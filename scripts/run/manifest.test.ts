@@ -92,11 +92,7 @@ describe('manifest', () => {
   });
 
   test('criteria parse from unchecked numbered items only', () => {
-    const md = '- [ ] 1. First.
-- [x] 2. Done already.
-- [ ] 3. Third.
-not a criterion
-';
+    const md = ['- [ ] 1. First.', '- [x] 2. Done already.', '- [ ] 3. Third.', 'not a criterion'].join('\n');
     expect(parseCriteria('base', md).map((c) => c.id)).toEqual(['base-1', 'base-3']);
   });
 
