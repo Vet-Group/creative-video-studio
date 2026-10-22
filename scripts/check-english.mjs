@@ -13,6 +13,7 @@ const TEXT = /\.(ts|tsx|mts|mjs|js|json|md|yml|yaml|sh|ps1|sql|toml|css|html)$|(
 const STRINGS_ALLOWED = [
   /^apps\/web\/src\//,
   /^packages\/db\/seed\/presets\.ts$/,
+  /^packages\/core\/src\/presets\.ts$/,
   /\.test\.tsx?$/,
   /^scripts\/preflight\.ts$/,
   /^scripts\/run\/(cli|manifest|preapproval|preflight)\.ts$/,

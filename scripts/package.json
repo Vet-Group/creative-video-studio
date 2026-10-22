@@ -7,6 +7,9 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "3.1150.0"
+    "@aws-sdk/client-s3": "3.1150.0",
+    "@cvs/core": "workspace:*",
+    "ffmpeg-static": "5.2.0",
+    "ffprobe-static": "3.1.0"
   }
 }

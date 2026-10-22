@@ -13,6 +13,8 @@ never a runtime dependency.
 | Path | What |
 |---|---|
 | `apps/web` | Next.js app: UI and route handlers, better-auth |
+| `apps/worker` | pg-boss consumer: submits jobs to the video providers and copies the output (skeleton until M.2) |
+| `packages/core` | Shared contracts: model config, provider adapter interface, presets |
 | `packages/db` | Drizzle schema, migrations, test database helper |
 | `scripts` | Preflight, the autonomous-run harness (`scripts/run`), repository checks |
 | `deploy/linux` | Server-side scripts for the VET host |

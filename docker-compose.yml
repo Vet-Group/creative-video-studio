@@ -1,6 +1,6 @@
 # Local data services for development. Ports avoid Ideas Hub (5433, 9300/9301, 3300),
 # POD Studio (54316, 19000/19001) and the other local services. Credentials are local-only placeholders.
-name: creative-video-studio
+name: ${COMPOSE_PROJECT_NAME:-creative-video-studio}
 
 services:
   postgres:
@@ -13,7 +13,7 @@ services:
       POSTGRES_PASSWORD: cvs-local-only
       POSTGRES_DB: cvs
     ports:
-      - "127.0.0.1:5435:5432"
+      - "127.0.0.1:${CVS_PG_PORT:-5435}:5432"
     volumes:
       - pg-data:/var/lib/postgresql/data
     healthcheck:
@@ -33,8 +33,8 @@ services:
       MINIO_ROOT_USER: cvs
       MINIO_ROOT_PASSWORD: cvs-local-only
     ports:
-      - "127.0.0.1:9400:9000"
-      - "127.0.0.1:9401:9001"
+      - "127.0.0.1:${CVS_S3_PORT:-9400}:9000"
+      - "127.0.0.1:${CVS_S3_CONSOLE_PORT:-9401}:9001"
     volumes:
       - minio-data:/data
     healthcheck:
