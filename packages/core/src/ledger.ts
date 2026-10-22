@@ -108,7 +108,8 @@ export async function reserve(tx: Queryable, jobId: string, estimateUsd: string 
 
 export type Settlement =
   | { status: 'succeeded'; costUsd: string | number; outputAssetId: string; posterAssetId: string | null }
-  | { status: 'failed'; costUsd: string | number; error: string };
+  /** `billed`: the provider ran and billed the job though we fail it (a clip we reject), so cost 0 keeps the estimate instead of meaning unbilled. */
+  | { status: 'failed'; costUsd: string | number; error: string; billed?: boolean };
 
 /** A running job reached the provider's final state: succeeded, or failed with the cost the provider reports (0 means unbilled). False when it is no longer running. */
 export async function settle(pool: LedgerPool, jobId: string, s: Settlement): Promise<boolean> {
@@ -116,7 +117,7 @@ export async function settle(pool: LedgerPool, jobId: string, s: Settlement): Pr
     const job = await lockJob(tx, jobId);
     const bal = await balance(tx, jobId);
     if (job.status !== 'running' || bal.final) return false;
-    const { kind, target } = closingRow(s.costUsd, bal.estimate, s.status === 'failed');
+    const { kind, target } = closingRow(s.costUsd, bal.estimate, s.status === 'failed' && !s.billed);
     await bookTo(tx, job, kind, target, bal.total);
     if (s.status === 'succeeded') {
       await tx.query(`update jobs set status = 'succeeded', output_asset_id = $2, poster_asset_id = $3, finished_at = now() where id = $1`, [jobId, s.outputAssetId, s.posterAssetId]);
