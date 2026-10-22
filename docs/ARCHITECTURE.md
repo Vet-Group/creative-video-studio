@@ -134,7 +134,7 @@ Every money event is a row in `cost_entries`. The ledger is the only place cost 
 
 | Model | Route | List price (2026-10-22) | Clip of 8 s |
 |---|---|---|---|
-| Kling o3 Pro (reference), 1080p, no audio | fal | $0.112–0.14/s | ~$0.90–1.12 |
+| Kling o3 Pro (reference), 1080p, no audio | fal | $0.112–0.14/s (the range spans fal and Kling direct; B.1 records the fal price) | ~$0.90–1.12 |
 | Seedance 2.5 (reference), 720p | Replicate | $0.2312/s | ~$1.85 |
 | Not a fallback: Veo 3.1 needs a new decision and budget (see the go/no-go gate) | Vertex / fal | $0.40/s | $3.20 |
 

@@ -46,7 +46,7 @@ Decision (the go/no-go gate):
 
 | Item | When |
 |---|---|
-| Work through the preflight checklist: fal and Replicate accounts prepaid (at most $60 in the bake-off month), the Lark OAuth app, the R2 bucket and key plus the restic password, a Cloudflare token for `vetgroup.net`, the first Admin email and password | Once, before the run; a missing item only skips its steps |
+| Work through the preflight checklist. Required: `gh` logged in and Docker running on this machine; without either the run does not start. Optional, each skipping only its own steps when missing: `ssh vet-linux`, fal and Replicate accounts prepaid (at most $60 in the bake-off month), the Lark OAuth app, the R2 bucket and key plus the restic password, a Cloudflare token for `vetgroup.net`, the first Admin email and password, and a Lark test message to the owner | Once, before the run |
 | Run `pnpm preflight`, then type the pre-approval sentence (`pnpm run:approve`) | Once, before the run; it covers the repository, spend, VET access and the deployment, for 14 days |
 | Nothing for the sample images: a fixed script copies them and an AI judge scores the clips | Milestone 1, step 5 |
 | Real monthly budget, if different from $200 | Any time; it is a setting |
