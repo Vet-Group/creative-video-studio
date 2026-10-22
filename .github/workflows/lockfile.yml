@@ -1,5 +1,5 @@
 # The conductor session cannot change the lockfile locally, so CI computes it and the main CI job then verifies it with --frozen-lockfile.
-# The account's artifact storage quota is full, so the result goes to a new scratch branch lockfile/<run id>, which the conductor copies from and deletes.
+# The account's artifact storage quota is full, so the result goes to a new scratch branch lockfile/<run id> holding only that file, which the conductor copies from and deletes.
 name: Lockfile
 
 on:
@@ -37,7 +37,7 @@ jobs:
           if git diff --quiet pnpm-lock.yaml; then echo "pnpm-lock.yaml is up to date"; exit 0; fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git switch -c "lockfile/$GITHUB_RUN_ID"
-          git commit -m "Update pnpm-lock.yaml." pnpm-lock.yaml
-          git push origin "lockfile/$GITHUB_RUN_ID"
+          # A parentless commit holding only the lockfile: GITHUB_TOKEN may not push history that touches workflow files.
+          tree=$(printf '100644 blob %s\tpnpm-lock.yaml\n' "$(git hash-object -w pnpm-lock.yaml)" | git mktree)
+          git push origin "$(git commit-tree "$tree" -m "Update pnpm-lock.yaml."):refs/heads/lockfile/$GITHUB_RUN_ID"
           echo "Published on lockfile/$GITHUB_RUN_ID"
