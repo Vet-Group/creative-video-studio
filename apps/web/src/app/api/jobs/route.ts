@@ -1,4 +1,5 @@
 import { reserve, withTransaction } from '@cvs/core/ledger';
+import { type CapRefusal, checkCaps } from '@cvs/core/limits';
 import { VIDEO_QUEUE, videoSendOptions } from '@cvs/core/queue';
 import { pool } from '@/lib/auth';
 import { boss } from '@/lib/queue';
@@ -6,22 +7,28 @@ import { guard } from '@/lib/session';
 
 const MAX_IMAGES = 4;
 const bad = (error: string) => Response.json({ error }, { status: 400 });
+/** Member-facing text for a Run a cap refused. */
+const CAP_MESSAGES: Record<CapRefusal, string> = {
+  daily_clips: 'Bạn đã dùng hết số clip trong ngày hôm nay',
+  monthly_usd: 'Đã hết ngân sách tháng của công ty',
+};
 
 /**
  * Create a video job: 1-4 input images the caller may use (their own, or the inputs of a succeeded Library clip for Reuse), an enabled
- * model, a preset, the ratio and duration the model allows, and an optional visible store. The job and its `estimate`
- * ledger row are written in one transaction; the pg-boss job is sent afterwards.
+ * model, a preset, the ratio and duration the model allows, and an optional visible store. The caps are checked and the job and its
+ * `estimate` ledger row are written in one transaction (429 when a cap refuses, nothing sent); the pg-boss job is sent afterwards.
+ * `retryOf` retries the caller's failed job once, with the original's team and store.
  */
 export async function POST(request: Request) {
   const g = await guard(request, 'member');
   if (g.error) return g.error;
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
-  const { assetIds, modelId, presetId, ratio, durationSec, storeId = null } = body ?? {};
+  const { assetIds, modelId, presetId, ratio, durationSec, storeId = null, retryOf = null } = body ?? {};
   if (!Array.isArray(assetIds) || assetIds.length < 1 || assetIds.length > MAX_IMAGES || !assetIds.every((a) => typeof a === 'string') || new Set(assetIds).size !== assetIds.length) {
     return bad(`assetIds must list 1 to ${MAX_IMAGES} different asset ids`);
   }
-  if (typeof modelId !== 'string' || typeof presetId !== 'string' || typeof ratio !== 'string' || !Number.isInteger(durationSec) || (storeId !== null && typeof storeId !== 'string')) {
-    return bad('modelId, presetId, ratio, durationSec (a whole number) and an optional storeId are required');
+  if (typeof modelId !== 'string' || typeof presetId !== 'string' || typeof ratio !== 'string' || !Number.isInteger(durationSec) || (storeId !== null && typeof storeId !== 'string') || (retryOf !== null && typeof retryOf !== 'string')) {
+    return bad('modelId, presetId, ratio, durationSec (a whole number), an optional storeId and an optional retryOf are required');
   }
   const userId = g.session.user.id;
 
@@ -40,20 +47,39 @@ export async function POST(request: Request) {
   }
   const preset = (await pool.query('select prompt from presets where id = $1 and enabled', [presetId])).rows[0];
   if (!preset) return bad('the preset does not exist or is not enabled');
-  if (storeId !== null && (await pool.query('select 1 from stores where id = $1 and not hidden', [storeId])).rowCount === 0) {
+  // A retry takes the original's store, even one that is hidden since, so a store in the body is not checked.
+  if (retryOf === null && storeId !== null && (await pool.query('select 1 from stores where id = $1 and not hidden', [storeId])).rowCount === 0) {
     return bad('the store does not exist or is hidden');
   }
 
   const id = crypto.randomUUID();
   const estimateUsd = (Number(model.usd_per_second) * (durationSec as number)).toFixed(4);
-  await withTransaction(pool, async (tx) => {
+  const refused = await withTransaction(pool, async (tx): Promise<Response | null> => {
+    // One writer at a time, so two Runs cannot both take the last daily slot or the last dollars of the month.
+    await tx.query(`select pg_advisory_xact_lock(hashtext('caps'))`);
+    let original: { team_id: string; store_id: string | null } | undefined;
+    if (retryOf !== null) {
+      const o = (await tx.query('select user_id, team_id, store_id, status, retry_of from jobs where id = $1', [retryOf])).rows[0];
+      if (!o) return Response.json({ error: 'the job to retry does not exist' }, { status: 404 });
+      if (o.user_id !== userId && g.session.user.role !== 'admin') return Response.json({ error: 'only the owner of a job may retry it' }, { status: 403 });
+      if (!['failed', 'timed_out', 'failed_unknown'].includes(o.status)) return Response.json({ error: 'only a failed job can be retried' }, { status: 409 });
+      if (o.retry_of !== null || (await tx.query('select 1 from jobs where retry_of = $1', [retryOf])).rowCount) {
+        return Response.json({ error: 'a job can be retried only once, and a retry cannot be retried' }, { status: 409 });
+      }
+      original = o;
+    }
+    // A mock job books 0 USD (see the ledger), so it adds nothing to the monthly cap.
+    const cap = await checkCaps(tx, userId, model.provider === 'mock' ? '0' : estimateUsd);
+    if (cap) return Response.json({ error: CAP_MESSAGES[cap] }, { status: 429 });
     await tx.query(
-      `insert into jobs (id, user_id, team_id, store_id, model, provider, preset_id, prompt, aspect, duration_s, input_asset_ids, is_mock)
-       values ($1, $2, (select team_id from users where id = $2), $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-      [id, userId, storeId, modelId, model.provider, presetId, preset.prompt, ratio, durationSec, assetIds, model.provider === 'mock'],
+      `insert into jobs (id, user_id, team_id, store_id, retry_of, model, provider, preset_id, prompt, aspect, duration_s, input_asset_ids, is_mock)
+       values ($1, $2, coalesce($3, (select team_id from users where id = $2)), $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+      [id, userId, original?.team_id ?? null, original ? original.store_id : storeId, retryOf, modelId, model.provider, presetId, preset.prompt, ratio, durationSec, assetIds, model.provider === 'mock'],
     );
     await reserve(tx, id, estimateUsd);
+    return null;
   });
+  if (refused) return refused;
   // The row is already queued: if the send fails, the worker's reconcile loop sends it later.
   try {
     await (await boss()).send(VIDEO_QUEUE, { jobId: id }, videoSendOptions(userId, id));
