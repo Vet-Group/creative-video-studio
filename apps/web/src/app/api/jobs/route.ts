@@ -8,7 +8,7 @@ const MAX_IMAGES = 4;
 const bad = (error: string) => Response.json({ error }, { status: 400 });
 
 /**
- * Create a video job: 1-4 input images the caller may use (their own, or the inputs of a Library clip for Reuse), an enabled
+ * Create a video job: 1-4 input images the caller may use (their own, or the inputs of a succeeded Library clip for Reuse), an enabled
  * model, a preset, the ratio and duration the model allows, and an optional visible store. The job and its `estimate`
  * ledger row are written in one transaction; the pg-boss job is sent afterwards.
  */
@@ -28,7 +28,7 @@ export async function POST(request: Request) {
   const usable = await pool.query(
     `select a.id from assets a
       where a.id = any($1::text[]) and a.deleted_at is null and a.kind = 'input'
-        and (a.owner_id = $2 or exists (select 1 from jobs j where a.id = any(j.input_asset_ids) and j.deleted_at is null and j.purged_at is null))`,
+        and (a.owner_id = $2 or exists (select 1 from jobs j where a.id = any(j.input_asset_ids) and j.status = 'succeeded' and j.deleted_at is null and j.purged_at is null))`,
     [assetIds, userId],
   );
   if (usable.rowCount !== assetIds.length) return bad('one or more assets do not exist or cannot be used');

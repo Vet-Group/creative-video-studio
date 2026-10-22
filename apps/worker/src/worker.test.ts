@@ -63,11 +63,11 @@ async function waitFor<T>(what: string, fn: () => Promise<T | undefined | false>
 }
 
 /** A queued job with its estimate booked (not yet sent to pg-boss). */
-async function newJob(userId: string, o: { prompt?: string; estimate?: string } = {}): Promise<string> {
+async function newJob(userId: string, o: { prompt?: string; estimate?: string; isMock?: boolean; provider?: string } = {}): Promise<string> {
   const id = randomUUID();
   await pool.query(
-    `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids) values ($1, $2, 'team-unassigned', 'mock-sample', 'mock', $3, '9:16', 5, '{}')`,
-    [id, userId, o.prompt ?? 'a product'],
+    `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, is_mock) values ($1, $2, 'team-unassigned', 'mock-sample', $4, $3, '9:16', 5, '{}', $5)`,
+    [id, userId, o.prompt ?? 'a product', o.provider ?? 'mock', o.isMock ?? false],
   );
   await withTransaction(pool, (tx) => reserve(tx, id, o.estimate ?? '1.5000'));
   return id;
@@ -147,8 +147,67 @@ describe('the mock lifecycle', () => {
     expect(await total(id)).toEqual({ usd: '1.5000', is_final: false });
     await waitFor('the late result', async () => (await total(id)).is_final);
     expect(await status(id)).toBe('timed_out');
-    expect(await total(id)).toEqual({ usd: '0.0000', is_final: true }); // the mock reports no charge
+    expect(await total(id)).toEqual({ usd: '1.5000', is_final: true }); // a late success with no reported cost keeps the estimate, as settle does
     expect((await job(id)).output_asset_id).toBeNull(); // a late result is not delivered
+  });
+
+  test('books 0 USD for a mock job, from the estimate to the settlement', async () => {
+    const id = await newJob('u1', { isMock: true, estimate: '1.5000' });
+    await start(counting(300));
+    await send(id, 'u1');
+    await waitFor('the job to succeed', async () => (await status(id)) === 'succeeded');
+    expect((await costs(id)).map((c) => [c.kind, c.usd])).toEqual([['estimate', '0.0000'], ['actual_adjustment', '0.0000']]);
+    expect(await total(id)).toEqual({ usd: '0.0000', is_final: true });
+  });
+
+  test('times out a running job whose provider has no adapter', async () => {
+    const id = await newJob('u2', { provider: 'fal' });
+    await pool.query(`update jobs set status = 'running', provider_job_id = 'fal:1', started_at = now() - interval '1 hour', claimed_by = 'gone' where id = $1`, [id]);
+    await start(counting(300), { runTimeoutMs: 60_000 });
+    await waitFor('the job to time out', async () => (await status(id)) === 'timed_out');
+    expect(await total(id)).toEqual({ usd: '1.5000', is_final: false });
+  });
+});
+
+describe('a submit that pg-boss expiry or an error would orphan', () => {
+  test('is not aborted by the pg-boss expiry of the handler', async () => {
+    counting.submits = 0;
+    const id = await newJob('u1');
+    // The provider takes 3 s to accept the job; pg-boss expires the handler after 1 s.
+    const slow = counting(300, (inner) => ({ ...inner, submit: async (req) => { await new Promise((r) => setTimeout(r, 3_000)); return inner.submit(req); } }));
+    await start(slow);
+    await boss.send(VIDEO_QUEUE, { jobId: id }, { ...videoSendOptions('u1', id), expireInSeconds: 1 });
+    await waitFor('the job to succeed', async () => (await status(id)) === 'succeeded');
+    expect(counting.submits).toBe(1);
+    expect((await job(id)).provider_job_id).toMatch(/^mock:/);
+  });
+
+  test('turns a submitting row of this worker that no submit holds into failed_unknown, keeping the estimate', async () => {
+    const id = await newJob('u3', { estimate: '2.5000' });
+    const w = await start(counting(300));
+    await pool.query(`update jobs set status = 'submitting', claimed_by = $2 where id = $1`, [id, w.id]);
+    await waitFor('failed_unknown', async () => {
+      await w.reconcile();
+      return (await status(id)) === 'failed_unknown';
+    });
+    expect(await total(id)).toEqual({ usd: '2.5000', is_final: false });
+  });
+
+  test('saves the provider job id even when the row was already marked failed_unknown, so it can be billed late', async () => {
+    counting.submits = 0;
+    const id = await newJob('u1');
+    let release!: () => void;
+    const gate = new Promise<void>((r) => { release = r; });
+    const held = counting(300, (inner) => ({ ...inner, submit: async (req) => { const out = await inner.submit(req); await gate; return out; } }));
+    await start(held);
+    await send(id, 'u1');
+    await waitFor('the submit', async () => counting.submits === 1 && (await status(id)) === 'submitting');
+    await pool.query(`update jobs set status = 'failed_unknown', error = 'lost', finished_at = now() where id = $1`, [id]);
+    release();
+    await waitFor('the provider job id', async () => (await job(id)).provider_job_id);
+    expect(await status(id)).toBe('failed_unknown');
+    await waitFor('the late bill', async () => (await total(id)).is_final);
+    expect(await total(id)).toEqual({ usd: '1.5000', is_final: true });
   });
 });
 

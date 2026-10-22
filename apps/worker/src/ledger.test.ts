@@ -124,6 +124,18 @@ describe('settle', () => {
     expect(await settle(pool, id, { status: 'failed', costUsd: 0, error: 'x' })).toBe(false);
     expect(await total(id)).toEqual({ usd: '1.0000', is_final: false });
   });
+
+  test('refuses a running job whose ledger is already closed', async () => {
+    const id = await reservedJob('1.0000', { status: 'running' });
+    await pool.query(
+      `insert into cost_entries (kind, usd, month, day, user_id, team_id, job_id, provider, model, is_final)
+       select 'actual_adjustment', 0, month, day, user_id, team_id, job_id, provider, model, true from cost_entries where job_id = $1`,
+      [id],
+    );
+    expect(await settle(pool, id, { status: 'succeeded', costUsd: 9, outputAssetId: await asset(), posterAssetId: null })).toBe(false);
+    expect(await statusOf(id)).toBe('running');
+    expect((await rowsOf(id)).map((r) => r.kind)).toEqual(['estimate', 'actual_adjustment']);
+  });
 });
 
 describe('release', () => {
@@ -146,10 +158,16 @@ describe('lateBill', () => {
     expect(await statusOf(id)).toBe('timed_out');
   });
 
-  test('releases the estimate when the provider reports no charge', async () => {
+  test('releases the estimate when the provider reports no charge for a failed job', async () => {
     const id = await reservedJob('2.0000', { status: 'timed_out' });
     expect(await lateBill(pool, id, 0)).toBe(true);
     expect(await total(id)).toEqual({ usd: '0.0000', is_final: true });
+  });
+
+  test('keeps the estimate of a late success that reports no cost', async () => {
+    const id = await reservedJob('2.0000', { status: 'failed_unknown' });
+    expect(await lateBill(pool, id, 0, true)).toBe(true);
+    expect(await total(id)).toEqual({ usd: '2.0000', is_final: true });
   });
 
   test('ignores a job that is still running', async () => {
@@ -218,8 +236,16 @@ describe('bookShared', () => {
   });
 
   test('requires a note on a manual adjustment', async () => {
-    await expect(bookShared(pool, { kind: 'manual_adjustment', usd: -1, month: '2026-10' })).rejects.toThrow(/cost_entries_manual_note_check/);
-    expect(await bookShared(pool, { kind: 'manual_adjustment', usd: -1, month: '2026-10', note: 'refund from the provider' })).toBe(true);
+    await expect(bookShared(pool, { kind: 'manual_adjustment', usd: -1, month: '2026-10', ref: 'adj-no-note' })).rejects.toThrow(/cost_entries_manual_note_check/);
+    expect(await bookShared(pool, { kind: 'manual_adjustment', usd: -1, month: '2026-10', ref: 'adj-refund', note: 'refund from the provider' })).toBe(true);
+  });
+
+  test('refuses a row without a ref, so a re-run cannot book it twice', async () => {
+    const before = (await pool.query('select count(*)::int as n from cost_entries')).rows[0].n;
+    for (const ref of ['', '  ', undefined]) {
+      await expect(bookShared(pool, { kind: 'bakeoff', usd: 1, month: '2026-10', provider: 'fal', ref } as unknown as Parameters<typeof bookShared>[1])).rejects.toThrow(/needs a ref/);
+    }
+    expect((await pool.query('select count(*)::int as n from cost_entries')).rows[0].n).toBe(before);
   });
 });
 

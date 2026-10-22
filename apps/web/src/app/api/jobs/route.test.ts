@@ -106,9 +106,18 @@ describe('POST /api/jobs', () => {
     expect((await pool.query(`select usd::text from cost_entries where job_id = $1`, [id])).rows).toEqual([{ usd: '0.0000' }]);
   });
 
-  test("lets another Member reuse the inputs of a Library clip but not an unused asset of someone else", async () => {
-    expect((await run(otherCookie, { ...base, assetIds: ['own-1'] })).status).toBe(201); // own-1 is an input of the owner's jobs
-    expect((await run(otherCookie, { ...base, assetIds: ['own-3'] })).status).toBe(400); // own-3 is in no job
+  test("lets another Member reuse the inputs of a succeeded Library clip but not those of an unfinished job or an unused asset", async () => {
+    const insertJob = (id: string, assets: string[], status: string) =>
+      pool.query(
+        `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, status) values ($1, $2, 'team-b', 'fal-test', 'fal', 'p', '9:16', 5, $3, $4)`,
+        [id, ownerId, assets, status],
+      );
+    await insertJob('queued-job', ['own-3'], 'queued');
+    expect((await run(otherCookie, { ...base, assetIds: ['own-3'] })).status).toBe(400); // the input of another user's queued job
+    await insertJob('clip-job', ['own-2'], 'succeeded');
+    expect((await run(otherCookie, { ...base, assetIds: ['own-2'] })).status).toBe(201); // the input of a Library clip
+    await pool.query(`update jobs set deleted_at = now() where id = 'clip-job'`);
+    expect((await run(otherCookie, { ...base, assetIds: ['own-2'] })).status).toBe(400); // the clip left the Library
     expect((await run(ownerCookie, { ...base, assetIds: ['theirs-1'] })).status).toBe(400);
   });
 

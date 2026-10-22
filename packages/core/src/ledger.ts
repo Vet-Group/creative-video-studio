@@ -114,8 +114,8 @@ export type Settlement =
 export async function settle(pool: LedgerPool, jobId: string, s: Settlement): Promise<boolean> {
   return withTransaction(pool, async (tx) => {
     const job = await lockJob(tx, jobId);
-    if (job.status !== 'running') return false;
     const bal = await balance(tx, jobId);
+    if (job.status !== 'running' || bal.final) return false;
     const { kind, target } = closingRow(s.costUsd, bal.estimate, s.status === 'failed');
     await bookTo(tx, job, kind, target, bal.total);
     if (s.status === 'succeeded') {
@@ -139,13 +139,13 @@ export async function release(pool: LedgerPool, jobId: string, error: string): P
   });
 }
 
-/** The provider reported a final cost for a job we had given up on (timed_out or failed_unknown). A cost of 0 means unbilled and releases the estimate. */
-export async function lateBill(pool: LedgerPool, jobId: string, costUsd: string | number): Promise<boolean> {
+/** The provider reported a final cost for a job we had given up on (timed_out or failed_unknown). A cost of 0 on a failed or canceled job means unbilled and releases the estimate; a late success keeps the larger of the cost and the estimate, as `settle` does. */
+export async function lateBill(pool: LedgerPool, jobId: string, costUsd: string | number, succeeded = false): Promise<boolean> {
   return withTransaction(pool, async (tx) => {
     const job = await lockJob(tx, jobId);
     const bal = await balance(tx, jobId);
     if (bal.final || bal.rows === 0 || !['timed_out', 'failed_unknown'].includes(job.status)) return false;
-    const { kind, target } = closingRow(costUsd, bal.estimate, true);
+    const { kind, target } = closingRow(costUsd, bal.estimate, !succeeded);
     await bookTo(tx, job, kind === 'release' ? 'release' : 'late_bill', target, bal.total);
     return true;
   });
@@ -177,14 +177,15 @@ export async function reassignStore(pool: LedgerPool, jobId: string, storeId: st
   });
 }
 
-/** A row with no job: one bake-off row per provider, or an Admin's correction (the note is required). `ref` makes it idempotent. False when the ref was booked before. */
+/** A row with no job: one bake-off row per provider, or an Admin's correction (the note is required). The required `ref` makes it idempotent. False when the ref was booked before. */
 export async function bookShared(
   db: Queryable,
-  e: { kind: SharedKind; usd: string | number; month: string; provider?: string; model?: string; ref?: string; note?: string },
+  e: { kind: SharedKind; usd: string | number; month: string; provider?: string; model?: string; ref: string; note?: string },
 ): Promise<boolean> {
+  if (!e.ref?.trim()) throw new Error('a shared cost row needs a ref');
   const { rowCount } = await db.query(
     `insert into cost_entries (kind, usd, month, provider, model, is_final, ref, note) values ($1, $2, $3, $4, $5, true, $6, $7) on conflict (ref) do nothing`,
-    [e.kind, fmt(units(e.usd)), e.month, e.provider ?? null, e.model ?? null, e.ref ?? null, e.note ?? null],
+    [e.kind, fmt(units(e.usd)), e.month, e.provider ?? null, e.model ?? null, e.ref, e.note ?? null],
   );
   return rowCount === 1;
 }

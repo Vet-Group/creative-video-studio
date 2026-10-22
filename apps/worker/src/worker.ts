@@ -124,15 +124,24 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
 
   /** In one short transaction under an advisory lock: queued -> submitting when the user and the app are under their limits. */
   async function admit(jobId: string): Promise<'claimed' | 'wait' | 'gone'> {
-    return withTransaction(pool, async (tx) => {
+    // In the set before the row can read as submitting, so failLostSubmits never takes a job that is only about to be submitted.
+    let added = false;
+    const claimed = await withTransaction(pool, async (tx) => {
       await tx.query(`select pg_advisory_xact_lock(hashtext('video-admission'))`);
       const job = (await tx.query('select status, user_id from jobs where id = $1', [jobId])).rows[0];
       if (job?.status !== 'queued') return 'gone';
       const n = (await tx.query(`select (count(*) filter (where user_id = $1))::int as mine, count(*)::int as total from jobs where status in ('submitting', 'running')`, [job.user_id])).rows[0];
       if (n.mine >= o.perUserLimit || n.total >= o.globalLimit) return 'wait';
-      await tx.query(`update jobs set status = 'submitting', claimed_by = $2 where id = $1`, [jobId, id]);
-      return 'claimed';
+      added = true;
+      submitting.add(jobId);
+      const { rowCount } = await tx.query(`update jobs set status = 'submitting', claimed_by = $2 where id = $1 and status = 'queued'`, [jobId, id]);
+      return rowCount ? 'claimed' : 'gone';
+    }).catch((e) => {
+      if (added) submitting.delete(jobId);
+      throw e;
     });
+    if (added && claimed !== 'claimed') submitting.delete(jobId);
+    return claimed;
   }
 
   /** Calls the provider once. A failure before the call is a clean release; once the call is made, any failure may have started a billed job. */
@@ -165,7 +174,12 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
         await pool.query(`update jobs set status = 'failed_unknown', error = $2, finished_at = now() where id = $1 and status = 'submitting'`, [jobId, `submit failed: ${e instanceof Error ? e.message : e}`]);
         return;
       }
-      await pool.query(`update jobs set provider_job_id = $2, status = 'running', started_at = now() where id = $1 and status = 'submitting'`, [jobId, providerJobId]);
+      // The id is saved whatever the row says now (even failed_unknown), so the provider's late result can still be billed.
+      await pool.query(
+        `update jobs set provider_job_id = $2, status = case when status = 'submitting' then 'running' else status end,
+                started_at = case when status = 'submitting' then now() else started_at end where id = $1`,
+        [jobId, providerJobId],
+      );
     } finally {
       submitting.delete(jobId);
     }
@@ -181,7 +195,8 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
       if (admission === 'claimed') break;
       await sleep(o.admissionSleepMs, signal);
     }
-    await submit(jobId, signal);
+    // Only a shutdown may cut a submit short: pg-boss's expiry covers the admission wait too, and an aborted submit loses a billed provider job.
+    await submit(jobId, stopping.signal);
     // Stay active until the job is final, so pg-boss's own limits cover the time the provider runs it.
     while (!signal.aborted) {
       const status = (await pool.query('select status from jobs where id = $1', [jobId])).rows[0]?.status;
@@ -241,13 +256,14 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
     }
   }
 
-  /** A submit whose worker is gone: the provider may have started the job, so it keeps its estimate (failed_unknown). */
+  /** A submit nobody is making any more (its worker is gone, or this worker lost it to an error): the provider may have started the job, so it keeps its estimate (failed_unknown). */
   async function failLostSubmits(): Promise<void> {
     await pool.query(
       `update jobs set status = 'failed_unknown', error = 'the worker stopped while submitting; the provider may have started the job', finished_at = now()
         where status = 'submitting' and provider_job_id is null and not (id = any($1::text[]))
-          and not exists (select 1 from worker_heartbeat h where h.worker_id = jobs.claimed_by and h.beat_at > now() - ($2::float8 * interval '1 millisecond'))`,
-      [[...submitting], o.heartbeatStaleMs],
+          and (claimed_by = $3
+            or not exists (select 1 from worker_heartbeat h where h.worker_id = jobs.claimed_by and h.beat_at > now() - ($2::float8 * interval '1 millisecond')))`,
+      [[...submitting], o.heartbeatStaleMs, id],
     );
   }
 
@@ -259,15 +275,15 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
     for (const row of rows) {
       try {
         const provider = providers[row.provider];
-        if (!provider) continue;
         const pj = await providerJob(row);
-        const status = await provider.status(pj);
+        // Without an adapter the job can only time out.
+        const status = provider ? await provider.status(pj) : { state: 'running' as const };
         if (status.state === 'succeeded') await deliver(row, status.outputUrl, status.costUsd);
         else if (status.state === 'failed' || status.state === 'canceled') await settle(pool, row.id, { status: 'failed', costUsd: status.costUsd, error: status.error });
         else if (row.expired) {
           // The estimate stays counted until the provider's final state is known.
           const { rowCount } = await pool.query(`update jobs set status = 'timed_out', error = 'timed out', finished_at = now() where id = $1 and status = 'running'`, [row.id]);
-          if (rowCount) await provider.cancel(pj).catch((e) => log(`cancel ${row.id}`, e));
+          if (rowCount && provider) await provider.cancel(pj).catch((e) => log(`cancel ${row.id}`, e));
         }
       } catch (e) {
         log(`running job ${row.id}`, e);
@@ -287,7 +303,7 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
         if (provider && row.provider_job_id) {
           const status = await provider.status(await providerJob(row));
           if (status.state === 'succeeded' || status.state === 'failed' || status.state === 'canceled') {
-            await lateBill(pool, row.id, status.costUsd);
+            await lateBill(pool, row.id, status.costUsd, status.state === 'succeeded');
             continue;
           }
         }
