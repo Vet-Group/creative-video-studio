@@ -1,0 +1,17 @@
+{
+  "name": "@cvs/worker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "3.1150.0",
+    "@cvs/core": "workspace:*",
+    "@cvs/db": "workspace:*",
+    "ffmpeg-static": "5.2.0",
+    "ffprobe-static": "3.1.0",
+    "pg-boss": "12.37.0"
+  }
+}
