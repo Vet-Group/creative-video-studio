@@ -102,7 +102,8 @@ describe.skipIf(!hasBash)('cvs-backup (needs bash only)', { timeout: 30_000 }, (
     const r = run([], { CVS_RESTIC_PASSWORD: '' });
     expect(r.status).not.toBe(0);
     expect(r.out).toContain('failed at config');
-    expect(run([]).out).not.toContain(baseEnv.CVS_RESTIC_PASSWORD);
+    // Stop at the disk check: past it, restic runs in Docker and leaves root-owned files on a Linux runner.
+    expect(run([], { CVS_MIN_FREE_PERCENT: '101' }).out).not.toContain(baseEnv.CVS_RESTIC_PASSWORD);
   });
 });
 
