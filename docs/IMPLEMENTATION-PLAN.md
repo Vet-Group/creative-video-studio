@@ -26,7 +26,7 @@ Order matters. Nothing costs money until step 1.4.
 4. **Owner action:** create and fund the fal and Replicate accounts, and put the keys in the server `.env`. The keys never go into chat. The plan collects this in a preflight checklist.
 5. **Run** a canary (one clip per model, about $3), then the rest of 10 sample images × 2 models = 20 clips, at 9:16, 8 s, with one fixed safe preset. A fixed script copies the 10 images read-only from POD Studio production (5 mockups, 5 product photos, at least 2 with small text) into a folder outside the repo. The run is guarded in code:
    - a hard stop at $40 actual spend, counting the canary, any extra round and the later server smoke clip;
-   - no retries; a failed clip is logged with its reason;
+   - no retries; every job is logged to `jobs.jsonl`;
    - a rerun resumes and never submits the same clip twice.
 6. **Scoring:** an AI judge scores each clip blind against the 5 faults, with a frame-difference measure for flicker and judder. Results go into `docs/BAKEOFF.md`, with the pass rate and its Wilson 95% interval, the cost per clip and the time each clip took.
 
