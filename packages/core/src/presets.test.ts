@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { BAKEOFF_PRESET, PRESETS } from './presets';
+import { BAKEOFF_PRESET, KEEP, PRESETS } from './presets';
 
 test('has six presets with unique ids', () => {
   expect(PRESETS).toHaveLength(6);
@@ -16,4 +16,8 @@ test('labels are non-empty and prompts are ASCII-only', () => {
     expect(p.label.trim()).not.toBe('');
     expect(p.prompt).toMatch(/^[\x20-\x7e]+$/);
   }
+});
+
+test('every prompt tells the model to keep the product unchanged', () => {
+  for (const p of PRESETS) expect(p.prompt).toContain(KEEP);
 });

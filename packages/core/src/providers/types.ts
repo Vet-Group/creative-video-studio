@@ -9,17 +9,22 @@ export interface SubmitRequest {
   durationSec: number;
 }
 
-export interface ProviderStatus {
-  state: 'queued' | 'running' | 'succeeded' | 'failed';
-  outputUrl?: string;
-  error?: string;
-  costUsd?: number;
-  costSource?: 'reported' | 'estimate';
+/** fal's queue URLs include the model endpoint, so polling needs the model as well as the id. */
+export interface ProviderJob {
+  providerJobId: string;
+  model: ModelConfig;
 }
+
+export type CostSource = 'reported' | 'estimate';
+
+export type ProviderStatus =
+  | { state: 'queued' | 'running' }
+  | { state: 'succeeded'; outputUrl: string; costUsd: number; costSource: CostSource }
+  | { state: 'failed' | 'canceled'; error: string; costUsd: number; costSource: CostSource };
 
 export interface VideoProvider {
   submit(req: SubmitRequest): Promise<{ providerJobId: string }>;
-  status(providerJobId: string): Promise<ProviderStatus>;
+  status(job: ProviderJob): Promise<ProviderStatus>;
   // fal cannot cancel a running job, so its adapter returns { supported: false }.
-  cancel(providerJobId: string): Promise<{ supported: boolean }>;
+  cancel(job: ProviderJob): Promise<{ supported: boolean }>;
 }

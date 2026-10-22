@@ -70,7 +70,7 @@ Layout [proposed]: a pnpm workspace with `apps/web`, `apps/worker` and `packages
 
 ### Provider adapter
 
-The adapter interface is `submit(input) → providerJobId`, `status(id) → {state, outputUrl?, costUsd?, costSource?, error?}` and `cancel(id)`. `costSource` is `reported` or `estimate`. For fal, `cancel` is a no-op that returns `{supported: false}`. Each model carries its own limits: the allowed ratios, durations, maximum number of images and output resolution (at least 720p), plus a price per second used for the estimate.
+The adapter interface (`packages/core/src/providers/types.ts`) is `submit(input) → providerJobId`, `status({providerJobId, model}) → {state, …}` and `cancel({providerJobId, model})`; the model is passed because fal's queue URLs include the model endpoint. `state` is `queued`, `running`, `succeeded` (with `outputUrl`), `failed` or `canceled` (with `error`); every final state carries `costUsd` and `costSource`, which is `reported` or `estimate`. For fal, `cancel` is a no-op that returns `{supported: false}`. Each model carries its own limits: the allowed ratios, durations, maximum number of images and output resolution (at least 720p), plus a price per second used for the estimate.
 
 ## Model picker and pass rate
 

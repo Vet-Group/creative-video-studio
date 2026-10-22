@@ -4,8 +4,6 @@ packages:
   - scripts
 # Exact versions only, as in Ideas Hub.
 saveExact: true
-# Lets `${VAR:-default}` work in package scripts on Windows too.
-shellEmulator: true
 # Prebuilt binaries come as optional platform packages; their install scripts only re-check them.
 allowBuilds:
   esbuild: false

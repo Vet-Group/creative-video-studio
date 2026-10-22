@@ -7,9 +7,10 @@ export interface Preset {
   isBakeoffSafe: boolean;
 }
 
-const KEEP =
+// Audio is off through each adapter's request parameter, not through this text.
+export const KEEP =
   'Keep the product, its shape, colours and any printed text exactly unchanged. Do not add any text, logos or watermarks. ' +
-  'No people\'s faces unless asked. Smooth, stable camera. No audio.';
+  'No faces. Smooth, stable camera.';
 
 export const PRESETS: Preset[] = [
   {
@@ -21,7 +22,7 @@ export const PRESETS: Preset[] = [
   {
     id: 'slow-orbit',
     label: 'Xoay quanh chậm',
-    prompt: `The camera slowly orbits around the product, showing it from a few angles on a clean background. ${KEEP}`,
+    prompt: `The camera moves in a slow, small arc in front of the product on a clean background, showing only the sides visible in the image. ${KEEP}`,
     isBakeoffSafe: false,
   },
   {
@@ -45,7 +46,7 @@ export const PRESETS: Preset[] = [
   {
     id: 'handheld-product',
     label: 'Cầm trên tay',
-    prompt: `A hand holds the product and turns it slightly toward the camera in soft indoor light, with subtle hand-held motion. Show only the hand, never a face. ${KEEP}`,
+    prompt: `A hand holds the product steady, facing the camera as in the image, in soft indoor light with subtle hand-held motion. Show only the hand. ${KEEP}`,
     isBakeoffSafe: false,
   },
 ];
