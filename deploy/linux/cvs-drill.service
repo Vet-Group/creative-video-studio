@@ -1,0 +1,9 @@
+# Root user unit. Restores the latest snapshot into a scratch database and MinIO and compares it with the snapshot's counts.txt.
+[Unit]
+Description=Creative Video Studio restore drill
+
+[Service]
+Type=oneshot
+EnvironmentFile=%h/.config/creative-video-studio/backup.env
+ExecStart=/opt/creative-video-studio/deploy/linux/cvs-backup --drill
+TimeoutStartSec=3h

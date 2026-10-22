@@ -1,0 +1,204 @@
+#!/usr/bin/env bash
+# Usage: cvs-backup [--drill | --weekly-copy]
+#   (none)         nightly: pg_dump -Fc + counts.txt + the MinIO volume into the LOCAL restic repo, keep 14 dailies.
+#   --drill        restore the latest snapshot into a scratch DB and a scratch MinIO and compare it with counts.txt.
+#   --weekly-copy  copy the latest snapshot to the R2 repo (CVS_R2_*), keep 8 weeklies. Needs R2 credentials.
+# Adapted from ideas-hub scripts/linux/ideashub-backup. Acts only on its own compose project (CVS_COMPOSE_PROJECT).
+# Env (defaults): CVS_COMPOSE_PROJECT (creative-video-studio), CVS_BACKUP_DIR (/opt/creative-video-studio/backups),
+# CVS_STATE_DIR (~/.local/state/creative-video-studio), CVS_DB_NAME / CVS_DB_USER (cvs), CVS_S3_BUCKET (.env S3_BUCKET),
+# CVS_MIN_FREE_PERCENT (15), CVS_RESTIC_PASSWORD or CVS_RESTIC_PASSWORD_FILE, CVS_R2_REPOSITORY / _ACCESS_KEY_ID / _SECRET_ACCESS_KEY.
+set -Eeuo pipefail
+# Git Bash must not rewrite the container paths passed to docker; harmless on Linux.
+export MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*'
+repo="${CVS_REPO:-$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/../.." && pwd)}"
+project="${CVS_COMPOSE_PROJECT:-creative-video-studio}"
+backup_dir="${CVS_BACKUP_DIR:-/opt/creative-video-studio/backups}"
+state="${CVS_STATE_DIR:-$HOME/.local/state/creative-video-studio}"
+db="${CVS_DB_NAME:-cvs}"
+db_user="${CVS_DB_USER:-cvs}"
+min_free="${CVS_MIN_FREE_PERCENT:-15}"
+staging="$backup_dir/staging"
+restic_dir="$backup_dir/restic"
+restic_image="restic/restic:0.19.1@sha256:136600b6ff6843d61d355f7f71f460a166429f35de6fd11b568fece3c9a4d510"
+restic_host=cvs
+cache_volume="${CVS_RESTIC_CACHE_VOLUME:-${project}_restic-cache}"
+check_db="${db}_restore_check"
+drill_name="${project}-drill-minio"
+drill_volume="${project}_drill-minio"
+mkdir -p "$state"
+exec > >(tee -a "$state/backup.log") 2>&1
+say() { printf '%s [backup] %s\n' "$(date -u +%FT%TZ)" "$*"; }
+fail() { # $1 = stage, $2 = short error; the only failure path
+  say "failed at $1: $2"
+  exit 1
+}
+native() { cygpath -m "$1" 2> /dev/null || printf '%s' "$1"; } # host path in the form docker.exe expects
+mode=backup
+case "${1:-}" in
+  --drill) mode=drill ;;
+  --weekly-copy) mode=weekly ;;
+  "") ;;
+  -h | --help) awk 'NR > 1 { if (/^#/) print; else exit }' "$0"; exit 0 ;;
+  *) awk 'NR > 1 { if (/^#/) print; else exit }' "$0" >&2; exit 2 ;;
+esac
+
+# Config checks first: they need neither docker nor the stack.
+pw=()
+if [ -n "${CVS_RESTIC_PASSWORD:-}" ]; then
+  # Passed to docker by name, so it never shows on a command line.
+  export RESTIC_PASSWORD="$CVS_RESTIC_PASSWORD" RESTIC_FROM_PASSWORD="$CVS_RESTIC_PASSWORD"
+  pw=(-e RESTIC_PASSWORD -e RESTIC_FROM_PASSWORD)
+elif [ -r "${CVS_RESTIC_PASSWORD_FILE:-}" ]; then
+  pw=(-e RESTIC_PASSWORD_FILE=/run/restic-password -e RESTIC_FROM_PASSWORD_FILE=/run/restic-password
+    -v "$(native "$CVS_RESTIC_PASSWORD_FILE"):/run/restic-password:ro")
+else
+  fail config "set CVS_RESTIC_PASSWORD, or CVS_RESTIC_PASSWORD_FILE to a readable file"
+fi
+if [ "$mode" = weekly ]; then
+  for v in CVS_R2_REPOSITORY CVS_R2_ACCESS_KEY_ID CVS_R2_SECRET_ACCESS_KEY; do
+    [ -n "${!v:-}" ] || fail config "weekly copy needs $v; the R2 bucket and key are not set up, so no weekly copy runs"
+  done
+  export RESTIC_REPOSITORY="$CVS_R2_REPOSITORY" AWS_ACCESS_KEY_ID="$CVS_R2_ACCESS_KEY_ID" AWS_SECRET_ACCESS_KEY="$CVS_R2_SECRET_ACCESS_KEY"
+fi
+
+# Refuse when the backup filesystem has less than min_free percent free.
+mkdir -p "$backup_dir"
+free="$(df -Pk "$backup_dir" | awk 'NR == 2 { printf "%.1f", $4 * 100 / $2 }')" || fail disk "df failed for $backup_dir"
+awk -v f="$free" -v t="$min_free" 'BEGIN { exit !(f < t) }' && fail disk "only $free% free on $backup_dir, below the $min_free% minimum"
+
+cd "$repo"
+compose=(docker compose -p "$project" -f "$(native "$repo/docker-compose.yml")")
+bucket="${CVS_S3_BUCKET:-$(sed -n 's/^S3_BUCKET=//p' .env 2> /dev/null | tr -d '\r"')}" || true
+bucket="${bucket:-cvs-media}"
+# Backup, drill and deploys share one lock. Linux always has flock; without it (Git Bash) only an explicit opt-out proceeds.
+if command -v flock > /dev/null; then
+  exec 9> "$state/ops.lock"
+  flock -w 2400 9 || fail lock "ops.lock still held after 40 minutes"
+elif [ "${CVS_ALLOW_NO_FLOCK:-}" = 1 ]; then
+  say "warning: flock is missing, running without the ops lock"
+else
+  fail lock "flock is missing (set CVS_ALLOW_NO_FLOCK=1 only for a local test)"
+fi
+mounts=()
+renv=(-e RESTIC_REPOSITORY=/repo)
+[ "$mode" != weekly ] || renv=(-e RESTIC_REPOSITORY -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_DEFAULT_REGION=auto -e RESTIC_FROM_REPOSITORY=/repo)
+restic() {
+  docker run --rm --cpus 1 --memory 1g "${renv[@]}" "${pw[@]}" \
+    -e RESTIC_CACHE_DIR=/cache -v "$cache_volume:/cache" -v "$(native "$restic_dir"):/repo" "${mounts[@]}" "$restic_image" "$@"
+}
+last_line() { printf '%s' "$1" | tr -d '\r' | sed '/^$/d' | tail -n 1; }
+mc_in() { docker exec "$1" sh -c 'MC_HOST_ih="http://$MINIO_ROOT_USER:$MINIO_ROOT_PASSWORD@127.0.0.1:9000" exec mc "$@"' mc "${@:2}"; }
+bucket_counts() {
+  mc_in "$1" ls --recursive --json "ih/$bucket" |
+    awk '/"type":"file"/ { n++; if (match($0, /"size":[0-9]+/)) b += substr($0, RSTART + 7, RLENGTH - 7) } END { printf "%d %.0f\n", n, b }'
+}
+# stdin: pg_restore --data-only text. Prints "rows <table> <n>" per table and "sum <table> <usd>" for cost_entries.
+dump_counts() {
+  awk '
+    /^COPY / {
+      t = $2; n = 0; col = 0; s = 0
+      if (t ~ /(^|\.)cost_entries$/) {
+        if (match($0, /\(.*\)/)) {
+          k = split(substr($0, RSTART + 1, RLENGTH - 2), cols, /, /)
+          for (i = 1; i <= k; i++) if (cols[i] == "usd") col = i
+        }
+        if (!col) { print "cost_entries has no usd column" > "/dev/stderr"; exit 3 }
+      }
+      next
+    }
+    t != "" && /^\\\.$/ { print "rows", t, n; if (col) printf "sum %s %.6f\n", t, s; t = ""; col = 0; next }
+    t != "" { n++; if (col) { split($0, f, "\t"); s += f[col] } }
+  '
+}
+snapshot_id() {
+  local out id
+  out="$(restic snapshots --host "$restic_host" --latest 1 --json 2>&1)" || { printf '%s\n' "$out" >&2; return 1; }
+  id="$(printf '%s' "$out" | grep -o '"short_id":"[0-9a-f]*"' | head -n 1 | cut -d'"' -f4)" || true
+  [ -n "$id" ] || return 1
+  printf '%s' "$id"
+}
+
+if [ "$mode" = backup ]; then
+  [ ! -e "$state/restore-failed" ] || fail sentinel "$state/restore-failed exists; no backup until a person restores the database"
+  mkdir -p "$restic_dir"
+  out="$(restic cat config 2>&1)" || { out="$(restic init 2>&1)" || { printf '%s\n' "$out"; fail init "$(last_line "$out")"; }; }
+  rm -rf "$staging"; mkdir -p "$staging"
+  "${compose[@]}" exec -T postgres pg_dump -U "$db_user" -d "$db" -Fc > "$staging/cvs.dump" || fail dump "pg_dump failed"
+  "${compose[@]}" exec -T postgres pg_restore --data-only -f - < "$staging/cvs.dump" | dump_counts \
+    > "$staging/counts.txt" || fail counts "reading the dump's row counts failed"
+  grep -q '^rows ' "$staging/counts.txt" || fail counts "the dump holds no table"
+  minio="$("${compose[@]}" ps -q minio)" || minio=""
+  [ -n "$minio" ] || fail counts "the minio container is not running"
+  objects="$(bucket_counts "$minio")" || fail counts "listing bucket $bucket failed"
+  echo "objects $bucket $objects" >> "$staging/counts.txt"
+  mounts=(-v "$(native "$staging"):/backup/staging:ro" -v "${project}_minio-data:/backup/minio:ro")
+  out="$(restic backup --host "$restic_host" /backup 2>&1)" || { printf '%s\n' "$out"; fail backup "$(last_line "$out")"; }
+  mounts=()
+  prune=(); [ "$(date +%u)" != 7 ] || prune=(--prune)
+  out="$(restic forget --host "$restic_host" --keep-daily 14 "${prune[@]}" 2>&1)" || { printf '%s\n' "$out"; fail forget "$(last_line "$out")"; }
+  rm -rf "$staging"; say "backup done${prune:+ (pruned)}"; exit 0
+fi
+
+if [ "$mode" = weekly ]; then
+  # The local repo is the source; the destination is the R2 repo (RESTIC_REPOSITORY).
+  renv_r2=("${renv[@]}")
+  renv=(-e RESTIC_REPOSITORY=/repo)
+  snap="$(snapshot_id)" || fail weekly "no snapshot of host $restic_host in the local repository"
+  renv=("${renv_r2[@]}")
+  out="$(restic cat config 2>&1)" || {
+    out="$(restic init --from-repo /repo --copy-chunker-params 2>&1)" || { printf '%s\n' "$out"; fail weekly "$(last_line "$out")"; }
+  }
+  out="$(restic copy "$snap" 2>&1)" || { printf '%s\n' "$out"; fail weekly "$(last_line "$out")"; }
+  out="$(restic forget --host "$restic_host" --keep-weekly 8 --prune 2>&1)" || { printf '%s\n' "$out"; fail weekly "$(last_line "$out")"; }
+  say "weekly copy of snapshot $snap done"; exit 0
+fi
+
+# --drill. Scratch names are fixed per compose project; the lock keeps two drills apart and each run clears leftovers first.
+cleanup() {
+  "${compose[@]}" exec -T postgres dropdb -U "$db_user" --if-exists --force "$check_db" || say "warning: could not drop $check_db"
+  docker rm -f "$drill_name" > /dev/null 2>&1 || true
+  docker volume rm -f "$drill_volume" > /dev/null 2>&1 || true
+}
+cleanup; trap cleanup EXIT
+snap="$(snapshot_id)" || fail drill "no snapshot of host $restic_host in the repository"
+expected="$(restic dump "$snap" /backup/staging/counts.txt)" || fail drill "counts.txt not in snapshot $snap"
+minio="$("${compose[@]}" ps -q minio)" || minio=""
+[ -n "$minio" ] || fail drill "the minio container is not running"
+minio_image="$(docker inspect --format '{{.Config.Image}}' "$minio")" || fail drill "cannot read the minio image"
+"${compose[@]}" exec -T postgres createdb -U "$db_user" -O "$db_user" "$check_db" || fail drill "createdb $check_db failed"
+restic dump "$snap" /backup/staging/cvs.dump | "${compose[@]}" exec -T postgres pg_restore -U "$db_user" -d "$check_db" --no-owner --exit-on-error || fail drill "pg_restore of snapshot $snap failed"
+# Test-only fault injection: SQL run on the scratch DB (never the live one) before the comparison.
+if [ -n "${CVS_DRILL_FAULT_SQL:-}" ]; then
+  "${compose[@]}" exec -T postgres psql -U "$db_user" -d "$check_db" -v ON_ERROR_STOP=1 -c "$CVS_DRILL_FAULT_SQL" < /dev/null || fail drill "the fault SQL failed"
+fi
+mounts=(-v "$drill_volume:/target")
+out="$(restic restore "$snap:/backup/minio" --target /target 2>&1)" || { printf '%s\n' "$out"; fail drill "$(last_line "$out")"; }
+mounts=()
+MINIO_ROOT_USER=drill MINIO_ROOT_PASSWORD="$(head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+export MINIO_ROOT_USER MINIO_ROOT_PASSWORD
+docker run -d --name "$drill_name" --user 0 --cpus 0.5 --memory 512m -e MINIO_ROOT_USER -e MINIO_ROOT_PASSWORD -v "$drill_volume:/data" "$minio_image" server /data > /dev/null || fail drill "the temporary MinIO did not start"
+for ((i = 0; i < 30; i++)); do mc_in "$drill_name" ready ih > /dev/null 2>&1 && break; sleep 2; done
+psql_check() { "${compose[@]}" exec -T postgres psql -U "$db_user" -d "$check_db" -AtX -v ON_ERROR_STOP=1 -c "$1" 2>&1 < /dev/null; }
+diffs=0
+report() { # $1 = got, $2 = want, $3.. = label
+  local got="$1" want="$2"; shift 2
+  if [ "$got" = "$want" ]; then echo "ok   $* $got"; else echo "DIFF $* restored ${got//$'\n'/ }, snapshot $want"; diffs=$((diffs + 1)); fi
+}
+while read -r kind name n bytes; do
+  case "$kind" in
+    rows) report "$(psql_check "select count(*) from $name" || echo error)" "$n" "$kind" "$name" ;;
+    sum) # shortcut: money is compared to 0.0005, since awk adds doubles; tighten if usd ever needs exact equality
+      got="$(psql_check "select coalesce(sum(usd), 0) from $name" || echo error)"
+      if awk -v a="$got" -v b="$n" 'BEGIN { d = a - b; if (d < 0) d = -d; exit !(d < 0.0005) }' 2> /dev/null; then echo "ok   $kind $name $got"
+      else echo "DIFF $kind $name restored $got, snapshot $n"; diffs=$((diffs + 1)); fi ;;
+    objects) report "$(bucket_counts "$drill_name" 2>&1 || echo error)" "$n $bytes" "$kind" "$name" ;;
+    *) continue ;;
+  esac
+done <<< "$expected"
+# Tables that arrive later (jobs, cost_entries) must be absent on both sides, or present on both.
+for t in users jobs assets cost_entries; do
+  want=absent; ! grep -q "^rows public\\.$t " <<< "$expected" || want=present
+  report "$(psql_check "select case when to_regclass('public.$t') is null then 'absent' else 'present' end" || echo error)" "$want" presence "$t"
+done
+[ "$diffs" = 0 ] || fail drill "$diffs line(s) of snapshot $snap differ from its counts.txt"
+say "drill of snapshot $snap ok"
