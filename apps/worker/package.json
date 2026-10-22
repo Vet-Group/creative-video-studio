@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "start": "tsx src/index.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests"
   },
@@ -13,5 +14,8 @@
     "ffmpeg-static": "5.2.0",
     "ffprobe-static": "3.1.0",
     "pg-boss": "12.37.0"
+  },
+  "devDependencies": {
+    "tsx": "4.23.15"
   }
 }

@@ -1,0 +1,124 @@
+// Integration test of migration 0002 on a disposable database (needs the compose Postgres: `pnpm services:up`).
+import pg from 'pg';
+import { afterAll, beforeAll, describe, expect, test } from 'vitest';
+import { PRESETS } from '../../core/src/presets';
+import { createTestDatabase } from './testing';
+
+const testDb = await createTestDatabase();
+const pool = new pg.Pool({ connectionString: testDb.url, max: 2 });
+
+afterAll(async () => {
+  await pool.end();
+  await testDb.drop();
+});
+
+let seq = 0;
+const next = () => `t${++seq}`;
+
+async function insertUser(): Promise<string> {
+  const id = next();
+  await pool.query(`insert into users (id, email, name) values ($1, $2, $1)`, [id, `${id}@example.test`]);
+  return id;
+}
+
+async function insertJob(userId: string): Promise<string> {
+  const id = next();
+  await pool.query(
+    `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids)
+     values ($1, $2, 'team-unassigned', 'kling-o3-pro', 'fal', 'p', '9:16', 5, '{}')`,
+    [id, userId],
+  );
+  return id;
+}
+
+const entry = (kind: string, jobId: string | null, usd: string, extra: Record<string, unknown> = {}) =>
+  pool.query(
+    `insert into cost_entries (kind, usd, month, day, job_id, is_final, ref, note) values ($1, $2, '2026-10', $3, $4, $5, $6, $7)`,
+    [kind, usd, jobId ? '2026-10-23' : null, jobId, extra.isFinal ?? false, extra.ref ?? null, extra.note ?? null],
+  );
+
+let userId = '';
+beforeAll(async () => {
+  userId = await insertUser();
+});
+
+describe('migration 0002 seed data', () => {
+  test('seeds the unassigned team, which a new user joins by default', async () => {
+    const { rows } = await pool.query(`select name, (select team_id from users where id = $1) as user_team from teams where id = 'team-unassigned'`, [userId]);
+    expect(rows).toEqual([{ name: 'Chưa phân team', user_team: 'team-unassigned' }]);
+  });
+
+  test('rejects a user whose team does not exist', async () => {
+    await expect(pool.query(`insert into users (id, email, name, team_id) values ('x', 'x@example.test', 'x', 'nope')`)).rejects.toThrow(/users_team_id_teams_id_fk/);
+  });
+
+  test('seeds the six presets from packages/core/src/presets.ts, the safe one flagged once', async () => {
+    const { rows } = await pool.query(`select id, label, prompt, is_bakeoff_safe as "isBakeoffSafe" from presets order by sort_order`);
+    expect(rows).toEqual(PRESETS.map((p) => ({ id: p.id, label: p.label, prompt: p.prompt, isBakeoffSafe: p.isBakeoffSafe })));
+    expect(rows.filter((r) => r.isBakeoffSafe)).toHaveLength(1);
+  });
+
+  test('seeds the two models disabled with no price or limits, and the settings row', async () => {
+    const models = await pool.query(`select id, provider, endpoint, enabled, usd_per_second, max_images, output_resolution from model_configs order by id`);
+    expect(models.rows).toEqual([
+      { id: 'kling-o3-pro', provider: 'fal', endpoint: 'fal-ai/kling-video/o3/pro/reference-to-video', enabled: false, usd_per_second: null, max_images: null, output_resolution: null },
+      { id: 'seedance-2.5', provider: 'replicate', endpoint: 'bytedance/seedance-2.5', enabled: false, usd_per_second: null, max_images: null, output_resolution: null },
+    ]);
+    expect((await pool.query(`select monthly_cap_usd::text as cap, member_daily_clip_cap as daily from settings`)).rows).toEqual([{ cap: '200.0000', daily: 5 }]);
+  });
+
+  test('refuses to enable a model that has no price or limits', async () => {
+    await expect(pool.query(`update model_configs set enabled = true where id = 'kling-o3-pro'`)).rejects.toThrow(/model_configs_enabled_complete_check/);
+  });
+});
+
+describe('cost_entries', () => {
+  test('is append-only: UPDATE, DELETE and TRUNCATE raise', async () => {
+    const job = await insertJob(userId);
+    await entry('estimate', job, '1.5000');
+    await expect(pool.query(`update cost_entries set usd = 0 where job_id = $1`, [job])).rejects.toThrow(/append-only/);
+    await expect(pool.query(`delete from cost_entries where job_id = $1`, [job])).rejects.toThrow(/append-only/);
+    await expect(pool.query(`truncate cost_entries`)).rejects.toThrow(/append-only/);
+    expect((await pool.query(`select usd::text from cost_entries where job_id = $1`, [job])).rows).toEqual([{ usd: '1.5000' }]);
+  });
+
+  test('refuses a manual_adjustment without a note', async () => {
+    await expect(entry('manual_adjustment', null, '1', { note: null })).rejects.toThrow(/cost_entries_manual_note_check/);
+    await expect(entry('manual_adjustment', null, '1', { note: '   ' })).rejects.toThrow(/cost_entries_manual_note_check/);
+    await entry('manual_adjustment', null, '1', { note: 'fixed a typo in the invoice' });
+  });
+
+  test('allows a job row only with a job and a shared row only without one', async () => {
+    const job = await insertJob(userId);
+    await expect(entry('estimate', null, '1')).rejects.toThrow(/cost_entries_job_shared_check/);
+    await expect(entry('bakeoff', job, '1')).rejects.toThrow(/cost_entries_job_shared_check/);
+  });
+
+  test('blocks a second estimate, actual_adjustment, release or late_bill for one job, but not a second store_reassign', async () => {
+    const job = await insertJob(userId);
+    for (const kind of ['estimate', 'actual_adjustment', 'release', 'late_bill']) {
+      await entry(kind, job, '1');
+      await expect(entry(kind, job, '1')).rejects.toThrow(/cost_entries_job_kind_once_idx/);
+    }
+    await entry('store_reassign', job, '1');
+    await entry('store_reassign', job, '-1');
+  });
+
+  test('keeps a shared ref unique, so a second booking of the same ref fails', async () => {
+    await entry('bakeoff', null, '3', { ref: 'bakeoff-2026-10-fal' });
+    await expect(entry('bakeoff', null, '3', { ref: 'bakeoff-2026-10-fal' })).rejects.toThrow(/cost_entries_ref_unique/);
+  });
+
+  test('refuses a month that is not YYYY-MM and a shared row that names a user', async () => {
+    await expect(pool.query(`insert into cost_entries (kind, usd, month) values ('bakeoff', 1, '2026-13')`)).rejects.toThrow(/cost_entries_month_check/);
+    await expect(pool.query(`insert into cost_entries (kind, usd, month, user_id) values ('bakeoff', 1, '2026-10', $1)`, [userId])).rejects.toThrow(/cost_entries_shared_unattributed_check/);
+  });
+
+  test('job_costs sums the rows of a job and is final once a row closes it', async () => {
+    const job = await insertJob(userId);
+    await entry('estimate', job, '2.0000');
+    expect((await pool.query(`select usd::text, is_final from job_costs where job_id = $1`, [job])).rows).toEqual([{ usd: '2.0000', is_final: false }]);
+    await entry('actual_adjustment', job, '0.5000', { isFinal: true });
+    expect((await pool.query(`select usd::text, is_final from job_costs where job_id = $1`, [job])).rows).toEqual([{ usd: '2.5000', is_final: true }]);
+  });
+});

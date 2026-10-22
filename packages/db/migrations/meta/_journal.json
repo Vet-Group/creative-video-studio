@@ -15,6 +15,13 @@
       "when": 1792753332036,
       "tag": "0001_assets",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792839732036,
+      "tag": "0002_jobs_ledger",
+      "breakpoints": true
     }
   ]
 }

@@ -16,6 +16,8 @@ export const auth = betterAuth({
   database: drizzleAdapter(createDb(pool), { provider: 'pg', usePlural: true, schema: { users, sessions, accounts, verifications } }),
   // No public sign-up: an Admin creates every account (Q4).
   emailAndPassword: { enabled: true, disableSignUp: true },
+  // The team is changed only by an Admin, so input: false keeps /api/auth/update-user from setting it. The column default is the seeded team.
+  user: { additionalFields: { teamId: { type: 'string', required: false, input: false } } },
   plugins: [
     admin({
       // Q4 roles: member has the plugin's plain user rights, admin manages users.
