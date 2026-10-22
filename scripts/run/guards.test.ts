@@ -74,7 +74,8 @@ describe('gate key install and removal (dry run on a 3-key authorized_keys copy)
 
 const pwsh = spawnSync('pwsh', ['-NoProfile', '-Command', 'exit 0']).status === 0;
 
-describe.skipIf(!pwsh)('watchdog dry run', () => {
+// pwsh cold start on a CI runner can take several seconds per call.
+describe.skipIf(!pwsh)('watchdog dry run', { timeout: 30_000 }, () => {
   function runDir(heartbeat: string, lease: object | null) {
     const dir = tmp();
     const m = initManifest({ preflight: { checkedAt: heartbeat, results: [] }, skipped: new Map(), criteria: [] });
