@@ -11,6 +11,7 @@ process.env.APP_URL = 'http://localhost';
 process.env.S3_BUCKET = `cvs-test-${randomBytes(6).toString('hex')}`;
 
 const { auth, pool } = await import('@/lib/auth');
+const { MAX_BODY } = await import('@/lib/assets');
 const { signDownloadToken } = await import('@/lib/download-token');
 const { bucketName, ensureBucket, s3 } = await import('@/lib/storage');
 const { POST } = await import('./route');
@@ -70,10 +71,19 @@ beforeAll(async () => {
   adminCookie = await signIn('admin@example.test');
 });
 
+async function objectKeys(): Promise<string[]> {
+  const { Contents = [] } = await s3().send(new ListObjectsV2Command({ Bucket: bucketName() }));
+  return Contents.flatMap(({ Key }) => (Key ? [Key] : []));
+}
+
+async function assetCount(): Promise<number> {
+  return Number((await pool.query('select count(*) from assets')).rows[0].count);
+}
+
 afterAll(async () => {
   const Bucket = bucketName();
-  const { Contents = [] } = await s3().send(new ListObjectsV2Command({ Bucket }));
-  if (Contents.length > 0) await s3().send(new DeleteObjectsCommand({ Bucket, Delete: { Objects: Contents.map(({ Key }) => ({ Key })) } }));
+  const keys = await objectKeys();
+  if (keys.length > 0) await s3().send(new DeleteObjectsCommand({ Bucket, Delete: { Objects: keys.map((Key) => ({ Key })) } }));
   await s3().send(new DeleteBucketCommand({ Bucket }));
   await pool.end();
   await testDb.drop();
@@ -113,15 +123,65 @@ describe('POST /api/assets', () => {
     expect(res.status).toBe(415);
   });
 
-  test('rejects the whole request when one of the files is bad', async () => {
+  test('rejects the whole request when one of the files is bad, storing nothing', async () => {
+    const [rows, keys] = [await assetCount(), await objectKeys()];
     const res = await upload(ownerCookie, { name: 'ok.png', bytes: png(64) }, { name: 'bad.gif', bytes: file([0x47, 0x49, 0x46, 0x38], 64) });
     expect(res.status).toBe(415);
+    expect(await assetCount()).toBe(rows);
+    expect((await objectKeys()).sort()).toEqual(keys.sort());
   });
 
   test('rejects a 5th file and an empty request', async () => {
     const five = Array.from({ length: 5 }, (_, i) => ({ name: `${i}.png`, bytes: png(64) }));
     expect((await upload(ownerCookie, ...five)).status).toBe(400);
     expect((await upload(ownerCookie)).status).toBe(400);
+  });
+
+  test('answers 413 at once when content-length is past the body limit', async () => {
+    const form = new FormData();
+    form.append('file', new File([png(64)], 'a.png'));
+    const res = await POST(new Request(BASE, { method: 'POST', body: form, headers: { cookie: ownerCookie, 'content-length': String(MAX_BODY + 1) } }));
+    expect(res.status).toBe(413);
+  });
+
+  test('answers 413 for a streamed body past the limit, without a content-length to trust', async () => {
+    const chunk = new Uint8Array(new ArrayBuffer(1024 * 1024));
+    let sent = 0;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (sent === 0) controller.enqueue(new TextEncoder().encode('--b\r\nContent-Disposition: form-data; name="file"; filename="a.png"\r\n\r\n'));
+        controller.enqueue(chunk);
+        sent += chunk.length;
+        if (sent > MAX_BODY * 2) controller.close();
+      },
+    });
+    const req = new Request(BASE, { method: 'POST', body, duplex: 'half', headers: { cookie: ownerCookie, 'content-type': 'multipart/form-data; boundary=b' } } as RequestInit);
+    expect(req.headers.get('content-length')).toBeNull();
+    expect((await POST(req)).status).toBe(413);
+    expect(sent).toBeLessThan(MAX_BODY * 2); // the stream was cut off, not read to the end
+  });
+
+  test('answers 400 for a body that is not multipart', async () => {
+    const res = await POST(new Request(BASE, { method: 'POST', body: 'hello', headers: { cookie: ownerCookie, 'content-type': 'text/plain' } }));
+    expect(res.status).toBe(400);
+  });
+
+  test('keeps at most 255 characters of the file name', async () => {
+    const res = await upload(ownerCookie, { name: `${'a'.repeat(300)}.png`, bytes: png(64) });
+    expect(res.status).toBe(201);
+    const { assets } = (await res.json()) as { assets: [{ filename: string }] };
+    expect(assets[0].filename).toBe('a'.repeat(255));
+  });
+
+  test('removes the objects it stored when saving the rows fails', async () => {
+    const keys = await objectKeys();
+    await pool.query(`alter table assets add constraint assets_poison check (filename <> 'poison.png')`);
+    try {
+      await expect(upload(ownerCookie, { name: 'poison.png', bytes: png(64) })).rejects.toThrow();
+    } finally {
+      await pool.query('alter table assets drop constraint assets_poison');
+    }
+    expect((await objectKeys()).sort()).toEqual(keys.sort());
   });
 });
 
@@ -164,8 +224,16 @@ describe('GET /api/assets/:id/content', () => {
     expect(res.headers.get('content-range')).toBe('bytes */1000');
   });
 
+  test('ignores an inverted Range and serves the whole file', async () => {
+    const res = await GET_CONTENT(get(`/api/assets/${id}/content`, ownerCookie, { range: 'bytes=5-3' }), ctx(id));
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-range')).toBeNull();
+    expect(new Uint8Array(await res.arrayBuffer())).toEqual(bytes);
+  });
+
   test('serves a download as an attachment when asked', async () => {
     const res = await GET_CONTENT(get(`/api/assets/${id}/content?download`, ownerCookie), ctx(id));
+    expect(res.status).toBe(200);
     expect(res.headers.get('content-disposition')).toMatch(/^attachment; filename="photo.png"/);
   });
 
@@ -176,6 +244,32 @@ describe('GET /api/assets/:id/content', () => {
 
   test('answers 404 for an unknown asset', async () => {
     expect((await GET_CONTENT(get('/api/assets/nope/content', ownerCookie), ctx('nope'))).status).toBe(404);
+  });
+});
+
+describe('GET /api/assets/:id', () => {
+  let id = '';
+  beforeAll(async () => {
+    id = await uploadOne(ownerCookie, png(64));
+  });
+
+  test('rejects a request without a session', async () => {
+    expect((await GET_DETAILS(get(`/api/assets/${id}`), ctx(id))).status).toBe(401);
+  });
+
+  test('keeps another Member out', async () => {
+    expect((await GET_DETAILS(get(`/api/assets/${id}`, otherCookie), ctx(id))).status).toBe(403);
+  });
+});
+
+describe('a soft-deleted asset', () => {
+  test('answers 404 on the details, content and download routes', async () => {
+    const id = await uploadOne(ownerCookie, png(64));
+    await pool.query('update assets set deleted_at = now() where id = $1', [id]);
+    expect((await GET_DETAILS(get(`/api/assets/${id}`, ownerCookie), ctx(id))).status).toBe(404);
+    expect((await GET_CONTENT(get(`/api/assets/${id}/content`, ownerCookie), ctx(id))).status).toBe(404);
+    const token = signDownloadToken(id, ownerId);
+    expect((await GET_DOWNLOAD(get(`/api/assets/${id}/download?t=${token}`, ownerCookie), ctx(id))).status).toBe(404);
   });
 });
 
@@ -198,6 +292,13 @@ describe('GET /api/assets/:id/download', () => {
     expect(res.status).toBe(200);
     expect(res.headers.get('content-disposition')).toMatch(/^attachment; filename="t_n _nh.jpg"; filename\*=UTF-8''t%C3%AAn%20%E1%BA%A3nh\.jpg$/);
     expect(new Uint8Array(await res.arrayBuffer())).toEqual(bytes);
+  });
+
+  test("percent-encodes the characters RFC 8187 does not allow in filename*", async () => {
+    const quoted = await uploadOne(ownerCookie, jpeg(10), `it's (1)*.jpg`);
+    const res = await download(quoted, ownerCookie, signDownloadToken(quoted, ownerId));
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-disposition')).toBe(`attachment; filename="it's (1)*.jpg"; filename*=UTF-8''it%27s%20%281%29%2A.jpg`);
   });
 
   test('rejects a request without a session', async () => {

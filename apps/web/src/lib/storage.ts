@@ -1,7 +1,15 @@
 // The S3 client for the app's own MinIO (127.0.0.1 only, so every byte goes through our routes).
-import { CreateBucketCommand, GetObjectCommand, HeadBucketCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { CreateBucketCommand, DeleteObjectCommand, GetObjectCommand, HeadBucketCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 
+/** A setting from the environment, else from the repo's .env (local runs; variables already set win). */
 function env(name: string): string {
+  if (!process.env[name]) {
+    try {
+      process.loadEnvFile(new URL('../../../../.env', import.meta.url));
+    } catch {
+      // No .env file.
+    }
+  }
   const value = process.env[name];
   if (!value) throw new Error(`${name} is not set; copy .env.example to .env`);
   return value;
@@ -11,13 +19,6 @@ function env(name: string): string {
 const g = globalThis as unknown as { cvsS3?: S3Client };
 
 export function s3(): S3Client {
-  if (!process.env.S3_ENDPOINT) {
-    try {
-      process.loadEnvFile(new URL('../../../../.env', import.meta.url));
-    } catch {
-      // No .env file.
-    }
-  }
   return (g.cvsS3 ??= new S3Client({
     endpoint: env('S3_ENDPOINT'),
     region: 'us-east-1',
@@ -41,6 +42,10 @@ export async function ensureBucket(): Promise<void> {
 
 export async function putObject(key: string, body: Uint8Array, contentType: string): Promise<void> {
   await s3().send(new PutObjectCommand({ Bucket: bucketName(), Key: key, Body: body, ContentType: contentType }));
+}
+
+export async function deleteObject(key: string): Promise<void> {
+  await s3().send(new DeleteObjectCommand({ Bucket: bucketName(), Key: key }));
 }
 
 /** The object as a web stream; `range` is an HTTP byte range such as `bytes=0-99`. */

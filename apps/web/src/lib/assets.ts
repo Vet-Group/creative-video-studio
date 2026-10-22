@@ -6,10 +6,38 @@ import { getObject } from './storage';
 
 export const MAX_FILES = 4;
 export const MAX_BYTES = 10 * 1024 * 1024;
+export const MAX_BODY = MAX_FILES * MAX_BYTES + 64 * 1024;
+export const MAX_FILENAME = 255;
 
 export const db = createDb(pool);
 
 export type RouteContext = { params: Promise<{ id: string }> };
+
+/** The multipart body as FormData, 'too-large' once it passes MAX_BODY (counted while streaming, so it is never fully buffered), or null when it is not multipart. */
+export async function readUploadForm(request: Request): Promise<FormData | 'too-large' | null> {
+  if (Number(request.headers.get('content-length')) > MAX_BODY) return 'too-large';
+  const contentType = request.headers.get('content-type');
+  if (!request.body || !contentType) return null;
+  let seen = 0;
+  let tooLarge = false;
+  const limited = request.body.pipeThrough(
+    new TransformStream<Uint8Array, Uint8Array>({
+      transform(chunk, controller) {
+        seen += chunk.length;
+        if (seen > MAX_BODY) {
+          tooLarge = true;
+          throw new Error('request body too large');
+        }
+        controller.enqueue(chunk);
+      },
+    }),
+  );
+  try {
+    return await new Response(limited, { headers: { 'content-type': contentType } }).formData();
+  } catch {
+    return tooLarge ? 'too-large' : null;
+  }
+}
 
 /** The image type from the file's first bytes (never from the client's name or content type). */
 export function sniffImage(b: Uint8Array): 'image/jpeg' | 'image/png' | 'image/webp' | undefined {
@@ -32,6 +60,7 @@ export async function readableAsset(session: Session, id: string): Promise<{ ass
 function parseRange(header: string | null, size: number): { start: number; end: number } | null | undefined {
   const m = /^bytes=(\d*)-(\d*)$/.exec(header ?? '');
   if (!m || (!m[1] && !m[2])) return undefined;
+  if (m[1] && m[2] && Number(m[2]) < Number(m[1])) return undefined; // RFC 9110: an inverted range is invalid, so it is ignored
   const start = m[1] ? Number(m[1]) : Math.max(size - Number(m[2]), 0);
   const end = m[1] && m[2] ? Math.min(Number(m[2]), size - 1) : size - 1;
   return start <= end && start < size ?{ start, end } : null;
@@ -44,7 +73,7 @@ export async function streamAsset(request: Request, asset: Asset, disposition: '
   const headers: Record<string, string> = {
     'content-type': asset.mime,
     'accept-ranges': 'bytes',
-    'content-disposition': `${disposition}; filename="${asset.filename.replace(/[^\x20-\x7e]|["\\]/g, '_')}"; filename*=UTF-8''${encodeURIComponent(asset.filename)}`,
+    'content-disposition': `${disposition}; filename="${asset.filename.replace(/[^\x20-\x7e]|["\\]/g, '_')}"; filename*=UTF-8''${encodeURIComponent(asset.filename).replace(/['()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`)}`,
     'cache-control': 'private, no-store',
     'x-content-type-options': 'nosniff',
   };
