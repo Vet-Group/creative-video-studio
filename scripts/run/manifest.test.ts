@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
@@ -91,7 +91,17 @@ describe('manifest', () => {
     expect(readManifest(path).steps[0]!.status).toBe('pending');
   });
 
-  test('the three specs yield 71 criteria', () => {
+  test('criteria parse from unchecked numbered items only', () => {
+    const md = '- [ ] 1. First.
+- [x] 2. Done already.
+- [ ] 3. Third.
+not a criterion
+';
+    expect(parseCriteria('base', md).map((c) => c.id)).toEqual(['base-1', 'base-3']);
+  });
+
+  // The specs live in the local planning folder, which is not in Git, so CI skips this one.
+  test.skipIf(!existsSync(SPECS))('the three specs yield 71 criteria', () => {
     const n = ['deep-interview-creative-video-studio.md', 'deep-interview-cvs-cost-attribution.md', 'deep-interview-cvs-autonomous-run.md'].map(
       (f) => parseCriteria('x', readFileSync(join(SPECS, f), 'utf8')).length,
     );
