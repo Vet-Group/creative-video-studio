@@ -3,6 +3,15 @@ import { db, MAX_BYTES, MAX_FILENAME, MAX_FILES, readUploadForm, sniffImage } fr
 import { guard } from '@/lib/session';
 import { deleteObject, putObject } from '@/lib/storage';
 
+/** Cut a file name to MAX_FILENAME code points (never splitting a surrogate pair), keeping a short extension. */
+function shortName(name: string): string {
+  const chars = Array.from(name);
+  if (chars.length <= MAX_FILENAME) return name;
+  const dot = chars.lastIndexOf('.');
+  const ext = dot > 0 && chars.length - dot <= 10 ? chars.slice(dot) : [];
+  return [...chars.slice(0, MAX_FILENAME - ext.length), ...ext].join('');
+}
+
 /** Upload 1-4 input images (multipart field `file`): at most 10 MB each, JPEG/PNG/WebP by magic bytes. All or nothing. */
 export async function POST(request: Request) {
   const g = await guard(request, 'member');
@@ -26,8 +35,7 @@ export async function POST(request: Request) {
     ownerId: g.session.user.id,
     kind: 'input' as const,
     s3Key: `assets/${id}`,
-    // By code point, so the cut never splits a surrogate pair.
-    filename: Array.from(file.name || 'upload').slice(0, MAX_FILENAME).join(''),
+    filename: shortName(file.name || 'upload'),
     mime,
     bytes: bytes.length,
   }));

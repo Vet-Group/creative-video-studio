@@ -166,11 +166,12 @@ describe('POST /api/assets', () => {
     expect(res.status).toBe(400);
   });
 
-  test('keeps at most 255 characters of the file name', async () => {
-    const res = await upload(ownerCookie, { name: `${'a'.repeat(300)}.png`, bytes: png(64) });
+  test('keeps at most 255 characters of the file name and its extension', async () => {
+    const res = await upload(ownerCookie, { name: `${'a'.repeat(300)}.png`, bytes: png(64) }, { name: 'b'.repeat(300), bytes: png(64) });
     expect(res.status).toBe(201);
-    const { assets } = (await res.json()) as { assets: [{ filename: string }] };
-    expect(assets[0].filename).toBe('a'.repeat(255));
+    const { assets } = (await res.json()) as { assets: [{ filename: string }, { filename: string }] };
+    expect(assets[0].filename).toBe(`${'a'.repeat(251)}.png`);
+    expect(assets[1].filename).toBe('b'.repeat(255));
   });
 
   test('removes the objects it stored when saving the rows fails', async () => {
