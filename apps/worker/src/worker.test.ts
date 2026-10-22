@@ -1,8 +1,11 @@
 // The worker against a disposable database and bucket on the compose Postgres and MinIO (`pnpm services:up`), with the mock provider.
 import { randomBytes, randomUUID } from 'node:crypto';
-import { rm } from 'node:fs/promises';
+import { execFile } from 'node:child_process';
+import { mkdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { promisify } from 'node:util';
 import { DeleteBucketCommand, DeleteObjectsCommand, HeadObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { reserve, withTransaction } from '@cvs/core/ledger';
 import type { VideoProvider } from '@cvs/core/providers';
@@ -11,6 +14,7 @@ import { createPool } from '@cvs/db/client';
 import { createTestDatabase } from '@cvs/db/testing';
 import { PgBoss } from 'pg-boss';
 import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
+import { requireFfmpeg } from './media';
 import { createMockProvider, MOCK_FAIL } from './mock-provider';
 import { bucketName, ensureBucket, s3 } from './storage';
 import { type RunningWorker, startWorker, type WorkerOptions } from './worker';
@@ -25,6 +29,7 @@ const mockDir = join(tmpdir(), `cvs-mock-${randomBytes(6).toString('hex')}`);
 
 const FAST: Partial<WorkerOptions> = { admissionSleepMs: 100, waitPollMs: 100, reconcileEveryMs: 200, heartbeatEveryMs: 200, resendAfterMs: 0, pollingIntervalSeconds: 0.5 };
 const workers: RunningWorker[] = [];
+const run = promisify(execFile);
 
 beforeAll(async () => {
   await ensureBucket();
@@ -160,6 +165,32 @@ describe('the mock lifecycle', () => {
     expect(await total(id)).toEqual({ usd: '0.0000', is_final: true });
   });
 
+  test('fails a sub-720p output but keeps the estimate of a non-mock job, because the provider rendered and billed it', async () => {
+    const small = join(mockDir, `${randomUUID()}-small.mp4`);
+    await mkdir(mockDir, { recursive: true });
+    await run(requireFfmpeg(), ['-y', '-v', 'error', '-f', 'lavfi', '-i', 'testsrc2=size=320x240:rate=24', '-t', '1', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', small]);
+    const id = await newJob('u1', { estimate: '1.5000' });
+    await start(counting(300, (inner) => ({ ...inner, status: async (pj) => ((await inner.status(pj)).state === 'running' ? { state: 'running' } : { state: 'succeeded', outputUrl: pathToFileURL(small).href, costUsd: 0, costSource: 'estimate' }) })));
+    await send(id, 'u1');
+    await waitFor('the job to fail', async () => (await status(id)) === 'failed');
+    expect((await job(id)).error).toMatch(/320x240, below 720p/);
+    expect((await job(id)).output_asset_id).toBeNull();
+    expect((await costs(id)).map((c) => [c.kind, c.usd])).toEqual([['estimate', '1.5000'], ['actual_adjustment', '0.0000']]); // not a release of -1.5000
+    expect(await total(id)).toEqual({ usd: '1.5000', is_final: true });
+  });
+
+  test('times out a job whose delivery keeps failing, frees its slot and settles it from timed_out', async () => {
+    const id = await newJob('u2');
+    const broken = counting(300, (inner) => ({ ...inner, status: async () => ({ state: 'succeeded', outputUrl: 'http://127.0.0.1:9/gone.mp4', costUsd: 0, costSource: 'estimate' }) }));
+    await start(broken, { runTimeoutMs: 600 });
+    await send(id, 'u2');
+    await waitFor('the job to time out', async () => (await status(id)) === 'timed_out');
+    expect((await pool.query(`select count(*)::int as n from jobs where user_id = 'u2' and status in ('submitting', 'running')`)).rows[0].n).toBe(0);
+    await waitFor('the late bill', async () => (await total(id)).is_final);
+    expect(await total(id)).toEqual({ usd: '1.5000', is_final: true });
+    expect((await job(id)).output_asset_id).toBeNull();
+  });
+
   test('times out a running job whose provider has no adapter', async () => {
     const id = await newJob('u2', { provider: 'fal' });
     await pool.query(`update jobs set status = 'running', provider_job_id = 'fal:1', started_at = now() - interval '1 hour', claimed_by = 'gone' where id = $1`, [id]);
@@ -191,6 +222,51 @@ describe('a submit that pg-boss expiry or an error would orphan', () => {
       return (await status(id)) === 'failed_unknown';
     });
     expect(await total(id)).toEqual({ usd: '2.5000', is_final: false });
+  });
+
+  test('does not mark a job admitted while the lost-submit check is waiting for its turn', async () => {
+    counting.submits = 0;
+    const id = await newJob('u1');
+    // The lost-submit UPDATE is held back, as when the pool is busy; the job is admitted in the meantime.
+    let reached!: () => void;
+    let open!: () => void;
+    const hit = new Promise<void>((r) => { reached = r; });
+    const opened = new Promise<void>((r) => { open = r; });
+    const hold = async (sql: unknown) => {
+      if (typeof sql === 'string' && sql.includes('the worker stopped while submitting')) {
+        reached();
+        await opened;
+      }
+    };
+    const bind = (t: object, p: string | symbol) => {
+      const v = Reflect.get(t, p, t);
+      return typeof v === 'function' ? v.bind(t) : v;
+    };
+    const slowPool = new Proxy(pool, {
+      get(t, p) {
+        if (p === 'query') return async (sql: unknown, ...a: unknown[]) => { await hold(sql); return (t.query as (...x: unknown[]) => unknown)(sql, ...a); };
+        if (p === 'connect') {
+          return async () => {
+            const c = await t.connect();
+            return new Proxy(c, { get: (ct, cp) => (cp === 'query' ? async (sql: unknown, ...a: unknown[]) => { await hold(sql); return (ct.query as (...x: unknown[]) => unknown)(sql, ...a); } : bind(ct, cp)) });
+          };
+        }
+        return bind(t, p);
+      },
+    });
+    const slowSubmit = counting(300, (inner) => ({ ...inner, submit: async (req) => { await new Promise((r) => setTimeout(r, 2_000)); return inner.submit(req); } }));
+    workers.push(await startWorker({ pool: slowPool, connectionString: testDb.url, providers: { mock: slowSubmit }, options: FAST }));
+    await hit;
+    await send(id, 'u1');
+    await new Promise((r) => setTimeout(r, 700));
+    open();
+    const seen = new Set<string>();
+    await waitFor('the job to succeed', async () => {
+      seen.add(await status(id));
+      return seen.has('succeeded');
+    });
+    expect(seen).not.toContain('failed_unknown');
+    expect(counting.submits).toBe(1);
   });
 
   test('saves the provider job id even when the row was already marked failed_unknown, so it can be billed late', async () => {

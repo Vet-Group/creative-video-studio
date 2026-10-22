@@ -218,7 +218,7 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
       await download(outputUrl, video, job.provider);
       const { width, height } = await probeSize(video);
       if (Math.min(width, height) < 720) {
-        await settle(pool, job.id, { status: 'failed', costUsd, error: `the output is ${width}x${height}, below 720p` });
+        await settle(pool, job.id, { status: 'failed', costUsd, billed: true, error: `the output is ${width}x${height}, below 720p` });
         return;
       }
       const poster = join(dir, 'poster.jpg');
@@ -258,13 +258,18 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
 
   /** A submit nobody is making any more (its worker is gone, or this worker lost it to an error): the provider may have started the job, so it keeps its estimate (failed_unknown). */
   async function failLostSubmits(): Promise<void> {
-    await pool.query(
-      `update jobs set status = 'failed_unknown', error = 'the worker stopped while submitting; the provider may have started the job', finished_at = now()
-        where status = 'submitting' and provider_job_id is null and not (id = any($1::text[]))
-          and (claimed_by = $3
-            or not exists (select 1 from worker_heartbeat h where h.worker_id = jobs.claimed_by and h.beat_at > now() - ($2::float8 * interval '1 millisecond')))`,
-      [[...submitting], o.heartbeatStaleMs, id],
-    );
+    // Under the admission lock, and the set is read only once it is held: admit adds a job to the set before its commit, so every row this
+    // update can see as submitting from this worker is already in the set, and an admit still running waits for the lock behind the update.
+    await withTransaction(pool, async (tx) => {
+      await tx.query(`select pg_advisory_xact_lock(hashtext('video-admission'))`);
+      await tx.query(
+        `update jobs set status = 'failed_unknown', error = 'the worker stopped while submitting; the provider may have started the job', finished_at = now()
+          where status = 'submitting' and provider_job_id is null and not (id = any($1::text[]))
+            and (claimed_by = $3
+              or not exists (select 1 from worker_heartbeat h where h.worker_id = jobs.claimed_by and h.beat_at > now() - ($2::float8 * interval '1 millisecond')))`,
+        [[...submitting], o.heartbeatStaleMs, id],
+      );
+    });
   }
 
   async function pollRunning(): Promise<void> {
@@ -280,15 +285,19 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
         const status = provider ? await provider.status(pj) : { state: 'running' as const };
         if (status.state === 'succeeded') await deliver(row, status.outputUrl, status.costUsd);
         else if (status.state === 'failed' || status.state === 'canceled') await settle(pool, row.id, { status: 'failed', costUsd: status.costUsd, error: status.error });
-        else if (row.expired) {
-          // The estimate stays counted until the provider's final state is known.
-          const { rowCount } = await pool.query(`update jobs set status = 'timed_out', error = 'timed out', finished_at = now() where id = $1 and status = 'running'`, [row.id]);
-          if (rowCount && provider) await provider.cancel(pj).catch((e) => log(`cancel ${row.id}`, e));
-        }
+        else if (row.expired && (await timeOut(row.id)) && provider) await provider.cancel(pj).catch((e) => log(`cancel ${row.id}`, e));
       } catch (e) {
         log(`running job ${row.id}`, e);
+        // A delivery or status call that keeps failing must not keep the job running past its limit; lateBill or close24h finalize it from timed_out.
+        if (row.expired) await timeOut(row.id).catch((err) => log(`time out ${row.id}`, err));
       }
     }
+  }
+
+  /** The estimate stays counted until the provider's final state is known. False when the job is no longer running. */
+  async function timeOut(jobId: string): Promise<boolean> {
+    const { rowCount } = await pool.query(`update jobs set status = 'timed_out', error = 'timed out', finished_at = now() where id = $1 and status = 'running'`, [jobId]);
+    return !!rowCount;
   }
 
   /** Timed-out and lost jobs: bill them when the provider reports a final state (the late result is not delivered), else close them after 24 h. */
