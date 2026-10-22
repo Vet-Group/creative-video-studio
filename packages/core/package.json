@@ -5,7 +5,9 @@
   "exports": {
     "./models": "./src/models.ts",
     "./providers": "./src/providers/types.ts",
-    "./presets": "./src/presets.ts"
+    "./presets": "./src/presets.ts",
+    "./ledger": "./src/ledger.ts",
+    "./queue": "./src/queue.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
