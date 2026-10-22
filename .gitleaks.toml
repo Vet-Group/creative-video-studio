@@ -1,0 +1,7 @@
+# gitleaks configuration: the default rules plus the local-only placeholders this repo commits on purpose.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Local development placeholders from docker-compose.yml and .env.example"
+regexes = ['''cvs-local-only''']
