@@ -19,6 +19,12 @@ const get = (m: Manifest, id: string) => m.steps.find((s) => s.id === id)!;
 const tmp = () => mkdtempSync(join(tmpdir(), 'cvs-run-'));
 
 describe('steps', () => {
+  test('the results report waits for every other step', () => {
+    const p1 = STEPS.find((s) => s.id === 'P.1')!;
+    expect([...p1.deps].sort()).toEqual(STEPS.filter((s) => s.id !== 'P.1' && s.id !== 'A.2').map((s) => s.id).sort());
+    expect(p1.soft).toEqual(p1.deps);
+  });
+
   test('are topologically ordered with known deps', () => {
     const seen = new Set<string>();
     for (const s of STEPS) {

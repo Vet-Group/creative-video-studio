@@ -41,6 +41,11 @@ export const STEPS: StepDef[] = [
   { id: 'D.5-hostname', title: 'Public hostname', deps: ['D.5'], worktree: 'app' },
   { id: 'D.5-admin', title: 'First Admin', deps: ['D.5'], worktree: 'app' },
   { id: 'D.5-lark', title: 'Lark live check', deps: ['D.5-hostname', 'D.1'], worktree: 'app' },
-  { id: 'P.1', title: 'Boss results report', deps: ['D.5-hostname', 'D.5-admin', 'D.5-lark', 'D.2-r2'], worktree: 'main', soft: ['D.5-hostname', 'D.5-admin', 'D.5-lark', 'D.2-r2'] },
-  { id: 'A.2', title: 'Done check and clean-up', deps: ['P.1'], worktree: 'main', soft: ['P.1'] },
 ];
+
+// The results report reports on every other step, so it waits for all of them; a skipped or stuck one is reported, not blocking.
+const reported = STEPS.map((s) => s.id);
+STEPS.push(
+  { id: 'P.1', title: 'Boss results report', deps: reported, worktree: 'main', soft: reported },
+  { id: 'A.2', title: 'Done check and clean-up', deps: ['P.1'], worktree: 'main', soft: ['P.1'] },
+);
