@@ -1,0 +1,10 @@
+packages:
+  - apps/*
+  - packages/*
+  - scripts
+# Exact versions only, as in Ideas Hub.
+saveExact: true
+# Prebuilt binaries come as optional platform packages; their install scripts only re-check them.
+allowBuilds:
+  esbuild: false
+  sharp: false

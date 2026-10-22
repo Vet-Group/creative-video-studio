@@ -1,0 +1,48 @@
+# Local data services for development. Ports avoid Ideas Hub (5433, 9300/9301, 3300),
+# POD Studio (54316, 19000/19001) and the other local services. Credentials are local-only placeholders.
+name: creative-video-studio
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    mem_limit: 1g
+    cpus: 1.0
+    environment:
+      POSTGRES_USER: cvs
+      POSTGRES_PASSWORD: cvs-local-only
+      POSTGRES_DB: cvs
+    ports:
+      - "127.0.0.1:5435:5432"
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cvs -d cvs"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  minio:
+    # Same digest-pinned Chainguard MinIO build that Ideas Hub and POD Studio use.
+    image: chainguard/minio@sha256:4692462f35d97d7e82c30371d82f057703c5d9489bcae726010594c812f2d285
+    restart: unless-stopped
+    mem_limit: 512m
+    cpus: 0.5
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: cvs
+      MINIO_ROOT_PASSWORD: cvs-local-only
+    ports:
+      - "127.0.0.1:9400:9000"
+      - "127.0.0.1:9401:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  pg-data:
+  minio-data:

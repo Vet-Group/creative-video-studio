@@ -1,0 +1,43 @@
+.env
+.env.*
+!.env.example
+!.env.*.example
+node_modules/
+.next/
+dist/
+coverage/
+playwright-report/
+test-results/
+*.log
+.DS_Store
+Thumbs.db
+uploads/
+generated-media/
+evidence/
+.next/
+next-env.d.ts
+*.tsbuildinfo
+.omc/
+
+# Owner-facing docs and run state stay local.
+docs/boss/
+docs/ops/PREFLIGHT.md
+cvs-bakeoff/
+*.mp4
+*.jpg
+*.jpeg
+*.png
+*.webp
+!**/fixtures/**
+
+# Agent launch kit: local only, hashed through scripts/run/local-guards.txt.
+scripts/run/local-guards.txt
+scripts/run/conductor-settings.json
+scripts/run/conductor-prompt.md
+scripts/run/start-conductor.ps1
+
+# Local-only artefacts: the handoff prompt and saved research pages.
+CONTINUE-*.md
+docs/*.html
+*.local.md
+scripts/run/agent-kit.test.ts

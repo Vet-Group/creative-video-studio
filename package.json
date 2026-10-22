@@ -1,0 +1,23 @@
+{
+  "name": "creative-video-studio",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.14.0",
+  "engines": {
+    "node": "^22.12.0 || ^24 || >=26"
+  },
+  "scripts": {
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "services:up": "docker compose up -d --wait",
+    "services:down": "docker compose down",
+    "preflight": "node --env-file-if-exists=.env scripts/preflight.ts",
+    "run:approve": "node --env-file-if-exists=.env scripts/run/cli.ts approve",
+    "run:verify": "node --env-file-if-exists=.env scripts/run/cli.ts verify"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.0",
+    "typescript": "6.0.3",
+    "vitest": "5.0.2"
+  }
+}
