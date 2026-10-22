@@ -194,6 +194,10 @@ switch (cmd) {
     writeLease(join(RUN, 'conductor.lock'), { pid: Number(values.pid), startedAt: values.started ?? '' }, values.force);
     break;
   case 'should-relaunch': {
+    if (!existsSync(MANIFEST)) {
+      console.log('run not approved');
+      process.exit(1);
+    }
     const m = readManifest(MANIFEST);
     const ps = values['proc-started'];
     const d = shouldRelaunch({ heartbeat: m.heartbeat, lease: readLease(join(RUN, 'conductor.lock')), procStartedAt: ps && ps !== 'none' ? ps : null, now, finished: m.steps.find((s) => s.id === 'A.2')?.status === 'done' });
