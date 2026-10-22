@@ -1,8 +1,11 @@
 import { sql } from 'drizzle-orm';
-import { boolean, check, index, pgTable, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
+import { boolean, check, index, integer, pgTable, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
 
 export const ROLES = ['member', 'admin'] as const;
 export type Role = (typeof ROLES)[number];
+
+export const ASSET_KINDS = ['input', 'output'] as const;
+export type AssetKind = (typeof ASSET_KINDS)[number];
 
 const tstz = (name: string) => timestamp(name, { withTimezone: true });
 
@@ -79,4 +82,28 @@ export const verifications = pgTable(
     updatedAt: tstz('updated_at').notNull().defaultNow(),
   },
   (t) => [index('verifications_identifier_idx').on(t.identifier)],
+);
+
+// An uploaded input image or a generated output clip; the bytes live in MinIO under s3Key.
+export const assets = pgTable(
+  'assets',
+  {
+    id: text('id').primaryKey(),
+    ownerId: text('owner_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'restrict' }),
+    kind: text('kind', { enum: ASSET_KINDS }).notNull(),
+    s3Key: text('s3_key').notNull().unique(),
+    filename: text('filename').notNull(),
+    mime: text('mime').notNull(),
+    bytes: integer('bytes').notNull(),
+    width: integer('width'),
+    height: integer('height'),
+    createdAt: tstz('created_at').notNull().defaultNow(),
+    deletedAt: tstz('deleted_at'),
+  },
+  (t) => [
+    index('assets_owner_id_idx').on(t.ownerId),
+    check('assets_kind_check', sql`${t.kind} in ('input', 'output')`),
+  ],
 );

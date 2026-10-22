@@ -4,6 +4,7 @@
   "type": "module",
   "exports": {
     ".": "./src/schema.ts",
+    "./assets": "./src/assets.ts",
     "./client": "./src/client.ts",
     "./testing": "./src/testing.ts"
   },

@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { expect, test } from 'vitest';
 
 const root = join(import.meta.dirname, '..');
-const FILES = ['docker-compose.yml', 'apps/web/package.json', 'apps/web/scripts/next.ts', 'packages/db/src/minio.test.ts'];
+const FILES = ['docker-compose.yml', 'apps/web/package.json', 'apps/web/scripts/next.ts', 'apps/web/src/app/api/assets/route.test.ts'];
 
 // Each worktree overrides these through its .env, so they may only appear as the default of a CVS_..._PORT variable.
 test.each(FILES)('%s hard-codes none of the default ports', (file) => {
