@@ -4,7 +4,7 @@ Status: draft for owner approval, 2026-10-22; aligned with the deep-interview de
 
 ## Goal
 
-Company staff turn existing product images into short product videos without leaving one internal tool. Provider cost stays visible and capped.
+Company staff turn existing product images into short product videos without leaving one internal tool. Provider cost stays visible and capped. The app runs on the company VET Linux server and is reached at `video.vetgroup.net` (LAN only until the Cloudflare tunnel exists).
 
 ## Persona
 
@@ -96,6 +96,8 @@ Company staff turn existing product images into short product videos without lea
 - **Library:** empty, loading, list, filtered to nothing, deleted item.
 
 ## Acceptance criteria
+
+This is a summary. The plan tracks the full list: 33 base, 18 cost and 20 autonomous-run criteria, each with machine-checked evidence.
 
 Milestone 0 runs on the mock provider.
 

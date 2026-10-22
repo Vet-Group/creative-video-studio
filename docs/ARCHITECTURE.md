@@ -23,18 +23,18 @@ The stack is reused from `dev/work/ideas-hub`, so deployment, backup and debuggi
 | DB | Postgres 16 + Drizzle | Its own instance, not shared with Ideas Hub or POD Studio |
 | Queue | pg-boss | Supplies queueing, the per-user and global concurrency limits, the 10-minute expiry and the retry state |
 | Storage | MinIO (S3 API, `@aws-sdk/client-s3`) | Its own instance. Provider URLs are copied into MinIO at once. |
-| Auth | better-auth: email/password (the password is optional per user), plus Lark through generic OAuth | Lark is allow-list only: a user signs in with Lark only if an Admin added their email. A user created without a password can sign in only with Lark. **Unverified:** whether Lark works with better-auth's generic OAuth (RESEARCH-GAPS R1) |
-| Runtime | docker-compose on the VET Linux server | Deploy only under the owner's pre-approval in the plan (section 3) |
-| Tests | Vitest (unit and integration against real Postgres and MinIO in compose) + Playwright (one end-to-end flow) | |
+| Auth | better-auth: email/password (the password is optional per user), plus Lark through generic OAuth | Lark is allow-list only: a user signs in with Lark only if an Admin added their email. A user created without a password can sign in only with Lark. The Lark sign-in accepts only the company tenant (`tenant_key`) and only the `enterprise_email`, never a personal email. **Unverified:** whether Lark works with better-auth's generic OAuth (RESEARCH-GAPS R1) |
+| Runtime | On the VET Linux server: Postgres and MinIO in the compose project `creative-video-studio`; web and worker as root user systemd units `cvs-web` and `cvs-worker` (each with `MemoryMax`), on a pinned Node under `/opt/creative-video-studio/node`; reached through the Cloudflare tunnel at `video.vetgroup.net` | Deploy only under the owner's pre-approval in the plan (section 3). `uninstall.sh` is the rollback |
+| Tests | Vitest (unit and integration against real Postgres and MinIO in compose) + Playwright on the mock provider (the Member flow, the Admin flow, a Member blocked from Admin pages, a mobile viewport) | |
 
 Layout [proposed]: a pnpm workspace with `apps/web`, `apps/worker` and `packages/db`. Provider adapters live in `packages/core`. This mirrors Ideas Hub.
 
 ## Data model [proposed]
 
-- **`user`, `session`, `account`**: better-auth tables. `user.role` is `member` or `admin`. `user.banned` blocks sign-in. `user.team_id` is required and cannot be changed by the user. Users are banned, never deleted.
+- **`users`, `sessions`, `accounts`**: better-auth tables. `users.role` is `member` or `admin`. `users.banned` blocks sign-in. `users.team_id` is required and cannot be changed by the user. Users are banned, never deleted.
 - **`teams`, `stores`**: managed by an Admin and hidden, never deleted. A team has a name and an optional cost-centre code. A store has a name and a unique code that equals POD Studio's `store_id`; the code cannot change once the store has cost. A default team is seeded, and existing users move into it.
-- **`asset`**: `id`, `owner_id`, `kind` (`input`/`output`), `s3_key`, `mime`, `bytes`, `width`, `height`, `created_at`, `deleted_at`.
-- **`job`**:
+- **`assets`**: `id`, `owner_id`, `kind` (`input`/`output`), `s3_key`, `mime`, `bytes`, `width`, `height`, `created_at`, `deleted_at`.
+- **`jobs`**:
   - Request: `id`, `user_id`, `model`, `provider`, `prompt`, `aspect` (`9:16`/`1:1`), `duration_s` (5–10), `input_asset_ids[]`.
   - Attribution: `team_id` (a snapshot of the user's team at Run) and an optional `store_id`.
   - State: `status` (`queued`/`submitting`/`running`/`succeeded`/`failed`/`failed_unknown`/`timed_out`), `retry_of`.
@@ -134,15 +134,15 @@ Every money event is a row in `cost_entries`. The ledger is the only place cost 
 
 | Model | Route | List price (2026-10-22) | Clip of 8 s |
 |---|---|---|---|
-| Kling o3 Pro (reference), 1080p, no audio | fal | $0.112/s | ~$0.90 |
+| Kling o3 Pro (reference), 1080p, no audio | fal | $0.112–0.14/s | ~$0.90–1.12 |
 | Seedance 2.5 (reference), 720p | Replicate | $0.2312/s | ~$1.85 |
-| Fallback if both fail the 70% gate: Veo 3.1 | Vertex / fal | $0.40/s | $3.20 |
+| Not a fallback: Veo 3.1 needs a new decision and budget (see the go/no-go gate) | Vertex / fal | $0.40/s | $3.20 |
 
 The prices come from the session pricing report (audited 53/53 against saved pages) and have not been checked with real API calls. The input limits per model must come from the provider API schema, not from Fash UI labels (RESEARCH-GAPS R3).
 
 ## Bake-off judging and go/no-go gate
 
-- The bake-off runs early, as a script, in parallel with Milestone 0. It makes 20 clips (2 models x 10 images, 9:16, 8 s) with one fixed safe preset. Total spend stays under $40, counting the canary and any extra round, and nothing retries automatically.
+- The bake-off runs early, as a script, in parallel with Milestone 0. It makes 20 clips (2 models x 10 images, 9:16, 8 s) with one fixed safe preset. Total real spend before go-live stays within $40, counting the canary (one clip per model), the bake-off, any extra round and the server smoke clip, and nothing is retried.
 - The 10 images are read-only copies from POD Studio production MinIO. They are kept outside the repository and never go into Git.
 - An AI judge scores the clips blind; there is no human reviewer:
   - Clips are anonymised to random ids, scaled to 720p and stripped of metadata.
@@ -207,7 +207,7 @@ The fal adapter always sends `X-Fal-Store-IO: 0` and an object lifecycle of at l
 - MinIO is not public. It listens on 127.0.0.1 only, so URLs signed by MinIO itself cannot work.
 - Media is served by `GET /api/assets/:id/content`, an authenticated stream that supports `Range` (needed for video seeking).
 - Downloads use a download token: `GET /api/assets/:id/download?t=<token>`. The token is an HMAC of the asset id, the user id and an expiry of 5 minutes. The route checks both the token and the session. An expired token, or a token for another user, gets 403.
-- The purge sweep is a pg-boss scheduled job. It removes soft-deleted rows and their objects after 30 days. An input asset is purged only when no undeleted job references it.
+- The purge sweep is a pg-boss scheduled job. For clips soft-deleted more than 30 days ago it deletes the objects and asset rows and sets `jobs.purged_at`. Job rows and ledger rows are never deleted; they stay as tombstones for the cost ledger. An input asset is purged only when no undeleted job references it.
 - The cap check and the job insert run in one transaction, so two concurrent Runs cannot both pass the last slot.
 - Shortcut: the cost estimate uses list prices; the actual cost from the provider replaces it when the job finishes (an `actual_adjustment` ledger row). Prices drift, so the per-model price table is reviewed monthly.
 
@@ -224,4 +224,4 @@ The fal adapter always sends `X-Fal-Store-IO: 0` and an object lifecycle of at l
 ## Not decided here
 
 - Which model wins. That is the outcome of Milestone 1.
-- Ports, RAM and disk on the VET server (RESEARCH-GAPS R4).
+- RAM and disk headroom on the VET server (RESEARCH-GAPS R4). The ports are fixed (web 3400, Postgres 5435, MinIO 9400/9401); `install.sh` refuses to run if one is taken.

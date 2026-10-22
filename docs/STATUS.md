@@ -1,6 +1,6 @@
 # Status — Creative Video Studio (internal)
 
-Last updated: 2026-10-23. Planning phase; steps 0.1 and 0.2 are built locally and not committed. The deep-interview decisions are recorded in the section after Q9; where they differ from Q1–Q9, they win.
+Last updated: 2026-10-23. Steps 0.1, 0.2 and R.3 and the run harness are committed locally; nothing is pushed yet. Next is the owner's preflight and pre-approval sentence. The deep-interview decisions are recorded in the section after Q9; where they differ from Q1–Q9, they win.
 
 ## Workspace
 
@@ -72,11 +72,11 @@ Last updated: 2026-10-23. Planning phase; steps 0.1 and 0.2 are built locally an
   - Design volume: 5–7 clips/day for the first month. This was 20–50 until Q5b.
   - **Q5b (2026-10-22):**
     - The $200 cap is kept for month 1 as a pilot.
-    - At list price, 5–7 clips/day costs about $135–189 a month with Kling ($0.90 per clip) but about $277–389 with Seedance ($1.85 per clip). With Seedance, the cap allows only about 3–4 clips/day.
+    - At list price, 5–7 clips/day costs about $135–235 a month with Kling ($0.90–1.12 per clip; above about 6 clips/day at the high price it passes $200) but about $277–389 with Seedance ($1.85 per clip). With Seedance, the cap allows only about 3–4 clips/day.
     - After Milestone 1 and one month of real invoices, the Admin resets the caps from the real accept rate.
   - Estimated cost per accepted clip: about $1.3–2.6 (list price ÷ 70%). This has not been checked against a real invoice.
 - **Decided in grilling, Q6 (2026-10-22):** privacy and retention.
-  - Only providers whose API terms say inputs are not used for training and are not kept long-term. The providers' data terms have not been read yet. That check goes into `ARCHITECTURE.md` for each candidate (Replicate, fal, BytePlus, Kling, Google).
+  - Only providers whose API terms say inputs are not used for training and are not kept long-term. The terms were read on 2026-10-22: fal and Replicate pass at the platform layer, with a shared model-owner residual risk (`ARCHITECTURE.md`, "Data terms check").
   - Input images and output videos are stored in company-controlled storage. Provider temporary links are never the record.
   - Both are kept until someone deletes them, then soft-deleted for 30 days, then purged.
   - Photos with models are accepted. The upload screen reminds users to upload only images the company has the right to use.
@@ -92,8 +92,8 @@ Last updated: 2026-10-23. Planning phase; steps 0.1 and 0.2 are built locally an
   - Reuse the Ideas Hub stack in this separate repo:
     - a Next.js web app and a worker that calls providers;
     - Postgres with Drizzle, the pg-boss queue, MinIO (S3 API) and better-auth;
-    - all run with docker-compose.
-  - Providers sit behind an adapter layer: a mock adapter for tests, plus one real adapter once a provider is chosen.
+    - Postgres and MinIO run with docker-compose; web and worker run as systemd units (plan step D.4).
+  - Providers sit behind an adapter layer: a mock adapter for tests, plus real adapters for fal and Replicate; only models that pass the bake-off are enabled.
   - The app runs on the company VET Linux server, with its own Postgres and MinIO (no shared database with Ideas Hub or POD Studio).
   - Deploying needs owner approval because the server is production. The plan collects it once, as the pre-approval sentence (section 3).
   - Maintainer: the owner, under the usual repo workflow.
@@ -105,8 +105,8 @@ Last updated: 2026-10-23. Planning phase; steps 0.1 and 0.2 are built locally an
     - Tests cover the flow, the caps and the timeout.
     - The mock output is a sample file and is labelled as mock in both the app and the reports.
   - **Milestone 1 (paid)** is a bake-off on the 10-image sample set.
-    - Candidates: Kling o3 Pro 1080p via fal (about $0.90 per 8 s clip) and Seedance 2.5 720p via Replicate (about $1.85).
-    - 20 clips, about $27.5 at list price, with a hard cap of $40 including technical retries.
+    - Candidates: Kling o3 Pro 1080p via fal (about $0.90–1.12 per 8 s clip) and Seedance 2.5 720p via Replicate (about $1.85).
+    - 20 clips, about $27.5–29.7 at list price. A hard stop at $40 covers the canary, the bake-off, any extra round and the server smoke clip. Nothing is retried; a failed clip is logged with its reason.
     - Before the run, the provider data terms are checked (Q6) and any failing candidate is replaced.
     - The owner creates and funds the provider accounts; keys never go into chat.
   - Continue if at least one model reaches 70% under the Q3 rubric. Then list every passing model in the picker (the higher pass rate is pre-selected) and build the real adapters. Deployment to VET is covered by the owner's pre-approval in the plan (section 3).
@@ -118,18 +118,18 @@ These come from the plan (`.omc/plans/creative-video-studio-plan.md`) and its sp
 
 - **Model picker.**
   - Staff choose the model. Kling o3 Pro (fal) and Seedance 2.5 (Replicate) are each listed with a pass rate and an estimated cost.
-  - Default rule: the model with the higher pass rate is pre-selected; on a tie, the cheaper one. The agent does not pick a default by itself.
+  - Default rule: the model with the higher pass rate is pre-selected; on a tie, the cheaper one. No other default rule is used.
   - The first pass rate comes from the bake-off. After that it is `(seed passes + marked passes) / (seed n + marked n)`, counting marked clips only.
   - An Admin enables or disables each model. A new model needs a small bake-off on the same 10 images first.
 - **Accounts.** An Admin may create a user without a password; that user signs in only with Lark. Only emails an Admin has added can sign in with Lark, and go-live does not wait for Lark.
 - **AI judge.**
-  - The bake-off is automatic: the AI picks 10 images (read-only copies from POD Studio production, kept outside Git) and judges the 20 clips blind. There is no human reviewer.
+  - The bake-off is automatic: a fixed script copies 10 images read-only from POD Studio production (5 mockups, 5 product photos, at least 2 with small text; kept outside Git), and an AI judge scores the 20 clips blind. There is no human reviewer.
   - The judge sees anonymised clips, sampled frames and a fixed rubric. Flicker and judder are also measured from frame differences, with thresholds fixed before judging.
 - **Pass/Fail verdict, report and audit log.**
   - The creator or an Admin marks each clip Pass or Fail. Fail needs one of the 5 faults or "Other".
   - The Admin Report shows 3 weekly KPIs per user (accepted clips, cost per accepted clip, median time from Run to clip) and the failure rate, with a CSV export.
   - An audit log records who changed caps, models, presets, roles, bans and teams, who deleted another user's clip, and who edited a verdict.
-- **Presets.** The AI writes 6 POD presets with Vietnamese labels and English prompts. An Admin edits and toggles them. The bake-off uses one fixed safe preset.
+- **Presets.** 6 POD presets are written in advance, with Vietnamese labels and English prompts. An Admin edits and toggles them. The bake-off uses one fixed safe preset.
 - **Tray.** A "My jobs" tray on every page shows live status, with a toast and a tab-title change on completion. It shows "worker offline" after 60 s without a worker heartbeat.
 - **Backups and restore drill.** Nightly `pg_dump` plus a MinIO copy, kept 14 days on VET. A weekly encrypted copy goes to Cloudflare R2. A restore drill runs before staff go live and then monthly.
 - **Go/no-go gate.** The bake-off runs early, in parallel with Milestone 0. Real-provider and deployment work continues only if a model reaches 70%. If neither does, one extra round runs for the better model within the same $40; if it still misses, the app ships with both models disabled and the result is reported.
@@ -138,6 +138,7 @@ These come from the plan (`.omc/plans/creative-video-studio-plan.md`) and its sp
   - Every provider dollar is an append-only ledger row with user, team (at Run), store, provider, model and ICT month.
   - Caps, the Costs page and two CSVs read the ledger. This is attribution, not billing: no team budgets, wallet or team-lead role.
   - Details: `docs/ARCHITECTURE.md`, "Cost ledger".
+- **Autonomous run.** The owner acts once, before the run: a zero-cost preflight (`pnpm preflight`) and one pre-approval sentence (`pnpm run:approve`), valid 14 days. It covers the private repository, up to $40 of real spend before go-live, read-only VET access for the sample images and checks, the deployment, the tunnel and DNS record, and Lark messages to the owner only. Five hard stops are enforced in code (plan section 3).
 - **Provider data.** The fal adapter sends `X-Fal-Store-IO: 0` and an object lifecycle of at least 1 h; the worker copies the output at once. Downloads use an HMAC download token instead of presigned URLs.
 
 ## What exists
@@ -183,7 +184,7 @@ These are candidates only; nothing is approved.
 
 ### New app
 
-- Steps 0.1 (skeleton) and 0.2 (auth) are built locally and not committed. No provider has been called and nothing is deployed. The stack, auth method and deployment target are chosen in Q8 and the plan.
+- Steps 0.1 (skeleton), 0.2 (auth) and R.3 (password-optional users) and the run harness are committed locally; nothing is pushed. No provider has been called and nothing is deployed. The stack, auth method and deployment target are chosen in Q8 and the plan.
 
 ## Evidence gaps
 
@@ -194,7 +195,7 @@ The Fash backend contract is not needed: the new app calls its own providers.
 - Job lifecycle: queue, status, timeout, retry, cancel, recovery after reload. This depends on provider APIs, typically a webhook or polling flow.
 - Data model for inputs, jobs, outputs and the library, with permissions and retention.
 - Per-model input and setting constraints. **The authoritative source is the provider's API docs, not Fash labels.**
-- Error, empty, loading and success states, download and reuse-settings, budget limits per user or team.
+- Error, empty, loading and success states, download and reuse-settings, the daily and monthly caps (no team budgets).
 - Quality rubric and a test input set from company assets.
 
 ### B. Needs Fash behaviour verification (browser checks; optional, non-blocking)
@@ -237,4 +238,4 @@ Q1–Q9 are decided. The owner accepted three extra defaults on 2026-10-22:
 - a Vietnamese UI;
 - desktop first, with view and download only on mobile.
 
-Drafts written for approval: `docs/PRD.md`, `docs/ARCHITECTURE.md`, `docs/IMPLEMENTATION-PLAN.md` and `docs/RESEARCH-GAPS.md`. The cap/volume conflict was resolved by Q5b. Application code comes only after approval.
+The documents are aligned with the delivery plan (consensus v5). The owner now fills `.env` from the preflight checklist, runs `pnpm preflight` and types the pre-approval sentence with `pnpm run:approve`. The run then creates the repository and works through the plan's phases without further approval waits.
