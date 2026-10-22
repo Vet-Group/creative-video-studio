@@ -3,9 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "next dev --port ${CVS_WEB_PORT:-3400}",
+    "dev": "node scripts/next.ts dev",
     "build": "next build",
-    "start": "next start --port ${CVS_WEB_PORT:-3400}",
+    "start": "node scripts/next.ts start",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "auth:create-user": "tsx scripts/create-user.ts"
