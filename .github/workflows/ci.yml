@@ -1,0 +1,93 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  check:
+    name: Typecheck, test, build, checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      # Matches docker-compose.yml, so DATABASE_URL is the one in .env.example.
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: cvs
+          POSTGRES_PASSWORD: cvs-local-only
+          POSTGRES_DB: cvs
+        ports:
+          - 5435:5432
+        options: >-
+          --health-cmd "pg_isready -U cvs -d cvs"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
+    env:
+      DATABASE_URL: postgres://cvs:cvs-local-only@127.0.0.1:5435/cvs
+      S3_ENDPOINT: http://127.0.0.1:9400
+      S3_ACCESS_KEY_ID: cvs
+      S3_SECRET_ACCESS_KEY: cvs-local-only
+      S3_BUCKET: cvs-media
+      APP_URL: http://localhost:3400
+      # A throwaway value for the build and tests only.
+      BETTER_AUTH_SECRET: ci-only-not-a-secret-0123456789abcdef
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0 (version from packageManager)
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Secret scan
+        run: |
+          docker run --rm -v "$PWD:/repo" \
+            ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f \
+            git --redact --no-banner --config /repo/.gitleaks.toml /repo
+
+      - name: English check
+        run: node scripts/check-english.mjs
+
+      - name: Schema and migrations agree
+        run: pnpm --filter @cvs/db generate && git diff --exit-code && test -z "$(git status --porcelain packages/db/migrations)"
+
+      - name: Shell scripts
+        run: |
+          for f in scripts/run/*.sh deploy/linux/cvs-run-gate .githooks/pre-push; do bash -n "$f"; done
+          shellcheck scripts/run/*.sh deploy/linux/cvs-run-gate .githooks/pre-push
+
+      # A service container cannot take the `server /data` command, so MinIO (docker-compose.yml's image) starts here.
+      - name: Start MinIO
+        run: |
+          docker run -d --name minio -p 9400:9000 -e MINIO_ROOT_USER=cvs -e MINIO_ROOT_PASSWORD=cvs-local-only \
+            chainguard/minio@sha256:4692462f35d97d7e82c30371d82f057703c5d9489bcae726010594c812f2d285 server /data
+          for i in $(seq 1 30); do curl -fs http://127.0.0.1:9400/minio/health/ready && exit 0; sleep 1; done
+          docker logs minio; exit 1
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build
+        run: pnpm --filter @cvs/web build
