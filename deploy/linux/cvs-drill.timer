@@ -1,0 +1,10 @@
+[Unit]
+Description=Creative Video Studio monthly restore drill
+
+[Timer]
+OnCalendar=*-*-01 05:30:00
+Persistent=true
+Unit=cvs-drill.service
+
+[Install]
+WantedBy=timers.target

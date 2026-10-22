@@ -1,0 +1,10 @@
+[Unit]
+Description=Creative Video Studio weekly copy to R2
+
+[Timer]
+OnCalendar=Sun *-*-* 04:30:00
+Persistent=true
+Unit=cvs-backup-weekly.service
+
+[Install]
+WantedBy=timers.target

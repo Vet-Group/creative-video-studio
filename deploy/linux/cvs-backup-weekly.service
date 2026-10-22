@@ -1,0 +1,9 @@
+# Root user unit. Only install together with its timer once CVS_R2_* are set; without them the copy refuses with a clear message.
+[Unit]
+Description=Creative Video Studio weekly copy to the R2 restic repo
+
+[Service]
+Type=oneshot
+EnvironmentFile=%h/.config/creative-video-studio/backup.env
+ExecStart=/opt/creative-video-studio/deploy/linux/cvs-backup --weekly-copy
+TimeoutStartSec=6h

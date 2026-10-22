@@ -1,0 +1,11 @@
+# Root user unit (like the Ideas Hub units). Copy to ~/.config/systemd/user/ for root; D.4 installs it.
+# Secrets live in ~/.config/creative-video-studio/backup.env (CVS_RESTIC_PASSWORD_FILE=..., optional CVS_R2_*), mode 600.
+[Unit]
+Description=Creative Video Studio nightly backup (local restic repo)
+
+[Service]
+Type=oneshot
+EnvironmentFile=%h/.config/creative-video-studio/backup.env
+ExecStart=/opt/creative-video-studio/deploy/linux/cvs-backup
+# The script waits up to 40 minutes for the shared ops lock.
+TimeoutStartSec=3h
