@@ -17,3 +17,6 @@ export interface ModelConfig {
   /** Where each fact above was read: field name to source URL and read date. */
   sources: Record<string, { url: string; readAt: string }>;
 }
+
+/** The USD a Run of `durationSec` reserves at the model's price, as a 4-decimal string (a mock job books 0 in the ledger regardless). */
+export const estimateUsd = (usdPerSecond: number | string, durationSec: number): string => (Number(usdPerSecond) * durationSec).toFixed(4);

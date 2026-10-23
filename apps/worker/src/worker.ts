@@ -13,11 +13,12 @@ import { fileURLToPath } from 'node:url';
 import { close24h, lateBill, type LedgerPool, release, settle, withTransaction } from '@cvs/core/ledger';
 import type { ModelConfig } from '@cvs/core/models';
 import type { ProviderJob, SubmitRequest, VideoProvider } from '@cvs/core/providers';
-import { VIDEO_QUEUE, VIDEO_QUEUE_OPTIONS, type VideoJobData, videoSendOptions } from '@cvs/core/queue';
+import { PURGE_CRON, PURGE_QUEUE, VIDEO_QUEUE, VIDEO_QUEUE_OPTIONS, type VideoJobData, videoSendOptions } from '@cvs/core/queue';
 import { insertAssets } from '@cvs/db/assets';
 import { createDb, type createPool } from '@cvs/db/client';
 import { type Job, PgBoss } from 'pg-boss';
 import { extractPoster, probeSize } from './media';
+import { purgeDeletedClips } from './purge';
 import { deleteObject, putObject } from './storage';
 
 export interface WorkerOptions {
@@ -338,6 +339,12 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
 
   await boss.start();
   await boss.createQueue(VIDEO_QUEUE, VIDEO_QUEUE_OPTIONS);
+  // pg-boss sends the purge once per tick however many workers run.
+  await boss.createQueue(PURGE_QUEUE);
+  await boss.schedule(PURGE_QUEUE, PURGE_CRON, null, { tz: 'Asia/Ho_Chi_Minh' });
+  await boss.work(PURGE_QUEUE, async () => {
+    await purgeDeletedClips(pool, deleteObject, log);
+  });
   await beat();
   await boss.work<VideoJobData>(VIDEO_QUEUE, { localConcurrency: 5, groupConcurrency: 2, pollingIntervalSeconds: o.pollingIntervalSeconds }, async (jobs) => {
     await Promise.all(jobs.map((job) => handle(job).catch((e) => log(`job ${job.data.jobId}`, e))));

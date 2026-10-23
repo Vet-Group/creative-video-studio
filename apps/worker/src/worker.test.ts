@@ -382,3 +382,13 @@ describe('restarts', () => {
     expect((await costs(id)).map((c) => c.kind)).toEqual(['estimate', 'actual_adjustment']);
   });
 });
+
+describe('the purge schedule', () => {
+  test('is registered once a day at 03:00 Ho Chi Minh time, however many workers start', async () => {
+    await start(counting(300));
+    await start(counting(300));
+    const purge = (await boss.getSchedules()).filter((s) => s.name === 'purge');
+    expect(purge).toHaveLength(1);
+    expect(purge[0]).toMatchObject({ cron: '0 3 * * *', timezone: 'Asia/Ho_Chi_Minh' });
+  });
+});

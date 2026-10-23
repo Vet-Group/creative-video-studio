@@ -1,5 +1,6 @@
 import { reserve, withTransaction } from '@cvs/core/ledger';
 import { type CapRefusal, checkCaps } from '@cvs/core/limits';
+import { estimateUsd } from '@cvs/core/models';
 import { VIDEO_QUEUE, videoSendOptions } from '@cvs/core/queue';
 import { pool } from '@/lib/auth';
 import { boss } from '@/lib/queue';
@@ -13,6 +14,32 @@ const CAP_MESSAGES: Record<CapRefusal, string> = {
   daily_clips: 'Bạn đã dùng hết số clip trong ngày hôm nay',
   monthly_usd: 'Đã hết ngân sách tháng của công ty',
 };
+
+/**
+ * `?mine`: the "My jobs" tray. The caller's 20 latest jobs that are not deleted, newest first, and whether the worker is offline
+ * (no heartbeat for 60 s). `retried` is true once the job has its one manual retry.
+ */
+export async function GET(request: Request) {
+  const g = await guard(request, 'member');
+  if (g.error) return g.error;
+  if (!new URL(request.url).searchParams.has('mine')) return bad('only ?mine is supported');
+  const [jobs, worker] = await Promise.all([
+    pool.query(
+      `select j.id, j.status, j.error, j.is_mock, j.aspect, j.duration_s, j.model, j.retry_of, j.output_asset_id, j.poster_asset_id, j.created_at, j.finished_at,
+              exists (select 1 from jobs r where r.retry_of = j.id) as retried
+         from jobs j where j.user_id = $1 and j.deleted_at is null order by j.created_at desc, j.id desc limit 20`,
+      [g.session.user.id],
+    ),
+    pool.query(`select not exists (select 1 from worker_heartbeat where beat_at > now() - interval '60 seconds') as offline`),
+  ]);
+  return Response.json({
+    workerOffline: worker.rows[0].offline,
+    jobs: jobs.rows.map((r) => ({
+      id: r.id, status: r.status, error: r.error, isMock: r.is_mock, ratio: r.aspect, durationSec: r.duration_s, modelId: r.model, retryOf: r.retry_of,
+      retried: r.retried, outputAssetId: r.output_asset_id, posterAssetId: r.poster_asset_id, createdAt: r.created_at, finishedAt: r.finished_at,
+    })),
+  });
+}
 
 /**
  * Create a video job: 1-4 input images the caller may use (their own, or the inputs of a succeeded Library clip for Reuse), an enabled
@@ -84,16 +111,16 @@ export async function POST(request: Request) {
       }
     }
     const provider = original?.provider ?? model.provider;
-    const estimateUsd = (Number(model.usd_per_second) * durationSec).toFixed(4);
+    const estimate = estimateUsd(model.usd_per_second, durationSec);
     // A mock job books 0 USD (see the ledger), so it adds nothing to the monthly cap.
-    const cap = await checkCaps(tx, userId, provider === 'mock' ? '0' : estimateUsd);
+    const cap = await checkCaps(tx, userId, provider === 'mock' ? '0' : estimate);
     if (cap) return Response.json({ error: CAP_MESSAGES[cap] }, { status: 429 });
     await tx.query(
       `insert into jobs (id, user_id, team_id, store_id, retry_of, model, provider, preset_id, prompt, aspect, duration_s, input_asset_ids, is_mock)
        values ($1, $2, coalesce($3, (select team_id from users where id = $2)), $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
       [id, userId, original?.team_id ?? null, storeId, retryOf, modelId, provider, presetId, prompt, ratio, durationSec, assetIds, provider === 'mock'],
     );
-    await reserve(tx, id, estimateUsd);
+    await reserve(tx, id, estimate);
     return null;
   });
   if (refused) return refused;

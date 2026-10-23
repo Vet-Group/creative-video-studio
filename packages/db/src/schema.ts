@@ -328,6 +328,25 @@ export const verdicts = pgTable(
   ],
 );
 
+// Who did what to whom: an Admin deleting another user's clip, any Pass/Fail edit, and the Admin changes of M.5.
+export const auditEntries = pgTable(
+  'audit_entries',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    actorId: text('actor_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'restrict' }),
+    /** The event type, for example 'verdict.set' or 'clip.delete'. */
+    action: text('action').notNull(),
+    /** What the action touched, as 'kind:id' (for example 'job:<id>'). */
+    target: text('target').notNull(),
+    oldValue: jsonb('old_value'),
+    newValue: jsonb('new_value'),
+    createdAt: tstz('created_at').notNull().defaultNow(),
+  },
+  (t) => [index('audit_entries_created_at_idx').on(t.createdAt)],
+);
+
 // One row per worker instance; the UI shows "worker offline" after 60 s without a beat.
 export const workerHeartbeat = pgTable('worker_heartbeat', {
   workerId: text('worker_id').primaryKey(),

@@ -4,6 +4,7 @@
   "type": "module",
   "exports": {
     "./models": "./src/models.ts",
+    "./audit": "./src/audit.ts",
     "./providers": "./src/providers/types.ts",
     "./presets": "./src/presets.ts",
     "./ledger": "./src/ledger.ts",

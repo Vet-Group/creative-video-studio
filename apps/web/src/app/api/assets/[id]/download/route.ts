@@ -1,8 +1,9 @@
 import { readableAsset, streamAsset, type RouteContext } from '@/lib/assets';
+import { clipDownloadName } from '@/lib/clips';
 import { verifyDownloadToken } from '@/lib/download-token';
 import { guard } from '@/lib/session';
 
-/** Attachment download behind a short-lived token; the token must match this asset and this session's user. */
+/** Attachment download behind a short-lived token; the token must match this asset and this session's user. A clip's video is named `YYYYMMDD-<creator-slug>-<id>.mp4`. */
 export async function GET(request: Request, { params }: RouteContext) {
   const g = await guard(request, 'member');
   if (g.error) return g.error;
@@ -13,5 +14,6 @@ export async function GET(request: Request, { params }: RouteContext) {
   }
   const found = await readableAsset(g.session, id);
   if (found.error) return found.error;
-  return streamAsset(request, found.asset, 'attachment');
+  const filename = await clipDownloadName(id);
+  return streamAsset(request, filename ? { ...found.asset, filename } : found.asset, 'attachment');
 }

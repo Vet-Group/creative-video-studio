@@ -2,6 +2,7 @@
 import { type Asset, findAsset } from '@cvs/db/assets';
 import { createDb } from '@cvs/db/client';
 import { pool, type Session } from './auth';
+import { LIVE_CLIP } from './clips';
 import { getObject } from './storage';
 
 export const MAX_FILES = 4;
@@ -48,11 +49,14 @@ export function sniffImage(b: Uint8Array): 'image/jpeg' | 'image/png' | 'image/w
   return undefined;
 }
 
-/** The asset for a signed-in user: 404 when it does not exist, 403 unless the user owns it or is an Admin. */
+/** The asset for a signed-in user: 404 when it does not exist, 403 unless the user owns it, is an Admin, or it belongs to a Library clip (its video, poster or input images). */
 export async function readableAsset(session: Session, id: string): Promise<{ asset: Asset; error?: never } | { asset?: never; error: Response }> {
   const asset = await findAsset(db, id);
   if (!asset) return { error: Response.json({ error: 'not found' }, { status: 404 }) };
-  if (asset.ownerId !== session.user.id && session.user.role !== 'admin') return { error: Response.json({ error: 'forbidden' }, { status: 403 }) };
+  if (asset.ownerId !== session.user.id && session.user.role !== 'admin') {
+    const inLibrary = await pool.query(`select 1 from jobs j where ${LIVE_CLIP} and ($1 in (j.output_asset_id, j.poster_asset_id) or $1 = any(j.input_asset_ids)) limit 1`, [id]);
+    if (!inLibrary.rowCount) return { error: Response.json({ error: 'forbidden' }, { status: 403 }) };
+  }
   return { asset };
 }
 
