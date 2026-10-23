@@ -22,6 +22,10 @@ const CLIPS = [
   { id: 'example-4', width: 240, height: 240, hue: 180 },
   { id: 'example-5', width: 180, height: 320, hue: 240 },
   { id: 'example-6', width: 180, height: 320, hue: 300 },
+  { id: 'example-7', width: 320, height: 180, hue: 30 },
+  { id: 'example-8', width: 240, height: 320, hue: 90 },
+  { id: 'example-9', width: 320, height: 180, hue: 150 },
+  { id: 'example-10', width: 240, height: 320, hue: 210 },
 ];
 
 test('the example clips exist, are tiny, and have posters', async () => {

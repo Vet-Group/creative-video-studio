@@ -1,13 +1,16 @@
 'use client';
-import { type DragEvent, type KeyboardEvent, useEffect, useState } from 'react';
+import { type DragEvent, type KeyboardEvent, useEffect, useId, useRef, useState } from 'react';
 import { api, errorText, sendJson } from '@/lib/api';
-import { EXAMPLES, type Example, exampleForPreset } from '@/lib/examples';
+import { EXAMPLES, type Example, exampleForPreset, splitColumns } from '@/lib/examples';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { useHydrated } from '@/lib/use-hydrated';
 import { Carousel } from './Carousel';
+import { Icon } from './Icon';
 import { useJobs } from './jobs';
 import { Modal } from './Modal';
+import { ModelPicker } from './ModelPicker';
 import { Preview } from './Preview';
+import { Select } from './Select';
 import { Tray } from './Shell';
 
 interface Model {
@@ -69,6 +72,9 @@ export function CreateForm({ reuse }: { reuse?: string }) {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const narrow = useMediaQuery(NARROW);
+  const fileInput = useRef<HTMLInputElement>(null);
+  const [dragOver, setDragOver] = useState(false);
+  const promptId = useId();
   const [tab, setTab] = useState<Tab | null>(null); // null: the default for the width (Create below 1024 px, else History)
   const [picking, setPicking] = useState(false);
   const [detail, setDetail] = useState<Example | null>(null);
@@ -159,7 +165,7 @@ export function CreateForm({ reuse }: { reuse?: string }) {
     setNotice('');
     try {
       await api('/api/jobs', sendJson('POST', { assetIds: images.map((i) => i.id), modelId, ...(presetId ? { presetId } : { prompt }), ratio, durationSec, storeId: storeId || null }));
-      setNotice(narrow ? 'Đã gửi job. Theo dõi trong tab "Lịch sử".' : 'Đã gửi job. Theo dõi trong mục "Job của tôi".');
+      setNotice('Đã gửi job. Theo dõi trong tab "Lịch sử".');
       setRefetch((n) => n + 1);
       if (!narrow) setTab('history'); // beside the form, the new job shows in History
       await refresh();
@@ -187,12 +193,13 @@ export function CreateForm({ reuse }: { reuse?: string }) {
   }
   function onDrop(e: DragEvent) {
     e.preventDefault();
+    setDragOver(false);
     if (hydrated) void upload([...e.dataTransfer.files]);
   }
-  /** Fills the form from a sample; nothing is submitted. */
+  /** Fills the form from a sample; nothing is submitted. A sample whose look has no matching form ratio leaves the ratio alone. */
   function fillFromExample(ex: Example) {
     if (presets?.some((p) => p.id === ex.presetId)) setPresetId(ex.presetId);
-    setRatio(ex.ratio);
+    if (ex.ratio) setRatio(ex.ratio);
     setDurationSec(ex.durationSec);
     setDetail(null);
     setPicking(false);
@@ -201,7 +208,9 @@ export function CreateForm({ reuse }: { reuse?: string }) {
 
   return (
     <section aria-labelledby="create-title" className="create">
-      <h1 id="create-title">Tạo video</h1>
+      <h1 id="create-title" className="sr-only">
+        Tạo video
+      </h1>
       <div className="create-grid">
         <div className="tabs" role="tablist" aria-label="Khu vực làm việc" onKeyDown={onTabKey}>
           {tabs.map((t) => (
@@ -212,155 +221,167 @@ export function CreateForm({ reuse }: { reuse?: string }) {
         </div>
 
         <div className="card form-card" id="create-panel-create" role={narrow ? 'tabpanel' : undefined} aria-labelledby={narrow ? 'create-tab-create' : undefined} hidden={narrow && shown !== 'create'}>
-      <div className="banner">
-        {banner ? <img src={banner.poster} alt="" /> : <div className="banner-empty" aria-hidden="true" />}
-        <div className="banner-text">
-          <strong>{current?.label ?? 'Tự viết mô tả'}</strong>
-          <button type="button" onClick={() => setPicking(true)}>
-            Chọn mẫu khác
-          </button>
-        </div>
-      </div>
-
-      <label>
-        Mẫu chuyển động
-        <select value={presetId} onChange={(e) => setPresetId(e.target.value)}>
-          {presets?.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.label}
-            </option>
-          ))}
-          <option value="">Tự viết mô tả</option>
-        </select>
-      </label>
-
-      <fieldset className="dropzone" onDragOver={(e) => e.preventDefault()} onDrop={onDrop}>
-        <legend>Ảnh sản phẩm</legend>
-        <input
-          type="file"
-          accept="image/jpeg,image/png,image/webp"
-          multiple
-          aria-label="Ảnh sản phẩm"
-          disabled={!hydrated}
-          onChange={(e) => {
-            const files = [...(e.target.files ?? [])];
-            e.target.value = '';
-            void upload(files);
-          }}
-        />
-        <p className="muted">Kéo ảnh vào đây hoặc chọn tệp. 1 đến {MAX_IMAGES} ảnh JPEG, PNG hoặc WebP. Ảnh đầu tiên là sản phẩm chính. Chỉ tải lên ảnh mà công ty có quyền sử dụng.</p>
-        <ul className="thumbs">
-          {images.map((i) => (
-            <li key={i.id}>
-              <img src={`/api/assets/${i.id}/content`} alt={i.filename} />
-              <button type="button" aria-label={`Bỏ ảnh ${i.filename}`} onClick={() => setImages((cur) => cur.filter((x) => x.id !== i.id))}>
-                ×
+          <div className="form-scroll">
+            <div className="banner">
+              {banner ? <img src={banner.poster} alt="" /> : <div className="banner-empty" aria-hidden="true" />}
+              <div className="banner-text">
+                <strong>{current?.label ?? 'Tự viết mô tả'}</strong>
+              </div>
+              <button type="button" className="banner-chip" onClick={() => setPicking(true)}>
+                Chọn mẫu khác
               </button>
-            </li>
-          ))}
-        </ul>
-      </fieldset>
+            </div>
 
-      <fieldset className="models">
-        <legend>Mô hình</legend>
-        {models?.models.map((m) => (
-          <label key={m.id} className="model">
-            <input type="radio" name="model" value={m.id} checked={modelId === m.id} disabled={!m.supported} onChange={() => setModelId(m.id)} />
-            <span>
-              {m.label}
-              {m.isMock && <span className="badge">MOCK</span>}
-            </span>
-            <span className="muted">Tỉ lệ đạt: {ratePct(m)}</span>
-            <span className="muted">Ước tính: ${m.estimateUsd}</span>
-            {!m.supported && <span className="muted">Không hỗ trợ lựa chọn này</span>}
-          </label>
-        ))}
-        {models && models.models.length === 0 && <p className="muted">Chưa có mô hình nào được bật.</p>}
-        {tooMany && chosen && <p className="error">Mô hình này nhận tối đa {chosen.maxImages} ảnh.</p>}
-      </fieldset>
+            <Select
+              label="Mẫu chuyển động"
+              icon="preset"
+              heading="Chọn mẫu chuyển động"
+              value={presetId}
+              options={[...(presets ?? []).map((p) => ({ value: p.id, label: p.label })), { value: '', label: 'Tự viết mô tả' }]}
+              onChange={setPresetId}
+            />
 
-      <label>
-        Mô tả chuyển động
-        <textarea value={prompt} maxLength={MAX_PROMPT} rows={4} disabled={presetId !== ''} onChange={(e) => setPrompt(e.target.value)} />
-      </label>
-      <p className="muted">Chọn một mẫu, hoặc chọn "Tự viết mô tả" rồi nhập mô tả (tối đa {MAX_PROMPT} ký tự, nên viết bằng tiếng Anh).</p>
+            <div className="dropzone" data-over={dragOver} data-filled={images.length > 0} onDragOver={(e) => (e.preventDefault(), setDragOver(true))} onDragLeave={() => setDragOver(false)} onDrop={onDrop}>
+              <input
+                ref={fileInput}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                multiple
+                hidden
+                aria-label="Ảnh sản phẩm"
+                disabled={!hydrated}
+                onChange={(e) => {
+                  const files = [...(e.target.files ?? [])];
+                  e.target.value = '';
+                  void upload(files);
+                }}
+              />
+              <button type="button" className="dropzone-pick" disabled={!hydrated || images.length >= MAX_IMAGES} onClick={() => fileInput.current?.click()}>
+                {images.length === 0 && (
+                  <span className="dropzone-plus" aria-hidden="true">
+                    <Icon name="plus" size={16} />
+                  </span>
+                )}
+                <span className="dropzone-hint">
+                  {images.length === 0 ? `Kéo thả hoặc bấm để thêm 1–${MAX_IMAGES} ảnh sản phẩm` : images.length >= MAX_IMAGES ? `Đã đủ ${MAX_IMAGES} ảnh` : `${images.length}/${MAX_IMAGES} ảnh, bấm hoặc kéo thêm`}
+                </span>
+              </button>
+              {images.length > 0 && (
+                <ul className="thumbs" aria-label="Ảnh đã chọn">
+                  {images.map((i) => (
+                    <li key={i.id}>
+                      <img src={`/api/assets/${i.id}/content`} alt={i.filename} />
+                      <button type="button" aria-label={`Bỏ ảnh ${i.filename}`} onClick={() => setImages((cur) => cur.filter((x) => x.id !== i.id))}>
+                        <Icon name="x" size={12} />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <p className="help">JPEG, PNG hoặc WebP. Ảnh đầu tiên là sản phẩm chính. Chỉ tải lên ảnh mà công ty có quyền sử dụng.</p>
 
-      <div className="settings">
-        <label>
-          Tỉ lệ khung hình
-          <select value={ratio} onChange={(e) => setRatio(e.target.value)}>
-            {[...new Set(ratios)].map((r) => (
-              <option key={r} value={r}>
-                {RATIO_LABEL[r] ?? r}
-              </option>
-            ))}
-          </select>
-        </label>
+            {models && models.models.length > 0 && (
+              <ModelPicker
+                models={models.models.map((m) => ({ id: m.id, label: m.label, isMock: m.isMock, supported: m.supported, rate: ratePct(m), estimateUsd: m.estimateUsd }))}
+                value={modelId}
+                onChange={setModelId}
+              />
+            )}
+            {models && models.models.length === 0 && <p className="help">Chưa có mô hình nào được bật.</p>}
+            {tooMany && chosen && <p className="error">Mô hình này nhận tối đa {chosen.maxImages} ảnh.</p>}
 
-        <label>
-          Thời lượng
-          <select value={durationSec} onChange={(e) => setDurationSec(Number(e.target.value))}>
-            {durations.map((d) => (
-              <option key={d} value={d}>
-                {d} giây
-              </option>
-            ))}
-          </select>
-        </label>
+            <div className="field">
+              <label htmlFor={promptId} className="field-label">
+                Mô tả chuyển động
+              </label>
+              <div className="prompt-box" data-disabled={presetId !== ''}>
+                <textarea id={promptId} value={prompt} maxLength={MAX_PROMPT} disabled={presetId !== ''} onChange={(e) => setPrompt(e.target.value)} />
+                <div className="prompt-foot">
+                  <span>Tối đa {MAX_PROMPT} ký tự</span>
+                  <span>
+                    {prompt.length}/{MAX_PROMPT}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <p className="help">Chọn một mẫu, hoặc chọn "Tự viết mô tả" rồi nhập mô tả (nên viết bằng tiếng Anh).</p>
 
-        <label>
-          Cửa hàng/Thương hiệu
-          <select value={storeId} onChange={(e) => setStoreId(e.target.value)}>
-            <option value="">Không chọn</option>
-            {stores.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
+            <Select
+              label="Tỉ lệ khung hình"
+              icon="ratio"
+              heading="Chọn tỉ lệ khung hình"
+              value={ratio}
+              options={[...new Set(ratios)].map((r) => ({ value: r, label: RATIO_LABEL[r] ?? r }))}
+              onChange={setRatio}
+            />
+            <Select
+              label="Thời lượng"
+              icon="clock"
+              heading="Chọn thời lượng"
+              value={String(durationSec)}
+              options={durations.map((d) => ({ value: String(d), label: `${d} giây` }))}
+              onChange={(v) => setDurationSec(Number(v))}
+            />
+            <Select
+              label="Cửa hàng/Thương hiệu"
+              icon="store"
+              heading="Chọn cửa hàng hoặc thương hiệu"
+              value={storeId}
+              options={[{ value: '', label: 'Không chọn' }, ...stores.map((s) => ({ value: s.id, label: s.name }))]}
+              onChange={setStoreId}
+            />
 
-      {models && (
-        <p>
-          Tháng này bạn đã dùng: ${models.monthToDate.usd}
-          {models.monthToDate.provisional && <span className="tag">Tạm tính</span>}
-          {models.remainingBudgetUsd !== undefined && <span> · Ngân sách tháng còn lại của công ty: ${models.remainingBudgetUsd}</span>}
-        </p>
-      )}
+            {models && (
+              <p className="help">
+                Tháng này bạn đã dùng: ${models.monthToDate.usd}
+                {models.monthToDate.provisional && <span className="tag">Tạm tính</span>}
+                {models.remainingBudgetUsd !== undefined && <span> · Ngân sách tháng còn lại của công ty: ${models.remainingBudgetUsd}</span>}
+              </p>
+            )}
+          </div>
 
-      {error && (
-        <p className="error" role="alert">
-          {error}
-        </p>
-      )}
-      {notice && <p role="status">{notice}</p>}
-      <div className="runbar">
-        {chosen && <span className="muted">Mỗi clip: ${chosen.estimateUsd}</span>}
-        <button type="button" className="primary" disabled={!canRun} onClick={() => void run()}>
-          Tạo video
-        </button>
-      </div>
+          {(error || notice) && (
+            <div className="form-message">
+              {error && (
+                <p className="error" role="alert">
+                  {error}
+                </p>
+              )}
+              {notice && <p role="status">{notice}</p>}
+            </div>
+          )}
+          <div className="runbar">
+            <button type="button" className="primary run" disabled={!canRun} onClick={() => void run()}>
+              Tạo video
+              {chosen && <span className="run-cost">· ${chosen.estimateUsd}</span>}
+            </button>
+          </div>
         </div>
 
         <div className="side" id={`create-panel-${shown === 'create' ? 'history' : shown}`} role="tabpanel" aria-labelledby={`create-tab-${shown === 'create' ? 'history' : shown}`} hidden={narrow && shown === 'create'}>
           {shown === 'examples' ? (
-            <ul className="masonry" aria-label="Video mẫu">
-              {EXAMPLES.map((ex) => (
-                <li key={ex.id} className="example" onClick={() => setDetail(ex)}>
-                  <div className="example-media">
-                    <Preview src={ex.src} poster={ex.poster} width={ex.width} height={ex.height} title={ex.title} paused={picking || detail !== null} />
-                    <span className="chips">
-                      <span className="chip">Mẫu</span>
-                      {ex.fixture && <span className="chip">fixture</span>}
-                    </span>
-                  </div>
-                  <button type="button" className="example-title" onClick={() => setDetail(ex)}>
-                    {ex.title}
-                  </button>
-                </li>
+            <div className="masonry" role="group" aria-label="Video mẫu">
+              {splitColumns(EXAMPLES, narrow ? 2 : 3).map((column, c) => (
+                <ul key={c} className="masonry-col">
+                  {column.map((ex) => (
+                    <li key={ex.id} className="example">
+                      <Preview src={ex.src} poster={ex.poster} width={ex.width} height={ex.height} title={ex.title} paused={picking || detail !== null} />
+                      <span className="chips">
+                        <span className="chip">Mẫu</span>
+                        {ex.fixture && <span className="chip">fixture</span>}
+                      </span>
+                      <button type="button" className="example-open" onClick={() => setDetail(ex)}>
+                        <span className="example-caption">{ex.title}</span>
+                      </button>
+                      <button type="button" className="example-use" aria-label={`Dùng mẫu này: ${ex.title}`} onClick={() => fillFromExample(ex)}>
+                        Dùng mẫu này
+                      </button>
+                    </li>
+                  ))}
+                </ul>
               ))}
-            </ul>
+            </div>
           ) : (
             <Tray />
           )}
@@ -410,7 +431,7 @@ export function CreateForm({ reuse }: { reuse?: string }) {
             <h2>{detail.title}</h2>
             <Preview src={detail.src} poster={detail.poster} width={detail.width} height={detail.height} title={detail.title} />
             <p className="muted">
-              Mẫu minh họa{detail.fixture ? ' (fixture)' : ''} · {detail.ratio} · {detail.durationSec} giây
+              Mẫu minh họa{detail.fixture ? ' (fixture)' : ''} · {detail.aspect} · {detail.durationSec} giây
             </p>
             <button type="button" className="primary" onClick={() => fillFromExample(detail)}>
               Dùng mẫu này

@@ -1,0 +1,29 @@
+// A small inline icon set, drawn for this app: 16 px grid, 1.5 px strokes, colour from the text.
+const PATHS = {
+  create: 'M2 4.5h7.5a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1v-5a1 1 0 0 1 1-1z M10.5 7l4-2v6l-4-2',
+  library: 'M2 2h5v5H2z M9 2h5v5H9z M2 9h5v5H2z M9 9h5v5H9z',
+  admin: 'M8 1.5l5.5 2v4c0 3.2-2.3 5.6-5.5 7-3.2-1.4-5.5-3.8-5.5-7v-4z',
+  gear: 'M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z M8 1v2 M8 13v2 M1 8h2 M13 8h2 M3.05 3.05l1.4 1.4 M11.55 11.55l1.4 1.4 M3.05 12.95l1.4-1.4 M11.55 4.45l1.4-1.4',
+  menu: 'M2 4h12 M2 8h12 M2 12h12',
+  down: 'M3.5 6l4.5 4.5L12.5 6',
+  up: 'M3.5 10l4.5-4.5L12.5 10',
+  plus: 'M8 3v10 M3 8h10',
+  check: 'M3 8.5l3.2 3.2L13 4.5',
+  x: 'M3.5 3.5l9 9 M12.5 3.5l-9 9',
+  preset: 'M8 1.5l1.4 3.6 3.6 1.4-3.6 1.4L8 11.5 6.6 7.9 3 6.5l3.6-1.4z',
+  ratio: 'M2.5 4h11v8h-11z',
+  clock: 'M8 2a6 6 0 1 0 0 12A6 6 0 0 0 8 2z M8 4.8V8l2.2 1.4',
+  store: 'M2 6l1-3.5h10L14 6 M2 6v7.5h12V6 M2 6c0 1.1.9 1.8 2 1.8S6 7.1 6 6c0 1.1.9 1.8 2 1.8s2-.7 2-1.8c0 1.1.9 1.8 2 1.8s2-.7 2-1.8',
+  model: 'M8 1.5l6 3.2v6.6l-6 3.2-6-3.2V4.7z M2 4.7l6 3.2 6-3.2 M8 7.9v6.6',
+  search: 'M7 2.5a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9z M10.5 10.5L14 14',
+} as const;
+
+export type IconName = keyof typeof PATHS;
+
+export function Icon({ name, size = 14 }: { name: IconName; size?: number }) {
+  return (
+    <svg className="icon" aria-hidden="true" focusable="false" width={size} height={size} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d={PATHS[name]} />
+    </svg>
+  );
+}

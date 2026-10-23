@@ -1,14 +1,15 @@
 // Motion parity (docs/UI-MOTION-PARITY.md, acceptance 3): the Examples clips really play from real video files, and the playback rules hold.
 // A poster is never evidence of motion, so these specs read currentTime and decoded frames from the video elements.
 import { expect, type Locator, type Page, test } from '@playwright/test';
-import { signIn } from './support.test';
+import { EXAMPLES } from '../src/lib/examples';
+import { modelButton, signIn } from './support.test';
 
-const CLIPS = 6;
+const CLIPS = EXAMPLES.length;
 
 async function openExamples(page: Page, size = { width: 1440, height: 1400 }): Promise<Locator> {
   await page.setViewportSize(size);
   await signIn(page, 'member6');
-  await expect(page.getByRole('radio', { name: /Mock E2E/ })).toBeChecked();
+  await expect(modelButton(page)).toContainText('Mock E2E');
   await page.getByRole('tab', { name: 'Ví dụ' }).click();
   const videos = page.locator('.masonry video');
   await expect(videos).toHaveCount(CLIPS);
@@ -81,9 +82,10 @@ test('a hidden tab pauses every clip and a shown tab resumes them', async ({ pag
 });
 
 test('C2: a broken source keeps a poster-sized placeholder, not a gap', async ({ page }) => {
-  await page.route('**/fixtures/examples/example-3.mp4', (r) => r.fulfill({ status: 404, body: 'gone' }));
+  // The first tile is the first to get a play slot, so its broken source is hit at once (the tiles are dealt into columns, so tile 3 is no longer among the first four).
+  await page.route('**/fixtures/examples/example-1.mp4', (r) => r.fulfill({ status: 404, body: 'gone' }));
   const videos = await openExamples(page);
-  const placeholder = page.getByRole('img', { name: /Đặt trên bàn đời thường: không tải được video/ });
+  const placeholder = page.getByRole('img', { name: /Tiến gần nhẹ nhàng: không tải được video/ });
   await expect(placeholder).toBeVisible();
   const box = (await placeholder.boundingBox())!;
   expect(box.width).toBeGreaterThan(50);

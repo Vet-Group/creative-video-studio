@@ -1,7 +1,7 @@
 // Helpers shared by the specs. The name ends in .test.ts, like the specs, so the UI strings below pass the English check;
 // Playwright runs only *.e2e.test.ts (see playwright.config.ts) and Vitest skips this folder.
 import { crc32, deflateSync } from 'node:zlib';
-import { expect, type Page } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
 import { PASSWORD, USERS, type UserKey } from './users';
 
 /** A small valid 8x8 PNG, made here so no product image is needed. */
@@ -32,15 +32,51 @@ export async function signIn(page: Page, who: UserKey): Promise<void> {
   await expect(page).toHaveURL(/\/create$/);
 }
 
-/** Uploads one image on the Create page, keeps the pre-selected model and presses Run. `store` is the name of a store in the picker. */
+// The Create form's selects are custom: a button (role combobox) that opens a listbox. These helpers drive them the way a user does.
+
+/** The select with this label. Its `data-value` attribute holds the chosen value. */
+export const select = (page: Page, label: string): Locator => page.getByRole('combobox', { name: label, exact: true });
+/** The options of an open select. */
+export const optionsOf = (page: Page, label: string): Locator => page.getByRole('listbox', { name: label, exact: true }).getByRole('option');
+
+/** Opens the select and picks the option with this value (`data-value`). */
+export async function selectValue(page: Page, label: string, value: string): Promise<void> {
+  await select(page, label).click();
+  await optionsOf(page, label).and(page.locator(`[data-value="${value}"]`)).click();
+}
+
+/** Opens the select and picks the option with this text. */
+export async function selectText(page: Page, label: string, text: string): Promise<void> {
+  await select(page, label).click();
+  await optionsOf(page, label).getByText(text, { exact: true }).click();
+}
+
+/** Opens the select, checks the full list of options, and closes it again with the mouse. */
+export async function expectOptions(page: Page, label: string, texts: string[]): Promise<void> {
+  await select(page, label).click();
+  await expect(optionsOf(page, label)).toHaveText(texts);
+  await select(page, label).click();
+  await expect(select(page, label)).toHaveAttribute('aria-expanded', 'false');
+}
+
+/** The model picker's button; its text is the chosen model. */
+export const modelButton = (page: Page): Locator => page.getByRole('button', { name: /^Mô hình / });
+
+/** Opens the model panel and picks the model whose row matches. */
+export async function pickModel(page: Page, name: RegExp): Promise<void> {
+  await modelButton(page).click();
+  await page.getByRole('option', { name }).click();
+}
+
+/** Uploads one image on the Create page, keeps the pre-selected model and presses Run. `preset`, `ratio` and `duration` are option values; `store` is the name of a store in the picker. */
 export async function runInUi(page: Page, options: { preset?: string; ratio?: string; duration?: string; store?: string } = {}): Promise<void> {
   await page.getByLabel('Ảnh sản phẩm').setInputFiles({ name: 'shirt.png', mimeType: 'image/png', buffer: png() });
   await expect(page.getByRole('img', { name: 'shirt.png' })).toBeVisible();
-  if (options.preset) await page.getByLabel('Mẫu chuyển động').selectOption(options.preset);
-  if (options.ratio) await page.getByLabel('Tỉ lệ khung hình').selectOption(options.ratio);
-  if (options.duration) await page.getByLabel('Thời lượng').selectOption(options.duration);
-  if (options.store) await page.getByLabel('Cửa hàng/Thương hiệu').selectOption({ label: options.store });
-  await expect(page.getByRole('radio', { name: /Mock E2E/ })).toBeChecked();
+  if (options.preset) await selectValue(page, 'Mẫu chuyển động', options.preset);
+  if (options.ratio) await selectValue(page, 'Tỉ lệ khung hình', options.ratio);
+  if (options.duration) await selectValue(page, 'Thời lượng', options.duration);
+  if (options.store) await selectText(page, 'Cửa hàng/Thương hiệu', options.store);
+  await expect(modelButton(page)).toContainText('Mock E2E');
   await page.getByRole('button', { name: 'Tạo video' }).click();
   await expect(page.getByText('Đã gửi job')).toBeVisible();
 }

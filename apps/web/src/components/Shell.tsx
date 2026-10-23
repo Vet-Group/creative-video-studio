@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { createContext, type ReactNode, useContext, useEffect, useRef, useState } from 'react';
 import { api, errorText, sendJson, type JobStatus, type TrayJob } from '@/lib/api';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
+import { Icon, type IconName } from './Icon';
 import { JobsProvider, useJobs } from './jobs';
 
 const STATUS_LABEL: Record<JobStatus, string> = {
@@ -115,8 +116,11 @@ export function Shell({ userId, userName, isAdmin, children }: { userId: string;
   const [open, setOpen] = useState(false); // the drawer, below 1024 px
   const menuButton = useRef<HTMLButtonElement>(null);
   const sidebar = useRef<HTMLDivElement>(null);
-  const link = (href: string, text: string) => (
-    <Link href={href} aria-current={pathname === href ? 'page' : undefined}>
+  const link = (href: string, text: string, icon: IconName, current = pathname === href) => (
+    <Link href={href} aria-current={current ? 'page' : undefined}>
+      <span className="nav-icon">
+        <Icon name={icon} />
+      </span>
       {text}
     </Link>
   );
@@ -127,11 +131,16 @@ export function Shell({ userId, userName, isAdmin, children }: { userId: string;
 
   useEffect(() => setOpen(false), [pathname]);
   useEffect(() => {
+    if (!narrow) setOpen(false); // the drawer is for narrow screens only
+  }, [narrow]);
+  useEffect(() => {
     if (!open) return;
-    sidebar.current?.querySelector('a')?.focus();
+    sidebar.current?.querySelector<HTMLElement>('nav a')?.focus();
+    document.body.style.overflow = 'hidden'; // the page behind the drawer does not scroll
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
     document.addEventListener('keydown', onKey);
     return () => {
+      document.body.style.overflow = '';
       document.removeEventListener('keydown', onKey);
       menuButton.current?.focus(); // runs once the drawer has closed and the page is no longer inert
     };
@@ -159,30 +168,40 @@ export function Shell({ userId, userName, isAdmin, children }: { userId: string;
               </span>
               <strong>Creative Video Studio</strong>
               <button type="button" className="drawer-close" aria-label="Đóng menu" onClick={() => setOpen(false)}>
-                ×
+                <Icon name="x" size={16} />
               </button>
             </div>
             <nav aria-label="Điều hướng chính">
-              {link('/create', 'Tạo video')}
-              {link('/library', 'Thư viện')}
+              {link('/create', 'Tạo video', 'create')}
+              {link('/library', 'Thư viện', 'library')}
               {isAdmin && (
                 <Link href="/admin/users" aria-current={pathname.startsWith('/admin') ? 'page' : undefined}>
+                  <span className="nav-icon">
+                    <Icon name="admin" />
+                  </span>
                   Quản trị
                 </Link>
               )}
             </nav>
             <div className="account">
-              <span className="who">{userName}</span>
-              {link('/account/sign-in-methods', 'Phương thức đăng nhập')}
-              <button type="button" onClick={() => void signOut()}>
+              <div className="account-row">
+                <span className="avatar" aria-hidden="true">
+                  {userName.trim().charAt(0).toUpperCase()}
+                </span>
+                <span className="who">{userName}</span>
+                <Link href="/account/sign-in-methods" className="account-gear" aria-label="Phương thức đăng nhập" aria-current={pathname === '/account/sign-in-methods' ? 'page' : undefined}>
+                  <Icon name="gear" size={16} />
+                </Link>
+              </div>
+              <button type="button" className="signout" onClick={() => void signOut()}>
                 Đăng xuất
               </button>
             </div>
           </div>
           <div className="content" inert={narrow && open}>
             <header className="topbar">
-              <button ref={menuButton} type="button" aria-label="Mở menu" aria-expanded={open} aria-controls="sidebar" onClick={() => setOpen(true)}>
-                ☰
+              <button ref={menuButton} type="button" className="menu-button" aria-label="Mở menu" aria-expanded={open} aria-controls="sidebar" onClick={() => setOpen(true)}>
+                <Icon name="menu" size={20} />
               </button>
               <strong>{title}</strong>
             </header>
