@@ -479,6 +479,85 @@ describe('POST /api/jobs for an image feature', () => {
     expect((await runImage(m, { ...tryOn, prompt: '  Put the red dress on her ', assetIds: [m.asset, `${m.id}-garment`] })).status).toBe(201);
   });
 
+  describe('the image apps', () => {
+    const appModels: [string, string, number, string][] = [
+      ['app-char', 'character_swap', 2, 'auto'], ['app-model', 'model_swap', 2, 'auto'], ['app-bg', 'background_changer', 2, 'auto'], ['app-reframe', 'reframe', 1, '1:1,16:9'],
+      ['app-up', 'image_upscale', 1, 'auto'], ['app-face', 'face_swap', 2, 'auto'], ['app-rm', 'background_remover', 1, 'auto'],
+    ];
+    beforeAll(async () => {
+      for (const [id, feature, max, ratios] of appModels) {
+        await pool.query(
+          `insert into model_configs (id, provider, endpoint, label, kind, features, ratios, durations_sec, max_images, image_prices, sources, enabled)
+           values ($1, 'mock', 'mock', $1, 'image', $2::text[], $3::text[], '{}', $4, '{"1K": "0.0500", "2K": "0.0400"}', '{}', true)`,
+          [id, `{${feature}}`, `{${ratios}}`, max],
+        );
+      }
+    });
+    /** Runs `feature` on its model with `n` images (the first is the member's own, the rest are made for the run) and returns the response and the stored job. */
+    async function app(feature: string, n: number, extra: Record<string, unknown> = {}) {
+      const m = await newMember();
+      const ids = [m.asset];
+      for (let i = 1; i < n; i++) {
+        ids.push(`${m.id}-i${i}`);
+        await insertAsset(ids[i]!, m.id);
+      }
+      const modelId = appModels.find((a) => a[1] === feature)?.[0];
+      const res = await run(m.cookie, { assetIds: ids, modelId, feature, ratio: 'auto', params: { resolution: '1K' }, ...extra });
+      const body = (await res.json()) as { id?: string; error?: string };
+      const job = body.id ? (await pool.query('select feature, model, prompt, aspect, params from jobs where id = $1', [body.id])).rows[0] : undefined;
+      return { status: res.status, error: body.error, job };
+    }
+
+    test.each([
+      ['character_swap', 'replace the whole person in the second image with the person from the first image, keep the background'],
+      ['model_swap', 'replace the person in the second image with the model from the first image, keep the clothing, pose and background exactly'],
+    ])('%s needs exactly two images and stores its fixed instruction when the prompt is empty', async (feature, instruction) => {
+      expect(await app(feature, 1)).toMatchObject({ status: 400, error: `${feature} needs 2 images` });
+      expect((await app(feature, 3)).error).toMatch(/number of images/);
+      const ok = await app(feature, 2);
+      expect([ok.status, ok.job]).toEqual([201, { feature, model: appModels.find((a) => a[1] === feature)![0], prompt: instruction, aspect: 'auto', params: { resolution: '1K' } }]);
+    });
+
+    test('Face Swap needs two images and takes no prompt; Background Remover and Upscale take one image', async () => {
+      expect((await app('face_swap', 1)).error).toBe('face_swap needs 2 images');
+      expect(await app('face_swap', 2)).toMatchObject({ status: 201, job: { prompt: 'Swap the face from the first image onto the person in the second image.' } });
+      expect(await app('background_remover', 1)).toMatchObject({ status: 201, job: { prompt: 'Remove the background.' } });
+      expect((await app('background_remover', 2)).status).toBe(400);
+      expect(await app('image_upscale', 1, { params: { resolution: '2K' } })).toMatchObject({ status: 201, job: { params: { resolution: '2K' } } });
+      expect((await app('image_upscale', 1, { params: { resolution: '4K' } })).status).toBe(400); // this model has no 4K price
+    });
+
+    test('Reframe takes one of its ratios and a default prompt', async () => {
+      expect(await app('reframe', 1, { ratio: '16:9' })).toMatchObject({ status: 201, job: { aspect: '16:9', prompt: 'Extend the image to the new aspect ratio.' } });
+      expect((await app('reframe', 1, { ratio: '9:16' })).status).toBe(400);
+    });
+
+    test('Background Changer takes a prompt with one image or a reference image with two, not both and not neither', async () => {
+      expect(await app('background_changer', 1, { prompt: 'a marble table' })).toMatchObject({ status: 201, job: { prompt: 'a marble table' } });
+      expect(await app('background_changer', 2)).toMatchObject({ status: 201, job: { prompt: 'Replace the background with the one in the reference image.' } });
+      const message = /prompt or a reference image/;
+      expect((await app('background_changer', 1)).error).toMatch(message);
+      expect((await app('background_changer', 2, { prompt: 'a marble table' })).error).toMatch(message);
+    });
+
+    test("a swap adds the member's prompt to its fixed instruction; the other apps keep the member's prompt as it is, trimmed", async () => {
+      const fixed = 'replace the whole person in the second image with the person from the first image, keep the background';
+      expect(await app('character_swap', 2, { prompt: '  keep the hat ' })).toMatchObject({ status: 201, job: { prompt: `${fixed}. keep the hat` } });
+      expect(await app('reframe', 1, { prompt: '  wide shot ', ratio: '1:1' })).toMatchObject({ status: 201, job: { prompt: 'wide shot' } });
+    });
+
+    test.each([['reframe', 1, 'Extend the image to the new aspect ratio.'], ['model_swap', 2, 'replace the person in the second image with the model from the first image, keep the clothing, pose and background exactly'], ['background_changer', 2, 'Replace the background with the one in the reference image.']])(
+      'an empty or blank prompt on %s means no prompt, so the default applies',
+      async (feature, n, instruction) => {
+        for (const prompt of ['', '   ']) expect(await app(feature, n, { prompt, ratio: feature === 'reframe' ? '1:1' : 'auto' })).toMatchObject({ status: 201, job: { prompt: instruction } });
+      },
+    );
+
+    test('a blank prompt on a feature without a default is still refused', async () => {
+      expect((await app('image', 1, { prompt: '  ', modelId: 'img-pro', ratio: '1:1' })).error).toMatch(/takes a prompt and no preset/);
+    });
+  });
+
   test('keeps the video path to its own rules: no params, and the marketing feature needs a model that lists it', async () => {
     const m = await newMember();
     expect((await runAs(m, { params: { resolution: '1K' } })).status).toBe(400);

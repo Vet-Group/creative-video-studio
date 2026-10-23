@@ -74,7 +74,7 @@ describe('migration 0002 seed data', () => {
 
 describe('migration 0007 image models', () => {
   test('seeds the seven fal image models disabled, each with its prices, ratios and features', async () => {
-    const { rows } = await pool.query(`select id, endpoint, features, ratios, durations_sec, max_images, image_prices, usd_per_second, enabled, sources from model_configs where kind = 'image' order by id`);
+    const { rows } = await pool.query(`select id, endpoint, features, ratios, durations_sec, max_images, image_prices, usd_per_second, enabled, sources from model_configs where kind = 'image' and not features && ARRAY['character_swap', 'model_swap', 'background_changer', 'reframe', 'image_upscale', 'face_swap', 'background_remover']::text[] order by id`);
     expect(rows.map((r) => [r.id, r.endpoint, r.features, r.image_prices])).toEqual([
       ['fashn-v1.6', 'fal-ai/fashn/tryon/v1.6', ['try_on'], { '1K': '0.075' }],
       ['gpt-image-2', 'openai/gpt-image-2/edit', ['image'], { '1K': '0.21' }],
@@ -119,6 +119,36 @@ describe('migration 0007 image models', () => {
     expect((await pool.query(`select params, duration_s from jobs where id = $1`, [id])).rows).toEqual([{ params: { resolution: '2K' }, duration_s: 0 }]);
     expect((await pool.query(`select params from jobs where id = $1`, [await insertJob(user)])).rows).toEqual([{ params: {} }]);
     await expect(pool.query(`update jobs set aspect = '7:5' where id = $1`, [id])).rejects.toThrow(/jobs_aspect_check/);
+  });
+});
+
+describe('migration 0009 image app models', () => {
+  test('seeds one disabled row per app with its endpoint, input count, prices and a dated source', async () => {
+    const { rows } = await pool.query(`select id, endpoint, features, ratios, max_images, image_prices, enabled, sources from model_configs where features && ARRAY['character_swap', 'model_swap', 'background_changer', 'reframe', 'image_upscale', 'face_swap', 'background_remover']::text[] order by id`);
+    expect(rows.map((r) => [r.id, r.endpoint, r.features, r.max_images, r.image_prices])).toEqual([
+      ['bria-background-remove', 'fal-ai/bria/background/remove', ['background_remover'], 1, { '1K': '0.018' }],
+      ['bria-background-replace', 'fal-ai/bria/background/replace', ['background_changer'], 2, { '1K': '0.04' }],
+      ['easel-advanced-face-swap', 'easel-ai/advanced-face-swap', ['face_swap'], 2, { '1K': '0.05' }],
+      ['ideogram-v3-reframe', 'fal-ai/ideogram/v3/reframe', ['reframe'], 1, { '1K': '0.03' }],
+      ['nano-banana-pro-character-swap', 'fal-ai/nano-banana-pro/edit', ['character_swap'], 2, { '1K': '0.15' }],
+      ['nano-banana-pro-model-swap', 'fal-ai/nano-banana-pro/edit', ['model_swap'], 2, { '1K': '0.15' }],
+      ['topaz-upscale', 'fal-ai/topaz/upscale/image', ['image_upscale'], 1, { '2K': '0.08', '4K': '0.08' }],
+    ]);
+    for (const r of rows) {
+      expect(r.enabled).toBe(false);
+      expect(r.sources.imagePrices.readAt).toBe('2026-10-24');
+      expect(r.sources.ratios.url).toBe(`https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=${r.endpoint}`);
+    }
+    expect(rows.find((r) => r.id === 'topaz-upscale').sources.imagePrices.note).toContain('up to 24 MP');
+    // Reframe is the only app with a choice of ratio; the rest take the image as it is.
+    expect(rows.filter((r) => r.ratios.length > 1).map((r) => r.id)).toEqual(['ideogram-v3-reframe']);
+    expect(rows.find((r) => r.id === 'ideogram-v3-reframe').ratios).not.toContain('auto');
+  });
+
+  test('every app row can be enabled', async () => {
+    const ids = ['bria-background-remove', 'bria-background-replace', 'easel-advanced-face-swap', 'ideogram-v3-reframe', 'nano-banana-pro-character-swap', 'nano-banana-pro-model-swap', 'topaz-upscale'];
+    await pool.query(`update model_configs set enabled = true where id = any($1)`, [ids]);
+    await pool.query(`update model_configs set enabled = false where id = any($1)`, [ids]);
   });
 });
 

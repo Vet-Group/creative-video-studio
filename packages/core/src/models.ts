@@ -34,6 +34,21 @@ export interface ImageModelConfig {
   features: string[];
 }
 
+/**
+ * The prompt of an app that has no prompt field of its own (or only an optional one), stored with the job and sent when the Run names none.
+ * The two swaps send the new person as the first image and the photo to change as the second. For Background Changer it stands for "the second image is the new background".
+ */
+export const FEATURE_PROMPTS: Record<string, string> = {
+  try_on: 'Dress the person in the first image in the garment from the other image(s). Keep the person, face, pose, body and background exactly unchanged. Do not add any text, logos or watermarks.',
+  character_swap: 'replace the whole person in the second image with the person from the first image, keep the background',
+  model_swap: 'replace the person in the second image with the model from the first image, keep the clothing, pose and background exactly',
+  background_changer: 'Replace the background with the one in the reference image.',
+  reframe: 'Extend the image to the new aspect ratio.',
+  image_upscale: 'Upscale the image.',
+  face_swap: 'Swap the face from the first image onto the person in the second image.',
+  background_remover: 'Remove the background.',
+};
+
 const FAL_KLING_PAGE = 'https://fal.ai/models/fal-ai/kling-video/o3/pro/reference-to-video';
 const FAL_KLING_SCHEMA = 'https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=fal-ai/kling-video/o3/pro/reference-to-video';
 const REPLICATE_PAGE = 'https://replicate.com/bytedance/seedance-2.5';

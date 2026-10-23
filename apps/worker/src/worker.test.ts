@@ -8,6 +8,7 @@ import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import { DeleteBucketCommand, DeleteObjectsCommand, HeadObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { reserve, withTransaction } from '@cvs/core/ledger';
+import { ImageReadError } from '@cvs/core/providers/http';
 import type { ImageProvider, ImageSubmitRequest, VideoProvider } from '@cvs/core/providers';
 import { VIDEO_QUEUE, VIDEO_QUEUE_OPTIONS, videoSendOptions } from '@cvs/core/queue';
 import { createPool } from '@cvs/db/client';
@@ -484,6 +485,27 @@ describe('image jobs', () => {
     await send(id, 'u1');
     await waitFor('the job to fail', async () => (await status(id)) === 'failed');
     expect(await total(id)).toEqual({ usd: '0.0000', is_final: true });
+  });
+
+  test('an input the adapter refuses before any call fails the job and releases its estimate, where any other submit error keeps it', async () => {
+    const refusing: ImageProvider = {
+      ...createMockImageProvider({ runMs: 300, dir: mockDir }),
+      submit: async (req) => {
+        throw req.prompt === 'refuse' ? new ImageReadError('the image (6001x4000) is larger than the 24 MP the Upscale price covers') : new Error('connection reset');
+      },
+    };
+    const refused = await newImageJob('u1', { prompt: 'refuse' });
+    await startImages(refusing);
+    await send(refused, 'u1');
+    await waitFor('the job to fail', async () => (await status(refused)) === 'failed');
+    expect((await job(refused)).error).toMatch(/larger than the 24 MP/);
+    expect(await total(refused)).toEqual({ usd: '0.0000', is_final: true });
+    expect((await costs(refused)).map((c) => c.kind)).toEqual(['estimate', 'release']);
+
+    const unknown = await newImageJob('u1');
+    await send(unknown, 'u1');
+    await waitFor('the job to end unknown', async () => (await status(unknown)) === 'failed_unknown');
+    expect((await total(unknown)).is_final).toBe(false);
   });
 
   test('without an image adapter the job fails before any call and releases its estimate', async () => {

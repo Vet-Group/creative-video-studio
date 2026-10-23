@@ -5,7 +5,8 @@
 //   upload (only the SDKs); non-https images are therefore sent as data URIs, and the B.5a canary shows whether Kling accepts them
 //   Kling O3 Pro input and output schema: https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=fal-ai/kling-video/o3/pro/reference-to-video
 //   image endpoints (read 2026-10-24): https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=<endpoint>, one per entry of IMAGE_BODIES
-import { estimate, imageEstimate, packJobId, ProviderHttpError, resolveImages, sendJson, timeout, unpackJobId, type Fetch, type ReadImage } from './http';
+import { imageSize } from './image-size';
+import { estimate, ImageReadError, imageEstimate, packJobId, ProviderHttpError, resolveImages, sendJson, timeout, unpackJobId, type Fetch, type ReadImage } from './http';
 import type { ImageProvider, ImageSubmitRequest, ProviderStatus, VideoProvider } from './types';
 
 const QUEUE = 'https://queue.fal.run';
@@ -89,19 +90,42 @@ const nano =
 /** GPT Image 2 takes only these preset sizes (its schema states no limits for a custom size). */
 const GPT_SIZES: Record<string, string> = { auto: 'auto', '1:1': 'square_hd', '3:4': 'portrait_4_3', '9:16': 'portrait_16_9', '4:3': 'landscape_4_3', '16:9': 'landscape_16_9' };
 
+/** A width and height in the ratio with about `pixels` pixels in total, each a multiple of 16. */
+function sizeFor(ratio: string, pixels: number): { width: number; height: number } {
+  const [w, h] = ratio.split(':').map(Number) as [number, number];
+  const round = (n: number) => Math.round(n / 16) * 16;
+  return { width: round(Math.sqrt((pixels * w) / h)), height: round(Math.sqrt((pixels * h) / w)) };
+}
+
 /**
  * Seedream takes 'auto_1K' or 'auto_2K', or a size whose total pixels are between 1024x1024 and 2048x2048 (its schema description). The targets sit
  * inside that range with room for the rounding to a multiple of 16. shortcut: unconfirmed by a live call; the first canary run shows whether fal accepts it.
  */
 function seedreamSize(ratio: string, resolution: string): string | { width: number; height: number } {
   if (ratio === 'auto') return `auto_${resolution}`;
-  const [w, h] = ratio.split(':').map(Number) as [number, number];
-  const pixels = resolution === '2K' ? 4_000_000 : 1_100_000;
-  const round = (n: number) => Math.round(n / 16) * 16;
-  return { width: round(Math.sqrt((pixels * w) / h)), height: round(Math.sqrt((pixels * h) / w)) };
+  return sizeFor(ratio, resolution === '2K' ? 4_000_000 : 1_100_000);
 }
 
-/** The request body of each image endpoint, built from its input schema (read 2026-10-24). Output is always png (seedream and fashn offer png too). */
+/** The pixel target of each Upscale resolution (the Fash menu's 2K and 4K). */
+const UPSCALE_PIXELS: Record<string, number> = { '2K': 2048 * 2048, '4K': 3840 * 2160 };
+/** fal's price is $0.08 per output image up to 24 MP and $0.16 up to 48 MP (model page, read 2026-10-24); the app is priced at the first tier. */
+const UPSCALE_MAX_PIXELS = 24_000_000;
+
+/**
+ * The factor that brings an image to the target, rounded down, between 1 (an image at or over the target is still enhanced) and 4 (the schema's limit),
+ * and low enough that the output stays inside the price tier. An image over the tier even at factor 1 is refused before any call, which releases the estimate.
+ */
+function upscaleFactor(image: string, target: number): number {
+  // The worker always inlines its images, so the bytes are in the data URL; an https URL cannot be sized without a download.
+  const size = image.startsWith('data:') ? imageSize(Buffer.from(image.slice(image.indexOf(',') + 1), 'base64')) : undefined;
+  if (!size) throw new ImageReadError('upscale needs a jpeg, png or webp image it can measure');
+  const pixels = size.width * size.height;
+  const tier = Math.sqrt(UPSCALE_MAX_PIXELS / pixels);
+  if (tier < 1) throw new ImageReadError(`the image (${size.width}x${size.height}) is larger than the 24 MP the Upscale price covers`);
+  return Math.max(1, Math.floor(Math.min(4, tier, Math.sqrt(target / pixels)) * 100) / 100);
+}
+
+/** The request body of each image endpoint, built from its input schema (read 2026-10-24). Output is png wherever the schema offers a format; Topaz is left at its jpeg default, and the other endpoints have no choice. */
 const IMAGE_BODIES: Record<string, ImageBody> = {
   'fal-ai/nano-banana-pro/edit': nano(true),
   'google/nano-banana-2.1/edit': nano(true),
@@ -120,6 +144,32 @@ const IMAGE_BODIES: Record<string, ImageBody> = {
     if (urls.length !== 2) throw new Error('fashn needs the model image and the garment image');
     return { model_image: urls[0], garment_image: urls[1], num_samples: 1, output_format: 'png' };
   },
+  // Character Swap and Model Swap use the Nano Banana Pro builder above; their fixed prompt says which image is which.
+  // The reference image or the prompt, never both (the schema). The reference is the second input image; without it the prompt describes the new background.
+  'fal-ai/bria/background/replace': (req, [image_url, ref_image_url]) => {
+    if (ref_image_url) return { image_url, ref_image_url, num_images: 1 };
+    if (!req.prompt.trim()) throw new Error('bria background replace needs a reference image or a prompt');
+    return { image_url, prompt: req.prompt, num_images: 1 };
+  },
+  // The schema's ratio is a size, not a ratio: pixels in the ratio, about one megapixel. shortcut: the size limits are unconfirmed by a live call. Prompt and style fields are not offered.
+  'fal-ai/ideogram/v3/reframe': (req, [image_url]) => {
+    if (!/^\d+:\d+$/.test(req.ratio)) throw new Error(`ideogram reframe needs a ratio, not ${req.ratio}`);
+    return { image_url, image_size: sizeFor(req.ratio, 1_048_576), rendering_speed: 'TURBO', num_images: 1 };
+  },
+  // The schema has an upscale factor, not a target size, so the factor is worked out from the image's own size to land on the pixel budget of the resolution.
+  'fal-ai/topaz/upscale/image': (req, [image_url]) => {
+    const target = UPSCALE_PIXELS[req.resolution];
+    if (!target) throw new Error(`topaz upscale does not offer resolution ${req.resolution}`);
+    return { image_url, upscale_factor: upscaleFactor(image_url!, target), model: 'Standard V2' };
+  },
+  // The source face first, then the photo to put it on. gender_0 and workflow_type are required and the app has no field for them, so the neutral gender and
+  // the target's hair are fixed. upscale and detailer repeat the schema defaults so a default change cannot move the price.
+  'easel-ai/advanced-face-swap': (_req, urls) => {
+    if (urls.length !== 2) throw new Error('face swap needs the source face and the target photo');
+    return { face_image_0: urls[0], target_image: urls[1], gender_0: 'non-binary', workflow_type: 'target_hair', upscale: true, detailer: false };
+  },
+  // A prompt would be billed extra and change the cutout, so none is sent.
+  'fal-ai/bria/background/remove': (_req, [image_url]) => ({ image_url }),
 };
 
 export function createFalImageProvider(opts: { apiKey: string; fetch?: Fetch; readImage?: ReadImage }): ImageProvider {
@@ -136,7 +186,7 @@ export function createFalImageProvider(opts: { apiKey: string; fetch?: Fetch; re
       return { providerJobId: res.request_id };
     },
     async status(job) {
-      return pollFal(f, headers, job.model.endpoint, job.providerJobId, imageEstimate(job), (out) => (out.images as { url?: string }[] | undefined)?.[0]?.url, 'images[0].url');
+      return pollFal(f, headers, job.model.endpoint, job.providerJobId, imageEstimate(job), (out) => (out.images as { url?: string }[] | undefined)?.[0]?.url ?? (out.image as { url?: string } | undefined)?.url, 'images[0].url or image.url');
     },
     async cancel() {
       return { supported: false };
