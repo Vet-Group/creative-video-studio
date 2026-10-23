@@ -36,6 +36,7 @@ const backupDir = fwd(mkdtempSync(join(tmpdir(), 'cvs-backup-repo-')));
 const id = `${process.pid}`;
 const testDb = `cvs_bk_test_${id}`;
 const bucket = `cvs-bk-test-${id}`;
+const r2Bucket = `cvs-bk-r2-${id}`;
 const cacheVolume = `${project || 'cvs'}_restic-cache-test-${id}`;
 
 const baseEnv = {
@@ -124,6 +125,7 @@ describe.skipIf(skipReason !== null)(`cvs-backup against compose ${skipReason ? 
   afterAll(() => {
     dc(['exec', '-T', 'postgres', 'dropdb', '-U', 'cvs', '--if-exists', '--force', testDb]);
     mc(`mc rb --force ih/${bucket}`);
+    mc(`mc rb --force ih/${r2Bucket}`);
     spawnSync('docker', ['volume', 'rm', '-f', cacheVolume]);
   }, 120_000);
 
@@ -180,5 +182,30 @@ describe.skipIf(skipReason !== null)(`cvs-backup against compose ${skipReason ? 
     const bad = run(['--drill'], { CVS_DRILL_FAULT_SQL: 'update cost_entries set usd = usd + 1' });
     expect(bad.out).toContain('DIFF sum public.cost_entries restored 5.750000, snapshot 3.750000');
     expect(bad.status).not.toBe(0);
+  });
+
+  // Stands in for R2: a restic s3: repository on the compose MinIO, reached by service name over the compose network.
+  test('4. the weekly copy lands a snapshot in an S3 repository, hides the secrets and is idempotent', { timeout: 600_000 }, () => {
+    const minioEnv = (name: string) => mc(`printf %s "$${name}"`).stdout;
+    const secret = minioEnv('MINIO_ROOT_PASSWORD');
+    expect(secret).not.toBe('');
+    expect(mc(`mc mb ih/${r2Bucket}`).status).toBe(0);
+    const r2 = {
+      CVS_RESTIC_NETWORK: `${project}_default`,
+      CVS_R2_REPOSITORY: `s3:http://minio:9000/${r2Bucket}`,
+      CVS_R2_ACCESS_KEY_ID: minioEnv('MINIO_ROOT_USER'),
+      CVS_R2_SECRET_ACCESS_KEY: secret,
+    };
+    const snapshotObjects = () => mc(`mc ls ih/${r2Bucket}/snapshots/`).stdout.split('\n').filter((l) => l.trim()).length;
+    for (const pass of [1, 2]) {
+      const r = run(['--weekly-copy'], r2);
+      expect(r.out, `pass ${pass}`).toContain('weekly copy of snapshot');
+      expect(r.status).toBe(0);
+      expect(r.out).not.toContain(baseEnv.CVS_RESTIC_PASSWORD);
+      expect(r.out).not.toContain(secret);
+      expect(snapshotObjects(), `pass ${pass}`).toBe(1);
+    }
+    // The weekly forget must prune the R2 repo only; the local dailies stay.
+    expect(snapshotCount()).toBe(2);
   });
 });
