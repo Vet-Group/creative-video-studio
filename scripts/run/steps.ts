@@ -1,4 +1,4 @@
-// Every plan step with its dependencies (plan §4). The conductor only starts a step whose deps are done or skipped.
+// Every plan step with its dependencies (plan §4). The conductor only starts a step whose deps are done or skipped (gate deps: done only).
 export interface StepDef {
   id: string;
   title: string;
@@ -8,6 +8,8 @@ export interface StepDef {
   timeoutMin?: number;
   /** Deps whose skip does not skip this step: it then runs in its reduced form (e.g. M.6 ships models disabled). */
   soft?: string[];
+  /** Deps that must end `done`: a skip does not release this step, so it waits for the owner (e.g. D.5 waits for M.7b). */
+  gate?: string[];
 }
 
 export const STEPS: StepDef[] = [
@@ -35,13 +37,13 @@ export const STEPS: StepDef[] = [
   { id: 'D.1', title: 'Google and Lark login with account linking (mocked OAuth)', deps: ['M.5'], worktree: 'app' },
   // Change request UI-PARITY (2026-10-23): rebuild the Fash look and motion on the existing app (docs/UI-MOTION-PARITY.md).
   { id: 'M.7', title: 'UI and motion parity', deps: ['D.1'], worktree: 'app', timeoutMin: 180 },
-  // M.7 ended with C4 not met; M.7b applies the measured fix list (docs/UI-MOTION-PARITY-M7B.md).
-  { id: 'M.7b', title: 'UI parity fixes from measurements', deps: ['D.1'], worktree: 'app', timeoutMin: 180 },
+  // M.7 ended with C4 not met; M.7b applies the measured fix list (docs/UI-MOTION-PARITY-M7B.md). B.3 only feeds the demo media.
+  { id: 'M.7b', title: 'High-fidelity video UI (owner C4 sign-off)', deps: ['D.1', 'B.3'], worktree: 'app', timeoutMin: 180, soft: ['B.3'] },
   { id: 'D.2', title: 'Backups', deps: ['A.0b'], worktree: 'app' },
   { id: 'D.2-r2', title: 'Weekly R2 copy', deps: ['D.2'], worktree: 'app' },
   { id: 'D.3', title: 'Read-only VET check', deps: ['A.0c'], worktree: 'app' },
   { id: 'D.4', title: 'Deploy kit', deps: ['D.2', 'D.3'], worktree: 'app', soft: ['D.3'] },
-  { id: 'D.5', title: 'Deploy', deps: ['D.4', 'D.1', 'M.6', 'B.7', 'M.7', 'M.7b'], worktree: 'app', timeoutMin: 180, soft: ['M.6', 'B.7', 'M.7', 'M.7b'] },
+  { id: 'D.5', title: 'Deploy', deps: ['D.4', 'D.1', 'M.6', 'B.7', 'M.7', 'M.7b'], worktree: 'app', timeoutMin: 180, soft: ['M.6', 'B.7', 'M.7'], gate: ['M.7b'] },
   { id: 'D.5-hostname', title: 'Public hostname', deps: ['D.5'], worktree: 'app' },
   { id: 'D.5-admin', title: 'First Admin', deps: ['D.5'], worktree: 'app' },
   { id: 'D.5-lark', title: 'Lark live check', deps: ['D.5-hostname', 'D.1'], worktree: 'app' },
