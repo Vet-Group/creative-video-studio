@@ -1,0 +1,54 @@
+// Audit rows for the links and unlinks better-auth makes itself: the first social sign-in, linkSocial and unlinkAccount.
+// The Admin unlink route writes its own row in its own transaction (api/admin/users/[id]/accounts/[provider]).
+import { audit } from '@cvs/core/audit';
+import type { Queryable } from '@cvs/core/ledger';
+import { googleEmail } from './sign-in-methods';
+
+interface AccountRow {
+  userId: string;
+  providerId: string;
+  accountId: string;
+  idToken?: string | null;
+}
+
+// Lark sends no id_token, so its getUserInfo leaves the email here, keyed by the Lark account id, for the account.link hook that follows.
+const larkEmails = new Map<string, string>();
+export function rememberLarkEmail(accountId: string, email: string): void {
+  if (larkEmails.size >= 500) larkEmails.clear(); // entries of sign-ins that linked nothing are never taken
+  larkEmails.set(accountId, email);
+}
+
+/** The provider email of the latest account.link row of this user and provider; for an unlink, when the account row no longer says. */
+export async function lastLinkedEmail(q: Queryable, userId: string, provider: string): Promise<string | null> {
+  const { rows } = await q.query(
+    `select new_value->>'email' as email from audit_entries where action = 'account.link' and target = $1 and new_value->>'provider' = $2 order by id desc limit 1`,
+    [`user:${userId}`, provider],
+  );
+  return rows[0]?.email ?? null;
+}
+
+/**
+ * databaseHooks.account for better-auth. The actor is the account's own user: all three flows run in that user's session.
+ * shortcut: the hook runs after the account write on another statement, because better-auth gives hooks no handle on its connection;
+ * a crash between the two loses the row, and a failing audit write fails the sign-in or link that was already saved. Upgrade by moving
+ * the writes to a Postgres trigger on accounts if the audit log must never miss one.
+ */
+export function accountAuditHooks(q: Queryable) {
+  return {
+    create: {
+      async after(a: AccountRow) {
+        if (a.providerId === 'credential') return; // the password account Admin user creation makes is not a link
+        const email = googleEmail(a.idToken ?? null) ?? larkEmails.get(a.accountId) ?? null;
+        larkEmails.delete(a.accountId);
+        await audit(q, { actorId: a.userId, action: 'account.link', target: `user:${a.userId}`, newValue: { provider: a.providerId, email } });
+      },
+    },
+    delete: {
+      async after(a: AccountRow) {
+        if (a.providerId === 'credential') return;
+        const email = googleEmail(a.idToken ?? null) ?? (await lastLinkedEmail(q, a.userId, a.providerId));
+        await audit(q, { actorId: a.userId, action: 'account.unlink', target: `user:${a.userId}`, oldValue: { provider: a.providerId, email } });
+      },
+    },
+  };
+}
