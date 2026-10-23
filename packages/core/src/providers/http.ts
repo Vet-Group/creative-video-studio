@@ -3,8 +3,13 @@ import type { ProviderJob, SubmitRequest } from './types';
 
 /** A provider answered with a non-2xx status; `body` keeps the response text for isFundingRefusal. */
 export class ProviderHttpError extends Error {
-  constructor(readonly status: number, readonly body: string, message: string) {
+  readonly status: number;
+  readonly body: string;
+  // Fields are declared out here, not as constructor parameter properties, so the scripts can run this file under Node's type stripping.
+  constructor(status: number, body: string, message: string) {
     super(message);
+    this.status = status;
+    this.body = body;
   }
 }
 
