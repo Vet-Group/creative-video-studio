@@ -104,6 +104,13 @@ describe('fal', () => {
     await expect(createFalProvider({ apiKey: 'k', fetch: fn }).status(job)).rejects.toBeInstanceOf(ProviderHttpError);
   });
 
+  test.each([401, 403, 429])('a %i on the result says nothing about the job, so it throws and the key is polled again', async (code) => {
+    const { fn } = fakeFetch([200, { status: 'COMPLETED' }], [code, { detail: 'nope' }]);
+    const err = await createFalProvider({ apiKey: 'k', fetch: fn }).status(job).catch((e) => e);
+    expect(err).toBeInstanceOf(ProviderHttpError);
+    expect(err.status).toBe(code);
+  });
+
   test('status and result requests carry a timeout signal', async () => {
     const { fn, calls } = fakeFetch([200, { status: 'COMPLETED' }], [200, { video: { url: 'u' } }]);
     await createFalProvider({ apiKey: 'k', fetch: fn }).status(job);
@@ -239,6 +246,9 @@ describe('replicate', () => {
 describe('shared helpers', () => {
   test('other refusals are not funding refusals', () => {
     expect(isFundingRefusal(new ProviderHttpError(403, 'forbidden', 'x'))).toBe(false);
+    // A rate limit is never a credit refusal, even when its body mentions payment or credit.
+    expect(isFundingRefusal(new ProviderHttpError(429, 'add a payment method', 'x'))).toBe(false);
+    expect(isFundingRefusal(new ProviderHttpError(429, 'out of credit for this minute', 'x'))).toBe(false);
     expect(isFundingRefusal(new ProviderHttpError(422, 'invalid duration', 'x'))).toBe(false);
     expect(isFundingRefusal(new ProviderHttpError(500, 'credit service down', 'x'))).toBe(false);
     expect(isFundingRefusal(new Error('balance'))).toBe(false);

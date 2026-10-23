@@ -4,12 +4,19 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "bakeoff:run": "tsx bakeoff/run.ts",
+    "bakeoff:anonymise": "tsx bakeoff/anonymise.ts",
+    "bakeoff:metrics": "tsx bakeoff/metrics.ts",
+    "bakeoff:judge": "tsx bakeoff/judge.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.1150.0",
     "@cvs/core": "workspace:*",
     "ffmpeg-static": "5.2.0",
     "ffprobe-static": "3.1.0"
+  },
+  "devDependencies": {
+    "tsx": "4.23.15"
   }
 }

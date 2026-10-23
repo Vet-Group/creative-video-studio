@@ -3,18 +3,26 @@ import type { ProviderJob, SubmitRequest } from './types';
 
 /** A provider answered with a non-2xx status; `body` keeps the response text for isFundingRefusal. */
 export class ProviderHttpError extends Error {
-  constructor(readonly status: number, readonly body: string, message: string) {
+  readonly status: number;
+  readonly body: string;
+  // Fields are declared out here, not as constructor parameter properties, so the scripts can run this file under Node's type stripping.
+  constructor(status: number, body: string, message: string) {
     super(message);
+    this.status = status;
+    this.body = body;
   }
 }
 
 /**
  * True when the provider refused for lack of credit or billing, which is not a render failure (plan, Credit thrift).
  * 402 is the expected code; fal is reported to answer 403 "User is locked. Reason: Exhausted balance", so any 4xx whose body names a balance
- * problem counts too. B.5a confirms the real codes against the live APIs.
+ * problem counts too. A 429 is a rate limit whatever its body says ("add a payment method" is a plan-tier hint). B.5a confirms the real
+ * codes against the live APIs.
  */
 export const isFundingRefusal = (e: unknown): boolean =>
-  e instanceof ProviderHttpError && (e.status === 402 || (e.status >= 400 && e.status < 500 && /balance|billing|credit|locked|payment/i.test(e.body)));
+  e instanceof ProviderHttpError &&
+  e.status !== 429 &&
+  (e.status === 402 || (e.status >= 400 && e.status < 500 && /balance|billing|credit|locked|payment/i.test(e.body)));
 
 export type Fetch = typeof fetch;
 
@@ -40,12 +48,19 @@ export async function resolveImages(urls: string[], readImage?: ReadImage): Prom
   return Promise.all(
     urls.map(async (url) => {
       if (url.startsWith('https:')) return url;
-      if (!readImage) throw new Error(`image ${url.split(':')[0]}: URL needs a readImage resolver`);
-      const { bytes, contentType } = await readImage(url);
-      return `data:${contentType};base64,${Buffer.from(bytes).toString('base64')}`;
+      if (!readImage) throw new ImageReadError(`image ${url.split(':')[0]}: URL needs a readImage resolver`);
+      try {
+        const { bytes, contentType } = await readImage(url);
+        return `data:${contentType};base64,${Buffer.from(bytes).toString('base64')}`;
+      } catch (e) {
+        throw new ImageReadError(`image ${url.split(':')[0]}: ${(e as Error).message}`);
+      }
     }),
   );
 }
+
+/** An input image could not be read locally; thrown before any network call, so nothing was submitted or billed. */
+export class ImageReadError extends Error {}
 
 // The provider job id carries the requested duration ("5:abc123"), so status() can estimate the cost after a worker restart.
 export const packJobId = (durationSec: number, id: string): string => `${durationSec}:${id}`;
