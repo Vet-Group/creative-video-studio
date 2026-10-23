@@ -12,8 +12,8 @@ export function validWeek(week: string | null): boolean {
 export async function weeklyReport(week: string | null) {
   const { rows } = await pool.query(
     `with w as (select date_trunc('week', coalesce($1::date, (now() at time zone ${ICT})::date)::timestamp)::date as start),
-          wj as (select j.* from jobs j, w where (j.created_at at time zone ${ICT})::date >= w.start and (j.created_at at time zone ${ICT})::date < w.start + 7),
-          spend as (select user_id, sum(usd) as usd from cost_entries, w where job_id is not null and day >= w.start and day < w.start + 7 group by user_id),
+          wj as (select j.* from jobs j, w where j.feature in ('video', 'marketing') and (j.created_at at time zone ${ICT})::date >= w.start and (j.created_at at time zone ${ICT})::date < w.start + 7),
+          spend as (select ce.user_id, sum(ce.usd) as usd from cost_entries ce join jobs j on j.id = ce.job_id and j.feature in ('video', 'marketing'), w where ce.day >= w.start and ce.day < w.start + 7 group by ce.user_id),
           per_user as (
             select j.user_id, count(*)::int as jobs, (count(*) filter (where v.verdict = 'pass'))::int as accepted,
                    (count(*) filter (where j.status in ('failed', 'timed_out', 'failed_unknown')))::int as failed,
@@ -22,7 +22,7 @@ export async function weeklyReport(week: string | null) {
               from wj j left join verdicts v on v.job_id = j.id group by j.user_id)
      select w.start::text as start, (w.start + 6)::text as "end",
             to_char(w.start::timestamp, 'YYYY-MM') as cap_month, s.monthly_cap_usd::text as monthly_cap, s.member_daily_clip_cap as daily_cap,
-            coalesce((select sum(usd) from cost_entries where month = to_char(w.start::timestamp, 'YYYY-MM')), 0)::numeric(12, 4)::text as cap_used,
+            coalesce((select sum(usd) from cost_entries ce where month = to_char(w.start::timestamp, 'YYYY-MM') and not exists (select 1 from jobs j where j.id = ce.job_id and j.feature not in ('video', 'marketing'))), 0)::numeric(12, 4)::text as cap_used,
             u.id as user_id, u.name, u.email, t.name as team, p.jobs, p.accepted, p.failed, p.finished, p.median_s,
             coalesce(sp.usd, 0)::numeric(12, 4)::text as spend, round(sp.usd / nullif(p.accepted, 0), 4)::text as per_accepted,
             round(coalesce(sp.usd, 0) / nullif(s.monthly_cap_usd, 0), 4)::text as of_cap

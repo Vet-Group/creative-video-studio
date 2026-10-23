@@ -583,3 +583,39 @@ describe("a Member's own month-to-date total", () => {
     expect(await ledgerSum()).toBe('2.0000');
   });
 });
+
+describe('the image and apps features on the Costs page', () => {
+  const FM = '2031-08';
+  async function featureJob(id: string, feature: string, estimate: string) {
+    await pool.query(
+      `insert into jobs (id, user_id, team_id, store_id, model, provider, prompt, aspect, duration_s, input_asset_ids, created_at, feature)
+       values ($1, 'bob', 't2', null, 'fal-test', 'fal', 'p', '1:1', 5, '{}', '2031-08-10T03:00:00Z', $2)`,
+      [id, feature],
+    );
+    await reserve(pool, id, estimate);
+  }
+
+  test('splits the month into the video and the image and apps budgets, lists spend by feature and flags soft caps from 80 %', async () => {
+    await open('fv1', 'bob', 't2', null, 'fal', '2031-08-09T03:00:00Z', '3.0000'); // a video job
+    await featureJob('ff1', 'face_swap', '5.0000'); // soft cap 5: 100 %
+    await featureJob('ff2', 'background_remover', '8.0000'); // soft cap 10: 80 %
+    await featureJob('ff3', 'image', '1.5000'); // soft cap 135: no flag
+    const p = (await page(FM)) as unknown as {
+      capUsage: { usd: string; monthlyCapUsd: string };
+      featuresCapUsage: { usd: string; monthlyCapUsd: string };
+      byFeature: { id: string; name: string; usd: string }[];
+      featureCaps: { feature: string; spentUsd: string; capUsd: string; level: number | null }[];
+    };
+    expect(p.capUsage).toEqual({ usd: '3.0000', monthlyCapUsd: '200.0000' });
+    expect(p.featuresCapUsage).toEqual({ usd: '14.5000', monthlyCapUsd: '260.0000' });
+    expect(p.byFeature.map((f) => [f.id, f.name, f.usd])).toEqual([
+      ['background_remover', 'Xoá nền', '8.0000'],
+      ['face_swap', 'Đổi khuôn mặt', '5.0000'],
+      ['video', 'Tạo video', '3.0000'],
+      ['image', 'Tạo ảnh', '1.5000'],
+    ]);
+    const level = Object.fromEntries(p.featureCaps.map((c) => [c.feature, c.level]));
+    expect(level).toMatchObject({ face_swap: 100, background_remover: 80, image: null, try_on: null });
+    expect(p.featureCaps.find((c) => c.feature === 'face_swap')).toMatchObject({ spentUsd: '5.0000', capUsd: '5.0000' });
+  });
+});

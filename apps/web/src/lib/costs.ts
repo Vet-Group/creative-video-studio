@@ -4,6 +4,7 @@
 import { type Queryable, withTransaction } from '@cvs/core/ledger';
 import { pool } from '@/lib/auth';
 import { csvResponse, text } from '@/lib/csv';
+import { featureLabel } from '@/lib/features';
 
 const NO_STORE = 'Không gắn cửa hàng';
 const SHARED = 'Chi phí chung';
@@ -16,6 +17,8 @@ interface Row {
   month: string;
   day: string | null;
   job_id: string | null;
+  /** The job's feature; null on shared rows. */
+  feature: string | null;
   provider: string | null;
   model: string | null;
   user_id: string | null;
@@ -57,8 +60,14 @@ export interface Snapshot {
   asOf: number;
   rate: string | null;
   rows: Row[];
+  /** The video budget: every ledger row of the month outside the image and apps features (shared rows included), and its cap. */
   capUsageUsd: string;
   monthlyCapUsd: string;
+  /** The image and apps budget and its hard cap. */
+  featuresCapUsageUsd: string;
+  featuresMonthlyCapUsd: string;
+  /** The soft per-feature caps. */
+  featureCaps: { feature: string; monthlyUsd: string }[];
   invoices: InvoiceRow[];
 }
 
@@ -92,12 +101,18 @@ export function snapshot(requestedMonth: string | null, upTo: number | null = nu
     const month = requestedMonth ?? ((await tx.query(`select to_char(now() at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM') as m`)).rows[0].m as string);
     const rate = await tx.query('select vnd_per_usd::text as rate from monthly_rates where month = $1', [month]);
     const cap = await tx.query(
-      `select coalesce((select sum(usd) from cost_entries where month = $1), 0)::numeric(12, 4)::text as used, (select monthly_cap_usd::text from settings where id = 1) as cap`,
+      `with b as (select ce.usd, exists (select 1 from jobs j where j.id = ce.job_id and j.feature not in ('video', 'marketing')) as budget
+                    from cost_entries ce where ce.month = $1)
+       select coalesce((select sum(usd) from b where not budget), 0)::numeric(12, 4)::text as used,
+              coalesce((select sum(usd) from b where budget), 0)::numeric(12, 4)::text as features_used,
+              s.monthly_cap_usd::text as cap, s.features_monthly_cap_usd::text as features_cap
+         from settings s where s.id = 1`,
       [month],
     );
+    const featureCaps = await tx.query('select feature, monthly_usd::text as "monthlyUsd" from feature_caps order by feature');
     const rows = await tx.query(
       `select ce.id::int as id, ce.kind, ce.usd::text as usd, round_half_even(ce.usd * r.vnd_per_usd)::text as vnd, ce.month, ce.day::text as day,
-              ce.job_id, ce.provider, ce.model, ce.user_id, u.name as user_name, u.email, ce.team_id, t.name as team_name, t.cost_centre_code,
+              ce.job_id, j.feature, ce.provider, ce.model, ce.user_id, u.name as user_name, u.email, ce.team_id, t.name as team_name, t.cost_centre_code,
               ce.store_id, s.name as store_name, s.code as store_code, j.user_id as job_user, j.team_id as job_team, j.store_id as job_store,
               coalesce(jc.is_final, true) as final, v.verdict,
               coalesce(j.status in ('failed', 'timed_out') and jc.usd > 0 and v.verdict is distinct from 'fail', false) as fail_status
@@ -114,6 +129,7 @@ export function snapshot(requestedMonth: string | null, upTo: number | null = nu
     );
     return {
       month, asOf, rate: rate.rows[0]?.rate ?? null, rows: rows.rows, capUsageUsd: cap.rows[0].used, monthlyCapUsd: cap.rows[0].cap,
+      featuresCapUsageUsd: cap.rows[0].features_used, featuresMonthlyCapUsd: cap.rows[0].features_cap, featureCaps: featureCaps.rows,
       invoices: await invoiceRows(tx, month),
     };
   });
@@ -201,9 +217,23 @@ export function costsPage(s: Snapshot) {
     byUser: groups(s, (r) => r.user_id ?? '', (r) => r.job_user ?? '', (r) => ({ name: r.user_name, email: r.email })),
     byTeam: groups(s, (r) => r.team_id ?? '', (r) => r.job_team ?? '', (r) => ({ name: r.team_name, costCentreCode: r.cost_centre_code })),
     byStore: groups(s, (r) => r.store_id ?? '', (r) => r.job_store ?? '', (r) => ({ name: r.store_name ?? NO_STORE, code: r.store_code })),
+    byFeature: groups(s, (r) => r.feature ?? '', (r) => r.feature ?? '', (r) => ({ name: featureLabel(r.feature) })),
     capUsage: { usd: s.capUsageUsd, monthlyCapUsd: s.monthlyCapUsd },
+    featuresCapUsage: { usd: s.featuresCapUsageUsd, monthlyCapUsd: s.featuresMonthlyCapUsd },
+    featureCaps: featureCapLines(s),
     invoices: s.invoices,
   };
+}
+
+/** Each soft per-feature cap with the month's spend and 80 or 100 once that share is reached (null below 80%). */
+function featureCapLines(s: Snapshot) {
+  const spent = aggregate(s.rows, (r) => r.feature ?? '', (r) => r.feature ?? '');
+  return s.featureCaps.map(({ feature, monthlyUsd }) => {
+    const usd = spent.get(feature)?.usd ?? 0n;
+    const cap = units(monthlyUsd);
+    const level = cap > 0n && usd >= cap ? 100 : cap > 0n && usd * 10n >= cap * 8n ? 80 : null;
+    return { feature, name: featureLabel(feature), capUsd: monthlyUsd, spentUsd: fixed(usd, 4), level };
+  });
 }
 
 /** A CSV download with a label line holding the month and as_of. */
