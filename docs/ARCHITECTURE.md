@@ -43,7 +43,7 @@ Layout [proposed]: a pnpm workspace with `apps/web`, `apps/worker` and `packages
 - **`cost_entries`, `monthly_rates`, `provider_invoices`**: the cost ledger and its inputs. See "Cost ledger".
 - **`model_configs`**: per model, the limits, price per second, whether it is enabled, and the pass-rate seed.
 - **`presets`**: a Vietnamese label, an English prompt, `enabled` and `is_bakeoff_safe`. Six are seeded.
-- **`verdicts`**: Pass or Fail per output clip (unique per output asset), the fault for a Fail, and who marked it.
+- **`verdicts`**: Pass or Fail per clip (unique per job, so a purge that removes the output asset keeps the verdict), the fault for a Fail, and who marked it.
 - **`audit_entries`**: who, when, what, and the old and new values.
 - **`worker_heartbeat`**: written by the worker; the UI shows "worker offline" after 60 s without it.
 - **`settings`**: one row with `monthly_cap_usd` (200) and `member_daily_clip_cap` (5).
@@ -76,7 +76,7 @@ The adapter interface (`packages/core/src/providers/types.ts`) is `submit(input)
 
 - Create Videos lists every enabled model with its pass rate and estimated cost. A disabled model is hidden, and the server refuses it.
 - Default rule: the model with the higher pass rate is pre-selected. On a tie, the cheaper model is. The app never picks a default in any other way.
-- The pass rate is seeded from the bake-off (`docs/BAKEOFF.md`). After that it is `(seed passes + marked passes) / (seed n + marked n)`. Only clips with a Pass or Fail mark count; unmarked clips are left out.
+- The pass rate is seeded from the bake-off (`docs/BAKEOFF.md`). After that it is `(seed passes + marked passes) / (seed n + marked n)`. Only clips with a Pass or Fail mark count; unmarked clips are left out. A mark still counts after its clip is deleted or purged.
 - Enabling a model that has no bake-off record is refused.
 
 ## Cost ledger

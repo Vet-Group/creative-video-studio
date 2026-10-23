@@ -16,9 +16,6 @@ const db = await createTestDatabase('cvs_e2e');
 process.env.DATABASE_URL = db.url;
 process.env.S3_BUCKET = 'cvs-e2e';
 process.env.CVS_MOCK_RUN_MS = '4000';
-// The login page shows the Lark button only when Lark is configured; the specs assert it is absent.
-process.env.LARK_APP_ID = '';
-process.env.LARK_APP_SECRET = '';
 
 const { auth, pool } = await import('../src/lib/auth');
 await pool.query(

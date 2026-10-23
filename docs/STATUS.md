@@ -119,7 +119,7 @@ These come from the plan (`.omc/plans/creative-video-studio-plan.md`) and its sp
 - **Model picker.**
   - Staff choose the model. Kling o3 Pro (fal) and Seedance 2.5 (Replicate) are each listed with a pass rate and an estimated cost.
   - Default rule: the model with the higher pass rate is pre-selected; on a tie, the cheaper one. No other default rule is used.
-  - The first pass rate comes from the bake-off. After that it is `(seed passes + marked passes) / (seed n + marked n)`, counting marked clips only.
+  - The first pass rate comes from the bake-off. After that it is `(seed passes + marked passes) / (seed n + marked n)`, counting marked clips only, including clips deleted or purged after they were marked.
   - An Admin enables or disables each model. A new model needs a small bake-off on the same 10 images first.
 - **Accounts.** An Admin may create a user without a password; that user signs in only with Lark. Only emails an Admin has added can sign in with Lark, and go-live does not wait for Lark.
 - **AI judge.**
