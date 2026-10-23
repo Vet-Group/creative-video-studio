@@ -9,15 +9,15 @@ export interface ModelConfig {
   ratios: Ratio[];
   durationsSec: number[];
   maxImages: number;
-  /** For example '1080p'. */
-  outputResolution: string;
+  /** For example '1080p'; null while unknown, which keeps the model from being enabled. */
+  outputResolution: string | null;
   usdPerSecond: number;
   /** The response field that carries the billed amount; null when the API returns none. */
   billedAmountField: string | null;
   /** Where each fact above was read: field name to source URL and read date. */
   sources: Record<string, { url: string; readAt: string }>;
   /** Cheapest valid settings for every paid test clip (the plan's Credit thrift rule). */
-  thrift?: { durationSec: number; resolution: string };
+  thrift?: { durationSec: number; resolution: string | null };
 }
 
 const FAL_KLING_PAGE = 'https://fal.ai/models/fal-ai/kling-video/o3/pro/reference-to-video';
@@ -26,29 +26,30 @@ const REPLICATE_PAGE = 'https://replicate.com/bytedance/seedance-2.5';
 const REPLICATE_SCHEMA = 'https://api.replicate.com/v1/models/bytedance/seedance-2.5';
 const READ_AT = '2026-10-23';
 
+// M.6 copies these facts into the seeded model_configs rows; B.5a records Kling's measured output resolution.
 /**
  * The two bake-off candidates. The app offers 9:16 and 1:1 and 5-10 s clips (PRD) and sends at most 4 images,
  * so `ratios`, `durationsSec` and `maxImages` are the app's subset of what the provider accepts (see `sources`).
  */
 export const BAKEOFF_MODELS: ModelConfig[] = [
   {
-    id: 'fal-kling-o3-pro',
+    id: 'kling-o3-pro',
     provider: 'fal',
     endpoint: 'fal-ai/kling-video/o3/pro/reference-to-video',
-    label: 'Kling o3 Pro (reference)',
+    label: 'Kling O3 Pro',
     // fal accepts 16:9, 9:16 and 1:1.
     ratios: ['9:16', '1:1'],
     // fal accepts 3-15 s as strings "3".."15".
     durationsSec: [5, 6, 7, 8, 9, 10],
     // fal documents "Maximum 4 total (elements + reference images)" only for requests with a video.
     maxImages: 4,
-    // fal states no output resolution and the schema has no resolution input; B.5a measures the canary clip.
-    outputResolution: 'unspecified',
+    // fal states no output resolution and the schema has no resolution input; null until B.5a measures the canary clip.
+    outputResolution: null,
     // Audio off: $0.112 per second (audio on is $0.14).
     usdPerSecond: 0.112,
     // The queue status carries only metrics.inference_time and the result is the model output; no billed amount.
     billedAmountField: null,
-    thrift: { durationSec: 5, resolution: 'unspecified' },
+    thrift: { durationSec: 5, resolution: null },
     sources: {
       ratios: { url: FAL_KLING_SCHEMA, readAt: READ_AT },
       durationsSec: { url: FAL_KLING_SCHEMA, readAt: READ_AT },
@@ -59,7 +60,7 @@ export const BAKEOFF_MODELS: ModelConfig[] = [
     },
   },
   {
-    id: 'replicate-seedance-2-5',
+    id: 'seedance-2.5',
     provider: 'replicate',
     endpoint: 'bytedance/seedance-2.5',
     label: 'Seedance 2.5',

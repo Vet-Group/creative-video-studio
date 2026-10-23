@@ -27,6 +27,11 @@ describe.each(BAKEOFF_MODELS)('$id', (model) => {
   });
 });
 
+test('ids and labels match the rows seeded by migration 0002, and Kling stays without a resolution until B.5a', () => {
+  expect(BAKEOFF_MODELS.map((m) => [m.id, m.label])).toEqual([['kling-o3-pro', 'Kling O3 Pro'], ['seedance-2.5', 'Seedance 2.5']]);
+  expect(BAKEOFF_MODELS.map((m) => m.outputResolution)).toEqual([null, '720p']);
+});
+
 test('estimates the cost of a thrift clip and of an 8 s staff clip', () => {
   const [kling, seedance] = BAKEOFF_MODELS;
   expect(estimateUsd(kling!.usdPerSecond, kling!.thrift!.durationSec)).toBe('0.5600');
