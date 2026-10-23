@@ -151,8 +151,11 @@ export function Gallery({ kind, label, emptyText }: { kind: string; label: strin
   const narrow = useMediaQuery(NARROW);
   const wide = useMediaQuery(WIDE);
   const columns = narrow ? 2 : wide ? 4 : 3;
+  const loading = useRef(false); // a second click while a page loads would append it twice
 
   async function load(offset: number) {
+    if (loading.current) return;
+    loading.current = true;
     try {
       const r = await api<{ hasMore: boolean; clips: Clip[] }>(`/api/library?kind=${kind}${offset > 0 ? `&offset=${offset}` : ''}`);
       setItems((cur) => (offset > 0 ? [...cur, ...r.clips] : r.clips));
@@ -160,6 +163,8 @@ export function Gallery({ kind, label, emptyText }: { kind: string; label: strin
       setState('ready');
     } catch {
       setState('error');
+    } finally {
+      loading.current = false;
     }
   }
   useEffect(() => {

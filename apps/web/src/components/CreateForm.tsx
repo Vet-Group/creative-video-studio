@@ -407,7 +407,7 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
           ) : shown === 'about' ? (
             <About />
           ) : (
-            <Tray />
+            <Tray feature="video" />
           )}
         </div>
       </div>

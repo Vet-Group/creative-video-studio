@@ -78,9 +78,16 @@ test('Try On: a missing slot keeps Run disabled with a reason, a mock run reache
   // Ví dụ shows the company's try-on outputs.
   await nav(page).getByRole('link', { name: 'Thử đồ' }).click();
   await page.getByRole('tab', { name: 'Ví dụ' }).click();
-  await expect(page.getByRole('group', { name: 'Ảnh thử đồ của công ty' }).getByRole('img').first()).toBeVisible();
+  const gallery = page.getByRole('group', { name: 'Ảnh thử đồ của công ty' });
+  await expect(gallery.getByRole('img').first()).toBeVisible();
+  await expect.poll(() => gallery.getByRole('img').first().evaluate((i: HTMLImageElement) => i.complete && i.naturalWidth > 0)).toBe(true); // decoded, not just in the DOM
   await page.getByRole('tab', { name: 'Giới thiệu' }).click();
   await expect(page.getByRole('heading', { name: 'Thử đồ trên người mẫu' })).toBeVisible();
+
+  // The two try-on jobs of this user must not show in Create's video history (an unfiltered Tray would list them).
+  await nav(page).getByRole('link', { name: 'Tạo video' }).click();
+  await expect(page.getByText('Chưa có job nào.')).toBeVisible();
+  await expect(page.getByText('Hoàn tất')).toHaveCount(0);
 });
 
 test('Try On: Ví dụ says so when the company has no try-on image yet', async ({ page }) => {
@@ -147,6 +154,12 @@ test('Image Generation: the bar needs an image and a prompt, every pill works by
   await page.keyboard.press('Escape');
   await expect(panel).toBeHidden();
   await expect(modelButton(page)).toBeFocused();
+  for (const key of ['ArrowDown', 'ArrowUp']) {
+    await page.keyboard.press(key); // like the Select pills, an arrow opens it
+    await expect(panel).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(panel).toBeHidden();
+  }
   await page.keyboard.press(' ');
   await expect(panel).toBeVisible();
   await page.keyboard.press('ArrowDown');
@@ -170,7 +183,9 @@ test('Image Generation: the bar needs an image and a prompt, every pill works by
 
   // Ví dụ now holds the image, and the Library files it under Tạo ảnh and Tất cả ảnh, not under Thử đồ or the videos.
   await page.getByRole('tab', { name: 'Ví dụ' }).click();
-  await expect(page.getByRole('group', { name: 'Ảnh của công ty' }).getByRole('img').first()).toBeVisible();
+  const gallery = page.getByRole('group', { name: 'Ảnh của công ty' });
+  await expect(gallery.getByRole('img').first()).toBeVisible();
+  await expect.poll(() => gallery.getByRole('img').first().evaluate((i: HTMLImageElement) => i.complete && i.naturalWidth > 0)).toBe(true); // decoded, not just in the DOM
   await libraryChip(page, 'Tạo ảnh');
   const mine = page.getByRole('article').filter({ hasText: 'E2E Member 10' });
   await expect(mine).toHaveCount(1);
@@ -223,7 +238,9 @@ test('geometry at 1440: the Try On card is 320 wide at x=288 and the image bar i
 
   await expect.poll(async () => ((await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { status: string }[] }).jobs.filter((j) => j.status === 'succeeded').length, { timeout: 120_000 }).toBe(10);
   await page.goto('/image-generation');
-  await expect(page.getByRole('group', { name: 'Ảnh của công ty' }).getByRole('img').first()).toBeVisible();
+  const gallery = page.getByRole('group', { name: 'Ảnh của công ty' });
+  await expect(gallery.getByRole('img').first()).toBeVisible();
+  await expect.poll(() => gallery.getByRole('img').first().evaluate((i: HTMLImageElement) => i.complete && i.naturalWidth > 0)).toBe(true); // decoded, not just in the DOM
   const bar = page.locator('.imagebar');
   const b = await box(bar);
   const content = await box(page.locator('.content'));

@@ -147,10 +147,16 @@ export function ModelPicker({ models, value, onChange }: { models: ModelOption[]
           aria-labelledby={`${labelId} ${valueId}`}
           onMouseDown={(e) => open && e.preventDefault()} // keeps focus in the search box, so the click below closes the panel instead of reopening it
           onClick={() => (open ? close(true) : show())}
+          onKeyDown={(e) => {
+            if (!open && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+              e.preventDefault();
+              show();
+            }
+          }}
         >
           <Icon name="model" />
-          <span className="select-value" id={valueId}>
-            {chosen ? chosen.label : 'Chưa chọn mô hình'}
+          <span className="select-value select-value-row" id={valueId}>
+            <span className="select-value-text">{chosen ? chosen.label : 'Chưa chọn mô hình'}</span>
             {chosen?.isMock && <span className="badge">MOCK</span>}
           </span>
           <Icon name={open ? 'up' : 'down'} />

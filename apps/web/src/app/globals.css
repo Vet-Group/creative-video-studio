@@ -169,6 +169,9 @@ td code { white-space: pre-wrap; overflow-wrap: anywhere; }
 .select-trigger .icon { color: rgb(102, 102, 102); }
 .select-trigger:hover, .select[data-open='true'] .select-trigger { border-color: rgb(204, 204, 204); }
 .select-value { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.select-value-row { display: flex; align-items: baseline; }
+.select-value-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.select-value-row .badge { flex: none; line-height: normal; }
 .select-pop { position: absolute; z-index: 50; top: calc(100% + 3px); left: 0; right: 0; max-height: 280px; overflow: auto; padding-top: 6px; background: #fff; border-radius: 8px; box-shadow: 0 4px 16px rgb(0 0 0 / .12); }
 .select-heading { height: 36px; padding: 10px 16px 8px; color: rgb(102, 102, 102); font-size: 12px; line-height: 18px; font-weight: 600; }
 .select-pop ul { margin: 0; padding: 0; list-style: none; }

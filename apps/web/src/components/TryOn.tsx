@@ -3,6 +3,7 @@
 // laid out like Create. Run posts a try_on job; the inputs go in the order the API expects: the person first, then the garments, then the background.
 import { useId, useState } from 'react';
 import { api, errorText, sendJson } from '@/lib/api';
+import { tryOnPrompt } from '@/lib/try-on-prompt';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { Gallery, type Img, RATIO_LABEL, Slot, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, WorkTabs } from './image-tools';
 import { useJobs } from './jobs';
@@ -14,11 +15,6 @@ type Tab = 'create' | 'history' | 'examples' | 'about';
 const TAB_LABEL: Record<Tab, string> = { create: 'Tạo', history: 'Lịch sử', examples: 'Ví dụ', about: 'Giới thiệu' };
 const MAX_GARMENTS = 4;
 const MAX_PROMPT = 1500;
-
-/** What each input is, so the model never mistakes the background for a garment. Sent with every Run that has more than one garment or a background, or a prompt. */
-const roles = (garments: number, background: boolean): string =>
-  `Image 1 is the person. ${garments === 1 ? 'Image 2 is the garment.' : `Images 2 to ${garments + 1} are the garments.`}${background ? ` Image ${garments + 2} is the background scene.` : ''} ` +
-  `Dress the person in the garment${garments > 1 ? 's' : ''}${background ? ' and place them in the background scene' : ''}. Keep the person's face, pose and body exactly unchanged. Do not add any text, logos or watermarks.`;
 
 export function TryOn() {
   const { refresh } = useJobs();
@@ -77,14 +73,14 @@ export function TryOn() {
     setNotice('');
     try {
       const text = prompt.trim();
+      const sent = tryOnPrompt(garments.length, background.length > 0, text); // with one garment and no background the server's default prompt says it all
       const body = {
         feature: 'try_on',
         modelId: pick.modelId,
         assetIds: [...person, ...garments, ...background].map((i) => i.id),
         ratio: pick.ratio,
         params: { resolution: pick.resolution },
-        // With one garment and no background the server's default prompt says it all; otherwise name each image's role.
-        ...(background.length > 0 || garments.length > 1 || text ? { prompt: `${roles(garments.length, background.length > 0)}${text ? ` ${text}` : ''}` } : {}),
+        ...(sent ? { prompt: sent } : {}),
       };
       await api('/api/jobs', sendJson('POST', body));
       setNotice('Đã gửi job. Theo dõi trong tab "Lịch sử".');
