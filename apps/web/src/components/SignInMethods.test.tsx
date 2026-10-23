@@ -30,4 +30,7 @@ test('offers a link button only when the provider is on and not linked yet', () 
 test('shows the reason a failed link left in the URL', () => {
   expect(render({ error: 'account_already_linked_to_different_user' })).toContain('đã được liên kết với một người dùng khác');
   expect(render({ error: 'email_does_not_match' })).toContain('không khớp với tài khoản đang đăng nhập');
+  const refused = render({ error: 'unable_to_link_account' });
+  expect(refused).toContain('Không liên kết được tài khoản này');
+  expect(refused).not.toContain('Không đăng nhập được');
 });

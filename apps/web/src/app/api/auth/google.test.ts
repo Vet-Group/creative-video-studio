@@ -19,7 +19,7 @@ delete process.env.LARK_TENANT_KEY;
 const { auth, pool, googleLoginEnabled, larkLoginEnabled } = await import('@/lib/auth');
 const route = await import('./[...all]/route');
 const { GET: listUsers } = await import('../admin/users/route');
-const { DELETE: adminUnlink } = await import('../admin/users/[id]/accounts/[provider]/route');
+const { DELETE: adminUnlink } = await import('../admin/users/[id]/accounts/[accountId]/route');
 const providers = mockProviders();
 
 const PASSWORD = 'correct-horse-battery';
@@ -100,10 +100,22 @@ describe('Google sign-in', () => {
   test('refuses a banned user and starts no session', async () => {
     const id = await user('banned@example.test');
     await pool.query('update users set banned = true where id = $1', [id]);
+    const [accountsBefore, auditsBefore] = [await accountsOf(id), await audits(id)];
     const flow = await oauth(route, { provider: 'google', code: google('banned@example.test') });
     expect(flow.error).toBe('BANNED_USER');
     expect(flow.location.pathname).toBe('/login');
     expect(flow.cookie).toBe('');
+    // The refusal comes before the write: no accounts row and no account.link audit row are left behind.
+    expect(await accountsOf(id)).toEqual(accountsBefore);
+    expect(await audits(id)).toEqual(auditsBefore);
+  });
+
+  test('links a user whose ban has expired', async () => {
+    const id = await user('lapsed@example.test');
+    await pool.query(`update users set banned = true, ban_expires = now() - interval '1 hour' where id = $1`, [id]);
+    const flow = await oauth(route, { provider: 'google', code: google('lapsed@example.test') });
+    expect(flow.error).toBeNull();
+    expect(await sessionUser(flow.cookie)).toBe(id);
   });
 
   test('has no Lark provider while Lark is not configured', async () => {
@@ -144,6 +156,17 @@ describe('Linking', () => {
     expect((await accountsOf(owner)).map((a) => a.provider_id)).toEqual(['credential', 'google']);
   });
 
+  test('refuses to link a Google account whose email is not verified, and creates no account row', async () => {
+    const id = await user('careful@example.test');
+    const cookie = await cookieOf('careful@example.test');
+    const before = await accountsOf(id);
+    const flow = await oauth(route, { provider: 'google', code: google('careful@example.test', { email_verified: false }), link: { cookie } });
+    expect(flow.error).toBe('unable_to_link_account');
+    expect(flow.location.pathname).toBe('/account/sign-in-methods');
+    expect(await accountsOf(id)).toEqual(before);
+    expect(await audits(id)).toEqual([]);
+  });
+
   const unlink = (cookie: string, accountId: string) =>
     route.POST(new Request('http://localhost/api/auth/unlink-account', { method: 'POST', headers: { cookie, origin: 'http://localhost', 'content-type': 'application/json' }, body: JSON.stringify({ accountId }) }));
 
@@ -169,28 +192,54 @@ describe('Linking', () => {
     await user('plain@example.test');
     const memberCookie = await cookieOf('plain@example.test');
     const target = await user('target@example.test');
-    await oauth(route, { provider: 'google', code: google('target.private@gmail.test'), link: { cookie: await cookieOf('target@example.test') } });
-    expect((await accountsOf(target)).map((a) => a.provider_id)).toEqual(['credential', 'google']);
+    const targetCookie = await cookieOf('target@example.test');
+    await oauth(route, { provider: 'google', code: google('target.private@gmail.test'), link: { cookie: targetCookie } });
+    const [credential, linked] = await accountsOf(target);
+    expect([credential.provider_id, linked.provider_id]).toEqual(['credential', 'google']);
+    expect(await sessionUser(targetCookie)).toBe(target);
 
-    const del = (cookie: string | undefined, id: string, provider: string) =>
-      adminUnlink(new Request('http://localhost/x', { method: 'DELETE', headers: cookie ? { cookie } : {} }), { params: Promise.resolve({ id, provider }) });
-    expect((await del(undefined, target, 'google')).status).toBe(401);
-    expect((await del(memberCookie, target, 'google')).status).toBe(403);
-    expect((await del(adminCookie, target, 'github')).status).toBe(400);
-    expect((await del(adminCookie, target, 'lark')).status).toBe(404);
-    expect((await del(adminCookie, 'no-such-user', 'google')).status).toBe(404);
+    const del = (cookie: string | undefined, id: string, accountId: string) =>
+      adminUnlink(new Request('http://localhost/x', { method: 'DELETE', headers: cookie ? { cookie } : {} }), { params: Promise.resolve({ id, accountId }) });
+    expect((await del(undefined, target, linked.id)).status).toBe(401);
+    expect((await del(memberCookie, target, linked.id)).status).toBe(403);
+    expect((await del(adminCookie, target, credential.id)).status).toBe(404); // the password method is never deleted here
+    expect((await del(adminCookie, target, 'no-such-account')).status).toBe(404);
+    expect((await del(adminCookie, 'no-such-user', linked.id)).status).toBe(404);
     expect((await accountsOf(target)).map((a) => a.provider_id)).toEqual(['credential', 'google']);
+    expect(await sessionUser(targetCookie)).toBe(target);
 
-    expect((await del(adminCookie, target, 'google')).status).toBe(200);
+    expect((await del(adminCookie, target, linked.id)).status).toBe(200);
     expect((await accountsOf(target)).map((a) => a.provider_id)).toEqual(['credential']);
+    // The session opened with the lost account ends with it.
+    expect(await sessionUser(targetCookie)).toBeUndefined();
+    expect((await pool.query('select 1 from sessions where user_id = $1', [target])).rowCount).toBe(0);
 
     const googleOnly = await user('lost-google@example.test', { password: false });
     await oauth(route, { provider: 'google', code: google('lost-google@example.test') });
-    expect((await del(adminCookie, googleOnly, 'google')).status).toBe(409);
+    const [only] = await accountsOf(googleOnly);
+    expect((await del(adminCookie, googleOnly, only.id)).status).toBe(409);
+    expect(await accountsOf(googleOnly)).toHaveLength(1);
+    // An account id is only good for its own user.
+    expect((await del(adminCookie, target, only.id)).status).toBe(404);
     expect(await accountsOf(googleOnly)).toHaveLength(1);
 
     const log = await audits(target);
-    expect(log.at(-1)).toEqual({ actor_id: adminId, action: 'account.unlink', target: `user:${target}`, old_value: { provider: 'google', email: 'target.private@gmail.test' }, new_value: null });
+    expect(log.at(-1)).toEqual({ actor_id: adminId, action: 'account.unlink', target: `user:${target}`, old_value: { provider: 'google', email: 'target.private@gmail.test' }, new_value: { sessionsRevoked: true } });
+  });
+
+  test('an Admin unlinks exactly the Google account it names when the user holds two', async () => {
+    const adminCookie = await cookieOf('boss@example.test');
+    const id = await user('twice@example.test');
+    const cookie = await cookieOf('twice@example.test');
+    await oauth(route, { provider: 'google', code: google('twice@example.test') });
+    await oauth(route, { provider: 'google', code: google('twice.private@gmail.test'), link: { cookie } });
+    const [credential, first, second] = await accountsOf(id);
+    expect([credential.provider_id, first.provider_id, second.provider_id]).toEqual(['credential', 'google', 'google']);
+
+    const res = await adminUnlink(new Request('http://localhost/x', { method: 'DELETE', headers: { cookie: adminCookie } }), { params: Promise.resolve({ id, accountId: second.id }) });
+    expect(res.status).toBe(200);
+    expect((await accountsOf(id)).map((a) => a.id)).toEqual([credential.id, first.id]);
+    expect((await audits(id)).at(-1)).toMatchObject({ action: 'account.unlink', old_value: { provider: 'google', email: 'twice.private@gmail.test' } });
   });
 
   test('lists each user with the methods linked to the account', async () => {
@@ -213,8 +262,8 @@ describe('Linking', () => {
     expect(rows.map((a) => a.provider_id)).toEqual(['credential', 'google', 'google']);
     expect((await unlink(cookie, rows[1].id)).status).toBe(200);
     expect(await audits(id)).toEqual([
-      { actor_id: id, action: 'account.link', target: `user:${id}`, old_value: null, new_value: { provider: 'google', email: 'audited@example.test' } },
-      { actor_id: id, action: 'account.link', target: `user:${id}`, old_value: null, new_value: { provider: 'google', email: 'audited.private@gmail.test' } },
+      { actor_id: id, action: 'account.link', target: `user:${id}`, old_value: null, new_value: { provider: 'google', accountId: rows[1].account_id, email: 'audited@example.test' } },
+      { actor_id: id, action: 'account.link', target: `user:${id}`, old_value: null, new_value: { provider: 'google', accountId: rows[2].account_id, email: 'audited.private@gmail.test' } },
       { actor_id: id, action: 'account.unlink', target: `user:${id}`, old_value: { provider: 'google', email: 'audited@example.test' }, new_value: null },
     ]);
   });

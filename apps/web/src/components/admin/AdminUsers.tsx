@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { api, sendJson } from '@/lib/api';
 import { useAction, useFetch } from '@/lib/admin-ui';
-import { METHOD_LABEL, type SignInMethod } from '@/lib/sign-in-methods';
+import { methodText, providerLabel, type SignInMethod } from '@/lib/sign-in-methods';
 
 interface User {
   id: string;
@@ -49,13 +49,12 @@ function UserRow({ user, teams, run }: { user: User; teams: Team[]; run: Run }) 
         <ul className="methods">
           {user.methods.map((m) => (
             <li key={m.id}>
-              {METHOD_LABEL[m.provider] ?? m.provider}
-              {m.email ? ` (${m.email})` : ''}
+              {methodText(m)}
               {m.provider !== 'credential' && (
                 <button
                   type="button"
-                  aria-label={`Huỷ liên kết ${METHOD_LABEL[m.provider] ?? m.provider} của ${user.email}`}
-                  onClick={() => void run(() => api(`/api/admin/users/${user.id}/accounts/${m.provider}`, { method: 'DELETE' }), 'Không huỷ được liên kết.')}
+                  aria-label={`Huỷ liên kết ${providerLabel(m.provider)} của ${user.email}`}
+                  onClick={() => void run(() => api(`/api/admin/users/${user.id}/accounts/${m.id}`, { method: 'DELETE' }), 'Không huỷ được liên kết.')}
                 >
                   Huỷ liên kết
                 </button>

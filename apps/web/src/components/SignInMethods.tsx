@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { ApiError, api, sendJson } from '@/lib/api';
-import { authErrorText, METHOD_LABEL, type SignInMethod } from '@/lib/sign-in-methods';
+import { authErrorText, METHOD_LABEL, methodText, providerLabel, type SignInMethod } from '@/lib/sign-in-methods';
 
 const PAGE = '/account/sign-in-methods';
 
@@ -51,12 +51,9 @@ export function SignInMethods({ methods, googleEnabled, larkEnabled, error }: { 
       <ul className="methods">
         {methods.map((m) => (
           <li key={m.id}>
-            <span>
-              {METHOD_LABEL[m.provider] ?? m.provider}
-              {m.email ? ` (${m.email})` : ''}
-            </span>
+            <span>{methodText(m)}</span>
             {m.provider !== 'credential' && (
-              <button type="button" aria-label={`Huỷ liên kết ${METHOD_LABEL[m.provider] ?? m.provider}`} onClick={() => void unlink(m)}>
+              <button type="button" aria-label={`Huỷ liên kết ${providerLabel(m.provider)}`} onClick={() => void unlink(m)}>
                 Huỷ liên kết
               </button>
             )}

@@ -1,7 +1,8 @@
 // Audit rows for the links and unlinks better-auth makes itself: the first social sign-in, linkSocial and unlinkAccount.
-// The Admin unlink route writes its own row in its own transaction (api/admin/users/[id]/accounts/[provider]).
+// The Admin unlink route writes its own row in its own transaction (api/admin/users/[id]/accounts/[accountId]).
 import { audit } from '@cvs/core/audit';
 import type { Queryable } from '@cvs/core/ledger';
+import { APIError } from 'better-auth/api';
 import { googleEmail } from './sign-in-methods';
 
 interface AccountRow {
@@ -18,11 +19,11 @@ export function rememberLarkEmail(accountId: string, email: string): void {
   larkEmails.set(accountId, email);
 }
 
-/** The provider email of the latest account.link row of this user and provider; for an unlink, when the account row no longer says. */
-export async function lastLinkedEmail(q: Queryable, userId: string, provider: string): Promise<string | null> {
+/** The provider email of the latest account.link row of this provider account; for an unlink, when the account row no longer says. */
+export async function lastLinkedEmail(q: Queryable, userId: string, provider: string, accountId: string): Promise<string | null> {
   const { rows } = await q.query(
-    `select new_value->>'email' as email from audit_entries where action = 'account.link' and target = $1 and new_value->>'provider' = $2 order by id desc limit 1`,
-    [`user:${userId}`, provider],
+    `select new_value->>'email' as email from audit_entries where action = 'account.link' and target = $1 and new_value->>'provider' = $2 and new_value->>'accountId' = $3 order by id desc limit 1`,
+    [`user:${userId}`, provider, accountId],
   );
   return rows[0]?.email ?? null;
 }
@@ -36,17 +37,24 @@ export async function lastLinkedEmail(q: Queryable, userId: string, provider: st
 export function accountAuditHooks(q: Queryable) {
   return {
     create: {
+      // Refuse before the row is written: the admin plugin's session hook also refuses a banned user, but only after this row and its audit row exist.
+      async before(a: AccountRow) {
+        const u = (await q.query('select banned, ban_expires from users where id = $1', [a.userId])).rows[0];
+        if (!u?.banned || (u.ban_expires && new Date(u.ban_expires).getTime() < Date.now())) return; // an expired ban is lifted by that session hook
+        larkEmails.delete(a.accountId);
+        throw APIError.from('FORBIDDEN', { message: 'You have been banned from this application.', code: 'BANNED_USER' });
+      },
       async after(a: AccountRow) {
         if (a.providerId === 'credential') return; // the password account Admin user creation makes is not a link
         const email = googleEmail(a.idToken ?? null) ?? larkEmails.get(a.accountId) ?? null;
         larkEmails.delete(a.accountId);
-        await audit(q, { actorId: a.userId, action: 'account.link', target: `user:${a.userId}`, newValue: { provider: a.providerId, email } });
+        await audit(q, { actorId: a.userId, action: 'account.link', target: `user:${a.userId}`, newValue: { provider: a.providerId, accountId: a.accountId, email } });
       },
     },
     delete: {
       async after(a: AccountRow) {
         if (a.providerId === 'credential') return;
-        const email = googleEmail(a.idToken ?? null) ?? (await lastLinkedEmail(q, a.userId, a.providerId));
+        const email = googleEmail(a.idToken ?? null) ?? (await lastLinkedEmail(q, a.userId, a.providerId, a.accountId));
         await audit(q, { actorId: a.userId, action: 'account.unlink', target: `user:${a.userId}`, oldValue: { provider: a.providerId, email } });
       },
     },
