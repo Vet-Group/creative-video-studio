@@ -27,7 +27,8 @@ app="${CVS_APP_DIR:-/opt/creative-video-studio}"
 state_file="$app/install.state"
 unit_dir="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
 uid="$(id -u)"
-export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$uid}"
+# Not inherited: under `su` without `-` it would point systemctl --user at another user's manager.
+export XDG_RUNTIME_DIR="/run/user/$uid"
 
 say() { printf '%s\n' "$*"; }
 fail() { printf 'error: %s\n' "$*" >&2; exit 1; }
@@ -125,6 +126,11 @@ if [ -n "$dns_id" ] || [ -n "$tunnel_id" ]; then
     say "warning: CLOUDFLARE_API_TOKEN is not set; the DNS record ${dns_id:-none} and tunnel ${tunnel_id:-none} stay in Cloudflare and in $state_file"
     incomplete=1
   else
+    # An id without its zone or account cannot be deleted; keep the state so the orphan is not forgotten.
+    if { [ -n "$dns_id" ] && [ -z "$zone_id" ]; } || { [ -n "$tunnel_id" ] && [ -z "$account_id" ]; }; then
+      say "warning: $state_file has a DNS record or tunnel id without its zone or account id; delete it in Cloudflare by hand"
+      incomplete=1
+    fi
     if [ -n "$dns_id" ] && [ -n "$zone_id" ]; then
       if cf_delete "/zones/$zone_id/dns_records/$dns_id"; then
         drop "dns_record_id=$dns_id"

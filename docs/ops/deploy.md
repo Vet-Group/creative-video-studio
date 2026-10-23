@@ -21,7 +21,7 @@ A failed read-only precondition prints `[dry-run] would fail: <reason>` and exit
 
 0. Checks the preconditions (it forces `HOME=/root`, so `systemctl --user` and `~/.config/systemd/user` agree; `CVS_APP_DIR` must be
    absolute and end in `creative-video-studio`, and an existing git checkout there must have the configured `origin`; a repo URL with a
-   user or password is refused, only `git@github.com:...` style SSH URLs are accepted).
+   user or password is refused; use the `git@github.com:...` SSH form with the deploy key).
 1. Refuses (exit 1, nothing changed) if any of ports 3400, 5435, 9400 or 9401 is taken (`ss -ltnH`), then takes the same
    `~/.local/state/creative-video-studio/ops.lock` that `cvs-backup` uses (waits up to 40 minutes).
 2. Clones or fast-forwards the repo into `/opt/creative-video-studio` over a read-only deploy key. Only the key's path is

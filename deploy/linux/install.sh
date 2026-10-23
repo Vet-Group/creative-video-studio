@@ -84,7 +84,8 @@ if [ -d "$app/.git" ] && [ "$(git -C "$app" remote get-url origin 2> /dev/null |
 fi
 if [ "$dry" = 1 ]; then say "dry run: nothing below is executed"; fi
 uid="$(id -u)"
-export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$uid}"
+# Not inherited: under `su` without `-` it would point systemctl --user at another user's manager.
+export XDG_RUNTIME_DIR="/run/user/$uid"
 export PATH="$node_dir/bin:$PATH"
 
 # Settings the environment lacks come from <app>/.env (KEY=VALUE lines; surrounding double quotes and CR are dropped).
@@ -181,7 +182,7 @@ if [ -z "$pnpm_version" ]; then
   pnpm_version="<packageManager version>"
 fi
 if [ "$(cd / && pnpm --version 2> /dev/null || true)" != "$pnpm_version" ]; then
-  run npm install --global --silent --prefix "$node_dir" "pnpm@$pnpm_version"
+  run "${scrub[@]}" npm install --global --silent --prefix "$node_dir" "pnpm@$pnpm_version"
 fi
 
 # 6. Dependencies, build, data services, bucket, migrations (the seed rows are part of the migrations).

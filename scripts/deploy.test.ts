@@ -435,6 +435,15 @@ describe.skipIf(!hasBash)('deploy kit (needs bash only)', { timeout: 30_000 }, (
     expect(other.calls()).not.toContain('docker');
   });
 
+  test('k5. a tunnel id without its account id is kept in the state, not silently dropped', () => {
+    const s = sandbox();
+    writeFileSync(s.stateFile, 'tunnel_id=0123abcd-0123-4abc-8abc-0123456789ab\n');
+    const r = run(uninstallSh, [], s.env);
+    expect(r.status).toBe(1);
+    expect(r.out).toContain('delete it in Cloudflare by hand');
+    expect(s.state()).toEqual(['tunnel_id=0123abcd-0123-4abc-8abc-0123456789ab']);
+  });
+
   test('k4. uninstall --dry-run says it was a dry run', () => {
     const s = sandbox();
     writeFileSync(s.stateFile, fixture(s.app));
