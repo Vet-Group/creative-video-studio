@@ -74,7 +74,11 @@ export function Select({ label, icon, heading, value, options, onChange }: { lab
           aria-expanded={open}
           aria-controls={open ? listId : undefined}
           aria-activedescendant={open ? optionId(active) : undefined}
-          onClick={() => (open ? setOpen(false) : show())}
+          onClick={(e) => {
+            e.currentTarget.focus(); // Safari and Firefox on macOS do not focus a clicked button, and the list closes on blur
+            if (open) setOpen(false);
+            else show();
+          }}
           onKeyDown={onKeyDown}
           onKeyUp={(e) => e.key === ' ' && e.preventDefault()} // a released Space must not click the button again
           onBlur={() => setOpen(false)}

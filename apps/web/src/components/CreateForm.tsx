@@ -74,7 +74,6 @@ export function CreateForm({ reuse }: { reuse?: string }) {
   const narrow = useMediaQuery(NARROW);
   const fileInput = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
-  const hintId = useId();
   const promptId = useId();
   const [tab, setTab] = useState<Tab | null>(null); // null: the default for the width (Create below 1024 px, else History)
   const [picking, setPicking] = useState(false);
@@ -166,7 +165,7 @@ export function CreateForm({ reuse }: { reuse?: string }) {
     setNotice('');
     try {
       await api('/api/jobs', sendJson('POST', { assetIds: images.map((i) => i.id), modelId, ...(presetId ? { presetId } : { prompt }), ratio, durationSec, storeId: storeId || null }));
-      setNotice(narrow ? 'Đã gửi job. Theo dõi trong tab "Lịch sử".' : 'Đã gửi job. Theo dõi trong mục "Job của tôi".');
+      setNotice('Đã gửi job. Theo dõi trong tab "Lịch sử".');
       setRefetch((n) => n + 1);
       if (!narrow) setTab('history'); // beside the form, the new job shows in History
       await refresh();
@@ -257,13 +256,13 @@ export function CreateForm({ reuse }: { reuse?: string }) {
                   void upload(files);
                 }}
               />
-              <button type="button" className="dropzone-pick" disabled={!hydrated || images.length >= MAX_IMAGES} aria-describedby={hintId} onClick={() => fileInput.current?.click()}>
+              <button type="button" className="dropzone-pick" disabled={!hydrated || images.length >= MAX_IMAGES} onClick={() => fileInput.current?.click()}>
                 {images.length === 0 && (
                   <span className="dropzone-plus" aria-hidden="true">
                     <Icon name="plus" size={16} />
                   </span>
                 )}
-                <span className="dropzone-hint" id={hintId}>
+                <span className="dropzone-hint">
                   {images.length === 0 ? `Kéo thả hoặc bấm để thêm 1–${MAX_IMAGES} ảnh sản phẩm` : images.length >= MAX_IMAGES ? `Đã đủ ${MAX_IMAGES} ảnh` : `${images.length}/${MAX_IMAGES} ảnh, bấm hoặc kéo thêm`}
                 </span>
               </button>

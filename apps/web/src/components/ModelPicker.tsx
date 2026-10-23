@@ -50,10 +50,9 @@ export function ModelPicker({ models, value, onChange }: { models: ModelOption[]
   // The panel is fixed to the screen, so it closes when the page moves under it.
   useEffect(() => {
     if (!open) return;
-    const close = () => setPlace(null);
     const width = window.innerWidth;
-    const onResize = () => window.innerWidth !== width && close(); // a touch keyboard changes the height only
-    const onScroll = (e: Event) => e.target instanceof Node && !panel.current?.contains(e.target) && close();
+    const onResize = () => window.innerWidth !== width && close(false); // a touch keyboard changes the height only
+    const onScroll = (e: Event) => e.target instanceof Node && !panel.current?.contains(e.target) && close(false);
     window.addEventListener('resize', onResize);
     document.addEventListener('scroll', onScroll, true);
     return () => {
