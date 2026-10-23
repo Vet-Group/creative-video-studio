@@ -18,6 +18,9 @@ const PATHS = {
   store: 'M2 6l1-3.5h10L14 6 M2 6v7.5h12V6 M2 6c0 1.1.9 1.8 2 1.8S6 7.1 6 6c0 1.1.9 1.8 2 1.8s2-.7 2-1.8c0 1.1.9 1.8 2 1.8s2-.7 2-1.8',
   model: 'M8 1.5l6 3.2v6.6l-6 3.2-6-3.2V4.7z M2 4.7l6 3.2 6-3.2 M8 7.9v6.6',
   search: 'M7 2.5a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9z M10.5 10.5L14 14',
+  download: 'M8 2v8 M4.5 6.5L8 10l3.5-3.5 M2.5 13.5h11',
+  external: 'M9.5 2.5h4v4 M13.5 2.5L7.5 8.5 M11.5 9.5v4h-9v-9h4',
+  copy: 'M5.5 5.5h8v8h-8z M10.5 5.5v-3h-8v8h3',
 } as const;
 
 export type IconName = keyof typeof PATHS;

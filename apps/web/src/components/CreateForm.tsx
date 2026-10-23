@@ -1,5 +1,5 @@
 'use client';
-import { type CSSProperties, type DragEvent, type KeyboardEvent, useEffect, useId, useRef, useState } from 'react';
+import { type DragEvent, type KeyboardEvent, useEffect, useId, useRef, useState } from 'react';
 import { api, errorText, sendJson } from '@/lib/api';
 import { EXAMPLES, type Example, exampleForPreset, splitColumns } from '@/lib/examples';
 import { NARROW, useMediaQuery, WIDE } from '@/lib/use-media-query';
@@ -185,6 +185,8 @@ export function CreateForm({ reuse }: { reuse?: string }) {
   const current = presets?.find((p) => p.id === presetId);
   const banner = exampleForPreset(presetId);
   const detailAt = detail ? EXAMPLES.indexOf(detail) : -1;
+  const prevStep = useRef<HTMLButtonElement>(null);
+  const nextStep = useRef<HTMLButtonElement>(null);
 
   function onTabKey(e: KeyboardEvent) {
     const i = tabs.indexOf(shown);
@@ -435,32 +437,64 @@ export function CreateForm({ reuse }: { reuse?: string }) {
         </Carousel>
       </Modal>
 
-      {/* The live Example dialog (REA-video V01): the clip beside its details, Previous/Next wrap around, and one button only fills the form. */}
+      {/* The live Example dialog (REA-video V01, measured 2026-10-23): the clip on black with Close at its top-left, the details column,
+          and Previous/Next as round buttons at the viewport edges that stop at the first and last sample. Nothing here submits a job. */}
       <Modal open={detail !== null} onClose={() => setDetail(null)} label="Chi tiết mẫu" className="example-detail">
         {detail && (
           <>
-            <div className="detail-media" style={{ '--ratio': detail.width / detail.height } as CSSProperties}>
+            <div className="detail-media">
               <Preview key={detail.id} src={detail.src} poster={detail.poster} width={detail.width} height={detail.height} title={detail.title} />
             </div>
+            {/* Before the details, so Tab meets Previous and Next first. Stepping onto an end hides the pressed button, so the focus moves to the other one. */}
+            <button
+              ref={prevStep}
+              type="button"
+              className="detail-step prev"
+              aria-label="Mẫu trước"
+              hidden={detailAt <= 0}
+              onClick={() => {
+                setDetail(EXAMPLES[detailAt - 1]!);
+                if (detailAt - 1 === 0) nextStep.current?.focus();
+              }}
+            >
+              <Icon name="left" size={18} />
+            </button>
+            <button
+              ref={nextStep}
+              type="button"
+              className="detail-step next"
+              aria-label="Mẫu sau"
+              hidden={detailAt >= EXAMPLES.length - 1}
+              onClick={() => {
+                setDetail(EXAMPLES[detailAt + 1]!);
+                if (detailAt + 1 === EXAMPLES.length - 1) prevStep.current?.focus();
+              }}
+            >
+              <Icon name="right" size={18} />
+            </button>
             <div className="detail-info">
+              <span className="detail-chip">
+                <img src={exampleForPreset(detail.presetId)?.poster ?? detail.poster} alt="" width={36} height={36} />
+                {presets?.find((p) => p.id === detail.presetId)?.label}
+              </span>
               <h2>{detail.title}</h2>
-              <p className="muted">Mẫu minh họa{detail.fixture ? ' (fixture)' : ''}</p>
-              <dl className="detail-specs">
-                <dt>Tỉ lệ</dt>
-                <dd>{detail.aspect}</dd>
-                <dt>Thời lượng</dt>
-                <dd>{detail.durationSec} giây</dd>
-              </dl>
-              <div className="detail-actions">
-                <div className="detail-nav">
-                  <button type="button" aria-label="Mẫu trước" onClick={() => setDetail(EXAMPLES[(detailAt + EXAMPLES.length - 1) % EXAMPLES.length]!)}>
-                    <Icon name="left" />
-                  </button>
-                  <button type="button" aria-label="Mẫu sau" onClick={() => setDetail(EXAMPLES[(detailAt + 1) % EXAMPLES.length]!)}>
-                    <Icon name="right" />
-                  </button>
+              <img className="detail-input" src={detail.poster} alt="Khung hình mẫu" width={48} height={48} />
+              <ul className="detail-pills" aria-label="Thông số">
+                <li aria-label={`Thời lượng ${detail.durationSec} giây`}>{detail.durationSec}s</li>
+                <li aria-label={`Tỉ lệ ${detail.aspect}`}>{detail.aspect}</li>
+              </ul>
+              <div className="detail-foot">
+                <p className="detail-date">Mẫu minh họa{detail.fixture ? ' (fixture)' : ''}</p>
+                <div className="detail-tools">
+                  <a href={detail.src} download aria-label="Tải video mẫu" title="Tải video mẫu">
+                    <Icon name="download" />
+                  </a>
+                  <a href={detail.src} target="_blank" rel="noreferrer" aria-label="Mở trong tab mới" title="Mở trong tab mới">
+                    <Icon name="external" />
+                  </a>
                 </div>
-                <button type="button" className="primary detail-use" onClick={() => fillFromExample(detail)}>
+                <button type="button" className="detail-use" onClick={() => fillFromExample(detail)}>
+                  <Icon name="copy" />
                   Dùng mẫu này
                 </button>
               </div>
