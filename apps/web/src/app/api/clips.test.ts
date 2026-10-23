@@ -457,6 +457,22 @@ describe('GET /api/models', () => {
     }
   });
 
+  test('keeps the models that list the feature when ?feature= is given, and takes 16:9 for marketing only', async () => {
+    const ids = async (query: string) => (await models(alice.cookie, query)).models.map((m) => m.id);
+    expect((await GET_MODELS(req('/api/models?feature=image&ratio=9:16&durationSec=8', alice.cookie))).status).toBe(400);
+    expect((await GET_MODELS(req('/api/models?feature=video&ratio=16:9&durationSec=8', alice.cookie))).status).toBe(400);
+    expect((await GET_MODELS(req('/api/models?feature=marketing&ratio=3:4&durationSec=8', alice.cookie))).status).toBe(400);
+    await pool.query(`update model_configs set features = '{video,marketing}' where id = 'fal-test'`);
+    await pool.query(`update model_configs set features = '{marketing}' where id = 'cheap-test'`);
+    try {
+      expect(await ids('?feature=marketing&ratio=16:9&durationSec=8')).toEqual(['cheap-test', 'fal-test']);
+      expect(await ids('?feature=video&ratio=9:16&durationSec=8')).toEqual(['fal-test', 'mock-sample']);
+      expect(await ids('?ratio=9:16&durationSec=8')).toEqual(['cheap-test', 'fal-test', 'mock-sample']); // no filter: every video model
+    } finally {
+      await pool.query(`update model_configs set features = '{video}' where id in ('fal-test', 'cheap-test')`);
+    }
+  });
+
   test('flags models that lack the ratio or duration, and counts every mark, including those of deleted clips', async () => {
     expect((await models(alice.cookie, '?ratio=1:1&durationSec=10')).models.map((m) => [m.id, m.supported])).toEqual([['cheap-test', false], ['fal-test', true], ['mock-sample', false]]);
     const id = await clip(alice.id, { model: 'fal-test' });

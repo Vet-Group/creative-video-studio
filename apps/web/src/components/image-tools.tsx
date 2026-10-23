@@ -143,8 +143,8 @@ export function WorkTabs<T extends string>({ prefix, tabs, labels, shown, onSele
 
 const aspectOf = (ratio: string): string => (/^\d+:\d+$/.test(ratio) ? ratio.replace(':', ' / ') : '1 / 1');
 
-/** The company's latest outputs of one Library `kind` (`try_on` or `image`) in a masonry of columns; 24 at a time. */
-export function Gallery({ kind, label, emptyText }: { kind: string; label: string; emptyText: string }) {
+/** The company's latest outputs of one Library `kind` (`try_on`, `image` or, with `video`, `marketing`) in a masonry of columns; 24 at a time. */
+export function Gallery({ kind, label, emptyText, video = false }: { kind: string; label: string; emptyText: string; video?: boolean }) {
   const [items, setItems] = useState<Clip[]>([]);
   const [hasMore, setHasMore] = useState(false);
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
@@ -181,7 +181,11 @@ export function Gallery({ kind, label, emptyText }: { kind: string; label: strin
           <ul key={c} className="masonry-col">
             {items.filter((_, i) => i % columns === c).map((it) => (
               <li key={it.id} className="gallery-item" style={{ aspectRatio: aspectOf(it.ratio) }}>
-                <img src={`/api/assets/${it.videoAssetId}/content`} alt={`${it.modelLabel}, ${it.ratio}`} loading="lazy" />
+                {video ? (
+                  <video controls playsInline preload="metadata" aria-label={`${it.modelLabel}, ${it.ratio}`} poster={it.posterAssetId ? `/api/assets/${it.posterAssetId}/content` : undefined} src={`/api/assets/${it.videoAssetId}/content`} />
+                ) : (
+                  <img src={`/api/assets/${it.videoAssetId}/content`} alt={`${it.modelLabel}, ${it.ratio}`} loading="lazy" />
+                )}
               </li>
             ))}
           </ul>

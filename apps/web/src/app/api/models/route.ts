@@ -9,6 +9,7 @@ const MONTH = `to_char(now() at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM')`;
  * The video model picker (image models are left out) for a ratio and duration (`?ratio=9:16&durationSec=8`): the enabled models with pass rate and estimated cost,
  * and the model to pre-select (the highest pass rate among those that support the choice, the cheaper on a tie).
  * Pass rate = (seed passes + marked passes) / (seed total + marked total) over every marked clip, deleted or purged ones included; null while nothing is counted.
+ * `?feature=video` or `?feature=marketing` keeps the models whose `features` lists it (Marketing Studio also accepts ratio 16:9); without it every enabled video model is listed.
  * `monthToDate` is the caller's own total this ICT month, provisional while a job of it has no closing row. `remainingBudgetUsd` is for Admins only.
  */
 export async function GET(request: Request) {
@@ -17,7 +18,10 @@ export async function GET(request: Request) {
   const q = new URL(request.url).searchParams;
   const ratio = q.get('ratio');
   const durationSec = q.get('durationSec') ? Number(q.get('durationSec')) : NaN;
-  if (!(ASPECTS as readonly (string | null)[]).includes(ratio) || !Number.isInteger(durationSec)) {
+  const feature = q.get('feature');
+  if (feature !== null && feature !== 'video' && feature !== 'marketing') return Response.json({ error: 'feature must be video or marketing' }, { status: 400 });
+  const ratios: readonly (string | null)[] = feature === 'marketing' ? [...ASPECTS, '16:9'] : ASPECTS;
+  if (!ratios.includes(ratio) || !Number.isInteger(durationSec)) {
     return Response.json({ error: 'ratio and durationSec (a whole number) are required' }, { status: 400 });
   }
   const userId = g.session.user.id;
@@ -29,7 +33,8 @@ export async function GET(request: Request) {
          from model_configs m
          left join (select j.model, (count(*) filter (where v.verdict = 'pass'))::int as passes, count(*)::int as total
                       from verdicts v join jobs j on j.id = v.job_id group by j.model) v on v.model = m.id
-        where m.enabled and m.kind = 'video' order by m.label, m.id`,
+        where m.enabled and m.kind = 'video' and ($1::text is null or $1 = any(m.features)) order by m.label, m.id`,
+      [feature],
     ),
     pool.query(
       `with m as (select job_id, sum(usd) as usd from cost_entries where user_id = $1 and month = ${MONTH} group by job_id)
