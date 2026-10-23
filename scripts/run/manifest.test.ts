@@ -57,6 +57,24 @@ describe('steps', () => {
     expect(ready()).toContain('D.5');
   });
 
+  test('M.7b is ready once D.1 is done, whatever state B.3 is in, and a renewal drops its old B.3 dep', () => {
+    const m = fresh();
+    get(m, 'D.1').status = 'done';
+    for (const status of ['pending', 'doing', 'stuck', 'skipped', 'done'] as const) {
+      get(m, 'B.3').status = status;
+      expect(readySteps(m).map((s) => s.id), status).toContain('M.7b');
+      expect(readySteps(m).map((s) => s.id), status).not.toContain('D.5');
+    }
+    // A run manifest written before the change still lists B.3; renewal takes the deps from steps.ts.
+    const old = fresh();
+    Object.assign(get(old, 'M.7b'), { deps: ['D.1', 'B.3'], soft: ['B.3'], status: 'doing' });
+    renewManifest(old, fresh());
+    expect(get(old, 'M.7b')).toMatchObject({ deps: ['D.1'], soft: [], status: 'doing' });
+    // B.3 still feeds the bake-off steps that need real images.
+    expect(STEPS.filter((s) => s.deps.includes('B.3')).map((s) => s.id)).not.toContain('M.7b');
+    expect(STEPS.some((s) => s.id !== 'M.7b' && s.deps.includes('B.3'))).toBe(true);
+  });
+
   test('are topologically ordered with known deps', () => {
     const seen = new Set<string>();
     for (const s of STEPS) {
