@@ -25,6 +25,7 @@ export function Carousel({ label, children }: { label: string; children: ReactNo
   function onPointerMove(e: PointerEvent<HTMLUListElement>) {
     const d = drag.current;
     if (!d) return;
+    if (e.buttons === 0) return onPointerUp(); // the button was released outside, so the drag is over
     if (!d.moved && Math.abs(e.clientX - d.x) < DRAG_START_PX) return;
     if (!d.moved) {
       d.moved = true;

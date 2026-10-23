@@ -66,7 +66,7 @@ export async function freezeData(page: Page): Promise<void> {
   await page.route(/\/api\/models\?/, (r) =>
     r.fulfill({
       json: {
-        models: [{ id: 'mock-e2e', label: 'Mock E2E', isMock: true, durationsSec: [5, 8], maxImages: 4, estimateUsd: '0.8000', passRate: 0.8, passes: 8, total: 10, supported: true }],
+        models: [{ id: 'mock-e2e', label: 'Mock E2E', isMock: true, ratios: ['9:16', '1:1'], durationsSec: [5, 8], maxImages: 4, estimateUsd: '0.8000', passRate: 0.8, passes: 8, total: 10, supported: true }],
         defaultModelId: 'mock-e2e',
         monthToDate: { usd: '0.0000', provisional: false },
       },

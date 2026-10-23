@@ -29,7 +29,8 @@ export default defineConfig({
   workers: 1,
   timeout: 180_000,
   expect: { timeout: 20_000 },
-  // Screenshot baselines live in a `fixtures` folder, which .gitignore lets through for images; they are for the browser the specs drive, not per platform.
+  // Screenshot baselines live in a `fixtures` folder, which .gitignore lets through for images. They are machine-bound: they were taken with the system Chrome on Windows
+  // (font and anti-aliasing included), so a different OS or browser needs its own baselines. CI does not run these specs.
   snapshotPathTemplate: '{testDir}/fixtures/screenshots/{testFileName}/{arg}{ext}',
   reporter: [['list']],
   use: {

@@ -17,7 +17,8 @@ export function Modal({ open, onClose, label, children }: { open: boolean; onClo
           <button type="button" className="modal-close" aria-label="Đóng" onClick={onClose}>
             ×
           </button>
-          {children}
+          {/* The dialog itself has no padding, so a click whose target is the dialog is a click on the backdrop. */}
+          <div className="modal-body">{children}</div>
         </>
       )}
     </dialog>

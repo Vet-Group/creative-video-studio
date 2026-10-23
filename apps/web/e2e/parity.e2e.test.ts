@@ -243,3 +243,103 @@ test('choosing a preset or using an example fills the form and creates no job', 
   await expect(page.getByText('Chưa có job nào.')).toBeVisible();
   expect(posts).toEqual([]);
 });
+
+test('a dialog closes on its backdrop, not on a click inside it', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await signIn(page, 'member5');
+  await openCreate(page);
+  await page.getByRole('tab', { name: 'Ví dụ' }).click();
+  await page.getByRole('button', { name: 'Xoay quanh chậm', exact: true }).click();
+  const detail = page.getByRole('dialog', { name: 'Chi tiết mẫu' });
+  await expect(detail).toBeVisible();
+
+  // The padding beside the video and the text under it are inside the dialog.
+  await detail.locator('.modal-body').click({ position: { x: 20, y: 200 } });
+  await detail.getByText('Mẫu minh họa').click();
+  await expect(detail).toBeVisible();
+
+  await page.mouse.click(5, 5); // the backdrop
+  await expect(detail).toBeHidden();
+});
+
+test('the drawer closes on any link, even the current page, and on its close button', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await signIn(page, 'member5');
+  const menu = page.getByRole('button', { name: 'Mở menu' });
+  const nav = page.getByRole('navigation', { name: 'Điều hướng chính' });
+  const drawer = page.getByRole('dialog', { name: 'Menu' });
+  await expect(drawer).toHaveCount(0); // a dialog only while it is open
+
+  await menu.click();
+  await expect(drawer).toBeVisible();
+  await expect(drawer).toHaveAttribute('aria-modal', 'true');
+  await nav.getByRole('link', { name: 'Tạo video' }).click(); // the page already open
+  await expect(nav).toBeHidden();
+  await expect(page).toHaveURL(/\/create$/);
+
+  await menu.click();
+  await drawer.getByRole('button', { name: 'Đóng menu' }).click();
+  await expect(nav).toBeHidden();
+  await expect(menu).toBeFocused();
+
+  // The close button is for the drawer only.
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await expect(page.getByRole('button', { name: 'Đóng menu' })).toBeHidden();
+});
+
+test('changing the model changes the ratio and duration options to the ones it supports', async ({ page }) => {
+  await page.route(/\/api\/models\?/, (r) => {
+    const q = new URL(r.request().url()).searchParams;
+    const base = { provider: 'mock', isMock: true, maxImages: 4, estimateUsd: '0.1000', passRate: null, passes: 0, total: 0 };
+    const models = [
+      { ...base, id: 'wide', label: 'Wide model', ratios: ['9:16', '1:1'], durationsSec: [5, 8, 10] },
+      { ...base, id: 'short', label: 'Short model', ratios: ['9:16'], durationsSec: [5] },
+    ].map((m) => ({ ...m, supported: m.ratios.includes(q.get('ratio')!) && m.durationsSec.includes(Number(q.get('durationSec'))) }));
+    return r.fulfill({ json: { models, defaultModelId: 'wide', monthToDate: { usd: '0.0000', provisional: false } } });
+  });
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await signIn(page, 'member5');
+  const durations = page.getByLabel('Thời lượng').locator('option');
+  const ratios = page.getByLabel('Tỉ lệ khung hình').locator('option');
+  const wide = page.getByRole('radio', { name: /Wide model/ });
+  const short = page.getByRole('radio', { name: /Short model/ });
+
+  await expect(wide).toBeChecked();
+  await expect(durations).toHaveText(['5 giây', '8 giây', '10 giây']);
+  await expect(ratios).toHaveText(['9:16 (dọc)', '1:1 (vuông)']);
+  await expect(short).toBeDisabled(); // it has no 8 s clips
+  await page.getByLabel('Thời lượng').selectOption('5');
+  await short.check();
+  await expect(durations).toHaveText(['5 giây']);
+  await expect(ratios).toHaveText(['9:16 (dọc)']);
+  await wide.check();
+  await expect(durations).toHaveText(['5 giây', '8 giây', '10 giây']);
+  await expect(ratios).toHaveText(['9:16 (dọc)', '1:1 (vuông)']);
+});
+
+for (const width of [1440, 1280, 390]) {
+  test(`the app shell keeps a sensible focus order and works by keyboard at ${width} px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: width === 390 ? 844 : 800 });
+    await signIn(page, 'member5');
+    await openCreate(page);
+    const wideScreen = width >= 1024;
+    const focused = () => page.evaluate(() => (document.activeElement as HTMLElement).getAttribute('aria-label') ?? document.activeElement?.textContent?.trim());
+    const order = wideScreen ? ['Tạo video', 'Thư viện', 'Phương thức đăng nhập', 'Đăng xuất', 'Lịch sử'] : ['Mở menu', 'Tạo'];
+
+    for (const name of order) {
+      await page.keyboard.press('Tab');
+      await expect.poll(focused).toBe(name);
+    }
+
+    if (wideScreen) {
+      // The persistent sidebar navigates without a mouse.
+      await page.goto('/create');
+      await expect(page.getByRole('tab', { name: 'Lịch sử' })).toBeVisible();
+      await page.keyboard.press('Tab');
+      await page.keyboard.press('Tab');
+      await expect.poll(focused).toBe('Thư viện');
+      await page.keyboard.press('Enter');
+      await expect(page).toHaveURL(/\/library$/);
+    }
+  });
+}

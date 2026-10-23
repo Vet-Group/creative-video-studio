@@ -14,6 +14,7 @@ interface Model {
   id: string;
   label: string;
   isMock: boolean;
+  ratios: string[];
   durationsSec: number[];
   maxImages: number;
   estimateUsd: string;
@@ -44,6 +45,7 @@ interface JobDetail {
 
 type Tab = 'create' | 'history' | 'examples';
 const TAB_LABEL: Record<Tab, string> = { create: 'Tạo', history: 'Lịch sử', examples: 'Ví dụ' };
+const RATIO_LABEL: Record<string, string> = { '9:16': '9:16 (dọc)', '1:1': '1:1 (vuông)' };
 const MAX_IMAGES = 4;
 const MAX_PROMPT = 2000;
 const ratePct = (m: Model) => (m.passRate === null ? 'chưa có dữ liệu' : `${Math.round(m.passRate * 100)}% (${m.passes}/${m.total})`);
@@ -126,8 +128,10 @@ export function CreateForm({ reuse }: { reuse?: string }) {
     };
   }, [ready, ratio, durationSec, refetch]);
 
-  const durations = [...new Set(models?.models.flatMap((m) => m.durationsSec) ?? [durationSec])].sort((a, b) => a - b);
   const chosen = models?.models.find((m) => m.id === modelId);
+  // The options follow the chosen model; before one is chosen, every model's options show.
+  const durations = [...new Set(chosen ? chosen.durationsSec : (models?.models.flatMap((m) => m.durationsSec) ?? [durationSec]))].sort((a, b) => a - b);
+  const ratios = chosen ? chosen.ratios : (models?.models.flatMap((m) => m.ratios) ?? [ratio]);
   const tooMany = chosen !== undefined && images.length > chosen.maxImages;
   const promptOk = presetId !== '' || (prompt.trim() !== '' && prompt.trim().length <= MAX_PROMPT);
   const canRun = ready && !busy && images.length > 0 && chosen?.supported === true && !tooMany && promptOk;
@@ -155,7 +159,7 @@ export function CreateForm({ reuse }: { reuse?: string }) {
     setNotice('');
     try {
       await api('/api/jobs', sendJson('POST', { assetIds: images.map((i) => i.id), modelId, ...(presetId ? { presetId } : { prompt }), ratio, durationSec, storeId: storeId || null }));
-      setNotice('Đã gửi job. Theo dõi trong mục "Job của tôi".');
+      setNotice(narrow ? 'Đã gửi job. Theo dõi trong tab "Lịch sử".' : 'Đã gửi job. Theo dõi trong mục "Job của tôi".');
       setRefetch((n) => n + 1);
       if (!narrow) setTab('history'); // beside the form, the new job shows in History
       await refresh();
@@ -201,7 +205,7 @@ export function CreateForm({ reuse }: { reuse?: string }) {
       <div className="create-grid">
         <div className="tabs" role="tablist" aria-label="Khu vực làm việc" onKeyDown={onTabKey}>
           {tabs.map((t) => (
-            <button key={t} type="button" role="tab" id={`create-tab-${t}`} aria-selected={shown === t} aria-controls={`create-panel-${t}`} tabIndex={shown === t ? 0 : -1} onClick={() => setTab(t)}>
+            <button key={t} type="button" role="tab" id={`create-tab-${t}`} aria-selected={shown === t} aria-controls={shown === t ? `create-panel-${t}` : undefined} tabIndex={shown === t ? 0 : -1} onClick={() => setTab(t)}>
               {TAB_LABEL[t]}
             </button>
           ))}
@@ -285,8 +289,11 @@ export function CreateForm({ reuse }: { reuse?: string }) {
         <label>
           Tỉ lệ khung hình
           <select value={ratio} onChange={(e) => setRatio(e.target.value)}>
-            <option value="9:16">9:16 (dọc)</option>
-            <option value="1:1">1:1 (vuông)</option>
+            {[...new Set(ratios)].map((r) => (
+              <option key={r} value={r}>
+                {RATIO_LABEL[r] ?? r}
+              </option>
+            ))}
           </select>
         </label>
 

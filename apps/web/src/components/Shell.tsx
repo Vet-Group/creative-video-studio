@@ -143,12 +143,24 @@ export function Shell({ userId, userName, isAdmin, children }: { userId: string;
       <AdminContext value={isAdmin}>
         <div className="app">
           <div className="scrim" data-open={open} onClick={() => setOpen(false)} aria-hidden="true" />
-          <div ref={sidebar} className="sidebar" id="sidebar" data-open={open}>
+          <div
+            ref={sidebar}
+            className="sidebar"
+            id="sidebar"
+            data-open={open}
+            role={narrow && open ? 'dialog' : undefined}
+            aria-modal={narrow && open ? true : undefined}
+            aria-label={narrow && open ? 'Menu' : undefined}
+            onClick={(e) => e.target instanceof Element && e.target.closest('a') && setOpen(false)} // any link, even to the page already open
+          >
             <div className="brand">
               <span className="logo" aria-hidden="true">
                 CV
               </span>
               <strong>Creative Video Studio</strong>
+              <button type="button" className="drawer-close" aria-label="Đóng menu" onClick={() => setOpen(false)}>
+                ×
+              </button>
             </div>
             <nav aria-label="Điều hướng chính">
               {link('/create', 'Tạo video')}

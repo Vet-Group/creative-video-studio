@@ -26,6 +26,7 @@ legend { font-weight: 600; padding: 0 .25rem; }
 .scrim { position: fixed; inset: 0; z-index: 20; background: rgb(0 0 0 / .4); opacity: 0; visibility: hidden; transition: opacity .2s, visibility 0s .2s; }
 .scrim[data-open='true'] { opacity: 1; visibility: visible; transition: opacity .2s; }
 .brand { display: flex; align-items: center; gap: .6rem; padding: 0 .5rem; }
+.drawer-close { margin-left: auto; padding: .1rem .55rem; font-size: 1.2rem; line-height: 1.2; }
 .logo { display: grid; place-items: center; width: 2rem; height: 2rem; border-radius: .6rem; background: #1d4ed8; color: #fff; font-size: .8rem; font-weight: 800; }
 .sidebar nav { display: grid; gap: .25rem; }
 .sidebar nav a { display: block; padding: .55rem .75rem; border-radius: .6rem; color: #3f3f46; font-weight: 500; text-decoration: none; }
@@ -39,7 +40,7 @@ legend { font-weight: 600; padding: 0 .25rem; }
 .frame { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.5rem; padding: .75rem; }
 @media (min-width: 1024px) {
   .sidebar { width: 15rem; transform: none; visibility: visible; transition: none; }
-  .topbar, .scrim { display: none; }
+  .topbar, .scrim, .drawer-close { display: none; }
   .content { margin-left: 15rem; }
   .frame { padding: 1.5rem; max-width: 90rem; margin: 0 auto; }
 }
@@ -142,7 +143,8 @@ td code { white-space: pre-wrap; overflow-wrap: anywhere; }
   .carousel-arrow { display: block; }
 }
 
-dialog.modal { position: fixed; width: min(40rem, calc(100vw - 2rem)); max-height: calc(100vh - 2rem); padding: 1rem; border: 0; border-radius: 1rem; overflow: auto; }
+dialog.modal { position: fixed; width: min(40rem, calc(100vw - 2rem)); max-height: calc(100vh - 2rem); padding: 0; border: 0; border-radius: 1rem; overflow: auto; }
+.modal-body { padding: 1rem; }
 dialog.modal::backdrop { background: rgb(0 0 0 / .5); }
 .modal-close { position: absolute; top: .5rem; right: .5rem; padding: .1rem .55rem; }
 .modal .preview { max-width: 16rem; margin: .5rem auto; }
