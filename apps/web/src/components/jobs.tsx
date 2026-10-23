@@ -62,7 +62,7 @@ export function JobsProvider({ userId, children }: { userId: string; children: R
     setNews(true);
     setToasts((cur) => [
       ...cur,
-      ...fresh.map((j) => ({ id: nextId.current++, ok: j.status === 'succeeded', text: j.status === 'succeeded' ? 'Clip đã xong' : 'Một job không thành công' })),
+      ...fresh.map((j) => ({ id: nextId.current++, ok: j.status === 'succeeded', text: j.status === 'succeeded' ? (j.resolution ? 'Ảnh đã xong' : 'Clip đã xong') : 'Một job không thành công' })),
     ]);
   }, [userId]);
 

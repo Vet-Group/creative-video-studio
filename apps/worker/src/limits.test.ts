@@ -127,7 +127,7 @@ describe('monthly USD (ICT month)', () => {
     await setCaps(text(units - 1n));
     expect(await checkCaps(pool, u, '0', at('2030-01-15T00:00:00Z'))).toBe('monthly_usd');
     await setCaps('200');
-  });
+  }, 30_000); // 1,000 sequential inserts take about 4 s alone, more when other suites share the machine
 });
 
 describe('image and apps features', () => {

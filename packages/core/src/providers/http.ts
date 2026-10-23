@@ -1,5 +1,5 @@
 import { estimateUsd } from '../models';
-import type { ProviderJob, SubmitRequest } from './types';
+import type { ImageProviderJob, ProviderJob, SubmitRequest } from './types';
 
 /** A provider answered with a non-2xx status; `body` keeps the response text for isFundingRefusal. */
 export class ProviderHttpError extends Error {
@@ -76,3 +76,10 @@ export const estimate = (req: Pick<SubmitRequest, 'model'>, durationSec: number)
   costUsd: Number(estimateUsd(req.model.usdPerSecond, durationSec)),
   costSource: 'estimate' as const,
 });
+
+/** An image job costs the model's price for its resolution; neither API returns a billed amount. */
+export function imageEstimate(job: Pick<ImageProviderJob, 'model' | 'resolution'>) {
+  const price = job.model.imagePrices[job.resolution];
+  if (price === undefined) throw new Error(`model ${job.model.id} has no price for resolution ${job.resolution}`);
+  return { costUsd: Number(price), costSource: 'estimate' as const };
+}

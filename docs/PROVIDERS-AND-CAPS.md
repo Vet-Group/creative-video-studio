@@ -35,3 +35,9 @@ Assumed use for 30 staff (6 heavy, 12 medium, 12 light users) was simulated over
 The per-feature caps only warn, because hard caps at p95 for ten features would block one feature or another in about 18% of months even at the assumed use.
 
 The hard caps are checked in `packages/core/src/limits.ts` (`checkCaps` with the job's `feature`), in the same transaction and advisory lock as the job insert. The image and apps budget sums the ledger rows of jobs whose `feature` is not `video` or `marketing`. Shared rows (bake-off, adjustments, invoice differences) stay in the video budget. Admins change every cap on the Settings page; each change is audited.
+
+## Image models and jobs (migration 0007)
+
+`model_configs` has a `kind` (`video` or `image`), the `features` a model may serve, and, for an image model, `image_prices` (resolution label to USD per image) instead of `usd_per_second` and durations. Migration 0007 seeds seven fal image models **disabled**; an Admin switches them on in Settings (the database refuses an image model without prices, a limit and a ratio). Their ratios and request fields come from each endpoint's fal OpenAPI schema (`sources` records the URL and the read date); the prices are the ones in the table above, per image. Where a schema has no resolution input (Nano Banana, GPT Image 2, FASHN) the only price label is `1K` and nothing is sent; Seedream takes `auto_1K`/`auto_2K` or a computed size.
+
+An image job (`POST /api/jobs` with `feature` other than `video` or `marketing`) stores `duration_s = 0` and `params` (`resolution`, optional `quality`, which only GPT Image reads and which defaults to the `high` tier its price assumes). Its estimate is `image_prices[resolution]`, booked at Run and settled to the larger of that and the reported cost, like a video. Try On needs the person image first and at least one garment image, and may omit the prompt: the API then stores a fixed English default, so the row shows what was sent.

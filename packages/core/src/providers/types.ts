@@ -1,4 +1,4 @@
-import type { ModelConfig, Ratio } from '../models';
+import type { ImageModelConfig, ModelConfig, Ratio } from '../models';
 
 export interface SubmitRequest {
   model: ModelConfig;
@@ -27,4 +27,31 @@ export interface VideoProvider {
   status(job: ProviderJob): Promise<ProviderStatus>;
   // fal cannot cancel a running job, so its adapter returns { supported: false }.
   cancel(job: ProviderJob): Promise<{ supported: boolean }>;
+}
+
+export interface ImageSubmitRequest {
+  model: ImageModelConfig;
+  prompt: string;
+  /** The first image is the main one; Try On sends the person first, then the garment. */
+  imageUrls: string[];
+  /** One of the model's ratios, or 'auto'. */
+  ratio: string;
+  /** A key of the model's imagePrices. */
+  resolution: string;
+  /** Only GPT Image reads it ('auto', 'low', 'medium' or 'high'); the price is estimated at 'high', which is also the default. */
+  quality?: string;
+}
+
+/** Image prices depend on the resolution, so polling needs it as well as the id. */
+export interface ImageProviderJob {
+  providerJobId: string;
+  model: ImageModelConfig;
+  resolution: string;
+}
+
+/** Like VideoProvider; a succeeded status carries the cost of the one image. */
+export interface ImageProvider {
+  submit(req: ImageSubmitRequest): Promise<{ providerJobId: string }>;
+  status(job: ImageProviderJob): Promise<ProviderStatus>;
+  cancel(job: ImageProviderJob): Promise<{ supported: boolean }>;
 }

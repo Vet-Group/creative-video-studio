@@ -11,13 +11,13 @@ import { pipeline } from 'node:stream/promises';
 import type { ReadableStream as WebReadableStream } from 'node:stream/web';
 import { fileURLToPath } from 'node:url';
 import { close24h, lateBill, type LedgerPool, release, settle, withTransaction } from '@cvs/core/ledger';
-import type { ModelConfig } from '@cvs/core/models';
-import type { ProviderJob, SubmitRequest, VideoProvider } from '@cvs/core/providers';
+import type { ImageModelConfig, ModelConfig } from '@cvs/core/models';
+import type { ImageProvider, ImageProviderJob, ImageSubmitRequest, ProviderJob, ProviderStatus, SubmitRequest, VideoProvider } from '@cvs/core/providers';
 import { PURGE_CRON, PURGE_QUEUE, VIDEO_QUEUE, VIDEO_QUEUE_OPTIONS, type VideoJobData, videoSendOptions } from '@cvs/core/queue';
 import { insertAssets } from '@cvs/db/assets';
 import { createDb, type createPool } from '@cvs/db/client';
 import { type Job, PgBoss } from 'pg-boss';
-import { extractPoster, probeSize } from './media';
+import { extractPoster, probeSize, sniffImage } from './media';
 import { purgeDeletedClips } from './purge';
 import { deleteObject, putObject } from './storage';
 
@@ -55,8 +55,9 @@ export const DEFAULT_OPTIONS: WorkerOptions = {
 export interface WorkerDeps {
   pool: ReturnType<typeof createPool>;
   connectionString: string;
-  /** Adapters by provider name. */
+  /** Adapters by provider name; a job whose model is of kind image uses `imageProviders`. */
   providers: Partial<Record<string, VideoProvider>>;
+  imageProviders?: Partial<Record<string, ImageProvider>>;
   options?: Partial<WorkerOptions>;
 }
 
@@ -101,6 +102,7 @@ async function download(url: string, to: string, provider: string): Promise<void
 
 export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
   const { pool, providers } = deps;
+  const imageProviders = deps.imageProviders ?? {};
   const o: WorkerOptions = { ...DEFAULT_OPTIONS, ...deps.options };
   const db = createDb(pool);
   const id = `worker-${randomUUID()}`;
@@ -119,6 +121,27 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
       id: r.id, provider: r.provider, endpoint: r.endpoint, label: r.label, ratios: r.ratios, durationsSec: r.durations_sec, maxImages: r.max_images,
       outputResolution: r.output_resolution, usdPerSecond: Number(r.usd_per_second), billedAmountField: r.billed_amount_field, sources: r.sources,
     };
+  }
+
+  async function loadImageModel(modelId: string): Promise<ImageModelConfig> {
+    const { rows } = await pool.query('select * from model_configs where id = $1', [modelId]);
+    const r = rows[0];
+    if (!r || r.kind !== 'image' || r.image_prices == null || r.max_images == null) throw new Error(`model ${modelId} has no image prices or limits`);
+    return { id: r.id, provider: r.provider, endpoint: r.endpoint, label: r.label, ratios: r.ratios, maxImages: r.max_images, imagePrices: r.image_prices, features: r.features };
+  }
+
+  /** The status and cancel calls of a job that has a provider id: the model's kind picks the image or the video adapter. Undefined without an adapter. */
+  async function adapterFor(row: { provider: string; provider_job_id: string; model: string; kind: string; params: Record<string, string> }) {
+    if (row.kind === 'image') {
+      const provider = imageProviders[row.provider];
+      if (!provider) return undefined;
+      const job: ImageProviderJob = { providerJobId: row.provider_job_id, model: await loadImageModel(row.model), resolution: row.params.resolution! };
+      return { status: (): Promise<ProviderStatus> => provider.status(job), cancel: () => provider.cancel(job) };
+    }
+    const provider = providers[row.provider];
+    if (!provider) return undefined;
+    const job: ProviderJob = { providerJobId: row.provider_job_id, model: await loadModel(row.model) };
+    return { status: (): Promise<ProviderStatus> => provider.status(job), cancel: () => provider.cancel(job) };
   }
 
   // ---- admission and submit (the pg-boss handler) ----
@@ -149,26 +172,34 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
   async function submit(jobId: string, signal: AbortSignal): Promise<void> {
     submitting.add(jobId);
     try {
-      const job = (await pool.query('select provider, model, prompt, aspect, duration_s, input_asset_ids from jobs where id = $1', [jobId])).rows[0];
+      const job = (
+        await pool.query(
+          'select j.provider, j.model, j.prompt, j.aspect, j.duration_s, j.params, j.input_asset_ids, m.kind from jobs j join model_configs m on m.id = j.model where j.id = $1',
+          [jobId],
+        )
+      ).rows[0];
       const prepared = await (async () => {
+        // The adapters upload the images themselves (B.2); until then the URL only names the asset.
+        const imageUrls = (job.input_asset_ids as string[]).map((a) => `asset://${a}`);
+        if (job.kind === 'image') {
+          const provider = imageProviders[job.provider];
+          if (!provider) throw new Error(`no adapter for provider ${job.provider}`);
+          const request: ImageSubmitRequest = {
+            model: await loadImageModel(job.model), prompt: job.prompt, imageUrls, ratio: job.aspect, resolution: job.params.resolution, quality: job.params.quality,
+          };
+          return { send: () => provider.submit(request) };
+        }
         const provider = providers[job.provider];
         if (!provider) throw new Error(`no adapter for provider ${job.provider}`);
-        // The adapters upload the images themselves (B.2); until then the URL only names the asset.
-        const request: SubmitRequest = {
-          model: await loadModel(job.model),
-          prompt: job.prompt,
-          imageUrls: (job.input_asset_ids as string[]).map((a) => `asset://${a}`),
-          ratio: job.aspect,
-          durationSec: job.duration_s,
-        };
-        return { provider, request };
+        const request: SubmitRequest = { model: await loadModel(job.model), prompt: job.prompt, imageUrls, ratio: job.aspect, durationSec: job.duration_s };
+        return { send: () => provider.submit(request) };
       })().catch(async (e) => {
         await release(pool, jobId, e instanceof Error ? e.message : String(e));
       });
       if (!prepared) return;
       let providerJobId: string;
       try {
-        ({ providerJobId } = await abortable(prepared.provider.submit(prepared.request), signal));
+        ({ providerJobId } = await abortable(prepared.send(), signal));
       } catch (e) {
         // Shutting down mid-call: the row stays submitting and the next worker turns it into failed_unknown.
         if (signal.aborted) return;
@@ -209,7 +240,8 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
   // ---- reconcile ----
 
   /** Copies the output into MinIO, checks it is at least 720p, cuts the poster and settles the job. A failure that may pass leaves the job running for the next pass. */
-  async function deliver(job: { id: string; user_id: string; provider: string }, outputUrl: string, costUsd: number): Promise<void> {
+  async function deliver(job: { id: string; user_id: string; provider: string; kind: string }, outputUrl: string, costUsd: number): Promise<void> {
+    if (job.kind === 'image') return deliverImage(job, outputUrl, costUsd);
     const dir = await mkdtemp(join(tmpdir(), 'cvs-deliver-'));
     const outputId = randomUUID();
     const posterId = randomUUID();
@@ -244,8 +276,32 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
     }
   }
 
-  async function providerJob(row: { provider_job_id: string; model: string }): Promise<ProviderJob> {
-    return { providerJobId: row.provider_job_id, model: await loadModel(row.model) };
+  /** An image is stored as it came (its type read from its bytes) and needs no poster: the Library shows the image itself. */
+  async function deliverImage(job: { id: string; user_id: string; provider: string }, outputUrl: string, costUsd: number): Promise<void> {
+    const dir = await mkdtemp(join(tmpdir(), 'cvs-deliver-'));
+    const outputId = randomUUID();
+    const key = `assets/${outputId}`;
+    try {
+      const file = join(dir, 'output');
+      await download(outputUrl, file, job.provider);
+      const bytes = await readFile(file);
+      const type = sniffImage(bytes);
+      if (!type) {
+        await settle(pool, job.id, { status: 'failed', costUsd, billed: true, error: 'the output is not a PNG, JPEG or WebP image' });
+        return;
+      }
+      const { width, height } = await probeSize(file);
+      await putObject(key, bytes, type.mime);
+      await insertAssets(db, [{ id: outputId, ownerId: job.user_id, kind: 'output', s3Key: key, filename: `image-${job.id.slice(0, 8)}.${type.ext}`, mime: type.mime, bytes: bytes.length, width, height }]);
+      if (await settle(pool, job.id, { status: 'succeeded', costUsd, outputAssetId: outputId, posterAssetId: null })) return;
+      throw new Error('the job was settled by someone else');
+    } catch (e) {
+      await pool.query('delete from assets where id = $1', [outputId]).catch((err) => log('cleanup', err));
+      await deleteObject(key).catch((err) => log('cleanup', err));
+      throw e;
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   }
 
   async function resendQueued(): Promise<void> {
@@ -275,18 +331,18 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
 
   async function pollRunning(): Promise<void> {
     const { rows } = await pool.query(
-      `select id, user_id, provider, provider_job_id, model, (now() - started_at > ($1::float8 * interval '1 millisecond')) as expired from jobs where status = 'running'`,
+      `select j.id, j.user_id, j.provider, j.provider_job_id, j.model, j.params, m.kind, (now() - j.started_at > ($1::float8 * interval '1 millisecond')) as expired
+         from jobs j join model_configs m on m.id = j.model where j.status = 'running'`,
       [o.runTimeoutMs],
     );
     for (const row of rows) {
       try {
-        const provider = providers[row.provider];
-        const pj = await providerJob(row);
+        const adapter = await adapterFor(row);
         // Without an adapter the job can only time out.
-        const status = provider ? await provider.status(pj) : { state: 'running' as const };
+        const status = adapter ? await adapter.status() : { state: 'running' as const };
         if (status.state === 'succeeded') await deliver(row, status.outputUrl, status.costUsd);
         else if (status.state === 'failed' || status.state === 'canceled') await settle(pool, row.id, { status: 'failed', costUsd: status.costUsd, error: status.error });
-        else if (row.expired && (await timeOut(row.id)) && provider) await provider.cancel(pj).catch((e) => log(`cancel ${row.id}`, e));
+        else if (row.expired && (await timeOut(row.id)) && adapter) await adapter.cancel().catch((e) => log(`cancel ${row.id}`, e));
       } catch (e) {
         log(`running job ${row.id}`, e);
         // A delivery or status call that keeps failing must not keep the job running past its limit; lateBill or close24h finalize it from timed_out.
@@ -304,14 +360,14 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
   /** Timed-out and lost jobs: bill them when the provider reports a final state (the late result is not delivered), else close them after 24 h. */
   async function pollUnresolved(): Promise<void> {
     const { rows } = await pool.query(
-      `select id, provider, provider_job_id, model from jobs j where status in ('timed_out', 'failed_unknown')
+      `select j.id, j.provider, j.provider_job_id, j.model, j.params, m.kind from jobs j join model_configs m on m.id = j.model where j.status in ('timed_out', 'failed_unknown')
           and not exists (select 1 from job_costs c where c.job_id = j.id and c.is_final)`,
     );
     for (const row of rows) {
       try {
-        const provider = providers[row.provider];
-        if (provider && row.provider_job_id) {
-          const status = await provider.status(await providerJob(row));
+        const adapter = row.provider_job_id ? await adapterFor(row) : undefined;
+        if (adapter) {
+          const status = await adapter.status();
           if (status.state === 'succeeded' || status.state === 'failed' || status.state === 'canceled') {
             await lateBill(pool, row.id, status.costUsd, status.state === 'succeeded');
             continue;

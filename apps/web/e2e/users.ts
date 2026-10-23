@@ -9,6 +9,7 @@ export const USERS = {
   member5: { email: 'member5@e2e.test', name: 'E2E Member 5', role: 'member' },
   member6: { email: 'member6@e2e.test', name: 'E2E Member 6', role: 'member' },
   member7: { email: 'member7@e2e.test', name: 'E2E Member 7', role: 'member' },
+  member8: { email: 'member8@e2e.test', name: 'E2E Member 8', role: 'member' },
   admin: { email: 'admin@e2e.test', name: 'E2E Admin', role: 'admin' },
 } as const;
 

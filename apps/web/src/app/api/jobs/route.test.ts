@@ -397,6 +397,160 @@ describe('POST /api/jobs with retryOf', () => {
   });
 });
 
+describe('POST /api/jobs for an image feature', () => {
+  const image = { modelId: 'img-pro', feature: 'image', prompt: 'a bottle on marble', ratio: '3:4', params: { resolution: '2K' } };
+  const runImage = (m: Member, extra: Record<string, unknown> = {}) => run(m.cookie, { ...image, assetIds: [m.asset], ...extra });
+  const error = async (res: Response) => ((await res.json()) as { error: string }).error;
+
+  beforeAll(async () => {
+    await pool.query(
+      `insert into model_configs (id, provider, endpoint, label, kind, features, ratios, durations_sec, max_images, image_prices, sources, enabled) values
+         ('img-pro', 'fal', 'x', 'Img pro', 'image', '{image,try_on}', '{auto,1:1,3:4}', '{}', 2, '{"1K": "0.1500", "2K": "0.3000"}', '{}', true),
+         ('img-only', 'fal', 'x', 'Img only', 'image', '{image}', '{auto,1:1}', '{}', 2, '{"1K": "0.0398"}', '{}', true),
+         ('img-off', 'fal', 'x', 'Img off', 'image', '{image}', '{auto}', '{}', 2, '{"1K": "0.1"}', '{}', false),
+         ('img-mock', 'mock', 'mock', 'Img mock', 'image', '{image}', '{auto,1:1}', '{}', 2, '{"1K": "0.2000"}', '{}', true)`,
+    );
+  });
+
+  test('creates a queued image job with the per-image estimate, 0 seconds, the params and the feature', async () => {
+    const m = await newMember();
+    const res = await runImage(m);
+    expect(res.status).toBe(201);
+    const { id } = (await res.json()) as { id: string };
+    expect((await pool.query('select feature, model, provider, preset_id, prompt, aspect, duration_s, params, status, is_mock from jobs where id = $1', [id])).rows).toEqual([
+      { feature: 'image', model: 'img-pro', provider: 'fal', preset_id: null, prompt: 'a bottle on marble', aspect: '3:4', duration_s: 0, params: { resolution: '2K' }, status: 'queued', is_mock: false },
+    ]);
+    expect((await pool.query('select kind, usd::text as usd from cost_entries where job_id = $1', [id])).rows).toEqual([{ kind: 'estimate', usd: '0.3000' }]);
+    expect(await sentCount(m.id)).toBe(1);
+  });
+
+  test('takes a quality, ignores durationSec, and books a mock image model at 0', async () => {
+    const m = await newMember();
+    const { id } = (await (await runImage(m, { params: { resolution: '1K', quality: 'low' }, durationSec: 99 })).json()) as { id: string };
+    expect((await pool.query('select duration_s, params from jobs where id = $1', [id])).rows).toEqual([{ duration_s: 0, params: { resolution: '1K', quality: 'low' } }]);
+    const mock = (await (await runImage(m, { modelId: 'img-mock', ratio: 'auto', params: { resolution: '1K' } })).json()) as { id: string };
+    expect((await pool.query('select usd::text from cost_entries where job_id = $1', [mock.id])).rows).toEqual([{ usd: '0.0000' }]);
+  });
+
+  test.each([
+    ['a model that does not list the feature', { modelId: 'img-only', feature: 'try_on', two: true }, /does not offer this feature/],
+    ['a video model', { modelId: 'fal-test' }, /does not offer this feature/],
+    ['a disabled model', { modelId: 'img-off', ratio: 'auto', params: { resolution: '1K' } }, /not enabled/],
+    ['a ratio the model lacks', { ratio: '16:9' }, /ratio, resolution or number of images/],
+    ['a resolution the model lacks', { params: { resolution: '4K' } }, /ratio, resolution or number of images/],
+    ['a prototype key as the resolution', { params: { resolution: 'constructor' } }, /ratio, resolution or number of images/],
+    ['no resolution', { params: {} }, /params\.resolution is required/],
+    ['a param that is not allowed', { params: { resolution: '1K', seed: '1' } }, /only resolution and quality/],
+    ['a quality that does not exist', { params: { resolution: '1K', quality: 'ultra' } }, /params\.quality must be one of/],
+    ['a preset', { presetId: 'gentle-push-in', prompt: undefined }, /takes a prompt and no preset/],
+    ['no prompt', { prompt: undefined }, /takes a prompt and no preset/],
+    ['an unknown feature', { feature: 'telepathy' }, /feature must be one of/],
+  ])('refuses %s, books nothing and sends nothing', async (_what, extra, message) => {
+    const m = await newMember();
+    const { two, ...fields } = extra as { two?: boolean };
+    if (two) await insertAsset(`${m.id}-b`, m.id);
+    const res = await runImage(m, { ...fields, ...(two && { assetIds: [m.asset, `${m.id}-b`] }) });
+    expect(res.status).toBe(400);
+    expect(await error(res)).toMatch(message);
+    expect((await pool.query('select count(*)::int as n from jobs where user_id = $1', [m.id])).rows[0].n).toBe(0);
+    expect(await sentCount(m.id)).toBe(0);
+  });
+
+  test('refuses more inputs than the model takes, and an input the caller cannot use', async () => {
+    const m = await newMember();
+    for (const n of [2, 3]) await insertAsset(`${m.id}-extra-${n}`, m.id);
+    expect((await runImage(m, { assetIds: [m.asset, `${m.id}-extra-2`] })).status).toBe(201); // img-pro takes 2
+    const res = await runImage(m, { assetIds: [m.asset, `${m.id}-extra-2`, `${m.id}-extra-3`] });
+    expect([res.status, await error(res)]).toEqual([400, 'the model does not allow this ratio, resolution or number of images']);
+    expect((await runImage(m, { assetIds: ['theirs-1'] })).status).toBe(400);
+  });
+
+  test('Try On needs two images, and runs without a prompt on a default one', async () => {
+    const m = await newMember();
+    await insertAsset(`${m.id}-garment`, m.id);
+    const tryOn = { feature: 'try_on', prompt: undefined };
+    expect(await error(await runImage(m, tryOn))).toMatch(/at least one garment image/);
+    const res = await runImage(m, { ...tryOn, assetIds: [m.asset, `${m.id}-garment`] });
+    expect(res.status).toBe(201);
+    const { id } = (await res.json()) as { id: string };
+    const job = (await pool.query('select feature, prompt from jobs where id = $1', [id])).rows[0];
+    expect(job.feature).toBe('try_on');
+    expect(job.prompt).toMatch(/^Dress the person in the first image/);
+    expect((await runImage(m, { ...tryOn, prompt: '  Put the red dress on her ', assetIds: [m.asset, `${m.id}-garment`] })).status).toBe(201);
+  });
+
+  test('keeps the video path to its own rules: no params, and the marketing feature needs a model that lists it', async () => {
+    const m = await newMember();
+    expect((await runAs(m, { params: { resolution: '1K' } })).status).toBe(400);
+    expect((await runAs(m, { feature: 'marketing' })).status).toBe(400); // fal-test lists only video
+    await pool.query(`update model_configs set features = '{video,marketing}' where id = 'fal-test'`);
+    try {
+      const { id } = (await (await runAs(m, { feature: 'marketing' })).json()) as { id: string };
+      expect((await pool.query('select feature, duration_s from jobs where id = $1', [id])).rows).toEqual([{ feature: 'marketing', duration_s: 5 }]);
+    } finally {
+      await pool.query(`update model_configs set features = '{video}' where id = 'fal-test'`);
+    }
+  });
+
+  describe('the image and apps caps', () => {
+    const cap = (sql: string) => pool.query(`update settings set ${sql}`);
+    const reset = () => cap(`features_monthly_cap_usd = 260, member_daily_usd_cap = 10, member_monthly_usd_cap = 50`);
+
+    test("refuses a Run past the member's day, their month and the company month with the cap messages, one image Run at a time", async () => {
+      const m = await newMember();
+      try {
+        await cap(`member_daily_usd_cap = 0.5`); // two 0.3000 estimates do not fit
+        expect((await runImage(m)).status).toBe(201);
+        const day = await runImage(m);
+        expect([day.status, await error(day)]).toEqual([429, 'Bạn đã dùng hết hạn mức chi phí hôm nay']);
+        await reset();
+        await cap(`member_monthly_usd_cap = 0.5`);
+        const month = await runImage(m);
+        expect([month.status, await error(month)]).toEqual([429, 'Bạn đã dùng hết hạn mức chi phí tháng này']);
+        await reset();
+        const used = Number((await pool.query(`select coalesce(sum(usd), 0)::text as usd from cost_entries ce where month = to_char(now() at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM') and exists (select 1 from jobs j where j.id = ce.job_id and j.feature not in ('video', 'marketing'))`)).rows[0].usd);
+        await cap(`features_monthly_cap_usd = ${(used + 0.2).toFixed(4)}`);
+        const company = await runImage(m);
+        expect([company.status, await error(company)]).toEqual([429, 'Đã hết ngân sách tháng cho ảnh và ứng dụng']);
+        expect(await sentCount(m.id)).toBe(1);
+      } finally {
+        await reset();
+      }
+    });
+
+    test('keeps the video caps apart: a spent image budget does not stop a video Run, and the daily clip cap does not count images', async () => {
+      const m = await newMember();
+      try {
+        await cap(`member_daily_usd_cap = 0, member_monthly_usd_cap = 0, features_monthly_cap_usd = 0`);
+        expect((await runAs(m)).status).toBe(201);
+        await reset();
+        await seedJobs(m.id, 3);
+        for (let i = 0; i < 3; i++) expect((await runImage(m)).status).toBe(201); // 4 jobs today and the clip cap is 5, but images are not clips
+        expect((await runAs(m)).status).toBe(201);
+        expect((await runAs(m)).status).toBe(429); // the 6th clip
+      } finally {
+        await reset();
+      }
+    });
+  });
+
+  test('retries an image job from its own feature, params and model price', async () => {
+    const m = await newMember();
+    const { id } = (await (await runImage(m)).json()) as { id: string };
+    await pool.query(`update jobs set status = 'failed' where id = $1`, [id]);
+    await pool.query(`update model_configs set image_prices = '{"1K": "0.1500", "2K": "0.4000"}' where id = 'img-pro'`);
+    try {
+      const res = await run(m.cookie, { retryOf: id });
+      expect(res.status).toBe(201);
+      const retry = ((await res.json()) as { id: string }).id;
+      expect((await pool.query('select feature, aspect, duration_s, params from jobs where id = $1', [retry])).rows).toEqual([{ feature: 'image', aspect: '3:4', duration_s: 0, params: { resolution: '2K' } }]);
+      expect((await pool.query('select usd::text from cost_entries where job_id = $1', [retry])).rows).toEqual([{ usd: '0.4000' }]);
+    } finally {
+      await pool.query(`update model_configs set image_prices = '{"1K": "0.1500", "2K": "0.3000"}' where id = 'img-pro'`);
+    }
+  });
+});
+
 describe('moving a user to another team', () => {
   test('leaves the earlier jobs and their ledger rows on the old team', async () => {
     const m = await newMember('team-b');

@@ -1,6 +1,6 @@
 // The worker process: `pnpm --filter @cvs/worker start`. Only the mock provider exists until the real adapters land (B.2).
 import { createPool, databaseUrl } from '@cvs/db/client';
-import { createMockProvider } from './mock-provider';
+import { createMockImageProvider, createMockProvider } from './mock-provider';
 import { ensureBucket } from './storage';
 import { startWorker } from './worker';
 
@@ -13,6 +13,7 @@ const worker = await startWorker({
   pool,
   connectionString,
   providers: { mock: createMockProvider({ runMs: Number(process.env.CVS_MOCK_RUN_MS ?? 8_000) }) },
+  imageProviders: { mock: createMockImageProvider({ runMs: Number(process.env.CVS_MOCK_RUN_MS ?? 8_000) }) },
 });
 console.log(`worker ${worker.id} is running`);
 

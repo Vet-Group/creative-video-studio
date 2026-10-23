@@ -1,21 +1,21 @@
 // The worker against a disposable database and bucket on the compose Postgres and MinIO (`pnpm services:up`), with the mock provider.
 import { randomBytes, randomUUID } from 'node:crypto';
 import { execFile } from 'node:child_process';
-import { mkdir, rm } from 'node:fs/promises';
+import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import { DeleteBucketCommand, DeleteObjectsCommand, HeadObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { reserve, withTransaction } from '@cvs/core/ledger';
-import type { VideoProvider } from '@cvs/core/providers';
+import type { ImageProvider, ImageSubmitRequest, VideoProvider } from '@cvs/core/providers';
 import { VIDEO_QUEUE, VIDEO_QUEUE_OPTIONS, videoSendOptions } from '@cvs/core/queue';
 import { createPool } from '@cvs/db/client';
 import { createTestDatabase } from '@cvs/db/testing';
 import { PgBoss } from 'pg-boss';
 import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
 import { requireFfmpeg } from './media';
-import { createMockProvider, MOCK_FAIL } from './mock-provider';
+import { createMockImageProvider, createMockProvider, MOCK_FAIL } from './mock-provider';
 import { bucketName, ensureBucket, s3 } from './storage';
 import { type RunningWorker, startWorker, type WorkerOptions } from './worker';
 
@@ -39,6 +39,10 @@ beforeAll(async () => {
   await pool.query(
     `insert into model_configs (id, provider, endpoint, label, ratios, durations_sec, max_images, output_resolution, usd_per_second, sources, enabled)
      values ('mock-sample', 'mock', 'mock', 'Mock', '{9:16,1:1}', '{5,10}', 4, '720p', 0.1, '{}', true)`,
+  );
+  await pool.query(
+    `insert into model_configs (id, provider, endpoint, label, kind, features, ratios, durations_sec, max_images, image_prices, sources, enabled)
+     values ('mock-image', 'mock', 'mock', 'Mock image', 'image', '{image,try_on}', '{auto,1:1,3:4}', '{}', 4, '{"1K": "0.1500", "2K": "0.3000"}', '{}', true)`,
   );
 });
 
@@ -380,6 +384,115 @@ describe('restarts', () => {
     await new Promise((r) => setTimeout(r, 1_000));
     expect(counting.submits).toBe(1);
     expect((await costs(id)).map((c) => c.kind)).toEqual(['estimate', 'actual_adjustment']);
+  });
+});
+
+describe('image jobs', () => {
+  /** A queued image job with its estimate booked; the estimate is the price of its resolution. */
+  async function newImageJob(userId: string, o: { prompt?: string; ratio?: string; resolution?: string; isMock?: boolean; quality?: string } = {}): Promise<string> {
+    const id = randomUUID();
+    const resolution = o.resolution ?? '1K';
+    await pool.query(
+      `insert into jobs (id, user_id, team_id, feature, model, provider, prompt, aspect, duration_s, params, input_asset_ids, is_mock)
+       values ($1, $2, 'team-unassigned', 'image', 'mock-image', 'mock', $3, $4, 0, $5, '{}', $6)`,
+      [id, userId, o.prompt ?? 'a product', o.ratio ?? '3:4', JSON.stringify({ resolution, ...(o.quality && { quality: o.quality }) }), o.isMock ?? false],
+    );
+    await withTransaction(pool, (tx) => reserve(tx, id, resolution === '2K' ? '0.3000' : '0.1500'));
+    return id;
+  }
+
+  async function startImages(image: ImageProvider, options: Partial<WorkerOptions> = {}): Promise<RunningWorker> {
+    const w = await startWorker({ pool, connectionString: testDb.url, providers: { mock: counting(300) }, imageProviders: { mock: image }, options: { ...FAST, ...options } });
+    workers.push(w);
+    return w;
+  }
+
+  /** The mock image provider, recording what it was asked and, like the fal adapter, reporting the model price as the cost. */
+  function recording(requests: ImageSubmitRequest[], output?: (inner: string) => Promise<string>): ImageProvider {
+    const inner = createMockImageProvider({ runMs: 300, dir: mockDir });
+    return {
+      ...inner,
+      async submit(req) {
+        requests.push(req);
+        return inner.submit(req);
+      },
+      async status(job) {
+        const st = await inner.status(job);
+        if (st.state !== 'succeeded') return st;
+        return { ...st, outputUrl: output ? await output(st.outputUrl) : st.outputUrl, costUsd: Number(job.model.imagePrices[job.resolution]) };
+      },
+    };
+  }
+
+  test('runs a mock image job: a PNG output in MinIO, no poster, nothing billed', async () => {
+    const id = await newImageJob('u1', { isMock: true, ratio: '3:4' });
+    await startImages(createMockImageProvider({ runMs: 300, dir: mockDir }));
+    await send(id, 'u1');
+    await waitFor('the job to succeed', async () => (await status(id)) === 'succeeded');
+
+    const j = await job(id);
+    expect(j.poster_asset_id).toBeNull();
+    const a = (await pool.query(`select kind, mime, filename, bytes, width, height, s3_key, owner_id from assets where id = $1`, [j.output_asset_id])).rows[0];
+    expect(a).toMatchObject({ kind: 'output', mime: 'image/png', owner_id: 'u1', width: 192, height: 256 });
+    expect(a.filename).toBe(`image-${id.slice(0, 8)}.png`);
+    const head = await s3().send(new HeadObjectCommand({ Bucket: bucketName(), Key: a.s3_key }));
+    expect([head.ContentLength, head.ContentType]).toEqual([a.bytes, 'image/png']);
+    expect((await costs(id)).map((c) => [c.kind, c.usd])).toEqual([['estimate', '0.0000'], ['actual_adjustment', '0.0000']]);
+  });
+
+  test('sends the model, resolution, ratio and quality to the image adapter and books the per-image price', async () => {
+    const requests: ImageSubmitRequest[] = [];
+    const id = await newImageJob('u1', { resolution: '2K', ratio: 'auto', quality: 'low' });
+    await startImages(recording(requests));
+    await send(id, 'u1');
+    await waitFor('the job to succeed', async () => (await status(id)) === 'succeeded');
+    expect(requests).toHaveLength(1);
+    expect(requests[0]).toMatchObject({ prompt: 'a product', ratio: 'auto', resolution: '2K', quality: 'low', model: { id: 'mock-image', imagePrices: { '1K': '0.1500', '2K': '0.3000' }, features: ['image', 'try_on'] } });
+    expect(requests[0]!.imageUrls).toEqual([]);
+    expect((await costs(id)).map((c) => [c.kind, c.usd])).toEqual([['estimate', '0.3000'], ['actual_adjustment', '0.0000']]);
+    expect(await total(id)).toEqual({ usd: '0.3000', is_final: true });
+  });
+
+  test('stores a JPEG under its own type and extension, whatever name the provider gave it', async () => {
+    const jpg = join(mockDir, `${randomUUID()}.bin`);
+    await mkdir(mockDir, { recursive: true });
+    await run(requireFfmpeg(), ['-y', '-v', 'error', '-f', 'lavfi', '-i', 'testsrc2=size=64x48', '-frames:v', '1', '-f', 'image2', '-c:v', 'mjpeg', jpg]);
+    const id = await newImageJob('u1');
+    await startImages(recording([], async () => pathToFileURL(jpg).href));
+    await send(id, 'u1');
+    await waitFor('the job to succeed', async () => (await status(id)) === 'succeeded');
+    const a = (await pool.query(`select mime, filename, width, height from assets where id = (select output_asset_id from jobs where id = $1)`, [id])).rows[0];
+    expect(a).toEqual({ mime: 'image/jpeg', filename: `image-${id.slice(0, 8)}.jpg`, width: 64, height: 48 });
+  });
+
+  test('fails an output that is not an image but keeps the estimate, because the provider billed it', async () => {
+    const text = join(mockDir, `${randomUUID()}.png`);
+    await mkdir(mockDir, { recursive: true });
+    await writeFile(text, 'not an image');
+    const id = await newImageJob('u1');
+    await startImages(recording([], async () => pathToFileURL(text).href));
+    await send(id, 'u1');
+    await waitFor('the job to fail', async () => (await status(id)) === 'failed');
+    expect((await job(id)).error).toBe('the output is not a PNG, JPEG or WebP image');
+    expect((await job(id)).output_asset_id).toBeNull();
+    expect(await total(id)).toEqual({ usd: '0.1500', is_final: true });
+  });
+
+  test('releases the estimate when the provider fails the image job without billing', async () => {
+    const id = await newImageJob('u1', { prompt: `a product ${MOCK_FAIL}` });
+    await startImages(createMockImageProvider({ runMs: 300, dir: mockDir }));
+    await send(id, 'u1');
+    await waitFor('the job to fail', async () => (await status(id)) === 'failed');
+    expect(await total(id)).toEqual({ usd: '0.0000', is_final: true });
+  });
+
+  test('without an image adapter the job fails before any call and releases its estimate', async () => {
+    const id = await newImageJob('u1');
+    workers.push(await startWorker({ pool, connectionString: testDb.url, providers: { mock: counting(300) }, options: FAST }));
+    await send(id, 'u1');
+    await waitFor('the job to fail', async () => (await status(id)) === 'failed');
+    expect((await job(id)).error).toBe('no adapter for provider mock');
+    expect(await total(id)).toEqual({ usd: '0.0000', is_final: true });
   });
 });
 

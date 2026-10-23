@@ -279,6 +279,17 @@ describe('settings', () => {
     expect(body.models.find((m) => m.id === 'fal-test')).toMatchObject({ enabled: true, priced: true });
   });
 
+  test('lists the seeded image models as priced and lets an Admin switch one on and off, audited; one without prices cannot be enabled', async () => {
+    const pro = (await get()).models.find((m) => m.id === 'nano-banana-pro');
+    expect(pro).toMatchObject({ enabled: false, priced: true });
+    expect((await put({ models: [{ id: 'nano-banana-pro', enabled: true }] })).status).toBe(200);
+    expect((await audits('model:nano-banana-pro')).at(-1)).toEqual({ actor_id: admin.id, action: 'model.set_enabled', old_value: { enabled: false }, new_value: { enabled: true } });
+    expect((await put({ models: [{ id: 'nano-banana-pro', enabled: false }] })).status).toBe(200);
+    await pool.query(`insert into model_configs (id, provider, endpoint, label, kind, ratios, durations_sec, max_images, sources) values ('draft-image', 'fal', 'x', 'Draft image', 'image', '{auto}', '{}', 2, '{}')`);
+    expect((await get()).models.find((m) => m.id === 'draft-image')).toMatchObject({ enabled: false, priced: false });
+    expect((await put({ models: [{ id: 'draft-image', enabled: true }] })).status).toBe(400);
+  });
+
   test('changes the caps, audited once with the old and new values, and writes nothing when they are unchanged', async () => {
     expect((await put({ monthlyCapUsd: '350.5', memberDailyClipCap: 8 })).status).toBe(200);
     expect(await get()).toMatchObject({ monthlyCapUsd: '350.5000', memberDailyClipCap: 8 });

@@ -20,6 +20,20 @@ export interface ModelConfig {
   thrift?: { durationSec: number; resolution: string | null };
 }
 
+/** An image model: priced per image and resolution, with no durations. `ratios` may include 'auto' (follow the input). */
+export interface ImageModelConfig {
+  id: string;
+  provider: 'fal' | 'replicate' | 'mock';
+  endpoint: string;
+  label: string;
+  ratios: string[];
+  maxImages: number;
+  /** Resolution label to USD per image, for example { '1K': '0.15' }. */
+  imagePrices: Record<string, string>;
+  /** The job features that may use this model. */
+  features: string[];
+}
+
 const FAL_KLING_PAGE = 'https://fal.ai/models/fal-ai/kling-video/o3/pro/reference-to-video';
 const FAL_KLING_SCHEMA = 'https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=fal-ai/kling-video/o3/pro/reference-to-video';
 const REPLICATE_PAGE = 'https://replicate.com/bytedance/seedance-2.5';

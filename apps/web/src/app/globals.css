@@ -102,6 +102,8 @@ label.model input { display: inline; margin: 0; min-width: 0; width: auto; }
 .filters { display: flex; gap: 1rem; flex-wrap: wrap; align-items: end; }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(16rem, 100%), 1fr)); gap: 1rem; margin: 1rem 0; }
 .card { background: #fff; border: 1px solid #e4e4e7; border-radius: 14px; padding: .75rem; min-width: 0; box-shadow: 0 1px 2px rgb(0 0 0 / .04); }
+.kinds { display: flex; gap: .5rem; flex-wrap: wrap; margin: .5rem 0 1rem; }
+.card img.output { display: block; width: 100%; max-height: 28rem; object-fit: contain; background: rgb(242, 242, 242); border-radius: 10px; }
 .card video { width: 100%; max-height: 28rem; background: #000; border-radius: 10px; }
 .card video.tall { aspect-ratio: 9 / 16; }
 .card video.square { aspect-ratio: 1 / 1; }
