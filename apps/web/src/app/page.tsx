@@ -1,8 +1,6 @@
-export default function Home() {
-  return (
-    <main>
-      <h1>Creative Video Studio</h1>
-      <p>Đang dựng khung ứng dụng.</p>
-    </main>
-  );
+import { redirect } from 'next/navigation';
+import { currentUser } from '@/lib/current-user';
+
+export default async function Home() {
+  redirect((await currentUser()) ? '/create' : '/login');
 }

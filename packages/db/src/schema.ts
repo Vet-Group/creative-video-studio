@@ -304,13 +304,16 @@ export const costEntries = pgTable(
   ],
 );
 
-// Pass or Fail per output clip.
+// Pass or Fail per job's clip. It is keyed by job so it survives a purge, which nulls output_asset_id.
 export const verdicts = pgTable(
   'verdicts',
   {
     id: text('id').primaryKey(),
-    outputAssetId: text('output_asset_id')
+    jobId: text('job_id')
       .notNull()
+      .unique()
+      .references(() => jobs.id, { onDelete: 'restrict' }),
+    outputAssetId: text('output_asset_id')
       .unique()
       .references(() => assets.id, { onDelete: 'restrict' }),
     verdict: text('verdict', { enum: VERDICTS }).notNull(),
@@ -326,6 +329,25 @@ export const verdicts = pgTable(
     check('verdicts_verdict_check', sql`${t.verdict} in ('pass', 'fail')`),
     check('verdicts_fault_check', sql`${t.verdict} <> 'fail' or ${t.fault} is not null`),
   ],
+);
+
+// Who did what to whom: an Admin deleting another user's clip, any Pass/Fail edit, and the Admin changes of M.5.
+export const auditEntries = pgTable(
+  'audit_entries',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    actorId: text('actor_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'restrict' }),
+    /** The event type, for example 'verdict.set' or 'clip.delete'. */
+    action: text('action').notNull(),
+    /** What the action touched, as 'kind:id' (for example 'job:<id>'). */
+    target: text('target').notNull(),
+    oldValue: jsonb('old_value'),
+    newValue: jsonb('new_value'),
+    createdAt: tstz('created_at').notNull().defaultNow(),
+  },
+  (t) => [index('audit_entries_created_at_idx').on(t.createdAt), index('audit_entries_target_idx').on(t.target)],
 );
 
 // One row per worker instance; the UI shows "worker offline" after 60 s without a beat.
