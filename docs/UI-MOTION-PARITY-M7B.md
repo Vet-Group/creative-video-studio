@@ -8,7 +8,7 @@ C4 of `docs/UI-MOTION-PARITY.md` was not met: the owner compared the M.7 baselin
 - Rebuild from measurements: own code, but the measured sizes, colours, spacing and radii, not a design "inspired by" the reference. No reference HTML, CSS, JS, fonts, icons or images enter this repository.
 - Video-only scope stays. Do not add credits, the Upgrade button, Try-On, image generation, the audio toggle, the About tab or the Enhance chip. Each such omission is listed as an intended difference; it never excuses a layout, type or motion gap elsewhere.
 - Keep the backend and every existing function (upload, model options, cost estimate, submit, job tray, library, admin). No paid call.
-- **M.7b gates the deploy.** It is a run step in the `app` worktree after D.1. D.5 lists it under `gate`: only `done` releases the deploy; `skipped`, `stuck` or `doing` keep D.5 waiting. M.7b is done only when the owner accepts C4 (see "Done").
+- **M.7b gates the deploy.** It is a run step in the `app` worktree after D.1; it does not wait for B.3. D.5 lists it under `gate`: only `done` releases the deploy; `skipped`, `stuck` or `doing` keep D.5 waiting. M.7b is done only when the owner accepts C4 (see "Done").
 
 **Evidence sources**
 - The live reference page (logged in) and saved live evidence are canonical. The port 4317 capture is a secondary, static source for geometry and CSS: it has no video sources and a known mobile carousel offset, so it is not the reference for motion or responsive states. Do not wait for 4317 to be fixed.

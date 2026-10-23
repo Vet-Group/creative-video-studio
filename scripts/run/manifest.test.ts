@@ -35,7 +35,7 @@ describe('steps', () => {
 
   test('the high-fidelity UI step runs in the app worktree and gates the deploy', () => {
     const m7b = STEPS.find((s) => s.id === 'M.7b')!;
-    expect(m7b).toMatchObject({ deps: ['D.1', 'B.3'], soft: ['B.3'], worktree: 'app' });
+    expect(m7b).toMatchObject({ deps: ['D.1'], worktree: 'app' });
     const d5 = STEPS.find((s) => s.id === 'D.5')!;
     expect(d5.deps).toContain('M.7b');
     expect(d5.soft).not.toContain('M.7b');
