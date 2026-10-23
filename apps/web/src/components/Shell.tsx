@@ -114,9 +114,9 @@ export function Shell({ userId, userName, isAdmin, children }: { userId: string;
   const narrow = useMediaQuery(NARROW);
   const [open, setOpen] = useState(false); // the drawer, below 1024 px
   const menuButton = useRef<HTMLButtonElement>(null);
-  const firstLink = useRef<HTMLAnchorElement>(null);
-  const link = (href: string, text: string, ref?: typeof firstLink) => (
-    <Link href={href} ref={ref} aria-current={pathname === href ? 'page' : undefined}>
+  const sidebar = useRef<HTMLDivElement>(null);
+  const link = (href: string, text: string) => (
+    <Link href={href} aria-current={pathname === href ? 'page' : undefined}>
       {text}
     </Link>
   );
@@ -128,14 +128,13 @@ export function Shell({ userId, userName, isAdmin, children }: { userId: string;
   useEffect(() => setOpen(false), [pathname]);
   useEffect(() => {
     if (!open) return;
-    firstLink.current?.focus();
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
-      setOpen(false);
-      menuButton.current?.focus();
-    };
+    sidebar.current?.querySelector('a')?.focus();
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
     document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      menuButton.current?.focus(); // runs once the drawer has closed and the page is no longer inert
+    };
   }, [open]);
 
   const title = PAGE_TITLES.find(([prefix]) => pathname.startsWith(prefix))?.[1] ?? 'Creative Video Studio';
@@ -144,7 +143,7 @@ export function Shell({ userId, userName, isAdmin, children }: { userId: string;
       <AdminContext value={isAdmin}>
         <div className="app">
           <div className="scrim" data-open={open} onClick={() => setOpen(false)} aria-hidden="true" />
-          <div className="sidebar" id="sidebar" data-open={open}>
+          <div ref={sidebar} className="sidebar" id="sidebar" data-open={open}>
             <div className="brand">
               <span className="logo" aria-hidden="true">
                 CV
@@ -152,7 +151,7 @@ export function Shell({ userId, userName, isAdmin, children }: { userId: string;
               <strong>Creative Video Studio</strong>
             </div>
             <nav aria-label="Điều hướng chính">
-              {link('/create', 'Tạo video', firstLink)}
+              {link('/create', 'Tạo video')}
               {link('/library', 'Thư viện')}
               {isAdmin && (
                 <Link href="/admin/users" aria-current={pathname.startsWith('/admin') ? 'page' : undefined}>
