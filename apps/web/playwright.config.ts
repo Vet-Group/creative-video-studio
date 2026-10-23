@@ -29,6 +29,8 @@ export default defineConfig({
   workers: 1,
   timeout: 180_000,
   expect: { timeout: 20_000 },
+  // Screenshot baselines live in a `fixtures` folder, which .gitignore lets through for images; they are for the browser the specs drive, not per platform.
+  snapshotPathTemplate: '{testDir}/fixtures/screenshots/{testFileName}/{arg}{ext}',
   reporter: [['list']],
   use: {
     baseURL,

@@ -1,0 +1,2 @@
+/* Applied to every baseline screenshot: the Next.js dev indicator is not part of the app. */
+nextjs-portal { display: none !important; }
