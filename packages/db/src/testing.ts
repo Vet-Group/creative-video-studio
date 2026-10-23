@@ -6,9 +6,10 @@ import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import pg from 'pg';
 import { databaseUrl } from './client';
 
-export async function createTestDatabase(): Promise<{ url: string; drop: () => Promise<void> }> {
+/** A random database name, or `fixedName` (replacing any database of that name left behind) when the caller must know the URL up front. */
+export async function createTestDatabase(fixedName?: string): Promise<{ url: string; drop: () => Promise<void> }> {
   const base = new URL(databaseUrl());
-  const name = `cvs_test_${randomBytes(6).toString('hex')}`;
+  const name = fixedName ?? `cvs_test_${randomBytes(6).toString('hex')}`;
   const run = async (q: string) => {
     const c = new pg.Client({ connectionString: base.toString() });
     await c.connect();
@@ -18,6 +19,7 @@ export async function createTestDatabase(): Promise<{ url: string; drop: () => P
       await c.end();
     }
   };
+  if (fixedName) await run(`drop database if exists ${name} with (force)`);
   await run(`create database ${name}`);
   const url = new URL(base);
   url.pathname = `/${name}`;

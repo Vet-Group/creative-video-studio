@@ -1,0 +1,64 @@
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; color: #1c1c1e; background: #f6f6f7; line-height: 1.45; }
+h1 { font-size: 1.4rem; margin: 0 0 1rem; }
+h2 { font-size: 1.05rem; margin: 0 0 .75rem; }
+p { margin: .25rem 0; }
+a { color: #1d4ed8; }
+button, .button { font: inherit; padding: .45rem .8rem; border: 1px solid #b8b8c0; border-radius: 6px; background: #fff; color: inherit; cursor: pointer; text-decoration: none; display: inline-block; }
+button:disabled { opacity: .5; cursor: not-allowed; }
+button[aria-pressed='true'] { background: #e0e7ff; border-color: #1d4ed8; }
+button.primary { background: #1d4ed8; border-color: #1d4ed8; color: #fff; margin-top: .5rem; }
+label { display: block; margin: .75rem 0; font-weight: 600; }
+label input, label select { display: block; margin-top: .25rem; font: inherit; font-weight: 400; padding: .4rem .5rem; min-width: 14rem; max-width: 100%; }
+fieldset { border: 1px solid #d4d4d8; border-radius: 8px; margin: .75rem 0; padding: .75rem; }
+legend { font-weight: 600; padding: 0 .25rem; }
+.muted { color: #6b6b73; font-size: .9rem; }
+.error { color: #b91c1c; }
+.warn { background: #fef3c7; border: 1px solid #f59e0b; border-radius: 6px; padding: .5rem .75rem; }
+.badge { margin-left: .5rem; padding: 0 .4rem; border-radius: 4px; background: #7c3aed; color: #fff; font-size: .75rem; font-weight: 700; }
+.tag { margin-left: .5rem; padding: 0 .4rem; border-radius: 4px; background: #fde68a; font-size: .75rem; }
+
+.bar { display: flex; align-items: center; gap: 1rem; padding: .6rem 1rem; background: #fff; border-bottom: 1px solid #e4e4e7; flex-wrap: wrap; }
+.bar nav { display: flex; gap: .75rem; flex: 1; }
+.bar nav a[aria-current='page'] { font-weight: 700; text-decoration: none; color: inherit; }
+.frame { display: grid; grid-template-columns: minmax(0, 1fr) 20rem; gap: 1.5rem; padding: 1rem; max-width: 80rem; margin: 0 auto; }
+
+.tray { background: #fff; border: 1px solid #e4e4e7; border-radius: 8px; padding: 1rem; align-self: start; }
+.tray ul { list-style: none; margin: 0; padding: 0; display: grid; gap: .5rem; }
+.job { display: flex; gap: .6rem; border: 1px solid #e4e4e7; border-radius: 6px; padding: .5rem; }
+.job-poster { width: 3.5rem; height: 3.5rem; object-fit: cover; border-radius: 4px; }
+.job-body { min-width: 0; overflow-wrap: anywhere; }
+.job-failed, .job-failed_unknown, .job-timed_out { border-color: #fca5a5; }
+.job-succeeded { border-color: #86efac; }
+
+.toasts { position: fixed; right: 1rem; bottom: 1rem; display: grid; gap: .5rem; z-index: 10; max-width: calc(100vw - 2rem); }
+.toast { display: flex; gap: .75rem; align-items: center; background: #14532d; color: #fff; padding: .6rem .9rem; border-radius: 8px; box-shadow: 0 4px 14px rgb(0 0 0 / .25); }
+.toast a { color: #bbf7d0; }
+.toast-bad { background: #7f1d1d; }
+.toast button { background: transparent; border: 0; color: inherit; padding: 0 .25rem; }
+
+.thumbs { list-style: none; padding: 0; display: flex; gap: .5rem; flex-wrap: wrap; }
+.thumbs li { position: relative; }
+.thumbs img { width: 6rem; height: 6rem; object-fit: cover; border-radius: 6px; border: 1px solid #d4d4d8; display: block; }
+.thumbs button { position: absolute; top: 2px; right: 2px; padding: 0 .35rem; }
+.model { display: flex; gap: .6rem; align-items: center; flex-wrap: wrap; font-weight: 400; }
+.model input { display: inline; margin: 0; min-width: 0; }
+
+.login { max-width: 22rem; margin: 4rem auto; padding: 1.5rem; background: #fff; border: 1px solid #e4e4e7; border-radius: 8px; }
+.login input { width: 100%; }
+
+.filters { display: flex; gap: 1rem; flex-wrap: wrap; align-items: end; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); gap: 1rem; margin: 1rem 0; }
+.card { background: #fff; border: 1px solid #e4e4e7; border-radius: 8px; padding: .75rem; min-width: 0; }
+.card video { width: 100%; max-height: 28rem; background: #000; border-radius: 6px; }
+.card video.tall { aspect-ratio: 9 / 16; }
+.card video.square { aspect-ratio: 1 / 1; }
+.actions { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; margin-top: .5rem; }
+.actions label { margin: 0; }
+
+@media (max-width: 800px) {
+  .frame { grid-template-columns: minmax(0, 1fr); padding: .75rem; }
+  .grid { grid-template-columns: minmax(0, 1fr); }
+  .card video.tall { max-height: 70vh; }
+  label input, label select { min-width: 0; width: 100%; }
+}
