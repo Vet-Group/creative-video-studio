@@ -113,10 +113,12 @@ export async function checkItem(id: string, deps: Deps): Promise<ItemResult> {
       const t = e.CLOUDFLARE_API_TOKEN;
       if (!t) return missing(id, 'điền CLOUDFLARE_API_TOKEN');
       const auth = { headers: { Authorization: `Bearer ${t}` } };
-      const verify = await http(deps, 'https://api.cloudflare.com/client/v4/user/tokens/verify', auth);
-      if (!verify?.ok) return wrong(id, 'khoá không hợp lệ');
       const zones = await http(deps, `https://api.cloudflare.com/client/v4/zones?name=${CLOUDFLARE_ZONE}`, auth);
       const zone = ((await zones?.json().catch(() => null)) as { result?: { id: string; account: { id: string } }[] } | null)?.result?.[0];
+      // User tokens verify on /user; account-owned tokens only on their account's path.
+      const verify = await http(deps, 'https://api.cloudflare.com/client/v4/user/tokens/verify', auth);
+      const accountVerify = !verify?.ok && zone ? await http(deps, `https://api.cloudflare.com/client/v4/accounts/${zone.account.id}/tokens/verify`, auth) : null;
+      if (!verify?.ok && !accountVerify?.ok) return wrong(id, 'khoá không hợp lệ');
       if (!zone) return wrong(id, `khoá không thấy zone ${CLOUDFLARE_ZONE}`);
       const dns = await http(deps, `https://api.cloudflare.com/client/v4/zones/${zone.id}/dns_records?per_page=1`, auth);
       const tunnels = await http(deps, `https://api.cloudflare.com/client/v4/accounts/${zone.account.id}/cfd_tunnel?per_page=1`, auth);

@@ -55,6 +55,21 @@ describe('preflight', () => {
     expect((await checkItem('r2', deps({ ...FAKE, CVS_R2_REPOSITORY: 'https://wrong' }))).status).toBe('SAI');
   });
 
+  test('an account-owned Cloudflare token passes on the account verify path only', async () => {
+    const withVerify = (accountOk: boolean): Deps => {
+      const d = deps(FAKE);
+      const base = d.fetch;
+      d.fetch = (async (url: string, init?: RequestInit) => {
+        if (url.includes('/user/tokens/verify')) return json(401, {});
+        if (url.includes('/accounts/a/tokens/verify')) return json(accountOk ? 200 : 401, {});
+        return base(url, init);
+      }) as typeof fetch;
+      return d;
+    };
+    expect((await checkItem('cloudflare', withVerify(true))).status).toBe('ĐỦ');
+    expect((await checkItem('cloudflare', withVerify(false))).status).toBe('SAI');
+  });
+
   test('missing GitHub or Docker blocks the run', async () => {
     expect((await runPreflight(deps(FAKE, 500))).blocked).toBe(true);
   });
