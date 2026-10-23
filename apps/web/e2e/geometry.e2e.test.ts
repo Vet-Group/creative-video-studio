@@ -560,8 +560,8 @@ test.describe('390x844', () => {
     await expect(run).toContainText('$0.8000');
   });
 
-  test('T3 narrow tabs: three equal pills, 30 tall, padding 6px 4px, radius 8, 12px/600, 2px gaps, active black on white', async ({ page }) => {
-    const names = ['Tạo', 'Lịch sử', 'Ví dụ'];
+  test('T3 narrow tabs: four equal pills, 30 tall, padding 6px 4px, radius 8, 12px/600, 2px gaps, active black on white', async ({ page }) => {
+    const names = ['Tạo', 'Lịch sử', 'Ví dụ', 'Giới thiệu'];
     const boxes = await Promise.all(names.map((n) => box(tab(page, n))));
     for (const [i, b] of boxes.entries()) {
       near(b.height, 30, `tab ${i} height`);

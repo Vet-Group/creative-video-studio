@@ -93,7 +93,7 @@ test('the layout flips at 1024 px: sidebar and two columns above, top bar, tabs 
     if (size.width >= 1024) {
       await expect(nav).toBeVisible();
       await expect(menu).toBeHidden();
-      await expect(tabs).toHaveText(['Lịch sử', 'Ví dụ']);
+      await expect(tabs).toHaveText(['Lịch sử', 'Ví dụ', 'Giới thiệu']);
       await expect(page.getByRole('tab', { name: 'Lịch sử' })).toHaveAttribute('aria-selected', 'true');
       await expect(form).toBeVisible();
       // Two columns: the form card sits left of the pane.
@@ -106,7 +106,7 @@ test('the layout flips at 1024 px: sidebar and two columns above, top bar, tabs 
     } else {
       await expect(nav).toBeHidden();
       await expect(menu).toBeVisible();
-      await expect(tabs).toHaveText(['Tạo', 'Lịch sử', 'Ví dụ']);
+      await expect(tabs).toHaveText(['Tạo', 'Lịch sử', 'Ví dụ', 'Giới thiệu']);
       await expect(page.getByRole('tab', { name: 'Tạo', exact: true })).toHaveAttribute('aria-selected', 'true');
       await expect(form).toBeVisible();
       await expect(page.locator('.side')).toBeHidden();
@@ -159,7 +159,7 @@ for (const width of [1280, 1023]) {
     await page.setViewportSize({ width, height: 800 });
     await signIn(page, 'member5');
     await openCreate(page);
-    const order = width >= 1024 ? ['Lịch sử', 'Ví dụ'] : ['Tạo', 'Lịch sử', 'Ví dụ'];
+    const order = width >= 1024 ? ['Lịch sử', 'Ví dụ', 'Giới thiệu'] : ['Tạo', 'Lịch sử', 'Ví dụ', 'Giới thiệu'];
     const tab = (name: string) => page.getByRole('tab', { name, exact: true });
 
     await tab(order[0]!).focus();
@@ -171,6 +171,9 @@ for (const width of [1280, 1023]) {
     await page.keyboard.press('ArrowRight');
     await expect(tab(order[0]!)).toHaveAttribute('aria-selected', 'true');
     await page.keyboard.press('End');
+    await expect(tab('Giới thiệu')).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByRole('heading', { name: 'Tạo video sản phẩm từ ảnh' })).toBeVisible();
+    await page.keyboard.press('ArrowLeft');
     await expect(tab('Ví dụ')).toHaveAttribute('aria-selected', 'true');
     await expect(page.locator('.masonry')).toBeVisible();
     await page.keyboard.press('Home');
