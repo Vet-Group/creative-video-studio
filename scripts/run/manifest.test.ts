@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -81,6 +82,31 @@ describe('steps', () => {
       for (const d of s.deps) expect(seen.has(d), `${s.id} -> ${d}`).toBe(true);
       seen.add(s.id);
     }
+  });
+});
+
+describe('owner-closed steps', () => {
+  const cli = (dir: string, ...args: string[]) =>
+    spawnSync(process.execPath, [join(import.meta.dirname, 'cli.ts'), ...args], { encoding: 'utf8', env: { ...process.env, CVS_RUN_DIR: dir } });
+
+  test('done and skip refuse M.7b without the owner words, and keep them as a note when given', () => {
+    const dir = tmp();
+    const m = fresh();
+    get(m, 'M.7b').status = 'doing';
+    writeManifest(join(dir, 'manifest.json'), m);
+    const ci = JSON.stringify([{ kind: 'ci', repo: 'anhtahaylove/creative-video-studio', sha: 'a'.repeat(40) }]);
+    for (const args of [['done', 'M.7b', '--evidence', ci], ['skip', 'M.7b', 'merged']]) {
+      const r = cli(dir, ...args);
+      expect(r.status, r.stderr).toBe(2);
+      expect(r.stderr).toMatch(/owner/);
+      expect(get(readManifest(join(dir, 'manifest.json')), 'M.7b').status).toBe('doing');
+    }
+    const r = cli(dir, 'done', 'M.7b', '--evidence', ci, '--owner', 'C4 accepted on revision abc');
+    expect(r.status, r.stderr).toBe(0);
+    const s = get(readManifest(join(dir, 'manifest.json')), 'M.7b');
+    expect(s.status).toBe('done');
+    expect(s.evidence).toContainEqual({ kind: 'note', text: 'owner: C4 accepted on revision abc' });
+    expect(STEPS.filter((d) => d.ownerDone).map((d) => d.id)).toEqual(['M.7b']);
   });
 });
 

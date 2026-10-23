@@ -2,6 +2,7 @@
 //   approve "<sentence>"           owner: record the pre-approval, create or refresh the manifest from preflight
 //   heartbeat | ready | render     conductor: alive signal, steps it may start, regenerate reports
 //   start <step> --agent a --model m | done <step> --evidence '<json[]>' | fail <step> "<reason>" | skip <step> "<reason>"
+//                                   (an ownerDone step such as M.7b also needs --owner "<the owner's words>" for done and skip)
 //   verify                          anyone: machine check of all evidence (exit 1 on any error)
 //   notify "<headline>"             conductor: Lark DM to the owner plus the Run log issue
 //   guard-check                     vet.sh and the watchdog: exit 3 when a guard file changed (hard stop 2)
@@ -19,6 +20,7 @@ import {
 import { sendLark, updateRunLog, type Run } from './notify.ts';
 import { matchesPreapproval, PREAPPROVAL_SENTENCE } from './preapproval.ts';
 import { ownerOpenId, type ItemResult } from './preflight.ts';
+import { STEPS } from './steps.ts';
 import { verify, type CiStatus } from './verify.ts';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
@@ -74,9 +76,19 @@ const [cmd, ...rest] = process.argv.slice(2);
 const { values, positionals } = parseArgs({
   args: rest,
   allowPositionals: true,
-  options: { agent: { type: 'string' }, model: { type: 'string' }, evidence: { type: 'string' }, pid: { type: 'string' }, started: { type: 'string' }, force: { type: 'boolean' }, 'proc-started': { type: 'string' } },
+  options: { agent: { type: 'string' }, model: { type: 'string' }, evidence: { type: 'string' }, pid: { type: 'string' }, started: { type: 'string' }, force: { type: 'boolean' }, 'proc-started': { type: 'string' }, owner: { type: 'string' } },
 });
 const now = new Date();
+
+/** A step the owner closes (M.7b, C4) needs `--owner "<the owner's words>"`, which is kept as a note. */
+function ownerOnly(id: string): void {
+  if (!STEPS.find((d) => d.id === id)?.ownerDone) return;
+  if (!values.owner) {
+    console.error(`${id} is closed only on the owner's word (C4 sign-off): leave it doing and notify the owner.`);
+    process.exit(2);
+  }
+  values.evidence = JSON.stringify([...(JSON.parse(values.evidence ?? '[]') as Evidence[]), { kind: 'note', text: `owner: ${values.owner}` }]);
+}
 
 switch (cmd) {
   case 'approve': {
@@ -133,6 +145,7 @@ switch (cmd) {
   case 'done': {
     const m = readManifest(MANIFEST);
     const s = step(m, positionals[0]);
+    ownerOnly(s.id);
     s.evidence.push(...(JSON.parse(values.evidence ?? '[]') as Evidence[]));
     s.status = 'done';
     s.reason = undefined;
@@ -145,6 +158,7 @@ switch (cmd) {
     const s = step(m, positionals[0]);
     const reason = positionals.slice(1).join(' ');
     if (!reason) throw new Error('a reason is required');
+    if (cmd === 'skip') ownerOnly(s.id);
     if (cmd === 'fail') recordFailure(s, reason);
     else Object.assign(s, { status: 'skipped', reason });
     save(m);
