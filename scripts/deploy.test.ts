@@ -29,18 +29,47 @@ const dirs: string[] = [];
 /** Bash's own view of a path (Git Bash turns C:/x into /c/x), so values handed to the scripts match what they compare. */
 const posix = (p: string) => spawnSync(bash, ['-c', 'cd "$1" && pwd', '_', p], { encoding: 'utf8' }).stdout.trim();
 
-function sandbox(listen = 'LISTEN 0 4096 127.0.0.1:631 0.0.0.0:*\n', dotEnv?: string) {
+// Tiny stand-ins for the commands the scripts call, first on PATH: each logs its argv to $STUB_LOG and answers from STUB_* variables,
+// so the read-only preconditions (root, tools, file mode, ...) pass anywhere and the real paths run without Docker, systemd or Cloudflare.
+const stubBody = `#!/usr/bin/env bash
+n="$(basename "$0")"
+printf '%s %s\\n' "$n" "$*" >> "$STUB_LOG"
+case "$n" in
+  id) if [ "\${1:-}" = -un ]; then echo root; else echo "\${STUB_UID:-0}"; fi ;;
+  stat) echo "\${STUB_STAT_MODE:-600}" ;;
+  curl)
+    case " $* " in *" --config - "*) cat >> "$STUB_LOG.stdin" ;; esac
+    case "\${!#}" in
+      */dns_records/*) printf '%s' "\${STUB_DNS_CODE:-200}" ;;
+      */cfd_tunnel/*) printf '%s' "\${STUB_TUNNEL_CODE:-200}" ;;
+    esac ;;
+  docker) case " $* " in *" ps -q "*) printf '%s' "\${STUB_PS_Q:-}" ;; esac ;;
+  systemctl) case " $* " in *" is-active "*) exit "\${STUB_WEB_ACTIVE:-3}" ;; esac ;;
+  git) case " $* " in *" remote get-url "*) printf '%s\\n' "\${STUB_GIT_REMOTE:-}" ;; esac ;;
+esac
+exit 0
+`;
+const stubNames = ['id', 'stat', 'curl', 'docker', 'systemctl', 'loginctl', 'git', 'tar', 'xz', 'sha256sum', 'base64', 'mktemp', 'flock', 'cloudflared'];
+const defaultRepo = 'git@github.com:anhtahaylove/creative-video-studio.git';
+
+function sandbox(listen = 'LISTEN 0 4096 127.0.0.1:631 0.0.0.0:*\n', dotEnv = '') {
   const dir = fwd(mkdtempSync(join(tmpdir(), 'cvs-deploy-test-')));
   dirs.push(dir);
-  for (const d of ['app', 'home']) mkdirSync(join(dir, d));
+  for (const d of ['creative-video-studio', 'home', 'stubs']) mkdirSync(join(dir, d));
+  const appDir = join(dir, 'creative-video-studio');
   writeFileSync(join(dir, 'listen.txt'), listen);
   writeFileSync(join(dir, 'deploy-key'), `-----BEGIN FAKE KEY-----\n${secrets.key}\n-----END FAKE KEY-----\n`);
-  if (dotEnv !== undefined) writeFileSync(join(dir, 'app', '.env'), dotEnv);
-  const app = posix(join(dir, 'app'));
+  writeFileSync(join(appDir, '.env'), dotEnv);
+  for (const n of stubNames) writeFileSync(join(dir, 'stubs', n), stubBody, { mode: 0o755 });
+  const app = posix(appDir);
   const home = posix(join(dir, 'home'));
   const env = {
     HOME: home,
+    CVS_ROOT_HOME: home,
     XDG_CONFIG_HOME: '',
+    CVS_TEST_STUBS: posix(join(dir, 'stubs')),
+    STUB_LOG: `${dir}/calls.log`,
+    CVS_RETRY_SLEEP: '0',
     CVS_APP_DIR: app,
     CVS_LISTEN_FILE: posix(dir) + '/listen.txt',
     CVS_DEPLOY_KEY: posix(dir) + '/deploy-key',
@@ -51,12 +80,22 @@ function sandbox(listen = 'LISTEN 0 4096 127.0.0.1:631 0.0.0.0:*\n', dotEnv?: st
     CVS_R2_SECRET_ACCESS_KEY: '',
     S3_BUCKET: '',
   };
-  const left = () => [...readdirSync(join(dir, 'app')), ...readdirSync(join(dir, 'home'))].filter((f) => f !== '.env');
-  return { dir, app, home, env, left };
+  const left = () => [...readdirSync(appDir), ...readdirSync(join(dir, 'home'))].filter((f) => f !== '.env');
+  const calls = () => (existsSync(`${dir}/calls.log`) ? readFileSync(`${dir}/calls.log`, 'utf8') : '');
+  const stdin = () => (existsSync(`${dir}/calls.log.stdin`) ? readFileSync(`${dir}/calls.log.stdin`, 'utf8') : '');
+  const stateFile = join(appDir, 'install.state');
+  const state = () => (existsSync(stateFile) ? readFileSync(stateFile, 'utf8').split('\n').filter(Boolean) : null);
+  return { dir, appDir, app, home, env, left, calls, stdin, stateFile, state };
 }
 
 function run(script: string, args: string[], env: Record<string, string>) {
-  const r = spawnSync(bash, [script, ...args], { cwd: root, env: { ...process.env, ...env }, encoding: 'utf8', timeout: 25_000 });
+  // PATH is put in front inside bash: Git Bash puts /usr/bin ahead of the inherited PATH, which would hide the stubs.
+  const r = spawnSync(bash, ['-c', 'PATH="$CVS_TEST_STUBS:$PATH"; exec "$BASH" "$@"', '_', script, ...args], {
+    cwd: root,
+    env: { ...process.env, ...env },
+    encoding: 'utf8',
+    timeout: 25_000,
+  });
   return { status: r.status, out: `${r.stdout}${r.stderr}` };
 }
 
@@ -94,6 +133,7 @@ describe.skipIf(!hasBash)('deploy kit (needs bash only)', { timeout: 30_000 }, (
       'SHASUMS256.txt',
       'pnpm install --frozen-lockfile',
       'pnpm --filter @cvs/web build',
+      'record compose=creative-video-studio',
       'docker compose -p creative-video-studio up -d --wait',
       'pnpm --filter @cvs/db migrate',
       'cloudflare POST /accounts/<account id>/cfd_tunnel',
@@ -169,7 +209,7 @@ describe.skipIf(!hasBash)('deploy kit (needs bash only)', { timeout: 30_000 }, (
 
   test('c. uninstall --dry-run touches only cvs-* units, keeps the volumes and deletes by recorded ids', () => {
     const s = sandbox();
-    writeFileSync(join(s.dir, 'app', 'install.state'), fixture(s.app));
+    writeFileSync(s.stateFile, fixture(s.app));
     const r = run(uninstallSh, ['--dry-run'], s.env);
     expect(r.status).toBe(0);
     expect(r.out).not.toContain('==>');
@@ -183,13 +223,13 @@ describe.skipIf(!hasBash)('deploy kit (needs bash only)', { timeout: 30_000 }, (
     expect(r.out).toContain('cloudflare DELETE /zones/11112222333344445555666677778888/dns_records/99990000aaaabbbbccccddddeeeeffff');
     expect(r.out).toContain('cloudflare DELETE /accounts/aaaabbbbccccddddeeeeffff00001111/cfd_tunnel/0123abcd-0123-4abc-8abc-0123456789ab');
     expect(r.out).toMatch(new RegExp(`rm -f \\S*/cloudflared/\\S+\\.json ${s.app}/cloudflared/cvs\\.yml`));
-    expect(existsSync(join(s.dir, 'app', 'install.state'))).toBe(true);
+    expect(existsSync(s.stateFile)).toBe(true);
   });
 
   test('c2. a state file naming a non-cvs unit, a foreign file or a bad id is refused before any command', () => {
     for (const bad of ['unit=ideashub-web.service', 'unit=cvs-web.service; rm', 'file=/etc/passwd', 'tunnel_id=../../x', 'zone_id=not-hex']) {
       const s = sandbox();
-      writeFileSync(join(s.dir, 'app', 'install.state'), fixture(s.app, bad));
+      writeFileSync(s.stateFile, fixture(s.app, bad));
       const r = run(uninstallSh, ['--dry-run'], s.env);
       expect(r.status, bad).not.toBe(0);
       expect(dryRunLines(r.out), bad).toEqual([]);
@@ -222,9 +262,9 @@ describe.skipIf(!hasBash)('deploy kit (needs bash only)', { timeout: 30_000 }, (
       `CLOUDFLARE_API_TOKEN=${secrets.token}`,
     ].join('\n');
     const s = sandbox(undefined, dotEnv);
-    writeFileSync(join(s.dir, 'app', 'install.state'), fixture(s.app));
+    writeFileSync(s.stateFile, fixture(s.app));
     for (const [script, env] of [
-      [installSh, s.env],
+      [installSh, sandbox(undefined, dotEnv).env], // no state file: a state file with a tunnel would make this an update
       [uninstallSh, { ...s.env, CLOUDFLARE_API_TOKEN: '' }],
       [uninstallSh, s.env],
     ] as const) {
@@ -244,6 +284,167 @@ describe.skipIf(!hasBash)('deploy kit (needs bash only)', { timeout: 30_000 }, (
     expect(r.out).toContain('systemctl --user enable --now cvs-web.service cvs-worker.service cvs-backup.timer cvs-drill.timer\n');
   });
 
+  const wouldFailLine = (r: { status: number | null; out: string }, reason: string) => {
+    expect(r.status, r.out).toBe(1);
+    expect(r.out).toContain(`[dry-run] would fail: `);
+    expect(r.out).toContain(reason);
+    expect(r.out).not.toContain('==>');
+  };
+
+  test('f. a dry run checks the read-only preconditions too and says it would fail', () => {
+    wouldFailLine(run(installSh, ['--dry-run'], { ...sandbox().env, STUB_UID: '1000' }), 'not root');
+    const noKey = sandbox();
+    wouldFailLine(run(installSh, ['--dry-run'], { ...noKey.env, CVS_DEPLOY_KEY: `${posix(noKey.dir)}/nope` }), 'deploy key');
+    const noEnv = sandbox();
+    rmSync(join(noEnv.appDir, '.env'));
+    wouldFailLine(run(installSh, ['--dry-run'], noEnv.env), '/.env is missing');
+    wouldFailLine(run(installSh, ['--dry-run'], { ...sandbox().env, STUB_STAT_MODE: '644' }), 'must be mode 600');
+  });
+
+  test('f3. CVS_APP_DIR must be absolute and end in creative-video-studio, in both scripts', () => {
+    for (const script of [installSh, uninstallSh]) {
+      for (const bad of ['relative/creative-video-studio', `${posix(sandbox().dir)}/other`, `${sandbox().app}/../creative-video-studio`]) {
+        const r = run(script, ['--dry-run'], { ...sandbox().env, CVS_APP_DIR: bad });
+        expect(r.status, bad).toBe(1);
+        expect(r.out, bad).toContain('CVS_APP_DIR must be an absolute path ending in /creative-video-studio');
+      }
+    }
+  });
+
+  test('f4. a checkout of another repository in the app directory is refused, the configured one is accepted', () => {
+    const s = sandbox();
+    mkdirSync(join(s.appDir, '.git'));
+    wouldFailLine(run(installSh, ['--dry-run'], { ...s.env, STUB_GIT_REMOTE: 'git@github.com:someone/else.git' }), 'origin is not CVS_REPO_URL');
+    const ok = run(installSh, ['--dry-run'], { ...s.env, STUB_GIT_REMOTE: defaultRepo });
+    expect(ok.status).toBe(0);
+    expect(ok.out).toContain('fetch --quiet origin main');
+  });
+
+  test('g. a repo URL with a user or password is refused; the SSH form is fine', () => {
+    for (const url of ['https://user@github.com/x/y.git', 'https://user:pw@github.com/x/y.git', 'ssh://git@github.com/x/y.git']) {
+      const r = run(installSh, ['--dry-run'], { ...sandbox().env, CVS_REPO_URL: url });
+      expect(r.status, url).toBe(1);
+      expect(r.out, url).toContain('must not carry a user or password');
+    }
+    expect(run(installSh, ['--dry-run'], { ...sandbox().env, CVS_REPO_URL: defaultRepo }).status).toBe(0);
+  });
+
+  test('h. pnpm install, build and migrate run without the Cloudflare, R2 and restic secrets; the lock is the ops lock', () => {
+    const r = run(installSh, ['--dry-run'], sandbox().env);
+    const secretVars = ['CLOUDFLARE_API_TOKEN', 'CVS_R2_REPOSITORY', 'CVS_R2_ACCESS_KEY_ID', 'CVS_R2_SECRET_ACCESS_KEY', 'CVS_RESTIC_PASSWORD'];
+    for (const cmd of ['pnpm install --frozen-lockfile', 'pnpm --filter @cvs/web build', 'pnpm --filter @cvs/db migrate']) {
+      const line = dryRunLines(r.out).find((l) => l.includes(cmd));
+      expect(line, cmd).toBeDefined();
+      for (const v of secretVars) expect(line, `${cmd} ${v}`).toContain(`-u ${v}`);
+    }
+    expect(r.out).toContain('flock');
+    expect(r.out).toContain('/.local/state/creative-video-studio/ops.lock');
+  });
+
+  test('i. a re-run with a recorded tunnel keeps it only when it is complete', () => {
+    const half = sandbox();
+    writeFileSync(half.stateFile, 'compose=creative-video-studio\ntunnel_id=0123abcd-0123-4abc-8abc-0123456789ab\n');
+    const bad = run(installSh, ['--dry-run'], { ...half.env, STUB_PS_Q: 'x', STUB_WEB_ACTIVE: '0' });
+    expect(bad.status).toBe(1);
+    expect(bad.out).toContain('uninstall.sh first');
+
+    const full = sandbox();
+    mkdirSync(join(full.appDir, 'cloudflared'));
+    for (const f of ['0123abcd-0123-4abc-8abc-0123456789ab.json', 'cvs.yml']) writeFileSync(join(full.appDir, 'cloudflared', f), '');
+    writeFileSync(full.stateFile, fixture(full.app));
+    const ok = run(installSh, ['--dry-run'], { ...full.env, STUB_PS_Q: 'x', STUB_WEB_ACTIVE: '0' });
+    expect(ok.status).toBe(0);
+    expect(ok.out).toContain('a complete tunnel is already recorded');
+  });
+
+  test('j. an update re-run passes the port check when this install holds the ports, and only then', () => {
+    const all = 'LISTEN 0 1 0.0.0.0:3400 0.0.0.0:*\nLISTEN 0 1 0.0.0.0:5435 0.0.0.0:*\nLISTEN 0 1 0.0.0.0:9400 0.0.0.0:*\nLISTEN 0 1 0.0.0.0:9401 0.0.0.0:*\n';
+    const own = sandbox(all);
+    writeFileSync(own.stateFile, 'compose=creative-video-studio\n');
+    const ok = run(installSh, ['--dry-run'], { ...own.env, STUB_PS_Q: 'abc123', STUB_WEB_ACTIVE: '0' });
+    expect(ok.status).toBe(0);
+    expect(ok.out).toContain('held by this install');
+    expect(own.calls()).toContain('docker compose -p creative-video-studio ps -q');
+    expect(own.calls()).toContain('systemctl --user is-active --quiet cvs-web.service');
+
+    const stranger = sandbox(all);
+    writeFileSync(stranger.stateFile, 'compose=creative-video-studio\n');
+    const refused = run(installSh, ['--dry-run'], stranger.env);
+    expect(refused.status).toBe(1);
+    expect(refused.out).toContain('port(s) 3400 5435 9400 9401 already in use');
+    // Without a state file nothing is "ours", even when the stubs claim the project is up.
+    const fresh = sandbox(all);
+    expect(run(installSh, ['--dry-run'], { ...fresh.env, STUB_PS_Q: 'abc123', STUB_WEB_ACTIVE: '0' }).status).toBe(1);
+  });
+
+  test('k. real uninstall: the token goes over stdin only, state lines go as their resources go, compose keeps the volumes', () => {
+    const s = sandbox();
+    writeFileSync(s.stateFile, fixture(s.app));
+    const r = run(uninstallSh, [], s.env);
+    expect(r.status).toBe(0);
+    expect(r.out).toContain('==> cloudflare DELETE /zones/');
+    expect(r.out).not.toContain('dry run');
+    for (const value of Object.values(secrets)) {
+      expect(r.out).not.toContain(value);
+      expect(s.calls()).not.toContain(value);
+    }
+    expect(s.stdin()).toContain(`Bearer ${secrets.token}`);
+    expect(s.calls()).toContain('curl --config - --silent --show-error --max-time 30 --output /dev/null --write-out %{http_code} --request DELETE https://api.cloudflare.com/client/v4/zones/');
+    expect(s.calls()).toContain('docker compose -p creative-video-studio down\n');
+    expect(s.calls()).not.toMatch(/docker[^\n]*(\s-v\b|--volumes)/);
+    expect(s.state()).toBeNull();
+  });
+
+  test('k2. a failed tunnel DELETE keeps only what is needed to retry; a re-run where Cloudflare says 404 finishes', () => {
+    const s = sandbox();
+    writeFileSync(s.stateFile, fixture(s.app));
+    const first = run(uninstallSh, [], { ...s.env, STUB_TUNNEL_CODE: '500' });
+    expect(first.status).toBe(1);
+    expect(first.out).toContain('Cloudflare answered HTTP 500');
+    expect(s.calls().match(/cfd_tunnel/g)).toHaveLength(4);
+    expect(s.state()).toEqual(['tunnel_id=0123abcd-0123-4abc-8abc-0123456789ab', 'account_id=aaaabbbbccccddddeeeeffff00001111']);
+    const again = run(uninstallSh, [], { ...s.env, STUB_TUNNEL_CODE: '404' });
+    expect(again.status).toBe(0);
+    expect(s.state()).toBeNull();
+    // The same for the DNS record: 404 means it is already gone.
+    const t = sandbox();
+    writeFileSync(t.stateFile, fixture(t.app));
+    expect(run(uninstallSh, [], { ...t.env, STUB_DNS_CODE: '404' }).status).toBe(0);
+    expect(t.state()).toBeNull();
+    // A refused DNS DELETE (403) keeps the DNS lines (and the zone id they need), not the tunnel's.
+    const u = sandbox();
+    writeFileSync(u.stateFile, fixture(u.app));
+    expect(run(uninstallSh, [], { ...u.env, STUB_DNS_CODE: '403' }).status).toBe(1);
+    expect(u.state()).toEqual(['zone_id=11112222333344445555666677778888', 'dns_record_id=99990000aaaabbbbccccddddeeeeffff']);
+  });
+
+  test('k3. a state with only the compose line runs compose down without -v; another project name is refused', () => {
+    const s = sandbox();
+    writeFileSync(s.stateFile, 'compose=creative-video-studio\n');
+    const r = run(uninstallSh, [], s.env);
+    expect(r.status).toBe(0);
+    expect(s.calls()).toContain('docker compose -p creative-video-studio down\n');
+    expect(s.calls()).not.toMatch(/\s-v\b|--volumes/);
+    expect(s.calls()).not.toContain('curl');
+    expect(s.state()).toBeNull();
+
+    const other = sandbox();
+    writeFileSync(other.stateFile, 'compose=ideas-hub\n');
+    const refused = run(uninstallSh, [], other.env);
+    expect(refused.status).toBe(1);
+    expect(other.calls()).not.toContain('docker');
+  });
+
+  test('k4. uninstall --dry-run says it was a dry run', () => {
+    const s = sandbox();
+    writeFileSync(s.stateFile, fixture(s.app));
+    const r = run(uninstallSh, ['--dry-run'], s.env);
+    expect(r.status).toBe(0);
+    expect(r.out).toContain('dry run: nothing was changed');
+    expect(r.out).not.toContain('done:');
+    expect(s.calls()).toBe('id -u\n');
+  });
+
   test('the pinned Node satisfies the root engines range and its checksum is verified against SHASUMS256.txt', () => {
     const src = readFileSync(installSh, 'utf8');
     const [major, minor] = /^node_version=(\d+)\.(\d+)\.\d+$/m.exec(src)?.slice(1).map(Number) ?? [];
@@ -253,4 +454,18 @@ describe.skipIf(!hasBash)('deploy kit (needs bash only)', { timeout: 30_000 }, (
     expect(src).toContain('sha256sum -c -');
     expect(src).toContain('SHASUMS256.txt');
   });
+});
+
+// A unit's ExecStart fails with 203/EXEC when the script it names is not executable in the checkout.
+test('every deploy/linux script a unit ExecStarts is mode 100755 in git', () => {
+  const dir = join(root, 'deploy/linux');
+  const scripts = readdirSync(dir)
+    .filter((f) => f.endsWith('.service'))
+    .flatMap((f) => [...readFileSync(join(dir, f), 'utf8').matchAll(/^ExecStart=(\S+)/gm)].map((m) => /deploy\/linux\/[\w.-]+$/.exec(m[1]!)?.[0]))
+    .filter((p): p is string => p !== undefined);
+  expect(scripts).toContain('deploy/linux/cvs-backup');
+  for (const script of new Set(scripts)) {
+    const r = spawnSync('git', ['ls-files', '-s', '--', script], { cwd: root, encoding: 'utf8' });
+    expect(r.stdout.split(' ')[0], script).toBe('100755');
+  }
 });

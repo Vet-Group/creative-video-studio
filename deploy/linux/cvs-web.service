@@ -2,7 +2,6 @@
 # install.sh fills @APP@ and builds first; scripts/next.ts loads <app>/.env and runs `next start`.
 [Unit]
 Description=Creative Video Studio web (Next.js, port 3400)
-After=network-online.target
 
 [Service]
 WorkingDirectory=@APP@/apps/web

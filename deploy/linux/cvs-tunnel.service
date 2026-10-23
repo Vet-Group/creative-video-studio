@@ -3,7 +3,7 @@
 # Ideas Hub's and POD Studio's tunnels and configs are never touched.
 [Unit]
 Description=Creative Video Studio Cloudflare tunnel
-After=network-online.target cvs-web.service
+After=cvs-web.service
 
 [Service]
 ExecStart=@CLOUDFLARED@ tunnel --no-autoupdate --config @APP@/cloudflared/cvs.yml run

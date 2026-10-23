@@ -2,7 +2,6 @@
 # The worker reads <app>/.env itself (DATABASE_URL and the S3 settings).
 [Unit]
 Description=Creative Video Studio worker
-After=network-online.target
 
 [Service]
 WorkingDirectory=@APP@

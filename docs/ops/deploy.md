@@ -12,18 +12,26 @@ deploy/linux/uninstall.sh --dry-run
 ```
 
 `--dry-run` prints every command and every unit file it would write, changes nothing, and exits 0 when the preconditions
-pass (free ports; for uninstall, a valid state file). Lines start with `[dry-run]`; a real run prints `==>` instead.
+pass (for install: root, the required tools, the deploy key, `.env` present with mode 600, `cloudflared` when a token is set,
+a free port set; for uninstall, a valid state file). Lines start with `[dry-run]`; a real run prints `==>` instead.
+A failed read-only precondition prints `[dry-run] would fail: <reason>` and exits 1. `uninstall.sh --dry-run` ends with
+"dry run: nothing was changed".
 
 ## What install.sh does, in order
 
-1. Refuses (exit 1, nothing changed) if any of ports 3400, 5435, 9400 or 9401 is taken (`ss -ltnH`).
+0. Checks the preconditions (it forces `HOME=/root`, so `systemctl --user` and `~/.config/systemd/user` agree; `CVS_APP_DIR` must be
+   absolute and end in `creative-video-studio`, and an existing git checkout there must have the configured `origin`; a repo URL with a
+   user or password is refused, only `git@github.com:...` style SSH URLs are accepted).
+1. Refuses (exit 1, nothing changed) if any of ports 3400, 5435, 9400 or 9401 is taken (`ss -ltnH`), then takes the same
+   `~/.local/state/creative-video-studio/ops.lock` that `cvs-backup` uses (waits up to 40 minutes).
 2. Clones or fast-forwards the repo into `/opt/creative-video-studio` over a read-only deploy key. Only the key's path is
    used; its content is never read or printed.
 3. Installs the pinned Node (**24.22.1**, inside the root `engines` range) into `/opt/creative-video-studio/node`. The tarball is
    downloaded from `https://nodejs.org/dist/v24.22.1/` and checked with `sha256sum -c` against that release's `SHASUMS256.txt`.
    Then pnpm at the `packageManager` version is installed next to it.
-4. `pnpm install --frozen-lockfile` and `pnpm --filter @cvs/web build`.
-5. `docker compose -p creative-video-studio up -d --wait`, creates the MinIO bucket (`S3_BUCKET`, default `cvs-media`; the
+4. `pnpm install --frozen-lockfile` and `pnpm --filter @cvs/web build`. These, and the migrations, run without
+   `CLOUDFLARE_API_TOKEN`, `CVS_R2_*` and `CVS_RESTIC_PASSWORD` in their environment.
+5. Records `compose=creative-video-studio` in the state file, then `docker compose -p creative-video-studio up -d --wait`, creates the MinIO bucket (`S3_BUCKET`, default `cvs-media`; the
    production worker does not create it) and runs `pnpm --filter @cvs/db migrate`. The seed rows (the default team, the
    model configs, the presets) are part of the migrations, so there is no separate seed step.
 6. Writes `~/.config/creative-video-studio/backup.env` (mode 600) from `CVS_RESTIC_PASSWORD` and `CVS_R2_*` if the file is missing.
@@ -34,19 +42,29 @@ pass (free ports; for uninstall, a valid state file). Lines start with `[dry-run
    `cvs-drill.timer` (monthly), `cvs-backup-weekly.timer` (only if all three `CVS_R2_*` are set) and `cvs-tunnel` (only if step 7 ran).
 
 `MemoryMax=768M` for web and worker is the plan's expected value. Plan step D.3 (measuring the headroom next to Ideas Hub) was
-skipped, so the values wait for that measurement.
+skipped, so the values wait for that measurement: **D.3 must set `MemoryMax` before D.5** (the real deploy).
+
+The Cloudflare token needs these permissions (unverified: not yet tried against the real account): Zone:Read and DNS:Edit on the
+`vetgroup.net` zone, and Account / Cloudflare Tunnel:Edit.
 
 Settings come from the environment first, then from `/opt/creative-video-studio/.env`, which must exist before a real run.
 Other variables: `CVS_APP_DIR`, `CVS_REPO_URL`, `CVS_REPO_REF`, `CVS_DEPLOY_KEY` (default `~/.ssh/cvs-deploy`), `CVS_HOSTNAME`, `CVS_ZONE`.
 `CVS_LISTEN_FILE` (a file in `ss -ltnH` format) replaces the port probe; the tests use it.
 
-If a run stops half way, run `uninstall.sh` and then `install.sh` again: the stack's own ports count as taken while it is up.
+### Re-running and updating
+
+A state file means the next `install.sh` is an update, and it works without uninstalling (which would delete the tunnel and the
+DNS record): ports held by this install's own compose project (`docker compose -p creative-video-studio ps -q` is not empty) or
+by `cvs-web` are not counted as taken, the repo is fast-forwarded, and a recorded tunnel is kept, but only when its DNS record id
+and both `cloudflared/` files exist. A tunnel recorded without them (a run that stopped in step 7) is refused with
+"run uninstall.sh first". A run that stopped after `compose up` can be undone with `uninstall.sh`, because the compose line was
+recorded before `up`.
 
 ## The state file
 
 `/opt/creative-video-studio/install.state` lists what install.sh created, one `key=value` per line:
-`unit=<name>`, `tunnel_id`, `account_id`, `zone_id`, `dns_record_id`, and `file=<path under cloudflared/>`.
-Each line is written as soon as the thing exists, so a failed install can still be undone.
+`compose=creative-video-studio` (the only accepted value), `unit=<name>`, `tunnel_id`, `account_id`, `zone_id`, `dns_record_id`,
+and `file=<path under cloudflared/>`. Each line is written as soon as the thing exists, so a failed install can still be undone.
 
 ## uninstall.sh
 
@@ -54,9 +72,15 @@ Reads only the state file and validates every line; a unit that is not named `cv
 malformed id makes it refuse before running anything. Then it:
 
 1. disables and removes the recorded units;
-2. runs `docker compose -p creative-video-studio down`. **Volumes are kept**: `-v` is never passed, so the database and the videos survive;
-3. deletes the DNS record and the tunnel by their recorded ids (needs `CLOUDFLARE_API_TOKEN`; without it they stay in Cloudflare
-   and the state file is kept so the script can run again);
-4. removes the recorded files and the state file.
+2. runs `docker compose -p creative-video-studio down` from the app directory, even when the state file holds only the `compose` line.
+   **Volumes are kept**: `-v` is never passed, so the database and the videos survive;
+3. removes the recorded files;
+4. deletes the DNS record and the tunnel by their recorded ids (needs `CLOUDFLARE_API_TOKEN`; without it they stay in Cloudflare
+   and the state file is kept so the script can run again). HTTP 404 counts as already deleted; the tunnel DELETE is tried four times
+   because cloudflared connections can linger for a moment after `cvs-tunnel` stops. The token goes to `curl` over stdin, never on a command line;
+5. removes the state file.
+
+Each state line is removed as soon as its resource is gone, so after a partial Cloudflare failure the file holds only what is left
+(for example `tunnel_id` and the `account_id` it needs) and the script can simply be run again.
 
 It never touches other units, other compose projects, `/opt/creative-video-studio` itself, the backups, or any Ideas Hub or POD Studio path.

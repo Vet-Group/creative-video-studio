@@ -19,6 +19,12 @@ next-env.d.ts
 *.tsbuildinfo
 .omc/
 
+# Files deploy/linux/install.sh creates inside the app directory on the host.
+/node/
+/cloudflared/
+/install.state
+/backups/
+
 # Owner-facing docs and run state stay local.
 docs/boss/
 docs/ops/PREFLIGHT.md
