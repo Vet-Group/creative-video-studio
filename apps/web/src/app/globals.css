@@ -398,3 +398,47 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 @media (max-width: 480px) {
   .bar-run { width: 100%; margin-left: 0; }
 }
+
+/* The Apps index and the app pages: cards in 1, 2 and 3 columns, a header card with a change-app menu, two upload boxes side by side, and the coming-soon page. */
+.feature-tag { background: rgb(228, 228, 231); color: rgb(39, 39, 42); }
+.badge-soon { margin-left: .5rem; padding: 0 .4rem; border-radius: 4px; background: rgb(228, 228, 231); color: rgb(63, 63, 70); font-size: .75rem; font-weight: 600; white-space: nowrap; }
+.apps h1 { margin: 0 0 4px; }
+.apps-sub { margin: 0 0 16px; }
+.apps-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; margin: 0 0 16px; }
+.apps-tools .kinds { margin: 0; }
+.apps-search { position: relative; flex: 0 1 15rem; min-width: 0; }
+.apps-search .icon { position: absolute; top: 50%; left: 12px; transform: translateY(-50%); color: rgb(113, 113, 122); }
+.apps-search input { width: 100%; height: 40px; margin: 0; padding: 0 12px 0 36px; border-radius: 999px; }
+.apps-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; margin: 0; padding: 0; list-style: none; }
+@media (min-width: 640px) { .apps-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1024px) { .apps-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.app-card { display: flex; flex-direction: column; gap: 4px; height: 100%; padding: 0 0 12px; overflow: hidden; border: 1px solid #e4e4e7; border-radius: 14px; background: #fff; color: inherit; text-decoration: none; }
+.app-card:hover { border-color: rgb(153, 153, 153); }
+.app-card > strong, .app-card > .muted, .app-card-head, .app-card > .app-card-head + .muted { margin-inline: 12px; }
+.app-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.app-card .muted { font-size: 13px; line-height: 18px; }
+.app-art { display: grid; place-items: center; aspect-ratio: 16 / 9; margin-bottom: 8px; background: rgb(244, 244, 245); color: rgb(63, 63, 70); }
+.app-art[data-category='fashion'] { background: rgb(254, 235, 240); color: rgb(157, 23, 77); }
+.app-art[data-category='photo'] { background: rgb(224, 242, 254); color: rgb(3, 105, 161); }
+.app-art[data-category='video'] { background: rgb(237, 233, 254); color: rgb(109, 40, 217); }
+.app-art[data-category='utility'] { background: rgb(220, 252, 231); color: rgb(21, 128, 61); }
+.app-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; min-height: 130px; margin-bottom: 16px; padding: 12px; border-radius: 18px; background: rgb(39, 39, 42); color: #fff; }
+.app-head[data-category='fashion'] { background: rgb(157, 23, 77); }
+.app-head[data-category='photo'] { background: rgb(3, 105, 161); }
+.app-head[data-category='video'] { background: rgb(109, 40, 217); }
+.app-head[data-category='utility'] { background: rgb(21, 128, 61); }
+.app-head strong { font-size: 20px; line-height: 26px; }
+.app-change { position: relative; flex: none; }
+.app-change > button { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 0; border-radius: 14px; background: rgb(0 0 0 / .45); color: #fff; font-size: 12px; }
+.app-change > button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.app-change-list { position: absolute; z-index: 30; top: calc(100% + 4px); right: 0; width: 15rem; max-height: 60vh; margin: 0; padding: 4px; overflow: auto; list-style: none; border: 1px solid #e4e4e7; border-radius: 12px; background: #fff; box-shadow: 0 12px 32px rgb(0 0 0 / .16); }
+.app-change-list a { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; border-radius: 8px; color: rgb(26, 26, 26); font-size: 14px; text-decoration: none; }
+.app-change-list a:hover, .app-change-list a[aria-current='page'] { background: rgb(244, 244, 245); }
+.app-slots { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0 8px; }
+.app-slots[data-two='true'] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.app-slots[data-two='true'] .slot { flex-direction: column; justify-content: center; min-height: 174px; text-align: center; }
+.app-slots .field { min-width: 0; }
+.soon { display: grid; justify-items: center; gap: 12px; max-width: 32rem; margin: 32px auto; padding: 24px; text-align: center; }
+.soon .app-art { width: 100%; border-radius: 14px; }
+.soon p { margin: 0; }
+.soon .button { padding: 10px 24px; border-radius: 8px; }

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { createContext, type ReactNode, useContext, useEffect, useRef, useState } from 'react';
 import { api, errorText, sendJson, type JobStatus, type TrayJob } from '@/lib/api';
+import { appBySlug } from '@/lib/apps';
 import { COLLAPSED_COOKIE } from '@/lib/sidebar';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { Icon, type IconName } from './Icon';
@@ -114,17 +115,26 @@ const NAV: { href: string; text: string; icon: IconName }[] = [
   { href: '/try-on', text: 'Thử đồ', icon: 'tryon' },
   { href: '/image-generation', text: 'Tạo ảnh', icon: 'image' },
   { href: '/create', text: 'Tạo video', icon: 'create' },
+  { href: '/apps', text: 'Ứng dụng', icon: 'apps' },
   { href: '/library', text: 'Thư viện', icon: 'library' },
 ];
 
 /** The pages that show their own History tab instead of the tray beside them. */
 const OWN_HISTORY = ['/create', '/try-on', '/image-generation'];
 
+/** The app pages have a History tab too; the Apps index and the coming-soon pages keep the tray. */
+const hasOwnHistory = (path: string): boolean => {
+  if (OWN_HISTORY.some((p) => path.startsWith(p))) return true;
+  const app = path.startsWith('/apps/') ? appBySlug(path.split('/')[2]!) : undefined;
+  return app !== undefined && !app.soon;
+};
+
 const PAGE_TITLES: [prefix: string, title: string][] = [
   ['/explore', 'Khám phá'],
   ['/try-on', 'Thử đồ'],
   ['/image-generation', 'Tạo ảnh'],
   ['/create', 'Tạo video'],
+  ['/apps', 'Ứng dụng'],
   ['/library', 'Thư viện'],
   ['/admin', 'Quản trị'],
   ['/account', 'Phương thức đăng nhập'],
@@ -217,7 +227,7 @@ export function Shell({ userId, userName, isAdmin, account, initialCollapsed, ch
             </header>
             <div className="frame">
               <main>{children}</main>
-              {!OWN_HISTORY.some((p) => pathname.startsWith(p)) && <Tray />}
+              {!hasOwnHistory(pathname) && <Tray />}
             </div>
           </div>
           <Toasts />

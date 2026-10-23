@@ -12,6 +12,7 @@ const clip = (n: number, ratio: '9:16' | '1:1', verdict: boolean) => ({
   createdAt: `2026-10-2${n}T03:00:00.000Z`,
   modelId: 'mock-e2e',
   modelLabel: 'Mock E2E',
+  feature: 'video',
   ratio,
   durationSec: 5,
   isMock: true,
