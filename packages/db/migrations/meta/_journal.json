@@ -36,6 +36,13 @@
       "when": 1793012532036,
       "tag": "0004_round_half_even",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793098932036,
+      "tag": "0005_backfill_email_verified",
+      "breakpoints": true
     }
   ]
 }

@@ -76,6 +76,12 @@ describe('/api/admin/users', () => {
     expect(await signIn('new@example.test')).toContain('better-auth.session_token');
   });
 
+  test('creates users with a verified email, which better-auth needs before it links a social sign-in', async () => {
+    const body = JSON.stringify({ email: 'verified@example.test', name: 'Verified', teamId: 'team-unassigned' });
+    expect((await POST(req(adminCookie, { method: 'POST', body }))).status).toBe(201);
+    expect((await pool.query(`select email_verified from users where email = 'verified@example.test'`)).rows[0].email_verified).toBe(true);
+  });
+
   test('lets an Admin create a user without a password, who then cannot sign in by email', async () => {
     const body = JSON.stringify({ email: 'lark-only@example.test', name: 'Lark Only', teamId: 'team-unassigned' });
     const res = await POST(req(adminCookie, { method: 'POST', body }));
@@ -161,6 +167,14 @@ describe('PATCH /api/admin/users/:id', () => {
     expect((await auth.api.signInEmail({ body: { email: m.email, password: 'temporary-pass-1' }, asResponse: true })).status).toBe(200);
     const log = await audits(m.id);
     expect(log).toEqual([{ actor_id: await adminId(), action: 'user.password_set', old_value: null, new_value: { temporary: true } }]);
+  });
+
+  test('bans a user without a password and gives them a temporary one in the same request', async () => {
+    const { user } = await auth.api.createUser({ body: { email: 'social-only@example.test', name: 'Social', role: 'member' } });
+    expect((await patch(adminCookie, user.id, { banned: true, temporaryPassword: 'temporary-pass-4' })).status).toBe(200);
+    const { rows } = await pool.query('select provider_id from accounts where user_id = $1', [user.id]);
+    expect(rows).toEqual([{ provider_id: 'credential' }]);
+    expect((await audits(user.id)).map((a) => a.action)).toEqual(['user.ban', 'user.password_set']);
   });
 
   test('changes the role, audited once with the old and new role, and refuses a bad role or an unknown user', async () => {
