@@ -230,6 +230,28 @@ dialog.modal { position: fixed; width: min(40rem, calc(100vw - 2rem)); max-heigh
 dialog.modal::backdrop { background: rgb(0 0 0 / .5); }
 .modal-close { position: absolute; top: .5rem; right: .5rem; padding: .1rem .55rem; }
 .modal .preview { max-width: 16rem; margin: .5rem auto; }
+/* Example details, measured on live at 1440x1000: 1100x501 centred, radius 14, the clip left, a 219 px column right with 32 px Previous/Next and a 36 px button. */
+dialog.modal.example-detail { width: min(1100px, calc(100vw - 2rem)); border-radius: 14px; }
+.example-detail .modal-body { display: flex; flex-direction: column; padding: 0; }
+.detail-media { display: grid; place-items: center; background: #18181b; }
+.example-detail .detail-media .preview { width: min(100%, calc(60vh * var(--ratio))); max-width: none; margin: 0; border-radius: 0; }
+.detail-info { display: flex; flex-direction: column; gap: 8px; padding: 16px; }
+.detail-info h2 { margin: 0; padding-right: 2rem; font-size: 16px; line-height: 24px; font-weight: 600; }
+.detail-info .muted { margin: 0; }
+.detail-specs { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0; font-size: 14px; line-height: 21px; }
+.detail-specs dt { color: rgb(102, 102, 102); }
+.detail-specs dd { margin: 0; }
+.detail-actions { display: flex; flex-direction: column; gap: 6px; margin-top: auto; }
+.detail-nav { display: flex; gap: 6px; }
+.detail-nav button { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 6px; background: rgb(242, 242, 242); color: rgb(77, 77, 77); }
+.detail-actions .detail-use { height: 36px; margin: 0; padding: 0 12px; border-radius: 8px; font-size: 12px; line-height: 24px; }
+@media (min-width: 1024px) {
+  dialog.modal.example-detail { height: min(501px, calc(100vh - 2rem)); overflow: hidden; }
+  .example-detail .modal-body { flex-direction: row; height: 100%; }
+  .detail-media { flex: 1; min-width: 0; }
+  .example-detail .detail-media .preview { width: min(100%, calc(min(501px, 100vh - 2rem) * var(--ratio))); }
+  .detail-info { flex: none; width: 219px; }
+}
 
 @media (min-width: 1024px) {
   .create-grid { grid-template-columns: 320px minmax(0, 1fr); grid-template-areas: 'form tabs' 'form side'; grid-template-rows: auto 1fr; gap: 0 32px; align-items: start; }
