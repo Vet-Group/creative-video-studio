@@ -41,8 +41,8 @@ A failed read-only precondition prints `[dry-run] would fail: <reason>` and exit
 8. Writes and enables the units `cvs-web`, `cvs-worker` (each `MemoryMax=768M`, `Restart=on-failure`), `cvs-backup.timer`,
    `cvs-drill.timer` (monthly), `cvs-backup-weekly.timer` (only if all three `CVS_R2_*` are set) and `cvs-tunnel` (only if step 7 ran).
 
-`MemoryMax=768M` for web and worker is the plan's expected value. Plan step D.3 (measuring the headroom next to Ideas Hub) was
-skipped, so the values wait for that measurement: **D.3 must set `MemoryMax` before D.5** (the real deploy).
+`MemoryMax=768M` for web and worker was confirmed by plan step D.3 against the measured headroom next to Ideas Hub; see
+[`production.md`](production.md).
 
 The Cloudflare token needs these permissions (unverified: not yet tried against the real account): Zone:Read and DNS:Edit on the
 `vetgroup.net` zone, and Account / Cloudflare Tunnel:Edit.
