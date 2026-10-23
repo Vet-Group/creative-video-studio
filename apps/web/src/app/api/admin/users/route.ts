@@ -1,21 +1,24 @@
 import { auth, pool } from '@/lib/auth';
 import { authFailure, bad, readBody } from '@/lib/admin';
 import { guard } from '@/lib/session';
+import { userMethods } from '@/lib/user-methods';
 
-/** Admin: list users. */
+/** Admin: list users, each with the sign-in methods linked to the account. */
 export async function GET(request: Request) {
   const g = await guard(request, 'admin');
   if (g.error) return g.error;
   // shortcut: one page of 10000 instead of paging, far above the headcount of one company; page through if the user count ever nears it
   const { users } = await auth.api.listUsers({ headers: request.headers, query: { limit: 10_000 } });
+  const methods = await userMethods(pool);
   return Response.json({
-    users: users.map((u) => ({ id: u.id, email: u.email, name: u.name, role: u.role, banned: u.banned, teamId: (u as typeof u & { teamId: string }).teamId })),
+    users: users.map((u) => ({ id: u.id, email: u.email, name: u.name, role: u.role, banned: u.banned, teamId: (u as typeof u & { teamId: string }).teamId, methods: methods.get(u.id) ?? [] })),
   });
 }
 
 /**
  * Admin: create a Member or Admin account (Q4: accounts are created by an Admin, never by sign-up).
- * The team is required and must be a visible one. The password is optional (interview round 8): a user without one can sign in only with Lark.
+ * The team is required and must be a visible one. The password is optional (interview round 8): a user without one can sign in only
+ * with Lark or Google. The email counts as verified, which better-auth needs before it links a first social sign-in to the account.
  */
 export async function POST(request: Request) {
   const g = await guard(request, 'admin');
@@ -27,7 +30,7 @@ export async function POST(request: Request) {
   if (typeof teamId !== 'string') return bad('teamId is required');
   if (!(await pool.query('select 1 from teams where id = $1 and not hidden', [teamId])).rowCount) return bad('teamId must be the id of a visible team');
   try {
-    const { user } = await auth.api.createUser({ headers: request.headers, body: { email, name, password, role, data: { teamId } } });
+    const { user } = await auth.api.createUser({ headers: request.headers, body: { email, name, password, role, data: { teamId, emailVerified: true } } });
     return Response.json({ id: user.id, email: user.email, role, teamId }, { status: 201 });
   } catch (e) {
     return authFailure(e);

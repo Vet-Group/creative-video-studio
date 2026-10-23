@@ -16,6 +16,9 @@ const db = await createTestDatabase('cvs_e2e');
 process.env.DATABASE_URL = db.url;
 process.env.S3_BUCKET = 'cvs-e2e';
 process.env.CVS_MOCK_RUN_MS = '4000';
+// The specs run with no social login (no login buttons), whatever the developer's .env holds, and with a known support email on /privacy.
+for (const name of ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'LARK_APP_ID', 'LARK_APP_SECRET', 'LARK_TENANT_KEY']) delete process.env[name];
+process.env.CVS_SUPPORT_EMAIL = 'support@e2e.test';
 
 const { auth, pool } = await import('../src/lib/auth');
 await pool.query(
@@ -26,7 +29,7 @@ await pool.query(
 await pool.query(`insert into stores (id, name, code) values ('store-e2e', 'E2E Shop', 'E2E-SEED')`);
 // Every spec runs jobs; the daily clip cap is not what is under test here.
 await pool.query('update settings set member_daily_clip_cap = 1000 where id = 1');
-for (const u of Object.values(USERS)) await auth.api.createUser({ body: { email: u.email, name: u.name, password: PASSWORD, role: u.role } });
+for (const u of Object.values(USERS)) await auth.api.createUser({ body: { email: u.email, name: u.name, password: PASSWORD, role: u.role, data: { emailVerified: true } } });
 await pool.end();
 
 const children: ChildProcess[] = [

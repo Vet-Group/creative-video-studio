@@ -13,7 +13,7 @@ if (!values.email || !values.name || !password || (role !== 'admin' && role !== 
   process.exit(2);
 }
 try {
-  const { user } = await auth.api.createUser({ body: { email: values.email, name: values.name, password, role, data: teamId ? { teamId } : {} } });
+  const { user } = await auth.api.createUser({ body: { email: values.email, name: values.name, password, role, data: { emailVerified: true, ...(teamId ? { teamId } : {}) } } });
   console.log(`created ${user.id} (${role}, team ${(user as typeof user & { teamId: string }).teamId})`);
 } finally {
   await pool.end();

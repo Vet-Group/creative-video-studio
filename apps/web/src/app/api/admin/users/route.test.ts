@@ -76,6 +76,12 @@ describe('/api/admin/users', () => {
     expect(await signIn('new@example.test')).toContain('better-auth.session_token');
   });
 
+  test('creates users with a verified email, which better-auth needs before it links a social sign-in', async () => {
+    const body = JSON.stringify({ email: 'verified@example.test', name: 'Verified', teamId: 'team-unassigned' });
+    expect((await POST(req(adminCookie, { method: 'POST', body }))).status).toBe(201);
+    expect((await pool.query(`select email_verified from users where email = 'verified@example.test'`)).rows[0].email_verified).toBe(true);
+  });
+
   test('lets an Admin create a user without a password, who then cannot sign in by email', async () => {
     const body = JSON.stringify({ email: 'lark-only@example.test', name: 'Lark Only', teamId: 'team-unassigned' });
     const res = await POST(req(adminCookie, { method: 'POST', body }));
