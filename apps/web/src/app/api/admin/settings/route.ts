@@ -21,7 +21,7 @@ export async function GET(request: Request) {
               member_daily_usd_cap::text as "memberDailyUsdCap", member_monthly_usd_cap::text as "memberMonthlyUsdCap" from settings where id = 1`,
     )
   ).rows[0];
-  const models = await pool.query('select id, label, provider, enabled, usd_per_second is not null as priced from model_configs order by provider, id');
+  const models = await pool.query('select id, label, provider, enabled, (usd_per_second is not null or image_prices is not null) as priced from model_configs order by provider, id');
   const featureCaps = await pool.query('select feature, monthly_usd::text as "monthlyUsd" from feature_caps order by feature');
   return Response.json({ ...caps, featureCaps: featureCaps.rows, models: models.rows });
 }

@@ -50,6 +50,13 @@
       "when": 1793185332036,
       "tag": "0006_features_and_member_usd_caps",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793271732036,
+      "tag": "0007_image_models",
+      "breakpoints": true
     }
   ]
 }

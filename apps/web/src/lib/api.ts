@@ -30,8 +30,11 @@ export interface TrayJob {
   status: JobStatus;
   error: string | null;
   isMock: boolean;
+  feature: string;
   ratio: string;
   durationSec: number;
+  /** The resolution of an image job (its duration is 0), else null. */
+  resolution: string | null;
   modelId: string;
   retryOf: string | null;
   retried: boolean;
@@ -49,7 +52,11 @@ export interface Clip {
   modelLabel: string;
   ratio: string;
   durationSec: number;
+  feature: string;
+  mediaType: 'video' | 'image';
+  resolution: string | null;
   isMock: boolean;
+  /** The output asset: the video, or the image when `mediaType` is 'image'. */
   videoAssetId: string;
   posterAssetId: string | null;
   storeId: string | null;

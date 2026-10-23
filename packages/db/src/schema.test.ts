@@ -59,7 +59,7 @@ describe('migration 0002 seed data', () => {
   });
 
   test('seeds the two models disabled with no price or limits, and the settings row', async () => {
-    const models = await pool.query(`select id, provider, endpoint, enabled, usd_per_second, max_images, output_resolution from model_configs order by id`);
+    const models = await pool.query(`select id, provider, endpoint, enabled, usd_per_second, max_images, output_resolution from model_configs where kind = 'video' order by id`);
     expect(models.rows).toEqual([
       { id: 'kling-o3-pro', provider: 'fal', endpoint: 'fal-ai/kling-video/o3/pro/reference-to-video', enabled: false, usd_per_second: null, max_images: null, output_resolution: null },
       { id: 'seedance-2.5', provider: 'replicate', endpoint: 'bytedance/seedance-2.5', enabled: false, usd_per_second: null, max_images: null, output_resolution: null },
@@ -69,6 +69,56 @@ describe('migration 0002 seed data', () => {
 
   test('refuses to enable a model that has no price or limits', async () => {
     await expect(pool.query(`update model_configs set enabled = true where id = 'kling-o3-pro'`)).rejects.toThrow(/model_configs_enabled_complete_check/);
+  });
+});
+
+describe('migration 0007 image models', () => {
+  test('seeds the seven fal image models disabled, each with its prices, ratios and features', async () => {
+    const { rows } = await pool.query(`select id, endpoint, features, ratios, durations_sec, max_images, image_prices, usd_per_second, enabled, sources from model_configs where kind = 'image' order by id`);
+    expect(rows.map((r) => [r.id, r.endpoint, r.features, r.image_prices])).toEqual([
+      ['fashn-v1.6', 'fal-ai/fashn/tryon/v1.6', ['try_on'], { '1K': '0.075' }],
+      ['gpt-image-2', 'openai/gpt-image-2/edit', ['image'], { '1K': '0.21' }],
+      ['nano-banana', 'fal-ai/nano-banana/edit', ['image', 'try_on'], { '1K': '0.0398' }],
+      ['nano-banana-2', 'fal-ai/nano-banana-2/edit', ['image'], { '1K': '0.08' }],
+      ['nano-banana-2.1', 'google/nano-banana-2.1/edit', ['image', 'try_on'], { '1K': '0.04', '2K': '0.059' }],
+      ['nano-banana-pro', 'fal-ai/nano-banana-pro/edit', ['image', 'try_on'], { '1K': '0.15', '2K': '0.15', '4K': '0.30' }],
+      ['seedream-5-pro', 'bytedance/seedream/v5/pro/edit', ['image'], { '1K': '0.0675', '2K': '0.135' }],
+    ]);
+    for (const r of rows) {
+      expect(r.enabled).toBe(false);
+      expect(r.durations_sec).toEqual([]);
+      expect(r.usd_per_second).toBeNull();
+      expect(r.sources.imagePrices.readAt).toBe('2026-10-24');
+      expect(r.sources.ratios.url).toContain(`endpoint_id=${r.endpoint}`);
+    }
+  });
+
+  test('a video row keeps its defaults: kind video, feature video, no image prices', async () => {
+    expect((await pool.query(`select kind, features, image_prices from model_configs where id = 'kling-o3-pro'`)).rows).toEqual([{ kind: 'video', features: ['video'], image_prices: null }]);
+  });
+
+  test('an image model can be enabled with prices, a limit and a ratio, and not without them', async () => {
+    await pool.query(`update model_configs set enabled = true where id = 'nano-banana-pro'`);
+    await pool.query(`update model_configs set enabled = false where id = 'nano-banana-pro'`);
+    for (const [what, set] of [['image_prices', `image_prices = null`], ['empty image_prices', `image_prices = '{}'::jsonb`], ['max_images', `max_images = null`], ['ratios', `ratios = '{}'`]]) {
+      await expect(pool.query(`update model_configs set ${set}, enabled = true where id = 'nano-banana-pro'`), what).rejects.toThrow(/model_configs_enabled_complete_check/);
+    }
+    // A video row is still judged by the video rule, whatever else it carries.
+    await expect(pool.query(`update model_configs set image_prices = '{"1K": "1"}'::jsonb, max_images = 4, ratios = '{9:16}', enabled = true where id = 'kling-o3-pro'`)).rejects.toThrow(/model_configs_enabled_complete_check/);
+    await expect(pool.query(`update model_configs set kind = 'audio' where id = 'kling-o3-pro'`)).rejects.toThrow(/model_configs_kind_check/);
+  });
+
+  test('a job takes the image ratios and params; 0 seconds and the default params are fine', async () => {
+    const user = await insertUser();
+    const id = next();
+    await pool.query(
+      `insert into jobs (id, user_id, team_id, feature, model, provider, prompt, aspect, duration_s, params, input_asset_ids)
+       values ($1, $2, 'team-unassigned', 'image', 'nano-banana-pro', 'fal', 'p', '21:9', 0, '{"resolution": "2K"}', '{}')`,
+      [id, user],
+    );
+    expect((await pool.query(`select params, duration_s from jobs where id = $1`, [id])).rows).toEqual([{ params: { resolution: '2K' }, duration_s: 0 }]);
+    expect((await pool.query(`select params from jobs where id = $1`, [await insertJob(user)])).rows).toEqual([{ params: {} }]);
+    await expect(pool.query(`update jobs set aspect = '7:5' where id = $1`, [id])).rejects.toThrow(/jobs_aspect_check/);
   });
 });
 

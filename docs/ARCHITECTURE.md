@@ -35,13 +35,13 @@ Layout [proposed]: a pnpm workspace with `apps/web`, `apps/worker` and `packages
 - **`teams`, `stores`**: managed by an Admin and hidden, never deleted. A team has a name and an optional cost-centre code. A store has a name and a unique code that equals POD Studio's `store_id`; the code cannot change once the store has cost. A default team is seeded, and existing users move into it.
 - **`assets`**: `id`, `owner_id`, `kind` (`input`/`output`), `s3_key`, `mime`, `bytes`, `width`, `height`, `created_at`, `deleted_at`.
 - **`jobs`**:
-  - Request: `id`, `user_id`, `model`, `provider`, `prompt`, `aspect` (`9:16`/`1:1`), `duration_s` (5–10), `input_asset_ids[]`.
+  - Request: `id`, `user_id`, `model`, `provider`, `prompt`, `aspect` (`9:16`/`1:1` for video; an image job also takes `auto` and the image ratios), `duration_s` (5–10; 0 for an image), `feature`, `params`, `input_asset_ids[]`.
   - Attribution: `team_id` (a snapshot of the user's team at Run) and an optional `store_id`.
   - State: `status` (`queued`/`submitting`/`running`/`succeeded`/`failed`/`failed_unknown`/`timed_out`), `retry_of`.
   - Provider: `provider_job_id`, `error`, `is_mock`. **There are no money columns**: cost lives only in the cost ledger.
   - Result and timing: `output_asset_id`, `created_at`, `started_at`, `finished_at`, `deleted_at`, `purged_at`.
 - **`cost_entries`, `monthly_rates`, `provider_invoices`**: the cost ledger and its inputs. See "Cost ledger".
-- **`model_configs`**: per model, the limits, price per second, whether it is enabled, and the pass-rate seed.
+- **`model_configs`**: per model, the limits, price per second (or per image and resolution for an image model), whether it is enabled, and the pass-rate seed.
 - **`presets`**: a Vietnamese label, an English prompt, `enabled` and `is_bakeoff_safe`. Six are seeded.
 - **`verdicts`**: Pass or Fail per clip (unique per job, so a purge that removes the output asset keeps the verdict), the fault for a Fail, and who marked it.
 - **`audit_entries`**: who, when, what, and the old and new values.

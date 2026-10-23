@@ -26,6 +26,9 @@ export const JOB_STATUSES = ['queued', 'submitting', 'running', 'succeeded', 'fa
 export type JobStatus = (typeof JOB_STATUSES)[number];
 
 export const ASPECTS = ['9:16', '1:1'] as const;
+/** Every ratio a job may store: 'auto' (follow the input) and the image models' ratios. A video Run is still limited to its model's own ratios. */
+export const IMAGE_RATIOS = ['auto', '1:1', '9:16', '16:9', '3:4', '4:3', '2:3', '3:2', '4:5', '5:4', '21:9'] as const;
+export const MODEL_KINDS = ['video', 'image'] as const;
 export const PROVIDERS = ['fal', 'replicate', 'mock'] as const;
 /** What a job is for. `video` and `marketing` spend the company video budget; the rest share the image and apps budget (FEATURE_BUDGET). */
 export const FEATURES = [
@@ -177,6 +180,7 @@ export const presets = pgTable('presets', {
 });
 
 // The limits and price are NULL (or empty) until B.1 records them from the provider schema; such a model cannot be enabled.
+// A video model is priced per second (usd_per_second); an image model per image and resolution (image_prices), and has no durations.
 export const modelConfigs = pgTable(
   'model_configs',
   {
@@ -185,11 +189,16 @@ export const modelConfigs = pgTable(
     /** The provider's model path. */
     endpoint: text('endpoint').notNull(),
     label: text('label').notNull(),
+    kind: text('kind', { enum: MODEL_KINDS }).notNull().default('video'),
+    /** The job features that may use this model. */
+    features: text('features').array().notNull().default(sql`'{video}'`),
     ratios: text('ratios').array().notNull(),
     durationsSec: integer('durations_sec').array().notNull(),
     maxImages: integer('max_images'),
     outputResolution: text('output_resolution'),
     usdPerSecond: numeric('usd_per_second', { precision: 10, scale: 4 }),
+    /** Image models: resolution label to USD per image as a string, for example { "1K": "0.15", "4K": "0.30" }. */
+    imagePrices: jsonb('image_prices').$type<Record<string, string>>(),
     billedAmountField: text('billed_amount_field'),
     /** Where each fact was read: field name to { url, readAt }. */
     sources: jsonb('sources').notNull(),
@@ -201,9 +210,10 @@ export const modelConfigs = pgTable(
   },
   (t) => [
     check('model_configs_provider_check', sql`${t.provider} in ('fal', 'replicate', 'mock')`),
+    check('model_configs_kind_check', sql`${t.kind} in ('video', 'image')`),
     check(
       'model_configs_enabled_complete_check',
-      sql`not ${t.enabled} or (${t.usdPerSecond} is not null and ${t.maxImages} is not null and ${t.outputResolution} is not null and cardinality(${t.ratios}) > 0 and cardinality(${t.durationsSec}) > 0)`,
+      sql`not ${t.enabled} or (${t.kind} = 'video' and ${t.usdPerSecond} is not null and ${t.maxImages} is not null and ${t.outputResolution} is not null and cardinality(${t.ratios}) > 0 and cardinality(${t.durationsSec}) > 0) or (${t.kind} = 'image' and ${t.imagePrices} is not null and ${t.imagePrices} <> '{}'::jsonb and ${t.maxImages} is not null and cardinality(${t.ratios}) > 0)`,
     ),
   ],
 );
@@ -246,8 +256,11 @@ export const jobs = pgTable(
     provider: text('provider', { enum: PROVIDERS }).notNull(),
     presetId: text('preset_id').references(() => presets.id, { onDelete: 'restrict' }),
     prompt: text('prompt').notNull(),
-    aspect: text('aspect', { enum: ASPECTS }).notNull(),
+    aspect: text('aspect', { enum: IMAGE_RATIOS }).notNull(),
+    /** Seconds of a video; 0 for an image. */
     durationS: integer('duration_s').notNull(),
+    /** Options of the feature; for images { resolution, quality? }. Validated by the API. */
+    params: jsonb('params').$type<Record<string, string>>().notNull().default(sql`'{}'`),
     inputAssetIds: text('input_asset_ids').array().notNull(),
     status: text('status', { enum: JOB_STATUSES }).notNull().default('queued'),
     providerJobId: text('provider_job_id'),
@@ -268,7 +281,7 @@ export const jobs = pgTable(
     index('jobs_user_id_created_at_idx').on(t.userId, t.createdAt),
     index('jobs_status_idx').on(t.status),
     check('jobs_status_check', sql`${t.status} in ('queued', 'submitting', 'running', 'succeeded', 'failed', 'failed_unknown', 'timed_out')`),
-    check('jobs_aspect_check', sql`${t.aspect} in ('9:16', '1:1')`),
+    check('jobs_aspect_check', sql`${t.aspect} in ('auto', '1:1', '9:16', '16:9', '3:4', '4:3', '2:3', '3:2', '4:5', '5:4', '21:9')`),
     check('jobs_provider_check', sql`${t.provider} in ('fal', 'replicate', 'mock')`),
     check('jobs_feature_check', sql`${t.feature} in ('video', 'marketing', 'try_on', 'image', 'character_swap', 'model_swap', 'background_changer', 'reframe', 'image_upscale', 'face_swap', 'background_remover', 'motion_control', 'media_optimizer')`),
   ],

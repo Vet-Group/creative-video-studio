@@ -51,7 +51,7 @@ function TrayItem({ job, isAdmin }: { job: TrayJob; isAdmin: boolean }) {
           {job.retryOf && <span className="tag">Thử lại</span>}
         </p>
         <p className="muted">
-          {job.ratio} · {job.durationSec}s · {fmtTime(job.createdAt)}
+          {job.ratio} · {job.resolution ?? `${job.durationSec}s`} · {fmtTime(job.createdAt)}
         </p>
         {FAILURE_TEXT[job.status] && <p className="error">{FAILURE_TEXT[job.status]}</p>}
         {isAdmin && job.error && <p className="muted">{job.error}</p>}

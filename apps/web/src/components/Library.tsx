@@ -5,6 +5,17 @@ import { api, type Clip, errorText, sendJson } from '@/lib/api';
 import { FAULTS } from '@/lib/faults';
 
 const fmtTime = (iso: string) => new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date(iso));
+/** The Library filters in the reference order; the id is the `kind` the API takes. */
+const KINDS = [
+  { id: 'all', label: 'Tất cả' },
+  { id: 'images', label: 'Tất cả ảnh' },
+  { id: 'videos', label: 'Tất cả video' },
+  { id: 'try_on', label: 'Thử đồ' },
+  { id: 'image', label: 'Tạo ảnh' },
+  { id: 'video', label: 'Tạo video' },
+  { id: 'marketing', label: 'Marketing Studio' },
+  { id: 'apps', label: 'Ứng dụng' },
+];
 const faultLabel = (id: string | null) => FAULTS.find((f) => f.id === id)?.label ?? id ?? '';
 
 interface StoreOption {
@@ -19,6 +30,8 @@ function ClipCard({ clip, stores, onChange, onDeleted }: { clip: Clip; stores?: 
   const [fault, setFault] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [problem, setProblem] = useState('');
+  const image = clip.mediaType === 'image';
+  const noun = image ? 'ảnh' : 'clip';
 
   async function mark(body: { verdict: 'pass' } | { verdict: 'fail'; fault: string }) {
     setProblem('');
@@ -48,7 +61,7 @@ function ClipCard({ clip, stores, onChange, onDeleted }: { clip: Clip; stores?: 
       await api(`/api/jobs/${clip.id}`, { method: 'DELETE' });
       onDeleted(clip.id);
     } catch {
-      setProblem('Không xóa được clip.');
+      setProblem(`Không xóa được ${noun}.`);
     }
   }
 
@@ -68,21 +81,25 @@ function ClipCard({ clip, stores, onChange, onDeleted }: { clip: Clip; stores?: 
   }
 
   return (
-    <article className="card" aria-label={`Clip ${clip.downloadName}`}>
-      <video
-        controls
-        playsInline
-        preload="metadata"
-        poster={clip.posterAssetId ? `/api/assets/${clip.posterAssetId}/content` : undefined}
-        src={`/api/assets/${clip.videoAssetId}/content`}
-        className={clip.ratio === '1:1' ? 'square' : 'tall'}
-      />
+    <article className="card" aria-label={`${image ? 'Ảnh' : 'Clip'} ${clip.downloadName}`}>
+      {image ? (
+        <img className="output" src={`/api/assets/${clip.videoAssetId}/content`} alt={clip.downloadName} loading="lazy" />
+      ) : (
+        <video
+          controls
+          playsInline
+          preload="metadata"
+          poster={clip.posterAssetId ? `/api/assets/${clip.posterAssetId}/content` : undefined}
+          src={`/api/assets/${clip.videoAssetId}/content`}
+          className={clip.ratio === '1:1' ? 'square' : 'tall'}
+        />
+      )}
       <p>
         <strong>{clip.creator.name}</strong>
         {clip.isMock && <span className="badge">MOCK</span>}
       </p>
       <p className="muted">
-        {fmtTime(clip.createdAt)} · {clip.modelLabel} · {clip.ratio} · {clip.durationSec} giây
+        {fmtTime(clip.createdAt)} · {clip.modelLabel} · {clip.ratio} · {image ? clip.resolution : `${clip.durationSec} giây`}
       </p>
       <p>
         Chi phí thật: ${clip.costUsd}
@@ -109,9 +126,11 @@ function ClipCard({ clip, stores, onChange, onDeleted }: { clip: Clip; stores?: 
         <button type="button" onClick={() => void download()}>
           Tải xuống
         </button>
-        <Link href={`/create?reuse=${clip.id}`} className="button">
-          Dùng lại
-        </Link>
+        {!image && (
+          <Link href={`/create?reuse=${clip.id}`} className="button">
+            Dùng lại
+          </Link>
+        )}
         {clip.canEdit && (
           <>
             <button type="button" aria-pressed={clip.verdict?.verdict === 'pass'} onClick={() => void mark({ verdict: 'pass' })}>
@@ -147,7 +166,7 @@ function ClipCard({ clip, stores, onChange, onDeleted }: { clip: Clip; stores?: 
       )}
       {confirmDelete && (
         <div className="actions" role="alertdialog" aria-label="Xác nhận xóa">
-          <span>Xóa clip này?</span>
+          <span>Xóa {noun} này?</span>
           <button type="button" onClick={() => void remove()}>
             Xác nhận xóa
           </button>
@@ -165,6 +184,7 @@ export function Library() {
   const [creator, setCreator] = useState('');
   const [date, setDate] = useState('');
   const [ratio, setRatio] = useState('');
+  const [kind, setKind] = useState('all');
   const [clips, setClips] = useState<Clip[]>([]);
   const [creators, setCreators] = useState<{ id: string; name: string }[]>([]);
   const [hasMore, setHasMore] = useState(false);
@@ -180,6 +200,7 @@ export function Library() {
       if (creator) q.set('creator', creator);
       if (date) q.set('date', date);
       if (ratio) q.set('ratio', ratio);
+      if (kind !== 'all') q.set('kind', kind);
       if (offset > 0) q.set('offset', String(offset));
       try {
         const r = await api<{ hasMore: boolean; isAdmin: boolean; creators: { id: string; name: string }[]; clips: Clip[] }>(`/api/library?${q}`);
@@ -193,7 +214,7 @@ export function Library() {
         if (ticket === latest.current) setState('error');
       }
     },
-    [creator, date, ratio],
+    [creator, date, ratio, kind],
   );
 
   useEffect(() => {
@@ -208,6 +229,13 @@ export function Library() {
   return (
     <section aria-labelledby="library-title">
       <h1 id="library-title">Thư viện</h1>
+      <div className="kinds" role="group" aria-label="Loại">
+        {KINDS.map((k) => (
+          <button key={k.id} type="button" aria-pressed={kind === k.id} onClick={() => setKind(k.id)}>
+            {k.label}
+          </button>
+        ))}
+      </div>
       <div className="filters" role="search" aria-label="Bộ lọc">
         <label>
           Người tạo

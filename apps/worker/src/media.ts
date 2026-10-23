@@ -14,6 +14,15 @@ export async function probeSize(file: string): Promise<{ width: number; height: 
   return stream;
 }
 
+/** The image type from the file's first bytes (the provider's content type is not trusted), or undefined when it is not a PNG, JPEG or WebP. */
+export function sniffImage(b: Uint8Array): { mime: string; ext: string } | undefined {
+  const at = (i: number, text: string) => [...text].every((c, k) => b[i + k] === c.charCodeAt(0));
+  if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return { mime: 'image/jpeg', ext: 'jpg' };
+  if (b[0] === 0x89 && at(1, 'PNG')) return { mime: 'image/png', ext: 'png' };
+  if (at(0, 'RIFF') && at(8, 'WEBP')) return { mime: 'image/webp', ext: 'webp' };
+  return undefined;
+}
+
 /** Writes the first frame as a JPEG no wider than 480 px. */
 export async function extractPoster(video: string, jpeg: string): Promise<void> {
   await run(requireFfmpeg(), ['-y', '-v', 'error', '-i', video, '-frames:v', '1', '-vf', "scale='min(480,iw)':-2", '-q:v', '3', jpeg]);

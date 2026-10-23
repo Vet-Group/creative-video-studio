@@ -147,7 +147,7 @@ describe('GET /api/library', () => {
     expect(ids.indexOf(a)).toBeLessThan(ids.indexOf(b)); // newest first
     expect(body.clips.find((c) => c.id === a)).toEqual({
       id: a, creator: { id: alice.id, name: 'Nguyễn Văn Đạt' }, createdAt: '2026-10-22T17:30:00.000Z', modelId: 'fal-test', modelLabel: 'Fal test', ratio: '1:1', durationSec: 8,
-      isMock: false, videoAssetId: 'lib-a-video', posterAssetId: 'lib-a-poster', storeId: null, costUsd: '1.6000', costFinal: true, verdict: { verdict: 'fail', fault: 'flicker', markedBy: alice.id },
+      feature: 'video', mediaType: 'video', resolution: null, isMock: false, videoAssetId: 'lib-a-video', posterAssetId: 'lib-a-poster', storeId: null, costUsd: '1.6000', costFinal: true, verdict: { verdict: 'fail', fault: 'flicker', markedBy: alice.id },
       canEdit: false, downloadName: expect.stringMatching(/^20261023-nguyen-van-dat-lib-a\.mp4$/),
     });
     expect(body.clips.find((c) => c.id === b)).toMatchObject({ isMock: true, costFinal: false, verdict: null, canEdit: true }); // bob is the creator
@@ -181,6 +181,91 @@ describe('GET /api/library', () => {
     expect(await page(0)).toMatchObject({ hasMore: true, clips: expect.any(Array) });
     expect((await page(0)).clips).toHaveLength(24);
     expect(await page(24)).toMatchObject({ hasMore: false, clips: [expect.anything()] });
+  });
+});
+
+describe('images in the Library', () => {
+  let seqImage = 0;
+  /** A succeeded image job of the user, with its output image (no poster) and a 0.15 USD ledger total. */
+  async function imageClip(userId: string, o: { id?: string; feature?: string; resolution?: string; ratio?: string; filename?: string; createdAt?: string } = {}): Promise<string> {
+    const id = o.id ?? `img-${++seqImage}-${randomBytes(4).toString('hex')}`;
+    await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, width, height) values ($1, $2, 'output', $3, $4, 'image/png', 10, 64, 64)`, [`${id}-out`, userId, `assets/${id}-out`, o.filename ?? `image-${id.slice(0, 8)}.png`]);
+    await pool.query(
+      `insert into jobs (id, user_id, team_id, feature, model, provider, prompt, aspect, duration_s, params, input_asset_ids, status, output_asset_id, created_at)
+       values ($1, $2, 'team-unassigned', $3, 'nano-banana-pro', 'fal', 'a prompt', $4, 0, $5, '{}', 'succeeded', $6, coalesce($7::timestamptz, now()))`,
+      [id, userId, o.feature ?? 'image', o.ratio ?? '1:1', JSON.stringify({ resolution: o.resolution ?? '2K' }), `${id}-out`, o.createdAt ?? null],
+    );
+    await pool.query(
+      `insert into cost_entries (kind, usd, month, day, user_id, team_id, job_id, is_final)
+       select 'estimate', 0.15, to_char(created_at at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM'), (created_at at time zone 'Asia/Ho_Chi_Minh')::date, user_id, team_id, id, true from jobs where id = $1`,
+      [id],
+    );
+    return id;
+  }
+  const items = async (cookie: string, query = '') => ((await (await GET_LIBRARY(req(`/api/library${query}`, cookie))).json()) as { clips: Record<string, unknown>[] }).clips;
+
+  test('lists an image with its feature, media type, resolution, no poster and a download name that ends in its type', async () => {
+    const id = await imageClip(alice.id, { id: 'img-list-a', createdAt: '2026-10-22T17:30:00Z', ratio: '3:4' });
+    const day = await items(bob.cookie, '?date=2026-10-23');
+    const item = day.find((c) => c.id === id);
+    expect(item).toMatchObject({
+      feature: 'image', mediaType: 'image', resolution: '2K', ratio: '3:4', durationSec: 0, videoAssetId: `${id}-out`, posterAssetId: null, costUsd: '0.1500',
+      downloadName: '20261023-nguyen-van-dat-img-list.png', canEdit: false,
+    });
+    expect(day.find((c) => c.id === 'lib-a')).toMatchObject({ feature: 'video', mediaType: 'video', resolution: null });
+  });
+
+  test('filters by kind: images, videos, one feature, and every app feature', async () => {
+    const v = await clip(alice.id, { id: 'kind-video' });
+    const mk = await clip(alice.id, { id: 'kind-marketing' });
+    await pool.query(`update jobs set feature = 'marketing' where id = $1`, [mk]);
+    const im = await imageClip(alice.id, { id: 'kind-image', feature: 'image' });
+    const to = await imageClip(alice.id, { id: 'kind-tryon', feature: 'try_on' });
+    const rf = await imageClip(alice.id, { id: 'kind-reframe', feature: 'reframe' });
+    const mc = await imageClip(alice.id, { id: 'kind-motion', feature: 'motion_control' });
+    await pool.query(`update assets set mime = 'video/mp4' where id = $1`, [`${mc}-out`]); // an app that outputs a video
+    const kind = async (k: string) => (await items(bob.cookie, `?kind=${k}`)).map((c) => c.id as string).filter((id) => id.startsWith('kind-')).sort();
+    expect(await kind('all')).toEqual([im, mk, mc, rf, to, v].sort());
+    expect(await kind('images')).toEqual([im, rf, to].sort());
+    expect(await kind('videos')).toEqual([mc, mk, v].sort());
+    expect(await kind('try_on')).toEqual([to]);
+    expect(await kind('image')).toEqual([im]);
+    expect(await kind('video')).toEqual([v]);
+    expect(await kind('marketing')).toEqual([mk]);
+    expect(await kind('apps')).toEqual([mc, rf].sort());
+    expect((await items(bob.cookie)).map((c) => c.id)).toEqual(expect.arrayContaining([v, im])); // no kind is all
+    expect((await GET_LIBRARY(req('/api/library?kind=cats', bob.cookie))).status).toBe(400);
+    expect((await GET_LIBRARY(req('/api/library?kind=toString', bob.cookie))).status).toBe(400);
+  });
+
+  test('combines kind with the creator filter', async () => {
+    const mine = await imageClip(bob.id, { id: 'combo-bob' });
+    await imageClip(alice.id, { id: 'combo-alice' });
+    expect((await items(bob.cookie, `?kind=images&creator=${bob.id}`)).map((c) => c.id)).toEqual([mine]);
+  });
+
+  test('lets the creator mark and delete an image, and streams it with its own type', async () => {
+    const id = await imageClip(alice.id, { id: 'img-own-a' });
+    await putObject(`assets/${id}-out`, new Uint8Array(10), 'image/png');
+    expect((await PUT_VERDICT(req(`/api/jobs/${id}/verdict`, alice.cookie, { method: 'PUT', body: JSON.stringify({ verdict: 'pass' }) }), ctx(id))).status).toBe(200);
+    const content = await GET_CONTENT(req(`/api/assets/${id}-out/content`, bob.cookie), ctx(`${id}-out`));
+    expect([content.status, content.headers.get('content-type')]).toEqual([200, 'image/png']);
+    await content.arrayBuffer();
+    const details = await GET_ASSET(req(`/api/assets/${id}-out`, bob.cookie), ctx(`${id}-out`));
+    const download = await GET_DOWNLOAD(req(((await details.json()) as { downloadUrl: string }).downloadUrl, bob.cookie), ctx(`${id}-out`));
+    expect(download.headers.get('content-disposition')).toContain(`attachment; filename="${(await pool.query(`select to_char(created_at at time zone 'Asia/Ho_Chi_Minh', 'YYYYMMDD') as d from jobs where id = $1`, [id])).rows[0].d}-nguyen-van-dat-img-own-.png"`);
+    await download.arrayBuffer();
+    expect((await DELETE_JOB(req(`/api/jobs/${id}`, alice.cookie, { method: 'DELETE' }), ctx(id))).status).toBe(200);
+    expect((await items(bob.cookie, '?kind=images')).map((c) => c.id)).not.toContain(id);
+  });
+
+  test('shows an image job in the tray and in the job detail with its resolution', async () => {
+    const video = await clip(alice.id, { id: 'tray-video' });
+    const id = await imageClip(alice.id, { id: 'img-tray-a', resolution: '4K' });
+    const tray = (await (await GET_MINE(req('/api/jobs?mine', alice.cookie))).json()) as { jobs: Record<string, unknown>[] };
+    expect(tray.jobs.find((j) => j.id === id)).toMatchObject({ feature: 'image', durationSec: 0, resolution: '4K' });
+    expect(tray.jobs.find((j) => j.id === video)).toMatchObject({ feature: 'video', resolution: null });
+    expect(await (await GET_JOB(req(`/api/jobs/${id}`, alice.cookie), ctx(id))).json()).toMatchObject({ feature: 'image', resolution: '4K', durationSec: 0 });
   });
 });
 
@@ -292,7 +377,7 @@ describe('GET /api/jobs/:id', () => {
     const res = await detail(bob.cookie, id);
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
-      id, userId: alice.id, status: 'succeeded', error: null, isMock: false, presetId: 'gentle-push-in', prompt: 'a prompt', ratio: '1:1', durationSec: 8, modelId: 'fal-test',
+      id, userId: alice.id, status: 'succeeded', error: null, isMock: false, feature: 'video', resolution: null, presetId: 'gentle-push-in', prompt: 'a prompt', ratio: '1:1', durationSec: 8, modelId: 'fal-test',
       storeId: 'store-ok', outputAssetId: `${id}-video`, posterAssetId: `${id}-poster`,
       images: [{ id: 'd-in-2', filename: 'in.png', width: null, height: null }, { id: 'd-in-1', filename: 'in.png', width: null, height: null }],
     });
@@ -335,6 +420,15 @@ describe('GET /api/models', () => {
     expect(body.models.map((m) => m.id)).not.toContain('kling-o3-pro'); // disabled
   });
 
+  test('leaves out image models, even enabled ones', async () => {
+    await pool.query(`update model_configs set enabled = true where id = 'nano-banana-pro'`);
+    try {
+      expect((await models(alice.cookie)).models.map((m) => m.id)).not.toContain('nano-banana-pro');
+    } finally {
+      await pool.query(`update model_configs set enabled = false where id = 'nano-banana-pro'`);
+    }
+  });
+
   test('flags models that lack the ratio or duration, and counts every mark, including those of deleted clips', async () => {
     expect((await models(alice.cookie, '?ratio=1:1&durationSec=10')).models.map((m) => [m.id, m.supported])).toEqual([['cheap-test', false], ['fal-test', true], ['mock-sample', false]]);
     const id = await clip(alice.id, { model: 'fal-test' });
@@ -346,7 +440,8 @@ describe('GET /api/models', () => {
   });
 
   test('shows the remaining monthly budget to an Admin only', async () => {
-    const used = (await pool.query(`select coalesce(sum(usd), 0)::text as usd from cost_entries where month = to_char(now() at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM')`)).rows[0].usd;
+    // The video budget: the image and apps features (the images of the Library tests) have their own.
+    const used = (await pool.query(`select coalesce(sum(usd), 0)::text as usd from cost_entries ce where month = to_char(now() at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM') and not exists (select 1 from jobs j where j.id = ce.job_id and j.feature not in ('video', 'marketing'))`)).rows[0].usd;
     const member = await models(alice.cookie);
     expect(member).not.toHaveProperty('remainingBudgetUsd');
     const adminBody = await models(admin.cookie);
