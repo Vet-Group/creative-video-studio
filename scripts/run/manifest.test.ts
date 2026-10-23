@@ -33,6 +33,14 @@ describe('steps', () => {
     expect(d5.soft).toContain('M.7');
   });
 
+  test('the measured UI fixes run in the app worktree after D.1, and the deploy waits for them unless they are skipped', () => {
+    const m7b = STEPS.find((s) => s.id === 'M.7b')!;
+    expect(m7b).toMatchObject({ deps: ['D.1'], worktree: 'app' });
+    const d5 = STEPS.find((s) => s.id === 'D.5')!;
+    expect(d5.deps).toContain('M.7b');
+    expect(d5.soft).toContain('M.7b');
+  });
+
   test('are topologically ordered with known deps', () => {
     const seen = new Set<string>();
     for (const s of STEPS) {
