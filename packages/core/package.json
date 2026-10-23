@@ -7,6 +7,7 @@
     "./providers": "./src/providers/types.ts",
     "./presets": "./src/presets.ts",
     "./ledger": "./src/ledger.ts",
+    "./limits": "./src/limits.ts",
     "./queue": "./src/queue.ts"
   },
   "scripts": {

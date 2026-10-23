@@ -11,6 +11,8 @@ process.env.APP_URL = 'http://localhost';
 const { auth, pool } = await import('@/lib/auth');
 const { stopBoss } = await import('@/lib/queue');
 const { POST } = await import('./route');
+const { GET } = await import('../stores/route');
+const { settle } = await import('@cvs/core/ledger');
 
 const PASSWORD = 'correct-horse-battery';
 
@@ -146,5 +148,235 @@ describe('POST /api/jobs', () => {
   test('answers 400 for a body that is not JSON', async () => {
     const res = await POST(new Request('http://localhost/api/jobs', { method: 'POST', body: 'hello', headers: { cookie: ownerCookie } }));
     expect(res.status).toBe(400);
+  });
+});
+
+let memberSeq = 0;
+/** A fresh user with one input asset, so each cap test has its own daily count. */
+async function newMember(teamId?: string, role = 'member') {
+  const email = `m${++memberSeq}@example.test`;
+  const { user } = await auth.api.createUser({ body: { email, name: email, password: PASSWORD, role: role as 'member', ...(teamId ? { data: { teamId } } : {}) } });
+  await insertAsset(`${user.id}-asset`, user.id);
+  return { id: user.id, asset: `${user.id}-asset`, cookie: await signIn(email) };
+}
+type Member = Awaited<ReturnType<typeof newMember>>;
+const runAs = (m: Member, extra: Record<string, unknown> = {}) => run(m.cookie, { ...base, assetIds: [m.asset], ...extra });
+
+/** Jobs created today by the user, as if earlier Runs had finished; they take daily slots only. */
+async function seedJobs(userId: string, n: number, status = 'succeeded', extra: { teamId?: string; storeId?: string | null; assets?: string[] } = {}): Promise<string[]> {
+  const ids: string[] = [];
+  for (let i = 0; i < n; i++) {
+    const id = `seed-${userId}-${status}-${i}`;
+    ids.push(id);
+    await pool.query(
+      `insert into jobs (id, user_id, team_id, store_id, model, provider, prompt, aspect, duration_s, input_asset_ids, status) values ($1, $2, $3, $4, 'fal-test', 'fal', 'p', '9:16', 5, $6, $5)`,
+      [id, userId, extra.teamId ?? 'team-unassigned', extra.storeId ?? null, status, extra.assets ?? []],
+    );
+  }
+  return ids;
+}
+const sentCount = async (userId: string) => (await pool.query(`select count(*)::int as n from pgboss.job where name = 'video' and group_id = $1`, [userId])).rows[0].n as number;
+const dayFull = 'Bạn đã dùng hết số clip trong ngày hôm nay';
+
+describe('the daily clip cap', () => {
+  test('lets exactly one of two parallel Runs take the last slot, and sends nothing for the other', async () => {
+    const m = await newMember();
+    await seedJobs(m.id, 4);
+    const results = await Promise.all([runAs(m), runAs(m)]);
+    expect(results.map((r) => r.status).sort()).toEqual([201, 429]);
+    const refused = results.find((r) => r.status === 429)!;
+    expect(await refused.json()).toEqual({ error: dayFull });
+    expect((await pool.query('select count(*)::int as n from jobs where user_id = $1', [m.id])).rows[0].n).toBe(5);
+    expect(await sentCount(m.id)).toBe(1); // the queue, and so the provider adapter, was never reached for the refused Run
+  });
+
+  test('accepts at most 5 of 10 simultaneous Runs from one Member', async () => {
+    const m = await newMember();
+    const results = await Promise.all(Array.from({ length: 10 }, () => runAs(m)));
+    expect(results.filter((r) => r.status === 201)).toHaveLength(5);
+    expect(results.filter((r) => r.status === 429)).toHaveLength(5);
+    expect(await sentCount(m.id)).toBe(5);
+    expect((await pool.query(`select count(*)::int as n from cost_entries where user_id = $1 and kind = 'estimate'`, [m.id])).rows[0].n).toBe(5);
+  });
+
+  test('gives the slot back after an unbilled failure, but not after a billed one or a timeout', async () => {
+    const m = await newMember();
+    await seedJobs(m.id, 3);
+    await seedJobs(m.id, 1, 'timed_out');
+    const first = (await (await runAs(m)).json()) as { id: string };
+    expect((await runAs(m)).status).toBe(429); // 5 today, one of them timed_out
+
+    await pool.query(`update jobs set status = 'running' where id = $1`, [first.id]);
+    expect(await settle(pool, first.id, { status: 'failed', costUsd: 0, error: 'rejected' })).toBe(true); // failed + release => total 0
+    expect((await pool.query('select usd::text from job_costs where job_id = $1', [first.id])).rows).toEqual([{ usd: '0.0000' }]);
+    const second = (await (await runAs(m)).json()) as { id: string };
+    expect(second.id).toBeTruthy();
+
+    await pool.query(`update jobs set status = 'running' where id = $1`, [second.id]);
+    expect(await settle(pool, second.id, { status: 'failed', costUsd: '0.7000', error: 'crashed late', billed: true })).toBe(true);
+    expect((await runAs(m)).status).toBe(429); // a failure the provider billed keeps its slot
+  });
+});
+
+describe('the monthly USD cap', () => {
+  const monthUsd = async () => (await pool.query(`select coalesce(sum(usd), 0)::text as usd from cost_entries where month = to_char(now() at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM')`)).rows[0].usd as string;
+  const setCap = (usd: string) => pool.query('update settings set monthly_cap_usd = $1', [usd]);
+
+  test('refuses a Run whose estimate would pass the cap, counting the reservation of a running job, and a mock job still passes', async () => {
+    const m = await newMember();
+    const used = Number(await monthUsd());
+    try {
+      await setCap((used + 1).toFixed(4)); // room for exactly one 1.0000 estimate
+      const first = (await (await runAs(m)).json()) as { id: string };
+      await pool.query(`update jobs set status = 'running' where id = $1`, [first.id]);
+      const sentBefore = await sentCount(m.id);
+      const refused = await runAs(m);
+      expect(refused.status).toBe(429);
+      expect(await refused.json()).toEqual({ error: 'Đã hết ngân sách tháng của công ty' });
+      expect(await sentCount(m.id)).toBe(sentBefore);
+      expect((await pool.query('select count(*)::int as n from jobs where user_id = $1', [m.id])).rows[0].n).toBe(1);
+
+      expect((await runAs(m, { modelId: 'mock-sample' })).status).toBe(201); // a mock job books 0 USD
+      expect(Number(await monthUsd())).toBeCloseTo(used + 1, 4);
+    } finally {
+      await setCap('200');
+    }
+  });
+});
+
+describe('the monthly USD cap under contention', () => {
+  test('lets exactly one of two parallel Runs take the last dollars of the month', async () => {
+    const m = await newMember();
+    const used = Number((await pool.query(`select coalesce(sum(usd), 0)::text as usd from cost_entries where month = to_char(now() at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM')`)).rows[0].usd);
+    await pool.query('update settings set monthly_cap_usd = $1', [(used + 1).toFixed(4)]); // room for exactly one 1.0000 estimate
+    try {
+      const results = await Promise.all([runAs(m), runAs(m)]);
+      expect(results.map((r) => r.status).sort()).toEqual([201, 429]);
+      expect(await sentCount(m.id)).toBe(1);
+      expect((await pool.query(`select count(*)::int as n from cost_entries where user_id = $1 and kind = 'estimate'`, [m.id])).rows[0].n).toBe(1);
+    } finally {
+      await pool.query('update settings set monthly_cap_usd = 200');
+    }
+  });
+});
+
+describe('POST /api/jobs with retryOf', () => {
+  test('refuses a job that is not failed, unknown, or not the caller own', async () => {
+    const m = await newMember();
+    const other = await newMember();
+    const [running] = await seedJobs(m.id, 1, 'running');
+    const [ok] = await seedJobs(m.id, 1, 'failed');
+    expect((await runAs(m, { retryOf: running })).status).toBe(409);
+    expect((await runAs(m, { retryOf: 'nope' })).status).toBe(404);
+    expect((await runAs(other, { retryOf: ok })).status).toBe(403);
+    expect((await runAs(m, { retryOf: 5 })).status).toBe(400);
+    expect((await pool.query('select count(*)::int as n from jobs where retry_of is not null and user_id = any($1)', [[m.id, other.id]])).rows[0].n).toBe(0);
+  });
+
+  test.each(['failed', 'timed_out', 'failed_unknown'])('retries a %s job once, and refuses a second retry and a retry of the retry', async (status) => {
+    const m = await newMember();
+    const [original] = await seedJobs(m.id, 1, status);
+    const res = await runAs(m, { retryOf: original });
+    expect(res.status).toBe(201);
+    const { id } = (await res.json()) as { id: string };
+    expect((await pool.query('select retry_of from jobs where id = $1', [id])).rows[0].retry_of).toBe(original);
+
+    expect((await runAs(m, { retryOf: original })).status).toBe(409); // a second retry of the same job
+    await pool.query(`update jobs set status = 'failed' where id = $1`, [id]);
+    expect((await runAs(m, { retryOf: id })).status).toBe(409); // a retry of a retry
+    expect((await pool.query('select count(*)::int as n from jobs where retry_of is not null and user_id = $1', [m.id])).rows[0].n).toBe(1);
+  });
+
+  test('two parallel retries of one job book only one', async () => {
+    const m = await newMember();
+    const [original] = await seedJobs(m.id, 1, 'failed');
+    const results = await Promise.all([runAs(m, { retryOf: original }), runAs(m, { retryOf: original })]);
+    expect(results.map((r) => r.status).sort()).toEqual([201, 409]);
+  });
+
+  test('inherits the team and store of the original even after the user changes team, and ignores the store in the body', async () => {
+    const m = await newMember('team-b');
+    const [original] = await seedJobs(m.id, 1, 'failed', { teamId: 'team-b', storeId: 'store-ok' });
+    await pool.query(`update stores set hidden = true where id = 'store-ok'`); // hidden since, still inherited
+    await pool.query(`update users set team_id = 'team-unassigned' where id = $1`, [m.id]);
+    try {
+      const res = await runAs(m, { retryOf: original, storeId: 'store-hidden' });
+      expect(res.status).toBe(201);
+      const { id } = (await res.json()) as { id: string };
+      expect((await pool.query('select team_id, store_id from jobs where id = $1', [id])).rows[0]).toEqual({ team_id: 'team-b', store_id: 'store-ok' });
+      expect((await pool.query(`select team_id, store_id from cost_entries where job_id = $1`, [id])).rows).toEqual([{ team_id: 'team-b', store_id: 'store-ok' }]);
+    } finally {
+      await pool.query(`update stores set hidden = false where id = 'store-ok'`);
+    }
+  });
+
+  test('refuses an Admin who is not the owner: only the owner may retry', async () => {
+    const m = await newMember('team-b');
+    const admin = await newMember(undefined, 'admin');
+    const [original] = await seedJobs(m.id, 1, 'failed', { teamId: 'team-b' });
+    expect((await runAs(admin, { retryOf: original })).status).toBe(403);
+    expect((await pool.query('select count(*)::int as n from jobs where retry_of = $1', [original])).rows[0].n).toBe(0);
+  });
+
+  test('takes the inputs, model, preset, prompt, ratio and duration from the original and ignores those in the body', async () => {
+    const m = await newMember();
+    const [original] = await seedJobs(m.id, 1, 'failed', { assets: [m.asset] });
+    const res = await run(m.cookie, { retryOf: original, assetIds: ['theirs-1'], modelId: 'mock-sample', presetId: 'nope', ratio: '1:1', durationSec: 10 });
+    expect(res.status).toBe(201);
+    const { id } = (await res.json()) as { id: string };
+    expect((await pool.query('select model, provider, is_mock, prompt, aspect, duration_s, input_asset_ids from jobs where id = $1', [id])).rows[0]).toEqual({
+      model: 'fal-test', provider: 'fal', is_mock: false, prompt: 'p', aspect: '9:16', duration_s: 5, input_asset_ids: [m.asset],
+    });
+    expect((await pool.query(`select usd::text from cost_entries where job_id = $1`, [id])).rows).toEqual([{ usd: '1.0000' }]);
+  });
+
+  test('books the estimate at the current price of the model', async () => {
+    const m = await newMember();
+    const [original] = await seedJobs(m.id, 1, 'failed', { assets: [m.asset] });
+    await pool.query(`update model_configs set usd_per_second = 0.5 where id = 'fal-test'`);
+    try {
+      const { id } = (await (await run(m.cookie, { retryOf: original })).json()) as { id: string };
+      expect((await pool.query(`select usd::text from cost_entries where job_id = $1`, [id])).rows).toEqual([{ usd: '2.5000' }]);
+    } finally {
+      await pool.query(`update model_configs set usd_per_second = 0.2 where id = 'fal-test'`);
+    }
+  });
+
+  test('refuses a retry whose model is disabled since or whose input asset was deleted', async () => {
+    const m = await newMember();
+    const [original] = await seedJobs(m.id, 1, 'failed', { assets: [m.asset] });
+    await pool.query(`update model_configs set enabled = false where id = 'fal-test'`);
+    try {
+      expect((await run(m.cookie, { retryOf: original })).status).toBe(400);
+    } finally {
+      await pool.query(`update model_configs set enabled = true where id = 'fal-test'`);
+    }
+    await pool.query(`update assets set deleted_at = now() where id = $1`, [m.asset]);
+    expect((await run(m.cookie, { retryOf: original })).status).toBe(400);
+    expect((await pool.query('select count(*)::int as n from jobs where retry_of = $1', [original])).rows[0].n).toBe(0);
+  });
+});
+
+describe('moving a user to another team', () => {
+  test('leaves the earlier jobs and their ledger rows on the old team', async () => {
+    const m = await newMember('team-b');
+    const first = (await (await runAs(m)).json()) as { id: string };
+    await pool.query(`update users set team_id = 'team-unassigned' where id = $1`, [m.id]);
+    const second = (await (await runAs(m)).json()) as { id: string };
+    const teams = async (jobId: string) => (await pool.query(`select team_id from jobs where id = $1 union all select team_id from cost_entries where job_id = $1`, [jobId])).rows.map((r) => r.team_id);
+    expect(await teams(first.id)).toEqual(['team-b', 'team-b']);
+    expect(await teams(second.id)).toEqual(['team-unassigned', 'team-unassigned']);
+  });
+});
+
+describe('GET /api/stores', () => {
+  test('rejects a request without a session', async () => {
+    expect((await GET(new Request('http://localhost/api/stores'))).status).toBe(401);
+  });
+
+  test('lists the visible stores and leaves out a hidden one', async () => {
+    const res = await GET(new Request('http://localhost/api/stores', { headers: { cookie: ownerCookie } }));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ stores: [{ id: 'store-ok', name: 'Store', code: 'S1' }] });
   });
 });
