@@ -2,7 +2,7 @@
 import { describe, expect, test } from 'vitest';
 import { BAKEOFF_MODELS } from '../models';
 import { createFalProvider } from './fal';
-import { ProviderHttpError } from './http';
+import { isFundingRefusal, ProviderHttpError, unpackJobId } from './http';
 import { createMockVideoProvider, MOCK_FAIL } from './mock';
 import { createReplicateProvider } from './replicate';
 import type { ProviderJob, SubmitRequest } from './types';
@@ -10,13 +10,19 @@ import type { ProviderJob, SubmitRequest } from './types';
 const [kling, seedance] = BAKEOFF_MODELS as [(typeof BAKEOFF_MODELS)[0], (typeof BAKEOFF_MODELS)[0]];
 const base: Omit<SubmitRequest, 'model'> = { prompt: 'a bottle on a table', imageUrls: ['https://img/1.jpg', 'https://img/2.jpg'], ratio: '9:16', durationSec: 5 };
 
-type Call = { url: string; method: string; headers: Record<string, string>; body: unknown };
+type Call = { url: string; method: string; headers: Record<string, string>; body: unknown; signal?: AbortSignal | null };
+
+const readImage = async (url: string) => {
+  if (url.includes('missing')) throw new Error('asset not found');
+  return { bytes: new Uint8Array([1, 2, 3]), contentType: 'image/png' };
+};
+const DATA_URL = 'data:image/png;base64,AQID';
 
 /** A fetch that records every call and answers from a queue of [status, json] fixtures. */
 function fakeFetch(...answers: [number, unknown][]) {
   const calls: Call[] = [];
   const fn = (async (url: string, init: RequestInit = {}) => {
-    calls.push({ url, method: init.method ?? 'GET', headers: init.headers as Record<string, string>, body: init.body ? JSON.parse(init.body as string) : undefined });
+    calls.push({ url, method: init.method ?? 'GET', headers: init.headers as Record<string, string>, body: init.body ? JSON.parse(init.body as string) : undefined, signal: init.signal });
     const [status, json] = answers.shift() ?? [500, {}];
     return new Response(JSON.stringify(json), { status });
   }) as unknown as typeof fetch;
@@ -86,6 +92,48 @@ describe('fal', () => {
     expect(s).toMatchObject({ costUsd: 0.896, costSource: 'estimate' });
   });
 
+  test('COMPLETED but a 4xx on the result is a failed job, not a thrown poll error', async () => {
+    const { fn } = fakeFetch([200, { status: 'COMPLETED' }], [422, { detail: 'bad output' }]);
+    const s = await createFalProvider({ apiKey: 'k', fetch: fn }).status(job);
+    expect(s).toMatchObject({ state: 'failed', costUsd: 0.56, costSource: 'estimate' });
+    expect((s as { error: string }).error).toContain('422');
+  });
+
+  test('a 5xx on the result still throws so the poll is retried', async () => {
+    const { fn } = fakeFetch([200, { status: 'COMPLETED' }], [503, {}]);
+    await expect(createFalProvider({ apiKey: 'k', fetch: fn }).status(job)).rejects.toBeInstanceOf(ProviderHttpError);
+  });
+
+  test('status and result requests carry a timeout signal', async () => {
+    const { fn, calls } = fakeFetch([200, { status: 'COMPLETED' }], [200, { video: { url: 'u' } }]);
+    await createFalProvider({ apiKey: 'k', fetch: fn }).status(job);
+    expect(calls.map((c) => c.signal instanceof AbortSignal)).toEqual([true, true]);
+  });
+
+  test('uploads non-https images before submit and sends the uploaded form', async () => {
+    const { fn, calls } = fakeFetch([200, { request_id: 'req-1' }]);
+    await createFalProvider({ apiKey: 'k', fetch: fn, readImage }).submit({ ...req, imageUrls: ['asset://a1', 'https://img/2.jpg'] });
+    expect(calls).toHaveLength(1);
+    expect((calls[0]!.body as { image_urls: string[] }).image_urls).toEqual([DATA_URL, 'https://img/2.jpg']);
+  });
+
+  test('a failed image read submits nothing, and a non-https URL without a resolver throws before any call', async () => {
+    const { fn, calls } = fakeFetch([200, { request_id: 'req-1' }]);
+    await expect(createFalProvider({ apiKey: 'k', fetch: fn, readImage }).submit({ ...req, imageUrls: ['asset://missing'] })).rejects.toThrow('asset not found');
+    await expect(createFalProvider({ apiKey: 'k', fetch: fn }).submit({ ...req, imageUrls: ['asset://a1'] })).rejects.toThrow('readImage');
+    expect(calls).toHaveLength(0);
+  });
+
+  test.each([
+    ['402', 402, { detail: 'Payment required' }],
+    ['403 exhausted balance', 403, { detail: 'User is locked. Reason: Exhausted balance.' }],
+  ])('a %s refusal is a funding refusal', async (_n, status, body) => {
+    const { fn } = fakeFetch([status, body]);
+    const err = await createFalProvider({ apiKey: 'k', fetch: fn }).submit(req).catch((e) => e);
+    expect(isFundingRefusal(err)).toBe(true);
+    expect(err.body).toContain(JSON.stringify(body));
+  });
+
   test('cancel is unsupported and makes no network call', async () => {
     const { fn, calls } = fakeFetch();
     expect(await createFalProvider({ apiKey: 'k', fetch: fn }).cancel(job)).toEqual({ supported: false });
@@ -147,12 +195,61 @@ describe('replicate', () => {
     expect(await createReplicateProvider({ apiToken: 't', fetch: f2.fn }).status(job)).toEqual({ state: 'canceled', error: 'canceled', costUsd: 1.156, costSource: 'estimate' });
   });
 
+  test('status and cancel requests carry a timeout signal', async () => {
+    const { fn, calls } = fakeFetch([200, { status: 'processing' }], [200, {}]);
+    const p = createReplicateProvider({ apiToken: 't', fetch: fn });
+    await p.status(job);
+    await p.cancel(job);
+    expect(calls.map((c) => c.signal instanceof AbortSignal)).toEqual([true, true]);
+  });
+
+  test('uploads non-https images before submit and sends the uploaded form', async () => {
+    const { fn, calls } = fakeFetch([201, { id: 'pred-1' }]);
+    await createReplicateProvider({ apiToken: 't', fetch: fn, readImage }).submit({ ...req, imageUrls: ['asset://a1', 'https://img/2.jpg'] });
+    expect(calls).toHaveLength(1);
+    expect((calls[0]!.body as { input: { reference_images: string[] } }).input.reference_images).toEqual([DATA_URL, 'https://img/2.jpg']);
+  });
+
+  test('a failed image read submits nothing, and a non-https URL without a resolver throws before any call', async () => {
+    const { fn, calls } = fakeFetch([201, { id: 'pred-1' }]);
+    await expect(createReplicateProvider({ apiToken: 't', fetch: fn, readImage }).submit({ ...req, imageUrls: ['asset://missing'] })).rejects.toThrow('asset not found');
+    await expect(createReplicateProvider({ apiToken: 't', fetch: fn }).submit({ ...req, imageUrls: ['asset://a1'] })).rejects.toThrow('readImage');
+    expect(calls).toHaveLength(0);
+  });
+
+  test.each([
+    ['402', 402, { detail: 'Payment required' }],
+    ['403 exhausted balance', 403, { detail: 'Your account has insufficient credit; set up billing' }],
+  ])('a %s refusal is a funding refusal', async (_n, status, body) => {
+    const { fn } = fakeFetch([status, body]);
+    const err = await createReplicateProvider({ apiToken: 't', fetch: fn }).submit(req).catch((e) => e);
+    expect(isFundingRefusal(err)).toBe(true);
+    expect(err.body).toContain(JSON.stringify(body));
+  });
+
   test('cancel posts to the cancel endpoint', async () => {
     const { fn, calls } = fakeFetch([200, { status: 'canceled' }]);
     expect(await createReplicateProvider({ apiToken: 't', fetch: fn }).cancel(job)).toEqual({ supported: true });
     expect(calls[0]!.url).toBe('https://api.replicate.com/v1/predictions/pred-1/cancel');
     expect(calls[0]!.method).toBe('POST');
     expect(calls[0]!.headers['User-Agent']).toBeTruthy();
+  });
+});
+
+describe('shared helpers', () => {
+  test('other refusals are not funding refusals', () => {
+    expect(isFundingRefusal(new ProviderHttpError(403, 'forbidden', 'x'))).toBe(false);
+    expect(isFundingRefusal(new ProviderHttpError(422, 'invalid duration', 'x'))).toBe(false);
+    expect(isFundingRefusal(new ProviderHttpError(500, 'credit service down', 'x'))).toBe(false);
+    expect(isFundingRefusal(new Error('balance'))).toBe(false);
+  });
+
+  test.each(['abc', ':abc', '0:abc', '-5:abc', '5.5:abc', '5:', 'abc:5'])('unpackJobId rejects "%s" instead of costing $0', (providerJobId) => {
+    expect(() => unpackJobId({ providerJobId, model: kling })).toThrow('duration');
+  });
+
+  test('unpackJobId keeps colons inside the provider id', () => {
+    expect(unpackJobId({ providerJobId: '8:a:b', model: kling })).toEqual({ durationSec: 8, id: 'a:b' });
   });
 });
 
