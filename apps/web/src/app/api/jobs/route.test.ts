@@ -163,14 +163,14 @@ type Member = Awaited<ReturnType<typeof newMember>>;
 const runAs = (m: Member, extra: Record<string, unknown> = {}) => run(m.cookie, { ...base, assetIds: [m.asset], ...extra });
 
 /** Jobs created today by the user, as if earlier Runs had finished; they take daily slots only. */
-async function seedJobs(userId: string, n: number, status = 'succeeded', extra: { teamId?: string; storeId?: string | null } = {}): Promise<string[]> {
+async function seedJobs(userId: string, n: number, status = 'succeeded', extra: { teamId?: string; storeId?: string | null; assets?: string[] } = {}): Promise<string[]> {
   const ids: string[] = [];
   for (let i = 0; i < n; i++) {
     const id = `seed-${userId}-${status}-${i}`;
     ids.push(id);
     await pool.query(
-      `insert into jobs (id, user_id, team_id, store_id, model, provider, prompt, aspect, duration_s, input_asset_ids, status) values ($1, $2, $3, $4, 'fal-test', 'fal', 'p', '9:16', 5, '{}', $5)`,
-      [id, userId, extra.teamId ?? 'team-unassigned', extra.storeId ?? null, status],
+      `insert into jobs (id, user_id, team_id, store_id, model, provider, prompt, aspect, duration_s, input_asset_ids, status) values ($1, $2, $3, $4, 'fal-test', 'fal', 'p', '9:16', 5, $6, $5)`,
+      [id, userId, extra.teamId ?? 'team-unassigned', extra.storeId ?? null, status, extra.assets ?? []],
     );
   }
   return ids;
@@ -244,6 +244,22 @@ describe('the monthly USD cap', () => {
   });
 });
 
+describe('the monthly USD cap under contention', () => {
+  test('lets exactly one of two parallel Runs take the last dollars of the month', async () => {
+    const m = await newMember();
+    const used = Number((await pool.query(`select coalesce(sum(usd), 0)::text as usd from cost_entries where month = to_char(now() at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM')`)).rows[0].usd);
+    await pool.query('update settings set monthly_cap_usd = $1', [(used + 1).toFixed(4)]); // room for exactly one 1.0000 estimate
+    try {
+      const results = await Promise.all([runAs(m), runAs(m)]);
+      expect(results.map((r) => r.status).sort()).toEqual([201, 429]);
+      expect(await sentCount(m.id)).toBe(1);
+      expect((await pool.query(`select count(*)::int as n from cost_entries where user_id = $1 and kind = 'estimate'`, [m.id])).rows[0].n).toBe(1);
+    } finally {
+      await pool.query('update settings set monthly_cap_usd = 200');
+    }
+  });
+});
+
 describe('POST /api/jobs with retryOf', () => {
   test('refuses a job that is not failed, unknown, or not the caller own', async () => {
     const m = await newMember();
@@ -294,14 +310,50 @@ describe('POST /api/jobs with retryOf', () => {
     }
   });
 
-  test('lets an Admin retry a Member job', async () => {
+  test('refuses an Admin who is not the owner: only the owner may retry', async () => {
     const m = await newMember('team-b');
     const admin = await newMember(undefined, 'admin');
     const [original] = await seedJobs(m.id, 1, 'failed', { teamId: 'team-b' });
-    const res = await runAs(admin, { retryOf: original });
+    expect((await runAs(admin, { retryOf: original })).status).toBe(403);
+    expect((await pool.query('select count(*)::int as n from jobs where retry_of = $1', [original])).rows[0].n).toBe(0);
+  });
+
+  test('takes the inputs, model, preset, prompt, ratio and duration from the original and ignores those in the body', async () => {
+    const m = await newMember();
+    const [original] = await seedJobs(m.id, 1, 'failed', { assets: [m.asset] });
+    const res = await run(m.cookie, { retryOf: original, assetIds: ['theirs-1'], modelId: 'mock-sample', presetId: 'nope', ratio: '1:1', durationSec: 10 });
     expect(res.status).toBe(201);
     const { id } = (await res.json()) as { id: string };
-    expect((await pool.query('select user_id, team_id from jobs where id = $1', [id])).rows[0]).toEqual({ user_id: admin.id, team_id: 'team-b' });
+    expect((await pool.query('select model, provider, is_mock, prompt, aspect, duration_s, input_asset_ids from jobs where id = $1', [id])).rows[0]).toEqual({
+      model: 'fal-test', provider: 'fal', is_mock: false, prompt: 'p', aspect: '9:16', duration_s: 5, input_asset_ids: [m.asset],
+    });
+    expect((await pool.query(`select usd::text from cost_entries where job_id = $1`, [id])).rows).toEqual([{ usd: '1.0000' }]);
+  });
+
+  test('books the estimate at the current price of the model', async () => {
+    const m = await newMember();
+    const [original] = await seedJobs(m.id, 1, 'failed', { assets: [m.asset] });
+    await pool.query(`update model_configs set usd_per_second = 0.5 where id = 'fal-test'`);
+    try {
+      const { id } = (await (await run(m.cookie, { retryOf: original })).json()) as { id: string };
+      expect((await pool.query(`select usd::text from cost_entries where job_id = $1`, [id])).rows).toEqual([{ usd: '2.5000' }]);
+    } finally {
+      await pool.query(`update model_configs set usd_per_second = 0.2 where id = 'fal-test'`);
+    }
+  });
+
+  test('refuses a retry whose model is disabled since or whose input asset was deleted', async () => {
+    const m = await newMember();
+    const [original] = await seedJobs(m.id, 1, 'failed', { assets: [m.asset] });
+    await pool.query(`update model_configs set enabled = false where id = 'fal-test'`);
+    try {
+      expect((await run(m.cookie, { retryOf: original })).status).toBe(400);
+    } finally {
+      await pool.query(`update model_configs set enabled = true where id = 'fal-test'`);
+    }
+    await pool.query(`update assets set deleted_at = now() where id = $1`, [m.asset]);
+    expect((await run(m.cookie, { retryOf: original })).status).toBe(400);
+    expect((await pool.query('select count(*)::int as n from jobs where retry_of = $1', [original])).rows[0].n).toBe(0);
   });
 });
 

@@ -88,10 +88,12 @@ describe('monthly USD (ICT month)', () => {
     expect(await checkCaps(pool, u, '0.5000', at('2027-03-20T00:00:00Z'))).toBeNull();
   });
 
-  test('the month ends at 00:00 ICT: spend of March does not count in April', async () => {
+  test('the month ends at 00:00 ICT: spend of August does not count in September', async () => {
+    await setCaps('200');
     const u = await member();
-    expect(await checkCaps(pool, u, '1.0000', at('2027-03-31T16:59:59Z'))).toBe('monthly_usd'); // 23:59:59 ICT on 2027-03-31
-    expect(await checkCaps(pool, u, '1.0000', at('2027-03-31T17:00:00Z'))).toBeNull(); // 00:00 ICT on 2027-04-01
+    await newJob(u, '2027-08-15T05:00:00Z', { estimate: '199.5000', status: 'running' }); // its own reserve, in its own month
+    expect(await checkCaps(pool, u, '1.0000', at('2027-08-31T16:59:59Z'))).toBe('monthly_usd'); // 23:59:59 ICT on 2027-08-31
+    expect(await checkCaps(pool, u, '1.0000', at('2027-08-31T17:00:00Z'))).toBeNull(); // 00:00 ICT on 2027-09-01
   });
 
   test('a late bill written next month stays in the month of the Run', async () => {
