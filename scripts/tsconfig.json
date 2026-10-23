@@ -1,7 +1,7 @@
 {
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
-    // These scripts run directly under Node's type stripping, so imports carry .ts and no TS-only syntax is allowed.
+    // preflight and run/ run under Node's type stripping and bakeoff/ under tsx (it imports @cvs/core sources), so imports carry .ts and no TS-only syntax is allowed.
     "allowImportingTsExtensions": true,
     "erasableSyntaxOnly": true
   },

@@ -1,10 +1,10 @@
 // anonymise, metrics and judge on tiny clips made with the pinned ffmpeg-static, in temp dirs. No provider is involved.
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { BAKEOFF_MODELS } from '@cvs/core/models';
 import { beforeAll, describe, expect, test } from 'vitest';
-import { anonymise, FRAMES } from './anonymise.ts';
+import { anonymise, FRAMES, shuffle } from './anonymise.ts';
 import { ffmpeg } from './common.ts';
 import type { Inputs } from './inputs.ts';
 import { appendLine, type JobLine } from './jobs.ts';
@@ -17,9 +17,15 @@ const work = mkdtempSync(join(tmpdir(), 'cvs-bakeoff-judging-'));
 const steady = join(work, 'steady.mp4');
 const flicker = join(work, 'flicker.mp4');
 
-/** 2 s at 10 fps and 64x112; the title tag stands in for provider metadata that anonymise must strip. */
-const makeClip = (file: string, vf?: string) =>
-  ffmpeg(['-y', '-v', 'error', '-f', 'lavfi', '-i', 'color=c=0x808080:s=64x112:r=10:d=2', ...(vf ? ['-vf', vf] : []), '-metadata', 'title=kling-secret', '-pix_fmt', 'yuv420p', file]);
+/** 2 s at 10 fps and 64x112 by default; the container and stream tags stand in for provider metadata that anonymise must strip. */
+const makeClip = (file: string, vf?: string, o: { size?: string; rate?: number; secs?: number } = {}) =>
+  ffmpeg([
+    '-y', '-v', 'error', '-f', 'lavfi', '-i', `color=c=0x808080:s=${o.size ?? '64x112'}:r=${o.rate ?? 10}:d=${o.secs ?? 2}`, ...(vf ? ['-vf', vf] : []),
+    '-metadata', 'title=kling-secret', '-metadata:s:v:0', 'handler_name=kling-secret', '-pix_fmt', 'yuv420p', file,
+  ]);
+
+/** What ffmpeg prints for a file: stream size and frame rate, and the frame count from decoding it to nothing. */
+const probe = async (file: string) => (await ffmpeg(['-i', file, '-f', 'null', '-'])).stderr;
 
 beforeAll(async () => {
   await makeClip(steady);
@@ -91,7 +97,7 @@ describe('anonymise, metrics and judge on a set', () => {
 
   test('anonymise copies only the set\'s succeeded clips, strips metadata, scales to 720 wide, and keeps the map outside', async () => {
     let n = 0;
-    const map = await anonymise({ root, set: 'half-1', mapPath, inputs, inputsDir, newId: () => `clip-${String(++n).padStart(4, '0')}` });
+    const map = await anonymise({ root, set: 'half-1', mapPath, inputs, inputsDir, durationSec: 1, newId: () => `clip-${String(++n).padStart(4, '0')}` });
     expect(Object.keys(map.clips)).toEqual(['clip-0001', 'clip-0002', 'clip-0003']);
     expect(Object.values(map.clips).map((c) => `${c.model}/${c.image}`).sort()).toEqual([`${KLING}/1`, `${KLING}/2`, `${SEEDANCE}/1`].sort());
     expect(JSON.parse(readFileSync(mapPath, 'utf8'))).toEqual(map);
@@ -101,13 +107,11 @@ describe('anonymise, metrics and judge on a set', () => {
     const dir = join(set, 'clip-0001');
     expect(readdirSync(dir).sort()).toEqual(['clip.mp4', ...Array.from({ length: FRAMES }, (_, i) => `frame-${i + 1}.jpg`), 'source.jpg'].sort());
     expect(readFileSync(join(dir, 'source.jpg'), 'utf8')).toBe(`source of img${map.clips['clip-0001']!.image}.jpg`);
-    // The source title tag is gone, and nothing under blind/ names a model or a source file.
+    // The container title and the stream handler_name tags are gone, and nothing under blind/ names a model or a source file.
     expect(readFileSync(join(dir, 'clip.mp4')).includes('kling-secret')).toBe(false);
     const all = readdirSync(set, { recursive: true }).join('\n');
     expect(all).not.toMatch(/kling|seedance|c\d\.mp4|bakeoff/i);
-    const { stderr } = await ffmpeg(['-i', join(dir, 'clip.mp4'), '-f', 'null', '-']);
-    // The 64x112 test clip keeps its 4:7 shape at 720 wide.
-    expect(stderr).toMatch(/Stream #0:0.*, 720x1260/);
+    expect(await probe(join(dir, 'clip.mp4'))).toMatch(/Stream #0:0.*, 720x1280/);
 
     // A second run would orphan the map, so it refuses; so does a map inside cvs-bakeoff.
     await expect(anonymise({ root, set: 'half-1', mapPath, inputs, inputsDir })).rejects.toThrow(/already holds clips/);
@@ -120,7 +124,10 @@ describe('anonymise, metrics and judge on a set', () => {
     writeFileSync(calibrated, readFileSync(RUBRIC, 'utf8').replace('- flicker_mean_max:', '- flicker_mean_max: 0.5'));
     const rows = await metricsForSet(root, 'half-1', calibrated);
     expect(rows.map((r) => r.id)).toEqual(['clip-0001', 'clip-0002', 'clip-0003']);
-    expect(existsSync(join(root, 'blind', 'half-1', 'metrics.json'))).toBe(true);
+    const file = readFileSync(join(root, 'blind', 'half-1', 'metrics.json'), 'utf8');
+    // Nothing per-model, such as a sample count, goes into the file the judge can read.
+    expect(Object.keys(JSON.parse(file)[0]).sort()).toEqual(['flicker', 'id', 'judder', 'mean', 'p99']);
+    expect(file).not.toMatch(/samples/);
     expect(rows.every((r) => r.flicker !== null && r.judder === null)).toBe(true);
 
     const brief = readFileSync(prepareBrief(root, 'half-1'), 'utf8');
@@ -128,6 +135,46 @@ describe('anonymise, metrics and judge on a set', () => {
     expect(brief).toContain('scores-half-1.csv');
     expect(brief).not.toMatch(/kling|seedance/i);
   }, 120_000);
+});
+
+describe('blind clips cannot be told apart by their encoding', () => {
+  test('sources with different size, fps and length come out with the same size, fps and frame count, in a shuffled order', async () => {
+    const root = join(work, 'cvs-bakeoff-normalise');
+    const out = join(root, 'out');
+    mkdirSync(join(out, 'clips'), { recursive: true });
+    mkdirSync(join(root, 'inputs'), { recursive: true });
+    const inputs: Inputs = { images: Array.from({ length: 10 }, (_, i) => ({ file: `img${i + 1}.jpg`, category: i % 2 ? 'product' : 'mockup', sourceKey: `k${i}` })) };
+    for (const im of inputs.images) writeFileSync(join(root, 'inputs', im.file), 'x');
+    // A short, small, slow clip and a longer, bigger, faster one, the way two providers could differ.
+    await makeClip(join(out, 'clips', 'a.mp4'), undefined, { size: '64x112', rate: 10, secs: 0.5 });
+    await makeClip(join(out, 'clips', 'b.mp4'), undefined, { size: '90x160', rate: 25, secs: 3 });
+    const base = { at: '2026-10-23T00:00:00.000Z', provider: 'fal', estimateUsd: 0.56, round: 'bakeoff', status: 'succeeded' } as const;
+    appendLine(out, { ...base, image: 1, model: KLING, clip: 'clips/a.mp4' });
+    appendLine(out, { ...base, image: 1, model: SEEDANCE, clip: 'clips/b.mp4' });
+
+    let n = 0;
+    const map = await anonymise({
+      root, set: 'half-1', mapPath: join(work, 'scratch', 'map-normalise.json'), inputs, inputsDir: join(root, 'inputs'), durationSec: 1,
+      newId: () => `clip-${++n}`, shuffle: (xs) => [...xs].reverse(),
+    });
+    // The shuffle hook ran before the ids were handed out: the last log entry got the first id.
+    expect(map.clips['clip-1']!.model).toBe(SEEDANCE);
+
+    for (const id of Object.keys(map.clips)) {
+      const text = await probe(join(root, 'blind', 'half-1', id, 'clip.mp4'));
+      expect(text).toMatch(/Stream #0:0.*, 720x1280.*, 24 fps/);
+      expect(text).toMatch(/Duration: 00:00:01\.0/);
+      const frames = [...text.matchAll(/frame=\s*(\d+)/g)].map((m) => Number(m[1]));
+      expect(Math.max(...frames)).toBe(24);
+    }
+  }, 120_000);
+
+  test('the default shuffle keeps every item and is not the identity order every time', () => {
+    const xs = Array.from({ length: 12 }, (_, i) => i);
+    expect([...shuffle(xs)].sort((a, b) => a - b)).toEqual(xs);
+    // 12 items: the chance that 5 shuffles all return the original order is (1/12!)^5.
+    expect(Array.from({ length: 5 }, () => shuffle(xs).join()).some((s) => s !== xs.join())).toBe(true);
+  });
 });
 
 describe('judge scores', () => {

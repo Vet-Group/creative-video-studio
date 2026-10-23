@@ -262,6 +262,194 @@ describe('runStage', () => {
   });
 });
 
+describe('runStage money safety', () => {
+  const kling1 = `${KLING.id}:input:img1.jpg`;
+  const lockOf = (r: Rig) => join(r.outDir, 'run.lock');
+
+  test('a second run cannot start while out/run.lock exists, and the lock is not removed by the refused run', async () => {
+    const r = rig();
+    mkdirSync(r.outDir, { recursive: true });
+    writeFileSync(lockOf(r), '{}');
+    await expect(runStage(r.deps, canary)).rejects.toThrow(/another run\.ts holds out\/run\.lock/);
+    expect(r.submits).toEqual([]);
+    expect(existsSync(lockOf(r))).toBe(true);
+  });
+
+  test('two runs started together: one holds the lock and the other submits nothing, so no key is submitted twice', async () => {
+    const r = rig();
+    const [a, b] = await Promise.allSettled([runStage(r.deps, canary), runStage(r.deps, canary)]);
+    expect([a.status, b.status].sort()).toEqual(['fulfilled', 'rejected']);
+    expect(r.submits).toHaveLength(2);
+    expect(new Set(r.submits).size).toBe(2);
+  });
+
+  test('the lock is released after a normal stage and after a stage that throws', async () => {
+    const r = rig();
+    await runStage(r.deps, canary);
+    expect(existsSync(lockOf(r))).toBe(false);
+    await expect(runStage(r.deps, { set: 'extra', models: [KLING.id], images: [1] })).rejects.toThrow(/preset/);
+    expect(existsSync(lockOf(r))).toBe(false);
+    await expect(runStage({ ...r.deps, falBalance: async () => { throw new Error('x'); }, outDir: join(r.outDir, '..', 'out2') }, { set: 'half-2' })).resolves.toBeTruthy();
+    expect(existsSync(join(r.outDir, '..', 'out2', 'run.lock'))).toBe(false);
+  });
+
+  test('a key submitted by someone else after the plan was read is skipped right before its submitting line', async () => {
+    const r = rig();
+    let reads = 0;
+    // The first read is the funding gate; the second is the first in-loop read, where another run "submits" Kling image 1.
+    r.deps.falBalance = async () => {
+      if (++reads === 2) appendLine(r.outDir, line({ status: 'submitted', providerJobId: '5:other-run' }));
+      return 100;
+    };
+    await runStage(r.deps, canary);
+    expect(r.submits).toEqual([`${SEEDANCE.id}:input:img1.jpg`]);
+  });
+
+  test('duplicate --models, duplicate --images and duplicate keys in the plan are refused before anything is submitted', async () => {
+    const other = PRESETS.find((p) => !p.isBakeoffSafe)!;
+    const r = rig();
+    await expect(runStage(r.deps, { set: 'half-2', models: [KLING.id, KLING.id] })).rejects.toThrow(/repeats a model/);
+    await expect(runStage(r.deps, { set: 'extra', models: [KLING.id], images: [1, 1], presetId: other.id })).rejects.toThrow(/repeats an image/);
+    await expect(runStage({ ...r.deps, models: [KLING, KLING] }, canary)).rejects.toThrow(/duplicate job keys/);
+    expect(r.submits).toEqual([]);
+  });
+
+  test.each([
+    ['an empty baseline', '{}'],
+    ['a null baseline', '{"falBalanceUsd":null}'],
+    ['a text baseline', '{"falBalanceUsd":"100"}'],
+  ])('%s submits nothing', async (_name, baseline) => {
+    const r = rig();
+    mkdirSync(r.outDir, { recursive: true });
+    writeFileSync(join(r.outDir, 'baseline.json'), baseline);
+    await expect(runStage(r.deps, canary)).rejects.toThrow(/finite falBalanceUsd/);
+    expect(r.submits).toEqual([]);
+    expect(existsSync(lockOf(r))).toBe(false);
+  });
+
+  test('a balance that is not a number stops the stage instead of passing the cap check', async () => {
+    const r = rig();
+    r.deps.falBalance = async () => NaN;
+    expect((await runStage(r.deps, canary)).outcome).toBe('stuck: not funded');
+    const r2 = rig();
+    let reads = 0;
+    r2.deps.falBalance = async () => (++reads === 1 ? 100 : NaN);
+    expect((await runStage(r2.deps, canary)).outcome).toBe('stopped: cap');
+    expect(r.submits).toEqual([]);
+    expect(r2.submits).toEqual([]);
+  });
+
+  test.each([
+    ['a non-numeric reported cost', { costUsd: null }],
+    ['a negative reported cost', { costUsd: -1 }],
+    ['a negative estimate', { estimateUsd: -5 }],
+    ['a text estimate', { estimateUsd: 'free' }],
+  ])('a log line with %s stops the run before any spend', async (_name, bad) => {
+    const r = rig();
+    mkdirSync(r.outDir, { recursive: true });
+    writeFileSync(join(r.outDir, JOBS_FILE), `${JSON.stringify({ ...line({ image: 3 }), ...bad })}\n`);
+    await expect(runStage(r.deps, canary)).rejects.toThrow(/negative or not a finite number/);
+    expect(r.submits).toEqual([]);
+  });
+
+  test('a key refused for credit twice is recorded as failed, not submitted a third time', async () => {
+    const refuseKling = (inner: VideoProvider): VideoProvider => ({
+      ...inner,
+      submit: async () => { throw new ProviderHttpError(402, 'payment required', 'fal submit: HTTP 402'); },
+    });
+    const r = rig({ fal: refuseKling });
+    const first = await runStage(r.deps, canary);
+    expect(first.outcome).toBe('stuck: not funded');
+    expect(first.renderFailures).toBe(0);
+    const second = await runStage(r.deps, canary);
+    expect(second.outcome).toBe('stuck: not funded');
+    expect(readLines(r.outDir).filter((l) => l.status === 'not_funded')).toHaveLength(2);
+    expect(second.counts.failed).toBe(1);
+    expect(readLines(r.outDir).at(-1)).toMatchObject({ model: KLING.id, status: 'failed', error: 'refused for credit twice' });
+    // A healthy provider now: Kling image 1 stays failed and is not submitted; only Seedance goes out.
+    const healthy = rig();
+    const calls: string[] = [];
+    r.deps.providers.fal = { ...healthy.deps.providers.fal!, submit: async (req) => { calls.push(req.model.id); return healthy.deps.providers.fal!.submit(req); } };
+    const third = await runStage(r.deps, canary);
+    expect(calls).toEqual([]);
+    expect(third.counts.failed).toBe(1);
+    expect(third.counts.succeeded).toBe(1);
+  });
+
+  test('a 429 is recorded as not attempted: no render failure, no spend, and the key is submitted again later', async () => {
+    let limited = true;
+    const rateLimit = (inner: VideoProvider): VideoProvider => ({
+      ...inner,
+      submit: async (req) => {
+        if (limited) throw new ProviderHttpError(429, 'slow down', 'fal submit: HTTP 429');
+        return inner.submit(req);
+      },
+    });
+    const r = rig({ fal: rateLimit });
+    const first = await runStage(r.deps, canary);
+    expect(first.outcome).toBe('stopped: rate limited');
+    expect(first.renderFailures).toBe(0);
+    expect(first.counts).toEqual({ notSubmitted: 2 });
+    expect(first.spentUsd).toBe(0);
+    expect(readLines(r.outDir).at(-1)).toMatchObject({ status: 'not_attempted' });
+    limited = false;
+    const second = await runStage(r.deps, canary);
+    expect(second.outcome).toBe('complete');
+    expect(second.counts).toEqual({ succeeded: 2 });
+  });
+
+  test('an image that cannot be read locally is not a render failure and nothing reaches the network', async () => {
+    let fetched = 0;
+    const unreadable = (): VideoProvider =>
+      createFalProvider({
+        apiKey: 'test-key',
+        readImage: async () => { throw new Error('ENOENT: no such file'); },
+        fetch: (async () => { fetched++; return new Response('{}'); }) as unknown as typeof fetch,
+      });
+    const r = rig({ fal: unreadable });
+    const res = await runStage(r.deps, canary);
+    expect(fetched).toBe(0);
+    expect(res.outcome).toBe('stopped: image unreadable');
+    expect(res.renderFailures).toBe(0);
+    expect(res.spentUsd).toBe(0);
+    expect(readLines(r.outDir).at(-1)).toMatchObject({ model: KLING.id, status: 'not_attempted' });
+  });
+
+  test('a balance read that fails between submits stops the stage as not funded', async () => {
+    const r = rig();
+    let reads = 0;
+    r.deps.falBalance = async () => {
+      if (++reads === 3) throw new Error('billing down');
+      return 100;
+    };
+    const res = await runStage(r.deps, { set: 'half-1' });
+    expect(res.outcome).toBe('stuck: not funded');
+    // Read 1 is the funding gate, read 2 precedes the Kling submit, read 3 precedes the Seedance submit and fails.
+    expect(r.submits).toEqual([kling1]);
+  });
+
+  test('the result reports spend per provider and the last fal balance', async () => {
+    const r = rig();
+    r.balance.usd = 77;
+    const res = await runStage(r.deps, canary);
+    expect(res.spentByProvider.fal).toBeCloseTo(KLING_5S, 6);
+    expect(res.spentByProvider.replicate).toBeCloseTo(SEEDANCE_5S, 6);
+    expect(res.falBalanceUsd).toBe(77);
+    expect((await runStage(rig().deps, canary)).falBalanceUsd).toBe(100);
+  });
+
+  test('lines keep their order within a file even when their timestamps are out of order; files merge by timestamp', () => {
+    const dir = join(tmp(), 'out');
+    mkdirSync(dir, { recursive: true });
+    const a = JSON.stringify(line({ status: 'submitted', providerJobId: '5:x', at: '2026-10-23T00:00:05.000Z' }));
+    const b = JSON.stringify(line({ status: 'succeeded', at: '2026-10-23T00:00:01.000Z' }));
+    writeFileSync(join(dir, JOBS_FILE), `${a}\n${b}\n`);
+    writeFileSync(join(dir, 'other.jsonl'), `${JSON.stringify(line({ image: 9, at: '2026-10-23T00:00:03.000Z' }))}\n`);
+    const lines = readLines(dir);
+    expect(lines.map((l) => `${l.image}:${l.status}`)).toEqual(['9:succeeded', '1:submitted', '1:succeeded']);
+  });
+});
+
 describe('parseFalBalance', () => {
   test('reads credits.current_balance and rejects anything else', () => {
     expect(parseFalBalance({ credits: { current_balance: 12.5 } })).toBe(12.5);

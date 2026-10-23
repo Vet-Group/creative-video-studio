@@ -66,9 +66,9 @@ export async function lumaDiffSeries(file: string): Promise<number[]> {
 
 export const clipMetrics = async (file: string) => motionStats(await lumaDiffSeries(file));
 
+/** What blind/<set>/metrics.json holds per clip. Nothing here may differ systematically by model, so the sample count is left out. */
 export interface ClipMetrics {
   id: string;
-  samples: number;
   mean: number;
   p99: number;
   flicker: boolean | null;
@@ -84,7 +84,7 @@ export async function metricsForSet(root: string, set: SetName, rubricPath = RUB
   const out: ClipMetrics[] = [];
   for (const id of ids) {
     const s = await clipMetrics(join(dir, id, 'clip.mp4'));
-    out.push({ id, ...s, ...flagsFor(s, thresholds) });
+    out.push({ id, mean: s.mean, p99: s.p99, ...flagsFor(s, thresholds) });
   }
   writeFileSync(join(dir, 'metrics.json'), `${JSON.stringify(out, null, 2)}\n`);
   return out;

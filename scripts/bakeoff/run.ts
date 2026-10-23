@@ -3,12 +3,12 @@
 // FAL_KEY and REPLICATE_API_TOKEN come from the environment. Sets: canary = image 1; half-1 = images 1-5 (image 1 is polled, not
 // resubmitted); half-2 = images 6-10 (pass --models with the models still able to pass); extra = at most 5 images of one model with a
 // preset other than the safe one, round "extra". The logic is in runStage so tests drive it on the mock adapter, never a real provider.
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { closeSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync, writeSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { BAKEOFF_MODELS, estimateUsd, validateRequest, type ModelConfig } from '@cvs/core/models';
 import { BAKEOFF_PRESET, PRESETS } from '@cvs/core/presets';
-import { isFundingRefusal, ProviderHttpError } from '@cvs/core/providers/http';
+import { ImageReadError, isFundingRefusal, ProviderHttpError } from '@cvs/core/providers/http';
 import { createFalProvider } from '@cvs/core/providers/fal';
 import { createReplicateProvider } from '@cvs/core/providers/replicate';
 import type { VideoProvider } from '@cvs/core/providers';
@@ -49,12 +49,15 @@ export interface StageOptions {
 
 export interface StageResult {
   set: SetName;
-  outcome: 'complete' | 'stuck: not funded' | 'stopped: cap';
+  outcome: 'complete' | 'stuck: not funded' | 'stopped: cap' | 'stopped: rate limited' | 'stopped: image unreadable';
   reason?: string;
   counts: Record<string, number>;
   /** failed + unknown + timeout: jobs that ended without a clip. A refusal for credit is not one. */
   renderFailures: number;
   spentUsd: number;
+  spentByProvider: Record<string, number>;
+  /** The last fal balance read during the stage; null when none was read. */
+  falBalanceUsd: number | null;
 }
 
 const FINAL: JobStatus[] = ['succeeded', 'failed', 'unknown'];
@@ -68,6 +71,8 @@ interface Planned {
 }
 
 function plan(deps: RunDeps, opts: StageOptions): { jobs: Planned[]; prompt: string } {
+  if (opts.models && new Set(opts.models).size !== opts.models.length) throw new Error('--models repeats a model');
+  if (opts.images && new Set(opts.images).size !== opts.images.length) throw new Error('--images repeats an image');
   const models = opts.models ? opts.models.map((id) => deps.models.find((m) => m.id === id) ?? fail(`unknown model ${id}`)) : deps.models;
   if (!models.length) throw new Error('no model selected');
   let images: number[];
@@ -94,6 +99,8 @@ function plan(deps: RunDeps, opts: StageOptions): { jobs: Planned[]; prompt: str
       jobs.push({ key: { image, model: model.id, round: roundOf(opts.set) }, model, durationSec, estimateUsd: Number(estimateUsd(model.usdPerSecond, durationSec)) });
     }
   }
+  // One job per key: a duplicate would be submitted twice before the log could show the first.
+  if (new Set(jobs.map((j) => keyId(j.key))).size !== jobs.length) throw new Error('the plan has duplicate job keys');
   return { jobs, prompt };
 }
 
@@ -103,7 +110,27 @@ function fail(msg: string): never {
 
 const clipName = (k: JobKey): string => `clips/image${String(k.image).padStart(2, '0')}-${k.model}-${k.round}.mp4`;
 
+/** Only one run may spend at a time: the lock is created exclusively and removed when the stage ends, however it ends. */
 export async function runStage(deps: RunDeps, opts: StageOptions): Promise<StageResult> {
+  mkdirSync(deps.outDir, { recursive: true });
+  const lockPath = join(deps.outDir, 'run.lock');
+  let fd: number;
+  try {
+    fd = openSync(lockPath, 'wx');
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === 'EEXIST') throw new Error('another run.ts holds out/run.lock (delete the file only if that run is dead)');
+    throw e;
+  }
+  try {
+    writeSync(fd, `${JSON.stringify({ pid: process.pid, at: (deps.now ?? (() => new Date()))().toISOString() })}\n`);
+    return await runLocked(deps, opts);
+  } finally {
+    closeSync(fd);
+    rmSync(lockPath, { force: true });
+  }
+}
+
+async function runLocked(deps: RunDeps, opts: StageOptions): Promise<StageResult> {
   const cap = deps.capUsd ?? CAP_USD;
   const margin = deps.marginUsd ?? MARGIN_USD;
   const now = deps.now ?? (() => new Date());
@@ -117,36 +144,47 @@ export async function runStage(deps: RunDeps, opts: StageOptions): Promise<Stage
   // A key stuck at `submitting` with no id may or may not have been accepted: it becomes `unknown`, its estimate stays counted.
   for (const p of jobs) if (current(p)?.status === 'submitting') line(p, { status: 'unknown', error: 'the run stopped before the provider answered' });
 
-  const toSubmit = jobs.filter((p) => {
-    const s = current(p)?.status;
-    return s === undefined || s === 'not_funded';
-  });
+  // Keys that never reached a provider (or were refused for credit) may be submitted again; everything else is already in the log.
+  const submittable = (s: JobStatus | undefined): boolean => s === undefined || s === 'not_funded' || s === 'not_attempted';
+  const refusals = (p: Planned): number => readLines(deps.outDir).filter((l) => keyId(l) === keyId(p.key) && l.status === 'not_funded').length;
+  let lastBalance: number | null = null;
+  const toSubmit = jobs.filter((p) => submittable(current(p)?.status));
   if (toSubmit.length) {
     const falCost = toSubmit.filter((p) => p.model.provider === 'fal').reduce((a, p) => a + p.estimateUsd, 0);
-    let balance: number | null = null;
     try {
-      balance = await deps.falBalance();
+      lastBalance = await deps.falBalance();
     } catch (e) {
       outcome = 'stuck: not funded';
       reason = `the fal balance could not be read: ${(e as Error).message}`;
     }
-    if (balance !== null && balance < falCost + margin) {
+    if (lastBalance !== null && !(lastBalance >= falCost + margin)) {
       outcome = 'stuck: not funded';
-      reason = `fal balance $${balance.toFixed(2)} is below the stage's fal cost $${falCost.toFixed(2)} plus $${margin.toFixed(2)}`;
+      reason = `fal balance $${lastBalance} is not a number at or above the stage's fal cost $${falCost.toFixed(2)} plus $${margin.toFixed(2)}`;
     }
-    if (balance !== null && outcome === 'complete') {
-      const baseline = readBaseline(deps.outDir) ?? writeBaseline(deps.outDir, balance, now());
+    if (lastBalance !== null && outcome === 'complete') {
+      const baseline = readBaseline(deps.outDir) ?? writeBaseline(deps.outDir, lastBalance, now());
       for (const p of toSubmit) {
-        const have = await deps.falBalance();
+        let have: number;
+        try {
+          have = await deps.falBalance();
+        } catch (e) {
+          outcome = 'stuck: not funded';
+          reason = `the fal balance could not be read: ${(e as Error).message}`;
+          break;
+        }
+        lastBalance = have;
         const s = spend(readLines(deps.outDir));
         // The larger of the job log and the balance fall since preflight (fal) plus the Replicate log; a top-up only lowers the fall.
+        // Written so that a NaN anywhere stops the stage instead of passing the check.
         const spent = Math.max(s.total, baseline - have + (s.byProvider.replicate ?? 0));
-        if (spent + p.estimateUsd > cap + 1e-9) {
+        if (!(spent + p.estimateUsd <= cap + 1e-9)) {
           outcome = 'stopped: cap';
-          reason = `spent $${spent.toFixed(2)} plus $${p.estimateUsd.toFixed(2)} for ${keyId(p.key)} would pass the $${cap} cap`;
+          reason = `spent $${spent} plus $${p.estimateUsd.toFixed(2)} for ${keyId(p.key)} would pass the $${cap} cap, or the amounts are not numbers`;
           break;
         }
         const provider = deps.providers[p.model.provider] ?? fail(`no provider for ${p.model.provider}`);
+        // The key may have changed since the plan was read; submit only a key nobody has submitted.
+        if (!submittable(current(p)?.status)) continue;
         line(p, { status: 'submitting' });
         try {
           const { providerJobId } = await provider.submit({ model: p.model, prompt, imageUrls: [imageUrl(deps.inputs, p.key.image)], ratio: THRIFT_RATIO, durationSec: p.durationSec });
@@ -154,8 +192,22 @@ export async function runStage(deps: RunDeps, opts: StageOptions): Promise<Stage
         } catch (e) {
           if (isFundingRefusal(e)) {
             line(p, { status: 'not_funded', error: (e as Error).message });
+            // One more submit is allowed after a top-up; a second refusal of the same key ends it as failed.
+            if (refusals(p) >= 2) line(p, { status: 'failed', error: 'refused for credit twice' });
             outcome = 'stuck: not funded';
             reason = `the provider refused ${keyId(p.key)} for lack of credit`;
+            break;
+          }
+          if (e instanceof ProviderHttpError && e.status === 429) {
+            line(p, { status: 'not_attempted', error: (e as Error).message });
+            outcome = 'stopped: rate limited';
+            reason = `the provider answered 429 for ${keyId(p.key)}`;
+            break;
+          }
+          if (e instanceof ImageReadError) {
+            line(p, { status: 'not_attempted', error: (e as Error).message });
+            outcome = 'stopped: image unreadable';
+            reason = (e as Error).message;
             break;
           }
           // A 4xx answer means the provider rejected the job. Anything else may have created it, so the key is never resubmitted.
@@ -193,21 +245,28 @@ export async function runStage(deps: RunDeps, opts: StageOptions): Promise<Stage
   const counts: Record<string, number> = {};
   for (const p of jobs) {
     const s = current(p)?.status;
-    const k = s === undefined || s === 'not_funded' ? 'notSubmitted' : s;
+    const k = submittable(s) ? 'notSubmitted' : s!;
     counts[k] = (counts[k] ?? 0) + 1;
   }
   const renderFailures = (counts.failed ?? 0) + (counts.unknown ?? 0) + (counts.timeout ?? 0);
-  return { set: opts.set, outcome, ...(reason ? { reason } : {}), counts, renderFailures, spentUsd: spend(readLines(deps.outDir)).total };
+  const total = spend(readLines(deps.outDir));
+  return {
+    set: opts.set, outcome, ...(reason ? { reason } : {}), counts, renderFailures, spentUsd: total.total, spentByProvider: total.byProvider, falBalanceUsd: lastBalance,
+  };
 }
 
-/** The fal balance when the first paid stage began; later balance falls are measured from it. */
+/** The fal balance when the first paid stage began; later balance falls are measured from it. A baseline that is not a finite number stops the run. */
 function readBaseline(outDir: string): number | null {
+  let text: string;
   try {
-    return (JSON.parse(readFileSync(join(outDir, 'baseline.json'), 'utf8')) as { falBalanceUsd: number }).falBalanceUsd;
+    text = readFileSync(join(outDir, 'baseline.json'), 'utf8');
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code === 'ENOENT') return null;
     throw e;
   }
+  const v = (JSON.parse(text) as { falBalanceUsd?: unknown }).falBalanceUsd;
+  if (typeof v !== 'number' || !Number.isFinite(v)) throw new Error('out/baseline.json has no finite falBalanceUsd; fix or delete it before spending anything');
+  return v;
 }
 
 function writeBaseline(outDir: string, falBalanceUsd: number, at: Date): number {

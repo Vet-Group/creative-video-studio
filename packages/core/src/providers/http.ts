@@ -45,12 +45,19 @@ export async function resolveImages(urls: string[], readImage?: ReadImage): Prom
   return Promise.all(
     urls.map(async (url) => {
       if (url.startsWith('https:')) return url;
-      if (!readImage) throw new Error(`image ${url.split(':')[0]}: URL needs a readImage resolver`);
-      const { bytes, contentType } = await readImage(url);
-      return `data:${contentType};base64,${Buffer.from(bytes).toString('base64')}`;
+      if (!readImage) throw new ImageReadError(`image ${url.split(':')[0]}: URL needs a readImage resolver`);
+      try {
+        const { bytes, contentType } = await readImage(url);
+        return `data:${contentType};base64,${Buffer.from(bytes).toString('base64')}`;
+      } catch (e) {
+        throw new ImageReadError(`image ${url.split(':')[0]}: ${(e as Error).message}`);
+      }
     }),
   );
 }
+
+/** An input image could not be read locally; thrown before any network call, so nothing was submitted or billed. */
+export class ImageReadError extends Error {}
 
 // The provider job id carries the requested duration ("5:abc123"), so status() can estimate the cost after a worker restart.
 export const packJobId = (durationSec: number, id: string): string => `${durationSec}:${id}`;
