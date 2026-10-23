@@ -80,7 +80,7 @@ else
   fail lock "flock is missing (set CVS_ALLOW_NO_FLOCK=1 only for a local test)"
 fi
 mounts=()
-net=(); [ -z "${CVS_RESTIC_NETWORK:-}" ] || net=(--network "$CVS_RESTIC_NETWORK") # only for a non-R2 S3 target on a compose network (tests)
+net=(); [ -z "${CVS_RESTIC_NETWORK:-}" ] || net=(--network "$CVS_RESTIC_NETWORK") # every restic run joins this network when set; tests only, unset in production
 renv=(-e RESTIC_REPOSITORY=/repo)
 [ "$mode" != weekly ] || renv=(-e RESTIC_REPOSITORY -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_DEFAULT_REGION=auto -e RESTIC_FROM_REPOSITORY=/repo)
 restic() {

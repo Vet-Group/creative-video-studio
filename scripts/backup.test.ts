@@ -205,5 +205,7 @@ describe.skipIf(skipReason !== null)(`cvs-backup against compose ${skipReason ? 
       expect(r.out).not.toContain(secret);
       expect(snapshotObjects(), `pass ${pass}`).toBe(1);
     }
+    // The weekly forget must prune the R2 repo only; the local dailies stay.
+    expect(snapshotCount()).toBe(2);
   });
 });
