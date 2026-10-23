@@ -364,6 +364,21 @@ export const verdicts = pgTable(
   ],
 );
 
+// Each user's own favourites in the Library. They mark nothing on the job itself and go with the user or the job.
+export const favorites = pgTable(
+  'favorites',
+  {
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    jobId: text('job_id')
+      .notNull()
+      .references(() => jobs.id, { onDelete: 'cascade' }),
+    createdAt: tstz('created_at').notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.jobId] })],
+);
+
 // Who did what to whom: an Admin deleting another user's clip, any Pass/Fail edit, and the Admin changes of M.5.
 export const auditEntries = pgTable(
   'audit_entries',

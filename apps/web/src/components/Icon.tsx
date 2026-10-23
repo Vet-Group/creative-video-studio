@@ -23,6 +23,7 @@ const PATHS = {
   copy: 'M5.5 5.5h8v8h-8z M10.5 5.5v-3h-8v8h3',
   home: 'M2 7.5L8 2.5l6 5 M3.5 6.5v7h3.5v-4h2v4h3.5v-7',
   panel: 'M2 3h12v10H2z M6 3v10',
+  star: 'M8 1.8l1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.6l-3.8 2 .7-4.3-3.1-3 4.3-.6z',
 } as const;
 
 export type IconName = keyof typeof PATHS;

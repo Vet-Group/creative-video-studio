@@ -63,6 +63,8 @@ export interface Clip {
   costUsd: string;
   costFinal: boolean;
   verdict: { verdict: 'pass' | 'fail'; fault: string | null; markedBy: string } | null;
+  /** In the caller's own favourites. */
+  favorite: boolean;
   canEdit: boolean;
   downloadName: string;
 }
