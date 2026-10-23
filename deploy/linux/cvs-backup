@@ -6,7 +6,7 @@
 # Adapted from ideas-hub scripts/linux/ideashub-backup. Acts only on its own compose project (CVS_COMPOSE_PROJECT).
 # Env (defaults): CVS_COMPOSE_PROJECT (creative-video-studio), CVS_BACKUP_DIR (/opt/creative-video-studio/backups),
 # CVS_STATE_DIR (~/.local/state/creative-video-studio), CVS_DB_NAME / CVS_DB_USER (cvs), CVS_S3_BUCKET (.env S3_BUCKET),
-# CVS_MIN_FREE_PERCENT (15), CVS_RESTIC_PASSWORD or CVS_RESTIC_PASSWORD_FILE, CVS_R2_REPOSITORY / _ACCESS_KEY_ID / _SECRET_ACCESS_KEY.
+# CVS_MIN_FREE_PERCENT (15), CVS_RESTIC_NETWORK (docker network for restic; unset in production), CVS_RESTIC_PASSWORD or CVS_RESTIC_PASSWORD_FILE, CVS_R2_REPOSITORY / _ACCESS_KEY_ID / _SECRET_ACCESS_KEY.
 set -Eeuo pipefail
 # Git Bash must not rewrite the container paths passed to docker; harmless on Linux.
 export MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*'
@@ -80,10 +80,11 @@ else
   fail lock "flock is missing (set CVS_ALLOW_NO_FLOCK=1 only for a local test)"
 fi
 mounts=()
+net=(); [ -z "${CVS_RESTIC_NETWORK:-}" ] || net=(--network "$CVS_RESTIC_NETWORK") # only for a non-R2 S3 target on a compose network (tests)
 renv=(-e RESTIC_REPOSITORY=/repo)
 [ "$mode" != weekly ] || renv=(-e RESTIC_REPOSITORY -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_DEFAULT_REGION=auto -e RESTIC_FROM_REPOSITORY=/repo)
 restic() {
-  docker run --rm --cpus 1 --memory 1g "${renv[@]}" "${pw[@]}" \
+  docker run --rm --cpus 1 --memory 1g "${net[@]}" "${renv[@]}" "${pw[@]}" \
     -e RESTIC_CACHE_DIR=/cache -v "$cache_volume:/cache" -v "$(native "$restic_dir"):/repo" "${mounts[@]}" "$restic_image" "$@"
 }
 last_line() { printf '%s' "$1" | tr -d '\r' | sed '/^$/d' | tail -n 1; }
