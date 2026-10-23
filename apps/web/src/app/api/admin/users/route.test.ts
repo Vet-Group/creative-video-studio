@@ -10,6 +10,7 @@ process.env.APP_URL = 'http://localhost:3400';
 
 const { auth, pool } = await import('@/lib/auth');
 const { GET, POST } = await import('./route');
+const { PATCH } = await import('./[id]/route');
 
 const URL_USERS = 'http://localhost:3400/api/admin/users';
 const PASSWORD = 'correct-horse-battery';
@@ -67,15 +68,15 @@ describe('/api/admin/users', () => {
   });
 
   test('lets an Admin create a Member, who can then sign in', async () => {
-    const body = JSON.stringify({ email: 'new@example.test', name: 'New', password: PASSWORD });
+    const body = JSON.stringify({ email: 'new@example.test', name: 'New', password: PASSWORD, teamId: 'team-unassigned' });
     const res = await POST(req(adminCookie, { method: 'POST', body }));
     expect(res.status).toBe(201);
-    expect(await res.json()).toMatchObject({ email: 'new@example.test', role: 'member' });
+    expect(await res.json()).toMatchObject({ email: 'new@example.test', role: 'member', teamId: 'team-unassigned' });
     expect(await signIn('new@example.test')).toContain('better-auth.session_token');
   });
 
   test('lets an Admin create a user without a password, who then cannot sign in by email', async () => {
-    const body = JSON.stringify({ email: 'lark-only@example.test', name: 'Lark Only' });
+    const body = JSON.stringify({ email: 'lark-only@example.test', name: 'Lark Only', teamId: 'team-unassigned' });
     const res = await POST(req(adminCookie, { method: 'POST', body }));
     expect(res.status).toBe(201);
     const signIn = await auth.api.signInEmail({ body: { email: 'lark-only@example.test', password: PASSWORD }, asResponse: true });
@@ -83,13 +84,124 @@ describe('/api/admin/users', () => {
   });
 
   test('rejects a password that is not a string', async () => {
-    const body = JSON.stringify({ email: 'y@example.test', name: 'Y', password: 12345678 });
+    const body = JSON.stringify({ email: 'y@example.test', name: 'Y', password: 12345678, teamId: 'team-unassigned' });
     expect((await POST(req(adminCookie, { method: 'POST', body }))).status).toBe(400);
   });
 
   test('rejects a bad role', async () => {
-    const body = JSON.stringify({ email: 'x@example.test', name: 'X', password: PASSWORD, role: 'owner' });
+    const body = JSON.stringify({ email: 'x@example.test', name: 'X', password: PASSWORD, role: 'owner', teamId: 'team-unassigned' });
     expect((await POST(req(adminCookie, { method: 'POST', body }))).status).toBe(400);
+  });
+
+  test('requires a team: without teamId, or with an unknown or hidden team, it answers 400 and creates nobody', async () => {
+    await pool.query(`insert into teams (id, name, hidden) values ('team-b', 'Team B', false), ('team-old', 'Old team', true)`);
+    for (const teamId of [undefined, 'no-such-team', 'team-old']) {
+      const body = JSON.stringify({ email: 'noteam@example.test', name: 'No Team', password: PASSWORD, teamId });
+      expect((await POST(req(adminCookie, { method: 'POST', body }))).status).toBe(400);
+    }
+    expect((await pool.query(`select 1 from users where email = 'noteam@example.test'`)).rowCount).toBe(0);
+  });
+
+  test('puts a new user in the given team and lists the team', async () => {
+    const body = JSON.stringify({ email: 'teamed@example.test', name: 'Teamed', teamId: 'team-b' });
+    expect((await POST(req(adminCookie, { method: 'POST', body }))).status).toBe(201);
+    expect((await pool.query(`select team_id from users where email = 'teamed@example.test'`)).rows[0].team_id).toBe('team-b');
+    const { users } = (await (await GET(req(adminCookie))).json()) as { users: { email: string; teamId: string }[] };
+    expect(users.find((u) => u.email === 'teamed@example.test')?.teamId).toBe('team-b');
+  });
+});
+
+describe('PATCH /api/admin/users/:id', () => {
+  const patch = (cookie: string | undefined, id: string, body: unknown) => PATCH(req(cookie, { method: 'PATCH', body: JSON.stringify(body) }), { params: Promise.resolve({ id }) });
+  const audits = async (id: string) => (await pool.query('select actor_id, action, old_value, new_value from audit_entries where target = $1 order by id', [`user:${id}`])).rows;
+  let seq = 0;
+  async function member(teamId = 'team-unassigned') {
+    const email = `patch-${++seq}@example.test`;
+    const { user } = await auth.api.createUser({ body: { email, name: email, password: PASSWORD, role: 'member', data: { teamId } } });
+    return { id: user.id, email };
+  }
+  const adminId = async () => (await pool.query(`select id from users where email = 'admin@example.test'`)).rows[0].id as string;
+
+  test('refuses a Member and a request without a session', async () => {
+    const m = await member();
+    expect((await patch(memberCookie, m.id, { role: 'admin' })).status).toBe(403);
+    expect((await patch(undefined, m.id, { role: 'admin' })).status).toBe(401);
+    expect(await audits(m.id)).toEqual([]);
+  });
+
+  test('bans a user, who can no longer sign in, and unbans them, each audited once', async () => {
+    const m = await member();
+    const admin = await adminId();
+    expect((await patch(adminCookie, m.id, { banned: true, banReason: 'left the company' })).status).toBe(200);
+    expect((await pool.query('select banned from users where id = $1', [m.id])).rows[0].banned).toBe(true);
+    expect((await auth.api.signInEmail({ body: { email: m.email, password: PASSWORD }, asResponse: true })).status).toBe(403);
+    expect((await patch(adminCookie, m.id, { banned: true })).status).toBe(200); // already banned: nothing to audit
+    expect(await audits(m.id)).toEqual([
+      { actor_id: admin, action: 'user.ban', old_value: { banned: false }, new_value: { banned: true, reason: 'left the company' } },
+    ]);
+
+    expect((await patch(adminCookie, m.id, { banned: false })).status).toBe(200);
+    expect(await signIn(m.email)).toContain('better-auth.session_token');
+    expect((await audits(m.id)).slice(1)).toEqual([{ actor_id: admin, action: 'user.unban', old_value: { banned: true }, new_value: { banned: false } }]);
+  });
+
+  test('refuses to ban yourself or change your own role', async () => {
+    const admin = await adminId();
+    expect((await patch(adminCookie, admin, { banned: true })).status).toBe(400);
+    expect((await patch(adminCookie, admin, { role: 'member' })).status).toBe(400);
+    expect(await audits(admin)).toEqual([]);
+  });
+
+  test('sets a temporary password that replaces the old one, audits it once and never stores it', async () => {
+    const m = await member();
+    expect((await patch(adminCookie, m.id, { temporaryPassword: 'short' })).status).toBe(400); // better-auth minimum length
+    expect((await patch(adminCookie, m.id, { temporaryPassword: 'temporary-pass-1' })).status).toBe(200);
+    expect((await auth.api.signInEmail({ body: { email: m.email, password: PASSWORD }, asResponse: true })).status).toBe(401);
+    expect((await auth.api.signInEmail({ body: { email: m.email, password: 'temporary-pass-1' }, asResponse: true })).status).toBe(200);
+    const log = await audits(m.id);
+    expect(log).toEqual([{ actor_id: await adminId(), action: 'user.password_set', old_value: null, new_value: { temporary: true } }]);
+  });
+
+  test('changes the role, audited once with the old and new role, and refuses a bad role or an unknown user', async () => {
+    const m = await member();
+    expect((await patch(adminCookie, m.id, { role: 'owner' })).status).toBe(400);
+    expect((await patch(adminCookie, m.id, {})).status).toBe(400);
+    expect((await patch(adminCookie, 'no-such-user', { role: 'admin' })).status).toBe(404);
+    const res = await patch(adminCookie, m.id, { role: 'admin' });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ id: m.id, role: 'admin' });
+    expect((await pool.query('select role from users where id = $1', [m.id])).rows[0].role).toBe('admin');
+    expect(await audits(m.id)).toEqual([{ actor_id: await adminId(), action: 'user.role_change', old_value: { role: 'member' }, new_value: { role: 'admin' } }]);
+  });
+
+  test('changes the team for new jobs only: an earlier job and its ledger row keep the old team, and the change is audited once', async () => {
+    await pool.query(
+      `insert into model_configs (id, provider, endpoint, label, ratios, durations_sec, max_images, output_resolution, usd_per_second, sources, enabled)
+       values ('fal-test', 'fal', 'x', 'Fal test', '{9:16}', '{5}', 2, '720p', 0.2, '{}', true) on conflict do nothing`,
+    );
+    const m = await member('team-b');
+    const job = async (id: string) => {
+      await pool.query(
+        `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids) select $1, $2, team_id, 'fal-test', 'fal', 'p', '9:16', 5, '{}' from users where id = $2`,
+        [id, m.id],
+      );
+      await pool.query(`insert into cost_entries (kind, usd, month, day, user_id, team_id, job_id) select 'estimate', 1, '2026-10', '2026-10-23', user_id, team_id, id from jobs where id = $1`, [id]);
+    };
+    await job('team-job-before');
+    expect((await patch(adminCookie, m.id, { teamId: 'team-old' })).status).toBe(400); // hidden
+    expect((await patch(adminCookie, m.id, { teamId: 'no-such-team' })).status).toBe(400);
+    const res = await patch(adminCookie, m.id, { teamId: 'team-unassigned' });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ id: m.id, teamId: 'team-unassigned' });
+    await job('team-job-after');
+    const teamOf = async (id: string) => (await pool.query(`select team_id from jobs where id = $1 union all select team_id from cost_entries where job_id = $1`, [id])).rows.map((r) => r.team_id);
+    expect(await teamOf('team-job-before')).toEqual(['team-b', 'team-b']);
+    expect(await teamOf('team-job-after')).toEqual(['team-unassigned', 'team-unassigned']);
+    expect(await audits(m.id)).toEqual([
+      { actor_id: await adminId(), action: 'user.team_change', old_value: { teamId: 'team-b' }, new_value: { teamId: 'team-unassigned' } },
+    ]);
+    expect((await patch(adminCookie, m.id, { teamId: 'team-unassigned' })).status).toBe(200); // same team: no second entry
+    expect(await audits(m.id)).toHaveLength(1);
   });
 });
 
