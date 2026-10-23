@@ -13,7 +13,7 @@ C4 of `docs/UI-MOTION-PARITY.md` was not met: the owner compared the M.7 baselin
 **Evidence sources**
 - The live reference page (logged in) and saved live evidence are canonical. The port 4317 capture is a secondary, static source for geometry and CSS: it has no video sources and a known mobile carousel offset, so it is not the reference for motion or responsive states. Do not wait for 4317 to be fixed.
 - Reuse the measurements below. Measure only what is missing or doubtful, on the live page, read-only (no upload, no Run, no credits), with the owner's browser profile `huuhungn` (instance `a6d16171`) only; if it is not connected, record the evidence as missing instead of switching profile.
-- Record each measurement with route, viewport, state, time, source (`live`, `4317` or `internal decision`), bounding box and computed styles. Check the font actually rendered, not only the first `font-family` name. A live value that differs from a 4317 value below wins; the live addendum lists them.
+- Record each measurement with route, viewport, state, time, source (`live`, `4317` or `internal decision`), bounding box and computed styles. Check the font actually rendered, not only the first `font-family` name. A live value that differs from a 4317 value below wins. The live measurements (2026-10-23, 1440×1000, 1280, 1024, 1023 and 390×844, plus dropdowns, hover, drawer and font) are in [`UI-MOTION-PARITY-M7B-LIVE.md`](UI-MOTION-PARITY-M7B-LIVE.md), with the intended differences.
 
 **Order of work**
 1. Overall geometry: sidebar, page background, content edges, card width, scrolling inside the card, Run position, gap between the columns, narrow layout.
