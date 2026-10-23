@@ -11,7 +11,7 @@ ExecStart=@APP@/node/bin/pnpm --filter @cvs/worker start
 Restart=on-failure
 RestartSec=5
 TimeoutStopSec=30
-# Expected value from plan step D.3. D.3 (measuring the VET headroom) was skipped, so this awaits that measurement.
+# Set by plan step D.3 from the measured VET headroom (docs/ops/production.md).
 MemoryMax=768M
 
 [Install]
