@@ -4,6 +4,7 @@ import { api, errorText, sendJson } from '@/lib/api';
 import { EXAMPLES, type Example, exampleForPreset, splitColumns } from '@/lib/examples';
 import { NARROW, useMediaQuery, WIDE } from '@/lib/use-media-query';
 import { useHydrated } from '@/lib/use-hydrated';
+import { About } from './About';
 import { Carousel } from './Carousel';
 import { Icon } from './Icon';
 import { useJobs } from './jobs';
@@ -46,8 +47,8 @@ interface JobDetail {
   images: Image[];
 }
 
-type Tab = 'create' | 'history' | 'examples';
-const TAB_LABEL: Record<Tab, string> = { create: 'Tạo', history: 'Lịch sử', examples: 'Ví dụ' };
+type Tab = 'create' | 'history' | 'examples' | 'about';
+const TAB_LABEL: Record<Tab, string> = { create: 'Tạo', history: 'Lịch sử', examples: 'Ví dụ', about: 'Giới thiệu' };
 const RATIO_LABEL: Record<string, string> = { '9:16': '9:16 (dọc)', '1:1': '1:1 (vuông)' };
 const MAX_IMAGES = 4;
 const MAX_PROMPT = 2000;
@@ -188,9 +189,9 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
     }
   }
 
-  // Below 1024 px the form is one tab among Create / History / Examples; beside it, the tabs are History / Examples.
-  const tabs: Tab[] = narrow ? ['create', 'history', 'examples'] : ['history', 'examples'];
-  const shown: Tab = narrow ? (tab ?? 'create') : tab === 'examples' ? 'examples' : 'history';
+  // Below 1024 px the form is one tab among Create / History / Examples / About; beside it, the tabs are History / Examples / About.
+  const tabs: Tab[] = narrow ? ['create', 'history', 'examples', 'about'] : ['history', 'examples', 'about'];
+  const shown: Tab = narrow ? (tab ?? 'create') : tab === 'examples' || tab === 'about' ? tab : 'history';
   const current = presets?.find((p) => p.id === presetId);
   const banner = exampleForPreset(presetId);
   const detailAt = detail ? EXAMPLES.indexOf(detail) : -1;
@@ -403,6 +404,8 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
                 </ul>
               ))}
             </div>
+          ) : shown === 'about' ? (
+            <About />
           ) : (
             <Tray />
           )}
