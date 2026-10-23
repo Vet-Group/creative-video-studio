@@ -23,7 +23,9 @@ process.env.CVS_SUPPORT_EMAIL = 'support@e2e.test';
 const { auth, pool } = await import('../src/lib/auth');
 await pool.query(
   `insert into model_configs (id, provider, endpoint, label, ratios, durations_sec, max_images, output_resolution, usd_per_second, sources, enabled, pass_seed_passes, pass_seed_total)
-   values ('mock-e2e', 'mock', 'mock', 'Mock E2E', '{9:16,1:1}', '{5,8}', 4, '720p', 0.1, '{}', true, 8, 10)`,
+   values ('mock-e2e', 'mock', 'mock', 'Mock E2E', '{9:16,1:1}', '{5,8}', 4, '720p', 0.1, '{}', true, 8, 10),
+          -- Off: the Explore spec switches it on for itself, to pick a model that does not support the form's starting choice.
+          ('mock-e2e-square', 'mock', 'mock', 'Mock E2E Square', '{1:1}', '{5}', 4, '720p', 0.1, '{}', false, 0, 0)`,
 );
 // A store the Create picker offers, for the specs that tag a clip with one.
 await pool.query(`insert into stores (id, name, code) values ('store-e2e', 'E2E Shop', 'E2E-SEED')`);
