@@ -78,7 +78,14 @@ describe('appInputs', () => {
     expect(appInputs(appBySlug('face-swap')!, { images: [[img('a')], [img('b')]], prompt: '' })).toEqual({ assetIds: ['a', 'b'] });
   });
 
-  it('sends the written prompt only for Background Changer, trimmed', () => {
+  it('sends the written prompt for the swaps and Background Changer, trimmed, and for no other app', () => {
+    for (const slug of ['character-swap', 'model-swap']) {
+      expect(appBySlug(slug)).toMatchObject({ prompt: 'optional' });
+      expect(appInputs(appBySlug(slug)!, { images: [[img('a')], [img('b')]], prompt: ' keep the hat ' })).toEqual({ assetIds: ['a', 'b'], prompt: 'keep the hat' });
+      expect(appInputs(appBySlug(slug)!, { images: [[img('a')], [img('b')]], prompt: '  ' })).toEqual({ assetIds: ['a', 'b'] });
+      expect(reason(slug, [['a'], ['b']], 'keep the hat')).toBeNull();
+    }
+    expect(appInputs(appBySlug('face-swap')!, { images: [[img('a')], [img('b')]], prompt: 'ignored' })).toEqual({ assetIds: ['a', 'b'] });
     const bg = appBySlug('background-changer')!;
     expect(appInputs(bg, { images: [[img('a')], []], prompt: '  a sunlit cafe ' })).toEqual({ assetIds: ['a'], prompt: 'a sunlit cafe' });
     expect(appInputs(bg, { images: [[img('a')], [img('b')]], prompt: '' })).toEqual({ assetIds: ['a', 'b'] });

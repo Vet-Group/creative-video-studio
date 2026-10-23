@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
-import { png, select, selectValue, signIn } from './support.test';
+import { expectOptions, modelButton, png, select, selectValue, signIn } from './support.test';
 
 const nav = (page: Page) => page.getByRole('navigation', { name: 'Điều hướng chính' });
 const file = (name: string) => ({ name, mimeType: 'image/png', buffer: png() });
@@ -194,6 +194,100 @@ test('Image Upscale shows the resolution field and Background Changer follows it
   await expect(reasonOf(page)).toHaveText('Chọn mô tả nền hoặc ảnh nền tham chiếu, không dùng cả hai.');
   await description.fill('');
   await expect(runButton(page)).toBeEnabled();
+});
+
+test('a priced model: Upscale shows its price and stores the chosen resolution, Reframe offers its own ratios and stores the chosen one', async ({ page }) => {
+  await signIn(page, 'appsc');
+  const jobs = async () => ((await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { feature: string; ratio: string; resolution: string | null }[] }).jobs;
+  const pickPriced = async () => {
+    await modelButton(page).click();
+    await page.getByRole('option', { name: /Mock apps priced/ }).click();
+    await expect(modelButton(page)).toContainText('Mock apps priced');
+  };
+
+  await openApp(page, 'Tăng độ phân giải', 'image-upscale');
+  await expect(modelButton(page)).toContainText('Mock apps E2E'); // the free model sorts first, so the other specs keep it
+  await pickPriced();
+  await page.getByLabel('Ảnh cần tăng độ phân giải').setInputFiles(file('small.png'));
+  await expectOptions(page, 'Độ phân giải', ['2K', '4K']);
+  await expect(select(page, 'Độ phân giải')).toHaveAttribute('data-value', '2K');
+  await expect(runButton(page)).toContainText('$0.0800');
+  await selectValue(page, 'Độ phân giải', '4K');
+  await expect(runButton(page)).toContainText('$0.0800');
+  await runButton(page).click();
+  await expect(page.getByText('Đã gửi job')).toBeVisible();
+  await expect.poll(async () => (await jobs()).filter((j) => j.feature === 'image_upscale').map((j) => j.resolution)).toEqual(['4K']);
+
+  await openApp(page, 'Đổi khung hình', 'reframe');
+  await pickPriced();
+  await expectOptions(page, 'Tỉ lệ', ['1:1', '16:9']); // no "Tự động": Reframe needs a target ratio
+  await expect(select(page, 'Tỉ lệ')).toHaveAttribute('data-value', '1:1');
+  await page.getByLabel('Ảnh cần đổi khung').setInputFiles(file('photo.png'));
+  await expect(runButton(page)).toContainText('$0.0800');
+  await selectValue(page, 'Tỉ lệ', '16:9');
+  await runButton(page).click();
+  await expect(page.getByText('Đã gửi job')).toBeVisible();
+  await expect.poll(async () => (await jobs()).filter((j) => j.feature === 'reframe').map((j) => [j.ratio, j.resolution])).toEqual([['16:9', '2K']]);
+});
+
+test('the swaps take an optional prompt that is added to their fixed instruction', async ({ page }) => {
+  await signIn(page, 'appsc');
+  await openApp(page, 'Đổi nhân vật', 'character-swap');
+  const prompt = page.getByRole('textbox', { name: 'Prompt (tuỳ chọn)' });
+  await page.locator('input[type=file][aria-label="Ảnh nhân vật mới"]').setInputFiles(file('new.png'));
+  await page.locator('input[type=file][aria-label="Ảnh đích"]').setInputFiles(file('target.png'));
+  await expect(runButton(page)).toBeEnabled(); // the prompt is not required
+  await prompt.fill('keep the red hat');
+  await runButton(page).click();
+  await expect(page.getByText('Đã gửi job')).toBeVisible();
+  const mine = (await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { id: string; feature: string }[] };
+  const detail = (await (await page.request.get(`/api/jobs/${mine.jobs.find((j) => j.feature === 'character_swap')!.id}`)).json()) as { prompt: string };
+  expect(detail.prompt).toBe('replace the whole person in the second image with the person from the first image, keep the background. keep the red hat');
+  await openApp(page, 'Đổi người mẫu', 'model-swap');
+  await expect(page.getByRole('textbox', { name: 'Prompt (tuỳ chọn)' })).toBeVisible();
+  await openApp(page, 'Đổi khuôn mặt', 'face-swap');
+  await expect(page.getByRole('textbox')).toHaveCount(0);
+});
+
+test('the change-app menu returns focus to its button on Escape, closes when focus leaves it, and shows a focus ring', async ({ page }) => {
+  await signIn(page, 'appsc');
+  await openApp(page, 'Đổi khuôn mặt', 'face-swap');
+  const change = page.getByRole('button', { name: 'Đổi ứng dụng' });
+  const list = page.getByRole('list', { name: 'Ứng dụng' });
+  await expect(async () => {
+    await change.focus();
+    await page.keyboard.press('Enter');
+    await expect(change).toHaveAttribute('aria-expanded', 'true', { timeout: 1_000 });
+  }).toPass();
+  await page.keyboard.press('Tab');
+  await expect(list.getByRole('link').first()).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(list).toBeHidden();
+  await expect(change).toBeFocused();
+  expect(await change.evaluate((el) => getComputedStyle(el).outlineStyle)).toBe('solid'); // the ring is drawn on the dark card
+  expect(await change.evaluate((el) => getComputedStyle(el).outlineColor)).toBe('rgb(255, 255, 255)');
+
+  await page.keyboard.press('Enter');
+  await expect(list).toBeVisible();
+  await page.getByRole('button', { name: 'Tải lên Khuôn mặt nguồn' }).focus(); // focus moves outside the menu
+  await expect(list).toBeHidden();
+});
+
+test('each upload button names its slot, and only the pages with a History tab hide the tray', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await signIn(page, 'appsc');
+  const tray = page.getByRole('complementary', { name: 'Job của tôi' });
+  await page.goto('/apps/face-swap');
+  await expect(page.getByRole('button', { name: 'Tải lên Khuôn mặt nguồn' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Tải lên Ảnh đích' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Tải lên', exact: true })).toHaveCount(0);
+  await expect(tray).toHaveCount(0); // the page has its own History tab
+
+  await page.goto('/apps');
+  await expect(tray).toBeVisible();
+  await page.goto('/apps/motion-control');
+  await expect(page.getByText('Sắp có')).toBeVisible();
+  await expect(tray).toBeVisible();
 });
 
 test('Run is disabled with a reason when the app has no enabled model, and "Đổi ứng dụng" switches app with a fresh form', async ({ page }) => {

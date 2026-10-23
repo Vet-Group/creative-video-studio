@@ -40,6 +40,12 @@ await pool.query(
      ('mock-apps-e2e', 'mock', 'mock', 'Mock apps E2E', 'image', '{character_swap,model_swap,background_changer,reframe,image_upscale,face_swap,background_remover}', '{auto,1:1,9:16}', '{}', 2,
       '{"1K": "0.0500", "2K": "0.0800", "4K": "0.0800"}', '{}', true)`,
 );
+// A priced model for Upscale and Reframe, which an e2e page picks to see real prices, a model's own ratios (no `auto`) and resolutions. Its provider is `fal`
+// so the page shows its prices (a mock model shows 0), and the e2e worker has no fal adapter: its jobs are posted and stored, then released. Never used by another spec.
+await pool.query(
+  `insert into model_configs (id, provider, endpoint, label, kind, features, ratios, durations_sec, max_images, image_prices, sources, enabled) values
+     ('mock-apps-priced', 'fal', 'fal-ai/e2e-priced', 'Mock apps priced', 'image', '{image_upscale,reframe}', '{1:1,16:9}', '{}', 1, '{"2K": "0.08", "4K": "0.08"}', '{}', true)`,
+);
 // A store the Create picker offers, for the specs that tag a clip with one.
 await pool.query(`insert into stores (id, name, code) values ('store-e2e', 'E2E Shop', 'E2E-SEED')`);
 // Every spec runs jobs; the daily clip cap is not what is under test here.

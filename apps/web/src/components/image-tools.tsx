@@ -108,7 +108,7 @@ export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRem
           </ul>
         )}
         {!full && (
-          <button type="button" className="slot-add" disabled={!hydrated || busy} onClick={() => input.current?.click()}>
+          <button type="button" className="slot-add" aria-label={`Tải lên ${label}`} disabled={!hydrated || busy} onClick={() => input.current?.click()}>
             <Icon name="plus" size={16} />
             <span>Tải lên</span>
           </button>

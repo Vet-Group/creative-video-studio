@@ -15,7 +15,7 @@ import { Tray } from './Shell';
 
 type Tab = 'create' | 'history' | 'about';
 const TAB_LABEL: Record<Tab, string> = { create: 'Tạo', history: 'Lịch sử', about: 'Giới thiệu' };
-const MAX_PROMPT = 1000;
+const MAX_PROMPT = 1500;
 const CATEGORY_ICON: Record<AppCategory, IconName> = { fashion: 'tryon', photo: 'image', video: 'create', utility: 'library' };
 
 /** The picture of an app on a card and in the page header: a tinted tile with the icon of its category. */
@@ -31,6 +31,7 @@ export function AppArt({ app }: { app: AppConfig }) {
 function ChangeMenu({ current }: { current: string }) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
   const listId = useId();
   useEffect(() => {
     if (!open) return;
@@ -39,8 +40,13 @@ function ChangeMenu({ current }: { current: string }) {
     return () => document.removeEventListener('mousedown', onDown);
   }, [open]);
   return (
-    <div className="app-change" ref={root} onKeyDown={(e) => e.key === 'Escape' && open && (e.stopPropagation(), setOpen(false))}>
-      <button type="button" aria-expanded={open} aria-controls={open ? listId : undefined} onClick={() => setOpen(!open)}>
+    <div
+      className="app-change"
+      ref={root}
+      onKeyDown={(e) => e.key === 'Escape' && open && (e.stopPropagation(), setOpen(false), trigger.current?.focus())}
+      onBlur={(e) => open && e.relatedTarget instanceof Node && !root.current?.contains(e.relatedTarget) && setOpen(false)} // a click elsewhere is handled below; this is the Tab key
+    >
+      <button ref={trigger} type="button" aria-expanded={open} aria-controls={open ? listId : undefined} onClick={() => setOpen(!open)}>
         Đổi ứng dụng
         <Icon name={open ? 'up' : 'down'} size={12} />
       </button>
@@ -164,10 +170,10 @@ function AppForm({ app }: { app: AppConfig }) {
             {app.prompt && (
               <div className="field">
                 <label htmlFor={promptId} className="field-label">
-                  Mô tả nền (tuỳ chọn)
+                  {app.prompt === 'background' ? 'Mô tả nền (tuỳ chọn)' : 'Prompt (tuỳ chọn)'}
                 </label>
                 <div className="prompt-box">
-                  <textarea id={promptId} value={prompt} maxLength={MAX_PROMPT} placeholder="Ví dụ: quán cà phê ngoài trời đầy nắng, bàn đá cẩm thạch" onChange={(e) => setPrompt(e.target.value)} />
+                  <textarea id={promptId} value={prompt} maxLength={MAX_PROMPT} placeholder={app.prompt === 'background' ? 'Ví dụ: quán cà phê ngoài trời đầy nắng, bàn đá cẩm thạch' : 'Mô tả điều bạn muốn thêm...'} onChange={(e) => setPrompt(e.target.value)} />
                   <div className="prompt-foot">
                     <span>Tối đa {MAX_PROMPT} ký tự</span>
                     <span>

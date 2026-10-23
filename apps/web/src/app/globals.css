@@ -430,6 +430,7 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .app-head strong { font-size: 20px; line-height: 26px; }
 .app-change { position: relative; flex: none; }
 .app-change > button { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 0; border-radius: 14px; background: rgb(0 0 0 / .45); color: #fff; font-size: 12px; }
+.app-change > button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .app-change-list { position: absolute; z-index: 30; top: calc(100% + 4px); right: 0; width: 15rem; max-height: 60vh; margin: 0; padding: 4px; overflow: auto; list-style: none; border: 1px solid #e4e4e7; border-radius: 12px; background: #fff; box-shadow: 0 12px 32px rgb(0 0 0 / .16); }
 .app-change-list a { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; border-radius: 8px; color: rgb(26, 26, 26); font-size: 14px; text-decoration: none; }
 .app-change-list a:hover, .app-change-list a[aria-current='page'] { background: rgb(244, 244, 245); }

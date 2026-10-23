@@ -35,8 +35,8 @@ export interface AppConfig {
   description: string;
   category: AppCategory;
   slots: AppSlot[];
-  /** A prompt box that excludes the reference image (Background Changer); no other app has one, the swaps and the rest send their fixed prompt. */
-  prompt?: 'background';
+  /** A prompt box. `background` (Background Changer) excludes the reference image; `optional` (the two swaps) adds the member's text to the fixed instruction. The other apps send their fixed prompt. */
+  prompt?: 'background' | 'optional';
   /** Shows the ratio field (Reframe); the options are the model's own ratios. */
   ratio?: boolean;
   /** Shows the resolution field (Upscale); the options are the keys of the model's prices. */
@@ -60,12 +60,14 @@ export const APPS: AppConfig[] = [
       { label: 'Nhân vật mới', inputLabel: 'Ảnh nhân vật mới', empty: 'Thêm 1 ảnh người sẽ xuất hiện trong kết quả' },
       { label: 'Ảnh đích', inputLabel: 'Ảnh đích', empty: 'Thêm 1 ảnh có người cần thay' },
     ],
+    prompt: 'optional',
     about: {
       title: 'Đổi nhân vật chỉ với một lần chạy',
       intro: 'Ứng dụng thay toàn bộ người trong ảnh đích bằng người trong ảnh nhân vật mới, giữ nguyên bối cảnh. Hợp với ảnh thời trang và quảng cáo cần đổi người nhưng không đổi cảnh.',
       steps: [
         ['Tải nhân vật mới.', 'Một ảnh người sẽ xuất hiện trong kết quả: khuôn mặt, dáng người và trang phục đều lấy từ ảnh này.'],
         ['Tải ảnh đích.', 'Ảnh có người cần thay. Kết quả giữ bối cảnh của ảnh này.'],
+        ['Thêm mô tả (tuỳ chọn).', 'Một câu nếu muốn dặn thêm; nó được ghép vào chỉ dẫn cố định của ứng dụng.'],
         ['Chạy.', 'Nhấn Chạy; ảnh mới nằm trong tab Lịch sử và trong Thư viện, mục Ứng dụng.'],
       ],
       notes: [PHOTO_NOTE, BUDGET_NOTE],
@@ -81,12 +83,14 @@ export const APPS: AppConfig[] = [
       { label: 'Người mẫu mới', inputLabel: 'Ảnh người mẫu mới', empty: 'Thêm 1 ảnh người mẫu mới' },
       { label: 'Ảnh đích', inputLabel: 'Ảnh đích', empty: 'Thêm 1 ảnh sản phẩm có người mẫu cần thay' },
     ],
+    prompt: 'optional',
     about: {
       title: 'Đổi người mẫu mà vẫn giữ sản phẩm',
       intro: 'Ứng dụng thay người mẫu trong ảnh đích bằng người mẫu mới, còn trang phục, dáng và bối cảnh giữ nguyên. Hợp với ảnh sản phẩm cần nhiều gương mặt.',
       steps: [
         ['Tải người mẫu mới.', 'Một ảnh rõ mặt và dáng, ánh sáng đều.'],
         ['Tải ảnh đích.', 'Ảnh sản phẩm có người mẫu cần thay. Trang phục, dáng và bối cảnh của ảnh này được giữ.'],
+        ['Thêm mô tả (tuỳ chọn).', 'Một câu nếu muốn dặn thêm; nó được ghép vào chỉ dẫn cố định của ứng dụng.'],
         ['Chạy.', 'Nhấn Chạy và theo dõi trong tab Lịch sử.'],
       ],
       notes: [PHOTO_NOTE, BUDGET_NOTE],
