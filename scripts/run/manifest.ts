@@ -18,6 +18,7 @@ export interface Step {
   title: string;
   deps: string[];
   soft: string[];
+  gate?: string[];
   worktree: string;
   status: StepStatus;
   attempts: number;
@@ -64,7 +65,7 @@ export function initManifest(opts: { preflight: { checkedAt: string; results: It
     const soft = d.soft ?? [];
     const hardSkip = d.deps.find((dep) => !soft.includes(dep) && steps.find((s) => s.id === dep)?.status === 'skipped');
     const reason = opts.skipped.get(d.id) ?? (hardSkip ? `dependency ${hardSkip} skipped` : undefined);
-    steps.push({ id: d.id, title: d.title, deps: d.deps, soft, worktree: d.worktree, status: reason ? 'skipped' : 'pending', attempts: 0, evidence: [], reason, spendUsd: 0, timeoutMin: d.timeoutMin ?? 60 });
+    steps.push({ id: d.id, title: d.title, deps: d.deps, soft, gate: d.gate, worktree: d.worktree, status: reason ? 'skipped' : 'pending', attempts: 0, evidence: [], reason, spendUsd: 0, timeoutMin: d.timeoutMin ?? 60 });
   }
   return { version: 1, preflight: opts.preflight, guardHashes: {}, steps, criteria: opts.criteria, agentLog: [] };
 }
@@ -86,11 +87,11 @@ export function validate(m: Manifest): string[] {
   return errors;
 }
 
-const resolved = (s: Step | undefined) => s?.status === 'done' || s?.status === 'skipped';
+const resolved = (s: Step | undefined, gated: boolean) => s?.status === 'done' || (!gated && s?.status === 'skipped');
 
-/** Steps the conductor may start now. */
+/** Steps the conductor may start now. A gate dep releases its step only when done. */
 export function readySteps(m: Manifest): Step[] {
-  return m.steps.filter((s) => s.status === 'pending' && s.deps.every((d) => resolved(m.steps.find((x) => x.id === d))));
+  return m.steps.filter((s) => s.status === 'pending' && s.deps.every((d) => resolved(m.steps.find((x) => x.id === d), !!s.gate?.includes(d))));
 }
 
 /** `doing` steps past their timeout become `stuck` (plan A.0: heartbeat is separate from progress). */
@@ -127,7 +128,7 @@ export function renewManifest(m: Manifest, fresh: Manifest): void {
       s.status = 'pending';
       s.reason = undefined;
     }
-    return { ...s, title: f.title, deps: f.deps, soft: f.soft };
+    return { ...s, title: f.title, deps: f.deps, soft: f.soft, gate: f.gate };
   });
   m.preflight = fresh.preflight;
 }

@@ -28,6 +28,8 @@ Source audit (read-only, kept outside this repository): `C:\Users\User\dev\work\
 
 These are single samples of about 1.4 s; a clip without a source may still be lazy-loading.
 
+> Follow-up: M.7 ended with C4 not met. The measured fix list for step M.7b is in [`UI-MOTION-PARITY-M7B.md`](UI-MOTION-PARITY-M7B.md); where they differ, its measured targets win.
+
 ## Parity matrix
 
 "Same" = rebuild to match the Fash layout and behaviour at the stated viewports. "Internal" = deliberately different for an internal tool. Viewports: 1440×1000, 1280×800 and 390×844.

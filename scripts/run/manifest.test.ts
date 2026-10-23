@@ -33,6 +33,30 @@ describe('steps', () => {
     expect(d5.soft).toContain('M.7');
   });
 
+  test('the high-fidelity UI step runs in the app worktree and gates the deploy', () => {
+    const m7b = STEPS.find((s) => s.id === 'M.7b')!;
+    expect(m7b).toMatchObject({ deps: ['D.1', 'B.3'], soft: ['B.3'], worktree: 'app' });
+    const d5 = STEPS.find((s) => s.id === 'D.5')!;
+    expect(d5.deps).toContain('M.7b');
+    expect(d5.soft).not.toContain('M.7b');
+    expect(d5.gate).toEqual(['M.7b']);
+  });
+
+  test('a gate dep releases the deploy only when done, never when skipped or stuck', () => {
+    const m = fresh();
+    for (const s of m.steps) if (s.id !== 'D.5' && !s.id.startsWith('D.5-') && s.id !== 'P.1' && s.id !== 'A.2') s.status = 'done';
+    const ready = () => readySteps(m).map((s) => s.id);
+    for (const status of ['pending', 'doing', 'stuck', 'skipped'] as const) {
+      get(m, 'M.7b').status = status;
+      expect(ready(), status).not.toContain('D.5');
+    }
+    get(m, 'M.7b').status = 'done';
+    expect(ready()).toContain('D.5');
+    // A soft dep that ends skipped still releases the deploy.
+    get(m, 'M.7').status = 'skipped';
+    expect(ready()).toContain('D.5');
+  });
+
   test('are topologically ordered with known deps', () => {
     const seen = new Set<string>();
     for (const s of STEPS) {
