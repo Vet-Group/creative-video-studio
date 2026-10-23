@@ -388,6 +388,35 @@ test.describe('1280x800', () => {
     expect(await page.evaluate(() => document.documentElement.scrollHeight <= window.innerHeight)).toBe(true);
   });
 
+  test('V01 example dialog at 1440: 1100x501 centred, radius 14, the clip left of a 219 px column with 32 px Previous/Next and a 36 px button', async ({ page }) => {
+    await page.setViewportSize(DESKTOP);
+    await tab(page, 'Ví dụ').click();
+    await page.getByRole('button', { name: 'Xoay quanh chậm', exact: true }).click({ position: { x: 12, y: 12 } });
+    const dialog = page.getByRole('dialog', { name: 'Chi tiết mẫu' });
+    const d = await box(dialog);
+    sized(d, 1100, 501, 'dialog');
+    near(d.x, 170, 'dialog x');
+    near(d.y, 250, 'dialog y');
+    expect(await css(dialog, 'border-top-left-radius', 'background-color')).toEqual(['14px', 'rgb(255, 255, 255)']);
+    const info = await box(dialog.locator('.detail-info'));
+    near(info.width, 219, 'details column width');
+    near(info.x + info.width, d.x + d.width, 'details column right edge');
+    const media = await box(dialog.locator('.detail-media .preview'));
+    expect(media.x + media.width).toBeLessThanOrEqual(info.x + 0.5);
+    near(media.height, 501, 'square clip height'); // a 1:1 clip fills the height
+    for (const name of ['Mẫu trước', 'Mẫu sau']) {
+      const b = dialog.getByRole('button', { name });
+      sized(await box(b), 32, 32, name);
+      expect(await css(b, 'border-top-left-radius', 'background-color', 'color')).toEqual(['6px', 'rgb(242, 242, 242)', 'rgb(77, 77, 77)']);
+    }
+    const use = dialog.getByRole('button', { name: 'Dùng mẫu này' });
+    const u = await box(use);
+    sized(u, 187, 36, 'use button');
+    near(d.y + d.height - (u.y + u.height), 16, 'use button bottom inset', 3);
+    near((await box(dialog.getByRole('button', { name: 'Mẫu sau' }))).y + 32 + 6, u.y, 'Previous/Next sit 6 px above the button');
+    expect(await css(use, 'background-color', 'color', 'border-top-left-radius', 'font-size')).toEqual(['rgb(0, 0, 0)', 'rgb(255, 255, 255)', '8px', '12px']);
+  });
+
   test('S5 T2 G4 the layout holds at 1280: card at x=288, tabs centred over a grid that starts at y=81', async ({ page }) => {
     near((await box(page.locator('.form-card'))).x, 288, 'card x');
     const tabs = await box(page.locator('.tabs'));
@@ -395,6 +424,22 @@ test.describe('1280x800', () => {
     near(tabs.x + tabs.width / 2, side.x + side.width / 2, 'tabs centre', 4);
     await tab(page, 'Ví dụ').click();
     near((await box(page.locator('.masonry'))).y, 81, 'grid top', 6);
+  });
+});
+
+test.describe('1536 px and wider', () => {
+  const columns = (page: Page) => page.locator('.masonry-col');
+
+  test('V09 the examples grid has 4 columns from 1536 px and 3 just below, filled shortest column first', async ({ page }) => {
+    await openCreate(page, { width: 1536, height: 900 });
+    await tab(page, 'Ví dụ').click();
+    await expect(columns(page)).toHaveCount(4);
+    // Every tile went to the column that was shortest so far, so no column ends more than one tile below another.
+    const bottoms = await columns(page).evaluateAll((els) => els.map((c) => c.getBoundingClientRect().height));
+    const tallest = await page.locator('.example').evaluateAll((els) => Math.max(...els.map((e) => e.getBoundingClientRect().height)));
+    expect(Math.max(...bottoms) - Math.min(...bottoms)).toBeLessThanOrEqual(tallest + 8);
+    await page.setViewportSize({ width: 1535, height: 900 });
+    await expect(columns(page)).toHaveCount(3);
   });
 });
 

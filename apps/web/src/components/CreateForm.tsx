@@ -1,8 +1,8 @@
 'use client';
-import { type DragEvent, type KeyboardEvent, useEffect, useId, useRef, useState } from 'react';
+import { type CSSProperties, type DragEvent, type KeyboardEvent, useEffect, useId, useRef, useState } from 'react';
 import { api, errorText, sendJson } from '@/lib/api';
 import { EXAMPLES, type Example, exampleForPreset, splitColumns } from '@/lib/examples';
-import { NARROW, useMediaQuery } from '@/lib/use-media-query';
+import { NARROW, useMediaQuery, WIDE } from '@/lib/use-media-query';
 import { useHydrated } from '@/lib/use-hydrated';
 import { Carousel } from './Carousel';
 import { Icon } from './Icon';
@@ -72,6 +72,7 @@ export function CreateForm({ reuse }: { reuse?: string }) {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const narrow = useMediaQuery(NARROW);
+  const wide = useMediaQuery(WIDE);
   const fileInput = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
   const promptId = useId();
@@ -139,13 +140,15 @@ export function CreateForm({ reuse }: { reuse?: string }) {
   const durations = [...new Set(chosen ? chosen.durationsSec : (models?.models.flatMap((m) => m.durationsSec) ?? [durationSec]))].sort((a, b) => a - b);
   const ratios = chosen ? chosen.ratios : (models?.models.flatMap((m) => m.ratios) ?? [ratio]);
   const tooMany = chosen !== undefined && images.length > chosen.maxImages;
+  // The upload limit follows the chosen model (REA-video V02); the server caps every model at MAX_IMAGES.
+  const maxImages = Math.min(MAX_IMAGES, chosen?.maxImages ?? MAX_IMAGES);
   const promptOk = presetId !== '' || (prompt.trim() !== '' && prompt.trim().length <= MAX_PROMPT);
   const canRun = ready && !busy && images.length > 0 && chosen?.supported === true && !tooMany && promptOk;
 
   async function upload(files: File[]) {
     if (files.length === 0) return;
     setError('');
-    if (images.length + files.length > MAX_IMAGES) return setError(`Tối đa ${MAX_IMAGES} ảnh.`);
+    if (images.length + files.length > maxImages) return setError(`Tối đa ${maxImages} ảnh.`);
     const form = new FormData();
     for (const f of files) form.append('file', f);
     setBusy(true);
@@ -181,6 +184,7 @@ export function CreateForm({ reuse }: { reuse?: string }) {
   const shown: Tab = narrow ? (tab ?? 'create') : tab === 'examples' ? 'examples' : 'history';
   const current = presets?.find((p) => p.id === presetId);
   const banner = exampleForPreset(presetId);
+  const detailAt = detail ? EXAMPLES.indexOf(detail) : -1;
 
   function onTabKey(e: KeyboardEvent) {
     const i = tabs.indexOf(shown);
@@ -256,14 +260,20 @@ export function CreateForm({ reuse }: { reuse?: string }) {
                   void upload(files);
                 }}
               />
-              <button type="button" className="dropzone-pick" disabled={!hydrated || images.length >= MAX_IMAGES} onClick={() => fileInput.current?.click()}>
+              <button type="button" className="dropzone-pick" disabled={!hydrated || images.length >= maxImages} onClick={() => fileInput.current?.click()}>
                 {images.length === 0 && (
                   <span className="dropzone-plus" aria-hidden="true">
                     <Icon name="plus" size={16} />
                   </span>
                 )}
                 <span className="dropzone-hint">
-                  {images.length === 0 ? `Kéo thả hoặc bấm để thêm 1–${MAX_IMAGES} ảnh sản phẩm` : images.length >= MAX_IMAGES ? `Đã đủ ${MAX_IMAGES} ảnh` : `${images.length}/${MAX_IMAGES} ảnh, bấm hoặc kéo thêm`}
+                  {images.length === 0
+                    ? maxImages === 1
+                      ? 'Kéo thả hoặc bấm để thêm 1 ảnh sản phẩm'
+                      : `Kéo thả hoặc bấm để thêm 1–${maxImages} ảnh sản phẩm`
+                    : images.length >= maxImages
+                      ? `Đã đủ ${maxImages} ảnh`
+                      : `${images.length}/${maxImages} ảnh, bấm hoặc kéo thêm`}
                 </span>
               </button>
               {images.length > 0 && (
@@ -362,7 +372,7 @@ export function CreateForm({ reuse }: { reuse?: string }) {
         <div className="side" id={`create-panel-${shown === 'create' ? 'history' : shown}`} role="tabpanel" aria-labelledby={`create-tab-${shown === 'create' ? 'history' : shown}`} hidden={narrow && shown === 'create'}>
           {shown === 'examples' ? (
             <div className="masonry" role="group" aria-label="Video mẫu">
-              {splitColumns(EXAMPLES, narrow ? 2 : 3).map((column, c) => (
+              {splitColumns(EXAMPLES, narrow ? 2 : wide ? 4 : 3).map((column, c) => (
                 <ul key={c} className="masonry-col">
                   {column.map((ex) => (
                     <li key={ex.id} className="example">
@@ -425,17 +435,36 @@ export function CreateForm({ reuse }: { reuse?: string }) {
         </Carousel>
       </Modal>
 
-      <Modal open={detail !== null} onClose={() => setDetail(null)} label="Chi tiết mẫu">
+      {/* The live Example dialog (REA-video V01): the clip beside its details, Previous/Next wrap around, and one button only fills the form. */}
+      <Modal open={detail !== null} onClose={() => setDetail(null)} label="Chi tiết mẫu" className="example-detail">
         {detail && (
           <>
-            <h2>{detail.title}</h2>
-            <Preview src={detail.src} poster={detail.poster} width={detail.width} height={detail.height} title={detail.title} />
-            <p className="muted">
-              Mẫu minh họa{detail.fixture ? ' (fixture)' : ''} · {detail.aspect} · {detail.durationSec} giây
-            </p>
-            <button type="button" className="primary" onClick={() => fillFromExample(detail)}>
-              Dùng mẫu này
-            </button>
+            <div className="detail-media" style={{ '--ratio': detail.width / detail.height } as CSSProperties}>
+              <Preview key={detail.id} src={detail.src} poster={detail.poster} width={detail.width} height={detail.height} title={detail.title} />
+            </div>
+            <div className="detail-info">
+              <h2>{detail.title}</h2>
+              <p className="muted">Mẫu minh họa{detail.fixture ? ' (fixture)' : ''}</p>
+              <dl className="detail-specs">
+                <dt>Tỉ lệ</dt>
+                <dd>{detail.aspect}</dd>
+                <dt>Thời lượng</dt>
+                <dd>{detail.durationSec} giây</dd>
+              </dl>
+              <div className="detail-actions">
+                <div className="detail-nav">
+                  <button type="button" aria-label="Mẫu trước" onClick={() => setDetail(EXAMPLES[(detailAt + EXAMPLES.length - 1) % EXAMPLES.length]!)}>
+                    <Icon name="left" />
+                  </button>
+                  <button type="button" aria-label="Mẫu sau" onClick={() => setDetail(EXAMPLES[(detailAt + 1) % EXAMPLES.length]!)}>
+                    <Icon name="right" />
+                  </button>
+                </div>
+                <button type="button" className="primary detail-use" onClick={() => fillFromExample(detail)}>
+                  Dùng mẫu này
+                </button>
+              </div>
+            </div>
           </>
         )}
       </Modal>

@@ -103,11 +103,18 @@ Where live and the 4317 list differ, live wins: S2, C2, K2 and N1 take the live 
 
 | Topic | Live | M.7b | Why |
 |---|---|---|---|
-| Layout switch | narrow layout from 768 down; 770-1023 keeps the desktop layout with a 2-column grid of 29-156 px columns | keep the 1024 px switch from M.7 | the live 770-1023 range is cramped; the owner can still choose 768 at C4 |
+| Layout switch | narrow layout from 768 down; 770-1023 keeps the desktop layout with a 2-column grid of 29-156 px columns | keep the 1024 px switch from M.7 (decided 2026-10-23) | the live 770-1023 range is cramped; the live Examples helper also switches its grid at 1024 |
 | Drawer close | overlay click only | overlay click **and** Escape | keyboard accessibility |
 | Focus | no visible focus ring | visible focus ring | keyboard accessibility |
 | Upload zone | not keyboard-focusable | focusable, opens the file picker on Enter or Space | keyboard accessibility |
 | Narrow Run | static inside a card sized to the viewport | same pixels (358x60, 12 px above the bottom); a sticky bar is acceptable only if the pixels match | same look |
 | Tile hover button | "Recreate" | our "use this sample" action, same size, place and fade | internal wording |
 | Drawer content | account row, nav, upgrade promo | account row and nav; no upgrade promo | out of scope |
+| Audio | an audio on/off control in the Create card | no audio control (decided 2026-10-23) | the PRD has no audio, and the models are priced and called with audio off |
+| Example dialog (V01) | 1100x501, the clip beside a details column, Previous/Next, "Recreate" (not pressed, so its effect is unknown) | same box; Previous/Next wrap around; "use this sample" only fills the form | no job from a sample |
+| Upload limit (V02) | the image count follows the model (9 to 7 from Seedance to Kling) | the hint and the picker follow the chosen model's `maxImages`, capped at 4 | the limits come from `/api/models`, not from the reference |
+| Examples columns (V09) | 2 columns, 3 from 1024 px, 4 from 1536 px; each tile goes to the shortest column | same | read from the reference script, not measured at 1536 |
+| Off-screen play (V10) | clips may play up to two screens outside the viewport | play only on screen, at most 4, paused in a hidden tab | performance; not the reference behaviour |
 | Font | Inter variable | self-host Inter from its open-licence distribution and note the source | rendered font must match |
+
+V01, V02, V09 and V10 come from the REA-video pass of 2026-10-23 (live, read-only, no job; report kept outside the repo in `fash-internal/evidence/rea-video/2026-10-23-video-pass/`). It also observed the Library request and its empty response (V07, V08), the run payload and job events in the reference script (V03 to V06) and per-component breakpoints (V12). None of those change the app: its own API, job tray and Library stay.

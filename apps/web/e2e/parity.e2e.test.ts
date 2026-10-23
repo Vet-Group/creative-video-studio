@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { expect, type Page, test } from '@playwright/test';
 import { EXAMPLES } from '../src/lib/examples';
 import { freezeData } from './frozen.test';
-import { expectOptions, modelButton, optionsOf, pickModel, select, selectValue, signIn } from './support.test';
+import { expectOptions, modelButton, optionsOf, pickModel, png, select, selectValue, signIn } from './support.test';
 
 // Posters and a frozen clock: reduced motion keeps every clip on its poster, so a second run paints the same frame.
 test.use({ contextOptions: { reducedMotion: 'reduce' } });
@@ -269,6 +269,62 @@ test('choosing a preset or using an example fills the form and creates no job', 
   await page.getByRole('tab', { name: 'Lịch sử' }).click();
   await expect(page.getByText('Chưa có job nào.')).toBeVisible();
   expect(posts).toEqual([]);
+});
+
+test('V01 Previous and Next step through every sample in order and wrap around; nothing is submitted', async ({ page }) => {
+  const posts: string[] = [];
+  page.on('request', (r) => r.method() === 'POST' && r.url().includes('/api/jobs') && posts.push(r.url()));
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await signIn(page, 'member5');
+  await openCreate(page);
+  await page.getByRole('tab', { name: 'Ví dụ' }).click();
+  await openTile(page, EXAMPLES[0]!.title);
+  const detail = page.getByRole('dialog', { name: 'Chi tiết mẫu' });
+  const title = detail.getByRole('heading', { level: 2 });
+  await expect(title).toHaveText(EXAMPLES[0]!.title);
+  await expect(detail).toContainText(EXAMPLES[0]!.aspect);
+  for (const ex of EXAMPLES.slice(1)) {
+    await detail.getByRole('button', { name: 'Mẫu sau' }).click();
+    await expect(title).toHaveText(ex.title);
+    await expect(detail).toContainText(`${ex.durationSec} giây`);
+  }
+  await detail.getByRole('button', { name: 'Mẫu sau' }).click();
+  await expect(title).toHaveText(EXAMPLES[0]!.title);
+  await detail.getByRole('button', { name: 'Mẫu trước' }).click();
+  await expect(title).toHaveText(EXAMPLES.at(-1)!.title);
+  await expect(detail.getByRole('button', { name: 'Mẫu trước' })).toBeFocused(); // the button keeps the focus while the sample changes
+  await page.keyboard.press('Escape');
+  await expect(detail).toBeHidden();
+  expect(posts).toEqual([]);
+});
+
+test('V02 the upload limit and its hint follow the chosen model', async ({ page }) => {
+  await page.route(/\/api\/models\?/, (r) => {
+    const base = { provider: 'mock', isMock: true, estimateUsd: '0.1000', passRate: null, passes: 0, total: 0, ratios: ['9:16', '1:1'], durationsSec: [5, 8], supported: true };
+    const models = [
+      { ...base, id: 'two', label: 'Two image model', maxImages: 2 },
+      { ...base, id: 'one', label: 'One image model', maxImages: 1 },
+      { ...base, id: 'four', label: 'Four image model', maxImages: 4 },
+    ];
+    return r.fulfill({ json: { models, defaultModelId: 'two', monthToDate: { usd: '0.0000', provisional: false } } });
+  });
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await signIn(page, 'member5');
+  const pick = page.locator('.dropzone-pick');
+  await expect(modelButton(page)).toContainText('Two image model');
+  await expect(pick).toContainText('thêm 1–2 ảnh sản phẩm');
+  await pickModel(page, /One image model/);
+  await expect(pick).toContainText('thêm 1 ảnh sản phẩm');
+  await pickModel(page, /Two image model/);
+  await page.getByLabel('Ảnh sản phẩm').setInputFiles(['a.png', 'b.png'].map((name) => ({ name, mimeType: 'image/png', buffer: png() })));
+  await expect(pick).toContainText('Đã đủ 2 ảnh');
+  await expect(pick).toBeDisabled();
+  await pickModel(page, /Four image model/);
+  await expect(pick).toContainText('2/4 ảnh, bấm hoặc kéo thêm');
+  await expect(pick).toBeEnabled();
+  await pickModel(page, /One image model/);
+  await expect(page.getByText('Mô hình này nhận tối đa 1 ảnh.')).toBeVisible(); // too many for this model: Run stays off until one goes
+  await expect(page.getByRole('button', { name: /^Tạo video/ })).toBeDisabled();
 });
 
 test('a dialog closes on its backdrop, not on a click inside it', async ({ page }) => {
