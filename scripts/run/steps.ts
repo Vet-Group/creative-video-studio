@@ -32,7 +32,7 @@ export const STEPS: StepDef[] = [
   { id: 'M.4', title: 'UI', deps: ['M.3'], worktree: 'app' },
   { id: 'M.5', title: 'Admin area', deps: ['M.4'], worktree: 'app' },
   { id: 'M.6', title: 'Real providers', deps: ['M.5', 'B.6'], worktree: 'app', soft: ['B.6'] },
-  { id: 'D.1', title: 'Lark login (mocked OAuth)', deps: ['M.5'], worktree: 'app' },
+  { id: 'D.1', title: 'Google and Lark login with account linking (mocked OAuth)', deps: ['M.5'], worktree: 'app' },
   { id: 'D.2', title: 'Backups', deps: ['A.0b'], worktree: 'app' },
   { id: 'D.2-r2', title: 'Weekly R2 copy', deps: ['D.2'], worktree: 'app' },
   { id: 'D.3', title: 'Read-only VET check', deps: ['A.0c'], worktree: 'app' },
@@ -41,6 +41,7 @@ export const STEPS: StepDef[] = [
   { id: 'D.5-hostname', title: 'Public hostname', deps: ['D.5'], worktree: 'app' },
   { id: 'D.5-admin', title: 'First Admin', deps: ['D.5'], worktree: 'app' },
   { id: 'D.5-lark', title: 'Lark live check', deps: ['D.5-hostname', 'D.1'], worktree: 'app' },
+  { id: 'D.5-google', title: 'Google live check', deps: ['D.5-hostname', 'D.1'], worktree: 'app' },
 ];
 
 // The results report reports on every other step, so it waits for all of them; a skipped or stuck one is reported, not blocking.

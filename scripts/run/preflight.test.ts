@@ -7,6 +7,8 @@ const FAKE: Env = {
   LARK_APP_ID: 'cli_app',
   LARK_APP_SECRET: 'lark-secret-3333',
   LARK_TENANT_KEY: 'tenant',
+  GOOGLE_CLIENT_ID: 'id.apps.googleusercontent.com',
+  GOOGLE_CLIENT_SECRET: 'google-secret-9999',
   CVS_R2_REPOSITORY: 's3:https://acct.r2.cloudflarestorage.com/cvs-backup',
   CVS_R2_ACCESS_KEY_ID: 'r2-key-4444',
   CVS_R2_SECRET_ACCESS_KEY: 'r2-secret-5555',
@@ -26,6 +28,7 @@ function deps(env: Env, status = 200): Deps {
       // Echo the request back in the body: a leak would surface if any code printed a response.
       if (status !== 200) return json(status, { echo: url, env });
       if (url.includes('tenant_access_token')) return json(200, { code: 0, echo: env });
+      if (url.includes('oauth2.googleapis.com/token')) return json(400, { error: 'invalid_grant', echo: env });
       if (url.includes('/zones?name=')) return json(200, { result: [{ id: 'z', account: { id: 'a' } }] });
       return json(200, { echo: env });
     }) as typeof fetch,
@@ -68,6 +71,18 @@ describe('preflight', () => {
     };
     expect((await checkItem('cloudflare', withVerify(true))).status).toBe('ĐỦ');
     expect((await checkItem('cloudflare', withVerify(false))).status).toBe('SAI');
+  });
+
+  test('a Google client passes only when Google rejects the probe code, not the client', async () => {
+    const google = (error: string): Deps => {
+      const d = deps(FAKE);
+      d.fetch = (async () => json(error === 'invalid_grant' ? 400 : 401, { error })) as typeof fetch;
+      return d;
+    };
+    expect((await checkItem('google-app', google('invalid_grant'))).status).toBe('ĐỦ');
+    expect((await checkItem('google-app', google('invalid_client'))).status).toBe('SAI');
+    expect((await checkItem('google-app', google('redirect_uri_mismatch'))).note).toContain('/api/auth/callback/google');
+    expect((await checkItem('google-app', deps({}))).status).toBe('THIẾU');
   });
 
   test('missing GitHub or Docker blocks the run', async () => {

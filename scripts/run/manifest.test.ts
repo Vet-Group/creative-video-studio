@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import { shouldRelaunch, writeLease } from './lease.ts';
 import {
-  approve, changedGuards, expireSteps, guardFiles, initManifest, parseCriteria, preapprovalValid, readManifest, readySteps, recordFailure,
+  approve, changedGuards, expireSteps, guardFiles, initManifest, parseCriteria, preapprovalValid, readManifest, readySteps, recordFailure, renewManifest,
   sha256, validate, writeManifest, type Manifest,
 } from './manifest.ts';
 import { sendLark } from './notify.ts';
@@ -76,6 +76,17 @@ describe('manifest', () => {
     Object.assign(get(m, 'A.0'), { status: 'doing', startedAt: '2026-10-23T00:00:00Z' });
     expect(expireSteps(m, new Date('2026-10-23T00:59:00Z'))).toEqual([]);
     expect(expireSteps(m, new Date('2026-10-23T01:01:00Z'))).toEqual(['A.0']);
+  });
+
+  test('renewal adds steps new to the plan and re-opens preflight skips that are now ready', () => {
+    const old = fresh(new Map([['D.5-lark', 'preflight lark-app: THIẾU']]));
+    old.steps = old.steps.filter((s) => s.id !== 'D.5-google');
+    get(old, 'M.1').status = 'doing';
+    renewManifest(old, fresh(new Map([['D.5-google', 'preflight google-app: THIẾU']])));
+    expect(get(old, 'D.5-lark').status).toBe('pending');
+    expect(get(old, 'D.5-google').status).toBe('skipped');
+    expect(get(old, 'M.1').status).toBe('doing');
+    expect(old.steps.map((s) => s.id)).toEqual(fresh().steps.map((s) => s.id));
   });
 
   test('pre-approval expires after 14 days', () => {

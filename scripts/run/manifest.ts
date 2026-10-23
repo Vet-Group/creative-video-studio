@@ -118,6 +118,20 @@ export function recordFailure(s: Step, reason: string): void {
   }
 }
 
+/** Renewal: steps added to the plan since the first approve join as freshly computed; titles and deps follow the plan; preflight skips that are now ĐỦ re-open (autonomy AC 4). */
+export function renewManifest(m: Manifest, fresh: Manifest): void {
+  m.steps = fresh.steps.map((f) => {
+    const s = m.steps.find((x) => x.id === f.id);
+    if (!s) return f;
+    if (s.status === 'skipped' && f.status === 'pending' && /^(preflight|dependency)/.test(s.reason ?? '')) {
+      s.status = 'pending';
+      s.reason = undefined;
+    }
+    return { ...s, title: f.title, deps: f.deps, soft: f.soft };
+  });
+  m.preflight = fresh.preflight;
+}
+
 export function approve(m: Manifest, sentence: string, now: Date): void {
   m.preapproval = { sentence, at: now.toISOString(), expiresAt: new Date(now.getTime() + PREAPPROVAL_DAYS * 86_400_000).toISOString() };
 }
