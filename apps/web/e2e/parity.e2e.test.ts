@@ -135,10 +135,10 @@ test('below 1024 px the drawer opens and closes by keyboard and navigates withou
   await expect(menu).toHaveAttribute('aria-expanded', 'true');
   await expect(nav.getByRole('link', { name: 'Khám phá' })).toBeFocused();
   // The page behind the drawer is out of the focus order.
-  await page.keyboard.press('Tab');
-  await expect(nav.getByRole('link', { name: 'Tạo video' })).toBeFocused();
-  await page.keyboard.press('Tab');
-  await expect(nav.getByRole('link', { name: 'Thư viện' })).toBeFocused();
+  for (const name of ['Thử đồ', 'Tạo ảnh', 'Tạo video', 'Thư viện']) {
+    await page.keyboard.press('Tab');
+    await expect(nav.getByRole('link', { name })).toBeFocused();
+  }
 
   await page.keyboard.press('Escape');
   await expect(nav).toBeHidden();
@@ -146,8 +146,7 @@ test('below 1024 px the drawer opens and closes by keyboard and navigates withou
 
   await page.keyboard.press('Enter');
   await expect(nav).toBeVisible();
-  await page.keyboard.press('Tab');
-  await page.keyboard.press('Tab');
+  for (let i = 0; i < 4; i++) await page.keyboard.press('Tab');
   await page.keyboard.press('Enter');
   await expect(page).toHaveURL(/\/library$/);
   await expect(nav).toBeHidden();
@@ -505,7 +504,7 @@ for (const width of [1440, 1280, 390]) {
     await openCreate(page);
     const wideScreen = width >= 1024;
     const focused = () => page.evaluate(() => (document.activeElement as HTMLElement).getAttribute('aria-label') ?? document.activeElement?.textContent?.trim());
-    const order = wideScreen ? ['Thu gọn thanh bên', 'Cài đặt', 'Khám phá', 'Tạo video', 'Thư viện', 'Lịch sử'] : ['Mở menu', 'Tạo'];
+    const order = wideScreen ? ['Thu gọn thanh bên', 'Cài đặt', 'Khám phá', 'Thử đồ', 'Tạo ảnh', 'Tạo video', 'Thư viện', 'Lịch sử'] : ['Mở menu', 'Tạo'];
 
     for (const name of order) {
       await page.keyboard.press('Tab');
@@ -516,7 +515,7 @@ for (const width of [1440, 1280, 390]) {
       // The persistent sidebar navigates without a mouse.
       await page.goto('/create');
       await expect(page.getByRole('tab', { name: 'Lịch sử' })).toBeVisible();
-      for (let i = 0; i < 5; i++) await page.keyboard.press('Tab');
+      for (let i = 0; i < 7; i++) await page.keyboard.press('Tab');
       await expect.poll(focused).toBe('Thư viện');
       await page.keyboard.press('Enter');
       await expect(page).toHaveURL(/\/library$/);

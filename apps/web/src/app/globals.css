@@ -348,3 +348,50 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .card .favorite[aria-pressed='true'] { color: rgb(180, 120, 0); }
 .card .favorite[aria-pressed='true'] svg path { fill: currentColor; }
 .library-empty .button { padding: 10px 40px; border-color: #000; border-radius: 8px; background: #000; color: #fff; font-weight: 600; }
+
+/* Try On and Image Generation (REA, measured 2026-10-24 at 1424 px): Try On reuses the Create card and tabs; its upload slots are dashed boxes of 56 px thumbnails and a 56 px
+   upload tile. Image Generation has tabs over a gallery and a floating bar, 818 wide and centred in the content area, with 24 px under it. */
+.slot { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-height: 82px; padding: 12px; border: 1px dashed rgb(153, 153, 153); border-radius: 18px; transition: border-color .15s, background-color .15s; }
+.slot:hover, .slot[data-over='true'] { border-color: rgb(26, 26, 26); background: rgb(250, 250, 250); }
+.slot-thumbs { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.slot-thumbs li, .bar-thumbs li { position: relative; width: 56px; height: 56px; }
+.slot-thumbs img, .bar-thumbs img { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: 12px; }
+.slot-thumbs button, .bar-thumbs li > button:not(.bar-add) { position: absolute; top: -6px; right: -6px; display: grid; place-items: center; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%; background: rgb(26, 26, 26); color: #fff; }
+.slot-add { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; width: 56px; height: 56px; padding: 0; border: 1px dashed rgb(204, 204, 204); border-radius: 12px; background: rgb(242, 242, 242); color: rgb(77, 77, 77); font-size: 11px; line-height: 14px; }
+.slot-hint { flex: 1; min-width: 7rem; color: rgb(102, 102, 102); font-size: 13px; line-height: 18px; }
+.run-cost { font-weight: 400; }
+
+.imagegen { display: flex; flex-direction: column; min-height: calc(100dvh - 105px); }
+.imagegen .tabs { align-self: center; }
+.imagegen-side { flex: 1; min-width: 0; padding-top: 12px; }
+.imagegen-side .tray { width: min(100%, 36rem); margin: 0 auto; padding: 0; border: 0; background: transparent; }
+.imagegen-side .tray .muted { font-size: 14px; line-height: 21px; color: rgb(102, 102, 102); }
+.imagegen-side .tray h2 { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.imagegen-side .about { margin: 0 auto; }
+.gallery-item { overflow: hidden; border-radius: 14px; background: rgb(242, 242, 242); }
+.gallery-item img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.gallery-more { display: block; margin: 16px auto 0; }
+.frame:has(.imagegen) { padding-bottom: 0; }
+.imagebar { position: sticky; bottom: 16px; z-index: 40; width: min(818px, 100%); margin: 16px auto; padding: 12px; background: #fff; border-radius: 24px; box-shadow: 0 12px 40px rgb(0 0 0 / .18); }
+.imagebar-top { display: flex; align-items: flex-start; gap: 12px; }
+.bar-thumbs { display: flex; flex: none; flex-wrap: wrap; gap: 8px; max-width: 45%; margin: 0; padding: 0; list-style: none; }
+.bar-add { display: grid; place-items: center; width: 56px; height: 56px; padding: 0; border: 1px dashed rgb(153, 153, 153); border-radius: 12px; background: transparent; color: rgb(77, 77, 77); }
+.imagebar textarea { flex: 1; min-width: 0; height: 56px; padding: 6px 4px; border: 0; outline: none; background: transparent; color: inherit; font: inherit; font-size: 14px; line-height: 21px; resize: none; }
+.imagebar textarea:focus-visible { outline: 2px solid rgb(26, 26, 26); outline-offset: 2px; border-radius: 8px; }
+.bar-message { padding: 4px 4px 0; font-size: 14px; line-height: 21px; }
+.bar-message p { margin: 0; }
+.imagebar-bottom { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.pills { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-width: 0; }
+.imagebar .field { display: block; margin: 0; }
+.imagebar .field-label { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.imagebar .select-trigger { width: auto; max-width: 14rem; height: 34px; padding: 0 12px; border: 1px solid rgb(230, 230, 230); border-radius: 17px; background: #fff; font-size: 13px; }
+.imagebar .select-trigger:hover, .imagebar .select[data-open='true'] .select-trigger { border-color: rgb(153, 153, 153); }
+.imagebar .select-pop { top: auto; bottom: calc(100% + 3px); right: auto; min-width: 11rem; }
+.bar-run { display: flex; align-items: center; justify-content: center; gap: 8px; height: 44px; margin: 0 0 0 auto; padding: 0 24px; border: 0; border-radius: 12px; background: #000; color: #fff; font-size: 14px; line-height: 21px; font-weight: 500; }
+@media (min-width: 1024px) {
+  .imagegen { min-height: calc(100dvh - 48px); }
+  .imagebar { bottom: 24px; margin: 24px auto; padding: 24px; }
+}
+@media (max-width: 480px) {
+  .bar-run { width: 100%; margin-left: 0; }
+}

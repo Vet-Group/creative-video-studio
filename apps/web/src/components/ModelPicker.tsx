@@ -10,7 +10,8 @@ export interface ModelOption {
   label: string;
   isMock: boolean;
   supported: boolean;
-  rate: string;
+  /** The pass rate as text; image models have none yet, so the row leaves it out. */
+  rate?: string;
   estimateUsd: string;
 }
 
@@ -68,7 +69,10 @@ export function ModelPicker({ models, value, onChange }: { models: ModelOption[]
     const width = Math.min(PANEL.width, w - 2 * PANEL.gap);
     const left = beside ? r.right + PANEL.gap : Math.max(PANEL.gap, Math.min(r.left, w - width - PANEL.gap));
     const top = beside ? Math.max(PANEL.gap, Math.min(r.top, h - PANEL.height - PANEL.gap)) : r.bottom + 3;
-    setPlace({ left, top, width, maxHeight: Math.min(PANEL.height, h - top - PANEL.gap) });
+    // A button near the bottom of the screen (the Image Generation bar) opens the panel above it when there is more room there.
+    const above = r.top - PANEL.gap - 3;
+    if (!beside && h - top - PANEL.gap < 240 && above > h - top - PANEL.gap) setPlace({ left, bottom: h - r.top + 3, width, maxHeight: Math.min(PANEL.height, above) });
+    else setPlace({ left, top, width, maxHeight: Math.min(PANEL.height, h - top - PANEL.gap) });
     const list = rowsFor(models, '');
     const at = list.findIndex((m) => m.id === value && m.supported);
     setActive(at >= 0 ? at : Math.max(0, firstEnabled(list.map((m) => !m.supported))));
@@ -114,7 +118,7 @@ export function ModelPicker({ models, value, onChange }: { models: ModelOption[]
                 {m.isMock && <span className="badge">MOCK</span>}
               </span>
               <span className="model-sub">
-                <span>Tỉ lệ đạt: {m.rate}</span>
+                {m.rate !== undefined && <span>Tỉ lệ đạt: {m.rate}</span>}
                 <span>Ước tính: ${m.estimateUsd}</span>
                 {!m.supported && <span>Không hỗ trợ lựa chọn này</span>}
               </span>
