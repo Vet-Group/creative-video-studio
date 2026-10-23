@@ -29,6 +29,7 @@ interface Image {
 }
 interface JobDetail {
   presetId: string | null;
+  prompt: string;
   ratio: string;
   durationSec: number;
   modelId: string;
@@ -37,13 +38,15 @@ interface JobDetail {
 }
 
 const MAX_IMAGES = 4;
+const MAX_PROMPT = 2000;
 const ratePct = (m: Model) => (m.passRate === null ? 'chưa có dữ liệu' : `${Math.round(m.passRate * 100)}% (${m.passes}/${m.total})`);
 
 export function CreateForm({ reuse }: { reuse?: string }) {
   const { refresh } = useJobs();
   const hydrated = useHydrated();
   const [images, setImages] = useState<Image[]>([]);
-  const [presetId, setPresetId] = useState(PRESETS[0]!.id);
+  const [presetId, setPresetId] = useState(PRESETS[0]!.id); // '' means a free prompt
+  const [prompt, setPrompt] = useState('');
   const [ratio, setRatio] = useState('9:16');
   const [durationSec, setDurationSec] = useState(5);
   const [modelId, setModelId] = useState('');
@@ -66,7 +69,8 @@ export function CreateForm({ reuse }: { reuse?: string }) {
     api<JobDetail>(`/api/jobs/${reuse}`)
       .then((j) => {
         setImages(j.images);
-        if (j.presetId) setPresetId(j.presetId);
+        setPresetId(j.presetId ?? '');
+        if (!j.presetId) setPrompt(j.prompt);
         setRatio(j.ratio);
         setDurationSec(j.durationSec);
         setModelId(j.modelId);
@@ -98,7 +102,8 @@ export function CreateForm({ reuse }: { reuse?: string }) {
   const durations = [...new Set(models?.models.flatMap((m) => m.durationsSec) ?? [durationSec])].sort((a, b) => a - b);
   const chosen = models?.models.find((m) => m.id === modelId);
   const tooMany = chosen !== undefined && images.length > chosen.maxImages;
-  const canRun = ready && !busy && images.length > 0 && chosen?.supported === true && !tooMany;
+  const promptOk = presetId !== '' || (prompt.trim() !== '' && prompt.trim().length <= MAX_PROMPT);
+  const canRun = ready && !busy && images.length > 0 && chosen?.supported === true && !tooMany && promptOk;
 
   async function upload(e: ChangeEvent<HTMLInputElement>) {
     const files = [...(e.target.files ?? [])];
@@ -124,7 +129,7 @@ export function CreateForm({ reuse }: { reuse?: string }) {
     setError('');
     setNotice('');
     try {
-      await api('/api/jobs', sendJson('POST', { assetIds: images.map((i) => i.id), modelId, presetId, ratio, durationSec, storeId: storeId || null }));
+      await api('/api/jobs', sendJson('POST', { assetIds: images.map((i) => i.id), modelId, ...(presetId ? { presetId } : { prompt }), ratio, durationSec, storeId: storeId || null }));
       setNotice('Đã gửi job. Theo dõi trong mục "Job của tôi".');
       setRefetch((n) => n + 1);
       await refresh();
@@ -163,8 +168,15 @@ export function CreateForm({ reuse }: { reuse?: string }) {
               {p.label}
             </option>
           ))}
+          <option value="">Tự viết mô tả</option>
         </select>
       </label>
+
+      <label>
+        Mô tả chuyển động
+        <textarea value={prompt} maxLength={MAX_PROMPT} rows={4} disabled={presetId !== ''} onChange={(e) => setPrompt(e.target.value)} />
+      </label>
+      <p className="muted">Chọn một mẫu, hoặc chọn "Tự viết mô tả" rồi nhập mô tả (tối đa {MAX_PROMPT} ký tự, nên viết bằng tiếng Anh).</p>
 
       <label>
         Tỉ lệ khung hình

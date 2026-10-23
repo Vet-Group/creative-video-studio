@@ -123,6 +123,34 @@ describe('POST /api/jobs', () => {
     expect((await run(ownerCookie, { ...base, assetIds: ['theirs-1'] })).status).toBe(400);
   });
 
+  test('takes a free prompt instead of a preset: trimmed, stored with a null preset', async () => {
+    const m = await newMember(); // its own daily count, so the owner keeps room for the cap tests
+    const res = await runAs(m, { presetId: null, prompt: '  Một chiếc áo xoay chậm.  ' });
+    expect(res.status).toBe(201);
+    const { id } = (await res.json()) as { id: string };
+    expect((await pool.query('select preset_id, prompt from jobs where id = $1', [id])).rows[0]).toEqual({ preset_id: null, prompt: 'Một chiếc áo xoay chậm.' });
+    const noPreset = { modelId: base.modelId, ratio: base.ratio, durationSec: base.durationSec, prompt: 'A slow turn.', assetIds: [m.asset] };
+    expect((await run(m.cookie, noPreset)).status).toBe(201); // presetId may be left out
+  });
+
+  test.each([
+    ['an empty prompt', { presetId: null, prompt: '' }],
+    ['a blank prompt', { presetId: null, prompt: ' \n\t ' }],
+    ['a prompt over 2000 characters', { presetId: null, prompt: 'x'.repeat(2001) }],
+    ['a prompt that is not text', { presetId: null, prompt: 5 }],
+    ['both a preset and a prompt', { prompt: 'A slow turn.' }],
+    ['neither a preset nor a prompt', { presetId: null }],
+  ])('answers 400 for %s, creating nothing', async (_, body) => {
+    const before = await jobCount();
+    expect((await run(ownerCookie, { ...base, assetIds: ['own-1'], ...body })).status).toBe(400);
+    expect(await jobCount()).toBe(before);
+  });
+
+  test('accepts a prompt of exactly 2000 characters', async () => {
+    const m = await newMember(); // its own daily count, so the owner keeps room for the cap tests above
+    expect((await runAs(m, { presetId: null, prompt: 'x'.repeat(2000) })).status).toBe(201);
+  });
+
   test.each([
     ['no assets', { assetIds: [] }],
     ['five assets', { assetIds: ['own-1', 'own-2', 'own-3', 'a4', 'a5'] }],
@@ -328,6 +356,18 @@ describe('POST /api/jobs with retryOf', () => {
       model: 'fal-test', provider: 'fal', is_mock: false, prompt: 'p', aspect: '9:16', duration_s: 5, input_asset_ids: [m.asset],
     });
     expect((await pool.query(`select usd::text from cost_entries where job_id = $1`, [id])).rows).toEqual([{ usd: '1.0000' }]);
+  });
+
+  test('keeps the free prompt of the original and its null preset', async () => {
+    const m = await newMember();
+    await pool.query(
+      `insert into jobs (id, user_id, team_id, model, provider, preset_id, prompt, aspect, duration_s, input_asset_ids, status) values ($1, $2, 'team-unassigned', 'fal-test', 'fal', null, 'My own prompt.', '9:16', 5, $3, 'failed')`,
+      [`free-${m.id}`, m.id, [m.asset]],
+    );
+    const res = await runAs(m, { retryOf: `free-${m.id}` });
+    expect(res.status).toBe(201);
+    const { id } = (await res.json()) as { id: string };
+    expect((await pool.query('select preset_id, prompt from jobs where id = $1', [id])).rows[0]).toEqual({ preset_id: null, prompt: 'My own prompt.' });
   });
 
   test('books the estimate at the current price of the model', async () => {

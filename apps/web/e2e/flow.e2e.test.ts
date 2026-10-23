@@ -61,6 +61,13 @@ test('a Member runs a mock job and works through the Library', async ({ page }) 
   await page.getByLabel('Mẫu chuyển động').selectOption('light-sweep');
   await expect(page.getByLabel('Mẫu chuyển động')).toHaveValue('light-sweep');
 
+  // A user picks a preset or writes a prompt: the prompt box opens only for "Tự viết mô tả", and Run waits for some text.
+  await expect(page.getByLabel('Mô tả chuyển động')).toBeDisabled();
+  await page.getByLabel('Mẫu chuyển động').selectOption({ label: 'Tự viết mô tả' });
+  await expect(page.getByRole('button', { name: 'Tạo video' })).toBeDisabled();
+  await page.getByLabel('Mô tả chuyển động').fill('Slow turn of the shirt.');
+  await expect(page.getByRole('button', { name: 'Tạo video' })).toBeEnabled();
+
   // Pass, then Fail, which needs a fault.
   await page.getByRole('link', { name: 'Thư viện' }).first().click();
   await card.getByRole('button', { name: 'Đạt', exact: true }).click();

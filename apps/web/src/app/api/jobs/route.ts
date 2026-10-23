@@ -7,7 +7,9 @@ import { boss } from '@/lib/queue';
 import { guard } from '@/lib/session';
 
 const MAX_IMAGES = 4;
-type Spec = { assetIds: string[]; modelId: string; presetId: string; ratio: string; durationSec: number; storeId: string | null };
+const MAX_PROMPT = 2000;
+/** `presetId` is null for a free prompt, and `prompt` is null when a preset supplies it (or, in a retry, when the original's is copied). */
+type Spec = { assetIds: string[]; modelId: string; presetId: string | null; prompt: string | null; ratio: string; durationSec: number; storeId: string | null };
 const bad = (error: string) => Response.json({ error }, { status: 400 });
 /** Member-facing text for a Run a cap refused. */
 const CAP_MESSAGES: Record<CapRefusal, string> = {
@@ -43,7 +45,7 @@ export async function GET(request: Request) {
 
 /**
  * Create a video job: 1-4 input images the caller may use (their own, or the inputs of a succeeded Library clip for Reuse), an enabled
- * model, a preset, the ratio and duration the model allows, and an optional visible store. The caps are checked and the job and its
+ * model, a preset or a free prompt (exactly one; a free prompt is trimmed, 1 to 2000 characters, and stored with a null preset), the ratio and duration the model allows, and an optional visible store. The caps are checked and the job and its
  * `estimate` ledger row are written in one transaction (429 when a cap refuses, nothing sent); the pg-boss job is sent afterwards.
  * `retryOf` retries the caller's own failed job once: the inputs, model, preset, prompt, ratio, duration, team and store all come from the
  * original (the body may carry just `retryOf`), the estimate from the model's current price.
@@ -59,13 +61,17 @@ export async function POST(request: Request) {
   // A retry takes everything from the original job, so only a new Run is validated against the body.
   let spec: Spec | null = null;
   if (retryOf === null) {
-    const { assetIds, modelId, presetId, ratio, durationSec, storeId = null } = body ?? {};
+    const { assetIds, modelId, presetId = null, prompt: freePrompt = null, ratio, durationSec, storeId = null } = body ?? {};
     if (!Array.isArray(assetIds) || assetIds.length < 1 || assetIds.length > MAX_IMAGES || !assetIds.every((a) => typeof a === 'string') || new Set(assetIds).size !== assetIds.length) {
       return bad(`assetIds must list 1 to ${MAX_IMAGES} different asset ids`);
     }
-    if (typeof modelId !== 'string' || typeof presetId !== 'string' || typeof ratio !== 'string' || !Number.isInteger(durationSec) || (storeId !== null && typeof storeId !== 'string')) {
-      return bad('modelId, presetId, ratio, durationSec (a whole number) and an optional storeId are required');
+    if (typeof modelId !== 'string' || (presetId !== null && typeof presetId !== 'string') || (freePrompt !== null && typeof freePrompt !== 'string') || typeof ratio !== 'string' || !Number.isInteger(durationSec) || (storeId !== null && typeof storeId !== 'string')) {
+      return bad('modelId, ratio, durationSec (a whole number), a presetId or a prompt, and an optional storeId are required');
     }
+    // The PRD gives "an optional prompt, or one of the presets": exactly one of the two.
+    if ((presetId === null) === (freePrompt === null)) return bad('give either a presetId or a prompt, not both and not neither');
+    const prompt = freePrompt?.trim() ?? null;
+    if (prompt !== null && (prompt === '' || prompt.length > MAX_PROMPT)) return bad(`the prompt must have 1 to ${MAX_PROMPT} characters`);
     const usable = await pool.query(
       `select a.id from assets a
         where a.id = any($1::text[]) and a.deleted_at is null and a.kind = 'input'
@@ -73,7 +79,7 @@ export async function POST(request: Request) {
       [assetIds, userId],
     );
     if (usable.rowCount !== assetIds.length) return bad('one or more assets do not exist or cannot be used');
-    spec = { assetIds, modelId, presetId, ratio, durationSec: durationSec as number, storeId: storeId as string | null };
+    spec = { assetIds, modelId, presetId, prompt, ratio, durationSec: durationSec as number, storeId: storeId as string | null };
   }
 
   const id = crypto.randomUUID();
@@ -93,19 +99,21 @@ export async function POST(request: Request) {
       }
       const live = await tx.query('select 1 from assets where id = any($1::text[]) and deleted_at is null', [o.input_asset_ids]);
       if (live.rowCount !== o.input_asset_ids.length) return bad('one or more assets of the job were deleted');
-      s = { assetIds: o.input_asset_ids, modelId: o.model, presetId: o.preset_id, ratio: o.aspect, durationSec: o.duration_s, storeId: o.store_id };
+      s = { assetIds: o.input_asset_ids, modelId: o.model, presetId: o.preset_id, prompt: o.prompt, ratio: o.aspect, durationSec: o.duration_s, storeId: o.store_id };
       original = o;
     }
-    const { assetIds, modelId, presetId, ratio, durationSec, storeId } = s!;
+    const { assetIds, modelId, presetId, prompt: freePrompt, ratio, durationSec, storeId } = s!;
     const model = (await tx.query('select enabled, provider, ratios, durations_sec, max_images, usd_per_second from model_configs where id = $1', [modelId])).rows[0];
     if (!model?.enabled) return bad('the model does not exist or is not enabled');
     if (!model.ratios.includes(ratio) || !model.durations_sec.includes(durationSec) || assetIds.length > model.max_images) {
       return bad('the model does not allow this ratio, duration or number of images');
     }
-    let prompt = original?.prompt;
+    let prompt = original?.prompt ?? freePrompt;
     if (!original) {
-      prompt = (await tx.query('select prompt from presets where id = $1 and enabled', [presetId])).rows[0]?.prompt;
-      if (prompt === undefined) return bad('the preset does not exist or is not enabled');
+      if (presetId !== null) {
+        prompt = (await tx.query('select prompt from presets where id = $1 and enabled', [presetId])).rows[0]?.prompt;
+        if (prompt === undefined) return bad('the preset does not exist or is not enabled');
+      }
       if (storeId !== null && (await tx.query('select 1 from stores where id = $1 and not hidden', [storeId])).rowCount === 0) {
         return bad('the store does not exist or is hidden');
       }
