@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { api, sendJson } from '@/lib/api';
 import { useAction, useFetch } from '@/lib/admin-ui';
+import { METHOD_LABEL, type SignInMethod } from '@/lib/sign-in-methods';
 
 interface User {
   id: string;
@@ -10,6 +11,7 @@ interface User {
   role: 'member' | 'admin';
   banned: boolean | null;
   teamId: string;
+  methods: SignInMethod[];
 }
 interface Team {
   id: string;
@@ -42,6 +44,25 @@ function UserRow({ user, teams, run }: { user: User; teams: Team[]; run: Run }) 
               </option>
             ))}
         </select>
+      </td>
+      <td>
+        <ul className="methods">
+          {user.methods.map((m) => (
+            <li key={m.id}>
+              {METHOD_LABEL[m.provider] ?? m.provider}
+              {m.email ? ` (${m.email})` : ''}
+              {m.provider !== 'credential' && (
+                <button
+                  type="button"
+                  aria-label={`Huỷ liên kết ${METHOD_LABEL[m.provider] ?? m.provider} của ${user.email}`}
+                  onClick={() => void run(() => api(`/api/admin/users/${user.id}/accounts/${m.provider}`, { method: 'DELETE' }), 'Không huỷ được liên kết.')}
+                >
+                  Huỷ liên kết
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
       </td>
       <td>{user.banned ? 'Đã khóa' : 'Hoạt động'}</td>
       <td>
@@ -125,7 +146,7 @@ export function AdminUsers() {
             Thêm người dùng
           </button>
         </div>
-        <p className="muted">Người dùng không có mật khẩu chỉ đăng nhập được bằng Lark. Đổi nhóm chỉ áp dụng cho các job mới.</p>
+        <p className="muted">Người dùng không có mật khẩu chỉ đăng nhập được bằng Lark hoặc Google. Đổi nhóm chỉ áp dụng cho các job mới.</p>
       </fieldset>
       {problem && (
         <p className="error" role="alert">
@@ -140,6 +161,7 @@ export function AdminUsers() {
               <th scope="col">Email</th>
               <th scope="col">Vai trò</th>
               <th scope="col">Nhóm</th>
+              <th scope="col">Phương thức đăng nhập</th>
               <th scope="col">Trạng thái</th>
               <th scope="col">Thao tác</th>
             </tr>

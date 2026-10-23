@@ -122,6 +122,7 @@ export function Shell({ userId, userName, isAdmin, children }: { userId: string;
           )}
         </nav>
         <span className="who">{userName}</span>
+        {link('/account/sign-in-methods', 'Phương thức đăng nhập')}
         <button type="button" onClick={() => void signOut()}>
           Đăng xuất
         </button>

@@ -1,12 +1,14 @@
 'use client';
 import { type FormEvent, useState } from 'react';
 import { ApiError, api, sendJson } from '@/lib/api';
+import { authErrorText, METHOD_LABEL } from '@/lib/sign-in-methods';
 import { useHydrated } from '@/lib/use-hydrated';
 
-export function LoginForm({ larkEnabled }: { larkEnabled: boolean }) {
+/** `error` is the `?error=` code a failed social sign-in left in the URL. */
+export function LoginForm({ googleEnabled, larkEnabled, error: errorCode }: { googleEnabled: boolean; larkEnabled: boolean; error?: string }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [error, setError] = useState(authErrorText(errorCode) ?? '');
   const [busy, setBusy] = useState(false);
   // Submitting before hydration would send the form as a plain GET, with the password in the URL.
   const hydrated = useHydrated();
@@ -24,13 +26,14 @@ export function LoginForm({ larkEnabled }: { larkEnabled: boolean }) {
     }
   }
 
-  async function lark() {
+  // Without errorCallbackURL better-auth sends a refused sign-in to its own /api/auth/error page.
+  async function social(provider: 'google' | 'lark') {
     setError('');
     try {
-      const r = await api<{ url?: string }>('/api/auth/sign-in/social', sendJson('POST', { provider: 'lark', callbackURL: '/create' }));
+      const r = await api<{ url?: string }>('/api/auth/sign-in/social', sendJson('POST', { provider, callbackURL: '/create', errorCallbackURL: '/login' }));
       if (r.url) window.location.assign(r.url);
     } catch {
-      setError('Không đăng nhập được bằng Lark.');
+      setError(`Không đăng nhập được bằng ${METHOD_LABEL[provider]}.`);
     }
   }
 
@@ -55,10 +58,19 @@ export function LoginForm({ larkEnabled }: { larkEnabled: boolean }) {
           Đăng nhập
         </button>
       </form>
-      {larkEnabled && (
-        <button type="button" onClick={() => void lark()}>
-          Đăng nhập bằng Lark
-        </button>
+      {(googleEnabled || larkEnabled) && (
+        <div className="social">
+          {googleEnabled && (
+            <button type="button" onClick={() => void social('google')}>
+              Đăng nhập bằng Google
+            </button>
+          )}
+          {larkEnabled && (
+            <button type="button" onClick={() => void social('lark')}>
+              Đăng nhập bằng Lark
+            </button>
+          )}
+        </div>
       )}
     </main>
   );

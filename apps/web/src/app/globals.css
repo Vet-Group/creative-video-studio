@@ -46,6 +46,10 @@ legend { font-weight: 600; padding: 0 .25rem; }
 
 .login { max-width: 22rem; margin: 4rem auto; padding: 1.5rem; background: #fff; border: 1px solid #e4e4e7; border-radius: 8px; }
 .login input { width: 100%; }
+.login .social { display: flex; flex-direction: column; gap: .5rem; margin-top: 1rem; }
+.methods { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .35rem; }
+.methods li { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+.prose { max-width: 42rem; margin: 2rem auto; padding: 0 1rem; }
 
 .filters { display: flex; gap: 1rem; flex-wrap: wrap; align-items: end; }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); gap: 1rem; margin: 1rem 0; }
