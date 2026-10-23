@@ -1,8 +1,9 @@
 'use client';
 import Link from 'next/link';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { type CSSProperties, useCallback, useEffect, useRef, useState } from 'react';
 import { api, type Clip, errorText, sendJson } from '@/lib/api';
 import { FAULTS } from '@/lib/faults';
+import { Icon } from './Icon';
 
 const fmtTime = (iso: string) => new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date(iso));
 /** The Library filters in the reference order; the id is the `kind` the API takes. */
@@ -16,6 +17,9 @@ const KINDS = [
   { id: 'marketing', label: 'Marketing Studio' },
   { id: 'apps', label: 'Ứng dụng' },
 ];
+/** The size slider: card widths from small to large, remembered per browser. */
+const SIZES = ['12rem', '16rem', '22rem'];
+const SIZE_KEY = 'cvs.library.size';
 const faultLabel = (id: string | null) => FAULTS.find((f) => f.id === id)?.label ?? id ?? '';
 
 interface StoreOption {
@@ -30,6 +34,7 @@ function ClipCard({ clip, stores, onChange, onDeleted }: { clip: Clip; stores?: 
   const [fault, setFault] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [problem, setProblem] = useState('');
+  const [saving, setSaving] = useState(false);
   const image = clip.mediaType === 'image';
   const noun = image ? 'ảnh' : 'clip';
 
@@ -62,6 +67,19 @@ function ClipCard({ clip, stores, onChange, onDeleted }: { clip: Clip; stores?: 
       onDeleted(clip.id);
     } catch {
       setProblem(`Không xóa được ${noun}.`);
+    }
+  }
+
+  async function toggleFavorite() {
+    setProblem('');
+    setSaving(true); // a second click before the answer would send the same value again
+    try {
+      const r = await api<{ favorite: boolean }>(`/api/jobs/${clip.id}/favorite`, sendJson('PUT', { favorite: !clip.favorite }));
+      onChange({ ...clip, favorite: r.favorite });
+    } catch {
+      setProblem('Không lưu được mục yêu thích.');
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -123,6 +141,10 @@ function ClipCard({ clip, stores, onChange, onDeleted }: { clip: Clip; stores?: 
       )}
 
       <div className="actions">
+        <button type="button" className="favorite" aria-pressed={clip.favorite} disabled={saving} onClick={() => void toggleFavorite()}>
+          <Icon name="star" />
+          Yêu thích
+        </button>
         <button type="button" onClick={() => void download()}>
           Tải xuống
         </button>
@@ -185,6 +207,9 @@ export function Library() {
   const [date, setDate] = useState('');
   const [ratio, setRatio] = useState('');
   const [kind, setKind] = useState('all');
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
+  const [sort, setSort] = useState<'newest' | 'oldest'>('newest');
+  const [size, setSize] = useState(1);
   const [clips, setClips] = useState<Clip[]>([]);
   const [creators, setCreators] = useState<{ id: string; name: string }[]>([]);
   const [hasMore, setHasMore] = useState(false);
@@ -201,6 +226,8 @@ export function Library() {
       if (date) q.set('date', date);
       if (ratio) q.set('ratio', ratio);
       if (kind !== 'all') q.set('kind', kind);
+      if (favoritesOnly) q.set('favorites', '1');
+      if (sort !== 'newest') q.set('sort', sort);
       if (offset > 0) q.set('offset', String(offset));
       try {
         const r = await api<{ hasMore: boolean; isAdmin: boolean; creators: { id: string; name: string }[]; clips: Clip[] }>(`/api/library?${q}`);
@@ -214,7 +241,7 @@ export function Library() {
         if (ticket === latest.current) setState('error');
       }
     },
-    [creator, date, ratio, kind],
+    [creator, date, ratio, kind, favoritesOnly, sort],
   );
 
   useEffect(() => {
@@ -223,18 +250,51 @@ export function Library() {
   }, [load]);
 
   useEffect(() => {
+    try {
+      const saved = localStorage.getItem(SIZE_KEY);
+      if (saved !== null && Number(saved) in SIZES) setSize(Number(saved)); // Number(null) is 0, the smallest size
+    } catch {} // blocked storage: the default size
+  }, []);
+  function resize(next: number) {
+    setSize(next);
+    try {
+      localStorage.setItem(SIZE_KEY, String(next));
+    } catch {}
+  }
+
+  useEffect(() => {
     if (isAdmin) api<{ stores: StoreOption[] }>('/api/admin/stores?includeHidden=1').then((r) => setStores(r.stores), () => null);
   }, [isAdmin]);
 
   return (
     <section aria-labelledby="library-title">
       <h1 id="library-title">Thư viện</h1>
+      <p className="muted library-sub">Mọi thứ công ty đã tạo, ở cùng một chỗ.</p>
       <div className="kinds" role="group" aria-label="Loại">
         {KINDS.map((k) => (
           <button key={k.id} type="button" aria-pressed={kind === k.id} onClick={() => setKind(k.id)}>
             {k.label}
           </button>
         ))}
+      </div>
+      <div className="library-tools">
+        <label className="check">
+          <input type="checkbox" checked={favoritesOnly} onChange={(e) => setFavoritesOnly(e.target.checked)} />
+          Chỉ mục yêu thích
+        </label>
+        <label>
+          <span className="sr-only">Sắp xếp</span>
+          <select value={sort} onChange={(e) => setSort(e.target.value as 'newest' | 'oldest')}>
+            <option value="newest">Mới nhất trước</option>
+            <option value="oldest">Cũ nhất trước</option>
+          </select>
+        </label>
+        <label className="library-size">
+          <span className="sr-only">Cỡ ô</span>
+          <Icon name="library" />
+          <input type="range" min={0} max={SIZES.length - 1} step={1} value={size} onChange={(e) => resize(Number(e.target.value))} aria-valuetext={['Nhỏ', 'Vừa', 'Lớn'][size]} />
+          <Icon name="ratio" />
+        </label>
       </div>
       <div className="filters" role="search" aria-label="Bộ lọc">
         <label>
@@ -264,14 +324,23 @@ export function Library() {
 
       {state === 'loading' && <p role="status">Đang tải...</p>}
       {state === 'error' && <p className="error">Không tải được thư viện.</p>}
-      {state === 'ready' && clips.length === 0 && <p className="muted">Chưa có clip nào khớp bộ lọc.</p>}
-      <div className="grid">
+      {state === 'ready' && clips.length === 0 && (
+        <div className="library-empty">
+          <Icon name="library" size={40} />
+          <p className="muted">Chưa có clip nào khớp bộ lọc.</p>
+          <Link href="/explore" className="button">
+            Bắt đầu tạo
+          </Link>
+        </div>
+      )}
+      <div className="grid" style={{ '--card-min': SIZES[size] } as CSSProperties}>
         {clips.map((c) => (
           <ClipCard
             key={c.id}
             clip={c}
             stores={isAdmin ? stores : undefined}
-            onChange={(next) => setClips((cur) => cur.map((x) => (x.id === next.id ? next : x)))}
+            // Under Favourites only an unmarked item leaves the list, so the next page's offset stays right.
+            onChange={(next) => setClips((cur) => (favoritesOnly && !next.favorite ? cur.filter((x) => x.id !== next.id) : cur.map((x) => (x.id === next.id ? next : x))))}
             onDeleted={(id) => setClips((cur) => cur.filter((x) => x.id !== id))}
           />
         ))}

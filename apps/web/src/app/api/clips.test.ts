@@ -17,6 +17,7 @@ const { bucketName, ensureBucket, putObject, s3 } = await import('@/lib/storage'
 const { GET: GET_MINE } = await import('./jobs/route');
 const { GET: GET_JOB, DELETE: DELETE_JOB } = await import('./jobs/[id]/route');
 const { PUT: PUT_VERDICT } = await import('./jobs/[id]/verdict/route');
+const { PUT: PUT_FAVORITE } = await import('./jobs/[id]/favorite/route');
 const { GET: GET_LIBRARY } = await import('./library/route');
 const { GET: GET_MODELS } = await import('./models/route');
 const { GET: GET_ASSET } = await import('./assets/[id]/route');
@@ -148,7 +149,7 @@ describe('GET /api/library', () => {
     expect(body.clips.find((c) => c.id === a)).toEqual({
       id: a, creator: { id: alice.id, name: 'Nguyễn Văn Đạt' }, createdAt: '2026-10-22T17:30:00.000Z', modelId: 'fal-test', modelLabel: 'Fal test', ratio: '1:1', durationSec: 8,
       feature: 'video', mediaType: 'video', resolution: null, isMock: false, videoAssetId: 'lib-a-video', posterAssetId: 'lib-a-poster', storeId: null, costUsd: '1.6000', costFinal: true, verdict: { verdict: 'fail', fault: 'flicker', markedBy: alice.id },
-      canEdit: false, downloadName: expect.stringMatching(/^20261023-nguyen-van-dat-lib-a\.mp4$/),
+      favorite: false, canEdit: false, downloadName: expect.stringMatching(/^20261023-nguyen-van-dat-lib-a\.mp4$/),
     });
     expect(body.clips.find((c) => c.id === b)).toMatchObject({ isMock: true, costFinal: false, verdict: null, canEdit: true }); // bob is the creator
     expect(body.creators).toEqual(expect.arrayContaining([{ id: alice.id, name: 'Nguyễn Văn Đạt' }, { id: bob.id, name: 'Bob' }]));
@@ -170,8 +171,35 @@ describe('GET /api/library', () => {
     expect(await lib(`?creator=${bob.id}&ratio=1:1`)).toEqual([]);
   });
 
-  test.each(['?date=2026-13-45', '?date=yesterday', '?ratio=16:9', '?offset=-1', '?offset=x'])('answers 400 for %s', async (query) => {
+  test.each(['?date=2026-13-45', '?date=yesterday', '?ratio=16:9', '?offset=-1', '?offset=x', '?favorites=0', '?sort=random'])('answers 400 for %s', async (query) => {
     expect((await GET_LIBRARY(req(`/api/library${query}`, bob.cookie))).status).toBe(400);
+  });
+
+  test('sorts oldest first on request', async () => {
+    const lib = async (query: string) => (await libraryIds(bob.cookie, query)).filter((id) => id.startsWith('lib-'));
+    expect(await lib('')).toEqual(['lib-a', 'lib-b']);
+    expect(await lib('?sort=oldest')).toEqual(['lib-b', 'lib-a']);
+    expect(await lib('?sort=newest')).toEqual(['lib-a', 'lib-b']);
+  });
+
+  test('keeps favourites per user: each sees and filters only their own, and taking one out is harmless twice', async () => {
+    const fav = (id: string, cookie: string | undefined, favorite: unknown) => PUT_FAVORITE(req(`/api/jobs/${id}/favorite`, cookie, { method: 'PUT', body: JSON.stringify({ favorite }) }), ctx(id));
+    expect((await fav('lib-a', undefined, true)).status).toBe(401);
+    expect((await fav('lib-a', bob.cookie, 'yes')).status).toBe(400);
+    expect((await fav('no-such-clip', bob.cookie, true)).status).toBe(404);
+    expect(await (await fav('lib-a', bob.cookie, true)).json()).toEqual({ favorite: true });
+    expect((await fav('lib-a', bob.cookie, true)).status).toBe(200); // again: still one row
+    expect((await pool.query(`select count(*)::int as n from favorites where job_id = 'lib-a'`)).rows[0].n).toBe(1);
+
+    const lib = async (cookie: string, query: string) => ((await (await GET_LIBRARY(req(`/api/library${query}`, cookie))).json()) as { clips: { id: string; favorite: boolean }[] }).clips;
+    expect((await lib(bob.cookie, '?favorites=1')).map((c) => c.id)).toEqual(['lib-a']);
+    expect((await lib(bob.cookie, '')).find((c) => c.id === 'lib-a')?.favorite).toBe(true);
+    expect((await lib(alice.cookie, '')).find((c) => c.id === 'lib-a')?.favorite).toBe(false); // another user's favourite is private
+    expect(await lib(alice.cookie, '?favorites=1')).toEqual([]);
+
+    expect(await (await fav('lib-a', bob.cookie, false)).json()).toEqual({ favorite: false });
+    expect((await fav('lib-a', bob.cookie, false)).status).toBe(200);
+    expect(await lib(bob.cookie, '?favorites=1')).toEqual([]);
   });
 
   test('pages by 24', async () => {
