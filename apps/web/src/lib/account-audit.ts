@@ -53,10 +53,14 @@ export function accountAuditHooks(q: Queryable) {
       },
     },
     delete: {
-      async after(a: AccountRow) {
+      // ctx is the endpoint context; unlink-account's session middleware has put the caller's session on ctx.context.
+      async after(a: AccountRow, ctx: { context: { session: { session: { id: string } } | null } } | null) {
         if (a.providerId === 'credential') return;
         const email = googleEmail(a.idToken ?? null) ?? (await lastLinkedEmail(q, a.userId, a.providerId, a.accountId));
-        await audit(q, { actorId: a.userId, action: 'account.unlink', target: `user:${a.userId}`, oldValue: { provider: a.providerId, email } });
+        const keep = ctx?.context.session?.session.id;
+        // Like the Admin unlink, end the sessions the lost account may have opened; the caller's own stays.
+        if (keep) await q.query('delete from sessions where user_id = $1 and id <> $2', [a.userId, keep]);
+        await audit(q, { actorId: a.userId, action: 'account.unlink', target: `user:${a.userId}`, oldValue: { provider: a.providerId, email }, ...(keep ? { newValue: { sessionsRevoked: true } } : {}) });
       },
     },
   };
