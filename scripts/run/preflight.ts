@@ -26,6 +26,7 @@ export const ITEMS: { id: string; label: string; required?: boolean; skips: stri
   { id: 'fal', label: 'fal (FAL_KEY)', skips: ['B.5a', 'B.5', 'B.6', 'B.7', 'M.6'] },
   { id: 'replicate', label: 'Replicate (REPLICATE_API_TOKEN)', skips: ['B.5a', 'B.5', 'B.6', 'B.7', 'M.6'] },
   { id: 'lark-app', label: 'App Lark OAuth', skips: ['D.5-lark'] },
+  { id: 'google-app', label: 'App Google OAuth', skips: ['D.5-google'] },
   { id: 'r2', label: 'Cloudflare R2 cho sao lưu', skips: ['D.2-r2'] },
   { id: 'restic', label: 'Mật khẩu mã hoá sao lưu (restic)', skips: ['D.2-r2'] },
   { id: 'cloudflare', label: 'Khoá Cloudflare (tunnel + DNS vetgroup.net)', skips: ['D.5-hostname'] },
@@ -35,6 +36,7 @@ export const ITEMS: { id: string; label: string; required?: boolean; skips: stri
 
 export const FAL_PROBE_ENDPOINT = 'fal-ai/kling-video/o3/pro/reference-to-video';
 export const CLOUDFLARE_ZONE = 'vetgroup.net';
+export const GOOGLE_REDIRECT = 'https://video.vetgroup.net/api/auth/callback/google';
 
 const ok = (id: string, note = ''): ItemResult => ({ id, status: 'ĐỦ', note });
 const missing = (id: string, note: string): ItemResult => ({ id, status: 'THIẾU', note });
@@ -83,6 +85,19 @@ export async function checkItem(id: string, deps: Deps): Promise<ItemResult> {
     case 'replicate':
       if (!e.REPLICATE_API_TOKEN) return missing(id, 'điền REPLICATE_API_TOKEN');
       return bearer(deps, id, 'https://api.replicate.com/v1/account', `Bearer ${e.REPLICATE_API_TOKEN}`);
+    case 'google-app': {
+      if (!e.GOOGLE_CLIENT_ID || !e.GOOGLE_CLIENT_SECRET) return missing(id, 'điền GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET');
+      // Exchanging a dummy code costs nothing: a valid client gets invalid_grant, a wrong ID or secret gets invalid_client.
+      const res = await http(deps, 'https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ grant_type: 'authorization_code', code: 'cvs-preflight-probe', redirect_uri: GOOGLE_REDIRECT, client_id: e.GOOGLE_CLIENT_ID, client_secret: e.GOOGLE_CLIENT_SECRET }).toString(),
+      });
+      if (!res) return wrong(id, 'không kết nối được');
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      if (body.error === 'invalid_grant') return ok(id);
+      return wrong(id, body.error === 'redirect_uri_mismatch' ? `thiếu redirect ${GOOGLE_REDIRECT}` : `Google trả ${body.error ?? res.status}`);
+    }
     case 'lark-app': {
       if (!e.LARK_APP_ID || !e.LARK_APP_SECRET || !e.LARK_TENANT_KEY) return missing(id, 'điền LARK_APP_ID, LARK_APP_SECRET, LARK_TENANT_KEY');
       const res = await http(deps, 'https://open.larksuite.com/open-apis/auth/v3/tenant_access_token/internal', {

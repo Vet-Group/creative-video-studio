@@ -14,7 +14,7 @@ import { parseArgs } from 'node:util';
 import { readLease, shouldRelaunch, writeLease } from './lease.ts';
 import {
   approve, changedGuards, expireSteps, guardFiles, initManifest, parseCriteria, preapprovalValid, readManifest, readySteps, recordFailure,
-  renderEvidence, renderLark, renderProgress, renderRunLog, sha256, writeManifest, type Evidence, type Manifest,
+  renderEvidence, renewManifest, renderLark, renderProgress, renderRunLog, sha256, writeManifest, type Evidence, type Manifest,
 } from './manifest.ts';
 import { sendLark, updateRunLog, type Run } from './notify.ts';
 import { matchesPreapproval, PREAPPROVAL_SENTENCE } from './preapproval.ts';
@@ -96,17 +96,8 @@ switch (cmd) {
     ];
     let m: Manifest;
     if (existsSync(MANIFEST)) {
-      // Renewal or a re-run of preflight: un-skip steps whose preflight item is now ĐỦ (autonomy AC 4).
       m = readManifest(MANIFEST);
-      const fresh = initManifest({ preflight, skipped, criteria });
-      for (const s of m.steps) {
-        const f = fresh.steps.find((x) => x.id === s.id);
-        if (s.status === 'skipped' && f?.status === 'pending' && /^(preflight|dependency)/.test(s.reason ?? '')) {
-          s.status = 'pending';
-          s.reason = undefined;
-        }
-      }
-      m.preflight = { checkedAt: preflight.checkedAt, results: preflight.results };
+      renewManifest(m, initManifest({ preflight: { checkedAt: preflight.checkedAt, results: preflight.results }, skipped, criteria }));
     } else {
       m = initManifest({ preflight, skipped, criteria });
     }
