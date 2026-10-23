@@ -37,8 +37,8 @@ export const STEPS: StepDef[] = [
   { id: 'D.1', title: 'Google and Lark login with account linking (mocked OAuth)', deps: ['M.5'], worktree: 'app' },
   // Change request UI-PARITY (2026-10-23): rebuild the Fash look and motion on the existing app (docs/UI-MOTION-PARITY.md).
   { id: 'M.7', title: 'UI and motion parity', deps: ['D.1'], worktree: 'app', timeoutMin: 180 },
-  // M.7 ended with C4 not met; M.7b applies the measured fix list (docs/UI-MOTION-PARITY-M7B.md). B.3 only feeds the demo media.
-  { id: 'M.7b', title: 'High-fidelity video UI (owner C4 sign-off)', deps: ['D.1', 'B.3'], worktree: 'app', timeoutMin: 180, soft: ['B.3'] },
+  // M.7 ended with C4 not met; M.7b applies the measured fix list (docs/UI-MOTION-PARITY-M7B.md). It does not wait for B.3: demo media comes from B.3 images when they exist, otherwise from other assets.
+  { id: 'M.7b', title: 'High-fidelity video UI (owner C4 sign-off)', deps: ['D.1'], worktree: 'app', timeoutMin: 180 },
   { id: 'D.2', title: 'Backups', deps: ['A.0b'], worktree: 'app' },
   { id: 'D.2-r2', title: 'Weekly R2 copy', deps: ['D.2'], worktree: 'app' },
   { id: 'D.3', title: 'Read-only VET check', deps: ['A.0c'], worktree: 'app' },
