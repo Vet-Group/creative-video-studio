@@ -198,7 +198,7 @@ Kept apart on purpose: merged code is not a deployment, and a mock job is not a 
 - **Deployment:** none. Nothing runs on the VET server yet; D.3 (read-only check) and D.5 (deploy, tunnel, `video.vetgroup.net`) are pending.
 - **Paid bake-off:** not started, $0 spent. B.1 (provider facts) is pending again after a reset; the fal balance is $30 and Replicate bills monthly on the card. The canary waits behind the funding gate.
 - **Owner keys:** preflight 12/12 ready on 2026-10-23 (fal, Replicate, Lark, Google, Cloudflare, R2, restic, first Admin).
-- **Change request UI-PARITY (2026-10-23):** the app should look and move close to the Fash video screens. Matrix and acceptance in [`UI-MOTION-PARITY.md`](UI-MOTION-PARITY.md); built in run step M.7 after D.1, before the deploy.
+- **Change request UI-PARITY (2026-10-23):** the app should look and move close to the Fash video screens. Matrix and acceptance in [`UI-MOTION-PARITY.md`](UI-MOTION-PARITY.md); built in run step M.7 after D.1, before the deploy. M.7 is in the run manifest (renewal after #17) and not started yet; it uses local fixtures and does not wait for the bake-off, funding or the port 4317 reference. If the deploy goes ahead with M.7 skipped or incomplete, this page will say "UI and motion parity not met".
 
 ## Evidence gaps
 
