@@ -45,6 +45,75 @@ const nav = (page: Page) => page.locator('.sidebar nav');
 /** Page titles a person can see: headings drawn larger than the screen-reader-only one, plus the top bar title. */
 const visibleTitles = (page: Page) => page.evaluate(() => [...document.querySelectorAll('h1, .topbar strong')].filter((el) => el.getBoundingClientRect().width > 2 && el.getBoundingClientRect().height > 2).map((el) => el.textContent));
 
+/** The Example dialog against one viewport's live measurements (REA-video V01): [x, y, width, height] boxes, y positions and widths in px. */
+async function checkExampleDialog(
+  page: Page,
+  m: {
+    dialog: [number, number, number, number];
+    media: [number, number];
+    close: [number, number];
+    chipImage: [number, number];
+    titleY: number;
+    inputY: number;
+    pillsY: number;
+    dateY: number;
+    tool: [number, number, number];
+    use: [number, number, number];
+    step: [number, number, number, number];
+  },
+): Promise<void> {
+  const dialog = page.getByRole('dialog', { name: 'Chi tiết mẫu' });
+  const d = await box(dialog);
+  near(d.x, m.dialog[0], 'dialog x');
+  near(d.y, m.dialog[1], 'dialog y');
+  sized(d, m.dialog[2], m.dialog[3], 'dialog', 3);
+  expect(await css(dialog, 'border-top-left-radius', 'background-color', 'border-top-color')).toEqual(['14px', 'rgb(255, 255, 255)', 'rgb(204, 204, 204)']);
+  const media = dialog.locator('.detail-media');
+  sized(await box(media), m.media[0], m.media[1], 'clip area', 3);
+  expect(await css(media, 'background-color')).toEqual(['rgb(0, 0, 0)']);
+  const close = dialog.getByRole('button', { name: 'Đóng' });
+  const c = await box(close);
+  sized(c, 32, 32, 'Close');
+  near(c.x, m.close[0], 'Close x');
+  near(c.y, m.close[1], 'Close y');
+  expect(await css(close, 'background-color', 'border-top-left-radius')).toEqual(['rgba(0, 0, 0, 0.5)', '10px']);
+  const chip = await box(dialog.locator('.detail-chip img'));
+  sized(chip, 36, 36, 'preset chip image');
+  near(chip.x, m.chipImage[0], 'chip image x');
+  near(chip.y, m.chipImage[1], 'chip image y');
+  near((await box(dialog.getByRole('heading', { level: 2 }))).y, m.titleY, 'title y');
+  const input = await box(dialog.locator('.detail-input'));
+  sized(input, 48, 48, 'input thumbnail');
+  near(input.y, m.inputY, 'input thumbnail y');
+  const pill = dialog.locator('.detail-pills li').first();
+  const p = await box(pill);
+  near(p.y, m.pillsY, 'pills y');
+  near(p.height, 28, 'pill height');
+  expect(await css(pill, 'border-top-left-radius', 'color', 'font-size')).toEqual(['20px', 'rgb(77, 77, 77)', '12px']);
+  near((await box(dialog.locator('.detail-date'))).y, m.dateY, 'date y', 3);
+  const tool = dialog.getByRole('link', { name: 'Tải video mẫu' });
+  const t = await box(tool);
+  near(t.x, m.tool[0], 'first tool x');
+  near(t.y, m.tool[1], 'tools y', 3);
+  sized(t, m.tool[2], 32, 'tool');
+  expect(await css(tool, 'background-color', 'border-top-left-radius')).toEqual(['rgb(242, 242, 242)', '6px']);
+  const use = dialog.getByRole('button', { name: 'Dùng mẫu này' });
+  const u = await box(use);
+  near(u.x, m.use[0], 'use button x');
+  near(u.y, m.use[1], 'use button y', 3);
+  sized(u, m.use[2], 36, 'use button');
+  expect(await css(use, 'background-color', 'color', 'border-top-left-radius', 'font-size', 'font-weight')).toEqual(['rgb(0, 0, 0)', 'rgb(255, 255, 255)', '8px', '11px', '600']);
+  const [leftX, rightX, stepY, size] = m.step;
+  for (const [name, x] of [['Mẫu trước', leftX], ['Mẫu sau', rightX]] as const) {
+    const b = page.getByRole('button', { name });
+    const s = await box(b);
+    sized(s, size, size, name);
+    near(s.x, x, `${name} x`);
+    near(s.y, stepY, `${name} y`);
+    expect(await css(b, 'background-color', 'border-top-left-radius')).toEqual(['rgba(0, 0, 0, 0.5)', '50%']);
+  }
+}
+
 test.describe('1440x1000', () => {
   test.beforeEach(async ({ page }) => openCreate(page, DESKTOP));
 
@@ -388,33 +457,23 @@ test.describe('1280x800', () => {
     expect(await page.evaluate(() => document.documentElement.scrollHeight <= window.innerHeight)).toBe(true);
   });
 
-  test('V01 example dialog at 1440: 1100x501 centred, radius 14, the clip left of a 219 px column with 32 px Previous/Next and a 36 px button', async ({ page }) => {
+  test('V01 example dialog at 1440 matches the live measurements: clip on black, Close top-left, details column, tools, the use button and Previous/Next at the viewport edges', async ({ page }) => {
     await page.setViewportSize(DESKTOP);
     await tab(page, 'Ví dụ').click();
     await page.getByRole('button', { name: 'Xoay quanh chậm', exact: true }).click({ position: { x: 12, y: 12 } });
-    const dialog = page.getByRole('dialog', { name: 'Chi tiết mẫu' });
-    const d = await box(dialog);
-    sized(d, 1100, 501, 'dialog');
-    near(d.x, 170, 'dialog x');
-    near(d.y, 250, 'dialog y');
-    expect(await css(dialog, 'border-top-left-radius', 'background-color')).toEqual(['14px', 'rgb(255, 255, 255)']);
-    const info = await box(dialog.locator('.detail-info'));
-    near(info.width, 219, 'details column width');
-    near(info.x + info.width, d.x + d.width, 'details column right edge');
-    const media = await box(dialog.locator('.detail-media .preview'));
-    expect(media.x + media.width).toBeLessThanOrEqual(info.x + 0.5);
-    near(media.height, 501, 'square clip height'); // a 1:1 clip fills the height
-    for (const name of ['Mẫu trước', 'Mẫu sau']) {
-      const b = dialog.getByRole('button', { name });
-      sized(await box(b), 32, 32, name);
-      expect(await css(b, 'border-top-left-radius', 'background-color', 'color')).toEqual(['6px', 'rgb(242, 242, 242)', 'rgb(77, 77, 77)']);
-    }
-    const use = dialog.getByRole('button', { name: 'Dùng mẫu này' });
-    const u = await box(use);
-    sized(u, 187, 36, 'use button');
-    near(d.y + d.height - (u.y + u.height), 16, 'use button bottom inset', 3);
-    near((await box(dialog.getByRole('button', { name: 'Mẫu sau' }))).y + 32 + 6, u.y, 'Previous/Next sit 6 px above the button');
-    expect(await css(use, 'background-color', 'color', 'border-top-left-radius', 'font-size')).toEqual(['rgb(0, 0, 0)', 'rgb(255, 255, 255)', '8px', '12px']);
+    await checkExampleDialog(page, {
+      dialog: [170, 250, 1100, 501],
+      media: [880, 500],
+      close: [182, 262],
+      chipImage: [1074, 273],
+      titleY: 328,
+      inputY: 361,
+      pillsY: 421,
+      dateY: 618,
+      tool: [1067, 660, 32],
+      use: [1067, 698, 187],
+      step: [24, 1368, 476, 48],
+    });
   });
 
   test('S5 T2 G4 the layout holds at 1280: card at x=288, tabs centred over a grid that starts at y=81', async ({ page }) => {
@@ -445,6 +504,24 @@ test.describe('1536 px and wider', () => {
 
 test.describe('390x844', () => {
   test.beforeEach(async ({ page }) => openCreate(page, PHONE));
+
+  test('V01 example dialog at 390 matches the live measurements: stacked, a 400 px clip, 79 px tools, a full-width use button and 36 px Previous/Next', async ({ page }) => {
+    await tab(page, 'Ví dụ').click();
+    await page.getByRole('button', { name: 'Xoay quanh chậm', exact: true }).click({ position: { x: 12, y: 12 } });
+    await checkExampleDialog(page, {
+      dialog: [16, 54, 358, 737],
+      media: [358, 400],
+      close: [28, 67],
+      chipImage: [35, 474],
+      titleY: 529,
+      inputY: 562,
+      pillsY: 622,
+      dateY: 662,
+      tool: [28, 704, 79],
+      use: [28, 742, 334],
+      step: [24, 330, 404, 36],
+    });
+  });
 
   test('N1 top bar: 57 tall, sticky, white, above the content, hairline bottom border, 40x40 radius-10 menu button, 18px/600 title at x=52', async ({ page }) => {
     const bar = page.locator('.topbar');

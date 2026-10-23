@@ -271,7 +271,7 @@ test('choosing a preset or using an example fills the form and creates no job', 
   expect(posts).toEqual([]);
 });
 
-test('V01 Previous and Next step through every sample in order and wrap around; nothing is submitted', async ({ page }) => {
+test('V01 Previous and Next step through every sample in order and stop at the ends; the tools and the use button submit nothing', async ({ page }) => {
   const posts: string[] = [];
   page.on('request', (r) => r.method() === 'POST' && r.url().includes('/api/jobs') && posts.push(r.url()));
   await page.setViewportSize({ width: 1280, height: 800 });
@@ -281,19 +281,27 @@ test('V01 Previous and Next step through every sample in order and wrap around; 
   await openTile(page, EXAMPLES[0]!.title);
   const detail = page.getByRole('dialog', { name: 'Chi tiết mẫu' });
   const title = detail.getByRole('heading', { level: 2 });
+  const specs = detail.getByRole('list', { name: 'Thông số' });
+  const prev = detail.getByRole('button', { name: 'Mẫu trước' });
+  const next = detail.getByRole('button', { name: 'Mẫu sau' });
   await expect(title).toHaveText(EXAMPLES[0]!.title);
-  await expect(detail).toContainText(EXAMPLES[0]!.aspect);
+  await expect(specs).toContainText(EXAMPLES[0]!.aspect);
+  await expect(prev).toBeHidden(); // the first sample has no Previous, as on live
   for (const ex of EXAMPLES.slice(1)) {
-    await detail.getByRole('button', { name: 'Mẫu sau' }).click();
+    await next.click();
     await expect(title).toHaveText(ex.title);
-    await expect(detail).toContainText(`${ex.durationSec} giây`);
+    await expect(specs).toContainText(`${ex.durationSec}s`);
   }
-  await detail.getByRole('button', { name: 'Mẫu sau' }).click();
-  await expect(title).toHaveText(EXAMPLES[0]!.title);
-  await detail.getByRole('button', { name: 'Mẫu trước' }).click();
-  await expect(title).toHaveText(EXAMPLES.at(-1)!.title);
-  await expect(detail.getByRole('button', { name: 'Mẫu trước' })).toBeFocused(); // the button keeps the focus while the sample changes
-  await page.keyboard.press('Escape');
+  await expect(next).toBeHidden(); // and the last has no Next
+  await expect(prev).toBeFocused(); // Next disappeared under the focus, which moved to Previous
+  await prev.click();
+  await expect(title).toHaveText(EXAMPLES.at(-2)!.title);
+  await expect(prev).toBeFocused(); // the button keeps the focus while the sample changes
+  const download = detail.getByRole('link', { name: 'Tải video mẫu' });
+  await expect(download).toHaveAttribute('href', EXAMPLES.at(-2)!.src);
+  await expect(download).toHaveAttribute('download', '');
+  await expect(detail.getByRole('link', { name: 'Mở trong tab mới' })).toHaveAttribute('target', '_blank');
+  await detail.getByRole('button', { name: 'Dùng mẫu này' }).click();
   await expect(detail).toBeHidden();
   expect(posts).toEqual([]);
 });
