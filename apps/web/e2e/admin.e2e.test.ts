@@ -101,7 +101,7 @@ test('an Admin sets up a team, a store and a user, then reconciles the month cos
 
   // Settings and Presets load; a preset edit is saved.
   await nav(page, 'Cài đặt').click();
-  await expect(page.getByRole('checkbox', { name: /Mock E2E/ })).toBeChecked();
+  await expect(page.getByRole('checkbox', { name: 'Mock E2E (mock)', exact: true })).toBeChecked();
   await nav(page, 'Mẫu chuyển động').click();
   const label = page.getByRole('textbox', { name: /^Tên mẫu / }).first();
   await expect(label).toBeVisible();

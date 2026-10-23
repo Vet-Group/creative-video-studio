@@ -133,8 +133,10 @@ test('below 1024 px the drawer opens and closes by keyboard and navigates withou
   await menu.focus();
   await page.keyboard.press('Enter');
   await expect(menu).toHaveAttribute('aria-expanded', 'true');
-  await expect(nav.getByRole('link', { name: 'Tạo video' })).toBeFocused();
+  await expect(nav.getByRole('link', { name: 'Khám phá' })).toBeFocused();
   // The page behind the drawer is out of the focus order.
+  await page.keyboard.press('Tab');
+  await expect(nav.getByRole('link', { name: 'Tạo video' })).toBeFocused();
   await page.keyboard.press('Tab');
   await expect(nav.getByRole('link', { name: 'Thư viện' })).toBeFocused();
 
@@ -144,6 +146,7 @@ test('below 1024 px the drawer opens and closes by keyboard and navigates withou
 
   await page.keyboard.press('Enter');
   await expect(nav).toBeVisible();
+  await page.keyboard.press('Tab');
   await page.keyboard.press('Tab');
   await page.keyboard.press('Enter');
   await expect(page).toHaveURL(/\/library$/);
@@ -499,7 +502,7 @@ for (const width of [1440, 1280, 390]) {
     await openCreate(page);
     const wideScreen = width >= 1024;
     const focused = () => page.evaluate(() => (document.activeElement as HTMLElement).getAttribute('aria-label') ?? document.activeElement?.textContent?.trim());
-    const order = wideScreen ? ['Tạo video', 'Thư viện', 'Phương thức đăng nhập', 'Đăng xuất', 'Lịch sử'] : ['Mở menu', 'Tạo'];
+    const order = wideScreen ? ['Thu gọn thanh bên', 'Cài đặt', 'Khám phá', 'Tạo video', 'Thư viện', 'Lịch sử'] : ['Mở menu', 'Tạo'];
 
     for (const name of order) {
       await page.keyboard.press('Tab');
@@ -510,8 +513,7 @@ for (const width of [1440, 1280, 390]) {
       // The persistent sidebar navigates without a mouse.
       await page.goto('/create');
       await expect(page.getByRole('tab', { name: 'Lịch sử' })).toBeVisible();
-      await page.keyboard.press('Tab');
-      await page.keyboard.press('Tab');
+      for (let i = 0; i < 5; i++) await page.keyboard.press('Tab');
       await expect.poll(focused).toBe('Thư viện');
       await page.keyboard.press('Enter');
       await expect(page).toHaveURL(/\/library$/);

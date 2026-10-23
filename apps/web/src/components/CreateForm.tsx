@@ -53,7 +53,8 @@ const MAX_IMAGES = 4;
 const MAX_PROMPT = 2000;
 const ratePct = (m: Model) => (m.passRate === null ? 'chưa có dữ liệu' : `${Math.round(m.passRate * 100)}% (${m.passes}/${m.total})`);
 
-export function CreateForm({ reuse }: { reuse?: string }) {
+/** `preset` and `model` pre-select the choices Explore links to; an unknown or switched-off one falls back to the default. */
+export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: string; model?: string }) {
   const { refresh } = useJobs();
   const hydrated = useHydrated();
   const [images, setImages] = useState<Image[]>([]);
@@ -62,7 +63,8 @@ export function CreateForm({ reuse }: { reuse?: string }) {
   const [prompt, setPrompt] = useState('');
   const [ratio, setRatio] = useState('9:16');
   const [durationSec, setDurationSec] = useState(8);
-  const [modelId, setModelId] = useState('');
+  const [modelId, setModelId] = useState(model ?? '');
+  const wanted = useRef(model); // the Explore choice, honoured once: the form takes its ratio and duration rather than dropping it
   const [storeId, setStoreId] = useState('');
   const [stores, setStores] = useState<{ id: string; name: string }[]>([]);
   const [models, setModels] = useState<ModelsResponse | null>(null);
@@ -89,14 +91,14 @@ export function CreateForm({ reuse }: { reuse?: string }) {
     api<{ presets: { id: string; label: string }[] }>('/api/presets').then(
       (r) => {
         setPresets(r.presets);
-        if (!reuse) setPresetId(r.presets[0]?.id ?? '');
+        if (!reuse) setPresetId(r.presets.find((p) => p.id === preset)?.id ?? r.presets[0]?.id ?? '');
       },
       () => {
         setPresets([]);
         setError('Không tải được danh sách mẫu chuyển động.');
       },
     );
-  }, [reuse]);
+  }, [reuse, preset]);
 
   // Reuse: fill the form from the source clip; everything stays editable. A preset switched off since falls back to its prompt as a free prompt.
   useEffect(() => {
@@ -124,6 +126,13 @@ export function CreateForm({ reuse }: { reuse?: string }) {
       (r) => {
         if (stale) return;
         setModels(r);
+        const want = r.models.find((m) => m.id === wanted.current);
+        wanted.current = undefined;
+        if (want && !want.supported && want.ratios.length > 0 && want.durationsSec.length > 0) {
+          if (!want.ratios.includes(ratio)) setRatio(want.ratios[0]!);
+          if (!want.durationsSec.includes(durationSec)) setDurationSec(want.durationsSec[0]!);
+          return; // the next fetch, for the new ratio and duration, keeps the model
+        }
         setModelId((cur) => (r.models.some((m) => m.id === cur && m.supported) ? cur : (r.defaultModelId ?? '')));
         const options = r.models.flatMap((m) => m.durationsSec);
         if (options.length > 0 && !options.includes(durationSec)) setDurationSec(Math.min(...options));

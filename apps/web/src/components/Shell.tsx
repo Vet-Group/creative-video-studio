@@ -4,9 +4,11 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { createContext, type ReactNode, useContext, useEffect, useRef, useState } from 'react';
 import { api, errorText, sendJson, type JobStatus, type TrayJob } from '@/lib/api';
+import { COLLAPSED_COOKIE } from '@/lib/sidebar';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { Icon, type IconName } from './Icon';
 import { JobsProvider, useJobs } from './jobs';
+import { type Account, Settings } from './Settings';
 
 const STATUS_LABEL: Record<JobStatus, string> = {
   queued: 'Đang chờ',
@@ -103,30 +105,40 @@ function Toasts() {
   );
 }
 
+// The sidebar in the live order; later features slot in where the live sidebar has them.
+const NAV: { href: string; text: string; icon: IconName }[] = [
+  { href: '/explore', text: 'Khám phá', icon: 'home' },
+  { href: '/create', text: 'Tạo video', icon: 'create' },
+  { href: '/library', text: 'Thư viện', icon: 'library' },
+];
+
 const PAGE_TITLES: [prefix: string, title: string][] = [
+  ['/explore', 'Khám phá'],
   ['/create', 'Tạo video'],
   ['/library', 'Thư viện'],
   ['/admin', 'Quản trị'],
   ['/account', 'Phương thức đăng nhập'],
 ];
 
-export function Shell({ userId, userName, isAdmin, children }: { userId: string; userName: string; isAdmin: boolean; children: ReactNode }) {
+export function Shell({ userId, userName, isAdmin, account, initialCollapsed, children }: { userId: string; userName: string; isAdmin: boolean; account: Account; initialCollapsed: boolean; children: ReactNode }) {
   const pathname = usePathname();
   const narrow = useMediaQuery(NARROW);
   const [open, setOpen] = useState(false); // the drawer, below 1024 px
   const menuButton = useRef<HTMLButtonElement>(null);
   const sidebar = useRef<HTMLDivElement>(null);
+  const [collapsed, setCollapsed] = useState(initialCollapsed); // the icon rail, from 1024 px
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const link = (href: string, text: string, icon: IconName, current = pathname === href) => (
-    <Link href={href} aria-current={current ? 'page' : undefined}>
+    <Link key={href} href={href} aria-current={current ? 'page' : undefined} title={collapsed ? text : undefined}>
       <span className="nav-icon">
         <Icon name={icon} />
       </span>
-      {text}
+      <span className="nav-label">{text}</span>
     </Link>
   );
-  async function signOut() {
-    await api('/api/auth/sign-out', sendJson('POST', {})).catch(() => null);
-    window.location.assign('/login');
+  function toggleRail() {
+    document.cookie = `${COLLAPSED_COOKIE}=${collapsed ? '0' : '1'}; path=/; max-age=31536000; samesite=lax`;
+    setCollapsed(!collapsed);
   }
 
   useEffect(() => setOpen(false), [pathname]);
@@ -137,7 +149,8 @@ export function Shell({ userId, userName, isAdmin, children }: { userId: string;
     if (!open) return;
     sidebar.current?.querySelector<HTMLElement>('nav a')?.focus();
     document.body.style.overflow = 'hidden'; // the page behind the drawer does not scroll
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
+    // Esc inside a dialog opened from the drawer (Settings) closes only that dialog.
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && !(e.target instanceof Element && e.target.closest('dialog')) && setOpen(false);
     document.addEventListener('keydown', onKey);
     return () => {
       document.body.style.overflow = '';
@@ -150,7 +163,7 @@ export function Shell({ userId, userName, isAdmin, children }: { userId: string;
   return (
     <JobsProvider userId={userId}>
       <AdminContext value={isAdmin}>
-        <div className="app">
+        <div className="app" data-collapsed={collapsed}>
           <div className="scrim" data-open={open} onClick={() => setOpen(false)} aria-hidden="true" />
           <div
             ref={sidebar}
@@ -166,38 +179,25 @@ export function Shell({ userId, userName, isAdmin, children }: { userId: string;
               <span className="logo" aria-hidden="true">
                 CV
               </span>
-              <strong>Creative Video Studio</strong>
+              <strong className="who">{userName}</strong>
+              <span className="brand-tools">
+                <button type="button" className="rail-toggle" aria-label="Thu gọn thanh bên" title="Thu gọn thanh bên" aria-pressed={collapsed} onClick={toggleRail}>
+                  <Icon name="panel" size={16} />
+                </button>
+                <button type="button" className="settings-button" aria-label="Cài đặt" title="Cài đặt" aria-haspopup="dialog" onClick={() => setSettingsOpen(true)}>
+                  <Icon name="gear" size={16} />
+                </button>
+              </span>
               <button type="button" className="drawer-close" aria-label="Đóng menu" onClick={() => setOpen(false)}>
                 <Icon name="x" size={16} />
               </button>
             </div>
             <nav aria-label="Điều hướng chính">
-              {link('/create', 'Tạo video', 'create')}
-              {link('/library', 'Thư viện', 'library')}
-              {isAdmin && (
-                <Link href="/admin/users" aria-current={pathname.startsWith('/admin') ? 'page' : undefined}>
-                  <span className="nav-icon">
-                    <Icon name="admin" />
-                  </span>
-                  Quản trị
-                </Link>
-              )}
+              {NAV.map((n) => link(n.href, n.text, n.icon))}
+              {isAdmin && link('/admin/users', 'Quản trị', 'admin', pathname.startsWith('/admin'))}
             </nav>
-            <div className="account">
-              <div className="account-row">
-                <span className="avatar" aria-hidden="true">
-                  {userName.trim().charAt(0).toUpperCase()}
-                </span>
-                <span className="who">{userName}</span>
-                <Link href="/account/sign-in-methods" className="account-gear" aria-label="Phương thức đăng nhập" aria-current={pathname === '/account/sign-in-methods' ? 'page' : undefined}>
-                  <Icon name="gear" size={16} />
-                </Link>
-              </div>
-              <button type="button" className="signout" onClick={() => void signOut()}>
-                Đăng xuất
-              </button>
-            </div>
           </div>
+          <Settings open={settingsOpen} onClose={() => setSettingsOpen(false)} userName={userName} account={account} />
           <div className="content" inert={narrow && open}>
             <header className="topbar">
               <button ref={menuButton} type="button" className="menu-button" aria-label="Mở menu" aria-expanded={open} aria-controls="sidebar" onClick={() => setOpen(true)}>
