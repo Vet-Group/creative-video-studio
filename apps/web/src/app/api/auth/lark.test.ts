@@ -17,6 +17,7 @@ delete process.env.GOOGLE_CLIENT_SECRET;
 
 const { auth, pool, googleLoginEnabled, larkLoginEnabled } = await import('@/lib/auth');
 const route = await import('./[...all]/route');
+const { DELETE: adminUnlink } = await import('../admin/users/[id]/accounts/[accountId]/route');
 const providers = mockProviders();
 
 let seq = 0;
@@ -147,6 +148,20 @@ describe('Lark sign-in', () => {
     );
     expect(res.status).toBe(200);
     expect((await auditsOf(id)).at(-1)).toMatchObject({ action: 'account.unlink', old_value: { provider: 'lark', email: 'first.lark@example.test' } });
+  });
+
+  test('an Admin unlink of one of two Lark accounts writes the email of that account', async () => {
+    await auth.api.createUser({ body: { email: 'lark-admin@example.test', name: 'Admin', role: 'admin', password: PASSWORD } });
+    const adminCookie = await cookieOf('lark-admin@example.test');
+    const id = await user('two-lark-admin@example.test', { password: true });
+    const cookie = await cookieOf('two-lark-admin@example.test');
+    for (const email of ['first.admin@example.test', 'second.admin@example.test']) {
+      expect((await oauth(route, { provider: 'lark', code: lark({ enterprise_email: email }), link: { cookie } })).error).toBeNull();
+    }
+    const rows = (await pool.query(`select id from accounts where user_id = $1 and provider_id = 'lark' order by created_at, id`, [id])).rows;
+    const res = await adminUnlink(new Request('http://localhost/x', { method: 'DELETE', headers: { cookie: adminCookie } }), { params: Promise.resolve({ id, accountId: rows[0].id }) });
+    expect(res.status).toBe(200);
+    expect((await auditsOf(id)).at(-1)).toMatchObject({ action: 'account.unlink', old_value: { provider: 'lark', email: 'first.admin@example.test' } });
   });
 
   test('refuses to link a Lark account of another tenant, and creates no account row', async () => {

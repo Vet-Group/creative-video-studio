@@ -169,6 +169,14 @@ describe('PATCH /api/admin/users/:id', () => {
     expect(log).toEqual([{ actor_id: await adminId(), action: 'user.password_set', old_value: null, new_value: { temporary: true } }]);
   });
 
+  test('bans a user without a password and gives them a temporary one in the same request', async () => {
+    const { user } = await auth.api.createUser({ body: { email: 'social-only@example.test', name: 'Social', role: 'member' } });
+    expect((await patch(adminCookie, user.id, { banned: true, temporaryPassword: 'temporary-pass-4' })).status).toBe(200);
+    const { rows } = await pool.query('select provider_id from accounts where user_id = $1', [user.id]);
+    expect(rows).toEqual([{ provider_id: 'credential' }]);
+    expect((await audits(user.id)).map((a) => a.action)).toEqual(['user.ban', 'user.password_set']);
+  });
+
   test('changes the role, audited once with the old and new role, and refuses a bad role or an unknown user', async () => {
     const m = await member();
     expect((await patch(adminCookie, m.id, { role: 'owner' })).status).toBe(400);

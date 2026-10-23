@@ -39,6 +39,7 @@ export function accountAuditHooks(q: Queryable) {
     create: {
       // Refuse before the row is written: the admin plugin's session hook also refuses a banned user, but only after this row and its audit row exist.
       async before(a: AccountRow) {
+        if (a.providerId === 'credential') return; // an Admin may give a banned social-only user a password
         const u = (await q.query('select banned, ban_expires from users where id = $1', [a.userId])).rows[0];
         if (!u?.banned || (u.ban_expires && new Date(u.ban_expires).getTime() < Date.now())) return; // an expired ban is lifted by that session hook
         larkEmails.delete(a.accountId);

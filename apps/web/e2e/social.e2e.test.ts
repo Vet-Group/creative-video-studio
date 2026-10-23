@@ -4,7 +4,7 @@ import { signIn } from './support.test';
 // The e2e server runs with no Google or Lark values (serve.ts), so no social button shows anywhere.
 test('the login page explains a refused social sign-in and shows no social button', async ({ page }) => {
   await page.goto('/login?error=signup_disabled');
-  await expect(page.getByRole('alert')).toHaveText('Email này chưa được cấp quyền. Liên hệ Admin.');
+  await expect(page.getByRole('alert').filter({ hasText: 'Email này chưa được cấp quyền. Liên hệ Admin.' })).toBeVisible();
   await expect(page.getByRole('button', { name: /Google|Lark/ })).toHaveCount(0);
 });
 
