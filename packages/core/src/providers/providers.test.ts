@@ -32,6 +32,12 @@ function fakeFetch(...answers: [number, unknown][]) {
 describe('fal', () => {
   const req: SubmitRequest = { ...base, model: kling };
 
+  test('submit rewrites [ImageN] in the prompt to the @ImageN that the Kling schema reads', async () => {
+    const { fn, calls } = fakeFetch([200, { request_id: 'req-1', status_url: 'x' }]);
+    await createFalProvider({ apiKey: 'k', fetch: fn }).submit({ ...req, prompt: 'The person in [Image1] wears the product in [Image2]. Keep [Image 3] and @Image4.' });
+    expect((calls[0]!.body as { prompt: string }).prompt).toBe('The person in @Image1 wears the product in @Image2. Keep [Image 3] and @Image4.');
+  });
+
   test('submit sends auth, Store-IO 0, an hour lifecycle and the Kling body with audio off', async () => {
     const { fn, calls } = fakeFetch([200, { request_id: 'req-1', status_url: 'x' }]);
     const out = await createFalProvider({ apiKey: 'k', fetch: fn }).submit(req);

@@ -558,17 +558,70 @@ describe('POST /api/jobs for an image feature', () => {
     });
   });
 
-  test('keeps the video path to its own rules: no params, and the marketing feature needs a model that lists it', async () => {
+  test('keeps the video path to its own rules: no params', async () => {
     const m = await newMember();
     expect((await runAs(m, { params: { resolution: '1K' } })).status).toBe(400);
-    expect((await runAs(m, { feature: 'marketing' })).status).toBe(400); // fal-test lists only video
-    await pool.query(`update model_configs set features = '{video,marketing}' where id = 'fal-test'`);
-    try {
-      const { id } = (await (await runAs(m, { feature: 'marketing' })).json()) as { id: string };
-      expect((await pool.query('select feature, duration_s from jobs where id = $1', [id])).rows).toEqual([{ feature: 'marketing', duration_s: 5 }]);
-    } finally {
-      await pool.query(`update model_configs set features = '{video}' where id = 'fal-test'`);
+  });
+
+  describe('the marketing feature', () => {
+    const error = async (res: Response) => ((await res.json()) as { error: string }).error;
+    const prompt = 'The person in [Image1] wears the product in [Image2].';
+    async function marketing(m: Member, extra: Record<string, unknown> = {}) {
+      await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) values ($1, $2, 'input', $1, 'p.png', 'image/png', 1) on conflict (id) do nothing`, [`${m.id}-product`, m.id]);
+      return runAs(m, { feature: 'marketing', presetId: null, prompt, assetIds: [m.asset, `${m.id}-product`], ...extra });
     }
+    const withMarketing = async (fn: () => Promise<void>) => {
+      await pool.query(`update model_configs set features = '{video,marketing}' where id = 'fal-test'`);
+      try {
+        await fn();
+      } finally {
+        await pool.query(`update model_configs set features = '{video}' where id = 'fal-test'`);
+      }
+    };
+
+    test('needs a model that lists it', async () => {
+      expect((await marketing(await newMember())).status).toBe(400); // fal-test lists only video
+    });
+
+    test('takes the model photo and the product photo in that order, stores the prompt and books the video estimate', () =>
+      withMarketing(async () => {
+        const m = await newMember();
+        const res = await marketing(m);
+        expect(res.status).toBe(201);
+        const { id } = (await res.json()) as { id: string };
+        expect((await pool.query('select feature, preset_id, prompt, duration_s, input_asset_ids from jobs where id = $1', [id])).rows).toEqual([
+          { feature: 'marketing', preset_id: null, prompt, duration_s: 5, input_asset_ids: [m.asset, `${m.id}-product`] },
+        ]);
+        expect((await pool.query(`select usd::text from cost_entries where job_id = $1`, [id])).rows).toEqual([{ usd: '1.0000' }]);
+      }));
+
+    test('refuses anything but exactly 2 images, a preset, and a missing or blank prompt, in English', () =>
+      withMarketing(async () => {
+        const m = await newMember();
+        const before = await jobCount();
+        expect(await error(await runAs(m, { feature: 'marketing', presetId: null, prompt }))).toMatch(/exactly 2 images/);
+        await insertAsset(`${m.id}-third`, m.id);
+        expect(await error(await marketing(m, { assetIds: [m.asset, `${m.id}-product`, `${m.id}-third`] }))).toMatch(/exactly 2 images/);
+        expect(await error(await marketing(m, { presetId: 'gentle-push-in', prompt: null }))).toMatch(/prompt and no preset/);
+        expect(await error(await marketing(m, { presetId: 'gentle-push-in' }))).toMatch(/prompt and no preset/);
+        expect(await error(await marketing(m, { prompt: null }))).toMatch(/prompt and no preset/);
+        expect(await error(await marketing(m, { prompt: undefined }))).toMatch(/prompt and no preset/);
+        expect(await error(await marketing(m, { prompt: '   ' }))).toMatch(/prompt and no preset/);
+        expect(await jobCount()).toBe(before);
+      }));
+
+    test('a retry copies the two inputs and the prompt of the original and is not held to the new-Run checks', () =>
+      withMarketing(async () => {
+        const m = await newMember();
+        const { id } = (await (await marketing(m)).json()) as { id: string };
+        await pool.query(`update jobs set status = 'failed' where id = $1`, [id]);
+        const res = await run(m.cookie, { retryOf: id });
+        expect(res.status).toBe(201);
+        const retry = ((await res.json()) as { id: string }).id;
+        expect((await pool.query('select feature, prompt, input_asset_ids, retry_of from jobs where id = $1', [retry])).rows).toEqual([
+          { feature: 'marketing', prompt, input_asset_ids: [m.asset, `${m.id}-product`], retry_of: id },
+        ]);
+      }));
   });
 
   describe('the image and apps caps', () => {

@@ -58,7 +58,8 @@ export function createFalProvider(opts: { apiKey: string; fetch?: Fetch; readIma
   return {
     async submit(req) {
       const body = {
-        prompt: req.prompt,
+        // The app writes [Image1], [Image2]; Kling's schema addresses the reference images as @Image1, @Image2.
+        prompt: req.prompt.replace(/\[Image(\d+)\]/g, '@Image$1'),
         image_urls: await resolveImages(req.imageUrls, opts.readImage),
         aspect_ratio: req.ratio,
         duration: String(req.durationSec),

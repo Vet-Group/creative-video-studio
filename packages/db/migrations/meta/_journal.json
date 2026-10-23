@@ -71,6 +71,13 @@
       "when": 1793444532036,
       "tag": "0009_image_app_models",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1793530932036,
+      "tag": "0010_marketing_model",
+      "breakpoints": true
     }
   ]
 }
