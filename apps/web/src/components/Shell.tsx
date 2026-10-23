@@ -114,17 +114,19 @@ const NAV: { href: string; text: string; icon: IconName }[] = [
   { href: '/try-on', text: 'Thử đồ', icon: 'tryon' },
   { href: '/image-generation', text: 'Tạo ảnh', icon: 'image' },
   { href: '/create', text: 'Tạo video', icon: 'create' },
+  { href: '/apps', text: 'Ứng dụng', icon: 'apps' },
   { href: '/library', text: 'Thư viện', icon: 'library' },
 ];
 
 /** The pages that show their own History tab instead of the tray beside them. */
-const OWN_HISTORY = ['/create', '/try-on', '/image-generation'];
+const OWN_HISTORY = ['/create', '/try-on', '/image-generation', '/apps'];
 
 const PAGE_TITLES: [prefix: string, title: string][] = [
   ['/explore', 'Khám phá'],
   ['/try-on', 'Thử đồ'],
   ['/image-generation', 'Tạo ảnh'],
   ['/create', 'Tạo video'],
+  ['/apps', 'Ứng dụng'],
   ['/library', 'Thư viện'],
   ['/admin', 'Quản trị'],
   ['/account', 'Phương thức đăng nhập'],

@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { type CSSProperties, useCallback, useEffect, useRef, useState } from 'react';
 import { api, type Clip, errorText, sendJson } from '@/lib/api';
 import { FAULTS } from '@/lib/faults';
+import { featureLabel } from '@/lib/features';
 import { Icon } from './Icon';
 
 const fmtTime = (iso: string) => new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date(iso));
@@ -114,6 +115,7 @@ function ClipCard({ clip, stores, onChange, onDeleted }: { clip: Clip; stores?: 
       )}
       <p>
         <strong>{clip.creator.name}</strong>
+        {clip.feature !== 'video' && <span className="tag feature-tag">{featureLabel(clip.feature)}</span>}
         {clip.isMock && <span className="badge">MOCK</span>}
       </p>
       <p className="muted">

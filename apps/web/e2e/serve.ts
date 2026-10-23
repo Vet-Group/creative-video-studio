@@ -34,6 +34,12 @@ await pool.query(
      ('mock-image-e2e', 'mock', 'mock', 'Mock image E2E', 'image', '{image,try_on}', '{auto,1:1,3:4}', '{}', 4, '{"1K": "0.1500", "2K": "0.3000"}', '{}', true),
      ('mock-image-solo', 'mock', 'mock', 'Mock image Solo', 'image', '{image}', '{auto}', '{}', 1, '{"1K": "0.1000"}', '{}', true)`,
 );
+// One image model for the seven image apps, which the Apps specs run; it takes up to two images and lists every app feature.
+await pool.query(
+  `insert into model_configs (id, provider, endpoint, label, kind, features, ratios, durations_sec, max_images, image_prices, sources, enabled) values
+     ('mock-apps-e2e', 'mock', 'mock', 'Mock apps E2E', 'image', '{character_swap,model_swap,background_changer,reframe,image_upscale,face_swap,background_remover}', '{auto,1:1,9:16}', '{}', 2,
+      '{"1K": "0.0500", "2K": "0.0800", "4K": "0.0800"}', '{}', true)`,
+);
 // A store the Create picker offers, for the specs that tag a clip with one.
 await pool.query(`insert into stores (id, name, code) values ('store-e2e', 'E2E Shop', 'E2E-SEED')`);
 // Every spec runs jobs; the daily clip cap is not what is under test here.
