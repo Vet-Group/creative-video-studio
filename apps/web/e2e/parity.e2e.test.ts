@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { expect, type Page, test } from '@playwright/test';
 import { EXAMPLES } from '../src/lib/examples';
 import { freezeData } from './frozen.test';
-import { expectOptions, modelButton, optionsOf, pickModel, select, selectText, selectValue, signIn } from './support.test';
+import { expectOptions, modelButton, optionsOf, pickModel, select, selectValue, signIn } from './support.test';
 
 // Posters and a frozen clock: reduced motion keeps every clip on its poster, so a second run paints the same frame.
 test.use({ contextOptions: { reducedMotion: 'reduce' } });
@@ -26,10 +26,17 @@ async function openCreate(page: Page): Promise<void> {
   await select(page, 'Cửa hàng/Thương hiệu').click();
   await expect(optionsOf(page, 'Cửa hàng/Thương hiệu')).not.toHaveCount(1); // the empty choice and at least one store
   await select(page, 'Cửa hàng/Thương hiệu').click();
+  // Opening the store list scrolled the form and left the focus on it; the specs and baselines start from a fresh load.
+  await page.reload();
+  await expect(modelButton(page)).toContainText('Mock E2E');
+  await expect(select(page, 'Mẫu chuyển động')).not.toHaveText('Tự viết mô tả');
   await expect(page.getByText('Tháng này bạn đã dùng: $0.0000')).toBeVisible();
 }
 
 const narrow = (page: Page) => (page.viewportSize()?.width ?? 0) < 1024;
+
+/** Opens a sample's details: the whole tile is the button, but its centre holds the play button under reduced motion, so click a corner. */
+const openTile = (page: Page, title: string) => page.getByRole('button', { name: title, exact: true }).click({ position: { x: 12, y: 12 } });
 
 for (const size of SIZES) {
   const at = `${size.width}x${size.height}`;
@@ -238,7 +245,7 @@ test('choosing a preset or using an example fills the form and creates no job', 
 
   // An example: a click shows the details with a "use this sample" button, which fills preset, ratio and duration.
   await page.getByRole('tab', { name: 'Ví dụ' }).click();
-  await page.getByRole('button', { name: 'Xoay quanh chậm', exact: true }).click();
+  await openTile(page, 'Xoay quanh chậm');
   const detail = page.getByRole('dialog', { name: 'Chi tiết mẫu' });
   await expect(detail).toContainText('Mẫu minh họa');
   await expect(presetSelect).toHaveAttribute('data-value', 'light-sweep');
@@ -269,7 +276,7 @@ test('a dialog closes on its backdrop, not on a click inside it', async ({ page 
   await signIn(page, 'member5');
   await openCreate(page);
   await page.getByRole('tab', { name: 'Ví dụ' }).click();
-  await page.getByRole('button', { name: 'Xoay quanh chậm', exact: true }).click();
+  await openTile(page, 'Xoay quanh chậm');
   const detail = page.getByRole('dialog', { name: 'Chi tiết mẫu' });
   await expect(detail).toBeVisible();
 
@@ -328,7 +335,7 @@ test('changing the model changes the ratio and duration options to the ones it s
   await modelButton(page).click();
   await expect(page.getByRole('option', { name: /Wide model/ })).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByRole('option', { name: /Short model/ })).toHaveAttribute('aria-disabled', 'true'); // it has no 8 s clips
-  await page.getByRole('option', { name: /Short model/ }).click(); // a disabled model cannot be picked
+  await page.getByRole('option', { name: /Short model/ }).click({ force: true }); // a disabled model cannot be picked, even by a forced click
   await expect(modelButton(page)).toContainText('Wide model');
   await page.keyboard.press('Escape');
   await selectValue(page, 'Thời lượng', '5');
@@ -401,6 +408,12 @@ test('the model picker opens a panel beside its button, searches, and closes wit
 
   await search.fill('zzz');
   await expect(panel.getByText('Không có mô hình nào khớp.')).toBeVisible();
+  // The page scrolling under the fixed panel closes it, and the next open starts with an empty search.
+  await page.locator('.form-scroll').evaluate((el) => el.dispatchEvent(new Event('scroll')));
+  await expect(panel).toBeHidden();
+  await trigger.click();
+  await expect(search).toHaveValue('');
+  await expect(panel.getByRole('option', { name: /Mock E2E/ })).toBeVisible();
   await search.fill('mock');
   await page.keyboard.press('ArrowDown');
   await page.keyboard.press('Enter');
