@@ -58,8 +58,9 @@ export function createFalProvider(opts: { apiKey: string; fetch?: Fetch; readIma
   return {
     async submit(req) {
       const body = {
-        // The app writes [Image1], [Image2]; Kling's schema addresses the reference images as @Image1, @Image2.
-        prompt: req.prompt.replace(/\[Image(\d+)\]/g, '@Image$1'),
+        // The app writes [Image1], [Image2]; Kling's schema (the only fal video model) addresses them as @Image1, @Image2.
+        // A digit right after the token gets a space, so "[Image1]2" does not become @Image12.
+        prompt: req.prompt.replace(/\[Image(\d+)\](\d?)/g, (_, n: string, d: string) => `@Image${n}${d ? ` ${d}` : ''}`),
         image_urls: await resolveImages(req.imageUrls, opts.readImage),
         aspect_ratio: req.ratio,
         duration: String(req.durationSec),
