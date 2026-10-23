@@ -1,6 +1,6 @@
 import { reserve, withTransaction } from '@cvs/core/ledger';
 import { type CapRefusal, checkCaps } from '@cvs/core/limits';
-import { estimateUsd } from '@cvs/core/models';
+import { estimateUsd, FEATURE_PROMPTS } from '@cvs/core/models';
 import { VIDEO_QUEUE, videoSendOptions } from '@cvs/core/queue';
 import { FEATURES } from '@cvs/db';
 import { pool } from '@/lib/auth';
@@ -14,8 +14,8 @@ const MAX_PROMPT = 2000;
 /** The features that run on a video model; every other feature runs on an image model. */
 const VIDEO_FEATURES = ['video', 'marketing'];
 const QUALITIES = ['auto', 'low', 'medium', 'high'];
-/** Try On may be sent without a prompt (the person image first, then the garment); this is stored and sent instead. */
-const TRY_ON_PROMPT = 'Dress the person in the first image in the garment from the other image(s). Keep the person, face, pose, body and background exactly unchanged. Do not add any text, logos or watermarks.';
+/** The apps that need more than one input image; the model's own max_images is the upper limit. Try On has its own message below. */
+const MIN_INPUTS: Record<string, number> = { character_swap: 2, model_swap: 2, face_swap: 2 };
 /** `presetId` is null for a free prompt, and `prompt` is null when a preset supplies it (or, in a retry, when the original's is copied). An image job has no preset and `durationSec` 0. */
 type Spec = {
   assetIds: string[]; modelId: string; presetId: string | null; prompt: string | null; ratio: string; durationSec: number; storeId: string | null;
@@ -62,8 +62,8 @@ export async function GET(request: Request) {
  * model, a preset or a free prompt (exactly one; a free prompt is trimmed, 1 to 2000 characters, and stored with a null preset), the ratio and duration the model allows, and an optional visible store. The caps are checked and the job and its
  * `estimate` ledger row are written in one transaction (429 when a cap refuses, nothing sent); the pg-boss job is sent afterwards.
  * `feature` (default `video`) picks the kind of job. `video` and `marketing` take a video model, the durations above and no `params`. Any other feature is an
- * image job: an enabled image model that lists the feature, no preset, a prompt (Try On may omit it and gets a default), 1 to the model's `max_images`
- * inputs (Try On needs at least 2), one of the model's ratios (or `auto`), `params.resolution` (a key of the model's `image_prices`, which also sets the
+ * image job: an enabled image model that lists the feature, no preset, a prompt (the apps in FEATURE_PROMPTS may omit it and get that one), 1 to the model's `max_images`
+ * inputs (Try On, the two swaps and Face Swap need at least 2; Background Changer takes a prompt or a second image as the reference), one of the model's ratios (or `auto`), `params.resolution` (a key of the model's `image_prices`, which also sets the
  * estimate) and an optional `params.quality`. `durationSec` is not read and the job stores 0.
  * `retryOf` retries the caller's own failed job once: the inputs, model, preset, prompt, ratio, duration, team and store all come from the
  * original (the body may carry just `retryOf`), the estimate from the model's current price.
@@ -88,6 +88,7 @@ export async function POST(request: Request) {
       return bad(`assetIds must list 1 to ${maxInputs} different asset ids`);
     }
     if (feature === 'try_on' && assetIds.length < 2) return bad('Try On needs the person image and at least one garment image');
+    if (assetIds.length < (MIN_INPUTS[feature] ?? 1)) return bad(`${feature} needs ${MIN_INPUTS[feature]} images`);
     if (typeof modelId !== 'string' || (presetId !== null && typeof presetId !== 'string') || (freePrompt !== null && typeof freePrompt !== 'string') || typeof ratio !== 'string' || (!isImage && !Number.isInteger(durationSec)) || (storeId !== null && typeof storeId !== 'string')) {
       return bad('modelId, ratio, durationSec (a whole number, video only), a presetId or a prompt, and an optional storeId are required');
     }
@@ -97,10 +98,12 @@ export async function POST(request: Request) {
     if (isImage ? given.resolution === undefined : entries.length > 0) return bad(isImage ? 'params.resolution is required' : 'params are for image features only');
     if (given.quality !== undefined && !QUALITIES.includes(given.quality)) return bad(`params.quality must be one of ${QUALITIES.join(', ')}`);
     // The PRD gives "an optional prompt, or one of the presets" for video: exactly one of the two. An image job has no presets.
-    if (isImage ? presetId !== null || (freePrompt === null && feature !== 'try_on') : (presetId === null) === (freePrompt === null)) {
-      return bad(isImage ? 'an image job takes a prompt and no preset (only Try On may omit the prompt)' : 'give either a presetId or a prompt, not both and not neither');
+    if (isImage ? presetId !== null || (freePrompt === null && !Object.hasOwn(FEATURE_PROMPTS, feature)) : (presetId === null) === (freePrompt === null)) {
+      return bad(isImage ? 'an image job takes a prompt and no preset (only the apps may omit the prompt)' : 'give either a presetId or a prompt, not both and not neither');
     }
-    const prompt = freePrompt?.trim() ?? (isImage ? TRY_ON_PROMPT : null);
+    // Background Changer takes a prompt (one image) or a reference image (two images), the schema says not both.
+    if (feature === 'background_changer' && (assetIds.length > 1) === (freePrompt !== null)) return bad('Background Changer takes a prompt or a reference image (the second image), not both and not neither');
+    const prompt = freePrompt?.trim() ?? FEATURE_PROMPTS[feature] ?? null;
     if (prompt !== null && (prompt === '' || prompt.length > MAX_PROMPT)) return bad(`the prompt must have 1 to ${MAX_PROMPT} characters`);
     const usable = await pool.query(
       `select a.id from assets a

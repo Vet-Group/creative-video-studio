@@ -1,6 +1,6 @@
 // Image adapters against fixtures shaped like the fal input and output schemas read on 2026-10-24. No network, no key.
 import { describe, expect, test } from 'vitest';
-import type { ImageModelConfig } from '../models';
+import { FEATURE_PROMPTS, type ImageModelConfig } from '../models';
 import { createFalImageProvider } from './fal';
 import { imageEstimate, ProviderHttpError } from './http';
 import { createMockImageProvider, MOCK_FAIL } from './mock';
@@ -91,6 +91,100 @@ describe('fal image submit', () => {
     expect(calls).toHaveLength(0);
   });
 
+  // The apps of 2026-10-24. Field names and shapes are those of each endpoint's input schema.
+  describe('image apps', () => {
+    const app = (endpoint: string, price = '0.05') => model(endpoint, { '1K': price });
+    const one = { imageUrls: ['https://img/1.jpg'] };
+    const two = { imageUrls: ['https://img/1.jpg', 'https://img/2.jpg'] };
+    const refuses = async (r: ImageSubmitRequest, message: RegExp, readImage?: Parameters<typeof bodyFor>[1]) => {
+      const { fn, calls } = fakeFetch();
+      await expect(createFalImageProvider({ apiKey: 'k', fetch: fn, readImage }).submit(r)).rejects.toThrow(message);
+      expect(calls).toHaveLength(0);
+    };
+
+    test('Character Swap and Model Swap send the images and the fixed prompt through the Nano Banana Pro body', async () => {
+      const prompt = FEATURE_PROMPTS.character_swap!;
+      expect(prompt).toBe('replace the whole person in the second image with the person from the first image, keep the background');
+      expect(FEATURE_PROMPTS.model_swap).toBe('replace the person in the second image with the model from the first image, keep the clothing, pose and background exactly');
+      expect((await bodyFor(req(PRO, { ...two, prompt, ratio: 'auto' }))).body).toEqual({
+        prompt, image_urls: ['https://img/1.jpg', 'https://img/2.jpg'], aspect_ratio: 'auto', resolution: '1K', num_images: 1, output_format: 'png',
+      });
+    });
+
+    test('Background Changer sends the reference image or the prompt, never both, and needs one of them', async () => {
+      const bria = app('fal-ai/bria/background/replace', '0.04');
+      expect((await bodyFor(req(bria, { ...one, prompt: 'a marble table', ratio: 'auto' }))).body).toEqual({ image_url: 'https://img/1.jpg', prompt: 'a marble table', num_images: 1 });
+      expect((await bodyFor(req(bria, { ...two, prompt: FEATURE_PROMPTS.background_changer, ratio: 'auto' }))).body).toEqual({
+        image_url: 'https://img/1.jpg', ref_image_url: 'https://img/2.jpg', num_images: 1,
+      });
+      await refuses(req(bria, { ...one, prompt: '  ', ratio: 'auto' }), /reference image or a prompt/);
+    });
+
+    test('Reframe sends the image and a width and height in the ratio, about one megapixel in multiples of 16', async () => {
+      const reframe = app('fal-ai/ideogram/v3/reframe', '0.03');
+      expect((await bodyFor(req(reframe, { ...one, ratio: '16:9' }))).body).toEqual({
+        image_url: 'https://img/1.jpg', image_size: { width: 1360, height: 768 }, rendering_speed: 'BALANCED', num_images: 1,
+      });
+      for (const ratio of ['1:1', '9:16', '3:4', '4:3', '2:3', '3:2', '4:5', '5:4', '21:9']) {
+        const { width, height } = ((await bodyFor(req(reframe, { ...one, ratio }))).body as { image_size: { width: number; height: number } }).image_size;
+        expect([width % 16, height % 16]).toEqual([0, 0]);
+        expect(width * height).toBeGreaterThan(900_000);
+        expect(width * height).toBeLessThan(1_200_000);
+      }
+      await refuses(req(reframe, { ...one, ratio: 'auto' }), /needs a ratio, not auto/);
+    });
+
+    describe('Upscale', () => {
+      const topaz = model('fal-ai/topaz/upscale/image', { '2K': '0.04', '4K': '0.08' });
+      const png = (width: number, height: number) => {
+        const b = new Uint8Array(33);
+        b.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+        new DataView(b.buffer).setUint32(16, width);
+        new DataView(b.buffer).setUint32(20, height);
+        return b;
+      };
+      const readPng = (width: number, height: number) => async () => ({ bytes: png(width, height), contentType: 'image/png' });
+      const upscaleReq = (resolution: string) => req(topaz, { imageUrls: ['asset://a'], resolution, ratio: 'auto' });
+      const factor = async (width: number, height: number, resolution: string) =>
+        ((await bodyFor(upscaleReq(resolution), readPng(width, height))).body as { upscale_factor: number }).upscale_factor;
+
+      test('works out the factor that lands on the pixel budget of the resolution, from the image size', async () => {
+        expect((await bodyFor(upscaleReq('2K'), readPng(1024, 1024))).body).toEqual({ image_url: expect.stringMatching(/^data:image\/png;base64,/), upscale_factor: 2, model: 'Standard V2' });
+        expect(await factor(1000, 1000, '2K')).toBe(2.04); // 2048 x 2048 = 4.19 MP over 1 MP
+        expect(await factor(1920, 1080, '4K')).toBe(2); // 3840 x 2160
+        expect(await factor(1000, 1000, '4K')).toBe(2.88); // 8.29 MP over 1 MP
+      });
+
+      test('never asks for more than the 4x of the schema, and keeps the output inside the budget', async () => {
+        expect(await factor(200, 200, '4K')).toBe(4);
+        for (const [w, h, resolution] of [[1234, 987, '2K'], [3000, 2000, '4K'], [641, 480, '4K']] as const) {
+          const f = await factor(w, h, resolution);
+          expect(f).toBeGreaterThanOrEqual(1);
+          expect(w * f * (h * f)).toBeLessThanOrEqual(resolution === '2K' ? 2048 * 2048 : 3840 * 2160);
+        }
+      });
+
+      test('refuses an image that already exceeds the budget, an unknown resolution, and an image it cannot measure', async () => {
+        await refuses(upscaleReq('2K'), /already larger/, readPng(3000, 3000));
+        await refuses(upscaleReq('1K'), /does not offer resolution 1K/, readPng(100, 100));
+        await refuses(upscaleReq('2K'), /can measure/, async () => ({ bytes: new Uint8Array(40), contentType: 'image/png' }));
+        await refuses(req(topaz, { imageUrls: ['https://img/1.jpg'], resolution: '2K', ratio: 'auto' }), /can measure/);
+      });
+    });
+
+    test('Face Swap sends the source face and the target photo with the fixed fields, and needs exactly two images', async () => {
+      const easel = app('easel-ai/advanced-face-swap');
+      expect((await bodyFor(req(easel, { ...two, ratio: 'auto' }))).body).toEqual({
+        face_image_0: 'https://img/1.jpg', target_image: 'https://img/2.jpg', gender_0: 'non-binary', workflow_type: 'target_hair', upscale: true, detailer: false,
+      });
+      await refuses(req(easel, { ...one, ratio: 'auto' }), /source face and the target photo/);
+    });
+
+    test('Background Remover sends the image only, even if a prompt is stored', async () => {
+      expect((await bodyFor(req(app('fal-ai/bria/background/remove', '0.018'), { ...one, prompt: FEATURE_PROMPTS.background_remover, ratio: 'auto' }))).body).toEqual({ image_url: 'https://img/1.jpg' });
+    });
+  });
+
   test('an endpoint without a builder submits nothing', async () => {
     const { fn, calls } = fakeFetch();
     await expect(createFalImageProvider({ apiKey: 'k', fetch: fn }).submit(req(model('fal-ai/unknown/edit', { '1K': '1' })))).rejects.toThrow(/no request builder/);
@@ -138,11 +232,18 @@ describe('fal image status', () => {
     expect(calls[1]!.url).toBe('https://queue.fal.run/fal-ai/nano-banana-pro/requests/req-9');
   });
 
+  test.each([
+    ['image', { image: { url: 'https://v3.fal.media/b.png', content_type: 'image/png', file_name: 'b.png', file_size: 1, width: 10, height: 10 } }],
+    ['images', { images: [{ url: 'https://v3.fal.media/b.png' }], seed: 1 }],
+  ])('a result with %s (Topaz, Face Swap and Remover answer image; Reframe and Bria Replace answer images) gives its url', async (_what, out) => {
+    expect(await provider([200, { status: 'COMPLETED' }], [200, out]).p.status(job)).toMatchObject({ state: 'succeeded', outputUrl: 'https://v3.fal.media/b.png' });
+  });
+
   test('COMPLETED with an error, an empty result or a 4xx result is failed and still carries the price', async () => {
     expect(await provider([200, { status: 'COMPLETED', error: 'content policy', error_type: 'content_policy_violation' }]).p.status(job)).toEqual({
       state: 'failed', error: 'content policy', costUsd: 0.3, costSource: 'estimate',
     });
-    expect(await provider([200, { status: 'COMPLETED' }], [200, { images: [] }]).p.status(job)).toMatchObject({ state: 'failed', error: 'fal result has no images[0].url' });
+    expect(await provider([200, { status: 'COMPLETED' }], [200, { images: [] }]).p.status(job)).toMatchObject({ state: 'failed', error: 'fal result has no images[0].url or image.url' });
     expect(await provider([200, { status: 'COMPLETED' }], [422, { detail: 'image_too_large' }]).p.status(job)).toMatchObject({ state: 'failed', error: expect.stringContaining('422') });
   });
 
