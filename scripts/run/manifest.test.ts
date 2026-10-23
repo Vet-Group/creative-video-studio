@@ -25,6 +25,14 @@ describe('steps', () => {
     expect(p1.soft).toEqual(p1.deps);
   });
 
+  test('UI parity runs in the app worktree after D.1, and the deploy waits for it unless it is skipped', () => {
+    const m7 = STEPS.find((s) => s.id === 'M.7')!;
+    expect(m7).toMatchObject({ deps: ['D.1'], worktree: 'app' });
+    const d5 = STEPS.find((s) => s.id === 'D.5')!;
+    expect(d5.deps).toContain('M.7');
+    expect(d5.soft).toContain('M.7');
+  });
+
   test('are topologically ordered with known deps', () => {
     const seen = new Set<string>();
     for (const s of STEPS) {
