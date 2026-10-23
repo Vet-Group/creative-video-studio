@@ -93,8 +93,8 @@ describe('migration 0007 image models', () => {
     }
   });
 
-  test('a video row keeps its defaults: kind video, feature video, no image prices', async () => {
-    expect((await pool.query(`select kind, features, image_prices from model_configs where id = 'kling-o3-pro'`)).rows).toEqual([{ kind: 'video', features: ['video'], image_prices: null }]);
+  test('a video row keeps its defaults: kind video, no image prices (features: see migration 0010)', async () => {
+    expect((await pool.query(`select kind, features, image_prices from model_configs where id = 'kling-o3-pro'`)).rows).toEqual([{ kind: 'video', features: ['video', 'marketing'], image_prices: null }]);
   });
 
   test('an image model can be enabled with prices, a limit and a ratio, and not without them', async () => {
@@ -149,6 +149,15 @@ describe('migration 0009 image app models', () => {
     const ids = ['bria-background-remove', 'bria-background-replace', 'easel-advanced-face-swap', 'ideogram-v3-reframe', 'nano-banana-pro-character-swap', 'nano-banana-pro-model-swap', 'topaz-upscale'];
     await pool.query(`update model_configs set enabled = true where id = any($1)`, [ids]);
     await pool.query(`update model_configs set enabled = false where id = any($1)`, [ids]);
+  });
+});
+
+describe('migration 0010 marketing model', () => {
+  test('adds marketing to Kling O3 Pro, keeps it disabled, and records the schema read', async () => {
+    const { rows } = await pool.query(`select features, enabled, sources from model_configs where id = 'kling-o3-pro'`);
+    expect(rows[0].features).toEqual(['video', 'marketing']);
+    expect(rows[0].enabled).toBe(false);
+    expect(rows[0].sources.referenceImages).toMatchObject({ readAt: '2026-10-24', url: expect.stringContaining('endpoint_id=fal-ai/kling-video/o3/pro/reference-to-video') });
   });
 });
 

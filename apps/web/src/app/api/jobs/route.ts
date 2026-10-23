@@ -63,7 +63,7 @@ export async function GET(request: Request) {
  * Create a video job: 1-4 input images the caller may use (their own, or the inputs of a succeeded Library clip for Reuse), an enabled
  * model, a preset or a free prompt (exactly one; a free prompt is trimmed, 1 to 2000 characters, and stored with a null preset), the ratio and duration the model allows, and an optional visible store. The caps are checked and the job and its
  * `estimate` ledger row are written in one transaction (429 when a cap refuses, nothing sent); the pg-boss job is sent afterwards.
- * `feature` (default `video`) picks the kind of job. `video` and `marketing` take a video model, the durations above and no `params`. Any other feature is an
+ * `feature` (default `video`) picks the kind of job. `video` and `marketing` take a video model, the durations above and no `params`. `marketing` needs exactly 2 inputs (the model photo, then the product photo) and a prompt, no preset. Any other feature is an
  * image job: an enabled image model that lists the feature, no preset, a prompt (the apps in FEATURE_PROMPTS may omit it and get that one), 1 to the model's `max_images`
  * inputs (Try On, the two swaps and Face Swap need at least 2; Background Changer takes a prompt or a second image as the reference), one of the model's ratios (or `auto`), `params.resolution` (a key of the model's `image_prices`, which also sets the
  * estimate) and an optional `params.quality`. `durationSec` is not read and the job stores 0.
@@ -92,6 +92,8 @@ export async function POST(request: Request) {
       return bad(`assetIds must list 1 to ${maxInputs} different asset ids`);
     }
     if (feature === 'try_on' && assetIds.length < 2) return bad('Try On needs the person image and at least one garment image');
+    if (feature === 'marketing' && assetIds.length !== 2) return bad('Marketing Studio needs exactly 2 images: the model photo first, then the product photo');
+    if (feature === 'marketing' && (presetId !== null || typeof freePrompt !== 'string' || freePrompt.trim() === '')) return bad('Marketing Studio takes a prompt and no preset');
     if (assetIds.length < (MIN_INPUTS[feature] ?? 1)) return bad(`${feature} needs ${MIN_INPUTS[feature]} images`);
     if (typeof modelId !== 'string' || (presetId !== null && typeof presetId !== 'string') || (freePrompt !== null && typeof freePrompt !== 'string') || typeof ratio !== 'string' || (!isImage && !Number.isInteger(durationSec)) || (storeId !== null && typeof storeId !== 'string')) {
       return bad('modelId, ratio, durationSec (a whole number, video only), a presetId or a prompt, and an optional storeId are required');
