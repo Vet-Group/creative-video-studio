@@ -79,7 +79,8 @@ export async function POST(request: Request) {
   // A retry takes everything from the original job, so only a new Run is validated against the body.
   let spec: Spec | null = null;
   if (retryOf === null) {
-    const { assetIds, modelId, presetId = null, prompt: freePrompt = null, ratio, durationSec, storeId = null, feature = 'video', params = {} } = body ?? {};
+    const { assetIds, modelId, presetId = null, prompt: freePrompt = null, ratio, durationSec, storeId = null, feature = 'video', params: rawParams } = body ?? {};
+    const params = rawParams ?? {}; // null as well as absent: video clients may send it
     if (typeof feature !== 'string' || !(FEATURES as readonly string[]).includes(feature)) return bad(`feature must be one of ${FEATURES.join(', ')}`);
     const isImage = !VIDEO_FEATURES.includes(feature);
     const maxInputs = isImage ? MAX_IMAGE_INPUTS : MAX_IMAGES;
@@ -137,7 +138,9 @@ export async function POST(request: Request) {
     const model = (await tx.query('select enabled, provider, kind, features, ratios, durations_sec, max_images, usd_per_second, image_prices from model_configs where id = $1', [modelId])).rows[0];
     if (!model?.enabled) return bad('the model does not exist or is not enabled');
     if (model.kind !== (isImage ? 'image' : 'video') || !model.features.includes(feature)) return bad('the model does not offer this feature');
-    if (!model.ratios.includes(ratio) || !(isImage ? params.resolution! in model.image_prices : model.durations_sec.includes(durationSec)) || assetIds.length > model.max_images) {
+    // Own keys only, with a plain decimal price: `in` would also accept "constructor" and friends.
+    const imagePrice = isImage && Object.hasOwn(model.image_prices ?? {}, params.resolution!) ? String(model.image_prices[params.resolution!]) : null;
+    if (!model.ratios.includes(ratio) || !(isImage ? imagePrice !== null && /^\d+(\.\d+)?$/.test(imagePrice) : model.durations_sec.includes(durationSec)) || assetIds.length > model.max_images) {
       return bad(isImage ? 'the model does not allow this ratio, resolution or number of images' : 'the model does not allow this ratio, duration or number of images');
     }
     let prompt = original?.prompt ?? freePrompt;
@@ -151,7 +154,7 @@ export async function POST(request: Request) {
       }
     }
     const provider = original?.provider ?? model.provider;
-    const estimate = isImage ? Number(model.image_prices[params.resolution!]).toFixed(4) : estimateUsd(model.usd_per_second, durationSec);
+    const estimate = isImage ? Number(imagePrice).toFixed(4) : estimateUsd(model.usd_per_second, durationSec);
     // A mock job books 0 USD (see the ledger), so it adds nothing to the monthly cap.
     const cap = await checkCaps(tx, userId, provider === 'mock' ? '0' : estimate, undefined, feature);
     if (cap) return Response.json({ error: CAP_MESSAGES[cap] }, { status: 429 });

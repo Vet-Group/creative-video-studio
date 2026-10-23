@@ -438,6 +438,7 @@ describe('POST /api/jobs for an image feature', () => {
     ['a disabled model', { modelId: 'img-off', ratio: 'auto', params: { resolution: '1K' } }, /not enabled/],
     ['a ratio the model lacks', { ratio: '16:9' }, /ratio, resolution or number of images/],
     ['a resolution the model lacks', { params: { resolution: '4K' } }, /ratio, resolution or number of images/],
+    ['a prototype key as the resolution', { params: { resolution: 'constructor' } }, /ratio, resolution or number of images/],
     ['no resolution', { params: {} }, /params\.resolution is required/],
     ['a param that is not allowed', { params: { resolution: '1K', seed: '1' } }, /only resolution and quality/],
     ['a quality that does not exist', { params: { resolution: '1K', quality: 'ultra' } }, /params\.quality must be one of/],
