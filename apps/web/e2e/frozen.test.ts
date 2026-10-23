@@ -28,6 +28,8 @@ const clip = (n: number, ratio: '9:16' | '1:1', verdict: boolean) => ({
 const job = {
   id: 'frozen-job-1',
   status: 'succeeded',
+  feature: 'video',
+  resolution: null,
   error: null,
   isMock: true,
   ratio: '9:16',

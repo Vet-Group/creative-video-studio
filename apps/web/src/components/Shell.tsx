@@ -21,17 +21,18 @@ const STATUS_LABEL: Record<JobStatus, string> = {
 };
 const RETRYABLE: JobStatus[] = ['failed', 'failed_unknown', 'timed_out'];
 // What a Member reads about a job that did not finish; the raw error is for Admins.
-const FAILURE_TEXT: Partial<Record<JobStatus, string>> = {
-  failed: 'Không tạo được clip. Hãy thử lại, hoặc đổi ảnh hay mô hình.',
-  failed_unknown: 'Không rõ clip đã được tạo hay chưa. Hãy thử lại.',
-  timed_out: 'Việc tạo clip mất quá nhiều thời gian. Hãy thử lại.',
-};
+const FAILURE_TEXT = (noun: string): Partial<Record<JobStatus, string>> => ({
+  failed: `Không tạo được ${noun}. Hãy thử lại, hoặc đổi ảnh hay mô hình.`,
+  failed_unknown: `Không rõ ${noun} đã được tạo hay chưa. Hãy thử lại.`,
+  timed_out: `Việc tạo ${noun} mất quá nhiều thời gian. Hãy thử lại.`,
+});
 
 const fmtTime = (iso: string) => new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date(iso));
 
 function TrayItem({ job, isAdmin }: { job: TrayJob; isAdmin: boolean }) {
   const { refresh } = useJobs();
   const [problem, setProblem] = useState('');
+  const failure = FAILURE_TEXT(job.resolution ? 'ảnh' : 'clip')[job.status];
   async function retry() {
     setProblem('');
     try {
@@ -53,7 +54,7 @@ function TrayItem({ job, isAdmin }: { job: TrayJob; isAdmin: boolean }) {
         <p className="muted">
           {job.ratio} · {job.resolution ?? `${job.durationSec}s`} · {fmtTime(job.createdAt)}
         </p>
-        {FAILURE_TEXT[job.status] && <p className="error">{FAILURE_TEXT[job.status]}</p>}
+        {failure && <p className="error">{failure}</p>}
         {isAdmin && job.error && <p className="muted">{job.error}</p>}
         {job.status === 'succeeded' && <Link href="/library">Xem trong Thư viện</Link>}
         {RETRYABLE.includes(job.status) && !job.retried && !job.retryOf && (
@@ -70,10 +71,12 @@ function TrayItem({ job, isAdmin }: { job: TrayJob; isAdmin: boolean }) {
 
 const AdminContext = createContext(false);
 
-/** The "My jobs" list. It sits beside the page, or in the History tab of Create. */
-export function Tray() {
+/** The "My jobs" list. It sits beside the page, or in the History tab of Create. With `feature`, only the jobs of that feature (the History tab of Try On and Image Generation). */
+export function Tray({ feature }: { feature?: string }) {
   const isAdmin = useContext(AdminContext);
-  const { jobs, workerOffline, loaded } = useJobs();
+  const all = useJobs();
+  const { workerOffline, loaded } = all;
+  const jobs = feature ? all.jobs.filter((j) => j.feature === feature) : all.jobs;
   return (
     <aside className="tray" aria-label="Job của tôi">
       <h2>Job của tôi</h2>
@@ -108,12 +111,19 @@ function Toasts() {
 // The sidebar in the live order; later features slot in where the live sidebar has them.
 const NAV: { href: string; text: string; icon: IconName }[] = [
   { href: '/explore', text: 'Khám phá', icon: 'home' },
+  { href: '/try-on', text: 'Thử đồ', icon: 'tryon' },
+  { href: '/image-generation', text: 'Tạo ảnh', icon: 'image' },
   { href: '/create', text: 'Tạo video', icon: 'create' },
   { href: '/library', text: 'Thư viện', icon: 'library' },
 ];
 
+/** The pages that show their own History tab instead of the tray beside them. */
+const OWN_HISTORY = ['/create', '/try-on', '/image-generation'];
+
 const PAGE_TITLES: [prefix: string, title: string][] = [
   ['/explore', 'Khám phá'],
+  ['/try-on', 'Thử đồ'],
+  ['/image-generation', 'Tạo ảnh'],
   ['/create', 'Tạo video'],
   ['/library', 'Thư viện'],
   ['/admin', 'Quản trị'],
@@ -207,7 +217,7 @@ export function Shell({ userId, userName, isAdmin, account, initialCollapsed, ch
             </header>
             <div className="frame">
               <main>{children}</main>
-              {!pathname.startsWith('/create') && <Tray />}
+              {!OWN_HISTORY.some((p) => pathname.startsWith(p)) && <Tray />}
             </div>
           </div>
           <Toasts />

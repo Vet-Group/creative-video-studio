@@ -12,9 +12,17 @@ test('a mock image job made through the API is an image card under "Tất cả �
   });
   expect(created.status()).toBe(201);
 
-  // The tray shows the resolution where a video shows its duration, and the toast says it is an image.
+  // The tray shows the resolution where a video shows its duration, and the toast says it is an image. Create's history lists videos only; the image is in the Image Generation history.
   const tray = page.getByRole('complementary', { name: 'Job của tôi' });
   await expect(page.getByRole('region', { name: 'Thông báo' }).getByText('Ảnh đã xong')).toBeVisible({ timeout: 60_000 });
+  await expect(tray.getByText('Hoàn tất')).toHaveCount(0);
+  await page.getByRole('navigation', { name: 'Điều hướng chính' }).getByRole('link', { name: 'Tạo ảnh' }).click();
+  await expect(page).toHaveURL(/\/image-generation$/);
+  const history = page.getByRole('tab', { name: 'Lịch sử' });
+  await expect(async () => {
+    await history.click(); // the first click can land before the page hydrates
+    await expect(history).toHaveAttribute('aria-selected', 'true', { timeout: 1_000 });
+  }).toPass();
   await expect(tray.getByText('Hoàn tất')).toBeVisible();
   await expect(tray.getByText(/^3:4 · 1K · /)).toBeVisible();
 
@@ -36,12 +44,12 @@ test('a mock image job made through the API is an image card under "Tất cả �
   await expect(card.getByRole('link', { name: 'Dùng lại' })).toHaveCount(0); // Reuse is for videos
   for (const name of ['Tải xuống', 'Đạt', 'Không đạt', 'Xóa']) await expect(card.getByRole('button', { name, exact: true })).toBeVisible();
 
-  await chips.getByRole('button', { name: 'Tất cả video' }).click();
-  await expect(page.getByText('Chưa có clip nào khớp bộ lọc.')).toBeVisible();
-  await expect(card).toHaveCount(0);
-  for (const name of ['Thử đồ', 'Tạo video', 'Marketing Studio', 'Ứng dụng']) {
+  // The Library is company-wide, so other specs' clips may be listed; this member's image must be in none of the other kinds.
+  for (const name of ['Tất cả video', 'Thử đồ', 'Tạo video', 'Marketing Studio', 'Ứng dụng']) {
     await chips.getByRole('button', { name, exact: true }).click();
-    await expect(page.getByText('Chưa có clip nào khớp bộ lọc.')).toBeVisible();
+    await expect(chips.getByRole('button', { name, exact: true })).toHaveAttribute('aria-pressed', 'true');
+    await page.waitForLoadState('networkidle');
+    await expect(card).toHaveCount(0);
   }
   await chips.getByRole('button', { name: 'Tạo ảnh' }).click();
   await expect(card).toHaveCount(1);

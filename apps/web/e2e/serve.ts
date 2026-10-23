@@ -27,10 +27,12 @@ await pool.query(
           -- Off: the Explore spec switches it on for itself, to pick a model that does not support the form's starting choice.
           ('mock-e2e-square', 'mock', 'mock', 'Mock E2E Square', '{1:1}', '{5}', 4, '720p', 0.1, '{}', false, 0, 0)`,
 );
-// An image model for the specs that create image jobs through the API; the Create picker lists video models only.
+// Image models for the specs of Try On and Image Generation (the Create picker lists video models only): a roomy one for both features and a
+// one-image model for the image page, so the model pill has a second choice.
 await pool.query(
-  `insert into model_configs (id, provider, endpoint, label, kind, features, ratios, durations_sec, max_images, image_prices, sources, enabled)
-   values ('mock-image-e2e', 'mock', 'mock', 'Mock image E2E', 'image', '{image,try_on}', '{auto,1:1,3:4}', '{}', 4, '{"1K": "0.1500"}', '{}', true)`,
+  `insert into model_configs (id, provider, endpoint, label, kind, features, ratios, durations_sec, max_images, image_prices, sources, enabled) values
+     ('mock-image-e2e', 'mock', 'mock', 'Mock image E2E', 'image', '{image,try_on}', '{auto,1:1,3:4}', '{}', 4, '{"1K": "0.1500", "2K": "0.3000"}', '{}', true),
+     ('mock-image-solo', 'mock', 'mock', 'Mock image Solo', 'image', '{image}', '{auto}', '{}', 1, '{"1K": "0.1000"}', '{}', true)`,
 );
 // A store the Create picker offers, for the specs that tag a clip with one.
 await pool.query(`insert into stores (id, name, code) values ('store-e2e', 'E2E Shop', 'E2E-SEED')`);

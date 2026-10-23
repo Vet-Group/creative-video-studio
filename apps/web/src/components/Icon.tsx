@@ -1,6 +1,8 @@
 // A small inline icon set, drawn for this app: 16 px grid, 1.5 px strokes, colour from the text.
 const PATHS = {
   create: 'M2 4.5h7.5a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1v-5a1 1 0 0 1 1-1z M10.5 7l4-2v6l-4-2',
+  tryon: 'M5.5 2L1.5 4.5l1.8 3 1.7-.9V14h6V6.6l1.7.9 1.8-3L10.5 2C10.2 3.2 9.2 3.8 8 3.8S5.8 3.2 5.5 2z',
+  image: 'M2 3h12v10H2z M2 11.5l3.5-3.5 3 3 2-2 3.5 3 M10.5 5.6h.01',
   library: 'M2 2h5v5H2z M9 2h5v5H9z M2 9h5v5H2z M9 9h5v5H9z',
   admin: 'M8 1.5l5.5 2v4c0 3.2-2.3 5.6-5.5 7-3.2-1.4-5.5-3.8-5.5-7v-4z',
   gear: 'M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z M8 1v2 M8 13v2 M1 8h2 M13 8h2 M3.05 3.05l1.4 1.4 M11.55 11.55l1.4 1.4 M3.05 12.95l1.4-1.4 M11.55 4.45l1.4-1.4',
