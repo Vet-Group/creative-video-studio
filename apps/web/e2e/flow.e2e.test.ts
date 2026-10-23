@@ -1,13 +1,18 @@
 import { expect, test } from '@playwright/test';
-import { runInUi, signIn, today } from './support.test';
+import { modelButton, runInUi, select, selectValue, selectText, signIn, today } from './support.test';
 
 test('a Member runs a mock job and works through the Library', async ({ page }) => {
   await signIn(page, 'member1');
 
-  // Create: the pre-selected model shows its pass rate and estimate; a Member sees no company budget.
-  await expect(page.getByRole('radio', { name: /Mock E2E/ })).toBeChecked();
+  // Create: the pre-selected model shows its pass rate and estimate in the model panel, and the Run button carries the estimate; a Member sees no company budget.
+  await expect(modelButton(page)).toContainText('Mock E2E');
+  await modelButton(page).click();
+  await expect(page.getByRole('option', { name: /Mock E2E/ })).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByText('Tỉ lệ đạt: 80% (8/10)')).toBeVisible();
   await expect(page.getByText('Ước tính: $0.0000')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(modelButton(page)).toBeFocused();
+  await expect(page.getByRole('button', { name: 'Tạo video' })).toContainText('$0.0000');
   await expect(page.getByText('Tháng này bạn đã dùng: $0.0000')).toBeVisible();
   await expect(page.getByText('Ngân sách tháng còn lại')).toHaveCount(0);
 
@@ -56,17 +61,17 @@ test('a Member runs a mock job and works through the Library', async ({ page }) 
   await card.getByRole('link', { name: 'Dùng lại' }).click();
   await expect(page).toHaveURL(/\/create\?reuse=/);
   await expect(page.getByRole('img', { name: 'shirt.png' })).toBeVisible();
-  await expect(page.getByLabel('Mẫu chuyển động')).toHaveValue('slow-orbit');
-  await expect(page.getByLabel('Tỉ lệ khung hình')).toHaveValue('1:1');
-  await expect(page.getByLabel('Thời lượng')).toHaveValue('8');
-  await expect(page.getByRole('radio', { name: /Mock E2E/ })).toBeChecked();
-  await expect(page.getByLabel('Cửa hàng/Thương hiệu').locator('option:checked')).toHaveText('E2E Shop');
-  await page.getByLabel('Mẫu chuyển động').selectOption('light-sweep');
-  await expect(page.getByLabel('Mẫu chuyển động')).toHaveValue('light-sweep');
+  await expect(select(page, 'Mẫu chuyển động')).toHaveAttribute('data-value', 'slow-orbit');
+  await expect(select(page, 'Tỉ lệ khung hình')).toHaveAttribute('data-value', '1:1');
+  await expect(select(page, 'Thời lượng')).toHaveAttribute('data-value', '8');
+  await expect(modelButton(page)).toContainText('Mock E2E');
+  await expect(select(page, 'Cửa hàng/Thương hiệu')).toHaveText('E2E Shop');
+  await selectValue(page, 'Mẫu chuyển động', 'light-sweep');
+  await expect(select(page, 'Mẫu chuyển động')).toHaveAttribute('data-value', 'light-sweep');
 
   // A user picks a preset or writes a prompt: the prompt box opens only for "Tự viết mô tả", and Run waits for some text.
   await expect(page.getByLabel('Mô tả chuyển động')).toBeDisabled();
-  await page.getByLabel('Mẫu chuyển động').selectOption({ label: 'Tự viết mô tả' });
+  await selectText(page, 'Mẫu chuyển động', 'Tự viết mô tả');
   await expect(page.getByRole('button', { name: 'Tạo video' })).toBeDisabled();
   await page.getByLabel('Mô tả chuyển động').fill('Slow turn of the shirt.');
   await expect(page.getByRole('button', { name: 'Tạo video' })).toBeEnabled();

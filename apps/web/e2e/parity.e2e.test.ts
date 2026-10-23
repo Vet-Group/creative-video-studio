@@ -2,8 +2,9 @@
 // the drawer, the tabs and the carousel by keyboard and drag, and the rule that choosing a preset creates no job.
 import { fileURLToPath } from 'node:url';
 import { expect, type Page, test } from '@playwright/test';
+import { EXAMPLES } from '../src/lib/examples';
 import { freezeData } from './frozen.test';
-import { signIn } from './support.test';
+import { expectOptions, modelButton, optionsOf, pickModel, select, selectText, selectValue, signIn } from './support.test';
 
 // Posters and a frozen clock: reduced motion keeps every clip on its poster, so a second run paints the same frame.
 test.use({ contextOptions: { reducedMotion: 'reduce' } });
@@ -20,9 +21,11 @@ const SHOT = { animations: 'disabled', caret: 'hide', maxDiffPixelRatio: 0.01, s
 /** Create with everything loaded: the model, the presets and the stores. */
 async function openCreate(page: Page): Promise<void> {
   await page.goto('/create');
-  await expect(page.getByRole('radio', { name: /Mock E2E/ })).toBeChecked();
-  await expect(page.getByLabel('Mẫu chuyển động').locator('option')).not.toHaveCount(1);
-  await expect(page.getByLabel('Cửa hàng/Thương hiệu').locator('option')).not.toHaveCount(1);
+  await expect(modelButton(page)).toContainText('Mock E2E');
+  await expect(select(page, 'Mẫu chuyển động')).not.toHaveText('Tự viết mô tả'); // the first preset is chosen once the list has loaded
+  await select(page, 'Cửa hàng/Thương hiệu').click();
+  await expect(optionsOf(page, 'Cửa hàng/Thương hiệu')).not.toHaveCount(1); // the empty choice and at least one store
+  await select(page, 'Cửa hàng/Thương hiệu').click();
   await expect(page.getByText('Tháng này bạn đã dùng: $0.0000')).toBeVisible();
 }
 
@@ -45,8 +48,8 @@ for (const size of SIZES) {
     await expect(page).toHaveScreenshot(`create-history-${at}.png`, SHOT);
 
     await page.getByRole('tab', { name: 'Ví dụ' }).click();
-    await expect(page.getByRole('button', { name: /^Phát / })).toHaveCount(6);
-    await expect(page.locator('.masonry video')).toHaveCount(6);
+    await expect(page.getByRole('button', { name: /^Phát / })).toHaveCount(EXAMPLES.length);
+    await expect(page.locator('.masonry video')).toHaveCount(EXAMPLES.length);
     await expect.poll(() => page.locator('.masonry video').evaluateAll((vs) => vs.every((v) => (v as HTMLVideoElement).poster !== '' && v.getBoundingClientRect().height > 0))).toBe(true);
     await expect(page).toHaveScreenshot(`create-examples-${at}.png`, SHOT);
 
@@ -90,6 +93,9 @@ test('the layout flips at 1024 px: sidebar and two columns above, top bar, tabs 
       const card = (await form.boundingBox())!;
       const pane = (await page.locator('.side').boundingBox())!;
       expect(card.x + card.width).toBeLessThanOrEqual(pane.x);
+      // The card fits the screen and the Run button is pinned in it, visible without scrolling.
+      expect(card.y + card.height).toBeLessThanOrEqual(size.height);
+      await expect(run).toBeInViewport();
     } else {
       await expect(nav).toBeHidden();
       await expect(menu).toBeVisible();
@@ -97,13 +103,15 @@ test('the layout flips at 1024 px: sidebar and two columns above, top bar, tabs 
       await expect(page.getByRole('tab', { name: 'Tạo', exact: true })).toHaveAttribute('aria-selected', 'true');
       await expect(form).toBeVisible();
       await expect(page.locator('.side')).toBeHidden();
-      // The Run bar sticks to the bottom edge while the form is taller than the screen.
+      // The Run button stays at the bottom edge while the form, taller than the card, scrolls inside it.
       await page.evaluate(() => window.scrollTo(0, 0));
-      const card = (await form.boundingBox())!;
-      expect(card.height).toBeGreaterThan(size.height);
+      const scroller = page.locator('.form-scroll');
+      expect(await scroller.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
       const bar = (await page.locator('.runbar').boundingBox())!;
-      expect(Math.abs(bar.y + bar.height - size.height)).toBeLessThanOrEqual(2);
+      expect(Math.abs(bar.y + bar.height - (size.height - 12))).toBeLessThanOrEqual(2);
       await expect(run).toBeInViewport();
+      await scroller.evaluate((el) => el.scrollTo(0, el.scrollHeight));
+      expect(Math.abs((await page.locator('.runbar').boundingBox())!.y - bar.y)).toBeLessThanOrEqual(1);
     }
   }
 });
@@ -216,14 +224,15 @@ test('choosing a preset or using an example fills the form and creates no job', 
   await page.setViewportSize({ width: 1280, height: 800 });
   await signIn(page, 'member5');
   await openCreate(page);
-  const presetSelect = page.getByLabel('Mẫu chuyển động');
-  const before = await presetSelect.inputValue();
+  const presetSelect = select(page, 'Mẫu chuyển động');
+  const ratioSelect = select(page, 'Tỉ lệ khung hình');
+  const before = (await presetSelect.getAttribute('data-value'))!;
 
   // The picker: a card fills the preset and closes the dialog.
   await page.getByRole('button', { name: 'Chọn mẫu khác' }).click();
   await page.getByRole('list', { name: 'Danh sách mẫu' }).getByRole('button', { name: 'Ánh sáng quét nhẹ', exact: true }).click();
   await expect(page.getByRole('list', { name: 'Danh sách mẫu' })).toBeHidden();
-  await expect(presetSelect).toHaveValue('light-sweep');
+  await expect(presetSelect).toHaveAttribute('data-value', 'light-sweep');
   expect(before).not.toBe('light-sweep');
   await expect(page.locator('.banner-text strong')).toHaveText('Ánh sáng quét nhẹ');
 
@@ -232,11 +241,22 @@ test('choosing a preset or using an example fills the form and creates no job', 
   await page.getByRole('button', { name: 'Xoay quanh chậm', exact: true }).click();
   const detail = page.getByRole('dialog', { name: 'Chi tiết mẫu' });
   await expect(detail).toContainText('Mẫu minh họa');
-  await expect(presetSelect).toHaveValue('light-sweep');
+  await expect(presetSelect).toHaveAttribute('data-value', 'light-sweep');
   await detail.getByRole('button', { name: 'Dùng mẫu này' }).click();
   await expect(detail).toBeHidden();
-  await expect(presetSelect).toHaveValue('slow-orbit');
-  await expect(page.getByLabel('Tỉ lệ khung hình')).toHaveValue('1:1');
+  await expect(presetSelect).toHaveAttribute('data-value', 'slow-orbit');
+  await expect(ratioSelect).toHaveAttribute('data-value', '1:1');
+
+  // The hover button on a tile does the same without the dialog; a 16:9 sample has no matching form ratio, so the form keeps its own.
+  const tile = (title: string) => page.locator('.example').filter({ hasText: title });
+  await tile('Cầm trên tay').hover();
+  await tile('Cầm trên tay').getByRole('button', { name: 'Dùng mẫu này: Cầm trên tay' }).click();
+  await expect(presetSelect).toHaveAttribute('data-value', 'handheld-product');
+  await expect(ratioSelect).toHaveAttribute('data-value', '9:16');
+  await tile('Toàn cảnh trượt ngang').hover();
+  await tile('Toàn cảnh trượt ngang').getByRole('button', { name: 'Dùng mẫu này: Toàn cảnh trượt ngang' }).click();
+  await expect(presetSelect).toHaveAttribute('data-value', 'light-sweep');
+  await expect(ratioSelect).toHaveAttribute('data-value', '9:16');
 
   // Nothing was submitted, and the history is still empty.
   await page.getByRole('tab', { name: 'Lịch sử' }).click();
@@ -299,22 +319,100 @@ test('changing the model changes the ratio and duration options to the ones it s
   });
   await page.setViewportSize({ width: 1280, height: 800 });
   await signIn(page, 'member5');
-  const durations = page.getByLabel('Thời lượng').locator('option');
-  const ratios = page.getByLabel('Tỉ lệ khung hình').locator('option');
-  const wide = page.getByRole('radio', { name: /Wide model/ });
-  const short = page.getByRole('radio', { name: /Short model/ });
+  const durations = (texts: string[]) => expectOptions(page, 'Thời lượng', texts);
+  const ratios = (texts: string[]) => expectOptions(page, 'Tỉ lệ khung hình', texts);
 
-  await expect(wide).toBeChecked();
-  await expect(durations).toHaveText(['5 giây', '8 giây', '10 giây']);
-  await expect(ratios).toHaveText(['9:16 (dọc)', '1:1 (vuông)']);
-  await expect(short).toBeDisabled(); // it has no 8 s clips
-  await page.getByLabel('Thời lượng').selectOption('5');
-  await short.check();
-  await expect(durations).toHaveText(['5 giây']);
-  await expect(ratios).toHaveText(['9:16 (dọc)']);
-  await wide.check();
-  await expect(durations).toHaveText(['5 giây', '8 giây', '10 giây']);
-  await expect(ratios).toHaveText(['9:16 (dọc)', '1:1 (vuông)']);
+  await expect(modelButton(page)).toContainText('Wide model');
+  await durations(['5 giây', '8 giây', '10 giây']);
+  await ratios(['9:16 (dọc)', '1:1 (vuông)']);
+  await modelButton(page).click();
+  await expect(page.getByRole('option', { name: /Wide model/ })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('option', { name: /Short model/ })).toHaveAttribute('aria-disabled', 'true'); // it has no 8 s clips
+  await page.getByRole('option', { name: /Short model/ }).click(); // a disabled model cannot be picked
+  await expect(modelButton(page)).toContainText('Wide model');
+  await page.keyboard.press('Escape');
+  await selectValue(page, 'Thời lượng', '5');
+  await pickModel(page, /Short model/);
+  await expect(modelButton(page)).toContainText('Short model');
+  await durations(['5 giây']);
+  await ratios(['9:16 (dọc)']);
+  await pickModel(page, /Wide model/);
+  await expect(modelButton(page)).toContainText('Wide model');
+  await durations(['5 giây', '8 giây', '10 giây']);
+  await ratios(['9:16 (dọc)', '1:1 (vuông)']);
+});
+
+test('the custom selects work by keyboard: arrows, Home, End, Enter, Space and Escape', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await signIn(page, 'member5');
+  await openCreate(page);
+  const duration = select(page, 'Thời lượng');
+  const preset = select(page, 'Mẫu chuyển động');
+
+  // Arrow keys open the list on the chosen option and move through it; Enter picks.
+  await duration.focus();
+  await expect(duration).toHaveAttribute('aria-expanded', 'false');
+  await page.keyboard.press('ArrowDown');
+  await expect(duration).toHaveAttribute('aria-expanded', 'true');
+  await expect(optionsOf(page, 'Thời lượng').nth(1)).toHaveAttribute('aria-selected', 'true'); // 8 s is the default
+  await page.keyboard.press('ArrowUp');
+  await expect(duration).toHaveAttribute('aria-activedescendant', (await optionsOf(page, 'Thời lượng').first().getAttribute('id'))!);
+  await page.keyboard.press('Enter');
+  await expect(duration).toHaveAttribute('aria-expanded', 'false');
+  await expect(duration).toHaveAttribute('data-value', '5');
+  await expect(duration).toBeFocused();
+
+  // Escape closes without choosing and keeps the focus.
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('Escape');
+  await expect(duration).toHaveAttribute('aria-expanded', 'false');
+  await expect(duration).toHaveAttribute('data-value', '5');
+  await expect(duration).toBeFocused();
+
+  // Home and End jump to the ends; Space picks. "Tự viết mô tả" is the last preset and opens the prompt box.
+  await preset.focus();
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('End');
+  await page.keyboard.press('Space');
+  await expect(preset).toHaveAttribute('data-value', '');
+  await expect(page.getByLabel('Mô tả chuyển động')).toBeEnabled();
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Home');
+  await page.keyboard.press('Enter');
+  await expect(preset).not.toHaveAttribute('data-value', '');
+});
+
+test('the model picker opens a panel beside its button, searches, and closes with Escape', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await signIn(page, 'member5');
+  await openCreate(page);
+  const trigger = modelButton(page);
+
+  await trigger.focus();
+  await page.keyboard.press('Enter');
+  const panel = page.getByRole('dialog', { name: 'Chọn mô hình' });
+  const search = panel.getByRole('combobox', { name: 'Tìm mô hình' });
+  await expect(search).toBeFocused();
+  const t = (await trigger.boundingBox())!;
+  const p = (await panel.boundingBox())!;
+  expect(Math.abs(p.x - (t.x + t.width + 8))).toBeLessThanOrEqual(2); // 8 px right of the button
+  expect(Math.abs(p.y - t.y)).toBeLessThanOrEqual(2); // top aligned with it
+
+  await search.fill('zzz');
+  await expect(panel.getByText('Không có mô hình nào khớp.')).toBeVisible();
+  await search.fill('mock');
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('Enter');
+  await expect(panel).toBeHidden();
+  await expect(trigger).toBeFocused();
+
+  await page.keyboard.press('Space');
+  await expect(panel).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(panel).toBeHidden();
+  await expect(trigger).toBeFocused();
+  await expect(trigger).toContainText('Mock E2E');
 });
 
 for (const width of [1440, 1280, 390]) {
