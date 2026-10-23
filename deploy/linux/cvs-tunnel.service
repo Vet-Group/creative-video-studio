@@ -1,0 +1,14 @@
+# Creative Video Studio's own Cloudflare tunnel, a root user unit. install.sh fills @APP@ and @CLOUDFLARED@ and
+# installs this unit only after it has created the tunnel and written @APP@/cloudflared/cvs.yml.
+# Ideas Hub's and POD Studio's tunnels and configs are never touched.
+[Unit]
+Description=Creative Video Studio Cloudflare tunnel
+After=network-online.target cvs-web.service
+
+[Service]
+ExecStart=@CLOUDFLARED@ tunnel --no-autoupdate --config @APP@/cloudflared/cvs.yml run
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target

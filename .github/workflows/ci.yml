@@ -72,8 +72,8 @@ jobs:
 
       - name: Shell scripts
         run: |
-          for f in scripts/run/*.sh deploy/linux/cvs-run-gate .githooks/pre-push; do bash -n "$f"; done
-          shellcheck scripts/run/*.sh deploy/linux/cvs-run-gate .githooks/pre-push
+          for f in scripts/run/*.sh deploy/linux/cvs-run-gate deploy/linux/install.sh deploy/linux/uninstall.sh .githooks/pre-push; do bash -n "$f"; done
+          shellcheck scripts/run/*.sh deploy/linux/cvs-run-gate deploy/linux/install.sh deploy/linux/uninstall.sh .githooks/pre-push
 
       # A service container cannot take the `server /data` command, so MinIO (docker-compose.yml's image) starts here.
       - name: Start MinIO

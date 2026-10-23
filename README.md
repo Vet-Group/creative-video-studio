@@ -17,7 +17,7 @@ never a runtime dependency.
 | `packages/core` | Shared contracts: model config, provider adapter interface, presets |
 | `packages/db` | Drizzle schema, migrations, test database helper |
 | `scripts` | Preflight, the autonomous-run harness (`scripts/run`), repository checks |
-| `deploy/linux` | Server-side scripts for the VET host |
+| `deploy/linux` | Server-side scripts for the VET host (`install.sh`, `uninstall.sh`, backups; see `docs/ops/deploy.md`) |
 
 ## Development
 
