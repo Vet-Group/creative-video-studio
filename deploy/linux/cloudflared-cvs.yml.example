@@ -1,0 +1,8 @@
+# install.sh renders this file to <app>/cloudflared/cvs.yml, replacing the @...@ placeholders (docs/ops/deploy.md).
+# A separate named tunnel: nothing here is shared with Ideas Hub's or POD Studio's tunnel config.
+tunnel: @TUNNEL_ID@
+credentials-file: @APP@/cloudflared/@TUNNEL_ID@.json
+ingress:
+  - hostname: @HOSTNAME@
+    service: http://127.0.0.1:3400
+  - service: http_status:404

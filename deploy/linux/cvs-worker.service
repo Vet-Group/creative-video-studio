@@ -1,0 +1,18 @@
+# Creative Video Studio worker (`pnpm --filter @cvs/worker start`), a root user unit. install.sh fills @APP@.
+# The worker reads <app>/.env itself (DATABASE_URL and the S3 settings).
+[Unit]
+Description=Creative Video Studio worker
+
+[Service]
+WorkingDirectory=@APP@
+Environment=PATH=@APP@/node/bin:/usr/local/bin:/usr/bin:/bin
+Environment=NODE_ENV=production
+ExecStart=@APP@/node/bin/pnpm --filter @cvs/worker start
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+# Expected value from plan step D.3. D.3 (measuring the VET headroom) was skipped, so this awaits that measurement.
+MemoryMax=768M
+
+[Install]
+WantedBy=default.target
