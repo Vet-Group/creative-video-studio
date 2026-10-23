@@ -55,7 +55,7 @@ describe('every /api/admin route', () => {
   test('answers 401 without a session and 403 to a Member, on every method of every route file', async () => {
     const root = fileURLToPath(new URL('.', import.meta.url));
     const files = (readdirSync(root, { recursive: true }) as string[]).map((f) => f.replaceAll('\\', '/')).filter((f) => f.endsWith('route.ts'));
-    expect(files.length).toBeGreaterThanOrEqual(18);
+    expect(files.length).toBeGreaterThanOrEqual(19);
     let handlers = 0;
     for (const file of files) {
       const mod = (await import(/* @vite-ignore */ pathToFileURL(`${root}${file}`).href)) as Record<string, (r: Request, c: ReturnType<typeof ctx>) => Promise<Response>>;
@@ -66,7 +66,7 @@ describe('every /api/admin route', () => {
         expect((await mod[method](call(member.cookie, '/api/admin/x', method, {}), ctx('x'))).status, `${method} ${file} as a Member`).toBe(403);
       }
     }
-    expect(handlers).toBeGreaterThanOrEqual(22);
+    expect(handlers).toBeGreaterThanOrEqual(23);
   });
 
   test('nothing is ever deleted: no route offers DELETE', () => {

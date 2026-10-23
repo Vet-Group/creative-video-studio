@@ -12,6 +12,7 @@ process.env.APP_URL = 'http://localhost';
 const { auth, pool } = await import('@/lib/auth');
 const { reserve } = await import('@cvs/core/ledger');
 const { GET } = await import('./report/route');
+const { GET: GET_CSV } = await import('./report/csv/route');
 
 const PASSWORD = 'correct-horse-battery';
 
@@ -118,6 +119,27 @@ describe('GET /api/admin/report', () => {
 
   test.each(['x', '2026-13-01', '2026-02-30', '2026-10-1'])('answers 400 for ?week=%s', async (week) => {
     expect((await GET(call(admin.cookie, `?week=${week}`))).status).toBe(400);
+  });
+
+  test('the CSV starts with a BOM, has the columns in order and one hand-computed line per user; a Member gets 403', async () => {
+    const csvCall = (cookie: string | undefined, query = '') => GET_CSV(new Request(`http://localhost/api/admin/report/csv${query}`, { headers: cookie ? { cookie } : {} }));
+    expect((await csvCall(undefined)).status).toBe(401);
+    expect((await csvCall(member.cookie)).status).toBe(403);
+    expect((await csvCall(admin.cookie, '?week=2026-02-30')).status).toBe(400);
+
+    const res = await csvCall(admin.cookie, '?week=2026-10-14');
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toBe('text/csv; charset=utf-8');
+    expect(res.headers.get('content-disposition')).toBe('attachment; filename="cvs-report-2026-10-12.csv"');
+    const bytes = Buffer.from(await res.arrayBuffer()); // text() would drop the BOM
+    expect([...bytes.subarray(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
+    expect(bytes.toString('utf8').slice(1).split('\r\n')).toEqual([
+      'Creative Video Studio report 2026-10-12 to 2026-10-18',
+      'week start,user,email,team,jobs,accepted clips,spend USD,cost per accepted clip USD,median run seconds,failure rate,spend of cap',
+      '2026-10-12,Rep One,rep1@example.test,Report Team,4,2,8.0000,4.0000,200,0.25,0.0400',
+      '2026-10-12,Rep Two,rep2@example.test,Report Team,2,1,3.0000,3.0000,60,0.5,0.0150',
+      '',
+    ]);
   });
 
   test('a hidden team and a hidden store keep their history in the report', async () => {

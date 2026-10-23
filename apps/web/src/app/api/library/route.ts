@@ -26,7 +26,7 @@ export async function GET(request: Request) {
   const [clips, creators] = await Promise.all([
     pool.query(
       `select j.id, j.user_id, u.name as creator_name, j.created_at, ${ICT_DAY} as day, j.model, m.label as model_label, j.aspect, j.duration_s, j.is_mock,
-              j.output_asset_id, j.poster_asset_id, coalesce(c.usd, 0)::numeric(12, 4)::text as cost_usd, coalesce(c.is_final, false) as cost_final, v.verdict, v.fault, v.marked_by
+              j.output_asset_id, j.poster_asset_id, j.store_id, coalesce(c.usd, 0)::numeric(12, 4)::text as cost_usd, coalesce(c.is_final, false) as cost_final, v.verdict, v.fault, v.marked_by
          from jobs j
          join users u on u.id = j.user_id
          join model_configs m on m.id = j.model
@@ -44,6 +44,7 @@ export async function GET(request: Request) {
   const me = g.session.user;
   return Response.json({
     hasMore: clips.rows.length > PAGE,
+    isAdmin: me.role === 'admin',
     creators: creators.rows,
     clips: clips.rows.slice(0, PAGE).map((r) => ({
       id: r.id,
@@ -56,6 +57,7 @@ export async function GET(request: Request) {
       isMock: r.is_mock,
       videoAssetId: r.output_asset_id,
       posterAssetId: r.poster_asset_id,
+      storeId: r.store_id,
       costUsd: r.cost_usd,
       costFinal: r.cost_final,
       verdict: r.verdict ? { verdict: r.verdict, fault: r.fault, markedBy: r.marked_by } : null,

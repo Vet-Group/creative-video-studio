@@ -22,6 +22,8 @@ await pool.query(
   `insert into model_configs (id, provider, endpoint, label, ratios, durations_sec, max_images, output_resolution, usd_per_second, sources, enabled, pass_seed_passes, pass_seed_total)
    values ('mock-e2e', 'mock', 'mock', 'Mock E2E', '{9:16,1:1}', '{5,8}', 4, '720p', 0.1, '{}', true, 8, 10)`,
 );
+// A store the Create picker offers, for the specs that tag a clip with one.
+await pool.query(`insert into stores (id, name, code) values ('store-e2e', 'E2E Shop', 'E2E-SEED')`);
 // Every spec runs jobs; the daily clip cap is not what is under test here.
 await pool.query('update settings set member_daily_clip_cap = 1000 where id = 1');
 for (const u of Object.values(USERS)) await auth.api.createUser({ body: { email: u.email, name: u.name, password: PASSWORD, role: u.role } });

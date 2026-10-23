@@ -3,6 +3,7 @@
 // and whole VND as BigInt, so nothing passes through a float.
 import { type Queryable, withTransaction } from '@cvs/core/ledger';
 import { pool } from '@/lib/auth';
+import { csvResponse, text } from '@/lib/csv';
 
 const NO_STORE = 'Không gắn cửa hàng';
 const SHARED = 'Chi phí chung';
@@ -200,17 +201,9 @@ export function costsPage(s: Snapshot) {
   };
 }
 
-/** A text cell that Excel would read as a formula is prefixed with a quote. */
-const text = (v: string | null) => (v && /^[=+\-@\t\r]/.test(v) ? `'${v}` : v);
-const quote = (v: string | null) => ((v ?? '').match(/[",\r\n]/) ? `"${(v ?? '').replaceAll('"', '""')}"` : (v ?? ''));
-
-/** A CSV download: UTF-8 with a byte order mark so Excel reads the Vietnamese, a label line with the month and as_of, then the header. */
-function csv(s: Snapshot, kind: string, header: string[], rows: (string | null)[][]) {
-  const lines = [[`Creative Video Studio ${kind} ${s.month} as_of ${s.asOf}`], header, ...rows].map((r) => r.map(quote).join(','));
-  return new Response(`﻿${lines.join('\r\n')}\r\n`, {
-    headers: { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': `attachment; filename="cvs-${kind}-${s.month}.csv"` },
-  });
-}
+/** A CSV download with a label line holding the month and as_of. */
+const csv = (s: Snapshot, kind: string, header: string[], rows: (string | null)[][]) =>
+  csvResponse(`Creative Video Studio ${kind} ${s.month} as_of ${s.asOf}`, `cvs-${kind}-${s.month}.csv`, header, rows);
 
 /** The ledger detail: one line per ledger row of the month. */
 export function detailCsv(s: Snapshot) {

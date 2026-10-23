@@ -32,13 +32,14 @@ export async function signIn(page: Page, who: UserKey): Promise<void> {
   await expect(page).toHaveURL(/\/create$/);
 }
 
-/** Uploads one image on the Create page, keeps the pre-selected model and presses Run. */
-export async function runInUi(page: Page, options: { preset?: string; ratio?: string; duration?: string } = {}): Promise<void> {
+/** Uploads one image on the Create page, keeps the pre-selected model and presses Run. `store` is the name of a store in the picker. */
+export async function runInUi(page: Page, options: { preset?: string; ratio?: string; duration?: string; store?: string } = {}): Promise<void> {
   await page.getByLabel('Ảnh sản phẩm').setInputFiles({ name: 'shirt.png', mimeType: 'image/png', buffer: png() });
   await expect(page.getByRole('img', { name: 'shirt.png' })).toBeVisible();
   if (options.preset) await page.getByLabel('Mẫu chuyển động').selectOption(options.preset);
   if (options.ratio) await page.getByLabel('Tỉ lệ khung hình').selectOption(options.ratio);
   if (options.duration) await page.getByLabel('Thời lượng').selectOption(options.duration);
+  if (options.store) await page.getByLabel('Cửa hàng/Thương hiệu').selectOption({ label: options.store });
   await expect(page.getByRole('radio', { name: /Mock E2E/ })).toBeChecked();
   await page.getByRole('button', { name: 'Tạo video' }).click();
   await expect(page.getByText('Đã gửi job')).toBeVisible();

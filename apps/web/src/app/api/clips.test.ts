@@ -147,12 +147,14 @@ describe('GET /api/library', () => {
     expect(ids.indexOf(a)).toBeLessThan(ids.indexOf(b)); // newest first
     expect(body.clips.find((c) => c.id === a)).toEqual({
       id: a, creator: { id: alice.id, name: 'Nguyễn Văn Đạt' }, createdAt: '2026-10-22T17:30:00.000Z', modelId: 'fal-test', modelLabel: 'Fal test', ratio: '1:1', durationSec: 8,
-      isMock: false, videoAssetId: 'lib-a-video', posterAssetId: 'lib-a-poster', costUsd: '1.6000', costFinal: true, verdict: { verdict: 'fail', fault: 'flicker', markedBy: alice.id },
+      isMock: false, videoAssetId: 'lib-a-video', posterAssetId: 'lib-a-poster', storeId: null, costUsd: '1.6000', costFinal: true, verdict: { verdict: 'fail', fault: 'flicker', markedBy: alice.id },
       canEdit: false, downloadName: expect.stringMatching(/^20261023-nguyen-van-dat-lib-a\.mp4$/),
     });
     expect(body.clips.find((c) => c.id === b)).toMatchObject({ isMock: true, costFinal: false, verdict: null, canEdit: true }); // bob is the creator
     expect(body.creators).toEqual(expect.arrayContaining([{ id: alice.id, name: 'Nguyễn Văn Đạt' }, { id: bob.id, name: 'Bob' }]));
     expect(body.hasMore).toBe(false);
+    expect(body).toMatchObject({ isAdmin: false }); // the store control of the Library cards is for Admins
+    expect(await (await GET_LIBRARY(req('/api/library', admin.cookie))).json()).toMatchObject({ isAdmin: true });
   });
 
   test('filters by creator, by ICT date and by ratio', async () => {
