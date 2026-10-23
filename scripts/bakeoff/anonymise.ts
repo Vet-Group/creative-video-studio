@@ -63,11 +63,15 @@ export async function anonymise(o: AnonymiseOpts): Promise<ClipMap> {
   const newId = o.newId ?? (() => `clip-${randomBytes(4).toString('hex')}`);
   const secs = o.durationSec ?? THRIFT_SEC;
   const map: ClipMap = { set: o.set, clips: {} };
+  mkdirSync(dirname(o.mapPath), { recursive: true });
+  const writeMap = (): void => writeFileSync(o.mapPath, `${JSON.stringify(map, null, 2)}\n`);
   // Shuffled before any folder exists, so creation order, file times and the order of ids say nothing about the model.
   for (const l of (o.shuffle ?? shuffle)(done)) {
     let id = newId();
     while (map.clips[id]) id = newId();
     map.clips[id] = { model: l.model, image: l.image, round: l.round };
+    // The map is saved before the folder exists, so a failure further on never leaves a clip folder without its map entry.
+    writeMap();
     const dir = join(setDir, id);
     mkdirSync(dir, { recursive: true });
     const clip = join(dir, 'clip.mp4');
@@ -86,8 +90,6 @@ export async function anonymise(o: AnonymiseOpts): Promise<ClipMap> {
     const src = o.inputs.images[l.image - 1]!.file;
     copyFileSync(join(o.inputsDir, src), join(dir, `source${extname(src).toLowerCase()}`));
   }
-  mkdirSync(dirname(o.mapPath), { recursive: true });
-  writeFileSync(o.mapPath, `${JSON.stringify(map, null, 2)}\n`);
   return map;
 }
 

@@ -46,9 +46,10 @@ export function createFalProvider(opts: { apiKey: string; fetch?: Fetch; readIma
       const cost = estimate(job, durationSec);
       // A failed request completes with `error` (human-readable) and `error_type` (machine-readable).
       if (st.error || st.error_type) return { state: 'failed', error: st.error ?? st.error_type ?? 'failed', ...cost };
-      // The docs do not say what a failed result answers; a 4xx here is a failed job, not a poll error.
+      // The docs do not say what a failed result answers; a 4xx here is a failed job, not a poll error. Rate limits and auth errors say
+      // nothing about the job, so they throw and the key is polled again.
       const out = (await sendJson(f, 'fal result', base, { headers, signal: timeout() }).catch((e) => {
-        if (e instanceof ProviderHttpError && e.status >= 400 && e.status < 500) return { error: e.message };
+        if (e instanceof ProviderHttpError && e.status >= 400 && e.status < 500 && ![401, 403, 429].includes(e.status)) return { error: e.message };
         throw e;
       })) as { video?: { url?: string }; error?: string };
       if (out.error) return { state: 'failed', error: out.error, ...cost };

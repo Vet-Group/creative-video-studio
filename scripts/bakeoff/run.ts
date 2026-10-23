@@ -49,7 +49,14 @@ export interface StageOptions {
 
 export interface StageResult {
   set: SetName;
-  outcome: 'complete' | 'stuck: not funded' | 'stopped: cap' | 'stopped: rate limited' | 'stopped: image unreadable';
+  outcome:
+    | 'complete'
+    | 'stuck: not funded'
+    | 'stopped: cap'
+    | 'stopped: rate limited'
+    | 'stopped: image unreadable'
+    | 'stopped: auth'
+    | 'stopped: provider error';
   reason?: string;
   counts: Record<string, number>;
   /** failed + unknown + timeout: jobs that ended without a clip. A refusal for credit is not one. */
@@ -60,7 +67,7 @@ export interface StageResult {
   falBalanceUsd: number | null;
 }
 
-const FINAL: JobStatus[] = ['succeeded', 'failed', 'unknown'];
+const FINAL: JobStatus[] = ['succeeded', 'failed', 'unknown', 'refused'];
 const THRIFT_RATIO = '9:16';
 
 interface Planned {
@@ -110,7 +117,10 @@ function fail(msg: string): never {
 
 const clipName = (k: JobKey): string => `clips/image${String(k.image).padStart(2, '0')}-${k.model}-${k.round}.mp4`;
 
-/** Only one run may spend at a time: the lock is created exclusively and removed when the stage ends, however it ends. */
+/**
+ * Only one run may spend at a time: the lock is created exclusively and removed when the stage ends, however it ends.
+ * After a killed run the lock stays: the owner or conductor deletes out/run.lock once they have confirmed that no run.ts is alive.
+ */
 export async function runStage(deps: RunDeps, opts: StageOptions): Promise<StageResult> {
   mkdirSync(deps.outDir, { recursive: true });
   const lockPath = join(deps.outDir, 'run.lock');
@@ -190,29 +200,46 @@ async function runLocked(deps: RunDeps, opts: StageOptions): Promise<StageResult
           const { providerJobId } = await provider.submit({ model: p.model, prompt, imageUrls: [imageUrl(deps.inputs, p.key.image)], ratio: THRIFT_RATIO, durationSec: p.durationSec });
           line(p, { status: 'submitted', providerJobId });
         } catch (e) {
-          if (isFundingRefusal(e)) {
-            line(p, { status: 'not_funded', error: (e as Error).message });
-            // One more submit is allowed after a top-up; a second refusal of the same key ends it as failed.
-            if (refusals(p) >= 2) line(p, { status: 'failed', error: 'refused for credit twice' });
-            outcome = 'stuck: not funded';
-            reason = `the provider refused ${keyId(p.key)} for lack of credit`;
-            break;
-          }
-          if (e instanceof ProviderHttpError && e.status === 429) {
-            line(p, { status: 'not_attempted', error: (e as Error).message });
+          const msg = (e as Error).message;
+          const http = e instanceof ProviderHttpError ? e : null;
+          // A 429 is a rate limit whatever its body says, so it is checked before the credit test.
+          if (http?.status === 429) {
+            line(p, { status: 'not_attempted', error: msg });
             outcome = 'stopped: rate limited';
             reason = `the provider answered 429 for ${keyId(p.key)}`;
             break;
           }
-          if (e instanceof ImageReadError) {
-            line(p, { status: 'not_attempted', error: (e as Error).message });
-            outcome = 'stopped: image unreadable';
-            reason = (e as Error).message;
+          if (isFundingRefusal(e)) {
+            line(p, { status: 'not_funded', error: msg });
+            // One more submit is allowed after a top-up; a second refusal ends the key as refused, which is still no render failure.
+            if (refusals(p) >= 2) line(p, { status: 'refused', error: 'refused for credit twice' });
+            outcome = 'stuck: not funded';
+            reason = `the provider refused ${keyId(p.key)} for lack of credit`;
             break;
           }
-          // A 4xx answer means the provider rejected the job. Anything else may have created it, so the key is never resubmitted.
-          const rejected = e instanceof ProviderHttpError && e.status < 500;
-          line(p, { status: rejected ? 'failed' : 'unknown', error: (e as Error).message });
+          if (e instanceof ImageReadError) {
+            line(p, { status: 'not_attempted', error: msg });
+            outcome = 'stopped: image unreadable';
+            reason = msg;
+            break;
+          }
+          // A 401 or 403 that is not about credit says the key or account is wrong; nothing was run, so stop without a failure.
+          if (http && (http.status === 401 || http.status === 403)) {
+            line(p, { status: 'not_attempted', error: msg });
+            outcome = 'stopped: auth';
+            reason = `the provider answered ${http.status} for ${keyId(p.key)}`;
+            break;
+          }
+          // Any other 4xx means the provider rejected this job. A 5xx or a network error may have created it, so the key is never
+          // resubmitted and, because the provider is misbehaving, the stage stops.
+          if (http && http.status < 500) {
+            line(p, { status: 'failed', error: msg });
+            continue;
+          }
+          line(p, { status: 'unknown', error: msg });
+          outcome = 'stopped: provider error';
+          reason = `submit of ${keyId(p.key)} ended without an answer: ${msg}`;
+          break;
         }
       }
     }

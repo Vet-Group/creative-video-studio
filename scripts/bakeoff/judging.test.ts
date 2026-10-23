@@ -169,6 +169,32 @@ describe('blind clips cannot be told apart by their encoding', () => {
     }
   }, 120_000);
 
+  test('an ffmpeg failure part-way leaves a map entry for every clip folder already created', async () => {
+    const root = join(work, 'cvs-bakeoff-midfail');
+    const out = join(root, 'out');
+    mkdirSync(join(out, 'clips'), { recursive: true });
+    mkdirSync(join(root, 'inputs'), { recursive: true });
+    const inputs: Inputs = { images: Array.from({ length: 10 }, (_, i) => ({ file: `img${i + 1}.jpg`, category: i % 2 ? 'product' : 'mockup', sourceKey: `k${i}` })) };
+    for (const im of inputs.images) writeFileSync(join(root, 'inputs', im.file), 'x');
+    await makeClip(join(out, 'clips', 'ok.mp4'));
+    const base = { at: '2026-10-23T00:00:00.000Z', provider: 'fal', estimateUsd: 0.56, round: 'bakeoff', status: 'succeeded' } as const;
+    appendLine(out, { ...base, image: 1, model: KLING, clip: 'clips/ok.mp4' });
+    // The second clip file is missing, so ffmpeg fails after the first clip is done.
+    appendLine(out, { ...base, image: 2, model: SEEDANCE, clip: 'clips/gone.mp4' });
+
+    const mapPath = join(work, 'scratch', 'map-midfail.json');
+    let n = 0;
+    await expect(
+      anonymise({ root, set: 'half-1', mapPath, inputs, inputsDir: join(root, 'inputs'), durationSec: 1, newId: () => `clip-${++n}`, shuffle: (xs) => xs }),
+    ).rejects.toThrow(/ffmpeg failed/);
+    const saved = JSON.parse(readFileSync(mapPath, 'utf8')) as { clips: Record<string, { model: string }> };
+    const folders = readdirSync(join(root, 'blind', 'half-1'));
+    expect(folders.sort()).toEqual(['clip-1', 'clip-2']);
+    for (const f of folders) expect(saved.clips[f]).toBeDefined();
+    expect(saved.clips['clip-1']!.model).toBe(KLING);
+    expect(saved.clips['clip-2']!.model).toBe(SEEDANCE);
+  }, 120_000);
+
   test('the default shuffle keeps every item and is not the identity order every time', () => {
     const xs = Array.from({ length: 12 }, (_, i) => i);
     expect([...shuffle(xs)].sort((a, b) => a - b)).toEqual(xs);

@@ -352,7 +352,7 @@ describe('runStage money safety', () => {
     expect(r.submits).toEqual([]);
   });
 
-  test('a key refused for credit twice is recorded as failed, not submitted a third time', async () => {
+  test('a key refused for credit twice is final as refused: no render failure, no spend, not submitted a third time', async () => {
     const refuseKling = (inner: VideoProvider): VideoProvider => ({
       ...inner,
       submit: async () => { throw new ProviderHttpError(402, 'payment required', 'fal submit: HTTP 402'); },
@@ -364,16 +364,60 @@ describe('runStage money safety', () => {
     const second = await runStage(r.deps, canary);
     expect(second.outcome).toBe('stuck: not funded');
     expect(readLines(r.outDir).filter((l) => l.status === 'not_funded')).toHaveLength(2);
-    expect(second.counts.failed).toBe(1);
-    expect(readLines(r.outDir).at(-1)).toMatchObject({ model: KLING.id, status: 'failed', error: 'refused for credit twice' });
-    // A healthy provider now: Kling image 1 stays failed and is not submitted; only Seedance goes out.
+    expect(second.counts.refused).toBe(1);
+    expect(second.counts.failed).toBeUndefined();
+    expect(second.renderFailures).toBe(0);
+    expect(second.spentByProvider.fal ?? 0).toBe(0);
+    expect(readLines(r.outDir).at(-1)).toMatchObject({ model: KLING.id, status: 'refused', error: 'refused for credit twice' });
+    // A healthy provider now: Kling image 1 stays refused and is not submitted; only Seedance goes out.
     const healthy = rig();
     const calls: string[] = [];
     r.deps.providers.fal = { ...healthy.deps.providers.fal!, submit: async (req) => { calls.push(req.model.id); return healthy.deps.providers.fal!.submit(req); } };
     const third = await runStage(r.deps, canary);
     expect(calls).toEqual([]);
-    expect(third.counts.failed).toBe(1);
+    expect(third.counts.refused).toBe(1);
     expect(third.counts.succeeded).toBe(1);
+    expect(third.renderFailures).toBe(0);
+  });
+
+  test('a 429 whose body talks about payment is still a rate limit, not a credit refusal', async () => {
+    const r = rig({
+      fal: (inner) => ({ ...inner, submit: async () => { throw new ProviderHttpError(429, 'add a payment method to raise your limit', 'fal submit: HTTP 429'); } }),
+    });
+    const res = await runStage(r.deps, canary);
+    expect(res.outcome).toBe('stopped: rate limited');
+    expect(res.renderFailures).toBe(0);
+    expect(readLines(r.outDir).some((l) => l.status === 'not_funded')).toBe(false);
+    expect(readLines(r.outDir).at(-1)).toMatchObject({ status: 'not_attempted' });
+  });
+
+  test.each([
+    ['a 503', () => new ProviderHttpError(503, 'unavailable', 'fal submit: HTTP 503')],
+    ['a network error', () => new Error('socket hang up')],
+  ])('after %s on submit the key is unknown, its estimate counts, and the stage stops', async (_name, make) => {
+    const r = rig({ fal: (inner) => ({ ...inner, submit: async () => { throw make(); } }) });
+    const res = await runStage(r.deps, { set: 'half-1' });
+    expect(res.outcome).toBe('stopped: provider error');
+    expect(res.counts).toMatchObject({ unknown: 1, notSubmitted: 9 });
+    expect(res.renderFailures).toBe(1);
+    expect(res.spentByProvider.fal).toBeCloseTo(KLING_5S, 6);
+    // Nothing else was attempted after the unknown key, and a rerun does not resubmit it.
+    expect(r.submits).toEqual([]);
+    await runStage(r.deps, { set: 'half-1' });
+    expect(readLines(r.outDir).filter((l) => l.status === 'submitting' && l.model === KLING.id && l.image === 1)).toHaveLength(1);
+  });
+
+  test.each([
+    ['401', 401, 'invalid key'],
+    ['403', 403, 'forbidden'],
+  ])('a non-funding %s on submit stops as auth: not attempted, no cost, no render failure', async (_name, status, body) => {
+    const r = rig({ fal: (inner) => ({ ...inner, submit: async () => { throw new ProviderHttpError(status, body, `fal submit: HTTP ${status}`); } }) });
+    const res = await runStage(r.deps, canary);
+    expect(res.outcome).toBe('stopped: auth');
+    expect(res.renderFailures).toBe(0);
+    expect(res.spentUsd).toBe(0);
+    expect(res.counts).toEqual({ notSubmitted: 2 });
+    expect(readLines(r.outDir).at(-1)).toMatchObject({ status: 'not_attempted' });
   });
 
   test('a 429 is recorded as not attempted: no render failure, no spend, and the key is submitted again later', async () => {

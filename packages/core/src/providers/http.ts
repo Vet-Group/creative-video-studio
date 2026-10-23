@@ -16,10 +16,13 @@ export class ProviderHttpError extends Error {
 /**
  * True when the provider refused for lack of credit or billing, which is not a render failure (plan, Credit thrift).
  * 402 is the expected code; fal is reported to answer 403 "User is locked. Reason: Exhausted balance", so any 4xx whose body names a balance
- * problem counts too. B.5a confirms the real codes against the live APIs.
+ * problem counts too. A 429 is a rate limit whatever its body says ("add a payment method" is a plan-tier hint). B.5a confirms the real
+ * codes against the live APIs.
  */
 export const isFundingRefusal = (e: unknown): boolean =>
-  e instanceof ProviderHttpError && (e.status === 402 || (e.status >= 400 && e.status < 500 && /balance|billing|credit|locked|payment/i.test(e.body)));
+  e instanceof ProviderHttpError &&
+  e.status !== 429 &&
+  (e.status === 402 || (e.status >= 400 && e.status < 500 && /balance|billing|credit|locked|payment/i.test(e.body)));
 
 export type Fetch = typeof fetch;
 

@@ -15,10 +15,11 @@ export const keyId = (k: JobKey): string => `${k.image}|${k.model}|${k.round}`;
  * submitting: written before the provider is called; submitted: the provider answered with an id; succeeded, failed: final;
  * timeout: still unfinished when polling stopped (polled again on a rerun); unknown: submitting with no id, never resubmitted;
  * not_funded: the provider refused for lack of credit, so nothing was billed and the key may be submitted again after a top-up (once);
- * not_attempted: nothing reached the provider (HTTP 429, or the input image could not be read), so the key may be submitted again.
+ * not_attempted: nothing reached the provider (HTTP 429, an auth error, or the input image could not be read), so the key may be submitted again;
+ * refused: the provider refused the key for lack of credit twice. Final, costs nothing and is not a render failure, because no clip was attempted.
  */
-export type JobStatus = 'submitting' | 'submitted' | 'succeeded' | 'failed' | 'timeout' | 'unknown' | 'not_funded' | 'not_attempted';
-const STATUSES: JobStatus[] = ['submitting', 'submitted', 'succeeded', 'failed', 'timeout', 'unknown', 'not_funded', 'not_attempted'];
+export type JobStatus = 'submitting' | 'submitted' | 'succeeded' | 'failed' | 'timeout' | 'unknown' | 'not_funded' | 'not_attempted' | 'refused';
+const STATUSES: JobStatus[] = ['submitting', 'submitted', 'succeeded', 'failed', 'timeout', 'unknown', 'not_funded', 'not_attempted', 'refused'];
 
 export interface JobLine extends JobKey {
   at: string;
@@ -94,7 +95,7 @@ export function latest(lines: JobLine[]): Map<string, JobLine> {
 
 /** What one key counts against the cap: the larger of estimate and reported once final, the estimate while in flight or unknown, 0 if refused. */
 export const lineSpend = (l: JobLine): number =>
-  l.status === 'not_funded' || l.status === 'not_attempted' ? 0 : l.status === 'succeeded' || l.status === 'failed' ? Math.max(l.estimateUsd, l.costUsd ?? 0) : l.estimateUsd;
+  l.status === 'not_funded' || l.status === 'not_attempted' || l.status === 'refused' ? 0 : l.status === 'succeeded' || l.status === 'failed' ? Math.max(l.estimateUsd, l.costUsd ?? 0) : l.estimateUsd;
 
 /** Cumulative spend over every out/*.jsonl, in total and per provider. */
 export function spend(lines: JobLine[]): { total: number; byProvider: Record<string, number> } {
