@@ -2,7 +2,7 @@
 import { describe, expect, test } from 'vitest';
 import { FEATURE_PROMPTS, type ImageModelConfig } from '../models';
 import { createFalImageProvider } from './fal';
-import { imageEstimate, ProviderHttpError } from './http';
+import { ImageReadError, imageEstimate, ProviderHttpError } from './http';
 import { createMockImageProvider, MOCK_FAIL } from './mock';
 import type { ImageProviderJob, ImageSubmitRequest } from './types';
 
@@ -123,7 +123,7 @@ describe('fal image submit', () => {
     test('Reframe sends the image and a width and height in the ratio, about one megapixel in multiples of 16', async () => {
       const reframe = app('fal-ai/ideogram/v3/reframe', '0.03');
       expect((await bodyFor(req(reframe, { ...one, ratio: '16:9' }))).body).toEqual({
-        image_url: 'https://img/1.jpg', image_size: { width: 1360, height: 768 }, rendering_speed: 'BALANCED', num_images: 1,
+        image_url: 'https://img/1.jpg', image_size: { width: 1360, height: 768 }, rendering_speed: 'TURBO', num_images: 1,
       });
       for (const ratio of ['1:1', '9:16', '3:4', '4:3', '2:3', '3:2', '4:5', '5:4', '21:9']) {
         const { width, height } = ((await bodyFor(req(reframe, { ...one, ratio }))).body as { image_size: { width: number; height: number } }).image_size;
@@ -135,7 +135,7 @@ describe('fal image submit', () => {
     });
 
     describe('Upscale', () => {
-      const topaz = model('fal-ai/topaz/upscale/image', { '2K': '0.04', '4K': '0.08' });
+      const topaz = model('fal-ai/topaz/upscale/image', { '2K': '0.08', '4K': '0.08' });
       const png = (width: number, height: number) => {
         const b = new Uint8Array(33);
         b.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
@@ -155,7 +155,7 @@ describe('fal image submit', () => {
         expect(await factor(1000, 1000, '4K')).toBe(2.88); // 8.29 MP over 1 MP
       });
 
-      test('never asks for more than the 4x of the schema, and keeps the output inside the budget', async () => {
+      test('never asks for more than the 4x of the schema, and keeps the output inside the target', async () => {
         expect(await factor(200, 200, '4K')).toBe(4);
         for (const [w, h, resolution] of [[1234, 987, '2K'], [3000, 2000, '4K'], [641, 480, '4K']] as const) {
           const f = await factor(w, h, resolution);
@@ -164,11 +164,26 @@ describe('fal image submit', () => {
         }
       });
 
-      test('refuses an image that already exceeds the budget, an unknown resolution, and an image it cannot measure', async () => {
-        await refuses(upscaleReq('2K'), /already larger/, readPng(3000, 3000));
+      test('an image at or over the target still goes through at factor 1, priced at the $0.08 tier while its output stays within 24 MP', async () => {
+        expect(await factor(4032, 3024, '2K')).toBe(1); // 12.2 MP phone photo
+        expect(await factor(4032, 3024, '4K')).toBe(1);
+        expect(await factor(3000, 3000, '2K')).toBe(1);
+        expect(await factor(6000, 4000, '4K')).toBe(1); // exactly 24 MP
+      });
+
+      test('refuses with ImageReadError, before any call, an image over 24 MP, an unknown resolution and an image it cannot measure', async () => {
+        const refusal = async (r: ImageSubmitRequest, readImage: Parameters<typeof bodyFor>[1]) => {
+          const { fn, calls } = fakeFetch();
+          const err = await createFalImageProvider({ apiKey: 'k', fetch: fn, readImage }).submit(r).catch((e) => e);
+          expect(calls).toHaveLength(0);
+          return err;
+        };
+        const big = await refusal(upscaleReq('4K'), readPng(6001, 4000));
+        expect(big).toBeInstanceOf(ImageReadError);
+        expect(big.message).toMatch(/larger than the 24 MP/);
+        expect(await refusal(upscaleReq('2K'), async () => ({ bytes: new Uint8Array(40), contentType: 'image/png' }))).toBeInstanceOf(ImageReadError);
+        expect(await refusal(req(topaz, { imageUrls: ['https://img/1.jpg'], resolution: '2K', ratio: 'auto' }), undefined)).toBeInstanceOf(ImageReadError);
         await refuses(upscaleReq('1K'), /does not offer resolution 1K/, readPng(100, 100));
-        await refuses(upscaleReq('2K'), /can measure/, async () => ({ bytes: new Uint8Array(40), contentType: 'image/png' }));
-        await refuses(req(topaz, { imageUrls: ['https://img/1.jpg'], resolution: '2K', ratio: 'auto' }), /can measure/);
       });
     });
 

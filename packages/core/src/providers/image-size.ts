@@ -17,6 +17,8 @@ export function imageSize(b: Uint8Array): { width: number; height: number } | un
     // Walk the segments to the first start-of-frame marker (C0-CF except C4, C8 and CC).
     for (let i = 2; i + 9 < b.length; ) {
       if (b[i] !== 0xff) return undefined;
+      while (b[i + 1] === 0xff) i++; // fill bytes may repeat before a marker
+      if (i + 9 >= b.length) return undefined;
       const m = b[i + 1]!;
       if (m >= 0xc0 && m <= 0xcf && ![0xc4, 0xc8, 0xcc].includes(m)) return { height: v.getUint16(i + 5), width: v.getUint16(i + 7) };
       i += m === 0xd8 || m === 0x01 || (m >= 0xd0 && m <= 0xd7) ? 2 : 2 + v.getUint16(i + 2);

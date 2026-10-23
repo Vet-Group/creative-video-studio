@@ -6,7 +6,7 @@
 //   Kling O3 Pro input and output schema: https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=fal-ai/kling-video/o3/pro/reference-to-video
 //   image endpoints (read 2026-10-24): https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=<endpoint>, one per entry of IMAGE_BODIES
 import { imageSize } from './image-size';
-import { estimate, imageEstimate, packJobId, ProviderHttpError, resolveImages, sendJson, timeout, unpackJobId, type Fetch, type ReadImage } from './http';
+import { estimate, ImageReadError, imageEstimate, packJobId, ProviderHttpError, resolveImages, sendJson, timeout, unpackJobId, type Fetch, type ReadImage } from './http';
 import type { ImageProvider, ImageSubmitRequest, ProviderStatus, VideoProvider } from './types';
 
 const QUEUE = 'https://queue.fal.run';
@@ -106,20 +106,26 @@ function seedreamSize(ratio: string, resolution: string): string | { width: numb
   return sizeFor(ratio, resolution === '2K' ? 4_000_000 : 1_100_000);
 }
 
-/** The pixel budget of each Upscale resolution; the price is $0.01 per output megapixel, so 2K costs about $0.04 and 4K (3840x2160) about $0.08. */
+/** The pixel target of each Upscale resolution (the Fash menu's 2K and 4K). */
 const UPSCALE_PIXELS: Record<string, number> = { '2K': 2048 * 2048, '4K': 3840 * 2160 };
+/** fal's price is $0.08 per output image up to 24 MP and $0.16 up to 48 MP (model page, read 2026-10-24); the app is priced at the first tier. */
+const UPSCALE_MAX_PIXELS = 24_000_000;
 
-/** The factor (at most 4, the schema's limit) that brings an image to the budget, rounded down so the output stays inside it. */
-function upscaleFactor(image: string, budget: number): number {
+/**
+ * The factor that brings an image to the target, rounded down, between 1 (an image at or over the target is still enhanced) and 4 (the schema's limit),
+ * and low enough that the output stays inside the price tier. An image over the tier even at factor 1 is refused before any call, which releases the estimate.
+ */
+function upscaleFactor(image: string, target: number): number {
   // The worker always inlines its images, so the bytes are in the data URL; an https URL cannot be sized without a download.
   const size = image.startsWith('data:') ? imageSize(Buffer.from(image.slice(image.indexOf(',') + 1), 'base64')) : undefined;
-  if (!size) throw new Error('upscale needs a jpeg, png or webp image it can measure');
-  const factor = Math.min(4, Math.floor(Math.sqrt(budget / (size.width * size.height)) * 100) / 100);
-  if (factor < 1) throw new Error(`the image (${size.width}x${size.height}) is already larger than the chosen resolution`);
-  return factor;
+  if (!size) throw new ImageReadError('upscale needs a jpeg, png or webp image it can measure');
+  const pixels = size.width * size.height;
+  const tier = Math.sqrt(UPSCALE_MAX_PIXELS / pixels);
+  if (tier < 1) throw new ImageReadError(`the image (${size.width}x${size.height}) is larger than the 24 MP the Upscale price covers`);
+  return Math.max(1, Math.floor(Math.min(4, tier, Math.sqrt(target / pixels)) * 100) / 100);
 }
 
-/** The request body of each image endpoint, built from its input schema (read 2026-10-24). Output is always png (seedream and fashn offer png too). */
+/** The request body of each image endpoint, built from its input schema (read 2026-10-24). Output is png wherever the schema offers a format; Topaz is left at its jpeg default, and the other endpoints have no choice. */
 const IMAGE_BODIES: Record<string, ImageBody> = {
   'fal-ai/nano-banana-pro/edit': nano(true),
   'google/nano-banana-2.1/edit': nano(true),
@@ -148,13 +154,13 @@ const IMAGE_BODIES: Record<string, ImageBody> = {
   // The schema's ratio is a size, not a ratio: pixels in the ratio, about one megapixel. shortcut: the size limits are unconfirmed by a live call. Prompt and style fields are not offered.
   'fal-ai/ideogram/v3/reframe': (req, [image_url]) => {
     if (!/^\d+:\d+$/.test(req.ratio)) throw new Error(`ideogram reframe needs a ratio, not ${req.ratio}`);
-    return { image_url, image_size: sizeFor(req.ratio, 1_048_576), rendering_speed: 'BALANCED', num_images: 1 };
+    return { image_url, image_size: sizeFor(req.ratio, 1_048_576), rendering_speed: 'TURBO', num_images: 1 };
   },
   // The schema has an upscale factor, not a target size, so the factor is worked out from the image's own size to land on the pixel budget of the resolution.
   'fal-ai/topaz/upscale/image': (req, [image_url]) => {
-    const budget = UPSCALE_PIXELS[req.resolution];
-    if (!budget) throw new Error(`topaz upscale does not offer resolution ${req.resolution}`);
-    return { image_url, upscale_factor: upscaleFactor(image_url!, budget), model: 'Standard V2' };
+    const target = UPSCALE_PIXELS[req.resolution];
+    if (!target) throw new Error(`topaz upscale does not offer resolution ${req.resolution}`);
+    return { image_url, upscale_factor: upscaleFactor(image_url!, target), model: 'Standard V2' };
   },
   // The source face first, then the photo to put it on. gender_0 and workflow_type are required and the app has no field for them, so the neutral gender and
   // the target's hair are fixed. upscale and detailer repeat the schema defaults so a default change cannot move the price.

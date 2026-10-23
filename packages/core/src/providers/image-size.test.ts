@@ -25,6 +25,12 @@ test.each([
   expect(imageSize(bytes('RIFF', [0, 0, 0, 0], 'WEBP', fourcc, chunk, pad(20)))).toEqual({ width: 800, height: 600 });
 });
 
+test('skips repeated fill bytes before a jpeg marker, and stops at the end of the data', () => {
+  const sof = [0xff, 0xff, 0xff, 0xc0, 0, 17, 8, ...[0x03, 0x00], ...[0x04, 0x00], 3, ...pad(9)];
+  expect(imageSize(bytes([0xff, 0xd8], [0xff, 0xe0, 0, 4, 0, 0], sof, pad(4)))).toEqual({ width: 1024, height: 768 });
+  expect(imageSize(bytes([0xff, 0xd8], pad(0), new Array<number>(40).fill(0xff)))).toBeUndefined();
+});
+
 test('gives up on text, a short buffer and a jpeg without a frame', () => {
   expect(imageSize(bytes('not an image at all, just some text.'))).toBeUndefined();
   expect(imageSize(new Uint8Array(5))).toBeUndefined();

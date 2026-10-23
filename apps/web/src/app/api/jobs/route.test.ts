@@ -501,7 +501,7 @@ describe('POST /api/jobs for an image feature', () => {
         ids.push(`${m.id}-i${i}`);
         await insertAsset(ids[i]!, m.id);
       }
-      const modelId = appModels.find((a) => a[1] === feature)![0];
+      const modelId = appModels.find((a) => a[1] === feature)?.[0];
       const res = await run(m.cookie, { assetIds: ids, modelId, feature, ratio: 'auto', params: { resolution: '1K' }, ...extra });
       const body = (await res.json()) as { id?: string; error?: string };
       const job = body.id ? (await pool.query('select feature, model, prompt, aspect, params from jobs where id = $1', [body.id])).rows[0] : undefined;
@@ -540,8 +540,21 @@ describe('POST /api/jobs for an image feature', () => {
       expect((await app('background_changer', 2, { prompt: 'a marble table' })).error).toMatch(message);
     });
 
-    test('an app prompt is trimmed and kept when the member writes one', async () => {
-      expect(await app('character_swap', 2, { prompt: '  swap them, keep the hat ' })).toMatchObject({ status: 201, job: { prompt: 'swap them, keep the hat' } });
+    test("a swap adds the member's prompt to its fixed instruction; the other apps keep the member's prompt as it is, trimmed", async () => {
+      const fixed = 'replace the whole person in the second image with the person from the first image, keep the background';
+      expect(await app('character_swap', 2, { prompt: '  keep the hat ' })).toMatchObject({ status: 201, job: { prompt: `${fixed}. keep the hat` } });
+      expect(await app('reframe', 1, { prompt: '  wide shot ', ratio: '1:1' })).toMatchObject({ status: 201, job: { prompt: 'wide shot' } });
+    });
+
+    test.each([['reframe', 1, 'Extend the image to the new aspect ratio.'], ['model_swap', 2, 'replace the person in the second image with the model from the first image, keep the clothing, pose and background exactly'], ['background_changer', 2, 'Replace the background with the one in the reference image.']])(
+      'an empty or blank prompt on %s means no prompt, so the default applies',
+      async (feature, n, instruction) => {
+        for (const prompt of ['', '   ']) expect(await app(feature, n, { prompt, ratio: feature === 'reframe' ? '1:1' : 'auto' })).toMatchObject({ status: 201, job: { prompt: instruction } });
+      },
+    );
+
+    test('a blank prompt on a feature without a default is still refused', async () => {
+      expect((await app('image', 1, { prompt: '  ', modelId: 'img-pro', ratio: '1:1' })).error).toMatch(/takes a prompt and no preset/);
     });
   });
 

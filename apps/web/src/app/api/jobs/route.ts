@@ -15,6 +15,8 @@ const MAX_PROMPT = 2000;
 const VIDEO_FEATURES = ['video', 'marketing'];
 const QUALITIES = ['auto', 'low', 'medium', 'high'];
 /** The apps that need more than one input image; the model's own max_images is the upper limit. Try On has its own message below. */
+/** The apps whose fixed instruction a member's own prompt is added to, not replaced by. */
+const APPEND_TO_INSTRUCTION = ['character_swap', 'model_swap'];
 const MIN_INPUTS: Record<string, number> = { character_swap: 2, model_swap: 2, face_swap: 2 };
 /** `presetId` is null for a free prompt, and `prompt` is null when a preset supplies it (or, in a retry, when the original's is copied). An image job has no preset and `durationSec` 0. */
 type Spec = {
@@ -79,10 +81,12 @@ export async function POST(request: Request) {
   // A retry takes everything from the original job, so only a new Run is validated against the body.
   let spec: Spec | null = null;
   if (retryOf === null) {
-    const { assetIds, modelId, presetId = null, prompt: freePrompt = null, ratio, durationSec, storeId = null, feature = 'video', params: rawParams } = body ?? {};
+    const { assetIds, modelId, presetId = null, prompt: rawPrompt = null, ratio, durationSec, storeId = null, feature = 'video', params: rawParams } = body ?? {};
     const params = rawParams ?? {}; // null as well as absent: video clients may send it
     if (typeof feature !== 'string' || !(FEATURES as readonly string[]).includes(feature)) return bad(`feature must be one of ${FEATURES.join(', ')}`);
     const isImage = !VIDEO_FEATURES.includes(feature);
+    // An app's empty prompt box means "no prompt", so its default applies.
+    const freePrompt = isImage && typeof rawPrompt === 'string' && rawPrompt.trim() === '' ? null : rawPrompt;
     const maxInputs = isImage ? MAX_IMAGE_INPUTS : MAX_IMAGES;
     if (!Array.isArray(assetIds) || assetIds.length < 1 || assetIds.length > maxInputs || !assetIds.every((a) => typeof a === 'string') || new Set(assetIds).size !== assetIds.length) {
       return bad(`assetIds must list 1 to ${maxInputs} different asset ids`);
@@ -103,7 +107,8 @@ export async function POST(request: Request) {
     }
     // Background Changer takes a prompt (one image) or a reference image (two images), the schema says not both.
     if (feature === 'background_changer' && (assetIds.length > 1) === (freePrompt !== null)) return bad('Background Changer takes a prompt or a reference image (the second image), not both and not neither');
-    const prompt = freePrompt?.trim() ?? FEATURE_PROMPTS[feature] ?? null;
+    const written = freePrompt?.trim();
+    const prompt = written && APPEND_TO_INSTRUCTION.includes(feature) ? `${FEATURE_PROMPTS[feature]}. ${written}` : (written ?? FEATURE_PROMPTS[feature] ?? null);
     if (prompt !== null && (prompt === '' || prompt.length > MAX_PROMPT)) return bad(`the prompt must have 1 to ${MAX_PROMPT} characters`);
     const usable = await pool.query(
       `select a.id from assets a

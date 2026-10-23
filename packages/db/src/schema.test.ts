@@ -132,13 +132,14 @@ describe('migration 0009 image app models', () => {
       ['ideogram-v3-reframe', 'fal-ai/ideogram/v3/reframe', ['reframe'], 1, { '1K': '0.03' }],
       ['nano-banana-pro-character-swap', 'fal-ai/nano-banana-pro/edit', ['character_swap'], 2, { '1K': '0.15' }],
       ['nano-banana-pro-model-swap', 'fal-ai/nano-banana-pro/edit', ['model_swap'], 2, { '1K': '0.15' }],
-      ['topaz-upscale', 'fal-ai/topaz/upscale/image', ['image_upscale'], 1, { '2K': '0.04', '4K': '0.08' }],
+      ['topaz-upscale', 'fal-ai/topaz/upscale/image', ['image_upscale'], 1, { '2K': '0.08', '4K': '0.08' }],
     ]);
     for (const r of rows) {
       expect(r.enabled).toBe(false);
       expect(r.sources.imagePrices.readAt).toBe('2026-10-24');
       expect(r.sources.ratios.url).toBe(`https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=${r.endpoint}`);
     }
+    expect(rows.find((r) => r.id === 'topaz-upscale').sources.imagePrices.note).toContain('up to 24 MP');
     // Reframe is the only app with a choice of ratio; the rest take the image as it is.
     expect(rows.filter((r) => r.ratios.length > 1).map((r) => r.id)).toEqual(['ideogram-v3-reframe']);
     expect(rows.find((r) => r.id === 'ideogram-v3-reframe').ratios).not.toContain('auto');

@@ -12,6 +12,7 @@ import type { ReadableStream as WebReadableStream } from 'node:stream/web';
 import { fileURLToPath } from 'node:url';
 import { close24h, lateBill, type LedgerPool, release, settle, withTransaction } from '@cvs/core/ledger';
 import type { ImageModelConfig, ModelConfig } from '@cvs/core/models';
+import { ImageReadError } from '@cvs/core/providers/http';
 import type { ImageProvider, ImageProviderJob, ImageSubmitRequest, ProviderJob, ProviderStatus, SubmitRequest, VideoProvider } from '@cvs/core/providers';
 import { PURGE_CRON, PURGE_QUEUE, VIDEO_QUEUE, VIDEO_QUEUE_OPTIONS, type VideoJobData, videoSendOptions } from '@cvs/core/queue';
 import { insertAssets } from '@cvs/db/assets';
@@ -203,6 +204,11 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
       } catch (e) {
         // Shutting down mid-call: the row stays submitting and the next worker turns it into failed_unknown.
         if (signal.aborted) return;
+        // The adapter refused an input before any network call: nothing was submitted, so the estimate is released.
+        if (e instanceof ImageReadError) {
+          await release(pool, jobId, e.message);
+          return;
+        }
         await pool.query(`update jobs set status = 'failed_unknown', error = $2, finished_at = now() where id = $1 and status = 'submitting'`, [jobId, `submit failed: ${e instanceof Error ? e.message : e}`]);
         return;
       }
