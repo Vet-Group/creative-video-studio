@@ -44,9 +44,13 @@ const PROVIDERS = ['fal', 'replicate'];
 const KIND_LABEL: Record<string, string> = { bakeoff: 'Thử nghiệm mô hình', manual_adjustment: 'Điều chỉnh tay', invoice_diff: 'Chênh lệch hóa đơn' };
 const vnd = (v: string | null) => (v === null ? '—' : `${Number(v).toLocaleString('vi-VN')} ₫`);
 
-/** The 2-decimal display value; the exact 4-decimal amount (and the VND, if given) is in the tooltip. */
+/** The 2-decimal display value with the exact 4-decimal amount beside it, and the VND when asked for. */
 function Usd({ m, withVnd = false }: { m: Money; withVnd?: boolean }) {
-  return <span title={`${m.usd} USD${withVnd && m.vnd !== null ? ` · ${vnd(m.vnd)}` : ''}`}>${m.usdDisplay}</span>;
+  return (
+    <span>
+      ${m.usdDisplay} <span className="muted">(${m.usd}{withVnd && ` · ${vnd(m.vnd)}`})</span>
+    </span>
+  );
 }
 
 function Breakdown({ title, groups, label }: { title: string; groups: Group[]; label: (g: Group) => string }) {
@@ -139,7 +143,7 @@ function CostsBody({ data, reload }: { data: Costs; reload: () => void }) {
   return (
     <>
       <p>
-        Tổng chi phí: <strong><Usd m={data.total} withVnd /></strong> · {vnd(data.total.vnd)}
+        Tổng chi phí: <strong><Usd m={data.total} withVnd /></strong>
         {data.provisional && <span className="tag">Tạm tính</span>}
       </p>
       <p className="muted">
@@ -169,7 +173,7 @@ function CostsBody({ data, reload }: { data: Costs; reload: () => void }) {
       <section aria-label="Chi phí chung">
         <h2>Chi phí chung</h2>
         <p>
-          <Usd m={data.shared} /> · {vnd(data.shared.vnd)}
+          <Usd m={data.shared} withVnd />
         </p>
         <ul>
           {Object.entries(data.shared.byKind).map(([kind, usd]) => (
@@ -207,10 +211,10 @@ function CostsBody({ data, reload }: { data: Costs; reload: () => void }) {
       </section>
 
       <div className="actions">
-        <a className="button" href={`/api/admin/costs/detail?month=${month}`} download>
+        <a className="button" href={`/api/admin/costs/detail?month=${month}&asOf=${data.asOf}`} download>
           Tải CSV chi tiết sổ cái
         </a>
-        <a className="button" href={`/api/admin/costs/summary?month=${month}`} download>
+        <a className="button" href={`/api/admin/costs/summary?month=${month}&asOf=${data.asOf}`} download>
           Tải CSV tổng hợp theo nhóm và cửa hàng
         </a>
       </div>

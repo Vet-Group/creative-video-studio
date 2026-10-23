@@ -167,7 +167,10 @@ describe('stores', () => {
     expect((await patch(id, { code: 'POD-3B' })).status).toBe(200); // same code is not a change
     expect((await patch(id, { name: 'Shop Three renamed' })).status).toBe(200);
     expect((await pool.query('select name, code from stores where id = $1', [id])).rows[0]).toEqual({ name: 'Shop Three renamed', code: 'POD-3B' });
-    expect((await audits(`store:${id}`)).map((a) => a.action)).toEqual(['store.create', 'store.update', 'store.update']);
+    expect((await audits(`store:${id}`)).slice(1)).toEqual([
+      { actor_id: admin.id, action: 'store.update', old_value: { name: 'Shop Three', code: 'POD-3' }, new_value: { name: 'Shop Three', code: 'POD-3B' } },
+      { actor_id: admin.id, action: 'store.update', old_value: { name: 'Shop Three', code: 'POD-3B' }, new_value: { name: 'Shop Three renamed', code: 'POD-3B' } },
+    ]);
   });
 
   test('refuses an empty change and an unknown store', async () => {
@@ -286,7 +289,7 @@ describe('settings', () => {
     expect(await audits('settings:1')).toHaveLength(1);
   });
 
-  test.each([{}, { monthlyCapUsd: -1 }, { monthlyCapUsd: 'lots' }, { monthlyCapUsd: '' }, { memberDailyClipCap: 1.5 }, { memberDailyClipCap: -1 }, { models: [{ id: 'fal-test' }] }, { models: 'all' }])('refuses %j', async (body) => {
+  test.each([{}, { monthlyCapUsd: -1 }, { monthlyCapUsd: 'lots' }, { monthlyCapUsd: '' }, { monthlyCapUsd: '0x10' }, { monthlyCapUsd: '1e2' }, { monthlyCapUsd: '1.23456' }, { memberDailyClipCap: 1.5 }, { memberDailyClipCap: -1 }, { models: [{ id: 'fal-test' }] }, { models: 'all' }])('refuses %j', async (body) => {
     expect((await put(body)).status).toBe(400);
   });
 

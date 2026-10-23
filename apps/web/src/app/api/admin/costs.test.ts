@@ -529,6 +529,35 @@ describe('VND rates', () => {
   });
 });
 
+describe('one snapshot across the page and its CSVs', () => {
+  const MS = '2026-06';
+  const detailAt = async (query: string) => csv(await detailRoute.GET(call(admin.cookie, `/api/admin/costs/detail?month=${MS}${query}`)));
+  const summaryAt = async (query: string) => csv(await summaryRoute.GET(call(admin.cookie, `/api/admin/costs/summary?month=${MS}${query}`)));
+
+  test('with the page as_of both CSVs show the rows the page showed, a row written later is left out, and without it they show it', async () => {
+    await bookShared(pool, { kind: 'bakeoff', usd: '4.0000', month: MS, provider: 'fal', ref: 'bakeoff-fal-2026-06' });
+    const p = await page(MS);
+    expect(p.total.usd).toBe('4.0000');
+    expect((await postAdjustment({ month: MS, usd: '1.2500', note: 'Written after the page was read' })).status).toBe(201);
+
+    const q = `&asOf=${p.asOf}`;
+    const [d, s] = [await detailAt(q), await summaryAt(q)];
+    expect(d.label).toBe(`Creative Video Studio ledger-detail ${MS} as_of ${p.asOf}`);
+    expect(s.label).toBe(`Creative Video Studio summary ${MS} as_of ${p.asOf}`);
+    expect(d.rows).toHaveLength(1);
+    expect([sumUsd(d.rows.map((r) => r[12]!)), s.rows.at(-1)![5]]).toEqual([p.total.usd, p.total.usd]);
+
+    const [dNow, sNow] = [await detailAt(''), await summaryAt('')];
+    expect(dNow.rows).toHaveLength(2);
+    expect([sumUsd(dNow.rows.map((r) => r[12]!)), sNow.rows.at(-1)![5]]).toEqual(['5.2500', '5.2500']);
+    expect((await page(MS)).total.usd).toBe('5.2500');
+  });
+
+  test.each(['0', '-1', '1.5', 'x', '', '99999999999'])('refuses ?asOf=%s with 400', async (asOf) => {
+    for (const run of [detailRoute.GET, summaryRoute.GET]) expect((await run(call(admin.cookie, `/api/admin/costs?month=${MS}&asOf=${asOf}`))).status).toBe(400);
+  });
+});
+
 describe("a Member's own month-to-date total", () => {
   // GET /api/models already returns it for the Create page; this checks it against the member's own ledger rows.
   const toDate = async () => {

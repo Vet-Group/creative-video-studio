@@ -1,7 +1,8 @@
 // Integration test against a disposable database on the compose Postgres (`pnpm services:up`).
 import { randomBytes } from 'node:crypto';
 import { createTestDatabase } from '@cvs/db/testing';
-import { afterAll, beforeAll, describe, expect, test } from 'vitest';
+import { APIError } from 'better-auth/api';
+import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 
 const testDb = await createTestDatabase();
 process.env.DATABASE_URL = testDb.url;
@@ -172,6 +173,70 @@ describe('PATCH /api/admin/users/:id', () => {
     expect(await res.json()).toMatchObject({ id: m.id, role: 'admin' });
     expect((await pool.query('select role from users where id = $1', [m.id])).rows[0].role).toBe('admin');
     expect(await audits(m.id)).toEqual([{ actor_id: await adminId(), action: 'user.role_change', old_value: { role: 'member' }, new_value: { role: 'admin' } }]);
+  });
+
+  test('checks every field before writing anything: a good role with a bad password changes nothing and audits nothing', async () => {
+    const m = await member();
+    for (const body of [
+      { role: 'admin', temporaryPassword: 'short' },
+      { role: 'admin', temporaryPassword: 'x'.repeat(129) },
+      { banned: true, temporaryPassword: 12345678 },
+      { role: 'admin', banned: 'yes' },
+      { role: 'admin', banReason: 5 },
+      { role: 'admin', teamId: 'no-such-team' },
+    ]) {
+      expect((await patch(adminCookie, m.id, body)).status, JSON.stringify(body)).toBe(400);
+    }
+    expect((await pool.query('select role, banned, team_id from users where id = $1', [m.id])).rows[0]).toEqual({ role: 'member', banned: false, team_id: 'team-unassigned' });
+    expect(await audits(m.id)).toEqual([]);
+    expect(await signIn(m.email)).toContain('better-auth.session_token');
+  });
+
+  test('audits a change only if better-auth made it: a refusal or a crash leaves the user and the log as they were', async () => {
+    const m = await member();
+    const state = async () => (await pool.query('select role, banned from users where id = $1', [m.id])).rows[0];
+    const refusal = new APIError('BAD_REQUEST', { message: 'refused' });
+    const cases: [string, () => Promise<Response>, keyof typeof auth.api][] = [
+      ['role', () => patch(adminCookie, m.id, { role: 'admin' }), 'setRole'],
+      ['ban', () => patch(adminCookie, m.id, { banned: true }), 'banUser'],
+      ['password', () => patch(adminCookie, m.id, { temporaryPassword: 'temporary-pass-2' }), 'setUserPassword'],
+    ];
+    for (const [name, run, method] of cases) {
+      const spy = vi.spyOn(auth.api, method as 'setRole').mockRejectedValueOnce(refusal);
+      expect((await run()).status, name).toBe(400);
+      spy.mockRejectedValueOnce(new Error('connection lost'));
+      await expect(run(), name).rejects.toThrow('connection lost');
+      spy.mockRestore();
+      expect(await state(), name).toEqual({ role: 'member', banned: false });
+      expect(await audits(m.id), name).toEqual([]);
+    }
+    expect((await auth.api.signInEmail({ body: { email: m.email, password: PASSWORD }, asResponse: true })).status).toBe(200);
+  });
+
+  test('makes no change when its audit row cannot be written', async () => {
+    const m = await member();
+    await pool.query(`create function refuse_audit() returns trigger language plpgsql as $$ begin raise exception 'audit refused'; end $$`);
+    await pool.query(`create trigger refuse_audit before insert on audit_entries for each row execute function refuse_audit()`);
+    try {
+      await expect(patch(adminCookie, m.id, { role: 'admin' })).rejects.toThrow('audit refused');
+      await expect(patch(adminCookie, m.id, { banned: true })).rejects.toThrow('audit refused');
+      await expect(patch(adminCookie, m.id, { temporaryPassword: 'temporary-pass-3' })).rejects.toThrow('audit refused');
+    } finally {
+      await pool.query('drop trigger refuse_audit on audit_entries');
+      await pool.query('drop function refuse_audit()');
+    }
+    expect((await pool.query('select role, banned from users where id = $1', [m.id])).rows[0]).toEqual({ role: 'member', banned: false });
+    expect((await auth.api.signInEmail({ body: { email: m.email, password: PASSWORD }, asResponse: true })).status).toBe(200);
+    expect(await audits(m.id)).toEqual([]);
+  });
+
+  test('keeps the audit of an earlier change when a later one in the same request fails', async () => {
+    const m = await member();
+    const spy = vi.spyOn(auth.api, 'banUser').mockRejectedValueOnce(new APIError('BAD_REQUEST', { message: 'refused' }));
+    expect((await patch(adminCookie, m.id, { role: 'admin', banned: true })).status).toBe(400);
+    spy.mockRestore();
+    expect((await audits(m.id)).map((a) => a.action)).toEqual(['user.role_change']);
+    expect((await pool.query('select role, banned from users where id = $1', [m.id])).rows[0]).toEqual({ role: 'admin', banned: false });
   });
 
   test('changes the team for new jobs only: an earlier job and its ledger row keep the old team, and the change is audited once', async () => {

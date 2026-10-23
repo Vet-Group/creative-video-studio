@@ -6,7 +6,8 @@ import { guard } from '@/lib/session';
 export async function GET(request: Request) {
   const g = await guard(request, 'admin');
   if (g.error) return g.error;
-  const { users } = await auth.api.listUsers({ headers: request.headers, query: { limit: 100 } });
+  // shortcut: one page of 10000 instead of paging, far above the headcount of one company; page through if the user count ever nears it
+  const { users } = await auth.api.listUsers({ headers: request.headers, query: { limit: 10_000 } });
   return Response.json({
     users: users.map((u) => ({ id: u.id, email: u.email, name: u.name, role: u.role, banned: u.banned, teamId: (u as typeof u & { teamId: string }).teamId })),
   });

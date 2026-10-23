@@ -1,5 +1,4 @@
 'use client';
-import { PRESETS } from '@cvs/core/presets';
 import { type ChangeEvent, useEffect, useState } from 'react';
 import { api, errorText, sendJson } from '@/lib/api';
 import { useHydrated } from '@/lib/use-hydrated';
@@ -45,7 +44,8 @@ export function CreateForm({ reuse }: { reuse?: string }) {
   const { refresh } = useJobs();
   const hydrated = useHydrated();
   const [images, setImages] = useState<Image[]>([]);
-  const [presetId, setPresetId] = useState(PRESETS[0]!.id); // '' means a free prompt
+  const [presets, setPresets] = useState<{ id: string; label: string }[] | null>(null);
+  const [presetId, setPresetId] = useState(''); // '' means a free prompt
   const [prompt, setPrompt] = useState('');
   const [ratio, setRatio] = useState('9:16');
   const [durationSec, setDurationSec] = useState(8);
@@ -63,14 +63,29 @@ export function CreateForm({ reuse }: { reuse?: string }) {
     api<{ stores: { id: string; name: string }[] }>('/api/stores').then((r) => setStores(r.stores), () => setError('Không tải được danh sách cửa hàng.'));
   }, []);
 
-  // Reuse: fill the form from the source clip; everything stays editable.
+  // The enabled presets the Admin set up; the first is the default, and with none enabled the form starts on a free prompt.
   useEffect(() => {
-    if (!reuse) return;
+    api<{ presets: { id: string; label: string }[] }>('/api/presets').then(
+      (r) => {
+        setPresets(r.presets);
+        if (!reuse) setPresetId(r.presets[0]?.id ?? '');
+      },
+      () => {
+        setPresets([]);
+        setError('Không tải được danh sách mẫu chuyển động.');
+      },
+    );
+  }, [reuse]);
+
+  // Reuse: fill the form from the source clip; everything stays editable. A preset switched off since falls back to its prompt as a free prompt.
+  useEffect(() => {
+    if (!reuse || !presets) return;
     api<JobDetail>(`/api/jobs/${reuse}`)
       .then((j) => {
+        const preset = presets.some((p) => p.id === j.presetId) ? j.presetId : null;
         setImages(j.images);
-        setPresetId(j.presetId ?? '');
-        if (!j.presetId) setPrompt(j.prompt);
+        setPresetId(preset ?? '');
+        if (!preset) setPrompt(j.prompt);
         setRatio(j.ratio);
         setDurationSec(j.durationSec);
         setModelId(j.modelId);
@@ -78,7 +93,7 @@ export function CreateForm({ reuse }: { reuse?: string }) {
       })
       .catch(() => setError('Không tìm thấy clip để dùng lại.'))
       .finally(() => setReady(true));
-  }, [reuse]);
+  }, [reuse, presets]);
 
   // The picker follows the ratio and duration; the chosen model stays while it supports them, else the server's default takes over.
   useEffect(() => {
@@ -163,7 +178,7 @@ export function CreateForm({ reuse }: { reuse?: string }) {
       <label>
         Mẫu chuyển động
         <select value={presetId} onChange={(e) => setPresetId(e.target.value)}>
-          {PRESETS.map((p) => (
+          {presets?.map((p) => (
             <option key={p.id} value={p.id}>
               {p.label}
             </option>

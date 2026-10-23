@@ -68,6 +68,8 @@ test('an Admin sets up a team, a store and a user, then reconciles the month cos
   const shared = page.getByRole('region', { name: 'Chi phí chung' });
   await expect(shared).toContainText('Chênh lệch hóa đơn: $12.5000');
   await expect(shared).toContainText('Điều chỉnh tay: $-1.5000');
+  // The total shows the 2-decimal value with the exact 4-decimal USD and the VND beside it, not in a tooltip.
+  await expect(page.getByText('Tổng chi phí:')).toContainText('$11.00 ($11.0000 · 275.000');
 
   // Both CSVs: file name, a byte order mark and the fixed header columns.
   const detail = await download(page, 'Tải CSV chi tiết sổ cái', `cvs-ledger-detail-${month}.csv`);
@@ -108,6 +110,26 @@ test('an Admin sets up a team, a store and a user, then reconciles the month cos
   await Promise.all([page.waitForResponse((r) => r.url().includes('/api/admin/presets/') && r.ok()), page.getByRole('button', { name: 'Lưu', exact: true }).first().click()]);
   await page.reload();
   await expect(page.getByRole('textbox', { name: /^Tên mẫu / }).first()).toHaveValue(`${before} (sửa)`);
+
+  // The Create form follows the presets: the new label shows, a preset switched off disappears and comes back when switched on.
+  await page.goto('/create');
+  const picker = page.getByLabel('Mẫu chuyển động');
+  await expect(picker.locator('option').first()).toHaveText(`${before} (sửa)`);
+  await page.goto('/admin/presets');
+  const second = page.getByRole('row').nth(2);
+  const secondLabel = await second.getByRole('textbox').first().inputValue();
+  const setSecond = async (on: boolean) => {
+    await second.getByRole('checkbox', { name: 'Đang bật' }).setChecked(on);
+    await Promise.all([page.waitForResponse((r) => r.url().includes('/api/admin/presets/') && r.ok()), second.getByRole('button', { name: 'Lưu', exact: true }).click()]);
+  };
+  await setSecond(false);
+  await page.goto('/create');
+  await expect(picker.locator('option', { hasText: `${before} (sửa)` })).toHaveCount(1);
+  await expect(picker.locator('option', { hasText: secondLabel })).toHaveCount(0);
+  await page.goto('/admin/presets');
+  await setSecond(true);
+  await page.goto('/create');
+  await expect(picker.locator('option', { hasText: secondLabel })).toHaveCount(1);
 });
 
 test('an Admin re-assigns a clip store from the Library and Reuse follows it', async ({ page }) => {

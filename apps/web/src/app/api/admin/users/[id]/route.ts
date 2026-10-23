@@ -1,13 +1,17 @@
-import { audit } from '@cvs/core/audit';
+import { type AuditEntry, audit } from '@cvs/core/audit';
 import { withTransaction } from '@cvs/core/ledger';
 import { type RouteContext } from '@/lib/assets';
 import { auth, pool } from '@/lib/auth';
-import { authFailure, bad, nonEmpty, readBody } from '@/lib/admin';
+import { authFailure, bad, readBody } from '@/lib/admin';
 import { guard } from '@/lib/session';
+
+/** better-auth's default password length limits (see lib/auth.ts, which does not change them). */
+const PASSWORD_LENGTH = { min: 8, max: 128 };
 
 /**
  * Admin: change one user. Any of `role` (member|admin), `teamId` (a visible team), `banned` (boolean, with an optional `banReason`) and
- * `temporaryPassword` in one body. Each change that differs from the current state is audited with its old and new value; the
+ * `temporaryPassword` in one body. Every field is checked before anything is written. Each change that differs from the current state is
+ * audited with its old and new value, in the transaction of the change itself: the audit row commits only if the change was made. The
  * password itself is never stored. A team change touches only users.team_id: jobs keep the team they were run under.
  */
 export async function PATCH(request: Request, { params }: RouteContext) {
@@ -21,18 +25,33 @@ export async function PATCH(request: Request, { params }: RouteContext) {
   if (teamId !== undefined && typeof teamId !== 'string') return bad('teamId must be a string');
   if (banned !== undefined && typeof banned !== 'boolean') return bad('banned must be true or false');
   if (banReason !== undefined && typeof banReason !== 'string') return bad('banReason must be a string');
-  if (temporaryPassword !== undefined && !nonEmpty(temporaryPassword)) return bad('temporaryPassword must be a non-empty string');
+  if (temporaryPassword !== undefined && !(typeof temporaryPassword === 'string' && temporaryPassword.length >= PASSWORD_LENGTH.min && temporaryPassword.length <= PASSWORD_LENGTH.max)) {
+    return bad(`temporaryPassword must have ${PASSWORD_LENGTH.min} to ${PASSWORD_LENGTH.max} characters`);
+  }
   if (id === actorId && ((role !== undefined && role !== g.session.user.role) || banned === true)) return bad('you cannot change your own role or ban yourself');
 
-  const user = (await pool.query('select role, banned from users where id = $1', [id])).rows[0];
-  if (!user) return bad('not found', 404);
+  if (!(await pool.query('select 1 from users where id = $1', [id])).rowCount) return bad('not found', 404);
   if (typeof teamId === 'string' && !(await pool.query('select 1 from teams where id = $1 and not hidden', [teamId])).rowCount) return bad('teamId must be the id of a visible team');
 
+  const target = `user:${id}`;
+  // The change and its audit row share a transaction: `apply` (a better-auth call on its own connection) failing rolls the audit row back.
+  // The users row is not locked, because better-auth updates it from another connection and would wait for us; an advisory lock
+  // serialises Admins changing the same user instead, so the old value read here is the one the change replaces.
+  const change = (entry: (old: { role: string; banned: boolean }) => Omit<AuditEntry, 'actorId' | 'target'> | null, apply: () => Promise<unknown>) =>
+    withTransaction(pool, async (tx) => {
+      await tx.query('select pg_advisory_xact_lock(hashtext($1))', [target]);
+      const e = entry((await tx.query('select role, banned from users where id = $1', [id])).rows[0]);
+      if (!e) return;
+      await audit(tx, { actorId, target, ...e });
+      await apply();
+    });
+
   try {
-    const target = `user:${id}`;
-    if (role !== undefined && role !== user.role) {
-      await auth.api.setRole({ headers: request.headers, body: { userId: id, role } });
-      await audit(pool, { actorId, action: 'user.role_change', target, oldValue: { role: user.role }, newValue: { role } });
+    if (role !== undefined) {
+      await change(
+        (old) => (role === old.role ? null : { action: 'user.role_change', oldValue: { role: old.role }, newValue: { role } }),
+        () => auth.api.setRole({ headers: request.headers, body: { userId: id, role } }),
+      );
     }
     if (typeof teamId === 'string') {
       await withTransaction(pool, async (tx) => {
@@ -42,16 +61,22 @@ export async function PATCH(request: Request, { params }: RouteContext) {
         await audit(tx, { actorId, action: 'user.team_change', target, oldValue: { teamId: old }, newValue: { teamId } });
       });
     }
-    if (banned === true && !user.banned) {
-      await auth.api.banUser({ headers: request.headers, body: { userId: id, ...(banReason ? { banReason } : {}) } });
-      await audit(pool, { actorId, action: 'user.ban', target, oldValue: { banned: false }, newValue: { banned: true, reason: banReason ?? null } });
-    } else if (banned === false && user.banned) {
-      await auth.api.unbanUser({ headers: request.headers, body: { userId: id } });
-      await audit(pool, { actorId, action: 'user.unban', target, oldValue: { banned: true }, newValue: { banned: false } });
+    if (banned === true) {
+      await change(
+        (old) => (old.banned ? null : { action: 'user.ban', oldValue: { banned: false }, newValue: { banned: true, reason: banReason ?? null } }),
+        () => auth.api.banUser({ headers: request.headers, body: { userId: id, ...(banReason ? { banReason } : {}) } }),
+      );
+    } else if (banned === false) {
+      await change(
+        (old) => (old.banned ? { action: 'user.unban', oldValue: { banned: true }, newValue: { banned: false } } : null),
+        () => auth.api.unbanUser({ headers: request.headers, body: { userId: id } }),
+      );
     }
     if (temporaryPassword !== undefined) {
-      await auth.api.setUserPassword({ headers: request.headers, body: { userId: id, newPassword: temporaryPassword as string } });
-      await audit(pool, { actorId, action: 'user.password_set', target, newValue: { temporary: true } });
+      await change(
+        () => ({ action: 'user.password_set', newValue: { temporary: true } }),
+        () => auth.api.setUserPassword({ headers: request.headers, body: { userId: id, newPassword: temporaryPassword as string } }),
+      );
     }
   } catch (e) {
     return authFailure(e);

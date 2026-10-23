@@ -8,6 +8,7 @@ const ROUTES = [
   '/api/library',
   '/api/models?ratio=9:16&durationSec=5',
   '/api/stores',
+  '/api/presets',
   '/api/assets',
   '/api/assets/warm-up',
   '/api/assets/warm-up/content',

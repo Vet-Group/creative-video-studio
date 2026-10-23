@@ -1,6 +1,6 @@
 import { audit } from '@cvs/core/audit';
 import { withTransaction } from '@cvs/core/ledger';
-import { bad, pgCode, readBody } from '@/lib/admin';
+import { bad, money, pgCode, readBody } from '@/lib/admin';
 import { pool } from '@/lib/auth';
 import { guard } from '@/lib/session';
 
@@ -22,10 +22,8 @@ export async function PUT(request: Request) {
   const g = await guard(request, 'admin');
   if (g.error) return g.error;
   const { monthlyCapUsd, memberDailyClipCap, models } = (await readBody(request)) ?? {};
-  const usd = Number(monthlyCapUsd);
-  if (monthlyCapUsd !== undefined && !((typeof monthlyCapUsd === 'number' || (typeof monthlyCapUsd === 'string' && monthlyCapUsd.trim() !== '')) && usd >= 0 && usd < 1e8)) {
-    return bad('monthlyCapUsd must be a number of 0 or more');
-  }
+  const usd = money(monthlyCapUsd);
+  if (monthlyCapUsd !== undefined && usd === null) return bad('monthlyCapUsd must be an amount of 0 or more with at most 4 decimals');
   if (memberDailyClipCap !== undefined && !(Number.isInteger(memberDailyClipCap) && (memberDailyClipCap as number) >= 0 && (memberDailyClipCap as number) <= 100_000)) {
     return bad('memberDailyClipCap must be a whole number of 0 or more');
   }
@@ -39,7 +37,7 @@ export async function PUT(request: Request) {
   try {
     return await withTransaction(pool, async (tx): Promise<Response> => {
       const old = (await tx.query('select monthly_cap_usd::text as usd, member_daily_clip_cap as daily from settings where id = 1 for update')).rows[0];
-      const next = { usd: monthlyCapUsd === undefined ? old.usd : usd.toFixed(4), daily: (memberDailyClipCap as number | undefined) ?? old.daily };
+      const next = { usd: usd ?? old.usd, daily: (memberDailyClipCap as number | undefined) ?? old.daily };
       if (Number(next.usd) !== Number(old.usd) || next.daily !== old.daily) {
         await tx.query('update settings set monthly_cap_usd = $1, member_daily_clip_cap = $2, updated_at = now() where id = 1', [next.usd, next.daily]);
         await audit(tx, {

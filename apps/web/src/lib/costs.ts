@@ -79,11 +79,16 @@ export async function invoiceRows(db: Queryable, month: string, provider?: strin
   return rows;
 }
 
-/** Reads the month's ledger rows, rate, cap usage and invoices in one REPEATABLE READ transaction; null means the current ICT month. */
-export function snapshot(requestedMonth: string | null): Promise<Snapshot> {
+/**
+ * Reads the month's ledger rows, rate, cap usage and invoices in one REPEATABLE READ transaction; null means the current ICT month.
+ * `upTo` keeps only the rows with an id up to it, so a CSV can show the rows the Costs page showed (the page's as_of).
+ * shortcut: bigserial ids can commit out of order, so a row with a lower id committed after the page load would appear; upgrade to a stored snapshot if that matters
+ */
+export function snapshot(requestedMonth: string | null, upTo: number | null = null): Promise<Snapshot> {
   return withTransaction(pool, async (tx) => {
     await tx.query('set transaction isolation level repeatable read read only');
-    const asOf = (await tx.query('select coalesce(max(id), 0)::int as n from cost_entries')).rows[0].n as number;
+    const latest = (await tx.query('select coalesce(max(id), 0)::int as n from cost_entries')).rows[0].n as number;
+    const asOf = upTo === null ? latest : Math.min(upTo, latest);
     const month = requestedMonth ?? ((await tx.query(`select to_char(now() at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM') as m`)).rows[0].m as string);
     const rate = await tx.query('select vnd_per_usd::text as rate from monthly_rates where month = $1', [month]);
     const cap = await tx.query(
@@ -104,8 +109,8 @@ export function snapshot(requestedMonth: string | null): Promise<Snapshot> {
          left join jobs j on j.id = ce.job_id
          left join job_costs jc on jc.job_id = ce.job_id
          left join verdicts v on v.job_id = ce.job_id
-        where ce.month = $1 order by ce.id`,
-      [month],
+        where ce.month = $1 and ce.id <= $2 order by ce.id`,
+      [month, asOf],
     );
     return {
       month, asOf, rate: rate.rows[0]?.rate ?? null, rows: rows.rows, capUsageUsd: cap.rows[0].used, monthlyCapUsd: cap.rows[0].cap,

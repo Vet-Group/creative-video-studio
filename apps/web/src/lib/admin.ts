@@ -22,6 +22,13 @@ export const nonEmpty = (v: unknown): v is string => typeof v === 'string' && v.
 /** An ICT month as the ledger writes it, 'YYYY-MM'. */
 export const isMonth = (v: unknown): v is string => typeof v === 'string' && /^\d{4}-(0[1-9]|1[0-2])$/.test(v);
 
+/** The `asOf` query parameter (the largest ledger id a CSV may include): a positive whole number, null when absent, undefined when malformed. */
+export function asOfParam(url: URL): number | null | undefined {
+  const v = url.searchParams.get('asOf');
+  if (v === null) return null;
+  return /^[1-9]\d{0,8}$/.test(v) ? Number(v) : undefined;
+}
+
 /** A money amount from a JSON number or string with at most 4 decimals, as a 4-decimal string; null for anything else. Never goes through a float. */
 export function money(v: unknown, allowNegative = false): string | null {
   const s = typeof v === 'number' || typeof v === 'string' ? String(v).trim() : '';
