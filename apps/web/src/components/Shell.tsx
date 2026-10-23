@@ -2,8 +2,9 @@
 // The frame of every signed-in page: navigation, the "My jobs" tray and the toasts.
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { type ReactNode, useState } from 'react';
+import { createContext, type ReactNode, useContext, useEffect, useRef, useState } from 'react';
 import { api, errorText, sendJson, type JobStatus, type TrayJob } from '@/lib/api';
+import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { JobsProvider, useJobs } from './jobs';
 
 const STATUS_LABEL: Record<JobStatus, string> = {
@@ -64,7 +65,11 @@ function TrayItem({ job, isAdmin }: { job: TrayJob; isAdmin: boolean }) {
   );
 }
 
-function Tray({ isAdmin }: { isAdmin: boolean }) {
+const AdminContext = createContext(false);
+
+/** The "My jobs" list. It sits beside the page, or in the History tab of Create. */
+export function Tray() {
+  const isAdmin = useContext(AdminContext);
   const { jobs, workerOffline, loaded } = useJobs();
   return (
     <aside className="tray" aria-label="Job của tôi">
@@ -97,8 +102,19 @@ function Toasts() {
   );
 }
 
+const PAGE_TITLES: [prefix: string, title: string][] = [
+  ['/create', 'Tạo video'],
+  ['/library', 'Thư viện'],
+  ['/admin', 'Quản trị'],
+  ['/account', 'Phương thức đăng nhập'],
+];
+
 export function Shell({ userId, userName, isAdmin, children }: { userId: string; userName: string; isAdmin: boolean; children: ReactNode }) {
   const pathname = usePathname();
+  const narrow = useMediaQuery(NARROW);
+  const [open, setOpen] = useState(false); // the drawer, below 1024 px
+  const menuButton = useRef<HTMLButtonElement>(null);
+  const sidebar = useRef<HTMLDivElement>(null);
   const link = (href: string, text: string) => (
     <Link href={href} aria-current={pathname === href ? 'page' : undefined}>
       {text}
@@ -108,30 +124,76 @@ export function Shell({ userId, userName, isAdmin, children }: { userId: string;
     await api('/api/auth/sign-out', sendJson('POST', {})).catch(() => null);
     window.location.assign('/login');
   }
+
+  useEffect(() => setOpen(false), [pathname]);
+  useEffect(() => {
+    if (!open) return;
+    sidebar.current?.querySelector('a')?.focus();
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      menuButton.current?.focus(); // runs once the drawer has closed and the page is no longer inert
+    };
+  }, [open]);
+
+  const title = PAGE_TITLES.find(([prefix]) => pathname.startsWith(prefix))?.[1] ?? 'Creative Video Studio';
   return (
     <JobsProvider userId={userId}>
-      <header className="bar">
-        <strong>Creative Video Studio</strong>
-        <nav aria-label="Điều hướng chính">
-          {link('/create', 'Tạo video')}
-          {link('/library', 'Thư viện')}
-          {isAdmin && (
-            <Link href="/admin/users" aria-current={pathname.startsWith('/admin') ? 'page' : undefined}>
-              Quản trị
-            </Link>
-          )}
-        </nav>
-        <span className="who">{userName}</span>
-        {link('/account/sign-in-methods', 'Phương thức đăng nhập')}
-        <button type="button" onClick={() => void signOut()}>
-          Đăng xuất
-        </button>
-      </header>
-      <div className="frame">
-        <main>{children}</main>
-        <Tray isAdmin={isAdmin} />
-      </div>
-      <Toasts />
+      <AdminContext value={isAdmin}>
+        <div className="app">
+          <div className="scrim" data-open={open} onClick={() => setOpen(false)} aria-hidden="true" />
+          <div
+            ref={sidebar}
+            className="sidebar"
+            id="sidebar"
+            data-open={open}
+            role={narrow && open ? 'dialog' : undefined}
+            aria-modal={narrow && open ? true : undefined}
+            aria-label={narrow && open ? 'Menu' : undefined}
+            onClick={(e) => e.target instanceof Element && e.target.closest('a') && setOpen(false)} // any link, even to the page already open
+          >
+            <div className="brand">
+              <span className="logo" aria-hidden="true">
+                CV
+              </span>
+              <strong>Creative Video Studio</strong>
+              <button type="button" className="drawer-close" aria-label="Đóng menu" onClick={() => setOpen(false)}>
+                ×
+              </button>
+            </div>
+            <nav aria-label="Điều hướng chính">
+              {link('/create', 'Tạo video')}
+              {link('/library', 'Thư viện')}
+              {isAdmin && (
+                <Link href="/admin/users" aria-current={pathname.startsWith('/admin') ? 'page' : undefined}>
+                  Quản trị
+                </Link>
+              )}
+            </nav>
+            <div className="account">
+              <span className="who">{userName}</span>
+              {link('/account/sign-in-methods', 'Phương thức đăng nhập')}
+              <button type="button" onClick={() => void signOut()}>
+                Đăng xuất
+              </button>
+            </div>
+          </div>
+          <div className="content" inert={narrow && open}>
+            <header className="topbar">
+              <button ref={menuButton} type="button" aria-label="Mở menu" aria-expanded={open} aria-controls="sidebar" onClick={() => setOpen(true)}>
+                ☰
+              </button>
+              <strong>{title}</strong>
+            </header>
+            <div className="frame">
+              <main>{children}</main>
+              {!pathname.startsWith('/create') && <Tray />}
+            </div>
+          </div>
+          <Toasts />
+        </div>
+      </AdminContext>
     </JobsProvider>
   );
 }
