@@ -1,6 +1,6 @@
 # Status — Creative Video Studio (internal)
 
-Last updated: 2026-10-23, 11:45 ICT (main at `218f1b7`). The autonomous run is under way under the plan v5.1 pre-approval; the current state is in "Run state" below. Earlier sections keep the research record. The deep-interview decisions are recorded in the section after Q9; where they differ from Q1–Q9, they win.
+Last updated: 2026-10-23, 11:45 ICT (main after #16). The autonomous run is under way under the plan v5.1 pre-approval; the current state is in "Run state" below. Earlier sections keep the research record. The deep-interview decisions are recorded in the section after Q9; where they differ from Q1–Q9, they win.
 
 ## Workspace
 
@@ -193,7 +193,7 @@ Kept apart on purpose: merged code is not a deployment, and a mock job is not a 
   - #10 daily and monthly caps, one manual retry (M.3); #11 Create, Library, login, job tray, verdicts, delete, purge (M.4);
   - #15 Admin area (M.5); #7 nightly backup, weekly R2 copy, restore drill (D.2); #13 deploy kit with dry-run (D.4);
   - #12, #14 preflight fixes and Google login in the harness.
-- **In progress:** D.1 (Google and Lark login with account linking, mocked OAuth, and the public `/privacy` page), branch `cvs/app-social-login`, no PR yet.
+  - #16 Google and Lark sign-in with account linking, the sign-in methods page, Admin unlink and the public `/privacy` page (D.1, mocked OAuth; the live sign-ins are D.5).
 - **Tests:** unit, integration and e2e suites run in CI on each PR; the e2e suites use the mock provider only. Library playback and download are covered by `apps/web/e2e/flow.e2e.test.ts` and `mobile.e2e.test.ts`.
 - **Deployment:** none. Nothing runs on the VET server yet; D.3 (read-only check) and D.5 (deploy, tunnel, `video.vetgroup.net`) are pending.
 - **Paid bake-off:** not started, $0 spent. B.1 (provider facts) is pending again after a reset; the fal balance is $30 and Replicate bills monthly on the card. The canary waits behind the funding gate.
