@@ -264,8 +264,22 @@ describe('Linking', () => {
     expect(await audits(id)).toEqual([
       { actor_id: id, action: 'account.link', target: `user:${id}`, old_value: null, new_value: { provider: 'google', accountId: rows[1].account_id, email: 'audited@example.test' } },
       { actor_id: id, action: 'account.link', target: `user:${id}`, old_value: null, new_value: { provider: 'google', accountId: rows[2].account_id, email: 'audited.private@gmail.test' } },
-      { actor_id: id, action: 'account.unlink', target: `user:${id}`, old_value: { provider: 'google', email: 'audited@example.test' }, new_value: null },
+      { actor_id: id, action: 'account.unlink', target: `user:${id}`, old_value: { provider: 'google', email: 'audited@example.test' }, new_value: { sessionsRevoked: true } },
     ]);
+  });
+
+  test('a user who unlinks Google ends the other sessions, including the one Google opened, and keeps the current one', async () => {
+    const id = await user('revoke@example.test');
+    const passwordSession = await cookieOf('revoke@example.test');
+    const googleSession = (await oauth(route, { provider: 'google', code: google('revoke@example.test') })).cookie;
+    const [, linked] = await accountsOf(id);
+    expect([await sessionUser(passwordSession), await sessionUser(googleSession)]).toEqual([id, id]);
+
+    expect((await unlink(passwordSession, linked.id)).status).toBe(200);
+    expect(await sessionUser(googleSession)).toBeUndefined();
+    expect(await sessionUser(passwordSession)).toBe(id);
+    expect((await pool.query('select 1 from sessions where user_id = $1', [id])).rowCount).toBe(1);
+    expect((await audits(id)).at(-1)).toMatchObject({ action: 'account.unlink', new_value: { sessionsRevoked: true } });
   });
 
   test('writes no audit row for the password account an Admin creates a user with', async () => {
