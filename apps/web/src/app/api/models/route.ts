@@ -37,7 +37,7 @@ export async function GET(request: Request) {
       [userId],
     ),
     g.session.user.role === 'admin'
-      ? pool.query(`select (s.monthly_cap_usd - coalesce((select sum(usd) from cost_entries where month = ${MONTH}), 0))::text as remaining from settings s where s.id = 1`)
+      ? pool.query(`select (s.monthly_cap_usd - coalesce((select sum(usd) from cost_entries ce where month = ${MONTH} and not exists (select 1 from jobs j where j.id = ce.job_id and j.feature not in ('video', 'marketing'))), 0))::text as remaining from settings s where s.id = 1`)
       : undefined,
   ]);
 

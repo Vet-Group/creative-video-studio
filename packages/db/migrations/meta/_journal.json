@@ -43,6 +43,13 @@
       "when": 1793098932036,
       "tag": "0005_backfill_email_verified",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793185332036,
+      "tag": "0006_features_and_member_usd_caps",
+      "breakpoints": true
     }
   ]
 }

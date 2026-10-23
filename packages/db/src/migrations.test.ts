@@ -11,3 +11,8 @@ test('the latest migration snapshot matches the schema, so generate has nothing 
   const previous = JSON.parse(readFileSync(new URL(latest, metaDir), 'utf8'));
   expect(await generateMigration(previous, generateDrizzleJson(schema))).toEqual([]);
 });
+
+test('journal stamps only grow, so the migrator never skips a new migration on a database that has run the older ones', () => {
+  const { entries } = JSON.parse(readFileSync(new URL('_journal.json', metaDir), 'utf8')) as { entries: { when: number }[] };
+  for (let i = 1; i < entries.length; i++) expect(entries[i]!.when).toBeGreaterThan(entries[i - 1]!.when);
+});

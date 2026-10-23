@@ -15,6 +15,9 @@ const bad = (error: string) => Response.json({ error }, { status: 400 });
 const CAP_MESSAGES: Record<CapRefusal, string> = {
   daily_clips: 'Bạn đã dùng hết số clip trong ngày hôm nay',
   monthly_usd: 'Đã hết ngân sách tháng của công ty',
+  features_monthly_usd: 'Đã hết ngân sách tháng cho ảnh và ứng dụng',
+  member_daily_usd: 'Bạn đã dùng hết hạn mức chi phí hôm nay',
+  member_monthly_usd: 'Bạn đã dùng hết hạn mức chi phí tháng này',
 };
 
 /**

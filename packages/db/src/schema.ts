@@ -27,6 +27,13 @@ export type JobStatus = (typeof JOB_STATUSES)[number];
 
 export const ASPECTS = ['9:16', '1:1'] as const;
 export const PROVIDERS = ['fal', 'replicate', 'mock'] as const;
+/** What a job is for. `video` and `marketing` spend the company video budget; the rest share the image and apps budget (FEATURE_BUDGET). */
+export const FEATURES = [
+  'video', 'marketing', 'try_on', 'image', 'character_swap', 'model_swap', 'background_changer', 'reframe', 'image_upscale', 'face_swap',
+  'background_remover', 'motion_control', 'media_optimizer',
+] as const;
+/** The features under settings.features_monthly_cap_usd and the per-member USD caps. */
+export const FEATURE_BUDGET = FEATURES.filter((f) => f !== 'video' && f !== 'marketing');
 export const COST_KINDS = ['estimate', 'actual_adjustment', 'release', 'late_bill', 'bakeoff', 'manual_adjustment', 'invoice_diff', 'store_reassign'] as const;
 export type CostKind = (typeof COST_KINDS)[number];
 export const VERDICTS = ['pass', 'fail'] as const;
@@ -208,6 +215,10 @@ export const settings = pgTable(
     id: integer('id').primaryKey().default(1),
     monthlyCapUsd: numeric('monthly_cap_usd', { precision: 12, scale: 4 }).notNull().default('200'),
     memberDailyClipCap: integer('member_daily_clip_cap').notNull().default(5),
+    /** Hard caps on the image and apps features (FEATURE_BUDGET): the month for all members, and each member's ICT day and month. */
+    featuresMonthlyCapUsd: numeric('features_monthly_cap_usd', { precision: 12, scale: 4 }).notNull().default('260'),
+    memberDailyUsdCap: numeric('member_daily_usd_cap', { precision: 12, scale: 4 }).notNull().default('10'),
+    memberMonthlyUsdCap: numeric('member_monthly_usd_cap', { precision: 12, scale: 4 }).notNull().default('50'),
     updatedAt: tstz('updated_at').notNull().defaultNow(),
   },
   (t) => [check('settings_singleton_check', sql`${t.id} = 1`)],
@@ -228,6 +239,7 @@ export const jobs = pgTable(
       .references(() => teams.id, { onDelete: 'restrict' }),
     storeId: text('store_id').references(() => stores.id, { onDelete: 'restrict' }),
     retryOf: text('retry_of').references((): AnyPgColumn => jobs.id, { onDelete: 'restrict' }),
+    feature: text('feature', { enum: FEATURES }).notNull().default('video'),
     model: text('model')
       .notNull()
       .references(() => modelConfigs.id, { onDelete: 'restrict' }),
@@ -258,8 +270,16 @@ export const jobs = pgTable(
     check('jobs_status_check', sql`${t.status} in ('queued', 'submitting', 'running', 'succeeded', 'failed', 'failed_unknown', 'timed_out')`),
     check('jobs_aspect_check', sql`${t.aspect} in ('9:16', '1:1')`),
     check('jobs_provider_check', sql`${t.provider} in ('fal', 'replicate', 'mock')`),
+    check('jobs_feature_check', sql`${t.feature} in ('video', 'marketing', 'try_on', 'image', 'character_swap', 'model_swap', 'background_changer', 'reframe', 'image_upscale', 'face_swap', 'background_remover', 'motion_control', 'media_optimizer')`),
   ],
 );
+
+// Soft monthly caps per feature: crossing 80% or 100% only warns the Admin; Runs are never refused by these.
+export const featureCaps = pgTable('feature_caps', {
+  feature: text('feature', { enum: FEATURES }).primaryKey(),
+  monthlyUsd: numeric('monthly_usd', { precision: 12, scale: 4 }).notNull(),
+  updatedAt: tstz('updated_at').notNull().defaultNow(),
+});
 
 // The cost ledger. Append-only: a trigger (migration 0002) raises on UPDATE, DELETE and TRUNCATE. All writes go through
 // packages/core/src/ledger.ts; the view job_costs sums a job's rows.

@@ -36,7 +36,10 @@ interface Costs {
   byUser: Group[];
   byTeam: Group[];
   byStore: Group[];
+  byFeature: Group[];
   capUsage: { usd: string; monthlyCapUsd: string };
+  featuresCapUsage: { usd: string; monthlyCapUsd: string };
+  featureCaps: { feature: string; name: string; capUsd: string; spentUsd: string; level: 80 | 100 | null }[];
   invoices: Invoice[];
 }
 
@@ -147,8 +150,20 @@ function CostsBody({ data, reload }: { data: Costs; reload: () => void }) {
         {data.provisional && <span className="tag">Tạm tính</span>}
       </p>
       <p className="muted">
-        Số liệu tính đến bút toán #{data.asOf} (as_of). Ngân sách tháng: ${data.capUsage.usd} trên ${data.capUsage.monthlyCapUsd}.
+        Số liệu tính đến bút toán #{data.asOf} (as_of). Ngân sách tháng cho video: ${data.capUsage.usd} trên ${data.capUsage.monthlyCapUsd}. Ngân sách tháng cho ảnh
+        và ứng dụng: ${data.featuresCapUsage.usd} trên ${data.featuresCapUsage.monthlyCapUsd}.
       </p>
+      {data.featureCaps.some((c) => c.level !== null) && (
+        <ul className="warn" aria-label="Cảnh báo hạn mức theo mục">
+          {data.featureCaps
+            .filter((c) => c.level !== null)
+            .map((c) => (
+              <li key={c.feature}>
+                {c.name}: ${c.spentUsd} trên hạn mức ${c.capUsd} ({c.level === 100 ? 'đã chạm hạn mức' : 'đã quá 80%'}). Hạn mức này chỉ để cảnh báo, không chặn Run.
+              </li>
+            ))}
+        </ul>
+      )}
       {problem && (
         <p className="error" role="alert">
           {problem}
@@ -169,6 +184,7 @@ function CostsBody({ data, reload }: { data: Costs; reload: () => void }) {
       <Breakdown title="Theo người dùng" groups={data.byUser} label={(g) => `${g.name ?? g.id} (${g.email ?? ''})`} />
       <Breakdown title="Theo nhóm" groups={data.byTeam} label={(g) => g.name ?? g.id} />
       <Breakdown title="Theo cửa hàng" groups={data.byStore} label={(g) => g.name ?? g.id} />
+      <Breakdown title="Theo mục" groups={data.byFeature} label={(g) => g.name ?? g.id} />
 
       <section aria-label="Chi phí chung">
         <h2>Chi phí chung</h2>

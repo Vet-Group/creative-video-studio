@@ -289,7 +289,28 @@ describe('settings', () => {
     expect(await audits('settings:1')).toHaveLength(1);
   });
 
-  test.each([{}, { monthlyCapUsd: -1 }, { monthlyCapUsd: 'lots' }, { monthlyCapUsd: '' }, { monthlyCapUsd: '0x10' }, { monthlyCapUsd: '1e2' }, { monthlyCapUsd: '1.23456' }, { memberDailyClipCap: 1.5 }, { memberDailyClipCap: -1 }, { models: [{ id: 'fal-test' }] }, { models: 'all' }])('refuses %j', async (body) => {
+  test('reads and changes the image and apps caps and the soft per-feature caps, each audited once', async () => {
+    const before = (await (await settingsRoute.GET(call(admin.cookie, '/api/admin/settings'))).json()) as {
+      featuresMonthlyCapUsd: string; memberDailyUsdCap: string; memberMonthlyUsdCap: string; featureCaps: { feature: string; monthlyUsd: string }[];
+    };
+    expect(before).toMatchObject({ featuresMonthlyCapUsd: '260.0000', memberDailyUsdCap: '10.0000', memberMonthlyUsdCap: '50.0000' });
+    expect(before.featureCaps.find((c) => c.feature === 'motion_control')).toEqual({ feature: 'motion_control', monthlyUsd: '40.0000' });
+    expect(before.featureCaps).toHaveLength(10);
+
+    expect((await put({ featuresMonthlyCapUsd: '310', memberDailyUsdCap: '12.5', featureCaps: [{ feature: 'image', monthlyUsd: '150' }, { feature: 'reframe', monthlyUsd: '5' }] })).status).toBe(200);
+    const after = (await (await settingsRoute.GET(call(admin.cookie, '/api/admin/settings'))).json()) as typeof before;
+    expect(after).toMatchObject({ featuresMonthlyCapUsd: '310.0000', memberDailyUsdCap: '12.5000', memberMonthlyUsdCap: '50.0000' });
+    expect(after.featureCaps.find((c) => c.feature === 'image')?.monthlyUsd).toBe('150.0000');
+    expect((await audits('settings:1')).at(-1)).toEqual({
+      actor_id: admin.id, action: 'settings.update',
+      old_value: { featuresMonthlyCapUsd: '260.0000', memberDailyUsdCap: '10.0000' }, new_value: { featuresMonthlyCapUsd: '310.0000', memberDailyUsdCap: '12.5000' },
+    });
+    expect(await audits('feature:image')).toEqual([{ actor_id: admin.id, action: 'feature_cap.update', old_value: { monthlyUsd: '135.0000' }, new_value: { monthlyUsd: '150.0000' } }]);
+    expect(await audits('feature:reframe')).toEqual([]); // unchanged
+    expect((await put({ featureCaps: [{ feature: 'no-such-feature', monthlyUsd: '1' }] })).status).toBe(404);
+  });
+
+  test.each([{}, { monthlyCapUsd: -1 }, { monthlyCapUsd: 'lots' }, { monthlyCapUsd: '' }, { monthlyCapUsd: '0x10' }, { monthlyCapUsd: '1e2' }, { monthlyCapUsd: '1.23456' }, { memberDailyClipCap: 1.5 }, { memberDailyClipCap: -1 }, { models: [{ id: 'fal-test' }] }, { models: 'all' }, { memberDailyUsdCap: -1 }, { featuresMonthlyCapUsd: 'lots' }, { featureCaps: [{ feature: 'image' }] }, { featureCaps: 'all' }])('refuses %j', async (body) => {
     expect((await put(body)).status).toBe(400);
   });
 

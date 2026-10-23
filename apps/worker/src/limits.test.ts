@@ -129,3 +129,86 @@ describe('monthly USD (ICT month)', () => {
     await setCaps('200');
   });
 });
+
+describe('image and apps features', () => {
+  async function featureJob(userId: string, feature: string, createdAt: string, estimate: string): Promise<string> {
+    const id = next('job');
+    await pool.query(
+      `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, created_at, feature)
+       values ($1, $2, 'team-b', 'kling-o3-pro', 'fal', 'p', '1:1', 5, '{}', $3, $4)`,
+      [id, userId, createdAt, feature],
+    );
+    await withTransaction(pool, (tx) => reserve(tx, id, estimate));
+    return id;
+  }
+  async function setFeatureCaps(month: string, memberDay: string, memberMonth: string) {
+    await pool.query('update settings set features_monthly_cap_usd = $1, member_daily_usd_cap = $2, member_monthly_usd_cap = $3', [month, memberDay, memberMonth]);
+  }
+
+  test('a member is refused once the ICT day reaches the daily USD cap, and the next ICT day starts fresh', async () => {
+    await setFeatureCaps('260', '10', '50');
+    const u = await member();
+    await featureJob(u, 'image', '2031-01-10T03:00:00Z', '9.8500');
+    expect(await checkCaps(pool, u, '0.1500', at('2031-01-10T16:59:59Z'), 'image')).toBeNull(); // 9.85 + 0.15 = 10
+    expect(await checkCaps(pool, u, '0.1501', at('2031-01-10T16:59:59Z'), 'try_on')).toBe('member_daily_usd');
+    expect(await checkCaps(pool, u, '0.1501', at('2031-01-10T17:00:00Z'), 'try_on')).toBeNull(); // 00:00 ICT on 2031-01-11
+  });
+
+  test('a member is refused once the ICT month reaches the monthly USD cap', async () => {
+    await setFeatureCaps('260', '10', '50');
+    const u = await member();
+    for (const day of ['02', '05', '08', '11', '14']) await featureJob(u, 'reframe', `2031-02-${day}T03:00:00Z`, '9.9000'); // 49.50 over 5 days
+    expect(await checkCaps(pool, u, '0.5000', at('2031-02-20T03:00:00Z'), 'reframe')).toBeNull();
+    expect(await checkCaps(pool, u, '0.5001', at('2031-02-20T03:00:00Z'), 'reframe')).toBe('member_monthly_usd');
+    expect(await checkCaps(pool, u, '1.0000', at('2031-03-01T03:00:00Z'), 'reframe')).toBeNull(); // a new month
+  });
+
+  test('the image and apps month is shared by every member, and video spend does not count against it', async () => {
+    await setFeatureCaps('20', '1000', '1000');
+    const [a, b] = [await member(), await member()];
+    await featureJob(a, 'image', '2031-04-03T03:00:00Z', '12.0000');
+    await featureJob(b, 'face_swap', '2031-04-04T03:00:00Z', '7.0000');
+    await newJob(a, '2031-04-04T03:00:00Z', { estimate: '150.0000' }); // a video job
+    expect(await checkCaps(pool, b, '1.0000', at('2031-04-05T03:00:00Z'), 'image')).toBeNull(); // 19 + 1 = 20
+    expect(await checkCaps(pool, b, '1.0001', at('2031-04-05T03:00:00Z'), 'image')).toBe('features_monthly_usd');
+    await setFeatureCaps('260', '10', '50');
+  });
+
+  test('image and apps spend does not count against the video month or the daily clips', async () => {
+    await setCaps('5', 1);
+    const u = await member();
+    await featureJob(u, 'image_upscale', '2031-05-03T03:00:00Z', '9.0000');
+    expect(await checkCaps(pool, u, '5.0000', at('2031-05-03T04:00:00Z'))).toBeNull(); // the 9 USD of upscales are not video
+    await newJob(u, '2031-05-03T03:30:00Z', { estimate: '1.0000' });
+    expect(await checkCaps(pool, u, '1.0000', at('2031-05-03T04:00:00Z'))).toBe('daily_clips');
+    await setCaps('200');
+  });
+
+  test('soft caps never refuse a Run, even past 100 %', async () => {
+    await setFeatureCaps('100000', '100000', '100000');
+    const u = await member();
+    await featureJob(u, 'face_swap', '2031-06-03T03:00:00Z', '6.0000'); // soft cap 5
+    expect(await checkCaps(pool, u, '1.0000', at('2031-06-20T03:00:00Z'), 'face_swap')).toBeNull();
+    await setFeatureCaps('260', '10', '50');
+  });
+
+  test('one member\'s spend does not count against another member\'s day or month', async () => {
+    await setFeatureCaps('260', '10', '50');
+    const [a, b] = [await member(), await member()];
+    await featureJob(a, 'image', '2031-08-03T03:00:00Z', '10.0000');
+    expect(await checkCaps(pool, a, '0.0001', at('2031-08-03T04:00:00Z'), 'image')).toBe('member_daily_usd');
+    expect(await checkCaps(pool, b, '10.0000', at('2031-08-03T04:00:00Z'), 'image')).toBeNull();
+  });
+
+  test('shared ledger rows (no job) stay in the video month', async () => {
+    await setFeatureCaps('5', '1000', '1000');
+    await setCaps('1000');
+    await bookShared(pool, { kind: 'bakeoff', usd: '50.0000', month: '2031-09', provider: 'fal', ref: 'shared-1' });
+    const u = await member();
+    expect(await checkCaps(pool, u, '5.0000', at('2031-09-10T03:00:00Z'), 'image')).toBeNull();
+    await setCaps('50');
+    expect(await checkCaps(pool, u, '0.0001', at('2031-09-10T03:00:00Z'))).toBe('monthly_usd');
+    await setCaps('200');
+    await setFeatureCaps('260', '10', '50');
+  });
+});
