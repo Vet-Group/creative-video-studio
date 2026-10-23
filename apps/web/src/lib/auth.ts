@@ -28,4 +28,7 @@ export const auth = betterAuth({
   ],
 });
 
+// D.1 turns this on when the Lark genericOAuth provider is wired above; the LARK_* variables alone also serve notifications.
+export const larkLoginEnabled = false;
+
 export type Session = typeof auth.$Infer.Session;

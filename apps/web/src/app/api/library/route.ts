@@ -31,7 +31,7 @@ export async function GET(request: Request) {
          join users u on u.id = j.user_id
          join model_configs m on m.id = j.model
          left join job_costs c on c.job_id = j.id
-         left join verdicts v on v.output_asset_id = j.output_asset_id
+         left join verdicts v on v.job_id = j.id
         where ${LIVE_CLIP}
           and ($1::text is null or j.user_id = $1)
           and ($2::date is null or (j.created_at at time zone 'Asia/Ho_Chi_Minh')::date = $2::date)

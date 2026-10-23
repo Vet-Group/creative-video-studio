@@ -304,13 +304,16 @@ export const costEntries = pgTable(
   ],
 );
 
-// Pass or Fail per output clip.
+// Pass or Fail per job's clip. It is keyed by job so it survives a purge, which nulls output_asset_id.
 export const verdicts = pgTable(
   'verdicts',
   {
     id: text('id').primaryKey(),
-    outputAssetId: text('output_asset_id')
+    jobId: text('job_id')
       .notNull()
+      .unique()
+      .references(() => jobs.id, { onDelete: 'restrict' }),
+    outputAssetId: text('output_asset_id')
       .unique()
       .references(() => assets.id, { onDelete: 'restrict' }),
     verdict: text('verdict', { enum: VERDICTS }).notNull(),
@@ -344,7 +347,7 @@ export const auditEntries = pgTable(
     newValue: jsonb('new_value'),
     createdAt: tstz('created_at').notNull().defaultNow(),
   },
-  (t) => [index('audit_entries_created_at_idx').on(t.createdAt)],
+  (t) => [index('audit_entries_created_at_idx').on(t.createdAt), index('audit_entries_target_idx').on(t.target)],
 );
 
 // One row per worker instance; the UI shows "worker offline" after 60 s without a beat.

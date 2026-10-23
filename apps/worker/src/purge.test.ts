@@ -50,7 +50,7 @@ async function clip(id: string, inputs: string[], deletedDaysAgo: number | null)
      values ($1, 'u1', 'team-unassigned', 'm', 'fal', 'p', '9:16', 5, $2, 'succeeded', $3, $4, case when $5::int is null then null else now() - make_interval(days => $5::int) end)`,
     [id, inputs, `${id}-video`, `${id}-poster`, deletedDaysAgo],
   );
-  await pool.query(`insert into verdicts (id, output_asset_id, verdict, marked_by) values ($1, $2, 'pass', 'u1')`, [`v-${id}`, `${id}-video`]);
+  await pool.query(`insert into verdicts (id, job_id, output_asset_id, verdict, marked_by) values ($1, $2, $3, 'pass', 'u1')`, [`v-${id}`, id, `${id}-video`]);
   for (const [kind, usd, isFinal] of [['estimate', '1.0000', false], ['actual_adjustment', '0.2500', true]] as const) {
     await pool.query(
       `insert into cost_entries (kind, usd, month, day, user_id, team_id, job_id, is_final) values ($1, $2, '2026-10', '2026-10-01', 'u1', 'team-unassigned', $3, $4)`,
@@ -82,11 +82,15 @@ describe('purgeDeletedClips', () => {
       { kind: 'actual_adjustment', usd: '0.2500', is_final: true },
     ]);
     expect((await pool.query(`select usd::text from job_costs where job_id = 'old'`)).rows).toEqual([{ usd: '1.2500' }]);
-    // Gone: the video, poster and verdict of the old clip, and the input nothing else uses. Kept: the inputs a live clip or a failed Run names, and the other clips.
+    // Gone: the video and poster of the old clip, and the input nothing else uses. Kept: the inputs a live clip or a failed Run names, the other clips, and every verdict (the old one loses its asset).
     expect((await pool.query(`select id from assets order by id`)).rows.map((r) => r.id)).toEqual([
       'in-other-live', 'in-own', 'in-shared', 'live-poster', 'live-video', 'recent-poster', 'recent-video',
     ]);
-    expect((await pool.query(`select id from verdicts order by id`)).rows.map((r) => r.id)).toEqual(['v-live', 'v-recent']);
+    expect((await pool.query(`select id, output_asset_id from verdicts order by id`)).rows).toEqual([
+      { id: 'v-live', output_asset_id: 'live-video' },
+      { id: 'v-old', output_asset_id: null },
+      { id: 'v-recent', output_asset_id: 'recent-video' },
+    ]);
     expect(await keys()).toEqual(['assets/in-other-live', 'assets/in-own', 'assets/in-shared', 'assets/live-poster', 'assets/live-video', 'assets/recent-poster', 'assets/recent-video']);
     expect((await pool.query(`select count(*)::int as n from jobs where purged_at is not null`)).rows[0].n).toBe(1);
     expect(logged).toEqual([]);

@@ -8,6 +8,8 @@ import { api, type TrayJob } from '@/lib/api';
 
 const POLL_MS = 5_000;
 const SEEN_KEY = 'cvs.tray.seenUntil';
+/** How long the tab title keeps announcing a result in a tab the user is looking at. */
+const TITLE_NEWS_MS = 8_000;
 const BASE_TITLE = 'Creative Video Studio';
 const FINISHED = ['succeeded', 'failed', 'failed_unknown', 'timed_out'];
 
@@ -34,7 +36,7 @@ export function useJobs(): JobsState {
   return v;
 }
 
-export function JobsProvider({ children }: { children: ReactNode }) {
+export function JobsProvider({ userId, children }: { userId: string; children: ReactNode }) {
   const [data, setData] = useState({ jobs: [] as TrayJob[], workerOffline: false, loaded: false });
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [news, setNews] = useState(false);
@@ -47,21 +49,22 @@ export function JobsProvider({ children }: { children: ReactNode }) {
     setData({ jobs: r.jobs, workerOffline: r.workerOffline, loaded: true });
     const finished = r.jobs.filter((j) => FINISHED.includes(j.status) && j.finishedAt);
     const times = finished.map((j) => Date.parse(j.finishedAt!));
-    const stored = localStorage.getItem(SEEN_KEY);
+    const seenKey = `${SEEN_KEY}.${userId}`; // per user, so two accounts in one browser do not hide each other's news
+    const stored = localStorage.getItem(seenKey);
     if (stored === null) {
-      // First visit in this browser: results that already exist are not news.
-      localStorage.setItem(SEEN_KEY, String(Math.max(0, ...times)));
+      // First visit of this user in this browser: results that already exist are not news.
+      localStorage.setItem(seenKey, String(Math.max(0, ...times)));
       return;
     }
     const fresh = finished.filter((j) => Date.parse(j.finishedAt!) > Number(stored));
     if (fresh.length === 0) return;
-    localStorage.setItem(SEEN_KEY, String(Math.max(...times)));
+    localStorage.setItem(seenKey, String(Math.max(...times)));
     setNews(true);
     setToasts((cur) => [
       ...cur,
       ...fresh.map((j) => ({ id: nextId.current++, ok: j.status === 'succeeded', text: j.status === 'succeeded' ? 'Clip đã xong' : 'Một job không thành công' })),
     ]);
-  }, []);
+  }, [userId]);
 
   useEffect(() => {
     void refresh();
@@ -75,6 +78,13 @@ export function JobsProvider({ children }: { children: ReactNode }) {
     document.addEventListener('visibilitychange', seen);
     return () => document.removeEventListener('visibilitychange', seen);
   }, []);
+
+  // In a tab the user is already looking at, the title announcement lapses by itself (a hidden tab keeps it until it is shown).
+  useEffect(() => {
+    if (!news || document.visibilityState === 'hidden') return;
+    const t = setTimeout(() => setNews(false), TITLE_NEWS_MS);
+    return () => clearTimeout(t);
+  }, [news]);
 
   const active = data.jobs.filter((j) => !FINISHED.includes(j.status)).length;
   useEffect(() => {

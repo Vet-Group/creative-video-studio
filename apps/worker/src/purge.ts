@@ -14,9 +14,9 @@ export async function purgeDeletedClips(pool: LedgerPool, removeObject: (key: st
         const job = (await tx.query('select input_asset_ids, output_asset_id, poster_asset_id from jobs where id = $1 and purged_at is null for update', [id])).rows[0];
         if (!job) return [];
         const outputs = [job.output_asset_id, job.poster_asset_id].filter((a): a is string => !!a);
-        // The job and the verdict reference the output assets, so both let go of them first.
+        // The job and the verdict reference the output assets, so both let go of them first; the verdict itself survives (it still counts in the pass rate).
         await tx.query('update jobs set purged_at = now(), output_asset_id = null, poster_asset_id = null where id = $1', [id]);
-        await tx.query('delete from verdicts where output_asset_id = any($1::text[])', [outputs]);
+        await tx.query('update verdicts set output_asset_id = null where job_id = $1', [id]);
         // An input stays while any other undeleted job (a Reuse, a retry, a failed Run) still names it.
         const { rows } = await tx.query(
           `delete from assets a where a.id = any($1::text[])

@@ -28,11 +28,11 @@ export async function PUT(request: Request, { params }: RouteContext) {
     const job = (await tx.query(`select j.user_id, j.output_asset_id from jobs j where j.id = $1 and ${LIVE_CLIP} for update of j`, [id])).rows[0];
     if (!job) return Response.json({ error: 'not found' }, { status: 404 });
     if (job.user_id !== userId && role !== 'admin') return Response.json({ error: 'forbidden' }, { status: 403 });
-    const old = (await tx.query('select verdict, fault, marked_by from verdicts where output_asset_id = $1', [job.output_asset_id])).rows[0];
+    const old = (await tx.query('select verdict, fault, marked_by from verdicts where job_id = $1', [id])).rows[0];
     await tx.query(
-      `insert into verdicts (id, output_asset_id, verdict, fault, marked_by) values ($1, $2, $3, $4, $5)
-       on conflict (output_asset_id) do update set verdict = excluded.verdict, fault = excluded.fault, marked_by = excluded.marked_by, updated_at = now()`,
-      [crypto.randomUUID(), job.output_asset_id, verdict, fault, userId],
+      `insert into verdicts (id, job_id, output_asset_id, verdict, fault, marked_by) values ($1, $2, $3, $4, $5, $6)
+       on conflict (job_id) do update set verdict = excluded.verdict, fault = excluded.fault, marked_by = excluded.marked_by, updated_at = now()`,
+      [crypto.randomUUID(), id, job.output_asset_id, verdict, fault, userId],
     );
     await audit(tx, {
       actorId: userId,

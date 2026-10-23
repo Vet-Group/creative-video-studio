@@ -6,5 +6,9 @@ import { currentUser } from '@/lib/current-user';
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const user = await currentUser();
   if (!user) redirect('/login');
-  return <Shell userName={user.name}>{children}</Shell>;
+  return (
+    <Shell userId={user.id} userName={user.name} isAdmin={user.role === 'admin'}>
+      {children}
+    </Shell>
+  );
 }

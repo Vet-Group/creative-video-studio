@@ -48,7 +48,7 @@ export function CreateForm({ reuse }: { reuse?: string }) {
   const [presetId, setPresetId] = useState(PRESETS[0]!.id); // '' means a free prompt
   const [prompt, setPrompt] = useState('');
   const [ratio, setRatio] = useState('9:16');
-  const [durationSec, setDurationSec] = useState(5);
+  const [durationSec, setDurationSec] = useState(8);
   const [modelId, setModelId] = useState('');
   const [storeId, setStoreId] = useState('');
   const [stores, setStores] = useState<{ id: string; name: string }[]>([]);
@@ -147,7 +147,7 @@ export function CreateForm({ reuse }: { reuse?: string }) {
       <fieldset>
         <legend>Ảnh sản phẩm</legend>
         <input type="file" accept="image/jpeg,image/png,image/webp" multiple aria-label="Ảnh sản phẩm" disabled={!hydrated} onChange={(e) => void upload(e)} />
-        <p className="muted">1 đến {MAX_IMAGES} ảnh JPEG, PNG hoặc WebP.</p>
+        <p className="muted">1 đến {MAX_IMAGES} ảnh JPEG, PNG hoặc WebP. Ảnh đầu tiên là sản phẩm chính. Chỉ tải lên ảnh mà công ty có quyền sử dụng.</p>
         <ul className="thumbs">
           {images.map((i) => (
             <li key={i.id}>

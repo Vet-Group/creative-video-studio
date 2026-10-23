@@ -97,12 +97,13 @@ export async function POST(request: Request) {
       if (o.retry_of !== null || (await tx.query('select 1 from jobs where retry_of = $1', [retryOf])).rowCount) {
         return Response.json({ error: 'a job can be retried only once, and a retry cannot be retried' }, { status: 409 });
       }
-      const live = await tx.query('select 1 from assets where id = any($1::text[]) and deleted_at is null', [o.input_asset_ids]);
-      if (live.rowCount !== o.input_asset_ids.length) return bad('one or more assets of the job were deleted');
-      s = { assetIds: o.input_asset_ids, modelId: o.model, presetId: o.preset_id, prompt: o.prompt, ratio: o.aspect, durationSec: o.duration_s, storeId: o.store_id };
+      s ={ assetIds: o.input_asset_ids, modelId: o.model, presetId: o.preset_id, prompt: o.prompt, ratio: o.aspect, durationSec: o.duration_s, storeId: o.store_id };
       original = o;
     }
     const { assetIds, modelId, presetId, prompt: freePrompt, ratio, durationSec, storeId } = s!;
+    // A new Run was checked before the lock and a retry never was, so both look again: an image deleted meanwhile is refused.
+    const live = await tx.query('select 1 from assets where id = any($1::text[]) and deleted_at is null', [assetIds]);
+    if (live.rowCount !== assetIds.length) return bad('one or more assets were deleted');
     const model = (await tx.query('select enabled, provider, ratios, durations_sec, max_images, usd_per_second from model_configs where id = $1', [modelId])).rows[0];
     if (!model?.enabled) return bad('the model does not exist or is not enabled');
     if (!model.ratios.includes(ratio) || !model.durations_sec.includes(durationSec) || assetIds.length > model.max_images) {

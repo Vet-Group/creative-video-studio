@@ -134,7 +134,7 @@ describe('GET /api/library', () => {
     const deleted = await clip(bob.id);
     await pool.query(`update jobs set deleted_at = now() where id = $1`, [deleted]);
     await pool.query(`update jobs set is_mock = true where id = $1`, [b]);
-    await pool.query(`insert into verdicts (id, output_asset_id, verdict, fault, marked_by) values ('v1', 'lib-a-video', 'fail', 'flicker', $1)`, [alice.id]);
+    await pool.query(`insert into verdicts (id, job_id, output_asset_id, verdict, fault, marked_by) values ('v1', 'lib-a', 'lib-a-video', 'fail', 'flicker', $1)`, [alice.id]);
 
     expect((await GET_LIBRARY(req('/api/library'))).status).toBe(401);
     const res = await GET_LIBRARY(req('/api/library', bob.cookie));
@@ -184,7 +184,7 @@ describe('GET /api/library', () => {
 
 describe('PUT /api/jobs/:id/verdict', () => {
   const mark = (cookie: string | undefined, id: string, body: unknown) => PUT_VERDICT(req(`/api/jobs/${id}/verdict`, cookie, { method: 'PUT', body: JSON.stringify(body) }), ctx(id));
-  const stored = async (id: string) => (await pool.query(`select v.verdict, v.fault, v.marked_by from verdicts v join jobs j on j.output_asset_id = v.output_asset_id where j.id = $1`, [id])).rows[0];
+  const stored = async (id: string) => (await pool.query(`select v.verdict, v.fault, v.marked_by from verdicts v where v.job_id = $1`, [id])).rows[0];
 
   test('refuses a request without a session, an unknown clip, and a job that is not a Library clip', async () => {
     const id = await clip(alice.id);
@@ -224,7 +224,7 @@ describe('PUT /api/jobs/:id/verdict', () => {
     expect(await stored(id)).toEqual({ verdict: 'fail', fault: 'other', marked_by: alice.id });
     expect((await mark(admin.cookie, id, { verdict: 'pass' })).status).toBe(200);
     expect(await stored(id)).toEqual({ verdict: 'pass', fault: null, marked_by: admin.id });
-    expect((await pool.query(`select count(*)::int as n from verdicts v join jobs j on j.output_asset_id = v.output_asset_id where j.id = $1`, [id])).rows[0].n).toBe(1);
+    expect((await pool.query(`select count(*)::int as n from verdicts v where v.job_id = $1`, [id])).rows[0].n).toBe(1);
 
     const log = await audits(`job:${id}`);
     expect(log).toHaveLength(8);
@@ -322,6 +322,7 @@ describe('GET /api/models', () => {
     expect((await GET_MODELS(req('/api/models?ratio=9:16&durationSec=8'))).status).toBe(401);
     expect((await GET_MODELS(req('/api/models?ratio=16:9&durationSec=8', alice.cookie))).status).toBe(400);
     expect((await GET_MODELS(req('/api/models?ratio=9:16', alice.cookie))).status).toBe(400);
+    expect((await GET_MODELS(req('/api/models?ratio=9:16&durationSec=', alice.cookie))).status).toBe(400);
     const body = await models(alice.cookie);
     expect(body.models.map((m) => [m.id, m.estimateUsd, m.passRate, m.supported, m.isMock])).toEqual([
       ['cheap-test', '0.8000', 0.8, true, false],
@@ -332,14 +333,14 @@ describe('GET /api/models', () => {
     expect(body.models.map((m) => m.id)).not.toContain('kling-o3-pro'); // disabled
   });
 
-  test('flags models that lack the ratio or duration, and counts the marks of live clips only', async () => {
+  test('flags models that lack the ratio or duration, and counts every mark, including those of deleted clips', async () => {
     expect((await models(alice.cookie, '?ratio=1:1&durationSec=10')).models.map((m) => [m.id, m.supported])).toEqual([['cheap-test', false], ['fal-test', true], ['mock-sample', false]]);
     const id = await clip(alice.id, { model: 'fal-test' });
-    await pool.query(`insert into verdicts (id, output_asset_id, verdict, fault, marked_by) values ('m1', $1, 'pass', null, $2)`, [`${id}-video`, alice.id]);
+    await pool.query(`insert into verdicts (id, job_id, output_asset_id, verdict, fault, marked_by) values ('m1', $1, $2, 'pass', null, $3)`, [id, `${id}-video`, alice.id]);
     expect((await models(alice.cookie)).models.find((m) => m.id === 'fal-test')?.passRate).toBeCloseTo(9 / 11);
     expect((await models(alice.cookie)).defaultModelId).toBe('fal-test'); // 9/11 beats 8/10
     await pool.query(`update jobs set deleted_at = now() where id = $1`, [id]);
-    expect((await models(alice.cookie)).models.find((m) => m.id === 'fal-test')?.passRate).toBeCloseTo(0.8);
+    expect((await models(alice.cookie)).models.find((m) => m.id === 'fal-test')?.passRate).toBeCloseTo(9 / 11);
   });
 
   test('shows the remaining monthly budget to an Admin only', async () => {
@@ -399,5 +400,15 @@ describe('download name', () => {
     await putObject(`assets/${done}-video`, new Uint8Array(10), 'video/mp4');
     expect(await status('r-in-clip')).toBe(206);
     expect(await status(`${done}-video`)).toBe(206);
+  });
+
+  test('gives a Member 403 for the input of another user deleted clip and for another user upload no job ever used', async () => {
+    await input('r-in-deleted', alice.id);
+    await input('r-in-private', alice.id);
+    const gone = await clip(alice.id, { inputs: ['r-in-deleted'] });
+    await pool.query(`update jobs set deleted_at = now() where id = $1`, [gone]);
+    for (const asset of ['r-in-deleted', 'r-in-private']) {
+      expect((await GET_CONTENT(req(`/api/assets/${asset}/content`, bob.cookie), ctx(asset))).status).toBe(403);
+    }
   });
 });

@@ -16,10 +16,16 @@ const STATUS_LABEL: Record<JobStatus, string> = {
   timed_out: 'Quá thời gian',
 };
 const RETRYABLE: JobStatus[] = ['failed', 'failed_unknown', 'timed_out'];
+// What a Member reads about a job that did not finish; the raw error is for Admins.
+const FAILURE_TEXT: Partial<Record<JobStatus, string>> = {
+  failed: 'Không tạo được clip. Hãy thử lại, hoặc đổi ảnh hay mô hình.',
+  failed_unknown: 'Không rõ clip đã được tạo hay chưa. Hãy thử lại.',
+  timed_out: 'Việc tạo clip mất quá nhiều thời gian. Hãy thử lại.',
+};
 
 const fmtTime = (iso: string) => new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date(iso));
 
-function TrayItem({ job }: { job: TrayJob }) {
+function TrayItem({ job, isAdmin }: { job: TrayJob; isAdmin: boolean }) {
   const { refresh } = useJobs();
   const [problem, setProblem] = useState('');
   async function retry() {
@@ -43,7 +49,8 @@ function TrayItem({ job }: { job: TrayJob }) {
         <p className="muted">
           {job.ratio} · {job.durationSec}s · {fmtTime(job.createdAt)}
         </p>
-        {job.error && <p className="error">{job.error}</p>}
+        {FAILURE_TEXT[job.status] && <p className="error">{FAILURE_TEXT[job.status]}</p>}
+        {isAdmin && job.error && <p className="muted">{job.error}</p>}
         {job.status === 'succeeded' && <Link href="/library">Xem trong Thư viện</Link>}
         {RETRYABLE.includes(job.status) && !job.retried && !job.retryOf && (
           <button type="button" onClick={() => void retry()}>
@@ -57,7 +64,7 @@ function TrayItem({ job }: { job: TrayJob }) {
   );
 }
 
-function Tray() {
+function Tray({ isAdmin }: { isAdmin: boolean }) {
   const { jobs, workerOffline, loaded } = useJobs();
   return (
     <aside className="tray" aria-label="Job của tôi">
@@ -66,7 +73,7 @@ function Tray() {
       {loaded && jobs.length === 0 && <p className="muted">Chưa có job nào.</p>}
       <ul>
         {jobs.map((j) => (
-          <TrayItem key={j.id} job={j} />
+          <TrayItem key={j.id} job={j} isAdmin={isAdmin} />
         ))}
       </ul>
     </aside>
@@ -90,7 +97,7 @@ function Toasts() {
   );
 }
 
-export function Shell({ userName, children }: { userName: string; children: ReactNode }) {
+export function Shell({ userId, userName, isAdmin, children }: { userId: string; userName: string; isAdmin: boolean; children: ReactNode }) {
   const pathname = usePathname();
   const link = (href: string, text: string) => (
     <Link href={href} aria-current={pathname === href ? 'page' : undefined}>
@@ -102,7 +109,7 @@ export function Shell({ userName, children }: { userName: string; children: Reac
     window.location.assign('/login');
   }
   return (
-    <JobsProvider>
+    <JobsProvider userId={userId}>
       <header className="bar">
         <strong>Creative Video Studio</strong>
         <nav aria-label="Điều hướng chính">
@@ -116,7 +123,7 @@ export function Shell({ userName, children }: { userName: string; children: Reac
       </header>
       <div className="frame">
         <main>{children}</main>
-        <Tray />
+        <Tray isAdmin={isAdmin} />
       </div>
       <Toasts />
     </JobsProvider>

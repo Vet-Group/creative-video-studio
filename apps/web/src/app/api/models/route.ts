@@ -8,7 +8,7 @@ const MONTH = `to_char(now() at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM')`;
 /**
  * The model picker for a ratio and duration (`?ratio=9:16&durationSec=8`): the enabled models with pass rate and estimated cost,
  * and the model to pre-select (the highest pass rate among those that support the choice, the cheaper on a tie).
- * Pass rate = (seed passes + marked passes) / (seed total + marked total) over live clips; null while nothing is counted.
+ * Pass rate = (seed passes + marked passes) / (seed total + marked total) over every marked clip, deleted or purged ones included; null while nothing is counted.
  * `monthToDate` is the caller's own total this ICT month, provisional while a job of it has no closing row. `remainingBudgetUsd` is for Admins only.
  */
 export async function GET(request: Request) {
@@ -16,7 +16,7 @@ export async function GET(request: Request) {
   if (g.error) return g.error;
   const q = new URL(request.url).searchParams;
   const ratio = q.get('ratio');
-  const durationSec = Number(q.get('durationSec') ?? NaN);
+  const durationSec = q.get('durationSec') ? Number(q.get('durationSec')) : NaN;
   if (!(ASPECTS as readonly (string | null)[]).includes(ratio) || !Number.isInteger(durationSec)) {
     return Response.json({ error: 'ratio and durationSec (a whole number) are required' }, { status: 400 });
   }
@@ -28,8 +28,7 @@ export async function GET(request: Request) {
               coalesce(m.pass_seed_passes, 0) + coalesce(v.passes, 0) as passes, coalesce(m.pass_seed_total, 0) + coalesce(v.total, 0) as total
          from model_configs m
          left join (select j.model, (count(*) filter (where v.verdict = 'pass'))::int as passes, count(*)::int as total
-                      from verdicts v join jobs j on j.output_asset_id = v.output_asset_id
-                     where j.deleted_at is null and j.purged_at is null group by j.model) v on v.model = m.id
+                      from verdicts v join jobs j on j.id = v.job_id group by j.model) v on v.model = m.id
         where m.enabled order by m.label, m.id`,
     ),
     pool.query(
