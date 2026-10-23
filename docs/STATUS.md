@@ -105,7 +105,7 @@ Last updated: 2026-10-23, 11:45 ICT (main after #16). The autonomous run is unde
     - Tests cover the flow, the caps and the timeout.
     - The mock output is a sample file and is labelled as mock in both the app and the reports.
   - **Milestone 1 (paid)** is a bake-off on the 10-image sample set.
-    - Candidates: Kling o3 Pro 1080p via fal (about $0.90–1.12 per 8 s clip) and Seedance 2.5 720p via Replicate (about $1.85).
+    - Candidates: Kling o3 Pro via fal (resolution not stated by fal; measured at B.5a) (about $0.90–1.12 per 8 s clip) and Seedance 2.5 720p via Replicate (about $1.85).
     - 20 clips, about $27.5–29.7 at list price. A hard stop at $40 covers the canary, the bake-off, any extra round and the server smoke clip. Nothing is retried; every job is logged to `jobs.jsonl`.
     - Before the run, the provider data terms are checked (Q6) and any failing candidate is replaced.
     - The owner creates and funds the provider accounts; keys never go into chat.
