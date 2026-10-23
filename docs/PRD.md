@@ -136,3 +136,5 @@ Operations and cost criteria:
 ## Screens are original
 
 The layout follows the Create Videos → Library workflow observed on Fash. All UI code, copy, icons and images are new; nothing is copied from `fash-internal`.
+
+Since 2026-10-23 (change request UI-PARITY) the screens also rebuild the Fash look and motion: sidebar shell, settings card, Examples masonry with looping previews, carousels. The rebuild is in our own code with company media, and its matrix and tests are in `docs/UI-MOTION-PARITY.md`.

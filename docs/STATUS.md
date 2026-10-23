@@ -1,11 +1,11 @@
 # Status — Creative Video Studio (internal)
 
-Last updated: 2026-10-23. Steps 0.1, 0.2 and R.3 and the run harness are committed locally; nothing is pushed yet. Next is the owner's preflight and pre-approval sentence. The deep-interview decisions are recorded in the section after Q9; where they differ from Q1–Q9, they win.
+Last updated: 2026-10-23, 11:45 ICT (main after #16). The autonomous run is under way under the plan v5.1 pre-approval; the current state is in "Run state" below. Earlier sections keep the research record. The deep-interview decisions are recorded in the section after Q9; where they differ from Q1–Q9, they win.
 
 ## Workspace
 
 - Product workspace: `C:\Users\User\dev\work\creative-video-studio`.
-- Git: a local repository on `main`, no remote yet. The private GitHub repository is created in plan step R.1, under the owner's pre-approval.
+- Git: private GitHub repository `anhtahaylove/creative-video-studio` (created in R.1), protected `main`, CI on every PR. Run worktrees: `C:\Users\User\dev\wt\cvs-app` (app steps) and `C:\Users\User\dev\wt\cvs-bakeoff` (bake-off steps).
 - Read-only reference: `C:\Users\User\dev\work\fash-internal`. Nothing in that folder is moved, edited or turned into product code.
 - The product UI and code will be written from scratch. Fash HTML, CSS, JS, fonts, logos and images do not go into this repository; they serve as a workflow and layout reference only.
 
@@ -182,9 +182,23 @@ These are candidates only; nothing is approved.
 - These figures were audited against the saved pages (53/53). They have not been tested with real API calls, so latency, failure rate and output quality are unknown.
 - BytePlus ModelArk sells to Vietnam. Seedance must be called through the Johor region.
 
-### New app
+### New app — run state (2026-10-23, 11:45 ICT)
 
-- Steps 0.1 (skeleton), 0.2 (auth) and R.3 (password-optional users) and the run harness are committed locally; nothing is pushed. No provider has been called and nothing is deployed. The stack, auth method and deployment target are chosen in Q8 and the plan.
+Kept apart on purpose: merged code is not a deployment, and a mock job is not a provider result.
+
+- **Code merged to `main`** (CI green on `218f1b7`, `96385cc`, `18f0213`):
+  - #1 run harness, server gate, CI, doc alignment; #2 results-report dependencies;
+  - #4, #5 shared contracts, presets, per-worktree ports (A.0b);
+  - #6 assets and MinIO storage (M.1); #8, #9 jobs, ledger, presets and the worker on the **mock** provider (M.2);
+  - #10 daily and monthly caps, one manual retry (M.3); #11 Create, Library, login, job tray, verdicts, delete, purge (M.4);
+  - #15 Admin area (M.5); #7 nightly backup, weekly R2 copy, restore drill (D.2); #13 deploy kit with dry-run (D.4);
+  - #12, #14 preflight fixes and Google login in the harness.
+  - #16 Google and Lark sign-in with account linking, the sign-in methods page, Admin unlink and the public `/privacy` page (D.1, mocked OAuth; the live sign-ins are D.5).
+- **Tests:** unit, integration and e2e suites run in CI on each PR; the e2e suites use the mock provider only. Library playback and download are covered by `apps/web/e2e/flow.e2e.test.ts` and `mobile.e2e.test.ts`.
+- **Deployment:** none. Nothing runs on the VET server yet; D.3 (read-only check) and D.5 (deploy, tunnel, `video.vetgroup.net`) are pending.
+- **Paid bake-off:** not started, $0 spent. B.1 (provider facts) is pending again after a reset; the fal balance is $30 and Replicate bills monthly on the card. The canary waits behind the funding gate.
+- **Owner keys:** preflight 12/12 ready on 2026-10-23 (fal, Replicate, Lark, Google, Cloudflare, R2, restic, first Admin).
+- **Change request UI-PARITY (2026-10-23):** the app should look and move close to the Fash video screens. Matrix and acceptance in [`UI-MOTION-PARITY.md`](UI-MOTION-PARITY.md); built in run step M.7 after D.1, before the deploy.
 
 ## Evidence gaps
 
@@ -198,7 +212,9 @@ The Fash backend contract is not needed: the new app calls its own providers.
 - Error, empty, loading and success states, download and reuse-settings, the daily and monthly caps (no team budgets).
 - Quality rubric and a test input set from company assets.
 
-### B. Needs Fash behaviour verification (browser checks; optional, non-blocking)
+### B. Needs Fash behaviour verification (browser checks)
+
+UI and motion parity is no longer optional: see `UI-MOTION-PARITY.md` (M.7). The two checks below stay optional refinements.
 
 These would only refine the UX reference. Each one is recorded in `docs/RESEARCH-GAPS.md` once grilling shows it matters.
 
@@ -232,6 +248,9 @@ An earlier note (2026-10-22) describes:
 The handoff of 2026-10-22 supersedes it: video only, no credits or billing, and `fash-internal` is read-only. The provider routing in that note is kept as candidate input only.
 
 ## Next step
+
+Current: the run continues on its own (conductor, watchdog every 20 minutes). The owner's remaining manual part is one Lark and one Google browser sign-in at D.5. The text below is the pre-run record.
+
 
 Q1–Q9 are decided. The owner accepted three extra defaults on 2026-10-22:
 - 1–4 images per Run, with the first image as the main product; an optional prompt plus company-written presets;

@@ -12,7 +12,7 @@ Only the gaps that change the build are listed. The app calls its own providers,
 
 ## Optional Fash UX checks (browser checks; not blocking)
 
-These only refine the look of states the PRD already defines. They are not needed to build or to pass acceptance.
+These only refine the look of states the PRD already defines. They are not needed to build or to pass acceptance. Visual and motion parity itself is required since 2026-10-23 (change request UI-PARITY, run step M.7, `docs/UI-MOTION-PARITY.md`); it is built from the audit evidence and needs neither check.
 
 | ID | Question | Paid? |
 |---|---|---|
