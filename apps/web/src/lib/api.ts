@@ -52,6 +52,7 @@ export interface Clip {
   isMock: boolean;
   videoAssetId: string;
   posterAssetId: string | null;
+  storeId: string | null;
   costUsd: string;
   costFinal: boolean;
   verdict: { verdict: 'pass' | 'fail'; fault: string | null; markedBy: string } | null;

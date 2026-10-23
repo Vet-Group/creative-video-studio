@@ -11,7 +11,7 @@ test('a Member runs a mock job and works through the Library', async ({ page }) 
   await expect(page.getByText('Tháng này bạn đã dùng: $0.0000')).toBeVisible();
   await expect(page.getByText('Ngân sách tháng còn lại')).toHaveCount(0);
 
-  await runInUi(page, { preset: 'slow-orbit', ratio: '1:1', duration: '8' });
+  await runInUi(page, { preset: 'slow-orbit', ratio: '1:1', duration: '8', store: 'E2E Shop' });
 
   // The tray shows the live state, then the toast announces the result.
   const tray = page.getByRole('complementary', { name: 'Job của tôi' });
@@ -25,6 +25,8 @@ test('a Member runs a mock job and works through the Library', async ({ page }) 
   await expect(card).toHaveCount(1);
   await expect(card.getByText('MOCK', { exact: true })).toBeVisible();
   await expect(card.getByText('Chi phí thật: $0.0000')).toBeVisible();
+  // Re-assigning the store is for Admins: a Member has no such control.
+  await expect(card.getByLabel('Cửa hàng')).toHaveCount(0);
 
   // Play.
   const video = card.locator('video');
@@ -58,6 +60,7 @@ test('a Member runs a mock job and works through the Library', async ({ page }) 
   await expect(page.getByLabel('Tỉ lệ khung hình')).toHaveValue('1:1');
   await expect(page.getByLabel('Thời lượng')).toHaveValue('8');
   await expect(page.getByRole('radio', { name: /Mock E2E/ })).toBeChecked();
+  await expect(page.getByLabel('Cửa hàng/Thương hiệu').locator('option:checked')).toHaveText('E2E Shop');
   await page.getByLabel('Mẫu chuyển động').selectOption('light-sweep');
   await expect(page.getByLabel('Mẫu chuyển động')).toHaveValue('light-sweep');
 

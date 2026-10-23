@@ -7,7 +7,14 @@ import { FAULTS } from '@/lib/faults';
 const fmtTime = (iso: string) => new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date(iso));
 const faultLabel = (id: string | null) => FAULTS.find((f) => f.id === id)?.label ?? id ?? '';
 
-function ClipCard({ clip, onChange, onDeleted }: { clip: Clip; onChange: (c: Clip) => void; onDeleted: (id: string) => void }) {
+interface StoreOption {
+  id: string;
+  name: string;
+  hidden: boolean;
+}
+
+/** `stores` is given to Admins only: it switches on the store control. */
+function ClipCard({ clip, stores, onChange, onDeleted }: { clip: Clip; stores?: StoreOption[]; onChange: (c: Clip) => void; onDeleted: (id: string) => void }) {
   const [failing, setFailing] = useState(false);
   const [fault, setFault] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -22,6 +29,16 @@ function ClipCard({ clip, onChange, onDeleted }: { clip: Clip; onChange: (c: Cli
       setFault('');
     } catch {
       setProblem('Không lưu được đánh giá.');
+    }
+  }
+
+  async function reassign(storeId: string) {
+    setProblem('');
+    try {
+      await api(`/api/admin/jobs/${clip.id}/store`, sendJson('PUT', { storeId: storeId || null }));
+      onChange({ ...clip, storeId: storeId || null });
+    } catch {
+      setProblem('Không đổi được cửa hàng.');
     }
   }
 
@@ -72,6 +89,21 @@ function ClipCard({ clip, onChange, onDeleted }: { clip: Clip; onChange: (c: Cli
         {!clip.costFinal && <span className="tag">Tạm tính</span>}
       </p>
       {clip.verdict && <p>{clip.verdict.verdict === 'pass' ? 'Kết quả: Đạt' : `Kết quả: Không đạt (${faultLabel(clip.verdict.fault)})`}</p>}
+      {stores && (
+        <label>
+          Cửa hàng
+          <select value={clip.storeId ?? ''} onChange={(e) => void reassign(e.target.value)}>
+            <option value="">Không gắn cửa hàng</option>
+            {stores
+              .filter((s) => !s.hidden || s.id === clip.storeId)
+              .map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+          </select>
+        </label>
+      )}
 
       <div className="actions">
         <button type="button" onClick={() => void download()}>
@@ -136,6 +168,8 @@ export function Library() {
   const [clips, setClips] = useState<Clip[]>([]);
   const [creators, setCreators] = useState<{ id: string; name: string }[]>([]);
   const [hasMore, setHasMore] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [stores, setStores] = useState<StoreOption[]>([]);
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
   const latest = useRef(0);
 
@@ -148,8 +182,9 @@ export function Library() {
       if (ratio) q.set('ratio', ratio);
       if (offset > 0) q.set('offset', String(offset));
       try {
-        const r = await api<{ hasMore: boolean; creators: { id: string; name: string }[]; clips: Clip[] }>(`/api/library?${q}`);
+        const r = await api<{ hasMore: boolean; isAdmin: boolean; creators: { id: string; name: string }[]; clips: Clip[] }>(`/api/library?${q}`);
         if (ticket !== latest.current) return;
+        setIsAdmin(r.isAdmin);
         setClips((cur) => (offset > 0 ? [...cur, ...r.clips] : r.clips));
         setCreators(r.creators);
         setHasMore(r.hasMore);
@@ -165,6 +200,10 @@ export function Library() {
     setState('loading');
     void load(0);
   }, [load]);
+
+  useEffect(() => {
+    if (isAdmin) api<{ stores: StoreOption[] }>('/api/admin/stores?includeHidden=1').then((r) => setStores(r.stores), () => null);
+  }, [isAdmin]);
 
   return (
     <section aria-labelledby="library-title">
@@ -203,6 +242,7 @@ export function Library() {
           <ClipCard
             key={c.id}
             clip={c}
+            stores={isAdmin ? stores : undefined}
             onChange={(next) => setClips((cur) => cur.map((x) => (x.id === next.id ? next : x)))}
             onDeleted={(id) => setClips((cur) => cur.filter((x) => x.id !== id))}
           />

@@ -2,6 +2,7 @@
 // Every function locks the job row (FOR UPDATE) and checks its status in the same transaction as the status change, so two
 // reconcile loops cannot book a job twice. Money is summed in whole 1/10000 USD, never as floats. A mock job books 0 USD.
 // Plain SQL over a structural pg interface keeps this package free of database dependencies.
+import { audit } from './audit';
 
 export interface Queryable {
   query(text: string, values?: unknown[]): Promise<{ rows: any[]; rowCount: number | null }>;
@@ -163,12 +164,13 @@ export async function close24h(pool: LedgerPool, jobId: string): Promise<boolean
   });
 }
 
-/** Moves a job to another store (null for none) and its net balance per old store with it, as a store_reassign pair. Later rows land on the new store. */
-export async function reassignStore(pool: LedgerPool, jobId: string, storeId: string | null): Promise<boolean> {
+/** Moves a job to another store (null for none) and its net balance per old store with it, as a store_reassign pair. Later rows land on the new store. With `actorId`, the move is audited in the same transaction. */
+export async function reassignStore(pool: LedgerPool, jobId: string, storeId: string | null, actorId?: string): Promise<boolean> {
   return withTransaction(pool, async (tx) => {
     const job = await lockJob(tx, jobId);
     if (job.store_id === storeId) return false;
     await tx.query('update jobs set store_id = $2 where id = $1', [jobId, storeId]);
+    if (actorId) await audit(tx, { actorId, action: 'store.reassign', target: `job:${jobId}`, oldValue: { storeId: job.store_id }, newValue: { storeId } });
     const { rows } = await tx.query(`select store_id, sum(usd)::text as usd from cost_entries where job_id = $1 group by store_id having sum(usd) <> 0`, [jobId]);
     for (const r of rows) {
       await append(tx, job, { kind: 'store_reassign', usd: -units(r.usd), isFinal: false, storeId: r.store_id });
@@ -194,12 +196,14 @@ export async function bookShared(
 /**
  * Records the provider's invoice total for a month and books the difference to everything the ledger already holds for that
  * provider and month (job rows, bake-off rows, earlier invoice_diff rows), so entering the same invoice again books nothing
- * and a corrected total books only the new difference. Returns the difference booked now, in USD.
+ * and a corrected total books only the new difference. Returns the difference booked now, in USD. With `actorId`, an entry that changes the
+ * invoice total or books a difference is audited as invoice.enter in the same transaction.
  */
-export async function bookInvoice(pool: LedgerPool, i: { month: string; provider: string; totalUsd: string | number }): Promise<string> {
+export async function bookInvoice(pool: LedgerPool, i: { month: string; provider: string; totalUsd: string | number }, actorId?: string): Promise<string> {
   if (!MONTH.test(i.month)) throw new Error(`not a month: ${i.month}`);
   return withTransaction(pool, async (tx) => {
     await tx.query('select pg_advisory_xact_lock(hashtext($1))', [`invoice:${i.month}:${i.provider}`]);
+    const before = (await tx.query('select total_usd::text as total from provider_invoices where month = $1 and provider = $2', [i.month, i.provider])).rows[0]?.total as string | undefined;
     await tx.query(
       `insert into provider_invoices (month, provider, total_usd) values ($1, $2, $3)
        on conflict (month, provider) do update set total_usd = excluded.total_usd, updated_at = now()`,
@@ -215,6 +219,12 @@ export async function bookInvoice(pool: LedgerPool, i: { month: string; provider
         `insert into cost_entries (kind, usd, month, provider, is_final, ref) values ('invoice_diff', $1, $2, $3, true, $4)`,
         [fmt(diff), i.month, i.provider, `invoice-${i.month}-${i.provider}-${rows[0].diffs + 1}`],
       );
+    }
+    if (actorId && (before !== fmt(units(i.totalUsd)) || diff !== 0)) {
+      await audit(tx, {
+        actorId, action: 'invoice.enter', target: `invoice:${i.month}:${i.provider}`,
+        oldValue: before === undefined ? null : { totalUsd: before }, newValue: { totalUsd: fmt(units(i.totalUsd)), bookedUsd: fmt(diff) },
+      });
     }
     return fmt(diff);
   });

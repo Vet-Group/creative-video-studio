@@ -29,6 +29,13 @@
       "when": 1792926132036,
       "tag": "0003_audit_entries",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793012532036,
+      "tag": "0004_round_half_even",
+      "breakpoints": true
     }
   ]
 }

@@ -56,6 +56,19 @@ legend { font-weight: 600; padding: 0 .25rem; }
 .actions { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; margin-top: .5rem; }
 .actions label { margin: 0; }
 
+.admin-nav { display: flex; gap: .75rem; flex-wrap: wrap; margin-bottom: 1rem; padding-bottom: .5rem; border-bottom: 1px solid #e4e4e7; }
+.admin-nav a[aria-current='page'] { font-weight: 700; text-decoration: none; color: inherit; }
+.table-wrap { overflow-x: auto; margin: .75rem 0; }
+table { border-collapse: collapse; width: 100%; background: #fff; font-size: .9rem; }
+th, td { border: 1px solid #e4e4e7; padding: .35rem .5rem; text-align: left; vertical-align: top; }
+th { background: #f4f4f5; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+td input, td select, td textarea { font: inherit; max-width: 100%; }
+td code { white-space: pre-wrap; overflow-wrap: anywhere; }
+.row { display: flex; gap: .75rem; flex-wrap: wrap; align-items: end; }
+.row label { margin: 0; }
+.row .primary { margin-top: 0; }
+
 @media (max-width: 800px) {
   .frame { grid-template-columns: minmax(0, 1fr); padding: .75rem; }
   .grid { grid-template-columns: minmax(0, 1fr); }

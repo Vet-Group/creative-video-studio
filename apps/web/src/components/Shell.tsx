@@ -115,6 +115,11 @@ export function Shell({ userId, userName, isAdmin, children }: { userId: string;
         <nav aria-label="Điều hướng chính">
           {link('/create', 'Tạo video')}
           {link('/library', 'Thư viện')}
+          {isAdmin && (
+            <Link href="/admin/users" aria-current={pathname.startsWith('/admin') ? 'page' : undefined}>
+              Quản trị
+            </Link>
+          )}
         </nav>
         <span className="who">{userName}</span>
         <button type="button" onClick={() => void signOut()}>
