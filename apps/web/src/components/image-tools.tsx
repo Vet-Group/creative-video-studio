@@ -144,13 +144,29 @@ export function WorkTabs<T extends string>({ prefix, tabs, labels, shown, onSele
 const aspectOf = (ratio: string): string => (/^\d+:\d+$/.test(ratio) ? ratio.replace(':', ' / ') : '1 / 1');
 
 /** The company's latest outputs of one Library `kind` (`try_on`, `image` or, with `video`, `marketing`) in a masonry of columns; 24 at a time. */
-export function Gallery({ kind, label, emptyText, video = false }: { kind: string; label: string; emptyText: string; video?: boolean }) {
+const GALLERY_SIZE_KEY = 'cvs.gallery.size';
+
+/** `cols` is the column count below 1024 px, up to 1536 px and above; from 1024 px a slider (as on Fash) shows one column more or less, remembered per browser. */
+export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4] }: { kind: string; label: string; emptyText: string; video?: boolean; cols?: [number, number, number] }) {
   const [items, setItems] = useState<Clip[]>([]);
   const [hasMore, setHasMore] = useState(false);
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [size, setSize] = useState(1); // 0 small tiles, 1 default, 2 large tiles
   const narrow = useMediaQuery(NARROW);
   const wide = useMediaQuery(WIDE);
-  const columns = narrow ? 2 : wide ? 4 : 3;
+  const columns = narrow ? cols[0] : Math.max(1, (wide ? cols[2] : cols[1]) + 1 - size);
+  useEffect(() => {
+    try {
+      const saved = Number(localStorage.getItem(GALLERY_SIZE_KEY) ?? 1);
+      if (saved === 0 || saved === 1 || saved === 2) setSize(saved);
+    } catch {} // blocked storage: the default size
+  }, []);
+  function resize(next: number) {
+    setSize(next);
+    try {
+      localStorage.setItem(GALLERY_SIZE_KEY, String(next));
+    } catch {}
+  }
   const loading = useRef(false); // a second click while a page loads would append it twice
 
   async function load(offset: number) {
@@ -176,6 +192,16 @@ export function Gallery({ kind, label, emptyText, video = false }: { kind: strin
   if (items.length === 0) return <p className="muted">{emptyText}</p>;
   return (
     <>
+      {!narrow && (
+        <div className="gallery-tools">
+          <label className="library-size">
+            <span className="sr-only">Cỡ ô</span>
+            <Icon name="library" />
+            <input type="range" min={0} max={2} step={1} value={size} onChange={(e) => resize(Number(e.target.value))} aria-valuetext={['Nhỏ', 'Vừa', 'Lớn'][size]} />
+            <Icon name="ratio" />
+          </label>
+        </div>
+      )}
       <div className="masonry" role="group" aria-label={label}>
         {Array.from({ length: columns }, (_, c) => (
           <ul key={c} className="masonry-col">

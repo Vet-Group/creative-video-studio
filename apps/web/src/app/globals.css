@@ -475,3 +475,30 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .choice-grid button:hover { border-color: rgb(153, 153, 153); }
 .choice-grid button[aria-selected='true'] { border-color: #000; background: #000; color: #fff; }
 .gallery-item video { display: block; width: 100%; height: 100%; object-fit: cover; background: #000; }
+
+/* C4 round 2 (three independent graders, 2026-10-24). */
+/* Gallery: the tile-size slider sits at the top right, above the columns. */
+.gallery-tools { display: flex; justify-content: flex-end; margin: 0 0 12px; }
+/* Marketing Studio: icon and name inside each box, as on Fash; the image slots keep their name for screen readers. */
+.marketing-slots .field-label { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.choice-label { color: rgb(77, 77, 77); font-size: 13px; line-height: 18px; }
+.marketing-slots .choice-value { font-weight: 500; color: rgb(128, 128, 128); }
+.marketing-head { justify-content: center; align-items: center; min-height: 100px; text-align: center; }
+.field-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 8px; }
+/* Library filters: one row of equal 36 px controls styled like the app's selects. */
+.library-filters { gap: 12px; margin: 0 0 8px; }
+.library-filters label { margin: 0; color: rgb(102, 102, 102); font-size: 13px; line-height: 18px; font-weight: 500; }
+.library-filters select, .library-filters input { width: 10rem; min-width: 0; height: 36px; margin-top: 4px; padding: 0 10px; border: 1px solid rgb(0 0 0 / .1); border-radius: 8px; background: #fff; color: inherit; font: inherit; font-size: 13px; }
+.library-empty { padding-top: 96px; }
+.explore-sub { margin: -8px 0 16px; }
+/* Below 1024 px: centred empty Image Generation history, smaller Explore headings; tablets keep model, ratio and size on one row, as on Fash. */
+@media (max-width: 1023.98px) {
+  .imagegen-side .tray > p.muted { padding: 22vh 0 0; }
+  .explore h1 { margin-bottom: 16px; font-size: 20px; line-height: 28px; }
+  .explore h2 { margin-top: 32px; font-size: 18px; line-height: 26px; }
+}
+/* Phones keep the wrap: one row would push a 390 px page sideways, and a scrolling row would clip the menus that open upward. */
+@media (min-width: 600px) and (max-width: 1023.98px) {
+  .imagebar .pills { flex-wrap: nowrap; }
+  .imagebar .select-trigger { max-width: 10rem; }
+}
