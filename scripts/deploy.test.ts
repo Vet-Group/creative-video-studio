@@ -407,6 +407,9 @@ describe.skipIf(!hasBash)('deploy kit (needs bash only)', { timeout: 30_000 }, (
     expect(ok.out).toContain('held by this install');
     expect(own.calls()).toContain('docker compose -p creative-video-studio ps -q');
     expect(own.calls()).toContain('systemctl --user is-active --quiet cvs-web.service');
+    // An update restarts web and worker after the build, so they run the new code; a first install (test a) only enables them.
+    expect(ok.out).toContain('systemctl --user restart cvs-web.service cvs-worker.service');
+    expect(run(installSh, ['--dry-run'], sandbox().env).out).not.toContain('systemctl --user restart');
 
     const stranger = sandbox(all);
     writeFileSync(stranger.stateFile, 'compose=creative-video-studio\n');

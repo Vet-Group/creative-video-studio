@@ -71,9 +71,14 @@ Other variables: `CVS_APP_DIR`, `CVS_REPO_URL`, `CVS_REPO_REF`, `CVS_DEPLOY_KEY`
 A state file means the next `install.sh` is an update, and it works without uninstalling (which would delete the tunnel and the
 DNS record): ports held by this install's own compose project (`docker compose -p creative-video-studio ps -q` is not empty) or
 by `cvs-web` are not counted as taken, the repo is fast-forwarded, and a recorded tunnel is kept, but only when its DNS record id
-and both `cloudflared/` files exist. A tunnel recorded without them (a run that stopped in step 7) is refused with
+and both `cloudflared/` files exist. After the build, an update restarts `cvs-web` and `cvs-worker` so they run the new code. A tunnel recorded without them (a run that stopped in step 7) is refused with
 "run uninstall.sh first". A run that stopped after `compose up` can be undone with `uninstall.sh`, because the compose line was
 recorded before `up`.
+
+## Status
+
+`bash scripts/run/vet.sh status` runs `deploy/linux/status.sh` on VET (read-only): the commit, the `cvs-*` units, the compose
+containers, the answer of `https://video.vetgroup.net/privacy` and the last backup log line.
 
 ## The state file
 
