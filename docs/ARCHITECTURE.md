@@ -142,7 +142,7 @@ The prices come from the session pricing report (audited 53/53 against saved pag
 
 ## Bake-off judging and go/no-go gate
 
-- The bake-off runs early, as a script, in parallel with Milestone 0. It makes 20 clips (2 models x 10 images, 9:16, 8 s) with one fixed safe preset. Total real spend before go-live stays within $40, counting the canary (one clip per model), the bake-off, any extra round and the server smoke clip, and nothing is retried.
+- The bake-off runs early, as a script, in parallel with Milestone 0. It makes 20 clips (2 models x 10 images, 9:16, 8 s) with one fixed safe preset. Total real spend before go-live stays within $20 (lowered from $40 by the owner on 2026-10-24), counting the canary (one clip per model), the bake-off, any extra round and the server smoke clip, and nothing is retried.
 - The 10 images are read-only copies from POD Studio production MinIO. They are kept outside the repository and never go into Git.
 - An AI judge scores the clips blind; there is no human reviewer:
   - Clips are anonymised to random ids, scaled to 720p and stripped of metadata.
@@ -150,7 +150,7 @@ The prices come from the session pricing report (audited 53/53 against saved pag
   - Flicker and judder are measured from all frames, as a luma difference series. The thresholds are fixed in the rubric before judging and are marked provisional.
   - 4 of the 20 clips are judged a second time, and the agreement is reported.
   - `docs/BAKEOFF.md` reports the pass rate per model with a Wilson 95% interval (10 clips per model is a noisy signal), the cost and render time per clip, and the decision. A script recomputes every number in it.
-- Go/no-go gate: real-provider and deployment work continues only if at least one model reaches 70%. If neither does, one extra small round runs for the better model with a different preset, within the same $40. If it still misses, the app ships with both models disabled and the result is reported.
+- Go/no-go gate: real-provider and deployment work continues only if at least one model reaches 70%. If neither does, one extra small round runs for the better model with a different preset, only if it still fits under the $20 stop or the owner raises it. If it still misses, the app ships with both models disabled and the result is reported.
 
 ## Data terms check (Q6), read 2026-10-22
 

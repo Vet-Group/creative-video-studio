@@ -18,7 +18,8 @@ import {
   appendLine, defaultImages, keyId, latest, parseSet, readLines, roundOf, spend, type JobKey, type JobLine, type JobStatus, type SetName,
 } from './jobs.ts';
 
-export const CAP_USD = 40;
+// Lowered from $40 by the owner on 2026-10-24: the canary, the 20 bake-off clips and the server smoke clip fit (about $19.30 at 5 s).
+export const CAP_USD = 20;
 /** The funding gate keeps this much fal balance beyond the stage's estimated fal cost. */
 export const MARGIN_USD = 2;
 

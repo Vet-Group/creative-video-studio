@@ -106,7 +106,7 @@ Last updated: 2026-10-24 (main after #42; see "Overnight 2026-10-24" below). Ear
     - The mock output is a sample file and is labelled as mock in both the app and the reports.
   - **Milestone 1 (paid)** is a bake-off on the 10-image sample set.
     - Candidates: Kling o3 Pro via fal (resolution not stated by fal; measured at B.5a) (about $0.90–1.12 per 8 s clip) and Seedance 2.5 720p via Replicate (about $1.85).
-    - 20 clips, about $27.5–29.7 at list price. A hard stop at $40 covers the canary, the bake-off, any extra round and the server smoke clip. Nothing is retried; every job is logged to `jobs.jsonl`.
+    - 20 clips, about $27.5–29.7 at list price. A hard stop at $40 covered the canary, the bake-off, any extra round and the server smoke clip; on 2026-10-24 the owner lowered it to $20 (`CAP_USD`), which fits the canary, the 20 clips at 5 s and the smoke clip (about $19.30), so an extra round needs the owner to raise it. Nothing is retried; every job is logged to `jobs.jsonl`.
     - Before the run, the provider data terms are checked (Q6) and any failing candidate is replaced.
     - The owner creates and funds the provider accounts; keys never go into chat.
   - Continue if at least one model reaches 70% under the Q3 rubric. Then list every passing model in the picker (the higher pass rate is pre-selected) and build the real adapters. Deployment to VET is covered by the owner's pre-approval in the plan (section 3).
@@ -132,7 +132,7 @@ These come from the plan (`.omc/plans/creative-video-studio-plan.md`) and its sp
 - **Presets.** 6 POD presets are written in advance, with Vietnamese labels and English prompts. An Admin edits and toggles them. The bake-off uses one fixed safe preset.
 - **Tray.** A "My jobs" tray on every page shows live status, with a toast and a tab-title change on completion. It shows "worker offline" after 60 s without a worker heartbeat.
 - **Backups and restore drill.** Nightly `pg_dump` plus a MinIO copy, kept 14 days on VET. A weekly encrypted copy goes to Cloudflare R2. A restore drill runs before staff go live and then monthly.
-- **Go/no-go gate.** The bake-off runs early, in parallel with Milestone 0. Real-provider and deployment work continues only if a model reaches 70%. If neither does, one extra round runs for the better model within the same $40; if it still misses, the app ships with both models disabled and the result is reported.
+- **Go/no-go gate.** The bake-off runs early, in parallel with Milestone 0. Real-provider and deployment work continues only if a model reaches 70%. If neither does, one extra round runs for the better model if it fits under the $20 stop (or the owner raises it); if it still misses, the app ships with both models disabled and the result is reported.
 - **Teams, stores and the cost ledger.** This replaces the "No departments or brands" line in Q4.
   - Teams and stores are managed by an Admin. Each user is in one team. A store code equals POD Studio's `store_id`.
   - Every provider dollar is an append-only ledger row with user, team (at Run), store, provider, model and ICT month.
