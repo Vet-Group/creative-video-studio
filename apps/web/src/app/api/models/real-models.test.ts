@@ -103,6 +103,14 @@ describe('PUT /api/admin/settings', () => {
     expect([await enabled('new-model'), await enabled('seedance-2.5')]).toEqual([false, false]);
   });
 
+  test('refuses a record with no passes or more passes than clips', async () => {
+    for (const [passes, total] of [[null, 10], [11, 10]]) {
+      await pool.query('update model_configs set pass_seed_passes = $1, pass_seed_total = $2 where id = $3', [passes, total, 'new-model']);
+      const res = await put({ models: [{ id: 'new-model', enabled: true }] });
+      expect([res.status, await enabled('new-model')]).toEqual([400, false]);
+    }
+  });
+
   test('enables a model once its record reaches 70%, audited', async () => {
     await pool.query(`update model_configs set pass_seed_passes = 7, pass_seed_total = 10 where id = 'new-model'`);
     expect((await put({ models: [{ id: 'new-model', enabled: true }] })).status).toBe(200);

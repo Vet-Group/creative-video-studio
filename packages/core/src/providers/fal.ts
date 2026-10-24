@@ -136,32 +136,32 @@ const IMAGE_BODIES: Record<string, ImageBody> = {
   'fal-ai/nano-banana/edit': nano(false),
   'openai/gpt-image-2/edit': (req, image_urls) => {
     const image_size = GPT_SIZES[req.ratio];
-    if (!image_size) throw new Error(`gpt-image-2 does not offer ratio ${req.ratio}`);
+    if (!image_size) throw new ImageReadError(`gpt-image-2 does not offer ratio ${req.ratio}`);
     // The model's price assumes the high quality tier (the schema default); send it so a default change cannot raise the price.
     return { prompt: req.prompt, image_urls, image_size, quality: req.quality ?? 'high', num_images: 1, output_format: 'png' };
   },
   'bytedance/seedream/v5/pro/edit': (req, image_urls) => ({ prompt: req.prompt, image_urls, image_size: seedreamSize(req.ratio, req.resolution), num_images: 1, output_format: 'png' }),
   // The person image first, then the garment; the output follows the person image, so the schema has no ratio, and the prompt is not read.
   'fal-ai/fashn/tryon/v1.6': (_req, urls) => {
-    if (urls.length !== 2) throw new Error('fashn needs the model image and the garment image');
+    if (urls.length !== 2) throw new ImageReadError('fashn needs the model image and the garment image');
     return { model_image: urls[0], garment_image: urls[1], num_samples: 1, output_format: 'png' };
   },
   // Character Swap, Model Swap and Face Swap use the Nano Banana Pro builder above; their fixed prompt says which image is which.
   // The reference image or the prompt, never both (the schema). The reference is the second input image; without it the prompt describes the new background.
   'fal-ai/bria/background/replace': (req, [image_url, ref_image_url]) => {
     if (ref_image_url) return { image_url, ref_image_url, num_images: 1 };
-    if (!req.prompt.trim()) throw new Error('bria background replace needs a reference image or a prompt');
+    if (!req.prompt.trim()) throw new ImageReadError('bria background replace needs a reference image or a prompt');
     return { image_url, prompt: req.prompt, num_images: 1 };
   },
   // The schema's ratio is a size, not a ratio: pixels in the ratio, about one megapixel. shortcut: the size limits are unconfirmed by a live call. Prompt and style fields are not offered.
   'fal-ai/ideogram/v3/reframe': (req, [image_url]) => {
-    if (!/^\d+:\d+$/.test(req.ratio)) throw new Error(`ideogram reframe needs a ratio, not ${req.ratio}`);
+    if (!/^\d+:\d+$/.test(req.ratio)) throw new ImageReadError(`ideogram reframe needs a ratio, not ${req.ratio}`);
     return { image_url, image_size: sizeFor(req.ratio, 1_048_576), rendering_speed: 'TURBO', num_images: 1 };
   },
   // The schema has an upscale factor, not a target size, so the factor is worked out from the image's own size to land on the pixel budget of the resolution.
   'fal-ai/topaz/upscale/image': (req, [image_url]) => {
     const target = UPSCALE_PIXELS[req.resolution];
-    if (!target) throw new Error(`topaz upscale does not offer resolution ${req.resolution}`);
+    if (!target) throw new ImageReadError(`topaz upscale does not offer resolution ${req.resolution}`);
     return { image_url, upscale_factor: upscaleFactor(image_url!, target), model: 'Standard V2' };
   },
   // A prompt would be billed extra and change the cutout, so none is sent.
@@ -174,7 +174,7 @@ export function createFalImageProvider(opts: { apiKey: string; fetch?: Fetch; re
   return {
     async submit(req) {
       const build = IMAGE_BODIES[req.model.endpoint];
-      if (!build) throw new Error(`fal image: no request builder for ${req.model.endpoint}`);
+      if (!build) throw new ImageReadError(`fal image: no request builder for ${req.model.endpoint}`);
       // Built before any network call, so a request the model cannot take submits nothing.
       const body = build(req, await resolveImages(req.imageUrls, opts.readImage));
       const res = (await sendJson(f, 'fal submit', `${QUEUE}/${req.model.endpoint}`, { method: 'POST', headers, body: JSON.stringify(body) })) as { request_id?: string };

@@ -106,6 +106,13 @@ describe('owner-closed steps', () => {
     const s = get(readManifest(join(dir, 'manifest.json')), 'M.7b');
     expect(s.status).toBe('done');
     expect(s.evidence).toContainEqual({ kind: 'note', text: 'owner: C4 accepted on revision abc' });
+    get(m, 'M.7b').status = 'doing';
+    writeManifest(join(dir, 'manifest.json'), m);
+    const k = cli(dir, 'skip', 'M.7b', 'deploy', 'later', '--owner', 'skip M.7b, deploy later');
+    expect(k.status, k.stderr).toBe(0);
+    const sk = get(readManifest(join(dir, 'manifest.json')), 'M.7b');
+    expect([sk.status, sk.reason]).toEqual(['skipped', 'deploy later']);
+    expect(sk.evidence).toContainEqual({ kind: 'note', text: 'owner: skip M.7b, deploy later' });
     expect(STEPS.filter((d) => d.ownerDone).map((d) => d.id)).toEqual(['M.7b']);
   });
 });

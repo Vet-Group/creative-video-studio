@@ -11,13 +11,14 @@ import { getObject } from './storage';
 export const MAX_INLINE_BYTES = 600_000;
 const MAX_SIDE = 2048;
 
-/** An image that is small enough passes through untouched; a larger one is turned upright, flattened on white and re-encoded as JPEG until it fits. */
+/** An image that is small enough passes through untouched; a larger one is turned upright and re-encoded until it fits: JPEG, or WebP when it has transparency. */
 export async function fitForInline(bytes: Uint8Array, contentType: string): Promise<{ bytes: Uint8Array; contentType: string }> {
-  const { width = Infinity, height = Infinity } = await sharp(bytes).metadata();
+  const { width = Infinity, height = Infinity, hasAlpha } = await sharp(bytes).metadata();
   if (bytes.byteLength <= MAX_INLINE_BYTES && Math.max(width, height) <= MAX_SIDE) return { bytes, contentType };
   for (const [side, quality] of [[MAX_SIDE, 85], [MAX_SIDE, 70], [1536, 70], [1024, 70], [768, 60]] as const) {
-    const out = await sharp(bytes).rotate().resize(side, side, { fit: 'inside', withoutEnlargement: true }).flatten({ background: '#ffffff' }).jpeg({ quality, mozjpeg: true }).toBuffer();
-    if (out.byteLength <= MAX_INLINE_BYTES) return { bytes: new Uint8Array(out), contentType: 'image/jpeg' };
+    const img = sharp(bytes).rotate().resize(side, side, { fit: 'inside', withoutEnlargement: true });
+    const out = await (hasAlpha ? img.webp({ quality }) : img.jpeg({ quality, mozjpeg: true })).toBuffer();
+    if (out.byteLength <= MAX_INLINE_BYTES) return { bytes: new Uint8Array(out), contentType: hasAlpha ? 'image/webp' : 'image/jpeg' };
   }
   throw new Error(`the image cannot be brought under ${MAX_INLINE_BYTES} bytes`);
 }

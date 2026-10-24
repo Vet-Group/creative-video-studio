@@ -66,6 +66,7 @@ export async function resolveImages(urls: string[], readImage?: ReadImage): Prom
 }
 
 /** An input image could not be read, measured or accepted locally; thrown before any network call, so nothing was submitted or billed (the worker releases the estimate). */
+/** An input refused before any call to the provider (unreadable, too large, or a request the builder cannot make): nothing was sent, so the worker releases the estimate. */
 export class ImageReadError extends Error {}
 
 // The provider job id carries the requested duration ("5:abc123"), so status() can estimate the cost after a worker restart.
