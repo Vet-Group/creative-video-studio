@@ -518,3 +518,35 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
   .side .gallery-tools { margin: -57px 0 20px; }
   .imagegen-side .gallery-tools { margin: -69px 0 32px; }
 }
+
+/* C4 round 4. */
+/* Below 1024 px the image bar is one compact card, as on Fash: it ends 8 px above the screen edge, a 40 px add box sits beside the prompt, small chips that show the whole model name, and Run on its own full-width row. */
+@media (max-width: 1023.98px) {
+  .imagegen { min-height: calc(100dvh - 73px); }
+  .imagebar { bottom: 8px; margin: 8px auto; }
+  .imagebar .bar-thumbs li, .imagebar .bar-add { width: 40px; height: 40px; }
+  .imagebar textarea { height: 40px; padding: 2px 4px; }
+  .bar-message { padding-top: 2px; font-size: 12px; line-height: 16px; }
+  .imagebar .pills { gap: 6px; }
+  .imagebar .select-trigger { max-width: none; height: 28px; padding: 0 8px; gap: 6px; font-size: 12px; }
+  .bar-run { flex: 1 0 100%; margin-left: 0; }
+}
+/* Phones: no chevrons, so the three chips fit one row; the model chip may shorten its name before the row could push the page sideways. */
+@media (max-width: 599.98px) {
+  .imagebar .pills { flex-wrap: nowrap; gap: 4px; }
+  .imagebar .pills > * { min-width: 0; }
+  .imagebar .select-trigger > .icon:last-child { display: none; }
+  .imagebar .select-value-row .badge { margin-left: 4px; }
+  /* The last chip ends near the right edge, so its menu opens leftwards to stay on screen. */
+  .imagebar .pills > :last-child .select-pop { left: auto; right: 0; }
+}
+/* Below 1440 px the size slider is shorter and shares the tab row too, so the gallery starts right under the tabs; below 1280 px the tabs move to the left of the side column (as on Fash) to make room. */
+@media (min-width: 1024px) and (max-width: 1279.98px) {
+  .create-grid .tabs { justify-self: start; }
+  .create-grid .tabs button { padding: 8px 12px; }
+}
+@media (min-width: 1024px) and (max-width: 1439.98px) {
+  .side .gallery-tools { height: 37px; align-items: center; margin: -57px 0 20px; }
+  .side .gallery-tools input { width: 64px; }
+  .side .gallery-tools .icon:last-child { display: none; }
+}
