@@ -146,7 +146,7 @@ const IMAGE_BODIES: Record<string, ImageBody> = {
     if (urls.length !== 2) throw new Error('fashn needs the model image and the garment image');
     return { model_image: urls[0], garment_image: urls[1], num_samples: 1, output_format: 'png' };
   },
-  // Character Swap and Model Swap use the Nano Banana Pro builder above; their fixed prompt says which image is which.
+  // Character Swap, Model Swap and Face Swap use the Nano Banana Pro builder above; their fixed prompt says which image is which.
   // The reference image or the prompt, never both (the schema). The reference is the second input image; without it the prompt describes the new background.
   'fal-ai/bria/background/replace': (req, [image_url, ref_image_url]) => {
     if (ref_image_url) return { image_url, ref_image_url, num_images: 1 };
@@ -163,12 +163,6 @@ const IMAGE_BODIES: Record<string, ImageBody> = {
     const target = UPSCALE_PIXELS[req.resolution];
     if (!target) throw new Error(`topaz upscale does not offer resolution ${req.resolution}`);
     return { image_url, upscale_factor: upscaleFactor(image_url!, target), model: 'Standard V2' };
-  },
-  // The source face first, then the photo to put it on. gender_0 and workflow_type are required and the app has no field for them, so the neutral gender and
-  // the target's hair are fixed. upscale and detailer repeat the schema defaults so a default change cannot move the price.
-  'easel-ai/advanced-face-swap': (_req, urls) => {
-    if (urls.length !== 2) throw new Error('face swap needs the source face and the target photo');
-    return { face_image_0: urls[0], target_image: urls[1], gender_0: 'non-binary', workflow_type: 'target_hair', upscale: true, detailer: false };
   },
   // A prompt would be billed extra and change the cutout, so none is sent.
   'fal-ai/bria/background/remove': (_req, [image_url]) => ({ image_url }),

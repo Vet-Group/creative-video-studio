@@ -15,8 +15,8 @@ Every image and app feature runs on fal.ai: one key, one invoice, and the `fal` 
 | Character Swap, Model Swap | `fal-ai/nano-banana-pro/edit` | $0.15 |
 | Background Changer | `fal-ai/bria/background/replace` | $0.04 |
 | Reframe | `fal-ai/ideogram/v3/reframe` (fallback `fal-ai/bria/expand`, $0.04) | $0.03 |
-| Image Upscale | `fal-ai/topaz/upscale/image` | $0.01 per megapixel (4K about $0.08) |
-| Face Swap | `easel-ai/advanced-face-swap` | $0.05 |
+| Image Upscale | `fal-ai/topaz/upscale/image` | $0.08 per output image up to 24 MP, so 2K and 4K cost the same (the proposal's $0.01 per megapixel was wrong) |
+| Face Swap | `fal-ai/nano-banana-pro/edit` (migration 0011; fal deprecated `easel-ai/advanced-face-swap`, $0.05, on 2026-10-24) | $0.15 |
 | Background Remover | `fal-ai/bria/background/remove` | $0.018 |
 | Motion Control | `fal-ai/kling-video/v3/standard/motion-control` | $0.126 per second |
 | Media Optimizer | local | $0 |
