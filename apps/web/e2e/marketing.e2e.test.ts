@@ -1,6 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 import { HOOKS, LOCATIONS } from '../src/lib/marketing';
-import { modelButton, png, select, signIn } from './support.test';
+import { modelButton, png, select, selectValue, signIn } from './support.test';
 
 const nav = (page: Page) => page.getByRole('navigation', { name: 'Điều hướng chính' });
 const file = (name: string) => ({ name, mimeType: 'image/png', buffer: png() });
@@ -42,11 +42,11 @@ test('a mock marketing job runs from two photos, a hook and a location, and show
   await page.keyboard.press('Enter');
   const hooks = page.getByRole('dialog', { name: 'Chọn hook' });
   await expect(hooks).toBeVisible();
-  const cards = hooks.getByRole('radio');
+  const cards = hooks.getByRole('option');
   await expect(cards).toHaveCount(HOOKS.length + 1);
   await expect(cards.first()).toHaveText('Không chọn');
   await expect(cards.first()).toBeFocused();
-  await expect(cards.first()).toHaveAttribute('aria-checked', 'true');
+  await expect(cards.first()).toHaveAttribute('aria-selected', 'true');
   await page.keyboard.press('Escape');
   await expect(hooks).toBeHidden();
   await expect(hookBox).toContainText('Chưa chọn');
@@ -57,24 +57,24 @@ test('a mock marketing job runs from two photos, a hook and a location, and show
   await expect(cards.last()).toBeFocused();
   await page.keyboard.press('Home');
   await expect(cards.first()).toBeFocused();
-  await hooks.getByRole('radio', { name: hook.name, exact: true }).focus();
+  await hooks.getByRole('option', { name: hook.name, exact: true }).focus();
   await page.keyboard.press('Enter');
   await expect(hooks).toBeHidden();
   await expect(hookBox).toContainText(hook.name);
   await hookBox.click();
-  await expect(hooks.getByRole('radio', { name: hook.name, exact: true })).toHaveAttribute('aria-checked', 'true');
-  await hooks.getByRole('radio', { name: 'Không chọn' }).click(); // the first card clears the choice
+  await expect(hooks.getByRole('option', { name: hook.name, exact: true })).toHaveAttribute('aria-selected', 'true');
+  await hooks.getByRole('option', { name: 'Không chọn' }).click(); // the first card clears the choice
   await expect(hookBox).toContainText('Chưa chọn');
   await hookBox.click();
-  await hooks.getByRole('radio', { name: hook.name, exact: true }).click();
+  await hooks.getByRole('option', { name: hook.name, exact: true }).click();
   await expect(hookBox).toContainText(hook.name);
 
   // Location: the same picker, with the mouse.
   const locationBox = page.getByRole('button', { name: /^Bối cảnh/ });
   await locationBox.click();
   const places = page.getByRole('dialog', { name: 'Chọn bối cảnh' });
-  await expect(places.getByRole('radio')).toHaveCount(LOCATIONS.length + 1);
-  await places.getByRole('radio', { name: spot.name, exact: true }).click();
+  await expect(places.getByRole('option')).toHaveCount(LOCATIONS.length + 1);
+  await places.getByRole('option', { name: spot.name, exact: true }).click();
   await expect(locationBox).toContainText(spot.name);
 
   await page.getByRole('textbox', { name: 'Prompt (tuỳ chọn)' }).fill('soft morning light');
@@ -117,11 +117,11 @@ test('the model, ratio and duration come from the marketing model, the About tab
   await expect(runButton(page)).toBeEnabled();
   await expect(select(page, 'Thời lượng')).toBeVisible();
   await select(page, 'Thời lượng').click();
-  await expect(page.getByRole('listbox', { name: 'Thời lượng' }).getByRole('option')).toHaveText(['5 giây', '8 giây']); // the model's own durations; 10 s is not one
+  await expect(page.getByRole('listbox', { name: 'Thời lượng' }).getByRole('option')).toHaveText(['5 giây', '8 giây', '10 giây']); // what any marketing model offers
   await page.keyboard.press('Escape');
   await expect(select(page, 'Tỉ lệ')).toHaveAttribute('data-value', '9:16');
   await select(page, 'Tỉ lệ').click();
-  await expect(page.getByRole('listbox', { name: 'Tỉ lệ' }).getByRole('option')).toHaveText(['9:16 (dọc)', '1:1 (vuông)']);
+  await expect(page.getByRole('listbox', { name: 'Tỉ lệ' }).getByRole('option')).toHaveText(['9:16 (dọc)', '16:9 (ngang)', '1:1 (vuông)']);
   await page.keyboard.press('Escape');
 
   await page.route(/\/api\/jobs$/, (r) => (r.request().method() === 'POST' ? r.fulfill({ status: 429, json: { error: 'Bạn đã dùng hết số clip trong ngày hôm nay' } }) : r.fallback()));
@@ -131,6 +131,52 @@ test('the model, ratio and duration come from the marketing model, the About tab
   await page.getByRole('tab', { name: 'Giới thiệu' }).click();
   await expect(page.getByRole('heading', { name: /UGC Thử đồ/ })).toBeVisible();
   await expect(page.getByText(/chưa được xây dựng/)).toBeVisible();
+});
+
+test('a second model with other ratios and durations can be picked: the menus offer the options of both models and the job stores the ratio and duration', async ({ page }) => {
+  await signIn(page, 'mktc');
+  await openPage(page);
+  await page.getByLabel('Ảnh người mẫu').setInputFiles(file('model.png'));
+  await page.getByLabel('Ảnh sản phẩm').setInputFiles(file('product.png'));
+  await expect(modelButton(page)).toContainText('Mock E2E');
+  await expect(select(page, 'Tỉ lệ')).toHaveAttribute('data-value', '9:16');
+  await expect(select(page, 'Thời lượng')).toHaveAttribute('data-value', '5'); // the first model's own first duration; 10 s was only the start
+  await expect(runButton(page)).toBeEnabled();
+
+  // A ratio only the other model offers: the chosen model is unsupported, Run says so, and the picker offers the other one.
+  const pick = (name: RegExp) => page.getByRole('option', { name });
+  await selectValue(page, 'Tỉ lệ', '16:9');
+  await expect(runButton(page)).toBeDisabled();
+  await expect(reasonOf(page)).toHaveText(/Mô hình này không có tỉ lệ hoặc thời lượng đã chọn/);
+  await modelButton(page).click();
+  await expect(pick(/Mock E2E Wide/)).toBeEnabled();
+  await pick(/Mock E2E Wide/).click();
+  await expect(modelButton(page)).toContainText('Mock E2E Wide');
+  await expect(select(page, 'Tỉ lệ')).toHaveAttribute('data-value', '16:9');
+  await expect(select(page, 'Thời lượng')).toHaveAttribute('data-value', '10'); // moved to the model's own duration
+  await expect(runButton(page)).toBeEnabled();
+  await runButton(page).click();
+  await expect(page.getByText('Đã gửi job')).toBeVisible();
+  await expect.poll(async () => ((await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { feature: string; ratio: string; durationSec: number; modelId: string }[] }).jobs.map((j) => [j.feature, j.modelId, j.ratio, j.durationSec])).toEqual([['marketing', 'mock-e2e-wide', '16:9', 10]]);
+
+  // Back to the first model: the ratio and the duration move to its own.
+  await modelButton(page).click();
+  await pick(/Mock E2E(?! Wide)/).click();
+  await expect(select(page, 'Tỉ lệ')).toHaveAttribute('data-value', '9:16');
+  await expect(select(page, 'Thời lượng')).toHaveAttribute('data-value', '5');
+});
+
+test('a failed model list can be retried', async ({ page }) => {
+  await signIn(page, 'mktb');
+  let failing = true;
+  await page.route(/\/api\/models\?feature=marketing/, (r) => (failing ? r.abort() : r.fallback()));
+  await openPage(page);
+  await expect(reasonOf(page)).toHaveText('Không tải được danh sách mô hình.');
+  failing = false;
+  await page.getByRole('button', { name: 'Thử lại' }).click();
+  await expect(modelButton(page)).toContainText('Mock E2E');
+  await expect(page.getByRole('button', { name: 'Thử lại' })).toHaveCount(0);
+  await expect(reasonOf(page)).toHaveText('Tải lên ảnh người mẫu.');
 });
 
 test('with no enabled marketing model Run is disabled and says the app is not enabled', async ({ page }) => {

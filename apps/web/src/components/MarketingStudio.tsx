@@ -27,7 +27,7 @@ type Tab = 'create' | 'history' | 'examples' | 'about';
 const TAB_LABEL: Record<Tab, string> = { create: 'Tạo', history: 'Lịch sử', examples: 'Ví dụ', about: 'Giới thiệu' };
 /** The ratios of the page, in the order of the menu; a model offers some of them. */
 const RATIO_LABEL: Record<string, string> = { '9:16': '9:16 (dọc)', '16:9': '16:9 (ngang)', '1:1': '1:1 (vuông)' };
-/** The fixed part of the composed prompt is about 550 characters and the API takes 2000. */
+/** The fixed part of the composed prompt is about 290 characters (about 460 with the longest hook and location) and the API takes 2000; 1400 leaves room. */
 const MAX_PROMPT = 1400;
 
 /** A box on the form that opens the list of choices; shows the chosen one. */
@@ -49,17 +49,17 @@ function ChoiceBox({ label, icon, choice, onOpen }: { label: string; icon: IconN
   );
 }
 
-/** The dialog of one list: text cards in a grid, the "no choice" card first. Arrows move between the cards, Enter or Space picks, Escape closes. */
+/** The dialog of one list: text cards in a grid, the "no choice" card first. Arrows move the focus between the cards, Enter or Space picks, Escape closes. */
 function ChoiceDialog({ open, title, choices, value, onPick, onClose }: { open: boolean; title: string; choices: MarketingChoice[]; value: string; onPick: (id: string) => void; onClose: () => void }) {
   const grid = useRef<HTMLDivElement>(null);
   // showModal (in Modal's effect, which runs first) focuses the close button, so the chosen card takes the focus afterwards.
   useEffect(() => {
-    if (open) grid.current?.querySelector<HTMLElement>('[aria-checked=true]')?.focus();
+    if (open) grid.current?.querySelector<HTMLElement>('[aria-selected=true]')?.focus();
   }, [open]);
   function onKey(e: KeyboardEvent<HTMLDivElement>) {
     const moves: Record<string, number> = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
     if (!(e.key in moves) && e.key !== 'Home' && e.key !== 'End') return;
-    const cards = [...e.currentTarget.querySelectorAll<HTMLButtonElement>('[role=radio]')];
+    const cards = [...e.currentTarget.querySelectorAll<HTMLButtonElement>('[role=option]')];
     const at = cards.indexOf(document.activeElement as HTMLButtonElement);
     const next = e.key === 'Home' ? 0 : e.key === 'End' ? cards.length - 1 : (at + moves[e.key]! + cards.length) % cards.length;
     e.preventDefault();
@@ -69,9 +69,9 @@ function ChoiceDialog({ open, title, choices, value, onPick, onClose }: { open: 
   return (
     <Modal open={open} onClose={onClose} label={title} className="choice-dialog">
       <h2>{title}</h2>
-      <div ref={grid} className="choice-grid" role="radiogroup" aria-label={title} onKeyDown={onKey}>
+      <div ref={grid} className="choice-grid" role="listbox" aria-label={title} onKeyDown={onKey}>
         {all.map((c) => (
-          <button key={c.id || 'none'} type="button" role="radio" aria-checked={value === c.id} tabIndex={value === c.id ? 0 : -1} onClick={() => onPick(c.id)}>
+          <button key={c.id || 'none'} type="button" role="option" aria-selected={value === c.id} tabIndex={value === c.id ? 0 : -1} onClick={() => onPick(c.id)}>
             {c.name}
           </button>
         ))}
@@ -90,10 +90,11 @@ export function MarketingStudio() {
   const [picker, setPicker] = useState<'hook' | 'location' | null>(null);
   const [prompt, setPrompt] = useState('');
   const [modelId, setModelId] = useState('');
-  const [wantRatio, setWantRatio] = useState('9:16');
-  const [wantDuration, setWantDuration] = useState(10);
-  const [list, setList] = useState<{ key: string; models: VideoModel[] } | null>(null);
+  const [ratio, setRatio] = useState('9:16');
+  const [durationSec, setDurationSec] = useState(10);
+  const [list, setList] = useState<{ key: string; models: VideoModel[]; defaultId: string | null } | null>(null);
   const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const [tab, setTab] = useState<Tab | null>(null); // null: the default for the width (the form below 1024 px, else the examples)
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -101,42 +102,60 @@ export function MarketingStudio() {
   const promptId = useId();
   const reasonId = useId();
 
-  // The model stays while it is listed; the ratio and the duration fall back to the model's own first option, so the options always match the model.
+  // The ratio and duration menus offer what any marketing model offers, so a model whose options differ from the chosen one's can still be picked;
+  // switching to a model moves the ratio and the duration to that model's own when it lacks them.
   const models = list?.models ?? null;
-  const chosen = models?.find((m) => m.id === modelId) ?? models?.[0];
-  const ratios = chosen ? Object.keys(RATIO_LABEL).filter((r) => chosen.ratios.includes(r)) : [];
-  const durations = chosen ? [...chosen.durationsSec].sort((a, b) => a - b) : [];
-  const ratio = ratios.length > 0 && !ratios.includes(wantRatio) ? ratios[0]! : wantRatio;
-  const durationSec = durations.length > 0 && !durations.includes(wantDuration) ? durations[0]! : wantDuration;
+  const chosen = models?.find((m) => m.id === modelId);
+  const ratios = Object.keys(RATIO_LABEL).filter((r) => models?.some((m) => m.ratios.includes(r)));
+  const durations = [...new Set(models?.flatMap((m) => m.durationsSec))].sort((a, b) => a - b);
   const key = `${ratio}/${durationSec}`;
+  const fresh = list !== null && list.key === key;
 
-  // The list (with the estimate for this duration) is fetched again when the ratio or the duration changes.
+  // Every model can be picked (the picker is told all are supported): switching moves the ratio and the duration to the model's own.
+  function pickModel(m: VideoModel) {
+    setModelId(m.id);
+    const own = Object.keys(RATIO_LABEL).filter((r) => m.ratios.includes(r));
+    if (own.length > 0 && !own.includes(ratio)) setRatio(own[0]!);
+    const ownDurations = [...m.durationsSec].sort((a, b) => a - b);
+    if (ownDurations.length > 0 && !ownDurations.includes(durationSec)) setDurationSec(ownDurations[0]!);
+  }
+
+  // The list (with the estimate for this duration) is fetched again when the ratio or the duration changes, or when the member retries after a failure.
   useEffect(() => {
     let stale = false;
-    api<{ models: VideoModel[] }>(`/api/models?feature=marketing&ratio=${encodeURIComponent(ratio)}&durationSec=${durationSec}`).then(
-      (r) => !stale && (setList({ key, models: r.models }), setFailed(false)),
+    api<{ models: VideoModel[]; defaultModelId: string | null }>(`/api/models?feature=marketing&ratio=${encodeURIComponent(ratio)}&durationSec=${durationSec}`).then(
+      (r) => !stale && (setList({ key, models: r.models, defaultId: r.defaultModelId }), setFailed(false)),
       () => !stale && setFailed(true),
     );
     return () => {
       stale = true;
     };
-  }, [key]);
+  }, [key, attempt]);
+
+  // The first list picks the server's default model (the best of those that offer the starting ratio and duration), else the first; a model switched off since is replaced the same way.
+  useEffect(() => {
+    if (!list || list.models.some((m) => m.id === modelId)) return;
+    const first = list.models.find((m) => m.id === list.defaultId) ?? list.models[0];
+    if (first) pickModel(first);
+  }, [list]);
 
   // The first thing that stops Run, in the order the form is filled; null when it can go.
   const reason =
     failed
       ? 'Không tải được danh sách mô hình.'
-      : list === null || list.key !== key
+      : !fresh || (models!.length > 0 && !chosen)
         ? 'Đang tải danh sách mô hình...'
-        : !chosen
+        : models!.length === 0
           ? 'Marketing Studio chưa được Admin bật'
           : ratios.length === 0 || durations.length === 0
-            ? 'Mô hình này không có tỉ lệ hoặc thời lượng dùng được cho Marketing Studio.'
-            : person.length === 0
-              ? 'Tải lên ảnh người mẫu.'
-              : product.length === 0
-                ? 'Tải lên ảnh sản phẩm.'
-                : null;
+            ? 'Các mô hình này không có tỉ lệ hoặc thời lượng dùng được cho Marketing Studio.'
+            : !chosen!.supported
+              ? 'Mô hình này không có tỉ lệ hoặc thời lượng đã chọn. Chọn mô hình khác, hoặc đổi tỉ lệ hoặc thời lượng.'
+              : person.length === 0
+                ? 'Tải lên ảnh người mẫu.'
+                : product.length === 0
+                  ? 'Tải lên ảnh sản phẩm.'
+                  : null;
   const canRun = reason === null && !busy;
 
   function add(set: (f: (cur: Img[]) => Img[]) => void) {
@@ -219,12 +238,12 @@ export function MarketingStudio() {
               </div>
             </div>
 
-            {models && models.length > 0 && <ModelPicker models={models.map((m) => ({ id: m.id, label: m.label, isMock: m.isMock, supported: m.supported, estimateUsd: m.estimateUsd }))} value={chosen?.id ?? ''} onChange={setModelId} />}
-            {chosen && ratios.length > 0 && (
-              <Select label="Tỉ lệ" icon="ratio" heading="Chọn tỉ lệ" value={ratio} options={ratios.map((r) => ({ value: r, label: RATIO_LABEL[r]! }))} onChange={setWantRatio} />
+            {models && models.length > 0 && <ModelPicker models={models.map((m) => ({ id: m.id, label: m.label, isMock: m.isMock, supported: true, estimateUsd: m.estimateUsd }))} value={chosen?.id ?? ''} onChange={(id) => pickModel(models.find((m) => m.id === id)!)} />}
+            {models && ratios.length > 0 && (
+              <Select label="Tỉ lệ" icon="ratio" heading="Chọn tỉ lệ" value={ratio} options={ratios.map((r) => ({ value: r, label: RATIO_LABEL[r]! }))} onChange={setRatio} />
             )}
-            {chosen && durations.length > 0 && (
-              <Select label="Thời lượng" icon="clock" heading="Chọn thời lượng" value={String(durationSec)} options={durations.map((d) => ({ value: String(d), label: `${d} giây` }))} onChange={(v) => setWantDuration(Number(v))} />
+            {models && durations.length > 0 && (
+              <Select label="Thời lượng" icon="clock" heading="Chọn thời lượng" value={String(durationSec)} options={durations.map((d) => ({ value: String(d), label: `${d} giây` }))} onChange={(v) => setDurationSec(Number(v))} />
             )}
           </div>
 
@@ -233,6 +252,11 @@ export function MarketingStudio() {
               <p id={reasonId} className="help" role="status">
                 {reason}
               </p>
+            )}
+            {failed && (
+              <button type="button" onClick={() => setAttempt((n) => n + 1)}>
+                Thử lại
+              </button>
             )}
             {error && (
               <p className="error" role="alert">
@@ -244,7 +268,7 @@ export function MarketingStudio() {
           <div className="runbar">
             <button type="button" className="primary run" disabled={!canRun} aria-describedby={reason ? reasonId : undefined} onClick={() => void run()}>
               Tạo video
-              {chosen && <span className="run-cost">· ${chosen.estimateUsd}</span>}
+              {chosen && <span className="run-cost">· {fresh ? `$${chosen.estimateUsd}` : '…'}</span>} {/* the estimate is for the duration of the last list */}
             </button>
           </div>
         </div>

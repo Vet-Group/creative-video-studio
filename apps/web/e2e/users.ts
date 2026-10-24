@@ -19,6 +19,7 @@ export const USERS = {
   appsc: { email: 'appsc@e2e.test', name: 'E2E Apps C', role: 'member' },
   mkta: { email: 'mkta@e2e.test', name: 'E2E Mkt A', role: 'member' },
   mktb: { email: 'mktb@e2e.test', name: 'E2E Mkt B', role: 'member' },
+  mktc: { email: 'mktc@e2e.test', name: 'E2E Mkt C', role: 'member' },
   admin: { email: 'admin@e2e.test', name: 'E2E Admin', role: 'admin' },
 } as const;
 

@@ -19,7 +19,7 @@ const range = (values: number[]) => (values.length === 0 ? '' : values.length > 
 export default async function ExplorePage() {
   const [models, presets] = await Promise.all([
     pool.query<{ id: string; label: string; provider: string; ratios: string[]; durations_sec: number[] }>(
-      `select id, label, provider, ratios, durations_sec from model_configs where enabled and kind = 'video' order by label, id`,
+      `select id, label, provider, ratios, durations_sec from model_configs where enabled and kind = 'video' and 'video' = any(features) order by label, id`,
     ),
     pool.query<{ id: string; label: string }>('select id, label from presets where enabled order by sort_order, id'),
   ]);
