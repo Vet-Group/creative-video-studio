@@ -368,6 +368,20 @@ describe.skipIf(!hasBash)('deploy kit (needs bash only)', { timeout: 30_000 }, (
     expect(r.out).toContain(`ExecStart=${s.home}/.local/bin/cloudflared tunnel --no-autoupdate`);
   });
 
+  test('e3. jget reads a dotted path from the top of a Cloudflare reply and refuses a reply that is not a success', () => {
+    // The first real deploy stopped at "the token does not see zone" because jget started below "result" while its callers name it.
+    const fn = readFileSync(installSh, 'utf8').match(/^jget\(\) \{[\s\S]*?\n\}\n/m)?.[0];
+    expect(fn).toBeDefined();
+    const jget = (json: string, path: string) => spawnSync(bash, ['-c', `${fn}\njget "$1" "$2"`, '_', json, path], { encoding: 'utf8' });
+    const zone = JSON.stringify({ success: true, result: [{ id: 'z1', account: { id: 'a1' } }] });
+    expect(jget(zone, 'result.0.id').stdout.trim()).toBe('z1');
+    expect(jget(zone, 'result.0.account.id').stdout.trim()).toBe('a1');
+    expect(jget(JSON.stringify({ success: true, result: { id: 't1' } }), 'result.id').stdout.trim()).toBe('t1');
+    expect(jget(JSON.stringify({ success: true, result: [] }), 'result.0.id').stdout.trim()).toBe('');
+    const refused = jget(JSON.stringify({ success: false, errors: [{ code: 9109, message: 'no' }] }), 'result.0.id');
+    expect([refused.status, refused.stderr]).toEqual([1, expect.stringContaining('9109')]);
+  });
+
   test('i. a re-run with a recorded tunnel keeps it only when it is complete', () => {
     const half = sandbox();
     writeFileSync(half.stateFile, 'compose=creative-video-studio\ntunnel_id=0123abcd-0123-4abc-8abc-0123456789ab\n');

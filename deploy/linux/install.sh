@@ -241,14 +241,14 @@ cf() { # $1 = method, $2 = API path, $3 = optional file holding the JSON body; t
   if [ -n "${3:-}" ]; then args+=(--data-binary "@$3"); fi
   printf 'header = "Authorization: Bearer %s"\n' "$CLOUDFLARE_API_TOKEN" | curl --config - "${args[@]}" "https://api.cloudflare.com/client/v4$2"
 }
-jget() { # $1 = JSON, $2 = dotted path to print; exits 1 with Cloudflare's errors when success is not true
+jget() { # $1 = JSON, $2 = dotted path from the top of the reply (result.0.id); exits 1 with Cloudflare's errors when success is not true
   printf '%s' "$1" | node -e '
     let s = "";
     process.stdin.on("data", (d) => (s += d)).on("end", () => {
       let j;
       try { j = JSON.parse(s); } catch { console.error("Cloudflare sent a reply that is not JSON"); process.exit(1); }
       if (!j.success) { console.error("Cloudflare refused: " + JSON.stringify(j.errors ?? [])); process.exit(1); }
-      let v = j.result;
+      let v = j;
       for (const k of process.argv[1].split(".")) v = v?.[k];
       console.log(v ?? "");
     });' "$2"
