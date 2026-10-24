@@ -319,7 +319,7 @@ test('Run is disabled with a reason when the app has no enabled model, and "Đ�
   await expect(reasonOf(page)).toHaveText('Tải lên ảnh: Nhân vật mới.');
 });
 
-for (const [width, height, columns] of [[390, 844, 1], [1024, 768, 3], [1440, 1000, 3], [800, 900, 2]] as const) {
+for (const [width, height, columns] of [[390, 844, 2], [1024, 768, 2], [1440, 1000, 3], [800, 900, 2], [1920, 1080, 5]] as const) {
   test(`at ${width} px the index has ${columns} column(s) and the app pages fit the width in every tab`, async ({ page }) => {
     await page.setViewportSize({ width, height });
     await signIn(page, 'appsb');
