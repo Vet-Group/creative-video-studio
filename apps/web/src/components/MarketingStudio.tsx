@@ -36,11 +36,11 @@ function ChoiceBox({ label, icon, choice, onOpen }: { label: string; icon: IconN
   const valueId = useId();
   return (
     <div className="field">
-      <span id={labelId} className="field-label">
-        {label}
-      </span>
       <button type="button" className="choice-box" aria-haspopup="dialog" aria-labelledby={`${labelId} ${valueId}`} onClick={onOpen}>
         <Icon name={icon} size={20} />
+        <span id={labelId} className="choice-label">
+          {label}
+        </span>
         <span id={valueId} className="choice-value">
           {choice ? choice.name : 'Chưa chọn'}
         </span>
@@ -212,7 +212,7 @@ export function MarketingStudio() {
 
         <div className="card form-card" id="marketing-panel-create" role={narrow ? 'tabpanel' : undefined} aria-labelledby={narrow ? 'marketing-tab-create' : undefined} hidden={narrow && shown !== 'create'}>
           <div className="form-scroll">
-            <div className="app-head" data-category="video">
+            <div className="app-head marketing-head" data-category="video">
               <strong>UGC Thử đồ</strong>
             </div>
             <div className="app-slots marketing-slots" data-two="true">
@@ -239,12 +239,14 @@ export function MarketingStudio() {
             </div>
 
             {models && models.length > 0 && <ModelPicker models={models.map((m) => ({ id: m.id, label: m.label, isMock: m.isMock, supported: true, estimateUsd: m.estimateUsd }))} value={chosen?.id ?? ''} onChange={(id) => pickModel(models.find((m) => m.id === id)!)} />}
-            {models && ratios.length > 0 && (
-              <Select label="Tỉ lệ" icon="ratio" heading="Chọn tỉ lệ" value={ratio} options={ratios.map((r) => ({ value: r, label: RATIO_LABEL[r]! }))} onChange={setRatio} />
-            )}
-            {models && durations.length > 0 && (
-              <Select label="Thời lượng" icon="clock" heading="Chọn thời lượng" value={String(durationSec)} options={durations.map((d) => ({ value: String(d), label: `${d} giây` }))} onChange={(v) => setDurationSec(Number(v))} />
-            )}
+            <div className="field-row">
+              {models && ratios.length > 0 && (
+                <Select label="Tỉ lệ" icon="ratio" heading="Chọn tỉ lệ" value={ratio} options={ratios.map((r) => ({ value: r, label: RATIO_LABEL[r]! }))} onChange={setRatio} />
+              )}
+              {models && durations.length > 0 && (
+                <Select label="Thời lượng" icon="clock" heading="Chọn thời lượng" value={String(durationSec)} options={durations.map((d) => ({ value: String(d), label: `${d} giây` }))} onChange={(v) => setDurationSec(Number(v))} />
+              )}
+            </div>
           </div>
 
           <div className="form-message">

@@ -18,8 +18,9 @@ const range = (values: number[]) => (values.length === 0 ? '' : values.length > 
 /** Explore: the start page of the live dashboard, with the tools, the enabled models and the company presets, each linking into Create. */
 export default async function ExplorePage() {
   const [models, presets] = await Promise.all([
-    pool.query<{ id: string; label: string; provider: string; ratios: string[]; durations_sec: number[] }>(
-      `select id, label, provider, ratios, durations_sec from model_configs where enabled and kind = 'video' and 'video' = any(features) order by label, id`,
+    // Video models open Create Videos and image models open Image Generation, as the live page features both.
+    pool.query<{ id: string; label: string; provider: string; kind: string; ratios: string[]; durations_sec: number[] }>(
+      `select id, label, provider, kind, ratios, durations_sec from model_configs where enabled and kind = any(features) and kind in ('video', 'image') order by kind desc, label, id`,
     ),
     pool.query<{ id: string; label: string }>('select id, label from presets where enabled order by sort_order, id'),
   ]);
@@ -50,7 +51,7 @@ export default async function ExplorePage() {
         <ul className="explore-cards" aria-label="Mô hình">
           {models.rows.map((m) => (
             <li key={m.id}>
-              <Link href={`/create?model=${encodeURIComponent(m.id)}`} className="explore-card">
+              <Link href={m.kind === 'video' ? `/create?model=${encodeURIComponent(m.id)}` : '/image-generation'} className="explore-card">
                 <span className="banner-empty" aria-hidden="true" />
                 <strong>{m.label}</strong>
                 <span className="muted">
@@ -63,6 +64,7 @@ export default async function ExplorePage() {
       )}
 
       <h2>Mẫu chuyển động</h2>
+      <p className="muted explore-sub">Chọn một mẫu, tải ảnh đầu lên và nhận video.</p>
       {presets.rows.length === 0 ? (
         <p className="muted">Chưa có mẫu nào được bật.</p>
       ) : (

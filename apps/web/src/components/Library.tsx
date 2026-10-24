@@ -298,7 +298,7 @@ export function Library() {
           <Icon name="ratio" />
         </label>
       </div>
-      <div className="filters" role="search" aria-label="Bộ lọc">
+      <div className="filters library-filters" role="search" aria-label="Bộ lọc">
         <label>
           Người tạo
           <select value={creator} onChange={(e) => setCreator(e.target.value)}>

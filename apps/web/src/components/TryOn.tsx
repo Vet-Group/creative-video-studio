@@ -159,7 +159,7 @@ export function TryOn() {
         </div>
 
         <div className="side" id={`tryon-panel-${panel}`} role="tabpanel" aria-labelledby={`tryon-tab-${panel}`} hidden={narrow && shown === 'create'}>
-          {shown === 'examples' ? <Gallery kind="try_on" label="Ảnh thử đồ của công ty" emptyText="Chưa có ảnh thử đồ nào trong công ty." /> : shown === 'about' ? <TryOnAbout /> : <Tray feature="try_on" />}
+          {shown === 'examples' ? <Gallery kind="try_on" cols={[2, 2, 3]} label="Ảnh thử đồ của công ty" emptyText="Chưa có ảnh thử đồ nào trong công ty." /> : shown === 'about' ? <TryOnAbout /> : <Tray feature="try_on" />}
         </div>
       </div>
     </section>
