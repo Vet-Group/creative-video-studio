@@ -239,6 +239,9 @@ importers:
       pg-boss:
         specifier: 12.37.0
         version: 12.37.0(@opentelemetry/api@1.10.0)
+      sharp:
+        specifier: 0.35.5
+        version: 0.35.5(@types/node@24.19.0)
     devDependencies:
       tsx:
         specifier: 4.23.15
@@ -2532,8 +2535,7 @@ snapshots:
 
   '@fontsource-variable/inter@5.2.8': {}
 
-  '@img/colour@1.1.0':
-    optional: true
+  '@img/colour@1.1.0': {}
 
   '@img/sharp-darwin-arm64@0.35.5':
     optionalDependencies:
@@ -3266,8 +3268,7 @@ snapshots:
 
   scheduler@0.28.0: {}
 
-  semver@7.8.5:
-    optional: true
+  semver@7.8.5: {}
 
   serialize-error@13.0.2:
     dependencies:
@@ -3308,7 +3309,6 @@ snapshots:
       '@img/sharp-win32-ia32': 0.35.5
       '@img/sharp-win32-x64': 0.35.5
       '@types/node': 24.19.0
-    optional: true
 
   source-map-js@1.2.2: {}
 

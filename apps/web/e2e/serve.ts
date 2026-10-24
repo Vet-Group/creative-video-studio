@@ -17,10 +17,13 @@ process.env.DATABASE_URL = db.url;
 process.env.S3_BUCKET = 'cvs-e2e';
 process.env.CVS_MOCK_RUN_MS = '4000';
 // The specs run with no social login (no login buttons), whatever the developer's .env holds, and with a known support email on /privacy.
-for (const name of ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'LARK_APP_ID', 'LARK_APP_SECRET', 'LARK_TENANT_KEY']) delete process.env[name];
+// They never reach a paid provider either: without these keys the e2e worker has only the mock adapters.
+for (const name of ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'LARK_APP_ID', 'LARK_APP_SECRET', 'LARK_TENANT_KEY', 'FAL_KEY', 'REPLICATE_API_TOKEN']) delete process.env[name];
 process.env.CVS_SUPPORT_EMAIL = 'support@e2e.test';
 
 const { auth, pool } = await import('../src/lib/auth');
+// Migration 0013 enables Kling; the specs run on the mock models only.
+await pool.query(`update model_configs set enabled = false where id = 'kling-o3-pro'`);
 await pool.query(
   `insert into model_configs (id, provider, endpoint, label, ratios, durations_sec, max_images, output_resolution, usd_per_second, sources, enabled, pass_seed_passes, pass_seed_total)
    values ('mock-e2e', 'mock', 'mock', 'Mock E2E', '{9:16,1:1}', '{5,8}', 4, '720p', 0.1, '{}', true, 8, 10),

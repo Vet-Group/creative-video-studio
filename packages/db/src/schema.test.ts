@@ -1,6 +1,8 @@
 // Integration test of migration 0002 on a disposable database (needs the compose Postgres: `pnpm services:up`).
+import { readFileSync } from 'node:fs';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
+import { BAKEOFF_MODELS } from '../../core/src/models';
 import { PRESETS } from '../../core/src/presets';
 import { createTestDatabase } from './testing';
 
@@ -58,17 +60,17 @@ describe('migration 0002 seed data', () => {
     expect(rows.filter((r) => r.isBakeoffSafe)).toHaveLength(1);
   });
 
-  test('seeds the two models disabled with no price or limits, and the settings row', async () => {
-    const models = await pool.query(`select id, provider, endpoint, enabled, usd_per_second, max_images, output_resolution from model_configs where kind = 'video' order by id`);
+  test('seeds the two models with price, limits and bake-off record (migration 0013: Kling enabled, Seedance disabled), and the settings row', async () => {
+    const models = await pool.query(`select id, provider, endpoint, enabled, usd_per_second::text as usd, max_images, output_resolution, pass_seed_passes as passes, pass_seed_total as total from model_configs where kind = 'video' order by id`);
     expect(models.rows).toEqual([
-      { id: 'kling-o3-pro', provider: 'fal', endpoint: 'fal-ai/kling-video/o3/pro/reference-to-video', enabled: false, usd_per_second: null, max_images: null, output_resolution: null },
-      { id: 'seedance-2.5', provider: 'replicate', endpoint: 'bytedance/seedance-2.5', enabled: false, usd_per_second: null, max_images: null, output_resolution: null },
+      { id: 'kling-o3-pro', provider: 'fal', endpoint: 'fal-ai/kling-video/o3/pro/reference-to-video', enabled: true, usd: '0.1120', max_images: 4, output_resolution: '1080p', passes: 7, total: 10 },
+      { id: 'seedance-2.5', provider: 'replicate', endpoint: 'bytedance/seedance-2.5', enabled: false, usd: '0.2312', max_images: 4, output_resolution: '720p', passes: 6, total: 9 },
     ]);
     expect((await pool.query(`select monthly_cap_usd::text as cap, member_daily_clip_cap as daily from settings`)).rows).toEqual([{ cap: '200.0000', daily: 5 }]);
   });
 
   test('refuses to enable a model that has no price or limits', async () => {
-    await expect(pool.query(`update model_configs set enabled = true where id = 'kling-o3-pro'`)).rejects.toThrow(/model_configs_enabled_complete_check/);
+    await expect(pool.query(`update model_configs set enabled = true, usd_per_second = null where id = 'seedance-2.5'`)).rejects.toThrow(/model_configs_enabled_complete_check/);
   });
 });
 
@@ -104,8 +106,8 @@ describe('migration 0007 image models', () => {
       await expect(pool.query(`update model_configs set ${set}, enabled = true where id = 'nano-banana-pro'`), what).rejects.toThrow(/model_configs_enabled_complete_check/);
     }
     // A video row is still judged by the video rule, whatever else it carries.
-    await expect(pool.query(`update model_configs set image_prices = '{"1K": "1"}'::jsonb, max_images = 4, ratios = '{9:16}', enabled = true where id = 'kling-o3-pro'`)).rejects.toThrow(/model_configs_enabled_complete_check/);
-    await expect(pool.query(`update model_configs set kind = 'audio' where id = 'kling-o3-pro'`)).rejects.toThrow(/model_configs_kind_check/);
+    await expect(pool.query(`update model_configs set image_prices = '{"1K": "1"}'::jsonb, max_images = 4, ratios = '{9:16}', usd_per_second = null, enabled = true where id = 'seedance-2.5'`)).rejects.toThrow(/model_configs_enabled_complete_check/);
+    await expect(pool.query(`update model_configs set kind = 'audio' where id = 'seedance-2.5'`)).rejects.toThrow(/model_configs_kind_check/);
   });
 
   test('a job takes the image ratios and params; 0 seconds and the default params are fine', async () => {
@@ -153,10 +155,9 @@ describe('migration 0009 image app models', () => {
 });
 
 describe('migration 0010 marketing model', () => {
-  test('adds marketing to Kling O3 Pro, keeps it disabled, and records the schema read', async () => {
-    const { rows } = await pool.query(`select features, enabled, sources from model_configs where id = 'kling-o3-pro'`);
+  test('adds marketing to Kling O3 Pro and records the schema read', async () => {
+    const { rows } = await pool.query(`select features, sources from model_configs where id = 'kling-o3-pro'`);
     expect(rows[0].features).toEqual(['video', 'marketing']);
-    expect(rows[0].enabled).toBe(false);
     expect(rows[0].sources.referenceImages).toMatchObject({ readAt: '2026-10-24', url: expect.stringContaining('endpoint_id=fal-ai/kling-video/o3/pro/reference-to-video') });
   });
 });
@@ -168,6 +169,21 @@ describe('migration 0011 face swap model', () => {
       { id: 'easel-advanced-face-swap', features: [], enabled: false },
       { id: 'nano-banana-pro-face-swap', features: ['face_swap'], enabled: false },
     ]);
+  });
+});
+
+describe('migration 0013 real video models', () => {
+  test('the rows carry the BAKEOFF_MODELS facts and the pass counts of docs/BAKEOFF.md', async () => {
+    const doc = readFileSync(new URL('../../../docs/BAKEOFF.md', import.meta.url), 'utf8');
+    for (const m of BAKEOFF_MODELS) {
+      const row = (await pool.query(`select *, usd_per_second::float8 as usd from model_configs where id = $1`, [m.id])).rows[0];
+      expect(row, m.id).toMatchObject({
+        provider: m.provider, endpoint: m.endpoint, label: m.label, ratios: m.ratios, durations_sec: m.durationsSec, max_images: m.maxImages,
+        output_resolution: m.outputResolution, usd: m.usdPerSecond, billed_amount_field: m.billedAmountField, sources: m.sources,
+      });
+      const [, passes, total] = new RegExp(`\\| ${m.id} \\| (\\d+)/(\\d+) \\|`).exec(doc)!;
+      expect([row.pass_seed_passes, row.pass_seed_total], m.id).toEqual([Number(passes), Number(total)]);
+    }
   });
 });
 
