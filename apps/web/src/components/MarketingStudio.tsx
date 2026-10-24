@@ -221,7 +221,6 @@ export function MarketingStudio() {
               <ChoiceBox label="Hook (tuỳ chọn)" icon="preset" choice={HOOKS.find((c) => c.id === hook)} onOpen={() => setPicker('hook')} />
               <ChoiceBox label="Bối cảnh (tuỳ chọn)" icon="store" choice={LOCATIONS.find((c) => c.id === location)} onOpen={() => setPicker('location')} />
             </div>
-            <p className="help">JPEG, PNG hoặc WebP. Chỉ tải lên ảnh mà công ty có quyền sử dụng.</p>
 
             <div className="field">
               <label htmlFor={promptId} className="field-label">
@@ -238,7 +237,6 @@ export function MarketingStudio() {
               </div>
             </div>
 
-            {models && models.length > 0 && <ModelPicker models={models.map((m) => ({ id: m.id, label: m.label, isMock: m.isMock, supported: true, estimateUsd: m.estimateUsd }))} value={chosen?.id ?? ''} onChange={(id) => pickModel(models.find((m) => m.id === id)!)} />}
             <div className="field-row">
               {models && ratios.length > 0 && (
                 <Select label="Tỉ lệ" icon="ratio" heading="Chọn tỉ lệ" value={ratio} options={ratios.map((r) => ({ value: r, label: RATIO_LABEL[r]! }))} onChange={setRatio} />
@@ -247,6 +245,8 @@ export function MarketingStudio() {
                 <Select label="Thời lượng" icon="clock" heading="Chọn thời lượng" value={String(durationSec)} options={durations.map((d) => ({ value: String(d), label: `${d} giây` }))} onChange={(v) => setDurationSec(Number(v))} />
               )}
             </div>
+            {models && models.length > 0 && <ModelPicker models={models.map((m) => ({ id: m.id, label: m.label, isMock: m.isMock, supported: true, estimateUsd: m.estimateUsd }))} value={chosen?.id ?? ''} onChange={(id) => pickModel(models.find((m) => m.id === id)!)} />}
+            <p className="help">JPEG, PNG hoặc WebP. Chỉ tải lên ảnh mà công ty có quyền sử dụng.</p>
           </div>
 
           <div className="form-message">
