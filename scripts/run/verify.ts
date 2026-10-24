@@ -1,6 +1,6 @@
 // pnpm run:verify — machine check of every evidence item (plan A.0, A.2). "Done" cannot be claimed past this.
 import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { isAbsolute, join } from 'node:path';
 import { changedGuards, counts, sha256, validate, type Evidence, type Manifest } from './manifest.ts';
 
 export type CiStatus = 'success' | 'failure' | 'pending' | 'missing';
@@ -12,12 +12,13 @@ async function checkEvidence(e: Evidence, root: string, ci: (repo: string, sha: 
       return s === 'success' ? null : `CI on ${e.sha.slice(0, 7)} is ${s}`;
     }
     case 'file': {
-      const p = join(root, e.path);
+      // Bake-off inputs live outside the repo, so their evidence path is absolute.
+      const p = isAbsolute(e.path) ? e.path : join(root, e.path);
       if (!existsSync(p)) return `${e.path} is missing`;
       return sha256(p) === e.sha256 ? null : `${e.path} changed since it was recorded`;
     }
     case 'log': {
-      const p = join(root, e.path);
+      const p = isAbsolute(e.path) ? e.path : join(root, e.path);
       if (!existsSync(p)) return `${e.path} is missing`;
       // Logs written by the run end with "EXIT <code>".
       const last = readFileSync(p, 'utf8').trimEnd().split('\n').pop() ?? '';

@@ -256,6 +256,16 @@ describe('notify and verify', () => {
       'base-1: still open',
     ]);
   });
+
+  test('verify reads file evidence at an absolute path as is', async () => {
+    const dir = tmp();
+    const outside = join(tmp(), 'inputs.json');
+    writeFileSync(outside, 'x');
+    const m = fresh();
+    m.criteria = [];
+    Object.assign(get(m, 'P.0'), { status: 'done', evidence: [{ kind: 'file', path: outside, sha256: sha256(outside) }] });
+    expect((await verify(m, dir, async () => 'success')).errors).toEqual([]);
+  });
 });
 
 test('guard files: committed list plus the local list entries that exist', () => {
