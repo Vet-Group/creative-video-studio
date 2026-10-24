@@ -1,5 +1,5 @@
 -- M.6: the two bake-off models get their provider facts (BAKEOFF_MODELS in packages/core/src/models.ts, each with its source) and their bake-off record (docs/BAKEOFF.md, 2026-10-24).
--- Kling O3 Pro passed (7/10 = 70%, bar 70%) and is enabled; Seedance 2.5 reached 6/9 (67%) and stays disabled, so an Admin may enable it later.
+-- Kling O3 Pro passed (7/10 = 70%, bar 70%) and is enabled; Seedance 2.5 reached 6/9 (67%): it keeps its record and stays disabled, and the settings API refuses to enable it under 70%.
 -- Kling's output resolution is the B.5a canary measurement (1080x1920, scripts/bakeoff/rubric.md).
 UPDATE "model_configs" SET
 	"ratios" = ARRAY['9:16', '1:1']::text[],

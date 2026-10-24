@@ -90,16 +90,24 @@ describe('PUT /api/admin/settings', () => {
     );
     const res = await put({ monthlyCapUsd: 999, models: [{ id: 'new-model', enabled: true }] });
     expect(res.status).toBe(400);
-    expect(((await res.json()) as { error: string }).error).toMatch(/no bake-off record for new-model.*adding-a-model\.md/);
+    expect(((await res.json()) as { error: string }).error).toMatch(/no passing bake-off record \(at least 70%\) for new-model.*adding-a-model\.md/);
     expect(await enabled('new-model')).toBe(false);
     expect((await pool.query('select monthly_cap_usd::text as cap from settings')).rows[0].cap).toBe('200.0000');
   });
 
-  test('enables a model once its bake-off record exists, audited, and lets an Admin switch Seedance on', async () => {
-    await pool.query(`update model_configs set pass_seed_passes = 3, pass_seed_total = 5 where id = 'new-model'`);
-    expect((await put({ models: [{ id: 'new-model', enabled: true }, { id: 'seedance-2.5', enabled: true }] })).status).toBe(200);
-    expect([await enabled('new-model'), await enabled('seedance-2.5')]).toEqual([true, true]);
+  test('refuses a record under 70%, so Seedance 2.5 (6/9) stays off, and changes nothing', async () => {
+    await pool.query(`update model_configs set pass_seed_passes = 6, pass_seed_total = 9 where id = 'new-model'`);
+    const res = await put({ models: [{ id: 'seedance-2.5', enabled: true }, { id: 'new-model', enabled: true }] });
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { error: string }).error).toMatch(/no passing bake-off record \(at least 70%\) for new-model, seedance-2\.5/);
+    expect([await enabled('new-model'), await enabled('seedance-2.5')]).toEqual([false, false]);
+  });
+
+  test('enables a model once its record reaches 70%, audited', async () => {
+    await pool.query(`update model_configs set pass_seed_passes = 7, pass_seed_total = 10 where id = 'new-model'`);
+    expect((await put({ models: [{ id: 'new-model', enabled: true }] })).status).toBe(200);
+    expect(await enabled('new-model')).toBe(true);
     const audits = (await pool.query(`select count(*)::int as n from audit_entries where action = 'model.set_enabled'`)).rows[0].n;
-    expect(audits).toBe(2);
+    expect(audits).toBe(1);
   });
 });

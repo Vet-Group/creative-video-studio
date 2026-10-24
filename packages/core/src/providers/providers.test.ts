@@ -2,7 +2,7 @@
 import { describe, expect, test } from 'vitest';
 import { BAKEOFF_MODELS } from '../models';
 import { createFalProvider } from './fal';
-import { isFundingRefusal, ProviderHttpError, unpackJobId } from './http';
+import { ImageReadError, isFundingRefusal, MAX_INLINE_CHARS, ProviderHttpError, unpackJobId } from './http';
 import { createMockVideoProvider, MOCK_FAIL } from './mock';
 import { createReplicateProvider } from './replicate';
 import type { ProviderJob, SubmitRequest } from './types';
@@ -228,6 +228,15 @@ describe('replicate', () => {
     await expect(createReplicateProvider({ apiToken: 't', fetch: fn, readImage }).submit({ ...req, imageUrls: ['asset://missing'] })).rejects.toThrow('asset not found');
     await expect(createReplicateProvider({ apiToken: 't', fetch: fn }).submit({ ...req, imageUrls: ['asset://a1'] })).rejects.toThrow('readImage');
     expect(calls).toHaveLength(0);
+  });
+
+  test('inlined images over MAX_INLINE_CHARS in total are refused before any call (Replicate reset a 3.8 MB body)', async () => {
+    const { fn, calls } = fakeFetch([201, { id: 'pred-1' }]);
+    const big = async () => ({ bytes: new Uint8Array(Math.ceil((MAX_INLINE_CHARS * 3) / 8)), contentType: 'image/png' });
+    await expect(createReplicateProvider({ apiToken: 't', fetch: fn, readImage: big }).submit({ ...req, imageUrls: ['asset://a1', 'asset://a2'] })).rejects.toThrow(ImageReadError);
+    expect(calls).toHaveLength(0);
+    const { fn: ok } = fakeFetch([201, { id: 'pred-1' }]);
+    await expect(createReplicateProvider({ apiToken: 't', fetch: ok, readImage: big }).submit({ ...req, imageUrls: ['asset://a1'] })).resolves.toEqual({ providerJobId: '5:pred-1' });
   });
 
   test.each([

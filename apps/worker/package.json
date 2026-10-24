@@ -13,7 +13,8 @@
     "@cvs/db": "workspace:*",
     "ffmpeg-static": "5.2.0",
     "ffprobe-static": "3.1.0",
-    "pg-boss": "12.37.0"
+    "pg-boss": "12.37.0",
+    "sharp": "0.35.5"
   },
   "devDependencies": {
     "tsx": "4.23.15"
