@@ -51,6 +51,7 @@ export default async function ExplorePage() {
           {models.rows.map((m) => (
             <li key={m.id}>
               <Link href={`/create?model=${encodeURIComponent(m.id)}`} className="explore-card">
+                <span className="banner-empty" aria-hidden="true" />
                 <strong>{m.label}</strong>
                 <span className="muted">
                   {[m.provider, m.ratios.join(', '), range(m.durations_sec)].filter(Boolean).join(' · ')}
