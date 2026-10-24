@@ -489,7 +489,6 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .library-filters { gap: 12px; margin: 0 0 8px; }
 .library-filters label { margin: 0; color: rgb(102, 102, 102); font-size: 13px; line-height: 18px; font-weight: 500; }
 .library-filters select, .library-filters input { width: 10rem; min-width: 0; height: 36px; margin-top: 4px; padding: 0 10px; border: 1px solid rgb(0 0 0 / .1); border-radius: 8px; background: #fff; color: inherit; font: inherit; font-size: 13px; }
-.library-empty { padding-top: 96px; }
 .explore-sub { margin: -8px 0 16px; }
 /* Below 1024 px: centred empty Image Generation history, smaller Explore headings; tablets keep model, ratio and size on one row, as on Fash. */
 @media (max-width: 1023.98px) {
@@ -501,4 +500,21 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 @media (min-width: 600px) and (max-width: 1023.98px) {
   .imagebar .pills { flex-wrap: nowrap; }
   .imagebar .select-trigger { max-width: 10rem; }
+}
+
+/* C4 round 3. */
+/* Fash centres the empty Library in the space left under the toolbar: the page fills the viewport (less the frame padding, and the phone top bar) and the empty state takes the rest. */
+.library:has(> .library-empty) { display: flex; flex-direction: column; min-height: calc(100dvh - 48px); }
+.library-empty { flex: 1; align-content: center; padding: 0 16px; }
+@media (max-width: 1023.98px) { .library:has(> .library-empty) { min-height: calc(100dvh - 105px); } }
+/* From 768 px the kind pills wrap instead of running under the edge; phones keep the scrolling row. */
+@media (min-width: 768px) { .kinds { flex-wrap: wrap; overflow-x: visible; } }
+/* The rights reminder sits inside the empty upload box, so the Create form reaches Duration above the Run bar. */
+.dropzone:has(> .dropzone-note) .dropzone-pick { padding-bottom: 34px; }
+.dropzone-note { position: absolute; right: 12px; bottom: 6px; left: 12px; margin: 0; color: rgb(102, 102, 102); font-size: 11px; line-height: 16px; text-align: center; pointer-events: none; }
+/* From 1440 px (where it clears the centred tabs) the gallery size slider shares the tab row, as on Fash, so the gallery starts right under the tabs. */
+@media (min-width: 1440px) {
+  .side .gallery-tools, .imagegen-side .gallery-tools { height: 37px; align-items: center; }
+  .side .gallery-tools { margin: -57px 0 20px; }
+  .imagegen-side .gallery-tools { margin: -69px 0 32px; }
 }

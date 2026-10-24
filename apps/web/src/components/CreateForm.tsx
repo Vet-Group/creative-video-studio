@@ -300,8 +300,8 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
                   ))}
                 </ul>
               )}
+              {images.length === 0 && <p className="dropzone-note">Ảnh đầu là sản phẩm chính. Chỉ dùng ảnh công ty có quyền sử dụng.</p>}
             </div>
-            <p className="help">JPEG, PNG hoặc WebP. Ảnh đầu tiên là sản phẩm chính. Chỉ tải lên ảnh mà công ty có quyền sử dụng.</p>
 
             {models && models.models.length > 0 && (
               <ModelPicker
@@ -318,16 +318,15 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
                 Mô tả chuyển động
               </label>
               <div className="prompt-box" data-disabled={presetId !== ''}>
-                <textarea id={promptId} value={prompt} maxLength={MAX_PROMPT} disabled={presetId !== ''} onChange={(e) => setPrompt(e.target.value)} />
+                <textarea id={promptId} value={presetId === '' ? prompt : ''} maxLength={MAX_PROMPT} disabled={presetId !== ''} placeholder={presetId === '' ? 'Mô tả chuyển động, nên viết bằng tiếng Anh' : 'Đang dùng mẫu; chọn "Tự viết mô tả" để tự nhập'} onChange={(e) => setPrompt(e.target.value)} />
                 <div className="prompt-foot">
                   <span>Tối đa {MAX_PROMPT} ký tự</span>
                   <span>
-                    {prompt.length}/{MAX_PROMPT}
+                    {presetId === '' ? prompt.length : 0}/{MAX_PROMPT}
                   </span>
                 </div>
               </div>
             </div>
-            <p className="help">Chọn một mẫu, hoặc chọn "Tự viết mô tả" rồi nhập mô tả (nên viết bằng tiếng Anh).</p>
 
             <Select
               label="Tỉ lệ khung hình"
