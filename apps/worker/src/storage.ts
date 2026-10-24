@@ -1,5 +1,5 @@
 // The worker's S3 client for the app's own MinIO (the same bucket the web app streams from).
-import { CreateBucketCommand, DeleteObjectCommand, HeadBucketCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { CreateBucketCommand, DeleteObjectCommand, GetObjectCommand, HeadBucketCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 
 /** A setting from the environment, else from the repo's .env (local runs; variables already set win). */
 function env(name: string): string {
@@ -40,6 +40,11 @@ export async function ensureBucket(): Promise<void> {
 
 export async function putObject(key: string, body: Uint8Array, contentType: string): Promise<void> {
   await s3().send(new PutObjectCommand({ Bucket: bucketName(), Key: key, Body: body, ContentType: contentType }));
+}
+
+export async function getObject(key: string): Promise<Uint8Array> {
+  const res = await s3().send(new GetObjectCommand({ Bucket: bucketName(), Key: key }));
+  return res.Body!.transformToByteArray();
 }
 
 export async function deleteObject(key: string): Promise<void> {

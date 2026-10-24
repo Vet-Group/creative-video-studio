@@ -55,7 +55,7 @@ const REPLICATE_PAGE = 'https://replicate.com/bytedance/seedance-2.5';
 const REPLICATE_SCHEMA = 'https://api.replicate.com/v1/models/bytedance/seedance-2.5';
 const READ_AT = '2026-10-23';
 
-// M.6 copies these facts into the seeded model_configs rows; B.5a records Kling's measured output resolution.
+// Migration 0013 (M.6) copies these facts into the seeded model_configs rows; packages/db/src/schema.test.ts keeps the two in step.
 /**
  * The two bake-off candidates. The app offers 9:16 and 1:1 and 5-10 s clips (PRD) and sends at most 4 images,
  * so `ratios`, `durationsSec` and `maxImages` are the app's subset of what the provider accepts (see `sources`).
@@ -72,18 +72,18 @@ export const BAKEOFF_MODELS: ModelConfig[] = [
     durationsSec: [5, 6, 7, 8, 9, 10],
     // fal documents "Maximum 4 total (elements + reference images)" only for requests with a video.
     maxImages: 4,
-    // fal states no output resolution and the schema has no resolution input; null until B.5a measures the canary clip.
-    outputResolution: null,
+    // fal states no output resolution and the schema has no resolution input; B.5a measured the canary clip at 1080x1920 (scripts/bakeoff/rubric.md).
+    outputResolution: '1080p',
     // Audio off: $0.112 per second (audio on is $0.14).
     usdPerSecond: 0.112,
     // The queue status carries only metrics.inference_time and the result is the model output; no billed amount.
     billedAmountField: null,
-    thrift: { durationSec: 5, resolution: null },
+    thrift: { durationSec: 5, resolution: '1080p' },
     sources: {
       ratios: { url: FAL_KLING_SCHEMA, readAt: READ_AT },
       durationsSec: { url: FAL_KLING_SCHEMA, readAt: READ_AT },
       maxImages: { url: FAL_KLING_SCHEMA, readAt: READ_AT },
-      outputResolution: { url: FAL_KLING_PAGE, readAt: READ_AT },
+      outputResolution: { url: 'scripts/bakeoff/rubric.md', readAt: READ_AT },
       usdPerSecond: { url: FAL_KLING_PAGE, readAt: READ_AT },
       billedAmountField: { url: 'https://fal.ai/docs/model-apis/model-endpoints/queue', readAt: READ_AT },
     },

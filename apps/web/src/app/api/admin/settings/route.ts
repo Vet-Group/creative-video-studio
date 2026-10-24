@@ -29,8 +29,8 @@ export async function GET(request: Request) {
 /**
  * Admin: change `monthlyCapUsd`, `memberDailyClipCap`, `featuresMonthlyCapUsd`, `memberDailyUsdCap`, `memberMonthlyUsdCap`, `featureCaps` (a list of
  * `{ feature, monthlyUsd }`) and/or `models` (a list of `{ id, enabled }`). All or nothing. Changed caps are audited as settings.update, each changed
- * soft cap as feature_cap.update and each changed model as model.set_enabled. The database refuses to enable a model whose limits and price are not
- * recorded; that is 400 and nothing is changed.
+ * soft cap as feature_cap.update and each changed model as model.set_enabled. A real video model without a bake-off record (`pass_seed_total`) cannot be
+ * enabled, and the database refuses to enable a model whose limits and price are not recorded; both are 400 and nothing is changed.
  */
 export async function PUT(request: Request) {
   const g = await guard(request, 'admin');
@@ -63,6 +63,12 @@ export async function PUT(request: Request) {
   if ((await pool.query('select 1 from feature_caps where feature = any($1::text[])', [features])).rowCount !== features.length) return bad('unknown feature', 404);
   const ids = [...new Set((list as { id: string }[]).map((m) => m.id))];
   if ((await pool.query('select 1 from model_configs where id = any($1::text[])', [ids])).rowCount !== ids.length) return bad('unknown model', 404);
+  // A real video model needs a bake-off record (AC 22): the seeded passes and total of its mini bake-off, see docs/ops/adding-a-model.md. Image and mock models have none.
+  const noRecord = await pool.query(
+    `select id from model_configs where id = any($1::text[]) and not enabled and kind = 'video' and provider <> 'mock' and coalesce(pass_seed_total, 0) = 0 order by id`,
+    [(list as { id: string; enabled: boolean }[]).filter((m) => m.enabled).map((m) => m.id)],
+  );
+  if (noRecord.rowCount) return bad(`no bake-off record for ${noRecord.rows.map((r) => r.id).join(', ')}; run the mini bake-off in docs/ops/adding-a-model.md first`);
   const actorId = g.session.user.id;
 
   try {

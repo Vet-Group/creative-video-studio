@@ -86,6 +86,7 @@ beforeAll(async () => {
        ('cheap-test', 'fal', 'x', 'Cheap test', '{9:16}', '{5,8}', 2, '720p', 0.1, '{}', true, 8, 10),
        ('mock-sample', 'mock', 'mock', 'Mock', '{9:16}', '{5,8}', 4, '720p', 0.1, '{}', true, 5, 10)`,
   );
+  await pool.query(`update model_configs set enabled = false where id = 'kling-o3-pro'`); // migration 0013 enables it; this file lists only its own models
   alice = await newUser('alice@example.test', 'Nguyễn Văn Đạt');
   bob = await newUser('bob@example.test', 'Bob');
   admin = await newUser('admin@example.test', 'Admin', 'admin');

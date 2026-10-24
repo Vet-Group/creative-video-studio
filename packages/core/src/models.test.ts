@@ -19,17 +19,17 @@ describe.each(BAKEOFF_MODELS)('$id', (model) => {
     expect(validateRequest(model, { ...ok, ...change })).not.toBeNull();
   });
 
-  test('every fact has a source with a URL and a read date', () => {
+  test('every fact has a source with a URL (or a repo path for a measurement) and a read date', () => {
     for (const field of ['ratios', 'durationsSec', 'maxImages', 'outputResolution', 'usdPerSecond', 'billedAmountField']) {
-      expect(model.sources[field]?.url).toMatch(/^https:\/\//);
+      expect(model.sources[field]?.url).toMatch(/^(https:\/\/|scripts\/)/);
       expect(model.sources[field]?.readAt).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     }
   });
 });
 
-test('ids and labels match the rows seeded by migration 0002, and Kling stays without a resolution until B.5a', () => {
+test('ids and labels match the rows seeded by migration 0002, and Kling carries the resolution B.5a measured', () => {
   expect(BAKEOFF_MODELS.map((m) => [m.id, m.label])).toEqual([['kling-o3-pro', 'Kling O3 Pro'], ['seedance-2.5', 'Seedance 2.5']]);
-  expect(BAKEOFF_MODELS.map((m) => m.outputResolution)).toEqual([null, '720p']);
+  expect(BAKEOFF_MODELS.map((m) => m.outputResolution)).toEqual(['1080p', '720p']);
 });
 
 test('estimates the cost of a thrift clip and of an 8 s staff clip', () => {
