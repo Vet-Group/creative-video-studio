@@ -8,6 +8,7 @@ const FEATURES = [
   { href: '/try-on', title: 'Thử đồ', text: 'Mặc trang phục lên người mẫu từ ảnh, giữ nguyên người và bối cảnh.', poster: EXAMPLES[2]!.poster },
   { href: '/image-generation', title: 'Tạo ảnh', text: 'Tạo hoặc chỉnh ảnh sản phẩm từ ảnh tham chiếu và một mô tả.', poster: EXAMPLES[3]!.poster },
   { href: '/create', title: 'Tạo video', text: 'Biến ảnh sản phẩm thành video ngắn bằng các mô hình AI.', poster: EXAMPLES[0]!.poster },
+  { href: '/marketing-studio', title: 'Marketing Studio', text: 'Tạo video kiểu người sáng tạo nội dung từ ảnh người mẫu và ảnh sản phẩm.', poster: EXAMPLES[0]!.poster },
   { href: '/apps', title: 'Ứng dụng', text: 'Đổi nhân vật, đổi nền, xoá nền, phóng to ảnh và các công cụ AI một chạm khác.', poster: EXAMPLES[1]!.poster },
   { href: '/library', title: 'Thư viện', text: 'Xem, tải xuống và đánh giá mọi clip của công ty.', poster: EXAMPLES[1]!.poster },
 ];
@@ -18,7 +19,7 @@ const range = (values: number[]) => (values.length === 0 ? '' : values.length > 
 export default async function ExplorePage() {
   const [models, presets] = await Promise.all([
     pool.query<{ id: string; label: string; provider: string; ratios: string[]; durations_sec: number[] }>(
-      `select id, label, provider, ratios, durations_sec from model_configs where enabled and kind = 'video' order by label, id`,
+      `select id, label, provider, ratios, durations_sec from model_configs where enabled and kind = 'video' and 'video' = any(features) order by label, id`,
     ),
     pool.query<{ id: string; label: string }>('select id, label from presets where enabled order by sort_order, id'),
   ]);

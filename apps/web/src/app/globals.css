@@ -434,11 +434,23 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .app-change-list { position: absolute; z-index: 30; top: calc(100% + 4px); right: 0; width: 15rem; max-height: 60vh; margin: 0; padding: 4px; overflow: auto; list-style: none; border: 1px solid #e4e4e7; border-radius: 12px; background: #fff; box-shadow: 0 12px 32px rgb(0 0 0 / .16); }
 .app-change-list a { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; border-radius: 8px; color: rgb(26, 26, 26); font-size: 14px; text-decoration: none; }
 .app-change-list a:hover, .app-change-list a[aria-current='page'] { background: rgb(244, 244, 245); }
-.app-slots { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0 8px; }
+.app-slots { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0 8px; align-items: end; }
 .app-slots[data-two='true'] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .app-slots[data-two='true'] .slot { flex-direction: column; justify-content: center; min-height: 174px; text-align: center; }
 .app-slots .field { min-width: 0; }
+.app-slots .slot-hint { min-width: 0; }
 .soon { display: grid; justify-items: center; gap: 12px; max-width: 32rem; margin: 32px auto; padding: 24px; text-align: center; }
 .soon .app-art { width: 100%; border-radius: 14px; }
 .soon p { margin: 0; }
 .soon .button { padding: 10px 24px; border-radius: 8px; }
+
+/* Marketing Studio: the hook and location boxes sit under the two photo slots like the reference, and open a dialog of text cards. */
+.choice-box { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; width: 100%; min-height: 174px; padding: 12px; border: 1px dashed rgb(153, 153, 153); border-radius: 18px; background: transparent; color: rgb(77, 77, 77); text-align: center; }
+.choice-box:hover { border-color: rgb(26, 26, 26); background: rgb(250, 250, 250); }
+.choice-value { color: rgb(26, 26, 26); font-size: 13px; line-height: 18px; font-weight: 600; overflow-wrap: anywhere; }
+.choice-dialog .modal-body h2 { margin: 0 0 12px; font-size: 18px; line-height: 26px; }
+.choice-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr)); gap: 8px; }
+.choice-grid button { min-height: 56px; padding: 8px 12px; border: 1px solid #e4e4e7; border-radius: 12px; background: #fff; font-size: 14px; line-height: 20px; text-align: center; }
+.choice-grid button:hover { border-color: rgb(153, 153, 153); }
+.choice-grid button[aria-selected='true'] { border-color: #000; background: #000; color: #fff; }
+.gallery-item video { display: block; width: 100%; height: 100%; object-fit: cover; background: #000; }

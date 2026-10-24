@@ -27,6 +27,13 @@ await pool.query(
           -- Off: the Explore spec switches it on for itself, to pick a model that does not support the form's starting choice.
           ('mock-e2e-square', 'mock', 'mock', 'Mock E2E Square', '{1:1}', '{5}', 4, '720p', 0.1, '{}', false, 0, 0)`,
 );
+// The mock video model also runs Marketing Studio jobs.
+await pool.query(`update model_configs set features = '{video,marketing}' where id = 'mock-e2e'`);
+// A second marketing-only video model whose ratio and duration do not overlap with mock-e2e's, so the page must offer the union to let it be picked.
+await pool.query(
+  `insert into model_configs (id, provider, endpoint, label, ratios, durations_sec, max_images, output_resolution, usd_per_second, sources, enabled, features)
+   values ('mock-e2e-wide', 'mock', 'mock', 'Mock E2E Wide', '{16:9}', '{10}', 2, '720p', 0.1, '{}', true, '{marketing}')`,
+);
 // Image models for the specs of Try On and Image Generation (the Create picker lists video models only): a roomy one for both features and a
 // one-image model for the image page, so the model pill has a second choice.
 await pool.query(

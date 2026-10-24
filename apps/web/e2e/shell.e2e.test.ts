@@ -4,14 +4,14 @@ import { modelButton, select, signIn } from './support.test';
 const sidebar = (page: Page) => page.locator('.sidebar');
 const nav = (page: Page) => page.getByRole('navigation', { name: 'Điều hướng chính' });
 
-test('the sidebar lists Explore, Try On, Image Generation, Create, Apps and Library in the live order, and Admin only for an Admin', async ({ page }) => {
+test('the sidebar lists Explore, Try On, Image Generation, Create, Marketing Studio, Apps and Library in the live order, and Admin only for an Admin', async ({ page }) => {
   await signIn(page, 'member1');
-  await expect(nav(page).getByRole('link')).toHaveText(['Khám phá', 'Thử đồ', 'Tạo ảnh', 'Tạo video', 'Ứng dụng', 'Thư viện']);
+  await expect(nav(page).getByRole('link')).toHaveText(['Khám phá', 'Thử đồ', 'Tạo ảnh', 'Tạo video', 'Marketing Studio', 'Ứng dụng', 'Thư viện']);
   await page.getByRole('button', { name: 'Cài đặt' }).click();
   await page.getByRole('dialog', { name: 'Cài đặt' }).getByRole('button', { name: 'Đăng xuất' }).click();
   await expect(page).toHaveURL(/\/login$/);
   await signIn(page, 'admin');
-  await expect(nav(page).getByRole('link')).toHaveText(['Khám phá', 'Thử đồ', 'Tạo ảnh', 'Tạo video', 'Ứng dụng', 'Thư viện', 'Quản trị']);
+  await expect(nav(page).getByRole('link')).toHaveText(['Khám phá', 'Thử đồ', 'Tạo ảnh', 'Tạo video', 'Marketing Studio', 'Ứng dụng', 'Thư viện', 'Quản trị']);
 });
 
 test('Explore links into Create with the chosen preset or model already picked', async ({ page }) => {
@@ -20,8 +20,8 @@ test('Explore links into Create with the chosen preset or model already picked',
   await expect(page).toHaveURL(/\/explore$/);
   await expect(page.getByRole('heading', { name: 'Bắt đầu sáng tạo' })).toBeVisible();
   const tools = page.getByRole('list', { name: 'Công cụ' }).getByRole('link');
-  await expect(tools).toHaveCount(5);
-  await expect(tools.locator('strong')).toHaveText(['Thử đồ', 'Tạo ảnh', 'Tạo video', 'Ứng dụng', 'Thư viện']);
+  await expect(tools).toHaveCount(6);
+  await expect(tools.locator('strong')).toHaveText(['Thử đồ', 'Tạo ảnh', 'Tạo video', 'Marketing Studio', 'Ứng dụng', 'Thư viện']);
 
   await page.getByRole('list', { name: 'Mẫu' }).getByRole('link', { name: 'Xoay quanh chậm' }).click();
   await expect(page).toHaveURL(/\/create\?preset=slow-orbit$/);

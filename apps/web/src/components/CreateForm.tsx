@@ -123,7 +123,7 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
   useEffect(() => {
     if (!ready) return;
     let stale = false;
-    api<ModelsResponse>(`/api/models?ratio=${encodeURIComponent(ratio)}&durationSec=${durationSec}`).then(
+    api<ModelsResponse>(`/api/models?feature=video&ratio=${encodeURIComponent(ratio)}&durationSec=${durationSec}`).then(
       (r) => {
         if (stale) return;
         setModels(r);
