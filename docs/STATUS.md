@@ -195,7 +195,7 @@ Kept apart on purpose: merged code is not a deployment, and a mock job is not a 
   - #12, #14 preflight fixes and Google login in the harness.
   - #16 Google and Lark sign-in with account linking, the sign-in methods page, Admin unlink and the public `/privacy` page (D.1, mocked OAuth; the live sign-ins are D.5).
 - **Tests:** unit, integration and e2e suites run in CI on each PR; the e2e suites use the mock provider only. Library playback and download are covered by `apps/web/e2e/flow.e2e.test.ts` and `mobile.e2e.test.ts`.
-- **Deployment:** none. Nothing runs on the VET server yet; D.3 (read-only check) and D.5 (deploy, tunnel, `video.vetgroup.net`) are pending.
+- **Deployment:** see "Live on VET" below (2026-10-25). This line described 2026-10-23.
 - **Paid bake-off:** done 2026-10-24, result in [`BAKEOFF.md`](BAKEOFF.md). Go: Kling o3 Pro passed 7/10 (70%); Seedance 2.5 reached 6/9 (67%) and stays disabled. Billed $14.85 (fal $5.60, Replicate $9.25 for the 8 clips that rendered); the spend stop counts $18.32 because it keeps failed jobs at their estimate, including two Seedance jobs an off-script check created by mistake (one canceled, one refused, neither billed). Replicate is prepaid credit, not monthly billing. Findings for M.6 and D.5:
   - Replicate drops a create request whose JSON body is about 3.8 MB (a 2.9 MB PNG inlined as a data URL); 3.7 MB passed. The worker inlines uploads of up to 10 MB, so large images need downscaling or the Replicate files API before Seedance is ever enabled.
   - Replicate refused one product image as sensitive (E005), a render failure that costs a user a job.
@@ -228,7 +228,18 @@ The owner widened the scope on 2026-10-23 from video only to the whole dashboard
 - **Not done:**
   - Every image model and app ships disabled; an Admin enables each one in Settings.
   - Model configuration for video (M.6), the Motion Control and Media Optimizer apps (shown as "coming soon"), and the Marketing formats other than UGC Try On are not built.
-- **Deployment:** none. M.7b waits on the owner's C4 comparison, which now covers the whole dashboard; D.5 follows it.
+- **Deployment:** none on 2026-10-24. M.7b waits on the owner's C4 comparison, which now covers the whole dashboard; D.5 follows it.
+
+### Live on VET (2026-10-25)
+
+- **Deployed:** https://video.vetgroup.net runs main `d5bae42` in `/opt/creative-video-studio` as root user units (`cvs-web` on port 3400, `cvs-worker`, `cvs-tunnel`, and the backup, weekly R2 copy and monthly drill timers), with the compose project `creative-video-studio` (Postgres, MinIO). Tunnel `creative-video-studio`, new CNAME `video.vetgroup.net`. Deployed through the run's gate key under the owner's pre-approval; `bash scripts/run/vet.sh status` shows the state.
+- **Fixed on the way (PRs #56-#61):** the deploy key name and the first Admin from `.env` (#56), `cloudflared` in `/root/.local/bin` (#57), the zone lookup that always failed (#58), `cvs-backup` reading `backup.env` outside systemd (#59), an update now restarts web and worker, plus the gate's `status` script (#60), and the Lark scope (#61).
+- **Smoke (real money):** the first Admin signed in through the hostname, uploaded a product image and ran one Kling o3 Pro job: it succeeded in 147 s; the clip downloaded (h264 1080x1920, 5.04 s), played with ranged requests, appeared in the Library, and Costs showed $0.56.
+- **Sign-in:** Google and Lark were checked live in a browser. Lark needed two fixes: the redirect URL is `https://video.vetgroup.net/api/auth/callback/lark` (better-auth's core callback route), and the scope is `contact:user.employee:readonly`, the one Lark Suite documents for `enterprise_email` in `user_info`; `contact:user.enterprise_email:readonly` does not exist there.
+- **Backups:** a backup and a restore drill ran through the gate: backup done (pruned), drill of snapshot `06a03dee` ok (objects and the users, jobs, assets and cost_entries tables present).
+- **Neighbours:** Ideas Hub units and the POD Studio containers were sampled every 30 s during each deploy; every sample was OK (11 units active, none failed, `ideas.vetgroup.net` answering).
+- **Seedance on this network:** from the VET server, as from the office PC, TLS to `replicate.delivery` times out (TCP connects, no handshake, 3 of 3 tries), while `api.replicate.com` and `fal.media` work. Seedance clips could not be downloaded here, so Seedance stays disabled for network reasons too, not only its 67% pass rate.
+- **Ledger:** bake-off billed $14.85; the smoke clip $0.56; the image-model check $1.09 (fal Usage page).
 
 ## Evidence gaps
 
