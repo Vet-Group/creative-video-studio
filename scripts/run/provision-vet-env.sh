@@ -19,6 +19,7 @@ trap 'rm -rf "$tmp"' EXIT
 
 (
   umask 077
+  # shellcheck disable=SC2016 # the single-quoted program is JavaScript, not shell
   node -e '
     const fs = require("fs"), crypto = require("crypto");
     const names = (f) => fs.readFileSync(f, "utf8").split(/\r?\n/).filter((l) => /^[A-Z_][A-Z0-9_]*=/.test(l)).map((l) => l.slice(0, l.indexOf("=")));
