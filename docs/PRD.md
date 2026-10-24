@@ -124,7 +124,7 @@ Milestone 1 is a paid quality gate:
    - The scores are recorded per clip, with the evidence frames, the cost and the render time of each clip. A second judging of 4 clips reports the agreement.
    - Pass rates are reported with a Wilson 95% interval. They only seed the picker; in-app Pass/Fail marks update them.
 
-   Go/no-go gate: the work on real providers and deployment continues if at least one model reaches 70%. If neither does, one extra small round runs for the better model with a different preset, within the same $40. If it still misses, the app ships with both models disabled and the result is reported. This is not a stop.
+   Go/no-go gate: the work on real providers and deployment continues if at least one model reaches 70%. If neither does, one extra small round runs for the better model with a different preset, only if it still fits under the $20 stop or the owner raises it. If it still misses, the app ships with both models disabled and the result is reported. This is not a stop.
 
 Operations and cost criteria:
 

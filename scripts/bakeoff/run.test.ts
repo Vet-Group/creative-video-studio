@@ -128,21 +128,21 @@ describe('runStage', () => {
 
   test('the guard counts earlier rounds in any out/*.jsonl file', async () => {
     const r = rig();
-    // 39.00 spent by an earlier smoke round in another file: Kling (0.56) fits, Seedance (1.156) would pass $40.
+    // 19.00 spent by an earlier smoke round in another file: Kling (0.56) fits, Seedance (1.156) would pass $20.
     mkdirSync(r.outDir, { recursive: true });
-    writeFileSync(join(r.outDir, 'smoke.jsonl'), `${JSON.stringify(line({ image: 1, round: 'smoke', estimateUsd: 39 }))}\n`);
+    writeFileSync(join(r.outDir, 'smoke.jsonl'), `${JSON.stringify(line({ image: 1, round: 'smoke', estimateUsd: 19 }))}\n`);
     appendLine(r.outDir, line({ image: 2, round: 'extra', status: 'failed', estimateUsd: 0, costUsd: 0 }));
     const res = await runStage(r.deps, canary);
     expect(res.outcome).toBe('stopped: cap');
     expect(r.submits).toEqual([`${KLING.id}:input:img1.jpg`]);
-    expect(res.spentUsd).toBeCloseTo(39 + KLING_5S, 6);
+    expect(res.spentUsd).toBeCloseTo(19 + KLING_5S, 6);
   });
 
   test('the guard takes the larger of the log and the fal balance fall since the baseline', async () => {
     const r = rig();
     mkdirSync(r.outDir, { recursive: true });
     writeFileSync(join(r.outDir, 'baseline.json'), JSON.stringify({ at: '2026-10-23T00:00:00.000Z', falBalanceUsd: 100 }));
-    r.balance.usd = 61; // 39 spent according to fal, nothing in the log
+    r.balance.usd = 81; // 19 spent according to fal, nothing in the log
     const res = await runStage(r.deps, canary);
     expect(res.outcome).toBe('stopped: cap');
     expect(r.submits).toEqual([`${KLING.id}:input:img1.jpg`]);

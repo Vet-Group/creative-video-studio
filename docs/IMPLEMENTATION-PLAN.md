@@ -32,7 +32,7 @@ Order matters. Nothing costs money until step 1.4.
 
 Decision (the go/no-go gate):
 - **Go** if at least one model reaches 70%: enable every passing model for staff. The pass rates seed the model picker, which pre-selects the model with the higher rate (on a tie, the cheaper one).
-- **No-go** if neither reaches 70%: run one extra small round for the better model with a different preset, within the same $40. If it still misses, the app ships with both models disabled and the result is reported. Veo 3.1 or other changes need a new decision and budget.
+- **No-go** if neither reaches 70%: run one extra small round for the better model with a different preset, only if it still fits under the $20 stop or the owner raises it. If it still misses, the app ships with both models disabled and the result is reported. Veo 3.1 or other changes need a new decision and budget.
 - Real-provider and deployment work waits for this gate.
 
 ## Milestone 2: Lark login and first deployment
@@ -53,7 +53,7 @@ Decision (the go/no-go gate):
 
 ## Costs to confirm
 
-- Milestone 1: about $27.5–29.7 at list price, $40 hard stop.
+- Milestone 1: about $18.60 with the 5 s thrift clips ($27.5–29.7 at 8 s), $20 hard stop (was $40 until 2026-10-24).
 - Running cost in month 1 (Q5b):
   - The cap is $200; the design volume is 5–7 clips/day; each Member may make 5 clips/day.
   - At list price that volume is about $135–235 a month with Kling, which fits the cap up to about 5 clips/day at the high price. With Seedance it is about $277–389, which does not fit: the cap then allows only about 3–4 clips/day.
