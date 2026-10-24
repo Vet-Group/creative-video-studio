@@ -42,7 +42,7 @@ export function mockProviders() {
       const body = JSON.parse(String(init?.body)) as Record<string, string>;
       larkTokenRequests.push(body);
       if (!lark.has(body.code!)) return Response.json({ code: 20001, error: 'invalid_grant' }, { status: 400 });
-      return Response.json({ code: 0, access_token: `lark-access-${body.code}`, token_type: 'Bearer', expires_in: 7200, refresh_token: 'lark-refresh', scope: 'contact:user.enterprise_email:readonly' });
+      return Response.json({ code: 0, access_token: `lark-access-${body.code}`, token_type: 'Bearer', expires_in: 7200, refresh_token: 'lark-refresh', scope: 'contact:user.employee:readonly' });
     }
     if (url.hostname === 'open.larksuite.com' && url.pathname === '/open-apis/authen/v1/user_info') {
       const token = new Headers(init?.headers).get('authorization')?.replace('Bearer lark-access-', '') ?? '';
