@@ -20,7 +20,9 @@ export function larkOAuth(app: { appId: string; appSecret: string; tenantKey: st
     clientId: app.appId,
     clientSecret: app.appSecret,
     authorizationUrl: AUTHORIZE,
-    scopes: ['contact:user.enterprise_email:readonly'],
+    // user_info's enterprise_email needs contact:user.employee:readonly (Lark Suite reference for authen/v1/user_info, read 2026-10-25);
+    // contact:user.enterprise_email:readonly does not exist on Lark Suite and fails the authorize page with error 20043 (D.5-lark).
+    scopes: ['contact:user.employee:readonly'],
     disableSignUp: true,
     async getToken({ code, redirectURI, codeVerifier }) {
       const res = await fetch(TOKEN, {

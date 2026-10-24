@@ -70,7 +70,7 @@ describe('Lark sign-in', () => {
     const flow = await oauth(route, { provider: 'lark', code: lark({ enterprise_email: 'request@example.test' }) });
     expect(flow.authUrl.hostname).toBe('accounts.larksuite.com');
     expect(flow.authUrl.searchParams.get('client_id')).toBe('cli_lark_app');
-    expect(flow.authUrl.searchParams.get('scope')).toContain('contact:user.enterprise_email:readonly');
+    expect(flow.authUrl.searchParams.get('scope')).toContain('contact:user.employee:readonly');
     expect(providers.larkTokenRequests.at(-1)).toMatchObject({ grant_type: 'authorization_code', client_id: 'cli_lark_app', client_secret: 'lark-secret', code: expect.stringMatching(/^lark-code-/) });
     expect(providers.larkTokenRequests.at(-1)?.code_verifier).toEqual(expect.any(String));
   });
