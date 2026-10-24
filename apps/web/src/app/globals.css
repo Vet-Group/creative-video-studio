@@ -288,6 +288,8 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 }
 @media (max-width: 1023.98px) {
   .toasts { bottom: 5rem; }
+  /* The form scrolls behind the hint, so a rule marks where it ends; otherwise a clipped label reads as overlapping the hint. */
+  .form-message:has(p) { border-top: 1px solid rgb(204, 204, 204); }
 }
 @media (max-width: 800px) {
   .card video.tall { max-height: 70vh; }
