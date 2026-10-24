@@ -99,6 +99,7 @@ function run(script: string, args: string[], env: Record<string, string>) {
   return { status: r.status, out: `${r.stdout}${r.stderr}` };
 }
 
+const onPath = (cmd: string) => spawnSync(bash, ['-c', `command -v ${cmd}`]).status === 0;
 const dryRunLines = (out: string) => out.split('\n').filter((l) => l.startsWith('[dry-run]'));
 
 afterAll(() => {
@@ -354,6 +355,17 @@ describe.skipIf(!hasBash)('deploy kit (needs bash only)', { timeout: 30_000 }, (
     const none = run(installSh, ['--dry-run'], sandbox(undefined, 'CVS_ADMIN_EMAIL=admin@example.test\n').env);
     expect(none.out).not.toContain('--first-admin');
     expect(none.out).toContain('no first Admin is created');
+  });
+
+  // A host with cloudflared on PATH (this Windows PC has it through WinGet) cannot show the fallback; CI has none.
+  test.skipIf(onPath('cloudflared'))('e2. cloudflared outside PATH is found in ~/.local/bin, where Ideas Hub installed it, and the tunnel unit runs that one', () => {
+    const s = sandbox();
+    rmSync(join(s.dir, 'stubs', 'cloudflared'));
+    mkdirSync(join(s.dir, 'home', '.local', 'bin'), { recursive: true });
+    writeFileSync(join(s.dir, 'home', '.local', 'bin', 'cloudflared'), stubBody, { mode: 0o755 });
+    const r = run(installSh, ['--dry-run'], s.env);
+    expect(r.status).toBe(0);
+    expect(r.out).toContain(`ExecStart=${s.home}/.local/bin/cloudflared tunnel --no-autoupdate`);
   });
 
   test('i. a re-run with a recorded tunnel keeps it only when it is complete', () => {
