@@ -25,8 +25,12 @@ describe('report', () => {
     expect(md).toContain('| b | 3/3 | 100% |');
     expect(md).toContain('**Go.** Enable b; the picker pre-selects b');
     expect(md).toContain('1/2 clips got the same pass or fail');
-    expect(md).toContain('Total $4.50 (fal $1.50, replicate $3.00)');
+    expect(md).toContain('Counted against the spend stop $4.50 (fal $1.50, replicate $3.00)');
     expect(md).toContain('Every planned clip rendered');
+    expect(md).not.toContain('Billed');
+    const billed = buildReport({ lines, verdicts, rejudge: {}, billed: { fal: { usd: 1.5, source: 'fal usage' }, replicate: { usd: 2.248, source: 'replicate billing' } } });
+    expect(billed).toContain('Billed $3.75 (fal $1.50, replicate $2.25)');
+    expect(billed).toContain('- replicate: replicate billing');
     expect(md).toContain('| half-1 | 3 | a | no | print | - | 3.0 |');
   });
 

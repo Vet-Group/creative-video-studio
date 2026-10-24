@@ -31,12 +31,14 @@ export interface ReportData {
   rejudge: Record<string, boolean>;
   /** Render seconds the provider reported, by provider job id (out/provider-times.json); missing ids show as "-". */
   providerSec?: Record<string, number>;
+  /** What each provider billed, read off its usage page (out/billed.json); the ledger books these, not the cap-guard counts. */
+  billed?: Record<string, { usd: number; source: string }>;
 }
 
 const pct = (x: number): string => `${Math.round(x * 100)}%`;
 const usd = (x: number): string => `$${x.toFixed(2)}`;
 
-export function buildReport({ lines, verdicts: judged0, rejudge, providerSec = {} }: ReportData): string {
+export function buildReport({ lines, verdicts: judged0, rejudge, providerSec = {}, billed = {} }: ReportData): string {
   const last = latest(lines);
   const bakeoff = [...last.values()].filter((l) => l.round === 'bakeoff');
   // A clip the provider refused or failed to render is a fail for that model; a key that never reached the provider (our side) is left
@@ -96,8 +98,16 @@ export function buildReport({ lines, verdicts: judged0, rejudge, providerSec = {
     '',
     '## Spend',
     '',
-    `Total ${usd(total.total)} (${Object.entries(total.byProvider).map(([p, s]) => `${p} ${usd(s)}`).join(', ')}), counting the canary, every bake-off clip and any other logged job, each at the larger of estimate and reported cost.`,
+    `Counted against the spend stop ${usd(total.total)} (${Object.entries(total.byProvider).map(([p, s]) => `${p} ${usd(s)}`).join(', ')}), counting the canary, every bake-off clip and any other logged job, each at the larger of estimate and reported cost.`,
     '',
+    ...(Object.keys(billed).length
+      ? [
+          `Billed $${Object.values(billed).reduce((a, b) => a + b.usd, 0).toFixed(2)} (${Object.entries(billed).map(([p, b]) => `${p} ${usd(b.usd)}`).join(', ')}), as the providers' usage pages show; the ledger books these amounts.`,
+          '',
+          ...Object.entries(billed).map(([p, b]) => `- ${p}: ${b.source}`),
+          '',
+        ]
+      : []),
     '## Clips',
     '',
     'Render seconds are what the provider reported; minutes run from the provider accepting the job to the clip saved on this PC, so they include any download delay.',
@@ -132,7 +142,9 @@ export function loadReportData(root: string, maps: string): ReportData {
   const rejudge = existsSync(rj) ? Object.fromEntries([...readScores(rj)].map(([id, s]) => [id, s.pass])) : {};
   const pt = join(root, 'out', 'provider-times.json');
   const providerSec = existsSync(pt) ? (JSON.parse(readFileSync(pt, 'utf8')) as Record<string, number>) : {};
-  return { lines: readLines(join(root, 'out')), verdicts, rejudge, providerSec };
+  const bf = join(root, 'out', 'billed.json');
+  const billed = existsSync(bf) ? (JSON.parse(readFileSync(bf, 'utf8')) as ReportData['billed']) : {};
+  return { lines: readLines(join(root, 'out')), verdicts, rejudge, providerSec, billed };
 }
 
 if (isMain(import.meta.url)) {
