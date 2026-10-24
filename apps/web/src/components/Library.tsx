@@ -269,7 +269,7 @@ export function Library() {
   }, [isAdmin]);
 
   return (
-    <section aria-labelledby="library-title">
+    <section className="library" aria-labelledby="library-title">
       <h1 id="library-title">Thư viện</h1>
       <p className="muted library-sub">Mọi thứ công ty đã tạo, ở cùng một chỗ.</p>
       <div className="kinds" role="group" aria-label="Loại">
