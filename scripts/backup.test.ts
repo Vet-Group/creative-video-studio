@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
@@ -100,11 +100,26 @@ describe.skipIf(!hasBash)('cvs-backup (needs bash only)', { timeout: 30_000 }, (
   });
 
   test('a missing restic password is refused and never echoed', () => {
-    const r = run([], { CVS_RESTIC_PASSWORD: '' });
+    const r = run([], { CVS_RESTIC_PASSWORD: '', CVS_BACKUP_ENV: '/nonexistent/backup.env' });
     expect(r.status).not.toBe(0);
     expect(r.out).toContain('failed at config');
     // Stop at the disk check: past it, restic runs in Docker and leaves root-owned files on a Linux runner.
     expect(run([], { CVS_MIN_FREE_PERCENT: '101' }).out).not.toContain(baseEnv.CVS_RESTIC_PASSWORD);
+  });
+});
+
+describe.skipIf(!hasBash)('cvs-backup reads backup.env (needs bash only)', { timeout: 30_000 }, () => {
+  test('a run outside systemd takes the password from backup.env, never echoes it, and a set variable wins', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'cvs-backup-env-'));
+    const file = join(dir, 'backup.env');
+    writeFileSync(file, 'CVS_RESTIC_PASSWORD=from-backup-env-6d1f\n', { mode: 0o600 });
+    // The password check passes, so the run reaches the disk check, which stops it before Docker.
+    const r = run([], { CVS_RESTIC_PASSWORD: '', CVS_BACKUP_ENV: file, CVS_MIN_FREE_PERCENT: '101' });
+    expect(r.out).not.toContain('failed at config');
+    expect(r.out).toMatch(/failed at disk/);
+    expect(r.out).not.toContain('from-backup-env-6d1f');
+    expect(run([], { CVS_RESTIC_PASSWORD: '', CVS_BACKUP_ENV: join(dir, 'missing.env') }).out).toContain('failed at config');
+    rmSync(dir, { recursive: true, force: true });
   });
 });
 

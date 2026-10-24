@@ -6,7 +6,8 @@
 # Adapted from ideas-hub scripts/linux/ideashub-backup. Acts only on its own compose project (CVS_COMPOSE_PROJECT).
 # Env (defaults): CVS_COMPOSE_PROJECT (creative-video-studio), CVS_BACKUP_DIR (/opt/creative-video-studio/backups),
 # CVS_STATE_DIR (~/.local/state/creative-video-studio), CVS_DB_NAME / CVS_DB_USER (cvs), CVS_S3_BUCKET (.env S3_BUCKET),
-# CVS_MIN_FREE_PERCENT (15), CVS_RESTIC_NETWORK (docker network for restic; unset in production), CVS_RESTIC_PASSWORD or CVS_RESTIC_PASSWORD_FILE, CVS_R2_REPOSITORY / _ACCESS_KEY_ID / _SECRET_ACCESS_KEY.
+# CVS_MIN_FREE_PERCENT (15), CVS_RESTIC_NETWORK (docker network for restic; unset in production), CVS_RESTIC_PASSWORD or CVS_RESTIC_PASSWORD_FILE, CVS_R2_REPOSITORY / _ACCESS_KEY_ID / _SECRET_ACCESS_KEY,
+# CVS_BACKUP_ENV (~/.config/creative-video-studio/backup.env; read for the variables that are not set).
 set -Eeuo pipefail
 # Git Bash must not rewrite the container paths passed to docker; harmless on Linux.
 export MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*'
@@ -41,6 +42,16 @@ case "${1:-}" in
   -h | --help) awk 'NR > 1 { if (/^#/) print; else exit }' "$0"; exit 0 ;;
   *) awk 'NR > 1 { if (/^#/) print; else exit }' "$0" >&2; exit 2 ;;
 esac
+
+# The units read backup.env through EnvironmentFile; a run by hand or through the gate (cvs-run-gate backup|drill) reads the same
+# file here. Variables already set win.
+backup_env="${CVS_BACKUP_ENV:-$HOME/.config/creative-video-studio/backup.env}"
+if [ -r "$backup_env" ]; then
+  while IFS= read -r line; do
+    k="${line%%=*}"
+    if [ -z "${!k:-}" ]; then export "$k=${line#*=}"; fi
+  done < <(grep -E '^[A-Za-z_][A-Za-z0-9_]*=' "$backup_env" || true)
+fi
 
 # Config checks first: they need neither docker nor the stack.
 pw=()
