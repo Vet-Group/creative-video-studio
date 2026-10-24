@@ -95,6 +95,8 @@ while IFS= read -r line; do
   if [ -z "${!k:-}" ]; then export "$k=$v"; fi
 done < <(grep -E '^[A-Za-z_][A-Za-z0-9_]*=' "$app/.env" || true)
 cloudflared_bin="$(command -v cloudflared || true)"
+# Ideas Hub installed it as root's user binary, outside PATH (its ideashub-tunnel unit runs /root/.local/bin/cloudflared).
+if [ -z "$cloudflared_bin" ] && [ -x "$HOME/.local/bin/cloudflared" ]; then cloudflared_bin="$HOME/.local/bin/cloudflared"; fi
 if [ -n "${CLOUDFLARE_API_TOKEN:-}" ] && [ -z "$cloudflared_bin" ]; then
   precheck "cloudflared is not installed; install it, or unset CLOUDFLARE_API_TOKEN to deploy without the hostname"
 fi
