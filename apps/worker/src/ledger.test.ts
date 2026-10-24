@@ -228,10 +228,10 @@ describe('reassignStore', () => {
 
 describe('bookShared', () => {
   test('books a bake-off row once per ref', async () => {
-    const entry = { kind: 'bakeoff' as const, usd: '12.3400', month: '2026-10', provider: 'fal', ref: 'bakeoff-2026-10-fal' };
+    const entry = { kind: 'bakeoff' as const, usd: '12.3400', month: '2026-08', provider: 'fal', ref: 'bakeoff-2026-08-fal' };
     expect(await bookShared(pool, entry)).toBe(true);
     expect(await bookShared(pool, entry)).toBe(false);
-    const { rows } = await pool.query(`select usd::text, is_final, job_id, user_id, team_id from cost_entries where ref = 'bakeoff-2026-10-fal'`);
+    const { rows } = await pool.query(`select usd::text, is_final, job_id, user_id, team_id from cost_entries where ref = 'bakeoff-2026-08-fal'`);
     expect(rows).toEqual([{ usd: '12.3400', is_final: true, job_id: null, user_id: null, team_id: null }]);
   });
 

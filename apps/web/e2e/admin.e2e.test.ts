@@ -48,12 +48,15 @@ test('an Admin sets up a team, a store and a user, then reconciles the month cos
 
   // Costs: the VND rate, an invoice and its difference, a manual adjustment.
   await nav(page, 'Chi phí').click();
-  const month = await page.getByLabel('Tháng', { exact: true }).inputValue();
-  expect(month).toMatch(/^\d{4}-\d{2}$/);
-  await page.getByLabel(/Tỉ giá VND\/USD/).fill('25000');
-  await Promise.all([page.waitForResponse((r) => r.url().includes('/api/admin/rates/') && r.ok()), page.getByRole('button', { name: 'Lưu tỉ giá' }).click()]);
+  // A month with no seeded rows (migration 0012 books the bake-off into 2026-10), so the totals do not depend on the run date.
+  const month = '2030-01';
+  const rate = page.getByLabel(`Tỉ giá VND/USD của tháng ${month}`);
+  await page.getByLabel('Tháng', { exact: true }).fill(month);
+  await rate.fill('25000');
+  await Promise.all([page.waitForResponse((r) => r.url().includes(`/api/admin/rates/${month}`) && r.ok()), page.getByRole('button', { name: 'Lưu tỉ giá' }).click()]);
   await page.reload();
-  await expect(page.getByLabel(/Tỉ giá VND\/USD/)).toHaveValue('25000.0000');
+  await page.getByLabel('Tháng', { exact: true }).fill(month);
+  await expect(rate).toHaveValue('25000.0000');
 
   await page.getByLabel('Tổng hóa đơn fal (USD)').fill('12.5');
   await page.getByRole('button', { name: 'Ghi hóa đơn fal' }).click();
