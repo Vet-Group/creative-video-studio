@@ -187,12 +187,12 @@ describe('fal image submit', () => {
       });
     });
 
-    test('Face Swap sends the source face and the target photo with the fixed fields, and needs exactly two images', async () => {
-      const easel = app('easel-ai/advanced-face-swap');
-      expect((await bodyFor(req(easel, { ...two, ratio: 'auto' }))).body).toEqual({
-        face_image_0: 'https://img/1.jpg', target_image: 'https://img/2.jpg', gender_0: 'non-binary', workflow_type: 'target_hair', upscale: true, detailer: false,
+    test('Face Swap sends the source face and the target photo with its fixed prompt through the Nano Banana Pro body', async () => {
+      const prompt = FEATURE_PROMPTS.face_swap!;
+      expect(prompt).toBe('Swap the face from the first image onto the person in the second image.');
+      expect((await bodyFor(req(PRO, { ...two, prompt, ratio: 'auto' }))).body).toEqual({
+        prompt, image_urls: ['https://img/1.jpg', 'https://img/2.jpg'], aspect_ratio: 'auto', resolution: '1K', num_images: 1, output_format: 'png',
       });
-      await refuses(req(easel, { ...one, ratio: 'auto' }), /source face and the target photo/);
     });
 
     test('Background Remover sends the image only, even if a prompt is stored', async () => {

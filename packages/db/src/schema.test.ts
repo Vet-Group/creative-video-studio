@@ -74,7 +74,7 @@ describe('migration 0002 seed data', () => {
 
 describe('migration 0007 image models', () => {
   test('seeds the seven fal image models disabled, each with its prices, ratios and features', async () => {
-    const { rows } = await pool.query(`select id, endpoint, features, ratios, durations_sec, max_images, image_prices, usd_per_second, enabled, sources from model_configs where kind = 'image' and not features && ARRAY['character_swap', 'model_swap', 'background_changer', 'reframe', 'image_upscale', 'face_swap', 'background_remover']::text[] order by id`);
+    const { rows } = await pool.query(`select id, endpoint, features, ratios, durations_sec, max_images, image_prices, usd_per_second, enabled, sources from model_configs where kind = 'image' and cardinality(features) > 0 and not features && ARRAY['character_swap', 'model_swap', 'background_changer', 'reframe', 'image_upscale', 'face_swap', 'background_remover']::text[] order by id`);
     expect(rows.map((r) => [r.id, r.endpoint, r.features, r.image_prices])).toEqual([
       ['fashn-v1.6', 'fal-ai/fashn/tryon/v1.6', ['try_on'], { '1K': '0.075' }],
       ['gpt-image-2', 'openai/gpt-image-2/edit', ['image'], { '1K': '0.21' }],
@@ -128,9 +128,9 @@ describe('migration 0009 image app models', () => {
     expect(rows.map((r) => [r.id, r.endpoint, r.features, r.max_images, r.image_prices])).toEqual([
       ['bria-background-remove', 'fal-ai/bria/background/remove', ['background_remover'], 1, { '1K': '0.018' }],
       ['bria-background-replace', 'fal-ai/bria/background/replace', ['background_changer'], 2, { '1K': '0.04' }],
-      ['easel-advanced-face-swap', 'easel-ai/advanced-face-swap', ['face_swap'], 2, { '1K': '0.05' }],
       ['ideogram-v3-reframe', 'fal-ai/ideogram/v3/reframe', ['reframe'], 1, { '1K': '0.03' }],
       ['nano-banana-pro-character-swap', 'fal-ai/nano-banana-pro/edit', ['character_swap'], 2, { '1K': '0.15' }],
+      ['nano-banana-pro-face-swap', 'fal-ai/nano-banana-pro/edit', ['face_swap'], 2, { '1K': '0.15' }],
       ['nano-banana-pro-model-swap', 'fal-ai/nano-banana-pro/edit', ['model_swap'], 2, { '1K': '0.15' }],
       ['topaz-upscale', 'fal-ai/topaz/upscale/image', ['image_upscale'], 1, { '2K': '0.08', '4K': '0.08' }],
     ]);
@@ -146,7 +146,7 @@ describe('migration 0009 image app models', () => {
   });
 
   test('every app row can be enabled', async () => {
-    const ids = ['bria-background-remove', 'bria-background-replace', 'easel-advanced-face-swap', 'ideogram-v3-reframe', 'nano-banana-pro-character-swap', 'nano-banana-pro-model-swap', 'topaz-upscale'];
+    const ids = ['bria-background-remove', 'bria-background-replace', 'ideogram-v3-reframe', 'nano-banana-pro-character-swap', 'nano-banana-pro-face-swap', 'nano-banana-pro-model-swap', 'topaz-upscale'];
     await pool.query(`update model_configs set enabled = true where id = any($1)`, [ids]);
     await pool.query(`update model_configs set enabled = false where id = any($1)`, [ids]);
   });
@@ -158,6 +158,16 @@ describe('migration 0010 marketing model', () => {
     expect(rows[0].features).toEqual(['video', 'marketing']);
     expect(rows[0].enabled).toBe(false);
     expect(rows[0].sources.referenceImages).toMatchObject({ readAt: '2026-10-24', url: expect.stringContaining('endpoint_id=fal-ai/kling-video/o3/pro/reference-to-video') });
+  });
+});
+
+describe('migration 0011 face swap model', () => {
+  test('moves Face Swap from the deprecated Easel app to a disabled Nano Banana Pro row, and the Easel row serves no feature', async () => {
+    const { rows } = await pool.query(`select id, features, enabled from model_configs where 'face_swap' = any(features) or id = 'easel-advanced-face-swap' order by id`);
+    expect(rows).toEqual([
+      { id: 'easel-advanced-face-swap', features: [], enabled: false },
+      { id: 'nano-banana-pro-face-swap', features: ['face_swap'], enabled: false },
+    ]);
   });
 });
 
