@@ -87,8 +87,9 @@ describe('GET /api/admin/report', () => {
   test('gives the weekly KPIs per user for the week of any date in it, with hand-computed numbers', async () => {
     const r = await report('?week=2026-10-14');
     expect(r.week).toEqual({ start: '2026-10-12', end: '2026-10-18' });
-    // The cap is the ledger usage of the month the week starts in: 2 + 3 + 1 + 2 + 1.5 + 1.5 + 9 + 7.
-    expect(r.cap).toEqual({ month: '2026-10', monthlyCapUsd: '200.0000', usedUsd: '27.0000', memberDailyClipCap: 5 });
+    // The cap is the ledger usage of the month the week starts in: 2 + 3 + 1 + 2 + 1.5 + 1.5 + 9 + 7, plus the bake-off rows
+    // migration 0012 books for October (5.6 + 13.872).
+    expect(r.cap).toEqual({ month: '2026-10', monthlyCapUsd: '200.0000', usedUsd: '46.4720', memberDailyClipCap: 5 });
     expect(r.users).toEqual([
       // r1..r4: 2 accepted (r1, r2); spend 2 + 3 + 1 + 2 = 8; 8 / 2 = 4; succeeded times 100, 200, 300 -> median 200; 1 of 4 failed; 8 / 200 of the cap.
       { userId: 'rep1', name: 'Rep One', email: 'rep1@example.test', team: 'Report Team', jobs: 4, acceptedClips: 2, spendUsd: '8.0000', costPerAcceptedUsd: '4.0000', medianRunSeconds: 200, failureRate: 0.25, spendOfCap: '0.0400' },

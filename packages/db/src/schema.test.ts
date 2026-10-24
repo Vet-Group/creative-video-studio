@@ -204,8 +204,8 @@ describe('cost_entries', () => {
   });
 
   test('keeps a shared ref unique, so a second booking of the same ref fails', async () => {
-    await entry('bakeoff', null, '3', { ref: 'bakeoff-2026-10-fal' });
-    await expect(entry('bakeoff', null, '3', { ref: 'bakeoff-2026-10-fal' })).rejects.toThrow(/cost_entries_ref_unique/);
+    await entry('bakeoff', null, '3', { ref: 'bakeoff-2026-08-fal' });
+    await expect(entry('bakeoff', null, '3', { ref: 'bakeoff-2026-08-fal' })).rejects.toThrow(/cost_entries_ref_unique/);
   });
 
   test('refuses a month that is not YYYY-MM and a shared row that names a user', async () => {
