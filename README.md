@@ -6,7 +6,7 @@ never a runtime dependency.
 
 - Product and decisions: [`docs/PRD.md`](docs/PRD.md), [`docs/STATUS.md`](docs/STATUS.md).
 - Design: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Milestones: [`docs/IMPLEMENTATION-PLAN.md`](docs/IMPLEMENTATION-PLAN.md).
-- Scope: video only. No pricing, subscriptions or billing; image generation and editing tools are deferred.
+- Scope: the internal creative dashboard: Explore, Try On, Image Generation, Create Videos, Marketing Studio, Apps and Library. No pricing, subscriptions or billing; real USD cost is shown instead.
 
 ## Layout
 

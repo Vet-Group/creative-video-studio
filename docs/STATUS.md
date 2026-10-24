@@ -1,6 +1,6 @@
 # Status — Creative Video Studio (internal)
 
-Last updated: 2026-10-23, 11:45 ICT (main after #16). The autonomous run is under way under the plan v5.1 pre-approval; the current state is in "Run state" below. Earlier sections keep the research record. The deep-interview decisions are recorded in the section after Q9; where they differ from Q1–Q9, they win.
+Last updated: 2026-10-24 (main after #42; see "Overnight 2026-10-24" below). Earlier: 2026-10-23, 11:45 ICT (main after #16). The autonomous run is under way under the plan v5.1 pre-approval; the current state is in "Run state" below. Earlier sections keep the research record. The deep-interview decisions are recorded in the section after Q9; where they differ from Q1–Q9, they win.
 
 ## Workspace
 
@@ -36,7 +36,7 @@ Last updated: 2026-10-23, 11:45 ICT (main after #16). The autonomous run is unde
   - Internal auth and permissions, storage, and a provider budget sized for one company.
 - **Out of scope (phase 1):**
   - Marketing landing pages, pricing, subscriptions, billing, checkout and credit sales.
-  - Image generation, Try-On, background removal, upscaling, image editing and the Apps catalog.
+  - Image generation, Try-On, background removal, upscaling, image editing and the Apps catalog. **Superseded on 2026-10-23:** the owner widened the scope to the whole dashboard (Try On, Image Generation, Marketing Studio, Apps); pricing and billing stay out. See "Overnight 2026-10-24".
   - Building all 10 captured pages.
 - **Allowed:** reference, product or first/last-frame images as video inputs. This does not make an image module.
 - **Decided in grilling, Q1 (2026-10-22):** the MVP flow is product video from existing images. Real inputs are POD mockups and product photos. Prompt-only video is out as a separate goal. UGC (a talking person or voice-over) is deferred to a later phase.
@@ -200,6 +200,32 @@ Kept apart on purpose: merged code is not a deployment, and a mock job is not a 
 - **Owner keys:** preflight 12/12 ready on 2026-10-23 (fal, Replicate, Lark, Google, Cloudflare, R2, restic, first Admin).
 - **Change request UI-PARITY (2026-10-23):** the app should look and move close to the Fash video screens. Matrix and acceptance in [`UI-MOTION-PARITY.md`](UI-MOTION-PARITY.md); built in run step M.7 after D.1, before the deploy. M.7 is built in the `cvs/app-m7` PR: C1-C3 hold (Examples clips play from local fixtures, fallbacks, Create and Library at 1440, 1280, 1024, 1023 and 390 px); C4 pending: the owner compares the baselines with the Fash audit screenshots. UI and motion parity not met until then. The Playwright e2e is verified locally only, because CI does not run Playwright. It uses local fixtures and does not wait for the bake-off, funding or the port 4317 reference. Cosmetic rows deferred: Library cards have no separate status chip (the Library lists finished clips only), the preset banner shows the poster rather than a loop, and the carousel is used in the preset picker only. If the deploy goes ahead with M.7 skipped or incomplete, this page will say "UI and motion parity not met".
 - **M.7b (2026-10-23):** M.7 merged as #23 and was skipped with C4 not met; the owner judged the look not close enough. M.7b applies the measured fix list in [`UI-MOTION-PARITY-M7B.md`](UI-MOTION-PARITY-M7B.md) (shell, Create card, upload, controls, tabs, Examples grid, Run button, narrow layout) before the deploy. M.7b gates D.5: only `done` releases the deploy, and it is recorded done only when the owner accepts C4 on the new revision. UI and motion parity stays "not met" until then.
+
+### Overnight 2026-10-24 (whole-dashboard scope)
+
+The owner widened the scope on 2026-10-23 from video only to the whole dashboard: Explore, Try On, Image Generation, Create Videos, Marketing Studio, Apps and Library. Pricing, subscriptions, credits and billing stay out of scope; real USD cost is shown instead. The deploy waits until the whole dashboard is built. Providers are allowed, with caps.
+
+- **Merged to `main`** (each one has CI green on its exact head commit, and its full Playwright e2e was run locally, since CI does not run Playwright):
+
+  | PR | Content |
+  |---|---|
+  | #32 | V01 live measurements |
+  | #33 | Image and apps budget, separate from video: per-feature caps, migration 0006, [`PROVIDERS-AND-CAPS.md`](PROVIDERS-AND-CAPS.md) |
+  | #34 | App shell: sidebar in the live order, icon rail, Settings dialog without Billing, Explore |
+  | #35 | About tab on Create Videos |
+  | #36 | Image jobs core: `ImageProvider`, image models seeded disabled (0007), the jobs API for image features, Library kinds |
+  | #37 | Library favourites (0008), oldest-first sort, card size slider, empty state |
+  | #38 | Seven image app models seeded disabled (0009) and their fal request builders. Topaz Upscale is priced at a flat $0.08 per output up to 24 MP, and inputs it cannot take release their estimate |
+  | #39 | Try On and Image Generation pages, plus `/api/image-models` |
+  | #40 | Marketing Studio core: `marketing` on Kling O3 Pro (0010), the jobs API rules, the prompt builder, and `[ImageN]` rewritten to `@ImageN` for Kling |
+  | #41 | Apps index and app pages |
+  | #42 | Marketing Studio page |
+
+- **Live provider check (2026-10-24):** one real fal call was made per seeded image model, through the adapter, with synthetic inputs. 11 of 12 succeeded (all Image Generation and Try On models, plus Model Swap, Background Changer, Reframe, Upscale and Background Remover). Easel Face Swap answered HTTP 503 "Application is not available" on fal for both field shapes; it stays disabled. The check spent about $0.84. The video models (Kling for Marketing Studio) were not called; they wait for M.6.
+- **Not done:**
+  - Every image model and app ships disabled; an Admin enables each one in Settings.
+  - Model configuration for video (M.6), the Motion Control and Media Optimizer apps (shown as "coming soon"), and the Marketing formats other than UGC Try On are not built.
+- **Deployment:** none. M.7b waits on the owner's C4 comparison, which now covers the whole dashboard; D.5 follows it.
 
 ## Evidence gaps
 
