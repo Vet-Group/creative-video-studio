@@ -9,7 +9,7 @@
 # <app>/install.state so uninstall.sh can undo exactly that. With a state file present the run is an update: ports held by
 # this install's own compose project and cvs-web are not "taken", and a recorded tunnel is kept.
 # Env (defaults): CVS_APP_DIR (/opt/creative-video-studio; absolute, last part creative-video-studio), CVS_REPO_URL (the GitHub
-# SSH URL; no user or password in an https URL), CVS_REPO_REF (main), CVS_DEPLOY_KEY (~/.ssh/cvs-deploy), CVS_HOSTNAME
+# SSH URL; no user or password in an https URL), CVS_REPO_REF (main), CVS_DEPLOY_KEY (~/.ssh/cvs_deploy_ed25519, the key install-gate-key.sh made), CVS_HOSTNAME
 # (video.vetgroup.net), CVS_ZONE (vetgroup.net), CLOUDFLARE_API_TOKEN, CVS_STATE_DIR (~/.local/state/creative-video-studio;
 # holds ops.lock, shared with cvs-backup), CVS_ROOT_HOME (/root; HOME is forced to it so `systemctl --user` and
 # ~/.config/systemd/user agree), CVS_LISTEN_FILE (a file in `ss -ltnH` format that replaces running ss; for tests).
@@ -37,7 +37,7 @@ here="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
 app="${CVS_APP_DIR:-/opt/creative-video-studio}"
 repo_url="${CVS_REPO_URL:-git@github.com:anhtahaylove/creative-video-studio.git}"
 repo_ref="${CVS_REPO_REF:-main}"
-deploy_key="${CVS_DEPLOY_KEY:-$HOME/.ssh/cvs-deploy}"
+deploy_key="${CVS_DEPLOY_KEY:-$HOME/.ssh/cvs_deploy_ed25519}"
 public_host="${CVS_HOSTNAME:-video.vetgroup.net}"
 zone="${CVS_ZONE:-vetgroup.net}"
 state_file="$app/install.state"
@@ -194,6 +194,13 @@ bucket="${S3_BUCKET:-cvs-media}"
 # shellcheck disable=SC2016 # the $VARS are meant to expand inside the MinIO container, not here
 app_run docker compose -p "$project" exec -T minio sh -c 'MC_HOST_ih="http://$MINIO_ROOT_USER:$MINIO_ROOT_PASSWORD@127.0.0.1:9000" exec mc mb --ignore-existing "ih/$1"' mc "$bucket"
 app_run "${scrub[@]}" pnpm --filter @cvs/db migrate
+# The first Admin (plan D.5). create-user reads the email and password from the environment, so neither is printed, and it
+# leaves an email that already has an account alone, so a re-run changes nothing.
+if [ -n "${CVS_ADMIN_EMAIL:-}" ] && [ -n "${CVS_ADMIN_PASSWORD:-}" ]; then
+  app_run "${scrub[@]}" pnpm --filter @cvs/web auth:create-user --first-admin
+else
+  say "CVS_ADMIN_EMAIL or CVS_ADMIN_PASSWORD is not set in $app/.env: no first Admin is created"
+fi
 
 # 7. Backup settings: the units read backup.env, built from .env when it does not exist yet.
 if [ ! -f "$backup_env" ]; then

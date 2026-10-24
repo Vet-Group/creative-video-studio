@@ -341,6 +341,21 @@ describe.skipIf(!hasBash)('deploy kit (needs bash only)', { timeout: 30_000 }, (
     expect(r.out).toContain('/.local/state/creative-video-studio/ops.lock');
   });
 
+  test('h2. the first Admin is created after the migrations from .env, without printing the password, and only when both names are set', () => {
+    const s = sandbox(undefined, 'CVS_ADMIN_EMAIL=admin@example.test\nCVS_ADMIN_PASSWORD=not-a-real-password-123\n');
+    const r = run(installSh, ['--dry-run'], s.env);
+    expect(r.status).toBe(0);
+    const lines = dryRunLines(r.out);
+    const migrate = lines.findIndex((l) => l.includes('pnpm --filter @cvs/db migrate'));
+    const admin = lines.findIndex((l) => l.includes('pnpm --filter @cvs/web auth:create-user --first-admin'));
+    expect(admin).toBeGreaterThan(migrate);
+    expect(lines[admin]).toContain('-u CLOUDFLARE_API_TOKEN');
+    expect(r.out).not.toContain('not-a-real-password-123');
+    const none = run(installSh, ['--dry-run'], sandbox(undefined, 'CVS_ADMIN_EMAIL=admin@example.test\n').env);
+    expect(none.out).not.toContain('--first-admin');
+    expect(none.out).toContain('no first Admin is created');
+  });
+
   test('i. a re-run with a recorded tunnel keeps it only when it is complete', () => {
     const half = sandbox();
     writeFileSync(half.stateFile, 'compose=creative-video-studio\ntunnel_id=0123abcd-0123-4abc-8abc-0123456789ab\n');
