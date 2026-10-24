@@ -30,7 +30,9 @@ Write `scores-<set>.csv` with the header `id,pass,faults,note`, one row per clip
 
 ## Motion thresholds
 
-Status: not calibrated. B.5a fills these in from the canary clips that rendered plus the mock sample and marks them provisional; they do not change after that. While a value is empty, `metrics.ts` flags nothing for that measure.
+Status: provisional, calibrated at B.5a on 2026-10-24; they do not change after that. While a value is empty, `metrics.ts` flags nothing for that measure.
 
-- flicker_mean_max:
-- judder_p99_max:
+Calibration: both canary clips showed no flicker or judder when checked frame by frame (Kling o3 Pro 1080x1920: mean 0.093, p99 1.377; Seedance 2.5 720x1280: mean 0.415, p99 2.677; mock sample: mean 0.005, p99 0.023). Each threshold is twice the highest clean value, rounded.
+
+- flicker_mean_max: 0.8
+- judder_p99_max: 5.4

@@ -34,9 +34,9 @@ beforeAll(async () => {
 }, 60_000);
 
 describe('metrics', () => {
-  test('the shipped rubric.md has empty thresholds and the five Q3 faults', () => {
+  test('the shipped rubric.md has the B.5a thresholds and the five Q3 faults', () => {
     const rubric = readFileSync(RUBRIC, 'utf8');
-    expect(readThresholds(rubric)).toEqual({ flickerMeanMax: null, judderP99Max: null });
+    expect(readThresholds(rubric)).toEqual({ flickerMeanMax: 0.8, judderP99Max: 5.4 });
     for (const code of FAULT_CODES) expect(rubric).toContain(`\`${code}\``);
   });
 
@@ -121,7 +121,7 @@ describe('anonymise, metrics and judge on a set', () => {
 
   test('metrics writes blind/<set>/metrics.json and judge prepares a brief that names no model', async () => {
     const calibrated = join(work, 'rubric.md');
-    writeFileSync(calibrated, readFileSync(RUBRIC, 'utf8').replace('- flicker_mean_max:', '- flicker_mean_max: 0.5'));
+    writeFileSync(calibrated, readFileSync(RUBRIC, 'utf8').replace(/^- flicker_mean_max:.*$/m, '- flicker_mean_max: 0.5').replace(/^- judder_p99_max:.*$/m, '- judder_p99_max:'));
     const rows = await metricsForSet(root, 'half-1', calibrated);
     expect(rows.map((r) => r.id)).toEqual(['clip-0001', 'clip-0002', 'clip-0003']);
     const file = readFileSync(join(root, 'blind', 'half-1', 'metrics.json'), 'utf8');
