@@ -321,4 +321,6 @@ if [ "$(loginctl show-user "$(id -un)" -p Linger --value 2> /dev/null || true)" 
 fi
 run systemctl --user daemon-reload
 run systemctl --user enable --now "${enable[@]}"
+# enable --now leaves a unit that is already running on its old code, so an update restarts the app units after the new build.
+if [ ${#own[@]} -gt 0 ]; then run systemctl --user restart cvs-web.service cvs-worker.service; fi
 say "done. State: $state_file; undo with $here/uninstall.sh"
