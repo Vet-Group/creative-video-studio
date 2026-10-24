@@ -17,6 +17,20 @@ a free port set; for uninstall, a valid state file). Lines start with `[dry-run]
 A failed read-only precondition prints `[dry-run] would fail: <reason>` and exits 1. `uninstall.sh --dry-run` ends with
 "dry run: nothing was changed".
 
+## Before the first deploy: the VET `.env` (owner)
+
+The run's gate key cannot write files on VET, so the `.env` is placed once with the owner's `vet-linux` profile, like A.0c:
+
+```
+bash scripts/run/provision-vet-env.sh --dry-run   # the names it would write, no ssh
+bash scripts/run/provision-vet-env.sh
+```
+
+It copies only the names in `.env.example` from this checkout's `.env` (so `FAL_ADMIN_KEY` never reaches VET), sets `APP_URL` to
+`https://video.vetgroup.net`, keeps the `BETTER_AUTH_SECRET` already on VET or makes a new one, writes the file with mode 600, and
+prepares `/opt/creative-video-studio` as a checkout with the right `origin`, so the gate's `deploy <commit>` fetches into it. Run it
+again after changing a value in `.env`; then `deploy` again so the services read it.
+
 ## What install.sh does, in order
 
 0. Checks the preconditions (it forces `HOME=/root`, so `systemctl --user` and `~/.config/systemd/user` agree; `CVS_APP_DIR` must be
@@ -33,7 +47,8 @@ A failed read-only precondition prints `[dry-run] would fail: <reason>` and exit
    `CLOUDFLARE_API_TOKEN`, `CVS_R2_*` and `CVS_RESTIC_PASSWORD` in their environment.
 5. Records `compose=creative-video-studio` in the state file, then `docker compose -p creative-video-studio up -d --wait`, creates the MinIO bucket (`S3_BUCKET`, default `cvs-media`; the
    production worker does not create it) and runs `pnpm --filter @cvs/db migrate`. The seed rows (the default team, the
-   model configs, the presets) are part of the migrations, so there is no separate seed step.
+   model configs, the presets) are part of the migrations, so there is no separate seed step. Then, when `CVS_ADMIN_EMAIL` and
+   `CVS_ADMIN_PASSWORD` are set, it creates that Admin (`auth:create-user --first-admin`); an email that already has an account is left alone.
 6. Writes `~/.config/creative-video-studio/backup.env` (mode 600) from `CVS_RESTIC_PASSWORD` and `CVS_R2_*` if the file is missing.
 7. With `CLOUDFLARE_API_TOKEN`: finds the zone, refuses if the DNS record already exists, creates the tunnel
    `creative-video-studio`, writes `cloudflared/<id>.json` (mode 600) and `cloudflared/cvs.yml`, and creates only the
@@ -48,7 +63,7 @@ The Cloudflare token needs these permissions (unverified: not yet tried against 
 `vetgroup.net` zone, and Account / Cloudflare Tunnel:Edit.
 
 Settings come from the environment first, then from `/opt/creative-video-studio/.env`, which must exist before a real run.
-Other variables: `CVS_APP_DIR`, `CVS_REPO_URL`, `CVS_REPO_REF`, `CVS_DEPLOY_KEY` (default `~/.ssh/cvs-deploy`), `CVS_HOSTNAME`, `CVS_ZONE`.
+Other variables: `CVS_APP_DIR`, `CVS_REPO_URL`, `CVS_REPO_REF`, `CVS_DEPLOY_KEY` (default `~/.ssh/cvs_deploy_ed25519`, the read-only key `scripts/run/install-gate-key.sh` created), `CVS_HOSTNAME`, `CVS_ZONE`.
 `CVS_LISTEN_FILE` (a file in `ss -ltnH` format) replaces the port probe; the tests use it.
 
 ### Re-running and updating

@@ -72,6 +72,18 @@ describe('gate key install and removal (dry run on a 3-key authorized_keys copy)
   });
 });
 
+describe('provision-vet-env.sh (D.5 owner step)', () => {
+  test('--dry-run keeps only the .env.example names, never FAL_ADMIN_KEY, and prints no value', () => {
+    const env = join(tmp(), '.env');
+    writeFileSync(env, 'FAL_KEY=fal-secret-value\nFAL_ADMIN_KEY=admin-secret-value\nAPP_URL=http://localhost:3400\nNOT_IN_EXAMPLE=x\n');
+    const r = bash([join(ROOT, 'scripts/run/provision-vet-env.sh'), '--dry-run'], { CVS_ENV_FILE: env });
+    expect(r.status).toBe(0);
+    expect(r.stdout).toMatch(/names: .*FAL_KEY /);
+    expect(r.stdout).not.toMatch(/FAL_ADMIN_KEY|NOT_IN_EXAMPLE|secret-value|localhost/);
+    expect(r.stdout).toContain('dry run: nothing was sent');
+  });
+});
+
 const pwsh = spawnSync('pwsh', ['-NoProfile', '-Command', 'exit 0']).status === 0;
 
 // pwsh cold start on a CI runner can take several seconds per call.
