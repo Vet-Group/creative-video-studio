@@ -143,10 +143,10 @@ export function WorkTabs<T extends string>({ prefix, tabs, labels, shown, onSele
 
 const aspectOf = (ratio: string): string => (/^\d+:\d+$/.test(ratio) ? ratio.replace(':', ' / ') : '1 / 1');
 
-/** The company's latest outputs of one Library `kind` (`try_on`, `image` or, with `video`, `marketing`) in a masonry of columns; 24 at a time. */
 const GALLERY_SIZE_KEY = 'cvs.gallery.size';
 
-/** `cols` is the column count below 1024 px, up to 1536 px and above; from 1024 px a slider (as on Fash) shows one column more or less, remembered per browser. */
+/** The company's latest outputs of one Library `kind` (`try_on`, `image` or, with `video`, `marketing`) in a masonry of columns; 24 at a time.
+ * `cols` is the column count below 1024 px, up to 1536 px and above; from 1024 px a slider (as on Fash) shows one column more or less, remembered per browser. */
 export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4] }: { kind: string; label: string; emptyText: string; video?: boolean; cols?: [number, number, number] }) {
   const [items, setItems] = useState<Clip[]>([]);
   const [hasMore, setHasMore] = useState(false);
