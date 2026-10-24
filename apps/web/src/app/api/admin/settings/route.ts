@@ -67,7 +67,7 @@ export async function PUT(request: Request) {
   // docs/ops/adding-a-model.md. Seedance 2.5 keeps its 6/9 record but cannot be enabled. Image and mock models have none.
   const noRecord = await pool.query(
     `select id from model_configs where id = any($1::text[]) and not enabled and kind = 'video' and provider <> 'mock'
-       and (coalesce(pass_seed_total, 0) = 0 or pass_seed_passes < 0.7 * pass_seed_total) order by id`,
+       and (pass_seed_passes is null or coalesce(pass_seed_total, 0) = 0 or pass_seed_passes > pass_seed_total or pass_seed_passes < 0.7 * pass_seed_total) order by id`,
     [(list as { id: string; enabled: boolean }[]).filter((m) => m.enabled).map((m) => m.id)],
   );
   if (noRecord.rowCount) return bad(`no passing bake-off record (at least 70%) for ${noRecord.rows.map((r) => r.id).join(', ')}; run the mini bake-off in docs/ops/adding-a-model.md first`);

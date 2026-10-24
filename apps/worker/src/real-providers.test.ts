@@ -6,8 +6,11 @@ import { assetReader, fitForInline, MAX_INLINE_BYTES, realProviders } from './re
 
 const asset = { s3_key: 'inputs/a1', mime: 'image/png' };
 const pool = (rows: unknown[]) => ({ query: vi.fn(async () => ({ rows })) }) as never;
-const png = (w: number, h: number, noise = false) =>
-  sharp(noise ? Buffer.from(Array.from({ length: w * h * 3 }, (_, i) => (i * 7919 + (i >> 5) * 104729) % 251)) : Buffer.alloc(w * h * 3, 200), { raw: { width: w, height: h, channels: 3 } }).png().toBuffer().then((b) => new Uint8Array(b));
+const png = (w: number, h: number, noise = false, alpha = false) => {
+  const c = alpha ? 4 : 3;
+  return sharp(noise ? Buffer.from(Array.from({ length: w * h * c }, (_, i) => (i * 7919 + (i >> 5) * 104729) % 251)) : Buffer.alloc(w * h * c, 200), { raw: { width: w, height: h, channels: c } })
+    .png().toBuffer().then((b) => new Uint8Array(b));
+};
 const small = await png(4, 4);
 const read = vi.fn(async () => small);
 const SMALL_URL = `data:image/png;base64,${Buffer.from(small).toString('base64')}`;
@@ -55,6 +58,12 @@ describe('fitForInline', () => {
       const meta = await sharp(out.bytes).metadata();
       expect([out.contentType, meta.format, out.bytes.byteLength <= MAX_INLINE_BYTES, Math.max(meta.width!, meta.height!) <= 2048]).toEqual(['image/jpeg', 'jpeg', true, true]);
     }
+  }, 60_000);
+
+  test('keeps the transparency of a large PNG with alpha (WebP)', async () => {
+    const out = await fitForInline(await png(2600, 1400, true, true), 'image/png');
+    const meta = await sharp(out.bytes).metadata();
+    expect([out.contentType, meta.format, meta.hasAlpha, out.bytes.byteLength <= MAX_INLINE_BYTES]).toEqual(['image/webp', 'webp', true, true]);
   }, 60_000);
 
   test('refuses bytes that are not an image', async () => {

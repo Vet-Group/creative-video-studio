@@ -98,7 +98,8 @@ describe('fal image submit', () => {
     const two = { imageUrls: ['https://img/1.jpg', 'https://img/2.jpg'] };
     const refuses = async (r: ImageSubmitRequest, message: RegExp, readImage?: Parameters<typeof bodyFor>[1]) => {
       const { fn, calls } = fakeFetch();
-      await expect(createFalImageProvider({ apiKey: 'k', fetch: fn, readImage }).submit(r)).rejects.toThrow(message);
+      const err = await createFalImageProvider({ apiKey: 'k', fetch: fn, readImage }).submit(r).catch((e: unknown) => e);
+      expect([err instanceof ImageReadError, (err as Error).message]).toEqual([true, expect.stringMatching(message)]);
       expect(calls).toHaveLength(0);
     };
 

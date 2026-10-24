@@ -158,9 +158,12 @@ switch (cmd) {
     const s = step(m, positionals[0]);
     const reason = positionals.slice(1).join(' ');
     if (!reason) throw new Error('a reason is required');
-    if (cmd === 'skip') ownerOnly(s.id);
     if (cmd === 'fail') recordFailure(s, reason);
-    else Object.assign(s, { status: 'skipped', reason });
+    else {
+      ownerOnly(s.id);
+      s.evidence.push(...(JSON.parse(values.evidence ?? '[]') as Evidence[]));
+      Object.assign(s, { status: 'skipped', reason });
+    }
     save(m);
     console.log(`${s.id}: ${s.status}${s.status === 'stuck' ? ' (3 attempts used)' : ''}`);
     break;
