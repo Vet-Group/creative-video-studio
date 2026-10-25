@@ -28,7 +28,7 @@ export function LoopVideo({ src, poster }: { src: string; poster: string | null 
       document.removeEventListener('visibilitychange', sync);
       v.pause();
     };
-  }, [reduced]);
+  }, [reduced, src]); // a new src (another preset chosen) loads paused, so the watch starts again
   return <video ref={ref} src={src} poster={poster ?? undefined} muted loop playsInline preload="none" aria-hidden="true" />;
 }
 
