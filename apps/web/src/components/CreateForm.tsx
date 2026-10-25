@@ -1,9 +1,10 @@
 'use client';
 import { type DragEvent, type KeyboardEvent, useEffect, useId, useRef, useState } from 'react';
 import { api, errorText, sendJson } from '@/lib/api';
-import { EXAMPLES, type Example, exampleForPreset, splitColumns } from '@/lib/examples';
+import { EXAMPLES, type Example, exampleForPreset, sampleSrc, splitColumns } from '@/lib/examples';
 import { NARROW, useMediaQuery, WIDE } from '@/lib/use-media-query';
 import { useHydrated } from '@/lib/use-hydrated';
+import { useSamples } from '@/lib/use-samples';
 import { About } from './About';
 import { Carousel } from './Carousel';
 import { Icon } from './Icon';
@@ -193,6 +194,8 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
   const tabs: Tab[] = narrow ? ['create', 'history', 'examples', 'about'] : ['history', 'examples', 'about'];
   const shown: Tab = narrow ? (tab ?? 'create') : tab === 'examples' || tab === 'about' ? tab : 'history';
   const current = presets?.find((p) => p.id === presetId);
+  const have = useSamples();
+  const media = (path: string) => sampleSrc(have, path);
   const banner = exampleForPreset(presetId);
   const detailAt = detail ? EXAMPLES.indexOf(detail) : -1;
   const prevStep = useRef<HTMLButtonElement>(null);
@@ -239,7 +242,7 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
         <div className="card form-card" id="create-panel-create" role={narrow ? 'tabpanel' : undefined} aria-labelledby={narrow ? 'create-tab-create' : undefined} hidden={narrow && shown !== 'create'}>
           <div className="form-scroll">
             <div className="banner">
-              {banner ? <img src={banner.poster} alt="" /> : <div className="banner-empty" aria-hidden="true" />}
+              {banner ? <img src={media(banner.poster)} alt="" /> : <div className="banner-empty" aria-hidden="true" />}
               <div className="banner-text">
                 <strong>{current?.label ?? 'Tự viết mô tả'}</strong>
               </div>
@@ -387,7 +390,7 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
                 <ul key={c} className="masonry-col">
                   {column.map((ex) => (
                     <li key={ex.id} className="example">
-                      <Preview src={ex.src} poster={ex.poster} width={ex.width} height={ex.height} title={ex.title} paused={picking || detail !== null} />
+                      <Preview src={media(ex.src)} poster={media(ex.poster)} width={ex.width} height={ex.height} title={ex.title} paused={picking || detail !== null} />
                       <span className="chips">
                         <span className="chip">Mẫu</span>
                         {ex.fixture && <span className="chip">fixture</span>}
@@ -418,7 +421,7 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
             const ex = exampleForPreset(p.id);
             return (
               <li key={p.id} className="preset-card">
-                {ex ? <Preview src={ex.src} poster={ex.poster} width={ex.width} height={ex.height} title={p.label} /> : <div className="banner-empty" />}
+                {ex ? <Preview src={media(ex.src)} poster={media(ex.poster)} width={ex.width} height={ex.height} title={p.label} /> : <div className="banner-empty" />}
                 <button
                   type="button"
                   aria-pressed={p.id === presetId}
@@ -454,7 +457,7 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
         {detail && (
           <>
             <div className="detail-media">
-              <Preview key={detail.id} src={detail.src} poster={detail.poster} width={detail.width} height={detail.height} title={detail.title} />
+              <Preview key={detail.id} src={media(detail.src)} poster={media(detail.poster)} width={detail.width} height={detail.height} title={detail.title} />
             </div>
             {/* Before the details, so Tab meets Previous and Next first. Stepping onto an end hides the pressed button, so the focus moves to the other one. */}
             <button
@@ -485,11 +488,11 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
             </button>
             <div className="detail-info">
               <span className="detail-chip">
-                <img src={exampleForPreset(detail.presetId)?.poster ?? detail.poster} alt="" width={36} height={36} />
+                <img src={media(exampleForPreset(detail.presetId)?.poster ?? detail.poster)} alt="" width={36} height={36} />
                 {presets?.find((p) => p.id === detail.presetId)?.label}
               </span>
               <h2>{detail.title}</h2>
-              <img className="detail-input" src={detail.poster} alt="Khung hình mẫu" width={48} height={48} />
+              <img className="detail-input" src={media(detail.poster)} alt="Khung hình mẫu" width={48} height={48} />
               <ul className="detail-pills" aria-label="Thông số">
                 <li aria-label={`Thời lượng ${detail.durationSec} giây`}>{detail.durationSec}s</li>
                 <li aria-label={`Tỉ lệ ${detail.aspect}`}>{detail.aspect}</li>
@@ -497,10 +500,10 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
               <div className="detail-foot">
                 <p className="detail-date">Mẫu minh họa{detail.fixture ? ' (fixture)' : ''}</p>
                 <div className="detail-tools">
-                  <a href={detail.src} download aria-label="Tải video mẫu" title="Tải video mẫu">
+                  <a href={media(detail.src)} download aria-label="Tải video mẫu" title="Tải video mẫu">
                     <Icon name="download" />
                   </a>
-                  <a href={detail.src} target="_blank" rel="noreferrer" aria-label="Mở trong tab mới" title="Mở trong tab mới">
+                  <a href={media(detail.src)} target="_blank" rel="noreferrer" aria-label="Mở trong tab mới" title="Mở trong tab mới">
                     <Icon name="external" />
                   </a>
                 </div>
