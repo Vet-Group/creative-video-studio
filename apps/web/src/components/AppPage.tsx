@@ -265,7 +265,7 @@ function VideoSlot({ video, busy, onAdd, onRemove }: { video: RefVideo | null; b
   return (
     <div className="field">
       <span id={labelId} className="field-label">
-        Video chuyển động
+        Video mẫu
       </span>
       <div className="slot" role="group" aria-labelledby={labelId}>
         <input
@@ -282,7 +282,7 @@ function VideoSlot({ video, busy, onAdd, onRemove }: { video: RefVideo | null; b
           }}
         />
         {video ? (
-          <ul className="slot-thumbs" aria-label="Video chuyển động: video đã chọn">
+          <ul className="slot-thumbs" aria-label="Video mẫu: video đã chọn">
             <li>
               <video src={`/api/assets/${video.id}/content`} muted playsInline preload="metadata" aria-label={video.filename} />
               <button type="button" aria-label={`Bỏ video ${video.filename}`} onClick={onRemove}>
@@ -291,7 +291,7 @@ function VideoSlot({ video, busy, onAdd, onRemove }: { video: RefVideo | null; b
             </li>
           </ul>
         ) : (
-          <button type="button" className="slot-add" aria-label="Tải lên Video chuyển động" disabled={!hydrated || busy} onClick={() => input.current?.click()}>
+          <button type="button" className="slot-add" aria-label="Tải lên Video mẫu" disabled={!hydrated || busy} onClick={() => input.current?.click()}>
             <Icon name="plus" size={16} />
             <span>Tải lên</span>
           </button>

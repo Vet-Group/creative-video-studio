@@ -102,9 +102,9 @@ describe('motionReason', () => {
     expect(motionReason({ ...base, failed: true })).toBe('Không tải được danh sách mô hình.');
     expect(motionReason({ ...base, model: undefined })).toBe('Ứng dụng này chưa được Admin bật');
     expect(motionReason({ ...base, image: false })).toBe('Tải lên ảnh: Nhân vật.');
-    expect(motionReason({ ...base, videoMs: null })).toBe('Tải lên video chuyển động.');
-    expect(motionReason({ ...base, videoMs: 1900 })).toBe('Video chuyển động phải dài từ 3 đến 30 giây.'); // rounds up to 2 s
-    expect(motionReason({ ...base, videoMs: 30_100 })).toBe('Video chuyển động phải dài từ 3 đến 30 giây.'); // rounds up to 31 s
+    expect(motionReason({ ...base, videoMs: null })).toBe('Tải lên video mẫu.');
+    expect(motionReason({ ...base, videoMs: 1900 })).toBe('Video mẫu phải dài từ 3 đến 30 giây.'); // rounds up to 2 s
+    expect(motionReason({ ...base, videoMs: 30_100 })).toBe('Video mẫu phải dài từ 3 đến 30 giây.'); // rounds up to 31 s
     expect(motionReason(base)).toBeNull();
     expect(motionReason({ ...base, videoMs: 30_000 })).toBeNull();
   });

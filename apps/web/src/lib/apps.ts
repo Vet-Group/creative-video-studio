@@ -207,7 +207,7 @@ export const APPS: AppConfig[] = [
       intro: 'Ứng dụng dùng Kling V3 Motion Control: nhân vật trong ảnh của bạn làm lại đúng các động tác của một video mẫu. Video kết quả dài bằng video mẫu.',
       steps: [
         ['Tải ảnh nhân vật.', 'Một ảnh rõ người, thấy cả thân càng tốt.'],
-        ['Tải video chuyển động.', 'Video MP4 hoặc MOV dài 3 đến 30 giây, tối đa 20 MB, có một người làm động tác rõ ràng.'],
+        ['Tải video mẫu.', 'Video MP4 hoặc MOV dài 3 đến 30 giây, tối đa 20 MB, có một người làm động tác rõ ràng.'],
         ['Chạy.', 'Prompt là tuỳ chọn. Video kết quả nằm trong tab Lịch sử và trong Thư viện, mục Ứng dụng.'],
       ],
       notes: [PHOTO_NOTE, 'Video kết quả không có tiếng. Chi phí tính theo số giây của video mẫu, làm tròn lên.', BUDGET_NOTE],
@@ -280,9 +280,9 @@ export function motionReason(d: MotionDraft): string | null {
   if (d.failed) return 'Không tải được danh sách mô hình.';
   if (!d.model) return 'Ứng dụng này chưa được Admin bật';
   if (!d.image) return 'Tải lên ảnh: Nhân vật.';
-  if (d.videoMs === null) return 'Tải lên video chuyển động.';
+  if (d.videoMs === null) return 'Tải lên video mẫu.';
   const allowed = d.model.durationsSec;
-  if (!allowed.includes(Math.ceil(d.videoMs / 1000))) return `Video chuyển động phải dài từ ${allowed[0]} đến ${allowed.at(-1)} giây.`;
+  if (!allowed.includes(Math.ceil(d.videoMs / 1000))) return `Video mẫu phải dài từ ${allowed[0]} đến ${allowed.at(-1)} giây.`;
   return null;
 }
 
