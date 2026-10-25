@@ -1,11 +1,12 @@
 'use client';
 import { type DragEvent, type KeyboardEvent, useEffect, useId, useRef, useState } from 'react';
 import { api, errorText, sendJson } from '@/lib/api';
-import { EXAMPLES, type Example, exampleForPreset, sampleSrc, splitColumns } from '@/lib/examples';
+import { cardSample, type Example, exampleForPreset, examplesFor, sampleSrc, splitColumns } from '@/lib/examples';
 import { NARROW, useMediaQuery, WIDE } from '@/lib/use-media-query';
 import { useHydrated } from '@/lib/use-hydrated';
 import { useSamples } from '@/lib/use-samples';
 import { About } from './About';
+import { CardMedia } from './CardMedia';
 import { Carousel } from './Carousel';
 import { Icon } from './Icon';
 import { useJobs } from './jobs';
@@ -95,7 +96,7 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
     api<{ presets: { id: string; label: string }[] }>('/api/presets').then(
       (r) => {
         setPresets(r.presets);
-        if (!reuse) setPresetId(r.presets.find((p) => p.id === preset)?.id ?? r.presets[0]?.id ?? '');
+        if (!reuse) setPresetId(preset === 'none' ? '' : (r.presets.find((p) => p.id === preset)?.id ?? r.presets[0]?.id ?? '')); // none: Explore's free-prompt tile
       },
       () => {
         setPresets([]);
@@ -198,8 +199,16 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
   const current = presets?.find((p) => p.id === presetId);
   const have = useSamples();
   const media = (path: string) => sampleSrc(have, path);
-  const banner = exampleForPreset(presetId);
-  const detailAt = detail ? EXAMPLES.indexOf(detail) : -1;
+  /** A preset's loop: its own `preset-<id>` sample (`preset-general` for the free prompt), else the sample clip that stands for it. */
+  const presetMedia = (id: string) => {
+    const ex = exampleForPreset(id);
+    const own = cardSample(have, `preset-${id || 'general'}`, ex ? media(ex.poster) : null);
+    return { video: own.video ?? (ex ? media(ex.src) : null), poster: own.poster, ex };
+  };
+  const banner = presetMedia(presetId);
+  const free = presetMedia('');
+  const examples = examplesFor(have);
+  const detailAt = detail ? examples.findIndex((e) => e.id === detail.id) : -1;
   const prevStep = useRef<HTMLButtonElement>(null);
   const nextStep = useRef<HTMLButtonElement>(null);
 
@@ -244,7 +253,7 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
         <div className="card form-card" id="create-panel-create" role={narrow ? 'tabpanel' : undefined} aria-labelledby={narrow ? 'create-tab-create' : undefined} hidden={narrow && shown !== 'create'}>
           <div className="form-scroll">
             <div className="banner">
-              {banner ? <img src={media(banner.poster)} alt="" /> : <div className="banner-empty" aria-hidden="true" />}
+              <CardMedia video={banner.video} poster={banner.poster} />
               <div className="banner-text">
                 <strong>{current?.label ?? 'Tự viết mô tả'}</strong>
               </div>
@@ -388,7 +397,7 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
         <div className="side" id={`create-panel-${shown === 'create' ? 'history' : shown}`} role="tabpanel" aria-labelledby={`create-tab-${shown === 'create' ? 'history' : shown}`} hidden={narrow && shown === 'create'}>
           {shown === 'examples' ? (
             <div className="masonry" role="group" aria-label="Video mẫu">
-              {splitColumns(EXAMPLES, narrow ? 2 : wide ? 4 : 3).map((column, c) => (
+              {splitColumns(examples, narrow ? 2 : wide ? 4 : 3).map((column, c) => (
                 <ul key={c} className="masonry-col">
                   {column.map((ex) => (
                     <li key={ex.id} className="example">
@@ -419,10 +428,10 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
         <h2>Chọn mẫu</h2>
         <Carousel label="Danh sách mẫu">
           {presets?.map((p) => {
-            const ex = exampleForPreset(p.id);
+            const m = presetMedia(p.id);
             return (
               <li key={p.id} className="preset-card">
-                {ex ? <Preview src={media(ex.src)} poster={media(ex.poster)} width={ex.width} height={ex.height} title={p.label} /> : <div className="banner-empty" />}
+                {m.video ? <Preview src={m.video} poster={m.poster ?? ''} width={3} height={4} title={p.label} /> : <div className="banner-empty" />}
                 <button
                   type="button"
                   aria-pressed={p.id === presetId}
@@ -437,7 +446,7 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
             );
           })}
           <li className="preset-card">
-            <div className="banner-empty" />
+            {free.video ? <Preview src={free.video} poster={free.poster ?? ''} width={3} height={4} title="Tự viết mô tả" /> : <div className="banner-empty" />}
             <button
               type="button"
               aria-pressed={presetId === ''}
@@ -468,7 +477,7 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
               aria-label="Mẫu trước"
               hidden={detailAt <= 0}
               onClick={() => {
-                setDetail(EXAMPLES[detailAt - 1]!);
+                setDetail(examples[detailAt - 1]!);
                 if (detailAt - 1 === 0) nextStep.current?.focus();
               }}
             >
@@ -479,10 +488,10 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
               type="button"
               className="detail-step next"
               aria-label="Mẫu sau"
-              hidden={detailAt >= EXAMPLES.length - 1}
+              hidden={detailAt >= examples.length - 1}
               onClick={() => {
-                setDetail(EXAMPLES[detailAt + 1]!);
-                if (detailAt + 1 === EXAMPLES.length - 1) prevStep.current?.focus();
+                setDetail(examples[detailAt + 1]!);
+                if (detailAt + 1 === examples.length - 1) prevStep.current?.focus();
               }}
             >
               <Icon name="right" size={18} />

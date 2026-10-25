@@ -7,7 +7,9 @@ import { api, errorText, sendJson } from '@/lib/api';
 import { APPS, type AppConfig, appInputs, appReason, type AppCategory, motionReason } from '@/lib/apps';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { useHydrated } from '@/lib/use-hydrated';
+import { cardSample } from '@/lib/examples';
 import { useSamples } from '@/lib/use-samples';
+import { CardMedia, LoopVideo } from './CardMedia';
 import { Icon, type IconName } from './Icon';
 import { type Img, RATIO_LABEL, Slot, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, WorkTabs } from './image-tools';
 import { useJobs } from './jobs';
@@ -20,13 +22,12 @@ const TAB_LABEL: Record<Tab, string> = { create: 'Tạo', history: 'Lịch sử'
 const MAX_PROMPT = 1500;
 const CATEGORY_ICON: Record<AppCategory, IconName> = { fashion: 'tryon', photo: 'image', video: 'create', utility: 'library' };
 
-/** The picture of an app on a card and in the page header: a tinted tile with the icon of its category. */
+/** The picture of an app on a card and in the page header: its sample loop or still, else a tinted tile with the icon of its category. */
 export function AppArt({ app }: { app: AppConfig }) {
-  const sample = `app-${app.slug}.jpg`;
-  const have = useSamples();
+  const media = cardSample(useSamples(), `app-${app.slug}`);
   return (
     <span className="app-art" data-category={app.category} aria-hidden="true">
-      {have.has(sample) ? <img src={`/api/samples/${sample}`} alt="" /> : <Icon name={CATEGORY_ICON[app.category]} size={36} />}
+      {media.video || media.poster ? <CardMedia {...media} /> : <Icon name={CATEGORY_ICON[app.category]} size={36} />}
     </span>
   );
 }
@@ -75,6 +76,11 @@ function AppHeader({ app }: { app: AppConfig }) {
   const have = useSamples();
   return (
     <div className="app-head" data-category={app.category} data-photo={have.has(photo) || undefined} style={have.has(photo) ? ({ '--photo': `url(/api/samples/${photo})` } as CSSProperties) : undefined}>
+      {have.has(`app-${app.slug}.mp4`) && (
+        <span className="head-loop">
+          <LoopVideo src={`/api/samples/app-${app.slug}.mp4`} poster={have.has(photo) ? `/api/samples/${photo}` : null} />
+        </span>
+      )}
       <strong>{app.name}</strong>
       <ChangeMenu current={app.slug} />
     </div>

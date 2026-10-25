@@ -46,9 +46,60 @@ export const EXAMPLES: Example[] = [
   clip(10, 'Treo trên giá', 'handheld-product', '3:4', 240, 320),
 ];
 
+/** The reference site's other example clips (owner, 2026-10-26: show all of them). They exist only as uploaded samples, with no fixture behind them. */
+const more = (n: number, aspect: Aspect, width: number, height: number, durationSec: number): Example => ({
+  id: `example-${n}`,
+  title: `Video mẫu ${n}`,
+  presetId: '',
+  aspect,
+  ...(aspect === '9:16' || aspect === '1:1' ? { ratio: aspect } : {}),
+  durationSec,
+  width,
+  height,
+  fixture: false,
+  src: `/api/samples/example-${n}.mp4`,
+  poster: `/api/samples/example-${n}.jpg`,
+});
+
+export const MORE_EXAMPLES: Example[] = [
+  more(11, '9:16', 408, 720, 6),
+  more(12, '9:16', 408, 720, 8),
+  more(13, '9:16', 402, 720, 6),
+  more(14, '9:16', 408, 720, 8),
+  more(15, '9:16', 400, 720, 8),
+  more(16, '9:16', 400, 720, 5),
+  more(17, '3:4', 540, 720, 8),
+  more(18, '3:4', 540, 720, 8),
+  more(19, '3:4', 540, 720, 8),
+  more(20, '9:16', 406, 720, 7),
+  more(21, '9:16', 400, 720, 5),
+  more(22, '3:4', 576, 720, 5),
+  more(23, '3:4', 576, 720, 6),
+  more(24, '9:16', 400, 720, 6),
+  more(25, '9:16', 406, 720, 8),
+  more(26, '9:16', 406, 720, 6),
+  more(27, '16:9', 720, 406, 6),
+  more(28, '9:16', 406, 720, 6),
+  more(29, '16:9', 720, 406, 6),
+  more(30, '16:9', 720, 406, 6),
+  more(31, '1:1', 720, 720, 6),
+  more(32, '1:1', 720, 720, 6),
+  more(33, '1:1', 720, 720, 6),
+  more(34, '9:16', 406, 720, 6),
+  more(35, '9:16', 406, 720, 6),
+];
+
+/** The Examples tab: the ten fixture-backed clips, then each further sample clip that is uploaded. */
+export const examplesFor = (have: ReadonlySet<string>): Example[] => [...EXAMPLES, ...MORE_EXAMPLES.filter((e) => have.has(`${e.id}.mp4`))];
+
 /** The uploaded sample named `name` (lib/samples.ts) when it exists, else `fallback`; by default the name is the fallback's file name. */
 export function sampleSrc(have: ReadonlySet<string>, fallback: string, name = fallback.slice(fallback.lastIndexOf('/') + 1)): string {
   return have.has(name) ? `/api/samples/${name}` : fallback;
+}
+
+/** A card's samples: the uploaded `<base>.mp4` loop, if any, and the uploaded `<base>.jpg` as its still, else `fallback`. */
+export function cardSample(have: ReadonlySet<string>, base: string, fallback: string | null = null): { video: string | null; poster: string | null } {
+  return { video: have.has(`${base}.mp4`) ? `/api/samples/${base}.mp4` : null, poster: have.has(`${base}.jpg`) ? `/api/samples/${base}.jpg` : fallback };
 }
 
 /** The uploaded samples named `<prefix><n>.<ext>` (n = 1, 2, ...), in number order: the fixed sample tiles of a gallery. */
