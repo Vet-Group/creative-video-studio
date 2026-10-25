@@ -144,6 +144,20 @@ export function WorkTabs<T extends string>({ prefix, tabs, labels, shown, onSele
   );
 }
 
+/** The model, resolution and ratio fields, shown locked while no model is enabled, so the form keeps its shape; the run button's notice says why. */
+export function LockedFields() {
+  return (
+    <div className="locked-fields" aria-hidden="true">
+      {['Mô hình', 'Độ phân giải', 'Tỉ lệ'].map((label) => (
+        <div key={label} className="field">
+          <span className="field-label">{label}</span>
+          <span className="select-trigger locked">Chưa bật mô hình</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 const aspectOf = (ratio: string): string => (/^\d+:\d+$/.test(ratio) ? ratio.replace(':', ' / ') : '1 / 1');
 
 const GALLERY_SIZE_KEY = 'cvs.gallery.size';

@@ -162,8 +162,8 @@ function ClipCard({ clip, stores, onChange, onDeleted }: { clip: Clip; stores?: 
             <button type="button" aria-pressed={failing || clip.verdict?.verdict === 'fail'} onClick={() => setFailing((f) => !f)}>
               Không đạt
             </button>
-            <button type="button" className="danger" onClick={() => setConfirmDelete(true)}>
-              Xóa
+            <button type="button" className="danger icon-button" onClick={() => setConfirmDelete(true)} aria-label="Xóa" title="Xóa">
+              <Icon name="x" />
             </button>
           </>
         )}
