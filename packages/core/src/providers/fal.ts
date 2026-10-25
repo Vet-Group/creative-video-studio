@@ -59,6 +59,11 @@ async function pollFal(
 const imageTokens = (prompt: string, name: (n: string) => string) => prompt.replace(/\[Image(\d+)\](\d?)/g, (_, n: string, d: string) => `${name(n)}${d ? ` ${d}` : ''}`);
 const atImage = (n: string) => `@Image${n}`;
 const plainImage = (n: string) => `image ${n}`;
+/**
+ * The smoke run of 2026-10-25 saw Seedance 2.5 and FLUX 3 Reference show the input as the first frame, then cut to the plain studio a preset asks for.
+ * These endpoints start from the input image, so they are told to stay in its scene in one shot.
+ */
+const oneShot = (prompt: string) => `${prompt} One continuous shot that starts on the input image: keep its scene and background, with no cuts.`;
 
 /**
  * How each fal video endpoint takes a Run, built from its input schema (read 2026-10-25, sources in migration 0015; Kling O3 Pro 2026-10-23). `crop`: the
@@ -81,14 +86,14 @@ export const VIDEO_BODIES: Record<string, VideoBody> = {
   'fal-ai/kling-video/v2.6/pro/image-to-video': { crop: true, build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), start_image_url: images[0], duration: seconds(req), generate_audio: false }) },
   'fal-ai/kling-video/v2.5-turbo/pro/image-to-video': { crop: true, build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), duration: seconds(req) }) },
   'bytedance/seedance-2.5/us/reference-to-video': { build: (req, images) => ({ prompt: imageTokens(req.prompt, atImage), ...ref(images), aspect_ratio: req.ratio, duration: seconds(req), resolution: '720p', generate_audio: false }) },
-  'bytedance/seedance-2.5/us/image-to-video': { crop: true, build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), duration: seconds(req), resolution: '720p', generate_audio: false }) },
+  'bytedance/seedance-2.5/us/image-to-video': { crop: true, build: (req, images) => ({ prompt: oneShot(imageTokens(req.prompt, plainImage)), ...first(images), duration: seconds(req), resolution: '720p', generate_audio: false }) },
   'bytedance/seedance-2.0/us/reference-to-video': { build: (req, images) => ({ prompt: imageTokens(req.prompt, atImage), ...ref(images), aspect_ratio: req.ratio, duration: seconds(req), resolution: '720p', generate_audio: false }) },
   'bytedance/seedance-2.0/us/image-to-video': { build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), aspect_ratio: req.ratio, duration: seconds(req), resolution: '720p', generate_audio: false }) },
   'fal-ai/bytedance/seedance/v1.5/pro/image-to-video': { build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), aspect_ratio: req.ratio, duration: seconds(req), resolution: '720p', generate_audio: false }) },
   // Seedance 1.0 Pro and FLUX 3 render "720p" 9:16 as 704 px wide, under the worker's 720p floor (smoke run 2026-10-25), so they ask for 1080p.
   'fal-ai/bytedance/seedance/v1/pro/image-to-video': { build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), aspect_ratio: req.ratio, duration: seconds(req), resolution: '1080p' }) },
   // fal has no FLUX 3 reference endpoint; keyframes pins the product image as the first frame, the closest match to Fash's "FLUX 3 Reference".
-  'blackforestlabs/flux-3/keyframes-to-video': { build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), keyframes: [{ image_url: images[0], frame_index: 0 }], aspect_ratio: req.ratio, duration: req.durationSec, resolution: '1080p', generate_audio: false }) },
+  'blackforestlabs/flux-3/keyframes-to-video': { build: (req, images) => ({ prompt: oneShot(imageTokens(req.prompt, plainImage)), keyframes: [{ image_url: images[0], frame_index: 0 }], aspect_ratio: req.ratio, duration: req.durationSec, resolution: '1080p', generate_audio: false }) },
   'blackforestlabs/flux-3/image-to-video': { build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), aspect_ratio: req.ratio, duration: req.durationSec, resolution: '1080p', generate_audio: false }) },
   'google/gemini-omni-flash/v1.1/reference-to-video': { build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...ref(images), aspect_ratio: req.ratio, duration: req.durationSec, resolution: '720p' }) },
   'google/gemini-omni-flash/v1.1/image-to-video': { build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), aspect_ratio: req.ratio, duration: req.durationSec, resolution: '720p' }) },
