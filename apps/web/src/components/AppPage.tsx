@@ -2,7 +2,7 @@
 // One app of the Apps index, driven by its entry in lib/apps.ts: a card with the app's header, upload slots, fields and Run, beside the History and About tabs
 // (laid out like Try On). An app that is not built yet shows why instead of the form.
 import Link from 'next/link';
-import { useEffect, useId, useRef, useState } from 'react';
+import { type CSSProperties, useEffect, useId, useRef, useState } from 'react';
 import { api, errorText, sendJson } from '@/lib/api';
 import { APPS, type AppConfig, appInputs, appReason, type AppCategory } from '@/lib/apps';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
@@ -70,8 +70,10 @@ function ChangeMenu({ current }: { current: string }) {
 }
 
 function AppHeader({ app }: { app: AppConfig }) {
+  const photo = `app-${app.slug}.jpg`;
+  const have = useSamples();
   return (
-    <div className="app-head" data-category={app.category}>
+    <div className="app-head" data-category={app.category} data-photo={have.has(photo) || undefined} style={have.has(photo) ? ({ '--photo': `url(/api/samples/${photo})` } as CSSProperties) : undefined}>
       <strong>{app.name}</strong>
       <ChangeMenu current={app.slug} />
     </div>

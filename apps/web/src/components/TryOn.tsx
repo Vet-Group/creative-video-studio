@@ -41,7 +41,7 @@ export function TryOn() {
       : failed
         ? 'Không tải được danh sách mô hình.'
         : !chosen
-          ? 'Chưa có mô hình nào được bật cho Thử đồ.'
+          ? 'Chưa bật mô hình nào cho Thử đồ. Admin bật trong Quản trị → Cài đặt → Mô hình.'
           : garments.length === 0
             ? 'Tải lên ít nhất 1 ảnh trang phục.'
             : person.length === 0

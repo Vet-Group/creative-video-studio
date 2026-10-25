@@ -313,7 +313,7 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
                 onChange={setModelId}
               />
             )}
-            {models && models.models.length === 0 && <p className="help">Chưa có mô hình nào được bật.</p>}
+            {models && models.models.length === 0 && <p className="help">Chưa bật mô hình video nào. Admin bật trong Quản trị → Cài đặt → Mô hình.</p>}
             {tooMany && chosen && <p className="error">Mô hình này nhận tối đa {chosen.maxImages} ảnh.</p>}
 
             <div className="field">
@@ -392,7 +392,6 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
                     <li key={ex.id} className="example">
                       <Preview src={media(ex.src)} poster={media(ex.poster)} width={ex.width} height={ex.height} title={ex.title} paused={picking || detail !== null} />
                       <span className="chips">
-                        <span className="chip">Mẫu</span>
                         {ex.fixture && media(ex.src) === ex.src && <span className="chip">fixture</span>}
                       </span>
                       <button type="button" className="example-open" onClick={() => setDetail(ex)}>

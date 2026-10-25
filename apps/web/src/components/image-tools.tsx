@@ -8,6 +8,7 @@ import { numberedSamples } from '@/lib/examples';
 import { useHydrated } from '@/lib/use-hydrated';
 import { useSamples } from '@/lib/use-samples';
 import { Icon } from './Icon';
+import { Preview } from './Preview';
 import type { ModelOption } from './ModelPicker';
 
 export interface ImageModel {
@@ -192,9 +193,12 @@ export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4
     void load(0);
   }, [kind]);
 
-  if (state === 'loading') return <p role="status" className="muted">Đang tải...</p>;
-  if (state === 'error') return <p className="error">Không tải được ảnh mẫu.</p>;
-  if (items.length === 0 && sampleTiles.length === 0) return <p className="muted">{emptyText}</p>;
+  // The fixed samples show at once; only the company's own outputs wait for the request.
+  if (sampleTiles.length === 0) {
+    if (state === 'loading') return <p role="status" className="muted">Đang tải...</p>;
+    if (state === 'error') return <p className="error">Không tải được ảnh mẫu.</p>;
+    if (items.length === 0) return <p className="muted">{emptyText}</p>;
+  }
   const tiles: (Clip | string)[] = [...sampleTiles, ...items];
   return (
     <>
@@ -215,7 +219,9 @@ export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4
               typeof it === 'string' ? (
                 <li key={it} className="gallery-item">
                   {video ? (
-                    <video controls playsInline preload="metadata" aria-label="Video mẫu" poster={`/api/samples/${it.replace(/\.mp4$/, '.jpg')}`} src={`/api/samples/${it}`} />
+                    <a href={`/api/samples/${it}`} target="_blank" rel="noreferrer" aria-label="Mở video mẫu trong tab mới">
+                      <Preview src={`/api/samples/${it}`} poster={`/api/samples/${it.replace(/\.mp4$/, '.jpg')}`} width={9} height={16} title="Video mẫu" />
+                    </a>
                   ) : (
                     <img src={`/api/samples/${it}`} alt="Ảnh mẫu" loading="lazy" />
                   )}
@@ -223,7 +229,9 @@ export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4
               ) : (
               <li key={it.id} className="gallery-item" style={{ aspectRatio: aspectOf(it.ratio) }}>
                 {video ? (
-                  <video controls playsInline preload="metadata" aria-label={`${it.modelLabel}, ${it.ratio}`} poster={it.posterAssetId ? `/api/assets/${it.posterAssetId}/content` : undefined} src={`/api/assets/${it.videoAssetId}/content`} />
+                  <a href={`/api/assets/${it.videoAssetId}/content`} target="_blank" rel="noreferrer" aria-label={`Mở video ${it.modelLabel}, ${it.ratio} trong tab mới`}>
+                    <Preview src={`/api/assets/${it.videoAssetId}/content`} poster={it.posterAssetId ? `/api/assets/${it.posterAssetId}/content` : ''} width={Number(it.ratio.split(':')[0]) || 9} height={Number(it.ratio.split(':')[1]) || 16} title={`${it.modelLabel}, ${it.ratio}`} />
+                  </a>
                 ) : (
                   <img src={`/api/assets/${it.videoAssetId}/content`} alt={`${it.modelLabel}, ${it.ratio}`} loading="lazy" />
                 )}
@@ -233,6 +241,7 @@ export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4
           </ul>
         ))}
       </div>
+      {state === 'error' && sampleTiles.length > 0 && <p className="error">Không tải được kết quả của công ty.</p>}
       {hasMore && (
         <button type="button" className="gallery-more" onClick={() => void load(items.length)}>
           Tải thêm

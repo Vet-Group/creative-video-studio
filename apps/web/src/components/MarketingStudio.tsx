@@ -1,10 +1,11 @@
 'use client';
 // Marketing Studio: a creator-style try-on video from two photos (the model, then the product), laid out like Try On. The page composes one English prompt
 // from the hook, the location and the member's own text, and posts a `marketing` video job on a video model that lists the feature.
-import { type KeyboardEvent, useEffect, useId, useRef, useState } from 'react';
+import { type CSSProperties, type KeyboardEvent, useEffect, useId, useRef, useState } from 'react';
 import { api, errorText, sendJson } from '@/lib/api';
 import { HOOKS, LOCATIONS, type MarketingChoice, marketingPrompt } from '@/lib/marketing';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
+import { useSamples } from '@/lib/use-samples';
 import { Icon, type IconName } from './Icon';
 import { Gallery, type Img, Slot, uploadImages, UPLOAD_ERROR, WorkTabs } from './image-tools';
 import { useJobs } from './jobs';
@@ -80,7 +81,11 @@ function ChoiceDialog({ open, title, choices, value, onPick, onClose }: { open: 
   );
 }
 
+/** The sample photo behind the format header, when an Admin uploaded one. */
+const UGC_PHOTO = 'marketing-format-ugc.jpg';
+
 export function MarketingStudio() {
+  const have = useSamples();
   const { refresh } = useJobs();
   const narrow = useMediaQuery(NARROW);
   const [person, setPerson] = useState<Img[]>([]);
@@ -212,7 +217,7 @@ export function MarketingStudio() {
 
         <div className="card form-card" id="marketing-panel-create" role={narrow ? 'tabpanel' : undefined} aria-labelledby={narrow ? 'marketing-tab-create' : undefined} hidden={narrow && shown !== 'create'}>
           <div className="form-scroll">
-            <div className="app-head marketing-head" data-category="video">
+            <div className="app-head marketing-head" data-category="video" data-photo={have.has(UGC_PHOTO) || undefined} style={have.has(UGC_PHOTO) ? ({ '--photo': `url(/api/samples/${UGC_PHOTO})` } as CSSProperties) : undefined}>
               <strong>UGC Thử đồ</strong>
             </div>
             <div className="app-slots marketing-slots" data-two="true">
