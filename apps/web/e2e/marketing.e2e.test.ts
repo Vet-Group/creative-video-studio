@@ -20,7 +20,15 @@ test('a mock marketing job runs from two photos, a hook and a location, and show
   await signIn(page, 'mkta');
   await openPage(page);
   await expect(nav(page).getByRole('link', { name: 'Marketing Studio' })).toHaveAttribute('aria-current', 'page');
-  await expect(page.locator('.app-head')).toHaveText('UGC Thử đồ');
+  await expect(page.locator('.app-head strong')).toHaveText('UGC Thử đồ');
+  // The format picker, as on the live page: UGC is the built format; the other three are shown but cannot be picked yet.
+  await page.getByRole('button', { name: 'Đổi định dạng' }).click();
+  const formats = page.getByRole('dialog', { name: 'Chọn định dạng' });
+  await expect(formats.getByRole('button', { name: /^(UGC Thử đồ|Nâng cao|Mở hộp|Đánh giá sản phẩm)/ })).toHaveCount(4);
+  await expect(formats.getByRole('button', { name: 'UGC Thử đồ' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(formats.getByRole('button', { disabled: true })).toHaveCount(3);
+  await formats.getByRole('button', { name: 'UGC Thử đồ' }).click();
+  await expect(formats).toBeHidden();
   await expect(page.locator('.slot')).toHaveCount(2);
   await expect(modelButton(page)).toContainText('Mock E2E');
   await expect(select(page, 'Tỉ lệ')).toHaveAttribute('data-value', '9:16');

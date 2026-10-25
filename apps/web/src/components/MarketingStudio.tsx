@@ -90,6 +90,13 @@ function ChoiceDialog({ open, title, kind, choices, value, onPick, onClose }: { 
 /** The sample photo behind the format header, when an Admin uploaded one. */
 const UGC_PHOTO = 'marketing-format-ugc.jpg';
 const UGC_LOOP = 'marketing-format-ugc.mp4';
+/** The formats of the live format picker, each with its sample loop; only UGC try-on is built, the others say why they cannot be picked. */
+const FORMATS = [
+  { id: 'ugc', name: 'UGC Thử đồ', soon: null },
+  { id: 'advanced', name: 'Nâng cao', soon: 'Sắp có' },
+  { id: 'unboxing', name: 'Mở hộp', soon: 'Sắp có' },
+  { id: 'product-review', name: 'Đánh giá sản phẩm', soon: 'Sắp có' },
+];
 
 export function MarketingStudio() {
   const have = useSamples();
@@ -99,7 +106,7 @@ export function MarketingStudio() {
   const [product, setProduct] = useState<Img[]>([]);
   const [hook, setHook] = useState('');
   const [location, setLocation] = useState('');
-  const [picker, setPicker] = useState<'hook' | 'location' | null>(null);
+  const [picker, setPicker] = useState<'hook' | 'location' | 'format' | null>(null);
   const [prompt, setPrompt] = useState('');
   const [modelId, setModelId] = useState('');
   const [ratio, setRatio] = useState('9:16');
@@ -231,6 +238,9 @@ export function MarketingStudio() {
                 </span>
               )}
               <strong>UGC Thử đồ</strong>
+              <button type="button" className="banner-chip" onClick={() => setPicker('format')}>
+                Đổi định dạng
+              </button>
             </div>
             <div className="app-slots marketing-slots" data-two="true">
               <Slot label="Người mẫu" empty="Thêm 1 ảnh người mẫu" inputLabel="Ảnh người mẫu" images={person} max={1} busy={busy} onAdd={add(setPerson)} onRemove={() => setPerson([])} />
@@ -303,6 +313,20 @@ export function MarketingStudio() {
         </div>
       </div>
 
+      <Modal open={picker === 'format'} onClose={() => setPicker(null)} label="Chọn định dạng" className="choice-dialog">
+        <h2>Chọn định dạng</h2>
+        <div className="choice-grid">
+          {FORMATS.map((f) => (
+            <button key={f.id} type="button" aria-pressed={f.id === 'ugc'} disabled={f.soon !== null} onClick={() => setPicker(null)}>
+              {picker === 'format' && <CardMedia {...cardSample(have, `marketing-format-${f.id}`)} />}
+              <span className="choice-name">
+                {f.name}
+                {f.soon && <span className="badge-soon">{f.soon}</span>}
+              </span>
+            </button>
+          ))}
+        </div>
+      </Modal>
       <ChoiceDialog open={picker === 'hook'} title="Chọn hook" kind="hook" choices={HOOKS} value={hook} onPick={(id) => (setHook(id), setPicker(null))} onClose={() => setPicker(null)} />
       <ChoiceDialog open={picker === 'location'} title="Chọn bối cảnh" kind="location" choices={LOCATIONS} value={location} onPick={(id) => (setLocation(id), setPicker(null))} onClose={() => setPicker(null)} />
     </section>
