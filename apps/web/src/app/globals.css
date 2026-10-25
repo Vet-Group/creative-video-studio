@@ -498,7 +498,7 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .field-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 8px; }
 /* Library filters: one row of equal 36 px controls styled like the app's selects. */
 .library-filters { gap: 12px; margin: 0 0 8px; }
-.library .kinds { gap: 6px; flex-wrap: nowrap; overflow-x: auto; } /* one scrolling row, as on Fash, instead of a lone pill on a second line */
+.library .kinds { gap: 6px; flex-wrap: nowrap; overflow-x: auto; padding-right: 24px; mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); } /* one scrolling row, as on Fash, instead of a lone pill on a second line; the faded padding hints at more pills without covering the last one when all fit */
 .library .kinds button { padding: 0 12px; }
 .library-filters label { margin: 0; color: rgb(102, 102, 102); font-size: 13px; line-height: 18px; font-weight: 500; }
 .library-filters select, .library-filters input { width: 10rem; min-width: 0; height: 36px; margin-top: 4px; padding: 0 10px; border: 1px solid rgb(0 0 0 / .1); border-radius: 8px; background: #fff; color: inherit; font: inherit; font-size: 13px; }
@@ -592,6 +592,10 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 
 /* Round 2 review: locked model fields, a visible reason for a disabled Run, unboxed Library clips. */
 .locked-fields .select-trigger.locked { color: rgb(153, 153, 153); cursor: not-allowed; }
+.locked-pills { display: contents; }
+.select-trigger.locked { color: rgb(153, 153, 153); cursor: not-allowed; }
+.select-trigger.locked .icon { color: rgb(179, 179, 179); }
+.imagebar .select-trigger.locked:hover { border-color: rgb(230, 230, 230); }
 .form-message p.help[role='status'] { margin: 0 0 8px; padding: 8px 12px; border-radius: 8px; background: rgb(245, 245, 245); color: rgb(64, 64, 64); font-size: 13px; line-height: 19px; }
 .library .card video.tall { display: block; width: auto; max-width: 100%; margin: 0 auto; background: transparent; }
 .job-body a { color: rgb(38, 38, 38); font-size: 13px; text-decoration-color: rgb(0 0 0 / .3); text-underline-offset: 2px; }
