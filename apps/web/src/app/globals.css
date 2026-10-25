@@ -590,9 +590,8 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .library .card .actions .danger:hover { background: rgb(254, 242, 242); }
 .library .card video { background: rgb(242, 242, 242); }
 
-/* Round 2 review: locked model fields, a visible reason for a disabled Run, a quieter disabled Run, unboxed Library clips. */
+/* Round 2 review: locked model fields, a visible reason for a disabled Run, unboxed Library clips. */
 .locked-fields .select-trigger.locked { color: rgb(153, 153, 153); cursor: not-allowed; }
 .form-message p.help[role='status'] { margin: 0 0 8px; padding: 8px 12px; border-radius: 8px; background: rgb(245, 245, 245); color: rgb(64, 64, 64); font-size: 13px; line-height: 19px; }
-.runbar button.primary.run:disabled { opacity: 1; background: rgb(229, 229, 229); color: rgb(115, 115, 115); }
 .library .card video.tall { display: block; width: auto; max-width: 100%; margin: 0 auto; background: transparent; }
 .job-body a { color: rgb(38, 38, 38); font-size: 13px; text-decoration-color: rgb(0 0 0 / .3); text-underline-offset: 2px; }
