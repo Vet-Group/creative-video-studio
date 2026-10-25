@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { HOOKS, LOCATIONS, marketingPrompt } from './marketing';
 
 describe('HOOKS and LOCATIONS', () => {
-  it.each([['HOOKS', HOOKS], ['LOCATIONS', LOCATIONS]])('%s has 8 to 12 unique choices with a Vietnamese name and an English phrase', (_, list) => {
-    expect(list.length).toBeGreaterThanOrEqual(8);
+  it.each([['HOOKS', HOOKS], ['LOCATIONS', LOCATIONS]])('%s has 6 to 12 unique choices with a Vietnamese name and an English phrase', (_, list) => {
+    expect(list.length).toBeGreaterThanOrEqual(6);
     expect(list.length).toBeLessThanOrEqual(12);
     expect(new Set(list.map((c) => c.id)).size).toBe(list.length);
     expect(new Set(list.map((c) => c.name)).size).toBe(list.length);
@@ -25,20 +25,20 @@ describe('marketingPrompt', () => {
   });
 
   it('adds the hook, then the location, then the trimmed text, in that order', () => {
-    const p = marketingPrompt({ hook: 'twirl', location: 'cafe', prompt: '  Keep it cheerful.  ' });
-    const hook = HOOKS.find((c) => c.id === 'twirl')!.phrase;
-    const place = LOCATIONS.find((c) => c.id === 'cafe')!.phrase;
+    const p = marketingPrompt({ hook: 'product-catch', location: 'kitchen', prompt: '  Keep it cheerful.  ' });
+    const hook = HOOKS.find((c) => c.id === 'product-catch')!.phrase;
+    const place = LOCATIONS.find((c) => c.id === 'kitchen')!.phrase;
     expect(p).toBe(`${fixed} ${hook} Set in ${place}. Keep it cheerful.`);
   });
 
   it('adds only what is given', () => {
-    expect(marketingPrompt({ hook: 'twirl' })).toBe(`${fixed} ${HOOKS.find((c) => c.id === 'twirl')!.phrase}`);
-    expect(marketingPrompt({ location: 'park' })).toBe(`${fixed} Set in ${LOCATIONS.find((c) => c.id === 'park')!.phrase}.`);
+    expect(marketingPrompt({ hook: 'product-catch' })).toBe(`${fixed} ${HOOKS.find((c) => c.id === 'product-catch')!.phrase}`);
+    expect(marketingPrompt({ location: 'outdoor' })).toBe(`${fixed} Set in ${LOCATIONS.find((c) => c.id === 'outdoor')!.phrase}.`);
     expect(marketingPrompt({ prompt: 'x' })).toBe(`${fixed} x`);
   });
 
   it('ignores an unknown id, and a hook id is not a location id', () => {
-    expect(marketingPrompt({ hook: 'nope', location: 'twirl' })).toBe(fixed);
+    expect(marketingPrompt({ hook: 'nope', location: 'product-catch' })).toBe(fixed);
   });
 
   it('leaves room for the member text under the 2000-character prompt limit of the jobs API', () => {

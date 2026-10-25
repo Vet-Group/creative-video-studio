@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { EXAMPLES, numberedSamples, splitColumns } from './examples';
+import { cardSample, EXAMPLES, examplesFor, numberedSamples, splitColumns } from './examples';
 
 test('the samples cover four aspects and never set a ratio the job form lacks', () => {
   expect(new Set(EXAMPLES.map((e) => e.aspect))).toEqual(new Set(['16:9', '1:1', '3:4', '9:16']));
@@ -28,4 +28,19 @@ test('numbered samples keep their prefix and extension and sort by number', () =
   expect(numberedSamples(have, 'image-example-', 'jpg')).toEqual(['image-example-1.jpg', 'image-example-2.jpg', 'image-example-10.jpg']);
   expect(numberedSamples(have, 'image-example-', 'mp4')).toEqual(['image-example-3.mp4']);
   expect(numberedSamples(new Set(), 'image-example-', 'jpg')).toEqual([]);
+});
+
+test('a card plays its uploaded loop over its uploaded still, and falls back to the given still or nothing', () => {
+  const have = new Set(['app-reframe.mp4', 'app-reframe.jpg', 'model-veo-3-1.jpg', 'preset-turn-around.mp4']);
+  expect(cardSample(have, 'app-reframe')).toEqual({ video: '/api/samples/app-reframe.mp4', poster: '/api/samples/app-reframe.jpg' });
+  expect(cardSample(have, 'model-veo-3-1')).toEqual({ video: null, poster: '/api/samples/model-veo-3-1.jpg' });
+  expect(cardSample(have, 'preset-turn-around', '/fixtures/examples/example-1.jpg')).toEqual({ video: '/api/samples/preset-turn-around.mp4', poster: '/fixtures/examples/example-1.jpg' });
+  expect(cardSample(have, 'app-face-swap')).toEqual({ video: null, poster: null });
+});
+
+test('the Examples tab keeps the ten fixture clips and adds only the further sample clips that are uploaded, in order', () => {
+  expect(examplesFor(new Set())).toEqual(EXAMPLES);
+  const ids = examplesFor(new Set(['example-12.mp4', 'example-11.mp4', 'example-12.jpg', 'example-99.mp4'])).map((e) => e.id);
+  expect(ids.slice(10)).toEqual(['example-11', 'example-12']);
+  expect(ids).toHaveLength(12);
 });

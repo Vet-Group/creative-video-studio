@@ -1,22 +1,23 @@
 import Link from 'next/link';
+import { CardMedia } from '@/components/CardMedia';
 import { Icon } from '@/components/Icon';
 import { pool } from '@/lib/auth';
-import { EXAMPLES, exampleForPreset, sampleSrc } from '@/lib/examples';
+import { cardSample, EXAMPLES, exampleForPreset, sampleSrc } from '@/lib/examples';
 import { modelStats, rank, scoreOf } from '@/lib/model-scores';
 import { listSamples } from '@/lib/samples';
 
 // The tools the app has, in the live sidebar order; each later tool adds its card here. Posters are the fixture clips until real ones exist.
 const FEATURES = [
-  { href: '/try-on', sample: 'feature-try-on.jpg', title: 'Thử đồ', text: 'Mặc trang phục lên người mẫu từ ảnh, giữ nguyên người và bối cảnh.', poster: EXAMPLES[2]!.poster },
-  { href: '/image-generation', sample: 'feature-image-generation.jpg', title: 'Tạo ảnh', text: 'Tạo hoặc chỉnh ảnh sản phẩm từ ảnh tham chiếu và một mô tả.', poster: EXAMPLES[3]!.poster },
-  { href: '/create', sample: 'feature-create-videos.jpg', title: 'Tạo video', text: 'Biến ảnh sản phẩm thành video ngắn bằng các mô hình AI.', poster: EXAMPLES[0]!.poster },
-  { href: '/marketing-studio', sample: 'feature-marketing-studio.jpg', title: 'Marketing Studio', text: 'Tạo video kiểu người sáng tạo nội dung từ ảnh người mẫu và ảnh sản phẩm.', poster: EXAMPLES[0]!.poster },
-  { href: '/apps', sample: 'feature-apps.jpg', title: 'Ứng dụng', text: 'Đổi nhân vật, đổi nền, xoá nền, phóng to ảnh và các công cụ AI một chạm khác.', poster: EXAMPLES[1]!.poster },
-  { href: '/library', sample: 'feature-library.jpg', title: 'Thư viện', text: 'Xem, tải xuống và đánh giá mọi clip của công ty.', poster: EXAMPLES[1]!.poster },
+  { href: '/try-on', sample: 'feature-try-on', title: 'Thử đồ', text: 'Mặc trang phục lên người mẫu từ ảnh, giữ nguyên người và bối cảnh.', poster: EXAMPLES[2]!.poster },
+  { href: '/image-generation', sample: 'feature-image-generation', title: 'Tạo ảnh', text: 'Tạo hoặc chỉnh ảnh sản phẩm từ ảnh tham chiếu và một mô tả.', poster: EXAMPLES[3]!.poster },
+  { href: '/create', sample: 'feature-create-videos', title: 'Tạo video', text: 'Biến ảnh sản phẩm thành video ngắn bằng các mô hình AI.', poster: EXAMPLES[0]!.poster },
+  { href: '/marketing-studio', sample: 'feature-marketing-studio', title: 'Marketing Studio', text: 'Tạo video kiểu người sáng tạo nội dung từ ảnh người mẫu và ảnh sản phẩm.', poster: EXAMPLES[0]!.poster },
+  { href: '/apps', sample: 'feature-apps', title: 'Ứng dụng', text: 'Đổi nhân vật, đổi nền, xoá nền, phóng to ảnh và các công cụ AI một chạm khác.', poster: EXAMPLES[1]!.poster },
+  { href: '/library', sample: 'feature-library', title: 'Thư viện', text: 'Xem, tải xuống và đánh giá mọi clip của công ty.', poster: EXAMPLES[1]!.poster },
 ];
 
-/** The sample image of a model card; ids such as seedance-2.5 keep only letters, digits and dashes in sample names. */
-const modelSample = (id: string) => `model-${id.replace(/[^a-z0-9-]/g, '-')}.jpg`;
+/** The sample name of a model card; ids such as seedance-2.5 keep only letters, digits and dashes in sample names. */
+const modelSample = (id: string) => `model-${id.replace(/[^a-z0-9-]/g, '-')}`;
 
 const range = (values: number[]) => (values.length === 0 ? '' : values.length > 1 ? `${Math.min(...values)}–${Math.max(...values)} giây` : `${values[0]} giây`);
 
@@ -37,7 +38,7 @@ export default async function ExplorePage() {
   const scored = models.rows.map((m) => {
     const st = (m.kind === 'video' ? videoStats : imageStats).get(m.id) ?? { passes: 0, total: 0, ok: 0, bad: 0 };
     const usd = m.kind === 'video' ? Number(m.usd_per_second ?? 0) : Math.min(...Object.values(m.image_prices ?? {}).map(Number));
-    return { ...m, score: scoreOf(st).score, usd };
+    return { ...m, score: scoreOf(st).score, marks: st.total, usd };
   });
   const recommended = new Set(['video', 'image'].map((kind) => rank(scored.filter((m) => m.kind === kind)).recommended));
   return (
@@ -47,7 +48,7 @@ export default async function ExplorePage() {
         {FEATURES.map((f) => (
           <li key={f.href}>
             <Link href={f.href} className="explore-feature">
-              <img src={sampleSrc(have, f.poster, f.sample)} alt="" />
+              <CardMedia {...cardSample(have, f.sample, f.poster)} />
               <span className="explore-feature-head">
                 <strong>{f.title}</strong>
                 <span className="explore-arrow" aria-hidden="true">
@@ -68,13 +69,13 @@ export default async function ExplorePage() {
           {scored.map((m) => (
             <li key={m.id}>
               <Link href={m.kind === 'video' ? `/create?model=${encodeURIComponent(m.id)}` : '/image-generation'} className="explore-card">
-                {have.has(modelSample(m.id)) ? <img src={`/api/samples/${modelSample(m.id)}`} alt="" /> : <span className="banner-empty" aria-hidden="true" />}
+                <CardMedia {...cardSample(have, modelSample(m.id))} />
                 <strong>
                   {m.label}
                   {recommended.has(m.id) && <span className="badge badge-recommended">Đề xuất</span>}
                 </strong>
                 <span className="muted">
-                  {[m.ratios.join(', '), range(m.durations_sec), `Điểm ${m.score}/100`].filter(Boolean).join(' · ')}
+                  {[m.ratios.join(', '), range(m.durations_sec), `Điểm ${m.score}/100`, m.marks > 0 && `${m.marks} lượt đánh giá`].filter(Boolean).join(' · ')}
                 </span>
               </Link>
             </li>
@@ -84,23 +85,27 @@ export default async function ExplorePage() {
 
       <h2>Mẫu chuyển động</h2>
       <p className="muted explore-sub">Chọn một mẫu, tải ảnh đầu lên và nhận video.</p>
-      {presets.rows.length === 0 ? (
-        <p className="muted">Chưa có mẫu nào được bật.</p>
-      ) : (
-        <ul className="explore-cards" aria-label="Mẫu">
-          {presets.rows.map((p) => {
-            const ex = exampleForPreset(p.id);
-            return (
-              <li key={p.id}>
-                <Link href={`/create?preset=${encodeURIComponent(p.id)}`} className="explore-card">
-                  {ex ? <img src={sampleSrc(have, ex.poster)} alt="" /> : <span className="banner-empty" aria-hidden="true" />}
+      {/* A masonry of looping tiles like the live page: the name and a Create button show on hover or focus. The first tile is the free prompt. */}
+      <ul className="explore-prompts" aria-label="Mẫu">
+        {[{ id: 'none', label: 'Tự viết mô tả', sample: 'preset-general' }, ...presets.rows.map((p) => ({ ...p, sample: `preset-${p.id}` }))].map((p) => {
+          const ex = exampleForPreset(p.id);
+          const media = cardSample(have, p.sample, ex ? sampleSrc(have, ex.poster) : null);
+          return (
+            <li key={p.id}>
+              <Link href={`/create?preset=${encodeURIComponent(p.id)}`} className="explore-prompt" aria-label={p.label}>
+                <CardMedia video={media.video ?? (ex ? sampleSrc(have, ex.src) : null)} poster={media.poster} />
+                <span className="explore-prompt-hover" aria-hidden="true">
                   <strong>{p.label}</strong>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      )}
+                  <span className="explore-prompt-go">
+                    <Icon name="create" size={16} />
+                    Tạo
+                  </span>
+                </span>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }

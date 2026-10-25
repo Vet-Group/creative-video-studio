@@ -5,6 +5,7 @@ import { useId, useState } from 'react';
 import { api, errorText, sendJson } from '@/lib/api';
 import { tryOnPrompt } from '@/lib/try-on-prompt';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
+import { AboutClips } from './CardMedia';
 import { Gallery, type Img, LockedFields, RATIO_LABEL, Slot, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, WorkTabs } from './image-tools';
 import { useJobs } from './jobs';
 import { ModelPicker } from './ModelPicker';
@@ -172,6 +173,8 @@ function TryOnAbout() {
     <article className="about">
       <h2>Thử đồ trên người mẫu</h2>
       <p>Tải ảnh trang phục và ảnh một người mẫu, và nhận lại ảnh người đó mặc trang phục. Ảnh nằm trong Thư viện của công ty, mục Thử đồ.</p>
+
+      <AboutClips names={['try-on-about']} title="Từ ảnh thử đồ thành video khoe đồ" />
 
       <p className="about-kicker">Từng bước</p>
       <h3>Một lần Run gồm những gì</h3>

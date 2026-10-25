@@ -51,6 +51,8 @@ These are single samples of about 1.4 s; a clip without a source may still be la
 
 ## Media for previews
 
+> Update 2026-10-26: the owner accepted the copyright risk of the reference site's sample media (2026-10-25) and asked for every card that loops there to loop here too. Those samples live only in the bucket under `samples/` (PR #67), never in Git. `components/CardMedia.tsx` plays a card's `<name>.mp4` loop while it is on screen and keeps `<name>.jpg` as the poster (reduced motion keeps the poster). Names: `feature-<tool>`, `model-<id with dashes>`, `preset-<id>` (`preset-general` is the free prompt), `app-<slug>`, `marketing-format-ugc`, `marketing-hook-<id>`, `marketing-location-<id>`, `example-<n>` (11 to 35 appear only when uploaded) and `try-on-about`. The rules below describe the earlier fixture-only period.
+
 - Example clips and preset posters are company media: clips from the bake-off (B.5, real company products) once they exist, and before that short fixture clips generated locally (for example with ffmpeg from company sample images) and marked as fixtures. No Fash video or poster is downloaded into this repository.
 - **M.7 does not wait for B.3, B.5 or funding.** If no company media exists yet, M.7 makes fixture clips locally (for example ffmpeg pans and zooms over company or generated test images), stores them as test fixtures with a visible **fixture** label, and uses them for layout and playback tests. No paid render is made for M.7.
 - A poster is a fallback, never evidence of motion: the playback tests must run on real video files.

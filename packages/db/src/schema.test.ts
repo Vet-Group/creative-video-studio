@@ -56,9 +56,21 @@ describe('migration 0002 seed data', () => {
   });
 
   test('seeds the six presets from packages/core/src/presets.ts, the safe one flagged once', async () => {
-    const { rows } = await pool.query(`select id, label, prompt, is_bakeoff_safe as "isBakeoffSafe" from presets order by sort_order`);
+    const { rows } = await pool.query(`select id, label, prompt, is_bakeoff_safe as "isBakeoffSafe" from presets where sort_order < 10 order by sort_order`);
     expect(rows).toEqual(PRESETS.map((p) => ({ id: p.id, label: p.label, prompt: p.prompt, isBakeoffSafe: p.isBakeoffSafe })));
-    expect(rows.filter((r) => r.isBakeoffSafe)).toHaveLength(1);
+    expect((await pool.query('select id from presets where is_bakeoff_safe')).rows).toHaveLength(1);
+  });
+
+  test('migration 0020 adds the 19 motion templates after the company presets, enabled, not bake-off safe, with ASCII prompts that keep the person and outfit', async () => {
+    const { rows } = await pool.query(`select id, label, prompt, enabled, is_bakeoff_safe as safe, sort_order as sort from presets where sort_order >= 10 order by sort_order`);
+    expect(rows).toHaveLength(19);
+    expect(rows.slice(0, 2).map((r) => r.id)).toEqual(['shoulder-sequence', 'turn-around']);
+    expect(rows.at(-1)).toMatchObject({ id: 'golden-hour-wall', label: 'Golden Hour Wall', sort: 28 });
+    for (const r of rows) {
+      expect(r).toMatchObject({ enabled: true, safe: false });
+      expect(r.prompt).toMatch(/^[ -~]+$/);
+      expect(r.prompt).toContain('Keep the person, their face, the outfit');
+    }
   });
 
   test('seeds the two models with price, limits and bake-off record (migration 0013: Kling enabled, Seedance disabled), and the settings row', async () => {

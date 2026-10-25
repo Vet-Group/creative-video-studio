@@ -7,8 +7,8 @@ const file = (name: string) => ({ name, mimeType: 'image/png', buffer: png() });
 const runButton = (page: Page) => page.getByRole('button', { name: /^Tạo video/ });
 const reasonOf = (page: Page) => page.locator('.form-message').getByRole('status');
 const fits = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
-const hook = HOOKS.find((h) => h.id === 'mirror-check')!;
-const spot = LOCATIONS.find((l) => l.id === 'cafe')!;
+const hook = HOOKS.find((h) => h.id === 'dramatic-arrival')!;
+const spot = LOCATIONS.find((l) => l.id === 'kitchen')!;
 
 async function openPage(page: Page): Promise<void> {
   await nav(page).getByRole('link', { name: 'Marketing Studio' }).click();

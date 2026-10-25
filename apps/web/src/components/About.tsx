@@ -1,9 +1,13 @@
 // The About tab of Create: how a Run works here, what limits it, and how to write a motion prompt. Company guidance, not marketing.
+import { AboutClips } from './CardMedia';
+
 export function About() {
   return (
     <article className="about">
       <h2>Tạo video sản phẩm từ ảnh</h2>
       <p>Đưa vào một hoặc vài ảnh sản phẩm, chọn một mẫu chuyển động hoặc tự viết mô tả, và nhận lại một clip ngắn. Clip nằm trong Thư viện của công ty, ai trong công ty cũng xem và tải được.</p>
+
+      <AboutClips names={['example-2', 'example-3']} title="Từ ảnh tĩnh thành video" />
 
       <p className="about-kicker">Từng bước</p>
       <h3>Một lần Run gồm những gì</h3>

@@ -6,6 +6,8 @@ import { api, errorText, sendJson } from '@/lib/api';
 import { HOOKS, LOCATIONS, type MarketingChoice, marketingPrompt } from '@/lib/marketing';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { useSamples } from '@/lib/use-samples';
+import { cardSample } from '@/lib/examples';
+import { CardMedia, LoopVideo } from './CardMedia';
 import { Icon, type IconName } from './Icon';
 import { Gallery, type Img, Slot, uploadImages, UPLOAD_ERROR, WorkTabs } from './image-tools';
 import { useJobs } from './jobs';
@@ -52,9 +54,10 @@ function ChoiceBox({ label, icon, choice, onOpen }: { label: string; icon: IconN
   );
 }
 
-/** The dialog of one list: text cards in a grid, the "no choice" card first. Arrows move the focus between the cards, Enter or Space picks, Escape closes. */
-function ChoiceDialog({ open, title, choices, value, onPick, onClose }: { open: boolean; title: string; choices: MarketingChoice[]; value: string; onPick: (id: string) => void; onClose: () => void }) {
+/** The dialog of one list: cards with the choice's sample loop (`marketing-<kind>-<id>`) and name in a grid, the "no choice" card first. Arrows move the focus between the cards, Enter or Space picks, Escape closes. */
+function ChoiceDialog({ open, title, kind, choices, value, onPick, onClose }: { open: boolean; title: string; kind: 'hook' | 'location'; choices: MarketingChoice[]; value: string; onPick: (id: string) => void; onClose: () => void }) {
   const grid = useRef<HTMLDivElement>(null);
+  const have = useSamples();
   // showModal (in Modal's effect, which runs first) focuses the close button, so the chosen card takes the focus afterwards.
   useEffect(() => {
     if (open) grid.current?.querySelector<HTMLElement>('[aria-selected=true]')?.focus();
@@ -75,7 +78,8 @@ function ChoiceDialog({ open, title, choices, value, onPick, onClose }: { open: 
       <div ref={grid} className="choice-grid" role="listbox" aria-label={title} onKeyDown={onKey}>
         {all.map((c) => (
           <button key={c.id || 'none'} type="button" role="option" aria-selected={value === c.id} tabIndex={value === c.id ? 0 : -1} onClick={() => onPick(c.id)}>
-            {c.name}
+            {c.id && open && <CardMedia {...cardSample(have, `marketing-${kind}-${c.id}`)} />}
+            <span className="choice-name">{c.name}</span>
           </button>
         ))}
       </div>
@@ -85,6 +89,7 @@ function ChoiceDialog({ open, title, choices, value, onPick, onClose }: { open: 
 
 /** The sample photo behind the format header, when an Admin uploaded one. */
 const UGC_PHOTO = 'marketing-format-ugc.jpg';
+const UGC_LOOP = 'marketing-format-ugc.mp4';
 
 export function MarketingStudio() {
   const have = useSamples();
@@ -220,6 +225,11 @@ export function MarketingStudio() {
         <div className="card form-card" id="marketing-panel-create" role={narrow ? 'tabpanel' : undefined} aria-labelledby={narrow ? 'marketing-tab-create' : undefined} hidden={narrow && shown !== 'create'}>
           <div className="form-scroll">
             <div className="app-head marketing-head" data-category="video" data-photo={have.has(UGC_PHOTO) || undefined} style={have.has(UGC_PHOTO) ? ({ '--photo': `url(/api/samples/${UGC_PHOTO})` } as CSSProperties) : undefined}>
+              {have.has(UGC_LOOP) && (
+                <span className="head-loop">
+                  <LoopVideo src={`/api/samples/${UGC_LOOP}`} poster={have.has(UGC_PHOTO) ? `/api/samples/${UGC_PHOTO}` : null} />
+                </span>
+              )}
               <strong>UGC Thử đồ</strong>
             </div>
             <div className="app-slots marketing-slots" data-two="true">
@@ -293,8 +303,8 @@ export function MarketingStudio() {
         </div>
       </div>
 
-      <ChoiceDialog open={picker === 'hook'} title="Chọn hook" choices={HOOKS} value={hook} onPick={(id) => (setHook(id), setPicker(null))} onClose={() => setPicker(null)} />
-      <ChoiceDialog open={picker === 'location'} title="Chọn bối cảnh" choices={LOCATIONS} value={location} onPick={(id) => (setLocation(id), setPicker(null))} onClose={() => setPicker(null)} />
+      <ChoiceDialog open={picker === 'hook'} title="Chọn hook" kind="hook" choices={HOOKS} value={hook} onPick={(id) => (setHook(id), setPicker(null))} onClose={() => setPicker(null)} />
+      <ChoiceDialog open={picker === 'location'} title="Chọn bối cảnh" kind="location" choices={LOCATIONS} value={location} onPick={(id) => (setLocation(id), setPicker(null))} onClose={() => setPicker(null)} />
     </section>
   );
 }

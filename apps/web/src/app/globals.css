@@ -146,7 +146,7 @@ td code { white-space: pre-wrap; overflow-wrap: anywhere; }
 .help { margin: 8px 0 0; color: rgb(102, 102, 102); font-size: 12px; line-height: 18px; }
 
 .banner { position: relative; width: 100%; height: 130px; overflow: hidden; border-radius: 18px; background: #e4e4e7; }
-.banner img, .banner-empty { display: block; width: 100%; height: 100%; object-fit: cover; }
+.banner img, .banner video, .banner-empty { display: block; width: 100%; height: 100%; object-fit: cover; }
 .banner-empty { background: repeating-linear-gradient(135deg, #e4e4e7 0 10px, #f4f4f5 10px 20px); }
 .banner::after { content: ''; position: absolute; inset: 0; background: rgb(0 0 0 / .25); pointer-events: none; }
 .banner-text { position: absolute; inset: 0; z-index: 1; display: grid; place-items: center; padding: 0 12px; pointer-events: none; }
@@ -333,20 +333,34 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
   .explore-cards > li { flex-basis: 218px; }
 }
 .explore-feature { display: grid; gap: 8px; height: 100%; padding-bottom: 20px; overflow: hidden; border: 1px solid rgb(0 0 0 / .1); border-radius: 12px; color: inherit; text-decoration: none; }
-.explore-feature img { width: 100%; aspect-ratio: 420 / 260; object-fit: cover; }
+.explore-feature img, .explore-feature video { display: block; width: 100%; aspect-ratio: 420 / 260; object-fit: cover; }
 .explore-feature-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 20px 0; font-size: 18px; line-height: 27px; }
 .explore-feature > .muted { padding: 0 20px; font-size: 14px; line-height: 21px; }
 .explore-arrow { display: grid; place-items: center; width: 32px; height: 32px; border: 1px solid rgb(0 0 0 / .1); border-radius: 8px; }
 .explore-feature:hover .explore-arrow, .explore-card:hover { background: rgb(242, 242, 242); }
 .explore-card { display: grid; align-content: start; gap: 6px; height: 100%; padding: 16px; overflow: hidden; border: 1px solid rgb(0 0 0 / .1); border-radius: 12px; color: inherit; text-decoration: none; font-size: 14px; line-height: 21px; }
-.explore-card img, .explore-card .banner-empty { width: calc(100% + 32px); margin: -16px -16px 6px; aspect-ratio: 1; object-fit: cover; }
+.explore-card img, .explore-card video, .explore-card .banner-empty { width: calc(100% + 32px); margin: -16px -16px 6px; aspect-ratio: 1; object-fit: cover; }
 .explore-card .muted { font-size: 13px; line-height: 18px; }
+/* The motion templates section: the live page's 4-column masonry of looping tiles (2 below 1024 px), name and Create on hover or focus. */
+.explore-prompts { columns: 2; column-gap: 12px; }
+@media (min-width: 1024px) { .explore-prompts { columns: 4; } }
+.explore-prompts > li { break-inside: avoid; margin-bottom: 12px; }
+.explore-prompt { position: relative; display: block; overflow: hidden; border-radius: 8px; background: #e4e4e7; color: #fff; text-decoration: none; }
+.explore-prompt img, .explore-prompt video { display: block; width: 100%; height: auto; min-height: 120px; object-fit: cover; transition: filter .2s; }
+.explore-prompt .banner-empty { aspect-ratio: 3 / 4; }
+.explore-prompt-hover { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 24px; padding: 16px; background: rgb(0 0 0 / .35); opacity: 0; transition: opacity .2s; text-align: center; }
+.explore-prompt-hover strong { font-size: 22px; line-height: 28px; font-weight: 600; }
+.explore-prompt-go { display: inline-flex; align-items: center; gap: 10px; padding: 9px 40px; border: 1px solid rgb(255 255 255 / .25); border-radius: 8px; background: rgb(255 255 255 / .12); font-size: 15px; font-weight: 600; }
+.explore-prompt:hover .explore-prompt-hover, .explore-prompt:focus-visible .explore-prompt-hover { opacity: 1; }
+.explore-prompt:hover :is(img, video), .explore-prompt:focus-visible :is(img, video) { filter: blur(6px); }
 
 /* The About tab of Create. */
 .about { max-width: 46rem; padding-bottom: 32px; color: rgb(51, 51, 51); font-size: 14px; line-height: 22px; }
 .about h2 { margin: 8px 0 12px; color: rgb(26, 26, 26); font-size: 22px; line-height: 30px; font-weight: 600; }
 .about h3 { margin: 0 0 12px; color: rgb(26, 26, 26); font-size: 18px; line-height: 26px; font-weight: 600; }
 .about-kicker { margin: 32px 0 4px; color: rgb(128, 128, 128); font-size: 12px; line-height: 18px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+.about-clips { display: grid; grid-template-columns: repeat(auto-fill, minmax(10rem, 14rem)); gap: 12px; }
+.about-clips :is(video, img) { display: block; width: 100%; aspect-ratio: 9 / 16; object-fit: cover; border-radius: 12px; background: #e4e4e7; }
 .about ol, .about ul { display: grid; gap: 8px; margin: 0; padding-left: 20px; }
 
 /* Library tools: favourites, sort and the card size slider; the empty state. */
@@ -444,7 +458,7 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .app-card .muted { font-size: 13px; line-height: 18px; }
 .app-card .app-art { aspect-ratio: 1; }
 .app-art { overflow: hidden; }
-.app-art img { width: 100%; height: 100%; object-fit: cover; }
+.app-art img, .app-art video { width: 100%; height: 100%; object-fit: cover; }
 .app-art { display: grid; place-items: center; aspect-ratio: 16 / 9; margin-bottom: 8px; background: rgb(244, 244, 245); color: rgb(63, 63, 70); }
 .app-art[data-category='fashion'] { background: rgb(254, 235, 240); color: rgb(157, 23, 77); }
 .app-art[data-category='photo'] { background: rgb(224, 242, 254); color: rgb(3, 105, 161); }
@@ -459,6 +473,11 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 /* An uploaded sample photo behind the header, darkened at the bottom so the title stays readable. */
 .app-head[data-photo] { background: linear-gradient(180deg, rgb(0 0 0 / 0), rgb(0 0 0 / .55)), var(--photo) center / cover no-repeat; }
 .app-head[data-photo] strong { text-shadow: 0 1px 8px rgb(0 0 0 / .45); }
+/* The header's sample loop sits under the title and buttons, with the same shade as the photo. */
+.app-head:has(> .head-loop) { position: relative; isolation: isolate; }
+.head-loop { position: absolute; inset: 0; z-index: -1; overflow: hidden; border-radius: inherit; }
+.head-loop video { display: block; width: 100%; height: 100%; object-fit: cover; }
+.head-loop::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgb(0 0 0 / 0), rgb(0 0 0 / .55)); }
 .gallery-item > a { display: block; }
 .gallery-item .preview { border-radius: 0; }
 .app-change { position: relative; flex: none; }
@@ -487,6 +506,9 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .choice-grid button { min-height: 56px; padding: 8px 12px; border: 1px solid #e4e4e7; border-radius: 12px; background: #fff; font-size: 14px; line-height: 20px; text-align: center; }
 .choice-grid button:hover { border-color: rgb(153, 153, 153); }
 .choice-grid button[aria-selected='true'] { border-color: #000; background: #000; color: #fff; }
+/* A choice with a sample loop: the 3:4 clip above its name, like the live hook and location cards. */
+.choice-grid button:has(> video, > img) { display: grid; align-content: start; gap: 6px; padding: 6px 6px 8px; }
+.choice-grid button > :is(video, img) { display: block; width: 100%; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 8px; }
 .gallery-item video { display: block; width: 100%; height: 100%; object-fit: cover; background: #000; }
 
 /* C4 round 2 (three independent graders, 2026-10-24). */
