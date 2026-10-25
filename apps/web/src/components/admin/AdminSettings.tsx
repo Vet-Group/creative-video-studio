@@ -48,30 +48,48 @@ function SettingsForm({ settings, reload }: { settings: Settings; reload: () => 
 
   return (
     <>
-      <div className="row">
-        <label>
-          Ngân sách tháng cho video (USD)
-          <input inputMode="decimal" value={monthly} onChange={(e) => setMonthly(e.target.value)} />
-        </label>
-        <label>
-          Số clip tối đa mỗi Member mỗi ngày
-          <input inputMode="numeric" value={daily} onChange={(e) => setDaily(e.target.value)} />
-        </label>
-      </div>
+      <p className="muted">
+        Sửa số trong ô rồi bấm “Lưu cài đặt” ở cuối trang. Mức mới áp dụng ngay từ lần bấm Run tiếp theo, được ghi vào Nhật ký, và tính theo giờ
+        Việt Nam (tháng bắt đầu từ ngày 1, ngày bắt đầu lúc 0 giờ). Đặt 0 để khoá hẳn phần đó.
+      </p>
+      <fieldset>
+        <legend>Video (Tạo video, Marketing Studio)</legend>
+        <div className="row">
+          <label>
+            Ngân sách tháng cho video (USD)
+            <input inputMode="decimal" value={monthly} onChange={(e) => setMonthly(e.target.value)} />
+            <small className="muted">
+              Trần chung của cả công ty cho video trong một tháng. Khi tổng đã chi cộng tiền đang tạm giữ chạm mức này, mọi người không bấm Run
+              video được nữa cho tới ngày 1 tháng sau. Ví dụ 200 USD là khoảng 350 clip Kling 5 giây (0,56 USD mỗi clip).
+            </small>
+          </label>
+          <label>
+            Số clip tối đa mỗi Member mỗi ngày
+            <input inputMode="numeric" value={daily} onChange={(e) => setDaily(e.target.value)} />
+            <small className="muted">Số video mỗi người được tạo trong một ngày. Clip lỗi không mất tiền thì không tính.</small>
+          </label>
+        </div>
+      </fieldset>
       <fieldset>
         <legend>Ảnh và ứng dụng</legend>
         <div className="row">
           <label>
             Ngân sách tháng cho ảnh và ứng dụng (USD)
             <input inputMode="decimal" value={features} onChange={(e) => setFeatures(e.target.value)} />
+            <small className="muted">
+              Trần chung của cả công ty cho Thử đồ, Tạo ảnh và các Ứng dụng ảnh trong một tháng, tách riêng khỏi ngân sách video. Chạm mức thì các
+              trang này không bấm Run được nữa cho tới ngày 1 tháng sau.
+            </small>
           </label>
           <label>
             Hạn mức mỗi Member mỗi ngày (USD)
             <input inputMode="decimal" value={memberDay} onChange={(e) => setMemberDay(e.target.value)} />
+            <small className="muted">Mỗi người chi tối đa bấy nhiêu cho ảnh và ứng dụng trong một ngày (không tính video).</small>
           </label>
           <label>
             Hạn mức mỗi Member mỗi tháng (USD)
             <input inputMode="decimal" value={memberMonth} onChange={(e) => setMemberMonth(e.target.value)} />
+            <small className="muted">Mỗi người chi tối đa bấy nhiêu cho ảnh và ứng dụng trong một tháng (không tính video).</small>
           </label>
         </div>
         <p className="muted">Hạn mức theo mục dưới đây chỉ để cảnh báo trên trang Chi phí (từ 80%), không chặn Run.</p>

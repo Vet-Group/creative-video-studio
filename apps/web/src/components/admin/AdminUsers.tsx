@@ -22,11 +22,23 @@ type Run = ReturnType<typeof useAction>['run'];
 
 function UserRow({ user, teams, run }: { user: User; teams: Team[]; run: Run }) {
   const [password, setPassword] = useState('');
+  const [name, setName] = useState(user.name);
+  const [email, setEmail] = useState(user.email);
   const patch = (body: Record<string, unknown>, fallback: string) => run(() => api(`/api/admin/users/${user.id}`, sendJson('PATCH', body)), fallback);
+  const edited = name.trim() !== user.name || email.trim().toLowerCase() !== user.email;
   return (
     <tr>
-      <td>{user.name}</td>
-      <td>{user.email}</td>
+      <td>
+        <input aria-label={`Tên của ${user.email}`} value={name} onChange={(e) => setName(e.target.value)} />
+      </td>
+      <td>
+        <input type="email" aria-label={`Email của ${user.email}`} value={email} onChange={(e) => setEmail(e.target.value)} />
+        {edited && (
+          <button type="button" disabled={name.trim() === '' || email.trim() === ''} onClick={() => void patch({ name, email }, 'Không lưu được tên hoặc email.')}>
+            Lưu tên, email
+          </button>
+        )}
+      </td>
       <td>
         <select aria-label={`Vai trò của ${user.email}`} value={user.role} onChange={(e) => void patch({ role: e.target.value }, 'Không đổi được vai trò.')}>
           <option value="member">Member</option>
@@ -146,6 +158,9 @@ export function AdminUsers() {
           </button>
         </div>
         <p className="muted">Người dùng không có mật khẩu chỉ đăng nhập được bằng Lark hoặc Google. Đổi nhóm chỉ áp dụng cho các job mới.</p>
+        <p className="muted">
+          Sửa tên hoặc email ngay trong bảng dưới rồi bấm “Lưu tên, email”. Email phải là địa chỉ Gmail của người đó, hoặc email công ty trên Lark: lần đầu đăng nhập bằng Google hoặc Lark, app tìm tài khoản theo đúng email này. Muốn dùng cả hai, người đó đăng nhập một cách rồi bấm “Liên kết” cách còn lại ở trang Phương thức đăng nhập.
+        </p>
       </fieldset>
       {problem && (
         <p className="error" role="alert">
