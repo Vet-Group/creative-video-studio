@@ -67,6 +67,14 @@ describe('fal image submit', () => {
     expect(calls).toHaveLength(0);
   });
 
+  test('GPT Image 2.5 Flare and Sunburst take the same body as GPT Image 2', async () => {
+    for (const endpoint of ['openai/gpt-image-2.5/flare/edit', 'openai/gpt-image-2.5/sunburst/edit']) {
+      const { url, body } = await bodyFor(req(model(endpoint, { '1K': '0.21' }), { ratio: '3:4' }));
+      expect(url).toBe(`https://queue.fal.run/${endpoint}`);
+      expect(body).toEqual({ prompt: 'a bottle on a table', image_urls: ['https://img/1.jpg', 'https://img/2.jpg'], image_size: 'portrait_4_3', quality: 'high', num_images: 1, output_format: 'png' });
+    }
+  });
+
   test('Seedream sends auto_<resolution> for auto and otherwise a size inside 1024x1024..2048x2048 pixels, in multiples of 16', async () => {
     const seed = model('bytedance/seedream/v5/pro/edit', { '1K': '0.0675', '2K': '0.135' });
     expect((await bodyFor(req(seed, { ratio: 'auto', resolution: '2K' }))).body).toMatchObject({ image_size: 'auto_2K' });

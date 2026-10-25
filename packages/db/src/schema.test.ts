@@ -104,9 +104,20 @@ describe('migration 0016 video models at 1080p', () => {
   });
 });
 
+describe('migration 0017 GPT Image 2.5', () => {
+  test('adds Flare and Sunburst disabled, with the price and ratios of GPT Image 2', async () => {
+    const { rows } = await pool.query(`select id, endpoint, features, ratios, max_images, image_prices, enabled from model_configs where id like 'gpt-image-2.5%' order by id`);
+    expect(rows.map((r) => [r.id, r.endpoint, r.features, r.image_prices, r.max_images, r.enabled])).toEqual([
+      ['gpt-image-2.5-flare', 'openai/gpt-image-2.5/flare/edit', ['image'], { '1K': '0.21' }, 4, false],
+      ['gpt-image-2.5-sunburst', 'openai/gpt-image-2.5/sunburst/edit', ['image'], { '1K': '0.21' }, 4, false],
+    ]);
+    for (const r of rows) expect(r.ratios).toEqual(['auto', '1:1', '9:16', '16:9', '3:4', '4:3']);
+  });
+});
+
 describe('migration 0007 image models', () => {
   test('seeds the seven fal image models disabled, each with its prices, ratios and features', async () => {
-    const { rows } = await pool.query(`select id, endpoint, features, ratios, durations_sec, max_images, image_prices, usd_per_second, enabled, sources from model_configs where kind = 'image' and cardinality(features) > 0 and not features && ARRAY['character_swap', 'model_swap', 'background_changer', 'reframe', 'image_upscale', 'face_swap', 'background_remover']::text[] order by id`);
+    const { rows } = await pool.query(`select id, endpoint, features, ratios, durations_sec, max_images, image_prices, usd_per_second, enabled, sources from model_configs where kind = 'image' and cardinality(features) > 0 and not features && ARRAY['character_swap', 'model_swap', 'background_changer', 'reframe', 'image_upscale', 'face_swap', 'background_remover']::text[] and id not like 'gpt-image-2.5%' order by id`);
     expect(rows.map((r) => [r.id, r.endpoint, r.features, r.image_prices])).toEqual([
       ['fashn-v1.6', 'fal-ai/fashn/tryon/v1.6', ['try_on'], { '1K': '0.075' }],
       ['gpt-image-2', 'openai/gpt-image-2/edit', ['image'], { '1K': '0.21' }],

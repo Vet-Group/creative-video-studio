@@ -133,6 +133,13 @@ const nano =
 /** GPT Image 2 takes only these preset sizes (its schema states no limits for a custom size). */
 const GPT_SIZES: Record<string, string> = { auto: 'auto', '1:1': 'square_hd', '3:4': 'portrait_4_3', '9:16': 'portrait_16_9', '4:3': 'landscape_4_3', '16:9': 'landscape_16_9' };
 
+/** The GPT Image edit endpoints. The model's price assumes the high quality tier (the schema default); it is sent so a default change cannot raise the price. */
+const gptImage: ImageBody = (req, image_urls) => {
+  const image_size = GPT_SIZES[req.ratio];
+  if (!image_size) throw new ImageReadError(`GPT Image does not offer ratio ${req.ratio}`);
+  return { prompt: req.prompt, image_urls, image_size, quality: req.quality ?? 'high', num_images: 1, output_format: 'png' };
+};
+
 /** A width and height in the ratio with about `pixels` pixels in total, each a multiple of 16. */
 function sizeFor(ratio: string, pixels: number): { width: number; height: number } {
   const [w, h] = ratio.split(':').map(Number) as [number, number];
@@ -175,12 +182,10 @@ const IMAGE_BODIES: Record<string, ImageBody> = {
   'fal-ai/nano-banana-2/edit': nano(true),
   // This schema has no resolution input.
   'fal-ai/nano-banana/edit': nano(false),
-  'openai/gpt-image-2/edit': (req, image_urls) => {
-    const image_size = GPT_SIZES[req.ratio];
-    if (!image_size) throw new ImageReadError(`gpt-image-2 does not offer ratio ${req.ratio}`);
-    // The model's price assumes the high quality tier (the schema default); send it so a default change cannot raise the price.
-    return { prompt: req.prompt, image_urls, image_size, quality: req.quality ?? 'high', num_images: 1, output_format: 'png' };
-  },
+  'openai/gpt-image-2/edit': gptImage,
+  // GPT Image 2.5 Flare and Sunburst share GPT Image 2's schema and token prices (model pages, read 2026-10-26).
+  'openai/gpt-image-2.5/flare/edit': gptImage,
+  'openai/gpt-image-2.5/sunburst/edit': gptImage,
   'bytedance/seedream/v5/pro/edit': (req, image_urls) => ({ prompt: req.prompt, image_urls, image_size: seedreamSize(req.ratio, req.resolution), num_images: 1, output_format: 'png' }),
   // The person image first, then the garment; the output follows the person image, so the schema has no ratio, and the prompt is not read.
   'fal-ai/fashn/tryon/v1.6': (_req, urls) => {
