@@ -595,3 +595,7 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .form-message p.help[role='status'] { margin: 0 0 8px; padding: 8px 12px; border-radius: 8px; background: rgb(245, 245, 245); color: rgb(64, 64, 64); font-size: 13px; line-height: 19px; }
 .library .card video.tall { display: block; width: auto; max-width: 100%; margin: 0 auto; background: transparent; }
 .job-body a { color: rgb(38, 38, 38); font-size: 13px; text-decoration-color: rgb(0 0 0 / .3); text-underline-offset: 2px; }
+/* Library card actions: the clip actions on one row with Delete at its end, the verdict buttons together on the next. */
+.library .card .actions .danger { order: 1; margin-left: auto; }
+.library .card .actions .verdict-buttons { display: flex; flex-basis: 100%; gap: 6px; order: 2; }
+.library .card .actions .verdict-buttons button { flex: 1; }

@@ -148,10 +148,10 @@ export function WorkTabs<T extends string>({ prefix, tabs, labels, shown, onSele
 export function LockedFields() {
   return (
     <div className="locked-fields" aria-hidden="true">
-      {['Mô hình', 'Độ phân giải', 'Tỉ lệ'].map((label) => (
+      {['Mô hình', 'Độ phân giải', 'Tỉ lệ'].map((label, i) => (
         <div key={label} className="field">
           <span className="field-label">{label}</span>
-          <span className="select-trigger locked">Chưa bật mô hình</span>
+          <span className="select-trigger locked">{i === 0 ? 'Chưa bật mô hình' : '—'}</span>
         </div>
       ))}
     </div>
