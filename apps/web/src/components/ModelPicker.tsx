@@ -10,9 +10,12 @@ export interface ModelOption {
   label: string;
   isMock: boolean;
   supported: boolean;
-  /** The pass rate as text; image models have none yet, so the row leaves it out. */
+  /** The pass rate as text (video models). */
   rate?: string;
   estimateUsd: string;
+  /** The recommendation score, 0-100 (lib/model-scores.ts), and whether this is the model to recommend. */
+  score?: number;
+  recommended?: boolean;
 }
 
 const PANEL = { width: 334, height: 446, gap: 8 };
@@ -116,8 +119,10 @@ export function ModelPicker({ models, value, onChange }: { models: ModelOption[]
               <span className="model-name">
                 {m.label}
                 {m.isMock && <span className="badge">MOCK</span>}
+                {m.recommended && <span className="badge badge-recommended">Đề xuất</span>}
               </span>
               <span className="model-sub">
+                {m.score !== undefined && <span>Điểm: {m.score}/100</span>}
                 {m.rate !== undefined && <span>Tỉ lệ đạt: {m.rate}</span>}
                 <span>Ước tính: ${m.estimateUsd}</span>
                 {!m.supported && <span>Không hỗ trợ lựa chọn này</span>}
@@ -158,6 +163,7 @@ export function ModelPicker({ models, value, onChange }: { models: ModelOption[]
           <span className="select-value select-value-row" id={valueId}>
             <span className="select-value-text">{chosen ? chosen.label : 'Chưa chọn mô hình'}</span>
             {chosen?.isMock && <span className="badge">MOCK</span>}
+            {chosen?.recommended && <span className="badge badge-recommended">Đề xuất</span>}
           </span>
           <Icon name={open ? 'up' : 'down'} />
         </button>

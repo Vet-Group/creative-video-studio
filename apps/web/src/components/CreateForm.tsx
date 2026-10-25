@@ -24,6 +24,8 @@ interface Model {
   maxImages: number;
   estimateUsd: string;
   passRate: number | null;
+  score: number;
+  recommended: boolean;
   passes: number;
   total: number;
   supported: boolean;
@@ -308,7 +310,7 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
 
             {models && models.models.length > 0 && (
               <ModelPicker
-                models={models.models.map((m) => ({ id: m.id, label: m.label, isMock: m.isMock, supported: m.supported, rate: ratePct(m), estimateUsd: m.estimateUsd }))}
+                models={models.models.map((m) => ({ id: m.id, label: m.label, isMock: m.isMock, supported: m.supported, rate: ratePct(m), estimateUsd: m.estimateUsd, score: m.score, recommended: m.recommended }))}
                 value={modelId}
                 onChange={setModelId}
               />

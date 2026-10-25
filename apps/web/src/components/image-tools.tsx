@@ -21,6 +21,9 @@ export interface ImageModel {
   /** USD per image by resolution, as 4-decimal strings. */
   prices: Record<string, string>;
   maxImages: number;
+  /** The recommendation score (0-100) for this feature, and whether it is the one to recommend. */
+  score: number;
+  recommended: boolean;
 }
 export interface Img {
   id: string;
@@ -43,18 +46,20 @@ export function useImageModels(feature: string): { models: ImageModel[] | null; 
 }
 
 /**
- * The model, ratio and resolution of a Run. The chosen model stays while it is listed; a ratio or resolution the model lacks falls back to its first,
+ * The model, ratio and resolution of a Run. The chosen model stays while it is listed (until one is chosen, the recommended model that takes the inputs);
+ * a ratio or resolution the model lacks falls back to its first,
  * so the options always match the model. `images` is how many inputs the Run has: a model that takes fewer is shown as not supported.
  */
 export function useImageChoice(models: ImageModel[] | null, images: number) {
   const [modelId, setModelId] = useState('');
   const [wantRatio, setRatio] = useState('auto');
   const [wantResolution, setResolution] = useState('1K');
-  const chosen = models?.find((m) => m.id === modelId) ?? models?.find((m) => m.maxImages >= images) ?? models?.[0];
+  const fits = (m: ImageModel) => m.maxImages >= images;
+  const chosen = models?.find((m) => m.id === modelId) ?? models?.find((m) => m.recommended && fits(m)) ?? models?.find(fits) ?? models?.[0];
   const ratio = chosen && !chosen.ratios.includes(wantRatio) ? chosen.ratios[0]! : wantRatio;
   const resolution = chosen && !chosen.resolutions.includes(wantResolution) ? chosen.resolutions[0]! : wantResolution;
   const options: ModelOption[] = (models ?? []).map((m) => ({
-    id: m.id, label: m.label, isMock: m.isMock, supported: m.maxImages >= images, estimateUsd: m.prices[resolution] ?? Object.values(m.prices)[0] ?? '0.0000',
+    id: m.id, label: m.label, isMock: m.isMock, supported: fits(m), estimateUsd: m.prices[resolution] ?? Object.values(m.prices)[0] ?? '0.0000', score: m.score, recommended: m.recommended,
   }));
   return { chosen, ratio, resolution, estimate: chosen?.prices[resolution], options, modelId: chosen?.id ?? '', setModelId, setRatio, setResolution };
 }

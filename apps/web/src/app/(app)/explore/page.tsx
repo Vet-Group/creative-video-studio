@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { Icon } from '@/components/Icon';
 import { pool } from '@/lib/auth';
 import { EXAMPLES, exampleForPreset, sampleSrc } from '@/lib/examples';
+import { modelStats, rank, scoreOf } from '@/lib/model-scores';
 import { listSamples } from '@/lib/samples';
 
 // The tools the app has, in the live sidebar order; each later tool adds its card here. Posters are the fixture clips until real ones exist.
@@ -21,15 +22,24 @@ const range = (values: number[]) => (values.length === 0 ? '' : values.length > 
 
 /** Explore: the start page of the live dashboard, with the tools, the enabled models and the company presets, each linking into Create. */
 export default async function ExplorePage() {
-  const [models, presets, samples] = await Promise.all([
+  const [models, presets, samples, videoStats, imageStats] = await Promise.all([
     // Video models open Create Videos and image models open Image Generation, as the live page features both.
-    pool.query<{ id: string; label: string; provider: string; kind: string; ratios: string[]; durations_sec: number[] }>(
-      `select id, label, provider, kind, ratios, durations_sec from model_configs where enabled and kind = any(features) and kind in ('video', 'image') order by kind desc, label, id`,
+    pool.query<{ id: string; label: string; provider: string; kind: string; ratios: string[]; durations_sec: number[]; usd_per_second: string | null; image_prices: Record<string, string> | null }>(
+      `select id, label, provider, kind, ratios, durations_sec, usd_per_second, image_prices from model_configs where enabled and kind = any(features) and kind in ('video', 'image') order by kind desc, label, id`,
     ),
     pool.query<{ id: string; label: string }>('select id, label from presets where enabled order by sort_order, id'),
     listSamples().catch(() => []), // without the bucket the page keeps its fallbacks
+    // The same scores as the pickers: every mark for a video model, the Image Generation marks for an image model.
+    modelStats(null),
+    modelStats('image'),
   ]);
   const have = new Set(samples.map((s) => s.name));
+  const scored = models.rows.map((m) => {
+    const st = (m.kind === 'video' ? videoStats : imageStats).get(m.id) ?? { passes: 0, total: 0, ok: 0, bad: 0 };
+    const usd = m.kind === 'video' ? Number(m.usd_per_second ?? 0) : Math.min(...Object.values(m.image_prices ?? {}).map(Number));
+    return { ...m, score: scoreOf(st).score, usd };
+  });
+  const recommended = new Set(['video', 'image'].map((kind) => rank(scored.filter((m) => m.kind === kind)).recommended));
   return (
     <div className="explore">
       <h1>Bắt đầu sáng tạo</h1>
@@ -55,13 +65,16 @@ export default async function ExplorePage() {
         <p className="muted">Chưa có mô hình nào được bật.</p>
       ) : (
         <ul className="explore-cards" aria-label="Mô hình">
-          {models.rows.map((m) => (
+          {scored.map((m) => (
             <li key={m.id}>
               <Link href={m.kind === 'video' ? `/create?model=${encodeURIComponent(m.id)}` : '/image-generation'} className="explore-card">
                 {have.has(modelSample(m.id)) ? <img src={`/api/samples/${modelSample(m.id)}`} alt="" /> : <span className="banner-empty" aria-hidden="true" />}
-                <strong>{m.label}</strong>
+                <strong>
+                  {m.label}
+                  {recommended.has(m.id) && <span className="badge badge-recommended">Đề xuất</span>}
+                </strong>
                 <span className="muted">
-                  {[m.ratios.join(', '), range(m.durations_sec)].filter(Boolean).join(' · ')}
+                  {[m.ratios.join(', '), range(m.durations_sec), `Điểm ${m.score}/100`].filter(Boolean).join(' · ')}
                 </span>
               </Link>
             </li>
