@@ -11,7 +11,7 @@ const MONTH = `to_char(now() at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM')`;
  * score and estimated cost, and the model to pre-select: the best score among those that support the choice (the cheaper on a tie), flagged `recommended`
  * unless every supported model scores the same. Pass rate = (seed passes + marked passes) / (seed total + marked total) over every marked clip, deleted or
  * purged ones included; null while nothing is counted. The score also weighs how often real jobs of the model end well (lib/model-scores.ts).
- * `?feature=video` or `?feature=marketing` keeps the models whose `features` lists it (Marketing Studio also accepts ratio 16:9); without it every enabled video model is listed.
+ * `?feature=video`, `marketing` or `motion_control` keeps the models whose `features` lists it (Marketing Studio also accepts ratio 16:9, Motion Control takes only `auto`); without it every enabled video model is listed.
  * `monthToDate` is the caller's own total this ICT month, provisional while a job of it has no closing row. `remainingBudgetUsd` is for Admins only.
  */
 export async function GET(request: Request) {
@@ -21,8 +21,9 @@ export async function GET(request: Request) {
   const ratio = q.get('ratio');
   const durationSec = q.get('durationSec') ? Number(q.get('durationSec')) : NaN;
   const feature = q.get('feature');
-  if (feature !== null && feature !== 'video' && feature !== 'marketing') return Response.json({ error: 'feature must be video or marketing' }, { status: 400 });
-  const ratios: readonly (string | null)[] = feature === 'marketing' ? [...ASPECTS, '16:9'] : ASPECTS;
+  if (feature !== null && !['video', 'marketing', 'motion_control'].includes(feature)) return Response.json({ error: 'feature must be video, marketing or motion_control' }, { status: 400 });
+  // Motion Control's output follows the reference video, so its only ratio is 'auto'.
+  const ratios: readonly (string | null)[] = feature === 'marketing' ? [...ASPECTS, '16:9'] : feature === 'motion_control' ? ['auto'] : ASPECTS;
   if (!ratios.includes(ratio) || !Number.isInteger(durationSec)) {
     return Response.json({ error: 'ratio and durationSec (a whole number) are required' }, { status: 400 });
   }

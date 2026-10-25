@@ -1,5 +1,5 @@
 import { insertAssets } from '@cvs/db/assets';
-import { db, MAX_BYTES, MAX_FILENAME, MAX_FILES, readUploadForm, sniffImage } from '@/lib/assets';
+import { db, MAX_BYTES, MAX_FILENAME, MAX_FILES, MAX_VIDEO_BYTES, mp4DurationMs, readUploadForm, sniffImage, sniffVideo } from '@/lib/assets';
 import { guard } from '@/lib/session';
 import { deleteObject, putObject } from '@/lib/storage';
 
@@ -12,7 +12,10 @@ function shortName(name: string): string {
   return [...chars.slice(0, MAX_FILENAME - ext.length), ...ext].join('');
 }
 
-/** Upload 1-4 input images (multipart field `file`): at most 10 MB each, JPEG/PNG/WebP by magic bytes. All or nothing. */
+/**
+ * Upload 1-4 input files (multipart field `file`), all or nothing: JPEG/PNG/WebP images of at most 10 MB, or MP4/MOV videos (Motion Control's reference)
+ * of at most 20 MB whose header gives their length (`durationMs`). The type comes from the magic bytes.
+ */
 export async function POST(request: Request) {
   const g = await guard(request, 'member');
   if (g.error) return g.error;
@@ -22,15 +25,23 @@ export async function POST(request: Request) {
   if (files.length === 0 || files.length > MAX_FILES) {
     return Response.json({ error: `send 1 to ${MAX_FILES} files in the "file" field` }, { status: 400 });
   }
-  const checked: { id: string; file: File; bytes: Uint8Array; mime: string }[] = [];
+  const checked: { id: string; file: File; bytes: Uint8Array; mime: string; durationMs: number | null }[] = [];
   for (const file of files) {
-    if (file.size > MAX_BYTES) return Response.json({ error: `${file.name} is larger than 10 MB` }, { status: 413 });
+    if (file.size > MAX_VIDEO_BYTES) return Response.json({ error: `${file.name} is larger than 20 MB` }, { status: 413 });
     const bytes = new Uint8Array(await file.arrayBuffer());
+    const video = sniffVideo(bytes);
+    if (video) {
+      const durationMs = mp4DurationMs(bytes);
+      if (!durationMs) return Response.json({ error: `${file.name} has no readable length` }, { status: 415 });
+      checked.push({ id: crypto.randomUUID(), file, bytes, mime: video, durationMs });
+      continue;
+    }
+    if (file.size > MAX_BYTES) return Response.json({ error: `${file.name} is larger than 10 MB` }, { status: 413 });
     const mime = sniffImage(bytes);
-    if (!mime) return Response.json({ error: `${file.name} is not a JPEG, PNG or WebP image` }, { status: 415 });
-    checked.push({ id: crypto.randomUUID(), file, bytes, mime });
+    if (!mime) return Response.json({ error: `${file.name} is not a JPEG, PNG or WebP image, or an MP4 or MOV video` }, { status: 415 });
+    checked.push({ id: crypto.randomUUID(), file, bytes, mime, durationMs: null });
   }
-  const rows = checked.map(({ id, file, bytes, mime }) => ({
+  const rows = checked.map(({ id, file, bytes, mime, durationMs }) => ({
     id,
     ownerId: g.session.user.id,
     kind: 'input' as const,
@@ -38,6 +49,7 @@ export async function POST(request: Request) {
     filename: shortName(file.name || 'upload'),
     mime,
     bytes: bytes.length,
+    durationMs,
   }));
   const puts = await Promise.allSettled(checked.map(({ id, bytes, mime }) => putObject(`assets/${id}`, bytes, mime)));
   try {
@@ -49,5 +61,5 @@ export async function POST(request: Request) {
     await Promise.allSettled(rows.map((r) => deleteObject(r.s3Key)));
     throw e;
   }
-  return Response.json({ assets: rows.map((r) => ({ id: r.id, filename: r.filename, mime: r.mime, bytes: r.bytes })) }, { status: 201 });
+  return Response.json({ assets: rows.map((r) => ({ id: r.id, filename: r.filename, mime: r.mime, bytes: r.bytes, durationMs: r.durationMs })) }, { status: 201 });
 }

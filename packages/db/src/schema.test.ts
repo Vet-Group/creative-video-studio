@@ -78,7 +78,7 @@ describe('migration 0002 seed data', () => {
 describe('migration 0015 Fash video models', () => {
   test('adds 22 fal video models, disabled and complete, each with a request builder and its sources', async () => {
     const { rows } = await pool.query(
-      `select id, endpoint, ratios, durations_sec, max_images, output_resolution, usd_per_second::float as usd, sources from model_configs where kind = 'video' and provider = 'fal' and id <> 'kling-o3-pro' and not enabled order by id`,
+      `select id, endpoint, ratios, durations_sec, max_images, output_resolution, usd_per_second::float as usd, sources from model_configs where kind = 'video' and provider = 'fal' and id <> 'kling-o3-pro' and not 'motion_control' = any(features) and not enabled order by id`,
     );
     expect(rows).toHaveLength(22);
     for (const r of rows) {
@@ -101,6 +101,24 @@ describe('migration 0016 video models at 1080p', () => {
       { id: 'flux-3-reference', output_resolution: '1080p', usd: 0.29 },
       { id: 'seedance-1.0-pro', output_resolution: '1080p', usd: 0.124 },
     ]);
+  });
+});
+
+describe('migrations 0018 and 0019 Motion Control', () => {
+  test('adds the two Kling V3 Motion Control models disabled: ratio auto, 3 to 30 s, the image and the video, a request builder each', async () => {
+    const { rows } = await pool.query(`select id, endpoint, features, ratios, durations_sec, max_images, usd_per_second::text as usd, enabled from model_configs where 'motion_control' = any(features) order by id`);
+    expect(rows.map((r) => [r.id, r.endpoint, r.usd, r.enabled])).toEqual([
+      ['kling-v3-motion-pro', 'fal-ai/kling-video/v3/pro/motion-control', '0.1680', false],
+      ['kling-v3-motion-standard', 'fal-ai/kling-video/v3/standard/motion-control', '0.1260', false],
+    ]);
+    for (const r of rows) {
+      expect([r.features, r.ratios, r.max_images, r.durations_sec[0], r.durations_sec.at(-1), r.durations_sec.length]).toEqual([['motion_control'], ['auto'], 2, 3, 30, 28]);
+      expect(VIDEO_BODIES[r.endpoint], r.id).toMatchObject({ upload: true });
+    }
+  });
+
+  test('an asset can carry the length of a video', async () => {
+    expect((await pool.query(`select data_type, is_nullable from information_schema.columns where table_name = 'assets' and column_name = 'duration_ms'`)).rows).toEqual([{ data_type: 'integer', is_nullable: 'YES' }]);
   });
 });
 

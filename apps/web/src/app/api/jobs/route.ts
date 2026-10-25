@@ -12,7 +12,7 @@ const MAX_IMAGES = 4;
 const MAX_IMAGE_INPUTS = 16;
 const MAX_PROMPT = 2000;
 /** The features that run on a video model; every other feature runs on an image model. */
-const VIDEO_FEATURES = ['video', 'marketing'];
+const VIDEO_FEATURES = ['video', 'marketing', 'motion_control'];
 const QUALITIES = ['auto', 'low', 'medium', 'high'];
 /** The apps that need more than one input image; the model's own max_images is the upper limit. Try On has its own message below. */
 /** The apps whose fixed instruction a member's own prompt is added to, not replaced by. */
@@ -67,6 +67,9 @@ export async function GET(request: Request) {
  * image job: an enabled image model that lists the feature, no preset, a prompt (the apps in FEATURE_PROMPTS may omit it and get that one), 1 to the model's `max_images`
  * inputs (Try On, the two swaps and Face Swap need at least 2; Background Changer takes a prompt or a second image as the reference), one of the model's ratios (or `auto`), `params.resolution` (a key of the model's `image_prices`, which also sets the
  * estimate) and an optional `params.quality`. `durationSec` is not read and the job stores 0.
+ * `motion_control` takes a video model that lists it, exactly 2 inputs (the character image, then an MP4/MOV reference video), ratio `auto`, no preset and
+ * an optional prompt; its duration is the reference video's length rounded up (the body's `durationSec` is not read), which the model must allow.
+ * Every other feature takes images only.
  * `retryOf` retries the caller's own failed job once: the inputs, model, preset, prompt, ratio, duration, team and store all come from the
  * original (the body may carry just `retryOf`), the estimate from the model's current price.
  */
@@ -85,8 +88,9 @@ export async function POST(request: Request) {
     const params = rawParams ?? {}; // null as well as absent: video clients may send it
     if (typeof feature !== 'string' || !(FEATURES as readonly string[]).includes(feature)) return bad(`feature must be one of ${FEATURES.join(', ')}`);
     const isImage = !VIDEO_FEATURES.includes(feature);
-    // An app's empty prompt box means "no prompt", so its default applies.
-    const freePrompt = isImage && typeof rawPrompt === 'string' && rawPrompt.trim() === '' ? null : rawPrompt;
+    const motion = feature === 'motion_control';
+    // An app's empty prompt box means "no prompt", so its default applies (Motion Control has none: it sends no prompt).
+    const freePrompt = (isImage || motion) && typeof rawPrompt === 'string' && rawPrompt.trim() === '' ? null : rawPrompt;
     const maxInputs = isImage ? MAX_IMAGE_INPUTS : MAX_IMAGES;
     if (!Array.isArray(assetIds) || assetIds.length < 1 || assetIds.length > maxInputs || !assetIds.every((a) => typeof a === 'string') || new Set(assetIds).size !== assetIds.length) {
       return bad(`assetIds must list 1 to ${maxInputs} different asset ids`);
@@ -95,7 +99,8 @@ export async function POST(request: Request) {
     if (feature === 'marketing' && assetIds.length !== 2) return bad('Marketing Studio needs exactly 2 images: the model photo first, then the product photo');
     if (feature === 'marketing' && (presetId !== null || typeof freePrompt !== 'string' || freePrompt.trim() === '')) return bad('Marketing Studio takes a prompt and no preset');
     if (assetIds.length < (MIN_INPUTS[feature] ?? 1)) return bad(`${feature} needs ${MIN_INPUTS[feature]} images`);
-    if (typeof modelId !== 'string' || (presetId !== null && typeof presetId !== 'string') || (freePrompt !== null && typeof freePrompt !== 'string') || typeof ratio !== 'string' || (!isImage && !Number.isInteger(durationSec)) || (storeId !== null && typeof storeId !== 'string')) {
+    if (motion && (assetIds.length !== 2 || presetId !== null)) return bad('Motion Control needs exactly 2 inputs (the character image, then the reference video) and no preset');
+    if (typeof modelId !== 'string' || (presetId !== null && typeof presetId !== 'string') || (freePrompt !== null && typeof freePrompt !== 'string') || typeof ratio !== 'string' || (!isImage && !motion && !Number.isInteger(durationSec)) || (storeId !== null && typeof storeId !== 'string')) {
       return bad('modelId, ratio, durationSec (a whole number, video only), a presetId or a prompt, and an optional storeId are required');
     }
     const entries = params && typeof params === 'object' && !Array.isArray(params) ? Object.entries(params) : null;
@@ -104,22 +109,28 @@ export async function POST(request: Request) {
     if (isImage ? given.resolution === undefined : entries.length > 0) return bad(isImage ? 'params.resolution is required' : 'params are for image features only');
     if (given.quality !== undefined && !QUALITIES.includes(given.quality)) return bad(`params.quality must be one of ${QUALITIES.join(', ')}`);
     // The PRD gives "an optional prompt, or one of the presets" for video: exactly one of the two. An image job has no presets.
-    if (isImage ? presetId !== null || (freePrompt === null && !Object.hasOwn(FEATURE_PROMPTS, feature)) : (presetId === null) === (freePrompt === null)) {
+    if (!motion && (isImage ? presetId !== null || (freePrompt === null && !Object.hasOwn(FEATURE_PROMPTS, feature)) : (presetId === null) === (freePrompt === null))) {
       return bad(isImage ? 'an image job takes a prompt and no preset (only the apps may omit the prompt)' : 'give either a presetId or a prompt, not both and not neither');
     }
     // Background Changer takes a prompt (one image) or a reference image (two images), the schema says not both.
     if (feature === 'background_changer' && (assetIds.length > 1) === (freePrompt !== null)) return bad('Background Changer takes a prompt or a reference image (the second image), not both and not neither');
     const written = freePrompt?.trim();
-    const prompt = written && APPEND_TO_INSTRUCTION.includes(feature) ? `${FEATURE_PROMPTS[feature]}. ${written}` : (written ?? FEATURE_PROMPTS[feature] ?? null);
-    if (prompt !== null && (prompt === '' || prompt.length > MAX_PROMPT)) return bad(`the prompt must have 1 to ${MAX_PROMPT} characters`);
+    const prompt = written && APPEND_TO_INSTRUCTION.includes(feature) ? `${FEATURE_PROMPTS[feature]}. ${written}` : (written ?? FEATURE_PROMPTS[feature] ?? (motion ? '' : null));
+    if (prompt !== null && ((prompt === '' && !motion) || prompt.length > MAX_PROMPT)) return bad(`the prompt must have 1 to ${MAX_PROMPT} characters`);
     const usable = await pool.query(
-      `select a.id from assets a
+      `select a.id, a.mime, a.duration_ms from assets a
         where a.id = any($1::text[]) and a.deleted_at is null and a.kind = 'input'
           and (a.owner_id = $2 or exists (select 1 from jobs j where a.id = any(j.input_asset_ids) and j.status = 'succeeded' and j.deleted_at is null and j.purged_at is null))`,
       [assetIds, userId],
     );
     if (usable.rowCount !== assetIds.length) return bad('one or more assets do not exist or cannot be used');
-    spec = { assetIds, modelId, presetId, prompt, ratio, durationSec: isImage ? 0 : (durationSec as number), storeId: storeId as string | null, feature, params: params as Record<string, string> };
+    const byId = new Map(usable.rows.map((r: { id: string; mime: string; duration_ms: number | null }) => [r.id, r]));
+    const isVideo = (i: number) => byId.get(assetIds[i] as string)!.mime.startsWith('video/');
+    if (motion ? isVideo(0) || !isVideo(1) : assetIds.some((_, i) => isVideo(i))) {
+      return bad(motion ? 'Motion Control needs the character image first, then the reference video' : 'only Motion Control takes a video input');
+    }
+    const length = motion ? Math.ceil(byId.get(assetIds[1] as string)!.duration_ms! / 1000) : (durationSec as number);
+    spec = { assetIds, modelId, presetId, prompt, ratio, durationSec: isImage ? 0 : length, storeId: storeId as string | null, feature, params: params as Record<string, string> };
   }
 
   const id = crypto.randomUUID();

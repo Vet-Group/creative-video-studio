@@ -143,7 +143,7 @@ export const verifications = pgTable(
   (t) => [index('verifications_identifier_idx').on(t.identifier)],
 );
 
-// An uploaded input image or a generated output clip; the bytes live in MinIO under s3Key.
+// An uploaded input image or video, or a generated output; the bytes live in MinIO under s3Key.
 export const assets = pgTable(
   'assets',
   {
@@ -158,6 +158,8 @@ export const assets = pgTable(
     bytes: integer('bytes').notNull(),
     width: integer('width'),
     height: integer('height'),
+    /** The length of an input video (Motion Control's reference), read from its MP4/MOV header at upload; null for images and outputs. */
+    durationMs: integer('duration_ms'),
     createdAt: tstz('created_at').notNull().defaultNow(),
     deletedAt: tstz('deleted_at'),
   },

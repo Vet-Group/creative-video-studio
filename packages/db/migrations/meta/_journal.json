@@ -127,6 +127,20 @@
       "when": 1793790136036,
       "tag": "0017_gpt_image_2_5",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1793790137036,
+      "tag": "0018_asset_duration",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1793790138036,
+      "tag": "0019_kling_v3_motion_control",
+      "breakpoints": true
     }
   ]
 }

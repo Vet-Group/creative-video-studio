@@ -2,7 +2,8 @@
 //   queue (submit/status/result/cancel, auth, statuses): https://fal.ai/docs/model-apis/model-endpoints/queue
 //   X-Fal-Store-IO and X-Fal-Object-Lifecycle-Preference: https://fal.ai/docs/model-apis/media-expiration
 //   file inputs: https://fal.ai/docs/documentation/model-apis/fal-cdn.md says "Some models also accept data URIs" and does not document a plain-HTTP
-//   upload (only the SDKs); non-https images are therefore sent as data URIs, and the B.5a canary shows whether Kling accepts them
+//   upload (only the SDKs); non-https images are therefore sent as data URIs, and the B.5a canary shows whether Kling accepts them. A video is too large
+//   for that, so Motion Control uploads its inputs with the SDK's storage flow instead (uploadInputs)
 //   Kling O3 Pro input and output schema: https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=fal-ai/kling-video/o3/pro/reference-to-video
 //   image endpoints (read 2026-10-24) and the other video endpoints (read 2026-10-25): https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=<endpoint>,
 //   one per entry of IMAGE_BODIES and VIDEO_BODIES
@@ -11,6 +12,7 @@ import { estimate, ImageReadError, imageEstimate, packJobId, ProviderHttpError, 
 import type { ImageProvider, ImageSubmitRequest, ProviderStatus, SubmitRequest, VideoProvider } from './types';
 
 const QUEUE = 'https://queue.fal.run';
+const REST = 'https://rest.fal.ai';
 /** One hour, the example value in the media-expiration docs; the worker copies the output at once. */
 const LIFECYCLE = JSON.stringify({ expiration_duration_seconds: 3600 });
 
@@ -65,6 +67,8 @@ const plainImage = (n: string) => `image ${n}`;
  */
 interface VideoBody {
   crop?: boolean;
+  /** The inputs include a video, too large to inline, so they go to fal's storage and the body carries their URLs (uploadInputs). */
+  upload?: boolean;
   build: (req: SubmitRequest, images: string[]) => Record<string, unknown>;
 }
 const seconds = (req: SubmitRequest) => String(req.durationSec);
@@ -98,7 +102,46 @@ export const VIDEO_BODIES: Record<string, VideoBody> = {
   'minimax/h3-max/image-to-video': { crop: true, build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), duration: req.durationSec, resolution: '768P', prompt_expansion_mode: 'balanced' }) },
   // A fixed-length clip: the schema has no duration, and the row offers 6 s only, as Fash does.
   'fal-ai/minimax/hailuo-2.3/pro/image-to-video': { crop: true, build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images) }) },
+  'fal-ai/kling-video/v3/pro/motion-control': { upload: true, build: (req, inputs) => motion(req, inputs) },
+  'fal-ai/kling-video/v3/standard/motion-control': { upload: true, build: (req, inputs) => motion(req, inputs) },
 };
+
+/**
+ * Motion Control: the character image (1st input) moves like the reference video (2nd input). Orientation 'video' lets the reference run up to 30 s
+ * ('image' allows 10 s); the reference's sound is dropped, as audio is everywhere. The prompt is optional and sent only when the member wrote one.
+ */
+function motion(req: SubmitRequest, [image_url, video_url, ...rest]: string[]): Record<string, unknown> {
+  if (!image_url || !video_url || rest.length > 0) throw new ImageReadError('motion control needs the character image and the reference video');
+  return { image_url, video_url, character_orientation: 'video', keep_original_sound: false, ...(req.prompt.trim() && { prompt: req.prompt }) };
+}
+
+/**
+ * Puts each non-https input in fal's storage and returns the file URLs: initiate on rest.fal.ai, then PUT the bytes (the flow of @fal-ai/client 1.10.1,
+ * src/storage.js, checked with a live upload 2026-10-26). The objects expire after an hour, like the outputs. A failed read or upload has sent nothing
+ * billable, so it is an ImageReadError and the worker releases the estimate.
+ */
+async function uploadInputs(f: Fetch, apiKey: string, urls: string[], readImage?: ReadImage): Promise<string[]> {
+  return Promise.all(
+    urls.map(async (url) => {
+      if (url.startsWith('https:')) return url;
+      if (!readImage) throw new ImageReadError(`input ${url.split(':')[0]}: URL needs a readImage resolver`);
+      try {
+        const { bytes, contentType } = await readImage(url);
+        const init = (await sendJson(f, 'fal upload', `${REST}/storage/upload/initiate?storage_type=fal-cdn-v3`, {
+          method: 'POST',
+          headers: { Authorization: `Key ${apiKey}`, 'Content-Type': 'application/json', 'X-Fal-Object-Lifecycle': LIFECYCLE },
+          body: JSON.stringify({ content_type: contentType, file_name: `input.${contentType.split('/')[1] ?? 'bin'}` }),
+        })) as { upload_url?: string; file_url?: string };
+        if (!init.upload_url || !init.file_url) throw new Error('fal upload: no upload_url or file_url');
+        const put = await f(init.upload_url, { method: 'PUT', headers: { 'Content-Type': contentType }, body: Buffer.from(bytes) });
+        if (!put.ok) throw new Error(`fal upload: HTTP ${put.status}`);
+        return init.file_url;
+      } catch (e) {
+        throw new ImageReadError(`input ${url.split(':')[0]}: ${(e as Error).message}`);
+      }
+    }),
+  );
+}
 
 export function createFalProvider(opts: { apiKey: string; fetch?: Fetch; readImage?: ReadImage }): VideoProvider {
   const f = opts.fetch ?? fetch;
@@ -107,7 +150,8 @@ export function createFalProvider(opts: { apiKey: string; fetch?: Fetch; readIma
     async submit(req) {
       const spec = VIDEO_BODIES[req.model.endpoint];
       if (!spec) throw new ImageReadError(`fal video: no request builder for ${req.model.endpoint}`);
-      const body = spec.build(req, await resolveImages(req.imageUrls, opts.readImage, spec.crop ? { ratio: req.ratio } : undefined));
+      const inputs = spec.upload ? await uploadInputs(f, opts.apiKey, req.imageUrls, opts.readImage) : await resolveImages(req.imageUrls, opts.readImage, spec.crop ? { ratio: req.ratio } : undefined);
+      const body = spec.build(req, inputs);
       const res = (await sendJson(f, 'fal submit', `${QUEUE}/${req.model.endpoint}`, { method: 'POST', headers, body: JSON.stringify(body) })) as { request_id?: string };
       if (!res.request_id) throw new Error('fal submit: no request_id in the response');
       return { providerJobId: packJobId(req.durationSec, res.request_id) };

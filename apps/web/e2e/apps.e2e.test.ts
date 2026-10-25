@@ -36,7 +36,7 @@ test('the index lists nine apps, and the search box and the chips filter the car
   await expect(cards(page).locator('strong')).toHaveText([
     'Đổi nhân vật', 'Đổi người mẫu', 'Đổi nền', 'Đổi khung hình', 'Tăng độ phân giải', 'Đổi khuôn mặt', 'Xoá nền', 'Điều khiển chuyển động', 'Tối ưu media',
   ]);
-  await expect(cards(page).filter({ hasText: 'Sắp có' })).toHaveCount(2);
+  await expect(cards(page).filter({ hasText: 'Sắp có' })).toHaveCount(1);
 
   const chips = page.getByRole('group', { name: 'Danh mục' });
   await expect(chips.getByRole('button')).toHaveText(['Tất cả', 'Thời trang', 'Chỉnh ảnh', 'Video', 'Tiện ích']);
@@ -65,22 +65,13 @@ test('the index lists nine apps, and the search box and the chips filter the car
   await filter('Tất cả', ['Đổi nhân vật', 'Đổi người mẫu', 'Đổi nền', 'Đổi khung hình', 'Tăng độ phân giải', 'Đổi khuôn mặt', 'Xoá nền', 'Điều khiển chuyển động', 'Tối ưu media']);
 });
 
-test('an unknown app is a 404, and the two apps that are not built say "Sắp có" and why', async ({ page }) => {
+test('an unknown app is a 404, and the app that is not built says "Sắp có" and why', async ({ page }) => {
   await signIn(page, 'appsa');
   const missing = await page.goto('/apps/no-such-app');
   expect(missing?.status()).toBe(404);
   await expect(runButton(page)).toHaveCount(0);
 
   await page.goto('/apps');
-  await cards(page).filter({ hasText: 'Điều khiển chuyển động' }).click();
-  await expect(page).toHaveURL(/\/apps\/motion-control$/);
-  await expect(page.getByRole('heading', { name: 'Điều khiển chuyển động', level: 1 })).toBeVisible();
-  await expect(page.getByText('Sắp có')).toBeVisible();
-  await expect(page.getByText(/mô hình video riêng/)).toBeVisible();
-  await expect(runButton(page)).toHaveCount(0);
-  await page.getByRole('link', { name: 'Xem các ứng dụng khác' }).click();
-  await expect(page).toHaveURL(/\/apps$/);
-
   await cards(page).filter({ hasText: 'Tối ưu media' }).click();
   await expect(page).toHaveURL(/\/apps\/media-optimizer$/);
   await expect(page.getByText('Sắp có')).toBeVisible();
@@ -285,9 +276,61 @@ test('each upload button names its slot, and only the pages with a History tab h
 
   await page.goto('/apps');
   await expect(tray).toBeVisible();
-  await page.goto('/apps/motion-control');
+  await page.goto('/apps/media-optimizer');
   await expect(page.getByText('Sắp có')).toBeVisible();
   await expect(tray).toBeVisible();
+});
+
+/** An MP4 whose header gives `ms` (ftyp, then moov holding a version 0 mvhd with timescale 1000): the server reads only the header. */
+function mp4(ms: number): Buffer {
+  const b = Buffer.alloc(64);
+  const box = (at: number, len: number, type: string) => (b.writeUInt32BE(len, at), b.write(type, at + 4, 'latin1'));
+  box(0, 16, 'ftyp');
+  b.write('isom', 8, 'latin1');
+  box(16, 36, 'moov');
+  box(24, 28, 'mvhd');
+  b.writeUInt32BE(1000, 44);
+  b.writeUInt32BE(ms, 48);
+  box(52, 12, 'mdat');
+  return b;
+}
+
+test('Motion Control: the image and the reference video, a length check, and a Run that sends both with ratio auto', async ({ page }) => {
+  await signIn(page, 'appsa');
+  const durationsSec = Array.from({ length: 28 }, (_, i) => i + 3);
+  const model = (id: string, label: string, usd: string) => ({ id, label, isMock: false, supported: true, estimateUsd: usd, durationsSec, score: 50, recommended: false });
+  await page.route(/\/api\/models\?feature=motion_control/, (r) => {
+    const seconds = Number(new URL(r.request().url()).searchParams.get('durationSec'));
+    return r.fulfill({ json: { models: [model('kling-v3-motion-pro', 'Kling V3 Motion Control Pro', (0.168 * seconds).toFixed(4)), model('kling-v3-motion-standard', 'Kling V3 Motion Control Standard', (0.126 * seconds).toFixed(4))], defaultModelId: 'kling-v3-motion-standard' } });
+  });
+  let sent: Record<string, unknown> | null = null;
+  await page.route('**/api/jobs', (r) => {
+    if (r.request().method() !== 'POST') return r.fallback();
+    sent = r.request().postDataJSON() as Record<string, unknown>;
+    return r.fulfill({ status: 201, json: { id: 'motion-1', status: 'queued' } });
+  });
+  await openApp(page, 'Điều khiển chuyển động', 'motion-control');
+  await expect(page.getByText('Sắp có')).toHaveCount(0);
+  await expect(reasonOf(page)).toHaveText('Tải lên ảnh: Nhân vật.');
+  await page.getByLabel('Ảnh nhân vật').setInputFiles(file('dancer.png'));
+  await expect(page.getByRole('img', { name: 'dancer.png' })).toBeVisible();
+  await expect(reasonOf(page)).toHaveText('Tải lên video chuyển động.');
+
+  await page.getByLabel('Video chuyển động mẫu').setInputFiles({ name: 'short.mp4', mimeType: 'video/mp4', buffer: mp4(1900) });
+  await expect(page.getByText('short.mp4 · 1.9 giây')).toBeVisible();
+  await expect(reasonOf(page)).toHaveText('Video chuyển động phải dài từ 3 đến 30 giây.');
+  await expect(runButton(page)).toBeDisabled();
+
+  await page.getByRole('button', { name: 'Bỏ video short.mp4' }).click();
+  await page.getByLabel('Video chuyển động mẫu').setInputFiles({ name: 'dance.mp4', mimeType: 'video/mp4', buffer: mp4(5400) });
+  await expect(page.getByText('dance.mp4 · 5.4 giây')).toBeVisible();
+  await expect(reasonOf(page)).toHaveCount(0);
+  await expect(runButton(page)).toHaveText(/\$0\.7560/); // the recommended Standard model, 6 s
+  await runButton(page).click();
+  await expect(page.getByText('Đã gửi job. Theo dõi trong tab "Lịch sử".')).toBeVisible();
+  expect(sent).toMatchObject({ feature: 'motion_control', modelId: 'kling-v3-motion-standard', ratio: 'auto' });
+  expect((sent as unknown as { assetIds: string[] }).assetIds).toHaveLength(2);
+  expect(sent).not.toHaveProperty('prompt');
 });
 
 test('Run is disabled with a reason when the app has no enabled model, and "Đổi ứng dụng" switches app with a fresh form', async ({ page }) => {
@@ -331,11 +374,6 @@ for (const [width, height, columns] of [[390, 844, 2], [1024, 768, 2], [1440, 10
 
     for (const slug of ['character-swap', 'background-changer', 'reframe', 'motion-control']) {
       await page.goto(`/apps/${slug}`);
-      if (slug === 'motion-control') {
-        await expect(page.getByText('Sắp có')).toBeVisible();
-        expect(await fits(page), slug).toBe(true);
-        continue;
-      }
       await expect(page.getByRole('tab').first()).toBeVisible();
       for (const tab of await page.getByRole('tab').all()) {
         await tab.click();

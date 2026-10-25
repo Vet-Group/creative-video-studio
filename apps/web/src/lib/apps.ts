@@ -200,9 +200,18 @@ export const APPS: AppConfig[] = [
     name: 'Điều khiển chuyển động',
     description: 'Chép chuyển động từ một video sang nhân vật của bạn.',
     category: 'video',
+    // Its form is its own (AppPage's MotionForm): one image slot and one video slot.
     slots: [],
-    soon: 'Ứng dụng này cần một mô hình video riêng cho chuyển động, và phần đó chưa xong. Khi mô hình sẵn sàng, ứng dụng sẽ xuất hiện ở đây.',
-    about: { title: '', intro: '', steps: [], notes: [] },
+    about: {
+      title: 'Điều khiển chuyển động',
+      intro: 'Ứng dụng dùng Kling V3 Motion Control: nhân vật trong ảnh của bạn làm lại đúng các động tác của một video mẫu. Video kết quả dài bằng video mẫu.',
+      steps: [
+        ['Tải ảnh nhân vật.', 'Một ảnh rõ người, thấy cả thân càng tốt.'],
+        ['Tải video chuyển động.', 'Video MP4 hoặc MOV dài 3 đến 30 giây, tối đa 20 MB, có một người làm động tác rõ ràng.'],
+        ['Chạy.', 'Prompt là tuỳ chọn. Video kết quả nằm trong tab Lịch sử và trong Thư viện, mục Ứng dụng.'],
+      ],
+      notes: [PHOTO_NOTE, 'Video kết quả không có tiếng. Chi phí tính theo số giây của video mẫu, làm tròn lên.', BUDGET_NOTE],
+    },
   },
   {
     slug: 'media-optimizer',
@@ -253,6 +262,27 @@ export function appReason(app: AppConfig, d: AppDraft): string | null {
   }
   const count = d.images.reduce((n, list) => n + list.length, 0);
   if (count > model.maxImages) return `Mô hình này nhận tối đa ${model.maxImages} ảnh.`;
+  return null;
+}
+
+/** What Motion Control has chosen: the character image, the reference video's length (null until one is uploaded) and the model's allowed lengths. */
+export interface MotionDraft {
+  image: boolean;
+  videoMs: number | null;
+  /** null while the model list loads; `failed` when it could not be loaded. */
+  model: { durationsSec: number[] } | null | undefined;
+  failed: boolean;
+}
+
+/** The first thing that stops a Motion Control Run, in the order the form is filled; null when it can go. */
+export function motionReason(d: MotionDraft): string | null {
+  if (d.model === null) return 'Đang tải danh sách mô hình...';
+  if (d.failed) return 'Không tải được danh sách mô hình.';
+  if (!d.model) return 'Ứng dụng này chưa được Admin bật';
+  if (!d.image) return 'Tải lên ảnh: Nhân vật.';
+  if (d.videoMs === null) return 'Tải lên video chuyển động.';
+  const allowed = d.model.durationsSec;
+  if (!allowed.includes(Math.ceil(d.videoMs / 1000))) return `Video chuyển động phải dài từ ${allowed[0]} đến ${allowed.at(-1)} giây.`;
   return null;
 }
 
