@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { BAKEOFF_MODELS } from '../../core/src/models';
+import { VIDEO_BODIES } from '../../core/src/providers/fal';
 import { PRESETS } from '../../core/src/presets';
 import { createTestDatabase } from './testing';
 
@@ -61,7 +62,7 @@ describe('migration 0002 seed data', () => {
   });
 
   test('seeds the two models with price, limits and bake-off record (migration 0013: Kling enabled, Seedance disabled), and the settings row', async () => {
-    const models = await pool.query(`select id, provider, endpoint, enabled, usd_per_second::text as usd, max_images, output_resolution, pass_seed_passes as passes, pass_seed_total as total from model_configs where kind = 'video' order by id`);
+    const models = await pool.query(`select id, provider, endpoint, enabled, usd_per_second::text as usd, max_images, output_resolution, pass_seed_passes as passes, pass_seed_total as total from model_configs where id in ('kling-o3-pro', 'seedance-2.5') order by id`);
     expect(models.rows).toEqual([
       { id: 'kling-o3-pro', provider: 'fal', endpoint: 'fal-ai/kling-video/o3/pro/reference-to-video', enabled: true, usd: '0.1120', max_images: 4, output_resolution: '1080p', passes: 7, total: 10 },
       { id: 'seedance-2.5', provider: 'replicate', endpoint: 'bytedance/seedance-2.5', enabled: false, usd: '0.2312', max_images: 4, output_resolution: '720p', passes: 6, total: 9 },
@@ -71,6 +72,24 @@ describe('migration 0002 seed data', () => {
 
   test('refuses to enable a model that has no price or limits', async () => {
     await expect(pool.query(`update model_configs set enabled = true, usd_per_second = null where id = 'seedance-2.5'`)).rejects.toThrow(/model_configs_enabled_complete_check/);
+  });
+});
+
+describe('migration 0015 Fash video models', () => {
+  test('adds 22 fal video models, disabled and complete, each with a request builder and its sources', async () => {
+    const { rows } = await pool.query(
+      `select id, endpoint, ratios, durations_sec, max_images, output_resolution, usd_per_second::float as usd, sources from model_configs where kind = 'video' and provider = 'fal' and id <> 'kling-o3-pro' and not enabled order by id`,
+    );
+    expect(rows).toHaveLength(22);
+    for (const r of rows) {
+      expect(VIDEO_BODIES[r.endpoint], r.id).toBeDefined();
+      expect(r.ratios.length * r.durations_sec.length * r.max_images * r.usd, r.id).toBeGreaterThan(0);
+      expect(['720p', '768p', '1080p'], r.id).toContain(r.output_resolution);
+      expect(Object.keys(r.sources).sort(), r.id).toEqual(['durationsSec', 'maxImages', 'outputResolution', 'ratios', 'usdPerSecond']);
+    }
+    expect(rows.find((r) => r.id === 'veo-3.1')).toMatchObject({ ratios: ['9:16'], durations_sec: [8] }); // no 1:1, and Fash's 8 s only
+    await pool.query(`update model_configs set enabled = true where id = 'kling-3.0-pro'`); // complete enough for the enable check
+    await pool.query(`update model_configs set enabled = false where id = 'kling-3.0-pro'`);
   });
 });
 

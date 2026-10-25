@@ -38,6 +38,28 @@ describe('fal', () => {
     expect((calls[0]!.body as { prompt: string }).prompt).toBe('The person in @Image1 wears the product in @Image2. Keep [Image 3], @Image4 and @Image1 2.');
   });
 
+  test('each other video endpoint gets its own body: image field, duration type, resolution and how the prompt names images', async () => {
+    const body = async (endpoint: string, prompt = 'put [Image1] on [Image2]') => {
+      const { fn, calls } = fakeFetch([200, { request_id: 'r' }]);
+      await createFalProvider({ apiKey: 'k', fetch: fn }).submit({ ...req, prompt, model: { ...kling, endpoint } });
+      expect(calls[0]!.url).toBe(`https://queue.fal.run/${endpoint}`);
+      return calls[0]!.body;
+    };
+    expect(await body('bytedance/seedance-2.5/us/reference-to-video')).toEqual({ prompt: 'put @Image1 on @Image2', image_urls: ['https://img/1.jpg', 'https://img/2.jpg'], aspect_ratio: '9:16', duration: '5', resolution: '720p', generate_audio: false });
+    expect(await body('fal-ai/kling-video/v3/pro/image-to-video')).toEqual({ prompt: 'put image 1 on image 2', start_image_url: 'https://img/1.jpg', duration: '5', generate_audio: false });
+    expect(await body('google/gemini-omni-flash/v1.1/image-to-video')).toEqual({ prompt: 'put image 1 on image 2', image_url: 'https://img/1.jpg', aspect_ratio: '9:16', duration: 5, resolution: '720p' });
+    expect(await body('fal-ai/veo3.1/image-to-video')).toMatchObject({ duration: '5s', generate_audio: false });
+    expect(await body('blackforestlabs/flux-3/keyframes-to-video')).toMatchObject({ keyframes: [{ image_url: 'https://img/1.jpg', frame_index: 0 }], duration: 5 });
+    expect(await body('minimax/h3-max/reference-to-video')).toEqual({ prompt: 'put Image 1 on Image 2', reference_image_urls: ['https://img/1.jpg', 'https://img/2.jpg'], aspect_ratio: '9:16', duration: 5, resolution: '768P', prompt_expansion_mode: 'balanced' });
+    expect(await body('fal-ai/minimax/hailuo-2.3/pro/image-to-video')).toEqual({ prompt: 'put image 1 on image 2', image_url: 'https://img/1.jpg' });
+  });
+
+  test('an endpoint without a request builder is refused before any call', async () => {
+    const { fn, calls } = fakeFetch();
+    await expect(createFalProvider({ apiKey: 'k', fetch: fn }).submit({ ...req, model: { ...kling, endpoint: 'fal-ai/unknown' } })).rejects.toThrow(ImageReadError);
+    expect(calls).toHaveLength(0);
+  });
+
   test('submit sends auth, Store-IO 0, an hour lifecycle and the Kling body with audio off', async () => {
     const { fn, calls } = fakeFetch([200, { request_id: 'req-1', status_url: 'x' }]);
     const out = await createFalProvider({ apiKey: 'k', fetch: fn }).submit(req);

@@ -4,10 +4,11 @@
 //   file inputs: https://fal.ai/docs/documentation/model-apis/fal-cdn.md says "Some models also accept data URIs" and does not document a plain-HTTP
 //   upload (only the SDKs); non-https images are therefore sent as data URIs, and the B.5a canary shows whether Kling accepts them
 //   Kling O3 Pro input and output schema: https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=fal-ai/kling-video/o3/pro/reference-to-video
-//   image endpoints (read 2026-10-24): https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=<endpoint>, one per entry of IMAGE_BODIES
+//   image endpoints (read 2026-10-24) and the other video endpoints (read 2026-10-25): https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=<endpoint>,
+//   one per entry of IMAGE_BODIES and VIDEO_BODIES
 import { imageSize } from './image-size';
 import { estimate, ImageReadError, imageEstimate, packJobId, ProviderHttpError, resolveImages, sendJson, timeout, unpackJobId, type Fetch, type ReadImage } from './http';
-import type { ImageProvider, ImageSubmitRequest, ProviderStatus, VideoProvider } from './types';
+import type { ImageProvider, ImageSubmitRequest, ProviderStatus, SubmitRequest, VideoProvider } from './types';
 
 const QUEUE = 'https://queue.fal.run';
 /** One hour, the example value in the media-expiration docs; the worker copies the output at once. */
@@ -52,21 +53,60 @@ async function pollFal(
   return { state: 'succeeded', outputUrl, ...cost };
 }
 
+/** The app writes [Image1], [Image2]; each schema names them its own way. A digit right after the token gets a space, so "[Image1]2" does not become @Image12. */
+const imageTokens = (prompt: string, name: (n: string) => string) => prompt.replace(/\[Image(\d+)\](\d?)/g, (_, n: string, d: string) => `${name(n)}${d ? ` ${d}` : ''}`);
+const atImage = (n: string) => `@Image${n}`;
+const plainImage = (n: string) => `image ${n}`;
+
+/**
+ * How each fal video endpoint takes a Run, built from its input schema (read 2026-10-25, sources in migration 0015; Kling O3 Pro 2026-10-23). `crop`: the
+ * endpoint has no ratio field and follows the input image, so the worker centre-crops the inputs to the chosen ratio first. Audio is off wherever the
+ * schema has the switch (the stored prices assume it), and the resolution is the one the stored price is for.
+ */
+interface VideoBody {
+  crop?: boolean;
+  build: (req: SubmitRequest, images: string[]) => Record<string, unknown>;
+}
+const seconds = (req: SubmitRequest) => String(req.durationSec);
+const ref = (images: string[]) => ({ image_urls: images });
+const first = (images: string[]) => ({ image_url: images[0] });
+export const VIDEO_BODIES: Record<string, VideoBody> = {
+  'fal-ai/kling-video/o3/pro/reference-to-video': { build: (req, images) => ({ prompt: imageTokens(req.prompt, atImage), ...ref(images), aspect_ratio: req.ratio, duration: seconds(req), generate_audio: false }) },
+  'fal-ai/kling-video/o1/reference-to-video': { build: (req, images) => ({ prompt: imageTokens(req.prompt, atImage), ...ref(images), aspect_ratio: req.ratio, duration: seconds(req) }) },
+  'fal-ai/kling-video/v3/pro/image-to-video': { crop: true, build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), start_image_url: images[0], duration: seconds(req), generate_audio: false }) },
+  'fal-ai/kling-video/v2.6/pro/image-to-video': { crop: true, build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), start_image_url: images[0], duration: seconds(req), generate_audio: false }) },
+  'fal-ai/kling-video/v2.5-turbo/pro/image-to-video': { crop: true, build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), duration: seconds(req) }) },
+  'bytedance/seedance-2.5/us/reference-to-video': { build: (req, images) => ({ prompt: imageTokens(req.prompt, atImage), ...ref(images), aspect_ratio: req.ratio, duration: seconds(req), resolution: '720p', generate_audio: false }) },
+  'bytedance/seedance-2.5/us/image-to-video': { crop: true, build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), duration: seconds(req), resolution: '720p', generate_audio: false }) },
+  'bytedance/seedance-2.0/us/reference-to-video': { build: (req, images) => ({ prompt: imageTokens(req.prompt, atImage), ...ref(images), aspect_ratio: req.ratio, duration: seconds(req), resolution: '720p', generate_audio: false }) },
+  'bytedance/seedance-2.0/us/image-to-video': { build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), aspect_ratio: req.ratio, duration: seconds(req), resolution: '720p', generate_audio: false }) },
+  'fal-ai/bytedance/seedance/v1.5/pro/image-to-video': { build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), aspect_ratio: req.ratio, duration: seconds(req), resolution: '720p', generate_audio: false }) },
+  'fal-ai/bytedance/seedance/v1/pro/image-to-video': { build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), aspect_ratio: req.ratio, duration: seconds(req), resolution: '720p' }) },
+  // fal has no FLUX 3 reference endpoint; keyframes pins the product image as the first frame, the closest match to Fash's "FLUX 3 Reference".
+  'blackforestlabs/flux-3/keyframes-to-video': { build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), keyframes: [{ image_url: images[0], frame_index: 0 }], aspect_ratio: req.ratio, duration: req.durationSec, resolution: '720p', generate_audio: false }) },
+  'blackforestlabs/flux-3/image-to-video': { build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), aspect_ratio: req.ratio, duration: req.durationSec, resolution: '720p', generate_audio: false }) },
+  'google/gemini-omni-flash/v1.1/reference-to-video': { build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...ref(images), aspect_ratio: req.ratio, duration: req.durationSec, resolution: '720p' }) },
+  'google/gemini-omni-flash/v1.1/image-to-video': { build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), aspect_ratio: req.ratio, duration: req.durationSec, resolution: '720p' }) },
+  'fal-ai/veo3.1/image-to-video': { build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), aspect_ratio: req.ratio, duration: `${req.durationSec}s`, resolution: '720p', generate_audio: false }) },
+  'xai/grok-imagine-video/reference-to-video': { build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), reference_image_urls: images, aspect_ratio: req.ratio, duration: req.durationSec, resolution: '720p' }) },
+  'xai/grok-imagine-video/v1.5/image-to-video': { crop: true, build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), duration: req.durationSec, resolution: '720p' }) },
+  'fal-ai/wan/v2.7/reference-to-video': { build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), reference_image_urls: images, aspect_ratio: req.ratio, duration: req.durationSec, resolution: '720p' }) },
+  'fal-ai/wan/v2.7/image-to-video': { crop: true, build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), duration: req.durationSec, resolution: '720p' }) },
+  // Minimax names references "Image 1" and requires prompt_expansion_mode (the schema default, 'balanced'); its resolutions end in a capital P.
+  'minimax/h3-max/reference-to-video': { build: (req, images) => ({ prompt: imageTokens(req.prompt, (n) => `Image ${n}`), reference_image_urls: images, aspect_ratio: req.ratio, duration: req.durationSec, resolution: '768P', prompt_expansion_mode: 'balanced' }) },
+  'minimax/h3-max/image-to-video': { crop: true, build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), duration: req.durationSec, resolution: '768P', prompt_expansion_mode: 'balanced' }) },
+  // A fixed-length clip: the schema has no duration, and the row offers 6 s only, as Fash does.
+  'fal-ai/minimax/hailuo-2.3/pro/image-to-video': { crop: true, build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images) }) },
+};
+
 export function createFalProvider(opts: { apiKey: string; fetch?: Fetch; readImage?: ReadImage }): VideoProvider {
   const f = opts.fetch ?? fetch;
   const headers = falHeaders(opts.apiKey);
   return {
     async submit(req) {
-      const body = {
-        // The app writes [Image1], [Image2]; Kling's schema (the only fal video model) addresses them as @Image1, @Image2.
-        // A digit right after the token gets a space, so "[Image1]2" does not become @Image12.
-        prompt: req.prompt.replace(/\[Image(\d+)\](\d?)/g, (_, n: string, d: string) => `@Image${n}${d ? ` ${d}` : ''}`),
-        image_urls: await resolveImages(req.imageUrls, opts.readImage),
-        aspect_ratio: req.ratio,
-        duration: String(req.durationSec),
-        // The model's price assumes audio off (the schema default is false); send it so a default change cannot raise the price.
-        generate_audio: false,
-      };
+      const spec = VIDEO_BODIES[req.model.endpoint];
+      if (!spec) throw new ImageReadError(`fal video: no request builder for ${req.model.endpoint}`);
+      const body = spec.build(req, await resolveImages(req.imageUrls, opts.readImage, spec.crop ? { ratio: req.ratio } : undefined));
       const res = (await sendJson(f, 'fal submit', `${QUEUE}/${req.model.endpoint}`, { method: 'POST', headers, body: JSON.stringify(body) })) as { request_id?: string };
       if (!res.request_id) throw new Error('fal submit: no request_id in the response');
       return { providerJobId: packJobId(req.durationSec, res.request_id) };

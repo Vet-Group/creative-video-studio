@@ -26,8 +26,8 @@ export const isFundingRefusal = (e: unknown): boolean =>
 
 export type Fetch = typeof fetch;
 
-/** Reads the bytes behind a non-https image URL (the worker's `asset://<id>`). */
-export type ReadImage = (url: string) => Promise<{ bytes: Uint8Array; contentType: string }>;
+/** Reads the bytes behind a non-https image URL (the worker's `asset://<id>`); with `ratio` ('9:16') the image is centre-cropped to it first. */
+export type ReadImage = (url: string, opts?: { ratio?: string }) => Promise<{ bytes: Uint8Array; contentType: string }>;
 
 /** Every request after submit gets a bounded wait, so a stuck provider cannot hang a poll. */
 export const timeout = (): AbortSignal => AbortSignal.timeout(30_000);
@@ -47,13 +47,13 @@ export async function sendJson(f: Fetch, what: string, url: string, init: Reques
  */
 export const MAX_INLINE_CHARS = 3_600_000;
 
-export async function resolveImages(urls: string[], readImage?: ReadImage): Promise<string[]> {
+export async function resolveImages(urls: string[], readImage?: ReadImage, opts?: { ratio?: string }): Promise<string[]> {
   const out = await Promise.all(
     urls.map(async (url) => {
       if (url.startsWith('https:')) return url;
       if (!readImage) throw new ImageReadError(`image ${url.split(':')[0]}: URL needs a readImage resolver`);
       try {
-        const { bytes, contentType } = await readImage(url);
+        const { bytes, contentType } = await readImage(url, opts);
         return `data:${contentType};base64,${Buffer.from(bytes).toString('base64')}`;
       } catch (e) {
         throw new ImageReadError(`image ${url.split(':')[0]}: ${(e as Error).message}`);
