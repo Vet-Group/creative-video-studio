@@ -189,7 +189,7 @@ test('the preset carousel scrolls natively: 16 px edge, 12 px gaps, arrow keys a
   await page.getByRole('button', { name: 'Chọn mẫu khác' }).click();
   const track = page.getByRole('list', { name: 'Danh sách mẫu' });
   const cards = track.getByRole('listitem');
-  await expect(cards).toHaveCount(7);
+  await expect(cards).toHaveCount(26); // 6 company presets, the 19 motion templates of migration 0020 and the free prompt
   await expect(page.getByRole('button', { name: 'Cuộn sang phải' })).toBeHidden(); // arrows are for desktop; touch swipes
 
   const t = (await track.boundingBox())!;
