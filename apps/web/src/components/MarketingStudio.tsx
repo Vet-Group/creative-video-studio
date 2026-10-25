@@ -277,7 +277,7 @@ export function MarketingStudio() {
 
         <div className="side" id={`marketing-panel-${panel}`} role="tabpanel" aria-labelledby={`marketing-tab-${panel}`} hidden={narrow && shown === 'create'}>
           {shown === 'examples' ? (
-            <Gallery kind="marketing" video label="Video Marketing Studio của công ty" emptyText="Chưa có video Marketing Studio nào trong công ty." />
+            <Gallery kind="marketing" video samples="marketing-example-" label="Video Marketing Studio của công ty" emptyText="Chưa có video Marketing Studio nào trong công ty." />
           ) : shown === 'about' ? (
             <MarketingAbout />
           ) : (

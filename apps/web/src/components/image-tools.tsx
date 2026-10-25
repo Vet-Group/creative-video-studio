@@ -4,7 +4,9 @@
 import { type DragEvent, type KeyboardEvent, useEffect, useId, useRef, useState } from 'react';
 import { api, type Clip } from '@/lib/api';
 import { NARROW, useMediaQuery, WIDE } from '@/lib/use-media-query';
+import { numberedSamples } from '@/lib/examples';
 import { useHydrated } from '@/lib/use-hydrated';
+import { useSamples } from '@/lib/use-samples';
 import { Icon } from './Icon';
 import type { ModelOption } from './ModelPicker';
 
@@ -146,8 +148,11 @@ const aspectOf = (ratio: string): string => (/^\d+:\d+$/.test(ratio) ? ratio.rep
 const GALLERY_SIZE_KEY = 'cvs.gallery.size';
 
 /** The company's latest outputs of one Library `kind` (`try_on`, `image` or, with `video`, `marketing`) in a masonry of columns; 24 at a time.
- * `cols` is the column count below 1024 px, up to 1536 px and above; from 1024 px a slider (as on Fash) shows one column more or less, remembered per browser. */
-export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4] }: { kind: string; label: string; emptyText: string; video?: boolean; cols?: [number, number, number] }) {
+ * `cols` is the column count below 1024 px, up to 1536 px and above; from 1024 px a slider (as on Fash) shows one column more or less, remembered per browser.
+ * `samples` names the fixed sample tiles shown first: the uploaded samples `<samples><n>.jpg` (or `.mp4` with a `.jpg` poster for `video`). */
+export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4], samples }: { kind: string; label: string; emptyText: string; video?: boolean; cols?: [number, number, number]; samples?: string }) {
+  const have = useSamples();
+  const sampleTiles = samples ? numberedSamples(have, samples, video ? 'mp4' : 'jpg') : [];
   const [items, setItems] = useState<Clip[]>([]);
   const [hasMore, setHasMore] = useState(false);
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
@@ -189,7 +194,8 @@ export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4
 
   if (state === 'loading') return <p role="status" className="muted">Đang tải...</p>;
   if (state === 'error') return <p className="error">Không tải được ảnh mẫu.</p>;
-  if (items.length === 0) return <p className="muted">{emptyText}</p>;
+  if (items.length === 0 && sampleTiles.length === 0) return <p className="muted">{emptyText}</p>;
+  const tiles: (Clip | string)[] = [...sampleTiles, ...items];
   return (
     <>
       {!narrow && (
@@ -205,7 +211,16 @@ export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4
       <div className="masonry" role="group" aria-label={label}>
         {Array.from({ length: columns }, (_, c) => (
           <ul key={c} className="masonry-col">
-            {items.filter((_, i) => i % columns === c).map((it) => (
+            {tiles.filter((_, i) => i % columns === c).map((it) =>
+              typeof it === 'string' ? (
+                <li key={it} className="gallery-item">
+                  {video ? (
+                    <video controls playsInline preload="metadata" aria-label="Video mẫu" poster={`/api/samples/${it.replace(/\.mp4$/, '.jpg')}`} src={`/api/samples/${it}`} />
+                  ) : (
+                    <img src={`/api/samples/${it}`} alt="Ảnh mẫu" loading="lazy" />
+                  )}
+                </li>
+              ) : (
               <li key={it.id} className="gallery-item" style={{ aspectRatio: aspectOf(it.ratio) }}>
                 {video ? (
                   <video controls playsInline preload="metadata" aria-label={`${it.modelLabel}, ${it.ratio}`} poster={it.posterAssetId ? `/api/assets/${it.posterAssetId}/content` : undefined} src={`/api/assets/${it.videoAssetId}/content`} />
@@ -213,7 +228,8 @@ export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4
                   <img src={`/api/assets/${it.videoAssetId}/content`} alt={`${it.modelLabel}, ${it.ratio}`} loading="lazy" />
                 )}
               </li>
-            ))}
+              ),
+            )}
           </ul>
         ))}
       </div>
