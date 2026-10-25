@@ -72,6 +72,11 @@ describe('assetReader', () => {
     expect(await assetReader(pool([asset]), read)('asset://a1')).toEqual({ bytes: small, contentType: 'image/png' });
     await expect(assetReader(pool([]), read)('asset://gone')).rejects.toThrow('asset not found');
   });
+
+  test('passes a video through untouched, even when a crop is asked for', async () => {
+    const video = new Uint8Array([0, 0, 0, 24, 0x66, 0x74, 0x79, 0x70]);
+    expect(await assetReader(pool([{ s3_key: 'assets/v1', mime: 'video/mp4' }]), async () => video)('asset://v1', { ratio: '9:16' })).toEqual({ bytes: video, contentType: 'video/mp4' });
+  });
 });
 
 describe('fitForInline', () => {

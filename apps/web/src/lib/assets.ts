@@ -7,6 +7,8 @@ import { getObject } from './storage';
 
 export const MAX_FILES = 4;
 export const MAX_BYTES = 10 * 1024 * 1024;
+/** A reference video (Motion Control). Uploads much over 20 MB failed through the Cloudflare tunnel on 2026-10-25, so this is the cap. */
+export const MAX_VIDEO_BYTES = 20 * 1024 * 1024;
 export const MAX_BODY = MAX_FILES * MAX_BYTES + 64 * 1024;
 export const MAX_FILENAME = 255;
 
@@ -47,6 +49,42 @@ export function sniffImage(b: Uint8Array): 'image/jpeg' | 'image/png' | 'image/w
   if (b[0] === 0x89 && at(1, 'PNG') && b[4] === 0x0d && b[5] === 0x0a && b[6] === 0x1a && b[7] === 0x0a) return 'image/png';
   if (at(0, 'RIFF') && at(8, 'WEBP')) return 'image/webp';
   return undefined;
+}
+
+/** MP4 or MOV from the file's first bytes (an ISO media file starts with an `ftyp` box; QuickTime's brand is `qt  `). */
+export function sniffVideo(b: Uint8Array): 'video/mp4' | 'video/quicktime' | undefined {
+  if (String.fromCharCode(...b.subarray(4, 8)) !== 'ftyp') return undefined;
+  return String.fromCharCode(...b.subarray(8, 12)) === 'qt  ' ? 'video/quicktime' : 'video/mp4';
+}
+
+/** The length of an MP4/MOV in ms, from its movie header (the `mvhd` box inside `moov`), or undefined when there is none. */
+export function mp4DurationMs(b: Uint8Array): number | undefined {
+  const v = new DataView(b.buffer, b.byteOffset, b.byteLength);
+  // The [start, end) of the body of the first box of `type` between `from` and `to`; 64-bit sizes (1) and "to the end" (0) are handled.
+  const find = (from: number, to: number, type: string): [number, number] | undefined => {
+    for (let i = from; i + 8 <= to; ) {
+      let size = v.getUint32(i);
+      let head = 8;
+      if (size === 1) {
+        if (i + 16 > to) return undefined;
+        size = Number(v.getBigUint64(i + 8));
+        head = 16;
+      } else if (size === 0) size = to - i;
+      if (size < head) return undefined;
+      if (String.fromCharCode(...b.subarray(i + 4, i + 8)) === type) return [i + head, Math.min(i + size, to)];
+      i += size;
+    }
+    return undefined;
+  };
+  const moov = find(0, b.length, 'moov');
+  const mvhd = moov && find(moov[0], moov[1], 'mvhd');
+  if (!mvhd) return undefined;
+  const [p, end] = mvhd;
+  const v1 = b[p] === 1;
+  if (p + (v1 ? 32 : 20) > end) return undefined;
+  const scale = v.getUint32(p + (v1 ? 20 : 12));
+  const duration = v1 ? Number(v.getBigUint64(p + 24)) : v.getUint32(p + 16);
+  return scale > 0 && duration > 0 ? Math.round((duration * 1000) / scale) : undefined;
 }
 
 /** The asset for a signed-in user: 404 when it does not exist, 403 unless the user owns it, is an Admin, or it belongs to a Library clip (its video, poster or input images). */

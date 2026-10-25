@@ -178,6 +178,54 @@ describe('fal', () => {
   });
 });
 
+describe('fal Motion Control', () => {
+  const motionModel = { ...kling, id: 'kling-v3-motion-pro', endpoint: 'fal-ai/kling-video/v3/pro/motion-control' };
+  const inputs = ['asset://img', 'asset://vid'];
+  const read = async (url: string) => (url.endsWith('vid') ? { bytes: new Uint8Array([9, 9]), contentType: 'video/mp4' } : { bytes: new Uint8Array([1]), contentType: 'image/png' });
+
+  /** fal's storage and queue, answered by URL: each initiate gets its own file URL, each PUT succeeds, the submit returns a request id. */
+  function falFake(put = 200) {
+    const calls: { url: string; method: string; headers: Record<string, string>; body: unknown }[] = [];
+    let n = 0;
+    const fn = (async (url: string, init: RequestInit = {}) => {
+      const json = typeof init.body === 'string';
+      calls.push({ url, method: init.method ?? 'GET', headers: init.headers as Record<string, string>, body: json ? JSON.parse(init.body as string) : init.body });
+      if (url.startsWith('https://rest.fal.ai/storage/upload/initiate')) {
+        n += 1;
+        return Response.json({ upload_url: `https://upload.test/${n}`, file_url: `https://v3b.fal.media/files/${(JSON.parse(init.body as string) as { content_type: string }).content_type.replace('/', '-')}` });
+      }
+      if (url.startsWith('https://upload.test/')) return new Response('', { status: put });
+      return Response.json({ request_id: 'm1' });
+    }) as unknown as typeof fetch;
+    return { fn, calls };
+  }
+
+  test('uploads the image and the video to fal storage, then sends their URLs with orientation video and no sound', async () => {
+    const { fn, calls } = falFake();
+    const out = await createFalProvider({ apiKey: 'k', fetch: fn, readImage: read }).submit({ ...base, model: motionModel, prompt: '', imageUrls: inputs, ratio: 'auto', durationSec: 7 });
+    expect(out.providerJobId).toBe('7:m1');
+    const initiates = calls.filter((c) => c.url.includes('/storage/upload/initiate'));
+    expect(initiates.map((c) => (c.body as { content_type: string }).content_type).sort()).toEqual(['image/png', 'video/mp4']);
+    expect(initiates[0]!.headers.Authorization).toBe('Key k');
+    expect(calls.filter((c) => c.method === 'PUT')).toHaveLength(2);
+    const submit = calls.at(-1)!;
+    expect(submit.url).toBe('https://queue.fal.run/fal-ai/kling-video/v3/pro/motion-control');
+    expect(submit.body).toEqual({ image_url: 'https://v3b.fal.media/files/image-png', video_url: 'https://v3b.fal.media/files/video-mp4', character_orientation: 'video', keep_original_sound: false });
+  });
+
+  test('a written prompt is sent; a failed upload or a missing video submits nothing and is an ImageReadError', async () => {
+    const ok = falFake();
+    await createFalProvider({ apiKey: 'k', fetch: ok.fn, readImage: read }).submit({ ...base, model: motionModel, prompt: 'a dancer', imageUrls: inputs, ratio: 'auto', durationSec: 5 });
+    expect(ok.calls.at(-1)!.body).toMatchObject({ prompt: 'a dancer' });
+    const broken = falFake(500);
+    await expect(createFalProvider({ apiKey: 'k', fetch: broken.fn, readImage: read }).submit({ ...base, model: motionModel, imageUrls: inputs, ratio: 'auto' })).rejects.toThrow(ImageReadError);
+    expect(broken.calls.some((c) => c.url.startsWith('https://queue.fal.run'))).toBe(false);
+    const one = falFake();
+    await expect(createFalProvider({ apiKey: 'k', fetch: one.fn, readImage: read }).submit({ ...base, model: motionModel, imageUrls: ['asset://img'], ratio: 'auto' })).rejects.toThrow(ImageReadError);
+    expect(one.calls.some((c) => c.url.startsWith('https://queue.fal.run'))).toBe(false);
+  });
+});
+
 describe('replicate', () => {
   const req: SubmitRequest = { ...base, model: seedance };
   const job: ProviderJob = { providerJobId: '5:pred-1', model: seedance };

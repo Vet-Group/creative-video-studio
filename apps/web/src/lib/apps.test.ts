@@ -1,25 +1,26 @@
 import { FEATURE_PROMPTS } from '@cvs/core/models';
 import { FEATURES } from '@cvs/db';
 import { describe, expect, it } from 'vitest';
-import { APPS, appBySlug, appInputs, appReason, type AppDraft, filterApps } from './apps';
+import { APPS, appBySlug, appInputs, appReason, type AppDraft, filterApps, motionReason } from './apps';
 
 const img = (id: string) => ({ id });
 const draft = (images: string[][], prompt = '', maxImages = 2): AppDraft => ({ images: images.map((l) => l.map(img)), prompt, models: [{ maxImages }], failed: false });
 const reason = (slug: string, images: string[][], prompt?: string, maxImages?: number) => appReason(appBySlug(slug)!, draft(images, prompt, maxImages));
 
 describe('the app list', () => {
-  it('has nine apps with unique slugs, known features and (for the built ones) a default prompt', () => {
+  it('has nine apps with unique slugs, known features and (for the built image apps) a default prompt', () => {
     expect(APPS).toHaveLength(9);
     expect(new Set(APPS.map((a) => a.slug)).size).toBe(9);
     for (const a of APPS) {
       expect(FEATURES as readonly string[]).toContain(a.feature);
-      if (!a.soon) expect(FEATURE_PROMPTS).toHaveProperty(a.feature);
+      if (!a.soon && a.feature !== 'motion_control') expect(FEATURE_PROMPTS).toHaveProperty(a.feature);
     }
   });
 
-  it('marks Motion Control and Media Optimizer as coming soon, with no slots', () => {
-    for (const slug of ['motion-control', 'media-optimizer']) expect(appBySlug(slug)).toMatchObject({ slots: [], soon: expect.any(String) });
-    expect(APPS.filter((a) => a.soon)).toHaveLength(2);
+  it('marks only Media Optimizer as coming soon; Motion Control is built, with its own form', () => {
+    expect(appBySlug('media-optimizer')).toMatchObject({ slots: [], soon: expect.any(String) });
+    expect(APPS.filter((a) => a.soon).map((a) => a.slug)).toEqual(['media-optimizer']);
+    expect(appBySlug('motion-control')!.about.steps).toHaveLength(3);
   });
 
   it('gives the swaps and Face Swap two required slots, and the others the slots of the reference', () => {
@@ -90,5 +91,21 @@ describe('appInputs', () => {
     expect(appInputs(bg, { images: [[img('a')], []], prompt: '  a sunlit cafe ' })).toEqual({ assetIds: ['a'], prompt: 'a sunlit cafe' });
     expect(appInputs(bg, { images: [[img('a')], [img('b')]], prompt: '' })).toEqual({ assetIds: ['a', 'b'] });
     expect(appInputs(appBySlug('reframe')!, { images: [[img('a')]], prompt: 'ignored' })).toEqual({ assetIds: ['a'] });
+  });
+});
+
+describe('motionReason', () => {
+  const model = { durationsSec: Array.from({ length: 28 }, (_, i) => i + 3) };
+  const base = { image: true, videoMs: 5400, model, failed: false };
+  it('asks for the steps in order, then checks the video length against the model', () => {
+    expect(motionReason({ ...base, model: null })).toBe('Đang tải danh sách mô hình...');
+    expect(motionReason({ ...base, failed: true })).toBe('Không tải được danh sách mô hình.');
+    expect(motionReason({ ...base, model: undefined })).toBe('Ứng dụng này chưa được Admin bật');
+    expect(motionReason({ ...base, image: false })).toBe('Tải lên ảnh: Nhân vật.');
+    expect(motionReason({ ...base, videoMs: null })).toBe('Tải lên video chuyển động.');
+    expect(motionReason({ ...base, videoMs: 1900 })).toBe('Video chuyển động phải dài từ 3 đến 30 giây.'); // rounds up to 2 s
+    expect(motionReason({ ...base, videoMs: 30_100 })).toBe('Video chuyển động phải dài từ 3 đến 30 giây.'); // rounds up to 31 s
+    expect(motionReason(base)).toBeNull();
+    expect(motionReason({ ...base, videoMs: 30_000 })).toBeNull();
   });
 });

@@ -32,6 +32,20 @@ function file(magic: number[], size: number): Uint8Array<ArrayBuffer> {
 const png = (size: number) => file([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], size);
 const jpeg = (size: number) => file([0xff, 0xd8, 0xff, 0xe0], size);
 const webp = (size: number) => file([0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50], size);
+/** An MP4 (or MOV with brand `qt  `) of `size` bytes: ftyp, moov holding an mvhd (version 0, timescale 1000) of `ms`, then an mdat filling the rest. */
+function mp4(ms: number, size = 64, brand = 'isom'): Uint8Array<ArrayBuffer> {
+  const bytes = new Uint8Array(new ArrayBuffer(size));
+  const v = new DataView(bytes.buffer);
+  const box = (at: number, len: number, type: string) => (v.setUint32(at, len), [...type].forEach((c, i) => (bytes[at + 4 + i] = c.charCodeAt(0))));
+  box(0, 16, 'ftyp');
+  [...brand].forEach((c, i) => (bytes[8 + i] = c.charCodeAt(0)));
+  box(16, 36, 'moov');
+  box(24, 28, 'mvhd');
+  v.setUint32(44, 1000);
+  v.setUint32(48, ms);
+  box(52, size - 52, 'mdat');
+  return bytes;
+}
 
 const get = (path: string, cookie?: string, headers: Record<string, string> = {}) =>
   new Request(`http://localhost${path}`, { headers: { ...(cookie ? { cookie } : {}), ...headers } });
@@ -104,6 +118,21 @@ describe('POST /api/assets', () => {
     expect(res.status).toBe(201);
     const { assets } = (await res.json()) as { assets: { mime: string; bytes: number }[] };
     expect(assets.map((a) => [a.mime, a.bytes])).toEqual([['image/jpeg', 64], ['image/png', 64], ['image/webp', 64]]);
+  });
+
+  test('stores an MP4 or MOV reference video of up to 20 MB with its length from the movie header', async () => {
+    const res = await upload(ownerCookie, { name: 'dance.mp4', bytes: mp4(5400) }, { name: 'walk.mov', bytes: mp4(12_000, 64, 'qt  ') });
+    expect(res.status).toBe(201);
+    const { assets } = (await res.json()) as { assets: { id: string; mime: string; durationMs: number | null }[] };
+    expect(assets.map((a) => [a.mime, a.durationMs])).toEqual([['video/mp4', 5400], ['video/quicktime', 12_000]]);
+    expect((await pool.query('select duration_ms from assets where id = $1', [assets[0]!.id])).rows[0].duration_ms).toBe(5400);
+    expect((await upload(ownerCookie, { name: 'edge.mp4', bytes: mp4(3000, 20 * 1024 * 1024) })).status).toBe(201);
+    expect((await upload(ownerCookie, { name: 'big.mp4', bytes: mp4(3000, 20 * 1024 * 1024 + 1) })).status).toBe(413);
+  });
+
+  test('rejects a video whose header gives no length', async () => {
+    const bytes = mp4(0);
+    expect((await upload(ownerCookie, { name: 'empty.mp4', bytes })).status).toBe(415);
   });
 
   test('rejects a file over 10 MB', async () => {

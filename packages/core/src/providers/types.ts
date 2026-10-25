@@ -5,7 +5,8 @@ export interface SubmitRequest {
   prompt: string;
   /** The first image is the main product. */
   imageUrls: string[];
-  ratio: Ratio;
+  /** 'auto' only for Motion Control, whose output follows its reference video. */
+  ratio: Ratio | 'auto';
   durationSec: number;
 }
 

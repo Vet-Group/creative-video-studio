@@ -22,7 +22,7 @@ export function createMockProvider(opts: { runMs: number; dir?: string }): Video
       const outcome = req.prompt.includes(MOCK_FAIL) ? 'fail' : 'ok';
       await mkdir(dir, { recursive: true });
       await run(requireFfmpeg(), [
-        '-y', '-v', 'error', '-f', 'lavfi', '-i', `testsrc2=size=${SIZES[req.ratio]}:rate=24`, '-t', '1',
+        '-y', '-v', 'error', '-f', 'lavfi', '-i', `testsrc2=size=${SIZES[req.ratio === 'auto' ? '9:16' : req.ratio]}:rate=24`, '-t', '1',
         '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', join(dir, `${id}.mp4`),
       ]);
       return { providerJobId: `mock:${Date.now() + opts.runMs}:${outcome}:${id}` };
