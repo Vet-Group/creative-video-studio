@@ -38,7 +38,7 @@ export default async function ExplorePage() {
   const scored = models.rows.map((m) => {
     const st = (m.kind === 'video' ? videoStats : imageStats).get(m.id) ?? { passes: 0, total: 0, ok: 0, bad: 0 };
     const usd = m.kind === 'video' ? Number(m.usd_per_second ?? 0) : Math.min(...Object.values(m.image_prices ?? {}).map(Number));
-    return { ...m, score: scoreOf(st).score, usd };
+    return { ...m, score: scoreOf(st).score, marks: st.total, usd };
   });
   const recommended = new Set(['video', 'image'].map((kind) => rank(scored.filter((m) => m.kind === kind)).recommended));
   return (
@@ -75,7 +75,7 @@ export default async function ExplorePage() {
                   {recommended.has(m.id) && <span className="badge badge-recommended">Đề xuất</span>}
                 </strong>
                 <span className="muted">
-                  {[m.ratios.join(', '), range(m.durations_sec), `Điểm ${m.score}/100`].filter(Boolean).join(' · ')}
+                  {[m.ratios.join(', '), range(m.durations_sec), `Điểm ${m.score}/100`, m.marks > 0 && `${m.marks} lượt đánh giá`].filter(Boolean).join(' · ')}
                 </span>
               </Link>
             </li>
