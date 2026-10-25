@@ -142,6 +142,16 @@ export function ImageGeneration() {
         <div className="imagebar-bottom">
           <div className="pills">
             {models && models.length > 0 && <ModelPicker models={pick.options} value={pick.modelId} onChange={pick.setModelId} />}
+            {models !== null && !failed && !chosen && (
+              <span className="locked-pills" aria-hidden="true">
+                {([['Chưa bật mô hình', 'image'], ['Tỉ lệ', 'ratio'], ['Độ phân giải', 'preset']] as const).map(([label, icon]) => (
+                  <span key={label} className="select-trigger locked">
+                    <Icon name={icon} />
+                    {label}
+                  </span>
+                ))}
+              </span>
+            )}
             {chosen && (
               <>
                 <Select label="Tỉ lệ" icon="ratio" heading="Chọn tỉ lệ" value={pick.ratio} options={chosen.ratios.map((r) => ({ value: r, label: RATIO_LABEL[r] ?? r }))} onChange={pick.setRatio} />
