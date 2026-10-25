@@ -143,12 +143,11 @@ function ClipCard({ clip, stores, onChange, onDeleted }: { clip: Clip; stores?: 
       )}
 
       <div className="actions">
-        <button type="button" className="favorite" aria-pressed={clip.favorite} disabled={saving} onClick={() => void toggleFavorite()}>
+        <button type="button" className="favorite icon-button" aria-pressed={clip.favorite} disabled={saving} onClick={() => void toggleFavorite()} aria-label="Yêu thích" title="Yêu thích">
           <Icon name="star" />
-          Yêu thích
         </button>
-        <button type="button" onClick={() => void download()}>
-          Tải xuống
+        <button type="button" className="icon-button" onClick={() => void download()} aria-label="Tải xuống" title="Tải xuống">
+          <Icon name="download" />
         </button>
         {!image && (
           <Link href={`/create?reuse=${clip.id}`} className="button">
@@ -163,7 +162,7 @@ function ClipCard({ clip, stores, onChange, onDeleted }: { clip: Clip; stores?: 
             <button type="button" aria-pressed={failing || clip.verdict?.verdict === 'fail'} onClick={() => setFailing((f) => !f)}>
               Không đạt
             </button>
-            <button type="button" onClick={() => setConfirmDelete(true)}>
+            <button type="button" className="danger" onClick={() => setConfirmDelete(true)}>
               Xóa
             </button>
           </>

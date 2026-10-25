@@ -313,7 +313,7 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
                 onChange={setModelId}
               />
             )}
-            {models && models.models.length === 0 && <p className="help">Chưa có mô hình nào được bật.</p>}
+            {models && models.models.length === 0 && <p className="help">Chưa bật mô hình video nào. Admin bật trong Quản trị → Cài đặt → Mô hình.</p>}
             {tooMany && chosen && <p className="error">Mô hình này nhận tối đa {chosen.maxImages} ảnh.</p>}
 
             <div className="field">

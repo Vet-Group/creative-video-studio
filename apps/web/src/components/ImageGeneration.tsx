@@ -38,7 +38,7 @@ export function ImageGeneration() {
       : failed
         ? 'Không tải được danh sách mô hình.'
         : !chosen
-          ? 'Chưa có mô hình nào được bật cho Tạo ảnh.'
+          ? 'Chưa bật mô hình nào cho Tạo ảnh. Admin bật trong Quản trị → Cài đặt → Mô hình.'
           : images.length === 0
             ? 'Tải lên ít nhất 1 ảnh tham chiếu.'
             : images.length > chosen.maxImages
