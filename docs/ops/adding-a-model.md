@@ -9,7 +9,7 @@ Since 2026-10-25 the owner keeps every model open, as on Fash: an Admin can enab
 ## 1. Add the model and its adapter
 
 1. Read the provider's official input schema and price page. Record each fact (ratios, durations, image limit, output resolution, price per second, the response field that carries the billed amount, or none) with its URL and read date, as `BAKEOFF_MODELS` does in `packages/core/src/models.ts`.
-2. If the provider is not fal or Replicate, add an adapter next to `packages/core/src/providers/fal.ts` and wire it in `apps/worker/src/real-providers.ts`. The worker uses an adapter only when its key is set (`FAL_KEY`, `REPLICATE_API_TOKEN`).
+2. On fal, add the endpoint's request builder to `VIDEO_BODIES` in `packages/core/src/providers/fal.ts`, from its schema: the image field, the duration type, the resolution the price is for, audio off, and `crop: true` when the endpoint has no ratio field (the worker then centre-crops the inputs to the chosen ratio). A Run on an endpoint without a builder is refused before any call. If the provider is not fal or Replicate, add an adapter next to `fal.ts` and wire it in `apps/worker/src/real-providers.ts`. The worker uses an adapter only when its key is set (`FAL_KEY`, `REPLICATE_API_TOKEN`).
 3. Add the `model_configs` row in a migration, disabled, with the facts above and no bake-off record (`pass_seed_passes` and `pass_seed_total` stay null).
 
 ## 2. Run the mini bake-off

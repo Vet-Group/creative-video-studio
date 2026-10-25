@@ -2,7 +2,7 @@
 import { BAKEOFF_MODELS } from '@cvs/core/models';
 import sharp from 'sharp';
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import { assetReader, fitForInline, MAX_INLINE_BYTES, realProviders } from './real-providers';
+import { assetReader, cropToRatio, fitForInline, MAX_INLINE_BYTES, realProviders } from './real-providers';
 
 const asset = { s3_key: 'inputs/a1', mime: 'image/png' };
 const pool = (rows: unknown[]) => ({ query: vi.fn(async () => ({ rows })) }) as never;
@@ -37,6 +37,33 @@ describe('realProviders', () => {
     expect(out).toEqual({ providerJobId: '5:req-1' });
     expect(calls).toEqual([{ url: 'https://queue.fal.run/fal-ai/kling-video/o3/pro/reference-to-video', body: expect.objectContaining({ image_urls: [SMALL_URL], duration: '5' }) }]);
     expect(read).toHaveBeenCalledWith('inputs/a1');
+  });
+});
+
+describe('cropToRatio', () => {
+  test('centre-crops to the ratio, never enlarging', async () => {
+    const size = async (out: { bytes: Uint8Array }) => sharp(out.bytes).metadata().then((m) => [m.width, m.height]);
+    const wide = await png(1200, 800);
+    expect(await size(await cropToRatio(wide, '9:16'))).toEqual([450, 800]);
+    expect(await size(await cropToRatio(wide, '1:1'))).toEqual([800, 800]);
+    expect(await size(await cropToRatio(await png(300, 1000), '1:1'))).toEqual([300, 300]);
+    expect((await cropToRatio(await png(40, 40, false, true), '9:16')).contentType).toBe('image/png'); // transparency kept
+    await expect(cropToRatio(wide, 'auto')).rejects.toThrow('cannot crop');
+  });
+
+  test('a fal endpoint that follows the input image gets the asset cropped to the chosen ratio', async () => {
+    const bodies: Record<string, unknown>[] = [];
+    vi.stubGlobal('fetch', async (_url: string, init: { body: string }) => {
+      bodies.push(JSON.parse(init.body));
+      return new Response(JSON.stringify({ request_id: 'req-2' }));
+    });
+    const wide = await png(1200, 800);
+    const { providers } = realProviders(pool([asset]), { FAL_KEY: 'k' }, async () => wide);
+    const model = { ...BAKEOFF_MODELS[0]!, endpoint: 'fal-ai/kling-video/v3/pro/image-to-video' };
+    await providers.fal!.submit({ model, prompt: 'p', imageUrls: ['asset://a1'], ratio: '9:16', durationSec: 5 });
+    const sent = Buffer.from((bodies[0]!.start_image_url as string).split(',')[1]!, 'base64');
+    expect(await sharp(sent).metadata().then((m) => [m.width, m.height])).toEqual([450, 800]);
+    expect(bodies[0]).toEqual({ prompt: 'p', start_image_url: expect.any(String), duration: '5', generate_audio: false });
   });
 });
 

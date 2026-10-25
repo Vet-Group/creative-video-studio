@@ -23,13 +23,29 @@ export async function fitForInline(bytes: Uint8Array, contentType: string): Prom
   throw new Error(`the image cannot be brought under ${MAX_INLINE_BYTES} bytes`);
 }
 
-/** `asset://<id>` is an input asset in MinIO: the adapters inline it as a data URL before any call to the provider, shrunk by fitForInline. */
+/** The image turned upright and centre-cropped to `ratio` ('9:16'), for endpoints whose video follows the input image's shape. */
+export async function cropToRatio(bytes: Uint8Array, ratio: string): Promise<{ bytes: Uint8Array; contentType: string }> {
+  const [rw, rh] = ratio.split(':').map(Number);
+  if (!rw || !rh) throw new Error(`cannot crop to ratio ${ratio}`);
+  const upright = await sharp(bytes).rotate().toBuffer();
+  const { width = 0, height = 0, hasAlpha } = await sharp(upright).metadata();
+  const w = Math.min(width, Math.round((height * rw) / rh));
+  const h = Math.min(height, Math.round((width * rh) / rw));
+  const img = sharp(upright).extract({ left: Math.floor((width - w) / 2), top: Math.floor((height - h) / 2), width: w, height: h });
+  const out = await (hasAlpha ? img.png() : img.jpeg({ quality: 92, mozjpeg: true })).toBuffer();
+  return { bytes: new Uint8Array(out), contentType: hasAlpha ? 'image/png' : 'image/jpeg' };
+}
+
+/** `asset://<id>` is an input asset in MinIO: the adapters inline it as a data URL before any call to the provider, cropped when asked, shrunk by fitForInline. */
 export const assetReader =
   (pool: WorkerDeps['pool'], read: (key: string) => Promise<Uint8Array> = getObject): ReadImage =>
-  async (url) => {
+  async (url, opts) => {
     const { rows } = await pool.query('select s3_key, mime from assets where id = $1 and deleted_at is null', [url.replace(/^asset:\/\//, '')]);
     if (!rows[0]) throw new Error('asset not found');
-    return fitForInline(await read(rows[0].s3_key), rows[0].mime);
+    const bytes = await read(rows[0].s3_key);
+    if (!opts?.ratio) return fitForInline(bytes, rows[0].mime);
+    const cropped = await cropToRatio(bytes, opts.ratio);
+    return fitForInline(cropped.bytes, cropped.contentType);
   };
 
 /** fal serves the video and image models, Replicate the video ones. */
