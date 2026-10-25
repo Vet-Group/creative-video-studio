@@ -4,7 +4,7 @@ Since 2026-10-25 the owner keeps every model open, as on Fash: an Admin can enab
 
 ## The recommendation score
 
-`apps/web/src/lib/model-scores.ts` computes it on every request: quality is `(seed passes + marked passes) / (seed n + marked n)` (0.5 while nothing is counted), reliability is `(succeeded + 4) / (succeeded + failed + 4)` over the model's real jobs, and the score is `100 x quality x reliability`. Image pickers count the marks and jobs of their own feature. The model that scores above every other choice of a picker (and of each kind on Explore) carries the recommended badge, and the video picker pre-selects the best score.
+`apps/web/src/lib/model-scores.ts` computes it on every request: quality is `(seed passes + marked passes + 2) / (seed n + marked n + 4)` (0.5 while nothing is counted; the 2-in-4 prior keeps one or two marks from swinging a model to 100 or 0), reliability is `(succeeded + 4) / (succeeded + failed + 4)` over the model's real jobs, and the score is `100 x quality x reliability`. Image pickers count the marks and jobs of their own feature. The model that scores above every other choice of a picker (and of each kind on Explore) carries the recommended badge, and the video picker pre-selects the best score.
 
 ## 1. Add the model and its adapter
 

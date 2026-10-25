@@ -54,7 +54,7 @@ describe('the model picker', () => {
     expect(both.models.map((m) => [m.id, m.passes, m.total, m.estimateUsd])).toEqual([['kling-o3-pro', 7, 10, '0.8960'], ['seedance-2.5', 6, 9, '1.8496']]);
     expect(both.models[1]!.passRate).toBeCloseTo(6 / 9);
     expect(both.defaultModelId).toBe('kling-o3-pro'); // 70% against 67%
-    expect(both.models.map((m) => [m.id, m.score, m.recommended])).toEqual([['kling-o3-pro', 70, true], ['seedance-2.5', 67, false]]);
+    expect(both.models.map((m) => [m.id, m.score, m.recommended])).toEqual([['kling-o3-pro', 64, true], ['seedance-2.5', 62, false]]);
     expect(before.models[0]!.recommended).toBe(false); // one model: nothing to recommend between
     await pool.query(`update model_configs set enabled = false where id = 'seedance-2.5'`);
   });
@@ -69,7 +69,7 @@ describe('the model picker', () => {
       [member.id],
     );
     const after = await picker(member.cookie);
-    expect(after.models.map((m) => [m.id, m.score, m.recommended])).toEqual([['kling-o3-pro', 47, false], ['seedance-2.5', 67, true]]); // 0.7 x 4/6
+    expect(after.models.map((m) => [m.id, m.score, m.recommended])).toEqual([['kling-o3-pro', 43, false], ['seedance-2.5', 62, true]]); // 9/14 x 4/6
     expect(after.defaultModelId).toBe('seedance-2.5');
     await pool.query(`delete from jobs where id in ('fail-1', 'fail-2', 'fail-mock')`);
     await pool.query(`update model_configs set enabled = false where id = 'seedance-2.5'`);

@@ -479,9 +479,9 @@ describe('GET /api/models', () => {
     const id = await clip(alice.id, { model: 'fal-test' });
     await pool.query(`insert into verdicts (id, job_id, output_asset_id, verdict, fault, marked_by) values ('m1', $1, $2, 'pass', null, $3)`, [id, `${id}-video`, alice.id]);
     expect((await models(alice.cookie)).models.find((m) => m.id === 'fal-test')?.passRate).toBeCloseTo(9 / 11);
-    // 9/11 beats 8/10 on pass rate, but the failed real fal-test job of the earlier tests (1 of 14) costs it the score: 81.8 x 17/18 = 77 against 80.
+    // 9/11 beats 8/10 on pass rate, but the failed real fal-test job of the earlier tests (1 of 14) costs it the score: (9 + 2) / (11 + 4) x 17/18 = 69 against (8 + 2) / (10 + 4) = 71.
     const after = await models(alice.cookie);
-    expect(after.models.map((m) => [m.id, m.score])).toEqual([['cheap-test', 80], ['fal-test', 77], ['mock-sample', 50]]);
+    expect(after.models.map((m) => [m.id, m.score])).toEqual([['cheap-test', 71], ['fal-test', 69], ['mock-sample', 50]]);
     expect(after.defaultModelId).toBe('cheap-test');
     await pool.query(`update jobs set deleted_at = now() where id = $1`, [id]);
     expect((await models(alice.cookie)).models.find((m) => m.id === 'fal-test')?.passRate).toBeCloseTo(9 / 11);
