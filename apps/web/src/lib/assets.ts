@@ -71,7 +71,7 @@ function parseRange(header: string | null, size: number): { start: number; end: 
 }
 
 /** Streams the object out of MinIO with `Range` support, as an inline image/video or an attachment. */
-export async function streamAsset(request: Request, asset: Asset, disposition: 'inline' | 'attachment'): Promise<Response> {
+export async function streamAsset(request: Request, asset: Pick<Asset, 's3Key' | 'bytes' | 'mime' | 'filename'>, disposition: 'inline' | 'attachment'): Promise<Response> {
   const range = parseRange(request.headers.get('range'), asset.bytes);
   if (range === null) return new Response(null, { status: 416, headers: { 'content-range': `bytes */${asset.bytes}` } });
   const headers: Record<string, string> = {

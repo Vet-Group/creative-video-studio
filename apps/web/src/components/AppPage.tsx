@@ -6,6 +6,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { api, errorText, sendJson } from '@/lib/api';
 import { APPS, type AppConfig, appInputs, appReason, type AppCategory } from '@/lib/apps';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
+import { useSamples } from '@/lib/use-samples';
 import { Icon, type IconName } from './Icon';
 import { type Img, RATIO_LABEL, Slot, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, WorkTabs } from './image-tools';
 import { useJobs } from './jobs';
@@ -20,9 +21,11 @@ const CATEGORY_ICON: Record<AppCategory, IconName> = { fashion: 'tryon', photo: 
 
 /** The picture of an app on a card and in the page header: a tinted tile with the icon of its category. */
 export function AppArt({ app }: { app: AppConfig }) {
+  const sample = `app-${app.slug}.jpg`;
+  const have = useSamples();
   return (
     <span className="app-art" data-category={app.category} aria-hidden="true">
-      <Icon name={CATEGORY_ICON[app.category]} size={36} />
+      {have.has(sample) ? <img src={`/api/samples/${sample}`} alt="" /> : <Icon name={CATEGORY_ICON[app.category]} size={36} />}
     </span>
   );
 }

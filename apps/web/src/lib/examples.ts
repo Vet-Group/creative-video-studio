@@ -46,6 +46,11 @@ export const EXAMPLES: Example[] = [
   clip(10, 'Treo trên giá', 'handheld-product', '3:4', 240, 320),
 ];
 
+/** The uploaded sample named `name` (lib/samples.ts) when it exists, else `fallback`; by default the name is the fallback's file name. */
+export function sampleSrc(have: ReadonlySet<string>, fallback: string, name = fallback.slice(fallback.lastIndexOf('/') + 1)): string {
+  return have.has(name) ? `/api/samples/${name}` : fallback;
+}
+
 export const exampleForPreset = (presetId: string): Example | undefined => EXAMPLES.find((e) => e.presetId === presetId);
 
 /** Deals the tiles into columns, each to the currently shortest one, so the columns end level and every tile keeps its aspect ratio. */
