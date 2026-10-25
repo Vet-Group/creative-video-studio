@@ -9,8 +9,8 @@ import { guard } from '@/lib/session';
 const PASSWORD_LENGTH = { min: 8, max: 128 };
 
 /**
- * Admin: change one user. Any of `role` (member|admin), `teamId` (a visible team), `banned` (boolean, with an optional `banReason`) and
- * `temporaryPassword` in one body. Every field is checked before anything is written. Each change that differs from the current state is
+ * Admin: change one user. Any of `name`, `email` (unique; a first Google or Lark sign-in links by this address), `role` (member|admin),
+ * `teamId` (a visible team), `banned` (boolean, with an optional `banReason`) and `temporaryPassword` in one body. Every field is checked before anything is written. Each change that differs from the current state is
  * audited with its old and new value, in the transaction of the change itself: the audit row commits only if the change was made. The
  * password itself is never stored. A team change touches only users.team_id: jobs keep the team they were run under.
  */
@@ -19,8 +19,12 @@ export async function PATCH(request: Request, { params }: RouteContext) {
   if (g.error) return g.error;
   const { id } = await params;
   const actorId = g.session.user.id;
-  const { role, teamId, banned, banReason, temporaryPassword } = (await readBody(request)) ?? {};
-  if ([role, teamId, banned, temporaryPassword].every((v) => v === undefined)) return bad('give at least one of role, teamId, banned, temporaryPassword');
+  const { name, email, role, teamId, banned, banReason, temporaryPassword } = (await readBody(request)) ?? {};
+  if ([name, email, role, teamId, banned, temporaryPassword].every((v) => v === undefined)) return bad('give at least one of name, email, role, teamId, banned, temporaryPassword');
+  const newName = typeof name === 'string' ? name.trim() : name;
+  const newEmail = typeof email === 'string' ? email.trim().toLowerCase() : email;
+  if (newName !== undefined && !(typeof newName === 'string' && newName.length >= 1 && newName.length <= 100)) return bad('name must have 1 to 100 characters');
+  if (newEmail !== undefined && !(typeof newEmail === 'string' && newEmail.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail))) return bad('email must be an email address');
   if (role !== undefined && role !== 'member' && role !== 'admin') return bad('role must be member or admin');
   if (teamId !== undefined && typeof teamId !== 'string') return bad('teamId must be a string');
   if (banned !== undefined && typeof banned !== 'boolean') return bad('banned must be true or false');
@@ -32,6 +36,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
 
   if (!(await pool.query('select 1 from users where id = $1', [id])).rowCount) return bad('not found', 404);
   if (typeof teamId === 'string' && !(await pool.query('select 1 from teams where id = $1 and not hidden', [teamId])).rowCount) return bad('teamId must be the id of a visible team');
+  if (typeof newEmail === 'string' && (await pool.query('select 1 from users where lower(email) = $1 and id <> $2', [newEmail, id])).rowCount) return bad('another user has this email', 409);
 
   const target = `user:${id}`;
   // The change and its audit row share a transaction: `apply` (a better-auth call on its own connection) failing rolls the audit row back.
@@ -47,6 +52,16 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     });
 
   try {
+    if (typeof newName === 'string' || typeof newEmail === 'string') {
+      await withTransaction(pool, async (tx) => {
+        const old = (await tx.query('select name, email from users where id = $1 for update', [id])).rows[0];
+        const next = { name: (newName as string | undefined) ?? old.name, email: (newEmail as string | undefined) ?? old.email };
+        if (next.name === old.name && next.email === old.email) return;
+        // The address stays verified: an Admin set it, as when the user was created (POST /api/admin/users).
+        await tx.query('update users set name = $2, email = $3, email_verified = true, updated_at = now() where id = $1', [id, next.name, next.email]);
+        await audit(tx, { actorId, action: 'user.update', target, oldValue: old, newValue: next });
+      });
+    }
     if (role !== undefined) {
       await change(
         (old) => (role === old.role ? null : { action: 'user.role_change', oldValue: { role: old.role }, newValue: { role } }),

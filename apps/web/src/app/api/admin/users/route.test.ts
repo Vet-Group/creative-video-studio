@@ -152,6 +152,23 @@ describe('PATCH /api/admin/users/:id', () => {
     expect((await audits(m.id)).slice(1)).toEqual([{ actor_id: admin, action: 'user.unban', old_value: { banned: true }, new_value: { banned: false } }]);
   });
 
+  test('changes the name and the email, lowercased and kept verified, audited once with the old and new values', async () => {
+    const m = await member();
+    const other = await member();
+    expect((await patch(adminCookie, m.id, { email: 'not an email' })).status).toBe(400);
+    expect((await patch(adminCookie, m.id, { name: '   ' })).status).toBe(400);
+    expect((await patch(adminCookie, m.id, { email: other.email.toUpperCase() })).status).toBe(409);
+    const res = await patch(adminCookie, m.id, { name: ' Nhân viên A ', email: ' New.Address@Example.test ' });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ name: 'Nhân viên A', email: 'new.address@example.test' });
+    expect((await pool.query('select email_verified from users where id = $1', [m.id])).rows[0].email_verified).toBe(true);
+    expect(await signIn('new.address@example.test')).toContain('better-auth.session_token');
+    expect((await patch(adminCookie, m.id, { name: 'Nhân viên A' })).status).toBe(200); // unchanged: nothing to audit
+    expect(await audits(m.id)).toEqual([
+      { actor_id: await adminId(), action: 'user.update', old_value: { name: m.email, email: m.email }, new_value: { name: 'Nhân viên A', email: 'new.address@example.test' } },
+    ]);
+  });
+
   test('refuses to ban yourself or change your own role', async () => {
     const admin = await adminId();
     expect((await patch(adminCookie, admin, { banned: true })).status).toBe(400);
