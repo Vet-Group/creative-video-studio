@@ -393,7 +393,7 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
                       <Preview src={media(ex.src)} poster={media(ex.poster)} width={ex.width} height={ex.height} title={ex.title} paused={picking || detail !== null} />
                       <span className="chips">
                         <span className="chip">Mẫu</span>
-                        {ex.fixture && <span className="chip">fixture</span>}
+                        {ex.fixture && media(ex.src) === ex.src && <span className="chip">fixture</span>}
                       </span>
                       <button type="button" className="example-open" onClick={() => setDetail(ex)}>
                         <span className="example-caption">{ex.title}</span>
@@ -498,7 +498,7 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
                 <li aria-label={`Tỉ lệ ${detail.aspect}`}>{detail.aspect}</li>
               </ul>
               <div className="detail-foot">
-                <p className="detail-date">Mẫu minh họa{detail.fixture ? ' (fixture)' : ''}</p>
+                <p className="detail-date">Mẫu minh họa{detail.fixture && media(detail.src) === detail.src ? ' (fixture)' : ''}</p>
                 <div className="detail-tools">
                   <a href={media(detail.src)} download aria-label="Tải video mẫu" title="Tải video mẫu">
                     <Icon name="download" />
