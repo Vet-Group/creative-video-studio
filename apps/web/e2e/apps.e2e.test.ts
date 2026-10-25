@@ -314,11 +314,11 @@ test('Motion Control: the image and the reference video, a length check, and a R
   await expect(reasonOf(page)).toHaveText('Tải lên ảnh: Nhân vật.');
   await page.getByLabel('Ảnh nhân vật').setInputFiles(file('dancer.png'));
   await expect(page.getByRole('img', { name: 'dancer.png' })).toBeVisible();
-  await expect(reasonOf(page)).toHaveText('Tải lên video chuyển động.');
+  await expect(reasonOf(page)).toHaveText('Tải lên video mẫu.');
 
   await page.getByLabel('Video chuyển động mẫu').setInputFiles({ name: 'short.mp4', mimeType: 'video/mp4', buffer: mp4(1900) });
   await expect(page.getByText('short.mp4 · 1.9 giây')).toBeVisible();
-  await expect(reasonOf(page)).toHaveText('Video chuyển động phải dài từ 3 đến 30 giây.');
+  await expect(reasonOf(page)).toHaveText('Video mẫu phải dài từ 3 đến 30 giây.');
   await expect(runButton(page)).toBeDisabled();
 
   await page.getByRole('button', { name: 'Bỏ video short.mp4' }).click();
@@ -326,6 +326,10 @@ test('Motion Control: the image and the reference video, a length check, and a R
   await expect(page.getByText('dance.mp4 · 5.4 giây')).toBeVisible();
   await expect(reasonOf(page)).toHaveCount(0);
   await expect(runButton(page)).toHaveText(/\$0\.7560/); // the recommended Standard model, 6 s
+  // The long model name stays inside the form: the picker is a grid item, which would otherwise grow to its text.
+  const picker = (await page.locator('.select-trigger').boundingBox())!;
+  const form = (await page.locator('.form-scroll').boundingBox())!;
+  expect(picker.x + picker.width).toBeLessThanOrEqual(form.x + form.width);
   await runButton(page).click();
   await expect(page.getByText('Đã gửi job. Theo dõi trong tab "Lịch sử".')).toBeVisible();
   expect(sent).toMatchObject({ feature: 'motion_control', modelId: 'kling-v3-motion-standard', ratio: 'auto' });
