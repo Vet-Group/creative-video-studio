@@ -2,7 +2,7 @@
 // A poster is never evidence of motion, so these specs read currentTime and decoded frames from the video elements.
 import { expect, type Locator, type Page, test } from '@playwright/test';
 import { EXAMPLES } from '../src/lib/examples';
-import { modelButton, signIn } from './support.test';
+import { modelButton, select, signIn } from './support.test';
 
 const CLIPS = EXAMPLES.length;
 
@@ -126,4 +126,18 @@ test('C2: when the browser blocks autoplay each clip shows a play button, and pr
 
   await buttons.first().click();
   await expect.poll(() => videos.first().evaluate((v: HTMLVideoElement) => v.currentTime)).toBeGreaterThan(0);
+});
+
+test('the preset banner keeps looping when another preset swaps its clip in place', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await signIn(page, 'member6');
+  await expect(select(page, 'Mẫu chuyển động')).not.toHaveText('Tự viết mô tả');
+  const banner = page.locator('.banner video');
+  const moving = () => banner.evaluate((v: HTMLVideoElement) => !v.paused && v.currentTime > 0);
+  await expect.poll(moving).toBe(true);
+  const before = await banner.getAttribute('src');
+  await page.getByRole('button', { name: 'Chọn mẫu khác' }).click();
+  await page.getByRole('list', { name: 'Danh sách mẫu' }).getByRole('button', { name: 'Xoay quanh chậm', exact: true }).click();
+  await expect(banner).not.toHaveAttribute('src', before!); // the same element, a new source
+  await expect.poll(moving).toBe(true);
 });

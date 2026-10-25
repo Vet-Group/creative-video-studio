@@ -19,6 +19,9 @@ const FEATURES = [
 /** The sample name of a model card; ids such as seedance-2.5 keep only letters, digits and dashes in sample names. */
 const modelSample = (id: string) => `model-${id.replace(/[^a-z0-9-]/g, '-')}`;
 
+/** The live page's featured models, in its order; they lead the row, then the other models with a sample loop, then those with a still, then the rest. */
+const FEATURED = ['seedance-2.5-image', 'kling-o3-pro', 'gemini-omni-flash', 'kling-3.0-pro', 'seedance-2.0'];
+
 const range = (values: number[]) => (values.length === 0 ? '' : values.length > 1 ? `${Math.min(...values)}–${Math.max(...values)} giây` : `${values[0]} giây`);
 
 /** Explore: the start page of the live dashboard, with the tools, the enabled models and the company presets, each linking into Create. */
@@ -40,6 +43,13 @@ export default async function ExplorePage() {
     const usd = m.kind === 'video' ? Number(m.usd_per_second ?? 0) : Math.min(...Object.values(m.image_prices ?? {}).map(Number));
     return { ...m, score: scoreOf(st).score, marks: st.total, usd };
   });
+  const rankOf = (id: string) => {
+    const featured = FEATURED.indexOf(id);
+    if (featured >= 0) return featured;
+    const media = cardSample(have, modelSample(id));
+    return FEATURED.length + (media.video ? 0 : media.poster ? 1 : 2);
+  };
+  scored.sort((a, b) => rankOf(a.id) - rankOf(b.id)); // stable: within a group the query's kind and label order stays
   const recommended = new Set(['video', 'image'].map((kind) => rank(scored.filter((m) => m.kind === kind)).recommended));
   return (
     <div className="explore">
