@@ -93,6 +93,17 @@ describe('migration 0015 Fash video models', () => {
   });
 });
 
+describe('migration 0016 video models at 1080p', () => {
+  test('FLUX 3, FLUX 3 Reference and Seedance 1.0 Pro carry the 1080p output and price their builders ask for', async () => {
+    const { rows } = await pool.query(`select id, output_resolution, usd_per_second::float as usd from model_configs where id in ('flux-3', 'flux-3-reference', 'seedance-1.0-pro') order by id`);
+    expect(rows).toEqual([
+      { id: 'flux-3', output_resolution: '1080p', usd: 0.29 },
+      { id: 'flux-3-reference', output_resolution: '1080p', usd: 0.29 },
+      { id: 'seedance-1.0-pro', output_resolution: '1080p', usd: 0.124 },
+    ]);
+  });
+});
+
 describe('migration 0007 image models', () => {
   test('seeds the seven fal image models disabled, each with its prices, ratios and features', async () => {
     const { rows } = await pool.query(`select id, endpoint, features, ratios, durations_sec, max_images, image_prices, usd_per_second, enabled, sources from model_configs where kind = 'image' and cardinality(features) > 0 and not features && ARRAY['character_swap', 'model_swap', 'background_changer', 'reframe', 'image_upscale', 'face_swap', 'background_remover']::text[] order by id`);
