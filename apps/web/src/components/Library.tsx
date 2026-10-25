@@ -156,12 +156,14 @@ function ClipCard({ clip, stores, onChange, onDeleted }: { clip: Clip; stores?: 
         )}
         {clip.canEdit && (
           <>
-            <button type="button" aria-pressed={clip.verdict?.verdict === 'pass'} onClick={() => void mark({ verdict: 'pass' })}>
-              Đạt
-            </button>
-            <button type="button" aria-pressed={failing || clip.verdict?.verdict === 'fail'} onClick={() => setFailing((f) => !f)}>
-              Không đạt
-            </button>
+            <span className="verdict-buttons">
+              <button type="button" aria-pressed={clip.verdict?.verdict === 'pass'} onClick={() => void mark({ verdict: 'pass' })}>
+                Đạt
+              </button>
+              <button type="button" aria-pressed={failing || clip.verdict?.verdict === 'fail'} onClick={() => setFailing((f) => !f)}>
+                Không đạt
+              </button>
+            </span>
             <button type="button" className="danger icon-button" onClick={() => setConfirmDelete(true)} aria-label="Xóa" title="Xóa">
               <Icon name="x" />
             </button>
