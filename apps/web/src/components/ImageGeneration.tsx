@@ -86,7 +86,7 @@ export function ImageGeneration() {
       </h1>
       <WorkTabs prefix="imagegen" tabs={TABS} labels={TAB_LABEL} shown={tab} onSelect={setTab} />
       <div className="imagegen-side" id={`imagegen-panel-${tab}`} role="tabpanel" aria-labelledby={`imagegen-tab-${tab}`}>
-        {tab === 'examples' ? <Gallery kind="image" label="Ảnh của công ty" emptyText="Chưa có ảnh nào trong công ty. Hãy tạo ảnh đầu tiên bên dưới." /> : tab === 'about' ? <ImageAbout /> : <Tray feature="image" />}
+        {tab === 'examples' ? <Gallery kind="image" samples="image-example-" label="Ảnh của công ty" emptyText="Chưa có ảnh nào trong công ty. Hãy tạo ảnh đầu tiên bên dưới." /> : tab === 'about' ? <ImageAbout /> : <Tray feature="image" />}
       </div>
 
       <div className="imagebar" role="group" aria-label="Thanh tạo ảnh">

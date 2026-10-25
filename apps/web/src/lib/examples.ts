@@ -51,6 +51,12 @@ export function sampleSrc(have: ReadonlySet<string>, fallback: string, name = fa
   return have.has(name) ? `/api/samples/${name}` : fallback;
 }
 
+/** The uploaded samples named `<prefix><n>.<ext>` (n = 1, 2, ...), in number order: the fixed sample tiles of a gallery. */
+export function numberedSamples(have: ReadonlySet<string>, prefix: string, ext: 'jpg' | 'mp4'): string[] {
+  const n = (name: string) => Number(name.slice(prefix.length, -ext.length - 1));
+  return [...have].filter((name) => name.startsWith(prefix) && name.endsWith(`.${ext}`) && /^[1-9]\d*$/.test(name.slice(prefix.length, -ext.length - 1))).sort((a, b) => n(a) - n(b));
+}
+
 export const exampleForPreset = (presetId: string): Example | undefined => EXAMPLES.find((e) => e.presetId === presetId);
 
 /** Deals the tiles into columns, each to the currently shortest one, so the columns end level and every tile keeps its aspect ratio. */
