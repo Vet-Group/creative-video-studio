@@ -506,6 +506,8 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .choice-grid button { min-height: 56px; padding: 8px 12px; border: 1px solid #e4e4e7; border-radius: 12px; background: #fff; font-size: 14px; line-height: 20px; text-align: center; }
 .choice-grid button:hover { border-color: rgb(153, 153, 153); }
 .choice-grid button[aria-selected='true'] { border-color: #000; background: #000; color: #fff; }
+.choice-grid button[aria-pressed='true'] { border-color: #000; }
+.choice-grid button:disabled { cursor: not-allowed; opacity: .6; }
 /* A choice with a sample loop: the 3:4 clip above its name, like the live hook and location cards. */
 .choice-grid button:has(> video, > img) { display: grid; align-content: start; gap: 6px; padding: 6px 6px 8px; }
 .choice-grid button > :is(video, img) { display: block; width: 100%; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 8px; }
@@ -518,7 +520,7 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .marketing-slots .field-label { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .choice-label { color: rgb(77, 77, 77); font-size: 13px; line-height: 18px; }
 .marketing-slots .choice-value { font-weight: 500; color: rgb(128, 128, 128); }
-.marketing-head { justify-content: center; align-items: center; min-height: 100px; text-align: center; }
+.marketing-head { position: relative; justify-content: center; align-items: center; min-height: 100px; text-align: center; }
 .field-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 8px; }
 /* Library filters: one row of equal 36 px controls styled like the app's selects. */
 .library-filters { gap: 12px; margin: 0 0 8px; }
