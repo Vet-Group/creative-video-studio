@@ -11,12 +11,15 @@ export interface ModelStats {
 
 /** Each real job outcome counts against 4 assumed successes, so one early failure dents a model without sinking it. */
 const RELIABILITY_PRIOR = 4;
+/** Quality counts 2 assumed passes in 4 marks, so one or two marks move a model only part of the way and a long record outweighs them. */
+const QUALITY_PRIOR = { passes: 2, total: 4 };
 
-/** Quality is the pass rate (0.5 while nothing is counted), reliability the share of real jobs that ended well; the score is 0-100. */
+/** Quality is the pass rate drawn toward 0.5 (exactly 0.5 while nothing is counted), reliability the share of real jobs that ended well; the score is 0-100. */
 export function scoreOf(s: ModelStats) {
   const passRate = s.total > 0 ? s.passes / s.total : null;
   const reliability = (s.ok + RELIABILITY_PRIOR) / (s.ok + s.bad + RELIABILITY_PRIOR);
-  return { passRate, reliability, score: Math.round(100 * (passRate ?? 0.5) * reliability) };
+  const quality = (s.passes + QUALITY_PRIOR.passes) / (s.total + QUALITY_PRIOR.total);
+  return { passRate, reliability, score: Math.round(100 * quality * reliability) };
 }
 
 /**

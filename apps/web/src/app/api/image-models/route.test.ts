@@ -86,8 +86,8 @@ describe('GET /api/image-models', () => {
     await pool.query(`insert into verdicts (id, job_id, verdict, fault, marked_by) values ('v-img-1', 'img-1', 'fail', 'other', $1)`, [memberId]);
     try {
       const score = async (feature: string) => (await list(feature)).map((m) => [m.id, m.score, m.recommended]);
-      expect(await score('image')).toEqual([['t-image', 50, false], ['t-both', 73, true], ['t-mock', 50, false]]); // (8 + 0) / (10 + 1)
-      expect(await score('try_on')).toEqual([['t-both', 80, true], ['t-tryon', 50, false], ['t-mock', 50, false]]); // the image mark does not count here
+      expect(await score('image')).toEqual([['t-image', 50, false], ['t-both', 67, true], ['t-mock', 50, false]]); // (8 + 0 + 2) / (10 + 1 + 4)
+      expect(await score('try_on')).toEqual([['t-both', 71, true], ['t-tryon', 50, false], ['t-mock', 50, false]]); // the image mark does not count here
     } finally {
       await pool.query(`delete from verdicts where id = 'v-img-1'`);
       await pool.query(`delete from jobs where id = 'img-1'`);

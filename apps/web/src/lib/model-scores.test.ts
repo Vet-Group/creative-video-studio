@@ -2,11 +2,13 @@ import { describe, expect, test } from 'vitest';
 import { rank, scoreOf } from './model-scores';
 
 describe('scoreOf', () => {
-  test('is the pass rate times reliability, out of 100; nothing counted is 50', () => {
-    expect(scoreOf({ passes: 7, total: 10, ok: 0, bad: 0 })).toEqual({ passRate: 0.7, reliability: 1, score: 70 });
+  test('is the pass rate, drawn toward 0.5, times reliability, out of 100; nothing counted is 50', () => {
+    expect(scoreOf({ passes: 7, total: 10, ok: 0, bad: 0 })).toEqual({ passRate: 0.7, reliability: 1, score: 64 }); // (7 + 2) / (10 + 4)
+    expect(scoreOf({ passes: 1, total: 1, ok: 1, bad: 0 }).score).toBe(60); // one pass does not make a model perfect
+    expect(scoreOf({ passes: 0, total: 1, ok: 1, bad: 0 }).score).toBe(40); // nor one fail worthless
     expect(scoreOf({ passes: 0, total: 0, ok: 0, bad: 0 }).score).toBe(50);
-    expect(scoreOf({ passes: 7, total: 10, ok: 6, bad: 0 }).score).toBe(70); // successes alone keep reliability at 1
-    expect(scoreOf({ passes: 7, total: 10, ok: 0, bad: 4 })).toMatchObject({ reliability: 0.5, score: 35 });
+    expect(scoreOf({ passes: 7, total: 10, ok: 6, bad: 0 }).score).toBe(64); // successes alone keep reliability at 1
+    expect(scoreOf({ passes: 7, total: 10, ok: 0, bad: 4 })).toMatchObject({ reliability: 0.5, score: 32 });
   });
 });
 
