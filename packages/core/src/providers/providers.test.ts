@@ -51,6 +51,10 @@ describe('fal', () => {
     expect(await body('fal-ai/veo3.1/image-to-video')).toMatchObject({ duration: '5s', generate_audio: false });
     expect(await body('blackforestlabs/flux-3/keyframes-to-video')).toMatchObject({ keyframes: [{ image_url: 'https://img/1.jpg', frame_index: 0 }], duration: 5, resolution: '1080p' });
     expect(await body('blackforestlabs/flux-3/image-to-video')).toMatchObject({ resolution: '1080p' }); // 720p comes back 704 px wide
+    for (const endpoint of ['bytedance/seedance-2.5/us/image-to-video', 'blackforestlabs/flux-3/keyframes-to-video']) {
+      expect(await body(endpoint, 'a slow push-in')).toMatchObject({ prompt: 'a slow push-in One continuous shot that starts on the input image: keep its scene and background, with no cuts.' });
+    }
+    expect(((await body('blackforestlabs/flux-3/image-to-video', 'a slow push-in')) as { prompt: string }).prompt).toBe('a slow push-in'); // only the two that cut
     expect(await body('fal-ai/bytedance/seedance/v1/pro/image-to-video')).toMatchObject({ resolution: '1080p' });
     expect(await body('minimax/h3-max/reference-to-video')).toEqual({ prompt: 'put Image 1 on Image 2', reference_image_urls: ['https://img/1.jpg', 'https://img/2.jpg'], aspect_ratio: '9:16', duration: 5, resolution: '768P', prompt_expansion_mode: 'balanced' });
     expect(await body('fal-ai/minimax/hailuo-2.3/pro/image-to-video')).toEqual({ prompt: 'put image 1 on image 2', image_url: 'https://img/1.jpg' });
