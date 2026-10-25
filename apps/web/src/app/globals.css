@@ -150,7 +150,7 @@ td code { white-space: pre-wrap; overflow-wrap: anywhere; }
 .banner-empty { background: repeating-linear-gradient(135deg, #e4e4e7 0 10px, #f4f4f5 10px 20px); }
 .banner::after { content: ''; position: absolute; inset: 0; background: rgb(0 0 0 / .25); pointer-events: none; }
 .banner-text { position: absolute; inset: 0; z-index: 1; display: grid; place-items: center; padding: 0 12px; pointer-events: none; }
-.banner-text strong { max-width: 100%; padding: 10px 14px; border-radius: 10px; background: rgb(0 0 0 / .35); color: #fff; font-size: 24px; line-height: 28px; font-weight: 600; text-align: center; }
+.banner-text strong { max-width: 100%; color: #fff; font-size: 24px; line-height: 28px; font-weight: 600; text-align: center; text-shadow: 0 1px 2px rgb(0 0 0 / .35), 0 2px 16px rgb(0 0 0 / .45); }
 .banner-chip { position: absolute; top: 8px; right: 8px; z-index: 2; height: 26px; padding: 4px 12px; border: 0; border-radius: 16px; background: rgb(0 0 0 / .55); color: #fff; font-size: 12px; line-height: 18px; }
 
 .dropzone { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; width: 100%; height: 130px; margin-top: 16px; border: 1px dashed rgb(153, 153, 153); border-radius: 18px; transition: border-color .15s, background-color .15s; }
@@ -454,6 +454,11 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .app-head[data-category='video'] { background: rgb(109, 40, 217); }
 .app-head[data-category='utility'] { background: rgb(21, 128, 61); }
 .app-head strong { font-size: 20px; line-height: 26px; }
+/* An uploaded sample photo behind the header, darkened at the bottom so the title stays readable. */
+.app-head[data-photo] { background: linear-gradient(180deg, rgb(0 0 0 / 0), rgb(0 0 0 / .55)), var(--photo) center / cover no-repeat; }
+.app-head[data-photo] strong { text-shadow: 0 1px 8px rgb(0 0 0 / .45); }
+.gallery-item > a { display: block; }
+.gallery-item .preview { border-radius: 0; }
 .app-change { position: relative; flex: none; }
 .app-change > button { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 0; border-radius: 14px; background: rgb(0 0 0 / .45); color: #fff; font-size: 12px; }
 .app-change > button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
@@ -493,6 +498,8 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .field-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 8px; }
 /* Library filters: one row of equal 36 px controls styled like the app's selects. */
 .library-filters { gap: 12px; margin: 0 0 8px; }
+.library .kinds { gap: 6px; }
+.library .kinds button { padding: 0 12px; }
 .library-filters label { margin: 0; color: rgb(102, 102, 102); font-size: 13px; line-height: 18px; font-weight: 500; }
 .library-filters select, .library-filters input { width: 10rem; min-width: 0; height: 36px; margin-top: 4px; padding: 0 10px; border: 1px solid rgb(0 0 0 / .1); border-radius: 8px; background: #fff; color: inherit; font: inherit; font-size: 13px; }
 .explore-sub { margin: -8px 0 16px; }
@@ -569,3 +576,12 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 }
 /* 1024-1279 px: a narrower search keeps the five kind pills on its row. */
 @media (min-width: 1024px) and (max-width: 1279.98px) { .apps-search { flex-basis: 12rem; } }
+
+/* Library cards: a compact caption under the media, so the clip stays the focus and every action still fits. */
+.library .card { padding: 8px; }
+.library .card > p { margin: 8px 2px 0; font-size: 13px; line-height: 18px; }
+.library .card > p.muted { margin-top: 2px; font-size: 12px; }
+.library .card > label { display: grid; gap: 4px; margin: 8px 2px 0; color: rgb(102, 102, 102); font-size: 12px; font-weight: 500; }
+.library .card > label select { height: 32px; padding: 0 8px; border: 1px solid rgb(0 0 0 / .1); border-radius: 8px; background: #fff; color: inherit; font-size: 13px; }
+.library .card .actions { gap: 6px; margin: 8px 0 0; }
+.library .card .actions button, .library .card .actions .button { height: 30px; padding: 0 10px; border-radius: 8px; font-size: 12px; line-height: 28px; }

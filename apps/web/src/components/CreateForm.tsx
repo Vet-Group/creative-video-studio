@@ -392,7 +392,6 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
                     <li key={ex.id} className="example">
                       <Preview src={media(ex.src)} poster={media(ex.poster)} width={ex.width} height={ex.height} title={ex.title} paused={picking || detail !== null} />
                       <span className="chips">
-                        <span className="chip">Mẫu</span>
                         {ex.fixture && media(ex.src) === ex.src && <span className="chip">fixture</span>}
                       </span>
                       <button type="button" className="example-open" onClick={() => setDetail(ex)}>
