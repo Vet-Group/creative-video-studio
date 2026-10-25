@@ -427,7 +427,7 @@ describe('GET /api/jobs/:id', () => {
 
 describe('GET /api/models', () => {
   const models = async (cookie: string, query = '?ratio=9:16&durationSec=8') => (await GET_MODELS(req(`/api/models${query}`, cookie))).json() as Promise<{
-    models: { id: string; estimateUsd: string; passRate: number | null; supported: boolean; isMock: boolean }[];
+    models: { id: string; estimateUsd: string; passRate: number | null; supported: boolean; isMock: boolean; score: number }[];
     defaultModelId: string | null;
     monthToDate: { usd: string; provisional: boolean };
     remainingBudgetUsd?: string;
@@ -479,7 +479,10 @@ describe('GET /api/models', () => {
     const id = await clip(alice.id, { model: 'fal-test' });
     await pool.query(`insert into verdicts (id, job_id, output_asset_id, verdict, fault, marked_by) values ('m1', $1, $2, 'pass', null, $3)`, [id, `${id}-video`, alice.id]);
     expect((await models(alice.cookie)).models.find((m) => m.id === 'fal-test')?.passRate).toBeCloseTo(9 / 11);
-    expect((await models(alice.cookie)).defaultModelId).toBe('fal-test'); // 9/11 beats 8/10
+    // 9/11 beats 8/10 on pass rate, but the failed real fal-test job of the earlier tests (1 of 14) costs it the score: 81.8 x 17/18 = 77 against 80.
+    const after = await models(alice.cookie);
+    expect(after.models.map((m) => [m.id, m.score])).toEqual([['cheap-test', 80], ['fal-test', 77], ['mock-sample', 50]]);
+    expect(after.defaultModelId).toBe('cheap-test');
     await pool.query(`update jobs set deleted_at = now() where id = $1`, [id]);
     expect((await models(alice.cookie)).models.find((m) => m.id === 'fal-test')?.passRate).toBeCloseTo(9 / 11);
   });

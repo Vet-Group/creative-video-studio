@@ -22,6 +22,8 @@ interface VideoModel {
   durationsSec: number[];
   estimateUsd: string;
   supported: boolean;
+  score: number;
+  recommended: boolean;
 }
 
 type Tab = 'create' | 'history' | 'examples' | 'about';
@@ -250,7 +252,7 @@ export function MarketingStudio() {
                 <Select label="Thời lượng" icon="clock" heading="Chọn thời lượng" value={String(durationSec)} options={durations.map((d) => ({ value: String(d), label: `${d} giây` }))} onChange={(v) => setDurationSec(Number(v))} />
               )}
             </div>
-            {models && models.length > 0 && <ModelPicker models={models.map((m) => ({ id: m.id, label: m.label, isMock: m.isMock, supported: true, estimateUsd: m.estimateUsd }))} value={chosen?.id ?? ''} onChange={(id) => pickModel(models.find((m) => m.id === id)!)} />}
+            {models && models.length > 0 && <ModelPicker models={models.map((m) => ({ id: m.id, label: m.label, isMock: m.isMock, supported: true, estimateUsd: m.estimateUsd, score: m.score, recommended: m.recommended }))} value={chosen?.id ?? ''} onChange={(id) => pickModel(models.find((m) => m.id === id)!)} />}
             <p className="help">JPEG, PNG hoặc WebP. Chỉ tải lên ảnh mà công ty có quyền sử dụng.</p>
           </div>
 

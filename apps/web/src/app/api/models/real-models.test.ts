@@ -25,7 +25,7 @@ async function newUser(email: string, role: 'member' | 'admin') {
 const call = (cookie: string, path: string, method = 'GET', body?: unknown) =>
   new Request(`http://localhost${path}`, { method, headers: { cookie, 'content-type': 'application/json' }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
 const picker = async (cookie: string) =>
-  (await GET(call(cookie, '/api/models?ratio=9:16&durationSec=8'))).json() as Promise<{ models: { id: string; passRate: number | null; passes: number; total: number; estimateUsd: string }[]; defaultModelId: string | null }>;
+  (await GET(call(cookie, '/api/models?ratio=9:16&durationSec=8'))).json() as Promise<{ models: { id: string; passRate: number | null; passes: number; total: number; estimateUsd: string; score: number; recommended: boolean }[]; defaultModelId: string | null }>;
 const enabled = async (id: string) => (await pool.query('select enabled from model_configs where id = $1', [id])).rows[0].enabled as boolean;
 
 let admin: Awaited<ReturnType<typeof newUser>>;
@@ -54,6 +54,24 @@ describe('the model picker', () => {
     expect(both.models.map((m) => [m.id, m.passes, m.total, m.estimateUsd])).toEqual([['kling-o3-pro', 7, 10, '0.8960'], ['seedance-2.5', 6, 9, '1.8496']]);
     expect(both.models[1]!.passRate).toBeCloseTo(6 / 9);
     expect(both.defaultModelId).toBe('kling-o3-pro'); // 70% against 67%
+    expect(both.models.map((m) => [m.id, m.score, m.recommended])).toEqual([['kling-o3-pro', 70, true], ['seedance-2.5', 67, false]]);
+    expect(before.models[0]!.recommended).toBe(false); // one model: nothing to recommend between
+    await pool.query(`update model_configs set enabled = false where id = 'seedance-2.5'`);
+  });
+
+  test('real jobs that fail lower the score, so the badge and the pre-selection move to the other model; mock jobs do not count', async () => {
+    await pool.query(`update model_configs set enabled = true where id = 'seedance-2.5'`);
+    await pool.query(
+      `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, status, is_mock) values
+         ('fail-1', $1, 'team-unassigned', 'kling-o3-pro', 'fal', 'p', '9:16', 8, '{}', 'failed', false),
+         ('fail-2', $1, 'team-unassigned', 'kling-o3-pro', 'fal', 'p', '9:16', 8, '{}', 'timed_out', false),
+         ('fail-mock', $1, 'team-unassigned', 'kling-o3-pro', 'fal', 'p', '9:16', 8, '{}', 'failed', true)`,
+      [member.id],
+    );
+    const after = await picker(member.cookie);
+    expect(after.models.map((m) => [m.id, m.score, m.recommended])).toEqual([['kling-o3-pro', 47, false], ['seedance-2.5', 67, true]]); // 0.7 x 4/6
+    expect(after.defaultModelId).toBe('seedance-2.5');
+    await pool.query(`delete from jobs where id in ('fail-1', 'fail-2', 'fail-mock')`);
     await pool.query(`update model_configs set enabled = false where id = 'seedance-2.5'`);
   });
 
@@ -83,39 +101,22 @@ describe('a disabled model', () => {
 describe('PUT /api/admin/settings', () => {
   const put = (body: unknown) => PUT_SETTINGS(call(admin.cookie, '/api/admin/settings', 'PUT', body));
 
-  test('refuses to enable a video model without a bake-off record, and changes nothing', async () => {
+  test('enables a video model with no bake-off record, and one under 70% (Seedance 2.5, 6/9): the record only feeds the score; each change audited', async () => {
     await pool.query(
       `insert into model_configs (id, provider, endpoint, label, ratios, durations_sec, max_images, output_resolution, usd_per_second, sources)
        values ('new-model', 'fal', 'x', 'New model', '{9:16}', '{5}', 2, '720p', 0.2, '{}')`,
     );
-    const res = await put({ monthlyCapUsd: 999, models: [{ id: 'new-model', enabled: true }] });
-    expect(res.status).toBe(400);
-    expect(((await res.json()) as { error: string }).error).toMatch(/no passing bake-off record \(at least 70%\) for new-model.*adding-a-model\.md/);
-    expect(await enabled('new-model')).toBe(false);
-    expect((await pool.query('select monthly_cap_usd::text as cap from settings')).rows[0].cap).toBe('200.0000');
-  });
-
-  test('refuses a record under 70%, so Seedance 2.5 (6/9) stays off, and changes nothing', async () => {
-    await pool.query(`update model_configs set pass_seed_passes = 6, pass_seed_total = 9 where id = 'new-model'`);
-    const res = await put({ models: [{ id: 'seedance-2.5', enabled: true }, { id: 'new-model', enabled: true }] });
-    expect(res.status).toBe(400);
-    expect(((await res.json()) as { error: string }).error).toMatch(/no passing bake-off record \(at least 70%\) for new-model, seedance-2\.5/);
-    expect([await enabled('new-model'), await enabled('seedance-2.5')]).toEqual([false, false]);
-  });
-
-  test('refuses a record with no passes or more passes than clips', async () => {
-    for (const [passes, total] of [[null, 10], [11, 10]]) {
-      await pool.query('update model_configs set pass_seed_passes = $1, pass_seed_total = $2 where id = $3', [passes, total, 'new-model']);
-      const res = await put({ models: [{ id: 'new-model', enabled: true }] });
-      expect([res.status, await enabled('new-model')]).toEqual([400, false]);
-    }
-  });
-
-  test('enables a model once its record reaches 70%, audited', async () => {
-    await pool.query(`update model_configs set pass_seed_passes = 7, pass_seed_total = 10 where id = 'new-model'`);
-    expect((await put({ models: [{ id: 'new-model', enabled: true }] })).status).toBe(200);
-    expect(await enabled('new-model')).toBe(true);
+    expect((await put({ models: [{ id: 'new-model', enabled: true }, { id: 'seedance-2.5', enabled: true }] })).status).toBe(200);
+    expect([await enabled('new-model'), await enabled('seedance-2.5')]).toEqual([true, true]);
     const audits = (await pool.query(`select count(*)::int as n from audit_entries where action = 'model.set_enabled'`)).rows[0].n;
-    expect(audits).toBe(1);
+    expect(audits).toBe(2);
+    await put({ models: [{ id: 'new-model', enabled: false }, { id: 'seedance-2.5', enabled: false }] });
+  });
+
+  test('still refuses a model whose price is not recorded, and changes nothing', async () => {
+    await pool.query(`update model_configs set usd_per_second = null where id = 'new-model'`);
+    const res = await put({ monthlyCapUsd: 999, models: [{ id: 'new-model', enabled: true }] });
+    expect([res.status, await enabled('new-model')]).toEqual([400, false]);
+    expect((await pool.query('select monthly_cap_usd::text as cap from settings')).rows[0].cap).toBe('200.0000');
   });
 });

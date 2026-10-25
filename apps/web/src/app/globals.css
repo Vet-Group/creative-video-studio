@@ -419,6 +419,8 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 
 /* The Apps index and the app pages: cards in 1, 2 and 3 columns, a header card with a change-app menu, two upload boxes side by side, and the coming-soon page. */
 .feature-tag { background: rgb(228, 228, 231); color: rgb(39, 39, 42); }
+/* The recommendation badge, in the green of Fash's NEW tag. */
+.badge-recommended { background: rgb(220, 252, 231); color: rgb(21, 128, 61); font-weight: 600; white-space: nowrap; }
 .badge-soon { margin-left: .5rem; padding: 0 .4rem; border-radius: 4px; background: rgb(228, 228, 231); color: rgb(63, 63, 70); font-size: .75rem; font-weight: 600; white-space: nowrap; }
 .apps h1, #library-title { margin: 0 0 4px; font-size: 30px; line-height: 38px; font-weight: 700; }
 .apps-sub { margin: 0 0 16px; }
