@@ -61,7 +61,7 @@ export default async function ExplorePage() {
                 {have.has(modelSample(m.id)) ? <img src={`/api/samples/${modelSample(m.id)}`} alt="" /> : <span className="banner-empty" aria-hidden="true" />}
                 <strong>{m.label}</strong>
                 <span className="muted">
-                  {[m.provider, m.ratios.join(', '), range(m.durations_sec)].filter(Boolean).join(' · ')}
+                  {[m.ratios.join(', '), range(m.durations_sec)].filter(Boolean).join(' · ')}
                 </span>
               </Link>
             </li>

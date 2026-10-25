@@ -5,7 +5,7 @@ import { useId, useState } from 'react';
 import { api, errorText, sendJson } from '@/lib/api';
 import { tryOnPrompt } from '@/lib/try-on-prompt';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
-import { Gallery, type Img, RATIO_LABEL, Slot, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, WorkTabs } from './image-tools';
+import { Gallery, type Img, LockedFields, RATIO_LABEL, Slot, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, WorkTabs } from './image-tools';
 import { useJobs } from './jobs';
 import { ModelPicker } from './ModelPicker';
 import { Select } from './Select';
@@ -129,6 +129,7 @@ export function TryOn() {
               </div>
             </div>
 
+            {models !== null && !failed && !chosen && <LockedFields />}
             {chosen && (
               <>
                 <Select label="Độ phân giải" icon="preset" heading="Chọn độ phân giải" value={pick.resolution} options={chosen.resolutions.map((r) => ({ value: r, label: r }))} onChange={pick.setResolution} />
