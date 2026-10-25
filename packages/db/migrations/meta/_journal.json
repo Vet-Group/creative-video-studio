@@ -120,6 +120,13 @@
       "when": 1793790135036,
       "tag": "0016_video_models_1080p",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1793790136036,
+      "tag": "0017_gpt_image_2_5",
+      "breakpoints": true
     }
   ]
 }
