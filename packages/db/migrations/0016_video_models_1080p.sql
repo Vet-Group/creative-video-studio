@@ -1,0 +1,6 @@
+-- The paid smoke run of 2026-10-25 (one shortest 9:16 clip per Fash video model) failed FLUX 3, FLUX 3 Reference and Seedance 1.0 Pro: at "720p" fal
+-- returns 704x1280 and 704x1248, under the worker's 720p floor. packages/core/src/providers/fal.ts now asks those three for 1080p, so their rows carry
+-- the 1080p output and price: FLUX 3 $0.29/s at 1080p, Seedance 1.0 Pro about $0.62 per 1080p 5 s clip ($0.124/s). Model pages read 2026-10-25.
+UPDATE "model_configs" SET "output_resolution" = '1080p', "usd_per_second" = 0.29, "sources" = "sources" || '{"outputResolution":{"url":"https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=blackforestlabs/flux-3/image-to-video","readAt":"2026-10-25"},"usdPerSecond":{"url":"https://fal.ai/models/blackforestlabs/flux-3/image-to-video","readAt":"2026-10-25"}}'::jsonb, "updated_at" = now() WHERE "id" IN ('flux-3', 'flux-3-reference');
+--> statement-breakpoint
+UPDATE "model_configs" SET "output_resolution" = '1080p', "usd_per_second" = 0.124, "sources" = "sources" || '{"outputResolution":{"url":"https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=fal-ai/bytedance/seedance/v1/pro/image-to-video","readAt":"2026-10-25"},"usdPerSecond":{"url":"https://fal.ai/models/fal-ai/bytedance/seedance/v1/pro/image-to-video","readAt":"2026-10-25"}}'::jsonb, "updated_at" = now() WHERE "id" = 'seedance-1.0-pro';
