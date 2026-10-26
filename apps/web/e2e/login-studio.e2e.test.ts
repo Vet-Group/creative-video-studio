@@ -226,7 +226,7 @@ test.describe('touch', () => {
 test.describe('narrow window with a mouse', () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
-  test('narrow pointer: the beam lights the whole password but stays off the Email field and the submit button', async ({ page }) => {
+  test('narrow pointer: the beam lights the whole password but stays off the Email field, the submit button and the page backdrop', async ({ page }) => {
     const { pw, eye, submit, card } = await open(page);
     expect(await hoverNone(page)).toBe(false);
     await pw.fill('abcdefgh');
@@ -240,6 +240,8 @@ test.describe('narrow window with a mouse', () => {
     const email = await box(page.getByLabel('Email'));
     expect(beamBox.y).toBeGreaterThanOrEqual(email.y + email.height);
     expect(beamBox.y + beamBox.height).toBeLessThanOrEqual((await box(submit)).y);
+    // It ends at the card's left edge rather than spilling onto the page backdrop.
+    expect(beamBox.x).toBeGreaterThanOrEqual((await box(page.locator('.login-card'))).x - 1);
   });
 });
 
