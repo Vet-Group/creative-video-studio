@@ -47,11 +47,9 @@
   --scene-tally-day: #7f1d1d;
   --scene-tally-night: #4a1d1d;
   --scene-tally-on: #f87171;
-  --cta: #000;
   --ink-strong: #000;
   --media-bg: #000;
   --light: 255 255 255;
-  --app-link: #1d4ed8;
   --danger: #b91c1c;
   --danger-text: rgb(220, 38, 38);
   --danger-soft: rgb(254, 242, 242);
@@ -108,11 +106,12 @@ body { margin: 0; font-family: 'Inter Variable', Inter, Arial, sans-serif; font-
 h1 { font-size: 1.4rem; margin: 0 0 1rem; }
 h2 { font-size: 1.05rem; margin: 0 0 .75rem; }
 p { margin: .25rem 0; }
-a { color: var(--app-link); }
+a { color: var(--link); }
 button, .button { font: inherit; padding: .45rem .8rem; border: 1px solid var(--border-button); border-radius: 8px; background: var(--surface); color: inherit; cursor: pointer; text-decoration: none; display: inline-block; }
 button:disabled { opacity: .5; cursor: not-allowed; }
 button[aria-pressed='true'] { background: var(--fill); border-color: var(--ink); }
-button.primary { background: var(--cta); border-color: var(--cta); color: var(--on-dark); margin-top: .5rem; }
+button.primary { background: var(--brand); border-color: var(--brand); color: var(--on-dark); margin-top: .5rem; }
+button.primary:hover:not(:disabled), .runbar button.primary.run:hover:not(:disabled), .detail-use:hover, .library-empty .button:hover, .bar-run:hover:not(:disabled) { border-color: var(--brand-hover); background: var(--brand-hover); }
 :focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 select { border: 1px solid transparent; border-radius: 8px; background: var(--fill); }
 label { display: block; margin: .75rem 0; font-weight: 600; }
@@ -142,7 +141,7 @@ legend { font-weight: 600; padding: 0 .25rem; }
 .rail-toggle:hover, .settings-button:hover { background: var(--fill); color: var(--ink); }
 .rail-toggle { display: none; }
 .drawer-close { margin-left: auto; display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 8px; background: transparent; }
-.logo { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; background: var(--ink-strong); color: var(--on-dark); font-size: 11px; font-weight: 800; }
+.logo { display: grid; place-items: center; width: 28px; height: 28px; }
 .sidebar nav { display: grid; gap: 2px; }
 .sidebar nav a { display: flex; align-items: center; height: 37px; padding: 8px 12px; border-radius: 10px; color: var(--text-2); font-size: 14px; line-height: 21px; font-weight: 500; text-decoration: none; transition: background-color .15s; }
 .nav-icon { display: grid; place-items: center; flex: none; width: 20px; margin-right: 8px; color: var(--text-subtle); }
@@ -151,6 +150,7 @@ legend { font-weight: 600; padding: 0 .25rem; }
 .sidebar nav a[aria-current='page'] .nav-icon { color: var(--ink); }
 .topbar { position: sticky; top: 0; z-index: 99; display: flex; align-items: center; gap: 12px; height: 57px; padding: 8px 0; background: var(--surface); border-bottom: 1px solid rgb(var(--shade) / .1); }
 .topbar strong { font-size: 18px; line-height: 27px; font-weight: 600; color: var(--ink); }
+.topbar > .vet-logo { flex: none; margin-left: auto; margin-right: 6px; }
 .menu-button { display: grid; place-items: center; flex: none; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 10px; background: transparent; color: var(--ink); }
 .menu-button:hover { background: var(--fill); }
 .content { min-width: 0; }
@@ -285,8 +285,7 @@ label.model input { display: inline; margin: 0; min-width: 0; width: auto; }
 .login .link-button:hover { text-decoration: underline; }
 .login-hint { margin: 0; font-size: 14px; line-height: 21px; }
 .login .error { margin: 12px 0 0; font-size: 14px; line-height: 21px; }
-.login button.primary { width: 100%; min-height: 48px; margin-top: 16px; border: 0; border-radius: 10px; background: var(--brand); color: var(--on-dark); font-weight: 600; box-shadow: 0 10px 24px -10px color-mix(in srgb, var(--brand) 70%, transparent); transition: background-color .15s; }
-.login button.primary:hover:not(:disabled) { background: var(--brand-hover); }
+.login button.primary { width: 100%; min-height: 48px; margin-top: 16px; border: 0; border-radius: 10px; font-weight: 600; box-shadow: 0 10px 24px -10px color-mix(in srgb, var(--brand) 70%, transparent); transition: background-color .15s; }
 .login button.primary[aria-busy='true'] { cursor: progress; }
 .login .social { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
 .login .social button { min-height: 44px; border-radius: 10px; }
@@ -366,8 +365,8 @@ td code { white-space: pre-wrap; overflow-wrap: anywhere; }
 .form-message { padding-top: 8px; font-size: 14px; line-height: 21px; }
 .form-message p { margin: 0; }
 .runbar { margin: 0 -24px -24px; }
-.runbar button.primary.run { display: flex; align-items: center; justify-content: center; gap: 12px; width: 100%; height: 60px; margin: 0; padding: 12px 16px; border: 0; border-radius: 8px; background: var(--cta); color: var(--on-dark); font-size: 16px; line-height: 24px; font-weight: 500; }
-/* A disabled Run keeps the live look: solid black on the video pages, light grey with dark text on Try On; the reason line says why. */
+.runbar button.primary.run { display: flex; align-items: center; justify-content: center; gap: 12px; width: 100%; height: 60px; margin: 0; padding: 12px 16px; border: 0; border-radius: 8px; background: var(--brand); color: var(--on-dark); font-size: 16px; line-height: 24px; font-weight: 500; }
+/* A disabled Run keeps the live look: solid brand red on the video pages, light grey with dark text on Try On; the reason line says why. */
 .runbar button.primary.run:disabled { opacity: 1; }
 [aria-labelledby='tryon-title'] .runbar button.primary.run:disabled { background: var(--fill-strong); color: var(--ink); }
 .field { display: grid; gap: 6px; margin-top: 16px; }
@@ -508,7 +507,7 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .detail-date { margin: 0; color: var(--text-subtle); font-size: 12px; line-height: 18px; }
 .detail-tools { display: flex; gap: 6px; margin-top: 12px; padding-top: 11px; border-top: 1px solid var(--divider); }
 .detail-tools a { display: grid; place-items: center; width: calc((100% - 18px) / 4); height: 32px; border-radius: 6px; background: var(--fill); color: var(--text-2); }
-.detail-use { display: flex; align-items: center; justify-content: center; gap: 6px; height: 36px; margin: 6px 0 0; padding: 0 12px; border: 0; border-radius: 8px; background: var(--cta); color: var(--on-dark); font-size: 11px; line-height: 16.5px; font-weight: 600; }
+.detail-use { display: flex; align-items: center; justify-content: center; gap: 6px; height: 36px; margin: 6px 0 0; padding: 0 12px; border: 0; border-radius: 8px; background: var(--brand); color: var(--on-dark); font-size: 11px; line-height: 16.5px; font-weight: 600; }
 .detail-step { position: fixed; top: 50%; z-index: 3; display: grid; place-items: center; width: 36px; height: 36px; padding: 0; transform: translateY(-50%); border: 0; border-radius: 50%; background: rgb(var(--shade) / .5); color: var(--on-dark); }
 .detail-step[hidden] { display: none; }
 .detail-step.prev { left: 24px; }
@@ -642,7 +641,7 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .card .favorite { display: inline-flex; align-items: center; gap: 6px; }
 .card .favorite[aria-pressed='true'] { color: var(--favorite); }
 .card .favorite[aria-pressed='true'] svg path { fill: currentColor; }
-.library-empty .button { padding: 10px 40px; border-color: var(--cta); border-radius: 8px; background: var(--cta); color: var(--on-dark); font-weight: 600; }
+.library-empty .button { padding: 10px 40px; border-color: var(--brand); border-radius: 8px; background: var(--brand); color: var(--on-dark); font-weight: 600; }
 
 /* Try On and Image Generation (REA, measured 2026-10-24 at 1424 px): Try On reuses the Create card and tabs; its upload slots are dashed boxes of 56 px thumbnails and a 56 px
    upload tile. Image Generation has tabs over a gallery and a floating bar, 818 wide and centred in the content area, with 24 px under it. */
@@ -704,7 +703,7 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .imagebar .select-trigger { width: auto; max-width: 14rem; height: 34px; padding: 0 12px; border: 1px solid var(--field-border); border-radius: 17px; background: var(--surface); font-size: 13px; }
 .imagebar .select-trigger:hover, .imagebar .select[data-open='true'] .select-trigger { border-color: var(--text-disabled); }
 .imagebar .select-pop { top: auto; bottom: calc(100% + 3px); right: auto; min-width: 11rem; }
-.bar-run { display: flex; align-items: center; justify-content: center; gap: 8px; height: 44px; margin: 0 0 0 auto; padding: 0 24px; border: 0; border-radius: 12px; background: var(--cta); color: var(--on-dark); font-size: 14px; line-height: 21px; font-weight: 500; }
+.bar-run { display: flex; align-items: center; justify-content: center; gap: 8px; height: 44px; margin: 0 0 0 auto; padding: 0 24px; border: 0; border-radius: 12px; background: var(--brand); color: var(--on-dark); font-size: 14px; line-height: 21px; font-weight: 500; }
 @media (min-width: 1024px) {
   .imagegen { min-height: calc(100dvh - 48px); }
   .imagebar { bottom: 24px; margin: 24px auto; padding: 24px; }
