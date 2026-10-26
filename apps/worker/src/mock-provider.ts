@@ -10,7 +10,7 @@ import type { ImageProvider, VideoProvider } from '@cvs/core/providers';
 import { requireFfmpeg } from './media';
 
 const run = promisify(execFile);
-const SIZES = { '9:16': '720x1280', '1:1': '720x720' } as const;
+const SIZES = { '9:16': '720x1280', '1:1': '720x720', '16:9': '1280x720' } as const;
 /** A prompt containing this ends the mock job as failed, so tests can reach the failure path. */
 export const MOCK_FAIL = 'MOCK_FAIL';
 

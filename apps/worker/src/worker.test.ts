@@ -10,7 +10,7 @@ import { DeleteBucketCommand, DeleteObjectsCommand, HeadObjectCommand, ListObjec
 import type { Enhancer } from '@cvs/core/enhance';
 import { reserve, withTransaction } from '@cvs/core/ledger';
 import { ImageReadError } from '@cvs/core/providers/http';
-import type { ImageProvider, ImageSubmitRequest, VideoProvider } from '@cvs/core/providers';
+import type { ImageProvider, ImageSubmitRequest, SubmitRequest, VideoProvider } from '@cvs/core/providers';
 import { VIDEO_QUEUE, VIDEO_QUEUE_OPTIONS, videoSendOptions } from '@cvs/core/queue';
 import { createPool } from '@cvs/db/client';
 import { createTestDatabase } from '@cvs/db/testing';
@@ -243,6 +243,22 @@ describe('Enhance', () => {
     expect(prompts.sort()).toEqual(['as written', 'slow orbit']);
     expect(calls).toBe(1);
     expect((await job(failed)).enhanced_prompt).toBeNull();
+  });
+});
+
+describe('native audio', () => {
+  test("a job's params.audio 'on' reaches the adapter with the endpoint's audio price; without it the job stays silent at the stored price", async () => {
+    const requests: SubmitRequest[] = [];
+    await start(counting(300, (inner) => ({ ...inner, submit: async (req) => (requests.push(req), inner.submit(req)) })));
+    const loud = await newJob('u1');
+    await pool.query(`update jobs set params = '{"format":"advanced","audio":"on"}' where id = $1`, [loud]);
+    const quiet = await newJob('u2');
+    await send(loud, 'u1');
+    await send(quiet, 'u2');
+    await waitFor('both submits', async () => requests.length === 2);
+    const seen = requests.map((r) => [r.audio, r.model.usdPerSecond]).sort();
+    expect(seen).toEqual([[false, 0.1], [true, 0]]); // the mock endpoint's audio price is 0 (AUDIO_USD_PER_SECOND)
+    await waitFor('both jobs to finish', async () => (await status(loud)) === 'succeeded' && (await status(quiet)) === 'succeeded');
   });
 });
 

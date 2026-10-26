@@ -1,14 +1,17 @@
 'use client';
-// Marketing Studio: a creator-style try-on video from two photos (the model, then the product), laid out like Try On. The page composes one English prompt
-// from the hook, the location and the member's own text, and posts a `marketing` video job on a video model that lists the feature.
+// Marketing Studio, in two formats. UGC Try On: a creator-style try-on video from two photos (the model, then the product), laid out like Try On.
+// Advanced (/marketing-studio/advanced): 1 to 7 reference images, the member's brief, an optional script and the audio switch. Each composes one English
+// prompt (lib/marketing.ts) and posts a `marketing` video job on a video model that lists the feature; Advanced adds params format and audio.
+import { useRouter } from 'next/navigation';
 import { type CSSProperties, type KeyboardEvent, useEffect, useId, useRef, useState } from 'react';
 import { ABOUT } from '@/lib/about-content';
 import { api, errorText, sendJson } from '@/lib/api';
-import { HOOKS, LOCATIONS, type MarketingChoice, marketingPrompt } from '@/lib/marketing';
+import { ADVANCED_MAX_BRIEF, ADVANCED_MAX_IMAGES, ADVANCED_MAX_SCRIPT, advancedPrompt, HOOKS, LOCATIONS, type MarketingChoice, marketingPrompt } from '@/lib/marketing';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { useSamples } from '@/lib/use-samples';
 import { cardSample } from '@/lib/examples';
 import { About } from './About';
+import { AudioSwitch } from './AudioSwitch';
 import { CardMedia, LoopVideo } from './CardMedia';
 import { Icon, type IconName } from './Icon';
 import { Gallery, type Img, Slot, uploadImages, UPLOAD_ERROR, WorkTabs } from './image-tools';
@@ -25,6 +28,9 @@ interface VideoModel {
   ratios: string[];
   durationsSec: number[];
   estimateUsd: string;
+  /** The estimate with native audio on; null when the model cannot make audio. */
+  audioEstimateUsd: string | null;
+  maxImages: number;
   supported: boolean;
   score: number;
   recommended: boolean;
@@ -92,23 +98,26 @@ function ChoiceDialog({ open, title, sub, kind, choices, value, onPick, onClose 
   );
 }
 
-/** The sample photo behind the format header, when an Admin uploaded one. */
-const UGC_PHOTO = 'marketing-format-ugc.jpg';
-const UGC_LOOP = 'marketing-format-ugc.mp4';
-/** The formats of the live format picker, each with its sample loop; only UGC try-on is built, the others say why they cannot be picked. */
+export type MarketingFormat = 'ugc' | 'advanced';
+/** The formats of the live format picker, each with its page and sample loop; the ones not built yet say why they cannot be picked. */
 const FORMATS = [
-  { id: 'ugc', name: 'UGC Thử đồ', soon: null },
-  { id: 'advanced', name: 'Nâng cao', soon: 'Sắp có' },
-  { id: 'unboxing', name: 'Mở hộp', soon: 'Sắp có' },
-  { id: 'product-review', name: 'Đánh giá sản phẩm', soon: 'Sắp có' },
+  { id: 'ugc', name: 'UGC Thử đồ', href: '/marketing-studio', soon: null },
+  { id: 'advanced', name: 'Nâng cao', href: '/marketing-studio/advanced', soon: null },
+  { id: 'unboxing', name: 'Mở hộp', href: null, soon: 'Sắp có' },
+  { id: 'product-review', name: 'Đánh giá sản phẩm', href: null, soon: 'Sắp có' },
 ];
 
-export function MarketingStudio() {
+export function MarketingStudio({ format = 'ugc' }: { format?: MarketingFormat }) {
+  const advanced = format === 'advanced';
+  const router = useRouter();
   const have = useSamples();
   const { refresh } = useJobs();
   const narrow = useMediaQuery(NARROW);
   const [person, setPerson] = useState<Img[]>([]);
   const [product, setProduct] = useState<Img[]>([]);
+  const [refs, setRefs] = useState<Img[]>([]);
+  const [script, setScript] = useState('');
+  const [audio, setAudio] = useState(true);
   const [hook, setHook] = useState('');
   const [location, setLocation] = useState('');
   const [picker, setPicker] = useState<'hook' | 'location' | 'format' | null>(null);
@@ -124,6 +133,7 @@ export function MarketingStudio() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const promptId = useId();
+  const scriptId = useId();
   const reasonId = useId();
 
   // The ratio and duration menus offer what any marketing model offers, so a model whose options differ from the chosen one's can still be picked;
@@ -134,6 +144,16 @@ export function MarketingStudio() {
   const durations = [...new Set(models?.flatMap((m) => m.durationsSec))].sort((a, b) => a - b);
   const key = `${ratio}/${durationSec}`;
   const fresh = list !== null && list.key === key;
+  // Advanced: the slot takes up to the chosen model's reference cap (7 at most); a model that takes fewer images than are chosen cannot be picked.
+  const maxRefs = Math.min(ADVANCED_MAX_IMAGES, chosen?.maxImages ?? ADVANCED_MAX_IMAGES);
+  // Native audio is on by default in both formats, as on the reference site, on a model that can make it.
+  const audioOn = audio && chosen?.audioEstimateUsd != null;
+  const cost = audioOn ? chosen!.audioEstimateUsd! : chosen?.estimateUsd;
+  const words = script.trim() ? script.trim().split(/\s+/).length : 0;
+  const name = FORMATS.find((f) => f.id === format)!.name;
+  /** The sample photo and loop behind the format header, when an Admin uploaded them. */
+  const photo = `marketing-format-${format}.jpg`;
+  const loop = `marketing-format-${format}.mp4`;
 
   // Every model can be picked (the picker is told all are supported): switching moves the ratio and the duration to the model's own.
   function pickModel(m: VideoModel) {
@@ -175,21 +195,30 @@ export function MarketingStudio() {
             ? 'Các mô hình này không có tỉ lệ hoặc thời lượng dùng được cho Marketing Studio.'
             : !chosen!.supported
               ? 'Mô hình này không có tỉ lệ hoặc thời lượng đã chọn. Chọn mô hình khác, hoặc đổi tỉ lệ hoặc thời lượng.'
-              : person.length === 0
-                ? 'Tải lên ảnh người mẫu.'
-                : product.length === 0
-                  ? 'Tải lên ảnh sản phẩm.'
-                  : null;
+              : advanced
+                ? refs.length === 0
+                  ? 'Tải lên ít nhất 1 ảnh tham chiếu.'
+                  : refs.length > chosen!.maxImages
+                    ? `Mô hình này nhận tối đa ${chosen!.maxImages} ảnh tham chiếu. Bỏ bớt ảnh hoặc chọn mô hình khác.`
+                    : prompt.trim() === ''
+                      ? 'Viết prompt mô tả video bạn muốn.'
+                      : null
+                : person.length === 0
+                  ? 'Tải lên ảnh người mẫu.'
+                  : product.length === 0
+                    ? 'Tải lên ảnh sản phẩm.'
+                    : null;
   const canRun = reason === null && !busy;
 
-  function add(set: (f: (cur: Img[]) => Img[]) => void) {
+  /** Uploads the files into a slot: a one-image slot is replaced, the reference slot is added to, up to `max`. */
+  function add(set: (f: (cur: Img[]) => Img[]) => void, max = 1) {
     return async (files: File[]) => {
       if (files.length === 0) return;
       setError('');
       setBusy(true);
       try {
         const assets = await uploadImages(files);
-        set(() => assets.slice(0, 1));
+        set((cur) => [...(max > 1 ? cur : []), ...assets].slice(0, max));
       } catch {
         setError(UPLOAD_ERROR);
       } finally {
@@ -203,14 +232,17 @@ export function MarketingStudio() {
     setError('');
     setNotice('');
     try {
-      const body = {
-        feature: 'marketing',
-        assetIds: [person[0]!.id, product[0]!.id],
-        modelId: chosen!.id,
-        prompt: marketingPrompt({ hook, location, prompt }),
-        ratio,
-        durationSec,
-      };
+      const body = advanced
+        ? {
+            feature: 'marketing',
+            assetIds: refs.map((r) => r.id),
+            modelId: chosen!.id,
+            prompt: advancedPrompt({ brief: prompt, images: refs.length, hook, location, script, audio: audioOn }),
+            ratio,
+            durationSec,
+            params: { format: 'advanced', audio: audioOn ? 'on' : 'off' },
+          }
+        : { feature: 'marketing', assetIds: [person[0]!.id, product[0]!.id], modelId: chosen!.id, prompt: marketingPrompt({ hook, location, prompt, audio: audioOn }), ratio, durationSec, params: { audio: audioOn ? 'on' : 'off' } };
       await api('/api/jobs', sendJson('POST', body));
       setNotice('Đã gửi job. Theo dõi trong tab "Lịch sử".');
       if (!narrow) setTab('history');
@@ -236,38 +268,63 @@ export function MarketingStudio() {
 
         <div className="card form-card" id="marketing-panel-create" role={narrow ? 'tabpanel' : undefined} aria-labelledby={narrow ? 'marketing-tab-create' : undefined} hidden={narrow && shown !== 'create'}>
           <div className="form-scroll">
-            <div className="app-head marketing-head" data-category="video" data-photo={have.has(UGC_PHOTO) || undefined} style={have.has(UGC_PHOTO) ? ({ '--photo': `url(/api/samples/${UGC_PHOTO})` } as CSSProperties) : undefined}>
-              {have.has(UGC_LOOP) && (
+            <div className="app-head marketing-head" data-category="video" data-photo={have.has(photo) || undefined} style={have.has(photo) ? ({ '--photo': `url(/api/samples/${photo})` } as CSSProperties) : undefined}>
+              {have.has(loop) && (
                 <span className="head-loop">
-                  <LoopVideo src={`/api/samples/${UGC_LOOP}`} poster={have.has(UGC_PHOTO) ? `/api/samples/${UGC_PHOTO}` : null} />
+                  <LoopVideo src={`/api/samples/${loop}`} poster={have.has(photo) ? `/api/samples/${photo}` : null} />
                 </span>
               )}
-              <strong>UGC Thử đồ</strong>
+              <strong>{name}</strong>
               <button type="button" className="banner-chip" onClick={() => setPicker('format')}>
                 <Icon name="edit" size={12} />
                 Đổi định dạng
               </button>
             </div>
-            <div className="app-slots marketing-slots" data-two="true">
-              <Slot label="Người mẫu" empty="Thêm 1 ảnh người mẫu" inputLabel="Ảnh người mẫu" images={person} max={1} busy={busy} onAdd={add(setPerson)} onRemove={() => setPerson([])} />
-              <Slot label="Sản phẩm" empty="Thêm 1 ảnh sản phẩm" inputLabel="Ảnh sản phẩm" images={product} max={1} busy={busy} onAdd={add(setProduct)} onRemove={() => setProduct([])} />
+            <div className="app-slots marketing-slots" data-two={!advanced}>
+              {advanced ? (
+                <div className="slot-wide">
+                  <Slot label="Ảnh tham chiếu" empty={`Tối đa ${maxRefs} ảnh tham chiếu`} inputLabel="Ảnh tham chiếu" images={refs} max={maxRefs} busy={busy} onAdd={add(setRefs, maxRefs)} onRemove={(id) => setRefs((cur) => cur.filter((r) => r.id !== id))} />
+                </div>
+              ) : (
+                <>
+                  <Slot label="Người mẫu" empty="Thêm 1 ảnh người mẫu" inputLabel="Ảnh người mẫu" images={person} max={1} busy={busy} onAdd={add(setPerson)} onRemove={() => setPerson([])} />
+                  <Slot label="Sản phẩm" empty="Thêm 1 ảnh sản phẩm" inputLabel="Ảnh sản phẩm" images={product} max={1} busy={busy} onAdd={add(setProduct)} onRemove={() => setProduct([])} />
+                </>
+              )}
               <ChoiceBox label="Hook (tuỳ chọn)" icon="film" choice={HOOKS.find((c) => c.id === hook)} onOpen={() => setPicker('hook')} />
               <ChoiceBox label="Bối cảnh (tuỳ chọn)" icon="sliders" choice={LOCATIONS.find((c) => c.id === location)} onOpen={() => setPicker('location')} />
             </div>
 
             <div className="field">
               <label htmlFor={promptId} className="field-label">
-                Prompt (tuỳ chọn)
+                {advanced ? 'Prompt' : 'Prompt (tuỳ chọn)'}
               </label>
               <div className="prompt-box">
-                <textarea id={promptId} value={prompt} maxLength={MAX_PROMPT} placeholder="Mô tả video marketing bạn muốn…" onChange={(e) => setPrompt(e.target.value)} />
+                <textarea id={promptId} value={prompt} maxLength={advanced ? ADVANCED_MAX_BRIEF : MAX_PROMPT} aria-required={advanced || undefined} placeholder="Mô tả video marketing bạn muốn…" onChange={(e) => setPrompt(e.target.value)} />
                 <div className="prompt-foot">
                   <span>
-                    {prompt.length}/{MAX_PROMPT}
+                    {prompt.length}/{advanced ? ADVANCED_MAX_BRIEF : MAX_PROMPT}
                   </span>
                 </div>
               </div>
             </div>
+            {advanced && (
+              <div className="field">
+                <label htmlFor={scriptId} className="field-label">
+                  Lời thoại (tuỳ chọn)
+                </label>
+                <div className="prompt-box">
+                  <textarea id={scriptId} value={script} maxLength={ADVANCED_MAX_SCRIPT} placeholder="Viết lời thoại bạn muốn nhân vật nói (tuỳ chọn)…" onChange={(e) => setScript(e.target.value)} />
+                  <div className="prompt-foot script-foot">
+                    {/* About two spoken words per second (the About tab), so the lines can be matched to the duration. */}
+                    <span>{words > 0 && `${words} từ, khoảng ${Math.ceil(words / 2)} giây`}</span>
+                    <span>
+                      {script.length}/{ADVANCED_MAX_SCRIPT}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="field-row">
               {models && ratios.length > 0 && (
@@ -277,7 +334,8 @@ export function MarketingStudio() {
                 <Select label="Thời lượng" icon="clock" heading="Chọn thời lượng" value={String(durationSec)} options={durations.map((d) => ({ value: String(d), label: `${d} giây` }))} onChange={(v) => setDurationSec(Number(v))} />
               )}
             </div>
-            {models && models.length > 0 && <ModelPicker models={models.map((m) => ({ id: m.id, label: m.label, isMock: m.isMock, supported: true, estimateUsd: m.estimateUsd, score: m.score, recommended: m.recommended }))} value={chosen?.id ?? ''} onChange={(id) => pickModel(models.find((m) => m.id === id)!)} />}
+            <AudioSwitch on={audio} available={chosen?.audioEstimateUsd != null} onChange={setAudio} />
+            {models && models.length > 0 && <ModelPicker models={models.map((m) => ({ id: m.id, label: m.label, isMock: m.isMock, supported: !advanced || m.maxImages >= refs.length, estimateUsd: audio && m.audioEstimateUsd != null ? m.audioEstimateUsd : m.estimateUsd, score: m.score, recommended: m.recommended }))} value={chosen?.id ?? ''} onChange={(id) => pickModel(models.find((m) => m.id === id)!)} />}
           </div>
 
           <div className="form-message">
@@ -301,7 +359,7 @@ export function MarketingStudio() {
           <div className="runbar">
             <button type="button" className="primary run" disabled={!canRun} aria-describedby={reason ? reasonId : undefined} onClick={() => void run()}>
               Tạo video
-              {chosen && <span className="run-cost">· {fresh ? `$${chosen.estimateUsd}` : '…'}</span>} {/* the estimate is for the duration of the last list */}
+              {chosen && <span className="run-cost">· {fresh ? `$${cost}` : '…'}</span>} {/* the estimate is for the duration of the last list */}
             </button>
           </div>
         </div>
@@ -310,7 +368,7 @@ export function MarketingStudio() {
           {shown === 'examples' ? (
             <Gallery kind="marketing" video samples="marketing-example-" label="Video Marketing Studio của công ty" emptyText="Chưa có video Marketing Studio nào trong công ty." />
           ) : shown === 'about' ? (
-            <About page={ABOUT.marketing} />
+            <About page={advanced ? ABOUT.advanced : ABOUT.marketing} />
           ) : (
             <Tray feature="marketing" />
           )}
@@ -319,10 +377,10 @@ export function MarketingStudio() {
 
       <Modal open={picker === 'format'} onClose={() => setPicker(null)} label="Chọn định dạng" className="choice-dialog">
         <h2>Chọn định dạng</h2>
-        <p className="modal-sub">Kiểu video marketing sẽ tạo. Hiện có UGC Thử đồ; các định dạng khác sẽ có sau.</p>
+        <p className="modal-sub">Kiểu video marketing sẽ tạo. Hiện có UGC Thử đồ và Nâng cao; các định dạng khác sẽ có sau.</p>
         <div className="choice-grid">
           {FORMATS.map((f) => (
-            <button key={f.id} type="button" aria-pressed={f.id === 'ugc'} disabled={f.soon !== null} onClick={() => setPicker(null)}>
+            <button key={f.id} type="button" aria-pressed={f.id === format} disabled={f.href === null} onClick={() => (setPicker(null), f.href && f.id !== format && router.push(f.href))}>
               {picker === 'format' && <CardMedia {...cardSample(have, `marketing-format-${f.id}`)} />}
               <span className="choice-name">
                 {f.name}

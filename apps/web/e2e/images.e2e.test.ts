@@ -28,7 +28,7 @@ test('a mock image job made through the API is an image card under "Tất cả �
 
   await page.getByRole('link', { name: 'Thư viện' }).first().click();
   const chips = page.getByRole('group', { name: 'Loại' });
-  await expect(chips.getByRole('button')).toHaveText(['Tất cả', 'Tất cả ảnh', 'Tất cả video', 'Thử đồ', 'Tạo ảnh', 'Tạo video', 'Marketing Studio', 'Ứng dụng']);
+  await expect(chips.getByRole('button')).toHaveText(['Tất cả', 'Tất cả ảnh', 'Tất cả video', 'Thử đồ', 'Tạo ảnh', 'Tạo video', 'Marketing Studio', 'UGC Thử đồ', 'Nâng cao', 'Ứng dụng']);
   const cards = page.getByRole('article');
 
   await chips.getByRole('button', { name: 'Tất cả ảnh' }).click();

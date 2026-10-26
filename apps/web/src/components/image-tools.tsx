@@ -65,10 +65,17 @@ export function useImageChoice(models: ImageModel[] | null, images: number) {
 }
 
 /** Uploads files through /api/assets and returns the new assets. */
+/** The most files one POST /api/assets takes (MAX_FILES in lib/assets.ts); a larger pick (Advanced takes 7) goes up in batches. */
+const PER_UPLOAD = 4;
+
 export async function uploadImages(files: File[]): Promise<Img[]> {
-  const form = new FormData();
-  for (const f of files) form.append('file', f);
-  return (await api<{ assets: Img[] }>('/api/assets', { method: 'POST', body: form })).assets;
+  const out: Img[] = [];
+  for (let i = 0; i < files.length; i += PER_UPLOAD) {
+    const form = new FormData();
+    for (const f of files.slice(i, i + PER_UPLOAD)) form.append('file', f);
+    out.push(...(await api<{ assets: Img[] }>('/api/assets', { method: 'POST', body: form })).assets);
+  }
+  return out;
 }
 
 /**

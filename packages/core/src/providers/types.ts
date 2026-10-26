@@ -8,6 +8,8 @@ export interface SubmitRequest {
   /** 'auto' only for Motion Control, whose output follows its reference video. */
   ratio: Ratio | 'auto';
   durationSec: number;
+  /** Native audio on; only the endpoints of AUDIO_USD_PER_SECOND read it, and the others stay silent. */
+  audio?: boolean;
 }
 
 /** fal's queue URLs include the model endpoint, so polling needs the model as well as the id. */

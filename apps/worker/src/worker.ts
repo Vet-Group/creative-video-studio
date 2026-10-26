@@ -12,7 +12,7 @@ import type { ReadableStream as WebReadableStream } from 'node:stream/web';
 import { fileURLToPath } from 'node:url';
 import type { Enhancer } from '@cvs/core/enhance';
 import { close24h, lateBill, type LedgerPool, release, settle, withTransaction } from '@cvs/core/ledger';
-import type { ImageModelConfig, ModelConfig } from '@cvs/core/models';
+import { type ImageModelConfig, type ModelConfig, usdPerSecondFor } from '@cvs/core/models';
 import { ImageReadError } from '@cvs/core/providers/http';
 import type { ImageProvider, ImageProviderJob, ImageSubmitRequest, ProviderJob, ProviderStatus, SubmitRequest, VideoProvider } from '@cvs/core/providers';
 import { PURGE_CRON, PURGE_QUEUE, VIDEO_QUEUE, VIDEO_QUEUE_OPTIONS, type VideoJobData, videoSendOptions } from '@cvs/core/queue';
@@ -117,13 +117,14 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
   const boss = new PgBoss({ connectionString: deps.connectionString, max: 4 });
   boss.on('error', (e) => log('pg-boss', e));
 
-  async function loadModel(modelId: string): Promise<ModelConfig> {
+  /** `audio` is the job's params.audio: with 'on' the price is the endpoint's audio price, which the API checked exists. */
+  async function loadModel(modelId: string, audio?: string): Promise<ModelConfig> {
     const { rows } = await pool.query('select * from model_configs where id = $1', [modelId]);
     const r = rows[0];
     if (!r || r.usd_per_second == null || r.max_images == null || r.output_resolution == null) throw new Error(`model ${modelId} has no price or limits`);
     return {
       id: r.id, provider: r.provider, endpoint: r.endpoint, label: r.label, ratios: r.ratios, durationsSec: r.durations_sec, maxImages: r.max_images,
-      outputResolution: r.output_resolution, usdPerSecond: Number(r.usd_per_second), billedAmountField: r.billed_amount_field, sources: r.sources,
+      outputResolution: r.output_resolution, usdPerSecond: Number(usdPerSecondFor({ endpoint: r.endpoint, usdPerSecond: r.usd_per_second }, audio) ?? r.usd_per_second), billedAmountField: r.billed_amount_field, sources: r.sources,
     };
   }
 
@@ -144,7 +145,7 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
     }
     const provider = providers[row.provider];
     if (!provider) return undefined;
-    const job: ProviderJob = { providerJobId: row.provider_job_id, model: await loadModel(row.model) };
+    const job: ProviderJob = { providerJobId: row.provider_job_id, model: await loadModel(row.model, row.params.audio) };
     return { status: (): Promise<ProviderStatus> => provider.status(job), cancel: () => provider.cancel(job) };
   }
 
@@ -208,7 +209,7 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
         }
         const provider = providers[job.provider];
         if (!provider) throw new Error(`no adapter for provider ${job.provider}`);
-        const request: SubmitRequest = { model: await loadModel(job.model), prompt: job.prompt, imageUrls, ratio: job.aspect, durationSec: job.duration_s };
+        const request: SubmitRequest = { model: await loadModel(job.model, job.params.audio), prompt: job.prompt, imageUrls, ratio: job.aspect, durationSec: job.duration_s, audio: job.params.audio === 'on' };
         return { send: () => provider.submit(request) };
       })().catch(async (e) => {
         await release(pool, jobId, e instanceof Error ? e.message : String(e));

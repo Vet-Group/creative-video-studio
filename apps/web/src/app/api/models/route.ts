@@ -1,8 +1,13 @@
-import { estimateUsd } from '@cvs/core/models';
+import { estimateUsd, usdPerSecondFor } from '@cvs/core/models';
 import { ASPECTS } from '@cvs/db';
 import { pool } from '@/lib/auth';
 import { modelStats, rank, scoreOf } from '@/lib/model-scores';
 import { guard } from '@/lib/session';
+
+function audioEstimate(r: { provider: string; endpoint: string; usd_per_second: string }, durationSec: number): string | null {
+  const perSecond = usdPerSecondFor({ endpoint: r.endpoint, usdPerSecond: r.usd_per_second }, 'on');
+  return perSecond === undefined ? null : r.provider === 'mock' ? '0.0000' : estimateUsd(perSecond, durationSec);
+}
 
 const MONTH = `to_char(now() at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM')`;
 
@@ -12,6 +17,7 @@ const MONTH = `to_char(now() at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM')`;
  * unless every supported model scores the same. Pass rate = (seed passes + marked passes) / (seed total + marked total) over every marked clip, deleted or
  * purged ones included; null while nothing is counted. The score also weighs how often real jobs of the model end well (lib/model-scores.ts).
  * `?feature=video`, `marketing` or `motion_control` keeps the models whose `features` lists it (Marketing Studio also accepts ratio 16:9, Motion Control takes only `auto`); without it every enabled video model is listed.
+ * `audioEstimateUsd` is the estimate with native audio on, null for a model that cannot make audio.
  * `monthToDate` is the caller's own total this ICT month, provisional while a job of it has no closing row. `remainingBudgetUsd` is for Admins only.
  */
 export async function GET(request: Request) {
@@ -31,7 +37,7 @@ export async function GET(request: Request) {
 
   const [models, mine, budget, stats] = await Promise.all([
     pool.query(
-      `select m.id, m.label, m.provider, m.ratios, m.durations_sec, m.max_images, m.usd_per_second, m.output_resolution
+      `select m.id, m.label, m.provider, m.endpoint, m.ratios, m.durations_sec, m.max_images, m.usd_per_second, m.output_resolution
          from model_configs m
         where m.enabled and m.kind = 'video' and ($1::text is null or $1 = any(m.features)) order by m.label, m.id`,
       [feature],
@@ -60,6 +66,8 @@ export async function GET(request: Request) {
       resolution: r.output_resolution as string | null,
       // A mock job books 0 USD, so that is what the picker shows for it.
       estimateUsd: r.provider === 'mock' ? '0.0000' : estimateUsd(r.usd_per_second, durationSec),
+      // With native audio on (Marketing Studio Advanced); null when the endpoint cannot make audio.
+      audioEstimateUsd: audioEstimate(r, durationSec),
       ...scoreOf(st),
       passes: st.passes,
       total: st.total,

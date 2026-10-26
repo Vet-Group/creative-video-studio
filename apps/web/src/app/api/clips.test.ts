@@ -244,23 +244,27 @@ describe('images in the Library', () => {
     expect(day.find((c) => c.id === 'lib-a')).toMatchObject({ feature: 'video', mediaType: 'video', resolution: null });
   });
 
-  test('filters by kind: images, videos, one feature, and every app feature', async () => {
+  test('filters by kind: images, videos, one feature, the two Marketing Studio formats, and every app feature', async () => {
     const v = await clip(alice.id, { id: 'kind-video' });
     const mk = await clip(alice.id, { id: 'kind-marketing' });
     await pool.query(`update jobs set feature = 'marketing' where id = $1`, [mk]);
+    const ma = await clip(alice.id, { id: 'kind-marketing-advanced' });
+    await pool.query(`update jobs set feature = 'marketing', params = '{"format":"advanced","audio":"on"}' where id = $1`, [ma]);
     const im = await imageClip(alice.id, { id: 'kind-image', feature: 'image' });
     const to = await imageClip(alice.id, { id: 'kind-tryon', feature: 'try_on' });
     const rf = await imageClip(alice.id, { id: 'kind-reframe', feature: 'reframe' });
     const mc = await imageClip(alice.id, { id: 'kind-motion', feature: 'motion_control' });
     await pool.query(`update assets set mime = 'video/mp4' where id = $1`, [`${mc}-out`]); // an app that outputs a video
     const kind = async (k: string) => (await items(bob.cookie, `?kind=${k}`)).map((c) => c.id as string).filter((id) => id.startsWith('kind-')).sort();
-    expect(await kind('all')).toEqual([im, mk, mc, rf, to, v].sort());
+    expect(await kind('all')).toEqual([im, mk, ma, mc, rf, to, v].sort());
     expect(await kind('images')).toEqual([im, rf, to].sort());
-    expect(await kind('videos')).toEqual([mc, mk, v].sort());
+    expect(await kind('videos')).toEqual([mc, mk, ma, v].sort());
     expect(await kind('try_on')).toEqual([to]);
     expect(await kind('image')).toEqual([im]);
     expect(await kind('video')).toEqual([v]);
-    expect(await kind('marketing')).toEqual([mk]);
+    expect(await kind('marketing')).toEqual([mk, ma].sort());
+    expect(await kind('marketing_ugc')).toEqual([mk]);
+    expect(await kind('marketing_advanced')).toEqual([ma]);
     expect(await kind('apps')).toEqual([mc, rf].sort());
     expect((await items(bob.cookie)).map((c) => c.id)).toEqual(expect.arrayContaining([v, im])); // no kind is all
     expect((await GET_LIBRARY(req('/api/library?kind=cats', bob.cookie))).status).toBe(400);
@@ -406,7 +410,7 @@ describe('GET /api/jobs/:id', () => {
     const res = await detail(bob.cookie, id);
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
-      id, userId: alice.id, status: 'succeeded', error: null, isMock: false, feature: 'video', resolution: null, presetId: 'gentle-push-in', prompt: 'a prompt', enhance: false, enhancedPrompt: null, ratio: '1:1', durationSec: 8, modelId: 'fal-test',
+      id, userId: alice.id, status: 'succeeded', error: null, isMock: false, feature: 'video', resolution: null, presetId: 'gentle-push-in', prompt: 'a prompt', enhance: false, enhancedPrompt: null, audio: null, ratio: '1:1', durationSec: 8, modelId: 'fal-test',
       storeId: 'store-ok', outputAssetId: `${id}-video`, posterAssetId: `${id}-poster`,
       images: [{ id: 'd-in-2', filename: 'in.png', width: null, height: null }, { id: 'd-in-1', filename: 'in.png', width: null, height: null }],
     });

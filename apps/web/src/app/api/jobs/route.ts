@@ -1,6 +1,6 @@
 import { reserve, withTransaction } from '@cvs/core/ledger';
 import { type CapRefusal, checkCaps } from '@cvs/core/limits';
-import { estimateUsd, FEATURE_PROMPTS } from '@cvs/core/models';
+import { estimateUsd, FEATURE_PROMPTS, usdPerSecondFor } from '@cvs/core/models';
 import { VIDEO_QUEUE, videoSendOptions } from '@cvs/core/queue';
 import { FEATURES } from '@cvs/db';
 import { pool } from '@/lib/auth';
@@ -8,6 +8,8 @@ import { boss } from '@/lib/queue';
 import { guard } from '@/lib/session';
 
 const MAX_IMAGES = 4;
+/** Marketing Studio Advanced (`params.format` 'advanced') takes up to 7 reference images, as on the reference site; the model's max_images is checked under the lock. */
+const MAX_ADVANCED_IMAGES = 7;
 /** An image job may name more inputs; the model's own max_images is checked under the lock. */
 const MAX_IMAGE_INPUTS = 16;
 const MAX_PROMPT = 2000;
@@ -67,7 +69,9 @@ export async function GET(request: Request) {
  * Create a video job: 1-4 input images the caller may use (their own, or the inputs of a succeeded Library clip for Reuse), an enabled
  * model, a preset or a free prompt (exactly one; a free prompt is trimmed, 1 to 2000 characters, and stored with a null preset), the ratio and duration the model allows, and an optional visible store. The caps are checked and the job and its
  * `estimate` ledger row are written in one transaction (429 when a cap refuses, nothing sent); the pg-boss job is sent afterwards.
- * `feature` (default `video`) picks the kind of job. `video` and `marketing` take a video model, the durations above and no `params`. `marketing` needs exactly 2 inputs (the model photo, then the product photo) and a prompt, no preset. Any other feature is an
+ * `feature` (default `video`) picks the kind of job. `video` and `marketing` take a video model and the durations above, and an optional `params.audio` (below); `video` takes no other `params`. `marketing` needs exactly 2 inputs (the model photo, then the product photo) and a prompt, no preset;
+ * with `params.format` 'advanced' (Marketing Studio Advanced) it takes 1 to 7 reference images instead, up to the model's `max_images`. A video job's optional `params.audio` 'on' prices
+ * it at the endpoint's audio price (AUDIO_USD_PER_SECOND; refused on a model without one), and 'off' or none keeps it silent. Any other feature is an
  * image job: an enabled image model that lists the feature, no preset, a prompt (the apps in FEATURE_PROMPTS may omit it and get that one), 1 to the model's `max_images`
  * inputs (Try On, the two swaps and Face Swap need at least 2; Background Changer takes a prompt or a second image as the reference), one of the model's ratios (or `auto`), `params.resolution` (a key of the model's `image_prices`, which also sets the
  * estimate) and an optional `params.quality`. `durationSec` is not read and the job stores 0.
@@ -95,12 +99,14 @@ export async function POST(request: Request) {
     const motion = feature === 'motion_control';
     // An app's empty prompt box means "no prompt", so its default applies (Motion Control has none: it sends no prompt).
     const freePrompt = (isImage || motion) && typeof rawPrompt === 'string' && rawPrompt.trim() === '' ? null : rawPrompt;
-    const maxInputs = isImage ? MAX_IMAGE_INPUTS : MAX_IMAGES;
+    const given = (rawParams && typeof rawParams === 'object' && !Array.isArray(rawParams) ? rawParams : {}) as Record<string, string>;
+    const advanced = feature === 'marketing' && given.format === 'advanced';
+    const maxInputs = isImage ? MAX_IMAGE_INPUTS : advanced ? MAX_ADVANCED_IMAGES : MAX_IMAGES;
     if (!Array.isArray(assetIds) || assetIds.length < 1 || assetIds.length > maxInputs || !assetIds.every((a) => typeof a === 'string') || new Set(assetIds).size !== assetIds.length) {
       return bad(`assetIds must list 1 to ${maxInputs} different asset ids`);
     }
     if (feature === 'try_on' && assetIds.length < 2) return bad('Try On needs the person image and at least one garment image');
-    if (feature === 'marketing' && assetIds.length !== 2) return bad('Marketing Studio needs exactly 2 images: the model photo first, then the product photo');
+    if (feature === 'marketing' && !advanced && assetIds.length !== 2) return bad('Marketing Studio needs exactly 2 images: the model photo first, then the product photo');
     if (feature === 'marketing' && (presetId !== null || typeof freePrompt !== 'string' || freePrompt.trim() === '')) return bad('Marketing Studio takes a prompt and no preset');
     if (assetIds.length < (MIN_INPUTS[feature] ?? 1)) return bad(`${feature} needs ${MIN_INPUTS[feature]} images`);
     if (motion && (assetIds.length !== 2 || presetId !== null)) return bad('Motion Control needs exactly 2 inputs (the character image, then the reference video) and no preset');
@@ -108,9 +114,14 @@ export async function POST(request: Request) {
       return bad('modelId, ratio, durationSec (a whole number, video only), a presetId or a prompt, and an optional storeId are required');
     }
     const entries = params && typeof params === 'object' && !Array.isArray(params) ? Object.entries(params) : null;
-    if (!entries || entries.some(([k, v]) => !['resolution', 'quality'].includes(k) || typeof v !== 'string')) return bad('params may hold only resolution and quality, as text');
-    const given = params as Record<string, string>;
-    if (isImage ? given.resolution === undefined : entries.length > 0) return bad(isImage ? 'params.resolution is required' : 'params are for image features only');
+    // Images take resolution and quality; Marketing Studio takes format ('advanced') and audio ('on' or 'off'); Create video takes audio; the others none.
+    const keys = isImage ? ['resolution', 'quality'] : feature === 'marketing' ? ['format', 'audio'] : feature === 'video' ? ['audio'] : [];
+    if (!entries || entries.some(([k, v]) => !keys.includes(k) || typeof v !== 'string')) {
+      return bad(keys.length > 0 ? `params may hold only ${keys.join(' and ')}, as text` : 'params are for image features, Create video and Marketing Studio only');
+    }
+    if (isImage && given.resolution === undefined) return bad('params.resolution is required');
+    if (given.format !== undefined && given.format !== 'advanced') return bad('params.format must be advanced');
+    if (given.audio !== undefined && given.audio !== 'on' && given.audio !== 'off') return bad('params.audio must be on or off');
     if (given.quality !== undefined && !QUALITIES.includes(given.quality)) return bad(`params.quality must be one of ${QUALITIES.join(', ')}`);
     // The PRD gives "an optional prompt, or one of the presets" for video: exactly one of the two. An image job has no presets.
     if (!motion && (isImage ? presetId !== null || (freePrompt === null && !Object.hasOwn(FEATURE_PROMPTS, feature)) : (presetId === null) === (freePrompt === null))) {
@@ -162,7 +173,7 @@ export async function POST(request: Request) {
     // A new Run was checked before the lock and a retry never was, so both look again: an image deleted meanwhile is refused.
     const live = await tx.query('select 1 from assets where id = any($1::text[]) and deleted_at is null', [assetIds]);
     if (live.rowCount !== assetIds.length) return bad('one or more assets were deleted');
-    const model = (await tx.query('select enabled, provider, kind, features, ratios, durations_sec, max_images, usd_per_second, image_prices from model_configs where id = $1', [modelId])).rows[0];
+    const model = (await tx.query('select enabled, provider, endpoint, kind, features, ratios, durations_sec, max_images, usd_per_second, image_prices from model_configs where id = $1', [modelId])).rows[0];
     if (!model?.enabled) return bad('the model does not exist or is not enabled');
     if (model.kind !== (isImage ? 'image' : 'video') || !model.features.includes(feature)) return bad('the model does not offer this feature');
     // Own keys only, with a plain decimal price: `in` would also accept "constructor" and friends.
@@ -181,7 +192,9 @@ export async function POST(request: Request) {
       }
     }
     const provider = original?.provider ?? model.provider;
-    const estimate = isImage ? Number(imagePrice).toFixed(4) : estimateUsd(model.usd_per_second, durationSec);
+    const perSecond = isImage ? null : usdPerSecondFor({ endpoint: model.endpoint, usdPerSecond: model.usd_per_second }, params.audio);
+    if (!isImage && perSecond === undefined) return bad('the model cannot generate audio');
+    const estimate = isImage ? Number(imagePrice).toFixed(4) : estimateUsd(perSecond!, durationSec);
     // A mock job books 0 USD (see the ledger), so it adds nothing to the monthly cap.
     const cap = await checkCaps(tx, userId, provider === 'mock' ? '0' : estimate, undefined, feature);
     if (cap) return Response.json({ error: CAP_MESSAGES[cap] }, { status: 429 });

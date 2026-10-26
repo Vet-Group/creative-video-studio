@@ -845,6 +845,7 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 /* Marketing Studio: the hook and location boxes sit under the two photo slots like the reference, and open a dialog of text cards. */
 .choice-box { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; width: 100%; min-height: 174px; padding: 12px; border: 1px dashed var(--text-disabled); border-radius: 18px; background: transparent; color: var(--text-2); text-align: center; }
 .app-slots.marketing-slots .slot, .marketing-slots .choice-box { min-height: 128px; }
+.marketing-slots .slot-wide { grid-column: 1 / -1; } /* Advanced: the reference slot spans the row above the hook and location boxes */
 .choice-box:hover { border-color: var(--ink); background: var(--surface-1); }
 .choice-value { color: var(--ink); font-size: 13px; line-height: 18px; font-weight: 600; overflow-wrap: anywhere; }
 .choice-dialog .modal-body h2:not(:has(+ .modal-sub)) { margin: 0 0 12px; font-size: 18px; line-height: 26px; }
@@ -961,7 +962,7 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 /* C4 round 5. */
 /* Marketing Studio: the boxes start 16 px under the banner and the prompt has no counter row (the field still stops at the limit), so ratio and duration sit above the Run bar, as on Fash. */
 .marketing-head { margin-bottom: 0; }
-.form-scroll:has(> .marketing-head) .prompt-foot { display: none; }
+.form-scroll:has(> .marketing-head) .prompt-foot:not(.script-foot) { display: none; }
 /* 1024-1439 px: Image Generation's size slider shares the tab row too, as Try On's does. */
 @media (min-width: 1024px) and (max-width: 1439.98px) {
   .imagegen-side .gallery-tools { height: 37px; align-items: center; margin: -69px 0 32px; }

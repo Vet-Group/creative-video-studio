@@ -31,7 +31,7 @@ export async function GET(request: Request, { params }: RouteContext) {
     [job.input_asset_ids],
   );
   return Response.json({
-    id: job.id, userId: job.user_id, status: job.status, error: job.error, isMock: job.is_mock, feature: job.feature, resolution: job.params.resolution ?? null, presetId: job.preset_id, prompt: job.prompt, enhance: job.enhance, enhancedPrompt: job.enhanced_prompt, ratio: job.aspect,
+    id: job.id, userId: job.user_id, status: job.status, error: job.error, isMock: job.is_mock, feature: job.feature, resolution: job.params.resolution ?? null, presetId: job.preset_id, prompt: job.prompt, enhance: job.enhance, enhancedPrompt: job.enhanced_prompt, audio: job.params.audio ?? null, ratio: job.aspect,
     durationSec: job.duration_s, modelId: job.model, storeId: job.store_id, outputAssetId: job.output_asset_id, posterAssetId: job.poster_asset_id, images: images.rows,
   });
 }

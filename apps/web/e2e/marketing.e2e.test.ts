@@ -21,12 +21,12 @@ test('a mock marketing job runs from two photos, a hook and a location, and show
   await openPage(page);
   await expect(nav(page).getByRole('link', { name: 'Marketing Studio' })).toHaveAttribute('aria-current', 'page');
   await expect(page.locator('.app-head strong')).toHaveText('UGC Thử đồ');
-  // The format picker, as on the live page: UGC is the built format; the other three are shown but cannot be picked yet.
+  // The format picker, as on the live page: UGC and Advanced are built (marketing-advanced.e2e.test.ts); the other two are shown but cannot be picked yet.
   await page.getByRole('button', { name: 'Đổi định dạng' }).click();
   const formats = page.getByRole('dialog', { name: 'Chọn định dạng' });
   await expect(formats.getByRole('button', { name: /^(UGC Thử đồ|Nâng cao|Mở hộp|Đánh giá sản phẩm)/ })).toHaveCount(4);
   await expect(formats.getByRole('button', { name: 'UGC Thử đồ' })).toHaveAttribute('aria-pressed', 'true');
-  await expect(formats.getByRole('button', { disabled: true })).toHaveCount(3);
+  await expect(formats.getByRole('button', { disabled: true })).toHaveCount(2);
   await formats.getByRole('button', { name: 'UGC Thử đồ' }).click();
   await expect(formats).toBeHidden();
   await expect(page.locator('.slot')).toHaveCount(2);
@@ -101,7 +101,8 @@ test('a mock marketing job runs from two photos, a hook and a location, and show
   expect(detail.prompt).toContain('[Image1]');
   expect(detail.prompt).toContain(hook.phrase);
   expect(detail.prompt).toContain(`Set in ${spot.phrase}.`);
-  expect(detail.prompt.endsWith(' soft morning light')).toBe(true);
+  // The member's text comes last before the sound rule; audio is on by default, as on Fash.
+  expect(detail.prompt).toContain(' soft morning light Natural sound recorded on the phone:');
 
   // Ví dụ lists the company's marketing clips as videos.
   await page.getByRole('tab', { name: 'Ví dụ' }).click();
