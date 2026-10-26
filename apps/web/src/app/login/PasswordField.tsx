@@ -52,8 +52,10 @@ export function PasswordField({
       const field = i.getBoundingClientRect();
       const origin = centre(e.getBoundingClientRect());
       const aim = pointer.current ?? origin;
-      // On the stacked (narrow) form the Email field and the submit button sit close above and below, so the beam stays as tall as the field.
-      const b = beam(origin, aim, field.width, narrow ? field.height : Infinity);
+      // On the stacked (narrow) form the Email field and the submit button sit close above and below, so the beam stays as tall as the field,
+      // and it ends at the card's left edge instead of spilling onto the page backdrop.
+      const card = narrow ? i.closest('.login-card')?.getBoundingClientRect() : undefined;
+      const b = beam(origin, aim, field.width, narrow ? field.height : Infinity, card?.left);
       const half = halfAt(b, b.length);
       // Where the cone stops widening, as a share of the length; 100% when it never reaches the cap.
       const flat = Math.min(100, ((half - W0) / SPREAD / b.length) * 100);

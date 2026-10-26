@@ -36,3 +36,11 @@ test('a capped beam stops widening, so points off the axis by more than the cap 
   expect(lightAt(capped, origin.x - 200, origin.y - 50)).toBe(0);
   expect(lightAt(capped, origin.x - 200, origin.y - 5)).toBeGreaterThan(0.9);
 });
+
+test('a beam pointing left ends at minX, and stays full length when it points right', () => {
+  const clipped = beam(origin, { x: 100, y: 100 }, 280, Infinity, 150);
+  expect(clipped.length).toBe(150);
+  expect(lightAt(clipped, 140, origin.y)).toBe(0);
+  expect(lightAt(clipped, 250, origin.y)).toBeGreaterThan(0.9);
+  expect(beam(origin, { x: 500, y: 100 }, 280, Infinity, 150).length).toBe(200 + TAIL);
+});

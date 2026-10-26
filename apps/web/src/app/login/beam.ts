@@ -17,13 +17,17 @@ export const MIN_D = 1;
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 
-/** `maxHalf` caps the half width, so on a narrow form the cone flattens into a band that stays off the neighbouring fields. */
-export function beam(origin: Point, pointer: Point, fieldWidth: number, maxHalf = Infinity): Beam {
+/**
+ * `maxHalf` caps the half width, so on a narrow form the cone flattens into a band that stays off the neighbouring fields.
+ * `minX` is a vertical line the beam ends at when it points left, such as the edge of the login card.
+ */
+export function beam(origin: Point, pointer: Point, fieldWidth: number, maxHalf = Infinity, minX = -Infinity): Beam {
   const dx = pointer.x - origin.x;
   const dy = pointer.y - origin.y;
   const d = Math.hypot(dx, dy);
   const u = d < MIN_D ? { x: -1, y: 0 } : { x: dx / d, y: dy / d };
-  return { origin, u, length: Math.max(d + TAIL, fieldWidth), angle: (Math.atan2(u.y, u.x) * 180) / Math.PI, maxHalf };
+  const toEdge = u.x < 0 ? (origin.x - minX) / -u.x : Infinity;
+  return { origin, u, length: Math.min(Math.max(d + TAIL, fieldWidth), toEdge), angle: (Math.atan2(u.y, u.x) * 180) / Math.PI, maxHalf };
 }
 
 /** Half width of the beam at a distance along it. */
