@@ -119,7 +119,7 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
         setImages(j.images);
         setPresetId(preset ?? '');
         if (!preset) setPrompt(j.prompt);
-        setEnhance(j.enhance ?? true);
+        setEnhance(j.presetId === null ? (j.enhance ?? true) : true); // a preset job never had Enhance, so the default stays
         setRatio(j.ratio);
         setDurationSec(j.durationSec);
         setModelId(j.modelId);
