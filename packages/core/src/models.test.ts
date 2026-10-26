@@ -10,9 +10,9 @@ describe.each(BAKEOFF_MODELS)('$id', (model) => {
   });
 
   test.each([
-    ['16:9', { ratio: '16:9' }],
-    ['4 s', { durationSec: 4 }],
-    ['11 s', { durationSec: 11 }],
+    ['4:3', { ratio: '4:3' }],
+    ['2 s', { durationSec: 2 }],
+    ['16 s', { durationSec: 16 }],
     ['too many images', { imageCount: model.maxImages + 1 }],
     ['no images', { imageCount: 0 }],
   ])('rejects %s', (_name, change) => {

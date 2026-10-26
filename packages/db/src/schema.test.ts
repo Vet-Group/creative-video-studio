@@ -79,6 +79,10 @@ describe('migration 0002 seed data', () => {
       { id: 'kling-o3-pro', provider: 'fal', endpoint: 'fal-ai/kling-video/o3/pro/reference-to-video', enabled: true, usd: '0.1120', max_images: 7, output_resolution: '1080p', passes: 7, total: 10 },
       { id: 'seedance-2.5', provider: 'replicate', endpoint: 'bytedance/seedance-2.5', enabled: false, usd: '0.2312', max_images: 4, output_resolution: '720p', passes: 6, total: 9 },
     ]);
+    // 0022 also widens Kling to every ratio and duration fal accepts, matching the model facts in packages/core.
+    const kling = BAKEOFF_MODELS.find((m) => m.id === 'kling-o3-pro')!;
+    expect((await pool.query(`select ratios, durations_sec from model_configs where id = 'kling-o3-pro'`)).rows).toEqual([{ ratios: kling.ratios, durations_sec: kling.durationsSec }]);
+    expect([kling.ratios, kling.durationsSec[0], kling.durationsSec.at(-1)]).toEqual([['9:16', '1:1', '16:9'], 3, 15]);
     expect((await pool.query(`select monthly_cap_usd::text as cap, member_daily_clip_cap as daily from settings`)).rows).toEqual([{ cap: '200.0000', daily: 5 }]);
   });
 

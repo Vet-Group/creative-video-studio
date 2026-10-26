@@ -1,4 +1,4 @@
-export type Ratio = '9:16' | '1:1';
+export type Ratio = '9:16' | '1:1' | '16:9';
 
 export interface ModelConfig {
   id: string;
@@ -57,8 +57,8 @@ const READ_AT = '2026-10-23';
 
 // Migration 0013 (M.6) copies these facts into the seeded model_configs rows; packages/db/src/schema.test.ts keeps the two in step.
 /**
- * The two bake-off candidates. The app offers 9:16 and 1:1 and 5-10 s clips (PRD) and sends at most 4 images,
- * so `ratios`, `durationsSec` and `maxImages` are the app's subset of what the provider accepts (see `sources`).
+ * The two bake-off candidates. `ratios`, `durationsSec` and `maxImages` are the app's subset of what the provider accepts (see `sources`);
+ * Kling offers all of fal's, as the reference site does (migration 0022).
  */
 export const BAKEOFF_MODELS: ModelConfig[] = [
   {
@@ -66,10 +66,10 @@ export const BAKEOFF_MODELS: ModelConfig[] = [
     provider: 'fal',
     endpoint: 'fal-ai/kling-video/o3/pro/reference-to-video',
     label: 'Kling O3 Pro',
-    // fal accepts 16:9, 9:16 and 1:1.
-    ratios: ['9:16', '1:1'],
+    // fal accepts 16:9, 9:16 and 1:1; Create Video still offers only 9:16 and 1:1 (the models API).
+    ratios: ['9:16', '1:1', '16:9'],
     // fal accepts 3-15 s as strings "3".."15".
-    durationsSec: [5, 6, 7, 8, 9, 10],
+    durationsSec: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
     // fal documents "Maximum 4 total (elements + reference images)" only for requests with a video; the app sends none, and takes up to 7 like the
     // reference site's Marketing Studio Advanced (migration 0022). Create Video still sends at most 4 (the jobs API).
     maxImages: 7,
@@ -81,8 +81,8 @@ export const BAKEOFF_MODELS: ModelConfig[] = [
     billedAmountField: null,
     thrift: { durationSec: 5, resolution: '1080p' },
     sources: {
-      ratios: { url: FAL_KLING_SCHEMA, readAt: READ_AT },
-      durationsSec: { url: FAL_KLING_SCHEMA, readAt: READ_AT },
+      ratios: { url: FAL_KLING_SCHEMA, readAt: '2026-10-26' },
+      durationsSec: { url: FAL_KLING_SCHEMA, readAt: '2026-10-26' },
       maxImages: { url: FAL_KLING_SCHEMA, readAt: '2026-10-26' },
       outputResolution: { url: 'scripts/bakeoff/rubric.md', readAt: READ_AT },
       usdPerSecond: { url: FAL_KLING_PAGE, readAt: READ_AT },
