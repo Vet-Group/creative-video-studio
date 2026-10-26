@@ -105,6 +105,9 @@ legend { font-weight: 600; padding: 0 .25rem; }
   .sidebar { z-index: 30; width: 240px; padding: 16px 16px 32px; overflow-y: visible; transform: none; visibility: visible; transition: none; }
   .topbar, .scrim, .drawer-close { display: none; }
   .content { margin-left: 240px; }
+  /* Fash widens the sidebar to 280 px on the Apps pages only. */
+  .app:not([data-collapsed='true']):has(.apps, .app-page) .sidebar { width: 280px; }
+  .app:not([data-collapsed='true']):has(.apps, .app-page) .content { margin-left: 280px; }
   .frame { padding: 16px 48px 32px; }
   /* Explore rows run to the window edge, as on the live page, and still scroll back to the gutter. */
   .explore :is(.explore-features, .explore-cards) { margin-right: -48px; padding-right: 48px; } /* beats .explore ul */
@@ -559,7 +562,6 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .about ol { grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: 16px; padding: 0; list-style: none; }
 .about ol li { padding: 20px; border: 1px solid #e5e5e5; border-radius: 12px; color: #555; font-size: 14px; line-height: 21px; }
 /* An odd last card fills the row, so the grid ends even as on the live About pages. */
-.about ol li:last-child:nth-child(odd) { grid-column: 1 / -1; }
 .about ol li strong { display: block; margin-bottom: 6px; color: #1a1a1a; font-size: 18px; line-height: 26px; font-weight: 600; }
 /* An app's About reads as an article (live app pages): left-aligned sections, a plain numbered list. */
 .about-long > p, .about-long ul { text-align: left; }
@@ -753,7 +755,7 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .choice-grid button:has(> video, > img):is([aria-selected='true'], [aria-pressed='true']) > :is(video, img) { outline: 2px solid #000; outline-offset: 2px; }
 .choice-grid button > :is(video, img) { display: block; width: 100%; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 8px; }
 .choice-grid button:has(> video, > img) .choice-name { font-size: 13px; line-height: 18px; font-weight: 600; }
-.choice-grid .choice-name .badge-soon { display: block; width: fit-content; margin: 6px 0 0; padding: 2px 10px; border: 1px solid rgb(228, 228, 231); border-radius: 999px; background: #fff; color: rgb(82, 82, 82); font-weight: 500; }
+.choice-grid .choice-name .badge-soon { display: block; width: fit-content; margin: 6px auto 0; padding: 2px 10px; border: 1px solid rgb(228, 228, 231); border-radius: 999px; background: #fff; color: rgb(82, 82, 82); font-weight: 500; }
 /* The "none" choice beside the clips: a light 3:4 tile, ringed when chosen. */
 .choice-grid:has(button > :is(video, img)) button:not(:has(> video, > img)) { align-self: start; aspect-ratio: 3 / 4; border: 0; border-radius: 8px; background: #f2f2f2; color: #1a1a1a; font-weight: 600; }
 .choice-grid:has(button > :is(video, img)) button:not(:has(> video, > img))[aria-selected='true'] { outline: 2px solid #000; outline-offset: 2px; }
@@ -778,7 +780,7 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 /* Try On's optional prompt is a 75 px box without a counter row, so Ratio clears the Run bar as on the live page. */
 [aria-labelledby='tryon-title'] .prompt-box textarea { height: 75px; }
 [aria-labelledby='tryon-title'] .prompt-foot { display: none; }
-.choice-label { color: rgb(77, 77, 77); font-size: 13px; line-height: 18px; }
+.choice-label { color: rgb(77, 77, 77); font-size: 13px; line-height: 18px; white-space: pre-line; }
 .marketing-slots .choice-value { font-weight: 500; color: rgb(128, 128, 128); }
 .marketing-head { position: relative; justify-content: center; align-items: center; min-height: 130px; text-align: center; }
 .field-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 8px; }

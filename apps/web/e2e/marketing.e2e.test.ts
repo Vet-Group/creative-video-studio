@@ -46,6 +46,7 @@ test('a mock marketing job runs from two photos, a hook and a location, and show
   // Hook: the box opens a dialog of text cards by keyboard, the arrows move between them, Enter picks, Escape closes without a change.
   const hookBox = page.getByRole('button', { name: /^Hook/ });
   await expect(hookBox).toContainText('Chưa chọn');
+  expect(await hookBox.locator('.choice-label').evaluate((el) => (el as HTMLElement).innerText)).toBe('Hook\n(tuỳ chọn)'); // two lines, as on Fash
   await hookBox.focus();
   await page.keyboard.press('Enter');
   const hooks = page.getByRole('dialog', { name: 'Chọn hook' });
