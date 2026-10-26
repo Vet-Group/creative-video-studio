@@ -16,6 +16,8 @@ const KINDS = [
   { id: 'image', label: 'Tạo ảnh' },
   { id: 'video', label: 'Tạo video' },
   { id: 'marketing', label: 'Marketing Studio' },
+  { id: 'marketing_ugc', label: 'UGC Thử đồ' },
+  { id: 'marketing_advanced', label: 'Nâng cao' },
   { id: 'apps', label: 'Ứng dụng' },
 ];
 /** The size slider: card widths from small to large, remembered per browser. */

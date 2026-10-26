@@ -80,7 +80,8 @@ const seconds = (req: SubmitRequest) => String(req.durationSec);
 const ref = (images: string[]) => ({ image_urls: images });
 const first = (images: string[]) => ({ image_url: images[0] });
 export const VIDEO_BODIES: Record<string, VideoBody> = {
-  'fal-ai/kling-video/o3/pro/reference-to-video': { build: (req, images) => ({ prompt: imageTokens(req.prompt, atImage), ...ref(images), aspect_ratio: req.ratio, duration: seconds(req), generate_audio: false }) },
+  // Audio is on only for a job that asks for it (Marketing Studio Advanced), priced by AUDIO_USD_PER_SECOND.
+  'fal-ai/kling-video/o3/pro/reference-to-video': { build: (req, images) => ({ prompt: imageTokens(req.prompt, atImage), ...ref(images), aspect_ratio: req.ratio, duration: seconds(req), generate_audio: req.audio === true }) },
   'fal-ai/kling-video/o1/reference-to-video': { build: (req, images) => ({ prompt: imageTokens(req.prompt, atImage), ...ref(images), aspect_ratio: req.ratio, duration: seconds(req) }) },
   'fal-ai/kling-video/v3/pro/image-to-video': { crop: true, build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), start_image_url: images[0], duration: seconds(req), generate_audio: false }) },
   'fal-ai/kling-video/v2.6/pro/image-to-video': { crop: true, build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), start_image_url: images[0], duration: seconds(req), generate_audio: false }) },

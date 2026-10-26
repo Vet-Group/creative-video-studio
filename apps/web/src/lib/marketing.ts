@@ -40,3 +40,38 @@ export function marketingPrompt({ hook, location, prompt }: { hook?: string | nu
   const text = prompt?.trim();
   return [INSTRUCTION, h?.phrase, l && `Set in ${l.phrase}.`, text].filter(Boolean).join(' ');
 }
+
+/** The most reference images an Advanced run takes, as on the reference site; each model's own max_images may be lower. */
+export const ADVANCED_MAX_IMAGES = 7;
+/** The page's limits on the brief and the script: with the longest fixed part (about 600 characters) the prompt stays under the API's 2000. A script of
+ * roughly two spoken words per second fills a 15 s clip at about 200 characters. */
+export const ADVANCED_MAX_BRIEF = 1000;
+export const ADVANCED_MAX_SCRIPT = 300;
+
+/**
+ * The one English prompt a Marketing Studio Advanced run sends. The member's brief is the source of truth, the reference images are named
+ * [Image1]..[ImageN] (each adapter rewrites them for its schema), the hook and the location follow when chosen, then one dialogue rule:
+ * audio off is silent; a script is spoken word for word and nothing else; with no script there is speech only when the brief asks for it.
+ */
+export function advancedPrompt({ brief, images, hook, location, script, audio }: { brief: string; images: number; hook?: string | null; location?: string | null; script?: string | null; audio: boolean }): string {
+  const h = HOOKS.find((c) => c.id === hook);
+  const l = LOCATIONS.find((c) => c.id === location);
+  const refs = Array.from({ length: images }, (_, i) => `[Image${i + 1}]`).join(', ');
+  const lines = script?.trim().replace(/\s+/g, ' ');
+  const dialogue = !audio
+    ? 'The video is completely silent: no speech, no music and no sound.'
+    : lines
+      ? `The speaker says exactly: "${lines}", lip-synced, and no other spoken words.`
+      : 'Add speech only if the brief asks for it; otherwise use ambient sound or music with no spoken words.';
+  return [
+    'Marketing video. The brief below is the source of truth; follow it.',
+    images > 0 && `The reference images ${refs} show the people, products, settings or style to use; keep their faces, shapes, colours, text and logos true to the photos.`,
+    `Brief: ${brief.trim()}`,
+    h?.phrase,
+    l && `Set in ${l.phrase}.`,
+    dialogue,
+    'Do not add on-screen text, captions or watermarks.',
+  ]
+    .filter(Boolean)
+    .join(' ');
+}

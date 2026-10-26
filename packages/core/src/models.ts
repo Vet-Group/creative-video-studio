@@ -70,8 +70,9 @@ export const BAKEOFF_MODELS: ModelConfig[] = [
     ratios: ['9:16', '1:1'],
     // fal accepts 3-15 s as strings "3".."15".
     durationsSec: [5, 6, 7, 8, 9, 10],
-    // fal documents "Maximum 4 total (elements + reference images)" only for requests with a video.
-    maxImages: 4,
+    // fal documents "Maximum 4 total (elements + reference images)" only for requests with a video; the app sends none, and takes up to 7 like the
+    // reference site's Marketing Studio Advanced (migration 0022). Create Video still sends at most 4 (the jobs API).
+    maxImages: 7,
     // fal states no output resolution and the schema has no resolution input; B.5a measured the canary clip at 1080x1920 (scripts/bakeoff/rubric.md).
     outputResolution: '1080p',
     // Audio off: $0.112 per second (audio on is $0.14).
@@ -82,7 +83,7 @@ export const BAKEOFF_MODELS: ModelConfig[] = [
     sources: {
       ratios: { url: FAL_KLING_SCHEMA, readAt: READ_AT },
       durationsSec: { url: FAL_KLING_SCHEMA, readAt: READ_AT },
-      maxImages: { url: FAL_KLING_SCHEMA, readAt: READ_AT },
+      maxImages: { url: FAL_KLING_SCHEMA, readAt: '2026-10-26' },
       outputResolution: { url: 'scripts/bakeoff/rubric.md', readAt: READ_AT },
       usdPerSecond: { url: FAL_KLING_PAGE, readAt: READ_AT },
       billedAmountField: { url: 'https://fal.ai/docs/model-apis/model-endpoints/queue', readAt: READ_AT },
@@ -124,6 +125,17 @@ export const validateRequest = (model: ModelConfig, req: { ratio: string; durati
   if (req.imageCount < 1 || req.imageCount > model.maxImages) return `${req.imageCount} images; ${model.maxImages} at most`;
   return null;
 };
+
+/**
+ * USD per second with native audio on, by endpoint: only the endpoints whose request builder sends the audio switch (fal.ts) and whose model page
+ * states the audio price. Kling O3 Pro: $0.112 audio off, $0.14 audio on (https://fal.ai/models/fal-ai/kling-video/o3/pro/reference-to-video/llms.txt,
+ * read 2026-10-26). The mock endpoint takes the switch so the specs can drive it; a mock job books 0 regardless.
+ */
+export const AUDIO_USD_PER_SECOND: Record<string, number> = { 'fal-ai/kling-video/o3/pro/reference-to-video': 0.14, mock: 0 };
+
+/** The model's price per second for a job, with audio on when `audio` is 'on' (a job's params.audio); undefined when the endpoint cannot make audio. */
+export const usdPerSecondFor = (model: { endpoint: string; usdPerSecond: number | string }, audio: string | undefined): number | string | undefined =>
+  audio === 'on' ? (Object.hasOwn(AUDIO_USD_PER_SECOND, model.endpoint) ? AUDIO_USD_PER_SECOND[model.endpoint] : undefined) : model.usdPerSecond;
 
 /** The USD a Run of `durationSec` reserves at the model's price, as a 4-decimal string (a mock job books 0 in the ledger regardless). */
 export const estimateUsd = (usdPerSecond: number | string, durationSec: number): string => (Number(usdPerSecond) * durationSec).toFixed(4);

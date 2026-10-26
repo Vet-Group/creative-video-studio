@@ -16,12 +16,15 @@ const KINDS: Record<string, string> = {
   image: `j.feature = 'image'`,
   video: `j.feature = 'video'`,
   marketing: `j.feature = 'marketing'`,
+  // The two Marketing Studio formats, as the reference Library splits them: Advanced jobs carry params.format 'advanced'.
+  marketing_ugc: `j.feature = 'marketing' and j.params->>'format' is null`,
+  marketing_advanced: `j.feature = 'marketing' and j.params->>'format' = 'advanced'`,
   apps: `j.feature in (${APP_FEATURES})`,
 };
 
 /**
  * The Library: every user's live clips and images, newest first. Filters: `creator` (a user id), `date` (YYYY-MM-DD, Asia/Ho_Chi_Minh), `ratio` and
- * `kind` (`all` by default, `images`, `videos`, one feature of `try_on`, `image`, `video`, `marketing`, or `apps` for every app feature),
+ * `kind` (`all` by default, `images`, `videos`, one feature of `try_on`, `image`, `video`, `marketing` (or one of its formats, `marketing_ugc` and `marketing_advanced`), or `apps` for every app feature),
  * `favorites=1` (only the caller's favourites) and `sort` (`newest`, the default, or `oldest`); `offset` pages by 24. `favorite` says whether the caller marked an item. Each item has its `feature` and `mediaType` (`video` or `image`, from the output asset); `videoAssetId` is the output asset
  * either way, and an image item has `durationSec` 0 and its `resolution`. `creators` fills the creator filter. `costUsd` is the job's ledger total, provisional while `costFinal` is false.
  */

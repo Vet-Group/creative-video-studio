@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { BAKEOFF_MODELS, estimateUsd, validateRequest } from './models';
+import { BAKEOFF_MODELS, estimateUsd, usdPerSecondFor, validateRequest } from './models';
 
 describe.each(BAKEOFF_MODELS)('$id', (model) => {
   const ok = { ratio: '9:16', durationSec: 5, imageCount: 1 };
@@ -38,4 +38,13 @@ test('estimates the cost of a thrift clip and of an 8 s staff clip', () => {
   expect(estimateUsd(seedance!.usdPerSecond, seedance!.thrift!.durationSec)).toBe('1.1560');
   expect(estimateUsd(kling!.usdPerSecond, 8)).toBe('0.8960');
   expect(estimateUsd(seedance!.usdPerSecond, 8)).toBe('1.8496');
+});
+
+test('audio on takes the endpoint audio price, audio off or absent the stored price, and an endpoint without audio has none', () => {
+  const kling = { endpoint: 'fal-ai/kling-video/o3/pro/reference-to-video', usdPerSecond: 0.112 };
+  expect(usdPerSecondFor(kling, 'on')).toBe(0.14);
+  expect(usdPerSecondFor(kling, 'off')).toBe(0.112);
+  expect(usdPerSecondFor(kling, undefined)).toBe(0.112);
+  expect(usdPerSecondFor({ endpoint: 'fal-ai/wan/v2.7/reference-to-video', usdPerSecond: 0.1 }, 'on')).toBeUndefined();
+  expect(usdPerSecondFor({ endpoint: 'constructor', usdPerSecond: 0.1 }, 'on')).toBeUndefined();
 });

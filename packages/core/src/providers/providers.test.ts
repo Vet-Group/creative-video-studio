@@ -86,6 +86,14 @@ describe('fal', () => {
     });
   });
 
+  test('a job with audio on asks Kling for native audio; other endpoints stay silent', async () => {
+    const { fn, calls } = fakeFetch([200, { request_id: 'req-1' }], [200, { request_id: 'req-2' }]);
+    await createFalProvider({ apiKey: 'k', fetch: fn }).submit({ ...req, audio: true });
+    expect(calls[0]!.body).toMatchObject({ generate_audio: true });
+    await createFalProvider({ apiKey: 'k', fetch: fn }).submit({ ...req, audio: true, model: { ...kling, endpoint: 'bytedance/seedance-2.5/us/reference-to-video' } });
+    expect(calls[1]!.body).toMatchObject({ generate_audio: false });
+  });
+
   test('a refusal surfaces the HTTP status', async () => {
     const { fn } = fakeFetch([402, { detail: 'Exhausted balance' }]);
     const err = await createFalProvider({ apiKey: 'k', fetch: fn }).submit(req).catch((e) => e);

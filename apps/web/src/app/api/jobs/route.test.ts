@@ -646,6 +646,69 @@ describe('POST /api/jobs for an image feature', () => {
           { feature: 'marketing', prompt, input_asset_ids: [m.asset, `${m.id}-product`], retry_of: id },
         ]);
       }));
+
+    describe('Advanced (params.format advanced)', () => {
+      // Kling O3 Pro lists marketing (migration 0010), takes 7 references (0022) and has an audio price; fal-test (endpoint 'x') takes 2 and has none.
+      const kling = { modelId: 'kling-o3-pro', ratio: '9:16', durationSec: 5 };
+      let refSeq = 0;
+      async function refs(m: Member, n: number): Promise<string[]> {
+        const ids = Array.from({ length: n }, () => `${m.id}-ref-${++refSeq}`);
+        for (const id of ids) await insertAsset(id, m.id);
+        return ids;
+      }
+      const advanced = async (m: Member, n: number, extra: Record<string, unknown> = {}) =>
+        runAs(m, { feature: 'marketing', presetId: null, prompt, ...kling, assetIds: await refs(m, n), params: { format: 'advanced', audio: 'on' }, ...extra });
+
+      test('takes 1 to 7 reference images, stores format and audio, and books the audio price with audio on and the silent price with it off', async () => {
+        for (const [n, audio, usd] of [[1, 'on', '0.7000'], [7, 'off', '0.5600']] as const) {
+          const m = await newMember();
+          const res = await advanced(m, n, { params: { format: 'advanced', audio } });
+          expect(res.status).toBe(201);
+          const { id } = (await res.json()) as { id: string };
+          const row = (await pool.query('select feature, model, prompt, params, input_asset_ids from jobs where id = $1', [id])).rows[0];
+          expect(row).toMatchObject({ feature: 'marketing', model: 'kling-o3-pro', prompt, params: { format: 'advanced', audio } });
+          expect(row.input_asset_ids).toHaveLength(n);
+          expect((await pool.query(`select usd::text from cost_entries where job_id = $1`, [id])).rows).toEqual([{ usd }]);
+        }
+      });
+
+      test('refuses no image, an eighth image, a missing prompt, a preset, and unknown format or audio values, in English', async () => {
+        const m = await newMember();
+        const before = await jobCount();
+        expect(await error(await advanced(m, 0))).toMatch(/assetIds must list 1 to 7/);
+        expect(await error(await advanced(m, 8))).toMatch(/assetIds must list 1 to 7/);
+        expect(await error(await advanced(m, 2, { prompt: '  ' }))).toMatch(/prompt and no preset/);
+        expect(await error(await advanced(m, 2, { presetId: 'gentle-push-in' }))).toMatch(/prompt and no preset/);
+        expect(await error(await advanced(m, 2, { params: { format: 'unboxing' } }))).toMatch(/params.format must be advanced/);
+        expect(await error(await advanced(m, 2, { params: { format: 'advanced', audio: 'yes' } }))).toMatch(/params.audio must be on or off/);
+        expect(await error(await advanced(m, 2, { params: { format: 'advanced', resolution: '1K' } }))).toMatch(/params may hold only format and audio/);
+        expect(await error(await advanced(m, 2, { feature: 'video', prompt: 'x', params: { format: 'advanced' } }))).toMatch(/params are for image features and Marketing Studio only/);
+        expect(await jobCount()).toBe(before);
+      });
+
+      test("is held to the model's own reference cap and refuses audio on a model without an audio price", () =>
+        withMarketing(async () => {
+          const m = await newMember();
+          const before = await jobCount();
+          const falTest = { modelId: 'fal-test', ratio: '9:16', durationSec: 5 };
+          expect(await error(await advanced(m, 3, { ...falTest, params: { format: 'advanced', audio: 'off' } }))).toMatch(/number of images/);
+          expect(await error(await advanced(m, 2, { ...falTest, params: { format: 'advanced', audio: 'on' } }))).toMatch(/cannot generate audio/);
+          expect(await jobCount()).toBe(before);
+          expect((await advanced(m, 2, { ...falTest, params: { format: 'advanced', audio: 'off' } })).status).toBe(201);
+        }));
+
+      test('UGC without the format still needs exactly 2 images, and a retry copies the params of the original', async () => {
+        const m = await newMember();
+        expect(await error(await advanced(m, 3, { params: { audio: 'off' } }))).toMatch(/exactly 2 images/);
+        const { id } = (await (await advanced(m, 3)).json()) as { id: string };
+        await pool.query(`update jobs set status = 'failed' where id = $1`, [id]);
+        const res = await run(m.cookie, { retryOf: id });
+        expect(res.status).toBe(201);
+        const retry = ((await res.json()) as { id: string }).id;
+        expect((await pool.query('select params from jobs where id = $1', [retry])).rows[0].params).toEqual({ format: 'advanced', audio: 'on' });
+        expect((await pool.query(`select usd::text from cost_entries where job_id = $1`, [retry])).rows).toEqual([{ usd: '0.7000' }]);
+      });
+    });
   });
 
   describe('the image and apps caps', () => {

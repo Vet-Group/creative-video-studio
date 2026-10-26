@@ -219,7 +219,7 @@ export function Shell({ userId, userName, isAdmin, account, initialCollapsed, ch
               </button>
             </div>
             <nav aria-label="Điều hướng chính">
-              {NAV.map((n) => link(n.href, n.text, n.icon))}
+              {NAV.map((n) => link(n.href, n.text, n.icon, pathname === n.href || pathname.startsWith(`${n.href}/`)))}
               {isAdmin && link('/admin/users', 'Quản trị', 'admin', pathname.startsWith('/admin'))}
             </nav>
           </div>
