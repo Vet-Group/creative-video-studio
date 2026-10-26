@@ -597,6 +597,9 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .slot-add { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; width: 56px; height: 56px; padding: 0; border: 1px dashed rgb(204, 204, 204); border-radius: 12px; background: rgb(242, 242, 242); color: rgb(77, 77, 77); font-size: 11px; line-height: 14px; }
 .slot-hint { color: rgb(102, 102, 102); font-size: 13px; line-height: 18px; }
 .slot-icon { display: grid; place-items: center; }
+.slot-name { display: none; color: rgb(102, 102, 102); font-size: 14px; line-height: 20px; }
+.app-slots[data-two='true'] .slot-add .slot-hint { display: none; } /* not the video slot's own line */
+.app-slots[data-two='true'] .slot-name { display: block; }
 /* An empty slot is one button. Full width (Try On): the hint on the left and a 76x79 grey upload tile on the right, in a 105 px box. Half width: a grey circle over the hint. */
 .slot-add:has(.slot-hint) { flex: 1 1 100%; flex-direction: row-reverse; justify-content: space-between; gap: 12px; width: auto; height: auto; min-height: 79px; border: 0; background: transparent; text-align: left; }
 .slot:has(.slot-hint) { min-height: 105px; }
@@ -668,9 +671,9 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .apps-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 0; padding: 0; list-style: none; }
 @media (min-width: 1280px) { .apps-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; } }
 @media (min-width: 1800px) { .apps-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
-.app-card { display: flex; flex-direction: column; gap: 4px; height: 100%; padding: 0 0 12px; overflow: hidden; border: 1px solid #e4e4e7; border-radius: 14px; background: #fff; color: inherit; text-decoration: none; }
+.app-card { display: flex; flex-direction: column; gap: 4px; height: 100%; padding: 0 0 16px; overflow: hidden; border: 1px solid #e4e4e7; border-radius: 14px; background: #fff; color: inherit; text-decoration: none; }
 .app-card:hover { border-color: rgb(153, 153, 153); }
-.app-card > strong, .app-card > .muted, .app-card-head, .app-card > .app-card-head + .muted { margin-inline: 12px; }
+.app-card > strong, .app-card > .muted, .app-card-head, .app-card > .app-card-head + .muted { margin-inline: 16px; }
 .app-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .app-card .muted { font-size: 13px; line-height: 18px; }
 .app-card .app-art { aspect-ratio: 331 / 320; } /* the live card art, 331x320 at 1440 px */
@@ -732,8 +735,8 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .choice-grid button[aria-pressed='true'] { border-color: #000; }
 .choice-grid button:disabled { cursor: not-allowed; opacity: .6; }
 /* A format that is not ready yet: its clip washed out and a light pill centred under the name, as on the live picker. */
-.choice-grid button:has(.badge-soon) > :is(video, img) { opacity: .5; }
-.choice-grid button:has(.badge-soon) .choice-name { color: rgb(128, 128, 128); text-align: center; }
+.choice-grid button:has(.badge-soon) > :is(video, img) { opacity: .85; }
+.choice-grid button:has(.badge-soon) .choice-name { color: rgb(128, 128, 128); }
 /* A choice with a sample loop: the bare 3:4 clip with its name left-aligned below, like the live pickers; the chosen one gets a ring and a check badge. */
 .choice-grid:has(button > :is(video, img)) { grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr)); gap: 16px; padding: 4px; }
 .choice-grid button:has(> video, > img) { position: relative; display: grid; align-content: start; gap: 8px; min-height: 0; padding: 0; border: 0; background: transparent; color: #1a1a1a; text-align: left; }
@@ -741,7 +744,7 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .choice-grid button:has(> video, > img):is([aria-selected='true'], [aria-pressed='true']) > :is(video, img) { outline: 2px solid #000; outline-offset: 2px; }
 .choice-grid button > :is(video, img) { display: block; width: 100%; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 8px; }
 .choice-grid button:has(> video, > img) .choice-name { font-size: 13px; line-height: 18px; font-weight: 600; }
-.choice-grid .choice-name .badge-soon { display: block; width: fit-content; margin: 6px auto 0; padding: 2px 10px; border: 1px solid rgb(228, 228, 231); border-radius: 999px; background: #fff; color: rgb(82, 82, 82); font-weight: 500; }
+.choice-grid .choice-name .badge-soon { display: block; width: fit-content; margin: 6px 0 0; padding: 2px 10px; border: 1px solid rgb(228, 228, 231); border-radius: 999px; background: #fff; color: rgb(82, 82, 82); font-weight: 500; }
 /* The "none" choice beside the clips: a light 3:4 tile, ringed when chosen. */
 .choice-grid:has(button > :is(video, img)) button:not(:has(> video, > img)) { align-self: start; aspect-ratio: 3 / 4; border: 0; border-radius: 8px; background: #f2f2f2; color: #1a1a1a; font-weight: 600; }
 .choice-grid:has(button > :is(video, img)) button:not(:has(> video, > img))[aria-selected='true'] { outline: 2px solid #000; outline-offset: 2px; }

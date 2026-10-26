@@ -117,11 +117,13 @@ export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRem
         )}
         {/* Empty, the whole slot is the upload button, a grey circle over its hint as on the live pages; with images, a small tile adds more. */}
         {!full && (
-          <button type="button" className="slot-add" aria-label={`Tải lên ${label}`} disabled={!hydrated || busy} onClick={() => input.current?.click()}>
+          <button type="button" className="slot-add" aria-label={`Tải lên ${label}`} title={images.length === 0 ? empty : undefined} disabled={!hydrated || busy} onClick={() => input.current?.click()}>
             <span className="slot-icon" aria-hidden="true">
               <Icon name={images.length === 0 ? 'image' : 'plus'} size={16} />
             </span>
+            {/* A half-width slot shows just its name, as on the live pages; the full hint is its tooltip there. */}
             {images.length === 0 && <span className="slot-hint">{empty}</span>}
+            {images.length === 0 && <span className="slot-name">{label}</span>}
           </button>
         )}
       </div>
