@@ -102,7 +102,7 @@ async function checkExampleDialog(
   near(u.x, m.use[0], 'use button x');
   near(u.y, m.use[1], 'use button y', 3);
   sized(u, m.use[2], 36, 'use button');
-  expect(await css(use, 'background-color', 'color', 'border-top-left-radius', 'font-size', 'font-weight')).toEqual(['rgb(0, 0, 0)', 'rgb(255, 255, 255)', '8px', '11px', '600']);
+  expect(await css(use, 'background-color', 'color', 'border-top-left-radius', 'font-size', 'font-weight')).toEqual(['rgb(220, 38, 38)', 'rgb(255, 255, 255)', '8px', '11px', '600']);
   const [leftX, rightX, stepY, size] = m.step;
   for (const [name, x] of [['Mẫu trước', leftX], ['Mẫu sau', rightX]] as const) {
     const b = page.getByRole('button', { name });
@@ -420,7 +420,7 @@ test.describe('1440x1000', () => {
     const b = await box(run);
     sized(b, 272, 56, 'run');
     near(b.y, 912, 'run y');
-    expect(await css(run, 'background-color', 'color', 'font-size', 'font-weight', 'border-top-left-radius', 'padding-top', 'padding-right', 'column-gap', 'justify-content')).toEqual(['rgb(0, 0, 0)', 'rgb(255, 255, 255)', '16px', '500', '8px', '12px', '16px', '12px', 'center']);
+    expect(await css(run, 'background-color', 'color', 'font-size', 'font-weight', 'border-top-left-radius', 'padding-top', 'padding-right', 'column-gap', 'justify-content')).toEqual(['rgb(220, 38, 38)', 'rgb(255, 255, 255)', '16px', '500', '8px', '12px', '16px', '12px', 'center']);
     await expect(run).toContainText('$0.8000');
   });
 
@@ -558,7 +558,7 @@ test.describe('390x844', () => {
     sized(b, 358, 60, 'run');
     near(b.y, 772, 'run y');
     near(b.y + b.height, 844 - 12, 'run bottom');
-    expect(await css(run, 'border-top-left-radius', 'background-color')).toEqual(['8px', 'rgb(0, 0, 0)']);
+    expect(await css(run, 'border-top-left-radius', 'background-color')).toEqual(['8px', 'rgb(220, 38, 38)']);
     expect(await css(page.locator('.runbar'), 'box-shadow', 'background-color', 'border-top-width')).toEqual(['none', 'rgba(0, 0, 0, 0)', '0px']);
     await expect(run).toContainText('$0.8000');
   });

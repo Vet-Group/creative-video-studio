@@ -1,2 +1,4 @@
 /* Applied to every baseline screenshot: the Next.js dev indicator is not part of the app. */
 nextjs-portal { display: none !important; }
+/* The parity baselines keep the Fash colours; the VET brand colours are asserted by geometry.e2e and brand.e2e instead. */
+:root { --brand: #000; --brand-hover: #000; --link: #1d4ed8; }

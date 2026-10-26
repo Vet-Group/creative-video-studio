@@ -10,6 +10,7 @@ import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { Icon, type IconName } from './Icon';
 import { JobsProvider, useJobs } from './jobs';
 import { type Account, Settings } from './Settings';
+import { VetLogo } from './VetLogo';
 
 const STATUS_LABEL: Record<JobStatus, string> = {
   queued: 'Đang chờ',
@@ -202,7 +203,7 @@ export function Shell({ userId, userName, isAdmin, account, initialCollapsed, ch
           >
             <div className="brand">
               <span className="logo" aria-hidden="true">
-                CV
+                <VetLogo size={28} />
               </span>
               <strong className="who">{userName}</strong>
               <span className="brand-tools">
@@ -229,6 +230,7 @@ export function Shell({ userId, userName, isAdmin, account, initialCollapsed, ch
                 <Icon name="menu" size={20} />
               </button>
               <strong>{title}</strong>
+              <VetLogo size={28} />
             </header>
             <div className="frame">
               <main>{children}</main>

@@ -78,6 +78,10 @@ Cosmetic rows of the matrix (spacing, shadows, icon choice) may be marked "defer
 6. **No paid calls:** every M.7 test uses the mock provider and fixtures. Real provider work stays in the bake-off under its own budget gate.
 7. The PR description shows the desktop and 390 px screenshots of `/create` next to the matching Fash audit screenshots for review.
 
+## VET identity (2026-10-26)
+
+Colours and logo moved to VET identity; the Fash layout parity is kept. Every colour in `globals.css` is a token on `:root`; the primary buttons use `--brand` (`#dc2626`, hover `#b91c1c`) and links use `--link` (`#b91c1c`, AA on white and on the zinc fills); the VET logo replaces the "CV" tile in the sidebar brand and sits at the right end of the narrow top bar. The geometry checks that asserted the black primary button now assert `rgb(220, 38, 38)`. The parity screenshot baselines are unchanged: `e2e/screenshot.css` points the brand tokens back to the Fash colours for screenshots only, so the owner's pending comparison still uses the same baselines, and the brand colours are asserted by the geometry checks and `e2e/brand.e2e.test.ts`.
+
 ## Not measured on Fash (internal decisions stand)
 
 - What clicking an Examples card does on Fash: not recorded. The internal behaviour above is a design decision, not a measurement.
