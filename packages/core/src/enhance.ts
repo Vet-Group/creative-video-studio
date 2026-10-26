@@ -12,8 +12,12 @@ export const MAX_ENHANCED = 2000;
 export type EnhanceKind = 'video' | 'image';
 export type Enhancer = (prompt: string, kind: EnhanceKind) => Promise<{ prompt: string; costUsd: number | null }>;
 
+// The brief is written from the text alone, and a first trial made up logo text and garment colours; so nothing visual may be invented.
 const KEEP =
-  'Keep every concrete detail the user gave, word for word where it matters: named products, colours, quoted text and tokens such as [Image1]. ' +
+  'You cannot see the reference images. Never invent or name anything about what they show (colours, printed text, logos, garments, brands, ' +
+  'the people, their age or looks, the place): refer to it as "the product", "the garment", "the model" or by the user\'s own words. ' +
+  'Keep every concrete detail the user gave: named products, colours, quoted text, and tokens such as [Image1] exactly as written; ' +
+  'never add an [ImageN] token the user did not write. If the request is not in English, translate it; only quoted text keeps its language. ' +
   'Write in English, as one plain paragraph of 60 to 140 words, with no title, list, quotes or comments around it. Reply with the brief only.';
 
 export const SYSTEM_PROMPTS: Record<EnhanceKind, string> = {
