@@ -9,6 +9,8 @@ const file = (name: string) => ({ name, mimeType: 'image/png', buffer: png() });
 const runButton = (page: Page) => page.getByRole('button', { name: /^Tạo video/ });
 const reasonOf = (page: Page) => page.locator('.form-message').getByRole('status');
 const brief = (page: Page) => page.getByRole('textbox', { name: 'Prompt', exact: true });
+/** The file input of the reference slot; the slot group and its upload button carry the same name. */
+const refsInput = (page: Page) => page.getByRole('group', { name: 'Ảnh tham chiếu' }).getByLabel('Ảnh tham chiếu', { exact: true });
 const script = (page: Page) => page.getByRole('textbox', { name: 'Lời thoại (tuỳ chọn)' });
 const audio = (page: Page) => page.getByRole('switch', { name: 'Tạo âm thanh' });
 const hook = HOOKS.find((h) => h.id === 'product-catch')!;
@@ -44,7 +46,7 @@ test('an Advanced job runs from reference images, a brief, a script and audio on
   // Run waits for an image, then for the brief.
   await expect(runButton(page)).toBeDisabled();
   await expect(reasonOf(page)).toHaveText('Tải lên ít nhất 1 ảnh tham chiếu.');
-  await page.getByLabel('Ảnh tham chiếu').setInputFiles([file('model.png'), file('product.png'), file('style.png')]);
+  await refsInput(page).setInputFiles([file('model.png'), file('product.png'), file('style.png')]);
   await expect(page.getByRole('img', { name: 'style.png' })).toBeVisible();
   await expect(reasonOf(page)).toHaveText('Viết prompt mô tả video bạn muốn.');
   await expect(runButton(page)).toBeDisabled();
@@ -95,7 +97,8 @@ test('audio off makes a silent job, the reference slot stops at the model cap, a
   await signIn(page, 'mktd');
   await page.goto('/marketing-studio/advanced');
   await expect(runButton(page)).toBeVisible();
-  await page.getByLabel('Ảnh tham chiếu').setInputFiles([1, 2, 3, 4, 5].map((n) => file(`ref-${n}.png`)));
+  await expect(modelButton(page)).toContainText('Mock E2E'); // the cap is the chosen model's, known once the list is in
+  await refsInput(page).setInputFiles([1, 2, 3, 4, 5].map((n) => file(`ref-${n}.png`)));
   await expect(page.locator('.slot-thumbs li')).toHaveCount(4); // Mock E2E takes 4; the fifth is dropped
   await brief(page).fill('A quiet product shot.');
   await script(page).fill('Never spoken');

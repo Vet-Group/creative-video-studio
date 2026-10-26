@@ -101,7 +101,8 @@ test('a mock marketing job runs from two photos, a hook and a location, and show
   expect(detail.prompt).toContain('[Image1]');
   expect(detail.prompt).toContain(hook.phrase);
   expect(detail.prompt).toContain(`Set in ${spot.phrase}.`);
-  expect(detail.prompt.endsWith(' soft morning light')).toBe(true);
+  // The member's text comes last before the sound rule; audio is on by default, as on Fash.
+  expect(detail.prompt).toContain(' soft morning light Natural sound recorded on the phone:');
 
   // Ví dụ lists the company's marketing clips as videos.
   await page.getByRole('tab', { name: 'Ví dụ' }).click();

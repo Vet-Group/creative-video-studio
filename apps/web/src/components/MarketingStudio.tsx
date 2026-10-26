@@ -280,7 +280,7 @@ export function MarketingStudio({ format = 'ugc' }: { format?: MarketingFormat }
                 Đổi định dạng
               </button>
             </div>
-            <div className="app-slots marketing-slots" data-two="true">
+            <div className="app-slots marketing-slots" data-two={!advanced}>
               {advanced ? (
                 <div className="slot-wide">
                   <Slot label="Ảnh tham chiếu" empty={`Tối đa ${maxRefs} ảnh tham chiếu`} inputLabel="Ảnh tham chiếu" images={refs} max={maxRefs} busy={busy} onAdd={add(setRefs, maxRefs)} onRemove={(id) => setRefs((cur) => cur.filter((r) => r.id !== id))} />
@@ -315,7 +315,7 @@ export function MarketingStudio({ format = 'ugc' }: { format?: MarketingFormat }
                 </label>
                 <div className="prompt-box">
                   <textarea id={scriptId} value={script} maxLength={ADVANCED_MAX_SCRIPT} placeholder="Viết lời thoại bạn muốn nhân vật nói (tuỳ chọn)…" onChange={(e) => setScript(e.target.value)} />
-                  <div className="prompt-foot">
+                  <div className="prompt-foot script-foot">
                     {/* About two spoken words per second (the About tab), so the lines can be matched to the duration. */}
                     <span>{words > 0 && `${words} từ, khoảng ${Math.ceil(words / 2)} giây`}</span>
                     <span>
@@ -335,7 +335,7 @@ export function MarketingStudio({ format = 'ugc' }: { format?: MarketingFormat }
               )}
             </div>
             <AudioSwitch on={audio} available={chosen?.audioEstimateUsd != null} onChange={setAudio} />
-            {models && models.length > 0 && <ModelPicker models={models.map((m) => ({ id: m.id, label: m.label, isMock: m.isMock, supported: !advanced || m.maxImages >= refs.length, estimateUsd: audio && m.audioEstimateUsd !== null ? m.audioEstimateUsd : m.estimateUsd, score: m.score, recommended: m.recommended }))} value={chosen?.id ?? ''} onChange={(id) => pickModel(models.find((m) => m.id === id)!)} />}
+            {models && models.length > 0 && <ModelPicker models={models.map((m) => ({ id: m.id, label: m.label, isMock: m.isMock, supported: !advanced || m.maxImages >= refs.length, estimateUsd: audio && m.audioEstimateUsd != null ? m.audioEstimateUsd : m.estimateUsd, score: m.score, recommended: m.recommended }))} value={chosen?.id ?? ''} onChange={(id) => pickModel(models.find((m) => m.id === id)!)} />}
           </div>
 
           <div className="form-message">

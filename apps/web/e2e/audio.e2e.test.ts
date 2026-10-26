@@ -6,8 +6,17 @@ import { png, runInUi, signIn } from './support.test';
 const audio = (page: Page) => page.getByRole('switch', { name: 'Tạo âm thanh' });
 const nav = (page: Page) => page.getByRole('navigation', { name: 'Điều hướng chính' });
 
-/** The body of the next POST /api/jobs. */
-const nextJob = (page: Page) => page.waitForRequest((r) => r.method() === 'POST' && r.url().endsWith('/api/jobs')).then((r) => r.postDataJSON() as Record<string, unknown>);
+/** The body of the next POST /api/jobs and the id of the job it made. */
+const nextJob = (page: Page) =>
+  page
+    .waitForResponse((r) => r.request().method() === 'POST' && r.url().endsWith('/api/jobs'))
+    .then(async (r) => ({ ...(r.request().postDataJSON() as { params: unknown; prompt: string }), id: ((await r.json()) as { id: string }).id }));
+
+/** Deletes the spec's clip once it is done, so the shared Library the later specs filter holds none of it. */
+async function remove(page: Page, id: string): Promise<void> {
+  await expect.poll(async () => ((await (await page.request.get(`/api/jobs/${id}`)).json()) as { status: string }).status, { timeout: 60_000 }).toBe('succeeded');
+  expect((await page.request.delete(`/api/jobs/${id}`)).ok()).toBe(true);
+}
 
 test('Create video: Tạo âm thanh is on by default, flips, and the job carries params.audio', async ({ page }) => {
   await signIn(page, 'auda');
@@ -20,7 +29,9 @@ test('Create video: Tạo âm thanh is on by default, flips, and the job carries
   await expect(audio(page)).toHaveAttribute('aria-checked', 'true');
   const body = nextJob(page);
   await runInUi(page);
-  expect((await body).params).toEqual({ audio: 'on' });
+  const sent = await body;
+  expect(sent.params).toEqual({ audio: 'on' });
+  await remove(page, sent.id);
 });
 
 test('a model that cannot make audio shows the switch off and fixed, and its job is silent', async ({ page }) => {
@@ -36,7 +47,9 @@ test('a model that cannot make audio shows the switch off and fixed, and its job
   await expect(page.locator('.switch-row')).toContainText('Tắt');
   const body = nextJob(page);
   await runInUi(page);
-  expect((await body).params).toEqual({ audio: 'off' });
+  const sent = await body;
+  expect(sent.params).toEqual({ audio: 'off' });
+  await remove(page, sent.id);
 });
 
 test('Marketing Studio UGC: Tạo âm thanh is on by default and the job asks for phone sound', async ({ page }) => {
@@ -56,4 +69,5 @@ test('Marketing Studio UGC: Tạo âm thanh is on by default and the job asks fo
   expect(sent.params).toEqual({ audio: 'on' });
   expect(sent.prompt).toMatch(/Natural sound recorded on the phone/);
   await expect(page.getByText('Đã gửi job')).toBeVisible();
+  await remove(page, sent.id);
 });
