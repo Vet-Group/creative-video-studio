@@ -175,7 +175,6 @@ function AppForm({ app }: { app: AppConfig }) {
                 />
               ))}
             </div>
-            <p className="help">JPEG, PNG hoặc WebP. Chỉ tải lên ảnh mà công ty có quyền sử dụng.</p>
 
             {models && models.length > 1 && <ModelPicker models={pick.options} value={pick.modelId} onChange={pick.setModelId} />}
 
@@ -187,7 +186,6 @@ function AppForm({ app }: { app: AppConfig }) {
                 <div className="prompt-box">
                   <textarea id={promptId} value={prompt} maxLength={MAX_PROMPT} placeholder={app.prompt === 'background' ? 'Ví dụ: quán cà phê ngoài trời đầy nắng, bàn đá cẩm thạch' : 'Mô tả điều bạn muốn thêm...'} onChange={(e) => setPrompt(e.target.value)} />
                   <div className="prompt-foot">
-                    <span>Tối đa {MAX_PROMPT} ký tự</span>
                     <span>
                       {prompt.length}/{MAX_PROMPT}
                     </span>
@@ -412,7 +410,6 @@ function MotionForm({ app }: { app: AppConfig }) {
               <div className="prompt-box">
                 <textarea id={promptId} value={prompt} maxLength={MAX_PROMPT} placeholder="Ví dụ: sân khấu ánh đèn ấm, nhân vật mặc nguyên bộ đồ trong ảnh" onChange={(e) => setPrompt(e.target.value)} />
                 <div className="prompt-foot">
-                  <span>Tối đa {MAX_PROMPT} ký tự</span>
                   <span>
                     {prompt.length}/{MAX_PROMPT}
                   </span>
@@ -452,19 +449,23 @@ function MotionForm({ app }: { app: AppConfig }) {
 
 function AppAbout({ app }: { app: AppConfig }) {
   const { title, intro, steps, notes } = app.about;
+  // A long-form article like the live app pages: a centred title, then sections with a heading each.
   return (
-    <article className="about">
+    <article className="about about-long">
       <h2>{title}</h2>
+      <h3>{app.name} là gì?</h3>
       <p>{intro}</p>
-      <p className="about-kicker">Từng bước</p>
+      <h3>
+        Cách dùng {app.name} trong {steps.length} bước
+      </h3>
       <ol className="about-steps">
         {steps.map(([lead, text]) => (
           <li key={lead}>
-            <strong>{lead}</strong> {text}
+            <strong>{lead}.</strong> {text}
           </li>
         ))}
       </ol>
-      <p className="about-kicker">Lưu ý</p>
+      <h3>Lưu ý</h3>
       <ul>
         {notes.map((n) => (
           <li key={n}>{n}</li>

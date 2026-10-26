@@ -7,9 +7,9 @@ export function About() {
       <h2>Tạo video sản phẩm từ ảnh</h2>
       <p>Đưa vào một hoặc vài ảnh sản phẩm, chọn một mẫu chuyển động hoặc tự viết mô tả, và nhận lại một clip ngắn. Clip nằm trong Thư viện của công ty, ai trong công ty cũng xem và tải được.</p>
 
-
       <p className="about-kicker">Từng bước</p>
       <h3>Một lần Run gồm những gì</h3>
+      <p className="about-lead">Mỗi lần Run đi qua năm bước, từ ảnh sản phẩm đến một clip đã được đánh giá trong Thư viện.</p>
       <ol className="about-steps">
         <li>
           <strong>Tải ảnh lên</strong> Ảnh đầu tiên là sản phẩm chính. Mỗi mô hình nhận tối đa một số ảnh nhất định; ô tải ảnh báo khi bạn vượt quá.
@@ -30,6 +30,7 @@ export function About() {
 
       <p className="about-kicker">Giới hạn</p>
       <h3>Hạn mức và chi phí</h3>
+      <p className="about-lead">Hạn mức giữ chi phí video của công ty trong ngân sách; mỗi Run được kiểm trước khi gửi đi.</p>
       <ul>
         <li>Mỗi người có hạn mức số clip mỗi ngày theo giờ Việt Nam, do Admin đặt. Job thất bại không tốn tiền thì không tính.</li>
         <li>Công ty có ngân sách video mỗi tháng. Run nào làm tháng vượt ngân sách sẽ bị từ chối.</li>
@@ -38,6 +39,7 @@ export function About() {
 
       <p className="about-kicker">Mẹo</p>
       <h3>Viết mô tả chuyển động</h3>
+      <p className="about-lead">Mô tả tốt thì ngắn và chỉ nói về chuyển động, vì ảnh đã quyết định sản phẩm.</p>
       <ul>
         <li>Tả một chuyển động chính: máy quay tiến lại gần, xoay chậm, ánh sáng quét qua.</li>
         <li>Nói rõ điều gì phải giữ nguyên, ví dụ chữ in trên sản phẩm hay màu vải.</li>

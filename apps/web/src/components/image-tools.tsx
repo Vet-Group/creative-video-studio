@@ -115,13 +115,15 @@ export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRem
             ))}
           </ul>
         )}
+        {/* Empty, the whole slot is the upload button, a grey circle over its hint as on the live pages; with images, a small tile adds more. */}
         {!full && (
           <button type="button" className="slot-add" aria-label={`Tải lên ${label}`} disabled={!hydrated || busy} onClick={() => input.current?.click()}>
-            <Icon name="plus" size={16} />
-            <span>Tải lên</span>
+            <span className="slot-icon" aria-hidden="true">
+              <Icon name={images.length === 0 ? 'image' : 'plus'} size={16} />
+            </span>
+            {images.length === 0 && <span className="slot-hint">{empty}</span>}
           </button>
         )}
-        {images.length === 0 && <span className="slot-hint">{empty}</span>}
       </div>
     </div>
   );

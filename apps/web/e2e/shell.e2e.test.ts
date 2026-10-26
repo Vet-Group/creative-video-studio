@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
-import { modelButton, select, signIn } from './support.test';
+import { modelButton, presetOf, select, signIn } from './support.test';
 
 const sidebar = (page: Page) => page.locator('.sidebar');
 const nav = (page: Page) => page.getByRole('navigation', { name: 'Điều hướng chính' });
@@ -25,7 +25,7 @@ test('Explore links into Create with the chosen preset or model already picked',
 
   await page.getByRole('list', { name: 'Mẫu' }).getByRole('link', { name: 'Xoay quanh chậm' }).click();
   await expect(page).toHaveURL(/\/create\?preset=slow-orbit$/);
-  await expect(select(page, 'Mẫu chuyển động')).toHaveAttribute('data-value', 'slow-orbit');
+  await expect(presetOf(page)).toHaveAttribute('data-value', 'slow-orbit');
 
   await page.goto('/explore');
   await page.getByRole('list', { name: 'Mô hình' }).getByRole('link', { name: /Mock E2E/ }).click();
@@ -47,7 +47,7 @@ test('Explore links into Create with the chosen preset or model already picked',
   }
 
   await page.goto('/create?preset=no-such-preset');
-  await expect(select(page, 'Mẫu chuyển động')).toHaveAttribute('data-value', 'gentle-push-in'); // the default
+  await expect(presetOf(page)).toHaveAttribute('data-value', 'gentle-push-in'); // the default
 });
 
 test('the sidebar collapses to a 64 px icon rail that keeps its labels for screen readers and is remembered', async ({ page }) => {

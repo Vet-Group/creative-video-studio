@@ -46,17 +46,29 @@ export function ModelPicker({ models, value, onChange }: { models: ModelOption[]
 
   useEffect(() => {
     // With a mouse the search box takes the focus; on a touch screen that would raise the keyboard, so the panel itself does.
-    if (open) (window.matchMedia('(pointer: fine)').matches ? search.current : panel.current)?.focus();
+    // preventScroll: the panel is fixed, so the form under it must not scroll, which would close it.
+    if (open) (window.matchMedia('(pointer: fine)').matches ? search.current : panel.current)?.focus({ preventScroll: true });
   }, [open]);
   useEffect(() => {
-    if (open) document.getElementById(optionId(active))?.scrollIntoView({ block: 'nearest' });
+    // Scrolls the list only: scrollIntoView would also scroll the form card behind the fixed panel and so close it.
+    const row = open ? document.getElementById(optionId(active)) : null;
+    const list = open ? document.getElementById(listId) : null;
+    if (!row || !list) return;
+    const r = row.getBoundingClientRect();
+    const b = list.getBoundingClientRect();
+    if (r.top < b.top) list.scrollTop -= b.top - r.top;
+    else if (r.bottom > b.bottom) list.scrollTop += r.bottom - b.bottom;
   }, [open, active, uid]);
   // The panel is fixed to the screen, so it closes when the page moves under it.
   useEffect(() => {
     if (!open) return;
     const width = window.innerWidth;
     const onResize = () => window.innerWidth !== width && close(false); // a touch keyboard changes the height only
-    const onScroll = (e: Event) => e.target instanceof Node && !panel.current?.contains(e.target) && close(false);
+    // A scroll event can arrive just after the panel opened for a scroll that ended before it (the button scrolled into view), so only a real move closes it.
+    const at = (t: EventTarget | null) => (t instanceof Element ? `${t.scrollTop},${t.scrollLeft}` : `${window.scrollY},${window.scrollX}`);
+    const start = new Map<EventTarget | null, string>([[document, at(document)]]);
+    for (let el = trigger.current?.parentElement; el; el = el.parentElement) start.set(el, at(el));
+    const onScroll = (e: Event) => e.target instanceof Node && !panel.current?.contains(e.target) && start.get(e.target) !== at(e.target) && close(false);
     window.addEventListener('resize', onResize);
     document.addEventListener('scroll', onScroll, true);
     return () => {

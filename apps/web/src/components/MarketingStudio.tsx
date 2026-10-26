@@ -240,6 +240,7 @@ export function MarketingStudio() {
               )}
               <strong>UGC Thử đồ</strong>
               <button type="button" className="banner-chip" onClick={() => setPicker('format')}>
+                <Icon name="edit" size={12} />
                 Đổi định dạng
               </button>
             </div>
@@ -257,7 +258,6 @@ export function MarketingStudio() {
               <div className="prompt-box">
                 <textarea id={promptId} value={prompt} maxLength={MAX_PROMPT} placeholder="Mô tả video marketing bạn muốn…" onChange={(e) => setPrompt(e.target.value)} />
                 <div className="prompt-foot">
-                  <span>Tối đa {MAX_PROMPT} ký tự</span>
                   <span>
                     {prompt.length}/{MAX_PROMPT}
                   </span>
@@ -274,7 +274,6 @@ export function MarketingStudio() {
               )}
             </div>
             {models && models.length > 0 && <ModelPicker models={models.map((m) => ({ id: m.id, label: m.label, isMock: m.isMock, supported: true, estimateUsd: m.estimateUsd, score: m.score, recommended: m.recommended }))} value={chosen?.id ?? ''} onChange={(id) => pickModel(models.find((m) => m.id === id)!)} />}
-            <p className="help">JPEG, PNG hoặc WebP. Chỉ tải lên ảnh mà công ty có quyền sử dụng.</p>
           </div>
 
           <div className="form-message">

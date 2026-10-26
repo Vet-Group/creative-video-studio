@@ -31,7 +31,7 @@ export async function GET(request: Request) {
 
   const [models, mine, budget, stats] = await Promise.all([
     pool.query(
-      `select m.id, m.label, m.provider, m.ratios, m.durations_sec, m.max_images, m.usd_per_second
+      `select m.id, m.label, m.provider, m.ratios, m.durations_sec, m.max_images, m.usd_per_second, m.output_resolution
          from model_configs m
         where m.enabled and m.kind = 'video' and ($1::text is null or $1 = any(m.features)) order by m.label, m.id`,
       [feature],
@@ -57,6 +57,7 @@ export async function GET(request: Request) {
       ratios: r.ratios as string[],
       durationsSec: r.durations_sec as number[],
       maxImages: r.max_images as number,
+      resolution: r.output_resolution as string | null,
       // A mock job books 0 USD, so that is what the picker shows for it.
       estimateUsd: r.provider === 'mock' ? '0.0000' : estimateUsd(r.usd_per_second, durationSec),
       ...scoreOf(st),

@@ -111,7 +111,6 @@ export function TryOn() {
             <Slot label="Trang phục" empty="Thêm 1 đến 4 ảnh trang phục" inputLabel="Ảnh trang phục" images={garments} max={MAX_GARMENTS} busy={busy} onAdd={add(setGarments)} onRemove={(id) => setGarments((c) => c.filter((i) => i.id !== id))} />
             <Slot label="Người mẫu" empty="Thêm 1 ảnh người mẫu" inputLabel="Ảnh người mẫu" images={person} max={1} busy={busy} onAdd={add(setPerson)} onRemove={(id) => setPerson((c) => c.filter((i) => i.id !== id))} />
             <Slot label="Bối cảnh (tuỳ chọn)" empty="Thêm 1 ảnh bối cảnh nếu muốn" inputLabel="Ảnh bối cảnh" images={background} max={1} busy={busy} onAdd={add(setBackground)} onRemove={(id) => setBackground((c) => c.filter((i) => i.id !== id))} />
-            <p className="help">JPEG, PNG hoặc WebP. Chỉ tải lên ảnh mà công ty có quyền sử dụng.</p>
 
             {models && models.length > 0 && <ModelPicker models={pick.options} value={pick.modelId} onChange={pick.setModelId} />}
 
@@ -122,7 +121,6 @@ export function TryOn() {
               <div className="prompt-box">
                 <textarea id={promptId} value={prompt} maxLength={MAX_PROMPT} placeholder="Mô tả điều bạn muốn..." onChange={(e) => setPrompt(e.target.value)} />
                 <div className="prompt-foot">
-                  <span>Tối đa {MAX_PROMPT} ký tự</span>
                   <span>
                     {prompt.length}/{MAX_PROMPT}
                   </span>
@@ -174,9 +172,9 @@ function TryOnAbout() {
       <h2>Thử đồ trên người mẫu</h2>
       <p>Tải ảnh trang phục và ảnh một người mẫu, và nhận lại ảnh người đó mặc trang phục. Ảnh nằm trong Thư viện của công ty, mục Thử đồ.</p>
 
-
       <p className="about-kicker">Từng bước</p>
       <h3>Một lần Run gồm những gì</h3>
+      <p className="about-lead">Một lần Run cần ảnh trang phục và ảnh người mẫu; bối cảnh và prompt là tuỳ chọn.</p>
       <ol className="about-steps">
         <li>
           <strong>Trang phục</strong> Ít nhất 1 ảnh, tốt nhất là ảnh trải phẳng hoặc ảnh người mặc, nền sạch, thấy rõ cả bộ.
@@ -197,6 +195,7 @@ function TryOnAbout() {
 
       <p className="about-kicker">Giới hạn</p>
       <h3>Hạn mức và chi phí</h3>
+      <p className="about-lead">Thử đồ dùng ngân sách ảnh, tách khỏi video, và mỗi Run được kiểm hạn mức trước khi gửi đi.</p>
       <ul>
         <li>Ảnh và ứng dụng có ngân sách riêng, tách khỏi ngân sách video: mỗi người có hạn mức theo ngày và theo tháng, công ty có hạn mức theo tháng. Run làm vượt hạn mức sẽ bị từ chối.</li>
         <li>Nút Run ghi chi phí ước tính của một ảnh; chi phí thật nằm trên ảnh trong Thư viện.</li>

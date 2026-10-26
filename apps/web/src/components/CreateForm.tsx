@@ -22,6 +22,8 @@ interface Model {
   ratios: string[];
   durationsSec: number[];
   maxImages: number;
+  /** The one output resolution the stored price is for, e.g. '1080p'. */
+  resolution: string | null;
   estimateUsd: string;
   passRate: number | null;
   score: number;
@@ -82,6 +84,7 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
   const fileInput = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
   const promptId = useId();
+  const audioId = useId();
   const [tab, setTab] = useState<Tab | null>(null); // null: the default for the width (Create below 1024 px, else Examples, as on the live page)
   const [picking, setPicking] = useState(false);
   const [detail, setDetail] = useState<Example | null>(null);
@@ -254,22 +257,13 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
             <div className="banner">
               <CardMedia video={banner.video} poster={banner.poster} />
               <div className="banner-text">
-                <strong>{current?.label ?? 'Tự viết mô tả'}</strong>
+                <strong data-value={presetId}>{current?.label ?? 'Tự viết mô tả'}</strong>
               </div>
               <button type="button" className="banner-chip" onClick={() => setPicking(true)}>
                 <Icon name="edit" size={12} />
                 Chọn mẫu khác
               </button>
             </div>
-
-            <Select
-              label="Mẫu chuyển động"
-              icon="preset"
-              heading="Chọn mẫu chuyển động"
-              value={presetId}
-              options={[...(presets ?? []).map((p) => ({ value: p.id, label: p.label })), { value: '', label: 'Tự viết mô tả' }]}
-              onChange={setPresetId}
-            />
 
             <div className="dropzone" data-over={dragOver} data-filled={images.length > 0} onDragOver={(e) => (e.preventDefault(), setDragOver(true))} onDragLeave={() => setDragOver(false)} onDrop={onDrop}>
               <input
@@ -295,8 +289,8 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
                 <span className="dropzone-hint">
                   {images.length === 0
                     ? maxImages === 1
-                      ? 'Kéo thả hoặc bấm để thêm 1 ảnh sản phẩm'
-                      : `Kéo thả hoặc bấm để thêm 1–${maxImages} ảnh sản phẩm`
+                      ? 'Tối đa 1 ảnh sản phẩm'
+                      : `Tối đa ${maxImages} ảnh sản phẩm`
                     : images.length >= maxImages
                       ? `Đã đủ ${maxImages} ảnh`
                       : `${images.length}/${maxImages} ảnh, bấm hoặc kéo thêm`}
@@ -314,7 +308,6 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
                   ))}
                 </ul>
               )}
-              {images.length === 0 && <p className="dropzone-note">Ảnh đầu là sản phẩm chính. Chỉ dùng ảnh công ty có quyền sử dụng.</p>}
             </div>
 
             {models && models.models.length > 0 && (
@@ -332,24 +325,19 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
                 Mô tả chuyển động
               </label>
               <div className="prompt-box" data-disabled={presetId !== ''}>
-                <textarea id={promptId} value={presetId === '' ? prompt : ''} maxLength={MAX_PROMPT} disabled={presetId !== ''} placeholder={presetId === '' ? 'Mô tả chuyển động, nên viết bằng tiếng Anh' : 'Đang dùng mẫu; chọn "Tự viết mô tả" để tự nhập'} onChange={(e) => setPrompt(e.target.value)} />
+                <textarea id={promptId} value={presetId === '' ? prompt : ''} maxLength={MAX_PROMPT} disabled={presetId !== ''} placeholder={presetId === '' ? 'Mô tả video bạn muốn, nên viết bằng tiếng Anh' : 'Đang dùng mẫu. Chọn "Tự viết mô tả" trong danh sách mẫu để tự nhập'} onChange={(e) => setPrompt(e.target.value)} />
+                {/* The row stays while a preset is in use, so the box keeps the live 121 px height. */}
                 <div className="prompt-foot">
-                  <span>Tối đa {MAX_PROMPT} ký tự</span>
-                  <span>
-                    {presetId === '' ? prompt.length : 0}/{MAX_PROMPT}
-                  </span>
+                  {presetId === '' && (
+                    <span>
+                      {prompt.length}/{MAX_PROMPT}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
 
-            <Select
-              label="Tỉ lệ khung hình"
-              icon="ratio"
-              heading="Chọn tỉ lệ khung hình"
-              value={ratio}
-              options={[...new Set(ratios)].map((r) => ({ value: r, label: RATIO_LABEL[r] ?? r }))}
-              onChange={setRatio}
-            />
+            <Select label="Độ phân giải" icon="preset" heading="Độ phân giải" value={chosen?.resolution ?? ''} options={[{ value: chosen?.resolution ?? '', label: chosen?.resolution ?? 'Theo mô hình' }]} onChange={() => undefined} />
             <Select
               label="Thời lượng"
               icon="clock"
@@ -358,6 +346,27 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
               options={durations.map((d) => ({ value: String(d), label: `${d} giây` }))}
               onChange={(v) => setDurationSec(Number(v))}
             />
+            <Select
+              label="Tỉ lệ khung hình"
+              icon="ratio"
+              heading="Chọn tỉ lệ khung hình"
+              value={ratio}
+              options={[...new Set(ratios)].map((r) => ({ value: r, label: RATIO_LABEL[r] ?? r }))}
+              onChange={setRatio}
+            />
+            {/* Every price is for a silent clip (models.ts), so the switch shows that state and does not move. */}
+            <div className="field">
+              <span className="field-label" id={audioId}>
+                Tạo âm thanh
+              </span>
+              <span className="switch-row" title="Giá đã tính cho clip không tiếng">
+                <button type="button" role="switch" className="switch" aria-checked="false" aria-labelledby={audioId} aria-describedby={`${audioId}-why`} disabled />
+                <span>Tắt</span>
+                <span id={`${audioId}-why`} className="sr-only">
+                  Giá đã tính cho clip không tiếng
+                </span>
+              </span>
+            </div>
             <Select
               label="Cửa hàng/Thương hiệu"
               icon="store"
@@ -435,6 +444,7 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
                 {m.video ? <Preview src={m.video} poster={m.poster ?? ''} width={3} height={4} title={p.label} /> : <div className="banner-empty" />}
                 <button
                   type="button"
+                  data-value={p.id}
                   aria-pressed={p.id === presetId}
                   onClick={() => {
                     setPresetId(p.id);
@@ -450,6 +460,7 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
             {free.video ? <Preview src={free.video} poster={free.poster ?? ''} width={3} height={4} title="Tự viết mô tả" /> : <div className="banner-empty" />}
             <button
               type="button"
+              data-value=""
               aria-pressed={presetId === ''}
               onClick={() => {
                 setPresetId('');
