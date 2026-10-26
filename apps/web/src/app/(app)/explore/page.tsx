@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { CardMedia } from '@/components/CardMedia';
 import { Icon } from '@/components/Icon';
+import { MODEL_CARD_TEXT } from '@/lib/about-content';
 import { pool } from '@/lib/auth';
 import { cardSample, EXAMPLES, exampleForPreset, sampleSrc } from '@/lib/examples';
 import { modelStats, rank, scoreOf } from '@/lib/model-scores';
@@ -84,8 +85,9 @@ export default async function ExplorePage() {
                   {m.label}
                   {recommended.has(m.id) && <span className="badge badge-recommended">Đề xuất</span>}
                 </strong>
-                <span className="muted">
-                  {[m.ratios.join(', '), range(m.durations_sec), `Điểm ${m.score}/100`, m.marks > 0 && `${m.marks} lượt đánh giá`].filter(Boolean).join(' · ')}
+                {/* A short description like the live cards, clamped to three lines; a model without one keeps its spec line. */}
+                <span className="muted explore-card-text">
+                  {MODEL_CARD_TEXT[m.id] ?? [m.ratios.join(', '), range(m.durations_sec), `Điểm ${m.score}/100`, m.marks > 0 && `${m.marks} lượt đánh giá`].filter(Boolean).join(' · ')}
                 </span>
               </Link>
             </li>

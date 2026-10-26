@@ -2,11 +2,13 @@
 // Marketing Studio: a creator-style try-on video from two photos (the model, then the product), laid out like Try On. The page composes one English prompt
 // from the hook, the location and the member's own text, and posts a `marketing` video job on a video model that lists the feature.
 import { type CSSProperties, type KeyboardEvent, useEffect, useId, useRef, useState } from 'react';
+import { ABOUT } from '@/lib/about-content';
 import { api, errorText, sendJson } from '@/lib/api';
 import { HOOKS, LOCATIONS, type MarketingChoice, marketingPrompt } from '@/lib/marketing';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { useSamples } from '@/lib/use-samples';
 import { cardSample } from '@/lib/examples';
+import { About } from './About';
 import { CardMedia, LoopVideo } from './CardMedia';
 import { Icon, type IconName } from './Icon';
 import { Gallery, type Img, Slot, uploadImages, UPLOAD_ERROR, WorkTabs } from './image-tools';
@@ -308,7 +310,7 @@ export function MarketingStudio() {
           {shown === 'examples' ? (
             <Gallery kind="marketing" video samples="marketing-example-" label="Video Marketing Studio của công ty" emptyText="Chưa có video Marketing Studio nào trong công ty." />
           ) : shown === 'about' ? (
-            <MarketingAbout />
+            <About page={ABOUT.marketing} />
           ) : (
             <Tray feature="marketing" />
           )}
@@ -333,42 +335,5 @@ export function MarketingStudio() {
       <ChoiceDialog open={picker === 'hook'} title="Chọn hook" sub="Cảnh mở đầu giữ chân người xem trong vài giây đầu. Có thể bỏ qua." kind="hook" choices={HOOKS} value={hook} onPick={(id) => (setHook(id), setPicker(null))} onClose={() => setPicker(null)} />
       <ChoiceDialog open={picker === 'location'} title="Chọn bối cảnh" sub="Nơi người mẫu xuất hiện trong video. Có thể bỏ qua." kind="location" choices={LOCATIONS} value={location} onPick={(id) => (setLocation(id), setPicker(null))} onClose={() => setPicker(null)} />
     </section>
-  );
-}
-
-function MarketingAbout() {
-  return (
-    <article className="about">
-      <h2>UGC Thử đồ: video kiểu người sáng tạo nội dung</h2>
-      <p>Tải ảnh một người mẫu và ảnh sản phẩm, và nhận lại một video dọc quay bằng điện thoại, người đó mặc hoặc dùng sản phẩm. Video nằm trong Thư viện của công ty, mục Marketing Studio.</p>
-
-      <p className="about-kicker">Từng bước</p>
-      <h3>Một lần chạy gồm những gì</h3>
-      <ol className="about-steps">
-        <li>
-          <strong>Người mẫu và sản phẩm.</strong> Mỗi bên một ảnh, người mẫu trước, sản phẩm sau. Ảnh rõ mặt và rõ sản phẩm cho kết quả tốt hơn.
-        </li>
-        <li>
-          <strong>Hook (tuỳ chọn).</strong> Cách video mở đầu, ví dụ mở hộp hoặc soi gương. Chọn Không chọn nếu muốn để mô hình tự quyết.
-        </li>
-        <li>
-          <strong>Bối cảnh (tuỳ chọn).</strong> Nơi video diễn ra, ví dụ phòng ngủ hoặc quán cà phê.
-        </li>
-        <li>
-          <strong>Prompt (tuỳ chọn).</strong> Thêm một hai câu về điều bạn muốn thấy; nó được ghép vào cuối chỉ dẫn cố định của ứng dụng.
-        </li>
-        <li>
-          <strong>Mô hình, tỉ lệ, thời lượng.</strong> Chỉ hiện các mô hình đã được bật cho Marketing Studio. Nút chạy ghi chi phí ước tính, tính như trang Tạo video.
-        </li>
-      </ol>
-
-      <p className="about-kicker">Giới hạn</p>
-      <h3>Điều chưa có</h3>
-      <ul>
-        <li>Hiện chỉ có định dạng UGC Thử đồ. Các định dạng khác của Marketing Studio, như viết kịch bản, chọn giọng đọc hay dựng nhiều cảnh, chưa được xây dựng.</li>
-        <li>Video dùng chung ngân sách với Tạo video: hạn mức theo ngày, theo tháng của bạn và của công ty. Chạy làm vượt hạn mức sẽ bị từ chối.</li>
-        <li>Chỉ dùng ảnh công ty có quyền sử dụng, và chỉ với người đã đồng ý.</li>
-      </ul>
-    </article>
   );
 }

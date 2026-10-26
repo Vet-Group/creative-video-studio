@@ -5,6 +5,7 @@ import { cardSample, type Example, exampleForPreset, examplesFor, sampleSrc, spl
 import { NARROW, useMediaQuery, WIDE } from '@/lib/use-media-query';
 import { useHydrated } from '@/lib/use-hydrated';
 import { useSamples } from '@/lib/use-samples';
+import { ABOUT } from '@/lib/about-content';
 import { About } from './About';
 import { CardMedia } from './CardMedia';
 import { EnhanceToggle } from './EnhanceToggle';
@@ -432,7 +433,7 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
               ))}
             </div>
           ) : shown === 'about' ? (
-            <About />
+            <About page={ABOUT.create} />
           ) : (
             <Tray feature="video" />
           )}

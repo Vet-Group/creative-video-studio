@@ -3,12 +3,14 @@
 // (laid out like Try On). An app that is not built yet shows why instead of the form.
 import Link from 'next/link';
 import { type CSSProperties, useEffect, useId, useRef, useState } from 'react';
+import { APP_ABOUT } from '@/lib/about-content';
 import { api, errorText, sendJson } from '@/lib/api';
 import { APPS, type AppConfig, appInputs, appReason, type AppCategory, motionReason } from '@/lib/apps';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { useHydrated } from '@/lib/use-hydrated';
 import { cardSample } from '@/lib/examples';
 import { useSamples } from '@/lib/use-samples';
+import { About } from './About';
 import { CardMedia, LoopVideo } from './CardMedia';
 import { Icon, type IconName } from './Icon';
 import { type Img, RATIO_LABEL, Slot, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, WorkTabs } from './image-tools';
@@ -51,9 +53,10 @@ function ChangeMenu({ current }: { current: string }) {
       onKeyDown={(e) => e.key === 'Escape' && open && (e.stopPropagation(), setOpen(false), trigger.current?.focus())}
       onBlur={(e) => open && e.relatedTarget instanceof Node && !root.current?.contains(e.relatedTarget) && setOpen(false)} // a click elsewhere is handled below; this is the Tab key
     >
-      <button ref={trigger} type="button" aria-expanded={open} aria-controls={open ? listId : undefined} onClick={() => setOpen(!open)}>
-        Đổi ứng dụng
-        <Icon name={open ? 'up' : 'down'} size={12} />
+      {/* Short like the live "Change" chip and Create's banner chip; the name says what it changes. */}
+      <button ref={trigger} type="button" aria-label="Đổi ứng dụng" aria-expanded={open} aria-controls={open ? listId : undefined} onClick={() => setOpen(!open)}>
+        <Icon name="edit" size={12} />
+        Đổi
       </button>
       {open && (
         <ul id={listId} className="app-change-list" aria-label="Ứng dụng">
@@ -448,29 +451,6 @@ function MotionForm({ app }: { app: AppConfig }) {
 }
 
 function AppAbout({ app }: { app: AppConfig }) {
-  const { title, intro, steps, notes } = app.about;
-  // A long-form article like the live app pages: a centred title, then sections with a heading each.
-  return (
-    <article className="about about-long">
-      <h2>{title}</h2>
-      <h3>{app.name} là gì?</h3>
-      <p>{intro}</p>
-      <h3>
-        Cách dùng {app.name} trong {steps.length} bước
-      </h3>
-      <ol className="about-steps">
-        {steps.map(([lead, text]) => (
-          <li key={lead}>
-            <strong>{lead}.</strong> {text}
-          </li>
-        ))}
-      </ol>
-      <h3>Lưu ý</h3>
-      <ul>
-        {notes.map((n) => (
-          <li key={n}>{n}</li>
-        ))}
-      </ul>
-    </article>
-  );
+  const page = APP_ABOUT[app.slug];
+  return page ? <About page={page} long /> : null;
 }
