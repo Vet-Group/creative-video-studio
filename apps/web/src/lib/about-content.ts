@@ -202,10 +202,11 @@ const create: AboutPage = {
     },
     {
       kicker: 'Âm thanh',
-      title: 'Video có tiếng hoặc lồng tiếng được không?',
+      title: 'Video có tiếng không?',
       blocks: [
-        'Hiện chưa. Mọi clip ở đây được tạo không có tiếng, và giá ghi trên nút Run là giá cho clip không tiếng; vì vậy công tắc Tạo âm thanh trên form luôn ở trạng thái Tắt.',
-        'Một số mô hình trong danh mục có thể tạo âm thanh ở phía nhà cung cấp, nhưng công ty chưa bật tuỳ chọn này để giữ chi phí. Nếu clip cần lời thoại, nhạc hay giọng của thương hiệu, hãy tải clip xuống và lồng tiếng trong phần mềm dựng.',
+        'Có. Công tắc Tạo âm thanh bật sẵn, như trên Fash: với mô hình tạo được âm thanh, clip có tiếng gốc, gồm âm thanh không khí, tiếng động và lời nói khi mô tả yêu cầu. Giá ghi trên nút Tạo video đã tính âm thanh; tắt công tắc để có clip im lặng.',
+        'Các mô hình có âm thanh: Kling O3 Pro, Kling 3.0 Pro, Kling 2.6 Pro, Veo 3.1, Seedance 1.5 Pro, Seedance 2.0, Seedance 2.5 và FLUX 3. Với Kling, Veo và Seedance 1.5, âm thanh làm giá mỗi giây cao hơn (Kling O3 Pro khoảng một phần tư, Veo 3.1 gấp đôi); Seedance 2.0, 2.5 và FLUX 3 giữ nguyên giá. Mô hình không tạo được âm thanh thì công tắc ở Tắt và không bấm được.',
+        'Cần giọng thương hiệu hay nhạc riêng? Tắt âm thanh, tải clip xuống và lồng tiếng trong phần mềm dựng.',
       ],
     },
     {
@@ -382,7 +383,7 @@ const create: AboutPage = {
             ['Có giới hạn số video không?', 'Có. Mỗi người có hạn mức số clip mỗi ngày theo giờ Việt Nam, do Admin đặt, và công ty có ngân sách video mỗi tháng. Run làm vượt hạn mức sẽ bị từ chối kèm lý do. Job thất bại không tốn tiền thì không tính.'],
             ['AI biến ảnh thành video được không?', 'Được. Tải bất kỳ ảnh nào, ảnh sản phẩm, ảnh người mẫu hay một kết quả trước đó, làm khung mở đầu và tả chuyển động bạn muốn. AI làm động thành một video bắt đầu đúng từ ảnh đó. Mô hình tham chiếu cũng nhận ảnh của bạn nhưng dựng một cảnh mới từ chúng thay vì làm động một khung cố định.'],
             ['Xuất được cho nền tảng và định dạng nào?', 'Mọi mô hình có 9:16 cho Reels, TikTok và Stories, và đa số có thêm 1:1 cho bảng tin và ô sản phẩm. Bạn chọn tỉ lệ trước khi chạy, vì không có gì tự đổi cỡ sau đó.'],
-            ['Có lồng tiếng bằng giọng thương hiệu được không?', 'Chưa. Clip ở đây không có tiếng, và ứng dụng không có tải giọng hay nhân bản giọng. Hãy tải clip xuống và lồng tiếng hoặc ghép nhạc trong phần mềm dựng.'],
+            ['Có lồng tiếng bằng giọng thương hiệu được không?', 'Chưa: ứng dụng không có tải giọng hay nhân bản giọng. Khi Tạo âm thanh bật, clip có tiếng gốc của mô hình; muốn giọng riêng thì tắt âm thanh, tải clip xuống và lồng tiếng hoặc ghép nhạc trong phần mềm dựng.'],
             ['Ứng dụng dùng những mô hình nào?', 'Danh mục có hơn 20 mô hình video thuộc các họ Kling, Seedance, FLUX 3, Google VEO, Gemini Omni Flash, Grok Imagine, WAN và Minimax. Admin bật mô hình nào thì menu có mô hình đó, và bạn chọn trước mỗi lần chạy. Đổi mô hình cũng đổi chi phí ghi trên nút Run.'],
             ['Video dài tối đa bao lâu?', 'Từ 1 đến 30 giây tuỳ mô hình. Grok Imagine 1.5 từ 1 đến 15 giây, Kling 3.0 Pro từ 3 đến 15, Seedance 2.0, WAN 2.7 và Minimax H3 Max tới 15, FLUX 3 từ 5 đến 20 và Seedance 2.5 tới 30. Google VEO 3.1 luôn 8 giây, Hailuo 2.3 Pro luôn 6 giây.'],
             ['Nên chọn mô hình nào?', 'Kling mạnh về chuyển động chân thực và vật lý, ở 1080p. Seedance có dải thời lượng dài nhất. Google VEO 3.1 cho clip 8 giây trau chuốt. Grok Imagine hợp với clip dài mà tiết kiệm, FLUX 3 cho chuyển động điện ảnh tới 20 giây ở 1080p, và Hailuo 2.3 Pro là đường nhanh nhất tới clip 1080p. Khi phân vân, chọn mô hình có nhãn Đề xuất: đó là mô hình công ty chấm điểm cao nhất.'],
@@ -1081,16 +1082,16 @@ const marketing: AboutPage = {
       ],
     },
     {
-      kicker: 'Lời thoại',
-      title: 'Video có lời thoại không?',
+      kicker: 'Âm thanh',
+      title: 'Video có tiếng không?',
       blocks: [
-        'Chưa. Video ở đây được tạo không có tiếng, và giá ghi trên nút chạy là giá cho clip không tiếng. Công cụ không viết kịch bản hay tạo giọng; người trong video thể hiện bằng hình ảnh, cử chỉ và khoảnh khắc thử đồ.',
+        'Có. Như trên Fash, Tạo âm thanh bật sẵn: clip có tiếng như quay bằng điện thoại, gồm âm thanh căn phòng và vài câu phản ứng ngắn, tự nhiên của người mẫu về sản phẩm, không có nhạc nền. Tắt công tắc để có clip im lặng. Muốn viết đúng từng chữ người mẫu nói, hãy dùng định dạng Nâng cao.',
         {
           cols: 3,
           cards: [
             { title: 'Dáng quay điện thoại thật', text: 'Ánh sáng tự nhiên, máy hơi rung tay, chất hình chân thật. Đoạn quay giống người sáng tạo nội dung thật hơn là quảng cáo bóng bẩy, vì đó là thứ hiệu quả trên bảng tin.' },
             { title: 'Đúng người, đúng sản phẩm', text: 'Chỉ dẫn cố định yêu cầu giữ khuôn mặt và dáng người theo ảnh người mẫu, cùng hình dáng, màu sắc và chi tiết theo ảnh sản phẩm.' },
-            { title: 'Tự thêm tiếng sau', text: 'Cần lời thoại, nhạc hay phụ đề? Tải clip xuống và thêm trong phần mềm dựng, nơi bạn kiểm soát giọng, phông chữ và vị trí.' },
+            { title: 'Tiếng như quay điện thoại', text: 'Âm thanh căn phòng và lời phản ứng ngắn của người mẫu, không nhạc nền. Cần nhạc, phụ đề hay giọng thương hiệu thì tắt âm thanh và thêm trong phần mềm dựng.' },
           ],
         },
         'Muốn lái video? Ô Prompt (tuỳ chọn) nhận ghi chú về chi tiết sản phẩm, không khí hay một khoảnh khắc bạn muốn; ghi chú được ghép vào cuối chỉ dẫn cố định của công cụ.',
@@ -1100,7 +1101,7 @@ const marketing: AboutPage = {
       kicker: 'Thị trường',
       title: 'Video UGC Thử đồ dùng cho nhiều thị trường được không?',
       blocks: [
-        'Được. Vì video không có lời thoại, cùng một clip dùng được cho nhiều ngôn ngữ; phụ đề hay lồng tiếng theo từng thị trường bạn thêm trong phần mềm dựng.',
+        'Được. Lời phản ứng trong clip ngắn và tự nhiên; với thị trường dùng ngôn ngữ khác, tắt Tạo âm thanh để có clip không lời, rồi thêm phụ đề hay lồng tiếng theo từng thị trường trong phần mềm dựng.',
         'Hợp thị trường còn hơn cả ngôn ngữ. Ảnh người mẫu quyết định khán giả thấy ai, nên chạy cùng sản phẩm với một người mẫu khác cho mỗi thị trường một gương mặt giống khách hàng ở đó. Bảng chọn bối cảnh đổi khung cảnh, nên cùng một chiếc áo khoác có thể xuất hiện trong phòng ngủ cho thị trường này và trên sân thượng thành phố cho thị trường khác.',
         'Giữ nguyên ảnh sản phẩm trong cả bộ và chỉ đổi người mẫu và bối cảnh. Các quảng cáo khi đó đọc như một chiến dịch với gương mặt địa phương, đúng dáng vẻ của một đợt triển khai theo từng thị trường.',
       ],
@@ -1131,6 +1132,7 @@ const marketing: AboutPage = {
           ratios: [
             ['9:16', 'Reels, TikTok, Stories và quảng cáo dọc, mặc định'],
             ['1:1', 'Bài đăng bảng tin và ô sản phẩm trên sàn'],
+            ['16:9', 'YouTube, trang web và quảng cáo ngang'],
           ],
         },
         'Menu Tỉ lệ chỉ có các tỉ lệ mà mô hình đã bật cho Marketing Studio hỗ trợ; Kling O3 Pro có 9:16 và 1:1.',
@@ -1180,10 +1182,10 @@ const marketing: AboutPage = {
             ['AI có làm được quảng cáo UGC không?', 'Được. Công cụ biến một ảnh người mẫu và một ảnh sản phẩm thành video thử đồ ngắn kiểu UGC, sẵn cho mạng xã hội, không cần tìm người, quay hay dựng.'],
             ['Hook trong video UGC là gì?', `Hook là khoảnh khắc mở đầu gây chú ý, vài giây đầu quyết định người xem ở lại hay lướt qua. Chọn một trong ${HOOKS.length} hook có sẵn: ${hookNames}. AI mở video bằng hook đó rồi chuyển sang phần thử đồ.`],
             ['Cần gì để tạo một video UGC Thử đồ?', 'Hai ảnh: một người mẫu và một sản phẩm. Hook, bối cảnh và một ghi chú ngắn là tuỳ chọn.'],
-            ['Một video UGC Thử đồ tốn bao nhiêu?', 'Chi phí tuỳ mô hình và thời lượng, vì chi phí tính theo giây. Nút Tạo video ghi chi phí ước tính bằng USD trước khi bạn chạy. Video dùng chung ngân sách với Tạo video: hạn mức số clip theo ngày của bạn và ngân sách video theo tháng của công ty.'],
-            ['Video có giọng nói không?', 'Không. Video được tạo không có tiếng. Nếu cần lời thoại hay nhạc, hãy tải clip xuống và thêm trong phần mềm dựng.'],
+            ['Một video UGC Thử đồ tốn bao nhiêu?', 'Chi phí tuỳ mô hình và thời lượng, vì chi phí tính theo giây. Nút Tạo video ghi chi phí ước tính bằng USD trước khi bạn chạy. Âm thanh làm giá cao hơn ở một số mô hình, và giá trên nút đã tính nó. Video dùng chung ngân sách với Tạo video: hạn mức số clip theo ngày của bạn và ngân sách video theo tháng của công ty.'],
+            ['Video có giọng nói không?', 'Có, khi Tạo âm thanh bật (mặc định): người mẫu nói vài câu phản ứng ngắn, kèm âm thanh căn phòng, không nhạc nền. Tắt công tắc để có clip im lặng; muốn viết lời thoại chính xác thì dùng định dạng Nâng cao.'],
             ['Kiểm soát được nội dung video không?', 'Ô Prompt (tuỳ chọn) lái video. Nhắc chi tiết sản phẩm, không khí hay khoảnh khắc bạn muốn; ghi chú được ghép vào cuối chỉ dẫn cố định. Hook và bối cảnh cho bạn thêm hai cách kiểm soát nữa.'],
-            ['Dùng cho nhiều ngôn ngữ và thị trường được không?', 'Được. Video không có lời thoại nên dùng được ở mọi ngôn ngữ; thêm phụ đề hay lồng tiếng theo từng thị trường khi dựng. Đổi ảnh người mẫu và bối cảnh để mỗi thị trường có gương mặt và khung cảnh của riêng mình.'],
+            ['Dùng cho nhiều ngôn ngữ và thị trường được không?', 'Được. Tắt Tạo âm thanh để có clip không lời, dùng được ở mọi ngôn ngữ; thêm phụ đề hay lồng tiếng theo từng thị trường khi dựng. Đổi ảnh người mẫu và bối cảnh để mỗi thị trường có gương mặt và khung cảnh của riêng mình.'],
             ['Video đặt được ở những bối cảnh nào?', `${LOCATIONS.length} bối cảnh có sẵn: ${locationNames}. Mỗi bối cảnh đặt người trong video vào một khung cảnh đáng tin với ánh sáng và không khí phù hợp, và bảng chọn có video xem trước cho từng lựa chọn.`],
             ['Có những tỉ lệ và độ dài nào?', 'Tỉ lệ và thời lượng đi theo mô hình đã bật cho Marketing Studio. Với Kling O3 Pro: 9:16 dọc (mặc định) cho Reels, TikTok và Stories, thêm 1:1, và thời lượng 5 đến 10 giây.'],
             ['Video có phụ đề hay chữ trên hình không?', 'Không. Chỉ dẫn cố định yêu cầu không thêm chữ, logo hay watermark vào hình. Thêm phụ đề sau trong phần mềm dựng, nơi bạn kiểm soát phông chữ, vị trí và quy định phụ đề của từng nền tảng.'],
@@ -1197,12 +1199,12 @@ const marketing: AboutPage = {
 };
 
 /**
- * Marketing Studio's Advanced format, for the Advanced page to import. It assumes the page takes 1 to 4 reference images (the video models' limit), a written brief,
- * an optional hook and location from lib/marketing.ts, the ratio and duration of the chosen model, and makes a silent clip like every video here.
+ * Marketing Studio's Advanced format (MarketingStudio.tsx): 1 to 7 reference images (each model's own max_images may be lower), a written brief, an optional
+ * hook and location from lib/marketing.ts, an optional script spoken word for word, the ratio and duration of the chosen model, and native audio on by default.
  */
 const advanced: AboutPage = {
   title: 'Video marketing nâng cao, giải thích rõ',
-  lead: 'Mang ảnh của bạn và một bản brief sáng tạo, rồi tự chỉ đạo quảng cáo. Một hook, một bối cảnh và tối đa 4 ảnh tham chiếu được dựng thành một video marketing riêng. Hướng dẫn này giải thích công cụ hoạt động ra sao và cách viết brief cho tốt.',
+  lead: 'Mang ảnh của bạn và một bản brief sáng tạo, rồi tự chỉ đạo quảng cáo. Một hook, một bối cảnh, lời thoại chính xác và tối đa 7 ảnh tham chiếu được dựng thành một video marketing riêng. Hướng dẫn này giải thích công cụ hoạt động ra sao và cách viết brief cho tốt.',
   sections: [
     {
       kicker: 'Chọn công cụ',
@@ -1212,16 +1214,17 @@ const advanced: AboutPage = {
         {
           cards: [
             { title: 'UGC Thử đồ', text: 'Định dạng gọn: một ảnh người mẫu và một ảnh sản phẩm vào, một video thử đồ kiểu người sáng tạo nội dung ra. Công cụ tự chỉ đạo mọi thứ.' },
-            { title: 'Nâng cao', text: 'Ghế đạo diễn: bản brief của bạn là nguồn sự thật, bạn đưa tối đa 4 ảnh của mình, và tự chọn hook và bối cảnh.' },
+            { title: 'Nâng cao', text: 'Ghế đạo diễn: bản brief của bạn là nguồn sự thật, bạn đưa tối đa 7 ảnh của mình, viết đúng lời nhân vật nói, và tự chọn hook và bối cảnh.' },
           ],
         },
         {
           table: [
             ['', 'UGC Thử đồ', 'Nâng cao'],
-            ['Ảnh đầu vào', 'Đúng 2: người mẫu, sản phẩm', '1 đến 4 ảnh tham chiếu'],
+            ['Ảnh đầu vào', 'Đúng 2: người mẫu, sản phẩm', '1 đến 7 ảnh tham chiếu'],
             ['Ai chỉ đạo', 'Chỉ dẫn cố định của công cụ', 'Bản brief của bạn'],
             ['Hook và bối cảnh', 'Tuỳ chọn', 'Tuỳ chọn'],
-            ['Âm thanh', 'Không có tiếng', 'Không có tiếng'],
+            ['Lời thoại', 'Vài câu phản ứng ngắn, tự nhiên', 'Lời bạn viết, đọc đúng từng chữ'],
+            ['Âm thanh', 'Bật sẵn, tắt được', 'Bật sẵn, tắt được'],
           ],
         },
       ],
@@ -1233,9 +1236,9 @@ const advanced: AboutPage = {
       blocks: [
         {
           steps: [
-            { title: 'Thêm ảnh và viết brief', text: 'Tải tối đa 4 ảnh tham chiếu, là người, sản phẩm, bối cảnh hay ảnh phong cách, và tả video bạn muốn. Bản brief là nguồn sự thật: AI dựng cả quảng cáo quanh nó.', media: 'about-advanced-step-1' },
-            { title: 'Thêm hook và bối cảnh', text: `Nếu muốn, mở đầu bằng một trong ${HOOKS.length} hook và đặt cảnh ở một trong ${LOCATIONS.length} bối cảnh.`, media: 'about-advanced-step-2' },
-            { title: 'Chạy và nhận video', text: 'Chọn tỉ lệ và thời lượng, rồi bấm chạy, với chi phí ước tính bằng USD ghi trên nút. Video xong nằm trong tab Lịch sử và trong Thư viện.', media: 'about-advanced-step-3' },
+            { title: 'Thêm ảnh và viết brief', text: 'Tải tối đa 7 ảnh tham chiếu, là người, sản phẩm, bối cảnh hay ảnh phong cách, và tả video bạn muốn. Bản brief là nguồn sự thật: AI dựng cả quảng cáo quanh nó.', media: 'about-advanced-step-1' },
+            { title: 'Thêm hook, bối cảnh và lời thoại', text: `Nếu muốn, mở đầu bằng một trong ${HOOKS.length} hook, đặt cảnh ở một trong ${LOCATIONS.length} bối cảnh, và viết đúng lời nhân vật sẽ nói.`, media: 'about-advanced-step-2' },
+            { title: 'Chạy và nhận video', text: 'Chọn tỉ lệ, thời lượng và âm thanh, rồi bấm chạy, với chi phí ước tính bằng USD ghi trên nút. Video xong nằm trong tab Lịch sử và trong Thư viện.', media: 'about-advanced-step-3' },
           ],
         },
       ],
@@ -1255,15 +1258,25 @@ const advanced: AboutPage = {
       ],
     },
     {
-      kicker: 'Âm thanh',
-      title: 'Video có lời thoại không?',
-      blocks: ['Chưa. Như mọi video trong ứng dụng, video nâng cao được tạo không có tiếng, và giá ghi trên nút chạy là giá cho clip không tiếng. Cần lời thoại, nhạc hay giọng thương hiệu thì tải clip xuống và thêm trong phần mềm dựng.'],
+      kicker: 'Lời thoại',
+      title: 'Quy tắc của lời thoại',
+      lead: 'Tạo âm thanh bật sẵn, như trên Fash. Ô Lời thoại (tuỳ chọn) quyết định nhân vật nói gì.',
+      blocks: [
+        {
+          list: [
+            'Lời bạn viết thành lời nói khớp khẩu hình của người trong video. Mô hình được dặn không nói thêm chữ nào ngoài lời thoại.',
+            'Khoảng hai từ mỗi giây: video 10 giây nên có khoảng hai mươi từ.',
+            'Không có lời thoại: chỉ có lời nói khi brief yêu cầu; còn lại là âm thanh nền hoặc nhạc.',
+            'Tắt Tạo âm thanh để có video im lặng, rồi thêm giọng đọc hoặc nhạc của riêng bạn khi dựng. Mô hình không tạo được âm thanh thì công tắc ở Tắt, và ở một số mô hình âm thanh làm giá cao hơn.',
+          ],
+        },
+      ],
     },
     {
       kicker: 'Ảnh tham chiếu',
       title: 'Ảnh tham chiếu hoạt động thế nào?',
       blocks: [
-        'Tải tối đa 4 ảnh và AI dựng video từ chúng: một người, một sản phẩm, một bối cảnh, một ảnh phong cách, hay bất kỳ tổ hợp nào. Mỗi ảnh giữ chi tiết thật nhìn thấy được của nó: hình dáng, màu sắc, chữ, logo và nhận dạng được giữ trung thực trong kết quả.',
+        'Tải tối đa 7 ảnh và AI dựng video từ chúng: một người, một sản phẩm, một bối cảnh, một ảnh phong cách, hay bất kỳ tổ hợp nào. Mỗi ảnh giữ chi tiết thật nhìn thấy được của nó: hình dáng, màu sắc, chữ, logo và nhận dạng được giữ trung thực trong kết quả.',
         {
           list: [
             'Nói trong brief mỗi ảnh là gì, ví dụ “ảnh 1 là người mẫu, ảnh 2 là chiếc túi, ảnh 3 là quán cà phê”.',
@@ -1282,6 +1295,7 @@ const advanced: AboutPage = {
           ratios: [
             ['9:16', 'Reels, TikTok, Stories và quảng cáo dọc, mặc định'],
             ['1:1', 'Bài đăng bảng tin và ô sản phẩm trên sàn'],
+            ['16:9', 'YouTube, trang web và quảng cáo ngang'],
           ],
         },
       ],
@@ -1323,12 +1337,12 @@ const advanced: AboutPage = {
       blocks: [
         {
           faq: [
-            ['Video marketing nâng cao là gì?', 'Là định dạng marketing toàn quyền kiểm soát: bạn tải tối đa 4 ảnh tham chiếu của mình, viết một bản brief sáng tạo, và thêm hook và bối cảnh nếu muốn. AI dựng tất cả thành một video marketing riêng.'],
-            ['Nâng cao khác UGC Thử đồ thế nào?', 'UGC Thử đồ là định dạng gọn: hai ảnh vào, một video thử đồ kiểu người sáng tạo nội dung ra, theo chỉ dẫn cố định. Nâng cao trao bạn ghế đạo diễn: bản brief là nguồn sự thật và bạn đưa tối đa 4 ảnh.'],
-            ['Dùng được bao nhiêu ảnh tham chiếu?', 'Tối đa 4. Mỗi ảnh có thể là người, sản phẩm, bối cảnh hay ảnh phong cách. AI giữ chi tiết nhìn thấy được của chúng và dựng video quanh chúng.'],
+            ['Video marketing nâng cao là gì?', 'Là định dạng marketing toàn quyền kiểm soát: bạn tải tối đa 7 ảnh tham chiếu của mình, viết một bản brief sáng tạo, và thêm hook, bối cảnh và lời thoại nếu muốn. AI dựng tất cả thành một video marketing riêng.'],
+            ['Nâng cao khác UGC Thử đồ thế nào?', 'UGC Thử đồ là định dạng gọn: hai ảnh vào, một video thử đồ kiểu người sáng tạo nội dung ra, theo chỉ dẫn cố định. Nâng cao trao bạn ghế đạo diễn: bản brief là nguồn sự thật, bạn đưa tối đa 7 ảnh và viết lời thoại.'],
+            ['Dùng được bao nhiêu ảnh tham chiếu?', 'Tối đa 7, hoặc ít hơn nếu mô hình đã chọn nhận ít ảnh hơn. Mỗi ảnh có thể là người, sản phẩm, bối cảnh hay ảnh phong cách. AI giữ chi tiết nhìn thấy được của chúng và dựng video quanh chúng.'],
             ['Có bắt buộc chọn hook hay bối cảnh không?', 'Không, cả hai đều tuỳ chọn. Có hook, video mở bằng khoảnh khắc đó trước khi vào ý tưởng của bạn; có bối cảnh, cảnh được đặt ở đó. Không có, AI theo bản brief.'],
-            ['Video có lời thoại không?', 'Chưa. Video được tạo không có tiếng. Tải clip xuống và thêm lời thoại hay nhạc trong phần mềm dựng.'],
-            ['Một video nâng cao tốn bao nhiêu?', 'Chi phí tuỳ mô hình và thời lượng, vì chi phí tính theo giây. Chi phí ước tính luôn ghi trên nút chạy trước khi bạn tạo, và video dùng chung ngân sách với Tạo video.'],
+            ['Video có lời thoại không?', 'Có. Tạo âm thanh bật sẵn; lời bạn viết trong ô Lời thoại được đọc đúng từng chữ, khớp khẩu hình. Không viết lời thoại thì chỉ có lời nói khi brief yêu cầu. Tắt công tắc để có clip im lặng.'],
+            ['Một video nâng cao tốn bao nhiêu?', 'Chi phí tuỳ mô hình và thời lượng, vì chi phí tính theo giây. Âm thanh làm giá cao hơn ở một số mô hình. Chi phí ước tính, đã tính âm thanh, luôn ghi trên nút chạy trước khi bạn tạo, và video dùng chung ngân sách với Tạo video.'],
             ['Video có chữ hay phụ đề trên hình không?', 'Nên dặn rõ trong brief là không có chữ, logo hay watermark. Thêm phụ đề sau trong phần mềm dựng, nơi bạn kiểm soát phông chữ và vị trí.'],
             ['Video thuộc về ai?', `Video là tài sản của công ty, dùng cho trang sản phẩm, mạng xã hội và quảng cáo của công ty. ${RIGHTS}`],
             PRIVACY,

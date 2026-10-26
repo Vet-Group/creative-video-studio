@@ -69,9 +69,9 @@ export async function GET(request: Request) {
  * Create a video job: 1-4 input images the caller may use (their own, or the inputs of a succeeded Library clip for Reuse), an enabled
  * model, a preset or a free prompt (exactly one; a free prompt is trimmed, 1 to 2000 characters, and stored with a null preset), the ratio and duration the model allows, and an optional visible store. The caps are checked and the job and its
  * `estimate` ledger row are written in one transaction (429 when a cap refuses, nothing sent); the pg-boss job is sent afterwards.
- * `feature` (default `video`) picks the kind of job. `video` and `marketing` take a video model and the durations above; `video` takes no `params`. `marketing` needs exactly 2 inputs (the model photo, then the product photo) and a prompt, no preset;
- * with `params.format` 'advanced' (Marketing Studio Advanced) it takes 1 to 7 reference images instead, up to the model's `max_images`. Its optional `params.audio` 'on' prices
- * the job at the endpoint's audio price (AUDIO_USD_PER_SECOND; refused on a model without one), and 'off' or none keeps it silent. Any other feature is an
+ * `feature` (default `video`) picks the kind of job. `video` and `marketing` take a video model and the durations above, and an optional `params.audio` (below); `video` takes no other `params`. `marketing` needs exactly 2 inputs (the model photo, then the product photo) and a prompt, no preset;
+ * with `params.format` 'advanced' (Marketing Studio Advanced) it takes 1 to 7 reference images instead, up to the model's `max_images`. A video job's optional `params.audio` 'on' prices
+ * it at the endpoint's audio price (AUDIO_USD_PER_SECOND; refused on a model without one), and 'off' or none keeps it silent. Any other feature is an
  * image job: an enabled image model that lists the feature, no preset, a prompt (the apps in FEATURE_PROMPTS may omit it and get that one), 1 to the model's `max_images`
  * inputs (Try On, the two swaps and Face Swap need at least 2; Background Changer takes a prompt or a second image as the reference), one of the model's ratios (or `auto`), `params.resolution` (a key of the model's `image_prices`, which also sets the
  * estimate) and an optional `params.quality`. `durationSec` is not read and the job stores 0.
@@ -114,10 +114,10 @@ export async function POST(request: Request) {
       return bad('modelId, ratio, durationSec (a whole number, video only), a presetId or a prompt, and an optional storeId are required');
     }
     const entries = params && typeof params === 'object' && !Array.isArray(params) ? Object.entries(params) : null;
-    // Images take resolution and quality; Marketing Studio takes format ('advanced') and audio ('on' or 'off'); the other video features take none.
-    const keys = isImage ? ['resolution', 'quality'] : feature === 'marketing' ? ['format', 'audio'] : [];
+    // Images take resolution and quality; Marketing Studio takes format ('advanced') and audio ('on' or 'off'); Create video takes audio; the others none.
+    const keys = isImage ? ['resolution', 'quality'] : feature === 'marketing' ? ['format', 'audio'] : feature === 'video' ? ['audio'] : [];
     if (!entries || entries.some(([k, v]) => !keys.includes(k) || typeof v !== 'string')) {
-      return bad(keys.length > 0 ? `params may hold only ${keys.join(' and ')}, as text` : 'params are for image features and Marketing Studio only');
+      return bad(keys.length > 0 ? `params may hold only ${keys.join(' and ')}, as text` : 'params are for image features, Create video and Marketing Studio only');
     }
     if (isImage && given.resolution === undefined) return bad('params.resolution is required');
     if (given.format !== undefined && given.format !== 'advanced') return bad('params.format must be advanced');

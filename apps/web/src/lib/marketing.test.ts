@@ -32,6 +32,13 @@ describe('marketingPrompt', () => {
     expect(p).toBe(`${fixed} ${hook} Set in ${place}. Keep it cheerful.`);
   });
 
+  it('ends with the sound rule when audio is given: phone sound with a spoken reaction when on, silence when off', () => {
+    const on = marketingPrompt({ prompt: 'x', audio: true });
+    expect(on.startsWith(`${fixed} x Natural sound recorded on the phone:`)).toBe(true);
+    expect(on).toMatch(/spoken reaction.*no background music\.$/);
+    expect(marketingPrompt({ audio: false })).toBe(`${fixed} The video is completely silent: no speech, no music and no sound.`);
+  });
+
   it('adds only what is given', () => {
     expect(marketingPrompt({ hook: 'product-catch' })).toBe(`${fixed} ${HOOKS.find((c) => c.id === 'product-catch')!.phrase}`);
     expect(marketingPrompt({ location: 'outdoor' })).toBe(`${fixed} Set in ${LOCATIONS.find((c) => c.id === 'outdoor')!.phrase}.`);

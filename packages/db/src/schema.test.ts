@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
-import { BAKEOFF_MODELS } from '../../core/src/models';
+import { AUDIO_USD_PER_SECOND, BAKEOFF_MODELS } from '../../core/src/models';
 import { VIDEO_BODIES } from '../../core/src/providers/fal';
 import { PRESETS } from '../../core/src/presets';
 import { createTestDatabase } from './testing';
@@ -106,6 +106,18 @@ describe('migration 0015 Fash video models', () => {
     expect(rows.find((r) => r.id === 'veo-3.1')).toMatchObject({ ratios: ['9:16'], durations_sec: [8] }); // no 1:1, and Fash's 8 s only
     await pool.query(`update model_configs set enabled = true where id = 'kling-3.0-pro'`); // complete enough for the enable check
     await pool.query(`update model_configs set enabled = false where id = 'kling-3.0-pro'`);
+  });
+});
+
+describe('migration 0023 Seedance in Marketing Studio', () => {
+  test('lists the two Seedance reference models for marketing with 16:9, 7 references and an audio price, and no other video model gains it', async () => {
+    const { rows } = await pool.query(`select id, endpoint, ratios, max_images from model_configs where 'marketing' = any(features) and provider <> 'mock' order by id`);
+    expect(rows.map((r) => [r.id, r.ratios, r.max_images])).toEqual([
+      ['kling-o3-pro', ['9:16', '1:1', '16:9'], 7],
+      ['seedance-2.0-reference', ['9:16', '1:1', '16:9'], 7],
+      ['seedance-2.5-reference', ['9:16', '1:1', '16:9'], 7],
+    ]);
+    for (const r of rows) expect(AUDIO_USD_PER_SECOND[r.endpoint], r.id).toBeDefined();
   });
 });
 

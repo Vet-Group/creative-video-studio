@@ -32,14 +32,18 @@ const INSTRUCTION =
 
 /**
  * The one English prompt a Marketing Studio run sends: the fixed try-on instruction, then the hook and the location when chosen, then the member's own text.
- * An unknown or empty hook or location id adds nothing.
+ * An unknown or empty hook or location id adds nothing. `audio` adds the sound rule (UGC_SOUND or SILENT); left out, the prompt says nothing about sound.
  */
-export function marketingPrompt({ hook, location, prompt }: { hook?: string | null; location?: string | null; prompt?: string | null }): string {
+export function marketingPrompt({ hook, location, prompt, audio }: { hook?: string | null; location?: string | null; prompt?: string | null; audio?: boolean }): string {
   const h = HOOKS.find((c) => c.id === hook);
   const l = LOCATIONS.find((c) => c.id === location);
   const text = prompt?.trim();
-  return [INSTRUCTION, h?.phrase, l && `Set in ${l.phrase}.`, text].filter(Boolean).join(' ');
+  return [INSTRUCTION, h?.phrase, l && `Set in ${l.phrase}.`, text, audio === undefined ? null : audio ? UGC_SOUND : SILENT].filter(Boolean).join(' ');
 }
+
+/** Sound of a UGC clip with audio on: what a phone records, as on the reference site's UGC clips. */
+const UGC_SOUND = "Natural sound recorded on the phone: the room's ambience and the creator's short, casual spoken reaction to the product, with no background music.";
+const SILENT = 'The video is completely silent: no speech, no music and no sound.';
 
 /** The most reference images an Advanced run takes, as on the reference site; each model's own max_images may be lower. */
 export const ADVANCED_MAX_IMAGES = 7;
@@ -59,7 +63,7 @@ export function advancedPrompt({ brief, images, hook, location, script, audio }:
   const refs = Array.from({ length: images }, (_, i) => `[Image${i + 1}]`).join(', ');
   const lines = script?.trim().replace(/\s+/g, ' ');
   const dialogue = !audio
-    ? 'The video is completely silent: no speech, no music and no sound.'
+    ? SILENT
     : lines
       ? `The speaker says exactly: "${lines}", lip-synced, and no other spoken words.`
       : 'Add speech only if the brief asks for it; otherwise use ambient sound or music with no spoken words.';

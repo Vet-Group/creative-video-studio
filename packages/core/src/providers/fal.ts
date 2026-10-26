@@ -67,8 +67,8 @@ const oneShot = (prompt: string) => `${prompt} One continuous shot that starts o
 
 /**
  * How each fal video endpoint takes a Run, built from its input schema (read 2026-10-25, sources in migration 0015; Kling O3 Pro 2026-10-23). `crop`: the
- * endpoint has no ratio field and follows the input image, so the worker centre-crops the inputs to the chosen ratio first. Audio is off wherever the
- * schema has the switch (the stored prices assume it), and the resolution is the one the stored price is for.
+ * endpoint has no ratio field and follows the input image, so the worker centre-crops the inputs to the chosen ratio first.
+ * Audio follows the job wherever the schema has the switch (the stored prices are for audio off), and the resolution is the one the stored price is for.
  */
 interface VideoBody {
   crop?: boolean;
@@ -80,25 +80,25 @@ const seconds = (req: SubmitRequest) => String(req.durationSec);
 const ref = (images: string[]) => ({ image_urls: images });
 const first = (images: string[]) => ({ image_url: images[0] });
 export const VIDEO_BODIES: Record<string, VideoBody> = {
-  // Audio is on only for a job that asks for it (Marketing Studio Advanced), priced by AUDIO_USD_PER_SECOND.
+  // Audio is on only for a job that asks for it (params.audio 'on'), priced by AUDIO_USD_PER_SECOND.
   'fal-ai/kling-video/o3/pro/reference-to-video': { build: (req, images) => ({ prompt: imageTokens(req.prompt, atImage), ...ref(images), aspect_ratio: req.ratio, duration: seconds(req), generate_audio: req.audio === true }) },
   'fal-ai/kling-video/o1/reference-to-video': { build: (req, images) => ({ prompt: imageTokens(req.prompt, atImage), ...ref(images), aspect_ratio: req.ratio, duration: seconds(req) }) },
-  'fal-ai/kling-video/v3/pro/image-to-video': { crop: true, build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), start_image_url: images[0], duration: seconds(req), generate_audio: false }) },
-  'fal-ai/kling-video/v2.6/pro/image-to-video': { crop: true, build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), start_image_url: images[0], duration: seconds(req), generate_audio: false }) },
+  'fal-ai/kling-video/v3/pro/image-to-video': { crop: true, build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), start_image_url: images[0], duration: seconds(req), generate_audio: req.audio === true }) },
+  'fal-ai/kling-video/v2.6/pro/image-to-video': { crop: true, build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), start_image_url: images[0], duration: seconds(req), generate_audio: req.audio === true }) },
   'fal-ai/kling-video/v2.5-turbo/pro/image-to-video': { crop: true, build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), duration: seconds(req) }) },
-  'bytedance/seedance-2.5/us/reference-to-video': { build: (req, images) => ({ prompt: imageTokens(req.prompt, atImage), ...ref(images), aspect_ratio: req.ratio, duration: seconds(req), resolution: '720p', generate_audio: false }) },
-  'bytedance/seedance-2.5/us/image-to-video': { crop: true, build: (req, images) => ({ prompt: oneShot(imageTokens(req.prompt, plainImage)), ...first(images), duration: seconds(req), resolution: '720p', generate_audio: false }) },
-  'bytedance/seedance-2.0/us/reference-to-video': { build: (req, images) => ({ prompt: imageTokens(req.prompt, atImage), ...ref(images), aspect_ratio: req.ratio, duration: seconds(req), resolution: '720p', generate_audio: false }) },
-  'bytedance/seedance-2.0/us/image-to-video': { build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), aspect_ratio: req.ratio, duration: seconds(req), resolution: '720p', generate_audio: false }) },
-  'fal-ai/bytedance/seedance/v1.5/pro/image-to-video': { build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), aspect_ratio: req.ratio, duration: seconds(req), resolution: '720p', generate_audio: false }) },
+  'bytedance/seedance-2.5/us/reference-to-video': { build: (req, images) => ({ prompt: imageTokens(req.prompt, atImage), ...ref(images), aspect_ratio: req.ratio, duration: seconds(req), resolution: '720p', generate_audio: req.audio === true }) },
+  'bytedance/seedance-2.5/us/image-to-video': { crop: true, build: (req, images) => ({ prompt: oneShot(imageTokens(req.prompt, plainImage)), ...first(images), duration: seconds(req), resolution: '720p', generate_audio: req.audio === true }) },
+  'bytedance/seedance-2.0/us/reference-to-video': { build: (req, images) => ({ prompt: imageTokens(req.prompt, atImage), ...ref(images), aspect_ratio: req.ratio, duration: seconds(req), resolution: '720p', generate_audio: req.audio === true }) },
+  'bytedance/seedance-2.0/us/image-to-video': { build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), aspect_ratio: req.ratio, duration: seconds(req), resolution: '720p', generate_audio: req.audio === true }) },
+  'fal-ai/bytedance/seedance/v1.5/pro/image-to-video': { build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), aspect_ratio: req.ratio, duration: seconds(req), resolution: '720p', generate_audio: req.audio === true }) },
   // Seedance 1.0 Pro and FLUX 3 render "720p" 9:16 as 704 px wide, under the worker's 720p floor (smoke run 2026-10-25), so they ask for 1080p.
   'fal-ai/bytedance/seedance/v1/pro/image-to-video': { build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), aspect_ratio: req.ratio, duration: seconds(req), resolution: '1080p' }) },
   // fal has no FLUX 3 reference endpoint; keyframes pins the product image as the first frame, the closest match to Fash's "FLUX 3 Reference".
-  'blackforestlabs/flux-3/keyframes-to-video': { build: (req, images) => ({ prompt: oneShot(imageTokens(req.prompt, plainImage)), keyframes: [{ image_url: images[0], frame_index: 0 }], aspect_ratio: req.ratio, duration: req.durationSec, resolution: '1080p', generate_audio: false }) },
-  'blackforestlabs/flux-3/image-to-video': { build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), aspect_ratio: req.ratio, duration: req.durationSec, resolution: '1080p', generate_audio: false }) },
+  'blackforestlabs/flux-3/keyframes-to-video': { build: (req, images) => ({ prompt: oneShot(imageTokens(req.prompt, plainImage)), keyframes: [{ image_url: images[0], frame_index: 0 }], aspect_ratio: req.ratio, duration: req.durationSec, resolution: '1080p', generate_audio: req.audio === true }) },
+  'blackforestlabs/flux-3/image-to-video': { build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), aspect_ratio: req.ratio, duration: req.durationSec, resolution: '1080p', generate_audio: req.audio === true }) },
   'google/gemini-omni-flash/v1.1/reference-to-video': { build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...ref(images), aspect_ratio: req.ratio, duration: req.durationSec, resolution: '720p' }) },
   'google/gemini-omni-flash/v1.1/image-to-video': { build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), aspect_ratio: req.ratio, duration: req.durationSec, resolution: '720p' }) },
-  'fal-ai/veo3.1/image-to-video': { build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), aspect_ratio: req.ratio, duration: `${req.durationSec}s`, resolution: '720p', generate_audio: false }) },
+  'fal-ai/veo3.1/image-to-video': { build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), aspect_ratio: req.ratio, duration: `${req.durationSec}s`, resolution: '720p', generate_audio: req.audio === true }) },
   'xai/grok-imagine-video/reference-to-video': { build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), reference_image_urls: images, aspect_ratio: req.ratio, duration: req.durationSec, resolution: '720p' }) },
   'xai/grok-imagine-video/v1.5/image-to-video': { crop: true, build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), duration: req.durationSec, resolution: '720p' }) },
   'fal-ai/wan/v2.7/reference-to-video': { build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), reference_image_urls: images, aspect_ratio: req.ratio, duration: req.durationSec, resolution: '720p' }) },

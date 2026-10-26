@@ -11,6 +11,7 @@ import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { useSamples } from '@/lib/use-samples';
 import { cardSample } from '@/lib/examples';
 import { About } from './About';
+import { AudioSwitch } from './AudioSwitch';
 import { CardMedia, LoopVideo } from './CardMedia';
 import { Icon, type IconName } from './Icon';
 import { Gallery, type Img, Slot, uploadImages, UPLOAD_ERROR, WorkTabs } from './image-tools';
@@ -133,7 +134,6 @@ export function MarketingStudio({ format = 'ugc' }: { format?: MarketingFormat }
   const [notice, setNotice] = useState('');
   const promptId = useId();
   const scriptId = useId();
-  const audioId = useId();
   const reasonId = useId();
 
   // The ratio and duration menus offer what any marketing model offers, so a model whose options differ from the chosen one's can still be picked;
@@ -146,7 +146,8 @@ export function MarketingStudio({ format = 'ugc' }: { format?: MarketingFormat }
   const fresh = list !== null && list.key === key;
   // Advanced: the slot takes up to the chosen model's reference cap (7 at most); a model that takes fewer images than are chosen cannot be picked.
   const maxRefs = Math.min(ADVANCED_MAX_IMAGES, chosen?.maxImages ?? ADVANCED_MAX_IMAGES);
-  const audioOn = advanced && audio && chosen?.audioEstimateUsd != null;
+  // Native audio is on by default in both formats, as on the reference site, on a model that can make it.
+  const audioOn = audio && chosen?.audioEstimateUsd != null;
   const cost = audioOn ? chosen!.audioEstimateUsd! : chosen?.estimateUsd;
   const words = script.trim() ? script.trim().split(/\s+/).length : 0;
   const name = FORMATS.find((f) => f.id === format)!.name;
@@ -241,7 +242,7 @@ export function MarketingStudio({ format = 'ugc' }: { format?: MarketingFormat }
             durationSec,
             params: { format: 'advanced', audio: audioOn ? 'on' : 'off' },
           }
-        : { feature: 'marketing', assetIds: [person[0]!.id, product[0]!.id], modelId: chosen!.id, prompt: marketingPrompt({ hook, location, prompt }), ratio, durationSec };
+        : { feature: 'marketing', assetIds: [person[0]!.id, product[0]!.id], modelId: chosen!.id, prompt: marketingPrompt({ hook, location, prompt, audio: audioOn }), ratio, durationSec, params: { audio: audioOn ? 'on' : 'off' } };
       await api('/api/jobs', sendJson('POST', body));
       setNotice('Đã gửi job. Theo dõi trong tab "Lịch sử".');
       if (!narrow) setTab('history');
@@ -333,23 +334,8 @@ export function MarketingStudio({ format = 'ugc' }: { format?: MarketingFormat }
                 <Select label="Thời lượng" icon="clock" heading="Chọn thời lượng" value={String(durationSec)} options={durations.map((d) => ({ value: String(d), label: `${d} giây` }))} onChange={(v) => setDurationSec(Number(v))} />
               )}
             </div>
-            {advanced && (
-              <div className="field">
-                <span className="field-label" id={audioId}>
-                  Tạo âm thanh
-                </span>
-                <span className="switch-row">
-                  <button type="button" role="switch" className="switch" aria-checked={audioOn} aria-labelledby={audioId} aria-describedby={chosen?.audioEstimateUsd === null ? `${audioId}-why` : undefined} disabled={!chosen || chosen.audioEstimateUsd === null} onClick={() => setAudio(!audio)} />
-                  <span>{audioOn ? 'Bật' : 'Tắt'}</span>
-                  {chosen?.audioEstimateUsd === null && (
-                    <span id={`${audioId}-why`} className="sr-only">
-                      Mô hình này không tạo được âm thanh
-                    </span>
-                  )}
-                </span>
-              </div>
-            )}
-            {models && models.length > 0 && <ModelPicker models={models.map((m) => ({ id: m.id, label: m.label, isMock: m.isMock, supported: !advanced || m.maxImages >= refs.length, estimateUsd: audioOn && m.audioEstimateUsd !== null ? m.audioEstimateUsd : m.estimateUsd, score: m.score, recommended: m.recommended }))} value={chosen?.id ?? ''} onChange={(id) => pickModel(models.find((m) => m.id === id)!)} />}
+            <AudioSwitch on={audio} available={chosen?.audioEstimateUsd != null} onChange={setAudio} />
+            {models && models.length > 0 && <ModelPicker models={models.map((m) => ({ id: m.id, label: m.label, isMock: m.isMock, supported: !advanced || m.maxImages >= refs.length, estimateUsd: audio && m.audioEstimateUsd !== null ? m.audioEstimateUsd : m.estimateUsd, score: m.score, recommended: m.recommended }))} value={chosen?.id ?? ''} onChange={(id) => pickModel(models.find((m) => m.id === id)!)} />}
           </div>
 
           <div className="form-message">

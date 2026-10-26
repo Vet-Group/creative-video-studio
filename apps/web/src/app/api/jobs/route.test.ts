@@ -682,7 +682,7 @@ describe('POST /api/jobs for an image feature', () => {
         expect(await error(await advanced(m, 2, { params: { format: 'unboxing' } }))).toMatch(/params.format must be advanced/);
         expect(await error(await advanced(m, 2, { params: { format: 'advanced', audio: 'yes' } }))).toMatch(/params.audio must be on or off/);
         expect(await error(await advanced(m, 2, { params: { format: 'advanced', resolution: '1K' } }))).toMatch(/params may hold only format and audio/);
-        expect(await error(await advanced(m, 2, { feature: 'video', prompt: 'x', params: { format: 'advanced' } }))).toMatch(/params are for image features and Marketing Studio only/);
+        expect(await error(await advanced(m, 2, { feature: 'video', prompt: 'x', params: { format: 'advanced' } }))).toMatch(/params may hold only audio, as text/);
         expect(await jobCount()).toBe(before);
       });
 
@@ -696,6 +696,18 @@ describe('POST /api/jobs for an image feature', () => {
           expect(await jobCount()).toBe(before);
           expect((await advanced(m, 2, { ...falTest, params: { format: 'advanced', audio: 'off' } })).status).toBe(201);
         }));
+
+      test('Create video takes params.audio too: on books the audio price, off the silent one, and on is refused on a model without an audio price', async () => {
+          const m = await newMember();
+          for (const [audio, usd] of [['on', '0.7000'], ['off', '0.5600']] as const) {
+            const res = await advanced(m, 1, { feature: 'video', params: { audio } });
+            expect(res.status).toBe(201);
+            const { id } = (await res.json()) as { id: string };
+            expect((await pool.query('select feature, params from jobs where id = $1', [id])).rows[0]).toEqual({ feature: 'video', params: { audio } });
+            expect((await pool.query(`select usd::text from cost_entries where job_id = $1`, [id])).rows).toEqual([{ usd }]);
+          }
+          expect(await error(await advanced(m, 1, { feature: 'video', modelId: 'fal-test', params: { audio: 'on' } }))).toMatch(/cannot generate audio/);
+        });
 
       test('UGC without the format still needs exactly 2 images, and a retry copies the params of the original', async () => {
         const m = await newMember();

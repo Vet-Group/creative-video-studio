@@ -127,11 +127,26 @@ export const validateRequest = (model: ModelConfig, req: { ratio: string; durati
 };
 
 /**
- * USD per second with native audio on, by endpoint: only the endpoints whose request builder sends the audio switch (fal.ts) and whose model page
- * states the audio price. Kling O3 Pro: $0.112 audio off, $0.14 audio on (https://fal.ai/models/fal-ai/kling-video/o3/pro/reference-to-video/llms.txt,
- * read 2026-10-26). The mock endpoint takes the switch so the specs can drive it; a mock job books 0 regardless.
+ * USD per second with native audio on, by endpoint: the endpoints whose request builder sends the audio switch (fal.ts), at the price their fal model
+ * page states (read 2026-10-26, https://fal.ai/models/<endpoint>), for the resolution the builder asks for. Kling O3 Pro $0.112 -> $0.14, Kling 3.0 Pro
+ * $0.112 -> $0.168, Kling 2.6 Pro $0.07 -> $0.14, Veo 3.1 $0.20 -> $0.40 (720p/1080p), Seedance 1.5 Pro $1.20 -> $2.40 per million tokens (so twice the
+ * stored $0.0259). Seedance 2.0 and 2.5 and FLUX 3 price by resolution and tokens only, so audio costs nothing more. The mock endpoint takes the switch
+ * so the specs can drive it; a mock job books 0 regardless.
  */
-export const AUDIO_USD_PER_SECOND: Record<string, number> = { 'fal-ai/kling-video/o3/pro/reference-to-video': 0.14, mock: 0 };
+export const AUDIO_USD_PER_SECOND: Record<string, number> = {
+  'fal-ai/kling-video/o3/pro/reference-to-video': 0.14,
+  'fal-ai/kling-video/v3/pro/image-to-video': 0.168,
+  'fal-ai/kling-video/v2.6/pro/image-to-video': 0.14,
+  'fal-ai/veo3.1/image-to-video': 0.4,
+  'fal-ai/bytedance/seedance/v1.5/pro/image-to-video': 0.0518,
+  'bytedance/seedance-2.0/us/image-to-video': 0.3034,
+  'bytedance/seedance-2.0/us/reference-to-video': 0.37,
+  'bytedance/seedance-2.5/us/image-to-video': 0.473,
+  'bytedance/seedance-2.5/us/reference-to-video': 0.473,
+  'blackforestlabs/flux-3/image-to-video': 0.29,
+  'blackforestlabs/flux-3/keyframes-to-video': 0.29,
+  mock: 0,
+};
 
 /** The model's price per second for a job, with audio on when `audio` is 'on' (a job's params.audio); undefined when the endpoint cannot make audio. */
 export const usdPerSecondFor = (model: { endpoint: string; usdPerSecond: number | string }, audio: string | undefined): number | string | undefined =>

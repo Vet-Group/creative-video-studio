@@ -1,7 +1,7 @@
 // Hand-written fixtures until B.5a replaces them with recorded real responses. No test reads FAL_KEY or REPLICATE_API_TOKEN.
 import { describe, expect, test } from 'vitest';
-import { BAKEOFF_MODELS } from '../models';
-import { createFalProvider } from './fal';
+import { AUDIO_USD_PER_SECOND, BAKEOFF_MODELS } from '../models';
+import { createFalProvider, VIDEO_BODIES } from './fal';
 import { ImageReadError, isFundingRefusal, MAX_INLINE_CHARS, ProviderHttpError, unpackJobId } from './http';
 import { createMockVideoProvider, MOCK_FAIL } from './mock';
 import { createReplicateProvider } from './replicate';
@@ -86,12 +86,17 @@ describe('fal', () => {
     });
   });
 
-  test('a job with audio on asks Kling for native audio; other endpoints stay silent', async () => {
-    const { fn, calls } = fakeFetch([200, { request_id: 'req-1' }], [200, { request_id: 'req-2' }]);
-    await createFalProvider({ apiKey: 'k', fetch: fn }).submit({ ...req, audio: true });
-    expect(calls[0]!.body).toMatchObject({ generate_audio: true });
-    await createFalProvider({ apiKey: 'k', fetch: fn }).submit({ ...req, audio: true, model: { ...kling, endpoint: 'bytedance/seedance-2.5/us/reference-to-video' } });
-    expect(calls[1]!.body).toMatchObject({ generate_audio: false });
+  test('a job with audio on asks every endpoint with an audio price for native audio; the others have no switch to send', async () => {
+    // The uploading endpoints (Motion Control) put their inputs in fal storage first and have no audio switch.
+    const endpoints = Object.keys(VIDEO_BODIES).filter((e) => !VIDEO_BODIES[e]!.upload);
+    const { fn, calls } = fakeFetch(...[...endpoints, 'off'].map(() => [200, { request_id: 'r' }] as [number, unknown]));
+    const provider = createFalProvider({ apiKey: 'k', fetch: fn });
+    for (const endpoint of endpoints) await provider.submit({ ...req, audio: true, model: { ...kling, endpoint } });
+    const sent = calls.map((c) => (c.body as { generate_audio?: boolean }).generate_audio);
+    expect(endpoints.filter((_e, i) => sent[i] === true).sort()).toEqual(Object.keys(AUDIO_USD_PER_SECOND).filter((e) => e !== 'mock').sort());
+    expect(sent).not.toContain(false);
+    await provider.submit({ ...req, model: { ...kling, endpoint: 'bytedance/seedance-2.5/us/reference-to-video' } });
+    expect(calls.at(-1)!.body).toMatchObject({ generate_audio: false }); // audio off unless the job asks
   });
 
   test('a refusal surfaces the HTTP status', async () => {

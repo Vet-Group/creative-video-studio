@@ -7,6 +7,7 @@ import { useHydrated } from '@/lib/use-hydrated';
 import { useSamples } from '@/lib/use-samples';
 import { ABOUT } from '@/lib/about-content';
 import { About } from './About';
+import { AudioSwitch } from './AudioSwitch';
 import { CardMedia } from './CardMedia';
 import { EnhanceToggle } from './EnhanceToggle';
 import { Icon } from './Icon';
@@ -27,6 +28,8 @@ interface Model {
   /** The one output resolution the stored price is for, e.g. '1080p'. */
   resolution: string | null;
   estimateUsd: string;
+  /** The estimate with native audio on; null when the model cannot make audio. */
+  audioEstimateUsd: string | null;
   passRate: number | null;
   score: number;
   recommended: boolean;
@@ -47,6 +50,7 @@ interface Image {
 interface JobDetail {
   presetId: string | null;
   enhance?: boolean;
+  audio?: string | null;
   prompt: string;
   ratio: string;
   durationSec: number;
@@ -70,6 +74,7 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
   const [presets, setPresets] = useState<{ id: string; label: string }[] | null>(null);
   const [presetId, setPresetId] = useState(''); // '' means a free prompt
   const [enhance, setEnhance] = useState(true); // on by default, as on Fash; it rewrites a free prompt only
+  const [audio, setAudio] = useState(true); // native audio, on by default as on Fash, on a model that can make it
   const [prompt, setPrompt] = useState('');
   const [ratio, setRatio] = useState('9:16');
   const [durationSec, setDurationSec] = useState(8);
@@ -88,7 +93,6 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
   const fileInput = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
   const promptId = useId();
-  const audioId = useId();
   const [tab, setTab] = useState<Tab | null>(null); // null: the default for the width (Create below 1024 px, else Examples, as on the live page)
   const [picking, setPicking] = useState(false);
   const [detail, setDetail] = useState<Example | null>(null);
@@ -121,6 +125,7 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
         setPresetId(preset ?? '');
         if (!preset) setPrompt(j.prompt);
         setEnhance(j.presetId === null ? (j.enhance ?? true) : true); // a preset job never had Enhance, so the default stays
+        setAudio(j.audio === 'on'); // a clip from before the switch was silent
         setRatio(j.ratio);
         setDurationSec(j.durationSec);
         setModelId(j.modelId);
@@ -157,6 +162,7 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
   }, [ready, ratio, durationSec, refetch]);
 
   const chosen = models?.models.find((m) => m.id === modelId);
+  const audioOn = audio && chosen?.audioEstimateUsd != null;
   // The options follow the chosen model; before one is chosen, every model's options show.
   const durations = [...new Set(chosen ? chosen.durationsSec : (models?.models.flatMap((m) => m.durationsSec) ?? [durationSec]))].sort((a, b) => a - b);
   const ratios = chosen ? chosen.ratios : (models?.models.flatMap((m) => m.ratios) ?? [ratio]);
@@ -188,7 +194,7 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
     setError('');
     setNotice('');
     try {
-      await api('/api/jobs', sendJson('POST', { assetIds: images.map((i) => i.id), modelId, ...(presetId ? { presetId } : { prompt, enhance }), ratio, durationSec, storeId: storeId || null }));
+      await api('/api/jobs', sendJson('POST', { assetIds: images.map((i) => i.id), modelId, ...(presetId ? { presetId } : { prompt, enhance }), ratio, durationSec, storeId: storeId || null, params: { audio: audioOn ? 'on' : 'off' } }));
       setNotice('Đã gửi job. Theo dõi trong tab "Lịch sử".');
       setRefetch((n) => n + 1);
       if (!narrow) setTab('history'); // beside the form, the new job shows in History
@@ -318,7 +324,7 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
 
             {models && models.models.length > 0 && (
               <ModelPicker
-                models={models.models.map((m) => ({ id: m.id, label: m.label, isMock: m.isMock, supported: m.supported, rate: ratePct(m), estimateUsd: m.estimateUsd, score: m.score, recommended: m.recommended }))}
+                models={models.models.map((m) => ({ id: m.id, label: m.label, isMock: m.isMock, supported: m.supported, rate: ratePct(m), estimateUsd: audio && m.audioEstimateUsd !== null ? m.audioEstimateUsd : m.estimateUsd, score: m.score, recommended: m.recommended }))}
                 value={modelId}
                 onChange={setModelId}
               />
@@ -361,19 +367,7 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
               options={[...new Set(ratios)].map((r) => ({ value: r, label: RATIO_LABEL[r] ?? r }))}
               onChange={setRatio}
             />
-            {/* Every price is for a silent clip (models.ts), so the switch shows that state and does not move. */}
-            <div className="field">
-              <span className="field-label" id={audioId}>
-                Tạo âm thanh
-              </span>
-              <span className="switch-row" title="Giá đã tính cho clip không tiếng">
-                <button type="button" role="switch" className="switch" aria-checked="false" aria-labelledby={audioId} aria-describedby={`${audioId}-why`} disabled />
-                <span>Tắt</span>
-                <span id={`${audioId}-why`} className="sr-only">
-                  Giá đã tính cho clip không tiếng
-                </span>
-              </span>
-            </div>
+            <AudioSwitch on={audio} available={chosen?.audioEstimateUsd != null} onChange={setAudio} />
             <Select
               label="Cửa hàng/Thương hiệu"
               icon="store"
@@ -405,7 +399,7 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
           <div className="runbar">
             <button type="button" className="primary run" disabled={!canRun} onClick={() => void run()}>
               Tạo video
-              {chosen && <span className="run-cost">· ${chosen.estimateUsd}</span>}
+              {chosen && <span className="run-cost">· ${audioOn ? chosen.audioEstimateUsd : chosen.estimateUsd}</span>}
             </button>
           </div>
         </div>
