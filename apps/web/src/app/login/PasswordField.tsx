@@ -1,8 +1,8 @@
 import { type RefObject, useEffect, useRef } from 'react';
 import { Icon } from '@/components/Icon';
-import { REDUCED_MOTION, useMediaQuery } from '@/lib/use-media-query';
+import { NARROW, REDUCED_MOTION, useMediaQuery } from '@/lib/use-media-query';
 import { useHydrated } from '@/lib/use-hydrated';
-import { beam, lightAt, type Point, SPREAD, W0 } from './beam';
+import { beam, halfAt, lightAt, type Point, SPREAD, W0 } from './beam';
 
 export type RevealMode = 'pointer' | 'touch' | 'plain';
 
@@ -32,6 +32,7 @@ export function PasswordField({
   mascot: RefObject<SVGGElement | null>;
 }) {
   const hydrated = useHydrated();
+  const narrow = useMediaQuery(NARROW);
   const input = useRef<HTMLInputElement>(null);
   const eye = useRef<HTMLButtonElement>(null);
   const light = useRef<HTMLDivElement>(null);
@@ -51,10 +52,14 @@ export function PasswordField({
       const field = i.getBoundingClientRect();
       const origin = centre(e.getBoundingClientRect());
       const aim = pointer.current ?? origin;
-      const b = beam(origin, aim, field.width);
-      const half = W0 + SPREAD * b.length;
+      // On the stacked (narrow) form the Email field and the submit button sit close above and below, so the beam stays as tall as the field.
+      const b = beam(origin, aim, field.width, narrow ? field.height : Infinity);
+      const half = halfAt(b, b.length);
+      // Where the cone stops widening, as a share of the length; 100% when it never reaches the cap.
+      const flat = Math.min(100, ((half - W0) / SPREAD / b.length) * 100);
       l.style.width = `${b.length}px`;
       l.style.height = `${2 * half}px`;
+      l.style.clipPath = `polygon(0 calc(50% - ${W0}px), ${flat}% 0, 100% 0, 100% 100%, ${flat}% 100%, 0 calc(50% + ${W0}px))`;
       l.style.transform = `translate(${origin.x}px, ${origin.y - half}px) rotate(${b.angle}deg)`;
       t.style.transform = `translateX(${-i.scrollLeft}px)`;
       const y = field.top + field.height / 2;
@@ -91,7 +96,7 @@ export function PasswordField({
       mascot.current?.style.removeProperty('--lens-angle');
       mascot.current?.removeAttribute('data-lit');
     };
-  }, [mode, value, mascot]);
+  }, [mode, value, mascot, narrow]);
 
   return (
     <div className="password-field">

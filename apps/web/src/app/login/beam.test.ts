@@ -27,3 +27,12 @@ test('a pointer on the origin gives finite values and points along the field tow
   expect(Number.isNaN(lightAt(z, origin.x - 50, origin.y))).toBe(false);
   expect(lightAt(z, origin.x - 50, origin.y)).toBeGreaterThan(0.9);
 });
+
+test('a capped beam stops widening, so points off the axis by more than the cap stay dark', () => {
+  const capped = beam(origin, { x: 100, y: 100 }, 280, 20);
+  expect(capped.maxHalf).toBe(20);
+  // 200 px along, the open cone is 76 px wide on each side; capped it is 20.
+  expect(lightAt(b, origin.x - 200, origin.y - 50)).toBeGreaterThan(0.9);
+  expect(lightAt(capped, origin.x - 200, origin.y - 50)).toBe(0);
+  expect(lightAt(capped, origin.x - 200, origin.y - 5)).toBeGreaterThan(0.9);
+});

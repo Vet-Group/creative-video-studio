@@ -223,6 +223,26 @@ test.describe('touch', () => {
   });
 });
 
+test.describe('narrow window with a mouse', () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  test('narrow pointer: the beam lights the whole password but stays off the Email field and the submit button', async ({ page }) => {
+    const { pw, eye, submit, card } = await open(page);
+    expect(await hoverNone(page)).toBe(false);
+    await pw.fill('abcdefgh');
+    await eye.click();
+    await expect(card).toHaveAttribute('data-flashlight', 'pointer');
+    const field = await box(pw);
+    await page.mouse.move(field.x - 40, field.y + field.height / 2);
+    await expect(page.locator('.password-reveal [data-lit="true"]')).toHaveCount(8);
+    // Aimed along the field the beam is unrotated, so its box is its drawn extent.
+    const beamBox = await box(page.locator('.beam'));
+    const email = await box(page.getByLabel('Email'));
+    expect(beamBox.y).toBeGreaterThanOrEqual(email.y + email.height);
+    expect(beamBox.y + beamBox.height).toBeLessThanOrEqual((await box(submit)).y);
+  });
+});
+
 test.describe('reduced motion', () => {
   test.use({ viewport: DESKTOP, contextOptions: { reducedMotion: 'reduce' } });
 
