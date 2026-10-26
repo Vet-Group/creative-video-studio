@@ -16,6 +16,7 @@ const worker = await startWorker({
   connectionString,
   providers: { mock: createMockProvider({ runMs: Number(process.env.CVS_MOCK_RUN_MS ?? 8_000) }), ...real.providers },
   imageProviders: { mock: createMockImageProvider({ runMs: Number(process.env.CVS_MOCK_RUN_MS ?? 8_000) }), ...real.imageProviders },
+  enhance: real.enhance,
 });
 console.log(`worker ${worker.id} is running`);
 

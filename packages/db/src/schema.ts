@@ -258,6 +258,12 @@ export const jobs = pgTable(
     provider: text('provider', { enum: PROVIDERS }).notNull(),
     presetId: text('preset_id').references(() => presets.id, { onDelete: 'restrict' }),
     prompt: text('prompt').notNull(),
+    /** Enhance: the worker has an LLM rewrite `prompt` into a detailed brief before the provider call. */
+    enhance: boolean('enhance').notNull().default(false),
+    /** The brief the provider received when Enhance rewrote the prompt; null when it was off or fell back to `prompt`. */
+    enhancedPrompt: text('enhanced_prompt'),
+    /** What the Enhance call cost, from the LLM's usage report. */
+    enhanceCostUsd: numeric('enhance_cost_usd', { precision: 10, scale: 6 }),
     aspect: text('aspect', { enum: IMAGE_RATIOS }).notNull(),
     /** Seconds of a video; 0 for an image. */
     durationS: integer('duration_s').notNull(),

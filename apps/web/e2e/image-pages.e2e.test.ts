@@ -175,8 +175,16 @@ test('Image Generation: the bar needs an image and a prompt, every pill works by
   await expect(modelButton(page)).toContainText('Mock image E2E');
   await expect(ratio).toHaveAttribute('data-value', '1:1'); // back on the roomy model, the earlier choice returns
 
+  // Enhance sits in the bar, on by default; the job stores the member's choice (a mock job is never rewritten).
+  const enhance = bar.getByRole('button', { name: 'Cải thiện mô tả bằng AI' });
+  await expect(enhance).toHaveAttribute('aria-pressed', 'true');
+  await enhance.click();
+  await expect(enhance).toHaveText('Cải thiện: tắt');
+
   await run.click();
   await expect(page.getByText('Đã gửi job')).toBeVisible();
+  const sent = ((await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { id: string }[] }).jobs[0]!;
+  expect(await (await page.request.get(`/api/jobs/${sent.id}`)).json()).toMatchObject({ prompt: 'a red shirt on a hanger', enhance: false, enhancedPrompt: null });
   await expect(page.getByRole('tab', { name: 'Lịch sử' })).toHaveAttribute('aria-selected', 'true');
   await expect(toast(page, 'Ảnh đã xong')).toBeVisible({ timeout: 60_000 });
   const tray = page.getByRole('complementary', { name: 'Job của tôi' });

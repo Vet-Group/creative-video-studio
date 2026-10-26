@@ -5,6 +5,7 @@ import { useRef, useState } from 'react';
 import { api, errorText, sendJson } from '@/lib/api';
 import { useHydrated } from '@/lib/use-hydrated';
 import { Gallery, type Img, RATIO_LABEL, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, WorkTabs } from './image-tools';
+import { EnhanceToggle } from './EnhanceToggle';
 import { Icon } from './Icon';
 import { useJobs } from './jobs';
 import { ModelPicker } from './ModelPicker';
@@ -21,6 +22,7 @@ export function ImageGeneration() {
   const hydrated = useHydrated();
   const [images, setImages] = useState<Img[]>([]);
   const [prompt, setPrompt] = useState('');
+  const [enhance, setEnhance] = useState(true); // on by default, as on Fash
   const [tab, setTab] = useState<Tab>('examples');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -67,7 +69,7 @@ export function ImageGeneration() {
     setError('');
     setNotice('');
     try {
-      const body = { feature: 'image', modelId: pick.modelId, assetIds: images.map((i) => i.id), prompt: prompt.trim(), ratio: pick.ratio, params: { resolution: pick.resolution } };
+      const body = { feature: 'image', modelId: pick.modelId, assetIds: images.map((i) => i.id), prompt: prompt.trim(), enhance, ratio: pick.ratio, params: { resolution: pick.resolution } };
       await api('/api/jobs', sendJson('POST', body));
       setNotice('Đã gửi job. Theo dõi trong tab "Lịch sử".');
       setTab('history');
@@ -159,6 +161,7 @@ export function ImageGeneration() {
               </>
             )}
           </div>
+          <EnhanceToggle on={enhance} onChange={setEnhance} />
           <button type="button" className="primary bar-run" disabled={!canRun} aria-describedby={reason ? 'imagegen-reason' : undefined} onClick={() => void run()}>
             Tạo ảnh
             {pick.estimate !== undefined && <span className="run-cost">· ${pick.estimate}</span>}

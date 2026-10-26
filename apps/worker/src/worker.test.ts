@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import { DeleteBucketCommand, DeleteObjectsCommand, HeadObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
+import type { Enhancer } from '@cvs/core/enhance';
 import { reserve, withTransaction } from '@cvs/core/ledger';
 import { ImageReadError } from '@cvs/core/providers/http';
 import type { ImageProvider, ImageSubmitRequest, VideoProvider } from '@cvs/core/providers';
@@ -202,6 +203,46 @@ describe('the mock lifecycle', () => {
     await start(counting(300), { runTimeoutMs: 60_000 });
     await waitFor('the job to time out', async () => (await status(id)) === 'timed_out');
     expect(await total(id)).toEqual({ usd: '1.5000', is_final: false });
+  });
+});
+
+describe('Enhance', () => {
+  /** The mock adapter, recording the prompts it was sent; the jobs are not flagged is_mock, which Enhance skips. */
+  async function startWithEnhance(enhance: Enhancer) {
+    const prompts: string[] = [];
+    const inner = createMockProvider({ runMs: 200, dir: mockDir });
+    const w = await startWorker({ pool, connectionString: testDb.url, providers: { mock: { ...inner, submit: (req) => (prompts.push(req.prompt), inner.submit(req)) } }, enhance, options: FAST });
+    workers.push(w);
+    return prompts;
+  }
+  const enhanced = async (id: string) => (await pool.query(`update jobs set enhance = true where id = $1`, [id]), id);
+
+  test('sends the rewritten brief, saves it with its cost and keeps the member’s prompt', async () => {
+    const asked: [string, string][] = [];
+    const prompts = await startWithEnhance(async (p, kind) => (asked.push([p, kind]), { prompt: `A detailed brief for ${p}.`, costUsd: 0.0004 }));
+    const id = await enhanced(await newJob('u1', { prompt: 'push in' }));
+    await send(id, 'u1');
+    await waitFor('the job to succeed', async () => (await status(id)) === 'succeeded'); // finished, so it holds no slot of the later tests
+    expect(asked).toEqual([['push in', 'video']]);
+    expect(prompts).toEqual(['A detailed brief for push in.']);
+    const j = await job(id);
+    expect([j.prompt, j.enhanced_prompt, Number(j.enhance_cost_usd)]).toEqual(['push in', 'A detailed brief for push in.', 0.0004]);
+  });
+
+  test('falls back to the member’s prompt when the LLM fails, and never calls it with Enhance off', async () => {
+    let calls = 0;
+    const prompts = await startWithEnhance(async () => {
+      calls++;
+      throw new Error('rate limited');
+    });
+    const failed = await enhanced(await newJob('u2', { prompt: 'slow orbit' }));
+    const off = await newJob('u3', { prompt: 'as written' });
+    await send(failed, 'u2');
+    await send(off, 'u3');
+    await waitFor('both jobs to succeed', async () => (await Promise.all([failed, off].map(status))).every((s) => s === 'succeeded'));
+    expect(prompts.sort()).toEqual(['as written', 'slow orbit']);
+    expect(calls).toBe(1);
+    expect((await job(failed)).enhanced_prompt).toBeNull();
   });
 });
 
