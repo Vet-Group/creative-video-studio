@@ -179,19 +179,19 @@ function TryOnAbout() {
       <h3>Một lần Run gồm những gì</h3>
       <ol className="about-steps">
         <li>
-          <strong>Trang phục.</strong> Ít nhất 1 ảnh, tốt nhất là ảnh trải phẳng hoặc ảnh người mặc, nền sạch, thấy rõ cả bộ.
+          <strong>Trang phục</strong> Ít nhất 1 ảnh, tốt nhất là ảnh trải phẳng hoặc ảnh người mặc, nền sạch, thấy rõ cả bộ.
         </li>
         <li>
-          <strong>Người mẫu.</strong> Một ảnh rõ mặt và dáng, ánh sáng đều. Mô hình giữ nguyên người này.
+          <strong>Người mẫu</strong> Một ảnh rõ mặt và dáng, ánh sáng đều. Mô hình giữ nguyên người này.
         </li>
         <li>
-          <strong>Bối cảnh (tuỳ chọn).</strong> Thêm một ảnh nếu muốn đặt người mẫu vào một khung cảnh khác.
+          <strong>Bối cảnh (tuỳ chọn)</strong> Thêm một ảnh nếu muốn đặt người mẫu vào một khung cảnh khác.
         </li>
         <li>
-          <strong>Mô hình, độ phân giải, tỉ lệ.</strong> Mỗi mô hình nhận tối đa một số ảnh và ghi giá cho từng ảnh. Độ phân giải cao hơn có thể đắt hơn.
+          <strong>Mô hình, độ phân giải, tỉ lệ</strong> Mỗi mô hình nhận tối đa một số ảnh và ghi giá cho từng ảnh. Độ phân giải cao hơn có thể đắt hơn.
         </li>
         <li>
-          <strong>Prompt (tuỳ chọn).</strong> Bỏ trống thì công ty dùng một câu mặc định: mặc trang phục lên người mẫu và giữ nguyên người và bối cảnh.
+          <strong>Prompt (tuỳ chọn)</strong> Bỏ trống thì công ty dùng một câu mặc định: mặc trang phục lên người mẫu và giữ nguyên người và bối cảnh.
         </li>
       </ol>
 

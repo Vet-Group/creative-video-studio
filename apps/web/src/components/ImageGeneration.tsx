@@ -179,16 +179,16 @@ function ImageAbout() {
       <h3>Một lần Run gồm những gì</h3>
       <ol className="about-steps">
         <li>
-          <strong>Ảnh tham chiếu.</strong> Bấm dấu cộng trên thanh bên dưới để tải ảnh. Mỗi mô hình nhận tối đa một số ảnh nhất định.
+          <strong>Ảnh tham chiếu</strong> Bấm dấu cộng trên thanh bên dưới để tải ảnh. Mỗi mô hình nhận tối đa một số ảnh nhất định.
         </li>
         <li>
-          <strong>Mô tả.</strong> Tả cảnh, ánh sáng và điều cần đổi, hoặc điều phải giữ nguyên. Viết bằng tiếng Anh thường cho kết quả ổn định hơn.
+          <strong>Mô tả</strong> Tả cảnh, ánh sáng và điều cần đổi, hoặc điều phải giữ nguyên. Viết bằng tiếng Anh thường cho kết quả ổn định hơn.
         </li>
         <li>
-          <strong>Mô hình, tỉ lệ, độ phân giải.</strong> Mỗi menu mở bằng chuột hoặc bàn phím (Enter, Space, phím mũi tên, Esc để đóng). Nút Run ghi chi phí ước tính của một ảnh.
+          <strong>Mô hình, tỉ lệ, độ phân giải</strong> Mỗi menu mở bằng chuột hoặc bàn phím (Enter, Space, phím mũi tên, Esc để đóng). Nút Run ghi chi phí ước tính của một ảnh.
         </li>
         <li>
-          <strong>Xem kết quả.</strong> Job hiện trong mục Lịch sử và báo khi xong. Thư viện có mọi ảnh của công ty để xem, tải xuống và đánh giá.
+          <strong>Xem kết quả</strong> Job hiện trong mục Lịch sử và báo khi xong. Thư viện có mọi ảnh của công ty để xem, tải xuống và đánh giá.
         </li>
       </ol>
 

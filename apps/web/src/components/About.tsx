@@ -12,19 +12,19 @@ export function About() {
       <h3>Một lần Run gồm những gì</h3>
       <ol className="about-steps">
         <li>
-          <strong>Tải ảnh lên.</strong> Ảnh đầu tiên là sản phẩm chính. Mỗi mô hình nhận tối đa một số ảnh nhất định; ô tải ảnh báo khi bạn vượt quá.
+          <strong>Tải ảnh lên</strong> Ảnh đầu tiên là sản phẩm chính. Mỗi mô hình nhận tối đa một số ảnh nhất định; ô tải ảnh báo khi bạn vượt quá.
         </li>
         <li>
-          <strong>Chọn mẫu hoặc viết mô tả.</strong> Mẫu chuyển động là các câu lệnh công ty đã thử và giữ lại. Khi tự viết, chỉ cần tả chuyển động: ảnh đã quyết định sản phẩm, màu và bối cảnh.
+          <strong>Chọn mẫu hoặc viết mô tả</strong> Mẫu chuyển động là các câu lệnh công ty đã thử và giữ lại. Khi tự viết, chỉ cần tả chuyển động: ảnh đã quyết định sản phẩm, màu và bối cảnh.
         </li>
         <li>
-          <strong>Chọn mô hình, tỉ lệ và thời lượng.</strong> Menu mô hình xếp theo nhà cung cấp và ghi tỉ lệ đạt, tức tỉ lệ clip được đánh giá Đạt. Mô hình không hỗ trợ tỉ lệ hay thời lượng đang chọn nằm ở cuối và không chọn được.
+          <strong>Chọn mô hình, tỉ lệ và thời lượng</strong> Menu mô hình xếp theo nhà cung cấp và ghi tỉ lệ đạt, tức tỉ lệ clip được đánh giá Đạt. Mô hình không hỗ trợ tỉ lệ hay thời lượng đang chọn nằm ở cuối và không chọn được.
         </li>
         <li>
-          <strong>Bấm Run.</strong> Nút Run ghi chi phí ước tính. Job hiện trong mục Lịch sử và báo khi xong; bạn có thể rời trang trong lúc chờ.
+          <strong>Bấm Run</strong> Nút Run ghi chi phí ước tính. Job hiện trong mục Lịch sử và báo khi xong; bạn có thể rời trang trong lúc chờ.
         </li>
         <li>
-          <strong>Đánh giá clip.</strong> Đánh dấu Đạt hoặc Không đạt trong Thư viện. Đánh giá giúp công ty chọn mô hình và mẫu tốt hơn.
+          <strong>Đánh giá clip</strong> Đánh dấu Đạt hoặc Không đạt trong Thư viện. Đánh giá giúp công ty chọn mô hình và mẫu tốt hơn.
         </li>
       </ol>
 
