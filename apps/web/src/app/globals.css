@@ -237,6 +237,7 @@ label.model input { display: inline; margin: 0; min-width: 0; width: auto; }
 .scene-toggle span { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; }
 .scene-toggle[aria-pressed='false'] span:first-child, .scene-toggle[aria-pressed='true'] span:last-child { background: var(--ink); color: var(--on-dark); }
 .scene-toggle:focus-visible { outline-color: var(--brand); outline-offset: 3px; }
+.login[data-flashlight='pointer'] .scene-toggle, .login[data-flashlight='touch'] .scene-toggle { visibility: hidden; } /* the flashlight darkens the studio itself; the scene choice returns when it is off */
 .scene-wall { fill: var(--scene-wall); }
 .scene-sweep { fill: var(--scene-sweep); }
 .scene-floor { fill: var(--scene-floor); }
