@@ -8,6 +8,8 @@ import { Icon, type IconName } from './Icon';
 export interface SelectOption {
   value: string;
   label: string;
+  /** What the closed select shows, when the option label is too long for a half-width field. */
+  short?: string;
   disabled?: boolean;
 }
 
@@ -84,7 +86,7 @@ export function Select({ label, icon, heading, value, options, onChange }: { lab
           onBlur={() => setOpen(false)}
         >
           <Icon name={icon} />
-          <span className="select-value">{options[selected]?.label ?? value}</span>
+          <span className="select-value">{options[selected]?.short ?? options[selected]?.label ?? value}</span>
           <Icon name={open ? 'up' : 'down'} />
         </button>
         {open && (

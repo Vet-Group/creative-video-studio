@@ -128,6 +128,7 @@ test('the model, ratio and duration come from the marketing model, the About tab
   await expect(page.getByRole('listbox', { name: 'Thời lượng' }).getByRole('option')).toHaveText(['5 giây', '8 giây', '10 giây']); // what any marketing model offers
   await page.keyboard.press('Escape');
   await expect(select(page, 'Tỉ lệ')).toHaveAttribute('data-value', '9:16');
+  await expect(select(page, 'Tỉ lệ').locator('.select-value')).toHaveText('9:16'); // the half-width field shows the bare ratio, the menu names it
   await select(page, 'Tỉ lệ').click();
   await expect(page.getByRole('listbox', { name: 'Tỉ lệ' }).getByRole('option')).toHaveText(['9:16 (dọc)', '16:9 (ngang)', '1:1 (vuông)']);
   await page.keyboard.press('Escape');
