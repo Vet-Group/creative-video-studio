@@ -1,5 +1,5 @@
 // UI parity (docs/UI-MOTION-PARITY.md): screenshot baselines on frozen data, the layout on both sides of the 1024 px breakpoint,
-// the drawer, the tabs and the carousel by keyboard and drag, and the rule that choosing a preset creates no job.
+// the drawer, the tabs, the preset picker grid, and the rule that choosing a preset creates no job.
 import { fileURLToPath } from 'node:url';
 import { expect, type Page, test } from '@playwright/test';
 import { EXAMPLES } from '../src/lib/examples';
@@ -94,7 +94,7 @@ test('the layout flips at 1024 px: sidebar and two columns above, top bar, tabs 
       await expect(nav).toBeVisible();
       await expect(menu).toBeHidden();
       await expect(tabs).toHaveText(['Lịch sử', 'Ví dụ', 'Giới thiệu']);
-      await expect(page.getByRole('tab', { name: 'Lịch sử' })).toHaveAttribute('aria-selected', 'true');
+      await expect(page.getByRole('tab', { name: 'Ví dụ' })).toHaveAttribute('aria-selected', 'true');
       await expect(form).toBeVisible();
       // Two columns: the form card sits left of the pane.
       const card = (await form.boundingBox())!;
@@ -158,7 +158,7 @@ for (const width of [1280, 1023]) {
     await page.setViewportSize({ width, height: 800 });
     await signIn(page, 'member5');
     await openCreate(page);
-    const order = width >= 1024 ? ['Lịch sử', 'Ví dụ', 'Giới thiệu'] : ['Tạo', 'Lịch sử', 'Ví dụ', 'Giới thiệu'];
+    const order = width >= 1024 ? ['Ví dụ', 'Giới thiệu', 'Lịch sử'] : ['Tạo', 'Lịch sử', 'Ví dụ', 'Giới thiệu']; // from the open tab; the arrows wrap
     const tab = (name: string) => page.getByRole('tab', { name, exact: true });
 
     await tab(order[0]!).focus();
@@ -176,58 +176,31 @@ for (const width of [1280, 1023]) {
     await expect(tab('Ví dụ')).toHaveAttribute('aria-selected', 'true');
     await expect(page.locator('.masonry')).toBeVisible();
     await page.keyboard.press('Home');
-    await expect(tab(order[0]!)).toHaveAttribute('aria-selected', 'true');
+    await expect(tab(width >= 1024 ? 'Lịch sử' : 'Tạo')).toHaveAttribute('aria-selected', 'true'); // the first tab in the row
     if (width < 1024) await expect(page.locator('.form-card')).toBeVisible();
     else await expect(page.getByRole('complementary', { name: 'Job của tôi' })).toBeVisible();
   });
 }
 
-test('the preset carousel scrolls natively: 16 px edge, 12 px gaps, arrow keys and mouse drag at 390 px', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  await signIn(page, 'member5');
-  await openCreate(page);
-  await page.getByRole('button', { name: 'Chọn mẫu khác' }).click();
-  const track = page.getByRole('list', { name: 'Danh sách mẫu' });
-  const cards = track.getByRole('listitem');
-  await expect(cards).toHaveCount(26); // 6 company presets, the 19 motion templates of migration 0020 and the free prompt
-  await expect(page.getByRole('button', { name: 'Cuộn sang phải' })).toBeHidden(); // arrows are for desktop; touch swipes
-
-  const t = (await track.boundingBox())!;
-  const first = (await cards.nth(0).boundingBox())!;
-  const second = (await cards.nth(1).boundingBox())!;
-  expect(Math.abs(first.x - t.x - 16)).toBeLessThanOrEqual(1);
-  expect(Math.abs(second.x - (first.x + first.width) - 12)).toBeLessThanOrEqual(1);
-
-  await track.focus();
-  await page.keyboard.press('ArrowRight');
-  await expect.poll(() => track.evaluate((el) => el.scrollLeft)).toBeGreaterThan(100);
-  const afterKey = await track.evaluate((el) => el.scrollLeft);
-
-  await page.mouse.move(t.x + 200, t.y + 60);
-  await page.mouse.down();
-  await page.mouse.move(t.x + 120, t.y + 60, { steps: 5 });
-  await page.mouse.move(t.x + 40, t.y + 60, { steps: 5 });
-  await page.mouse.up();
-  await expect.poll(() => track.evaluate((el) => el.scrollLeft)).toBeGreaterThan(afterKey + 80);
-
-  // Dragging is not choosing: the dialog is still open and the preset is unchanged.
-  await expect(track).toBeVisible();
-  await page.keyboard.press('Escape');
-  await expect(track).toBeHidden();
-  await expect(page.getByRole('button', { name: 'Chọn mẫu khác' })).toBeFocused();
-});
-
-test('on a wide screen the carousel has arrow buttons', async ({ page }) => {
-  await page.setViewportSize({ width: 1280, height: 800 });
-  await signIn(page, 'member5');
-  await openCreate(page);
-  await page.getByRole('button', { name: 'Chọn mẫu khác' }).click();
-  const track = page.getByRole('list', { name: 'Danh sách mẫu' });
-  await expect(page.getByRole('button', { name: 'Cuộn sang trái' })).toBeVisible();
-  await page.getByRole('button', { name: 'Cuộn sang phải' }).click();
-  await expect.poll(() => track.evaluate((el) => el.scrollLeft)).toBeGreaterThan(100);
-  await page.getByRole('button', { name: 'Cuộn sang trái' }).click();
-  await expect.poll(() => track.evaluate((el) => el.scrollLeft)).toBe(0);
+test('the preset picker is a vertically scrolling grid like the live one: 4 columns wide, 2 on a phone, the chosen card ringed', async ({ page }) => {
+  for (const [width, height, columns] of [[1280, 800, 4], [390, 844, 2]] as const) {
+    await page.setViewportSize({ width, height });
+    if (width === 1280) await signIn(page, 'member5');
+    await openCreate(page);
+    await page.getByRole('button', { name: 'Chọn mẫu khác' }).click();
+    const grid = page.getByRole('list', { name: 'Danh sách mẫu' });
+    const cards = grid.getByRole('listitem');
+    await expect(cards).toHaveCount(26); // 6 company presets, the 19 motion templates of migration 0020 and the free prompt
+    const tops = await cards.evaluateAll((li) => li.slice(0, 8).map((e) => Math.round(e.getBoundingClientRect().top)));
+    expect(tops.filter((t) => t === tops[0]).length).toBe(columns);
+    expect(await grid.evaluate((el) => el.scrollHeight > el.clientHeight && el.scrollWidth <= el.clientWidth)).toBe(true);
+    const chosen = cards.filter({ has: page.locator('button[aria-pressed="true"]') });
+    await expect(chosen).toHaveCount(1);
+    expect(await chosen.locator(':scope > :first-child').evaluate((e) => getComputedStyle(e).outlineStyle)).toBe('solid');
+    await page.keyboard.press('Escape');
+    await expect(grid).toBeHidden();
+    await expect(page.getByRole('button', { name: 'Chọn mẫu khác' })).toBeFocused();
+  }
 });
 
 test('choosing a preset or using an example fills the form and creates no job', async ({ page }) => {
@@ -504,7 +477,7 @@ for (const width of [1440, 1280, 390]) {
     await openCreate(page);
     const wideScreen = width >= 1024;
     const focused = () => page.evaluate(() => (document.activeElement as HTMLElement).getAttribute('aria-label') ?? document.activeElement?.textContent?.trim());
-    const order = wideScreen ? ['Thu gọn thanh bên', 'Cài đặt', 'Khám phá', 'Thử đồ', 'Tạo ảnh', 'Tạo video', 'Marketing Studio', 'Ứng dụng', 'Thư viện', 'Lịch sử'] : ['Mở menu', 'Tạo'];
+    const order = wideScreen ? ['Thu gọn thanh bên', 'Cài đặt', 'Khám phá', 'Thử đồ', 'Tạo ảnh', 'Tạo video', 'Marketing Studio', 'Ứng dụng', 'Thư viện', 'Ví dụ'] : ['Mở menu', 'Tạo']; // the open tab takes the tab stop
 
     for (const name of order) {
       await page.keyboard.press('Tab');

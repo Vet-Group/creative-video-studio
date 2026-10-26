@@ -55,7 +55,7 @@ function ChoiceBox({ label, icon, choice, onOpen }: { label: string; icon: IconN
 }
 
 /** The dialog of one list: cards with the choice's sample loop (`marketing-<kind>-<id>`) and name in a grid, the "no choice" card first. Arrows move the focus between the cards, Enter or Space picks, Escape closes. */
-function ChoiceDialog({ open, title, kind, choices, value, onPick, onClose }: { open: boolean; title: string; kind: 'hook' | 'location'; choices: MarketingChoice[]; value: string; onPick: (id: string) => void; onClose: () => void }) {
+function ChoiceDialog({ open, title, sub, kind, choices, value, onPick, onClose }: { open: boolean; title: string; sub: string; kind: 'hook' | 'location'; choices: MarketingChoice[]; value: string; onPick: (id: string) => void; onClose: () => void }) {
   const grid = useRef<HTMLDivElement>(null);
   const have = useSamples();
   // showModal (in Modal's effect, which runs first) focuses the close button, so the chosen card takes the focus afterwards.
@@ -75,6 +75,7 @@ function ChoiceDialog({ open, title, kind, choices, value, onPick, onClose }: { 
   return (
     <Modal open={open} onClose={onClose} label={title} className="choice-dialog">
       <h2>{title}</h2>
+      <p className="modal-sub">{sub}</p>
       <div ref={grid} className="choice-grid" role="listbox" aria-label={title} onKeyDown={onKey}>
         {all.map((c) => (
           <button key={c.id || 'none'} type="button" role="option" aria-selected={value === c.id} tabIndex={value === c.id ? 0 : -1} onClick={() => onPick(c.id)}>
@@ -315,6 +316,7 @@ export function MarketingStudio() {
 
       <Modal open={picker === 'format'} onClose={() => setPicker(null)} label="Chọn định dạng" className="choice-dialog">
         <h2>Chọn định dạng</h2>
+        <p className="modal-sub">Kiểu video marketing sẽ tạo. Hiện có UGC Thử đồ; các định dạng khác sẽ có sau.</p>
         <div className="choice-grid">
           {FORMATS.map((f) => (
             <button key={f.id} type="button" aria-pressed={f.id === 'ugc'} disabled={f.soon !== null} onClick={() => setPicker(null)}>
@@ -327,8 +329,8 @@ export function MarketingStudio() {
           ))}
         </div>
       </Modal>
-      <ChoiceDialog open={picker === 'hook'} title="Chọn hook" kind="hook" choices={HOOKS} value={hook} onPick={(id) => (setHook(id), setPicker(null))} onClose={() => setPicker(null)} />
-      <ChoiceDialog open={picker === 'location'} title="Chọn bối cảnh" kind="location" choices={LOCATIONS} value={location} onPick={(id) => (setLocation(id), setPicker(null))} onClose={() => setPicker(null)} />
+      <ChoiceDialog open={picker === 'hook'} title="Chọn hook" sub="Cảnh mở đầu giữ chân người xem trong vài giây đầu. Có thể bỏ qua." kind="hook" choices={HOOKS} value={hook} onPick={(id) => (setHook(id), setPicker(null))} onClose={() => setPicker(null)} />
+      <ChoiceDialog open={picker === 'location'} title="Chọn bối cảnh" sub="Nơi người mẫu xuất hiện trong video. Có thể bỏ qua." kind="location" choices={LOCATIONS} value={location} onPick={(id) => (setLocation(id), setPicker(null))} onClose={() => setPicker(null)} />
     </section>
   );
 }

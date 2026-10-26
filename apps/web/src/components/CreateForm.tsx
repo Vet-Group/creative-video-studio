@@ -7,7 +7,6 @@ import { useHydrated } from '@/lib/use-hydrated';
 import { useSamples } from '@/lib/use-samples';
 import { About } from './About';
 import { CardMedia } from './CardMedia';
-import { Carousel } from './Carousel';
 import { Icon } from './Icon';
 import { useJobs } from './jobs';
 import { Modal } from './Modal';
@@ -83,7 +82,7 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
   const fileInput = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
   const promptId = useId();
-  const [tab, setTab] = useState<Tab | null>(null); // null: the default for the width (Create below 1024 px, else History)
+  const [tab, setTab] = useState<Tab | null>(null); // null: the default for the width (Create below 1024 px, else Examples, as on the live page)
   const [picking, setPicking] = useState(false);
   const [detail, setDetail] = useState<Example | null>(null);
 
@@ -195,7 +194,7 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
 
   // Below 1024 px the form is one tab among Create / History / Examples / About; beside it, the tabs are History / Examples / About.
   const tabs: Tab[] = narrow ? ['create', 'history', 'examples', 'about'] : ['history', 'examples', 'about'];
-  const shown: Tab = narrow ? (tab ?? 'create') : tab === 'examples' || tab === 'about' ? tab : 'history';
+  const shown: Tab = narrow ? (tab ?? 'create') : tab === 'history' || tab === 'about' ? tab : 'examples';
   const current = presets?.find((p) => p.id === presetId);
   const have = useSamples();
   const media = (path: string) => sampleSrc(have, path);
@@ -258,6 +257,7 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
                 <strong>{current?.label ?? 'Tự viết mô tả'}</strong>
               </div>
               <button type="button" className="banner-chip" onClick={() => setPicking(true)}>
+                <Icon name="edit" size={12} />
                 Chọn mẫu khác
               </button>
             </div>
@@ -426,7 +426,8 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
 
       <Modal open={picking} onClose={() => setPicking(false)} label="Bộ sưu tập mẫu">
         <h2>Chọn mẫu</h2>
-        <Carousel label="Danh sách mẫu">
+        <p className="modal-sub">Mỗi mẫu là một kiểu chuyển động đã thử, kèm video ví dụ. Chọn một mẫu hoặc tự viết mô tả.</p>
+        <ul className="preset-grid" aria-label="Danh sách mẫu">
           {presets?.map((p) => {
             const m = presetMedia(p.id);
             return (
@@ -458,7 +459,7 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
               Tự viết mô tả
             </button>
           </li>
-        </Carousel>
+        </ul>
       </Modal>
 
       {/* The live Example dialog (REA-video V01, measured 2026-10-23): the clip on black with Close at its top-left, the details column,

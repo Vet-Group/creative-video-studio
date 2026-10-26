@@ -62,7 +62,7 @@ export default async function ExplorePage() {
               <span className="explore-feature-head">
                 <strong>{f.title}</strong>
                 <span className="explore-arrow" aria-hidden="true">
-                  <Icon name="external" />
+                  <Icon name="arrow" size={16} />
                 </span>
               </span>
               <span className="muted">{f.text}</span>
