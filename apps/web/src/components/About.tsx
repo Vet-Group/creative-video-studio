@@ -7,7 +7,6 @@ export function About() {
       <h2>Tạo video sản phẩm từ ảnh</h2>
       <p>Đưa vào một hoặc vài ảnh sản phẩm, chọn một mẫu chuyển động hoặc tự viết mô tả, và nhận lại một clip ngắn. Clip nằm trong Thư viện của công ty, ai trong công ty cũng xem và tải được.</p>
 
-      <AboutClips names={['example-2', 'example-3']} title="Từ ảnh tĩnh thành video" />
 
       <p className="about-kicker">Từng bước</p>
       <h3>Một lần Run gồm những gì</h3>
@@ -45,6 +44,7 @@ export function About() {
         <li>Câu ngắn và cụ thể cho kết quả ổn định hơn câu dài nhiều ý.</li>
         <li>Chỉ dùng ảnh công ty có quyền sử dụng.</li>
       </ul>
+      <AboutClips names={['example-2', 'example-3']} title="Từ ảnh tĩnh thành video" />
     </article>
   );
 }

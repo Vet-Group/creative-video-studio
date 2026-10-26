@@ -236,7 +236,7 @@ td code { white-space: pre-wrap; overflow-wrap: anywhere; }
 .preview-play { position: absolute; top: 50%; left: 50%; width: 3rem; height: 3rem; padding: 0; transform: translate(-50%, -50%); border: 2px solid #fff; border-radius: 50%; background: rgb(0 0 0 / .6); color: #fff; }
 
 /* The preset picker, like the live one: a vertically scrolling grid of 3:4 clips (4 columns, 2 on a phone), each name left-aligned under its clip. */
-.preset-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; max-height: calc(100vh - 250px); margin: 0; padding: 4px; overflow-y: auto; list-style: none; }
+.preset-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; max-height: min(560px, calc(100vh - 250px)); scrollbar-width: thin; margin: 0; padding: 4px; overflow-y: auto; list-style: none; }
 .preset-card { position: relative; display: grid; align-content: start; gap: 8px; }
 .preset-card > :first-child { border-radius: 8px; }
 .preset-card button { padding: 0; border: 0; background: transparent; color: #1a1a1a; font-size: 13px; line-height: 18px; font-weight: 600; text-align: left; }
@@ -253,7 +253,7 @@ dialog.modal::backdrop { background: rgb(0 0 0 / .5); }
 .modal-close { position: absolute; top: 18px; right: 18px; z-index: 3; display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; background: transparent; font-size: 24px; line-height: 1; }
 /* A picker's header: the title, a grey line under it and a rule across the dialog. */
 .modal-body:has(> .modal-sub) { padding: 24px; }
-.modal-body > h2:has(+ .modal-sub) { margin: 0 32px 4px 0; font-size: 20px; line-height: 28px; font-weight: 700; }
+.modal-body > h2:has(+ .modal-sub) { margin: 0 32px 4px 0; font-size: 18px; line-height: 26px; font-weight: 600; }
 .modal-sub { margin: 0 -24px 20px; padding: 0 24px 20px; border-bottom: 1px solid #eee; color: #6b6b6b; font-size: 14px; line-height: 20px; }
 .modal .preview { max-width: 16rem; margin: .5rem auto; }
 /* Example details, measured on live at 1440x1000 and 390x844: 1100x501 (358 wide, stacked, below 1024 px), the clip on black with Close at its top-left,
@@ -295,6 +295,8 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
   .tabs button { flex: none; height: 37px; padding: 8px 20px; font-size: 14px; line-height: 21px; }
   .form-card { grid-area: form; position: sticky; top: 16px; width: 320px; height: calc(100dvh - 24px); min-height: 0; border-radius: 24px; }
   .side { grid-area: side; position: relative; z-index: 1; } /* below the form card, whose menus open over it */
+  /* An app's panel is as tall as its inputs, as on the live app pages; Create keeps the full-height card. */
+  [aria-labelledby='app-title'] .form-card { height: auto; max-height: calc(100dvh - 24px); }
   .runbar { margin: 0; padding-top: 16px; border-top: 1px solid rgb(204, 204, 204); }
   .runbar button.primary.run { height: 56px; }
 }
@@ -332,7 +334,7 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 
 /* Explore. */
 .explore h1 { margin: 8px 0 24px; font-size: 24px; line-height: 32px; font-weight: 600; }
-.explore h2 { margin: 40px 0 16px; font-size: 22px; line-height: 30px; font-weight: 600; }
+.explore h2 { margin: 40px 0 32px; font-size: 22px; line-height: 30px; font-weight: 600; }
 .explore ul { margin: 0; padding: 0; list-style: none; }
 /* Each Explore list is one row that scrolls sideways, cards 300 / 178 px wide below 1024 px and 420 / 218 px above (Fash shots 2026-10-24). */
 .explore-features, .explore-cards { display: flex; align-items: stretch; gap: 16px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: thin; }
@@ -358,10 +360,10 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .explore-prompt { position: relative; display: block; overflow: hidden; border-radius: 8px; background: #e4e4e7; color: #fff; text-decoration: none; }
 .explore-prompt img, .explore-prompt video { display: block; width: 100%; height: auto; min-height: 120px; object-fit: cover; transition: filter .2s; }
 .explore-prompt .banner-empty { aspect-ratio: 3 / 4; }
-.explore-prompt-hover { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 24px; padding: 16px; background: rgb(0 0 0 / .35); opacity: 0; transition: opacity .2s; text-align: center; }
+.explore-prompt-hover { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 24px; padding: 16px 16px 92px; background: rgb(0 0 0 / .35); opacity: 0; transition: opacity .2s; text-align: center; }
 .explore-prompt-hover strong { font-size: 24px; line-height: 30px; font-weight: 600; }
 /* The live Generate button: about 70 % of the tile, the icon pinned left and the label centred. */
-.explore-prompt-go { position: relative; display: flex; align-items: center; justify-content: center; width: 70%; height: 44px; padding: 0 20px; border: 1px solid rgb(255 255 255 / .25); border-radius: 8px; background: rgb(255 255 255 / .12); font-size: 16px; font-weight: 600; }
+.explore-prompt-go { position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; justify-content: center; width: min(180px, calc(100% - 32px)); height: 44px; padding: 0 20px; border: 1px solid rgb(255 255 255 / .25); border-radius: 8px; background: rgb(255 255 255 / .12); font-size: 16px; font-weight: 600; }
 .explore-prompt-go .icon { position: absolute; left: 20px; }
 .explore-prompt:hover .explore-prompt-hover, .explore-prompt:focus-visible .explore-prompt-hover { opacity: 1; }
 .explore-prompt:hover :is(img, video), .explore-prompt:focus-visible :is(img, video) { filter: blur(6px); }
@@ -555,7 +557,7 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .library .kinds button { padding: 0 12px; }
 .library-filters label { margin: 0; color: rgb(102, 102, 102); font-size: 13px; line-height: 18px; font-weight: 500; }
 .library-filters select, .library-filters input { width: 10rem; min-width: 0; height: 36px; margin-top: 4px; padding: 0 10px; border: 1px solid rgb(0 0 0 / .1); border-radius: 8px; background: #fff; color: inherit; font: inherit; font-size: 13px; }
-.explore-sub { margin: -8px 0 16px; }
+.explore-sub { margin: -24px 0 24px; }
 /* Below 1024 px: centred empty Image Generation history, smaller Explore headings; tablets keep model, ratio and size on one row, as on Fash. */
 @media (max-width: 1023.98px) {
   .imagegen-side .tray > p.muted { padding: 22vh 0 0; }
