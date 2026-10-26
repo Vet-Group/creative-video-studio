@@ -184,7 +184,8 @@ test.describe('desktop', () => {
       if (night) {
         await scene.click();
         await expect(card).toHaveAttribute('data-scene', 'night');
-        await page.waitForTimeout(600); // let the scene colour transition settle before contrast is measured
+        // Contrast is measured only after the scene colour transitions have finished.
+        await expect.poll(() => page.evaluate(() => document.getAnimations().length)).toBe(0);
       }
       const all = await new AxeBuilder({ page }).exclude('nextjs-portal').analyze();
       expect(all.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical').map((v) => v.id)).toEqual([]);
