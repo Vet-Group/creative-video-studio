@@ -35,6 +35,10 @@ test('an Advanced job runs from reference images, a brief, a script and audio on
   // One wide reference slot, the hook and location boxes, the brief, the script and the audio switch, on by default.
   await expect(page.locator('.slot')).toHaveCount(1);
   await expect(page.getByText('Tối đa 4 ảnh tham chiếu')).toBeVisible(); // Mock E2E takes 4
+  // As on Fash, the hook and location boxes share the row under the wide slot.
+  const [hookBox, placeBox] = await Promise.all([/^Hook/, /^Bối cảnh/].map((name) => page.getByRole('button', { name }).boundingBox()));
+  expect(Math.abs(hookBox!.y - placeBox!.y)).toBeLessThan(1);
+  expect(placeBox!.x).toBeGreaterThan(hookBox!.x + hookBox!.width - 1);
   await expect(page.getByRole('button', { name: /^Hook/ })).toBeVisible();
   await expect(page.getByRole('button', { name: /^Bối cảnh/ })).toBeVisible();
   await expect(brief(page)).toHaveAttribute('placeholder', 'Mô tả video marketing bạn muốn…');

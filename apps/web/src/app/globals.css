@@ -712,6 +712,8 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .slot-name { display: none; color: var(--text-muted); font-size: 14px; line-height: 20px; }
 .app-slots[data-two='true'] .slot-add .slot-hint { display: none; } /* not the video slot's own line */
 .app-slots[data-two='true'] .slot-name { display: block; }
+.app-slots[data-two='true'] .slot-wide .slot-add .slot-hint { display: block; } /* Advanced: the wide slot reads its limit, as on Fash */
+.app-slots[data-two='true'] .slot-wide .slot-name { display: none; }
 /* Samples in an empty slot (live Try On): a grey strip of pictures to pick from, then the upload tile with a plus and its label. */
 .slot-samples { display: flex; flex: 1; align-items: center; gap: 4px; min-width: 0; height: 79px; margin: 0; padding: 0 8px; overflow-x: auto; scrollbar-width: none; border-radius: 12px; background: var(--fill); list-style: none; }
 .slot-samples li { height: 100%; }
