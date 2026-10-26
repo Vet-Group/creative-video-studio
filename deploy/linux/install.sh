@@ -35,7 +35,7 @@ esac
 export HOME="${CVS_ROOT_HOME:-/root}"
 here="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
 app="${CVS_APP_DIR:-/opt/creative-video-studio}"
-repo_url="${CVS_REPO_URL:-git@github.com:anhtahaylove/creative-video-studio.git}"
+repo_url="${CVS_REPO_URL:-git@github.com:Vet-Group/creative-video-studio.git}"
 repo_ref="${CVS_REPO_REF:-main}"
 deploy_key="${CVS_DEPLOY_KEY:-$HOME/.ssh/cvs_deploy_ed25519}"
 public_host="${CVS_HOSTNAME:-video.vetgroup.net}"

@@ -58,7 +58,7 @@ case "$VERB" in
   deploy) # D.5: check out one commit with the read-only deploy key, then run the repo's own installer
     [[ ${#ARGV[@]} -eq 2 && "${ARGV[1]}" =~ ^[0-9a-f]{40}$ ]] || refuse 'usage: deploy <40-hex commit>'
     if [[ ! -d "$APP/.git" ]]; then
-      run env GIT_SSH_COMMAND='ssh -i /root/.ssh/cvs_deploy_ed25519 -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new' git clone git@github.com:anhtahaylove/creative-video-studio.git "$APP"
+      run env GIT_SSH_COMMAND='ssh -i /root/.ssh/cvs_deploy_ed25519 -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new' git clone git@github.com:Vet-Group/creative-video-studio.git "$APP"
     fi
     run env GIT_SSH_COMMAND='ssh -i /root/.ssh/cvs_deploy_ed25519 -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new' git -C "$APP" fetch --quiet origin
     run git -C "$APP" checkout --quiet --detach "${ARGV[1]}"

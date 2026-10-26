@@ -94,7 +94,7 @@ describe('owner-closed steps', () => {
     const m = fresh();
     get(m, 'M.7b').status = 'doing';
     writeManifest(join(dir, 'manifest.json'), m);
-    const ci = JSON.stringify([{ kind: 'ci', repo: 'anhtahaylove/creative-video-studio', sha: 'a'.repeat(40) }]);
+    const ci = JSON.stringify([{ kind: 'ci', repo: 'Vet-Group/creative-video-studio', sha: 'a'.repeat(40) }]);
     for (const args of [['done', 'M.7b', '--evidence', ci], ['skip', 'M.7b', 'merged']]) {
       const r = cli(dir, ...args);
       expect(r.status, r.stderr).toBe(2);
