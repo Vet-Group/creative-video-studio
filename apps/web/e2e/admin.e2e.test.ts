@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
-import { optionsOf, runInUi, select, signIn } from './support.test';
+import { optionsOf, presetCards, runInUi, select, signIn } from './support.test';
 
 const nav = (page: Page, name: string) => page.getByRole('navigation', { name: 'Các trang quản trị' }).getByRole('link', { name, exact: true });
 
@@ -116,8 +116,8 @@ test('an Admin sets up a team, a store and a user, then reconciles the month cos
 
   // The Create form follows the presets: the new label shows, a preset switched off disappears and comes back when switched on.
   await page.goto('/create');
-  await select(page, 'Mẫu chuyển động').click();
-  const picker = optionsOf(page, 'Mẫu chuyển động');
+  await page.getByRole('button', { name: 'Chọn mẫu khác' }).click();
+  const picker = presetCards(page);
   await expect(picker.first()).toHaveText(`${before} (sửa)`);
   await page.goto('/admin/presets');
   const second = page.getByRole('row').nth(2);
@@ -128,13 +128,13 @@ test('an Admin sets up a team, a store and a user, then reconciles the month cos
   };
   await setSecond(false);
   await page.goto('/create');
-  await select(page, 'Mẫu chuyển động').click();
+  await page.getByRole('button', { name: 'Chọn mẫu khác' }).click();
   await expect(picker.filter({ hasText: `${before} (sửa)` })).toHaveCount(1);
   await expect(picker.filter({ hasText: secondLabel })).toHaveCount(0);
   await page.goto('/admin/presets');
   await setSecond(true);
   await page.goto('/create');
-  await select(page, 'Mẫu chuyển động').click();
+  await page.getByRole('button', { name: 'Chọn mẫu khác' }).click();
   await expect(picker.filter({ hasText: secondLabel })).toHaveCount(1);
 });
 

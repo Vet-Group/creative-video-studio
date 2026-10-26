@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { expect, type Locator, type Page, test } from '@playwright/test';
 import { EXAMPLES } from '../src/lib/examples';
-import { modelButton, select, signIn } from './support.test';
+import { modelButton, presetOf, select, signIn } from './support.test';
 
 const CLIPS = EXAMPLES.length;
 
@@ -133,7 +133,7 @@ test('C2: when the browser blocks autoplay each clip shows a play button, and pr
 test('the preset banner keeps looping when another preset swaps its clip in place', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await signIn(page, 'member6');
-  await expect(select(page, 'Mẫu chuyển động')).not.toHaveText('Tự viết mô tả');
+  await expect(presetOf(page)).not.toHaveAttribute('data-value', '');
   const banner = page.locator('.banner video');
   const moving = () => banner.evaluate((v: HTMLVideoElement) => !v.paused && v.currentTime > 0);
   await expect.poll(moving).toBe(true);

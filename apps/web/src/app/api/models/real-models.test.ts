@@ -25,7 +25,7 @@ async function newUser(email: string, role: 'member' | 'admin') {
 const call = (cookie: string, path: string, method = 'GET', body?: unknown) =>
   new Request(`http://localhost${path}`, { method, headers: { cookie, 'content-type': 'application/json' }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
 const picker = async (cookie: string) =>
-  (await GET(call(cookie, '/api/models?ratio=9:16&durationSec=8'))).json() as Promise<{ models: { id: string; passRate: number | null; passes: number; total: number; estimateUsd: string; score: number; recommended: boolean }[]; defaultModelId: string | null }>;
+  (await GET(call(cookie, '/api/models?ratio=9:16&durationSec=8'))).json() as Promise<{ models: { id: string; resolution: string | null; passRate: number | null; passes: number; total: number; estimateUsd: string; score: number; recommended: boolean }[]; defaultModelId: string | null }>;
 const enabled = async (id: string) => (await pool.query('select enabled from model_configs where id = $1', [id])).rows[0].enabled as boolean;
 
 let admin: Awaited<ReturnType<typeof newUser>>;
@@ -52,6 +52,7 @@ describe('the model picker', () => {
     await pool.query(`update model_configs set enabled = true where id = 'seedance-2.5'`);
     const both = await picker(member.cookie);
     expect(both.models.map((m) => [m.id, m.passes, m.total, m.estimateUsd])).toEqual([['kling-o3-pro', 7, 10, '0.8960'], ['seedance-2.5', 6, 9, '1.8496']]);
+    expect(both.models.map((m) => m.resolution)).toEqual(['1080p', '720p']); // what the Create form shows as the fixed resolution
     expect(both.models[1]!.passRate).toBeCloseTo(6 / 9);
     expect(both.defaultModelId).toBe('kling-o3-pro'); // 70% against 67%
     expect(both.models.map((m) => [m.id, m.score, m.recommended])).toEqual([['kling-o3-pro', 64, true], ['seedance-2.5', 62, false]]);

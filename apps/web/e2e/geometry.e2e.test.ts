@@ -2,7 +2,7 @@
 // computed styles and boxes of every measured row. Sizes are within 2 px, colours are exact. Titles start with the row id.
 import { expect, type Locator, type Page, test } from '@playwright/test';
 import { freezeData } from './frozen.test';
-import { modelButton, png, select, signIn } from './support.test';
+import { modelButton, png, presetOf, select, signIn } from './support.test';
 
 const DESKTOP = { width: 1440, height: 1000 };
 const LAPTOP = { width: 1280, height: 800 };
@@ -35,7 +35,7 @@ async function openCreate(page: Page, size: { width: number; height: number }, o
   if (options.noJobs) await page.route(/\/api\/jobs\?mine/, (r) => r.fulfill({ json: { jobs: [], workerOffline: false } }));
   await signIn(page, 'member7');
   await expect(modelButton(page)).toContainText('Mock E2E');
-  await expect(select(page, 'Mẫu chuyển động')).not.toHaveText('Tự viết mô tả');
+  await expect(presetOf(page)).not.toHaveAttribute('data-value', '');
   await page.evaluate(() => document.fonts.ready.then(() => undefined));
 }
 
@@ -282,7 +282,7 @@ test.describe('1440x1000', () => {
 
   test('K2 selects: 39 tall, rgb(242,242,242), radius 8, 1px transparent border, padding 8px 10px, 14px/21px, no native select', async ({ page }) => {
     expect(await page.locator('.form-card select').count()).toBe(0);
-    for (const label of ['Mẫu chuyển động', 'Tỉ lệ khung hình', 'Thời lượng', 'Cửa hàng/Thương hiệu']) {
+    for (const label of ['Độ phân giải', 'Thời lượng', 'Tỉ lệ khung hình', 'Cửa hàng/Thương hiệu']) {
       const trigger = select(page, label);
       const b = await box(trigger);
       sized(b, 268, 39, label);

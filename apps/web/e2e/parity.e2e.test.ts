@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { expect, type Page, test } from '@playwright/test';
 import { EXAMPLES } from '../src/lib/examples';
 import { freezeData } from './frozen.test';
-import { expectOptions, modelButton, optionsOf, pickModel, png, select, selectValue, signIn } from './support.test';
+import { expectOptions, modelButton, optionsOf, pickModel, png, presetOf, select, selectValue, signIn } from './support.test';
 
 // Posters and a frozen clock: reduced motion keeps every clip on its poster, so a second run paints the same frame.
 test.use({ contextOptions: { reducedMotion: 'reduce' } });
@@ -22,14 +22,14 @@ const SHOT = { animations: 'disabled', caret: 'hide', maxDiffPixelRatio: 0.01, s
 async function openCreate(page: Page): Promise<void> {
   await page.goto('/create');
   await expect(modelButton(page)).toContainText('Mock E2E');
-  await expect(select(page, 'Mẫu chuyển động')).not.toHaveText('Tự viết mô tả'); // the first preset is chosen once the list has loaded
+  await expect(presetOf(page)).not.toHaveAttribute('data-value', ''); // the first preset is chosen once the list has loaded
   await select(page, 'Cửa hàng/Thương hiệu').click();
   await expect(optionsOf(page, 'Cửa hàng/Thương hiệu')).not.toHaveCount(1); // the empty choice and at least one store
   await select(page, 'Cửa hàng/Thương hiệu').click();
   // Opening the store list scrolled the form and left the focus on it; the specs and baselines start from a fresh load.
   await page.reload();
   await expect(modelButton(page)).toContainText('Mock E2E');
-  await expect(select(page, 'Mẫu chuyển động')).not.toHaveText('Tự viết mô tả');
+  await expect(presetOf(page)).not.toHaveAttribute('data-value', '');
   await expect(page.getByText('Tháng này bạn đã dùng: $0.0000')).toBeVisible();
 }
 
@@ -209,7 +209,7 @@ test('choosing a preset or using an example fills the form and creates no job', 
   await page.setViewportSize({ width: 1280, height: 800 });
   await signIn(page, 'member5');
   await openCreate(page);
-  const presetSelect = select(page, 'Mẫu chuyển động');
+  const presetSelect = presetOf(page);
   const ratioSelect = select(page, 'Tỉ lệ khung hình');
   const before = (await presetSelect.getAttribute('data-value'))!;
 
@@ -298,9 +298,9 @@ test('V02 the upload limit and its hint follow the chosen model', async ({ page 
   await signIn(page, 'member5');
   const pick = page.locator('.dropzone-pick');
   await expect(modelButton(page)).toContainText('Two image model');
-  await expect(pick).toContainText('thêm 1–2 ảnh sản phẩm');
+  await expect(pick).toContainText('Tối đa 2 ảnh sản phẩm');
   await pickModel(page, /One image model/);
-  await expect(pick).toContainText('thêm 1 ảnh sản phẩm');
+  await expect(pick).toContainText('Tối đa 1 ảnh sản phẩm');
   await pickModel(page, /Two image model/);
   await page.getByLabel('Ảnh sản phẩm').setInputFiles(['a.png', 'b.png'].map((name) => ({ name, mimeType: 'image/png', buffer: png() })));
   await expect(pick).toContainText('Đã đủ 2 ảnh');
@@ -396,7 +396,7 @@ test('the custom selects work by keyboard: arrows, Home, End, Enter, Space and E
   await signIn(page, 'member5');
   await openCreate(page);
   const duration = select(page, 'Thời lượng');
-  const preset = select(page, 'Mẫu chuyển động');
+  const store = select(page, 'Cửa hàng/Thương hiệu');
 
   // Arrow keys open the list on the chosen option and move through it; Enter picks.
   await duration.focus();
@@ -419,17 +419,16 @@ test('the custom selects work by keyboard: arrows, Home, End, Enter, Space and E
   await expect(duration).toHaveAttribute('data-value', '5');
   await expect(duration).toBeFocused();
 
-  // Home and End jump to the ends; Space picks. "Tự viết mô tả" is the last preset and opens the prompt box.
-  await preset.focus();
+  // Home and End jump to the ends; Space picks. The last store is the last option, "Không chọn" the first.
+  await store.focus();
   await page.keyboard.press('Enter');
   await page.keyboard.press('End');
   await page.keyboard.press('Space');
-  await expect(preset).toHaveAttribute('data-value', '');
-  await expect(page.getByLabel('Mô tả chuyển động')).toBeEnabled();
+  await expect(store).not.toHaveAttribute('data-value', '');
   await page.keyboard.press('Enter');
   await page.keyboard.press('Home');
   await page.keyboard.press('Enter');
-  await expect(preset).not.toHaveAttribute('data-value', '');
+  await expect(store).toHaveAttribute('data-value', '');
 });
 
 test('the model picker opens a panel beside its button, searches, and closes with Escape', async ({ page }) => {
@@ -451,7 +450,8 @@ test('the model picker opens a panel beside its button, searches, and closes wit
   await search.fill('zzz');
   await expect(panel.getByText('Không có mô hình nào khớp.')).toBeVisible();
   // The page scrolling under the fixed panel closes it, and the next open starts with an empty search.
-  await page.locator('.form-scroll').evaluate((el) => el.dispatchEvent(new Event('scroll')));
+  await page.mouse.move(1200, 600); // over the Examples, clear of the panel
+  await page.mouse.wheel(0, 400);
   await expect(panel).toBeHidden();
   await trigger.click();
   await expect(search).toHaveValue('');

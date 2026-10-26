@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { modelButton, runInUi, select, selectValue, selectText, signIn, today } from './support.test';
+import { modelButton, pickPreset, presetOf, runInUi, select, selectText, selectValue, signIn, today } from './support.test';
 
 test('a Member runs a mock job and works through the Library', async ({ page }) => {
   await signIn(page, 'member1');
@@ -61,17 +61,16 @@ test('a Member runs a mock job and works through the Library', async ({ page }) 
   await card.getByRole('link', { name: 'Dùng lại' }).click();
   await expect(page).toHaveURL(/\/create\?reuse=/);
   await expect(page.getByRole('img', { name: 'shirt.png' })).toBeVisible();
-  await expect(select(page, 'Mẫu chuyển động')).toHaveAttribute('data-value', 'slow-orbit');
+  await expect(presetOf(page)).toHaveAttribute('data-value', 'slow-orbit');
   await expect(select(page, 'Tỉ lệ khung hình')).toHaveAttribute('data-value', '1:1');
   await expect(select(page, 'Thời lượng')).toHaveAttribute('data-value', '8');
   await expect(modelButton(page)).toContainText('Mock E2E');
   await expect(select(page, 'Cửa hàng/Thương hiệu')).toHaveText('E2E Shop');
-  await selectValue(page, 'Mẫu chuyển động', 'light-sweep');
-  await expect(select(page, 'Mẫu chuyển động')).toHaveAttribute('data-value', 'light-sweep');
+  await pickPreset(page, 'light-sweep');
 
   // A user picks a preset or writes a prompt: the prompt box opens only for "Tự viết mô tả", and Run waits for some text.
   await expect(page.getByLabel('Mô tả chuyển động')).toBeDisabled();
-  await selectText(page, 'Mẫu chuyển động', 'Tự viết mô tả');
+  await pickPreset(page, '');
   await expect(page.getByRole('button', { name: 'Tạo video' })).toBeDisabled();
   await page.getByLabel('Mô tả chuyển động').fill('Slow turn of the shirt.');
   await expect(page.getByRole('button', { name: 'Tạo video' })).toBeEnabled();

@@ -51,6 +51,18 @@ export async function selectText(page: Page, label: string, text: string): Promi
   await optionsOf(page, label).getByText(text, { exact: true }).click();
 }
 
+/** The Create form's chosen preset: the banner title, whose `data-value` holds the preset id ('' for a prompt of one's own). */
+export const presetOf = (page: Page): Locator => page.locator('.banner-text strong');
+/** The cards of the preset picker, opened from the banner. */
+export const presetCards = (page: Page): Locator => page.getByRole('list', { name: 'Danh sách mẫu' }).getByRole('button');
+
+/** Opens the preset picker from the banner and picks the card with this preset id (an empty id for a prompt of one's own). */
+export async function pickPreset(page: Page, value: string): Promise<void> {
+  await page.getByRole('button', { name: 'Chọn mẫu khác' }).click();
+  await presetCards(page).and(page.locator(`[data-value="${value}"]`)).click();
+  await expect(presetOf(page)).toHaveAttribute('data-value', value);
+}
+
 /** Opens the select, checks the full list of options, and closes it again with the mouse. */
 export async function expectOptions(page: Page, label: string, texts: string[]): Promise<void> {
   await select(page, label).click();
@@ -72,7 +84,7 @@ export async function pickModel(page: Page, name: RegExp): Promise<void> {
 export async function runInUi(page: Page, options: { preset?: string; ratio?: string; duration?: string; store?: string } = {}): Promise<void> {
   await page.getByLabel('Ảnh sản phẩm').setInputFiles({ name: 'shirt.png', mimeType: 'image/png', buffer: png() });
   await expect(page.getByRole('img', { name: 'shirt.png' })).toBeVisible();
-  if (options.preset) await selectValue(page, 'Mẫu chuyển động', options.preset);
+  if (options.preset) await pickPreset(page, options.preset);
   if (options.ratio) await selectValue(page, 'Tỉ lệ khung hình', options.ratio);
   if (options.duration) await selectValue(page, 'Thời lượng', options.duration);
   if (options.store) await selectText(page, 'Cửa hàng/Thương hiệu', options.store);
