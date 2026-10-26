@@ -1,5 +1,7 @@
 // Motion parity (docs/UI-MOTION-PARITY.md, acceptance 3): the Examples clips really play from real video files, and the playback rules hold.
 // A poster is never evidence of motion, so these specs read currentTime and decoded frames from the video elements.
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { expect, type Locator, type Page, test } from '@playwright/test';
 import { EXAMPLES } from '../src/lib/examples';
 import { modelButton, select, signIn } from './support.test';
@@ -155,4 +157,42 @@ test('with reduced motion the Explore prompt grid still loops, as the reference 
   const tile = page.getByRole('list', { name: 'Mẫu' }).getByRole('link', { name: 'Xoay quanh chậm' }).locator('video');
   await tile.scrollIntoViewIfNeeded();
   await expect.poll(() => tile.evaluate((v: HTMLVideoElement) => !v.paused && v.currentTime > 0)).toBe(true);
+});
+
+test('with reduced motion the Explore model cards and the Apps cards and header still loop, while the Explore feature cards keep their posters', async ({ page }) => {
+  // The test server has no samples, so the admin uploads the fixture clip under the slot names first and removes them afterwards.
+  const clip = readFileSync(fileURLToPath(new URL('../public/fixtures/examples/example-1.mp4', import.meta.url)));
+  const names = ['model-mock-e2e.mp4', 'app-character-swap.mp4', 'feature-try-on.mp4'];
+  const asAdmin = async (each: (name: string) => Promise<{ ok(): boolean }>) => {
+    await page.context().clearCookies();
+    await signIn(page, 'admin');
+    for (const name of names) expect((await each(name)).ok()).toBe(true);
+    await page.context().clearCookies();
+  };
+  await asAdmin((name) => page.request.put(`/api/admin/samples/${name}`, { data: clip, headers: { 'content-type': 'video/mp4' } }));
+  try {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await signIn(page, 'member6');
+    const moves = (video: Locator) => expect.poll(() => video.evaluate((v: HTMLVideoElement) => !v.paused && v.currentTime > 0)).toBe(true);
+
+    await page.goto('/explore');
+    const model = page.getByRole('list', { name: 'Mô hình' }).getByRole('link', { name: /Mock E2E/ }).locator('video');
+    await model.scrollIntoViewIfNeeded();
+    await moves(model);
+    const feature = page.getByRole('list', { name: 'Công cụ' }).locator('a[href="/try-on"] video');
+    await feature.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(1500);
+    expect(await feature.evaluate((v: HTMLVideoElement) => v.paused)).toBe(true);
+
+    await page.goto('/apps');
+    const card = page.getByRole('list', { name: 'Danh sách ứng dụng' }).locator('a[href="/apps/character-swap"] video');
+    await card.scrollIntoViewIfNeeded();
+    await moves(card);
+
+    await page.goto('/apps/character-swap');
+    await moves(page.locator('.head-loop video'));
+  } finally {
+    await asAdmin((name) => page.request.delete(`/api/admin/samples/${name}`));
+  }
 });
