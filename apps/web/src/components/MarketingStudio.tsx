@@ -249,8 +249,8 @@ export function MarketingStudio() {
             <div className="app-slots marketing-slots" data-two="true">
               <Slot label="Người mẫu" empty="Thêm 1 ảnh người mẫu" inputLabel="Ảnh người mẫu" images={person} max={1} busy={busy} onAdd={add(setPerson)} onRemove={() => setPerson([])} />
               <Slot label="Sản phẩm" empty="Thêm 1 ảnh sản phẩm" inputLabel="Ảnh sản phẩm" images={product} max={1} busy={busy} onAdd={add(setProduct)} onRemove={() => setProduct([])} />
-              <ChoiceBox label="Hook (tuỳ chọn)" icon="preset" choice={HOOKS.find((c) => c.id === hook)} onOpen={() => setPicker('hook')} />
-              <ChoiceBox label="Bối cảnh (tuỳ chọn)" icon="store" choice={LOCATIONS.find((c) => c.id === location)} onOpen={() => setPicker('location')} />
+              <ChoiceBox label="Hook (tuỳ chọn)" icon="film" choice={HOOKS.find((c) => c.id === hook)} onOpen={() => setPicker('hook')} />
+              <ChoiceBox label="Bối cảnh (tuỳ chọn)" icon="sliders" choice={LOCATIONS.find((c) => c.id === location)} onOpen={() => setPicker('location')} />
             </div>
 
             <div className="field">
