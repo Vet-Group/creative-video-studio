@@ -174,7 +174,6 @@ function TryOnAbout() {
       <h2>Thử đồ trên người mẫu</h2>
       <p>Tải ảnh trang phục và ảnh một người mẫu, và nhận lại ảnh người đó mặc trang phục. Ảnh nằm trong Thư viện của công ty, mục Thử đồ.</p>
 
-      <AboutClips names={['try-on-about']} title="Từ ảnh thử đồ thành video khoe đồ" />
 
       <p className="about-kicker">Từng bước</p>
       <h3>Một lần Run gồm những gì</h3>
@@ -203,6 +202,7 @@ function TryOnAbout() {
         <li>Nút Run ghi chi phí ước tính của một ảnh; chi phí thật nằm trên ảnh trong Thư viện.</li>
         <li>Chỉ dùng ảnh công ty có quyền sử dụng, và chỉ với người đã đồng ý.</li>
       </ul>
+      <AboutClips names={['try-on-about']} title="Từ ảnh thử đồ thành video khoe đồ" />
     </article>
   );
 }
