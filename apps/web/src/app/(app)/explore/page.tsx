@@ -103,7 +103,7 @@ export default async function ExplorePage() {
           return (
             <li key={p.id}>
               <Link href={`/create?preset=${encodeURIComponent(p.id)}`} className="explore-prompt" aria-label={p.label}>
-                <CardMedia video={media.video ?? (ex ? sampleSrc(have, ex.src) : null)} poster={media.poster} />
+                <CardMedia video={media.video ?? (ex ? sampleSrc(have, ex.src) : null)} poster={media.poster} always />
                 <span className="explore-prompt-hover" aria-hidden="true">
                   <strong>{p.label}</strong>
                   <span className="explore-prompt-go">

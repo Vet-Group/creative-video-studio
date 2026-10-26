@@ -141,3 +141,18 @@ test('the preset banner keeps looping when another preset swaps its clip in plac
   await expect(banner).not.toHaveAttribute('src', before!); // the same element, a new source
   await expect.poll(moving).toBe(true);
 });
+
+test('with reduced motion the Explore prompt grid still loops, as the reference site does, while the Create banner keeps its poster', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await signIn(page, 'member6');
+  const banner = page.locator('.banner video');
+  await expect(banner).toHaveCount(1);
+  await page.waitForTimeout(1500);
+  expect(await banner.evaluate((v: HTMLVideoElement) => v.paused)).toBe(true);
+
+  await page.goto('/explore');
+  const tile = page.getByRole('list', { name: 'Mẫu' }).getByRole('link', { name: 'Xoay quanh chậm' }).locator('video');
+  await tile.scrollIntoViewIfNeeded();
+  await expect.poll(() => tile.evaluate((v: HTMLVideoElement) => !v.paused && v.currentTime > 0)).toBe(true);
+});
