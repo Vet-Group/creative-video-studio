@@ -12,6 +12,7 @@ test('a job that finished while the tab was closed shows its result on return', 
 
   const back = await context.newPage();
   await back.goto('/create');
+  await back.getByRole('tab', { name: 'Lịch sử' }).click(); // Create opens on Examples; the job is in History
   const tray = back.getByRole('complementary', { name: 'Job của tôi' });
   await expect(tray.getByText('Hoàn tất')).toBeVisible();
   await expect(back.getByRole('region', { name: 'Thông báo' }).getByText('Clip đã xong')).toBeVisible();

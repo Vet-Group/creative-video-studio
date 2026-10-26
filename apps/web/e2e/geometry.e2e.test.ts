@@ -179,6 +179,7 @@ test.describe('1440x1000', () => {
     const bar = page.locator('.runbar');
     expect(await css(bar, 'border-top-width', 'border-top-style', 'border-top-color', 'padding-top')).toEqual(['1px', 'solid', 'rgb(204, 204, 204)', '16px']);
     near((await box(bar)).height, 73, 'run wrapper height');
+    await tab(page, 'Lịch sử').click(); // the Examples pane scrolls the page, as on the live site; an empty History keeps it one screen tall
     expect(await page.evaluate(() => document.documentElement.scrollHeight <= window.innerHeight)).toBe(true);
   });
 
@@ -351,8 +352,8 @@ test.describe('1440x1000', () => {
   });
 
   test('T1 pill tabs: 37 tall, padding 8px 20px, radius 8, 14px/600, active black on white, inactive rgb(102,102,102) on no background, no bottom border', async ({ page }) => {
-    const active = tab(page, 'Lịch sử');
-    const inactive = tab(page, 'Ví dụ');
+    const active = tab(page, 'Ví dụ'); // Examples is open by default, as on the live page
+    const inactive = tab(page, 'Lịch sử');
     near((await box(active)).height, 37, 'tab height');
     expect(await css(active, 'padding-top', 'padding-right', 'border-top-left-radius', 'font-size', 'font-weight', 'background-color', 'color')).toEqual(['8px', '20px', '8px', '14px', '600', 'rgb(0, 0, 0)', 'rgb(255, 255, 255)']);
     expect(await css(inactive, 'background-color', 'color')).toEqual(['rgba(0, 0, 0, 0)', 'rgb(102, 102, 102)']);
@@ -426,6 +427,7 @@ test.describe('1440x1000', () => {
   test('history empty state: 14px rgb(102,102,102)', async ({ page }) => {
     await page.route(/\/api\/jobs\?mine/, (r) => r.fulfill({ json: { jobs: [], workerOffline: false } }));
     await page.reload();
+    await page.getByRole('tab', { name: 'Lịch sử' }).click();
     const empty = page.getByText('Chưa có job nào.');
     await expect(empty).toBeVisible();
     expect(await css(empty, 'font-size', 'color')).toEqual(['14px', 'rgb(102, 102, 102)']);
@@ -454,6 +456,7 @@ test.describe('1280x800', () => {
     expect(await scroller.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
     await scroller.evaluate((el) => el.scrollTo(0, el.scrollHeight));
     near((await box(run)).y, b.y, 'run y after scrolling the form', 1);
+    await tab(page, 'Lịch sử').click(); // as in C2: an empty History keeps the page one screen tall
     expect(await page.evaluate(() => document.documentElement.scrollHeight <= window.innerHeight)).toBe(true);
   });
 

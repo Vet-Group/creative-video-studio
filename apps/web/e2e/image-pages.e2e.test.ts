@@ -86,6 +86,8 @@ test('Try On: a missing slot keeps Run disabled with a reason, a mock run reache
 
   // The two try-on jobs of this user must not show in Create's video history (an unfiltered Tray would list them).
   await nav(page).getByRole('link', { name: 'Tạo video' }).click();
+  await expect(page).toHaveURL(/\/create$/); // Try On has a History tab too; wait for Create's
+  await page.getByRole('tab', { name: 'Lịch sử' }).click();
   await expect(page.getByText('Chưa có job nào.')).toBeVisible();
   await expect(page.getByText('Hoàn tất')).toHaveCount(0);
 });

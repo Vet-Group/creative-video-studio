@@ -24,6 +24,8 @@ const PATHS = {
   search: 'M7 2.5a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9z M10.5 10.5L14 14',
   download: 'M8 2v8 M4.5 6.5L8 10l3.5-3.5 M2.5 13.5h11',
   external: 'M9.5 2.5h4v4 M13.5 2.5L7.5 8.5 M11.5 9.5v4h-9v-9h4',
+  arrow: 'M4.5 11.5l7-7 M5.5 4.5h6v6',
+  edit: 'M10.5 2.5l3 3L6 13H3v-3z M9 4l3 3',
   copy: 'M5.5 5.5h8v8h-8z M10.5 5.5v-3h-8v8h3',
   home: 'M2 7.5L8 2.5l6 5 M3.5 6.5v7h3.5v-4h2v4h3.5v-7',
   panel: 'M2 3h12v10H2z M6 3v10',

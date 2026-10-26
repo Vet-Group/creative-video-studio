@@ -264,7 +264,7 @@ test('the change-app menu returns focus to its button on Escape, closes when foc
   await expect(list).toBeHidden();
 });
 
-test('each upload button names its slot, and only the pages with a History tab hide the tray', async ({ page }) => {
+test('each upload button names its slot, and the tray shows only beside the coming-soon pages', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await signIn(page, 'appsc');
   const tray = page.getByRole('complementary', { name: 'Job của tôi' });
@@ -275,7 +275,8 @@ test('each upload button names its slot, and only the pages with a History tab h
   await expect(tray).toHaveCount(0); // the page has its own History tab
 
   await page.goto('/apps');
-  await expect(tray).toBeVisible();
+  await expect(page.getByRole('list', { name: 'Danh sách ứng dụng' })).toBeVisible();
+  await expect(tray).toHaveCount(0); // the card grid takes the full width, as on the live site
   await page.goto('/apps/media-optimizer');
   await expect(page.getByText('Sắp có')).toBeVisible();
   await expect(tray).toBeVisible();
