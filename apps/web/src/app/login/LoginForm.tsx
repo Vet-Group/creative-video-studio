@@ -1,8 +1,12 @@
 'use client';
-import { type FormEvent, useState } from 'react';
+import { type FormEvent, useId, useRef, useState } from 'react';
+import { Icon } from '@/components/Icon';
+import { VetLogo } from '@/components/VetLogo';
 import { ApiError, api, sendJson } from '@/lib/api';
 import { authErrorText, METHOD_LABEL } from '@/lib/sign-in-methods';
 import { useHydrated } from '@/lib/use-hydrated';
+import { PasswordField, useRevealMode } from './PasswordField';
+import { StudioScene } from './StudioScene';
 
 /** `error` is the `?error=` code a failed social sign-in left in the URL. */
 export function LoginForm({ googleEnabled, larkEnabled, error: errorCode }: { googleEnabled: boolean; larkEnabled: boolean; error?: string }) {
@@ -10,11 +14,20 @@ export function LoginForm({ googleEnabled, larkEnabled, error: errorCode }: { go
   const [password, setPassword] = useState('');
   const [error, setError] = useState(authErrorText(errorCode) ?? '');
   const [busy, setBusy] = useState(false);
+  const [scene, setScene] = useState<'day' | 'night'>('day');
+  const [revealed, setRevealed] = useState(false);
+  const [hint, setHint] = useState(false);
+  const kind = useRevealMode();
+  const mode = revealed ? kind : 'off';
+  const mascot = useRef<SVGGElement>(null);
+  const emailId = useId();
+  const passwordId = useId();
   // Submitting before hydration would send the form as a plain GET, with the password in the URL.
   const hydrated = useHydrated();
 
   async function submit(e: FormEvent) {
     e.preventDefault();
+    setRevealed(false);
     setBusy(true);
     setError('');
     try {
@@ -38,40 +51,64 @@ export function LoginForm({ googleEnabled, larkEnabled, error: errorCode }: { go
   }
 
   return (
-    <main className="login">
-      <h1>Đăng nhập</h1>
-      <form onSubmit={(e) => void submit(e)}>
-        <label>
-          Email
-          <input type="email" autoComplete="username" required value={email} onChange={(e) => setEmail(e.target.value)} />
-        </label>
-        <label>
-          Mật khẩu
-          <input type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
-        </label>
-        {error && (
-          <p className="error" role="alert">
-            {error}
-          </p>
-        )}
-        <button type="submit" disabled={busy || !hydrated}>
-          Đăng nhập
-        </button>
-      </form>
-      {(googleEnabled || larkEnabled) && (
-        <div className="social">
-          {googleEnabled && (
-            <button type="button" onClick={() => void social('google')}>
-              Đăng nhập bằng Google
+    <main className="login" data-scene={scene} data-flashlight={mode} data-dark={scene === 'night' || mode === 'pointer' || mode === 'touch'}>
+      <div className="login-card">
+        <section className="login-form">
+          <div className="login-brand">
+            <VetLogo size={40} label="VET Group" />
+            <span>Creative Video Studio</span>
+          </div>
+          <h1>Đăng nhập</h1>
+          <p className="muted">Tài khoản do Admin tạo. Liên hệ Admin nếu bạn chưa có tài khoản.</p>
+          <form onSubmit={(e) => void submit(e)}>
+            <label htmlFor={emailId}>Email</label>
+            <input id={emailId} type="email" autoComplete="username" required value={email} onChange={(e) => setEmail(e.target.value)} />
+            <label htmlFor={passwordId}>Mật khẩu</label>
+            <PasswordField id={passwordId} value={password} onChange={setPassword} mode={mode} onToggle={() => setRevealed((r) => !r)} mascot={mascot} />
+            <div className="login-forgot">
+              <button type="button" className="link-button" onClick={() => setHint(true)}>
+                Quên mật khẩu?
+              </button>
+            </div>
+            <p className="login-hint muted" aria-live="polite">
+              {hint && 'Liên hệ Admin để đặt lại mật khẩu.'}
+            </p>
+            {error && (
+              <p className="error" role="alert">
+                {error}
+              </p>
+            )}
+            <button type="submit" className="primary" aria-busy={busy || undefined} disabled={busy || !hydrated}>
+              {busy ? 'Đang đăng nhập…' : 'Đăng nhập'}
             </button>
+          </form>
+          {(googleEnabled || larkEnabled) && (
+            <div className="social">
+              {googleEnabled && (
+                <button type="button" onClick={() => void social('google')}>
+                  Đăng nhập bằng Google
+                </button>
+              )}
+              {larkEnabled && (
+                <button type="button" onClick={() => void social('lark')}>
+                  Đăng nhập bằng Lark
+                </button>
+              )}
+            </div>
           )}
-          {larkEnabled && (
-            <button type="button" onClick={() => void social('lark')}>
-              Đăng nhập bằng Lark
-            </button>
-          )}
-        </div>
-      )}
+        </section>
+        <section className="login-scene">
+          <StudioScene mascot={mascot} />
+          <button type="button" className="scene-toggle" aria-pressed={scene === 'night'} aria-label="Cảnh ban đêm" onClick={() => setScene((s) => (s === 'day' ? 'night' : 'day'))}>
+            <span>
+              <Icon name="sun" size={16} />
+            </span>
+            <span>
+              <Icon name="moon" size={16} />
+            </span>
+          </button>
+        </section>
+      </div>
     </main>
   );
 }

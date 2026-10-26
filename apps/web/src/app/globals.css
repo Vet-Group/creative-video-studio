@@ -1,3 +1,53 @@
+/* VET identity tokens used by the login page; the rest of the app adopts them later. Raw colours live only here. */
+:root {
+  --brand: #dc2626;
+  --brand-hover: #b91c1c;
+  --link: #b91c1c;
+  --on-dark: #fff;
+  --surface: #fff;
+  --ink: rgb(26, 26, 26);
+  --muted: #6b6b73;
+  --border-button: #b8b8c0;
+  --shade: 0 0 0;
+  --beam: rgb(255 214 120 / .5);
+  --scene-page-day: #f1ece4;
+  --scene-page-night: #0b0d13;
+  --scene-wall-day: #e8e1d6;
+  --scene-wall-night: #161922;
+  --scene-sweep-day: #f7f3ed;
+  --scene-sweep-night: #1f2330;
+  --scene-floor-day: #d5cbbc;
+  --scene-floor-night: #0f1118;
+  --scene-glow-day: rgb(255 238 196 / .7);
+  --scene-glow-night: rgb(255 238 196 / 0);
+  --scene-lamp-day: #2d2d33;
+  --scene-lamp-night: #07080c;
+  --scene-lamp-face-day: #fffaf0;
+  --scene-lamp-face-night: #2a2d38;
+  --scene-table-day: #3f3f46;
+  --scene-table-night: #1c1e26;
+  --scene-table-top-day: #71717a;
+  --scene-table-top-night: #2e313c;
+  --scene-box-front-day: #fafafa;
+  --scene-box-front-night: #3b3e49;
+  --scene-box-side-day: #e4e4e7;
+  --scene-box-side-night: #2c2f39;
+  --scene-box-top-day: #fff;
+  --scene-box-top-night: #474b57;
+  --scene-mark-day: #dc2626;
+  --scene-mark-night: #a3212a;
+  --scene-mascot-day: #27272a;
+  --scene-mascot-night: #3a3e4a;
+  --scene-mascot-dark-day: #18181b;
+  --scene-mascot-dark-night: #232631;
+  --scene-glass-day: #2b4c7e;
+  --scene-glass-night: #3d6aa8;
+  --scene-glint-day: #fff;
+  --scene-glint-night: #cfe0ff;
+  --scene-tally-day: #7f1d1d;
+  --scene-tally-night: #4a1d1d;
+  --scene-tally-on: #f87171;
+}
 * { box-sizing: border-box; }
 body { margin: 0; font-family: 'Inter Variable', Inter, Arial, sans-serif; font-size: 16px; line-height: 24px; color: rgb(26, 26, 26); background: #fff; }
 h1 { font-size: 1.4rem; margin: 0 0 1rem; }
@@ -95,9 +145,123 @@ legend { font-weight: 600; padding: 0 .25rem; }
 label.model { display: flex; gap: .6rem; align-items: center; flex-wrap: wrap; font-weight: 400; }
 label.model input { display: inline; margin: 0; min-width: 0; width: auto; }
 
-.login { max-width: 22rem; margin: 4rem auto; padding: 1.5rem; background: #fff; border: 1px solid #e4e4e7; border-radius: 8px; }
-.login input { width: 100%; }
-.login .social { display: flex; flex-direction: column; gap: .5rem; margin-top: 1rem; }
+/* Login: a studio backdrop with a split card; the scene sits left of the form from 1024 px and below it on narrower screens.
+   The form panel stays solid white in every state, so its contrast never depends on the scene. */
+.login {
+  --scene-page: var(--scene-page-day);
+  --scene-wall: var(--scene-wall-day);
+  --scene-sweep: var(--scene-sweep-day);
+  --scene-floor: var(--scene-floor-day);
+  --scene-glow: var(--scene-glow-day);
+  --scene-lamp: var(--scene-lamp-day);
+  --scene-lamp-face: var(--scene-lamp-face-day);
+  --scene-table: var(--scene-table-day);
+  --scene-table-top: var(--scene-table-top-day);
+  --scene-box-front: var(--scene-box-front-day);
+  --scene-box-side: var(--scene-box-side-day);
+  --scene-box-top: var(--scene-box-top-day);
+  --scene-mark: var(--scene-mark-day);
+  --scene-mascot: var(--scene-mascot-day);
+  --scene-mascot-dark: var(--scene-mascot-dark-day);
+  --scene-glass: var(--scene-glass-day);
+  --scene-glint: var(--scene-glint-day);
+  --scene-tally: var(--scene-tally-day);
+}
+.login[data-dark='true'] {
+  --scene-page: var(--scene-page-night);
+  --scene-wall: var(--scene-wall-night);
+  --scene-sweep: var(--scene-sweep-night);
+  --scene-floor: var(--scene-floor-night);
+  --scene-glow: var(--scene-glow-night);
+  --scene-lamp: var(--scene-lamp-night);
+  --scene-lamp-face: var(--scene-lamp-face-night);
+  --scene-table: var(--scene-table-night);
+  --scene-table-top: var(--scene-table-top-night);
+  --scene-box-front: var(--scene-box-front-night);
+  --scene-box-side: var(--scene-box-side-night);
+  --scene-box-top: var(--scene-box-top-night);
+  --scene-mark: var(--scene-mark-night);
+  --scene-mascot: var(--scene-mascot-night);
+  --scene-mascot-dark: var(--scene-mascot-dark-night);
+  --scene-glass: var(--scene-glass-night);
+  --scene-glint: var(--scene-glint-night);
+  --scene-tally: var(--scene-tally-night);
+}
+.login { min-height: 100vh; min-height: 100dvh; display: grid; place-items: center; padding: 24px 16px; background-color: var(--scene-page); background-image: radial-gradient(ellipse 70% 55% at 30% 15%, var(--scene-sweep), transparent 70%), radial-gradient(ellipse 60% 50% at 85% 100%, var(--scene-wall), transparent 70%); transition: background-color .5s; }
+.login-card { display: grid; grid-template-areas: 'form' 'scene'; width: 100%; max-width: 28rem; padding: 10px; border-radius: 24px; background: var(--surface); box-shadow: 0 1px 2px rgb(var(--shade) / .06), 0 24px 64px -16px rgb(var(--shade) / .3); transition: box-shadow .5s; }
+.login[data-dark='true'] .login-card { box-shadow: 0 0 0 1px rgb(var(--shade) / .4), 0 30px 90px -20px rgb(var(--shade) / .8), 0 0 140px -30px color-mix(in srgb, var(--brand) 55%, transparent); }
+.login-form { grid-area: form; display: flex; flex-direction: column; padding: 18px 14px 22px; color: var(--ink); background: var(--surface); }
+.login-scene { grid-area: scene; position: relative; min-height: 240px; overflow: hidden; border-radius: 16px; background: var(--scene-wall); }
+.login-scene .studio { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
+@media (min-width: 1024px) {
+  .login-card { grid-template-areas: 'scene form'; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); max-width: 980px; min-height: 620px; padding: 12px; }
+  .login-form { justify-content: center; padding: 40px 52px; }
+}
+.login-brand { display: flex; align-items: center; gap: 12px; margin-bottom: 28px; font-size: 15px; line-height: 20px; font-weight: 600; }
+.login-brand .vet-logo { display: block; flex: none; }
+.vet-logo-tile { fill: var(--brand); }
+.vet-logo-mark { fill: var(--on-dark); }
+.login h1 { margin: 0 0 6px; font-size: 28px; line-height: 36px; letter-spacing: -.02em; }
+.login-form > .muted { margin: 0 0 8px; font-size: 14px; line-height: 21px; }
+.login label { margin: 16px 0 6px; font-size: 14px; line-height: 20px; }
+.login input { display: block; width: 100%; height: 44px; margin: 0; padding: 0 12px; font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--border-button); border-radius: 10px; }
+.login input:hover { border-color: var(--muted); }
+.login input:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; border-color: var(--ink); }
+.password-field { position: relative; }
+.password-field input, .password-reveal { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace; letter-spacing: 0; }
+.password-field input { position: relative; z-index: 1; padding-right: 48px; }
+/* Text fill, not color: Chromium autofill forces color with !important but leaves the fill alone. */
+.login[data-flashlight='pointer'] .password-field input { -webkit-text-fill-color: transparent; caret-color: var(--ink); }
+.password-reveal { position: absolute; inset: 1px 49px 1px 1px; z-index: 2; display: flex; align-items: center; padding-left: 12px; overflow: hidden; white-space: pre; pointer-events: none; user-select: none; }
+.password-reveal > div { display: flex; flex: none; }
+.password-reveal span { position: relative; flex: none; width: 1ch; text-align: center; color: color-mix(in srgb, var(--ink) calc(var(--lit, 0) * 100%), transparent); }
+.password-reveal span::before { content: '\2022'; position: absolute; inset: 0; color: var(--ink); opacity: calc(1 - var(--lit, 0)); }
+.password-eye { position: absolute; top: 0; right: 0; z-index: 2; display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 10px; background: transparent; color: var(--muted); }
+.password-eye:hover:not(:disabled) { color: var(--ink); }
+.password-eye:focus-visible { outline-offset: -4px; }
+.login .password-eye[aria-pressed='true'] { background: transparent; color: var(--brand-hover); }
+.beam { position: fixed; top: 0; left: 0; z-index: 20; pointer-events: none; transform-origin: 0 50%; background: linear-gradient(90deg, var(--beam), transparent); clip-path: polygon(0 calc(50% - 6px), 100% 0, 100% 100%, 0 calc(50% + 6px)); }
+.beam[data-fixed='true'] { position: absolute; inset: -8px; z-index: 0; border-radius: 18px; transform: none; clip-path: none; background: var(--beam); filter: blur(10px); }
+.login-forgot { display: flex; justify-content: flex-end; }
+.login .link-button { min-height: 44px; padding: 0 2px; border: 0; background: none; color: var(--link); font-size: 14px; font-weight: 600; }
+.login .link-button:hover { text-decoration: underline; }
+.login-hint { margin: 0; font-size: 14px; line-height: 21px; }
+.login .error { margin: 12px 0 0; font-size: 14px; line-height: 21px; }
+.login button.primary { width: 100%; min-height: 48px; margin-top: 16px; border: 0; border-radius: 10px; background: var(--brand); color: var(--on-dark); font-weight: 600; box-shadow: 0 10px 24px -10px color-mix(in srgb, var(--brand) 70%, transparent); transition: background-color .15s; }
+.login button.primary:hover:not(:disabled) { background: var(--brand-hover); }
+.login button.primary[aria-busy='true'] { cursor: progress; }
+.login .social { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.login .social button { min-height: 44px; border-radius: 10px; }
+.scene-toggle { position: absolute; top: 14px; right: 14px; display: flex; gap: 4px; padding: 4px; border: 0; border-radius: 999px; background: var(--surface); color: var(--muted); box-shadow: 0 6px 18px rgb(var(--shade) / .22); }
+.login .scene-toggle[aria-pressed='true'] { background: var(--surface); }
+.scene-toggle span { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; }
+.scene-toggle[aria-pressed='false'] span:first-child, .scene-toggle[aria-pressed='true'] span:last-child { background: var(--ink); color: var(--on-dark); }
+.scene-toggle:focus-visible { outline-color: var(--brand); outline-offset: 3px; }
+.scene-wall { fill: var(--scene-wall); }
+.scene-sweep { fill: var(--scene-sweep); }
+.scene-floor { fill: var(--scene-floor); }
+.scene-glow { fill: var(--scene-glow); }
+.scene-stand { fill: none; stroke: var(--scene-lamp); stroke-width: 4; stroke-linecap: round; }
+.scene-lamp { fill: var(--scene-lamp); }
+.scene-lamp-face { fill: var(--scene-lamp-face); }
+.scene-table { fill: var(--scene-table); }
+.scene-table-top { fill: var(--scene-table-top); }
+.scene-box-front { fill: var(--scene-box-front); }
+.scene-box-side { fill: var(--scene-box-side); }
+.scene-box-top { fill: var(--scene-box-top); }
+.scene-box-mark { fill: var(--scene-mark); }
+.mascot-body { fill: var(--scene-mascot); }
+.mascot-dark { fill: var(--scene-mascot-dark); }
+.mascot-glass { fill: var(--scene-glass); }
+.mascot-glint { fill: var(--scene-glint); }
+.mascot-tally { fill: var(--scene-tally); }
+.mascot[data-lit='true'] .mascot-tally { fill: var(--scene-tally-on); }
+.studio :is(rect, path, ellipse, circle) { transition: fill .5s, stroke .5s; }
+.mascot-lens { transform: rotate(var(--lens-angle, 0deg)); transition: transform .12s ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .mascot, .beam { display: none; }
+  .login, .login-card, .login button.primary, .studio :is(rect, path, ellipse, circle) { transition: none; }
+}
 .methods { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .35rem; }
 .methods li { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
 .prose { max-width: 42rem; margin: 2rem auto; padding: 0 1rem; }
