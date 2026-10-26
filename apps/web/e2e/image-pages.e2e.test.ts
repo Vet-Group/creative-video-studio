@@ -297,3 +297,39 @@ for (const [width, height] of [[390, 844], [1024, 768], [1440, 1000]] as const) 
     }
   });
 }
+
+test('Try On: the sample pictures in an empty slot upload like a picked file, and give way to the slot image until it is removed', async ({ page }) => {
+  const names = ['try-on-garment-1.png', 'try-on-garment-2.png', 'try-on-model-1.png', 'try-on-background-1.png'];
+  const asAdmin = async (each: (name: string) => Promise<{ ok(): boolean }>) => {
+    await page.context().clearCookies();
+    await signIn(page, 'admin');
+    for (const name of names) expect((await each(name)).ok()).toBe(true);
+    await page.context().clearCookies();
+  };
+  await asAdmin((name) => page.request.put(`/api/admin/samples/${name}`, { data: png(), headers: { 'content-type': 'image/png' } }));
+  try {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await signIn(page, 'member9');
+    await page.goto('/try-on');
+    const samplesOf = (slot: string) => page.getByRole('list', { name: `${slot}: ảnh mẫu` }).getByRole('button');
+    const run = page.getByRole('button', { name: /^Thử đồ/ });
+    await expect(samplesOf('Trang phục')).toHaveCount(2);
+    await expect(samplesOf('Người mẫu')).toHaveCount(1);
+    await expect(samplesOf('Bối cảnh (tuỳ chọn)')).toHaveCount(1);
+    await expect(page.getByRole('button', { name: 'Tải lên Trang phục' })).toBeVisible(); // the own-file tile stays beside the samples
+
+    await page.getByRole('button', { name: 'Dùng ảnh mẫu 2 cho Trang phục' }).click();
+    await expect(page.getByLabel('Trang phục: ảnh đã chọn').getByRole('img', { name: 'try-on-garment-2.png' })).toBeVisible();
+    await expect(samplesOf('Trang phục')).toHaveCount(0);
+    await expect(run).toBeDisabled();
+    await page.getByRole('button', { name: 'Dùng ảnh mẫu 1 cho Người mẫu' }).click();
+    await expect(page.getByLabel('Người mẫu: ảnh đã chọn').getByRole('img', { name: 'try-on-model-1.png' })).toBeVisible();
+    await expect(run).toBeEnabled(); // the samples went through the normal upload, so they count as the run's images
+
+    await page.getByRole('button', { name: 'Bỏ ảnh try-on-model-1.png' }).click();
+    await expect(samplesOf('Người mẫu')).toHaveCount(1);
+    await expect(run).toBeDisabled();
+  } finally {
+    await asAdmin((name) => page.request.delete(`/api/admin/samples/${name}`));
+  }
+});
