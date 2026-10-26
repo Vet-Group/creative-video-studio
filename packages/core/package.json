@@ -11,6 +11,7 @@
     "./providers/mock": "./src/providers/mock.ts",
     "./providers/http": "./src/providers/http.ts",
     "./presets": "./src/presets.ts",
+    "./enhance": "./src/enhance.ts",
     "./ledger": "./src/ledger.ts",
     "./limits": "./src/limits.ts",
     "./queue": "./src/queue.ts"

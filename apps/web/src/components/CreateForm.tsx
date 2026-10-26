@@ -7,6 +7,7 @@ import { useHydrated } from '@/lib/use-hydrated';
 import { useSamples } from '@/lib/use-samples';
 import { About } from './About';
 import { CardMedia } from './CardMedia';
+import { EnhanceToggle } from './EnhanceToggle';
 import { Icon } from './Icon';
 import { useJobs } from './jobs';
 import { Modal } from './Modal';
@@ -44,6 +45,7 @@ interface Image {
 }
 interface JobDetail {
   presetId: string | null;
+  enhance?: boolean;
   prompt: string;
   ratio: string;
   durationSec: number;
@@ -66,6 +68,7 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
   const [images, setImages] = useState<Image[]>([]);
   const [presets, setPresets] = useState<{ id: string; label: string }[] | null>(null);
   const [presetId, setPresetId] = useState(''); // '' means a free prompt
+  const [enhance, setEnhance] = useState(true); // on by default, as on Fash; it rewrites a free prompt only
   const [prompt, setPrompt] = useState('');
   const [ratio, setRatio] = useState('9:16');
   const [durationSec, setDurationSec] = useState(8);
@@ -116,6 +119,7 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
         setImages(j.images);
         setPresetId(preset ?? '');
         if (!preset) setPrompt(j.prompt);
+        setEnhance(j.enhance ?? true);
         setRatio(j.ratio);
         setDurationSec(j.durationSec);
         setModelId(j.modelId);
@@ -183,7 +187,7 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
     setError('');
     setNotice('');
     try {
-      await api('/api/jobs', sendJson('POST', { assetIds: images.map((i) => i.id), modelId, ...(presetId ? { presetId } : { prompt }), ratio, durationSec, storeId: storeId || null }));
+      await api('/api/jobs', sendJson('POST', { assetIds: images.map((i) => i.id), modelId, ...(presetId ? { presetId } : { prompt, enhance }), ratio, durationSec, storeId: storeId || null }));
       setNotice('Đã gửi job. Theo dõi trong tab "Lịch sử".');
       setRefetch((n) => n + 1);
       if (!narrow) setTab('history'); // beside the form, the new job shows in History
@@ -329,6 +333,7 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
                 <textarea id={promptId} value={presetId === '' ? prompt : ''} maxLength={MAX_PROMPT} disabled={presetId !== ''} placeholder={presetId === '' ? 'Mô tả video bạn muốn, nên viết bằng tiếng Anh' : 'Đang dùng mẫu. Chọn "Tự viết mô tả" trong danh sách mẫu để tự nhập'} onChange={(e) => setPrompt(e.target.value)} />
                 {/* The row stays while a preset is in use, so the box keeps the live 121 px height. */}
                 <div className="prompt-foot">
+                  {presetId === '' && <EnhanceToggle on={enhance} onChange={setEnhance} />}
                   {presetId === '' && (
                     <span>
                       {prompt.length}/{MAX_PROMPT}

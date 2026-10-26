@@ -10,6 +10,7 @@ import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import type { ReadableStream as WebReadableStream } from 'node:stream/web';
 import { fileURLToPath } from 'node:url';
+import type { Enhancer } from '@cvs/core/enhance';
 import { close24h, lateBill, type LedgerPool, release, settle, withTransaction } from '@cvs/core/ledger';
 import type { ImageModelConfig, ModelConfig } from '@cvs/core/models';
 import { ImageReadError } from '@cvs/core/providers/http';
@@ -59,6 +60,8 @@ export interface WorkerDeps {
   /** Adapters by provider name; a job whose model is of kind image uses `imageProviders`. */
   providers: Partial<Record<string, VideoProvider>>;
   imageProviders?: Partial<Record<string, ImageProvider>>;
+  /** Rewrites a job's prompt when the member left Enhance on; without it (no fal key) the prompt goes as written. */
+  enhance?: Enhancer;
   options?: Partial<WorkerOptions>;
 }
 
@@ -175,10 +178,23 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
     try {
       const job = (
         await pool.query(
-          'select j.provider, j.model, j.prompt, j.aspect, j.duration_s, j.params, j.input_asset_ids, m.kind from jobs j join model_configs m on m.id = j.model where j.id = $1',
+          'select j.provider, j.model, j.prompt, j.enhance, j.enhanced_prompt, j.aspect, j.duration_s, j.params, j.input_asset_ids, m.kind from jobs j join model_configs m on m.id = j.model where j.id = $1',
           [jobId],
         )
       ).rows[0];
+      // Enhance once per job (a resubmit reuses the saved brief). Mock models are tests and never spend on it. Any failure keeps the member's prompt.
+      if (job.enhance && !job.enhanced_prompt && deps.enhance && job.provider !== 'mock') {
+        try {
+          const r = await abortable(deps.enhance(job.prompt, job.kind === 'image' ? 'image' : 'video'), signal);
+          await pool.query('update jobs set enhanced_prompt = $2, enhance_cost_usd = $3 where id = $1', [jobId, r.prompt, r.costUsd]);
+          job.enhanced_prompt = r.prompt;
+        } catch (e) {
+          // Shutting down before the provider call: nothing was submitted, so the estimate is released.
+          if (signal.aborted) return void (await release(pool, jobId, 'the worker stopped before submitting'));
+          log(`enhance ${jobId}, sending the prompt as written`, e);
+        }
+      }
+      job.prompt = job.enhanced_prompt ?? job.prompt;
       const prepared = await (async () => {
         // The adapters upload the images themselves (B.2); until then the URL only names the asset.
         const imageUrls = (job.input_asset_ids as string[]).map((a) => `asset://${a}`);

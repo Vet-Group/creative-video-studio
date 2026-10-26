@@ -13,6 +13,8 @@ const MAX_IMAGE_INPUTS = 16;
 const MAX_PROMPT = 2000;
 /** The features that run on a video model; every other feature runs on an image model. */
 const VIDEO_FEATURES = ['video', 'marketing', 'motion_control'];
+/** The features that offer Enhance, as on Fash: Create Videos and Image Generation. */
+const ENHANCE_FEATURES = ['video', 'image'];
 const QUALITIES = ['auto', 'low', 'medium', 'high'];
 /** The apps that need more than one input image; the model's own max_images is the upper limit. Try On has its own message below. */
 /** The apps whose fixed instruction a member's own prompt is added to, not replaced by. */
@@ -22,6 +24,8 @@ const MIN_INPUTS: Record<string, number> = { character_swap: 2, model_swap: 2, f
 type Spec = {
   assetIds: string[]; modelId: string; presetId: string | null; prompt: string | null; ratio: string; durationSec: number; storeId: string | null;
   feature: string; params: Record<string, string>;
+  /** Enhance: the worker has an LLM rewrite the member's own prompt first (Create video and Image Generation only). */
+  enhance: boolean;
 };
 const bad = (error: string) => Response.json({ error }, { status: 400 });
 /** Member-facing text for a Run a cap refused. */
@@ -84,7 +88,7 @@ export async function POST(request: Request) {
   // A retry takes everything from the original job, so only a new Run is validated against the body.
   let spec: Spec | null = null;
   if (retryOf === null) {
-    const { assetIds, modelId, presetId = null, prompt: rawPrompt = null, ratio, durationSec, storeId = null, feature = 'video', params: rawParams } = body ?? {};
+    const { assetIds, modelId, presetId = null, prompt: rawPrompt = null, ratio, durationSec, storeId = null, feature = 'video', params: rawParams, enhance = false } = body ?? {};
     const params = rawParams ?? {}; // null as well as absent: video clients may send it
     if (typeof feature !== 'string' || !(FEATURES as readonly string[]).includes(feature)) return bad(`feature must be one of ${FEATURES.join(', ')}`);
     const isImage = !VIDEO_FEATURES.includes(feature);
@@ -114,6 +118,8 @@ export async function POST(request: Request) {
     }
     // Background Changer takes a prompt (one image) or a reference image (two images), the schema says not both.
     if (feature === 'background_changer' && (assetIds.length > 1) === (freePrompt !== null)) return bad('Background Changer takes a prompt or a reference image (the second image), not both and not neither');
+    if (typeof enhance !== 'boolean') return bad('enhance must be true or false');
+    if (enhance && (!ENHANCE_FEATURES.includes(feature) || presetId !== null)) return bad('Enhance rewrites your own prompt in Create video and Image Generation only');
     const written = freePrompt?.trim();
     const prompt = written && APPEND_TO_INSTRUCTION.includes(feature) ? `${FEATURE_PROMPTS[feature]}. ${written}` : (written ?? FEATURE_PROMPTS[feature] ?? (motion ? '' : null));
     if (prompt !== null && ((prompt === '' && !motion) || prompt.length > MAX_PROMPT)) return bad(`the prompt must have 1 to ${MAX_PROMPT} characters`);
@@ -130,7 +136,7 @@ export async function POST(request: Request) {
       return bad(motion ? 'Motion Control needs the character image first, then the reference video' : 'only Motion Control takes a video input');
     }
     const length = motion ? Math.ceil(byId.get(assetIds[1] as string)!.duration_ms! / 1000) : (durationSec as number);
-    spec = { assetIds, modelId, presetId, prompt, ratio, durationSec: isImage ? 0 : length, storeId: storeId as string | null, feature, params: params as Record<string, string> };
+    spec = { assetIds, modelId, presetId, prompt, ratio, durationSec: isImage ? 0 : length, storeId: storeId as string | null, feature, params: params as Record<string, string>, enhance };
   }
 
   const id = crypto.randomUUID();
@@ -139,19 +145,19 @@ export async function POST(request: Request) {
     await tx.query(`select pg_advisory_xact_lock(hashtext('caps'))`);
     // The model, preset, store and assets are read under the lock, so one disabled or hidden meanwhile is refused.
     let s = spec;
-    let original: { team_id: string; provider: string; prompt: string } | undefined;
+    let original: { team_id: string; provider: string; prompt: string; enhanced_prompt: string | null } | undefined;
     if (retryOf !== null) {
-      const o = (await tx.query('select user_id, team_id, store_id, status, retry_of, input_asset_ids, model, provider, preset_id, prompt, aspect, duration_s, feature, params from jobs where id = $1', [retryOf])).rows[0];
+      const o = (await tx.query('select user_id, team_id, store_id, status, retry_of, input_asset_ids, model, provider, preset_id, prompt, enhance, enhanced_prompt, aspect, duration_s, feature, params from jobs where id = $1', [retryOf])).rows[0];
       if (!o) return Response.json({ error: 'the job to retry does not exist' }, { status: 404 });
       if (o.user_id !== userId) return Response.json({ error: 'only the owner of a job may retry it' }, { status: 403 });
       if (!['failed', 'timed_out', 'failed_unknown'].includes(o.status)) return Response.json({ error: 'only a failed job can be retried' }, { status: 409 });
       if (o.retry_of !== null || (await tx.query('select 1 from jobs where retry_of = $1', [retryOf])).rowCount) {
         return Response.json({ error: 'a job can be retried only once, and a retry cannot be retried' }, { status: 409 });
       }
-      s = { assetIds: o.input_asset_ids, modelId: o.model, presetId: o.preset_id, prompt: o.prompt, ratio: o.aspect, durationSec: o.duration_s, storeId: o.store_id, feature: o.feature, params: o.params };
+      s = { assetIds: o.input_asset_ids, modelId: o.model, presetId: o.preset_id, prompt: o.prompt, ratio: o.aspect, durationSec: o.duration_s, storeId: o.store_id, feature: o.feature, params: o.params, enhance: o.enhance };
       original = o;
     }
-    const { assetIds, modelId, presetId, prompt: freePrompt, ratio, durationSec, storeId, feature, params } = s!;
+    const { assetIds, modelId, presetId, prompt: freePrompt, ratio, durationSec, storeId, feature, params, enhance } = s!;
     const isImage = !VIDEO_FEATURES.includes(feature);
     // A new Run was checked before the lock and a retry never was, so both look again: an image deleted meanwhile is refused.
     const live = await tx.query('select 1 from assets where id = any($1::text[]) and deleted_at is null', [assetIds]);
@@ -180,9 +186,10 @@ export async function POST(request: Request) {
     const cap = await checkCaps(tx, userId, provider === 'mock' ? '0' : estimate, undefined, feature);
     if (cap) return Response.json({ error: CAP_MESSAGES[cap] }, { status: 429 });
     await tx.query(
-      `insert into jobs (id, user_id, team_id, store_id, retry_of, feature, model, provider, preset_id, prompt, aspect, duration_s, params, input_asset_ids, is_mock)
-       values ($1, $2, coalesce($3, (select team_id from users where id = $2)), $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb, $14, $15)`,
-      [id, userId, original?.team_id ?? null, storeId, retryOf, feature, modelId, provider, presetId, prompt, ratio, durationSec, JSON.stringify(params), assetIds, provider === 'mock'],
+      // A retry keeps the original's brief, so it is not rewritten (and paid for) again.
+      `insert into jobs (id, user_id, team_id, store_id, retry_of, feature, model, provider, preset_id, prompt, aspect, duration_s, params, input_asset_ids, is_mock, enhance, enhanced_prompt)
+       values ($1, $2, coalesce($3, (select team_id from users where id = $2)), $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb, $14, $15, $16, $17)`,
+      [id, userId, original?.team_id ?? null, storeId, retryOf, feature, modelId, provider, presetId, prompt, ratio, durationSec, JSON.stringify(params), assetIds, provider === 'mock', enhance, original?.enhanced_prompt ?? null],
     );
     await reserve(tx, id, estimate);
     return null;

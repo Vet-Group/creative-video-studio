@@ -146,6 +146,20 @@ describe('POST /api/jobs', () => {
     expect(await jobCount()).toBe(before);
   });
 
+  test('stores Enhance for a free prompt (off when left out) and refuses it with a preset, a non-boolean or another feature', async () => {
+    const m = await newMember();
+    const on = (await (await runAs(m, { presetId: null, prompt: 'A slow turn.', enhance: true })).json()) as { id: string };
+    const off = (await (await runAs(m, { presetId: null, prompt: 'A slow turn.' })).json()) as { id: string };
+    const rows = (await pool.query('select id, enhance, enhanced_prompt from jobs where id = any($1) order by enhance desc', [[on.id, off.id]])).rows;
+    expect(rows).toEqual([{ id: on.id, enhance: true, enhanced_prompt: null }, { id: off.id, enhance: false, enhanced_prompt: null }]);
+    const before = await jobCount();
+    expect((await runAs(m, { enhance: true })).status).toBe(400); // a preset's tested prompt is not rewritten
+    expect((await runAs(m, { presetId: null, prompt: 'A slow turn.', enhance: 'yes' })).status).toBe(400);
+    const marketing = await run(m.cookie, { feature: 'marketing', modelId: base.modelId, ratio: base.ratio, durationSec: 5, prompt: 'p', assetIds: [m.asset, 'own-1'], enhance: true });
+    expect([marketing.status, ((await marketing.json()) as { error: string }).error]).toEqual([400, expect.stringMatching(/^Enhance/)]);
+    expect(await jobCount()).toBe(before);
+  });
+
   test('accepts a prompt of exactly 2000 characters', async () => {
     const m = await newMember(); // its own daily count, so the owner keeps room for the cap tests above
     expect((await runAs(m, { presetId: null, prompt: 'x'.repeat(2000) })).status).toBe(201);
@@ -368,6 +382,16 @@ describe('POST /api/jobs with retryOf', () => {
     expect(res.status).toBe(201);
     const { id } = (await res.json()) as { id: string };
     expect((await pool.query('select preset_id, prompt from jobs where id = $1', [id])).rows[0]).toEqual({ preset_id: null, prompt: 'My own prompt.' });
+  });
+
+  test('keeps Enhance and the brief the original already paid for, so the retry is not rewritten again', async () => {
+    const m = await newMember();
+    await pool.query(
+      `insert into jobs (id, user_id, team_id, model, provider, prompt, enhance, enhanced_prompt, aspect, duration_s, input_asset_ids, status) values ($1, $2, 'team-unassigned', 'fal-test', 'fal', 'turn', true, 'A slow turn brief.', '9:16', 5, $3, 'failed')`,
+      [`enh-${m.id}`, m.id, [m.asset]],
+    );
+    const { id } = (await (await runAs(m, { retryOf: `enh-${m.id}` })).json()) as { id: string };
+    expect((await pool.query('select prompt, enhance, enhanced_prompt from jobs where id = $1', [id])).rows[0]).toEqual({ prompt: 'turn', enhance: true, enhanced_prompt: 'A slow turn brief.' });
   });
 
   test('books the estimate at the current price of the model', async () => {
