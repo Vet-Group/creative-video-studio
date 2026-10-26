@@ -71,13 +71,21 @@ export async function uploadImages(files: File[]): Promise<Img[]> {
   return (await api<{ assets: Img[] }>('/api/assets', { method: 'POST', body: form })).assets;
 }
 
-/** One labelled upload slot: its thumbnails with a remove button each, and a tile that opens the file picker until the slot is full. */
-export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRemove }: { label: string; empty: string; inputLabel: string; images: Img[]; max: number; busy: boolean; onAdd: (files: File[]) => void; onRemove: (id: string) => void }) {
+/**
+ * One labelled upload slot: its thumbnails with a remove button each, and a tile that opens the file picker until the slot is full.
+ * `samples` (sample names, lib/samples.ts) show while the slot is empty, as on the live Try On; a click uploads that sample like a file the user picked.
+ */
+export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRemove, samples = [] }: { label: string; empty: string; inputLabel: string; images: Img[]; max: number; busy: boolean; onAdd: (files: File[]) => void; onRemove: (id: string) => void; samples?: string[] }) {
   const hydrated = useHydrated();
   const input = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
   const labelId = useId();
   const full = images.length >= max;
+  const offer = images.length === 0 ? samples : [];
+  async function pickSample(name: string) {
+    const res = await fetch(`/api/samples/${name}`);
+    if (res.ok) onAdd([new File([await res.blob()], name, { type: res.headers.get('content-type') ?? '' })]);
+  }
   function onDrop(e: DragEvent) {
     e.preventDefault();
     setOver(false);
@@ -115,15 +123,27 @@ export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRem
             ))}
           </ul>
         )}
+        {offer.length > 0 && (
+          <ul className="slot-samples" aria-label={`${label}: ảnh mẫu`}>
+            {offer.map((name, i) => (
+              <li key={name}>
+                <button type="button" aria-label={`Dùng ảnh mẫu ${i + 1} cho ${label}`} disabled={!hydrated || busy} onClick={() => void pickSample(name)}>
+                  <img src={`/api/samples/${name}`} alt="" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
         {/* Empty, the whole slot is the upload button, a grey circle over its hint as on the live pages; with images, a small tile adds more. */}
         {!full && (
           <button type="button" className="slot-add" aria-label={`Tải lên ${label}`} title={images.length === 0 ? empty : undefined} disabled={!hydrated || busy} onClick={() => input.current?.click()}>
             <span className="slot-icon" aria-hidden="true">
-              <Icon name={images.length === 0 ? 'image' : 'plus'} size={16} />
+              <Icon name={images.length === 0 && offer.length === 0 ? 'image' : 'plus'} size={16} />
+              {offer.length > 0 && <span>Tải lên</span>}
             </span>
             {/* A half-width slot shows just its name, as on the live pages; the full hint is its tooltip there. */}
-            {images.length === 0 && <span className="slot-hint">{empty}</span>}
-            {images.length === 0 && <span className="slot-name">{label}</span>}
+            {images.length === 0 && offer.length === 0 && <span className="slot-hint">{empty}</span>}
+            {images.length === 0 && offer.length === 0 && <span className="slot-name">{label}</span>}
           </button>
         )}
       </div>
