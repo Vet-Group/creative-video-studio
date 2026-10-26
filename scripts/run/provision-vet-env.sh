@@ -12,7 +12,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 APP=/opt/creative-video-studio
-REPO=git@github.com:anhtahaylove/creative-video-studio.git
+REPO=git@github.com:Vet-Group/creative-video-studio.git
 ENV_FILE="${CVS_ENV_FILE:-$ROOT/.env}"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT

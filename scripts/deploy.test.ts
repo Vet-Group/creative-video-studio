@@ -50,7 +50,7 @@ esac
 exit 0
 `;
 const stubNames = ['id', 'stat', 'curl', 'docker', 'systemctl', 'loginctl', 'git', 'tar', 'xz', 'sha256sum', 'base64', 'mktemp', 'flock', 'cloudflared'];
-const defaultRepo = 'git@github.com:anhtahaylove/creative-video-studio.git';
+const defaultRepo = 'git@github.com:Vet-Group/creative-video-studio.git';
 
 function sandbox(listen = 'LISTEN 0 4096 127.0.0.1:631 0.0.0.0:*\n', dotEnv = '') {
   const dir = fwd(mkdtempSync(join(tmpdir(), 'cvs-deploy-test-')));

@@ -27,7 +27,7 @@ const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 // CVS_RUN_DIR lets the watchdog dry-run test use a throwaway run directory.
 const RUN = process.env.CVS_RUN_DIR ?? join(ROOT, '.omc', 'run');
 const MANIFEST = join(RUN, 'manifest.json');
-const REPO = 'anhtahaylove/creative-video-studio';
+const REPO = 'Vet-Group/creative-video-studio';
 
 const run: Run = (cmd, args, stdin) =>
   new Promise((resolve) => {

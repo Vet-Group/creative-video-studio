@@ -5,7 +5,7 @@ Last updated: 2026-10-24 (main after #42; see "Overnight 2026-10-24" below). Ear
 ## Workspace
 
 - Product workspace: `C:\Users\User\dev\work\creative-video-studio`.
-- Git: private GitHub repository `anhtahaylove/creative-video-studio` (created in R.1), protected `main`, CI on every PR. Run worktrees: `C:\Users\User\dev\wt\cvs-app` (app steps) and `C:\Users\User\dev\wt\cvs-bakeoff` (bake-off steps).
+- Git: public GitHub repository `Vet-Group/creative-video-studio` (created in R.1 as the private `anhtahaylove/creative-video-studio`; moved to the Vet-Group organization and made public on 2026-10-26), protected `main`, CI on every PR. Run worktrees: `C:\Users\User\dev\wt\cvs-app` (app steps) and `C:\Users\User\dev\wt\cvs-bakeoff` (bake-off steps).
 - Read-only reference: `C:\Users\User\dev\work\fash-internal`. Nothing in that folder is moved, edited or turned into product code.
 - The product UI and code will be written from scratch. Fash HTML, CSS, JS, fonts, logos and images do not go into this repository; they serve as a workflow and layout reference only.
 

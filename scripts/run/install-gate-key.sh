@@ -45,8 +45,8 @@ remote_sum=$(ssh vet-linux 'sha256sum /usr/local/sbin/cvs-run-gate' | cut -d' ' 
 
 # Read-only deploy key: generated on VET, so the private half never leaves it.
 pub=$(ssh vet-linux 'test -f /root/.ssh/cvs_deploy_ed25519 || ssh-keygen -q -t ed25519 -N "" -C cvs-deploy -f /root/.ssh/cvs_deploy_ed25519; cat /root/.ssh/cvs_deploy_ed25519.pub')
-if ! gh repo deploy-key list --repo anhtahaylove/creative-video-studio | grep -q 'vet-linux'; then
-  printf '%s\n' "$pub" | gh repo deploy-key add - --repo anhtahaylove/creative-video-studio --title vet-linux
+if ! gh repo deploy-key list --repo Vet-Group/creative-video-studio | grep -q 'vet-linux'; then
+  printf '%s\n' "$pub" | gh repo deploy-key add - --repo Vet-Group/creative-video-studio --title vet-linux
 fi
 
 # Prove the gate works through the new key, and that it refuses everything else.
