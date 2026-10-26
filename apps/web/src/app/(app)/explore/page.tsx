@@ -79,7 +79,7 @@ export default async function ExplorePage() {
           {scored.map((m) => (
             <li key={m.id}>
               <Link href={m.kind === 'video' ? `/create?model=${encodeURIComponent(m.id)}` : '/image-generation'} className="explore-card">
-                <CardMedia {...cardSample(have, modelSample(m.id))} />
+                <CardMedia {...cardSample(have, modelSample(m.id))} always />
                 <strong>
                   {m.label}
                   {recommended.has(m.id) && <span className="badge badge-recommended">Đề xuất</span>}
