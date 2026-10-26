@@ -140,6 +140,7 @@ These come from the plan (`.omc/plans/creative-video-studio-plan.md`) and its sp
   - Details: `docs/ARCHITECTURE.md`, "Cost ledger".
 - **Autonomous run.** The owner acts once, before the run: a zero-cost preflight (`pnpm preflight`) and one pre-approval sentence (`pnpm run:approve`), valid 14 days. It covers the private repository, up to $40 of real spend before go-live, read-only VET access for the sample images and checks, the deployment, the tunnel and DNS record, and Lark messages to the owner only. Five hard stops are enforced in code (plan section 3).
 - **Provider data.** The fal adapter sends `X-Fal-Store-IO: 0` and an object lifecycle of at least 1 h; the worker copies the output at once. Downloads use an HMAC download token instead of presigned URLs.
+- **Login redesign (2026-10-26).** `/login` is rebuilt as the VET product-video studio card (flashlight password reveal, day/night scene, camera mascot) with login-scoped tokens only; the app-wide VET tokens and the shell logo are deferred to a later PR while the UI-parity work on `globals.css` continues.
 
 ## What exists
 
