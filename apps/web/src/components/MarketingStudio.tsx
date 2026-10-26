@@ -46,7 +46,7 @@ function ChoiceBox({ label, icon, choice, onOpen }: { label: string; icon: IconN
           <Icon name={icon} size={16} />
         </span>
         <span id={labelId} className="choice-label">
-          {label}
+          {label.replace(' (', '\n(') /* "(tuỳ chọn)" on its own line, as on Fash */}
         </span>
         <span id={valueId} className={choice ? 'choice-value' : 'choice-value sr-only'}>
           {choice ? choice.name : 'Chưa chọn'}

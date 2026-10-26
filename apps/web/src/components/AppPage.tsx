@@ -150,7 +150,7 @@ function AppForm({ app }: { app: AppConfig }) {
   const two = app.slots.length === 2;
 
   return (
-    <section aria-labelledby="app-title" className="create">
+    <section aria-labelledby="app-title" className="create app-page">
       <h1 id="app-title" className="sr-only">
         {app.name}
       </h1>
@@ -371,7 +371,7 @@ function MotionForm({ app }: { app: AppConfig }) {
   const panel = shown === 'create' ? 'about' : shown;
 
   return (
-    <section aria-labelledby="app-title" className="create">
+    <section aria-labelledby="app-title" className="create app-page">
       <h1 id="app-title" className="sr-only">
         {app.name}
       </h1>
