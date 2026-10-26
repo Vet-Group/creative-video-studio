@@ -42,11 +42,13 @@ function ChoiceBox({ label, icon, choice, onOpen }: { label: string; icon: IconN
   return (
     <div className="field">
       <button type="button" className="choice-box" aria-haspopup="dialog" aria-labelledby={`${labelId} ${valueId}`} onClick={onOpen}>
-        <Icon name={icon} size={20} />
+        <span className="slot-icon" aria-hidden="true">
+          <Icon name={icon} size={16} />
+        </span>
         <span id={labelId} className="choice-label">
           {label}
         </span>
-        <span id={valueId} className="choice-value">
+        <span id={valueId} className={choice ? 'choice-value' : 'choice-value sr-only'}>
           {choice ? choice.name : 'Chưa chọn'}
         </span>
       </button>

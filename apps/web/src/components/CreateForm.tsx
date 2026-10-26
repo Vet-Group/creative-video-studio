@@ -259,9 +259,10 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
               <div className="banner-text">
                 <strong data-value={presetId}>{current?.label ?? 'Tự viết mô tả'}</strong>
               </div>
-              <button type="button" className="banner-chip" onClick={() => setPicking(true)}>
+              {/* Short like the live "Prompts" chip; the name says what it does. */}
+              <button type="button" className="banner-chip" aria-label="Chọn mẫu khác" onClick={() => setPicking(true)}>
                 <Icon name="edit" size={12} />
-                Chọn mẫu khác
+                Mẫu
               </button>
             </div>
 
