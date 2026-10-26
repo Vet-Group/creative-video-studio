@@ -1,52 +1,171 @@
-// The About tab of Create: how a Run works here, what limits it, and how to write a motion prompt. Company guidance, not marketing.
-import { AboutClips } from './CardMedia';
+'use client';
+// The one renderer of every About tab: a page from lib/about-content.ts, laid out like the reference site's About pages (a centred title and lead,
+// then sections of eyebrow, heading and lead with cards, steps, before-and-after pairs, tables, ratio tiles, example prompts and a FAQ).
+// `long` is the app pages' article style: plain headings, numbered steps and points without boxes.
+import Link from 'next/link';
+import type { AboutBlock, AboutCard, AboutPage } from '@/lib/about-content';
+import { cardSample } from '@/lib/examples';
+import { useSamples } from '@/lib/use-samples';
+import { CardMedia } from './CardMedia';
 
-export function About() {
+/** A sample's loop or still; the empty stripes while it is not uploaded, so the slot keeps its place. */
+function Media({ name }: { name: string }) {
   return (
-    <article className="about">
-      <h2>Tạo video sản phẩm từ ảnh</h2>
-      <p>Đưa vào một hoặc vài ảnh sản phẩm, chọn một mẫu chuyển động hoặc tự viết mô tả, và nhận lại một clip ngắn. Clip nằm trong Thư viện của công ty, ai trong công ty cũng xem và tải được.</p>
+    <span className="about-media">
+      <CardMedia {...cardSample(useSamples(), name)} />
+    </span>
+  );
+}
 
-      <p className="about-kicker">Từng bước</p>
-      <h3>Một lần Run gồm những gì</h3>
-      <p className="about-lead">Mỗi lần Run đi qua năm bước, từ ảnh sản phẩm đến một clip đã được đánh giá trong Thư viện.</p>
+function Card({ card }: { card: AboutCard }) {
+  return (
+    <li>
+      {card.media && <Media name={card.media} />}
+      {card.tag && <span className="about-tag">{card.tag}</span>}
+      <h4>{card.title}</h4>
+      <p>{card.text}</p>
+      {card.specs && (
+        <ul className="about-specs">
+          {card.specs.map((s) => (
+            <li key={s}>{s}</li>
+          ))}
+        </ul>
+      )}
+    </li>
+  );
+}
+
+function Block({ block }: { block: AboutBlock }) {
+  if (typeof block === 'string') return <p>{block}</p>;
+  if ('cards' in block)
+    return (
+      <ul className="about-cards" data-cols={block.cols ?? 2}>
+        {block.cards.map((c) => (
+          <Card key={c.title} card={c} />
+        ))}
+      </ul>
+    );
+  if ('steps' in block)
+    return (
       <ol className="about-steps">
-        <li>
-          <strong>Tải ảnh lên</strong> Ảnh đầu tiên là sản phẩm chính. Mỗi mô hình nhận tối đa một số ảnh nhất định; ô tải ảnh báo khi bạn vượt quá.
-        </li>
-        <li>
-          <strong>Chọn mẫu hoặc viết mô tả</strong> Mẫu chuyển động là các câu lệnh công ty đã thử và giữ lại. Khi tự viết, chỉ cần tả chuyển động: ảnh đã quyết định sản phẩm, màu và bối cảnh.
-        </li>
-        <li>
-          <strong>Chọn mô hình, tỉ lệ và thời lượng</strong> Menu mô hình xếp theo nhà cung cấp và ghi tỉ lệ đạt, tức tỉ lệ clip được đánh giá Đạt. Mô hình không hỗ trợ tỉ lệ hay thời lượng đang chọn nằm ở cuối và không chọn được.
-        </li>
-        <li>
-          <strong>Bấm Run</strong> Nút Run ghi chi phí ước tính. Job hiện trong mục Lịch sử và báo khi xong; bạn có thể rời trang trong lúc chờ.
-        </li>
-        <li>
-          <strong>Đánh giá clip</strong> Đánh dấu Đạt hoặc Không đạt trong Thư viện. Đánh giá giúp công ty chọn mô hình và mẫu tốt hơn.
-        </li>
+        {block.steps.map((s, i) => (
+          <li key={s.title}>
+            {s.media && <Media name={s.media} />}
+            <span>
+              <span className="about-step-no">Bước {String(i + 1).padStart(2, '0')}</span>
+              <strong>{s.title}</strong> {s.text}
+            </span>
+          </li>
+        ))}
       </ol>
-
-      <p className="about-kicker">Giới hạn</p>
-      <h3>Hạn mức và chi phí</h3>
-      <p className="about-lead">Hạn mức giữ chi phí video của công ty trong ngân sách; mỗi Run được kiểm trước khi gửi đi.</p>
-      <ul>
-        <li>Mỗi người có hạn mức số clip mỗi ngày theo giờ Việt Nam, do Admin đặt. Job thất bại không tốn tiền thì không tính.</li>
-        <li>Công ty có ngân sách video mỗi tháng. Run nào làm tháng vượt ngân sách sẽ bị từ chối.</li>
-        <li>Chi phí ghi trên mỗi clip là chi phí thật từ nhà cung cấp khi có; trước đó là số ước tính.</li>
+    );
+  if ('pairs' in block)
+    return (
+      <div className="about-pairs">
+        {block.pairs.map((pair) => (
+          <div key={pair.join()} className="about-pair">
+            {pair.map((name, i) => (
+              <figure key={name}>
+                <Media name={name} />
+                <figcaption>{block.labels[i]}</figcaption>
+              </figure>
+            ))}
+          </div>
+        ))}
+      </div>
+    );
+  if ('table' in block) {
+    const [head, ...rows] = block.table;
+    return (
+      <div className="about-table">
+        <table>
+          <thead>
+            <tr>
+              {head!.map((h, i) => (
+                <th key={i} scope="col">
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.join()}>
+                {r.map((c, i) => (
+                  <td key={i}>{c}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+  if ('list' in block)
+    return (
+      <ul className="about-list">
+        {block.list.map((t) => (
+          <li key={t}>{t}</li>
+        ))}
       </ul>
-
-      <p className="about-kicker">Mẹo</p>
-      <h3>Viết mô tả chuyển động</h3>
-      <p className="about-lead">Mô tả tốt thì ngắn và chỉ nói về chuyển động, vì ảnh đã quyết định sản phẩm.</p>
-      <ul>
-        <li>Tả một chuyển động chính: máy quay tiến lại gần, xoay chậm, ánh sáng quét qua.</li>
-        <li>Nói rõ điều gì phải giữ nguyên, ví dụ chữ in trên sản phẩm hay màu vải.</li>
-        <li>Câu ngắn và cụ thể cho kết quả ổn định hơn câu dài nhiều ý.</li>
-        <li>Chỉ dùng ảnh công ty có quyền sử dụng.</li>
+    );
+  if ('links' in block)
+    return (
+      <ul className="about-list">
+        {block.links.map(([label, href, text]) => (
+          <li key={label}>
+            <Link href={href}>{label}</Link> {text}
+          </li>
+        ))}
       </ul>
-      <AboutClips names={['example-2', 'example-3']} title="Từ ảnh tĩnh thành video" />
+    );
+  if ('ratios' in block)
+    return (
+      <ul className="about-ratios">
+        {block.ratios.map(([ratio, text]) => (
+          <li key={ratio}>
+            <span className="about-ratio-shape" data-auto={ratio === 'auto' || undefined} style={ratio === 'auto' ? undefined : { aspectRatio: ratio.replace(':', ' / ') }} aria-hidden="true" />
+            <strong>{ratio}</strong>
+            <span>{text}</span>
+          </li>
+        ))}
+      </ul>
+    );
+  if ('example' in block)
+    return (
+      <figure className="about-example">
+        {block.example.media && <Media name={block.example.media} />}
+        <figcaption>
+          <span className="about-tag">{block.example.label}</span>
+          <q>{block.example.text}</q>
+        </figcaption>
+      </figure>
+    );
+  return (
+    <div className="about-faq">
+      {block.faq.map(([q, a]) => (
+        <details key={q}>
+          <summary>{q}</summary>
+          <p>{a}</p>
+        </details>
+      ))}
+    </div>
+  );
+}
+
+export function About({ page, long = false }: { page: AboutPage; long?: boolean }) {
+  return (
+    <article className={long ? 'about about-long' : 'about'}>
+      <h2>{page.title}</h2>
+      {page.lead && <p className="about-intro">{page.lead}</p>}
+      {page.sections.map((s) => (
+        <section key={s.title}>
+          {s.kicker && <p className="about-kicker">{s.kicker}</p>}
+          <h3>{s.title}</h3>
+          {s.lead && <p className="about-lead">{s.lead}</p>}
+          {s.blocks?.map((b, i) => <Block key={i} block={b} />)}
+        </section>
+      ))}
     </article>
   );
 }

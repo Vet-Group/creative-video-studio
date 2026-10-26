@@ -139,7 +139,7 @@ test('the model, ratio and duration come from the marketing model, the About tab
   await expect(page.locator('.form-message').getByRole('alert')).toHaveText('Bạn đã dùng hết số clip trong ngày hôm nay');
 
   await page.getByRole('tab', { name: 'Giới thiệu' }).click();
-  await expect(page.getByRole('heading', { name: /UGC Thử đồ/ })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 2, name: /UGC Thử đồ/ })).toBeVisible();
   await expect(page.getByText(/chưa được xây dựng/)).toBeVisible();
 });
 

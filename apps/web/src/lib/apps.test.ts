@@ -1,6 +1,7 @@
 import { FEATURE_PROMPTS } from '@cvs/core/models';
 import { FEATURES } from '@cvs/db';
 import { describe, expect, it } from 'vitest';
+import { APP_ABOUT } from './about-content';
 import { APPS, appBySlug, appInputs, appReason, type AppDraft, filterApps, motionReason } from './apps';
 
 const img = (id: string) => ({ id });
@@ -20,7 +21,6 @@ describe('the app list', () => {
   it('marks only Media Optimizer as coming soon; Motion Control is built, with its own form', () => {
     expect(appBySlug('media-optimizer')).toMatchObject({ slots: [], soon: expect.any(String) });
     expect(APPS.filter((a) => a.soon).map((a) => a.slug)).toEqual(['media-optimizer']);
-    expect(appBySlug('motion-control')!.about.steps).toHaveLength(3);
   });
 
   it('gives the swaps and Face Swap two required slots, and the others the slots of the reference', () => {
@@ -29,6 +29,13 @@ describe('the app list', () => {
     for (const slug of ['reframe', 'image-upscale', 'background-remover']) expect(appBySlug(slug)!.slots).toHaveLength(1);
     expect(appBySlug('reframe')).toMatchObject({ ratio: true });
     expect(appBySlug('image-upscale')).toMatchObject({ resolution: true });
+  });
+});
+
+describe('the app About tabs', () => {
+  it('has an About page for every built app and none for an app that is not built', () => {
+    for (const a of APPS) expect(Object.hasOwn(APP_ABOUT, a.slug)).toBe(!a.soon);
+    expect(Object.keys(APP_ABOUT)).toHaveLength(APPS.filter((a) => !a.soon).length);
   });
 });
 

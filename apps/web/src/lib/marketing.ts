@@ -1,29 +1,29 @@
-/** A choice on the Marketing Studio page: a Vietnamese name for the member and an English scene phrase for the model. */
-export type MarketingChoice = { id: string; name: string; phrase: string };
+/** A choice on the Marketing Studio page: a Vietnamese name and one-line description for the member, and an English scene phrase for the model. */
+export type MarketingChoice = { id: string; name: string; desc: string; phrase: string };
 
 /** How the clip opens: the reference site's six hooks (owner, 2026-10-26: match it), each with its sample loop marketing-hook-<id>.mp4. */
 export const HOOKS: MarketingChoice[] = [
-  { id: 'blizzard', name: 'Bão tuyết', phrase: 'The clip opens as a sudden snowstorm sweeps across the scene, then clears to reveal the creator in the outfit.' },
-  { id: 'flip-fail', name: 'Lộn nhào hụt', phrase: 'The clip opens with the creator trying a playful flip that fails, then laughing and showing the outfit.' },
-  { id: 'dramatic-arrival', name: 'Xuất hiện ấn tượng', phrase: 'The product crashes dramatically into the scene and lands intact in front of the creator.' },
-  { id: 'product-catch', name: 'Bắt lấy sản phẩm', phrase: 'The creator catches the product thrown into frame with an energetic, surprised reaction.' },
-  { id: 'product-drop', name: 'Sản phẩm rơi xuống', phrase: 'The product drops into frame from above and the creator picks it up to show it.' },
-  { id: 'strange-mic', name: 'Micro kỳ lạ', phrase: 'An oddly shaped microphone pops up in front of the creator, who starts talking about the product.' },
+  { id: 'blizzard', name: 'Bão tuyết', desc: 'Bão tuyết bất ngờ quét qua khung hình', phrase: 'The clip opens as a sudden snowstorm sweeps across the scene, then clears to reveal the creator in the outfit.' },
+  { id: 'flip-fail', name: 'Lộn nhào hụt', desc: 'Một cú lộn nhào hụt, rồi vào thẳng phần khoe đồ', phrase: 'The clip opens with the creator trying a playful flip that fails, then laughing and showing the outfit.' },
+  { id: 'dramatic-arrival', name: 'Xuất hiện ấn tượng', desc: 'Sản phẩm lao vào cảnh và đáp xuống nguyên vẹn', phrase: 'The product crashes dramatically into the scene and lands intact in front of the creator.' },
+  { id: 'product-catch', name: 'Bắt lấy sản phẩm', desc: 'Bắt lấy sản phẩm trong một khoảnh khắc đầy năng lượng', phrase: 'The creator catches the product thrown into frame with an energetic, surprised reaction.' },
+  { id: 'product-drop', name: 'Sản phẩm rơi xuống', desc: 'Sản phẩm rơi từ trên xuống khung hình', phrase: 'The product drops into frame from above and the creator picks it up to show it.' },
+  { id: 'strange-mic', name: 'Micro kỳ lạ', desc: 'Một chiếc micro kỳ lạ bật lên trước mặt', phrase: 'An oddly shaped microphone pops up in front of the creator, who starts talking about the product.' },
 ];
 
 /** Where the clip is set: the reference site's eleven locations, each with its sample loop marketing-location-<id>.mp4. */
 export const LOCATIONS: MarketingChoice[] = [
-  { id: 'airplane-wing', name: 'Cánh máy bay', phrase: 'a seat on an airplane wing high above the clouds' },
-  { id: 'bathroom', name: 'Phòng tắm', phrase: 'a clean, minimal modern bathroom' },
-  { id: 'bedroom', name: 'Phòng ngủ', phrase: 'a cozy bedroom with soft natural light from a window' },
-  { id: 'car-roof', name: 'Cửa sổ trời ô tô', phrase: 'an open car sunroof, looking up at the sky' },
-  { id: 'gym', name: 'Phòng tập', phrase: 'a fitness studio with equipment in the background' },
-  { id: 'in-car', name: 'Trong xe', phrase: 'the inside of a car, with the dashboard and windshield behind' },
-  { id: 'kitchen', name: 'Nhà bếp', phrase: 'a modern kitchen in warm light' },
-  { id: 'office', name: 'Văn phòng', phrase: 'a tidy, professional desk workspace' },
-  { id: 'outdoor', name: 'Ngoài trời', phrase: 'a green open-air space in daylight' },
-  { id: 'rooftop', name: 'Sân thượng', phrase: 'an urban rooftop with the city skyline behind' },
-  { id: 'street', name: 'Đường phố', phrase: 'a lively city street in the daytime' },
+  { id: 'airplane-wing', name: 'Cánh máy bay', desc: 'Ngồi trên cánh máy bay, cao trên những tầng mây', phrase: 'a seat on an airplane wing high above the clouds' },
+  { id: 'bathroom', name: 'Phòng tắm', desc: 'Phòng tắm hiện đại, sạch sẽ và tối giản', phrase: 'a clean, minimal modern bathroom' },
+  { id: 'bedroom', name: 'Phòng ngủ', desc: 'Phòng ngủ ấm cúng, ánh sáng tự nhiên dịu nhẹ', phrase: 'a cozy bedroom with soft natural light from a window' },
+  { id: 'car-roof', name: 'Cửa sổ trời ô tô', desc: 'Nhô lên qua cửa sổ trời, nhìn lên bầu trời', phrase: 'an open car sunroof, looking up at the sky' },
+  { id: 'gym', name: 'Phòng tập', desc: 'Phòng tập với dụng cụ phía sau', phrase: 'a fitness studio with equipment in the background' },
+  { id: 'in-car', name: 'Trong xe', desc: 'Trong xe, thấy bảng điều khiển và kính lái phía sau', phrase: 'the inside of a car, with the dashboard and windshield behind' },
+  { id: 'kitchen', name: 'Nhà bếp', desc: 'Nhà bếp hiện đại với ánh sáng ấm', phrase: 'a modern kitchen in warm light' },
+  { id: 'office', name: 'Văn phòng', desc: 'Góc làm việc gọn gàng, chuyên nghiệp', phrase: 'a tidy, professional desk workspace' },
+  { id: 'outdoor', name: 'Ngoài trời', desc: 'Không gian ngoài trời xanh mát, ánh sáng ban ngày', phrase: 'a green open-air space in daylight' },
+  { id: 'rooftop', name: 'Sân thượng', desc: 'Sân thượng giữa phố, đường chân trời thành phố phía sau', phrase: 'an urban rooftop with the city skyline behind' },
+  { id: 'street', name: 'Đường phố', desc: 'Đường phố nhộn nhịp ban ngày', phrase: 'a lively city street in the daytime' },
 ];
 
 const INSTRUCTION =

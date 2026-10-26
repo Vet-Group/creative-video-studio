@@ -3,7 +3,9 @@
 // with an upload tile, the prompt, the model, ratio and resolution pills, and Run. Every pill is a Select or the model picker, so each works by keyboard.
 import { useRef, useState } from 'react';
 import { api, errorText, sendJson } from '@/lib/api';
+import { ABOUT } from '@/lib/about-content';
 import { useHydrated } from '@/lib/use-hydrated';
+import { About } from './About';
 import { Gallery, type Img, RATIO_LABEL, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, WorkTabs } from './image-tools';
 import { EnhanceToggle } from './EnhanceToggle';
 import { Icon } from './Icon';
@@ -88,7 +90,7 @@ export function ImageGeneration() {
       </h1>
       <WorkTabs prefix="imagegen" tabs={TABS} labels={TAB_LABEL} shown={tab} onSelect={setTab} />
       <div className="imagegen-side" id={`imagegen-panel-${tab}`} role="tabpanel" aria-labelledby={`imagegen-tab-${tab}`}>
-        {tab === 'examples' ? <Gallery kind="image" samples="image-example-" label="Ảnh của công ty" emptyText="Chưa có ảnh nào trong công ty. Hãy tạo ảnh đầu tiên bên dưới." /> : tab === 'about' ? <ImageAbout /> : <Tray feature="image" />}
+        {tab === 'examples' ? <Gallery kind="image" samples="image-example-" label="Ảnh của công ty" emptyText="Chưa có ảnh nào trong công ty. Hãy tạo ảnh đầu tiên bên dưới." /> : tab === 'about' ? <About page={ABOUT.image} /> : <Tray feature="image" />}
       </div>
 
       <div className="imagebar" role="group" aria-label="Thanh tạo ảnh">
@@ -169,39 +171,5 @@ export function ImageGeneration() {
         </div>
       </div>
     </section>
-  );
-}
-
-function ImageAbout() {
-  return (
-    <article className="about">
-      <h2>Tạo và chỉnh ảnh sản phẩm</h2>
-      <p>Đưa vào một hoặc vài ảnh tham chiếu và mô tả cảnh bạn muốn, và nhận lại một ảnh mới. Ảnh nằm trong Thư viện của công ty, mục Tạo ảnh.</p>
-
-      <p className="about-kicker">Từng bước</p>
-      <h3>Một lần Run gồm những gì</h3>
-      <ol className="about-steps">
-        <li>
-          <strong>Ảnh tham chiếu</strong> Bấm dấu cộng trên thanh bên dưới để tải ảnh. Mỗi mô hình nhận tối đa một số ảnh nhất định.
-        </li>
-        <li>
-          <strong>Mô tả</strong> Tả cảnh, ánh sáng và điều cần đổi, hoặc điều phải giữ nguyên. Viết bằng tiếng Anh thường cho kết quả ổn định hơn.
-        </li>
-        <li>
-          <strong>Mô hình, tỉ lệ, độ phân giải</strong> Mỗi menu mở bằng chuột hoặc bàn phím (Enter, Space, phím mũi tên, Esc để đóng). Nút Run ghi chi phí ước tính của một ảnh.
-        </li>
-        <li>
-          <strong>Xem kết quả</strong> Job hiện trong mục Lịch sử và báo khi xong. Thư viện có mọi ảnh của công ty để xem, tải xuống và đánh giá.
-        </li>
-      </ol>
-
-      <p className="about-kicker">Giới hạn</p>
-      <h3>Hạn mức và chi phí</h3>
-      <ul>
-        <li>Ảnh và ứng dụng có ngân sách riêng, tách khỏi ngân sách video: mỗi người có hạn mức theo ngày và theo tháng, công ty có hạn mức theo tháng. Run làm vượt hạn mức sẽ bị từ chối.</li>
-        <li>Chi phí ghi trên mỗi ảnh là chi phí thật từ nhà cung cấp khi có; trước đó là số ước tính.</li>
-        <li>Chỉ dùng ảnh công ty có quyền sử dụng.</li>
-      </ul>
-    </article>
   );
 }

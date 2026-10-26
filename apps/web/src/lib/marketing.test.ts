@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { HOOKS, LOCATIONS, marketingPrompt } from './marketing';
 
 describe('HOOKS and LOCATIONS', () => {
-  it.each([['HOOKS', HOOKS], ['LOCATIONS', LOCATIONS]])('%s has 6 to 12 unique choices with a Vietnamese name and an English phrase', (_, list) => {
+  it.each([['HOOKS', HOOKS], ['LOCATIONS', LOCATIONS]])('%s has 6 to 12 unique choices with a Vietnamese name and description and an English phrase', (_, list) => {
     expect(list.length).toBeGreaterThanOrEqual(6);
     expect(list.length).toBeLessThanOrEqual(12);
     expect(new Set(list.map((c) => c.id)).size).toBe(list.length);
@@ -10,6 +10,7 @@ describe('HOOKS and LOCATIONS', () => {
     for (const c of list) {
       expect(c.id).toMatch(/^[a-z-]+$/);
       expect(c.name.trim()).not.toBe('');
+      expect(c.desc.trim()).not.toBe('');
       expect(c.phrase).toMatch(/^[\x20-\x7e]+$/); // plain English, no diacritics
     }
   });

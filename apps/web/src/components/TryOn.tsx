@@ -6,7 +6,8 @@ import { api, errorText, sendJson } from '@/lib/api';
 import { tryOnPrompt } from '@/lib/try-on-prompt';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { useSamples } from '@/lib/use-samples';
-import { AboutClips } from './CardMedia';
+import { ABOUT } from '@/lib/about-content';
+import { About } from './About';
 import { Gallery, type Img, LockedFields, RATIO_LABEL, Slot, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, WorkTabs } from './image-tools';
 import { useJobs } from './jobs';
 import { ModelPicker } from './ModelPicker';
@@ -163,49 +164,9 @@ export function TryOn() {
         </div>
 
         <div className="side" id={`tryon-panel-${panel}`} role="tabpanel" aria-labelledby={`tryon-tab-${panel}`} hidden={narrow && shown === 'create'}>
-          {shown === 'examples' ? <Gallery kind="try_on" samples="try-on-example-" cols={[2, 2, 3]} label="Ảnh thử đồ của công ty" emptyText="Chưa có ảnh thử đồ nào trong công ty." /> : shown === 'about' ? <TryOnAbout /> : <Tray feature="try_on" />}
+          {shown === 'examples' ? <Gallery kind="try_on" samples="try-on-example-" cols={[2, 2, 3]} label="Ảnh thử đồ của công ty" emptyText="Chưa có ảnh thử đồ nào trong công ty." /> : shown === 'about' ? <About page={ABOUT.tryOn} /> : <Tray feature="try_on" />}
         </div>
       </div>
     </section>
-  );
-}
-
-function TryOnAbout() {
-  return (
-    <article className="about">
-      <h2>Thử đồ trên người mẫu</h2>
-      <p>Tải ảnh trang phục và ảnh một người mẫu, và nhận lại ảnh người đó mặc trang phục. Ảnh nằm trong Thư viện của công ty, mục Thử đồ.</p>
-
-      <p className="about-kicker">Từng bước</p>
-      <h3>Một lần Run gồm những gì</h3>
-      <p className="about-lead">Một lần Run cần ảnh trang phục và ảnh người mẫu; bối cảnh và prompt là tuỳ chọn.</p>
-      <ol className="about-steps">
-        <li>
-          <strong>Trang phục</strong> Ít nhất 1 ảnh, tốt nhất là ảnh trải phẳng hoặc ảnh người mặc, nền sạch, thấy rõ cả bộ.
-        </li>
-        <li>
-          <strong>Người mẫu</strong> Một ảnh rõ mặt và dáng, ánh sáng đều. Mô hình giữ nguyên người này.
-        </li>
-        <li>
-          <strong>Bối cảnh (tuỳ chọn)</strong> Thêm một ảnh nếu muốn đặt người mẫu vào một khung cảnh khác.
-        </li>
-        <li>
-          <strong>Mô hình, độ phân giải, tỉ lệ</strong> Mỗi mô hình nhận tối đa một số ảnh và ghi giá cho từng ảnh. Độ phân giải cao hơn có thể đắt hơn.
-        </li>
-        <li>
-          <strong>Prompt (tuỳ chọn)</strong> Bỏ trống thì công ty dùng một câu mặc định: mặc trang phục lên người mẫu và giữ nguyên người và bối cảnh.
-        </li>
-      </ol>
-
-      <p className="about-kicker">Giới hạn</p>
-      <h3>Hạn mức và chi phí</h3>
-      <p className="about-lead">Thử đồ dùng ngân sách ảnh, tách khỏi video, và mỗi Run được kiểm hạn mức trước khi gửi đi.</p>
-      <ul>
-        <li>Ảnh và ứng dụng có ngân sách riêng, tách khỏi ngân sách video: mỗi người có hạn mức theo ngày và theo tháng, công ty có hạn mức theo tháng. Run làm vượt hạn mức sẽ bị từ chối.</li>
-        <li>Nút Run ghi chi phí ước tính của một ảnh; chi phí thật nằm trên ảnh trong Thư viện.</li>
-        <li>Chỉ dùng ảnh công ty có quyền sử dụng, và chỉ với người đã đồng ý.</li>
-      </ul>
-      <AboutClips names={['try-on-about']} title="Từ ảnh thử đồ thành video khoe đồ" />
-    </article>
   );
 }
