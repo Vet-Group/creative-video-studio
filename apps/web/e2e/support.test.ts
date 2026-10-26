@@ -30,6 +30,8 @@ export async function signIn(page: Page, who: UserKey): Promise<void> {
   await page.getByLabel('Mật khẩu').fill(PASSWORD);
   await page.getByRole('button', { name: 'Đăng nhập' }).click();
   await expect(page).toHaveURL(/\/create$/);
+  // The click leaves the pointer where the login's submit button was, which can hover a Create card and skew geometry checks.
+  await page.mouse.move(0, 0);
 }
 
 // The Create form's selects are custom: a button (role combobox) that opens a listbox. These helpers drive them the way a user does.
