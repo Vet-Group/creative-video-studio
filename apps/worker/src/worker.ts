@@ -178,12 +178,12 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
     try {
       const job = (
         await pool.query(
-          'select j.provider, j.model, j.prompt, j.enhance, j.enhanced_prompt, j.aspect, j.duration_s, j.params, j.input_asset_ids, m.kind from jobs j join model_configs m on m.id = j.model where j.id = $1',
+          'select j.provider, j.is_mock, j.model, j.prompt, j.enhance, j.enhanced_prompt, j.aspect, j.duration_s, j.params, j.input_asset_ids, m.kind from jobs j join model_configs m on m.id = j.model where j.id = $1',
           [jobId],
         )
       ).rows[0];
       // Enhance once per job (a resubmit reuses the saved brief). Mock models are tests and never spend on it. Any failure keeps the member's prompt.
-      if (job.enhance && !job.enhanced_prompt && deps.enhance && job.provider !== 'mock') {
+      if (job.enhance && !job.enhanced_prompt && deps.enhance && !job.is_mock) {
         try {
           const r = await abortable(deps.enhance(job.prompt, job.kind === 'image' ? 'image' : 'video'), signal);
           await pool.query('update jobs set enhanced_prompt = $2, enhance_cost_usd = $3 where id = $1', [jobId, r.prompt, r.costUsd]);

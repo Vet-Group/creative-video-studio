@@ -207,11 +207,11 @@ describe('the mock lifecycle', () => {
 });
 
 describe('Enhance', () => {
-  /** The mock adapter under the fal name (Enhance skips mock jobs), recording the prompts it was sent. */
-  async function startAsFal(enhance: Enhancer) {
+  /** The mock adapter, recording the prompts it was sent; the jobs are not flagged is_mock, which Enhance skips. */
+  async function startWithEnhance(enhance: Enhancer) {
     const prompts: string[] = [];
     const inner = createMockProvider({ runMs: 200, dir: mockDir });
-    const w = await startWorker({ pool, connectionString: testDb.url, providers: { fal: { ...inner, submit: (req) => (prompts.push(req.prompt), inner.submit(req)) } }, enhance, options: FAST });
+    const w = await startWorker({ pool, connectionString: testDb.url, providers: { mock: { ...inner, submit: (req) => (prompts.push(req.prompt), inner.submit(req)) } }, enhance, options: FAST });
     workers.push(w);
     return prompts;
   }
@@ -219,10 +219,10 @@ describe('Enhance', () => {
 
   test('sends the rewritten brief, saves it with its cost and keeps the member’s prompt', async () => {
     const asked: [string, string][] = [];
-    const prompts = await startAsFal(async (p, kind) => (asked.push([p, kind]), { prompt: `A detailed brief for ${p}.`, costUsd: 0.0004 }));
-    const id = await enhanced(await newJob('u1', { prompt: 'push in', provider: 'fal' }));
+    const prompts = await startWithEnhance(async (p, kind) => (asked.push([p, kind]), { prompt: `A detailed brief for ${p}.`, costUsd: 0.0004 }));
+    const id = await enhanced(await newJob('u1', { prompt: 'push in' }));
     await send(id, 'u1');
-    await waitFor('the job to run', async () => ['running', 'succeeded'].includes(await status(id)));
+    await waitFor('the job to succeed', async () => (await status(id)) === 'succeeded'); // finished, so it holds no slot of the later tests
     expect(asked).toEqual([['push in', 'video']]);
     expect(prompts).toEqual(['A detailed brief for push in.']);
     const j = await job(id);
@@ -231,15 +231,15 @@ describe('Enhance', () => {
 
   test('falls back to the member’s prompt when the LLM fails, and never calls it with Enhance off', async () => {
     let calls = 0;
-    const prompts = await startAsFal(async () => {
+    const prompts = await startWithEnhance(async () => {
       calls++;
       throw new Error('rate limited');
     });
-    const failed = await enhanced(await newJob('u2', { prompt: 'slow orbit', provider: 'fal' }));
-    const off = await newJob('u3', { prompt: 'as written', provider: 'fal' });
+    const failed = await enhanced(await newJob('u2', { prompt: 'slow orbit' }));
+    const off = await newJob('u3', { prompt: 'as written' });
     await send(failed, 'u2');
     await send(off, 'u3');
-    await waitFor('both jobs to run', async () => (await Promise.all([failed, off].map(status))).every((s) => ['running', 'succeeded'].includes(s)));
+    await waitFor('both jobs to succeed', async () => (await Promise.all([failed, off].map(status))).every((s) => s === 'succeeded'));
     expect(prompts.sort()).toEqual(['as written', 'slow orbit']);
     expect(calls).toBe(1);
     expect((await job(failed)).enhanced_prompt).toBeNull();
