@@ -2,6 +2,7 @@
 // Every test first checks the media the mode depends on, so a wrong emulation fails loudly instead of testing the wrong mode.
 import AxeBuilder from '@axe-core/playwright';
 import { expect, type Locator, type Page, test } from '@playwright/test';
+import { REACH } from '../src/app/login/beam';
 import { signIn } from './support.test';
 
 const DESKTOP = { width: 1440, height: 900 };
@@ -53,7 +54,15 @@ test.describe('desktop', () => {
     await expect(page.locator('.password-reveal span')).toHaveCount(8);
     await expect(lit).toHaveCount(8);
 
+    // Pointing closer to the eye shortens the beam, so the characters far from it go dark while the nearest stay lit.
     const eyeBox = await box(eye);
+    const ex = eyeBox.x + eyeBox.width / 2;
+    const far = ex - (await box(page.locator('.password-reveal span').first())).x;
+    await page.mouse.move(ex - (far - 5) / REACH, field.y + field.height / 2);
+    await expect.poll(() => lit.count()).toBeGreaterThan(0);
+    expect(await lit.count()).toBeLessThan(8);
+    await expect(page.locator('.password-reveal span').first()).toHaveAttribute('data-lit', 'false');
+
     await page.mouse.move(eyeBox.x + eyeBox.width / 2, 5);
     await expect(lit).toHaveCount(0);
     const mascot = page.locator('.mascot');
@@ -116,7 +125,7 @@ test.describe('desktop', () => {
     await expect(submit).toBeEnabled();
   });
 
-  test('scene: the studio is drawn, and the day/night toggle changes only the scene', async ({ page }) => {
+  test('scene: the studio is drawn, the day/night toggle changes only the scene, and it hides while the flashlight darkens the studio', async ({ page }) => {
     const { pw, eye, scene, card } = await open(page);
     expect(await hoverNone(page)).toBe(false);
     await expect(page.locator('.scene-turntable')).toBeVisible();
@@ -134,10 +143,13 @@ test.describe('desktop', () => {
     await expect(pw).toHaveAttribute('type', 'password');
 
     await eye.click();
+    await expect(card).toHaveAttribute('data-flashlight', 'pointer');
+    await expect(scene).toBeHidden();
+    await eye.click();
+    await expect(scene).toBeVisible();
     await scene.click();
     await expect(card).toHaveAttribute('data-scene', 'day');
-    await expect(eye).toHaveAttribute('aria-pressed', 'true');
-    await expect(card).toHaveAttribute('data-flashlight', 'pointer');
+    await expect(eye).toHaveAttribute('aria-pressed', 'false');
   });
 
   for (const viewport of [DESKTOP, { width: 1280, height: 800 }]) {
@@ -206,6 +218,7 @@ test.describe('touch', () => {
     await expect(card).toHaveAttribute('data-flashlight', 'touch');
     await expect(pw).toHaveAttribute('type', 'text');
     await expect(page.locator('.beam[data-fixed="true"]')).toBeVisible();
+    await expect(scene).toBeHidden();
     await expect(page.locator('.password-reveal')).toHaveCount(0);
     await eye.tap();
     await expect(eye).toHaveAttribute('aria-pressed', 'false');

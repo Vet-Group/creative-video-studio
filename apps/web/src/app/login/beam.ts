@@ -2,8 +2,10 @@
 export type Point = { x: number; y: number };
 export type Beam = { origin: Point; u: Point; length: number; angle: number; maxHalf: number };
 
-/** Extra length past the pointer, so the light reaches beyond it. */
-export const TAIL = 120;
+/** The beam reaches this many times the pointer distance, so pointing near the eye lights only the nearest characters. */
+export const REACH = 1.65;
+/** The shortest beam, so a pointer right on the eye still shows some light. */
+export const MIN_LENGTH = 160;
 /** Half width of the cone at the origin. */
 export const W0 = 6;
 /** How much the half width grows per pixel along the beam. */
@@ -21,13 +23,13 @@ const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
  * `maxHalf` caps the half width, so on a narrow form the cone flattens into a band that stays off the neighbouring fields.
  * `minX` is a vertical line the beam ends at when it points left, such as the edge of the login card.
  */
-export function beam(origin: Point, pointer: Point, fieldWidth: number, maxHalf = Infinity, minX = -Infinity): Beam {
+export function beam(origin: Point, pointer: Point, maxHalf = Infinity, minX = -Infinity): Beam {
   const dx = pointer.x - origin.x;
   const dy = pointer.y - origin.y;
   const d = Math.hypot(dx, dy);
   const u = d < MIN_D ? { x: -1, y: 0 } : { x: dx / d, y: dy / d };
   const toEdge = u.x < 0 ? (origin.x - minX) / -u.x : Infinity;
-  return { origin, u, length: Math.min(Math.max(d + TAIL, fieldWidth), toEdge), angle: (Math.atan2(u.y, u.x) * 180) / Math.PI, maxHalf };
+  return { origin, u, length: Math.min(Math.max(d * REACH, MIN_LENGTH), toEdge), angle: (Math.atan2(u.y, u.x) * 180) / Math.PI, maxHalf };
 }
 
 /** Half width of the beam at a distance along it. */
