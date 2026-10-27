@@ -300,6 +300,13 @@ describe('images in the Library', () => {
     expect(tray.jobs.find((j) => j.id === video)).toMatchObject({ feature: 'video', resolution: null });
     expect(await (await GET_JOB(req(`/api/jobs/${id}`, alice.cookie), ctx(id))).json()).toMatchObject({ feature: 'image', resolution: '4K', durationSec: 0 });
   });
+  test("returns a Marketing job's own inputs for reuse: hook, location and format to anyone who may see it, the brief and the script to the creator only", async () => {
+    const id = await clip(alice.id, { id: 'mkt-reuse' });
+    await pool.query(`update jobs set feature = 'marketing', params = $2 where id = $1`, [id, { format: 'advanced', audio: 'on', hook: 'product-catch', location: 'bedroom', brief: 'my brief', script: 'my lines' }]);
+    const as = async (cookie: string) => (await (await GET_JOB(req(`/api/jobs/${id}`, cookie), ctx(id))).json()) as Record<string, unknown>;
+    expect(await as(alice.cookie)).toMatchObject({ format: 'advanced', hook: 'product-catch', location: 'bedroom', brief: 'my brief', script: 'my lines' });
+    for (const cookie of [bob.cookie, admin.cookie]) expect(await as(cookie)).toMatchObject({ format: 'advanced', hook: 'product-catch', location: 'bedroom', brief: null, script: null });
+  });
 });
 
 describe('PUT /api/jobs/:id/verdict', () => {
@@ -410,7 +417,7 @@ describe('GET /api/jobs/:id', () => {
     const res = await detail(bob.cookie, id);
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
-      id, userId: alice.id, status: 'succeeded', error: null, isMock: false, feature: 'video', resolution: null, presetId: 'gentle-push-in', prompt: 'a prompt', enhance: false, enhancedPrompt: null, audio: null, ratio: '1:1', durationSec: 8, modelId: 'fal-test',
+      id, userId: alice.id, status: 'succeeded', error: null, isMock: false, feature: 'video', resolution: null, presetId: 'gentle-push-in', prompt: 'a prompt', enhance: false, enhancedPrompt: null, audio: null, ratio: '1:1', format: null, hook: null, location: null, brief: null, script: null, durationSec: 8, modelId: 'fal-test',
       storeId: 'store-ok', outputAssetId: `${id}-video`, posterAssetId: `${id}-poster`,
       images: [{ id: 'd-in-2', filename: 'in.png', width: null, height: null }, { id: 'd-in-1', filename: 'in.png', width: null, height: null }],
     });

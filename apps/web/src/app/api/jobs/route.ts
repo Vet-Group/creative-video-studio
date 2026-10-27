@@ -5,6 +5,7 @@ import { VIDEO_QUEUE, videoSendOptions } from '@cvs/core/queue';
 import { FEATURES } from '@cvs/db';
 import { pool } from '@/lib/auth';
 import { boss } from '@/lib/queue';
+import { ADVANCED_MAX_BRIEF, ADVANCED_MAX_SCRIPT, HOOKS, LOCATIONS, UGC_MAX_BRIEF } from '@/lib/marketing';
 import { guard } from '@/lib/session';
 
 const MAX_IMAGES = 4;
@@ -114,15 +115,22 @@ export async function POST(request: Request) {
       return bad('modelId, ratio, durationSec (a whole number, video only), a presetId or a prompt, and an optional storeId are required');
     }
     const entries = params && typeof params === 'object' && !Array.isArray(params) ? Object.entries(params) : null;
-    // Images take resolution and quality; Marketing Studio takes format ('advanced') and audio ('on' or 'off'); Create video takes audio; the others none.
-    const keys = isImage ? ['resolution', 'quality'] : feature === 'marketing' ? ['format', 'audio'] : feature === 'video' ? ['audio'] : [];
+    // Images take resolution and quality; Marketing Studio takes format ('advanced'), audio ('on' or 'off') and the form's own inputs (kept for reuse, never read by the worker); Create video takes audio; the others none.
+    const keys = isImage ? ['resolution', 'quality'] : feature === 'marketing' ? ['format', 'audio', 'hook', 'location', 'brief', 'script'] : feature === 'video' ? ['audio'] : [];
     if (!entries || entries.some(([k, v]) => !keys.includes(k) || typeof v !== 'string')) {
-      return bad(keys.length > 0 ? `params may hold only ${keys.join(' and ')}, as text` : 'params are for image features, Create video and Marketing Studio only');
+      return bad(keys.length > 0 ? `params may hold only ${keys.length > 1 ? `${keys.slice(0, -1).join(', ')} and ${keys.at(-1)}` : keys[0]}, as text` : 'params are for image features, Create video and Marketing Studio only');
     }
     if (isImage && given.resolution === undefined) return bad('params.resolution is required');
     if (given.format !== undefined && given.format !== 'advanced') return bad('params.format must be advanced');
     if (given.audio !== undefined && given.audio !== 'on' && given.audio !== 'off') return bad('params.audio must be on or off');
     if (given.quality !== undefined && !QUALITIES.includes(given.quality)) return bad(`params.quality must be one of ${QUALITIES.join(', ')}`);
+    for (const [key, choices] of [['hook', HOOKS], ['location', LOCATIONS]] as const) {
+      if (given[key] !== undefined && !choices.some((c) => c.id === given[key])) return bad(`params.${key} must be one of ${choices.map((c) => c.id).join(', ')}`);
+    }
+    for (const [key, max] of [['brief', advanced ? ADVANCED_MAX_BRIEF : UGC_MAX_BRIEF], ['script', ADVANCED_MAX_SCRIPT]] as const) {
+      if (given[key] !== undefined && given[key].length > max) return bad(`params.${key} may be at most ${max} characters`);
+    }
+    if (given.script !== undefined && !advanced) return bad('params.script is for Advanced only');
     // The PRD gives "an optional prompt, or one of the presets" for video: exactly one of the two. An image job has no presets.
     if (!motion && (isImage ? presetId !== null || (freePrompt === null && !Object.hasOwn(FEATURE_PROMPTS, feature)) : (presetId === null) === (freePrompt === null))) {
       return bad(isImage ? 'an image job takes a prompt and no preset (only the apps may omit the prompt)' : 'give either a presetId or a prompt, not both and not neither');

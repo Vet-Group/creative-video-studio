@@ -24,7 +24,8 @@ export async function GET(request: Request, { params }: RouteContext) {
       [id],
     )
   ).rows[0];
-  const mine = job?.user_id === g.session.user.id || g.session.user.role === 'admin';
+  const own = job?.user_id === g.session.user.id;
+  const mine = own || g.session.user.role === 'admin';
   if (!job || !(mine || (job.status === 'succeeded' && job.output_asset_id))) return notFound();
   const images = await pool.query(
     'select id, filename, width, height from assets where id = any($1::text[]) and deleted_at is null order by array_position($1::text[], id)',
@@ -32,6 +33,8 @@ export async function GET(request: Request, { params }: RouteContext) {
   );
   return Response.json({
     id: job.id, userId: job.user_id, status: job.status, error: job.error, isMock: job.is_mock, feature: job.feature, resolution: job.params.resolution ?? null, presetId: job.preset_id, prompt: job.prompt, enhance: job.enhance, enhancedPrompt: job.enhanced_prompt, audio: job.params.audio ?? null, ratio: job.aspect,
+    // Marketing Studio's form inputs, for reuse; the brief and the script are the creator's own words.
+    format: job.params.format ?? null, hook: job.params.hook ?? null, location: job.params.location ?? null, brief: own ? (job.params.brief ?? null) : null, script: own ? (job.params.script ?? null) : null,
     durationSec: job.duration_s, modelId: job.model, storeId: job.store_id, outputAssetId: job.output_asset_id, posterAssetId: job.poster_asset_id, images: images.rows,
   });
 }

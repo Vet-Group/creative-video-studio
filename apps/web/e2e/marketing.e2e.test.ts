@@ -103,6 +103,8 @@ test('a mock marketing job runs from two photos, a hook and a location, and show
   expect(detail.prompt).toContain(`Set in ${spot.phrase}.`);
   // The member's text comes last before the sound rule; audio is on by default, as on Fash.
   expect(detail.prompt).toContain(' soft morning light Natural sound recorded on the phone:');
+  // The form's own inputs are kept for Dùng lại.
+  expect(await (await page.request.get(`/api/jobs/${jobs.jobs[0]!.id}`)).json()).toMatchObject({ hook: hook.id, location: spot.id, brief: 'soft morning light', format: null });
 
   // Ví dụ lists the company's marketing clips as videos.
   await page.getByRole('tab', { name: 'Ví dụ' }).click();
