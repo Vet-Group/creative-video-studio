@@ -7,7 +7,7 @@ import { NARROW, useMediaQuery, WIDE } from '@/lib/use-media-query';
 import { numberedSamples } from '@/lib/examples';
 import { useHydrated } from '@/lib/use-hydrated';
 import { useSamples } from '@/lib/use-samples';
-import { Icon } from './Icon';
+import { Icon, type IconName } from './Icon';
 import { Preview } from './Preview';
 import type { ModelOption } from './ModelPicker';
 
@@ -81,8 +81,9 @@ export async function uploadImages(files: File[]): Promise<Img[]> {
 /**
  * One labelled upload slot: its thumbnails with a remove button each, and a tile that opens the file picker until the slot is full.
  * `samples` (sample names, lib/samples.ts) show while the slot is empty, as on the live Try On; a click uploads that sample like a file the user picked.
+ * `icon` is the empty slot's icon: a picture by default, a plus on Advanced's wide slot, as on the live page.
  */
-export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRemove, samples = [] }: { label: string; empty: string; inputLabel: string; images: Img[]; max: number; busy: boolean; onAdd: (files: File[]) => void; onRemove: (id: string) => void; samples?: string[] }) {
+export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRemove, samples = [], icon = 'image' }: { label: string; empty: string; inputLabel: string; images: Img[]; max: number; busy: boolean; onAdd: (files: File[]) => void; onRemove: (id: string) => void; samples?: string[]; icon?: IconName }) {
   const hydrated = useHydrated();
   const input = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
@@ -145,7 +146,7 @@ export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRem
         {!full && (
           <button type="button" className="slot-add" aria-label={`Tải lên ${label}`} title={images.length === 0 ? empty : undefined} disabled={!hydrated || busy} onClick={() => input.current?.click()}>
             <span className="slot-icon" aria-hidden="true">
-              <Icon name={images.length === 0 && offer.length === 0 ? 'image' : 'plus'} size={16} />
+              <Icon name={images.length === 0 && offer.length === 0 ? icon : 'plus'} size={16} />
               {offer.length > 0 && <span>Tải lên</span>}
             </span>
             {/* A half-width slot shows just its name, as on the live pages; the full hint is its tooltip there. */}
