@@ -19,7 +19,7 @@ function shortName(name: string): string {
  */
 /**
  * `?recent=marketing-product`: the caller's own product photos from their UGC Marketing Studio jobs (the second input), newest use first, each once,
- * at most 12, for the product slot's "Sản phẩm của tôi" (Fash's My Products). Advanced references and deleted files are left out.
+ * at most 12, for the product slot's My products dialog (Fash's My Products). Advanced references and deleted files are left out.
  */
 export async function GET(request: Request) {
   const g = await guard(request, 'member');
