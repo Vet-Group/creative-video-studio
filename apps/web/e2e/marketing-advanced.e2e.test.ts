@@ -137,3 +137,20 @@ test('the format picker goes back to UGC Thử đồ from Advanced', async ({ pa
   await expect(page).toHaveURL(/\/marketing-studio$/);
   await expect(page.locator('.slot')).toHaveCount(2);
 });
+
+test('as on Fash, the references sit in square dashed tiles, three to a row, with a plus tile of the same size and no outer box', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await signIn(page, 'mktd');
+  await page.goto('/marketing-studio/advanced');
+  await refsInput(page).setInputFiles([file('a.png'), file('b.png')]);
+  const tiles = page.getByLabel('Ảnh tham chiếu: ảnh đã chọn').getByRole('listitem');
+  await expect(tiles).toHaveCount(2);
+  const [a, b, plus, slot] = await Promise.all([tiles.nth(0).boundingBox(), tiles.nth(1).boundingBox(), page.getByRole('button', { name: 'Tải lên Ảnh tham chiếu' }).boundingBox(), page.locator('.slot-wide .slot').boundingBox()]);
+  for (const t of [a!, b!, plus!]) {
+    expect(Math.abs(t.width - t.height)).toBeLessThan(1); // square
+    expect(Math.abs(t.width - a!.width)).toBeLessThan(1); // one size
+    expect(Math.abs(t.y - a!.y)).toBeLessThan(1); // one row
+  }
+  expect(a!.width * 3 + 16).toBeCloseTo(slot!.width, 0); // three per row with 8 px gaps
+  await expect(page.locator('.slot-wide .slot')).toHaveCSS('border-top-style', 'none');
+});
