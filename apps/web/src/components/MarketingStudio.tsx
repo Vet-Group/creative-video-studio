@@ -3,7 +3,7 @@
 // Advanced (/marketing-studio/advanced): 1 to 7 reference images, the member's brief, an optional script and the audio switch. Each composes one English
 // prompt (lib/marketing.ts) and posts a `marketing` video job on a video model that lists the feature; Advanced adds params format and audio.
 import { useRouter } from 'next/navigation';
-import { type CSSProperties, type KeyboardEvent, useEffect, useId, useRef, useState } from 'react';
+import { type CSSProperties, type KeyboardEvent, type ReactNode, useEffect, useId, useRef, useState } from 'react';
 import { ABOUT } from '@/lib/about-content';
 import { api, errorText, sendJson } from '@/lib/api';
 import { ADVANCED_MAX_BRIEF, ADVANCED_MAX_IMAGES, ADVANCED_MAX_SCRIPT, advancedPrompt, HOOKS, LOCATIONS, type MarketingChoice, marketingPrompt, UGC_MAX_BRIEF } from '@/lib/marketing';
@@ -36,13 +36,16 @@ interface VideoModel {
   recommended: boolean;
 }
 
+/** The most hook variants one Run makes, one clip each. */
+const MAX_VARIANTS = 3;
+
 type Tab = 'create' | 'history' | 'examples' | 'about';
 const TAB_LABEL: Record<Tab, string> = { create: 'Tạo', history: 'Lịch sử', examples: 'Ví dụ', about: 'Giới thiệu' };
 /** The ratios of the page, in the order of the menu; a model offers some of them. */
 const RATIO_LABEL: Record<string, string> = { '9:16': '9:16 (dọc)', '16:9': '16:9 (ngang)', '1:1': '1:1 (vuông)' };
 
 /** A box on the form that opens the list of choices; shows the chosen one. */
-function ChoiceBox({ label, icon, choice, onOpen }: { label: string; icon: IconName; choice: MarketingChoice | undefined; onOpen: () => void }) {
+function ChoiceBox({ label, icon, value, onOpen }: { label: string; icon: IconName; value: string | undefined; onOpen: () => void }) {
   const labelId = useId();
   const valueId = useId();
   return (
@@ -54,8 +57,8 @@ function ChoiceBox({ label, icon, choice, onOpen }: { label: string; icon: IconN
         <span id={labelId} className="choice-label">
           {label.replace(' (', '\n(') /* "(tuỳ chọn)" on its own line, as on Fash */}
         </span>
-        <span id={valueId} className={choice ? 'choice-value' : 'choice-value sr-only'}>
-          {choice ? choice.name : 'Chưa chọn'}
+        <span id={valueId} className={value ? 'choice-value' : 'choice-value sr-only'}>
+          {value ?? 'Chưa chọn'}
         </span>
       </button>
     </div>
@@ -63,7 +66,7 @@ function ChoiceBox({ label, icon, choice, onOpen }: { label: string; icon: IconN
 }
 
 /** The dialog of one list: cards with the choice's sample loop (`marketing-<kind>-<id>`) and name in a grid, the "no choice" card first. Arrows move the focus between the cards, Enter or Space picks, Escape closes. */
-function ChoiceDialog({ open, title, sub, kind, choices, value, onPick, onClose }: { open: boolean; title: string; sub: string; kind: 'hook' | 'location'; choices: MarketingChoice[]; value: string; onPick: (id: string) => void; onClose: () => void }) {
+function ChoiceDialog({ open, title, sub, kind, choices, selected, onPick, onClose, footer }: { open: boolean; title: string; sub: string; kind: 'hook' | 'location'; choices: MarketingChoice[]; selected: string[]; onPick: (id: string) => void; onClose: () => void; footer?: ReactNode }) {
   const grid = useRef<HTMLDivElement>(null);
   const have = useSamples();
   // showModal (in Modal's effect, which runs first) focuses the close button, so the chosen card takes the focus afterwards.
@@ -86,12 +89,13 @@ function ChoiceDialog({ open, title, sub, kind, choices, value, onPick, onClose 
       <p className="modal-sub">{sub}</p>
       <div ref={grid} className="choice-grid" role="listbox" aria-label={title} onKeyDown={onKey}>
         {all.map((c) => (
-          <button key={c.id || 'none'} type="button" role="option" aria-selected={value === c.id} tabIndex={value === c.id ? 0 : -1} onClick={() => onPick(c.id)}>
+          <button key={c.id || 'none'} type="button" role="option" aria-selected={c.id ? selected.includes(c.id) : selected.length === 0} tabIndex={(c.id ? selected[0] === c.id : selected.length === 0) ? 0 : -1} onClick={() => onPick(c.id)}>
             {c.id && open && <CardMedia {...cardSample(have, `marketing-${kind}-${c.id}`)} />}
             <span className="choice-name">{c.name}</span>
           </button>
         ))}
       </div>
+      {footer}
     </Modal>
   );
 }
@@ -124,14 +128,16 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
   const advanced = format === 'advanced';
   const router = useRouter();
   const have = useSamples();
-  const { refresh } = useJobs();
+  const { refresh, clips } = useJobs();
   const narrow = useMediaQuery(NARROW);
   const [person, setPerson] = useState<Img[]>([]);
   const [product, setProduct] = useState<Img[]>([]);
   const [refs, setRefs] = useState<Img[]>([]);
   const [script, setScript] = useState('');
   const [audio, setAudio] = useState(true);
-  const [hook, setHook] = useState('');
+  /** The chosen hooks: one, or with variants on up to MAX_VARIANTS, one clip each. */
+  const [hooks, setHooks] = useState<string[]>([]);
+  const [many, setMany] = useState(false);
   const [location, setLocation] = useState('');
   const [picker, setPicker] = useState<'hook' | 'location' | 'format' | 'model' | null>(null);
   const [prompt, setPrompt] = useState('');
@@ -164,7 +170,14 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
   const cost = audioOn ? chosen!.audioEstimateUsd! : chosen?.estimateUsd;
   const words = script.trim() ? script.trim().split(/\s+/).length : 0;
   /** The English prompt Run sends, shown as is under the form. */
-  const sent = advanced ? advancedPrompt({ brief: prompt, images: refs.length, hook, location, script, audio: audioOn }) : marketingPrompt({ hook, location, prompt, audio: audioOn, ratio });
+  const variants = hooks.length > 0 ? hooks : [''];
+  const compose = (hook: string) => (advanced ? advancedPrompt({ brief: prompt, images: refs.length, hook, location, script, audio: audioOn }) : marketingPrompt({ hook, location, prompt, audio: audioOn, ratio }));
+  /** What a Run sends for each variant, in order. */
+  const sent = variants.map(compose);
+  const n = variants.length;
+  /** The estimate of the whole Run, at the estimate's own precision. */
+  const total = cost === undefined ? undefined : (Number(cost) * n).toFixed(cost.split('.')[1]?.length ?? 2);
+  const hookName = (id: string) => HOOKS.find((c) => c.id === id)?.name ?? id;
   const name = FORMATS.find((f) => f.id === format)!.name;
   /** The sample photo and loop behind the format header, when an Admin uploaded them. */
   const photo = `marketing-format-${format}.jpg`;
@@ -203,7 +216,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
         if ((j.format === 'advanced') !== advanced) return router.replace(`/marketing-studio${j.format === 'advanced' ? '/advanced' : ''}?reuse=${encodeURIComponent(reuse)}`);
         if (advanced) setRefs(j.images);
         else (setPerson(j.images.slice(0, 1)), setProduct(j.images.slice(1, 2)));
-        setHook(j.hook ?? '');
+        setHooks(j.hook ? [j.hook] : []);
         setLocation(j.location ?? '');
         setPrompt(j.brief ?? '');
         setScript(j.script ?? '');
@@ -249,7 +262,9 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
                   : product.length === 0
                     ? 'Tải lên ảnh sản phẩm.'
                     : null;
-  const canRun = reason === null && !busy;
+  /** Hook variants beyond the clips left today are refused before anything is sent. */
+  const short = n > 1 && clips !== null && clips.today + n > clips.cap ? `Hôm nay bạn chỉ còn ${Math.max(0, clips.cap - clips.today)} clip; bỏ bớt biến thể hook.` : null;
+  const canRun = reason === null && short === null && !busy;
 
   /** A stock model goes through the normal upload, like a file the member picked, so the job only ever holds the member's own assets. */
   async function pickStock(name: string) {
@@ -275,11 +290,15 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
     };
   }
 
+  /** One job per hook variant, sent one after another (the API takes one job per POST); a refused variant does not stop the rest. */
   async function run() {
+    if (n > 1 && !window.confirm(`Tạo ${n} clip, mỗi hook một clip, tổng $${total}?`)) return;
     setBusy(true);
     setError('');
     setNotice('');
-    try {
+    const sentOk: string[] = [];
+    const refused: string[] = [];
+    for (const [i, hook] of variants.entries()) {
       // The form's own inputs ride along in params so History can refill the form (reuse); the worker never reads them.
       const inputs = { ...(hook && { hook }), ...(location && { location }), ...(prompt.trim() && { brief: prompt.trim() }) };
       const body = advanced
@@ -287,21 +306,26 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
             feature: 'marketing',
             assetIds: refs.map((r) => r.id),
             modelId: chosen!.id,
-            prompt: sent,
+            prompt: sent[i],
             ratio,
             durationSec,
             params: { format: 'advanced', audio: audioOn ? 'on' : 'off', ...inputs, ...(script.trim() && { script: script.trim() }) },
           }
-        : { feature: 'marketing', assetIds: [person[0]!.id, product[0]!.id], modelId: chosen!.id, prompt: sent, ratio, durationSec, params: { audio: audioOn ? 'on' : 'off', ...inputs } };
-      await api('/api/jobs', sendJson('POST', body));
-      setNotice('Đã gửi job. Theo dõi trong tab "Lịch sử".');
-      if (!narrow) setTab('history');
-      await refresh();
-    } catch (e) {
-      setError(errorText(e, 'Không gửi được job, hãy thử lại.'));
-    } finally {
-      setBusy(false);
+        : { feature: 'marketing', assetIds: [person[0]!.id, product[0]!.id], modelId: chosen!.id, prompt: sent[i], ratio, durationSec, params: { audio: audioOn ? 'on' : 'off', ...inputs } };
+      try {
+        await api('/api/jobs', sendJson('POST', body));
+        sentOk.push(hookName(hook));
+      } catch (e) {
+        refused.push(n > 1 ? `${hookName(hook)}: ${errorText(e, 'không gửi được')}` : errorText(e, 'Không gửi được job, hãy thử lại.'));
+      }
     }
+    if (sentOk.length > 0) {
+      setNotice(n > 1 ? `Đã gửi ${sentOk.length}/${n} biến thể: ${sentOk.join(', ')}. Theo dõi trong tab "Lịch sử".` : 'Đã gửi job. Theo dõi trong tab "Lịch sử".');
+      if (!narrow) setTab('history');
+    }
+    if (refused.length > 0) setError(n > 1 ? `Không gửi được ${refused.join('; ')}` : refused[0]!);
+    await refresh();
+    setBusy(false);
   }
 
   const tabs: Tab[] = narrow ? ['create', 'history', 'examples', 'about'] : ['history', 'examples', 'about'];
@@ -341,8 +365,8 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
                   <Slot label="Sản phẩm" empty="Thêm 1 ảnh sản phẩm" inputLabel="Ảnh sản phẩm" images={product} max={1} busy={busy} onAdd={add(setProduct)} onRemove={() => setProduct([])} />
                 </>
               )}
-              <ChoiceBox label="Hook (tuỳ chọn)" icon="film" choice={HOOKS.find((c) => c.id === hook)} onOpen={() => setPicker('hook')} />
-              <ChoiceBox label="Bối cảnh (tuỳ chọn)" icon="sliders" choice={LOCATIONS.find((c) => c.id === location)} onOpen={() => setPicker('location')} />
+              <ChoiceBox label="Hook (tuỳ chọn)" icon="film" value={hooks.length === 0 ? undefined : hooks.length === 1 ? hookName(hooks[0]!) : `${hooks.length} biến thể: ${hooks.map(hookName).join(', ')}`} onOpen={() => setPicker('hook')} />
+              <ChoiceBox label="Bối cảnh (tuỳ chọn)" icon="sliders" value={LOCATIONS.find((c) => c.id === location)?.name} onOpen={() => setPicker('location')} />
             </div>
 
             <div className="field">
@@ -380,7 +404,12 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
 
             <details className="prompt-preview">
               <summary>Xem prompt gửi đi</summary>
-              <p lang="en">{sent}</p>
+              {sent.map((p, i) => (
+                <p key={variants[i] || 'none'} lang="en">
+                  {n > 1 && <strong lang="vi">Biến thể {i + 1} ({hookName(variants[i]!)}): </strong>}
+                  {p}
+                </p>
+              ))}
             </details>
 
             <div className="field-row">
@@ -396,9 +425,9 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
           </div>
 
           <div className="form-message">
-            {reason && (
+            {(reason ?? short) && (
               <p id={reasonId} className="help" role="status">
-                {reason}
+                {reason ?? short}
               </p>
             )}
             {failed && (
@@ -411,12 +440,18 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
                 {error}
               </p>
             )}
+            {n > 1 && clips && (
+              <p className="help variants-usage">
+                {n} biến thể, tổng ${total}: dùng {n} trong {clips.cap} clip mỗi ngày của bạn (hôm nay đã dùng {clips.today}).
+              </p>
+            )}
             {notice && <p role="status">{notice}</p>}
           </div>
           <div className="runbar">
-            <button type="button" className="primary run" disabled={!canRun} aria-describedby={reason ? reasonId : undefined} onClick={() => void run()}>
+            <button type="button" className="primary run" disabled={!canRun} aria-describedby={(reason ?? short) ? reasonId : undefined} onClick={() => void run()}>
               Tạo video
-              {chosen && <span className="run-cost">· {fresh ? `$${cost}` : '…'}</span>} {/* the estimate is for the duration of the last list */}
+              {n > 1 && ` ${n} clip`}
+              {chosen && <span className="run-cost">· {fresh ? `$${total}` : '…'}</span>} {/* the estimate is for the duration of the last list */}
             </button>
           </div>
         </div>
@@ -463,8 +498,26 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
           ))}
         </div>
       </Modal>
-      <ChoiceDialog open={picker === 'hook'} title="Chọn hook" sub="Cảnh mở đầu giữ chân người xem trong vài giây đầu. Có thể bỏ qua." kind="hook" choices={HOOKS} value={hook} onPick={(id) => (setHook(id), setPicker(null))} onClose={() => setPicker(null)} />
-      <ChoiceDialog open={picker === 'location'} title="Chọn bối cảnh" sub="Nơi người mẫu xuất hiện trong video. Có thể bỏ qua." kind="location" choices={LOCATIONS} value={location} onPick={(id) => (setLocation(id), setPicker(null))} onClose={() => setPicker(null)} />
+      <ChoiceDialog open={picker === 'hook'} title="Chọn hook" sub="Cảnh mở đầu giữ chân người xem trong vài giây đầu. Có thể bỏ qua." kind="hook"
+        choices={HOOKS}
+        selected={hooks}
+        onPick={(id) => (many && id ? setHooks((cur) => (cur.includes(id) ? cur.filter((h) => h !== id) : cur.length < MAX_VARIANTS ? [...cur, id] : cur)) : (setHooks(id ? [id] : []), setPicker(null)))}
+        onClose={() => setPicker(null)}
+        footer={
+          <div className="variants">
+            <label>
+              <input type="checkbox" checked={many} onChange={(e) => (setMany(e.target.checked), !e.target.checked && setHooks((cur) => cur.slice(0, 1)))} />
+              Tạo nhiều biến thể: tối đa {MAX_VARIANTS} hook, mỗi hook một clip
+            </label>
+            {many && (
+              <button type="button" className="primary" onClick={() => setPicker(null)}>
+                Xong ({hooks.length}/{MAX_VARIANTS})
+              </button>
+            )}
+          </div>
+        }
+      />
+      <ChoiceDialog open={picker === 'location'} title="Chọn bối cảnh" sub="Nơi người mẫu xuất hiện trong video. Có thể bỏ qua." kind="location" choices={LOCATIONS} selected={location ? [location] : []} onPick={(id) => (setLocation(id), setPicker(null))} onClose={() => setPicker(null)} />
     </section>
   );
 }

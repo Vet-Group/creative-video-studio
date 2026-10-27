@@ -684,6 +684,9 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 /* Marketing Studio: the exact English prompt Run sends, folded under the form. */
 .prompt-preview { margin: 0 0 12px; font-size: 12px; line-height: 18px; }
 .prompt-preview summary { color: var(--text-subtle); cursor: pointer; }
+/* Hook variants: the switch and Done under the hook grid. */
+.variants { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; margin-top: 16px; font-size: 13px; line-height: 18px; }
+.variants label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
 .prompt-preview p { margin: 6px 0 0; padding: 8px 10px; border-radius: 8px; background: var(--fill); color: var(--ink); white-space: pre-wrap; overflow-wrap: anywhere; }
 .about-faq details p { margin: 0; padding: 0 20px 16px; font-size: 14px; line-height: 21px; }
 @container (max-width: 560px) {

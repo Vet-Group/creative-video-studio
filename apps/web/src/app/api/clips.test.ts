@@ -568,3 +568,18 @@ describe('download name', () => {
     }
   });
 });
+
+// Last, so its jobs do not shift the counts the tests above expect.
+describe('GET /api/jobs?mine clips', () => {
+  test('reports the video clips the caller made today against the daily clip cap, as the Run caps count them', async () => {
+    const clips = async () => ((await (await GET_MINE(req('/api/jobs?mine', alice.cookie))).json()) as { clips: { today: number; cap: number } }).clips;
+    const before = await clips();
+    await clip(alice.id);
+    const refunded = await clip(alice.id, { status: 'failed' });
+    await pool.query(`insert into cost_entries (kind, usd, month, day, user_id, team_id, job_id, is_final) select 'actual_adjustment', -1.6, month, day, user_id, team_id, job_id, true from cost_entries where job_id = $1`, [refunded]); // failed with 0 USD booked does not count
+    await clip(alice.id, { createdAt: '2026-01-01T00:00:00Z' }); // another day
+    await clip(bob.id);
+    const cap = (await pool.query(`select member_daily_clip_cap from settings where id = 1`)).rows[0].member_daily_clip_cap;
+    expect(await clips()).toEqual({ today: before.today + 1, cap });
+  });
+});

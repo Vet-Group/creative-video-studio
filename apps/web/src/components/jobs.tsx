@@ -22,6 +22,8 @@ export interface Toast {
 interface JobsState {
   jobs: TrayJob[];
   workerOffline: boolean;
+  /** The video clips made today against the daily clip cap; null until the first load. */
+  clips: { today: number; cap: number } | null;
   loaded: boolean;
   toasts: Toast[];
   refresh: () => Promise<void>;
@@ -37,16 +39,16 @@ export function useJobs(): JobsState {
 }
 
 export function JobsProvider({ userId, children }: { userId: string; children: ReactNode }) {
-  const [data, setData] = useState({ jobs: [] as TrayJob[], workerOffline: false, loaded: false });
+  const [data, setData] = useState({ jobs: [] as TrayJob[], workerOffline: false, clips: null as JobsState['clips'], loaded: false });
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [news, setNews] = useState(false);
   const nextId = useRef(0);
   const pathname = usePathname();
 
   const refresh = useCallback(async () => {
-    const r = await api<{ jobs: TrayJob[]; workerOffline: boolean }>('/api/jobs?mine').catch(() => null);
+    const r = await api<{ jobs: TrayJob[]; workerOffline: boolean; clips: { today: number; cap: number } }>('/api/jobs?mine').catch(() => null);
     if (!r) return;
-    setData({ jobs: r.jobs, workerOffline: r.workerOffline, loaded: true });
+    setData({ jobs: r.jobs, workerOffline: r.workerOffline, clips: r.clips, loaded: true });
     const finished = r.jobs.filter((j) => FINISHED.includes(j.status) && j.finishedAt);
     const times = finished.map((j) => Date.parse(j.finishedAt!));
     const seenKey = `${SEEN_KEY}.${userId}`; // per user, so two accounts in one browser do not hide each other's news

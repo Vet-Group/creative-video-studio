@@ -1,5 +1,5 @@
 import { reserve, withTransaction } from '@cvs/core/ledger';
-import { type CapRefusal, checkCaps } from '@cvs/core/limits';
+import { type CapRefusal, checkCaps, dailyClips } from '@cvs/core/limits';
 import { estimateUsd, FEATURE_PROMPTS, usdPerSecondFor } from '@cvs/core/models';
 import { VIDEO_QUEUE, videoSendOptions } from '@cvs/core/queue';
 import { FEATURES } from '@cvs/db';
@@ -41,14 +41,14 @@ const CAP_MESSAGES: Record<CapRefusal, string> = {
 };
 
 /**
- * `?mine`: the "My jobs" tray. The caller's 20 latest jobs that are not deleted, newest first, and whether the worker is offline
- * (no heartbeat for 60 s). `retried` is true once the job has its one manual retry.
+ * `?mine`: the "My jobs" tray. The caller's 20 latest jobs that are not deleted, newest first, whether the worker is offline
+ * (no heartbeat for 60 s), and `clips`: the video clips made today against the daily clip cap. `retried` is true once the job has its one manual retry.
  */
 export async function GET(request: Request) {
   const g = await guard(request, 'member');
   if (g.error) return g.error;
   if (!new URL(request.url).searchParams.has('mine')) return bad('only ?mine is supported');
-  const [jobs, worker] = await Promise.all([
+  const [jobs, worker, clips] = await Promise.all([
     pool.query(
       `select j.id, j.status, j.error, j.is_mock, j.feature, j.aspect, j.duration_s, j.params, j.model, j.retry_of, j.output_asset_id, j.poster_asset_id, j.created_at, j.finished_at,
               exists (select 1 from jobs r where r.retry_of = j.id) as retried
@@ -56,9 +56,11 @@ export async function GET(request: Request) {
       [g.session.user.id],
     ),
     pool.query(`select not exists (select 1 from worker_heartbeat where beat_at > now() - interval '60 seconds') as offline`),
+    dailyClips(pool, g.session.user.id),
   ]);
   return Response.json({
     workerOffline: worker.rows[0].offline,
+    clips,
     jobs: jobs.rows.map((r) => ({
       id: r.id, status: r.status, error: r.error, isMock: r.is_mock, feature: r.feature, ratio: r.aspect, durationSec: r.duration_s, resolution: r.params.resolution ?? null, modelId: r.model, retryOf: r.retry_of,
       retried: r.retried, outputAssetId: r.output_asset_id, posterAssetId: r.poster_asset_id, createdAt: r.created_at, finishedAt: r.finished_at,
