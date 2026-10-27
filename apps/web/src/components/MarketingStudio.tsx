@@ -163,6 +163,8 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
   const audioOn = audio && chosen?.audioEstimateUsd != null;
   const cost = audioOn ? chosen!.audioEstimateUsd! : chosen?.estimateUsd;
   const words = script.trim() ? script.trim().split(/\s+/).length : 0;
+  /** The English prompt Run sends, shown as is under the form. */
+  const sent = advanced ? advancedPrompt({ brief: prompt, images: refs.length, hook, location, script, audio: audioOn }) : marketingPrompt({ hook, location, prompt, audio: audioOn });
   const name = FORMATS.find((f) => f.id === format)!.name;
   /** The sample photo and loop behind the format header, when an Admin uploaded them. */
   const photo = `marketing-format-${format}.jpg`;
@@ -285,12 +287,12 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
             feature: 'marketing',
             assetIds: refs.map((r) => r.id),
             modelId: chosen!.id,
-            prompt: advancedPrompt({ brief: prompt, images: refs.length, hook, location, script, audio: audioOn }),
+            prompt: sent,
             ratio,
             durationSec,
             params: { format: 'advanced', audio: audioOn ? 'on' : 'off', ...inputs, ...(script.trim() && { script: script.trim() }) },
           }
-        : { feature: 'marketing', assetIds: [person[0]!.id, product[0]!.id], modelId: chosen!.id, prompt: marketingPrompt({ hook, location, prompt, audio: audioOn }), ratio, durationSec, params: { audio: audioOn ? 'on' : 'off', ...inputs } };
+        : { feature: 'marketing', assetIds: [person[0]!.id, product[0]!.id], modelId: chosen!.id, prompt: sent, ratio, durationSec, params: { audio: audioOn ? 'on' : 'off', ...inputs } };
       await api('/api/jobs', sendJson('POST', body));
       setNotice('Đã gửi job. Theo dõi trong tab "Lịch sử".');
       if (!narrow) setTab('history');
@@ -375,6 +377,11 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
                 </div>
               </div>
             )}
+
+            <details className="prompt-preview">
+              <summary>Xem prompt gửi đi</summary>
+              <p lang="en">{sent}</p>
+            </details>
 
             <div className="field-row">
               {models && ratios.length > 0 && (

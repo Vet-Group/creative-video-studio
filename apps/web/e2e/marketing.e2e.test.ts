@@ -87,6 +87,11 @@ test('a mock marketing job runs from two photos, a hook and a location, and show
   await expect(locationBox).toContainText(spot.name);
 
   await page.getByRole('textbox', { name: 'Prompt (tuỳ chọn)' }).fill('soft morning light');
+  // The folded preview shows the English prompt Run is about to send.
+  await page.getByText('Xem prompt gửi đi').click();
+  const preview = page.locator('.prompt-preview p');
+  await expect(preview).toContainText(' soft morning light Natural sound recorded on the phone:');
+  const shown = await preview.innerText();
   await runButton(page).click();
   await expect(page.getByText('Đã gửi job')).toBeVisible();
   await expect(page.getByRole('tab', { name: 'Lịch sử' })).toHaveAttribute('aria-selected', 'true');
@@ -98,6 +103,7 @@ test('a mock marketing job runs from two photos, a hook and a location, and show
   const detail = (await (await page.request.get(`/api/jobs/${jobs.jobs[0]!.id}`)).json()) as { prompt: string; presetId: string | null; images: { filename: string }[] };
   expect(detail.images.map((i) => i.filename)).toEqual(['model.png', 'product.png']);
   expect(detail.presetId).toBeNull();
+  expect(detail.prompt).toBe(shown);
   expect(detail.prompt).toContain('[Image1]');
   expect(detail.prompt).toContain(hook.phrase);
   expect(detail.prompt).toContain(`Set in ${spot.phrase}.`);
