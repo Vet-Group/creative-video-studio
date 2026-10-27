@@ -104,7 +104,7 @@ export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRem
       <span id={labelId} className="field-label">
         {label}
       </span>
-      <div className="slot" role="group" aria-labelledby={labelId} data-over={over} onDragOver={(e) => (e.preventDefault(), setOver(true))} onDragLeave={() => setOver(false)} onDrop={onDrop}>
+      <div className="slot" role="group" aria-labelledby={labelId} data-over={over} data-one={(max === 1 && images.length === 1) || undefined} onDragOver={(e) => (e.preventDefault(), setOver(true))} onDragLeave={() => setOver(false)} onDrop={onDrop}>
         <input
           ref={input}
           type="file"
@@ -124,6 +124,11 @@ export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRem
             {images.map((i) => (
               <li key={i.id}>
                 <img src={`/api/assets/${i.id}/content`} alt={i.filename} />
+                {max === 1 && (
+                  <span className="slot-chip" aria-hidden="true">
+                    {label}
+                  </span>
+                )}
                 <button type="button" aria-label={`Bỏ ảnh ${i.filename}`} onClick={() => onRemove(i.id)}>
                   <Icon name="x" size={12} />
                 </button>
