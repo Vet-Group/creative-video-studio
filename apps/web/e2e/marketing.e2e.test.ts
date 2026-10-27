@@ -242,8 +242,12 @@ test('with stock models uploaded, the empty model slot opens the stock model dia
   try {
     await signIn(page, 'mktc');
     await page.goto('/marketing-studio');
-    await page.getByRole('button', { name: 'Tải lên Người mẫu' }).click();
     const dialog = page.getByRole('dialog', { name: 'Chọn người mẫu' });
+    // The slot offers the dialog once the sample list is in; before that a click opens the file picker, so click until it shows.
+    await expect(async () => {
+      await page.getByRole('button', { name: 'Tải lên Người mẫu' }).click();
+      await expect(dialog).toBeVisible({ timeout: 1000 });
+    }).toPass();
     // The stock models in number order (10 after 2), after the own-photo tile.
     await expect(dialog.getByRole('button', { name: /^Người mẫu có sẵn/ })).toHaveCount(3);
     await expect(dialog.getByRole('button', { name: 'Người mẫu có sẵn 1' }).locator('img')).toHaveAttribute('src', '/api/samples/marketing-model-1.png');
