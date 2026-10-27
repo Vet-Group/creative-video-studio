@@ -2,6 +2,7 @@
 import { randomBytes } from 'node:crypto';
 import { createTestDatabase } from '@cvs/db/testing';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
+import { UGC_MAX_BRIEF } from '@/lib/marketing';
 
 const testDb = await createTestDatabase();
 process.env.DATABASE_URL = testDb.url;
@@ -698,7 +699,7 @@ describe('POST /api/jobs for an image feature', () => {
         expect(await error(await advanced(m, 2, { params: { format: 'advanced', location: 'moon' } }))).toMatch(/params.location must be one of/);
         expect(await error(await advanced(m, 2, { params: { format: 'advanced', brief: 'x'.repeat(1001) } }))).toMatch(/params.brief may be at most 1000/);
         expect(await error(await advanced(m, 2, { params: { format: 'advanced', script: 'x'.repeat(301) } }))).toMatch(/params.script may be at most 300/);
-        expect(await error(await runAs(m, { feature: 'marketing', presetId: null, prompt, ...kling, assetIds: await refs(m, 2), params: { brief: 'x'.repeat(1401) } }))).toMatch(/params.brief may be at most 1400/);
+        expect(await error(await runAs(m, { feature: 'marketing', presetId: null, prompt, ...kling, assetIds: await refs(m, 2), params: { brief: 'x'.repeat(UGC_MAX_BRIEF + 1) } }))).toMatch(new RegExp(`params.brief may be at most ${UGC_MAX_BRIEF}`));
         expect(await error(await runAs(m, { feature: 'marketing', presetId: null, prompt, ...kling, assetIds: await refs(m, 2), params: { script: 's' } }))).toMatch(/params.script is for Advanced only/);
         expect(await jobCount()).toBe(before);
       });

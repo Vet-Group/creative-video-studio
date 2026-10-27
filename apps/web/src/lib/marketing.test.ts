@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ADVANCED_MAX_BRIEF, ADVANCED_MAX_IMAGES, ADVANCED_MAX_SCRIPT, advancedPrompt, HOOKS, LOCATIONS, marketingPrompt } from './marketing';
+import { ADVANCED_MAX_BRIEF, ADVANCED_MAX_IMAGES, ADVANCED_MAX_SCRIPT, advancedPrompt, HOOKS, LOCATIONS, marketingPrompt, UGC_MAX_BRIEF } from './marketing';
 
 describe('HOOKS and LOCATIONS', () => {
   it.each([['HOOKS', HOOKS], ['LOCATIONS', LOCATIONS]])('%s has 6 to 12 unique choices with a Vietnamese name and description and an English phrase', (_, list) => {
@@ -20,8 +20,8 @@ describe('marketingPrompt', () => {
   const fixed = marketingPrompt({});
 
   it('is the fixed try-on instruction alone when nothing is chosen or written', () => {
-    expect(fixed).toContain('The person in [Image1] wears the product in [Image2]');
-    expect(fixed).toContain('Creator-style handheld vertical video');
+    expect(fixed).toContain('The creator in [Image1] wears or holds the product in [Image2]');
+    expect(fixed).toContain('Show the whole look, a close-up of the product, then a natural move or turn that shows the fit.');
     for (const none of [{ hook: null, location: null, prompt: null }, { hook: '', location: '', prompt: '   ' }, { hook: undefined }]) expect(marketingPrompt(none)).toBe(fixed);
   });
 
@@ -29,12 +29,12 @@ describe('marketingPrompt', () => {
     const p = marketingPrompt({ hook: 'product-catch', location: 'kitchen', prompt: '  Keep it cheerful.  ' });
     const hook = HOOKS.find((c) => c.id === 'product-catch')!.phrase;
     const place = LOCATIONS.find((c) => c.id === 'kitchen')!.phrase;
-    expect(p).toBe(`${fixed} ${hook} Set in ${place}. Keep it cheerful.`);
+    expect(p).toBe(`${fixed} ${hook} Set in ${place}. Creator notes: Keep it cheerful.`);
   });
 
   it('ends with the sound rule when audio is given: phone sound with a spoken reaction when on, silence when off', () => {
     const on = marketingPrompt({ prompt: 'x', audio: true });
-    expect(on.startsWith(`${fixed} x Natural sound recorded on the phone:`)).toBe(true);
+    expect(on.startsWith(`${fixed} Creator notes: x Natural sound recorded on the phone:`)).toBe(true);
     expect(on).toMatch(/spoken reaction.*no background music\.$/);
     expect(marketingPrompt({ audio: false })).toBe(`${fixed} The video is completely silent: no speech, no music and no sound.`);
   });
@@ -42,11 +42,46 @@ describe('marketingPrompt', () => {
   it('adds only what is given', () => {
     expect(marketingPrompt({ hook: 'product-catch' })).toBe(`${fixed} ${HOOKS.find((c) => c.id === 'product-catch')!.phrase}`);
     expect(marketingPrompt({ location: 'outdoor' })).toBe(`${fixed} Set in ${LOCATIONS.find((c) => c.id === 'outdoor')!.phrase}.`);
-    expect(marketingPrompt({ prompt: 'x' })).toBe(`${fixed} x`);
+    expect(marketingPrompt({ prompt: 'x' })).toBe(`${fixed} Creator notes: x`);
   });
 
   it('ignores an unknown id, and a hook id is not a location id', () => {
     expect(marketingPrompt({ hook: 'nope', location: 'product-catch' })).toBe(fixed);
+  });
+
+  it('frames the clip by the chosen ratio, not always vertical', () => {
+    expect(marketingPrompt({ ratio: '9:16' }).startsWith('UGC try-on video, vertical 9:16 frame,')).toBe(true);
+    expect(marketingPrompt({ ratio: '16:9' }).startsWith('UGC try-on video, horizontal 16:9 frame,')).toBe(true);
+    expect(marketingPrompt({ ratio: '1:1' }).startsWith('UGC try-on video, square 1:1 frame,')).toBe(true);
+    expect(marketingPrompt({ ratio: '4:5' }).startsWith('UGC try-on video, 4:5 frame,')).toBe(true);
+    expect(fixed.startsWith('UGC try-on video, vertical frame,')).toBe(true);
+  });
+
+  // Three whole prompts pinned, so a wording change shows up in review.
+  it.each([
+    [
+      'nothing chosen, 9:16, audio on',
+      { ratio: '9:16', audio: true },
+      "UGC try-on video, vertical 9:16 frame, filmed handheld on a phone by a real creator. The creator in [Image1] wears or holds the product in [Image2]; keep their face, hair and body and the product's shape, colours, print and details exactly as in the photos. Show the whole look, a close-up of the product, then a natural move or turn that shows the fit. Soft natural light, authentic energy. No on-screen text, logos or watermarks. Natural sound recorded on the phone: the room's ambience and the creator's short, casual spoken reaction to the product, with no background music.",
+    ],
+    [
+      'hook, location and notes, 1:1, silent',
+      { ratio: '1:1', hook: 'product-catch', location: 'kitchen', prompt: ' Keep it cheerful. ', audio: false },
+      "UGC try-on video, square 1:1 frame, filmed handheld on a phone by a real creator. The creator in [Image1] wears or holds the product in [Image2]; keep their face, hair and body and the product's shape, colours, print and details exactly as in the photos. Show the whole look, a close-up of the product, then a natural move or turn that shows the fit. Soft natural light, authentic energy. No on-screen text, logos or watermarks. The creator catches the product thrown into frame with an energetic, surprised reaction. Set in a modern kitchen in warm light. Creator notes: Keep it cheerful. The video is completely silent: no speech, no music and no sound.",
+    ],
+    [
+      'location only, 16:9, audio on',
+      { ratio: '16:9', location: 'street', audio: true },
+      "UGC try-on video, horizontal 16:9 frame, filmed handheld on a phone by a real creator. The creator in [Image1] wears or holds the product in [Image2]; keep their face, hair and body and the product's shape, colours, print and details exactly as in the photos. Show the whole look, a close-up of the product, then a natural move or turn that shows the fit. Soft natural light, authentic energy. No on-screen text, logos or watermarks. Set in a lively city street in the daytime. Natural sound recorded on the phone: the room's ambience and the creator's short, casual spoken reaction to the product, with no background music.",
+    ],
+  ])('pins the whole prompt: %s', (_, input, expected) => {
+    expect(marketingPrompt(input)).toBe(expected);
+  });
+
+  it('stays within the 2000-character prompt limit of the jobs API with the longest brief, hook, location and ratio and audio on', () => {
+    const brief = 'x'.repeat(UGC_MAX_BRIEF);
+    const worst = Math.max(...['9:16', '16:9', '1:1'].flatMap((ratio) => HOOKS.flatMap((h) => LOCATIONS.map((l) => marketingPrompt({ ratio, hook: h.id, location: l.id, prompt: brief, audio: true }).length))));
+    expect(worst).toBeLessThanOrEqual(2000);
   });
 
   it('leaves room for the member text under the 2000-character prompt limit of the jobs API', () => {
