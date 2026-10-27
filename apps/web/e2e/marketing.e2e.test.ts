@@ -229,3 +229,36 @@ for (const [width, height] of [[390, 844], [1024, 768], [1440, 1000]] as const) 
     }
   });
 }
+
+test('with stock models uploaded, the empty model slot opens the stock model dialog: a stock model or an own photo fills the slot', async ({ page }) => {
+  const names = ['marketing-model-1.png', 'marketing-model-2.png', 'marketing-model-10.png'];
+  const asAdmin = async (each: (name: string) => Promise<{ ok(): boolean }>) => {
+    await page.context().clearCookies();
+    await signIn(page, 'admin');
+    for (const name of names) expect((await each(name)).ok()).toBe(true);
+    await page.context().clearCookies();
+  };
+  await asAdmin((name) => page.request.put(`/api/admin/samples/${name}`, { data: png(), headers: { 'content-type': 'image/png' } }));
+  try {
+    await signIn(page, 'mktc');
+    await page.goto('/marketing-studio');
+    await page.getByRole('button', { name: 'Tải lên Người mẫu' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Chọn người mẫu' });
+    // The stock models in number order (10 after 2), after the own-photo tile.
+    await expect(dialog.getByRole('button', { name: /^Người mẫu có sẵn/ })).toHaveCount(3);
+    await expect(dialog.getByRole('button', { name: 'Người mẫu có sẵn 1' }).locator('img')).toHaveAttribute('src', '/api/samples/marketing-model-1.png');
+    await expect(dialog.getByRole('button', { name: 'Người mẫu có sẵn 3' }).locator('img')).toHaveAttribute('src', '/api/samples/marketing-model-10.png');
+    await dialog.getByRole('button', { name: 'Người mẫu có sẵn 2' }).click();
+    await expect(dialog).toBeHidden();
+    await expect(page.getByLabel('Người mẫu: ảnh đã chọn').getByRole('img', { name: 'marketing-model-2.png' })).toBeVisible();
+
+    // Removing it brings the dialog back; the own-photo tile uploads like the slot's file input.
+    await page.getByRole('button', { name: 'Bỏ ảnh marketing-model-2.png' }).click();
+    await page.getByRole('button', { name: 'Tải lên Người mẫu' }).click();
+    await dialog.getByLabel('Tải lên ảnh của bạn').setInputFiles(file('mine.png'));
+    await expect(dialog).toBeHidden();
+    await expect(page.getByLabel('Người mẫu: ảnh đã chọn').getByRole('img', { name: 'mine.png' })).toBeVisible();
+  } finally {
+    await asAdmin((name) => page.request.delete(`/api/admin/samples/${name}`));
+  }
+});

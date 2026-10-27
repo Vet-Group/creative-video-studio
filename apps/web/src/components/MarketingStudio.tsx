@@ -133,7 +133,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
   const [audio, setAudio] = useState(true);
   const [hook, setHook] = useState('');
   const [location, setLocation] = useState('');
-  const [picker, setPicker] = useState<'hook' | 'location' | 'format' | null>(null);
+  const [picker, setPicker] = useState<'hook' | 'location' | 'format' | 'model' | null>(null);
   const [prompt, setPrompt] = useState('');
   const [modelId, setModelId] = useState('');
   const [ratio, setRatio] = useState('9:16');
@@ -166,6 +166,8 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
   const name = FORMATS.find((f) => f.id === format)!.name;
   /** The sample photo and loop behind the format header, when an Admin uploaded them. */
   const photo = `marketing-format-${format}.jpg`;
+  /** The stock model photos an Admin uploaded (`marketing-model-1.jpg`...), offered by the model slot as on Fash's Choose model dialog. */
+  const stockModels = [...have].filter((n) => /^marketing-model-\d+\.(jpg|png|webp)$/.test(n)).sort((a, b) => parseInt(a.slice(16)) - parseInt(b.slice(16)));
   const loop = `marketing-format-${format}.mp4`;
 
   // Every model can be picked (the picker is told all are supported): switching moves the ratio and the duration to the model's own.
@@ -247,6 +249,13 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
                     : null;
   const canRun = reason === null && !busy;
 
+  /** A stock model goes through the normal upload, like a file the member picked, so the job only ever holds the member's own assets. */
+  async function pickStock(name: string) {
+    const res = await fetch(`/api/samples/${name}`);
+    if (res.ok) await add(setPerson)([new File([await res.blob()], name, { type: res.headers.get('content-type') ?? 'image/jpeg' })]);
+    else setError(UPLOAD_ERROR);
+  }
+
   /** Uploads the files into a slot: a one-image slot is replaced, the reference slot is added to, up to `max`. */
   function add(set: (f: (cur: Img[]) => Img[]) => void, max = 1) {
     return async (files: File[]) => {
@@ -326,7 +335,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
                 </div>
               ) : (
                 <>
-                  <Slot label="Người mẫu" empty="Thêm 1 ảnh người mẫu" inputLabel="Ảnh người mẫu" images={person} max={1} busy={busy} onAdd={add(setPerson)} onRemove={() => setPerson([])} />
+                  <Slot label="Người mẫu" empty="Thêm 1 ảnh người mẫu" inputLabel="Ảnh người mẫu" images={person} max={1} busy={busy} onAdd={add(setPerson)} onRemove={() => setPerson([])} onBrowse={stockModels.length > 0 ? () => setPicker('model') : undefined} />
                   <Slot label="Sản phẩm" empty="Thêm 1 ảnh sản phẩm" inputLabel="Ảnh sản phẩm" images={product} max={1} busy={busy} onAdd={add(setProduct)} onRemove={() => setProduct([])} />
                 </>
               )}
@@ -427,6 +436,22 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
                 {f.name}
                 {f.soon && <span className="badge-soon">{f.soon}</span>}
               </span>
+            </button>
+          ))}
+        </div>
+      </Modal>
+      <Modal open={picker === 'model'} onClose={() => setPicker(null)} label="Chọn người mẫu" className="choice-dialog">
+        <h2>Chọn người mẫu</h2>
+        <p className="modal-sub">Dùng một người mẫu có sẵn, hoặc tải lên ảnh của bạn.</p>
+        <div className="choice-grid model-grid">
+          <label className="model-upload">
+            <Icon name="plus" size={16} />
+            Tải lên ảnh của bạn
+            <input type="file" accept="image/*" className="sr-only" onChange={(e) => (setPicker(null), void add(setPerson)([...(e.target.files ?? [])].slice(0, 1)))} />
+          </label>
+          {stockModels.map((name, i) => (
+            <button key={name} type="button" aria-label={`Người mẫu có sẵn ${i + 1}`} disabled={busy} onClick={() => (setPicker(null), void pickStock(name))}>
+              {picker === 'model' && <img src={`/api/samples/${name}`} alt="" />}
             </button>
           ))}
         </div>

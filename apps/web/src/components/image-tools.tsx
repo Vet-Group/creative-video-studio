@@ -83,7 +83,7 @@ export async function uploadImages(files: File[]): Promise<Img[]> {
  * `samples` (sample names, lib/samples.ts) show while the slot is empty, as on the live Try On; a click uploads that sample like a file the user picked.
  * `icon` is the empty slot's icon: a picture by default, a plus on Advanced's wide slot, as on the live page.
  */
-export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRemove, samples = [], icon = 'image' }: { label: string; empty: string; inputLabel: string; images: Img[]; max: number; busy: boolean; onAdd: (files: File[]) => void; onRemove: (id: string) => void; samples?: string[]; icon?: IconName }) {
+export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRemove, samples = [], icon = 'image', onBrowse }: { label: string; empty: string; inputLabel: string; images: Img[]; max: number; busy: boolean; onAdd: (files: File[]) => void; onRemove: (id: string) => void; samples?: string[]; icon?: IconName; onBrowse?: () => void }) {
   const hydrated = useHydrated();
   const input = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
@@ -144,7 +144,7 @@ export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRem
         )}
         {/* Empty, the whole slot is the upload button, a grey circle over its hint as on the live pages; with images, a small tile adds more. */}
         {!full && (
-          <button type="button" className="slot-add" aria-label={`Tải lên ${label}`} title={images.length === 0 ? empty : undefined} disabled={!hydrated || busy} onClick={() => input.current?.click()}>
+          <button type="button" className="slot-add" aria-label={`Tải lên ${label}`} title={images.length === 0 ? empty : undefined} disabled={!hydrated || busy} onClick={() => (onBrowse && images.length === 0 ? onBrowse() : input.current?.click())}>
             <span className="slot-icon" aria-hidden="true">
               <Icon name={images.length === 0 && offer.length === 0 ? icon : 'plus'} size={16} />
               {offer.length > 0 && <span>Tải lên</span>}

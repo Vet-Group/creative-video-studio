@@ -874,6 +874,12 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .choice-grid button[aria-selected='true'] { border-color: var(--ink-strong); background: var(--ink-strong); color: var(--on-dark); }
 .choice-grid button[aria-pressed='true'] { border-color: var(--ink-strong); }
 .choice-grid button:disabled { cursor: not-allowed; opacity: .6; }
+/* Choose model, as on Fash: 4 per row of 3:4 portraits, the upload tile first. */
+.model-grid { grid-template-columns: repeat(4, 1fr); }
+.model-grid button, .model-upload { position: relative; aspect-ratio: 163 / 217; min-height: 0; padding: 0; overflow: hidden; border-radius: 12px; }
+.model-grid img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.model-upload { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; border: 1px dashed var(--border-strong); background: var(--fill); color: var(--text-subtle); font-size: 13px; line-height: 18px; text-align: center; cursor: pointer; }
+.model-upload:focus-within { outline: 2px solid var(--ink-strong); outline-offset: 2px; }
 /* A format that is not ready yet: its clip washed out and a light pill centred under the name, as on the live picker. */
 .choice-grid button:has(.badge-soon) > :is(video, img) { opacity: .85; }
 .choice-grid button:has(.badge-soon) .choice-name { color: var(--text-subtle); }
