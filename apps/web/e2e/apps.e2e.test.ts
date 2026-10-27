@@ -240,6 +240,22 @@ test('the swaps take an optional prompt that is added to their fixed instruction
   await expect(page.getByRole('textbox')).toHaveCount(0);
 });
 
+test('an app About at 1440 reads like the live article: 24 px from the form, 56 then 64 px before sections, semibold titles, no column rules', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await signIn(page, 'appsc');
+  await openApp(page, 'Đổi nhân vật', 'character-swap');
+  await page.getByRole('tab', { name: 'Giới thiệu' }).click();
+  const about = page.locator('.about-long');
+  const box = async (sel: string, i = 0) => (await about.locator(sel).nth(i).boundingBox())!;
+  const form = (await page.locator('.form-card').boundingBox())!;
+  expect(Math.round((await about.boundingBox())!.x - (form.x + form.width))).toBe(24);
+  const title = await box(':scope > h2'), first = await box(':scope > section'), second = await box(':scope > section', 1);
+  expect(Math.round(first.y - (title.y + title.height))).toBe(56);
+  expect(Math.round(second.y - (first.y + first.height))).toBe(64);
+  expect(await about.locator('h3').first().evaluate((e) => getComputedStyle(e).fontWeight)).toBe('600');
+  expect(await about.locator('.about-table td').first().evaluate((e) => getComputedStyle(e).borderLeftWidth)).toBe('0px');
+});
+
 test('the change-app menu returns focus to its button on Escape, closes when focus leaves it, and shows a focus ring', async ({ page }) => {
   await signIn(page, 'appsc');
   await openApp(page, 'Đổi khuôn mặt', 'face-swap');

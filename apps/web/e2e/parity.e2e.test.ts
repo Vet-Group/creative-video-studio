@@ -197,6 +197,14 @@ test('the preset picker is a vertically scrolling grid like the live one: 4 colu
     const chosen = cards.filter({ has: page.locator('button[aria-pressed="true"]') });
     await expect(chosen).toHaveCount(1);
     expect(await chosen.locator(':scope > :first-child').evaluate((e) => getComputedStyle(e).outlineStyle)).toBe('solid');
+    // As on the live picker: the first row 16 px under the header rule, each clip flush with its card and its name 6 px under it.
+    const sub = (await page.locator('dialog[open] .modal-sub').boundingBox())!;
+    const card = (await cards.first().boundingBox())!;
+    const clip = (await cards.first().locator(':scope > :first-child').boundingBox())!;
+    const name = (await cards.first().locator(':scope > button').boundingBox())!;
+    expect(Math.round(card.y - (sub.y + sub.height))).toBe(16);
+    expect(Math.round(clip.y - card.y)).toBe(0);
+    expect(Math.round(name.y - (clip.y + clip.height))).toBe(6);
     await page.keyboard.press('Escape');
     await expect(grid).toBeHidden();
     await expect(page.getByRole('button', { name: 'Chọn mẫu khác' })).toBeFocused();
