@@ -391,3 +391,25 @@ test('as on Fash, a filled photo slot and a chosen hook or location show the pic
     await asAdmin((name) => page.request.delete(`/api/admin/samples/${name}`));
   }
 });
+
+test("with earlier UGC jobs, the empty product slot offers the member's own past products (Fash's My Products)", async ({ page }) => {
+  await signIn(page, 'mktg');
+  const upload = async (name: string) => ((await (await page.request.post('/api/assets', { multipart: { file: file(name) } })).json()) as { assets: { id: string }[] }).assets[0]!.id;
+  const res = await page.request.post('/api/jobs', { data: { feature: 'marketing', assetIds: [await upload('old-model.png'), await upload('old-product.png')], modelId: 'mock-e2e', prompt: 'p', ratio: '9:16', durationSec: 5, params: { audio: 'off' } } });
+  expect(res.status()).toBe(201);
+
+  await page.goto('/marketing-studio');
+  const dialog = page.getByRole('dialog', { name: 'Chọn sản phẩm' });
+  // The slot offers the dialog once the list is in; before that a click opens the file picker, so click until it shows.
+  await expect(async () => {
+    await page.getByRole('button', { name: 'Tải lên Sản phẩm' }).click();
+    await expect(dialog).toBeVisible({ timeout: 1000 });
+  }).toPass();
+  await expect(dialog.getByRole('button', { name: /^Dùng lại / })).toHaveCount(1);
+  await dialog.getByRole('button', { name: 'Dùng lại old-product.png' }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByLabel('Sản phẩm: ảnh đã chọn').getByRole('img', { name: 'old-product.png' })).toBeVisible();
+  // Removing the product only empties the slot.
+  await page.getByRole('button', { name: 'Bỏ ảnh old-product.png' }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+});

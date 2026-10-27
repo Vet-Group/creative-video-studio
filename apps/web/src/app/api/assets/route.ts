@@ -1,4 +1,5 @@
 import { insertAssets } from '@cvs/db/assets';
+import { pool } from '@/lib/auth';
 import { db, MAX_BYTES, MAX_FILENAME, MAX_FILES, MAX_VIDEO_BYTES, mp4DurationMs, readUploadForm, sniffImage, sniffVideo } from '@/lib/assets';
 import { guard } from '@/lib/session';
 import { deleteObject, putObject } from '@/lib/storage';
@@ -16,6 +17,26 @@ function shortName(name: string): string {
  * Upload 1-4 input files (multipart field `file`), all or nothing: JPEG/PNG/WebP images of at most 10 MB, or MP4/MOV videos (Motion Control's reference)
  * of at most 20 MB whose header gives their length (`durationMs`). The type comes from the magic bytes.
  */
+/**
+ * `?recent=marketing-product`: the caller's own product photos from their UGC Marketing Studio jobs (the second input), newest use first, each once,
+ * at most 12, for the product slot's My products dialog (Fash's My Products). Advanced references and deleted files are left out.
+ */
+export async function GET(request: Request) {
+  const g = await guard(request, 'member');
+  if (g.error) return g.error;
+  if (new URL(request.url).searchParams.get('recent') !== 'marketing-product') return Response.json({ error: 'only ?recent=marketing-product is supported' }, { status: 400 });
+  const { rows } = await pool.query(
+    `select id, filename from (
+       select distinct on (a.id) a.id, a.filename, j.created_at from jobs j join assets a on a.id = j.input_asset_ids[2]
+        where j.user_id = $1 and j.feature = 'marketing' and coalesce(j.params->>'format', '') <> 'advanced' and j.deleted_at is null
+          and a.owner_id = $1 and a.deleted_at is null
+        order by a.id, j.created_at desc) p
+     order by created_at desc limit 12`,
+    [g.session.user.id],
+  );
+  return Response.json({ assets: rows });
+}
+
 export async function POST(request: Request) {
   const g = await guard(request, 'member');
   if (g.error) return g.error;
