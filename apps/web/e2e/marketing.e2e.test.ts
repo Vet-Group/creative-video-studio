@@ -272,3 +272,80 @@ test('with stock models uploaded, the empty model slot opens the stock model dia
     await asAdmin((name) => page.request.delete(`/api/admin/samples/${name}`));
   }
 });
+
+test('hook variants: up to 3 hooks make one clip each, with the total, the daily clip use and a confirm first, and a refused variant is listed', async ({ page }) => {
+  const picks = HOOKS.slice(0, 4);
+  await signIn(page, 'mktf');
+  await page.goto('/marketing-studio');
+  await page.getByLabel('Ảnh người mẫu').setInputFiles(file('model.png'));
+  await page.getByLabel('Ảnh sản phẩm').setInputFiles(file('product.png'));
+  await page.getByRole('button', { name: /^Hook/ }).click();
+  const dialog = page.getByRole('dialog', { name: 'Chọn hook' });
+  await dialog.getByLabel(/^Tạo nhiều biến thể/).check();
+  for (const h of picks) await dialog.getByRole('option', { name: h.name, exact: true }).click();
+  // The fourth pick is ignored: three at most, and a picked card shows as selected.
+  await expect(dialog.getByRole('option', { selected: true })).toHaveCount(3);
+  await expect(dialog.getByRole('option', { name: picks[3]!.name, exact: true })).toHaveAttribute('aria-selected', 'false');
+  await dialog.getByRole('button', { name: 'Xong (3/3)' }).click();
+  await expect(page.getByRole('button', { name: /^Hook/ })).toContainText(`3 biến thể: ${picks.slice(0, 3).map((h) => h.name).join(', ')}`);
+
+  // Before Run: the clip count and total on the button, the daily clip use, and one prompt per variant in the preview.
+  await expect(runButton(page)).toContainText('3 clip');
+  await expect(runButton(page)).toContainText('$0.0000'); // the mock model books 0 USD, so 3 x 0
+  await expect(page.locator('.variants-usage')).toContainText(/3 biến thể, tổng \$0\.0000: dùng 3 trong \d+ clip mỗi ngày của bạn \(hôm nay đã dùng 0\)/);
+  await page.getByText('Xem prompt gửi đi').click();
+  await expect(page.locator('.prompt-preview p')).toHaveCount(3);
+  for (const [i, h] of picks.slice(0, 3).entries()) await expect(page.locator('.prompt-preview p').nth(i)).toContainText(h.phrase);
+
+  // Dismissing the confirm sends nothing.
+  page.once('dialog', (d) => void d.dismiss());
+  await runButton(page).click();
+  await expect(page.getByText(/Đã gửi/)).toHaveCount(0);
+
+  // The server refuses the second variant (as when a cap is reached meanwhile); the other two go, one after another, and the refusal is named.
+  let posts = 0;
+  await page.route('**/api/jobs', async (route) => {
+    if (route.request().method() !== 'POST') return route.continue();
+    posts += 1;
+    if (posts === 2) return route.fulfill({ status: 429, contentType: 'application/json', body: JSON.stringify({ error: 'Bạn đã dùng hết số clip trong ngày hôm nay' }) });
+    return route.continue();
+  });
+  page.once('dialog', (d) => {
+    expect(d.message()).toContain('Tạo 3 clip');
+    void d.accept();
+  });
+  await runButton(page).click();
+  await expect(page.getByText(`Đã gửi 2/3 biến thể: ${picks[0]!.name}, ${picks[2]!.name}.`)).toBeVisible();
+  await expect(page.locator('.form-message').getByRole('alert')).toContainText(`Không gửi được ${picks[1]!.name}: Bạn đã dùng hết số clip trong ngày hôm nay`);
+  const jobs = (await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { id: string }[]; clips: { today: number } };
+  expect(jobs.jobs).toHaveLength(2);
+  const hooks = await Promise.all(jobs.jobs.map(async (j) => ((await (await page.request.get(`/api/jobs/${j.id}`)).json()) as { hook: string }).hook));
+  expect(hooks.sort()).toEqual([picks[0]!.id, picks[2]!.id].sort());
+  expect(jobs.clips.today).toBe(2);
+});
+
+test('hook variants beyond the clips left today are refused before anything is sent', async ({ page }) => {
+  await signIn(page, 'mktf');
+  // The tray says one clip is left today.
+  await page.route('**/api/jobs?mine', async (route) => {
+    const res = await route.fetch();
+    const body = (await res.json()) as { clips: { today: number; cap: number } };
+    await route.fulfill({ response: res, json: { ...body, clips: { today: body.clips.cap - 1, cap: body.clips.cap } } });
+  });
+  await page.goto('/marketing-studio');
+  await page.getByLabel('Ảnh người mẫu').setInputFiles(file('model.png'));
+  await page.getByLabel('Ảnh sản phẩm').setInputFiles(file('product.png'));
+  await page.getByRole('button', { name: /^Hook/ }).click();
+  const dialog = page.getByRole('dialog', { name: 'Chọn hook' });
+  await dialog.getByLabel(/^Tạo nhiều biến thể/).check();
+  for (const h of HOOKS.slice(0, 2)) await dialog.getByRole('option', { name: h.name, exact: true }).click();
+  await dialog.getByRole('button', { name: 'Xong (2/3)' }).click();
+  await expect(reasonOf(page)).toHaveText('Hôm nay bạn chỉ còn 1 clip; bỏ bớt biến thể hook.');
+  await expect(runButton(page)).toBeDisabled();
+  // Turning variants off keeps the first hook and lets one clip go.
+  await page.getByRole('button', { name: /^Hook/ }).click();
+  await dialog.getByLabel(/^Tạo nhiều biến thể/).uncheck();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('button', { name: /^Hook/ })).toContainText(HOOKS[0]!.name);
+  await expect(runButton(page)).toBeEnabled();
+});
