@@ -246,6 +246,13 @@ test('geometry at 1440: the Try On card is 320 wide at x=288 and the image bar i
   // Three slots, then the model picker, the prompt, the resolution and the ratio, in the order of the reference.
   await expect(page.locator('.form-scroll .field-label')).toHaveText(['Trang phục', 'Người mẫu', 'Bối cảnh (tuỳ chọn)', 'Mô hình', 'Prompt (tuỳ chọn)', 'Độ phân giải', 'Tỉ lệ']);
   for (const slot of await page.locator('.slot').all()) near((await box(slot)).width, 268, 'slot width');
+  // The live rhythm: the first label at the top of the form, 32 px between one picture tray and the next label.
+  const labels = page.locator('.form-scroll .field-label'), slots = page.locator('.slot');
+  near((await box(labels.first())).y, (await box(page.locator('.form-scroll'))).y, 'first label y', 1);
+  for (const i of [0, 1]) {
+    const tray = await box(slots.nth(i));
+    near((await box(labels.nth(i + 1))).y - (tray.y + tray.height), 32, 'tray to next label', 1);
+  }
 
   await expect.poll(async () => ((await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { status: string }[] }).jobs.filter((j) => j.status === 'succeeded').length, { timeout: 120_000 }).toBe(10);
   await page.goto('/image-generation');
