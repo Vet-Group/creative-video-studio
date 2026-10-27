@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { createContext, type ReactNode, useContext, useEffect, useRef, useState } from 'react';
 import { api, errorText, sendJson, type JobStatus, type TrayJob } from '@/lib/api';
 import { appBySlug } from '@/lib/apps';
+import { reuseHref } from '@/lib/reuse';
 import { COLLAPSED_COOKIE } from '@/lib/sidebar';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { Icon, type IconName } from './Icon';
@@ -59,6 +60,7 @@ function TrayItem({ job, isAdmin }: { job: TrayJob; isAdmin: boolean }) {
         {failure && <p className="error">{failure}</p>}
         {isAdmin && job.error && <p className="muted">{job.error}</p>}
         {job.status === 'succeeded' && <Link href="/library">Xem trong Thư viện</Link>}
+        {reuseHref(job) && <Link href={reuseHref(job)!}>Dùng lại</Link>}
         {RETRYABLE.includes(job.status) && !job.retried && !job.retryOf && (
           <button type="button" onClick={() => void retry()}>
             Thử lại
