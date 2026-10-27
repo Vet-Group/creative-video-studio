@@ -169,6 +169,13 @@
       "when": 1793790142036,
       "tag": "0023_marketing_seedance_audio",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1793790143036,
+      "tag": "0024_motion_template_labels",
+      "breakpoints": true
     }
   ]
 }
