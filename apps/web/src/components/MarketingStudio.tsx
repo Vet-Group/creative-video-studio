@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { type CSSProperties, type KeyboardEvent, useEffect, useId, useRef, useState } from 'react';
 import { ABOUT } from '@/lib/about-content';
 import { api, errorText, sendJson } from '@/lib/api';
-import { ADVANCED_MAX_BRIEF, ADVANCED_MAX_IMAGES, ADVANCED_MAX_SCRIPT, advancedPrompt, HOOKS, LOCATIONS, type MarketingChoice, marketingPrompt } from '@/lib/marketing';
+import { ADVANCED_MAX_BRIEF, ADVANCED_MAX_IMAGES, ADVANCED_MAX_SCRIPT, advancedPrompt, HOOKS, LOCATIONS, type MarketingChoice, marketingPrompt, UGC_MAX_BRIEF } from '@/lib/marketing';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { useSamples } from '@/lib/use-samples';
 import { cardSample } from '@/lib/examples';
@@ -40,8 +40,6 @@ type Tab = 'create' | 'history' | 'examples' | 'about';
 const TAB_LABEL: Record<Tab, string> = { create: 'Tạo', history: 'Lịch sử', examples: 'Ví dụ', about: 'Giới thiệu' };
 /** The ratios of the page, in the order of the menu; a model offers some of them. */
 const RATIO_LABEL: Record<string, string> = { '9:16': '9:16 (dọc)', '16:9': '16:9 (ngang)', '1:1': '1:1 (vuông)' };
-/** The fixed part of the composed prompt is about 290 characters (about 460 with the longest hook and location) and the API takes 2000; 1400 leaves room. */
-const MAX_PROMPT = 1400;
 
 /** A box on the form that opens the list of choices; shows the chosen one. */
 function ChoiceBox({ label, icon, choice, onOpen }: { label: string; icon: IconName; choice: MarketingChoice | undefined; onOpen: () => void }) {
@@ -232,6 +230,8 @@ export function MarketingStudio({ format = 'ugc' }: { format?: MarketingFormat }
     setError('');
     setNotice('');
     try {
+      // The form's own inputs ride along in params so History can refill the form (Dùng lại); the worker never reads them.
+      const inputs = { ...(hook && { hook }), ...(location && { location }), ...(prompt.trim() && { brief: prompt.trim() }) };
       const body = advanced
         ? {
             feature: 'marketing',
@@ -240,9 +240,9 @@ export function MarketingStudio({ format = 'ugc' }: { format?: MarketingFormat }
             prompt: advancedPrompt({ brief: prompt, images: refs.length, hook, location, script, audio: audioOn }),
             ratio,
             durationSec,
-            params: { format: 'advanced', audio: audioOn ? 'on' : 'off' },
+            params: { format: 'advanced', audio: audioOn ? 'on' : 'off', ...inputs, ...(script.trim() && { script: script.trim() }) },
           }
-        : { feature: 'marketing', assetIds: [person[0]!.id, product[0]!.id], modelId: chosen!.id, prompt: marketingPrompt({ hook, location, prompt, audio: audioOn }), ratio, durationSec, params: { audio: audioOn ? 'on' : 'off' } };
+        : { feature: 'marketing', assetIds: [person[0]!.id, product[0]!.id], modelId: chosen!.id, prompt: marketingPrompt({ hook, location, prompt, audio: audioOn }), ratio, durationSec, params: { audio: audioOn ? 'on' : 'off', ...inputs } };
       await api('/api/jobs', sendJson('POST', body));
       setNotice('Đã gửi job. Theo dõi trong tab "Lịch sử".');
       if (!narrow) setTab('history');
@@ -300,10 +300,10 @@ export function MarketingStudio({ format = 'ugc' }: { format?: MarketingFormat }
                 {advanced ? 'Prompt' : 'Prompt (tuỳ chọn)'}
               </label>
               <div className="prompt-box">
-                <textarea id={promptId} value={prompt} maxLength={advanced ? ADVANCED_MAX_BRIEF : MAX_PROMPT} aria-required={advanced || undefined} placeholder="Mô tả video marketing bạn muốn…" onChange={(e) => setPrompt(e.target.value)} />
+                <textarea id={promptId} value={prompt} maxLength={advanced ? ADVANCED_MAX_BRIEF : UGC_MAX_BRIEF} aria-required={advanced || undefined} placeholder="Mô tả video marketing bạn muốn…" onChange={(e) => setPrompt(e.target.value)} />
                 <div className="prompt-foot">
                   <span>
-                    {prompt.length}/{advanced ? ADVANCED_MAX_BRIEF : MAX_PROMPT}
+                    {prompt.length}/{advanced ? ADVANCED_MAX_BRIEF : UGC_MAX_BRIEF}
                   </span>
                 </div>
               </div>

@@ -51,6 +51,8 @@ export const ADVANCED_MAX_IMAGES = 7;
  * roughly two spoken words per second fills a 15 s clip at about 200 characters. */
 export const ADVANCED_MAX_BRIEF = 1000;
 export const ADVANCED_MAX_SCRIPT = 300;
+/** UGC's prompt limit: the fixed part of the composed prompt is about 290 characters (about 460 with the longest hook and location) and the API takes 2000. */
+export const UGC_MAX_BRIEF = 1400;
 
 /**
  * The one English prompt a Marketing Studio Advanced run sends. The member's brief is the source of truth, the reference images are named

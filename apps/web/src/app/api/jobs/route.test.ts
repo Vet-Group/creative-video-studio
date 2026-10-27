@@ -681,8 +681,25 @@ describe('POST /api/jobs for an image feature', () => {
         expect(await error(await advanced(m, 2, { presetId: 'gentle-push-in' }))).toMatch(/prompt and no preset/);
         expect(await error(await advanced(m, 2, { params: { format: 'unboxing' } }))).toMatch(/params.format must be advanced/);
         expect(await error(await advanced(m, 2, { params: { format: 'advanced', audio: 'yes' } }))).toMatch(/params.audio must be on or off/);
-        expect(await error(await advanced(m, 2, { params: { format: 'advanced', resolution: '1K' } }))).toMatch(/params may hold only format and audio/);
+        expect(await error(await advanced(m, 2, { params: { format: 'advanced', resolution: '1K' } }))).toMatch(/params may hold only format, audio, hook, location, brief and script/);
         expect(await error(await advanced(m, 2, { feature: 'video', prompt: 'x', params: { format: 'advanced' } }))).toMatch(/params may hold only audio, as text/);
+        expect(await jobCount()).toBe(before);
+      });
+
+      test('keeps the chosen hook, location, brief and script for reuse, and refuses unknown choices and over-long text', async () => {
+        const m = await newMember();
+        const kept = { format: 'advanced', audio: 'on', hook: 'product-catch', location: 'bedroom', brief: 'b', script: 's' };
+        const { id } = (await (await advanced(m, 2, { params: kept })).json()) as { id: string };
+        expect((await pool.query('select params from jobs where id = $1', [id])).rows[0].params).toEqual(kept);
+        const ugc = await runAs(m, { feature: 'marketing', presetId: null, prompt, ...kling, assetIds: await refs(m, 2), params: { audio: 'off', hook: 'blizzard', brief: 'b' } });
+        expect(ugc.status).toBe(201);
+        const before = await jobCount();
+        expect(await error(await advanced(m, 2, { params: { format: 'advanced', hook: 'nope' } }))).toMatch(/params.hook must be one of/);
+        expect(await error(await advanced(m, 2, { params: { format: 'advanced', location: 'moon' } }))).toMatch(/params.location must be one of/);
+        expect(await error(await advanced(m, 2, { params: { format: 'advanced', brief: 'x'.repeat(1001) } }))).toMatch(/params.brief may be at most 1000/);
+        expect(await error(await advanced(m, 2, { params: { format: 'advanced', script: 'x'.repeat(301) } }))).toMatch(/params.script may be at most 300/);
+        expect(await error(await runAs(m, { feature: 'marketing', presetId: null, prompt, ...kling, assetIds: await refs(m, 2), params: { brief: 'x'.repeat(1401) } }))).toMatch(/params.brief may be at most 1400/);
+        expect(await error(await runAs(m, { feature: 'marketing', presetId: null, prompt, ...kling, assetIds: await refs(m, 2), params: { script: 's' } }))).toMatch(/params.script is for Advanced only/);
         expect(await jobCount()).toBe(before);
       });
 
