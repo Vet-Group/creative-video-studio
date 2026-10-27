@@ -105,7 +105,7 @@ const FORMATS = [
   { id: 'product-review', name: 'Đánh giá sản phẩm', href: null, soon: 'Sắp có' },
 ];
 
-/** What Dùng lại reads back from a Marketing Studio job (GET /api/jobs/:id). */
+/** What the reuse link reads back from a Marketing Studio job (GET /api/jobs/:id). */
 interface MarketingJob {
   feature: string;
   format: string | null;
@@ -189,7 +189,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
     };
   }, [key, attempt]);
 
-  // Dùng lại: refill the form from the source job, everything stays editable. A job of the other format opens on its own page; without the
+  // Reuse: refill the form from the source job, everything stays editable. A job of the other format opens on its own page; without the
   // member's own text (a job from before it was kept, or someone else's) the rest is refilled and the brief is asked for again.
   useEffect(() => {
     if (!reuse) return;
@@ -269,7 +269,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
     setError('');
     setNotice('');
     try {
-      // The form's own inputs ride along in params so History can refill the form (Dùng lại); the worker never reads them.
+      // The form's own inputs ride along in params so History can refill the form (reuse); the worker never reads them.
       const inputs = { ...(hook && { hook }), ...(location && { location }), ...(prompt.trim() && { brief: prompt.trim() }) };
       const body = advanced
         ? {

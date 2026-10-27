@@ -2,7 +2,7 @@ import { expect, type Page, test } from '@playwright/test';
 import { HOOKS, LOCATIONS } from '../src/lib/marketing';
 import { png, select, signIn } from './support.test';
 
-// Dùng lại (Fash's Recreate, without the run): History and the Library open the page that made the job with its form refilled.
+// The reuse link (Fash's Recreate, without the run): History and the Library open the page that made the job with its form refilled.
 const hook = HOOKS.find((h) => h.id === 'product-catch')!;
 const spot = LOCATIONS.find((l) => l.id === 'bedroom')!;
 
@@ -16,7 +16,7 @@ async function job(page: Page, assetIds: string[], params: Record<string, string
   return ((await res.json()) as { id: string }).id;
 }
 
-test('Dùng lại in History refills a UGC job, and an Advanced job opens on the Advanced page with its references, brief and script', async ({ page }) => {
+test('the reuse link in History refills a UGC job, and an Advanced job opens on the Advanced page with its references, brief and script', async ({ page }) => {
   await signIn(page, 'mkte');
   const ugc = await job(page, [await upload(page, 'model.png'), await upload(page, 'product.png')], { audio: 'off', hook: hook.id, location: spot.id, brief: 'soft light' });
 
@@ -44,7 +44,7 @@ test('Dùng lại in History refills a UGC job, and an Advanced job opens on the
   await expect(page.getByRole('textbox', { name: 'Lời thoại (tuỳ chọn)' })).toHaveValue('my lines');
   await expect(page.getByRole('button', { name: /^Hook/ })).not.toContainText(hook.name);
 
-  // The Library's Dùng lại opens the same page for a marketing clip, not Create video.
+  // The Library's reuse link opens the same page for a marketing clip, not Create video.
   await expect.poll(async () => ((await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { status: string }[] }).jobs.filter((j) => j.status === 'succeeded').length, { timeout: 60_000 }).toBe(2);
   await page.goto('/library');
   const card = page.getByRole('article').filter({ hasText: 'E2E Mkt E' }).first();
