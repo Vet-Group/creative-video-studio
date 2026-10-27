@@ -101,12 +101,12 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
     api<{ stores: { id: string; name: string }[] }>('/api/stores').then((r) => setStores(r.stores), () => setError('Không tải được danh sách cửa hàng.'));
   }, []);
 
-  // The enabled presets the Admin set up; the first is the default, and with none enabled the form starts on a free prompt.
+  // The enabled presets the Admin set up; as on the live form, it starts on a free prompt unless Explore links to a preset.
   useEffect(() => {
     api<{ presets: { id: string; label: string }[] }>('/api/presets').then(
       (r) => {
         setPresets(r.presets);
-        if (!reuse) setPresetId(preset === 'none' ? '' : (r.presets.find((p) => p.id === preset)?.id ?? r.presets[0]?.id ?? '')); // none: Explore's free-prompt tile
+        if (!reuse) setPresetId(r.presets.find((p) => p.id === preset)?.id ?? '');
       },
       () => {
         setPresets([]);
@@ -265,7 +265,7 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
 
         <div className="card form-card" id="create-panel-create" role={narrow ? 'tabpanel' : undefined} aria-labelledby={narrow ? 'create-tab-create' : undefined} hidden={narrow && shown !== 'create'}>
           <div className="form-scroll">
-            <div className="banner">
+            <div className="banner" aria-busy={presets === null}>
               <CardMedia video={banner.video} poster={banner.poster} />
               <div className="banner-text">
                 <strong data-value={presetId}>{current?.label ?? 'Tự viết mô tả'}</strong>

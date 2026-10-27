@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { expect, type Locator, type Page, test } from '@playwright/test';
 import { EXAMPLES } from '../src/lib/examples';
-import { modelButton, presetOf, select, signIn } from './support.test';
+import { modelButton, select, signIn } from './support.test';
 
 const CLIPS = EXAMPLES.length;
 
@@ -133,7 +133,8 @@ test('C2: when the browser blocks autoplay each clip shows a play button, and pr
 test('the preset banner keeps looping when another preset swaps its clip in place', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await signIn(page, 'member6');
-  await expect(presetOf(page)).not.toHaveAttribute('data-value', '');
+  await page.goto('/create?preset=gentle-push-in'); // the free prompt has no clip of its own here
+  await expect(page.locator('.banner')).toHaveAttribute('aria-busy', 'false');
   const banner = page.locator('.banner video');
   const moving = () => banner.evaluate((v: HTMLVideoElement) => !v.paused && v.currentTime > 0);
   await expect.poll(moving).toBe(true);
@@ -148,6 +149,7 @@ test('with reduced motion the Explore prompt grid still loops, as the reference 
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.setViewportSize({ width: 1280, height: 900 });
   await signIn(page, 'member6');
+  await page.goto('/create?preset=gentle-push-in');
   const banner = page.locator('.banner video');
   await expect(banner).toHaveCount(1);
   await page.waitForTimeout(1500);
