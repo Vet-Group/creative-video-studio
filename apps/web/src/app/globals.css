@@ -967,6 +967,7 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 /* Marketing Studio: the boxes start 16 px under the banner and the prompt has no counter row (the field still stops at the limit), so ratio and duration sit above the Run bar, as on Fash. */
 .marketing-head { margin-bottom: 0; }
 .form-scroll:has(> .marketing-head) .prompt-foot:not(.script-foot) { display: none; }
+.form-scroll:has(> .marketing-head) .prompt-box textarea { height: 64px; } /* with no counter row, each box is 74 px tall, as on Fash */
 /* 1024-1439 px: Image Generation's size slider shares the tab row too, as Try On's does. */
 @media (min-width: 1024px) and (max-width: 1439.98px) {
   .imagegen-side .gallery-tools { height: 37px; align-items: center; margin: -69px 0 32px; }

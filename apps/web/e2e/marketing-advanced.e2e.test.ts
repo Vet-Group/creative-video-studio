@@ -44,6 +44,7 @@ test('an Advanced job runs from reference images, a brief, a script and audio on
   await expect(brief(page)).toHaveAttribute('placeholder', 'Mô tả video marketing bạn muốn…');
   await expect(script(page)).toBeVisible();
   await expect(page.locator('.script-foot')).toHaveCount(0); // empty, the script box is as short as the live page's
+  for (const box of await page.locator('.prompt-box').all()) expect((await box.boundingBox())!.height).toBeCloseTo(74, 0); // the prompt and script boxes, 74 px as on Fash
   await expect(audio(page)).toHaveAttribute('aria-checked', 'true');
   await expect(modelButton(page)).toContainText('Mock E2E');
   await expect(runButton(page)).toContainText('$0.0000');
