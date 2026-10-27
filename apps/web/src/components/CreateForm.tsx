@@ -438,6 +438,21 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
         <h2>Chọn mẫu</h2>
         <p className="modal-sub">Mỗi mẫu là một kiểu chuyển động đã thử, kèm video ví dụ. Chọn một mẫu hoặc tự viết mô tả.</p>
         <ul className="preset-grid" aria-label="Danh sách mẫu">
+          {/* The free prompt leads, as "General" does on the live picker: it is the default choice. */}
+          <li className="preset-card">
+            {free.video ? <Preview src={free.video} poster={free.poster ?? ''} width={3} height={4} title="Tự viết mô tả" /> : <div className="banner-empty" />}
+            <button
+              type="button"
+              data-value=""
+              aria-pressed={presetId === ''}
+              onClick={() => {
+                setPresetId('');
+                setPicking(false);
+              }}
+            >
+              Tự viết mô tả
+            </button>
+          </li>
           {presets?.map((p) => {
             const m = presetMedia(p.id);
             return (
@@ -457,20 +472,6 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
               </li>
             );
           })}
-          <li className="preset-card">
-            {free.video ? <Preview src={free.video} poster={free.poster ?? ''} width={3} height={4} title="Tự viết mô tả" /> : <div className="banner-empty" />}
-            <button
-              type="button"
-              data-value=""
-              aria-pressed={presetId === ''}
-              onClick={() => {
-                setPresetId('');
-                setPicking(false);
-              }}
-            >
-              Tự viết mô tả
-            </button>
-          </li>
         </ul>
       </Modal>
 

@@ -196,6 +196,7 @@ test('the preset picker is a vertically scrolling grid like the live one: 4 colu
     expect(await grid.evaluate((el) => el.scrollHeight > el.clientHeight && el.scrollWidth <= el.clientWidth)).toBe(true);
     const chosen = cards.filter({ has: page.locator('button[aria-pressed="true"]') });
     await expect(chosen).toHaveCount(1);
+    await expect(cards.first().locator('button[aria-pressed="true"]')).toHaveText('Tự viết mô tả'); // the default comes first and ringed, as "General" does live
     expect(await chosen.locator(':scope > :first-child').evaluate((e) => getComputedStyle(e).outlineStyle)).toBe('solid');
     // As on the live picker: the first row 16 px under the header rule, each clip flush with its card and its name 6 px under it.
     const sub = (await page.locator('dialog[open] .modal-sub').boundingBox())!;

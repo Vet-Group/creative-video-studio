@@ -118,7 +118,7 @@ test('an Admin sets up a team, a store and a user, then reconciles the month cos
   await page.goto('/create');
   await page.getByRole('button', { name: 'Chọn mẫu khác' }).click();
   const picker = presetCards(page);
-  await expect(picker.first()).toHaveText(`${before} (sửa)`);
+  await expect(picker.nth(1)).toHaveText(`${before} (sửa)`); // after the free prompt card
   await page.goto('/admin/presets');
   const second = page.getByRole('row').nth(2);
   const secondLabel = await second.getByRole('textbox').first().inputValue();
