@@ -105,7 +105,22 @@ const FORMATS = [
   { id: 'product-review', name: 'Đánh giá sản phẩm', href: null, soon: 'Sắp có' },
 ];
 
-export function MarketingStudio({ format = 'ugc' }: { format?: MarketingFormat }) {
+/** What Dùng lại reads back from a Marketing Studio job (GET /api/jobs/:id). */
+interface MarketingJob {
+  feature: string;
+  format: string | null;
+  images: Img[];
+  hook: string | null;
+  location: string | null;
+  brief: string | null;
+  script: string | null;
+  audio: string | null;
+  ratio: string;
+  durationSec: number;
+  modelId: string;
+}
+
+export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingFormat; reuse?: string }) {
   const advanced = format === 'advanced';
   const router = useRouter();
   const have = useSamples();
@@ -173,6 +188,30 @@ export function MarketingStudio({ format = 'ugc' }: { format?: MarketingFormat }
       stale = true;
     };
   }, [key, attempt]);
+
+  // Dùng lại: refill the form from the source job, everything stays editable. A job of the other format opens on its own page; without the
+  // member's own text (a job from before it was kept, or someone else's) the rest is refilled and the brief is asked for again.
+  useEffect(() => {
+    if (!reuse) return;
+    api<MarketingJob>(`/api/jobs/${encodeURIComponent(reuse)}`).then(
+      (j) => {
+        if (j.feature !== 'marketing') return setError('Không tìm thấy clip để dùng lại.');
+        if ((j.format === 'advanced') !== advanced) return router.replace(`/marketing-studio${j.format === 'advanced' ? '/advanced' : ''}?reuse=${encodeURIComponent(reuse)}`);
+        if (advanced) setRefs(j.images);
+        else (setPerson(j.images.slice(0, 1)), setProduct(j.images.slice(1, 2)));
+        setHook(j.hook ?? '');
+        setLocation(j.location ?? '');
+        setPrompt(j.brief ?? '');
+        setScript(j.script ?? '');
+        setAudio(j.audio !== 'off');
+        setRatio(j.ratio);
+        setDurationSec(j.durationSec);
+        setModelId(j.modelId);
+        if (j.brief === null && advanced) setNotice('Clip này không có mô tả gốc: đã điền lại ảnh và cài đặt, hãy nhập lại mô tả.');
+      },
+      () => setError('Không tìm thấy clip để dùng lại.'),
+    );
+  }, [reuse]);
 
   // The first list picks the server's default model (the best of those that offer the starting ratio and duration), else the first; a model switched off since is replaced the same way.
   useEffect(() => {

@@ -4,6 +4,7 @@ import { type CSSProperties, useCallback, useEffect, useRef, useState } from 're
 import { api, type Clip, errorText, sendJson } from '@/lib/api';
 import { FAULTS } from '@/lib/faults';
 import { featureLabel } from '@/lib/features';
+import { reuseHref } from '@/lib/reuse';
 import { Icon } from './Icon';
 
 const fmtTime = (iso: string) => new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date(iso));
@@ -151,8 +152,8 @@ function ClipCard({ clip, stores, onChange, onDeleted }: { clip: Clip; stores?: 
         <button type="button" className="icon-button" onClick={() => void download()} aria-label="Tải xuống" title="Tải xuống">
           <Icon name="download" />
         </button>
-        {!image && (
-          <Link href={`/create?reuse=${clip.id}`} className="button">
+        {reuseHref(clip) && (
+          <Link href={reuseHref(clip)!} className="button">
             Dùng lại
           </Link>
         )}
