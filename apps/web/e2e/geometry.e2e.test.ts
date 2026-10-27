@@ -2,7 +2,7 @@
 // computed styles and boxes of every measured row. Sizes are within 2 px, colours are exact. Titles start with the row id.
 import { expect, type Locator, type Page, test } from '@playwright/test';
 import { freezeData } from './frozen.test';
-import { modelButton, png, presetOf, select, signIn } from './support.test';
+import { modelButton, png, select, signIn } from './support.test';
 
 const DESKTOP = { width: 1440, height: 1000 };
 const LAPTOP = { width: 1280, height: 800 };
@@ -35,7 +35,7 @@ async function openCreate(page: Page, size: { width: number; height: number }, o
   if (options.noJobs) await page.route(/\/api\/jobs\?mine/, (r) => r.fulfill({ json: { jobs: [], workerOffline: false } }));
   await signIn(page, 'member7');
   await expect(modelButton(page)).toContainText('Mock E2E');
-  await expect(presetOf(page)).not.toHaveAttribute('data-value', '');
+  await expect(page.locator('.banner')).toHaveAttribute('aria-busy', 'false');
   await page.evaluate(() => document.fonts.ready.then(() => undefined));
 }
 

@@ -47,7 +47,8 @@ test('Explore links into Create with the chosen preset or model already picked',
   }
 
   await page.goto('/create?preset=no-such-preset');
-  await expect(presetOf(page)).toHaveAttribute('data-value', 'gentle-push-in'); // the default
+  await expect(page.locator('.banner')).toHaveAttribute('aria-busy', 'false');
+  await expect(presetOf(page)).toHaveAttribute('data-value', ''); // the default free prompt
 });
 
 test('the sidebar collapses to a 64 px icon rail that keeps its labels for screen readers and is remembered', async ({ page }) => {

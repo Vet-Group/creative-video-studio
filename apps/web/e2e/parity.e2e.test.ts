@@ -22,14 +22,14 @@ const SHOT = { animations: 'disabled', caret: 'hide', maxDiffPixelRatio: 0.01, s
 async function openCreate(page: Page): Promise<void> {
   await page.goto('/create');
   await expect(modelButton(page)).toContainText('Mock E2E');
-  await expect(presetOf(page)).not.toHaveAttribute('data-value', ''); // the first preset is chosen once the list has loaded
+  await expect(page.locator('.banner')).toHaveAttribute('aria-busy', 'false'); // the presets have loaded
   await select(page, 'Cửa hàng/Thương hiệu').click();
   await expect(optionsOf(page, 'Cửa hàng/Thương hiệu')).not.toHaveCount(1); // the empty choice and at least one store
   await select(page, 'Cửa hàng/Thương hiệu').click();
   // Opening the store list scrolled the form and left the focus on it; the specs and baselines start from a fresh load.
   await page.reload();
   await expect(modelButton(page)).toContainText('Mock E2E');
-  await expect(presetOf(page)).not.toHaveAttribute('data-value', '');
+  await expect(page.locator('.banner')).toHaveAttribute('aria-busy', 'false');
   await expect(page.getByText('Tháng này bạn đã dùng: $0.0000')).toBeVisible();
 }
 
@@ -209,6 +209,17 @@ test('the preset picker is a vertically scrolling grid like the live one: 4 colu
     await expect(grid).toBeHidden();
     await expect(page.getByRole('button', { name: 'Chọn mẫu khác' })).toBeFocused();
   }
+});
+
+test('Create starts on a free prompt as on the live form: the prompt box open and Enhance on', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await signIn(page, 'member5');
+  await openCreate(page);
+  await expect(presetOf(page)).toHaveAttribute('data-value', '');
+  await expect(page.getByLabel('Mô tả chuyển động')).toBeEnabled();
+  const enhance = page.getByRole('button', { name: 'Cải thiện mô tả bằng AI' });
+  await expect(enhance).toHaveAttribute('aria-pressed', 'true');
+  await expect(enhance).toHaveCSS('background-color', 'rgb(26, 26, 26)'); // filled when on, so its white label reads
 });
 
 test('choosing a preset or using an example fills the form and creates no job', async ({ page }) => {

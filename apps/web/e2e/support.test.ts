@@ -84,12 +84,12 @@ export async function pickModel(page: Page, name: RegExp): Promise<void> {
   await page.getByRole('option', { name }).click();
 }
 
-/** Uploads one image on the Create page, keeps the pre-selected model and presses Run. `preset`, `ratio` and `duration` are option values; `store` is the name of a store in the picker. */
+/** Uploads one image on the Create page, keeps the pre-selected model and presses Run. `preset` (default `gentle-push-in`, as the form starts on a free prompt), `ratio` and `duration` are option values; `store` is the name of a store in the picker. */
 export async function runInUi(page: Page, options: { preset?: string; ratio?: string; duration?: string; store?: string } = {}): Promise<void> {
   await expect(page.getByLabel('Ảnh sản phẩm')).toBeEnabled(); // the file input stays disabled until hydration; files set before it are dropped
   await page.getByLabel('Ảnh sản phẩm').setInputFiles({ name: 'shirt.png', mimeType: 'image/png', buffer: png() });
   await expect(page.getByRole('img', { name: 'shirt.png' })).toBeVisible();
-  if (options.preset) await pickPreset(page, options.preset);
+  await pickPreset(page, options.preset ?? 'gentle-push-in');
   if (options.ratio) await selectValue(page, 'Tỉ lệ khung hình', options.ratio);
   if (options.duration) await selectValue(page, 'Thời lượng', options.duration);
   if (options.store) await selectText(page, 'Cửa hàng/Thương hiệu', options.store);
