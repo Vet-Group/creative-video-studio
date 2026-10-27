@@ -26,19 +26,25 @@ export const LOCATIONS: MarketingChoice[] = [
   { id: 'street', name: 'Đường phố', desc: 'Đường phố nhộn nhịp ban ngày', phrase: 'a lively city street in the daytime' },
 ];
 
-const INSTRUCTION =
-  'UGC try-on video. The person in [Image1] wears the product in [Image2]. Keep the person\'s face and body and the product\'s shape, colours and details true to the photos. ' +
-  'Creator-style handheld vertical video, shot on a phone, natural and authentic. Do not add any text, logos or watermarks.';
+/** How the clip is framed, from the chosen ratio; the try-on instruction used to say "vertical" whatever the ratio. */
+const FRAMES: Record<string, string> = { '9:16': 'vertical 9:16 frame', '16:9': 'horizontal 16:9 frame', '1:1': 'square 1:1 frame' };
+
+/** The fixed try-on instruction: who and what must stay true to the photos, and the shots a try-on clip needs (the whole look, a product close-up, the fit in motion). */
+const instruction = (ratio?: string | null) =>
+  `UGC try-on video, ${(ratio && FRAMES[ratio]) ?? (ratio ? `${ratio} frame` : 'vertical frame')}, filmed handheld on a phone by a real creator. ` +
+  "The creator in [Image1] wears or holds the product in [Image2]; keep their face, hair and body and the product's shape, colours, print and details exactly as in the photos. " +
+  'Show the whole look, a close-up of the product, then a natural move or turn that shows the fit. Soft natural light, authentic energy. No on-screen text, logos or watermarks.';
 
 /**
- * The one English prompt a Marketing Studio run sends: the fixed try-on instruction, then the hook and the location when chosen, then the member's own text.
- * An unknown or empty hook or location id adds nothing. `audio` adds the sound rule (UGC_SOUND or SILENT); left out, the prompt says nothing about sound.
+ * The one English prompt a Marketing Studio run sends: the fixed try-on instruction for the ratio, then the hook and the location when chosen, then the
+ * member's own text as creator notes. An unknown or empty hook or location id adds nothing. `audio` adds the sound rule (UGC_SOUND or SILENT); left out,
+ * the prompt says nothing about sound.
  */
-export function marketingPrompt({ hook, location, prompt, audio }: { hook?: string | null; location?: string | null; prompt?: string | null; audio?: boolean }): string {
+export function marketingPrompt({ hook, location, prompt, audio, ratio }: { hook?: string | null; location?: string | null; prompt?: string | null; audio?: boolean; ratio?: string | null }): string {
   const h = HOOKS.find((c) => c.id === hook);
   const l = LOCATIONS.find((c) => c.id === location);
   const text = prompt?.trim();
-  return [INSTRUCTION, h?.phrase, l && `Set in ${l.phrase}.`, text, audio === undefined ? null : audio ? UGC_SOUND : SILENT].filter(Boolean).join(' ');
+  return [instruction(ratio), h?.phrase, l && `Set in ${l.phrase}.`, text && `Creator notes: ${text}`, audio === undefined ? null : audio ? UGC_SOUND : SILENT].filter(Boolean).join(' ');
 }
 
 /** Sound of a UGC clip with audio on: what a phone records, as on the reference site's UGC clips. */
@@ -51,8 +57,9 @@ export const ADVANCED_MAX_IMAGES = 7;
  * roughly two spoken words per second fills a 15 s clip at about 200 characters. */
 export const ADVANCED_MAX_BRIEF = 1000;
 export const ADVANCED_MAX_SCRIPT = 300;
-/** UGC's prompt limit: the fixed part of the composed prompt is about 290 characters (about 460 with the longest hook and location) and the API takes 2000. */
-export const UGC_MAX_BRIEF = 1400;
+/** UGC's prompt limit: with the longest ratio, hook, location and sound rule the rest of the prompt is about 770 characters, and the API takes 2000
+ * (marketing.test.ts checks the worst case). */
+export const UGC_MAX_BRIEF = 1200;
 
 /**
  * The one English prompt a Marketing Studio Advanced run sends. The member's brief is the source of truth, the reference images are named

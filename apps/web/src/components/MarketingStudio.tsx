@@ -164,7 +164,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
   const cost = audioOn ? chosen!.audioEstimateUsd! : chosen?.estimateUsd;
   const words = script.trim() ? script.trim().split(/\s+/).length : 0;
   /** The English prompt Run sends, shown as is under the form. */
-  const sent = advanced ? advancedPrompt({ brief: prompt, images: refs.length, hook, location, script, audio: audioOn }) : marketingPrompt({ hook, location, prompt, audio: audioOn });
+  const sent = advanced ? advancedPrompt({ brief: prompt, images: refs.length, hook, location, script, audio: audioOn }) : marketingPrompt({ hook, location, prompt, audio: audioOn, ratio });
   const name = FORMATS.find((f) => f.id === format)!.name;
   /** The sample photo and loop behind the format header, when an Admin uploaded them. */
   const photo = `marketing-format-${format}.jpg`;
