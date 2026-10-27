@@ -6,12 +6,15 @@ const nav = (page: Page) => page.getByRole('navigation', { name: 'Điều hướ
 
 test('the sidebar lists Explore, Try On, Image Generation, Create, Marketing Studio, Apps and Library in the live order, and Admin only for an Admin', async ({ page }) => {
   await signIn(page, 'member1');
-  await expect(nav(page).getByRole('link')).toHaveText(['Khám phá', 'Thử đồ', 'Tạo ảnh', 'Tạo video', 'Marketing Studio', 'Ứng dụng', 'Thư viện']);
+  await expect(nav(page).getByRole('link')).toHaveCount(7);
+  await expect(nav(page).locator('.nav-label')).toHaveText(['Khám phá', 'Thử đồ', 'Tạo ảnh', 'Tạo video', 'Marketing Studio', 'Ứng dụng', 'Thư viện']);
+  await expect(nav(page).getByRole('link', { name: 'Marketing Studio', exact: true })).toBeVisible(); // the badge is not part of the name
   await page.getByRole('button', { name: 'Cài đặt' }).click();
   await page.getByRole('dialog', { name: 'Cài đặt' }).getByRole('button', { name: 'Đăng xuất' }).click();
   await expect(page).toHaveURL(/\/login$/);
   await signIn(page, 'admin');
-  await expect(nav(page).getByRole('link')).toHaveText(['Khám phá', 'Thử đồ', 'Tạo ảnh', 'Tạo video', 'Marketing Studio', 'Ứng dụng', 'Thư viện', 'Quản trị']);
+  await expect(nav(page).getByRole('link')).toHaveCount(8);
+  await expect(nav(page).locator('.nav-label')).toHaveText(['Khám phá', 'Thử đồ', 'Tạo ảnh', 'Tạo video', 'Marketing Studio', 'Ứng dụng', 'Thư viện', 'Quản trị']);
 });
 
 test('Explore links into Create with the chosen preset or model already picked', async ({ page }) => {
@@ -49,6 +52,24 @@ test('Explore links into Create with the chosen preset or model already picked',
   await page.goto('/create?preset=no-such-preset');
   await expect(page.locator('.banner')).toHaveAttribute('aria-busy', 'false');
   await expect(presetOf(page)).toHaveAttribute('data-value', ''); // the default free prompt
+});
+
+test('at 1440 the sidebar rhythm is the live one: the first item at 81 px, one every 41 px, solid 16 px icons and a red "Mới" pill on Marketing Studio', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await signIn(page, 'member1');
+  const links = nav(page).getByRole('link');
+  const ys = await links.evaluateAll((as) => as.map((a) => Math.round(a.getBoundingClientRect().y)));
+  expect(ys[0]).toBe(81);
+  for (let i = 1; i < ys.length; i++) expect(ys[i]! - ys[i - 1]!).toBe(41);
+  const icon = links.first().locator('svg');
+  await expect(icon).toHaveAttribute('fill', 'currentColor');
+  expect((await icon.boundingBox())!.width).toBe(16);
+  const badge = links.nth(4).locator('.nav-badge');
+  await expect(badge).toHaveText('Mới');
+  await expect(badge).toHaveCSS('background-color', 'rgb(240, 68, 56)');
+  expect((await links.nth(4).locator('.nav-label').boundingBox())!.height).toBe(21); // one line, the pill beside it
+  const pill = (await badge.boundingBox())!, row = (await links.nth(4).boundingBox())!;
+  expect(pill.x + pill.width).toBeLessThanOrEqual(row.x + row.width);
 });
 
 test('the sidebar collapses to a 64 px icon rail that keeps its labels for screen readers and is remembered', async ({ page }) => {

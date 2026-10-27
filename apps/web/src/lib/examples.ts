@@ -89,8 +89,30 @@ export const MORE_EXAMPLES: Example[] = [
   more(35, '9:16', 406, 720, 6),
 ];
 
+/** The reference site's clips uploaded over the fixtures, in their own sizes (measured on the live samples 2026-10-27), so each tile keeps its clip's shape. */
+const UPLOADED_SIZE: Record<string, [Aspect, number, number]> = {
+  'example-1': ['3:4', 1248, 1664],
+  'example-2': ['9:16', 1088, 1920],
+  'example-3': ['3:4', 1244, 1664],
+  'example-4': ['16:9', 1920, 1080],
+  'example-5': ['9:16', 1088, 1920],
+  'example-6': ['16:9', 1920, 1080],
+  'example-7': ['1:1', 1440, 1440],
+  'example-8': ['9:16', 1088, 1920],
+  'example-9': ['3:4', 1248, 1664],
+  'example-10': ['1:1', 1440, 1440],
+};
+
+function uploaded(e: Example, have: ReadonlySet<string>): Example {
+  const size = have.has(`${e.id}.mp4`) ? UPLOADED_SIZE[e.id] : undefined;
+  if (!size) return e;
+  const { ratio: _fixtureRatio, ...rest } = e;
+  const [aspect, width, height] = size;
+  return { ...rest, aspect, width, height, ...(aspect === '9:16' || aspect === '1:1' ? { ratio: aspect } : {}) };
+}
+
 /** The Examples tab: the ten fixture-backed clips, then each further sample clip that is uploaded. */
-export const examplesFor = (have: ReadonlySet<string>): Example[] => [...EXAMPLES, ...MORE_EXAMPLES.filter((e) => have.has(`${e.id}.mp4`))];
+export const examplesFor = (have: ReadonlySet<string>): Example[] => [...EXAMPLES.map((e) => uploaded(e, have)), ...MORE_EXAMPLES.filter((e) => have.has(`${e.id}.mp4`))];
 
 /** The uploaded sample named `name` (lib/samples.ts) when it exists, else `fallback`; by default the name is the fallback's file name. */
 export function sampleSrc(have: ReadonlySet<string>, fallback: string, name = fallback.slice(fallback.lastIndexOf('/') + 1)): string {

@@ -111,12 +111,12 @@ function Toasts() {
 }
 
 // The sidebar in the live order; later features slot in where the live sidebar has them.
-const NAV: { href: string; text: string; icon: IconName }[] = [
+const NAV: { href: string; text: string; icon: IconName; badge?: string }[] = [
   { href: '/explore', text: 'Khám phá', icon: 'home' },
   { href: '/try-on', text: 'Thử đồ', icon: 'tryon' },
   { href: '/image-generation', text: 'Tạo ảnh', icon: 'image' },
   { href: '/create', text: 'Tạo video', icon: 'create' },
-  { href: '/marketing-studio', text: 'Marketing Studio', icon: 'megaphone' },
+  { href: '/marketing-studio', text: 'Marketing Studio', icon: 'megaphone', badge: 'Mới' },
   { href: '/apps', text: 'Ứng dụng', icon: 'apps' },
   { href: '/library', text: 'Thư viện', icon: 'library' },
 ];
@@ -154,12 +154,13 @@ export function Shell({ userId, userName, isAdmin, account, initialCollapsed, ch
   const sidebar = useRef<HTMLDivElement>(null);
   const [collapsed, setCollapsed] = useState(initialCollapsed); // the icon rail, from 1024 px
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const link = (href: string, text: string, icon: IconName, current = pathname === href) => (
+  const link = (href: string, text: string, icon: IconName, current = pathname === href, badge?: string) => (
     <Link key={href} href={href} aria-current={current ? 'page' : undefined} title={collapsed ? text : undefined}>
       <span className="nav-icon">
-        <Icon name={icon} />
+        <Icon name={icon} size={16} filled />
       </span>
       <span className="nav-label">{text}</span>
+      {badge && <span className="nav-badge" aria-hidden="true">{badge}</span>}
     </Link>
   );
   function toggleRail() {
@@ -219,7 +220,7 @@ export function Shell({ userId, userName, isAdmin, account, initialCollapsed, ch
               </button>
             </div>
             <nav aria-label="Điều hướng chính">
-              {NAV.map((n) => link(n.href, n.text, n.icon, pathname === n.href || pathname.startsWith(`${n.href}/`)))}
+              {NAV.map((n) => link(n.href, n.text, n.icon, pathname === n.href || pathname.startsWith(`${n.href}/`), n.badge))}
               {isAdmin && link('/admin/users', 'Quản trị', 'admin', pathname.startsWith('/admin'))}
             </nav>
           </div>

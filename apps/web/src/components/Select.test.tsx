@@ -18,6 +18,14 @@ test('a closed select is a labelled combobox showing the chosen option, with no 
   expect(html).not.toContain('role="listbox"');
 });
 
+test('a ratio select draws its icon in the chosen shape: tall for 9:16, square for 1:1, wide otherwise', () => {
+  const shape = (value: string) => renderToStaticMarkup(<Select label="Tỉ lệ" icon="ratio" heading="Chọn tỉ lệ" value={value} options={[{ value, label: value }]} onChange={() => undefined} />).match(/<path d="([^"]+)"/)![1];
+  expect(shape('9:16')).toBe('M4.5 2h7v12h-7z');
+  expect(shape('1:1')).toBe('M3 3h10v10H3z');
+  expect(shape('16:9')).toBe('M2.5 4h11v8h-11z');
+  expect(shape('auto')).toBe('M2.5 4h11v8h-11z');
+});
+
 test('the model picker shows the chosen model on its button and keeps the panel closed', () => {
   const models = [
     { id: 'a', label: 'Alpha', isMock: false, supported: true, rate: '80% (8/10)', estimateUsd: '0.8000' },
