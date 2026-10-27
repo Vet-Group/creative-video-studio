@@ -45,12 +45,15 @@ const TAB_LABEL: Record<Tab, string> = { create: 'Tạo', history: 'Lịch sử'
 const RATIO_LABEL: Record<string, string> = { '9:16': '9:16 (dọc)', '16:9': '16:9 (ngang)', '1:1': '1:1 (vuông)' };
 
 /** A box on the form that opens the list of choices; shows the chosen one. */
-function ChoiceBox({ label, icon, value, onOpen }: { label: string; icon: IconName; value: string | undefined; onOpen: () => void }) {
+/** With `media` (the chosen choice's sample), a chosen box shows it full size under a name chip, as on Fash. */
+function ChoiceBox({ label, icon, value, media, onOpen, onClear }: { label: string; icon: IconName; value: string | undefined; media?: { video: string | null; poster: string | null }; onOpen: () => void; onClear: () => void }) {
+  const filled = value !== undefined && media !== undefined && (media.video ?? media.poster) !== null;
   const labelId = useId();
   const valueId = useId();
   return (
     <div className="field">
-      <button type="button" className="choice-box" aria-haspopup="dialog" aria-labelledby={`${labelId} ${valueId}`} onClick={onOpen}>
+      <button type="button" className="choice-box" data-filled={filled || undefined} aria-haspopup="dialog" aria-labelledby={`${labelId} ${valueId}`} onClick={onOpen}>
+        {filled && <CardMedia {...media} />}
         <span className="slot-icon" aria-hidden="true">
           <Icon name={icon} size={16} />
         </span>
@@ -61,6 +64,11 @@ function ChoiceBox({ label, icon, value, onOpen }: { label: string; icon: IconNa
           {value ?? 'Chưa chọn'}
         </span>
       </button>
+      {value !== undefined && (
+        <button type="button" className="choice-clear" aria-label={`Bỏ ${label.replace(' (tuỳ chọn)', '')}`} onClick={onClear}>
+          <Icon name="x" size={12} />
+        </button>
+      )}
     </div>
   );
 }
@@ -365,8 +373,8 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
                   <Slot label="Sản phẩm" empty="Thêm 1 ảnh sản phẩm" inputLabel="Ảnh sản phẩm" images={product} max={1} busy={busy} onAdd={add(setProduct)} onRemove={() => setProduct([])} />
                 </>
               )}
-              <ChoiceBox label="Hook (tuỳ chọn)" icon="film" value={hooks.length === 0 ? undefined : hooks.length === 1 ? hookName(hooks[0]!) : `${hooks.length} biến thể: ${hooks.map(hookName).join(', ')}`} onOpen={() => setPicker('hook')} />
-              <ChoiceBox label="Bối cảnh (tuỳ chọn)" icon="sliders" value={LOCATIONS.find((c) => c.id === location)?.name} onOpen={() => setPicker('location')} />
+              <ChoiceBox label="Hook (tuỳ chọn)" icon="film" media={hooks[0] ? cardSample(have, `marketing-hook-${hooks[0]}`) : undefined} value={hooks.length === 0 ? undefined : hooks.length === 1 ? hookName(hooks[0]!) : `${hooks.length} biến thể: ${hooks.map(hookName).join(', ')}`} onOpen={() => setPicker('hook')} onClear={() => setHooks([])} />
+              <ChoiceBox label="Bối cảnh (tuỳ chọn)" icon="sliders" media={location ? cardSample(have, `marketing-location-${location}`) : undefined} value={LOCATIONS.find((c) => c.id === location)?.name} onOpen={() => setPicker('location')} onClear={() => setLocation('')} />
             </div>
 
             <div className="field">

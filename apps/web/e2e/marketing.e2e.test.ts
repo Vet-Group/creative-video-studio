@@ -1,6 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 import { HOOKS, LOCATIONS } from '../src/lib/marketing';
-import { modelButton, png, select, selectValue, signIn } from './support.test';
+import { jpg, modelButton, png, select, selectValue, signIn } from './support.test';
 
 const nav = (page: Page) => page.getByRole('navigation', { name: 'Điều hướng chính' });
 const file = (name: string) => ({ name, mimeType: 'image/png', buffer: png() });
@@ -348,4 +348,46 @@ test('hook variants beyond the clips left today are refused before anything is s
   await page.keyboard.press('Escape');
   await expect(page.getByRole('button', { name: /^Hook/ })).toContainText(HOOKS[0]!.name);
   await expect(runButton(page)).toBeEnabled();
+});
+
+test('as on Fash, a filled photo slot and a chosen hook or location show the picture full size under a name chip, with an X to clear', async ({ page }) => {
+  const names = [`marketing-hook-${hook.id}.jpg`];
+  const asAdmin = async (each: (name: string) => Promise<{ ok(): boolean }>) => {
+    await page.context().clearCookies();
+    await signIn(page, 'admin');
+    for (const name of names) expect((await each(name)).ok()).toBe(true);
+    await page.context().clearCookies();
+  };
+  await asAdmin((name) => page.request.put(`/api/admin/samples/${name}`, { data: jpg(), headers: { 'content-type': 'image/jpeg' } }));
+  try {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await signIn(page, 'mktb');
+    await page.goto('/marketing-studio');
+    await page.getByLabel('Ảnh sản phẩm').setInputFiles(file('product.png'));
+    const slot = page.getByRole('group', { name: 'Sản phẩm' });
+    const photo = slot.getByRole('img', { name: 'product.png' });
+    await expect(photo).toBeVisible();
+    await expect(slot.locator('.slot-chip')).toHaveText('Sản phẩm');
+    const [box, img] = [(await slot.boundingBox())!, (await photo.boundingBox())!];
+    expect(img.width).toBeGreaterThan(box.width - 4); // fills the tile, not a 56 px thumbnail
+    expect(img.height).toBeGreaterThan(box.height - 4);
+
+    const hookBox = page.getByRole('button', { name: /^Hook/ });
+    await hookBox.click();
+    await page.getByRole('dialog', { name: 'Chọn hook' }).getByRole('option', { name: hook.name, exact: true }).click();
+    await expect(hookBox.locator('img')).toHaveAttribute('src', `/api/samples/marketing-hook-${hook.id}.jpg`);
+    await expect(hookBox.locator('.choice-value')).toHaveText(hook.name);
+    await page.getByRole('button', { name: 'Bỏ Hook' }).click();
+    await expect(hookBox.locator('img')).toHaveCount(0);
+    await expect(hookBox).not.toContainText(hook.name);
+
+    // A choice without an uploaded sample keeps the plain box with the name.
+    const placeBox = page.getByRole('button', { name: /^Bối cảnh/ });
+    await placeBox.click();
+    await page.getByRole('dialog', { name: 'Chọn bối cảnh' }).getByRole('option', { name: LOCATIONS.find((l) => l.id === 'kitchen')!.name, exact: true }).click();
+    await expect(placeBox.locator('img, video')).toHaveCount(0);
+    await expect(placeBox).toContainText(LOCATIONS.find((l) => l.id === 'kitchen')!.name);
+  } finally {
+    await asAdmin((name) => page.request.delete(`/api/admin/samples/${name}`));
+  }
 });

@@ -871,6 +871,18 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 /* Marketing Studio: the hook and location boxes sit under the two photo slots like the reference, and open a dialog of text cards. */
 .choice-box { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; width: 100%; min-height: 174px; padding: 12px; border: 1px dashed var(--text-disabled); border-radius: 18px; background: transparent; color: var(--text-2); text-align: center; }
 .app-slots.marketing-slots .slot, .marketing-slots .choice-box { min-height: 128px; }
+/* Marketing Studio, as on Fash: a filled one-image slot and a chosen hook or location show the picture full size, a dark name chip bottom left and the X top right. */
+.marketing-slots .slot[data-one] { position: relative; padding: 0; overflow: hidden; }
+.marketing-slots .slot[data-one] .slot-thumbs { position: absolute; inset: 0; }
+.marketing-slots .slot[data-one] .slot-thumbs li { width: 100%; height: 100%; }
+.marketing-slots .slot[data-one] .slot-thumbs img { border-radius: 17px; }
+.marketing-slots .slot[data-one] .slot-thumbs button { top: 8px; right: 8px; }
+.slot-chip, .choice-box[data-filled] .choice-value { position: absolute; left: 8px; bottom: 8px; z-index: 1; max-width: calc(100% - 16px); padding: 3px 8px; overflow: hidden; border-radius: 6px; background: rgba(0, 0, 0, .75); color: #fff; font-size: 11px; line-height: 16px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.choice-box[data-filled] { position: relative; padding: 0; overflow: hidden; }
+.marketing-slots .field:has(> .choice-box) { position: relative; }
+.choice-clear { position: absolute; top: 8px; right: 8px; z-index: 2; display: grid; place-items: center; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%; background: var(--ink); color: var(--on-dark); }
+.choice-box[data-filled] > :is(video, img) { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.choice-box[data-filled] .slot-icon, .choice-box[data-filled] .choice-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 .marketing-slots .slot-wide { grid-column: 1 / -1; } /* Advanced: the reference slot spans the row above the hook and location boxes */
 .choice-box:hover { border-color: var(--ink); background: var(--surface-1); }
 .choice-value { color: var(--ink); font-size: 13px; line-height: 18px; font-weight: 600; overflow-wrap: anywhere; }
