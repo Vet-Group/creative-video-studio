@@ -357,3 +357,48 @@ describe('GET /api/assets/:id/download', () => {
     expect((await download(id, ownerCookie, `${expiry}.${signature[0] === 'A' ? 'B' : 'A'}${signature.slice(1)}`)).status).toBe(403);
   });
 });
+
+describe('GET /api/assets?recent=marketing-product', () => {
+  beforeAll(async () => {
+    await pool.query(
+      `insert into model_configs (id, provider, endpoint, label, ratios, durations_sec, max_images, output_resolution, usd_per_second, sources, enabled, features)
+       values ('fal-test', 'fal', 'x', 'Fal test', '{9:16}', '{5}', 7, '720p', 0.2, '{}', true, '{marketing}')`,
+    );
+  });
+  /** A UGC (or, with `format`, Advanced) Marketing Studio job of the user over the given inputs, `minutesAgo` old. */
+  async function job(userId: string, inputs: string[], minutesAgo: number, format?: string) {
+    const id = `mkt-${randomBytes(4).toString('hex')}`;
+    await pool.query(
+      `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, status, feature, params, created_at)
+       values ($1, $2, 'team-unassigned', 'fal-test', 'fal', 'p', '9:16', 5, $3, 'succeeded', 'marketing', $4, now() - make_interval(mins => $5))`,
+      [id, userId, inputs, format ? { format } : {}, minutesAgo],
+    );
+  }
+  const recent = async (cookie: string, query = '?recent=marketing-product') => {
+    const { GET } = await import('./route');
+    return GET(new Request(`${BASE}${query}`, { headers: { cookie } }));
+  };
+
+  test("lists the caller's own UGC product photos, newest first and once each, without model photos, Advanced references or deleted files", async () => {
+    const up = (name: string) => uploadOne(ownerCookie, png(64), name);
+    const [model, p1, p2, ref, gone] = [await up('m.png'), await up('p1.png'), await up('p2.png'), await up('ref.png'), await up('gone.png')];
+    await job(ownerId, [model, p1], 30);
+    await job(ownerId, [model, p2], 20);
+    await job(ownerId, [model, p1], 10); // p1 again, most recently
+    await job(ownerId, [ref, model], 5, 'advanced');
+    await job(ownerId, [model, gone], 1);
+    await pool.query(`update assets set deleted_at = now() where id = $1`, [gone]);
+    const res = await recent(ownerCookie);
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { assets: { id: string; filename: string }[] }).assets).toEqual([
+      { id: p1, filename: 'p1.png' },
+      { id: p2, filename: 'p2.png' },
+    ]);
+  });
+
+  test("never shows another member's products, and asks for a session and the one supported query", async () => {
+    expect(((await (await recent(otherCookie)).json()) as { assets: unknown[] }).assets).toEqual([]);
+    expect((await recent('')).status).toBe(401);
+    expect((await recent(ownerCookie, '?recent=other')).status).toBe(400);
+  });
+});

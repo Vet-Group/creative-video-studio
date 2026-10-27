@@ -108,6 +108,28 @@ function ChoiceDialog({ open, title, sub, kind, choices, selected, onPick, onClo
   );
 }
 
+/** A photo dialog of the model or product slot, as on Fash: an upload tile first, then the photos to pick (4 per row of 3:4 portraits). */
+function PhotoDialog({ open, title, sub, tiles, busy, onFile, onClose }: { open: boolean; title: string; sub: string; tiles: { key: string; src: string; label: string; pick: () => void }[]; busy: boolean; onFile: (files: File[]) => void; onClose: () => void }) {
+  return (
+    <Modal open={open} onClose={onClose} label={title} className="choice-dialog">
+      <h2>{title}</h2>
+      <p className="modal-sub">{sub}</p>
+      <div className="choice-grid model-grid">
+        <label className="model-upload">
+          <Icon name="plus" size={16} />
+          Tải lên ảnh của bạn
+          <input type="file" accept="image/*" className="sr-only" onChange={(e) => (onClose(), onFile([...(e.target.files ?? [])].slice(0, 1)))} />
+        </label>
+        {tiles.map((t) => (
+          <button key={t.key} type="button" aria-label={t.label} disabled={busy} onClick={() => (onClose(), t.pick())}>
+            {open && <img src={t.src} alt="" />}
+          </button>
+        ))}
+      </div>
+    </Modal>
+  );
+}
+
 export type MarketingFormat = 'ugc' | 'advanced';
 /** The formats of the live format picker, each with its page and sample loop; the ones not built yet say why they cannot be picked. */
 const FORMATS = [
@@ -147,7 +169,9 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
   const [hooks, setHooks] = useState<string[]>([]);
   const [many, setMany] = useState(false);
   const [location, setLocation] = useState('');
-  const [picker, setPicker] = useState<'hook' | 'location' | 'format' | 'model' | null>(null);
+  const [picker, setPicker] = useState<'hook' | 'location' | 'format' | 'model' | 'product' | null>(null);
+  /** The member's past UGC product photos (Fash's My Products), offered by the product slot. */
+  const [myProducts, setMyProducts] = useState<Img[]>([]);
   const [prompt, setPrompt] = useState('');
   const [modelId, setModelId] = useState('');
   const [ratio, setRatio] = useState('9:16');
@@ -237,6 +261,15 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
       () => setError('Không tìm thấy clip để dùng lại.'),
     );
   }, [reuse]);
+
+  // My products: loaded once; a failure just leaves the plain upload slot.
+  useEffect(() => {
+    if (advanced) return;
+    api<{ assets: Img[] }>('/api/assets?recent=marketing-product').then(
+      (r) => setMyProducts(r.assets),
+      () => {},
+    );
+  }, [advanced]);
 
   // The first list picks the server's default model (the best of those that offer the starting ratio and duration), else the first; a model switched off since is replaced the same way.
   useEffect(() => {
@@ -370,7 +403,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
               ) : (
                 <>
                   <Slot label="Người mẫu" empty="Thêm 1 ảnh người mẫu" inputLabel="Ảnh người mẫu" images={person} max={1} busy={busy} onAdd={add(setPerson)} onRemove={() => setPerson([])} onBrowse={stockModels.length > 0 ? () => setPicker('model') : undefined} />
-                  <Slot label="Sản phẩm" empty="Thêm 1 ảnh sản phẩm" inputLabel="Ảnh sản phẩm" images={product} max={1} busy={busy} onAdd={add(setProduct)} onRemove={() => setProduct([])} />
+                  <Slot label="Sản phẩm" empty="Thêm 1 ảnh sản phẩm" inputLabel="Ảnh sản phẩm" images={product} max={1} busy={busy} onAdd={add(setProduct)} onRemove={() => setProduct([])} onBrowse={myProducts.length > 0 ? () => setPicker('product') : undefined} />
                 </>
               )}
               <ChoiceBox label="Hook (tuỳ chọn)" icon="film" media={hooks[0] ? cardSample(have, `marketing-hook-${hooks[0]}`) : undefined} value={hooks.length === 0 ? undefined : hooks.length === 1 ? hookName(hooks[0]!) : `${hooks.length} biến thể: ${hooks.map(hookName).join(', ')}`} onOpen={() => setPicker('hook')} onClear={() => setHooks([])} />
@@ -490,22 +523,24 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
           ))}
         </div>
       </Modal>
-      <Modal open={picker === 'model'} onClose={() => setPicker(null)} label="Chọn người mẫu" className="choice-dialog">
-        <h2>Chọn người mẫu</h2>
-        <p className="modal-sub">Dùng một người mẫu có sẵn, hoặc tải lên ảnh của bạn.</p>
-        <div className="choice-grid model-grid">
-          <label className="model-upload">
-            <Icon name="plus" size={16} />
-            Tải lên ảnh của bạn
-            <input type="file" accept="image/*" className="sr-only" onChange={(e) => (setPicker(null), void add(setPerson)([...(e.target.files ?? [])].slice(0, 1)))} />
-          </label>
-          {stockModels.map((name, i) => (
-            <button key={name} type="button" aria-label={`Người mẫu có sẵn ${i + 1}`} disabled={busy} onClick={() => (setPicker(null), void pickStock(name))}>
-              {picker === 'model' && <img src={`/api/samples/${name}`} alt="" />}
-            </button>
-          ))}
-        </div>
-      </Modal>
+      <PhotoDialog
+        open={picker === 'model'}
+        title="Chọn người mẫu"
+        sub="Dùng một người mẫu có sẵn, hoặc tải lên ảnh của bạn."
+        tiles={stockModels.map((name, i) => ({ key: name, src: `/api/samples/${name}`, label: `Người mẫu có sẵn ${i + 1}`, pick: () => void pickStock(name) }))}
+        busy={busy}
+        onFile={(files) => void add(setPerson)(files)}
+        onClose={() => setPicker(null)}
+      />
+      <PhotoDialog
+        open={picker === 'product'}
+        title="Chọn sản phẩm"
+        sub="Sản phẩm của tôi: các ảnh sản phẩm bạn đã dùng, hoặc tải lên ảnh mới."
+        tiles={myProducts.map((a) => ({ key: a.id, src: `/api/assets/${a.id}/content`, label: `Dùng lại ${a.filename}`, pick: () => setProduct([a]) }))}
+        busy={busy}
+        onFile={(files) => void add(setProduct)(files)}
+        onClose={() => setPicker(null)}
+      />
       <ChoiceDialog open={picker === 'hook'} title="Chọn hook" sub="Cảnh mở đầu giữ chân người xem trong vài giây đầu. Có thể bỏ qua." kind="hook"
         choices={HOOKS}
         selected={hooks}
