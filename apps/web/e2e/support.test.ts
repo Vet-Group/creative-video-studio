@@ -30,6 +30,8 @@ export async function signIn(page: Page, who: UserKey): Promise<void> {
   await page.getByLabel('Mật khẩu').fill(PASSWORD);
   await page.getByRole('button', { name: 'Đăng nhập' }).click();
   await expect(page).toHaveURL(/\/create$/);
+  // Wait for hydration, so the next link click navigates client-side and the next page's file inputs are already enabled.
+  await expect(page.getByLabel('Ảnh sản phẩm')).toBeEnabled();
   // The click leaves the pointer where the login's submit button was, which can hover a Create card and skew geometry checks.
   await page.mouse.move(0, 0);
 }

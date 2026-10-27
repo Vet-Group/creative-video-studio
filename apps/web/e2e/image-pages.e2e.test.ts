@@ -213,6 +213,7 @@ test('Image Generation: a cap refusal shows its message in Vietnamese', async ({
   await page.route(/\/api\/jobs$/, (r) => (r.request().method() === 'POST' ? r.fulfill({ status: 429, json: { error: 'Bạn đã dùng hết hạn mức chi phí hôm nay' } }) : r.fallback()));
   await page.goto('/image-generation');
   const bar = page.getByRole('group', { name: 'Thanh tạo ảnh' });
+  await expect(bar.getByLabel('Ảnh tham chiếu', { exact: true })).toBeEnabled(); // a fresh load: the input is disabled until hydration
   await bar.getByLabel('Ảnh tham chiếu', { exact: true }).setInputFiles(file('reference.png'));
   await bar.getByRole('textbox', { name: 'Mô tả cảnh bạn muốn tạo' }).fill('a bottle');
   await bar.getByRole('button', { name: /^Tạo ảnh/ }).click();
