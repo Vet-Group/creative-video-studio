@@ -326,6 +326,10 @@ test('Try On: the sample pictures in an empty slot upload like a picked file, an
     await expect(samplesOf('Người mẫu')).toHaveCount(1);
     await expect(samplesOf('Bối cảnh (tuỳ chọn)')).toHaveCount(1);
     await expect(page.getByRole('button', { name: 'Tải lên Trang phục' })).toBeVisible(); // the own-file tile stays beside the samples
+    // As on the live page, sample tiles are 79 px squares filling the tray's height, and a lone sample (the background) fills the tray.
+    expect((await samplesOf('Trang phục').first().boundingBox())!.width).toBeCloseTo(79, 0);
+    const tray = (await page.getByRole('list', { name: 'Bối cảnh (tuỳ chọn): ảnh mẫu' }).boundingBox())!;
+    expect((await samplesOf('Bối cảnh (tuỳ chọn)').boundingBox())!.width).toBeCloseTo(tray.width, 0);
 
     await page.getByRole('button', { name: 'Dùng ảnh mẫu 2 cho Trang phục' }).click();
     await expect(page.getByLabel('Trang phục: ảnh đã chọn').getByRole('img', { name: 'try-on-garment-2.png' })).toBeVisible();

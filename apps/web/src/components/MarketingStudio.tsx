@@ -315,13 +315,15 @@ export function MarketingStudio({ format = 'ugc' }: { format?: MarketingFormat }
                 </label>
                 <div className="prompt-box">
                   <textarea id={scriptId} value={script} maxLength={ADVANCED_MAX_SCRIPT} placeholder="Viết lời thoại bạn muốn nhân vật nói (tuỳ chọn)…" onChange={(e) => setScript(e.target.value)} />
-                  <div className="prompt-foot script-foot">
-                    {/* About two spoken words per second (the About tab), so the lines can be matched to the duration. */}
-                    <span>{words > 0 && `${words} từ, khoảng ${Math.ceil(words / 2)} giây`}</span>
-                    <span>
-                      {script.length}/{ADVANCED_MAX_SCRIPT}
-                    </span>
-                  </div>
+                  {/* Empty, the box is as short as the live page's; once lines are typed, their length in words, seconds (about two words a second, the About tab) and characters shows. */}
+                  {script && (
+                    <div className="prompt-foot script-foot">
+                      <span>{words > 0 && `${words} từ, khoảng ${Math.ceil(words / 2)} giây`}</span>
+                      <span>
+                        {script.length}/{ADVANCED_MAX_SCRIPT}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

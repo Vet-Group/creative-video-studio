@@ -672,7 +672,7 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 }
 /* An app's About reads as an article (live app pages): left-aligned sections, a plain numbered list, points without boxes. */
 .about-long > section { margin-top: 48px; }
-.about-long p { color: var(--muted); font-size: 16px; line-height: 24px; }
+.about-long p { margin: 0 0 24px; color: var(--ink-2); font-size: 16px; line-height: 24px; }
 .about-long .about-steps { display: block; padding-left: 20px; list-style: decimal; }
 .about-long .about-steps > li { display: list-item; margin: 0 0 8px; }
 .about-long .about-step-no { display: none; }
@@ -715,11 +715,13 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .app-slots[data-two='true'] .slot-wide .slot-add .slot-hint { display: block; } /* Advanced: the wide slot reads its limit, as on Fash */
 .app-slots[data-two='true'] .slot-wide .slot-name { display: none; }
 /* Samples in an empty slot (live Try On): a grey strip of pictures to pick from, then the upload tile with a plus and its label. */
-.slot-samples { display: flex; flex: 1; align-items: center; gap: 4px; min-width: 0; height: 79px; margin: 0; padding: 0 8px; overflow-x: auto; scrollbar-width: none; border-radius: 12px; background: var(--fill); list-style: none; }
-.slot-samples li { height: 100%; }
-.slot-samples button { display: block; height: 100%; padding: 4px 0; border: 0; background: transparent; }
+.slot-samples { display: flex; flex: 1; align-items: center; min-width: 0; height: 79px; margin: 0; padding: 0; overflow-x: auto; scrollbar-width: none; border-radius: 12px; background: var(--fill); list-style: none; }
+.slot-samples li { flex: none; height: 100%; overflow: hidden; }
+.slot-samples li:only-child { flex: 1; } /* one sample (a background) fills the tray, as on the live page */
+.slot-samples button { display: block; width: 100%; height: 100%; padding: 0; border: 0; background: transparent; }
 .slot-samples button:hover img { transform: scale(1.04); }
-.slot-samples img { display: block; width: auto; max-width: 96px; height: 100%; object-fit: contain; transition: transform .15s; }
+.slot-samples img { display: block; width: 79px; height: 100%; object-fit: cover; transition: transform .15s; }
+.slot-samples li:only-child img { width: 100%; }
 .slot:has(.slot-samples) .slot-add { flex: none; width: 76px; height: 79px; border: 1px dashed var(--border-strong); border-radius: 12px; background: var(--fill); }
 .slot:has(.slot-samples) .slot-icon { display: flex; flex-direction: column; align-items: center; gap: 2px; width: auto; height: auto; background: none; font-size: 11px; line-height: 14px; }
 /* An empty slot is one button. Full width (Try On): the hint on the left and a 76x79 grey upload tile on the right, in a 105 px box. Half width: a grey circle over the hint. */
