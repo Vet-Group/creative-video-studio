@@ -495,7 +495,14 @@ for (const width of [1440, 1280, 390]) {
     await signIn(page, 'member5');
     await openCreate(page);
     const wideScreen = width >= 1024;
-    const focused = () => page.evaluate(() => (document.activeElement as HTMLElement).getAttribute('aria-label') ?? document.activeElement?.textContent?.trim());
+    // The focused control's name as a screen reader gets it: its aria-label, else its text without the aria-hidden parts (the "Mới" pill).
+    const focused = () =>
+      page.evaluate(() => {
+        const el = document.activeElement as HTMLElement;
+        const copy = el.cloneNode(true) as HTMLElement;
+        copy.querySelectorAll('[aria-hidden="true"]').forEach((n) => n.remove());
+        return el.getAttribute('aria-label') ?? copy.textContent?.trim();
+      });
     const order = wideScreen ? ['Thu gọn thanh bên', 'Cài đặt', 'Khám phá', 'Thử đồ', 'Tạo ảnh', 'Tạo video', 'Marketing Studio', 'Ứng dụng', 'Thư viện', 'Ví dụ'] : ['Mở menu', 'Tạo']; // the open tab takes the tab stop
 
     for (const name of order) {

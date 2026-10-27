@@ -15,6 +15,13 @@ export interface SelectOption {
 
 const MOVES = ['ArrowDown', 'ArrowUp', 'Home', 'End'];
 
+/** A ratio select's icon takes the chosen shape, as on the live form; "auto" and wide ratios keep the wide frame. */
+function ratioIcon(value: string): IconName {
+  const [w, h] = value.split(':').map(Number);
+  if (!w || !h) return 'ratio';
+  return w < h ? 'ratio-tall' : w === h ? 'ratio-square' : 'ratio';
+}
+
 export function Select({ label, icon, heading, value, options, onChange }: { label: string; icon: IconName; heading: string; value: string; options: SelectOption[]; onChange: (value: string) => void }) {
   const uid = useId();
   const triggerId = `${uid}-trigger`;
@@ -85,7 +92,7 @@ export function Select({ label, icon, heading, value, options, onChange }: { lab
           onKeyUp={(e) => e.key === ' ' && e.preventDefault()} // a released Space must not click the button again
           onBlur={() => setOpen(false)}
         >
-          <Icon name={icon} />
+          <Icon name={icon === 'ratio' ? ratioIcon(value) : icon} />
           <span className="select-value">{options[selected]?.short ?? options[selected]?.label ?? value}</span>
           <Icon name={open ? 'up' : 'down'} />
         </button>

@@ -18,6 +18,8 @@ const PATHS = {
   x: 'M3.5 3.5l9 9 M12.5 3.5l-9 9',
   preset: 'M8 1.5l1.4 3.6 3.6 1.4-3.6 1.4L8 11.5 6.6 7.9 3 6.5l3.6-1.4z',
   ratio: 'M2.5 4h11v8h-11z',
+  'ratio-tall': 'M4.5 2h7v12h-7z',
+  'ratio-square': 'M3 3h10v10H3z',
   film: 'M2.5 3h11v10h-11z M5 3v10 M11 3v10 M2.5 6h2.5 M2.5 10h2.5 M11 6h2.5 M11 10h2.5',
   sliders: 'M2 4.5h12 M2 8h12 M2 11.5h12 M5 3v3 M10.5 6.5v3 M7 10v3',
   wand: 'M2.5 13.5l7.5-7.5 M8.5 4.5l3 3 M12 1.5v2 M11 2.5h2 M13.5 5v2 M12.5 6h2 M5 2.5v2 M4 3.5h2',
@@ -38,9 +40,25 @@ const PATHS = {
   moon: 'M13.5 9.6A5.6 5.6 0 0 1 6.4 2.5a5.6 5.6 0 1 0 7.1 7.1z',
 } as const;
 
+/** Solid shapes for the sidebar, as the live one draws its menu; an icon without one fills its outline path. */
+const FILLED: Partial<Record<keyof typeof PATHS, string>> = {
+  home: 'M8 1.5L1.2 7.3V14.5h4.8v-4.5h4v4.5h4.8V7.3z',
+  image: 'M1.5 2.5h13v11h-13z M3 11.8h10L10 8.2l-2 2.3-1.6-1.6z M10.6 4.3a1.3 1.3 0 1 0 0 2.6 1.3 1.3 0 0 0 0-2.6z',
+  create: 'M2 3.5h8a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1z M12 6.5l3.5-2.2v7.4L12 9.5z',
+  megaphone: 'M1 5.8v4.4h2.8L10 14V2L3.8 5.8z M11.5 5a3.2 3.2 0 0 1 0 6z M3.5 11l1.3 3.8h2.4L6.1 11z',
+  apps: 'M1.5 3.5h3.5v3.5H1.5z M6.25 3.5h3.5v3.5h-3.5z M11 3.5h3.5v3.5H11z M1.5 9h3.5v3.5H1.5z M6.25 9h3.5v3.5h-3.5z M11 9h3.5v3.5H11z',
+  library: 'M3.5 1.5h11v9h-11z M5 9h8L10.6 6l-1.8 2-1.3-1.2z M1.5 4v10.5H12V13H3V4z',
+};
+
 export type IconName = keyof typeof PATHS;
 
-export function Icon({ name, size = 14 }: { name: IconName; size?: number }) {
+export function Icon({ name, size = 14, filled = false }: { name: IconName; size?: number; filled?: boolean }) {
+  if (filled)
+    return (
+      <svg className="icon" aria-hidden="true" focusable="false" width={size} height={size} viewBox="0 0 16 16" fill="currentColor" fillRule="evenodd">
+        <path d={FILLED[name] ?? PATHS[name]} />
+      </svg>
+    );
   return (
     <svg className="icon" aria-hidden="true" focusable="false" width={size} height={size} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
       <path d={PATHS[name]} />

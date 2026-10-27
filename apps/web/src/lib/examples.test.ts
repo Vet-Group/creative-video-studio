@@ -44,3 +44,12 @@ test('the Examples tab keeps the ten fixture clips and adds only the further sam
   expect(ids.slice(10)).toEqual(['example-11', 'example-12']);
   expect(ids).toHaveLength(12);
 });
+
+test('an uploaded clip that replaces a fixture keeps its own size, and "use this sample" follows it', () => {
+  const [first, , , , , sixth] = examplesFor(new Set(['example-1.mp4', 'example-6.mp4']));
+  expect(first).toMatchObject({ id: 'example-1', aspect: '3:4', width: 1248, height: 1664 });
+  expect(first!.ratio).toBeUndefined(); // the form has no 3:4
+  expect(sixth).toMatchObject({ id: 'example-6', aspect: '16:9', width: 1920, height: 1080 });
+  expect(sixth!.ratio).toBeUndefined();
+  expect(examplesFor(new Set(['example-2.mp4']))[1]).toMatchObject({ aspect: '9:16', ratio: '9:16', width: 1088, height: 1920 });
+});
