@@ -253,6 +253,7 @@ test('geometry at 1440: the Try On card is 320 wide at x=288 and the image bar i
     const tray = await box(slots.nth(i));
     near((await box(labels.nth(i + 1))).y - (tray.y + tray.height), 32, 'tray to next label', 1);
   }
+  near((await box(page.locator('.prompt-box'))).height, 74, 'prompt box height', 1); // 74 px with no counter row, as on Fash and Marketing Studio
 
   await expect.poll(async () => ((await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { status: string }[] }).jobs.filter((j) => j.status === 'succeeded').length, { timeout: 120_000 }).toBe(10);
   await page.goto('/image-generation');

@@ -906,8 +906,8 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 [aria-labelledby='marketing-title'] .prompt-box textarea { height: 75px; }
 /* An app's Run follows its slots without a rule, as on the live app pages. */
 [aria-labelledby='app-title'] .runbar { border-top: 0; }
-/* Try On's optional prompt is a 75 px box without a counter row, so Ratio clears the Run bar as on the live page. */
-[aria-labelledby='tryon-title'] .prompt-box textarea { height: 75px; }
+/* Try On's optional prompt is a 74 px box without a counter row (as in Marketing Studio), so Ratio clears the Run bar as on the live page. */
+[aria-labelledby='tryon-title'] .prompt-box textarea { height: 64px; }
 [aria-labelledby='tryon-title'] .prompt-foot { display: none; }
 /* The live Try On form starts at its first label and leaves 32 px between one picture tray and the next. */
 [aria-labelledby='tryon-title'] .form-scroll > .field:first-child { margin-top: 0; }

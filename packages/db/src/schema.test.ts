@@ -65,12 +65,20 @@ describe('migration 0002 seed data', () => {
     const { rows } = await pool.query(`select id, label, prompt, enabled, is_bakeoff_safe as safe, sort_order as sort from presets where sort_order >= 10 order by sort_order`);
     expect(rows).toHaveLength(19);
     expect(rows.slice(0, 2).map((r) => r.id)).toEqual(['shoulder-sequence', 'turn-around']);
-    expect(rows.at(-1)).toMatchObject({ id: 'golden-hour-wall', label: 'Golden Hour Wall', sort: 28 });
+    expect(rows.at(-1)).toMatchObject({ id: 'golden-hour-wall', sort: 28 });
     for (const r of rows) {
       expect(r).toMatchObject({ enabled: true, safe: false });
       expect(r.prompt).toMatch(/^[ -~]+$/);
       expect(r.prompt).toContain('Keep the person, their face, the outfit');
     }
+  });
+
+  test('migration 0024 gives the motion templates Vietnamese labels, as the company presets have', async () => {
+    const { rows } = await pool.query(`select id, label from presets where sort_order >= 10 order by sort_order`);
+    expect(rows.at(0)).toEqual({ id: 'shoulder-sequence', label: 'Cận vai rồi toàn thân' });
+    expect(rows.at(-1)).toEqual({ id: 'golden-hour-wall', label: 'Tường nắng hoàng hôn' });
+    expect(new Set(rows.map((r) => r.label)).size).toBe(19);
+    for (const r of rows) expect(r.label).not.toMatch(/^[A-Z][a-z-]+( [A-Z&][a-z-]*)+$/);
   });
 
   test('seeds the two models with price, limits and bake-off record (migration 0013: Kling enabled, Seedance disabled; 0022: Kling takes 7 references), and the settings row', async () => {

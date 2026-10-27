@@ -116,7 +116,7 @@ const create: AboutPage = {
             { title: 'Nội dung quảng cáo', text: 'Biến thể chuyển động mới cho chiến dịch trả phí: đổi chuyển động, nhịp độ hay mẫu mà không cần quay lại.' },
             { title: 'Clip chiến dịch', text: 'Clip dài tới 30 giây với chuyển máy, trên các mô hình có thời lượng dài như Seedance 2.5 hay FLUX 3.' },
             { title: 'Dựng cảnh từ nhiều ảnh', text: 'Với mô hình tham chiếu, đưa người mẫu, sản phẩm và bối cảnh vào tối đa 4 ảnh để AI dựng một cảnh mới có đủ các yếu tố đó.' },
-            { title: 'Mẫu chuyển động có sẵn', text: 'Các mẫu công ty đã thử như Turn Around, Runway Walk hay Outfit Reveal: chọn một mẫu là có ngay câu lệnh đã được kiểm chứng.' },
+            { title: 'Mẫu chuyển động có sẵn', text: 'Các mẫu công ty đã thử như Xoay một vòng, Sải bước catwalk hay Hé lộ trang phục: chọn một mẫu là có ngay câu lệnh đã được kiểm chứng.' },
           ],
         },
       ],
