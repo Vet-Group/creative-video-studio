@@ -72,6 +72,8 @@ test('an Advanced job runs from reference images, a brief, a script and audio on
   await page.getByRole('dialog', { name: 'Chọn bối cảnh' }).getByRole('option', { name: spot.name, exact: true }).click();
   await script(page).fill('These are so comfy. Grab yours today!');
   await expect(page.getByText('7 từ, khoảng 4 giây')).toBeVisible();
+  await page.getByText('Xem prompt gửi đi').click();
+  const shown = await page.locator('.prompt-preview p').innerText();
 
   await runButton(page).click();
   await expect(page.getByText('Đã gửi job')).toBeVisible();
@@ -82,6 +84,7 @@ test('an Advanced job runs from reference images, a brief, a script and audio on
   expect(jobs.jobs.map((j) => j.feature)).toEqual(['marketing']);
   const detail = (await (await page.request.get(`/api/jobs/${jobs.jobs[0]!.id}`)).json()) as { prompt: string; images: { filename: string }[] };
   expect(detail.images.map((i) => i.filename)).toEqual(['model.png', 'product.png', 'style.png']);
+  expect(detail.prompt).toBe(shown); // the preview showed exactly what was sent
   expect(detail.prompt).toContain('Brief: The first image is the model');
   expect(detail.prompt).toContain('[Image1], [Image2], [Image3]');
   expect(detail.prompt).toContain(hook.phrase);
