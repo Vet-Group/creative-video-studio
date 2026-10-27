@@ -6,7 +6,7 @@ import { api, errorText, sendJson } from '@/lib/api';
 import { ABOUT } from '@/lib/about-content';
 import { useHydrated } from '@/lib/use-hydrated';
 import { About } from './About';
-import { Gallery, type Img, RATIO_LABEL, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, WorkTabs } from './image-tools';
+import { Gallery, type Img, RATIO_LABEL, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
 import { EnhanceToggle } from './EnhanceToggle';
 import { Icon } from './Icon';
 import { useJobs } from './jobs';
@@ -19,7 +19,7 @@ const TAB_LABEL: Record<Tab, string> = { history: 'Lịch sử', examples: 'Ví 
 const TABS: Tab[] = ['history', 'examples', 'about'];
 const MAX_PROMPT = 2000;
 
-export function ImageGeneration() {
+export function ImageGeneration({ reuse }: { reuse?: string }) {
   const { refresh } = useJobs();
   const hydrated = useHydrated();
   const [images, setImages] = useState<Img[]>([]);
@@ -34,6 +34,20 @@ export function ImageGeneration() {
   const pick = useImageChoice(models, Math.max(1, images.length));
   const { chosen } = pick;
   const max = chosen?.maxImages ?? 4;
+
+  useReuse(
+    reuse,
+    'image',
+    (j) => {
+      setImages(j.images);
+      setPrompt(j.prompt ?? '');
+      setEnhance(j.enhance ?? true);
+      pick.setModelId(j.modelId);
+      pick.setRatio(j.ratio);
+      if (j.resolution) pick.setResolution(j.resolution);
+    },
+    () => setError('Không tìm thấy ảnh để dùng lại.'),
+  );
 
   // The first thing that stops Run; null when it can go.
   const reason =

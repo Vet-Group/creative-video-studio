@@ -50,3 +50,41 @@ test('the reuse link in History refills a UGC job, and an Advanced job opens on 
   const card = page.getByRole('article').filter({ hasText: 'E2E Mkt E' }).first();
   await expect(card.getByRole('link', { name: 'Dùng lại' })).toHaveAttribute('href', /^\/marketing-studio\?reuse=/);
 });
+
+test('the reuse link refills Try On (person, garments, background, text, model, ratio, resolution), Image Generation and an app', async ({ page }) => {
+  await signIn(page, 'reusea');
+  const post = async (data: Record<string, unknown>) => {
+    const res = await page.request.post('/api/jobs', { data });
+    expect(res.status()).toBe(201);
+    return ((await res.json()) as { id: string }).id;
+  };
+  const [person, g1, g2, bg] = [await upload(page, 'person.png'), await upload(page, 'g1.png'), await upload(page, 'g2.png'), await upload(page, 'bg.png')];
+
+  // Try On: the person, two garments and a background, with the member's own text.
+  const tryOn = await post({ feature: 'try_on', modelId: 'mock-image-e2e', assetIds: [person, g1, g2, bg], ratio: '3:4', prompt: 'composed', params: { resolution: '2K', garments: '2', brief: 'red dress' } });
+  await page.goto(`/try-on?reuse=${tryOn}`);
+  await expect(page.getByLabel('Người mẫu: ảnh đã chọn').getByRole('img')).toHaveAttribute('alt', 'person.png');
+  await expect(page.getByLabel('Trang phục: ảnh đã chọn').getByRole('img')).toHaveCount(2);
+  await expect(page.getByLabel('Bối cảnh (tuỳ chọn): ảnh đã chọn').getByRole('img')).toHaveAttribute('alt', 'bg.png');
+  await expect(page.getByRole('textbox', { name: 'Prompt (tuỳ chọn)' })).toHaveValue('red dress');
+  await expect(select(page, 'Tỉ lệ')).toHaveAttribute('data-value', '3:4');
+  await expect(select(page, 'Độ phân giải')).toHaveAttribute('data-value', '2K');
+
+  // Image Generation: the images, the member's prompt and Enhance off.
+  const image = await post({ feature: 'image', modelId: 'mock-image-e2e', assetIds: [g1], ratio: '1:1', prompt: 'a studio shot', enhance: false, params: { resolution: '1K' } });
+  await page.goto(`/image-generation?reuse=${image}`);
+  await expect(page.getByRole('textbox', { name: 'Mô tả cảnh bạn muốn tạo' })).toHaveValue('a studio shot');
+  await expect(page.getByRole('img', { name: 'g1.png' })).toBeVisible();
+  await expect(select(page, 'Tỉ lệ')).toHaveAttribute('data-value', '1:1');
+
+  // An app: Character Swap, one image per slot in order, and the member's text.
+  const swap = await post({ feature: 'character_swap', modelId: 'mock-apps-e2e', assetIds: [person, bg], ratio: 'auto', prompt: 'keep the pose', params: { resolution: '1K', brief: 'keep the pose' } });
+  await page.goto(`/apps/character-swap?reuse=${swap}`);
+  await expect(page.getByLabel('Nhân vật mới: ảnh đã chọn').getByRole('img')).toHaveAttribute('alt', 'person.png');
+  await expect(page.getByLabel('Ảnh đích: ảnh đã chọn').getByRole('img')).toHaveAttribute('alt', 'bg.png');
+  await expect(page.getByRole('textbox', { name: 'Prompt (tuỳ chọn)' })).toHaveValue('keep the pose');
+
+  // A job of another feature is not refilled.
+  await page.goto(`/try-on?reuse=${image}`);
+  await expect(page.getByText('Không tìm thấy ảnh để dùng lại.')).toBeVisible();
+});

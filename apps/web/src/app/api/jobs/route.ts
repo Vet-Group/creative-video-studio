@@ -117,8 +117,9 @@ export async function POST(request: Request) {
       return bad('modelId, ratio, durationSec (a whole number, video only), a presetId or a prompt, and an optional storeId are required');
     }
     const entries = params && typeof params === 'object' && !Array.isArray(params) ? Object.entries(params) : null;
-    // Images take resolution and quality; Marketing Studio takes format ('advanced'), audio ('on' or 'off') and the form's own inputs (kept for reuse, never read by the worker); Create video takes audio; the others none.
-    const keys = isImage ? ['resolution', 'quality'] : feature === 'marketing' ? ['format', 'audio', 'hook', 'location', 'brief', 'script'] : feature === 'video' ? ['audio'] : [];
+    // Images take resolution and quality, plus the member's own text (and Try On its garment count) kept for reuse; Marketing Studio takes format ('advanced'),
+    // audio ('on' or 'off') and the form's own inputs. The kept inputs are never read by the worker. Create video takes audio; the others none.
+    const keys = isImage ? ['resolution', 'quality', 'brief', ...(feature === 'try_on' ? ['garments'] : [])] : feature === 'marketing' ? ['format', 'audio', 'hook', 'location', 'brief', 'script'] : feature === 'video' ? ['audio'] : [];
     if (!entries || entries.some(([k, v]) => !keys.includes(k) || typeof v !== 'string')) {
       return bad(keys.length > 0 ? `params may hold only ${keys.length > 1 ? `${keys.slice(0, -1).join(', ')} and ${keys.at(-1)}` : keys[0]}, as text` : 'params are for image features, Create video and Marketing Studio only');
     }
@@ -129,10 +130,14 @@ export async function POST(request: Request) {
     for (const [key, choices] of [['hook', HOOKS], ['location', LOCATIONS]] as const) {
       if (given[key] !== undefined && !choices.some((c) => c.id === given[key])) return bad(`params.${key} must be one of ${choices.map((c) => c.id).join(', ')}`);
     }
-    for (const [key, max] of [['brief', advanced ? ADVANCED_MAX_BRIEF : UGC_MAX_BRIEF], ['script', ADVANCED_MAX_SCRIPT]] as const) {
+    // The page's own limit on the member's text: Marketing Studio's per format, the image pages' the prompt limit.
+    for (const [key, max] of [['brief', isImage ? MAX_PROMPT : advanced ? ADVANCED_MAX_BRIEF : UGC_MAX_BRIEF], ['script', ADVANCED_MAX_SCRIPT]] as const) {
       if (given[key] !== undefined && given[key].length > max) return bad(`params.${key} may be at most ${max} characters`);
     }
     if (given.script !== undefined && !advanced) return bad('params.script is for Advanced only');
+    if (given.garments !== undefined && !(/^[1-9]$/.test(given.garments) && Number(given.garments) <= assetIds.length - 1)) {
+      return bad(`params.garments must count the garment images (1 to ${assetIds.length - 1})`);
+    }
     // The PRD gives "an optional prompt, or one of the presets" for video: exactly one of the two. An image job has no presets.
     if (!motion && (isImage ? presetId !== null || (freePrompt === null && !Object.hasOwn(FEATURE_PROMPTS, feature)) : (presetId === null) === (freePrompt === null))) {
       return bad(isImage ? 'an image job takes a prompt and no preset (only the apps may omit the prompt)' : 'give either a presetId or a prompt, not both and not neither');
