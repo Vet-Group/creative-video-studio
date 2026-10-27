@@ -84,6 +84,7 @@ export async function pickModel(page: Page, name: RegExp): Promise<void> {
 
 /** Uploads one image on the Create page, keeps the pre-selected model and presses Run. `preset`, `ratio` and `duration` are option values; `store` is the name of a store in the picker. */
 export async function runInUi(page: Page, options: { preset?: string; ratio?: string; duration?: string; store?: string } = {}): Promise<void> {
+  await expect(page.getByLabel('Ảnh sản phẩm')).toBeEnabled(); // the file input stays disabled until hydration; files set before it are dropped
   await page.getByLabel('Ảnh sản phẩm').setInputFiles({ name: 'shirt.png', mimeType: 'image/png', buffer: png() });
   await expect(page.getByRole('img', { name: 'shirt.png' })).toBeVisible();
   if (options.preset) await pickPreset(page, options.preset);
