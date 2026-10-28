@@ -82,9 +82,9 @@ function ChoiceBox({ label, icon, value, media, onOpen, onClear }: { label: stri
 function ChoiceDialog({ open, title, sub, kind, choices, selected, onPick, onClose, footer }: { open: boolean; title: string; sub: string; kind: 'hook' | 'location'; choices: MarketingChoice[]; selected: string[]; onPick: (id: string) => void; onClose: () => void; footer?: ReactNode }) {
   const grid = useRef<HTMLDivElement>(null);
   const have = useSamples();
-  // showModal (in Modal's effect, which runs first) focuses the close button, so the chosen card takes the focus afterwards.
+  // showModal (in Modal's effect, which runs first) focuses the close button, so the chosen card (else the first) takes the focus afterwards.
   useEffect(() => {
-    if (open) grid.current?.querySelector<HTMLElement>('[aria-selected=true]')?.focus();
+    if (open) (grid.current?.querySelector<HTMLElement>('[aria-selected=true]') ?? grid.current?.querySelector<HTMLElement>('[role=option]'))?.focus();
   }, [open]);
   function onKey(e: KeyboardEvent<HTMLDivElement>) {
     const moves: Record<string, number> = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
@@ -95,21 +95,19 @@ function ChoiceDialog({ open, title, sub, kind, choices, selected, onPick, onClo
     e.preventDefault();
     cards[next]?.focus();
   }
-  const all: { id: string; name: string; desc?: string }[] = [{ id: '', name: 'Không chọn' }, ...choices];
   return (
     <Modal open={open} onClose={onClose} label={title} className="choice-dialog">
       <h2>{title}</h2>
       <p className="modal-sub">{sub}</p>
       <div ref={grid} className="choice-grid" role="listbox" aria-label={title} onKeyDown={onKey}>
-        {all.map((c) => (
-          <button key={c.id || 'none'} type="button" role="option" aria-selected={c.id ? selected.includes(c.id) : selected.length === 0} tabIndex={(c.id ? selected[0] === c.id : selected.length === 0) ? 0 : -1} aria-label={c.desc ? c.name : undefined} aria-describedby={c.desc ? `${kind}-${c.id}-desc` : undefined} onClick={() => onPick(c.id)}>
-            {c.id && open && <CardMedia {...cardSample(have, `marketing-${kind}-${c.id}`)} always />}
+        {/* As on Fash, no "none" card: the X on the chosen box clears it. */}
+        {choices.map((c, i) => (
+          <button key={c.id} type="button" role="option" aria-selected={selected.includes(c.id)} tabIndex={(selected.length > 0 ? selected[0] === c.id : i === 0) ? 0 : -1} aria-label={c.name} aria-describedby={`${kind}-${c.id}-desc`} onClick={() => onPick(c.id)}>
+            {open && <CardMedia {...cardSample(have, `marketing-${kind}-${c.id}`)} always />}
             <span className="choice-name">{c.name}</span>
-            {c.desc && (
-              <span id={`${kind}-${c.id}-desc`} className="choice-desc">
-                {c.desc}
-              </span>
-            )}
+            <span id={`${kind}-${c.id}-desc`} className="choice-desc">
+              {c.desc}
+            </span>
           </button>
         ))}
       </div>
