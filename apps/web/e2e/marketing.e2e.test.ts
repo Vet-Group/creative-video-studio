@@ -245,6 +245,7 @@ for (const [width, height] of [[390, 844], [1024, 768], [1440, 1000]] as const) 
     await signIn(page, 'mktb');
     await page.goto('/marketing-studio');
     await expect(page.getByRole('tab').first()).toBeVisible();
+    if (width === 1440) expect((await page.locator('.marketing-head').boundingBox())!.height).toBe(130);
     for (const tab of await page.getByRole('tab').all()) {
       await tab.click();
       expect(await fits(page), (await tab.textContent()) ?? '').toBe(true);
@@ -252,6 +253,7 @@ for (const [width, height] of [[390, 844], [1024, 768], [1440, 1000]] as const) 
     if (width === 390) {
       await expect(page.getByRole('tab')).toHaveText(['Tạo', 'Lịch sử', 'Ví dụ', 'Giới thiệu']);
       await page.getByRole('tab', { name: 'Tạo' }).click();
+      expect((await page.locator('.marketing-head').boundingBox())!.height).toBe(100); // Fash's phone format card
       const run = (await runButton(page).boundingBox())!;
       expect(run.y + run.height).toBeLessThanOrEqual(height);
       expect(run.x + run.width).toBeLessThanOrEqual(width);
