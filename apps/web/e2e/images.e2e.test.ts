@@ -24,7 +24,7 @@ test('a mock image job made through the API is an image card under "Tất cả �
     await expect(history).toHaveAttribute('aria-selected', 'true', { timeout: 1_000 });
   }).toPass();
   await expect(tray.getByText('Hoàn tất')).toBeVisible();
-  await expect(tray.locator('.job-chips').first().locator('span')).toHaveText(['1K', '3:4']); // the History card's resolution and ratio chips
+  await expect(tray.locator('.job-chips').first().locator('button')).toHaveText(['1K', '3:4']); // the History card's resolution and ratio chips
 
   await page.getByRole('link', { name: 'Thư viện' }).first().click();
   const chips = page.getByRole('group', { name: 'Loại' });

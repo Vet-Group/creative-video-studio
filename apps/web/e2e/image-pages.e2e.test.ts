@@ -52,7 +52,7 @@ test('Try On: a missing slot keeps Run disabled with a reason, a mock run reache
   await expect(toast(page, 'Ảnh đã xong')).toBeVisible({ timeout: 60_000 });
   const tray = page.getByRole('complementary', { name: 'Job của tôi' });
   await expect(tray.getByText('Hoàn tất')).toHaveCount(1);
-  await expect(tray.locator('.job-chips').first().locator('span')).toHaveText(['1K', 'auto']); // the History card's resolution and ratio chips
+  await expect(tray.locator('.job-chips').first().locator('button')).toHaveText(['1K', 'auto']); // the History card's resolution and ratio chips
 
   // A second run with a background: the garment is still second and the background last, and the prompt names each image's role.
   await page.getByLabel('Ảnh bối cảnh').setInputFiles(file('background.png'));
@@ -262,7 +262,7 @@ test('Image Generation: the bar needs an image and a prompt, every pill works by
   await expect(toast(page, 'Ảnh đã xong')).toBeVisible({ timeout: 60_000 });
   const tray = page.getByRole('complementary', { name: 'Job của tôi' });
   await expect(tray.getByText('Hoàn tất')).toHaveCount(1);
-  await expect(tray.locator('.job-chips').first().locator('span')).toHaveText(['2K', '1:1']);
+  await expect(tray.locator('.job-chips').first().locator('button')).toHaveText(['2K', '1:1']);
 
   // Ví dụ now holds the image, and the Library files it under Tạo ảnh and Tất cả ảnh, not under Thử đồ or the videos.
   await page.getByRole('tab', { name: 'Ví dụ' }).click();

@@ -17,6 +17,26 @@ export interface Toast {
   id: number;
   ok: boolean;
   text: string;
+  /** A short note (a History chip applied) rather than a finished job: no Library link, and it goes by itself. */
+  note?: boolean;
+}
+
+const NOTE_MS = 3_000;
+
+/** A setting a History card's chip carries (Fash's chips, checked 2026-10-29): a click sets it on the form beside the History. */
+export interface Setting {
+  durationSec?: number;
+  ratio?: string;
+  resolution?: string;
+}
+
+/** The form's side of a chip click: sets what the chip carries and says so, as Fash's "Duration selected" and "Ratio selected" toasts. */
+export function useApplier(set: (s: Setting) => void): (s: Setting) => void {
+  const { notify } = useJobs();
+  return (s) => {
+    set(s);
+    notify(s.durationSec ? `Đã chọn thời lượng ${s.durationSec}s` : s.ratio ? `Đã chọn tỉ lệ ${s.ratio}` : `Đã chọn độ phân giải ${s.resolution}`);
+  };
 }
 
 interface JobsState {
@@ -28,6 +48,7 @@ interface JobsState {
   toasts: Toast[];
   refresh: () => Promise<void>;
   dismiss: (id: number) => void;
+  notify: (text: string) => void;
 }
 
 const Ctx = createContext<JobsState | null>(null);
@@ -103,6 +124,12 @@ export function JobsProvider({ userId, children }: { userId: string; children: R
     setNews(false);
   }, []);
 
-  const value = useMemo(() => ({ ...data, toasts, refresh, dismiss }), [data, toasts, refresh, dismiss]);
+  const notify = useCallback((text: string) => {
+    const id = nextId.current++;
+    setToasts((cur) => [...cur, { id, ok: true, text, note: true }]);
+    setTimeout(() => setToasts((cur) => cur.filter((t) => t.id !== id)), NOTE_MS);
+  }, []);
+
+  const value = useMemo(() => ({ ...data, toasts, refresh, dismiss, notify }), [data, toasts, refresh, dismiss, notify]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
