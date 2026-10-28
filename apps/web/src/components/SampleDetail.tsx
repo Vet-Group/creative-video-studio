@@ -1,5 +1,5 @@
 'use client';
-// A sample clip of Ví dụ opened in place, as the reference site's Examples open: the clip, its prompt, photos and settings, and Dùng lại (Fash's Recreate).
+// A sample clip of the Examples tab opened in place, as the reference site's Examples open: the clip, its prompt, photos and settings, and the reuse link (Fash's Recreate).
 // The details come from the sample's own file (`<sample>.json`, uploaded by an Admin beside the clip); nothing here runs a job.
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
