@@ -11,6 +11,7 @@ import { useHydrated } from '@/lib/use-hydrated';
 import { useSamples } from '@/lib/use-samples';
 import { Icon, type IconName } from './Icon';
 import { Preview } from './Preview';
+import { SampleDetail } from './SampleDetail';
 import type { ModelOption } from './ModelPicker';
 
 export interface ImageModel {
@@ -95,6 +96,13 @@ export function useReuse(reuse: string | undefined, feature: string, fill: (j: R
 /** The most files one POST /api/assets takes (MAX_FILES in lib/assets.ts); a larger pick (Advanced takes 7) goes up in batches. */
 const PER_UPLOAD = 4;
 
+/** A sample picture as a file the user picked, to upload as an input. */
+export async function sampleFile(name: string): Promise<File> {
+  const res = await fetch(`/api/samples/${name}`);
+  if (!res.ok) throw new Error(`sample ${name}: ${res.status}`);
+  return new File([await res.blob()], name, { type: res.headers.get('content-type') ?? '' });
+}
+
 export async function uploadImages(files: File[]): Promise<Img[]> {
   const out: Img[] = [];
   for (let i = 0; i < files.length; i += PER_UPLOAD) {
@@ -118,8 +126,8 @@ export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRem
   const full = images.length >= max;
   const offer = images.length === 0 ? samples : [];
   async function pickSample(name: string) {
-    const res = await fetch(`/api/samples/${name}`);
-    if (res.ok) onAdd([new File([await res.blob()], name, { type: res.headers.get('content-type') ?? '' })]);
+    const file = await sampleFile(name).catch(() => null);
+    if (file) onAdd([file]);
   }
   function onDrop(e: DragEvent) {
     e.preventDefault();
@@ -237,6 +245,9 @@ const GALLERY_SIZE_KEY = 'cvs.gallery.size';
 export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4], samples }: { kind: string; label: string; emptyText: string; video?: boolean; cols?: [number, number, number]; samples?: string }) {
   const have = useSamples();
   const sampleTiles = samples ? numberedSamples(have, samples, video ? 'mp4' : 'jpg') : [];
+  /** The sample clips with a details file open in place (SampleDetail); the others still open in a new tab. */
+  const detailed = video ? sampleTiles.filter((n) => have.has(n.replace(/\.mp4$/, '.json'))) : [];
+  const [open, setOpen] = useState<number | null>(null);
   const [items, setItems] = useState<Clip[]>([]);
   const [hasMore, setHasMore] = useState(false);
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
@@ -302,7 +313,7 @@ export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4
               typeof it === 'string' ? (
                 <li key={it} className="gallery-item">
                   {video ? (
-                    <a href={`/api/samples/${it}`} target="_blank" rel="noreferrer" aria-label="Mở video mẫu trong tab mới">
+                    <a href={`/api/samples/${it}`} target="_blank" rel="noreferrer" aria-label={detailed.includes(it) ? 'Xem chi tiết video mẫu' : 'Mở video mẫu trong tab mới'} onClick={detailed.includes(it) ? (e) => (e.preventDefault(), setOpen(detailed.indexOf(it))) : undefined}>
                       <Preview src={`/api/samples/${it}`} poster={`/api/samples/${it.replace(/\.mp4$/, '.jpg')}`} width={9} height={16} title="Video mẫu" />
                     </a>
                   ) : (
@@ -330,6 +341,7 @@ export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4
           </ul>
         ))}
       </div>
+      {open !== null && <SampleDetail names={detailed} index={open} onIndex={setOpen} />}
       {state === 'error' && sampleTiles.length > 0 && <p className="error">Không tải được kết quả của công ty.</p>}
       {hasMore && (
         <button type="button" className="gallery-more" onClick={() => void load(items.length)}>

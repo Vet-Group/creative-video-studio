@@ -15,7 +15,7 @@ import { About } from './About';
 import { AudioSwitch } from './AudioSwitch';
 import { CardMedia, LoopVideo } from './CardMedia';
 import { Icon, type IconName } from './Icon';
-import { Gallery, type Img, Slot, uploadImages, UPLOAD_ERROR, WorkTabs } from './image-tools';
+import { Gallery, type Img, sampleFile, Slot, uploadImages, UPLOAD_ERROR, WorkTabs } from './image-tools';
 import { useHasHistory, useJobs } from './jobs';
 import { Modal } from './Modal';
 import { ModelPicker } from './ModelPicker';
@@ -159,11 +159,11 @@ const FORMATS = [
   { id: 'product-review', name: 'Đánh giá sản phẩm', href: null, soon: 'Sắp có' },
 ];
 
-/** What the reuse link reads back from a Marketing Studio job (GET /api/jobs/:id) or a saved template (GET /api/templates/:id). */
+/** What the reuse link reads back from a Marketing Studio job (GET /api/jobs/:id), a saved template (GET /api/templates/:id) or a sample in Ví dụ (its details file, photos named as samples). */
 interface MarketingJob {
   feature: string;
   format: string | null;
-  images: Img[];
+  images: (Img | { sample: string })[];
   hook: string | null;
   location: string | null;
   brief: string | null;
@@ -267,12 +267,15 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
   // member's own text (a job from before it was kept, or someone else's) the rest is refilled and the brief is asked for again.
   useEffect(() => {
     if (!reuse) return;
-    api<MarketingJob>(reuse).then(
-      (j) => {
+    api<MarketingJob>(reuse)
+      .then(async (j) => {
         if (j.feature !== 'marketing') return setError('Không tìm thấy clip để dùng lại.');
         if ((j.format === 'advanced') !== advanced) return router.replace(`/marketing-studio${j.format === 'advanced' ? '/advanced' : ''}${window.location.search}`);
-        if (advanced) setRefs(j.images);
-        else (setPerson(j.images.slice(0, 1)), setProduct(j.images.slice(1, 2)));
+        // A sample's photos are uploaded as this member's inputs first, as a picked sample is.
+        const samples = j.images.map((i) => ('sample' in i ? i.sample : null)).filter((s) => s !== null);
+        const inputs = samples.length > 0 ? await uploadImages(await Promise.all(samples.map(sampleFile))) : (j.images as Img[]);
+        if (advanced) setRefs(inputs);
+        else (setPerson(inputs.slice(0, 1)), setProduct(inputs.slice(1, 2)));
         setHooks(j.hook ? [j.hook] : []);
         setLocation(j.location ?? '');
         setPrompt(j.brief ?? '');
@@ -283,9 +286,8 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
         if (j.durationSec) setDurationSec(j.durationSec);
         if (j.modelId) setModelId(j.modelId);
         if (j.brief === null && advanced) setNotice('Clip này không có mô tả gốc: đã điền lại ảnh và cài đặt, hãy nhập lại mô tả.');
-      },
-      () => setError('Không tìm thấy clip để dùng lại.'),
-    );
+      })
+      .catch(() => setError('Không tìm thấy clip để dùng lại.'));
   }, [reuse]);
 
   // My products: loaded once; a failure just leaves the plain upload slot.
