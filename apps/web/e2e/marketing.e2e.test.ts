@@ -154,6 +154,20 @@ test('the model, ratio and duration come from the marketing model, the About tab
   await expect(page.getByText(/chưa được xây dựng/)).toBeVisible();
 });
 
+test('with one photo tile still empty, a reason about the model stays on screen and Run points to it', async ({ page }) => {
+  await signIn(page, 'mktc');
+  await openPage(page);
+  await page.getByLabel('Ảnh người mẫu').setInputFiles(file('model.png'));
+  await expect(page.getByRole('img', { name: 'model.png' })).toBeVisible();
+  await expect(reasonOf(page)).toHaveText('Tải lên ảnh sản phẩm.');
+  expect((await reasonOf(page).boundingBox())!.height).toBeLessThanOrEqual(1); // the empty product tile says it
+  await selectValue(page, 'Tỉ lệ', '16:9');
+  await expect(runButton(page)).toBeDisabled();
+  await expect(reasonOf(page)).toHaveText(/Mô hình này không có tỉ lệ hoặc thời lượng đã chọn/);
+  expect((await reasonOf(page).boundingBox())!.height).toBeGreaterThan(10);
+  await expect(runButton(page)).toHaveAttribute('aria-describedby', (await reasonOf(page).getAttribute('id'))!);
+});
+
 test('a second model with other ratios and durations can be picked: the menus offer the options of both models and the job stores the ratio and duration', async ({ page }) => {
   await signIn(page, 'mktc');
   await openPage(page);
@@ -417,6 +431,7 @@ test('as on Fash, a filled photo slot and a chosen hook or location show the pic
     expect(box.x + box.width - (x.x + x.width)).toBeLessThanOrEqual(8);
     expect(x.y - box.y).toBeLessThanOrEqual(8);
     await expect.poll(() => slot.evaluate((e) => getComputedStyle(e).borderTopStyle)).toBe('dashed');
+    await expect.poll(() => slot.evaluate((e) => getComputedStyle(e).borderTopColor)).not.toBe('rgba(0, 0, 0, 0)');
 
     const hookBox = page.getByRole('button', { name: /^Hook/ });
     await hookBox.click();

@@ -143,6 +143,8 @@ function PhotoDialog({ open, title, sub, tiles, busy, onFile, onClose }: { open:
   );
 }
 
+const QUIET_REASONS = ['Tải lên ảnh người mẫu.', 'Tải lên ảnh sản phẩm.', 'Viết prompt mô tả video bạn muốn.'];
+
 export type MarketingFormat = 'ugc' | 'advanced';
 /** The formats of the live format picker, each with its page and sample loop; the ones not built yet say why they cannot be picked. */
 const FORMATS = [
@@ -507,8 +509,8 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
 
           <div className="form-message">
             {(reason ?? short) && (
-              // The empty prompt box already asks for a prompt: that reason is read out but not drawn over the form's foot.
-              <p id={reasonId} className="help" role="status" data-quiet={reason === 'Viết prompt mô tả video bạn muốn.' || undefined}>
+              // An empty photo tile or prompt box already asks for itself: those reasons are read out but not drawn over the form's foot.
+              <p id={reasonId} className="help" role="status" data-quiet={QUIET_REASONS.includes(reason ?? '') || undefined}>
                 {reason ?? short}
               </p>
             )}
