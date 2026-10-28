@@ -68,6 +68,9 @@ interface JobDetail {
 
 /** A sample clip's details file (`example-<n>.json` beside the clip): what the reference site's Example dialog shows, read as a refill too. */
 interface SampleDetails {
+  presetId: string | null;
+  modelId: string | null;
+  resolution?: string | null;
   prompt: string | null;
   images: { sample: string }[];
   aspect: string | null;
@@ -260,6 +263,8 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
       stale = true;
     };
   }, [detailed]);
+  const detailPreset = details?.presetId ? presets?.find((p) => p.id === details.presetId) : undefined;
+  const detailModel = details?.modelId ? models?.models.find((m) => m.id === details.modelId)?.label : undefined;
   const prevStep = useRef<HTMLButtonElement>(null);
   const nextStep = useRef<HTMLButtonElement>(null);
 
@@ -559,11 +564,22 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
               <Icon name="right" size={18} />
             </button>
             <div className="detail-info">
-              <span className="detail-chip">
-                <img src={media(exampleForPreset(detail.presetId)?.poster ?? detail.poster)} alt="" width={36} height={36} />
-                {presets?.find((p) => p.id === detail.presetId)?.label}
-              </span>
-              <h2>{detail.title}</h2>
+              {/* As on Fash (checked 2026-10-29): the preset chip only for a sample made from a preset, then the model, and no title over the prompt. */}
+              {details ? (
+                detailPreset && (
+                  <span className="detail-chip">
+                    <img src={presetMedia(detailPreset.id).poster ?? media(detail.poster)} alt="" width={36} height={36} />
+                    {detailPreset.label}
+                  </span>
+                )
+              ) : (
+                <span className="detail-chip">
+                  <img src={media(exampleForPreset(detail.presetId)?.poster ?? detail.poster)} alt="" width={36} height={36} />
+                  {presets?.find((p) => p.id === detail.presetId)?.label}
+                </span>
+              )}
+              <h2 className={details ? 'sr-only' : undefined}>{detail.title}</h2>
+              {detailModel && <p className="detail-model">{detailModel}</p>}
               {details?.prompt && <p className="detail-prompt">{details.prompt}</p>}
               {details ? (
                 <ul className="detail-inputs" aria-label="Ảnh đầu vào">
@@ -577,6 +593,7 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
                 <img className="detail-input" src={media(detail.poster)} alt="Khung hình mẫu" width={48} height={48} />
               )}
               <ul className="detail-pills" aria-label="Thông số">
+                {details?.resolution && <li aria-label={`Độ phân giải ${details.resolution}`}>{details.resolution}</li>}
                 <li aria-label={`Thời lượng ${details?.durationSec ?? detail.durationSec} giây`}>{details?.durationSec ?? detail.durationSec}s</li>
                 <li aria-label={`Tỉ lệ ${details?.aspect ?? detail.aspect}`}>{details?.aspect ?? detail.aspect}</li>
               </ul>
