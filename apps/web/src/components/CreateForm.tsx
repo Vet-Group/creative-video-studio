@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link';
 import { type DragEvent, type KeyboardEvent, useEffect, useId, useRef, useState } from 'react';
 import { api, errorText, sendJson } from '@/lib/api';
 import { cardSample, type Example, exampleForPreset, examplesFor, sampleSrc, splitColumns } from '@/lib/examples';
@@ -12,6 +13,7 @@ import { AudioSwitch } from './AudioSwitch';
 import { CardMedia } from './CardMedia';
 import { EnhanceToggle } from './EnhanceToggle';
 import { Icon } from './Icon';
+import { sampleFile, uploadImages } from './image-tools';
 import { useHasHistory, useJobs } from './jobs';
 import { Modal } from './Modal';
 import { ModelPicker } from './ModelPicker';
@@ -60,8 +62,20 @@ interface JobDetail {
   durationSec: number | null;
   modelId: string | null;
   storeId: string | null;
-  images: Image[];
+  /** A sample's details file names its photos as samples (`?example=`); a job or a template has uploaded images. */
+  images: (Image | { sample: string })[];
 }
+
+/** A sample clip's details file (`example-<n>.json` beside the clip): what the reference site's Example dialog shows, read as a refill too. */
+interface SampleDetails {
+  prompt: string | null;
+  images: { sample: string }[];
+  aspect: string | null;
+  durationSec: number | null;
+  date: string;
+}
+
+const fmtDate = (day: string) => new Intl.DateTimeFormat('vi-VN', { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(day));
 
 type Tab = 'create' | 'history' | 'examples' | 'about';
 const TAB_LABEL: Record<Tab, string> = { create: 'Tạo', history: 'Lịch sử', examples: 'Ví dụ', about: 'Giới thiệu' };
@@ -101,6 +115,7 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
   const opening: Tab = useHasHistory('video') ? 'history' : 'examples';
   const [picking, setPicking] = useState(false);
   const [detail, setDetail] = useState<Example | null>(null);
+  const [details, setDetails] = useState<SampleDetails | null>(null);
 
   useEffect(() => {
     api<{ stores: { id: string; name: string }[] }>('/api/stores').then((r) => setStores(r.stores), () => setError('Không tải được danh sách cửa hàng.'));
@@ -124,9 +139,11 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
   useEffect(() => {
     if (!reuse || !presets) return;
     api<JobDetail>(reuse)
-      .then((j) => {
+      .then(async (j) => {
         const preset = presets.some((p) => p.id === j.presetId) ? j.presetId : null;
-        setImages(j.images);
+        // A sample's photos are uploaded as this member's inputs first, as a picked sample is.
+        const samples = j.images.flatMap((i) => ('sample' in i ? [i.sample] : []));
+        setImages(samples.length > 0 ? await uploadImages(await Promise.all(samples.map(sampleFile))) : (j.images as Image[]));
         setPresetId(preset ?? '');
         if (!preset) setPrompt(j.prompt ?? '');
         setEnhance(j.presetId === null ? (j.enhance ?? true) : true); // a preset job never had Enhance, so the default stays
@@ -229,6 +246,20 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
   const free = presetMedia('');
   const examples = examplesFor(have);
   const detailAt = detail ? examples.findIndex((e) => e.id === detail.id) : -1;
+  // As on Fash, a sample with a details file shows its own prompt, input photos, settings and date, and Dùng lại refills the form from it.
+  const detailed = detail !== null && have.has(`${detail.id}.json`) ? detail.id : null;
+  useEffect(() => {
+    setDetails(null);
+    if (!detailed) return;
+    let stale = false;
+    api<SampleDetails>(`/api/samples/${detailed}.json`).then(
+      (d) => !stale && setDetails(d),
+      () => undefined, // the dialog keeps the clip's own facts
+    );
+    return () => {
+      stale = true;
+    };
+  }, [detailed]);
   const prevStep = useRef<HTMLButtonElement>(null);
   const nextStep = useRef<HTMLButtonElement>(null);
 
@@ -533,13 +564,24 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
                 {presets?.find((p) => p.id === detail.presetId)?.label}
               </span>
               <h2>{detail.title}</h2>
-              <img className="detail-input" src={media(detail.poster)} alt="Khung hình mẫu" width={48} height={48} />
+              {details?.prompt && <p className="detail-prompt">{details.prompt}</p>}
+              {details ? (
+                <ul className="detail-inputs" aria-label="Ảnh đầu vào">
+                  {details.images.map((i) => (
+                    <li key={i.sample}>
+                      <img className="detail-input" src={`/api/samples/${i.sample}`} alt={i.sample} width={48} height={48} />
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <img className="detail-input" src={media(detail.poster)} alt="Khung hình mẫu" width={48} height={48} />
+              )}
               <ul className="detail-pills" aria-label="Thông số">
-                <li aria-label={`Thời lượng ${detail.durationSec} giây`}>{detail.durationSec}s</li>
-                <li aria-label={`Tỉ lệ ${detail.aspect}`}>{detail.aspect}</li>
+                <li aria-label={`Thời lượng ${details?.durationSec ?? detail.durationSec} giây`}>{details?.durationSec ?? detail.durationSec}s</li>
+                <li aria-label={`Tỉ lệ ${details?.aspect ?? detail.aspect}`}>{details?.aspect ?? detail.aspect}</li>
               </ul>
               <div className="detail-foot">
-                <p className="detail-date">Mẫu minh họa{detail.fixture && media(detail.src) === detail.src ? ' (fixture)' : ''}</p>
+                <p className="detail-date">{details ? fmtDate(details.date) : `Mẫu minh họa${detail.fixture && media(detail.src) === detail.src ? ' (fixture)' : ''}`}</p>
                 <div className="detail-tools">
                   <a href={media(detail.src)} download aria-label="Tải video mẫu" title="Tải video mẫu">
                     <Icon name="download" />
@@ -548,10 +590,17 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
                     <Icon name="external" />
                   </a>
                 </div>
-                <button type="button" className="detail-use" onClick={() => fillFromExample(detail)}>
-                  <Icon name="copy" />
-                  Dùng mẫu này
-                </button>
+                {details ? (
+                  <Link className="detail-use" href={`/create?example=${detail.id}`}>
+                    <Icon name="copy" />
+                    Dùng lại
+                  </Link>
+                ) : (
+                  <button type="button" className="detail-use" onClick={() => fillFromExample(detail)}>
+                    <Icon name="copy" />
+                    Dùng mẫu này
+                  </button>
+                )}
               </div>
             </div>
           </>

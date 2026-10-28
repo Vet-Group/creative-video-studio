@@ -596,13 +596,15 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .detail-chip img { width: 36px; height: 36px; border-radius: 8px; object-fit: cover; }
 .detail-info h2 { margin: 0; font-size: 14px; line-height: 21px; font-weight: 600; }
 .detail-input { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; background: var(--fill); }
+.detail-inputs { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.detail-prompt { max-height: 120px; margin: 0; overflow-y: auto; color: var(--text-2); font-size: 12px; line-height: 18px; white-space: pre-line; }
 .detail-pills { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .detail-pills li { padding: 4px 10px; border: .8px solid var(--border-strong); border-radius: 20px; background: var(--surface); color: var(--text-2); font-size: 12px; line-height: 18px; }
 .detail-foot { display: flex; flex-direction: column; align-self: stretch; margin-top: auto; }
 .detail-date { margin: 0; color: var(--text-subtle); font-size: 12px; line-height: 18px; }
 .detail-tools { display: flex; gap: 6px; margin-top: 12px; padding-top: 11px; border-top: 1px solid var(--divider); }
 .detail-tools a { display: grid; place-items: center; width: calc((100% - 18px) / 4); height: 32px; border-radius: 6px; background: var(--fill); color: var(--text-2); }
-.detail-use { display: flex; align-items: center; justify-content: center; gap: 6px; height: 36px; margin: 6px 0 0; padding: 0 12px; border: 0; border-radius: 8px; background: var(--brand); color: var(--on-dark); font-size: 11px; line-height: 16.5px; font-weight: 600; }
+.detail-use { display: flex; align-items: center; justify-content: center; gap: 6px; height: 36px; margin: 6px 0 0; padding: 0 12px; border: 0; border-radius: 8px; background: var(--brand); color: var(--on-dark); font-size: 11px; line-height: 16.5px; font-weight: 600; text-decoration: none; }
 .detail-step { position: fixed; top: 50%; z-index: 3; display: grid; place-items: center; width: 36px; height: 36px; padding: 0; transform: translateY(-50%); border: 0; border-radius: 50%; background: rgb(var(--shade) / .5); color: var(--on-dark); }
 .detail-step[hidden] { display: none; }
 .detail-step.prev { left: 24px; }

@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { expect, type Page, test } from '@playwright/test';
 import { EXAMPLES } from '../src/lib/examples';
 import { freezeData } from './frozen.test';
-import { expectOptions, modelButton, optionsOf, pickModel, png, presetOf, select, selectValue, signIn } from './support.test';
+import { expectOptions, jpg, modelButton, optionsOf, pickModel, png, presetOf, select, selectValue, signIn } from './support.test';
 
 // Posters and a frozen clock: reduced motion keeps every clip on its poster, so a second run paints the same frame.
 test.use({ contextOptions: { reducedMotion: 'reduce' } });
@@ -333,6 +333,46 @@ test('V02 the upload limit and its hint follow the chosen model', async ({ page 
   await pickModel(page, /One image model/);
   await expect(page.getByText('Mô hình này nhận tối đa 1 ảnh.')).toBeVisible(); // too many for this model: Run stays off until one goes
   await expect(page.getByRole('button', { name: /^Tạo video/ })).toBeDisabled();
+});
+
+test('as on Fash, a sample with a details file shows its prompt, input photos, settings and date, and Dùng lại refills the form from it', async ({ page }) => {
+  const details = { prompt: 'A slow orbit around the bottle.', images: [{ sample: 'example-2-input.png' }, { sample: 'example-2-ref.jpg' }], presetId: null, enhance: false, audio: 'off', ratio: '1:1', aspect: '1:1', durationSec: 8, modelId: null, storeId: null, date: '2026-08-18' };
+  const files: [string, Buffer, string][] = [['example-2.json', Buffer.from(JSON.stringify(details)), 'application/json'], ['example-2-input.png', png(), 'image/png'], ['example-2-ref.jpg', jpg(), 'image/jpeg']];
+  const asAdmin = async (each: (name: string, data: Buffer, type: string) => Promise<{ ok(): boolean }>) => {
+    await page.context().clearCookies();
+    await signIn(page, 'admin');
+    for (const [name, data, type] of files) expect((await each(name, data, type)).ok(), name).toBe(true);
+    await page.context().clearCookies();
+  };
+  await asAdmin((name, data, type) => page.request.put(`/api/admin/samples/${name}`, { data, headers: { 'content-type': type } }));
+  try {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await signIn(page, 'cvexa');
+    await openCreate(page);
+    await page.getByRole('tab', { name: 'Ví dụ' }).click();
+    await openTile(page, 'Xoay quanh chậm');
+    const detail = page.getByRole('dialog', { name: 'Chi tiết mẫu' });
+    await expect(detail.locator('.detail-prompt')).toHaveText(details.prompt);
+    await expect(detail.getByRole('list', { name: 'Ảnh đầu vào' }).getByRole('img')).toHaveCount(2);
+    await expect(detail.getByRole('list', { name: 'Thông số' })).toHaveText('8s1:1');
+    await expect(detail.locator('.detail-date')).toHaveText('18 thg 8, 2026');
+    // The next sample has no details file: its own facts and the in-place "use this sample" as before.
+    await detail.getByRole('button', { name: 'Mẫu sau' }).click();
+    await expect(detail).toContainText('Mẫu minh họa');
+    await expect(detail.getByRole('button', { name: 'Dùng mẫu này' })).toBeVisible();
+    await expect(detail.locator('.detail-prompt')).toHaveCount(0);
+    await detail.getByRole('button', { name: 'Mẫu trước' }).click();
+
+    await detail.getByRole('link', { name: 'Dùng lại' }).click();
+    await expect(page).toHaveURL(/\/create\?example=example-2$/);
+    await expect(page.getByRole('img', { name: 'example-2-input.png' })).toBeVisible();
+    await expect(page.getByRole('img', { name: 'example-2-ref.jpg' })).toBeVisible();
+    await expect(page.getByRole('textbox', { name: 'Mô tả chuyển động' })).toHaveValue(details.prompt);
+    await expect(select(page, 'Tỉ lệ khung hình')).toHaveAttribute('data-value', '1:1');
+    await expect(select(page, 'Thời lượng')).toHaveAttribute('data-value', '8');
+  } finally {
+    await asAdmin((name) => page.request.delete(`/api/admin/samples/${name}`));
+  }
 });
 
 test('a dialog closes on its backdrop, not on a click inside it', async ({ page }) => {
