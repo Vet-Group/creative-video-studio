@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ADVANCED_MAX_BRIEF, ADVANCED_MAX_IMAGES, ADVANCED_MAX_SCRIPT, advancedPrompt, HOOKS, LOCATIONS, marketingPrompt, UGC_MAX_BRIEF } from './marketing';
+import { ADVANCED_MAX_IMAGES, ADVANCED_MAX_SCRIPT, advancedPrompt, briefRoom, HOOKS, LOCATIONS, marketingPrompt } from './marketing';
 
 describe('HOOKS and LOCATIONS', () => {
   it.each([['HOOKS', HOOKS], ['LOCATIONS', LOCATIONS]])('%s has 6 to 12 unique choices with a Vietnamese name and description and an English phrase', (_, list) => {
@@ -78,15 +78,18 @@ describe('marketingPrompt', () => {
     expect(marketingPrompt(input)).toBe(expected);
   });
 
-  it('stays within the 2000-character prompt limit of the jobs API with the longest brief, hook, location and ratio and audio on', () => {
-    const brief = 'x'.repeat(UGC_MAX_BRIEF);
-    const worst = Math.max(...['9:16', '16:9', '1:1'].flatMap((ratio) => HOOKS.flatMap((h) => LOCATIONS.map((l) => marketingPrompt({ ratio, hook: h.id, location: l.id, prompt: brief, audio: true }).length))));
-    expect(worst).toBeLessThanOrEqual(2000);
-  });
-
-  it('leaves room for the member text under the 2000-character prompt limit of the jobs API', () => {
-    const longest = Math.max(...HOOKS.flatMap((h) => LOCATIONS.map((l) => marketingPrompt({ hook: h.id, location: l.id }).length)));
-    expect(longest).toBeLessThan(1000);
+  it('gives the brief exactly the room the model leaves: a brief of that length fills the limit, and the smallest limit (2000) still leaves over 1000', () => {
+    for (const ratio of ['9:16', '16:9', '1:1']) {
+      for (const h of HOOKS) {
+        for (const l of LOCATIONS) {
+          const compose = (prompt: string) => marketingPrompt({ ratio, hook: h.id, location: l.id, prompt, audio: true });
+          const room = briefRoom(compose, 2000);
+          expect(room).toBeGreaterThan(1000);
+          expect(compose('x'.repeat(room)).length).toBe(2000);
+          expect(briefRoom(compose, 5000)).toBe(room + 3000);
+        }
+      }
+    }
   });
 });
 
@@ -130,8 +133,14 @@ describe('advancedPrompt', () => {
     expect(advancedPrompt({ ...base, hook: 'nope', location: 'product-drop' })).toBe(advancedPrompt(base));
   });
 
-  it('fits the 2000-character limit of the jobs API with the longest hook, location, 7 images and the page limits', () => {
-    const longest = Math.max(...HOOKS.flatMap((h) => LOCATIONS.map((l) => advancedPrompt({ brief: 'x'.repeat(ADVANCED_MAX_BRIEF), images: ADVANCED_MAX_IMAGES, hook: h.id, location: l.id, script: 'y'.repeat(ADVANCED_MAX_SCRIPT), audio: true }).length)));
-    expect(longest).toBeLessThanOrEqual(2000);
+  it('leaves the brief over 1000 characters on the smallest limit (2000) with the longest hook, location, 7 images and script, and fills it exactly', () => {
+    for (const h of HOOKS) {
+      for (const l of LOCATIONS) {
+        const compose = (brief: string) => advancedPrompt({ brief, images: ADVANCED_MAX_IMAGES, hook: h.id, location: l.id, script: 'y'.repeat(ADVANCED_MAX_SCRIPT), audio: true });
+        expect(briefRoom(compose, 2000)).toBeGreaterThan(1000);
+        expect(compose('x'.repeat(briefRoom(compose, 2000))).length).toBe(2000);
+      }
+    }
+    expect(briefRoom(() => 'y'.repeat(3000), 2000)).toBe(0); // never negative
   });
 });

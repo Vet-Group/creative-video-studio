@@ -15,6 +15,8 @@ interface Ask {
   /** Left out (undefined) when none is chosen. */
   hook?: string;
   location?: string;
+  /** For a brief: the characters the chosen model leaves for it. */
+  room?: number;
 }
 
 export function SuggestButton({ ask, label, onPick }: { ask: () => Ask; label: string; onPick: (text: string) => void }) {

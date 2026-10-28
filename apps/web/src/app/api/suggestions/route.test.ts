@@ -23,7 +23,7 @@ process.env.APP_URL = 'http://localhost';
 const { auth, pool } = await import('@/lib/auth');
 const { POST } = await import('./route');
 const { GET } = await import('./[id]/route');
-const { ADVANCED_MAX_BRIEF, ADVANCED_MAX_SCRIPT, HOOKS, SUGGEST_DAILY_LIMIT } = await import('@/lib/marketing');
+const { ADVANCED_MAX_SCRIPT, HOOKS, SUGGEST_DAILY_LIMIT } = await import('@/lib/marketing');
 
 const PASSWORD = 'correct-horse-battery';
 let seq = 0;
@@ -48,11 +48,11 @@ describe('/api/suggestions', () => {
   test('queues a run with the hook phrase and the member’s text, and gives its options to the member who asked only', async () => {
     const [u, other] = [await newUser(), await newUser()];
     const hook = HOOKS[0]!;
-    const res = await ask(u, { field: 'brief', text: ' linen dress ', hook: hook.id });
+    const res = await ask(u, { field: 'brief', text: ' linen dress ', hook: hook.id, room: 1234 });
     expect(res.status).toBe(202);
     const { id } = (await res.json()) as { id: string };
     expect(sent.at(-1)).toEqual({ name: 'suggest', data: { runId: id } });
-    expect((await pool.query('select input from suggestion_runs where id = $1', [id])).rows[0].input).toEqual({ field: 'brief', text: 'linen dress', context: hook.phrase, max: 1200 });
+    expect((await pool.query('select input from suggestion_runs where id = $1', [id])).rows[0].input).toEqual({ field: 'brief', text: 'linen dress', context: hook.phrase, max: 1234 }); // the room the chosen model leaves
     expect(await (await poll(u, id)).json()).toEqual({ id, status: 'queued', options: [] });
     await pool.query(`update suggestion_runs set status = 'succeeded', output = '["a","b","c"]' where id = $1`, [id]);
     expect(await (await poll(u, id)).json()).toEqual({ id, status: 'succeeded', options: ['a', 'b', 'c'] });
@@ -94,7 +94,9 @@ describe('/api/suggestions', () => {
     expect(await error(await ask(u, { field: 'title' }))).toBe('field must be brief or script');
     expect(await error(await ask(u, { field: 'script' }))).toBe('a script is for Advanced only');
     expect((await ask(u, { field: 'script', format: 'advanced', text: 'x'.repeat(ADVANCED_MAX_SCRIPT + 1) })).status).toBe(202); // the brief as notes for lines
-    expect(await error(await ask(u, { field: 'script', format: 'advanced', text: 'x'.repeat(ADVANCED_MAX_BRIEF + 1) }))).toBe(`text may be at most ${ADVANCED_MAX_BRIEF} characters`);
+    expect(await error(await ask(u, { field: 'script', format: 'advanced', text: 'x'.repeat(5001) }))).toBe('text may be at most 5000 characters');
+    expect(await error(await ask(u, { field: 'brief', room: 0 }))).toBe('room must be a whole number of characters');
+    expect(await error(await ask(u, { field: 'brief', room: 1.5 }))).toBe('room must be a whole number of characters');
     expect(await error(await ask(u, { field: 'brief', hook: 'nope' }))).toBe('hook is not a hook');
     expect(await error(await ask(u, { field: 'brief', location: 'moon' }))).toBe('location is not a location');
     expect(sent.length).toBe(before + 1);

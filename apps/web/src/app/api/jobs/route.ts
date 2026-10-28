@@ -1,11 +1,11 @@
 import { reserve, withTransaction } from '@cvs/core/ledger';
 import { type CapRefusal, checkCaps, dailyClips } from '@cvs/core/limits';
-import { estimateUsd, FEATURE_PROMPTS, usdPerSecondFor } from '@cvs/core/models';
+import { estimateUsd, FEATURE_PROMPTS, PROMPT_CEILING, promptLimit, usdPerSecondFor } from '@cvs/core/models';
 import { VIDEO_QUEUE, videoSendOptions } from '@cvs/core/queue';
 import { FEATURES } from '@cvs/db';
 import { pool } from '@/lib/auth';
 import { boss } from '@/lib/queue';
-import { ADVANCED_MAX_BRIEF, ADVANCED_MAX_SCRIPT, HOOKS, LOCATIONS, UGC_MAX_BRIEF } from '@/lib/marketing';
+import { ADVANCED_MAX_SCRIPT, HOOKS, LOCATIONS } from '@/lib/marketing';
 import { guard } from '@/lib/session';
 
 const MAX_IMAGES = 4;
@@ -13,7 +13,6 @@ const MAX_IMAGES = 4;
 const MAX_ADVANCED_IMAGES = 7;
 /** An image job may name more inputs; the model's own max_images is checked under the lock. */
 const MAX_IMAGE_INPUTS = 16;
-const MAX_PROMPT = 2000;
 /** The features that run on a video model; every other feature runs on an image model. */
 const VIDEO_FEATURES = ['video', 'marketing', 'motion_control'];
 /** The features that offer Enhance, as on Fash: Create Videos and Image Generation. */
@@ -75,7 +74,7 @@ export async function GET(request: Request) {
 
 /**
  * Create a video job: 1-4 input images the caller may use (their own, or the inputs of a succeeded Library clip for Reuse), an enabled
- * model, a preset or a free prompt (exactly one; a free prompt is trimmed, 1 to 2000 characters, and stored with a null preset), the ratio and duration the model allows, and an optional visible store. The caps are checked and the job and its
+ * model, a preset or a free prompt (exactly one; a free prompt is trimmed, 1 character up to the model's prompt limit (promptLimit), and stored with a null preset), the ratio and duration the model allows, and an optional visible store. The caps are checked and the job and its
  * `estimate` ledger row are written in one transaction (429 when a cap refuses, nothing sent); the pg-boss job is sent afterwards.
  * `feature` (default `video`) picks the kind of job. `video` and `marketing` take a video model and the durations above, and an optional `params.audio` (below); `video` takes no other `params`. `marketing` needs exactly 2 inputs (the model photo, then the product photo) and a prompt, no preset;
  * with `params.format` 'advanced' (Marketing Studio Advanced) it takes 1 to 7 reference images instead, up to the model's `max_images`. A video job's optional `params.audio` 'on' prices
@@ -135,8 +134,8 @@ export async function POST(request: Request) {
     for (const [key, choices] of [['hook', HOOKS], ['location', LOCATIONS]] as const) {
       if (given[key] !== undefined && !choices.some((c) => c.id === given[key])) return bad(`params.${key} must be one of ${choices.map((c) => c.id).join(', ')}`);
     }
-    // The page's own limit on the member's text: Marketing Studio's per format, the image pages' the prompt limit.
-    for (const [key, max] of [['brief', isImage ? MAX_PROMPT : advanced ? ADVANCED_MAX_BRIEF : UGC_MAX_BRIEF], ['script', ADVANCED_MAX_SCRIPT]] as const) {
+    // The member's text kept for reuse: the brief is part of the prompt, which the model's limit holds below; the script is held to what a clip can say.
+    for (const [key, max] of [['brief', PROMPT_CEILING], ['script', ADVANCED_MAX_SCRIPT]] as const) {
       if (given[key] !== undefined && given[key].length > max) return bad(`params.${key} may be at most ${max} characters`);
     }
     if (given.script !== undefined && !advanced) return bad('params.script is for Advanced only');
@@ -153,7 +152,7 @@ export async function POST(request: Request) {
     if (enhance && (!ENHANCE_FEATURES.includes(feature) || presetId !== null)) return bad('Enhance rewrites your own prompt in Create video and Image Generation only');
     const written = freePrompt?.trim();
     const prompt = written && APPEND_TO_INSTRUCTION.includes(feature) ? `${FEATURE_PROMPTS[feature]}. ${written}` : (written ?? FEATURE_PROMPTS[feature] ?? (motion ? '' : null));
-    if (prompt !== null && ((prompt === '' && !motion) || prompt.length > MAX_PROMPT)) return bad(`the prompt must have 1 to ${MAX_PROMPT} characters`);
+    if (prompt !== null && ((prompt === '' && !motion) || prompt.length > PROMPT_CEILING)) return bad(`the prompt must have 1 to ${PROMPT_CEILING} characters`);
     const usable = await pool.query(
       `select a.id, a.mime, a.duration_ms from assets a
         where a.id = any($1::text[]) and a.deleted_at is null and a.kind = 'input'
@@ -193,7 +192,7 @@ export async function POST(request: Request) {
     // A new Run was checked before the lock and a retry never was, so both look again: an image deleted meanwhile is refused.
     const live = await tx.query('select 1 from assets where id = any($1::text[]) and deleted_at is null', [assetIds]);
     if (live.rowCount !== assetIds.length) return bad('one or more assets were deleted');
-    const model = (await tx.query('select enabled, provider, endpoint, kind, features, ratios, durations_sec, max_images, usd_per_second, image_prices from model_configs where id = $1', [modelId])).rows[0];
+    const model = (await tx.query('select enabled, provider, endpoint, kind, features, ratios, durations_sec, max_images, max_prompt_chars, usd_per_second, image_prices from model_configs where id = $1', [modelId])).rows[0];
     if (!model?.enabled) return bad('the model does not exist or is not enabled');
     if (model.kind !== (isImage ? 'image' : 'video') || !model.features.includes(feature)) return bad('the model does not offer this feature');
     // Own keys only, with a plain decimal price: `in` would also accept "constructor" and friends.
@@ -207,6 +206,9 @@ export async function POST(request: Request) {
         prompt = (await tx.query('select prompt from presets where id = $1 and enabled', [presetId])).rows[0]?.prompt;
         if (prompt === undefined) return bad('the preset does not exist or is not enabled');
       }
+      // Checked here, before anything is reserved, rather than refused by the provider after the money is held. A retry sends the prompt it was checked with.
+      const limit = promptLimit(model.max_prompt_chars);
+      if (prompt && prompt.length > limit) return bad(`the prompt may be at most ${limit} characters on this model`);
       if (storeId !== null && (await tx.query('select 1 from stores where id = $1 and not hidden', [storeId])).rowCount === 0) {
         return bad('the store does not exist or is hidden');
       }

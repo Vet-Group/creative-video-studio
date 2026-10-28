@@ -1,11 +1,13 @@
 'use client';
 // One app of the Apps index, driven by its entry in lib/apps.ts: a card with the app's header, upload slots, fields and Run, beside the History and About tabs
 // (laid out like Try On). An app that is not built yet shows why instead of the form.
+import { FEATURE_PROMPTS } from '@cvs/core/models';
 import Link from 'next/link';
 import { type CSSProperties, useEffect, useId, useRef, useState } from 'react';
 import { APP_ABOUT } from '@/lib/about-content';
 import { api, errorText, sendJson } from '@/lib/api';
 import { APPS, type AppConfig, appInputs, appReason, type AppCategory, motionReason, slotMax, splitImages } from '@/lib/apps';
+import { promptTooLong } from '@/lib/prompt-limit';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { useHydrated } from '@/lib/use-hydrated';
 import { cardSample } from '@/lib/examples';
@@ -22,7 +24,6 @@ import { Templates } from './Templates';
 
 type Tab = 'create' | 'history' | 'about';
 const TAB_LABEL: Record<Tab, string> = { create: 'Tạo', history: 'Lịch sử', about: 'Giới thiệu' };
-const MAX_PROMPT = 1500;
 const CATEGORY_ICON: Record<AppCategory, IconName> = { fashion: 'tryon', photo: 'image', video: 'create', utility: 'library' };
 
 /** The picture of an app on a card and in the page header: its sample loop or still, else a tinted tile with the icon of its category. The loop plays under reduced motion too, as on the reference site's Apps pages. */
@@ -120,7 +121,10 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
     },
     () => setError('Không tìm thấy ảnh để dùng lại.'),
   );
-  const reason = appReason(app, { images, prompt, models: chosen ? [chosen] : models === null ? null : [], failed });
+  // The swaps add the member's text to their fixed instruction, so it shares the model's limit with it.
+  const fixed = app.prompt === 'optional' ? FEATURE_PROMPTS[app.feature]!.length + 2 : 0;
+  const room = chosen && chosen.maxPromptChars - fixed;
+  const reason = appReason(app, { images, prompt, models: chosen ? [chosen] : models === null ? null : [], failed }) ?? promptTooLong(chosen, prompt.trim() ? prompt.trim().length + fixed : 0);
   const canRun = reason === null && !busy;
 
   function add(slot: number) {
@@ -202,10 +206,11 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
                   {app.prompt === 'background' ? 'Mô tả nền (tuỳ chọn)' : 'Prompt (tuỳ chọn)'}
                 </label>
                 <div className="prompt-box">
-                  <textarea id={promptId} value={prompt} maxLength={MAX_PROMPT} placeholder={app.prompt === 'background' ? 'Ví dụ: quán cà phê ngoài trời đầy nắng, bàn đá cẩm thạch' : 'Mô tả điều bạn muốn thêm...'} onChange={(e) => setPrompt(e.target.value)} />
+                  <textarea id={promptId} value={prompt} maxLength={room} placeholder={app.prompt === 'background' ? 'Ví dụ: quán cà phê ngoài trời đầy nắng, bàn đá cẩm thạch' : 'Mô tả điều bạn muốn thêm...'} onChange={(e) => setPrompt(e.target.value)} />
                   <div className="prompt-foot">
                     <span>
-                      {prompt.length}/{MAX_PROMPT}
+                      {prompt.length}
+                      {room !== undefined && `/${room}`}
                     </span>
                   </div>
                 </div>
@@ -280,7 +285,7 @@ interface RefVideo {
   filename: string;
   durationMs: number;
 }
-type MotionModel = ModelOption & { durationsSec: number[] };
+type MotionModel = ModelOption & { durationsSec: number[]; maxPromptChars: number };
 type Uploaded = Img & { durationMs: number | null };
 const VIDEO_UPLOAD_ERROR = 'Không tải video lên được. Video phải là MP4 hoặc MOV, tối đa 20 MB.';
 
@@ -353,7 +358,7 @@ function MotionForm({ app }: { app: AppConfig }) {
     );
   }, [seconds]);
   const chosen = list?.models.find((m) => m.id === modelId) ?? list?.models.find((m) => m.id === list.best) ?? list?.models[0];
-  const reason = motionReason({ image: image.length > 0, videoMs: video?.durationMs ?? null, model: list === null ? null : chosen, failed: list?.failed ?? false });
+  const reason = motionReason({ image: image.length > 0, videoMs: video?.durationMs ?? null, model: list === null ? null : chosen, failed: list?.failed ?? false }) ?? promptTooLong(chosen, prompt.trim().length);
   const canRun = reason === null && !busy;
 
   async function upload(files: File[], then: (assets: Uploaded[]) => void, message: string) {
@@ -431,10 +436,11 @@ function MotionForm({ app }: { app: AppConfig }) {
                 Prompt (tuỳ chọn)
               </label>
               <div className="prompt-box">
-                <textarea id={promptId} value={prompt} maxLength={MAX_PROMPT} placeholder="Ví dụ: sân khấu ánh đèn ấm, nhân vật mặc nguyên bộ đồ trong ảnh" onChange={(e) => setPrompt(e.target.value)} />
+                <textarea id={promptId} value={prompt} maxLength={chosen?.maxPromptChars} placeholder="Ví dụ: sân khấu ánh đèn ấm, nhân vật mặc nguyên bộ đồ trong ảnh" onChange={(e) => setPrompt(e.target.value)} />
                 <div className="prompt-foot">
                   <span>
-                    {prompt.length}/{MAX_PROMPT}
+                    {prompt.length}
+                    {chosen && `/${chosen.maxPromptChars}`}
                   </span>
                 </div>
               </div>

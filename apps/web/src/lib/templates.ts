@@ -1,10 +1,11 @@
 // Saved forms (user_templates): the inputs of one page in the shape the reuse link reads from a job, so a template refills a form the same way.
+import { PROMPT_CEILING } from '@cvs/core/models';
 import { HOOKS, LOCATIONS } from './marketing';
 
 /** The most templates one member keeps. */
 export const MAX_TEMPLATES = 50;
 export const MAX_TEMPLATE_NAME = 60;
-const MAX_TEXT = 2000;
+const MAX_TEXT = PROMPT_CEILING; // the longest prompt any model takes
 const MAX_IMAGES = 7;
 
 /** A template's stored inputs: asset ids for the images, and the fields of GET /api/jobs/:id the pages refill from. */

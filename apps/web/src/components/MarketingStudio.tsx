@@ -6,7 +6,8 @@ import { useRouter } from 'next/navigation';
 import { type CSSProperties, type KeyboardEvent, type ReactNode, useEffect, useId, useRef, useState } from 'react';
 import { ABOUT } from '@/lib/about-content';
 import { api, errorText, sendJson } from '@/lib/api';
-import { ADVANCED_MAX_BRIEF, ADVANCED_MAX_IMAGES, ADVANCED_MAX_SCRIPT, advancedPrompt, HOOKS, LOCATIONS, type MarketingChoice, marketingPrompt, UGC_MAX_BRIEF } from '@/lib/marketing';
+import { ADVANCED_MAX_IMAGES, ADVANCED_MAX_SCRIPT, advancedPrompt, briefRoom, HOOKS, LOCATIONS, type MarketingChoice, marketingPrompt } from '@/lib/marketing';
+import { promptTooLong } from '@/lib/prompt-limit';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { useSamples } from '@/lib/use-samples';
 import { cardSample } from '@/lib/examples';
@@ -33,6 +34,8 @@ interface VideoModel {
   /** The estimate with native audio on; null when the model cannot make audio. */
   audioEstimateUsd: string | null;
   maxImages: number;
+  /** The model's prompt limit (the API caps it at PROMPT_CEILING). */
+  maxPromptChars: number;
   supported: boolean;
   score: number;
   recommended: boolean;
@@ -205,7 +208,11 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
   const words = script.trim() ? script.trim().split(/\s+/).length : 0;
   /** The English prompt Run sends, shown as is under the form. */
   const variants = hooks.length > 0 ? hooks : [''];
-  const compose = (hook: string) => (advanced ? advancedPrompt({ brief: prompt, images: refs.length, hook, location, script, audio: audioOn }) : marketingPrompt({ hook, location, prompt, audio: audioOn, ratio }));
+  const composeFor = (hook: string, brief: string) =>
+    advanced ? advancedPrompt({ brief, images: refs.length, hook, location, script, audio: audioOn }) : marketingPrompt({ hook, location, prompt: brief, audio: audioOn, ratio });
+  const compose = (hook: string) => composeFor(hook, prompt);
+  /** What the brief may take: the chosen model's limit less what the page adds around it, for the longest variant. */
+  const room = chosen && Math.min(...variants.map((h) => briefRoom((b) => composeFor(h, b), chosen.maxPromptChars)));
   /** What a Run sends for each variant, in order. */
   const sent = variants.map(compose);
   const n = variants.length;
@@ -281,8 +288,8 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
     if (first) pickModel(first);
   }, [list]);
 
-  // The first thing that stops Run, in the order the form is filled; null when it can go.
-  const reason =
+  // The first thing that stops Run, in the order the form is filled; null when it can go. The prompt's length comes last.
+  const formReason =
     failed
       ? 'Không tải được danh sách mô hình.'
       : !fresh || (models!.length > 0 && !chosen)
@@ -306,6 +313,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
                   : product.length === 0
                     ? 'Tải lên ảnh sản phẩm.'
                     : null;
+  const reason = formReason ?? promptTooLong(chosen, Math.max(...sent.map((s) => s.length)));
   /** Hook variants beyond the clips left today are refused before anything is sent. */
   const short = n > 1 && clips !== null && clips.today + n > clips.cap ? `Hôm nay bạn chỉ còn ${Math.max(0, clips.cap - clips.today)} clip; bỏ bớt biến thể hook.` : null;
   const canRun = reason === null && short === null && !busy;
@@ -418,13 +426,14 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
                 <label htmlFor={promptId} className="field-label">
                   {advanced ? 'Prompt' : 'Prompt (tuỳ chọn)'}
                 </label>
-                <SuggestButton label="Gợi ý mô tả" ask={() => ({ field: 'brief', ...(advanced && { format: 'advanced' }), text: prompt, hook: hooks[0], location: location || undefined })} onPick={setPrompt} />
+                <SuggestButton label="Gợi ý mô tả" ask={() => ({ field: 'brief', ...(advanced && { format: 'advanced' }), text: prompt, hook: hooks[0], location: location || undefined, ...(room !== undefined && { room }) })} onPick={setPrompt} />
               </div>
               <div className="prompt-box">
-                <textarea id={promptId} value={prompt} maxLength={advanced ? ADVANCED_MAX_BRIEF : UGC_MAX_BRIEF} aria-required={advanced || undefined} placeholder="Mô tả video marketing bạn muốn…" onChange={(e) => setPrompt(e.target.value)} />
+                <textarea id={promptId} value={prompt} maxLength={room} aria-required={advanced || undefined} placeholder="Mô tả video marketing bạn muốn…" onChange={(e) => setPrompt(e.target.value)} />
                 <div className="prompt-foot">
                   <span>
-                    {prompt.length}/{advanced ? ADVANCED_MAX_BRIEF : UGC_MAX_BRIEF}
+                    {prompt.length}
+                    {room !== undefined && `/${room}`}
                   </span>
                 </div>
               </div>

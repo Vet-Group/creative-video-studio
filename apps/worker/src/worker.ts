@@ -12,7 +12,7 @@ import type { ReadableStream as WebReadableStream } from 'node:stream/web';
 import { fileURLToPath } from 'node:url';
 import type { Enhancer } from '@cvs/core/enhance';
 import { close24h, lateBill, type LedgerPool, release, settle, withTransaction } from '@cvs/core/ledger';
-import { type ImageModelConfig, type ModelConfig, usdPerSecondFor } from '@cvs/core/models';
+import { type ImageModelConfig, type ModelConfig, promptLimit, usdPerSecondFor } from '@cvs/core/models';
 import { ImageReadError } from '@cvs/core/providers/http';
 import type { ImageProvider, ImageProviderJob, ImageSubmitRequest, ProviderJob, ProviderStatus, SubmitRequest, VideoProvider } from '@cvs/core/providers';
 import { PURGE_CRON, PURGE_QUEUE, SUGGEST_QUEUE, SUGGEST_QUEUE_OPTIONS, type SuggestJobData, VIDEO_QUEUE, VIDEO_QUEUE_OPTIONS, type VideoJobData, videoSendOptions } from '@cvs/core/queue';
@@ -183,14 +183,14 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
     try {
       const job = (
         await pool.query(
-          'select j.provider, j.is_mock, j.model, j.prompt, j.enhance, j.enhanced_prompt, j.aspect, j.duration_s, j.params, j.input_asset_ids, m.kind from jobs j join model_configs m on m.id = j.model where j.id = $1',
+          'select j.provider, j.is_mock, j.model, j.prompt, j.enhance, j.enhanced_prompt, j.aspect, j.duration_s, j.params, j.input_asset_ids, m.kind, m.max_prompt_chars from jobs j join model_configs m on m.id = j.model where j.id = $1',
           [jobId],
         )
       ).rows[0];
       // Enhance once per job (a resubmit reuses the saved brief). Mock models are tests and never spend on it. Any failure keeps the member's prompt.
       if (job.enhance && !job.enhanced_prompt && deps.enhance && !job.is_mock) {
         try {
-          const r = await abortable(deps.enhance(job.prompt, job.kind === 'image' ? 'image' : 'video'), signal);
+          const r = await abortable(deps.enhance(job.prompt, job.kind === 'image' ? 'image' : 'video', promptLimit(job.max_prompt_chars)), signal);
           await pool.query('update jobs set enhanced_prompt = $2, enhance_cost_usd = $3 where id = $1', [jobId, r.prompt, r.costUsd]);
           job.enhanced_prompt = r.prompt;
         } catch (e) {

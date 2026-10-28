@@ -2,7 +2,6 @@
 import { randomBytes } from 'node:crypto';
 import { createTestDatabase } from '@cvs/db/testing';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
-import { UGC_MAX_BRIEF } from '@/lib/marketing';
 
 const testDb = await createTestDatabase();
 process.env.DATABASE_URL = testDb.url;
@@ -137,7 +136,7 @@ describe('POST /api/jobs', () => {
   test.each([
     ['an empty prompt', { presetId: null, prompt: '' }],
     ['a blank prompt', { presetId: null, prompt: ' \n\t ' }],
-    ['a prompt over 2000 characters', { presetId: null, prompt: 'x'.repeat(2001) }],
+    ['a prompt over the model’s 2000 characters', { presetId: null, prompt: 'x'.repeat(2001) }],
     ['a prompt that is not text', { presetId: null, prompt: 5 }],
     ['both a preset and a prompt', { prompt: 'A slow turn.' }],
     ['neither a preset nor a prompt', { presetId: null }],
@@ -164,6 +163,27 @@ describe('POST /api/jobs', () => {
   test('accepts a prompt of exactly 2000 characters', async () => {
     const m = await newMember(); // its own daily count, so the owner keeps room for the cap tests above
     expect((await runAs(m, { presetId: null, prompt: 'x'.repeat(2000) })).status).toBe(201);
+  });
+
+  test('holds a prompt to the model’s own limit, never past the 5000 ceiling, before anything is reserved', async () => {
+    const m = await newMember();
+    const limit = (n: number) => pool.query('update model_configs set max_prompt_chars = $2 where id = $1', [base.modelId, n]);
+    const refused = async (prompt: string) => {
+      const res = await runAs(m, { presetId: null, prompt });
+      return [res.status, ((await res.json()) as { error?: string }).error];
+    };
+    try {
+      await limit(50000); // Nano Banana's schema allows 50000; the app sends at most 5000
+      expect((await runAs(m, { presetId: null, prompt: 'x'.repeat(5000) })).status).toBe(201);
+      const before = await jobCount();
+      expect(await refused('x'.repeat(5001))).toEqual([400, 'the prompt must have 1 to 5000 characters']);
+      await limit(2500); // Kling's
+      expect((await runAs(m, { presetId: null, prompt: 'x'.repeat(2500) })).status).toBe(201);
+      expect(await refused('x'.repeat(2501))).toEqual([400, 'the prompt may be at most 2500 characters on this model']);
+      expect(await jobCount()).toBe(before + 1);
+    } finally {
+      await limit(2000);
+    }
   });
 
   test.each([
@@ -517,7 +537,7 @@ describe('POST /api/jobs for an image feature', () => {
     expect(await error(await runImage(m, { ...tryOn, params: { resolution: '1K', garments: '2' } }))).toMatch(/params.garments must count the garment images \(1 to 1\)/); // 2 inputs: the person and 1 garment
     expect(await error(await runImage(m, { ...tryOn, params: { resolution: '1K', garments: 'x' } }))).toMatch(/params.garments must count the garment images/);
     expect(await error(await runImage(m, { params: { resolution: '1K', garments: '1' } }))).toMatch(/params may hold only resolution, quality and brief/);
-    expect(await error(await runImage(m, { params: { resolution: '1K', brief: 'x'.repeat(2001) } }))).toMatch(/params.brief may be at most 2000/);
+    expect(await error(await runImage(m, { params: { resolution: '1K', brief: 'x'.repeat(5001) } }))).toMatch(/params.brief may be at most 5000/);
     expect(await jobCount()).toBe(before);
   });
 
@@ -721,9 +741,8 @@ describe('POST /api/jobs for an image feature', () => {
         const before = await jobCount();
         expect(await error(await advanced(m, 2, { params: { format: 'advanced', hook: 'nope' } }))).toMatch(/params.hook must be one of/);
         expect(await error(await advanced(m, 2, { params: { format: 'advanced', location: 'moon' } }))).toMatch(/params.location must be one of/);
-        expect(await error(await advanced(m, 2, { params: { format: 'advanced', brief: 'x'.repeat(1001) } }))).toMatch(/params.brief may be at most 1000/);
+        expect(await error(await advanced(m, 2, { params: { format: 'advanced', brief: 'x'.repeat(5001) } }))).toMatch(/params.brief may be at most 5000/);
         expect(await error(await advanced(m, 2, { params: { format: 'advanced', script: 'x'.repeat(301) } }))).toMatch(/params.script may be at most 300/);
-        expect(await error(await runAs(m, { feature: 'marketing', presetId: null, prompt, ...kling, assetIds: await refs(m, 2), params: { brief: 'x'.repeat(UGC_MAX_BRIEF + 1) } }))).toMatch(new RegExp(`params.brief may be at most ${UGC_MAX_BRIEF}`));
         expect(await error(await runAs(m, { feature: 'marketing', presetId: null, prompt, ...kling, assetIds: await refs(m, 2), params: { script: 's' } }))).toMatch(/params.script is for Advanced only/);
         expect(await jobCount()).toBe(before);
       });

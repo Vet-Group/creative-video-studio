@@ -53,13 +53,13 @@ const SILENT = 'The video is completely silent: no speech, no music and no sound
 
 /** The most reference images an Advanced run takes, as on the reference site; each model's own max_images may be lower. */
 export const ADVANCED_MAX_IMAGES = 7;
-/** The page's limits on the brief and the script: with the longest fixed part (about 600 characters) the prompt stays under the API's 2000. A script of
- * roughly two spoken words per second fills a 15 s clip at about 200 characters. */
-export const ADVANCED_MAX_BRIEF = 1000;
+/** The script's limit: roughly two spoken words per second fill a 15 s clip at about 200 characters. */
 export const ADVANCED_MAX_SCRIPT = 300;
-/** UGC's prompt limit: with the longest ratio, hook, location and sound rule the rest of the prompt is about 770 characters, and the API takes 2000
- * (marketing.test.ts checks the worst case). */
-export const UGC_MAX_BRIEF = 1200;
+/**
+ * The characters the member's brief may take on a model whose prompt limit is `limit`: the limit less the fixed part `compose` builds around the brief
+ * (instruction, hook, location, script and sound rule). It changes with the model and the choices; nothing else holds the brief.
+ */
+export const briefRoom = (compose: (brief: string) => string, limit: number): number => Math.max(0, limit - (compose('x').length - 1));
 /** Suggestion runs one member may ask for per day (Asia/Ho_Chi_Minh), each one LLM call of about 0.0004 USD. */
 export const SUGGEST_DAILY_LIMIT = 20;
 

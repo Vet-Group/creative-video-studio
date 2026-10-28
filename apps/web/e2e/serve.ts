@@ -38,6 +38,8 @@ await pool.query(
   `insert into model_configs (id, provider, endpoint, label, ratios, durations_sec, max_images, output_resolution, usd_per_second, sources, enabled, features)
    values ('mock-e2e-wide', 'mock', 'mock', 'Mock E2E Wide', '{16:9}', '{10}', 2, '720p', 0.1, '{}', true, '{marketing}')`,
 );
+// The first mock model keeps the default prompt limit (2000); the wide one takes 1000, so a switch to it can leave the text too long.
+await pool.query(`update model_configs set max_prompt_chars = 1000 where id = 'mock-e2e-wide'`);
 // Image models for the specs of Try On and Image Generation (the Create picker lists video models only): a roomy one for both features and a
 // one-image model for the image page, so the model pill has a second choice.
 await pool.query(

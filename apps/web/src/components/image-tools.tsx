@@ -23,6 +23,8 @@ export interface ImageModel {
   /** USD per image by resolution, as 4-decimal strings. */
   prices: Record<string, string>;
   maxImages: number;
+  /** The model's prompt limit (the API caps it at PROMPT_CEILING). */
+  maxPromptChars: number;
   /** The recommendation score (0-100) for this feature, and whether it is the one to recommend. */
   score: number;
   recommended: boolean;

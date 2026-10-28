@@ -217,13 +217,13 @@ describe('Enhance', () => {
   }
   const enhanced = async (id: string) => (await pool.query(`update jobs set enhance = true where id = $1`, [id]), id);
 
-  test('sends the rewritten brief, saves it with its cost and keeps the member’s prompt', async () => {
-    const asked: [string, string][] = [];
-    const prompts = await startWithEnhance(async (p, kind) => (asked.push([p, kind]), { prompt: `A detailed brief for ${p}.`, costUsd: 0.0004 }));
+  test('sends the rewritten brief, cut to the model’s prompt limit, saves it with its cost and keeps the member’s prompt', async () => {
+    const asked: [string, string, number][] = [];
+    const prompts = await startWithEnhance(async (p, kind, max) => (asked.push([p, kind, max]), { prompt: `A detailed brief for ${p}.`, costUsd: 0.0004 }));
     const id = await enhanced(await newJob('u1', { prompt: 'push in' }));
     await send(id, 'u1');
     await waitFor('the job to succeed', async () => (await status(id)) === 'succeeded'); // finished, so it holds no slot of the later tests
-    expect(asked).toEqual([['push in', 'video']]);
+    expect(asked).toEqual([['push in', 'video', 2000]]); // the default limit of a model whose schema states none
     expect(prompts).toEqual(['A detailed brief for push in.']);
     const j = await job(id);
     expect([j.prompt, j.enhanced_prompt, Number(j.enhance_cost_usd)]).toEqual(['push in', 'A detailed brief for push in.', 0.0004]);

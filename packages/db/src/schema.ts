@@ -197,6 +197,8 @@ export const modelConfigs = pgTable(
     ratios: text('ratios').array().notNull(),
     durationsSec: integer('durations_sec').array().notNull(),
     maxImages: integer('max_images'),
+    /** The longest prompt the provider's schema allows; 2000 when the schema states none. The app also caps it at PROMPT_CEILING (core/models). */
+    maxPromptChars: integer('max_prompt_chars').notNull().default(2000),
     outputResolution: text('output_resolution'),
     usdPerSecond: numeric('usd_per_second', { precision: 10, scale: 4 }),
     /** Image models: resolution label to USD per image as a string, for example { "1K": "0.15", "4K": "0.30" }. */
@@ -213,6 +215,7 @@ export const modelConfigs = pgTable(
   (t) => [
     check('model_configs_provider_check', sql`${t.provider} in ('fal', 'replicate', 'mock')`),
     check('model_configs_kind_check', sql`${t.kind} in ('video', 'image')`),
+    check('model_configs_max_prompt_chars_check', sql`${t.maxPromptChars} > 0`),
     check(
       'model_configs_enabled_complete_check',
       sql`not ${t.enabled} or (${t.kind} = 'video' and ${t.usdPerSecond} is not null and ${t.maxImages} is not null and ${t.outputResolution} is not null and cardinality(${t.ratios}) > 0 and cardinality(${t.durationsSec}) > 0) or (${t.kind} = 'image' and ${t.imagePrices} is not null and ${t.imagePrices} <> '{}'::jsonb and ${t.maxImages} is not null and cardinality(${t.ratios}) > 0)`,

@@ -4,6 +4,7 @@
 import { useRef, useState } from 'react';
 import { api, errorText, sendJson } from '@/lib/api';
 import { ABOUT } from '@/lib/about-content';
+import { promptTooLong } from '@/lib/prompt-limit';
 import { useHydrated } from '@/lib/use-hydrated';
 import { About } from './About';
 import { Gallery, type Img, RATIO_LABEL, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
@@ -18,7 +19,6 @@ import { Templates } from './Templates';
 type Tab = 'history' | 'examples' | 'about';
 const TAB_LABEL: Record<Tab, string> = { history: 'Lịch sử', examples: 'Ví dụ', about: 'Giới thiệu' };
 const TABS: Tab[] = ['history', 'examples', 'about'];
-const MAX_PROMPT = 2000;
 
 export function ImageGeneration({ reuse, model }: { reuse?: string; model?: string }) {
   const { refresh } = useJobs();
@@ -64,7 +64,7 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
               ? `Mô hình này nhận tối đa ${chosen.maxImages} ảnh.`
               : prompt.trim() === ''
                 ? 'Nhập mô tả cảnh bạn muốn tạo.'
-                : null;
+                : promptTooLong(chosen, prompt.trim().length);
   const canRun = reason === null && !busy;
 
   async function upload(files: File[]) {
@@ -143,7 +143,7 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
               </li>
             )}
           </ul>
-          <textarea aria-label="Mô tả cảnh bạn muốn tạo" placeholder="Mô tả cảnh bạn muốn tạo…" value={prompt} maxLength={MAX_PROMPT} rows={2} onChange={(e) => setPrompt(e.target.value)} />
+          <textarea aria-label="Mô tả cảnh bạn muốn tạo" placeholder="Mô tả cảnh bạn muốn tạo…" value={prompt} maxLength={chosen?.maxPromptChars} rows={2} onChange={(e) => setPrompt(e.target.value)} />
         </div>
         {(reason || error || notice) && (
           <div className="bar-message">

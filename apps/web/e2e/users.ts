@@ -20,6 +20,7 @@ export const USERS = {
   mkta: { email: 'mkta@e2e.test', name: 'E2E Mkt A', role: 'member' },
   mktb: { email: 'mktb@e2e.test', name: 'E2E Mkt B', role: 'member' },
   mktc: { email: 'mktc@e2e.test', name: 'E2E Mkt C', role: 'member' },
+  mktp: { email: 'mktp@e2e.test', name: 'E2E Mkt P', role: 'member' },
   mktd: { email: 'mktd@e2e.test', name: 'E2E Mkt D', role: 'member' },
   mkte: { email: 'mkte@e2e.test', name: 'E2E Mkt E', role: 'member' },
   mktf: { email: 'mktf@e2e.test', name: 'E2E Mkt F', role: 'member' },

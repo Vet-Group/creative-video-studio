@@ -3,6 +3,7 @@
 // laid out like Create. Run posts a try_on job; the inputs go in the order the API expects: the person first, then the garments, then the background.
 import { useId, useState } from 'react';
 import { api, errorText, sendJson } from '@/lib/api';
+import { promptTooLong } from '@/lib/prompt-limit';
 import { tryOnPrompt } from '@/lib/try-on-prompt';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { useSamples } from '@/lib/use-samples';
@@ -18,7 +19,6 @@ import { Templates } from './Templates';
 type Tab = 'create' | 'history' | 'examples' | 'about';
 const TAB_LABEL: Record<Tab, string> = { create: 'Tạo', history: 'Lịch sử', examples: 'Ví dụ', about: 'Giới thiệu' };
 const MAX_GARMENTS = 4;
-const MAX_PROMPT = 1500;
 
 export function TryOn({ reuse }: { reuse?: string }) {
   const { refresh } = useJobs();
@@ -72,8 +72,10 @@ export function TryOn({ reuse }: { reuse?: string }) {
               ? 'Tải lên ảnh người mẫu.'
               : total > chosen.maxImages
                 ? `Mô hình này nhận tối đa ${chosen.maxImages} ảnh (người mẫu, trang phục và bối cảnh).`
-                : null;
+                : promptTooLong(chosen, tryOnPrompt(garments.length, background.length > 0, prompt)?.length ?? 0);
   const canRun = reason === null && !busy;
+  /** What the member may write: the model's limit less the image roles the prompt starts with. */
+  const room = chosen && chosen.maxPromptChars - (tryOnPrompt(Math.max(1, garments.length), background.length > 0, 'x')!.length - 1);
 
   function add(set: (f: (cur: Img[]) => Img[]) => void) {
     return async (files: File[]) => {
@@ -143,10 +145,11 @@ export function TryOn({ reuse }: { reuse?: string }) {
                 Prompt (tuỳ chọn)
               </label>
               <div className="prompt-box">
-                <textarea id={promptId} value={prompt} maxLength={MAX_PROMPT} placeholder="Mô tả điều bạn muốn..." onChange={(e) => setPrompt(e.target.value)} />
+                <textarea id={promptId} value={prompt} maxLength={room} placeholder="Mô tả điều bạn muốn..." onChange={(e) => setPrompt(e.target.value)} />
                 <div className="prompt-foot">
                   <span>
-                    {prompt.length}/{MAX_PROMPT}
+                    {prompt.length}
+                    {room !== undefined && `/${room}`}
                   </span>
                 </div>
               </div>
