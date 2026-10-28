@@ -465,3 +465,24 @@ test('as on Fash, the ratio and duration menus span the whole row under the pair
     await expect(pop).toBeHidden();
   }
 });
+
+test('opening a menu low in the form neither scrolls the form nor hides under its edge, and the menu keeps its heading', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await signIn(page, 'mktp');
+  await page.goto('/marketing-studio');
+  const form = page.locator('.form-scroll');
+  const before = await form.evaluate((e) => e.scrollTop);
+  await select(page, 'Thời lượng').click();
+  const pop = page.locator('.select-pop');
+  await expect(pop.getByText('Chọn thời lượng')).toBeVisible();
+  expect(await form.evaluate((e) => e.scrollTop)).toBe(before);
+  const [frame, menu] = [(await form.boundingBox())!, (await pop.boundingBox())!];
+  expect(menu.y, 'menu top inside the form').toBeGreaterThanOrEqual(frame.y - 1);
+  expect(menu.y + menu.height, 'menu bottom inside the form').toBeLessThanOrEqual(frame.y + frame.height + 1);
+  await page.keyboard.press('Escape');
+
+  // The hook dialog's variants box sits next to its text, not stretched by the generic input width.
+  await page.getByRole('button', { name: /^Hook/ }).click();
+  const box = (await page.getByRole('checkbox', { name: /Tạo nhiều biến thể/ }).boundingBox())!;
+  expect(box.width).toBeLessThan(24);
+});

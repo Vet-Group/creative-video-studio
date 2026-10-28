@@ -14,6 +14,10 @@ export interface SelectOption {
 }
 
 const MOVES = ['ArrowDown', 'ArrowUp', 'Home', 'End'];
+// The menu's size in CSS (.select-pop): heading, one row per option, and the list's cap.
+const POP_HEADING = 42;
+const POP_ROW = 41;
+const POP_MAX = 280;
 
 /** A ratio select's icon takes the chosen shape, as on the live form; "auto" and wide ratios keep the wide frame. */
 function ratioIcon(value: string): IconName {
@@ -27,29 +31,36 @@ export function Select({ label, icon, heading, value, options, onChange }: { lab
   const triggerId = `${uid}-trigger`;
   const listId = `${uid}-list`;
   const optionId = (i: number) => `${uid}-option-${i}`;
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState<false | 'down' | 'up'>(false);
   const [active, setActive] = useState(0);
   const flags = options.map((o) => !!o.disabled);
   const selected = options.findIndex((o) => o.value === value);
 
   useEffect(() => {
-    if (open) document.getElementById(optionId(active))?.scrollIntoView({ block: 'nearest' });
+    // Scroll only the list to the active option: scrollIntoView would also scroll the form around the menu.
+    const li = open ? document.getElementById(optionId(active)) : null;
+    const list = li?.parentElement;
+    if (li && list) list.scrollTop = Math.min(li.offsetTop, Math.max(list.scrollTop, li.offsetTop + li.offsetHeight - list.clientHeight));
   }, [open, active, uid]);
 
-  function show() {
+  /** Opens below the trigger, or above it when the scrolling form has no room below for the menu but has it above. */
+  function show(trigger: HTMLElement) {
     setActive(selected >= 0 && !flags[selected] ? selected : Math.max(0, firstEnabled(flags)));
-    setOpen(true);
+    const box = trigger.getBoundingClientRect();
+    const frame = trigger.closest('.form-scroll')?.getBoundingClientRect() ?? { top: 0, bottom: window.innerHeight };
+    const need = Math.min(POP_MAX, POP_HEADING + options.length * POP_ROW);
+    setOpen(frame.bottom - box.bottom < need && box.top - frame.top >= need ? 'up' : 'down');
   }
   function pick(i: number) {
     if (flags[i]) return;
     onChange(options[i]!.value);
     setOpen(false);
   }
-  function onKeyDown(e: KeyboardEvent) {
+  function onKeyDown(e: KeyboardEvent<HTMLButtonElement>) {
     if (!open) {
       if (['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(e.key)) {
         e.preventDefault();
-        show();
+        show(e.currentTarget);
       }
       return;
     }
@@ -72,7 +83,7 @@ export function Select({ label, icon, heading, value, options, onChange }: { lab
       <label htmlFor={triggerId} className="field-label">
         {label}
       </label>
-      <div className="select" data-open={open}>
+      <div className="select" data-open={open !== false} data-up={open === 'up' || undefined}>
         <button
           type="button"
           id={triggerId}
@@ -80,13 +91,13 @@ export function Select({ label, icon, heading, value, options, onChange }: { lab
           data-value={value}
           role="combobox"
           aria-haspopup="listbox"
-          aria-expanded={open}
+          aria-expanded={open !== false}
           aria-controls={open ? listId : undefined}
           aria-activedescendant={open ? optionId(active) : undefined}
           onClick={(e) => {
             e.currentTarget.focus(); // Safari and Firefox on macOS do not focus a clicked button, and the list closes on blur
             if (open) setOpen(false);
-            else show();
+            else show(e.currentTarget);
           }}
           onKeyDown={onKeyDown}
           onKeyUp={(e) => e.key === ' ' && e.preventDefault()} // a released Space must not click the button again
