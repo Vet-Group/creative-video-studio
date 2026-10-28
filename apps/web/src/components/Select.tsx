@@ -104,7 +104,10 @@ export function Select({ label, icon, heading, value, options, onChange }: { lab
             <ul role="listbox" id={listId} aria-label={label}>
               {options.map((o, i) => (
                 <li key={o.value} id={optionId(i)} role="option" data-value={o.value} aria-selected={i === selected} aria-disabled={o.disabled || undefined} data-active={i === active} onClick={() => pick(i)} onMouseMove={() => !o.disabled && setActive(i)}>
-                  <span>{o.label}</span>
+                  <span>
+                    {icon === 'ratio' && <Icon name={ratioIcon(o.value)} />}
+                    {o.label}
+                  </span>
                   {i === selected && <Icon name="check" />}
                 </li>
               ))}
