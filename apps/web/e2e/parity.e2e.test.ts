@@ -51,7 +51,9 @@ for (const size of SIZES) {
     if (narrow(page)) await expect(page).toHaveScreenshot(`create-form-${at}.png`, SHOT);
     await page.getByRole('tab', { name: 'Lịch sử' }).click();
     await expect(page.getByText('Hoàn tất')).toBeVisible();
-    await expect(page.getByRole('complementary', { name: 'Job của tôi' }).locator('img')).toHaveJSProperty('complete', true);
+    // The History card shows the clip's video with its poster: wait for the poster to load so the screenshot is stable.
+    const poster = await page.getByRole('complementary', { name: 'Job của tôi' }).locator('video').getAttribute('poster');
+    await page.evaluate((src) => new Promise((done) => Object.assign(new Image(), { onload: done, src })), poster!);
     await expect(page).toHaveScreenshot(`create-history-${at}.png`, SHOT);
 
     await page.getByRole('tab', { name: 'Ví dụ' }).click();

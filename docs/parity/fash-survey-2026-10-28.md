@@ -14,17 +14,17 @@ Survey by a browser automation CLI (bsk) in an Agent Window on the owner's signe
 | M1 | UGC form default (format card, Model, Product, Hook, Location, Prompt, ratio, duration, Run) | 01-default-1440, 09-form-filled-1440.measure.json | same fields, plus approved model select + audio switch | already matches | - |
 | M2 | Format picker: UGC Try On, Advanced, Unboxing (Coming Soon), Product Review (Coming Soon) | 02-format-dialog-1440 | FORMATS dialog | already matches (verify coming-soon cards in grading) | US-008 |
 | M3 | Model picker: "Choose model" grid of 8 stock models (cdn public models/model-1..8.jpg), 4 per row 163x217 | 03-model-picker-1440, 03-model-picker.json | Choose model dialog from `marketing-model-<n>` samples, plus an own-photo tile | cloned (#120) | - |
-| M4 | Product picker: "Upload your own product" tile + "My Products" (all past product uploads) | 04-product-picker-1440, 04-product-picker.json | upload-only slot | queued | US-008 (my uploads list) |
-| M5 | Selected slot: image fills tile, dark chip label bottom-left (Product / hook name / location name), X top-right | 07-ratio-menu-1440, 05b, 06b | slot thumbnails | queued | US-008 |
+| M4 | Product picker: "Upload your own product" tile + "My Products" (all past product uploads) | 04-product-picker-1440, 04-product-picker.json | product picker with "Upload your own product" and the member's past product uploads (#126) | cloned | - |
+| M5 | Selected slot: image fills tile, dark chip label bottom-left (Product / hook name / location name), X top-right | 07-ratio-menu-1440, 05b, 06b | filled slot fills the tile with a dark chip label and an X (#125) | cloned | - |
 | M6 | Hook dialog "Open With a Hook": 6 video tiles 156x208 with title + one-line description | 05-hook-dialog-1440/json | same 6 hooks, ChoiceDialog | already matches | - |
 | M7 | Location dialog "Pick the Perfect Location": 11 video tiles | 06-location-dialog-1440/json | same 11 | already matches | - |
 | M8 | Ratio menu: "Aspect Ratio" header, 9:16 / 16:9 / 1:1 with icons and check | 07-ratio-menu-1440 | Select | already matches (graded) | - |
 | M9 | Duration menu: 3s..15s list | 08-duration-menu-1440 | Select | already matches | - |
-| M10 | History card: video left; right column title (format), prompt (scroll), input thumbnails (model, product, hook, location), chips duration + ratio, date, icon actions (regenerate, download, fullscreen, open in new tab, favorite, delete), "Recreate" | 10-history-card-hover-1440, 10-history-card-actions.txt | Tray item: poster, a "view in Library" link, retry and reuse links | queued | reuse refill cloned in #119 (no run); card layout and actions US-013 |
+| M10 | History card: video left; right column title (format), prompt (scroll), input thumbnails (model, product, hook, location), chips duration + ratio, date, icon actions (regenerate, download, fullscreen, open in new tab, favorite, delete), "Recreate" | 10-history-card-hover-1440, 10-history-card-actions.txt | History card: result left; side column with title, the member's words, input thumbnails, ratio and length chips, status and date, download / fullscreen / open in new tab / favourite / delete, reuse link | cloned | regenerate is the reuse link (no paid run) |
 | M11 | Examples tab: format loops + company examples | 11-examples-1440, 11-examples-media.json | Gallery marketing-example- | already matches (media check in US-013) | US-013 |
 | M12 | About tab (UGC): long article, 17.8k chars | 12-about-1440 full page, 12-about-text.md | About renderer | queued (text/sections diff) | US-013 |
 | M13 | Advanced default: refs slot "Up to 7 reference images", Hook, Location, Prompt, Script, ratio, duration, Generate Audio switch, Run | 20-advanced-default-1440 | same + approved model select | already matches | - |
-| M14 | Advanced refs filled: 3-per-row thumbnails with X, plus tile | 22-advanced-refs-filled-1440 | Slot with plus | queued (geometry check) | US-008 |
+| M14 | Advanced refs filled: 3-per-row thumbnails with X, plus tile | 22-advanced-refs-filled-1440 | 3-per-row square reference tiles with X and a same-size plus tile (#127) | cloned | - |
 | M15 | Advanced Examples / About (8.4k chars) | 23, 24, 24-advanced-about-text.md | About renderer | queued | US-013 |
 | M16 | 390: interstitial "Get the best performance on desktop" + Continue on mobile | 31a-mobile-interstitial-390 | none | approved difference candidate: not cloned (our app is mobile-first; an interstitial would only add a tap) | - |
 | M17 | 390 Advanced/UGC: Create/History/Examples/About tabs, form card, sticky Run | 30-advanced-390, 31-ugc-390, 32-ugc-390-full | same pattern | already matches (graded r16 create-mobile) | grading |
@@ -37,7 +37,7 @@ Survey by a browser automation CLI (bsk) in an Agent Window on the owner's signe
 |---|----------------|---------------|-----------|--------|--------|
 | C1 | Default form (image slot, prompt, Prompts button, Enhance pill, ratio/duration/model, Run) | 01-default-1440 + measure | same (graded r16 >= 90) | already matches | - |
 | C2 | "Steal Our Prompts" dialog: General + 19 templates | 02-prompts-dialog-1440/json | preset picker with the same 19 + free prompt | already matches | - |
-| C3 | History tab: cards with video + side panel (title, prompt, inputs, chips, date, actions, Recreate) | 02/03-history-1440 | Tray list + reuse link (#119) | queued (card layout) | US-013 |
+| C3 | History tab: cards with video + side panel (title, prompt, inputs, chips, date, actions, Recreate) | 02/03-history-1440 | the same History card on every page with a History tab | cloned | - |
 | C4 | Examples tab | 03-examples-1440, media json | Gallery video-example- | already matches | - |
 | C5 | About tab (27k chars) | 04-about-1440, 04-about-text.md | About renderer | queued (text/image diff) | US-013 |
 

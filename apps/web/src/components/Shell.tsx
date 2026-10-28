@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { createContext, type ReactNode, useContext, useEffect, useRef, useState } from 'react';
 import { api, errorText, sendJson, type JobStatus, type TrayJob } from '@/lib/api';
 import { appBySlug } from '@/lib/apps';
+import { featureLabel } from '@/lib/features';
 import { reuseHref } from '@/lib/reuse';
 import { COLLAPSED_COOKIE } from '@/lib/sidebar';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
@@ -73,6 +74,122 @@ function TrayItem({ job, isAdmin }: { job: TrayJob; isAdmin: boolean }) {
   );
 }
 
+/** The History card's title: the page's own name for what made it, as Fash titles its cards ("UGC Try On"). */
+const cardTitle = (job: TrayJob): string => (job.feature === 'marketing' ? (job.format === 'advanced' ? 'Marketing nâng cao' : 'UGC Thử đồ') : featureLabel(job.feature));
+
+/**
+ * One job in a page's History tab, laid out as Fash's History card: the result on the left; on the right the title, the member's own words,
+ * the inputs, the ratio and length chips, the status and date, the icon actions and Dùng lại (Fash's Recreate, without the run).
+ */
+function HistoryCard({ job, isAdmin }: { job: TrayJob; isAdmin: boolean }) {
+  const { refresh } = useJobs();
+  const [problem, setProblem] = useState('');
+  const [favorite, setFavorite] = useState(job.favorite);
+  const media = useRef<HTMLVideoElement & HTMLImageElement>(null);
+  const image = job.resolution !== null;
+  const out = job.status === 'succeeded' ? job.outputAssetId : null;
+  const failure = FAILURE_TEXT(image ? 'ảnh' : 'clip')[job.status];
+  const content = (id: string) => `/api/assets/${id}/content`;
+
+  async function act(what: () => Promise<unknown>, fail: string) {
+    setProblem('');
+    try {
+      await what();
+    } catch (e) {
+      setProblem(errorText(e, fail));
+    }
+  }
+  const retry = () => act(async () => (await api('/api/jobs', sendJson('POST', { retryOf: job.id })), await refresh()), 'Không thử lại được');
+  const toggleFavorite = () => act(async () => setFavorite((await api<{ favorite: boolean }>(`/api/jobs/${job.id}/favorite`, sendJson('PUT', { favorite: !favorite }))).favorite), 'Không lưu được mục yêu thích.');
+  const remove = () => {
+    if (!window.confirm(`Xóa ${image ? 'ảnh' : 'clip'} này? Nó cũng biến khỏi Thư viện.`)) return;
+    void act(async () => (await api(`/api/jobs/${job.id}`, { method: 'DELETE' }), await refresh()), `Không xóa được ${image ? 'ảnh' : 'clip'}.`);
+  };
+  const download = () =>
+    act(async () => {
+      const a = document.createElement('a');
+      a.href = (await api<{ downloadUrl: string }>(`/api/assets/${out}`)).downloadUrl;
+      document.body.append(a);
+      a.click();
+      a.remove();
+    }, 'Không tải xuống được.');
+
+  return (
+    <li className={`job job-card job-${job.status}`}>
+      <div className="job-media">
+        {out ? (
+          image ? (
+            <img ref={media} src={content(out)} alt={cardTitle(job)} loading="lazy" />
+          ) : (
+            <video ref={media} controls playsInline preload="metadata" poster={job.posterAssetId ? content(job.posterAssetId) : undefined} src={content(out)} />
+          )
+        ) : (
+          <span className="job-media-empty">{STATUS_LABEL[job.status]}</span>
+        )}
+      </div>
+      <div className="job-body">
+        <h3>
+          {cardTitle(job)}
+          {job.isMock && <span className="badge">MOCK</span>}
+          {job.retryOf && <span className="tag">Thử lại</span>}
+        </h3>
+        {job.text && <p className="job-text">{job.text}</p>}
+        {job.inputAssetIds.length > 0 && job.feature !== 'motion_control' && (
+          <ul className="job-inputs" aria-label="Ảnh đầu vào">
+            {job.inputAssetIds.map((id) => (
+              <li key={id}>
+                <img src={content(id)} alt="" loading="lazy" />
+              </li>
+            ))}
+          </ul>
+        )}
+        <p className="job-chips">
+          <span>{image ? job.resolution : `${job.durationSec}s`}</span>
+          <span>{job.ratio}</span>
+        </p>
+        <p className="job-when">
+          <strong>{STATUS_LABEL[job.status]}</strong> · {fmtTime(job.createdAt)}
+        </p>
+        {failure && <p className="error">{failure}</p>}
+        {isAdmin && job.error && <p className="muted">{job.error}</p>}
+        {job.retried && <p className="muted">Đã thử lại</p>}
+        {problem && <p className="error">{problem}</p>}
+        <div className="job-actions">
+          {RETRYABLE.includes(job.status) && !job.retried && !job.retryOf && (
+            <button type="button" className="icon-button" onClick={() => void retry()} aria-label="Thử lại" title="Thử lại">
+              <Icon name="arrow" />
+            </button>
+          )}
+          {out && (
+            <>
+              <button type="button" className="icon-button" onClick={() => void download()} aria-label="Tải xuống" title="Tải xuống">
+                <Icon name="download" />
+              </button>
+              <button type="button" className="icon-button" onClick={() => void media.current?.requestFullscreen?.()} aria-label="Toàn màn hình" title="Toàn màn hình">
+                <Icon name="eye" />
+              </button>
+              <a className="icon-button" href={content(out)} target="_blank" rel="noreferrer" aria-label="Mở trong tab mới" title="Mở trong tab mới">
+                <Icon name="external" />
+              </a>
+              <button type="button" className="favorite icon-button" aria-pressed={favorite} onClick={() => void toggleFavorite()} aria-label="Yêu thích" title="Yêu thích">
+                <Icon name="star" filled={favorite} />
+              </button>
+              <button type="button" className="danger icon-button" onClick={remove} aria-label="Xóa" title="Xóa">
+                <Icon name="x" />
+              </button>
+            </>
+          )}
+        </div>
+        {reuseHref(job) && (
+          <Link href={reuseHref(job)!} className="job-reuse">
+            <Icon name="copy" /> Dùng lại
+          </Link>
+        )}
+      </div>
+    </li>
+  );
+}
+
 const AdminContext = createContext(false);
 
 /** The "My jobs" list. It sits beside the page, or in the History tab of Create. With `feature`, only the jobs of that feature (the History tab of Try On and Image Generation). */
@@ -82,14 +199,12 @@ export function Tray({ feature }: { feature?: string }) {
   const { workerOffline, loaded } = all;
   const jobs = feature ? all.jobs.filter((j) => j.feature === feature) : all.jobs;
   return (
-    <aside className="tray" aria-label="Job của tôi">
+    <aside className={feature ? 'tray history' : 'tray'} aria-label="Job của tôi">
       <h2>Job của tôi</h2>
       {workerOffline && <p className="warn">Worker offline: chưa nhận được tín hiệu từ máy xử lý, job sẽ chạy khi worker hoạt động lại.</p>}
       {loaded && jobs.length === 0 && <p className="muted">Chưa có job nào.</p>}
       <ul>
-        {jobs.map((j) => (
-          <TrayItem key={j.id} job={j} isAdmin={isAdmin} />
-        ))}
+        {jobs.map((j) => (feature ? <HistoryCard key={j.id} job={j} isAdmin={isAdmin} /> : <TrayItem key={j.id} job={j} isAdmin={isAdmin} />))}
       </ul>
     </aside>
   );

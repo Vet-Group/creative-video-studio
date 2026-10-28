@@ -30,6 +30,7 @@ export const USERS = {
   usea: { email: 'usea@e2e.test', name: 'E2E Use A', role: 'member' },
   useb: { email: 'useb@e2e.test', name: 'E2E Use B', role: 'member' },
   sugga: { email: 'sugga@e2e.test', name: 'E2E Suggest A', role: 'member' },
+  hista: { email: 'hista@e2e.test', name: 'E2E History A', role: 'member' },
   auda: { email: 'auda@e2e.test', name: 'E2E Audio A', role: 'member' },
   audb: { email: 'audb@e2e.test', name: 'E2E Audio B', role: 'member' },
   admin: { email: 'admin@e2e.test', name: 'E2E Admin', role: 'admin' },
