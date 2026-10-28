@@ -1,5 +1,5 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
-import { modelButton, optionsOf, png, select, signIn } from './support.test';
+import { jpg, modelButton, optionsOf, png, select, signIn } from './support.test';
 
 const nav = (page: Page) => page.getByRole('navigation', { name: 'Điều hướng chính' });
 const file = (name: string) => ({ name, mimeType: 'image/png', buffer: png() });
@@ -98,6 +98,52 @@ test('Try On: Ví dụ says so when the company has no try-on image yet', async 
   await page.goto('/try-on');
   await page.getByRole('tab', { name: 'Ví dụ' }).click();
   await expect(page.getByText('Chưa có ảnh thử đồ nào trong công ty.')).toBeVisible();
+});
+
+test('Try On, as on Fash: a sample picture with a details file opens in place with the model, the photos, the prompt and its settings, and Dùng lại refills the form', async ({ page }) => {
+  const details = { feature: 'try_on', images: [{ sample: 'try-on-example-1-model.png' }, { sample: 'try-on-example-1-garment-1.png' }, { sample: 'try-on-bg-test.jpg' }], garments: 1, brief: 'Sitting in a velvet armchair.', modelId: 'mock-image-e2e', ratio: '3:4', resolution: '1K', background: 'Seamless White', date: '2026-08-18' };
+  const files: [string, Buffer, string][] = [
+    ['try-on-example-1.jpg', jpg(), 'image/jpeg'], ['try-on-example-1.json', Buffer.from(JSON.stringify(details)), 'application/json'],
+    ['try-on-example-1-model.png', png(), 'image/png'], ['try-on-example-1-garment-1.png', png(), 'image/png'], ['try-on-bg-test.jpg', jpg(), 'image/jpeg'],
+    ['try-on-example-2.jpg', jpg(), 'image/jpeg'],
+  ];
+  const asAdmin = async (each: (name: string, data: Buffer, type: string) => Promise<{ ok(): boolean }>) => {
+    await page.context().clearCookies();
+    await signIn(page, 'admin');
+    for (const [name, data, type] of files) expect((await each(name, data, type)).ok(), name).toBe(true);
+    await page.context().clearCookies();
+  };
+  await asAdmin((name, data, type) => page.request.put(`/api/admin/samples/${name}`, { data, headers: { 'content-type': type } }));
+  try {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await signIn(page, 'tryexa');
+    await page.route(/\/api\/library\?kind=try_on/, (r) => r.fulfill({ json: { hasMore: false, isAdmin: false, creators: [], clips: [] } }));
+    await page.goto('/try-on');
+    await page.getByRole('tab', { name: 'Ví dụ' }).click();
+    const gallery = page.getByRole('group', { name: 'Ảnh thử đồ của công ty' });
+    await expect(gallery.getByRole('link', { name: 'Xem chi tiết ảnh mẫu' })).toHaveCount(1);
+    await expect(gallery.getByRole('img', { name: 'Ảnh mẫu' })).toHaveCount(2); // the one without a details file stays a plain picture
+
+    await gallery.getByRole('link', { name: 'Xem chi tiết ảnh mẫu' }).click();
+    const detail = page.getByRole('dialog', { name: 'Chi tiết: Thử đồ' });
+    await expect(detail.getByRole('heading', { name: 'Mock image E2E' })).toBeVisible();
+    await expect(detail.getByRole('list', { name: 'Ảnh đầu vào' }).getByRole('img')).toHaveCount(3);
+    await expect(detail.locator('.job-text')).toHaveText(details.brief);
+    await expect(detail.locator('.job-chips')).toHaveText(['1K3:4', 'Seamless White']);
+    await expect(detail.locator('.lightbox-media img')).toHaveAttribute('src', '/api/samples/try-on-example-1.jpg');
+    await expect(detail.getByRole('link', { name: 'Dùng lại' })).toHaveAttribute('href', '/try-on?example=try-on-example-1');
+
+    await detail.getByRole('link', { name: 'Dùng lại' }).click();
+    await expect(page).toHaveURL(/\/try-on\?example=try-on-example-1$/);
+    await expect(page.getByLabel('Người mẫu: ảnh đã chọn').getByRole('img', { name: 'try-on-example-1-model.png' })).toBeVisible();
+    await expect(page.getByLabel('Trang phục: ảnh đã chọn').getByRole('img', { name: 'try-on-example-1-garment-1.png' })).toBeVisible();
+    await expect(page.getByLabel('Bối cảnh (tuỳ chọn): ảnh đã chọn').getByRole('img', { name: 'try-on-bg-test.jpg' })).toBeVisible();
+    await expect(page.getByRole('textbox', { name: 'Prompt (tuỳ chọn)' })).toHaveValue(details.brief);
+    await expect(select(page, 'Tỉ lệ')).toHaveAttribute('data-value', '3:4');
+    await expect(select(page, 'Độ phân giải')).toHaveAttribute('data-value', '1K');
+  } finally {
+    await asAdmin((name) => page.request.delete(`/api/admin/samples/${name}`));
+  }
 });
 
 test('Image Generation: the bar counts the prompt near the model limit, and a switch to a smaller limit keeps the text while Run waits', async ({ page }) => {
