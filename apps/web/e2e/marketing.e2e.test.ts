@@ -588,6 +588,26 @@ test("with earlier UGC jobs, the empty product slot offers the member's own past
   await expect(page.getByRole('dialog')).toHaveCount(0);
 });
 
+test('as on Fash in a 666 px tall window (measured 2026-10-29): no scrollbar narrows the form, and the ratio and duration pills are 132 px wide with the value 6 px after a 12 px clock or an 8 px ratio box', async ({ page }) => {
+  await page.setViewportSize({ width: 1426, height: 666 });
+  await signIn(page, 'mktb');
+  await page.goto('/marketing-studio');
+  const near = (got: number, want: number) => expect(Math.abs(got - want), `${got} vs ${want}`).toBeLessThanOrEqual(1);
+  const scroller = page.locator('.form-scroll').filter({ has: page.locator('.marketing-head') });
+  expect(await scroller.evaluate((e) => e.scrollHeight > e.clientHeight)).toBe(true);
+  // Headless Chromium hides scrollbars anyway, so the rule itself is what a test can see; a desktop Chrome would take 15 px of the 272.
+  expect(await scroller.evaluate((e) => getComputedStyle(e).scrollbarWidth)).toBe('none');
+  near((await page.locator('.marketing-head').boundingBox())!.width, 272);
+  // Fash: the ratio pill at x 312 has its value at 336.8; the duration pill at 452 has it at 480.8.
+  for (const [label, offset] of [['Tỉ lệ', 24.8], ['Thời lượng', 28.8]] as const) {
+    const pill = select(page, label);
+    const box = (await pill.boundingBox())!;
+    near(box.width, 132);
+    near((await pill.locator('.select-value').boundingBox())!.x - box.x, offset);
+    near((await pill.locator('.icon').last().boundingBox())!.width, 10);
+  }
+});
+
 test('as on Fash, the ratio and duration menus span the whole row under the pair, and each ratio option shows its shape', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await signIn(page, 'mktp');
