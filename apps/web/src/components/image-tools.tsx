@@ -74,16 +74,16 @@ export interface ReuseJob {
   brief: string | null;
   garments: number | null;
   enhance: boolean | null;
-  ratio: string;
+  ratio: string | null;
   resolution: string | null;
-  modelId: string;
+  modelId: string | null;
 }
 
-/** Reuse (`?reuse=<job>`): reads the job once and hands it to `fill` when it is a job of `feature`; `fail` otherwise. Everything stays editable. */
+/** Refill (`reuse` is a job's or a saved template's API path, lib/reuse.ts): reads it once and hands it to `fill` when it is of `feature`; `fail` otherwise. Everything stays editable. */
 export function useReuse(reuse: string | undefined, feature: string, fill: (j: ReuseJob) => void, fail: () => void) {
   useEffect(() => {
     if (!reuse) return;
-    api<ReuseJob>(`/api/jobs/${encodeURIComponent(reuse)}`).then((j) => (j.feature === feature ? fill(j) : fail()), fail);
+    api<ReuseJob>(reuse).then((j) => (j.feature === feature ? fill(j) : fail()), fail);
   }, [reuse]);
 }
 

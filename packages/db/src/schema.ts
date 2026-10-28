@@ -387,6 +387,24 @@ export const favorites = pgTable(
   (t) => [primaryKey({ columns: [t.userId, t.jobId] })],
 );
 
+// A member's saved form (Save template): the inputs of one page, in the shape the reuse link reads from a job, so applying it refills the form the same way.
+// `is_company` (set by an Admin) shares it with everyone; others never see the Admin's own photos in it.
+export const userTemplates = pgTable(
+  'user_templates',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    feature: text('feature', { enum: FEATURES }).notNull(),
+    name: text('name').notNull(),
+    data: jsonb('data').notNull(),
+    isCompany: boolean('is_company').notNull().default(false),
+    createdAt: tstz('created_at').notNull().defaultNow(),
+  },
+  (t) => [index('user_templates_user_id_idx').on(t.userId), check('user_templates_name_check', sql`char_length(${t.name}) between 1 and 60`)],
+);
+
 // Who did what to whom: an Admin deleting another user's clip, any Pass/Fail edit, and the Admin changes of M.5.
 export const auditEntries = pgTable(
   'audit_entries',

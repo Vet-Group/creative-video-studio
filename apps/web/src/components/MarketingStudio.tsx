@@ -20,6 +20,7 @@ import { Modal } from './Modal';
 import { ModelPicker } from './ModelPicker';
 import { Select } from './Select';
 import { Tray } from './Shell';
+import { Templates } from './Templates';
 
 interface VideoModel {
   id: string;
@@ -139,7 +140,7 @@ const FORMATS = [
   { id: 'product-review', name: 'Đánh giá sản phẩm', href: null, soon: 'Sắp có' },
 ];
 
-/** What the reuse link reads back from a Marketing Studio job (GET /api/jobs/:id). */
+/** What the reuse link reads back from a Marketing Studio job (GET /api/jobs/:id) or a saved template (GET /api/templates/:id). */
 interface MarketingJob {
   feature: string;
   format: string | null;
@@ -149,9 +150,9 @@ interface MarketingJob {
   brief: string | null;
   script: string | null;
   audio: string | null;
-  ratio: string;
-  durationSec: number;
-  modelId: string;
+  ratio: string | null;
+  durationSec: number | null;
+  modelId: string | null;
 }
 
 export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingFormat; reuse?: string }) {
@@ -242,10 +243,10 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
   // member's own text (a job from before it was kept, or someone else's) the rest is refilled and the brief is asked for again.
   useEffect(() => {
     if (!reuse) return;
-    api<MarketingJob>(`/api/jobs/${encodeURIComponent(reuse)}`).then(
+    api<MarketingJob>(reuse).then(
       (j) => {
         if (j.feature !== 'marketing') return setError('Không tìm thấy clip để dùng lại.');
-        if ((j.format === 'advanced') !== advanced) return router.replace(`/marketing-studio${j.format === 'advanced' ? '/advanced' : ''}?reuse=${encodeURIComponent(reuse)}`);
+        if ((j.format === 'advanced') !== advanced) return router.replace(`/marketing-studio${j.format === 'advanced' ? '/advanced' : ''}${window.location.search}`);
         if (advanced) setRefs(j.images);
         else (setPerson(j.images.slice(0, 1)), setProduct(j.images.slice(1, 2)));
         setHooks(j.hook ? [j.hook] : []);
@@ -253,9 +254,10 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
         setPrompt(j.brief ?? '');
         setScript(j.script ?? '');
         setAudio(j.audio !== 'off');
-        setRatio(j.ratio);
-        setDurationSec(j.durationSec);
-        setModelId(j.modelId);
+        // A saved template may leave these out; the form's defaults stay.
+        if (j.ratio) setRatio(j.ratio);
+        if (j.durationSec) setDurationSec(j.durationSec);
+        if (j.modelId) setModelId(j.modelId);
         if (j.brief === null && advanced) setNotice('Clip này không có mô tả gốc: đã điền lại ảnh và cài đặt, hãy nhập lại mô tả.');
       },
       () => setError('Không tìm thấy clip để dùng lại.'),
@@ -488,6 +490,20 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
             )}
             {notice && <p role="status">{notice}</p>}
           </div>
+          <Templates
+            feature="marketing"
+            data={() => ({
+              images: (advanced ? refs : [...person, ...product]).map((i) => i.id),
+              ...(advanced && { format: 'advanced', script: script.trim() }),
+              hook: hooks[0],
+              location,
+              brief: prompt.trim(),
+              audio: audio ? 'on' : 'off',
+              ratio,
+              durationSec,
+              modelId: chosen?.id,
+            })}
+          />
           <div className="runbar">
             <button type="button" className="primary run" disabled={!canRun} aria-describedby={(reason ?? short) ? reasonId : undefined} onClick={() => void run()}>
               Tạo video

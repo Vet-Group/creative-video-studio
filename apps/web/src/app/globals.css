@@ -377,6 +377,15 @@ td code { white-space: pre-wrap; overflow-wrap: anywhere; }
 .runbar button.primary.run:disabled { opacity: 1; }
 [aria-labelledby='tryon-title'] .runbar button.primary.run:disabled { background: var(--fill-strong); color: var(--ink); }
 .field { display: grid; gap: 6px; margin-top: 16px; }
+/* Saved forms: two quiet links above Run, and their dialogs. */
+.templates { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 16px; margin: 16px 0 12px; font-size: 14px; line-height: 21px; }
+.templates > [role='status'] { margin: 0 auto 0 0; color: var(--text-muted); }
+.link-button { padding: 0; border: 0; background: none; color: var(--ink-strong); font: inherit; font-weight: 500; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.template-list { display: grid; gap: 8px; margin: 0 0 12px; padding: 0; list-style: none; }
+.template-list li { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; }
+.template-list li a { flex: 1; color: var(--ink-strong); font-weight: 500; }
+.choice-dialog input:not([type]) { width: 100%; height: 40px; margin: 6px 0 12px; padding: 0 12px; border: 1px solid var(--border); border-radius: 8px; font: inherit; }
+.template-share { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; font-size: 14px; }
 .field-label { margin: 0; color: var(--ink-strong); font-size: 14px; line-height: 21px; font-weight: 500; }
 .help { margin: 8px 0 0; color: var(--text-muted); font-size: 12px; line-height: 18px; }
 
@@ -780,6 +789,7 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .imagebar-bottom { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 .pills { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-width: 0; }
 .imagebar .field { display: block; margin: 0; }
+.imagegen > .templates { margin: 12px 0 0; }
 .imagebar .field-label { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .imagebar .select-trigger { width: auto; max-width: 14rem; height: 34px; padding: 0 12px; border: 1px solid var(--field-border); border-radius: 17px; background: var(--surface); font-size: 13px; }
 .imagebar .select-trigger:hover, .imagebar .select[data-open='true'] .select-trigger { border-color: var(--text-disabled); }

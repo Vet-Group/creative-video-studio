@@ -13,6 +13,7 @@ import { useJobs } from './jobs';
 import { ModelPicker } from './ModelPicker';
 import { Select } from './Select';
 import { Tray } from './Shell';
+import { Templates } from './Templates';
 
 type Tab = 'history' | 'examples' | 'about';
 const TAB_LABEL: Record<Tab, string> = { history: 'Lịch sử', examples: 'Ví dụ', about: 'Giới thiệu' };
@@ -42,8 +43,8 @@ export function ImageGeneration({ reuse }: { reuse?: string }) {
       setImages(j.images);
       setPrompt(j.prompt ?? '');
       setEnhance(j.enhance ?? true);
-      pick.setModelId(j.modelId);
-      pick.setRatio(j.ratio);
+      if (j.modelId) pick.setModelId(j.modelId);
+      if (j.ratio) pick.setRatio(j.ratio);
       if (j.resolution) pick.setResolution(j.resolution);
     },
     () => setError('Không tìm thấy ảnh để dùng lại.'),
@@ -103,6 +104,8 @@ export function ImageGeneration({ reuse }: { reuse?: string }) {
         Tạo ảnh
       </h1>
       <WorkTabs prefix="imagegen" tabs={TABS} labels={TAB_LABEL} shown={tab} onSelect={setTab} />
+      {/* Above the gallery, not in the prompt bar, which keeps Fash's one-row height. */}
+      <Templates feature="image" data={() => ({ images: images.map((i) => i.id), prompt: prompt.trim(), enhance, ratio: pick.ratio, resolution: pick.resolution, modelId: pick.modelId })} />
       <div className="imagegen-side" id={`imagegen-panel-${tab}`} role="tabpanel" aria-labelledby={`imagegen-tab-${tab}`}>
         {tab === 'examples' ? <Gallery kind="image" samples="image-example-" label="Ảnh của công ty" emptyText="Chưa có ảnh nào trong công ty. Hãy tạo ảnh đầu tiên bên dưới." /> : tab === 'about' ? <About page={ABOUT.image} /> : <Tray feature="image" />}
       </div>
