@@ -11,6 +11,8 @@ export interface AboutCard {
   media?: string;
   /** Short spec lines under the text (a model card's durations, resolutions...). */
   specs?: string[];
+  /** A link closing the text, [label, href], as the live cards' "Open UGC Try-On." */
+  link?: [string, string];
 }
 export interface AboutStep {
   title: string;
@@ -1213,18 +1215,8 @@ const advanced: AboutPage = {
       blocks: [
         {
           cards: [
-            { title: 'UGC Thử đồ', text: 'Định dạng gọn: một ảnh người mẫu và một ảnh sản phẩm vào, một video thử đồ kiểu người sáng tạo nội dung ra. Công cụ tự chỉ đạo mọi thứ.' },
+            { title: 'UGC Thử đồ', text: 'Định dạng gọn: một ảnh người mẫu và một ảnh sản phẩm vào, một video thử đồ kiểu người sáng tạo nội dung ra. Công cụ tự chỉ đạo mọi thứ.', link: ['Mở UGC Thử đồ', '/marketing-studio'] },
             { title: 'Nâng cao', text: 'Ghế đạo diễn: bản brief của bạn là nguồn sự thật, bạn đưa tối đa 7 ảnh của mình, viết đúng lời nhân vật nói, và tự chọn hook và bối cảnh.' },
-          ],
-        },
-        {
-          table: [
-            ['', 'UGC Thử đồ', 'Nâng cao'],
-            ['Ảnh đầu vào', 'Đúng 2: người mẫu, sản phẩm', '1 đến 7 ảnh tham chiếu'],
-            ['Ai chỉ đạo', 'Chỉ dẫn cố định của công cụ', 'Bản brief của bạn'],
-            ['Hook và bối cảnh', 'Tuỳ chọn', 'Tuỳ chọn'],
-            ['Lời thoại', 'Vài câu phản ứng ngắn, tự nhiên', 'Lời bạn viết, đọc đúng từng chữ'],
-            ['Âm thanh', 'Bật sẵn, tắt được', 'Bật sẵn, tắt được'],
           ],
         },
       ],

@@ -33,6 +33,7 @@ describe('the About pages', () => {
     for (const b of page.sections.flatMap((s) => s.blocks ?? [])) {
       if (typeof b !== 'string' && 'table' in b) for (const row of b.table) expect(row).toHaveLength(b.table[0]!.length);
       if (typeof b !== 'string' && 'cards' in b) expect(new Set(b.cards.map((c) => c.title)).size).toBe(b.cards.length);
+      if (typeof b !== 'string' && 'cards' in b) for (const c of b.cards) if (c.link) expect(c.link[1]).toMatch(/^\/[a-z-/]+$/);
       if (typeof b !== 'string' && 'links' in b) for (const [, href] of b.links) expect(href).toMatch(/^\/[a-z-/]+$/);
     }
   });
@@ -52,6 +53,16 @@ describe('the About pages', () => {
     const names = media(page);
     for (const name of names) expect([sampleType(`${name}.mp4`), sampleType(`${name}.jpg`)], name).not.toContain(null); // the bucket accepts it as a loop and a still
     expect(new Set(names).size).toBe(names.length);
+  });
+
+  it("opens Advanced like the live page: the two format cards, the UGC one linking to UGC Try-On, and no comparison table", () => {
+    const [choose] = ABOUT.advanced.sections;
+    expect(choose!.blocks!.some((b) => typeof b !== 'string' && 'table' in b)).toBe(false);
+    const cards = choose!.blocks!.flatMap((b) => (typeof b !== 'string' && 'cards' in b ? b.cards : []));
+    expect(cards.map((c) => [c.title, c.link])).toEqual([
+      ['UGC Thử đồ', ['Mở UGC Thử đồ', '/marketing-studio']],
+      ['Nâng cao', undefined],
+    ]);
   });
 
   it('describes every app that is open, and gives every one an About page', () => {

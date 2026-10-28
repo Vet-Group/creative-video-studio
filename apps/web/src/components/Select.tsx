@@ -18,6 +18,9 @@ const MOVES = ['ArrowDown', 'ArrowUp', 'Home', 'End'];
 const POP_HEADING = 42;
 const POP_ROW = 41;
 const POP_MAX = 280;
+const POP_GAP = 3;
+/** The least a downward menu may shrink to: its heading and three options, the rest scrolling. */
+const POP_MIN = POP_HEADING + 3 * POP_ROW;
 
 /** A ratio select's icon takes the chosen shape, as on the live form; "auto" and wide ratios keep the wide frame. */
 function ratioIcon(value: string): IconName {
@@ -32,6 +35,7 @@ export function Select({ label, icon, heading, value, options, onChange }: { lab
   const listId = `${uid}-list`;
   const optionId = (i: number) => `${uid}-option-${i}`;
   const [open, setOpen] = useState<false | 'down' | 'up'>(false);
+  const [cap, setCap] = useState<number | undefined>(undefined);
   const [active, setActive] = useState(0);
   const flags = options.map((o) => !!o.disabled);
   const selected = options.findIndex((o) => o.value === value);
@@ -43,13 +47,16 @@ export function Select({ label, icon, heading, value, options, onChange }: { lab
     if (li && list) list.scrollTop = Math.min(li.offsetTop, Math.max(list.scrollTop, li.offsetTop + li.offsetHeight - list.clientHeight));
   }, [open, active, uid]);
 
-  /** Opens below the trigger, or above it when the scrolling form has no room below for the menu but has it above. */
+  /** Opens below the trigger as on the live page, shorter and scrolling when the form has less room below; above it only when below cannot fit even three options. */
   function show(trigger: HTMLElement) {
     setActive(selected >= 0 && !flags[selected] ? selected : Math.max(0, firstEnabled(flags)));
     const box = trigger.getBoundingClientRect();
     const frame = trigger.closest('.form-scroll')?.getBoundingClientRect() ?? { top: 0, bottom: window.innerHeight };
     const need = Math.min(POP_MAX, POP_HEADING + options.length * POP_ROW);
-    setOpen(frame.bottom - box.bottom < need && box.top - frame.top >= need ? 'up' : 'down');
+    const below = frame.bottom - box.bottom - POP_GAP;
+    const up = below < Math.min(need, POP_MIN) && box.top - frame.top - POP_GAP >= need;
+    setCap(!up && below < need ? Math.max(below, POP_MIN) : undefined);
+    setOpen(up ? 'up' : 'down');
   }
   function pick(i: number) {
     if (flags[i]) return;
@@ -108,7 +115,7 @@ export function Select({ label, icon, heading, value, options, onChange }: { lab
           <Icon name={open ? 'up' : 'down'} />
         </button>
         {open && (
-          <div className="select-pop" onMouseDown={(e) => e.preventDefault()}>
+          <div className="select-pop" style={cap === undefined ? undefined : { maxHeight: cap }} onMouseDown={(e) => e.preventDefault()}>
             <div className="select-heading" aria-hidden="true">
               {heading}
             </div>
