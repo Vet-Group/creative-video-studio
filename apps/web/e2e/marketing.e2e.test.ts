@@ -39,6 +39,8 @@ test('a mock marketing job runs from two photos, a hook and a location, and show
   await expect(page.getByRole('img', { name: 'model.png' })).toBeVisible();
   await expect(runButton(page)).toBeDisabled();
   await expect(reasonOf(page)).toHaveText('Tải lên ảnh sản phẩm.');
+  // The empty product tile already says what to add: the same reason is read out but not drawn over the form's foot.
+  expect((await reasonOf(page).boundingBox())!.height).toBeLessThanOrEqual(1);
   await page.getByLabel('Ảnh sản phẩm').setInputFiles(file('product.png'));
   await expect(page.getByRole('img', { name: 'product.png' })).toBeVisible();
   await expect(runButton(page)).toBeEnabled();
