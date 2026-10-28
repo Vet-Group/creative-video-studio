@@ -292,6 +292,8 @@ test('with stock models uploaded, the empty model slot opens the stock model dia
     await expect(dialog.getByRole('button', { name: /^Người mẫu có sẵn/ })).toHaveCount(3);
     await expect(dialog.locator('.model-grid > *')).toHaveCount(3);
     await expect(dialog.locator('.modal-sub')).toHaveCount(0);
+    // Its header as on the live dialog: a 16 px medium title over a full-width rule.
+    expect(await dialog.getByRole('heading', { name: 'Chọn người mẫu' }).evaluate((e) => { const c = getComputedStyle(e); return [c.fontSize, c.fontWeight, c.borderBottomStyle]; })).toEqual(['16px', '500', 'solid']);
     await expect(dialog.getByRole('button', { name: 'Người mẫu có sẵn 1' }).locator('img')).toHaveAttribute('src', '/api/samples/marketing-model-1.png');
     await expect(dialog.getByRole('button', { name: 'Người mẫu có sẵn 3' }).locator('img')).toHaveAttribute('src', '/api/samples/marketing-model-10.png');
     await dialog.getByRole('button', { name: 'Người mẫu có sẵn 2' }).click();
