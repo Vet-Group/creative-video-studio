@@ -524,7 +524,7 @@ describe('POST /api/jobs for an image feature', () => {
   describe('the image apps', () => {
     const appModels: [string, string, number, string][] = [
       ['app-char', 'character_swap', 2, 'auto'], ['app-model', 'model_swap', 2, 'auto'], ['app-bg', 'background_changer', 2, 'auto'], ['app-reframe', 'reframe', 1, '1:1,16:9'],
-      ['app-up', 'image_upscale', 1, 'auto'], ['app-face', 'face_swap', 2, 'auto'], ['app-rm', 'background_remover', 1, 'auto'],
+      ['app-up', 'image_upscale', 1, 'auto'], ['app-face', 'face_swap', 2, 'auto'], ['app-rm', 'background_remover', 1, 'auto'], ['app-jewel', 'jewelry_try_on', 2, 'auto'],
     ];
     beforeAll(async () => {
       for (const [id, feature, max, ratios] of appModels) {
@@ -567,6 +567,12 @@ describe('POST /api/jobs for an image feature', () => {
       expect((await app('background_remover', 2)).status).toBe(400);
       expect(await app('image_upscale', 1, { params: { resolution: '2K' } })).toMatchObject({ status: 201, job: { params: { resolution: '2K' } } });
       expect((await app('image_upscale', 1, { params: { resolution: '4K' } })).status).toBe(400); // this model has no 4K price
+    });
+
+    test('Jewelry Try-On takes the jewelry and the person, no prompt, and stores its fixed instruction', async () => {
+      expect((await app('jewelry_try_on', 1)).error).toBe('jewelry_try_on needs 2 images');
+      expect((await app('jewelry_try_on', 3)).error).toMatch(/number of images/);
+      expect(await app('jewelry_try_on', 2, { params: { resolution: '2K' } })).toMatchObject({ status: 201, job: { feature: 'jewelry_try_on', prompt: expect.stringMatching(/^Put the jewelry from the first image on the person in the second image/), params: { resolution: '2K' } } });
     });
 
     test('Reframe takes one of its ratios and a default prompt', async () => {

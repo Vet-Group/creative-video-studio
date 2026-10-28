@@ -1,5 +1,5 @@
-// The nine apps of the Apps index: what each page shows (upload slots, extra fields) and the rules a Run must meet before it is sent.
-// The rules mirror POST /api/jobs: the swaps and Face Swap take exactly 2 images; Background Changer takes a prompt with 1 image, or a reference image as the 2nd, not both and not neither.
+// The ten apps of the Apps index: what each page shows (upload slots, extra fields) and the rules a Run must meet before it is sent.
+// The rules mirror POST /api/jobs: the swaps, Jewelry Try-On and Face Swap take exactly 2 images; Background Changer takes a prompt with 1 image, or a reference image as the 2nd, not both and not neither.
 
 export type AppCategory = 'fashion' | 'photo' | 'video' | 'utility';
 export const CATEGORIES: { id: AppCategory | 'all'; label: string }[] = [
@@ -61,6 +61,18 @@ export const APPS: AppConfig[] = [
       { label: 'Ảnh đích', inputLabel: 'Ảnh đích', empty: 'Thêm 1 ảnh sản phẩm có người mẫu cần thay' },
     ],
     prompt: 'optional',
+  },
+  {
+    slug: 'jewelry-try-on',
+    feature: 'jewelry_try_on',
+    name: 'Thử trang sức',
+    description: 'Đeo trang sức của bạn lên ảnh người mẫu, giữ đúng từng chi tiết.',
+    category: 'fashion',
+    slots: [
+      { label: 'Trang sức', inputLabel: 'Ảnh trang sức', empty: 'Thêm 1 ảnh trang sức, chụp rõ trên nền trơn' },
+      { label: 'Người đeo', inputLabel: 'Ảnh người đeo', empty: 'Thêm 1 ảnh người sẽ đeo trang sức' },
+    ],
+    resolution: true,
   },
   {
     slug: 'background-changer',

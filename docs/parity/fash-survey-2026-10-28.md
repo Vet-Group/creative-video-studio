@@ -63,7 +63,7 @@ Survey by a browser automation CLI (bsk) in an Agent Window on the owner's signe
 | # | Screen / state | Fash evidence | Ours today | Status | Target |
 |---|----------------|---------------|-----------|--------|--------|
 | A1 | Apps index (10 apps) | 01-index-1440, app-links.json | 9 apps (AppsIndex) | already matches for 9 | - |
-| A2 | Jewelry Try-On (new on Fash) | apps/jewelry-try-on/ default + About | missing | queued: candidate new app (one model call like Try On, no new provider) | US-014 |
+| A2 | Jewelry Try-On (new on Fash) | apps/jewelry-try-on/ default + About | /apps/jewelry-try-on: jewelry and person slots, resolution, the three Nano Banana edit models, About from the reference page, card art in the samples bucket | cloned | US-014 |
 | A3 | Each app: default + About | apps/<slug>/ | AppPage + About | already matches | every open app has its About page (test); the reference app About shows one hero loop, which our app art already plays |
 
 ## Library (`library/`)

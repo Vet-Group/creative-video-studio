@@ -1849,6 +1849,116 @@ export const APP_ABOUT: Record<string, AboutPage> = {
       },
     ],
   },
+  'jewelry-try-on': {
+    title: 'Thử trang sức bằng AI',
+    sections: [
+      {
+        title: 'Thử trang sức bằng AI là gì?',
+        blocks: [
+          'Thử trang sức là ứng dụng đặt trang sức trong một ảnh sản phẩm lên người trong một ảnh khác và trả về ảnh người đó đang đeo nó. Bạn tải ảnh trang sức, tải ảnh người đeo rồi bấm Chạy. Người, dáng, trang phục và bối cảnh giữ nguyên; chỉ trang sức được thêm vào.',
+          `Ứng dụng làm cho đội bán hàng online và marketing cần ảnh trang sức trên người mẫu mà không phải đặt lịch chụp: chụp sản phẩm một lần, rồi đeo lên bao nhiêu ảnh người tuỳ ý. ${APP_COST}`,
+        ],
+      },
+      {
+        title: 'Thử trang sức trong 3 bước',
+        lead: 'Tải trang sức, chọn người đeo, rồi bấm Chạy.',
+        blocks: [
+          {
+            steps: [
+              { title: 'Tải trang sức', text: 'Thêm một ảnh rõ của món trang sức vào ô Trang sức. Ảnh chụp trên nền trơn, hoặc đã qua Xoá nền, giúp AI chỉ đọc đúng món đồ.' },
+              { title: 'Chọn người đeo', text: 'Thêm ảnh người sẽ đeo vào ô Người đeo: ảnh người mẫu, ảnh chân dung hay ảnh cận tai, cổ hoặc tay, tuỳ món đồ.' },
+              { title: 'Chạy', text: 'Bấm Chạy. AI nhận ra loại trang sức, đặt nó vào đúng chỗ đeo và khớp với ánh sáng của ảnh; ảnh mới nằm trong tab Lịch sử.' },
+            ],
+          },
+        ],
+      },
+      {
+        title: 'Thử được những gì?',
+        lead: 'AI nhận ra sáu loại trang sức và đặt mỗi loại vào đúng chỗ đeo.',
+        blocks: [
+          {
+            cols: 3,
+            cards: [
+              { title: 'Hoa tai', text: 'Khuyên, vòng tai, hoa tai dài hay kẹp vành tai. Dùng ảnh nghiêng hoặc cận tai, tóc vén ra sau để thấy rõ dái và vành tai. Muốn xem trước một lỗ xỏ mới, tải món định đeo và ảnh tai của bạn; vị trí chính xác vẫn nên hỏi thợ xỏ.' },
+              { title: 'Dây chuyền', text: 'Dây, mặt dây và vòng cổ được đặt lên cổ với độ dài và góc thật. Phần đi sau cổ, tóc hay cổ áo được che đi, để dây trông như đang đeo chứ không như dán lên. Cổ áo mở cho thấy trọn mặt dây.' },
+              { title: 'Nhẫn', text: 'Nhẫn nằm trên ngón tay đúng tỉ lệ, đá giữ nguyên giác cắt, màu và ổ chấu.' },
+              { title: 'Vòng tay', text: 'Vòng, lắc và vòng bản to nằm trên cổ tay, có bóng đổ chỗ chạm da.' },
+              { title: 'Đồng hồ', text: 'Đồng hồ nằm trên cổ tay, giữ nguyên mặt số, vỏ và dây như trong ảnh sản phẩm. Dùng ảnh có cổ tay hướng về máy ảnh.' },
+              { title: 'Ghim cài áo', text: 'Ghim và trâm cài được đặt lên áo, ở ngực hoặc cổ áo, cùng ánh sáng và bóng đổ với phần còn lại của ảnh. Áo vest hoặc áo trơn cho ghim một chỗ rõ ràng.' },
+            ],
+          },
+        ],
+      },
+      {
+        title: 'Thử bằng AI hay thử bằng AR?',
+        lead: 'Hai cách trả lời hai câu hỏi khác nhau.',
+        blocks: [
+          {
+            table: [
+              ['', 'Thử bằng AI', 'Thử bằng AR'],
+              ['Cách làm', 'Tạo ảnh mới từ ảnh người và ảnh trang sức', 'Phủ mô hình số của món đồ lên hình camera trực tiếp'],
+              ['Cần cài ứng dụng', 'Không, chạy ngay trên trình duyệt', 'Thường cần ứng dụng của cửa hàng hoặc trang web có camera'],
+              ['Chất lượng', 'Ảnh chân thực tới 4K, ánh sáng và bóng đổ khớp', 'Xem trực tiếp, chi tiết tuỳ mô hình số và camera'],
+              ['Ảnh để chia sẻ', 'Có, tải về ảnh hoàn chỉnh', 'Thường chỉ là ảnh chụp màn hình'],
+              ['Hợp nhất cho', 'Ảnh sản phẩm, quảng cáo, xem trước trên một ảnh cụ thể', 'Xem nhanh khi đang mua'],
+            ],
+          },
+        ],
+      },
+      {
+        title: 'Dùng cho thương hiệu và cửa hàng online',
+        lead: 'Ảnh trang sức trên người mẫu từ một ảnh sản phẩm, không cần buổi chụp.',
+        blocks: [
+          {
+            cards: [
+              { title: 'Ảnh sản phẩm trên người mẫu', text: 'Trang sản phẩm có ảnh món đồ đang được đeo cho thấy kích cỡ và cách nó nằm. Chạy cùng một ảnh sản phẩm trên ảnh tai, cổ hay tay để có cả bộ ảnh từ một lần chụp.' },
+              { title: 'Một món đồ trên nhiều người', text: 'Chạy cùng hoa tai hay dây chuyền trên những người có màu da và khuôn mặt khác nhau, để khách thấy nó trên người giống mình. Muốn giữ ảnh đã chốt mà đổi người, dùng Đổi người mẫu sau đó.' },
+              { title: 'Quảng cáo và bài đăng', text: 'Ảnh đời thường cho bạn ảnh kiểu chiến dịch để chạy quảng cáo và đăng mạng xã hội. Muốn hợp mùa hay màu thương hiệu, đổi nền kết quả bằng Đổi nền.' },
+              { title: 'Video từ chính ảnh đó', text: 'Ảnh thử trang sức đã xong có thể thành video ngắn cho trang sản phẩm và reels ở trang Tạo video, hoặc thành video UGC có người giới thiệu ở Marketing Studio.' },
+            ],
+          },
+        ],
+      },
+      {
+        title: 'Mẹo để ảnh thật hơn',
+        lead: 'AI khớp trang sức với ánh sáng của ảnh người đeo, nên đầu vào tốt cho kết quả tốt.',
+        blocks: [
+          {
+            cards: [
+              { title: 'Ánh sáng đều, mềm', text: 'Ảnh không có bóng gắt cho phản chiếu trên kim loại và đá sạch hơn.' },
+              { title: 'Góc rõ', text: 'Ảnh nghiêng cho hoa tai, ảnh thẳng cho dây chuyền, bàn tay hướng về máy ảnh cho nhẫn, vòng tay và đồng hồ.' },
+              { title: 'Vén tóc khi thử hoa tai', text: 'Vén tóc ra sau tai hoặc buộc lên để dái tai và vành tai lộ hẳn.' },
+              { title: 'Cổ áo mở khi thử dây chuyền', text: 'Cổ chữ V, cổ áo mở hay áo quây để chỗ cho dây và mặt dây.' },
+              { title: 'Nền trơn cho ảnh trang sức', text: 'Chụp món đồ trên mặt phẳng trơn, hoặc chạy Xoá nền trước, để AI chỉ đọc món trang sức.' },
+              { title: 'Độ phân giải cao', text: 'File lớn và nét giữ đá và chữ khắc đọc được. Ảnh sản phẩm nhỏ thì chạy Tăng độ phân giải trước khi tải lên.' },
+            ],
+          },
+        ],
+      },
+      {
+        title: 'Giới hạn',
+        blocks: [
+          'Đây là ảnh xem trước, không phải công cụ đo cỡ: kết quả cho thấy món đồ trông thế nào trên người, không cho biết cỡ nhẫn, độ dài dây hay đường kính khuyên cần mua. Dây rất mảnh, khuyên rất nhỏ và chữ khắc nhỏ có thể mờ đi, nhất là ở 1K. Ảnh mờ hoặc tối cho kết quả kém hơn, nên hãy bắt đầu từ ảnh tốt nhất bạn có.',
+          'Chỉ dùng ảnh sản phẩm công ty có quyền, và ảnh người khi người đó đã đồng ý.',
+        ],
+      },
+      {
+        title: 'Câu hỏi thường gặp',
+        blocks: [
+          {
+            faq: [
+              ['Thử trang sức bằng AI hoạt động thế nào?', 'AI đọc ảnh trang sức, nhận ra đó là loại gì và đặt nó vào chỗ đeo trên người trong ảnh. Nó giữ thiết kế, màu kim loại và đá, và khớp phản chiếu và bóng đổ với ánh sáng của ảnh. Người, dáng, trang phục và bối cảnh giữ nguyên.'],
+              ['Xem trước một lỗ xỏ tai được không?', 'Được. Tải ảnh cận tai và món khuyên định đeo; kết quả cho thấy cỡ và kiểu trên tai bạn. AI chọn một chỗ tự nhiên trên tai, nên hãy coi đó là ảnh xem kiểu và hỏi thợ xỏ vị trí chính xác.'],
+              ['Có dùng cho nam được không?', 'Được. Tải ảnh nghiêng của bạn hoặc của người mẫu nam có tai lộ rõ, cùng ảnh khuyên hay khuyên kẹp; AI đặt nó lên tai như với mọi ảnh khác.'],
+              ['Kết quả chính xác tới đâu?', 'Chính xác về vẻ ngoài, không phải về số đo. AI giữ thiết kế, màu kim loại và đá từ ảnh sản phẩm và đặt món đồ ở tỉ lệ thật, nhưng không biết cỡ nhẫn hay độ dài dây bạn cần.'],
+              ['Có cần cài ứng dụng không?', 'Không. Ứng dụng chạy trên trình duyệt, cả máy tính và điện thoại. Bạn tải ảnh hoàn chỉnh về khi xong.'],
+              ['Một lần chạy tốn bao nhiêu?', `${APP_COST} Chi phí thật nằm trên ảnh trong Thư viện.`],
+            ],
+          },
+        ],
+      },
+    ],
+  },
   'face-swap': {
     title: 'Đổi khuôn mặt chỉ với một lần chạy',
     sections: [

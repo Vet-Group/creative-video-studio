@@ -22,7 +22,7 @@ const QUALITIES = ['auto', 'low', 'medium', 'high'];
 /** The apps that need more than one input image; the model's own max_images is the upper limit. Try On has its own message below. */
 /** The apps whose fixed instruction a member's own prompt is added to, not replaced by. */
 const APPEND_TO_INSTRUCTION = ['character_swap', 'model_swap'];
-const MIN_INPUTS: Record<string, number> = { character_swap: 2, model_swap: 2, face_swap: 2 };
+const MIN_INPUTS: Record<string, number> = { character_swap: 2, model_swap: 2, face_swap: 2, jewelry_try_on: 2 };
 /** `presetId` is null for a free prompt, and `prompt` is null when a preset supplies it (or, in a retry, when the original's is copied). An image job has no preset and `durationSec` 0. */
 type Spec = {
   assetIds: string[]; modelId: string; presetId: string | null; prompt: string | null; ratio: string; durationSec: number; storeId: string | null;

@@ -175,10 +175,10 @@ describe('migration 0007 image models', () => {
     expect(rows.map((r) => [r.id, r.endpoint, r.features, r.image_prices])).toEqual([
       ['fashn-v1.6', 'fal-ai/fashn/tryon/v1.6', ['try_on'], { '1K': '0.075' }],
       ['gpt-image-2', 'openai/gpt-image-2/edit', ['image'], { '1K': '0.21' }],
-      ['nano-banana', 'fal-ai/nano-banana/edit', ['image', 'try_on'], { '1K': '0.0398' }],
+      ['nano-banana', 'fal-ai/nano-banana/edit', ['image', 'try_on', 'jewelry_try_on'], { '1K': '0.0398' }],
       ['nano-banana-2', 'fal-ai/nano-banana-2/edit', ['image'], { '1K': '0.08' }],
-      ['nano-banana-2.1', 'google/nano-banana-2.1/edit', ['image', 'try_on'], { '1K': '0.04', '2K': '0.059' }],
-      ['nano-banana-pro', 'fal-ai/nano-banana-pro/edit', ['image', 'try_on'], { '1K': '0.15', '2K': '0.15', '4K': '0.30' }],
+      ['nano-banana-2.1', 'google/nano-banana-2.1/edit', ['image', 'try_on', 'jewelry_try_on'], { '1K': '0.04', '2K': '0.059' }],
+      ['nano-banana-pro', 'fal-ai/nano-banana-pro/edit', ['image', 'try_on', 'jewelry_try_on'], { '1K': '0.15', '2K': '0.15', '4K': '0.30' }],
       ['seedream-5-pro', 'bytedance/seedream/v5/pro/edit', ['image'], { '1K': '0.0675', '2K': '0.135' }],
     ]);
     for (const r of rows) {
