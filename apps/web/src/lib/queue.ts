@@ -1,5 +1,5 @@
 // The pg-boss client the route handlers use to enqueue; the worker is the only consumer.
-import { VIDEO_QUEUE, VIDEO_QUEUE_OPTIONS } from '@cvs/core/queue';
+import { SUGGEST_QUEUE, SUGGEST_QUEUE_OPTIONS, VIDEO_QUEUE, VIDEO_QUEUE_OPTIONS } from '@cvs/core/queue';
 import { databaseUrl } from '@cvs/db/client';
 import { PgBoss } from 'pg-boss';
 
@@ -11,6 +11,7 @@ async function start(): Promise<PgBoss> {
   b.on('error', (e) => console.error('pg-boss:', e));
   await b.start();
   await b.createQueue(VIDEO_QUEUE, VIDEO_QUEUE_OPTIONS);
+  await b.createQueue(SUGGEST_QUEUE, SUGGEST_QUEUE_OPTIONS);
   return b;
 }
 

@@ -405,6 +405,23 @@ export const userTemplates = pgTable(
   (t) => [index('user_templates_user_id_idx').on(t.userId), check('user_templates_name_check', sql`char_length(${t.name}) between 1 and 60`)],
 );
 
+// One Marketing Studio suggestion request (packages/core/src/suggest.ts): what was asked, the options, their LLM cost. Counted for the daily limit.
+export const suggestionRuns = pgTable(
+  'suggestion_runs',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    input: jsonb('input').notNull(),
+    output: jsonb('output'),
+    costUsd: numeric('cost_usd', { precision: 12, scale: 6 }),
+    status: text('status', { enum: ['queued', 'succeeded', 'failed'] }).notNull().default('queued'),
+    createdAt: tstz('created_at').notNull().defaultNow(),
+  },
+  (t) => [index('suggestion_runs_user_created_idx').on(t.userId, t.createdAt)],
+);
+
 // Who did what to whom: an Admin deleting another user's clip, any Pass/Fail edit, and the Admin changes of M.5.
 export const auditEntries = pgTable(
   'audit_entries',

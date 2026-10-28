@@ -16,6 +16,7 @@ const db = await createTestDatabase('cvs_e2e');
 process.env.DATABASE_URL = db.url;
 process.env.S3_BUCKET = 'cvs-e2e';
 process.env.CVS_MOCK_RUN_MS = '4000';
+process.env.CVS_FAKE_SUGGEST = '1'; // the worker's suggestions come from a stand-in (apps/worker/src/suggest.ts), never fal
 // The specs run with no social login (no login buttons), whatever the developer's .env holds, and with a known support email on /privacy.
 // They never reach a paid provider either: without these keys the e2e worker has only the mock adapters.
 for (const name of ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'LARK_APP_ID', 'LARK_APP_SECRET', 'LARK_TENANT_KEY', 'FAL_KEY', 'REPLICATE_API_TOKEN']) delete process.env[name];

@@ -21,6 +21,7 @@ import { ModelPicker } from './ModelPicker';
 import { Select } from './Select';
 import { Tray } from './Shell';
 import { Templates } from './Templates';
+import { SuggestButton } from './Suggestions';
 
 interface VideoModel {
   id: string;
@@ -413,9 +414,12 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
             </div>
 
             <div className="field">
-              <label htmlFor={promptId} className="field-label">
-                {advanced ? 'Prompt' : 'Prompt (tuỳ chọn)'}
-              </label>
+              <div className="field-head">
+                <label htmlFor={promptId} className="field-label">
+                  {advanced ? 'Prompt' : 'Prompt (tuỳ chọn)'}
+                </label>
+                <SuggestButton label="Gợi ý mô tả" ask={() => ({ field: 'brief', ...(advanced && { format: 'advanced' }), text: prompt, hook: hooks[0], location: location || undefined })} onPick={setPrompt} />
+              </div>
               <div className="prompt-box">
                 <textarea id={promptId} value={prompt} maxLength={advanced ? ADVANCED_MAX_BRIEF : UGC_MAX_BRIEF} aria-required={advanced || undefined} placeholder="Mô tả video marketing bạn muốn…" onChange={(e) => setPrompt(e.target.value)} />
                 <div className="prompt-foot">
@@ -427,9 +431,12 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
             </div>
             {advanced && (
               <div className="field">
-                <label htmlFor={scriptId} className="field-label">
-                  Lời thoại (tuỳ chọn)
-                </label>
+                <div className="field-head">
+                  <label htmlFor={scriptId} className="field-label">
+                    Lời thoại (tuỳ chọn)
+                  </label>
+                  <SuggestButton label="Gợi ý lời thoại" ask={() => ({ field: 'script', format: 'advanced', text: script || prompt, hook: hooks[0], location: location || undefined })} onPick={setScript} />
+                </div>
                 <div className="prompt-box">
                   <textarea id={scriptId} value={script} maxLength={ADVANCED_MAX_SCRIPT} placeholder="Viết lời thoại bạn muốn nhân vật nói (tuỳ chọn)…" onChange={(e) => setScript(e.target.value)} />
                   {/* Empty, the box is as short as the live page's; once lines are typed, their length in words, seconds (about two words a second, the About tab) and characters shows. */}

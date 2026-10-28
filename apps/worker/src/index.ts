@@ -2,6 +2,7 @@
 import { createPool, databaseUrl } from '@cvs/db/client';
 import { createMockImageProvider, createMockProvider } from './mock-provider';
 import { realProviders } from './real-providers';
+import { fakeSuggester } from './suggest';
 import { ensureBucket } from './storage';
 import { startWorker } from './worker';
 
@@ -17,6 +18,8 @@ const worker = await startWorker({
   providers: { mock: createMockProvider({ runMs: Number(process.env.CVS_MOCK_RUN_MS ?? 8_000) }), ...real.providers },
   imageProviders: { mock: createMockImageProvider({ runMs: Number(process.env.CVS_MOCK_RUN_MS ?? 8_000) }), ...real.imageProviders },
   enhance: real.enhance,
+  // The e2e server sets CVS_FAKE_SUGGEST and removes FAL_KEY, so its suggestions never reach fal.
+  suggest: real.suggest ?? (process.env.CVS_FAKE_SUGGEST === '1' ? fakeSuggester : undefined),
 });
 console.log(`worker ${worker.id} is running`);
 

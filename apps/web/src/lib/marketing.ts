@@ -60,6 +60,8 @@ export const ADVANCED_MAX_SCRIPT = 300;
 /** UGC's prompt limit: with the longest ratio, hook, location and sound rule the rest of the prompt is about 770 characters, and the API takes 2000
  * (marketing.test.ts checks the worst case). */
 export const UGC_MAX_BRIEF = 1200;
+/** Suggestion runs one member may ask for per day (Asia/Ho_Chi_Minh), each one LLM call of about 0.0004 USD. */
+export const SUGGEST_DAILY_LIMIT = 20;
 
 /**
  * The one English prompt a Marketing Studio Advanced run sends. The member's brief is the source of truth, the reference images are named
