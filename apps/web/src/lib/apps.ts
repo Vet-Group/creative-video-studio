@@ -1,5 +1,5 @@
 // The ten apps of the Apps index: what each page shows (upload slots, extra fields) and the rules a Run must meet before it is sent.
-// The rules mirror POST /api/jobs: the swaps, Jewelry Try-On and Face Swap take exactly 2 images; Background Changer takes a prompt with 1 image, or a reference image as the 2nd, not both and not neither.
+// The rules mirror POST /api/jobs: the swaps and Face Swap take exactly 2 images, Jewelry Try-On 2 or more (the pieces, then the person); Background Changer takes a prompt with 1 image, or a reference image as the 2nd, not both and not neither.
 
 export type AppCategory = 'fashion' | 'photo' | 'video' | 'utility';
 export const CATEGORIES: { id: AppCategory | 'all'; label: string }[] = [
@@ -17,6 +17,8 @@ export interface AppSlot {
   inputLabel: string;
   empty: string;
   optional?: boolean;
+  /** Takes several images: up to the model's limit less one for each other slot (Jewelry Try-On's pieces). */
+  many?: boolean;
 }
 
 export interface AppConfig {
@@ -69,7 +71,7 @@ export const APPS: AppConfig[] = [
     description: 'Đeo trang sức của bạn lên ảnh người mẫu, giữ đúng từng chi tiết.',
     category: 'fashion',
     slots: [
-      { label: 'Trang sức', inputLabel: 'Ảnh trang sức', empty: 'Thêm 1 ảnh trang sức, chụp rõ trên nền trơn' },
+      { label: 'Trang sức', inputLabel: 'Ảnh trang sức', empty: 'Thêm 1 hoặc nhiều món trang sức, chụp rõ trên nền trơn', many: true },
       { label: 'Người đeo', inputLabel: 'Ảnh người đeo', empty: 'Thêm 1 ảnh người sẽ đeo trang sức' },
     ],
     resolution: true,
@@ -205,6 +207,21 @@ export function motionReason(d: MotionDraft): string | null {
 }
 
 /** The asset ids of a Run, slot by slot, and the prompt the body carries (only Background Changer sends one). */
+/** How many images slot `i` takes with a model that accepts `maxImages`. */
+export const slotMax = (app: AppConfig, i: number, maxImages: number): number => (app.slots[i]?.many ? Math.max(1, maxImages - (app.slots.length - 1)) : 1);
+
+/** Puts a job's images back in the slots they were sent from: one per slot, except a `many` slot, which takes all those between its neighbours. */
+export function splitImages<T>(app: AppConfig, images: T[]): T[][] {
+  const k = app.slots.findIndex((s) => s.many);
+  if (k < 0) return app.slots.map((_, i) => images.slice(i, i + 1));
+  const after = app.slots.length - 1 - k;
+  return app.slots.map((_, i) => {
+    if (i === k) return images.slice(k, images.length - after);
+    const j = i < k ? i : images.length - (app.slots.length - i); // the slots after it take the last images
+    return j < 0 ? [] : images.slice(j, j + 1);
+  });
+}
+
 export function appInputs(app: AppConfig, d: Pick<AppDraft, 'images' | 'prompt'>): { assetIds: string[]; prompt?: string } {
   const assetIds = d.images.flat().map((i) => i.id);
   const written = d.prompt.trim();
