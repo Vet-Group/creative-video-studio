@@ -100,6 +100,33 @@ test('Try On: Ví dụ says so when the company has no try-on image yet', async 
   await expect(page.getByText('Chưa có ảnh thử đồ nào trong công ty.')).toBeVisible();
 });
 
+test('Image Generation: the bar counts the prompt near the model limit, and a switch to a smaller limit keeps the text while Run waits', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await signIn(page, 'imgp');
+  await page.goto('/image-generation');
+  const bar = page.getByRole('group', { name: 'Thanh tạo ảnh' });
+  const run = bar.getByRole('button', { name: /^Tạo ảnh/ });
+  const prompt = bar.getByRole('textbox', { name: 'Mô tả cảnh bạn muốn tạo' });
+  const count = bar.locator('.bar-count');
+  await bar.getByLabel('Ảnh tham chiếu', { exact: true }).setInputFiles(file('reference.png'));
+  await expect(bar.getByRole('img', { name: 'reference.png' })).toBeVisible();
+  await expect(modelButton(page)).toContainText('Mock image E2E');
+  await prompt.fill('x'.repeat(1500));
+  await expect(count).toHaveCount(0); // under 80% of 2000: the bar stays as on the live page
+  const text = 'x'.repeat(1700);
+  await prompt.fill(text);
+  await expect(count).toHaveText('1700/2000 ký tự');
+  await expect(run).toBeEnabled();
+
+  await modelButton(page).click();
+  await page.getByRole('option', { name: /Mock image Solo/ }).click();
+  await expect(modelButton(page)).toContainText('Mock image Solo');
+  await expect(prompt).toHaveValue(text);
+  await expect(count).toHaveText('1700/1000 ký tự');
+  await expect(run).toBeDisabled();
+  await expect(bar.getByRole('status')).toHaveText('Mô hình Mock image Solo nhận tối đa 1000 ký tự, hãy rút gọn hoặc chọn mô hình khác.');
+});
+
 test('Image Generation: the bar needs an image and a prompt, every pill works by keyboard, and a mock run reaches History and the Tạo ảnh chip', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await signIn(page, 'member10');
