@@ -6,6 +6,7 @@ import { FAULTS } from '@/lib/faults';
 import { featureLabel } from '@/lib/features';
 import { reuseHref } from '@/lib/reuse';
 import { Icon } from './Icon';
+import { Modal } from './Modal';
 
 const fmtTime = (iso: string) => new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date(iso));
 /** The Library filters in the reference order; the id is the `kind` the API takes. */
@@ -33,7 +34,7 @@ interface StoreOption {
 }
 
 /** `stores` is given to Admins only: it switches on the store control. */
-function ClipCard({ clip, stores, onChange, onDeleted }: { clip: Clip; stores?: StoreOption[]; onChange: (c: Clip) => void; onDeleted: (id: string) => void }) {
+function ClipCard({ clip, stores, onChange, onDeleted, onOpen }: { clip: Clip; stores?: StoreOption[]; onChange: (c: Clip) => void; onDeleted: (id: string) => void; onOpen: () => void }) {
   const [failing, setFailing] = useState(false);
   const [fault, setFault] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -152,6 +153,9 @@ function ClipCard({ clip, stores, onChange, onDeleted }: { clip: Clip; stores?: 
         <button type="button" className="icon-button" onClick={() => void download()} aria-label="Tải xuống" title="Tải xuống">
           <Icon name="download" />
         </button>
+        <button type="button" className="icon-button" onClick={onOpen} aria-label="Xem chi tiết" title="Xem chi tiết">
+          <Icon name="eye" />
+        </button>
         {reuseHref(clip) && (
           <Link href={reuseHref(clip)!} className="button">
             Dùng lại
@@ -208,7 +212,121 @@ function ClipCard({ clip, stores, onChange, onDeleted }: { clip: Clip; stores?: 
   );
 }
 
+/** What the detail view reads from GET /api/jobs/:id beyond the Library row. */
+interface ClipInputs {
+  prompt: string | null;
+  presetId: string | null;
+  brief: string | null;
+  format: string | null;
+  images: { id: string; filename: string }[];
+}
+
+/**
+ * Fash's item detail (survey L3): the result large on the left; beside it the title, the words behind it, the inputs, the length and ratio
+ * chips, the date, download / fullscreen / open in a new tab / copy the words, and Dùng lại; arrows step through the loaded items.
+ */
+function ClipDetail({ clips, index, onIndex }: { clips: Clip[]; index: number; onIndex: (i: number | null) => void }) {
+  const clip = clips[index]!;
+  const image = clip.mediaType === 'image';
+  const [job, setJob] = useState<ClipInputs | null>(null);
+  const [note, setNote] = useState('');
+  const media = useRef<HTMLVideoElement & HTMLImageElement>(null);
+  const content = (id: string) => `/api/assets/${id}/content`;
+  useEffect(() => {
+    setJob(null);
+    setNote('');
+    api<ClipInputs>(`/api/jobs/${clip.id}`).then(setJob, () => setJob({ prompt: null, presetId: null, brief: null, format: null, images: [] }));
+  }, [clip.id]);
+  // The creator's own words: their brief (shown to them only), else a free prompt on Create video and Image Generation; others are composed.
+  const text = job && (job.brief ?? ((clip.feature === 'video' && !job.presetId) || clip.feature === 'image' ? job.prompt : null));
+  const title = clip.feature === 'marketing' ? (job?.format === 'advanced' ? 'Marketing nâng cao' : 'UGC Thử đồ') : featureLabel(clip.feature);
+
+  async function act(what: () => Promise<unknown>, fail: string) {
+    setNote('');
+    try {
+      await what();
+    } catch (e) {
+      setNote(errorText(e, fail));
+    }
+  }
+  const download = () =>
+    act(async () => {
+      const a = document.createElement('a');
+      a.href = (await api<{ downloadUrl: string }>(`/api/assets/${clip.videoAssetId}`)).downloadUrl;
+      a.download = clip.downloadName;
+      document.body.append(a);
+      a.click();
+      a.remove();
+    }, 'Không tải xuống được.');
+  const copy = () => act(async () => (await navigator.clipboard.writeText(text ?? ''), setNote('Đã sao chép.')), 'Không sao chép được.');
+
+  return (
+    <Modal open onClose={() => onIndex(null)} label={`Chi tiết: ${title}`} className="lightbox">
+      <div className="lightbox-media">
+        {image ? (
+          <img ref={media} src={content(clip.videoAssetId)} alt={clip.downloadName} />
+        ) : (
+          <video key={clip.id} ref={media} controls autoPlay muted playsInline poster={clip.posterAssetId ? content(clip.posterAssetId) : undefined} src={content(clip.videoAssetId)} />
+        )}
+      </div>
+      <div className="lightbox-side">
+        <h2>{title}</h2>
+        {text && <p className="job-text">{text}</p>}
+        {job && job.images.length > 0 && clip.feature !== 'motion_control' && (
+          <ul className="job-inputs" aria-label="Ảnh đầu vào">
+            {job.images.map((i) => (
+              <li key={i.id}>
+                <img src={content(i.id)} alt={i.filename} />
+              </li>
+            ))}
+          </ul>
+        )}
+        <p className="job-chips">
+          <span>{image ? clip.resolution : `${clip.durationSec}s`}</span>
+          <span>{clip.ratio}</span>
+        </p>
+        <p className="job-when">
+          {clip.creator.name} · {fmtTime(clip.createdAt)}
+        </p>
+        {note && <p className="muted" role="status">{note}</p>}
+        <div className="job-actions">
+          <button type="button" className="icon-button" onClick={() => void download()} aria-label="Tải xuống" title="Tải xuống">
+            <Icon name="download" />
+          </button>
+          <button type="button" className="icon-button" onClick={() => void media.current?.requestFullscreen?.()} aria-label="Toàn màn hình" title="Toàn màn hình">
+            <Icon name="eye" />
+          </button>
+          <a className="icon-button" href={content(clip.videoAssetId)} target="_blank" rel="noreferrer" aria-label="Mở trong tab mới" title="Mở trong tab mới">
+            <Icon name="external" />
+          </a>
+          {text && (
+            <button type="button" className="icon-button" onClick={() => void copy()} aria-label="Sao chép mô tả" title="Sao chép mô tả">
+              <Icon name="copy" />
+            </button>
+          )}
+        </div>
+        {reuseHref(clip) && (
+          <Link href={reuseHref(clip)!} className="lightbox-reuse">
+            Dùng lại
+          </Link>
+        )}
+      </div>
+      {index > 0 && (
+        <button type="button" className="lightbox-step lightbox-prev" onClick={() => onIndex(index - 1)} aria-label="Mục trước">
+          <Icon name="left" size={20} />
+        </button>
+      )}
+      {index < clips.length - 1 && (
+        <button type="button" className="lightbox-step lightbox-next" onClick={() => onIndex(index + 1)} aria-label="Mục tiếp theo">
+          <Icon name="right" size={20} />
+        </button>
+      )}
+    </Modal>
+  );
+}
+
 export function Library() {
+  const [detail, setDetail] = useState<number | null>(null); // the item open in the detail view, by its place in the list
   const [creator, setCreator] = useState('');
   const [date, setDate] = useState('');
   const [ratio, setRatio] = useState('');
@@ -340,7 +458,7 @@ export function Library() {
         </div>
       )}
       <div className="grid" style={{ '--card-min': SIZES[size] } as CSSProperties}>
-        {clips.map((c) => (
+        {clips.map((c, i) => (
           <ClipCard
             key={c.id}
             clip={c}
@@ -348,9 +466,11 @@ export function Library() {
             // Under Favourites only an unmarked item leaves the list, so the next page's offset stays right.
             onChange={(next) => setClips((cur) => (favoritesOnly && !next.favorite ? cur.filter((x) => x.id !== next.id) : cur.map((x) => (x.id === next.id ? next : x))))}
             onDeleted={(id) => setClips((cur) => cur.filter((x) => x.id !== id))}
+            onOpen={() => setDetail(i)}
           />
         ))}
       </div>
+      {detail !== null && clips[detail] && <ClipDetail clips={clips} index={detail} onIndex={setDetail} />}
       {hasMore && (
         <button type="button" onClick={() => void load(clips.length)}>
           Tải thêm

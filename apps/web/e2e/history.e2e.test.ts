@@ -40,3 +40,34 @@ test('a History card shows the text, inputs and chips, and its favourite, new-ta
   await expect(card).toHaveCount(0);
   expect(((await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { id: string }[] }).jobs.some((j) => j.id === id)).toBe(false);
 });
+
+test('the Library item detail shows the result large with its words, inputs and chips, steps to the next item and closes on Esc', async ({ page }) => {
+  await signIn(page, 'hista');
+  const up = async (name: string) => ((await (await page.request.post('/api/assets', { multipart: { file: { name, mimeType: 'image/png', buffer: png() } } })).json()) as { assets: { id: string }[] }).assets[0]!.id;
+  const input = await up('detail-in.png');
+  const ids: string[] = [];
+  for (const prompt of ['first detail shot', 'second detail shot']) {
+    const res = await page.request.post('/api/jobs', { data: { feature: 'image', modelId: 'mock-image-e2e', assetIds: [input], ratio: '3:4', prompt, enhance: false, params: { resolution: '1K' } } });
+    ids.push(((await res.json()) as { id: string }).id);
+  }
+  const done = async () => ((await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { id: string; status: string }[] }).jobs.filter((j) => ids.includes(j.id) && j.status === 'succeeded').length;
+  await expect.poll(done, { timeout: 60_000 }).toBe(2);
+
+  await page.goto('/library');
+  const mine = page.getByRole('article').filter({ hasText: 'E2E History A' });
+  await mine.first().getByRole('button', { name: 'Xem chi tiết' }).click();
+  const detail = page.getByRole('dialog', { name: 'Chi tiết: Tạo ảnh' });
+  await expect(detail.getByText('second detail shot')).toBeVisible(); // newest first
+  await expect(detail.getByRole('img', { name: 'detail-in.png' })).toBeVisible();
+  await expect(detail.locator('.job-chips span')).toHaveText(['1K', '3:4']);
+  await expect(detail.getByRole('link', { name: 'Dùng lại' })).toHaveAttribute('href', `/image-generation?reuse=${ids[1]}`);
+  await expect(detail.getByRole('link', { name: 'Mở trong tab mới' })).toHaveAttribute('href', /^\/api\/assets\/.+\/content$/);
+
+  await detail.getByRole('button', { name: 'Mục tiếp theo' }).click();
+  await expect(detail.getByText('first detail shot')).toBeVisible();
+  await expect(detail.getByRole('link', { name: 'Dùng lại' })).toHaveAttribute('href', `/image-generation?reuse=${ids[0]}`);
+  await detail.getByRole('button', { name: 'Mục trước' }).click();
+  await expect(detail.getByText('second detail shot')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(detail).toHaveCount(0);
+});

@@ -72,7 +72,7 @@ Survey by a browser automation CLI (bsk) in an Agent Window on the owner's signe
 |---|----------------|---------------|-----------|--------|--------|
 | L1 | Filters: All / Images / Videos / Try-On / Image Generation / Video Generation / Marketing Studio / Apps, Favorites only, Newest/Oldest, size slider | 01-default-1440, 01-text.md | kinds, creator, ratio, sort, size slider, favorites | already matches | - |
 | L2 | Filter by Marketing Studio | 02-filter-marketing-1440 | feature tag + kinds | already matches | - |
-| L3 | Item detail lightbox: 760x760 media, side panel (title, prompt, input thumbnails, duration/ratio chips, date, download / fullscreen / open in new tab / copy, Recreate), next arrow | 03-item-detail-1440, 03-item-detail.json | card actions only | queued | US-013 |
+| L3 | Item detail lightbox: 760x760 media, side panel (title, prompt, input thumbnails, duration/ratio chips, date, download / fullscreen / open in new tab / copy, Recreate), next arrow | 03-item-detail-1440, 03-item-detail.json | item detail view from each card: the result large on a dark panel, a 220 px side column (title, the words, input thumbnails, chips, creator and date, download / fullscreen / open in new tab / copy, reuse link), previous and next arrows, Esc closes | cloned | - |
 
 AC3 audit (all pages): 77 logged actions, 0 forbidden buttons clicked, refusals logged (`click-log-all.ndjson`). bsk sessions `woxd` and `qxnw` stopped 2026-10-28.
 
