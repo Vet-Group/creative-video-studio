@@ -56,10 +56,10 @@ test('a mock marketing job runs from two photos, a hook and a location, and show
   const hooks = page.getByRole('dialog', { name: 'Chọn hook' });
   await expect(hooks).toBeVisible();
   const cards = hooks.getByRole('option');
-  await expect(cards).toHaveCount(HOOKS.length + 1);
-  await expect(cards.first()).toHaveText('Không chọn');
+  await expect(cards).toHaveCount(HOOKS.length); // as on Fash, no "none" card: the X on the chosen box clears it
+  await expect(cards.first()).toHaveAccessibleName(HOOKS[0]!.name);
   await expect(cards.first()).toBeFocused();
-  await expect(cards.first()).toHaveAttribute('aria-selected', 'true');
+  await expect(hooks.getByRole('option', { selected: true })).toHaveCount(0);
   await page.keyboard.press('Escape');
   await expect(hooks).toBeHidden();
   await expect(hookBox).toContainText('Chưa chọn');
@@ -76,7 +76,8 @@ test('a mock marketing job runs from two photos, a hook and a location, and show
   await expect(hookBox).toContainText(hook.name);
   await hookBox.click();
   await expect(hooks.getByRole('option', { name: hook.name, exact: true })).toHaveAttribute('aria-selected', 'true');
-  await hooks.getByRole('option', { name: 'Không chọn' }).click(); // the first card clears the choice
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Bỏ Hook' }).click(); // the X clears the choice
   await expect(hookBox).toContainText('Chưa chọn');
   await hookBox.click();
   await hooks.getByRole('option', { name: hook.name, exact: true }).click();
@@ -86,7 +87,7 @@ test('a mock marketing job runs from two photos, a hook and a location, and show
   const locationBox = page.getByRole('button', { name: /^Bối cảnh/ });
   await locationBox.click();
   const places = page.getByRole('dialog', { name: 'Chọn bối cảnh' });
-  await expect(places.getByRole('option')).toHaveCount(LOCATIONS.length + 1);
+  await expect(places.getByRole('option')).toHaveCount(LOCATIONS.length);
   await places.getByRole('option', { name: spot.name, exact: true }).click();
   await expect(locationBox).toContainText(spot.name);
 
@@ -439,6 +440,10 @@ test('as on the live form (measured 2026-10-29): 272 px content, 131x130 tiles 1
   near((await disc.boundingBox())!.width, 36);
   expect(await disc.evaluate((e) => getComputedStyle(e).backgroundColor)).toBe('rgba(0, 0, 0, 0.06)');
   expect(await hookBox.locator('.choice-label').evaluate((e) => [getComputedStyle(e).fontSize, getComputedStyle(e).color])).toEqual(['14px', 'rgb(102, 102, 102)']);
+  // The Prompt label row is 21 px tall (its suggestion link does not stretch it) and the box sits 4 px under it: label at 478, box at 503 on Fash.
+  const head = (await page.locator('.field-head').filter({ has: page.locator('label', { hasText: 'Prompt' }) }).boundingBox())!;
+  near(head.height, 21);
+  near((await page.locator('.prompt-box').boundingBox())!.y - (head.y + head.height), 4);
 
   await hookBox.click();
   const card = page.getByRole('dialog', { name: 'Chọn hook' }).getByRole('option', { name: hook.name, exact: true });
@@ -530,6 +535,9 @@ test('as on Fash, a filled photo slot and a chosen hook or location show the pic
       expect(await x.evaluate((e) => { const s = getComputedStyle(e); return [s.borderTopLeftRadius, s.borderBottomRightRadius, s.borderBottomLeftRadius, s.backgroundColor]; })).toEqual(['0px', '0px', '8px', 'rgba(0, 0, 0, 0.75)']);
     };
     await cornerTab(box, slot.getByRole('button', { name: /^Bỏ / }));
+    // As on Fash (measured 2026-10-29): the whole photo shows (contain), under a 10 px name chip padded 8 px.
+    expect(await photo.evaluate((e) => getComputedStyle(e).objectFit)).toBe('contain');
+    expect(await slot.locator('.slot-chip').evaluate((e) => [getComputedStyle(e).fontSize, getComputedStyle(e).lineHeight, getComputedStyle(e).paddingTop])).toEqual(['10px', '15px', '8px']);
     await expect.poll(() => slot.evaluate((e) => getComputedStyle(e).borderTopStyle)).toBe('dashed');
     await expect.poll(() => slot.evaluate((e) => getComputedStyle(e).borderTopColor)).not.toBe('rgba(0, 0, 0, 0)');
 
@@ -542,6 +550,7 @@ test('as on Fash, a filled photo slot and a chosen hook or location show the pic
     expect(Math.abs(hc.x - hb.x), 'hook chip at the left edge').toBeLessThanOrEqual(2);
     expect(Math.abs(hc.y + hc.height - (hb.y + hb.height)), 'hook chip at the bottom edge').toBeLessThanOrEqual(2);
     await cornerTab(hb, page.getByRole('button', { name: 'Bỏ Hook' }));
+    expect(await hookBox.locator('img').evaluate((e) => getComputedStyle(e).objectFit)).toBe('contain');
     await page.getByRole('button', { name: 'Bỏ Hook' }).click();
     await expect(hookBox.locator('img')).toHaveCount(0);
     await expect(hookBox).not.toContainText(hook.name);
