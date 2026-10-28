@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { png, signIn } from './support.test';
+import { png, runViaApi, select, selectValue, signIn } from './support.test';
 
 // A page's History tab lists the member's jobs as Fash's History cards: the result, the member's words, the inputs, chips, and the actions.
 test('a History card shows the text, inputs and chips, and its favourite, new-tab, download, delete and Dùng lại actions work', async ({ page }) => {
@@ -16,7 +16,7 @@ test('a History card shows the text, inputs and chips, and its favourite, new-ta
   await expect(card.getByText('Hoàn tất')).toBeVisible({ timeout: 60_000 });
   await expect(card.getByRole('heading', { name: /Tạo ảnh/ })).toBeVisible();
   await expect(card.getByRole('list', { name: 'Ảnh đầu vào' }).locator('img')).toHaveCount(2); // decorative thumbnails (alt="")
-  await expect(card.locator('.job-chips span')).toHaveText(['2K', '1:1']);
+  await expect(card.locator('.job-chips button')).toHaveText(['2K', '1:1']); // as on Fash, each chip sets its value on the form (the next test)
   await expect(card.getByRole('img', { name: 'Tạo ảnh' })).toBeVisible();
   await expect(card.getByRole('link', { name: 'Dùng lại' })).toHaveAttribute('href', `/image-generation?reuse=${id}`);
 
@@ -39,6 +39,46 @@ test('a History card shows the text, inputs and chips, and its favourite, new-ta
   await card.getByRole('button', { name: 'Xóa' }).click();
   await expect(card).toHaveCount(0);
   expect(((await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { id: string }[] }).jobs.some((j) => j.id === id)).toBe(false);
+});
+
+test('as on Fash, a History chip sets its resolution, ratio or duration on the form beside it and says so', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await signIn(page, 'chipa');
+  const toast = (text: string) => page.getByRole('region', { name: 'Thông báo' }).getByText(text);
+  const up = (await (await page.request.post('/api/assets', { multipart: { file: { name: 'c.png', mimeType: 'image/png', buffer: png() } } })).json()) as { assets: { id: string }[] };
+  const res = await page.request.post('/api/jobs', { data: { feature: 'image', modelId: 'mock-image-e2e', assetIds: [up.assets[0]!.id], ratio: '1:1', prompt: 'chips shot', enhance: false, params: { resolution: '2K' } } });
+  expect(res.status()).toBe(201);
+
+  await page.goto('/image-generation');
+  await page.getByRole('tab', { name: 'Lịch sử' }).click();
+  const card = page.getByRole('complementary', { name: 'Job của tôi' }).getByRole('listitem').filter({ hasText: 'chips shot' });
+  await expect(card.getByText('Hoàn tất')).toBeVisible({ timeout: 60_000 });
+  await expect(select(page, 'Độ phân giải')).toHaveAttribute('data-value', '1K');
+  await card.getByRole('button', { name: '2K' }).click();
+  await expect(select(page, 'Độ phân giải')).toHaveAttribute('data-value', '2K');
+  await expect(toast('Đã chọn độ phân giải 2K')).toBeVisible();
+  await expect(toast('Đã chọn độ phân giải 2K')).toBeHidden({ timeout: 6_000 }); // a note goes by itself, with no Library link
+  await card.getByRole('button', { name: '1:1' }).click();
+  await expect(select(page, 'Tỉ lệ')).toHaveAttribute('data-value', '1:1');
+  await expect(toast('Đã chọn tỉ lệ 1:1')).toBeVisible();
+
+  // A video page: the duration chip.
+  await runViaApi(page); // 9:16, 5 s
+  await page.goto('/create');
+  await page.getByRole('tab', { name: 'Lịch sử' }).click();
+  const clip = page.getByRole('complementary', { name: 'Job của tôi' }).getByRole('listitem').first();
+  await expect(clip.getByText('Hoàn tất')).toBeVisible({ timeout: 60_000 });
+  await selectValue(page, 'Tỉ lệ khung hình', '1:1');
+  await expect(select(page, 'Thời lượng')).toHaveAttribute('data-value', '8');
+  await clip.getByRole('button', { name: '5s' }).click();
+  await expect(select(page, 'Thời lượng')).toHaveAttribute('data-value', '5');
+  await expect(toast('Đã chọn thời lượng 5s')).toBeVisible();
+  await clip.getByRole('button', { name: '9:16' }).click();
+  await expect(select(page, 'Tỉ lệ khung hình')).toHaveAttribute('data-value', '9:16');
+
+  // The Library's cards have no form beside them: their chips stay plain text.
+  await page.goto('/library');
+  await expect(page.locator('.job-chips button')).toHaveCount(0);
 });
 
 test('the Library item detail shows the result large with its words, inputs and chips, steps to the next item and closes on Esc', async ({ page }) => {

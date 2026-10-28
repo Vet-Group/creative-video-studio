@@ -10,7 +10,7 @@ import { useSamples } from '@/lib/use-samples';
 import { ABOUT } from '@/lib/about-content';
 import { About } from './About';
 import { Gallery, type Img, LockedFields, RATIO_LABEL, Slot, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
-import { useHasHistory, useJobs } from './jobs';
+import { useApplier, useHasHistory, useJobs } from './jobs';
 import { ModelPicker } from './ModelPicker';
 import { Select } from './Select';
 import { Tray } from './Shell';
@@ -41,6 +41,10 @@ export function TryOn({ reuse }: { reuse?: string }) {
   const total = garments.length + person.length + background.length;
   const pick = useImageChoice(models, Math.max(2, total));
   const { chosen } = pick;
+  const apply = useApplier((s) => {
+    if (s.ratio) pick.setRatio(s.ratio);
+    if (s.resolution) pick.setResolution(s.resolution);
+  });
 
   // Reuse: the person first, then the garments (their count is kept on the job), then the background.
   useReuse(
@@ -198,7 +202,7 @@ export function TryOn({ reuse }: { reuse?: string }) {
         </div>
 
         <div className="side" id={`tryon-panel-${panel}`} role="tabpanel" aria-labelledby={`tryon-tab-${panel}`} hidden={narrow && shown === 'create'}>
-          {shown === 'examples' ? <Gallery kind="try_on" samples="try-on-example-" cols={[2, 2, 3]} label="Ảnh thử đồ của công ty" emptyText="Chưa có ảnh thử đồ nào trong công ty." /> : shown === 'about' ? <About page={ABOUT.tryOn} /> : <Tray feature="try_on" />}
+          {shown === 'examples' ? <Gallery kind="try_on" samples="try-on-example-" cols={[2, 2, 3]} label="Ảnh thử đồ của công ty" emptyText="Chưa có ảnh thử đồ nào trong công ty." /> : shown === 'about' ? <About page={ABOUT.tryOn} /> : <Tray feature="try_on" apply={apply} />}
         </div>
       </div>
     </section>

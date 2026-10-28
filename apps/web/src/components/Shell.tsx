@@ -10,7 +10,7 @@ import { reuseHref } from '@/lib/reuse';
 import { COLLAPSED_COOKIE } from '@/lib/sidebar';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { Icon, type IconName } from './Icon';
-import { JobsProvider, useJobs } from './jobs';
+import { JobsProvider, type Setting, useJobs } from './jobs';
 import { type Account, Settings } from './Settings';
 import { VetLogo } from './VetLogo';
 
@@ -81,7 +81,7 @@ const cardTitle = (job: TrayJob): string => (job.feature === 'marketing' ? (job.
  * One job in a page's History tab, laid out as Fash's History card: the result on the left; on the right the title, the member's own words,
  * the inputs, the ratio and length chips, the status and date, the icon actions and Dùng lại (Fash's Recreate, without the run).
  */
-function HistoryCard({ job, isAdmin }: { job: TrayJob; isAdmin: boolean }) {
+function HistoryCard({ job, isAdmin, apply }: { job: TrayJob; isAdmin: boolean; apply?: (s: Setting) => void }) {
   const { refresh } = useJobs();
   const [problem, setProblem] = useState('');
   const [favorite, setFavorite] = useState(job.favorite);
@@ -143,10 +143,30 @@ function HistoryCard({ job, isAdmin }: { job: TrayJob; isAdmin: boolean }) {
             ))}
           </ul>
         )}
-        <p className="job-chips">
-          <span>{image ? job.resolution : `${job.durationSec}s`}</span>
-          <span>{job.ratio}</span>
-        </p>
+        {apply ? (
+          // As on Fash, a chip sets its value on the form beside the History.
+          <p className="job-chips">
+            {image ? (
+              job.resolution && (
+                <button type="button" onClick={() => apply({ resolution: job.resolution! })} title="Dùng độ phân giải này">
+                  {job.resolution}
+                </button>
+              )
+            ) : (
+              <button type="button" onClick={() => apply({ durationSec: job.durationSec })} title="Dùng thời lượng này">
+                {job.durationSec}s
+              </button>
+            )}
+            <button type="button" onClick={() => apply({ ratio: job.ratio })} title="Dùng tỉ lệ này">
+              {job.ratio}
+            </button>
+          </p>
+        ) : (
+          <p className="job-chips">
+            <span>{image ? job.resolution : `${job.durationSec}s`}</span>
+            <span>{job.ratio}</span>
+          </p>
+        )}
         <p className="job-when">
           <strong>{STATUS_LABEL[job.status]}</strong> · {fmtTime(job.createdAt)}
         </p>
@@ -192,8 +212,9 @@ function HistoryCard({ job, isAdmin }: { job: TrayJob; isAdmin: boolean }) {
 
 const AdminContext = createContext(false);
 
-/** The "My jobs" list. It sits beside the page, or in the History tab of Create. With `feature`, only the jobs of that feature (the History tab of Try On and Image Generation). */
-export function Tray({ feature }: { feature?: string }) {
+/** The "My jobs" list. It sits beside the page, or in the History tab of Create. With `feature`, only the jobs of that feature (the History tab of Try On and Image Generation).
+ * With `apply`, the cards' chips set their value on the page's form. */
+export function Tray({ feature, apply }: { feature?: string; apply?: (s: Setting) => void }) {
   const isAdmin = useContext(AdminContext);
   const all = useJobs();
   const { workerOffline, loaded } = all;
@@ -204,7 +225,7 @@ export function Tray({ feature }: { feature?: string }) {
       {workerOffline && <p className="warn">Worker offline: chưa nhận được tín hiệu từ máy xử lý, job sẽ chạy khi worker hoạt động lại.</p>}
       {loaded && jobs.length === 0 && <p className="muted">Chưa có job nào.</p>}
       <ul>
-        {jobs.map((j) => (feature ? <HistoryCard key={j.id} job={j} isAdmin={isAdmin} /> : <TrayItem key={j.id} job={j} isAdmin={isAdmin} />))}
+        {jobs.map((j) => (feature ? <HistoryCard key={j.id} job={j} isAdmin={isAdmin} apply={apply} /> : <TrayItem key={j.id} job={j} isAdmin={isAdmin} />))}
       </ul>
     </aside>
   );
@@ -217,7 +238,7 @@ function Toasts() {
       {toasts.map((t) => (
         <div key={t.id} className={t.ok ? 'toast' : 'toast toast-bad'}>
           <span>{t.text}</span>
-          {t.ok && <Link href="/library">Xem</Link>}
+          {t.ok && !t.note && <Link href="/library">Xem</Link>}
           <button type="button" onClick={() => dismiss(t.id)} aria-label="Đóng thông báo">
             ×
           </button>

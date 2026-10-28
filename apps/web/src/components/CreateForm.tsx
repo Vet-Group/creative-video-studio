@@ -14,7 +14,7 @@ import { CardMedia } from './CardMedia';
 import { EnhanceToggle } from './EnhanceToggle';
 import { Icon } from './Icon';
 import { sampleFile, uploadImages } from './image-tools';
-import { useHasHistory, useJobs } from './jobs';
+import { useApplier, useHasHistory, useJobs } from './jobs';
 import { Modal } from './Modal';
 import { ModelPicker } from './ModelPicker';
 import { Preview } from './Preview';
@@ -283,6 +283,11 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
     if (hydrated) void upload([...e.dataTransfer.files]);
   }
   /** Fills the form from a sample; nothing is submitted. A sample whose look has no matching form ratio leaves the ratio alone. */
+  const apply = useApplier((s) => {
+    if (s.ratio) setRatio(s.ratio);
+    if (s.durationSec) setDurationSec(s.durationSec);
+  });
+
   function fillFromExample(ex: Example) {
     if (presets?.some((p) => p.id === ex.presetId)) setPresetId(ex.presetId);
     if (ex.ratio) setRatio(ex.ratio);
@@ -482,7 +487,7 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
           ) : shown === 'about' ? (
             <About page={ABOUT.create} />
           ) : (
-            <Tray feature="video" />
+            <Tray feature="video" apply={apply} />
           )}
         </div>
       </div>

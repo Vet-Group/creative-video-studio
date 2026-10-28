@@ -10,7 +10,7 @@ import { About } from './About';
 import { Gallery, type Img, RATIO_LABEL, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
 import { EnhanceToggle } from './EnhanceToggle';
 import { Icon } from './Icon';
-import { useJobs } from './jobs';
+import { useApplier, useJobs } from './jobs';
 import { ModelPicker } from './ModelPicker';
 import { Select } from './Select';
 import { Tray } from './Shell';
@@ -33,6 +33,10 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
   const input = useRef<HTMLInputElement>(null);
   const { models, failed } = useImageModels('image');
   const pick = useImageChoice(models, Math.max(1, images.length), model); // Explore's model card picks the model
+  const apply = useApplier((s) => {
+    if (s.ratio) pick.setRatio(s.ratio);
+    if (s.resolution) pick.setResolution(s.resolution);
+  });
   const { chosen } = pick;
   const max = chosen?.maxImages ?? 4;
 
@@ -109,7 +113,7 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
       {/* Above the gallery, not in the prompt bar, which keeps Fash's one-row height. */}
       <Templates feature="image" data={() => ({ images: images.map((i) => i.id), prompt: prompt.trim(), enhance, ratio: pick.ratio, resolution: pick.resolution, modelId: pick.modelId })} />
       <div className="imagegen-side" id={`imagegen-panel-${tab}`} role="tabpanel" aria-labelledby={`imagegen-tab-${tab}`}>
-        {tab === 'examples' ? <Gallery kind="image" samples="image-example-" label="Ảnh của công ty" emptyText="Chưa có ảnh nào trong công ty. Hãy tạo ảnh đầu tiên bên dưới." /> : tab === 'about' ? <About page={ABOUT.image} /> : <Tray feature="image" />}
+        {tab === 'examples' ? <Gallery kind="image" samples="image-example-" label="Ảnh của công ty" emptyText="Chưa có ảnh nào trong công ty. Hãy tạo ảnh đầu tiên bên dưới." /> : tab === 'about' ? <About page={ABOUT.image} /> : <Tray feature="image" apply={apply} />}
       </div>
 
       <div className="imagebar" role="group" aria-label="Thanh tạo ảnh">

@@ -16,7 +16,7 @@ import { AudioSwitch } from './AudioSwitch';
 import { CardMedia, LoopVideo } from './CardMedia';
 import { Icon, type IconName } from './Icon';
 import { Gallery, type Img, sampleFile, Slot, uploadImages, UPLOAD_ERROR, WorkTabs } from './image-tools';
-import { useHasHistory, useJobs } from './jobs';
+import { useApplier, useHasHistory, useJobs } from './jobs';
 import { Modal } from './Modal';
 import { ModelPicker } from './ModelPicker';
 import { Select } from './Select';
@@ -194,6 +194,10 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
   const [modelId, setModelId] = useState('');
   const [ratio, setRatio] = useState('9:16');
   const [durationSec, setDurationSec] = useState(10);
+  const apply = useApplier((s) => {
+    if (s.ratio) setRatio(s.ratio);
+    if (s.durationSec) setDurationSec(s.durationSec);
+  });
   const [list, setList] = useState<{ key: string; models: VideoModel[]; defaultId: string | null } | null>(null);
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -552,7 +556,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
           ) : shown === 'about' ? (
             <About page={advanced ? ABOUT.advanced : ABOUT.marketing} />
           ) : (
-            <Tray feature="marketing" />
+            <Tray feature="marketing" apply={apply} />
           )}
         </div>
       </div>
