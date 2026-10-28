@@ -198,3 +198,37 @@ test('with reduced motion the Explore model cards and the Apps cards and header 
     await asAdmin((name) => page.request.delete(`/api/admin/samples/${name}`));
   }
 });
+
+test('with reduced motion the Marketing format header and the hook and location pickers still loop, as on Fash; a chosen hook shows its still', async ({ page }) => {
+  const clip = readFileSync(fileURLToPath(new URL('../public/fixtures/examples/example-1.mp4', import.meta.url)));
+  const still = readFileSync(fileURLToPath(new URL('../public/fixtures/examples/example-1.jpg', import.meta.url)));
+  const files: [string, Buffer, string][] = [['marketing-format-ugc.mp4', clip, 'video/mp4'], ['marketing-hook-blizzard.mp4', clip, 'video/mp4'], ['marketing-hook-blizzard.jpg', still, 'image/jpeg'], ['marketing-location-gym.mp4', clip, 'video/mp4']];
+  const asAdmin = async (each: (name: string, data: Buffer, type: string) => Promise<{ ok(): boolean }>) => {
+    await page.context().clearCookies();
+    await signIn(page, 'admin');
+    for (const [name, data, type] of files) expect((await each(name, data, type)).ok()).toBe(true);
+    await page.context().clearCookies();
+  };
+  await asAdmin((name, data, type) => page.request.put(`/api/admin/samples/${name}`, { data, headers: { 'content-type': type } }));
+  try {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await signIn(page, 'member6');
+    await page.goto('/marketing-studio');
+    const moves = (video: Locator) => expect.poll(() => video.evaluate((v: HTMLVideoElement) => !v.paused && v.currentTime > 0)).toBe(true);
+    await moves(page.locator('.head-loop video'));
+
+    const hookBox = page.getByRole('button', { name: /^Hook/ });
+    await hookBox.click();
+    const hooks = page.getByRole('dialog', { name: 'Chọn hook' });
+    await moves(hooks.getByRole('option', { name: 'Bão tuyết', exact: true }).locator('video'));
+    await hooks.getByRole('option', { name: 'Bão tuyết', exact: true }).click();
+    await expect(hookBox.locator('img')).toHaveAttribute('src', '/api/samples/marketing-hook-blizzard.jpg');
+    await expect(hookBox.locator('video')).toHaveCount(0);
+
+    await page.getByRole('button', { name: /^Bối cảnh/ }).click();
+    await moves(page.getByRole('dialog', { name: 'Chọn bối cảnh' }).getByRole('option', { name: 'Phòng tập', exact: true }).locator('video'));
+  } finally {
+    await asAdmin((name) => page.request.delete(`/api/admin/samples/${name}`));
+  }
+});

@@ -10,7 +10,7 @@ import { useSamples } from '@/lib/use-samples';
 import { ABOUT } from '@/lib/about-content';
 import { About } from './About';
 import { Gallery, type Img, LockedFields, RATIO_LABEL, Slot, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
-import { useJobs } from './jobs';
+import { useHasHistory, useJobs } from './jobs';
 import { ModelPicker } from './ModelPicker';
 import { Select } from './Select';
 import { Tray } from './Shell';
@@ -30,7 +30,8 @@ export function TryOn({ reuse }: { reuse?: string }) {
   const [person, setPerson] = useState<Img[]>([]);
   const [background, setBackground] = useState<Img[]>([]);
   const [prompt, setPrompt] = useState('');
-  const [tab, setTab] = useState<Tab | null>(null); // null: the default for the width (Create below 1024 px, else History)
+  const [tab, setTab] = useState<Tab | null>(null); // null: the default for the width (Create below 1024 px, else History or Examples)
+  const opening: Tab = useHasHistory('try_on') ? 'history' : 'examples';
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -121,7 +122,7 @@ export function TryOn({ reuse }: { reuse?: string }) {
   }
 
   const tabs: Tab[] = narrow ? ['create', 'history', 'examples', 'about'] : ['history', 'examples', 'about'];
-  const shown: Tab = narrow ? (tab ?? 'create') : tab === 'examples' || tab === 'about' ? tab : 'history';
+  const shown: Tab = narrow ? (tab ?? 'create') : tab === null || tab === 'create' ? opening : tab;
   const panel = shown === 'create' ? 'history' : shown;
 
   return (
