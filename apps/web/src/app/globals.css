@@ -475,9 +475,11 @@ td code { white-space: pre-wrap; overflow-wrap: anywhere; }
 .select-value-row { display: flex; align-items: baseline; }
 .select-value-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .select-value-row .badge { flex: none; line-height: normal; }
-.select-pop { position: absolute; z-index: 50; top: calc(100% + 3px); left: 0; right: 0; max-height: 280px; overflow: auto; padding-top: 6px; background: var(--surface); border-radius: 8px; box-shadow: 0 4px 16px rgb(var(--shade) / .12); }
+.select-pop { position: absolute; z-index: 50; top: calc(100% + 3px); left: 0; right: 0; display: flex; flex-direction: column; max-height: 280px; overflow: auto; padding-top: 6px; background: var(--surface); border-radius: 8px; box-shadow: 0 4px 16px rgb(var(--shade) / .12); }
 .select-heading { height: 36px; padding: 10px 16px 8px; color: var(--text-muted); font-size: 12px; line-height: 18px; font-weight: 600; }
-.select-pop ul { margin: 0; padding: 0; list-style: none; }
+.select-heading { flex: none; }
+.select-pop ul { position: relative; flex: 1; min-height: 0; margin: 0; padding: 0; overflow: auto; list-style: none; } /* the heading stays while the list scrolls */
+.select[data-up] .select-pop { top: auto; bottom: calc(100% + 3px); } /* no room below in the form: open upward */
 .select-pop li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 16px; font-size: 14px; line-height: 21px; cursor: pointer; }
 .select-pop li:last-child { border-radius: 0 0 8px 8px; }
 .select-pop li[data-active='true'] { background: rgb(var(--shade) / .04); }
@@ -757,6 +759,7 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 /* Hook variants: the switch and Done under the hook grid. */
 .variants { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; margin-top: 16px; font-size: 13px; line-height: 18px; }
 .variants label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.variants input[type='checkbox'] { width: 16px; min-width: 0; height: 16px; margin: 0; padding: 0; } /* the generic label-input min width must not push the box away from its text */
 .prompt-preview p { margin: 6px 0 0; padding: 8px 10px; border-radius: 8px; background: var(--fill); color: var(--ink); white-space: pre-wrap; overflow-wrap: anywhere; }
 .about-faq details p { margin: 0; padding: 0 20px 16px; font-size: 14px; line-height: 21px; }
 @container (max-width: 560px) {
