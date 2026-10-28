@@ -131,7 +131,7 @@ export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRem
       <span id={labelId} className="field-label">
         {label}
       </span>
-      <div className="slot" role="group" aria-labelledby={labelId} data-over={over} data-one={(max === 1 && images.length === 1) || undefined} data-empty={images.length === 0 || undefined} onDragOver={(e) => (e.preventDefault(), setOver(true))} onDragLeave={() => setOver(false)} onDrop={onDrop}>
+      <div className="slot" role="group" aria-labelledby={labelId} data-over={over} data-one={(max === 1 && images.length === 1) || undefined} onDragOver={(e) => (e.preventDefault(), setOver(true))} onDragLeave={() => setOver(false)} onDrop={onDrop}>
         <input
           ref={input}
           type="file"
