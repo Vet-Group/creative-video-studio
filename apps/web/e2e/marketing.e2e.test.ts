@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { expect, type Locator, type Page, test } from '@playwright/test';
 import { HOOKS, LOCATIONS } from '../src/lib/marketing';
 import { jpg, modelButton, png, select, selectValue, signIn } from './support.test';
@@ -442,6 +444,58 @@ test('as on the live form (measured 2026-10-29): 272 px content, 131x130 tiles 1
   const card = page.getByRole('dialog', { name: 'Chọn hook' }).getByRole('option', { name: hook.name, exact: true });
   await expect(card).toHaveAccessibleDescription(hook.desc);
   expect(await card.locator('.choice-desc').evaluate((e) => [getComputedStyle(e).fontSize, getComputedStyle(e).color])).toEqual(['12px', 'rgb(128, 128, 128)']);
+});
+
+test('as on Fash, a sample in Ví dụ with a details file opens in place with its prompt, photos and settings, steps to the next, and Dùng lại refills the form from it', async ({ page }) => {
+  const fixture = (name: string) => readFileSync(fileURLToPath(new URL(`../public/fixtures/examples/${name}`, import.meta.url)));
+  const json = (v: object) => Buffer.from(JSON.stringify(v));
+  const ugc = { feature: 'marketing', format: null, images: [{ sample: 'marketing-example-1-model.jpg' }, { sample: 'marketing-example-1-product.png' }], hook: hook.id, location: spot.id, brief: null, script: null, audio: 'on', ratio: '1:1', durationSec: 8, modelId: null, date: '2026-08-18' };
+  const adv = { ...ugc, format: 'advanced', images: [{ sample: 'marketing-example-1-product.png' }], hook: null, location: null, brief: 'A woman surfs at dawn, intercut with close-ups.' };
+  const files: [string, Buffer, string][] = [
+    ['marketing-example-1.mp4', fixture('example-1.mp4'), 'video/mp4'], ['marketing-example-1.jpg', fixture('example-1.jpg'), 'image/jpeg'], ['marketing-example-1.json', json(ugc), 'application/json'],
+    ['marketing-example-2.mp4', fixture('example-1.mp4'), 'video/mp4'], ['marketing-example-2.jpg', fixture('example-1.jpg'), 'image/jpeg'], ['marketing-example-2.json', json(adv), 'application/json'],
+    ['marketing-example-3.mp4', fixture('example-1.mp4'), 'video/mp4'], ['marketing-example-3.jpg', fixture('example-1.jpg'), 'image/jpeg'],
+    ['marketing-example-1-model.jpg', jpg(), 'image/jpeg'], ['marketing-example-1-product.png', png(), 'image/png'],
+  ];
+  const asAdmin = async (each: (name: string, data: Buffer, type: string) => Promise<{ ok(): boolean }>) => {
+    await page.context().clearCookies();
+    await signIn(page, 'admin');
+    for (const [name, data, type] of files) expect((await each(name, data, type)).ok(), name).toBe(true);
+    await page.context().clearCookies();
+  };
+  await asAdmin((name, data, type) => page.request.put(`/api/admin/samples/${name}`, { data, headers: { 'content-type': type } }));
+  try {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await signIn(page, 'mkte');
+    await page.goto('/marketing-studio');
+    await page.getByRole('tab', { name: 'Ví dụ' }).click();
+    const gallery = page.getByRole('group', { name: 'Video Marketing Studio của công ty' });
+    await expect(gallery.getByRole('link', { name: 'Xem chi tiết video mẫu' })).toHaveCount(2);
+    await expect(gallery.getByRole('link', { name: 'Mở video mẫu trong tab mới' })).toHaveCount(1); // no details file: the new tab as before
+
+    await gallery.getByRole('link', { name: 'Xem chi tiết video mẫu' }).first().click();
+    let detail = page.getByRole('dialog', { name: 'Chi tiết: UGC Thử đồ' });
+    await expect(detail.locator('.job-chips')).toHaveText('8s1:1');
+    await expect(detail.getByRole('list', { name: 'Ảnh đầu vào' }).getByRole('img')).toHaveCount(2);
+    await expect(detail.locator('video')).toHaveAttribute('src', '/api/samples/marketing-example-1.mp4');
+    await detail.getByRole('button', { name: 'Mục tiếp theo' }).click();
+    detail = page.getByRole('dialog', { name: 'Chi tiết: Nâng cao' });
+    await expect(detail.locator('.job-text')).toHaveText(adv.brief);
+    await expect(detail.getByRole('link', { name: 'Dùng lại' })).toHaveAttribute('href', '/marketing-studio/advanced?example=marketing-example-2');
+    await detail.getByRole('button', { name: 'Mục trước' }).click();
+    detail = page.getByRole('dialog', { name: 'Chi tiết: UGC Thử đồ' });
+
+    await detail.getByRole('link', { name: 'Dùng lại' }).click();
+    await expect(page).toHaveURL(/\/marketing-studio\?example=marketing-example-1$/);
+    await expect(page.getByRole('img', { name: 'marketing-example-1-model.jpg' })).toBeVisible();
+    await expect(page.getByRole('img', { name: 'marketing-example-1-product.png' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Hook/ })).toContainText(hook.name);
+    await expect(page.getByRole('button', { name: /^Bối cảnh/ })).toContainText(spot.name);
+    await expect(select(page, 'Tỉ lệ')).toHaveAttribute('data-value', '1:1');
+    await expect(select(page, 'Thời lượng')).toHaveAttribute('data-value', '8');
+  } finally {
+    await asAdmin((name) => page.request.delete(`/api/admin/samples/${name}`));
+  }
 });
 
 test('as on Fash, a filled photo slot and a chosen hook or location show the picture full size under a name chip, with an X to clear', async ({ page }) => {

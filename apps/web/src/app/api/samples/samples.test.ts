@@ -54,11 +54,14 @@ afterAll(async () => {
 
 describe('sample names and bytes', () => {
   test('accepts lower-case dashed names with a known extension only', () => {
-    expect(['example-3.mp4', 'app-card-reframe.webp', 'x.jpg', 'a1.png'].map(sampleType)).toEqual(['video/mp4', 'image/webp', 'image/jpeg', 'image/png']);
+    expect(['example-3.mp4', 'app-card-reframe.webp', 'x.jpg', 'a1.png', 'marketing-example-1.json'].map(sampleType)).toEqual(['video/mp4', 'image/webp', 'image/jpeg', 'image/png', 'application/json']);
     expect(['../x.mp4', 'Example.mp4', 'a_b.jpg', 'a.gif', 'a.mp4.exe', '-a.mp4', 'a--b.mp4'].map(sampleType)).toEqual(Array(7).fill(null));
   });
   test('checks the magic bytes against the type', () => {
     expect([sampleBytesMatch('video/mp4', mp4(32)), sampleBytesMatch('image/jpeg', jpeg), sampleBytesMatch('image/png', jpeg), sampleBytesMatch('video/mp4', jpeg)]).toEqual([true, true, false, false]);
+    const text = (s: string) => new TextEncoder().encode(s);
+    expect(['{"brief":"x"}', '[1]', 'null', '{"a":', ''].map((s) => sampleBytesMatch('application/json', text(s)))).toEqual([true, false, false, false, false]);
+    expect(sampleBytesMatch('application/json', jpeg)).toBe(false);
   });
 });
 

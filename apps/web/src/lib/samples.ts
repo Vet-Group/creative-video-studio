@@ -5,20 +5,28 @@ import { bucketName, s3 } from './storage';
 
 export const SAMPLE_PREFIX = 'samples/';
 export const MAX_SAMPLE_BYTES = 50 * 1024 * 1024;
-const TYPES = { mp4: 'video/mp4', jpg: 'image/jpeg', png: 'image/png', webp: 'image/webp' } as const;
+const TYPES = { mp4: 'video/mp4', jpg: 'image/jpeg', png: 'image/png', webp: 'image/webp', json: 'application/json' } as const;
 
 /** The content type of a valid sample name (lower-case words joined by dashes, one known extension), or null. */
 export function sampleType(name: string): string | null {
-  const m = /^[a-z0-9]+(?:-[a-z0-9]+)*\.(mp4|jpg|png|webp)$/.exec(name);
+  const m = /^[a-z0-9]+(?:-[a-z0-9]+)*\.(mp4|jpg|png|webp|json)$/.exec(name);
   return m ? TYPES[m[1] as keyof typeof TYPES] : null;
 }
 
-/** Whether the bytes look like the type their name claims: the magic numbers of JPEG, PNG, WebP and the MP4 `ftyp` box. */
+/** Whether the bytes look like the type their name claims: the magic numbers of JPEG, PNG, WebP and the MP4 `ftyp` box, or one JSON object (an example's details). */
 export function sampleBytesMatch(type: string, b: Uint8Array): boolean {
   const at = (i: number, s: string) => [...s].every((c, k) => b[i + k] === c.charCodeAt(0));
   if (type === 'image/jpeg') return b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff;
   if (type === 'image/png') return b[0] === 0x89 && at(1, 'PNG');
   if (type === 'image/webp') return at(0, 'RIFF') && at(8, 'WEBP');
+  if (type === 'application/json') {
+    try {
+      const v: unknown = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(b));
+      return typeof v === 'object' && v !== null && !Array.isArray(v);
+    } catch {
+      return false;
+    }
+  }
   return at(4, 'ftyp');
 }
 
