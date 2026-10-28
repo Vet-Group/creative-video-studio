@@ -18,6 +18,7 @@ import { useJobs } from './jobs';
 import { type ModelOption, ModelPicker } from './ModelPicker';
 import { Select } from './Select';
 import { Tray } from './Shell';
+import { Templates } from './Templates';
 
 type Tab = 'create' | 'history' | 'about';
 const TAB_LABEL: Record<Tab, string> = { create: 'Tạo', history: 'Lịch sử', about: 'Giới thiệu' };
@@ -113,8 +114,8 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
     (j) => {
       setImages(app.slots.map((_, i) => j.images.slice(i, i + 1)));
       setPrompt(j.brief ?? '');
-      pick.setModelId(j.modelId);
-      pick.setRatio(j.ratio);
+      if (j.modelId) pick.setModelId(j.modelId);
+      if (j.ratio) pick.setRatio(j.ratio);
       if (j.resolution) pick.setResolution(j.resolution);
     },
     () => setError('Không tìm thấy ảnh để dùng lại.'),
@@ -228,6 +229,11 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
             )}
             {notice && <p role="status">{notice}</p>}
           </div>
+          <Templates
+            feature={app.feature}
+            // shortcut: an empty slot shifts the later images up on refill, fine while every app's slots are all required
+            data={() => ({ images: images.flat().map((i) => i.id), brief: prompt.trim(), ratio: pick.ratio, resolution: pick.resolution, modelId: pick.modelId })}
+          />
           <div className="runbar">
             <button type="button" className="primary run" disabled={!canRun} aria-describedby={reason ? reasonId : undefined} onClick={() => void run()}>
               Chạy

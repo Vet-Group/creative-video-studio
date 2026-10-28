@@ -17,6 +17,7 @@ import { ModelPicker } from './ModelPicker';
 import { Preview } from './Preview';
 import { Select } from './Select';
 import { Tray } from './Shell';
+import { Templates } from './Templates';
 
 interface Model {
   id: string;
@@ -51,10 +52,10 @@ interface JobDetail {
   presetId: string | null;
   enhance?: boolean;
   audio?: string | null;
-  prompt: string;
-  ratio: string;
-  durationSec: number;
-  modelId: string;
+  prompt: string | null;
+  ratio: string | null;
+  durationSec: number | null;
+  modelId: string | null;
   storeId: string | null;
   images: Image[];
 }
@@ -118,17 +119,18 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
   // Reuse: fill the form from the source clip; everything stays editable. A preset switched off since falls back to its prompt as a free prompt.
   useEffect(() => {
     if (!reuse || !presets) return;
-    api<JobDetail>(`/api/jobs/${reuse}`)
+    api<JobDetail>(reuse)
       .then((j) => {
         const preset = presets.some((p) => p.id === j.presetId) ? j.presetId : null;
         setImages(j.images);
         setPresetId(preset ?? '');
-        if (!preset) setPrompt(j.prompt);
+        if (!preset) setPrompt(j.prompt ?? '');
         setEnhance(j.presetId === null ? (j.enhance ?? true) : true); // a preset job never had Enhance, so the default stays
         setAudio(j.audio === 'on'); // a clip from before the switch was silent
-        setRatio(j.ratio);
-        setDurationSec(j.durationSec);
-        setModelId(j.modelId);
+        // A saved template may leave these out; the form's defaults stay.
+        if (j.ratio) setRatio(j.ratio);
+        if (j.durationSec) setDurationSec(j.durationSec);
+        if (j.modelId) setModelId(j.modelId);
         setStoreId(j.storeId ?? '');
       })
       .catch(() => setError('Không tìm thấy clip để dùng lại.'))
@@ -396,6 +398,10 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
               {notice && <p role="status">{notice}</p>}
             </div>
           )}
+          <Templates
+            feature="video"
+            data={() => ({ images: images.map((i) => i.id), ...(presetId ? { presetId } : { prompt: prompt.trim(), enhance }), audio: audio ? 'on' : 'off', ratio, durationSec, modelId, storeId })}
+          />
           <div className="runbar">
             <button type="button" className="primary run" disabled={!canRun} onClick={() => void run()}>
               Tạo video

@@ -13,6 +13,7 @@ import { useJobs } from './jobs';
 import { ModelPicker } from './ModelPicker';
 import { Select } from './Select';
 import { Tray } from './Shell';
+import { Templates } from './Templates';
 
 type Tab = 'create' | 'history' | 'examples' | 'about';
 const TAB_LABEL: Record<Tab, string> = { create: 'Tạo', history: 'Lịch sử', examples: 'Ví dụ', about: 'Giới thiệu' };
@@ -50,8 +51,8 @@ export function TryOn({ reuse }: { reuse?: string }) {
       setGarments(j.images.slice(1, 1 + n));
       setBackground(j.images.slice(1 + n, 2 + n));
       setPrompt(j.brief ?? '');
-      pick.setModelId(j.modelId);
-      pick.setRatio(j.ratio);
+      if (j.modelId) pick.setModelId(j.modelId);
+      if (j.ratio) pick.setRatio(j.ratio);
       if (j.resolution) pick.setResolution(j.resolution);
     },
     () => setError('Không tìm thấy ảnh để dùng lại.'),
@@ -173,6 +174,17 @@ export function TryOn({ reuse }: { reuse?: string }) {
             )}
             {notice && <p role="status">{notice}</p>}
           </div>
+          <Templates
+            feature="try_on"
+            data={() => ({
+              images: [...person, ...garments, ...background].map((i) => i.id),
+              ...(garments.length > 0 && { garments: garments.length }),
+              brief: prompt.trim(),
+              ratio: pick.ratio,
+              resolution: pick.resolution,
+              modelId: pick.modelId,
+            })}
+          />
           <div className="runbar">
             <button type="button" className="primary run" disabled={!canRun} aria-describedby={reason ? reasonId : undefined} onClick={() => void run()}>
               Thử đồ
