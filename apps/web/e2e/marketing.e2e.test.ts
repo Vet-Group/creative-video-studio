@@ -595,7 +595,8 @@ test('as on Fash in a 666 px tall window (measured 2026-10-29): no scrollbar nar
   const near = (got: number, want: number) => expect(Math.abs(got - want), `${got} vs ${want}`).toBeLessThanOrEqual(1);
   const scroller = page.locator('.form-scroll').filter({ has: page.locator('.marketing-head') });
   expect(await scroller.evaluate((e) => e.scrollHeight > e.clientHeight)).toBe(true);
-  expect(await scroller.evaluate((e) => (e as HTMLElement).offsetWidth - e.clientWidth)).toBe(0);
+  // Headless Chromium hides scrollbars anyway, so the rule itself is what a test can see; a desktop Chrome would take 15 px of the 272.
+  expect(await scroller.evaluate((e) => getComputedStyle(e).scrollbarWidth)).toBe('none');
   near((await page.locator('.marketing-head').boundingBox())!.width, 272);
   // Fash: the ratio pill at x 312 has its value at 336.8; the duration pill at 452 has it at 480.8.
   for (const [label, offset] of [['Tỉ lệ', 24.8], ['Thời lượng', 28.8]] as const) {
