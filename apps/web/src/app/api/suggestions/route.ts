@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { SUGGEST_QUEUE } from '@cvs/core/queue';
+import { PROMPT_CEILING } from '@cvs/core/models';
 import type { SuggestInput } from '@cvs/core/suggest';
 import { pool } from '@/lib/auth';
-import { ADVANCED_MAX_BRIEF, ADVANCED_MAX_SCRIPT, HOOKS, LOCATIONS, SUGGEST_DAILY_LIMIT, UGC_MAX_BRIEF } from '@/lib/marketing';
+import { ADVANCED_MAX_SCRIPT, HOOKS, LOCATIONS, SUGGEST_DAILY_LIMIT } from '@/lib/marketing';
 import { boss } from '@/lib/queue';
 import { guard } from '@/lib/session';
 
@@ -10,22 +11,22 @@ const bad = (error: string, status = 400) => Response.json({ error }, { status }
 
 /**
  * Asks the worker for three Marketing Studio suggestions: `field` (`brief`, or `script` on Advanced), `format` ('advanced' or absent), the
- * member's `text` so far, and the chosen `hook` and `location`. Answers 202 with the run's id for the page to poll (GET /api/suggestions/:id),
+ * member's `text` so far, the chosen `hook` and `location`, and for a brief the `room` the chosen model leaves for it (the page computes it). Answers 202 with the run's id for the page to poll (GET /api/suggestions/:id),
  * 429 past the daily limit, 503 when the queue cannot take it (the run is not counted then).
  */
 export async function POST(request: Request) {
   const g = await guard(request, 'member');
   if (g.error) return g.error;
-  const b = (await request.json().catch(() => null)) as { field?: unknown; format?: unknown; text?: unknown; hook?: unknown; location?: unknown } | null;
+  const b = (await request.json().catch(() => null)) as { field?: unknown; format?: unknown; text?: unknown; hook?: unknown; location?: unknown; room?: unknown } | null;
   if (b?.field !== 'brief' && b?.field !== 'script') return bad('field must be brief or script');
   if (b.format !== undefined && b.format !== 'advanced') return bad('format must be advanced or left out');
   const advanced = b.format === 'advanced';
   if (b.field === 'script' && !advanced) return bad('a script is for Advanced only');
-  // The member's notes may be the brief even when lines are asked for, so they are held to the brief's limit; `max` is the options' own limit.
-  const notesMax = advanced ? ADVANCED_MAX_BRIEF : UGC_MAX_BRIEF;
-  const max = b.field === 'script' ? ADVANCED_MAX_SCRIPT : notesMax;
+  if (b.room !== undefined && !(Number.isInteger(b.room) && (b.room as number) >= 1)) return bad('room must be a whole number of characters');
+  // The member's notes may be the brief even when lines are asked for, so they are held to the longest prompt; `max` is the options' own limit.
+  const max = b.field === 'script' ? ADVANCED_MAX_SCRIPT : Math.min((b.room as number | undefined) ?? PROMPT_CEILING, PROMPT_CEILING);
   const text = typeof b.text === 'string' ? b.text.trim() : b.text === undefined ? '' : null;
-  if (text === null || text.length > notesMax) return bad(`text may be at most ${notesMax} characters`);
+  if (text === null || text.length > PROMPT_CEILING) return bad(`text may be at most ${PROMPT_CEILING} characters`);
   const hook = b.hook === undefined ? undefined : HOOKS.find((h) => h.id === b.hook);
   if (b.hook !== undefined && !hook) return bad('hook is not a hook');
   const location = b.location === undefined ? undefined : LOCATIONS.find((l) => l.id === b.location);

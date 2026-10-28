@@ -6,11 +6,9 @@ import { sendJson, timeout, type Fetch } from './providers/http';
 
 export const ENHANCE_URL = 'https://fal.run/openrouter/router';
 export const ENHANCE_MODEL = 'google/gemini-2.5-flash';
-/** The rewrite must still fit the jobs' prompt limit (MAX_PROMPT in the web app). */
-export const MAX_ENHANCED = 2000;
-
 export type EnhanceKind = 'video' | 'image';
-export type Enhancer = (prompt: string, kind: EnhanceKind) => Promise<{ prompt: string; costUsd: number | null }>;
+/** `maxChars`: the job's model prompt limit (promptLimit in models.ts), which the rewrite is cut to. */
+export type Enhancer = (prompt: string, kind: EnhanceKind, maxChars: number) => Promise<{ prompt: string; costUsd: number | null }>;
 
 // The brief is written from the text alone, and a first trial made up logo text and garment colours; so nothing visual may be invented.
 const KEEP =
@@ -33,9 +31,9 @@ export const SYSTEM_PROMPTS: Record<EnhanceKind, string> = {
     KEEP,
 };
 
-/** The rewrite, trimmed and cut to the prompt limit; an empty or failed answer throws, and the caller keeps the member's prompt. */
+/** The rewrite, trimmed and cut to the model's prompt limit; an empty or failed answer throws, and the caller keeps the member's prompt. */
 export function createFalEnhancer({ apiKey, fetch: f = fetch, model = ENHANCE_MODEL }: { apiKey: string; fetch?: Fetch; model?: string }): Enhancer {
-  return async (prompt, kind) => {
+  return async (prompt, kind, maxChars) => {
     const out = (await sendJson(f, 'fal enhance', ENHANCE_URL, {
       method: 'POST',
       headers: { Authorization: `Key ${apiKey}`, 'Content-Type': 'application/json' },
@@ -46,6 +44,6 @@ export function createFalEnhancer({ apiKey, fetch: f = fetch, model = ENHANCE_MO
     const text = typeof out.output === 'string' ? out.output.trim().replace(/^"(.*)"$/s, '$1').trim() : '';
     if (text === '') throw new Error('fal enhance: empty answer');
     const cost = Number(out.usage?.cost);
-    return { prompt: text.slice(0, MAX_ENHANCED), costUsd: Number.isFinite(cost) ? cost : null };
+    return { prompt: text.slice(0, maxChars), costUsd: Number.isFinite(cost) ? cost : null };
   };
 }

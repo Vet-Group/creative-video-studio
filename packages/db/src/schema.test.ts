@@ -99,6 +99,19 @@ describe('migration 0002 seed data', () => {
   });
 });
 
+describe('migration 0028 prompt limits', () => {
+  test('gives each model the prompt limit of its fal schema with the source, and 2000 where the schema states none', async () => {
+    const { rows } = await pool.query(`select id, endpoint, max_prompt_chars as n, sources->'maxPromptChars' as src from model_configs where id = any($1) order by id`, [
+      ['nano-banana-pro', 'kling-2.6', 'minimax-hailuo-2.3-pro', 'veo-3.1', 'grok-imagine-1.5', 'kling-o3-pro'],
+    ]);
+    const by = Object.fromEntries(rows.map((r) => [r.id, r]));
+    expect(Object.fromEntries(rows.map((r) => [r.id, r.n]))).toMatchObject({ 'nano-banana-pro': 50000, 'kling-2.6': 2500, 'minimax-hailuo-2.3-pro': 2000, 'veo-3.1': 20000, 'grok-imagine-1.5': 4096, 'kling-o3-pro': 2000 });
+    expect(by['kling-2.6'].src).toEqual({ url: `https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=${by['kling-2.6'].endpoint}`, readAt: '2026-10-28' });
+    expect(by['kling-o3-pro'].src).toBeNull(); // its schema states no limit, so it keeps the default and no source
+    await expect(pool.query(`update model_configs set max_prompt_chars = 0 where id = 'veo-3.1'`)).rejects.toThrow(/model_configs_max_prompt_chars_check/);
+  });
+});
+
 describe('migration 0015 Fash video models', () => {
   test('adds 22 fal video models, disabled and complete, each with a request builder and its sources', async () => {
     const { rows } = await pool.query(
@@ -109,7 +122,7 @@ describe('migration 0015 Fash video models', () => {
       expect(VIDEO_BODIES[r.endpoint], r.id).toBeDefined();
       expect(r.ratios.length * r.durations_sec.length * r.max_images * r.usd, r.id).toBeGreaterThan(0);
       expect(['720p', '768p', '1080p'], r.id).toContain(r.output_resolution);
-      expect(Object.keys(r.sources).sort(), r.id).toEqual(['durationsSec', 'maxImages', 'outputResolution', 'ratios', 'usdPerSecond']);
+      expect(Object.keys(r.sources).filter((k) => k !== 'maxPromptChars').sort(), r.id).toEqual(['durationsSec', 'maxImages', 'outputResolution', 'ratios', 'usdPerSecond']); // 0028 adds the prompt limit's source
     }
     expect(rows.find((r) => r.id === 'veo-3.1')).toMatchObject({ ratios: ['9:16'], durations_sec: [8] }); // no 1:1, and Fash's 8 s only
     await pool.query(`update model_configs set enabled = true where id = 'kling-3.0-pro'`); // complete enough for the enable check

@@ -34,6 +34,11 @@ export interface ImageModelConfig {
   features: string[];
 }
 
+/** No prompt longer than this is sent, whatever a model takes: past it the extra words rarely change the result, and a typo cannot send a novel. */
+export const PROMPT_CEILING = 5000;
+/** A model's prompt limit as the app applies it: its own `max_prompt_chars` under the ceiling. */
+export const promptLimit = (maxPromptChars: number): number => Math.min(maxPromptChars, PROMPT_CEILING);
+
 /**
  * The prompt of an app that has no prompt field of its own (or only an optional one), stored with the job and sent when the Run names none.
  * The two swaps send the new person as the first image and the photo to change as the second. For Background Changer it stands for "the second image is the new background".

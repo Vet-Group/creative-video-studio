@@ -185,6 +185,36 @@ test('a second model with other ratios and durations can be picked: the menus of
   await expect(select(page, 'Thời lượng')).toHaveAttribute('data-value', '5');
 });
 
+test('the brief may take what the chosen model leaves; a switch to a model with a smaller limit keeps the text and Run waits with the reason', async ({ page }) => {
+  await signIn(page, 'mktp');
+  await openPage(page);
+  await page.getByLabel('Ảnh người mẫu').setInputFiles(file('model.png'));
+  await page.getByLabel('Ảnh sản phẩm').setInputFiles(file('product.png'));
+  await expect(modelButton(page)).toContainText('Mock E2E');
+  const brief = page.getByRole('textbox', { name: 'Prompt (tuỳ chọn)' });
+  const counter = page.locator('.prompt-foot span').first();
+  const room = async () => Number((await counter.textContent())!.split('/')[1]);
+  await expect(counter).toHaveText(/^0\/\d+$/);
+  expect(await room()).toBeGreaterThan(1100); // 2000 less the fixed part the page adds
+  const text = 'x'.repeat(1100);
+  await brief.fill(text);
+  await expect(runButton(page)).toBeEnabled();
+
+  // Mock E2E Wide takes 1000 characters: the text stays as written and Run waits.
+  await selectValue(page, 'Tỉ lệ', '16:9');
+  await modelButton(page).click();
+  await page.getByRole('option', { name: /Mock E2E Wide/ }).click();
+  await expect(modelButton(page)).toContainText('Mock E2E Wide');
+  await expect(brief).toHaveValue(text);
+  await expect(runButton(page)).toBeDisabled();
+  await expect(reasonOf(page)).toHaveText('Mô hình Mock E2E Wide nhận tối đa 1000 ký tự, hãy rút gọn hoặc chọn mô hình khác.');
+  expect(await room()).toBeLessThan(1000);
+
+  await brief.fill('x'.repeat(await room()));
+  await expect(runButton(page)).toBeEnabled();
+  await expect(brief).toHaveAttribute('maxlength', String(await room()));
+});
+
 test('a failed model list can be retried', async ({ page }) => {
   await signIn(page, 'mktb');
   let failing = true;

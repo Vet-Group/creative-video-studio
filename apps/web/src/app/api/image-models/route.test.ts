@@ -21,7 +21,7 @@ async function newUser(email: string, role: 'member' | 'admin') {
   return res.headers.getSetCookie().map((c) => c.split(';')[0]).join('; ');
 }
 const call = (cookie: string | undefined, query: string) => GET(new Request(`http://localhost/api/image-models${query}`, { headers: cookie ? { cookie } : {} }));
-type Model = { id: string; label: string; isMock: boolean; ratios: string[]; resolutions: string[]; prices: Record<string, string>; maxImages: number; score: number; recommended: boolean };
+type Model = { id: string; label: string; isMock: boolean; ratios: string[]; resolutions: string[]; prices: Record<string, string>; maxImages: number; maxPromptChars: number; score: number; recommended: boolean };
 const list = async (feature: string, cookie = memberCookie) => ((await (await call(cookie, `?feature=${feature}`)).json()) as { models: Model[] }).models;
 const setEnabled = (id: string, enabled: boolean) => pool.query('update model_configs set enabled = $2 where id = $1', [id, enabled]);
 
@@ -29,12 +29,12 @@ beforeAll(async () => {
   memberCookie = await newUser('member@example.test', 'member');
   adminCookie = await newUser('admin@example.test', 'admin');
   await pool.query(
-    `insert into model_configs (id, provider, endpoint, label, kind, features, ratios, durations_sec, max_images, image_prices, sources, enabled) values
-       ('t-both', 'fal', 'x', 'B both', 'image', '{image,try_on}', '{auto,1:1}', '{}', 4, '{"1K": "0.1500", "2K": "0.3000"}', '{}', true),
-       ('t-image', 'fal', 'x', 'A image only', 'image', '{image}', '{auto}', '{}', 2, '{"1K": "0.04"}', '{}', true),
-       ('t-tryon', 'fal', 'x', 'C try-on only', 'image', '{try_on}', '{auto}', '{}', 2, '{"1K": "0.075"}', '{}', true),
-       ('t-mock', 'mock', 'mock', 'D mock', 'image', '{image,try_on}', '{auto,3:4}', '{}', 4, '{"1K": "0.1500"}', '{}', true),
-       ('t-off', 'fal', 'x', 'E disabled', 'image', '{image,try_on}', '{auto}', '{}', 4, '{"1K": "0.1"}', '{}', false)`,
+    `insert into model_configs (id, provider, endpoint, label, kind, features, ratios, durations_sec, max_images, image_prices, sources, enabled, max_prompt_chars) values
+       ('t-both', 'fal', 'x', 'B both', 'image', '{image,try_on}', '{auto,1:1}', '{}', 4, '{"1K": "0.1500", "2K": "0.3000"}', '{}', true, 50000),
+       ('t-image', 'fal', 'x', 'A image only', 'image', '{image}', '{auto}', '{}', 2, '{"1K": "0.04"}', '{}', true, 2000),
+       ('t-tryon', 'fal', 'x', 'C try-on only', 'image', '{try_on}', '{auto}', '{}', 2, '{"1K": "0.075"}', '{}', true, 2000),
+       ('t-mock', 'mock', 'mock', 'D mock', 'image', '{image,try_on}', '{auto,3:4}', '{}', 4, '{"1K": "0.1500"}', '{}', true, 4096),
+       ('t-off', 'fal', 'x', 'E disabled', 'image', '{image,try_on}', '{auto}', '{}', 4, '{"1K": "0.1"}', '{}', false, 2000)`,
   );
   await pool.query(
     `insert into model_configs (id, provider, endpoint, label, kind, features, ratios, durations_sec, max_images, output_resolution, usd_per_second, sources, enabled)
@@ -56,9 +56,9 @@ describe('GET /api/image-models', () => {
   test('lists the enabled image models of a feature, by label, with ratios, resolutions, prices and the image limit', async () => {
     const unscored = { passRate: null, reliability: 1, score: 50, passes: 0, total: 0, recommended: false }; // equal scores: no badge
     expect(await list('image')).toEqual([
-      { id: 't-image', label: 'A image only', provider: 'fal', isMock: false, ratios: ['auto'], resolutions: ['1K'], prices: { '1K': '0.0400' }, maxImages: 2, ...unscored },
-      { id: 't-both', label: 'B both', provider: 'fal', isMock: false, ratios: ['auto', '1:1'], resolutions: ['1K', '2K'], prices: { '1K': '0.1500', '2K': '0.3000' }, maxImages: 4, ...unscored },
-      { id: 't-mock', label: 'D mock', provider: 'mock', isMock: true, ratios: ['auto', '3:4'], resolutions: ['1K'], prices: { '1K': '0.0000' }, maxImages: 4, ...unscored },
+      { id: 't-image', label: 'A image only', provider: 'fal', isMock: false, ratios: ['auto'], resolutions: ['1K'], prices: { '1K': '0.0400' }, maxImages: 2, maxPromptChars: 2000, ...unscored },
+      { id: 't-both', label: 'B both', provider: 'fal', isMock: false, ratios: ['auto', '1:1'], resolutions: ['1K', '2K'], prices: { '1K': '0.1500', '2K': '0.3000' }, maxImages: 4, maxPromptChars: 5000, ...unscored }, // 50000 in its schema, under the ceiling
+      { id: 't-mock', label: 'D mock', provider: 'mock', isMock: true, ratios: ['auto', '3:4'], resolutions: ['1K'], prices: { '1K': '0.0000' }, maxImages: 4, maxPromptChars: 4096, ...unscored },
     ]);
     expect((await list('try_on')).map((m) => m.id)).toEqual(['t-both', 't-tryon', 't-mock']);
   });

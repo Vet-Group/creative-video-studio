@@ -2,6 +2,7 @@
 import { type DragEvent, type KeyboardEvent, useEffect, useId, useRef, useState } from 'react';
 import { api, errorText, sendJson } from '@/lib/api';
 import { cardSample, type Example, exampleForPreset, examplesFor, sampleSrc, splitColumns } from '@/lib/examples';
+import { promptTooLong } from '@/lib/prompt-limit';
 import { NARROW, useMediaQuery, WIDE } from '@/lib/use-media-query';
 import { useHydrated } from '@/lib/use-hydrated';
 import { useSamples } from '@/lib/use-samples';
@@ -26,6 +27,8 @@ interface Model {
   ratios: string[];
   durationsSec: number[];
   maxImages: number;
+  /** The model's prompt limit (the API caps it at PROMPT_CEILING). */
+  maxPromptChars: number;
   /** The one output resolution the stored price is for, e.g. '1080p'. */
   resolution: string | null;
   estimateUsd: string;
@@ -64,7 +67,6 @@ type Tab = 'create' | 'history' | 'examples' | 'about';
 const TAB_LABEL: Record<Tab, string> = { create: 'Tạo', history: 'Lịch sử', examples: 'Ví dụ', about: 'Giới thiệu' };
 const RATIO_LABEL: Record<string, string> = { '9:16': '9:16 (dọc)', '1:1': '1:1 (vuông)' };
 const MAX_IMAGES = 4;
-const MAX_PROMPT = 2000;
 const ratePct = (m: Model) => (m.passRate === null ? 'chưa có dữ liệu' : `${Math.round(m.passRate * 100)}% (${m.passes}/${m.total})`);
 
 /** `preset` and `model` pre-select the choices Explore links to; an unknown or switched-off one falls back to the default. */
@@ -171,7 +173,8 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
   const tooMany = chosen !== undefined && images.length > chosen.maxImages;
   // The upload limit follows the chosen model (REA-video V02); the server caps every model at MAX_IMAGES.
   const maxImages = Math.min(MAX_IMAGES, chosen?.maxImages ?? MAX_IMAGES);
-  const promptOk = presetId !== '' || (prompt.trim() !== '' && prompt.trim().length <= MAX_PROMPT);
+  const tooLong = presetId === '' ? promptTooLong(chosen, prompt.trim().length) : null;
+  const promptOk = presetId !== '' || (prompt.trim() !== '' && tooLong === null);
   const canRun = ready && !busy && images.length > 0 && chosen?.supported === true && !tooMany && promptOk;
 
   async function upload(files: File[]) {
@@ -333,19 +336,21 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
             )}
             {models && models.models.length === 0 && <p className="help">Chưa bật mô hình video nào. Admin bật trong Quản trị → Cài đặt → Mô hình.</p>}
             {tooMany && chosen && <p className="error">Mô hình này nhận tối đa {chosen.maxImages} ảnh.</p>}
+            {tooLong && <p className="error">{tooLong}</p>}
 
             <div className="field">
               <label htmlFor={promptId} className="field-label">
                 Mô tả chuyển động
               </label>
               <div className="prompt-box" data-disabled={presetId !== ''}>
-                <textarea id={promptId} value={presetId === '' ? prompt : ''} maxLength={MAX_PROMPT} disabled={presetId !== ''} placeholder={presetId === '' ? 'Mô tả video bạn muốn, nên viết bằng tiếng Anh' : 'Đang dùng mẫu. Chọn "Tự viết mô tả" trong danh sách mẫu để tự nhập'} onChange={(e) => setPrompt(e.target.value)} />
+                <textarea id={promptId} value={presetId === '' ? prompt : ''} maxLength={chosen?.maxPromptChars} disabled={presetId !== ''} placeholder={presetId === '' ? 'Mô tả video bạn muốn, nên viết bằng tiếng Anh' : 'Đang dùng mẫu. Chọn "Tự viết mô tả" trong danh sách mẫu để tự nhập'} onChange={(e) => setPrompt(e.target.value)} />
                 {/* The row stays while a preset is in use, so the box keeps the live 121 px height. */}
                 <div className="prompt-foot">
                   {presetId === '' && <EnhanceToggle on={enhance} onChange={setEnhance} />}
                   {presetId === '' && (
                     <span>
-                      {prompt.length}/{MAX_PROMPT}
+                      {prompt.length}
+                      {chosen && `/${chosen.maxPromptChars}`}
                     </span>
                   )}
                 </div>

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { BAKEOFF_MODELS, estimateUsd, usdPerSecondFor, validateRequest } from './models';
+import { BAKEOFF_MODELS, estimateUsd, PROMPT_CEILING, promptLimit, usdPerSecondFor, validateRequest } from './models';
 
 describe.each(BAKEOFF_MODELS)('$id', (model) => {
   const ok = { ratio: '9:16', durationSec: 5, imageCount: 1 };
@@ -47,4 +47,9 @@ test('audio on takes the endpoint audio price, audio off or absent the stored pr
   expect(usdPerSecondFor(kling, undefined)).toBe(0.112);
   expect(usdPerSecondFor({ endpoint: 'fal-ai/wan/v2.7/reference-to-video', usdPerSecond: 0.1 }, 'on')).toBeUndefined();
   expect(usdPerSecondFor({ endpoint: 'constructor', usdPerSecond: 0.1 }, 'on')).toBeUndefined();
+});
+
+test('a model’s prompt limit is its own, never past the ceiling', () => {
+  expect([promptLimit(2000), promptLimit(4096), promptLimit(50000)]).toEqual([2000, 4096, PROMPT_CEILING]);
+  expect(PROMPT_CEILING).toBe(5000);
 });
