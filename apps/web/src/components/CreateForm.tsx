@@ -396,6 +396,10 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
                 {models.remainingBudgetUsd !== undefined && <span> · Ngân sách tháng còn lại của công ty: ${models.remainingBudgetUsd}</span>}
               </p>
             )}
+            <Templates
+              feature="video"
+              data={() => ({ images: images.map((i) => i.id), ...(presetId ? { presetId } : { prompt: prompt.trim(), enhance }), audio: audio ? 'on' : 'off', ratio, durationSec, modelId, storeId })}
+            />
           </div>
 
           {(error || notice) && (
@@ -408,10 +412,6 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
               {notice && <p role="status">{notice}</p>}
             </div>
           )}
-          <Templates
-            feature="video"
-            data={() => ({ images: images.map((i) => i.id), ...(presetId ? { presetId } : { prompt: prompt.trim(), enhance }), audio: audio ? 'on' : 'off', ratio, durationSec, modelId, storeId })}
-          />
           <div className="runbar">
             <button type="button" className="primary run" disabled={!canRun} aria-describedby={tooLong ? tooLongId : undefined} onClick={() => void run()}>
               Tạo video

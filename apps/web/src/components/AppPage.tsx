@@ -219,6 +219,11 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
 
             {chosen && app.ratio && <Select label="Tỉ lệ" icon="ratio" heading="Chọn tỉ lệ" value={pick.ratio} options={chosen.ratios.map((r) => ({ value: r, label: RATIO_LABEL[r] ?? r }))} onChange={pick.setRatio} />}
             {chosen && app.resolution && <Select label="Độ phân giải" icon="preset" heading="Chọn độ phân giải" value={pick.resolution} options={chosen.resolutions.map((r) => ({ value: r, label: r }))} onChange={pick.setResolution} />}
+            <Templates
+              feature={app.feature}
+              // shortcut: an empty slot shifts the later images up on refill, fine while every app's slots are all required
+              data={() => ({ images: images.flat().map((i) => i.id), brief: prompt.trim(), ratio: pick.ratio, resolution: pick.resolution, modelId: pick.modelId })}
+            />
           </div>
 
           <div className="form-message">
@@ -234,11 +239,6 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
             )}
             {notice && <p role="status">{notice}</p>}
           </div>
-          <Templates
-            feature={app.feature}
-            // shortcut: an empty slot shifts the later images up on refill, fine while every app's slots are all required
-            data={() => ({ images: images.flat().map((i) => i.id), brief: prompt.trim(), ratio: pick.ratio, resolution: pick.resolution, modelId: pick.modelId })}
-          />
           <div className="runbar">
             <button type="button" className="primary run" disabled={!canRun} aria-describedby={reason ? reasonId : undefined} onClick={() => void run()}>
               Chạy

@@ -489,6 +489,20 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
             </div>
             <AudioSwitch on={audio} available={chosen?.audioEstimateUsd != null} onChange={setAudio} />
             {models && models.length > 0 && <ModelPicker models={models.map((m) => ({ id: m.id, label: m.label, isMock: m.isMock, supported: !advanced || m.maxImages >= refs.length, estimateUsd: audio && m.audioEstimateUsd != null ? m.audioEstimateUsd : m.estimateUsd, score: m.score, recommended: m.recommended }))} value={chosen?.id ?? ''} onChange={(id) => pickModel(models.find((m) => m.id === id)!)} />}
+            <Templates
+              feature="marketing"
+              data={() => ({
+                images: (advanced ? refs : [...person, ...product]).map((i) => i.id),
+                ...(advanced && { format: 'advanced', script: script.trim() }),
+                hook: hooks[0],
+                location,
+                brief: prompt.trim(),
+                audio: audio ? 'on' : 'off',
+                ratio,
+                durationSec,
+                modelId: chosen?.id,
+              })}
+            />
           </div>
 
           <div className="form-message">
@@ -514,20 +528,6 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
             )}
             {notice && <p role="status">{notice}</p>}
           </div>
-          <Templates
-            feature="marketing"
-            data={() => ({
-              images: (advanced ? refs : [...person, ...product]).map((i) => i.id),
-              ...(advanced && { format: 'advanced', script: script.trim() }),
-              hook: hooks[0],
-              location,
-              brief: prompt.trim(),
-              audio: audio ? 'on' : 'off',
-              ratio,
-              durationSec,
-              modelId: chosen?.id,
-            })}
-          />
           <div className="runbar">
             <button type="button" className="primary run" disabled={!canRun} aria-describedby={(reason ?? short) ? reasonId : undefined} onClick={() => void run()}>
               Tạo video

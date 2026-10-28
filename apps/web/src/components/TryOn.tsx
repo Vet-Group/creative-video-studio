@@ -162,6 +162,17 @@ export function TryOn({ reuse }: { reuse?: string }) {
                 <Select label="Tỉ lệ" icon="ratio" heading="Chọn tỉ lệ" value={pick.ratio} options={chosen.ratios.map((r) => ({ value: r, label: RATIO_LABEL[r] ?? r }))} onChange={pick.setRatio} />
               </>
             )}
+            <Templates
+              feature="try_on"
+              data={() => ({
+                images: [...person, ...garments, ...background].map((i) => i.id),
+                ...(garments.length > 0 && { garments: garments.length }),
+                brief: prompt.trim(),
+                ratio: pick.ratio,
+                resolution: pick.resolution,
+                modelId: pick.modelId,
+              })}
+            />
           </div>
 
           <div className="form-message">
@@ -177,17 +188,6 @@ export function TryOn({ reuse }: { reuse?: string }) {
             )}
             {notice && <p role="status">{notice}</p>}
           </div>
-          <Templates
-            feature="try_on"
-            data={() => ({
-              images: [...person, ...garments, ...background].map((i) => i.id),
-              ...(garments.length > 0 && { garments: garments.length }),
-              brief: prompt.trim(),
-              ratio: pick.ratio,
-              resolution: pick.resolution,
-              modelId: pick.modelId,
-            })}
-          />
           <div className="runbar">
             <button type="button" className="primary run" disabled={!canRun} aria-describedby={reason ? reasonId : undefined} onClick={() => void run()}>
               Thử đồ
