@@ -407,20 +407,23 @@ test('as on Fash, a filled photo slot and a chosen hook or location show the pic
     const [box, img] = [(await slot.boundingBox())!, (await photo.boundingBox())!];
     expect(img.width).toBeGreaterThan(box.width - 4); // fills the tile, not a 56 px thumbnail
     expect(img.height).toBeGreaterThan(box.height - 4);
-    // The chip sits in the bottom-left corner and the X near the top-right one; a filled tile has no dashed edge.
+    // The chip sits in the bottom-left corner and the X near the top-right one; the filled tile keeps its dashed edge, as on Fash.
     const chip = (await slot.locator('.slot-chip').boundingBox())!;
     expect(Math.abs(chip.x - box.x)).toBeLessThanOrEqual(2);
     expect(Math.abs(chip.y + chip.height - (box.y + box.height))).toBeLessThanOrEqual(2);
     const x = (await slot.getByRole('button', { name: /^Bỏ / }).boundingBox())!;
     expect(box.x + box.width - (x.x + x.width)).toBeLessThanOrEqual(8);
     expect(x.y - box.y).toBeLessThanOrEqual(8);
-    await expect.poll(() => slot.evaluate((e) => getComputedStyle(e).borderTopColor)).toBe('rgba(0, 0, 0, 0)'); // after the border transition
+    await expect.poll(() => slot.evaluate((e) => getComputedStyle(e).borderTopStyle)).toBe('dashed');
 
     const hookBox = page.getByRole('button', { name: /^Hook/ });
     await hookBox.click();
     await page.getByRole('dialog', { name: 'Chọn hook' }).getByRole('option', { name: hook.name, exact: true }).click();
     await expect(hookBox.locator('img')).toHaveAttribute('src', `/api/samples/marketing-hook-${hook.id}.jpg`);
     await expect(hookBox.locator('.choice-value')).toHaveText(hook.name);
+    const [hb, hc] = [(await hookBox.boundingBox())!, (await hookBox.locator('.choice-value').boundingBox())!];
+    expect(Math.abs(hc.x - hb.x), 'hook chip at the left edge').toBeLessThanOrEqual(2);
+    expect(Math.abs(hc.y + hc.height - (hb.y + hb.height)), 'hook chip at the bottom edge').toBeLessThanOrEqual(2);
     await page.getByRole('button', { name: 'Bỏ Hook' }).click();
     await expect(hookBox.locator('img')).toHaveCount(0);
     await expect(hookBox).not.toContainText(hook.name);
@@ -487,6 +490,11 @@ test('opening a menu low in the form neither scrolls the form nor hides under it
   await select(page, 'Thời lượng').click();
   const pop = page.locator('.select-pop');
   await expect(pop.getByText('Chọn thời lượng')).toBeVisible();
+  // The list shows whole rows: its height is a multiple of an option's, and scrolling to the chosen one leaves no half row.
+  const list = pop.getByRole('listbox');
+  const [rowH, listH, top] = await list.evaluate((e) => [(e.firstElementChild as HTMLElement).offsetHeight, e.clientHeight, e.scrollTop]);
+  expect(listH % rowH).toBe(0);
+  expect(top % rowH).toBe(0);
   expect(await form.evaluate((e) => e.scrollTop)).toBe(before);
   const [frame, menu] = [(await form.boundingBox())!, (await pop.boundingBox())!];
   const trigger = (await select(page, 'Thời lượng').boundingBox())!;

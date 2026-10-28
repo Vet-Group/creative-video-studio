@@ -52,10 +52,13 @@ export function Select({ label, icon, heading, value, options, onChange }: { lab
     setActive(selected >= 0 && !flags[selected] ? selected : Math.max(0, firstEnabled(flags)));
     const box = trigger.getBoundingClientRect();
     const frame = trigger.closest('.form-scroll')?.getBoundingClientRect() ?? { top: 0, bottom: window.innerHeight };
-    const need = Math.min(POP_MAX, POP_HEADING + options.length * POP_ROW);
+    const full = POP_HEADING + options.length * POP_ROW;
+    const need = Math.min(POP_MAX, full);
     const below = frame.bottom - box.bottom - POP_GAP;
     const up = below < Math.min(need, POP_MIN) && box.top - frame.top - POP_GAP >= need;
-    setCap(!up && below < need ? Math.max(below, POP_MIN) : undefined);
+    const fit = Math.min(POP_MAX, up ? need : Math.max(below, POP_MIN));
+    // A list that scrolls shows whole rows, so no option is cut in half under the heading.
+    setCap(full > fit ? POP_HEADING + Math.floor((fit - POP_HEADING) / POP_ROW) * POP_ROW : undefined);
     setOpen(up ? 'up' : 'down');
   }
   function pick(i: number) {
