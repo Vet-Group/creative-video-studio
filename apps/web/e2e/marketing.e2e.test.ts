@@ -403,6 +403,14 @@ test('as on Fash, a filled photo slot and a chosen hook or location show the pic
     const [box, img] = [(await slot.boundingBox())!, (await photo.boundingBox())!];
     expect(img.width).toBeGreaterThan(box.width - 4); // fills the tile, not a 56 px thumbnail
     expect(img.height).toBeGreaterThan(box.height - 4);
+    // The chip sits in the bottom-left corner and the X near the top-right one; a filled tile has no dashed edge.
+    const chip = (await slot.locator('.slot-chip').boundingBox())!;
+    expect(Math.abs(chip.x - box.x)).toBeLessThanOrEqual(2);
+    expect(Math.abs(chip.y + chip.height - (box.y + box.height))).toBeLessThanOrEqual(2);
+    const x = (await slot.getByRole('button', { name: /^Bỏ / }).boundingBox())!;
+    expect(box.x + box.width - (x.x + x.width)).toBeLessThanOrEqual(8);
+    expect(x.y - box.y).toBeLessThanOrEqual(8);
+    await expect.poll(() => slot.evaluate((e) => getComputedStyle(e).borderTopColor)).toBe('rgba(0, 0, 0, 0)'); // after the border transition
 
     const hookBox = page.getByRole('button', { name: /^Hook/ });
     await hookBox.click();
