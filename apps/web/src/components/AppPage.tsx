@@ -13,7 +13,7 @@ import { useSamples } from '@/lib/use-samples';
 import { About } from './About';
 import { CardMedia, LoopVideo } from './CardMedia';
 import { Icon, type IconName } from './Icon';
-import { type Img, RATIO_LABEL, Slot, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, WorkTabs } from './image-tools';
+import { type Img, RATIO_LABEL, Slot, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
 import { useJobs } from './jobs';
 import { type ModelOption, ModelPicker } from './ModelPicker';
 import { Select } from './Select';
@@ -90,7 +90,7 @@ function AppHeader({ app }: { app: AppConfig }) {
   );
 }
 
-function AppForm({ app }: { app: AppConfig }) {
+function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
   const { refresh } = useJobs();
   const narrow = useMediaQuery(NARROW);
   const [images, setImages] = useState<Img[][]>(() => app.slots.map(() => []));
@@ -105,6 +105,20 @@ function AppForm({ app }: { app: AppConfig }) {
   const count = images.reduce((n, list) => n + list.length, 0);
   const pick = useImageChoice(models, Math.max(1, count));
   const { chosen } = pick;
+
+  // Reuse: one image per slot, in the order they were sent, and the member's own text.
+  useReuse(
+    reuse,
+    app.feature,
+    (j) => {
+      setImages(app.slots.map((_, i) => j.images.slice(i, i + 1)));
+      setPrompt(j.brief ?? '');
+      pick.setModelId(j.modelId);
+      pick.setRatio(j.ratio);
+      if (j.resolution) pick.setResolution(j.resolution);
+    },
+    () => setError('Không tìm thấy ảnh để dùng lại.'),
+  );
   const reason = appReason(app, { images, prompt, models: chosen ? [chosen] : models === null ? null : [], failed });
   const canRun = reason === null && !busy;
 
@@ -134,7 +148,7 @@ function AppForm({ app }: { app: AppConfig }) {
         modelId: pick.modelId,
         ...appInputs(app, { images, prompt }),
         ratio: pick.ratio,
-        params: { resolution: pick.resolution },
+        params: { resolution: pick.resolution, ...(app.prompt && prompt.trim() && { brief: prompt.trim() }) }, // the member's own text, kept for reuse
       };
       await api('/api/jobs', sendJson('POST', body));
       setNotice('Đã gửi job. Theo dõi trong tab "Lịch sử".');
@@ -249,9 +263,9 @@ function Soon({ app, text }: { app: AppConfig; text: string }) {
   );
 }
 
-export function AppPage({ app }: { app: AppConfig }) {
+export function AppPage({ app, reuse }: { app: AppConfig; reuse?: string }) {
   if (app.soon) return <Soon app={app} text={app.soon} />;
-  return app.feature === 'motion_control' ? <MotionForm app={app} /> : <AppForm app={app} />;
+  return app.feature === 'motion_control' ? <MotionForm app={app} /> : <AppForm app={app} reuse={reuse} />;
 }
 
 /** An uploaded reference video and its length. */

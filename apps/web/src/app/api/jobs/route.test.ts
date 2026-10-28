@@ -465,7 +465,7 @@ describe('POST /api/jobs for an image feature', () => {
     ['a resolution the model lacks', { params: { resolution: '4K' } }, /ratio, resolution or number of images/],
     ['a prototype key as the resolution', { params: { resolution: 'constructor' } }, /ratio, resolution or number of images/],
     ['no resolution', { params: {} }, /params\.resolution is required/],
-    ['a param that is not allowed', { params: { resolution: '1K', seed: '1' } }, /only resolution and quality/],
+    ['a param that is not allowed', { params: { resolution: '1K', seed: '1' } }, /only resolution, quality and brief/],
     ['a quality that does not exist', { params: { resolution: '1K', quality: 'ultra' } }, /params\.quality must be one of/],
     ['a preset', { presetId: 'gentle-push-in', prompt: undefined }, /takes a prompt and no preset/],
     ['no prompt', { prompt: undefined }, /takes a prompt and no preset/],
@@ -502,6 +502,23 @@ describe('POST /api/jobs for an image feature', () => {
     expect(job.feature).toBe('try_on');
     expect(job.prompt).toMatch(/^Dress the person in the first image/);
     expect((await runImage(m, { ...tryOn, prompt: '  Put the red dress on her ', assetIds: [m.asset, `${m.id}-garment`] })).status).toBe(201);
+  });
+
+  test("keeps the member's own text and Try On's garment count for reuse, and refuses a bad count or over-long text", async () => {
+    const m = await newMember();
+    await insertAsset(`${m.id}-g1`, m.id);
+    const tryOn = { feature: 'try_on', prompt: undefined, assetIds: [m.asset, `${m.id}-g1`] };
+    const res = await runImage(m, { ...tryOn, params: { resolution: '1K', garments: '1', brief: 'red dress' } });
+    expect(res.status).toBe(201);
+    const { id } = (await res.json()) as { id: string };
+    expect((await pool.query('select params from jobs where id = $1', [id])).rows[0].params).toEqual({ resolution: '1K', garments: '1', brief: 'red dress' });
+    expect((await runImage(m, { params: { resolution: '1K', brief: 'a studio shot' } })).status).toBe(201); // Image Generation
+    const before = await jobCount();
+    expect(await error(await runImage(m, { ...tryOn, params: { resolution: '1K', garments: '2' } }))).toMatch(/params.garments must count the garment images \(1 to 1\)/); // 2 inputs: the person and 1 garment
+    expect(await error(await runImage(m, { ...tryOn, params: { resolution: '1K', garments: 'x' } }))).toMatch(/params.garments must count the garment images/);
+    expect(await error(await runImage(m, { params: { resolution: '1K', garments: '1' } }))).toMatch(/params may hold only resolution, quality and brief/);
+    expect(await error(await runImage(m, { params: { resolution: '1K', brief: 'x'.repeat(2001) } }))).toMatch(/params.brief may be at most 2000/);
+    expect(await jobCount()).toBe(before);
   });
 
   describe('the image apps', () => {

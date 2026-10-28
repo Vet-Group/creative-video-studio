@@ -24,6 +24,7 @@ export const USERS = {
   mkte: { email: 'mkte@e2e.test', name: 'E2E Mkt E', role: 'member' },
   mktf: { email: 'mktf@e2e.test', name: 'E2E Mkt F', role: 'member' },
   mktg: { email: 'mktg@e2e.test', name: 'E2E Mkt G', role: 'member' },
+  reusea: { email: 'reusea@e2e.test', name: 'E2E Reuse A', role: 'member' },
   auda: { email: 'auda@e2e.test', name: 'E2E Audio A', role: 'member' },
   audb: { email: 'audb@e2e.test', name: 'E2E Audio B', role: 'member' },
   admin: { email: 'admin@e2e.test', name: 'E2E Admin', role: 'admin' },

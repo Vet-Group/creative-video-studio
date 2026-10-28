@@ -64,6 +64,29 @@ export function useImageChoice(models: ImageModel[] | null, images: number) {
   return { chosen, ratio, resolution, estimate: chosen?.prices[resolution], options, modelId: chosen?.id ?? '', setModelId, setRatio, setResolution };
 }
 
+/** What the reuse link reads back from a job (GET /api/jobs/:id) to refill an image page. */
+export interface ReuseJob {
+  feature: string;
+  images: Img[];
+  /** The job's prompt: the member's own text on Image Generation, a composed prompt elsewhere. */
+  prompt: string | null;
+  /** The member's own text, kept for reuse (Try On and the apps). */
+  brief: string | null;
+  garments: number | null;
+  enhance: boolean | null;
+  ratio: string;
+  resolution: string | null;
+  modelId: string;
+}
+
+/** Reuse (`?reuse=<job>`): reads the job once and hands it to `fill` when it is a job of `feature`; `fail` otherwise. Everything stays editable. */
+export function useReuse(reuse: string | undefined, feature: string, fill: (j: ReuseJob) => void, fail: () => void) {
+  useEffect(() => {
+    if (!reuse) return;
+    api<ReuseJob>(`/api/jobs/${encodeURIComponent(reuse)}`).then((j) => (j.feature === feature ? fill(j) : fail()), fail);
+  }, [reuse]);
+}
+
 /** Uploads files through /api/assets and returns the new assets. */
 /** The most files one POST /api/assets takes (MAX_FILES in lib/assets.ts); a larger pick (Advanced takes 7) goes up in batches. */
 const PER_UPLOAD = 4;

@@ -8,7 +8,7 @@ import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { useSamples } from '@/lib/use-samples';
 import { ABOUT } from '@/lib/about-content';
 import { About } from './About';
-import { Gallery, type Img, LockedFields, RATIO_LABEL, Slot, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, WorkTabs } from './image-tools';
+import { Gallery, type Img, LockedFields, RATIO_LABEL, Slot, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
 import { useJobs } from './jobs';
 import { ModelPicker } from './ModelPicker';
 import { Select } from './Select';
@@ -19,7 +19,7 @@ const TAB_LABEL: Record<Tab, string> = { create: 'Tạo', history: 'Lịch sử'
 const MAX_GARMENTS = 4;
 const MAX_PROMPT = 1500;
 
-export function TryOn() {
+export function TryOn({ reuse }: { reuse?: string }) {
   const { refresh } = useJobs();
   const narrow = useMediaQuery(NARROW);
   const [garments, setGarments] = useState<Img[]>([]);
@@ -39,6 +39,23 @@ export function TryOn() {
   const total = garments.length + person.length + background.length;
   const pick = useImageChoice(models, Math.max(2, total));
   const { chosen } = pick;
+
+  // Reuse: the person first, then the garments (their count is kept on the job), then the background.
+  useReuse(
+    reuse,
+    'try_on',
+    (j) => {
+      const n = j.garments ?? j.images.length - 1;
+      setPerson(j.images.slice(0, 1));
+      setGarments(j.images.slice(1, 1 + n));
+      setBackground(j.images.slice(1 + n, 2 + n));
+      setPrompt(j.brief ?? '');
+      pick.setModelId(j.modelId);
+      pick.setRatio(j.ratio);
+      if (j.resolution) pick.setResolution(j.resolution);
+    },
+    () => setError('Không tìm thấy ảnh để dùng lại.'),
+  );
 
   // The first thing that stops Run, in the order the form is filled; null when it can go.
   const reason =
@@ -85,7 +102,8 @@ export function TryOn() {
         modelId: pick.modelId,
         assetIds: [...person, ...garments, ...background].map((i) => i.id),
         ratio: pick.ratio,
-        params: { resolution: pick.resolution },
+        // The garment count and the member's own text are kept for reuse.
+        params: { resolution: pick.resolution, garments: String(garments.length), ...(text && { brief: text }) },
         ...(sent ? { prompt: sent } : {}),
       };
       await api('/api/jobs', sendJson('POST', body));
