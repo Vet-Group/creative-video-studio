@@ -156,7 +156,7 @@ test('Reframe (a field): the ratio field comes from the model, and the chosen ra
   await expect(select(page, 'Tỉ lệ')).toHaveAttribute('data-value', '1:1');
   await runButton(page).click();
   await expect(toast(page, 'Ảnh đã xong')).toBeVisible({ timeout: 60_000 });
-  await expect(page.getByRole('complementary', { name: 'Job của tôi' }).getByText(/^1:1 · 1K · /)).toBeVisible();
+  await expect(page.getByRole('complementary', { name: 'Job của tôi' }).locator('.job-chips').first().locator('span')).toHaveText(['1K', '1:1']); // resolution and ratio chips
   const jobs = (await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { feature: string; ratio: string }[] };
   expect(jobs.jobs.map((j) => [j.feature, j.ratio])).toEqual([['reframe', '1:1']]);
 });

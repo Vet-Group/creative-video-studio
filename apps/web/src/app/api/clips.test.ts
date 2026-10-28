@@ -118,6 +118,25 @@ describe('GET /api/jobs?mine', () => {
     expect(body.jobs[0]).toMatchObject({ status: 'queued', ratio: '9:16', durationSec: 8, retried: false });
   });
 
+  test("gives the History card the member's own words, the inputs, the format and the caller's favourite", async () => {
+    // A disabled model of its own, so these clips move no other model's score.
+    await pool.query(`insert into model_configs (id, provider, endpoint, label, ratios, durations_sec, max_images, output_resolution, usd_per_second, sources, enabled) values ('history-test', 'fal', 'x', 'History test', '{9:16}', '{8}', 2, '720p', 0.2, '{}', false)`);
+    const preset = await clip(alice.id, { inputs: ['in-1', 'in-2'], model: 'history-test' });
+    const free = await clip(alice.id, { model: 'history-test' });
+    await pool.query(`update jobs set preset_id = null, prompt = 'my own words' where id = $1`, [free]);
+    const marketing = await clip(alice.id, { model: 'history-test' });
+    await pool.query(`update jobs set feature = 'marketing', prompt = 'a composed prompt', params = '{"format": "advanced", "brief": "my brief"}' where id = $1`, [marketing]);
+    await pool.query('insert into favorites (user_id, job_id) values ($1, $2), ($3, $4)', [alice.id, free, bob.id, preset]);
+    const { jobs } = (await (await GET_MINE(req('/api/jobs?mine', alice.cookie))).json()) as { jobs: { id: string }[] };
+    const byId = (id: string) => jobs.find((j) => j.id === id);
+    expect(byId(preset)).toMatchObject({ text: null, inputAssetIds: ['in-1', 'in-2'], format: null, favorite: false }); // a preset's prompt is not the member's, and Bob's favourite is his
+    expect(byId(free)).toMatchObject({ text: 'my own words', favorite: true });
+    expect(byId(marketing)).toMatchObject({ text: 'my brief', format: 'advanced' }); // never the composed prompt
+    // Leave the shared fixtures as found: later tests count Alice's favourites and every clip.
+    await pool.query('delete from favorites where job_id = any($1)', [[preset, free]]);
+    await pool.query('update jobs set deleted_at = now() where id = any($1)', [[preset, free, marketing]]);
+  });
+
   test('reports the worker offline until a heartbeat is under 60 s old', async () => {
     const offline = async () => ((await (await GET_MINE(req('/api/jobs?mine', alice.cookie))).json()) as { workerOffline: boolean }).workerOffline;
     expect(await offline()).toBe(true);

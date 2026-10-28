@@ -42,6 +42,11 @@ export interface TrayJob {
   posterAssetId: string | null;
   createdAt: string;
   finishedAt: string | null;
+  /** The member's own words, when kept. */
+  text: string | null;
+  inputAssetIds: string[];
+  format: string | null;
+  favorite: boolean;
 }
 
 export interface Clip {

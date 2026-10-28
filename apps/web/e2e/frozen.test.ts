@@ -42,6 +42,10 @@ const job = {
   posterAssetId: 'frozen-poster-1',
   createdAt: '2026-10-21T03:00:00.000Z',
   finishedAt: '2026-10-21T03:01:00.000Z',
+  text: null,
+  inputAssetIds: [],
+  format: null,
+  favorite: false,
 };
 
 /** Answers /api/library, /api/jobs?mine and the clip media from fixed data. Call before the first navigation. */
