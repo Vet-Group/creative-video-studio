@@ -61,7 +61,8 @@ describe('the app About tabs', () => {
 describe('filterApps', () => {
   it('filters by category and by name or description, ignoring accents and case', () => {
     expect(filterApps('all', '')).toHaveLength(10);
-    expect(filterApps('fashion', '').map((a) => a.slug)).toEqual(['character-swap', 'model-swap', 'jewelry-try-on', 'face-swap']);
+    expect(filterApps('all', '').at(-1)!.slug).toBe('jewelry-try-on'); // ours comes after the live apps, which keep their order
+    expect(filterApps('fashion', '').map((a) => a.slug)).toEqual(['character-swap', 'model-swap', 'face-swap', 'jewelry-try-on']);
     expect(filterApps('video', '').map((a) => a.slug)).toEqual(['motion-control']);
     expect(filterApps('all', 'DOI NEN').map((a) => a.slug)).toEqual(['background-changer']);
     expect(filterApps('all', 'xoá nền').map((a) => a.slug)).toContain('background-remover');

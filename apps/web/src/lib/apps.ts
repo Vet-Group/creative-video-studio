@@ -65,18 +65,6 @@ export const APPS: AppConfig[] = [
     prompt: 'optional',
   },
   {
-    slug: 'jewelry-try-on',
-    feature: 'jewelry_try_on',
-    name: 'Thử trang sức',
-    description: 'Đeo trang sức của bạn lên ảnh người mẫu, giữ đúng từng chi tiết.',
-    category: 'fashion',
-    slots: [
-      { label: 'Trang sức', inputLabel: 'Ảnh trang sức', empty: 'Thêm 1 hoặc nhiều món trang sức, chụp rõ trên nền trơn', many: true },
-      { label: 'Người đeo', inputLabel: 'Ảnh người đeo', empty: 'Thêm 1 ảnh người sẽ đeo trang sức' },
-    ],
-    resolution: true,
-  },
-  {
     slug: 'background-changer',
     feature: 'background_changer',
     name: 'Đổi nền',
@@ -142,6 +130,19 @@ export const APPS: AppConfig[] = [
     category: 'utility',
     slots: [],
     soon: 'Ứng dụng này sẽ có trong bản cập nhật kế tiếp.',
+  },
+  {
+    // Ours, not on the live page: last, so the live apps keep their places.
+    slug: 'jewelry-try-on',
+    feature: 'jewelry_try_on',
+    name: 'Thử trang sức',
+    description: 'Đeo trang sức của bạn lên ảnh người mẫu, giữ đúng từng chi tiết.',
+    category: 'fashion',
+    slots: [
+      { label: 'Trang sức', inputLabel: 'Ảnh trang sức', empty: 'Thêm 1 hoặc nhiều món trang sức, chụp rõ trên nền trơn', many: true },
+      { label: 'Người đeo', inputLabel: 'Ảnh người đeo', empty: 'Thêm 1 ảnh người sẽ đeo trang sức' },
+    ],
+    resolution: true,
   },
 ];
 
