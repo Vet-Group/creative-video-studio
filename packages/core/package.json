@@ -14,7 +14,8 @@
     "./enhance": "./src/enhance.ts",
     "./ledger": "./src/ledger.ts",
     "./limits": "./src/limits.ts",
-    "./queue": "./src/queue.ts"
+    "./queue": "./src/queue.ts",
+    "./suggest": "./src/suggest.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

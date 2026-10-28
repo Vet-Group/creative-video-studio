@@ -414,6 +414,16 @@ td code { white-space: pre-wrap; overflow-wrap: anywhere; }
 .prompt-box textarea { display: block; width: 100%; height: 75px; padding: 8px 0; border: 0; outline: none; background: transparent; color: inherit; font: inherit; font-size: 14px; line-height: 21px; resize: none; }
 .prompt-foot { display: flex; align-items: center; justify-content: space-between; height: 30px; color: var(--text-muted); font-size: 12px; line-height: 18px; }
 .prompt-foot > :only-child { margin-left: auto; }
+/* Suggestions: a quiet link in the field's foot or head; the three options open over the form beneath it. */
+.suggest { position: relative; }
+.suggest-button { padding: 0; border: 0; background: none; color: var(--ink-strong); font: inherit; font-size: 12px; font-weight: 500; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.suggest-button:disabled { color: var(--text-muted); text-decoration: none; cursor: default; }
+.suggestions { position: absolute; top: calc(100% + 6px); left: 0; z-index: 40; display: grid; gap: 6px; width: min(460px, 80vw); padding: 8px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); box-shadow: 0 8px 24px rgb(0 0 0 / 14%); }
+.suggestion { padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--fill); color: var(--ink-strong); font: inherit; font-size: 13px; line-height: 19px; text-align: left; cursor: pointer; }
+.suggestion:hover { border-color: var(--text-disabled); }
+.suggestions .error { margin: 0; font-size: 13px; }
+.field-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.field-head .suggestions { left: auto; right: 0; }
 /* Enhance: Fash's pill in the prompt box, filled when on, outlined when off. */
 .enhance { display: inline-flex; align-items: center; gap: 4px; height: 30px; padding: 0 10px; border: 1px solid var(--ink); border-radius: 999px; background: var(--ink); color: var(--on-dark); font: inherit; font-size: 12px; font-weight: 600; line-height: 18px; white-space: nowrap; cursor: pointer; }
 .enhance[aria-pressed='true'] { background: var(--ink); } /* beats the generic pressed-button fill, which hid the white label */

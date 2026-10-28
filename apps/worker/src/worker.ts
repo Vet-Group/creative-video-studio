@@ -15,13 +15,15 @@ import { close24h, lateBill, type LedgerPool, release, settle, withTransaction }
 import { type ImageModelConfig, type ModelConfig, usdPerSecondFor } from '@cvs/core/models';
 import { ImageReadError } from '@cvs/core/providers/http';
 import type { ImageProvider, ImageProviderJob, ImageSubmitRequest, ProviderJob, ProviderStatus, SubmitRequest, VideoProvider } from '@cvs/core/providers';
-import { PURGE_CRON, PURGE_QUEUE, VIDEO_QUEUE, VIDEO_QUEUE_OPTIONS, type VideoJobData, videoSendOptions } from '@cvs/core/queue';
+import { PURGE_CRON, PURGE_QUEUE, SUGGEST_QUEUE, SUGGEST_QUEUE_OPTIONS, type SuggestJobData, VIDEO_QUEUE, VIDEO_QUEUE_OPTIONS, type VideoJobData, videoSendOptions } from '@cvs/core/queue';
+import type { Suggester } from '@cvs/core/suggest';
 import { insertAssets } from '@cvs/db/assets';
 import { createDb, type createPool } from '@cvs/db/client';
 import { type Job, PgBoss } from 'pg-boss';
 import { extractPoster, probeSize, sniffImage } from './media';
 import { purgeDeletedClips } from './purge';
 import { deleteObject, putObject } from './storage';
+import { runSuggestion } from './suggest';
 
 export interface WorkerOptions {
   /** How long a job waits before it asks for a slot again. */
@@ -62,6 +64,8 @@ export interface WorkerDeps {
   imageProviders?: Partial<Record<string, ImageProvider>>;
   /** Rewrites a job's prompt when the member left Enhance on; without it (no fal key) the prompt goes as written. */
   enhance?: Enhancer;
+  /** Writes Marketing Studio suggestions; without it (no fal key) every run fails at once. */
+  suggest?: Suggester;
   options?: Partial<WorkerOptions>;
 }
 
@@ -423,6 +427,10 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
   await boss.schedule(PURGE_QUEUE, PURGE_CRON, null, { tz: 'Asia/Ho_Chi_Minh' });
   await boss.work(PURGE_QUEUE, async () => {
     await purgeDeletedClips(pool, deleteObject, log);
+  });
+  await boss.createQueue(SUGGEST_QUEUE, SUGGEST_QUEUE_OPTIONS);
+  await boss.work<SuggestJobData>(SUGGEST_QUEUE, { pollingIntervalSeconds: o.pollingIntervalSeconds }, async (jobs) => {
+    await Promise.all(jobs.map((job) => runSuggestion(pool, deps.suggest, job.data.runId).catch((e) => log(`suggestion ${job.data.runId}`, e))));
   });
   await beat();
   await boss.work<VideoJobData>(VIDEO_QUEUE, { localConcurrency: 5, groupConcurrency: 2, pollingIntervalSeconds: o.pollingIntervalSeconds }, async (jobs) => {

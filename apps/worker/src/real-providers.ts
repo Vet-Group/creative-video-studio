@@ -1,5 +1,6 @@
 // M.6: the real adapters, each wired only when its key is set, so a worker without keys still runs the mock models and the tests.
 import { createFalEnhancer } from '@cvs/core/enhance';
+import { createFalSuggester } from '@cvs/core/suggest';
 import { createFalImageProvider, createFalProvider } from '@cvs/core/providers/fal';
 import type { ReadImage } from '@cvs/core/providers/http';
 import { createReplicateProvider } from '@cvs/core/providers/replicate';
@@ -51,16 +52,18 @@ export const assetReader =
   };
 
 /** fal serves the video and image models, Replicate the video ones. */
-export function realProviders(pool: WorkerDeps['pool'], env: NodeJS.ProcessEnv = process.env, read?: (key: string) => Promise<Uint8Array>): Pick<WorkerDeps, 'providers' | 'imageProviders' | 'enhance'> {
+export function realProviders(pool: WorkerDeps['pool'], env: NodeJS.ProcessEnv = process.env, read?: (key: string) => Promise<Uint8Array>): Pick<WorkerDeps, 'providers' | 'imageProviders' | 'enhance' | 'suggest'> {
   const readImage = assetReader(pool, read);
   const providers: WorkerDeps['providers'] = {};
   const imageProviders: NonNullable<WorkerDeps['imageProviders']> = {};
   let enhance: WorkerDeps['enhance'];
+  let suggest: WorkerDeps['suggest'];
   if (env.FAL_KEY) {
     providers.fal = createFalProvider({ apiKey: env.FAL_KEY, readImage });
     imageProviders.fal = createFalImageProvider({ apiKey: env.FAL_KEY, readImage });
     enhance = createFalEnhancer({ apiKey: env.FAL_KEY });
+    suggest = createFalSuggester({ apiKey: env.FAL_KEY });
   }
   if (env.REPLICATE_API_TOKEN) providers.replicate = createReplicateProvider({ apiToken: env.REPLICATE_API_TOKEN, readImage });
-  return { providers, imageProviders, enhance };
+  return { providers, imageProviders, enhance, suggest };
 }
