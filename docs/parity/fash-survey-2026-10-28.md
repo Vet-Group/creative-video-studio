@@ -49,14 +49,14 @@ Survey by a browser automation CLI (bsk) in an Agent Window on the owner's signe
 | T2 | Try On History / Examples / About | try-on/02-04 | Tray / Gallery / About | queued (History card, About text) | US-013 |
 | I1 | Image Generation form | image-generation/01-default | same | already matches | - |
 | I2 | Image Generation History / Examples / About | image-generation/02-04 | Tray / Gallery / About | queued (History card, About text) | US-013 |
-| R1 | Reuse from History on Try On / Image / apps | - (Recreate never pressed) | reuse only for video + marketing (#119) | queued | US-010 |
+| R1 | Reuse from History on Try On / Image / apps | - (Recreate never pressed) | reuse link on every page that refills (#128); Motion Control keeps no refill | shipped | - |
 
 ## Explore (`explore/`)
 
 | # | Screen / state | Fash evidence | Ours today | Status | Target |
 |---|----------------|---------------|-----------|--------|--------|
 | E1 | Explore feed (cards per feature, full page) | 01-default, 02-full, 02-text.md | Explore page | already matches (graded earlier rounds) | grading |
-| E2 | "Use this template" from an Explore card into the feature page | not pressed (card click opens a feature page) | none | queued | US-012 |
+| E2 | "Use this template" from an Explore card into the feature page | not pressed (card click opens a feature page) | Explore model cards open Create or Image Generation on that model, prompt cards open Create on the preset; a "use this template" link on every company result in the Examples tab (Try On, Image Generation, Marketing Studio) fills the form from its inputs; saved personal and company templates (#129) on every form | shipped | - |
 
 ## Apps (`apps/`, 10 app folders)
 

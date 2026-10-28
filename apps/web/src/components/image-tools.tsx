@@ -2,7 +2,9 @@
 // What the Try On and Image Generation pages share: the image-model picker data, the choice of model, ratio and resolution, the upload slot,
 // the tab strip and the gallery of the company's outputs.
 import { type DragEvent, type KeyboardEvent, useEffect, useId, useRef, useState } from 'react';
+import Link from 'next/link';
 import { api, type Clip } from '@/lib/api';
+import { reuseHref } from '@/lib/reuse';
 import { NARROW, useMediaQuery, WIDE } from '@/lib/use-media-query';
 import { numberedSamples } from '@/lib/examples';
 import { useHydrated } from '@/lib/use-hydrated';
@@ -50,8 +52,8 @@ export function useImageModels(feature: string): { models: ImageModel[] | null; 
  * a ratio or resolution the model lacks falls back to its first,
  * so the options always match the model. `images` is how many inputs the Run has: a model that takes fewer is shown as not supported.
  */
-export function useImageChoice(models: ImageModel[] | null, images: number) {
-  const [modelId, setModelId] = useState('');
+export function useImageChoice(models: ImageModel[] | null, images: number, initialModel = '') {
+  const [modelId, setModelId] = useState(initialModel);
   const [wantRatio, setRatio] = useState('auto');
   const [wantResolution, setResolution] = useState('1K');
   const fits = (m: ImageModel) => m.maxImages >= images;
@@ -313,6 +315,12 @@ export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4
                   </a>
                 ) : (
                   <img src={`/api/assets/${it.videoAssetId}/content`} alt={`${it.modelLabel}, ${it.ratio}`} loading="lazy" />
+                )}
+                {/* Fash's "Use this template": the page's form filled from this result's inputs (a Library clip's inputs are open to every member). */}
+                {reuseHref(it) && (
+                  <Link href={reuseHref(it)!} className="gallery-use" aria-label={`Dùng mẫu này: ${it.modelLabel}, ${it.ratio}`}>
+                    Dùng mẫu này
+                  </Link>
                 )}
               </li>
               ),
