@@ -12,6 +12,17 @@ async function saveAs(page: Page, name: string) {
   await expect(page.getByRole('status').filter({ hasText: 'Đã lưu mẫu.' })).toBeVisible();
 }
 
+test('on every form the template links scroll with the fields, and the fixed bar below holds only Run, as on the live page', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await signIn(page, 'tplpos');
+  for (const path of ['/create', '/try-on', '/marketing-studio', '/apps/character-swap']) {
+    await page.goto(path);
+    await expect(page.getByRole('button', { name: 'Lưu mẫu' })).toBeVisible();
+    await expect(page.locator('.form-scroll > .templates'), path).toHaveCount(1);
+    await expect(page.locator('.runbar').getByRole('button'), path).toHaveCount(1);
+  }
+});
+
 test('Try On: a saved template lists under Mẫu của tôi and refills the person, garment, text and resolution; another member does not see it; it can be deleted', async ({ page, browser }) => {
   await signIn(page, 'tpla');
   await page.goto('/try-on');
