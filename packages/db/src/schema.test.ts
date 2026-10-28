@@ -108,6 +108,8 @@ describe('migration 0028 prompt limits', () => {
     expect(Object.fromEntries(rows.map((r) => [r.id, r.n]))).toMatchObject({ 'nano-banana-pro': 50000, 'kling-2.6': 2500, 'minimax-hailuo-2.3-pro': 2000, 'veo-3.1': 20000, 'grok-imagine-1.5': 4096, 'kling-o3-pro': 2000 });
     expect(by['kling-2.6'].src).toEqual({ url: `https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=${by['kling-2.6'].endpoint}`, readAt: '2026-10-28' });
     expect(by['kling-o3-pro'].src).toBeNull(); // its schema states no limit, so it keeps the default and no source
+    const seedance = (await pool.query(`select max_prompt_chars as n, sources->'maxPromptChars'->>'url' as url from model_configs where id = 'seedance-2.5'`)).rows[0];
+    expect(seedance).toEqual({ n: 2000, url: 'https://replicate.com/bytedance/seedance-2.5/api/schema' }); // 0029: Replicate's own 2000
     await expect(pool.query(`update model_configs set max_prompt_chars = 0 where id = 'veo-3.1'`)).rejects.toThrow(/model_configs_max_prompt_chars_check/);
   });
 });

@@ -204,6 +204,13 @@
       "when": 1794135743036,
       "tag": "0028_model_prompt_limits",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1794222143036,
+      "tag": "0029_seedance_prompt_source",
+      "breakpoints": true
     }
   ]
 }

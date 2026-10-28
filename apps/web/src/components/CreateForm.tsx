@@ -96,6 +96,7 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
   const fileInput = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
   const promptId = useId();
+  const tooLongId = useId();
   const [tab, setTab] = useState<Tab | null>(null); // null: the default for the width (Create below 1024 px, else Examples, as on the live page)
   const [picking, setPicking] = useState(false);
   const [detail, setDetail] = useState<Example | null>(null);
@@ -336,7 +337,11 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
             )}
             {models && models.models.length === 0 && <p className="help">Chưa bật mô hình video nào. Admin bật trong Quản trị → Cài đặt → Mô hình.</p>}
             {tooMany && chosen && <p className="error">Mô hình này nhận tối đa {chosen.maxImages} ảnh.</p>}
-            {tooLong && <p className="error">{tooLong}</p>}
+            {tooLong && (
+              <p className="error" id={tooLongId}>
+                {tooLong}
+              </p>
+            )}
 
             <div className="field">
               <label htmlFor={promptId} className="field-label">
@@ -408,7 +413,7 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
             data={() => ({ images: images.map((i) => i.id), ...(presetId ? { presetId } : { prompt: prompt.trim(), enhance }), audio: audio ? 'on' : 'off', ratio, durationSec, modelId, storeId })}
           />
           <div className="runbar">
-            <button type="button" className="primary run" disabled={!canRun} onClick={() => void run()}>
+            <button type="button" className="primary run" disabled={!canRun} aria-describedby={tooLong ? tooLongId : undefined} onClick={() => void run()}>
               Tạo video
               {chosen && <span className="run-cost">· ${audioOn ? chosen.audioEstimateUsd : chosen.estimateUsd}</span>}
             </button>

@@ -66,6 +66,8 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
                 ? 'Nhập mô tả cảnh bạn muốn tạo.'
                 : promptTooLong(chosen, prompt.trim().length);
   const canRun = reason === null && !busy;
+  // The bar has no counter, as on the live page, until the text nears the model's limit (or is over it after a switch).
+  const count = chosen && prompt.length >= chosen.maxPromptChars * 0.8 ? `${prompt.length}/${chosen.maxPromptChars} ký tự` : null;
 
   async function upload(files: File[]) {
     if (files.length === 0) return;
@@ -145,8 +147,9 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
           </ul>
           <textarea aria-label="Mô tả cảnh bạn muốn tạo" placeholder="Mô tả cảnh bạn muốn tạo…" value={prompt} maxLength={chosen?.maxPromptChars} rows={2} onChange={(e) => setPrompt(e.target.value)} />
         </div>
-        {(reason || error || notice) && (
+        {(reason || error || notice || count) && (
           <div className="bar-message">
+            {count && <p className="help bar-count">{count}</p>}
             {reason && (
               <p className="help" id="imagegen-reason" role="status">
                 {reason}
