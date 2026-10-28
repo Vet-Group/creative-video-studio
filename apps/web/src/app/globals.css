@@ -960,9 +960,11 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .marketing-slots .slot[data-one] .slot-thumbs { position: absolute; inset: 0; }
 .marketing-slots .slot[data-one] .slot-thumbs li { width: 100%; height: 100%; }
 .marketing-slots .slot[data-one] .slot-thumbs img { border-radius: 17px; }
-.marketing-slots .slot[data-one] .slot-thumbs button { top: 6px; right: 6px; }
 /* Filled, the picture fills the tile inside its dashed edge and the name chip sits in the bottom-left corner with the tile's own curve, as on Fash. */
 .marketing-slots .slot-chip, .marketing-slots .choice-box[data-filled] .choice-value { left: 0; bottom: 0; max-width: 100%; padding: 6px 10px; border-radius: 0 8px 0 17px; font-size: 12px; font-weight: 600; }
+/* The X mirrors the chip, as on Fash: a dark tab flush in the top-right corner with only its inner corner rounded. */
+.marketing-slots .slot[data-one] .slot-thumbs button, .marketing-slots .choice-clear { top: 0; right: 0; width: 24px; height: 22px; border-radius: 0 17px 0 8px; background: rgba(0, 0, 0, .75); color: #fff; }
+.marketing-slots .choice-clear { top: 1px; right: 1px; } /* outside the box, so inside its 1 px dashed edge by hand */
 /* Advanced with references, as on Fash: no outer box, three square dashed tiles per row (the photo inside, X top right) and a plus tile of the same size. */
 .marketing-slots .slot-wide .slot:has(.slot-thumbs) { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; min-height: 0; padding: 0; border: 0; }
 .marketing-slots .slot-wide .slot-thumbs { display: contents; }
