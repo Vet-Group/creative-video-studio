@@ -30,6 +30,14 @@ export interface Setting {
   resolution?: string;
 }
 
+/** After a form is refilled from a job or a sample (not a saved template): a note, as Fash's "Ready to Recreate" toast. */
+export function useRecreated(): (from: string) => void {
+  const { notify } = useJobs();
+  return (from) => {
+    if (!from.startsWith('/api/templates/')) notify('Sẵn sàng tạo lại');
+  };
+}
+
 /** The form's side of a chip click: sets what the chip carries and says so, as Fash's "Duration selected" and "Ratio selected" toasts. */
 export function useApplier(set: (s: Setting) => void): (s: Setting) => void {
   const { notify } = useJobs();

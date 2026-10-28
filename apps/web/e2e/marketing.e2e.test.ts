@@ -441,6 +441,13 @@ test('as on the live form (measured 2026-10-29): 272 px content, 131x130 tiles 1
   expect(await disc.evaluate((e) => getComputedStyle(e).backgroundColor)).toBe('rgba(0, 0, 0, 0.06)');
   expect(await hookBox.locator('.choice-label').evaluate((e) => [getComputedStyle(e).fontSize, getComputedStyle(e).color])).toEqual(['14px', 'rgb(102, 102, 102)']);
   // The Prompt label row is 21 px tall (its suggestion link does not stretch it) and the box sits 4 px under it: label at 478, box at 503 on Fash.
+  // The Change chip sits 4 px inside the banner's top right corner, in regular weight over a blur (Fash's .mkt-type-preview__change).
+  const banner = (await page.locator('.marketing-head').boundingBox())!;
+  const change = page.getByRole('button', { name: 'Đổi định dạng' });
+  const chip = (await change.boundingBox())!;
+  near(chip.y - banner.y, 4);
+  near(banner.x + banner.width - (chip.x + chip.width), 4);
+  expect(await change.evaluate((e) => [getComputedStyle(e).fontWeight, getComputedStyle(e).backdropFilter])).toEqual(['400', 'blur(4.5px)']);
   const head = (await page.locator('.field-head').filter({ has: page.locator('label', { hasText: 'Prompt' }) }).boundingBox())!;
   near(head.height, 21);
   near((await page.locator('.prompt-box').boundingBox())!.y - (head.y + head.height), 4);

@@ -14,7 +14,7 @@ import { CardMedia } from './CardMedia';
 import { EnhanceToggle } from './EnhanceToggle';
 import { Icon } from './Icon';
 import { sampleFile, uploadImages } from './image-tools';
-import { useApplier, useHasHistory, useJobs } from './jobs';
+import { useApplier, useHasHistory, useJobs, useRecreated } from './jobs';
 import { Modal } from './Modal';
 import { ModelPicker } from './ModelPicker';
 import { Preview } from './Preview';
@@ -89,6 +89,7 @@ const ratePct = (m: Model) => (m.passRate === null ? 'chưa có dữ liệu' : `
 /** `preset` and `model` pre-select the choices Explore links to; an unknown or switched-off one falls back to the default. */
 export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: string; model?: string }) {
   const { refresh } = useJobs();
+  const recreated = useRecreated();
   const hydrated = useHydrated();
   const [images, setImages] = useState<Image[]>([]);
   const [presets, setPresets] = useState<{ id: string; label: string }[] | null>(null);
@@ -141,8 +142,10 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
   // Reuse: fill the form from the source clip; everything stays editable. A preset switched off since falls back to its prompt as a free prompt.
   useEffect(() => {
     if (!reuse || !presets) return;
+    let stale = false; // a refill superseded (another link, or a re-run effect) must not fill or upload
     api<JobDetail>(reuse)
       .then(async (j) => {
+        if (stale) return;
         const preset = presets.some((p) => p.id === j.presetId) ? j.presetId : null;
         // A sample's photos are uploaded as this member's inputs first, as a picked sample is.
         const samples = j.images.flatMap((i) => ('sample' in i ? [i.sample] : []));
@@ -156,9 +159,13 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
         if (j.durationSec) setDurationSec(j.durationSec);
         if (j.modelId) setModelId(j.modelId);
         setStoreId(j.storeId ?? '');
+        recreated(reuse);
       })
       .catch(() => setError('Không tìm thấy clip để dùng lại.'))
       .finally(() => setReady(true));
+    return () => {
+      stale = true;
+    };
   }, [reuse, presets]);
 
   // The picker follows the ratio and duration; the chosen model stays while it supports them, else the server's default takes over.

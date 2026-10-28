@@ -16,7 +16,7 @@ import { AudioSwitch } from './AudioSwitch';
 import { CardMedia, LoopVideo } from './CardMedia';
 import { Icon, type IconName } from './Icon';
 import { Gallery, type Img, sampleFile, Slot, uploadImages, UPLOAD_ERROR, WorkTabs } from './image-tools';
-import { useApplier, useHasHistory, useJobs } from './jobs';
+import { useApplier, useHasHistory, useJobs, useRecreated } from './jobs';
 import { Modal } from './Modal';
 import { ModelPicker } from './ModelPicker';
 import { Select } from './Select';
@@ -177,6 +177,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
   const router = useRouter();
   const have = useSamples();
   const { refresh, clips } = useJobs();
+  const recreated = useRecreated();
   const narrow = useMediaQuery(NARROW);
   const [person, setPerson] = useState<Img[]>([]);
   const [product, setProduct] = useState<Img[]>([]);
@@ -269,8 +270,10 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
   // member's own text (a job from before it was kept, or someone else's) the rest is refilled and the brief is asked for again.
   useEffect(() => {
     if (!reuse) return;
+    let stale = false; // a refill superseded (another link, or a re-run effect) must not fill or upload
     api<MarketingJob>(reuse)
       .then(async (j) => {
+        if (stale) return;
         if (j.feature !== 'marketing') return setError('Không tìm thấy clip để dùng lại.');
         if ((j.format === 'advanced') !== advanced) return router.replace(`/marketing-studio${j.format === 'advanced' ? '/advanced' : ''}${window.location.search}`);
         // A sample's photos are uploaded as this member's inputs first, as a picked sample is.
@@ -288,8 +291,12 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
         if (j.durationSec) setDurationSec(j.durationSec);
         if (j.modelId) setModelId(j.modelId);
         if (j.brief === null && advanced) setNotice('Clip này không có mô tả gốc: đã điền lại ảnh và cài đặt, hãy nhập lại mô tả.');
+        recreated(reuse);
       })
       .catch(() => setError('Không tìm thấy clip để dùng lại.'));
+    return () => {
+      stale = true;
+    };
   }, [reuse]);
 
   // My products: loaded once; a failure just leaves the plain upload slot.
