@@ -433,6 +433,9 @@ td code { white-space: pre-wrap; overflow-wrap: anywhere; }
 .banner-text { position: absolute; inset: 0; z-index: 1; display: grid; place-items: center; padding: 0 12px; pointer-events: none; }
 .banner-text strong { max-width: 100%; color: var(--on-dark); font-size: 24px; line-height: 28px; font-weight: 600; text-align: center; text-shadow: 0 1px 2px rgb(var(--shade) / .35), 0 2px 16px rgb(var(--shade) / .45); }
 .banner-chip { position: absolute; top: 8px; right: 8px; z-index: 2; display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 4px 12px; border: 0; border-radius: 16px; background: transparent; font-weight: 600; text-shadow: 0 1px 4px rgb(var(--shade) / .6); color: var(--on-dark); font-size: 12px; line-height: 18px; }
+/* Marketing's Change chip as on Fash (measured 2026-10-29): 4 px from the corner, regular weight over a blur, an 11 px pencil. */
+.marketing-head .banner-chip { top: 4px; right: 4px; font-weight: 400; backdrop-filter: blur(4.5px); }
+.marketing-head .banner-chip .icon { width: 11px; height: 11px; }
 
 .dropzone { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; width: 100%; height: 130px; margin-top: 16px; border: 1px dashed var(--text-disabled); border-radius: 18px; transition: border-color .15s, background-color .15s; }
 .dropzone:hover, .dropzone[data-over='true'] { border-color: var(--ink); background: var(--surface-1); }

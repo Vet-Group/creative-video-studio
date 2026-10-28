@@ -44,6 +44,7 @@ test('Try On: a saved template lists under Mẫu của tôi and refills the pers
   await expect(page.getByLabel('Trang phục: ảnh đã chọn').getByRole('img')).toHaveAttribute('alt', 'garment.png');
   await expect(page.getByRole('textbox', { name: 'Prompt (tuỳ chọn)' })).toHaveValue('red dress');
   await expect(select(page, 'Độ phân giải')).toHaveAttribute('data-value', '2K');
+  await expect(page.getByRole('region', { name: 'Thông báo' }).getByText('Sẵn sàng tạo lại')).toHaveCount(0); // a saved template is not a recreate
   const url = page.url();
 
   // Another member: not in the list, and the link refills nothing.

@@ -33,6 +33,8 @@ test('the reuse link in History refills a UGC job, and an Advanced job opens on 
   await expect(page.getByRole('switch', { name: 'Tạo âm thanh' })).toHaveAttribute('aria-checked', 'false');
   await expect(select(page, 'Tỉ lệ')).toHaveAttribute('data-value', '1:1');
   await expect(select(page, 'Thời lượng')).toHaveAttribute('data-value', '5');
+  // As on Fash's "Ready to Recreate", a short note says the form is refilled.
+  await expect(page.getByRole('region', { name: 'Thông báo' }).getByText('Sẵn sàng tạo lại')).toBeVisible();
 
   // An Advanced job sent to the UGC page moves to the Advanced page, which refills the references, the brief and the script.
   const refs = [await upload(page, 'ref-1.png'), await upload(page, 'ref-2.png')];

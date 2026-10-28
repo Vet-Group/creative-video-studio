@@ -9,6 +9,7 @@ import { NARROW, useMediaQuery, WIDE } from '@/lib/use-media-query';
 import { numberedSamples } from '@/lib/examples';
 import { useHydrated } from '@/lib/use-hydrated';
 import { useSamples } from '@/lib/use-samples';
+import { useRecreated } from './jobs';
 import { Icon, type IconName } from './Icon';
 import { Preview } from './Preview';
 import { SampleDetail } from './SampleDetail';
@@ -87,16 +88,23 @@ export interface ReuseJob {
 
 /** Refill (`reuse` is a job's or a saved template's API path, lib/reuse.ts): reads it once and hands it to `fill` when it is of `feature`; `fail` otherwise. Everything stays editable. */
 export function useReuse(reuse: string | undefined, feature: string, fill: (j: Omit<ReuseJob, 'images'> & { images: Img[] }) => void, fail: () => void) {
+  const recreated = useRecreated();
   useEffect(() => {
     if (!reuse) return;
+    let stale = false; // a refill superseded (another link, or a re-run effect) must not fill or upload
     api<ReuseJob>(reuse)
       .then(async (j) => {
+        if (stale) return;
         if (j.feature !== feature) return fail();
         // A sample's photos are uploaded as this member's inputs first, as a picked sample is.
         const samples = j.images.flatMap((i) => ('sample' in i ? [i.sample] : []));
         fill({ ...j, images: samples.length > 0 ? await uploadImages(await Promise.all(samples.map(sampleFile))) : (j.images as Img[]) });
+        recreated(reuse);
       })
       .catch(fail);
+    return () => {
+      stale = true;
+    };
   }, [reuse]);
 }
 
