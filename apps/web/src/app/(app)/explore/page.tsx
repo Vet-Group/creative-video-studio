@@ -79,7 +79,7 @@ export default async function ExplorePage() {
         <ul className="explore-cards" aria-label="Mô hình">
           {scored.map((m) => (
             <li key={m.id}>
-              <Link href={m.kind === 'video' ? `/create?model=${encodeURIComponent(m.id)}` : '/image-generation'} className="explore-card">
+              <Link href={`${m.kind === 'video' ? '/create' : '/image-generation'}?model=${encodeURIComponent(m.id)}`} className="explore-card">
                 <CardMedia {...cardSample(have, modelSample(m.id))} always />
                 <strong>
                   {m.label}

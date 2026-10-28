@@ -27,6 +27,8 @@ export const USERS = {
   reusea: { email: 'reusea@e2e.test', name: 'E2E Reuse A', role: 'member' },
   tpla: { email: 'tpla@e2e.test', name: 'E2E Templates A', role: 'member' },
   tplb: { email: 'tplb@e2e.test', name: 'E2E Templates B', role: 'member' },
+  usea: { email: 'usea@e2e.test', name: 'E2E Use A', role: 'member' },
+  useb: { email: 'useb@e2e.test', name: 'E2E Use B', role: 'member' },
   auda: { email: 'auda@e2e.test', name: 'E2E Audio A', role: 'member' },
   audb: { email: 'audb@e2e.test', name: 'E2E Audio B', role: 'member' },
   admin: { email: 'admin@e2e.test', name: 'E2E Admin', role: 'admin' },

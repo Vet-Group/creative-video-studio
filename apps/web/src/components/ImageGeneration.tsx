@@ -20,7 +20,7 @@ const TAB_LABEL: Record<Tab, string> = { history: 'Lịch sử', examples: 'Ví 
 const TABS: Tab[] = ['history', 'examples', 'about'];
 const MAX_PROMPT = 2000;
 
-export function ImageGeneration({ reuse }: { reuse?: string }) {
+export function ImageGeneration({ reuse, model }: { reuse?: string; model?: string }) {
   const { refresh } = useJobs();
   const hydrated = useHydrated();
   const [images, setImages] = useState<Img[]>([]);
@@ -32,7 +32,7 @@ export function ImageGeneration({ reuse }: { reuse?: string }) {
   const [notice, setNotice] = useState('');
   const input = useRef<HTMLInputElement>(null);
   const { models, failed } = useImageModels('image');
-  const pick = useImageChoice(models, Math.max(1, images.length));
+  const pick = useImageChoice(models, Math.max(1, images.length), model); // Explore's model card picks the model
   const { chosen } = pick;
   const max = chosen?.maxImages ?? 4;
 
