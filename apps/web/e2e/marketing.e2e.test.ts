@@ -498,3 +498,16 @@ test('opening a menu low in the form neither scrolls the form nor hides under it
   const box = (await page.getByRole('checkbox', { name: /Tạo nhiều biến thể/ }).boundingBox())!;
   expect(box.width).toBeLessThan(24);
 });
+
+test('while more of the form lies below, its bottom edge fades instead of cutting a line; at the end of the form the fade is gone', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await signIn(page, 'mktp');
+  await page.goto('/marketing-studio/advanced');
+  const form = page.locator('.form-scroll');
+  const fade = () => form.evaluate((e) => Number(getComputedStyle(e, '::after').opacity));
+  await expect(page.getByRole('combobox', { name: 'Tỉ lệ' })).toBeVisible();
+  expect(await form.evaluate((e) => e.scrollHeight > e.clientHeight), 'the Advanced form is taller than its card here').toBe(true);
+  await expect.poll(fade).toBeGreaterThan(0.9);
+  await form.evaluate((e) => e.scrollTo(0, e.scrollHeight));
+  await expect.poll(fade).toBeLessThan(0.1);
+});

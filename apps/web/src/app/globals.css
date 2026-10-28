@@ -398,6 +398,12 @@ td code { white-space: pre-wrap; overflow-wrap: anywhere; }
 /* z-index: the card is a stacking context (sticky), so its menus must sit above the Examples pane painted after it. */
 .form-card { position: relative; z-index: 2; display: flex; flex-direction: column; height: calc(100dvh - 131px); min-height: 440px; padding: 24px; overflow: hidden; border: 0; border-radius: 8px; box-shadow: 0 12px 40px rgb(var(--shade) / .12); }
 .form-scroll { flex: 1; min-height: 0; overflow-y: auto; margin: 0 -2px; padding: 0 4px 14px; }
+/* While more of the form lies below, its last visible line fades out instead of being cut by the Run bar; the fade follows the scroll and is gone at the end (or when nothing scrolls). Menus (z-index 50) stay above it. */
+.form-scroll::after { content: ''; position: sticky; bottom: -14px; z-index: 1; display: block; height: 32px; margin: -32px -4px -14px; background: linear-gradient(transparent, var(--surface)); opacity: 0; pointer-events: none; }
+@supports (animation-timeline: scroll()) {
+  .form-scroll::after { animation: form-more linear both; animation-timeline: scroll(nearest); }
+}
+@keyframes form-more { from, 96% { opacity: 1; } to { opacity: 0; } }
 .form-message { padding-top: 8px; font-size: 14px; line-height: 21px; }
 .form-message p { margin: 0; }
 .runbar { margin: 0 -24px -24px; }
