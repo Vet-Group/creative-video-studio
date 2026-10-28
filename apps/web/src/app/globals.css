@@ -822,6 +822,7 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .slot-samples button { display: block; width: 100%; height: 100%; padding: 0; border: 0; background: transparent; }
 .slot-samples button:hover img { transform: scale(1.04); }
 .slot-samples img { display: block; width: 79px; height: 100%; object-fit: cover; transition: transform .15s; }
+.slot-samples img[src*='try-on-garment'] { mix-blend-mode: multiply; } /* the garments' white studio ground takes the tray's grey, as on the live page */
 .slot-samples li:only-child img { width: 100%; }
 .slot:has(.slot-samples) .slot-add { flex: none; width: 76px; height: 79px; border: 1px dashed var(--border-strong); border-radius: 12px; background: var(--fill); }
 .slot:has(.slot-samples) .slot-icon { display: flex; flex-direction: column; align-items: center; gap: 2px; width: auto; height: auto; background: none; font-size: 11px; line-height: 14px; }
@@ -979,6 +980,8 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .choice-box:hover { border-color: var(--ink); background: var(--surface-1); }
 .choice-value { color: var(--ink); font-size: 13px; line-height: 18px; font-weight: 600; overflow-wrap: anywhere; }
 .choice-dialog .modal-body h2:not(:has(+ .modal-sub)) { margin: 0 0 12px; font-size: 18px; line-height: 26px; }
+/* The model dialog's header, as on the live one: a 16 px medium title over a full-width rule, the photos 16 px below. */
+.choice-dialog .modal-body:has(> .photo-upload-link) > h2 { margin: 0 -16px 16px; padding: 0 16px 16px; border-bottom: 1px solid var(--hairline); font-size: 16px; line-height: 24px; font-weight: 500; }
 .choice-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr)); gap: 8px; }
 .choice-grid button { min-height: 56px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); font-size: 14px; line-height: 20px; text-align: center; }
 .choice-grid button:hover { border-color: var(--text-disabled); }
@@ -990,7 +993,7 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .model-grid button, .model-upload { position: relative; aspect-ratio: 163 / 217; min-height: 0; padding: 0; overflow: hidden; border-radius: 12px; }
 .model-grid img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .model-upload { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; border: 1px dashed var(--border-strong); background: var(--fill); color: var(--text-subtle); font-size: 13px; line-height: 18px; text-align: center; cursor: pointer; }
-.photo-upload-link { position: absolute; top: 21px; right: 60px; color: var(--ink); font-size: 14px; line-height: 20px; font-weight: 500; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.photo-upload-link { position: absolute; top: 18px; right: 60px; color: var(--ink); font-size: 14px; line-height: 20px; font-weight: 500; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 .photo-upload-link:focus-within { outline: 2px solid var(--ink-strong); outline-offset: 2px; border-radius: 4px; }
 .model-upload:focus-within { outline: 2px solid var(--ink-strong); outline-offset: 2px; }
 /* A format that is not ready yet: its clip washed out and a light pill centred under the name, as on the live picker. */

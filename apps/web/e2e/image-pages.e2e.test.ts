@@ -366,6 +366,9 @@ test('Try On: the sample pictures in an empty slot upload like a picked file, an
     const tray = (await page.getByRole('list', { name: 'Bối cảnh (tuỳ chọn): ảnh mẫu' }).boundingBox())!;
     expect((await samplesOf('Bối cảnh (tuỳ chọn)').boundingBox())!.width).toBeCloseTo(tray.width, 0);
 
+    // The garments' white ground takes the tray's grey; the model photos keep their own colours.
+    expect(await samplesOf('Trang phục').first().locator('img').evaluate((e) => getComputedStyle(e).mixBlendMode)).toBe('multiply');
+    expect(await samplesOf('Người mẫu').first().locator('img').evaluate((e) => getComputedStyle(e).mixBlendMode)).toBe('normal');
     await page.getByRole('button', { name: 'Dùng ảnh mẫu 2 cho Trang phục' }).click();
     await expect(page.getByLabel('Trang phục: ảnh đã chọn').getByRole('img', { name: 'try-on-garment-2.png' })).toBeVisible();
     await expect(samplesOf('Trang phục')).toHaveCount(0);
