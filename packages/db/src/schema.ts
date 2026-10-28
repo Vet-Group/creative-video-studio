@@ -33,7 +33,7 @@ export const PROVIDERS = ['fal', 'replicate', 'mock'] as const;
 /** What a job is for. `video` and `marketing` spend the company video budget; the rest share the image and apps budget (FEATURE_BUDGET). */
 export const FEATURES = [
   'video', 'marketing', 'try_on', 'image', 'character_swap', 'model_swap', 'background_changer', 'reframe', 'image_upscale', 'face_swap',
-  'background_remover', 'motion_control', 'media_optimizer',
+  'background_remover', 'motion_control', 'media_optimizer', 'jewelry_try_on',
 ] as const;
 /** The features under settings.features_monthly_cap_usd and the per-member USD caps. */
 export const FEATURE_BUDGET = FEATURES.filter((f) => f !== 'video' && f !== 'marketing');
@@ -291,7 +291,7 @@ export const jobs = pgTable(
     check('jobs_status_check', sql`${t.status} in ('queued', 'submitting', 'running', 'succeeded', 'failed', 'failed_unknown', 'timed_out')`),
     check('jobs_aspect_check', sql`${t.aspect} in ('auto', '1:1', '9:16', '16:9', '3:4', '4:3', '2:3', '3:2', '4:5', '5:4', '21:9')`),
     check('jobs_provider_check', sql`${t.provider} in ('fal', 'replicate', 'mock')`),
-    check('jobs_feature_check', sql`${t.feature} in ('video', 'marketing', 'try_on', 'image', 'character_swap', 'model_swap', 'background_changer', 'reframe', 'image_upscale', 'face_swap', 'background_remover', 'motion_control', 'media_optimizer')`),
+    check('jobs_feature_check', sql`${t.feature} in ('video', 'marketing', 'try_on', 'image', 'character_swap', 'model_swap', 'background_changer', 'reframe', 'image_upscale', 'face_swap', 'background_remover', 'motion_control', 'media_optimizer', 'jewelry_try_on')`),
   ],
 );
 

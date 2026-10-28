@@ -9,9 +9,9 @@ const draft = (images: string[][], prompt = '', maxImages = 2): AppDraft => ({ i
 const reason = (slug: string, images: string[][], prompt?: string, maxImages?: number) => appReason(appBySlug(slug)!, draft(images, prompt, maxImages));
 
 describe('the app list', () => {
-  it('has nine apps with unique slugs, known features and (for the built image apps) a default prompt', () => {
-    expect(APPS).toHaveLength(9);
-    expect(new Set(APPS.map((a) => a.slug)).size).toBe(9);
+  it('has ten apps with unique slugs, known features and (for the built image apps) a default prompt', () => {
+    expect(APPS).toHaveLength(10);
+    expect(new Set(APPS.map((a) => a.slug)).size).toBe(10);
     for (const a of APPS) {
       expect(FEATURES as readonly string[]).toContain(a.feature);
       if (!a.soon && a.feature !== 'motion_control') expect(FEATURE_PROMPTS).toHaveProperty(a.feature);
@@ -24,11 +24,12 @@ describe('the app list', () => {
   });
 
   it('gives the swaps and Face Swap two required slots, and the others the slots of the reference', () => {
-    for (const slug of ['character-swap', 'model-swap', 'face-swap']) expect(appBySlug(slug)!.slots.map((s) => !!s.optional)).toEqual([false, false]);
+    for (const slug of ['character-swap', 'model-swap', 'jewelry-try-on', 'face-swap']) expect(appBySlug(slug)!.slots.map((s) => !!s.optional)).toEqual([false, false]);
     expect(appBySlug('background-changer')!.slots.map((s) => !!s.optional)).toEqual([false, true]);
     for (const slug of ['reframe', 'image-upscale', 'background-remover']) expect(appBySlug(slug)!.slots).toHaveLength(1);
     expect(appBySlug('reframe')).toMatchObject({ ratio: true });
     expect(appBySlug('image-upscale')).toMatchObject({ resolution: true });
+    expect(appBySlug('jewelry-try-on')).toMatchObject({ resolution: true });
   });
 });
 
@@ -41,8 +42,8 @@ describe('the app About tabs', () => {
 
 describe('filterApps', () => {
   it('filters by category and by name or description, ignoring accents and case', () => {
-    expect(filterApps('all', '')).toHaveLength(9);
-    expect(filterApps('fashion', '').map((a) => a.slug)).toEqual(['character-swap', 'model-swap', 'face-swap']);
+    expect(filterApps('all', '')).toHaveLength(10);
+    expect(filterApps('fashion', '').map((a) => a.slug)).toEqual(['character-swap', 'model-swap', 'jewelry-try-on', 'face-swap']);
     expect(filterApps('video', '').map((a) => a.slug)).toEqual(['motion-control']);
     expect(filterApps('all', 'DOI NEN').map((a) => a.slug)).toEqual(['background-changer']);
     expect(filterApps('all', 'xoá nền').map((a) => a.slug)).toContain('background-remover');

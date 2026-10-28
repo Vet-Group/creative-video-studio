@@ -6,6 +6,7 @@ export const FEATURE_LABELS: Record<string, string> = {
   image: 'Tạo ảnh',
   character_swap: 'Đổi nhân vật',
   model_swap: 'Đổi người mẫu',
+  jewelry_try_on: 'Thử trang sức',
   background_changer: 'Đổi nền',
   reframe: 'Đổi khung hình',
   image_upscale: 'Tăng độ phân giải',
