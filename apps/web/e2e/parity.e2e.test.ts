@@ -336,8 +336,12 @@ test('V02 the upload limit and its hint follow the chosen model', async ({ page 
 });
 
 test('as on Fash, a sample with a details file shows its prompt, input photos, settings and date, and Dùng lại refills the form from it', async ({ page }) => {
-  const details = { prompt: 'A slow orbit around the bottle.', images: [{ sample: 'example-2-input.png' }, { sample: 'example-2-ref.jpg' }], presetId: null, enhance: false, audio: 'off', ratio: '1:1', aspect: '1:1', durationSec: 8, modelId: null, storeId: null, date: '2026-08-18' };
-  const files: [string, Buffer, string][] = [['example-2.json', Buffer.from(JSON.stringify(details)), 'application/json'], ['example-2-input.png', png(), 'image/png'], ['example-2-ref.jpg', jpg(), 'image/jpeg']];
+  const details = { prompt: 'A slow orbit around the bottle.', images: [{ sample: 'example-2-input.png' }, { sample: 'example-2-ref.jpg' }], presetId: null, enhance: false, audio: 'off', ratio: '1:1', aspect: '1:1', resolution: '720p', durationSec: 8, modelId: 'mock-e2e', storeId: null, date: '2026-08-18' };
+  const preset = { ...details, prompt: null, images: [{ sample: 'example-2-input.png' }], presetId: 'outfit-check', modelId: null, resolution: null, ratio: '9:16', aspect: '9:16' };
+  const files: [string, Buffer, string][] = [
+    ['example-2.json', Buffer.from(JSON.stringify(details)), 'application/json'], ['example-2-input.png', png(), 'image/png'], ['example-2-ref.jpg', jpg(), 'image/jpeg'],
+    ['example-3.json', Buffer.from(JSON.stringify(preset)), 'application/json'],
+  ];
   const asAdmin = async (each: (name: string, data: Buffer, type: string) => Promise<{ ok(): boolean }>) => {
     await page.context().clearCookies();
     await signIn(page, 'admin');
@@ -354,13 +358,23 @@ test('as on Fash, a sample with a details file shows its prompt, input photos, s
     const detail = page.getByRole('dialog', { name: 'Chi tiết mẫu' });
     await expect(detail.locator('.detail-prompt')).toHaveText(details.prompt);
     await expect(detail.getByRole('list', { name: 'Ảnh đầu vào' }).getByRole('img')).toHaveCount(2);
-    await expect(detail.getByRole('list', { name: 'Thông số' })).toHaveText('8s1:1');
+    await expect(detail.getByRole('list', { name: 'Thông số' })).toHaveText('720p8s1:1');
     await expect(detail.locator('.detail-date')).toHaveText('18 thg 8, 2026');
+    // As on Fash: the model above the prompt, no preset chip for a sample made from a prompt, and the title only for screen readers.
+    await expect(detail.locator('.detail-model')).toHaveText('Mock E2E');
+    await expect(detail.locator('.detail-chip')).toHaveCount(0);
+    await expect(detail.getByRole('heading', { name: 'Xoay quanh chậm' })).toHaveClass('sr-only');
+    // A sample made from a preset shows the preset's chip, with its name, and no prompt.
+    await detail.getByRole('button', { name: 'Mẫu sau' }).click();
+    await expect(detail.locator('.detail-chip')).toHaveText('Ngắm trọn bộ đồ');
+    await expect(detail.locator('.detail-prompt')).toHaveCount(0);
+    await expect(detail.locator('.detail-model')).toHaveCount(0);
     // The next sample has no details file: its own facts and the in-place "use this sample" as before.
     await detail.getByRole('button', { name: 'Mẫu sau' }).click();
     await expect(detail).toContainText('Mẫu minh họa');
     await expect(detail.getByRole('button', { name: 'Dùng mẫu này' })).toBeVisible();
     await expect(detail.locator('.detail-prompt')).toHaveCount(0);
+    await detail.getByRole('button', { name: 'Mẫu trước' }).click();
     await detail.getByRole('button', { name: 'Mẫu trước' }).click();
 
     await detail.getByRole('link', { name: 'Dùng lại' }).click();
