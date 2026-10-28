@@ -4,7 +4,7 @@
 import { useEffect, useRef } from 'react';
 import { REDUCED_MOTION, useMediaQuery } from '@/lib/use-media-query';
 
-/** `always`: play under reduced motion too, as the reference site's Explore prompt grid, Featured models and Apps pages do (checked 2026-10-26). */
+/** `always`: play under reduced motion too, as the reference site's Explore prompt grid, Featured models and Apps pages do (checked 2026-10-26), and its Marketing format header and pickers (checked 2026-10-29). */
 export function LoopVideo({ src, poster, always = false }: { src: string; poster: string | null; always?: boolean }) {
   const ref = useRef<HTMLVideoElement>(null);
   const reduced = useMediaQuery(REDUCED_MOTION) && !always;

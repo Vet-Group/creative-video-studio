@@ -38,6 +38,11 @@ export function useJobs(): JobsState {
   return v;
 }
 
+/** As on Fash (checked 2026-10-29): beside the form, a page opens on History once its feature has a job, else on Examples. */
+export function useHasHistory(feature: string): boolean {
+  return useJobs().jobs.some((j) => j.feature === feature);
+}
+
 export function JobsProvider({ userId, children }: { userId: string; children: ReactNode }) {
   const [data, setData] = useState({ jobs: [] as TrayJob[], workerOffline: false, clips: null as JobsState['clips'], loaded: false });
   const [toasts, setToasts] = useState<Toast[]>([]);

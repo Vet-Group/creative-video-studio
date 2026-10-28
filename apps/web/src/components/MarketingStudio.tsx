@@ -16,7 +16,7 @@ import { AudioSwitch } from './AudioSwitch';
 import { CardMedia, LoopVideo } from './CardMedia';
 import { Icon, type IconName } from './Icon';
 import { Gallery, type Img, Slot, uploadImages, UPLOAD_ERROR, WorkTabs } from './image-tools';
-import { useJobs } from './jobs';
+import { useHasHistory, useJobs } from './jobs';
 import { Modal } from './Modal';
 import { ModelPicker } from './ModelPicker';
 import { Select } from './Select';
@@ -50,7 +50,7 @@ const TAB_LABEL: Record<Tab, string> = { create: 'Tạo', history: 'Lịch sử'
 const RATIO_LABEL: Record<string, string> = { '9:16': '9:16 (dọc)', '16:9': '16:9 (ngang)', '1:1': '1:1 (vuông)' };
 
 /** A box on the form that opens the list of choices; shows the chosen one. */
-/** With `media` (the chosen choice's sample), a chosen box shows it full size under a name chip, as on Fash. */
+/** With `media` (the chosen choice's sample), a chosen box shows it full size under a name chip, as on Fash: its still, the loop only when there is no still. */
 function ChoiceBox({ label, icon, value, media, onOpen, onClear }: { label: string; icon: IconName; value: string | undefined; media?: { video: string | null; poster: string | null }; onOpen: () => void; onClear: () => void }) {
   const filled = value !== undefined && media !== undefined && (media.video ?? media.poster) !== null;
   const labelId = useId();
@@ -58,7 +58,7 @@ function ChoiceBox({ label, icon, value, media, onOpen, onClear }: { label: stri
   return (
     <div className="field">
       <button type="button" className="choice-box" data-filled={filled || undefined} aria-haspopup="dialog" aria-labelledby={`${labelId} ${valueId}`} onClick={onOpen}>
-        {filled && <CardMedia {...media} />}
+        {filled && <CardMedia video={media.poster ? null : media.video} poster={media.poster} />}
         <span className="slot-icon" aria-hidden="true">
           <Icon name={icon} size={16} />
         </span>
@@ -95,16 +95,21 @@ function ChoiceDialog({ open, title, sub, kind, choices, selected, onPick, onClo
     e.preventDefault();
     cards[next]?.focus();
   }
-  const all: { id: string; name: string }[] = [{ id: '', name: 'Không chọn' }, ...choices];
+  const all: { id: string; name: string; desc?: string }[] = [{ id: '', name: 'Không chọn' }, ...choices];
   return (
     <Modal open={open} onClose={onClose} label={title} className="choice-dialog">
       <h2>{title}</h2>
       <p className="modal-sub">{sub}</p>
       <div ref={grid} className="choice-grid" role="listbox" aria-label={title} onKeyDown={onKey}>
         {all.map((c) => (
-          <button key={c.id || 'none'} type="button" role="option" aria-selected={c.id ? selected.includes(c.id) : selected.length === 0} tabIndex={(c.id ? selected[0] === c.id : selected.length === 0) ? 0 : -1} onClick={() => onPick(c.id)}>
-            {c.id && open && <CardMedia {...cardSample(have, `marketing-${kind}-${c.id}`)} />}
+          <button key={c.id || 'none'} type="button" role="option" aria-selected={c.id ? selected.includes(c.id) : selected.length === 0} tabIndex={(c.id ? selected[0] === c.id : selected.length === 0) ? 0 : -1} aria-label={c.desc ? c.name : undefined} aria-describedby={c.desc ? `${kind}-${c.id}-desc` : undefined} onClick={() => onPick(c.id)}>
+            {c.id && open && <CardMedia {...cardSample(have, `marketing-${kind}-${c.id}`)} always />}
             <span className="choice-name">{c.name}</span>
+            {c.desc && (
+              <span id={`${kind}-${c.id}-desc`} className="choice-desc">
+                {c.desc}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -194,7 +199,8 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
   const [list, setList] = useState<{ key: string; models: VideoModel[]; defaultId: string | null } | null>(null);
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
-  const [tab, setTab] = useState<Tab | null>(null); // null: the default for the width (the form below 1024 px, else the examples)
+  const [tab, setTab] = useState<Tab | null>(null); // null: the default for the width (the form below 1024 px, else History or Examples)
+  const opening: Tab = useHasHistory('marketing') ? 'history' : 'examples';
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -391,7 +397,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
   }
 
   const tabs: Tab[] = narrow ? ['create', 'history', 'examples', 'about'] : ['history', 'examples', 'about'];
-  const shown: Tab = narrow ? (tab ?? 'create') : tab === 'history' || tab === 'about' ? tab : 'examples';
+  const shown: Tab = narrow ? (tab ?? 'create') : tab === null || tab === 'create' ? opening : tab;
   const panel = shown === 'create' ? 'examples' : shown;
 
   return (
@@ -407,7 +413,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
             <div className="app-head marketing-head" data-category="video" data-photo={have.has(photo) || undefined} style={have.has(photo) ? ({ '--photo': `url(/api/samples/${photo})` } as CSSProperties) : undefined}>
               {have.has(loop) && (
                 <span className="head-loop">
-                  <LoopVideo src={`/api/samples/${loop}`} poster={have.has(photo) ? `/api/samples/${photo}` : null} />
+                  <LoopVideo src={`/api/samples/${loop}`} poster={have.has(photo) ? `/api/samples/${photo}` : null} always />
                 </span>
               )}
               <strong>{name}</strong>
@@ -557,7 +563,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
         <div className="choice-grid">
           {FORMATS.map((f) => (
             <button key={f.id} type="button" aria-pressed={f.id === format} disabled={f.href === null} onClick={() => (setPicker(null), f.href && f.id !== format && router.push(f.href))}>
-              {picker === 'format' && <CardMedia {...cardSample(have, `marketing-format-${f.id}`)} />}
+              {picker === 'format' && <CardMedia {...cardSample(have, `marketing-format-${f.id}`)} always />}
               <span className="choice-name">
                 {f.name}
                 {f.soon && <span className="badge-soon">{f.soon}</span>}

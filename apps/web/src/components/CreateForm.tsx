@@ -12,7 +12,7 @@ import { AudioSwitch } from './AudioSwitch';
 import { CardMedia } from './CardMedia';
 import { EnhanceToggle } from './EnhanceToggle';
 import { Icon } from './Icon';
-import { useJobs } from './jobs';
+import { useHasHistory, useJobs } from './jobs';
 import { Modal } from './Modal';
 import { ModelPicker } from './ModelPicker';
 import { Preview } from './Preview';
@@ -97,7 +97,8 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
   const [dragOver, setDragOver] = useState(false);
   const promptId = useId();
   const tooLongId = useId();
-  const [tab, setTab] = useState<Tab | null>(null); // null: the default for the width (Create below 1024 px, else Examples, as on the live page)
+  const [tab, setTab] = useState<Tab | null>(null); // null: the default for the width (Create below 1024 px, else History or Examples, as on the live page)
+  const opening: Tab = useHasHistory('video') ? 'history' : 'examples';
   const [picking, setPicking] = useState(false);
   const [detail, setDetail] = useState<Example | null>(null);
 
@@ -214,7 +215,7 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
 
   // Below 1024 px the form is one tab among Create / History / Examples / About; beside it, the tabs are History / Examples / About.
   const tabs: Tab[] = narrow ? ['create', 'history', 'examples', 'about'] : ['history', 'examples', 'about'];
-  const shown: Tab = narrow ? (tab ?? 'create') : tab === 'history' || tab === 'about' ? tab : 'examples';
+  const shown: Tab = narrow ? (tab ?? 'create') : tab === null || tab === 'create' ? opening : tab;
   const current = presets?.find((p) => p.id === presetId);
   const have = useSamples();
   const media = (path: string) => sampleSrc(have, path);

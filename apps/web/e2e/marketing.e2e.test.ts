@@ -114,6 +114,10 @@ test('a mock marketing job runs from two photos, a hook and a location, and show
   // The form's own inputs are kept for Dùng lại.
   expect(await (await page.request.get(`/api/jobs/${jobs.jobs[0]!.id}`)).json()).toMatchObject({ hook: hook.id, location: spot.id, brief: 'soft morning light', format: null });
 
+  // As on Fash, with a Marketing job the page now opens on Lịch sử (a member without one opens on Ví dụ, below).
+  await page.reload();
+  await expect(page.getByRole('tab', { name: 'Lịch sử' })).toHaveAttribute('aria-selected', 'true');
+
   // Ví dụ lists the company's marketing clips as videos.
   await page.getByRole('tab', { name: 'Ví dụ' }).click();
   const gallery = page.getByRole('group', { name: 'Video Marketing Studio của công ty' });
@@ -413,6 +417,31 @@ test('as on Fash, the ratio row sits 16 px under the prompt box, and the sent-pr
   expect(gap, 'prompt box to ratio row').toBeLessThanOrEqual(18);
   const model = (await modelButton(page).boundingBox())!;
   expect((await page.getByText('Xem prompt gửi đi').boundingBox())!.y).toBeGreaterThanOrEqual(model.y + model.height + 8);
+});
+
+test('as on the live form (measured 2026-10-29): 272 px content, 131x130 tiles 10 px apart, 36 px icon discs, 14 px grey labels, hook cards with a grey line under the name, and Ví dụ open without a Marketing job', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await signIn(page, 'mktb');
+  await page.goto('/marketing-studio');
+  await expect(page.getByRole('tab', { name: 'Ví dụ' })).toHaveAttribute('aria-selected', 'true');
+  const near = (got: number, want: number) => expect(Math.abs(got - want), `${got} vs ${want}`).toBeLessThanOrEqual(1);
+  near((await page.locator('.marketing-head').boundingBox())!.width, 272);
+  const model = (await page.getByRole('group', { name: 'Người mẫu' }).boundingBox())!;
+  const product = (await page.getByRole('group', { name: 'Sản phẩm' }).boundingBox())!;
+  near(model.width, 131);
+  near(model.height, 130);
+  near(product.x - (model.x + model.width), 10);
+  const hookBox = page.getByRole('button', { name: /^Hook/ });
+  near((await hookBox.boundingBox())!.height, 130);
+  const disc = hookBox.locator('.slot-icon');
+  near((await disc.boundingBox())!.width, 36);
+  expect(await disc.evaluate((e) => getComputedStyle(e).backgroundColor)).toBe('rgba(0, 0, 0, 0.06)');
+  expect(await hookBox.locator('.choice-label').evaluate((e) => [getComputedStyle(e).fontSize, getComputedStyle(e).color])).toEqual(['14px', 'rgb(102, 102, 102)']);
+
+  await hookBox.click();
+  const card = page.getByRole('dialog', { name: 'Chọn hook' }).getByRole('option', { name: hook.name, exact: true });
+  await expect(card).toHaveAccessibleDescription(hook.desc);
+  expect(await card.locator('.choice-desc').evaluate((e) => [getComputedStyle(e).fontSize, getComputedStyle(e).color])).toEqual(['12px', 'rgb(128, 128, 128)']);
 });
 
 test('as on Fash, a filled photo slot and a chosen hook or location show the picture full size under a name chip, with an X to clear', async ({ page }) => {
