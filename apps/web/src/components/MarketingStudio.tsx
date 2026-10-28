@@ -113,18 +113,26 @@ function ChoiceDialog({ open, title, sub, kind, choices, selected, onPick, onClo
   );
 }
 
-/** A photo dialog of the model or product slot, as on Fash: an upload tile first, then the photos to pick (4 per row of 3:4 portraits). */
-function PhotoDialog({ open, title, sub, tiles, busy, onFile, onClose }: { open: boolean; title: string; sub: string; tiles: { key: string; src: string; label: string; pick: () => void }[]; busy: boolean; onFile: (files: File[]) => void; onClose: () => void }) {
+/** A photo dialog of the model or product slot, as on Fash: the photos to pick, 4 per row of 3:4 portraits. The product dialog has a subtitle and an upload tile first; the model dialog is stock photos only, so its own-photo upload is a link in the header. */
+function PhotoDialog({ open, title, sub, tiles, busy, onFile, onClose }: { open: boolean; title: string; sub?: string; tiles: { key: string; src: string; label: string; pick: () => void }[]; busy: boolean; onFile: (files: File[]) => void; onClose: () => void }) {
+  const upload = (
+    <>
+      Tải lên ảnh của bạn
+      <input type="file" accept="image/*" className="sr-only" onChange={(e) => (onClose(), onFile([...(e.target.files ?? [])].slice(0, 1)))} />
+    </>
+  );
   return (
     <Modal open={open} onClose={onClose} label={title} className="choice-dialog">
       <h2>{title}</h2>
-      <p className="modal-sub">{sub}</p>
+      {sub && <p className="modal-sub">{sub}</p>}
+      {!sub && <label className="photo-upload-link">{upload}</label>}
       <div className="choice-grid model-grid">
-        <label className="model-upload">
-          <Icon name="plus" size={16} />
-          Tải lên ảnh của bạn
-          <input type="file" accept="image/*" className="sr-only" onChange={(e) => (onClose(), onFile([...(e.target.files ?? [])].slice(0, 1)))} />
-        </label>
+        {sub && (
+          <label className="model-upload">
+            <Icon name="plus" size={16} />
+            {upload}
+          </label>
+        )}
         {tiles.map((t) => (
           <button key={t.key} type="button" aria-label={t.label} disabled={busy} onClick={() => (onClose(), t.pick())}>
             {open && <img src={t.src} alt="" />}
@@ -558,7 +566,6 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
       <PhotoDialog
         open={picker === 'model'}
         title="Chọn người mẫu"
-        sub="Dùng một người mẫu có sẵn, hoặc tải lên ảnh của bạn."
         tiles={stockModels.map((name, i) => ({ key: name, src: `/api/samples/${name}`, label: `Người mẫu có sẵn ${i + 1}`, pick: () => void pickStock(name) }))}
         busy={busy}
         onFile={(files) => void add(setPerson)(files)}

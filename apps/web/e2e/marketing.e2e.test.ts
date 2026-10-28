@@ -284,15 +284,17 @@ test('with stock models uploaded, the empty model slot opens the stock model dia
       await page.getByRole('button', { name: 'Tải lên Người mẫu' }).click();
       await expect(dialog).toBeVisible({ timeout: 1000 });
     }).toPass();
-    // The stock models in number order (10 after 2), after the own-photo tile.
+    // Only the stock models, in number order (10 after 2), as on the live dialog: no subtitle and no upload tile in the grid.
     await expect(dialog.getByRole('button', { name: /^Người mẫu có sẵn/ })).toHaveCount(3);
+    await expect(dialog.locator('.model-grid > *')).toHaveCount(3);
+    await expect(dialog.locator('.modal-sub')).toHaveCount(0);
     await expect(dialog.getByRole('button', { name: 'Người mẫu có sẵn 1' }).locator('img')).toHaveAttribute('src', '/api/samples/marketing-model-1.png');
     await expect(dialog.getByRole('button', { name: 'Người mẫu có sẵn 3' }).locator('img')).toHaveAttribute('src', '/api/samples/marketing-model-10.png');
     await dialog.getByRole('button', { name: 'Người mẫu có sẵn 2' }).click();
     await expect(dialog).toBeHidden();
     await expect(page.getByLabel('Người mẫu: ảnh đã chọn').getByRole('img', { name: 'marketing-model-2.png' })).toBeVisible();
 
-    // Removing it brings the dialog back; the own-photo tile uploads like the slot's file input.
+    // Removing it brings the dialog back; the header's own-photo link uploads like the slot's file input.
     await page.getByRole('button', { name: 'Bỏ ảnh marketing-model-2.png' }).click();
     await page.getByRole('button', { name: 'Tải lên Người mẫu' }).click();
     await dialog.getByLabel('Tải lên ảnh của bạn').setInputFiles(file('mine.png'));
@@ -442,4 +444,24 @@ test("with earlier UGC jobs, the empty product slot offers the member's own past
   // Removing the product only empties the slot.
   await page.getByRole('button', { name: 'Bỏ ảnh old-product.png' }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
+});
+
+test('as on Fash, the ratio and duration menus span the whole row under the pair, and each ratio option shows its shape', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await signIn(page, 'mktp');
+  await page.goto('/marketing-studio');
+  const row = page.locator('.field-row').filter({ has: select(page, 'Tỉ lệ') });
+  const rowBox = (await row.boundingBox())!;
+  for (const label of ['Tỉ lệ', 'Thời lượng']) {
+    await select(page, label).click();
+    const pop = row.locator('.select-pop');
+    await expect(pop).toBeVisible();
+    const popBox = (await pop.boundingBox())!;
+    expect(Math.abs(popBox.x - rowBox.x), `${label} menu left`).toBeLessThanOrEqual(1);
+    expect(Math.abs(popBox.width - rowBox.width), `${label} menu width`).toBeLessThanOrEqual(1);
+    // The shape icon sits with the option's name; the selected option's check is separate.
+    for (const option of await pop.getByRole('option').all()) await expect(option.locator('span svg')).toHaveCount(label === 'Tỉ lệ' ? 1 : 0);
+    await page.keyboard.press('Escape');
+    await expect(pop).toBeHidden();
+  }
 });
