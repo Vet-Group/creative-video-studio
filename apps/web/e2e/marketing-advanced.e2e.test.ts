@@ -55,6 +55,8 @@ test('an Advanced job runs from reference images, a brief, a script and audio on
   await refsInput(page).setInputFiles([file('model.png'), file('product.png'), file('style.png')]);
   await expect(page.getByRole('img', { name: 'style.png' })).toBeVisible();
   await expect(reasonOf(page)).toHaveText('Viết prompt mô tả video bạn muốn.');
+  // The empty prompt box already asks for it: the reason is read out but not drawn over the form's foot.
+  expect((await reasonOf(page).boundingBox())!.height).toBeLessThanOrEqual(1);
   await expect(runButton(page)).toBeDisabled();
   await brief(page).fill('   ');
   await expect(runButton(page)).toBeDisabled();

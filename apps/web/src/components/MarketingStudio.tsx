@@ -507,7 +507,8 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
 
           <div className="form-message">
             {(reason ?? short) && (
-              <p id={reasonId} className="help" role="status">
+              // The empty prompt box already asks for a prompt: that reason is read out but not drawn over the form's foot.
+              <p id={reasonId} className="help" role="status" data-quiet={reason === 'Viết prompt mô tả video bạn muốn.' || undefined}>
                 {reason ?? short}
               </p>
             )}

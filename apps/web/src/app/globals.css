@@ -1140,7 +1140,7 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .form-message p.help[role='status'] { margin: 0 0 8px; padding: 8px 12px; border-radius: 8px; background: var(--surface-2); color: var(--ink-3); font-size: 13px; line-height: 19px; }
 /* Before the first image the empty slots say what is missing, so the reason under them is for screen readers only. */
 /* On Marketing UGC an empty model or product tile already says what to add, so the same reason is kept for screen readers only. */
-.form-card:has(.slot):not(:has(.slot-thumbs li)) .form-message p.help[role='status'], .form-card:has(.marketing-slots .slot[data-empty]) .form-message p.help[role='status'] { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.form-card:has(.slot):not(:has(.slot-thumbs li)) .form-message p.help[role='status'], .form-card:has(.marketing-slots .slot[data-empty]) .form-message p.help[role='status'], .form-message p.help[role='status'][data-quiet] { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .library .card video.tall { display: block; width: auto; max-width: 100%; margin: 0 auto; background: transparent; }
 .job-body a { color: var(--ink-link); font-size: 13px; text-decoration-color: rgb(var(--shade) / .3); text-underline-offset: 2px; }
 /* Library card actions: the clip actions on one row with Delete at its end, the verdict buttons together on the next. */
