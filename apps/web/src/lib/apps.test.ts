@@ -2,7 +2,7 @@ import { FEATURE_PROMPTS } from '@cvs/core/models';
 import { FEATURES } from '@cvs/db';
 import { describe, expect, it } from 'vitest';
 import { APP_ABOUT } from './about-content';
-import { APPS, appBySlug, appInputs, appReason, type AppDraft, filterApps, motionReason } from './apps';
+import { APPS, appBySlug, appInputs, appReason, type AppDraft, filterApps, motionReason, slotMax, splitImages } from './apps';
 
 const img = (id: string) => ({ id });
 const draft = (images: string[][], prompt = '', maxImages = 2): AppDraft => ({ images: images.map((l) => l.map(img)), prompt, models: [{ maxImages }], failed: false });
@@ -30,6 +30,24 @@ describe('the app list', () => {
     expect(appBySlug('reframe')).toMatchObject({ ratio: true });
     expect(appBySlug('image-upscale')).toMatchObject({ resolution: true });
     expect(appBySlug('jewelry-try-on')).toMatchObject({ resolution: true });
+  });
+});
+
+describe('Jewelry Try-On pieces', () => {
+  const jewelry = appBySlug('jewelry-try-on')!;
+  it('takes as many pieces as the model allows beside the person, and one image in every other slot', () => {
+    expect([slotMax(jewelry, 0, 4), slotMax(jewelry, 1, 4), slotMax(jewelry, 0, 2)]).toEqual([3, 1, 1]);
+    expect(slotMax(appBySlug('face-swap')!, 0, 4)).toBe(1);
+    expect(reason('jewelry-try-on', [['a', 'b', 'c'], ['p']], '', 4)).toBeNull();
+    expect(reason('jewelry-try-on', [['a', 'b', 'c'], ['p']], '', 3)).toBe('Mô hình này nhận tối đa 3 ảnh.');
+    expect(appInputs(jewelry, { images: [[img('a'), img('b')], [img('p')]], prompt: '' })).toEqual({ assetIds: ['a', 'b', 'p'] });
+  });
+
+  it('puts a reused job back in its slots: the pieces first, the person last', () => {
+    expect(splitImages(jewelry, ['a', 'b', 'p'])).toEqual([['a', 'b'], ['p']]);
+    expect(splitImages(jewelry, ['a', 'p'])).toEqual([['a'], ['p']]);
+    expect(splitImages(jewelry, [])).toEqual([[], []]);
+    expect(splitImages(appBySlug('face-swap')!, ['s', 't', 'x'])).toEqual([['s'], ['t']]);
   });
 });
 

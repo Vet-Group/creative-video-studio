@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { type CSSProperties, useEffect, useId, useRef, useState } from 'react';
 import { APP_ABOUT } from '@/lib/about-content';
 import { api, errorText, sendJson } from '@/lib/api';
-import { APPS, type AppConfig, appInputs, appReason, type AppCategory, motionReason } from '@/lib/apps';
+import { APPS, type AppConfig, appInputs, appReason, type AppCategory, motionReason, slotMax, splitImages } from '@/lib/apps';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { useHydrated } from '@/lib/use-hydrated';
 import { cardSample } from '@/lib/examples';
@@ -107,12 +107,12 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
   const pick = useImageChoice(models, Math.max(1, count));
   const { chosen } = pick;
 
-  // Reuse: one image per slot, in the order they were sent, and the member's own text.
+  // Reuse: the images back in their slots, in the order they were sent, and the member's own text.
   useReuse(
     reuse,
     app.feature,
     (j) => {
-      setImages(app.slots.map((_, i) => j.images.slice(i, i + 1)));
+      setImages(splitImages(app, j.images));
       setPrompt(j.brief ?? '');
       if (j.modelId) pick.setModelId(j.modelId);
       if (j.ratio) pick.setRatio(j.ratio);
@@ -186,7 +186,7 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
                   empty={s.empty}
                   inputLabel={s.inputLabel}
                   images={images[i]!}
-                  max={1}
+                  max={slotMax(app, i, chosen?.maxImages ?? 1)}
                   busy={busy}
                   onAdd={add(i)}
                   onRemove={(id) => setImages((cur) => cur.map((list, j) => (j === i ? list.filter((x) => x.id !== id) : list)))}

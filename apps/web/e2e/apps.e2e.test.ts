@@ -111,6 +111,30 @@ test('Background Remover (one slot): Run needs the image, a mock job reaches His
   await expect(mine.locator('img.output')).toBeVisible();
 });
 
+test('Jewelry Try-On takes several pieces and then the person; a mock job sends them in that order with the fixed instruction', async ({ page }) => {
+  await signIn(page, 'appsa');
+  await openApp(page, 'Thử trang sức', 'jewelry-try-on');
+  await expect(reasonOf(page)).toHaveText('Tải lên ảnh: Trang sức.');
+  await page.getByLabel('Ảnh trang sức').setInputFiles([file('ring.png'), file('earring.png')]);
+  await expect(page.getByRole('group', { name: 'Trang sức' }).locator('img')).toHaveCount(2);
+  await expect(reasonOf(page)).toHaveText('Tải lên ảnh: Người đeo.');
+  await page.locator('input[type=file][aria-label="Ảnh người đeo"]').setInputFiles(file('wearer.png'));
+  await expect(runButton(page)).toBeEnabled();
+  await runButton(page).click();
+  await expect(toast(page, 'Ảnh đã xong')).toBeVisible({ timeout: 60_000 });
+
+  const jobs = (await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { id: string; feature: string }[] };
+  const job = jobs.jobs.find((j) => j.feature === 'jewelry_try_on')!;
+  const detail = (await (await page.request.get(`/api/jobs/${job.id}`)).json()) as { prompt: string; images: { filename: string }[] };
+  expect(detail.images.map((i) => i.filename)).toEqual(['ring.png', 'earring.png', 'wearer.png']);
+  expect(detail.prompt).toMatch(/^Put the jewelry from every image but the last on the person in the last image/);
+
+  // Dùng lại puts the two pieces back in Trang sức and the person in Người đeo.
+  await page.goto(`/apps/jewelry-try-on?reuse=${job.id}`);
+  await expect(page.getByRole('group', { name: 'Trang sức' }).locator('img')).toHaveCount(2);
+  await expect(page.getByRole('group', { name: 'Người đeo' }).getByRole('img', { name: 'wearer.png' })).toBeVisible();
+});
+
 test('Face Swap (two slots): each required slot has its reason, and a mock job takes the source face, then the target', async ({ page }) => {
   await signIn(page, 'appsa');
   await openApp(page, 'Đổi khuôn mặt', 'face-swap');
