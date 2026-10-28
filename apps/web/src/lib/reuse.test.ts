@@ -25,5 +25,6 @@ test("Recreate on a sample reads that sample's details file, and nothing else", 
   expect(exampleFrom({ example: 'marketing-example-3' })).toBe('/api/samples/marketing-example-3.json');
   expect(['marketing-example-0', 'marketing-example-3.mp4', '../x', 'image-example-1', 'example-0', ['marketing-example-1']].map((example) => exampleFrom({ example }))).toEqual(Array(6).fill(undefined));
   expect(exampleFrom({ example: 'example-12' })).toBe('/api/samples/example-12.json'); // Create Videos' samples
+  expect(exampleFrom({ example: 'try-on-example-4' })).toBe('/api/samples/try-on-example-4.json');
   expect(exampleFrom({})).toBeUndefined();
 });

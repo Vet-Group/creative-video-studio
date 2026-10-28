@@ -72,7 +72,8 @@ export function useImageChoice(models: ImageModel[] | null, images: number, init
 /** What the reuse link reads back from a job (GET /api/jobs/:id) to refill an image page. */
 export interface ReuseJob {
   feature: string;
-  images: Img[];
+  /** A sample's details file (`?example=`) names its photos as samples; a job or a template has uploaded images. */
+  images: (Img | { sample: string })[];
   /** The job's prompt: the member's own text on Image Generation, a composed prompt elsewhere. */
   prompt: string | null;
   /** The member's own text, kept for reuse (Try On and the apps). */
@@ -85,10 +86,17 @@ export interface ReuseJob {
 }
 
 /** Refill (`reuse` is a job's or a saved template's API path, lib/reuse.ts): reads it once and hands it to `fill` when it is of `feature`; `fail` otherwise. Everything stays editable. */
-export function useReuse(reuse: string | undefined, feature: string, fill: (j: ReuseJob) => void, fail: () => void) {
+export function useReuse(reuse: string | undefined, feature: string, fill: (j: Omit<ReuseJob, 'images'> & { images: Img[] }) => void, fail: () => void) {
   useEffect(() => {
     if (!reuse) return;
-    api<ReuseJob>(reuse).then((j) => (j.feature === feature ? fill(j) : fail()), fail);
+    api<ReuseJob>(reuse)
+      .then(async (j) => {
+        if (j.feature !== feature) return fail();
+        // A sample's photos are uploaded as this member's inputs first, as a picked sample is.
+        const samples = j.images.flatMap((i) => ('sample' in i ? [i.sample] : []));
+        fill({ ...j, images: samples.length > 0 ? await uploadImages(await Promise.all(samples.map(sampleFile))) : (j.images as Img[]) });
+      })
+      .catch(fail);
   }, [reuse]);
 }
 
@@ -245,8 +253,8 @@ const GALLERY_SIZE_KEY = 'cvs.gallery.size';
 export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4], samples }: { kind: string; label: string; emptyText: string; video?: boolean; cols?: [number, number, number]; samples?: string }) {
   const have = useSamples();
   const sampleTiles = samples ? numberedSamples(have, samples, video ? 'mp4' : 'jpg') : [];
-  /** The sample clips with a details file open in place (SampleDetail); the others still open in a new tab. */
-  const detailed = video ? sampleTiles.filter((n) => have.has(n.replace(/\.mp4$/, '.json'))) : [];
+  /** The samples with a details file open in place (SampleDetail); other clips still open in a new tab. */
+  const detailed = sampleTiles.filter((n) => have.has(n.replace(/\.(mp4|jpg)$/, '.json')));
   const [open, setOpen] = useState<number | null>(null);
   const [items, setItems] = useState<Clip[]>([]);
   const [hasMore, setHasMore] = useState(false);
@@ -315,6 +323,10 @@ export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4
                   {video ? (
                     <a href={`/api/samples/${it}`} target="_blank" rel="noreferrer" aria-label={detailed.includes(it) ? 'Xem chi tiết video mẫu' : 'Mở video mẫu trong tab mới'} onClick={detailed.includes(it) ? (e) => (e.preventDefault(), setOpen(detailed.indexOf(it))) : undefined}>
                       <Preview src={`/api/samples/${it}`} poster={`/api/samples/${it.replace(/\.mp4$/, '.jpg')}`} width={9} height={16} title="Video mẫu" />
+                    </a>
+                  ) : detailed.includes(it) ? (
+                    <a href={`/api/samples/${it}`} target="_blank" rel="noreferrer" aria-label="Xem chi tiết ảnh mẫu" onClick={(e) => (e.preventDefault(), setOpen(detailed.indexOf(it)))}>
+                      <img src={`/api/samples/${it}`} alt="Ảnh mẫu" loading="lazy" />
                     </a>
                   ) : (
                     <img src={`/api/samples/${it}`} alt="Ảnh mẫu" loading="lazy" />
