@@ -471,16 +471,6 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
               </div>
             )}
 
-            <details className="prompt-preview">
-              <summary>Xem prompt gửi đi</summary>
-              {sent.map((p, i) => (
-                <p key={variants[i] || 'none'} lang="en">
-                  {n > 1 && <strong lang="vi">Biến thể {i + 1} ({hookName(variants[i]!)}): </strong>}
-                  {p}
-                </p>
-              ))}
-            </details>
-
             <div className="field-row">
               {models && ratios.length > 0 && (
                 <Select label="Tỉ lệ" icon="ratio" heading="Chọn tỉ lệ" value={ratio} options={ratios.map((r) => ({ value: r, label: RATIO_LABEL[r]!, short: r }))} onChange={setRatio} />
@@ -491,6 +481,16 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
             </div>
             <AudioSwitch on={audio} available={chosen?.audioEstimateUsd != null} onChange={setAudio} />
             {models && models.length > 0 && <ModelPicker models={models.map((m) => ({ id: m.id, label: m.label, isMock: m.isMock, supported: !advanced || m.maxImages >= refs.length, estimateUsd: audio && m.audioEstimateUsd != null ? m.audioEstimateUsd : m.estimateUsd, score: m.score, recommended: m.recommended }))} value={chosen?.id ?? ''} onChange={(id) => pickModel(models.find((m) => m.id === id)!)} />}
+            {/* Under the model, so the ratio row sits right under the prompt box as on Fash. */}
+            <details className="prompt-preview">
+              <summary>Xem prompt gửi đi</summary>
+              {sent.map((p, i) => (
+                <p key={variants[i] || 'none'} lang="en">
+                  {n > 1 && <strong lang="vi">Biến thể {i + 1} ({hookName(variants[i]!)}): </strong>}
+                  {p}
+                </p>
+              ))}
+            </details>
             <Templates
               feature="marketing"
               data={() => ({

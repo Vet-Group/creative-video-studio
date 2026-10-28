@@ -402,6 +402,19 @@ test('hook variants beyond the clips left today are refused before anything is s
   await expect(runButton(page)).toBeEnabled();
 });
 
+test('as on Fash, the ratio row sits 16 px under the prompt box, and the sent-prompt disclosure folds under the model picker', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await signIn(page, 'mktb');
+  await page.goto('/marketing-studio');
+  const box = (await page.locator('.prompt-box').boundingBox())!;
+  const row = (await select(page, 'Tỉ lệ').boundingBox())!;
+  const gap = row.y - (box.y + box.height);
+  expect(gap, 'prompt box to ratio row').toBeGreaterThanOrEqual(14);
+  expect(gap, 'prompt box to ratio row').toBeLessThanOrEqual(18);
+  const model = (await modelButton(page).boundingBox())!;
+  expect((await page.getByText('Xem prompt gửi đi').boundingBox())!.y).toBeGreaterThanOrEqual(model.y + model.height + 8);
+});
+
 test('as on Fash, a filled photo slot and a chosen hook or location show the picture full size under a name chip, with an X to clear', async ({ page }) => {
   const names = [`marketing-hook-${hook.id}.jpg`];
   const asAdmin = async (each: (name: string) => Promise<{ ok(): boolean }>) => {
