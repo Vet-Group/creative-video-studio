@@ -23,7 +23,15 @@ function Card({ card }: { card: AboutCard }) {
       {card.media && <Media name={card.media} />}
       {card.tag && <span className="about-tag">{card.tag}</span>}
       <h4>{card.title}</h4>
-      <p>{card.text}</p>
+      <p>
+        {card.text}
+        {card.link && (
+          <>
+            {' '}
+            <Link href={card.link[1]}>{card.link[0]}</Link>.
+          </>
+        )}
+      </p>
       {card.specs && (
         <ul className="about-specs">
           {card.specs.map((s) => (

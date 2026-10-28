@@ -487,6 +487,8 @@ test('opening a menu low in the form neither scrolls the form nor hides under it
   await expect(pop.getByText('Chọn thời lượng')).toBeVisible();
   expect(await form.evaluate((e) => e.scrollTop)).toBe(before);
   const [frame, menu] = [(await form.boundingBox())!, (await pop.boundingBox())!];
+  const trigger = (await select(page, 'Thời lượng').boundingBox())!;
+  expect(menu.y, 'opens downward, as on the live page').toBeGreaterThan(trigger.y + trigger.height);
   expect(menu.y, 'menu top inside the form').toBeGreaterThanOrEqual(frame.y - 1);
   expect(menu.y + menu.height, 'menu bottom inside the form').toBeLessThanOrEqual(frame.y + frame.height + 1);
   await page.keyboard.press('Escape');
