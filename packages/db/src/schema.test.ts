@@ -102,7 +102,7 @@ describe('migration 0002 seed data', () => {
 describe('migration 0015 Fash video models', () => {
   test('adds 22 fal video models, disabled and complete, each with a request builder and its sources', async () => {
     const { rows } = await pool.query(
-      `select id, endpoint, ratios, durations_sec, max_images, output_resolution, usd_per_second::float as usd, sources from model_configs where kind = 'video' and provider = 'fal' and id <> 'kling-o3-pro' and not 'motion_control' = any(features) and not enabled order by id`,
+      `select id, endpoint, ratios, durations_sec, max_images, output_resolution, usd_per_second::float as usd, sources from model_configs where kind = 'video' and provider = 'fal' and id not in ('kling-o3-pro', 'veo-3.1-lite') and not 'motion_control' = any(features) and not enabled order by id`,
     );
     expect(rows).toHaveLength(22);
     for (const r of rows) {
@@ -114,6 +114,16 @@ describe('migration 0015 Fash video models', () => {
     expect(rows.find((r) => r.id === 'veo-3.1')).toMatchObject({ ratios: ['9:16'], durations_sec: [8] }); // no 1:1, and Fash's 8 s only
     await pool.query(`update model_configs set enabled = true where id = 'kling-3.0-pro'`); // complete enough for the enable check
     await pool.query(`update model_configs set enabled = false where id = 'kling-3.0-pro'`);
+  });
+});
+
+describe('migration 0028 Veo 3.1 Lite', () => {
+  test('adds Veo 3.1 Lite disabled at 720p, 9:16, 6 or 8 s, with a request builder, an audio price and its sources', async () => {
+    const { rows } = await pool.query(`select endpoint, ratios, durations_sec, max_images, output_resolution, usd_per_second::float as usd, sources, enabled from model_configs where id = 'veo-3.1-lite'`);
+    expect(rows[0]).toMatchObject({ endpoint: 'fal-ai/veo3.1/lite/image-to-video', ratios: ['9:16'], durations_sec: [6, 8], max_images: 1, output_resolution: '720p', usd: 0.03, enabled: false });
+    expect(VIDEO_BODIES[rows[0].endpoint]).toBeDefined();
+    expect(AUDIO_USD_PER_SECOND[rows[0].endpoint]).toBe(0.05);
+    expect(Object.keys(rows[0].sources).sort()).toEqual(['durationsSec', 'maxImages', 'outputResolution', 'ratios', 'usdPerSecond']);
   });
 });
 

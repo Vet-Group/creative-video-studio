@@ -49,6 +49,7 @@ describe('fal', () => {
     expect(await body('fal-ai/kling-video/v3/pro/image-to-video')).toEqual({ prompt: 'put image 1 on image 2', start_image_url: 'https://img/1.jpg', duration: '5', generate_audio: false });
     expect(await body('google/gemini-omni-flash/v1.1/image-to-video')).toEqual({ prompt: 'put image 1 on image 2', image_url: 'https://img/1.jpg', aspect_ratio: '9:16', duration: 5, resolution: '720p' });
     expect(await body('fal-ai/veo3.1/image-to-video')).toMatchObject({ duration: '5s', generate_audio: false });
+    expect(await body('fal-ai/veo3.1/lite/image-to-video')).toEqual({ prompt: 'put image 1 on image 2', image_url: 'https://img/1.jpg', aspect_ratio: '9:16', duration: '5s', resolution: '720p', generate_audio: false });
     expect(await body('blackforestlabs/flux-3/keyframes-to-video')).toMatchObject({ keyframes: [{ image_url: 'https://img/1.jpg', frame_index: 0 }], duration: 5, resolution: '1080p' });
     expect(await body('blackforestlabs/flux-3/image-to-video')).toMatchObject({ resolution: '1080p' }); // 720p comes back 704 px wide
     for (const endpoint of ['bytedance/seedance-2.5/us/image-to-video', 'blackforestlabs/flux-3/keyframes-to-video']) {
