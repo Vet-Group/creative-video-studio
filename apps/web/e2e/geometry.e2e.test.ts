@@ -352,7 +352,8 @@ test.describe('1440x1000', () => {
   });
 
   test('T1 pill tabs: 37 tall, padding 8px 20px, radius 8, 14px/600, active black on white, inactive rgb(102,102,102) on no background, no bottom border', async ({ page }) => {
-    const active = tab(page, 'Ví dụ'); // Examples is open by default, as on the live page
+    const active = tab(page, 'Ví dụ');
+    await active.click(); // the page opens on History once the member has a Create job (as on the live page), so pick the pane whose look is measured
     const inactive = tab(page, 'Lịch sử');
     near((await box(active)).height, 37, 'tab height');
     expect(await css(active, 'padding-top', 'padding-right', 'border-top-left-radius', 'font-size', 'font-weight', 'background-color', 'color')).toEqual(['8px', '20px', '8px', '14px', '600', 'rgb(0, 0, 0)', 'rgb(255, 255, 255)']);
