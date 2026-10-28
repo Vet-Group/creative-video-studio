@@ -1,4 +1,4 @@
-import { expect, type Page, test } from '@playwright/test';
+import { expect, type Locator, type Page, test } from '@playwright/test';
 import { HOOKS, LOCATIONS } from '../src/lib/marketing';
 import { jpg, modelButton, png, select, selectValue, signIn } from './support.test';
 
@@ -423,13 +423,17 @@ test('as on Fash, a filled photo slot and a chosen hook or location show the pic
     const [box, img] = [(await slot.boundingBox())!, (await photo.boundingBox())!];
     expect(img.width).toBeGreaterThan(box.width - 4); // fills the tile, not a 56 px thumbnail
     expect(img.height).toBeGreaterThan(box.height - 4);
-    // The chip sits in the bottom-left corner and the X near the top-right one; the filled tile keeps its dashed edge, as on Fash.
+    // The chip sits in the bottom-left corner and the X in the top-right one, a dark tab with only its inner corner rounded; the filled tile keeps its dashed edge, as on Fash.
     const chip = (await slot.locator('.slot-chip').boundingBox())!;
     expect(Math.abs(chip.x - box.x)).toBeLessThanOrEqual(2);
     expect(Math.abs(chip.y + chip.height - (box.y + box.height))).toBeLessThanOrEqual(2);
-    const x = (await slot.getByRole('button', { name: /^Bỏ / }).boundingBox())!;
-    expect(box.x + box.width - (x.x + x.width)).toBeLessThanOrEqual(8);
-    expect(x.y - box.y).toBeLessThanOrEqual(8);
+    const cornerTab = async (tile: { x: number; y: number; width: number }, x: Locator) => {
+      const b = (await x.boundingBox())!;
+      expect(Math.abs(tile.x + tile.width - (b.x + b.width)), 'X at the right edge').toBeLessThanOrEqual(2);
+      expect(Math.abs(b.y - tile.y), 'X at the top edge').toBeLessThanOrEqual(2);
+      expect(await x.evaluate((e) => { const s = getComputedStyle(e); return [s.borderTopLeftRadius, s.borderBottomRightRadius, s.borderBottomLeftRadius, s.backgroundColor]; })).toEqual(['0px', '0px', '8px', 'rgba(0, 0, 0, 0.75)']);
+    };
+    await cornerTab(box, slot.getByRole('button', { name: /^Bỏ / }));
     await expect.poll(() => slot.evaluate((e) => getComputedStyle(e).borderTopStyle)).toBe('dashed');
     await expect.poll(() => slot.evaluate((e) => getComputedStyle(e).borderTopColor)).not.toBe('rgba(0, 0, 0, 0)');
 
@@ -441,6 +445,7 @@ test('as on Fash, a filled photo slot and a chosen hook or location show the pic
     const [hb, hc] = [(await hookBox.boundingBox())!, (await hookBox.locator('.choice-value').boundingBox())!];
     expect(Math.abs(hc.x - hb.x), 'hook chip at the left edge').toBeLessThanOrEqual(2);
     expect(Math.abs(hc.y + hc.height - (hb.y + hb.height)), 'hook chip at the bottom edge').toBeLessThanOrEqual(2);
+    await cornerTab(hb, page.getByRole('button', { name: 'Bỏ Hook' }));
     await page.getByRole('button', { name: 'Bỏ Hook' }).click();
     await expect(hookBox.locator('img')).toHaveCount(0);
     await expect(hookBox).not.toContainText(hook.name);
