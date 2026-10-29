@@ -332,13 +332,26 @@ describe('migration 0013 real video models', () => {
   });
 });
 
-describe('migration 0032 Try On bake-off prior', () => {
-  test('Nano Banana 2.1 carries its Try On bake-off pass count from docs/BAKEOFF.md, above every other Try On model', async () => {
+describe('migrations 0032 and 0034 Try On bake-off prior', () => {
+  test('both Nano Banana 2.1 rows carry its Try On bake-off pass count from docs/BAKEOFF.md, above every other Try On model', async () => {
     const doc = readFileSync(new URL('../../../docs/BAKEOFF.md', import.meta.url), 'utf8');
     const [, passes, total] = /\| nano-banana-2\.1 \| (\d+)\/(\d+) \|/.exec(doc)!;
     const { rows } = await pool.query(`select id, pass_seed_passes::float8 / pass_seed_total as rate from model_configs where 'try_on' = any(features) order by rate desc nulls last, id`);
-    expect(rows[0]).toEqual({ id: 'nano-banana-2.1', rate: Number(passes) / Number(total) });
-    expect(rows[1].rate).toBeLessThan(rows[0].rate);
+    const rate = Number(passes) / Number(total);
+    expect(rows.slice(0, 2)).toEqual([{ id: 'nano-banana-2.1', rate }, { id: 'nano-banana-2.1-vertex', rate }]);
+    expect(rows[2].rate).toBeLessThan(rate);
+  });
+});
+
+describe('migration 0033 Seedance 2.0 on Replicate', () => {
+  test('adds a disabled Replicate row at its own price that otherwise matches the fal reference twin, without Marketing Studio (no audio)', async () => {
+    const pick = `select kind, features, ratios, durations_sec, max_images, max_prompt_chars, output_resolution from model_configs where id = $1`;
+    const [twin] = (await pool.query(pick, ['seedance-2.0-reference'])).rows;
+    const [row] = (await pool.query(pick, ['seedance-2.0-replicate'])).rows;
+    expect(row).toEqual({ ...twin, features: twin.features.filter((f: string) => f !== 'marketing') });
+    expect(row.features).toEqual(['video']);
+    const [facts] = (await pool.query(`select provider, endpoint, enabled, usd_per_second::text as usd, sources->'usdPerSecond'->>'url' as source from model_configs where id = 'seedance-2.0-replicate'`)).rows;
+    expect(facts).toEqual({ provider: 'replicate', endpoint: 'bytedance/seedance-2.0', enabled: false, usd: '0.1800', source: 'https://replicate.com/bytedance/seedance-2.0' });
   });
 });
 

@@ -68,4 +68,4 @@ all hold. Judged blind, the key read after the verdicts (2026-10-29).
 | nano-banana-pro on Vertex | - | 9/10 | 4/5 | pair 2 |
 | virtual-try-on on Vertex | - | 8/10 | 3/5 | pair 2; pair 4 "MATTERS" garbled |
 
-Nano Banana 2.1 passes at 27% of Pro's price, so migration 0032 records 9/10 as its prior and the Try On picker recommends it.
+Nano Banana 2.1 passes at 27% of Pro's price, so migration 0032 records 9/10 as its prior and the Try On picker recommends it. Migration 0034 gives the Vertex row the same prior, so on the tie the picker recommends the cheaper Vertex row and the fal row stays as the fallback.
