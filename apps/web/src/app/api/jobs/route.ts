@@ -9,7 +9,8 @@ import { findChoice } from '@/lib/choices';
 import { ADVANCED_MAX_SCRIPT } from '@/lib/marketing';
 import { guard } from '@/lib/session';
 
-const MAX_IMAGES = 4;
+/** Create Video takes up to 9 images (the most a fal reference schema allows, as Fash offers); the model's max_images is checked under the lock. */
+const MAX_IMAGES = 9;
 /** Marketing Studio Advanced (`params.format` 'advanced') takes up to 7 reference images, as on the reference site; the model's max_images is checked under the lock. */
 const MAX_ADVANCED_IMAGES = 7;
 /** An image job may name more inputs; the model's own max_images is checked under the lock. */

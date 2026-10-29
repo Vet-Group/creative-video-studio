@@ -188,7 +188,7 @@ describe('POST /api/jobs', () => {
 
   test.each([
     ['no assets', { assetIds: [] }],
-    ['five assets', { assetIds: ['own-1', 'own-2', 'own-3', 'a4', 'a5'] }],
+    ['ten assets', { assetIds: ['own-1', 'own-2', 'own-3', 'a4', 'a5', 'a6', 'a7', 'a8', 'a9', 'a10'] }],
     ['the same asset twice', { assetIds: ['own-1', 'own-1'] }],
     ['an unknown asset', { assetIds: ['own-1', 'nope'] }],
     ['a deleted asset', { assetIds: ['own-deleted'] }],
@@ -206,6 +206,18 @@ describe('POST /api/jobs', () => {
     const res = await run(ownerCookie, { ...base, ...body });
     expect(res.status).toBe(400);
     expect(await jobCount()).toBe(before);
+  });
+
+  test('takes up to 9 images on a model that allows 9, as a fal reference model does', async () => {
+    const m = await newMember(); // its own daily count, so the owner keeps room for the cap tests
+    const assets = [m.asset];
+    for (let i = 2; i <= 9; i++) await insertAsset(`${m.id}-asset-${i}`, m.id).then(() => assets.push(`${m.id}-asset-${i}`));
+    await pool.query(`update model_configs set max_images = 9 where id = 'fal-test'`);
+    try {
+      expect((await run(m.cookie, { ...base, assetIds: assets })).status).toBe(201);
+    } finally {
+      await pool.query(`update model_configs set max_images = 2 where id = 'fal-test'`);
+    }
   });
 
   test('answers 400 for a body that is not JSON', async () => {

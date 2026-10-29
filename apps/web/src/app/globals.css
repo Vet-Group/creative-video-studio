@@ -451,8 +451,9 @@ td code { white-space: pre-wrap; overflow-wrap: anywhere; }
 .dropzone-pick:disabled { opacity: 1; cursor: default; }
 .dropzone[data-filled='true'] .dropzone-pick { justify-content: flex-end; padding-bottom: 14px; }
 .dropzone-plus { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: rgb(var(--shade) / .06); color: var(--text-muted); }
-.thumbs { position: absolute; top: 16px; left: 0; right: 0; display: flex; justify-content: center; gap: 8px; margin: 0; padding: 0; list-style: none; pointer-events: none; }
-.thumbs li { position: relative; width: 56px; height: 56px; pointer-events: auto; }
+/* Up to 9 images (a fal reference model's limit) shrink to share the row. */
+.thumbs { position: absolute; top: 16px; left: 0; right: 0; display: flex; justify-content: center; gap: 8px; margin: 0; padding: 0 12px; list-style: none; pointer-events: none; }
+.thumbs li { position: relative; flex: 0 1 56px; min-width: 0; aspect-ratio: 1; pointer-events: auto; }
 .thumbs img { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: 12px; }
 .thumbs button { position: absolute; top: -6px; right: -6px; display: grid; place-items: center; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%; background: var(--ink); color: var(--on-dark); }
 

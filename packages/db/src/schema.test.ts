@@ -126,7 +126,7 @@ describe('migration 0015 Fash video models', () => {
       expect(['720p', '768p', '1080p'], r.id).toContain(r.output_resolution);
       expect(Object.keys(r.sources).filter((k) => k !== 'maxPromptChars').sort(), r.id).toEqual(['durationsSec', 'maxImages', 'outputResolution', 'ratios', 'usdPerSecond']); // 0028 adds the prompt limit's source
     }
-    expect(rows.find((r) => r.id === 'veo-3.1')).toMatchObject({ ratios: ['9:16'], durations_sec: [8] }); // no 1:1, and Fash's 8 s only
+    expect(rows.find((r) => r.id === 'veo-3.1')).toMatchObject({ ratios: ['9:16', '16:9'], durations_sec: [8] }); // no 1:1, and Fash's 8 s only; 0037 adds 16:9
     await pool.query(`update model_configs set enabled = true where id = 'kling-3.0-pro'`); // complete enough for the enable check
     await pool.query(`update model_configs set enabled = false where id = 'kling-3.0-pro'`);
   });
@@ -137,8 +137,8 @@ describe('migration 0023 Seedance in Marketing Studio', () => {
     const { rows } = await pool.query(`select id, endpoint, ratios, max_images from model_configs where 'marketing' = any(features) and provider <> 'mock' order by id`);
     expect(rows.map((r) => [r.id, r.ratios, r.max_images])).toEqual([
       ['kling-o3-pro', ['9:16', '1:1', '16:9'], 7],
-      ['seedance-2.0-reference', ['9:16', '1:1', '16:9'], 7],
-      ['seedance-2.5-reference', ['9:16', '1:1', '16:9'], 7],
+      ['seedance-2.0-reference', ['9:16', '1:1', '16:9', '4:3', '3:4'], 9], // 0037 widens both Seedance rows and gives 2.0 its 9 references
+      ['seedance-2.5-reference', ['9:16', '1:1', '16:9', '4:3', '3:4'], 7],
     ]);
     for (const r of rows) expect(AUDIO_USD_PER_SECOND[r.endpoint], r.id).toBeDefined();
   });
@@ -366,7 +366,8 @@ describe('migration 0033 Seedance 2.0 on Replicate', () => {
     const pick = `select kind, features, ratios, durations_sec, max_images, max_prompt_chars, output_resolution from model_configs where id = $1`;
     const [twin] = (await pool.query(pick, ['seedance-2.0-reference'])).rows;
     const [row] = (await pool.query(pick, ['seedance-2.0-replicate'])).rows;
-    expect(row).toEqual({ ...twin, features: twin.features.filter((f: string) => f !== 'marketing') });
+    // 0037 widens the fal twin from its own schema only, so the Replicate row keeps the twin's earlier ratios and 7 references.
+    expect(row).toEqual({ ...twin, features: twin.features.filter((f: string) => f !== 'marketing'), ratios: ['9:16', '1:1', '16:9'], max_images: 7 });
     expect(row.features).toEqual(['video']);
     const [facts] = (await pool.query(`select provider, endpoint, enabled, usd_per_second::text as usd, sources->'usdPerSecond'->>'url' as source from model_configs where id = 'seedance-2.0-replicate'`)).rows;
     expect(facts).toEqual({ provider: 'replicate', endpoint: 'bytedance/seedance-2.0', enabled: false, usd: '0.1800', source: 'https://replicate.com/bytedance/seedance-2.0' });
@@ -392,6 +393,29 @@ describe('migration 0036 Minimax H3 Max resolutions', () => {
       const { features, ratios, durations_sec, max_images } = twin(r.id.replace(/-(480p|1080p)$/, ''));
       expect({ features: r.features, ratios: r.ratios, durations_sec: r.durations_sec, max_images: r.max_images }, r.id).toEqual({ features, ratios, durations_sec, max_images });
     }
+  });
+});
+
+describe('migration 0037 references and ratios', () => {
+  test('raises the reference limits to the fal maxItems and adds the 16:9, 4:3 and 3:4 that each endpoint lists, after the rows own', async () => {
+    const { rows } = await pool.query(`select id, ratios, max_images, sources from model_configs where provider = 'fal' and kind = 'video' order by id`);
+    const of = (id: string) => rows.find((r) => r.id === id)!;
+    expect(['minimax-h3-max-reference', 'minimax-h3-max-reference-480p', 'minimax-h3-max-reference-1080p', 'seedance-2.0-reference', 'gemini-omni-flash-reference', 'grok-imagine-reference'].map((id) => [id, of(id).max_images])).toEqual([
+      ['minimax-h3-max-reference', 9],
+      ['minimax-h3-max-reference-480p', 9],
+      ['minimax-h3-max-reference-1080p', 9],
+      ['seedance-2.0-reference', 9],
+      ['gemini-omni-flash-reference', 9],
+      ['grok-imagine-reference', 7],
+    ]);
+    expect(of('minimax-h3-max-reference').ratios).toEqual(['9:16', '1:1', '16:9', '4:3', '3:4']);
+    expect(of('gemini-omni-flash-reference').ratios).toEqual(['9:16', '16:9']); // its enum has no 4:3 or 3:4
+    expect(of('kling-o3-pro').sources.ratios.readAt).not.toBe('2026-10-29'); // it already had 16:9, so it is left as it was
+    expect(of('minimax-h3-max').ratios).toEqual(['9:16', '1:1']); // its endpoint has no aspect_ratio: the first image is cropped
+    for (const r of rows) expect(r.ratios.every((x: string) => ['9:16', '1:1', '16:9', '4:3', '3:4', 'auto'].includes(x)), r.id).toBe(true);
+    const motion = rows.filter((r) => r.ratios.includes('auto'));
+    expect(motion.length).toBeGreaterThan(0);
+    for (const r of motion) expect(r.ratios, r.id).toEqual(['auto']);
   });
 });
 
