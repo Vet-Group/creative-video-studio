@@ -51,6 +51,14 @@ describe('fal image submit', () => {
     expect(body).toMatchObject({ aspect_ratio: 'auto', resolution: '1K', num_images: 1 });
   });
 
+  test('Nano Banana 2.1 sends a thinking level and an ultra-wide ratio as given, on the edit endpoint and its text twin; none sends no thinking_level', async () => {
+    const nb21 = model('google/nano-banana-2.1/edit', { '1K': '0.04' });
+    expect((await bodyFor(req(nb21, { ratio: '1:8', thinking: 'medium' }))).body).toMatchObject({ aspect_ratio: '1:8', thinking_level: 'medium' });
+    const text = await bodyFor(req(nb21, { imageUrls: [], ratio: '4:1', thinking: 'high' }));
+    expect([text.url, text.body]).toEqual(['https://queue.fal.run/google/nano-banana-2.1', expect.objectContaining({ aspect_ratio: '4:1', thinking_level: 'high' })]);
+    expect((await bodyFor(req(nb21))).body).not.toHaveProperty('thinking_level');
+  });
+
   test.each([
     ['fal-ai/nano-banana-pro/edit', 'fal-ai/nano-banana-pro'],
     ['google/nano-banana-2.1/edit', 'google/nano-banana-2.1'],

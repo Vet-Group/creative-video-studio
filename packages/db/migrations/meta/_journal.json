@@ -267,6 +267,13 @@
       "when": 1794394949036,
       "tag": "0037_more_references_and_ratios",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1794394950036,
+      "tag": "0038_image_ratios_thinking",
+      "breakpoints": true
     }
   ]
 }

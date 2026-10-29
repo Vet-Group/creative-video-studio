@@ -61,6 +61,15 @@ describe('vertex Gemini image models', () => {
     expect(JSON.parse(calls[1]!.body).generationConfig.imageConfig).toEqual({ aspectRatio: '9:16' });
   });
 
+  test('a thinking level goes in thinkingConfig, upper-case, with an ultra-wide ratio; none sends no thinkingConfig', async () => {
+    const { fn, calls } = fakeFetch([200, geminiAnswer], [200, geminiAnswer]);
+    const nb21 = model('nano-banana-2.1-vertex', 'gemini-nano-banana-2.1', { '1K': '0.034' });
+    await provider(fn).submit(req(nb21, { ratio: '8:1', resolution: '1K', thinking: 'high' }));
+    await provider(fn).submit(req(nb21, { resolution: '1K' }));
+    expect(JSON.parse(calls[0]!.body).generationConfig).toEqual({ responseModalities: ['IMAGE'], candidateCount: 1, imageConfig: { aspectRatio: '8:1', imageSize: '1K' }, thinkingConfig: { thinkingLevel: 'HIGH' } });
+    expect(JSON.parse(calls[1]!.body).generationConfig).not.toHaveProperty('thinkingConfig');
+  });
+
   test('a 200 without an image fails at the estimate, since its tokens are billed', async () => {
     const { fn } = fakeFetch([200, { candidates: [{ finishReason: 'SAFETY', content: { parts: [] } }] }]);
     const p = provider(fn);

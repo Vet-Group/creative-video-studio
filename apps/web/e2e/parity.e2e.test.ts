@@ -384,7 +384,7 @@ test('as on Fash, a sample with a details file shows its prompt, input photos, s
     await expect(page.getByLabel('Ảnh đã chọn').getByRole('img', { name: 'example-2-ref.jpg' })).toBeVisible();
     await detail.getByRole('button', { name: 'Chép prompt vào ô Prompt' }).click();
     await expect(page.getByRole('textbox', { name: 'Mô tả chuyển động' })).toHaveValue(details.prompt);
-    await detail.getByRole('button', { name: '1:1' }).click();
+    await detail.getByRole('button', { name: '1:1', exact: true }).click();
     await expect(select(page, 'Tỉ lệ khung hình')).toHaveAttribute('data-value', '1:1');
 
     await detail.getByRole('button', { name: 'Dùng lại' }).click(); // in place, as Fash's Recreate

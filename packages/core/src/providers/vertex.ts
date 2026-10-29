@@ -2,7 +2,8 @@
 //   Gemini image models (Nano Banana): https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/capabilities/image-generation (model ids,
 //   location global, generateContent with responseModalities IMAGE, inlineData in the answer); imageConfig.aspectRatio and imageSize:
 //   https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/capabilities/gemini-edit-images; ratios and 1K/2K/4K:
-//   https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/gemini/3-pro-image
+//   https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/gemini/3-pro-image; thinking levels by model (read 2026-10-30):
+//   https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/thinking, and the field: .../reference/rest/v1/GenerationConfig
 //   Virtual Try-On: https://docs.cloud.google.com/vertex-ai/generative-ai/docs/image/generate-virtual-try-on-images (virtual-try-on-001:predict,
 //   personImage, productImages, predictions[].bytesBase64Encoded)
 //   Product Recontext: https://docs.cloud.google.com/vertex-ai/generative-ai/docs/model-reference/imagen-product-recontext-api (prompt, up to three
@@ -89,7 +90,8 @@ function callFor(req: ImageSubmitRequest, images: Inline[], project: string, reg
       path: `https://aiplatform.googleapis.com/v1/projects/${project}/locations/global/publishers/google/models/${model}:generateContent`,
       body: {
         contents: [{ role: 'user', parts: [...images.map((inlineData) => ({ inlineData })), { text: req.prompt }] }],
-        generationConfig: { responseModalities: ['IMAGE'], candidateCount: 1, imageConfig },
+        // thinkingLevel is an upper-case enum (GenerationConfig in the REST reference); sent only on a job that names a level.
+        generationConfig: { responseModalities: ['IMAGE'], candidateCount: 1, imageConfig, ...(req.thinking && { thinkingConfig: { thinkingLevel: req.thinking.toUpperCase() } }) },
       },
       pick: geminiImage,
     };

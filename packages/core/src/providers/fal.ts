@@ -180,10 +180,12 @@ export function createFalProvider(opts: { apiKey: string; fetch?: Fetch; readIma
 
 type ImageBody = (req: ImageSubmitRequest, imageUrls: string[]) => Record<string, unknown>;
 
-/** The Nano Banana family takes the ratio and, except the first model, a resolution label as they are. */
+/** The Nano Banana family takes the ratio and, except the first model, a resolution label as they are, and a thinking level only on a job that names one (the jobs API allows it on the models that list it). */
 const nano =
   (withResolution: boolean): ImageBody =>
-  (req, image_urls) => ({ prompt: req.prompt, image_urls, aspect_ratio: req.ratio, ...(withResolution && { resolution: req.resolution }), num_images: 1, output_format: 'png' });
+  (req, image_urls) => ({
+    prompt: req.prompt, image_urls, aspect_ratio: req.ratio, ...(withResolution && { resolution: req.resolution }), ...(req.thinking && { thinking_level: req.thinking }), num_images: 1, output_format: 'png',
+  });
 
 /** GPT Image 2 takes only these preset sizes (its schema states no limits for a custom size). */
 const GPT_SIZES: Record<string, string> = { auto: 'auto', '1:1': 'square_hd', '3:4': 'portrait_4_3', '9:16': 'portrait_16_9', '4:3': 'landscape_4_3', '16:9': 'landscape_16_9' };

@@ -419,6 +419,25 @@ describe('migration 0037 references and ratios', () => {
   });
 });
 
+describe('migration 0038 ultra-wide ratios and thinking levels', () => {
+  test('gives Nano Banana 2 and 2.1 the four ultra-wide ratios and 2.1 its thinking levels, on fal and Vertex, and lets a job store the ratios', async () => {
+    const { rows } = await pool.query(`select id, ratios, thinking_levels, sources from model_configs where kind = 'image' order by id`);
+    const wide = ['4:1', '1:4', '8:1', '1:8'];
+    const nb2 = ['nano-banana-2', 'nano-banana-2-vertex', 'nano-banana-2.1', 'nano-banana-2.1-vertex'];
+    for (const r of rows) {
+      expect(r.ratios.slice(-4).join() === wide.join(), r.id).toBe(nb2.includes(r.id));
+      expect(r.thinking_levels, r.id).toEqual(r.id.startsWith('nano-banana-2.1') ? ['minimal', 'medium', 'high'] : []);
+    }
+    for (const id of nb2) expect(rows.find((r) => r.id === id)!.sources.ratios.readAt, id).toBe('2026-10-30');
+    expect(rows.find((r) => r.id === 'nano-banana-2.1-vertex')!.sources.thinkingLevels.url).toBe('https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/thinking');
+    const user = await insertUser();
+    const job = await insertJob(user);
+    await pool.query(`update jobs set aspect = '8:1' where id = $1`, [job]);
+    await pool.query(`update jobs set aspect = '1:4' where id = $1`, [job]);
+    await expect(pool.query(`update jobs set aspect = '2:1' where id = $1`, [job])).rejects.toThrow(/jobs_aspect_check/);
+  });
+});
+
 describe('cost_entries', () => {
   test('is append-only: UPDATE, DELETE and TRUNCATE raise', async () => {
     const job = await insertJob(userId);

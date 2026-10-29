@@ -468,6 +468,10 @@ describe('POST /api/jobs for an image feature', () => {
          ('img-mock', 'mock', 'mock', 'Img mock', 'image', '{image}', '{auto,1:1}', '{}', 2, '{"1K": "0.2000"}', '{}', true),
          ('img-text', 'fal', 'fal-ai/nano-banana-pro/edit', 'Img text', 'image', '{image,try_on}', '{auto,1:1,3:4}', '{}', 2, '{"1K": "0.1500", "2K": "0.1500"}', '{}', true)`,
     );
+    await pool.query(
+      `insert into model_configs (id, provider, endpoint, label, kind, features, ratios, thinking_levels, durations_sec, max_images, image_prices, sources, enabled) values
+         ('img-think', 'fal', 'google/nano-banana-2.1/edit', 'Img think', 'image', '{image}', '{auto,21:9,4:1,1:4,8:1,1:8}', '{minimal,medium,high}', '{}', 2, '{"1K": "0.0400"}', '{}', true)`,
+    );
   });
 
   test('creates a queued image job with the per-image estimate, 0 seconds, the params and the feature', async () => {
@@ -505,6 +509,15 @@ describe('POST /api/jobs for an image feature', () => {
     expect((await pool.query('select usd::text from cost_entries where job_id = $1', [mock.id])).rows).toEqual([{ usd: '0.0000' }]);
   });
 
+  test('takes an ultra-wide ratio and a thinking level the model lists, at the same per-image estimate', async () => {
+    const m = await newMember();
+    const res = await runImage(m, { modelId: 'img-think', ratio: '8:1', params: { resolution: '1K', thinking: 'high' } });
+    expect(res.status).toBe(201);
+    const { id } = (await res.json()) as { id: string };
+    expect((await pool.query('select aspect, params from jobs where id = $1', [id])).rows).toEqual([{ aspect: '8:1', params: { resolution: '1K', thinking: 'high' } }]);
+    expect((await pool.query('select usd::text from cost_entries where job_id = $1', [id])).rows).toEqual([{ usd: '0.0400' }]);
+  });
+
   test.each([
     ['a model that does not list the feature', { modelId: 'img-only', feature: 'try_on', two: true }, /does not offer this feature/],
     ['a video model', { modelId: 'fal-test' }, /does not offer this feature/],
@@ -513,8 +526,11 @@ describe('POST /api/jobs for an image feature', () => {
     ['a resolution the model lacks', { params: { resolution: '4K' } }, /ratio, resolution or number of images/],
     ['a prototype key as the resolution', { params: { resolution: 'constructor' } }, /ratio, resolution or number of images/],
     ['no resolution', { params: {} }, /params\.resolution is required/],
-    ['a param that is not allowed', { params: { resolution: '1K', seed: '1' } }, /only resolution, quality and brief/],
+    ['a param that is not allowed', { params: { resolution: '1K', seed: '1' } }, /only resolution, quality, thinking and brief/],
     ['a quality that does not exist', { params: { resolution: '1K', quality: 'ultra' } }, /params\.quality must be one of/],
+    ['a thinking level on a model with none', { params: { resolution: '2K', thinking: 'high' } }, /the model has no thinking level/],
+    ['a thinking level the model lacks', { modelId: 'img-think', ratio: 'auto', params: { resolution: '1K', thinking: 'low' } }, /params\.thinking must be one of minimal, medium, high on this model/],
+    ['an ultra-wide ratio on a model without it', { ratio: '4:1' }, /ratio, resolution or number of images/],
     ['a preset', { presetId: 'gentle-push-in', prompt: undefined }, /takes a prompt and no preset/],
     ['no prompt', { prompt: undefined }, /takes a prompt and no preset/],
     ['an unknown feature', { feature: 'telepathy' }, /feature must be one of/],
@@ -564,7 +580,7 @@ describe('POST /api/jobs for an image feature', () => {
     const before = await jobCount();
     expect(await error(await runImage(m, { ...tryOn, params: { resolution: '1K', garments: '2' } }))).toMatch(/params.garments must count the garment images \(1 to 1\)/); // 2 inputs: the person and 1 garment
     expect(await error(await runImage(m, { ...tryOn, params: { resolution: '1K', garments: 'x' } }))).toMatch(/params.garments must count the garment images/);
-    expect(await error(await runImage(m, { params: { resolution: '1K', garments: '1' } }))).toMatch(/params may hold only resolution, quality and brief/);
+    expect(await error(await runImage(m, { params: { resolution: '1K', garments: '1' } }))).toMatch(/params may hold only resolution, quality, thinking and brief/);
     expect(await error(await runImage(m, { params: { resolution: '1K', brief: 'x'.repeat(5001) } }))).toMatch(/params.brief may be at most 5000/);
     expect(await jobCount()).toBe(before);
   });

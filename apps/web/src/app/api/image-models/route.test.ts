@@ -21,7 +21,7 @@ async function newUser(email: string, role: 'member' | 'admin') {
   return res.headers.getSetCookie().map((c) => c.split(';')[0]).join('; ');
 }
 const call = (cookie: string | undefined, query: string) => GET(new Request(`http://localhost/api/image-models${query}`, { headers: cookie ? { cookie } : {} }));
-type Model = { id: string; label: string; isMock: boolean; ratios: string[]; resolutions: string[]; prices: Record<string, string>; maxImages: number; maxPromptChars: number; textToImage: boolean; score: number; recommended: boolean };
+type Model = { id: string; label: string; isMock: boolean; ratios: string[]; resolutions: string[]; prices: Record<string, string>; maxImages: number; maxPromptChars: number; textToImage: boolean; thinking: string[]; score: number; recommended: boolean };
 const list = async (feature: string, cookie = memberCookie) => ((await (await call(cookie, `?feature=${feature}`)).json()) as { models: Model[] }).models;
 const setEnabled = (id: string, enabled: boolean) => pool.query('update model_configs set enabled = $2 where id = $1', [id, enabled]);
 
@@ -36,6 +36,7 @@ beforeAll(async () => {
        ('t-mock', 'mock', 'mock', 'D mock', 'image', '{image,try_on}', '{auto,3:4}', '{}', 4, '{"1K": "0.1500"}', '{}', true, 4096),
        ('t-off', 'fal', 'x', 'E disabled', 'image', '{image,try_on}', '{auto}', '{}', 4, '{"1K": "0.1"}', '{}', false, 2000)`,
   );
+  await pool.query(`update model_configs set thinking_levels = '{minimal,medium,high}' where id = 't-both'`);
   await pool.query(
     `insert into model_configs (id, provider, endpoint, label, kind, features, ratios, durations_sec, max_images, output_resolution, usd_per_second, sources, enabled)
      values ('t-video', 'fal', 'x', 'F video', 'video', '{video,image}', '{9:16}', '{5}', 4, '720p', 0.1, '{}', true)`,
@@ -53,12 +54,12 @@ describe('GET /api/image-models', () => {
     for (const q of ['', '?feature=', '?feature=video', '?feature=marketing', '?feature=nope']) expect((await call(memberCookie, q)).status, q).toBe(400);
   });
 
-  test('lists the enabled image models of a feature, by label, with ratios, resolutions, prices and the image limit', async () => {
+  test('lists the enabled image models of a feature, by label, with ratios, resolutions, prices, the image limit and the thinking levels', async () => {
     const unscored = { passRate: null, reliability: 1, score: 50, passes: 0, total: 0, recommended: false }; // equal scores: no badge
     expect(await list('image')).toEqual([
-      { id: 't-image', label: 'A image only', provider: 'fal', isMock: false, ratios: ['auto'], resolutions: ['1K'], prices: { '1K': '0.0400' }, maxImages: 2, maxPromptChars: 2000, textToImage: true, ...unscored }, // its endpoint has a text-to-image twin
-      { id: 't-both', label: 'B both', provider: 'fal', isMock: false, ratios: ['auto', '1:1'], resolutions: ['1K', '2K'], prices: { '1K': '0.1500', '2K': '0.3000' }, maxImages: 4, maxPromptChars: 5000, textToImage: false, ...unscored }, // 50000 in its schema, under the ceiling
-      { id: 't-mock', label: 'D mock', provider: 'mock', isMock: true, ratios: ['auto', '3:4'], resolutions: ['1K'], prices: { '1K': '0.0000' }, maxImages: 4, maxPromptChars: 4096, textToImage: true, ...unscored },
+      { id: 't-image', label: 'A image only', provider: 'fal', isMock: false, ratios: ['auto'], resolutions: ['1K'], prices: { '1K': '0.0400' }, maxImages: 2, maxPromptChars: 2000, textToImage: true, thinking: [], ...unscored }, // its endpoint has a text-to-image twin
+      { id: 't-both', label: 'B both', provider: 'fal', isMock: false, ratios: ['auto', '1:1'], resolutions: ['1K', '2K'], prices: { '1K': '0.1500', '2K': '0.3000' }, maxImages: 4, maxPromptChars: 5000, textToImage: false, thinking: ['minimal', 'medium', 'high'], ...unscored }, // 50000 in its schema, under the ceiling
+      { id: 't-mock', label: 'D mock', provider: 'mock', isMock: true, ratios: ['auto', '3:4'], resolutions: ['1K'], prices: { '1K': '0.0000' }, maxImages: 4, maxPromptChars: 4096, textToImage: true, thinking: [], ...unscored },
     ]);
     expect((await list('try_on')).map((m) => m.id)).toEqual(['t-both', 't-tryon', 't-mock']);
   });

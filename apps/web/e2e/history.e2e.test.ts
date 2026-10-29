@@ -58,14 +58,14 @@ test('as on Fash, a History chip sets its resolution, ratio or duration on the f
   await expect(select(page, 'Độ phân giải')).toHaveAttribute('data-value', '2K');
   await selectValue(page, 'Độ phân giải', '1K');
   await expect(select(page, 'Độ phân giải')).toHaveAttribute('data-value', '1K');
-  await card.getByRole('button', { name: '2K' }).click();
+  await card.getByRole('button', { name: '2K', exact: true }).click();
   await expect(select(page, 'Độ phân giải')).toHaveAttribute('data-value', '2K');
   await expect(toast('Đã chọn độ phân giải 2K')).toBeVisible();
   await expect(toast('Đã chọn độ phân giải 2K')).toBeHidden({ timeout: 6_000 }); // a note goes by itself, with no Library link
   await expect(select(page, 'Tỉ lệ')).toHaveAttribute('data-value', '1:1');
   await selectValue(page, 'Tỉ lệ', 'auto');
   await expect(select(page, 'Tỉ lệ')).toHaveAttribute('data-value', 'auto');
-  await card.getByRole('button', { name: '1:1' }).click();
+  await card.getByRole('button', { name: '1:1', exact: true }).click(); // exact: the card's save-as-template button names the job time, and 01:14 holds 1:1
   await expect(select(page, 'Tỉ lệ')).toHaveAttribute('data-value', '1:1');
   await expect(toast('Đã chọn tỉ lệ 1:1')).toBeVisible();
 
@@ -82,7 +82,7 @@ test('as on Fash, a History chip sets its resolution, ratio or duration on the f
   await clip.getByRole('button', { name: '5s' }).click();
   await expect(select(page, 'Thời lượng')).toHaveAttribute('data-value', '5');
   await expect(toast('Đã chọn thời lượng 5s')).toBeVisible();
-  await clip.getByRole('button', { name: '9:16' }).click();
+  await clip.getByRole('button', { name: '9:16', exact: true }).click();
   await expect(select(page, 'Tỉ lệ khung hình')).toHaveAttribute('data-value', '9:16');
 
   // The Library's cards have no form beside them: their chips stay plain text.

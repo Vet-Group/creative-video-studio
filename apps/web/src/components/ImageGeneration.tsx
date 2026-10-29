@@ -9,7 +9,7 @@ import { confirmRun, runKey } from '@/lib/run-guard';
 import { useHydrated } from '@/lib/use-hydrated';
 import { useRecall } from '@/lib/use-recall';
 import { About } from './About';
-import { Gallery, type Img, photoImg, RATIO_LABEL, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
+import { Gallery, type Img, photoImg, RATIO_LABEL, THINKING_LABEL, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
 import { EnhanceToggle } from './EnhanceToggle';
 import { Icon } from './Icon';
 import { FormContext, type Photo, useApplier, useJobs } from './jobs';
@@ -125,7 +125,7 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
     setError('');
     setNotice('');
     try {
-      const body = { feature: 'image', modelId: pick.modelId, assetIds: images.map((i) => i.id), prompt: prompt.trim(), enhance, ratio: pick.ratio, params: { resolution: pick.resolution } };
+      const body = { feature: 'image', modelId: pick.modelId, assetIds: images.map((i) => i.id), prompt: prompt.trim(), enhance, ratio: pick.ratio, params: { resolution: pick.resolution, ...(pick.thinking && { thinking: pick.thinking }) } };
       await api('/api/jobs', sendJson('POST', body));
       setNotice('Đã gửi job. Theo dõi trong tab "Lịch sử".');
       setTab('history');
@@ -225,6 +225,7 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
               <>
                 <Select label="Tỉ lệ" icon="ratio" heading="Chọn tỉ lệ" value={pick.ratio} options={chosen.ratios.map((r) => ({ value: r, label: RATIO_LABEL[r] ?? r }))} onChange={pick.setRatio} />
                 <Select label="Độ phân giải" icon="preset" heading="Chọn độ phân giải" value={pick.resolution} options={chosen.resolutions.map((r) => ({ value: r, label: r }))} onChange={pick.setResolution} />
+                {pick.thinking && <Select label="Mức suy luận" icon="sliders" heading="Chọn mức suy luận" value={pick.thinking} options={chosen.thinking.map((t) => ({ value: t, label: THINKING_LABEL[t] ?? t }))} onChange={pick.setThinking} />}
               </>
             )}
           </div>
