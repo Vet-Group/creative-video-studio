@@ -46,6 +46,7 @@ export const USERS = {
   rema: { email: 'rema@e2e.test', name: 'E2E Remember A', role: 'member' },
   remb: { email: 'remb@e2e.test', name: 'E2E Remember B', role: 'member' },
   remc: { email: 'remc@e2e.test', name: 'E2E Remember C', role: 'member' },
+  remd: { email: 'remd@e2e.test', name: 'E2E Remember D', role: 'member' },
   custa: { email: 'custa@e2e.test', name: 'E2E Custom A', role: 'member' },
   custb: { email: 'custb@e2e.test', name: 'E2E Custom B', role: 'member' },
   // The Run guard, Ctrl+Enter, recent prompts, the prompt box and the zip download (upgrades spec), one account per part.

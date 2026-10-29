@@ -146,7 +146,7 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
       {/* Above the gallery, not in the prompt bar, which keeps Fash's one-row height. */}
       <Templates feature="image" data={() => ({ images: images.map((i) => i.id), prompt: prompt.trim(), enhance, ratio: pick.ratio, resolution: pick.resolution, modelId: pick.modelId })} />
       <div className="imagegen-side" id={`imagegen-panel-${tab}`} role="tabpanel" aria-labelledby={`imagegen-tab-${tab}`}>
-        <FormContext.Provider value={{ recreate, apply, photo: (p) => void take(p), prompt: (text) => (setPrompt(text), notify('Đã chép prompt')), result: (p) => void take(p) }}>
+        <FormContext.Provider value={{ recreate: (from) => (recall.touch(), recreate(from)), apply, photo: (p) => void take(p), prompt: (text) => (setPrompt(text), notify('Đã chép prompt')), result: (p) => void take(p) }}>
           {tab === 'examples' ? <Gallery kind="image" samples="image-example-" label="Ảnh của công ty" emptyText="Chưa có ảnh nào trong công ty. Hãy tạo ảnh đầu tiên bên dưới." /> : tab === 'about' ? <About page={ABOUT.image} /> : <Tray feature="image" />}
         </FormContext.Provider>
       </div>

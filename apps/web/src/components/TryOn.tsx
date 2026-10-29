@@ -271,7 +271,7 @@ export function TryOn({ reuse }: { reuse?: string }) {
         <div className="side" id={`tryon-panel-${panel}`} role="tabpanel" aria-labelledby={`tryon-tab-${panel}`} hidden={narrow && shown === 'create'}>
           <FormContext.Provider
             value={{
-              recreate: (from) => (recreate(from), narrow && setTab('create')),
+              recreate: (from) => (recall.touch(), recreate(from), narrow && setTab('create')),
               apply,
               photo: (p, role) => void take(p, role),
               prompt: (text) => (setPrompt(text), notify('Đã chép prompt')),
