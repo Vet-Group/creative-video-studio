@@ -1,7 +1,7 @@
 // Hand-written fixtures until B.5a replaces them with recorded real responses. No test reads FAL_KEY or REPLICATE_API_TOKEN.
 import { describe, expect, test } from 'vitest';
 import { AUDIO_USD_PER_SECOND, BAKEOFF_MODELS } from '../models';
-import { createFalProvider, VIDEO_BODIES } from './fal';
+import { createFalProvider, VIDEO_BODIES, videoInputs } from './fal';
 import { ImageReadError, isFundingRefusal, MAX_INLINE_CHARS, ProviderHttpError, unpackJobId } from './http';
 import { createMockVideoProvider, MOCK_FAIL } from './mock';
 import { createReplicateProvider } from './replicate';
@@ -61,6 +61,29 @@ describe('fal', () => {
     expect(await body('minimax/h3-max/reference-to-video', undefined, '1080p')).toMatchObject({ resolution: '1080P' });
     expect(await body('minimax/h3-max/image-to-video', undefined, '480p')).toMatchObject({ resolution: '480P' });
     expect(await body('fal-ai/minimax/hailuo-2.3/pro/image-to-video')).toEqual({ prompt: 'put image 1 on image 2', image_url: 'https://img/1.jpg' });
+  });
+
+  test('an end frame goes in each end-frame endpoint’s own field, read like the inputs (cropped where they are); elsewhere it is refused before any call', async () => {
+    const withEnd = Object.keys(VIDEO_BODIES).filter((e) => videoInputs(e).endFrame);
+    // The endpoints whose schema has end_image_url or tail_image_url (read 2026-10-30).
+    expect(withEnd.sort()).toEqual([
+      'bytedance/seedance-2.0/us/image-to-video', 'bytedance/seedance-2.5/us/image-to-video', 'fal-ai/bytedance/seedance/v1.5/pro/image-to-video', 'fal-ai/bytedance/seedance/v1/pro/image-to-video',
+      'fal-ai/kling-video/o3/pro/reference-to-video', 'fal-ai/kling-video/v2.5-turbo/pro/image-to-video', 'fal-ai/kling-video/v2.6/pro/image-to-video', 'fal-ai/kling-video/v3/pro/image-to-video',
+      'fal-ai/wan/v2.7/image-to-video', 'google/gemini-omni-flash/v1.1/image-to-video', 'minimax/h3-max/image-to-video', 'minimax/h3-max/reference-to-video',
+    ]);
+    const crops: Record<string, (string | undefined)[]> = {};
+    const { fn, calls } = fakeFetch(...withEnd.map(() => [200, { request_id: 'r' }] as [number, unknown]));
+    for (const endpoint of withEnd) {
+      const read = async (url: string, opts?: { ratio?: string }) => ((crops[endpoint] ??= []).push(`${url} ${opts?.ratio ?? 'as is'}`), readImage(url));
+      await createFalProvider({ apiKey: 'k', fetch: fn, readImage: read }).submit({ ...req, imageUrls: ['asset://start'], endImageUrl: 'asset://end', model: { ...kling, endpoint } });
+    }
+    withEnd.forEach((endpoint, i) => expect(calls[i]!.body).toMatchObject({ [endpoint.includes('v2.5-turbo') ? 'tail_image_url' : 'end_image_url']: DATA_URL }));
+    expect(crops['fal-ai/kling-video/v3/pro/image-to-video']).toEqual(['asset://start 9:16', 'asset://end 9:16']); // both frames in the chosen ratio
+    expect(crops['fal-ai/kling-video/o3/pro/reference-to-video']).toEqual(['asset://start as is', 'asset://end as is']);
+    expect(calls).toHaveLength(withEnd.length);
+    await expect(createFalProvider({ apiKey: 'k', fetch: fn }).submit({ ...req, endImageUrl: 'https://img/end.jpg', model: { ...kling, endpoint: 'fal-ai/kling-video/o1/reference-to-video' } })).rejects.toThrow(ImageReadError);
+    expect(calls).toHaveLength(withEnd.length);
+    expect(videoInputs('mock')).toEqual({ endFrame: false });
   });
 
   test('an endpoint without a request builder is refused before any call', async () => {

@@ -243,6 +243,12 @@ The owner widened the scope on 2026-10-23 from video only to the whole dashboard
 - **Seedance on this network:** from the VET server, as from the office PC, TLS to `replicate.delivery` times out (TCP connects, no handshake, 3 of 3 tries), while `api.replicate.com` and `fal.media` work. Seedance clips could not be downloaded here, so Seedance stays disabled for network reasons too, not only its 67% pass rate.
 - **Ledger:** bake-off billed $14.85; the smoke clip $0.56; the image-model check $1.09 (fal Usage page).
 
+### Create Video extras (2026-10-30)
+
+The owner asked for Fash's Create Videos inputs beyond the product images.
+
+- **End frame:** an optional image the clip ends on, on the 12 fal endpoints whose schema has `end_image_url` (`tail_image_url` on Kling 2.5 Turbo), declared next to each request builder (`VIDEO_BODIES` in `packages/core/src/providers/fal.ts`). The form shows the slot only for those models; the job keeps it in `params.endAssetId`. fal prices these endpoints by output seconds or output tokens, so the estimate is unchanged, except Minimax H3 Max Reference, where the frame counts toward the 4,096 free reference tokens. Not checked with a paid run.
+
 ## Evidence gaps
 
 ### A. Designable independently (no Fash behaviour needed)

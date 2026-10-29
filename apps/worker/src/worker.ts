@@ -225,7 +225,10 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
         }
         const provider = providers[job.provider];
         if (!provider) throw new Error(`no adapter for provider ${job.provider}`);
-        const request: SubmitRequest = { model: await loadModel(job.model, job.params.audio), prompt: job.prompt, imageUrls, ratio: job.aspect, durationSec: job.duration_s, audio: job.params.audio === 'on' };
+        const request: SubmitRequest = {
+          model: await loadModel(job.model, job.params.audio), prompt: job.prompt, imageUrls, ratio: job.aspect, durationSec: job.duration_s, audio: job.params.audio === 'on',
+          ...(job.params.endAssetId && { endImageUrl: `asset://${job.params.endAssetId}` }),
+        };
         return { send: () => provider.submit(request) };
       })().catch(async (e) => {
         await release(pool, jobId, e instanceof Error ? e.message : String(e));

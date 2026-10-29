@@ -15,7 +15,7 @@ import { AudioSwitch } from './AudioSwitch';
 import { CardMedia } from './CardMedia';
 import { EnhanceToggle } from './EnhanceToggle';
 import { Icon } from './Icon';
-import { photoImg, sampleFile, uploadImages } from './image-tools';
+import { photoImg, sampleFile, Slot, UPLOAD_ERROR, uploadImages } from './image-tools';
 import { FormContext, type Photo, Tap, useApplier, useHasHistory, useJobs, useRecreated } from './jobs';
 import { Modal } from './Modal';
 import { ModelPicker } from './ModelPicker';
@@ -39,6 +39,8 @@ interface Model {
   estimateUsd: string;
   /** The estimate with native audio on; null when the model cannot make audio. */
   audioEstimateUsd: string | null;
+  /** The model takes an end frame. */
+  endFrame: boolean;
   passRate: number | null;
   score: number;
   recommended: boolean;
@@ -97,6 +99,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
   const recreated = useRecreated();
   const hydrated = useHydrated();
   const [images, setImages] = useState<Image[]>([]);
+  const [endFrame, setEndFrame] = useState<Image | null>(null); // the image the clip ends on, as Fash's End frame; sent only on a model that takes one
   const [presets, setPresets] = useState<{ id: string; label: string }[] | null>(null);
   const [presetId, setPresetId] = useState(''); // '' means a free prompt
   const [enhance, setEnhance] = useState(true); // on by default, as on Fash; it rewrites a free prompt only
@@ -230,6 +233,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
 
   const chosen = models?.models.find((m) => m.id === modelId);
   const audioOn = audio && chosen?.audioEstimateUsd != null;
+  const endAssetId = chosen?.endFrame ? endFrame?.id : undefined;
   // The options follow the chosen model; before one is chosen, every model's options show.
   const durations = [...new Set(chosen ? chosen.durationsSec : (models?.models.flatMap((m) => m.durationsSec) ?? [durationSec]))].sort((a, b) => a - b);
   const ratios = chosen ? chosen.ratios : (models?.models.flatMap((m) => m.ratios) ?? [ratio]);
@@ -263,7 +267,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
     setError('');
     setNotice('');
     try {
-      await api('/api/jobs', sendJson('POST', { assetIds: images.map((i) => i.id), modelId, ...(presetId ? { presetId } : { prompt, enhance }), ratio, durationSec, storeId: storeId || null, params: { audio: audioOn ? 'on' : 'off' } }));
+      await api('/api/jobs', sendJson('POST', { assetIds: images.map((i) => i.id), modelId, ...(presetId ? { presetId } : { prompt, enhance }), ratio, durationSec, storeId: storeId || null, params: { audio: audioOn ? 'on' : 'off', ...(endAssetId && { endAssetId }) } }));
       setNotice('Đã gửi job. Theo dõi trong tab "Lịch sử".');
       setRefetch((n) => n + 1);
       if (!narrow) setTab('history'); // beside the form, the new job shows in History
@@ -437,6 +441,24 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
                 </ul>
               )}
             </div>
+            {chosen?.endFrame && (
+              <Slot
+                label="Khung hình cuối"
+                empty="Ảnh clip kết thúc ở đó (không bắt buộc)"
+                inputLabel="Ảnh khung hình cuối"
+                images={endFrame ? [endFrame] : []}
+                max={1}
+                busy={busy}
+                onAdd={(files) => {
+                  setError('');
+                  setBusy(true);
+                  uploadImages(files)
+                    .then(([img]) => img && setEndFrame(img), () => setError(UPLOAD_ERROR))
+                    .finally(() => setBusy(false));
+                }}
+                onRemove={() => setEndFrame(null)}
+              />
+            )}
 
             {models && models.models.length > 0 && (
               <ModelPicker

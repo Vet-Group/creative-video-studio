@@ -10,6 +10,8 @@ export interface SubmitRequest {
   durationSec: number;
   /** Native audio on; only the endpoints of AUDIO_USD_PER_SECOND read it, and the others stay silent. */
   audio?: boolean;
+  /** The image the clip ends on, on a model that takes one (fal's VIDEO_BODIES `end`). */
+  endImageUrl?: string;
 }
 
 /** fal's queue URLs include the model endpoint, so polling needs the model as well as the id. */
