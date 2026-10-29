@@ -1,5 +1,5 @@
 import { type Browser, expect, type Page, test } from '@playwright/test';
-import { modelButton, pickModel, png, select, selectValue, signIn } from './support.test';
+import { clearMyJobs, modelButton, pickModel, png, select, selectValue, signIn } from './support.test';
 import type { UserKey } from './users';
 
 const file = (name: string) => ({ name, mimeType: 'image/png', buffer: png() });
@@ -46,6 +46,7 @@ const pages: [string, (page: Page) => Promise<void>][] = [
 test("each page opens with the model and settings of the member's last Run, after a reload and in another browser", async ({ page, browser }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await signIn(page, 'rema');
+  await clearMyJobs(page); // a retry opens on the defaults again, not on the first attempt's Runs
 
   await page.goto('/image-generation');
   const bar = page.getByRole('group', { name: 'Thanh tạo ảnh' });
@@ -166,4 +167,20 @@ test("a refill wins over the memory: Dùng lại shows the job's settings, and a
   await expect(select(page, 'Độ phân giải')).toHaveAttribute('data-value', '1K');
   await expect(page.getByRole('group', { name: 'Thanh tạo ảnh' }).getByRole('status')).toHaveText('Nhập mô tả cảnh bạn muốn tạo.');
   await expect(page.getByRole('group', { name: 'Thanh tạo ảnh' }).getByRole('alert')).toHaveCount(0);
+});
+
+test('a memory that hangs holds Run only for a while: then the page goes on its defaults, and a late answer leaves the form alone', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await signIn(page, 'remb');
+  let answer: (() => void) | undefined;
+  await page.route(/\/api\/recall\?feature=image/, (r) => new Promise<void>((done) => (answer = done)).then(() => r.fulfill({ json: { settings: { modelId: 'mock-image-e2e', ratio: '16:9', durationSec: null, resolution: '2K', audio: null, enhance: null, storeId: null } } })));
+  await page.goto('/image-generation');
+  const status = page.getByRole('group', { name: 'Thanh tạo ảnh' }).getByRole('status');
+  await expect(status).toHaveText('Đang tải cài đặt đã dùng...');
+  await expect(status).toHaveText('Nhập mô tả cảnh bạn muốn tạo.', { timeout: 15_000 });
+  answer?.();
+  await page.waitForTimeout(1000);
+  await expect(select(page, 'Tỉ lệ')).toHaveAttribute('data-value', 'auto');
+  await expect(select(page, 'Độ phân giải')).toHaveAttribute('data-value', '1K');
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
 });

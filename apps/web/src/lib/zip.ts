@@ -99,9 +99,10 @@ async function* parts(entries: ZipEntry[], time: number, date: number): AsyncGen
 export function zipStream(entries: ZipEntry[], now = new Date()): ReadableStream<Uint8Array> {
   if (entries.length >= 0xffff) throw new RangeError('a zip32 holds fewer than 65535 entries');
   if (entries.reduce((sum, e) => sum + e.bytes, 0) >= ZIP32_LIMIT) throw new RangeError('a zip32 holds less than 4 GiB');
-  // MS-DOS time and date, in the server's local time as zip tools expect.
-  const time = (now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1);
-  const date = ((Math.max(now.getFullYear(), 1980) - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate();
+  // MS-DOS time and date are local with no zone: Vietnam time (UTC+7, no daylight saving), what the members' clocks show, whatever the server's zone.
+  const ict = new Date(now.getTime() + 7 * 3600_000);
+  const time = (ict.getUTCHours() << 11) | (ict.getUTCMinutes() << 5) | (ict.getUTCSeconds() >> 1);
+  const date = ((Math.max(ict.getUTCFullYear(), 1980) - 1980) << 9) | ((ict.getUTCMonth() + 1) << 5) | ict.getUTCDate();
   const it = parts(entries, time, date);
   return new ReadableStream<Uint8Array>({
     async pull(controller) {

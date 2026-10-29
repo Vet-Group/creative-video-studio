@@ -24,6 +24,13 @@ function lister(): ((file: string) => string) | null {
 }
 
 describe('zipStream', () => {
+  it('stamps entries with the Vietnam time, whatever the server zone', async () => {
+    // 17:30:10 UTC on 29 Oct is 00:30:10 on 30 Oct in Vietnam.
+    const v = new DataView((await bytesOf(zipStream([{ name: 'a.txt', bytes: 0, open: source() }], new Date('2026-10-29T17:30:10Z')))).buffer);
+    expect(v.getUint16(10, true)).toBe((0 << 11) | (30 << 5) | (10 >> 1));
+    expect(v.getUint16(12, true)).toBe(((2026 - 1980) << 9) | (10 << 5) | 30);
+  });
+
   const big = new Uint8Array(70_000).map((_, i) => i % 251);
   const parts = [big.subarray(0, 30_000), big.subarray(30_000)];
 
