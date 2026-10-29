@@ -162,7 +162,7 @@ test('Try On, as on Fash: a sample picture with a details file opens in place wi
     await expect(page.getByLabel('Bối cảnh (tuỳ chọn): ảnh đã chọn').getByRole('img', { name: 'try-on-bg-test.jpg' })).toBeVisible();
     await detail.getByRole('button', { name: 'Chép prompt vào ô Prompt' }).click();
     await expect(page.getByRole('textbox', { name: 'Prompt (tuỳ chọn)' })).toHaveValue(details.brief);
-    await detail.getByRole('button', { name: '3:4' }).click();
+    await detail.getByRole('button', { name: '3:4', exact: true }).click();
     await expect(select(page, 'Tỉ lệ')).toHaveAttribute('data-value', '3:4');
     await detail.getByRole('button', { name: 'Dùng kết quả' }).click();
     await expect(note('Đã dùng kết quả làm ảnh người mẫu')).toBeVisible();
