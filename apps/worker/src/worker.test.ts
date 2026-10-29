@@ -9,16 +9,18 @@ import { promisify } from 'node:util';
 import { DeleteBucketCommand, DeleteObjectsCommand, HeadObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import type { Enhancer } from '@cvs/core/enhance';
 import { reserve, withTransaction } from '@cvs/core/ledger';
+import { FEATURE_PROMPTS } from '@cvs/core/models';
 import { ImageReadError } from '@cvs/core/providers/http';
 import type { ImageProvider, ImageSubmitRequest, SubmitRequest, VideoProvider } from '@cvs/core/providers';
 import { VIDEO_QUEUE, VIDEO_QUEUE_OPTIONS, videoSendOptions } from '@cvs/core/queue';
 import { createPool } from '@cvs/db/client';
 import { createTestDatabase } from '@cvs/db/testing';
 import { PgBoss } from 'pg-boss';
+import sharp from 'sharp';
 import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
-import { requireFfmpeg } from './media';
+import { closestRatio, requireFfmpeg } from './media';
 import { createMockImageProvider, createMockProvider, MOCK_FAIL } from './mock-provider';
-import { bucketName, ensureBucket, s3 } from './storage';
+import { bucketName, ensureBucket, putObject, s3 } from './storage';
 import { type RunningWorker, startWorker, type WorkerOptions } from './worker';
 
 vi.setConfig({ testTimeout: 90_000, hookTimeout: 90_000 });
@@ -509,6 +511,41 @@ describe('image jobs', () => {
     expect(requests[0]!.imageUrls).toEqual([]);
     expect((await costs(id)).map((c) => [c.kind, c.usd])).toEqual([['estimate', '0.3000'], ['actual_adjustment', '0.0000']]);
     expect(await total(id)).toEqual({ usd: '0.3000', is_final: true });
+  });
+
+  // Reproduces a bug seen in the Try On bake-off of 2026-10-29 (plan A4): the Try On page sends ratio 'auto', the worker passes it on, and on 'auto'
+  // Nano Banana Pro takes the ratio of the garment photo, not the person's, so a square Shopify mockup gave a square, reframed person (6 of 10 pairs).
+  test("a Try On job at 'auto' asks the image model for the ratio of the person photo, not 'auto'", async () => {
+    const asset = async (width: number, height: number) => {
+      const id = randomUUID();
+      await putObject(`assets/${id}`, await sharp({ create: { width, height, channels: 3, background: '#ccc' } }).png().toBuffer(), 'image/png');
+      await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) values ($1, 'u1', 'input', $2, 'p.png', 'image/png', 1)`, [id, `assets/${id}`]);
+      return id;
+    };
+    const [person, garment] = [await asset(600, 800), await asset(500, 500)];
+    const id = randomUUID();
+    await pool.query(
+      `insert into jobs (id, user_id, team_id, feature, model, provider, prompt, aspect, duration_s, params, input_asset_ids)
+       values ($1, 'u1', 'team-unassigned', 'try_on', 'mock-image', 'mock', $2, 'auto', 0, '{"resolution": "1K", "garments": "1"}', $3)`,
+      [id, FEATURE_PROMPTS.try_on, [person, garment]],
+    );
+    await withTransaction(pool, (tx) => reserve(tx, id, '0.1500'));
+    const requests: ImageSubmitRequest[] = [];
+    await startImages(recording(requests));
+    await send(id, 'u1');
+    await waitFor('the job to succeed', async () => (await status(id)) === 'succeeded');
+    expect(requests[0]!.imageUrls).toEqual([`asset://${person}`, `asset://${garment}`]);
+    expect(requests[0]!.ratio).toBe('3:4');
+  });
+
+  test('closestRatio picks the offered ratio nearest the upright photo, and auto when the model offers none', async () => {
+    const photo = (width: number, height: number, orientation = 1) =>
+      sharp({ create: { width, height, channels: 3, background: '#ccc' } }).withMetadata({ orientation }).jpeg().toBuffer();
+    const ratios = ['auto', '1:1', '3:4', '4:3', '9:16', '16:9'];
+    expect(await closestRatio(await photo(400, 600), ratios)).toBe('3:4'); // 2:3 is not offered
+    expect(await closestRatio(await photo(1080, 1920), ratios)).toBe('9:16');
+    expect(await closestRatio(await photo(1920, 1080, 6), ratios)).toBe('9:16'); // a phone photo stored landscape, shown portrait
+    expect(await closestRatio(await photo(500, 500), ['auto'])).toBe('auto');
   });
 
   test('stores a JPEG under its own type and extension, whatever name the provider gave it', async () => {

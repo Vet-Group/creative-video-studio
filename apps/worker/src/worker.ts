@@ -20,9 +20,9 @@ import type { Suggester } from '@cvs/core/suggest';
 import { insertAssets } from '@cvs/db/assets';
 import { createDb, type createPool } from '@cvs/db/client';
 import { type Job, PgBoss } from 'pg-boss';
-import { extractPoster, probeSize, sniffImage } from './media';
+import { closestRatio, extractPoster, probeSize, sniffImage } from './media';
 import { purgeDeletedClips } from './purge';
-import { deleteObject, putObject } from './storage';
+import { deleteObject, getObject, putObject } from './storage';
 import { runSuggestion } from './suggest';
 
 export interface WorkerOptions {
@@ -132,6 +132,12 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
     };
   }
 
+  async function readAsset(id: string): Promise<Uint8Array> {
+    const { rows } = await pool.query('select s3_key from assets where id = $1 and deleted_at is null', [id]);
+    if (!rows[0]) throw new Error('asset not found');
+    return getObject(rows[0].s3_key);
+  }
+
   async function loadImageModel(modelId: string): Promise<ImageModelConfig> {
     const { rows } = await pool.query('select * from model_configs where id = $1', [modelId]);
     const r = rows[0];
@@ -183,7 +189,7 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
     try {
       const job = (
         await pool.query(
-          'select j.provider, j.is_mock, j.model, j.prompt, j.enhance, j.enhanced_prompt, j.aspect, j.duration_s, j.params, j.input_asset_ids, m.kind, m.max_prompt_chars from jobs j join model_configs m on m.id = j.model where j.id = $1',
+          'select j.provider, j.feature, j.is_mock, j.model, j.prompt, j.enhance, j.enhanced_prompt, j.aspect, j.duration_s, j.params, j.input_asset_ids, m.kind, m.max_prompt_chars from jobs j join model_configs m on m.id = j.model where j.id = $1',
           [jobId],
         )
       ).rows[0];
@@ -206,9 +212,11 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
         if (job.kind === 'image') {
           const provider = imageProviders[job.provider];
           if (!provider) throw new Error(`no adapter for provider ${job.provider}`);
-          const request: ImageSubmitRequest = {
-            model: await loadImageModel(job.model), prompt: job.prompt, imageUrls, ratio: job.aspect, resolution: job.params.resolution, quality: job.params.quality,
-          };
+          const model = await loadImageModel(job.model);
+          // On 'auto' Nano Banana Pro took the garment photo's ratio and reframed the person (Try On bake-off, 2026-10-29), so Try On asks for the
+          // ratio of the person photo, which the page sends first.
+          const ratio = job.feature === 'try_on' && job.aspect === 'auto' ? await closestRatio(await readAsset(job.input_asset_ids[0]), model.ratios) : job.aspect;
+          const request: ImageSubmitRequest = { model, prompt: job.prompt, imageUrls, ratio, resolution: job.params.resolution, quality: job.params.quality };
           return { send: () => provider.submit(request) };
         }
         const provider = providers[job.provider];
