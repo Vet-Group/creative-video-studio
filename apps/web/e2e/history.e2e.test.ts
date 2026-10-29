@@ -81,6 +81,30 @@ test('as on Fash, a History chip sets its resolution, ratio or duration on the f
   await expect(page.locator('.job-chips button')).toHaveCount(0);
 });
 
+test("as on Fash, a History card's words, inputs and result go on the form beside it, each with a note", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await signIn(page, 'chipa');
+  const up = async (name: string) => ((await (await page.request.post('/api/assets', { multipart: { file: { name, mimeType: 'image/png', buffer: png() } } })).json()) as { assets: { id: string }[] }).assets[0]!.id;
+  const res = await page.request.post('/api/jobs', { data: { feature: 'image', modelId: 'mock-image-e2e', assetIds: [await up('piece-1.png'), await up('piece-2.png')], ratio: '1:1', prompt: 'pieces shot', enhance: false, params: { resolution: '1K' } } });
+  expect(res.status()).toBe(201);
+
+  await page.goto('/image-generation');
+  await page.getByRole('tab', { name: 'Lịch sử' }).click();
+  const card = page.getByRole('complementary', { name: 'Job của tôi' }).getByRole('listitem').filter({ hasText: 'pieces shot' });
+  await expect(card.getByText('Hoàn tất')).toBeVisible({ timeout: 60_000 });
+  const note = (text: string) => page.getByRole('region', { name: 'Thông báo' }).getByText(text);
+  const chosen = page.getByRole('list', { name: 'Ảnh đã chọn' });
+  await card.getByRole('button', { name: 'Dùng ảnh đầu vào 2' }).click();
+  await expect(chosen.getByRole('img', { name: 'piece-2.png' })).toBeVisible();
+  await expect(note('Đã thêm ảnh vào đầu vào')).toBeVisible();
+  await card.getByRole('button', { name: 'Chép prompt vào ô Prompt' }).click();
+  await expect(page.getByRole('textbox', { name: 'Mô tả cảnh bạn muốn tạo' })).toHaveValue('pieces shot');
+  await expect(note('Đã chép prompt')).toBeVisible();
+  await card.getByRole('button', { name: 'Dùng kết quả' }).click(); // Fash's Use Result: the result as one more input
+  await expect(chosen.getByRole('img')).toHaveCount(2);
+  expect(await page.url()).toMatch(/\/image-generation$/);
+});
+
 test('the Library item detail shows the result large with its words, inputs and chips, steps to the next item and closes on Esc', async ({ page }) => {
   await signIn(page, 'hista');
   const up = async (name: string) => ((await (await page.request.post('/api/assets', { multipart: { file: { name, mimeType: 'image/png', buffer: png() } } })).json()) as { assets: { id: string }[] }).assets[0]!.id;

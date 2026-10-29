@@ -223,6 +223,11 @@ legend { font-weight: 600; padding: 0 .25rem; }
 .job-reuse { display: flex; align-items: center; justify-content: center; gap: 6px; height: 36px; border-radius: 8px; background: var(--fill); color: var(--ink-strong); font-size: 12px; font-weight: 500; text-decoration: none; }
 .job-reuse:hover { background: var(--fill-strong); }
 button.job-reuse, button.lightbox-reuse, button.gallery-use { width: 100%; border: 0; font-family: inherit; cursor: pointer; }
+/* A detail's piece that goes on the form beside it (Fash's clickable inputs, prompt and chips). */
+.tap { display: block; padding: 0; border: 0; background: none; font: inherit; color: inherit; text-align: inherit; cursor: pointer; }
+.tap.job-text:hover { color: var(--ink); }
+.job-inputs .tap:hover img { outline: 2px solid var(--ink-strong); outline-offset: 1px; }
+.lightbox-result { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; height: 40px; margin-top: 8px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface); color: var(--ink-strong); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
 @media (max-width: 640px) {
   .job-card { grid-template-columns: 1fr; min-height: 0; }
   .job-media { height: auto; max-height: 70vh; }

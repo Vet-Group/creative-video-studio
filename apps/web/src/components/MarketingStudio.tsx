@@ -16,8 +16,8 @@ import { About } from './About';
 import { AudioSwitch } from './AudioSwitch';
 import { CardMedia, LoopVideo } from './CardMedia';
 import { Icon, type IconName } from './Icon';
-import { Gallery, type Img, sampleFile, Slot, uploadImages, UPLOAD_ERROR, WorkTabs } from './image-tools';
-import { FormContext, useApplier, useHasHistory, useJobs, useRecreated } from './jobs';
+import { Gallery, type Img, photoImg, sampleFile, Slot, uploadImages, UPLOAD_ERROR, WorkTabs } from './image-tools';
+import { FormContext, type FormActions, type Photo, type PhotoRole, useApplier, useHasHistory, useJobs, useRecreated } from './jobs';
 import { Modal } from './Modal';
 import { ModelPicker } from './ModelPicker';
 import { Select } from './Select';
@@ -177,7 +177,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
   const advanced = format === 'advanced';
   const router = useRouter();
   const have = useSamples();
-  const { refresh, clips } = useJobs();
+  const { refresh, clips, notify } = useJobs();
   const recreated = useRecreated();
   const narrow = useMediaQuery(NARROW);
   const [person, setPerson] = useState<Img[]>([]);
@@ -356,6 +356,27 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
   }
 
   /** Uploads the files into a slot: a one-image slot is replaced, the reference slot is added to, up to `max`. */
+  /** A detail's photo in its slot: on UGC the person or the product, on Advanced one more reference. */
+  async function take(p: Photo, role: PhotoRole) {
+    if (advanced && refs.length >= maxRefs) return notify(`Tối đa ${maxRefs} ảnh tham chiếu`);
+    setError('');
+    try {
+      const img = await photoImg(p);
+      if (advanced) setRefs((cur) => (cur.length < maxRefs ? [...cur, img] : cur));
+      else if (role === 'model') setPerson([img]);
+      else setProduct([img]);
+      notify(advanced ? 'Đã thêm ảnh tham chiếu' : role === 'model' ? 'Đã dùng ảnh người mẫu' : 'Đã chọn ảnh sản phẩm');
+    } catch {
+      setError(UPLOAD_ERROR);
+    }
+  }
+  const actions: FormActions = {
+    recreate: (from) => (setSource({ from }), narrow && setTab('create')),
+    apply,
+    photo: (p, role) => void take(p, role),
+    prompt: (text) => (setPrompt(text), notify('Đã chép prompt')),
+  };
+
   function add(set: (f: (cur: Img[]) => Img[]) => void, max = 1) {
     return async (files: File[]) => {
       if (files.length === 0) return;
@@ -562,13 +583,13 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
 
         <div className="side" id={`marketing-panel-${panel}`} role="tabpanel" aria-labelledby={`marketing-tab-${panel}`} hidden={narrow && shown === 'create'}>
           {shown === 'examples' ? (
-            <FormContext.Provider value={{ recreate: (from) => (setSource({ from }), narrow && setTab('create')), apply }}>
+            <FormContext.Provider value={actions}>
               <Gallery kind="marketing" video samples="marketing-example-" label="Video Marketing Studio của công ty" emptyText="Chưa có video Marketing Studio nào trong công ty." />
             </FormContext.Provider>
           ) : shown === 'about' ? (
             <About page={advanced ? ABOUT.advanced : ABOUT.marketing} />
           ) : (
-            <FormContext.Provider value={{ recreate: (from) => (setSource({ from }), narrow && setTab('create')), apply }}>
+            <FormContext.Provider value={actions}>
               <Tray feature="marketing" />
             </FormContext.Provider>
           )}

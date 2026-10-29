@@ -10,7 +10,7 @@ import { refillFrom, reuseHref } from '@/lib/reuse';
 import { COLLAPSED_COOKIE } from '@/lib/sidebar';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { Icon, type IconName } from './Icon';
-import { JobsProvider, Recreate, useForm, useJobs } from './jobs';
+import { JobsProvider, Recreate, roleOf, Tap, useForm, useJobs } from './jobs';
 import { type Account, Settings } from './Settings';
 import { VetLogo } from './VetLogo';
 
@@ -82,7 +82,8 @@ const cardTitle = (job: TrayJob): string => (job.feature === 'marketing' ? (job.
  * the inputs, the ratio and length chips, the status and date, the icon actions and Dùng lại (Fash's Recreate, without the run).
  */
 function HistoryCard({ job, isAdmin }: { job: TrayJob; isAdmin: boolean }) {
-  const apply = useForm()?.apply;
+  const form = useForm();
+  const apply = form?.apply;
   const { refresh } = useJobs();
   const [problem, setProblem] = useState('');
   const [favorite, setFavorite] = useState(job.favorite);
@@ -134,12 +135,19 @@ function HistoryCard({ job, isAdmin }: { job: TrayJob; isAdmin: boolean }) {
           {job.isMock && <span className="badge">MOCK</span>}
           {job.retryOf && <span className="tag">Thử lại</span>}
         </h3>
-        {job.text && <p className="job-text">{job.text}</p>}
+        {/* As on Fash, the words, each input and the result can go on the form beside the History. */}
+        {job.text && (
+          <Tap on={form?.prompt && (() => form.prompt!(job.text!))} label="Chép prompt vào ô Prompt" className="job-text">
+            {job.text}
+          </Tap>
+        )}
         {job.inputAssetIds.length > 0 && job.feature !== 'motion_control' && (
           <ul className="job-inputs" aria-label="Ảnh đầu vào">
-            {job.inputAssetIds.map((id) => (
+            {job.inputAssetIds.map((id, n) => (
               <li key={id}>
-                <img src={content(id)} alt="" loading="lazy" />
+                <Tap on={form?.photo && (() => form.photo!({ asset: id }, roleOf(job.feature, n, { garments: job.garments, advanced: job.format === 'advanced' })))} label={`Dùng ảnh đầu vào ${n + 1}`}>
+                  <img src={content(id)} alt="" loading="lazy" />
+                </Tap>
               </li>
             ))}
           </ul>
@@ -205,6 +213,11 @@ function HistoryCard({ job, isAdmin }: { job: TrayJob; isAdmin: boolean }) {
           <Recreate href={reuseHref(job)!} from={refillFrom({ reuse: job.id })!} className="job-reuse">
             <Icon name="copy" /> Dùng lại
           </Recreate>
+        )}
+        {out && image && form?.result && (
+          <button type="button" className="job-reuse job-result" onClick={() => form.result!({ asset: out })}>
+            <Icon name="right" /> Dùng kết quả
+          </button>
         )}
       </div>
     </li>

@@ -7,7 +7,7 @@ import { exampleFrom } from '@/lib/reuse';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { Icon } from './Icon';
 import { useImageModels } from './image-tools';
-import { Recreate } from './jobs';
+import { Recreate, roleOf, Tap, useForm } from './jobs';
 import { Modal } from './Modal';
 
 /** A sample's details file, in the shape its page refills from (`?example=`): Marketing's format and duration, or Try On's model, resolution and background. */
@@ -21,6 +21,8 @@ interface SampleDetails {
   resolution?: string | null;
   /** The reference site's named background, shown as a chip; its picture is the last input. */
   background?: string | null;
+  /** How many of a Try On sample's photos are garments (after the person, before the background). */
+  garments?: number;
   date?: string;
 }
 
@@ -29,6 +31,16 @@ function ModelName({ id }: { id: string }) {
   const { models } = useImageModels('try_on');
   return <>{models?.find((m) => m.id === id)?.label ?? 'Thử đồ'}</>;
 }
+
+/** A chip: a button that sets its value on the form beside it, or plain text where there is none. */
+const chip = (text: string, on: (() => void) | undefined, label: string) =>
+  on ? (
+    <button type="button" onClick={on} title={label}>
+      {text}
+    </button>
+  ) : (
+    <span>{text}</span>
+  );
 
 const fmtDate = (day: string) => new Intl.DateTimeFormat('vi-VN', { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(day));
 
@@ -41,6 +53,7 @@ export function SampleDetail({ names, index, onIndex }: { names: string[]; index
   const [note, setNote] = useState('');
   const media = useRef<HTMLVideoElement & HTMLImageElement>(null);
   const narrow = useMediaQuery(NARROW);
+  const form = useForm();
   useEffect(() => {
     setDetails(null);
     setNote('');
@@ -49,15 +62,20 @@ export function SampleDetail({ names, index, onIndex }: { names: string[]; index
   const tryOn = !video;
   const advanced = details?.format === 'advanced';
   const title = tryOn ? 'Thử đồ' : advanced ? 'Nâng cao' : 'UGC Thử đồ';
+  // As on Fash, each photo, the words, a chip and the result can go on the form beside the Examples.
   const inputs = details && details.images.length > 0 && (
     <ul className="job-inputs" aria-label="Ảnh đầu vào">
-      {details.images.map((i) => (
+      {details.images.map((i, n) => (
         <li key={i.sample}>
-          <img src={`/api/samples/${i.sample}`} alt={i.sample} />
+          <Tap on={form?.photo && (() => form.photo!(i, roleOf(tryOn ? 'try_on' : 'marketing', n, { garments: details.garments, advanced })))}>
+            <img src={`/api/samples/${i.sample}`} alt={i.sample} />
+          </Tap>
         </li>
       ))}
     </ul>
   );
+  const apply = form?.apply;
+  const backdrop = details?.background ? details.images.at(-1) : undefined;
   const copy = () => navigator.clipboard.writeText(details?.brief ?? '').then(() => setNote('Đã sao chép.'), () => setNote('Không sao chép được.'));
 
   return (
@@ -69,19 +87,19 @@ export function SampleDetail({ names, index, onIndex }: { names: string[]; index
         {/* Fash's Try On lists the photos before the prompt; its Marketing the other way round. */}
         <h2>{tryOn && details?.modelId ? <ModelName id={details.modelId} /> : title}</h2>
         {tryOn && inputs}
-        {details?.brief && <p className="job-text">{details.brief}</p>}
+        {details?.brief && (
+          <Tap on={form?.prompt && (() => form.prompt!(details.brief!))} label="Chép prompt vào ô Prompt" className="job-text">
+            {details.brief}
+          </Tap>
+        )}
         {!tryOn && inputs}
         {details && (
           <p className="job-chips">
-            {tryOn ? <span>{details.resolution}</span> : <span>{details.durationSec}s</span>}
-            <span>{details.ratio}</span>
+            {tryOn ? chip(details.resolution ?? '', apply && details.resolution ? () => apply({ resolution: details.resolution! }) : undefined, 'Dùng độ phân giải này') : chip(`${details.durationSec}s`, apply && details.durationSec ? () => apply({ durationSec: details.durationSec }) : undefined, 'Dùng thời lượng này')}
+            {chip(details.ratio, apply && (() => apply({ ratio: details.ratio })), 'Dùng tỉ lệ này')}
           </p>
         )}
-        {details?.background && (
-          <p className="job-chips">
-            <span>{details.background}</span>
-          </p>
-        )}
+        {details?.background && <p className="job-chips">{chip(details.background, form?.photo && backdrop && (() => form.photo!(backdrop, 'background')), 'Dùng bối cảnh này')}</p>}
         {details?.date && <p className="job-when">{fmtDate(details.date)}</p>}
         {note && (
           <p className="muted" role="status">
@@ -108,6 +126,11 @@ export function SampleDetail({ names, index, onIndex }: { names: string[]; index
           <Recreate href={tryOn ? `/try-on?example=${base}` : `/marketing-studio${advanced ? '/advanced' : ''}?example=${base}`} from={exampleFrom({ example: base })!} className="lightbox-reuse" onDone={() => narrow && onIndex(null)}>
             Dùng lại
           </Recreate>
+        )}
+        {tryOn && form?.result && (
+          <button type="button" className="lightbox-result" onClick={() => form.result!({ sample: name })}>
+            <Icon name="right" /> Dùng kết quả
+          </button>
         )}
       </div>
       {index > 0 && (

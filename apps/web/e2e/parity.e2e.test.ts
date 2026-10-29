@@ -377,6 +377,16 @@ test('as on Fash, a sample with a details file shows its prompt, input photos, s
     await detail.getByRole('button', { name: 'Mẫu trước' }).click();
     await detail.getByRole('button', { name: 'Mẫu trước' }).click();
 
+    // As on Fash, a piece goes on the form on its own: a reference image, the words, the ratio.
+    const note = (text: string) => page.getByRole('region', { name: 'Thông báo' }).getByText(text);
+    await detail.getByRole('button', { name: 'example-2-ref.jpg' }).click();
+    await expect(note('Đã thêm ảnh tham chiếu')).toBeVisible();
+    await expect(page.getByRole('img', { name: 'example-2-ref.jpg' })).toBeVisible();
+    await detail.getByRole('button', { name: 'Chép prompt vào ô Prompt' }).click();
+    await expect(page.getByRole('textbox', { name: 'Mô tả chuyển động' })).toHaveValue(details.prompt);
+    await detail.getByRole('button', { name: '1:1' }).click();
+    await expect(select(page, 'Tỉ lệ khung hình')).toHaveAttribute('data-value', '1:1');
+
     await detail.getByRole('button', { name: 'Dùng lại' }).click(); // in place, as Fash's Recreate
     await expect(page).toHaveURL(/\/create$/);
     await expect(page.getByRole('img', { name: 'example-2-input.png' })).toBeVisible();

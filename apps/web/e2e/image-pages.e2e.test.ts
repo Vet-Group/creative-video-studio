@@ -152,11 +152,27 @@ test('Try On, as on Fash: a sample picture with a details file opens in place wi
     await expect(detail.locator('.job-chips')).toHaveText(['1K3:4', 'Seamless White']);
     await expect(detail.locator('.lightbox-media img')).toHaveAttribute('src', '/api/samples/try-on-example-1.jpg');
 
+    // As on Fash, each piece goes on the form on its own, with a note: a garment, the background, the words, a chip, the result as the model photo.
+    const note = (text: string) => page.getByRole('region', { name: 'Thông báo' }).getByText(text);
+    await detail.getByRole('button', { name: 'try-on-example-1-garment-1.png' }).click();
+    await expect(note('Đã thêm trang phục')).toBeVisible();
+    await expect(page.getByLabel('Trang phục: ảnh đã chọn').getByRole('img', { name: 'try-on-example-1-garment-1.png' })).toBeVisible();
+    await detail.getByRole('button', { name: 'Seamless White' }).click();
+    await expect(note('Đã chọn bối cảnh')).toBeVisible();
+    await expect(page.getByLabel('Bối cảnh (tuỳ chọn): ảnh đã chọn').getByRole('img', { name: 'try-on-bg-test.jpg' })).toBeVisible();
+    await detail.getByRole('button', { name: 'Chép prompt vào ô Prompt' }).click();
+    await expect(page.getByRole('textbox', { name: 'Prompt (tuỳ chọn)' })).toHaveValue(details.brief);
+    await detail.getByRole('button', { name: '3:4' }).click();
+    await expect(select(page, 'Tỉ lệ')).toHaveAttribute('data-value', '3:4');
+    await detail.getByRole('button', { name: 'Dùng kết quả' }).click();
+    await expect(note('Đã dùng kết quả làm ảnh người mẫu')).toBeVisible();
+    await expect(page.getByLabel('Người mẫu: ảnh đã chọn').getByRole('img', { name: 'try-on-example-1.jpg' })).toBeVisible();
+
     // As Fash's Recreate: the form refills in place, the URL stays, the detail stays open and a note shows above it.
     await detail.getByRole('button', { name: 'Dùng lại' }).click();
-    const note = page.getByRole('region', { name: 'Thông báo' }).getByText('Sẵn sàng tạo lại');
-    await expect(note).toBeVisible();
-    expect(await note.evaluate((e) => { const r = e.getBoundingClientRect(); return e.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)); })).toBe(true); // not under the dialog
+    const ready = note('Sẵn sàng tạo lại');
+    await expect(ready).toBeVisible();
+    expect(await ready.evaluate((e) => { const r = e.getBoundingClientRect(); return e.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)); })).toBe(true); // not under the dialog
     await expect(detail).toBeVisible();
     await expect(page).toHaveURL(/\/try-on$/);
     await expect(page.getByLabel('Người mẫu: ảnh đã chọn').getByRole('img', { name: 'try-on-example-1-model.png' })).toBeVisible();

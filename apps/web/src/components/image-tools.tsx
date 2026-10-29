@@ -9,7 +9,7 @@ import { NARROW, useMediaQuery, WIDE } from '@/lib/use-media-query';
 import { numberedSamples } from '@/lib/examples';
 import { useHydrated } from '@/lib/use-hydrated';
 import { useSamples } from '@/lib/use-samples';
-import { Recreate, useRecreated } from './jobs';
+import { type Photo, Recreate, useRecreated } from './jobs';
 import { Icon, type IconName } from './Icon';
 import { Preview } from './Preview';
 import { SampleDetail } from './SampleDetail';
@@ -121,6 +121,13 @@ export async function sampleFile(name: string): Promise<File> {
   const res = await fetch(`/api/samples/${name}`);
   if (!res.ok) throw new Error(`sample ${name}: ${res.status}`);
   return new File([await res.blob()], name, { type: res.headers.get('content-type') ?? '' });
+}
+
+/** A detail's photo as one of the form's images: a sample is uploaded as the member's own, an asset is read for its name. */
+export async function photoImg(p: Photo): Promise<Img> {
+  if ('sample' in p) return (await uploadImages([await sampleFile(p.sample)]))[0]!;
+  const a = await api<Img>(`/api/assets/${p.asset}`);
+  return { id: a.id, filename: a.filename };
 }
 
 export async function uploadImages(files: File[]): Promise<Img[]> {

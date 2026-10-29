@@ -9,8 +9,8 @@ import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { useSamples } from '@/lib/use-samples';
 import { ABOUT } from '@/lib/about-content';
 import { About } from './About';
-import { Gallery, type Img, LockedFields, RATIO_LABEL, Slot, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
-import { FormContext, useApplier, useHasHistory, useJobs } from './jobs';
+import { Gallery, type Img, LockedFields, photoImg, RATIO_LABEL, Slot, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
+import { FormContext, type Photo, type PhotoRole, useApplier, useHasHistory, useJobs } from './jobs';
 import { ModelPicker } from './ModelPicker';
 import { Select } from './Select';
 import { Tray } from './Shell';
@@ -21,7 +21,7 @@ const TAB_LABEL: Record<Tab, string> = { create: 'Tạo', history: 'Lịch sử'
 const MAX_GARMENTS = 5; // Fash's Nano Banana Pro try-on takes 5 garments (its MaxInputImageCount, read 2026-10-29)
 
 export function TryOn({ reuse }: { reuse?: string }) {
-  const { refresh } = useJobs();
+  const { refresh, notify } = useJobs();
   const narrow = useMediaQuery(NARROW);
   const [garments, setGarments] = useState<Img[]>([]);
   const have = useSamples();
@@ -81,6 +81,21 @@ export function TryOn({ reuse }: { reuse?: string }) {
   const canRun = reason === null && !busy;
   /** What the member may write: the model's limit less the image roles the prompt starts with. */
   const room = chosen && chosen.maxPromptChars - (tryOnPrompt(Math.max(1, garments.length), background.length > 0, 'x')!.length - 1);
+
+  /** A detail's photo in its slot, as Fash's clicks on a detail's inputs and its Use Result do. */
+  async function take(p: Photo, role: PhotoRole, note?: string) {
+    if (role === 'garment' && garments.length >= MAX_GARMENTS) return notify(`Tối đa ${MAX_GARMENTS} ảnh trang phục`);
+    setError('');
+    try {
+      const img = await photoImg(p);
+      if (role === 'model') setPerson([img]);
+      else if (role === 'background') setBackground([img]);
+      else setGarments((cur) => (cur.length < MAX_GARMENTS ? [...cur, img] : cur));
+      notify(note ?? (role === 'model' ? 'Đã dùng ảnh người mẫu' : role === 'background' ? 'Đã chọn bối cảnh' : 'Đã thêm trang phục'));
+    } catch {
+      setError(UPLOAD_ERROR);
+    }
+  }
 
   function add(set: (f: (cur: Img[]) => Img[]) => void) {
     return async (files: File[]) => {
@@ -202,7 +217,15 @@ export function TryOn({ reuse }: { reuse?: string }) {
         </div>
 
         <div className="side" id={`tryon-panel-${panel}`} role="tabpanel" aria-labelledby={`tryon-tab-${panel}`} hidden={narrow && shown === 'create'}>
-          <FormContext.Provider value={{ recreate: (from) => (recreate(from), narrow && setTab('create')), apply }}>
+          <FormContext.Provider
+            value={{
+              recreate: (from) => (recreate(from), narrow && setTab('create')),
+              apply,
+              photo: (p, role) => void take(p, role),
+              prompt: (text) => (setPrompt(text), notify('Đã chép prompt')),
+              result: (p) => void take(p, 'model', 'Đã dùng kết quả làm ảnh người mẫu'),
+            }}
+          >
             {shown === 'examples' ? <Gallery kind="try_on" samples="try-on-example-" cols={[2, 2, 3]} label="Ảnh thử đồ của công ty" emptyText="Chưa có ảnh thử đồ nào trong công ty." /> : shown === 'about' ? <About page={ABOUT.tryOn} /> : <Tray feature="try_on" />}
           </FormContext.Provider>
         </div>
