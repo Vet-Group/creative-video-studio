@@ -9,7 +9,6 @@ import { promisify } from 'node:util';
 import { DeleteBucketCommand, DeleteObjectsCommand, HeadObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import type { Enhancer } from '@cvs/core/enhance';
 import { reserve, withTransaction } from '@cvs/core/ledger';
-import { FEATURE_PROMPTS } from '@cvs/core/models';
 import { ImageReadError } from '@cvs/core/providers/http';
 import type { ImageProvider, ImageSubmitRequest, SubmitRequest, VideoProvider } from '@cvs/core/providers';
 import { VIDEO_QUEUE, VIDEO_QUEUE_OPTIONS, videoSendOptions } from '@cvs/core/queue';
@@ -515,27 +514,33 @@ describe('image jobs', () => {
 
   // Reproduces a bug seen in the Try On bake-off of 2026-10-29 (plan A4): the Try On page sends ratio 'auto', the worker passes it on, and on 'auto'
   // Nano Banana Pro takes the ratio of the garment photo, not the person's, so a square Shopify mockup gave a square, reframed person (6 of 10 pairs).
-  test("a Try On job at 'auto' asks the image model for the ratio of the person photo, not 'auto'", async () => {
-    const asset = async (width: number, height: number) => {
+  test.each([
+    ['try_on', [[600, 800], [500, 500]], 0], // person, garment
+    ['background_changer', [[600, 800], [1600, 900]], 0], // photo, reference background
+    ['character_swap', [[500, 500], [600, 800]], 1], // new character, target
+    ['jewelry_try_on', [[500, 500], [900, 400], [600, 800]], 2], // two pieces, wearer
+  ] as const)("a %s job at 'auto' asks the image model for the ratio of the input it keeps, not 'auto'", async (feature, sizes, kept) => {
+    const asset = async ([width, height]: readonly [number, number]) => {
       const id = randomUUID();
       await putObject(`assets/${id}`, await sharp({ create: { width, height, channels: 3, background: '#ccc' } }).png().toBuffer(), 'image/png');
       await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) values ($1, 'u1', 'input', $2, 'p.png', 'image/png', 1)`, [id, `assets/${id}`]);
       return id;
     };
-    const [person, garment] = [await asset(600, 800), await asset(500, 500)];
+    const inputs = [];
+    for (const size of sizes) inputs.push(await asset(size));
     const id = randomUUID();
     await pool.query(
       `insert into jobs (id, user_id, team_id, feature, model, provider, prompt, aspect, duration_s, params, input_asset_ids)
-       values ($1, 'u1', 'team-unassigned', 'try_on', 'mock-image', 'mock', $2, 'auto', 0, '{"resolution": "1K", "garments": "1"}', $3)`,
-      [id, FEATURE_PROMPTS.try_on, [person, garment]],
+       values ($1, 'u1', 'team-unassigned', $2, 'mock-image', 'mock', 'p', 'auto', 0, '{"resolution": "1K"}', $3)`,
+      [id, feature, inputs],
     );
     await withTransaction(pool, (tx) => reserve(tx, id, '0.1500'));
     const requests: ImageSubmitRequest[] = [];
     await startImages(recording(requests));
     await send(id, 'u1');
     await waitFor('the job to succeed', async () => (await status(id)) === 'succeeded');
-    expect(requests[0]!.imageUrls).toEqual([`asset://${person}`, `asset://${garment}`]);
-    expect(requests[0]!.ratio).toBe('3:4');
+    expect(requests[0]!.imageUrls).toEqual(inputs.map((a) => `asset://${a}`));
+    expect(requests[0]!.ratio, `input ${kept}`).toBe('3:4');
   });
 
   test('closestRatio picks the offered ratio nearest the upright photo, and auto when the model offers none', async () => {
