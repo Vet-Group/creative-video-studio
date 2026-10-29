@@ -24,7 +24,7 @@ const percent = (fraction: number | string, digits: number) => `${(Number(fracti
 
 export function AdminReport() {
   const [week, setWeek] = useState('');
-  const { data, failed } = useFetch<Report>(`/api/admin/report${week ? `?week=${week}` : ''}`);
+  const { data, failed } = useFetch<Report>(`/api/admin/report${week ? `?week=${week}` : ''}`, { onTabReturn: true });
   if (!data) return failed ? <p className="error">Không tải được báo cáo.</p> : <p role="status">Đang tải...</p>;
   return (
     <section aria-labelledby="report-title">

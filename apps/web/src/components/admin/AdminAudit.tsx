@@ -1,6 +1,7 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
+import { useTabReturn } from '@/lib/use-tab-return';
 
 interface Entry {
   id: number;
@@ -51,6 +52,7 @@ export function AdminAudit() {
     setState('loading');
     void load(0);
   }, [load]);
+  useTabReturn(() => void load(0));
 
   return (
     <section aria-labelledby="audit-title">

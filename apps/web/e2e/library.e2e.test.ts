@@ -13,9 +13,8 @@ test('Library tools: favourites only, oldest first, the size slider and the empt
   const mine = page.getByRole('article').filter({ hasText: 'E2E Member 4' });
   // A card's name holds its download name, which ends in the first 8 characters of the job id.
   const card = (id: string) => page.getByRole('article', { name: new RegExp(`${id.slice(0, 8)}\\.mp4$`) });
-  await expect(page.getByText('Clip đã xong')).toHaveCount(2, { timeout: 60_000 }); // the Library does not refresh itself
-  await page.reload();
-  await expect(card(first)).toBeVisible();
+  await expect(page.getByText('Clip đã xong')).toHaveCount(2, { timeout: 60_000 });
+  await expect(card(first)).toBeVisible(); // the Library reloads itself when the tray hears a job finished
   await expect(card(second)).toBeVisible();
   await expect(page.getByText('Mọi thứ công ty đã tạo, ở cùng một chỗ.')).toBeVisible();
 

@@ -6,6 +6,7 @@ import { FAULTS } from '@/lib/faults';
 import { featureLabel } from '@/lib/features';
 import { reuseHref } from '@/lib/reuse';
 import { Icon } from './Icon';
+import { useFreshResults } from './jobs';
 import { Modal } from './Modal';
 import { useZipDownload } from './ZipDownload';
 
@@ -375,6 +376,8 @@ export function Library() {
     setState('loading');
     void load(0);
   }, [load]);
+  // shortcut: a fresh result reloads the first page, so pages added with "Xem thêm" close; merge them if that bothers anyone.
+  useFreshResults(() => void load(0));
 
   useEffect(() => {
     try {

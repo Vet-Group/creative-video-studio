@@ -53,6 +53,9 @@ export const USERS = {
   upgb: { email: 'upgb@e2e.test', name: 'E2E Upgrades B', role: 'member' },
   upgc: { email: 'upgc@e2e.test', name: 'E2E Upgrades C', role: 'member' },
   upgd: { email: 'upgd@e2e.test', name: 'E2E Upgrades D', role: 'member' },
+  // refresh.e2e: pages that reload on a finished job or a return to the tab (fresha watches, freshb makes the jobs it must notice).
+  fresha: { email: 'fresha@e2e.test', name: 'E2E Fresh A', role: 'member' },
+  freshb: { email: 'freshb@e2e.test', name: 'E2E Fresh B', role: 'member' },
   admin: { email: 'admin@e2e.test', name: 'E2E Admin', role: 'admin' },
 } as const;
 

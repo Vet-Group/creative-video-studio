@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { api, type TrayJob } from '@/lib/api';
+import { useTabReturn } from '@/lib/use-tab-return';
 
 const POLL_MS = 5_000;
 const SEEN_KEY = 'cvs.tray.seenUntil';
@@ -105,6 +106,8 @@ interface JobsState {
   /** The video clips made today against the daily clip cap; null until the first load. */
   clips: { today: number; cap: number } | null;
   loaded: boolean;
+  /** The newest finish time among the user's jobs (ms), 0 until one has finished: pages that list results reload when it moves. */
+  lastFinished: number;
   toasts: Toast[];
   refresh: () => Promise<void>;
   dismiss: (id: number) => void;
@@ -126,8 +129,22 @@ export function useHasHistory(feature: string): boolean {
   return useJobs().jobs.some((j) => j.feature === feature);
 }
 
+/** Runs `run` when one of the user's jobs finishes (after the first poll, so what had already finished does not count) or the tab comes back to the front. */
+export function useFreshResults(run: () => void): void {
+  const { lastFinished, loaded } = useJobs();
+  const seen = useRef<number | null>(null);
+  const latest = useRef(run);
+  latest.current = run;
+  useEffect(() => {
+    if (!loaded) return;
+    if (seen.current !== null && lastFinished > seen.current) latest.current();
+    seen.current = lastFinished;
+  }, [lastFinished, loaded]);
+  useTabReturn(run);
+}
+
 export function JobsProvider({ userId, children }: { userId: string; children: ReactNode }) {
-  const [data, setData] = useState({ jobs: [] as TrayJob[], workerOffline: false, clips: null as JobsState['clips'], loaded: false });
+  const [data, setData] = useState({ jobs: [] as TrayJob[], workerOffline: false, clips: null as JobsState['clips'], loaded: false, lastFinished: 0 });
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [news, setNews] = useState(false);
   const nextId = useRef(0);
@@ -136,9 +153,9 @@ export function JobsProvider({ userId, children }: { userId: string; children: R
   const refresh = useCallback(async () => {
     const r = await api<{ jobs: TrayJob[]; workerOffline: boolean; clips: { today: number; cap: number } }>('/api/jobs?mine').catch(() => null);
     if (!r) return;
-    setData({ jobs: r.jobs, workerOffline: r.workerOffline, clips: r.clips, loaded: true });
     const finished = r.jobs.filter((j) => FINISHED.includes(j.status) && j.finishedAt);
     const times = finished.map((j) => Date.parse(j.finishedAt!));
+    setData({ jobs: r.jobs, workerOffline: r.workerOffline, clips: r.clips, loaded: true, lastFinished: Math.max(0, ...times) });
     const seenKey = `${SEEN_KEY}.${userId}`; // per user, so two accounts in one browser do not hide each other's news
     const stored = localStorage.getItem(seenKey);
     if (stored === null) {

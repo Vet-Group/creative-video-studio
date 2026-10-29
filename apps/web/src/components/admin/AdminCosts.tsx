@@ -240,7 +240,7 @@ function CostsBody({ data, reload }: { data: Costs; reload: () => void }) {
 
 export function AdminCosts() {
   const [month, setMonth] = useState('');
-  const { data, failed, reload } = useFetch<Costs>(`/api/admin/costs${month ? `?month=${month}` : ''}`);
+  const { data, failed, reload } = useFetch<Costs>(`/api/admin/costs${month ? `?month=${month}` : ''}`, { onTabReturn: true });
   if (!data) return failed ? <p className="error">Không tải được chi phí.</p> : <p role="status">Đang tải...</p>;
   return (
     <section aria-labelledby="costs-title">

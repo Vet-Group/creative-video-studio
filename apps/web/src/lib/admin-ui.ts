@@ -1,9 +1,13 @@
 // Browser-side helpers shared by the Admin pages.
 import { useEffect, useState } from 'react';
 import { api, ApiError } from './api';
+import { useTabReturn } from './use-tab-return';
 
-/** Loads a GET route, again whenever `path` changes or `reload` is called. `data` stays undefined until the first answer, so forms render after hydration. */
-export function useFetch<T>(path: string) {
+/**
+ * Loads a GET route, again whenever `path` changes or `reload` is called, and with `onTabReturn` when the tab comes back to the front (pages
+ * that only show figures; a page with forms would lose what is being typed). `data` stays undefined until the first answer, so forms render after hydration.
+ */
+export function useFetch<T>(path: string, { onTabReturn = false } = {}) {
   const [data, setData] = useState<T>();
   const [failed, setFailed] = useState(false);
   const [tick, setTick] = useState(0);
@@ -21,6 +25,7 @@ export function useFetch<T>(path: string) {
       stale = true;
     };
   }, [path, tick]);
+  useTabReturn(() => onTabReturn && setTick((n) => n + 1));
   return { data, failed, reload: () => setTick((n) => n + 1) };
 }
 
