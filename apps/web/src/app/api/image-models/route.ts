@@ -1,4 +1,4 @@
-import { promptLimit } from '@cvs/core/models';
+import { promptLimit, textToImage } from '@cvs/core/models';
 import { FEATURES } from '@cvs/db';
 import { pool } from '@/lib/auth';
 import { modelStats, rank, scoreOf } from '@/lib/model-scores';
@@ -7,7 +7,7 @@ import { guard } from '@/lib/session';
 /**
  * The model picker of an image page (`?feature=try_on` or `?feature=image`, or any feature other than video and marketing): the enabled image models that
  * list the feature, with their ratios, resolutions (the keys of `image_prices`), the price of one image per resolution as a 4-decimal string, and
- * `maxImages` and `maxPromptChars` (the model's prompt limit under the ceiling). A mock model prices every resolution at 0, as its jobs book 0 USD. Each model carries its recommendation score for this feature
+ * `maxImages`, `maxPromptChars` (the model's prompt limit under the ceiling) and `textToImage` (it takes a job with no input image). A mock model prices every resolution at 0, as its jobs book 0 USD. Each model carries its recommendation score for this feature
  * (lib/model-scores.ts), and the best (the cheaper on a tie) is flagged `recommended` unless all score the same. Members and Admins.
  */
 export async function GET(request: Request) {
@@ -19,7 +19,7 @@ export async function GET(request: Request) {
   }
   const [{ rows }, stats] = await Promise.all([
     pool.query(
-      `select id, label, provider, ratios, max_images, max_prompt_chars, image_prices from model_configs where enabled and kind = 'image' and $1 = any(features) order by label, id`,
+      `select id, label, provider, endpoint, ratios, max_images, max_prompt_chars, image_prices from model_configs where enabled and kind = 'image' and $1 = any(features) order by label, id`,
       [feature],
     ),
     modelStats(feature),
@@ -37,6 +37,7 @@ export async function GET(request: Request) {
       prices: Object.fromEntries(prices),
       maxImages: r.max_images as number,
       maxPromptChars: promptLimit(r.max_prompt_chars),
+      textToImage: textToImage(r),
       ...scoreOf(st),
       passes: st.passes,
       total: st.total,

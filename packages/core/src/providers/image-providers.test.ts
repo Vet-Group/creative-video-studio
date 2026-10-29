@@ -51,6 +51,27 @@ describe('fal image submit', () => {
     expect(body).toMatchObject({ aspect_ratio: 'auto', resolution: '1K', num_images: 1 });
   });
 
+  test.each([
+    ['fal-ai/nano-banana-pro/edit', 'fal-ai/nano-banana-pro'],
+    ['google/nano-banana-2.1/edit', 'google/nano-banana-2.1'],
+    ['fal-ai/nano-banana-2/edit', 'fal-ai/nano-banana-2'],
+    ['fal-ai/nano-banana/edit', 'fal-ai/nano-banana'],
+    ['openai/gpt-image-2/edit', 'openai/gpt-image-2'],
+    ['bytedance/seedream/v5/pro/edit', 'bytedance/seedream/v5/pro/text-to-image'],
+  ])('with no input image, %s goes to its text-to-image twin %s, with no images and no auto ratio', async (edit, text) => {
+    const { url, body } = await bodyFor(req(model(edit, { '1K': '0.04' }), { imageUrls: [], ratio: 'auto' }));
+    expect(url).toBe(`https://queue.fal.run/${text}`);
+    expect(body).not.toHaveProperty('image_urls');
+    expect(body).not.toHaveProperty('aspect_ratio');
+    expect(body).toMatchObject({ prompt: 'a bottle on a table', num_images: 1 });
+  });
+
+  test('a model with no text-to-image twin refuses a job with no input image before any call', async () => {
+    const { fn, calls } = fakeFetch();
+    await expect(createFalImageProvider({ apiKey: 'k', fetch: fn }).submit(req(model('openai/gpt-image-2.5/flare/edit', { '1K': '0.21' }), { imageUrls: [] }))).rejects.toThrow(ImageReadError);
+    expect(calls).toHaveLength(0);
+  });
+
   test('Nano Banana has no resolution input, so none is sent', async () => {
     const { body } = await bodyFor(req(model('fal-ai/nano-banana/edit', { '1K': '0.0398' })));
     expect(body).toEqual({ prompt: 'a bottle on a table', image_urls: ['https://img/1.jpg', 'https://img/2.jpg'], aspect_ratio: '1:1', num_images: 1, output_format: 'png' });

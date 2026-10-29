@@ -1,6 +1,6 @@
 import { reserve, withTransaction } from '@cvs/core/ledger';
 import { type CapRefusal, checkCaps, dailyClips } from '@cvs/core/limits';
-import { estimateUsd, FEATURE_PROMPTS, PROMPT_CEILING, promptLimit, usdPerSecondFor } from '@cvs/core/models';
+import { estimateUsd, FEATURE_PROMPTS, PROMPT_CEILING, promptLimit, textToImage, usdPerSecondFor } from '@cvs/core/models';
 import { VIDEO_QUEUE, videoSendOptions } from '@cvs/core/queue';
 import { FEATURES } from '@cvs/db';
 import { pool } from '@/lib/auth';
@@ -109,13 +109,15 @@ export async function POST(request: Request) {
     const given = (rawParams && typeof rawParams === 'object' && !Array.isArray(rawParams) ? rawParams : {}) as Record<string, string>;
     const advanced = feature === 'marketing' && given.format === 'advanced';
     const maxInputs = isImage ? MAX_IMAGE_INPUTS : advanced ? MAX_ADVANCED_IMAGES : MAX_IMAGES;
-    if (!Array.isArray(assetIds) || assetIds.length < 1 || assetIds.length > maxInputs || !assetIds.every((a) => typeof a === 'string') || new Set(assetIds).size !== assetIds.length) {
-      return bad(`assetIds must list 1 to ${maxInputs} different asset ids`);
+    // Image Generation may have no image (text to image, on a model that offers it: checked with the model below).
+    const fewest = feature === 'image' ? 0 : 1;
+    if (!Array.isArray(assetIds) || assetIds.length < fewest || assetIds.length > maxInputs || !assetIds.every((a) => typeof a === 'string') || new Set(assetIds).size !== assetIds.length) {
+      return bad(`assetIds must list ${fewest} to ${maxInputs} different asset ids`);
     }
     if (feature === 'try_on' && assetIds.length < 2) return bad('Try On needs the person image and at least one garment image');
     if (feature === 'marketing' && !advanced && assetIds.length !== 2) return bad('Marketing Studio needs exactly 2 images: the model photo first, then the product photo');
     if (feature === 'marketing' && (presetId !== null || typeof freePrompt !== 'string' || freePrompt.trim() === '')) return bad('Marketing Studio takes a prompt and no preset');
-    if (assetIds.length < (MIN_INPUTS[feature] ?? 1)) return bad(`${feature} needs ${MIN_INPUTS[feature]} images`);
+    if (assetIds.length < (MIN_INPUTS[feature] ?? fewest)) return bad(`${feature} needs ${MIN_INPUTS[feature]} images`);
     if (motion && (assetIds.length !== 2 || presetId !== null)) return bad('Motion Control needs exactly 2 inputs (the character image, then the reference video) and no preset');
     if (typeof modelId !== 'string' || (presetId !== null && typeof presetId !== 'string') || (freePrompt !== null && typeof freePrompt !== 'string') || typeof ratio !== 'string' || (!isImage && !motion && !Number.isInteger(durationSec)) || (storeId !== null && typeof storeId !== 'string')) {
       return bad('modelId, ratio, durationSec (a whole number, video only), a presetId or a prompt, and an optional storeId are required');
@@ -195,6 +197,7 @@ export async function POST(request: Request) {
     const model = (await tx.query('select enabled, provider, endpoint, kind, features, ratios, durations_sec, max_images, max_prompt_chars, usd_per_second, image_prices from model_configs where id = $1', [modelId])).rows[0];
     if (!model?.enabled) return bad('the model does not exist or is not enabled');
     if (model.kind !== (isImage ? 'image' : 'video') || !model.features.includes(feature)) return bad('the model does not offer this feature');
+    if (feature === 'image' && assetIds.length === 0 && !textToImage(model)) return bad('the model needs at least one input image');
     // Own keys only, with a plain decimal price: `in` would also accept "constructor" and friends.
     const imagePrice = isImage && Object.hasOwn(model.image_prices ?? {}, params.resolution!) ? String(model.image_prices[params.resolution!]) : null;
     if (!model.ratios.includes(ratio) || !(isImage ? imagePrice !== null && /^\d+(\.\d+)?$/.test(imagePrice) : model.durations_sec.includes(durationSec)) || assetIds.length > model.max_images) {
