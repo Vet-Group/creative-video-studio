@@ -1,5 +1,5 @@
 'use client';
-// A sample of the Examples tab (a Marketing clip or a Try On picture) opened in place, as the reference site's Examples open: the sample, its prompt, photos and
+// A sample of the Examples tab (a Marketing clip, a Try On or an Image Generation picture) opened in place, as the reference site's Examples open: the sample, its prompt, photos and
 // settings, and the reuse link (Fash's Recreate). The details come from the sample's own file (`<sample>.json`, uploaded by an Admin beside it); nothing here runs a job.
 import { useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
@@ -13,7 +13,9 @@ import { Modal } from './Modal';
 /** A sample's details file, in the shape its page refills from (`?example=`): Marketing's format and duration, or Try On's model, resolution and background. */
 interface SampleDetails {
   format?: string | null;
-  brief: string | null;
+  brief?: string | null;
+  /** Image Generation's words (its jobs keep the prompt itself). */
+  prompt?: string | null;
   images: { sample: string }[];
   ratio: string;
   durationSec?: number;
@@ -26,10 +28,10 @@ interface SampleDetails {
   date?: string;
 }
 
-/** Try On's heading is the model, as on Fash. */
-function ModelName({ id }: { id: string }) {
-  const { models } = useImageModels('try_on');
-  return <>{models?.find((m) => m.id === id)?.label ?? 'Thử đồ'}</>;
+/** A picture's heading is its model, as on Fash. */
+function ModelName({ id, feature, fallback }: { id: string; feature: string; fallback: string }) {
+  const { models } = useImageModels(feature);
+  return <>{models?.find((m) => m.id === id)?.label ?? fallback}</>;
 }
 
 /** A chip: a button that sets its value on the form beside it, or plain text where there is none. */
@@ -59,15 +61,18 @@ export function SampleDetail({ names, index, onIndex }: { names: string[]; index
     setNote('');
     api<SampleDetails>(`/api/samples/${base}.json`).then(setDetails, () => setNote(video ? 'Không tải được chi tiết của video mẫu.' : 'Không tải được chi tiết của ảnh mẫu.'));
   }, [base, video]);
-  const tryOn = !video;
+  const picture = !video; // a Try On or an Image Generation sample: the photos before the words, resolution chips, Use Result
+  const tryOn = base.startsWith('try-on-');
+  const feature = video ? 'marketing' : tryOn ? 'try_on' : 'image';
+  const text = details?.brief ?? details?.prompt ?? null;
   const advanced = details?.format === 'advanced';
-  const title = tryOn ? 'Thử đồ' : advanced ? 'Nâng cao' : 'UGC Thử đồ';
+  const title = tryOn ? 'Thử đồ' : picture ? 'Tạo ảnh' : advanced ? 'Nâng cao' : 'UGC Thử đồ';
   // As on Fash, each photo, the words, a chip and the result can go on the form beside the Examples.
   const inputs = details && details.images.length > 0 && (
     <ul className="job-inputs" aria-label="Ảnh đầu vào">
       {details.images.map((i, n) => (
         <li key={i.sample}>
-          <Tap on={form?.photo && (() => form.photo!(i, roleOf(tryOn ? 'try_on' : 'marketing', n, { garments: details.garments, advanced })))}>
+          <Tap on={form?.photo && (() => form.photo!(i, roleOf(feature, n, { garments: details.garments, advanced })))}>
             <img src={`/api/samples/${i.sample}`} alt={i.sample} />
           </Tap>
         </li>
@@ -76,7 +81,7 @@ export function SampleDetail({ names, index, onIndex }: { names: string[]; index
   );
   const apply = form?.apply;
   const backdrop = details?.background ? details.images.at(-1) : undefined;
-  const copy = () => navigator.clipboard.writeText(details?.brief ?? '').then(() => setNote('Đã sao chép.'), () => setNote('Không sao chép được.'));
+  const copy = () => navigator.clipboard.writeText(text ?? '').then(() => setNote('Đã sao chép.'), () => setNote('Không sao chép được.'));
 
   return (
     <Modal open onClose={() => onIndex(null)} label={`Chi tiết: ${title}`} className="lightbox">
@@ -85,17 +90,17 @@ export function SampleDetail({ names, index, onIndex }: { names: string[]; index
       </div>
       <div className="lightbox-side">
         {/* Fash's Try On lists the photos before the prompt; its Marketing the other way round. */}
-        <h2>{tryOn && details?.modelId ? <ModelName id={details.modelId} /> : title}</h2>
-        {tryOn && inputs}
-        {details?.brief && (
-          <Tap on={form?.prompt && (() => form.prompt!(details.brief!))} label="Chép prompt vào ô Prompt" className="job-text">
-            {details.brief}
+        <h2>{picture && details?.modelId ? <ModelName id={details.modelId} feature={feature} fallback={title} /> : title}</h2>
+        {picture && inputs}
+        {text && (
+          <Tap on={form?.prompt && (() => form.prompt!(text))} label="Chép prompt vào ô Prompt" className="job-text">
+            {text}
           </Tap>
         )}
-        {!tryOn && inputs}
+        {!picture && inputs}
         {details && (
           <p className="job-chips">
-            {tryOn ? chip(details.resolution ?? '', apply && details.resolution ? () => apply({ resolution: details.resolution! }) : undefined, 'Dùng độ phân giải này') : chip(`${details.durationSec}s`, apply && details.durationSec ? () => apply({ durationSec: details.durationSec }) : undefined, 'Dùng thời lượng này')}
+            {picture ? chip(details.resolution ?? '', apply && details.resolution ? () => apply({ resolution: details.resolution! }) : undefined, 'Dùng độ phân giải này') : chip(`${details.durationSec}s`, apply && details.durationSec ? () => apply({ durationSec: details.durationSec }) : undefined, 'Dùng thời lượng này')}
             {chip(details.ratio, apply && (() => apply({ ratio: details.ratio })), 'Dùng tỉ lệ này')}
           </p>
         )}
@@ -116,18 +121,18 @@ export function SampleDetail({ names, index, onIndex }: { names: string[]; index
           <a className="icon-button" href={`/api/samples/${name}`} target="_blank" rel="noreferrer" aria-label="Mở trong tab mới" title="Mở trong tab mới">
             <Icon name="external" />
           </a>
-          {details?.brief && (
+          {text && (
             <button type="button" className="icon-button" onClick={() => void copy()} aria-label="Sao chép mô tả" title="Sao chép mô tả">
               <Icon name="copy" />
             </button>
           )}
         </div>
         {details && (
-          <Recreate href={tryOn ? `/try-on?example=${base}` : `/marketing-studio${advanced ? '/advanced' : ''}?example=${base}`} from={exampleFrom({ example: base })!} className="lightbox-reuse" onDone={() => narrow && onIndex(null)}>
+          <Recreate href={tryOn ? `/try-on?example=${base}` : picture ? `/image-generation?example=${base}` : `/marketing-studio${advanced ? '/advanced' : ''}?example=${base}`} from={exampleFrom({ example: base })!} className="lightbox-reuse" onDone={() => narrow && onIndex(null)}>
             Dùng lại
           </Recreate>
         )}
-        {tryOn && form?.result && (
+        {picture && form?.result && (
           <button type="button" className="lightbox-result" onClick={() => form.result!({ sample: name })}>
             <Icon name="right" /> Dùng kết quả
           </button>

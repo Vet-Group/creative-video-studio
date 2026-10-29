@@ -79,12 +79,12 @@ export function Recreate({ href, from, className, label, onDone, children }: { h
   const form = useForm();
   if (!form)
     return (
-      <Link href={href} className={className} aria-label={label}>
+      <Link href={href} className={className} aria-label={label} data-from={from}>
         {children}
       </Link>
     );
   return (
-    <button type="button" className={className} aria-label={label} onClick={() => (form.recreate(from), onDone?.())}>
+    <button type="button" className={className} aria-label={label} data-from={from} onClick={() => (form.recreate(from), onDone?.())}>
       {children}
     </button>
   );

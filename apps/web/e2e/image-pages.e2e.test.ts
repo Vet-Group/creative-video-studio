@@ -172,7 +172,7 @@ test('Try On, as on Fash: a sample picture with a details file opens in place wi
     await detail.getByRole('button', { name: 'Dùng lại' }).click();
     const ready = note('Sẵn sàng tạo lại');
     await expect(ready).toBeVisible();
-    expect(await ready.evaluate((e) => { const r = e.getBoundingClientRect(); return e.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)); })).toBe(true); // not under the dialog
+    expect(await page.getByRole('region', { name: 'Thông báo' }).evaluate((e) => e.matches(':popover-open'))).toBe(true); // in the top layer, shown after the dialog, so above it
     await expect(detail).toBeVisible();
     await expect(page).toHaveURL(/\/try-on$/);
     await expect(page.getByLabel('Người mẫu: ảnh đã chọn').getByRole('img', { name: 'try-on-example-1-model.png' })).toBeVisible();
@@ -181,6 +181,43 @@ test('Try On, as on Fash: a sample picture with a details file opens in place wi
     await expect(page.getByRole('textbox', { name: 'Prompt (tuỳ chọn)' })).toHaveValue(details.brief);
     await expect(select(page, 'Tỉ lệ')).toHaveAttribute('data-value', '3:4');
     await expect(select(page, 'Độ phân giải')).toHaveAttribute('data-value', '1K');
+  } finally {
+    await asAdmin((name) => page.request.delete(`/api/admin/samples/${name}`));
+  }
+});
+
+test('Image Generation, as on Fash: a sample picture with a details file opens in place, and its input, words and Dùng lại go on the form', async ({ page }) => {
+  const details = { feature: 'image', images: [{ sample: 'image-example-1-input-1.png' }], prompt: 'Replace the outfit, keep the pose.', enhance: false, modelId: 'mock-image-e2e', ratio: '3:4', resolution: '2K', date: '2026-10-23' };
+  const files: [string, Buffer, string][] = [
+    ['image-example-1.jpg', jpg(), 'image/jpeg'], ['image-example-1.json', Buffer.from(JSON.stringify(details)), 'application/json'], ['image-example-1-input-1.png', png(), 'image/png'],
+  ];
+  const asAdmin = async (each: (name: string, data: Buffer, type: string) => Promise<{ ok(): boolean }>) => {
+    await page.context().clearCookies();
+    await signIn(page, 'admin');
+    for (const [name, data, type] of files) expect((await each(name, data, type)).ok(), name).toBe(true);
+    await page.context().clearCookies();
+  };
+  await asAdmin((name, data, type) => page.request.put(`/api/admin/samples/${name}`, { data, headers: { 'content-type': type } }));
+  try {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await signIn(page, 'imgexa');
+    await page.route(/\/api\/library\?kind=image/, (r) => r.fulfill({ json: { hasMore: false, isAdmin: false, creators: [], clips: [] } }));
+    await page.goto('/image-generation');
+    const gallery = page.getByRole('group', { name: 'Ảnh của công ty' });
+    await gallery.getByRole('link', { name: 'Xem chi tiết ảnh mẫu' }).click();
+    const detail = page.getByRole('dialog', { name: 'Chi tiết: Tạo ảnh' });
+    await expect(detail.getByRole('heading', { name: 'Mock image E2E' })).toBeVisible();
+    await expect(detail.locator('.job-text')).toHaveText(details.prompt);
+    await expect(detail.locator('.job-chips')).toHaveText('2K3:4');
+    const chosen = page.getByRole('list', { name: 'Ảnh đã chọn' });
+    await detail.getByRole('button', { name: 'image-example-1-input-1.png' }).click();
+    await expect(chosen.getByRole('img', { name: 'image-example-1-input-1.png' })).toBeVisible();
+    await detail.getByRole('button', { name: 'Dùng kết quả' }).click(); // the result as one more input
+    await expect(chosen.getByRole('img')).toHaveCount(2);
+    await detail.getByRole('button', { name: 'Dùng lại' }).click();
+    await expect(page.getByRole('textbox', { name: 'Mô tả cảnh bạn muốn tạo' })).toHaveValue(details.prompt);
+    await expect(chosen.getByRole('img')).toHaveCount(1); // Recreate refills: the sample's own input only
+    await expect(page).toHaveURL(/\/image-generation$/);
   } finally {
     await asAdmin((name) => page.request.delete(`/api/admin/samples/${name}`));
   }

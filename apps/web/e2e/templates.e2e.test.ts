@@ -114,12 +114,12 @@ test('Dùng mẫu này on a company result in Ví dụ fills Try On, Image Gener
   // Another member uses them: the inputs of a Library result are open to every member.
   const other = await (await browser.newContext()).newPage();
   await signIn(other, 'useb');
-  const use = (id: string) => other.locator(`a.gallery-use[href$="reuse=${id}"]`);
+  const use = (id: string) => other.locator(`.gallery-use[data-from="/api/jobs/${id}"]`);
 
   await other.goto('/try-on');
   await other.getByRole('tab', { name: 'Ví dụ' }).click();
   await use(ids.try_on).click();
-  await expect(other).toHaveURL((u) => u.pathname === '/try-on' && u.searchParams.get('reuse') === ids.try_on);
+  await expect(other).toHaveURL((u) => u.pathname === '/try-on' && u.search === ''); // in place, as Fash's Recreate
   await expect(other.getByLabel('Người mẫu: ảnh đã chọn').getByRole('img')).toHaveAttribute('alt', 'use-person.png');
   await expect(other.getByLabel('Trang phục: ảnh đã chọn').getByRole('img')).toHaveAttribute('alt', 'use-garment.png');
   await expect(other.getByRole('textbox', { name: 'Prompt (tuỳ chọn)' })).toHaveValue(''); // the creator's own words stay theirs
@@ -131,7 +131,7 @@ test('Dùng mẫu này on a company result in Ví dụ fills Try On, Image Gener
 
   await other.goto('/marketing-studio');
   await use(ids.marketing).click();
-  await expect(other).toHaveURL((u) => u.pathname === '/marketing-studio' && u.searchParams.get('reuse') === ids.marketing);
+  await expect(other).toHaveURL((u) => u.pathname === '/marketing-studio' && u.search === '');
   await expect(other.getByRole('img', { name: 'use-person.png' })).toBeVisible();
 
   await other.goto('/explore');
