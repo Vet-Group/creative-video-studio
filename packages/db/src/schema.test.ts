@@ -219,6 +219,24 @@ describe('migration 0031 Vertex models', () => {
   });
 });
 
+describe('migration 0035 user choices', () => {
+  test("keeps a member's hook or location with its limits, and drops it with the member", async () => {
+    const user = await insertUser();
+    const add = (kind: string, name: string, phrase: string, description: string | null = null) =>
+      pool.query(`insert into user_choices (id, user_id, kind, name, phrase, description) values ($1, $2, $3, $4, $5, $6)`, [next(), user, kind, name, phrase, description]);
+    await add('hook', 'x'.repeat(40), 'y'.repeat(300), 'z'.repeat(100));
+    await add('location', 'n', 'p');
+    expect((await pool.query(`select kind, is_company, description from user_choices where user_id = $1 order by kind`, [user])).rows.map((r) => [r.kind, r.is_company, r.description?.length ?? null])).toEqual([['hook', false, 100], ['location', false, null]]);
+    await expect(add('music', 'n', 'p')).rejects.toThrow(/user_choices_kind_check/);
+    await expect(add('hook', '', 'p')).rejects.toThrow(/user_choices_name_check/);
+    await expect(add('hook', 'x'.repeat(41), 'p')).rejects.toThrow(/user_choices_name_check/);
+    await expect(add('hook', 'n', 'y'.repeat(301))).rejects.toThrow(/user_choices_phrase_check/);
+    await expect(add('hook', 'n', 'p', 'z'.repeat(101))).rejects.toThrow(/user_choices_description_check/);
+    await pool.query('delete from users where id = $1', [user]);
+    expect((await pool.query('select count(*)::int as n from user_choices where user_id = $1', [user])).rows[0].n).toBe(0);
+  });
+});
+
 describe('migration 0007 image models', () => {
   test('seeds the seven fal image models disabled, each with its prices, ratios and features', async () => {
     const { rows } = await pool.query(`select id, endpoint, features, ratios, durations_sec, max_images, image_prices, usd_per_second, enabled, sources from model_configs where kind = 'image' and cardinality(features) > 0 and not features && ARRAY['character_swap', 'model_swap', 'background_changer', 'reframe', 'image_upscale', 'face_swap', 'background_remover']::text[] and id not like 'gpt-image-2.5%' and provider <> 'vertex' order by id`);

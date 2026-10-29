@@ -1,0 +1,198 @@
+import { type Browser, expect, type Page, test } from '@playwright/test';
+import { HOOKS } from '../src/lib/marketing';
+import { png, signIn } from './support.test';
+
+// A member's own hooks and locations on Marketing Studio, Save template from a History card, and the often-used group. Runs use the mock models only.
+// Every company hook made here is deleted in `finally`: marketing.e2e.test.ts counts HOOKS.length cards.
+const file = (name: string) => ({ name, mimeType: 'image/png', buffer: png() });
+const runButton = (page: Page) => page.getByRole('button', { name: /^Tạo video/ });
+const hookBox = (page: Page) => page.getByRole('button', { name: /^Hook/ });
+const locationBox = (page: Page) => page.getByRole('button', { name: /^Bối cảnh/ });
+const history = (page: Page) => page.getByRole('complementary', { name: 'Job của tôi' });
+const unique = () => Date.now().toString(36); // a retry makes new items, so names never clash with the first attempt's
+
+async function upload(page: Page, name: string): Promise<string> {
+  const res = await page.request.post('/api/assets', { multipart: { file: file(name) } });
+  return ((await res.json()) as { assets: { id: string }[] }).assets[0]!.id;
+}
+async function post(page: Page, data: Record<string, unknown>): Promise<string> {
+  const res = await page.request.post('/api/jobs', { data });
+  expect(res.status(), await res.text()).toBe(201);
+  return ((await res.json()) as { id: string }).id;
+}
+async function addChoice(page: Page, data: Record<string, unknown>): Promise<string> {
+  const res = await page.request.post('/api/choices', { data });
+  expect(res.status(), await res.text()).toBe(201);
+  return ((await res.json()) as { id: string }).id;
+}
+/** Deletes the member's jobs once they are done, so the shared Library the later specs filter (flow.e2e.test.ts) holds none of them. */
+test.afterEach(async ({ page }) => {
+  const mine = async () => ((await (await page.request.get('/api/jobs?mine')).json()) as { jobs?: { id: string; status: string }[] }).jobs ?? [];
+  await expect.poll(async () => (await mine()).every((j) => !['queued', 'submitting', 'running'].includes(j.status)), { timeout: 60_000 }).toBe(true);
+  for (const j of await mine()) if (j.status === 'succeeded') expect((await page.request.delete(`/api/jobs/${j.id}`)).ok()).toBe(true);
+});
+
+async function asAdmin(browser: Browser): Promise<Page> {
+  const page = await (await browser.newContext()).newPage();
+  await signIn(page, 'admin');
+  return page;
+}
+
+test('Thêm hook and Thêm bối cảnh save the member’s own, choose them at once, put their phrases in the prompt, and Dùng lại brings them back', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  const tag = unique();
+  const hook = { name: `Vẫy tay ${tag}`, phrase: `The creator waves at the camera ${tag}.` };
+  const spot = { name: `Quán quen ${tag}`, phrase: `a small corner cafe ${tag}` };
+  await signIn(page, 'custa');
+  await page.goto('/marketing-studio');
+  await page.getByLabel('Ảnh người mẫu').setInputFiles(file('model.png'));
+  await expect(page.getByRole('img', { name: 'model.png' })).toBeVisible();
+  await page.getByLabel('Ảnh sản phẩm').setInputFiles(file('product.png'));
+  await expect(page.getByRole('img', { name: 'product.png' })).toBeVisible();
+
+  await hookBox(page).click();
+  const hooks = page.getByRole('dialog', { name: 'Chọn hook' });
+  await hooks.getByRole('button', { name: 'Thêm hook' }).click();
+  const hookForm = hooks.getByRole('group', { name: 'Thêm hook' });
+  await hookForm.getByLabel('Tên', { exact: true }).fill(hook.name);
+  await hookForm.getByLabel('Cụm tiếng Anh').fill(hook.phrase);
+  await hookForm.getByRole('button', { name: 'Lưu', exact: true }).click();
+  await expect(hooks).toBeHidden();
+  await expect(hookBox(page)).toContainText(hook.name);
+  await hookBox(page).click();
+  await expect(hooks.getByRole('option', { name: hook.name, exact: true })).toHaveAttribute('aria-selected', 'true');
+  await expect(hooks.getByRole('region', { name: 'Hook của bạn' }).getByRole('button', { name: `Xoá hook ${hook.name}` })).toBeVisible();
+  await page.keyboard.press('Escape');
+
+  await locationBox(page).click();
+  const places = page.getByRole('dialog', { name: 'Chọn bối cảnh' });
+  await places.getByRole('button', { name: 'Thêm bối cảnh' }).click();
+  const spotForm = places.getByRole('group', { name: 'Thêm bối cảnh' });
+  await spotForm.getByLabel('Tên', { exact: true }).fill(spot.name);
+  await spotForm.getByLabel('Cụm tiếng Anh').fill(spot.phrase);
+  await spotForm.getByLabel('Mô tả (tuỳ chọn)').fill('Góc quán quen');
+  await spotForm.getByRole('button', { name: 'Lưu', exact: true }).click();
+  await expect(places).toBeHidden();
+  await expect(locationBox(page)).toContainText(spot.name);
+
+  await page.getByText('Xem prompt gửi đi').click();
+  const preview = page.locator('.prompt-preview p');
+  await expect(preview).toContainText(`${hook.phrase} Set in ${spot.phrase}.`);
+  await runButton(page).click();
+  await expect(page.getByText('Đã gửi job')).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Thông báo' }).getByText('Clip đã xong')).toBeVisible({ timeout: 60_000 });
+
+  // A fresh page refilled from History has the same choices and the same prompt.
+  await page.goto('/marketing-studio');
+  await expect(hookBox(page)).toContainText('Chưa chọn');
+  await history(page).getByRole('button', { name: 'Dùng lại' }).first().click();
+  await expect(hookBox(page)).toContainText(hook.name);
+  await expect(locationBox(page)).toContainText(spot.name);
+  await page.getByText('Xem prompt gửi đi').click();
+  await expect(preview).toContainText(`${hook.phrase} Set in ${spot.phrase}.`);
+});
+
+test("another member does not see a private hook; an Admin's company hook shows for every member, without Xoá", async ({ page, browser }) => {
+  const tag = unique();
+  await signIn(page, 'custa');
+  const privateName = `Riêng ${tag}`;
+  await addChoice(page, { kind: 'hook', name: privateName, phrase: 'Private words.' });
+  const admin = await asAdmin(browser);
+  const companyName = `Công ty ${tag}`;
+  const company = await addChoice(admin, { kind: 'hook', name: companyName, phrase: 'Company words.', isCompany: true });
+  try {
+    const other = await (await browser.newContext()).newPage();
+    await signIn(other, 'custb');
+    await other.goto('/marketing-studio');
+    await hookBox(other).click();
+    const hooks = other.getByRole('dialog', { name: 'Chọn hook' });
+    await expect(hooks.getByRole('option', { name: companyName, exact: true })).toBeVisible();
+    await expect(hooks.getByRole('option', { name: privateName, exact: true })).toHaveCount(0);
+    await expect(hooks.getByRole('button', { name: /^Xoá hook / })).toHaveCount(0);
+    await expect(hooks.getByRole('region', { name: 'Hook của bạn' })).toHaveCount(0);
+    // The owner, and an Admin for a company one, may delete; another member may not.
+    expect((await other.request.delete(`/api/choices/${company}`)).status()).toBe(404);
+    await other.close();
+  } finally {
+    expect((await admin.request.delete(`/api/choices/${company}`)).status()).toBe(204);
+    await admin.close();
+  }
+});
+
+test('Lưu mẫu on a History card saves that job as a template of its page, which Mẫu của tôi lists and refills, on Try On and on Marketing Studio', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  const tag = unique();
+  await signIn(page, 'custa');
+  const [person, garment] = [await upload(page, 'cust-person.png'), await upload(page, 'cust-garment.png')];
+  await post(page, { feature: 'try_on', modelId: 'mock-image-e2e', assetIds: [person, garment], ratio: '3:4', prompt: 'composed', params: { resolution: '2K', garments: '1', brief: 'blue coat' } });
+  await post(page, { feature: 'marketing', modelId: 'mock-e2e', assetIds: [person, garment], ratio: '9:16', durationSec: 5, prompt: 'composed', params: { audio: 'off', hook: HOOKS[0]!.id, brief: 'tpl brief' } });
+
+  async function saveFromCard(name: string) {
+    await page.getByRole('tab', { name: 'Lịch sử' }).click();
+    const card = history(page).locator('.job-card').first();
+    await card.getByRole('button', { name: /^Lưu mẫu từ / }).click();
+    const dialog = page.getByRole('dialog', { name: 'Lưu mẫu' });
+    await expect(dialog.getByLabel('Tên mẫu')).not.toHaveValue(''); // the card's title to start with
+    await dialog.getByLabel('Tên mẫu').fill(name);
+    await dialog.getByRole('button', { name: 'Lưu', exact: true }).click();
+    await expect(dialog).toBeHidden();
+    await expect(card.getByRole('status')).toHaveText('Đã lưu mẫu.');
+  }
+  async function openTemplate(path: RegExp, name: string) {
+    await page.getByRole('button', { name: 'Mẫu của tôi' }).click();
+    await page.getByRole('dialog', { name: 'Mẫu của tôi' }).getByRole('link', { name }).click();
+    await expect(page).toHaveURL(path);
+  }
+
+  await page.goto('/try-on');
+  await saveFromCard(`Áo xanh ${tag}`);
+  await page.goto('/try-on');
+  await expect(page.getByRole('textbox', { name: 'Prompt (tuỳ chọn)' })).toHaveValue('');
+  await openTemplate(/\/try-on\?template=/, `Áo xanh ${tag}`);
+  await expect(page.getByLabel('Người mẫu: ảnh đã chọn').getByRole('img')).toHaveAttribute('alt', 'cust-person.png');
+  await expect(page.getByLabel('Trang phục: ảnh đã chọn').getByRole('img')).toHaveAttribute('alt', 'cust-garment.png');
+  await expect(page.getByRole('textbox', { name: 'Prompt (tuỳ chọn)' })).toHaveValue('blue coat');
+
+  await page.goto('/marketing-studio');
+  await saveFromCard(`Bão ${tag}`);
+  await page.goto('/marketing-studio');
+  await openTemplate(/\/marketing-studio\?template=/, `Bão ${tag}`);
+  await expect(page.getByRole('textbox', { name: 'Prompt (tuỳ chọn)' })).toHaveValue('tpl brief');
+  await expect(hookBox(page)).toContainText(HOOKS[0]!.name);
+  await expect(page.getByRole('img', { name: 'cust-person.png' })).toBeVisible();
+});
+
+test('after two Runs with the same hook its picker has a Hay dùng group holding it; a member with no history has none', async ({ page, browser }) => {
+  const hook = HOOKS.find((h) => h.id === 'product-drop')!;
+  await signIn(page, 'custa');
+  const [person, product] = [await upload(page, 'often-person.png'), await upload(page, 'often-product.png')];
+  for (let i = 0; i < 2; i++) await post(page, { feature: 'marketing', modelId: 'mock-e2e', assetIds: [person, product], ratio: '9:16', durationSec: 5, prompt: 'composed', params: { audio: 'off', hook: hook.id } });
+  await page.goto('/marketing-studio');
+  await hookBox(page).click();
+  const hooks = page.getByRole('dialog', { name: 'Chọn hook' });
+  const often = hooks.getByRole('group', { name: 'Hay dùng' });
+  await expect(often.getByRole('option', { name: hook.name, exact: true })).toBeVisible();
+  await expect(hooks.getByRole('option', { name: hook.name, exact: true })).toHaveCount(1); // shown once, in Hay dùng only
+  await expect(hooks.getByRole('option').first()).toHaveAccessibleName(hook.name);
+
+  const other = await (await browser.newContext()).newPage();
+  await signIn(other, 'custb');
+  await other.goto('/marketing-studio');
+  await hookBox(other).click();
+  const theirs = other.getByRole('dialog', { name: 'Chọn hook' });
+  await expect(theirs.getByRole('option').first()).toHaveAccessibleName(HOOKS[0]!.name);
+  await expect(theirs.getByRole('group', { name: 'Hay dùng' })).toHaveCount(0);
+  await other.close();
+});
+
+test("the API refuses another member's private hook in a job", async ({ page, browser }) => {
+  await signIn(page, 'custa');
+  const mine = await addChoice(page, { kind: 'hook', name: `Riêng ${unique()}`, phrase: 'Private words.' });
+  const other = await (await browser.newContext()).newPage();
+  await signIn(other, 'custb');
+  const [person, product] = [await upload(other, 'b-person.png'), await upload(other, 'b-product.png')];
+  const res = await other.request.post('/api/jobs', { data: { feature: 'marketing', modelId: 'mock-e2e', assetIds: [person, product], ratio: '9:16', durationSec: 5, prompt: 'composed', params: { audio: 'off', hook: mine } } });
+  expect(res.status()).toBe(400);
+  expect(((await res.json()) as { error: string }).error).toMatch(/^params\.hook must be one of/);
+  await other.close();
+});

@@ -144,3 +144,24 @@ describe('advancedPrompt', () => {
     expect(briefRoom(() => 'y'.repeat(3000), 2000)).toBe(0); // never negative
   });
 });
+
+describe('custom hooks and locations', () => {
+  const custom = { hooks: [{ id: 'c-hook', name: 'Của tôi', desc: '', phrase: 'The creator waves at the camera.' }], locations: [{ id: 'c-spot', name: 'Quán', desc: '', phrase: 'a small corner cafe' }] };
+  const builtIn = { hooks: [{ ...HOOKS[0]!, id: 'c-hook' }], locations: [{ ...LOCATIONS[0]!, id: 'c-spot' }] };
+
+  it('puts a custom phrase exactly where a built-in one goes, in both formats', () => {
+    // The same phrase under a custom id gives the same prompt as the built-in id.
+    expect(marketingPrompt({ hook: 'c-hook', location: 'c-spot', prompt: 'notes' }, builtIn)).toBe(marketingPrompt({ hook: HOOKS[0]!.id, location: LOCATIONS[0]!.id, prompt: 'notes' }));
+    const brief = { brief: 'b', images: 2, audio: true };
+    expect(advancedPrompt({ ...brief, hook: 'c-hook', location: 'c-spot' }, builtIn)).toBe(advancedPrompt({ ...brief, hook: HOOKS[0]!.id, location: LOCATIONS[0]!.id }));
+    const p = marketingPrompt({ hook: 'c-hook', location: 'c-spot' }, custom);
+    expect(p).toContain('The creator waves at the camera. Set in a small corner cafe.');
+  });
+
+  it('changes nothing without custom choices, and a custom id unknown to the lists adds nothing', () => {
+    const args = { hook: HOOKS[1]!.id, location: LOCATIONS[1]!.id, prompt: 'x' };
+    expect(marketingPrompt(args, {})).toBe(marketingPrompt(args));
+    expect(marketingPrompt({ hook: 'c-hook', location: 'c-spot' })).toBe(marketingPrompt({}));
+    expect(advancedPrompt({ brief: 'b', images: 1, audio: false, hook: 'c-hook' })).toBe(advancedPrompt({ brief: 'b', images: 1, audio: false }));
+  });
+});

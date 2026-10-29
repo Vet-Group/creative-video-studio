@@ -408,6 +408,33 @@ export const userTemplates = pgTable(
   (t) => [index('user_templates_user_id_idx').on(t.userId), check('user_templates_name_check', sql`char_length(${t.name}) between 1 and 60`)],
 );
 
+export const CHOICE_KINDS = ['hook', 'location'] as const;
+export type ChoiceKind = (typeof CHOICE_KINDS)[number];
+
+// A member's own Marketing Studio hook or location: private, or shared by an Admin as a company one, as templates are.
+export const userChoices = pgTable(
+  'user_choices',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    kind: text('kind', { enum: CHOICE_KINDS }).notNull(),
+    name: text('name').notNull(),
+    phrase: text('phrase').notNull(),
+    description: text('description'),
+    isCompany: boolean('is_company').notNull().default(false),
+    createdAt: tstz('created_at').notNull().defaultNow(),
+  },
+  (t) => [
+    index('user_choices_user_id_idx').on(t.userId),
+    check('user_choices_kind_check', sql`${t.kind} in ('hook', 'location')`),
+    check('user_choices_name_check', sql`char_length(${t.name}) between 1 and 40`),
+    check('user_choices_phrase_check', sql`char_length(${t.phrase}) between 1 and 300`),
+    check('user_choices_description_check', sql`${t.description} is null or char_length(${t.description}) <= 100`),
+  ],
+);
+
 // One Marketing Studio suggestion request (packages/core/src/suggest.ts): what was asked, the options, their LLM cost. Counted for the daily limit.
 export const suggestionRuns = pgTable(
   'suggestion_runs',

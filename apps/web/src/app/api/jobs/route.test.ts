@@ -763,6 +763,26 @@ describe('POST /api/jobs for an image feature', () => {
         expect(await jobCount()).toBe(before);
       });
 
+      test("takes the member's own and a company hook or location, and refuses another member's private one, an unknown id and a deleted one", async () => {
+        const [m, other] = [await newMember(), await newMember()];
+        const choice = (id: string, userId: string, kind: string, company = false) =>
+          pool.query(`insert into user_choices (id, user_id, kind, name, phrase, is_company) values ($1, $2, $3, 'n', 'p', $4)`, [id, userId, kind, company]);
+        await choice(`${m.id}-hook`, m.id, 'hook');
+        await choice(`${other.id}-spot`, other.id, 'location', true);
+        await choice(`${other.id}-hook`, other.id, 'hook');
+        await choice(`${m.id}-gone`, m.id, 'hook');
+        const ok = await advanced(m, 2, { params: { format: 'advanced', hook: `${m.id}-hook`, location: `${other.id}-spot` } });
+        expect(ok.status).toBe(201);
+        expect((await pool.query('select params from jobs where id = $1', [((await ok.json()) as { id: string }).id])).rows[0].params).toMatchObject({ hook: `${m.id}-hook`, location: `${other.id}-spot` });
+        await pool.query('delete from user_choices where id = $1', [`${m.id}-gone`]);
+        const before = await jobCount();
+        expect(await error(await advanced(m, 2, { params: { format: 'advanced', hook: `${other.id}-hook` } }))).toBe("params.hook must be one of the built-in hooks, your own or the company's");
+        expect(await error(await advanced(m, 2, { params: { format: 'advanced', hook: `${m.id}-gone` } }))).toMatch(/params.hook must be one of/);
+        expect(await error(await advanced(m, 2, { params: { format: 'advanced', hook: `${other.id}-spot` } }))).toMatch(/params.hook must be one of/); // a location is not a hook
+        expect(await error(await advanced(m, 2, { params: { format: 'advanced', location: `${m.id}-hook` } }))).toMatch(/params.location must be one of/);
+        expect(await jobCount()).toBe(before);
+      });
+
       test("is held to the model's own reference cap and refuses audio on a model without an audio price", () =>
         withMarketing(async () => {
           const m = await newMember();

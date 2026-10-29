@@ -18,7 +18,7 @@ export async function GET(request: Request, { params }: RouteContext) {
   if (!t) return notFound();
   const data = t.data as TemplateData;
   const images = await pool.query(
-    `select id, filename from assets where id = any($1::text[]) and owner_id = $2 and kind = 'input' and deleted_at is null order by array_position($1::text[], id)`,
+    `select id, filename, mime, duration_ms as "durationMs" from assets where id = any($1::text[]) and owner_id = $2 and kind = 'input' and deleted_at is null order by array_position($1::text[], id)`,
     [data.images, userId],
   );
   return Response.json({

@@ -378,6 +378,28 @@ test('Motion Control: the image and the reference video, a length check, and a R
   expect(sent).not.toHaveProperty('prompt');
 });
 
+test("Motion Control: Dùng lại keeps the job's model even when the remembered model answers later", async ({ page }) => {
+  await signIn(page, 'appsa');
+  const model = (id: string, label: string) => ({ id, label, isMock: false, supported: true, estimateUsd: '0.8400', durationsSec: [5], score: 50, recommended: false });
+  await page.route(/\/api\/models\?feature=motion_control/, (r) =>
+    r.fulfill({ json: { models: [model('kling-v3-motion-pro', 'Kling V3 Motion Control Pro'), model('kling-v3-motion-standard', 'Kling V3 Motion Control Standard')], defaultModelId: 'kling-v3-motion-standard' } }),
+  );
+  await page.route('**/api/jobs/motion-old', (r) =>
+    r.fulfill({ json: { feature: 'motion_control', images: [], prompt: 'stage light', brief: null, garments: null, enhance: null, ratio: 'auto', resolution: null, modelId: 'kling-v3-motion-pro' } }),
+  );
+  let recalled = false;
+  await page.route(/\/api\/recall\?feature=motion_control/, async (r) => {
+    recalled = true;
+    await new Promise((done) => setTimeout(done, 1500)); // the memory answers after the refill
+    await r.fulfill({ json: { settings: { modelId: 'kling-v3-motion-standard', ratio: 'auto', durationSec: null, resolution: null, audio: null, enhance: null, storeId: null } } });
+  });
+  await page.goto('/apps/motion-control?reuse=motion-old');
+  await expect(page.locator('.select-trigger')).toContainText('Kling V3 Motion Control Pro');
+  await page.waitForTimeout(2500);
+  await expect(page.locator('.select-trigger')).toContainText('Kling V3 Motion Control Pro');
+  expect(recalled).toBe(false); // a refill skips the memory
+});
+
 test('Run is disabled with a reason when the app has no enabled model, and "Đổi ứng dụng" switches app with a fresh form', async ({ page }) => {
   await signIn(page, 'appsb');
   await page.route(/\/api\/image-models\?feature=model_swap/, (r) => r.fulfill({ json: { models: [] } }));

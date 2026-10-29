@@ -1,7 +1,7 @@
 // Saved forms (a client module: only the client forms import it): Save template keeps the page's current inputs under a name, My templates lists them (and the company's) and reopens the page filled from one.
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useId, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { api, errorText, sendJson } from '@/lib/api';
 import { MAX_TEMPLATE_NAME, type TemplateData } from '@/lib/templates';
 import { Modal } from './Modal';
@@ -13,15 +13,56 @@ interface Template {
   mine: boolean;
 }
 
+/** The Save template dialog: a name (`name` to start with) and, for an Admin, the company share box. `onSave` throws to show its error here. */
+export function SaveTemplateDialog({ open, onClose, onSave, canShare, name: initial = '' }: { open: boolean; onClose: () => void; onSave: (name: string, share: boolean) => Promise<void>; canShare: boolean; name?: string }) {
+  const nameId = useId();
+  const [name, setName] = useState(initial);
+  const [share, setShare] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    if (open) (setName(initial), setShare(false), setError(''));
+  }, [open]);
+  async function save() {
+    setBusy(true);
+    setError('');
+    try {
+      await onSave(name.trim(), share);
+    } catch (e) {
+      setError(errorText(e, 'Không lưu được mẫu, hãy thử lại.'));
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <Modal open={open} onClose={onClose} label="Lưu mẫu" className="choice-dialog">
+      <h2>Lưu mẫu</h2>
+      <label className="field-label" htmlFor={nameId}>
+        Tên mẫu
+      </label>
+      <input id={nameId} value={name} maxLength={MAX_TEMPLATE_NAME} onChange={(e) => setName(e.target.value)} />
+      {canShare && (
+        <label className="template-share">
+          <input type="checkbox" checked={share} onChange={(e) => setShare(e.target.checked)} /> Chia sẻ cho cả công ty
+        </label>
+      )}
+      {error && (
+        <p className="error" role="alert">
+          {error}
+        </p>
+      )}
+      <button type="button" className="primary" disabled={busy || !name.trim()} onClick={() => void save()}>
+        Lưu
+      </button>
+    </Modal>
+  );
+}
+
 /** `data` reads the form when Save template is pressed: images as asset ids, the rest as the reuse link reads them from a job. */
 export function Templates({ feature, data }: { feature: string; data: () => TemplateData }) {
   const path = usePathname();
-  const nameId = useId();
   const [open, setOpen] = useState<'list' | 'save' | null>(null);
   const [list, setList] = useState<{ templates: Template[]; canShare: boolean } | null>(null);
-  const [name, setName] = useState('');
-  const [share, setShare] = useState(false);
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
 
@@ -33,20 +74,10 @@ export function Templates({ feature, data }: { feature: string; data: () => Temp
     void load();
   };
 
-  async function save() {
-    setBusy(true);
-    setError('');
-    try {
-      await api('/api/templates', sendJson('POST', { feature, name: name.trim(), data: Object.fromEntries(Object.entries(data()).filter(([, v]) => v !== '' && v !== undefined)), ...(share && { isCompany: true }) }));
-      setOpen(null);
-      setName('');
-      setShare(false);
-      setNotice('Đã lưu mẫu.');
-    } catch (e) {
-      setError(errorText(e, 'Không lưu được mẫu, hãy thử lại.'));
-    } finally {
-      setBusy(false);
-    }
+  async function save(name: string, share: boolean) {
+    await api('/api/templates', sendJson('POST', { feature, name, data: Object.fromEntries(Object.entries(data()).filter(([, v]) => v !== '' && v !== undefined)), ...(share && { isCompany: true }) }));
+    setOpen(null);
+    setNotice('Đã lưu mẫu.');
   }
 
   async function remove(t: Template) {
@@ -97,26 +128,7 @@ export function Templates({ feature, data }: { feature: string; data: () => Temp
           </p>
         )}
       </Modal>
-      <Modal open={open === 'save'} onClose={() => setOpen(null)} label="Lưu mẫu" className="choice-dialog">
-        <h2>Lưu mẫu</h2>
-        <label className="field-label" htmlFor={nameId}>
-          Tên mẫu
-        </label>
-        <input id={nameId} value={name} maxLength={MAX_TEMPLATE_NAME} onChange={(e) => setName(e.target.value)} />
-        {list?.canShare && (
-          <label className="template-share">
-            <input type="checkbox" checked={share} onChange={(e) => setShare(e.target.checked)} /> Chia sẻ cho cả công ty
-          </label>
-        )}
-        {error && (
-          <p className="error" role="alert">
-            {error}
-          </p>
-        )}
-        <button type="button" className="primary" disabled={busy || !name.trim()} onClick={() => void save()}>
-          Lưu
-        </button>
-      </Modal>
+      <SaveTemplateDialog open={open === 'save'} onClose={() => setOpen(null)} onSave={save} canShare={list?.canShare ?? false} />
     </div>
   );
 }

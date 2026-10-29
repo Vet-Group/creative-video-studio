@@ -5,7 +5,8 @@ import { VIDEO_QUEUE, videoSendOptions } from '@cvs/core/queue';
 import { FEATURES } from '@cvs/db';
 import { pool } from '@/lib/auth';
 import { boss } from '@/lib/queue';
-import { ADVANCED_MAX_SCRIPT, HOOKS, LOCATIONS } from '@/lib/marketing';
+import { findChoice } from '@/lib/choices';
+import { ADVANCED_MAX_SCRIPT } from '@/lib/marketing';
 import { guard } from '@/lib/session';
 
 const MAX_IMAGES = 4;
@@ -133,8 +134,9 @@ export async function POST(request: Request) {
     if (given.format !== undefined && given.format !== 'advanced') return bad('params.format must be advanced');
     if (given.audio !== undefined && given.audio !== 'on' && given.audio !== 'off') return bad('params.audio must be on or off');
     if (given.quality !== undefined && !QUALITIES.includes(given.quality)) return bad(`params.quality must be one of ${QUALITIES.join(', ')}`);
-    for (const [key, choices] of [['hook', HOOKS], ['location', LOCATIONS]] as const) {
-      if (given[key] !== undefined && !choices.some((c) => c.id === given[key])) return bad(`params.${key} must be one of ${choices.map((c) => c.id).join(', ')}`);
+    // A built-in hook or location, or the member's own or a company one (lib/choices.ts).
+    for (const key of ['hook', 'location'] as const) {
+      if (given[key] !== undefined && !(await findChoice(userId, key, given[key]))) return bad(`params.${key} must be one of the built-in ${key}s, your own or the company's`);
     }
     // The member's text kept for reuse: the brief is part of the prompt, which the model's limit holds below; the script is held to what a clip can say.
     for (const [key, max] of [['brief', PROMPT_CEILING], ['script', ADVANCED_MAX_SCRIPT]] as const) {

@@ -246,6 +246,13 @@
       "when": 1794394946036,
       "tag": "0034_vertex_try_on_prior",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1794394947036,
+      "tag": "0035_user_choices",
+      "breakpoints": true
     }
   ]
 }

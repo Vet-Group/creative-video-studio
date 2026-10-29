@@ -9,7 +9,7 @@ test('the reuse link opens the page that made the job, with the job to refill fr
   expect(reuseHref({ id: 'j5', feature: 'character_swap' })).toBe('/apps/character-swap?reuse=j5');
   expect(reuseHref({ id: 'j6', feature: 'background_changer' })).toBe('/apps/background-changer?reuse=j6');
   expect(reuseHref({ id: 'j 7', feature: 'video' })).toBe('/create?reuse=j%207');
-  expect(reuseHref({ id: 'j8', feature: 'motion_control' })).toBeNull();
+  expect(reuseHref({ id: 'j8', feature: 'motion_control' })).toBe('/apps/motion-control?reuse=j8'); // its form refills since History saves it as a template
   expect(reuseHref({ id: 'j9', feature: 'media_optimizer' })).toBeNull(); // still to come
 });
 
