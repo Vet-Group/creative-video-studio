@@ -5,6 +5,7 @@ import { useRef, useState } from 'react';
 import { api, errorText, sendJson } from '@/lib/api';
 import { ABOUT } from '@/lib/about-content';
 import { promptTooLong } from '@/lib/prompt-limit';
+import { confirmRun, runKey } from '@/lib/run-guard';
 import { useHydrated } from '@/lib/use-hydrated';
 import { useRecall } from '@/lib/use-recall';
 import { About } from './About';
@@ -13,6 +14,7 @@ import { EnhanceToggle } from './EnhanceToggle';
 import { Icon } from './Icon';
 import { FormContext, type Photo, useApplier, useJobs } from './jobs';
 import { ModelPicker } from './ModelPicker';
+import { PromptTools } from './PromptTools';
 import { Select } from './Select';
 import { Tray } from './Shell';
 import { Templates } from './Templates';
@@ -118,6 +120,7 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
   }
 
   async function run() {
+    if (!confirmRun(pick.estimate)) return;
     setBusy(true);
     setError('');
     setNotice('');
@@ -181,7 +184,8 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
               </li>
             )}
           </ul>
-          <textarea aria-label="Mô tả cảnh bạn muốn tạo" placeholder="Mô tả cảnh bạn muốn tạo…" value={prompt} maxLength={chosen?.maxPromptChars} rows={2} onChange={(e) => setPrompt(e.target.value)} />
+          <textarea aria-label="Mô tả cảnh bạn muốn tạo" placeholder="Mô tả cảnh bạn muốn tạo…" value={prompt} maxLength={chosen?.maxPromptChars} rows={2} onChange={(e) => setPrompt(e.target.value)} onKeyDown={runKey(() => canRun && void run())} />
+          <PromptTools bare feature="image" value={prompt} onChange={setPrompt} maxLength={chosen?.maxPromptChars} onRun={() => canRun && void run()} />
         </div>
         {(reason || error || notice || count) && (
           <div className="bar-message">

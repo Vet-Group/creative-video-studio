@@ -48,6 +48,11 @@ export const USERS = {
   remc: { email: 'remc@e2e.test', name: 'E2E Remember C', role: 'member' },
   custa: { email: 'custa@e2e.test', name: 'E2E Custom A', role: 'member' },
   custb: { email: 'custb@e2e.test', name: 'E2E Custom B', role: 'member' },
+  // The Run guard, Ctrl+Enter, recent prompts, the prompt box and the zip download (upgrades spec), one account per part.
+  upga: { email: 'upga@e2e.test', name: 'E2E Upgrades A', role: 'member' },
+  upgb: { email: 'upgb@e2e.test', name: 'E2E Upgrades B', role: 'member' },
+  upgc: { email: 'upgc@e2e.test', name: 'E2E Upgrades C', role: 'member' },
+  upgd: { email: 'upgd@e2e.test', name: 'E2E Upgrades D', role: 'member' },
   admin: { email: 'admin@e2e.test', name: 'E2E Admin', role: 'admin' },
 } as const;
 

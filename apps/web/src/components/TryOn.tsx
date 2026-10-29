@@ -4,6 +4,7 @@
 import { useEffect, useId, useState } from 'react';
 import { api, errorText, sendJson } from '@/lib/api';
 import { promptTooLong } from '@/lib/prompt-limit';
+import { confirmRun, runKey } from '@/lib/run-guard';
 import { tryOnPrompt } from '@/lib/try-on-prompt';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { useRecall } from '@/lib/use-recall';
@@ -14,6 +15,7 @@ import { About } from './About';
 import { Gallery, type Img, LockedFields, PhotoDialog, photoImg, RATIO_LABEL, Slot, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
 import { FormContext, type Photo, type PhotoRole, useApplier, useHasHistory, useJobs } from './jobs';
 import { ModelPicker } from './ModelPicker';
+import { PromptTools } from './PromptTools';
 import { Select } from './Select';
 import { Tray } from './Shell';
 import { Templates } from './Templates';
@@ -143,6 +145,7 @@ export function TryOn({ reuse }: { reuse?: string }) {
   }
 
   async function run() {
+    if (!confirmRun(pick.estimate)) return;
     setBusy(true);
     setError('');
     setNotice('');
@@ -207,11 +210,14 @@ export function TryOn({ reuse }: { reuse?: string }) {
             {models && models.length > 0 && <ModelPicker models={pick.options} value={pick.modelId} onChange={pick.setModelId} />}
 
             <div className="field">
-              <label htmlFor={promptId} className="field-label">
-                Prompt (tuỳ chọn)
-              </label>
+              <div className="field-head">
+                <label htmlFor={promptId} className="field-label">
+                  Prompt (tuỳ chọn)
+                </label>
+                <PromptTools feature="try_on" value={prompt} onChange={setPrompt} maxLength={room} onRun={() => canRun && void run()} />
+              </div>
               <div className="prompt-box">
-                <textarea id={promptId} value={prompt} maxLength={room} placeholder="Mô tả điều bạn muốn..." onChange={(e) => setPrompt(e.target.value)} />
+                <textarea id={promptId} value={prompt} maxLength={room} placeholder="Mô tả điều bạn muốn..." onChange={(e) => setPrompt(e.target.value)} onKeyDown={runKey(() => canRun && void run())} />
                 <div className="prompt-foot">
                   <span>
                     {prompt.length}

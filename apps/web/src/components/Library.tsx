@@ -1,12 +1,13 @@
 'use client';
 import Link from 'next/link';
-import { type CSSProperties, useCallback, useEffect, useRef, useState } from 'react';
+import { type CSSProperties, type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { api, type Clip, errorText, sendJson } from '@/lib/api';
 import { FAULTS } from '@/lib/faults';
 import { featureLabel } from '@/lib/features';
 import { reuseHref } from '@/lib/reuse';
 import { Icon } from './Icon';
 import { Modal } from './Modal';
+import { useZipDownload } from './ZipDownload';
 
 const fmtTime = (iso: string) => new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date(iso));
 /** The Library filters in the reference order; the id is the `kind` the API takes. */
@@ -34,7 +35,7 @@ interface StoreOption {
 }
 
 /** `stores` is given to Admins only: it switches on the store control. */
-function ClipCard({ clip, stores, onChange, onDeleted, onOpen }: { clip: Clip; stores?: StoreOption[]; onChange: (c: Clip) => void; onDeleted: (id: string) => void; onOpen: () => void }) {
+function ClipCard({ clip, stores, select, onChange, onDeleted, onOpen }: { clip: Clip; stores?: StoreOption[]; select?: ReactNode; onChange: (c: Clip) => void; onDeleted: (id: string) => void; onOpen: () => void }) {
   const [failing, setFailing] = useState(false);
   const [fault, setFault] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -105,6 +106,7 @@ function ClipCard({ clip, stores, onChange, onDeleted, onOpen }: { clip: Clip; s
 
   return (
     <article className="card" aria-label={`${image ? 'Ảnh' : 'Clip'} ${clip.downloadName}`}>
+      {select}
       {image ? (
         <img className="output" src={`/api/assets/${clip.videoAssetId}/content`} alt={clip.downloadName} loading="lazy" />
       ) : (
@@ -326,6 +328,7 @@ function ClipDetail({ clips, index, onIndex }: { clips: Clip[]; index: number; o
 }
 
 export function Library() {
+  const zip = useZipDownload();
   const [detail, setDetail] = useState<number | null>(null); // the item open in the detail view, by its place in the list
   const [creator, setCreator] = useState('');
   const [date, setDate] = useState('');
@@ -419,7 +422,9 @@ export function Library() {
           <input type="range" min={0} max={SIZES.length - 1} step={1} value={size} onChange={(e) => resize(Number(e.target.value))} aria-valuetext={['Nhỏ', 'Vừa', 'Lớn'][size]} />
           <Icon name="ratio" />
         </label>
+        {zip.toggle}
       </div>
+      {zip.bar}
       <div className="filters library-filters" role="search" aria-label="Bộ lọc">
         <label>
           Người tạo
@@ -463,6 +468,7 @@ export function Library() {
             key={c.id}
             clip={c}
             stores={isAdmin ? stores : undefined}
+            select={zip.check(c.id, c.downloadName)}
             // Under Favourites only an unmarked item leaves the list, so the next page's offset stays right.
             onChange={(next) => setClips((cur) => (favoritesOnly && !next.favorite ? cur.filter((x) => x.id !== next.id) : cur.map((x) => (x.id === next.id ? next : x))))}
             onDeleted={(id) => setClips((cur) => cur.filter((x) => x.id !== id))}
