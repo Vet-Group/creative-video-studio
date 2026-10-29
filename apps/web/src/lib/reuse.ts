@@ -20,9 +20,15 @@ export function refillFrom(q: { reuse?: unknown; template?: unknown }): string |
   return undefined;
 }
 
-/** Recreate on a sample of the Examples tab (`?example=`: `marketing-example-<n>` on Marketing Studio, `try-on-example-<n>` on Try On, `example-<n>` on Create Videos): the sample's details file, read in the same shape, its photos named as samples. */
+/** Recreate on a sample of the Examples tab (`?example=`: `marketing-example-<n>` on Marketing Studio, `try-on-example-<n>` on Try On, `image-example-<n>` on Image Generation, `example-<n>` on Create Videos): the sample's details file, read in the same shape, its photos named as samples. */
 export function exampleFrom(q: { example?: unknown }): string | undefined {
-  return typeof q.example === 'string' && /^(marketing-|try-on-)?example-[1-9]\d*$/.test(q.example) ? `/api/samples/${q.example}.json` : undefined;
+  return typeof q.example === 'string' && /^(marketing-|try-on-|image-)?example-[1-9]\d*$/.test(q.example) ? `/api/samples/${q.example}.json` : undefined;
+}
+
+/** The page query that refills from `from` (what refillFrom and exampleFrom return), for a refill that has to open on another page. */
+export function queryOf(from: string): string {
+  const m = from.match(/^\/api\/(jobs|templates|samples)\/([^/]+?)(\.json)?$/);
+  return m ? `${{ jobs: 'reuse', templates: 'template', samples: 'example' }[m[1] as 'jobs' | 'templates' | 'samples']}=${m[2]}` : '';
 }
 
 /** The link for a job's reuse action, or null for a feature whose page cannot refill from a job yet. */

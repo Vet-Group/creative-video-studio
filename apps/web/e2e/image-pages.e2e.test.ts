@@ -151,16 +151,87 @@ test('Try On, as on Fash: a sample picture with a details file opens in place wi
     await expect(detail.locator('.job-text')).toHaveText(details.brief);
     await expect(detail.locator('.job-chips')).toHaveText(['1K3:4', 'Seamless White']);
     await expect(detail.locator('.lightbox-media img')).toHaveAttribute('src', '/api/samples/try-on-example-1.jpg');
-    await expect(detail.getByRole('link', { name: 'Dùng lại' })).toHaveAttribute('href', '/try-on?example=try-on-example-1');
 
-    await detail.getByRole('link', { name: 'Dùng lại' }).click();
-    await expect(page).toHaveURL(/\/try-on\?example=try-on-example-1$/);
+    // As on Fash, each piece goes on the form on its own, with a note: a garment, the background, the words, a chip, the result as the model photo.
+    const note = (text: string) => page.getByRole('region', { name: 'Thông báo' }).getByText(text);
+    await detail.getByRole('button', { name: 'try-on-example-1-garment-1.png' }).click();
+    await expect(note('Đã thêm trang phục')).toBeVisible();
+    await expect(page.getByLabel('Trang phục: ảnh đã chọn').getByRole('img', { name: 'try-on-example-1-garment-1.png' })).toBeVisible();
+    await detail.getByRole('button', { name: 'Seamless White' }).click();
+    await expect(note('Đã chọn bối cảnh')).toBeVisible();
+    await expect(page.getByLabel('Bối cảnh (tuỳ chọn): ảnh đã chọn').getByRole('img', { name: 'try-on-bg-test.jpg' })).toBeVisible();
+    await detail.getByRole('button', { name: 'Chép prompt vào ô Prompt' }).click();
+    await expect(page.getByRole('textbox', { name: 'Prompt (tuỳ chọn)' })).toHaveValue(details.brief);
+    await detail.getByRole('button', { name: '3:4' }).click();
+    await expect(select(page, 'Tỉ lệ')).toHaveAttribute('data-value', '3:4');
+    await detail.getByRole('button', { name: 'Dùng kết quả' }).click();
+    await expect(note('Đã dùng kết quả làm ảnh người mẫu')).toBeVisible();
+    await expect(page.getByLabel('Người mẫu: ảnh đã chọn').getByRole('img', { name: 'try-on-example-1.jpg' })).toBeVisible();
+
+    // As Fash's Recreate: the form refills in place, the URL stays, the detail stays open and a note shows above it.
+    await detail.getByRole('button', { name: 'Dùng lại' }).click();
+    const ready = note('Sẵn sàng tạo lại');
+    await expect(ready).toBeVisible();
+    expect(await page.getByRole('region', { name: 'Thông báo' }).evaluate((e) => e.matches(':popover-open'))).toBe(true); // in the top layer, shown after the dialog, so above it
+    await expect(detail).toBeVisible();
+    await expect(page).toHaveURL(/\/try-on$/);
     await expect(page.getByLabel('Người mẫu: ảnh đã chọn').getByRole('img', { name: 'try-on-example-1-model.png' })).toBeVisible();
     await expect(page.getByLabel('Trang phục: ảnh đã chọn').getByRole('img', { name: 'try-on-example-1-garment-1.png' })).toBeVisible();
     await expect(page.getByLabel('Bối cảnh (tuỳ chọn): ảnh đã chọn').getByRole('img', { name: 'try-on-bg-test.jpg' })).toBeVisible();
     await expect(page.getByRole('textbox', { name: 'Prompt (tuỳ chọn)' })).toHaveValue(details.brief);
     await expect(select(page, 'Tỉ lệ')).toHaveAttribute('data-value', '3:4');
     await expect(select(page, 'Độ phân giải')).toHaveAttribute('data-value', '1K');
+  } finally {
+    await asAdmin((name) => page.request.delete(`/api/admin/samples/${name}`));
+  }
+});
+
+test('Image Generation, as on Fash: a sample picture with a details file opens in place, and its input, words and Dùng lại go on the form', async ({ page }) => {
+  const details = { feature: 'image', images: [{ sample: 'image-example-1-input-1.png' }], prompt: 'Replace the outfit, keep the pose.', enhance: false, modelId: 'mock-image-e2e', ratio: '3:4', resolution: '2K', date: '2026-10-23' };
+  const files: [string, Buffer, string][] = [
+    ['image-example-1.jpg', jpg(), 'image/jpeg'], ['image-example-1.json', Buffer.from(JSON.stringify(details)), 'application/json'], ['image-example-1-input-1.png', png(), 'image/png'],
+  ];
+  const asAdmin = async (each: (name: string, data: Buffer, type: string) => Promise<{ ok(): boolean }>) => {
+    await page.context().clearCookies();
+    await signIn(page, 'admin');
+    for (const [name, data, type] of files) expect((await each(name, data, type)).ok(), name).toBe(true);
+    await page.context().clearCookies();
+  };
+  await asAdmin((name, data, type) => page.request.put(`/api/admin/samples/${name}`, { data, headers: { 'content-type': type } }));
+  try {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await signIn(page, 'imgexa');
+    await page.route(/\/api\/library\?kind=image/, (r) => r.fulfill({ json: { hasMore: false, isAdmin: false, creators: [], clips: [] } }));
+    await page.goto('/image-generation');
+    const gallery = page.getByRole('group', { name: 'Ảnh của công ty' });
+    await gallery.getByRole('link', { name: 'Xem chi tiết ảnh mẫu' }).click();
+    const detail = page.getByRole('dialog', { name: 'Chi tiết: Tạo ảnh' });
+    await expect(detail.getByRole('heading', { name: 'Mock image E2E' })).toBeVisible();
+    await expect(detail.locator('.job-text')).toHaveText(details.prompt);
+    await expect(detail.locator('.job-chips')).toHaveText('2K3:4');
+    const chosen = page.getByRole('list', { name: 'Ảnh đã chọn' });
+    await detail.getByRole('button', { name: 'image-example-1-input-1.png' }).click();
+    await expect(chosen.getByRole('img', { name: 'image-example-1-input-1.png' })).toBeVisible();
+    await detail.getByRole('button', { name: 'Dùng kết quả' }).click(); // the result as one more input
+    await expect(chosen.getByRole('img')).toHaveCount(2);
+    await detail.getByRole('button', { name: 'Dùng lại' }).click();
+    await expect(page.getByRole('textbox', { name: 'Mô tả cảnh bạn muốn tạo' })).toHaveValue(details.prompt);
+    await expect(chosen.getByRole('img')).toHaveCount(1); // Recreate refills: the sample's own input only
+    await expect(page).toHaveURL(/\/image-generation$/);
+
+    // As on Fash's cards, the tile's own actions on hover, without opening it: Use Result, then Recreate.
+    await page.keyboard.press('Escape');
+    await expect(detail).toBeHidden();
+    const tile = gallery.getByRole('listitem').filter({ has: page.getByRole('link', { name: 'Xem chi tiết ảnh mẫu' }) });
+    await tile.hover();
+    await expect(tile.getByRole('link', { name: 'Tải xuống' })).toHaveAttribute('href', '/api/samples/image-example-1.jpg');
+    await tile.getByRole('button', { name: 'Dùng kết quả' }).click();
+    await expect(chosen.getByRole('img')).toHaveCount(2);
+    await page.getByRole('textbox', { name: 'Mô tả cảnh bạn muốn tạo' }).fill('');
+    await tile.hover();
+    await tile.getByRole('button', { name: 'Dùng lại' }).click();
+    await expect(page.getByRole('textbox', { name: 'Mô tả cảnh bạn muốn tạo' })).toHaveValue(details.prompt);
+    await expect(chosen.getByRole('img')).toHaveCount(1);
   } finally {
     await asAdmin((name) => page.request.delete(`/api/admin/samples/${name}`));
   }
@@ -446,6 +517,50 @@ test('Try On: the sample pictures in an empty slot upload like a picked file, an
     await page.getByRole('button', { name: 'Bỏ ảnh try-on-model-1.png' }).click();
     await expect(samplesOf('Người mẫu')).toHaveCount(1);
     await expect(run).toBeDisabled();
+  } finally {
+    await asAdmin((name) => page.request.delete(`/api/admin/samples/${name}`));
+  }
+});
+
+test("Try On, as Fash's pickers: a stock model then its pose, a garment category then a garment, and a named background each go in their slot", async ({ page }) => {
+  const names = ['try-on-stock-model-10.jpg', 'try-on-stock-model-10-pose-2.jpg', 'try-on-stock-top.jpg', 'try-on-stock-top-1.jpg', 'try-on-bg-new-york.jpg'];
+  const asAdmin = async (each: (name: string) => Promise<{ ok(): boolean }>) => {
+    await page.context().clearCookies();
+    await signIn(page, 'admin');
+    for (const name of names) expect((await each(name)).ok(), name).toBe(true);
+    await page.context().clearCookies();
+  };
+  await asAdmin((name) => page.request.put(`/api/admin/samples/${name}`, { data: jpg(), headers: { 'content-type': 'image/jpeg' } }));
+  try {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await signIn(page, 'member9');
+    await page.goto('/try-on');
+    const chosen = (slot: string) => page.getByLabel(`${slot}: ảnh đã chọn`).getByRole('img');
+    // Each slot opens its picker once the sample list is in; until then it is an own-file upload.
+    for (const slot of ['Người mẫu', 'Trang phục', 'Bối cảnh (tuỳ chọn)']) await expect(page.getByRole('button', { name: `Tải lên ${slot}` })).toHaveAttribute('aria-haspopup', 'dialog');
+
+    await page.getByRole('button', { name: 'Tải lên Người mẫu' }).click();
+    const models = page.getByRole('dialog', { name: 'Chọn người mẫu' });
+    await models.getByRole('button', { name: 'Người mẫu có sẵn 1' }).click();
+    const poses = page.getByRole('dialog', { name: 'Chọn tư thế' });
+    await poses.getByRole('button', { name: 'Quay lại' }).click(); // back to the models, as Fash's arrow
+    await models.getByRole('button', { name: 'Người mẫu có sẵn 1' }).click();
+    await poses.getByRole('button', { name: 'Tư thế 1' }).click();
+    await expect(poses).toBeHidden();
+    await expect(chosen('Người mẫu')).toHaveCount(1);
+
+    await page.getByRole('button', { name: 'Tải lên Trang phục' }).click();
+    await page.getByRole('dialog', { name: 'Chọn trang phục' }).getByRole('button', { name: 'Áo' }).click();
+    await page.getByRole('dialog', { name: 'Áo' }).getByRole('button', { name: 'Áo 1' }).click();
+    await expect(chosen('Trang phục')).toHaveCount(1);
+    await page.getByRole('button', { name: 'Tải lên Trang phục' }).click(); // a slot with room opens the picker again
+    await expect(page.getByRole('dialog', { name: 'Chọn trang phục' })).toBeVisible();
+    await page.keyboard.press('Escape');
+
+    await page.getByRole('button', { name: 'Tải lên Bối cảnh (tuỳ chọn)' }).click();
+    await page.getByRole('dialog', { name: 'Chọn bối cảnh' }).getByRole('button', { name: 'New York Streets' }).click();
+    await expect(chosen('Bối cảnh (tuỳ chọn)')).toHaveCount(1);
+    await expect(page.getByRole('region', { name: 'Thông báo' }).getByText('Đã chọn bối cảnh')).toBeVisible();
   } finally {
     await asAdmin((name) => page.request.delete(`/api/admin/samples/${name}`));
   }

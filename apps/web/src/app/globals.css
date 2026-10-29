@@ -222,6 +222,12 @@ legend { font-weight: 600; padding: 0 .25rem; }
 .job-actions .icon-button { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--ink); }
 .job-reuse { display: flex; align-items: center; justify-content: center; gap: 6px; height: 36px; border-radius: 8px; background: var(--fill); color: var(--ink-strong); font-size: 12px; font-weight: 500; text-decoration: none; }
 .job-reuse:hover { background: var(--fill-strong); }
+button.job-reuse, button.lightbox-reuse, button.gallery-use { width: 100%; border: 0; font-family: inherit; cursor: pointer; }
+/* A detail's piece that goes on the form beside it (Fash's clickable inputs, prompt and chips). */
+.tap { display: block; padding: 0; border: 0; background: none; font: inherit; color: inherit; text-align: inherit; cursor: pointer; }
+.tap.job-text:hover { color: var(--ink); }
+.job-inputs .tap:hover img { outline: 2px solid var(--ink-strong); outline-offset: 1px; }
+.lightbox-result { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; height: 40px; margin-top: 8px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface); color: var(--ink-strong); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
 @media (max-width: 640px) {
   .job-card { grid-template-columns: 1fr; min-height: 0; }
   .job-media { height: auto; max-height: 70vh; }
@@ -232,6 +238,8 @@ legend { font-weight: 600; padding: 0 .25rem; }
 .side .tray .muted { font-size: 14px; line-height: 21px; color: var(--text-muted); }
 
 .toasts { position: fixed; right: 1rem; bottom: 1rem; display: grid; gap: .5rem; z-index: 10; max-width: calc(100vw - 2rem); }
+.toasts[popover] { top: auto; left: auto; margin: 0; padding: 0; border: 0; background: none; color: inherit; overflow: visible; }
+.toasts[popover]:not(:popover-open) { display: none; }
 .toast { display: flex; gap: .75rem; align-items: center; background: var(--toast-bg); color: var(--on-dark); padding: .6rem .9rem; border-radius: 8px; box-shadow: 0 4px 14px rgb(var(--shade) / .25); }
 .toast a { color: var(--toast-link); }
 .toast-bad { background: var(--toast-bad); }
@@ -858,6 +866,12 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .gallery-item:hover .gallery-use, .gallery-use:focus-visible { opacity: 1; }
 @media (hover: none) { .gallery-use { opacity: 1; } }
 .gallery-item img { display: block; width: 100%; height: 100%; object-fit: cover; }
+/* Fash's card actions (.grid-card__actions, .card-recreate): on hover, a column of icons at the top right and Recreate at the foot. */
+.card-actions { position: absolute; top: 8px; right: 8px; display: flex; flex-direction: column; gap: 6px; opacity: 0; transition: opacity .15s; }
+.card-actions > * { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 8px; background: rgb(0 0 0 / 55%); color: #fff; cursor: pointer; }
+.card-recreate { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); padding: 6px 16px; border: 0; border-radius: 999px; background: rgb(0 0 0 / 60%); color: #fff; font: inherit; font-size: 13px; line-height: 18px; font-weight: 600; opacity: 0; cursor: pointer; transition: opacity .15s; }
+.gallery-item:hover .card-actions, .gallery-item:hover .card-recreate, .card-actions:focus-within, .card-recreate:focus-visible { opacity: 1; }
+@media (hover: none) { .card-actions, .card-recreate { opacity: 1; } }
 .gallery-more { display: block; margin: 16px auto 0; }
 .frame:has(.imagegen) { padding-bottom: 0; }
 .imagebar { position: sticky; bottom: 16px; z-index: 40; width: min(818px, 100%); margin: 16px auto; padding: 12px; background: var(--surface); border-radius: 24px; box-shadow: 0 12px 40px rgb(var(--shade) / .18); }
@@ -1017,6 +1031,8 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .model-grid button, .model-upload { position: relative; aspect-ratio: 163 / 217; min-height: 0; padding: 0; overflow: hidden; border-radius: 12px; }
 .model-grid img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .model-upload { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; border: 1px dashed var(--border-strong); background: var(--fill); color: var(--text-subtle); font-size: 13px; line-height: 18px; text-align: center; cursor: pointer; }
+.photo-back { display: inline-grid; place-items: center; width: 28px; height: 28px; margin: 0 6px 0 -6px; padding: 0; border: 0; border-radius: 8px; background: none; color: inherit; vertical-align: -6px; cursor: pointer; }
+.photo-back:hover { background: var(--fill); }
 .photo-upload-link { position: absolute; top: 18px; right: 60px; color: var(--ink); font-size: 14px; line-height: 20px; font-weight: 500; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 .photo-upload-link:focus-within { outline: 2px solid var(--ink-strong); outline-offset: 2px; border-radius: 4px; }
 .model-upload:focus-within { outline: 2px solid var(--ink-strong); outline-offset: 2px; }

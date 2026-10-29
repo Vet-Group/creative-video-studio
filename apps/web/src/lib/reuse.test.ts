@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { exampleFrom, refillFrom, reuseHref } from './reuse';
+import { exampleFrom, queryOf, refillFrom, reuseHref } from './reuse';
 
 test('the reuse link opens the page that made the job, with the job to refill from; features without a refill yet get no link', () => {
   expect(reuseHref({ id: 'j1', feature: 'video' })).toBe('/create?reuse=j1');
@@ -23,8 +23,16 @@ test('a page refills from a job (?reuse=) before a saved template (?template=), 
 
 test("Recreate on a sample reads that sample's details file, and nothing else", () => {
   expect(exampleFrom({ example: 'marketing-example-3' })).toBe('/api/samples/marketing-example-3.json');
-  expect(['marketing-example-0', 'marketing-example-3.mp4', '../x', 'image-example-1', 'example-0', ['marketing-example-1']].map((example) => exampleFrom({ example }))).toEqual(Array(6).fill(undefined));
+  expect(['marketing-example-0', 'marketing-example-3.mp4', '../x', 'video-example-1', 'example-0', ['marketing-example-1']].map((example) => exampleFrom({ example }))).toEqual(Array(6).fill(undefined));
   expect(exampleFrom({ example: 'example-12' })).toBe('/api/samples/example-12.json'); // Create Videos' samples
   expect(exampleFrom({ example: 'try-on-example-4' })).toBe('/api/samples/try-on-example-4.json');
+  expect(exampleFrom({ example: 'image-example-7' })).toBe('/api/samples/image-example-7.json'); // Image Generation's
   expect(exampleFrom({})).toBeUndefined();
+});
+
+test('a refill that has to open on another page carries its source as that page query', () => {
+  expect(queryOf(refillFrom({ reuse: 'j 1' })!)).toBe('reuse=j%201');
+  expect(queryOf(refillFrom({ template: 't1' })!)).toBe('template=t1');
+  expect(queryOf(exampleFrom({ example: 'marketing-example-2' })!)).toBe('example=marketing-example-2');
+  expect(queryOf('/api/other/x')).toBe('');
 });

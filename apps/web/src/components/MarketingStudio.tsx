@@ -11,12 +11,13 @@ import { promptTooLong } from '@/lib/prompt-limit';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { useSamples } from '@/lib/use-samples';
 import { cardSample } from '@/lib/examples';
+import { queryOf } from '@/lib/reuse';
 import { About } from './About';
 import { AudioSwitch } from './AudioSwitch';
 import { CardMedia, LoopVideo } from './CardMedia';
 import { Icon, type IconName } from './Icon';
-import { Gallery, type Img, sampleFile, Slot, uploadImages, UPLOAD_ERROR, WorkTabs } from './image-tools';
-import { useApplier, useHasHistory, useJobs, useRecreated } from './jobs';
+import { Gallery, type Img, PhotoDialog, photoImg, sampleFile, Slot, uploadImages, UPLOAD_ERROR, WorkTabs } from './image-tools';
+import { FormContext, type FormActions, type Photo, type PhotoRole, useApplier, useHasHistory, useJobs, useRecreated } from './jobs';
 import { Modal } from './Modal';
 import { ModelPicker } from './ModelPicker';
 import { Select } from './Select';
@@ -116,36 +117,6 @@ function ChoiceDialog({ open, title, sub, kind, choices, selected, onPick, onClo
   );
 }
 
-/** A photo dialog of the model or product slot, as on Fash: the photos to pick, 4 per row of 3:4 portraits. The product dialog has a subtitle and an upload tile first; the model dialog is stock photos only, so its own-photo upload is a link in the header. */
-function PhotoDialog({ open, title, sub, tiles, busy, onFile, onClose }: { open: boolean; title: string; sub?: string; tiles: { key: string; src: string; label: string; pick: () => void }[]; busy: boolean; onFile: (files: File[]) => void; onClose: () => void }) {
-  const upload = (
-    <>
-      Tải lên ảnh của bạn
-      <input type="file" accept="image/*" className="sr-only" onChange={(e) => (onClose(), onFile([...(e.target.files ?? [])].slice(0, 1)))} />
-    </>
-  );
-  return (
-    <Modal open={open} onClose={onClose} label={title} className="choice-dialog">
-      <h2>{title}</h2>
-      {sub && <p className="modal-sub">{sub}</p>}
-      {!sub && <label className="photo-upload-link">{upload}</label>}
-      <div className="choice-grid model-grid">
-        {sub && (
-          <label className="model-upload">
-            <Icon name="plus" size={16} />
-            {upload}
-          </label>
-        )}
-        {tiles.map((t) => (
-          <button key={t.key} type="button" aria-label={t.label} disabled={busy} onClick={() => (onClose(), t.pick())}>
-            {open && <img src={t.src} alt="" />}
-          </button>
-        ))}
-      </div>
-    </Modal>
-  );
-}
-
 const QUIET_REASONS = ['Tải lên ảnh người mẫu.', 'Tải lên ảnh sản phẩm.', 'Viết prompt mô tả video bạn muốn.'];
 
 export type MarketingFormat = 'ugc' | 'advanced';
@@ -176,7 +147,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
   const advanced = format === 'advanced';
   const router = useRouter();
   const have = useSamples();
-  const { refresh, clips } = useJobs();
+  const { refresh, clips, notify } = useJobs();
   const recreated = useRecreated();
   const narrow = useMediaQuery(NARROW);
   const [person, setPerson] = useState<Img[]>([]);
@@ -199,6 +170,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
     if (s.ratio) setRatio(s.ratio);
     if (s.durationSec) setDurationSec(s.durationSec);
   });
+  const [source, setSource] = useState(reuse ? { from: reuse } : null); // what the form refills from; Recreate sets a new one in place
   const [list, setList] = useState<{ key: string; models: VideoModel[]; defaultId: string | null } | null>(null);
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -269,13 +241,14 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
   // Reuse: refill the form from the source job, everything stays editable. A job of the other format opens on its own page; without the
   // member's own text (a job from before it was kept, or someone else's) the rest is refilled and the brief is asked for again.
   useEffect(() => {
-    if (!reuse) return;
+    if (!source) return;
+    const reuse = source.from;
     let stale = false; // a refill superseded (another link, or a re-run effect) must not fill or upload
     api<MarketingJob>(reuse)
       .then(async (j) => {
         if (stale) return;
         if (j.feature !== 'marketing') return setError('Không tìm thấy clip để dùng lại.');
-        if ((j.format === 'advanced') !== advanced) return router.replace(`/marketing-studio${j.format === 'advanced' ? '/advanced' : ''}${window.location.search}`);
+        if ((j.format === 'advanced') !== advanced) return router.replace(`/marketing-studio${j.format === 'advanced' ? '/advanced' : ''}?${queryOf(reuse)}`);
         // A sample's photos are uploaded as this member's inputs first, as a picked sample is.
         const samples = j.images.map((i) => ('sample' in i ? i.sample : null)).filter((s) => s !== null);
         const inputs = samples.length > 0 ? await uploadImages(await Promise.all(samples.map(sampleFile))) : (j.images as Img[]);
@@ -297,7 +270,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
     return () => {
       stale = true;
     };
-  }, [reuse]);
+  }, [source]);
 
   // My products: loaded once; a failure just leaves the plain upload slot.
   useEffect(() => {
@@ -353,6 +326,27 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
   }
 
   /** Uploads the files into a slot: a one-image slot is replaced, the reference slot is added to, up to `max`. */
+  /** A detail's photo in its slot: on UGC the person or the product, on Advanced one more reference. */
+  async function take(p: Photo, role: PhotoRole) {
+    if (advanced && refs.length >= maxRefs) return notify(`Tối đa ${maxRefs} ảnh tham chiếu`);
+    setError('');
+    try {
+      const img = await photoImg(p);
+      if (advanced) setRefs((cur) => (cur.length < maxRefs ? [...cur, img] : cur));
+      else if (role === 'model') setPerson([img]);
+      else setProduct([img]);
+      notify(advanced ? 'Đã thêm ảnh tham chiếu' : role === 'model' ? 'Đã dùng ảnh người mẫu' : 'Đã chọn ảnh sản phẩm');
+    } catch {
+      setError(UPLOAD_ERROR);
+    }
+  }
+  const actions: FormActions = {
+    recreate: (from) => (setSource({ from }), narrow && setTab('create')),
+    apply,
+    photo: (p, role) => void take(p, role),
+    prompt: (text) => (setPrompt(text), notify('Đã chép prompt')),
+  };
+
   function add(set: (f: (cur: Img[]) => Img[]) => void, max = 1) {
     return async (files: File[]) => {
       if (files.length === 0) return;
@@ -559,11 +553,15 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
 
         <div className="side" id={`marketing-panel-${panel}`} role="tabpanel" aria-labelledby={`marketing-tab-${panel}`} hidden={narrow && shown === 'create'}>
           {shown === 'examples' ? (
-            <Gallery kind="marketing" video samples="marketing-example-" label="Video Marketing Studio của công ty" emptyText="Chưa có video Marketing Studio nào trong công ty." />
+            <FormContext.Provider value={actions}>
+              <Gallery kind="marketing" video samples="marketing-example-" label="Video Marketing Studio của công ty" emptyText="Chưa có video Marketing Studio nào trong công ty." />
+            </FormContext.Provider>
           ) : shown === 'about' ? (
             <About page={advanced ? ABOUT.advanced : ABOUT.marketing} />
           ) : (
-            <Tray feature="marketing" apply={apply} />
+            <FormContext.Provider value={actions}>
+              <Tray feature="marketing" />
+            </FormContext.Provider>
           )}
         </div>
       </div>

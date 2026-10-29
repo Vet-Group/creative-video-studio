@@ -16,7 +16,7 @@ import { About } from './About';
 import { CardMedia, LoopVideo } from './CardMedia';
 import { Icon, type IconName } from './Icon';
 import { type Img, RATIO_LABEL, Slot, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
-import { useJobs } from './jobs';
+import { FormContext, useJobs } from './jobs';
 import { type ModelOption, ModelPicker } from './ModelPicker';
 import { Select } from './Select';
 import { Tray } from './Shell';
@@ -109,7 +109,7 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
   const { chosen } = pick;
 
   // Reuse: the images back in their slots, in the order they were sent, and the member's own text.
-  useReuse(
+  const recreate = useReuse(
     reuse,
     app.feature,
     (j) => {
@@ -248,7 +248,9 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
         </div>
 
         <div className="side" id={`app-panel-${panel}`} role="tabpanel" aria-labelledby={`app-tab-${panel}`} hidden={narrow && shown === 'create'}>
-          {shown === 'history' ? <Tray feature={app.feature} /> : <AppAbout app={app} />}
+          <FormContext.Provider value={{ recreate: (from) => (recreate(from), narrow && setTab('create')) }}>
+            {shown === 'history' ? <Tray feature={app.feature} /> : <AppAbout app={app} />}
+          </FormContext.Provider>
         </div>
       </div>
     </section>

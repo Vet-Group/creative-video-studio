@@ -7,10 +7,11 @@ import { promptTooLong } from '@/lib/prompt-limit';
 import { tryOnPrompt } from '@/lib/try-on-prompt';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { useSamples } from '@/lib/use-samples';
+import { backgroundsIn, GARMENT_CATEGORIES, garmentsOf, posesOf, stockModels } from '@/lib/try-on-stock';
 import { ABOUT } from '@/lib/about-content';
 import { About } from './About';
-import { Gallery, type Img, LockedFields, RATIO_LABEL, Slot, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
-import { useApplier, useHasHistory, useJobs } from './jobs';
+import { Gallery, type Img, LockedFields, PhotoDialog, photoImg, RATIO_LABEL, Slot, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
+import { FormContext, type Photo, type PhotoRole, useApplier, useHasHistory, useJobs } from './jobs';
 import { ModelPicker } from './ModelPicker';
 import { Select } from './Select';
 import { Tray } from './Shell';
@@ -21,12 +22,17 @@ const TAB_LABEL: Record<Tab, string> = { create: 'Tạo', history: 'Lịch sử'
 const MAX_GARMENTS = 5; // Fash's Nano Banana Pro try-on takes 5 garments (its MaxInputImageCount, read 2026-10-29)
 
 export function TryOn({ reuse }: { reuse?: string }) {
-  const { refresh } = useJobs();
+  const { refresh, notify } = useJobs();
   const narrow = useMediaQuery(NARROW);
   const [garments, setGarments] = useState<Img[]>([]);
   const have = useSamples();
   /** The uploaded try-on samples of one kind, `try-on-garment-1.jpg` and so on, in name order. */
   const samplesOf = (kind: string) => [...have].filter((n) => n.startsWith(`try-on-${kind}-`)).sort();
+  /** Fash's pickers: a model then its pose, a garment category then its garments, a named background. */
+  const [picker, setPicker] = useState<{ role: 'model' | 'garment' | 'background'; of?: string } | null>(null);
+  const models0 = stockModels(have);
+  const backgrounds = backgroundsIn(have);
+  const categories = GARMENT_CATEGORIES.filter((c) => garmentsOf(have, c.id).length > 0);
   const [person, setPerson] = useState<Img[]>([]);
   const [background, setBackground] = useState<Img[]>([]);
   const [prompt, setPrompt] = useState('');
@@ -47,7 +53,7 @@ export function TryOn({ reuse }: { reuse?: string }) {
   });
 
   // Reuse: the person first, then the garments (their count is kept on the job), then the background.
-  useReuse(
+  const recreate = useReuse(
     reuse,
     'try_on',
     (j) => {
@@ -81,6 +87,21 @@ export function TryOn({ reuse }: { reuse?: string }) {
   const canRun = reason === null && !busy;
   /** What the member may write: the model's limit less the image roles the prompt starts with. */
   const room = chosen && chosen.maxPromptChars - (tryOnPrompt(Math.max(1, garments.length), background.length > 0, 'x')!.length - 1);
+
+  /** A detail's photo in its slot, as Fash's clicks on a detail's inputs and its Use Result do. */
+  async function take(p: Photo, role: PhotoRole, note?: string) {
+    if (role === 'garment' && garments.length >= MAX_GARMENTS) return notify(`Tối đa ${MAX_GARMENTS} ảnh trang phục`);
+    setError('');
+    try {
+      const img = await photoImg(p);
+      if (role === 'model') setPerson([img]);
+      else if (role === 'background') setBackground([img]);
+      else setGarments((cur) => (cur.length < MAX_GARMENTS ? [...cur, img] : cur));
+      notify(note ?? (role === 'model' ? 'Đã dùng ảnh người mẫu' : role === 'background' ? 'Đã chọn bối cảnh' : 'Đã thêm trang phục'));
+    } catch {
+      setError(UPLOAD_ERROR);
+    }
+  }
 
   function add(set: (f: (cur: Img[]) => Img[]) => void) {
     return async (files: File[]) => {
@@ -139,9 +160,25 @@ export function TryOn({ reuse }: { reuse?: string }) {
 
         <div className="card form-card" id="tryon-panel-create" role={narrow ? 'tabpanel' : undefined} aria-labelledby={narrow ? 'tryon-tab-create' : undefined} hidden={narrow && shown !== 'create'}>
           <div className="form-scroll">
-            <Slot label="Trang phục" empty="Thêm 1 đến 5 ảnh trang phục" inputLabel="Ảnh trang phục" images={garments} max={MAX_GARMENTS} busy={busy} onAdd={add(setGarments)} onRemove={(id) => setGarments((c) => c.filter((i) => i.id !== id))} samples={samplesOf('garment')} />
-            <Slot label="Người mẫu" empty="Thêm 1 ảnh người mẫu" inputLabel="Ảnh người mẫu" images={person} max={1} busy={busy} onAdd={add(setPerson)} onRemove={(id) => setPerson((c) => c.filter((i) => i.id !== id))} samples={samplesOf('model')} />
-            <Slot label="Bối cảnh (tuỳ chọn)" empty="Thêm 1 ảnh bối cảnh nếu muốn" inputLabel="Ảnh bối cảnh" images={background} max={1} busy={busy} onAdd={add(setBackground)} onRemove={(id) => setBackground((c) => c.filter((i) => i.id !== id))} samples={samplesOf('background')} />
+            <Slot label="Trang phục" empty="Thêm 1 đến 5 ảnh trang phục" inputLabel="Ảnh trang phục" images={garments} max={MAX_GARMENTS} busy={busy} onAdd={add(setGarments)} onRemove={(id) => setGarments((c) => c.filter((i) => i.id !== id))} samples={categories.length > 0 ? [] : samplesOf('garment')} onBrowse={categories.length > 0 ? () => setPicker({ role: 'garment' }) : undefined} />
+            <Slot label="Người mẫu" empty="Thêm 1 ảnh người mẫu" inputLabel="Ảnh người mẫu" images={person} max={1} busy={busy} onAdd={add(setPerson)} onRemove={(id) => setPerson((c) => c.filter((i) => i.id !== id))} samples={models0.length > 0 ? [] : samplesOf('model')} onBrowse={models0.length > 0 ? () => setPicker({ role: 'model' }) : undefined} />
+            <Slot label="Bối cảnh (tuỳ chọn)" empty="Thêm 1 ảnh bối cảnh nếu muốn" inputLabel="Ảnh bối cảnh" images={background} max={1} busy={busy} onAdd={add(setBackground)} onRemove={(id) => setBackground((c) => c.filter((i) => i.id !== id))} samples={backgrounds.length > 0 ? [] : samplesOf('background')} onBrowse={backgrounds.length > 0 ? () => setPicker({ role: 'background' }) : undefined} />
+            <PhotoDialog
+              open={picker !== null}
+              title={picker?.of ? (picker.role === 'model' ? 'Chọn tư thế' : GARMENT_CATEGORIES.find((c) => c.id === picker.of)!.label) : picker?.role === 'model' ? 'Chọn người mẫu' : picker?.role === 'garment' ? 'Chọn trang phục' : 'Chọn bối cảnh'}
+              tiles={
+                !picker ? [] :
+                picker.role === 'model' && !picker.of ? models0.map((name, i) => ({ key: name, src: `/api/samples/${name}`, label: `Người mẫu có sẵn ${i + 1}`, pick: () => (posesOf(have, name).length > 0 ? setPicker({ role: 'model', of: name }) : void take({ sample: name }, 'model')) })) :
+                picker.role === 'model' ? posesOf(have, picker.of!).map((name, i) => ({ key: name, src: `/api/samples/${name}`, label: `Tư thế ${i + 1}`, pick: () => void take({ sample: name }, 'model') })) :
+                picker.role === 'garment' && !picker.of ? categories.map((c) => ({ key: c.id, src: `/api/samples/try-on-stock-${c.id}.jpg`, label: c.label, pick: () => setPicker({ role: 'garment', of: c.id }) })) :
+                picker.role === 'garment' ? garmentsOf(have, picker.of!).map((name, i) => ({ key: name, src: `/api/samples/${name}`, label: `${GARMENT_CATEGORIES.find((c) => c.id === picker.of)!.label} ${i + 1}`, pick: () => void take({ sample: name }, 'garment') })) :
+                backgrounds.map((b) => ({ key: b.name, src: `/api/samples/${b.name}`, label: b.label, pick: () => void take({ sample: b.name }, 'background') }))
+              }
+              busy={busy}
+              onFile={(files) => void add(picker?.role === 'model' ? setPerson : picker?.role === 'background' ? setBackground : setGarments)(files)}
+              onClose={() => setPicker(null)}
+              onBack={picker?.of ? () => setPicker({ role: picker.role }) : undefined}
+            />
 
             {models && models.length > 0 && <ModelPicker models={pick.options} value={pick.modelId} onChange={pick.setModelId} />}
 
@@ -202,7 +239,17 @@ export function TryOn({ reuse }: { reuse?: string }) {
         </div>
 
         <div className="side" id={`tryon-panel-${panel}`} role="tabpanel" aria-labelledby={`tryon-tab-${panel}`} hidden={narrow && shown === 'create'}>
-          {shown === 'examples' ? <Gallery kind="try_on" samples="try-on-example-" cols={[2, 2, 3]} label="Ảnh thử đồ của công ty" emptyText="Chưa có ảnh thử đồ nào trong công ty." /> : shown === 'about' ? <About page={ABOUT.tryOn} /> : <Tray feature="try_on" apply={apply} />}
+          <FormContext.Provider
+            value={{
+              recreate: (from) => (recreate(from), narrow && setTab('create')),
+              apply,
+              photo: (p, role) => void take(p, role),
+              prompt: (text) => (setPrompt(text), notify('Đã chép prompt')),
+              result: (p) => void take(p, 'model', 'Đã dùng kết quả làm ảnh người mẫu'),
+            }}
+          >
+            {shown === 'examples' ? <Gallery kind="try_on" samples="try-on-example-" cols={[2, 2, 3]} label="Ảnh thử đồ của công ty" emptyText="Chưa có ảnh thử đồ nào trong công ty." /> : shown === 'about' ? <About page={ABOUT.tryOn} /> : <Tray feature="try_on" />}
+          </FormContext.Provider>
         </div>
       </div>
     </section>

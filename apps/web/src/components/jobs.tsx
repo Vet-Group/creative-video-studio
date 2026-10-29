@@ -2,6 +2,7 @@
 // The "My jobs" state: polls the server every 5 s, raises a toast and changes the tab title when a job finishes.
 // What counts as news is kept in localStorage (the newest finish time already shown), so a job that ended while the tab was closed
 // is announced when the user returns, and old results are not announced again.
+import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { api, type TrayJob } from '@/lib/api';
@@ -36,6 +37,57 @@ export function useRecreated(): (from: string) => void {
   return (from) => {
     if (!from.startsWith('/api/templates/')) notify('Sẵn sàng tạo lại');
   };
+}
+
+/** What a page's form offers the History, the Examples and their details beside it: Recreate in place (Fash's keeps the URL) and a chip's setting. */
+export interface FormActions {
+  recreate: (from: string) => void;
+  apply?: (s: Setting) => void;
+  /** A photo of a detail put on the form in its role, as a click on one of Fash's inputs does. */
+  photo?: (p: Photo, role: PhotoRole) => void;
+  /** A detail's words put in the form's prompt (Fash's "Prompt copied"). */
+  prompt?: (text: string) => void;
+  /** Fash's Use Result: the result on the form (Try On's model photo, Image Generation's inputs). */
+  result?: (p: Photo) => void;
+}
+/** A photo a detail hands the form: a sample (uploaded as the member's own first, as a picked sample is) or an asset (a job's input or result). */
+export type Photo = { sample: string } | { asset: string };
+export type PhotoRole = 'model' | 'garment' | 'background' | 'product' | 'input';
+
+/** The role of a job's or a sample's n-th photo: Try On sends the person, the garments, then the background; UGC the person, then the product. */
+export function roleOf(feature: string, n: number, opts: { garments?: number | null; advanced?: boolean }): PhotoRole {
+  if (feature === 'try_on') return n === 0 ? 'model' : n <= (opts.garments ?? Infinity) ? 'garment' : 'background';
+  if (feature === 'marketing' && !opts.advanced) return n === 0 ? 'model' : 'product';
+  return 'input';
+}
+
+/** One of a detail's pieces: a button that puts it on the form beside it, or the plain piece where there is none. */
+export function Tap({ on, label, className, children }: { on?: () => void; label?: string; className?: string; children: ReactNode }) {
+  if (!on) return className ? <span className={className}>{children}</span> : <>{children}</>;
+  return (
+    <button type="button" className={className ? `tap ${className}` : 'tap'} aria-label={label} title={label} onClick={on}>
+      {children}
+    </button>
+  );
+}
+export const FormContext = createContext<FormActions | null>(null);
+export const useForm = (): FormActions | null => useContext(FormContext);
+
+/** The reuse action (Fash's Recreate): beside a form it refills that form in place and the URL stays; elsewhere (the Library) it opens the page that made it.
+ * `from` is the API path the form refills from (lib/reuse.ts), `href` the page link; `onDone` runs after an in-place refill starts. */
+export function Recreate({ href, from, className, label, onDone, children }: { href: string; from: string; className?: string; label?: string; onDone?: () => void; children: ReactNode }) {
+  const form = useForm();
+  if (!form)
+    return (
+      <Link href={href} className={className} aria-label={label} data-from={from}>
+        {children}
+      </Link>
+    );
+  return (
+    <button type="button" className={className} aria-label={label} data-from={from} onClick={() => (form.recreate(from), onDone?.())}>
+      {children}
+    </button>
+  );
 }
 
 /** The form's side of a chip click: sets what the chip carries and says so, as Fash's "Duration selected" and "Ratio selected" toasts. */

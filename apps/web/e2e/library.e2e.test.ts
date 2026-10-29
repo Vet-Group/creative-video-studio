@@ -36,7 +36,8 @@ test('Library tools: favourites only, oldest first, the size slider and the empt
   await expect(card(second).getByRole('button', { name: 'Yêu thích' })).toHaveAttribute('aria-pressed', 'true');
   await expect(card(first).getByRole('button', { name: 'Yêu thích' })).toHaveAttribute('aria-pressed', 'false');
 
-  // Newest first by default; Oldest first swaps the two.
+  // Newest first by default; Oldest first swaps the two. Only this member's clips, so the other tests' clips never push these two off the oldest 24.
+  await page.getByLabel('Người tạo').selectOption({ label: 'E2E Member 4' });
   const position = async (id: string) => (await mine.evaluateAll((cards) => cards.map((c) => c.getAttribute('aria-label') ?? ''))).findIndex((l) => l.endsWith(`${id.slice(0, 8)}.mp4`));
   expect(await position(second)).toBeLessThan(await position(first));
   await page.getByLabel('Sắp xếp').selectOption('oldest');

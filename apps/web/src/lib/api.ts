@@ -45,6 +45,8 @@ export interface TrayJob {
   /** The member's own words, when kept. */
   text: string | null;
   inputAssetIds: string[];
+  /** How many of a Try On job's inputs are garments (after the person, before the background). */
+  garments: number | null;
   format: string | null;
   favorite: boolean;
 }
