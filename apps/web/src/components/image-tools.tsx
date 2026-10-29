@@ -9,7 +9,7 @@ import { NARROW, useMediaQuery, WIDE } from '@/lib/use-media-query';
 import { numberedSamples } from '@/lib/examples';
 import { useHydrated } from '@/lib/use-hydrated';
 import { useSamples } from '@/lib/use-samples';
-import { type Photo, Recreate, useForm, useRecreated } from './jobs';
+import { type Photo, Recreate, useForm, useJobs, useRecreated } from './jobs';
 import { Icon, type IconName } from './Icon';
 import { Modal } from './Modal';
 import { Preview } from './Preview';
@@ -28,6 +28,8 @@ export interface ImageModel {
   maxImages: number;
   /** The model's prompt limit (the API caps it at PROMPT_CEILING). */
   maxPromptChars: number;
+  /** It makes a picture from words alone (Image Generation with no reference image). */
+  textToImage: boolean;
   /** The recommendation score (0-100) for this feature, and whether it is the one to recommend. */
   score: number;
   recommended: boolean;
@@ -91,6 +93,7 @@ export interface ReuseJob {
  * Returns Recreate in place: the same refill from another path, the URL unchanged, as Fash's Recreate. */
 export function useReuse(reuse: string | undefined, feature: string, fill: (j: Omit<ReuseJob, 'images'> & { images: Img[] }) => void, fail: () => void): (from: string) => void {
   const recreated = useRecreated();
+  const { loading } = useJobs();
   const [source, setSource] = useState(reuse ? { from: reuse } : null); // a new object each time, so the same path refills again
   useEffect(() => {
     if (!source) return;
@@ -105,7 +108,8 @@ export function useReuse(reuse: string | undefined, feature: string, fill: (j: O
         fill({ ...j, images: samples.length > 0 ? await uploadImages(await Promise.all(samples.map(sampleFile))) : (j.images as Img[]) });
         recreated(reuse);
       })
-      .catch(fail);
+      .catch(fail)
+      .finally(loading('Đang tải ảnh...'));
     return () => {
       stale = true;
     };
@@ -270,8 +274,15 @@ const GALLERY_SIZE_KEY = 'cvs.gallery.size';
 /** The company's latest outputs of one Library `kind` (`try_on`, `image` or, with `video`, `marketing`) in a masonry of columns; 24 at a time.
  * `cols` is the column count below 1024 px, up to 1536 px and above; from 1024 px a slider (as on Fash) shows one column more or less, remembered per browser.
  * `samples` names the fixed sample tiles shown first: the uploaded samples `<samples><n>.jpg` (or `.mp4` with a `.jpg` poster for `video`). */
+type PhotoTile = { key: string; src: string; label: string; pick: () => void };
+
 /** A photo dialog of a slot, as on Fash (Marketing's model and product, Try On's model, garments and background): the photos to pick, 4 per row of 3:4 portraits. The product dialog has a subtitle and an upload tile first; a stock dialog's own-photo upload is a link in the header. A tile that opens a deeper list (a model's poses, a category) sets the dialog again after it closes; `onBack` returns. */
-export function PhotoDialog({ open, title, sub, tiles, busy, onFile, onClose, onBack }: { open: boolean; title: string; sub?: string; tiles: { key: string; src: string; label: string; pick: () => void }[]; busy: boolean; onFile: (files: File[]) => void; onClose: () => void; onBack?: () => void }) {
+export function PhotoDialog({ open, title, sub, tiles, busy, onFile, onClose, onBack, mine }: { open: boolean; title: string; sub?: string; tiles: PhotoTile[]; busy: boolean; onFile: (files: File[]) => void; onClose: () => void; onBack?: () => void; mine?: { title: string; tiles: PhotoTile[] } }) {
+  const tile = (t: PhotoTile) => (
+    <button key={t.key} type="button" aria-label={t.label} disabled={busy} onClick={() => (onClose(), t.pick())}>
+      {open && <img src={t.src} alt="" />}
+    </button>
+  );
   const upload = (
     <>
       Tải lên ảnh của bạn
@@ -297,12 +308,15 @@ export function PhotoDialog({ open, title, sub, tiles, busy, onFile, onClose, on
             {upload}
           </label>
         )}
-        {tiles.map((t) => (
-          <button key={t.key} type="button" aria-label={t.label} disabled={busy} onClick={() => (onClose(), t.pick())}>
-            {open && <img src={t.src} alt="" />}
-          </button>
-        ))}
+        {tiles.map(tile)}
       </div>
+      {/* The member's own photos of this slot, under their own heading, as Fash's My Models. */}
+      {mine && mine.tiles.length > 0 && (
+        <section aria-label={mine.title}>
+          <h3 className="photo-mine">{mine.title}</h3>
+          <div className="choice-grid model-grid">{mine.tiles.map(tile)}</div>
+        </section>
+      )}
     </Modal>
   );
 }

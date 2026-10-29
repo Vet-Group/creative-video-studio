@@ -453,7 +453,8 @@ describe('POST /api/jobs for an image feature', () => {
          ('img-pro', 'fal', 'x', 'Img pro', 'image', '{image,try_on}', '{auto,1:1,3:4}', '{}', 2, '{"1K": "0.1500", "2K": "0.3000"}', '{}', true),
          ('img-only', 'fal', 'x', 'Img only', 'image', '{image}', '{auto,1:1}', '{}', 2, '{"1K": "0.0398"}', '{}', true),
          ('img-off', 'fal', 'x', 'Img off', 'image', '{image}', '{auto}', '{}', 2, '{"1K": "0.1"}', '{}', false),
-         ('img-mock', 'mock', 'mock', 'Img mock', 'image', '{image}', '{auto,1:1}', '{}', 2, '{"1K": "0.2000"}', '{}', true)`,
+         ('img-mock', 'mock', 'mock', 'Img mock', 'image', '{image}', '{auto,1:1}', '{}', 2, '{"1K": "0.2000"}', '{}', true),
+         ('img-text', 'fal', 'fal-ai/nano-banana-pro/edit', 'Img text', 'image', '{image,try_on}', '{auto,1:1,3:4}', '{}', 2, '{"1K": "0.1500", "2K": "0.1500"}', '{}', true)`,
     );
   });
 
@@ -467,6 +468,21 @@ describe('POST /api/jobs for an image feature', () => {
     ]);
     expect((await pool.query('select kind, usd::text as usd from cost_entries where job_id = $1', [id])).rows).toEqual([{ kind: 'estimate', usd: '0.3000' }]);
     expect(await sentCount(m.id)).toBe(1);
+  });
+
+  test('as on Fash, Image Generation takes no image on a model with a text-to-image twin, and refuses it elsewhere and on Try On', async () => {
+    const m = await newMember();
+    const res = await runImage(m, { modelId: 'img-text', assetIds: [] });
+    expect(res.status).toBe(201);
+    const { id } = (await res.json()) as { id: string };
+    expect((await pool.query('select input_asset_ids, prompt from jobs where id = $1', [id])).rows).toEqual([{ input_asset_ids: [], prompt: 'a bottle on marble' }]);
+    const plain = await runImage(m, { assetIds: [] }); // img-pro's endpoint has no text twin
+    expect(plain.status).toBe(400);
+    expect(await error(plain)).toMatch(/needs at least one input image/);
+    const tryOn = await runImage(m, { modelId: 'img-text', feature: 'try_on', assetIds: [] });
+    expect(tryOn.status).toBe(400);
+    expect(await error(tryOn)).toMatch(/assetIds must list 1 to/);
+    expect(await error(await runImage(m, { modelId: 'img-text', assetIds: [], prompt: undefined }))).toMatch(/takes a prompt and no preset/);
   });
 
   test('takes a quality, ignores durationSec, and books a mock image model at 0', async () => {

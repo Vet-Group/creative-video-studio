@@ -21,7 +21,7 @@ const TAB_LABEL: Record<Tab, string> = { history: 'Lịch sử', examples: 'Ví 
 const TABS: Tab[] = ['history', 'examples', 'about'];
 
 export function ImageGeneration({ reuse, model }: { reuse?: string; model?: string }) {
-  const { refresh, notify } = useJobs();
+  const { refresh, notify, loading } = useJobs();
   const hydrated = useHydrated();
   const [images, setImages] = useState<Img[]>([]);
   const [prompt, setPrompt] = useState('');
@@ -44,7 +44,7 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
     if (images.length >= max) return notify(`Tối đa ${max} ảnh`);
     setError('');
     try {
-      const img = await photoImg(p);
+      const img = await photoImg(p).finally(loading('Đang tải ảnh...'));
       setImages((cur) => (cur.length < max ? [...cur, img] : cur));
       notify('Đã thêm ảnh vào đầu vào');
     } catch {
@@ -74,8 +74,8 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
         ? 'Không tải được danh sách mô hình.'
         : !chosen
           ? 'Chưa bật mô hình nào cho Tạo ảnh. Admin bật trong Quản trị → Cài đặt → Mô hình.'
-          : images.length === 0
-            ? 'Tải lên ít nhất 1 ảnh tham chiếu.'
+          : images.length === 0 && !chosen.textToImage
+            ? 'Mô hình này cần ít nhất 1 ảnh tham chiếu.'
             : images.length > chosen.maxImages
               ? `Mô hình này nhận tối đa ${chosen.maxImages} ảnh.`
               : prompt.trim() === ''

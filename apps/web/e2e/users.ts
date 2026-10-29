@@ -40,6 +40,8 @@ export const USERS = {
   tryexa: { email: 'tryexa@e2e.test', name: 'E2E Try On Examples A', role: 'member' },
   imgexa: { email: 'imgexa@e2e.test', name: 'E2E Image Examples A', role: 'member' },
   chipa: { email: 'chipa@e2e.test', name: 'E2E Chips A', role: 'member' },
+  vidfrom: { email: 'vidfrom@e2e.test', name: 'E2E Video From Image', role: 'member' },
+  pickera: { email: 'pickera@e2e.test', name: 'E2E Try On Pickers', role: 'member' }, // its own Try On job gives it My models, which would hide another user's slot samples
   admin: { email: 'admin@e2e.test', name: 'E2E Admin', role: 'admin' },
 } as const;
 

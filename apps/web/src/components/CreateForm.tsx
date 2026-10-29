@@ -89,8 +89,8 @@ const MAX_IMAGES = 4;
 const ratePct = (m: Model) => (m.passRate === null ? 'chưa có dữ liệu' : `${Math.round(m.passRate * 100)}% (${m.passes}/${m.total})`);
 
 /** `preset` and `model` pre-select the choices Explore links to; an unknown or switched-off one falls back to the default. */
-export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: string; model?: string }) {
-  const { refresh, notify } = useJobs();
+export function CreateForm({ reuse, preset, model, image }: { reuse?: string; preset?: string; model?: string; image?: string }) {
+  const { refresh, notify, loading } = useJobs();
   const recreated = useRecreated();
   const hydrated = useHydrated();
   const [images, setImages] = useState<Image[]>([]);
@@ -142,6 +142,18 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
     );
   }, [reuse, preset]);
 
+  // A picture from History (Fash's Generate Video): it becomes the first image, the rest of the form stays at its defaults.
+  useEffect(() => {
+    if (!image) return;
+    let stale = false;
+    photoImg({ asset: image })
+      .then((img) => !stale && setImages([img]))
+      .catch(() => setError('Không tìm thấy ảnh để tạo video.'));
+    return () => {
+      stale = true;
+    };
+  }, [image]);
+
   // Reuse: fill the form from the source clip; everything stays editable. A preset switched off since falls back to its prompt as a free prompt.
   useEffect(() => {
     if (!source || !presets) return;
@@ -166,7 +178,8 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
         recreated(reuse);
       })
       .catch(() => setError('Không tìm thấy clip để dùng lại.'))
-      .finally(() => setReady(true));
+      .finally(() => setReady(true))
+      .finally(loading('Đang tải ảnh...'));
     return () => {
       stale = true;
     };
@@ -303,7 +316,7 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
     if (images.length >= maxImages) return notify(`Tối đa ${maxImages} ảnh`);
     setError('');
     try {
-      const img = await photoImg(p);
+      const img = await photoImg(p).finally(loading('Đang tải ảnh...'));
       setImages((cur) => (cur.length < maxImages ? [...cur, img] : cur));
       notify('Đã thêm ảnh tham chiếu');
     } catch {

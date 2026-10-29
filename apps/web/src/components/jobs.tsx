@@ -109,6 +109,8 @@ interface JobsState {
   refresh: () => Promise<void>;
   dismiss: (id: number) => void;
   notify: (text: string) => void;
+  /** A note that stays until the call it returns (the work is done): a refill or a picked photo uploading. */
+  loading: (text: string) => () => void;
 }
 
 const Ctx = createContext<JobsState | null>(null);
@@ -190,6 +192,12 @@ export function JobsProvider({ userId, children }: { userId: string; children: R
     setTimeout(() => setToasts((cur) => cur.filter((t) => t.id !== id)), NOTE_MS);
   }, []);
 
-  const value = useMemo(() => ({ ...data, toasts, refresh, dismiss, notify }), [data, toasts, refresh, dismiss, notify]);
+  const loading = useCallback((text: string) => {
+    const id = nextId.current++;
+    setToasts((cur) => [...cur, { id, ok: true, text, note: true }]);
+    return () => setToasts((cur) => cur.filter((t) => t.id !== id));
+  }, []);
+
+  const value = useMemo(() => ({ ...data, toasts, refresh, dismiss, notify, loading }), [data, toasts, refresh, dismiss, notify, loading]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

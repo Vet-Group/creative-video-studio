@@ -39,6 +39,20 @@ export const PROMPT_CEILING = 5000;
 /** A model's prompt limit as the app applies it: its own `max_prompt_chars` under the ceiling. */
 export const promptLimit = (maxPromptChars: number): number => Math.min(maxPromptChars, PROMPT_CEILING);
 
+/** The fal text-to-image endpoint of each image edit endpoint (their schemas and prices, read 2026-10-29: the same price per image or less); a job with no input image goes there. */
+export const FAL_TEXT_ENDPOINTS: Record<string, string> = {
+  'fal-ai/nano-banana-pro/edit': 'fal-ai/nano-banana-pro',
+  'google/nano-banana-2.1/edit': 'google/nano-banana-2.1',
+  'fal-ai/nano-banana-2/edit': 'fal-ai/nano-banana-2',
+  'fal-ai/nano-banana/edit': 'fal-ai/nano-banana',
+  'openai/gpt-image-2/edit': 'openai/gpt-image-2',
+  'bytedance/seedream/v5/pro/edit': 'bytedance/seedream/v5/pro/text-to-image',
+};
+
+/** Whether an image model makes a picture from words alone, as Fash's text-to-image examples do: a fal edit endpoint with a text twin, a Gemini model on Vertex (generateContent takes text only), or a mock. */
+export const textToImage = (m: { provider: string; endpoint: string }): boolean =>
+  m.provider === 'mock' || (m.provider === 'vertex' ? m.endpoint.startsWith('gemini-') : Object.hasOwn(FAL_TEXT_ENDPOINTS, m.endpoint));
+
 /**
  * The prompt of an app that has no prompt field of its own (or only an optional one), stored with the job and sent when the Run names none.
  * The two swaps send the new person as the first image and the photo to change as the second. For Background Changer it stands for "the second image is the new background".

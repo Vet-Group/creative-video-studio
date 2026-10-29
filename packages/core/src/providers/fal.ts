@@ -9,6 +9,7 @@
 //   one per entry of IMAGE_BODIES and VIDEO_BODIES
 import { imageSize } from './image-size';
 import { estimate, ImageReadError, imageEstimate, packJobId, ProviderHttpError, resolveImages, sendJson, timeout, unpackJobId, type Fetch, type ReadImage } from './http';
+import { FAL_TEXT_ENDPOINTS } from '../models';
 import type { ImageProvider, ImageSubmitRequest, ProviderStatus, SubmitRequest, VideoProvider } from './types';
 
 const QUEUE = 'https://queue.fal.run';
@@ -271,9 +272,18 @@ export function createFalImageProvider(opts: { apiKey: string; fetch?: Fetch; re
     async submit(req) {
       const build = IMAGE_BODIES[req.model.endpoint];
       if (!build) throw new ImageReadError(`fal image: no request builder for ${req.model.endpoint}`);
+      // No input image: the text-to-image twin, same app (so the status URL is the same) and the same body without images.
+      const text = req.imageUrls.length === 0;
+      const endpoint = text ? FAL_TEXT_ENDPOINTS[req.model.endpoint] : req.model.endpoint;
+      if (!endpoint) throw new ImageReadError(`fal image: ${req.model.endpoint} needs an input image`);
       // Built before any network call, so a request the model cannot take submits nothing.
       const body = build(req, await resolveImages(req.imageUrls, opts.readImage));
-      const res = (await sendJson(f, 'fal submit', `${QUEUE}/${req.model.endpoint}`, { method: 'POST', headers, body: JSON.stringify(body) })) as { request_id?: string };
+      if (text) {
+        delete body.image_urls;
+        // Nano Banana's text endpoint has no 'auto' ratio; without one each takes its own default.
+        if (body.aspect_ratio === 'auto') delete body.aspect_ratio;
+      }
+      const res = (await sendJson(f, 'fal submit', `${QUEUE}/${endpoint}`, { method: 'POST', headers, body: JSON.stringify(body) })) as { request_id?: string };
       if (!res.request_id) throw new Error('fal submit: no request_id in the response');
       return { providerJobId: res.request_id };
     },

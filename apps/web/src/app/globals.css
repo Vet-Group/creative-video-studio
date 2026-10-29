@@ -1033,6 +1033,7 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .model-upload { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; border: 1px dashed var(--border-strong); background: var(--fill); color: var(--text-subtle); font-size: 13px; line-height: 18px; text-align: center; cursor: pointer; }
 .photo-back { display: inline-grid; place-items: center; width: 28px; height: 28px; margin: 0 6px 0 -6px; padding: 0; border: 0; border-radius: 8px; background: none; color: inherit; vertical-align: -6px; cursor: pointer; }
 .photo-back:hover { background: var(--fill); }
+.photo-mine { margin: 20px 0 10px; font-size: 14px; line-height: 20px; font-weight: 500; }
 .photo-upload-link { position: absolute; top: 18px; right: 60px; color: var(--ink); font-size: 14px; line-height: 20px; font-weight: 500; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 .photo-upload-link:focus-within { outline: 2px solid var(--ink-strong); outline-offset: 2px; border-radius: 4px; }
 .model-upload:focus-within { outline: 2px solid var(--ink-strong); outline-offset: 2px; }

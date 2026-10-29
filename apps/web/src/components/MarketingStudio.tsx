@@ -147,7 +147,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
   const advanced = format === 'advanced';
   const router = useRouter();
   const have = useSamples();
-  const { refresh, clips, notify } = useJobs();
+  const { refresh, clips, notify, loading } = useJobs();
   const recreated = useRecreated();
   const narrow = useMediaQuery(NARROW);
   const [person, setPerson] = useState<Img[]>([]);
@@ -266,7 +266,8 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
         if (j.brief === null && advanced) setNotice('Clip này không có mô tả gốc: đã điền lại ảnh và cài đặt, hãy nhập lại mô tả.');
         recreated(reuse);
       })
-      .catch(() => setError('Không tìm thấy clip để dùng lại.'));
+      .catch(() => setError('Không tìm thấy clip để dùng lại.'))
+      .finally(loading('Đang tải ảnh...'));
     return () => {
       stale = true;
     };
@@ -331,7 +332,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
     if (advanced && refs.length >= maxRefs) return notify(`Tối đa ${maxRefs} ảnh tham chiếu`);
     setError('');
     try {
-      const img = await photoImg(p);
+      const img = await photoImg(p).finally(loading('Đang tải ảnh...'));
       if (advanced) setRefs((cur) => (cur.length < maxRefs ? [...cur, img] : cur));
       else if (role === 'model') setPerson([img]);
       else setProduct([img]);
