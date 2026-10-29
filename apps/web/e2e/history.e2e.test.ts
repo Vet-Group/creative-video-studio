@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { png, runViaApi, select, selectValue, signIn } from './support.test';
+import { clearMyJobs, png, runViaApi, select, selectValue, signIn } from './support.test';
 
 // A page's History tab lists the member's jobs as Fash's History cards: the result, the member's words, the inputs, chips, and the actions.
 test('a History card shows the text, inputs and chips, and its favourite, new-tab, download, delete and Dùng lại actions work', async ({ page }) => {
@@ -44,6 +44,7 @@ test('a History card shows the text, inputs and chips, and its favourite, new-ta
 test('as on Fash, a History chip sets its resolution, ratio or duration on the form beside it and says so', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await signIn(page, 'chipa');
+  await clearMyJobs(page); // a retry starts with no card from the first attempt
   const toast = (text: string) => page.getByRole('region', { name: 'Thông báo' }).getByText(text);
   const up = (await (await page.request.post('/api/assets', { multipart: { file: { name: 'c.png', mimeType: 'image/png', buffer: png() } } })).json()) as { assets: { id: string }[] };
   const res = await page.request.post('/api/jobs', { data: { feature: 'image', modelId: 'mock-image-e2e', assetIds: [up.assets[0]!.id], ratio: '1:1', prompt: 'chips shot', enhance: false, params: { resolution: '2K' } } });

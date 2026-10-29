@@ -16,7 +16,7 @@ afterAll(() => {
 
 async function flags(env: Record<string, string>) {
   vi.resetModules();
-  for (const k of NAMES) delete process.env[k];
+  for (const k of NAMES) process.env[k] = ''; // empty, not deleted: the .env loader of lib/storage fills only missing names, so a checkout with real keys would leak them in
   Object.assign(process.env, env);
   const { googleLoginEnabled, larkLoginEnabled } = await import('@/lib/auth');
   return [googleLoginEnabled, larkLoginEnabled];

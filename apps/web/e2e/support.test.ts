@@ -115,5 +115,12 @@ export async function runViaApi(page: Page): Promise<string> {
   return ((await job.json()) as { id: string }).id;
 }
 
+/** Waits for the member's jobs to finish and deletes the finished ones: a test that reads its own History or remembered settings then starts the same on a retry. */
+export async function clearMyJobs(page: Page): Promise<void> {
+  const mine = async () => ((await (await page.request.get('/api/jobs?mine')).json()) as { jobs?: { id: string; status: string }[] }).jobs ?? [];
+  await expect.poll(async () => (await mine()).every((j) => !['queued', 'submitting', 'running'].includes(j.status)), { timeout: 60_000 }).toBe(true);
+  for (const j of await mine()) if (j.status === 'succeeded') expect((await page.request.delete(`/api/jobs/${j.id}`)).ok()).toBe(true);
+}
+
 /** `YYYYMMDD` of today in Vietnam, the first part of a download name. */
 export const today = (): string => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date()).replaceAll('-', '');
