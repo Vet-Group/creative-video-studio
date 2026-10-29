@@ -47,6 +47,29 @@ function mp4(ms: number, size = 64, brand = 'isom'): Uint8Array<ArrayBuffer> {
   return bytes;
 }
 
+const ascii = (bytes: Uint8Array, at: number, text: string) => [...text].forEach((c, i) => (bytes[at + i] = c.charCodeAt(0)));
+/** A WAV of `ms` at 8 kHz, 8-bit mono (8 bytes a millisecond): RIFF, a 16-byte fmt chunk and the data chunk; `data` false leaves the data chunk out. */
+function wav(ms: number, data = true): Uint8Array<ArrayBuffer> {
+  const size = ms * 8;
+  const bytes = new Uint8Array(new ArrayBuffer(36 + (data ? 8 + size : 0)));
+  const v = new DataView(bytes.buffer);
+  ascii(bytes, 0, 'RIFF');
+  v.setUint32(4, bytes.length - 8, true);
+  ascii(bytes, 8, 'WAVEfmt ');
+  [v.setUint32(16, 16, true), v.setUint16(20, 1, true), v.setUint16(22, 1, true), v.setUint32(24, 8000, true), v.setUint32(28, 8000, true), v.setUint16(32, 1, true), v.setUint16(34, 8, true)];
+  if (data) (ascii(bytes, 36, 'data'), v.setUint32(40, size, true));
+  return bytes;
+}
+/** An MP3 at 128 kbps (16 bytes a millisecond) of `ms` after an empty ID3v2 tag, starting with an MPEG 1 Layer III frame header; `xing` writes a Xing header with that frame count. */
+function mp3(ms: number, xing?: number): Uint8Array<ArrayBuffer> {
+  const bytes = new Uint8Array(new ArrayBuffer(10 + ms * 16));
+  ascii(bytes, 0, 'ID3');
+  bytes[3] = 4;
+  bytes.set([0xff, 0xfb, 0x90, 0x64], 10); // 128 kbps, 44.1 kHz, joint stereo, so the Xing header sits 32 bytes after the frame header
+  if (xing !== undefined) (ascii(bytes, 46, 'Xing'), new DataView(bytes.buffer).setUint32(50, 1), new DataView(bytes.buffer).setUint32(54, xing));
+  return bytes;
+}
+
 const get = (path: string, cookie?: string, headers: Record<string, string> = {}) =>
   new Request(`http://localhost${path}`, { headers: { ...(cookie ? { cookie } : {}), ...headers } });
 
@@ -128,6 +151,21 @@ describe('POST /api/assets', () => {
     expect((await pool.query('select duration_ms from assets where id = $1', [assets[0]!.id])).rows[0].duration_ms).toBe(5400);
     expect((await upload(ownerCookie, { name: 'edge.mp4', bytes: mp4(3000, 20 * 1024 * 1024) })).status).toBe(201);
     expect((await upload(ownerCookie, { name: 'big.mp4', bytes: mp4(3000, 20 * 1024 * 1024 + 1) })).status).toBe(413);
+  });
+
+  test('stores an MP3 or WAV clip of up to 15 MB with its length from its header', async () => {
+    const res = await upload(ownerCookie, { name: 'voice.wav', bytes: wav(2500) }, { name: 'song.mp3', bytes: mp3(3000) }, { name: 'vbr.mp3', bytes: mp3(100, 100) });
+    expect(res.status).toBe(201);
+    const { assets } = (await res.json()) as { assets: { mime: string; durationMs: number | null }[] };
+    // 100 frames of 1,152 samples at 44.1 kHz is 2,612 ms, whatever the file's size says.
+    expect(assets.map((a) => [a.mime, a.durationMs])).toEqual([['audio/wav', 2500], ['audio/mpeg', 3000], ['audio/mpeg', 2612]]);
+    const edge = 15 * 1024 * 1024;
+    expect((await upload(ownerCookie, { name: 'long.mp3', bytes: mp3(Math.floor((edge - 10) / 16)) })).status).toBe(201); // past the 10 MB of an image
+    expect((await upload(ownerCookie, { name: 'big.mp3', bytes: mp3(Math.ceil((edge - 9) / 16)) })).status).toBe(413);
+  });
+
+  test('rejects a clip whose header gives no length', async () => {
+    expect((await upload(ownerCookie, { name: 'empty.wav', bytes: wav(0, false) })).status).toBe(415);
   });
 
   test('rejects a video whose header gives no length', async () => {

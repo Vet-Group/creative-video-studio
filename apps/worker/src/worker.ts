@@ -228,6 +228,7 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
         const request: SubmitRequest = {
           model: await loadModel(job.model, job.params.audio), prompt: job.prompt, imageUrls, ratio: job.aspect, durationSec: job.duration_s, audio: job.params.audio === 'on',
           ...(job.params.endAssetId && { endImageUrl: `asset://${job.params.endAssetId}` }),
+          ...(job.params.audioAssetIds && { audioUrls: (job.params.audioAssetIds as string).split(',').map((a) => `asset://${a}`) }),
         };
         return { send: () => provider.submit(request) };
       })().catch(async (e) => {

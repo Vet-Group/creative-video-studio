@@ -88,6 +88,12 @@ interface VideoBody {
    * Reference ($0.07, text $0.14), Hailuo 2.3 (its text schema has no ratio) and Kling O1 and Motion Control (no twin checked).
    */
   text?: string;
+  /**
+   * Reference audio (MP3 or WAV, read 2026-10-30): the body field, how many clips and how many seconds in all the schema takes. The clips go to fal's
+   * storage (uploadInputs). Seedance prices output tokens only, so they cost nothing more; on Minimax they share the 4,096 free reference tokens with the
+   * images (its page gives no count per clip), past which the estimate is short.
+   */
+  audio?: { field: string; max: number; seconds: number };
   build: (req: SubmitRequest, images: string[]) => Record<string, unknown>;
 }
 const seconds = (req: SubmitRequest) => String(req.durationSec);
@@ -102,9 +108,10 @@ export const VIDEO_BODIES: Record<string, VideoBody> = {
   'fal-ai/kling-video/v3/pro/image-to-video': { crop: true, end: 'end_image_url', text: 'fal-ai/kling-video/v3/pro/text-to-video', build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), start_image_url: images[0], duration: seconds(req), generate_audio: req.audio === true }) },
   'fal-ai/kling-video/v2.6/pro/image-to-video': { crop: true, end: 'end_image_url', text: 'fal-ai/kling-video/v2.6/pro/text-to-video', build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), start_image_url: images[0], duration: seconds(req), generate_audio: req.audio === true }) },
   'fal-ai/kling-video/v2.5-turbo/pro/image-to-video': { crop: true, end: 'tail_image_url', text: 'fal-ai/kling-video/v2.5-turbo/pro/text-to-video', build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), duration: seconds(req) }) },
-  'bytedance/seedance-2.5/us/reference-to-video': { text: 'bytedance/seedance-2.5/us/text-to-video', build: (req, images) => ({ prompt: imageTokens(req.prompt, atImage), ...ref(images), aspect_ratio: req.ratio, duration: seconds(req), resolution: '720p', generate_audio: req.audio === true }) },
+  // "Up to 10 files", each 1.8 to 30.2 s and 30.2 s in all (the schema's description; it states no maxItems).
+  'bytedance/seedance-2.5/us/reference-to-video': { text: 'bytedance/seedance-2.5/us/text-to-video', audio: { field: 'audio_urls', max: 10, seconds: 30 }, build: (req, images) => ({ prompt: imageTokens(req.prompt, atImage), ...ref(images), aspect_ratio: req.ratio, duration: seconds(req), resolution: '720p', generate_audio: req.audio === true }) },
   'bytedance/seedance-2.5/us/image-to-video': { crop: true, end: 'end_image_url', text: 'bytedance/seedance-2.5/us/text-to-video', build: (req, images) => ({ prompt: oneShot(imageTokens(req.prompt, plainImage)), ...first(images), duration: seconds(req), resolution: '720p', generate_audio: req.audio === true }) },
-  'bytedance/seedance-2.0/us/reference-to-video': { text: 'bytedance/seedance-2.0/us/text-to-video', build: (req, images) => ({ prompt: imageTokens(req.prompt, atImage), ...ref(images), aspect_ratio: req.ratio, duration: seconds(req), resolution: '720p', generate_audio: req.audio === true }) },
+  'bytedance/seedance-2.0/us/reference-to-video': { text: 'bytedance/seedance-2.0/us/text-to-video', audio: { field: 'audio_urls', max: 3, seconds: 15 }, build: (req, images) => ({ prompt: imageTokens(req.prompt, atImage), ...ref(images), aspect_ratio: req.ratio, duration: seconds(req), resolution: '720p', generate_audio: req.audio === true }) },
   'bytedance/seedance-2.0/us/image-to-video': { end: 'end_image_url', build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), aspect_ratio: req.ratio, duration: seconds(req), resolution: '720p', generate_audio: req.audio === true }) },
   'fal-ai/bytedance/seedance/v1.5/pro/image-to-video': { end: 'end_image_url', text: 'fal-ai/bytedance/seedance/v1.5/pro/text-to-video', build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), aspect_ratio: req.ratio, duration: seconds(req), resolution: '720p', generate_audio: req.audio === true }) },
   // Seedance 1.0 Pro and FLUX 3 render "720p" 9:16 as 704 px wide, under the worker's 720p floor (smoke run 2026-10-25), so they ask for 1080p.
@@ -121,7 +128,7 @@ export const VIDEO_BODIES: Record<string, VideoBody> = {
   'fal-ai/wan/v2.7/image-to-video': { crop: true, end: 'end_image_url', text: 'fal-ai/wan/v2.7/text-to-video', build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), duration: req.durationSec, resolution: '720p' }) },
   // Minimax names references "Image 1" and requires prompt_expansion_mode (the schema default, 'balanced'); its resolutions (480P, 768P, 1080P) end
   // in a capital P, and each row's output resolution picks one, at that row's price.
-  'minimax/h3-max/reference-to-video': { end: 'end_image_url', text: 'minimax/h3-max/text-to-video', build: (req, images) => ({ prompt: imageTokens(req.prompt, (n) => `Image ${n}`), reference_image_urls: images, aspect_ratio: req.ratio, duration: req.durationSec, resolution: (req.model.outputResolution ?? '768p').toUpperCase(), prompt_expansion_mode: 'balanced' }) },
+  'minimax/h3-max/reference-to-video': { end: 'end_image_url', text: 'minimax/h3-max/text-to-video', audio: { field: 'reference_audio_urls', max: 3, seconds: 15 }, build: (req, images) => ({ prompt: imageTokens(req.prompt, (n) => `Image ${n}`), reference_image_urls: images, aspect_ratio: req.ratio, duration: req.durationSec, resolution: (req.model.outputResolution ?? '768p').toUpperCase(), prompt_expansion_mode: 'balanced' }) },
   'minimax/h3-max/image-to-video': { crop: true, end: 'end_image_url', text: 'minimax/h3-max/text-to-video', build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), duration: req.durationSec, resolution: (req.model.outputResolution ?? '768p').toUpperCase(), prompt_expansion_mode: 'balanced' }) },
   // A fixed-length clip: the schema has no duration, and the row offers 6 s only, as Fash does.
   'fal-ai/minimax/hailuo-2.3/pro/image-to-video': { crop: true, build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images) }) },
@@ -144,10 +151,13 @@ export const VIDEO_BODIES: Record<string, VideoBody> = {
   'minimax/h3-max/text-to-video': { build: (req) => words(req, req.durationSec, { resolution: (req.model.outputResolution ?? '768p').toUpperCase(), prompt_expansion_mode: 'balanced' }) },
 };
 
-/** What a video model takes besides its images, by endpoint, for the models and jobs APIs: `endFrame`, an end frame; `textOnly`, a Run with no image. */
+/**
+ * What a video model takes besides its images, by endpoint, for the models and jobs APIs: `endFrame`, an end frame; `textOnly`, a Run with no image;
+ * `audioClips`, reference audio up to `max` clips and `seconds` in all (null when none).
+ */
 export function videoInputs(endpoint: string) {
   const spec = Object.hasOwn(VIDEO_BODIES, endpoint) ? VIDEO_BODIES[endpoint] : undefined;
-  return { endFrame: spec?.end !== undefined, textOnly: spec?.text !== undefined };
+  return { endFrame: spec?.end !== undefined, textOnly: spec?.text !== undefined, audioClips: spec?.audio ? { max: spec.audio.max, seconds: spec.audio.seconds } : null };
 }
 
 /**
@@ -174,7 +184,8 @@ async function uploadInputs(f: Fetch, apiKey: string, urls: string[], readImage?
         const init = (await sendJson(f, 'fal upload', `${REST}/storage/upload/initiate?storage_type=fal-cdn-v3`, {
           method: 'POST',
           headers: { Authorization: `Key ${apiKey}`, 'Content-Type': 'application/json', 'X-Fal-Object-Lifecycle': LIFECYCLE },
-          body: JSON.stringify({ content_type: contentType, file_name: `input.${contentType.split('/')[1] ?? 'bin'}` }),
+          // audio/mpeg is an .mp3; the endpoints that take audio list MP3 and WAV.
+          body: JSON.stringify({ content_type: contentType, file_name: `input.${contentType === 'audio/mpeg' ? 'mp3' : (contentType.split('/')[1] ?? 'bin')}` }),
         })) as { upload_url?: string; file_url?: string };
         if (!init.upload_url || !init.file_url) throw new Error('fal upload: no upload_url or file_url');
         const put = await f(init.upload_url, { method: 'PUT', headers: { 'Content-Type': contentType }, body: Buffer.from(bytes) });
@@ -202,10 +213,12 @@ export function createFalProvider(opts: { apiKey: string; fetch?: Fetch; readIma
       const spec = endpoint ? VIDEO_BODIES[endpoint] : undefined;
       if (!endpoint || !spec) throw new ImageReadError(`fal video: ${req.model.endpoint} needs an input image`);
       if (req.endImageUrl && !spec.end) throw new ImageReadError(`fal video: ${req.model.endpoint} takes no end frame`);
+      if (req.audioUrls?.length && !spec.audio) throw new ImageReadError(`fal video: ${req.model.endpoint} takes no reference audio`);
       const inputs = spec.upload || req.imageUrls.length > MAX_INLINE_INPUTS ? await uploadInputs(f, opts.apiKey, req.imageUrls, opts.readImage) : await resolveImages(req.imageUrls, opts.readImage, spec.crop ? { ratio: req.ratio } : undefined);
       const body = spec.build(req, inputs);
       // The end frame is read like the inputs, cropped to the ratio where they are, so both frames have one shape.
       if (req.endImageUrl) [body[spec.end!]] = await resolveImages([req.endImageUrl], opts.readImage, spec.crop ? { ratio: req.ratio } : undefined);
+      if (req.audioUrls?.length) body[spec.audio!.field] = await uploadInputs(f, opts.apiKey, req.audioUrls, opts.readImage);
       const res = (await sendJson(f, 'fal submit', `${QUEUE}/${endpoint}`, { method: 'POST', headers, body: JSON.stringify(body) })) as { request_id?: string };
       if (!res.request_id) throw new Error('fal submit: no request_id in the response');
       return { providerJobId: packJobId(req.durationSec, res.request_id) };

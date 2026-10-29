@@ -12,6 +12,8 @@ export interface SubmitRequest {
   audio?: boolean;
   /** The image the clip ends on, on a model that takes one (fal's VIDEO_BODIES `end`). */
   endImageUrl?: string;
+  /** Reference audio clips (MP3 or WAV), on a model that takes them (fal's VIDEO_BODIES `audio`). */
+  audioUrls?: string[];
 }
 
 /** fal's queue URLs include the model endpoint, so polling needs the model as well as the id. */

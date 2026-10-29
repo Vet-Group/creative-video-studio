@@ -40,14 +40,14 @@ export async function cropToRatio(bytes: Uint8Array, ratio: string): Promise<{ b
   return { bytes: new Uint8Array(out), contentType: hasAlpha ? 'image/png' : 'image/jpeg' };
 }
 
-/** `asset://<id>` is an input asset in MinIO: the adapters inline an image as a data URL before any call to the provider, cropped when asked, shrunk by fitForInline. A video passes as it is (fal uploads it). */
+/** `asset://<id>` is an input asset in MinIO: the adapters inline an image as a data URL before any call to the provider, cropped when asked, shrunk by fitForInline. A video or an audio clip passes as it is (fal uploads it). */
 export const assetReader =
   (pool: WorkerDeps['pool'], read: (key: string) => Promise<Uint8Array> = getObject): ReadImage =>
   async (url, opts) => {
     const { rows } = await pool.query('select s3_key, mime from assets where id = $1 and deleted_at is null', [url.replace(/^asset:\/\//, '')]);
     if (!rows[0]) throw new Error('asset not found');
     const bytes = await read(rows[0].s3_key);
-    if (rows[0].mime.startsWith('video/')) return { bytes, contentType: rows[0].mime };
+    if (rows[0].mime.startsWith('video/') || rows[0].mime.startsWith('audio/')) return { bytes, contentType: rows[0].mime };
     if (!opts?.ratio) return fitForInline(bytes, rows[0].mime);
     const cropped = await cropToRatio(bytes, opts.ratio);
     return fitForInline(cropped.bytes, cropped.contentType);

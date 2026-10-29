@@ -1,6 +1,6 @@
 import { insertAssets } from '@cvs/db/assets';
 import { pool } from '@/lib/auth';
-import { db, MAX_BYTES, MAX_FILENAME, MAX_FILES, MAX_VIDEO_BYTES, mp4DurationMs, readUploadForm, sniffImage, sniffVideo } from '@/lib/assets';
+import { audioDurationMs, db, MAX_AUDIO_BYTES, MAX_BYTES, MAX_FILENAME, MAX_FILES, MAX_VIDEO_BYTES, mp4DurationMs, readUploadForm, sniffAudio, sniffImage, sniffVideo } from '@/lib/assets';
 import { guard } from '@/lib/session';
 import { deleteObject, putObject } from '@/lib/storage';
 
@@ -15,7 +15,8 @@ function shortName(name: string): string {
 
 /**
  * Upload 1-4 input files (multipart field `file`), all or nothing: JPEG/PNG/WebP images of at most 10 MB, or MP4/MOV videos (Motion Control's reference)
- * of at most 20 MB whose header gives their length (`durationMs`). The type comes from the magic bytes.
+ * of at most 20 MB whose header gives their length (`durationMs`), or MP3/WAV clips (Create video's reference audio) of at most 15 MB, measured the same way.
+ * The type comes from the magic bytes.
  */
 /** The photo of a slot the caller used before, by `?recent=`: the feature and the input's place (1-based) in its jobs. */
 const RECENT: Record<string, { feature: string; at: number }> = {
@@ -66,9 +67,17 @@ export async function POST(request: Request) {
       checked.push({ id: crypto.randomUUID(), file, bytes, mime: video, durationMs });
       continue;
     }
+    const audio = sniffAudio(bytes);
+    if (audio) {
+      if (file.size > MAX_AUDIO_BYTES) return Response.json({ error: `${file.name} is larger than 15 MB` }, { status: 413 });
+      const durationMs = audioDurationMs(bytes, audio);
+      if (!durationMs) return Response.json({ error: `${file.name} has no readable length` }, { status: 415 });
+      checked.push({ id: crypto.randomUUID(), file, bytes, mime: audio, durationMs });
+      continue;
+    }
     if (file.size > MAX_BYTES) return Response.json({ error: `${file.name} is larger than 10 MB` }, { status: 413 });
     const mime = sniffImage(bytes);
-    if (!mime) return Response.json({ error: `${file.name} is not a JPEG, PNG or WebP image, or an MP4 or MOV video` }, { status: 415 });
+    if (!mime) return Response.json({ error: `${file.name} is not a JPEG, PNG or WebP image, an MP4 or MOV video, or an MP3 or WAV clip` }, { status: 415 });
     checked.push({ id: crypto.randomUUID(), file, bytes, mime, durationMs: null });
   }
   const rows = checked.map(({ id, file, bytes, mime, durationMs }) => ({

@@ -175,7 +175,6 @@ describe('fal', () => {
       await expect(createFalProvider({ apiKey: 'k', fetch: fn }).submit({ ...req, imageUrls: [], model: { ...kling, endpoint } })).rejects.toThrow('needs an input image');
     }
     expect(calls).toHaveLength(0);
-    expect(videoInputs('mock')).toEqual({ endFrame: false, textOnly: false });
   });
 
   test('a refusal surfaces the HTTP status', async () => {
@@ -274,27 +273,63 @@ describe('fal', () => {
   });
 });
 
+/** fal's storage and queue, answered by URL: each initiate gets its own file URL, each PUT succeeds, the submit returns a request id. */
+function falFake(put = 200) {
+  const calls: { url: string; method: string; headers: Record<string, string>; body: unknown }[] = [];
+  let n = 0;
+  const fn = (async (url: string, init: RequestInit = {}) => {
+    const json = typeof init.body === 'string';
+    calls.push({ url, method: init.method ?? 'GET', headers: init.headers as Record<string, string>, body: json ? JSON.parse(init.body as string) : init.body });
+    if (url.startsWith('https://rest.fal.ai/storage/upload/initiate')) {
+      n += 1;
+      return Response.json({ upload_url: `https://upload.test/${n}`, file_url: `https://v3b.fal.media/files/${(JSON.parse(init.body as string) as { content_type: string }).content_type.replace('/', '-')}` });
+    }
+    if (url.startsWith('https://upload.test/')) return new Response('', { status: put });
+    return Response.json({ request_id: 'm1' });
+  }) as unknown as typeof fetch;
+  return { fn, calls };
+}
+
+describe('fal reference audio', () => {
+  const read = async (url: string) => (url.includes('clip') ? { bytes: new Uint8Array([0x49, 0x44, 0x33]), contentType: url.endsWith('wav') ? 'audio/wav' : 'audio/mpeg' } : readImage(url));
+
+  test('the endpoints that take it, with the count and total seconds their schemas allow (read 2026-10-30)', () => {
+    const takes = Object.keys(VIDEO_BODIES).filter((e) => videoInputs(e).audioClips).map((e) => [e, videoInputs(e).audioClips]);
+    expect(takes).toEqual([
+      ['bytedance/seedance-2.5/us/reference-to-video', { max: 10, seconds: 30 }],
+      ['bytedance/seedance-2.0/us/reference-to-video', { max: 3, seconds: 15 }],
+      ['minimax/h3-max/reference-to-video', { max: 3, seconds: 15 }],
+    ]);
+    expect(videoInputs('mock')).toEqual({ endFrame: false, textOnly: false, audioClips: null });
+  });
+
+  test('uploads the clips to fal storage as .mp3 or .wav and sends their URLs in the endpoint’s own field; the images stay inline', async () => {
+    for (const [endpoint, field] of [['bytedance/seedance-2.5/us/reference-to-video', 'audio_urls'], ['minimax/h3-max/reference-to-video', 'reference_audio_urls']] as const) {
+      const { fn, calls } = falFake();
+      await createFalProvider({ apiKey: 'k', fetch: fn, readImage: read }).submit({ ...base, imageUrls: ['asset://img'], audioUrls: ['asset://clip1', 'asset://clip2.wav'], model: { ...kling, endpoint, outputResolution: '768p' } });
+      const initiates = calls.filter((c) => c.url.includes('/storage/upload/initiate')).map((c) => c.body);
+      expect(initiates).toEqual([{ content_type: 'audio/mpeg', file_name: 'input.mp3' }, { content_type: 'audio/wav', file_name: 'input.wav' }]);
+      const submit = calls.at(-1)!;
+      expect(submit.url).toBe(`https://queue.fal.run/${endpoint}`);
+      expect((submit.body as Record<string, unknown>)[field]).toEqual(['https://v3b.fal.media/files/audio-mpeg', 'https://v3b.fal.media/files/audio-wav']);
+      expect(JSON.stringify(submit.body)).toContain(DATA_URL);
+    }
+  });
+
+  test('a model without reference audio, or a failed upload, submits nothing', async () => {
+    const none = falFake();
+    await expect(createFalProvider({ apiKey: 'k', fetch: none.fn, readImage: read }).submit({ ...base, audioUrls: ['asset://clip1'], model: kling })).rejects.toThrow(ImageReadError);
+    expect(none.calls).toHaveLength(0);
+    const broken = falFake(500);
+    await expect(createFalProvider({ apiKey: 'k', fetch: broken.fn, readImage: read }).submit({ ...base, audioUrls: ['asset://clip1'], model: { ...kling, endpoint: 'bytedance/seedance-2.0/us/reference-to-video' } })).rejects.toThrow(ImageReadError);
+    expect(broken.calls.some((c) => c.url.startsWith('https://queue.fal.run'))).toBe(false);
+  });
+});
+
 describe('fal Motion Control', () => {
   const motionModel = { ...kling, id: 'kling-v3-motion-pro', endpoint: 'fal-ai/kling-video/v3/pro/motion-control' };
   const inputs = ['asset://img', 'asset://vid'];
   const read = async (url: string) => (url.endsWith('vid') ? { bytes: new Uint8Array([9, 9]), contentType: 'video/mp4' } : { bytes: new Uint8Array([1]), contentType: 'image/png' });
-
-  /** fal's storage and queue, answered by URL: each initiate gets its own file URL, each PUT succeeds, the submit returns a request id. */
-  function falFake(put = 200) {
-    const calls: { url: string; method: string; headers: Record<string, string>; body: unknown }[] = [];
-    let n = 0;
-    const fn = (async (url: string, init: RequestInit = {}) => {
-      const json = typeof init.body === 'string';
-      calls.push({ url, method: init.method ?? 'GET', headers: init.headers as Record<string, string>, body: json ? JSON.parse(init.body as string) : init.body });
-      if (url.startsWith('https://rest.fal.ai/storage/upload/initiate')) {
-        n += 1;
-        return Response.json({ upload_url: `https://upload.test/${n}`, file_url: `https://v3b.fal.media/files/${(JSON.parse(init.body as string) as { content_type: string }).content_type.replace('/', '-')}` });
-      }
-      if (url.startsWith('https://upload.test/')) return new Response('', { status: put });
-      return Response.json({ request_id: 'm1' });
-    }) as unknown as typeof fetch;
-    return { fn, calls };
-  }
 
   test('uploads the image and the video to fal storage, then sends their URLs with orientation video and no sound', async () => {
     const { fn, calls } = falFake();
