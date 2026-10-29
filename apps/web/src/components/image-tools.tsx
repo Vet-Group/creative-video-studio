@@ -9,7 +9,7 @@ import { NARROW, useMediaQuery, WIDE } from '@/lib/use-media-query';
 import { numberedSamples } from '@/lib/examples';
 import { useHydrated } from '@/lib/use-hydrated';
 import { useSamples } from '@/lib/use-samples';
-import { type Photo, Recreate, useForm, useJobs, useRecreated } from './jobs';
+import { type Photo, Recreate, useForm, useFreshResults, useJobs, useRecreated } from './jobs';
 import { Icon, type IconName } from './Icon';
 import { Modal } from './Modal';
 import { Preview } from './Preview';
@@ -392,6 +392,7 @@ export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4
   useEffect(() => {
     void load(0);
   }, [kind]);
+  useFreshResults(() => void load(0));
 
   // The fixed samples show at once; only the company's own outputs wait for the request.
   if (sampleTiles.length === 0) {
