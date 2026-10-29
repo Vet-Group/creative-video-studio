@@ -232,6 +232,20 @@
       "when": 1794394944036,
       "tag": "0032_try_on_bake_off_seed",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1794394945036,
+      "tag": "0033_seedance_2_0_replicate",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1794394946036,
+      "tag": "0034_vertex_try_on_prior",
+      "breakpoints": true
     }
   ]
 }
