@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { type Browser, expect, type Page, test } from '@playwright/test';
 import { HOOKS } from '../src/lib/marketing';
 import { png, signIn } from './support.test';
@@ -183,6 +185,40 @@ test('after two Runs with the same hook its picker has a Hay dùng group holding
   await expect(theirs.getByRole('option').first()).toHaveAccessibleName(HOOKS[0]!.name);
   await expect(theirs.getByRole('group', { name: 'Hay dùng' })).toHaveCount(0);
   await other.close();
+});
+
+test("a Hay dùng card with no sample shows the poster of the member's latest clip with it; the other cards keep no picture", async ({ page }) => {
+  await signIn(page, 'custa');
+  const name = `Ảnh ${unique()}`;
+  const own = await addChoice(page, { kind: 'hook', name, phrase: 'The creator spins once and smiles.' });
+  const quiet = `Ít ${unique()}`;
+  await addChoice(page, { kind: 'hook', name: quiet, phrase: 'The creator nods.' });
+  const [person, product] = [await upload(page, 'thumb-person.png'), await upload(page, 'thumb-product.png')];
+  const ids: string[] = [];
+  for (let i = 0; i < 2; i++) ids.push(await post(page, { feature: 'marketing', modelId: 'mock-e2e', assetIds: [person, product], ratio: '9:16', durationSec: 5, prompt: 'composed', params: { audio: 'off', hook: own } }));
+  const jobs = async () => ((await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { id: string; status: string; posterAssetId: string | null }[] }).jobs;
+  await expect.poll(async () => (await jobs()).filter((j) => ids.includes(j.id) && j.status === 'succeeded').length, { timeout: 60_000 }).toBe(2);
+  const poster = (await jobs()).find((j) => j.id === ids[1])!.posterAssetId; // the later Run is the latest clip
+  expect(poster).not.toBeNull();
+
+  await page.goto('/marketing-studio');
+  await hookBox(page).click();
+  const hooks = page.getByRole('dialog', { name: 'Chọn hook' });
+  const card = hooks.getByRole('group', { name: 'Hay dùng' }).getByRole('option', { name, exact: true });
+  await expect(card.locator('img')).toHaveAttribute('src', `/api/assets/${poster}/content`);
+  await expect.poll(() => card.locator('img').evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true);
+  await expect(hooks.getByRole('option', { name: quiet, exact: true }).locator('img')).toHaveCount(0); // never used: no picture
+
+  // With an Admin sample loop the card plays it, and the member's poster does not show as its first frame.
+  const loop = `marketing-hook-${own}.mp4`;
+  await page.route('**/api/samples', async (r) => r.fulfill({ json: { samples: [...((await (await r.fetch()).json()) as { samples: { name: string }[] }).samples, { name: loop, bytes: 1 }] } }));
+  await page.route(`**/api/samples/${loop}`, (r) => r.fulfill({ body: readFileSync(fileURLToPath(new URL('../public/fixtures/examples/example-1.mp4', import.meta.url))), contentType: 'video/mp4' }));
+  await page.reload();
+  await hookBox(page).click();
+  const sampled = hooks.getByRole('group', { name: 'Hay dùng' }).getByRole('option', { name, exact: true });
+  await expect(sampled.locator('video')).toHaveAttribute('src', `/api/samples/${loop}`);
+  await expect(sampled.locator(`[poster*="/api/assets/"], img`)).toHaveCount(0);
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
 });
 
 test("the API refuses another member's private hook in a job", async ({ page, browser }) => {

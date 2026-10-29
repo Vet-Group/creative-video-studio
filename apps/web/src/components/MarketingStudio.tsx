@@ -91,6 +91,8 @@ interface ChoiceLists {
   hooks: Choice[];
   locations: Choice[];
   often: { hook: string[]; location: string[] };
+  /** Per often-used id, the poster of the member's latest clip with it. */
+  posters: { hook: Record<string, string>; location: Record<string, string> };
   canShare: boolean;
 }
 const KIND_NAME = { hook: 'hook', location: 'bối cảnh' } as const;
@@ -166,11 +168,11 @@ function AddChoice({ kind, canShare, onAdded }: { kind: 'hook' | 'location'; can
 }
 
 /**
- * The dialog of one list: cards with the choice's sample loop (`marketing-<kind>-<id>`; a member's own has none) and name in a grid, the member's often-used
- * group first when it has any. Arrows move the focus between the cards, Enter or Space picks, Escape closes. Below: the add form, and the
+ * The dialog of one list: cards with the choice's sample loop (`marketing-<kind>-<id>`; without one, an often-used card shows the poster of the member's
+ * latest clip with it) and name in a grid, the member's often-used group first when it has any. Arrows move the focus between the cards, Enter or Space picks, Escape closes. Below: the add form, and the
  * member's own (for an Admin also the company's) with Xoá.
  */
-function ChoiceDialog({ open, title, sub, kind, choices, often, custom, canShare, selected, onPick, onAdded, onDelete, onClose, footer }: { open: boolean; title: string; sub: string; kind: 'hook' | 'location'; choices: MarketingChoice[]; often: string[]; custom: Choice[]; canShare: boolean; selected: string[]; onPick: (id: string) => void; onAdded: (c: Choice) => void; onDelete: (c: Choice) => void; onClose: () => void; footer?: ReactNode }) {
+function ChoiceDialog({ open, title, sub, kind, choices, often, posters, custom, canShare, selected, onPick, onAdded, onDelete, onClose, footer }: { open: boolean; title: string; sub: string; kind: 'hook' | 'location'; choices: MarketingChoice[]; often: string[]; posters: Record<string, string>; custom: Choice[]; canShare: boolean; selected: string[]; onPick: (id: string) => void; onAdded: (c: Choice) => void; onDelete: (c: Choice) => void; onClose: () => void; footer?: ReactNode }) {
   const grid = useRef<HTMLDivElement>(null);
   const have = useSamples();
   // showModal (in Modal's effect, which runs first) focuses the close button, so the chosen card (else the first) takes the focus afterwards.
@@ -191,7 +193,7 @@ function ChoiceDialog({ open, title, sub, kind, choices, often, custom, canShare
   const rest = choices.filter((c) => !top.includes(c));
   const card = (c: MarketingChoice) => (
     <button key={c.id} type="button" role="option" aria-selected={selected.includes(c.id)} tabIndex={(selected.length > 0 ? selected[0] === c.id : c === (top[0] ?? rest[0])) ? 0 : -1} aria-label={c.name} aria-describedby={`${kind}-${c.id}-desc`} onClick={() => onPick(c.id)}>
-      {open && <CardMedia {...cardSample(have, `marketing-${kind}-${c.id}`)} always />}
+      {open && <CardMedia {...cardSample(have, `marketing-${kind}-${c.id}`, posters[c.id] && !have.has(`marketing-${kind}-${c.id}.mp4`) ? `/api/assets/${posters[c.id]}/content` : null)} always />}
       <span className="choice-name">{c.name}</span>
       <span id={`${kind}-${c.id}-desc`} className="choice-desc">
         {c.desc}
@@ -783,6 +785,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
       <ChoiceDialog open={picker === 'hook'} title="Chọn hook" sub="Cảnh mở đầu giữ chân người xem trong vài giây đầu. Có thể bỏ qua." kind="hook"
         choices={hookList}
         often={custom?.often.hook ?? []}
+        posters={custom?.posters.hook ?? {}}
         custom={custom?.hooks ?? []}
         canShare={custom?.canShare ?? false}
         selected={hooks}
@@ -804,7 +807,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
           </div>
         }
       />
-      <ChoiceDialog open={picker === 'location'} title="Chọn bối cảnh" sub="Nơi người mẫu xuất hiện trong video. Có thể bỏ qua." kind="location" choices={locationList} often={custom?.often.location ?? []} custom={custom?.locations ?? []} canShare={custom?.canShare ?? false}
+      <ChoiceDialog open={picker === 'location'} title="Chọn bối cảnh" sub="Nơi người mẫu xuất hiện trong video. Có thể bỏ qua." kind="location" choices={locationList} often={custom?.often.location ?? []} posters={custom?.posters.location ?? {}} custom={custom?.locations ?? []} canShare={custom?.canShare ?? false}
         selected={location ? [location] : []} onPick={(id) => (setLocation(id), setPicker(null))} onAdded={(c) => added('location', c)} onDelete={(c) => void removeChoice(c)} onClose={() => setPicker(null)} />
     </section>
   );
