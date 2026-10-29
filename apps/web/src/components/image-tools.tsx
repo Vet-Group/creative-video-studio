@@ -4,12 +4,12 @@
 import { type DragEvent, type KeyboardEvent, useEffect, useId, useRef, useState } from 'react';
 import Link from 'next/link';
 import { api, type Clip } from '@/lib/api';
-import { refillFrom, reuseHref } from '@/lib/reuse';
+import { exampleFrom, refillFrom, reuseHref } from '@/lib/reuse';
 import { NARROW, useMediaQuery, WIDE } from '@/lib/use-media-query';
 import { numberedSamples } from '@/lib/examples';
 import { useHydrated } from '@/lib/use-hydrated';
 import { useSamples } from '@/lib/use-samples';
-import { type Photo, Recreate, useRecreated } from './jobs';
+import { type Photo, Recreate, useForm, useRecreated } from './jobs';
 import { Icon, type IconName } from './Icon';
 import { Preview } from './Preview';
 import { SampleDetail } from './SampleDetail';
@@ -269,6 +269,33 @@ const GALLERY_SIZE_KEY = 'cvs.gallery.size';
 /** The company's latest outputs of one Library `kind` (`try_on`, `image` or, with `video`, `marketing`) in a masonry of columns; 24 at a time.
  * `cols` is the column count below 1024 px, up to 1536 px and above; from 1024 px a slider (as on Fash) shows one column more or less, remembered per browser.
  * `samples` names the fixed sample tiles shown first: the uploaded samples `<samples><n>.jpg` (or `.mp4` with a `.jpg` poster for `video`). */
+/** Fash's card actions on a sample with a details file, shown on hover: Recreate at the foot; Use Result (a picture), download and open at the side. */
+function SampleActions({ name }: { name: string }) {
+  const form = useForm();
+  const from = exampleFrom({ example: name.replace(/\.(mp4|jpg)$/, '') });
+  if (!form || !from) return null;
+  return (
+    <>
+      <div className="card-actions">
+        {name.endsWith('.jpg') && form.result && (
+          <button type="button" aria-label="Dùng kết quả" title="Dùng kết quả" onClick={() => form.result!({ sample: name })}>
+            <Icon name="right" />
+          </button>
+        )}
+        <a href={`/api/samples/${name}`} download={name} aria-label="Tải xuống" title="Tải xuống">
+          <Icon name="download" />
+        </a>
+        <a href={`/api/samples/${name}`} target="_blank" rel="noreferrer" aria-label="Mở trong tab mới" title="Mở trong tab mới">
+          <Icon name="external" />
+        </a>
+      </div>
+      <button type="button" className="card-recreate" onClick={() => form.recreate(from)}>
+        Dùng lại
+      </button>
+    </>
+  );
+}
+
 export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4], samples }: { kind: string; label: string; emptyText: string; video?: boolean; cols?: [number, number, number]; samples?: string }) {
   const have = useSamples();
   const sampleTiles = samples ? numberedSamples(have, samples, video ? 'mp4' : 'jpg') : [];
@@ -350,6 +377,7 @@ export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4
                   ) : (
                     <img src={`/api/samples/${it}`} alt="Ảnh mẫu" loading="lazy" />
                   )}
+                  {detailed.includes(it) && <SampleActions name={it} />}
                 </li>
               ) : (
               <li key={it.id} className="gallery-item" style={{ aspectRatio: aspectOf(it.ratio) }}>

@@ -218,6 +218,20 @@ test('Image Generation, as on Fash: a sample picture with a details file opens i
     await expect(page.getByRole('textbox', { name: 'Mô tả cảnh bạn muốn tạo' })).toHaveValue(details.prompt);
     await expect(chosen.getByRole('img')).toHaveCount(1); // Recreate refills: the sample's own input only
     await expect(page).toHaveURL(/\/image-generation$/);
+
+    // As on Fash's cards, the tile's own actions on hover, without opening it: Use Result, then Recreate.
+    await page.keyboard.press('Escape');
+    await expect(detail).toBeHidden();
+    const tile = gallery.getByRole('listitem').filter({ has: page.getByRole('link', { name: 'Xem chi tiết ảnh mẫu' }) });
+    await tile.hover();
+    await expect(tile.getByRole('link', { name: 'Tải xuống' })).toHaveAttribute('href', '/api/samples/image-example-1.jpg');
+    await tile.getByRole('button', { name: 'Dùng kết quả' }).click();
+    await expect(chosen.getByRole('img')).toHaveCount(2);
+    await page.getByRole('textbox', { name: 'Mô tả cảnh bạn muốn tạo' }).fill('');
+    await tile.hover();
+    await tile.getByRole('button', { name: 'Dùng lại' }).click();
+    await expect(page.getByRole('textbox', { name: 'Mô tả cảnh bạn muốn tạo' })).toHaveValue(details.prompt);
+    await expect(chosen.getByRole('img')).toHaveCount(1);
   } finally {
     await asAdmin((name) => page.request.delete(`/api/admin/samples/${name}`));
   }
