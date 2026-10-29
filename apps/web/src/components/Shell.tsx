@@ -8,12 +8,14 @@ import { appBySlug } from '@/lib/apps';
 import { featureLabel } from '@/lib/features';
 import { canReuse, refillFrom, reuseHref } from '@/lib/reuse';
 import { COLLAPSED_COOKIE } from '@/lib/sidebar';
+import { confirmRun } from '@/lib/run-guard';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { Icon, type IconName } from './Icon';
 import { JobsProvider, Recreate, roleOf, Tap, useForm, useJobs } from './jobs';
 import { type Account, Settings } from './Settings';
 import { SaveTemplateDialog } from './Templates';
 import { VetLogo } from './VetLogo';
+import { useZipDownload } from './ZipDownload';
 
 const STATUS_LABEL: Record<JobStatus, string> = {
   queued: 'Đang chờ',
@@ -39,6 +41,7 @@ function TrayItem({ job, isAdmin }: { job: TrayJob; isAdmin: boolean }) {
   const [problem, setProblem] = useState('');
   const failure = FAILURE_TEXT(job.resolution ? 'ảnh' : 'clip')[job.status];
   async function retry() {
+    if (!confirmRun(job.estimateUsd, `Thử lại job này với giá khoảng $${job.estimateUsd}?`)) return;
     setProblem('');
     try {
       await api('/api/jobs', sendJson('POST', { retryOf: job.id }));
@@ -82,7 +85,7 @@ const cardTitle = (job: TrayJob): string => (job.feature === 'marketing' ? (job.
  * One job in a page's History tab, laid out as Fash's History card: the result on the left; on the right the title, the member's own words,
  * the inputs, the ratio and length chips, the status and date, the icon actions and Dùng lại (Fash's Recreate, without the run).
  */
-function HistoryCard({ job, isAdmin }: { job: TrayJob; isAdmin: boolean }) {
+function HistoryCard({ job, isAdmin, select }: { job: TrayJob; isAdmin: boolean; select?: ReactNode }) {
   const form = useForm();
   const apply = form?.apply;
   const { refresh } = useJobs();
@@ -105,7 +108,7 @@ function HistoryCard({ job, isAdmin }: { job: TrayJob; isAdmin: boolean }) {
       setProblem(errorText(e, fail));
     }
   }
-  const retry = () => act(async () => (await api('/api/jobs', sendJson('POST', { retryOf: job.id })), await refresh()), 'Không thử lại được');
+  const retry = () => confirmRun(job.estimateUsd, `Thử lại job này với giá khoảng $${job.estimateUsd}?`) && act(async () => (await api('/api/jobs', sendJson('POST', { retryOf: job.id })), await refresh()), 'Không thử lại được');
   const toggleFavorite = () => act(async () => setFavorite((await api<{ favorite: boolean }>(`/api/jobs/${job.id}/favorite`, sendJson('PUT', { favorite: !favorite }))).favorite), 'Không lưu được mục yêu thích.');
   const remove = () => {
     if (!window.confirm(`Xóa ${image ? 'ảnh' : 'clip'} này? Nó cũng biến khỏi Thư viện.`)) return;
@@ -135,6 +138,7 @@ function HistoryCard({ job, isAdmin }: { job: TrayJob; isAdmin: boolean }) {
 
   return (
     <li className={`job job-card job-${job.status}`}>
+      {out && select}
       <div className="job-media">
         {out ? (
           image ? (
@@ -263,14 +267,22 @@ export function Tray({ feature }: { feature?: string }) {
   const all = useJobs();
   const { workerOffline, loaded } = all;
   const jobs = feature ? all.jobs.filter((j) => j.feature === feature) : all.jobs;
+  const zip = useZipDownload();
   return (
     <aside className={feature ? 'tray history' : 'tray'} aria-label="Job của tôi">
       <h2>Job của tôi</h2>
       {workerOffline && <p className="warn">Worker offline: chưa nhận được tín hiệu từ máy xử lý, job sẽ chạy khi worker hoạt động lại.</p>}
       {loaded && jobs.length === 0 && <p className="muted">Chưa có job nào.</p>}
       <ul>
-        {jobs.map((j) => (feature ? <HistoryCard key={j.id} job={j} isAdmin={isAdmin} /> : <TrayItem key={j.id} job={j} isAdmin={isAdmin} />))}
+        {jobs.map((j) => (feature ? <HistoryCard key={j.id} job={j} isAdmin={isAdmin} select={zip.check(j.id, `${cardTitle(j)} ${fmtTime(j.createdAt)}`)} /> : <TrayItem key={j.id} job={j} isAdmin={isAdmin} />))}
       </ul>
+      {/* Under the cards, so turning History into a tool row does not move them. */}
+      {feature && jobs.some((j) => j.status === 'succeeded' && j.outputAssetId) && (
+        <div className="zip-tools">
+          {zip.toggle}
+          {zip.bar}
+        </div>
+      )}
     </aside>
   );
 }

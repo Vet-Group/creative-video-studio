@@ -8,6 +8,7 @@ import { ABOUT } from '@/lib/about-content';
 import { api, errorText, sendJson } from '@/lib/api';
 import { ADVANCED_MAX_IMAGES, ADVANCED_MAX_SCRIPT, advancedPrompt, briefRoom, HOOKS, LOCATIONS, MAX_CHOICE_DESC, MAX_CHOICE_NAME, MAX_CHOICE_PHRASE, type MarketingChoice, marketingPrompt } from '@/lib/marketing';
 import { promptTooLong } from '@/lib/prompt-limit';
+import { confirmRun, runKey } from '@/lib/run-guard';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { useRecall } from '@/lib/use-recall';
 import { useSamples } from '@/lib/use-samples';
@@ -21,6 +22,7 @@ import { Gallery, type Img, PhotoDialog, photoImg, sampleFile, Slot, uploadImage
 import { FormContext, type FormActions, type Photo, type PhotoRole, useApplier, useHasHistory, useJobs, useRecreated } from './jobs';
 import { Modal } from './Modal';
 import { ModelPicker } from './ModelPicker';
+import { PromptTools } from './PromptTools';
 import { Select } from './Select';
 import { Tray } from './Shell';
 import { Templates } from './Templates';
@@ -454,11 +456,12 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
   }, [advanced]);
 
   // The first list picks the server's default model (the best of those that offer the starting ratio and duration), else the first; a model switched off since is replaced the same way.
+  // It waits for the remembered model: a list that lands just before it would otherwise pick the default after it.
   useEffect(() => {
-    if (!list || list.models.some((m) => m.id === modelId)) return;
+    if (!list || !recall.answered || list.models.some((m) => m.id === modelId)) return;
     const first = list.models.find((m) => m.id === list.defaultId) ?? list.models[0];
     if (first) pickModel(first);
-  }, [list]);
+  }, [list, recall.answered]);
 
   // The first thing that stops Run, in the order the form is filled; null when it can go. The prompt's length comes last.
   const formReason =
@@ -539,7 +542,8 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
 
   /** One job per hook variant, sent one after another (the API takes one job per POST); a refused variant does not stop the rest. */
   async function run() {
-    if (n > 1 && !window.confirm(`Tạo ${n} clip, mỗi hook một clip, tổng $${total}?`)) return;
+    // One question: the variants one when there are several, else the price one from 1 USD.
+    if (!(n > 1 ? window.confirm(`Tạo ${n} clip, mỗi hook một clip, tổng $${total}?`) : confirmRun(total))) return;
     setBusy(true);
     setError('');
     setNotice('');
@@ -622,10 +626,13 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
                 <label htmlFor={promptId} className="field-label">
                   {advanced ? 'Prompt' : 'Prompt (tuỳ chọn)'}
                 </label>
-                <SuggestButton label="Gợi ý mô tả" ask={() => ({ field: 'brief', ...(advanced && { format: 'advanced' }), text: prompt, hook: hooks[0], location: location || undefined, ...(room !== undefined && { room }) })} onPick={setPrompt} />
+                <span className="field-tools">
+                  <PromptTools feature="marketing" format={advanced ? 'advanced' : undefined} value={prompt} onChange={setPrompt} maxLength={room} onRun={() => canRun && void run()} />
+                  <SuggestButton label="Gợi ý mô tả" ask={() => ({ field: 'brief', ...(advanced && { format: 'advanced' }), text: prompt, hook: hooks[0], location: location || undefined, ...(room !== undefined && { room }) })} onPick={setPrompt} />
+                </span>
               </div>
               <div className="prompt-box">
-                <textarea id={promptId} value={prompt} maxLength={room} aria-required={advanced || undefined} placeholder="Mô tả video marketing bạn muốn…" onChange={(e) => setPrompt(e.target.value)} />
+                <textarea id={promptId} value={prompt} maxLength={room} aria-required={advanced || undefined} placeholder="Mô tả video marketing bạn muốn…" onChange={(e) => setPrompt(e.target.value)} onKeyDown={runKey(() => canRun && void run())} />
                 <div className="prompt-foot">
                   <span>
                     {prompt.length}

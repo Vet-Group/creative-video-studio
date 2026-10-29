@@ -8,6 +8,7 @@ import { APP_ABOUT } from '@/lib/about-content';
 import { api, errorText, sendJson } from '@/lib/api';
 import { APPS, type AppConfig, appInputs, appReason, type AppCategory, motionReason, slotMax, splitImages } from '@/lib/apps';
 import { promptTooLong } from '@/lib/prompt-limit';
+import { confirmRun, runKey } from '@/lib/run-guard';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { useHydrated } from '@/lib/use-hydrated';
 import { useRecall } from '@/lib/use-recall';
@@ -19,6 +20,7 @@ import { Icon, type IconName } from './Icon';
 import { type Img, RATIO_LABEL, Slot, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
 import { FormContext, useJobs } from './jobs';
 import { type ModelOption, ModelPicker } from './ModelPicker';
+import { PromptTools } from './PromptTools';
 import { Select } from './Select';
 import { Tray } from './Shell';
 import { Templates } from './Templates';
@@ -156,6 +158,7 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
   }
 
   async function run() {
+    if (!confirmRun(pick.estimate)) return;
     setBusy(true);
     setError('');
     setNotice('');
@@ -214,11 +217,14 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
 
             {app.prompt && (
               <div className="field">
-                <label htmlFor={promptId} className="field-label">
-                  {app.prompt === 'background' ? 'Mô tả nền (tuỳ chọn)' : 'Prompt (tuỳ chọn)'}
-                </label>
+                <div className="field-head">
+                  <label htmlFor={promptId} className="field-label">
+                    {app.prompt === 'background' ? 'Mô tả nền (tuỳ chọn)' : 'Prompt (tuỳ chọn)'}
+                  </label>
+                  <PromptTools feature={app.feature} value={prompt} onChange={setPrompt} maxLength={room} onRun={() => canRun && void run()} />
+                </div>
                 <div className="prompt-box">
-                  <textarea id={promptId} value={prompt} maxLength={room} placeholder={app.prompt === 'background' ? 'Ví dụ: quán cà phê ngoài trời đầy nắng, bàn đá cẩm thạch' : 'Mô tả điều bạn muốn thêm...'} onChange={(e) => setPrompt(e.target.value)} />
+                  <textarea id={promptId} value={prompt} maxLength={room} placeholder={app.prompt === 'background' ? 'Ví dụ: quán cà phê ngoài trời đầy nắng, bàn đá cẩm thạch' : 'Mô tả điều bạn muốn thêm...'} onChange={(e) => setPrompt(e.target.value)} onKeyDown={runKey(() => canRun && void run())} />
                   <div className="prompt-foot">
                     <span>
                       {prompt.length}
@@ -407,6 +413,7 @@ function MotionForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
   }
 
   async function run() {
+    if (!confirmRun(chosen?.estimateUsd)) return;
     setBusy(true);
     setError('');
     setNotice('');
@@ -462,11 +469,14 @@ function MotionForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
             {list && list.models.length > 1 && <ModelPicker models={list.models} value={chosen?.id ?? ''} onChange={setModelId} />}
 
             <div className="field">
-              <label htmlFor={promptId} className="field-label">
-                Prompt (tuỳ chọn)
-              </label>
+              <div className="field-head">
+                <label htmlFor={promptId} className="field-label">
+                  Prompt (tuỳ chọn)
+                </label>
+                <PromptTools feature={app.feature} value={prompt} onChange={setPrompt} maxLength={chosen?.maxPromptChars} onRun={() => canRun && void run()} />
+              </div>
               <div className="prompt-box">
-                <textarea id={promptId} value={prompt} maxLength={chosen?.maxPromptChars} placeholder="Ví dụ: sân khấu ánh đèn ấm, nhân vật mặc nguyên bộ đồ trong ảnh" onChange={(e) => setPrompt(e.target.value)} />
+                <textarea id={promptId} value={prompt} maxLength={chosen?.maxPromptChars} placeholder="Ví dụ: sân khấu ánh đèn ấm, nhân vật mặc nguyên bộ đồ trong ảnh" onChange={(e) => setPrompt(e.target.value)} onKeyDown={runKey(() => canRun && void run())} />
                 <div className="prompt-foot">
                   <span>
                     {prompt.length}

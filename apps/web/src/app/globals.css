@@ -459,7 +459,7 @@ td code { white-space: pre-wrap; overflow-wrap: anywhere; }
 .prompt-box { display: flex; flex-direction: column; gap: 6px; padding: 0 8px 8px; border: 1px solid var(--field-border); border-radius: 8px; background: var(--fill); }
 .prompt-box[data-disabled='true'] { opacity: .6; }
 .prompt-box:has(textarea:focus-visible) { outline: 2px solid var(--ink); outline-offset: 2px; }
-.prompt-box textarea { display: block; width: 100%; height: 75px; padding: 8px 0; border: 0; outline: none; background: transparent; color: inherit; font: inherit; font-size: 14px; line-height: 21px; resize: none; }
+.prompt-box textarea { display: block; width: 100%; min-height: 75px; max-height: 60vh; padding: 8px 0; border: 0; outline: none; background: transparent; color: inherit; font: inherit; font-size: 14px; line-height: 21px; resize: none; field-sizing: content; overflow-y: auto; }
 .prompt-foot { display: flex; align-items: center; justify-content: space-between; height: 30px; color: var(--text-muted); font-size: 12px; line-height: 18px; }
 .prompt-foot > :only-child { margin-left: auto; }
 /* Suggestions: a quiet link in the field's foot or head; the three options open over the form beneath it. */
@@ -472,6 +472,19 @@ td code { white-space: pre-wrap; overflow-wrap: anywhere; }
 .suggestions .error { margin: 0; font-size: 13px; }
 .field-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .field-head .suggestions { left: auto; right: 0; }
+/* The recent prompts and expand tools: quiet links beside the label (icons at the end of the Image Generation bar's prompt row); the list opens over the form, above the bar. */
+.prompt-tools, .field-tools { display: inline-flex; align-items: center; gap: 12px; }
+/* The list spans the field (or the bar), not the width of the suggestions under a narrow form's link. */
+.field-head:has(.prompt-tools) { position: relative; }
+.prompt-tools > .suggest { position: static; }
+.prompt-tools .suggestions { left: 0; right: 0; width: auto; }
+.prompt-tools .suggest-button { line-height: 18px; } /* under the label's 21 px, so the field head keeps its height */
+.imagebar .prompt-tools .suggestions { top: auto; bottom: calc(100% + 6px); }
+/* In the bar, a column at the end of the prompt row, as tall as the one-row bar's textarea, so the bar keeps its height. */
+.imagebar .prompt-tools { flex: none; flex-direction: column; gap: 4px; }
+.imagebar .prompt-tools .icon-button { display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 1px solid var(--field-border); border-radius: 50%; background: var(--surface); color: var(--ink); }
+.prompt-editor textarea { display: block; width: 100%; height: 60vh; padding: 8px; border: 1px solid var(--field-border); border-radius: 8px; background: var(--fill); color: inherit; font: inherit; font-size: 14px; line-height: 21px; resize: vertical; }
+.prompt-editor .help { text-align: right; }
 /* Enhance: Fash's pill in the prompt box, filled when on, outlined when off. */
 .enhance { display: inline-flex; align-items: center; gap: 4px; height: 30px; padding: 0 10px; border: 1px solid var(--ink); border-radius: 999px; background: var(--ink); color: var(--on-dark); font: inherit; font-size: 12px; font-weight: 600; line-height: 18px; white-space: nowrap; cursor: pointer; }
 .enhance[aria-pressed='true'] { background: var(--ink); } /* beats the generic pressed-button fill, which hid the white label */
@@ -806,6 +819,15 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .library-tools input[type="checkbox"] { width: 16px; height: 16px; padding: 0; }
 .library-tools label { white-space: nowrap; }
 .library-tools select { padding: 6px 28px 6px 12px; border-color: rgb(var(--shade) / .15); background: var(--surface); font-size: 13px; }
+/* Select mode: a checkbox in the corner of each item with a result, and the bar that downloads the picked ones as one .zip. */
+.library-tools .zip-toggle { height: 32px; margin: -8px 0; padding: 0 12px; font-size: 13px; line-height: 30px; } /* takes no more height than the size slider, so a wrapped row on a phone keeps its height */
+.zip-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin: 12px 0 0; }
+.zip-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin: 0 0 16px; font-size: 14px; line-height: 21px; }
+.zip-tools .zip-bar { margin: 0; }
+.zip-bar .error { flex-basis: 100%; margin: 0; }
+.card:has(> .zip-check), .job-card:has(> .zip-check) { position: relative; }
+.zip-check { position: absolute; top: 8px; left: 8px; z-index: 2; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 6px; background: var(--surface); }
+.zip-check input { width: 18px; height: 18px; margin: 0; }
 .library-size { margin-left: auto !important; color: var(--text-subtle); }
 .library-size input { width: 120px; padding: 0; }
 .library-empty { display: grid; justify-items: center; gap: 12px; padding: 64px 16px; color: var(--text-disabled); text-align: center; }
@@ -878,7 +900,7 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .imagebar-top { display: flex; align-items: flex-start; gap: 12px; }
 .bar-thumbs { display: flex; flex: none; flex-wrap: wrap; gap: 8px; max-width: 45%; margin: 0; padding: 0; list-style: none; }
 .bar-add { display: grid; place-items: center; width: 56px; height: 56px; padding: 0; border: 1px dashed var(--text-disabled); border-radius: 12px; background: transparent; color: var(--text-2); }
-.imagebar textarea { flex: 1; min-width: 0; height: 56px; padding: 6px 4px; border: 0; outline: none; background: transparent; color: inherit; font: inherit; font-size: 14px; line-height: 21px; resize: none; }
+.imagebar textarea { flex: 1; min-width: 0; min-height: 56px; max-height: 40vh; padding: 6px 4px; border: 0; outline: none; background: transparent; color: inherit; font: inherit; font-size: 14px; line-height: 21px; resize: none; field-sizing: content; overflow-y: auto; }
 .imagebar textarea:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: 8px; }
 .bar-message { padding: 4px 4px 0; font-size: 14px; line-height: 21px; }
 .bar-message p { margin: 0; }
@@ -968,7 +990,7 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 /* Half-width slots name themselves inside, as on the live app pages; the label stays for screen readers. */
 .app-slots[data-two='true'] .field-label { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 /* An app's own prompt is an optional extra line, so its box is shorter than Create's. */
-[aria-labelledby='app-title'] .prompt-box textarea { height: 56px; }
+[aria-labelledby='app-title'] .prompt-box textarea { min-height: 56px; }
 .soon { display: grid; justify-items: center; gap: 12px; max-width: 32rem; margin: 32px auto; padding: 24px; text-align: center; }
 .soon .app-art { width: 100%; border-radius: 14px; }
 .soon p { margin: 0; }
@@ -1078,11 +1100,11 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 /* Ratio and duration sit side by side without labels, the gallery has no size slider, and the prompt is 75 px, as on the live Marketing Studio. */
 [aria-labelledby='marketing-title'] .field-row .field-label { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 [aria-labelledby='marketing-title'] .gallery-tools { display: none; }
-[aria-labelledby='marketing-title'] .prompt-box textarea { height: 75px; }
+[aria-labelledby='marketing-title'] .prompt-box textarea { min-height: 75px; }
 /* An app's Run follows its slots without a rule, as on the live app pages. */
 [aria-labelledby='app-title'] .runbar { border-top: 0; }
 /* Try On's optional prompt is a 74 px box without a counter row (as in Marketing Studio), so Ratio clears the Run bar as on the live page. */
-[aria-labelledby='tryon-title'] .prompt-box textarea { height: 64px; }
+[aria-labelledby='tryon-title'] .prompt-box textarea { min-height: 64px; }
 [aria-labelledby='tryon-title'] .prompt-foot { display: none; }
 /* The live Try On form starts at its first label and leaves 32 px between one picture tray and the next. */
 [aria-labelledby='tryon-title'] .form-scroll > .field:first-child { margin-top: 0; }
@@ -1131,10 +1153,12 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
   .imagegen { min-height: calc(100dvh - 73px); }
   .imagebar { bottom: 8px; margin: 8px auto; }
   .imagebar .bar-thumbs li, .imagebar .bar-add { width: 40px; height: 40px; }
-  .imagebar textarea { height: 40px; padding: 2px 4px; }
+  .imagebar textarea { min-height: 40px; padding: 2px 4px; }
   .bar-message { padding-top: 2px; font-size: 12px; line-height: 16px; }
   .imagebar .pills { gap: 6px; }
   .imagebar .select-trigger { max-width: none; height: 28px; padding: 0 8px; gap: 6px; font-size: 12px; }
+  .imagebar .prompt-tools { flex-direction: row; } /* a 40 px row has room for one icon high */
+  .imagebar .prompt-tools .icon-button { width: 28px; height: 28px; }
   .bar-run { flex: 1 0 100%; margin-left: 0; }
 }
 /* Phones: no chevrons, so the three chips fit one row; the model chip may shorten its name before the row could push the page sideways. */
@@ -1161,7 +1185,7 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 /* Marketing Studio: the boxes start 16 px under the banner and the prompt has no counter row (the field still stops at the limit), so ratio and duration sit above the Run bar, as on Fash. */
 .marketing-head { margin-bottom: 0; }
 .form-scroll:has(> .marketing-head) .prompt-foot:not(.script-foot) { display: none; }
-.form-scroll:has(> .marketing-head) .prompt-box textarea { height: 64px; } /* with no counter row, each box is 74 px tall, as on Fash */
+.form-scroll:has(> .marketing-head) .prompt-box textarea { min-height: 64px; } /* with no counter row, each box is 74 px tall, as on Fash */
 /* 1024-1439 px: Image Generation's size slider shares the tab row too, as Try On's does. */
 @media (min-width: 1024px) and (max-width: 1439.98px) {
   .imagegen-side .gallery-tools { height: 37px; align-items: center; margin: -69px 0 32px; }

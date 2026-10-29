@@ -49,6 +49,8 @@ export interface TrayJob {
   garments: number | null;
   format: string | null;
   favorite: boolean;
+  /** The job's estimate in USD (4 decimals), which a retry costs again; null for a job without one. */
+  estimateUsd: string | null;
 }
 
 export interface Clip {
