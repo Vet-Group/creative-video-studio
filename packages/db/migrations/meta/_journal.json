@@ -260,6 +260,13 @@
       "when": 1794394948036,
       "tag": "0036_minimax_h3_resolutions",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1794394949036,
+      "tag": "0037_more_references_and_ratios",
+      "breakpoints": true
     }
   ]
 }

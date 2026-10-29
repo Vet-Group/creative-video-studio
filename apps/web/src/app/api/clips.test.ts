@@ -466,7 +466,7 @@ describe('GET /api/models', () => {
   test('lists the enabled models with pass rate and estimated cost, and pre-selects the cheaper one on a tie', async () => {
     await pool.query('delete from verdicts'); // the marks of the earlier tests would move the pass rates
     expect((await GET_MODELS(req('/api/models?ratio=9:16&durationSec=8'))).status).toBe(401);
-    expect((await GET_MODELS(req('/api/models?ratio=16:9&durationSec=8', alice.cookie))).status).toBe(400);
+    expect((await GET_MODELS(req('/api/models?ratio=21:9&durationSec=8', alice.cookie))).status).toBe(400);
     expect((await GET_MODELS(req('/api/models?ratio=9:16', alice.cookie))).status).toBe(400);
     expect((await GET_MODELS(req('/api/models?ratio=9:16&durationSec=', alice.cookie))).status).toBe(400);
     const body = await models(alice.cookie);
@@ -488,10 +488,11 @@ describe('GET /api/models', () => {
     }
   });
 
-  test('keeps the models that list the feature when ?feature= is given, and takes 16:9 for marketing only', async () => {
+  test('keeps the models that list the feature when ?feature= is given, takes 16:9 for marketing and 16:9, 4:3 and 3:4 for video', async () => {
     const ids = async (query: string) => (await models(alice.cookie, query)).models.map((m) => m.id);
     expect((await GET_MODELS(req('/api/models?feature=image&ratio=9:16&durationSec=8', alice.cookie))).status).toBe(400);
-    expect((await GET_MODELS(req('/api/models?feature=video&ratio=16:9&durationSec=8', alice.cookie))).status).toBe(400);
+    for (const r of ['16:9', '4:3', '3:4']) expect((await GET_MODELS(req(`/api/models?feature=video&ratio=${r}&durationSec=8`, alice.cookie))).status, r).toBe(200);
+    expect((await GET_MODELS(req('/api/models?feature=video&ratio=21:9&durationSec=8', alice.cookie))).status).toBe(400);
     expect((await GET_MODELS(req('/api/models?feature=marketing&ratio=3:4&durationSec=8', alice.cookie))).status).toBe(400);
     await pool.query(`update model_configs set features = '{video,marketing}' where id = 'fal-test'`);
     await pool.query(`update model_configs set features = '{marketing}' where id = 'cheap-test'`);

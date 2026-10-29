@@ -87,8 +87,8 @@ const fmtDate = (day: string) => new Intl.DateTimeFormat('vi-VN', { dateStyle: '
 
 type Tab = 'create' | 'history' | 'examples' | 'about';
 const TAB_LABEL: Record<Tab, string> = { create: 'Tạo', history: 'Lịch sử', examples: 'Ví dụ', about: 'Giới thiệu' };
-const RATIO_LABEL: Record<string, string> = { '9:16': '9:16 (dọc)', '1:1': '1:1 (vuông)' };
-const MAX_IMAGES = 4;
+const RATIO_LABEL: Record<string, string> = { '9:16': '9:16 (dọc)', '1:1': '1:1 (vuông)', '16:9': '16:9 (ngang)', '4:3': '4:3 (ngang)', '3:4': '3:4 (dọc)' };
+const MAX_IMAGES = 9;
 const ratePct = (m: Model) => (m.passRate === null ? 'chưa có dữ liệu' : `${Math.round(m.passRate * 100)}% (${m.passes}/${m.total})`);
 
 /** `preset` and `model` pre-select the choices Explore links to; an unknown or switched-off one falls back to the default. */

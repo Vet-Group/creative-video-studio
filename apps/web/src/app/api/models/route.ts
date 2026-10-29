@@ -28,8 +28,8 @@ export async function GET(request: Request) {
   const durationSec = q.get('durationSec') ? Number(q.get('durationSec')) : NaN;
   const feature = q.get('feature');
   if (feature !== null && !['video', 'marketing', 'motion_control'].includes(feature)) return Response.json({ error: 'feature must be video, marketing or motion_control' }, { status: 400 });
-  // Motion Control's output follows the reference video, so its only ratio is 'auto'.
-  const ratios: readonly (string | null)[] = feature === 'marketing' ? [...ASPECTS, '16:9'] : feature === 'motion_control' ? ['auto'] : ASPECTS;
+  // Motion Control's output follows the reference video, so its only ratio is 'auto'. Create Video offers each ratio some fal schema takes (0037).
+  const ratios: readonly (string | null)[] = feature === 'marketing' ? [...ASPECTS, '16:9'] : feature === 'motion_control' ? ['auto'] : [...ASPECTS, '16:9', '4:3', '3:4'];
   if (!ratios.includes(ratio) || !Number.isInteger(durationSec)) {
     return Response.json({ error: 'ratio and durationSec (a whole number) are required' }, { status: 400 });
   }
