@@ -454,7 +454,7 @@ const tryOn: AboutPage = {
         'Một lần chạy cần hai thứ: trang phục và người mặc. Mọi thứ khác trên form là tuỳ chọn.',
         {
           steps: [
-            { title: 'Tải ảnh trang phục', text: 'Thêm 1 đến 4 ảnh trang phục: ảnh trải phẳng, ảnh ma-nơ-canh ẩn hay ảnh người mặc đều được. Có thể chồng áo, quần và giày để phối cả bộ trong một lần. Tổng số ảnh của một lần chạy (người mẫu, trang phục và bối cảnh) không vượt giới hạn của mô hình: 4 với các mô hình Nano Banana, 2 với FASHN v1.6.', media: 'try-on-garment-1' },
+            { title: 'Tải ảnh trang phục', text: 'Thêm 1 đến 5 ảnh trang phục: ảnh trải phẳng, ảnh ma-nơ-canh ẩn hay ảnh người mặc đều được. Có thể chồng áo, quần và giày để phối cả bộ trong một lần. Tổng số ảnh của một lần chạy (người mẫu, trang phục và bối cảnh) không vượt giới hạn của mô hình: 14 với Nano Banana Pro, 2 và 2.1, 4 với Nano Banana, 2 với FASHN v1.6.', media: 'try-on-garment-1' },
             { title: 'Chọn người mẫu', text: 'Tải ảnh một người, hoặc chọn một ảnh mẫu có sẵn nếu công ty đã đưa lên. Dùng ảnh toàn thân của một người nhìn thẳng vào máy; ảnh càng rõ, kết quả càng tốt.', media: 'try-on-model-1' },
             { title: 'Chọn thông số và chạy', text: 'Chọn mô hình, độ phân giải và tỉ lệ, thêm ảnh bối cảnh hoặc prompt nếu muốn chỉ đạo cảnh, rồi bấm Thử đồ. Nút ghi chi phí ước tính bằng USD trước khi bạn bấm, và kết quả về tab Lịch sử.', media: 'try-on-example-1' },
           ],
@@ -735,7 +735,7 @@ const image: AboutPage = {
       blocks: [
         {
           steps: [
-            { title: 'Tải ảnh lên', text: 'Bấm dấu cộng trên thanh bên dưới để thêm 1 đến 4 ảnh tham chiếu: ảnh sản phẩm, ảnh người mẫu, thậm chí một ảnh điện thoại. Mỗi lần chạy cần ít nhất một ảnh.', media: 'about-image-step-1' },
+            { title: 'Tải ảnh lên', text: 'Bấm dấu cộng trên thanh bên dưới để thêm ảnh tham chiếu (tối đa 14 với Nano Banana Pro, 2 và 2.1): ảnh sản phẩm, ảnh người mẫu, thậm chí một ảnh điện thoại. Mỗi lần chạy cần ít nhất một ảnh.', media: 'about-image-step-1' },
             { title: 'Tả điều bạn muốn', text: 'Gõ bức ảnh bạn muốn vào ô mô tả: chủ thể, bối cảnh, ánh sáng và phong cách. Nói rõ điều cần đổi và điều phải giữ nguyên. Khi Cải thiện đang bật, AI viết lại mô tả thành một bản tả chi tiết bằng tiếng Anh trước khi chạy.', media: 'about-image-step-2' },
             { title: 'Chọn thông số và chạy', text: 'Chọn mô hình, tỉ lệ và độ phân giải theo nơi ảnh sẽ dùng, rồi bấm Tạo ảnh. Nút ghi chi phí ước tính bằng USD trước khi bạn bấm, và ảnh về tab Lịch sử khi xong. Đưa kết quả vào làm ảnh tham chiếu cho lần sau để đổi từng thứ một.', media: 'about-image-step-3' },
           ],

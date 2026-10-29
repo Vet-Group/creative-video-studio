@@ -211,6 +211,13 @@
       "when": 1794222143036,
       "tag": "0029_seedance_prompt_source",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1794308543036,
+      "tag": "0030_nano_banana_inputs",
+      "breakpoints": true
     }
   ]
 }
