@@ -39,9 +39,9 @@ describe('fal', () => {
   });
 
   test('each other video endpoint gets its own body: image field, duration type, resolution and how the prompt names images', async () => {
-    const body = async (endpoint: string, prompt = 'put [Image1] on [Image2]') => {
+    const body = async (endpoint: string, prompt = 'put [Image1] on [Image2]', outputResolution = kling.outputResolution) => {
       const { fn, calls } = fakeFetch([200, { request_id: 'r' }]);
-      await createFalProvider({ apiKey: 'k', fetch: fn }).submit({ ...req, prompt, model: { ...kling, endpoint } });
+      await createFalProvider({ apiKey: 'k', fetch: fn }).submit({ ...req, prompt, model: { ...kling, endpoint, outputResolution } });
       expect(calls[0]!.url).toBe(`https://queue.fal.run/${endpoint}`);
       return calls[0]!.body;
     };
@@ -56,7 +56,10 @@ describe('fal', () => {
     }
     expect(((await body('blackforestlabs/flux-3/image-to-video', 'a slow push-in')) as { prompt: string }).prompt).toBe('a slow push-in'); // only the two that cut
     expect(await body('fal-ai/bytedance/seedance/v1/pro/image-to-video')).toMatchObject({ resolution: '1080p' });
-    expect(await body('minimax/h3-max/reference-to-video')).toEqual({ prompt: 'put Image 1 on Image 2', reference_image_urls: ['https://img/1.jpg', 'https://img/2.jpg'], aspect_ratio: '9:16', duration: 5, resolution: '768P', prompt_expansion_mode: 'balanced' });
+    expect(await body('minimax/h3-max/reference-to-video', undefined, '768p')).toEqual({ prompt: 'put Image 1 on Image 2', reference_image_urls: ['https://img/1.jpg', 'https://img/2.jpg'], aspect_ratio: '9:16', duration: 5, resolution: '768P', prompt_expansion_mode: 'balanced' });
+    // Each Minimax row asks for its own resolution: the 480P and 1080P rows share the endpoint at their own price.
+    expect(await body('minimax/h3-max/reference-to-video', undefined, '1080p')).toMatchObject({ resolution: '1080P' });
+    expect(await body('minimax/h3-max/image-to-video', undefined, '480p')).toMatchObject({ resolution: '480P' });
     expect(await body('fal-ai/minimax/hailuo-2.3/pro/image-to-video')).toEqual({ prompt: 'put image 1 on image 2', image_url: 'https://img/1.jpg' });
   });
 

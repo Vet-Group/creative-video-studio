@@ -117,7 +117,7 @@ describe('migration 0028 prompt limits', () => {
 describe('migration 0015 Fash video models', () => {
   test('adds 22 fal video models, disabled and complete, each with a request builder and its sources', async () => {
     const { rows } = await pool.query(
-      `select id, endpoint, ratios, durations_sec, max_images, output_resolution, usd_per_second::float as usd, sources from model_configs where kind = 'video' and provider = 'fal' and id <> 'kling-o3-pro' and not 'motion_control' = any(features) and not enabled order by id`,
+      `select id, endpoint, ratios, durations_sec, max_images, output_resolution, usd_per_second::float as usd, sources from model_configs where kind = 'video' and provider = 'fal' and id <> 'kling-o3-pro' and not 'motion_control' = any(features) and not enabled and id !~ '^minimax-h3-max.*-(480|1080)p$' order by id`, // 0036's resolution rows have their own test
     );
     expect(rows).toHaveLength(22);
     for (const r of rows) {
@@ -370,6 +370,28 @@ describe('migration 0033 Seedance 2.0 on Replicate', () => {
     expect(row.features).toEqual(['video']);
     const [facts] = (await pool.query(`select provider, endpoint, enabled, usd_per_second::text as usd, sources->'usdPerSecond'->>'url' as source from model_configs where id = 'seedance-2.0-replicate'`)).rows;
     expect(facts).toEqual({ provider: 'replicate', endpoint: 'bytedance/seedance-2.0', enabled: false, usd: '0.1800', source: 'https://replicate.com/bytedance/seedance-2.0' });
+  });
+});
+
+describe('migration 0036 Minimax H3 Max resolutions', () => {
+  test('adds disabled 480P and 1080P rows beside each 768P Minimax H3 Max row, at the fal price, otherwise the same as their twin', async () => {
+    const { rows } = await pool.query(
+      `select id, endpoint, label, output_resolution as res, usd_per_second::text as usd, enabled, features, ratios, durations_sec, max_images from model_configs where id like 'minimax-h3-max%' order by id`,
+    );
+    expect(rows.map((r) => [r.id, r.endpoint, r.label, r.res, r.usd])).toEqual([
+      ['minimax-h3-max', 'minimax/h3-max/image-to-video', 'Minimax H3 Max', '768p', '0.0800'],
+      ['minimax-h3-max-1080p', 'minimax/h3-max/image-to-video', 'Minimax H3 Max 1080P', '1080p', '0.1600'],
+      ['minimax-h3-max-480p', 'minimax/h3-max/image-to-video', 'Minimax H3 Max 480P', '480p', '0.0500'],
+      ['minimax-h3-max-reference', 'minimax/h3-max/reference-to-video', 'Minimax H3 Max Reference', '768p', '0.0800'],
+      ['minimax-h3-max-reference-1080p', 'minimax/h3-max/reference-to-video', 'Minimax H3 Max Reference 1080P', '1080p', '0.1600'],
+      ['minimax-h3-max-reference-480p', 'minimax/h3-max/reference-to-video', 'Minimax H3 Max Reference 480P', '480p', '0.0500'],
+    ]);
+    const twin = (id: string) => rows.find((r) => r.id === id)!;
+    for (const r of rows.filter((r) => r.res !== '768p')) {
+      expect(r.enabled, r.id).toBe(false);
+      const { features, ratios, durations_sec, max_images } = twin(r.id.replace(/-(480p|1080p)$/, ''));
+      expect({ features: r.features, ratios: r.ratios, durations_sec: r.durations_sec, max_images: r.max_images }, r.id).toEqual({ features, ratios, durations_sec, max_images });
+    }
   });
 });
 

@@ -278,8 +278,11 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
 
   // ---- reconcile ----
 
-  /** Copies the output into MinIO, checks it is at least 720p, cuts the poster and settles the job. A failure that may pass leaves the job running for the next pass. */
-  async function deliver(job: { id: string; user_id: string; provider: string; kind: string }, outputUrl: string, costUsd: number): Promise<void> {
+  /**
+   * Copies the output into MinIO, checks it is at least 720p (or the row's own resolution when that is lower, as on a 480p draft row), cuts the poster
+   * and settles the job. A failure that may pass leaves the job running for the next pass.
+   */
+  async function deliver(job: { id: string; user_id: string; provider: string; kind: string; output_resolution?: string | null }, outputUrl: string, costUsd: number): Promise<void> {
     if (job.kind === 'image') return deliverImage(job, outputUrl, costUsd);
     const dir = await mkdtemp(join(tmpdir(), 'cvs-deliver-'));
     const outputId = randomUUID();
@@ -289,8 +292,9 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
       const video = join(dir, 'output.mp4');
       await download(outputUrl, video, job.provider);
       const { width, height } = await probeSize(video);
-      if (Math.min(width, height) < 720) {
-        await settle(pool, job.id, { status: 'failed', costUsd, billed: true, error: `the output is ${width}x${height}, below 720p` });
+      const floor = Math.min(720, Number.parseInt(job.output_resolution ?? '', 10) || 720);
+      if (Math.min(width, height) < floor) {
+        await settle(pool, job.id, { status: 'failed', costUsd, billed: true, error: `the output is ${width}x${height}, below ${floor}p` });
         return;
       }
       const poster = join(dir, 'poster.jpg');
@@ -370,7 +374,7 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
 
   async function pollRunning(): Promise<void> {
     const { rows } = await pool.query(
-      `select j.id, j.user_id, j.provider, j.provider_job_id, j.model, j.params, m.kind, (now() - j.started_at > ($1::float8 * interval '1 millisecond')) as expired
+      `select j.id, j.user_id, j.provider, j.provider_job_id, j.model, j.params, m.kind, m.output_resolution, (now() - j.started_at > ($1::float8 * interval '1 millisecond')) as expired
          from jobs j join model_configs m on m.id = j.model where j.status = 'running'`,
       [o.runTimeoutMs],
     );
