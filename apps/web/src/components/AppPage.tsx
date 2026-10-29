@@ -10,6 +10,7 @@ import { APPS, type AppConfig, appInputs, appReason, type AppCategory, motionRea
 import { promptTooLong } from '@/lib/prompt-limit';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { useHydrated } from '@/lib/use-hydrated';
+import { useRecall } from '@/lib/use-recall';
 import { cardSample } from '@/lib/examples';
 import { useSamples } from '@/lib/use-samples';
 import { About } from './About';
@@ -107,12 +108,23 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
   const count = images.reduce((n, list) => n + list.length, 0);
   const pick = useImageChoice(models, Math.max(1, count));
   const { chosen } = pick;
+  // The member's last model and settings, unless a refill opens the page.
+  const recall = useRecall(
+    app.feature,
+    (s) => {
+      pick.setModelId(s.modelId);
+      if (s.ratio) pick.setRatio(s.ratio);
+      if (s.resolution) pick.setResolution(s.resolution);
+    },
+    { skip: reuse !== undefined },
+  );
 
   // Reuse: the images back in their slots, in the order they were sent, and the member's own text.
   const recreate = useReuse(
     reuse,
     app.feature,
     (j) => {
+      recall.touch();
       setImages(splitImages(app, j.images));
       setPrompt(j.brief ?? '');
       if (j.modelId) pick.setModelId(j.modelId);
@@ -124,7 +136,7 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
   // The swaps add the member's text to their fixed instruction, so it shares the model's limit with it.
   const fixed = app.prompt === 'optional' ? FEATURE_PROMPTS[app.feature]!.length + 2 : 0;
   const room = chosen && chosen.maxPromptChars - fixed;
-  const reason = appReason(app, { images, prompt, models: chosen ? [chosen] : models === null ? null : [], failed }) ?? promptTooLong(chosen, prompt.trim() ? prompt.trim().length + fixed : 0);
+  const reason = (recall.answered ? null : 'Đang tải cài đặt đã dùng...') ?? appReason(app, { images, prompt, models: chosen ? [chosen] : models === null ? null : [], failed }) ?? promptTooLong(chosen, prompt.trim() ? prompt.trim().length + fixed : 0);
   const canRun = reason === null && !busy;
 
   function add(slot: number) {
@@ -179,7 +191,7 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
       <div className="create-grid">
         <WorkTabs prefix="app" tabs={tabs} labels={TAB_LABEL} shown={shown} onSelect={setTab} />
 
-        <div className="card form-card" id="app-panel-create" role={narrow ? 'tabpanel' : undefined} aria-labelledby={narrow ? 'app-tab-create' : undefined} hidden={narrow && shown !== 'create'}>
+        <div className="card form-card" id="app-panel-create" role={narrow ? 'tabpanel' : undefined} aria-labelledby={narrow ? 'app-tab-create' : undefined} hidden={narrow && shown !== 'create'} onPointerDownCapture={recall.touch} onKeyDownCapture={recall.touch}>
           <div className="form-scroll">
             <AppHeader app={app} />
             <div className="app-slots" data-two={two}>
@@ -349,6 +361,7 @@ function MotionForm({ app }: { app: AppConfig }) {
   const [notice, setNotice] = useState('');
   const [list, setList] = useState<{ models: MotionModel[]; best: string | null; failed: boolean } | null>(null);
   const [modelId, setModelId] = useState('');
+  const recall = useRecall(app.feature, (s) => setModelId(s.modelId)); // the member's last model
   const promptId = useId();
   const reasonId = useId();
   // The estimate is per second of the video, so the list is asked again for its length (5 s until a video is chosen).
@@ -360,7 +373,7 @@ function MotionForm({ app }: { app: AppConfig }) {
     );
   }, [seconds]);
   const chosen = list?.models.find((m) => m.id === modelId) ?? list?.models.find((m) => m.id === list.best) ?? list?.models[0];
-  const reason = motionReason({ image: image.length > 0, videoMs: video?.durationMs ?? null, model: list === null ? null : chosen, failed: list?.failed ?? false }) ?? promptTooLong(chosen, prompt.trim().length);
+  const reason = (recall.answered ? null : 'Đang tải cài đặt đã dùng...') ?? motionReason({ image: image.length > 0, videoMs: video?.durationMs ?? null, model: list === null ? null : chosen, failed: list?.failed ?? false }) ?? promptTooLong(chosen, prompt.trim().length);
   const canRun = reason === null && !busy;
 
   async function upload(files: File[], then: (assets: Uploaded[]) => void, message: string) {
@@ -408,7 +421,7 @@ function MotionForm({ app }: { app: AppConfig }) {
       <div className="create-grid">
         <WorkTabs prefix="app" tabs={tabs} labels={TAB_LABEL} shown={shown} onSelect={setTab} />
 
-        <div className="card form-card" id="app-panel-create" role={narrow ? 'tabpanel' : undefined} aria-labelledby={narrow ? 'app-tab-create' : undefined} hidden={narrow && shown !== 'create'}>
+        <div className="card form-card" id="app-panel-create" role={narrow ? 'tabpanel' : undefined} aria-labelledby={narrow ? 'app-tab-create' : undefined} hidden={narrow && shown !== 'create'} onPointerDownCapture={recall.touch} onKeyDownCapture={recall.touch}>
           <div className="form-scroll">
             <AppHeader app={app} />
             <div className="app-slots" data-two>

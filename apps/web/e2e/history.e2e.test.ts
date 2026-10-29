@@ -53,11 +53,17 @@ test('as on Fash, a History chip sets its resolution, ratio or duration on the f
   await page.getByRole('tab', { name: 'Lịch sử' }).click();
   const card = page.getByRole('complementary', { name: 'Job của tôi' }).getByRole('listitem').filter({ hasText: 'chips shot' });
   await expect(card.getByText('Hoàn tất')).toBeVisible({ timeout: 60_000 });
+  // The page opens as this job ran (the remembered settings), so the form is moved off them before each chip.
+  await expect(select(page, 'Độ phân giải')).toHaveAttribute('data-value', '2K');
+  await selectValue(page, 'Độ phân giải', '1K');
   await expect(select(page, 'Độ phân giải')).toHaveAttribute('data-value', '1K');
   await card.getByRole('button', { name: '2K' }).click();
   await expect(select(page, 'Độ phân giải')).toHaveAttribute('data-value', '2K');
   await expect(toast('Đã chọn độ phân giải 2K')).toBeVisible();
   await expect(toast('Đã chọn độ phân giải 2K')).toBeHidden({ timeout: 6_000 }); // a note goes by itself, with no Library link
+  await expect(select(page, 'Tỉ lệ')).toHaveAttribute('data-value', '1:1');
+  await selectValue(page, 'Tỉ lệ', 'auto');
+  await expect(select(page, 'Tỉ lệ')).toHaveAttribute('data-value', 'auto');
   await card.getByRole('button', { name: '1:1' }).click();
   await expect(select(page, 'Tỉ lệ')).toHaveAttribute('data-value', '1:1');
   await expect(toast('Đã chọn tỉ lệ 1:1')).toBeVisible();
@@ -69,6 +75,8 @@ test('as on Fash, a History chip sets its resolution, ratio or duration on the f
   const clip = page.getByRole('complementary', { name: 'Job của tôi' }).getByRole('listitem').first();
   await expect(clip.getByText('Hoàn tất')).toBeVisible({ timeout: 60_000 });
   await selectValue(page, 'Tỉ lệ khung hình', '1:1');
+  await expect(select(page, 'Thời lượng')).toHaveAttribute('data-value', '5'); // remembered from the clip
+  await selectValue(page, 'Thời lượng', '8');
   await expect(select(page, 'Thời lượng')).toHaveAttribute('data-value', '8');
   await clip.getByRole('button', { name: '5s' }).click();
   await expect(select(page, 'Thời lượng')).toHaveAttribute('data-value', '5');

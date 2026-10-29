@@ -9,6 +9,7 @@ import { api, errorText, sendJson } from '@/lib/api';
 import { ADVANCED_MAX_IMAGES, ADVANCED_MAX_SCRIPT, advancedPrompt, briefRoom, HOOKS, LOCATIONS, type MarketingChoice, marketingPrompt } from '@/lib/marketing';
 import { promptTooLong } from '@/lib/prompt-limit';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
+import { useRecall } from '@/lib/use-recall';
 import { useSamples } from '@/lib/use-samples';
 import { cardSample } from '@/lib/examples';
 import { queryOf } from '@/lib/reuse';
@@ -166,7 +167,19 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
   const [modelId, setModelId] = useState('');
   const [ratio, setRatio] = useState('9:16');
   const [durationSec, setDurationSec] = useState(10);
+  // The member's last model and settings on this format, unless a refill opens the page; the list then follows the ratio and duration.
+  const recall = useRecall(
+    'marketing',
+    (s) => {
+      setModelId(s.modelId);
+      if (s.ratio) setRatio(s.ratio);
+      if (s.durationSec) setDurationSec(s.durationSec);
+      if (s.audio !== null) setAudio(s.audio);
+    },
+    { format: advanced ? 'advanced' : undefined, skip: reuse !== undefined },
+  );
   const apply = useApplier((s) => {
+    recall.touch();
     if (s.ratio) setRatio(s.ratio);
     if (s.durationSec) setDurationSec(s.durationSec);
   });
@@ -291,29 +304,31 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
 
   // The first thing that stops Run, in the order the form is filled; null when it can go. The prompt's length comes last.
   const formReason =
-    failed
-      ? 'Không tải được danh sách mô hình.'
-      : !fresh || (models!.length > 0 && !chosen)
-        ? 'Đang tải danh sách mô hình...'
-        : models!.length === 0
-          ? 'Marketing Studio chưa được Admin bật'
-          : ratios.length === 0 || durations.length === 0
-            ? 'Các mô hình này không có tỉ lệ hoặc thời lượng dùng được cho Marketing Studio.'
-            : !chosen!.supported
-              ? 'Mô hình này không có tỉ lệ hoặc thời lượng đã chọn. Chọn mô hình khác, hoặc đổi tỉ lệ hoặc thời lượng.'
-              : advanced
-                ? refs.length === 0
-                  ? 'Tải lên ít nhất 1 ảnh tham chiếu.'
-                  : refs.length > chosen!.maxImages
-                    ? `Mô hình này nhận tối đa ${chosen!.maxImages} ảnh tham chiếu. Bỏ bớt ảnh hoặc chọn mô hình khác.`
-                    : prompt.trim() === ''
-                      ? 'Viết prompt mô tả video bạn muốn.'
-                      : null
-                : person.length === 0
-                  ? 'Tải lên ảnh người mẫu.'
-                  : product.length === 0
-                    ? 'Tải lên ảnh sản phẩm.'
-                    : null;
+    !recall.answered
+      ? 'Đang tải cài đặt đã dùng...'
+      : failed
+        ? 'Không tải được danh sách mô hình.'
+        : !fresh || (models!.length > 0 && !chosen)
+          ? 'Đang tải danh sách mô hình...'
+          : models!.length === 0
+            ? 'Marketing Studio chưa được Admin bật'
+            : ratios.length === 0 || durations.length === 0
+              ? 'Các mô hình này không có tỉ lệ hoặc thời lượng dùng được cho Marketing Studio.'
+              : !chosen!.supported
+                ? 'Mô hình này không có tỉ lệ hoặc thời lượng đã chọn. Chọn mô hình khác, hoặc đổi tỉ lệ hoặc thời lượng.'
+                : advanced
+                  ? refs.length === 0
+                    ? 'Tải lên ít nhất 1 ảnh tham chiếu.'
+                    : refs.length > chosen!.maxImages
+                      ? `Mô hình này nhận tối đa ${chosen!.maxImages} ảnh tham chiếu. Bỏ bớt ảnh hoặc chọn mô hình khác.`
+                      : prompt.trim() === ''
+                        ? 'Viết prompt mô tả video bạn muốn.'
+                        : null
+                  : person.length === 0
+                    ? 'Tải lên ảnh người mẫu.'
+                    : product.length === 0
+                      ? 'Tải lên ảnh sản phẩm.'
+                      : null;
   const reason = formReason ?? promptTooLong(chosen, Math.max(...sent.map((s) => s.length)));
   /** Hook variants beyond the clips left today are refused before anything is sent. */
   const short = n > 1 && clips !== null && clips.today + n > clips.cap ? `Hôm nay bạn chỉ còn ${Math.max(0, clips.cap - clips.today)} clip; bỏ bớt biến thể hook.` : null;
@@ -342,7 +357,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
     }
   }
   const actions: FormActions = {
-    recreate: (from) => (setSource({ from }), narrow && setTab('create')),
+    recreate: (from) => (recall.touch(), setSource({ from }), narrow && setTab('create')),
     apply,
     photo: (p, role) => void take(p, role),
     prompt: (text) => (setPrompt(text), notify('Đã chép prompt')),
@@ -414,7 +429,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
       <div className="create-grid">
         <WorkTabs prefix="marketing" tabs={tabs} labels={TAB_LABEL} shown={shown} onSelect={setTab} />
 
-        <div className="card form-card" id="marketing-panel-create" role={narrow ? 'tabpanel' : undefined} aria-labelledby={narrow ? 'marketing-tab-create' : undefined} hidden={narrow && shown !== 'create'}>
+        <div className="card form-card" id="marketing-panel-create" role={narrow ? 'tabpanel' : undefined} aria-labelledby={narrow ? 'marketing-tab-create' : undefined} hidden={narrow && shown !== 'create'} onPointerDownCapture={recall.touch} onKeyDownCapture={recall.touch}>
           <div className="form-scroll">
             <div className="app-head marketing-head" data-category="video" data-photo={have.has(photo) || undefined} style={have.has(photo) ? ({ '--photo': `url(/api/samples/${photo})` } as CSSProperties) : undefined}>
               {have.has(loop) && (

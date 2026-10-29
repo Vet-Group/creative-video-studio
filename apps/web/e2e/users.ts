@@ -42,6 +42,10 @@ export const USERS = {
   chipa: { email: 'chipa@e2e.test', name: 'E2E Chips A', role: 'member' },
   vidfrom: { email: 'vidfrom@e2e.test', name: 'E2E Video From Image', role: 'member' },
   pickera: { email: 'pickera@e2e.test', name: 'E2E Try On Pickers', role: 'member' }, // its own Try On job gives it My models, which would hide another user's slot samples
+  // memory.e2e: remembered settings (rema runs, remb never does, remc runs on a model that is then switched off).
+  rema: { email: 'rema@e2e.test', name: 'E2E Remember A', role: 'member' },
+  remb: { email: 'remb@e2e.test', name: 'E2E Remember B', role: 'member' },
+  remc: { email: 'remc@e2e.test', name: 'E2E Remember C', role: 'member' },
   admin: { email: 'admin@e2e.test', name: 'E2E Admin', role: 'admin' },
 } as const;
 
