@@ -6,8 +6,8 @@ const PAGES: Partial<Record<string, string>> = {
   marketing: '/marketing-studio',
   try_on: '/try-on',
   image: '/image-generation',
-  // The image apps; Motion Control's form has no refill yet.
-  ...Object.fromEntries(APPS.filter((a) => !a.soon && a.feature !== 'motion_control').map((a) => [a.feature, `/apps/${a.slug}`])),
+  // The apps, Motion Control too.
+  ...Object.fromEntries(APPS.filter((a) => !a.soon).map((a) => [a.feature, `/apps/${a.slug}`])),
 };
 
 /** Whether the feature's page can refill its form (from a job or a saved template). */

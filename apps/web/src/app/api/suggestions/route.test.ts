@@ -102,4 +102,18 @@ describe('/api/suggestions', () => {
     expect(sent.length).toBe(before + 1);
     expect(await runs(u.id)).toBe(1);
   });
+
+  test("puts the member's own hook and location phrases in the context, and refuses another member's private one", async () => {
+    const [u, other] = [await newUser(), await newUser()];
+    const choice = (id: string, userId: string, kind: string, phrase: string) => pool.query(`insert into user_choices (id, user_id, kind, name, phrase) values ($1, $2, $3, 'n', $4)`, [id, userId, kind, phrase]);
+    await choice(`${u.id}-hook`, u.id, 'hook', 'The creator waves.');
+    await choice(`${u.id}-spot`, u.id, 'location', 'a small cafe');
+    await choice(`${other.id}-hook`, other.id, 'hook', 'Secret.');
+    const { id } = (await (await ask(u, { field: 'brief', hook: `${u.id}-hook`, location: `${u.id}-spot` })).json()) as { id: string };
+    expect((await pool.query('select input from suggestion_runs where id = $1', [id])).rows[0].input.context).toBe('The creator waves. Set in a small cafe.');
+    const res = await ask(u, { field: 'brief', hook: `${other.id}-hook` });
+    expect([res.status, await error(res)]).toEqual([400, 'hook is not a hook']);
+    expect(await error(await ask(u, { field: 'brief', location: `${u.id}-hook` }))).toBe('location is not a location'); // a hook is not a location
+    expect(await runs(u.id)).toBe(1);
+  });
 });

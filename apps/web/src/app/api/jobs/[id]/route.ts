@@ -28,7 +28,7 @@ export async function GET(request: Request, { params }: RouteContext) {
   const mine = own || g.session.user.role === 'admin';
   if (!job || !(mine || (job.status === 'succeeded' && job.output_asset_id))) return notFound();
   const images = await pool.query(
-    'select id, filename, width, height from assets where id = any($1::text[]) and deleted_at is null order by array_position($1::text[], id)',
+    'select id, filename, width, height, mime, duration_ms as "durationMs" from assets where id = any($1::text[]) and deleted_at is null order by array_position($1::text[], id)',
     [job.input_asset_ids],
   );
   return Response.json({

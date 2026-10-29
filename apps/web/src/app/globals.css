@@ -1056,6 +1056,16 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 /* No choice is a light tile like the others; chosen, it takes the same ring and tick as a clip. */
 .choice-grid:has(button > :is(video, img)) button:not(:has(> video, > img))[aria-selected='true'] { position: relative; background: var(--fill); color: var(--ink); }
 .choice-grid:has(button > :is(video, img)) button:not(:has(> video, > img))[aria-selected='true']::after { content: '\2713'; position: absolute; top: 8px; right: 8px; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--ink-strong); color: var(--on-dark); font-size: 12px; line-height: 1; }
+/* A member's own hook or location has no sample: among sample cards it is the light tile with its name. */
+.choice-grid:has(button > :is(video, img)) button > .banner-empty { display: none; }
+/* The often-used group, then the rest: each group's title spans the grid, its cards stay in the grid's columns. */
+.choice-group { display: contents; }
+.choice-group-title { grid-column: 1 / -1; margin: 4px 0 0; color: var(--text-sub); font-size: 13px; line-height: 18px; font-weight: 600; }
+.choice-add { display: inline-flex; align-items: center; gap: 6px; margin-top: 16px; font-size: 14px; }
+.choice-form { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--hairline); }
+.choice-form-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.choice-own h3 { margin: 20px 0 8px; font-size: 14px; line-height: 20px; font-weight: 600; }
+.choice-own li > span:first-child { flex: 1; }
 .gallery-item video { display: block; width: 100%; height: 100%; object-fit: cover; background: var(--media-bg); }
 
 /* C4 round 2 (three independent graders, 2026-10-24). */

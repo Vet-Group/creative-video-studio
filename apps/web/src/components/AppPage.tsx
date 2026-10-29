@@ -290,7 +290,7 @@ function Soon({ app, text }: { app: AppConfig; text: string }) {
 
 export function AppPage({ app, reuse }: { app: AppConfig; reuse?: string }) {
   if (app.soon) return <Soon app={app} text={app.soon} />;
-  return app.feature === 'motion_control' ? <MotionForm app={app} /> : <AppForm app={app} reuse={reuse} />;
+  return app.feature === 'motion_control' ? <MotionForm app={app} reuse={reuse} /> : <AppForm app={app} reuse={reuse} />;
 }
 
 /** An uploaded reference video and its length. */
@@ -349,7 +349,7 @@ function VideoSlot({ video, busy, onAdd, onRemove }: { video: RefVideo | null; b
 }
 
 /** Motion Control: a character image and a reference video, a model of the feature, an optional prompt. The cost follows the video's length. */
-function MotionForm({ app }: { app: AppConfig }) {
+function MotionForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
   const { refresh } = useJobs();
   const narrow = useMediaQuery(NARROW);
   const [image, setImage] = useState<Img[]>([]);
@@ -361,7 +361,7 @@ function MotionForm({ app }: { app: AppConfig }) {
   const [notice, setNotice] = useState('');
   const [list, setList] = useState<{ models: MotionModel[]; best: string | null; failed: boolean } | null>(null);
   const [modelId, setModelId] = useState('');
-  const recall = useRecall(app.feature, (s) => setModelId(s.modelId)); // the member's last model
+  const recall = useRecall(app.feature, (s) => setModelId(s.modelId), { skip: reuse !== undefined }); // the member's last model, unless a refill comes
   const promptId = useId();
   const reasonId = useId();
   // The estimate is per second of the video, so the list is asked again for its length (5 s until a video is chosen).
@@ -372,6 +372,21 @@ function MotionForm({ app }: { app: AppConfig }) {
       () => setList({ models: [], best: null, failed: true }),
     );
   }, [seconds]);
+  // Reuse: the character image, the reference video, the member's own prompt and the model.
+  const recreate = useReuse(
+    reuse,
+    app.feature,
+    (j) => {
+      recall.touch();
+      const inputs = j.images as (Img & { mime?: string; durationMs?: number | null })[];
+      const ref = inputs.find((i) => i.mime?.startsWith('video/'));
+      setImage(inputs.filter((i) => i !== ref).slice(0, 1));
+      setVideo(ref ? { id: ref.id, filename: ref.filename, durationMs: ref.durationMs ?? 0 } : null);
+      setPrompt(j.prompt ?? '');
+      if (j.modelId) setModelId(j.modelId);
+    },
+    () => setError('Không tìm thấy video để dùng lại.'),
+  );
   const chosen = list?.models.find((m) => m.id === modelId) ?? list?.models.find((m) => m.id === list.best) ?? list?.models[0];
   const reason = (recall.answered ? null : 'Đang tải cài đặt đã dùng...') ?? motionReason({ image: image.length > 0, videoMs: video?.durationMs ?? null, model: list === null ? null : chosen, failed: list?.failed ?? false }) ?? promptTooLong(chosen, prompt.trim().length);
   const canRun = reason === null && !busy;
@@ -460,6 +475,7 @@ function MotionForm({ app }: { app: AppConfig }) {
                 </div>
               </div>
             </div>
+            <Templates feature={app.feature} data={() => ({ images: [...image, ...(video ? [video] : [])].map((i) => i.id), prompt: prompt.trim(), modelId: chosen?.id })} />
           </div>
 
           <div className="form-message">
@@ -484,7 +500,9 @@ function MotionForm({ app }: { app: AppConfig }) {
         </div>
 
         <div className="side" id={`app-panel-${panel}`} role="tabpanel" aria-labelledby={`app-tab-${panel}`} hidden={narrow && shown === 'create'}>
-          {shown === 'history' ? <Tray feature={app.feature} /> : <AppAbout app={app} />}
+          <FormContext.Provider value={{ recreate: (from) => (recreate(from), narrow && setTab('create')) }}>
+            {shown === 'history' ? <Tray feature={app.feature} /> : <AppAbout app={app} />}
+          </FormContext.Provider>
         </div>
       </div>
     </section>

@@ -6,12 +6,13 @@ import { createContext, type ReactNode, useContext, useEffect, useRef, useState 
 import { api, errorText, sendJson, type JobStatus, type TrayJob } from '@/lib/api';
 import { appBySlug } from '@/lib/apps';
 import { featureLabel } from '@/lib/features';
-import { refillFrom, reuseHref } from '@/lib/reuse';
+import { canReuse, refillFrom, reuseHref } from '@/lib/reuse';
 import { COLLAPSED_COOKIE } from '@/lib/sidebar';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { Icon, type IconName } from './Icon';
 import { JobsProvider, Recreate, roleOf, Tap, useForm, useJobs } from './jobs';
 import { type Account, Settings } from './Settings';
+import { SaveTemplateDialog } from './Templates';
 import { VetLogo } from './VetLogo';
 
 const STATUS_LABEL: Record<JobStatus, string> = {
@@ -87,6 +88,9 @@ function HistoryCard({ job, isAdmin }: { job: TrayJob; isAdmin: boolean }) {
   const { refresh } = useJobs();
   const [problem, setProblem] = useState('');
   const [favorite, setFavorite] = useState(job.favorite);
+  /** Save template: null while closed, else whether the member may share it with the company (asked when the dialog opens). */
+  const [saving, setSaving] = useState<{ canShare: boolean } | null>(null);
+  const [saved, setSaved] = useState(false);
   const media = useRef<HTMLVideoElement & HTMLImageElement>(null);
   const image = job.resolution !== null;
   const out = job.status === 'succeeded' ? job.outputAssetId : null;
@@ -107,6 +111,19 @@ function HistoryCard({ job, isAdmin }: { job: TrayJob; isAdmin: boolean }) {
     if (!window.confirm(`Xóa ${image ? 'ảnh' : 'clip'} này? Nó cũng biến khỏi Thư viện.`)) return;
     void act(async () => (await api(`/api/jobs/${job.id}`, { method: 'DELETE' }), await refresh()), `Không xóa được ${image ? 'ảnh' : 'clip'}.`);
   };
+  // Save template from a card: the job's own uploads, words and settings become a template of its page (POST /api/templates fromJob).
+  // Its name carries the time, not the card title, so it never matches a Run button's name such as 'Tạo video'.
+  const savable = canReuse(job.feature) && (job.inputAssetIds.length > 0 || job.text !== null);
+  const openSave = () =>
+    act(async () => {
+      setSaved(false);
+      setSaving({ canShare: (await api<{ canShare: boolean }>(`/api/templates?feature=${job.feature}`)).canShare });
+    }, 'Không mở được Lưu mẫu.');
+  async function saveTemplate(name: string, share: boolean) {
+    await api('/api/templates', sendJson('POST', { name, fromJob: job.id, ...(share && { isCompany: true }) }));
+    setSaving(null);
+    setSaved(true);
+  }
   const download = () =>
     act(async () => {
       const a = document.createElement('a');
@@ -183,10 +200,16 @@ function HistoryCard({ job, isAdmin }: { job: TrayJob; isAdmin: boolean }) {
         {isAdmin && job.error && <p className="muted">{job.error}</p>}
         {job.retried && <p className="muted">Đã thử lại</p>}
         {problem && <p className="error">{problem}</p>}
+        {saved && <p role="status">Đã lưu mẫu.</p>}
         <div className="job-actions">
           {RETRYABLE.includes(job.status) && !job.retried && !job.retryOf && (
             <button type="button" className="icon-button" onClick={() => void retry()} aria-label="Thử lại" title="Thử lại">
               <Icon name="arrow" />
+            </button>
+          )}
+          {savable && (
+            <button type="button" className="icon-button" onClick={() => void openSave()} aria-label={`Lưu mẫu từ job lúc ${fmtTime(job.createdAt)}`} title="Lưu mẫu">
+              <Icon name="plus" />
             </button>
           )}
           {out && (
@@ -226,6 +249,7 @@ function HistoryCard({ job, isAdmin }: { job: TrayJob; isAdmin: boolean }) {
           </Link>
         )}
       </div>
+      {savable && <SaveTemplateDialog open={saving !== null} onClose={() => setSaving(null)} onSave={saveTemplate} canShare={saving?.canShare ?? false} name={cardTitle(job)} />}
     </li>
   );
 }

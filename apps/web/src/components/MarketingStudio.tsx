@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { type CSSProperties, type KeyboardEvent, type ReactNode, useEffect, useId, useRef, useState } from 'react';
 import { ABOUT } from '@/lib/about-content';
 import { api, errorText, sendJson } from '@/lib/api';
-import { ADVANCED_MAX_IMAGES, ADVANCED_MAX_SCRIPT, advancedPrompt, briefRoom, HOOKS, LOCATIONS, type MarketingChoice, marketingPrompt } from '@/lib/marketing';
+import { ADVANCED_MAX_IMAGES, ADVANCED_MAX_SCRIPT, advancedPrompt, briefRoom, HOOKS, LOCATIONS, MAX_CHOICE_DESC, MAX_CHOICE_NAME, MAX_CHOICE_PHRASE, type MarketingChoice, marketingPrompt } from '@/lib/marketing';
 import { promptTooLong } from '@/lib/prompt-limit';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { useRecall } from '@/lib/use-recall';
@@ -80,8 +80,95 @@ function ChoiceBox({ label, icon, value, media, onOpen, onClear }: { label: stri
   );
 }
 
-/** The dialog of one list: cards with the choice's sample loop (`marketing-<kind>-<id>`) and name in a grid, the "no choice" card first. Arrows move the focus between the cards, Enter or Space picks, Escape closes. */
-function ChoiceDialog({ open, title, sub, kind, choices, selected, onPick, onClose, footer }: { open: boolean; title: string; sub: string; kind: 'hook' | 'location'; choices: MarketingChoice[]; selected: string[]; onPick: (id: string) => void; onClose: () => void; footer?: ReactNode }) {
+/** GET /api/choices: the member's own hooks and locations and the company's, and the often-used ids (those the member used twice or more in 90 days). */
+interface Choice extends MarketingChoice {
+  isCompany: boolean;
+  mine: boolean;
+}
+interface ChoiceLists {
+  hooks: Choice[];
+  locations: Choice[];
+  often: { hook: string[]; location: string[] };
+  canShare: boolean;
+}
+const KIND_NAME = { hook: 'hook', location: 'bối cảnh' } as const;
+
+/** Add a hook or a location: a name, the English phrase the prompt takes and an optional description, saved to the member's account; an Admin may share it. */
+function AddChoice({ kind, canShare, onAdded }: { kind: 'hook' | 'location'; canShare: boolean; onAdded: (c: Choice) => void }) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState('');
+  const [phrase, setPhrase] = useState('');
+  const [desc, setDesc] = useState('');
+  const [share, setShare] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const ids = { name: useId(), phrase: useId(), desc: useId() };
+  async function save() {
+    setBusy(true);
+    setError('');
+    try {
+      const c = await api<Omit<Choice, 'mine'>>('/api/choices', sendJson('POST', { kind, name: name.trim(), phrase: phrase.trim(), ...(desc.trim() && { desc: desc.trim() }), ...(share && { isCompany: true }) }));
+      setOpen(false);
+      setName('');
+      setPhrase('');
+      setDesc('');
+      setShare(false);
+      onAdded({ ...c, mine: true });
+    } catch (e) {
+      setError(errorText(e, `Không lưu được ${KIND_NAME[kind]}, hãy thử lại.`));
+    } finally {
+      setBusy(false);
+    }
+  }
+  if (!open) {
+    return (
+      <button type="button" className="link-button choice-add" onClick={() => setOpen(true)}>
+        <Icon name="plus" size={12} /> Thêm {KIND_NAME[kind]}
+      </button>
+    );
+  }
+  return (
+    <div className="choice-form" role="group" aria-label={`Thêm ${KIND_NAME[kind]}`}>
+      <label className="field-label" htmlFor={ids.name}>
+        Tên
+      </label>
+      <input id={ids.name} value={name} maxLength={MAX_CHOICE_NAME} onChange={(e) => setName(e.target.value)} />
+      <label className="field-label" htmlFor={ids.phrase}>
+        Cụm tiếng Anh
+      </label>
+      <input id={ids.phrase} lang="en" value={phrase} maxLength={MAX_CHOICE_PHRASE} onChange={(e) => setPhrase(e.target.value)} />
+      <label className="field-label" htmlFor={ids.desc}>
+        Mô tả (tuỳ chọn)
+      </label>
+      <input id={ids.desc} value={desc} maxLength={MAX_CHOICE_DESC} onChange={(e) => setDesc(e.target.value)} />
+      {canShare && (
+        <label className="template-share">
+          <input type="checkbox" checked={share} onChange={(e) => setShare(e.target.checked)} /> Chia sẻ cho cả công ty
+        </label>
+      )}
+      {error && (
+        <p className="error" role="alert">
+          {error}
+        </p>
+      )}
+      <div className="choice-form-actions">
+        <button type="button" onClick={() => setOpen(false)}>
+          Huỷ
+        </button>
+        <button type="button" className="primary" disabled={busy || !name.trim() || !phrase.trim()} onClick={() => void save()}>
+          Lưu
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The dialog of one list: cards with the choice's sample loop (`marketing-<kind>-<id>`; a member's own has none) and name in a grid, the member's often-used
+ * group first when it has any. Arrows move the focus between the cards, Enter or Space picks, Escape closes. Below: the add form, and the
+ * member's own (for an Admin also the company's) with Xoá.
+ */
+function ChoiceDialog({ open, title, sub, kind, choices, often, custom, canShare, selected, onPick, onAdded, onDelete, onClose, footer }: { open: boolean; title: string; sub: string; kind: 'hook' | 'location'; choices: MarketingChoice[]; often: string[]; custom: Choice[]; canShare: boolean; selected: string[]; onPick: (id: string) => void; onAdded: (c: Choice) => void; onDelete: (c: Choice) => void; onClose: () => void; footer?: ReactNode }) {
   const grid = useRef<HTMLDivElement>(null);
   const have = useSamples();
   // showModal (in Modal's effect, which runs first) focuses the close button, so the chosen card (else the first) takes the focus afterwards.
@@ -97,22 +184,62 @@ function ChoiceDialog({ open, title, sub, kind, choices, selected, onPick, onClo
     e.preventDefault();
     cards[next]?.focus();
   }
+  // Each card shows once: the often-used ones in their group, the rest after them.
+  const top = often.flatMap((id) => choices.filter((c) => c.id === id));
+  const rest = choices.filter((c) => !top.includes(c));
+  const card = (c: MarketingChoice) => (
+    <button key={c.id} type="button" role="option" aria-selected={selected.includes(c.id)} tabIndex={(selected.length > 0 ? selected[0] === c.id : c === (top[0] ?? rest[0])) ? 0 : -1} aria-label={c.name} aria-describedby={`${kind}-${c.id}-desc`} onClick={() => onPick(c.id)}>
+      {open && <CardMedia {...cardSample(have, `marketing-${kind}-${c.id}`)} always />}
+      <span className="choice-name">{c.name}</span>
+      <span id={`${kind}-${c.id}-desc`} className="choice-desc">
+        {c.desc}
+      </span>
+    </button>
+  );
+  const owned = custom.filter((c) => c.mine || (c.isCompany && canShare));
+  const ownLabel = kind === 'hook' ? 'Hook của bạn' : 'Bối cảnh của bạn';
   return (
     <Modal open={open} onClose={onClose} label={title} className="choice-dialog">
       <h2>{title}</h2>
       <p className="modal-sub">{sub}</p>
       <div ref={grid} className="choice-grid" role="listbox" aria-label={title} onKeyDown={onKey}>
         {/* As on Fash, no "none" card: the X on the chosen box clears it. */}
-        {choices.map((c, i) => (
-          <button key={c.id} type="button" role="option" aria-selected={selected.includes(c.id)} tabIndex={(selected.length > 0 ? selected[0] === c.id : i === 0) ? 0 : -1} aria-label={c.name} aria-describedby={`${kind}-${c.id}-desc`} onClick={() => onPick(c.id)}>
-            {open && <CardMedia {...cardSample(have, `marketing-${kind}-${c.id}`)} always />}
-            <span className="choice-name">{c.name}</span>
-            <span id={`${kind}-${c.id}-desc`} className="choice-desc">
-              {c.desc}
-            </span>
-          </button>
-        ))}
+        {top.length > 0 ? (
+          <>
+            <div role="group" aria-label="Hay dùng" className="choice-group">
+              <p className="choice-group-title" aria-hidden="true">
+                Hay dùng
+              </p>
+              {top.map(card)}
+            </div>
+            <div role="group" aria-label={`Tất cả ${KIND_NAME[kind]}`} className="choice-group">
+              <p className="choice-group-title" aria-hidden="true">
+                Tất cả {KIND_NAME[kind]}
+              </p>
+              {rest.map(card)}
+            </div>
+          </>
+        ) : (
+          rest.map(card)
+        )}
       </div>
+      <AddChoice kind={kind} canShare={canShare} onAdded={onAdded} />
+      {owned.length > 0 && (
+        <section className="choice-own" aria-label={ownLabel}>
+          <h3>{ownLabel}</h3>
+          <ul className="template-list">
+            {owned.map((c) => (
+              <li key={c.id}>
+                <span>{c.name}</span>
+                {c.isCompany && <span className="tag">Công ty</span>}
+                <button type="button" className="link-button" aria-label={`Xoá ${KIND_NAME[kind]} ${c.name}`} onClick={() => onDelete(c)}>
+                  Xoá
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       {footer}
     </Modal>
   );
@@ -160,6 +287,8 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
   const [hooks, setHooks] = useState<string[]>([]);
   const [many, setMany] = useState(false);
   const [location, setLocation] = useState('');
+  /** The member's own and the company's hooks and locations, and the often-used ids; null until loaded (the built-in ones show meanwhile). */
+  const [custom, setCustom] = useState<ChoiceLists | null>(null);
   const [picker, setPicker] = useState<'hook' | 'location' | 'format' | 'model' | 'product' | null>(null);
   /** The member's past UGC product photos (Fash's My Products), offered by the product slot. */
   const [myProducts, setMyProducts] = useState<Img[]>([]);
@@ -212,8 +341,11 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
   const words = script.trim() ? script.trim().split(/\s+/).length : 0;
   /** The English prompt Run sends, shown as is under the form. */
   const variants = hooks.length > 0 ? hooks : [''];
+  const hookList = [...HOOKS, ...(custom?.hooks ?? [])];
+  const locationList = [...LOCATIONS, ...(custom?.locations ?? [])];
+  const own = { hooks: custom?.hooks, locations: custom?.locations };
   const composeFor = (hook: string, brief: string) =>
-    advanced ? advancedPrompt({ brief, images: refs.length, hook, location, script, audio: audioOn }) : marketingPrompt({ hook, location, prompt: brief, audio: audioOn, ratio });
+    advanced ? advancedPrompt({ brief, images: refs.length, hook, location, script, audio: audioOn }, own) : marketingPrompt({ hook, location, prompt: brief, audio: audioOn, ratio }, own);
   const compose = (hook: string) => composeFor(hook, prompt);
   /** What the brief may take: the chosen model's limit less what the page adds around it, for the longest variant. */
   const room = chosen && Math.min(...variants.map((h) => briefRoom((b) => composeFor(h, b), chosen.maxPromptChars)));
@@ -222,7 +354,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
   const n = variants.length;
   /** The estimate of the whole Run, at the estimate's own precision. */
   const total = cost === undefined ? undefined : (Number(cost) * n).toFixed(cost.split('.')[1]?.length ?? 2);
-  const hookName = (id: string) => HOOKS.find((c) => c.id === id)?.name ?? id;
+  const hookName = (id: string) => hookList.find((c) => c.id === id)?.name ?? id;
   const name = FORMATS.find((f) => f.id === format)!.name;
   /** The sample photo and loop behind the format header, when an Admin uploaded them. */
   const photo = `marketing-format-${format}.jpg`;
@@ -285,6 +417,32 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
       stale = true;
     };
   }, [source]);
+
+  const loadChoices = () => api<ChoiceLists>(`/api/choices${advanced ? '?format=advanced' : ''}`).then(setCustom, () => {}); // a failure leaves the built-in ones
+  useEffect(() => void loadChoices(), [advanced]);
+  // A refilled hook or location that no longer exists (deleted, or another member's) is dropped once the lists are known.
+  useEffect(() => {
+    if (!custom) return;
+    if (hooks.some((h) => !hookList.some((c) => c.id === h))) setHooks((cur) => cur.filter((h) => hookList.some((c) => c.id === h)));
+    if (location && !locationList.some((c) => c.id === location)) setLocation('');
+  }, [custom, hooks, location]);
+  /** A new hook or location is listed and chosen at once. */
+  function added(kind: 'hook' | 'location', c: Choice) {
+    setCustom((cur) => cur && { ...cur, [kind === 'hook' ? 'hooks' : 'locations']: [c, ...cur[kind === 'hook' ? 'hooks' : 'locations']] });
+    if (!custom) void loadChoices(); // the lists failed to load at first: fetch them, so the new one has its phrase and name
+    if (kind === 'hook') pickHook(c.id);
+    else (setLocation(c.id), setPicker(null));
+  }
+  async function removeChoice(c: Choice) {
+    if (!window.confirm(`Xoá "${c.name}"?`)) return;
+    try {
+      await api(`/api/choices/${encodeURIComponent(c.id)}`, { method: 'DELETE' });
+      await loadChoices();
+    } catch (e) {
+      notify(errorText(e, 'Không xoá được.'));
+    }
+  }
+  const pickHook = (id: string) => (many && id ? setHooks((cur) => (cur.includes(id) ? cur.filter((h) => h !== id) : cur.length < MAX_VARIANTS ? [...cur, id] : cur)) : (setHooks(id ? [id] : []), setPicker(null)));
 
   // My products: loaded once; a failure just leaves the plain upload slot.
   useEffect(() => {
@@ -414,6 +572,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
     }
     if (refused.length > 0) setError(n > 1 ? `Không gửi được ${refused.join('; ')}` : refused[0]!);
     await refresh();
+    void loadChoices(); // the often-used group counts this Run
     setBusy(false);
   }
 
@@ -455,7 +614,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
                 </>
               )}
               <ChoiceBox label="Hook (tuỳ chọn)" icon="film" media={hooks[0] ? cardSample(have, `marketing-hook-${hooks[0]}`) : undefined} value={hooks.length === 0 ? undefined : hooks.length === 1 ? hookName(hooks[0]!) : `${hooks.length} biến thể: ${hooks.map(hookName).join(', ')}`} onOpen={() => setPicker('hook')} onClear={() => setHooks([])} />
-              <ChoiceBox label="Bối cảnh (tuỳ chọn)" icon="sliders" media={location ? cardSample(have, `marketing-location-${location}`) : undefined} value={LOCATIONS.find((c) => c.id === location)?.name} onOpen={() => setPicker('location')} onClear={() => setLocation('')} />
+              <ChoiceBox label="Bối cảnh (tuỳ chọn)" icon="sliders" media={location ? cardSample(have, `marketing-location-${location}`) : undefined} value={locationList.find((c) => c.id === location)?.name} onOpen={() => setPicker('location')} onClear={() => setLocation('')} />
             </div>
 
             <div className="field">
@@ -615,9 +774,14 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
         onClose={() => setPicker(null)}
       />
       <ChoiceDialog open={picker === 'hook'} title="Chọn hook" sub="Cảnh mở đầu giữ chân người xem trong vài giây đầu. Có thể bỏ qua." kind="hook"
-        choices={HOOKS}
+        choices={hookList}
+        often={custom?.often.hook ?? []}
+        custom={custom?.hooks ?? []}
+        canShare={custom?.canShare ?? false}
         selected={hooks}
-        onPick={(id) => (many && id ? setHooks((cur) => (cur.includes(id) ? cur.filter((h) => h !== id) : cur.length < MAX_VARIANTS ? [...cur, id] : cur)) : (setHooks(id ? [id] : []), setPicker(null)))}
+        onPick={pickHook}
+        onAdded={(c) => added('hook', c)}
+        onDelete={(c) => void removeChoice(c)}
         onClose={() => setPicker(null)}
         footer={
           <div className="variants">
@@ -633,7 +797,8 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
           </div>
         }
       />
-      <ChoiceDialog open={picker === 'location'} title="Chọn bối cảnh" sub="Nơi người mẫu xuất hiện trong video. Có thể bỏ qua." kind="location" choices={LOCATIONS} selected={location ? [location] : []} onPick={(id) => (setLocation(id), setPicker(null))} onClose={() => setPicker(null)} />
+      <ChoiceDialog open={picker === 'location'} title="Chọn bối cảnh" sub="Nơi người mẫu xuất hiện trong video. Có thể bỏ qua." kind="location" choices={locationList} often={custom?.often.location ?? []} custom={custom?.locations ?? []} canShare={custom?.canShare ?? false}
+        selected={location ? [location] : []} onPick={(id) => (setLocation(id), setPicker(null))} onAdded={(c) => added('location', c)} onDelete={(c) => void removeChoice(c)} onClose={() => setPicker(null)} />
     </section>
   );
 }

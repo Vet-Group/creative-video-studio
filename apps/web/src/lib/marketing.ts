@@ -26,6 +26,14 @@ export const LOCATIONS: MarketingChoice[] = [
   { id: 'street', name: 'Đường phố', desc: 'Đường phố nhộn nhịp ban ngày', phrase: 'a lively city street in the daytime' },
 ];
 
+/** A member's own hooks and locations (user_choices): the most of each kind one member keeps, and their fields' limits. */
+export const MAX_CHOICES = 50;
+export const MAX_CHOICE_NAME = 40;
+export const MAX_CHOICE_PHRASE = 300;
+export const MAX_CHOICE_DESC = 100;
+/** The member's own and the company's hooks and locations, looked up after the built-in ones. */
+export type CustomChoices = { hooks?: MarketingChoice[]; locations?: MarketingChoice[] };
+
 /** How the clip is framed, from the chosen ratio; the try-on instruction used to say "vertical" whatever the ratio. */
 const FRAMES: Record<string, string> = { '9:16': 'vertical 9:16 frame', '16:9': 'horizontal 16:9 frame', '1:1': 'square 1:1 frame' };
 
@@ -40,9 +48,9 @@ const instruction = (ratio?: string | null) =>
  * member's own text as creator notes. An unknown or empty hook or location id adds nothing. `audio` adds the sound rule (UGC_SOUND or SILENT); left out,
  * the prompt says nothing about sound.
  */
-export function marketingPrompt({ hook, location, prompt, audio, ratio }: { hook?: string | null; location?: string | null; prompt?: string | null; audio?: boolean; ratio?: string | null }): string {
-  const h = HOOKS.find((c) => c.id === hook);
-  const l = LOCATIONS.find((c) => c.id === location);
+export function marketingPrompt({ hook, location, prompt, audio, ratio }: { hook?: string | null; location?: string | null; prompt?: string | null; audio?: boolean; ratio?: string | null }, custom: CustomChoices = {}): string {
+  const h = [...HOOKS, ...(custom.hooks ?? [])].find((c) => c.id === hook);
+  const l = [...LOCATIONS, ...(custom.locations ?? [])].find((c) => c.id === location);
   const text = prompt?.trim();
   return [instruction(ratio), h?.phrase, l && `Set in ${l.phrase}.`, text && `Creator notes: ${text}`, audio === undefined ? null : audio ? UGC_SOUND : SILENT].filter(Boolean).join(' ');
 }
@@ -68,9 +76,9 @@ export const SUGGEST_DAILY_LIMIT = 20;
  * [Image1]..[ImageN] (each adapter rewrites them for its schema), the hook and the location follow when chosen, then one dialogue rule:
  * audio off is silent; a script is spoken word for word and nothing else; with no script there is speech only when the brief asks for it.
  */
-export function advancedPrompt({ brief, images, hook, location, script, audio }: { brief: string; images: number; hook?: string | null; location?: string | null; script?: string | null; audio: boolean }): string {
-  const h = HOOKS.find((c) => c.id === hook);
-  const l = LOCATIONS.find((c) => c.id === location);
+export function advancedPrompt({ brief, images, hook, location, script, audio }: { brief: string; images: number; hook?: string | null; location?: string | null; script?: string | null; audio: boolean }, custom: CustomChoices = {}): string {
+  const h = [...HOOKS, ...(custom.hooks ?? [])].find((c) => c.id === hook);
+  const l = [...LOCATIONS, ...(custom.locations ?? [])].find((c) => c.id === location);
   const refs = Array.from({ length: images }, (_, i) => `[Image${i + 1}]`).join(', ');
   const lines = script?.trim().replace(/\s+/g, ' ');
   const dialogue = !audio

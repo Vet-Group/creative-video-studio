@@ -3,7 +3,8 @@ import { SUGGEST_QUEUE } from '@cvs/core/queue';
 import { PROMPT_CEILING } from '@cvs/core/models';
 import type { SuggestInput } from '@cvs/core/suggest';
 import { pool } from '@/lib/auth';
-import { ADVANCED_MAX_SCRIPT, HOOKS, LOCATIONS, SUGGEST_DAILY_LIMIT } from '@/lib/marketing';
+import { findChoice } from '@/lib/choices';
+import { ADVANCED_MAX_SCRIPT, SUGGEST_DAILY_LIMIT } from '@/lib/marketing';
 import { boss } from '@/lib/queue';
 import { guard } from '@/lib/session';
 
@@ -27,13 +28,14 @@ export async function POST(request: Request) {
   const max = b.field === 'script' ? ADVANCED_MAX_SCRIPT : Math.min((b.room as number | undefined) ?? PROMPT_CEILING, PROMPT_CEILING);
   const text = typeof b.text === 'string' ? b.text.trim() : b.text === undefined ? '' : null;
   if (text === null || text.length > PROMPT_CEILING) return bad(`text may be at most ${PROMPT_CEILING} characters`);
-  const hook = b.hook === undefined ? undefined : HOOKS.find((h) => h.id === b.hook);
+  const userId = g.session.user.id;
+  // A built-in hook or location, or the member's own or a company one (lib/choices.ts).
+  const hook = typeof b.hook === 'string' ? await findChoice(userId, 'hook', b.hook) : undefined;
   if (b.hook !== undefined && !hook) return bad('hook is not a hook');
-  const location = b.location === undefined ? undefined : LOCATIONS.find((l) => l.id === b.location);
+  const location = typeof b.location === 'string' ? await findChoice(userId, 'location', b.location) : undefined;
   if (b.location !== undefined && !location) return bad('location is not a location');
   const input: SuggestInput = { field: b.field, text, context: [hook?.phrase, location && `Set in ${location.phrase}.`].filter(Boolean).join(' '), max };
 
-  const userId = g.session.user.id;
   const id = randomUUID();
   const client = await pool.connect();
   try {

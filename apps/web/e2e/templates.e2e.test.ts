@@ -5,7 +5,7 @@ import { png, select, signIn } from './support.test';
 const file = (name: string) => ({ name, mimeType: 'image/png', buffer: png() });
 
 async function saveAs(page: Page, name: string) {
-  await page.getByRole('button', { name: 'Lưu mẫu' }).click();
+  await page.getByRole('button', { name: 'Lưu mẫu', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Lưu mẫu' });
   await dialog.getByLabel('Tên mẫu').fill(name);
   await dialog.getByRole('button', { name: 'Lưu', exact: true }).click();
@@ -17,7 +17,7 @@ test('on every form the template links scroll with the fields, and the fixed bar
   await signIn(page, 'tplpos');
   for (const path of ['/create', '/try-on', '/marketing-studio', '/apps/character-swap']) {
     await page.goto(path);
-    await expect(page.getByRole('button', { name: 'Lưu mẫu' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Lưu mẫu', exact: true })).toBeVisible();
     await expect(page.locator('.form-scroll > .templates'), path).toHaveCount(1);
     await expect(page.locator('.runbar').getByRole('button'), path).toHaveCount(1);
   }
