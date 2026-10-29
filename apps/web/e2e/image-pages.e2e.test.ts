@@ -392,6 +392,24 @@ test('Image Generation, as Fash text-to-image: words alone make a picture on a m
   await expect(bar.getByRole('button', { name: /^Tạo ảnh/ })).toBeDisabled();
 });
 
+test('Image Generation: with words alone on a model that needs an image, one click picks the best model that makes pictures from words', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.route(/\/api\/image-models\?feature=image/, async (r) => {
+    const body = (await (await r.fetch()).json()) as { models: { id: string }[] };
+    await r.fulfill({ json: { models: body.models.map((m) => ({ ...m, textToImage: m.id === 'mock-image-solo', recommended: m.id === 'mock-image-e2e' })) } });
+  });
+  await signIn(page, 'member10');
+  await page.goto('/image-generation');
+  const bar = page.getByRole('group', { name: 'Thanh tạo ảnh' });
+  await expect(modelButton(page)).toContainText('Mock image E2E');
+  await expect(bar.getByRole('status')).toHaveText('Mô hình này cần ít nhất 1 ảnh tham chiếu.');
+  await bar.getByRole('button', { name: 'Dùng Mock image Solo' }).click(); // not switched silently: the member picks it
+  await expect(modelButton(page)).toContainText('Mock image Solo');
+  await expect(bar.getByRole('button', { name: /^Dùng Mock/ })).toHaveCount(0);
+  await bar.getByRole('textbox', { name: 'Mô tả cảnh bạn muốn tạo' }).fill('a linen dress on a sunny balcony');
+  await expect(bar.getByRole('button', { name: /^Tạo ảnh/ })).toBeEnabled();
+});
+
 test('Image Generation: a cap refusal shows its message in Vietnamese', async ({ page }) => {
   await signIn(page, 'member10');
   await page.route(/\/api\/jobs$/, (r) => (r.request().method() === 'POST' ? r.fulfill({ status: 429, json: { error: 'Bạn đã dùng hết hạn mức chi phí hôm nay' } }) : r.fallback()));
