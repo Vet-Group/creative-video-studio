@@ -82,6 +82,8 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
                 ? 'Nhập mô tả cảnh bạn muốn tạo.'
                 : promptTooLong(chosen, prompt.trim().length);
   const canRun = reason === null && !busy;
+  // With no image and a model that needs one, the best model that makes pictures from words is one click away (not switched to silently: its price differs).
+  const wordsModel = chosen && images.length === 0 && !chosen.textToImage ? models?.filter((m) => m.textToImage).sort((a, b) => b.score - a.score)[0] : undefined;
   // The bar has no counter, as on the live page, until the text nears the model's limit (or is over it after a switch).
   const count = chosen && prompt.length >= chosen.maxPromptChars * 0.8 ? `${prompt.length}/${chosen.maxPromptChars} ký tự` : null;
 
@@ -172,6 +174,11 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
               <p className="help" id="imagegen-reason" role="status">
                 {reason}
               </p>
+            )}
+            {wordsModel && (
+              <button type="button" className="link-button" onClick={() => pick.setModelId(wordsModel.id)}>
+                Dùng {wordsModel.label}
+              </button>
             )}
             {error && (
               <p className="error" role="alert">
