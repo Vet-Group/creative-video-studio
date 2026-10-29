@@ -1,4 +1,5 @@
-// Create video's end frame on the rows the migrations seed (Kling O3 Pro takes one, Kling O1 does not), against a disposable database on the compose Postgres.
+// Create video's end frame and Run from the prompt alone on the rows the migrations seed (Kling O3 Pro takes both, Kling O1 neither), against a
+// disposable database on the compose Postgres.
 import { randomBytes } from 'node:crypto';
 import { createTestDatabase } from '@cvs/db/testing';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
@@ -74,5 +75,28 @@ describe('the end frame', () => {
     await pool.query(`update jobs set status = 'failed' where id = $1`, [id]);
     await pool.query(`update assets set deleted_at = now() where id = 'end2'`);
     expect(await errorOf(await run({ retryOf: id }))).toBe('one or more assets were deleted');
+  });
+});
+
+describe('a Run from the prompt alone', () => {
+  test('the Create picker says which models take one', async () => {
+    const r = (await (await GET_MODELS(call('/api/models?feature=video&ratio=9:16&durationSec=5'))).json()) as { models: { id: string; textOnly: boolean }[] };
+    expect(r.models.map((m) => [m.id, m.textOnly])).toEqual([['kling-o3-pro', true], ['kling-o1', false]]);
+  });
+
+  test('queues a job with no input on a model with a text twin, at the row’s own estimate', async () => {
+    const res = await run({ assetIds: [], params: { audio: 'on' } });
+    expect(res.status).toBe(201);
+    const { id } = (await res.json()) as { id: string };
+    expect((await pool.query('select input_asset_ids, prompt, preset_id from jobs where id = $1', [id])).rows[0]).toEqual({ input_asset_ids: [], prompt: 'a slow turn', preset_id: null });
+    expect((await pool.query(`select usd::text from cost_entries where job_id = $1`, [id])).rows).toEqual([{ usd: '0.7000' }]);
+  });
+
+  test('refuses no image on a model without a twin, with a preset, with an end frame, or without a prompt', async () => {
+    expect(await errorOf(await run({ assetIds: [], modelId: 'kling-o1' }))).toBe('the model needs at least one input image');
+    expect(await errorOf(await run({ assetIds: [], prompt: null, presetId: 'gentle-push-in' }))).toBe('a Run with no image takes a prompt, and no preset or end frame');
+    expect(await errorOf(await run({ assetIds: [], params: { endAssetId: 'end' } }))).toBe('a Run with no image takes a prompt, and no preset or end frame');
+    expect((await run({ assetIds: [], prompt: '   ' })).status).toBe(400);
+    expect((await run({ assetIds: [], feature: 'marketing' })).status).toBe(400);
   });
 });

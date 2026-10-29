@@ -41,6 +41,8 @@ interface Model {
   audioEstimateUsd: string | null;
   /** The model takes an end frame. */
   endFrame: boolean;
+  /** The model runs from the prompt alone, with no image. */
+  textOnly: boolean;
   passRate: number | null;
   score: number;
   recommended: boolean;
@@ -233,7 +235,9 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
 
   const chosen = models?.models.find((m) => m.id === modelId);
   const audioOn = audio && chosen?.audioEstimateUsd != null;
-  const endAssetId = chosen?.endFrame ? endFrame?.id : undefined;
+  const endAssetId = chosen?.endFrame && images.length > 0 ? endFrame?.id : undefined;
+  // As on Fash, a model with a text twin runs from the prompt alone; a preset moves the product in an image, so it needs one.
+  const wordsOnly = images.length === 0 && chosen?.textOnly === true;
   // The options follow the chosen model; before one is chosen, every model's options show.
   const durations = [...new Set(chosen ? chosen.durationsSec : (models?.models.flatMap((m) => m.durationsSec) ?? [durationSec]))].sort((a, b) => a - b);
   const ratios = chosen ? chosen.ratios : (models?.models.flatMap((m) => m.ratios) ?? [ratio]);
@@ -242,7 +246,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
   const maxImages = Math.min(MAX_IMAGES, chosen?.maxImages ?? MAX_IMAGES);
   const tooLong = presetId === '' ? promptTooLong(chosen, prompt.trim().length) : null;
   const promptOk = presetId !== '' || (prompt.trim() !== '' && tooLong === null);
-  const canRun = ready && recall.answered && !busy && images.length > 0 && chosen?.supported === true && !tooMany && promptOk;
+  const canRun = ready && recall.answered && !busy && (images.length > 0 || (wordsOnly && presetId === '')) && chosen?.supported === true && !tooMany && promptOk;
 
   async function upload(files: File[]) {
     if (files.length === 0) return;
@@ -420,9 +424,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
                 )}
                 <span className="dropzone-hint">
                   {images.length === 0
-                    ? maxImages === 1
-                      ? 'Tối đa 1 ảnh sản phẩm'
-                      : `Tối đa ${maxImages} ảnh sản phẩm`
+                    ? `Tối đa ${maxImages} ảnh sản phẩm${chosen?.textOnly ? ', hoặc chỉ viết mô tả' : ''}`
                     : images.length >= maxImages
                       ? `Đã đủ ${maxImages} ảnh`
                       : `${images.length}/${maxImages} ảnh, bấm hoặc kéo thêm`}
@@ -469,6 +471,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
             )}
             {models && models.models.length === 0 && <p className="help">Chưa bật mô hình video nào. Admin bật trong Quản trị → Cài đặt → Mô hình.</p>}
             {tooMany && chosen && <p className="error">Mô hình này nhận tối đa {chosen.maxImages} ảnh.</p>}
+            {wordsOnly && presetId !== '' && <p className="help">Mẫu chuyển động cần ảnh sản phẩm. Không có ảnh thì chọn &quot;Tự viết mô tả&quot;.</p>}
             {tooLong && (
               <p className="error" id={tooLongId}>
                 {tooLong}

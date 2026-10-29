@@ -1,7 +1,7 @@
 import { expect, type Page, test } from '@playwright/test';
-import { png, signIn } from './support.test';
+import { pickPreset, png, signIn } from './support.test';
 
-// What Create video adds on a fal model that takes it, as Fash's Create Videos page does: an End frame slot. The mock model takes none (the models API
+// What Create video adds on a fal model that takes it, as Fash's Create Videos page does: an End frame slot and a Run from the prompt alone. The mock model takes none (the models API
 // reads them from fal's request builders), so the spec gives it the flags in the models answer and checks the Run's body without making the job.
 
 /** The mock models with `extras` merged into each, as the models API would answer for a fal model that has them. */
@@ -52,4 +52,26 @@ test('the End frame slot shows only for a model that takes one, and its image go
   const again = nextRun(page);
   await page.getByRole('button', { name: /^Tạo video/ }).click();
   expect((await again).params).toEqual({ audio: 'on' });
+});
+
+test('a model that runs from the prompt alone lets Run go with no image and a written prompt, but not with a preset', async ({ page }) => {
+  const run = page.getByRole('button', { name: /^Tạo video/ });
+  await signIn(page, 'cvxa');
+  await page.getByLabel('Mô tả chuyển động').fill('A red bottle on a beach at sunset.');
+  await expect(run).toBeDisabled(); // the mock endpoint needs an image
+
+  await withExtras(page, { textOnly: true });
+  await page.reload();
+  await expect(page.getByText('Tối đa 4 ảnh sản phẩm, hoặc chỉ viết mô tả')).toBeVisible();
+  await pickPreset(page, 'gentle-push-in');
+  await expect(run).toBeDisabled();
+  await expect(page.getByText('Mẫu chuyển động cần ảnh sản phẩm.', { exact: false })).toBeVisible();
+  await pickPreset(page, '');
+  await page.getByLabel('Mô tả chuyển động').fill('A red bottle on a beach at sunset.');
+  const body = nextRun(page);
+  await run.click();
+  const sent = (await body) as { assetIds: string[]; prompt?: string; presetId?: string };
+  expect(sent.assetIds).toEqual([]);
+  expect(sent.prompt).toBe('A red bottle on a beach at sunset.');
+  expect(sent.presetId).toBeUndefined();
 });

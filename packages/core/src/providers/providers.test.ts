@@ -17,6 +17,8 @@ const readImage = async (url: string) => {
   return { bytes: new Uint8Array([1, 2, 3]), contentType: 'image/png' };
 };
 const DATA_URL = 'data:image/png;base64,AQID';
+/** The text-to-video endpoints, which stand in for an image endpoint and are never a row's own. */
+const TWINS = new Set(Object.values(VIDEO_BODIES).flatMap((b) => (b.text ? [b.text] : [])));
 
 /** A fetch that records every call and answers from a queue of [status, json] fixtures. */
 function fakeFetch(...answers: [number, unknown][]) {
@@ -83,7 +85,6 @@ describe('fal', () => {
     expect(calls).toHaveLength(withEnd.length);
     await expect(createFalProvider({ apiKey: 'k', fetch: fn }).submit({ ...req, endImageUrl: 'https://img/end.jpg', model: { ...kling, endpoint: 'fal-ai/kling-video/o1/reference-to-video' } })).rejects.toThrow(ImageReadError);
     expect(calls).toHaveLength(withEnd.length);
-    expect(videoInputs('mock')).toEqual({ endFrame: false });
   });
 
   test('an endpoint without a request builder is refused before any call', async () => {
@@ -113,8 +114,8 @@ describe('fal', () => {
   });
 
   test('a job with audio on asks every endpoint with an audio price for native audio; the others have no switch to send', async () => {
-    // The uploading endpoints (Motion Control) put their inputs in fal storage first and have no audio switch.
-    const endpoints = Object.keys(VIDEO_BODIES).filter((e) => !VIDEO_BODIES[e]!.upload);
+    // The uploading endpoints (Motion Control) put their inputs in fal storage first and have no audio switch; a text twin is priced as its image endpoint (next test).
+    const endpoints = Object.keys(VIDEO_BODIES).filter((e) => !VIDEO_BODIES[e]!.upload && !TWINS.has(e));
     const { fn, calls } = fakeFetch(...[...endpoints, 'off'].map(() => [200, { request_id: 'r' }] as [number, unknown]));
     const provider = createFalProvider({ apiKey: 'k', fetch: fn });
     for (const endpoint of endpoints) await provider.submit({ ...req, audio: true, model: { ...kling, endpoint } });
@@ -123,6 +124,58 @@ describe('fal', () => {
     expect(sent).not.toContain(false);
     await provider.submit({ ...req, model: { ...kling, endpoint: 'bytedance/seedance-2.5/us/reference-to-video' } });
     expect(calls.at(-1)!.body).toMatchObject({ generate_audio: false }); // audio off unless the job asks
+  });
+
+  test('a Run with no image goes to the text twin of its app, with the ratio, the duration and the image endpoint’s resolution and audio switch', async () => {
+    const withText = Object.keys(VIDEO_BODIES).filter((e) => videoInputs(e).textOnly);
+    // The twins whose page price equals the row's (read 2026-10-30, see VideoBody.text).
+    expect(Object.fromEntries(withText.map((e) => [e, VIDEO_BODIES[e]!.text]))).toEqual({
+      'fal-ai/kling-video/o3/pro/reference-to-video': 'fal-ai/kling-video/o3/pro/text-to-video',
+      'fal-ai/kling-video/v3/pro/image-to-video': 'fal-ai/kling-video/v3/pro/text-to-video',
+      'fal-ai/kling-video/v2.6/pro/image-to-video': 'fal-ai/kling-video/v2.6/pro/text-to-video',
+      'fal-ai/kling-video/v2.5-turbo/pro/image-to-video': 'fal-ai/kling-video/v2.5-turbo/pro/text-to-video',
+      'bytedance/seedance-2.5/us/reference-to-video': 'bytedance/seedance-2.5/us/text-to-video',
+      'bytedance/seedance-2.5/us/image-to-video': 'bytedance/seedance-2.5/us/text-to-video',
+      'bytedance/seedance-2.0/us/reference-to-video': 'bytedance/seedance-2.0/us/text-to-video',
+      'fal-ai/bytedance/seedance/v1.5/pro/image-to-video': 'fal-ai/bytedance/seedance/v1.5/pro/text-to-video',
+      'fal-ai/bytedance/seedance/v1/pro/image-to-video': 'fal-ai/bytedance/seedance/v1/pro/text-to-video',
+      'blackforestlabs/flux-3/keyframes-to-video': 'blackforestlabs/flux-3/text-to-video',
+      'blackforestlabs/flux-3/image-to-video': 'blackforestlabs/flux-3/text-to-video',
+      'google/gemini-omni-flash/v1.1/reference-to-video': 'google/gemini-omni-flash/v1.1/text-to-video',
+      'google/gemini-omni-flash/v1.1/image-to-video': 'google/gemini-omni-flash/v1.1/text-to-video',
+      'fal-ai/veo3.1/image-to-video': 'fal-ai/veo3.1',
+      'xai/grok-imagine-video/v1.5/image-to-video': 'xai/grok-imagine-video/v1.5/text-to-video',
+      'fal-ai/wan/v2.7/reference-to-video': 'fal-ai/wan/v2.7/text-to-video',
+      'fal-ai/wan/v2.7/image-to-video': 'fal-ai/wan/v2.7/text-to-video',
+      'minimax/h3-max/reference-to-video': 'minimax/h3-max/text-to-video',
+      'minimax/h3-max/image-to-video': 'minimax/h3-max/text-to-video',
+    });
+    const app = (e: string) => e.split('/').slice(0, 2).join('/');
+    const { fn, calls } = fakeFetch(...withText.flatMap(() => [[200, { request_id: 'r' }], [200, { request_id: 'r' }]] as [number, unknown][]));
+    const provider = createFalProvider({ apiKey: 'k', fetch: fn });
+    for (const [i, endpoint] of withText.entries()) {
+      const text = VIDEO_BODIES[endpoint]!.text!;
+      expect(app(text)).toBe(app(endpoint)); // so status() finds the request under the row's own endpoint
+      await provider.submit({ ...req, prompt: 'a red bottle on a beach', imageUrls: [], audio: true, model: { ...kling, endpoint, outputResolution: '768p' } });
+      await provider.submit({ ...req, audio: true, model: { ...kling, endpoint, outputResolution: '768p' } });
+      const [words, image] = [calls[2 * i]!, calls[2 * i + 1]!] as [Call, Call];
+      expect(words.url).toBe(`https://queue.fal.run/${text}`);
+      const w = words.body as Record<string, unknown>;
+      const im = image.body as Record<string, unknown>;
+      expect(w).toMatchObject({ prompt: 'a red bottle on a beach', aspect_ratio: '9:16' });
+      expect(Object.keys(w).some((k) => /image|keyframes/.test(k))).toBe(false);
+      expect([w.duration, w.resolution, w.generate_audio]).toEqual([im.duration, im.resolution, im.generate_audio]);
+    }
+    expect(calls).toHaveLength(2 * withText.length);
+  });
+
+  test('a Run with no image on a model without a text twin is refused before any call', async () => {
+    const { fn, calls } = fakeFetch();
+    for (const endpoint of ['bytedance/seedance-2.0/us/image-to-video', 'fal-ai/kling-video/o1/reference-to-video']) {
+      await expect(createFalProvider({ apiKey: 'k', fetch: fn }).submit({ ...req, imageUrls: [], model: { ...kling, endpoint } })).rejects.toThrow('needs an input image');
+    }
+    expect(calls).toHaveLength(0);
+    expect(videoInputs('mock')).toEqual({ endFrame: false, textOnly: false });
   });
 
   test('a refusal surfaces the HTTP status', async () => {

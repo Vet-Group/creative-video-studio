@@ -77,7 +77,7 @@ export async function GET(request: Request) {
 }
 
 /**
- * Create a video job: 1-4 input images the caller may use (their own, or the inputs of a succeeded Library clip for Reuse), an enabled
+ * Create a video job: 1-9 input images the caller may use (none on a model with a text-to-video twin, videoInputs `textOnly`: then a free prompt, no preset or end frame) (their own, or the inputs of a succeeded Library clip for Reuse), an enabled
  * model, a preset or a free prompt (exactly one; a free prompt is trimmed, 1 character up to the model's prompt limit (promptLimit), and stored with a null preset), the ratio and duration the model allows, and an optional visible store. The caps are checked and the job and its
  * `estimate` ledger row are written in one transaction (429 when a cap refuses, nothing sent); the pg-boss job is sent afterwards.
  * `feature` (default `video`) picks the kind of job. `video` and `marketing` take a video model and the durations above, and an optional `params.audio` (below); `video` also takes
@@ -114,8 +114,8 @@ export async function POST(request: Request) {
     const given = (rawParams && typeof rawParams === 'object' && !Array.isArray(rawParams) ? rawParams : {}) as Record<string, string>;
     const advanced = feature === 'marketing' && given.format === 'advanced';
     const maxInputs = isImage ? MAX_IMAGE_INPUTS : advanced ? MAX_ADVANCED_IMAGES : MAX_IMAGES;
-    // Image Generation may have no image (text to image, on a model that offers it: checked with the model below).
-    const fewest = feature === 'image' ? 0 : 1;
+    // Image Generation and Create video may have no image (text to image or video, on a model that offers it: checked with the model below).
+    const fewest = feature === 'image' || feature === 'video' ? 0 : 1;
     if (!Array.isArray(assetIds) || assetIds.length < fewest || assetIds.length > maxInputs || !assetIds.every((a) => typeof a === 'string') || new Set(assetIds).size !== assetIds.length) {
       return bad(`assetIds must list ${fewest} to ${maxInputs} different asset ids`);
     }
@@ -154,6 +154,8 @@ export async function POST(request: Request) {
     if (!motion && (isImage ? presetId !== null || (freePrompt === null && !Object.hasOwn(FEATURE_PROMPTS, feature)) : (presetId === null) === (freePrompt === null))) {
       return bad(isImage ? 'an image job takes a prompt and no preset (only the apps may omit the prompt)' : 'give either a presetId or a prompt, not both and not neither');
     }
+    // The presets move the product in the image, and the end frame is where the first image goes.
+    if (feature === 'video' && assetIds.length === 0 && (presetId !== null || given.endAssetId !== undefined)) return bad('a Run with no image takes a prompt, and no preset or end frame');
     // Background Changer takes a prompt (one image) or a reference image (two images), the schema says not both.
     if (feature === 'background_changer' && (assetIds.length > 1) === (freePrompt !== null)) return bad('Background Changer takes a prompt or a reference image (the second image), not both and not neither');
     if (typeof enhance !== 'boolean') return bad('enhance must be true or false');
@@ -210,6 +212,8 @@ export async function POST(request: Request) {
     if (!model?.enabled) return bad('the model does not exist or is not enabled');
     if (model.kind !== (isImage ? 'image' : 'video') || !model.features.includes(feature)) return bad('the model does not offer this feature');
     if (feature === 'image' && assetIds.length === 0 && !textToImage(model)) return bad('the model needs at least one input image');
+    // A retry copies a Run this check already passed.
+    if (!original && feature === 'video' && assetIds.length === 0 && !videoInputs(model.endpoint).textOnly) return bad('the model needs at least one input image');
     if (params.endAssetId !== undefined && !videoInputs(model.endpoint).endFrame) return bad('the model does not take an end frame');
     // Own keys only, with a plain decimal price: `in` would also accept "constructor" and friends.
     const imagePrice = isImage && Object.hasOwn(model.image_prices ?? {}, params.resolution!) ? String(model.image_prices[params.resolution!]) : null;
