@@ -78,6 +78,9 @@ export interface RunningWorker {
 
 const log = (what: string, e: unknown) => console.error(`worker: ${what}:`, e instanceof Error ? e.message : e);
 
+/** The input whose frame the result keeps, by the order the pages send (lib/apps.ts slots): Try On's person and Background Changer's photo come first, a swap's target and Jewelry Try-On's wearer last. */
+const KEPT_INPUT: Partial<Record<string, 0 | -1>> = { try_on: 0, background_changer: 0, character_swap: -1, model_swap: -1, face_swap: -1, jewelry_try_on: -1 };
+
 function sleep(ms: number, signal: AbortSignal): Promise<void> {
   return new Promise((resolve) => {
     const done = () => {
@@ -213,9 +216,10 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
           const provider = imageProviders[job.provider];
           if (!provider) throw new Error(`no adapter for provider ${job.provider}`);
           const model = await loadImageModel(job.model);
-          // On 'auto' Nano Banana Pro took the garment photo's ratio and reframed the person (Try On bake-off, 2026-10-29), so Try On asks for the
-          // ratio of the person photo, which the page sends first.
-          const ratio = job.feature === 'try_on' && job.aspect === 'auto' ? await closestRatio(await readAsset(job.input_asset_ids[0]), model.ratios) : job.aspect;
+          // On 'auto' Nano Banana Pro took the garment photo's ratio and reframed the person (Try On bake-off, 2026-10-29), so a job that keeps one
+          // input's frame asks for that input's ratio.
+          const kept = KEPT_INPUT[job.feature];
+          const ratio = kept !== undefined && job.aspect === 'auto' ? await closestRatio(await readAsset(job.input_asset_ids.at(kept)), model.ratios) : job.aspect;
           const request: ImageSubmitRequest = { model, prompt: job.prompt, imageUrls, ratio, resolution: job.params.resolution, quality: job.params.quality };
           return { send: () => provider.submit(request) };
         }
