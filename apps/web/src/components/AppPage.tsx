@@ -266,7 +266,7 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
         </div>
 
         <div className="side" id={`app-panel-${panel}`} role="tabpanel" aria-labelledby={`app-tab-${panel}`} hidden={narrow && shown === 'create'}>
-          <FormContext.Provider value={{ recreate: (from) => (recreate(from), narrow && setTab('create')) }}>
+          <FormContext.Provider value={{ recreate: (from) => (recall.touch(), recreate(from), narrow && setTab('create')) }}>
             {shown === 'history' ? <Tray feature={app.feature} /> : <AppAbout app={app} />}
           </FormContext.Provider>
         </div>
@@ -510,7 +510,7 @@ function MotionForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
         </div>
 
         <div className="side" id={`app-panel-${panel}`} role="tabpanel" aria-labelledby={`app-tab-${panel}`} hidden={narrow && shown === 'create'}>
-          <FormContext.Provider value={{ recreate: (from) => (recreate(from), narrow && setTab('create')) }}>
+          <FormContext.Provider value={{ recreate: (from) => (recall.touch(), recreate(from), narrow && setTab('create')) }}>
             {shown === 'history' ? <Tray feature={app.feature} /> : <AppAbout app={app} />}
           </FormContext.Provider>
         </div>

@@ -184,3 +184,27 @@ test('a memory that hangs holds Run only for a while: then the page goes on its 
   await expect(select(page, 'Độ phân giải')).toHaveAttribute('data-value', '1K');
   await page.unrouteAll({ behavior: 'ignoreErrors' });
 });
+
+test('Dùng lại clicked before the memory answers wins: a field the job leaves empty stays on the default, not on the late memory', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await signIn(page, 'remd');
+  await clearMyJobs(page);
+  const res = await page.request.post('/api/jobs', { data: { feature: 'image', assetIds: [], modelId: 'mock-image-e2e', prompt: 'recreate race', ratio: '1:1', params: { resolution: '1K' } } });
+  expect(res.status()).toBe(201);
+  const id = ((await res.json()) as { id: string }).id;
+  await page.route(/\/api\/recall\?feature=image/, async (r) => {
+    await new Promise((done) => setTimeout(done, 4000)); // the memory answers while the job is still loading
+    await r.fulfill({ json: { settings: { modelId: 'mock-image-e2e', ratio: '16:9', durationSec: null, resolution: '2K', audio: null, enhance: null, storeId: null } } });
+  });
+  await page.route(`**/api/jobs/${id}`, async (r) => {
+    await new Promise((done) => setTimeout(done, 8000));
+    await r.fulfill({ json: { feature: 'image', images: [], prompt: 'recreate race', brief: null, garments: null, enhance: false, ratio: null, resolution: null, modelId: 'mock-image-e2e' } });
+  });
+  await page.goto('/image-generation');
+  await page.getByRole('tab', { name: 'Lịch sử' }).click();
+  await page.getByRole('complementary', { name: 'Job của tôi' }).getByRole('listitem').filter({ hasText: 'recreate race' }).getByRole('button', { name: 'Dùng lại' }).click();
+  await expect(page.getByRole('group', { name: 'Thanh tạo ảnh' }).getByRole('textbox', { name: 'Mô tả cảnh bạn muốn tạo' })).toHaveValue('recreate race', { timeout: 20_000 });
+  await expect(select(page, 'Tỉ lệ')).toHaveAttribute('data-value', 'auto');
+  await expect(select(page, 'Độ phân giải')).toHaveAttribute('data-value', '1K');
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
+});
