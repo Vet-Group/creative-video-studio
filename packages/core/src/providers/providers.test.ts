@@ -233,6 +233,19 @@ describe('fal Motion Control', () => {
     expect(submit.body).toEqual({ image_url: 'https://v3b.fal.media/files/image-png', video_url: 'https://v3b.fal.media/files/video-mp4', character_orientation: 'video', keep_original_sound: false });
   });
 
+  test('more than 4 images go through fal storage on any endpoint, since 9 shrunk inputs inlined would pass the inline limit; 4 stay inlined', async () => {
+    const ref = { ...kling, id: 'minimax-h3-max-reference', endpoint: 'minimax/h3-max/reference-to-video', outputResolution: '768p' };
+    const nine = Array.from({ length: 9 }, (_, i) => `asset://img${i}`);
+    const many = falFake();
+    await createFalProvider({ apiKey: 'k', fetch: many.fn, readImage: read }).submit({ ...base, model: ref, imageUrls: nine });
+    expect(many.calls.filter((c) => c.url.includes('/storage/upload/initiate'))).toHaveLength(9);
+    expect((many.calls.at(-1)!.body as { reference_image_urls: string[] }).reference_image_urls).toEqual(Array(9).fill('https://v3b.fal.media/files/image-png'));
+    const four = falFake();
+    await createFalProvider({ apiKey: 'k', fetch: four.fn, readImage: read }).submit({ ...base, model: ref, imageUrls: nine.slice(0, 4) });
+    expect(four.calls.some((c) => c.url.includes('/storage/upload/initiate'))).toBe(false);
+    expect((four.calls.at(-1)!.body as { reference_image_urls: string[] }).reference_image_urls.every((u) => u.startsWith('data:image/png;base64,'))).toBe(true);
+  });
+
   test('a written prompt is sent; a failed upload or a missing video submits nothing and is an ImageReadError', async () => {
     const ok = falFake();
     await createFalProvider({ apiKey: 'k', fetch: ok.fn, readImage: read }).submit({ ...base, model: motionModel, prompt: 'a dancer', imageUrls: inputs, ratio: 'auto', durationSec: 5 });

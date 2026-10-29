@@ -151,6 +151,9 @@ async function uploadInputs(f: Fetch, apiKey: string, urls: string[], readImage?
   );
 }
 
+/** The worker shrinks each inlined input to 600 KB so that 4 fit the inline limit; more (up to 9 references) go through fal storage instead. */
+const MAX_INLINE_INPUTS = 4;
+
 export function createFalProvider(opts: { apiKey: string; fetch?: Fetch; readImage?: ReadImage }): VideoProvider {
   const f = opts.fetch ?? fetch;
   const headers = falHeaders(opts.apiKey);
@@ -158,7 +161,7 @@ export function createFalProvider(opts: { apiKey: string; fetch?: Fetch; readIma
     async submit(req) {
       const spec = VIDEO_BODIES[req.model.endpoint];
       if (!spec) throw new ImageReadError(`fal video: no request builder for ${req.model.endpoint}`);
-      const inputs = spec.upload ? await uploadInputs(f, opts.apiKey, req.imageUrls, opts.readImage) : await resolveImages(req.imageUrls, opts.readImage, spec.crop ? { ratio: req.ratio } : undefined);
+      const inputs = spec.upload || req.imageUrls.length > MAX_INLINE_INPUTS ? await uploadInputs(f, opts.apiKey, req.imageUrls, opts.readImage) : await resolveImages(req.imageUrls, opts.readImage, spec.crop ? { ratio: req.ratio } : undefined);
       const body = spec.build(req, inputs);
       const res = (await sendJson(f, 'fal submit', `${QUEUE}/${req.model.endpoint}`, { method: 'POST', headers, body: JSON.stringify(body) })) as { request_id?: string };
       if (!res.request_id) throw new Error('fal submit: no request_id in the response');
