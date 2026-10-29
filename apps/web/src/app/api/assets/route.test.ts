@@ -396,6 +396,20 @@ describe('GET /api/assets?recent=marketing-product', () => {
     ]);
   });
 
+  test("lists the caller's own Try On model photos (the first input) for the model picker's My models, newest first", async () => {
+    const up = (name: string) => uploadOne(ownerCookie, png(64), name);
+    const [m1, m2, garment] = [await up('model-1.png'), await up('model-2.png'), await up('garment.png')];
+    for (const [inputs, ago] of [[[m1, garment], 20], [[m2, garment], 10]] as const) {
+      await pool.query(
+        `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, status, feature, params, created_at)
+         values ($1, $2, 'team-unassigned', 'fal-test', 'fal', 'p', 'auto', 0, $3, 'succeeded', 'try_on', '{}', now() - make_interval(mins => $4))`,
+        [`tro-${randomBytes(4).toString('hex')}`, ownerId, inputs, ago],
+      );
+    }
+    const res = await recent(ownerCookie, '?recent=try-on-model');
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { assets: { id: string }[] }).assets.map((a) => a.id)).toEqual([m2, m1]);
+  });
   test("never shows another member's products, and asks for a session and the one supported query", async () => {
     expect(((await (await recent(otherCookie)).json()) as { assets: unknown[] }).assets).toEqual([]);
     expect((await recent('')).status).toBe(401);

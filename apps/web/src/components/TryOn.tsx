@@ -1,7 +1,7 @@
 'use client';
 // Try On: a settings card (garments, the model photo, an optional background, model, prompt, resolution, ratio) beside the History, Examples and About tabs,
 // laid out like Create. Run posts a try_on job; the inputs go in the order the API expects: the person first, then the garments, then the background.
-import { useId, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { api, errorText, sendJson } from '@/lib/api';
 import { promptTooLong } from '@/lib/prompt-limit';
 import { tryOnPrompt } from '@/lib/try-on-prompt';
@@ -22,7 +22,7 @@ const TAB_LABEL: Record<Tab, string> = { create: 'Tạo', history: 'Lịch sử'
 const MAX_GARMENTS = 5; // Fash's Nano Banana Pro try-on takes 5 garments (its MaxInputImageCount, read 2026-10-29)
 
 export function TryOn({ reuse }: { reuse?: string }) {
-  const { refresh, notify } = useJobs();
+  const { refresh, notify, loading } = useJobs();
   const narrow = useMediaQuery(NARROW);
   const [garments, setGarments] = useState<Img[]>([]);
   const have = useSamples();
@@ -33,6 +33,14 @@ export function TryOn({ reuse }: { reuse?: string }) {
   const models0 = stockModels(have);
   const backgrounds = backgroundsIn(have);
   const categories = GARMENT_CATEGORIES.filter((c) => garmentsOf(have, c.id).length > 0);
+  /** The member's own model photos from earlier Try On jobs (Fash's My Models); a failure leaves just the stock ones. */
+  const [myModels, setMyModels] = useState<Img[]>([]);
+  useEffect(() => {
+    api<{ assets: Img[] }>('/api/assets?recent=try-on-model').then(
+      (r) => setMyModels(r.assets),
+      () => {},
+    );
+  }, []);
   const [person, setPerson] = useState<Img[]>([]);
   const [background, setBackground] = useState<Img[]>([]);
   const [prompt, setPrompt] = useState('');
@@ -93,7 +101,7 @@ export function TryOn({ reuse }: { reuse?: string }) {
     if (role === 'garment' && garments.length >= MAX_GARMENTS) return notify(`Tối đa ${MAX_GARMENTS} ảnh trang phục`);
     setError('');
     try {
-      const img = await photoImg(p);
+      const img = await photoImg(p).finally(loading('Đang tải ảnh...'));
       if (role === 'model') setPerson([img]);
       else if (role === 'background') setBackground([img]);
       else setGarments((cur) => (cur.length < MAX_GARMENTS ? [...cur, img] : cur));
@@ -161,7 +169,7 @@ export function TryOn({ reuse }: { reuse?: string }) {
         <div className="card form-card" id="tryon-panel-create" role={narrow ? 'tabpanel' : undefined} aria-labelledby={narrow ? 'tryon-tab-create' : undefined} hidden={narrow && shown !== 'create'}>
           <div className="form-scroll">
             <Slot label="Trang phục" empty="Thêm 1 đến 5 ảnh trang phục" inputLabel="Ảnh trang phục" images={garments} max={MAX_GARMENTS} busy={busy} onAdd={add(setGarments)} onRemove={(id) => setGarments((c) => c.filter((i) => i.id !== id))} samples={categories.length > 0 ? [] : samplesOf('garment')} onBrowse={categories.length > 0 ? () => setPicker({ role: 'garment' }) : undefined} />
-            <Slot label="Người mẫu" empty="Thêm 1 ảnh người mẫu" inputLabel="Ảnh người mẫu" images={person} max={1} busy={busy} onAdd={add(setPerson)} onRemove={(id) => setPerson((c) => c.filter((i) => i.id !== id))} samples={models0.length > 0 ? [] : samplesOf('model')} onBrowse={models0.length > 0 ? () => setPicker({ role: 'model' }) : undefined} />
+            <Slot label="Người mẫu" empty="Thêm 1 ảnh người mẫu" inputLabel="Ảnh người mẫu" images={person} max={1} busy={busy} onAdd={add(setPerson)} onRemove={(id) => setPerson((c) => c.filter((i) => i.id !== id))} samples={models0.length > 0 ? [] : samplesOf('model')} onBrowse={models0.length + myModels.length > 0 ? () => setPicker({ role: 'model' }) : undefined} />
             <Slot label="Bối cảnh (tuỳ chọn)" empty="Thêm 1 ảnh bối cảnh nếu muốn" inputLabel="Ảnh bối cảnh" images={background} max={1} busy={busy} onAdd={add(setBackground)} onRemove={(id) => setBackground((c) => c.filter((i) => i.id !== id))} samples={backgrounds.length > 0 ? [] : samplesOf('background')} onBrowse={backgrounds.length > 0 ? () => setPicker({ role: 'background' }) : undefined} />
             <PhotoDialog
               open={picker !== null}
@@ -178,6 +186,7 @@ export function TryOn({ reuse }: { reuse?: string }) {
               onFile={(files) => void add(picker?.role === 'model' ? setPerson : picker?.role === 'background' ? setBackground : setGarments)(files)}
               onClose={() => setPicker(null)}
               onBack={picker?.of ? () => setPicker({ role: picker.role }) : undefined}
+              mine={picker?.role === 'model' && !picker.of ? { title: 'Người mẫu của tôi', tiles: myModels.map((a) => ({ key: a.id, src: `/api/assets/${a.id}/content`, label: `Dùng lại ${a.filename}`, pick: () => setPerson([a]) })) } : undefined}
             />
 
             {models && models.length > 0 && <ModelPicker models={pick.options} value={pick.modelId} onChange={pick.setModelId} />}

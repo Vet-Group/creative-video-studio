@@ -105,6 +105,21 @@ test("as on Fash, a History card's words, inputs and result go on the form besid
   expect(await page.url()).toMatch(/\/image-generation$/);
 });
 
+test("as Fash's Generate Video, an image in History opens Create video with the picture as its first image", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await signIn(page, 'vidfrom');
+  const res = await page.request.post('/api/jobs', { data: { feature: 'image', modelId: 'mock-image-e2e', assetIds: [], ratio: '1:1', prompt: 'a picture to animate', enhance: false, params: { resolution: '1K' } } });
+  expect(res.status()).toBe(201);
+  await page.goto('/image-generation');
+  await page.getByRole('tab', { name: 'Lịch sử' }).click();
+  const card = page.getByRole('complementary', { name: 'Job của tôi' }).getByRole('listitem').filter({ hasText: 'a picture to animate' });
+  await expect(card.getByText('Hoàn tất')).toBeVisible({ timeout: 60_000 });
+  await card.getByRole('link', { name: 'Tạo video' }).click();
+  await expect(page).toHaveURL(/\/create\?image=[\w-]+$/);
+  await expect(page.getByLabel('Ảnh đã chọn').getByRole('img')).toHaveCount(1);
+  await expect(page.getByRole('textbox', { name: 'Mô tả chuyển động' })).toHaveValue('');
+});
+
 test('the Library item detail shows the result large with its words, inputs and chips, steps to the next item and closes on Esc', async ({ page }) => {
   await signIn(page, 'hista');
   const up = async (name: string) => ((await (await page.request.post('/api/assets', { multipart: { file: { name, mimeType: 'image/png', buffer: png() } } })).json()) as { assets: { id: string }[] }).assets[0]!.id;

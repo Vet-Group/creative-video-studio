@@ -219,6 +219,12 @@ function HistoryCard({ job, isAdmin }: { job: TrayJob; isAdmin: boolean }) {
             <Icon name="right" /> Dùng kết quả
           </button>
         )}
+        {/* Fash's Generate Video on an image: Create video opens with the picture as its first image. */}
+        {out && image && (
+          <Link href={`/create?image=${out}`} className="job-reuse">
+            <Icon name="film" /> Tạo video
+          </Link>
+        )}
       </div>
     </li>
   );

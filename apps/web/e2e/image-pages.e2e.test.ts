@@ -553,7 +553,7 @@ test("Try On, as Fash's pickers: a stock model then its pose, a garment category
   await asAdmin((name) => page.request.put(`/api/admin/samples/${name}`, { data: jpg(), headers: { 'content-type': 'image/jpeg' } }));
   try {
     await page.setViewportSize({ width: 1440, height: 1000 });
-    await signIn(page, 'member9');
+    await signIn(page, 'pickera');
     await page.goto('/try-on');
     const chosen = (slot: string) => page.getByLabel(`${slot}: ảnh đã chọn`).getByRole('img');
     // Each slot opens its picker once the sample list is in; until then it is an own-file upload.
@@ -565,9 +565,15 @@ test("Try On, as Fash's pickers: a stock model then its pose, a garment category
     const poses = page.getByRole('dialog', { name: 'Chọn tư thế' });
     await poses.getByRole('button', { name: 'Quay lại' }).click(); // back to the models, as Fash's arrow
     await models.getByRole('button', { name: 'Người mẫu có sẵn 1' }).click();
+    // The photo goes up as the member's own input; a note says so until it is in, so a slow upload never looks like nothing happened.
+    const loadingNote = page.getByRole('region', { name: 'Thông báo' }).getByText('Đang tải ảnh...');
+    await page.route('**/api/assets', async (r) => (r.request().method() === 'POST' ? (await new Promise((done) => setTimeout(done, 1500)), r.continue()) : r.continue()));
     await poses.getByRole('button', { name: 'Tư thế 1' }).click();
     await expect(poses).toBeHidden();
+    await expect(loadingNote).toBeVisible();
     await expect(chosen('Người mẫu')).toHaveCount(1);
+    await expect(loadingNote).toBeHidden();
+    await page.unroute('**/api/assets');
 
     await page.getByRole('button', { name: 'Tải lên Trang phục' }).click();
     await page.getByRole('dialog', { name: 'Chọn trang phục' }).getByRole('button', { name: 'Áo' }).click();
@@ -581,6 +587,17 @@ test("Try On, as Fash's pickers: a stock model then its pose, a garment category
     await page.getByRole('dialog', { name: 'Chọn bối cảnh' }).getByRole('button', { name: 'New York Streets' }).click();
     await expect(chosen('Bối cảnh (tuỳ chọn)')).toHaveCount(1);
     await expect(page.getByRole('region', { name: 'Thông báo' }).getByText('Đã chọn bối cảnh')).toBeVisible();
+
+    // My models, as on Fash: the model photo of an earlier Try On job, under its own heading in the model picker.
+    const up = async (name: string) => ((await (await page.request.post('/api/assets', { multipart: { file: { name, mimeType: 'image/png', buffer: png() } } })).json()) as { assets: { id: string }[] }).assets[0]!.id;
+    const done = await page.request.post('/api/jobs', { data: { feature: 'try_on', modelId: 'mock-image-e2e', assetIds: [await up('my-model.png'), await up('my-garment.png')], ratio: 'auto', prompt: '', enhance: false, params: { resolution: '1K', garments: '1' } } });
+    expect(done.status(), await done.text()).toBe(201);
+    await page.reload();
+    await expect(page.getByRole('button', { name: 'Tải lên Người mẫu' })).toHaveAttribute('aria-haspopup', 'dialog');
+    await page.getByRole('button', { name: 'Tải lên Người mẫu' }).click();
+    const mine = page.getByRole('dialog', { name: 'Chọn người mẫu' }).getByRole('region', { name: 'Người mẫu của tôi' });
+    await mine.getByRole('button', { name: 'Dùng lại my-model.png' }).click();
+    await expect(page.getByLabel('Người mẫu: ảnh đã chọn').getByRole('img', { name: 'my-model.png' })).toBeVisible();
   } finally {
     await asAdmin((name) => page.request.delete(`/api/admin/samples/${name}`));
   }
