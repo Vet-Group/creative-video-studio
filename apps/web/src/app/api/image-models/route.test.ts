@@ -103,7 +103,7 @@ describe('GET /api/image-models', () => {
     await setEnabled('nano-banana-pro', true);
     try {
       const pro = (await list('try_on')).find((m) => m.id === 'nano-banana-pro');
-      expect(pro).toMatchObject({ label: 'Nano Banana Pro', resolutions: ['1K', '2K', '4K'], prices: { '1K': '0.1500', '2K': '0.1500', '4K': '0.3000' }, maxImages: 4 });
+      expect(pro).toMatchObject({ label: 'Nano Banana Pro', resolutions: ['1K', '2K', '4K'], prices: { '1K': '0.1500', '2K': '0.1500', '4K': '0.3000' }, maxImages: 14 }); // up to 14 reference images (0030)
       expect(pro!.ratios).toContain('21:9');
     } finally {
       await setEnabled('nano-banana-pro', false);

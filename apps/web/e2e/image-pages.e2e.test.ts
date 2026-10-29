@@ -14,6 +14,26 @@ async function libraryChip(page: Page, chip: string): Promise<void> {
   await expect(page.getByRole('group', { name: 'Loại' }).getByRole('button', { name: chip, exact: true })).toHaveAttribute('aria-pressed', 'true');
 }
 
+test('Try On takes 5 garments, as Fash does with Nano Banana Pro, when the model takes that many photos', async ({ page }) => {
+  // Nano Banana Pro takes 14 photos (fal, read 2026-10-29); the mock model is shown with that limit, and nothing is run.
+  await page.route(/\/api\/image-models\?/, async (r) => {
+    const res = await r.fetch();
+    const json = (await res.json()) as { models: { maxImages: number }[] };
+    return r.fulfill({ json: { ...json, models: json.models.map((m) => ({ ...m, maxImages: 14 })) } });
+  });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await signIn(page, 'member9');
+  await page.goto('/try-on');
+  await expect(modelButton(page)).toContainText('Mock image E2E');
+  await expect(page.getByText('Thêm 1 đến 5 ảnh trang phục')).toBeVisible();
+  await page.getByLabel('Ảnh trang phục').setInputFiles([1, 2, 3, 4, 5, 6].map((n) => file(`g${n}.png`)));
+  await expect(page.getByLabel('Trang phục: ảnh đã chọn').getByRole('img')).toHaveCount(5); // the sixth is left out
+  await page.getByLabel('Ảnh người mẫu').setInputFiles(file('person.png'));
+  await page.getByLabel('Ảnh bối cảnh').setInputFiles(file('scene.png'));
+  await expect(page.getByRole('button', { name: /^Thử đồ/ })).toBeEnabled(); // 7 photos: under the model's 14
+  await expect(page.locator('.form-message').getByRole('status')).toHaveCount(0);
+});
+
 test('Try On: a missing slot keeps Run disabled with a reason, a mock run reaches History and the Thử đồ chip, and the inputs go person, garment, background', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await signIn(page, 'member9');
