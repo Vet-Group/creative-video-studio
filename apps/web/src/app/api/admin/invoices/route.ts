@@ -4,7 +4,7 @@ import { pool } from '@/lib/auth';
 import { invoiceRows } from '@/lib/costs';
 import { guard } from '@/lib/session';
 
-const PROVIDERS = ['fal', 'replicate'];
+const PROVIDERS = ['fal', 'replicate', 'vertex'];
 
 /**
  * Admin: enter a provider's invoice total for a month, `{ month, provider, totalUsd }`. It books an `invoice_diff` row equal to the invoice minus

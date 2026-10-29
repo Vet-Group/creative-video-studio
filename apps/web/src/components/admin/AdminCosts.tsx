@@ -43,7 +43,7 @@ interface Costs {
   invoices: Invoice[];
 }
 
-const PROVIDERS = ['fal', 'replicate'];
+const PROVIDERS = ['fal', 'replicate', 'vertex'];
 const KIND_LABEL: Record<string, string> = { bakeoff: 'Thử nghiệm mô hình', manual_adjustment: 'Điều chỉnh tay', invoice_diff: 'Chênh lệch hóa đơn' };
 const vnd = (v: string | null) => (v === null ? '—' : `${Number(v).toLocaleString('vi-VN')} ₫`);
 

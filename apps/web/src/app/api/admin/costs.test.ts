@@ -491,6 +491,12 @@ describe('invoices', () => {
     expect(await aug('fal', '92.15', '2026-07')).toMatchObject({ bookedUsd: '2.1500', invoice: { diffUsd: '-2.8500', red: false } });
   });
 
+  test('takes a Vertex invoice too; one that matches the ledger books no difference', async () => {
+    const ledger = await ledgerCount();
+    expect(await aug('vertex', '0', '2026-06')).toEqual({ month: '2026-06', bookedUsd: '0.0000', invoice: { provider: 'vertex', totalUsd: '0.0000', ledgerUsd: '0.0000', diffUsd: '0.0000', red: false, utcMonthUsd: '0.0000' } });
+    expect(await ledgerCount()).toBe(ledger);
+  });
+
   test.each([
     ['an unknown provider', { month: M, provider: 'mock', totalUsd: 1 }],
     ['a missing provider', { month: M, totalUsd: 1 }],

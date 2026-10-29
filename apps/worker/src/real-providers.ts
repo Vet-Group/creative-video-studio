@@ -4,6 +4,8 @@ import { createFalSuggester } from '@cvs/core/suggest';
 import { createFalImageProvider, createFalProvider } from '@cvs/core/providers/fal';
 import type { ReadImage } from '@cvs/core/providers/http';
 import { createReplicateProvider } from '@cvs/core/providers/replicate';
+import { createVertexImageProvider, type ServiceAccountKey } from '@cvs/core/providers/vertex';
+import { readFileSync } from 'node:fs';
 import sharp from 'sharp';
 import type { WorkerDeps } from './worker';
 import { getObject } from './storage';
@@ -51,7 +53,7 @@ export const assetReader =
     return fitForInline(cropped.bytes, cropped.contentType);
   };
 
-/** fal serves the video and image models, Replicate the video ones. */
+/** fal serves the video and image models, Replicate the video ones, Vertex (a service account key file) the image ones. */
 export function realProviders(pool: WorkerDeps['pool'], env: NodeJS.ProcessEnv = process.env, read?: (key: string) => Promise<Uint8Array>): Pick<WorkerDeps, 'providers' | 'imageProviders' | 'enhance' | 'suggest'> {
   const readImage = assetReader(pool, read);
   const providers: WorkerDeps['providers'] = {};
@@ -65,5 +67,11 @@ export function realProviders(pool: WorkerDeps['pool'], env: NodeJS.ProcessEnv =
     suggest = createFalSuggester({ apiKey: env.FAL_KEY });
   }
   if (env.REPLICATE_API_TOKEN) providers.replicate = createReplicateProvider({ apiToken: env.REPLICATE_API_TOKEN, readImage });
+  if (env.GOOGLE_APPLICATION_CREDENTIALS) {
+    const key = JSON.parse(readFileSync(env.GOOGLE_APPLICATION_CREDENTIALS, 'utf8')) as ServiceAccountKey & { project_id?: string };
+    const project = env.GOOGLE_CLOUD_PROJECT || key.project_id;
+    if (!project) throw new Error('GOOGLE_CLOUD_PROJECT is not set and the key file has no project_id');
+    imageProviders.vertex = createVertexImageProvider({ key, project, region: env.GOOGLE_CLOUD_LOCATION || undefined, readImage });
+  }
   return { providers, imageProviders, enhance, suggest };
 }

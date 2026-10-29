@@ -29,7 +29,7 @@ export const ASPECTS = ['9:16', '1:1'] as const;
 /** Every ratio a job may store: 'auto' (follow the input) and the image models' ratios. A video Run is still limited to its model's own ratios. */
 export const IMAGE_RATIOS = ['auto', '1:1', '9:16', '16:9', '3:4', '4:3', '2:3', '3:2', '4:5', '5:4', '21:9'] as const;
 export const MODEL_KINDS = ['video', 'image'] as const;
-export const PROVIDERS = ['fal', 'replicate', 'mock'] as const;
+export const PROVIDERS = ['fal', 'replicate', 'vertex', 'mock'] as const;
 /** What a job is for. `video` and `marketing` spend the company video budget; the rest share the image and apps budget (FEATURE_BUDGET). */
 export const FEATURES = [
   'video', 'marketing', 'try_on', 'image', 'character_swap', 'model_swap', 'background_changer', 'reframe', 'image_upscale', 'face_swap',
@@ -213,7 +213,7 @@ export const modelConfigs = pgTable(
     updatedAt: tstz('updated_at').notNull().defaultNow(),
   },
   (t) => [
-    check('model_configs_provider_check', sql`${t.provider} in ('fal', 'replicate', 'mock')`),
+    check('model_configs_provider_check', sql`${t.provider} in ('fal', 'replicate', 'vertex', 'mock')`),
     check('model_configs_kind_check', sql`${t.kind} in ('video', 'image')`),
     check('model_configs_max_prompt_chars_check', sql`${t.maxPromptChars} > 0`),
     check(
@@ -293,7 +293,7 @@ export const jobs = pgTable(
     index('jobs_status_idx').on(t.status),
     check('jobs_status_check', sql`${t.status} in ('queued', 'submitting', 'running', 'succeeded', 'failed', 'failed_unknown', 'timed_out')`),
     check('jobs_aspect_check', sql`${t.aspect} in ('auto', '1:1', '9:16', '16:9', '3:4', '4:3', '2:3', '3:2', '4:5', '5:4', '21:9')`),
-    check('jobs_provider_check', sql`${t.provider} in ('fal', 'replicate', 'mock')`),
+    check('jobs_provider_check', sql`${t.provider} in ('fal', 'replicate', 'vertex', 'mock')`),
     check('jobs_feature_check', sql`${t.feature} in ('video', 'marketing', 'try_on', 'image', 'character_swap', 'model_swap', 'background_changer', 'reframe', 'image_upscale', 'face_swap', 'background_remover', 'motion_control', 'media_optimizer', 'jewelry_try_on')`),
   ],
 );

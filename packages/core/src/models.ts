@@ -23,7 +23,7 @@ export interface ModelConfig {
 /** An image model: priced per image and resolution, with no durations. `ratios` may include 'auto' (follow the input). */
 export interface ImageModelConfig {
   id: string;
-  provider: 'fal' | 'replicate' | 'mock';
+  provider: 'fal' | 'replicate' | 'vertex' | 'mock';
   endpoint: string;
   label: string;
   ratios: string[];

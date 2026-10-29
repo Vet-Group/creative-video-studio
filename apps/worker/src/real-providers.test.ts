@@ -1,5 +1,8 @@
 // The real adapters are wired by key, and read input assets from the bucket; fetch is faked, so no test reaches a provider.
 import { BAKEOFF_MODELS } from '@cvs/core/models';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import sharp from 'sharp';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { assetReader, cropToRatio, fitForInline, MAX_INLINE_BYTES, realProviders } from './real-providers';
@@ -24,6 +27,21 @@ describe('realProviders', () => {
     expect([Object.keys(fal.providers), Object.keys(fal.imageProviders!)]).toEqual([['fal'], ['fal']]);
     const both = realProviders(pool([]), { FAL_KEY: 'k', REPLICATE_API_TOKEN: 't' });
     expect([Object.keys(both.providers), Object.keys(both.imageProviders!)]).toEqual([['fal', 'replicate'], ['fal']]);
+  });
+
+  test('wires Vertex image models from the key file, with the project from the env or else the key', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'cvs-vertex-'));
+    const file = join(dir, 'key.json');
+    writeFileSync(file, JSON.stringify({ client_email: 'sa@p.iam.gserviceaccount.com', private_key: 'unused', project_id: 'from-key' }));
+    try {
+      const vertex = realProviders(pool([]), { GOOGLE_APPLICATION_CREDENTIALS: file });
+      expect([Object.keys(vertex.providers), Object.keys(vertex.imageProviders!)]).toEqual([[], ['vertex']]);
+      writeFileSync(file, JSON.stringify({ client_email: 'sa@p.iam.gserviceaccount.com', private_key: 'unused' }));
+      expect(Object.keys(realProviders(pool([]), { GOOGLE_APPLICATION_CREDENTIALS: file, GOOGLE_CLOUD_PROJECT: 'p' }).imageProviders!)).toEqual(['vertex']);
+      expect(() => realProviders(pool([]), { GOOGLE_APPLICATION_CREDENTIALS: file })).toThrow(/GOOGLE_CLOUD_PROJECT/);
+    } finally {
+      rmSync(dir, { recursive: true });
+    }
   });
 
   test('submits a Kling job to fal with the input asset inlined from the bucket', async () => {
