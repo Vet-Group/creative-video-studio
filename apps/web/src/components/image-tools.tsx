@@ -30,6 +30,8 @@ export interface ImageModel {
   maxPromptChars: number;
   /** It makes a picture from words alone (Image Generation with no reference image). */
   textToImage: boolean;
+  /** The thinking levels it takes, the first the default (Nano Banana 2.1); empty for none. */
+  thinking: string[];
   /** The recommendation score (0-100) for this feature, and whether it is the one to recommend. */
   score: number;
   recommended: boolean;
@@ -40,6 +42,8 @@ export interface Img {
 }
 
 export const RATIO_LABEL: Record<string, string> = { auto: 'Tự động' };
+/** Fash's Minimal, Medium and High. */
+export const THINKING_LABEL: Record<string, string> = { minimal: 'Tối thiểu', medium: 'Vừa', high: 'Cao' };
 export const UPLOAD_ERROR = 'Không tải ảnh lên được. Ảnh phải là JPEG, PNG hoặc WebP, tối đa 10 MB mỗi ảnh.';
 
 /** The enabled image models of a feature, from /api/image-models; `models` is null while loading and `failed` once the request has failed. */
@@ -55,22 +59,24 @@ export function useImageModels(feature: string): { models: ImageModel[] | null; 
 }
 
 /**
- * The model, ratio and resolution of a Run. The chosen model stays while it is listed (until one is chosen, the recommended model that takes the inputs);
- * a ratio or resolution the model lacks falls back to its first,
+ * The model, ratio, resolution and thinking level of a Run. The chosen model stays while it is listed (until one is chosen, the recommended model that takes the inputs);
+ * a ratio, resolution or thinking level the model lacks falls back to its first (a model with no levels has none),
  * so the options always match the model. `images` is how many inputs the Run has: a model that takes fewer is shown as not supported.
  */
 export function useImageChoice(models: ImageModel[] | null, images: number, initialModel = '') {
   const [modelId, setModelId] = useState(initialModel);
   const [wantRatio, setRatio] = useState('auto');
   const [wantResolution, setResolution] = useState('1K');
+  const [wantThinking, setThinking] = useState('');
   const fits = (m: ImageModel) => m.maxImages >= images;
   const chosen = models?.find((m) => m.id === modelId) ?? models?.find((m) => m.recommended && fits(m)) ?? models?.find(fits) ?? models?.[0];
   const ratio = chosen && !chosen.ratios.includes(wantRatio) ? chosen.ratios[0]! : wantRatio;
   const resolution = chosen && !chosen.resolutions.includes(wantResolution) ? chosen.resolutions[0]! : wantResolution;
+  const thinking = chosen?.thinking.includes(wantThinking) ? wantThinking : chosen?.thinking[0];
   const options: ModelOption[] = (models ?? []).map((m) => ({
     id: m.id, label: m.label, isMock: m.isMock, supported: fits(m), estimateUsd: m.prices[resolution] ?? Object.values(m.prices)[0] ?? '0.0000', score: m.score, recommended: m.recommended,
   }));
-  return { chosen, ratio, resolution, estimate: chosen?.prices[resolution], options, modelId: chosen?.id ?? '', setModelId, setRatio, setResolution };
+  return { chosen, ratio, resolution, thinking, estimate: chosen?.prices[resolution], options, modelId: chosen?.id ?? '', setModelId, setRatio, setResolution, setThinking };
 }
 
 /** What the reuse link reads back from a job (GET /api/jobs/:id) to refill an image page. */

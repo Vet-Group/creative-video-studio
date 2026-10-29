@@ -84,7 +84,7 @@ export async function GET(request: Request) {
  * it at the endpoint's audio price (AUDIO_USD_PER_SECOND; refused on a model without one), and 'off' or none keeps it silent. Any other feature is an
  * image job: an enabled image model that lists the feature, no preset, a prompt (the apps in FEATURE_PROMPTS may omit it and get that one), 1 to the model's `max_images`
  * inputs (Try On, the two swaps and Face Swap need at least 2; Background Changer takes a prompt or a second image as the reference), one of the model's ratios (or `auto`), `params.resolution` (a key of the model's `image_prices`, which also sets the
- * estimate) and an optional `params.quality`. `durationSec` is not read and the job stores 0.
+ * estimate), an optional `params.quality` and an optional `params.thinking` (one of the model's `thinking_levels`; the price per image stays). `durationSec` is not read and the job stores 0.
  * `motion_control` takes a video model that lists it, exactly 2 inputs (the character image, then an MP4/MOV reference video), ratio `auto`, no preset and
  * an optional prompt; its duration is the reference video's length rounded up (the body's `durationSec` is not read), which the model must allow.
  * Every other feature takes images only.
@@ -126,9 +126,9 @@ export async function POST(request: Request) {
       return bad('modelId, ratio, durationSec (a whole number, video only), a presetId or a prompt, and an optional storeId are required');
     }
     const entries = params && typeof params === 'object' && !Array.isArray(params) ? Object.entries(params) : null;
-    // Images take resolution and quality, plus the member's own text (and Try On its garment count) kept for reuse; Marketing Studio takes format ('advanced'),
+    // Images take resolution, quality and thinking, plus the member's own text (and Try On its garment count) kept for reuse; Marketing Studio takes format ('advanced'),
     // audio ('on' or 'off') and the form's own inputs. The kept inputs are never read by the worker. Create video takes audio; the others none.
-    const keys = isImage ? ['resolution', 'quality', 'brief', ...(feature === 'try_on' ? ['garments'] : [])] : feature === 'marketing' ? ['format', 'audio', 'hook', 'location', 'brief', 'script'] : feature === 'video' ? ['audio'] : [];
+    const keys = isImage ? ['resolution', 'quality', 'thinking', 'brief', ...(feature === 'try_on' ? ['garments'] : [])] : feature === 'marketing' ? ['format', 'audio', 'hook', 'location', 'brief', 'script'] : feature === 'video' ? ['audio'] : [];
     if (!entries || entries.some(([k, v]) => !keys.includes(k) || typeof v !== 'string')) {
       return bad(keys.length > 0 ? `params may hold only ${keys.length > 1 ? `${keys.slice(0, -1).join(', ')} and ${keys.at(-1)}` : keys[0]}, as text` : 'params are for image features, Create video and Marketing Studio only');
     }
@@ -198,7 +198,7 @@ export async function POST(request: Request) {
     // A new Run was checked before the lock and a retry never was, so both look again: an image deleted meanwhile is refused.
     const live = await tx.query('select 1 from assets where id = any($1::text[]) and deleted_at is null', [assetIds]);
     if (live.rowCount !== assetIds.length) return bad('one or more assets were deleted');
-    const model = (await tx.query('select enabled, provider, endpoint, kind, features, ratios, durations_sec, max_images, max_prompt_chars, usd_per_second, image_prices from model_configs where id = $1', [modelId])).rows[0];
+    const model = (await tx.query('select enabled, provider, endpoint, kind, features, ratios, thinking_levels, durations_sec, max_images, max_prompt_chars, usd_per_second, image_prices from model_configs where id = $1', [modelId])).rows[0];
     if (!model?.enabled) return bad('the model does not exist or is not enabled');
     if (model.kind !== (isImage ? 'image' : 'video') || !model.features.includes(feature)) return bad('the model does not offer this feature');
     if (feature === 'image' && assetIds.length === 0 && !textToImage(model)) return bad('the model needs at least one input image');
@@ -206,6 +206,9 @@ export async function POST(request: Request) {
     const imagePrice = isImage && Object.hasOwn(model.image_prices ?? {}, params.resolution!) ? String(model.image_prices[params.resolution!]) : null;
     if (!model.ratios.includes(ratio) || !(isImage ? imagePrice !== null && /^\d+(\.\d+)?$/.test(imagePrice) : model.durations_sec.includes(durationSec)) || assetIds.length > model.max_images) {
       return bad(isImage ? 'the model does not allow this ratio, resolution or number of images' : 'the model does not allow this ratio, duration or number of images');
+    }
+    if (params.thinking !== undefined && !model.thinking_levels.includes(params.thinking)) {
+      return bad(model.thinking_levels.length > 0 ? `params.thinking must be one of ${model.thinking_levels.join(', ')} on this model` : 'the model has no thinking level');
     }
     let prompt = original?.prompt ?? freePrompt;
     if (!original) {

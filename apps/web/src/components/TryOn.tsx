@@ -12,7 +12,7 @@ import { useSamples } from '@/lib/use-samples';
 import { backgroundsIn, GARMENT_CATEGORIES, garmentsOf, posesOf, stockModels } from '@/lib/try-on-stock';
 import { ABOUT } from '@/lib/about-content';
 import { About } from './About';
-import { Gallery, type Img, LockedFields, PhotoDialog, photoImg, RATIO_LABEL, Slot, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
+import { Gallery, type Img, LockedFields, PhotoDialog, photoImg, RATIO_LABEL, Slot, THINKING_LABEL, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
 import { FormContext, type Photo, type PhotoRole, useApplier, useHasHistory, useJobs } from './jobs';
 import { ModelPicker } from './ModelPicker';
 import { PromptTools } from './PromptTools';
@@ -158,7 +158,7 @@ export function TryOn({ reuse }: { reuse?: string }) {
         assetIds: [...person, ...garments, ...background].map((i) => i.id),
         ratio: pick.ratio,
         // The garment count and the member's own text are kept for reuse.
-        params: { resolution: pick.resolution, garments: String(garments.length), ...(text && { brief: text }) },
+        params: { resolution: pick.resolution, ...(pick.thinking && { thinking: pick.thinking }), garments: String(garments.length), ...(text && { brief: text }) },
         ...(sent ? { prompt: sent } : {}),
       };
       await api('/api/jobs', sendJson('POST', body));
@@ -232,6 +232,7 @@ export function TryOn({ reuse }: { reuse?: string }) {
               <>
                 <Select label="Độ phân giải" icon="preset" heading="Chọn độ phân giải" value={pick.resolution} options={chosen.resolutions.map((r) => ({ value: r, label: r }))} onChange={pick.setResolution} />
                 <Select label="Tỉ lệ" icon="ratio" heading="Chọn tỉ lệ" value={pick.ratio} options={chosen.ratios.map((r) => ({ value: r, label: RATIO_LABEL[r] ?? r }))} onChange={pick.setRatio} />
+                {pick.thinking && <Select label="Mức suy luận" icon="sliders" heading="Chọn mức suy luận" value={pick.thinking} options={chosen.thinking.map((t) => ({ value: t, label: THINKING_LABEL[t] ?? t }))} onChange={pick.setThinking} />}
               </>
             )}
             <Templates

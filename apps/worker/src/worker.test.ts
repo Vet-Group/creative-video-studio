@@ -471,13 +471,13 @@ describe('restarts', () => {
 
 describe('image jobs', () => {
   /** A queued image job with its estimate booked; the estimate is the price of its resolution. */
-  async function newImageJob(userId: string, o: { prompt?: string; ratio?: string; resolution?: string; isMock?: boolean; quality?: string } = {}): Promise<string> {
+  async function newImageJob(userId: string, o: { prompt?: string; ratio?: string; resolution?: string; isMock?: boolean; quality?: string; thinking?: string } = {}): Promise<string> {
     const id = randomUUID();
     const resolution = o.resolution ?? '1K';
     await pool.query(
       `insert into jobs (id, user_id, team_id, feature, model, provider, prompt, aspect, duration_s, params, input_asset_ids, is_mock)
        values ($1, $2, 'team-unassigned', 'image', 'mock-image', 'mock', $3, $4, 0, $5, '{}', $6)`,
-      [id, userId, o.prompt ?? 'a product', o.ratio ?? '3:4', JSON.stringify({ resolution, ...(o.quality && { quality: o.quality }) }), o.isMock ?? false],
+      [id, userId, o.prompt ?? 'a product', o.ratio ?? '3:4', JSON.stringify({ resolution, ...(o.quality && { quality: o.quality }), ...(o.thinking && { thinking: o.thinking }) }), o.isMock ?? false],
     );
     await withTransaction(pool, (tx) => reserve(tx, id, resolution === '2K' ? '0.3000' : '0.1500'));
     return id;
@@ -522,14 +522,14 @@ describe('image jobs', () => {
     expect((await costs(id)).map((c) => [c.kind, c.usd])).toEqual([['estimate', '0.0000'], ['actual_adjustment', '0.0000']]);
   });
 
-  test('sends the model, resolution, ratio and quality to the image adapter and books the per-image price', async () => {
+  test('sends the model, resolution, ratio, quality and thinking level to the image adapter and books the per-image price', async () => {
     const requests: ImageSubmitRequest[] = [];
-    const id = await newImageJob('u1', { resolution: '2K', ratio: 'auto', quality: 'low' });
+    const id = await newImageJob('u1', { resolution: '2K', ratio: 'auto', quality: 'low', thinking: 'high' });
     await startImages(recording(requests));
     await send(id, 'u1');
     await waitFor('the job to succeed', async () => (await status(id)) === 'succeeded');
     expect(requests).toHaveLength(1);
-    expect(requests[0]).toMatchObject({ prompt: 'a product', ratio: 'auto', resolution: '2K', quality: 'low', model: { id: 'mock-image', imagePrices: { '1K': '0.1500', '2K': '0.3000' }, features: ['image', 'try_on'] } });
+    expect(requests[0]).toMatchObject({ prompt: 'a product', ratio: 'auto', resolution: '2K', quality: 'low', thinking: 'high', model: { id: 'mock-image', imagePrices: { '1K': '0.1500', '2K': '0.3000' }, features: ['image', 'try_on'] } });
     expect(requests[0]!.imageUrls).toEqual([]);
     expect((await costs(id)).map((c) => [c.kind, c.usd])).toEqual([['estimate', '0.3000'], ['actual_adjustment', '0.0000']]);
     expect(await total(id)).toEqual({ usd: '0.3000', is_final: true });

@@ -57,6 +57,7 @@ export const USERS = {
   // refresh.e2e: pages that reload on a finished job or a return to the tab (fresha watches, freshb makes the jobs it must notice).
   fresha: { email: 'fresha@e2e.test', name: 'E2E Fresh A', role: 'member' },
   freshb: { email: 'freshb@e2e.test', name: 'E2E Fresh B', role: 'member' },
+  thinka: { email: 'thinka@e2e.test', name: 'E2E Thinking A', role: 'member' }, // thinking.e2e
   admin: { email: 'admin@e2e.test', name: 'E2E Admin', role: 'admin' },
 } as const;
 

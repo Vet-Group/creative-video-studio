@@ -27,7 +27,7 @@ export type JobStatus = (typeof JOB_STATUSES)[number];
 
 export const ASPECTS = ['9:16', '1:1'] as const;
 /** Every ratio a job may store: 'auto' (follow the input) and the image models' ratios. A video Run is still limited to its model's own ratios. */
-export const IMAGE_RATIOS = ['auto', '1:1', '9:16', '16:9', '3:4', '4:3', '2:3', '3:2', '4:5', '5:4', '21:9'] as const;
+export const IMAGE_RATIOS = ['auto', '1:1', '9:16', '16:9', '3:4', '4:3', '2:3', '3:2', '4:5', '5:4', '21:9', '4:1', '1:4', '8:1', '1:8'] as const;
 export const MODEL_KINDS = ['video', 'image'] as const;
 export const PROVIDERS = ['fal', 'replicate', 'vertex', 'mock'] as const;
 /** What a job is for. `video` and `marketing` spend the company video budget; the rest share the image and apps budget (FEATURE_BUDGET). */
@@ -195,6 +195,8 @@ export const modelConfigs = pgTable(
     /** The job features that may use this model. */
     features: text('features').array().notNull().default(sql`'{video}'`),
     ratios: text('ratios').array().notNull(),
+    /** Image models: the thinking levels the provider's schema takes, in the order offered (the first is the default); empty when it offers none. */
+    thinkingLevels: text('thinking_levels').array().notNull().default(sql`'{}'`),
     durationsSec: integer('durations_sec').array().notNull(),
     maxImages: integer('max_images'),
     /** The longest prompt the provider's schema allows; 2000 when the schema states none. The app also caps it at PROMPT_CEILING (core/models). */
@@ -292,7 +294,7 @@ export const jobs = pgTable(
     index('jobs_user_id_created_at_idx').on(t.userId, t.createdAt),
     index('jobs_status_idx').on(t.status),
     check('jobs_status_check', sql`${t.status} in ('queued', 'submitting', 'running', 'succeeded', 'failed', 'failed_unknown', 'timed_out')`),
-    check('jobs_aspect_check', sql`${t.aspect} in ('auto', '1:1', '9:16', '16:9', '3:4', '4:3', '2:3', '3:2', '4:5', '5:4', '21:9')`),
+    check('jobs_aspect_check', sql`${t.aspect} in ('auto', '1:1', '9:16', '16:9', '3:4', '4:3', '2:3', '3:2', '4:5', '5:4', '21:9', '4:1', '1:4', '8:1', '1:8')`),
     check('jobs_provider_check', sql`${t.provider} in ('fal', 'replicate', 'vertex', 'mock')`),
     check('jobs_feature_check', sql`${t.feature} in ('video', 'marketing', 'try_on', 'image', 'character_swap', 'model_swap', 'background_changer', 'reframe', 'image_upscale', 'face_swap', 'background_remover', 'motion_control', 'media_optimizer', 'jewelry_try_on')`),
   ],
