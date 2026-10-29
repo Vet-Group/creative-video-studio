@@ -253,6 +253,13 @@
       "when": 1794394947036,
       "tag": "0035_user_choices",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1794394948036,
+      "tag": "0036_minimax_h3_resolutions",
+      "breakpoints": true
     }
   ]
 }

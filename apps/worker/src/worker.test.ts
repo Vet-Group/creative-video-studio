@@ -75,11 +75,11 @@ async function waitFor<T>(what: string, fn: () => Promise<T | undefined | false>
 }
 
 /** A queued job with its estimate booked (not yet sent to pg-boss). */
-async function newJob(userId: string, o: { prompt?: string; estimate?: string; isMock?: boolean; provider?: string } = {}): Promise<string> {
+async function newJob(userId: string, o: { prompt?: string; estimate?: string; isMock?: boolean; provider?: string; model?: string } = {}): Promise<string> {
   const id = randomUUID();
   await pool.query(
-    `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, is_mock) values ($1, $2, 'team-unassigned', 'mock-sample', $4, $3, '9:16', 5, '{}', $5)`,
-    [id, userId, o.prompt ?? 'a product', o.provider ?? 'mock', o.isMock ?? false],
+    `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, is_mock) values ($1, $2, 'team-unassigned', $6, $4, $3, '9:16', 5, '{}', $5)`,
+    [id, userId, o.prompt ?? 'a product', o.provider ?? 'mock', o.isMock ?? false, o.model ?? 'mock-sample'],
   );
   await withTransaction(pool, (tx) => reserve(tx, id, o.estimate ?? '1.5000'));
   return id;
@@ -184,6 +184,29 @@ describe('the mock lifecycle', () => {
     expect((await job(id)).output_asset_id).toBeNull();
     expect((await costs(id)).map((c) => [c.kind, c.usd])).toEqual([['estimate', '1.5000'], ['actual_adjustment', '0.0000']]); // not a release of -1.5000
     expect(await total(id)).toEqual({ usd: '1.5000', is_final: true });
+  });
+
+  test("a 480p row's output passes at its own 480p floor and still fails below it", async () => {
+    await pool.query(
+      `insert into model_configs (id, provider, endpoint, label, ratios, durations_sec, max_images, output_resolution, usd_per_second, sources, enabled)
+       values ('mock-480p', 'mock', 'mock', 'Mock 480p', '{9:16,1:1}', '{5,10}', 4, '480p', 0.05, '{}', true) on conflict do nothing`,
+    );
+    const clip = async (size: string) => {
+      const file = join(mockDir, `${randomUUID()}-small.mp4`);
+      await mkdir(mockDir, { recursive: true });
+      await run(requireFfmpeg(), ['-y', '-v', 'error', '-f', 'lavfi', '-i', `testsrc2=size=${size}:rate=24`, '-t', '1', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', file]);
+      return pathToFileURL(file).href;
+    };
+    let output = await clip('480x854');
+    await start(counting(300, (inner) => ({ ...inner, status: async (pj) => ((await inner.status(pj)).state === 'running' ? { state: 'running' } : { state: 'succeeded', outputUrl: output, costUsd: 0, costSource: 'estimate' }) })));
+    const draft = await newJob('u1', { model: 'mock-480p' });
+    await send(draft, 'u1');
+    await waitFor('the 480p job to succeed', async () => (await status(draft)) === 'succeeded');
+    output = await clip('320x240');
+    const tiny = await newJob('u2', { model: 'mock-480p' });
+    await send(tiny, 'u2');
+    await waitFor('the 240p job to fail', async () => (await status(tiny)) === 'failed');
+    expect((await job(tiny)).error).toMatch(/320x240, below 480p/);
   });
 
   test('times out a job whose delivery keeps failing, frees its slot and settles it from timed_out', async () => {

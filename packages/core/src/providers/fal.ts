@@ -104,9 +104,10 @@ export const VIDEO_BODIES: Record<string, VideoBody> = {
   'xai/grok-imagine-video/v1.5/image-to-video': { crop: true, build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), duration: req.durationSec, resolution: '720p' }) },
   'fal-ai/wan/v2.7/reference-to-video': { build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), reference_image_urls: images, aspect_ratio: req.ratio, duration: req.durationSec, resolution: '720p' }) },
   'fal-ai/wan/v2.7/image-to-video': { crop: true, build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), duration: req.durationSec, resolution: '720p' }) },
-  // Minimax names references "Image 1" and requires prompt_expansion_mode (the schema default, 'balanced'); its resolutions end in a capital P.
-  'minimax/h3-max/reference-to-video': { build: (req, images) => ({ prompt: imageTokens(req.prompt, (n) => `Image ${n}`), reference_image_urls: images, aspect_ratio: req.ratio, duration: req.durationSec, resolution: '768P', prompt_expansion_mode: 'balanced' }) },
-  'minimax/h3-max/image-to-video': { crop: true, build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), duration: req.durationSec, resolution: '768P', prompt_expansion_mode: 'balanced' }) },
+  // Minimax names references "Image 1" and requires prompt_expansion_mode (the schema default, 'balanced'); its resolutions (480P, 768P, 1080P) end
+  // in a capital P, and each row's output resolution picks one, at that row's price.
+  'minimax/h3-max/reference-to-video': { build: (req, images) => ({ prompt: imageTokens(req.prompt, (n) => `Image ${n}`), reference_image_urls: images, aspect_ratio: req.ratio, duration: req.durationSec, resolution: (req.model.outputResolution ?? '768p').toUpperCase(), prompt_expansion_mode: 'balanced' }) },
+  'minimax/h3-max/image-to-video': { crop: true, build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), duration: req.durationSec, resolution: (req.model.outputResolution ?? '768p').toUpperCase(), prompt_expansion_mode: 'balanced' }) },
   // A fixed-length clip: the schema has no duration, and the row offers 6 s only, as Fash does.
   'fal-ai/minimax/hailuo-2.3/pro/image-to-video': { crop: true, build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images) }) },
   'fal-ai/kling-video/v3/pro/motion-control': { upload: true, build: (req, inputs) => motion(req, inputs) },
