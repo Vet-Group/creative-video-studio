@@ -521,3 +521,47 @@ test('Try On: the sample pictures in an empty slot upload like a picked file, an
     await asAdmin((name) => page.request.delete(`/api/admin/samples/${name}`));
   }
 });
+
+test("Try On, as Fash's pickers: a stock model then its pose, a garment category then a garment, and a named background each go in their slot", async ({ page }) => {
+  const names = ['try-on-stock-model-10.jpg', 'try-on-stock-model-10-pose-2.jpg', 'try-on-stock-top.jpg', 'try-on-stock-top-1.jpg', 'try-on-bg-new-york.jpg'];
+  const asAdmin = async (each: (name: string) => Promise<{ ok(): boolean }>) => {
+    await page.context().clearCookies();
+    await signIn(page, 'admin');
+    for (const name of names) expect((await each(name)).ok(), name).toBe(true);
+    await page.context().clearCookies();
+  };
+  await asAdmin((name) => page.request.put(`/api/admin/samples/${name}`, { data: jpg(), headers: { 'content-type': 'image/jpeg' } }));
+  try {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await signIn(page, 'member9');
+    await page.goto('/try-on');
+    const chosen = (slot: string) => page.getByLabel(`${slot}: ảnh đã chọn`).getByRole('img');
+    // Each slot opens its picker once the sample list is in; until then it is an own-file upload.
+    for (const slot of ['Người mẫu', 'Trang phục', 'Bối cảnh (tuỳ chọn)']) await expect(page.getByRole('button', { name: `Tải lên ${slot}` })).toHaveAttribute('aria-haspopup', 'dialog');
+
+    await page.getByRole('button', { name: 'Tải lên Người mẫu' }).click();
+    const models = page.getByRole('dialog', { name: 'Chọn người mẫu' });
+    await models.getByRole('button', { name: 'Người mẫu có sẵn 1' }).click();
+    const poses = page.getByRole('dialog', { name: 'Chọn tư thế' });
+    await poses.getByRole('button', { name: 'Quay lại' }).click(); // back to the models, as Fash's arrow
+    await models.getByRole('button', { name: 'Người mẫu có sẵn 1' }).click();
+    await poses.getByRole('button', { name: 'Tư thế 1' }).click();
+    await expect(poses).toBeHidden();
+    await expect(chosen('Người mẫu')).toHaveCount(1);
+
+    await page.getByRole('button', { name: 'Tải lên Trang phục' }).click();
+    await page.getByRole('dialog', { name: 'Chọn trang phục' }).getByRole('button', { name: 'Áo' }).click();
+    await page.getByRole('dialog', { name: 'Áo' }).getByRole('button', { name: 'Áo 1' }).click();
+    await expect(chosen('Trang phục')).toHaveCount(1);
+    await page.getByRole('button', { name: 'Tải lên Trang phục' }).click(); // a slot with room opens the picker again
+    await expect(page.getByRole('dialog', { name: 'Chọn trang phục' })).toBeVisible();
+    await page.keyboard.press('Escape');
+
+    await page.getByRole('button', { name: 'Tải lên Bối cảnh (tuỳ chọn)' }).click();
+    await page.getByRole('dialog', { name: 'Chọn bối cảnh' }).getByRole('button', { name: 'New York Streets' }).click();
+    await expect(chosen('Bối cảnh (tuỳ chọn)')).toHaveCount(1);
+    await expect(page.getByRole('region', { name: 'Thông báo' }).getByText('Đã chọn bối cảnh')).toBeVisible();
+  } finally {
+    await asAdmin((name) => page.request.delete(`/api/admin/samples/${name}`));
+  }
+});

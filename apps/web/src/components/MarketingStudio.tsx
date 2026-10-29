@@ -16,7 +16,7 @@ import { About } from './About';
 import { AudioSwitch } from './AudioSwitch';
 import { CardMedia, LoopVideo } from './CardMedia';
 import { Icon, type IconName } from './Icon';
-import { Gallery, type Img, photoImg, sampleFile, Slot, uploadImages, UPLOAD_ERROR, WorkTabs } from './image-tools';
+import { Gallery, type Img, PhotoDialog, photoImg, sampleFile, Slot, uploadImages, UPLOAD_ERROR, WorkTabs } from './image-tools';
 import { FormContext, type FormActions, type Photo, type PhotoRole, useApplier, useHasHistory, useJobs, useRecreated } from './jobs';
 import { Modal } from './Modal';
 import { ModelPicker } from './ModelPicker';
@@ -113,36 +113,6 @@ function ChoiceDialog({ open, title, sub, kind, choices, selected, onPick, onClo
         ))}
       </div>
       {footer}
-    </Modal>
-  );
-}
-
-/** A photo dialog of the model or product slot, as on Fash: the photos to pick, 4 per row of 3:4 portraits. The product dialog has a subtitle and an upload tile first; the model dialog is stock photos only, so its own-photo upload is a link in the header. */
-function PhotoDialog({ open, title, sub, tiles, busy, onFile, onClose }: { open: boolean; title: string; sub?: string; tiles: { key: string; src: string; label: string; pick: () => void }[]; busy: boolean; onFile: (files: File[]) => void; onClose: () => void }) {
-  const upload = (
-    <>
-      Tải lên ảnh của bạn
-      <input type="file" accept="image/*" className="sr-only" onChange={(e) => (onClose(), onFile([...(e.target.files ?? [])].slice(0, 1)))} />
-    </>
-  );
-  return (
-    <Modal open={open} onClose={onClose} label={title} className="choice-dialog">
-      <h2>{title}</h2>
-      {sub && <p className="modal-sub">{sub}</p>}
-      {!sub && <label className="photo-upload-link">{upload}</label>}
-      <div className="choice-grid model-grid">
-        {sub && (
-          <label className="model-upload">
-            <Icon name="plus" size={16} />
-            {upload}
-          </label>
-        )}
-        {tiles.map((t) => (
-          <button key={t.key} type="button" aria-label={t.label} disabled={busy} onClick={() => (onClose(), t.pick())}>
-            {open && <img src={t.src} alt="" />}
-          </button>
-        ))}
-      </div>
     </Modal>
   );
 }

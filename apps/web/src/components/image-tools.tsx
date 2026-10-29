@@ -11,6 +11,7 @@ import { useHydrated } from '@/lib/use-hydrated';
 import { useSamples } from '@/lib/use-samples';
 import { type Photo, Recreate, useForm, useRecreated } from './jobs';
 import { Icon, type IconName } from './Icon';
+import { Modal } from './Modal';
 import { Preview } from './Preview';
 import { SampleDetail } from './SampleDetail';
 import type { ModelOption } from './ModelPicker';
@@ -211,7 +212,7 @@ export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRem
         )}
         {/* Empty, the whole slot is the upload button, a grey circle over its hint as on the live pages; with images, a small tile adds more. */}
         {!full && (
-          <button type="button" className="slot-add" aria-label={`Tải lên ${label}`} title={images.length === 0 ? empty : undefined} disabled={!hydrated || busy} onClick={() => (onBrowse && images.length === 0 ? onBrowse() : input.current?.click())}>
+          <button type="button" className="slot-add" aria-label={`Tải lên ${label}`} aria-haspopup={onBrowse ? 'dialog' : undefined} title={images.length === 0 ? empty : undefined} disabled={!hydrated || busy} onClick={() => (onBrowse ? onBrowse() : input.current?.click())}>
             <span className="slot-icon" aria-hidden="true">
               <Icon name={images.length === 0 && offer.length === 0 ? icon : 'plus'} size={16} />
               {offer.length > 0 && <span>Tải lên</span>}
@@ -269,6 +270,43 @@ const GALLERY_SIZE_KEY = 'cvs.gallery.size';
 /** The company's latest outputs of one Library `kind` (`try_on`, `image` or, with `video`, `marketing`) in a masonry of columns; 24 at a time.
  * `cols` is the column count below 1024 px, up to 1536 px and above; from 1024 px a slider (as on Fash) shows one column more or less, remembered per browser.
  * `samples` names the fixed sample tiles shown first: the uploaded samples `<samples><n>.jpg` (or `.mp4` with a `.jpg` poster for `video`). */
+/** A photo dialog of a slot, as on Fash (Marketing's model and product, Try On's model, garments and background): the photos to pick, 4 per row of 3:4 portraits. The product dialog has a subtitle and an upload tile first; a stock dialog's own-photo upload is a link in the header. A tile that opens a deeper list (a model's poses, a category) sets the dialog again after it closes; `onBack` returns. */
+export function PhotoDialog({ open, title, sub, tiles, busy, onFile, onClose, onBack }: { open: boolean; title: string; sub?: string; tiles: { key: string; src: string; label: string; pick: () => void }[]; busy: boolean; onFile: (files: File[]) => void; onClose: () => void; onBack?: () => void }) {
+  const upload = (
+    <>
+      Tải lên ảnh của bạn
+      <input type="file" accept="image/*" className="sr-only" onChange={(e) => (onClose(), onFile([...(e.target.files ?? [])].slice(0, 1)))} />
+    </>
+  );
+  return (
+    <Modal open={open} onClose={onClose} label={title} className="choice-dialog">
+      <h2>
+        {onBack && (
+          <button type="button" className="photo-back" aria-label="Quay lại" onClick={onBack}>
+            <Icon name="left" size={16} />
+          </button>
+        )}
+        {title}
+      </h2>
+      {sub && <p className="modal-sub">{sub}</p>}
+      {!sub && <label className="photo-upload-link">{upload}</label>}
+      <div className="choice-grid model-grid">
+        {sub && (
+          <label className="model-upload">
+            <Icon name="plus" size={16} />
+            {upload}
+          </label>
+        )}
+        {tiles.map((t) => (
+          <button key={t.key} type="button" aria-label={t.label} disabled={busy} onClick={() => (onClose(), t.pick())}>
+            {open && <img src={t.src} alt="" />}
+          </button>
+        ))}
+      </div>
+    </Modal>
+  );
+}
+
 /** Fash's card actions on a sample with a details file, shown on hover: Recreate at the foot; Use Result (a picture), download and open at the side. */
 function SampleActions({ name }: { name: string }) {
   const form = useForm();
