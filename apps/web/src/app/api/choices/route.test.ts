@@ -25,7 +25,7 @@ type User = Awaited<ReturnType<typeof newUser>>;
 
 const req = (u: User, path: string, init: RequestInit = {}) => new Request(`http://localhost${path}`, { ...init, headers: { 'content-type': 'application/json', cookie: u.cookie } });
 const add = (u: User, body: Record<string, unknown>) => POST(req(u, '/api/choices', { method: 'POST', body: JSON.stringify(body) }));
-const lists = async (u: User, query = '') => (await (await GET(req(u, `/api/choices${query}`))).json()) as { hooks: { id: string; name: string; desc: string; isCompany: boolean; mine: boolean }[]; locations: { id: string }[]; often: { hook: string[]; location: string[] }; canShare: boolean };
+const lists = async (u: User, query = '') => (await (await GET(req(u, `/api/choices${query}`))).json()) as { hooks: { id: string; name: string; desc: string; isCompany: boolean; mine: boolean }[]; locations: { id: string }[]; often: { hook: string[]; location: string[] }; posters: { hook: Record<string, string>; location: Record<string, string> }; canShare: boolean };
 const remove = (u: User, id: string) => DELETE(req(u, `/api/choices/${id}`, { method: 'DELETE' }), { params: Promise.resolve({ id }) });
 const error = async (res: Response) => ((await res.json()) as { error: string }).error;
 const hook = { kind: 'hook', name: 'Vẫy tay', phrase: 'The creator waves at the camera.' };
@@ -40,6 +40,17 @@ async function job(userId: string, params: Record<string, string>, { days = 0, r
     [id, userId, JSON.stringify(params), retryOf, days, deleted],
   );
   return id;
+}
+
+/** A finished clip of the member's job: an output and a poster asset (the poster's id is returned), optionally the poster deleted since. */
+async function clip(jobId: string, userId: string, { posterDeleted = false } = {}) {
+  for (const kind of ['out', 'poster']) {
+    await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, deleted_at) values ($1, $2, 'output', $1, $1, $3, 1, case when $4 then now() end)`, [
+      `${jobId}-${kind}`, userId, kind === 'out' ? 'video/mp4' : 'image/jpeg', kind === 'poster' && posterDeleted,
+    ]);
+  }
+  await pool.query('update jobs set output_asset_id = $2, poster_asset_id = $3 where id = $1', [jobId, `${jobId}-out`, `${jobId}-poster`]);
+  return `${jobId}-poster`;
 }
 
 afterAll(async () => {
@@ -152,6 +163,26 @@ describe('/api/choices', () => {
       await job(many.id, { hook: c.id }, { days: 13 - i });
     }
     expect((await lists(many)).often.hook).toHaveLength(12);
+  });
+
+  test("posters: each often-used id gets the poster of the caller's latest live clip with it, never another member's", async () => {
+    const [u, other] = [await newUser(), await newUser()];
+    const mine = (await (await add(u, hook)).json()) as { id: string };
+    const old = await clip(await job(u.id, { hook: mine.id, location: 'kitchen' }, { days: 3 }), u.id);
+    const latest = await clip(await job(u.id, { hook: mine.id, location: 'kitchen' }, { days: 2 }), u.id);
+    await clip(await job(u.id, { hook: mine.id }, { days: 1, deleted: true }), u.id); // a deleted clip is skipped
+    await clip(await job(u.id, { hook: mine.id }), u.id, { posterDeleted: true }); // so is a clip whose poster is gone
+    await job(u.id, { hook: 'blizzard' });
+    await job(u.id, { hook: 'blizzard' }); // often used, but with no clip
+    await clip(await job(other.id, { hook: 'blizzard' }), other.id);
+    await clip(await job(other.id, { hook: 'blizzard' }), other.id); // another member's clips stay theirs
+    await clip(await job(u.id, { hook: 'flip-fail' }), u.id); // used once: not often, so no poster
+    const got = await lists(u);
+    expect(got.often.hook).toEqual([mine.id, 'blizzard']);
+    expect(got.posters).toEqual({ hook: { [mine.id]: latest }, location: { kitchen: latest } });
+    expect(old).not.toBe(latest);
+    expect((await lists(other)).posters.hook).toEqual({ blizzard: expect.stringMatching(/-poster$/) });
+    expect((await lists(u, '?format=advanced')).posters).toEqual({ hook: {}, location: {} }); // the UGC clips are not Advanced ones
   });
 
   test('refuses a bad format and an unauthenticated caller', async () => {

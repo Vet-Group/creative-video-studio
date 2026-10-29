@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { CHOICE_KINDS, type ChoiceKind } from '@cvs/db';
 import { pool } from '@/lib/auth';
+import { LIVE_CLIP } from '@/lib/clips';
 import { HOOKS, LOCATIONS, MAX_CHOICE_DESC, MAX_CHOICE_NAME, MAX_CHOICE_PHRASE, MAX_CHOICES } from '@/lib/marketing';
 import { guard } from '@/lib/session';
 
@@ -12,7 +13,8 @@ const CONTROL = /[\p{Cc}\p{Zl}\p{Zp}]/u; // newlines and other control character
 /**
  * The Marketing Studio pickers' own lists: the caller's hooks and locations, then the company's, newest first in each; `often` (the often-used group), the ids
  * of the hooks and locations the caller's own `marketing` jobs of that format (`?format=advanced`, else UGC) used at least twice in 90 days, retries
- * and deleted jobs left out, most used first, only ids still in the lists; `canShare` for an Admin.
+ * and deleted jobs left out, most used first, only ids still in the lists; `posters`, for each often-used id, the poster asset of the caller's latest
+ * live clip with it (none when every such clip is gone), the card's picture when it has no sample; `canShare` for an Admin.
  */
 export async function GET(request: Request) {
   const g = await guard(request, 'member');
@@ -20,7 +22,7 @@ export async function GET(request: Request) {
   const format = new URL(request.url).searchParams.get('format');
   if (format !== null && format !== 'advanced') return bad('format must be advanced or left out');
   const userId = g.session.user.id;
-  const [own, used] = await Promise.all([
+  const [own, used, latest] = await Promise.all([
     pool.query(
       `select id, kind, name, description, phrase, is_company, user_id = $1 as mine from user_choices where user_id = $1 or is_company
         order by (user_id = $1) desc, created_at desc, id`,
@@ -33,6 +35,13 @@ export async function GET(request: Request) {
         group by c.kind, c.id having count(*) >= 2 order by count(*) desc, max(j.created_at) desc`,
       [userId, format === 'advanced'],
     ),
+    pool.query(
+      `select distinct on (c.kind, c.id) c.kind, c.id, j.poster_asset_id from jobs j join assets p on p.id = j.poster_asset_id and p.deleted_at is null,
+              lateral (values ('hook', j.params->>'hook'), ('location', j.params->>'location')) as c (kind, id)
+        where j.user_id = $1 and j.feature = 'marketing' and coalesce(j.params->>'format' = 'advanced', false) = $2 and ${LIVE_CLIP} and c.id is not null
+        order by c.kind, c.id, j.created_at desc, j.id desc`,
+      [userId, format === 'advanced'],
+    ),
   ]);
   const choices = own.rows.map((r) => ({ kind: r.kind as ChoiceKind, id: r.id as string, name: r.name, desc: r.description ?? '', phrase: r.phrase, isCompany: r.is_company, mine: r.mine }));
   const of = (kind: ChoiceKind) => choices.filter((c) => c.kind === kind).map(({ kind: _, ...c }) => c);
@@ -41,7 +50,9 @@ export async function GET(request: Request) {
     const known = new Set(list.map((c) => c.id));
     return used.rows.filter((r) => r.kind === kind && known.has(r.id)).slice(0, OFTEN_MAX).map((r) => r.id as string);
   };
-  return Response.json({ hooks, locations, often: { hook: often('hook', [...HOOKS, ...hooks]), location: often('location', [...LOCATIONS, ...locations]) }, canShare: g.session.user.role === 'admin' });
+  const oftenIds = { hook: often('hook', [...HOOKS, ...hooks]), location: often('location', [...LOCATIONS, ...locations]) };
+  const posters = (kind: ChoiceKind) => Object.fromEntries(latest.rows.filter((r) => r.kind === kind && oftenIds[kind].includes(r.id)).map((r) => [r.id as string, r.poster_asset_id as string]));
+  return Response.json({ hooks, locations, often: oftenIds, posters: { hook: posters('hook'), location: posters('location') }, canShare: g.session.user.role === 'admin' });
 }
 
 /**
