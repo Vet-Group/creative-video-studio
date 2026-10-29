@@ -8,7 +8,7 @@ import { createVertexImageProvider, type ServiceAccountKey } from '@cvs/core/pro
 import { readFileSync } from 'node:fs';
 import sharp from 'sharp';
 import type { WorkerDeps } from './worker';
-import { getObject } from './storage';
+import { deleteObject, getObject, putObject } from './storage';
 
 // Inputs are inlined as base64 in the JSON body. In the bake-off Replicate reset a 3.8 MB body while 3.7 MB passed, so with up to 4 images
 // each one is kept at or under 600 KB (4 x 600 KB is about 3.2 MB of base64). The videos are 1080p at most, so 2048 px loses nothing.
@@ -71,7 +71,7 @@ export function realProviders(pool: WorkerDeps['pool'], env: NodeJS.ProcessEnv =
     const key = JSON.parse(readFileSync(env.GOOGLE_APPLICATION_CREDENTIALS, 'utf8')) as ServiceAccountKey & { project_id?: string };
     const project = env.GOOGLE_CLOUD_PROJECT || key.project_id;
     if (!project) throw new Error('GOOGLE_CLOUD_PROJECT is not set and the key file has no project_id');
-    imageProviders.vertex = createVertexImageProvider({ key, project, region: env.GOOGLE_CLOUD_LOCATION || undefined, readImage });
+    imageProviders.vertex = createVertexImageProvider({ key, project, region: env.GOOGLE_CLOUD_LOCATION || undefined, readImage, store: { put: putObject, get: getObject, delete: deleteObject } });
   }
   return { providers, imageProviders, enhance, suggest };
 }
