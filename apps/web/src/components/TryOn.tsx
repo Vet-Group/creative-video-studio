@@ -10,7 +10,7 @@ import { useSamples } from '@/lib/use-samples';
 import { ABOUT } from '@/lib/about-content';
 import { About } from './About';
 import { Gallery, type Img, LockedFields, RATIO_LABEL, Slot, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
-import { useApplier, useHasHistory, useJobs } from './jobs';
+import { FormContext, useApplier, useHasHistory, useJobs } from './jobs';
 import { ModelPicker } from './ModelPicker';
 import { Select } from './Select';
 import { Tray } from './Shell';
@@ -47,7 +47,7 @@ export function TryOn({ reuse }: { reuse?: string }) {
   });
 
   // Reuse: the person first, then the garments (their count is kept on the job), then the background.
-  useReuse(
+  const recreate = useReuse(
     reuse,
     'try_on',
     (j) => {
@@ -202,7 +202,9 @@ export function TryOn({ reuse }: { reuse?: string }) {
         </div>
 
         <div className="side" id={`tryon-panel-${panel}`} role="tabpanel" aria-labelledby={`tryon-tab-${panel}`} hidden={narrow && shown === 'create'}>
-          {shown === 'examples' ? <Gallery kind="try_on" samples="try-on-example-" cols={[2, 2, 3]} label="Ảnh thử đồ của công ty" emptyText="Chưa có ảnh thử đồ nào trong công ty." /> : shown === 'about' ? <About page={ABOUT.tryOn} /> : <Tray feature="try_on" apply={apply} />}
+          <FormContext.Provider value={{ recreate: (from) => (recreate(from), narrow && setTab('create')), apply }}>
+            {shown === 'examples' ? <Gallery kind="try_on" samples="try-on-example-" cols={[2, 2, 3]} label="Ảnh thử đồ của công ty" emptyText="Chưa có ảnh thử đồ nào trong công ty." /> : shown === 'about' ? <About page={ABOUT.tryOn} /> : <Tray feature="try_on" />}
+          </FormContext.Provider>
         </div>
       </div>
     </section>

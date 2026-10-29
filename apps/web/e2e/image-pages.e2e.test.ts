@@ -151,10 +151,14 @@ test('Try On, as on Fash: a sample picture with a details file opens in place wi
     await expect(detail.locator('.job-text')).toHaveText(details.brief);
     await expect(detail.locator('.job-chips')).toHaveText(['1K3:4', 'Seamless White']);
     await expect(detail.locator('.lightbox-media img')).toHaveAttribute('src', '/api/samples/try-on-example-1.jpg');
-    await expect(detail.getByRole('link', { name: 'Dùng lại' })).toHaveAttribute('href', '/try-on?example=try-on-example-1');
 
-    await detail.getByRole('link', { name: 'Dùng lại' }).click();
-    await expect(page).toHaveURL(/\/try-on\?example=try-on-example-1$/);
+    // As Fash's Recreate: the form refills in place, the URL stays, the detail stays open and a note shows above it.
+    await detail.getByRole('button', { name: 'Dùng lại' }).click();
+    const note = page.getByRole('region', { name: 'Thông báo' }).getByText('Sẵn sàng tạo lại');
+    await expect(note).toBeVisible();
+    expect(await note.evaluate((e) => { const r = e.getBoundingClientRect(); return e.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)); })).toBe(true); // not under the dialog
+    await expect(detail).toBeVisible();
+    await expect(page).toHaveURL(/\/try-on$/);
     await expect(page.getByLabel('Người mẫu: ảnh đã chọn').getByRole('img', { name: 'try-on-example-1-model.png' })).toBeVisible();
     await expect(page.getByLabel('Trang phục: ảnh đã chọn').getByRole('img', { name: 'try-on-example-1-garment-1.png' })).toBeVisible();
     await expect(page.getByLabel('Bối cảnh (tuỳ chọn): ảnh đã chọn').getByRole('img', { name: 'try-on-bg-test.jpg' })).toBeVisible();

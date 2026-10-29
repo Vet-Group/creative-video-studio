@@ -493,12 +493,12 @@ test('as on Fash, a sample in Ví dụ with a details file opens in place with i
     await detail.getByRole('button', { name: 'Mục tiếp theo' }).click();
     detail = page.getByRole('dialog', { name: 'Chi tiết: Nâng cao' });
     await expect(detail.locator('.job-text')).toHaveText(adv.brief);
-    await expect(detail.getByRole('link', { name: 'Dùng lại' })).toHaveAttribute('href', '/marketing-studio/advanced?example=marketing-example-2');
+    await expect(detail.getByRole('button', { name: 'Dùng lại' })).toBeVisible();
     await detail.getByRole('button', { name: 'Mục trước' }).click();
     detail = page.getByRole('dialog', { name: 'Chi tiết: UGC Thử đồ' });
 
-    await detail.getByRole('link', { name: 'Dùng lại' }).click();
-    await expect(page).toHaveURL(/\/marketing-studio\?example=marketing-example-1$/);
+    await detail.getByRole('button', { name: 'Dùng lại' }).click(); // in place, as Fash's Recreate
+    await expect(page).toHaveURL(/\/marketing-studio$/);
     await expect(page.getByRole('img', { name: 'marketing-example-1-model.jpg' })).toBeVisible();
     await expect(page.getByRole('img', { name: 'marketing-example-1-product.png' })).toBeVisible();
     await expect(page.getByRole('button', { name: /^Hook/ })).toContainText(hook.name);

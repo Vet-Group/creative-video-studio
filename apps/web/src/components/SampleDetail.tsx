@@ -1,11 +1,13 @@
 'use client';
 // A sample of the Examples tab (a Marketing clip or a Try On picture) opened in place, as the reference site's Examples open: the sample, its prompt, photos and
 // settings, and the reuse link (Fash's Recreate). The details come from the sample's own file (`<sample>.json`, uploaded by an Admin beside it); nothing here runs a job.
-import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
+import { exampleFrom } from '@/lib/reuse';
+import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { Icon } from './Icon';
 import { useImageModels } from './image-tools';
+import { Recreate } from './jobs';
 import { Modal } from './Modal';
 
 /** A sample's details file, in the shape its page refills from (`?example=`): Marketing's format and duration, or Try On's model, resolution and background. */
@@ -38,6 +40,7 @@ export function SampleDetail({ names, index, onIndex }: { names: string[]; index
   const [details, setDetails] = useState<SampleDetails | null>(null);
   const [note, setNote] = useState('');
   const media = useRef<HTMLVideoElement & HTMLImageElement>(null);
+  const narrow = useMediaQuery(NARROW);
   useEffect(() => {
     setDetails(null);
     setNote('');
@@ -102,9 +105,9 @@ export function SampleDetail({ names, index, onIndex }: { names: string[]; index
           )}
         </div>
         {details && (
-          <Link href={tryOn ? `/try-on?example=${base}` : `/marketing-studio${advanced ? '/advanced' : ''}?example=${base}`} className="lightbox-reuse">
+          <Recreate href={tryOn ? `/try-on?example=${base}` : `/marketing-studio${advanced ? '/advanced' : ''}?example=${base}`} from={exampleFrom({ example: base })!} className="lightbox-reuse" onDone={() => narrow && onIndex(null)}>
             Dùng lại
-          </Link>
+          </Recreate>
         )}
       </div>
       {index > 0 && (

@@ -11,12 +11,13 @@ import { promptTooLong } from '@/lib/prompt-limit';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { useSamples } from '@/lib/use-samples';
 import { cardSample } from '@/lib/examples';
+import { queryOf } from '@/lib/reuse';
 import { About } from './About';
 import { AudioSwitch } from './AudioSwitch';
 import { CardMedia, LoopVideo } from './CardMedia';
 import { Icon, type IconName } from './Icon';
 import { Gallery, type Img, sampleFile, Slot, uploadImages, UPLOAD_ERROR, WorkTabs } from './image-tools';
-import { useApplier, useHasHistory, useJobs, useRecreated } from './jobs';
+import { FormContext, useApplier, useHasHistory, useJobs, useRecreated } from './jobs';
 import { Modal } from './Modal';
 import { ModelPicker } from './ModelPicker';
 import { Select } from './Select';
@@ -199,6 +200,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
     if (s.ratio) setRatio(s.ratio);
     if (s.durationSec) setDurationSec(s.durationSec);
   });
+  const [source, setSource] = useState(reuse ? { from: reuse } : null); // what the form refills from; Recreate sets a new one in place
   const [list, setList] = useState<{ key: string; models: VideoModel[]; defaultId: string | null } | null>(null);
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -269,13 +271,14 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
   // Reuse: refill the form from the source job, everything stays editable. A job of the other format opens on its own page; without the
   // member's own text (a job from before it was kept, or someone else's) the rest is refilled and the brief is asked for again.
   useEffect(() => {
-    if (!reuse) return;
+    if (!source) return;
+    const reuse = source.from;
     let stale = false; // a refill superseded (another link, or a re-run effect) must not fill or upload
     api<MarketingJob>(reuse)
       .then(async (j) => {
         if (stale) return;
         if (j.feature !== 'marketing') return setError('Không tìm thấy clip để dùng lại.');
-        if ((j.format === 'advanced') !== advanced) return router.replace(`/marketing-studio${j.format === 'advanced' ? '/advanced' : ''}${window.location.search}`);
+        if ((j.format === 'advanced') !== advanced) return router.replace(`/marketing-studio${j.format === 'advanced' ? '/advanced' : ''}?${queryOf(reuse)}`);
         // A sample's photos are uploaded as this member's inputs first, as a picked sample is.
         const samples = j.images.map((i) => ('sample' in i ? i.sample : null)).filter((s) => s !== null);
         const inputs = samples.length > 0 ? await uploadImages(await Promise.all(samples.map(sampleFile))) : (j.images as Img[]);
@@ -297,7 +300,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
     return () => {
       stale = true;
     };
-  }, [reuse]);
+  }, [source]);
 
   // My products: loaded once; a failure just leaves the plain upload slot.
   useEffect(() => {
@@ -559,11 +562,15 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
 
         <div className="side" id={`marketing-panel-${panel}`} role="tabpanel" aria-labelledby={`marketing-tab-${panel}`} hidden={narrow && shown === 'create'}>
           {shown === 'examples' ? (
-            <Gallery kind="marketing" video samples="marketing-example-" label="Video Marketing Studio của công ty" emptyText="Chưa có video Marketing Studio nào trong công ty." />
+            <FormContext.Provider value={{ recreate: (from) => (setSource({ from }), narrow && setTab('create')), apply }}>
+              <Gallery kind="marketing" video samples="marketing-example-" label="Video Marketing Studio của công ty" emptyText="Chưa có video Marketing Studio nào trong công ty." />
+            </FormContext.Provider>
           ) : shown === 'about' ? (
             <About page={advanced ? ABOUT.advanced : ABOUT.marketing} />
           ) : (
-            <Tray feature="marketing" apply={apply} />
+            <FormContext.Provider value={{ recreate: (from) => (setSource({ from }), narrow && setTab('create')), apply }}>
+              <Tray feature="marketing" />
+            </FormContext.Provider>
           )}
         </div>
       </div>

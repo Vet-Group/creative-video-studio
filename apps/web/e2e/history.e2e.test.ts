@@ -18,7 +18,7 @@ test('a History card shows the text, inputs and chips, and its favourite, new-ta
   await expect(card.getByRole('list', { name: 'Ảnh đầu vào' }).locator('img')).toHaveCount(2); // decorative thumbnails (alt="")
   await expect(card.locator('.job-chips button')).toHaveText(['2K', '1:1']); // as on Fash, each chip sets its value on the form (the next test)
   await expect(card.getByRole('img', { name: 'Tạo ảnh' })).toBeVisible();
-  await expect(card.getByRole('link', { name: 'Dùng lại' })).toHaveAttribute('href', `/image-generation?reuse=${id}`);
+  await expect(card.getByRole('button', { name: 'Dùng lại' })).toBeVisible(); // beside the form it refills in place (reuse e2e)
 
   const out = await card.getByRole('link', { name: 'Mở trong tab mới' }).getAttribute('href');
   expect(out).toMatch(/^\/api\/assets\/.+\/content$/);

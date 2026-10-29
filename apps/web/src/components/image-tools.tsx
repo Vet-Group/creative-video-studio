@@ -4,12 +4,12 @@
 import { type DragEvent, type KeyboardEvent, useEffect, useId, useRef, useState } from 'react';
 import Link from 'next/link';
 import { api, type Clip } from '@/lib/api';
-import { reuseHref } from '@/lib/reuse';
+import { refillFrom, reuseHref } from '@/lib/reuse';
 import { NARROW, useMediaQuery, WIDE } from '@/lib/use-media-query';
 import { numberedSamples } from '@/lib/examples';
 import { useHydrated } from '@/lib/use-hydrated';
 import { useSamples } from '@/lib/use-samples';
-import { useRecreated } from './jobs';
+import { Recreate, useRecreated } from './jobs';
 import { Icon, type IconName } from './Icon';
 import { Preview } from './Preview';
 import { SampleDetail } from './SampleDetail';
@@ -86,11 +86,14 @@ export interface ReuseJob {
   modelId: string | null;
 }
 
-/** Refill (`reuse` is a job's or a saved template's API path, lib/reuse.ts): reads it once and hands it to `fill` when it is of `feature`; `fail` otherwise. Everything stays editable. */
-export function useReuse(reuse: string | undefined, feature: string, fill: (j: Omit<ReuseJob, 'images'> & { images: Img[] }) => void, fail: () => void) {
+/** Refill (`reuse` is a job's or a saved template's API path, lib/reuse.ts): reads it and hands it to `fill` when it is of `feature`; `fail` otherwise. Everything stays editable.
+ * Returns Recreate in place: the same refill from another path, the URL unchanged, as Fash's Recreate. */
+export function useReuse(reuse: string | undefined, feature: string, fill: (j: Omit<ReuseJob, 'images'> & { images: Img[] }) => void, fail: () => void): (from: string) => void {
   const recreated = useRecreated();
+  const [source, setSource] = useState(reuse ? { from: reuse } : null); // a new object each time, so the same path refills again
   useEffect(() => {
-    if (!reuse) return;
+    if (!source) return;
+    const reuse = source.from;
     let stale = false; // a refill superseded (another link, or a re-run effect) must not fill or upload
     api<ReuseJob>(reuse)
       .then(async (j) => {
@@ -105,7 +108,8 @@ export function useReuse(reuse: string | undefined, feature: string, fill: (j: O
     return () => {
       stale = true;
     };
-  }, [reuse]);
+  }, [source]);
+  return (from) => setSource({ from });
 }
 
 /** Uploads files through /api/assets and returns the new assets. */
@@ -351,9 +355,9 @@ export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4
                 )}
                 {/* Fash's "Use this template": the page's form filled from this result's inputs (a Library clip's inputs are open to every member). */}
                 {reuseHref(it) && (
-                  <Link href={reuseHref(it)!} className="gallery-use" aria-label={`Dùng mẫu này: ${it.modelLabel}, ${it.ratio}`}>
+                  <Recreate href={reuseHref(it)!} from={refillFrom({ reuse: it.id })!} className="gallery-use" label={`Dùng mẫu này: ${it.modelLabel}, ${it.ratio}`}>
                     Dùng mẫu này
-                  </Link>
+                  </Recreate>
                 )}
               </li>
               ),

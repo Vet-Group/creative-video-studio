@@ -6,11 +6,11 @@ import { createContext, type ReactNode, useContext, useEffect, useRef, useState 
 import { api, errorText, sendJson, type JobStatus, type TrayJob } from '@/lib/api';
 import { appBySlug } from '@/lib/apps';
 import { featureLabel } from '@/lib/features';
-import { reuseHref } from '@/lib/reuse';
+import { refillFrom, reuseHref } from '@/lib/reuse';
 import { COLLAPSED_COOKIE } from '@/lib/sidebar';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { Icon, type IconName } from './Icon';
-import { JobsProvider, type Setting, useJobs } from './jobs';
+import { JobsProvider, Recreate, useForm, useJobs } from './jobs';
 import { type Account, Settings } from './Settings';
 import { VetLogo } from './VetLogo';
 
@@ -81,7 +81,8 @@ const cardTitle = (job: TrayJob): string => (job.feature === 'marketing' ? (job.
  * One job in a page's History tab, laid out as Fash's History card: the result on the left; on the right the title, the member's own words,
  * the inputs, the ratio and length chips, the status and date, the icon actions and Dùng lại (Fash's Recreate, without the run).
  */
-function HistoryCard({ job, isAdmin, apply }: { job: TrayJob; isAdmin: boolean; apply?: (s: Setting) => void }) {
+function HistoryCard({ job, isAdmin }: { job: TrayJob; isAdmin: boolean }) {
+  const apply = useForm()?.apply;
   const { refresh } = useJobs();
   const [problem, setProblem] = useState('');
   const [favorite, setFavorite] = useState(job.favorite);
@@ -201,9 +202,9 @@ function HistoryCard({ job, isAdmin, apply }: { job: TrayJob; isAdmin: boolean; 
           )}
         </div>
         {reuseHref(job) && (
-          <Link href={reuseHref(job)!} className="job-reuse">
+          <Recreate href={reuseHref(job)!} from={refillFrom({ reuse: job.id })!} className="job-reuse">
             <Icon name="copy" /> Dùng lại
-          </Link>
+          </Recreate>
         )}
       </div>
     </li>
@@ -213,8 +214,8 @@ function HistoryCard({ job, isAdmin, apply }: { job: TrayJob; isAdmin: boolean; 
 const AdminContext = createContext(false);
 
 /** The "My jobs" list. It sits beside the page, or in the History tab of Create. With `feature`, only the jobs of that feature (the History tab of Try On and Image Generation).
- * With `apply`, the cards' chips set their value on the page's form. */
-export function Tray({ feature, apply }: { feature?: string; apply?: (s: Setting) => void }) {
+ * Beside a form (FormContext), the cards' chips set their value on it and Dùng lại refills it in place. */
+export function Tray({ feature }: { feature?: string }) {
   const isAdmin = useContext(AdminContext);
   const all = useJobs();
   const { workerOffline, loaded } = all;
@@ -225,7 +226,7 @@ export function Tray({ feature, apply }: { feature?: string; apply?: (s: Setting
       {workerOffline && <p className="warn">Worker offline: chưa nhận được tín hiệu từ máy xử lý, job sẽ chạy khi worker hoạt động lại.</p>}
       {loaded && jobs.length === 0 && <p className="muted">Chưa có job nào.</p>}
       <ul>
-        {jobs.map((j) => (feature ? <HistoryCard key={j.id} job={j} isAdmin={isAdmin} apply={apply} /> : <TrayItem key={j.id} job={j} isAdmin={isAdmin} />))}
+        {jobs.map((j) => (feature ? <HistoryCard key={j.id} job={j} isAdmin={isAdmin} /> : <TrayItem key={j.id} job={j} isAdmin={isAdmin} />))}
       </ul>
     </aside>
   );
@@ -233,8 +234,15 @@ export function Tray({ feature, apply }: { feature?: string; apply?: (s: Setting
 
 function Toasts() {
   const { toasts, dismiss } = useJobs();
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el?.showPopover) return;
+    if (el.matches(':popover-open')) el.hidePopover();
+    if (toasts.length > 0) el.showPopover(); // shown last, so above a dialog opened before it
+  }, [toasts]);
   return (
-    <div className="toasts" role="region" aria-label="Thông báo" aria-live="polite">
+    <div ref={ref} popover="manual" className="toasts" role="region" aria-label="Thông báo" aria-live="polite">
       {toasts.map((t) => (
         <div key={t.id} className={t.ok ? 'toast' : 'toast toast-bad'}>
           <span>{t.text}</span>

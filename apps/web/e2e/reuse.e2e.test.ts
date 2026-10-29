@@ -18,13 +18,13 @@ async function job(page: Page, assetIds: string[], params: Record<string, string
 
 test('the reuse link in History refills a UGC job, and an Advanced job opens on the Advanced page with its references, brief and script', async ({ page }) => {
   await signIn(page, 'mkte');
-  const ugc = await job(page, [await upload(page, 'model.png'), await upload(page, 'product.png')], { audio: 'off', hook: hook.id, location: spot.id, brief: 'soft light' });
+  await job(page, [await upload(page, 'model.png'), await upload(page, 'product.png')], { audio: 'off', hook: hook.id, location: spot.id, brief: 'soft light' });
 
   await page.goto('/marketing-studio');
   await page.getByRole('tab', { name: 'Lịch sử' }).click();
   const tray = page.getByRole('complementary', { name: 'Job của tôi' });
-  await tray.getByRole('link', { name: 'Dùng lại' }).first().click();
-  await expect(page).toHaveURL((u) => u.pathname === '/marketing-studio' && u.searchParams.get('reuse') === ugc);
+  await tray.getByRole('button', { name: 'Dùng lại' }).first().click();
+  await expect(page).toHaveURL((u) => u.pathname === '/marketing-studio' && u.search === ''); // in place, as Fash's Recreate: the URL stays
   await expect(page.getByLabel('Người mẫu: ảnh đã chọn').getByRole('img', { name: 'model.png' })).toBeVisible();
   await expect(page.getByLabel('Sản phẩm: ảnh đã chọn').getByRole('img', { name: 'product.png' })).toBeVisible();
   await expect(page.getByRole('button', { name: /^Hook/ })).toContainText(hook.name);

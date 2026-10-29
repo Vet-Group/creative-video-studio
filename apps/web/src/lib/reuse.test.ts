@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { exampleFrom, refillFrom, reuseHref } from './reuse';
+import { exampleFrom, queryOf, refillFrom, reuseHref } from './reuse';
 
 test('the reuse link opens the page that made the job, with the job to refill from; features without a refill yet get no link', () => {
   expect(reuseHref({ id: 'j1', feature: 'video' })).toBe('/create?reuse=j1');
@@ -27,4 +27,11 @@ test("Recreate on a sample reads that sample's details file, and nothing else", 
   expect(exampleFrom({ example: 'example-12' })).toBe('/api/samples/example-12.json'); // Create Videos' samples
   expect(exampleFrom({ example: 'try-on-example-4' })).toBe('/api/samples/try-on-example-4.json');
   expect(exampleFrom({})).toBeUndefined();
+});
+
+test('a refill that has to open on another page carries its source as that page query', () => {
+  expect(queryOf(refillFrom({ reuse: 'j 1' })!)).toBe('reuse=j%201');
+  expect(queryOf(refillFrom({ template: 't1' })!)).toBe('template=t1');
+  expect(queryOf(exampleFrom({ example: 'marketing-example-2' })!)).toBe('example=marketing-example-2');
+  expect(queryOf('/api/other/x')).toBe('');
 });

@@ -377,8 +377,8 @@ test('as on Fash, a sample with a details file shows its prompt, input photos, s
     await detail.getByRole('button', { name: 'Mẫu trước' }).click();
     await detail.getByRole('button', { name: 'Mẫu trước' }).click();
 
-    await detail.getByRole('link', { name: 'Dùng lại' }).click();
-    await expect(page).toHaveURL(/\/create\?example=example-2$/);
+    await detail.getByRole('button', { name: 'Dùng lại' }).click(); // in place, as Fash's Recreate
+    await expect(page).toHaveURL(/\/create$/);
     await expect(page.getByRole('img', { name: 'example-2-input.png' })).toBeVisible();
     await expect(page.getByRole('img', { name: 'example-2-ref.jpg' })).toBeVisible();
     await expect(page.getByRole('textbox', { name: 'Mô tả chuyển động' })).toHaveValue(details.prompt);

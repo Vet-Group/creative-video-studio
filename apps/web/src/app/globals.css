@@ -222,6 +222,7 @@ legend { font-weight: 600; padding: 0 .25rem; }
 .job-actions .icon-button { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--ink); }
 .job-reuse { display: flex; align-items: center; justify-content: center; gap: 6px; height: 36px; border-radius: 8px; background: var(--fill); color: var(--ink-strong); font-size: 12px; font-weight: 500; text-decoration: none; }
 .job-reuse:hover { background: var(--fill-strong); }
+button.job-reuse, button.lightbox-reuse, button.gallery-use { width: 100%; border: 0; font-family: inherit; cursor: pointer; }
 @media (max-width: 640px) {
   .job-card { grid-template-columns: 1fr; min-height: 0; }
   .job-media { height: auto; max-height: 70vh; }
@@ -232,6 +233,8 @@ legend { font-weight: 600; padding: 0 .25rem; }
 .side .tray .muted { font-size: 14px; line-height: 21px; color: var(--text-muted); }
 
 .toasts { position: fixed; right: 1rem; bottom: 1rem; display: grid; gap: .5rem; z-index: 10; max-width: calc(100vw - 2rem); }
+.toasts[popover] { top: auto; left: auto; margin: 0; padding: 0; border: 0; background: none; color: inherit; overflow: visible; }
+.toasts[popover]:not(:popover-open) { display: none; }
 .toast { display: flex; gap: .75rem; align-items: center; background: var(--toast-bg); color: var(--on-dark); padding: .6rem .9rem; border-radius: 8px; box-shadow: 0 4px 14px rgb(var(--shade) / .25); }
 .toast a { color: var(--toast-link); }
 .toast-bad { background: var(--toast-bad); }

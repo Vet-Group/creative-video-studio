@@ -2,6 +2,7 @@
 // The "My jobs" state: polls the server every 5 s, raises a toast and changes the tab title when a job finishes.
 // What counts as news is kept in localStorage (the newest finish time already shown), so a job that ended while the tab was closed
 // is announced when the user returns, and old results are not announced again.
+import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { api, type TrayJob } from '@/lib/api';
@@ -36,6 +37,31 @@ export function useRecreated(): (from: string) => void {
   return (from) => {
     if (!from.startsWith('/api/templates/')) notify('Sẵn sàng tạo lại');
   };
+}
+
+/** What a page's form offers the History, the Examples and their details beside it: Recreate in place (Fash's keeps the URL) and a chip's setting. */
+export interface FormActions {
+  recreate: (from: string) => void;
+  apply?: (s: Setting) => void;
+}
+export const FormContext = createContext<FormActions | null>(null);
+export const useForm = (): FormActions | null => useContext(FormContext);
+
+/** The reuse action (Fash's Recreate): beside a form it refills that form in place and the URL stays; elsewhere (the Library) it opens the page that made it.
+ * `from` is the API path the form refills from (lib/reuse.ts), `href` the page link; `onDone` runs after an in-place refill starts. */
+export function Recreate({ href, from, className, label, onDone, children }: { href: string; from: string; className?: string; label?: string; onDone?: () => void; children: ReactNode }) {
+  const form = useForm();
+  if (!form)
+    return (
+      <Link href={href} className={className} aria-label={label}>
+        {children}
+      </Link>
+    );
+  return (
+    <button type="button" className={className} aria-label={label} onClick={() => (form.recreate(from), onDone?.())}>
+      {children}
+    </button>
+  );
 }
 
 /** The form's side of a chip click: sets what the chip carries and says so, as Fash's "Duration selected" and "Ratio selected" toasts. */

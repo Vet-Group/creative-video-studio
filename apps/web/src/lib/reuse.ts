@@ -25,6 +25,12 @@ export function exampleFrom(q: { example?: unknown }): string | undefined {
   return typeof q.example === 'string' && /^(marketing-|try-on-)?example-[1-9]\d*$/.test(q.example) ? `/api/samples/${q.example}.json` : undefined;
 }
 
+/** The page query that refills from `from` (what refillFrom and exampleFrom return), for a refill that has to open on another page. */
+export function queryOf(from: string): string {
+  const m = from.match(/^\/api\/(jobs|templates|samples)\/([^/]+?)(\.json)?$/);
+  return m ? `${{ jobs: 'reuse', templates: 'template', samples: 'example' }[m[1] as 'jobs' | 'templates' | 'samples']}=${m[2]}` : '';
+}
+
 /** The link for a job's reuse action, or null for a feature whose page cannot refill from a job yet. */
 export function reuseHref(job: { id: string; feature: string }): string | null {
   const page = PAGES[job.feature];

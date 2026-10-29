@@ -1,5 +1,4 @@
 'use client';
-import Link from 'next/link';
 import { type DragEvent, type KeyboardEvent, useEffect, useId, useRef, useState } from 'react';
 import { api, errorText, sendJson } from '@/lib/api';
 import { cardSample, type Example, exampleForPreset, examplesFor, sampleSrc, splitColumns } from '@/lib/examples';
@@ -8,13 +7,14 @@ import { NARROW, useMediaQuery, WIDE } from '@/lib/use-media-query';
 import { useHydrated } from '@/lib/use-hydrated';
 import { useSamples } from '@/lib/use-samples';
 import { ABOUT } from '@/lib/about-content';
+import { exampleFrom } from '@/lib/reuse';
 import { About } from './About';
 import { AudioSwitch } from './AudioSwitch';
 import { CardMedia } from './CardMedia';
 import { EnhanceToggle } from './EnhanceToggle';
 import { Icon } from './Icon';
 import { sampleFile, uploadImages } from './image-tools';
-import { useApplier, useHasHistory, useJobs, useRecreated } from './jobs';
+import { FormContext, useApplier, useHasHistory, useJobs, useRecreated } from './jobs';
 import { Modal } from './Modal';
 import { ModelPicker } from './ModelPicker';
 import { Preview } from './Preview';
@@ -105,6 +105,7 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
   const [stores, setStores] = useState<{ id: string; name: string }[]>([]);
   const [models, setModels] = useState<ModelsResponse | null>(null);
   const [ready, setReady] = useState(!reuse);
+  const [source, setSource] = useState(reuse ? { from: reuse } : null); // what the form refills from; Recreate sets a new one in place
   const [refetch, setRefetch] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -141,7 +142,8 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
 
   // Reuse: fill the form from the source clip; everything stays editable. A preset switched off since falls back to its prompt as a free prompt.
   useEffect(() => {
-    if (!reuse || !presets) return;
+    if (!source || !presets) return;
+    const reuse = source.from;
     let stale = false; // a refill superseded (another link, or a re-run effect) must not fill or upload
     api<JobDetail>(reuse)
       .then(async (j) => {
@@ -166,7 +168,7 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
     return () => {
       stale = true;
     };
-  }, [reuse, presets]);
+  }, [source, presets]);
 
   // The picker follows the ratio and duration; the chosen model stays while it supports them, else the server's default takes over.
   useEffect(() => {
@@ -294,6 +296,11 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
     if (s.ratio) setRatio(s.ratio);
     if (s.durationSec) setDurationSec(s.durationSec);
   });
+  /** Fash's Recreate: the form refills in place; on a narrow screen the form is its own tab, so it opens. */
+  function recreate(from: string) {
+    setSource({ from });
+    if (narrow) setTab('create');
+  }
 
   function fillFromExample(ex: Example) {
     if (presets?.some((p) => p.id === ex.presetId)) setPresetId(ex.presetId);
@@ -494,7 +501,9 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
           ) : shown === 'about' ? (
             <About page={ABOUT.create} />
           ) : (
-            <Tray feature="video" apply={apply} />
+            <FormContext.Provider value={{ recreate, apply }}>
+              <Tray feature="video" />
+            </FormContext.Provider>
           )}
         </div>
       </div>
@@ -620,10 +629,10 @@ export function CreateForm({ reuse, preset, model }: { reuse?: string; preset?: 
                   </a>
                 </div>
                 {details ? (
-                  <Link className="detail-use" href={`/create?example=${detail.id}`}>
+                  <button type="button" className="detail-use" onClick={() => (recreate(exampleFrom({ example: detail.id })!), narrow && setDetail(null))}>
                     <Icon name="copy" />
                     Dùng lại
-                  </Link>
+                  </button>
                 ) : (
                   <button type="button" className="detail-use" onClick={() => fillFromExample(detail)}>
                     <Icon name="copy" />
