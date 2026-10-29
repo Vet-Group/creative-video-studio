@@ -6,6 +6,7 @@ import { api, errorText, sendJson } from '@/lib/api';
 import { ABOUT } from '@/lib/about-content';
 import { promptTooLong } from '@/lib/prompt-limit';
 import { useHydrated } from '@/lib/use-hydrated';
+import { useRecall } from '@/lib/use-recall';
 import { About } from './About';
 import { Gallery, type Img, photoImg, RATIO_LABEL, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
 import { EnhanceToggle } from './EnhanceToggle';
@@ -33,7 +34,19 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
   const input = useRef<HTMLInputElement>(null);
   const { models, failed } = useImageModels('image');
   const pick = useImageChoice(models, Math.max(1, images.length), model); // Explore's model card picks the model
+  // The member's last model and settings, unless a refill or Explore's model card opens the page.
+  const recall = useRecall(
+    'image',
+    (s) => {
+      pick.setModelId(s.modelId);
+      if (s.ratio) pick.setRatio(s.ratio);
+      if (s.resolution) pick.setResolution(s.resolution);
+      if (s.enhance !== null) setEnhance(s.enhance);
+    },
+    { skip: reuse !== undefined || model !== undefined },
+  );
   const apply = useApplier((s) => {
+    recall.touch();
     if (s.ratio) pick.setRatio(s.ratio);
     if (s.resolution) pick.setResolution(s.resolution);
   });
@@ -56,6 +69,7 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
     reuse,
     'image',
     (j) => {
+      recall.touch();
       setImages(j.images);
       setPrompt(j.prompt ?? '');
       setEnhance(j.enhance ?? true);
@@ -68,19 +82,21 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
 
   // The first thing that stops Run; null when it can go.
   const reason =
-    models === null
-      ? 'Đang tải danh sách mô hình...'
-      : failed
-        ? 'Không tải được danh sách mô hình.'
-        : !chosen
-          ? 'Chưa bật mô hình nào cho Tạo ảnh. Admin bật trong Quản trị → Cài đặt → Mô hình.'
-          : images.length === 0 && !chosen.textToImage
-            ? 'Mô hình này cần ít nhất 1 ảnh tham chiếu.'
-            : images.length > chosen.maxImages
-              ? `Mô hình này nhận tối đa ${chosen.maxImages} ảnh.`
-              : prompt.trim() === ''
-                ? 'Nhập mô tả cảnh bạn muốn tạo.'
-                : promptTooLong(chosen, prompt.trim().length);
+    !recall.answered
+      ? 'Đang tải cài đặt đã dùng...'
+      : models === null
+        ? 'Đang tải danh sách mô hình...'
+        : failed
+          ? 'Không tải được danh sách mô hình.'
+          : !chosen
+            ? 'Chưa bật mô hình nào cho Tạo ảnh. Admin bật trong Quản trị → Cài đặt → Mô hình.'
+            : images.length === 0 && !chosen.textToImage
+              ? 'Mô hình này cần ít nhất 1 ảnh tham chiếu.'
+              : images.length > chosen.maxImages
+                ? `Mô hình này nhận tối đa ${chosen.maxImages} ảnh.`
+                : prompt.trim() === ''
+                  ? 'Nhập mô tả cảnh bạn muốn tạo.'
+                  : promptTooLong(chosen, prompt.trim().length);
   const canRun = reason === null && !busy;
   // With no image and a model that needs one, the best model that makes pictures from words is one click away (not switched to silently: its price differs).
   const wordsModel = chosen && images.length === 0 && !chosen.textToImage ? models?.filter((m) => m.textToImage).sort((a, b) => b.score - a.score)[0] : undefined;
@@ -132,7 +148,7 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
         </FormContext.Provider>
       </div>
 
-      <div className="imagebar" role="group" aria-label="Thanh tạo ảnh">
+      <div className="imagebar" role="group" aria-label="Thanh tạo ảnh" onPointerDownCapture={recall.touch} onKeyDownCapture={recall.touch}>
         <div className="imagebar-top">
           <input
             ref={input}

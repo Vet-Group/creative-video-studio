@@ -5,6 +5,7 @@ import { cardSample, type Example, exampleForPreset, examplesFor, sampleSrc, spl
 import { promptTooLong } from '@/lib/prompt-limit';
 import { NARROW, useMediaQuery, WIDE } from '@/lib/use-media-query';
 import { useHydrated } from '@/lib/use-hydrated';
+import { useRecall } from '@/lib/use-recall';
 import { useSamples } from '@/lib/use-samples';
 import { ABOUT } from '@/lib/about-content';
 import { exampleFrom } from '@/lib/reuse';
@@ -123,6 +124,20 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
   const [picking, setPicking] = useState(false);
   const [detail, setDetail] = useState<Example | null>(null);
   const [details, setDetails] = useState<SampleDetails | null>(null);
+  // The member's last model and settings, unless a refill or an Explore link opens the page. The model is honoured once, as Explore's is.
+  const recall = useRecall(
+    'video',
+    (s) => {
+      wanted.current = s.modelId;
+      setModelId(s.modelId);
+      if (s.ratio) setRatio(s.ratio);
+      if (s.durationSec) setDurationSec(s.durationSec);
+      if (s.audio !== null) setAudio(s.audio);
+      if (s.enhance !== null) setEnhance(s.enhance);
+      if (s.storeId) setStoreId(s.storeId);
+    },
+    { skip: reuse !== undefined || preset !== undefined || model !== undefined },
+  );
 
   useEffect(() => {
     api<{ stores: { id: string; name: string }[] }>('/api/stores').then((r) => setStores(r.stores), () => setError('Không tải được danh sách cửa hàng.'));
@@ -187,7 +202,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
 
   // The picker follows the ratio and duration; the chosen model stays while it supports them, else the server's default takes over.
   useEffect(() => {
-    if (!ready) return;
+    if (!ready || !recall.answered) return;
     let stale = false;
     api<ModelsResponse>(`/api/models?feature=video&ratio=${encodeURIComponent(ratio)}&durationSec=${durationSec}`).then(
       (r) => {
@@ -209,7 +224,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
     return () => {
       stale = true;
     };
-  }, [ready, ratio, durationSec, refetch]);
+  }, [ready, recall.answered, ratio, durationSec, refetch]);
 
   const chosen = models?.models.find((m) => m.id === modelId);
   const audioOn = audio && chosen?.audioEstimateUsd != null;
@@ -221,7 +236,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
   const maxImages = Math.min(MAX_IMAGES, chosen?.maxImages ?? MAX_IMAGES);
   const tooLong = presetId === '' ? promptTooLong(chosen, prompt.trim().length) : null;
   const promptOk = presetId !== '' || (prompt.trim() !== '' && tooLong === null);
-  const canRun = ready && !busy && images.length > 0 && chosen?.supported === true && !tooMany && promptOk;
+  const canRun = ready && recall.answered && !busy && images.length > 0 && chosen?.supported === true && !tooMany && promptOk;
 
   async function upload(files: File[]) {
     if (files.length === 0) return;
@@ -308,6 +323,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
   }
   /** Fills the form from a sample; nothing is submitted. A sample whose look has no matching form ratio leaves the ratio alone. */
   const apply = useApplier((s) => {
+    recall.touch();
     if (s.ratio) setRatio(s.ratio);
     if (s.durationSec) setDurationSec(s.durationSec);
   });
@@ -331,11 +347,13 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
   }
   /** Fash's Recreate: the form refills in place; on a narrow screen the form is its own tab, so it opens. */
   function recreate(from: string) {
+    recall.touch();
     setSource({ from });
     if (narrow) setTab('create');
   }
 
   function fillFromExample(ex: Example) {
+    recall.touch();
     if (presets?.some((p) => p.id === ex.presetId)) setPresetId(ex.presetId);
     if (ex.ratio) setRatio(ex.ratio);
     setDurationSec(ex.durationSec);
@@ -358,7 +376,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
           ))}
         </div>
 
-        <div className="card form-card" id="create-panel-create" role={narrow ? 'tabpanel' : undefined} aria-labelledby={narrow ? 'create-tab-create' : undefined} hidden={narrow && shown !== 'create'}>
+        <div className="card form-card" id="create-panel-create" role={narrow ? 'tabpanel' : undefined} aria-labelledby={narrow ? 'create-tab-create' : undefined} hidden={narrow && shown !== 'create'} onPointerDownCapture={recall.touch} onKeyDownCapture={recall.touch}>
           <div className="form-scroll">
             <div className="banner" aria-busy={presets === null}>
               <CardMedia video={banner.video} poster={banner.poster} />

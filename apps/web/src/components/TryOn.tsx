@@ -6,6 +6,7 @@ import { api, errorText, sendJson } from '@/lib/api';
 import { promptTooLong } from '@/lib/prompt-limit';
 import { tryOnPrompt } from '@/lib/try-on-prompt';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
+import { useRecall } from '@/lib/use-recall';
 import { useSamples } from '@/lib/use-samples';
 import { backgroundsIn, GARMENT_CATEGORIES, garmentsOf, posesOf, stockModels } from '@/lib/try-on-stock';
 import { ABOUT } from '@/lib/about-content';
@@ -55,7 +56,18 @@ export function TryOn({ reuse }: { reuse?: string }) {
   const total = garments.length + person.length + background.length;
   const pick = useImageChoice(models, Math.max(2, total));
   const { chosen } = pick;
+  // The member's last model and settings, unless a refill opens the page.
+  const recall = useRecall(
+    'try_on',
+    (s) => {
+      pick.setModelId(s.modelId);
+      if (s.ratio) pick.setRatio(s.ratio);
+      if (s.resolution) pick.setResolution(s.resolution);
+    },
+    { skip: reuse !== undefined },
+  );
   const apply = useApplier((s) => {
+    recall.touch();
     if (s.ratio) pick.setRatio(s.ratio);
     if (s.resolution) pick.setResolution(s.resolution);
   });
@@ -65,6 +77,7 @@ export function TryOn({ reuse }: { reuse?: string }) {
     reuse,
     'try_on',
     (j) => {
+      recall.touch();
       const n = j.garments ?? j.images.length - 1;
       setPerson(j.images.slice(0, 1));
       setGarments(j.images.slice(1, 1 + n));
@@ -79,19 +92,21 @@ export function TryOn({ reuse }: { reuse?: string }) {
 
   // The first thing that stops Run, in the order the form is filled; null when it can go.
   const reason =
-    models === null
-      ? 'Đang tải danh sách mô hình...'
-      : failed
-        ? 'Không tải được danh sách mô hình.'
-        : !chosen
-          ? 'Chưa bật mô hình nào cho Thử đồ. Admin bật trong Quản trị → Cài đặt → Mô hình.'
-          : garments.length === 0
-            ? 'Tải lên ít nhất 1 ảnh trang phục.'
-            : person.length === 0
-              ? 'Tải lên ảnh người mẫu.'
-              : total > chosen.maxImages
-                ? `Mô hình này nhận tối đa ${chosen.maxImages} ảnh (người mẫu, trang phục và bối cảnh).`
-                : promptTooLong(chosen, tryOnPrompt(garments.length, background.length > 0, prompt)?.length ?? 0);
+    !recall.answered
+      ? 'Đang tải cài đặt đã dùng...'
+      : models === null
+        ? 'Đang tải danh sách mô hình...'
+        : failed
+          ? 'Không tải được danh sách mô hình.'
+          : !chosen
+            ? 'Chưa bật mô hình nào cho Thử đồ. Admin bật trong Quản trị → Cài đặt → Mô hình.'
+            : garments.length === 0
+              ? 'Tải lên ít nhất 1 ảnh trang phục.'
+              : person.length === 0
+                ? 'Tải lên ảnh người mẫu.'
+                : total > chosen.maxImages
+                  ? `Mô hình này nhận tối đa ${chosen.maxImages} ảnh (người mẫu, trang phục và bối cảnh).`
+                  : promptTooLong(chosen, tryOnPrompt(garments.length, background.length > 0, prompt)?.length ?? 0);
   const canRun = reason === null && !busy;
   /** What the member may write: the model's limit less the image roles the prompt starts with. */
   const room = chosen && chosen.maxPromptChars - (tryOnPrompt(Math.max(1, garments.length), background.length > 0, 'x')!.length - 1);
@@ -166,7 +181,7 @@ export function TryOn({ reuse }: { reuse?: string }) {
       <div className="create-grid">
         <WorkTabs prefix="tryon" tabs={tabs} labels={TAB_LABEL} shown={shown} onSelect={setTab} />
 
-        <div className="card form-card" id="tryon-panel-create" role={narrow ? 'tabpanel' : undefined} aria-labelledby={narrow ? 'tryon-tab-create' : undefined} hidden={narrow && shown !== 'create'}>
+        <div className="card form-card" id="tryon-panel-create" role={narrow ? 'tabpanel' : undefined} aria-labelledby={narrow ? 'tryon-tab-create' : undefined} hidden={narrow && shown !== 'create'} onPointerDownCapture={recall.touch} onKeyDownCapture={recall.touch}>
           <div className="form-scroll">
             <Slot label="Trang phục" empty="Thêm 1 đến 5 ảnh trang phục" inputLabel="Ảnh trang phục" images={garments} max={MAX_GARMENTS} busy={busy} onAdd={add(setGarments)} onRemove={(id) => setGarments((c) => c.filter((i) => i.id !== id))} samples={categories.length > 0 ? [] : samplesOf('garment')} onBrowse={categories.length > 0 ? () => setPicker({ role: 'garment' }) : undefined} />
             <Slot label="Người mẫu" empty="Thêm 1 ảnh người mẫu" inputLabel="Ảnh người mẫu" images={person} max={1} busy={busy} onAdd={add(setPerson)} onRemove={(id) => setPerson((c) => c.filter((i) => i.id !== id))} samples={models0.length > 0 ? [] : samplesOf('model')} onBrowse={models0.length + myModels.length > 0 ? () => setPicker({ role: 'model' }) : undefined} />
