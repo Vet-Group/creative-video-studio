@@ -128,6 +128,29 @@ describe('vertex failures and inputs', () => {
     expect(JSON.parse(calls[0]!.body).contents[0].parts[0]).toEqual({ inlineData: { mimeType: 'image/webp', data: 'AQID' } });
   });
 
+  test('with a store, a provider started after a restart still hands back the billed image, once, and the stored copy is removed', async () => {
+    const objects = new Map<string, Uint8Array>();
+    const store = {
+      put: async (key: string, body: Uint8Array) => void objects.set(key, body),
+      get: async (key: string) => objects.get(key) ?? Promise.reject(new Error('NoSuchKey')),
+      delete: async (key: string) => void objects.delete(key),
+    };
+    const { providerJobId } = await createVertexImageProvider({ key: KEY, project: 'proj', fetch: fakeFetch([200, geminiAnswer]).fn, readImage, token: async () => 'tok', store }).submit(req(PRO));
+    expect([...objects.keys()]).toEqual([`vertex-outcomes/${providerJobId}.json`]);
+    const restarted = createVertexImageProvider({ key: KEY, project: 'proj', fetch: fakeFetch().fn, readImage, token: async () => 'tok', store });
+    const job = { providerJobId, model: PRO, resolution: '1K' };
+    expect(await restarted.status(job)).toEqual({ state: 'succeeded', outputUrl: 'data:image/png;base64,T1VU', costUsd: 0.134, costSource: 'estimate' });
+    expect(objects.size).toBe(0);
+    expect(await restarted.status(job)).toMatchObject({ state: 'failed', error: 'the vertex result was lost when the worker restarted' });
+  });
+
+  test('a store that fails to write leaves the in-memory outcome', async () => {
+    const store = { put: async () => Promise.reject(new Error('minio down')), get: async () => Promise.reject(new Error('minio down')), delete: async () => undefined };
+    const p = createVertexImageProvider({ key: KEY, project: 'proj', fetch: fakeFetch([200, geminiAnswer]).fn, readImage, token: async () => 'tok', store });
+    const { providerJobId } = await p.submit(req(PRO));
+    expect(await p.status({ providerJobId, model: PRO, resolution: '1K' })).toMatchObject({ state: 'succeeded', outputUrl: 'data:image/png;base64,T1VU' });
+  });
+
   test('cancel is not supported: the call has already run by the time a job has an id', async () => {
     expect(await provider(fakeFetch().fn).cancel({ providerJobId: 'x', model: PRO, resolution: '1K' })).toEqual({ supported: false });
   });

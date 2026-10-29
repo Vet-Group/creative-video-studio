@@ -110,8 +110,9 @@ function callFor(req: ImageSubmitRequest, images: Inline[], project: string, reg
 
 /**
  * The Vertex calls are synchronous: submit makes the call and keeps the outcome until status reads it, as a data URL the worker downloads like any
- * other output. shortcut: the outcome lives in this process only, so a worker restart between the two loses an image Google billed; status then
- * reports a failure at the estimate. Fine at a few images per minute; a Cloud Storage output (storageUri) would survive restarts.
+ * other output. With `store` the outcome is also written there (MinIO in the worker), so a worker restart between submit and status, up to one
+ * reconcile tick, no longer loses an image Google billed. shortcut: a restart during the call itself still loses it (status reports a failure at
+ * the estimate); a Cloud Storage output (storageUri) would cover that too.
  */
 export function createVertexImageProvider(opts: {
   key: ServiceAccountKey;
@@ -122,11 +123,14 @@ export function createVertexImageProvider(opts: {
   readImage?: ReadImage;
   /** Tests pass a fixed token; otherwise one is minted from the key. */
   token?: () => Promise<string>;
+  /** Where outcomes outlive the process: the worker passes its object storage. */
+  store?: { put(key: string, body: Uint8Array, contentType: string): Promise<void>; get(key: string): Promise<Uint8Array>; delete(key: string): Promise<void> };
 }): ImageProvider {
   const f = opts.fetch ?? fetch;
   const token = opts.token ?? serviceAccountToken(opts.key, f);
   const region = opts.region ?? 'us-central1';
   const outcomes = new Map<string, ProviderStatus>();
+  const keyOf = (id: string) => `vertex-outcomes/${id}.json`;
   return {
     async submit(req) {
       const call = callFor(req, (await resolveImages(req.imageUrls, opts.readImage)).map(inline), opts.project, region);
@@ -143,13 +147,17 @@ export function createVertexImageProvider(opts: {
         const cost = e instanceof ProviderHttpError ? { costUsd: 0, costSource: 'reported' as const } : billed;
         outcomes.set(id, { state: 'failed', error: e instanceof Error ? e.message : String(e), ...cost });
       }
+      // A store that fails leaves the in-memory copy, as before the store existed.
+      await opts.store?.put(keyOf(id), new TextEncoder().encode(JSON.stringify(outcomes.get(id))), 'application/json').catch(() => undefined);
       return { providerJobId: id };
     },
     async status(job) {
-      const out = outcomes.get(job.providerJobId);
-      if (!out) return { state: 'failed', error: 'the vertex result was lost when the worker restarted', ...imageEstimate(job) };
-      outcomes.delete(job.providerJobId);
-      return out;
+      const id = job.providerJobId;
+      const kept = outcomes.get(id) ?? (await opts.store?.get(keyOf(id)).then((b) => JSON.parse(new TextDecoder().decode(b)) as ProviderStatus, () => undefined));
+      if (!kept) return { state: 'failed', error: 'the vertex result was lost when the worker restarted', ...imageEstimate(job) };
+      outcomes.delete(id);
+      await opts.store?.delete(keyOf(id)).catch(() => undefined);
+      return kept;
     },
     async cancel() {
       return { supported: false };
