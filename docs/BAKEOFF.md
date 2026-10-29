@@ -53,3 +53,19 @@ Render seconds are what the provider reported; minutes run from the provider acc
 | half-2 | 9 | kling-o3-pro | yes | - | - | 2.3 |
 | half-2 | 10 | kling-o3-pro | yes | - | - | 3.6 |
 | half-2 | 10 | seedance-2.5 | yes | - | 159 | 22.6 |
+
+## Try On
+
+Ten person + garment pairs (five plain tees from Pexels, five printed tees from the company's own stores), 1K, the default Try On prompt, the person
+photo's ratio as the worker sends it since #167. A result passes only if the person, scene, garment colour and cut, every printed word and the hands
+all hold. Judged blind, the key read after the verdicts (2026-10-29).
+
+| Model | Round 1 (2 per pair) | Round 2 (5 per pair) | Printed pairs | Failed |
+|---|---|---|---|---|
+| nano-banana-2.1 | 9/10 | 9/10 | 4/5 | pair 2: seven small words misspelt |
+| nano-banana-pro | 9/10, not blind (4/10 at `auto` before #167) | 9/10 | 4/5 | pair 2 |
+| nano-banana-2.1 on Vertex | - | 8/10 | 3/5 | pair 2; pair 10 beige shirt for a light grey one, once in three runs (pairs 4, 6, 8, 10 run twice more: 8/8) |
+| nano-banana-pro on Vertex | - | 9/10 | 4/5 | pair 2 |
+| virtual-try-on on Vertex | - | 8/10 | 3/5 | pair 2; pair 4 "MATTERS" garbled |
+
+Nano Banana 2.1 passes at 27% of Pro's price, so migration 0032 records 9/10 as its prior and the Try On picker recommends it.

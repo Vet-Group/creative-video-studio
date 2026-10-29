@@ -332,6 +332,16 @@ describe('migration 0013 real video models', () => {
   });
 });
 
+describe('migration 0032 Try On bake-off prior', () => {
+  test('Nano Banana 2.1 carries its Try On bake-off pass count from docs/BAKEOFF.md, above every other Try On model', async () => {
+    const doc = readFileSync(new URL('../../../docs/BAKEOFF.md', import.meta.url), 'utf8');
+    const [, passes, total] = /\| nano-banana-2\.1 \| (\d+)\/(\d+) \|/.exec(doc)!;
+    const { rows } = await pool.query(`select id, pass_seed_passes::float8 / pass_seed_total as rate from model_configs where 'try_on' = any(features) order by rate desc nulls last, id`);
+    expect(rows[0]).toEqual({ id: 'nano-banana-2.1', rate: Number(passes) / Number(total) });
+    expect(rows[1].rate).toBeLessThan(rows[0].rate);
+  });
+});
+
 describe('cost_entries', () => {
   test('is append-only: UPDATE, DELETE and TRUNCATE raise', async () => {
     const job = await insertJob(userId);
