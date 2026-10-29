@@ -28,6 +28,9 @@ function nextRun(page: Page): Promise<{ assetIds: string[]; params: Record<strin
 
 const endSlot = (page: Page) => page.getByRole('group', { name: 'Khung hình cuối' });
 
+// A models request still in the route when a test ends would fail it, so the routes go first.
+test.afterEach(({ page }) => page.unrouteAll({ behavior: 'ignoreErrors' }));
+
 test('the End frame slot shows only for a model that takes one, and its image goes with the Run', async ({ page }) => {
   await signIn(page, 'cvxa');
   await expect(page.getByRole('button', { name: /^Mô hình / })).toContainText('Mock E2E');
