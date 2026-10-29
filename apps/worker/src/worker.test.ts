@@ -18,7 +18,7 @@ import { createTestDatabase } from '@cvs/db/testing';
 import { PgBoss } from 'pg-boss';
 import sharp from 'sharp';
 import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
-import { requireFfmpeg } from './media';
+import { closestRatio, requireFfmpeg } from './media';
 import { createMockImageProvider, createMockProvider, MOCK_FAIL } from './mock-provider';
 import { bucketName, ensureBucket, putObject, s3 } from './storage';
 import { type RunningWorker, startWorker, type WorkerOptions } from './worker';
@@ -522,7 +522,7 @@ describe('image jobs', () => {
       await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) values ($1, 'u1', 'input', $2, 'p.png', 'image/png', 1)`, [id, `assets/${id}`]);
       return id;
     };
-    const [person, garment] = [await asset(400, 600), await asset(500, 500)];
+    const [person, garment] = [await asset(600, 800), await asset(500, 500)];
     const id = randomUUID();
     await pool.query(
       `insert into jobs (id, user_id, team_id, feature, model, provider, prompt, aspect, duration_s, params, input_asset_ids)
@@ -535,7 +535,17 @@ describe('image jobs', () => {
     await send(id, 'u1');
     await waitFor('the job to succeed', async () => (await status(id)) === 'succeeded');
     expect(requests[0]!.imageUrls).toEqual([`asset://${person}`, `asset://${garment}`]);
-    expect(requests[0]!.ratio).toBe('2:3');
+    expect(requests[0]!.ratio).toBe('3:4');
+  });
+
+  test('closestRatio picks the offered ratio nearest the upright photo, and auto when the model offers none', async () => {
+    const photo = (width: number, height: number, orientation = 1) =>
+      sharp({ create: { width, height, channels: 3, background: '#ccc' } }).withMetadata({ orientation }).jpeg().toBuffer();
+    const ratios = ['auto', '1:1', '3:4', '4:3', '9:16', '16:9'];
+    expect(await closestRatio(await photo(400, 600), ratios)).toBe('3:4'); // 2:3 is not offered
+    expect(await closestRatio(await photo(1080, 1920), ratios)).toBe('9:16');
+    expect(await closestRatio(await photo(1920, 1080, 6), ratios)).toBe('9:16'); // a phone photo stored landscape, shown portrait
+    expect(await closestRatio(await photo(500, 500), ['auto'])).toBe('auto');
   });
 
   test('stores a JPEG under its own type and extension, whatever name the provider gave it', async () => {

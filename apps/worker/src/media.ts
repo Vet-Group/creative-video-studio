@@ -3,6 +3,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import ffmpegPath from 'ffmpeg-static';
 import ffprobe from 'ffprobe-static';
+import sharp from 'sharp';
 
 const run = promisify(execFile);
 
@@ -21,6 +22,19 @@ export function sniffImage(b: Uint8Array): { mime: string; ext: string } | undef
   if (b[0] === 0x89 && at(1, 'PNG')) return { mime: 'image/png', ext: 'png' };
   if (at(0, 'RIFF') && at(8, 'WEBP')) return { mime: 'image/webp', ext: 'webp' };
   return undefined;
+}
+
+/** The ratio of `ratios` closest to the image as it is seen (EXIF orientation applied); 'auto' when the model offers no fixed ratio. */
+export async function closestRatio(bytes: Uint8Array, ratios: string[]): Promise<string> {
+  const fixed = ratios.filter((r) => r !== 'auto');
+  const { width = 0, height = 0, orientation = 1 } = await sharp(bytes).metadata();
+  if (!fixed.length || !width || !height) return 'auto';
+  const shape = Math.log(orientation >= 5 ? height / width : width / height);
+  const off = (r: string) => {
+    const [w, h] = r.split(':').map(Number);
+    return Math.abs(Math.log(w! / h!) - shape);
+  };
+  return fixed.reduce((best, r) => (off(r) < off(best) ? r : best));
 }
 
 /** Writes the first frame as a JPEG no wider than 480 px. */
