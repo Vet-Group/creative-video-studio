@@ -184,9 +184,44 @@ describe('migration 0017 GPT Image 2.5', () => {
   });
 });
 
+describe('migration 0031 Vertex models', () => {
+  test('adds the Vertex image models disabled, the Nano Banana ones with the features and limits of their fal twins', async () => {
+    const { rows } = await pool.query(`select v.id, v.endpoint, v.label, v.kind, v.features, v.ratios, v.max_images, v.max_prompt_chars, v.image_prices, v.enabled,
+      v.sources->'imagePrices'->>'readAt' as read_at, f.features = v.features and f.ratios = v.ratios and f.max_images = v.max_images and f.max_prompt_chars = v.max_prompt_chars as same_as_twin
+      from model_configs v left join model_configs f on f.id = replace(v.id, '-vertex', '') and f.provider = 'fal' where v.provider = 'vertex' order by v.id`);
+    expect(rows.map((r) => [r.id, r.endpoint, r.image_prices, r.same_as_twin])).toEqual([
+      ['nano-banana-2-vertex', 'gemini-3.1-flash-image', { '1K': '0.067' }, true],
+      ['nano-banana-2.1-vertex', 'gemini-nano-banana-2.1', { '1K': '0.034', '2K': '0.05' }, true],
+      ['nano-banana-pro-vertex', 'gemini-3-pro-image', { '1K': '0.134', '2K': '0.134', '4K': '0.24' }, true],
+      ['nano-banana-vertex', 'gemini-2.5-flash-image', { '1K': '0.039' }, true],
+      ['product-recontext-vertex', 'imagen-product-recontext-preview-06-30', { '1K': '0.12' }, null],
+      ['virtual-try-on-vertex', 'virtual-try-on-001', { '1K': '0.06' }, null],
+    ]);
+    for (const r of rows) {
+      expect([r.kind, r.enabled, r.read_at], r.id).toEqual(['image', false, '2026-10-29']);
+      expect(r.label, r.id).toMatch(/ \(Vertex\)$/);
+    }
+    const [recontext, tryOn] = rows.slice(4);
+    expect([recontext.features, recontext.ratios, recontext.max_images]).toEqual([['image'], ['auto'], 3]);
+    expect([tryOn.features, tryOn.ratios, tryOn.max_images]).toEqual([['try_on'], ['auto'], 2]);
+  });
+
+  test('vertex is a provider for models and jobs, and an unknown one is still refused', async () => {
+    await pool.query(`update model_configs set enabled = true where id = 'virtual-try-on-vertex'`);
+    await pool.query(`update model_configs set enabled = false where id = 'virtual-try-on-vertex'`);
+    const user = await insertUser();
+    await pool.query(
+      `insert into jobs (id, user_id, team_id, feature, model, provider, prompt, aspect, duration_s, params, input_asset_ids)
+       values ($1, $2, 'team-unassigned', 'try_on', 'virtual-try-on-vertex', 'vertex', '', 'auto', 0, '{"resolution": "1K"}', '{}')`,
+      [next(), user],
+    );
+    await expect(pool.query(`update model_configs set provider = 'byteplus' where id = 'virtual-try-on-vertex'`)).rejects.toThrow(/model_configs_provider_check/);
+  });
+});
+
 describe('migration 0007 image models', () => {
   test('seeds the seven fal image models disabled, each with its prices, ratios and features', async () => {
-    const { rows } = await pool.query(`select id, endpoint, features, ratios, durations_sec, max_images, image_prices, usd_per_second, enabled, sources from model_configs where kind = 'image' and cardinality(features) > 0 and not features && ARRAY['character_swap', 'model_swap', 'background_changer', 'reframe', 'image_upscale', 'face_swap', 'background_remover']::text[] and id not like 'gpt-image-2.5%' order by id`);
+    const { rows } = await pool.query(`select id, endpoint, features, ratios, durations_sec, max_images, image_prices, usd_per_second, enabled, sources from model_configs where kind = 'image' and cardinality(features) > 0 and not features && ARRAY['character_swap', 'model_swap', 'background_changer', 'reframe', 'image_upscale', 'face_swap', 'background_remover']::text[] and id not like 'gpt-image-2.5%' and provider <> 'vertex' order by id`);
     expect(rows.map((r) => [r.id, r.endpoint, r.features, r.image_prices])).toEqual([
       ['fashn-v1.6', 'fal-ai/fashn/tryon/v1.6', ['try_on'], { '1K': '0.075' }],
       ['gpt-image-2', 'openai/gpt-image-2/edit', ['image'], { '1K': '0.21' }],

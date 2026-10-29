@@ -218,6 +218,13 @@
       "when": 1794308543036,
       "tag": "0030_nano_banana_inputs",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1794394943036,
+      "tag": "0031_vertex_models",
+      "breakpoints": true
     }
   ]
 }
