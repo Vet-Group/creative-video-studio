@@ -184,4 +184,7 @@ test('a saved template and History’s Dùng lại refill the end frame and the 
   await page.getByRole('button', { name: /^Tạo video/ }).click();
   expect(await plain).toMatchObject({ assetIds: sent.assetIds, params: { audio: 'on' } });
   expect((await plain).params).toEqual({ audio: 'on' });
+  // The 9:16 job would otherwise show in the shared Library and break the Library spec's empty 9:16 filter; only a finished clip can be deleted.
+  await expect.poll(async () => ((await (await page.request.get(`/api/jobs/${id}`)).json()) as { status: string }).status, { timeout: 60_000 }).toBe('succeeded');
+  expect((await page.request.delete(`/api/jobs/${id}`)).ok()).toBe(true);
 });

@@ -215,7 +215,7 @@ test('the brief may take what the chosen model leaves; a switch to a model with 
   await page.getByLabel('Ảnh sản phẩm').setInputFiles(file('product.png'));
   await expect(modelButton(page)).toContainText('Mock E2E');
   const brief = page.getByRole('textbox', { name: 'Prompt (tuỳ chọn)' });
-  const counter = page.locator('.prompt-foot span').first();
+  const counter = page.locator('.prompt-foot > span:last-child');
   const room = async () => Number((await counter.textContent())!.split('/')[1]);
   await expect(counter).toHaveText(/^0\/\d+$/);
   expect(await room()).toBeGreaterThan(1100); // 2000 less the fixed part the page adds

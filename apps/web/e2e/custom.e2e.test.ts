@@ -40,6 +40,45 @@ async function asAdmin(browser: Browser): Promise<Page> {
   return page;
 }
 
+test('the add form says what a hook is, an example fills it, a Vietnamese scene gets a hint, and the share box sits by its words', async ({ page, browser }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await signIn(page, 'custa');
+  await page.goto('/marketing-studio');
+  await hookBox(page).click();
+  const hooks = page.getByRole('dialog', { name: 'Chọn hook' });
+  // The variants row belongs to the picking, so it sits under the cards, above the add link.
+  const variantsY = (await hooks.getByText(/^Tạo nhiều biến thể/).boundingBox())!.y;
+  expect(variantsY).toBeLessThan((await hooks.getByRole('button', { name: 'Thêm hook' }).boundingBox())!.y);
+  await hooks.getByRole('button', { name: 'Thêm hook' }).click();
+  const form = hooks.getByRole('group', { name: 'Thêm hook' });
+  await expect(form).toContainText('Hook là 1-2 giây mở đầu clip');
+  await expect(form.getByLabel('Tên', { exact: true })).toBeFocused();
+  await form.getByRole('group', { name: 'Điền thử một ví dụ' }).getByRole('button', { name: 'Trước và sau' }).click();
+  await expect(form.getByLabel('Tên', { exact: true })).toHaveValue('Trước và sau');
+  await expect(form.getByLabel('Mô tả ngắn (tuỳ chọn)')).toHaveValue(/bộ đồ mới/);
+  const scene = form.getByLabel('Cảnh cho AI (tiếng Anh)');
+  await expect(scene).toHaveValue(/^The clip opens with the creator in a plain old outfit/);
+  await expect(scene).toHaveAccessibleDescription(/tiếng Anh tốt nhất/);
+  await scene.fill('Cô gái mở hộp quà');
+  await expect(scene).toHaveAccessibleDescription(/Có vẻ đây là tiếng Việt/);
+  await expect(form.getByRole('checkbox')).toHaveCount(0); // only an Admin shares
+
+  const admin = await asAdmin(browser);
+  try {
+    await admin.setViewportSize({ width: 1440, height: 1000 });
+    await admin.goto('/marketing-studio');
+    await hookBox(admin).click();
+    const dialog = admin.getByRole('dialog', { name: 'Chọn hook' });
+    await dialog.getByRole('button', { name: 'Thêm hook' }).click();
+    const box = (await dialog.getByRole('checkbox', { name: 'Chia sẻ cho cả công ty' }).boundingBox())!;
+    const label = (await dialog.locator('label.template-share').boundingBox())!;
+    expect(box.width).toBeLessThanOrEqual(20);
+    expect(box.x - label.x).toBeLessThan(4);
+  } finally {
+    await admin.context().close();
+  }
+});
+
 test('Thêm hook and Thêm bối cảnh save the member’s own, choose them at once, put their phrases in the prompt, and Dùng lại brings them back', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   const tag = unique();
@@ -57,7 +96,7 @@ test('Thêm hook and Thêm bối cảnh save the member’s own, choose them at 
   await hooks.getByRole('button', { name: 'Thêm hook' }).click();
   const hookForm = hooks.getByRole('group', { name: 'Thêm hook' });
   await hookForm.getByLabel('Tên', { exact: true }).fill(hook.name);
-  await hookForm.getByLabel('Cụm tiếng Anh').fill(hook.phrase);
+  await hookForm.getByLabel('Cảnh cho AI (tiếng Anh)').fill(hook.phrase);
   await hookForm.getByRole('button', { name: 'Lưu', exact: true }).click();
   await expect(hooks).toBeHidden();
   await expect(hookBox(page)).toContainText(hook.name);
@@ -71,8 +110,8 @@ test('Thêm hook and Thêm bối cảnh save the member’s own, choose them at 
   await places.getByRole('button', { name: 'Thêm bối cảnh' }).click();
   const spotForm = places.getByRole('group', { name: 'Thêm bối cảnh' });
   await spotForm.getByLabel('Tên', { exact: true }).fill(spot.name);
-  await spotForm.getByLabel('Cụm tiếng Anh').fill(spot.phrase);
-  await spotForm.getByLabel('Mô tả (tuỳ chọn)').fill('Góc quán quen');
+  await spotForm.getByLabel('Cảnh cho AI (tiếng Anh)').fill(spot.phrase);
+  await spotForm.getByLabel('Mô tả ngắn (tuỳ chọn)').fill('Góc quán quen');
   await spotForm.getByRole('button', { name: 'Lưu', exact: true }).click();
   await expect(places).toBeHidden();
   await expect(locationBox(page)).toContainText(spot.name);

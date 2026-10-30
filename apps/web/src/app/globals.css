@@ -431,6 +431,7 @@ td code { white-space: pre-wrap; overflow-wrap: anywhere; }
 .template-list li a { flex: 1; color: var(--ink-strong); font-weight: 500; }
 .choice-dialog input:not([type]) { width: 100%; height: 40px; margin: 6px 0 12px; padding: 0 12px; border: 1px solid var(--border); border-radius: 8px; font: inherit; }
 .template-share { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; font-size: 14px; }
+.template-share input { width: 16px; min-width: 0; height: 16px; margin: 0; padding: 0; } /* the generic label-input min width pushed the box away from its text */
 .field-label { margin: 0; color: var(--ink-strong); font-size: 14px; line-height: 21px; font-weight: 500; }
 .help { margin: 8px 0 0; color: var(--text-muted); font-size: 12px; line-height: 18px; }
 
@@ -465,18 +466,23 @@ td code { white-space: pre-wrap; overflow-wrap: anywhere; }
 .prompt-foot > :only-child { margin-left: auto; }
 /* Suggestions: a quiet link in the field's foot or head; the three options open over the form beneath it. */
 .suggest { position: relative; }
-.suggest-button { padding: 0; border: 0; background: none; color: var(--ink-strong); font: inherit; font-size: 12px; font-weight: 500; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.suggest-button { display: inline-flex; align-items: center; gap: 4px; padding: 0; border: 0; background: none; color: var(--ink-strong); font: inherit; font-size: 12px; font-weight: 500; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 .suggest-button:disabled { color: var(--text-muted); text-decoration: none; cursor: default; }
 .suggestions { position: absolute; top: calc(100% + 6px); left: 0; z-index: 40; display: grid; gap: 6px; width: min(460px, 80vw); padding: 8px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); box-shadow: 0 8px 24px rgb(0 0 0 / 14%); }
 .suggestion { padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--fill); color: var(--ink-strong); font: inherit; font-size: 13px; line-height: 19px; text-align: left; cursor: pointer; }
 .suggestion:hover { border-color: var(--text-disabled); }
 .suggestions .error { margin: 0; font-size: 13px; }
 .field-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.field-head .suggestions { left: auto; right: 0; }
+/* A list opened from the field's head or the box's foot spans the field: a 460 px list under a link in the narrow form ran off its left edge. */
+.field-head .suggestions, .prompt-foot .suggestions { left: 0; right: 0; width: auto; }
+.field-head .suggest, .prompt-foot .suggest { position: static; }
+.prompt-box:has(.prompt-foot .suggest) { position: relative; }
+/* In the foot, suggestions use a pill like Create's Enhance. */
+.prompt-foot .suggest-button { height: 30px; padding: 0 10px; border: 1px solid var(--border-button); border-radius: 999px; background: var(--surface); color: var(--ink); text-decoration: none; white-space: nowrap; }
 /* The recent prompts and expand tools: quiet links beside the label (icons at the end of the Image Generation bar's prompt row); the list opens over the form, above the bar. */
-.prompt-tools, .field-tools { display: inline-flex; align-items: center; gap: 12px; }
+.prompt-tools { display: inline-flex; align-items: center; gap: 12px; }
 /* The list spans the field (or the bar), not the width of the suggestions under a narrow form's link. */
-.field-head:has(.prompt-tools) { position: relative; }
+.field-head { position: relative; }
 .prompt-tools > .suggest { position: static; }
 .prompt-tools .suggestions { left: 0; right: 0; width: auto; }
 .prompt-tools .suggest-button { line-height: 18px; } /* under the label's 21 px, so the field head keeps its height */
@@ -1089,8 +1095,17 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .choice-group { display: contents; }
 .choice-group-title { grid-column: 1 / -1; margin: 4px 0 0; color: var(--text-sub); font-size: 13px; line-height: 18px; font-weight: 600; }
 .choice-add { display: inline-flex; align-items: center; gap: 6px; margin-top: 16px; font-size: 14px; }
-.choice-form { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--hairline); }
-.choice-form-actions { display: flex; justify-content: flex-end; gap: 8px; }
+/* The add form: a card with what the kind is, examples that fill it, and a hint under the English scene. */
+.choice-form { margin-top: 16px; padding: 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--fill); }
+.choice-form h3 { margin: 0; font-size: 15px; line-height: 22px; font-weight: 600; }
+.choice-form > .help { margin: 4px 0 0; }
+.choice-form :is(input:not([type]), textarea) { background: var(--surface); }
+.choice-form textarea { display: block; width: 100%; margin: 6px 0 0; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; color: inherit; font: inherit; font-size: 14px; line-height: 21px; resize: vertical; }
+.choice-form textarea + .help { margin: 6px 0 12px; }
+.choice-examples { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 12px 0 16px; color: var(--text-sub); font-size: 13px; }
+.choice-examples button { height: 28px; padding: 0 12px; border-radius: 999px; font-size: 13px; }
+.choice-form-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.choice-form-actions button { margin: 0; }
 .choice-own h3 { margin: 20px 0 8px; font-size: 14px; line-height: 20px; font-weight: 600; }
 .choice-own li > span:first-child { flex: 1; }
 .gallery-item video { display: block; width: 100%; height: 100%; object-fit: cover; background: var(--media-bg); }
@@ -1187,10 +1202,9 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 }
 
 /* C4 round 5. */
-/* Marketing Studio: the boxes start 16 px under the banner and the prompt has no counter row (the field still stops at the limit), so ratio and duration sit above the Run bar, as on Fash. */
+/* Marketing Studio: the boxes start 16 px under the banner. The prompt keeps its row for suggestions and the count (owner, 2026-10-30: the head was too crowded); an empty script box has none and is 74 px tall, as on Fash. */
 .marketing-head { margin-bottom: 0; }
-.form-scroll:has(> .marketing-head) .prompt-foot:not(.script-foot) { display: none; }
-.form-scroll:has(> .marketing-head) .prompt-box textarea { min-height: 64px; } /* with no counter row, each box is 74 px tall, as on Fash */
+.form-scroll:has(> .marketing-head) .prompt-box textarea { min-height: 64px; }
 /* 1024-1439 px: Image Generation's size slider shares the tab row too, as Try On's does. */
 @media (min-width: 1024px) and (max-width: 1439.98px) {
   .imagegen-side .gallery-tools { height: 37px; align-items: center; margin: -69px 0 32px; }
