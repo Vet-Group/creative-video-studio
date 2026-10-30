@@ -6,7 +6,7 @@ test('Gợi ý mô tả fills the brief with the picked option, and Gợi ý l�
   await page.setViewportSize({ width: 1440, height: 1000 });
   await signIn(page, 'sugga');
   await page.goto('/marketing-studio');
-  // The label and its two tools stay on one line, and Gợi ý sits in the box's foot.
+  // The label and its two tools stay on one line, and suggestions sit in the box's foot.
   const label = (await page.getByText('Prompt (tuỳ chọn)', { exact: true }).boundingBox())!;
   expect(label.height).toBeLessThanOrEqual(22);
   expect(Math.abs((await page.getByRole('button', { name: 'Mở rộng' }).boundingBox())!.y - label.y)).toBeLessThan(6);

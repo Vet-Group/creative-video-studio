@@ -46,7 +46,7 @@ test('an Advanced job runs from reference images, a brief, a script and audio on
   await expect(page.locator('.script-foot')).toHaveCount(0); // empty, the script box is as short as the live page's
   const [promptBox, scriptBox] = await page.locator('.prompt-box').all();
   expect((await scriptBox!.boundingBox())!.height).toBeCloseTo(74, 0); // empty, the script box is 74 px as on Fash
-  expect((await promptBox!.boundingBox())!.height).toBeCloseTo(110, 0); // the prompt keeps its row for Gợi ý and the count
+  expect((await promptBox!.boundingBox())!.height).toBeCloseTo(110, 0); // the prompt keeps its row for suggestions and the count
   await expect(audio(page)).toHaveAttribute('aria-checked', 'true');
   await expect(modelButton(page)).toContainText('Mock E2E');
   await expect(runButton(page)).toContainText('$0.0000');

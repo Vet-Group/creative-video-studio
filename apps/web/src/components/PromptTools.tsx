@@ -38,7 +38,7 @@ export function PromptTools({ feature, format, value, onChange, maxLength, onRun
       {prompts.length > 0 && (
         <span className="suggest" onKeyDown={(e) => e.key === 'Escape' && open && (e.stopPropagation(), setOpen(false))}>
           <button type="button" className={bare ? 'icon-button' : 'suggest-button'} aria-expanded={open} aria-label="Prompt gần đây" title={bare ? 'Prompt gần đây' : undefined} onClick={() => (open || load(), setOpen(!open))}>
-            {/* "Gần đây" beside the prompt's label, so a label with "(tuỳ chọn)" and both tools stay on one line. */}
+            {/* Keep recent prompts beside the label so its optional suffix and both tools fit on one line. */}
             {bare ? <Icon name="clock" /> : 'Gần đây'}
           </button>
           {open && (

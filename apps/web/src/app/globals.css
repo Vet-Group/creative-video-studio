@@ -477,7 +477,7 @@ td code { white-space: pre-wrap; overflow-wrap: anywhere; }
 .field-head .suggestions, .prompt-foot .suggestions { left: 0; right: 0; width: auto; }
 .field-head .suggest, .prompt-foot .suggest { position: static; }
 .prompt-box:has(.prompt-foot .suggest) { position: relative; }
-/* In the foot, Gợi ý is a pill like Create's Enhance. */
+/* In the foot, suggestions use a pill like Create's Enhance. */
 .prompt-foot .suggest-button { height: 30px; padding: 0 10px; border: 1px solid var(--border-button); border-radius: 999px; background: var(--surface); color: var(--ink); text-decoration: none; white-space: nowrap; }
 /* The recent prompts and expand tools: quiet links beside the label (icons at the end of the Image Generation bar's prompt row); the list opens over the form, above the bar. */
 .prompt-tools { display: inline-flex; align-items: center; gap: 12px; }
@@ -1202,7 +1202,7 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 }
 
 /* C4 round 5. */
-/* Marketing Studio: the boxes start 16 px under the banner. The prompt keeps its row for Gợi ý and the count (owner, 2026-10-30: the head was too crowded); an empty script box has none and is 74 px tall, as on Fash. */
+/* Marketing Studio: the boxes start 16 px under the banner. The prompt keeps its row for suggestions and the count (owner, 2026-10-30: the head was too crowded); an empty script box has none and is 74 px tall, as on Fash. */
 .marketing-head { margin-bottom: 0; }
 .form-scroll:has(> .marketing-head) .prompt-box textarea { min-height: 64px; }
 /* 1024-1439 px: Image Generation's size slider shares the tab row too, as Try On's does. */
