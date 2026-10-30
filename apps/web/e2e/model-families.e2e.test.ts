@@ -87,6 +87,7 @@ test('the picker opens on the featured models and the families; a family opens b
   await expect(kling).toHaveCount(0);
   await activeIs(families.filter({ hasText: /^Kling/ }));
   await page.keyboard.press('ArrowDown');
+  await activeIs(families.filter({ hasText: /^Google/ }));
   await page.keyboard.press('Enter'); // Enter opens a family too
   const google = list.getByRole('group', { name: 'Google' });
   await activeIs(google.getByRole('option', { name: /Google VEO 3\.1/ }));
