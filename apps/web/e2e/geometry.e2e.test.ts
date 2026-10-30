@@ -336,8 +336,8 @@ test.describe('1440x1000', () => {
     near((await box(row)).height, 56, 'row height');
     expect(await css(row, 'padding-top', 'padding-left', 'background-color')).toEqual(['6px', '12px', 'rgba(0, 0, 0, 0.06)']);
     expect(await row.locator('svg').count(), 'a check on the selected row').toBe(1);
-    await expect(panel.getByText('Tỉ lệ đạt: 80% (8/10)')).toBeVisible();
-    await expect(panel.getByText('Ước tính: $0.8000')).toBeVisible();
+    await expect(panel.getByText('Đạt 80% (8/10)')).toBeVisible();
+    await expect(panel.getByText('$0.8000')).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(panel).toBeHidden();
   });

@@ -25,7 +25,7 @@ async function newUser(email: string, role: 'member' | 'admin') {
 const call = (cookie: string, path: string, method = 'GET', body?: unknown) =>
   new Request(`http://localhost${path}`, { method, headers: { cookie, 'content-type': 'application/json' }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
 const picker = async (cookie: string) =>
-  (await GET(call(cookie, '/api/models?ratio=9:16&durationSec=8'))).json() as Promise<{ models: { id: string; resolution: string | null; maxPromptChars: number; passRate: number | null; passes: number; total: number; estimateUsd: string; audioEstimateUsd: string | null; score: number; recommended: boolean }[]; defaultModelId: string | null }>;
+  (await GET(call(cookie, '/api/models?ratio=9:16&durationSec=8'))).json() as Promise<{ models: { id: string; resolution: string | null; maxPromptChars: number; passRate: number | null; passes: number; total: number; estimateUsd: string; audioEstimateUsd: string | null; score: number; recommended: boolean; isNew: boolean }[]; defaultModelId: string | null }>;
 const enabled = async (id: string) => (await pool.query('select enabled from model_configs where id = $1', [id])).rows[0].enabled as boolean;
 
 let admin: Awaited<ReturnType<typeof newUser>>;
@@ -88,6 +88,12 @@ describe('the model picker', () => {
     const kling = (await picker(member.cookie)).models[0]!;
     expect([kling.passes, kling.total]).toEqual([8, 11]); // the unmarked clip is left out
     expect(kling.passRate).toBeCloseTo(8 / 11);
+  });
+
+  test('marks a model as new for 14 days after it was added', async () => {
+    expect((await picker(member.cookie)).models.map((m) => m.isNew)).toEqual([true]); // migrated into this database just now
+    await pool.query(`update model_configs set created_at = now() - interval '15 days' where id = 'kling-o3-pro'`);
+    expect((await picker(member.cookie)).models.map((m) => m.isNew)).toEqual([false]);
   });
 });
 

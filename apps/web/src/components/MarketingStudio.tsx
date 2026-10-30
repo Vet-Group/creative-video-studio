@@ -43,6 +43,10 @@ interface VideoModel {
   supported: boolean;
   score: number;
   recommended: boolean;
+  /** The output resolution, e.g. '1080p'. */
+  resolution: string | null;
+  /** Added in the last 14 days. */
+  isNew: boolean;
 }
 
 /** The most hook variants one Run makes, one clip each. */
@@ -675,7 +679,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
               )}
             </div>
             <AudioSwitch on={audio} available={chosen?.audioEstimateUsd != null} onChange={setAudio} />
-            {models && models.length > 0 && <ModelPicker models={models.map((m) => ({ id: m.id, label: m.label, isMock: m.isMock, supported: !advanced || m.maxImages >= refs.length, estimateUsd: audio && m.audioEstimateUsd != null ? m.audioEstimateUsd : m.estimateUsd, score: m.score, recommended: m.recommended }))} value={chosen?.id ?? ''} onChange={(id) => pickModel(models.find((m) => m.id === id)!)} />}
+            {models && models.length > 0 && <ModelPicker models={models.map((m) => ({ id: m.id, label: m.label, isMock: m.isMock, supported: !advanced || m.maxImages >= refs.length, estimateUsd: audio && m.audioEstimateUsd != null ? m.audioEstimateUsd : m.estimateUsd, score: m.score, recommended: m.recommended, resolution: m.resolution, durationsSec: m.durationsSec, audio: m.audioEstimateUsd != null, isNew: m.isNew }))} value={chosen?.id ?? ''} onChange={(id) => pickModel(models.find((m) => m.id === id)!)} />}
             {/* Under the model, so the ratio row sits right under the prompt box as on Fash. */}
             <details className="prompt-preview">
               <summary>Xem prompt gửi đi</summary>

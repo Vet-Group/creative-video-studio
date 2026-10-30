@@ -8,8 +8,8 @@ test('a Member runs a mock job and works through the Library', async ({ page }) 
   await expect(modelButton(page)).toContainText('Mock E2E');
   await modelButton(page).click();
   await expect(page.getByRole('option', { name: /Mock E2E/ })).toHaveAttribute('aria-selected', 'true');
-  await expect(page.getByText('Tỉ lệ đạt: 80% (8/10)')).toBeVisible();
-  await expect(page.getByText('Ước tính: $0.0000')).toBeVisible();
+  await expect(page.getByText('Đạt 80% (8/10)')).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Chọn mô hình' }).getByText('$0.0000')).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(modelButton(page)).toBeFocused();
   await expect(page.getByRole('button', { name: 'Tạo video' })).toContainText('$0.0000');
