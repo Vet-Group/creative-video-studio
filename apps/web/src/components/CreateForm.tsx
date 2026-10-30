@@ -380,6 +380,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
     recall.touch();
     wanted.current = id;
     setModelId(id);
+    setRefetch((n) => n + 1);
     notify(said);
   }
   /** A detail's photo as one more reference image, as Fash's "Reference image added". */

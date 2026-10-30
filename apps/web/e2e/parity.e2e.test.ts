@@ -400,10 +400,11 @@ test('as on Fash, a sample with a details file shows its prompt, input photos, s
 });
 
 test("as on Fash's Recreate, a sample's model name and its resolution put that model on the form", async ({ page }) => {
-  // Two models: the form starts on Wide; the sample was made with Short.
+  // Short requires a different ratio and duration from the current Wide settings.
   await page.route(/\/api\/models\?/, (r) => {
+    const query = new URL(r.request().url()).searchParams;
     const base = { provider: 'mock', isMock: true, maxImages: 4, estimateUsd: '0.1000', passRate: null, passes: 0, total: 0, maxPromptChars: 2500, supported: true, ratios: ['9:16', '1:1'], durationsSec: [5, 8] };
-    return r.fulfill({ json: { models: [{ ...base, id: 'wide', label: 'Wide model' }, { ...base, id: 'short', label: 'Short model', resolution: '720p' }], defaultModelId: 'wide', monthToDate: { usd: '0.0000', provisional: false } } });
+    return r.fulfill({ json: { models: [{ ...base, id: 'wide', label: 'Wide model' }, { ...base, id: 'short', label: 'Short model', resolution: '720p', ratios: ['1:1'], durationsSec: [8], supported: query.get('ratio') === '1:1' && query.get('durationSec') === '8' }], defaultModelId: 'wide', monthToDate: { usd: '0.0000', provisional: false } } });
   });
   const details = { prompt: 'A slow orbit.', images: [], presetId: null, enhance: false, audio: 'off', ratio: '1:1', aspect: '1:1', resolution: '720p', durationSec: 8, modelId: 'short', storeId: null, date: '2026-08-18' };
   await page.context().clearCookies();
@@ -416,6 +417,8 @@ test("as on Fash's Recreate, a sample's model name and its resolution put that m
     await page.goto('/create'); // not openCreate: it waits for the Mock E2E model, which the routed list leaves out
     await expect(modelButton(page)).toContainText('Wide model');
     await expect(page.locator('.banner')).toHaveAttribute('aria-busy', 'false');
+    await selectValue(page, 'Tỉ lệ khung hình', '9:16');
+    await selectValue(page, 'Thời lượng', '5');
     await page.getByRole('tab', { name: 'Ví dụ' }).click();
     await openTile(page, 'Xoay quanh chậm');
     const detail = page.getByRole('dialog', { name: 'Chi tiết mẫu' });
@@ -425,12 +428,19 @@ test("as on Fash's Recreate, a sample's model name and its resolution put that m
     await expect(modelButton(page)).toContainText('Short model');
 
     await page.keyboard.press('Escape'); // the form behind the dialog is inert while it is open
+    await expect(select(page, 'Tỉ lệ khung hình')).toHaveAttribute('data-value', '1:1');
+    await expect(select(page, 'Thời lượng')).toHaveAttribute('data-value', '8');
     await pickModel(page, /Wide model/);
+    await selectValue(page, 'Tỉ lệ khung hình', '9:16');
+    await selectValue(page, 'Thời lượng', '5');
     await expect(modelButton(page)).toContainText('Wide model');
     await openTile(page, 'Xoay quanh chậm');
     await detail.getByRole('list', { name: 'Thông số' }).getByRole('button', { name: '720p' }).click();
     await expect(note('Đã chọn độ phân giải 720p')).toBeVisible();
     await expect(modelButton(page)).toContainText('Short model');
+    await page.keyboard.press('Escape');
+    await expect(select(page, 'Tỉ lệ khung hình')).toHaveAttribute('data-value', '1:1');
+    await expect(select(page, 'Thời lượng')).toHaveAttribute('data-value', '8');
   } finally {
     await page.context().clearCookies();
     await signIn(page, 'admin');
