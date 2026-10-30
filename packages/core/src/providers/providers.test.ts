@@ -4,7 +4,7 @@ import { AUDIO_USD_PER_SECOND, BAKEOFF_MODELS } from '../models';
 import { createFalProvider, VIDEO_BODIES, videoInputs } from './fal';
 import { ImageReadError, isFundingRefusal, MAX_INLINE_CHARS, ProviderHttpError, unpackJobId } from './http';
 import { createMockVideoProvider, MOCK_FAIL } from './mock';
-import { createReplicateProvider } from './replicate';
+import { createReplicateProvider, REPLICATE_BODIES } from './replicate';
 import type { ProviderJob, SubmitRequest } from './types';
 
 const [kling, seedance] = BAKEOFF_MODELS as [(typeof BAKEOFF_MODELS)[0], (typeof BAKEOFF_MODELS)[0]];
@@ -120,7 +120,7 @@ describe('fal', () => {
     const provider = createFalProvider({ apiKey: 'k', fetch: fn });
     for (const endpoint of endpoints) await provider.submit({ ...req, audio: true, model: { ...kling, endpoint } });
     const sent = calls.map((c) => (c.body as { generate_audio?: boolean }).generate_audio);
-    expect(endpoints.filter((_e, i) => sent[i] === true).sort()).toEqual(Object.keys(AUDIO_USD_PER_SECOND).filter((e) => e !== 'mock').sort());
+    expect(endpoints.filter((_e, i) => sent[i] === true).sort()).toEqual(Object.keys(AUDIO_USD_PER_SECOND).filter((e) => e !== 'mock' && !Object.hasOwn(REPLICATE_BODIES, e)).sort());
     expect(sent).not.toContain(false);
     await provider.submit({ ...req, model: { ...kling, endpoint: 'bytedance/seedance-2.5/us/reference-to-video' } });
     expect(calls.at(-1)!.body).toMatchObject({ generate_audio: false }); // audio off unless the job asks
@@ -392,6 +392,29 @@ describe('replicate', () => {
         resolution: '720p',
       },
     });
+  });
+
+  test('Veo 3.1 sends the start frame as image, the end frame as last_frame, the row resolution and audio as the job asks; with no image, the prompt alone', async () => {
+    const veo = { ...seedance, endpoint: 'google/veo-3.1', outputResolution: '720p' };
+    const { fn, calls } = fakeFetch([201, { id: 'v1' }], [201, { id: 'v2' }], [201, { id: 'v3' }]);
+    const p = createReplicateProvider({ apiToken: 't', fetch: fn });
+    await p.submit({ ...req, model: veo, prompt: 'The bottle in [Image1] turns', imageUrls: ['https://img/1.jpg'], durationSec: 8, endImageUrl: 'https://img/end.jpg' });
+    await p.submit({ ...req, model: veo, imageUrls: ['https://img/1.jpg'], durationSec: 8, audio: true });
+    await p.submit({ ...req, model: veo, imageUrls: [], ratio: '16:9', durationSec: 8 });
+    expect(calls.map((c) => c.url)).toEqual(Array(3).fill('https://api.replicate.com/v1/models/google/veo-3.1/predictions'));
+    expect(calls.map((c) => (c.body as { input: unknown }).input)).toEqual([
+      { prompt: 'The bottle in image 1 turns', image: 'https://img/1.jpg', last_frame: 'https://img/end.jpg', aspect_ratio: '9:16', duration: 8, resolution: '720p', generate_audio: false },
+      { prompt: 'a bottle on a table', image: 'https://img/1.jpg', aspect_ratio: '9:16', duration: 8, resolution: '720p', generate_audio: true },
+      { prompt: 'a bottle on a table', aspect_ratio: '16:9', duration: 8, resolution: '720p', generate_audio: false },
+    ]);
+    expect(videoInputs('google/veo-3.1')).toEqual({ endFrame: true, textOnly: true, audioClips: null });
+    expect(videoInputs(seedance.endpoint)).toEqual({ endFrame: false, textOnly: false, audioClips: null });
+  });
+
+  test('Seedance refuses an end frame before any call', async () => {
+    const { fn, calls } = fakeFetch([201, { id: 'pred-1' }]);
+    await expect(createReplicateProvider({ apiToken: 't', fetch: fn }).submit({ ...req, endImageUrl: 'https://img/end.jpg' })).rejects.toThrow(ImageReadError);
+    expect(calls).toHaveLength(0);
   });
 
   test.each([

@@ -454,6 +454,21 @@ describe('migration 0039 thinking prices', () => {
   });
 });
 
+describe('migration 0040 Veo 3.1 on Replicate', () => {
+  test('adds a disabled Replicate row at $0.20 that otherwise matches the fal twin, within the Replicate enums, with an audio price', async () => {
+    const pick = `select kind, features, ratios, durations_sec, max_images, max_prompt_chars, output_resolution from model_configs where id = $1`;
+    const [twin] = (await pool.query(pick, ['veo-3.1'])).rows;
+    const [row] = (await pool.query(pick, ['veo-3.1-replicate'])).rows;
+    expect(row).toEqual(twin);
+    expect(row).toMatchObject({ ratios: ['9:16', '16:9'], durations_sec: [8], max_images: 1, output_resolution: '720p' });
+    const [facts] = (await pool.query(`select provider, endpoint, label, enabled, usd_per_second::text as usd, sources from model_configs where id = 'veo-3.1-replicate'`)).rows;
+    expect(facts).toMatchObject({ provider: 'replicate', endpoint: 'google/veo-3.1', label: 'Google VEO 3.1 (Replicate)', enabled: false, usd: '0.2000' });
+    expect(facts.sources.usdPerSecond).toEqual({ url: 'https://replicate.com/google/veo-3.1', readAt: '2026-10-30' });
+    expect(facts.sources.ratios).toEqual({ url: 'https://api.replicate.com/v1/models/google/veo-3.1', readAt: '2026-10-30' });
+    expect(AUDIO_USD_PER_SECOND['google/veo-3.1']).toBe(0.4);
+  });
+});
+
 describe('cost_entries', () => {
   test('is append-only: UPDATE, DELETE and TRUNCATE raise', async () => {
     const job = await insertJob(userId);
