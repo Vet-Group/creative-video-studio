@@ -38,6 +38,7 @@ const PATHS = {
   eye: 'M1.5 8S3.9 3.5 8 3.5 14.5 8 14.5 8 12.1 12.5 8 12.5 1.5 8 1.5 8z M8 6a2 2 0 1 0 0 4 2 2 0 0 0 0-4z',
   sun: 'M8 5.3a2.7 2.7 0 1 0 0 5.4 2.7 2.7 0 0 0 0-5.4z M8 1.3v1.4 M8 13.3v1.4 M1.3 8h1.4 M13.3 8h1.4 M3.3 3.3l1 1 M11.7 11.7l1 1 M3.3 12.7l1-1 M11.7 4.3l1-1',
   moon: 'M13.5 9.6A5.6 5.6 0 0 1 6.4 2.5a5.6 5.6 0 1 0 7.1 7.1z',
+  speaker: 'M2 6v4h2.5L8 13V3L4.5 6z M10.5 5.8a3 3 0 0 1 0 4.4 M12.3 4a5.5 5.5 0 0 1 0 8',
 } as const;
 
 /** Solid shapes for the sidebar, as the live one draws its menu; an icon without one fills its outline path. */

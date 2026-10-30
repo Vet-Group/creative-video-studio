@@ -37,6 +37,8 @@ export interface ImageModel {
   /** The recommendation score (0-100) for this feature, and whether it is the one to recommend. */
   score: number;
   recommended: boolean;
+  /** Added in the last 14 days. */
+  isNew: boolean;
 }
 export interface Img {
   id: string;
@@ -76,7 +78,7 @@ export function useImageChoice(models: ImageModel[] | null, images: number, init
   const resolution = chosen && !chosen.resolutions.includes(wantResolution) ? chosen.resolutions[0]! : wantResolution;
   const thinking = chosen?.thinking.includes(wantThinking) ? wantThinking : chosen?.thinking[0];
   const options: ModelOption[] = (models ?? []).map((m) => ({
-    id: m.id, label: m.label, isMock: m.isMock, supported: fits(m), estimateUsd: m.prices[resolution] ?? Object.values(m.prices)[0] ?? '0.0000', score: m.score, recommended: m.recommended,
+    id: m.id, label: m.label, isMock: m.isMock, supported: fits(m), estimateUsd: m.prices[resolution] ?? Object.values(m.prices)[0] ?? '0.0000', score: m.score, recommended: m.recommended, resolution: m.resolutions.join('/'), isNew: m.isNew,
   }));
   return { chosen, ratio, resolution, thinking, estimate: (thinking && chosen?.thinkingPrices[thinking]?.[resolution]) || chosen?.prices[resolution], options, modelId: chosen?.id ?? '', setModelId, setRatio, setResolution, setThinking };
 }

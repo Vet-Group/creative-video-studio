@@ -83,9 +83,10 @@ export async function expectOptions(page: Page, label: string, texts: string[]):
 /** The model picker's button; its text is the chosen model. */
 export const modelButton = (page: Page): Locator => page.getByRole('button', { name: /^Mô hình / });
 
-/** Opens the model panel and picks the model whose row matches. */
+/** Opens the model panel, searches for the name (so a model in a family flyout is found too) and picks the model whose row matches. The name's source must be plain text. */
 export async function pickModel(page: Page, name: RegExp): Promise<void> {
   await modelButton(page).click();
+  await page.getByRole('dialog', { name: 'Chọn mô hình' }).getByRole('combobox', { name: 'Tìm mô hình' }).fill(name.source);
   await page.getByRole('option', { name }).click();
 }
 

@@ -8,8 +8,8 @@ test('a Member runs a mock job and works through the Library', async ({ page }) 
   await expect(modelButton(page)).toContainText('Mock E2E');
   await modelButton(page).click();
   await expect(page.getByRole('option', { name: /Mock E2E/ })).toHaveAttribute('aria-selected', 'true');
-  await expect(page.getByText('Tỉ lệ đạt: 80% (8/10)')).toBeVisible();
-  await expect(page.getByText('Ước tính: $0.0000')).toBeVisible();
+  await expect(page.getByText('Đạt 80% (8/10)')).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Chọn mô hình' }).getByText('$0.0000')).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(modelButton(page)).toBeFocused();
   await expect(page.getByRole('button', { name: 'Tạo video' })).toContainText('$0.0000');
@@ -45,12 +45,12 @@ test('a Member runs a mock job and works through the Library', async ({ page }) 
   const [download] = await Promise.all([page.waitForEvent('download'), card.getByRole('button', { name: 'Tải xuống' }).click()]);
   expect(download.suggestedFilename()).toMatch(new RegExp(`^${today()}-e2e-member-1-[0-9a-f]{8}\\.mp4$`));
 
-  // Filters.
+  // Scope filters to this member's clip; earlier tests can create other company clips.
+  await page.getByLabel('Người tạo').selectOption({ label: 'E2E Member 1' });
+  await expect(card).toHaveCount(1);
   await page.getByLabel('Tỉ lệ').selectOption('9:16');
   await expect(page.getByText('Chưa có clip nào khớp bộ lọc.')).toBeVisible();
   await page.getByLabel('Tỉ lệ').selectOption('1:1');
-  await expect(card).toHaveCount(1);
-  await page.getByLabel('Người tạo').selectOption({ label: 'E2E Member 1' });
   await expect(card).toHaveCount(1);
   await page.getByLabel('Ngày').fill('2000-01-01');
   await expect(page.getByText('Chưa có clip nào khớp bộ lọc.')).toBeVisible();

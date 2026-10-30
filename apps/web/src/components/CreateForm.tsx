@@ -48,6 +48,8 @@ interface Model {
   passRate: number | null;
   score: number;
   recommended: boolean;
+  /** Added in the last 14 days. */
+  isNew: boolean;
   passes: number;
   total: number;
   supported: boolean;
@@ -102,7 +104,7 @@ type Tab = 'create' | 'history' | 'examples' | 'about';
 const TAB_LABEL: Record<Tab, string> = { create: 'Tạo', history: 'Lịch sử', examples: 'Ví dụ', about: 'Giới thiệu' };
 const RATIO_LABEL: Record<string, string> = { '9:16': '9:16 (dọc)', '1:1': '1:1 (vuông)', '16:9': '16:9 (ngang)', '4:3': '4:3 (ngang)', '3:4': '3:4 (dọc)' };
 const MAX_IMAGES = 9;
-const ratePct = (m: Model) => (m.passRate === null ? 'chưa có dữ liệu' : `${Math.round(m.passRate * 100)}% (${m.passes}/${m.total})`);
+const ratePct = (m: Model) => (m.passRate === null ? undefined : `${Math.round(m.passRate * 100)}% (${m.passes}/${m.total})`);
 
 /** `preset` and `model` pre-select the choices Explore links to; an unknown or switched-off one falls back to the default. */
 export function CreateForm({ reuse, preset, model, image }: { reuse?: string; preset?: string; model?: string; image?: string }) {
@@ -542,7 +544,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
 
             {models && models.models.length > 0 && (
               <ModelPicker
-                models={models.models.map((m) => ({ id: m.id, label: m.label, isMock: m.isMock, supported: m.supported, rate: ratePct(m), estimateUsd: audio && m.audioEstimateUsd != null ? m.audioEstimateUsd : m.estimateUsd, score: m.score, recommended: m.recommended }))}
+                models={models.models.map((m) => ({ id: m.id, label: m.label, isMock: m.isMock, supported: m.supported, rate: ratePct(m), estimateUsd: audio && m.audioEstimateUsd != null ? m.audioEstimateUsd : m.estimateUsd, score: m.score, recommended: m.recommended, resolution: m.resolution, durationsSec: m.durationsSec, audio: m.audioEstimateUsd != null, isNew: m.isNew }))}
                 value={modelId}
                 onChange={setModelId}
               />
