@@ -5,7 +5,7 @@
   "scripts": {
     "start": "tsx src/index.ts",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run --passWithNoTests --experimental.diagnostics=false"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.1150.0",
