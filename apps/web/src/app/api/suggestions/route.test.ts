@@ -91,7 +91,7 @@ describe('/api/suggestions', () => {
   test('refuses a bad field, a script outside Advanced, over-long text and unknown choices, and queues nothing', async () => {
     const u = await newUser();
     const before = sent.length;
-    expect(await error(await ask(u, { field: 'title' }))).toBe('field must be brief or script');
+    expect(await error(await ask(u, { field: 'title' }))).toBe('field must be brief, script, hook or location');
     expect(await error(await ask(u, { field: 'script' }))).toBe('a script is for Advanced only');
     expect((await ask(u, { field: 'script', format: 'advanced', text: 'x'.repeat(ADVANCED_MAX_SCRIPT + 1) })).status).toBe(202); // the brief as notes for lines
     expect(await error(await ask(u, { field: 'script', format: 'advanced', text: 'x'.repeat(5001) }))).toBe('text may be at most 5000 characters');
@@ -101,6 +101,19 @@ describe('/api/suggestions', () => {
     expect(await error(await ask(u, { field: 'brief', location: 'moon' }))).toBe('location is not a location');
     expect(sent.length).toBe(before + 1);
     expect(await runs(u.id)).toBe(1);
+  });
+
+  test('a hook or a location asks for the English scene from the name and description, counts against the day, and needs some text', async () => {
+    const u = await newUser();
+    const res = await ask(u, { field: 'location', text: 'Quán cà phê - Góc quán ấm cúng', format: 'ignored', hook: 'ignored' });
+    expect(res.status).toBe(202);
+    const { id } = (await res.json()) as { id: string };
+    const input = (await pool.query('select input from suggestion_runs where id = $1', [id])).rows[0].input;
+    expect(input).toEqual({ field: 'location', text: 'Quán cà phê - Góc quán ấm cúng', context: '', max: 300 });
+    expect((await ask(u, { field: 'hook', text: 'Mở hộp quà' })).status).toBe(202);
+    expect(await error(await ask(u, { field: 'hook', text: '  ' }))).toBe('text must be the name and description, 1 to 143 characters');
+    expect(await error(await ask(u, { field: 'hook', text: 'x'.repeat(144) }))).toBe('text must be the name and description, 1 to 143 characters');
+    expect(await runs(u.id)).toBe(2);
   });
 
   test("puts the member's own hook and location phrases in the context, and refuses another member's private one", async () => {

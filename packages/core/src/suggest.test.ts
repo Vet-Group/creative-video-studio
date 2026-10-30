@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import { ENHANCE_MODEL, ENHANCE_URL } from './enhance';
-import { createFalSuggester, parseSuggestions, SUGGEST_SYSTEM, suggestPrompt } from './suggest';
+import { createFalSuggester, parseSuggestions, SCENE_SYSTEM, SUGGEST_SYSTEM, suggestPrompt } from './suggest';
 
 const answer = (body: unknown, status = 200) => Promise.resolve(new Response(JSON.stringify(body), { status }));
 const input = { field: 'script' as const, text: 'váy linen mùa hè', context: 'The product crashes into the scene.', max: 40 };
@@ -22,6 +22,17 @@ test('asks the OpenRouter router for three options with the hook, location and t
   expect(body.prompt).toContain('The video: The product crashes into the scene.');
   expect(body.prompt).toContain("The seller's notes: váy linen mùa hè");
   expect(body.prompt).toContain('at most 40 characters');
+});
+
+test("a hook or a location asks for English scene text under its own system prompt; a brief keeps the seller's language", async () => {
+  const bodies: { system_prompt: string; prompt: string }[] = [];
+  const suggest = createFalSuggester({ apiKey: 'k', fetch: (_url, init) => (bodies.push(JSON.parse(String(init!.body))), answer({ output: '["a", "b", "c"]' })) });
+  for (const field of ['hook', 'location', 'brief'] as const) await suggest({ field, text: 'Quán cà phê - góc quán ấm cúng', context: '', max: 300 });
+  expect(bodies.map((b) => b.system_prompt)).toEqual([SCENE_SYSTEM, SCENE_SYSTEM, SUGGEST_SYSTEM]);
+  expect(SCENE_SYSTEM).toMatch(/plain English/);
+  expect(bodies[0]!.prompt).toMatch(/^Write three different hooks: .*"The clip opens"/);
+  expect(bodies[1]!.prompt).toMatch(/^Write three different places .*noun phrase/);
+  expect(bodies[1]!.prompt).toContain("The seller's notes: Quán cà phê - góc quán ấm cúng");
 });
 
 test('the prompt leaves out an empty context and empty notes', () => {
