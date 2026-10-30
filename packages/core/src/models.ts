@@ -2,7 +2,7 @@ export type Ratio = '9:16' | '1:1' | '16:9';
 
 export interface ModelConfig {
   id: string;
-  provider: 'fal' | 'replicate' | 'mock';
+  provider: 'fal' | 'replicate' | 'vertex' | 'mock';
   /** The provider's model path. */
   endpoint: string;
   label: string;
