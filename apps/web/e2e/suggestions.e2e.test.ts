@@ -3,13 +3,25 @@ import { signIn } from './support.test';
 
 // Suggestions come from the e2e worker's stand-in (CVS_FAKE_SUGGEST, no fal key): "Option n: <the member's text>".
 test('Gợi ý mô tả fills the brief with the picked option, and Gợi ý lời thoại fills the lines on Advanced', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
   await signIn(page, 'sugga');
   await page.goto('/marketing-studio');
+  // The label and its two tools stay on one line, and Gợi ý sits in the box's foot.
+  const label = (await page.getByText('Prompt (tuỳ chọn)', { exact: true }).boundingBox())!;
+  expect(label.height).toBeLessThanOrEqual(22);
+  expect(Math.abs((await page.getByRole('button', { name: 'Mở rộng' }).boundingBox())!.y - label.y)).toBeLessThan(6);
   const brief = page.getByRole('textbox', { name: 'Prompt (tuỳ chọn)' });
+  expect((await page.getByRole('button', { name: 'Gợi ý mô tả' }).boundingBox())!.y).toBeGreaterThan((await brief.boundingBox())!.y);
   await brief.fill('váy linen mùa hè');
   await page.getByRole('button', { name: 'Gợi ý mô tả' }).click();
   const options = page.getByRole('group', { name: 'Gợi ý mô tả' }).getByRole('button');
   await expect(options).toHaveText(['Option 1: váy linen mùa hè', 'Option 2: váy linen mùa hè', 'Option 3: váy linen mùa hè'], { timeout: 20_000 });
+  // The list spans the prompt box: a 460 px list under the link used to run off the narrow form's left edge.
+  const field = (await brief.boundingBox())!;
+  const list = (await page.getByRole('group', { name: 'Gợi ý mô tả' }).boundingBox())!;
+  expect(list.y).toBeGreaterThan(field.y);
+  expect(list.x).toBeGreaterThanOrEqual(field.x - 10);
+  expect(list.x + list.width).toBeLessThanOrEqual(field.x + field.width + 10);
   await options.nth(1).click();
   await expect(brief).toHaveValue('Option 2: váy linen mùa hè');
   await expect(page.getByRole('group', { name: 'Gợi ý mô tả' })).toHaveCount(0);

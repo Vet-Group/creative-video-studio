@@ -97,7 +97,35 @@ interface ChoiceLists {
 }
 const KIND_NAME = { hook: 'hook', location: 'bối cảnh' } as const;
 
-/** Add a hook or a location: a name, the English phrase the prompt takes and an optional description, saved to the member's account; an Admin may share it. */
+/** What each kind is, and three filled examples a member can start from: the name and card line in Vietnamese, the scene for the model in English. */
+const CHOICE_HELP = {
+  hook: {
+    intro: 'Hook là 1-2 giây mở đầu clip để giữ người xem lại. Đặt tên, tả ngắn bằng tiếng Việt, rồi viết điều xảy ra ở đầu clip bằng tiếng Anh.',
+    name: 'Ví dụ: Mở hộp quà',
+    desc: 'Ví dụ: Hộp quà bật mở, sản phẩm hiện ra',
+    phrase: 'Ví dụ: The clip opens on a gift box that bursts open to reveal the product.',
+    phraseHelp: 'Một câu tả điều xảy ra ở đầu clip. AI tạo video hiểu tiếng Anh tốt nhất.',
+    examples: [
+      { name: 'Mở hộp quà', desc: 'Hộp quà bật mở, sản phẩm hiện ra', phrase: 'The clip opens on a gift box that bursts open to reveal the product, and the creator reacts with delight.' },
+      { name: 'Trước và sau', desc: 'Từ bộ đồ cũ sang bộ đồ mới trong một cú chuyển cảnh', phrase: 'The clip opens with the creator in a plain old outfit, then a quick snap transition reveals them in the new outfit.' },
+      { name: 'Xoay một vòng', desc: 'Xoay một vòng khoe trọn bộ đồ', phrase: 'The clip opens with the creator spinning once to show the whole outfit, then stopping to face the camera.' },
+    ],
+  },
+  location: {
+    intro: 'Bối cảnh là nơi diễn ra clip. Đặt tên, tả ngắn bằng tiếng Việt, rồi viết nơi đó bằng tiếng Anh.',
+    name: 'Ví dụ: Quán cà phê',
+    desc: 'Ví dụ: Góc quán cà phê ấm cúng',
+    phrase: 'Ví dụ: a cozy corner cafe with warm light',
+    phraseHelp: 'Một cụm tả nơi chốn, không cần cả câu: prompt sẽ thành "Set in <cụm này>." AI tạo video hiểu tiếng Anh tốt nhất.',
+    examples: [
+      { name: 'Quán cà phê', desc: 'Góc quán cà phê ấm cúng', phrase: 'a cozy corner cafe with warm light' },
+      { name: 'Bãi biển', desc: 'Bãi biển nắng vàng buổi chiều', phrase: 'a sunny beach in golden afternoon light' },
+      { name: 'Cửa hàng thời trang', desc: 'Cửa hàng quần áo sáng sủa', phrase: 'a bright clothing boutique with racks of clothes behind' },
+    ],
+  },
+} as const;
+
+/** Add a hook or a location: a name, an optional card line and the English scene the prompt takes, saved to the member's account; an Admin may share it. An example fills all three. */
 function AddChoice({ kind, canShare, onAdded }: { kind: 'hook' | 'location'; canShare: boolean; onAdded: (c: Choice) => void }) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
@@ -106,12 +134,15 @@ function AddChoice({ kind, canShare, onAdded }: { kind: 'hook' | 'location'; can
   const [share, setShare] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const ids = { name: useId(), phrase: useId(), desc: useId() };
+  const ids = { name: useId(), phrase: useId(), desc: useId(), help: useId() };
+  const help = CHOICE_HELP[kind];
+  // The box wraps a long sentence; the prompt takes it on one line.
+  const scene = phrase.replace(/\s+/g, ' ').trim();
   async function save() {
     setBusy(true);
     setError('');
     try {
-      const c = await api<Omit<Choice, 'mine'>>('/api/choices', sendJson('POST', { kind, name: name.trim(), phrase: phrase.trim(), ...(desc.trim() && { desc: desc.trim() }), ...(share && { isCompany: true }) }));
+      const c = await api<Omit<Choice, 'mine'>>('/api/choices', sendJson('POST', { kind, name: name.trim(), phrase: scene, ...(desc.trim() && { desc: desc.trim() }), ...(share && { isCompany: true }) }));
       setOpen(false);
       setName('');
       setPhrase('');
@@ -133,18 +164,31 @@ function AddChoice({ kind, canShare, onAdded }: { kind: 'hook' | 'location'; can
   }
   return (
     <div className="choice-form" role="group" aria-label={`Thêm ${KIND_NAME[kind]}`}>
+      <h3>Thêm {KIND_NAME[kind]} của bạn</h3>
+      <p className="help">{help.intro}</p>
+      <div className="choice-examples" role="group" aria-label="Điền thử một ví dụ">
+        <span aria-hidden="true">Điền thử:</span>
+        {help.examples.map((e) => (
+          <button key={e.name} type="button" onClick={() => (setName(e.name), setDesc(e.desc), setPhrase(e.phrase))}>
+            {e.name}
+          </button>
+        ))}
+      </div>
       <label className="field-label" htmlFor={ids.name}>
         Tên
       </label>
-      <input id={ids.name} value={name} maxLength={MAX_CHOICE_NAME} onChange={(e) => setName(e.target.value)} />
-      <label className="field-label" htmlFor={ids.phrase}>
-        Cụm tiếng Anh
-      </label>
-      <input id={ids.phrase} lang="en" value={phrase} maxLength={MAX_CHOICE_PHRASE} onChange={(e) => setPhrase(e.target.value)} />
+      <input id={ids.name} value={name} maxLength={MAX_CHOICE_NAME} placeholder={help.name} autoFocus onChange={(e) => setName(e.target.value)} />
       <label className="field-label" htmlFor={ids.desc}>
-        Mô tả (tuỳ chọn)
+        Mô tả ngắn (tuỳ chọn)
       </label>
-      <input id={ids.desc} value={desc} maxLength={MAX_CHOICE_DESC} onChange={(e) => setDesc(e.target.value)} />
+      <input id={ids.desc} value={desc} maxLength={MAX_CHOICE_DESC} placeholder={help.desc} onChange={(e) => setDesc(e.target.value)} />
+      <label className="field-label" htmlFor={ids.phrase}>
+        Cảnh cho AI (tiếng Anh)
+      </label>
+      <textarea id={ids.phrase} lang="en" rows={3} value={phrase} maxLength={MAX_CHOICE_PHRASE} placeholder={help.phrase} aria-describedby={ids.help} onChange={(e) => setPhrase(e.target.value)} />
+      <p id={ids.help} className="help">
+        {/[À-ỹ]/.test(phrase) ? 'Có vẻ đây là tiếng Việt. Nên viết bằng tiếng Anh để AI hiểu đúng cảnh.' : help.phraseHelp}
+      </p>
       {canShare && (
         <label className="template-share">
           <input type="checkbox" checked={share} onChange={(e) => setShare(e.target.checked)} /> Chia sẻ cho cả công ty
@@ -159,7 +203,7 @@ function AddChoice({ kind, canShare, onAdded }: { kind: 'hook' | 'location'; can
         <button type="button" onClick={() => setOpen(false)}>
           Huỷ
         </button>
-        <button type="button" className="primary" disabled={busy || !name.trim() || !phrase.trim()} onClick={() => void save()}>
+        <button type="button" className="primary" disabled={busy || !name.trim() || !scene} onClick={() => void save()}>
           Lưu
         </button>
       </div>
@@ -169,7 +213,7 @@ function AddChoice({ kind, canShare, onAdded }: { kind: 'hook' | 'location'; can
 
 /**
  * The dialog of one list: cards with the choice's sample loop (`marketing-<kind>-<id>`; without one, an often-used card shows the poster of the member's
- * latest clip with it) and name in a grid, the member's often-used group first when it has any. Arrows move the focus between the cards, Enter or Space picks, Escape closes. Below: the add form, and the
+ * latest clip with it) and name in a grid, the member's often-used group first when it has any. Arrows move the focus between the cards, Enter or Space picks, Escape closes. Below: the footer (the variants row), the add form, and the
  * member's own (for an Admin also the company's) with Xoá.
  */
 function ChoiceDialog({ open, title, sub, kind, choices, often, posters, custom, canShare, selected, onPick, onAdded, onDelete, onClose, footer }: { open: boolean; title: string; sub: string; kind: 'hook' | 'location'; choices: MarketingChoice[]; often: string[]; posters: Record<string, string>; custom: Choice[]; canShare: boolean; selected: string[]; onPick: (id: string) => void; onAdded: (c: Choice) => void; onDelete: (c: Choice) => void; onClose: () => void; footer?: ReactNode }) {
@@ -227,6 +271,7 @@ function ChoiceDialog({ open, title, sub, kind, choices, often, posters, custom,
           rest.map(card)
         )}
       </div>
+      {footer}
       <AddChoice kind={kind} canShare={canShare} onAdded={onAdded} />
       {owned.length > 0 && (
         <section className="choice-own" aria-label={ownLabel}>
@@ -244,7 +289,6 @@ function ChoiceDialog({ open, title, sub, kind, choices, often, posters, custom,
           </ul>
         </section>
       )}
-      {footer}
     </Modal>
   );
 }
@@ -628,14 +672,13 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
                 <label htmlFor={promptId} className="field-label">
                   {advanced ? 'Prompt' : 'Prompt (tuỳ chọn)'}
                 </label>
-                <span className="field-tools">
-                  <PromptTools feature="marketing" format={advanced ? 'advanced' : undefined} value={prompt} onChange={setPrompt} maxLength={room} onRun={() => canRun && void run()} />
-                  <SuggestButton label="Gợi ý mô tả" ask={() => ({ field: 'brief', ...(advanced && { format: 'advanced' }), text: prompt, hook: hooks[0], location: location || undefined, ...(room !== undefined && { room }) })} onPick={setPrompt} />
-                </span>
+                <PromptTools feature="marketing" format={advanced ? 'advanced' : undefined} value={prompt} onChange={setPrompt} maxLength={room} onRun={() => canRun && void run()} />
               </div>
               <div className="prompt-box">
                 <textarea id={promptId} value={prompt} maxLength={room} aria-required={advanced || undefined} placeholder="Mô tả video marketing bạn muốn…" onChange={(e) => setPrompt(e.target.value)} onKeyDown={runKey(() => canRun && void run())} />
+                {/* Gợi ý in the box's foot, as Create's Enhance pill: beside the label it pushed the head onto two lines. */}
                 <div className="prompt-foot">
+                  <SuggestButton label="Gợi ý mô tả" ask={() => ({ field: 'brief', ...(advanced && { format: 'advanced' }), text: prompt, hook: hooks[0], location: location || undefined, ...(room !== undefined && { room }) })} onPick={setPrompt} />
                   <span>
                     {prompt.length}
                     {room !== undefined && `/${room}`}

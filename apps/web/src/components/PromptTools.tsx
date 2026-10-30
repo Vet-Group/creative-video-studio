@@ -37,8 +37,9 @@ export function PromptTools({ feature, format, value, onChange, maxLength, onRun
     <span className="prompt-tools">
       {prompts.length > 0 && (
         <span className="suggest" onKeyDown={(e) => e.key === 'Escape' && open && (e.stopPropagation(), setOpen(false))}>
-          <button type="button" className={bare ? 'icon-button' : 'suggest-button'} aria-expanded={open} aria-label={bare ? 'Prompt gần đây' : undefined} title={bare ? 'Prompt gần đây' : undefined} onClick={() => (open || load(), setOpen(!open))}>
-            {bare ? <Icon name="clock" /> : 'Prompt gần đây'}
+          <button type="button" className={bare ? 'icon-button' : 'suggest-button'} aria-expanded={open} aria-label="Prompt gần đây" title={bare ? 'Prompt gần đây' : undefined} onClick={() => (open || load(), setOpen(!open))}>
+            {/* "Gần đây" beside the prompt's label, so a label with "(tuỳ chọn)" and both tools stay on one line. */}
+            {bare ? <Icon name="clock" /> : 'Gần đây'}
           </button>
           {open && (
             <div className="suggestions" role="group" aria-label="Prompt gần đây">

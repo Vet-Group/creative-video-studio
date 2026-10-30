@@ -2,6 +2,7 @@
 // the one the member picks. It writes text only; nothing is generated or billed beyond the one LLM call.
 import { useEffect, useRef, useState } from 'react';
 import { api, errorText, sendJson } from '@/lib/api';
+import { Icon } from './Icon';
 
 const POLL_MS = 1_500;
 /** A little past the server's 60 s expiry, so the last poll sees `failed` rather than giving up first. */
@@ -54,6 +55,7 @@ export function SuggestButton({ ask, label, onPick }: { ask: () => Ask; label: s
   return (
     <span className="suggest">
       <button type="button" className="suggest-button" disabled={busy} onClick={() => void suggest()}>
+        <Icon name="wand" size={12} />
         {busy ? 'Đang gợi ý…' : label}
       </button>
       {(options.length > 0 || error) && (
