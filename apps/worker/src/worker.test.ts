@@ -539,17 +539,23 @@ describe('image jobs', () => {
     expect((await costs(id)).map((c) => [c.kind, c.usd])).toEqual([['estimate', '0.0000'], ['actual_adjustment', '0.0000']]);
   });
 
-  test('sends the model, resolution, ratio, quality and thinking level to the image adapter and books the per-image price', async () => {
-    const requests: ImageSubmitRequest[] = [];
-    const id = await newImageJob('u1', { resolution: '2K', ratio: 'auto', quality: 'low', thinking: 'high' });
-    await startImages(recording(requests));
-    await send(id, 'u1');
-    await waitFor('the job to succeed', async () => (await status(id)) === 'succeeded');
-    expect(requests).toHaveLength(1);
-    expect(requests[0]).toMatchObject({ prompt: 'a product', ratio: 'auto', resolution: '2K', quality: 'low', thinking: 'high', model: { id: 'mock-image', imagePrices: { '1K': '0.1500', '2K': '0.3000' }, features: ['image', 'try_on'] } });
-    expect(requests[0]!.imageUrls).toEqual([]);
-    expect((await costs(id)).map((c) => [c.kind, c.usd])).toEqual([['estimate', '0.3000'], ['actual_adjustment', '0.0000']]);
-    expect(await total(id)).toEqual({ usd: '0.3000', is_final: true });
+  test('sends the model, resolution, ratio, quality and thinking level to the image adapter and books the per-image price of that level', async () => {
+    await pool.query(`update model_configs set thinking_levels = '{minimal,medium,high}', thinking_prices = '{"minimal": {"1K": "0.1500", "2K": "0.3000"}, "high": {"1K": "0.2000", "2K": "0.4000"}}' where id = 'mock-image'`);
+    try {
+      const requests: ImageSubmitRequest[] = [];
+      const id = await newImageJob('u1', { resolution: '2K', ratio: 'auto', quality: 'low', thinking: 'high' });
+      await startImages(recording(requests));
+      await send(id, 'u1');
+      await waitFor('the job to succeed', async () => (await status(id)) === 'succeeded');
+      expect(requests).toHaveLength(1);
+      expect(requests[0]).toMatchObject({ prompt: 'a product', ratio: 'auto', resolution: '2K', quality: 'low', thinking: 'high', model: { id: 'mock-image', imagePrices: { '1K': '0.2000', '2K': '0.4000' }, features: ['image', 'try_on'] } });
+      expect(requests[0]!.imageUrls).toEqual([]);
+      // newImageJob reserves the 2K row price, so the High price books the difference.
+      expect((await costs(id)).map((c) => [c.kind, c.usd])).toEqual([['estimate', '0.3000'], ['actual_adjustment', '0.1000']]);
+      expect(await total(id)).toEqual({ usd: '0.4000', is_final: true });
+    } finally {
+      await pool.query(`update model_configs set thinking_levels = '{}', thinking_prices = null where id = 'mock-image'`);
+    }
   });
 
   // Reproduces a bug seen in the Try On bake-off of 2026-10-29 (plan A4): the Try On page sends ratio 'auto', the worker passes it on, and on 'auto'

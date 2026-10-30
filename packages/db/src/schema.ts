@@ -205,6 +205,8 @@ export const modelConfigs = pgTable(
     usdPerSecond: numeric('usd_per_second', { precision: 10, scale: 4 }),
     /** Image models: resolution label to USD per image as a string, for example { "1K": "0.15", "4K": "0.30" }. */
     imagePrices: jsonb('image_prices').$type<Record<string, string>>(),
+    /** Image models with thinking levels: level to { resolution: USD per image }, the same keys as image_prices; null prices every level at image_prices. */
+    thinkingPrices: jsonb('thinking_prices').$type<Record<string, Record<string, string>>>(),
     billedAmountField: text('billed_amount_field'),
     /** Where each fact was read: field name to { url, readAt }. */
     sources: jsonb('sources').notNull(),

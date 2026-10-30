@@ -469,8 +469,10 @@ describe('POST /api/jobs for an image feature', () => {
          ('img-text', 'fal', 'fal-ai/nano-banana-pro/edit', 'Img text', 'image', '{image,try_on}', '{auto,1:1,3:4}', '{}', 2, '{"1K": "0.1500", "2K": "0.1500"}', '{}', true)`,
     );
     await pool.query(
-      `insert into model_configs (id, provider, endpoint, label, kind, features, ratios, thinking_levels, durations_sec, max_images, image_prices, sources, enabled) values
-         ('img-think', 'fal', 'google/nano-banana-2.1/edit', 'Img think', 'image', '{image}', '{auto,21:9,4:1,1:4,8:1,1:8}', '{minimal,medium,high}', '{}', 2, '{"1K": "0.0400"}', '{}', true)`,
+      // Minimal unlike image_prices, so a job that names no level shows it takes the first level's price.
+      `insert into model_configs (id, provider, endpoint, label, kind, features, ratios, thinking_levels, durations_sec, max_images, image_prices, thinking_prices, sources, enabled) values
+         ('img-think', 'fal', 'google/nano-banana-2.1/edit', 'Img think', 'image', '{image}', '{auto,21:9,4:1,1:4,8:1,1:8}', '{minimal,medium,high}', '{}', 2, '{"1K": "0.0400"}',
+          '{"minimal": {"1K": "0.0410"}, "medium": {"1K": "0.0473"}, "high": {"1K": "0.0618"}}', '{}', true)`,
     );
   });
 
@@ -509,13 +511,23 @@ describe('POST /api/jobs for an image feature', () => {
     expect((await pool.query('select usd::text from cost_entries where job_id = $1', [mock.id])).rows).toEqual([{ usd: '0.0000' }]);
   });
 
-  test('takes an ultra-wide ratio and a thinking level the model lists, at the same per-image estimate', async () => {
+  test('takes an ultra-wide ratio and a thinking level the model lists, at that level’s estimate (the first level’s when none is named), on a retry too', async () => {
     const m = await newMember();
     const res = await runImage(m, { modelId: 'img-think', ratio: '8:1', params: { resolution: '1K', thinking: 'high' } });
     expect(res.status).toBe(201);
     const { id } = (await res.json()) as { id: string };
     expect((await pool.query('select aspect, params from jobs where id = $1', [id])).rows).toEqual([{ aspect: '8:1', params: { resolution: '1K', thinking: 'high' } }]);
-    expect((await pool.query('select usd::text from cost_entries where job_id = $1', [id])).rows).toEqual([{ usd: '0.0400' }]);
+    const usd = async (job: string) => (await pool.query('select usd::text from cost_entries where job_id = $1', [job])).rows;
+    expect(await usd(id)).toEqual([{ usd: '0.0618' }]);
+    for (const [params, want] of [[{ resolution: '1K', thinking: 'medium' }, '0.0473'], [{ resolution: '1K' }, '0.0410']] as const) {
+      const r = await runImage(m, { modelId: 'img-think', ratio: 'auto', params });
+      expect(r.status).toBe(201);
+      expect(await usd(((await r.json()) as { id: string }).id), JSON.stringify(params)).toEqual([{ usd: want }]);
+    }
+    await pool.query(`update jobs set status = 'failed' where id = $1`, [id]);
+    const retry = await run(m.cookie, { retryOf: id });
+    expect(retry.status).toBe(201);
+    expect(await usd(((await retry.json()) as { id: string }).id)).toEqual([{ usd: '0.0618' }]);
   });
 
   test.each([

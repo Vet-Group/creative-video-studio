@@ -53,6 +53,16 @@ export const FAL_TEXT_ENDPOINTS: Record<string, string> = {
 export const textToImage = (m: { provider: string; endpoint: string }): boolean =>
   m.provider === 'mock' || (m.provider === 'vertex' ? m.endpoint.startsWith('gemini-') : Object.hasOwn(FAL_TEXT_ENDPOINTS, m.endpoint));
 
+/** An image model row's prices (resolution to USD) at a thinking level: its `thinking_prices` for the level, or for the default (first) level when the job names none; else `image_prices`. */
+export function imagePricesFor(
+  m: { image_prices: Record<string, string>; thinking_levels: string[]; thinking_prices: Record<string, Record<string, string>> | null },
+  thinking?: string,
+): Record<string, string> {
+  const level = thinking ?? m.thinking_levels[0];
+  // Own keys only: `in` would also accept "constructor" and friends.
+  return level !== undefined && m.thinking_prices && Object.hasOwn(m.thinking_prices, level) ? m.thinking_prices[level]! : m.image_prices;
+}
+
 /**
  * The prompt of an app that has no prompt field of its own (or only an optional one), stored with the job and sent when the Run names none.
  * The two swaps send the new person as the first image and the photo to change as the second. For Background Changer it stands for "the second image is the new background".

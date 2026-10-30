@@ -12,7 +12,7 @@ import type { ReadableStream as WebReadableStream } from 'node:stream/web';
 import { fileURLToPath } from 'node:url';
 import type { Enhancer } from '@cvs/core/enhance';
 import { close24h, lateBill, type LedgerPool, release, settle, withTransaction } from '@cvs/core/ledger';
-import { type ImageModelConfig, type ModelConfig, promptLimit, usdPerSecondFor } from '@cvs/core/models';
+import { type ImageModelConfig, imagePricesFor, type ModelConfig, promptLimit, usdPerSecondFor } from '@cvs/core/models';
 import { ImageReadError } from '@cvs/core/providers/http';
 import type { ImageProvider, ImageProviderJob, ImageSubmitRequest, ProviderJob, ProviderStatus, SubmitRequest, VideoProvider } from '@cvs/core/providers';
 import { PURGE_CRON, PURGE_QUEUE, SUGGEST_QUEUE, SUGGEST_QUEUE_OPTIONS, type SuggestJobData, VIDEO_QUEUE, VIDEO_QUEUE_OPTIONS, type VideoJobData, videoSendOptions } from '@cvs/core/queue';
@@ -141,11 +141,12 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
     return getObject(rows[0].s3_key);
   }
 
-  async function loadImageModel(modelId: string): Promise<ImageModelConfig> {
+  /** The model as a job at `thinking` sees it: its prices are that level's, so the booked cost follows the level the jobs API estimated. */
+  async function loadImageModel(modelId: string, thinking: string | undefined): Promise<ImageModelConfig> {
     const { rows } = await pool.query('select * from model_configs where id = $1', [modelId]);
     const r = rows[0];
     if (!r || r.kind !== 'image' || r.image_prices == null || r.max_images == null) throw new Error(`model ${modelId} has no image prices or limits`);
-    return { id: r.id, provider: r.provider, endpoint: r.endpoint, label: r.label, ratios: r.ratios, maxImages: r.max_images, imagePrices: r.image_prices, features: r.features };
+    return { id: r.id, provider: r.provider, endpoint: r.endpoint, label: r.label, ratios: r.ratios, maxImages: r.max_images, imagePrices: imagePricesFor(r, thinking), features: r.features };
   }
 
   /** The status and cancel calls of a job that has a provider id: the model's kind picks the image or the video adapter. Undefined without an adapter. */
@@ -153,7 +154,7 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
     if (row.kind === 'image') {
       const provider = imageProviders[row.provider];
       if (!provider) return undefined;
-      const job: ImageProviderJob = { providerJobId: row.provider_job_id, model: await loadImageModel(row.model), resolution: row.params.resolution! };
+      const job: ImageProviderJob = { providerJobId: row.provider_job_id, model: await loadImageModel(row.model, row.params.thinking), resolution: row.params.resolution! };
       return { status: (): Promise<ProviderStatus> => provider.status(job), cancel: () => provider.cancel(job) };
     }
     const provider = providers[row.provider];
@@ -215,7 +216,7 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
         if (job.kind === 'image') {
           const provider = imageProviders[job.provider];
           if (!provider) throw new Error(`no adapter for provider ${job.provider}`);
-          const model = await loadImageModel(job.model);
+          const model = await loadImageModel(job.model, job.params.thinking);
           // On 'auto' Nano Banana Pro took the garment photo's ratio and reframed the person (Try On bake-off, 2026-10-29), so a job that keeps one
           // input's frame asks for that input's ratio.
           const kept = KEPT_INPUT[job.feature];

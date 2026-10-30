@@ -32,6 +32,8 @@ export interface ImageModel {
   textToImage: boolean;
   /** The thinking levels it takes, the first the default (Nano Banana 2.1); empty for none. */
   thinking: string[];
+  /** USD per image by level and resolution, as `prices` is at the first level; empty for none. */
+  thinkingPrices: Record<string, Record<string, string>>;
   /** The recommendation score (0-100) for this feature, and whether it is the one to recommend. */
   score: number;
   recommended: boolean;
@@ -76,7 +78,7 @@ export function useImageChoice(models: ImageModel[] | null, images: number, init
   const options: ModelOption[] = (models ?? []).map((m) => ({
     id: m.id, label: m.label, isMock: m.isMock, supported: fits(m), estimateUsd: m.prices[resolution] ?? Object.values(m.prices)[0] ?? '0.0000', score: m.score, recommended: m.recommended,
   }));
-  return { chosen, ratio, resolution, thinking, estimate: chosen?.prices[resolution], options, modelId: chosen?.id ?? '', setModelId, setRatio, setResolution, setThinking };
+  return { chosen, ratio, resolution, thinking, estimate: (thinking && chosen?.thinkingPrices[thinking]?.[resolution]) || chosen?.prices[resolution], options, modelId: chosen?.id ?? '', setModelId, setRatio, setResolution, setThinking };
 }
 
 /** What the reuse link reads back from a job (GET /api/jobs/:id) to refill an image page. */
