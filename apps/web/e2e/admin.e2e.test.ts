@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
-import { optionsOf, presetCards, runInUi, select, signIn } from './support.test';
+import { optionsOf, png, presetCards, runInUi, select, signIn } from './support.test';
 
 const nav = (page: Page, name: string) => page.getByRole('navigation', { name: 'Các trang quản trị' }).getByRole('link', { name, exact: true });
 
@@ -20,16 +20,21 @@ test('an Admin sets up a team, a store and a user, then reconciles the month cos
   await signIn(page, 'admin');
   await page.getByRole('link', { name: 'Quản trị', exact: true }).click();
   await expect(page).toHaveURL(/\/admin\/users$/);
+  // The tab bar marks the page shown, and the Admin pages give the tray's width to their tables.
+  await expect(nav(page, 'Người dùng')).toHaveAttribute('aria-current', 'page');
+  await expect(page.getByRole('complementary', { name: 'Job của tôi' })).toHaveCount(0);
 
   // Teams: create one with a cost-centre code.
   await nav(page, 'Nhóm').click();
+  await expect(nav(page, 'Nhóm')).toHaveAttribute('aria-current', 'page');
+  await expect(nav(page, 'Người dùng')).not.toHaveAttribute('aria-current');
   await page.getByLabel('Tên nhóm', { exact: true }).fill('Team E2E');
   await page.getByLabel('Mã trung tâm chi phí (không bắt buộc)').fill('CC-E2E');
   await page.getByRole('button', { name: 'Tạo nhóm', exact: true }).click();
   await expect(page.getByLabel('Tên nhóm Team E2E')).toHaveValue('Team E2E');
   await expect(page.getByLabel('Mã trung tâm chi phí của Team E2E')).toHaveValue('CC-E2E');
 
-  // Stores: create one; its code can still be edited because it has no cost yet.
+  // Stores: create one; its code stays editable.
   await nav(page, 'Cửa hàng').click();
   await page.getByLabel('Tên cửa hàng', { exact: true }).fill('Store E2E');
   await page.getByLabel('Mã cửa hàng (store_id của POD Studio)').fill('E2E-1');
@@ -45,6 +50,29 @@ test('an Admin sets up a team, a store and a user, then reconciles the month cos
   await page.getByRole('button', { name: 'Thêm người dùng', exact: true }).click();
   await expect(page.getByLabel('Nhóm của new.user@e2e.test').locator('option:checked')).toHaveText('Team E2E');
   await expect(page.getByRole('row', { name: /new\.user@e2e\.test/ })).toContainText('Hoạt động');
+  // The search narrows the table by name or email, accents and case ignored, and shows every row again once cleared.
+  const search = page.getByRole('searchbox', { name: 'Tìm theo tên hoặc email' });
+  const rows = page.getByRole('row').filter({ has: page.getByRole('cell') });
+  const all = await rows.count();
+  await search.fill('NEW E2E');
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first()).toContainText('Hoạt động');
+  await expect(page.getByLabel('Email của new.user@e2e.test')).toBeVisible();
+  await search.fill('admin@e2e');
+  await expect(rows).toHaveCount(1);
+  await expect(page.getByLabel('Email của new.user@e2e.test')).toBeHidden();
+  await search.fill('khong-co-ai');
+  await expect(rows).toHaveCount(0);
+  await expect(page.getByText('Không có người dùng nào khớp “khong-co-ai”.')).toBeVisible();
+  await search.fill('');
+  await expect(rows).toHaveCount(all);
+  // The temporary password field shows only after its button is pressed.
+  const newRow = page.getByRole('row').filter({ has: page.getByLabel('Email của new.user@e2e.test') });
+  await expect(page.getByLabel('Mật khẩu tạm của new.user@e2e.test')).toHaveCount(0);
+  await newRow.getByRole('button', { name: 'Đặt mật khẩu tạm' }).click();
+  await page.getByLabel('Mật khẩu tạm của new.user@e2e.test').fill('Temp-pass-123');
+  await Promise.all([page.waitForResponse((r) => r.url().includes('/api/admin/users/') && r.ok()), newRow.getByRole('button', { name: 'Lưu mật khẩu' }).click()]);
+  await expect(page.getByLabel('Mật khẩu tạm của new.user@e2e.test')).toHaveCount(0);
 
   // Costs: the VND rate, an invoice and its difference, a manual adjustment.
   await nav(page, 'Chi phí').click();
@@ -99,7 +127,8 @@ test('an Admin sets up a team, a store and a user, then reconciles the month cos
   // Audit: the team creation is listed with its new value, and the action filter narrows the list.
   await nav(page, 'Nhật ký').click();
   await page.getByLabel('Loại sự kiện').selectOption('team.create');
-  await expect(page.getByRole('cell', { name: /"name":"Team E2E"/ })).toBeVisible();
+  await expect(page.getByRole('cell', { name: /name: Team E2E/ })).toBeVisible();
+  await expect(page.getByRole('cell', { name: /"name"/ })).toHaveCount(0); // read as fields, not raw JSON
   await expect(page.getByRole('cell', { name: 'store.create', exact: true })).toHaveCount(0);
 
   // Settings and Presets load; a preset edit is saved.
@@ -163,6 +192,96 @@ test('an Admin re-assigns a clip store from the Library and Reuse follows it', a
   await mine.getByRole('button', { name: 'Xóa', exact: true }).click();
   await mine.getByRole('button', { name: 'Xác nhận xóa' }).click();
   await expect(mine).toHaveCount(0);
+});
+
+test('an Admin changes the code of a store that has costs after a confirm, and the audit reads the change', async ({ page }) => {
+  await signIn(page, 'admin');
+  const code = `CC${Date.now() % 100000}`;
+  const name = `Coded store ${code}`;
+  const created = await page.request.post('/api/admin/stores', { data: { name, code } });
+  expect(created.status()).toBe(201);
+  const storeId = ((await created.json()) as { id: string }).id;
+  // A job booked on the store gives it cost entries.
+  const up = await page.request.post('/api/assets', { multipart: { file: { name: 'shirt.png', mimeType: 'image/png', buffer: png() } } });
+  const { assets } = (await up.json()) as { assets: { id: string }[] };
+  const job = await page.request.post('/api/jobs', { data: { assetIds: [assets[0]!.id], modelId: 'mock-e2e', presetId: 'gentle-push-in', ratio: '9:16', durationSec: 5, storeId } });
+  expect(job.status()).toBe(201);
+  const jobId = ((await job.json()) as { id: string }).id;
+
+  await page.goto('/admin/stores');
+  await expect(nav(page, 'Cửa hàng')).toHaveAttribute('aria-current', 'page');
+  const field = () => page.getByLabel(`Mã cửa hàng của ${name}`);
+  const save = () => page.getByRole('row').filter({ has: field() }).getByRole('button', { name: 'Lưu', exact: true });
+  await expect(field()).toBeEnabled();
+  // Dismissed, nothing is sent; accepted, the new code is saved.
+  await field().fill(`${code}-B`);
+  page.once('dialog', (d) => void d.dismiss());
+  await save().click();
+  await page.reload();
+  await expect(field()).toHaveValue(code);
+  await field().fill(`${code}-B`);
+  let asked = '';
+  page.once('dialog', (d) => {
+    asked = d.message();
+    void d.accept();
+  });
+  await Promise.all([page.waitForResponse((r) => r.url().includes(`/api/admin/stores/${storeId}`) && r.ok()), save().click()]);
+  expect(asked).toContain('Cửa hàng này đã có chi phí');
+  await page.reload();
+  await expect(field()).toHaveValue(`${code}-B`);
+
+  // The audit shows the change as old → new, and the event name in a code badge.
+  await nav(page, 'Nhật ký').click();
+  await page.getByLabel('Loại sự kiện').selectOption('store.update');
+  const entry = page.getByRole('row').filter({ hasText: `code: ${code} → ${code}-B` });
+  await expect(entry).toContainText(`store:${storeId}`);
+  await expect(entry).toContainText(`name: ${name}`);
+  await expect(entry.locator('code.event')).toHaveText('store.update');
+
+  // The Library is shared by every spec: leave no clip of this one behind.
+  await expect.poll(async () => ((await (await page.request.get(`/api/jobs/${jobId}`)).json()) as { status: string }).status, { timeout: 60_000 }).toBe('succeeded');
+  expect((await page.request.delete(`/api/jobs/${jobId}`)).ok()).toBe(true);
+});
+
+test('the audit reads a switched-off model as enabled: true → false', async ({ page }) => {
+  await signIn(page, 'admin');
+  const set = (enabled: boolean) => page.request.put('/api/admin/settings', { data: { models: [{ id: 'mock-e2e-square', enabled }] } });
+  expect((await set(true)).ok()).toBe(true);
+  expect((await set(false)).ok()).toBe(true);
+  await page.goto('/admin/audit');
+  await page.getByLabel('Loại sự kiện').selectOption('model.set_enabled');
+  const latest = page.getByRole('row').filter({ hasText: 'mock-e2e-square' }).first();
+  await expect(latest).toContainText('enabled: true → false');
+  await expect(latest).not.toContainText('{');
+});
+
+test('an Admin can edit presets and read audit details at 390px without horizontal scrolling', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await signIn(page, 'admin');
+  await page.goto('/admin/presets');
+  const row = page.getByRole('row').filter({ has: page.getByRole('textbox', { name: /^Tên mẫu / }) }).first();
+  const label = row.getByRole('textbox', { name: /^Tên mẫu / });
+  const prompt = row.getByRole('textbox', { name: /^Mô tả của mẫu / });
+  const save = row.getByRole('button', { name: 'Lưu', exact: true });
+  for (const control of [label, prompt, save]) {
+    await control.scrollIntoViewIfNeeded();
+    await expect(control).toBeInViewport({ ratio: 1 });
+    const box = (await control.boundingBox())!;
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(390);
+  }
+  const original = await label.inputValue();
+  await label.fill(`${original} mobile`);
+  await Promise.all([page.waitForResponse((r) => r.url().includes('/api/admin/presets/') && r.ok()), save.click()]);
+  await label.fill(original);
+  await Promise.all([page.waitForResponse((r) => r.url().includes('/api/admin/presets/') && r.ok()), save.click()]);
+  await page.goto('/admin/audit');
+  await page.getByLabel('Loại sự kiện').selectOption('preset.update');
+  const changes = page.locator('.changes').first();
+  await expect(changes).toContainText('mobile');
+  await changes.scrollIntoViewIfNeeded();
+  await expect(changes).toBeInViewport({ ratio: 1 });
+  expect(await page.locator('.table-wrap').evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
 });
 
 test('a Member cannot see the Admin pages', async ({ page }) => {

@@ -32,7 +32,7 @@ Layout [proposed]: a pnpm workspace with `apps/web`, `apps/worker` and `packages
 ## Data model [proposed]
 
 - **`users`, `sessions`, `accounts`**: better-auth tables. `users.role` is `member` or `admin`. `users.banned` blocks sign-in. `users.team_id` is required and cannot be changed by the user. Users are banned, never deleted.
-- **`teams`, `stores`**: managed by an Admin and hidden, never deleted. A team has a name and an optional cost-centre code. A store has a name and a unique code that equals POD Studio's `store_id`; the code cannot change once the store has cost. A default team is seeded, and existing users move into it.
+- **`teams`, `stores`**: managed by an Admin and hidden, never deleted. A team has a name and an optional cost-centre code. A store has a name and a unique code that equals POD Studio's `store_id`; the code can change at any time (costs and jobs point at the store by id, and the change is audited). A default team is seeded, and existing users move into it.
 - **`assets`**: `id`, `owner_id`, `kind` (`input`/`output`), `s3_key`, `mime`, `bytes`, `width`, `height`, `created_at`, `deleted_at`.
 - **`jobs`**:
   - Request: `id`, `user_id`, `model`, `provider`, `prompt`, `aspect` (`9:16`/`1:1` for video; an image job also takes `auto` and the image ratios), `duration_s` (5–10; 0 for an image), `feature`, `params`, `input_asset_ids[]`.

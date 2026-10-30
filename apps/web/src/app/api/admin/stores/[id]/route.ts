@@ -6,8 +6,9 @@ import { pool } from '@/lib/auth';
 import { guard } from '@/lib/session';
 
 /**
- * Admin: rename a store, change its `code` or hide or unhide it (`store.hide`). A store is never deleted. The code is refused (409) once the
- * ledger holds rows for the store, and so is a code that another store uses.
+ * Admin: rename a store, change its `code` or hide or unhide it (`store.hide`). A store is never deleted. The code may change at any time: cost
+ * entries and jobs point at the store by id, so its history stays with it, and the change is audited (`store.update`). A code that another
+ * store uses is refused (409).
  */
 export async function PATCH(request: Request, { params }: RouteContext) {
   const g = await guard(request, 'admin');
@@ -25,9 +26,6 @@ export async function PATCH(request: Request, { params }: RouteContext) {
       const old = (await tx.query('select name, code, hidden from stores where id = $1 for update', [id])).rows[0];
       if (!old) return bad('not found', 404);
       const next = { name: nonEmpty(name) ? name.trim() : old.name, code: nonEmpty(code) ? code.trim() : old.code, hidden: typeof hidden === 'boolean' ? hidden : old.hidden };
-      if (next.code !== old.code && (await tx.query('select 1 from cost_entries where store_id = $1 limit 1', [id])).rowCount) {
-        return bad('the code of a store that has cost entries cannot be changed', 409);
-      }
       await tx.query('update stores set name = $2, code = $3, hidden = $4 where id = $1', [id, next.name, next.code, next.hidden]);
       if (next.name !== old.name || next.code !== old.code) {
         await audit(tx, { actorId, action: 'store.update', target: `store:${id}`, oldValue: { name: old.name, code: old.code }, newValue: { name: next.name, code: next.code } });

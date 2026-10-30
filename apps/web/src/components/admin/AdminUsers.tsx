@@ -20,14 +20,17 @@ interface Team {
 }
 type Run = ReturnType<typeof useAction>['run'];
 
-function UserRow({ user, teams, run }: { user: User; teams: Team[]; run: Run }) {
-  const [password, setPassword] = useState('');
+/** Lower case without accents, so a search typed without accents still finds an accented name. */
+const fold = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '').replace(/đ/gi, 'd').toLowerCase();
+
+function UserRow({ user, teams, run, hidden }: { user: User; teams: Team[]; run: Run; hidden: boolean }) {
+  const [password, setPassword] = useState<string | null>(null);
   const [name, setName] = useState(user.name);
   const [email, setEmail] = useState(user.email);
   const patch = (body: Record<string, unknown>, fallback: string) => run(() => api(`/api/admin/users/${user.id}`, sendJson('PATCH', body)), fallback);
   const edited = name.trim() !== user.name || email.trim().toLowerCase() !== user.email;
   return (
-    <tr>
+    <tr hidden={hidden}>
       <td>
         <input aria-label={`Tên của ${user.email}`} value={name} onChange={(e) => setName(e.target.value)} />
       </td>
@@ -65,6 +68,7 @@ function UserRow({ user, teams, run }: { user: User; teams: Team[]; run: Run }) 
               {m.provider !== 'credential' && (
                 <button
                   type="button"
+                  className="small"
                   aria-label={`Huỷ liên kết ${providerLabel(m.provider)} của ${user.email}`}
                   onClick={() => void run(() => api(`/api/admin/users/${user.id}/accounts/${m.id}`, { method: 'DELETE' }), 'Không huỷ được liên kết.')}
                 >
@@ -75,19 +79,34 @@ function UserRow({ user, teams, run }: { user: User; teams: Team[]; run: Run }) 
           ))}
         </ul>
       </td>
-      <td>{user.banned ? 'Đã khóa' : 'Hoạt động'}</td>
+      <td>
+        <span className={user.banned ? 'status off' : 'status'}>{user.banned ? 'Đã khóa' : 'Hoạt động'}</span>
+      </td>
       <td>
         <div className="actions">
-          <button type="button" onClick={() => void patch({ banned: !user.banned }, user.banned ? 'Không mở khóa được.' : 'Không khóa được.')}>
+          {/* The temporary password field shows only while it is being set. */}
+          {password === null ? (
+            <button type="button" onClick={() => setPassword('')}>
+              Đặt mật khẩu tạm
+            </button>
+          ) : (
+            <>
+              <input type="password" autoComplete="new-password" autoFocus aria-label={`Mật khẩu tạm của ${user.email}`} value={password} onChange={(e) => setPassword(e.target.value)} />
+              <button
+                type="button"
+                className="primary"
+                disabled={password.trim() === ''}
+                onClick={() => void patch({ temporaryPassword: password }, 'Không đặt được mật khẩu tạm.').then((ok) => ok && setPassword(null))}
+              >
+                Lưu mật khẩu
+              </button>
+              <button type="button" onClick={() => setPassword(null)}>
+                Huỷ
+              </button>
+            </>
+          )}
+          <button type="button" className={user.banned ? undefined : 'danger'} onClick={() => void patch({ banned: !user.banned }, user.banned ? 'Không mở khóa được.' : 'Không khóa được.')}>
             {user.banned ? 'Mở khóa' : 'Khóa'}
-          </button>
-          <input type="password" autoComplete="new-password" aria-label={`Mật khẩu tạm của ${user.email}`} value={password} onChange={(e) => setPassword(e.target.value)} />
-          <button
-            type="button"
-            disabled={password.trim() === ''}
-            onClick={() => void patch({ temporaryPassword: password }, 'Không đặt được mật khẩu tạm.').then((ok) => ok && setPassword(''))}
-          >
-            Đặt mật khẩu tạm
           </button>
         </div>
       </td>
@@ -104,9 +123,13 @@ export function AdminUsers() {
   const [password, setPassword] = useState('');
   const [teamId, setTeamId] = useState('');
   const [role, setRole] = useState('member');
+  const [query, setQuery] = useState('');
 
   if (!users.data || !teams.data) return users.failed || teams.failed ? <p className="error">Không tải được danh sách người dùng.</p> : <p role="status">Đang tải...</p>;
   const visible = teams.data.teams.filter((t) => !t.hidden);
+  // Filtered rows are hidden, not unmounted, so a name or email being edited in them is kept.
+  const matches = (u: User) => fold(`${u.name} ${u.email}`).includes(fold(query.trim()));
+  const shown = users.data.users.filter(matches).length;
 
   async function add() {
     const ok = await run(() => api('/api/admin/users', sendJson('POST', { email, name, teamId, role, ...(password ? { password } : {}) })), 'Không thêm được người dùng.');
@@ -167,6 +190,15 @@ export function AdminUsers() {
           {problem}
         </p>
       )}
+      <div className="filters" role="search" aria-label="Tìm người dùng">
+        <label>
+          Tìm theo tên hoặc email
+          <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} />
+        </label>
+        <p className="muted" role="status">
+          {query.trim() ? `${shown} trên ${users.data.users.length} người dùng` : `${users.data.users.length} người dùng`}
+        </p>
+      </div>
       <div className="table-wrap">
         <table>
           <thead>
@@ -182,10 +214,11 @@ export function AdminUsers() {
           </thead>
           <tbody>
             {users.data.users.map((u) => (
-              <UserRow key={u.id} user={u} teams={teams.data!.teams} run={run} />
+              <UserRow key={u.id} user={u} teams={teams.data!.teams} run={run} hidden={!matches(u)} />
             ))}
           </tbody>
         </table>
+        {shown === 0 && <p className="muted empty">Không có người dùng nào khớp “{query.trim()}”.</p>}
       </div>
     </section>
   );

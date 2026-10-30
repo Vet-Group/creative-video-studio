@@ -325,12 +325,12 @@ const NAV: { href: string; text: string; icon: IconName; badge?: string }[] = [
 /** The pages that show their own History tab instead of the tray beside them. */
 const OWN_HISTORY = ['/create', '/try-on', '/image-generation', '/marketing-studio'];
 
-/** Explore and the Apps index give the full width to their card grids, as on the live site; the jobs show in Library and in the History tabs. */
+/** Explore and the Apps index give the full width to their card grids, as on the live site, and the Admin pages to their tables; the jobs show in Library and in the History tabs. */
 const NO_TRAY = ['/explore', '/apps'];
 
 /** The app pages have a History tab too; the coming-soon pages keep the tray. */
 const hasOwnHistory = (path: string): boolean => {
-  if (NO_TRAY.includes(path) || OWN_HISTORY.some((p) => path.startsWith(p))) return true;
+  if (NO_TRAY.includes(path) || path.startsWith('/admin') || OWN_HISTORY.some((p) => path.startsWith(p))) return true;
   const app = path.startsWith('/apps/') ? appBySlug(path.split('/')[2]!) : undefined;
   return app !== undefined && !app.soon;
 };

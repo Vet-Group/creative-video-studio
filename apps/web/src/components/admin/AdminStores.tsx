@@ -15,6 +15,11 @@ function StoreRow({ store, run }: { store: Store; run: ReturnType<typeof useActi
   const [name, setName] = useState(store.name);
   const [code, setCode] = useState(store.code);
   const patch = (body: Record<string, unknown>, fallback: string) => run(() => api(`/api/admin/stores/${store.id}`, sendJson('PATCH', body)), fallback);
+  function save() {
+    // Costs point at the store by id, so they stay with it; only what is written from now on carries the new code.
+    if (store.hasCost && code.trim() !== store.code && !window.confirm('Cửa hàng này đã có chi phí. Báo cáo và CSV từ giờ dùng mã mới; file đã xuất trước đó vẫn mang mã cũ. Đổi mã?')) return;
+    void patch({ name, code }, 'Không lưu được cửa hàng.');
+  }
   return (
     <tr>
       <td>
@@ -22,18 +27,11 @@ function StoreRow({ store, run }: { store: Store; run: ReturnType<typeof useActi
         {store.hidden && <span className="tag">Đã ẩn</span>}
       </td>
       <td>
-        <input
-          aria-label={`Mã cửa hàng của ${store.name}`}
-          value={code}
-          disabled={store.hasCost}
-          title={store.hasCost ? 'Cửa hàng đã có chi phí nên không đổi được mã.' : undefined}
-          onChange={(e) => setCode(e.target.value)}
-        />
-        {store.hasCost && <p className="muted">Đã có chi phí, không đổi được mã.</p>}
+        <input aria-label={`Mã cửa hàng của ${store.name}`} value={code} onChange={(e) => setCode(e.target.value)} />
       </td>
       <td>
         <div className="actions">
-          <button type="button" disabled={!name.trim() || !code.trim()} onClick={() => void patch({ name, code }, 'Không lưu được cửa hàng.')}>
+          <button type="button" disabled={!name.trim() || !code.trim()} onClick={save}>
             Lưu
           </button>
           <button type="button" onClick={() => void patch({ hidden: !store.hidden }, 'Không đổi được trạng thái ẩn.')}>
@@ -79,7 +77,7 @@ export function AdminStores() {
             Tạo cửa hàng
           </button>
         </div>
-        <p className="muted">Cửa hàng không bao giờ bị xóa. Mã phải là duy nhất và không đổi được sau khi cửa hàng đã có chi phí.</p>
+        <p className="muted">Cửa hàng không bao giờ bị xóa. Mã phải là duy nhất. Đổi mã khi cửa hàng đã có chi phí thì chi phí cũ vẫn thuộc cửa hàng này; báo cáo và CSV từ giờ dùng mã mới.</p>
       </fieldset>
       {problem && (
         <p className="error" role="alert">

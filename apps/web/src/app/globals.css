@@ -385,8 +385,6 @@ input[type='range'] { accent-color: var(--ink); }
 .actions { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; margin-top: .5rem; }
 .actions label { margin: 0; }
 
-.admin-nav { display: flex; gap: .75rem; flex-wrap: wrap; margin-bottom: 1rem; padding-bottom: .5rem; border-bottom: 1px solid var(--border); }
-.admin-nav a[aria-current='page'] { font-weight: 700; text-decoration: none; color: inherit; }
 .table-wrap { overflow-x: auto; margin: .75rem 0; }
 table { border-collapse: collapse; width: 100%; background: var(--surface); font-size: .9rem; }
 th, td { border: 1px solid var(--border); padding: .35rem .5rem; text-align: left; vertical-align: top; }
@@ -398,6 +396,81 @@ td code { white-space: pre-wrap; overflow-wrap: anywhere; }
 .row label { margin: 0; }
 .row:has(small) { align-items: start; }
 .row .primary { margin-top: 0; }
+
+/* Admin: the page tabs look like the work-page tabs; fields, buttons and tables share the app's 36 px controls, 8 px corners and hairlines. */
+.admin-nav { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 24px; }
+.admin-nav a { display: inline-flex; align-items: center; height: 37px; padding: 0 16px; border-radius: 8px; color: var(--text-muted); font-size: 14px; line-height: 21px; font-weight: 600; text-decoration: none; white-space: nowrap; }
+.admin-nav a:hover { background: var(--fill); color: var(--ink); }
+.admin-nav a[aria-current='page'] { background: var(--ink-strong); color: var(--on-dark); }
+.admin { font-size: 14px; line-height: 21px; }
+.admin h2 { margin: 32px 0 12px; font-size: 16px; line-height: 24px; }
+.admin p.muted { max-width: 80ch; }
+.admin label { max-width: 22rem; margin: 0 0 12px; color: var(--text-sub); font-size: 13px; line-height: 18px; font-weight: 500; }
+.admin label small { margin-top: 6px; color: var(--muted); font-size: 12px; line-height: 18px; }
+.admin :is(input:not([type='checkbox']), select, textarea) { padding: 0 12px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface); color: var(--ink); font: inherit; font-size: 14px; line-height: 21px; font-weight: 400; }
+.admin :is(input:not([type='checkbox']), select) { height: 36px; }
+.admin :is(input:not([type='checkbox']), select, textarea):hover { border-color: var(--text-subtle); }
+.admin :is(input:not([type='checkbox']), select, textarea):focus-visible { border-color: var(--ink); outline: 1px solid var(--ink); outline-offset: 0; }
+.admin label :is(input:not([type='checkbox']), select, textarea) { width: 100%; min-width: 0; margin-top: 6px; }
+.admin textarea { display: block; width: 100%; height: auto; min-height: 66px; padding: 7px 12px; resize: vertical; field-sizing: content; }
+.admin input[type='checkbox'] { flex: none; width: 16px; height: 16px; min-width: 0; margin: 0; padding: 0; accent-color: var(--ink-strong); }
+.admin label.check { display: inline-flex; gap: 8px; align-items: center; margin: 0; color: var(--ink); font-size: 14px; white-space: nowrap; }
+.admin label.model { max-width: none; margin: 0; padding: 6px 0; color: var(--ink); font-size: 14px; }
+.admin :is(button, .button) { display: inline-flex; align-items: center; justify-content: center; height: 36px; padding: 0 14px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface); color: var(--ink); font-size: 14px; line-height: 21px; font-weight: 500; white-space: nowrap; }
+.admin :is(button, .button):hover:not(:disabled) { background: var(--fill); }
+.admin button:disabled { opacity: 1; border-color: var(--field-border); background: var(--surface-1); color: var(--text-disabled); }
+.admin button.primary { margin: 0; border-color: var(--brand); background: var(--brand); color: var(--on-dark); }
+.admin button.primary:hover:not(:disabled) { border-color: var(--brand-hover); background: var(--brand-hover); }
+.admin button.primary:disabled { border-color: var(--fill-strong); background: var(--fill-strong); color: var(--text-muted); }
+.admin button.danger { border-color: var(--danger-soft-border); color: var(--danger); }
+.admin button.danger:hover:not(:disabled) { background: var(--danger-soft); }
+.admin button.small { height: 28px; padding: 0 10px; font-size: 13px; }
+.admin fieldset { margin: 0 0 24px; padding: 12px 20px 8px; border: 1px solid var(--border); border-radius: 14px; }
+.admin legend { padding: 0 6px; color: var(--ink); font-size: 15px; font-weight: 600; }
+.admin fieldset > .muted { margin: 0 0 12px; }
+.admin .row { gap: 0 16px; margin: 0; }
+.admin .row > label { flex: 1 1 13rem; }
+.admin .row > :is(button, .button) { margin-bottom: 12px; }
+.admin .filters { gap: 0 16px; }
+.admin .filters > label { flex: 0 1 22rem; }
+.admin .filters > p { margin: 0 0 20px; }
+.admin section > ul:not(.warn) { display: grid; gap: 4px; margin: 0 0 12px; padding: 0; list-style: none; }
+.admin .table-wrap { margin: 8px 0 16px; border: 1px solid var(--border); border-radius: 14px; }
+.admin :is(th, td) { padding: 10px 8px; border: 0; border-bottom: 1px solid var(--hairline); vertical-align: middle; }
+.admin th { background: var(--surface-1); color: var(--text-sub); font-size: 12px; line-height: 18px; font-weight: 600; white-space: nowrap; }
+.admin :is(th, td):first-child { padding-left: 12px; }
+.admin :is(th, td):last-child { padding-right: 12px; }
+.admin tbody tr:last-child > td { border-bottom: 0; }
+.admin tbody tr:hover > td { background: var(--surface-1); }
+.admin td :is(input:not([type='checkbox']), select) { width: 100%; min-width: 8.5rem; }
+.admin td select { min-width: 7rem; }
+.admin td input.narrow { width: 5rem; min-width: 0; }
+.admin th.wide { width: 50%; min-width: 24rem; }
+.admin td .actions { flex-wrap: nowrap; margin: 0; }
+/* The temporary password: the field over its buttons, so the column keeps its width. */
+.admin td .actions:has(input) { flex-wrap: wrap; width: 14rem; }
+.admin td .actions input { width: 100%; min-width: 0; }
+.admin td:has(> .actions) { width: 1%; }
+.admin td > button { margin-top: 6px; }
+.admin .table-wrap > .empty { margin: 0; padding: 12px; }
+.admin .nowrap { white-space: nowrap; }
+@media (max-width: 640px) {
+  .admin .mobile-records { min-width: 0; }
+  .admin .mobile-records thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .admin .mobile-records tbody { display: block; }
+  .admin .mobile-records tr { display: grid; padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .admin .mobile-records td { display: block; min-width: 0; padding: 8px 12px; border: 0; white-space: normal; overflow-wrap: anywhere; }
+  .admin .mobile-records td::before { display: block; margin-bottom: 6px; color: var(--text-subtle); font-size: 12px; content: attr(data-label); }
+  .admin .mobile-records input:not([type='checkbox']) { width: 100%; }
+  .admin .mobile-records .changes { min-width: 0; }
+}
+.admin .tag { display: inline-block; margin-left: 8px; padding: 0 8px; border-radius: 999px; background: var(--fill); color: var(--text-sub); font-size: 12px; line-height: 20px; font-weight: 500; }
+.admin .status { display: inline-block; padding: 0 10px; border-radius: 999px; background: var(--cat-utility-bg); color: var(--cat-utility-fg); font-size: 12px; line-height: 24px; font-weight: 600; white-space: nowrap; }
+.admin .status.off { background: var(--danger-soft); color: var(--danger); }
+.admin .methods li { gap: 8px; }
+.admin code.event { padding: 2px 8px; border-radius: 6px; background: var(--fill); font-family: ui-monospace, Consolas, monospace; font-size: 12px; white-space: nowrap; }
+.admin .changes { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; overflow-wrap: anywhere; }
+.admin .changes .key { color: var(--text-sub); font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
 
 /* Create: a settings card beside the Examples/History pane; below 1024 px the same parts are tabs and the card fills the screen under them. */
 .create-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }

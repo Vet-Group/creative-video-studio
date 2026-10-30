@@ -1,5 +1,6 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { auditChanges } from '@/lib/admin-ui';
 import { api } from '@/lib/api';
 import { useTabReturn } from '@/lib/use-tab-return';
 
@@ -20,7 +21,6 @@ const ACTIONS = [
 ];
 
 const fmtTime = (iso: string) => new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'medium', timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date(iso));
-const json = (v: unknown) => (v === null || v === undefined ? '' : JSON.stringify(v));
 
 export function AdminAudit() {
   const [action, setAction] = useState('');
@@ -74,29 +74,33 @@ export function AdminAudit() {
       {state === 'error' && <p className="error">Không tải được nhật ký.</p>}
       {state === 'ready' && entries.length === 0 && <p className="muted">Chưa có sự kiện nào khớp bộ lọc.</p>}
       <div className="table-wrap">
-        <table>
+        <table className="mobile-records">
           <thead>
             <tr>
               <th scope="col">Thời gian</th>
               <th scope="col">Người thực hiện</th>
               <th scope="col">Sự kiện</th>
               <th scope="col">Đối tượng</th>
-              <th scope="col">Giá trị cũ</th>
-              <th scope="col">Giá trị mới</th>
+              <th scope="col">Thay đổi</th>
             </tr>
           </thead>
           <tbody>
             {entries.map((e) => (
               <tr key={e.id}>
-                <td>{fmtTime(e.createdAt)}</td>
-                <td>{e.actorName}</td>
-                <td>{e.action}</td>
-                <td>{e.target}</td>
-                <td>
-                  <code>{json(e.oldValue)}</code>
+                <td data-label="Thời gian" className="nowrap">{fmtTime(e.createdAt)}</td>
+                <td data-label="Người thực hiện">{e.actorName}</td>
+                <td data-label="Sự kiện">
+                  <code className="event">{e.action}</code>
                 </td>
-                <td>
-                  <code>{json(e.newValue)}</code>
+                <td data-label="Đối tượng">{e.target}</td>
+                <td data-label="Thay đổi">
+                  <ul className="changes">
+                    {auditChanges(e.oldValue, e.newValue).map((c) => (
+                      <li key={c.key}>
+                        <span className="key">{c.key}:</span> {c.text}
+                      </li>
+                    ))}
+                  </ul>
                 </td>
               </tr>
             ))}
