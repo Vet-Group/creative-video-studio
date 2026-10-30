@@ -439,7 +439,26 @@ describe('GET /api/jobs/:id', () => {
       id, userId: alice.id, status: 'succeeded', error: null, isMock: false, feature: 'video', resolution: null, presetId: 'gentle-push-in', prompt: 'a prompt', enhance: false, enhancedPrompt: null, audio: null, ratio: '1:1', garments: null, format: null, hook: null, location: null, brief: null, script: null, durationSec: 8, modelId: 'fal-test',
       storeId: 'store-ok', outputAssetId: `${id}-video`, posterAssetId: `${id}-poster`,
       images: [{ id: 'd-in-2', filename: 'in.png', width: null, height: null, mime: 'image/png', durationMs: null }, { id: 'd-in-1', filename: 'in.png', width: null, height: null, mime: 'image/png', durationMs: null }],
+      endFrame: null, clips: [],
     });
+  });
+
+  test('gives Reuse the end frame and reference audio that still exist, to the creator only', async () => {
+    await input('d-end', alice.id);
+    for (const [id, ms] of [['d-clip-1', 3000], ['d-clip-gone', 4000], ['d-clip-2', 5000]] as const) {
+      await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, duration_ms) values ($1, $2, 'input', $1, 'a.mp3', 'audio/mpeg', 1, $3)`, [id, alice.id, ms]);
+    }
+    await pool.query(`update assets set deleted_at = now() where id = 'd-clip-gone'`);
+    const id = await clip(alice.id, { inputs: [] });
+    await pool.query(`update jobs set params = $2 where id = $1`, [id, { endAssetId: 'd-end', audioAssetIds: 'd-clip-2,d-clip-gone,d-clip-1' }]);
+    expect(await (await detail(alice.cookie, id)).json()).toMatchObject({
+      endFrame: { id: 'd-end', filename: 'in.png', mime: 'image/png', durationMs: null },
+      clips: [{ id: 'd-clip-2', filename: 'a.mp3', mime: 'audio/mpeg', durationMs: 5000 }, { id: 'd-clip-1', filename: 'a.mp3', mime: 'audio/mpeg', durationMs: 3000 }],
+    });
+    // A Run takes only the caller's own end frame and audio, so another Member and an Admin get none.
+    for (const cookie of [bob.cookie, admin.cookie]) expect(await (await detail(cookie, id)).json()).toMatchObject({ endFrame: null, clips: [] });
+    await pool.query(`update assets set deleted_at = now() where id = 'd-end'`);
+    expect(await (await detail(alice.cookie, id)).json()).toMatchObject({ endFrame: null });
   });
 
   test('leaves out a store that is hidden now, hides a job that is not a clip from other Members but not from its owner or an Admin, and 404s a deleted one', async () => {

@@ -60,6 +60,7 @@ export const USERS = {
   thinka: { email: 'thinka@e2e.test', name: 'E2E Thinking A', role: 'member' }, // thinking.e2e
   // create-extras.e2e: the end frame, a Run from the prompt alone and reference audio on Create video.
   cvxa: { email: 'cvxa@e2e.test', name: 'E2E Create Extras A', role: 'member' },
+  cvxr: { email: 'cvxr@e2e.test', name: 'E2E Create Extras Reuse', role: 'member' }, // its end frame and audio refilled from a template and from History
   admin: { email: 'admin@e2e.test', name: 'E2E Admin', role: 'admin' },
 } as const;
 

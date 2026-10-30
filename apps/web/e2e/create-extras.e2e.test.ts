@@ -121,3 +121,67 @@ test('a model that takes reference audio shows the picker: clips of 2 s or more 
   await page.getByRole('button', { name: /^Tạo video/ }).click();
   expect((await again).params.audioAssetIds).toBe(ids[1]);
 });
+
+test('a saved template and History’s Dùng lại refill the end frame and the audio, and a model that takes neither leaves them out of the Run', async ({ page }) => {
+  const picker = page.getByRole('group', { name: 'Âm thanh tham chiếu' });
+  await signIn(page, 'cvxr');
+  await withExtras(page, { endFrame: true, audioClips: { max: 2, seconds: 15 } });
+  await page.reload();
+  await page.getByLabel('Ảnh sản phẩm').setInputFiles({ name: 'start.png', mimeType: 'image/png', buffer: png() });
+  await page.getByLabel('Ảnh khung hình cuối').setInputFiles({ name: 'end.png', mimeType: 'image/png', buffer: png() });
+  await page.getByLabel('Tệp âm thanh tham chiếu').setInputFiles([
+    { name: 'voice.wav', mimeType: 'audio/wav', buffer: wav(2500) },
+    { name: 'song.wav', mimeType: 'audio/wav', buffer: wav(4000) },
+  ]);
+  await expect(picker.getByRole('listitem')).toHaveCount(2);
+  await page.getByLabel('Mô tả chuyển động').fill('The bottle turns to face the camera.');
+  await page.getByRole('button', { name: 'Lưu mẫu', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Lưu mẫu' });
+  await dialog.getByLabel('Tên mẫu').fill('Kết thúc có nhạc');
+  await dialog.getByRole('button', { name: 'Lưu', exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Đã lưu mẫu.' })).toBeVisible();
+
+  // A fresh form refilled from the template has the end frame and both clips back, and sends them with the Run.
+  await page.goto('/create');
+  await expect(endSlot(page)).toBeVisible();
+  await expect(endSlot(page).getByRole('img')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Mẫu của tôi' }).click();
+  await page.getByRole('dialog', { name: 'Mẫu của tôi' }).getByRole('link', { name: 'Kết thúc có nhạc' }).click();
+  await expect(endSlot(page).getByRole('img', { name: 'end.png' })).toBeVisible();
+  await expect(picker.getByRole('listitem')).toHaveText(['voice.wav · 2.5 giây', 'song.wav · 4.0 giây']);
+  const body = nextRun(page);
+  await page.getByRole('button', { name: /^Tạo video/ }).click();
+  const sent = await body;
+  expect(sent.params).toEqual({ audio: 'on', endAssetId: expect.any(String), audioAssetIds: expect.stringMatching(/^[^,]+,[^,]+$/) });
+  const { endAssetId, audioAssetIds } = sent.params as { endAssetId: string; audioAssetIds: string };
+
+  // History's reuse button: a job the API gives back with that end frame and audio (the mock model cannot run one) refills them the same way.
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
+  const run = await page.request.post('/api/jobs', { data: { assetIds: sent.assetIds, modelId: 'mock-e2e', prompt: 'p', enhance: false, ratio: '9:16', durationSec: 5, params: { audio: 'on' } } });
+  expect(run.status()).toBe(201);
+  const { id } = (await run.json()) as { id: string };
+  const [voice, song] = audioAssetIds.split(',');
+  await page.route(`**/api/jobs/${id}`, async (route) => {
+    const res = await route.fetch();
+    await route.fulfill({ response: res, json: { ...(await res.json()), endFrame: { id: endAssetId, filename: 'end.png' }, clips: [{ id: song, filename: 'song.wav', durationMs: 4000 }, { id: voice, filename: 'voice.wav', durationMs: 2500 }] } });
+  });
+  await withExtras(page, { endFrame: true, audioClips: { max: 2, seconds: 15 } });
+  await page.goto('/create');
+  await page.getByRole('tab', { name: 'Lịch sử' }).click();
+  await page.getByRole('complementary', { name: 'Job của tôi' }).getByRole('button', { name: 'Dùng lại' }).first().click();
+  await expect(endSlot(page).getByRole('img', { name: 'end.png' })).toBeVisible();
+  await expect(picker.getByRole('listitem')).toHaveText(['song.wav · 4.0 giây', 'voice.wav · 2.5 giây']);
+
+  // On a model that takes neither, the template refills the image and leaves the end frame and the audio out of the Run.
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
+  await page.goto('/create');
+  await page.getByRole('button', { name: 'Mẫu của tôi' }).click();
+  await page.getByRole('dialog', { name: 'Mẫu của tôi' }).getByRole('link', { name: 'Kết thúc có nhạc' }).click();
+  await expect(page.getByLabel('Mô tả chuyển động')).toHaveValue('The bottle turns to face the camera.');
+  await expect(endSlot(page)).toHaveCount(0);
+  await expect(picker).toHaveCount(0);
+  const plain = nextRun(page);
+  await page.getByRole('button', { name: /^Tạo video/ }).click();
+  expect(await plain).toMatchObject({ assetIds: sent.assetIds, params: { audio: 'on' } });
+  expect((await plain).params).toEqual({ audio: 'on' });
+});

@@ -28,6 +28,9 @@ async function jobData(jobId: string, userId: string): Promise<{ feature: string
       `select j.feature, j.params, j.preset_id, j.prompt, j.enhance, j.aspect, j.duration_s, j.model,
               (select array_agg(a.id order by array_position(j.input_asset_ids, a.id)) from assets a
                 where a.id = any(j.input_asset_ids) and a.owner_id = $2 and a.kind = 'input' and a.deleted_at is null) as images,
+              (select a.id from assets a where a.id = j.params->>'endAssetId' and a.owner_id = $2 and a.kind = 'input' and a.deleted_at is null) as end_frame,
+              (select array_agg(a.id order by array_position(string_to_array(j.params->>'audioAssetIds', ','), a.id)) from assets a
+                where a.id = any(string_to_array(j.params->>'audioAssetIds', ',')) and a.owner_id = $2 and a.kind = 'input' and a.deleted_at is null) as clips,
               (select s.id from stores s where s.id = j.store_id and not s.hidden) as store_id
          from jobs j where j.id = $1 and j.user_id = $2 and j.deleted_at is null and j.purged_at is null`,
       [jobId, userId],
@@ -39,6 +42,7 @@ async function jobData(jobId: string, userId: string): Promise<{ feature: string
   const ownPrompt = (j.feature === 'video' && !j.preset_id) || j.feature === 'image' || j.feature === 'motion_control';
   const data = {
     images: j.images ?? [],
+    endFrame: j.end_frame, clips: j.clips,
     prompt: ownPrompt ? j.prompt : undefined,
     brief: p.brief, script: p.script, hook: p.hook, location: p.location, format: p.format, audio: p.audio,
     garments: p.garments ? Number(p.garments) : undefined,
@@ -50,7 +54,7 @@ async function jobData(jobId: string, userId: string): Promise<{ feature: string
 }
 
 /**
- * Saves the caller's form as a template: `feature` (a page that refills), `name` (1 to 60 characters), `data` (lib/templates.ts) whose images must be
+ * Saves the caller's form as a template: `feature` (a page that refills), `name` (1 to 60 characters), `data` (lib/templates.ts) whose images, end frame and clips must be
  * the caller's own live uploads, and `isCompany` (Admin only) to share it. A member keeps at most 50. The hook and the location must be ones the caller
  * may use (lib/choices.ts), and a company template may hold only built-in or company ones.
  * `fromJob` (instead of `feature` and `data`) saves what one of the caller's own jobs was made from, as a History card's Save template does: its own live uploads,
@@ -82,9 +86,10 @@ export async function POST(request: Request) {
     else if (!choice) return bad(`data.${key} is not a ${key}`);
     else if (isCompany && !choice.builtIn && !choice.isCompany) return bad('a company template may use only built-in or company hooks and locations');
   }
-  if (data.images.length > 0) {
-    const own = await pool.query(`select count(*)::int as n from assets where id = any($1::text[]) and owner_id = $2 and kind = 'input' and deleted_at is null`, [data.images, userId]);
-    if (own.rows[0].n !== data.images.length) return bad('data.images may hold only your own uploads');
+  for (const [key, ids] of [['images', data.images], ['endFrame', data.endFrame ? [data.endFrame] : []], ['clips', data.clips ?? []]] as const) {
+    if (ids.length === 0) continue;
+    const own = await pool.query(`select count(*)::int as n from assets where id = any($1::text[]) and owner_id = $2 and kind = 'input' and deleted_at is null`, [ids, userId]);
+    if (own.rows[0].n !== ids.length) return bad(`data.${key} may hold only your own uploads`);
   }
   const id = randomUUID();
   // One writer per member, so two saves cannot both take the 50th place.

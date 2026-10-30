@@ -9,7 +9,7 @@ const notFound = () => Response.json({ error: 'not found' }, { status: 404 });
 
 /**
  * A job (an image job carries its `feature` and `resolution`, and `durationSec` 0) with what Reuse needs to prefill Create: the input images that still exist, preset, prompt, ratio, duration, model and store
- * (null when the store is hidden now, since a Run cannot take it). Visible to its owner and to Admins, and to everyone once it is a
+ * (null when the store is hidden now, since a Run cannot take it), and to its creator the end frame and reference audio that still exist (a Run takes only the caller's own). Visible to its owner and to Admins, and to everyone once it is a
  * Library clip. A deleted or purged job is 404.
  */
 export async function GET(request: Request, { params }: RouteContext) {
@@ -31,11 +31,17 @@ export async function GET(request: Request, { params }: RouteContext) {
     'select id, filename, width, height, mime, duration_ms as "durationMs" from assets where id = any($1::text[]) and deleted_at is null order by array_position($1::text[], id)',
     [job.input_asset_ids],
   );
+  const owned = (ids: string[]) =>
+    pool.query(
+      `select id, filename, mime, duration_ms as "durationMs" from assets where id = any($1::text[]) and owner_id = $2 and kind = 'input' and deleted_at is null order by array_position($1::text[], id)`,
+      [own ? ids : [], job.user_id],
+    );
+  const [end, clips] = await Promise.all([owned(job.params.endAssetId ? [job.params.endAssetId] : []), owned(job.params.audioAssetIds?.split(',') ?? [])]);
   return Response.json({
     id: job.id, userId: job.user_id, status: job.status, error: job.error, isMock: job.is_mock, feature: job.feature, resolution: job.params.resolution ?? null, presetId: job.preset_id, prompt: job.prompt, enhance: job.enhance, enhancedPrompt: job.enhanced_prompt, audio: job.params.audio ?? null, ratio: job.aspect,
     // The form inputs kept for reuse (Marketing Studio's, the image pages' own text, Try On's garment count); the brief and the script are the creator's own words.
     garments: job.params.garments ? Number(job.params.garments) : null, format: job.params.format ?? null, hook: job.params.hook ?? null, location: job.params.location ?? null, brief: own ? (job.params.brief ?? null) : null, script: own ? (job.params.script ?? null) : null,
-    durationSec: job.duration_s, modelId: job.model, storeId: job.store_id, outputAssetId: job.output_asset_id, posterAssetId: job.poster_asset_id, images: images.rows,
+    durationSec: job.duration_s, modelId: job.model, storeId: job.store_id, outputAssetId: job.output_asset_id, posterAssetId: job.poster_asset_id, images: images.rows, endFrame: end.rows[0] ?? null, clips: clips.rows,
   });
 }
 

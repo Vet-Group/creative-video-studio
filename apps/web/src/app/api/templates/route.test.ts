@@ -72,6 +72,28 @@ describe('/api/templates', () => {
     expect((await pool.query('select count(*)::int as n from user_templates where user_id = $1', [a.id])).rows[0].n).toBe(0);
   });
 
+  test("keeps Create video's end frame and audio clips as the images are: the owner's own live uploads only", async () => {
+    const [a, b] = [await newUser(), await newUser()];
+    const clip = (u: User, id: string) => pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, duration_ms) values ($1, $2, 'input', $1, 'a.mp3', 'audio/mpeg', 1, 3000)`, [id, u.id]);
+    await clip(a, `${a.id}-c1`);
+    await clip(a, `${a.id}-c2`);
+    await clip(b, `${b.id}-c1`);
+    const video = (data: Record<string, unknown>) => ({ feature: 'video', name: 'V', data: { images: [a.asset], ...data } });
+    const res = await save(a, video({ endFrame: a.asset, clips: [`${a.id}-c2`, `${a.id}-c1`] }));
+    expect(res.status).toBe(201);
+    const { id } = (await res.json()) as { id: string };
+    expect(await (await one(req(a, `/api/templates/${id}`), ctx(id))).json()).toMatchObject({
+      endFrame: { id: a.asset, filename: 'own.png' },
+      clips: [{ id: `${a.id}-c2`, filename: 'a.mp3', mime: 'audio/mpeg', durationMs: 3000 }, { id: `${a.id}-c1`, filename: 'a.mp3', mime: 'audio/mpeg', durationMs: 3000 }],
+    });
+    await pool.query('update assets set deleted_at = now() where id = $1', [`${a.id}-c1`]);
+    expect(await (await one(req(a, `/api/templates/${id}`), ctx(id))).json()).toMatchObject({ clips: [{ id: `${a.id}-c2` }] });
+    expect(await error(await save(a, video({ endFrame: b.asset })))).toBe('data.endFrame may hold only your own uploads');
+    expect(await error(await save(a, video({ clips: [`${b.id}-c1`] })))).toBe('data.clips may hold only your own uploads');
+    expect(await error(await save(a, video({ clips: [`${a.id}-c2`, `${a.id}-c2`] })))).toBe('data.clips must list up to 10 different asset ids');
+    expect(await error(await save(a, video({ endFrame: 5 })))).toBe('data.endFrame must be short text');
+  });
+
   test('keeps at most 50 per member and refuses the 51st', async () => {
     const u = await newUser();
     for (let i = 0; i < 50; i++) expect((await save(u, { feature: 'image', name: `t${i}`, data: { images: [] } })).status).toBe(201);
@@ -149,6 +171,21 @@ describe('/api/templates', () => {
         { id: u.asset, filename: 'own.png', mime: 'image/png', durationMs: null },
         { id: `${u.id}-v`, filename: 'ref.mp4', mime: 'video/mp4', durationMs: 5300 },
       ]);
+    });
+
+    test("keeps a video job's own live end frame and audio clips, and leaves out another member's and deleted ones", async () => {
+      const [u, other] = [await newUser(), await newUser()];
+      for (const [id, owner, gone] of [[`${u.id}-c1`, u, false], [`${u.id}-c2`, u, false], [`${u.id}-cx`, u, true], [`${other.id}-c`, other, false]] as const) {
+        await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, duration_ms, deleted_at) values ($1, $2, 'input', $1, 'a.mp3', 'audio/mpeg', 1, 3000, $3)`, [id, owner.id, gone ? new Date() : null]);
+      }
+      const base = { feature: 'video', model: 'kling-o3-pro', prompt: 'p', duration: 5, inputs: [u.asset] };
+      const audio = `${u.id}-c2,${other.id}-c,${u.id}-cx,${u.id}-c1`;
+      expect((await saved(await fromJob(u, await job(u, { ...base, params: { endAssetId: u.asset, audioAssetIds: audio } })))).data).toEqual({
+        images: [u.asset], endFrame: u.asset, clips: [`${u.id}-c2`, `${u.id}-c1`], prompt: 'p', enhance: false, ratio: '9:16', modelId: 'kling-o3-pro', durationSec: 5,
+      });
+      expect((await saved(await fromJob(u, await job(u, { ...base, params: { endAssetId: other.asset, audioAssetIds: `${other.id}-c` } })))).data).toEqual({
+        images: [u.asset], prompt: 'p', enhance: false, ratio: '9:16', modelId: 'kling-o3-pro', durationSec: 5,
+      });
     });
 
     test("leaves out another member's and deleted inputs, a hidden store and a hook the member cannot use, and keeps a visible store", async () => {
