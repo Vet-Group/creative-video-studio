@@ -47,7 +47,7 @@ export interface ImageSubmitRequest {
   resolution: string;
   /** Only GPT Image reads it ('auto', 'low', 'medium' or 'high'); the price is estimated at 'high', which is also the default. */
   quality?: string;
-  /** One of the model's thinking levels (lowercase, as fal takes them); absent leaves the provider's default. The price per image does not change with it. */
+  /** One of the model's thinking levels (lowercase, as fal takes them); absent leaves the provider's default. The worker prices the model at this level (imagePricesFor). */
   thinking?: string;
 }
 

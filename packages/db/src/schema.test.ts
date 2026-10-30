@@ -438,6 +438,22 @@ describe('migration 0038 ultra-wide ratios and thinking levels', () => {
   });
 });
 
+describe('migration 0039 thinking prices', () => {
+  test('prices each thinking level of Nano Banana 2.1, Minimal at the row price and the others by Fash ratio, and no other row', async () => {
+    const { rows } = await pool.query(`select id, thinking_levels, image_prices, thinking_prices, sources from model_configs where kind = 'image' order by id`);
+    for (const r of rows) expect(r.thinking_prices === null, r.id).toBe(r.thinking_levels.length === 0);
+    const of = (id: string) => rows.find((r) => r.id === id)!;
+    expect(of('nano-banana-2.1').thinking_prices).toEqual({ minimal: { '1K': '0.04', '2K': '0.059' }, medium: { '1K': '0.0473', '2K': '0.0627' }, high: { '1K': '0.0618', '2K': '0.0774' } });
+    expect(of('nano-banana-2.1-vertex').thinking_prices).toEqual({ minimal: { '1K': '0.034', '2K': '0.05' }, medium: { '1K': '0.0402', '2K': '0.0531' }, high: { '1K': '0.0525', '2K': '0.0656' } });
+    for (const id of ['nano-banana-2.1', 'nano-banana-2.1-vertex']) {
+      const r = of(id);
+      expect(Object.keys(r.thinking_prices), id).toEqual(expect.arrayContaining(r.thinking_levels));
+      expect(r.thinking_prices[r.thinking_levels[0]], id).toEqual(r.image_prices); // the default level keeps the row price
+      expect(r.sources.thinkingPrices, id).toEqual({ url: 'https://fash.studio/dashboard/image-generation', readAt: '2026-10-30', note: 'ratio of Fash credits, not a provider price' });
+    }
+  });
+});
+
 describe('cost_entries', () => {
   test('is append-only: UPDATE, DELETE and TRUNCATE raise', async () => {
     const job = await insertJob(userId);

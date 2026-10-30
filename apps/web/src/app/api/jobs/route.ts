@@ -1,6 +1,6 @@
 import { reserve, withTransaction } from '@cvs/core/ledger';
 import { type CapRefusal, checkCaps, dailyClips } from '@cvs/core/limits';
-import { estimateUsd, FEATURE_PROMPTS, PROMPT_CEILING, promptLimit, textToImage, usdPerSecondFor } from '@cvs/core/models';
+import { estimateUsd, FEATURE_PROMPTS, imagePricesFor, PROMPT_CEILING, promptLimit, textToImage, usdPerSecondFor } from '@cvs/core/models';
 import { videoInputs } from '@cvs/core/providers/fal';
 import { VIDEO_QUEUE, videoSendOptions } from '@cvs/core/queue';
 import { FEATURES } from '@cvs/db';
@@ -89,7 +89,7 @@ export async function GET(request: Request) {
  * it at the endpoint's audio price (AUDIO_USD_PER_SECOND; refused on a model without one), and 'off' or none keeps it silent. Any other feature is an
  * image job: an enabled image model that lists the feature, no preset, a prompt (the apps in FEATURE_PROMPTS may omit it and get that one), 1 to the model's `max_images`
  * inputs (Try On, the two swaps and Face Swap need at least 2; Background Changer takes a prompt or a second image as the reference), one of the model's ratios (or `auto`), `params.resolution` (a key of the model's `image_prices`, which also sets the
- * estimate), an optional `params.quality` and an optional `params.thinking` (one of the model's `thinking_levels`; the price per image stays). `durationSec` is not read and the job stores 0.
+ * estimate), an optional `params.quality` and an optional `params.thinking` (one of the model's `thinking_levels`; its `thinking_prices` set the estimate, the first level's when none is named). `durationSec` is not read and the job stores 0.
  * `motion_control` takes a video model that lists it, exactly 2 inputs (the character image, then an MP4/MOV reference video), ratio `auto`, no preset and
  * an optional prompt; its duration is the reference video's length rounded up (the body's `durationSec` is not read), which the model must allow.
  * Every other feature takes images only.
@@ -224,7 +224,7 @@ export async function POST(request: Request) {
     const inputs = [...new Set([...assetIds, ...(params.endAssetId ? [params.endAssetId] : []), ...clips])];
     const live = await tx.query('select 1 from assets where id = any($1::text[]) and deleted_at is null', [inputs]);
     if (live.rowCount !== inputs.length) return bad('one or more assets were deleted');
-    const model = (await tx.query('select enabled, provider, endpoint, kind, features, ratios, thinking_levels, durations_sec, max_images, max_prompt_chars, usd_per_second, image_prices from model_configs where id = $1', [modelId])).rows[0];
+    const model = (await tx.query('select enabled, provider, endpoint, kind, features, ratios, thinking_levels, durations_sec, max_images, max_prompt_chars, usd_per_second, image_prices, thinking_prices from model_configs where id = $1', [modelId])).rows[0];
     if (!model?.enabled) return bad('the model does not exist or is not enabled');
     if (model.kind !== (isImage ? 'image' : 'video') || !model.features.includes(feature)) return bad('the model does not offer this feature');
     if (feature === 'image' && assetIds.length === 0 && !textToImage(model)) return bad('the model needs at least one input image');
@@ -237,7 +237,8 @@ export async function POST(request: Request) {
       if (!takes || clips.length > takes.max || ms > takes.seconds * 1000) return bad(takes ? `the model takes at most ${takes.max} audio clips, ${takes.seconds} seconds in all` : 'the model does not take reference audio');
     }
     // Own keys only, with a plain decimal price: `in` would also accept "constructor" and friends.
-    const imagePrice = isImage && Object.hasOwn(model.image_prices ?? {}, params.resolution!) ? String(model.image_prices[params.resolution!]) : null;
+    const prices = isImage ? imagePricesFor(model, params.thinking) : {};
+    const imagePrice = isImage && Object.hasOwn(prices, params.resolution!) ? String(prices[params.resolution!]) : null;
     if (!model.ratios.includes(ratio) || !(isImage ? imagePrice !== null && /^\d+(\.\d+)?$/.test(imagePrice) : model.durations_sec.includes(durationSec)) || assetIds.length > model.max_images) {
       return bad(isImage ? 'the model does not allow this ratio, resolution or number of images' : 'the model does not allow this ratio, duration or number of images');
     }

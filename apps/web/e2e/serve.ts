@@ -49,7 +49,10 @@ await pool.query(
      ('mock-image-solo', 'mock', 'mock', 'Mock image Solo', 'image', '{image}', '{auto}', '{}', 1, '{"1K": "0.1000"}', '{}', true)`,
 );
 await pool.query(`update model_configs set max_prompt_chars = 1000 where id = 'mock-image-solo'`); // a smaller limit for the image bar spec
-await pool.query(`update model_configs set thinking_levels = '{minimal,medium,high}' where id = 'mock-image-solo'`); // Nano Banana 2.1's levels, for the thinking spec
+// Nano Banana 2.1's levels and its fal 1K prices per level (a mock row shows them at 0; the thinking spec swaps in prices), for the thinking spec
+await pool.query(
+  `update model_configs set thinking_levels = '{minimal,medium,high}', thinking_prices = '{"minimal": {"1K": "0.04"}, "medium": {"1K": "0.0473"}, "high": {"1K": "0.0618"}}' where id = 'mock-image-solo'`,
+);
 // One image model for the seven image apps, which the Apps specs run; it takes up to two images and lists every app feature.
 await pool.query(
   `insert into model_configs (id, provider, endpoint, label, kind, features, ratios, durations_sec, max_images, image_prices, sources, enabled) values

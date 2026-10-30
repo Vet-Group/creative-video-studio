@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { BAKEOFF_MODELS, estimateUsd, PROMPT_CEILING, promptLimit, usdPerSecondFor, validateRequest } from './models';
+import { BAKEOFF_MODELS, estimateUsd, imagePricesFor, PROMPT_CEILING, promptLimit, usdPerSecondFor, validateRequest } from './models';
 
 describe.each(BAKEOFF_MODELS)('$id', (model) => {
   const ok = { ratio: '9:16', durationSec: 5, imageCount: 1 };
@@ -52,4 +52,13 @@ test('audio on takes the endpoint audio price, audio off or absent the stored pr
 test('a model’s prompt limit is its own, never past the ceiling', () => {
   expect([promptLimit(2000), promptLimit(4096), promptLimit(50000)]).toEqual([2000, 4096, PROMPT_CEILING]);
   expect(PROMPT_CEILING).toBe(5000);
+});
+
+test('an image job is priced at its thinking level, the default (first) level when it names none, and at image_prices on a model without level prices', () => {
+  const row = { image_prices: { '1K': '0.04' }, thinking_levels: ['minimal', 'medium', 'high'], thinking_prices: { minimal: { '1K': '0.05' }, high: { '1K': '0.0618' } } };
+  expect(imagePricesFor(row, 'high')).toEqual({ '1K': '0.0618' });
+  expect(imagePricesFor(row)).toEqual({ '1K': '0.05' });
+  expect(imagePricesFor(row, 'medium')).toEqual(row.image_prices);
+  expect(imagePricesFor(row, 'constructor')).toEqual(row.image_prices);
+  expect(imagePricesFor({ ...row, thinking_levels: [], thinking_prices: null })).toEqual(row.image_prices);
 });

@@ -1,4 +1,4 @@
-import { promptLimit, textToImage } from '@cvs/core/models';
+import { imagePricesFor, promptLimit, textToImage } from '@cvs/core/models';
 import { FEATURES } from '@cvs/db';
 import { pool } from '@/lib/auth';
 import { modelStats, rank, scoreOf } from '@/lib/model-scores';
@@ -7,7 +7,7 @@ import { guard } from '@/lib/session';
 /**
  * The model picker of an image page (`?feature=try_on` or `?feature=image`, or any feature other than video and marketing): the enabled image models that
  * list the feature, with their ratios, resolutions (the keys of `image_prices`), the price of one image per resolution as a 4-decimal string, and
- * `maxImages`, `maxPromptChars` (the model's prompt limit under the ceiling), `textToImage` (it takes a job with no input image) and `thinking` (its thinking levels, the first the default; empty for none). A mock model prices every resolution at 0, as its jobs book 0 USD. Each model carries its recommendation score for this feature
+ * `maxImages`, `maxPromptChars` (the model's prompt limit under the ceiling), `textToImage` (it takes a job with no input image), `thinking` (its thinking levels, the first the default; empty for none) and `thinkingPrices` (level to the prices at that level, as `prices` is at the default level; empty for none). A mock model prices every resolution at 0, as its jobs book 0 USD. Each model carries its recommendation score for this feature
  * (lib/model-scores.ts), and the best (the cheaper on a tie) is flagged `recommended` unless all score the same. Members and Admins.
  */
 export async function GET(request: Request) {
@@ -19,13 +19,14 @@ export async function GET(request: Request) {
   }
   const [{ rows }, stats] = await Promise.all([
     pool.query(
-      `select id, label, provider, endpoint, ratios, thinking_levels, max_images, max_prompt_chars, image_prices from model_configs where enabled and kind = 'image' and $1 = any(features) order by label, id`,
+      `select id, label, provider, endpoint, ratios, thinking_levels, max_images, max_prompt_chars, image_prices, thinking_prices from model_configs where enabled and kind = 'image' and $1 = any(features) order by label, id`,
       [feature],
     ),
     modelStats(feature),
   ]);
   const models = rows.map((r) => {
-    const prices = Object.entries(r.image_prices as Record<string, string>).map(([k, v]) => [k, r.provider === 'mock' ? '0.0000' : Number(v).toFixed(4)] as const);
+    const shown = (p: Record<string, string>) => Object.entries(p).map(([k, v]) => [k, r.provider === 'mock' ? '0.0000' : Number(v).toFixed(4)] as const);
+    const prices = shown(imagePricesFor(r));
     const st = stats.get(r.id) ?? { passes: 0, total: 0, ok: 0, bad: 0 };
     return {
       id: r.id as string,
@@ -39,6 +40,7 @@ export async function GET(request: Request) {
       maxPromptChars: promptLimit(r.max_prompt_chars),
       textToImage: textToImage(r),
       thinking: r.thinking_levels as string[],
+      thinkingPrices: Object.fromEntries((r.thinking_levels as string[]).map((t) => [t, Object.fromEntries(shown(imagePricesFor(r, t)))])),
       ...scoreOf(st),
       passes: st.passes,
       total: st.total,
