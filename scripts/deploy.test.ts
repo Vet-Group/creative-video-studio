@@ -106,6 +106,14 @@ afterAll(() => {
   for (const d of dirs) rmSync(d, { recursive: true, force: true });
 });
 
+test('worker unit launches tsx directly so pnpm cannot turn a clean shutdown into a failure', () => {
+  const unit = readFileSync(join(root, 'deploy/linux/cvs-worker.service'), 'utf8');
+  expect(unit).toContain('ExecStart=@APP@/node/bin/node @APP@/apps/worker/node_modules/tsx/dist/cli.mjs @APP@/apps/worker/src/index.ts');
+  expect(unit).toContain('WorkingDirectory=@APP@');
+  expect(unit).toContain('TimeoutStopSec=30');
+  expect(unit).not.toContain('SuccessExitStatus=');
+});
+
 // Each case starts the script through Git Bash, which takes seconds on Windows.
 describe.skipIf(!hasBash)('deploy kit (needs bash only)', { timeout: 30_000 }, () => {
   test.each([installSh, uninstallSh])('bash -n finds no syntax error in %s', (script) => {

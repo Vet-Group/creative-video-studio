@@ -1,4 +1,5 @@
-# Creative Video Studio worker (`pnpm --filter @cvs/worker start`), a root user unit. install.sh fills @APP@.
+# Creative Video Studio worker, a root user unit. install.sh fills @APP@.
+# Run tsx directly: pnpm can report a failed task after a clean worker shutdown.
 # The worker reads <app>/.env itself (DATABASE_URL and the S3 settings).
 [Unit]
 Description=Creative Video Studio worker
@@ -7,7 +8,7 @@ Description=Creative Video Studio worker
 WorkingDirectory=@APP@
 Environment=PATH=@APP@/node/bin:/usr/local/bin:/usr/bin:/bin
 Environment=NODE_ENV=production
-ExecStart=@APP@/node/bin/pnpm --filter @cvs/worker start
+ExecStart=@APP@/node/bin/node @APP@/apps/worker/node_modules/tsx/dist/cli.mjs @APP@/apps/worker/src/index.ts
 Restart=on-failure
 RestartSec=5
 TimeoutStopSec=30
