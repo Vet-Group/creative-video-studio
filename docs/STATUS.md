@@ -39,7 +39,7 @@ Last updated: 2026-10-24 (main after #42; see "Overnight 2026-10-24" below). Ear
   - Image generation, Try-On, background removal, upscaling, image editing and the Apps catalog. **Superseded on 2026-10-23:** the owner widened the scope to the whole dashboard (Try On, Image Generation, Marketing Studio, Apps); pricing and billing stay out. See "Overnight 2026-10-24".
   - Building all 10 captured pages.
 - **Allowed:** reference, product or first/last-frame images as video inputs. This does not make an image module.
-- **Decided in grilling, Q1 (2026-10-22):** the MVP flow is product video from existing images. Real inputs are POD mockups and product photos. Prompt-only video is out as a separate goal. UGC (a talking person or voice-over) is deferred to a later phase.
+- **Decided in grilling, Q1 (2026-10-22):** the MVP flow is product video from existing images. Real inputs are POD mockups and product photos. Prompt-only video is out as a separate goal. **Superseded on 2026-10-30:** the owner wants Create video to run from the prompt alone, as Fash does; see "Create Video extras (2026-10-30)". UGC (a talking person or voice-over) is deferred to a later phase.
 - **Decided in grilling, Q2 (2026-10-22):** output clip spec.
   - Aspect ratio 9:16 or 1:1 (no 16:9 yet).
   - 5–10 s, default 8 s.
@@ -242,6 +242,14 @@ The owner widened the scope on 2026-10-23 from video only to the whole dashboard
 - **Neighbours:** Ideas Hub units and the POD Studio containers were sampled every 30 s during each deploy; every sample was OK (11 units active, none failed, `ideas.vetgroup.net` answering).
 - **Seedance on this network:** from the VET server, as from the office PC, TLS to `replicate.delivery` times out (TCP connects, no handshake, 3 of 3 tries), while `api.replicate.com` and `fal.media` work. Seedance clips could not be downloaded here, so Seedance stays disabled for network reasons too, not only its 67% pass rate.
 - **Ledger:** bake-off billed $14.85; the smoke clip $0.56; the image-model check $1.09 (fal Usage page).
+
+### Create Video extras (2026-10-30)
+
+The owner asked for Fash's Create Videos inputs beyond the product images.
+
+- **End frame:** an optional image the clip ends on, on the 12 fal endpoints whose schema has `end_image_url` (`tail_image_url` on Kling 2.5 Turbo), declared next to each request builder (`VIDEO_BODIES` in `packages/core/src/providers/fal.ts`). The form shows the slot only for those models; the job keeps it in `params.endAssetId`. fal prices these endpoints by output seconds or output tokens, so the estimate is unchanged, except Minimax H3 Max Reference, where the frame counts toward the 4,096 free reference tokens. Not checked with a paid run.
+- **From the prompt alone:** with no image, a model whose fal app has a text-to-video endpoint at the row's own price runs there (`text` in `VIDEO_BODIES`, the same pattern as Image Generation's `FAL_TEXT_ENDPOINTS`), with a written prompt and no preset or end frame. 19 image endpoints have one; each model page was read on 2026-10-30 (`https://fal.ai/models/<endpoint>`). Left out because the price or the schema differs: Seedance 2.0 Image ($0.3034/s, text $0.37), Grok Imagine Reference ($0.07, text $0.14), Hailuo 2.3 (no ratio in its text schema), and Kling O1 and Motion Control (no twin checked). The 720p output check is unchanged. Not checked with a paid run.
+- **Reference audio:** MP3 or WAV clips (at most 15 MB each, their length read from the header on upload) on Seedance 2.5 Reference (`audio_urls`, up to 10 clips, 30 s in all), Seedance 2.0 Reference (`audio_urls`, 3, 15 s) and Minimax H3 Max Reference (`reference_audio_urls`, 3, 15 s), each at least 2 s as on Fash; the clips go to fal's storage like Motion Control's video. The job keeps them in `params.audioAssetIds` (comma-separated). Seedance prices output tokens only, so the estimate is unchanged; on Minimax the clips share the 4,096 free reference tokens with the images, and its page gives no count per clip, so a Run with audio may cost more than the estimate. Not checked with a paid run.
 
 ## Evidence gaps
 

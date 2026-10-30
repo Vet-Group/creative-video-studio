@@ -95,6 +95,11 @@ describe('assetReader', () => {
     const video = new Uint8Array([0, 0, 0, 24, 0x66, 0x74, 0x79, 0x70]);
     expect(await assetReader(pool([{ s3_key: 'assets/v1', mime: 'video/mp4' }]), async () => video)('asset://v1', { ratio: '9:16' })).toEqual({ bytes: video, contentType: 'video/mp4' });
   });
+
+  test('passes a reference audio clip through untouched', async () => {
+    const clip = new Uint8Array([0x49, 0x44, 0x33, 4, 0]);
+    expect(await assetReader(pool([{ s3_key: 'assets/a1', mime: 'audio/mpeg' }]), async () => clip)('asset://a1')).toEqual({ bytes: clip, contentType: 'audio/mpeg' });
+  });
 });
 
 describe('fitForInline', () => {

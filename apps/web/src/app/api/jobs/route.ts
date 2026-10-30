@@ -1,6 +1,7 @@
 import { reserve, withTransaction } from '@cvs/core/ledger';
 import { type CapRefusal, checkCaps, dailyClips } from '@cvs/core/limits';
 import { estimateUsd, FEATURE_PROMPTS, PROMPT_CEILING, promptLimit, textToImage, usdPerSecondFor } from '@cvs/core/models';
+import { videoInputs } from '@cvs/core/providers/fal';
 import { VIDEO_QUEUE, videoSendOptions } from '@cvs/core/queue';
 import { FEATURES } from '@cvs/db';
 import { pool } from '@/lib/auth';
@@ -20,6 +21,8 @@ const VIDEO_FEATURES = ['video', 'marketing', 'motion_control'];
 /** The features that offer Enhance, as on Fash: Create Videos and Image Generation. */
 const ENHANCE_FEATURES = ['video', 'image'];
 const QUALITIES = ['auto', 'low', 'medium', 'high'];
+/** The shortest reference audio clip, as on Fash. */
+const MIN_AUDIO_MS = 2000;
 /** The apps that need more than one input image; the model's own max_images is the upper limit. Try On has its own message below. */
 /** The apps whose fixed instruction a member's own prompt is added to, not replaced by. */
 const APPEND_TO_INSTRUCTION = ['character_swap', 'model_swap'];
@@ -76,10 +79,12 @@ export async function GET(request: Request) {
 }
 
 /**
- * Create a video job: 1-4 input images the caller may use (their own, or the inputs of a succeeded Library clip for Reuse), an enabled
+ * Create a video job: 1-9 input images the caller may use (none on a model with a text-to-video twin, videoInputs `textOnly`: then a free prompt, no preset or end frame) (their own, or the inputs of a succeeded Library clip for Reuse), an enabled
  * model, a preset or a free prompt (exactly one; a free prompt is trimmed, 1 character up to the model's prompt limit (promptLimit), and stored with a null preset), the ratio and duration the model allows, and an optional visible store. The caps are checked and the job and its
  * `estimate` ledger row are written in one transaction (429 when a cap refuses, nothing sent); the pg-boss job is sent afterwards.
- * `feature` (default `video`) picks the kind of job. `video` and `marketing` take a video model and the durations above, and an optional `params.audio` (below); `video` takes no other `params`. `marketing` needs exactly 2 inputs (the model photo, then the product photo) and a prompt, no preset;
+ * `feature` (default `video`) picks the kind of job. `video` and `marketing` take a video model and the durations above, and an optional `params.audio` (below); `video` also takes
+ * an optional `params.endAssetId`, the end frame: one of the caller's own live images, on a model whose fal request builder takes one (videoInputs), and an optional
+ * `params.audioAssetIds`, reference audio: the caller's own MP3/WAV clips (comma-separated ids), each at least 2 s, within the model's count and total length; and no other `params`. `marketing` needs exactly 2 inputs (the model photo, then the product photo) and a prompt, no preset;
  * with `params.format` 'advanced' (Marketing Studio Advanced) it takes 1 to 7 reference images instead, up to the model's `max_images`. A video job's optional `params.audio` 'on' prices
  * it at the endpoint's audio price (AUDIO_USD_PER_SECOND; refused on a model without one), and 'off' or none keeps it silent. Any other feature is an
  * image job: an enabled image model that lists the feature, no preset, a prompt (the apps in FEATURE_PROMPTS may omit it and get that one), 1 to the model's `max_images`
@@ -112,8 +117,8 @@ export async function POST(request: Request) {
     const given = (rawParams && typeof rawParams === 'object' && !Array.isArray(rawParams) ? rawParams : {}) as Record<string, string>;
     const advanced = feature === 'marketing' && given.format === 'advanced';
     const maxInputs = isImage ? MAX_IMAGE_INPUTS : advanced ? MAX_ADVANCED_IMAGES : MAX_IMAGES;
-    // Image Generation may have no image (text to image, on a model that offers it: checked with the model below).
-    const fewest = feature === 'image' ? 0 : 1;
+    // Image Generation and Create video may have no image (text to image or video, on a model that offers it: checked with the model below).
+    const fewest = feature === 'image' || feature === 'video' ? 0 : 1;
     if (!Array.isArray(assetIds) || assetIds.length < fewest || assetIds.length > maxInputs || !assetIds.every((a) => typeof a === 'string') || new Set(assetIds).size !== assetIds.length) {
       return bad(`assetIds must list ${fewest} to ${maxInputs} different asset ids`);
     }
@@ -127,8 +132,8 @@ export async function POST(request: Request) {
     }
     const entries = params && typeof params === 'object' && !Array.isArray(params) ? Object.entries(params) : null;
     // Images take resolution, quality and thinking, plus the member's own text (and Try On its garment count) kept for reuse; Marketing Studio takes format ('advanced'),
-    // audio ('on' or 'off') and the form's own inputs. The kept inputs are never read by the worker. Create video takes audio; the others none.
-    const keys = isImage ? ['resolution', 'quality', 'thinking', 'brief', ...(feature === 'try_on' ? ['garments'] : [])] : feature === 'marketing' ? ['format', 'audio', 'hook', 'location', 'brief', 'script'] : feature === 'video' ? ['audio'] : [];
+    // audio ('on' or 'off') and the form's own inputs. The kept inputs are never read by the worker. Create video takes audio, an end frame and reference audio; the others none.
+    const keys = isImage ? ['resolution', 'quality', 'thinking', 'brief', ...(feature === 'try_on' ? ['garments'] : [])] : feature === 'marketing' ? ['format', 'audio', 'hook', 'location', 'brief', 'script'] : feature === 'video' ? ['audio', 'endAssetId', 'audioAssetIds'] : [];
     if (!entries || entries.some(([k, v]) => !keys.includes(k) || typeof v !== 'string')) {
       return bad(keys.length > 0 ? `params may hold only ${keys.length > 1 ? `${keys.slice(0, -1).join(', ')} and ${keys.at(-1)}` : keys[0]}, as text` : 'params are for image features, Create video and Marketing Studio only');
     }
@@ -152,6 +157,10 @@ export async function POST(request: Request) {
     if (!motion && (isImage ? presetId !== null || (freePrompt === null && !Object.hasOwn(FEATURE_PROMPTS, feature)) : (presetId === null) === (freePrompt === null))) {
       return bad(isImage ? 'an image job takes a prompt and no preset (only the apps may omit the prompt)' : 'give either a presetId or a prompt, not both and not neither');
     }
+    // The presets move the product in the image, the end frame is where the first image goes, and the reference endpoints that take audio need an image too.
+    if (feature === 'video' && assetIds.length === 0 && (presetId !== null || given.endAssetId !== undefined || given.audioAssetIds !== undefined)) {
+      return bad('a Run with no image takes a prompt, and no preset, end frame or audio');
+    }
     // Background Changer takes a prompt (one image) or a reference image (two images), the schema says not both.
     if (feature === 'background_changer' && (assetIds.length > 1) === (freePrompt !== null)) return bad('Background Changer takes a prompt or a reference image (the second image), not both and not neither');
     if (typeof enhance !== 'boolean') return bad('enhance must be true or false');
@@ -170,6 +179,20 @@ export async function POST(request: Request) {
     const isVideo = (i: number) => byId.get(assetIds[i] as string)!.mime.startsWith('video/');
     if (motion ? isVideo(0) || !isVideo(1) : assetIds.some((_, i) => isVideo(i))) {
       return bad(motion ? 'Motion Control needs the character image first, then the reference video' : 'only Motion Control takes a video input');
+    }
+    if (usable.rows.some((r: { mime: string }) => r.mime.startsWith('audio/'))) return bad('an audio clip goes in params.audioAssetIds, not assetIds');
+    // Reference audio: the caller's own MP3 or WAV clips, comma-separated, each at least 2 s as on Fash (fal's floor is 1.8 or 2 s); the model's count and
+    // total length are checked with the model below.
+    if (given.audioAssetIds !== undefined) {
+      const clips = given.audioAssetIds.split(',');
+      const own = await pool.query(`select mime, duration_ms from assets where id = any($1::text[]) and owner_id = $2 and kind = 'input' and deleted_at is null`, [clips, userId]);
+      if (new Set(clips).size !== clips.length || own.rowCount !== clips.length || own.rows.some((r) => !r.mime.startsWith('audio/'))) return bad('params.audioAssetIds must list your own audio clips, separated by commas');
+      if (own.rows.some((r) => r.duration_ms < MIN_AUDIO_MS)) return bad('each audio clip must last at least 2 seconds');
+    }
+    // The end frame is the caller's own image (whether the model takes one is checked with the model below).
+    if (given.endAssetId !== undefined) {
+      const end = await pool.query(`select mime from assets where id = $1 and owner_id = $2 and kind = 'input' and deleted_at is null`, [given.endAssetId, userId]);
+      if (!end.rows[0]?.mime.startsWith('image/')) return bad('params.endAssetId must be one of your own images');
     }
     const length = motion ? Math.ceil(byId.get(assetIds[1] as string)!.duration_ms! / 1000) : (durationSec as number);
     spec = { assetIds, modelId, presetId, prompt, ratio, durationSec: isImage ? 0 : length, storeId: storeId as string | null, feature, params: params as Record<string, string>, enhance };
@@ -196,12 +219,23 @@ export async function POST(request: Request) {
     const { assetIds, modelId, presetId, prompt: freePrompt, ratio, durationSec, storeId, feature, params, enhance } = s!;
     const isImage = !VIDEO_FEATURES.includes(feature);
     // A new Run was checked before the lock and a retry never was, so both look again: an image deleted meanwhile is refused.
-    const live = await tx.query('select 1 from assets where id = any($1::text[]) and deleted_at is null', [assetIds]);
-    if (live.rowCount !== assetIds.length) return bad('one or more assets were deleted');
+    const clips = params.audioAssetIds?.split(',') ?? [];
+    // A Set: the end frame may be the first image again, for a clip that loops.
+    const inputs = [...new Set([...assetIds, ...(params.endAssetId ? [params.endAssetId] : []), ...clips])];
+    const live = await tx.query('select 1 from assets where id = any($1::text[]) and deleted_at is null', [inputs]);
+    if (live.rowCount !== inputs.length) return bad('one or more assets were deleted');
     const model = (await tx.query('select enabled, provider, endpoint, kind, features, ratios, thinking_levels, durations_sec, max_images, max_prompt_chars, usd_per_second, image_prices from model_configs where id = $1', [modelId])).rows[0];
     if (!model?.enabled) return bad('the model does not exist or is not enabled');
     if (model.kind !== (isImage ? 'image' : 'video') || !model.features.includes(feature)) return bad('the model does not offer this feature');
     if (feature === 'image' && assetIds.length === 0 && !textToImage(model)) return bad('the model needs at least one input image');
+    // A retry copies a Run this check already passed.
+    if (!original && feature === 'video' && assetIds.length === 0 && !videoInputs(model.endpoint).textOnly) return bad('the model needs at least one input image');
+    if (params.endAssetId !== undefined && !videoInputs(model.endpoint).endFrame) return bad('the model does not take an end frame');
+    if (clips.length > 0) {
+      const takes = videoInputs(model.endpoint).audioClips;
+      const ms = (await tx.query('select coalesce(sum(duration_ms), 0)::int as ms from assets where id = any($1::text[])', [clips])).rows[0].ms as number;
+      if (!takes || clips.length > takes.max || ms > takes.seconds * 1000) return bad(takes ? `the model takes at most ${takes.max} audio clips, ${takes.seconds} seconds in all` : 'the model does not take reference audio');
+    }
     // Own keys only, with a plain decimal price: `in` would also accept "constructor" and friends.
     const imagePrice = isImage && Object.hasOwn(model.image_prices ?? {}, params.resolution!) ? String(model.image_prices[params.resolution!]) : null;
     if (!model.ratios.includes(ratio) || !(isImage ? imagePrice !== null && /^\d+(\.\d+)?$/.test(imagePrice) : model.durations_sec.includes(durationSec)) || assetIds.length > model.max_images) {

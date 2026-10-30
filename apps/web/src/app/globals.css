@@ -848,6 +848,10 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .slot-thumbs button, .bar-thumbs li > button:not(.bar-add) { position: absolute; top: -6px; right: -6px; display: grid; place-items: center; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%; background: var(--ink); color: var(--on-dark); }
 .slot-add { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; width: 56px; height: 56px; padding: 0; border: 1px dashed var(--border-strong); border-radius: 12px; background: var(--fill); color: var(--text-2); font-size: 11px; line-height: 14px; }
 .slot-hint { color: var(--text-muted); font-size: 13px; line-height: 18px; }
+/* Create video's reference audio: one line per clip, its name and length, then the remove button. */
+.clips { display: flex; flex: 1 1 100%; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; font-size: 13px; line-height: 18px; }
+.clips li { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; overflow-wrap: anywhere; }
+.clips button { display: grid; flex: none; place-items: center; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%; background: var(--ink); color: var(--on-dark); }
 .slot-icon { display: grid; place-items: center; }
 .slot-name { display: none; color: var(--text-muted); font-size: 14px; line-height: 20px; }
 .app-slots[data-two='true'] .slot-add .slot-hint { display: none; } /* not the video slot's own line */

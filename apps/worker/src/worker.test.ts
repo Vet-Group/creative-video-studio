@@ -286,6 +286,23 @@ describe('native audio', () => {
   });
 });
 
+describe('Create video extras', () => {
+  test("a job's params.endAssetId and audioAssetIds reach the adapter as the end frame's and the clips' asset URLs; without them the request has none", async () => {
+    const requests: SubmitRequest[] = [];
+    await start(counting(300, (inner) => ({ ...inner, submit: async (req) => (requests.push(req), inner.submit(req)) })));
+    const framed = await newJob('u1', { prompt: 'framed' });
+    await pool.query(`update jobs set input_asset_ids = '{start}', params = '{"audio":"off","endAssetId":"last","audioAssetIds":"song,voice"}' where id = $1`, [framed]);
+    const plain = await newJob('u2', { prompt: 'plain' });
+    await send(framed, 'u1');
+    await send(plain, 'u2');
+    await waitFor('both submits', async () => requests.length === 2);
+    const by = Object.fromEntries(requests.map((r) => [r.prompt, r]));
+    expect(by.framed).toMatchObject({ imageUrls: ['asset://start'], endImageUrl: 'asset://last', audioUrls: ['asset://song', 'asset://voice'] });
+    expect([by.plain!.endImageUrl, by.plain!.audioUrls]).toEqual([undefined, undefined]);
+    await waitFor('both jobs to finish', async () => (await status(framed)) === 'succeeded' && (await status(plain)) === 'succeeded');
+  });
+});
+
 describe('a submit that pg-boss expiry or an error would orphan', () => {
   test('is not aborted by the pg-boss expiry of the handler', async () => {
     counting.submits = 0;

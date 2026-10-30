@@ -15,7 +15,7 @@ import { AudioSwitch } from './AudioSwitch';
 import { CardMedia } from './CardMedia';
 import { EnhanceToggle } from './EnhanceToggle';
 import { Icon } from './Icon';
-import { photoImg, sampleFile, uploadImages } from './image-tools';
+import { photoImg, sampleFile, Slot, UPLOAD_ERROR, uploadImages } from './image-tools';
 import { FormContext, type Photo, Tap, useApplier, useHasHistory, useJobs, useRecreated } from './jobs';
 import { Modal } from './Modal';
 import { ModelPicker } from './ModelPicker';
@@ -39,6 +39,12 @@ interface Model {
   estimateUsd: string;
   /** The estimate with native audio on; null when the model cannot make audio. */
   audioEstimateUsd: string | null;
+  /** The model takes an end frame. */
+  endFrame: boolean;
+  /** The model runs from the prompt alone, with no image. */
+  textOnly: boolean;
+  /** The reference audio the model takes: how many clips and how many seconds in all; null when none. */
+  audioClips: { max: number; seconds: number } | null;
   passRate: number | null;
   score: number;
   recommended: boolean;
@@ -56,6 +62,10 @@ interface Image {
   id: string;
   filename: string;
 }
+/** An uploaded reference audio clip and its length. */
+type Clip = Image & { durationMs: number };
+/** The shortest clip the jobs API takes, as on Fash. */
+const MIN_CLIP_MS = 2000;
 interface JobDetail {
   presetId: string | null;
   enhance?: boolean;
@@ -97,6 +107,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
   const recreated = useRecreated();
   const hydrated = useHydrated();
   const [images, setImages] = useState<Image[]>([]);
+  const [endFrame, setEndFrame] = useState<Image | null>(null); // the image the clip ends on, as Fash's End frame; sent only on a model that takes one
   const [presets, setPresets] = useState<{ id: string; label: string }[] | null>(null);
   const [presetId, setPresetId] = useState(''); // '' means a free prompt
   const [enhance, setEnhance] = useState(true); // on by default, as on Fash; it rewrites a free prompt only
@@ -121,6 +132,9 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
   const [dragOver, setDragOver] = useState(false);
   const promptId = useId();
   const tooLongId = useId();
+  const clipsId = useId();
+  const clipInput = useRef<HTMLInputElement>(null);
+  const [clips, setClips] = useState<Clip[]>([]); // reference audio, sent only on a model that takes it
   const [tab, setTab] = useState<Tab | null>(null); // null: the default for the width (Create below 1024 px, else History or Examples, as on the live page)
   const opening: Tab = useHasHistory('video') ? 'history' : 'examples';
   const [picking, setPicking] = useState(false);
@@ -230,6 +244,12 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
 
   const chosen = models?.models.find((m) => m.id === modelId);
   const audioOn = audio && chosen?.audioEstimateUsd != null;
+  const endAssetId = chosen?.endFrame && images.length > 0 ? endFrame?.id : undefined;
+  // As on Fash, a model with a text twin runs from the prompt alone; a preset moves the product in an image, so it needs one.
+  const wordsOnly = images.length === 0 && chosen?.textOnly === true;
+  const takes = chosen?.audioClips;
+  const audioAssetIds = takes && images.length > 0 && clips.length > 0 ? clips.map((c) => c.id).join(',') : undefined;
+  const clipsOver = takes != null && (clips.length > takes.max || clips.reduce((s, c) => s + c.durationMs, 0) > takes.seconds * 1000);
   // The options follow the chosen model; before one is chosen, every model's options show.
   const durations = [...new Set(chosen ? chosen.durationsSec : (models?.models.flatMap((m) => m.durationsSec) ?? [durationSec]))].sort((a, b) => a - b);
   const ratios = chosen ? chosen.ratios : (models?.models.flatMap((m) => m.ratios) ?? [ratio]);
@@ -238,7 +258,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
   const maxImages = Math.min(MAX_IMAGES, chosen?.maxImages ?? MAX_IMAGES);
   const tooLong = presetId === '' ? promptTooLong(chosen, prompt.trim().length) : null;
   const promptOk = presetId !== '' || (prompt.trim() !== '' && tooLong === null);
-  const canRun = ready && recall.answered && !busy && images.length > 0 && chosen?.supported === true && !tooMany && promptOk;
+  const canRun = ready && recall.answered && !busy && (images.length > 0 || (wordsOnly && presetId === '')) && chosen?.supported === true && !tooMany && !clipsOver && promptOk;
 
   async function upload(files: File[]) {
     if (files.length === 0) return;
@@ -257,13 +277,30 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
     }
   }
 
+  /** Reference audio: MP3 or WAV clips, each at least 2 s, up to the model's count; the total length is checked against the model before Run. */
+  async function addClips(files: File[]) {
+    if (!takes || files.length === 0) return;
+    setError('');
+    if (clips.length + files.length > takes.max) return setError(`Tối đa ${takes.max} tệp âm thanh.`);
+    setBusy(true);
+    try {
+      const added = (await uploadImages(files)) as Clip[]; // the assets API answers every upload with its length
+      if (added.some((c) => c.durationMs < MIN_CLIP_MS)) setError('Mỗi tệp âm thanh phải dài ít nhất 2 giây.');
+      setClips((cur) => [...cur, ...added.filter((c) => c.durationMs >= MIN_CLIP_MS)]);
+    } catch {
+      setError('Không tải âm thanh lên được. Tệp phải là MP3 hoặc WAV, tối đa 15 MB.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function run() {
     if (!confirmRun(chosen && (audioOn ? chosen.audioEstimateUsd : chosen.estimateUsd))) return;
     setBusy(true);
     setError('');
     setNotice('');
     try {
-      await api('/api/jobs', sendJson('POST', { assetIds: images.map((i) => i.id), modelId, ...(presetId ? { presetId } : { prompt, enhance }), ratio, durationSec, storeId: storeId || null, params: { audio: audioOn ? 'on' : 'off' } }));
+      await api('/api/jobs', sendJson('POST', { assetIds: images.map((i) => i.id), modelId, ...(presetId ? { presetId } : { prompt, enhance }), ratio, durationSec, storeId: storeId || null, params: { audio: audioOn ? 'on' : 'off', ...(endAssetId && { endAssetId }), ...(audioAssetIds && { audioAssetIds }) } }));
       setNotice('Đã gửi job. Theo dõi trong tab "Lịch sử".');
       setRefetch((n) => n + 1);
       if (!narrow) setTab('history'); // beside the form, the new job shows in History
@@ -416,9 +453,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
                 )}
                 <span className="dropzone-hint">
                   {images.length === 0
-                    ? maxImages === 1
-                      ? 'Tối đa 1 ảnh sản phẩm'
-                      : `Tối đa ${maxImages} ảnh sản phẩm`
+                    ? `Tối đa ${maxImages} ảnh sản phẩm${chosen?.textOnly ? ', hoặc chỉ viết mô tả' : ''}`
                     : images.length >= maxImages
                       ? `Đã đủ ${maxImages} ảnh`
                       : `${images.length}/${maxImages} ảnh, bấm hoặc kéo thêm`}
@@ -437,6 +472,67 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
                 </ul>
               )}
             </div>
+            {chosen?.endFrame && (
+              <Slot
+                label="Khung hình cuối"
+                empty="Ảnh clip kết thúc ở đó (không bắt buộc)"
+                inputLabel="Ảnh khung hình cuối"
+                images={endFrame ? [endFrame] : []}
+                max={1}
+                busy={busy}
+                onAdd={(files) => {
+                  setError('');
+                  setBusy(true);
+                  uploadImages(files)
+                    .then(([img]) => img && setEndFrame(img), () => setError(UPLOAD_ERROR))
+                    .finally(() => setBusy(false));
+                }}
+                onRemove={() => setEndFrame(null)}
+              />
+            )}
+            {takes && (
+              <div className="field">
+                <span id={clipsId} className="field-label">
+                  Âm thanh tham chiếu
+                </span>
+                <div className="slot" role="group" aria-labelledby={clipsId}>
+                  <input
+                    ref={clipInput}
+                    type="file"
+                    accept="audio/mpeg,audio/wav,.mp3,.wav"
+                    multiple
+                    hidden
+                    aria-label="Tệp âm thanh tham chiếu"
+                    disabled={!hydrated}
+                    onChange={(e) => {
+                      const files = [...(e.target.files ?? [])];
+                      e.target.value = '';
+                      void addClips(files);
+                    }}
+                  />
+                  {clips.length > 0 && (
+                    <ul className="clips" aria-label="Âm thanh đã chọn">
+                      {clips.map((c) => (
+                        <li key={c.id}>
+                          {c.filename} · {(c.durationMs / 1000).toFixed(1)} giây
+                          <button type="button" aria-label={`Bỏ âm thanh ${c.filename}`} onClick={() => setClips((cur) => cur.filter((x) => x.id !== c.id))}>
+                            <Icon name="x" size={12} />
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {clips.length < takes.max && (
+                    <button type="button" className="slot-add" aria-label="Tải lên Âm thanh tham chiếu" disabled={!hydrated || busy} onClick={() => clipInput.current?.click()}>
+                      <Icon name="plus" size={16} />
+                      <span>Tải lên</span>
+                    </button>
+                  )}
+                  <span className="slot-hint">{`Tối đa ${takes.max} tệp MP3 hoặc WAV, mỗi tệp từ 2 giây, tổng tối đa ${takes.seconds} giây`}</span>
+                </div>
+              </div>
+            )}
+            {clipsOver && <p className="error">Mô hình này nhận tối đa {takes!.max} tệp âm thanh, tổng {takes!.seconds} giây.</p>}
 
             {models && models.models.length > 0 && (
               <ModelPicker
@@ -447,6 +543,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
             )}
             {models && models.models.length === 0 && <p className="help">Chưa bật mô hình video nào. Admin bật trong Quản trị → Cài đặt → Mô hình.</p>}
             {tooMany && chosen && <p className="error">Mô hình này nhận tối đa {chosen.maxImages} ảnh.</p>}
+            {wordsOnly && presetId !== '' && <p className="help">Mẫu chuyển động cần ảnh sản phẩm. Không có ảnh thì chọn &quot;Tự viết mô tả&quot;.</p>}
             {tooLong && (
               <p className="error" id={tooLongId}>
                 {tooLong}

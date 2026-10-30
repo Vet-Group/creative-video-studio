@@ -58,6 +58,8 @@ export const USERS = {
   fresha: { email: 'fresha@e2e.test', name: 'E2E Fresh A', role: 'member' },
   freshb: { email: 'freshb@e2e.test', name: 'E2E Fresh B', role: 'member' },
   thinka: { email: 'thinka@e2e.test', name: 'E2E Thinking A', role: 'member' }, // thinking.e2e
+  // create-extras.e2e: the end frame, a Run from the prompt alone and reference audio on Create video.
+  cvxa: { email: 'cvxa@e2e.test', name: 'E2E Create Extras A', role: 'member' },
   admin: { email: 'admin@e2e.test', name: 'E2E Admin', role: 'admin' },
 } as const;
 
