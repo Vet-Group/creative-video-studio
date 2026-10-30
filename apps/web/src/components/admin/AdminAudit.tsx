@@ -74,7 +74,7 @@ export function AdminAudit() {
       {state === 'error' && <p className="error">Không tải được nhật ký.</p>}
       {state === 'ready' && entries.length === 0 && <p className="muted">Chưa có sự kiện nào khớp bộ lọc.</p>}
       <div className="table-wrap">
-        <table>
+        <table className="mobile-records">
           <thead>
             <tr>
               <th scope="col">Thời gian</th>
@@ -87,13 +87,13 @@ export function AdminAudit() {
           <tbody>
             {entries.map((e) => (
               <tr key={e.id}>
-                <td className="nowrap">{fmtTime(e.createdAt)}</td>
-                <td>{e.actorName}</td>
-                <td>
+                <td data-label="Thời gian" className="nowrap">{fmtTime(e.createdAt)}</td>
+                <td data-label="Người thực hiện">{e.actorName}</td>
+                <td data-label="Sự kiện">
                   <code className="event">{e.action}</code>
                 </td>
-                <td>{e.target}</td>
-                <td>
+                <td data-label="Đối tượng">{e.target}</td>
+                <td data-label="Thay đổi">
                   <ul className="changes">
                     {auditChanges(e.oldValue, e.newValue).map((c) => (
                       <li key={c.key}>

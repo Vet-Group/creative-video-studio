@@ -19,21 +19,21 @@ function PresetRow({ preset, run }: { preset: Preset; run: ReturnType<typeof use
   const order = Number(sortOrder);
   return (
     <tr>
-      <td>
+      <td data-label="Tên mẫu">
         <input aria-label={`Tên mẫu ${preset.id}`} value={label} onChange={(e) => setLabel(e.target.value)} />
       </td>
-      <td>
+      <td data-label="Mô tả chuyển động">
         <textarea aria-label={`Mô tả của mẫu ${preset.id}`} rows={3} value={prompt} onChange={(e) => setPrompt(e.target.value)} />
       </td>
-      <td>
+      <td data-label="Thứ tự">
         <input className="narrow" aria-label={`Thứ tự của mẫu ${preset.id}`} inputMode="numeric" value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} />
       </td>
-      <td>
+      <td data-label="Trạng thái">
         <label className="check">
           <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} /> Đang bật
         </label>
       </td>
-      <td>
+      <td data-label="Thao tác">
         <button
           type="button"
           disabled={!label.trim() || !prompt.trim() || sortOrder.trim() === '' || !Number.isInteger(order)}
@@ -60,7 +60,7 @@ export function AdminPresets() {
         </p>
       )}
       <div className="table-wrap">
-        <table>
+        <table className="mobile-records">
           <thead>
             <tr>
               <th scope="col">Tên mẫu</th>

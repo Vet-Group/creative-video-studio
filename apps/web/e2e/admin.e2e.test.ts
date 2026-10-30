@@ -255,6 +255,35 @@ test('the audit reads a switched-off model as enabled: true → false', async ({
   await expect(latest).not.toContainText('{');
 });
 
+test('an Admin can edit presets and read audit details at 390px without horizontal scrolling', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await signIn(page, 'admin');
+  await page.goto('/admin/presets');
+  const row = page.getByRole('row').filter({ has: page.getByRole('textbox', { name: /^Tên mẫu / }) }).first();
+  const label = row.getByRole('textbox', { name: /^Tên mẫu / });
+  const prompt = row.getByRole('textbox', { name: /^Mô tả của mẫu / });
+  const save = row.getByRole('button', { name: 'Lưu', exact: true });
+  for (const control of [label, prompt, save]) {
+    await control.scrollIntoViewIfNeeded();
+    await expect(control).toBeInViewport({ ratio: 1 });
+    const box = (await control.boundingBox())!;
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(390);
+  }
+  const original = await label.inputValue();
+  await label.fill(`${original} mobile`);
+  await Promise.all([page.waitForResponse((r) => r.url().includes('/api/admin/presets/') && r.ok()), save.click()]);
+  await label.fill(original);
+  await Promise.all([page.waitForResponse((r) => r.url().includes('/api/admin/presets/') && r.ok()), save.click()]);
+  await page.goto('/admin/audit');
+  await page.getByLabel('Loại sự kiện').selectOption('preset.update');
+  const changes = page.locator('.changes').first();
+  await expect(changes).toContainText('mobile');
+  await changes.scrollIntoViewIfNeeded();
+  await expect(changes).toBeInViewport({ ratio: 1 });
+  expect(await page.locator('.table-wrap').evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+});
+
 test('a Member cannot see the Admin pages', async ({ page }) => {
   await signIn(page, 'member4');
   await expect(page.getByRole('link', { name: 'Quản trị', exact: true })).toHaveCount(0);
