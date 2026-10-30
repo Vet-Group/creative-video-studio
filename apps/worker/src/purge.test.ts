@@ -42,13 +42,13 @@ async function asset(id: string, kind: 'input' | 'output') {
 }
 
 /** A succeeded clip with a video, a poster, a verdict and an estimate plus a closing row in the ledger; `deletedDaysAgo` null leaves it live. */
-async function clip(id: string, inputs: string[], deletedDaysAgo: number | null) {
+async function clip(id: string, inputs: string[], deletedDaysAgo: number | null, params: Record<string, string> = {}) {
   await asset(`${id}-video`, 'output');
   await asset(`${id}-poster`, 'output');
   await pool.query(
-    `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, status, output_asset_id, poster_asset_id, deleted_at)
-     values ($1, 'u1', 'team-unassigned', 'm', 'fal', 'p', '9:16', 5, $2, 'succeeded', $3, $4, case when $5::int is null then null else now() - make_interval(days => $5::int) end)`,
-    [id, inputs, `${id}-video`, `${id}-poster`, deletedDaysAgo],
+    `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, status, output_asset_id, poster_asset_id, deleted_at, params)
+     values ($1, 'u1', 'team-unassigned', 'm', 'fal', 'p', '9:16', 5, $2, 'succeeded', $3, $4, case when $5::int is null then null else now() - make_interval(days => $5::int) end, $6)`,
+    [id, inputs, `${id}-video`, `${id}-poster`, deletedDaysAgo, JSON.stringify(params)],
   );
   await pool.query(`insert into verdicts (id, job_id, output_asset_id, verdict, marked_by) values ($1, $2, $3, 'pass', 'u1')`, [`v-${id}`, id, `${id}-video`]);
   for (const [kind, usd, isFinal] of [['estimate', '1.0000', false], ['actual_adjustment', '0.2500', true]] as const) {
@@ -112,5 +112,21 @@ describe('purgeDeletedClips', () => {
     expect(await purgeDeletedClips(pool, failing, log)).toBe(1);
     expect(logged.sort()).toEqual(['remove object assets/broken-poster', 'remove object assets/broken-video']);
     expect((await pool.query(`select purged_at is not null as purged from jobs where id = 'broken'`)).rows[0].purged).toBe(true);
+  });
+
+  test('treats an end frame and reference audio as inputs: removes those no other job names, keeps one a live job uses as either', async () => {
+    for (const id of ['end-solo', 'clip-solo', 'end-shared', 'clip-shared', 'img-as-end']) await asset(id, 'input');
+    await clip('extras', ['img-as-end'], 31, { endAssetId: 'end-solo', audioAssetIds: 'clip-solo,clip-shared' });
+    await clip('extras-gone', [], 31, { endAssetId: 'end-shared' });
+    // A live job names the shared clip as its audio, the shared end frame as an image, and the other clip's image as its end frame.
+    await clip('extras-live', ['end-shared'], null, { endAssetId: 'img-as-end', audioAssetIds: 'clip-shared' });
+    const before = (await pool.query(`select id from assets order by id`)).rows.map((r) => r.id);
+
+    expect(await purgeDeletedClips(pool, deleteObject, log)).toBe(2);
+
+    const gone = ['clip-solo', 'end-solo', 'extras-gone-poster', 'extras-gone-video', 'extras-poster', 'extras-video'];
+    expect((await pool.query(`select id from assets order by id`)).rows.map((r) => r.id)).toEqual(before.filter((id) => !gone.includes(id)));
+    for (const id of ['clip-shared', 'end-shared', 'img-as-end']) expect(await keys()).toContain(`assets/${id}`);
+    for (const id of gone) expect(await keys()).not.toContain(`assets/${id}`);
   });
 });

@@ -77,6 +77,9 @@ interface JobDetail {
   storeId: string | null;
   /** A sample's details file names its photos as samples (`?example=`); a job or a template has uploaded images. */
   images: (Image | { sample: string })[];
+  /** The end frame and reference audio a job or a template still has; a sample has none. */
+  endFrame?: Image | null;
+  clips?: Clip[];
 }
 
 /** A sample clip's details file (`example-<n>.json` beside the clip): what the reference site's Example dialog shows, read as a refill too. */
@@ -197,6 +200,9 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
         // A sample's photos are uploaded as this member's inputs first, as a picked sample is.
         const samples = j.images.flatMap((i) => ('sample' in i ? [i.sample] : []));
         setImages(samples.length > 0 ? await uploadImages(await Promise.all(samples.map(sampleFile))) : (j.images as Image[]));
+        // Sent only on a model that takes them, as when picked by hand.
+        setEndFrame(j.endFrame ?? null);
+        setClips(j.clips ?? []);
         setPresetId(preset ?? '');
         if (!preset) setPrompt(j.prompt ?? '');
         setEnhance(j.presetId === null ? (j.enhance ?? true) : true); // a preset job never had Enhance, so the default stays
@@ -608,7 +614,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
             )}
             <Templates
               feature="video"
-              data={() => ({ images: images.map((i) => i.id), ...(presetId ? { presetId } : { prompt: prompt.trim(), enhance }), audio: audio ? 'on' : 'off', ratio, durationSec, modelId, storeId })}
+              data={() => ({ images: images.map((i) => i.id), endFrame: endAssetId, clips: audioAssetIds ? clips.map((c) => c.id) : undefined, ...(presetId ? { presetId } : { prompt: prompt.trim(), enhance }), audio: audio ? 'on' : 'off', ratio, durationSec, modelId, storeId })}
             />
           </div>
 
