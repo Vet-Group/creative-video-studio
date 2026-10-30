@@ -99,7 +99,7 @@ describe('migration 0002 seed data', () => {
   });
 });
 
-describe('migration 0039 Kling prompt limits', () => {
+describe('migration 0041 Kling prompt limits', () => {
   test('gives Kling O3 Pro, Kling 3.0 Pro and both Kling 3.0 Motion Control endpoints the 2500 characters of their fal schemas', async () => {
     const { rows } = await pool.query(`select endpoint, max_prompt_chars as n from model_configs where endpoint like 'fal-ai/kling-video/%' order by endpoint`);
     expect(rows.length).toBeGreaterThan(0);
@@ -115,7 +115,7 @@ describe('migration 0028 prompt limits', () => {
     const by = Object.fromEntries(rows.map((r) => [r.id, r]));
     expect(Object.fromEntries(rows.map((r) => [r.id, r.n]))).toMatchObject({ 'nano-banana-pro': 50000, 'kling-2.6': 2500, 'minimax-hailuo-2.3-pro': 2000, 'veo-3.1': 20000, 'grok-imagine-1.5': 4096, 'kling-o3-pro': 2500 });
     expect(by['kling-2.6'].src).toEqual({ url: `https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=${by['kling-2.6'].endpoint}`, readAt: '2026-10-28' });
-    // 0028 read no limit for Kling O3 Pro; 0039 found 2500 inside the schema's anyOf.
+    // 0028 read no limit for Kling O3 Pro; 0041 found 2500 inside the schema's anyOf.
     expect(by['kling-o3-pro'].src).toEqual({ url: `https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=${by['kling-o3-pro'].endpoint}`, readAt: '2026-10-30' });
     const seedance = (await pool.query(`select max_prompt_chars as n, sources->'maxPromptChars'->>'url' as url from model_configs where id = 'seedance-2.5'`)).rows[0];
     expect(seedance).toEqual({ n: 2000, url: 'https://replicate.com/bytedance/seedance-2.5/api/schema' }); // 0029: Replicate's own 2000
