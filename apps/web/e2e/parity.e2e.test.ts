@@ -399,6 +399,45 @@ test('as on Fash, a sample with a details file shows its prompt, input photos, s
   }
 });
 
+test("as on Fash's Recreate, a sample's model name and its resolution put that model on the form", async ({ page }) => {
+  // Two models: the form starts on Wide; the sample was made with Short.
+  await page.route(/\/api\/models\?/, (r) => {
+    const base = { provider: 'mock', isMock: true, maxImages: 4, estimateUsd: '0.1000', passRate: null, passes: 0, total: 0, maxPromptChars: 2500, supported: true, ratios: ['9:16', '1:1'], durationsSec: [5, 8] };
+    return r.fulfill({ json: { models: [{ ...base, id: 'wide', label: 'Wide model' }, { ...base, id: 'short', label: 'Short model', resolution: '720p' }], defaultModelId: 'wide', monthToDate: { usd: '0.0000', provisional: false } } });
+  });
+  const details = { prompt: 'A slow orbit.', images: [], presetId: null, enhance: false, audio: 'off', ratio: '1:1', aspect: '1:1', resolution: '720p', durationSec: 8, modelId: 'short', storeId: null, date: '2026-08-18' };
+  await page.context().clearCookies();
+  await signIn(page, 'admin');
+  expect((await page.request.put('/api/admin/samples/example-2.json', { data: Buffer.from(JSON.stringify(details)), headers: { 'content-type': 'application/json' } })).ok()).toBe(true);
+  await page.context().clearCookies();
+  try {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await signIn(page, 'cvexa');
+    await page.goto('/create'); // not openCreate: it waits for the Mock E2E model, which the routed list leaves out
+    await expect(modelButton(page)).toContainText('Wide model');
+    await expect(page.locator('.banner')).toHaveAttribute('aria-busy', 'false');
+    await page.getByRole('tab', { name: 'Ví dụ' }).click();
+    await openTile(page, 'Xoay quanh chậm');
+    const detail = page.getByRole('dialog', { name: 'Chi tiết mẫu' });
+    const note = (text: string) => page.getByRole('region', { name: 'Thông báo' }).getByText(text);
+    await detail.getByRole('button', { name: 'Dùng mô hình Short model' }).click();
+    await expect(note('Đã chọn mô hình Short model')).toBeVisible();
+    await expect(modelButton(page)).toContainText('Short model');
+
+    await page.keyboard.press('Escape'); // the form behind the dialog is inert while it is open
+    await pickModel(page, /Wide model/);
+    await expect(modelButton(page)).toContainText('Wide model');
+    await openTile(page, 'Xoay quanh chậm');
+    await detail.getByRole('list', { name: 'Thông số' }).getByRole('button', { name: '720p' }).click();
+    await expect(note('Đã chọn độ phân giải 720p')).toBeVisible();
+    await expect(modelButton(page)).toContainText('Short model');
+  } finally {
+    await page.context().clearCookies();
+    await signIn(page, 'admin');
+    await page.request.delete('/api/admin/samples/example-2.json');
+  }
+});
+
 test('a dialog closes on its backdrop, not on a click inside it', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await signIn(page, 'member5');

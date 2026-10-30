@@ -375,6 +375,13 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
     if (s.ratio) setRatio(s.ratio);
     if (s.durationSec) setDurationSec(s.durationSec);
   });
+  /** A detail's model (its name, or its resolution, which the model fixes) on the form, as Fash's Recreate picks it. Both show only for a model the picker lists. */
+  function pickModel(id: string, said: string) {
+    recall.touch();
+    wanted.current = id;
+    setModelId(id);
+    notify(said);
+  }
   /** A detail's photo as one more reference image, as Fash's "Reference image added". */
   async function take(p: Photo) {
     if (images.length >= maxImages) return notify(`Tối đa ${maxImages} ảnh`);
@@ -762,7 +769,11 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
                 </span>
               )}
               <h2 className={details ? 'sr-only' : undefined}>{detail.title}</h2>
-              {detailModel && <p className="detail-model">{detailModel}</p>}
+              {detailModel && (
+                <Tap on={() => pickModel(details!.modelId!, `Đã chọn mô hình ${detailModel}`)} label={`Dùng mô hình ${detailModel}`} className="detail-model">
+                  {detailModel}
+                </Tap>
+              )}
               {details?.prompt && (
                 <Tap on={() => copyPrompt(details.prompt!)} label="Chép prompt vào ô Prompt" className="detail-prompt">
                   {details.prompt}
@@ -782,7 +793,11 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
                 <img className="detail-input" src={media(detail.poster)} alt="Khung hình mẫu" width={48} height={48} />
               )}
               <ul className="detail-pills" aria-label="Thông số">
-                {details?.resolution && <li aria-label={`Độ phân giải ${details.resolution}`}>{details.resolution}</li>}
+                {details?.resolution && (
+                  <li aria-label={`Độ phân giải ${details.resolution}`}>
+                    <Tap on={detailModel ? () => pickModel(details.modelId!, `Đã chọn độ phân giải ${details.resolution}`) : undefined}>{details.resolution}</Tap>
+                  </li>
+                )}
                 <li aria-label={`Thời lượng ${details?.durationSec ?? detail.durationSec} giây`}>
                   <Tap on={details?.durationSec ? () => apply({ durationSec: details.durationSec! }) : undefined}>{details?.durationSec ?? detail.durationSec}s</Tap>
                 </li>

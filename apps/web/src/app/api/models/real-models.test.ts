@@ -53,7 +53,7 @@ describe('the model picker', () => {
     const both = await picker(member.cookie);
     expect(both.models.map((m) => [m.id, m.passes, m.total, m.estimateUsd])).toEqual([['kling-o3-pro', 7, 10, '0.8960'], ['seedance-2.5', 6, 9, '1.8496']]);
     expect(both.models.map((m) => m.resolution)).toEqual(['1080p', '720p']); // what the Create form shows as the fixed resolution
-    expect(both.models.map((m) => m.maxPromptChars)).toEqual([2000, 2000]); // neither schema states a limit (migration 0028)
+    expect(both.models.map((m) => m.maxPromptChars)).toEqual([2500, 2000]); // Kling O3 Pro's fal schema (migration 0039); Replicate's own 2000 (0029)
     // Kling's audio price is $0.14/s (Marketing Studio Advanced); Replicate Seedance has no audio switch.
     expect(both.models.map((m) => m.audioEstimateUsd)).toEqual(['1.1200', null]);
     expect(both.models[1]!.passRate).toBeCloseTo(6 / 9);
