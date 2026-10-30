@@ -331,7 +331,7 @@ test.describe('1440x1000', () => {
     sized(await box(search), 292, 29, 'search');
     expect(await css(search, 'background-color', 'border-top-left-radius')).toEqual(['rgb(242, 242, 242)', '8px']);
     expect(await css(panel.locator('input'), 'font-size')).toEqual(['14px']);
-    expect(await css(panel.locator('.model-group').first(), 'font-size', 'font-weight', 'letter-spacing', 'text-transform', 'color')).toEqual(['10px', '700', '0.5px', 'uppercase', 'rgb(153, 153, 153)']);
+    expect(await css(panel.locator('.model-group').first(), 'font-size', 'font-weight', 'letter-spacing', 'text-transform', 'color')).toEqual(['10px', '700', '0.5px', 'uppercase', 'rgb(102, 102, 102)']);
     const row = panel.getByRole('option', { name: /Mock E2E/ });
     near((await box(row)).height, 56, 'row height');
     expect(await css(row, 'padding-top', 'padding-left', 'background-color')).toEqual(['6px', '12px', 'rgba(0, 0, 0, 0.06)']);

@@ -30,10 +30,13 @@ async function open(page: Page, width: number): Promise<{ panel: Locator; list: 
   await expect(modelButton(page)).toContainText('Seedance 2.0');
   await modelButton(page).click();
   const panel = page.getByRole('dialog', { name: 'Chọn mô hình' });
+  const heading = panel.locator('.model-group').first();
+  await expect(heading.locator('.icon')).toHaveCSS('display', 'inline-block');
+  expect((await heading.boundingBox())!.height).toBe(27); // one 15px label line plus 8px/4px padding
   return { panel, list: panel.getByRole('listbox', { name: 'Mô hình' }) };
 }
 
-test('the picker opens on the featured models and the families; a family opens beside the panel by pointer and by keyboard', async ({ page }) => {
+test('the picker opens on the featured models and the families; a family opens beside the panel by pointer and by keyboard', async ({ page }, testInfo) => {
   const { panel, list } = await open(page, 1440);
   const featured = list.getByRole('group', { name: 'Model nổi bật' }).getByRole('option');
   await expect(featured).toHaveText([/^Seedance 2\.0Có âm thanhĐề xuất/, /^Seedance 2\.0 \(Replicate\)/, /^Kling 3\.0 ProMỚI/, /^Google VEO 3\.1Có âm thanh/, /^Gemini Omni Flash/]);
@@ -41,6 +44,7 @@ test('the picker opens on the featured models and the families; a family opens b
   await expect(featured.first()).toHaveAttribute('aria-selected', 'true');
   const families = list.getByRole('group', { name: 'Tất cả model' }).getByRole('option');
   await expect(families).toHaveText([/^Seedance/, /^Kling/, /^Google/, /^xAI/, /^Alibaba/, /^MiniMax/, /^Khác/]);
+  await page.screenshot({ path: testInfo.outputPath('picker-desktop-initial.png') });
 
   // Hovering a family opens its models beside the panel, the supported first; picking one closes the panel.
   await families.filter({ hasText: /^Kling/ }).hover();
@@ -49,13 +53,24 @@ test('the picker opens on the featured models and the families; a family opens b
   const p = (await panel.boundingBox())!;
   const f = (await kling.boundingBox())!;
   expect(Math.abs(f.x - (p.x + p.width + 8))).toBeLessThanOrEqual(2);
+  await families.filter({ hasText: /^Alibaba/ }).scrollIntoViewIfNeeded();
+  await page.mouse.move(0, 0);
   await families.filter({ hasText: /^Alibaba/ }).hover();
   await expect(list.getByRole('group', { name: 'Alibaba' }).getByRole('option', { name: /WAN 2\.7/ })).toHaveAttribute('aria-disabled', 'true');
   await expect(kling).toHaveCount(0);
-  // The roles and names only: the light grey section headings are Fash's (geometry K3), not part of this change.
-  const axe = await new AxeBuilder({ page }).include('.model-pop').disableRules(['color-contrast']).analyze();
+  // Include contrast: section labels must remain readable, not just match the reference.
+  const axe = await new AxeBuilder({ page }).include('.model-pop').analyze();
   expect(axe.violations.map((v) => v.id)).toEqual([]);
   await families.filter({ hasText: /^Kling/ }).hover();
+  await expect(families.filter({ hasText: /^Kling/ })).toHaveAttribute('data-open', 'true');
+  await expect(featured.first().getByText('Điểm 80')).toBeVisible();
+  await expect(featured.first().locator('.model-sub')).toHaveText('1080p4s-15s$1.5000Điểm 80');
+  await page.screenshot({ path: testInfo.outputPath('picker-desktop-light.png') });
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await expect(panel).toHaveCSS('background-color', 'rgb(32, 32, 36)');
+  const darkAxe = await new AxeBuilder({ page }).include('.model-pop').analyze();
+  expect(darkAxe.violations.map((v) => v.id)).toEqual([]);
+  await page.screenshot({ path: testInfo.outputPath('picker-desktop-dark.png') });
   await kling.getByRole('option', { name: /Kling 2\.6/ }).click();
   await expect(panel).toBeHidden();
   await expect(modelButton(page)).toContainText('Kling 2.6');
@@ -97,8 +112,10 @@ test('a search shows a flat list with no sections, and the e2e helper picks a mo
   await expect(modelButton(page)).toContainText('Minimax H3 Max');
 });
 
-test('at 390 px a family opens under its row, inside the screen', async ({ page }) => {
+test('at 390 px a family opens under its row, inside the screen', async ({ page }, testInfo) => {
   const { panel, list } = await open(page, 390);
+  await expect(list.getByRole('group', { name: 'Model nổi bật' }).getByRole('option').first().getByText('Điểm 80')).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('picker-390-initial.png') });
   const p = (await panel.boundingBox())!;
   expect(p.x).toBeGreaterThanOrEqual(0);
   expect(p.x + p.width).toBeLessThanOrEqual(390);
@@ -111,6 +128,8 @@ test('at 390 px a family opens under its row, inside the screen', async ({ page 
     expect(o.x + o.width).toBeLessThanOrEqual(p.x + p.width);
   }
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  await kling.getByRole('option').last().scrollIntoViewIfNeeded();
+  await page.screenshot({ path: testInfo.outputPath('picker-390.png') });
   await kling.getByRole('option', { name: /Kling 3\.0 Pro/ }).click();
   await expect(modelButton(page)).toContainText('Kling 3.0 Pro');
 });
