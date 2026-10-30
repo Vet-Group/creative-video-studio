@@ -99,15 +99,24 @@ describe('migration 0002 seed data', () => {
   });
 });
 
+describe('migration 0041 Kling prompt limits', () => {
+  test('gives Kling O3 Pro, Kling 3.0 Pro and both Kling 3.0 Motion Control endpoints the 2500 characters of their fal schemas', async () => {
+    const { rows } = await pool.query(`select endpoint, max_prompt_chars as n from model_configs where endpoint like 'fal-ai/kling-video/%' order by endpoint`);
+    expect(rows.length).toBeGreaterThan(0);
+    for (const r of rows) expect(r.n, r.endpoint).toBe(2500);
+  });
+});
+
 describe('migration 0028 prompt limits', () => {
   test('gives each model the prompt limit of its fal schema with the source, and 2000 where the schema states none', async () => {
     const { rows } = await pool.query(`select id, endpoint, max_prompt_chars as n, sources->'maxPromptChars' as src from model_configs where id = any($1) order by id`, [
       ['nano-banana-pro', 'kling-2.6', 'minimax-hailuo-2.3-pro', 'veo-3.1', 'grok-imagine-1.5', 'kling-o3-pro'],
     ]);
     const by = Object.fromEntries(rows.map((r) => [r.id, r]));
-    expect(Object.fromEntries(rows.map((r) => [r.id, r.n]))).toMatchObject({ 'nano-banana-pro': 50000, 'kling-2.6': 2500, 'minimax-hailuo-2.3-pro': 2000, 'veo-3.1': 20000, 'grok-imagine-1.5': 4096, 'kling-o3-pro': 2000 });
+    expect(Object.fromEntries(rows.map((r) => [r.id, r.n]))).toMatchObject({ 'nano-banana-pro': 50000, 'kling-2.6': 2500, 'minimax-hailuo-2.3-pro': 2000, 'veo-3.1': 20000, 'grok-imagine-1.5': 4096, 'kling-o3-pro': 2500 });
     expect(by['kling-2.6'].src).toEqual({ url: `https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=${by['kling-2.6'].endpoint}`, readAt: '2026-10-28' });
-    expect(by['kling-o3-pro'].src).toBeNull(); // its schema states no limit, so it keeps the default and no source
+    // 0028 read no limit for Kling O3 Pro; 0041 found 2500 inside the schema's anyOf.
+    expect(by['kling-o3-pro'].src).toEqual({ url: `https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=${by['kling-o3-pro'].endpoint}`, readAt: '2026-10-30' });
     const seedance = (await pool.query(`select max_prompt_chars as n, sources->'maxPromptChars'->>'url' as url from model_configs where id = 'seedance-2.5'`)).rows[0];
     expect(seedance).toEqual({ n: 2000, url: 'https://replicate.com/bytedance/seedance-2.5/api/schema' }); // 0029: Replicate's own 2000
     await expect(pool.query(`update model_configs set max_prompt_chars = 0 where id = 'veo-3.1'`)).rejects.toThrow(/model_configs_max_prompt_chars_check/);

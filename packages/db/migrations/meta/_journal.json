@@ -288,6 +288,13 @@
       "when": 1794394952036,
       "tag": "0040_veo_3_1_replicate",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1794394953036,
+      "tag": "0041_kling_prompt_2500",
+      "breakpoints": true
     }
   ]
 }
