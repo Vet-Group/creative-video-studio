@@ -4,27 +4,44 @@
 //   non-https images are sent as data URLs, recommended there for files of 256kb or less)
 //   input field names (aspect_ratio, resolution, duration, reference_images, generate_audio): the model schema, read by the coordinating
 //   session (plan B.1); the public model pages do not show it, so these names are unverified by this adapter's author.
-import { estimate, packJobId, resolveImages, sendJson, timeout, unpackJobId, type Fetch, type ReadImage } from './http';
-import type { ProviderStatus, VideoProvider } from './types';
+//   Veo 3.1 input schema (read 2026-10-30): https://api.replicate.com/v1/models/google/veo-3.1, latest_version.openapi_schema.components.schemas.Input
+import { estimate, ImageReadError, imageTokens, packJobId, plainImage, resolveImages, sendJson, timeout, unpackJobId, type Fetch, type ReadImage } from './http';
+import type { ProviderStatus, SubmitRequest, VideoProvider } from './types';
 
 const API = 'https://api.replicate.com/v1';
 // Without a User-Agent the API answers 403 (plan B.1).
 const USER_AGENT = 'creative-video-studio/1.0';
+
+/**
+ * The endpoints whose input is not the Seedance one below, with fal's VideoBody fields (videoInputs reads them): `end`, the end frame's field; `text`,
+ * where a Run with no image goes (here the endpoint itself). The row's output resolution is added to every body.
+ */
+export const REPLICATE_BODIES: Record<string, { end?: string; text?: string; build: (req: SubmitRequest, images: string[]) => Record<string, unknown> }> = {
+  // `image` is the start frame and may be left out; generate_audio defaults to true, so it is always sent. The schema's reference_images (16:9 and 8 s
+  // only) are not used: like its fal twin, the row takes one start frame.
+  'google/veo-3.1': { end: 'last_frame', text: 'google/veo-3.1', build: (req, [image]) => ({ prompt: imageTokens(req.prompt, plainImage), ...(image && { image }), aspect_ratio: req.ratio, duration: req.durationSec, generate_audio: req.audio === true }) },
+};
 
 export function createReplicateProvider(opts: { apiToken: string; fetch?: Fetch; readImage?: ReadImage }): VideoProvider {
   const f = opts.fetch ?? fetch;
   const headers = { Authorization: `Bearer ${opts.apiToken}`, 'Content-Type': 'application/json', 'User-Agent': USER_AGENT };
   return {
     async submit(req) {
-      const input: Record<string, unknown> = {
-        prompt: req.prompt,
-        // Product photos are references, not a first frame; the prompt addresses them as [Image1], [Image2].
-        reference_images: await resolveImages(req.imageUrls, opts.readImage),
-        aspect_ratio: req.ratio,
-        duration: req.durationSec,
-        // The price is the image-only variant; keep the output silent.
-        generate_audio: false,
-      };
+      const spec = Object.hasOwn(REPLICATE_BODIES, req.model.endpoint) ? REPLICATE_BODIES[req.model.endpoint] : undefined;
+      if (req.endImageUrl && !spec?.end) throw new ImageReadError(`replicate: ${req.model.endpoint} takes no end frame`);
+      const images = await resolveImages(req.imageUrls, opts.readImage);
+      const input: Record<string, unknown> = spec
+        ? spec.build(req, images)
+        : {
+            prompt: req.prompt,
+            // Product photos are references, not a first frame; the prompt addresses them as [Image1], [Image2].
+            reference_images: images,
+            aspect_ratio: req.ratio,
+            duration: req.durationSec,
+            // The price is the image-only variant; keep the output silent.
+            generate_audio: false,
+          };
+      if (req.endImageUrl) [input[spec!.end!]] = await resolveImages([req.endImageUrl], opts.readImage);
       if (req.model.outputResolution) input.resolution = req.model.outputResolution;
       const res = (await sendJson(f, 'replicate submit', `${API}/models/${req.model.endpoint}/predictions`, { method: 'POST', headers, body: JSON.stringify({ input }) })) as { id?: string };
       if (!res.id) throw new Error('replicate submit: no id in the response');

@@ -8,7 +8,8 @@
 //   image endpoints (read 2026-10-24) and the other video endpoints (read 2026-10-25): https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=<endpoint>,
 //   one per entry of IMAGE_BODIES and VIDEO_BODIES
 import { imageSize } from './image-size';
-import { estimate, ImageReadError, imageEstimate, packJobId, ProviderHttpError, resolveImages, sendJson, timeout, unpackJobId, type Fetch, type ReadImage } from './http';
+import { estimate, ImageReadError, imageEstimate, imageTokens, packJobId, plainImage, ProviderHttpError, resolveImages, sendJson, timeout, unpackJobId, type Fetch, type ReadImage } from './http';
+import { REPLICATE_BODIES } from './replicate';
 import { FAL_TEXT_ENDPOINTS } from '../models';
 import type { ImageProvider, ImageSubmitRequest, ProviderStatus, SubmitRequest, VideoProvider } from './types';
 
@@ -56,10 +57,7 @@ async function pollFal(
   return { state: 'succeeded', outputUrl, ...cost };
 }
 
-/** The app writes [Image1], [Image2]; each schema names them its own way. A digit right after the token gets a space, so "[Image1]2" does not become @Image12. */
-const imageTokens = (prompt: string, name: (n: string) => string) => prompt.replace(/\[Image(\d+)\](\d?)/g, (_, n: string, d: string) => `${name(n)}${d ? ` ${d}` : ''}`);
 const atImage = (n: string) => `@Image${n}`;
-const plainImage = (n: string) => `image ${n}`;
 /**
  * The smoke run of 2026-10-25 saw Seedance 2.5 and FLUX 3 Reference show the input as the first frame, then cut to the plain studio a preset asks for.
  * These endpoints start from the input image, so they are told to stay in its scene in one shot.
@@ -153,10 +151,10 @@ export const VIDEO_BODIES: Record<string, VideoBody> = {
 
 /**
  * What a video model takes besides its images, by endpoint, for the models and jobs APIs: `endFrame`, an end frame; `textOnly`, a Run with no image;
- * `audioClips`, reference audio up to `max` clips and `seconds` in all (null when none).
+ * `audioClips`, reference audio up to `max` clips and `seconds` in all (null when none). Replicate endpoints answer from REPLICATE_BODIES.
  */
 export function videoInputs(endpoint: string) {
-  const spec = Object.hasOwn(VIDEO_BODIES, endpoint) ? VIDEO_BODIES[endpoint] : undefined;
+  const spec: VideoBody | undefined = Object.hasOwn(VIDEO_BODIES, endpoint) ? VIDEO_BODIES[endpoint] : Object.hasOwn(REPLICATE_BODIES, endpoint) ? REPLICATE_BODIES[endpoint] : undefined;
   return { endFrame: spec?.end !== undefined, textOnly: spec?.text !== undefined, audioClips: spec?.audio ? { max: spec.audio.max, seconds: spec.audio.seconds } : null };
 }
 
