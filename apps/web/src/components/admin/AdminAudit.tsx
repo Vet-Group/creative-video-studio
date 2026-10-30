@@ -1,5 +1,6 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { auditChanges } from '@/lib/admin-ui';
 import { api } from '@/lib/api';
 import { useTabReturn } from '@/lib/use-tab-return';
 
@@ -20,7 +21,6 @@ const ACTIONS = [
 ];
 
 const fmtTime = (iso: string) => new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'medium', timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date(iso));
-const json = (v: unknown) => (v === null || v === undefined ? '' : JSON.stringify(v));
 
 export function AdminAudit() {
   const [action, setAction] = useState('');
@@ -81,22 +81,26 @@ export function AdminAudit() {
               <th scope="col">Người thực hiện</th>
               <th scope="col">Sự kiện</th>
               <th scope="col">Đối tượng</th>
-              <th scope="col">Giá trị cũ</th>
-              <th scope="col">Giá trị mới</th>
+              <th scope="col">Thay đổi</th>
             </tr>
           </thead>
           <tbody>
             {entries.map((e) => (
               <tr key={e.id}>
-                <td>{fmtTime(e.createdAt)}</td>
+                <td className="nowrap">{fmtTime(e.createdAt)}</td>
                 <td>{e.actorName}</td>
-                <td>{e.action}</td>
+                <td>
+                  <code className="event">{e.action}</code>
+                </td>
                 <td>{e.target}</td>
                 <td>
-                  <code>{json(e.oldValue)}</code>
-                </td>
-                <td>
-                  <code>{json(e.newValue)}</code>
+                  <ul className="changes">
+                    {auditChanges(e.oldValue, e.newValue).map((c) => (
+                      <li key={c.key}>
+                        <span className="key">{c.key}:</span> {c.text}
+                      </li>
+                    ))}
+                  </ul>
                 </td>
               </tr>
             ))}

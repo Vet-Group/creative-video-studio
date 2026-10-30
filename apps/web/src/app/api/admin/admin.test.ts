@@ -155,21 +155,24 @@ describe('stores', () => {
     expect((await audits(`store:${id}`)).slice(1)).toEqual([{ actor_id: admin.id, action: 'store.hide', old_value: { hidden: false }, new_value: { hidden: true } }]);
   });
 
-  test('lets the code change until the store has cost entries, then refuses it with 409; renaming stays possible', async () => {
+  test('lets the code change before and after the store has cost entries, audited; the costs stay with the store; a taken code is 409', async () => {
     const { id } = (await (await create('Shop Three', 'POD-3')).json()) as { id: string };
     expect((await patch(id, { code: 'POD-3B' })).status).toBe(200);
     expect((await patch(id, { code: 'POD-1' })).status).toBe(409); // another store's code
     expect((await list()).find((s) => s.id === id)).toMatchObject({ code: 'POD-3B', hasCost: false });
 
-    await seedJob('code-lock-job', id);
+    await seedJob('code-change-job', id);
     expect((await list()).find((s) => s.id === id)).toMatchObject({ hasCost: true });
-    expect((await patch(id, { code: 'POD-3C' })).status).toBe(409);
-    expect((await patch(id, { code: 'POD-3B' })).status).toBe(200); // same code is not a change
+    expect((await patch(id, { code: 'POD-3C' })).status).toBe(200);
+    expect((await patch(id, { code: 'POD-1' })).status).toBe(409); // still unique once it has cost
+    expect((await patch(id, { code: 'POD-3C' })).status).toBe(200); // same code is not a change
     expect((await patch(id, { name: 'Shop Three renamed' })).status).toBe(200);
-    expect((await pool.query('select name, code from stores where id = $1', [id])).rows[0]).toEqual({ name: 'Shop Three renamed', code: 'POD-3B' });
+    expect((await pool.query('select name, code from stores where id = $1', [id])).rows[0]).toEqual({ name: 'Shop Three renamed', code: 'POD-3C' });
+    expect((await pool.query('select distinct store_id from cost_entries where job_id = $1', ['code-change-job'])).rows).toEqual([{ store_id: id }]);
     expect((await audits(`store:${id}`)).slice(1)).toEqual([
       { actor_id: admin.id, action: 'store.update', old_value: { name: 'Shop Three', code: 'POD-3' }, new_value: { name: 'Shop Three', code: 'POD-3B' } },
-      { actor_id: admin.id, action: 'store.update', old_value: { name: 'Shop Three', code: 'POD-3B' }, new_value: { name: 'Shop Three renamed', code: 'POD-3B' } },
+      { actor_id: admin.id, action: 'store.update', old_value: { name: 'Shop Three', code: 'POD-3B' }, new_value: { name: 'Shop Three', code: 'POD-3C' } },
+      { actor_id: admin.id, action: 'store.update', old_value: { name: 'Shop Three', code: 'POD-3C' }, new_value: { name: 'Shop Three renamed', code: 'POD-3C' } },
     ]);
   });
 

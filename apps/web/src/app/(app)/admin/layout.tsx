@@ -14,9 +14,9 @@ export default async function AdminLayout({ children }: { children: ReactNode })
     );
   }
   return (
-    <>
+    <div className="admin">
       <AdminNav />
       {children}
-    </>
+    </div>
   );
 }

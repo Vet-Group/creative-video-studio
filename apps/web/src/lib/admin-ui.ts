@@ -48,3 +48,18 @@ export function useAction(reload: () => void) {
   }
   return { problem, run };
 }
+
+const auditText = (v: unknown): string => (v === null || v === undefined ? '—' : typeof v === 'object' ? JSON.stringify(v) : String(v));
+const auditFields = (v: unknown): Record<string, unknown> =>
+  v === null || v === undefined ? {} : typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : { 'giá trị': v };
+
+/** An audit entry's old and new values as one line per field: "enabled: false → true", or the value alone when it did not change or is new. */
+export function auditChanges(oldValue: unknown, newValue: unknown): { key: string; text: string }[] {
+  const before = auditFields(oldValue);
+  const after = auditFields(newValue);
+  return [...new Set([...Object.keys(before), ...Object.keys(after)])].map((key) => {
+    const from = auditText(before[key]);
+    const to = auditText(after[key]);
+    return { key, text: !(key in before) || from === to ? to : `${from} → ${to}` };
+  });
+}

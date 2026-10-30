@@ -26,10 +26,10 @@ function PresetRow({ preset, run }: { preset: Preset; run: ReturnType<typeof use
         <textarea aria-label={`Mô tả của mẫu ${preset.id}`} rows={3} value={prompt} onChange={(e) => setPrompt(e.target.value)} />
       </td>
       <td>
-        <input aria-label={`Thứ tự của mẫu ${preset.id}`} inputMode="numeric" size={4} value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} />
+        <input className="narrow" aria-label={`Thứ tự của mẫu ${preset.id}`} inputMode="numeric" value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} />
       </td>
       <td>
-        <label>
+        <label className="check">
           <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} /> Đang bật
         </label>
       </td>
@@ -64,7 +64,7 @@ export function AdminPresets() {
           <thead>
             <tr>
               <th scope="col">Tên mẫu</th>
-              <th scope="col">Mô tả chuyển động</th>
+              <th scope="col" className="wide">Mô tả chuyển động</th>
               <th scope="col">Thứ tự</th>
               <th scope="col">Trạng thái</th>
               <th scope="col">Thao tác</th>
