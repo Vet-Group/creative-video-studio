@@ -6,5 +6,5 @@ export default defineConfig({
   // tsconfig says jsx: preserve for Next; the component specs render to static markup and need the JSX compiled.
   oxc: { jsx: { runtime: 'automatic' } },
   // The Playwright specs run with `pnpm e2e`.
-  test: { exclude: [...configDefaults.exclude, 'e2e/**'] },
+  test: { exclude: [...configDefaults.exclude, 'e2e/**'], experimental: { diagnostics: false } },
 });

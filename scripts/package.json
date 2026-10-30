@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --experimental.diagnostics=false",
+    "test": "vitest run",
     "bakeoff:run": "tsx bakeoff/run.ts",
     "bakeoff:anonymise": "tsx bakeoff/anonymise.ts",
     "bakeoff:metrics": "tsx bakeoff/metrics.ts",
