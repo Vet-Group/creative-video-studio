@@ -186,9 +186,13 @@ function AddChoice({ kind, canShare, onAdded }: { kind: 'hook' | 'location'; can
         Mô tả ngắn (tuỳ chọn)
       </label>
       <input id={ids.desc} value={desc} maxLength={MAX_CHOICE_DESC} placeholder={help.desc} onChange={(e) => setDesc(e.target.value)} />
-      <label className="field-label" htmlFor={ids.phrase}>
-        Cảnh cho AI (tiếng Anh)
-      </label>
+      <div className="field-head">
+        <label className="field-label" htmlFor={ids.phrase}>
+          Cảnh cho AI (tiếng Anh)
+        </label>
+        {/* Written from the Vietnamese name and description, so it waits for a name. */}
+        <SuggestButton label="AI viết giúp" disabled={!name.trim()} ask={() => ({ field: kind, text: [name.trim(), desc.trim()].filter(Boolean).join(' - ') })} onPick={setPhrase} />
+      </div>
       <textarea id={ids.phrase} lang="en" rows={3} value={phrase} maxLength={MAX_CHOICE_PHRASE} placeholder={help.phrase} aria-describedby={ids.help} onChange={(e) => setPhrase(e.target.value)} />
       <p id={ids.help} className="help">
         {/[À-ỹ]/.test(phrase) ? 'Có vẻ đây là tiếng Việt. Nên viết bằng tiếng Anh để AI hiểu đúng cảnh.' : help.phraseHelp}

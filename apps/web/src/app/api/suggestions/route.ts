@@ -4,14 +4,15 @@ import { PROMPT_CEILING } from '@cvs/core/models';
 import type { SuggestInput } from '@cvs/core/suggest';
 import { pool } from '@/lib/auth';
 import { findChoice } from '@/lib/choices';
-import { ADVANCED_MAX_SCRIPT, SUGGEST_DAILY_LIMIT } from '@/lib/marketing';
+import { ADVANCED_MAX_SCRIPT, MAX_CHOICE_DESC, MAX_CHOICE_NAME, MAX_CHOICE_PHRASE, SUGGEST_DAILY_LIMIT } from '@/lib/marketing';
 import { boss } from '@/lib/queue';
 import { guard } from '@/lib/session';
 
 const bad = (error: string, status = 400) => Response.json({ error }, { status });
 
 /**
- * Asks the worker for three Marketing Studio suggestions: `field` (`brief`, or `script` on Advanced), `format` ('advanced' or absent), the
+ * Asks the worker for three Marketing Studio suggestions: `field` (`brief`, `script` on Advanced, or `hook` or `location` for the English scene of
+ * a new one from its Vietnamese name and description in `text`), `format` ('advanced' or absent), the
  * member's `text` so far, the chosen `hook` and `location`, and for a brief the `room` the chosen model leaves for it (the page computes it). Answers 202 with the run's id for the page to poll (GET /api/suggestions/:id),
  * 429 past the daily limit, 503 when the queue cannot take it (the run is not counted then).
  */
@@ -19,7 +20,13 @@ export async function POST(request: Request) {
   const g = await guard(request, 'member');
   if (g.error) return g.error;
   const b = (await request.json().catch(() => null)) as { field?: unknown; format?: unknown; text?: unknown; hook?: unknown; location?: unknown; room?: unknown } | null;
-  if (b?.field !== 'brief' && b?.field !== 'script') return bad('field must be brief or script');
+  if (b?.field !== 'brief' && b?.field !== 'script' && b?.field !== 'hook' && b?.field !== 'location') return bad('field must be brief, script, hook or location');
+  if (b.field === 'hook' || b.field === 'location') {
+    // The add form's AI help: the English scene of a new hook or location from its Vietnamese name and description, as long as the field takes.
+    const text = typeof b.text === 'string' ? b.text.trim() : '';
+    if (!text || text.length > MAX_CHOICE_NAME + MAX_CHOICE_DESC + 3) return bad(`text must be the name and description, 1 to ${MAX_CHOICE_NAME + MAX_CHOICE_DESC + 3} characters`);
+    return queue(g.session.user.id, { field: b.field, text, context: '', max: MAX_CHOICE_PHRASE });
+  }
   if (b.format !== undefined && b.format !== 'advanced') return bad('format must be advanced or left out');
   const advanced = b.format === 'advanced';
   if (b.field === 'script' && !advanced) return bad('a script is for Advanced only');
@@ -36,6 +43,11 @@ export async function POST(request: Request) {
   if (b.location !== undefined && !location) return bad('location is not a location');
   const input: SuggestInput = { field: b.field, text, context: [hook?.phrase, location && `Set in ${location.phrase}.`].filter(Boolean).join(' '), max };
 
+  return queue(userId, input);
+}
+
+/** Counts the run against the member's daily limit, stores it and hands it to the worker. */
+async function queue(userId: string, input: SuggestInput): Promise<Response> {
   const id = randomUUID();
   const client = await pool.connect();
   try {

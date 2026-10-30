@@ -10,7 +10,7 @@ const GIVE_UP_MS = 65_000;
 const UNAVAILABLE = 'Chưa lấy được gợi ý lúc này, hãy thử lại sau.';
 
 interface Ask {
-  field: 'brief' | 'script';
+  field: 'brief' | 'script' | 'hook' | 'location';
   format?: 'advanced';
   text: string;
   /** Left out (undefined) when none is chosen. */
@@ -20,7 +20,7 @@ interface Ask {
   room?: number;
 }
 
-export function SuggestButton({ ask, label, onPick }: { ask: () => Ask; label: string; onPick: (text: string) => void }) {
+export function SuggestButton({ ask, label, onPick, disabled }: { ask: () => Ask; label: string; onPick: (text: string) => void; disabled?: boolean }) {
   const [busy, setBusy] = useState(false);
   const [options, setOptions] = useState<string[]>([]);
   const [error, setError] = useState('');
@@ -54,7 +54,7 @@ export function SuggestButton({ ask, label, onPick }: { ask: () => Ask; label: s
   // The options open under the button, over the form, so the form's own layout does not move.
   return (
     <span className="suggest">
-      <button type="button" className="suggest-button" disabled={busy} onClick={() => void suggest()}>
+      <button type="button" className="suggest-button" disabled={busy || disabled} onClick={() => void suggest()}>
         <Icon name="wand" size={12} />
         {busy ? 'Đang gợi ý…' : label}
       </button>

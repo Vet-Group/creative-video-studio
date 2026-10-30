@@ -59,6 +59,17 @@ test('the add form says what a hook is, an example fills it, a Vietnamese scene 
   const scene = form.getByLabel('Cảnh cho AI (tiếng Anh)');
   await expect(scene).toHaveValue(/^The clip opens with the creator in a plain old outfit/);
   await expect(scene).toHaveAccessibleDescription(/tiếng Anh tốt nhất/);
+  // AI viết giúp writes the English scene from the Vietnamese name and description (the e2e worker's stand-in echoes them), and waits for a name.
+  const write = form.getByRole('button', { name: 'AI viết giúp' });
+  await form.getByLabel('Tên', { exact: true }).fill('');
+  await expect(write).toBeDisabled();
+  await form.getByLabel('Tên', { exact: true }).fill('Mở hộp');
+  await form.getByLabel('Mô tả ngắn (tuỳ chọn)').fill('Hộp quà bật mở');
+  await write.click();
+  const options = form.getByRole('group', { name: 'AI viết giúp' }).getByRole('button');
+  await expect(options).toHaveText(['Option 1: Mở hộp - Hộp quà bật mở', 'Option 2: Mở hộp - Hộp quà bật mở', 'Option 3: Mở hộp - Hộp quà bật mở'], { timeout: 20_000 });
+  await options.nth(2).click();
+  await expect(scene).toHaveValue('Option 3: Mở hộp - Hộp quà bật mở');
   await scene.fill('Cô gái mở hộp quà');
   await expect(scene).toHaveAccessibleDescription(/Có vẻ đây là tiếng Việt/);
   await expect(form.getByRole('checkbox')).toHaveCount(0); // only an Admin shares

@@ -62,6 +62,7 @@ test('Admin Costs, Report and Audit reload when the tab comes back', async ({ pa
   await page.goto('/admin/audit');
   const store = `Fresh store ${Date.now()}`;
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: 'Đang tải...' })).toHaveCount(0);
   expect((await page.request.post('/api/admin/stores', { data: { name: store, code: `FR${Date.now() % 100000}` } })).status()).toBe(201);
   const entry = page.getByRole('cell', { name: new RegExp(store) });
   await expect(entry).toHaveCount(0);
