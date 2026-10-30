@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "node scripts/next.ts start",
     "typecheck": "next typegen && tsc --noEmit",
-    "test": "vitest run --experimental.diagnostics=false",
+    "test": "vitest run",
     "e2e": "playwright test",
     "auth:create-user": "tsx scripts/create-user.ts"
   },
