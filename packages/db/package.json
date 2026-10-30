@@ -10,7 +10,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
+    "test": "vitest run --experimental.diagnostics=false",
     "generate": "drizzle-kit generate",
     "migrate": "drizzle-kit migrate"
   },
