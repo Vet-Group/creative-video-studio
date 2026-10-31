@@ -7,14 +7,14 @@ import { cardSample, EXAMPLES, exampleForPreset, sampleSrc } from '@/lib/example
 import { modelStats, rank, scoreOf } from '@/lib/model-scores';
 import { listSamples } from '@/lib/samples';
 
-// The tools the app has, in the live sidebar order; each later tool adds its card here. Posters are the fixture clips until real ones exist.
+// The tools the app has, in the live sidebar order; uploaded samples override these fallback posters.
 const FEATURES = [
   { href: '/try-on', sample: 'feature-try-on', title: 'Thử đồ', text: 'Mặc trang phục lên người mẫu từ ảnh, giữ nguyên người và bối cảnh.', poster: EXAMPLES[2]!.poster },
   { href: '/image-generation', sample: 'feature-image-generation', title: 'Tạo ảnh', text: 'Tạo hoặc chỉnh ảnh sản phẩm từ ảnh tham chiếu và một mô tả.', poster: EXAMPLES[3]!.poster },
   { href: '/create', sample: 'feature-create-videos', title: 'Tạo video', text: 'Biến ảnh sản phẩm thành video ngắn bằng các mô hình AI.', poster: EXAMPLES[0]!.poster },
   { href: '/marketing-studio', sample: 'feature-marketing-studio', title: 'Marketing Studio', text: 'Tạo video kiểu người sáng tạo nội dung từ ảnh người mẫu và ảnh sản phẩm.', poster: EXAMPLES[0]!.poster },
-  { href: '/apps', sample: 'feature-apps', title: 'Ứng dụng', text: 'Đổi nhân vật, đổi nền, xoá nền, phóng to ảnh và các công cụ AI một chạm khác.', poster: EXAMPLES[1]!.poster },
-  { href: '/library', sample: 'feature-library', title: 'Thư viện', text: 'Xem, tải xuống và đánh giá mọi clip của công ty.', poster: EXAMPLES[1]!.poster },
+  { href: '/apps', sample: 'feature-apps', title: 'Ứng dụng', text: 'Đổi nhân vật, đổi nền, xoá nền, phóng to ảnh và các công cụ AI một chạm khác.', poster: '/artwork/explore-apps.svg' },
+  { href: '/library', sample: 'feature-library', title: 'Thư viện', text: 'Xem, tải xuống và đánh giá mọi clip của công ty.', poster: '/artwork/explore-library.svg' },
 ];
 
 /** The sample name of a model card; ids such as seedance-2.5 keep only letters, digits and dashes in sample names. */
