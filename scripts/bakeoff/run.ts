@@ -74,6 +74,7 @@ const THRIFT_RATIO = '9:16';
 interface Planned {
   key: JobKey;
   model: ModelConfig;
+  provider: JobLine['provider'];
   durationSec: number;
   estimateUsd: number;
 }
@@ -100,11 +101,12 @@ function plan(deps: RunDeps, opts: StageOptions): { jobs: Planned[]; prompt: str
   const jobs: Planned[] = [];
   for (const image of images) {
     for (const model of models) {
+      if (model.provider === 'vertex') throw new Error('Vertex is not supported by the bake-off runner');
       const durationSec = model.thrift?.durationSec ?? fail(`${model.id} has no thrift settings`);
       if (model.thrift!.resolution !== model.outputResolution) fail(`${model.id}: thrift resolution differs from the resolution the adapter sends`);
       const bad = validateRequest(model, { ratio: THRIFT_RATIO, durationSec, imageCount: 1 });
       if (bad) fail(`${model.id}: ${bad}`);
-      jobs.push({ key: { image, model: model.id, round: roundOf(opts.set) }, model, durationSec, estimateUsd: Number(estimateUsd(model.usdPerSecond, durationSec)) });
+      jobs.push({ key: { image, model: model.id, round: roundOf(opts.set) }, model, provider: model.provider, durationSec, estimateUsd: Number(estimateUsd(model.usdPerSecond, durationSec)) });
     }
   }
   // One job per key: a duplicate would be submitted twice before the log could show the first.
@@ -147,7 +149,7 @@ async function runLocked(deps: RunDeps, opts: StageOptions): Promise<StageResult
   const now = deps.now ?? (() => new Date());
   const { jobs, prompt } = plan(deps, opts);
   const line = (p: Planned, l: Omit<JobLine, 'at' | 'image' | 'model' | 'round' | 'provider' | 'estimateUsd' | 'set'>): void =>
-    appendLine(deps.outDir, { ...l, ...p.key, at: now().toISOString(), provider: p.model.provider, estimateUsd: p.estimateUsd, set: opts.set });
+    appendLine(deps.outDir, { ...l, ...p.key, at: now().toISOString(), provider: p.provider, estimateUsd: p.estimateUsd, set: opts.set });
   const current = (p: Planned): JobLine | undefined => latest(readLines(deps.outDir)).get(keyId(p.key));
   let outcome: StageResult['outcome'] = 'complete';
   let reason: string | undefined;
