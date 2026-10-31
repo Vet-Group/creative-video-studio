@@ -17,8 +17,16 @@ const FEATURES = [
   { href: '/library', sample: 'feature-library', title: 'Thư viện', text: 'Xem, tải xuống và đánh giá mọi clip của công ty.', poster: '/artwork/explore-library.svg' },
 ];
 
-/** The sample name of a model card; ids such as seedance-2.5 keep only letters, digits and dashes in sample names. */
-const modelSample = (id: string) => `model-${id.replace(/[^a-z0-9-]/g, '-')}`;
+/** The sample name of a model card; ids such as seedance-2.5 keep only letters, digits and dashes in sample names.
+ * A variant without its own sample (a -vertex, -reference, -replicate, -1080p or -480p id) shows the sample of the model it varies. */
+const modelSample = (have: ReadonlySet<string>, id: string) => {
+  const own = `model-${id.replace(/[^a-z0-9-]/g, '-')}`;
+  for (let base = own, next = ''; ; base = next) {
+    if (have.has(`${base}.mp4`) || have.has(`${base}.jpg`)) return base;
+    next = base.replace(/-(vertex|reference|replicate|1080p|480p)$/, '');
+    if (next === base) return own;
+  }
+};
 
 /** The live page's featured models, in its order; they lead the row, then the other models with a sample loop, then those with a still, then the rest. */
 const FEATURED = ['seedance-2.5-image', 'kling-o3-pro', 'gemini-omni-flash', 'kling-3.0-pro', 'seedance-2.0'];
@@ -47,7 +55,7 @@ export default async function ExplorePage() {
   const rankOf = (id: string) => {
     const featured = FEATURED.indexOf(id);
     if (featured >= 0) return featured;
-    const media = cardSample(have, modelSample(id));
+    const media = cardSample(have, modelSample(have, id));
     return FEATURED.length + (media.video ? 0 : media.poster ? 1 : 2);
   };
   scored.sort((a, b) => rankOf(a.id) - rankOf(b.id)); // stable: within a group the query's kind and label order stays
@@ -80,7 +88,7 @@ export default async function ExplorePage() {
           {scored.map((m) => (
             <li key={m.id}>
               <Link href={`${m.kind === 'video' ? '/create' : '/image-generation'}?model=${encodeURIComponent(m.id)}`} className="explore-card">
-                <CardMedia {...cardSample(have, modelSample(m.id))} always />
+                <CardMedia {...cardSample(have, modelSample(have, m.id))} always />
                 <strong>
                   {m.label}
                   {recommended.has(m.id) && <span className="badge badge-recommended">Đề xuất</span>}
