@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400" viewBox="0 0 640 400">
+  <title>Creative tools</title>
+  <rect width="640" height="400" fill="#f2f0eb"/>
+  <g fill="#fff" stroke="#ddd9d1" stroke-width="2">
+    <rect x="100" y="66" width="132" height="120" rx="20"/>
+    <rect x="254" y="66" width="132" height="120" rx="20"/>
+    <rect x="408" y="66" width="132" height="120" rx="20"/>
+    <rect x="100" y="208" width="132" height="120" rx="20"/>
+    <rect x="254" y="208" width="132" height="120" rx="20"/>
+    <rect x="408" y="208" width="132" height="120" rx="20"/>
+  </g>
+  <g fill="none" stroke="#393c38" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="m146 145 40-40m-35-2 6 10m26 25 10 6m-12-49 2-9m-42 47-9 2"/>
+    <path d="M297 106h46v40h-46z m0 30 13-13 12 12 8-8 13 13"/>
+    <path d="M450 108h46m-46 16h32m-32 16h40"/>
+    <path d="M144 252h44v34h-44z m11-11v-8m20 8v-8m-20 64v-8m20 8v-8"/>
+    <path d="m298 285 44-44m-44 0h16m-16 0v16m44 12v16h-16"/>
+    <path d="M453 250h42v36h-42z m21-27v-12m-6 6h12"/>
+  </g>
+  <g fill="#dce7c6"><circle cx="215" cy="83" r="8"/><circle cx="369" cy="225" r="8"/></g>
+</svg>
