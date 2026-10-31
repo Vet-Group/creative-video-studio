@@ -1353,8 +1353,16 @@ const SWAP_TABLE = [
   ['Đổi người mẫu', 'Khuôn mặt, màu da và dáng người', 'Trang phục, tư thế và bối cảnh', 'Cho cùng bộ đồ lên một người khác'],
 ];
 
-/** The About tab of each built app, by slug (Media Optimizer is not built, so it has none). */
+/** The About tab of each built app, by slug. */
 export const APP_ABOUT: Record<string, AboutPage> = {
+  'media-optimizer': {
+    title: 'Tối ưu ảnh ngay trên thiết bị',
+    sections: [
+      { title: 'Miễn phí, không tải lên máy chủ', blocks: ['Đổi kích thước và chuyển định dạng PNG, JPG hoặc WEBP ngay trong trình duyệt. Giữ tỷ lệ được bật mặc định. Tải kết quả xuống trước khi rời trang; không lưu vào Thư viện hay Lịch sử.'] },
+      { title: 'Định dạng và giới hạn', blocks: ['Ảnh tối đa 20 MB, 8000 px mỗi chiều và 16 triệu điểm ảnh. Ảnh động chỉ xuất một khung hình. JPG dùng nền trắng cho vùng trong suốt. JPG/WEBP dùng chất lượng 82%; dung lượng có thể tăng. Chưa hỗ trợ video MP4/WEBM.'] },
+      { title: 'Câu hỏi thường gặp', blocks: [{ faq: [['Có thay đổi tệp gốc không?', 'Không. Kết quả là tệp mới để bạn tải xuống.'], ['Có hỗ trợ video không?', 'Chưa hỗ trợ video MP4/WEBM; chỉ nhận ảnh PNG, JPG và WEBP.']] }] },
+    ],
+  },
   'character-swap': {
     title: 'Đổi nhân vật chỉ với một lần chạy',
     sections: [

@@ -7,7 +7,7 @@ const PAGES: Partial<Record<string, string>> = {
   try_on: '/try-on',
   image: '/image-generation',
   // The apps, Motion Control too.
-  ...Object.fromEntries(APPS.filter((a) => !a.soon).map((a) => [a.feature, `/apps/${a.slug}`])),
+  ...Object.fromEntries(APPS.filter((a) => !a.soon && a.feature !== 'media_optimizer').map((a) => [a.feature, `/apps/${a.slug}`])),
 };
 
 /** Whether the feature's page can refill its form (from a job or a saved template). */

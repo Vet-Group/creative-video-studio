@@ -126,10 +126,9 @@ export const APPS: AppConfig[] = [
     slug: 'media-optimizer',
     feature: 'media_optimizer',
     name: 'Tối ưu media',
-    description: 'Nén, đổi cỡ và đổi định dạng ảnh và video trong một lượt.',
+    description: 'Nén, đổi cỡ và đổi định dạng ảnh ngay trên thiết bị, miễn phí. Chưa hỗ trợ video.',
     category: 'utility',
     slots: [],
-    soon: 'Ứng dụng này sẽ có trong bản cập nhật kế tiếp.',
   },
   {
     // Ours, not on the live page: last, so the live apps keep their places.
