@@ -1,0 +1,13 @@
+.workspace {
+  display: grid;
+  gap: 24px;
+  align-items: start;
+}
+.workspace > div { min-width: 0; }
+.workspace input:not([type='checkbox']), .workspace select { display: block; width: 100%; max-width: 100%; }
+.workspace label { display: block; }
+.workspace p { overflow-wrap: anywhere; }
+.workspace fieldset { min-width: 0; }
+@media (min-width: 900px) {
+  .workspace { grid-template-columns: minmax(280px, 360px) minmax(0, 1fr); }
+}

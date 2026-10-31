@@ -14,13 +14,15 @@ describe('the app list', () => {
     expect(new Set(APPS.map((a) => a.slug)).size).toBe(10);
     for (const a of APPS) {
       expect(FEATURES as readonly string[]).toContain(a.feature);
-      if (!a.soon && a.feature !== 'motion_control') expect(FEATURE_PROMPTS).toHaveProperty(a.feature);
+      if (!a.soon && a.feature !== 'motion_control' && a.feature !== 'media_optimizer') expect(FEATURE_PROMPTS).toHaveProperty(a.feature);
     }
   });
 
-  it('marks only Media Optimizer as coming soon; Motion Control is built, with its own form', () => {
-    expect(appBySlug('media-optimizer')).toMatchObject({ slots: [], soon: expect.any(String) });
-    expect(APPS.filter((a) => a.soon).map((a) => a.slug)).toEqual(['media-optimizer']);
+  it('opens Media Optimizer as a local image tool without a coming-soon badge', () => {
+    expect(appBySlug('media-optimizer')).toMatchObject({ slots: [], feature: 'media_optimizer' });
+    expect(appBySlug('media-optimizer')!.soon).toBeUndefined();
+    expect(appBySlug('media-optimizer')!.description).toContain('Chưa hỗ trợ video');
+    expect(APPS.filter((a) => a.soon)).toEqual([]);
   });
 
   it('gives the swaps and Face Swap two required slots, and the others the slots of the reference', () => {
