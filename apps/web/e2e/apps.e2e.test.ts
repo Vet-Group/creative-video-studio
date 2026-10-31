@@ -36,7 +36,7 @@ test('the index lists ten apps, and the search box and the chips filter the card
   await expect(cards(page).locator('strong')).toHaveText([
     'Đổi nhân vật', 'Đổi người mẫu', 'Đổi nền', 'Đổi khung hình', 'Tăng độ phân giải', 'Đổi khuôn mặt', 'Xoá nền', 'Điều khiển chuyển động', 'Tối ưu media', 'Thử trang sức',
   ]);
-  await expect(cards(page).filter({ hasText: 'Sắp có' })).toHaveCount(1);
+  await expect(cards(page).filter({ hasText: 'Sắp có' })).toHaveCount(0);
 
   const chips = page.getByRole('group', { name: 'Danh mục' });
   await expect(chips.getByRole('button')).toHaveText(['Tất cả', 'Thời trang', 'Chỉnh ảnh', 'Video', 'Tiện ích']);
@@ -65,7 +65,7 @@ test('the index lists ten apps, and the search box and the chips filter the card
   await filter('Tất cả', ['Đổi nhân vật', 'Đổi người mẫu', 'Đổi nền', 'Đổi khung hình', 'Tăng độ phân giải', 'Đổi khuôn mặt', 'Xoá nền', 'Điều khiển chuyển động', 'Tối ưu media', 'Thử trang sức']);
 });
 
-test('an unknown app is a 404, and the app that is not built says "Sắp có" and why', async ({ page }) => {
+test('an unknown app is a 404, and Media Optimizer opens its image tool', async ({ page }) => {
   await signIn(page, 'appsa');
   const missing = await page.goto('/apps/no-such-app');
   expect(missing?.status()).toBe(404);
@@ -74,8 +74,8 @@ test('an unknown app is a 404, and the app that is not built says "Sắp có" an
   await page.goto('/apps');
   await cards(page).filter({ hasText: 'Tối ưu media' }).click();
   await expect(page).toHaveURL(/\/apps\/media-optimizer$/);
-  await expect(page.getByText('Sắp có')).toBeVisible();
-  await expect(page.getByText(/bản cập nhật kế tiếp/)).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Media Optimizer', exact: true })).toBeVisible();
+  await expect(page.getByText('Ảnh được xử lý ngay trên thiết bị, không tải lên máy chủ. Chưa hỗ trợ video MP4/WEBM.', { exact: true })).toBeVisible();
 });
 
 test('Background Remover (one slot): Run needs the image, a mock job reaches History and the Library under Ứng dụng with the app name', async ({ page }) => {
@@ -304,7 +304,7 @@ test('the change-app menu returns focus to its button on Escape, closes when foc
   await expect(list).toBeHidden();
 });
 
-test('each upload button names its slot, and the tray shows only beside the coming-soon pages', async ({ page }) => {
+test('each upload button names its slot, and the tray stays off the image-only optimizer', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await signIn(page, 'appsc');
   const tray = page.getByRole('complementary', { name: 'Job của tôi' });
@@ -318,8 +318,8 @@ test('each upload button names its slot, and the tray shows only beside the comi
   await expect(page.getByRole('list', { name: 'Danh sách ứng dụng' })).toBeVisible();
   await expect(tray).toHaveCount(0); // the card grid takes the full width, as on the live site
   await page.goto('/apps/media-optimizer');
-  await expect(page.getByText('Sắp có')).toBeVisible();
-  await expect(tray).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Media Optimizer', exact: true })).toBeVisible();
+  await expect(tray).toHaveCount(0);
 });
 
 /** An MP4 whose header gives `ms` (ftyp, then moov holding a version 0 mvhd with timescale 1000): the server reads only the header. */
