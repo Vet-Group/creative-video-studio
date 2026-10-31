@@ -197,7 +197,7 @@ describe('migration 0031 Vertex models', () => {
   test('adds the Vertex image models disabled, the Nano Banana ones with the features and limits of their fal twins', async () => {
     const { rows } = await pool.query(`select v.id, v.endpoint, v.label, v.kind, v.features, v.ratios, v.max_images, v.max_prompt_chars, v.image_prices, v.enabled,
       v.sources->'imagePrices'->>'readAt' as read_at, f.features = v.features and f.ratios = v.ratios and f.max_images = v.max_images and f.max_prompt_chars = v.max_prompt_chars as same_as_twin
-      from model_configs v left join model_configs f on f.id = replace(v.id, '-vertex', '') and f.provider = 'fal' where v.provider = 'vertex' order by v.id`);
+      from model_configs v left join model_configs f on f.id = replace(v.id, '-vertex', '') and f.provider = 'fal' where v.provider = 'vertex' and v.kind = 'image' order by v.id`);
     expect(rows.map((r) => [r.id, r.endpoint, r.image_prices, r.same_as_twin])).toEqual([
       ['nano-banana-2-vertex', 'gemini-3.1-flash-image', { '1K': '0.067' }, true],
       ['nano-banana-2.1-vertex', 'gemini-nano-banana-2.1', { '1K': '0.034', '2K': '0.05' }, true],
@@ -475,6 +475,21 @@ describe('migration 0040 Veo 3.1 on Replicate', () => {
     expect(facts.sources.usdPerSecond).toEqual({ url: 'https://replicate.com/google/veo-3.1', readAt: '2026-10-30' });
     expect(facts.sources.ratios).toEqual({ url: 'https://api.replicate.com/v1/models/google/veo-3.1', readAt: '2026-10-30' });
     expect(AUDIO_USD_PER_SECOND['google/veo-3.1']).toBe(0.4);
+  });
+});
+
+describe('migration 0042 Veo 3.1 on Vertex', () => {
+  test('adds a disabled Vertex row at an estimated $0.20 that otherwise matches the fal twin, within what the adapter sends, with an audio price', async () => {
+    const pick = `select kind, features, ratios, durations_sec, max_images, max_prompt_chars, output_resolution from model_configs where id = $1`;
+    const [twin] = (await pool.query(pick, ['veo-3.1'])).rows;
+    const [row] = (await pool.query(pick, ['veo-3.1-vertex'])).rows;
+    expect(row).toEqual(twin);
+    expect(row).toMatchObject({ ratios: ['9:16', '16:9'], durations_sec: [8], max_images: 1, output_resolution: '720p' });
+    const [facts] = (await pool.query(`select provider, endpoint, label, enabled, usd_per_second::text as usd, sources from model_configs where id = 'veo-3.1-vertex'`)).rows;
+    expect(facts).toMatchObject({ provider: 'vertex', endpoint: 'veo-3.1-generate-001', label: 'Google VEO 3.1 (Vertex)', enabled: false, usd: '0.2000' });
+    expect(facts.sources.usdPerSecond).toMatchObject({ url: 'https://cloud.google.com/vertex-ai/generative-ai/pricing', readAt: '2026-11-01' });
+    expect(facts.sources.usdPerSecond.note).toMatch(/^estimate:/);
+    expect(AUDIO_USD_PER_SECOND['veo-3.1-generate-001']).toBe(0.4);
   });
 });
 
