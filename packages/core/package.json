@@ -9,6 +9,7 @@
     "./providers/fal": "./src/providers/fal.ts",
     "./providers/replicate": "./src/providers/replicate.ts",
     "./providers/vertex": "./src/providers/vertex.ts",
+    "./providers/vertex-video": "./src/providers/vertex-video.ts",
     "./providers/mock": "./src/providers/mock.ts",
     "./providers/http": "./src/providers/http.ts",
     "./presets": "./src/presets.ts",

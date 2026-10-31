@@ -79,6 +79,11 @@ const KLING_5S = 0.56;
 const SEEDANCE_5S = 1.156;
 
 describe('runStage', () => {
+  test('rejects Vertex before submitting or polling bake-off jobs', async () => {
+    const r = rig({ models: [{ ...KLING, provider: 'vertex' }] });
+    await expect(runStage(r.deps, canary)).rejects.toThrow('Vertex is not supported by the bake-off runner');
+    expect(r.submits).toEqual([]);
+  });
   test('canary submits image 1 for both models at 9:16 with the safe preset, polls and downloads', async () => {
     const r = rig();
     const res = await runStage(r.deps, canary);

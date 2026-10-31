@@ -1,6 +1,7 @@
 // The real adapters are wired by key, and read input assets from the bucket; fetch is faked, so no test reaches a provider.
 import { BAKEOFF_MODELS } from '@cvs/core/models';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { generateKeyPairSync } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import sharp from 'sharp';
@@ -35,13 +36,39 @@ describe('realProviders', () => {
     writeFileSync(file, JSON.stringify({ client_email: 'sa@p.iam.gserviceaccount.com', private_key: 'unused', project_id: 'from-key' }));
     try {
       const vertex = realProviders(pool([]), { GOOGLE_APPLICATION_CREDENTIALS: file });
-      expect([Object.keys(vertex.providers), Object.keys(vertex.imageProviders!)]).toEqual([[], ['vertex']]);
+      expect([Object.keys(vertex.providers), Object.keys(vertex.imageProviders!)]).toEqual([['vertex'], ['vertex']]);
       writeFileSync(file, JSON.stringify({ client_email: 'sa@p.iam.gserviceaccount.com', private_key: 'unused' }));
       expect(Object.keys(realProviders(pool([]), { GOOGLE_APPLICATION_CREDENTIALS: file, GOOGLE_CLOUD_PROJECT: 'p' }).imageProviders!)).toEqual(['vertex']);
       expect(() => realProviders(pool([]), { GOOGLE_APPLICATION_CREDENTIALS: file })).toThrow(/GOOGLE_CLOUD_PROJECT/);
     } finally {
       rmSync(dir, { recursive: true });
     }
+  });
+
+  test.each(['large alpha PNG', 'small WebP'])('normalizes %s only for Vertex video through the asset reader', async (kind) => {
+    const bytes = kind === 'large alpha PNG' ? await png(2100, 2, false, true) : new Uint8Array(await sharp(small).webp().toBuffer());
+    const mime = kind === 'large alpha PNG' ? 'image/png' : 'image/webp';
+    const dir = mkdtempSync(join(tmpdir(), 'cvs-veo-'));
+    const file = join(dir, 'key.json');
+    const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+    writeFileSync(file, JSON.stringify({ client_email: 'sa@test', private_key: privateKey.export({ type: 'pkcs8', format: 'pem' }), project_id: 'test' }));
+    const predictions: any[] = [];
+    vi.stubGlobal('fetch', async (url: string, init: RequestInit) => {
+      if (url.includes('oauth2.googleapis.com')) return Response.json({ access_token: 'fake', expires_in: 3600 });
+      predictions.push(JSON.parse(init.body as string));
+      return Response.json({ name: 'projects/test/locations/us-central1/publishers/google/models/veo-3.1-generate-001/operations/abc' });
+    });
+    try {
+      const db = pool([{ ...asset, mime }]);
+      const unchanged = await assetReader(db, async () => bytes)('asset://a');
+      expect(unchanged.contentType).toBe('image/webp');
+      const { providers } = realProviders(db, { GOOGLE_APPLICATION_CREDENTIALS: file }, async () => bytes);
+      await providers.vertex!.submit({ model: { ...BAKEOFF_MODELS[0]!, provider: 'vertex', endpoint: 'veo-3.1-generate-001', outputResolution: '720p' }, prompt: 'p', imageUrls: ['asset://a'], ratio: '16:9', durationSec: 4 });
+      expect(predictions).toHaveLength(1);
+      const image = predictions[0].instances[0].image;
+      expect(image.mimeType).toBe('image/png');
+      expect((await sharp(Buffer.from(image.bytesBase64Encoded, 'base64')).metadata()).format).toBe('png');
+    } finally { rmSync(dir, { recursive: true }); }
   });
 
   test('submits a Kling job to fal with the input asset inlined from the bucket', async () => {

@@ -5,6 +5,7 @@ import { createFalImageProvider, createFalProvider } from '@cvs/core/providers/f
 import type { ReadImage } from '@cvs/core/providers/http';
 import { createReplicateProvider } from '@cvs/core/providers/replicate';
 import { createVertexImageProvider, type ServiceAccountKey } from '@cvs/core/providers/vertex';
+import { createVertexVideoProvider } from '@cvs/core/providers/vertex-video';
 import { readFileSync } from 'node:fs';
 import sharp from 'sharp';
 import type { WorkerDeps } from './worker';
@@ -53,7 +54,7 @@ export const assetReader =
     return fitForInline(cropped.bytes, cropped.contentType);
   };
 
-/** fal serves the video and image models, Replicate the video ones, Vertex (a service account key file) the image ones. */
+/** fal and Vertex serve video and image models; Replicate serves video models. Vertex uses a service account key file. */
 export function realProviders(pool: WorkerDeps['pool'], env: NodeJS.ProcessEnv = process.env, read?: (key: string) => Promise<Uint8Array>): Pick<WorkerDeps, 'providers' | 'imageProviders' | 'enhance' | 'suggest'> {
   const readImage = assetReader(pool, read);
   const providers: WorkerDeps['providers'] = {};
@@ -71,6 +72,11 @@ export function realProviders(pool: WorkerDeps['pool'], env: NodeJS.ProcessEnv =
     const key = JSON.parse(readFileSync(env.GOOGLE_APPLICATION_CREDENTIALS, 'utf8')) as ServiceAccountKey & { project_id?: string };
     const project = env.GOOGLE_CLOUD_PROJECT || key.project_id;
     if (!project) throw new Error('GOOGLE_CLOUD_PROJECT is not set and the key file has no project_id');
+    providers.vertex = createVertexVideoProvider({ key, project, region: 'us-central1', readImage: async (url) => {
+      const image = await readImage(url);
+      if (image.contentType !== 'image/webp') return image;
+      return { bytes: new Uint8Array(await sharp(image.bytes).png().toBuffer()), contentType: 'image/png' };
+    } });
     imageProviders.vertex = createVertexImageProvider({ key, project, region: env.GOOGLE_CLOUD_LOCATION || undefined, readImage, store: { put: putObject, get: getObject, delete: deleteObject } });
   }
   return { providers, imageProviders, enhance, suggest };
