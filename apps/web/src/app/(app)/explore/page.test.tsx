@@ -7,6 +7,7 @@ vi.mock('@/lib/model-scores', () => ({ modelStats: vi.fn(async () => new Map()),
 vi.mock('@/lib/samples', () => ({ listSamples: vi.fn(async () => []) }));
 vi.mock('@/components/CardMedia', () => ({ CardMedia: ({ poster, video }: { poster: string; video: string }) => <img src={poster} data-video={video} alt="" /> }));
 
+import { pool } from '@/lib/auth';
 import { listSamples } from '@/lib/samples';
 import ExplorePage from './page';
 
@@ -34,4 +35,17 @@ test('uploaded Apps and Library posters and loops override local artwork', async
     expect(markup).toContain(`src="/api/samples/feature-${name}.jpg"`);
     expect(markup).toContain(`data-video="/api/samples/feature-${name}.mp4"`);
   }
+});
+
+test('a model variant without its own sample shows the sample of the model it varies', async () => {
+  const ids = ['seedance-2.0-replicate', 'minimax-h3-max-reference-1080p', 'seedance-2.0-reference', 'kling-2.6'];
+  const rows = ids.map((id) => ({ id, label: id, provider: 'fal', kind: 'video', ratios: ['9:16'], durations_sec: [5], usd_per_second: '0.1', image_prices: null }));
+  vi.mocked(pool.query).mockResolvedValueOnce({ rows } as never);
+  vi.mocked(listSamples).mockResolvedValue(['model-seedance-2-0.mp4', 'model-seedance-2-0.jpg', 'model-minimax-h3-max.jpg', 'model-seedance-2-0-reference.jpg'].map((name) => ({ name })) as Awaited<ReturnType<typeof listSamples>>);
+  const html = renderToStaticMarkup(await ExplorePage());
+  const model = (id: string) => card(html, `/create\\?model=${id}`);
+  expect(model('seedance-2.0-replicate')).toContain('data-video="/api/samples/model-seedance-2-0.mp4"');
+  expect(model('minimax-h3-max-reference-1080p')).toContain('src="/api/samples/model-minimax-h3-max.jpg"');
+  expect(model('seedance-2.0-reference')).toContain('src="/api/samples/model-seedance-2-0-reference.jpg"'); // its own sample wins
+  expect(model('kling-2.6')).not.toContain('src=');
 });
