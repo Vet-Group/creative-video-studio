@@ -43,6 +43,8 @@ export interface ImageModel {
 export interface Img {
   id: string;
   filename: string;
+  /** A picture that is not an uploaded asset (an object URL, as in Media Optimizer); else the asset's content. */
+  url?: string;
 }
 
 export const RATIO_LABEL: Record<string, string> = { auto: 'Tự động' };
@@ -200,7 +202,7 @@ export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRem
           <ul className="slot-thumbs" aria-label={`${label}: ảnh đã chọn`}>
             {images.map((i) => (
               <li key={i.id}>
-                <img src={`/api/assets/${i.id}/content`} alt={i.filename} />
+                <img src={i.url ?? `/api/assets/${i.id}/content`} alt={i.filename} />
                 {max === 1 && (
                   <span className="slot-chip" aria-hidden="true">
                     {label}

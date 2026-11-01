@@ -1356,11 +1356,114 @@ const SWAP_TABLE = [
 /** The About tab of each built app, by slug. */
 export const APP_ABOUT: Record<string, AboutPage> = {
   'media-optimizer': {
-    title: 'Tối ưu ảnh ngay trên thiết bị',
+    title: 'Nén, đổi cỡ và đổi định dạng ảnh ngay trên thiết bị',
     sections: [
-      { title: 'Miễn phí, không tải lên máy chủ', blocks: ['Đổi kích thước và chuyển định dạng PNG, JPG hoặc WEBP ngay trong trình duyệt. Giữ tỷ lệ được bật mặc định. Tải kết quả xuống trước khi rời trang; không lưu vào Thư viện hay Lịch sử.'] },
-      { title: 'Định dạng và giới hạn', blocks: ['Ảnh tối đa 20 MB, 8000 px mỗi chiều và 16 triệu điểm ảnh. Ảnh động chỉ xuất một khung hình. JPG dùng nền trắng cho vùng trong suốt. JPG/WEBP dùng chất lượng 82%; dung lượng có thể tăng. Chưa hỗ trợ video MP4/WEBM.'] },
-      { title: 'Câu hỏi thường gặp', blocks: [{ faq: [['Có thay đổi tệp gốc không?', 'Không. Kết quả là tệp mới để bạn tải xuống.'], ['Có hỗ trợ video không?', 'Chưa hỗ trợ video MP4/WEBM; chỉ nhận ảnh PNG, JPG và WEBP.']] }] },
+      {
+        title: 'Tối ưu media là gì?',
+        blocks: [
+          'Tối ưu media là công cụ nén ảnh, đổi kích thước và chuyển định dạng trong một lần chạy. Bạn đưa vào một ảnh, gõ chiều rộng và chiều cao mới nếu cần, chọn PNG, JPG hoặc WEBP, rồi bấm Chạy để nhận một tệp mới, nhẹ hơn.',
+          'Công cụ miễn phí và chạy hoàn toàn trong trình duyệt của bạn: ảnh không được tải lên máy chủ, không dùng mô hình AI và không tính vào ngân sách nào. Hiện chỉ hỗ trợ ảnh; chưa hỗ trợ video MP4 hoặc WEBM.',
+        ],
+      },
+      {
+        title: 'Cách dùng công cụ nén ảnh',
+        lead: 'Thêm ảnh, đặt kích thước nếu cần, chọn định dạng, rồi bấm Chạy.',
+        blocks: [
+          {
+            steps: [
+              { title: 'Thêm ảnh', text: 'Bấm vào ô Ảnh hoặc kéo thả một ảnh PNG, JPG hay WEBP, tối đa 20 MB. Kích thước gốc được điền sẵn vào hai ô Kích thước.' },
+              { title: 'Đặt kích thước (tuỳ chọn)', text: 'Gõ chiều rộng hoặc chiều cao mới để thu nhỏ ảnh. Khi Giữ tỷ lệ đang bật, ô còn lại tự đổi theo để ảnh không bị méo.' },
+              { title: 'Chọn định dạng', text: 'Chọn WEBP, JPG hoặc PNG ở mục Định dạng. WEBP là lựa chọn mặc định vì thường cho tệp nhỏ nhất.' },
+              { title: 'Chạy', text: 'Bấm Chạy. Ảnh mới xuất hiện trong tab Lịch sử, kèm dung lượng trước và sau, để bạn xem rồi tải xuống.' },
+            ],
+          },
+        ],
+      },
+      {
+        title: 'Định dạng và giới hạn',
+        lead: 'Công cụ nhận ảnh PNG, JPG và WEBP, tối đa 20 MB, 8000 px mỗi chiều và 16 triệu điểm ảnh.',
+        blocks: [
+          {
+            table: [
+              ['Mục', 'Chi tiết'],
+              ['Định dạng ảnh vào và ra', 'PNG, JPG, WEBP'],
+              ['Video', 'Chưa hỗ trợ MP4, WEBM'],
+              ['Dung lượng tệp tối đa', '20 MB'],
+              ['Kích thước tối đa', '8000 px mỗi chiều, tối đa 16 triệu điểm ảnh (ví dụ 4000 × 4000 px)'],
+              ['Chất lượng JPG và WEBP', '82%'],
+              ['Ảnh động', 'Chỉ xuất một khung hình'],
+              ['Giữ tỷ lệ', 'Bật mặc định; tắt để đặt riêng chiều rộng và chiều cao'],
+              ['Chi phí', 'Miễn phí'],
+              ['Nơi xử lý', 'Trong trình duyệt của bạn, không tải ảnh lên máy chủ'],
+              ['Lưu kết quả', 'Chỉ trong phiên này (tab Lịch sử), không lưu vào Thư viện'],
+            ],
+          },
+          'Ảnh vào và ảnh ra đều là ảnh, nên mỗi lần chạy cho đúng một tệp ảnh mới. Tệp gốc của bạn không bị thay đổi.',
+        ],
+      },
+      {
+        title: 'Nên chọn định dạng nào?',
+        lead: 'Chọn định dạng theo nơi tệp sẽ được dùng: WEBP cho trang web, JPG cho ảnh chụp, PNG khi cần nền trong suốt.',
+        blocks: [
+          {
+            cards: [
+              { title: 'WEBP cho website và trang tải nhanh', text: 'WEBP thường nhỏ hơn JPG hoặc PNG ở chất lượng nhìn tương đương, nên trang tải nhanh hơn. Đổi ảnh sản phẩm và ảnh bài viết sang WEBP là cách giảm dung lượng nhanh nhất cho trang của bạn. WEBP vẫn giữ được vùng trong suốt.' },
+              { title: 'JPG cho ảnh chụp', text: 'JPG được hầu hết sàn thương mại điện tử, email và mạng xã hội chấp nhận. JPG không có nền trong suốt: công cụ tô vùng trong suốt bằng màu trắng. Đổi PNG sang JPG giúp thu nhỏ ảnh chụp không cần nền trong suốt.' },
+              { title: 'PNG khi cần nền trong suốt', text: 'PNG giữ nguyên vùng trong suốt, hợp với logo, ảnh tách nền và đồ hoạ đặt lên nền màu. PNG không nén mất chất lượng nên tệp có thể lớn hơn bản gốc, nhất là với ảnh chụp.', link: ['Tách nền bằng Xoá nền', '/apps/background-remover'] },
+            ],
+            cols: 3,
+          },
+        ],
+      },
+      {
+        title: 'Vì sao nên nén ảnh?',
+        lead: 'Tệp nhỏ hơn tải nhanh hơn, qua được giới hạn tải lên và tốn ít chỗ lưu hơn.',
+        blocks: [
+          {
+            cards: [
+              { title: 'Tốc độ trang', text: 'Ảnh nặng là nguyên nhân phổ biến khiến trang tải chậm, và tốc độ ảnh hưởng cả người mua lẫn thứ hạng tìm kiếm. Nén ảnh giúp trang sản phẩm và trang đích nhẹ hơn.' },
+              { title: 'Giới hạn của sàn bán hàng', text: 'Sàn thương mại điện tử và nền tảng cửa hàng thường giới hạn dung lượng và kích thước ảnh. Nén và đổi cỡ trước khi tải lên giúp tránh bị từ chối tệp.' },
+              { title: 'Quảng cáo và email', text: 'Thư điện tử và nền tảng quảng cáo cũng giới hạn dung lượng tệp đính kèm hay ảnh tải lên. Nén trước khi gửi để không phải làm lại.' },
+              { title: 'Dung lượng lưu trữ', text: 'Ảnh nhỏ hơn tốn ít chỗ trong ổ đĩa và thư mục chia sẻ, đồng thời gửi cho đồng nghiệp nhanh hơn.' },
+            ],
+          },
+        ],
+      },
+      {
+        title: 'Đổi kích thước không làm méo ảnh',
+        lead: 'Giữ tỷ lệ bật là cách đổi kích thước an toàn: đổi chiều rộng thì chiều cao tự đổi theo, và ngược lại.',
+        blocks: [
+          'Giữ tỷ lệ được bật mặc định nên tỷ lệ khung hình của ảnh được khoá khi bạn đổi kích thước. Chỉ tắt khi cần đúng một cặp chiều rộng và chiều cao không cùng hình dạng với ảnh gốc, và chấp nhận nội dung bị kéo giãn hoặc bóp méo.',
+          'Đổi kích thước chỉ đổi cỡ tệp, không thêm chi tiết cho ảnh. Công cụ này chỉ giúp thu nhỏ ảnh; nếu cần ảnh lớn hơn và nét hơn, hoặc đổi tỷ lệ khung hình bằng cách thêm nội dung thay vì kéo giãn, hãy dùng các ứng dụng sau.',
+          {
+            links: [
+              ['Tăng độ phân giải', '/apps/image-upscale', 'làm ảnh lớn hơn và nét hơn bằng AI (có chi phí ước tính trên nút Chạy).'],
+              ['Đổi khung hình', '/apps/reframe', 'đổi tỷ lệ khung hình bằng cách mở rộng ảnh thay vì kéo giãn.'],
+              ['Xoá nền', '/apps/background-remover', 'tách nền ảnh; hãy giữ kết quả ở PNG để vùng trong suốt không bị mất.'],
+            ],
+          },
+          'Thêm một ảnh vào ô Ảnh ở trên để nén, đổi cỡ và chuyển định dạng ngay.',
+        ],
+      },
+      {
+        title: 'Câu hỏi thường gặp',
+        blocks: [
+          {
+            faq: [
+              ['Làm sao giảm dung lượng ảnh mà không mất nhiều chất lượng?', 'Thêm ảnh, giữ nguyên kích thước hoặc gõ kích thước nhỏ hơn, chọn WEBP rồi bấm Chạy. WEBP và JPG dùng chất lượng 82%, đủ nét cho hầu hết ảnh dùng trên web. Xem dung lượng trước và sau trong tab Lịch sử.'],
+              ['Ảnh của tôi có bị tải lên máy chủ không?', 'Không. Ảnh được đọc và xử lý ngay trong trình duyệt của bạn; không có gì được gửi đi. Nên công cụ vẫn dùng được với ảnh nội bộ.'],
+              ['Công cụ có tốn tiền không?', 'Không. Công cụ miễn phí, không dùng mô hình AI và không tính vào ngân sách ảnh hay ứng dụng.'],
+              ['Có nén được video không?', 'Chưa. Hiện chỉ nhận ảnh PNG, JPG và WEBP. Hỗ trợ video MP4 và WEBM chưa có.'],
+              ['Kết quả được lưu ở đâu?', 'Chỉ trong tab Lịch sử của phiên này, tối đa 20 kết quả gần nhất. Kết quả không có trong Thư viện, và mất khi bạn tải lại hoặc rời trang, nên hãy tải xuống ngay.'],
+              ['Có đổi được WEBP sang PNG hoặc PNG sang WEBP không?', 'Có. Thêm ảnh rồi chọn định dạng muốn nhận: PNG, JPG hoặc WEBP. Việc chuyển định dạng chạy cùng lần với nén và đổi cỡ. Nếu trình duyệt không hỗ trợ ghi định dạng đã chọn, công cụ báo lỗi và bạn hãy chọn định dạng khác.'],
+              ['Tệp ra có thể lớn hơn tệp gốc không?', 'Có thể, nhất là khi gốc đã được nén kỹ hoặc khi bạn chọn PNG cho ảnh chụp. Công cụ cho biết tệp mới nhẹ hơn hay nặng hơn bao nhiêu phần trăm để bạn chọn lại định dạng hoặc kích thước.'],
+              ['Có bị méo ảnh khi đổi kích thước không?', 'Không, khi Giữ tỷ lệ còn bật: đổi chiều rộng thì chiều cao tự đổi theo. Ảnh chỉ bị kéo giãn nếu bạn tự tắt Giữ tỷ lệ.'],
+              ['Ảnh động (PNG hoặc WEBP động) thì sao?', 'Công cụ chỉ xuất một khung hình của ảnh động.'],
+              ['Ảnh có thông tin chụp (EXIF) thì sao?', 'Ảnh được vẽ lại và mã hoá lại trong trình duyệt, nên tệp mới không mang theo thông tin EXIF của tệp gốc.'],
+            ],
+          },
+        ],
+      },
     ],
   },
   'character-swap': {
