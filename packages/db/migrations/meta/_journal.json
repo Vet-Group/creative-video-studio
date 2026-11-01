@@ -302,6 +302,13 @@
       "when": 1794394954036,
       "tag": "0042_veo_3_1_vertex",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1794394955036,
+      "tag": "0043_seedance_2_0_replicate_label",
+      "breakpoints": true
     }
   ]
 }
