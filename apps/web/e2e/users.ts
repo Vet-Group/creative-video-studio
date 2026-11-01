@@ -62,6 +62,7 @@ export const USERS = {
   cvxa: { email: 'cvxa@e2e.test', name: 'E2E Create Extras A', role: 'member' },
   cvxr: { email: 'cvxr@e2e.test', name: 'E2E Create Extras Reuse', role: 'member' }, // its end frame and audio refilled from a template and from History
   famsa: { email: 'famsa@e2e.test', name: 'E2E Families A', role: 'member' }, // model-families.e2e
+  passa: { email: 'passa@e2e.test', name: 'E2E Passkey A', role: 'member' }, // passkey.e2e
   admin: { email: 'admin@e2e.test', name: 'E2E Admin', role: 'admin' },
 } as const;
 

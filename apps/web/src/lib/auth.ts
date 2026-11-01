@@ -3,7 +3,7 @@ import { accounts, passkeys, sessions, users, verifications } from '@cvs/db';
 import { createDb, createPool, databaseUrl } from '@cvs/db/client';
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
-import { admin } from 'better-auth/plugins';
+import { admin, lastLoginMethod } from 'better-auth/plugins';
 import { adminAc, userAc } from 'better-auth/plugins/admin/access';
 import { genericOAuth } from 'better-auth/plugins/generic-oauth';
 import { accountAuditHooks, passkeyAuditHook } from './account-audit';
@@ -59,6 +59,8 @@ export const auth = betterAuth({
       origin: process.env.APP_URL,
       authenticatorSelection: { residentKey: 'required', userVerification: 'required' },
     }),
+    // A cookie only (email, google, lark or passkey), so the login page can mark the method this browser used last.
+    lastLoginMethod(),
   ],
 });
 

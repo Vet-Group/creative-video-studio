@@ -1,6 +1,12 @@
 // What the login page, the sign-in methods page and the Admin users page share about the ways to sign in.
 
-export const METHOD_LABEL: Record<string, string> = { credential: 'Email và mật khẩu', google: 'Google', lark: 'Lark' };
+export const METHOD_LABEL: Record<string, string> = { credential: 'Email và mật khẩu', google: 'Google', lark: 'Lark', passkey: 'Passkey' };
+
+/** A passkey of the signed-in user as the sign-in methods page lists it. */
+export interface PasskeyItem {
+  id: string;
+  createdAt: string;
+}
 
 /** A linked method as the pages list it; `email` is the provider's own address when it is known. */
 export interface SignInMethod {

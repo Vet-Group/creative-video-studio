@@ -31,5 +31,22 @@ test('a limiter refusal says how long to wait instead of blaming the password', 
   await page.getByLabel('Email').fill(USERS.member1.email);
   await page.getByLabel('Mật khẩu').fill(PASSWORD);
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
-  await expect(page.getByRole('alert')).toHaveText('Bạn thử quá nhiều lần. Hãy đợi 7 giây rồi thử lại.');
+  await expect(page.getByRole('alert').filter({ hasText: 'Bạn thử quá nhiều lần. Hãy đợi 7 giây rồi thử lại.' })).toBeVisible();
+});
+
+test('the password field warns while Caps Lock is on, and the camera shakes its head at a wrong password', async ({ page }) => {
+  await page.goto('/login');
+  const password = page.getByLabel('Mật khẩu');
+  // The browser driver cannot latch Caps Lock, so the key events carry the modifier state themselves.
+  const key = (capsLock: boolean) => password.evaluate((el, on) => el.dispatchEvent(new KeyboardEvent('keyup', { key: 'a', bubbles: true, modifierCapsLock: on } as KeyboardEventInit)), capsLock);
+  await key(true);
+  await expect(page.getByText('Caps Lock đang bật.')).toBeVisible();
+  await key(false);
+  await expect(page.getByText('Caps Lock đang bật.')).toHaveCount(0);
+
+  await page.getByLabel('Email').fill(USERS.member1.email);
+  await password.fill(`${PASSWORD}-wrong`);
+  await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
+  await expect(page.locator('.mascot')).toHaveAttribute('data-result', 'fail');
+  await expect(page.locator('.mascot')).not.toHaveAttribute('data-result', 'fail'); // cleared when the shake ends
 });

@@ -335,6 +335,9 @@ label.model input { display: inline; margin: 0; min-width: 0; width: auto; }
 .login button.primary[aria-busy='true'] { cursor: progress; }
 .login .social { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
 .login .social button { min-height: 44px; border-radius: 10px; }
+.login button:has(> .login-last) { position: relative; }
+.login-last { position: absolute; top: -9px; right: 12px; padding: 0 8px; border-radius: 999px; background: var(--ink); color: var(--on-dark); font-size: 11px; font-weight: 600; line-height: 18px; pointer-events: none; }
+.login-caps:not(:empty) { margin-top: 6px; color: var(--brand-hover); font-weight: 600; }
 .scene-toggle { position: absolute; top: 14px; right: 14px; display: flex; gap: 4px; padding: 4px; border: 0; border-radius: 999px; background: var(--surface); color: var(--muted); box-shadow: 0 6px 18px rgb(var(--shade) / .22); }
 .login .scene-toggle[aria-pressed='true'] { background: var(--surface); }
 .scene-toggle span { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; }
@@ -362,6 +365,8 @@ label.model input { display: inline; margin: 0; min-width: 0; width: auto; }
 .mascot[data-lit='true'] .mascot-tally { fill: var(--scene-tally-on); }
 .studio :is(rect, path, ellipse, circle) { transition: fill .5s, stroke .5s; }
 .mascot-lens { transform: rotate(var(--lens-angle, 0deg)); transition: transform .12s ease-out; }
+.mascot[data-result='fail'] { transform-box: fill-box; transform-origin: 50% 100%; animation: mascot-shake .45s ease-in-out; }
+@keyframes mascot-shake { 20% { transform: rotate(-5deg); } 40% { transform: rotate(4deg); } 60% { transform: rotate(-3deg); } 80% { transform: rotate(2deg); } }
 @media (prefers-reduced-motion: reduce) {
   .mascot, .beam { display: none; }
   .login, .login-card, .login button.primary, .studio :is(rect, path, ellipse, circle) { transition: none; }
