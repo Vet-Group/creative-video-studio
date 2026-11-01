@@ -74,8 +74,65 @@ test('an unknown app is a 404, and Media Optimizer opens its image tool', async 
   await page.goto('/apps');
   await cards(page).filter({ hasText: 'Tối ưu media' }).click();
   await expect(page).toHaveURL(/\/apps\/media-optimizer$/);
-  await expect(page.getByRole('heading', { name: 'Media Optimizer', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Tối ưu media', level: 1 })).toBeAttached();
   await expect(page.getByText('Ảnh được xử lý ngay trên thiết bị, không tải lên máy chủ. Chưa hỗ trợ video MP4/WEBM.', { exact: true })).toBeVisible();
+});
+
+test('Media Optimizer: the app layout with a Free Run, a session-only History tab and the long About', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await signIn(page, 'appsa');
+  await page.goto('/apps/media-optimizer');
+  const width = page.getByLabel('Chiều rộng (px)');
+  await expect(page.getByRole('button', { name: 'Đổi ứng dụng' })).toBeVisible();
+  await expect(page.getByRole('tab')).toHaveText(['Lịch sử', 'Giới thiệu']);
+  await expect(page.getByRole('heading', { name: 'Nén, đổi cỡ và đổi định dạng ảnh ngay trên thiết bị' })).toBeVisible();
+  await expect(runButton(page)).toBeDisabled();
+  await expect(runButton(page)).toContainText('Miễn phí');
+  await expect(reasonOf(page)).toHaveText('Thêm một ảnh để bắt đầu.');
+  await expect(width).toBeDisabled();
+
+  await page.getByLabel('Ảnh cần tối ưu').setInputFiles(file('shot.png'));
+  await expect(page.getByRole('img', { name: 'shot.png' })).toBeVisible();
+  await expect(width).toHaveValue('8');
+  await width.fill('4');
+  await expect(page.getByLabel('Chiều cao (px)')).toHaveValue('4'); // the ratio is kept
+  await runButton(page).click();
+  await expect(page.getByRole('tab', { name: 'Lịch sử' })).toHaveAttribute('aria-selected', 'true');
+  const history = page.getByRole('complementary', { name: 'Kết quả trong phiên này' });
+  await expect(history).toContainText('không lưu vào Thư viện');
+  await expect(history.getByRole('link', { name: 'Tải xuống' })).toHaveAttribute('download', 'shot-optimized.webp');
+  await expect(history).toContainText('4 × 4 px');
+
+  await page.getByRole('tab', { name: 'Giới thiệu' }).click();
+  await runButton(page).click(); // a second run, at the same size
+  await expect(history.getByRole('link', { name: 'Tải xuống' })).toHaveCount(2);
+
+  await page.setViewportSize({ width: 390, height: 900 });
+  await expect(page.getByRole('tab')).toHaveText(['Tạo', 'Lịch sử', 'Giới thiệu']);
+  expect(await fits(page)).toBe(true);
+});
+
+test('Media Optimizer: removing the image during a run frees the form instead of leaving Run busy', async ({ page }) => {
+  await page.addInitScript(() => {
+    // A slow encoder, so the image can be removed while the run is still in flight.
+    const encode = HTMLCanvasElement.prototype.toBlob;
+    HTMLCanvasElement.prototype.toBlob = function (this: HTMLCanvasElement, ...args: Parameters<typeof encode>) {
+      setTimeout(() => encode.apply(this, args), 1500);
+    };
+  });
+  await signIn(page, 'appsa');
+  await page.goto('/apps/media-optimizer');
+  await page.getByLabel('Ảnh cần tối ưu').setInputFiles(file('shot.png'));
+  await expect(runButton(page)).toBeEnabled();
+  await runButton(page).click();
+  const busy = page.getByRole('button', { name: 'Đang xử lý…' });
+  await expect(busy).toBeVisible();
+  await page.getByRole('button', { name: 'Bỏ ảnh shot.png' }).click();
+  await expect(busy).toHaveCount(0);
+  await expect(runButton(page)).toBeVisible();
+  await expect(reasonOf(page)).toHaveText('Thêm một ảnh để bắt đầu.');
+  await page.getByLabel('Ảnh cần tối ưu').setInputFiles(file('shot.png'));
+  await expect(runButton(page)).toBeEnabled(); // the next image runs again
 });
 
 test('Background Remover (one slot): Run needs the image, a mock job reaches History and the Library under Ứng dụng with the app name', async ({ page }) => {
@@ -318,7 +375,7 @@ test('each upload button names its slot, and the tray stays off the image-only o
   await expect(page.getByRole('list', { name: 'Danh sách ứng dụng' })).toBeVisible();
   await expect(tray).toHaveCount(0); // the card grid takes the full width, as on the live site
   await page.goto('/apps/media-optimizer');
-  await expect(page.getByRole('heading', { name: 'Media Optimizer', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Tối ưu media', level: 1 })).toBeAttached();
   await expect(tray).toHaveCount(0);
 });
 

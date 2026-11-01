@@ -25,8 +25,8 @@ import { Select } from './Select';
 import { Tray } from './Shell';
 import { Templates } from './Templates';
 
-type Tab = 'create' | 'history' | 'about';
-const TAB_LABEL: Record<Tab, string> = { create: 'Tạo', history: 'Lịch sử', about: 'Giới thiệu' };
+export type Tab = 'create' | 'history' | 'about';
+export const TAB_LABEL: Record<Tab, string> = { create: 'Tạo', history: 'Lịch sử', about: 'Giới thiệu' };
 const CATEGORY_ICON: Record<AppCategory, IconName> = { fashion: 'tryon', photo: 'image', video: 'create', utility: 'library' };
 
 /** The picture of an app on a card and in the page header: its sample loop or still, else a tinted tile with the icon of its category. The loop plays under reduced motion too, as on the reference site's Apps pages. */
@@ -79,7 +79,7 @@ function ChangeMenu({ current }: { current: string }) {
   );
 }
 
-function AppHeader({ app }: { app: AppConfig }) {
+export function AppHeader({ app }: { app: AppConfig }) {
   const photo = `app-${app.slug}.jpg`;
   const have = useSamples();
   return (
@@ -519,7 +519,7 @@ function MotionForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
   );
 }
 
-function AppAbout({ app }: { app: AppConfig }) {
+export function AppAbout({ app }: { app: AppConfig }) {
   const page = APP_ABOUT[app.slug];
   return page ? <About page={page} long /> : null;
 }
