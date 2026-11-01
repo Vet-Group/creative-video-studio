@@ -58,9 +58,9 @@ export function softAuthenticator(origin: string) {
         authenticatorAttachment: 'platform',
       };
     },
-    /** The browser's answer to generate-authenticate-options, signed with the credential's key. */
-    authenticate(challenge: string) {
-      const authData = Buffer.concat([rpIdHash, Buffer.from([0x05]), counter()]);
+    /** The browser's answer to generate-authenticate-options, signed with the credential's key; `verified` false leaves out the UV flag (no PIN or biometric). */
+    authenticate(challenge: string, verified = true) {
+      const authData = Buffer.concat([rpIdHash, Buffer.from([verified ? 0x05 : 0x01]), counter()]);
       const json = clientData('webauthn.get', challenge);
       const signature = sign('sha256', Buffer.concat([authData, sha256(json)]), privateKey);
       return {

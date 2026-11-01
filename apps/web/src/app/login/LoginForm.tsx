@@ -39,13 +39,16 @@ export function LoginForm({
   const hydrated = useHydrated();
   const webauthn = hydrated && typeof window.PublicKeyCredential === 'function';
 
-  // Offer the saved passkeys in the Email field's suggestions; a refusal here (an old browser, the limiter) just leaves the field as it was.
+  // Offer the saved passkeys in the Email field's suggestions. A browser without them, the limiter or a closed list leaves the field as it was;
+  // a passkey the user picked that the server then refuses (a ban, an expired challenge) says so.
   useEffect(() => {
     void (async () => {
       if (!(await browserSupportsWebAuthnAutofill())) return;
       await signInWithPasskey(true);
       window.location.assign('/create');
-    })().catch(() => {});
+    })().catch((e: unknown) => {
+      if (e instanceof ApiError && e.status !== 429) setError('Không đăng nhập được bằng passkey.');
+    });
   }, []);
 
   async function passkey() {

@@ -86,6 +86,14 @@ describe('signing in with a passkey', () => {
     expect(await count('users')).toBe(users);
   });
 
+  test('a passkey used without a PIN or biometric is refused and gets no session', async () => {
+    const id = await user('nopin@example.test');
+    const { key } = await seedPasskey(id);
+    const res = await ceremony('authenticate', (c) => key.authenticate(c, false));
+    expect(res.status).toBe(401);
+    expect(await count('sessions where user_id = $1', [id])).toBe(0);
+  });
+
   test('a banned user is refused and gets no session', async () => {
     const id = await user('banned@example.test');
     const { key } = await seedPasskey(id);

@@ -46,7 +46,14 @@ test('the password field warns while Caps Lock is on, and the camera shakes its 
 
   await page.getByLabel('Email').fill(USERS.member1.email);
   await password.fill(`${PASSWORD}-wrong`);
+  // The shake lasts less than a second, so an observer set up before the click catches the mark however late the answer comes.
+  const shook = page.locator('.mascot').evaluate(
+    (m: SVGGElement) =>
+      new Promise<boolean>((resolve) => {
+        new MutationObserver(() => m.dataset.result === 'fail' && resolve(true)).observe(m, { attributes: true, attributeFilter: ['data-result'] });
+      }),
+  );
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
-  await expect(page.locator('.mascot')).toHaveAttribute('data-result', 'fail');
+  expect(await shook).toBe(true);
   await expect(page.locator('.mascot')).not.toHaveAttribute('data-result', 'fail'); // cleared when the shake ends
 });

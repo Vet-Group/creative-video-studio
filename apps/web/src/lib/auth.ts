@@ -3,6 +3,7 @@ import { accounts, passkeys, sessions, users, verifications } from '@cvs/db';
 import { createDb, createPool, databaseUrl } from '@cvs/db/client';
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
+import { APIError } from 'better-auth/api';
 import { admin, lastLoginMethod } from 'better-auth/plugins';
 import { adminAc, userAc } from 'better-auth/plugins/admin/access';
 import { genericOAuth } from 'better-auth/plugins/generic-oauth';
@@ -58,6 +59,12 @@ export const auth = betterAuth({
       rpName: 'Creative Video Studio',
       origin: process.env.APP_URL,
       authenticatorSelection: { residentKey: 'required', userVerification: 'required' },
+      // The plugin verifies with requireUserVerification false; demand the PIN or biometric here, so a found security key alone signs no one in.
+      authentication: {
+        afterVerification: ({ verification }) => {
+          if (!verification.authenticationInfo.userVerified) throw new APIError('UNAUTHORIZED', { message: 'User verification required', code: 'USER_NOT_VERIFIED' });
+        },
+      },
     }),
     // A cookie only (email, google, lark or passkey), so the login page can mark the method this browser used last.
     lastLoginMethod(),

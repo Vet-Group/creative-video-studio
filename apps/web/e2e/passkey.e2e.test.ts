@@ -11,13 +11,22 @@ async function virtualAuthenticator(page: Page) {
 }
 
 async function signOut(page: Page) {
-  await page.getByRole('button', { name: 'Cài đặt' }).click();
-  await page.getByRole('dialog', { name: 'Cài đặt' }).getByRole('button', { name: 'Đăng xuất' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Cài đặt' });
+  // Right after a navigation the page may not be hydrated yet, and a click on Settings then does nothing; click again until it opens.
+  await expect(async () => {
+    await page.getByRole('button', { name: 'Cài đặt' }).click();
+    await expect(dialog).toBeVisible({ timeout: 2_000 });
+  }).toPass();
+  await dialog.getByRole('button', { name: 'Đăng xuất' }).click();
   await expect(page).toHaveURL(/\/login$/);
 }
 
 test('a member adds a passkey, signs in with it, sees it marked as used last, and deletes it', async ({ page }) => {
   await virtualAuthenticator(page);
+  // No passkey suggestions in the Email field, so only the button signs in and the page never moves on by itself.
+  await page.addInitScript(() => {
+    PublicKeyCredential.isConditionalMediationAvailable = async () => false;
+  });
   await signIn(page, 'passa');
 
   await page.goto('/account/sign-in-methods');
@@ -26,16 +35,11 @@ test('a member adds a passkey, signs in with it, sees it marked as used last, an
 
   await signOut(page);
   const button = page.getByRole('button', { name: 'Đăng nhập bằng passkey', exact: true });
-  await expect(button).toBeEnabled();
-  // The Email field's passkey suggestion may already have signed in; otherwise the button does.
-  if (page.url().endsWith('/login')) await button.click();
+  await button.click();
   await expect(page).toHaveURL(/\/create$/);
 
-  // No suggestion request this time, so the login page stays put while the mark is checked.
-  await page.route('**/api/auth/passkey/generate-authenticate-options', (route) => route.abort());
   await signOut(page);
   await expect(button.locator('.login-last')).toHaveText('Lần trước');
-  await page.unroute('**/api/auth/passkey/generate-authenticate-options');
 
   await signIn(page, 'passa');
   await page.goto('/account/sign-in-methods');
