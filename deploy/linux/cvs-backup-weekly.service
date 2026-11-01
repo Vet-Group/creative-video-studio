@@ -1,6 +1,6 @@
 # Root user unit. Only install together with its timer once CVS_R2_* are set; without them the copy refuses with a clear message.
 [Unit]
-Description=Creative Video Studio weekly copy to the R2 restic repo
+Description=Creative Video Studio daily copy to the R2 restic repo
 
 [Service]
 Type=oneshot

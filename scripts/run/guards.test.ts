@@ -121,6 +121,7 @@ describe('log scan', () => {
     expect(scanText('a.log', 'value s3cr3t-value here', ['s3cr3t-value'])).toEqual(['a.log: a value from .env']);
     expect(scanText('conductor.log', '$ ssh vet-linux id', [])).toEqual(['conductor.log: VET access outside vet.sh']);
     expect(scanText('vet-check.log', 'ssh root@auto-System-Product-Name.local check', [])).toEqual([]);
+    expect(scanText('conductor.log', 'ssh root@vet-server-new.local id', [])).toEqual(['conductor.log: VET access outside vet.sh']);
     expect(scanText('conductor.log', 'Plan step D.3 checks vet-linux read-only', [])).toEqual([]);
   });
 });

@@ -51,7 +51,7 @@ fi
 
 # Prove the gate works through the new key, and that it refuses everything else.
 bash "$ROOT/scripts/run/vet.sh" check >/dev/null || { echo "gate key cannot run check" >&2; exit 1; }
-if ssh -F none -i "$KEY" -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes "root@auto-System-Product-Name.local" 'id' 2>/dev/null; then
+if ssh -F none -i "$KEY" -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes "root@${CVS_VET_HOST:-vet-server-new.local}" 'id' 2>/dev/null; then
   echo "gate did not refuse an arbitrary command" >&2
   exit 1
 fi

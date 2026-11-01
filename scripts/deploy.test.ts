@@ -163,6 +163,8 @@ describe.skipIf(!hasBash)('deploy kit (needs bash only)', { timeout: 30_000 }, (
     expect(r.out.match(/^MemoryMax=768M$/gm)).toHaveLength(2);
     expect(r.out.match(/^Restart=on-failure$/gm)).toHaveLength(2);
     expect(readFileSync(join(root, 'deploy/linux/cvs-drill.timer'), 'utf8')).toContain('OnCalendar=*-*-01');
+    // The R2 copy runs daily (at most 1 day lost off-host), after the 03:30 nightly backup.
+    expect(readFileSync(join(root, 'deploy/linux/cvs-backup-weekly.timer'), 'utf8')).toMatch(/^OnCalendar=\*-\*-\* 04:30:00$/m);
     expect(r.out).toContain('record unit=cvs-drill.timer');
     // Nothing was created or written.
     expect(s.left()).toEqual([]);

@@ -99,6 +99,21 @@ describe.skipIf(!hasBash)('cvs-backup (needs bash only)', { timeout: 30_000 }, (
     expect(r.out).toContain('weekly copy needs CVS_R2_REPOSITORY');
   });
 
+  test('the last line is in backup.log when the script exits, even if its process group is killed right then', () => {
+    // systemd kills the unit's cgroup when the script exits; a slow tee first on PATH makes the old race certain.
+    const own = fwd(mkdtempSync(join(tmpdir(), 'cvs-backup-race-')));
+    const sh = [
+      'set -m',
+      `real=$(command -v tee); printf '#!/bin/bash\\nsleep 0.5\\nexec %s "$@"\\n' "$real" > "${own}/tee"; chmod +x "${own}/tee"`,
+      `PATH="${own}:$PATH" CVS_STATE_DIR="${own}/state" bash "${script}" --weekly-copy > /dev/null 2>&1 & p=$!`,
+      'wait $p; kill -9 -- -$p 2> /dev/null; sleep 1',
+      `cat "${own}/state/backup.log"`,
+    ].join('\n');
+    const r = spawnSync(bash, ['-c', sh], { env: { ...process.env, ...baseEnv }, encoding: 'utf8' });
+    rmSync(own, { recursive: true, force: true });
+    expect(r.stdout).toContain('weekly copy needs CVS_R2_REPOSITORY');
+  });
+
   test('a missing restic password is refused and never echoed', () => {
     const r = run([], { CVS_RESTIC_PASSWORD: '', CVS_BACKUP_ENV: '/nonexistent/backup.env' });
     expect(r.status).not.toBe(0);

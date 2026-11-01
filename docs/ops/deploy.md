@@ -54,7 +54,7 @@ again after changing a value in `.env`; then `deploy` again so the services read
    `creative-video-studio`, writes `cloudflared/<id>.json` (mode 600) and `cloudflared/cvs.yml`, and creates only the
    new CNAME `video.vetgroup.net`. **Without the token this step is skipped** and the app is deployed without the public hostname.
 8. Writes and enables the units `cvs-web`, `cvs-worker` (each `MemoryMax=768M`, `Restart=on-failure`), `cvs-backup.timer`,
-   `cvs-drill.timer` (monthly), `cvs-backup-weekly.timer` (only if all three `CVS_R2_*` are set) and `cvs-tunnel` (only if step 7 ran).
+   `cvs-drill.timer` (monthly), `cvs-backup-weekly.timer` (daily R2 copy despite its name; only if all three `CVS_R2_*` are set) and `cvs-tunnel` (only if step 7 ran).
 
 `MemoryMax=768M` for web and worker was confirmed by plan step D.3 against the measured headroom next to Ideas Hub; see
 [`production.md`](production.md).

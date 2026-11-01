@@ -6,7 +6,8 @@ set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 KEY="${CVS_GATE_KEY:-$HOME/.ssh/cvs_run_gate_ed25519}"
-HOST="${CVS_VET_HOST:-auto-System-Product-Name.local}"
+# Production moved to vet-server-new on 2026-11-01; auto-System-Product-Name is the fenced old host.
+HOST="${CVS_VET_HOST:-vet-server-new.local}"
 VERB="${1:-}"
 
 case "$VERB" in
