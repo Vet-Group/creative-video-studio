@@ -33,7 +33,7 @@ export async function signIn(page: Page, who: UserKey): Promise<void> {
   await page.goto('/login');
   await page.getByLabel('Email').fill(USERS[who].email);
   await page.getByLabel('Mật khẩu').fill(PASSWORD);
-  await page.getByRole('button', { name: 'Đăng nhập' }).click();
+  await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
   await expect(page).toHaveURL(/\/create$/);
   // Wait for hydration, so the next link click navigates client-side and the next page's file inputs are already enabled.
   await expect(page.getByLabel('Ảnh sản phẩm')).toBeEnabled();

@@ -34,7 +34,13 @@ export function LoginForm({ googleEnabled, larkEnabled, error: errorCode }: { go
       await api('/api/auth/sign-in/email', sendJson('POST', { email, password }));
       window.location.assign('/create');
     } catch (err) {
-      setError(err instanceof ApiError && err.status < 500 ? 'Email hoặc mật khẩu không đúng.' : 'Không đăng nhập được, hãy thử lại sau.');
+      setError(
+        err instanceof ApiError && err.status === 429
+          ? `Bạn thử quá nhiều lần. Hãy đợi ${err.retryAfter ?? 10} giây rồi thử lại.`
+          : err instanceof ApiError && err.status < 500
+            ? 'Email hoặc mật khẩu không đúng.'
+            : 'Không đăng nhập được, hãy thử lại sau.',
+      );
       setBusy(false);
     }
   }
