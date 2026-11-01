@@ -23,6 +23,7 @@ export function PasswordField({
   mode,
   onToggle,
   mascot,
+  onCapsLock,
 }: {
   id: string;
   value: string;
@@ -30,6 +31,8 @@ export function PasswordField({
   mode: RevealMode | 'off';
   onToggle: () => void;
   mascot: RefObject<SVGGElement | null>;
+  /** Told whether Caps Lock is on at each key in the field. */
+  onCapsLock: (on: boolean) => void;
 }) {
   const hydrated = useHydrated();
   const narrow = useMediaQuery(NARROW);
@@ -113,6 +116,8 @@ export function PasswordField({
         required
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => onCapsLock(e.getModifierState('CapsLock'))}
+        onKeyUp={(e) => onCapsLock(e.getModifierState('CapsLock'))}
       />
       {mode === 'pointer' && (
         <>

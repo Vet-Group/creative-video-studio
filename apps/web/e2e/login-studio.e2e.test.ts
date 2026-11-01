@@ -118,7 +118,7 @@ test.describe('desktop', () => {
     await expect(busy).toBeDisabled();
     await expect(eye).toHaveAttribute('aria-pressed', 'false');
     await expect(pw).toHaveAttribute('type', 'password');
-    await expect(page.getByRole('button', { name: 'Đăng nhập' })).toHaveCount(1);
+    await expect(page.locator('button[type="submit"]')).toHaveCount(1);
 
     release();
     await expect(page.getByRole('alert').filter({ hasText: 'Email hoặc mật khẩu không đúng.' })).toBeVisible();

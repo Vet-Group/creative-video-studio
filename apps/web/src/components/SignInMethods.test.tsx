@@ -34,3 +34,17 @@ test('shows the reason a failed link left in the URL', () => {
   expect(refused).toContain('Không liên kết được tài khoản này');
   expect(refused).not.toContain('Không đăng nhập được');
 });
+
+test('lists the passkeys with their date and a delete button, and offers to add one once the page can run WebAuthn', () => {
+  const html = render({ passkeys: [{ id: 'p1', createdAt: '2026-11-01T18:30:00.000Z' }] });
+  expect(html).toContain('Passkey · 02/11/2026'); // the day in Vietnam
+  expect(html).toContain('aria-label="Xoá passkey ngày 02/11/2026"');
+  expect(html).toContain('<button type="button" disabled="">Thêm passkey</button>');
+  expect(html).not.toContain('Quản lý passkey');
+});
+
+test('without the passkeys (the Settings dialog) links to the page that manages them', () => {
+  const html = render({});
+  expect(html).toContain('<a href="/account/sign-in-methods">Quản lý passkey</a>');
+  expect(html).not.toContain('Thêm passkey');
+});

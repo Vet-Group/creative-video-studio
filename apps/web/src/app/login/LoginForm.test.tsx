@@ -34,3 +34,28 @@ test.each([
 test('shows no error without a code', () => {
   expect(render({})).not.toContain('role="alert"');
 });
+
+test('always offers a passkey, also with Google and Lark off, but only once the page can run WebAuthn', () => {
+  const html = render({});
+  expect(html).toContain('<button type="button" disabled="">Đăng nhập bằng passkey</button>');
+  expect(html).toMatch(/autocomplete="username webauthn"/i);
+});
+
+test.each([
+  ['email', 'type="submit"'],
+  ['google', 'Đăng nhập bằng Google'],
+  ['lark', 'Đăng nhập bằng Lark'],
+  ['passkey', 'Đăng nhập bằng passkey'],
+])('marks %s as the method used last, inside its button only', (method, button) => {
+  const html = renderToStaticMarkup(<LoginForm googleEnabled larkEnabled lastMethod={method} />);
+  expect(html.match(/Lần trước/g)).toHaveLength(1);
+  const badge = html.indexOf('<span class="login-last" aria-hidden="true">Lần trước</span>');
+  const start = html.lastIndexOf('<button', badge);
+  expect(html.slice(start, badge)).toContain(button);
+});
+
+test('marks no method without the cookie, and keeps the Caps Lock line empty until a key says it is on', () => {
+  const html = render({});
+  expect(html).not.toContain('Lần trước');
+  expect(html).toContain('<p class="login-hint login-caps" aria-live="polite"></p>');
+});

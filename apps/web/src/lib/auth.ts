@@ -1,11 +1,13 @@
-import { accounts, sessions, users, verifications } from '@cvs/db';
+import { passkey } from '@better-auth/passkey';
+import { accounts, passkeys, sessions, users, verifications } from '@cvs/db';
 import { createDb, createPool, databaseUrl } from '@cvs/db/client';
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
-import { admin } from 'better-auth/plugins';
+import { APIError } from 'better-auth/api';
+import { admin, lastLoginMethod } from 'better-auth/plugins';
 import { adminAc, userAc } from 'better-auth/plugins/admin/access';
 import { genericOAuth } from 'better-auth/plugins/generic-oauth';
-import { accountAuditHooks } from './account-audit';
+import { accountAuditHooks, passkeyAuditHook } from './account-audit';
 import { larkOAuth } from './lark';
 
 // One pool per server process; dev reloads keep it on globalThis.
@@ -21,7 +23,13 @@ export const auth = betterAuth({
   baseURL: process.env.APP_URL,
   secret: process.env.BETTER_AUTH_SECRET,
   telemetry: { enabled: false },
-  database: drizzleAdapter(createDb(pool), { provider: 'pg', usePlural: true, schema: { users, sessions, accounts, verifications } }),
+  database: drizzleAdapter(createDb(pool), { provider: 'pg', usePlural: true, schema: { users, sessions, accounts, verifications, passkeys } }),
+  // Production is reached only through the Cloudflare tunnel (lan-guard keeps port 3400 off the LAN), and Cloudflare sets this header to the one
+  // client address. The default x-forwarded-for takes what a client sends, and a forged one sends every sign-in to one shared limiter bucket.
+  advanced: { ipAddress: { ipAddressHeaders: ['cf-connecting-ip'] } },
+  // Each passkey options request stores a challenge row, and the login page asks for one on every visit; the office shares one address.
+  rateLimit: { customRules: { '/passkey/generate-authenticate-options': { window: 60, max: 30 } } },
+  hooks: { after: passkeyAuditHook(pool) },
   // No public sign-up: an Admin creates every account (Q4).
   emailAndPassword: { enabled: true, disableSignUp: true },
   // disableSignUp, not disableImplicitSignUp: a client bypasses the latter with requestSignUp: true. A social sign-in only ever
@@ -46,6 +54,20 @@ export const auth = betterAuth({
       adminRoles: ['admin'],
     }),
     genericOAuth({ config: larkLoginEnabled ? [larkOAuth({ appId: LARK_APP_ID!, appSecret: LARK_APP_SECRET!, tenantKey: LARK_TENANT_KEY! })] : [] }),
+    // Adding a passkey needs a fresh session of an existing user; signing in with one never creates a user. rpID is APP_URL's host.
+    passkey({
+      rpName: 'Creative Video Studio',
+      origin: process.env.APP_URL,
+      authenticatorSelection: { residentKey: 'required', userVerification: 'required' },
+      // The plugin verifies with requireUserVerification false; demand the PIN or biometric here, so a found security key alone signs no one in.
+      authentication: {
+        afterVerification: ({ verification }) => {
+          if (!verification.authenticationInfo.userVerified) throw new APIError('UNAUTHORIZED', { message: 'User verification required', code: 'USER_NOT_VERIFIED' });
+        },
+      },
+    }),
+    // A cookie only (email, google, lark or passkey), so the login page can mark the method this browser used last.
+    lastLoginMethod(),
   ],
 });
 

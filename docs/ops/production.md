@@ -26,3 +26,10 @@ app's Postgres and MinIO run under `docker.service`, outside that cap, and the h
 
 The plan asks D.3 to read Ideas Hub ADR 0007 ("backup and drill stay disabled") and record whether its reason applies here.
 The run cannot read the Ideas Hub repository, so this is left to the owner before `cvs-backup.timer` is relied on.
+
+## Sign-in limiter and the client address
+
+better-auth's limiter (3 sign-ins per 10 s per address and path, in memory, production only) counts the `CF-Connecting-IP`
+address (`lib/auth.ts`), which Cloudflare sets to the one client address. That is safe only while the tunnel is the only way in:
+on the new host `lan-guard.service` keeps port 3400 off the LAN (owner record, 2026-11-02). If another way in is ever added, it
+must set or strip that header, or every request it brings shares one limiter bucket.
