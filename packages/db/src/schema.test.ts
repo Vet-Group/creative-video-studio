@@ -493,6 +493,17 @@ describe('migration 0042 Veo 3.1 on Vertex', () => {
   });
 });
 
+describe('migration 0043 Seedance 2.0 label', () => {
+  test('drops the provider suffix from the Replicate Seedance 2.0 label and changes nothing else', async () => {
+    const { rows } = await pool.query(`select id, label from model_configs where label like 'Seedance 2.0%' order by id`);
+    expect(rows).toEqual([
+      { id: 'seedance-2.0', label: 'Seedance 2.0' },
+      { id: 'seedance-2.0-reference', label: 'Seedance 2.0 Reference' },
+      { id: 'seedance-2.0-replicate', label: 'Seedance 2.0' },
+    ]);
+  });
+});
+
 describe('cost_entries', () => {
   test('is append-only: UPDATE, DELETE and TRUNCATE raise', async () => {
     const job = await insertJob(userId);
