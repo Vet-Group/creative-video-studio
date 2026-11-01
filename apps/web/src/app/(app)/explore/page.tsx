@@ -28,8 +28,9 @@ const modelSample = (have: ReadonlySet<string>, id: string) => {
   }
 };
 
-/** The live page's featured models, in its order; they lead the row, then the other models with a sample loop, then those with a still, then the rest. */
-const FEATURED = ['seedance-2.5-image', 'kling-o3-pro', 'gemini-omni-flash', 'kling-3.0-pro', 'seedance-2.0'];
+/** The live page's featured models, in its order; they lead the row, then the other models with a sample loop, then those with a still, then the rest.
+ * seedance-2.5 and seedance-2.0-replicate keep the live order when the -image and base rows are disabled. */
+const FEATURED = ['seedance-2.5-image', 'seedance-2.5', 'kling-o3-pro', 'gemini-omni-flash', 'kling-3.0-pro', 'seedance-2.0', 'seedance-2.0-replicate'];
 
 const range = (values: number[]) => (values.length === 0 ? '' : values.length > 1 ? `${Math.min(...values)}–${Math.max(...values)} giây` : `${values[0]} giây`);
 

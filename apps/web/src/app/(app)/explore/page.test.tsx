@@ -49,3 +49,14 @@ test('a model variant without its own sample shows the sample of the model it va
   expect(model('seedance-2.0-reference')).toContain('src="/api/samples/model-seedance-2-0-reference.jpg"'); // its own sample wins
   expect(model('kling-2.6')).not.toContain('src=');
 });
+
+test('Seedance 2.5 and the Replicate Seedance 2.0 keep their featured places when the -image and base rows are off', async () => {
+  const ids = ['flux-3', 'seedance-2.0-replicate', 'kling-o3-pro', 'seedance-2.5'];
+  const rows = ids.map((id) => ({ id, label: id, provider: 'fal', kind: 'video', ratios: ['9:16'], durations_sec: [5], usd_per_second: '0.1', image_prices: null }));
+  vi.mocked(pool.query).mockResolvedValueOnce({ rows } as never);
+  vi.mocked(listSamples).mockResolvedValue(['model-flux-3.mp4'].map((name) => ({ name })) as Awaited<ReturnType<typeof listSamples>>);
+  const html = renderToStaticMarkup(await ExplorePage());
+  const order = [...html.matchAll(/href="\/create\?model=([^"]+)"/g)].map((m) => m[1]);
+  expect(order).toEqual(['seedance-2.5', 'kling-o3-pro', 'seedance-2.0-replicate', 'flux-3']);
+  expect(html).toMatch(/model=seedance-2\.0-replicate"[^<]*<img[^>]*><strong>[^<]*<\/strong><span[^>]*>Thế hệ video mới/); // a description, not the spec line
+});
