@@ -91,6 +91,7 @@ describe('signing in with a passkey', () => {
     const { key } = await seedPasskey(id);
     const res = await ceremony('authenticate', (c) => key.authenticate(c, false));
     expect(res.status).toBe(401);
+    expect(((await res.json()) as { code: string }).code).toBe('USER_NOT_VERIFIED');
     expect(await count('sessions where user_id = $1', [id])).toBe(0);
   });
 
