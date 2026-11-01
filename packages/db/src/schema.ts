@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import {
   type AnyPgColumn,
+  bigint,
   bigserial,
   boolean,
   check,
@@ -141,6 +142,28 @@ export const verifications = pgTable(
     updatedAt: tstz('updated_at').notNull().defaultNow(),
   },
   (t) => [index('verifications_identifier_idx').on(t.identifier)],
+);
+
+// A WebAuthn credential of @better-auth/passkey; the JS keys are the plugin's field names. Only a signed-in user adds one.
+export const passkeys = pgTable(
+  'passkeys',
+  {
+    id: text('id').primaryKey(),
+    name: text('name'),
+    publicKey: text('public_key').notNull(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    credentialID: text('credential_id').notNull().unique(),
+    // The WebAuthn signature counter is a uint32, past the range of integer.
+    counter: bigint('counter', { mode: 'number' }).notNull(),
+    deviceType: text('device_type').notNull(),
+    backedUp: boolean('backed_up').notNull(),
+    transports: text('transports'),
+    createdAt: tstz('created_at').notNull().defaultNow(),
+    aaguid: text('aaguid'),
+  },
+  (t) => [index('passkeys_user_id_idx').on(t.userId)],
 );
 
 // An uploaded input image or video, or a generated output; the bytes live in MinIO under s3Key.

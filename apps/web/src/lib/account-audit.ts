@@ -2,7 +2,7 @@
 // The Admin unlink route writes its own row in its own transaction (api/admin/users/[id]/accounts/[accountId]).
 import { audit } from '@cvs/core/audit';
 import type { Queryable } from '@cvs/core/ledger';
-import { APIError } from 'better-auth/api';
+import { APIError, createAuthMiddleware } from 'better-auth/api';
 import { googleEmail } from './sign-in-methods';
 
 interface AccountRow {
@@ -64,4 +64,23 @@ export function accountAuditHooks(q: Queryable) {
       },
     },
   };
+}
+
+/**
+ * hooks.after for the passkey plugin, which writes its rows with adapter.create, out of reach of databaseHooks.account. Adding and deleting
+ * a passkey are audited like linking and unlinking a method, with provider 'passkey'. Both endpoints run in the caller's own session.
+ * shortcut: same out-of-transaction write as accountAuditHooks; deleting a passkey does not end the sessions it opened (unlike an unlink).
+ */
+export function passkeyAuditHook(q: Queryable) {
+  return createAuthMiddleware(async (ctx) => {
+    const done = ctx.context.returned;
+    const userId = ctx.context.session?.user.id;
+    if (!done || done instanceof APIError || !userId) return;
+    const target = `user:${userId}`;
+    if (ctx.path === '/passkey/verify-registration') {
+      await audit(q, { actorId: userId, action: 'account.link', target, newValue: { provider: 'passkey', accountId: (done as { id: string }).id, email: null } });
+    } else if (ctx.path === '/passkey/delete-passkey') {
+      await audit(q, { actorId: userId, action: 'account.unlink', target, oldValue: { provider: 'passkey', accountId: (ctx.body as { id: string }).id, email: null } });
+    }
+  });
 }
