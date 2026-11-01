@@ -78,9 +78,13 @@ for c in git docker curl tar xz sha256sum systemctl loginctl base64 mktemp flock
 [ -r "$deploy_key" ] || precheck "deploy key $deploy_key is not readable (set CVS_DEPLOY_KEY)"
 [ -f "$app/.env" ] || precheck "$app/.env is missing; copy .env.example to it and fill it first"
 [ "$(stat -c %a "$app/.env")" = 600 ] || precheck "$app/.env must be mode 600 (it holds secrets)"
-# A checkout of another repository in the app directory is never touched.
-if [ -d "$app/.git" ] && [ "$(git -C "$app" remote get-url origin 2> /dev/null || true)" != "$repo_url" ]; then
-  precheck "$app is a git checkout whose origin is not CVS_REPO_URL; refusing to change it"
+# A checkout of another repository in the app directory is never touched. The same repository over anonymous HTTPS is
+# accepted: the repo is public, so a host without a GitHub deploy key can still fetch it.
+if [ -d "$app/.git" ]; then
+  origin="$(git -C "$app" remote get-url origin 2> /dev/null || true)"
+  if [ "$origin" != "$repo_url" ] && [ "$origin" != "${repo_url/#git@github.com:/https://github.com/}" ]; then
+    precheck "$app is a git checkout whose origin is not CVS_REPO_URL; refusing to change it"
+  fi
 fi
 if [ "$dry" = 1 ]; then say "dry run: nothing below is executed"; fi
 uid="$(id -u)"
