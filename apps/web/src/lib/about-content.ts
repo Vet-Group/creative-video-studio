@@ -1372,7 +1372,7 @@ export const APP_ABOUT: Record<string, AboutPage> = {
           {
             steps: [
               { title: 'Thêm ảnh', text: 'Bấm vào ô Ảnh hoặc kéo thả một ảnh PNG, JPG hay WEBP, tối đa 20 MB. Kích thước gốc được điền sẵn vào hai ô Kích thước.' },
-              { title: 'Đặt kích thước (tuỳ chọn)', text: 'Gõ chiều rộng hoặc chiều cao mới để thu nhỏ ảnh. Khi Giữ tỷ lệ đang bật, ô còn lại tự đổi theo để ảnh không bị méo.' },
+              { title: 'Đặt kích thước (tuỳ chọn)', text: 'Gõ chiều rộng hoặc chiều cao mới, tối đa 8000 px mỗi chiều. Khi Giữ tỷ lệ đang bật, ô còn lại tự đổi theo để ảnh không bị méo.' },
               { title: 'Chọn định dạng', text: 'Chọn WEBP, JPG hoặc PNG ở mục Định dạng. WEBP là lựa chọn mặc định vì thường cho tệp nhỏ nhất.' },
               { title: 'Chạy', text: 'Bấm Chạy. Ảnh mới xuất hiện trong tab Lịch sử, kèm dung lượng trước và sau, để bạn xem rồi tải xuống.' },
             ],
@@ -1434,7 +1434,7 @@ export const APP_ABOUT: Record<string, AboutPage> = {
         lead: 'Giữ tỷ lệ bật là cách đổi kích thước an toàn: đổi chiều rộng thì chiều cao tự đổi theo, và ngược lại.',
         blocks: [
           'Giữ tỷ lệ được bật mặc định nên tỷ lệ khung hình của ảnh được khoá khi bạn đổi kích thước. Chỉ tắt khi cần đúng một cặp chiều rộng và chiều cao không cùng hình dạng với ảnh gốc, và chấp nhận nội dung bị kéo giãn hoặc bóp méo.',
-          'Đổi kích thước chỉ đổi cỡ tệp, không thêm chi tiết cho ảnh. Công cụ này chỉ giúp thu nhỏ ảnh; nếu cần ảnh lớn hơn và nét hơn, hoặc đổi tỷ lệ khung hình bằng cách thêm nội dung thay vì kéo giãn, hãy dùng các ứng dụng sau.',
+          'Đổi kích thước chỉ đổi cỡ tệp, không thêm chi tiết cho ảnh. Phóng to ở đây chỉ kéo giãn điểm ảnh có sẵn; nếu cần ảnh lớn hơn và nét hơn, hoặc đổi tỷ lệ khung hình bằng cách thêm nội dung thay vì kéo giãn, hãy dùng các ứng dụng sau.',
           {
             links: [
               ['Tăng độ phân giải', '/apps/image-upscale', 'làm ảnh lớn hơn và nét hơn bằng AI (có chi phí ước tính trên nút Chạy).'],

@@ -112,6 +112,29 @@ test('Media Optimizer: the app layout with a Free Run, a session-only History ta
   expect(await fits(page)).toBe(true);
 });
 
+test('Media Optimizer: removing the image during a run frees the form instead of leaving Run busy', async ({ page }) => {
+  await page.addInitScript(() => {
+    // A slow encoder, so the image can be removed while the run is still in flight.
+    const encode = HTMLCanvasElement.prototype.toBlob;
+    HTMLCanvasElement.prototype.toBlob = function (this: HTMLCanvasElement, ...args: Parameters<typeof encode>) {
+      setTimeout(() => encode.apply(this, args), 1500);
+    };
+  });
+  await signIn(page, 'appsa');
+  await page.goto('/apps/media-optimizer');
+  await page.getByLabel('Ảnh cần tối ưu').setInputFiles(file('shot.png'));
+  await expect(runButton(page)).toBeEnabled();
+  await runButton(page).click();
+  const busy = page.getByRole('button', { name: 'Đang xử lý…' });
+  await expect(busy).toBeVisible();
+  await page.getByRole('button', { name: 'Bỏ ảnh shot.png' }).click();
+  await expect(busy).toHaveCount(0);
+  await expect(runButton(page)).toBeVisible();
+  await expect(reasonOf(page)).toHaveText('Thêm một ảnh để bắt đầu.');
+  await page.getByLabel('Ảnh cần tối ưu').setInputFiles(file('shot.png'));
+  await expect(runButton(page)).toBeEnabled(); // the next image runs again
+});
+
 test('Background Remover (one slot): Run needs the image, a mock job reaches History and the Library under Ứng dụng with the app name', async ({ page }) => {
   await signIn(page, 'appsa');
   await openApp(page, 'Xoá nền', 'background-remover');

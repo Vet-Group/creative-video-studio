@@ -107,6 +107,7 @@ export function MediaOptimizer({ app }: { app: AppConfig }) {
     setFile(null);
     setError('');
     setNotice('');
+    setBusy(false); // a run or decode of the previous image no longer owns the form
     if (!next) return;
     const reason = imageFileReason(next);
     if (reason) {
@@ -137,6 +138,7 @@ export function MediaOptimizer({ app }: { app: AppConfig }) {
   }
 
   function dimension(side: 'width' | 'height', value: number) {
+    setNotice('');
     setSize(preserve && image.current ? resizedDimensions(image.current.width, image.current.height, side, value) : { ...size, [side]: value });
   }
 
@@ -224,10 +226,10 @@ export function MediaOptimizer({ app }: { app: AppConfig }) {
                   Giữ tỷ lệ
                 </button>
               </div>
-              <span className="help">Thu nhỏ kết quả; kích thước gốc được điền sẵn.</span>
+              <span className="help">Đổi kích thước kết quả; kích thước gốc được điền sẵn.</span>
             </div>
 
-            <Select label="Định dạng (tuỳ chọn)" icon="preset" heading="Chọn định dạng" value={format} options={IMAGE_FORMATS.map((f) => ({ value: f, label: formatName(f) }))} onChange={(v) => setFormat(v as ImageFormat)} />
+            <Select label="Định dạng (tuỳ chọn)" icon="preset" heading="Chọn định dạng" value={format} options={IMAGE_FORMATS.map((f) => ({ value: f, label: formatName(f) }))} onChange={(v) => { setFormat(v as ImageFormat); setNotice(''); }} />
             {file && <p className="help">JPG dùng nền trắng cho vùng trong suốt. JPG/WEBP dùng chất lượng 82%; dung lượng có thể lớn hơn bản gốc.</p>}
           </div>
 
