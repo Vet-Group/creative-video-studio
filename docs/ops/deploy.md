@@ -65,6 +65,9 @@ The Cloudflare token needs these permissions (unverified: not yet tried against 
 Settings come from the environment first, then from `/opt/creative-video-studio/.env`, which must exist before a real run.
 Other variables: `CVS_APP_DIR`, `CVS_REPO_URL`, `CVS_REPO_REF`, `CVS_DEPLOY_KEY` (default `~/.ssh/cvs_deploy_ed25519`, the read-only key `scripts/run/install-gate-key.sh` created), `CVS_HOSTNAME`, `CVS_ZONE`.
 `CVS_LISTEN_FILE` (a file in `ss -ltnH` format) replaces the port probe; the tests use it.
+An existing checkout whose origin is the same repository over anonymous HTTPS (`https://github.com/Vet-Group/creative-video-studio.git`)
+is accepted as well. The repo is public, so this is how a host without a GitHub deploy key fetches: on 2026-11-01 the
+Vet-Group organization had deploy keys disabled and the new VET host (192.168.1.31) was switched to it.
 
 ### Re-running and updating
 
