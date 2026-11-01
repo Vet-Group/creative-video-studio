@@ -214,7 +214,7 @@ The fal adapter always sends `X-Fal-Store-IO: 0` and an object lifecycle of at l
 ## Backups and restore drill
 
 - Nightly: `pg_dump -Fc` plus the MinIO data go into a local encrypted restic repo on the VET server, kept for 14 daily snapshots. Deduplication keeps 14 dailies from multiplying the video size. At most 1 day of data may be lost.
-- Weekly: `restic copy` to an encrypted Cloudflare R2 repo, with 8 weekly snapshots. The owner creates the bucket and key. Without them the weekly copy is skipped and the nightly backups still run.
+- Daily at 04:30 (weekly until 2026-11-01; the unit is still named `cvs-backup-weekly`): `restic copy` to an encrypted Cloudflare R2 repo, keeping 14 daily and 8 weekly snapshots, so at most 1 day of data is lost if the server disk fails. The owner creates the bucket and key. Without them the copy is skipped and the nightly backups still run.
 - Before each run the script checks free disk space and refuses below 15%.
 - Restore drill (`--drill`): restore the latest snapshot into a scratch database and a scratch MinIO, then compare the user, job and asset counts, plus the `cost_entries` row count and `sum(usd)`. A mismatch exits non-zero.
 - The drill runs before staff go live, then monthly from a timer.

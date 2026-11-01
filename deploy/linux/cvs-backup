@@ -2,7 +2,8 @@
 # Usage: cvs-backup [--drill | --weekly-copy]
 #   (none)         nightly: pg_dump -Fc + counts.txt + the MinIO volume into the LOCAL restic repo, keep 14 dailies.
 #   --drill        restore the latest snapshot into a scratch DB and a scratch MinIO and compare it with counts.txt.
-#   --weekly-copy  copy the latest snapshot to the R2 repo (CVS_R2_*), keep 8 weeklies. Needs R2 credentials.
+#   --weekly-copy  copy the latest snapshot to the R2 repo (CVS_R2_*), keep 14 dailies and 8 weeklies. Needs R2 credentials.
+#                  Runs daily since 2026-11-01 (cvs-backup-weekly.timer keeps its old name).
 # Adapted from ideas-hub scripts/linux/ideashub-backup. Acts only on its own compose project (CVS_COMPOSE_PROJECT).
 # Env (defaults): CVS_COMPOSE_PROJECT (creative-video-studio), CVS_BACKUP_DIR (/opt/creative-video-studio/backups),
 # CVS_STATE_DIR (~/.local/state/creative-video-studio), CVS_DB_NAME / CVS_DB_USER (cvs), CVS_S3_BUCKET (.env S3_BUCKET),
@@ -28,6 +29,10 @@ drill_name="${project}-drill-minio"
 drill_volume="${project}_drill-minio"
 mkdir -p "$state"
 exec > >(tee -a "$state/backup.log") 2>&1
+tee_pid=$!
+# systemd kills the unit's whole cgroup the moment this script exits, so tee must have written the last line by then.
+finish() { exec > /dev/null 2>&1; wait "$tee_pid" || true; }
+trap finish EXIT
 say() { printf '%s [backup] %s\n' "$(date -u +%FT%TZ)" "$*"; }
 fail() { # $1 = stage, $2 = short error; the only failure path
   say "failed at $1: $2"
@@ -161,7 +166,7 @@ if [ "$mode" = weekly ]; then
     out="$(restic init --from-repo /repo --copy-chunker-params 2>&1)" || { printf '%s\n' "$out"; fail weekly "$(last_line "$out")"; }
   }
   out="$(restic copy "$snap" 2>&1)" || { printf '%s\n' "$out"; fail weekly "$(last_line "$out")"; }
-  out="$(restic forget --host "$restic_host" --keep-weekly 8 --prune 2>&1)" || { printf '%s\n' "$out"; fail weekly "$(last_line "$out")"; }
+  out="$(restic forget --host "$restic_host" --keep-daily 14 --keep-weekly 8 --prune 2>&1)" || { printf '%s\n' "$out"; fail weekly "$(last_line "$out")"; }
   say "weekly copy of snapshot $snap done"; exit 0
 fi
 
@@ -171,7 +176,7 @@ cleanup() {
   docker rm -f "$drill_name" > /dev/null 2>&1 || true
   docker volume rm -f "$drill_volume" > /dev/null 2>&1 || true
 }
-cleanup; trap cleanup EXIT
+cleanup; trap 'cleanup; finish' EXIT
 snap="$(snapshot_id)" || fail drill "no snapshot of host $restic_host in the repository"
 expected="$(restic dump "$snap" /backup/staging/counts.txt)" || fail drill "counts.txt not in snapshot $snap"
 minio="$("${compose[@]}" ps -q minio)" || minio=""

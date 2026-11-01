@@ -1,8 +1,8 @@
 [Unit]
-Description=Creative Video Studio weekly copy to R2
+Description=Creative Video Studio daily copy to R2 (unit name kept from the weekly schedule)
 
 [Timer]
-OnCalendar=Sun *-*-* 04:30:00
+OnCalendar=*-*-* 04:30:00
 Persistent=true
 Unit=cvs-backup-weekly.service
 

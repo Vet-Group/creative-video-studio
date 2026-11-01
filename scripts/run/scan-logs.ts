@@ -18,7 +18,7 @@ export function scanText(name: string, text: string, secrets: string[]): string[
   for (const [rule, re] of PATTERNS) if (re.test(text)) findings.push(`${name}: ${rule}`);
   if (secrets.some((s) => text.includes(s))) findings.push(`${name}: a value from .env`);
   // vet.sh writes vet-*.log; an ssh/scp command line to the host in any other log means VET was reached another way.
-  if (!/^vet-/.test(name) && /\b(ssh|scp|sftp)\b[^\n]*(vet-linux|auto-System-Product-Name)/.test(text)) findings.push(`${name}: VET access outside vet.sh`);
+  if (!/^vet-/.test(name) && /\b(ssh|scp|sftp)\b[^\n]*(vet-linux|vet-server-new|auto-System-Product-Name)/.test(text)) findings.push(`${name}: VET access outside vet.sh`);
   return findings;
 }
 
