@@ -23,7 +23,7 @@ const text = (b: AboutBlock): string[] =>
                   ? [b.example.text]
                   : 'faq' in b
                     ? b.faq.flat()
-                    : [];
+                    : []; // pairs and loop carry no text
 
 describe('the About pages', () => {
   it.each(pages)('%s has unique section titles, ends on the FAQ and keeps table rows as wide as the header', (_, page) => {
@@ -43,10 +43,10 @@ describe('the About pages', () => {
     expect(all).not.toMatch(/credit|tín dụng|gói cước|Fash Studio|fash\.studio/i);
   });
 
-  /** Every media slot of a page: the sample each card, step and example names. */
+  /** Every media slot of a page: the sample each card, step, example and loop names. */
   const media = (page: AboutPage): string[] =>
     page.sections.flatMap((s) => s.blocks ?? []).flatMap((b) =>
-      typeof b === 'string' ? [] : 'cards' in b ? b.cards.flatMap((c) => c.media ?? []) : 'steps' in b ? b.steps.flatMap((x) => x.media ?? []) : 'example' in b ? (b.example.media ?? []) : [],
+      typeof b === 'string' ? [] : 'cards' in b ? b.cards.flatMap((c) => c.media ?? []) : 'steps' in b ? b.steps.flatMap((x) => x.media ?? []) : 'example' in b ? (b.example.media ?? []) : 'loop' in b ? [b.loop] : [],
     );
 
   it.each(pages)('%s names an uploadable sample in every media slot, once each', (_, page) => {

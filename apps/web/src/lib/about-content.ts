@@ -24,6 +24,8 @@ export type AboutBlock =
   | string
   | { cards: AboutCard[]; cols?: 2 | 3 }
   | { steps: AboutStep[] }
+  /** A looping clip on its own under the steps, as the live pages show the finished result there; the sample keeps its own shape. */
+  | { loop: string }
   | { pairs: [string, string][]; labels: [string, string] }
   | { table: string[][] }
   | { list: string[] }
@@ -81,6 +83,7 @@ const create: AboutPage = {
             { title: 'Chọn thông số và chạy', text: 'Chọn mô hình, rồi thời lượng và tỉ lệ mà mô hình đó hỗ trợ; độ phân giải đi theo mô hình. Nút Run ghi chi phí ước tính bằng USD trước khi bạn bấm, và job nằm trong tab Lịch sử cho đến khi clip xong.', media: 'about-create-step-3' },
           ],
         },
+        { loop: 'about-create-loop' },
       ],
     },
     {
@@ -459,6 +462,7 @@ const tryOn: AboutPage = {
             { title: 'Chọn thông số và chạy', text: 'Chọn mô hình, độ phân giải và tỉ lệ, thêm ảnh bối cảnh hoặc prompt nếu muốn chỉ đạo cảnh, rồi bấm Thử đồ. Nút ghi chi phí ước tính bằng USD trước khi bạn bấm, và kết quả về tab Lịch sử.', media: 'try-on-example-1' },
           ],
         },
+        { loop: 'about-try-on-loop' },
       ],
     },
     {
@@ -1049,6 +1053,7 @@ const marketing: AboutPage = {
             { title: 'Chạy và để AI chỉ đạo', text: 'Bấm Tạo video, với chi phí ước tính bằng USD ghi trên nút, và AI dựng video từ hai ảnh cùng các lựa chọn của bạn. Clip xong nằm trong tab Lịch sử và trong Thư viện, mục Marketing Studio.', media: 'about-marketing-step-3' },
           ],
         },
+        { loop: 'about-marketing-loop' },
       ],
     },
     {
@@ -1233,6 +1238,7 @@ const advanced: AboutPage = {
             { title: 'Chạy và nhận video', text: 'Chọn tỉ lệ, thời lượng và âm thanh, rồi bấm chạy, với chi phí ước tính bằng USD ghi trên nút. Video xong nằm trong tab Lịch sử và trong Thư viện.', media: 'about-advanced-step-3' },
           ],
         },
+        { loop: 'about-advanced-loop' },
       ],
     },
     {
@@ -2370,6 +2376,7 @@ export const MODEL_CARD_TEXT: Record<string, string> = {
   'seedance-2.5-image': 'Chuyển động sắc nét hơn và bám mô tả chặt hơn, với clip dài tới 30 giây.',
   'seedance-2.5-reference': 'Ghép tối đa 4 ảnh tham chiếu thành clip điện ảnh dài tới 30 giây.',
   'seedance-2.0': 'Thế hệ video mới với chuyển động chân thực và linh hoạt sáng tạo, clip tới 15 giây.',
+  'seedance-2.0-replicate': 'Thế hệ video mới với chuyển động chân thực và linh hoạt sáng tạo, clip tới 15 giây.',
   'seedance-2.0-reference': 'Dựng cảnh từ tối đa 4 ảnh tham chiếu, clip 4–15 giây.',
   'seedance-1.5-pro': 'Lựa chọn tiết kiệm của Seedance cho clip 4–12 giây.',
   'seedance-1.0-pro': 'Clip 3–12 giây ở 1080p, lựa chọn bền bỉ với chi phí vừa phải.',
@@ -2383,7 +2390,11 @@ export const MODEL_CARD_TEXT: Record<string, string> = {
   'wan-2.7': 'Mô hình mã nguồn mở của Alibaba, clip 2–15 giây.',
   'wan-2.7-reference': 'WAN dựng cảnh từ tối đa 4 ảnh tham chiếu, clip 2–10 giây.',
   'minimax-h3-max': 'Bản chủ lực của Minimax: clip 5–15 giây ở 768p.',
+  'minimax-h3-max-1080p': 'Minimax H3 Max tinh chỉnh lên 1080p, clip 5–15 giây sắc nét hơn bản 768p.',
+  'minimax-h3-max-480p': 'Minimax H3 Max ở 480p: rẻ nhất trong họ H3, hợp để thử ý tưởng nhanh.',
   'minimax-h3-max-reference': 'Minimax H3 Max dựng cảnh từ tối đa 4 ảnh tham chiếu.',
+  'minimax-h3-max-reference-1080p': 'Dựng cảnh từ tối đa 4 ảnh tham chiếu, tinh chỉnh lên 1080p.',
+  'minimax-h3-max-reference-480p': 'Dựng cảnh từ tối đa 4 ảnh tham chiếu ở 480p, chi phí thấp nhất.',
   'minimax-hailuo-2.3-pro': 'Đường nhanh nhất tới một clip 1080p sắc nét: một ảnh vào, video 6 giây ra.',
   'nano-banana-pro': 'Ghép tối đa 4 ảnh tham chiếu thành ảnh sắc nét, trung thực với bản gốc, tới 4K.',
   'nano-banana-2.1': 'Bản mới của Google: ảnh chân thực hơn, chữ sắc hơn ở tốc độ Flash.',

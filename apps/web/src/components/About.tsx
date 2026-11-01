@@ -67,6 +67,12 @@ function Block({ block }: { block: AboutBlock }) {
         ))}
       </ol>
     );
+  if ('loop' in block)
+    return (
+      <span className="about-loop">
+        <CardMedia {...cardSample(useSamples(), block.loop)} />
+      </span>
+    );
   if ('pairs' in block)
     return (
       <div className="about-pairs">
