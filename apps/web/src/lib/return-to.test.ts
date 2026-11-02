@@ -7,7 +7,7 @@ test('a page of this site is kept with its query and hash', () => {
 });
 
 test('anything that could leave the site, or loop back to the login, falls back to Create', () => {
-  for (const next of [undefined, '', 'library', 'https://evil.example', '//evil.example', '/\\evil.example', '/\t/evil.example', '/\n/evil.example', '//[', '/login', '/login?next=/x', ['/library']]) {
+  for (const next of [undefined, '', 'library', 'https://evil.example', '//evil.example', '/\\evil.example', '/\t/evil.example', '/\n/evil.example', '/..//evil.example', '/.//evil.example', '/%2e%2e//evil.example', '/x/..//evil.example', '//[', '/login', '/login?next=/x', ['/library']]) {
     expect(returnTo(next), String(next)).toBe('/create');
   }
 });
