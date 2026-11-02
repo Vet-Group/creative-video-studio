@@ -10,6 +10,9 @@ const PAGES: Partial<Record<string, string>> = {
   ...Object.fromEntries(APPS.filter((a) => !a.soon && a.feature !== 'media_optimizer').map((a) => [a.feature, `/apps/${a.slug}`])),
 };
 
+/** The page that made a job of the feature; it opens on its History once the feature has a job. */
+export const pageOf = (feature: string): string | undefined => PAGES[feature];
+
 /** Whether the feature's page can refill its form (from a job or a saved template). */
 export const canReuse = (feature: string): boolean => PAGES[feature] !== undefined;
 

@@ -76,6 +76,7 @@ export const USERS = {
   // settings.e2e: seta renames itself and picks a colour, setb walks the phone list and switches the preferences.
   seta: { email: 'seta@e2e.test', name: 'E2E Settings A', role: 'member' },
   setb: { email: 'setb@e2e.test', name: 'E2E Settings B', role: 'member' },
+  explorea: { email: 'explorea@e2e.test', name: 'E2E Explore Lan', role: 'member' }, // explore.e2e: the greeting by given name and the Continue strip
   admin: { email: 'admin@e2e.test', name: 'E2E Admin', role: 'admin' },
 } as const;
 

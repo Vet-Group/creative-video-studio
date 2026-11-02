@@ -174,7 +174,7 @@ legend { font-weight: 600; padding: 0 .25rem; }
   .app:not([data-collapsed='true']):has(.apps, .app-page) .content { margin-left: 280px; }
   .frame { padding: 16px 48px 32px; }
   /* Explore rows run to the window edge, as on the live page, and still scroll back to the gutter. */
-  .explore :is(.explore-features, .explore-cards) { margin-right: -48px; padding-right: 48px; } /* beats .explore ul */
+  .explore .explore-cards { margin-right: -48px; padding-right: 48px; } /* beats .explore ul */
   .brand-tools { flex-direction: column; gap: 0; }
   .rail-toggle { display: grid; }
   /* The icon rail: labels stay for screen readers and show as a tooltip. */
@@ -1161,23 +1161,46 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 @keyframes settings-pop { from { opacity: .4; transform: translateX(-30%); } }
 
 /* Explore. */
-.explore h1 { margin: 8px 0 48px; font-size: 26px; line-height: 32px; font-weight: 600; }
-.explore h2 { margin: 50px 0 32px; font-size: 22px; line-height: 30px; font-weight: 600; }
+.explore h2 { margin: 48px 0 20px; font-size: 22px; line-height: 30px; font-weight: 600; }
 .explore ul { margin: 0; padding: 0; list-style: none; }
-/* Each Explore list is one row that scrolls sideways, cards 300 / 178 px wide below 1024 px and 420 / 218 px above (Fash shots 2026-10-24). */
-.explore-features, .explore-cards { display: flex; align-items: stretch; gap: 16px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: thin; }
-.explore-features > li { flex: 0 0 300px; scroll-snap-align: start; }
+/* The greeting framed like a viewfinder (two corner marks), with a tally dot that blinks while a job runs, after the login's film studio. */
+.explore-hero { position: relative; width: fit-content; max-width: 100%; margin-top: 8px; padding: 24px 32px 24px 28px; }
+.explore-hero::before, .explore-hero::after { content: ''; position: absolute; width: 20px; height: 20px; border: 0 solid var(--border-strong); pointer-events: none; }
+.explore-hero::before { top: 0; left: 0; border-width: 2px 0 0 2px; border-top-left-radius: 6px; }
+.explore-hero::after { right: 0; bottom: 0; border-width: 0 2px 2px 0; border-bottom-right-radius: 6px; }
+.explore-slate { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; color: var(--muted); font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+.explore-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--brand); }
+@media (prefers-reduced-motion: no-preference) { .explore-dot[data-live='true'] { animation: explore-tally 1.6s ease-in-out infinite; } }
+@keyframes explore-tally { 50% { opacity: .2; } }
+.explore-hero h1 { margin: 0; font-size: 34px; line-height: 42px; font-weight: 600; letter-spacing: -.02em; }
+.explore-status { margin: 10px 0 0; color: var(--text-2); font-size: 15px; line-height: 22px; }
+.explore-first { max-width: 60ch; margin: 6px 0 0; }
+/* Continue: the member's latest jobs as small posters, one row that scrolls sideways on a phone. */
+.explore-jobs { display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: thin; }
+.explore-jobs > li { flex: 0 0 148px; scroll-snap-align: start; }
+@media (min-width: 1024px) { .explore-jobs > li { flex-basis: 176px; } }
+.explore-job { display: grid; gap: 2px; padding-bottom: 4px; border-radius: 10px; color: inherit; text-decoration: none; font-size: 14px; line-height: 20px; }
+.explore-job-media { position: relative; display: block; margin-bottom: 6px; aspect-ratio: 4 / 5; overflow: hidden; border-radius: 10px; background: var(--fill); }
+.explore-job-media img, .explore-job-media .banner-empty { display: block; width: 100%; height: 100%; object-fit: cover; transition: transform .3s; }
+.explore-job:hover .explore-job-media img { transform: scale(1.04); }
+.explore-job[data-status='running'] .explore-job-media img { filter: saturate(.4); }
+.explore-job[data-status='running'] .explore-job-media::after { content: ''; position: absolute; top: 10px; left: 10px; width: 8px; height: 8px; border-radius: 50%; background: var(--brand); box-shadow: 0 0 0 3px rgb(var(--light) / .85); }
+.explore-job .muted { font-size: 13px; line-height: 18px; }
+.explore-job:is([data-status='failed'], [data-status='failed_unknown'], [data-status='timed_out']) .muted { color: var(--danger); }
+/* The tools: compact tiles, a loop or still above the icon and name; 2 columns on a phone, 3 on a tablet, one row of 6 on a desktop. */
+.explore-tools { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+@media (min-width: 600px) { .explore-tools { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (min-width: 1200px) { .explore-tools { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+.explore-tool { display: grid; height: 100%; overflow: hidden; border: 1px solid rgb(var(--shade) / .1); border-radius: 12px; color: inherit; text-decoration: none; }
+.explore-tool img, .explore-tool video, .explore-tool .banner-empty { display: block; width: 100%; aspect-ratio: 16 / 10; object-fit: cover; }
+.explore-tool-name { display: flex; align-items: center; gap: 8px; padding: 10px 12px; font-size: 14px; line-height: 20px; }
+.explore-tool-name .icon { flex: none; color: var(--text-icon); }
+.explore-tool:hover .icon { color: var(--brand); }
+/* Each model card row scrolls sideways, cards 178 px wide below 1024 px and 218 px above (Fash shots 2026-10-24). */
+.explore-cards { display: flex; align-items: stretch; gap: 16px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: thin; }
 .explore-cards > li { flex: 0 0 178px; scroll-snap-align: start; }
-@media (min-width: 1024px) {
-  .explore-features > li { flex-basis: 420px; }
-  .explore-cards > li { flex-basis: 218px; }
-}
-.explore-feature { display: grid; gap: 8px; height: 100%; padding-bottom: 20px; overflow: hidden; border: 1px solid rgb(var(--shade) / .1); border-radius: 12px; color: inherit; text-decoration: none; }
-.explore-feature img, .explore-feature video { display: block; width: 100%; aspect-ratio: 420 / 260; object-fit: cover; }
-.explore-feature-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 20px 0; font-size: 18px; line-height: 27px; }
-.explore-feature > .muted { padding: 0 20px; font-size: 14px; line-height: 21px; }
-.explore-arrow { display: grid; place-items: center; width: 32px; height: 32px; border: 1px solid rgb(var(--shade) / .1); border-radius: 8px; }
-.explore-feature:hover .explore-arrow, .explore-card:hover { background: var(--fill); }
+@media (min-width: 1024px) { .explore-cards > li { flex-basis: 218px; } }
+.explore-tool:hover, .explore-card:hover { background: var(--fill); }
 .explore-card { display: grid; align-content: start; gap: 6px; height: 100%; padding: 16px; overflow: hidden; border: 1px solid rgb(var(--shade) / .1); border-radius: 12px; color: inherit; text-decoration: none; font-size: 14px; line-height: 21px; }
 .explore-card img, .explore-card video, .explore-card .banner-empty { width: calc(100% + 32px); margin: -16px -16px 6px; aspect-ratio: 1; object-fit: cover; }
 .explore-card .muted { font-size: 13px; line-height: 18px; }
@@ -1604,12 +1627,13 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .library .kinds button { padding: 0 12px; }
 .library-filters label { margin: 0; color: var(--text-muted); font-size: 13px; line-height: 18px; font-weight: 500; }
 .library-filters select, .library-filters input { width: 10rem; min-width: 0; height: 36px; margin-top: 4px; padding: 0 10px; border: 1px solid rgb(var(--shade) / .1); border-radius: 8px; background: var(--surface); color: inherit; font: inherit; font-size: 13px; }
-.explore-sub { margin: -24px 0 24px; }
+.explore-sub { margin: -12px 0 20px; }
 /* Below 1024 px: centred empty Image Generation history, smaller Explore headings; tablets keep model, ratio and size on one row, as on Fash. */
 @media (max-width: 1023.98px) {
   .imagegen-side .tray > p.muted { padding: 22vh 0 0; }
-  .explore h1 { margin-bottom: 16px; font-size: 20px; line-height: 28px; }
-  .explore h2 { margin-top: 32px; font-size: 18px; line-height: 26px; }
+  .explore-hero { padding: 20px; }
+  .explore-hero h1 { font-size: 26px; line-height: 32px; }
+  .explore h2 { margin-top: 36px; font-size: 18px; line-height: 26px; }
 }
 /* Phones keep the wrap: one row would push a 390 px page sideways, and a scrolling row would clip the menus that open upward. */
 @media (min-width: 600px) and (max-width: 1023.98px) {
