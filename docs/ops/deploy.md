@@ -81,7 +81,9 @@ recorded before `up`.
 ## Status
 
 `bash scripts/run/vet.sh status` runs `deploy/linux/status.sh` on VET (read-only): the commit, the `cvs-*` units, the compose
-containers, the answer of `https://video.vetgroup.net/privacy` and the last backup log line.
+containers, the answer of `https://video.vetgroup.net/privacy`, the last backup log line, and `perf` lines that tell a slow app from a
+slow line: `/login` and a static file served on the server itself and through the tunnel, the server's download and upload speed to
+Cloudflare, the tunnel's protocol and edge, and the CPU, load and memory. They add a few seconds and about 15 MB of traffic.
 
 ## The state file
 
