@@ -453,6 +453,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
         // A sample's photos become this member's inputs first, copied on the server.
         const samples = j.images.map((i) => ('sample' in i ? i.sample : null)).filter((s) => s !== null);
         const inputs = samples.length > 0 ? await copySamples(samples) : (j.images as Img[]);
+        if (stale) return; // superseded while the photos were copied
         if (advanced) setRefs(inputs);
         else (setPerson(inputs.slice(0, 1)), setProduct(inputs.slice(1, 2)));
         setHooks(j.hook ? [j.hook] : []);

@@ -201,7 +201,9 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
         const preset = presets.some((p) => p.id === j.presetId) ? j.presetId : null;
         // A sample's photos become this member's inputs first, copied on the server.
         const samples = j.images.flatMap((i) => ('sample' in i ? [i.sample] : []));
-        setImages(samples.length > 0 ? await copySamples(samples) : (j.images as Image[]));
+        const images = samples.length > 0 ? await copySamples(samples) : (j.images as Image[]);
+        if (stale) return; // superseded while the photos were copied
+        setImages(images);
         // Sent only on a model that takes them, as when picked by hand.
         setEndFrame(j.endFrame ?? null);
         setClips(j.clips ?? []);

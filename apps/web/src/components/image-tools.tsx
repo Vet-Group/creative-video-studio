@@ -117,7 +117,9 @@ export function useReuse(reuse: string | undefined, feature: string, fill: (j: O
         if (j.feature !== feature) return fail();
         // A sample's photos become this member's inputs first, copied on the server.
         const samples = j.images.flatMap((i) => ('sample' in i ? [i.sample] : []));
-        fill({ ...j, images: samples.length > 0 ? await copySamples(samples) : (j.images as Img[]) });
+        const images = samples.length > 0 ? await copySamples(samples) : (j.images as Img[]);
+        if (stale) return; // superseded while the photos were copied
+        fill({ ...j, images });
         recreated(reuse);
         dropRefillQuery();
       })
