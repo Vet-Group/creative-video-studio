@@ -9,13 +9,13 @@ import { useHydrated } from '@/lib/use-hydrated';
 import { useRecall } from '@/lib/use-recall';
 import { useSamples } from '@/lib/use-samples';
 import { ABOUT } from '@/lib/about-content';
-import { exampleFrom } from '@/lib/reuse';
+import { dropRefillQuery, exampleFrom } from '@/lib/reuse';
 import { About } from './About';
 import { AudioSwitch } from './AudioSwitch';
 import { CardMedia } from './CardMedia';
 import { EnhanceToggle } from './EnhanceToggle';
 import { Icon } from './Icon';
-import { photoImg, sampleFile, Slot, UPLOAD_ERROR, uploadImages } from './image-tools';
+import { copySamples, photoImg, Slot, UPLOAD_ERROR, uploadImages } from './image-tools';
 import { FormContext, type Photo, Tap, useApplier, useHasHistory, useJobs, useRecreated } from './jobs';
 import { Modal } from './Modal';
 import { ModelPicker } from './ModelPicker';
@@ -199,9 +199,9 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
       .then(async (j) => {
         if (stale) return;
         const preset = presets.some((p) => p.id === j.presetId) ? j.presetId : null;
-        // A sample's photos are uploaded as this member's inputs first, as a picked sample is.
+        // A sample's photos become this member's inputs first, copied on the server.
         const samples = j.images.flatMap((i) => ('sample' in i ? [i.sample] : []));
-        setImages(samples.length > 0 ? await uploadImages(await Promise.all(samples.map(sampleFile))) : (j.images as Image[]));
+        setImages(samples.length > 0 ? await copySamples(samples) : (j.images as Image[]));
         // Sent only on a model that takes them, as when picked by hand.
         setEndFrame(j.endFrame ?? null);
         setClips(j.clips ?? []);
@@ -215,6 +215,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
         if (j.modelId) setModelId(j.modelId);
         setStoreId(j.storeId ?? '');
         recreated(reuse);
+        dropRefillQuery();
       })
       .catch(() => setError('Không tìm thấy clip để dùng lại.'))
       .finally(() => setReady(true))

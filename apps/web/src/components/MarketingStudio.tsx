@@ -13,12 +13,12 @@ import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { useRecall } from '@/lib/use-recall';
 import { useSamples } from '@/lib/use-samples';
 import { cardSample } from '@/lib/examples';
-import { queryOf } from '@/lib/reuse';
+import { dropRefillQuery, queryOf } from '@/lib/reuse';
 import { About } from './About';
 import { AudioSwitch } from './AudioSwitch';
 import { CardMedia, LoopVideo } from './CardMedia';
 import { Icon, type IconName } from './Icon';
-import { Gallery, type Img, PhotoDialog, photoImg, sampleFile, Slot, uploadImages, UPLOAD_ERROR, WorkTabs } from './image-tools';
+import { copySamples, Gallery, type Img, PhotoDialog, photoImg, Slot, uploadImages, UPLOAD_ERROR, WorkTabs } from './image-tools';
 import { FormContext, type FormActions, type Photo, type PhotoRole, useApplier, useHasHistory, useJobs, useRecreated } from './jobs';
 import { Modal } from './Modal';
 import { ModelPicker } from './ModelPicker';
@@ -450,9 +450,9 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
         if (stale) return;
         if (j.feature !== 'marketing') return setError('Không tìm thấy clip để dùng lại.');
         if ((j.format === 'advanced') !== advanced) return router.replace(`/marketing-studio${j.format === 'advanced' ? '/advanced' : ''}?${queryOf(reuse)}`);
-        // A sample's photos are uploaded as this member's inputs first, as a picked sample is.
+        // A sample's photos become this member's inputs first, copied on the server.
         const samples = j.images.map((i) => ('sample' in i ? i.sample : null)).filter((s) => s !== null);
-        const inputs = samples.length > 0 ? await uploadImages(await Promise.all(samples.map(sampleFile))) : (j.images as Img[]);
+        const inputs = samples.length > 0 ? await copySamples(samples) : (j.images as Img[]);
         if (advanced) setRefs(inputs);
         else (setPerson(inputs.slice(0, 1)), setProduct(inputs.slice(1, 2)));
         setHooks(j.hook ? [j.hook] : []);
@@ -466,6 +466,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
         if (j.modelId) setModelId(j.modelId);
         if (j.brief === null && advanced) setNotice('Clip này không có mô tả gốc: đã điền lại ảnh và cài đặt, hãy nhập lại mô tả.');
         recreated(reuse);
+        dropRefillQuery();
       })
       .catch(() => setError('Không tìm thấy clip để dùng lại.'))
       .finally(loading('Đang tải ảnh...'));

@@ -59,8 +59,8 @@ test('a Member runs a mock job and works through the Library', async ({ page }) 
 
   // Reuse pre-fills the Create form, and it stays editable.
   await card.getByRole('link', { name: 'Dùng lại' }).click();
-  await expect(page).toHaveURL(/\/create\?reuse=/);
   await expect(page.getByRole('img', { name: 'shirt.png' })).toBeVisible();
+  await expect(page).toHaveURL((u) => u.pathname === '/create' && u.search === ''); // the link opened the refill, then the address drops its query
   await expect(presetOf(page)).toHaveAttribute('data-value', 'slow-orbit');
   await expect(select(page, 'Tỉ lệ khung hình')).toHaveAttribute('data-value', '1:1');
   await expect(select(page, 'Thời lượng')).toHaveAttribute('data-value', '8');

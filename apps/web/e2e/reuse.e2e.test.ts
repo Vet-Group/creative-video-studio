@@ -40,8 +40,8 @@ test('the reuse link in History refills a UGC job, and an Advanced job opens on 
   const refs = [await upload(page, 'ref-1.png'), await upload(page, 'ref-2.png')];
   const advanced = await job(page, refs, { format: 'advanced', audio: 'on', brief: 'my brief', script: 'my lines' });
   await page.goto(`/marketing-studio?reuse=${advanced}`);
-  await expect(page).toHaveURL((u) => u.pathname === '/marketing-studio/advanced' && u.searchParams.get('reuse') === advanced);
   await expect(page.getByLabel('Ảnh tham chiếu: ảnh đã chọn').getByRole('img')).toHaveCount(2);
+  await expect(page).toHaveURL((u) => u.pathname === '/marketing-studio/advanced' && u.search === ''); // the link opened the refill, then the address drops its query
   await expect(page.getByRole('textbox', { name: 'Prompt', exact: true })).toHaveValue('my brief');
   await expect(page.getByRole('textbox', { name: 'Lời thoại (tuỳ chọn)' })).toHaveValue('my lines');
   await expect(page.getByRole('button', { name: /^Hook/ })).not.toContainText(hook.name);

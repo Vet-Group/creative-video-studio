@@ -41,10 +41,11 @@ export async function listSamples(): Promise<{ name: string; bytes: number }[]> 
   return out.filter((s) => sampleType(s.name)).sort((a, b) => a.name.localeCompare(b.name));
 }
 
-export async function headSample(name: string): Promise<{ bytes: number } | null> {
+/** The sample's size and its store ETag (changes when an Admin replaces the file), or null when there is none. */
+export async function headSample(name: string): Promise<{ bytes: number; etag: string | null } | null> {
   try {
     const res = await s3().send(new HeadObjectCommand({ Bucket: bucketName(), Key: SAMPLE_PREFIX + name }));
-    return { bytes: res.ContentLength ?? 0 };
+    return { bytes: res.ContentLength ?? 0, etag: res.ETag ?? null };
   } catch (e) {
     if ((e as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode === 404) return null;
     throw e;
