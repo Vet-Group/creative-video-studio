@@ -18,7 +18,7 @@ import { About } from './About';
 import { AudioSwitch } from './AudioSwitch';
 import { CardMedia, LoopVideo } from './CardMedia';
 import { Icon, type IconName } from './Icon';
-import { copyError, copySamples, Gallery, type Img, PhotoDialog, photoImg, Slot, uploadImages, UPLOAD_ERROR, WorkTabs } from './image-tools';
+import { copyError, copySamples, Gallery, HISTORY_SIZE_KEY, type Img, PhotoDialog, photoImg, SizeSlider, Slot, uploadImages, UPLOAD_ERROR, useSize, WorkTabs } from './image-tools';
 import { FormContext, type FormActions, type Photo, type PhotoRole, useApplier, useHasHistory, useJobs, useRecreated } from './jobs';
 import { Modal } from './Modal';
 import { ModelPicker } from './ModelPicker';
@@ -334,6 +334,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
   const { refresh, clips, notify, loading } = useJobs();
   const recreated = useRecreated();
   const narrow = useMediaQuery(NARROW);
+  const [historySize, resizeHistory] = useSize(HISTORY_SIZE_KEY, 1, 1); // history: 0 two columns, 1 one
   const [person, setPerson] = useState<Img[]>([]);
   const [product, setProduct] = useState<Img[]>([]);
   const [refs, setRefs] = useState<Img[]>([]);
@@ -794,7 +795,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
           </div>
         </div>
 
-        <div className="side" id={`marketing-panel-${panel}`} role="tabpanel" aria-labelledby={`marketing-tab-${panel}`} hidden={narrow && shown === 'create'}>
+        <div className={!narrow && historySize === 0 ? 'side history-small' : 'side'} id={`marketing-panel-${panel}`} role="tabpanel" aria-labelledby={`marketing-tab-${panel}`} hidden={narrow && shown === 'create'}>
           {shown === 'examples' ? (
             <FormContext.Provider value={actions}>
               <Gallery kind="marketing" video samples="marketing-example-" label="Video Marketing Studio của công ty" emptyText="Chưa có video Marketing Studio nào trong công ty." />
@@ -803,6 +804,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
             <About page={advanced ? ABOUT.advanced : ABOUT.marketing} />
           ) : (
             <FormContext.Provider value={actions}>
+              {!narrow && <SizeSlider size={historySize} last={1} onChange={resizeHistory} />}
               <Tray feature="marketing" />
             </FormContext.Provider>
           )}

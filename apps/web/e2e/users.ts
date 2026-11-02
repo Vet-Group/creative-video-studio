@@ -37,6 +37,7 @@ export const USERS = {
   auda: { email: 'auda@e2e.test', name: 'E2E Audio A', role: 'member' },
   audb: { email: 'audb@e2e.test', name: 'E2E Audio B', role: 'member' },
   cvexa: { email: 'cvexa@e2e.test', name: 'E2E Create Examples A', role: 'member' },
+  sizea: { email: 'sizea@e2e.test', name: 'E2E Gallery Size A', role: 'member' },
   tryexa: { email: 'tryexa@e2e.test', name: 'E2E Try On Examples A', role: 'member' },
   imgexa: { email: 'imgexa@e2e.test', name: 'E2E Image Examples A', role: 'member' },
   chipa: { email: 'chipa@e2e.test', name: 'E2E Chips A', role: 'member' },
