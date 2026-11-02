@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { SUGGEST_QUEUE } from '@cvs/core/queue';
 import { PROMPT_CEILING } from '@cvs/core/models';
-import type { SuggestInput } from '@cvs/core/suggest';
+import { PROMPT_TASKS, type SuggestInput } from '@cvs/core/suggest';
 import { pool } from '@/lib/auth';
 import { findChoice } from '@/lib/choices';
 import { ADVANCED_MAX_SCRIPT, MAX_CHOICE_DESC, MAX_CHOICE_NAME, MAX_CHOICE_PHRASE, SUGGEST_DAILY_LIMIT } from '@/lib/marketing';
@@ -12,15 +12,24 @@ const bad = (error: string, status = 400) => Response.json({ error }, { status }
 
 /**
  * Asks the worker for three Marketing Studio suggestions: `field` (`brief`, `script` on Advanced, or `hook` or `location` for the English scene of
- * a new one from its Vietnamese name and description in `text`), `format` ('advanced' or absent), the
+ * a new one from its Vietnamese name and description in `text`, or `prompt` for the English prompt of the tool `feature`, a PROMPT_TASKS key), `format` ('advanced' or absent), the
  * member's `text` so far, the chosen `hook` and `location`, and for a brief the `room` the chosen model leaves for it (the page computes it). Answers 202 with the run's id for the page to poll (GET /api/suggestions/:id),
  * 429 past the daily limit, 503 when the queue cannot take it (the run is not counted then).
  */
 export async function POST(request: Request) {
   const g = await guard(request, 'member');
   if (g.error) return g.error;
-  const b = (await request.json().catch(() => null)) as { field?: unknown; format?: unknown; text?: unknown; hook?: unknown; location?: unknown; room?: unknown } | null;
-  if (b?.field !== 'brief' && b?.field !== 'script' && b?.field !== 'hook' && b?.field !== 'location') return bad('field must be brief, script, hook or location');
+  const b = (await request.json().catch(() => null)) as { field?: unknown; format?: unknown; feature?: unknown; text?: unknown; hook?: unknown; location?: unknown; room?: unknown } | null;
+  if (b?.field !== 'brief' && b?.field !== 'script' && b?.field !== 'hook' && b?.field !== 'location' && b?.field !== 'prompt') return bad('field must be brief, script, hook, location or prompt');
+  if (b.field === 'prompt') {
+    // Any other page's prompt: the tool's task is the server's own text, so the member's words only ever reach the model as their notes.
+    const task = typeof b.feature === 'string' && Object.hasOwn(PROMPT_TASKS, b.feature) ? PROMPT_TASKS[b.feature as keyof typeof PROMPT_TASKS] : undefined;
+    if (!task) return bad(`feature must be one of ${Object.keys(PROMPT_TASKS).join(', ')}`);
+    if (b.room !== undefined && !(Number.isInteger(b.room) && (b.room as number) >= 1)) return bad('room must be a whole number of characters');
+    const text = typeof b.text === 'string' ? b.text.trim() : b.text === undefined ? '' : null;
+    if (text === null || text.length > PROMPT_CEILING) return bad(`text may be at most ${PROMPT_CEILING} characters`);
+    return queue(g.session.user.id, { field: 'prompt', task, text, context: '', max: Math.min((b.room as number | undefined) ?? PROMPT_CEILING, PROMPT_CEILING) });
+  }
   if (b.field === 'hook' || b.field === 'location') {
     // The add form's AI help: the English scene of a new hook or location from its Vietnamese name and description, as long as the field takes.
     const text = typeof b.text === 'string' ? b.text.trim() : '';
