@@ -10,6 +10,12 @@ import { useHydrated } from '@/lib/use-hydrated';
 import { PasswordField, useRevealMode } from './PasswordField';
 import { StudioScene } from './StudioScene';
 
+/** Why a passkey sign-in failed; a passkey used without its PIN or fingerprint gets its own message, since trying again with them works. */
+export const passkeyFailure = (e: unknown) =>
+  e instanceof ApiError && e.code === 'USER_NOT_VERIFIED'
+    ? 'Passkey chưa xác minh bạn bằng vân tay hoặc mã PIN. Hãy thử lại và xác nhận khi trình duyệt hỏi.'
+    : 'Không đăng nhập được bằng passkey.';
+
 /**
  * `error` is the `?error=` code a failed social sign-in left in the URL; `lastMethod` the method this browser signed in with last; `next` the
  * page to open after the sign-in, already checked to be one of this site.
@@ -52,7 +58,7 @@ export function LoginForm({
       await signInWithPasskey(true);
       window.location.assign(next);
     })().catch((e: unknown) => {
-      if (e instanceof ApiError && e.status !== 429) setError('Không đăng nhập được bằng passkey.');
+      if (e instanceof ApiError && e.status !== 429) setError(passkeyFailure(e));
     });
   }, [next]);
 
@@ -62,7 +68,7 @@ export function LoginForm({
       await signInWithPasskey();
       window.location.assign(next);
     } catch (err) {
-      if (!cancelled(err)) setError('Không đăng nhập được bằng passkey.');
+      if (!cancelled(err)) setError(passkeyFailure(err));
     }
   }
 

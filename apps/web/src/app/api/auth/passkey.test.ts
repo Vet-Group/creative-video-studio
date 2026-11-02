@@ -2,7 +2,7 @@
 // authenticator (src/test/webauthn.ts) answers the ceremonies, so the plugin's own WebAuthn checks run unmocked.
 import { randomBytes } from 'node:crypto';
 import { createTestDatabase } from '@cvs/db/testing';
-import { afterAll, describe, expect, test } from 'vitest';
+import { afterAll, describe, expect, test, vi } from 'vitest';
 import { softAuthenticator } from '@/test/webauthn';
 
 const ORIGIN = 'http://localhost';
@@ -91,10 +91,15 @@ describe('signing in with a passkey', () => {
   test('a passkey used without a PIN or biometric is refused and gets no session', async () => {
     const id = await user('nopin@example.test');
     const { key } = await seedPasskey(id);
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
     const res = await ceremony('authenticate', (c) => key.authenticate(c, false));
     expect(res.status).toBe(401);
     expect(((await res.json()) as { code: string }).code).toBe('USER_NOT_VERIFIED');
     expect(await count('sessions where user_id = $1', [id])).toBe(0);
+    // The refusal is in the server log, with the credential that was used.
+    expect(logged.mock.calls.flat().join(' ')).toContain('USER_NOT_VERIFIED');
+    expect(JSON.stringify(logged.mock.calls)).toContain(key.id);
+    logged.mockRestore();
   });
 
   test('a banned user is refused and gets no session', async () => {

@@ -61,8 +61,11 @@ export const auth = betterAuth({
       authenticatorSelection: { residentKey: 'required', userVerification: 'required' },
       // The plugin verifies with requireUserVerification false; demand the PIN or biometric here, so a found security key alone signs no one in.
       authentication: {
-        afterVerification: ({ verification }) => {
-          if (!verification.authenticationInfo.userVerified) throw new APIError('UNAUTHORIZED', { message: 'User verification required', code: 'USER_NOT_VERIFIED' });
+        afterVerification: ({ ctx, verification, clientData }) => {
+          if (verification.authenticationInfo.userVerified) return;
+          // The plugin logs nothing for a refusal raised here. The credential id is public and finds the passkeys row.
+          ctx.context.logger.error('Passkey sign-in refused: USER_NOT_VERIFIED, the authenticator did not check a PIN or biometric', { credentialId: clientData.id });
+          throw new APIError('UNAUTHORIZED', { message: 'User verification required', code: 'USER_NOT_VERIFIED' });
         },
       },
     }),
