@@ -1,11 +1,12 @@
 'use client';
-// The "My jobs" state: polls the server every 5 s, raises a toast and changes the tab title when a job finishes.
+// The "My jobs" state: polls the server every 5 s, raises a toast and changes the tab title when a job finishes (and, if switched on in Settings, a system notification and a chime).
 // What counts as news is kept in localStorage (the newest finish time already shown), so a job that ended while the tab was closed
 // is announced when the user returns, and old results are not announced again.
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { api, type TrayJob } from '@/lib/api';
+import { announce } from '@/lib/preferences';
 import { useTabReturn } from '@/lib/use-tab-return';
 
 const POLL_MS = 5_000;
@@ -167,10 +168,9 @@ export function JobsProvider({ userId, children }: { userId: string; children: R
     if (fresh.length === 0) return;
     localStorage.setItem(seenKey, String(Math.max(...times)));
     setNews(true);
-    setToasts((cur) => [
-      ...cur,
-      ...fresh.map((j) => ({ id: nextId.current++, ok: j.status === 'succeeded', text: j.status === 'succeeded' ? (j.resolution ? 'Ảnh đã xong' : 'Clip đã xong') : 'Một job không thành công' })),
-    ]);
+    const done = fresh.map((j) => ({ ok: j.status === 'succeeded', text: j.status === 'succeeded' ? (j.resolution ? 'Ảnh đã xong' : 'Clip đã xong') : 'Một job không thành công' }));
+    setToasts((cur) => [...cur, ...done.map((n) => ({ id: nextId.current++, ...n }))]);
+    announce(done.map((n) => n.text));
   }, [userId]);
 
   useEffect(() => {

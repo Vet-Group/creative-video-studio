@@ -95,10 +95,10 @@ describe('a temporary password from an Admin', () => {
     for (const res of [
       await post('/link-social', cookie, { provider: 'google', callbackURL: '/account/sign-in-methods' }),
       await get('/passkey/generate-register-options', cookie),
-      await post('/update-user', cookie, { name: 'Renamed' }),
     ]) {
       expect([res.status, await codeOf(res)]).toEqual([403, 'PASSWORD_CHANGE_REQUIRED']);
     }
+    expect((await post('/update-user', cookie, { name: 'Renamed' })).status).toBe(404); // closed for every session (route.ts)
     expect(((await (await changePassword(cookie, 'temporary-pass-1', 'temporary-pass-1')).json()) as { code: string }).code).toBe('PASSWORD_UNCHANGED');
     expect(await flag(id)).toBe(true);
 

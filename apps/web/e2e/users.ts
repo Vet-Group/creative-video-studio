@@ -73,6 +73,9 @@ export const USERS = {
   totpa: { email: 'totpa@e2e.test', name: 'E2E Two Factor A', role: 'member' },
   totpb: { email: 'totpb@e2e.test', name: 'E2E Two Factor B', role: 'member' },
   totpc: { email: 'totpc@e2e.test', name: 'E2E Two Factor C', role: 'member' },
+  // settings.e2e: seta renames itself and picks a colour, setb walks the phone list and switches the preferences.
+  seta: { email: 'seta@e2e.test', name: 'E2E Settings A', role: 'member' },
+  setb: { email: 'setb@e2e.test', name: 'E2E Settings B', role: 'member' },
   admin: { email: 'admin@e2e.test', name: 'E2E Admin', role: 'admin' },
 } as const;
 
