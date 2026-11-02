@@ -1,6 +1,6 @@
 'use client';
 // The frame of every signed-in page: navigation, the "My jobs" tray and the toasts.
-import Link, { useLinkStatus } from 'next/link';
+import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { createContext, type ReactNode, useContext, useEffect, useRef, useState } from 'react';
 import { api, errorText, sendJson, type JobStatus, type TrayJob } from '@/lib/api';
@@ -312,11 +312,6 @@ function Toasts() {
 }
 
 // The sidebar in the live order; later features slot in where the live sidebar has them.
-/** A small spinner on the sidebar link being opened, so a click on a slow link shows at once that the page is on its way (the CSS waits 150 ms, so fast pages never flash it). */
-function NavPending() {
-  const { pending } = useLinkStatus();
-  return <span className={pending ? 'nav-pending is-pending' : 'nav-pending'} aria-hidden="true" />;
-}
 
 /**
  * A thin bar along the top while any link of the app opens another page (Explore cards, Dùng lại, Dùng mẫu này, the sidebar too), shown after 150 ms.
@@ -411,7 +406,6 @@ export function Shell({ userId, userName, isAdmin, account, initialCollapsed, ch
       </span>
       <span className="nav-label">{text}</span>
       {badge && <span className="nav-badge" aria-hidden="true">{badge}</span>}
-      <NavPending />
     </Link>
   );
   function toggleRail() {

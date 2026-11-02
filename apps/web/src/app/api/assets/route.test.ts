@@ -281,6 +281,7 @@ describe('GET /api/assets/:id/content', () => {
     expect(again.headers.get('etag')).toBe(`"${id}"`);
     expect(again.headers.get('cache-control')).toBe('private, max-age=86400');
     expect((await again.arrayBuffer()).byteLength).toBe(0);
+    expect((await GET_CONTENT(get(`/api/assets/${id}/content`, ownerCookie, { 'if-none-match': `"x", W/"${id}"` }), ctx(id))).status).toBe(304); // weak, in a list
     expect((await GET_CONTENT(get(`/api/assets/${id}/content`, ownerCookie, { 'if-none-match': '"another"' }), ctx(id))).status).toBe(200);
     expect((await GET_CONTENT(get(`/api/assets/${id}/content`, otherCookie, { 'if-none-match': `"${id}"` }), ctx(id))).status).toBe(403);
     expect((await GET_CONTENT(get(`/api/assets/${id}/content`, undefined, { 'if-none-match': `"${id}"` }), ctx(id))).status).toBe(401);

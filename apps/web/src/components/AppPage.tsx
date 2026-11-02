@@ -391,7 +391,7 @@ function MotionForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
       setPrompt(j.prompt ?? '');
       if (j.modelId) setModelId(j.modelId);
     },
-    () => setError('Không tìm thấy video để dùng lại.'),
+    (e) => setError(copyError(e, 'Không tìm thấy video để dùng lại.')),
   );
   const chosen = list?.models.find((m) => m.id === modelId) ?? list?.models.find((m) => m.id === list.best) ?? list?.models[0];
   const reason = (recall.answered ? null : 'Đang tải cài đặt đã dùng...') ?? motionReason({ image: image.length > 0, videoMs: video?.durationMs ?? null, model: list === null ? null : chosen, failed: list?.failed ?? false }) ?? promptTooLong(chosen, prompt.trim().length);

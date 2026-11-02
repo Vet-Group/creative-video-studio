@@ -12,6 +12,7 @@ export async function GET(request: Request, { params }: RouteContext) {
   const download = new URL(request.url).searchParams.has('download');
   const cache = 'private, max-age=86400';
   const etag = `"${found.asset.id}"`;
-  if (request.headers.get('if-none-match') === etag) return new Response(null, { status: 304, headers: { 'cache-control': cache, etag } });
+  // A cache or proxy may send it weak (W/) or in a list.
+  if (request.headers.get('if-none-match')?.split(',').some((t) => t.trim().replace(/^W\//, '') === etag)) return new Response(null, { status: 304, headers: { 'cache-control': cache, etag } });
   return streamAsset(request, found.asset, download ? 'attachment' : 'inline', cache, etag);
 }
