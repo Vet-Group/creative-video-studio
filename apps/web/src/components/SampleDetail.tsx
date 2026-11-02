@@ -7,7 +7,7 @@ import { exampleFrom } from '@/lib/reuse';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { Icon } from './Icon';
 import { useImageModels } from './image-tools';
-import { Recreate, roleOf, Tap, useForm } from './jobs';
+import { JobPrompt, Recreate, roleOf, Tap, useForm } from './jobs';
 import { Modal } from './Modal';
 
 /** A sample's details file, in the shape its page refills from (`?example=`): Marketing's format and duration, or Try On's model, resolution and background. */
@@ -81,7 +81,6 @@ export function SampleDetail({ names, index, onIndex }: { names: string[]; index
   );
   const apply = form?.apply;
   const backdrop = details?.background ? details.images.at(-1) : undefined;
-  const copy = () => navigator.clipboard.writeText(text ?? '').then(() => setNote('Đã sao chép.'), () => setNote('Không sao chép được.'));
 
   return (
     <Modal open onClose={() => onIndex(null)} label={`Chi tiết: ${title}`} className="lightbox">
@@ -92,11 +91,7 @@ export function SampleDetail({ names, index, onIndex }: { names: string[]; index
         {/* Fash's Try On lists the photos before the prompt; its Marketing the other way round. */}
         <h2>{picture && details?.modelId ? <ModelName id={details.modelId} feature={feature} fallback={title} /> : title}</h2>
         {picture && inputs}
-        {text && (
-          <Tap on={form?.prompt && (() => form.prompt!(text))} label="Chép prompt vào ô Prompt" className="job-text">
-            {text}
-          </Tap>
-        )}
+        {text && <JobPrompt text={text} onUse={form?.prompt && (() => form.prompt!(text))} />}
         {!picture && inputs}
         {details && (
           <p className="job-chips">
@@ -121,11 +116,6 @@ export function SampleDetail({ names, index, onIndex }: { names: string[]; index
           <a className="icon-button" href={`/api/samples/${name}`} target="_blank" rel="noreferrer" aria-label="Mở trong tab mới" title="Mở trong tab mới">
             <Icon name="external" />
           </a>
-          {text && (
-            <button type="button" className="icon-button" onClick={() => void copy()} aria-label="Sao chép mô tả" title="Sao chép mô tả">
-              <Icon name="copy" />
-            </button>
-          )}
         </div>
         {details && (
           <Recreate href={tryOn ? `/try-on?example=${base}` : picture ? `/image-generation?example=${base}` : `/marketing-studio${advanced ? '/advanced' : ''}?example=${base}`} from={exampleFrom({ example: base })!} className="lightbox-reuse" onDone={() => narrow && onIndex(null)}>

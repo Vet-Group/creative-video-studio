@@ -70,6 +70,8 @@ test("each page opens with the model and settings of the member's last Run, afte
   await page.goto('/marketing-studio');
   await page.getByLabel('Ảnh người mẫu').setInputFiles(file('model.png'));
   await page.getByLabel('Ảnh sản phẩm').setInputFiles(file('product.png'));
+  // The remembered settings land first (Run waits for them): a pick before that would be redrawn under the pointer.
+  await expect(page.getByRole('button', { name: /^Tạo video/ })).toBeEnabled();
   await pickModel(page, /Mock E2E Wide/); // it moves the ratio and the duration to its own 16:9 and 10 s
   await expect(select(page, 'Tỉ lệ')).toHaveAttribute('data-value', '16:9');
   await page.getByRole('button', { name: /^Tạo video/ }).click();

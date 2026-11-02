@@ -18,7 +18,7 @@ import { About } from './About';
 import { AudioSwitch } from './AudioSwitch';
 import { CardMedia, LoopVideo } from './CardMedia';
 import { Icon, type IconName } from './Icon';
-import { copyError, copySamples, Gallery, HISTORY_SIZE_KEY, type Img, PhotoDialog, photoImg, SizeSlider, Slot, uploadImages, UPLOAD_ERROR, useSize, WorkTabs } from './image-tools';
+import { copyError, copySamples, Gallery, HISTORY_SIZE_KEY, type Img, PhotoDialog, photoImg, RunSummary, SizeSlider, Slot, uploadImages, UPLOAD_ERROR, useSize, WorkTabs } from './image-tools';
 import { FormContext, type FormActions, type Photo, type PhotoRole, useApplier, useHasHistory, useJobs, useRecreated } from './jobs';
 import { Modal } from './Modal';
 import { ModelPicker } from './ModelPicker';
@@ -61,6 +61,7 @@ const RATIO_LABEL: Record<string, string> = { '9:16': '9:16 (dọc)', '16:9': '1
 /** With `media` (the chosen choice's sample), a chosen box shows it full size under a name chip, as on Fash: its still, the loop only when there is no still. */
 function ChoiceBox({ label, icon, value, media, onOpen, onClear }: { label: string; icon: IconName; value: string | undefined; media?: { video: string | null; poster: string | null }; onOpen: () => void; onClear: () => void }) {
   const filled = value !== undefined && media !== undefined && (media.video ?? media.poster) !== null;
+  const name = label.replace(' (tuỳ chọn)', '');
   const labelId = useId();
   const valueId = useId();
   return (
@@ -70,15 +71,22 @@ function ChoiceBox({ label, icon, value, media, onOpen, onClear }: { label: stri
         <span className="slot-icon" aria-hidden="true">
           <Icon name={icon} size={16} />
         </span>
+        {/* One line: the name, with the optional note for screen readers only; the eye gets the Optional chip under it. */}
         <span id={labelId} className="choice-label">
-          {label.replace(' (', '\n(') /* "(tuỳ chọn)" on its own line, as on Fash */}
+          {name}
+          {name !== label && <span className="sr-only"> (tuỳ chọn)</span>}
         </span>
+        {name !== label && !filled && (
+          <span className="choice-optional" aria-hidden="true">
+            Tuỳ chọn
+          </span>
+        )}
         <span id={valueId} className={value ? 'choice-value' : 'choice-value sr-only'}>
           {value ?? 'Chưa chọn'}
         </span>
       </button>
       {value !== undefined && (
-        <button type="button" className="choice-clear" aria-label={`Bỏ ${label.replace(' (tuỳ chọn)', '')}`} onClick={onClear}>
+        <button type="button" className="choice-clear" aria-label={`Bỏ ${name}`} onClick={onClear}>
           <Icon name="x" size={12} />
         </button>
       )}
@@ -779,6 +787,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
             {notice && <p role="status">{notice}</p>}
           </div>
           <div className="runbar">
+            <RunSummary items={[chosen?.label, ratio, `${durationSec} giây`, audioOn && 'có âm thanh']} />
             <button type="button" className="primary run" disabled={!canRun} aria-describedby={(reason ?? short) ? reasonId : undefined} onClick={() => void run()}>
               Tạo video
               {n > 1 && ` ${n} clip`}
