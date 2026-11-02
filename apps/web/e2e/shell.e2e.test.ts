@@ -151,13 +151,23 @@ test('the Apps pages widen the sidebar to 280 px as Fash does, and the icon rail
   expect((await sidebar(page).boundingBox())!.width).toBe(240);
 });
 
-test('Settings shows the profile, the support contact and no billing', async ({ page }) => {
+test('Settings shows the profile, the own caps, the sign-in summary, the support contact and no billing', async ({ page }) => {
   await signIn(page, 'member1');
   await page.getByRole('button', { name: 'Cài đặt' }).click();
   const settings = page.getByRole('dialog', { name: 'Cài đặt' });
-  await expect(settings.getByRole('navigation', { name: 'Tài khoản' }).getByRole('button')).toHaveText(['Hồ sơ', 'Tài khoản liên kết', 'Hỗ trợ', 'Đăng xuất']);
+  await expect(settings.getByRole('navigation', { name: 'Tài khoản' }).getByRole('button')).toHaveText(['Hồ sơ', 'Hạn mức', 'Bảo mật', 'Tài khoản liên kết', 'Hỗ trợ', 'Đăng xuất']);
+  await expect(settings.getByRole('button', { name: 'Hồ sơ' })).toHaveAttribute('aria-current', 'true');
   await expect(settings.getByText('member1@e2e.test')).toBeVisible();
   await expect(settings.getByText('E2E Member 1')).toBeVisible();
+  await expect(settings.getByText('Chưa phân team')).toBeVisible();
+  await settings.getByRole('button', { name: 'Hạn mức' }).click();
+  await expect(settings.getByRole('meter', { name: 'Clip video hôm nay' })).toHaveAttribute('aria-valuemax', '1000'); // serve.ts sets the daily clip cap
+  await expect(settings.getByRole('meter', { name: 'Ảnh và ứng dụng tháng này' })).toBeVisible();
+  await expect(settings.getByText('Hạn mức ngày đặt lại lúc 0:00 giờ Việt Nam', { exact: false })).toBeVisible();
+  await settings.getByRole('button', { name: 'Bảo mật' }).click();
+  await expect(settings.getByText('Đã đặt', { exact: true })).toBeVisible();
+  await expect(settings.getByText('Chưa có passkey')).toBeVisible();
+  await expect(settings.getByRole('link', { name: 'Quản lý passkey' })).toHaveAttribute('href', '/account/sign-in-methods');
   await settings.getByRole('button', { name: 'Hỗ trợ' }).click();
   await expect(settings.getByRole('link', { name: 'support@e2e.test' })).toHaveAttribute('href', 'mailto:support@e2e.test');
   await page.keyboard.press('Escape');

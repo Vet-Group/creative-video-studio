@@ -31,7 +31,7 @@ test('a member adds a passkey, signs in with it, sees it marked as used last, an
 
   await page.goto('/account/sign-in-methods');
   await page.getByRole('button', { name: 'Thêm passkey' }).click();
-  await expect(page.getByText(/^Passkey · \d{2}\/\d{2}\/\d{4}$/)).toBeVisible();
+  await expect(page.getByText(/^Thêm ngày \d{2}\/\d{2}\/\d{4}$/)).toBeVisible();
 
   await signOut(page);
   const button = page.getByRole('button', { name: 'Đăng nhập bằng passkey', exact: true });
@@ -52,6 +52,6 @@ test('a member adds a passkey, signs in with it, sees it marked as used last, an
   await signIn(page, 'passa');
   await page.goto('/account/sign-in-methods');
   await page.getByRole('button', { name: /^Xoá passkey ngày / }).click();
-  await expect(page.getByText(/^Passkey · /)).toHaveCount(0);
+  await expect(page.getByText(/^Thêm ngày /)).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Thêm passkey' })).toBeEnabled();
 });
