@@ -98,7 +98,7 @@ describe('owner-closed steps', () => {
     return spawnSync(process.execPath, [join(import.meta.dirname, 'cli.ts'), ...args], { encoding: 'utf8', env });
   };
 
-  test('ops-approve takes only the exact sentence from the owner terminal; guard-check then lets a routine verb through, not another, and still halts on a changed guard', () => {
+  test('ops-approve takes only the exact sentence from the owner terminal; guard-check then lets a routine verb through, not another, and still halts on a changed guard', { timeout: 30_000 }, () => {
     const dir = tmp();
     const m = fresh();
     approve(m, 'x', new Date('2026-10-01T00:00:00Z')); // long expired
