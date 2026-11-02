@@ -4,12 +4,11 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { ApiError, api, sendJson } from '@/lib/api';
 import { addPasskey, cancelled } from '@/lib/passkey';
-import { authErrorText, METHOD_LABEL, methodText, type PasskeyItem, providerLabel, type SignInMethod } from '@/lib/sign-in-methods';
+import { authErrorText, METHOD_LABEL, methodText, type PasskeyItem, passkeyDate, providerLabel, type SignInMethod } from '@/lib/sign-in-methods';
 import { useHydrated } from '@/lib/use-hydrated';
 
 const PAGE = '/account/sign-in-methods';
 const STALE = 'Phiên đăng nhập đã cũ. Hãy đăng xuất, đăng nhập lại rồi thử lại.';
-const fmtDate = (iso: string) => new Intl.DateTimeFormat('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date(iso));
 
 /** Without `passkeys` (the Settings dialog, which does not load them) the passkeys are managed on the page only, reached by a link. */
 export function SignInMethods({
@@ -100,9 +99,9 @@ export function SignInMethods({
         {passkeys?.map((p) => (
           <li key={p.id}>
             <span>
-              {METHOD_LABEL.passkey} · {fmtDate(p.createdAt)}
+              {METHOD_LABEL.passkey} · {passkeyDate(p.createdAt)}
             </span>
-            <button type="button" aria-label={`Xoá passkey ngày ${fmtDate(p.createdAt)}`} onClick={() => void remove(p)}>
+            <button type="button" aria-label={`Xoá passkey ngày ${passkeyDate(p.createdAt)}`} onClick={() => void remove(p)}>
               Xoá
             </button>
           </li>
