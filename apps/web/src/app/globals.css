@@ -323,7 +323,7 @@ legend { font-weight: 600; padding: 0 .25rem; }
   .account-menu button { min-height: 44px; }
   .account-hint { display: none; } /* no keyboard to press it on */
 }
-.menu-button { display: grid; place-items: center; flex: none; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 10px; background: transparent; color: var(--ink); }
+.menu-button { display: grid; place-items: center; flex: none; width: 44px; height: 44px; margin-right: -4px; padding: 0; border: 0; border-radius: 10px; background: transparent; color: var(--ink); } /* a full touch target; the margin keeps the title at x=52 */
 .menu-button:hover { background: var(--fill); }
 .content { min-width: 0; }
 .frame { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; padding: 16px 16px 32px; }
