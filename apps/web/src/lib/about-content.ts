@@ -44,7 +44,16 @@ function specLine(name: string, ms: SpecModel[], short: (m: SpecModel) => string
   const all = [...groups];
   const big = all.reduce((a, b) => (b[1].length > a[1].length ? b : a));
   const rest = big[1].length >= 3 ? [...all.filter((g) => g !== big), [big[0], ['các bản khác']] as const] : all;
-  return `${name}: ${rest.map(([v, who]) => `${v} (${who.join(', ')})`).join(' · ')}`;
+  return `${name}: ${rest.map(([v, who]) => `${v} (${levels(who).join(', ')})`).join(' · ')}`;
+}
+
+/** Variants that differ only by a resolution suffix ("H3 Max Reference", "... 1080P", "... 480P") read as one name with their level count. */
+function levels(who: readonly string[]): string[] {
+  const base = (w: string) => w.replace(/ \d+P$/, '');
+  return [...new Set(who.map((w) => {
+    const n = who.filter((x) => base(x) === base(w)).length;
+    return n > 1 ? `${base(w)} ở ${n} mức` : w;
+  }))];
 }
 
 /** A family card with its spec lines (and a model-count tag) built from the models the Create form loaded, so they follow Admin and migrations.
