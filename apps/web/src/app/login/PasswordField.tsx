@@ -1,16 +1,17 @@
 import { type RefObject, useEffect, useRef } from 'react';
 import { Icon } from '@/components/Icon';
-import { NARROW, REDUCED_MOTION, useMediaQuery } from '@/lib/use-media-query';
+import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { useHydrated } from '@/lib/use-hydrated';
 import { beam, halfAt, lightAt, type Point, SPREAD, W0 } from './beam';
 
-export type RevealMode = 'pointer' | 'touch' | 'plain';
+export type RevealMode = 'pointer' | 'touch';
 
-/** How this device reveals the password, from media queries only: a plain toggle under reduced motion, a fixed beam without hover, else a pointer flashlight. */
+/**
+ * How this device reveals the password: a fixed beam without hover, else a pointer flashlight. Reduced motion does not turn it off, on the
+ * owner's word (2026-11-02): many company PCs report it, and the studio was then a still picture.
+ */
 export function useRevealMode(): RevealMode {
-  const reduced = useMediaQuery(REDUCED_MOTION);
-  const touch = useMediaQuery('(hover: none)');
-  return reduced ? 'plain' : touch ? 'touch' : 'pointer';
+  return useMediaQuery('(hover: none)') ? 'touch' : 'pointer';
 }
 
 const centre = (r: DOMRect): Point => ({ x: r.left + r.width / 2, y: r.top + r.height / 2 });

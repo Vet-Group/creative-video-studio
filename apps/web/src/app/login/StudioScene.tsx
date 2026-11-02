@@ -1,6 +1,15 @@
-import type { Ref } from 'react';
+import type { CSSProperties, Ref } from 'react';
 
-/** The product-video studio drawn for the login page: paper sweep, two lights, a turntable with a product box and a camera mascot. */
+// Dust in the two light beams: [x, y, radius, seconds, delay]. Fixed, so the server and the browser draw the same scene.
+const DUST = [
+  [118, 236, 2.4, 7, 0], [150, 300, 2, 9, 2.1], [176, 352, 2.6, 8, 4.4], [132, 330, 1.9, 10, 1.3], [205, 396, 2.2, 7.5, 3.2], [160, 262, 1.8, 11, 5.6],
+  [362, 236, 2.4, 8, 1.1], [330, 300, 2, 9.5, 3.7], [304, 352, 2.6, 7, 0.6], [348, 330, 1.9, 10.5, 2.8], [276, 396, 2.2, 8.5, 4.9], [320, 262, 1.8, 11, 6.2],
+] as const;
+
+/**
+ * The product-video studio drawn for the login page: paper sweep, two lights that switch on, dust in their beams, a turntable with a product
+ * box, a camera mascot that shows REC while the form is being filled in, and a flash and clapperboard for a successful sign-in.
+ */
 export function StudioScene({ mascot }: { mascot: Ref<SVGGElement> }) {
   return (
     <svg className="studio" viewBox="0 0 480 560" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false">
@@ -8,6 +17,11 @@ export function StudioScene({ mascot }: { mascot: Ref<SVGGElement> }) {
       <rect className="scene-floor" y="410" width="480" height="150" />
       <path className="scene-sweep" d="M100 40h280v290q0 80 80 80v60H20v-60q80 0 80-80z" />
       <path className="scene-glow" d="M58 150l30 22 202 258H150z M422 150l-30 22-202 258h140z" />
+      <g className="scene-dust">
+        {DUST.map(([cx, cy, r, s, d]) => (
+          <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r={r} style={{ '--s': `${s}s`, '--d': `${d}s` } as CSSProperties} />
+        ))}
+      </g>
       {[
         { x: 46, turn: 28 },
         { x: 434, turn: -28 },
@@ -23,6 +37,7 @@ export function StudioScene({ mascot }: { mascot: Ref<SVGGElement> }) {
       <g className="scene-turntable">
         <path className="scene-table" d="M130 420v16a110 22 0 0 0 220 0v-16z" />
         <ellipse className="scene-table-top" cx="240" cy="420" rx="110" ry="22" />
+        <ellipse className="scene-table-ring" cx="240" cy="420" rx="92" ry="16" />
       </g>
       <g className="scene-box">
         <path className="scene-box-top" d="M190 330l30-16h80l-30 16z" />
@@ -36,6 +51,9 @@ export function StudioScene({ mascot }: { mascot: Ref<SVGGElement> }) {
         <rect className="mascot-body" x="62" y="334" width="76" height="54" rx="12" />
         <rect className="mascot-body" x="76" y="320" width="32" height="18" rx="5" />
         <circle className="mascot-tally" cx="124" cy="346" r="4" />
+        <text className="mascot-rec" x="114" y="330">
+          REC
+        </text>
         <g transform="translate(100 361)">
           <g className="mascot-lens">
             <rect className="mascot-dark" x="22" y="-14" width="30" height="28" rx="5" />
@@ -45,6 +63,18 @@ export function StudioScene({ mascot }: { mascot: Ref<SVGGElement> }) {
           </g>
         </g>
       </g>
+      <g className="scene-clapper">
+        <g className="scene-clapper-arm">
+          <rect x="300" y="196" width="112" height="18" rx="3" />
+          <path className="scene-clapper-stripes" d="M312 196l-10 18h16l10-18z M344 196l-10 18h16l10-18z M376 196l-10 18h16l10-18z" />
+        </g>
+        <rect x="300" y="216" width="112" height="70" rx="5" />
+        <path className="scene-clapper-stripes" d="M312 216l-10 14h16l10-14z M344 216l-10 14h16l10-14z M376 216l-10 14h16l10-14z" />
+        <text x="356" y="268" textAnchor="middle">
+          Bấm máy!
+        </text>
+      </g>
+      <rect className="scene-flash" width="480" height="560" />
     </svg>
   );
 }

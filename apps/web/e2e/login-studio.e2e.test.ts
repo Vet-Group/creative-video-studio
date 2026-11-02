@@ -196,8 +196,17 @@ test.describe('desktop', () => {
       if (night) {
         await scene.click();
         await expect(card).toHaveAttribute('data-scene', 'night');
-        // Contrast is measured only after the scene colour transitions have finished.
-        await expect.poll(() => page.evaluate(() => document.getAnimations().length)).toBe(0);
+        // Contrast is measured only after the scene colour transitions have finished; the studio's looping effects never do.
+        await expect
+          .poll(() =>
+            page.evaluate(() =>
+              document
+                .getAnimations()
+                .filter((a) => a.effect?.getTiming().iterations !== Infinity)
+                .map((a) => `${(a as CSSAnimation).animationName ?? (a as CSSTransition).transitionProperty} ${((a.effect as KeyframeEffect | null)?.target as Element | null)?.getAttribute('class')} ${a.playState}`),
+            ),
+          )
+          .toEqual([]);
       }
       const all = await new AxeBuilder({ page }).exclude('nextjs-portal').analyze();
       expect(all.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical').map((v) => v.id)).toEqual([]);
@@ -261,18 +270,49 @@ test.describe('narrow window with a mouse', () => {
 test.describe('reduced motion', () => {
   test.use({ viewport: DESKTOP, contextOptions: { reducedMotion: 'reduce' } });
 
-  test('reduced motion: no beam and no mascot; the eye simply shows and hides the password', async ({ page }) => {
+  // Owner's word (2026-11-02): many company PCs report reduced motion, and the studio was then a still picture, so the effects stay on.
+  test('reduced motion: the mascot, the flashlight and the living studio still play', async ({ page }) => {
     const { pw, eye, card } = await open(page);
-    expect(await hoverNone(page)).toBe(false);
     expect(await page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches)).toBe(true);
-    await expect(page.locator('.mascot')).toBeHidden();
+    await expect(page.locator('.mascot')).toBeVisible();
+    expect(await page.locator('.scene-dust circle').first().evaluate((e) => getComputedStyle(e).animationName)).toBe('dust');
     await eye.click();
     await expect(pw).toHaveAttribute('type', 'text');
-    await expect(card).toHaveAttribute('data-flashlight', 'plain');
-    await expect(card).toHaveAttribute('data-dark', 'false');
-    await expect(page.locator('.beam')).toHaveCount(0);
-    await expect(page.locator('.mascot')).toBeHidden();
+    await expect(card).toHaveAttribute('data-flashlight', 'pointer');
     await eye.click();
     await expect(pw).toHaveAttribute('type', 'password');
+  });
+});
+
+test.describe('living studio', () => {
+  test.use({ viewport: DESKTOP });
+
+  test('the camera records while a field has focus and looks toward the pointer', async ({ page }) => {
+    await open(page);
+    const rec = page.locator('.mascot-rec');
+    expect(await rec.evaluate((e) => getComputedStyle(e).opacity)).toBe('0');
+    await page.getByLabel('Email').focus();
+    await expect.poll(() => rec.evaluate((e) => getComputedStyle(e).opacity)).toBe('1');
+    const mascot = page.locator('.mascot');
+    const angle = () => mascot.evaluate((e) => (e as SVGGElement).style.getPropertyValue('--lens-angle'));
+    const m = await box(mascot);
+    await page.mouse.move(m.x + m.width + 300, m.y - 200);
+    const up = await angle();
+    await page.mouse.move(m.x + m.width + 300, m.y + m.height);
+    expect(up).not.toBe('');
+    expect(await angle()).not.toBe(up);
+  });
+
+  test('a successful sign-in flashes and claps before the next page opens', async ({ page }) => {
+    await page.route('**/api/auth/sign-in/email', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: '{}' }));
+    const { pw, submit, card } = await open(page);
+    await page.getByLabel('Email').fill('someone@example.test');
+    await pw.fill('anything');
+    // The mocked sign-in sets no session, so Create sends the browser back here; the request for it is what shows the page moved on.
+    const leaving = page.waitForRequest((r) => r.isNavigationRequest() && new URL(r.url()).pathname === '/create');
+    await submit.click();
+    await expect(card).toHaveAttribute('data-result', 'success');
+    await expect.poll(() => page.locator('.scene-clapper').evaluate((e) => getComputedStyle(e).opacity)).toBe('1');
+    await leaving;
   });
 });
