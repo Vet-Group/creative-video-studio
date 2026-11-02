@@ -2,6 +2,7 @@
 # A.0c: give the run its own SSH key on vet-linux, restricted to the cvs-run-gate forced command. The only step that uses
 # the owner's vet-linux profile. Also creates the read-only GitHub deploy key on VET.
 #   bash scripts/run/install-gate-key.sh                       real install (needs a valid pre-approval)
+#   bash scripts/run/install-gate-key.sh --gate-only           only upload deploy/linux/cvs-run-gate again (needs a valid pre-approval)
 #   bash scripts/run/install-gate-key.sh --file F --pubkey P   dry run on a local authorized_keys copy (tests)
 set -euo pipefail
 
@@ -28,6 +29,19 @@ append_gate_line() {
   echo "appended 1 line (backup $bak)"
 }
 
+upload_gate() {
+  ssh vet-linux 'install -m 0755 /dev/stdin /usr/local/sbin/cvs-run-gate' <"$ROOT/deploy/linux/cvs-run-gate"
+  remote_sum=$(ssh vet-linux 'sha256sum /usr/local/sbin/cvs-run-gate' | cut -d' ' -f1)
+  [[ "$remote_sum" == "$(sha256sum "$ROOT/deploy/linux/cvs-run-gate" | cut -d' ' -f1)" ]] || { echo "gate upload mismatch" >&2; exit 1; }
+}
+
+if [[ "${1:-}" == --gate-only ]]; then
+  env -u CVS_RUN_DIR node "$ROOT/scripts/run/cli.ts" guard-check || exit 3
+  upload_gate
+  echo "gate updated"
+  exit 0
+fi
+
 if [[ "${1:-}" == --file ]]; then
   [[ $# -eq 4 && "$3" == --pubkey ]] || { echo "usage: --file F --pubkey P" >&2; exit 2; }
   append_gate_line "$2" "$OPTS $(cat "$4")"
@@ -38,9 +52,7 @@ env -u CVS_RUN_DIR node "$ROOT/scripts/run/cli.ts" guard-check || exit 3
 [[ -f "$KEY" ]] || ssh-keygen -q -t ed25519 -N '' -C cvs-run-gate -f "$KEY"
 line="$OPTS $(cat "$KEY.pub")"
 
-ssh vet-linux 'install -m 0755 /dev/stdin /usr/local/sbin/cvs-run-gate' <"$ROOT/deploy/linux/cvs-run-gate"
-remote_sum=$(ssh vet-linux 'sha256sum /usr/local/sbin/cvs-run-gate' | cut -d' ' -f1)
-[[ "$remote_sum" == "$(sha256sum "$ROOT/deploy/linux/cvs-run-gate" | cut -d' ' -f1)" ]] || { echo "gate upload mismatch" >&2; exit 1; }
+upload_gate
 { declare -f append_gate_line; printf 'append_gate_line /root/.ssh/authorized_keys %q\n' "$line"; } | ssh vet-linux 'bash -s'
 
 # Read-only deploy key: generated on VET, so the private half never leaves it.

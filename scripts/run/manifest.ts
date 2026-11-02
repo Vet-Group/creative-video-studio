@@ -2,7 +2,7 @@
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { OPS_VERBS, PREAPPROVAL_DAYS } from './preapproval.ts';
+import { OPS_SENTENCE, OPS_VERBS, PREAPPROVAL_DAYS } from './preapproval.ts';
 import type { ItemResult } from './preflight.ts';
 import { STEPS } from './steps.ts';
 
@@ -145,7 +145,7 @@ export function preapprovalValid(m: Manifest, now: Date): boolean {
 
 /** Whether a vet.sh call may go out: any verb under a live pre-approval, the routine verbs under the standing operations permission. */
 export function vetAllowed(m: Manifest, now: Date, verb?: string): boolean {
-  return preapprovalValid(m, now) || (!!m.ops && !!verb && OPS_VERBS.includes(verb));
+  return preapprovalValid(m, now) || (m.ops?.sentence === OPS_SENTENCE && !!verb && OPS_VERBS.includes(verb));
 }
 
 export function readManifest(path: string): Manifest {
@@ -193,6 +193,10 @@ export const GUARD_FILES = [
   '.githooks/pre-push',
   '.gitleaks.toml',
   'package.json',
+  // What decides the permission itself (the sentences, the verbs, guard-check), so widening it halts like any other guard.
+  'scripts/run/cli.ts',
+  'scripts/run/manifest.ts',
+  'scripts/run/preapproval.ts',
 ];
 
 /** Committed guards plus the local list's entries, skipping files that do not exist. */

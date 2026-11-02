@@ -90,16 +90,31 @@ describe('owner-closed steps', () => {
   const cli = (dir: string, ...args: string[]) =>
     spawnSync(process.execPath, [join(import.meta.dirname, 'cli.ts'), ...args], { encoding: 'utf8', env: { ...process.env, CVS_RUN_DIR: dir } });
 
-  test('ops-approve takes only the exact sentence; guard-check then lets a routine verb through, not another, and still halts on a changed guard', () => {
+  // The owner's own terminal: no Claude Code markers.
+  const owner = (dir: string, ...args: string[]) => {
+    const env = { ...process.env, CVS_RUN_DIR: dir };
+    delete env.CLAUDECODE;
+    delete env.CLAUDE_CODE_ENTRYPOINT;
+    return spawnSync(process.execPath, [join(import.meta.dirname, 'cli.ts'), ...args], { encoding: 'utf8', env });
+  };
+
+  test('ops-approve takes only the exact sentence from the owner terminal; guard-check then lets a routine verb through, not another, and still halts on a changed guard', () => {
     const dir = tmp();
     const m = fresh();
     approve(m, 'x', new Date('2026-10-01T00:00:00Z')); // long expired
     writeManifest(join(dir, 'manifest.json'), m);
-    const wrong = cli(dir, 'ops-approve', 'Tôi cấp quyền tất cả');
+    for (const marker of ['CLAUDECODE', 'CLAUDE_CODE_ENTRYPOINT']) {
+      const agent = spawnSync(process.execPath, [join(import.meta.dirname, 'cli.ts'), 'ops-approve', OPS_SENTENCE], { encoding: 'utf8', env: { ...process.env, CVS_RUN_DIR: dir, [marker]: '1' } });
+      expect(agent.status, marker).toBe(2); // an agent session cannot sign for the owner
+      expect(agent.stderr).toMatch(/terminal/);
+    }
+    expect(readManifest(join(dir, 'manifest.json')).ops).toBeUndefined();
+    const wrong = owner(dir, 'ops-approve', 'Tôi cấp quyền tất cả');
     expect(wrong.status, wrong.stderr).toBe(2);
+    expect(wrong.stderr).toContain(OPS_SENTENCE); // it shows the sentence to copy
     expect(readManifest(join(dir, 'manifest.json')).ops).toBeUndefined();
 
-    const ok = cli(dir, 'ops-approve', ` ${OPS_SENTENCE.replace(/ /g, '  ')} `); // spacing is forgiven, as for the pre-approval
+    const ok = owner(dir, 'ops-approve', ` ${OPS_SENTENCE.replace(/ /g, '  ')} `); // spacing is forgiven, as for the pre-approval
     expect(ok.status, ok.stderr).toBe(0);
     expect(readManifest(join(dir, 'manifest.json')).ops?.sentence).toBe(OPS_SENTENCE);
     expect(cli(dir, 'guard-check', '--verb', 'status').status).toBe(0);
@@ -115,6 +130,11 @@ describe('owner-closed steps', () => {
     const halted = cli(dir, 'guard-check', '--verb', 'status');
     expect(halted.status).toBe(3);
     expect(halted.stderr).toMatch(/HARD STOP 2/);
+
+    expect(owner(dir, 'ops-approve', OPS_SENTENCE).status).toBe(0);
+    expect(cli(dir, 'ops-revoke').status).toBe(0); // revoking needs no owner terminal
+    expect(readManifest(join(dir, 'manifest.json')).ops).toBeUndefined();
+    expect(cli(dir, 'guard-check', '--verb', 'status').status).toBe(4);
   });
 
   test('done and skip refuse M.7b without the owner words, and keep them as a note when given', () => {
@@ -216,6 +236,8 @@ describe('manifest', () => {
     for (const v of OPS_VERBS) expect(vetAllowed(m, later, v), v).toBe(true);
     for (const v of ['check', 'sample-neighbours', 'fetch-inputs', 'uninstall', undefined]) expect(vetAllowed(m, later, v), String(v)).toBe(false);
     expect(vetAllowed(m, new Date('2026-10-30T00:00:00Z'), 'fetch-inputs')).toBe(true); // a live run approval still opens every verb
+    m.ops = { sentence: 'Tôi cấp mọi quyền', at: '2026-11-02T00:00:00Z' }; // a hand-edited manifest
+    expect(vetAllowed(m, later, 'status')).toBe(false);
   });
 
   test('writes atomically, keeps 20 history versions and refuses an invalid manifest', () => {

@@ -31,6 +31,19 @@ describe('cvs-run-gate (server side)', () => {
     expect(r.stderr).toContain('refused');
   });
 
+  test('deploy checks the commit is on main before it checks it out or runs its installer', () => {
+    const sha = 'a'.repeat(40);
+    const r = gate(`deploy ${sha}`);
+    expect(r.status, r.stderr).toBe(0);
+    const lines = r.stdout.split('\n');
+    const onMain = lines.findIndex((l) => l.includes(`merge-base --is-ancestor ${sha} origin/main`));
+    const checkout = lines.findIndex((l) => l.includes(`checkout --quiet --detach ${sha}`));
+    const install = lines.findIndex((l) => l.includes('deploy/linux/install.sh'));
+    expect(onMain).toBeGreaterThan(-1);
+    expect(onMain).toBeLessThan(checkout);
+    expect(checkout).toBeLessThan(install);
+  });
+
   test('runs an allowed verb (dry run prints the fixed commands)', () => {
     const r = gate('check');
     expect(r.status).toBe(0);

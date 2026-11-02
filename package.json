@@ -14,7 +14,8 @@
     "preflight": "node --env-file-if-exists=.env scripts/preflight.ts",
     "run:approve": "node --env-file-if-exists=.env scripts/run/cli.ts approve",
     "run:verify": "node --env-file-if-exists=.env scripts/run/cli.ts verify",
-    "run:ops-approve": "node --env-file-if-exists=.env scripts/run/cli.ts ops-approve"
+    "run:ops-approve": "node --env-file-if-exists=.env scripts/run/cli.ts ops-approve",
+    "run:ops-revoke": "node --env-file-if-exists=.env scripts/run/cli.ts ops-revoke"
   },
   "devDependencies": {
     "@types/node": "24.19.0",
