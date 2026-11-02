@@ -59,3 +59,12 @@ export function deviceLabel(userAgent: string | null): string {
 /** A session time as hh:mm dd/mm/yyyy in Vietnam time. */
 export const sessionTime = (iso: string) =>
   new Intl.DateTimeFormat('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date(iso));
+
+/** How many sessions the list shows before "Xem tất cả". */
+export const SESSIONS_SHOWN = 5;
+
+/** This device first, then the others newest first as the API lists them; the first few unless all are asked for. */
+export function visibleSessions<T extends { current: boolean }>(sessions: T[], all: boolean): T[] {
+  const ordered = [...sessions].sort((a, b) => Number(b.current) - Number(a.current));
+  return all ? ordered : ordered.slice(0, SESSIONS_SHOWN);
+}
