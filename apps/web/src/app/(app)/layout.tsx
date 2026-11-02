@@ -1,15 +1,16 @@
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { Shell } from '@/components/Shell';
 import { googleLoginEnabled, larkLoginEnabled, pool } from '@/lib/auth';
 import { currentUser } from '@/lib/current-user';
+import { loginFor } from '@/lib/return-to';
 import { COLLAPSED_COOKIE } from '@/lib/sidebar';
 import { userMethods } from '@/lib/user-methods';
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const user = await currentUser();
-  if (!user) redirect('/login');
+  if (!user) redirect(loginFor((await headers()).get('x-cvs-path'))); // set by src/proxy.ts
   const isAdmin = user.role === 'admin';
   const account = {
     email: user.email,

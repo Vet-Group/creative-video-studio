@@ -13,6 +13,8 @@ process.env.APP_URL = ORIGIN;
 
 const { auth, pool } = await import('@/lib/auth');
 const route = await import('./[...all]/route');
+const { GET: listUsers } = await import('../admin/users/route');
+const { DELETE: adminDelete } = await import('../admin/users/[id]/accounts/[accountId]/route');
 
 const PASSWORD = 'correct-horse-battery';
 afterAll(async () => {
@@ -20,8 +22,8 @@ afterAll(async () => {
   await testDb.drop();
 });
 
-async function user(email: string) {
-  return (await auth.api.createUser({ body: { email, name: email, role: 'member', password: PASSWORD, data: { emailVerified: true } } })).user.id;
+async function user(email: string, role: 'member' | 'admin' = 'member') {
+  return (await auth.api.createUser({ body: { email, name: email, role, password: PASSWORD, data: { emailVerified: true } } })).user.id;
 }
 const cookies = (res: Response) => res.headers.getSetCookie().map((c) => c.split(';')[0]);
 async function cookieOf(email: string) {
@@ -106,15 +108,17 @@ describe('signing in with a passkey', () => {
 });
 
 describe('deleting a passkey', () => {
-  test('the owner deletes it; it is audited as an unlink and the other sessions stay', async () => {
+  test('the owner deletes it; it is audited as an unlink and the other sessions end', async () => {
     const id = await user('bao@example.test');
     const { id: pk } = await seedPasskey(id);
     const [cookie, other] = [await cookieOf('bao@example.test'), await cookieOf('bao@example.test')];
     const res = await call('/passkey/delete-passkey', { cookie, body: { id: pk } });
     expect(res.status).toBe(200);
     expect(await count('passkeys where id = $1', [pk])).toBe(0);
-    expect((await audits(id)).at(-1)).toEqual({ action: 'account.unlink', old_value: { provider: 'passkey', accountId: pk, email: null }, new_value: null });
-    expect((await auth.api.getSession({ headers: new Headers({ cookie: other }) }))?.user.id).toBe(id);
+    expect((await audits(id)).at(-1)).toEqual({ action: 'account.unlink', old_value: { provider: 'passkey', accountId: pk, email: null }, new_value: { sessionsRevoked: true } });
+    // The user's other sessions end, as on an unlink; the one that deleted it stays.
+    expect(await auth.api.getSession({ headers: new Headers({ cookie: other }) })).toBeNull();
+    expect((await auth.api.getSession({ headers: new Headers({ cookie }) }))?.user.id).toBe(id);
   });
 
   test("another user cannot delete someone's passkey", async () => {
@@ -124,5 +128,29 @@ describe('deleting a passkey', () => {
     const res = await call('/passkey/delete-passkey', { cookie: await cookieOf('dan@example.test'), body: { id: pk } });
     expect(res.status).toBe(401);
     expect(await count('passkeys where id = $1', [pk])).toBe(1);
+  });
+});
+
+describe('an Admin and the passkeys of a user', () => {
+  test('lists them among the methods and deletes one, ending all the sessions of that user', async () => {
+    await user('admin@example.test', 'admin');
+    const id = await user('lost@example.test');
+    const { id: pk } = await seedPasskey(id);
+    const [adminCookie, memberCookie] = [await cookieOf('admin@example.test'), await cookieOf('lost@example.test')];
+
+    const res = await listUsers(new Request(`${ORIGIN}/api/admin/users`, { headers: { cookie: adminCookie } }));
+    const { users } = (await res.json()) as { users: { id: string; methods: { id: string; provider: string }[] }[] };
+    expect(users.find((u) => u.id === id)?.methods.map((m) => [m.provider, m.id])).toEqual([['credential', expect.any(String)], ['passkey', pk]]);
+
+    const del = (cookie: string, userId: string) =>
+      adminDelete(new Request(`${ORIGIN}/x`, { method: 'DELETE', headers: { cookie } }), { params: Promise.resolve({ id: userId, accountId: pk }) });
+    expect((await del(memberCookie, id)).status).toBe(403);
+    expect((await del(adminCookie, 'someone-else')).status).toBe(404);
+    expect(await count('passkeys where id = $1', [pk])).toBe(1);
+
+    expect((await del(adminCookie, id)).status).toBe(200);
+    expect(await count('passkeys where id = $1', [pk])).toBe(0);
+    expect(await auth.api.getSession({ headers: new Headers({ cookie: memberCookie }) })).toBeNull();
+    expect((await audits(id)).at(-1)).toEqual({ action: 'account.unlink', old_value: { provider: 'passkey', accountId: pk, email: null }, new_value: { sessionsRevoked: true } });
   });
 });

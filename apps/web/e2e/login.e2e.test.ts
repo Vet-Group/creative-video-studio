@@ -18,9 +18,21 @@ test('only an Admin sees the remaining company budget', async ({ page }) => {
   await expect(page.getByText('Ngân sách tháng còn lại của công ty: $')).toBeVisible();
 });
 
-test('a signed-out visit to the Library goes to the login page', async ({ page }) => {
-  await page.goto('/library');
-  await expect(page).toHaveURL(/\/login$/);
+test('a signed-out visit to the Library goes to the login page and back to the Library after the sign-in', async ({ page }) => {
+  await page.goto('/library?tab=video');
+  await expect(page).toHaveURL(/\/login\?next=%2Flibrary%3Ftab%3Dvideo$/);
+  await page.getByLabel('Email').fill(USERS.member1.email);
+  await page.getByLabel('Mật khẩu').fill(PASSWORD);
+  await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
+  await expect(page).toHaveURL(/\/library\?tab=video$/);
+});
+
+test('a login link that points at another site still lands on Create', async ({ page }) => {
+  await page.goto('/login?next=%2F%2Fevil.example');
+  await page.getByLabel('Email').fill(USERS.member1.email);
+  await page.getByLabel('Mật khẩu').fill(PASSWORD);
+  await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
+  await expect(page).toHaveURL(/\/create$/);
 });
 
 test('a limiter refusal says how long to wait instead of blaming the password', async ({ page }) => {

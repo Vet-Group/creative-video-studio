@@ -10,16 +10,21 @@ import { useHydrated } from '@/lib/use-hydrated';
 import { PasswordField, useRevealMode } from './PasswordField';
 import { StudioScene } from './StudioScene';
 
-/** `error` is the `?error=` code a failed social sign-in left in the URL; `lastMethod` the method this browser signed in with last. */
+/**
+ * `error` is the `?error=` code a failed social sign-in left in the URL; `lastMethod` the method this browser signed in with last; `next` the
+ * page to open after the sign-in, already checked to be one of this site.
+ */
 export function LoginForm({
   googleEnabled,
   larkEnabled,
   lastMethod,
+  next = '/create',
   error: errorCode,
 }: {
   googleEnabled: boolean;
   larkEnabled: boolean;
   lastMethod?: string;
+  next?: string;
   error?: string;
 }) {
   const [email, setEmail] = useState('');
@@ -45,17 +50,17 @@ export function LoginForm({
     void (async () => {
       if (!(await browserSupportsWebAuthnAutofill())) return;
       await signInWithPasskey(true);
-      window.location.assign('/create');
+      window.location.assign(next);
     })().catch((e: unknown) => {
       if (e instanceof ApiError && e.status !== 429) setError('Không đăng nhập được bằng passkey.');
     });
-  }, []);
+  }, [next]);
 
   async function passkey() {
     setError('');
     try {
       await signInWithPasskey();
-      window.location.assign('/create');
+      window.location.assign(next);
     } catch (err) {
       if (!cancelled(err)) setError('Không đăng nhập được bằng passkey.');
     }
@@ -68,7 +73,7 @@ export function LoginForm({
     setError('');
     try {
       await api('/api/auth/sign-in/email', sendJson('POST', { email, password }));
-      window.location.assign('/create');
+      window.location.assign(next);
     } catch (err) {
       setError(
         err instanceof ApiError && err.status === 429
@@ -99,7 +104,7 @@ export function LoginForm({
   async function social(provider: 'google' | 'lark') {
     setError('');
     try {
-      const r = await api<{ url?: string }>('/api/auth/sign-in/social', sendJson('POST', { provider, callbackURL: '/create', errorCallbackURL: '/login' }));
+      const r = await api<{ url?: string }>('/api/auth/sign-in/social', sendJson('POST', { provider, callbackURL: next, errorCallbackURL: '/login' }));
       if (r.url) window.location.assign(r.url);
     } catch {
       setError(`Không đăng nhập được bằng ${METHOD_LABEL[provider]}.`);

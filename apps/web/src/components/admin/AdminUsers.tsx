@@ -69,10 +69,10 @@ function UserRow({ user, teams, run, hidden }: { user: User; teams: Team[]; run:
                 <button
                   type="button"
                   className="small"
-                  aria-label={`Huỷ liên kết ${providerLabel(m.provider)} của ${user.email}`}
+                  aria-label={`${m.provider === 'passkey' ? 'Xoá' : 'Huỷ liên kết'} ${providerLabel(m.provider)} của ${user.email}`}
                   onClick={() => void run(() => api(`/api/admin/users/${user.id}/accounts/${m.id}`, { method: 'DELETE' }), 'Không huỷ được liên kết.')}
                 >
-                  Huỷ liên kết
+                  {m.provider === 'passkey' ? 'Xoá' : 'Huỷ liên kết'}
                 </button>
               )}
             </li>

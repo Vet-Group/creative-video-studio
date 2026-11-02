@@ -20,3 +20,11 @@ test('other failures have no wait and keep the server message', async () => {
   const e = (await failure(400, {}, { error: 'bad input' })) as ApiError;
   expect([e.status, e.message, e.retryAfter]).toEqual([400, 'bad input', null]);
 });
+
+test('a 401 on a page sends the user to the login, to come back to that page', async () => {
+  const assign = vi.fn();
+  vi.stubGlobal('window', { location: { pathname: '/library', search: '?tab=video', assign } });
+  vi.stubGlobal('fetch', async () => new Response('{}', { status: 401 }));
+  await api('/x').catch(() => {});
+  expect(assign).toHaveBeenCalledWith('/login?next=%2Flibrary%3Ftab%3Dvideo');
+});
