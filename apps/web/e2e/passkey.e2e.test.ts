@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
-import { signIn } from './support.test';
+import { openSettings, signIn } from './support.test';
 
 // A virtual authenticator of the browser (Chrome DevTools Protocol) stands in for the platform's own, and confirms each ceremony itself.
 async function virtualAuthenticator(page: Page) {
@@ -11,12 +11,7 @@ async function virtualAuthenticator(page: Page) {
 }
 
 async function signOut(page: Page) {
-  const dialog = page.getByRole('dialog', { name: 'Cài đặt' });
-  // Right after a navigation the page may not be hydrated yet, and a click on Settings then does nothing; click again until it opens.
-  await expect(async () => {
-    await page.getByRole('button', { name: 'Cài đặt' }).click();
-    await expect(dialog).toBeVisible({ timeout: 2_000 });
-  }).toPass();
+  const dialog = await openSettings(page); // retries the menu until the page has hydrated
   await dialog.getByRole('button', { name: 'Đăng xuất' }).click();
   await expect(page).toHaveURL(/\/login$/);
 }

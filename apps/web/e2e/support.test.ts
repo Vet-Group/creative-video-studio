@@ -41,6 +41,22 @@ export async function signIn(page: Page, who: UserKey): Promise<void> {
   await page.mouse.move(0, 0);
 }
 
+/** The account button: the sidebar's bottom chip, or the avatar in the top bar below 1024 px. */
+export const accountButton = (page: Page): Locator => page.getByRole('button', { name: /^Tài khoản: / });
+
+/** Opens Settings the way a user does: the account menu, then its first item. Retries the menu, as a click before hydration does nothing. */
+export async function openSettings(page: Page): Promise<Locator> {
+  const menu = page.getByRole('menu', { name: /^Tài khoản: / });
+  await expect(async () => {
+    if (!(await menu.isVisible())) await accountButton(page).click();
+    await expect(menu).toBeVisible({ timeout: 2_000 });
+  }).toPass();
+  await menu.getByRole('menuitem', { name: /^Cài đặt/ }).click();
+  const settings = page.getByRole('dialog', { name: 'Cài đặt' });
+  await expect(settings).toBeVisible();
+  return settings;
+}
+
 // The Create form's selects are custom: a button (role combobox) that opens a listbox. These helpers drive them the way a user does.
 
 /** The select with this label. Its `data-value` attribute holds the chosen value. */

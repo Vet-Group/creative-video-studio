@@ -1,5 +1,5 @@
 import { type Browser, expect, type Page, test } from '@playwright/test';
-import { signIn } from './support.test';
+import { openSettings, signIn } from './support.test';
 import { PASSWORD, USERS, type UserKey } from './users';
 
 // Built from the fixture password so no password-like literal sits in the source (the secret scan flags those).
@@ -23,8 +23,7 @@ async function otherDevice(browser: Browser, who: UserKey) {
 }
 
 async function openSecurity(page: Page) {
-  await page.getByRole('button', { name: 'Cài đặt' }).click();
-  const settings = page.getByRole('dialog', { name: 'Cài đặt' });
+  const settings = await openSettings(page);
   await settings.getByRole('button', { name: 'Bảo mật' }).click();
   return settings;
 }

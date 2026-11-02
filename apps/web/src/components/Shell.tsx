@@ -7,12 +7,14 @@ import { api, errorText, sendJson, type JobStatus, type TrayJob } from '@/lib/ap
 import { appBySlug } from '@/lib/apps';
 import { featureLabel } from '@/lib/features';
 import { canReuse, refillFrom, reuseHref } from '@/lib/reuse';
-import { COLLAPSED_COOKIE } from '@/lib/sidebar';
+import { userAvatarColor } from '@/lib/profile';
+import { COLLAPSED_COOKIE, isMac, isSettingsShortcut, navGroups } from '@/lib/sidebar';
 import { confirmRun } from '@/lib/run-guard';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
+import { AccountMenu } from './AccountMenu';
 import { Icon, type IconName } from './Icon';
 import { JobsProvider, Recreate, roleOf, Tap, useForm, useJobs } from './jobs';
-import { type Account, Settings } from './Settings';
+import { type Account, type Section, Settings } from './Settings';
 import { SaveTemplateDialog } from './Templates';
 import { VetLogo } from './VetLogo';
 import { useZipDownload } from './ZipDownload';
@@ -354,17 +356,6 @@ function NavProgress() {
   return <div className="nav-progress" data-on={on} aria-hidden="true" />;
 }
 
-// The sidebar in the live order; later features slot in where the live sidebar has them.
-const NAV: { href: string; text: string; icon: IconName; badge?: string }[] = [
-  { href: '/explore', text: 'Khám phá', icon: 'home' },
-  { href: '/try-on', text: 'Thử đồ', icon: 'tryon' },
-  { href: '/image-generation', text: 'Tạo ảnh', icon: 'image' },
-  { href: '/create', text: 'Tạo video', icon: 'create' },
-  { href: '/marketing-studio', text: 'Marketing Studio', icon: 'megaphone', badge: 'Mới' },
-  { href: '/apps', text: 'Ứng dụng', icon: 'apps' },
-  { href: '/library', text: 'Thư viện', icon: 'library' },
-];
-
 /** The pages that show their own History tab instead of the tray beside them. */
 const OWN_HISTORY = ['/create', '/try-on', '/image-generation', '/marketing-studio'];
 
@@ -397,7 +388,7 @@ export function Shell({ userId, userName, isAdmin, account, initialCollapsed, ch
   const menuButton = useRef<HTMLButtonElement>(null);
   const sidebar = useRef<HTMLDivElement>(null);
   const [collapsed, setCollapsed] = useState(initialCollapsed); // the icon rail, from 1024 px
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settings, setSettings] = useState<Section | null>(null); // the open Settings dialog's first section
   const link = (href: string, text: string, icon: IconName, current = pathname === href, badge?: string) => (
     <Link key={href} href={href} aria-current={current ? 'page' : undefined} title={collapsed ? text : undefined}>
       <span className="nav-icon">
@@ -412,6 +403,15 @@ export function Shell({ userId, userName, isAdmin, account, initialCollapsed, ch
     setCollapsed(!collapsed);
   }
 
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!isSettingsShortcut(e, isMac()) || document.querySelector('dialog[open]')) return;
+      e.preventDefault();
+      setSettings('profile');
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
   useEffect(() => setOpen(false), [pathname]);
   useEffect(() => {
     if (!narrow) setOpen(false); // the drawer is for narrow screens only
@@ -430,6 +430,10 @@ export function Shell({ userId, userName, isAdmin, account, initialCollapsed, ch
     };
   }, [open]);
 
+  const current = (href: string) => (href.startsWith('/admin') ? pathname.startsWith('/admin') : pathname === href || pathname.startsWith(`${href}/`));
+  const accountMenu = (variant: 'chip' | 'avatar') => (
+    <AccountMenu name={userName} email={account.email} color={userAvatarColor(userName, account.avatarColor)} variant={variant} onSettings={setSettings} />
+  );
   const title = PAGE_TITLES.find(([prefix]) => pathname.startsWith(prefix))?.[1] ?? 'Creative Video Studio';
   return (
     <JobsProvider userId={userId}>
@@ -451,13 +455,10 @@ export function Shell({ userId, userName, isAdmin, account, initialCollapsed, ch
               <span className="logo" aria-hidden="true">
                 <VetLogo size={28} />
               </span>
-              <strong className="who">{userName}</strong>
+              <strong>Video Studio</strong>
               <span className="brand-tools">
                 <button type="button" className="rail-toggle" aria-label="Thu gọn thanh bên" title="Thu gọn thanh bên" aria-pressed={collapsed} onClick={toggleRail}>
                   <Icon name="panel" size={16} />
-                </button>
-                <button type="button" className="settings-button" aria-label="Cài đặt" title="Cài đặt" aria-haspopup="dialog" onClick={() => setSettingsOpen(true)}>
-                  <Icon name="gear" size={16} />
                 </button>
               </span>
               <button type="button" className="drawer-close" aria-label="Đóng menu" onClick={() => setOpen(false)}>
@@ -465,18 +466,27 @@ export function Shell({ userId, userName, isAdmin, account, initialCollapsed, ch
               </button>
             </div>
             <nav aria-label="Điều hướng chính">
-              {NAV.map((n) => link(n.href, n.text, n.icon, pathname === n.href || pathname.startsWith(`${n.href}/`), n.badge))}
-              {isAdmin && link('/admin/overview', 'Quản trị', 'admin', pathname.startsWith('/admin'))}
+              {navGroups(isAdmin).map((g, i) => (
+                <div key={g.label ?? 'home'} className="nav-group" role={g.label ? 'group' : undefined} aria-labelledby={g.label ? `nav-group-${i}` : undefined}>
+                  {g.label && (
+                    <p className="nav-group-label" id={`nav-group-${i}`}>
+                      {g.label}
+                    </p>
+                  )}
+                  {g.items.map((n) => link(n.href, n.text, n.icon, current(n.href), n.badge))}
+                </div>
+              ))}
             </nav>
+            {accountMenu('chip')}
           </div>
-          <Settings open={settingsOpen} onClose={() => setSettingsOpen(false)} userName={userName} account={account} />
+          <Settings open={settings !== null} onClose={() => setSettings(null)} userName={userName} account={account} start={settings ?? 'profile'} />
           <div className="content" inert={narrow && open}>
             <header className="topbar">
               <button ref={menuButton} type="button" className="menu-button" aria-label="Mở menu" aria-expanded={open} aria-controls="sidebar" onClick={() => setOpen(true)}>
                 <Icon name="menu" size={20} />
               </button>
               <strong>{title}</strong>
-              <VetLogo size={28} />
+              {accountMenu('avatar')}
             </header>
             <div className="frame">
               <main>{children}</main>

@@ -1,5 +1,5 @@
 'use client';
-// The Settings dialog behind the gear: the profile, the user's own caps, sign-in security, preferences, the linked sign-in methods, support,
+// The Settings dialog behind the account menu: the profile, the user's own caps, sign-in security, preferences, the linked sign-in methods, support,
 // and signing out. No billing: the company pays. On phones the sections are a list, and each opens as its own page with a back button.
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -34,13 +34,13 @@ export interface Account {
 }
 
 /** GET /api/me/limits: the caller's use of each Run cap; USD amounts are numeric text. */
-interface Usage {
+export interface Usage {
   clips: { used: number; cap: number };
   dayUsd: { used: string; cap: string };
   monthUsd: { used: string; cap: string };
 }
 
-type Section = 'profile' | 'limits' | 'security' | 'preferences' | 'methods' | 'support';
+export type Section = 'profile' | 'limits' | 'security' | 'preferences' | 'methods' | 'support';
 
 const SECTIONS: readonly (readonly [Section, string, IconName, string])[] = [
   ['profile', 'Hồ sơ', 'user', 'Tên, màu ảnh đại diện, mức bảo vệ'],
@@ -71,8 +71,8 @@ const monthYear = (iso: string) => {
 };
 const usd = (v: string | number) => `$${Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`;
 /** A cap's fill: at or over the cap is full, as checkCaps refuses there (a cap of 0 is always full). */
-const shareOf = (used: number, cap: number) => (cap > 0 ? Math.min(used / cap, 1) : 1);
-const levelOf = (share: number) => (share >= 1 ? 'full' : share >= 0.8 ? 'warn' : 'ok');
+export const shareOf = (used: number, cap: number) => (cap > 0 ? Math.min(used / cap, 1) : 1);
+export const levelOf = (share: number) => (share >= 1 ? 'full' : share >= 0.8 ? 'warn' : 'ok');
 
 /** One cap as a labelled bar. */
 function Meter({ label, used, cap, text, left }: { label: string; used: number; cap: number; text: string; left: string }) {
@@ -315,7 +315,13 @@ function Protection({ account, twoFactor, onFix }: { account: Account; twoFactor
 
 const PASSWORD_DONE = 'Đã đổi mật khẩu. Các thiết bị khác đã được đăng xuất.';
 
-export function Settings({ open, onClose, userName, account }: { open: boolean; onClose: () => void; userName: string; account: Account }) {
+export async function signOut() {
+  await api('/api/auth/sign-out', sendJson('POST', {})).catch(() => null);
+  window.location.assign('/login');
+}
+
+/** `start`: the section it opens on (the account menu's items); on phones any other than the profile opens as its page. */
+export function Settings({ open, onClose, userName, account, start = 'profile' }: { open: boolean; onClose: () => void; userName: string; account: Account; start?: Section }) {
   const router = useRouter();
   const phone = useMediaQuery(PHONE);
   const [section, setSection] = useState<Section>('profile');
@@ -334,9 +340,9 @@ export function Settings({ open, onClose, userName, account }: { open: boolean; 
 
   useEffect(() => {
     if (!open) return;
-    // Every opening starts on the profile (the list on phones), with fresh caps for both the profile strip and the Limits section.
-    setSection('profile');
-    setView('list');
+    // Every opening starts on its section (the profile is the list on phones), with fresh caps for both the profile strip and the Limits section.
+    setSection(start);
+    setView(start === 'profile' ? 'list' : 'page');
     setSaved(null);
     setPwOpen(false);
     setPwDone(false);
@@ -344,7 +350,7 @@ export function Settings({ open, onClose, userName, account }: { open: boolean; 
     api<Usage>('/api/me/limits')
       .then(setUsage)
       .catch(() => setUsage('failed'));
-  }, [open]);
+  }, [open, start]);
 
   useEffect(() => {
     panel.current?.scrollTo(0, 0); // a wide screen scrolls the panel itself; each section starts at its top
@@ -364,10 +370,6 @@ export function Settings({ open, onClose, userName, account }: { open: boolean; 
     setView('page');
     // On a phone the page replaces the list, so focus follows it; on a wide screen a nav click keeps focus in the nav.
     if (from === 'jump' || phone) setFocus({ to: 'heading', anchor });
-  }
-  async function signOut() {
-    await api('/api/auth/sign-out', sendJson('POST', {})).catch(() => null);
-    window.location.assign('/login');
   }
 
   const name = saved?.name ?? userName;

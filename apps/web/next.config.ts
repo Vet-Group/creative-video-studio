@@ -5,6 +5,7 @@ const config: NextConfig = {
   transpilePackages: ['@cvs/core', '@cvs/db'],
   serverExternalPackages: ['pg-boss'],
   poweredByHeader: false,
+  devIndicators: { position: 'bottom-right' }, // the account chip has the bottom-left corner
   // No page is ever framed (stops clickjacking of the login and the Create buttons), and responses keep their declared types.
   async headers() {
     return [
