@@ -51,6 +51,8 @@ export const RATIO_LABEL: Record<string, string> = { auto: 'Tự động' };
 /** Fash's Minimal, Medium and High. */
 export const THINKING_LABEL: Record<string, string> = { minimal: 'Tối thiểu', medium: 'Vừa', high: 'Cao' };
 export const UPLOAD_ERROR = 'Không tải ảnh lên được. Ảnh phải là JPEG, PNG hoặc WebP, tối đa 10 MB mỗi ảnh.';
+/** The 429 of POST /api/assets/samples: the hourly cap on new pictures. */
+export const COPY_LIMIT_ERROR = 'Bạn đã thêm quá nhiều ảnh trong một giờ. Hãy thử lại sau.';
 
 /** The enabled image models of a feature, from /api/image-models; `models` is null while loading and `failed` once the request has failed. */
 export function useImageModels(feature: string): { models: ImageModel[] | null; failed: boolean } {

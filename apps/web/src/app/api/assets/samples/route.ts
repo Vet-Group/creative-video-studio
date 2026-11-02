@@ -9,7 +9,7 @@ import { deleteObject, getObject, putObject } from '@/lib/storage';
  * Copies 1-4 sample pictures (`{ names: ['try-on-model-1.jpg', ...] }`) into the caller's own input assets on the server, as if the caller had uploaded them.
  * A Recreate or "Use this" on an example used to download each sample to the browser and upload it back, two trips over a slow link for every photo.
  * The same checks as an upload apply: a JPEG, PNG or WebP image of at most 10 MB, by its magic bytes; all or nothing.
- * 429 once the caller has added COPY_HOURLY_LIMIT pictures (uploads included) in the last hour, so a loop cannot fill the bucket.
+ * 429 once the caller has added COPY_HOURLY_LIMIT pictures (uploads included) in the last hour: here a tiny request makes the server copy up to 4 files of 10 MB, so a loop is held back (uploads themselves are not capped).
  */
 export const COPY_HOURLY_LIMIT = 200;
 

@@ -153,8 +153,11 @@ describe('POST /api/assets/samples', () => {
         [count, age, age.replace(' ', '')],
       );
     await add(COPY_HOURLY_LIMIT, '2 hours'); // older than the hour: not counted
-    await add(COPY_HOURLY_LIMIT - 1, '1 minute');
-    expect((await copy(busy, { names: ['copy-a.jpg'] })).status).toBe(201); // the 200th
+    await add(COPY_HOURLY_LIMIT - 2, '1 minute');
+    await add(5, '30 seconds');
+    await pool.query(`update assets set kind = 'output' where id like '%-30seconds'`); // results are not new pictures
+    expect((await copy(busy, { names: ['copy-a.jpg', 'copy-a.jpg', 'copy-a.jpg', 'copy-a.jpg'] })).status).toBe(429); // 198 + 4 would pass the limit
+    expect((await copy(busy, { names: ['copy-a.jpg', 'copy-a.jpg'] })).status).toBe(201); // 198 + 2 is the limit itself
     const res = await copy(busy, { names: ['copy-a.jpg'] });
     expect(res.status).toBe(429);
     expect((await res.json()).error).toMatch(/hour/);
