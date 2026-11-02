@@ -14,6 +14,8 @@ interface User {
   role: 'member' | 'admin';
   banned: boolean | null;
   teamId: string;
+  /** Whether a password sign-in also asks for a TOTP code. */
+  twoFactor: boolean;
   methods: SignInMethod[];
 }
 interface Team {
@@ -107,6 +109,22 @@ function UserEditor({ user, teams, reload }: { user: User; teams: Team[]; reload
             </li>
           ))}
           {user.methods.length === 0 && <li className="muted">Chưa có cách đăng nhập nào.</li>}
+          {user.twoFactor && (
+            <li>
+              <span>Xác thực 2 lớp (mã từ ứng dụng)</span>
+              {/* For a lost phone; the user's sessions end with it. */}
+              <button
+                type="button"
+                className="small danger"
+                aria-label={`Tắt xác thực 2 lớp của ${user.email}`}
+                onClick={() => {
+                  if (window.confirm(`Tắt xác thực 2 lớp của ${user.email}? Người này sẽ bị đăng xuất khỏi mọi thiết bị và chỉ cần mật khẩu để đăng nhập.`)) void patch({ twoFactor: false }, 'Không tắt được xác thực 2 lớp.');
+                }}
+              >
+                Tắt xác thực 2 lớp
+              </button>
+            </li>
+          )}
         </ul>
       </div>
       <div className="editor-section">
@@ -167,6 +185,11 @@ function UserRow({ user, team, onEdit }: { user: User; team: string; onEdit: () 
               {m.provider === 'credential' ? 'Mật khẩu' : providerLabel(m.provider)}
             </li>
           ))}
+          {user.twoFactor && (
+            <li className="sign-in-2fa" title="Xác thực 2 lớp đang bật">
+              2FA
+            </li>
+          )}
         </ul>
       </td>
       <td data-label="Trạng thái">

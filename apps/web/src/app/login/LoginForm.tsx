@@ -6,6 +6,7 @@ import { VetLogo } from '@/components/VetLogo';
 import { ApiError, api, sendJson } from '@/lib/api';
 import { cancelled, signInWithPasskey } from '@/lib/passkey';
 import { authErrorText, METHOD_LABEL } from '@/lib/sign-in-methods';
+import { challengeEnded, twoFactorCall, twoFactorFailure } from '@/lib/two-factor';
 import { useHydrated } from '@/lib/use-hydrated';
 import { PasswordField, useRevealMode } from './PasswordField';
 import { StudioScene } from './StudioScene';
@@ -45,11 +46,16 @@ export function LoginForm({
   const [hint, setHint] = useState(false);
   const [capsLock, setCapsLock] = useState(false);
   const [result, setResult] = useState<'success' | null>(null);
+  // An account with 2FA on answers a right password with a second step: a code from the app, or one of the backup codes.
+  const [step, setStep] = useState<'password' | 'code' | 'backup'>('password');
+  const [code, setCode] = useState('');
+  const [trust, setTrust] = useState(false);
   const kind = useRevealMode();
   const mode = revealed ? kind : 'off';
   const mascot = useRef<SVGGElement>(null);
   const emailId = useId();
   const passwordId = useId();
+  const codeId = useId();
   // Submitting before hydration would send the form as a plain GET, with the password in the URL.
   const hydrated = useHydrated();
   const webauthn = hydrated && typeof window.PublicKeyCredential === 'function';
@@ -96,13 +102,33 @@ export function LoginForm({
     }
   }
 
+  // The camera shakes its head (globals.css); the mark goes when the shake ends, so the next failure shakes it again.
+  function shake() {
+    const m = mascot.current;
+    if (m) {
+      m.dataset.result = 'fail';
+      m.addEventListener('animationend', () => delete m.dataset.result, { once: true });
+    }
+  }
+
+  function toStep(next: typeof step) {
+    setStep(next);
+    setCode('');
+    setError('');
+  }
+
   async function submit(e: FormEvent) {
     e.preventDefault();
     setRevealed(false);
     setBusy(true);
     setError('');
     try {
-      await api('/api/auth/sign-in/email', sendJson('POST', { email, password }));
+      const r = await api<{ twoFactorRedirect?: boolean }>('/api/auth/sign-in/email', sendJson('POST', { email, password }));
+      if (r.twoFactorRedirect) {
+        toStep('code');
+        setBusy(false);
+        return;
+      }
       await enter();
     } catch (err) {
       setError(
@@ -113,12 +139,25 @@ export function LoginForm({
             : 'Không đăng nhập được, hãy thử lại sau.',
       );
       setBusy(false);
-      // The camera shakes its head (globals.css); the mark goes when the shake ends, so the next failure shakes it again.
-      const m = mascot.current;
-      if (m) {
-        m.dataset.result = 'fail';
-        m.addEventListener('animationend', () => delete m.dataset.result, { once: true });
-      }
+      shake();
+    }
+  }
+
+  async function verify(e: FormEvent) {
+    e.preventDefault();
+    if (step === 'code' && !/^\d{6}$/.test(code)) return setError('Hãy nhập đủ 6 số trong ứng dụng xác thực.');
+    if (!code.trim()) return setError('Hãy nhập một mã dự phòng.');
+    setBusy(true);
+    setError('');
+    try {
+      await twoFactorCall(step === 'code' ? 'verify-totp' : 'verify-backup-code', { code: code.trim(), trustDevice: trust });
+      await enter();
+    } catch (err) {
+      // A challenge that timed out or used its tries cannot take another code: the password must be given again.
+      if (challengeEnded(err)) toStep('password');
+      setError(twoFactorFailure(err));
+      setBusy(false);
+      shake();
     }
   }
 
@@ -149,53 +188,100 @@ export function LoginForm({
             <VetLogo size={40} label="VET Group" />
             <span>Creative Video Studio</span>
           </div>
-          <h1>Đăng nhập</h1>
-          <p className="muted">Tài khoản do Admin tạo. Liên hệ Admin nếu bạn chưa có tài khoản.</p>
-          <form onSubmit={(e) => void submit(e)}>
-            <label htmlFor={emailId}>Email</label>
-            <input id={emailId} type="email" autoComplete="username webauthn" required value={email} onChange={(e) => setEmail(e.target.value)} />
-            <label htmlFor={passwordId}>Mật khẩu</label>
-            <PasswordField id={passwordId} value={password} onChange={setPassword} mode={mode} onToggle={() => setRevealed((r) => !r)} mascot={mascot} onCapsLock={setCapsLock} />
-            <p className="login-hint login-caps" aria-live="polite">
-              {capsLock && 'Caps Lock đang bật.'}
-            </p>
-            <div className="login-forgot">
-              <button type="button" className="link-button" onClick={() => setHint(true)}>
-                Quên mật khẩu?
-              </button>
-            </div>
-            <p className="login-hint muted" aria-live="polite">
-              {hint && 'Liên hệ Admin để đặt lại mật khẩu.'}
-            </p>
-            {error && (
-              <p className="error" role="alert">
-                {error}
-              </p>
-            )}
-            <button type="submit" className="primary" aria-busy={busy || undefined} disabled={busy || !hydrated}>
-              {busy ? 'Đang đăng nhập…' : 'Đăng nhập'}
-              {!busy && last('email')}
-            </button>
-          </form>
-          <div className="social">
-            {googleEnabled && (
-              <button type="button" onClick={() => void social('google')}>
-                Đăng nhập bằng Google
-                {last('google')}
-              </button>
-            )}
-            {larkEnabled && (
-              <button type="button" onClick={() => void social('lark')}>
-                Đăng nhập bằng Lark
-                {last('lark')}
-              </button>
-            )}
-            {/* Disabled until hydration, and for good in a browser without WebAuthn. */}
-            <button type="button" disabled={!webauthn} onClick={() => void passkey()}>
-              Đăng nhập bằng passkey
-              {last('passkey')}
-            </button>
-          </div>
+          {step !== 'password' ? (
+            <>
+              <h1>Xác thực 2 lớp</h1>
+              <p className="muted">{step === 'code' ? 'Nhập mã 6 số trong ứng dụng xác thực của bạn.' : 'Nhập một mã dự phòng bạn đã lưu khi bật xác thực 2 lớp.'}</p>
+              <form onSubmit={(e) => void verify(e)} noValidate>
+                <label htmlFor={codeId}>{step === 'code' ? 'Mã xác thực' : 'Mã dự phòng'}</label>
+                {step === 'code' ? (
+                  <input
+                    key="code"
+                    id={codeId}
+                    className="login-code"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    maxLength={6}
+                    autoFocus
+                    value={code}
+                    onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+                  />
+                ) : (
+                  <input key="backup" id={codeId} className="login-code" autoComplete="off" autoCapitalize="off" spellCheck={false} maxLength={20} autoFocus value={code} onChange={(e) => setCode(e.target.value)} />
+                )}
+                <label className="login-trust">
+                  <input type="checkbox" checked={trust} onChange={(e) => setTrust(e.target.checked)} />
+                  Tin thiết bị này 30 ngày
+                </label>
+                {error && (
+                  <p className="error" role="alert">
+                    {error}
+                  </p>
+                )}
+                <button type="submit" className="primary" aria-busy={busy || undefined} disabled={busy}>
+                  {busy ? 'Đang xác thực…' : 'Xác nhận'}
+                </button>
+              </form>
+              <div className="login-steps">
+                <button type="button" className="link-button" onClick={() => toStep(step === 'code' ? 'backup' : 'code')}>
+                  {step === 'code' ? 'Dùng mã dự phòng' : 'Dùng mã từ ứng dụng'}
+                </button>
+                <button type="button" className="link-button" onClick={() => toStep('password')}>
+                  Quay lại
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <h1>Đăng nhập</h1>
+              <p className="muted">Tài khoản do Admin tạo. Liên hệ Admin nếu bạn chưa có tài khoản.</p>
+              <form onSubmit={(e) => void submit(e)}>
+                <label htmlFor={emailId}>Email</label>
+                <input id={emailId} type="email" autoComplete="username webauthn" required value={email} onChange={(e) => setEmail(e.target.value)} />
+                <label htmlFor={passwordId}>Mật khẩu</label>
+                <PasswordField id={passwordId} value={password} onChange={setPassword} mode={mode} onToggle={() => setRevealed((r) => !r)} mascot={mascot} onCapsLock={setCapsLock} />
+                <p className="login-hint login-caps" aria-live="polite">
+                  {capsLock && 'Caps Lock đang bật.'}
+                </p>
+                <div className="login-forgot">
+                  <button type="button" className="link-button" onClick={() => setHint(true)}>
+                    Quên mật khẩu?
+                  </button>
+                </div>
+                <p className="login-hint muted" aria-live="polite">
+                  {hint && 'Liên hệ Admin để đặt lại mật khẩu.'}
+                </p>
+                {error && (
+                  <p className="error" role="alert">
+                    {error}
+                  </p>
+                )}
+                <button type="submit" className="primary" aria-busy={busy || undefined} disabled={busy || !hydrated}>
+                  {busy ? 'Đang đăng nhập…' : 'Đăng nhập'}
+                  {!busy && last('email')}
+                </button>
+              </form>
+              <div className="social">
+                {googleEnabled && (
+                  <button type="button" onClick={() => void social('google')}>
+                    Đăng nhập bằng Google
+                    {last('google')}
+                  </button>
+                )}
+                {larkEnabled && (
+                  <button type="button" onClick={() => void social('lark')}>
+                    Đăng nhập bằng Lark
+                    {last('lark')}
+                  </button>
+                )}
+                {/* Disabled until hydration, and for good in a browser without WebAuthn. */}
+                <button type="button" disabled={!webauthn} onClick={() => void passkey()}>
+                  Đăng nhập bằng passkey
+                  {last('passkey')}
+                </button>
+              </div>
+            </>
+          )}
         </section>
         <section className="login-scene">
           <StudioScene mascot={mascot} />

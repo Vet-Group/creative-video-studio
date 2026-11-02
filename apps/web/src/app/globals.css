@@ -344,6 +344,10 @@ label.model input { display: inline; margin: 0; min-width: 0; width: auto; }
 .login button:has(> .login-last) { position: relative; }
 .login-last { position: absolute; top: -9px; right: 12px; padding: 0 8px; border-radius: 999px; background: var(--ink); color: var(--on-dark); font-size: 11px; font-weight: 600; line-height: 18px; pointer-events: none; }
 .login-caps:not(:empty) { margin-top: 6px; color: var(--brand-hover); font-weight: 600; }
+.login .login-code[inputmode='numeric'] { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace; font-size: 18px; letter-spacing: .2em; }
+.login .login-trust { display: flex; align-items: center; gap: 8px; margin: 14px 0 0; }
+.login .login-trust input { flex: none; width: 18px; height: 18px; min-width: 0; margin: 0; accent-color: var(--ink); }
+.login-steps { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0 12px; margin-top: 4px; }
 .scene-toggle { position: absolute; top: 14px; right: 14px; display: flex; gap: 4px; padding: 4px; border: 0; border-radius: 999px; background: var(--surface); color: var(--muted); box-shadow: 0 6px 18px rgb(var(--shade) / .22); }
 .login .scene-toggle[aria-pressed='true'] { background: var(--surface); }
 .scene-toggle span { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; }
@@ -601,6 +605,7 @@ td code { white-space: pre-wrap; overflow-wrap: anywhere; }
 .admin .role.admin { border-color: var(--danger-soft-border); background: var(--danger-soft); color: var(--danger); }
 .admin .sign-ins { display: flex; flex-wrap: wrap; gap: 4px; margin: 0; padding: 0; list-style: none; }
 .admin .sign-ins li { padding: 0 8px; border-radius: 999px; background: var(--fill); color: var(--text-2); font-size: 12px; line-height: 22px; white-space: nowrap; }
+.admin .sign-ins .sign-in-2fa { background: var(--cat-utility-bg); color: var(--cat-utility-fg); font-weight: 600; }
 .admin td.row-end { width: 1%; text-align: right; }
 @media (max-width: 640px) {
   .admin .users.mobile-records tr { position: relative; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 12px; }
@@ -1011,6 +1016,18 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .pw-done { color: var(--cat-utility-fg); font-weight: 500; }
 .pw-submit { justify-self: start; height: 40px; margin-top: 8px; padding: 0 16px; border-color: var(--ink); background: var(--ink); color: var(--surface); font-size: 14px; font-weight: 500; }
 .pw-submit:hover:not(:disabled) { border-color: var(--zinc-700); background: var(--zinc-700); }
+.tf-note { margin: 8px 0 0; font-size: 13px; line-height: 20px; }
+.tf-card { margin-top: 12px; }
+.tf-setup { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 20px; align-items: start; }
+.tf-qr { display: block; width: 176px; height: 176px; border: 1px solid rgb(var(--shade) / .12); border-radius: 8px; }
+.tf-step { margin: 0; font-size: 14px; line-height: 21px; }
+.tf-secret { padding: 8px 10px; border-radius: 8px; background: var(--fill); font-family: ui-monospace, Consolas, monospace; font-size: 14px; line-height: 20px; overflow-wrap: anywhere; user-select: all; }
+.pw-form > .tf-code { max-width: 12rem; font-family: ui-monospace, Consolas, monospace; font-size: 18px; letter-spacing: .2em; }
+.tf-buttons { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; }
+.tf-buttons .pw-submit { margin-top: 0; }
+.tf-buttons > :not(.pw-submit) { display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 14px; border: 1px solid var(--border-button); border-radius: 8px; background: var(--surface); color: var(--ink); font-size: 14px; text-decoration: none; }
+.tf-buttons > :not(.pw-submit):hover { background: var(--fill); }
+.tf-codes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 24px; margin: 12px 0; padding: 12px 16px 12px 40px; border: 1px solid rgb(var(--shade) / .08); border-radius: 8px; background: var(--surface); font-family: ui-monospace, Consolas, monospace; font-size: 14px; line-height: 22px; }
 /* The forced change page: one card in the middle of the screen, nothing else of the app. */
 .forced-pw { display: grid; place-items: center; min-height: 100vh; min-height: 100dvh; padding: 24px 16px; background: var(--surface-1); }
 .forced-pw-card { width: 100%; max-width: 28rem; padding: 28px; border: 1px solid rgb(var(--shade) / .08); border-radius: 16px; background: var(--surface); box-shadow: 0 24px 64px -16px rgb(var(--shade) / .2); }
@@ -1038,6 +1055,8 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
   .profile-card .role-badge { grid-column: 2; justify-self: start; margin-top: -8px; }
   .acct-row { display: grid; grid-template-columns: 36px minmax(0, 1fr); }
   .acct-row > :not(.acct-mark, .acct-text) { grid-column: 2; justify-self: start; }
+  .tf-setup { grid-template-columns: minmax(0, 1fr); }
+  .tf-qr { justify-self: center; }
 }
 @media (prefers-reduced-motion: reduce) {
   .settings-panel > section, .meter-track span { animation: none; }

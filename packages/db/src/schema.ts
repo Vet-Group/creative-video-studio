@@ -78,6 +78,8 @@ export const users = pgTable(
     emailVerified: boolean('email_verified').notNull().default(false),
     // Set with an Admin's temporary password; the app lets the user do nothing but change it (lib/session.ts, (app)/layout.tsx).
     mustChangePassword: boolean('must_change_password').notNull().default(false),
+    // better-auth's twoFactor plugin: set once the user confirms a TOTP code, asked only at email+password sign-in.
+    twoFactorEnabled: boolean('two_factor_enabled').notNull().default(false),
     image: text('image'),
     teamId: text('team_id')
       .notNull()
@@ -166,6 +168,23 @@ export const passkeys = pgTable(
     aaguid: text('aaguid'),
   },
   (t) => [index('passkeys_user_id_idx').on(t.userId)],
+);
+
+// The TOTP secret and backup codes of better-auth's twoFactor plugin, both encrypted with BETTER_AUTH_SECRET; one row per user.
+export const twoFactors = pgTable(
+  'two_factors',
+  {
+    id: text('id').primaryKey(),
+    secret: text('secret').notNull(),
+    backupCodes: text('backup_codes').notNull(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    verified: boolean('verified').notNull().default(true),
+    failedVerificationCount: integer('failed_verification_count').notNull().default(0),
+    lockedUntil: tstz('locked_until'),
+  },
+  (t) => [uniqueIndex('two_factors_user_id_key').on(t.userId)],
 );
 
 // An uploaded input image or video, or a generated output; the bytes live in MinIO under s3Key.

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { type CSSProperties, useEffect, useState } from 'react';
 import { api, sendJson } from '@/lib/api';
 import type { SignInMethod } from '@/lib/sign-in-methods';
-import { PasswordChange, Sessions } from './AccountSecurity';
+import { PasswordChange, Sessions, TwoFactor } from './AccountSecurity';
 import { Icon, type IconName } from './Icon';
 import { Modal } from './Modal';
 import { ProviderMark, SignInMethods } from './SignInMethods';
@@ -18,6 +18,8 @@ export interface Account {
   memberSince: string;
   /** How many passkeys the user has. */
   passkeys: number;
+  /** Whether a password sign-in also asks for a TOTP code. */
+  twoFactor: boolean;
   methods: SignInMethod[];
   googleEnabled: boolean;
   larkEnabled: boolean;
@@ -125,6 +127,7 @@ function Limits() {
 export function Settings({ open, onClose, userName, account }: { open: boolean; onClose: () => void; userName: string; account: Account }) {
   const [section, setSection] = useState('profile');
   const [changes, setChanges] = useState(0); // a password change signs the other devices out, so the sessions list reloads
+  const [twoFactor, setTwoFactor] = useState(account.twoFactor);
   useEffect(() => {
     if (open) setSection('profile'); // every opening starts on the profile
   }, [open]);
@@ -224,6 +227,20 @@ export function Settings({ open, onClose, userName, account }: { open: boolean; 
               ) : (
                 <p className="muted">Tài khoản của bạn đăng nhập bằng Google, Lark hoặc passkey nên không có mật khẩu để đổi.</p>
               )}
+              <p className="settings-kicker settings-sub" id="settings-two-factor">
+                Xác thực 2 lớp
+              </p>
+              <div role="group" aria-labelledby="settings-two-factor">
+                <TwoFactor
+                  email={account.email}
+                  hasPassword={hasPassword}
+                  on={twoFactor}
+                  onChange={(on) => {
+                    setTwoFactor(on);
+                    setChanges((n) => n + 1);
+                  }}
+                />
+              </div>
               <p className="settings-kicker settings-sub" id="settings-sessions">
                 Phiên đăng nhập
               </p>

@@ -11,6 +11,7 @@ const account: Account = {
   team: 'Team Ảnh',
   memberSince: '2026-10-31T18:00:00.000Z',
   passkeys: 2,
+  twoFactor: false,
   methods: [{ id: 'a1', provider: 'credential', email: null }],
   googleEnabled: false,
   larkEnabled: false,
