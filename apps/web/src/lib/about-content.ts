@@ -44,15 +44,20 @@ function specLine(name: string, ms: SpecModel[], short: (m: SpecModel) => string
   const all = [...groups];
   const big = all.reduce((a, b) => (b[1].length > a[1].length ? b : a));
   const rest = big[1].length >= 3 ? [...all.filter((g) => g !== big), [big[0], ['các bản khác']] as const] : all;
-  return `${name}: ${rest.map(([v, who]) => `${v} (${levels(who).join(', ')})`).join(' · ')}`;
+  const names = ms.map(short);
+  return `${name}: ${rest.map(([v, who]) => `${v} (${levels(who, names).join(', ')})`).join(' · ')}`;
 }
 
-/** Variants that differ only by a resolution suffix ("H3 Max Reference", "... 1080P", "... 480P") read as one name with their level count. */
-function levels(who: readonly string[]): string[] {
+/** Variants that differ only by a resolution suffix ("H3 Max Reference", "... 1080P", "... 480P") read as one name with their level count in parentheses:
+ * the name drops a leading sibling model's name ("H3 Max"), the owner's wording (2026-11-02). */
+function levels(who: readonly string[], names: string[]): string[] {
   const base = (w: string) => w.replace(/ \d+P$/, '');
   return [...new Set(who.map((w) => {
-    const n = who.filter((x) => base(x) === base(w)).length;
-    return n > 1 ? `${base(w)} ở ${n} mức` : w;
+    const b = base(w);
+    const n = who.filter((x) => base(x) === b).length;
+    if (n < 2) return w;
+    const parent = names.filter((p) => b.startsWith(`${p} `)).sort((x, y) => y.length - x.length)[0];
+    return `${parent ? b.slice(parent.length + 1) : b} (${n} mức)`;
   }))];
 }
 
