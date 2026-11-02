@@ -199,6 +199,30 @@ test('with reduced motion the Explore model cards and the Apps cards and header 
   }
 });
 
+test('with reduced motion the About clips still loop: a step tile and the result loop under the steps', async ({ page }) => {
+  const clip = readFileSync(fileURLToPath(new URL('../public/fixtures/examples/example-1.mp4', import.meta.url)));
+  const names = ['about-create-step-1.mp4', 'about-create-loop.mp4'];
+  const asAdmin = async (each: (name: string) => Promise<{ ok(): boolean }>) => {
+    await page.context().clearCookies();
+    await signIn(page, 'admin');
+    for (const name of names) expect((await each(name)).ok()).toBe(true);
+    await page.context().clearCookies();
+  };
+  await asAdmin((name) => page.request.put(`/api/admin/samples/${name}`, { data: clip, headers: { 'content-type': 'video/mp4' } }));
+  try {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await signIn(page, 'member6');
+    await page.goto('/create');
+    await page.getByRole('tab', { name: 'Giới thiệu' }).click();
+    const moves = (video: Locator) => expect.poll(async () => { await video.scrollIntoViewIfNeeded(); return video.evaluate((v: HTMLVideoElement) => !v.paused && v.currentTime > 0); }).toBe(true);
+    await moves(page.locator('.about-media video').first());
+    await moves(page.locator('.about-loop video'));
+  } finally {
+    await asAdmin((name) => page.request.delete(`/api/admin/samples/${name}`));
+  }
+});
+
 test('with reduced motion the Marketing format header and the hook and location pickers still loop, as on Fash; a chosen hook shows its still', async ({ page }) => {
   const clip = readFileSync(fileURLToPath(new URL('../public/fixtures/examples/example-1.mp4', import.meta.url)));
   const still = readFileSync(fileURLToPath(new URL('../public/fixtures/examples/example-1.jpg', import.meta.url)));
