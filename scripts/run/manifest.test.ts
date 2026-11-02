@@ -92,7 +92,7 @@ describe('owner-closed steps', () => {
 
   // The owner's own terminal: no Claude Code markers.
   const owner = (dir: string, ...args: string[]) => {
-    const env = { ...process.env, CVS_RUN_DIR: dir };
+    const env: NodeJS.ProcessEnv = { ...process.env, CVS_RUN_DIR: dir };
     delete env.CLAUDECODE;
     delete env.CLAUDE_CODE_ENTRYPOINT;
     return spawnSync(process.execPath, [join(import.meta.dirname, 'cli.ts'), ...args], { encoding: 'utf8', env });
