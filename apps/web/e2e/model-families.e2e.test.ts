@@ -67,7 +67,7 @@ test('the picker opens on the featured models and the families; a family opens b
   await expect(featured.first().locator('.model-sub')).toHaveText('1080p4s-15s$1.5000Điểm 80');
   await page.screenshot({ path: testInfo.outputPath('picker-desktop-light.png') });
   await page.emulateMedia({ colorScheme: 'dark' });
-  await expect(panel).toHaveCSS('background-color', 'rgb(32, 32, 36)');
+  await expect(panel).toHaveCSS('background-color', 'rgb(22, 22, 24)'); // the app's dark --surface: the picker follows the app theme
   const darkAxe = await new AxeBuilder({ page }).include('.model-pop').analyze();
   expect(darkAxe.violations.map((v) => v.id)).toEqual([]);
   await page.screenshot({ path: testInfo.outputPath('picker-desktop-dark.png') });
