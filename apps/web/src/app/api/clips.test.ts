@@ -12,7 +12,7 @@ process.env.APP_URL = 'http://localhost';
 process.env.S3_BUCKET = `cvs-test-${randomBytes(6).toString('hex')}`;
 
 const { auth, pool } = await import('@/lib/auth');
-const { downloadName } = await import('@/lib/clips');
+const { bestClips, downloadName } = await import('@/lib/clips');
 const { bucketName, ensureBucket, putObject, s3 } = await import('@/lib/storage');
 const { GET: GET_MINE } = await import('./jobs/route');
 const { GET: GET_JOB, DELETE: DELETE_JOB } = await import('./jobs/[id]/route');
@@ -620,5 +620,39 @@ describe('GET /api/jobs?mine clips', () => {
     await clip(bob.id);
     const cap = (await pool.query(`select member_daily_clip_cap from settings where id = 1`)).rows[0].member_daily_clip_cap;
     expect(await clips()).toEqual({ today: before.today + 1, cap });
+  });
+});
+
+describe('bestClips', () => {
+  test('per model, the real Pass clip with the most favourites, then the newest; an image gives its still', async () => {
+    await pool.query(
+      `insert into model_configs (id, provider, endpoint, label, ratios, durations_sec, max_images, output_resolution, usd_per_second, sources, enabled) values
+         ('best-video', 'fal', 'x', 'Best video', '{9:16}', '{8}', 2, '720p', 0.2, '{}', true), ('best-image', 'fal', 'x', 'Best image', '{9:16}', '{8}', 2, '720p', 0.2, '{}', true),
+         ('best-none', 'fal', 'x', 'Best none', '{9:16}', '{8}', 2, '720p', 0.2, '{}', true)`,
+    );
+    const mark = (id: string, verdict: 'pass' | 'fail') =>
+      pool.query(`insert into verdicts (id, job_id, output_asset_id, verdict, fault, marked_by) values ($1, $1, $2, $3, $4, $5)`, [id, `${id}-video`, verdict, verdict === 'fail' ? 'other' : null, admin.id]);
+    const old = await clip(alice.id, { model: 'best-video', createdAt: '2026-01-01T00:00:00Z' });
+    const newer = await clip(alice.id, { model: 'best-video', createdAt: '2026-02-01T00:00:00Z' });
+    const unmarked = await clip(alice.id, { model: 'best-video' });
+    const failed = await clip(alice.id, { model: 'best-video' });
+    const deleted = await clip(alice.id, { model: 'best-video' });
+    const mock = await clip(alice.id, { model: 'best-video' });
+    for (const id of [old, newer, deleted, mock]) await mark(id, 'pass');
+    await mark(failed, 'fail');
+    await pool.query(`update jobs set deleted_at = now() where id = $1`, [deleted]);
+    await pool.query(`update jobs set is_mock = true where id = $1`, [mock]);
+    await pool.query('insert into favorites (user_id, job_id) values ($1, $2), ($3, $2)', [alice.id, unmarked, bob.id]); // favourites alone do not qualify
+    expect((await bestClips()).get('best-video')).toEqual({ video: `/api/assets/${newer}-video/content`, poster: `/api/assets/${newer}-poster/content` });
+    await pool.query('insert into favorites (user_id, job_id) values ($1, $2)', [bob.id, old]);
+    expect((await bestClips()).get('best-video')?.video).toBe(`/api/assets/${old}-video/content`); // the favourite outranks the newer one
+
+    const image = await clip(alice.id, { model: 'best-image' });
+    await pool.query(`update assets set mime = 'image/png' where id = $1`, [`${image}-video`]);
+    await mark(image, 'pass');
+    await clip(alice.id, { model: 'best-none' });
+    const best = await bestClips();
+    expect(best.get('best-image')).toEqual({ video: null, poster: `/api/assets/${image}-video/content` });
+    expect(best.has('best-none')).toBe(false);
   });
 });
