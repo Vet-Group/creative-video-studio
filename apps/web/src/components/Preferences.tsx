@@ -1,6 +1,7 @@
-// Settings > Preferences: what happens on this device when a job finishes, and the keyboard shortcuts. Each block is one subsection.
+// Settings > Preferences: the colour theme, what happens on this device when a job finishes, and the keyboard shortcuts. Each block is one subsection.
 import { type ReactNode, useId, useState } from 'react';
 import { chime, notificationState, readPref, writePref } from '@/lib/preferences';
+import { readTheme, saveTheme, type Theme } from '@/lib/theme';
 import { Icon, type IconName } from './Icon';
 
 /** One preference row: an icon tile, the title and description, and an on/off switch named by the title. */
@@ -25,6 +26,12 @@ const NOTIFY_NOTE = {
   denied: 'Trình duyệt đang chặn thông báo của trang này. Hãy cho phép trong phần cài đặt trang web của trình duyệt.',
 } as const;
 
+const THEMES: readonly (readonly [Theme, string, IconName])[] = [
+  ['light', 'Sáng', 'sun'],
+  ['dark', 'Tối', 'moon'],
+  ['system', 'Theo hệ thống', 'monitor'],
+];
+
 const SHORTCUTS: readonly (readonly [string[], string])[] = [
   [['Ctrl', 'Enter'], 'Chạy job khi đang nhập mô tả (⌘ + Enter trên Mac)'],
   [['Ctrl', ','], 'Mở Cài đặt từ bất kỳ trang nào (⌘ + , trên Mac)'],
@@ -36,6 +43,7 @@ export function Preferences() {
   const [permission, setPermission] = useState(notificationState);
   const [notify, setNotify] = useState(() => readPref('notify') && notificationState() === 'granted');
   const [sound, setSound] = useState(() => readPref('chime'));
+  const [theme, setTheme] = useState(readTheme);
 
   async function toggleNotify() {
     if (notify) {
@@ -56,7 +64,28 @@ export function Preferences() {
 
   return (
     <>
-      <p className="settings-kicker" id="settings-done">
+      <p className="settings-kicker" id="settings-theme">
+        Giao diện
+      </p>
+      <div className="segmented theme-choice" role="radiogroup" aria-labelledby="settings-theme">
+        {THEMES.map(([value, label, icon]) => (
+          <label key={value}>
+            <input
+              type="radio"
+              name="theme"
+              value={value}
+              checked={theme === value}
+              onChange={() => {
+                saveTheme(value);
+                setTheme(value);
+              }}
+            />
+            <Icon name={icon} size={16} />
+            {label}
+          </label>
+        ))}
+      </div>
+      <p className="settings-kicker settings-sub" id="settings-done">
         Khi job xong
       </p>
       <ul className="acct-rows" aria-labelledby="settings-done">
@@ -67,7 +96,7 @@ export function Preferences() {
           Một tiếng chuông ngắn khi clip hoặc ảnh xong.
         </SwitchRow>
       </ul>
-      <p className="settings-note">Hai tuỳ chọn này chỉ áp dụng trên thiết bị và trình duyệt này.</p>
+      <p className="settings-note">Các tuỳ chọn này chỉ áp dụng trên thiết bị và trình duyệt này.</p>
       <p className="settings-kicker settings-sub" id="settings-keys">
         Phím tắt
       </p>
