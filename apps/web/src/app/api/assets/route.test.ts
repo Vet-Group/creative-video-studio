@@ -270,6 +270,7 @@ describe('GET /api/assets/:id/content', () => {
     expect(res.headers.get('content-type')).toBe('image/png');
     expect(res.headers.get('accept-ranges')).toBe('bytes');
     expect(res.headers.get('content-disposition')).toMatch(/^inline;/);
+    expect(res.headers.get('cache-control')).toBe('private, max-age=31536000, immutable'); // an asset's bytes never change under its id
     expect(new Uint8Array(await res.arrayBuffer())).toEqual(bytes);
   });
 

@@ -38,14 +38,15 @@ test('Try On: a saved template lists under Mẫu của tôi and refills the pers
   await expect(page.getByRole('textbox', { name: 'Prompt (tuỳ chọn)' })).toHaveValue('');
   await page.getByRole('button', { name: 'Mẫu của tôi' }).click();
   const list = page.getByRole('dialog', { name: 'Mẫu của tôi' });
-  await list.getByRole('link', { name: 'Váy đỏ' }).click();
-  await expect(page).toHaveURL(/\/try-on\?template=/);
+  const link = list.getByRole('link', { name: 'Váy đỏ' });
+  const url = new URL((await link.getAttribute('href'))!, page.url()).href; // the template link, for another member below
+  await link.click();
   await expect(page.getByLabel('Người mẫu: ảnh đã chọn').getByRole('img')).toHaveAttribute('alt', 'person.png');
+  await expect(page).toHaveURL((u) => u.pathname === '/try-on' && u.search === ''); // the link opened the refill, then the address drops its query
   await expect(page.getByLabel('Trang phục: ảnh đã chọn').getByRole('img')).toHaveAttribute('alt', 'garment.png');
   await expect(page.getByRole('textbox', { name: 'Prompt (tuỳ chọn)' })).toHaveValue('red dress');
   await expect(select(page, 'Độ phân giải')).toHaveAttribute('data-value', '2K');
   await expect(page.getByRole('region', { name: 'Thông báo' }).getByText('Sẵn sàng tạo lại')).toHaveCount(0); // a saved template is not a recreate
-  const url = page.url();
 
   // Another member: not in the list, and the link refills nothing.
   const other = await (await browser.newContext()).newPage();
@@ -88,8 +89,8 @@ test('Marketing Studio: an Advanced template chosen on the UGC page opens the Ad
   await page.goto('/marketing-studio');
   await page.getByRole('button', { name: 'Mẫu của tôi' }).click();
   await page.getByRole('dialog', { name: 'Mẫu của tôi' }).getByRole('link', { name: 'Launch' }).click();
-  await expect(page).toHaveURL((u) => u.pathname === '/marketing-studio/advanced' && u.searchParams.has('template'));
   await expect(page.getByLabel('Ảnh tham chiếu: ảnh đã chọn').getByRole('img')).toHaveCount(2);
+  await expect(page).toHaveURL((u) => u.pathname === '/marketing-studio/advanced' && u.search === ''); // the link opened the refill, then the address drops its query
   await expect(page.getByRole('textbox', { name: 'Prompt', exact: true })).toHaveValue('my brief');
   await expect(page.getByRole('textbox', { name: 'Lời thoại (tuỳ chọn)' })).toHaveValue('my lines');
 });

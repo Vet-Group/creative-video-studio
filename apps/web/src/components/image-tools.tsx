@@ -3,8 +3,8 @@
 // the tab strip and the gallery of the company's outputs.
 import { type DragEvent, type KeyboardEvent, useEffect, useId, useRef, useState } from 'react';
 import Link from 'next/link';
-import { api, type Clip } from '@/lib/api';
-import { exampleFrom, refillFrom, reuseHref } from '@/lib/reuse';
+import { api, type Clip, sendJson } from '@/lib/api';
+import { dropRefillQuery, exampleFrom, refillFrom, reuseHref } from '@/lib/reuse';
 import { NARROW, useMediaQuery, WIDE } from '@/lib/use-media-query';
 import { numberedSamples } from '@/lib/examples';
 import { useHydrated } from '@/lib/use-hydrated';
@@ -115,10 +115,13 @@ export function useReuse(reuse: string | undefined, feature: string, fill: (j: O
       .then(async (j) => {
         if (stale) return;
         if (j.feature !== feature) return fail();
-        // A sample's photos are uploaded as this member's inputs first, as a picked sample is.
+        // A sample's photos become this member's inputs first, copied on the server.
         const samples = j.images.flatMap((i) => ('sample' in i ? [i.sample] : []));
-        fill({ ...j, images: samples.length > 0 ? await uploadImages(await Promise.all(samples.map(sampleFile))) : (j.images as Img[]) });
+        const images = samples.length > 0 ? await copySamples(samples) : (j.images as Img[]);
+        if (stale) return; // superseded while the photos were copied
+        fill({ ...j, images });
         recreated(reuse);
+        dropRefillQuery();
       })
       .catch(fail)
       .finally(loading('Đang tải ảnh...'));
@@ -140,9 +143,16 @@ export async function sampleFile(name: string): Promise<File> {
   return new File([await res.blob()], name, { type: res.headers.get('content-type') ?? '' });
 }
 
-/** A detail's photo as one of the form's images: a sample is uploaded as the member's own, an asset is read for its name. */
+/** Sample pictures as the member's own inputs, copied on the server (POST /api/assets/samples) rather than downloaded and uploaded back. */
+export async function copySamples(names: string[]): Promise<Img[]> {
+  const out: Img[] = [];
+  for (let i = 0; i < names.length; i += PER_UPLOAD) out.push(...(await api<{ assets: Img[] }>('/api/assets/samples', sendJson('POST', { names: names.slice(i, i + PER_UPLOAD) }))).assets);
+  return out;
+}
+
+/** A detail's photo as one of the form's images: a sample is copied as the member's own, an asset is read for its name. */
 export async function photoImg(p: Photo): Promise<Img> {
-  if ('sample' in p) return (await uploadImages([await sampleFile(p.sample)]))[0]!;
+  if ('sample' in p) return (await copySamples([p.sample]))[0]!;
   const a = await api<Img>(`/api/assets/${p.asset}`);
   return { id: a.id, filename: a.filename };
 }

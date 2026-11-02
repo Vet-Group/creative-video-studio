@@ -156,14 +156,16 @@ function parseRange(header: string | null, size: number): { start: number; end: 
 }
 
 /** Streams the object out of MinIO with `Range` support, as an inline image/video or an attachment. */
-export async function streamAsset(request: Request, asset: Pick<Asset, 's3Key' | 'bytes' | 'mime' | 'filename'>, disposition: 'inline' | 'attachment'): Promise<Response> {
+/** `cache` is the Cache-Control value: nothing is cached unless the caller says so; `etag` goes out as is. */
+export async function streamAsset(request: Request, asset: Pick<Asset, 's3Key' | 'bytes' | 'mime' | 'filename'>, disposition: 'inline' | 'attachment', cache = 'private, no-store', etag?: string): Promise<Response> {
   const range = parseRange(request.headers.get('range'), asset.bytes);
   if (range === null) return new Response(null, { status: 416, headers: { 'content-range': `bytes */${asset.bytes}` } });
   const headers: Record<string, string> = {
     'content-type': asset.mime,
     'accept-ranges': 'bytes',
     'content-disposition': `${disposition}; filename="${asset.filename.replace(/[^\x20-\x7e]|["\\]/g, '_')}"; filename*=UTF-8''${encodeURIComponent(asset.filename).replace(/['()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`)}`,
-    'cache-control': 'private, no-store',
+    'cache-control': cache,
+    ...(etag ? { etag } : {}),
     'x-content-type-options': 'nosniff',
   };
   if (!range) {

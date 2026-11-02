@@ -25,6 +25,14 @@ export function exampleFrom(q: { example?: unknown }): string | undefined {
   return typeof q.example === 'string' && /^(marketing-|try-on-|image-)?example-[1-9]\d*$/.test(q.example) ? `/api/samples/${q.example}.json` : undefined;
 }
 
+/** Once a link's refill (?reuse=, ?template=, ?example=) is on the form, the address drops it: a reload or Back must not refill the form over the user's
+ * changes and copy its photos again, while the link itself still opens the refill from anywhere. */
+export function dropRefillQuery(): void {
+  const url = new URL(window.location.href);
+  for (const k of ['reuse', 'template', 'example']) url.searchParams.delete(k);
+  if (url.href !== window.location.href) window.history.replaceState(null, '', url);
+}
+
 /** The page query that refills from `from` (what refillFrom and exampleFrom return), for a refill that has to open on another page. */
 export function queryOf(from: string): string {
   const m = from.match(/^\/api\/(jobs|templates|samples)\/([^/]+?)(\.json)?$/);

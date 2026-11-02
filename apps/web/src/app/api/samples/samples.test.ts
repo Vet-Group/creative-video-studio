@@ -16,6 +16,7 @@ const { sampleBytesMatch, sampleType } = await import('@/lib/samples');
 const { GET: LIST } = await import('./route');
 const { GET: ONE } = await import('./[name]/route');
 const { PUT, DELETE } = await import('../admin/samples/[name]/route');
+const { POST: COPY } = await import('../assets/samples/route');
 
 const PASSWORD = 'correct-horse-battery';
 const ctx = (name: string) => ({ params: Promise.resolve({ name }) });
@@ -96,5 +97,48 @@ describe('/api/samples', () => {
       { action: 'sample.put', target: 'sample:example-1.mp4', old_value: { bytes: 5000 }, new_value: { bytes: 6000 } },
       { action: 'sample.delete', target: 'sample:poster-1.jpg', old_value: { bytes: 8 }, new_value: null },
     ]);
+  });
+});
+
+describe('sample caching', () => {
+  test('a sample is cached for an hour with its ETag, an unchanged one answers 304, a replaced one comes anew', async () => {
+    const put = (body: Uint8Array<ArrayBuffer>) => PUT(req(admin, { method: 'PUT', body, headers: { 'content-type': 'image/jpeg' } }), ctx('cache-test.jpg'));
+    expect((await put(jpeg)).ok).toBe(true);
+    const first = await ONE(req(member), ctx('cache-test.jpg'));
+    expect(first.status).toBe(200);
+    expect(first.headers.get('cache-control')).toBe('private, max-age=3600');
+    const etag = first.headers.get('etag');
+    expect(etag).toBeTruthy();
+    const again = await ONE(req(member, { headers: { 'if-none-match': etag! } }), ctx('cache-test.jpg'));
+    expect(again.status).toBe(304);
+    expect(await again.text()).toBe('');
+    expect((await put(new Uint8Array([...jpeg, 9, 9]))).ok).toBe(true);
+    const replaced = await ONE(req(member, { headers: { 'if-none-match': etag! } }), ctx('cache-test.jpg'));
+    expect(replaced.status).toBe(200);
+    expect(replaced.headers.get('etag')).not.toBe(etag);
+    expect((await ONE(req(undefined, { headers: { 'if-none-match': etag! } }), ctx('cache-test.jpg'))).status).toBe(401); // the ETag is no way around sign-in
+  });
+});
+
+describe('POST /api/assets/samples', () => {
+  const copy = (cookie: string | undefined, body: unknown) => COPY(new Request('http://localhost/api/assets/samples', { method: 'POST', body: JSON.stringify(body), headers: { 'content-type': 'application/json', ...(cookie ? { cookie } : {}) } }));
+  test('copies sample pictures into the caller own input assets on the server, all or nothing', async () => {
+    for (const [name, type, body] of [['copy-a.jpg', 'image/jpeg', jpeg], ['copy-b.jpg', 'image/jpeg', jpeg], ['copy-clip.mp4', 'video/mp4', mp4(64)]] as const) {
+      expect((await PUT(req(admin, { method: 'PUT', body, headers: { 'content-type': type } }), ctx(name))).ok, name).toBe(true);
+    }
+    expect((await copy(undefined, { names: ['copy-a.jpg'] })).status).toBe(401);
+    for (const names of [undefined, [], ['copy-a.jpg', 'copy-a.jpg', 'copy-a.jpg', 'copy-a.jpg', 'copy-a.jpg'], ['copy-clip.mp4'], ['../copy-a.jpg'], [1]]) {
+      expect((await copy(member, { names })).status, JSON.stringify(names)).toBe(400);
+    }
+    expect((await copy(member, { names: ['copy-a.jpg', 'no-such.jpg'] })).status).toBe(404);
+    const before = (await pool.query('select count(*)::int as n from assets')).rows[0].n;
+
+    const res = await copy(member, { names: ['copy-a.jpg', 'copy-b.jpg'] });
+    expect(res.status).toBe(201);
+    const { assets } = (await res.json()) as { assets: { id: string; filename: string; mime: string; bytes: number }[] };
+    expect(assets.map((a) => [a.filename, a.mime, a.bytes])).toEqual([['copy-a.jpg', 'image/jpeg', jpeg.length], ['copy-b.jpg', 'image/jpeg', jpeg.length]]);
+    const rows = (await pool.query(`select a.id, a.kind, a.s3_key, u.email from assets a join users u on u.id = a.owner_id where a.id = any($1) order by a.filename`, [assets.map((a) => a.id)])).rows;
+    expect(rows.map((r) => [r.kind, r.s3_key, r.email])).toEqual(assets.map((a) => ['input', `assets/${a.id}`, 'member@example.test']));
+    expect((await pool.query('select count(*)::int as n from assets')).rows[0].n).toBe(before + 2);
   });
 });

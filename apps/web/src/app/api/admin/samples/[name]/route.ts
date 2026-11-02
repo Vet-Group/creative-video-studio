@@ -22,7 +22,7 @@ export async function PUT(request: Request, { params }: Ctx) {
   const old = await headSample(name);
   // The object is written inside the transaction, so a failed upload leaves no audit row.
   await withTransaction(pool, async (tx) => {
-    await audit(tx, { actorId: g.session.user.id, action: 'sample.put', target: `sample:${name}`, oldValue: old, newValue: { bytes: body.byteLength } });
+    await audit(tx, { actorId: g.session.user.id, action: 'sample.put', target: `sample:${name}`, oldValue: old && { bytes: old.bytes }, newValue: { bytes: body.byteLength } });
     await putObject(SAMPLE_PREFIX + name, body, mime);
   });
   return Response.json({ name, bytes: body.byteLength }, { status: old ? 200 : 201 });
@@ -36,7 +36,7 @@ export async function DELETE(request: Request, { params }: Ctx) {
   const old = sampleType(name) && (await headSample(name));
   if (!old) return bad('not found', 404);
   await withTransaction(pool, async (tx) => {
-    await audit(tx, { actorId: g.session.user.id, action: 'sample.delete', target: `sample:${name}`, oldValue: old, newValue: null });
+    await audit(tx, { actorId: g.session.user.id, action: 'sample.delete', target: `sample:${name}`, oldValue: { bytes: old.bytes }, newValue: null });
     await deleteObject(SAMPLE_PREFIX + name);
   });
   return new Response(null, { status: 204 });
