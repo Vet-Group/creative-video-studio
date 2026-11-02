@@ -34,7 +34,7 @@ export function AppArt({ app }: { app: AppConfig }) {
   const media = cardSample(useSamples(), `app-${app.slug}`);
   return (
     <span className="app-art" data-category={app.category} aria-hidden="true">
-      {media.video || media.poster ? <CardMedia {...media} always /> : <Icon name={CATEGORY_ICON[app.category]} size={36} />}
+      {media.video || media.poster ? <CardMedia {...media} /> : <Icon name={CATEGORY_ICON[app.category]} size={36} />}
     </span>
   );
 }
@@ -86,7 +86,7 @@ export function AppHeader({ app }: { app: AppConfig }) {
     <div className="app-head" data-category={app.category} data-photo={have.has(photo) || undefined} style={have.has(photo) ? ({ '--photo': `url(/api/samples/${photo})` } as CSSProperties) : undefined}>
       {have.has(`app-${app.slug}.mp4`) && (
         <span className="head-loop">
-          <LoopVideo src={`/api/samples/app-${app.slug}.mp4`} poster={have.has(photo) ? `/api/samples/${photo}` : null} always />
+          <LoopVideo src={`/api/samples/app-${app.slug}.mp4`} poster={have.has(photo) ? `/api/samples/${photo}` : null} />
         </span>
       )}
       <strong>{app.name}</strong>

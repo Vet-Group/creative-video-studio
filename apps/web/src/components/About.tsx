@@ -13,7 +13,7 @@ import { CardMedia } from './CardMedia';
 function Media({ name }: { name: string }) {
   return (
     <span className="about-media">
-      <CardMedia {...cardSample(useSamples(), name)} always />
+      <CardMedia {...cardSample(useSamples(), name)} />
     </span>
   );
 }
@@ -71,7 +71,7 @@ function Block({ block }: { block: AboutBlock }) {
   if ('loop' in block)
     return (
       <span className="about-loop">
-        <CardMedia {...cardSample(useSamples(), block.loop)} always />
+        <CardMedia {...cardSample(useSamples(), block.loop)} />
       </span>
     );
   if ('pairs' in block)

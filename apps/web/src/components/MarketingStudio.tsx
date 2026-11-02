@@ -245,7 +245,7 @@ function ChoiceDialog({ open, title, sub, kind, choices, often, posters, custom,
   const rest = choices.filter((c) => !top.includes(c));
   const card = (c: MarketingChoice) => (
     <button key={c.id} type="button" role="option" aria-selected={selected.includes(c.id)} tabIndex={(selected.length > 0 ? selected[0] === c.id : c === (top[0] ?? rest[0])) ? 0 : -1} aria-label={c.name} aria-describedby={`${kind}-${c.id}-desc`} onClick={() => onPick(c.id)}>
-      {open && <CardMedia {...cardSample(have, `marketing-${kind}-${c.id}`, posters[c.id] && !have.has(`marketing-${kind}-${c.id}.mp4`) ? `/api/assets/${posters[c.id]}/content` : null)} always />}
+      {open && <CardMedia {...cardSample(have, `marketing-${kind}-${c.id}`, posters[c.id] && !have.has(`marketing-${kind}-${c.id}.mp4`) ? `/api/assets/${posters[c.id]}/content` : null)} />}
       <span className="choice-name">{c.name}</span>
       <span id={`${kind}-${c.id}-desc`} className="choice-desc">
         {c.desc}
@@ -659,7 +659,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
             <div className="app-head marketing-head" data-category="video" data-photo={have.has(photo) || undefined} style={have.has(photo) ? ({ '--photo': `url(/api/samples/${photo})` } as CSSProperties) : undefined}>
               {have.has(loop) && (
                 <span className="head-loop">
-                  <LoopVideo src={`/api/samples/${loop}`} poster={have.has(photo) ? `/api/samples/${photo}` : null} always />
+                  <LoopVideo src={`/api/samples/${loop}`} poster={have.has(photo) ? `/api/samples/${photo}` : null} />
                 </span>
               )}
               <strong>{name}</strong>
@@ -815,7 +815,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
         <div className="choice-grid">
           {FORMATS.map((f) => (
             <button key={f.id} type="button" aria-pressed={f.id === format} disabled={f.href === null} onClick={() => (setPicker(null), f.href && f.id !== format && router.push(f.href))}>
-              {picker === 'format' && <CardMedia {...cardSample(have, `marketing-format-${f.id}`)} always />}
+              {picker === 'format' && <CardMedia {...cardSample(have, `marketing-format-${f.id}`)} />}
               <span className="choice-name">
                 {f.name}
                 {f.soon && <span className="badge-soon">{f.soon}</span>}

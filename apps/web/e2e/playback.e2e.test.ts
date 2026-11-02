@@ -19,6 +19,14 @@ async function openExamples(page: Page, size = { width: 1440, height: 1400 }): P
 }
 
 const playing = (videos: Locator) => videos.evaluateAll((vs) => vs.filter((v) => !(v as HTMLVideoElement).paused).length);
+/** The clips at least a quarter on screen, the share Preview waits for before it plays. */
+const inView = (videos: Locator) =>
+  videos.evaluateAll((vs) =>
+    vs.filter((v) => {
+      const r = v.getBoundingClientRect();
+      return r.height > 0 && (Math.min(r.bottom, innerHeight) - Math.max(r.top, 0)) / r.height >= 0.25;
+    }).length,
+  );
 const frames = (video: Locator) => video.evaluate((v: HTMLVideoElement) => v.getVideoPlaybackQuality().totalVideoFrames);
 const evidence = (what: string, data: Record<string, unknown>) => console.info(`[playback] ${what} ${JSON.stringify(data)}`);
 
@@ -41,16 +49,12 @@ test('C1: example clips load from valid sources and move: readyState, currentTim
   expect(sources.every((s) => s.status === 200 || s.status === 206)).toBe(true);
 });
 
-test('at most 4 examples play at once, whatever is on screen', async ({ page }) => {
+test('every example on screen plays at once, as on the reference site', async ({ page }) => {
   const videos = await openExamples(page);
-  await expect.poll(() => playing(videos)).toBe(4);
-  let peak = 0;
-  for (let i = 0; i < 15; i++) {
-    peak = Math.max(peak, await playing(videos));
-    await page.waitForTimeout(100);
-  }
-  evidence('play limit', { clips: CLIPS, peak });
-  expect(peak).toBe(4);
+  const shown = await inView(videos);
+  expect(shown).toBeGreaterThan(4); // more than the old cap of 4
+  await expect.poll(() => playing(videos)).toBe(shown);
+  evidence('all visible play', { clips: CLIPS, shown });
 });
 
 test('a clip scrolled out of view pauses and plays again when it returns', async ({ page }) => {
@@ -70,7 +74,8 @@ test('a clip scrolled out of view pauses and plays again when it returns', async
 
 test('a hidden tab pauses every clip and a shown tab resumes them', async ({ page }) => {
   const videos = await openExamples(page);
-  await expect.poll(() => playing(videos)).toBe(4);
+  const shown = await inView(videos);
+  await expect.poll(() => playing(videos)).toBe(shown);
   const setVisibility = (state: 'hidden' | 'visible') =>
     page.evaluate((s) => {
       Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => s });
@@ -80,11 +85,11 @@ test('a hidden tab pauses every clip and a shown tab resumes them', async ({ pag
   await setVisibility('hidden');
   await expect.poll(() => playing(videos)).toBe(0);
   await setVisibility('visible');
-  await expect.poll(() => playing(videos)).toBe(4);
+  await expect.poll(() => playing(videos)).toBe(shown);
 });
 
 test('C2: a broken source keeps a poster-sized placeholder, not a gap', async ({ page }) => {
-  // The first tile is the first to get a play slot, so its broken source is hit at once (the tiles are dealt into columns, so tile 3 is no longer among the first four).
+  // The first tile is on screen at once, so its broken source is hit at once.
   await page.route('**/fixtures/examples/example-1.mp4', (r) => r.fulfill({ status: 404, body: 'gone' }));
   const videos = await openExamples(page);
   const placeholder = page.getByRole('img', { name: /Tiến gần nhẹ nhàng: không tải được video/ });
@@ -97,19 +102,12 @@ test('C2: a broken source keeps a poster-sized placeholder, not a gap', async ({
   evidence('broken source', { width: box.width, height: box.height });
 });
 
-test('C2: with reduced motion nothing autoplays; a poster and a play button stay until the user presses play', async ({ page }) => {
+test('with reduced motion the examples still autoplay, as on the reference site, with no play buttons', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   const videos = await openExamples(page);
-  const buttons = page.getByRole('button', { name: /^Phát / });
-  await expect(buttons).toHaveCount(CLIPS);
-  await page.waitForTimeout(1500);
-  expect(await playing(videos)).toBe(0);
-  expect(await videos.evaluateAll((vs) => vs.every((v) => (v as HTMLVideoElement).poster.endsWith('.jpg')))).toBe(true);
-
-  await buttons.first().click();
   await expect.poll(() => videos.first().evaluate((v: HTMLVideoElement) => v.currentTime)).toBeGreaterThan(0);
-  expect(await playing(videos)).toBe(1);
-  await expect(buttons).toHaveCount(CLIPS - 1);
+  expect(await playing(videos)).toBe(await inView(videos));
+  await expect(page.getByRole('button', { name: /^Phát / })).toHaveCount(0);
 });
 
 test('C2: when the browser blocks autoplay each clip shows a play button, and pressing it plays', async ({ page }) => {
@@ -145,15 +143,17 @@ test('the preset banner keeps looping when another preset swaps its clip in plac
   await expect.poll(moving).toBe(true);
 });
 
-test('with reduced motion the Explore prompt grid still loops, as the reference site does, while the Create banner keeps its poster', async ({ page }) => {
+test('with reduced motion the Create banner, the preset picker and the Explore prompt grid still loop, as the reference site does', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.setViewportSize({ width: 1280, height: 900 });
   await signIn(page, 'member6');
   await page.goto('/create?preset=gentle-push-in');
   const banner = page.locator('.banner video');
-  await expect(banner).toHaveCount(1);
-  await page.waitForTimeout(1500);
-  expect(await banner.evaluate((v: HTMLVideoElement) => v.paused)).toBe(true);
+  await expect.poll(() => banner.evaluate((v: HTMLVideoElement) => !v.paused && v.currentTime > 0)).toBe(true);
+  await page.getByRole('button', { name: 'Chọn mẫu khác' }).click();
+  const picked = page.getByRole('list', { name: 'Danh sách mẫu' }).locator('li', { hasText: 'Xoay quanh chậm' }).locator('video');
+  await expect.poll(() => picked.evaluate((v: HTMLVideoElement) => !v.paused && v.currentTime > 0)).toBe(true);
+  await page.keyboard.press('Escape');
 
   await page.goto('/explore');
   const tile = page.getByRole('list', { name: 'Mẫu' }).getByRole('link', { name: 'Xoay quanh chậm' }).locator('video');
@@ -161,7 +161,7 @@ test('with reduced motion the Explore prompt grid still loops, as the reference 
   await expect.poll(() => tile.evaluate((v: HTMLVideoElement) => !v.paused && v.currentTime > 0)).toBe(true);
 });
 
-test('with reduced motion the Explore model cards and the Apps cards and header still loop, while the Explore feature cards keep their posters', async ({ page }) => {
+test('with reduced motion the Explore model and feature cards and the Apps cards and header still loop', async ({ page }) => {
   // The test server has no samples, so the admin uploads the fixture clip under the slot names first and removes them afterwards.
   const clip = readFileSync(fileURLToPath(new URL('../public/fixtures/examples/example-1.mp4', import.meta.url)));
   const names = ['model-mock-e2e.mp4', 'app-character-swap.mp4', 'feature-try-on.mp4'];
@@ -184,8 +184,7 @@ test('with reduced motion the Explore model cards and the Apps cards and header 
     await moves(model);
     const feature = page.getByRole('list', { name: 'Công cụ' }).locator('a[href="/try-on"] video');
     await feature.scrollIntoViewIfNeeded();
-    await page.waitForTimeout(1500);
-    expect(await feature.evaluate((v: HTMLVideoElement) => v.paused)).toBe(true);
+    await moves(feature);
 
     await page.goto('/apps');
     const card = page.getByRole('list', { name: 'Danh sách ứng dụng' }).locator('a[href="/apps/character-swap"] video');
