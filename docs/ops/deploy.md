@@ -4,6 +4,32 @@
 (`systemctl --user` under root, `XDG_RUNTIME_DIR=/run/user/0`) in `/opt/creative-video-studio`, the same way Ideas Hub is run.
 Deploy only under the owner's pre-approval (plan section 3). Nothing here runs by itself.
 
+## Standing operations permission (owner, 2026-11-02)
+
+The run's pre-approval (`pnpm run:approve`) lasts 14 days and covers spend. For routine work after the run the owner
+types a second, standing permission once:
+
+```
+pnpm run:ops-approve "<sentence>"
+```
+
+Run it without the sentence (or with a wrong one) and it prints the exact Vietnamese sentence to copy. Both approve
+commands refuse to run inside a Claude Code session (`CLAUDECODE` or `CLAUDE_CODE_ENTRYPOINT` set): the owner types them in
+their own terminal. `ops-approve` also refuses while a committed guard file has uncommitted edits, and lists the guard files
+that changed since the last approval before it records them.
+
+- It never expires and opens only the `vet.sh` verbs `deploy`, `status`, `backup` and `drill`. Every other verb, and the
+  one-off key scripts (which call `guard-check` without a verb), still need a live run pre-approval.
+- It grants no provider spend. That is the owner's word, not something `guard-check` can enforce: the app's own spend
+  goes through its model settings and the monthly cap.
+- Like `run:approve` it records the guard file hashes, and the files that decide the permission (`cli.ts`, `manifest.ts`,
+  `preapproval.ts`) are guards too, so any change to a guard file halts every verb until the owner types it again.
+- `pnpm run:ops-revoke` (or `node scripts/run/cli.ts ops-revoke`) drops it at once.
+
+The server gate deploys only a commit that is already on `origin/main`: it fetches, refuses any other commit, and only then
+checks it out and runs that commit's installer. After the gate changes, the owner uploads it again with
+`bash scripts/run/install-gate-key.sh --gate-only` (needs a live run pre-approval and the owner's `vet-linux` SSH profile).
+
 ## Dry run first
 
 ```

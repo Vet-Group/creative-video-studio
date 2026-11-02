@@ -31,6 +31,34 @@ describe('cvs-run-gate (server side)', () => {
     expect(r.stderr).toContain('refused');
   });
 
+  test('deploy checks the commit is on main before it checks it out or runs its installer', () => {
+    const sha = 'a'.repeat(40);
+    const r = gate(`deploy ${sha}`);
+    expect(r.status, r.stderr).toBe(0);
+    const lines = r.stdout.split('\n');
+    expect(r.stdout).toContain('fetch --quiet --no-tags origin');
+    const onMain = lines.findIndex((l) => l.includes(`merge-base --is-ancestor ${sha} refs/remotes/origin/main`));
+    const checkout = lines.findIndex((l) => l.includes(`checkout --quiet --detach ${sha}`));
+    const install = lines.findIndex((l) => l.includes('deploy/linux/install.sh'));
+    expect(onMain).toBeGreaterThan(-1);
+    expect(onMain).toBeLessThan(checkout);
+    expect(checkout).toBeLessThan(install);
+  });
+
+  test('why the gate names refs/remotes/origin/main: a tag called origin/main shadows the short name, never the full ref', () => {
+    const dir = tmp();
+    const git = (...a: string[]) => spawnSync('git', ['-C', dir, '-c', 'user.name=t', '-c', 'user.email=t@t', ...a], { encoding: 'utf8' });
+    git('init', '-q', '-b', 'main');
+    git('commit', '-q', '--allow-empty', '-m', 'main');
+    git('update-ref', 'refs/remotes/origin/main', 'HEAD');
+    git('checkout', '-q', '-b', 'evil');
+    git('commit', '-q', '--allow-empty', '-m', 'evil');
+    const evil = git('rev-parse', 'HEAD').stdout.trim();
+    git('tag', 'origin/main', evil);
+    expect(git('merge-base', '--is-ancestor', evil, 'origin/main').status).toBe(0); // the trap
+    expect(git('merge-base', '--is-ancestor', evil, 'refs/remotes/origin/main').status).toBe(1); // what the gate asks
+  });
+
   test('runs an allowed verb (dry run prints the fixed commands)', () => {
     const r = gate('check');
     expect(r.status).toBe(0);

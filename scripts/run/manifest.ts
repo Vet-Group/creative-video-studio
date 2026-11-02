@@ -2,7 +2,7 @@
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { PREAPPROVAL_DAYS } from './preapproval.ts';
+import { OPS_SENTENCE, OPS_VERBS, PREAPPROVAL_DAYS } from './preapproval.ts';
 import type { ItemResult } from './preflight.ts';
 import { STEPS } from './steps.ts';
 
@@ -41,6 +41,8 @@ export interface Criterion {
 export interface Manifest {
   version: 1;
   preapproval?: { sentence: string; at: string; expiresAt: string };
+  /** The standing operations permission: no expiry, OPS_VERBS only (preapproval.ts). */
+  ops?: { sentence: string; at: string };
   preflight?: { checkedAt: string; results: ItemResult[] };
   ownerOpenId?: string;
   runLogIssue?: number;
@@ -141,6 +143,11 @@ export function preapprovalValid(m: Manifest, now: Date): boolean {
   return !!m.preapproval && now.getTime() < Date.parse(m.preapproval.expiresAt);
 }
 
+/** Whether a vet.sh call may go out: any verb under a live pre-approval, the routine verbs under the standing operations permission. */
+export function vetAllowed(m: Manifest, now: Date, verb?: string): boolean {
+  return preapprovalValid(m, now) || (m.ops?.sentence === OPS_SENTENCE && !!verb && OPS_VERBS.includes(verb));
+}
+
 export function readManifest(path: string): Manifest {
   return JSON.parse(readFileSync(path, 'utf8')) as Manifest;
 }
@@ -186,6 +193,10 @@ export const GUARD_FILES = [
   '.githooks/pre-push',
   '.gitleaks.toml',
   'package.json',
+  // What decides the permission itself (the sentences, the verbs, guard-check), so widening it halts like any other guard.
+  'scripts/run/cli.ts',
+  'scripts/run/manifest.ts',
+  'scripts/run/preapproval.ts',
 ];
 
 /** Committed guards plus the local list's entries, skipping files that do not exist. */

@@ -143,13 +143,13 @@ run mkdir -p "$app"
 export GIT_SSH_COMMAND="ssh -i $deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
 say "git uses the deploy key at $deploy_key"
 if [ -d "$app/.git" ]; then
-  run git -C "$app" fetch --quiet origin "$repo_ref"
-  run git -C "$app" merge --ff-only --quiet "origin/$repo_ref"
+  run git -C "$app" fetch --quiet --no-tags origin "$repo_ref"
+  run git -C "$app" merge --ff-only --quiet "refs/remotes/origin/$repo_ref" # the full ref: a tag of the same name cannot stand in
 else
   run git -C "$app" init --quiet
   run git -C "$app" remote add origin "$repo_url"
-  run git -C "$app" fetch --quiet origin "$repo_ref"
-  run git -C "$app" checkout --quiet -B "$repo_ref" "origin/$repo_ref"
+  run git -C "$app" fetch --quiet --no-tags origin "$repo_ref"
+  run git -C "$app" checkout --quiet -B "$repo_ref" "refs/remotes/origin/$repo_ref"
 fi
 
 units_src="$app/deploy/linux"
