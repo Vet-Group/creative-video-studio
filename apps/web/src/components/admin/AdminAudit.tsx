@@ -17,7 +17,7 @@ interface Entry {
 // The events the audit log records, for the filter.
 const ACTIONS = [
   'account.link', 'account.unlink', 'clip.delete', 'cost.manual_adjustment', 'invoice.enter', 'model.set_enabled', 'preset.update', 'rate.update', 'sample.delete', 'sample.put', 'settings.update', 'store.create', 'store.hide',
-  'store.reassign', 'store.update', 'team.create', 'team.hide', 'team.rename', 'user.ban', 'user.password_set', 'user.role_change', 'user.team_change', 'user.unban', 'user.update', 'verdict.set',
+  'store.reassign', 'store.update', 'team.create', 'team.hide', 'team.rename', 'user.ban', 'user.delete', 'user.password_set', 'user.role_change', 'user.team_change', 'user.unban', 'user.update', 'verdict.set',
 ];
 
 const fmtTime = (iso: string) => new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'medium', timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date(iso));
