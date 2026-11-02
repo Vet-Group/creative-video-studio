@@ -372,10 +372,43 @@ label.model input { display: inline; margin: 0; min-width: 0; width: auto; }
 .mascot-lens { transform: rotate(var(--lens-angle, 0deg)); transition: transform .12s ease-out; }
 .mascot[data-result='fail'] { transform-box: fill-box; transform-origin: 50% 100%; animation: mascot-shake .45s ease-in-out; }
 @keyframes mascot-shake { 20% { transform: rotate(-5deg); } 40% { transform: rotate(4deg); } 60% { transform: rotate(-3deg); } 80% { transform: rotate(2deg); } }
-@media (prefers-reduced-motion: reduce) {
-  .mascot, .beam { display: none; }
-  .login, .login-card, .login button.primary, .studio :is(rect, path, ellipse, circle) { transition: none; }
-}
+/* The living studio. These play under reduced motion too, on the owner's word (2026-11-02): many company PCs report it, and the studio was a still picture. */
+.login { background-size: 160% 160%; animation: backdrop-drift 26s ease-in-out infinite alternate; }
+@keyframes backdrop-drift { from { background-position: 0% 0%; } to { background-position: 100% 60%; } }
+/* The lights switch on one after the other, with a short flicker, then the beams fade in. */
+.scene-light .scene-lamp-face { animation: lamp-on 1.1s ease-out backwards; }
+.scene-light + .scene-light .scene-lamp-face { animation-delay: .45s; }
+.scene-glow { animation: glow-on 1.2s .7s ease-out backwards; }
+@keyframes lamp-on { 0% { opacity: .15; } 18% { opacity: 1; } 26% { opacity: .35; } 40%, 100% { opacity: 1; } }
+@keyframes glow-on { from { opacity: 0; } to { opacity: 1; } }
+/* Dust drifts up through the beams; it goes with the beams at night and under the flashlight. */
+.scene-dust circle { fill: rgb(232 170 60); opacity: 0; animation: dust var(--s) var(--d) ease-in-out infinite; transform-box: fill-box; }
+@keyframes dust { 0% { opacity: 0; transform: translate(0, 0); } 30% { opacity: .9; } 70% { opacity: .6; } 100% { opacity: 0; transform: translate(8px, -46px); } }
+.scene-dust { transition: opacity .5s; }
+.login[data-dark='true'] .scene-dust { opacity: 0; }
+/* The turntable turns: its dashed ring runs round, and the product box rocks a little on it. */
+.scene-table-ring { fill: none; stroke: var(--scene-table); stroke-width: 2; stroke-dasharray: 10 14; opacity: .55; animation: table-turn 5s linear infinite; }
+@keyframes table-turn { to { stroke-dashoffset: -96; } }
+.scene-box { transform-box: fill-box; transform-origin: 50% 100%; animation: box-bob 3.2s ease-in-out infinite alternate; }
+@keyframes box-bob { from { transform: translateY(0); } to { transform: translateY(-4px); } }
+/* The camera records while the form is being filled in. */
+.mascot-rec { font: 700 11px/1 system-ui, sans-serif; letter-spacing: .06em; fill: var(--scene-tally-on); opacity: 0; transition: opacity .2s; }
+.login:has(.login-form input:focus) .mascot-rec { opacity: 1; }
+.login:has(.login-form input:focus) .mascot-tally { fill: var(--scene-tally-on); animation: rec-blink 1s steps(1) infinite; }
+@keyframes rec-blink { 50% { opacity: .2; } }
+/* Signed in: a camera flash, then the clapperboard drops in and claps. */
+.scene-flash { fill: #fff; opacity: 0; pointer-events: none; }
+.scene-clapper { opacity: 0; transform: translateY(-24px); transform-box: fill-box; }
+.scene-clapper > rect, .scene-clapper-arm > rect { fill: #18181b; }
+.scene-clapper-stripes { fill: #fafafa; }
+.scene-clapper text { font: 800 16px/1 system-ui, sans-serif; fill: #fafafa; }
+.scene-clapper-arm { transform-box: fill-box; transform-origin: 0% 100%; transform: rotate(-24deg); }
+.login[data-result='success'] .scene-flash { animation: flash .6s ease-out; }
+.login[data-result='success'] .scene-clapper { opacity: 1; transform: none; transition: opacity .15s, transform .25s cubic-bezier(.2, 1.4, .4, 1); }
+.login[data-result='success'] .scene-clapper-arm { animation: clap .3s .25s ease-in forwards; }
+.login[data-result='success'] .mascot-tally { fill: #22c55e; animation: none; }
+@keyframes flash { 0% { opacity: 0; } 12% { opacity: .9; } 100% { opacity: 0; } }
+@keyframes clap { to { transform: rotate(0deg); } }
 .methods { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .35rem; }
 .methods li { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
 .prose { max-width: 42rem; margin: 2rem auto; padding: 0 1rem; }

@@ -10,6 +10,9 @@ import { useHydrated } from '@/lib/use-hydrated';
 import { PasswordField, useRevealMode } from './PasswordField';
 import { StudioScene } from './StudioScene';
 
+/** How long the sign-in flash and clapperboard play before the next page opens. */
+const ENTER_MS = 700;
+
 /** Why a passkey sign-in failed; a passkey used without its PIN or fingerprint gets its own message, since trying again with them works. */
 export const passkeyFailure = (e: unknown) =>
   e instanceof ApiError && e.code === 'USER_NOT_VERIFIED'
@@ -41,6 +44,7 @@ export function LoginForm({
   const [revealed, setRevealed] = useState(false);
   const [hint, setHint] = useState(false);
   const [capsLock, setCapsLock] = useState(false);
+  const [result, setResult] = useState<'success' | null>(null);
   const kind = useRevealMode();
   const mode = revealed ? kind : 'off';
   const mascot = useRef<SVGGElement>(null);
@@ -50,13 +54,33 @@ export function LoginForm({
   const hydrated = useHydrated();
   const webauthn = hydrated && typeof window.PublicKeyCredential === 'function';
 
+  // Signed in: the studio flashes and claps (globals.css) before the next page opens.
+  async function enter() {
+    setResult('success');
+    await new Promise((r) => setTimeout(r, ENTER_MS));
+    window.location.assign(next);
+  }
+
+  // The camera looks toward the pointer anywhere on the page. While the flashlight is on, PasswordField aims it instead and marks it data-lit.
+  useEffect(() => {
+    const look = (e: PointerEvent) => {
+      const m = mascot.current;
+      const body = m?.querySelector('.mascot-body')?.getBoundingClientRect();
+      if (!m || !body || m.dataset.lit !== undefined) return;
+      const angle = (Math.atan2(e.clientY - (body.top + body.height / 2), e.clientX - (body.left + body.width / 2)) * 180) / Math.PI;
+      m.style.setProperty('--lens-angle', `${Math.max(-40, Math.min(40, angle))}deg`); // a lens turned further would point into the camera
+    };
+    document.addEventListener('pointermove', look);
+    return () => document.removeEventListener('pointermove', look);
+  }, []);
+
   // Offer the saved passkeys in the Email field's suggestions. A browser without them, the limiter or a closed list leaves the field as it was;
   // a passkey the user picked that the server then refuses (a ban, an expired challenge) says so.
   useEffect(() => {
     void (async () => {
       if (!(await browserSupportsWebAuthnAutofill())) return;
       await signInWithPasskey(true);
-      window.location.assign(next);
+      await enter();
     })().catch((e: unknown) => {
       if (e instanceof ApiError && e.status !== 429) setError(passkeyFailure(e));
     });
@@ -66,7 +90,7 @@ export function LoginForm({
     setError('');
     try {
       await signInWithPasskey();
-      window.location.assign(next);
+      await enter();
     } catch (err) {
       if (!cancelled(err)) setError(passkeyFailure(err));
     }
@@ -79,7 +103,7 @@ export function LoginForm({
     setError('');
     try {
       await api('/api/auth/sign-in/email', sendJson('POST', { email, password }));
-      window.location.assign(next);
+      await enter();
     } catch (err) {
       setError(
         err instanceof ApiError && err.status === 429
@@ -118,7 +142,7 @@ export function LoginForm({
   }
 
   return (
-    <main className="login" data-scene={scene} data-flashlight={mode} data-dark={scene === 'night' || mode === 'pointer' || mode === 'touch'}>
+    <main className="login" data-result={result ?? undefined} data-scene={scene} data-flashlight={mode} data-dark={scene === 'night' || mode === 'pointer' || mode === 'touch'}>
       <div className="login-card">
         <section className="login-form">
           <div className="login-brand">
