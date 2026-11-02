@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { auditChanges } from '@/lib/admin-ui';
 import { api } from '@/lib/api';
 import { useTabReturn } from '@/lib/use-tab-return';
+import { Empty, PageHead } from './PageHead';
 
 interface Entry {
   id: number;
@@ -19,8 +20,52 @@ const ACTIONS = [
   'account.link', 'account.unlink', 'clip.delete', 'cost.manual_adjustment', 'invoice.enter', 'model.set_enabled', 'preset.update', 'rate.update', 'sample.delete', 'sample.put', 'settings.update', 'store.create', 'store.hide',
   'store.reassign', 'store.update', 'team.create', 'team.hide', 'team.rename', 'user.ban', 'user.delete', 'user.password_set', 'user.role_change', 'user.team_change', 'user.unban', 'user.update', 'verdict.set',
 ];
+const SHOWN_CHANGES = 3;
 
 const fmtTime = (iso: string) => new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'medium', timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date(iso));
+
+function AuditRow({ e }: { e: Entry }) {
+  const changes = auditChanges(e.oldValue, e.newValue);
+  // The raw JSON is rendered only while open, so a closed row carries no braces.
+  const [open, setOpen] = useState(false);
+  return (
+    <tr>
+      <td data-label="Thời gian" className="nowrap">
+        {fmtTime(e.createdAt)}
+      </td>
+      <td data-label="Người thực hiện">{e.actorName}</td>
+      <td data-label="Sự kiện">
+        <code className="event">{e.action}</code>
+      </td>
+      <td data-label="Đối tượng" className="clip" title={e.target}>
+        {e.target}
+      </td>
+      <td data-label="Thay đổi">
+        <ul className="changes">
+          {changes.slice(0, SHOWN_CHANGES).map((c) => (
+            <li key={c.key} title={`${c.key}: ${c.text}`}>
+              <span className="key">{c.key}:</span> {c.text}
+            </li>
+          ))}
+          {changes.length > SHOWN_CHANGES && <li className="muted">+{changes.length - SHOWN_CHANGES} trường khác</li>}
+        </ul>
+        {changes.length > 0 && (
+          <details className="raw" onToggle={(ev) => setOpen(ev.currentTarget.open)}>
+            <summary>Chi tiết</summary>
+            {open && (
+              <div>
+                <p>Trước</p>
+                <pre>{JSON.stringify(e.oldValue, null, 2) ?? '—'}</pre>
+                <p>Sau</p>
+                <pre>{JSON.stringify(e.newValue, null, 2) ?? '—'}</pre>
+              </div>
+            )}
+          </details>
+        )}
+      </td>
+    </tr>
+  );
+}
 
 export function AdminAudit() {
   const [action, setAction] = useState('');
@@ -56,57 +101,51 @@ export function AdminAudit() {
 
   return (
     <section aria-labelledby="audit-title">
-      <h1 id="audit-title">Nhật ký</h1>
-      <div className="filters" role="search" aria-label="Bộ lọc nhật ký">
-        <label>
-          Loại sự kiện
-          <select value={action} onChange={(e) => setAction(e.target.value)}>
-            <option value="">Tất cả</option>
-            {ACTIONS.map((a) => (
-              <option key={a} value={a}>
-                {a}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
+      <PageHead id="audit-title" title="Nhật ký" lead="Mọi thay đổi của Admin và người dùng, mới nhất trước. Bấm “Chi tiết” để xem giá trị đầy đủ.">
+        <div className="filters" role="search" aria-label="Bộ lọc nhật ký">
+          <label>
+            Loại sự kiện
+            <select value={action} onChange={(e) => setAction(e.target.value)}>
+              <option value="">Tất cả</option>
+              {ACTIONS.map((a) => (
+                <option key={a} value={a}>
+                  {a}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      </PageHead>
       {state === 'loading' && <p role="status">Đang tải...</p>}
       {state === 'error' && <p className="error">Không tải được nhật ký.</p>}
-      {state === 'ready' && entries.length === 0 && <p className="muted">Chưa có sự kiện nào khớp bộ lọc.</p>}
-      <div className="table-wrap">
-        <table className="mobile-records">
-          <thead>
-            <tr>
-              <th scope="col">Thời gian</th>
-              <th scope="col">Người thực hiện</th>
-              <th scope="col">Sự kiện</th>
-              <th scope="col">Đối tượng</th>
-              <th scope="col">Thay đổi</th>
-            </tr>
-          </thead>
-          <tbody>
-            {entries.map((e) => (
-              <tr key={e.id}>
-                <td data-label="Thời gian" className="nowrap">{fmtTime(e.createdAt)}</td>
-                <td data-label="Người thực hiện">{e.actorName}</td>
-                <td data-label="Sự kiện">
-                  <code className="event">{e.action}</code>
-                </td>
-                <td data-label="Đối tượng">{e.target}</td>
-                <td data-label="Thay đổi">
-                  <ul className="changes">
-                    {auditChanges(e.oldValue, e.newValue).map((c) => (
-                      <li key={c.key}>
-                        <span className="key">{c.key}:</span> {c.text}
-                      </li>
-                    ))}
-                  </ul>
-                </td>
+      {state === 'ready' && entries.length === 0 && <Empty title="Chưa có sự kiện nào khớp bộ lọc" />}
+      {entries.length > 0 && (
+        <div className="table-wrap">
+          <table className="mobile-records audit">
+            <colgroup>
+              <col className="c-time" />
+              <col className="c-actor" />
+              <col className="c-event" />
+              <col className="c-target" />
+              <col />
+            </colgroup>
+            <thead>
+              <tr>
+                <th scope="col">Thời gian</th>
+                <th scope="col">Người thực hiện</th>
+                <th scope="col">Sự kiện</th>
+                <th scope="col">Đối tượng</th>
+                <th scope="col">Thay đổi</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {entries.map((e) => (
+                <AuditRow key={e.id} e={e} />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
       {hasMore && (
         <button type="button" onClick={() => void load(entries.length)}>
           Tải thêm

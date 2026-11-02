@@ -83,6 +83,8 @@ test('Admin Costs, Report and Audit reload when the tab comes back', async ({ pa
   await page.goto('/admin/report');
   const row = page.getByRole('row', { name: /E2E Fresh B/ });
   await expect(page.getByRole('heading', { name: 'Báo cáo tuần' })).toBeVisible();
+  // The heading shows while the report loads, so wait for the figures before reading them.
+  await expect(page.getByRole('status').filter({ hasText: 'Đang tải...' })).toHaveCount(0);
   const jobsOf = async () => ((await row.count()) ? await row.getByRole('cell').nth(2).innerText() : '0');
   const was = Number(await jobsOf());
   const b = await other(browser);

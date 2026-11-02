@@ -466,7 +466,7 @@ export function Shell({ userId, userName, isAdmin, account, initialCollapsed, ch
             </div>
             <nav aria-label="Điều hướng chính">
               {NAV.map((n) => link(n.href, n.text, n.icon, pathname === n.href || pathname.startsWith(`${n.href}/`), n.badge))}
-              {isAdmin && link('/admin/users', 'Quản trị', 'admin', pathname.startsWith('/admin'))}
+              {isAdmin && link('/admin/overview', 'Quản trị', 'admin', pathname.startsWith('/admin'))}
             </nav>
           </div>
           <Settings open={settingsOpen} onClose={() => setSettingsOpen(false)} userName={userName} account={account} />
