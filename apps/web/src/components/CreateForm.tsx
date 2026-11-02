@@ -15,7 +15,7 @@ import { AudioSwitch } from './AudioSwitch';
 import { CardMedia } from './CardMedia';
 import { EnhanceToggle } from './EnhanceToggle';
 import { Icon } from './Icon';
-import { copyError, copySamples, photoImg, Slot, UPLOAD_ERROR, uploadImages } from './image-tools';
+import { copyError, copySamples, GALLERY_SIZE_KEY, HISTORY_SIZE_KEY, photoImg, SizeSlider, Slot, UPLOAD_ERROR, uploadImages, useSize } from './image-tools';
 import { FormContext, type Photo, Tap, useApplier, useHasHistory, useJobs, useRecreated } from './jobs';
 import { Modal } from './Modal';
 import { ModelPicker } from './ModelPicker';
@@ -133,6 +133,8 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
   const [notice, setNotice] = useState('');
   const narrow = useMediaQuery(NARROW);
   const wide = useMediaQuery(WIDE);
+  const [gallerySize, resizeGallery] = useSize(GALLERY_SIZE_KEY); // examples: 0 small tiles, 1 default, 2 large tiles
+  const [historySize, resizeHistory] = useSize(HISTORY_SIZE_KEY, 1, 1); // history: 0 two columns, 1 one
   const fileInput = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
   const promptId = useId();
@@ -649,10 +651,12 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
           </div>
         </div>
 
-        <div className="side" id={`create-panel-${shown === 'create' ? 'history' : shown}`} role="tabpanel" aria-labelledby={`create-tab-${shown === 'create' ? 'history' : shown}`} hidden={narrow && shown === 'create'}>
+        <div className={!narrow && historySize === 0 ? 'side history-small' : 'side'} id={`create-panel-${shown === 'create' ? 'history' : shown}`} role="tabpanel" aria-labelledby={`create-tab-${shown === 'create' ? 'history' : shown}`} hidden={narrow && shown === 'create'}>
+          {!narrow && shown === 'examples' && <SizeSlider size={gallerySize} onChange={resizeGallery} />}
+          {!narrow && shown === 'history' && <SizeSlider size={historySize} last={1} onChange={resizeHistory} />}
           {shown === 'examples' ? (
             <div className="masonry" role="group" aria-label="Video mẫu">
-              {splitColumns(examples, narrow ? 2 : wide ? 4 : 3).map((column, c) => (
+              {splitColumns(examples, narrow ? 2 : Math.max(1, (wide ? 4 : 3) + 1 - gallerySize)).map((column, c) => (
                 <ul key={c} className="masonry-col">
                   {column.map((ex) => (
                     <li key={ex.id} className="example">

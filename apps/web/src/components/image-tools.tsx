@@ -284,7 +284,40 @@ export function LockedFields() {
 
 const aspectOf = (ratio: string): string => (/^\d+:\d+$/.test(ratio) ? ratio.replace(':', ' / ') : '1 / 1');
 
-const GALLERY_SIZE_KEY = 'cvs.gallery.size';
+export const GALLERY_SIZE_KEY = 'cvs.gallery.size';
+export const HISTORY_SIZE_KEY = 'cvs.history.size';
+
+/** A size slider's stop (0 the smallest), remembered per browser under `key`; blocked storage keeps `initial`. */
+export function useSize(key: string, last = 2, initial = 1): [number, (next: number) => void] {
+  const [size, setSize] = useState(initial);
+  useEffect(() => {
+    try {
+      const saved = Number(localStorage.getItem(key) ?? initial);
+      if (Number.isInteger(saved) && saved >= 0 && saved <= last) setSize(saved);
+    } catch {}
+  }, [key, last, initial]);
+  function resize(next: number) {
+    setSize(next);
+    try {
+      localStorage.setItem(key, String(next));
+    } catch {}
+  }
+  return [size, resize];
+}
+
+/** The tile-size slider above a gallery or history, as on Fash: it shares the tab row from 1024 px. */
+export function SizeSlider({ size, last = 2, onChange }: { size: number; last?: number; onChange: (next: number) => void }) {
+  return (
+    <div className="gallery-tools">
+      <label className="library-size">
+        <span className="sr-only">Cỡ ô</span>
+        <Icon name="library" />
+        <input type="range" min={0} max={last} step={1} value={size} onChange={(e) => onChange(Number(e.target.value))} aria-valuetext={size === 0 ? 'Nhỏ' : size === last ? 'Lớn' : 'Vừa'} />
+        <Icon name="ratio" />
+      </label>
+    </div>
+  );
+}
 
 /** The company's latest outputs of one Library `kind` (`try_on`, `image` or, with `video`, `marketing`) in a masonry of columns; 24 at a time.
  * `cols` is the column count below 1024 px, up to 1536 px and above; from 1024 px a slider (as on Fash) shows one column more or less, remembered per browser.
@@ -372,22 +405,10 @@ export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4
   const [items, setItems] = useState<Clip[]>([]);
   const [hasMore, setHasMore] = useState(false);
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
-  const [size, setSize] = useState(1); // 0 small tiles, 1 default, 2 large tiles
+  const [size, resize] = useSize(GALLERY_SIZE_KEY); // 0 small tiles, 1 default, 2 large tiles
   const narrow = useMediaQuery(NARROW);
   const wide = useMediaQuery(WIDE);
   const columns = narrow ? cols[0] : Math.max(1, (wide ? cols[2] : cols[1]) + 1 - size);
-  useEffect(() => {
-    try {
-      const saved = Number(localStorage.getItem(GALLERY_SIZE_KEY) ?? 1);
-      if (saved === 0 || saved === 1 || saved === 2) setSize(saved);
-    } catch {} // blocked storage: the default size
-  }, []);
-  function resize(next: number) {
-    setSize(next);
-    try {
-      localStorage.setItem(GALLERY_SIZE_KEY, String(next));
-    } catch {}
-  }
   const loading = useRef(false); // a second click while a page loads would append it twice
 
   async function load(offset: number) {
@@ -418,16 +439,7 @@ export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4
   const tiles: (Clip | string)[] = [...sampleTiles, ...items];
   return (
     <>
-      {!narrow && (
-        <div className="gallery-tools">
-          <label className="library-size">
-            <span className="sr-only">Cỡ ô</span>
-            <Icon name="library" />
-            <input type="range" min={0} max={2} step={1} value={size} onChange={(e) => resize(Number(e.target.value))} aria-valuetext={['Nhỏ', 'Vừa', 'Lớn'][size]} />
-            <Icon name="ratio" />
-          </label>
-        </div>
-      )}
+      {!narrow && <SizeSlider size={size} onChange={resize} />}
       <div className="masonry" role="group" aria-label={label}>
         {Array.from({ length: columns }, (_, c) => (
           <ul key={c} className="masonry-col">

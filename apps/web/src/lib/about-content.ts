@@ -47,7 +47,7 @@ export interface AboutPage {
 
 const PRIVACY: [string, string] = [
   'Ảnh tải lên có riêng tư không?',
-  'Ảnh tải lên và kết quả nằm trong kho lưu trữ của công ty, chỉ người đã đăng nhập vào ứng dụng mới xem được. Ảnh được gửi tới nhà cung cấp mô hình để tạo kết quả. Thư viện dùng chung trong công ty, nên đồng nghiệp xem được kết quả của bạn.',
+  'Ảnh tải lên và kết quả nằm trong kho lưu trữ của công ty, chỉ người đã đăng nhập vào ứng dụng mới xem được. Ảnh được gửi tới nhà cung cấp mô hình để tạo kết quả. Ảnh và video của bạn không bao giờ bị bán, và chúng tôi không dùng chúng để huấn luyện mô hình AI của mình. Thư viện dùng chung trong công ty, nên đồng nghiệp xem được kết quả của bạn.',
 ];
 const RIGHTS = 'Chỉ dùng ảnh mà công ty có quyền sử dụng, và chỉ với người đã đồng ý.';
 

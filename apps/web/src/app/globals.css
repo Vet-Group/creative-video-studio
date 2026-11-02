@@ -205,6 +205,8 @@ legend { font-weight: 600; padding: 0 .25rem; }
 .tray.history { padding: 0; border: 0; background: none; }
 .tray.history > h2 { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 .tray.history ul { gap: 24px; }
+/* The History size slider's small stop: two columns of cards from 1440 px, where the panel has room for both. */
+@media (min-width: 1440px) { .side.history-small .tray.history ul { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .job-card { display: grid; grid-template-columns: minmax(0, 1fr) 220px; gap: 0; min-height: 500px; padding: 0; overflow: hidden; border: 0; border-radius: 16px; background: var(--surface); box-shadow: 0 1px 3px rgb(0 0 0 / 8%), 0 6px 24px rgb(0 0 0 / 6%); }
 .job-card.job-failed, .job-card.job-failed_unknown, .job-card.job-timed_out { box-shadow: 0 0 0 1px var(--danger-border); }
 .job-media { display: flex; align-items: center; justify-content: center; height: 500px; background: var(--fill); }
@@ -1436,9 +1438,8 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .marketing-slots .field-label { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 /* Hook and location use the same grey circle as the photo slots, and say nothing until one is chosen. */
 .choice-box .slot-icon { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: var(--divider); color: var(--text-icon); }
-/* Ratio and duration sit side by side without labels, the gallery has no size slider, and the prompt is 75 px, as on the live Marketing Studio. */
+/* Ratio and duration sit side by side without labels, and the prompt is 75 px, as on the live Marketing Studio. */
 [aria-labelledby='marketing-title'] .field-row .field-label { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-[aria-labelledby='marketing-title'] .gallery-tools { display: none; }
 [aria-labelledby='marketing-title'] .prompt-box textarea { min-height: 75px; }
 /* An app's Run follows its slots without a rule, as on the live app pages. */
 [aria-labelledby='app-title'] .runbar { border-top: 0; }
