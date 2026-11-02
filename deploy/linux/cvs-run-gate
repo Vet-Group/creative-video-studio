@@ -60,12 +60,13 @@ case "$VERB" in
     if [[ ! -d "$APP/.git" ]]; then
       run env GIT_SSH_COMMAND='ssh -i /root/.ssh/cvs_deploy_ed25519 -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new' git clone git@github.com:Vet-Group/creative-video-studio.git "$APP"
     fi
-    run env GIT_SSH_COMMAND='ssh -i /root/.ssh/cvs_deploy_ed25519 -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new' git -C "$APP" fetch --quiet origin
+    run env GIT_SSH_COMMAND='ssh -i /root/.ssh/cvs_deploy_ed25519 -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new' git -C "$APP" fetch --quiet --no-tags origin
     # Only a commit already on main: a pushed branch must never get its own installer run as root (owner, 2026-11-02).
+    # The full ref and --no-tags: a pushed tag named origin/main would otherwise shadow the remote branch.
     if [[ "${CVS_GATE_DRY_RUN:-}" == 1 ]]; then
-      echo "DRY-RUN: git -C $APP merge-base --is-ancestor ${ARGV[1]} origin/main"
+      echo "DRY-RUN: git -C $APP merge-base --is-ancestor ${ARGV[1]} refs/remotes/origin/main"
     else
-      git -C "$APP" merge-base --is-ancestor "${ARGV[1]}" origin/main || refuse 'commit is not on main'
+      git -C "$APP" merge-base --is-ancestor "${ARGV[1]}" refs/remotes/origin/main || refuse 'commit is not on main'
     fi
     run git -C "$APP" checkout --quiet --detach "${ARGV[1]}"
     run bash "$APP/deploy/linux/install.sh"

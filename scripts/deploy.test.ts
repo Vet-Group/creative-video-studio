@@ -328,7 +328,8 @@ describe.skipIf(!hasBash)('deploy kit (needs bash only)', { timeout: 30_000 }, (
     wouldFailLine(run(installSh, ['--dry-run'], { ...s.env, STUB_GIT_REMOTE: 'git@github.com:someone/else.git' }), 'origin is not CVS_REPO_URL');
     const ok = run(installSh, ['--dry-run'], { ...s.env, STUB_GIT_REMOTE: defaultRepo });
     expect(ok.status).toBe(0);
-    expect(ok.out).toContain('fetch --quiet origin main');
+    expect(ok.out).toContain('fetch --quiet --no-tags origin main');
+    expect(ok.out).toContain('merge --ff-only --quiet refs/remotes/origin/main');
     // The same repository over anonymous HTTPS (a host without a deploy key) is accepted; another one over HTTPS is not.
     expect(run(installSh, ['--dry-run'], { ...s.env, STUB_GIT_REMOTE: 'https://github.com/Vet-Group/creative-video-studio.git' }).status).toBe(0);
     wouldFailLine(run(installSh, ['--dry-run'], { ...s.env, STUB_GIT_REMOTE: 'https://github.com/someone/else.git' }), 'origin is not CVS_REPO_URL');
