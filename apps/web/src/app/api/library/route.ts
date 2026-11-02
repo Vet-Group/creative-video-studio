@@ -51,7 +51,7 @@ export async function GET(request: Request) {
   const [clips, creators] = await Promise.all([
     pool.query(
       `select j.id, j.user_id, u.name as creator_name, j.created_at, ${ICT_DAY} as day, j.model, m.label as model_label, j.aspect, j.duration_s, j.is_mock, j.feature, j.params, o.mime as output_mime, o.filename as output_filename,
-              j.output_asset_id, j.poster_asset_id, j.store_id, coalesce(c.usd, 0)::numeric(12, 4)::text as cost_usd, coalesce(c.is_final, false) as cost_final, v.verdict, v.fault, v.marked_by,
+              j.output_asset_id, j.poster_asset_id, j.store_id, coalesce(c.usd, 0)::numeric(12, 4)::text as cost_usd, coalesce(c.is_final, false) as cost_final, v.verdict, v.fault, v.featured, v.marked_by,
               exists (select 1 from favorites f where f.job_id = j.id and f.user_id = $6) as favorite
          from jobs j
          join users u on u.id = j.user_id
@@ -91,7 +91,7 @@ export async function GET(request: Request) {
       storeId: r.store_id,
       costUsd: r.cost_usd,
       costFinal: r.cost_final,
-      verdict: r.verdict ? { verdict: r.verdict, fault: r.fault, markedBy: r.marked_by } : null,
+      verdict: r.verdict ? { verdict: r.verdict, fault: r.fault, featured: r.featured, markedBy: r.marked_by } : null,
       favorite: r.favorite,
       canEdit: r.user_id === me.id || me.role === 'admin',
       downloadName: downloadName(r.day, r.creator_name, r.id, r.output_mime.startsWith('image/') ? extensionOf(r.output_filename) : 'mp4'),

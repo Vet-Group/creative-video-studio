@@ -390,6 +390,8 @@ export const verdicts = pgTable(
     verdict: text('verdict', { enum: VERDICTS }).notNull(),
     /** Required for a Fail. */
     fault: text('fault'),
+    /** The "featured" mark: a Pass good enough to show the whole company; Explore model cards pick these first. Still counts as a Pass everywhere. */
+    featured: boolean('featured').notNull().default(false),
     markedBy: text('marked_by')
       .notNull()
       .references(() => users.id, { onDelete: 'restrict' }),
@@ -399,6 +401,7 @@ export const verdicts = pgTable(
   (t) => [
     check('verdicts_verdict_check', sql`${t.verdict} in ('pass', 'fail')`),
     check('verdicts_fault_check', sql`${t.verdict} <> 'fail' or ${t.fault} is not null`),
+    check('verdicts_featured_check', sql`${t.verdict} = 'pass' or not ${t.featured}`),
   ],
 );
 

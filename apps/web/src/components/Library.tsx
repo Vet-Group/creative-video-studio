@@ -45,7 +45,7 @@ function ClipCard({ clip, stores, select, onChange, onDeleted, onOpen }: { clip:
   const image = clip.mediaType === 'image';
   const noun = image ? 'ảnh' : 'clip';
 
-  async function mark(body: { verdict: 'pass' } | { verdict: 'fail'; fault: string }) {
+  async function mark(body: { verdict: 'pass'; featured?: boolean } | { verdict: 'fail'; fault: string }) {
     setProblem('');
     try {
       const r = await api<{ verdict: NonNullable<Clip['verdict']> }>(`/api/jobs/${clip.id}/verdict`, sendJson('PUT', body));
@@ -132,7 +132,9 @@ function ClipCard({ clip, stores, select, onChange, onDeleted, onOpen }: { clip:
         Chi phí thật: ${clip.costUsd}
         {!clip.costFinal && <span className="tag">Tạm tính</span>}
       </p>
-      {clip.verdict && <p>{clip.verdict.verdict === 'pass' ? 'Kết quả: Đạt' : `Kết quả: Không đạt (${faultLabel(clip.verdict.fault)})`}</p>}
+      {clip.verdict && (
+        <p>{clip.verdict.verdict === 'fail' ? `Kết quả: Không đạt (${faultLabel(clip.verdict.fault)})` : clip.verdict.featured ? 'Kết quả: Đạt · Nổi bật' : 'Kết quả: Đạt'}</p>
+      )}
       {stores && (
         <label>
           Cửa hàng
@@ -167,8 +169,12 @@ function ClipCard({ clip, stores, select, onChange, onDeleted, onOpen }: { clip:
         {clip.canEdit && (
           <>
             <span className="verdict-buttons">
-              <button type="button" aria-pressed={clip.verdict?.verdict === 'pass'} onClick={() => void mark({ verdict: 'pass' })}>
+              <button type="button" aria-pressed={clip.verdict?.verdict === 'pass' && !clip.verdict.featured} onClick={() => void mark({ verdict: 'pass' })}>
                 Đạt
+              </button>
+              {/* A Pass worth showing the whole company: Explore model cards show these first. */}
+              <button type="button" aria-pressed={clip.verdict?.featured === true} title={`Đạt và đẹp, nên làm mẫu: ${noun} nổi bật hiện trước trên thẻ mô hình ở Khám phá`} onClick={() => void mark({ verdict: 'pass', featured: true })}>
+                Nổi bật
               </button>
               <button type="button" aria-pressed={failing || clip.verdict?.verdict === 'fail'} onClick={() => setFailing((f) => !f)}>
                 Không đạt

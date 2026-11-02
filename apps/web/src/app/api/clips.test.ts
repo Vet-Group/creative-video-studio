@@ -168,7 +168,7 @@ describe('GET /api/library', () => {
     expect(ids.indexOf(a)).toBeLessThan(ids.indexOf(b)); // newest first
     expect(body.clips.find((c) => c.id === a)).toEqual({
       id: a, creator: { id: alice.id, name: 'Nguyễn Văn Đạt' }, createdAt: '2026-10-22T17:30:00.000Z', modelId: 'fal-test', modelLabel: 'Fal test', ratio: '1:1', durationSec: 8,
-      feature: 'video', mediaType: 'video', resolution: null, isMock: false, videoAssetId: 'lib-a-video', posterAssetId: 'lib-a-poster', storeId: null, costUsd: '1.6000', costFinal: true, verdict: { verdict: 'fail', fault: 'flicker', markedBy: alice.id },
+      feature: 'video', mediaType: 'video', resolution: null, isMock: false, videoAssetId: 'lib-a-video', posterAssetId: 'lib-a-poster', storeId: null, costUsd: '1.6000', costFinal: true, verdict: { verdict: 'fail', fault: 'flicker', featured: false, markedBy: alice.id },
       favorite: false, canEdit: false, downloadName: expect.stringMatching(/^20261023-nguyen-van-dat-lib-a\.mp4$/),
     });
     expect(body.clips.find((c) => c.id === b)).toMatchObject({ isMock: true, costFinal: false, verdict: null, canEdit: true }); // bob is the creator
@@ -361,7 +361,7 @@ describe('PUT /api/jobs/:id/verdict', () => {
     const id = await clip(alice.id);
     const res = await mark(alice.cookie, id, { verdict: 'pass', fault: 'flicker' });
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ verdict: { verdict: 'pass', fault: null, markedBy: alice.id } });
+    expect(await res.json()).toEqual({ verdict: { verdict: 'pass', fault: null, featured: false, markedBy: alice.id } });
     expect(await stored(id)).toEqual({ verdict: 'pass', fault: null, marked_by: alice.id });
 
     for (const fault of ['print_changed', 'off_colour', 'deformed', 'flicker', 'stray_text', 'other']) {
@@ -374,11 +374,32 @@ describe('PUT /api/jobs/:id/verdict', () => {
 
     const log = await audits(`job:${id}`);
     expect(log).toHaveLength(8);
-    expect(log[0]).toEqual({ actor_id: alice.id, action: 'verdict.set', old_value: null, new_value: { verdict: 'pass', fault: null, markedBy: alice.id } });
-    expect(log[1]).toMatchObject({ old_value: { verdict: 'pass', fault: null, markedBy: alice.id }, new_value: { verdict: 'fail', fault: 'print_changed', markedBy: alice.id } });
+    expect(log[0]).toEqual({ actor_id: alice.id, action: 'verdict.set', old_value: null, new_value: { verdict: 'pass', fault: null, featured: false, markedBy: alice.id } });
+    expect(log[1]).toMatchObject({ old_value: { verdict: 'pass', fault: null, featured: false, markedBy: alice.id }, new_value: { verdict: 'fail', fault: 'print_changed', featured: false, markedBy: alice.id } });
     expect(log[7]).toEqual({
-      actor_id: admin.id, action: 'verdict.set', old_value: { verdict: 'fail', fault: 'other', markedBy: alice.id }, new_value: { verdict: 'pass', fault: null, markedBy: admin.id },
+      actor_id: admin.id, action: 'verdict.set', old_value: { verdict: 'fail', fault: 'other', featured: false, markedBy: alice.id }, new_value: { verdict: 'pass', fault: null, featured: false, markedBy: admin.id },
     });
+  });
+
+  test('"Đạt · Nổi bật" is a featured Pass: it still counts as a Pass, is audited, shows in the Library, and a plain Pass or a Fail clears it', async () => {
+    // A model of its own, off, so the model scores of the later tests do not move.
+    await pool.query(`insert into model_configs (id, provider, endpoint, label, ratios, durations_sec, max_images, output_resolution, usd_per_second, sources, enabled) values ('featured-test', 'fal', 'x', 'Featured test', '{9:16}', '{8}', 2, '720p', 0.2, '{}', false)`);
+    const id = await clip(alice.id, { model: 'featured-test' });
+    for (const body of [{ verdict: 'fail', fault: 'flicker', featured: true }, { verdict: 'pass', featured: 'yes' }]) expect((await mark(alice.cookie, id, body)).status, JSON.stringify(body)).toBe(400);
+    expect(await stored(id)).toBeUndefined();
+    const res = await mark(alice.cookie, id, { verdict: 'pass', featured: true });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ verdict: { verdict: 'pass', fault: null, featured: true, markedBy: alice.id } });
+    expect((await pool.query(`select verdict, featured from verdicts where job_id = $1`, [id])).rows[0]).toEqual({ verdict: 'pass', featured: true });
+    expect((await audits(`job:${id}`))[0].new_value).toEqual({ verdict: 'pass', fault: null, featured: true, markedBy: alice.id });
+    const listed = ((await (await GET_LIBRARY(req('/api/library', alice.cookie))).json()) as { clips: { id: string; verdict: unknown }[] }).clips.find((c) => c.id === id);
+    expect(listed?.verdict).toEqual({ verdict: 'pass', fault: null, featured: true, markedBy: alice.id });
+    expect((await mark(alice.cookie, id, { verdict: 'pass' })).status).toBe(200);
+    expect((await pool.query(`select featured from verdicts where job_id = $1`, [id])).rows[0].featured).toBe(false);
+    await mark(alice.cookie, id, { verdict: 'pass', featured: true });
+    expect((await mark(alice.cookie, id, { verdict: 'fail', fault: 'flicker' })).status).toBe(200);
+    expect((await pool.query(`select verdict, featured from verdicts where job_id = $1`, [id])).rows[0]).toEqual({ verdict: 'fail', featured: false });
+    await expect(pool.query(`update verdicts set featured = true where job_id = $1`, [id])).rejects.toThrow(/verdicts_featured_check/); // the database refuses a featured Fail too
   });
 });
 
@@ -648,6 +669,8 @@ describe('bestClips', () => {
     expect((await bestClips()).get('best-video')).toEqual({ video: `/api/assets/${newer}-video/content`, poster: `/api/assets/${newer}-poster/content` });
     await pool.query('insert into favorites (user_id, job_id) values ($1, $2)', [bob.id, old]);
     expect((await bestClips()).get('best-video')?.video).toBe(`/api/assets/${old}-video/content`); // the favourite outranks the newer one
+    await pool.query(`update verdicts set featured = true where job_id = $1`, [newer]);
+    expect((await bestClips()).get('best-video')?.video).toBe(`/api/assets/${newer}-video/content`); // a featured Pass outranks favourites
 
     const image = await clip(alice.id, { model: 'best-image' });
     await pool.query(`update jobs set feature = 'image' where id = $1`, [image]);

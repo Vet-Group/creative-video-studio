@@ -42,7 +42,7 @@ test('a mock image job made through the API is an image card under "Tất cả �
   await expect.poll(() => image.evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0);
   await expect(card.locator('video')).toHaveCount(0);
   await expect(card.getByRole('link', { name: 'Dùng lại' })).toHaveAttribute('href', /^\/image-generation\?reuse=/); // an image reopens Image Generation
-  for (const name of ['Tải xuống', 'Đạt', 'Không đạt', 'Xóa']) await expect(card.getByRole('button', { name, exact: true })).toBeVisible();
+  for (const name of ['Tải xuống', 'Đạt', 'Nổi bật', 'Không đạt', 'Xóa']) await expect(card.getByRole('button', { name, exact: true })).toBeVisible();
 
   // The Library is company-wide, so other specs' clips may be listed; this member's image must be in none of the other kinds.
   for (const name of ['Tất cả video', 'Thử đồ', 'Tạo video', 'Marketing Studio', 'Ứng dụng']) {

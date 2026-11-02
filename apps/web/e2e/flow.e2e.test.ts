@@ -84,10 +84,14 @@ test('a Member runs a mock job and works through the Library', async ({ page }) 
   await page.getByLabel('Mô tả chuyển động').fill('Slow turn of the shirt.');
   await expect(page.getByRole('button', { name: 'Tạo video' })).toBeEnabled();
 
-  // Pass, then Fail, which needs a fault.
+  // Pass, then a featured Pass ("Đạt · Nổi bật"), then Fail, which needs a fault.
   await page.getByRole('link', { name: 'Thư viện' }).first().click();
   await card.getByRole('button', { name: 'Đạt', exact: true }).click();
-  await expect(card.getByText('Kết quả: Đạt')).toBeVisible();
+  await expect(card.getByText('Kết quả: Đạt', { exact: true })).toBeVisible();
+  await card.getByRole('button', { name: 'Nổi bật', exact: true }).click();
+  await expect(card.getByText('Kết quả: Đạt · Nổi bật', { exact: true })).toBeVisible();
+  await expect(card.getByRole('button', { name: 'Nổi bật', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(card.getByRole('button', { name: 'Đạt', exact: true })).toHaveAttribute('aria-pressed', 'false');
   await card.getByRole('button', { name: 'Không đạt', exact: true }).click();
   await expect(card.getByRole('button', { name: 'Xác nhận không đạt' })).toBeDisabled();
   await card.getByLabel('Lỗi gặp phải').selectOption({ label: 'Sai màu' });
