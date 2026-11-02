@@ -1,6 +1,6 @@
 'use client';
 // The frame of every signed-in page: navigation, the "My jobs" tray and the toasts.
-import Link, { useLinkStatus } from 'next/link';
+import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { createContext, type ReactNode, useContext, useEffect, useRef, useState } from 'react';
 import { api, errorText, sendJson, type JobStatus, type TrayJob } from '@/lib/api';
@@ -311,17 +311,10 @@ function Toasts() {
   );
 }
 
-// The sidebar in the live order; later features slot in where the live sidebar has them.
-/** A small spinner on the sidebar link being opened, so a click on a slow link shows at once that the page is on its way (the CSS waits 150 ms, so fast pages never flash it). */
-function NavPending() {
-  const { pending } = useLinkStatus();
-  return <span className={pending ? 'nav-pending is-pending' : 'nav-pending'} aria-hidden="true" />;
-}
-
 /**
  * A thin bar along the top while any link of the app opens another page (Explore cards, Dùng lại, Dùng mẫu này, the sidebar too), shown after 150 ms.
- * The App Router has no navigation events: a plain click on a same-site link to another address starts it, the address changing (Next sets it when
- * the new page shows) or Back ends it, and it gives up after 15 s in case a link handled the click without navigating.
+ * The App Router has no navigation events: a plain click on a same-site link to another address starts it, the new page showing (Next then sets the
+ * address and a new history.state, also when a redirect lands back on the current address) or Back ends it, and it gives up after 15 s in case a link handled the click without navigating.
  */
 function NavProgress() {
   const [on, setOn] = useState(false);
@@ -339,10 +332,12 @@ function NavProgress() {
       if (!a || (a.target && a.target !== '_self') || a.hasAttribute('download') || a.origin !== location.origin) return;
       if (a.pathname === location.pathname && a.search === location.search) return; // the same page, or only its #fragment
       const from = location.href;
+      const state = history.state;
       stop();
       setOn(true);
       const watch = () => {
-        if (location.href !== from) return stop();
+        // The router writes a new history.state each time a page commits, even when a redirect lands on the address already shown.
+        if (location.href !== from || history.state !== state) return stop();
         poll = requestAnimationFrame(watch);
       };
       poll = requestAnimationFrame(watch);
@@ -359,6 +354,7 @@ function NavProgress() {
   return <div className="nav-progress" data-on={on} aria-hidden="true" />;
 }
 
+// The sidebar in the live order; later features slot in where the live sidebar has them.
 const NAV: { href: string; text: string; icon: IconName; badge?: string }[] = [
   { href: '/explore', text: 'Khám phá', icon: 'home' },
   { href: '/try-on', text: 'Thử đồ', icon: 'tryon' },
@@ -409,7 +405,6 @@ export function Shell({ userId, userName, isAdmin, account, initialCollapsed, ch
       </span>
       <span className="nav-label">{text}</span>
       {badge && <span className="nav-badge" aria-hidden="true">{badge}</span>}
-      <NavPending />
     </Link>
   );
   function toggleRail() {

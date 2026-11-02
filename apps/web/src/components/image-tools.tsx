@@ -3,7 +3,7 @@
 // the tab strip and the gallery of the company's outputs.
 import { type DragEvent, type KeyboardEvent, useEffect, useId, useRef, useState } from 'react';
 import Link from 'next/link';
-import { api, type Clip, sendJson } from '@/lib/api';
+import { api, ApiError, type Clip, sendJson } from '@/lib/api';
 import { dropRefillQuery, exampleFrom, refillFrom, reuseHref } from '@/lib/reuse';
 import { NARROW, useMediaQuery, WIDE } from '@/lib/use-media-query';
 import { numberedSamples } from '@/lib/examples';
@@ -53,6 +53,8 @@ export const THINKING_LABEL: Record<string, string> = { minimal: 'Tối thiểu'
 export const UPLOAD_ERROR = 'Không tải ảnh lên được. Ảnh phải là JPEG, PNG hoặc WebP, tối đa 10 MB mỗi ảnh.';
 /** The 429 of POST /api/assets/samples: the hourly cap on new pictures. */
 export const COPY_LIMIT_ERROR = 'Bạn đã thêm quá nhiều ảnh trong một giờ. Hãy thử lại sau.';
+/** The text for a failed sample copy: the hourly cap has its own, anything else is `text`. */
+export const copyError = (e: unknown, text: string) => (e instanceof ApiError && e.status === 429 ? COPY_LIMIT_ERROR : text);
 
 /** The enabled image models of a feature, from /api/image-models; `models` is null while loading and `failed` once the request has failed. */
 export function useImageModels(feature: string): { models: ImageModel[] | null; failed: boolean } {
@@ -105,7 +107,7 @@ export interface ReuseJob {
 
 /** Refill (`reuse` is a job's or a saved template's API path, lib/reuse.ts): reads it and hands it to `fill` when it is of `feature`; `fail` otherwise. Everything stays editable.
  * Returns Recreate in place: the same refill from another path, the URL unchanged, as Fash's Recreate. */
-export function useReuse(reuse: string | undefined, feature: string, fill: (j: Omit<ReuseJob, 'images'> & { images: Img[] }) => void, fail: () => void): (from: string) => void {
+export function useReuse(reuse: string | undefined, feature: string, fill: (j: Omit<ReuseJob, 'images'> & { images: Img[] }) => void, fail: (e?: unknown) => void): (from: string) => void {
   const recreated = useRecreated();
   const { loading } = useJobs();
   const [source, setSource] = useState(reuse ? { from: reuse } : null); // a new object each time, so the same path refills again

@@ -15,7 +15,7 @@ import { AudioSwitch } from './AudioSwitch';
 import { CardMedia } from './CardMedia';
 import { EnhanceToggle } from './EnhanceToggle';
 import { Icon } from './Icon';
-import { copySamples, photoImg, Slot, UPLOAD_ERROR, uploadImages } from './image-tools';
+import { copyError, copySamples, photoImg, Slot, UPLOAD_ERROR, uploadImages } from './image-tools';
 import { FormContext, type Photo, Tap, useApplier, useHasHistory, useJobs, useRecreated } from './jobs';
 import { Modal } from './Modal';
 import { ModelPicker } from './ModelPicker';
@@ -219,7 +219,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
         recreated(reuse);
         dropRefillQuery();
       })
-      .catch(() => setError('Không tìm thấy clip để dùng lại.'))
+      .catch((e) => setError(copyError(e, 'Không tìm thấy clip để dùng lại.')))
       .finally(() => setReady(true))
       .finally(loading('Đang tải ảnh...'));
     return () => {
@@ -394,8 +394,8 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
       const img = await photoImg(p).finally(loading('Đang tải ảnh...'));
       setImages((cur) => (cur.length < maxImages ? [...cur, img] : cur));
       notify('Đã thêm ảnh tham chiếu');
-    } catch {
-      setError('Không tải lên được ảnh.');
+    } catch (e) {
+      setError(copyError(e, 'Không tải lên được ảnh.'));
     }
   }
   /** A detail's words as the free prompt (a preset has none of its own text). */

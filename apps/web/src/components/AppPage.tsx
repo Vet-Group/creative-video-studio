@@ -17,7 +17,7 @@ import { useSamples } from '@/lib/use-samples';
 import { About } from './About';
 import { CardMedia, LoopVideo } from './CardMedia';
 import { Icon, type IconName } from './Icon';
-import { type Img, RATIO_LABEL, Slot, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
+import { copyError, type Img, RATIO_LABEL, Slot, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
 import { FormContext, useJobs } from './jobs';
 import { type ModelOption, ModelPicker } from './ModelPicker';
 import { PromptTools } from './PromptTools';
@@ -133,7 +133,7 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
       if (j.ratio) pick.setRatio(j.ratio);
       if (j.resolution) pick.setResolution(j.resolution);
     },
-    () => setError('Không tìm thấy ảnh để dùng lại.'),
+    (e) => setError(copyError(e, 'Không tìm thấy ảnh để dùng lại.')),
   );
   // The swaps add the member's text to their fixed instruction, so it shares the model's limit with it.
   const fixed = app.prompt === 'optional' ? FEATURE_PROMPTS[app.feature]!.length + 2 : 0;
@@ -391,7 +391,7 @@ function MotionForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
       setPrompt(j.prompt ?? '');
       if (j.modelId) setModelId(j.modelId);
     },
-    () => setError('Không tìm thấy video để dùng lại.'),
+    (e) => setError(copyError(e, 'Không tìm thấy video để dùng lại.')),
   );
   const chosen = list?.models.find((m) => m.id === modelId) ?? list?.models.find((m) => m.id === list.best) ?? list?.models[0];
   const reason = (recall.answered ? null : 'Đang tải cài đặt đã dùng...') ?? motionReason({ image: image.length > 0, videoMs: video?.durationMs ?? null, model: list === null ? null : chosen, failed: list?.failed ?? false }) ?? promptTooLong(chosen, prompt.trim().length);
