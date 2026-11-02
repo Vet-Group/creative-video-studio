@@ -35,4 +35,6 @@ test('a phone can play and download a clip', async ({ page }) => {
   await page.getByRole('button', { name: 'Danh sách', exact: true }).click();
   await expect(card.locator('.lib-thumb')).toBeVisible();
   expect(await tooSmall()).toEqual([]);
+  // The 44 px targets overlap the row's padding, so a list row stays short on a touch phone.
+  expect((await card.boundingBox())!.height).toBeLessThanOrEqual(104);
 });
