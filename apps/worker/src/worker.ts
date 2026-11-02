@@ -79,7 +79,7 @@ export interface RunningWorker {
 const log = (what: string, e: unknown) => console.error(`worker: ${what}:`, e instanceof Error ? e.message : e);
 
 /** The input whose frame the result keeps, by the order the pages send (lib/apps.ts slots): Try On's person and Background Changer's photo come first, a swap's target and Jewelry Try-On's wearer last. */
-const KEPT_INPUT: Partial<Record<string, 0 | -1>> = { try_on: 0, background_changer: 0, character_swap: -1, model_swap: -1, face_swap: -1, jewelry_try_on: -1 };
+const KEPT_INPUT: Partial<Record<string, 0 | -1>> = { try_on: 0, background_changer: 0, character_swap: -1, model_swap: -1, face_swap: -1, jewelry_try_on: -1, lingerie_try_on: -1 };
 
 function sleep(ms: number, signal: AbortSignal): Promise<void> {
   return new Promise((resolve) => {

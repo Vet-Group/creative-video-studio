@@ -2068,6 +2068,78 @@ export const APP_ABOUT: Record<string, AboutPage> = {
       },
     ],
   },
+  'lingerie-try-on': {
+    title: 'Thử đồ lót bằng AI',
+    sections: [
+      {
+        title: 'Thử đồ lót bằng AI là gì?',
+        blocks: [
+          'Thử đồ lót là ứng dụng mặc đồ lót trong ảnh sản phẩm lên người mẫu trong một ảnh khác và trả về ảnh người mẫu đang mặc nó. Bạn tải ảnh đồ lót, chọn hoặc tải ảnh người mẫu rồi bấm Chạy. Khuôn mặt, dáng, màu da và bối cảnh giữ nguyên; chỉ bộ đồ lót được thay vào.',
+          `Ứng dụng giúp đội bán hàng online có ảnh đồ lót trên người mẫu từ ảnh sản phẩm chụp một lần, không cần buổi chụp riêng. ${APP_COST}`,
+        ],
+      },
+      {
+        title: 'Thử đồ lót trong 3 bước',
+        lead: 'Tải đồ lót, chọn người mẫu, rồi bấm Chạy.',
+        blocks: [
+          {
+            steps: [
+              { title: 'Tải đồ lót', text: 'Thêm một hoặc nhiều ảnh đồ lót vào ô Đồ lót, ví dụ áo ngực và quần của cùng một bộ. Ảnh chụp rõ trên nền trơn giúp AI đọc đúng từng món.' },
+              { title: 'Chọn người mẫu', text: 'Chọn một người mẫu có sẵn ở ô Người mẫu, hoặc tải ảnh người mẫu của bạn lên. Có thể thêm mô tả ngắn và chọn tỉ lệ, độ phân giải.' },
+              { title: 'Chạy', text: 'Bấm Chạy. AI mặc bộ đồ lót lên người mẫu, giữ chất liệu và màu sắc; ảnh mới nằm trong tab Lịch sử.' },
+            ],
+          },
+        ],
+      },
+      {
+        title: 'Thử được những gì?',
+        lead: 'Áo ngực, bralette, bodysuit, set, babydoll, corset, đồ ngủ và đồ mặc nhà.',
+        blocks: [
+          {
+            cols: 3,
+            cards: [
+              { title: 'Áo ngực và bralette', text: 'Giữ nguyên dáng cup, dây và khoá của ảnh sản phẩm.' },
+              { title: 'Bodysuit và corset', text: 'Giữ đường cắt, đường may và các chi tiết tạo form.' },
+              { title: 'Set nhiều món', text: 'Thêm áo và quần của cùng một bộ để người mẫu mặc cả bộ trong một ảnh.' },
+              { title: 'Babydoll và đồ ngủ', text: 'Giữ độ rủ của vải và các chi tiết bèo, nơ.' },
+              { title: 'Đồ mặc nhà', text: 'Áo và quần mặc nhà được mặc lên người mẫu với đúng màu và hoạ tiết.' },
+              { title: 'Ren, lưới và satin', text: 'Hoạ tiết ren, độ trong của lưới và độ bóng của satin được giữ như trong ảnh sản phẩm.' },
+            ],
+          },
+        ],
+      },
+      {
+        title: 'Mẹo để ảnh thật hơn',
+        blocks: [
+          {
+            cards: [
+              { title: 'Nền trơn', text: 'Chụp từng món trên nền trơn, đủ sáng và thẳng góc để AI đọc rõ chất liệu.' },
+              { title: 'Người mẫu đứng thẳng', text: 'Ảnh người mẫu rõ thân người, không bị che bởi tay hay đồ vật, cho kết quả vừa vặn hơn.' },
+              { title: 'Độ phân giải cao', text: 'Chọn 2K khi cần giữ rõ hoạ tiết ren và đường may.' },
+            ],
+          },
+        ],
+      },
+      {
+        title: 'Giới hạn',
+        blocks: [
+          'Đây là ảnh xem trước, không phải công cụ đo cỡ: kết quả cho thấy bộ đồ trông thế nào trên người mẫu, không cho biết cỡ cần mua. Hoạ tiết ren rất mảnh có thể mờ đi, nhất là ở 1K. Chỉ dùng ảnh sản phẩm công ty có quyền, và ảnh người khi người đó đã đồng ý.',
+        ],
+      },
+      {
+        title: 'Câu hỏi thường gặp',
+        blocks: [
+          {
+            faq: [
+              ['Thử đồ lót bằng AI hoạt động thế nào?', 'AI đọc ảnh đồ lót và mặc nó lên người mẫu trong ảnh còn lại. Nó giữ chất liệu, màu sắc và chi tiết của sản phẩm; khuôn mặt, dáng, màu da và bối cảnh giữ nguyên.'],
+              ['Có thể thêm yêu cầu riêng không?', 'Có. Phần mô tả tuỳ chọn được thêm vào hướng dẫn cố định của ứng dụng, ví dụ màu hoặc cách mặc.'],
+              ['Một lần chạy tốn bao nhiêu?', `${APP_COST} Chi phí thật nằm trên ảnh trong Thư viện.`],
+            ],
+          },
+        ],
+      },
+    ],
+  },
   'face-swap': {
     title: 'Đổi khuôn mặt chỉ với một lần chạy',
     sections: [

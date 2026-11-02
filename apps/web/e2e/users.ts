@@ -18,6 +18,7 @@ export const USERS = {
   // Named so that no earlier spec's "E2E Member 1" text match picks them up.
   appsa: { email: 'appsa@e2e.test', name: 'E2E Apps A', role: 'member' },
   appsb: { email: 'appsb@e2e.test', name: 'E2E Apps B', role: 'member' },
+  stocka: { email: 'stocka@e2e.test', name: 'E2E Stock A', role: 'member' },
   appsc: { email: 'appsc@e2e.test', name: 'E2E Apps C', role: 'member' },
   mkta: { email: 'mkta@e2e.test', name: 'E2E Mkt A', role: 'member' },
   mktb: { email: 'mktb@e2e.test', name: 'E2E Mkt B', role: 'member' },

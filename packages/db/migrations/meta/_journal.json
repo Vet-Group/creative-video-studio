@@ -330,6 +330,13 @@
       "when": 1794394958036,
       "tag": "0046_must_change_password",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1794394959036,
+      "tag": "0047_lingerie_try_on",
+      "breakpoints": true
     }
   ]
 }

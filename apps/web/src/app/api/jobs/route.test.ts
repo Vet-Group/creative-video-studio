@@ -600,7 +600,7 @@ describe('POST /api/jobs for an image feature', () => {
   describe('the image apps', () => {
     const appModels: [string, string, number, string][] = [
       ['app-char', 'character_swap', 2, 'auto'], ['app-model', 'model_swap', 2, 'auto'], ['app-bg', 'background_changer', 2, 'auto'], ['app-reframe', 'reframe', 1, '1:1,16:9'],
-      ['app-up', 'image_upscale', 1, 'auto'], ['app-face', 'face_swap', 2, 'auto'], ['app-rm', 'background_remover', 1, 'auto'], ['app-jewel', 'jewelry_try_on', 4, 'auto'],
+      ['app-up', 'image_upscale', 1, 'auto'], ['app-face', 'face_swap', 2, 'auto'], ['app-rm', 'background_remover', 1, 'auto'], ['app-jewel', 'jewelry_try_on', 4, 'auto'], ['app-lingerie', 'lingerie_try_on', 4, 'auto'],
     ];
     beforeAll(async () => {
       for (const [id, feature, max, ratios] of appModels) {
@@ -650,6 +650,14 @@ describe('POST /api/jobs for an image feature', () => {
       expect((await app('jewelry_try_on', 5)).error).toMatch(/number of images/);
       expect((await app('jewelry_try_on', 2)).status).toBe(201);
       expect(await app('jewelry_try_on', 4, { params: { resolution: '2K' } })).toMatchObject({ status: 201, job: { feature: 'jewelry_try_on', prompt: expect.stringMatching(/^Put the jewelry from every image but the last on the person in the last image/), params: { resolution: '2K' } } });
+    });
+
+    test('Lingerie Try-On takes the pieces and then the model, and appends the text of the member to its fixed instruction', async () => {
+      expect((await app('lingerie_try_on', 1)).error).toBe('lingerie_try_on needs 2 images');
+      expect((await app('lingerie_try_on', 5)).error).toMatch(/number of images/);
+      expect(await app('lingerie_try_on', 3)).toMatchObject({ status: 201, job: { feature: 'lingerie_try_on', prompt: expect.stringMatching(/^Dress the person in the last image in the lingerie pieces[^.]*.[^]*watermarks$/) } });
+      const own = await app('lingerie_try_on', 2, { prompt: 'black lace set', params: { resolution: '2K' } });
+      expect(own).toMatchObject({ status: 201, job: { prompt: expect.stringMatching(/watermarks. black lace set$/), params: { resolution: '2K' } } });
     });
 
     test('Reframe takes one of its ratios and a default prompt', async () => {

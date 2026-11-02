@@ -2,16 +2,16 @@ import { FEATURE_PROMPTS } from '@cvs/core/models';
 import { FEATURES } from '@cvs/db';
 import { describe, expect, it } from 'vitest';
 import { APP_ABOUT } from './about-content';
-import { APPS, appBySlug, appInputs, appReason, type AppDraft, filterApps, motionReason, slotMax, splitImages } from './apps';
+import { APPS, appBySlug, appInputs, appReason, type AppDraft, filterApps, motionReason, slotMax, splitImages, stockGroups } from './apps';
 
 const img = (id: string) => ({ id });
 const draft = (images: string[][], prompt = '', maxImages = 2): AppDraft => ({ images: images.map((l) => l.map(img)), prompt, models: [{ maxImages }], failed: false });
 const reason = (slug: string, images: string[][], prompt?: string, maxImages?: number) => appReason(appBySlug(slug)!, draft(images, prompt, maxImages));
 
 describe('the app list', () => {
-  it('has ten apps with unique slugs, known features and (for the built image apps) a default prompt', () => {
-    expect(APPS).toHaveLength(10);
-    expect(new Set(APPS.map((a) => a.slug)).size).toBe(10);
+  it('has eleven apps with unique slugs, known features and (for the built image apps) a default prompt', () => {
+    expect(APPS).toHaveLength(11);
+    expect(new Set(APPS.map((a) => a.slug)).size).toBe(11);
     for (const a of APPS) {
       expect(FEATURES as readonly string[]).toContain(a.feature);
       if (!a.soon && a.feature !== 'motion_control' && a.feature !== 'media_optimizer') expect(FEATURE_PROMPTS).toHaveProperty(a.feature);
@@ -26,12 +26,39 @@ describe('the app list', () => {
   });
 
   it('gives the swaps and Face Swap two required slots, and the others the slots of the reference', () => {
-    for (const slug of ['character-swap', 'model-swap', 'jewelry-try-on', 'face-swap']) expect(appBySlug(slug)!.slots.map((s) => !!s.optional)).toEqual([false, false]);
+    for (const slug of ['character-swap', 'model-swap', 'jewelry-try-on', 'lingerie-try-on', 'face-swap']) expect(appBySlug(slug)!.slots.map((s) => !!s.optional)).toEqual([false, false]);
     expect(appBySlug('background-changer')!.slots.map((s) => !!s.optional)).toEqual([false, true]);
     for (const slug of ['reframe', 'image-upscale', 'background-remover']) expect(appBySlug(slug)!.slots).toHaveLength(1);
     expect(appBySlug('reframe')).toMatchObject({ ratio: true });
     expect(appBySlug('image-upscale')).toMatchObject({ resolution: true });
     expect(appBySlug('jewelry-try-on')).toMatchObject({ resolution: true });
+    expect(appBySlug('lingerie-try-on')).toMatchObject({ feature: 'lingerie_try_on', prompt: 'optional', ratio: true, resolution: true });
+  });
+});
+
+describe('Lingerie Try-On pieces', () => {
+  const lingerie = appBySlug('lingerie-try-on')!;
+  it('takes the pieces first and the model last, as Jewelry Try-On does', () => {
+    expect([slotMax(lingerie, 0, 4), slotMax(lingerie, 1, 4)]).toEqual([3, 1]);
+    expect(reason('lingerie-try-on', [['a', 'b'], ['p']], '', 4)).toBeNull();
+    expect(reason('lingerie-try-on', [[], ['p']], '', 4)).toBe('Tải lên ảnh: Đồ lót.');
+    expect(appInputs(lingerie, { images: [[img('a')], [img('p')]], prompt: ' ren đen ' })).toEqual({ assetIds: ['a', 'p'], prompt: 'ren đen' });
+    expect(splitImages(lingerie, ['a', 'b', 'p'])).toEqual([['a', 'b'], ['p']]);
+  });
+});
+
+describe('stockGroups', () => {
+  const have = new Set(['lingerie-model-m10.jpg', 'lingerie-model-m9.jpg', 'lingerie-model-m2.jpg.bak', 'jewelry-template-ear-02.jpg', 'jewelry-template-ear-01.jpg', 'jewelry-template-hand-01.png', 'app-lingerie-try-on.jpg']);
+  it('lists the uploaded photos of each group in number order and leaves out the groups with none', () => {
+    expect(stockGroups(appBySlug('lingerie-try-on')!.slots[1]!, have)).toEqual([{ label: undefined, names: ['lingerie-model-m9.jpg', 'lingerie-model-m10.jpg'] }]);
+    expect(stockGroups(appBySlug('jewelry-try-on')!.slots[1]!, have)).toEqual([
+      { label: 'Tai', names: ['jewelry-template-ear-01.jpg', 'jewelry-template-ear-02.jpg'] },
+      { label: 'Tay', names: ['jewelry-template-hand-01.png'] },
+    ]);
+  });
+  it('offers nothing for a slot without stock photos or when no sample exists', () => {
+    expect(stockGroups(appBySlug('lingerie-try-on')!.slots[0]!, have)).toEqual([]);
+    expect(stockGroups(appBySlug('lingerie-try-on')!.slots[1]!, new Set())).toEqual([]);
   });
 });
 
@@ -62,9 +89,9 @@ describe('the app About tabs', () => {
 
 describe('filterApps', () => {
   it('filters by category and by name or description, ignoring accents and case', () => {
-    expect(filterApps('all', '')).toHaveLength(10);
-    expect(filterApps('all', '').at(-1)!.slug).toBe('jewelry-try-on'); // ours comes after the live apps, which keep their order
-    expect(filterApps('fashion', '').map((a) => a.slug)).toEqual(['character-swap', 'model-swap', 'face-swap', 'jewelry-try-on']);
+    expect(filterApps('all', '')).toHaveLength(11);
+    expect(filterApps('all', '').at(-1)!.slug).toBe('lingerie-try-on'); // ours comes after the live apps, which keep their order
+    expect(filterApps('fashion', '').map((a) => a.slug)).toEqual(['character-swap', 'model-swap', 'face-swap', 'jewelry-try-on', 'lingerie-try-on']);
     expect(filterApps('video', '').map((a) => a.slug)).toEqual(['motion-control']);
     expect(filterApps('all', 'DOI NEN').map((a) => a.slug)).toEqual(['background-changer']);
     expect(filterApps('all', 'xoá nền').map((a) => a.slug)).toContain('background-remover');

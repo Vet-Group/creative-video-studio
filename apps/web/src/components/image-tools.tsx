@@ -325,7 +325,7 @@ export function SizeSlider({ size, last = 2, onChange }: { size: number; last?: 
 type PhotoTile = { key: string; src: string; label: string; pick: () => void };
 
 /** A photo dialog of a slot, as on Fash (Marketing's model and product, Try On's model, garments and background): the photos to pick, 4 per row of 3:4 portraits. The product dialog has a subtitle and an upload tile first; a stock dialog's own-photo upload is a link in the header. A tile that opens a deeper list (a model's poses, a category) sets the dialog again after it closes; `onBack` returns. */
-export function PhotoDialog({ open, title, sub, tiles, busy, onFile, onClose, onBack, mine }: { open: boolean; title: string; sub?: string; tiles: PhotoTile[]; busy: boolean; onFile: (files: File[]) => void; onClose: () => void; onBack?: () => void; mine?: { title: string; tiles: PhotoTile[] } }) {
+export function PhotoDialog({ open, title, sub, tiles, busy, onFile, onClose, onBack, mine, groups = [] }: { open: boolean; title: string; sub?: string; tiles: PhotoTile[]; busy: boolean; onFile: (files: File[]) => void; onClose: () => void; onBack?: () => void; mine?: { title: string; tiles: PhotoTile[] }; groups?: { title: string; tiles: PhotoTile[] }[] }) {
   const tile = (t: PhotoTile) => (
     <button key={t.key} type="button" aria-label={t.label} disabled={busy} onClick={() => (onClose(), t.pick())}>
       {open && <img src={t.src} alt="" />}
@@ -358,12 +358,15 @@ export function PhotoDialog({ open, title, sub, tiles, busy, onFile, onClose, on
         )}
         {tiles.map(tile)}
       </div>
-      {/* The member's own photos of this slot, under their own heading, as Fash's My Models. */}
-      {mine && mine.tiles.length > 0 && (
-        <section aria-label={mine.title}>
-          <h3 className="photo-mine">{mine.title}</h3>
-          <div className="choice-grid model-grid">{mine.tiles.map(tile)}</div>
-        </section>
+      {/* Headed groups of photos (Jewelry Try-On's templates), then the member's own photos of this slot under their own heading, as Fash's My Models. */}
+      {[...groups, ...(mine ? [mine] : [])].map(
+        (g) =>
+          g.tiles.length > 0 && (
+            <section key={g.title} aria-label={g.title}>
+              <h3 className="photo-mine">{g.title}</h3>
+              <div className="choice-grid model-grid">{g.tiles.map(tile)}</div>
+            </section>
+          ),
       )}
     </Modal>
   );
