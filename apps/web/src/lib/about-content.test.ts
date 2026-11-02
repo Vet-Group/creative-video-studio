@@ -107,6 +107,26 @@ describe('withLiveSpecs', () => {
     expect(withLiveSpecs(kling, models.slice(5))).toBe(kling);
   });
 
+  it('names variants that differ only by resolution once, with their level count', () => {
+    const minimax = ABOUT.create.sections.flatMap((s) => s.blocks ?? []).flatMap((b) => (typeof b === 'object' && 'cards' in b ? b.cards : [])).find((c) => c.title === 'Minimax')!;
+    const r5 = ['9:16', '1:1', '16:9', '4:3', '3:4'];
+    const card = withLiveSpecs(minimax, [
+      m('minimax-h3-max', 'Minimax H3 Max', range(5, 15), '768p', ['9:16', '1:1'], 1),
+      m('minimax-h3-max-1080p', 'Minimax H3 Max 1080P', range(5, 15), '1080p', ['9:16', '1:1'], 1),
+      m('minimax-h3-max-480p', 'Minimax H3 Max 480P', range(5, 15), '480p', ['9:16', '1:1'], 1),
+      m('minimax-h3-max-reference', 'Minimax H3 Max Reference', range(5, 15), '768p', r5, 9),
+      m('minimax-h3-max-reference-1080p', 'Minimax H3 Max Reference 1080P', range(5, 15), '1080p', r5, 9),
+      m('minimax-h3-max-reference-480p', 'Minimax H3 Max Reference 480P', range(5, 15), '480p', r5, 9),
+      m('minimax-hailuo-2.3-pro', 'Minimax Hailuo 2.3 Pro', [6], '1080p', ['9:16', '1:1'], 1),
+    ]);
+    expect(card.specs).toEqual([
+      'Thời lượng: 6 giây (Hailuo 2.3 Pro) · 5–15 giây (các bản khác)',
+      'Độ phân giải: 768p (H3 Max, H3 Max Reference) · 480p (H3 Max 480P, H3 Max Reference 480P) · 1080p (các bản khác)',
+      'Tỉ lệ: 9:16, 1:1, 16:9, 4:3, 3:4 (H3 Max Reference ở 3 mức) · 9:16, 1:1 (các bản khác)',
+      'Ảnh: tối đa 9 (H3 Max Reference ở 3 mức) · 1 (các bản khác)',
+    ]);
+  });
+
   it('gives each video family card a prefix that matches its own models only', () => {
     const fams = ABOUT.create.sections.flatMap((s) => s.blocks ?? []).flatMap((b) => (typeof b === 'object' && 'cards' in b ? b.cards : [])).filter((c) => c.family);
     expect(fams.map((c) => c.family)).toEqual(['kling-', 'seedance-', 'flux-3', 'veo-', 'gemini-omni-flash', 'grok-imagine', 'wan-', 'minimax-']);
