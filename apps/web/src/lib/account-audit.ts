@@ -69,18 +69,21 @@ export function accountAuditHooks(q: Queryable) {
 /**
  * hooks.after for the passkey plugin, which writes its rows with adapter.create, out of reach of databaseHooks.account. Adding and deleting
  * a passkey are audited like linking and unlinking a method, with provider 'passkey'. Both endpoints run in the caller's own session.
- * shortcut: same out-of-transaction write as accountAuditHooks; deleting a passkey does not end the sessions it opened (unlike an unlink).
+ * Deleting one also ends the user's other sessions, as an unlink does, since a lost passkey may have opened them.
+ * shortcut: same out-of-transaction write as accountAuditHooks.
  */
 export function passkeyAuditHook(q: Queryable) {
   return createAuthMiddleware(async (ctx) => {
     const done = ctx.context.returned;
-    const userId = ctx.context.session?.user.id;
-    if (!done || done instanceof APIError || !userId) return;
+    const session = ctx.context.session;
+    if (!done || done instanceof APIError || !session) return;
+    const userId = session.user.id;
     const target = `user:${userId}`;
     if (ctx.path === '/passkey/verify-registration') {
       await audit(q, { actorId: userId, action: 'account.link', target, newValue: { provider: 'passkey', accountId: (done as { id: string }).id, email: null } });
     } else if (ctx.path === '/passkey/delete-passkey') {
-      await audit(q, { actorId: userId, action: 'account.unlink', target, oldValue: { provider: 'passkey', accountId: (ctx.body as { id: string }).id, email: null } });
+      await q.query('delete from sessions where user_id = $1 and id <> $2', [userId, session.session.id]);
+      await audit(q, { actorId: userId, action: 'account.unlink', target, oldValue: { provider: 'passkey', accountId: (ctx.body as { id: string }).id, email: null }, newValue: { sessionsRevoked: true } });
     }
   });
 }
