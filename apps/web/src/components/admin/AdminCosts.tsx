@@ -1,7 +1,10 @@
 'use client';
 import { useState } from 'react';
+import { Icon } from '@/components/Icon';
 import { api, sendJson } from '@/lib/api';
 import { useAction, useFetch } from '@/lib/admin-ui';
+import { Budget } from './AdminOverview';
+import { Empty, PageHead } from './PageHead';
 
 interface Money {
   usd: string;
@@ -60,39 +63,38 @@ function Breakdown({ title, groups, label }: { title: string; groups: Group[]; l
   return (
     <section aria-label={title}>
       <h2>{title}</h2>
-      <div className="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th scope="col">Tên</th>
-              <th scope="col" className="num">USD</th>
-              <th scope="col" className="num">VND</th>
-              <th scope="col" className="num">Trong đó: clip Không đạt (USD)</th>
-              <th scope="col" className="num">Trong đó: job lỗi hoặc quá giờ (USD)</th>
-              <th scope="col" className="num">Clip đạt</th>
-              <th scope="col" className="num">Chi phí mỗi clip đạt (USD)</th>
-            </tr>
-          </thead>
-          <tbody>
-            {groups.map((g) => (
-              <tr key={g.id}>
-                <td>{label(g)}</td>
-                <td className="num"><Usd m={g} /></td>
-                <td className="num">{vnd(g.vnd)}</td>
-                <td className="num"><Usd m={g.failedByVerdict} withVnd /></td>
-                <td className="num"><Usd m={g.failedByStatus} withVnd /></td>
-                <td className="num">{g.acceptedClips}</td>
-                <td className="num">{g.costPerAcceptedUsd ?? '—'}</td>
-              </tr>
-            ))}
-            {groups.length === 0 && (
+      {groups.length === 0 ? (
+        <Empty title="Chưa có chi phí nào trong tháng này." />
+      ) : (
+        <div className="table-wrap">
+          <table className="sticky-first">
+            <thead>
               <tr>
-                <td colSpan={7} className="muted">Chưa có chi phí nào trong tháng này.</td>
+                <th scope="col">Tên</th>
+                <th scope="col" className="num">USD</th>
+                <th scope="col" className="num">VND</th>
+                <th scope="col" className="num">Trong đó: clip Không đạt (USD)</th>
+                <th scope="col" className="num">Trong đó: job lỗi hoặc quá giờ (USD)</th>
+                <th scope="col" className="num">Clip đạt</th>
+                <th scope="col" className="num">Chi phí mỗi clip đạt (USD)</th>
               </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {groups.map((g) => (
+                <tr key={g.id}>
+                  <td>{label(g)}</td>
+                  <td className="num"><Usd m={g} /></td>
+                  <td className="num">{vnd(g.vnd)}</td>
+                  <td className="num"><Usd m={g.failedByVerdict} withVnd /></td>
+                  <td className="num"><Usd m={g.failedByStatus} withVnd /></td>
+                  <td className="num">{g.acceptedClips}</td>
+                  <td className="num">{g.costPerAcceptedUsd ?? '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </section>
   );
 }
@@ -143,16 +145,30 @@ function CostsBody({ data, reload }: { data: Costs; reload: () => void }) {
     }
   }
 
+  const breakdowns: [string, Group[], (g: Group) => string][] = [
+    ['Theo người dùng', data.byUser, (g) => `${g.name ?? g.id} (${g.email ?? ''})`],
+    ['Theo nhóm', data.byTeam, (g) => g.name ?? g.id],
+    ['Theo cửa hàng', data.byStore, (g) => g.name ?? g.id],
+    ['Theo mục', data.byFeature, (g) => g.name ?? g.id],
+  ];
+
   return (
     <>
-      <p>
-        Tổng chi phí: <strong><Usd m={data.total} withVnd /></strong>
-        {data.provisional && <span className="tag">Tạm tính</span>}
-      </p>
-      <p className="muted">
-        Số liệu tính đến bút toán #{data.asOf} (as_of). Ngân sách tháng cho video: ${data.capUsage.usd} trên ${data.capUsage.monthlyCapUsd}. Ngân sách tháng cho ảnh
-        và ứng dụng: ${data.featuresCapUsage.usd} trên ${data.featuresCapUsage.monthlyCapUsd}.
-      </p>
+      <div className="kpis" role="group" aria-label="Tổng tháng">
+        <div className="kpi" role="group" aria-label="Tổng chi phí">
+          <p className="kpi-label">
+            Tổng chi phí tháng {month}
+            {data.provisional && <span className="tag">Tạm tính</span>}
+          </p>
+          <p className="kpi-value">${data.total.usdDisplay}</p>
+          <p className="kpi-sub">
+            ${data.total.usd} · {vnd(data.total.vnd)}
+          </p>
+        </div>
+        <Budget title="Ngân sách video" used={data.capUsage.usd} cap={data.capUsage.monthlyCapUsd} />
+        <Budget title="Ngân sách ảnh và ứng dụng" used={data.featuresCapUsage.usd} cap={data.featuresCapUsage.monthlyCapUsd} />
+      </div>
+      <p className="muted">Số liệu tính đến bút toán #{data.asOf} (as_of).</p>
       {data.featureCaps.some((c) => c.level !== null) && (
         <ul className="warn" aria-label="Cảnh báo hạn mức theo mục">
           {data.featureCaps
@@ -181,25 +197,29 @@ function CostsBody({ data, reload }: { data: Costs; reload: () => void }) {
       </div>
       {data.rateVndPerUsd === null && <p className="warn">Tháng này chưa có tỉ giá nên cột VND để trống.</p>}
 
-      <Breakdown title="Theo người dùng" groups={data.byUser} label={(g) => `${g.name ?? g.id} (${g.email ?? ''})`} />
-      <Breakdown title="Theo nhóm" groups={data.byTeam} label={(g) => g.name ?? g.id} />
-      <Breakdown title="Theo cửa hàng" groups={data.byStore} label={(g) => g.name ?? g.id} />
-      <Breakdown title="Theo mục" groups={data.byFeature} label={(g) => g.name ?? g.id} />
+      {breakdowns.every(([, groups]) => groups.length === 0) ? (
+        <section aria-label="Chi phí theo người dùng, nhóm, cửa hàng và mục">
+          <h2>Chi tiết chi phí</h2>
+          <Empty title={`Chưa có chi phí nào trong tháng ${month}.`}>Khi có job chạy, chi phí hiện ở đây theo người dùng, nhóm, cửa hàng và mục.</Empty>
+        </section>
+      ) : (
+        breakdowns.map(([title, groups, label]) => <Breakdown key={title} title={title} groups={groups} label={label} />)
+      )}
 
-      <section aria-label="Chi phí chung">
-        <h2>Chi phí chung</h2>
-        <p>
-          <Usd m={data.shared} withVnd />
-        </p>
-        <ul>
-          {Object.entries(data.shared.byKind).map(([kind, usd]) => (
-            <li key={kind}>
-              {KIND_LABEL[kind] ?? kind}: ${usd}
-            </li>
-          ))}
-        </ul>
-        <fieldset>
-          <legend>Thêm điều chỉnh tay</legend>
+      <div className="cost-cards">
+        <section className="panel" aria-label="Chi phí chung">
+          <h2>Chi phí chung</h2>
+          <p className="panel-figure">
+            <Usd m={data.shared} withVnd />
+          </p>
+          <ul className="lines">
+            {Object.entries(data.shared.byKind).map(([kind, usd]) => (
+              <li key={kind}>
+                {KIND_LABEL[kind] ?? kind}: ${usd}
+              </li>
+            ))}
+          </ul>
+          <h3>Thêm điều chỉnh tay</h3>
           <div className="row">
             <label>
               Số tiền điều chỉnh (USD, có thể âm)
@@ -213,26 +233,17 @@ function CostsBody({ data, reload }: { data: Costs; reload: () => void }) {
               Thêm điều chỉnh
             </button>
           </div>
-        </fieldset>
-      </section>
+        </section>
 
-      <section aria-label="Hóa đơn nhà cung cấp">
-        <h2>Hóa đơn nhà cung cấp</h2>
-        <p className="muted">Nhập tổng hóa đơn của tháng; hệ thống ghi phần chênh lệch với sổ cái. Chênh lệch quá 5% hóa đơn được tô đỏ.</p>
-        <ul>
-          {PROVIDERS.map((p) => (
-            <InvoiceForm key={p} provider={p} month={month} invoice={data.invoices.find((i) => i.provider === p)} run={run} />
-          ))}
-        </ul>
-      </section>
-
-      <div className="actions">
-        <a className="button" href={`/api/admin/costs/detail?month=${month}&asOf=${data.asOf}`} download>
-          Tải CSV chi tiết sổ cái
-        </a>
-        <a className="button" href={`/api/admin/costs/summary?month=${month}&asOf=${data.asOf}`} download>
-          Tải CSV tổng hợp theo nhóm và cửa hàng
-        </a>
+        <section className="panel" aria-label="Hóa đơn nhà cung cấp">
+          <h2>Hóa đơn nhà cung cấp</h2>
+          <p className="muted">Nhập tổng hóa đơn của tháng; hệ thống ghi phần chênh lệch với sổ cái. Lệch quá 5% được tô đỏ.</p>
+          <ul className="invoices">
+            {PROVIDERS.map((p) => (
+              <InvoiceForm key={p} provider={p} month={month} invoice={data.invoices.find((i) => i.provider === p)} run={run} />
+            ))}
+          </ul>
+        </section>
       </div>
     </>
   );
@@ -241,16 +252,34 @@ function CostsBody({ data, reload }: { data: Costs; reload: () => void }) {
 export function AdminCosts() {
   const [month, setMonth] = useState('');
   const { data, failed, reload } = useFetch<Costs>(`/api/admin/costs${month ? `?month=${month}` : ''}`, { onTabReturn: true });
-  if (!data) return failed ? <p className="error">Không tải được chi phí.</p> : <p role="status">Đang tải...</p>;
   return (
     <section aria-labelledby="costs-title">
-      <h1 id="costs-title">Chi phí</h1>
-      <label>
-        Tháng
-        <input type="month" value={month || data.month} onChange={(e) => e.target.value && setMonth(e.target.value)} />
-      </label>
-      {failed && <p className="error">Không tải được tháng này, đang hiện tháng trước đó.</p>}
-      <CostsBody key={`${data.month}-${data.asOf}`} data={data} reload={reload} />
+      <PageHead id="costs-title" title="Chi phí" lead="Chi phí theo tháng (giờ Việt Nam): ngân sách, chi tiết theo người, nhóm, cửa hàng, tỉ giá và hóa đơn nhà cung cấp.">
+        {data && (
+          <>
+            <label>
+              Tháng
+              <input type="month" value={month || data.month} onChange={(e) => e.target.value && setMonth(e.target.value)} />
+            </label>
+            <a className="button" href={`/api/admin/costs/detail?month=${data.month}&asOf=${data.asOf}`} download>
+              <Icon name="download" />
+              Tải CSV chi tiết sổ cái
+            </a>
+            <a className="button" href={`/api/admin/costs/summary?month=${data.month}&asOf=${data.asOf}`} download>
+              <Icon name="download" />
+              Tải CSV tổng hợp theo nhóm và cửa hàng
+            </a>
+          </>
+        )}
+      </PageHead>
+      {!data ? (
+        failed ? <p className="error">Không tải được chi phí.</p> : <p role="status">Đang tải...</p>
+      ) : (
+        <>
+          {failed && <p className="error">Không tải được tháng này, đang hiện tháng trước đó.</p>}
+          <CostsBody key={`${data.month}-${data.asOf}`} data={data} reload={reload} />
+        </>
+      )}
     </section>
   );
 }

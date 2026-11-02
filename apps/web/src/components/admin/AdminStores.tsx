@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { api, sendJson } from '@/lib/api';
 import { useAction, useFetch } from '@/lib/admin-ui';
+import { Empty, PageHead } from './PageHead';
 
 interface Store {
   id: string;
@@ -22,14 +23,14 @@ function StoreRow({ store, run }: { store: Store; run: ReturnType<typeof useActi
   }
   return (
     <tr>
-      <td>
+      <td data-label="Tên cửa hàng">
         <input aria-label={`Tên cửa hàng ${store.name}`} value={name} onChange={(e) => setName(e.target.value)} />
         {store.hidden && <span className="tag">Đã ẩn</span>}
       </td>
-      <td>
+      <td data-label="Mã cửa hàng">
         <input aria-label={`Mã cửa hàng của ${store.name}`} value={code} onChange={(e) => setCode(e.target.value)} />
       </td>
-      <td>
+      <td data-label="Thao tác">
         <div className="actions">
           <button type="button" disabled={!name.trim() || !code.trim()} onClick={save}>
             Lưu
@@ -49,7 +50,14 @@ export function AdminStores() {
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
 
-  if (!data) return failed ? <p className="error">Không tải được danh sách cửa hàng.</p> : <p role="status">Đang tải...</p>;
+  const head = <PageHead id="stores-title" title="Cửa hàng" lead="Cửa hàng/thương hiệu gắn với mỗi clip; mã cửa hàng là store_id của POD Studio." />;
+  if (!data)
+    return (
+      <section aria-labelledby="stores-title">
+        {head}
+        {failed ? <p className="error">Không tải được danh sách cửa hàng.</p> : <p role="status">Đang tải...</p>}
+      </section>
+    );
 
   async function create() {
     const ok = await run(() => api('/api/admin/stores', sendJson('POST', { name, code })), 'Không tạo được cửa hàng.');
@@ -61,7 +69,7 @@ export function AdminStores() {
 
   return (
     <section aria-labelledby="stores-title">
-      <h1 id="stores-title">Cửa hàng</h1>
+      {head}
       <fieldset>
         <legend>Tạo cửa hàng</legend>
         <div className="row">
@@ -77,29 +85,33 @@ export function AdminStores() {
             Tạo cửa hàng
           </button>
         </div>
-        <p className="muted">Cửa hàng không bao giờ bị xóa. Mã phải là duy nhất. Đổi mã khi cửa hàng đã có chi phí thì chi phí cũ vẫn thuộc cửa hàng này; báo cáo và CSV từ giờ dùng mã mới.</p>
+        <p className="muted">Cửa hàng không bao giờ bị xóa và mã là duy nhất. Đổi mã thì chi phí cũ vẫn thuộc cửa hàng này; báo cáo và CSV từ giờ dùng mã mới.</p>
       </fieldset>
       {problem && (
         <p className="error" role="alert">
           {problem}
         </p>
       )}
-      <div className="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th scope="col">Tên cửa hàng</th>
-              <th scope="col">Mã cửa hàng</th>
-              <th scope="col">Thao tác</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.stores.map((s) => (
-              <StoreRow key={s.id} store={s} run={run} />
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {data.stores.length === 0 ? (
+        <Empty title="Chưa có cửa hàng nào">Tạo cửa hàng đầu tiên ở trên.</Empty>
+      ) : (
+        <div className="table-wrap">
+          <table className="mobile-records">
+            <thead>
+              <tr>
+                <th scope="col">Tên cửa hàng</th>
+                <th scope="col">Mã cửa hàng</th>
+                <th scope="col">Thao tác</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.stores.map((s) => (
+                <StoreRow key={s.id} store={s} run={run} />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </section>
   );
 }

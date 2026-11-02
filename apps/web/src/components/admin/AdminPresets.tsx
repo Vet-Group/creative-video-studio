@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { api, sendJson } from '@/lib/api';
 import { useAction, useFetch } from '@/lib/admin-ui';
+import { Empty, PageHead } from './PageHead';
 
 interface Preset {
   id: string;
@@ -49,34 +50,38 @@ function PresetRow({ preset, run }: { preset: Preset; run: ReturnType<typeof use
 export function AdminPresets() {
   const { data, failed, reload } = useFetch<{ presets: Preset[] }>('/api/admin/presets');
   const { problem, run } = useAction(reload);
-  if (!data) return failed ? <p className="error">Không tải được danh sách mẫu.</p> : <p role="status">Đang tải...</p>;
   return (
     <section aria-labelledby="presets-title">
-      <h1 id="presets-title">Mẫu chuyển động</h1>
-      <p className="muted">Mô tả nên viết bằng tiếng Anh vì mô hình hiểu tốt nhất tiếng Anh.</p>
+      <PageHead id="presets-title" title="Mẫu chuyển động" lead="Các mẫu người dùng chọn ở trang Tạo video. Mô tả nên viết bằng tiếng Anh vì mô hình hiểu tốt nhất tiếng Anh." />
       {problem && (
         <p className="error" role="alert">
           {problem}
         </p>
       )}
-      <div className="table-wrap">
-        <table className="mobile-records">
-          <thead>
-            <tr>
-              <th scope="col">Tên mẫu</th>
-              <th scope="col" className="wide">Mô tả chuyển động</th>
-              <th scope="col">Thứ tự</th>
-              <th scope="col">Trạng thái</th>
-              <th scope="col">Thao tác</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.presets.map((p) => (
-              <PresetRow key={p.id} preset={p} run={run} />
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {!data ? (
+        failed ? <p className="error">Không tải được danh sách mẫu.</p> : <p role="status">Đang tải...</p>
+      ) : data.presets.length === 0 ? (
+        <Empty title="Chưa có mẫu chuyển động nào" />
+      ) : (
+        <div className="table-wrap">
+          <table className="mobile-records">
+            <thead>
+              <tr>
+                <th scope="col">Tên mẫu</th>
+                <th scope="col" className="wide">Mô tả chuyển động</th>
+                <th scope="col">Thứ tự</th>
+                <th scope="col">Trạng thái</th>
+                <th scope="col">Thao tác</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.presets.map((p) => (
+                <PresetRow key={p.id} preset={p} run={run} />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </section>
   );
 }

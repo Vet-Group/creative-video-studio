@@ -19,10 +19,11 @@ const BOM = [0xef, 0xbb, 0xbf];
 test('an Admin sets up a team, a store and a user, then reconciles the month costs', async ({ page }) => {
   await signIn(page, 'admin');
   await page.getByRole('link', { name: 'Quản trị', exact: true }).click();
-  await expect(page).toHaveURL(/\/admin\/users$/);
+  await expect(page).toHaveURL(/\/admin\/overview$/);
   // The tab bar marks the page shown, and the Admin pages give the tray's width to their tables.
-  await expect(nav(page, 'Người dùng')).toHaveAttribute('aria-current', 'page');
+  await expect(nav(page, 'Tổng quan')).toHaveAttribute('aria-current', 'page');
   await expect(page.getByRole('complementary', { name: 'Job của tôi' })).toHaveCount(0);
+  await expect(page.getByText('Ngân sách video', { exact: true })).toBeVisible();
 
   // Teams: create one with a cost-centre code.
   await nav(page, 'Nhóm').click();
@@ -48,8 +49,9 @@ test('an Admin sets up a team, a store and a user, then reconciles the month cos
   await page.getByLabel('Tên hiển thị').fill('New E2E User');
   await page.getByLabel('Nhóm của người dùng mới').selectOption({ label: 'Team E2E' });
   await page.getByRole('button', { name: 'Thêm người dùng', exact: true }).click();
-  await expect(page.getByLabel('Nhóm của new.user@e2e.test').locator('option:checked')).toHaveText('Team E2E');
-  await expect(page.getByRole('row', { name: /new\.user@e2e\.test/ })).toContainText('Hoạt động');
+  const newRow = page.getByRole('row', { name: /new\.user@e2e\.test/ });
+  await expect(newRow).toContainText('Team E2E');
+  await expect(newRow).toContainText('Hoạt động');
   // The search narrows the table by name or email, accents and case ignored, and shows every row again once cleared.
   const search = page.getByRole('searchbox', { name: 'Tìm theo tên hoặc email' });
   const rows = page.getByRole('row').filter({ has: page.getByRole('cell') });
@@ -57,22 +59,30 @@ test('an Admin sets up a team, a store and a user, then reconciles the month cos
   await search.fill('NEW E2E');
   await expect(rows).toHaveCount(1);
   await expect(rows.first()).toContainText('Hoạt động');
-  await expect(page.getByLabel('Email của new.user@e2e.test')).toBeVisible();
+  await expect(newRow).toBeVisible();
   await search.fill('admin@e2e');
   await expect(rows).toHaveCount(1);
-  await expect(page.getByLabel('Email của new.user@e2e.test')).toBeHidden();
+  await expect(newRow).toHaveCount(0);
   await search.fill('khong-co-ai');
   await expect(rows).toHaveCount(0);
   await expect(page.getByText('Không có người dùng nào khớp “khong-co-ai”.')).toBeVisible();
   await search.fill('');
   await expect(rows).toHaveCount(all);
-  // The temporary password field shows only after its button is pressed.
-  const newRow = page.getByRole('row').filter({ has: page.getByLabel('Email của new.user@e2e.test') });
-  await expect(page.getByLabel('Mật khẩu tạm của new.user@e2e.test')).toHaveCount(0);
-  await newRow.getByRole('button', { name: 'Đặt mật khẩu tạm' }).click();
-  await page.getByLabel('Mật khẩu tạm của new.user@e2e.test').fill('Temp-pass-123');
-  await Promise.all([page.waitForResponse((r) => r.url().includes('/api/admin/users/') && r.ok()), newRow.getByRole('button', { name: 'Lưu mật khẩu' }).click()]);
-  await expect(page.getByLabel('Mật khẩu tạm của new.user@e2e.test')).toHaveCount(0);
+  // Editing happens in a dialog opened from the row: the team and role, then a temporary password whose field shows only after its button is pressed.
+  await newRow.getByRole('button', { name: 'Sửa new.user@e2e.test' }).click();
+  const editor = page.getByRole('dialog', { name: 'Sửa người dùng new.user@e2e.test' });
+  await expect(editor.getByLabel('Nhóm của new.user@e2e.test').locator('option:checked')).toHaveText('Team E2E');
+  await expect(editor.getByLabel('Mật khẩu tạm của new.user@e2e.test')).toHaveCount(0);
+  await editor.getByRole('button', { name: 'Đặt mật khẩu tạm' }).click();
+  await editor.getByLabel('Mật khẩu tạm của new.user@e2e.test').fill('Temp-pass-123');
+  await Promise.all([page.waitForResponse((r) => r.url().includes('/api/admin/users/') && r.ok()), editor.getByRole('button', { name: 'Lưu mật khẩu' }).click()]);
+  await expect(editor.getByLabel('Mật khẩu tạm của new.user@e2e.test')).toHaveCount(0);
+  // A name change is saved from the dialog and shows in the row once it closes.
+  await editor.getByLabel('Tên của new.user@e2e.test').fill('Renamed E2E User');
+  await Promise.all([page.waitForResponse((r) => r.url().includes('/api/admin/users/') && r.ok()), editor.getByRole('button', { name: 'Lưu tên, email' }).click()]);
+  await editor.getByRole('button', { name: 'Đóng' }).click();
+  await expect(editor).toBeHidden();
+  await expect(newRow).toContainText('Renamed E2E User');
 
   // Costs: the VND rate, an invoice and its difference, a manual adjustment.
   await nav(page, 'Chi phí').click();
@@ -99,8 +109,10 @@ test('an Admin sets up a team, a store and a user, then reconciles the month cos
   const shared = page.getByRole('region', { name: 'Chi phí chung' });
   await expect(shared).toContainText('Chênh lệch hóa đơn: $12.5000');
   await expect(shared).toContainText('Điều chỉnh tay: $-1.5000');
-  // The total shows the 2-decimal value with the exact 4-decimal USD and the VND beside it, not in a tooltip.
-  await expect(page.getByText('Tổng chi phí:')).toContainText('$11.00 ($11.0000 · 275.000');
+  // The total card shows the 2-decimal value with the exact 4-decimal USD and the VND under it, not in a tooltip.
+  const total = page.getByRole('group', { name: 'Tổng chi phí' });
+  await expect(total.locator('.kpi-value')).toHaveText('$11.00');
+  await expect(total).toContainText('$11.0000 · 275.000');
 
   // Both CSVs: file name, a byte order mark and the fixed header columns.
   const detail = await download(page, 'Tải CSV chi tiết sổ cái', `cvs-ledger-detail-${month}.csv`);
@@ -253,6 +265,26 @@ test('the audit reads a switched-off model as enabled: true → false', async ({
   const latest = page.getByRole('row').filter({ hasText: 'mock-e2e-square' }).first();
   await expect(latest).toContainText('enabled: true → false');
   await expect(latest).not.toContainText('{');
+});
+
+test('a saved Settings change clears the save bar and says it was saved', async ({ page }) => {
+  await signIn(page, 'admin');
+  await page.goto('/admin/settings');
+  const budget = page.getByLabel('Ngân sách tháng cho video (USD)');
+  const before = await budget.inputValue();
+  const bar = page.getByRole('region', { name: 'Lưu cài đặt' });
+  await expect(bar).toHaveCount(0);
+  try {
+    // The server answers 250.0000 for 250: the same amount, so nothing is left unsaved.
+    await budget.fill('250');
+    await expect(bar).toContainText('Có thay đổi chưa lưu.');
+    await Promise.all([page.waitForResponse((r) => r.url().endsWith('/api/admin/settings') && r.request().method() === 'PUT' && r.ok()), bar.getByRole('button', { name: 'Lưu cài đặt' }).click()]);
+    await expect(page.getByRole('status').filter({ hasText: 'Đã lưu cài đặt.' })).toBeVisible();
+    await expect(bar).toHaveCount(0);
+    await expect(budget).toHaveValue('250');
+  } finally {
+    expect((await page.request.put('/api/admin/settings', { data: { monthlyCapUsd: before } })).ok()).toBe(true);
+  }
 });
 
 test('an Admin can edit presets and read audit details at 390px without horizontal scrolling', async ({ page }) => {
