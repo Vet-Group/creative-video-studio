@@ -51,6 +51,8 @@ export const RATIO_LABEL: Record<string, string> = { auto: 'Tự động' };
 /** Fash's Minimal, Medium and High. */
 export const THINKING_LABEL: Record<string, string> = { minimal: 'Tối thiểu', medium: 'Vừa', high: 'Cao' };
 export const UPLOAD_ERROR = 'Không tải ảnh lên được. Ảnh phải là JPEG, PNG hoặc WebP, tối đa 10 MB mỗi ảnh.';
+/** The 429 of POST /api/assets/samples: the hourly cap on new pictures. */
+export const COPY_LIMIT_ERROR = 'Bạn đã thêm quá nhiều ảnh trong một giờ. Hãy thử lại sau.';
 
 /** The enabled image models of a feature, from /api/image-models; `models` is null while loading and `failed` once the request has failed. */
 export function useImageModels(feature: string): { models: ImageModel[] | null; failed: boolean } {
@@ -136,13 +138,6 @@ export function useReuse(reuse: string | undefined, feature: string, fill: (j: O
 /** The most files one POST /api/assets takes (MAX_FILES in lib/assets.ts); a larger pick (Advanced takes 7) goes up in batches. */
 const PER_UPLOAD = 4;
 
-/** A sample picture as a file the user picked, to upload as an input. */
-export async function sampleFile(name: string): Promise<File> {
-  const res = await fetch(`/api/samples/${name}`);
-  if (!res.ok) throw new Error(`sample ${name}: ${res.status}`);
-  return new File([await res.blob()], name, { type: res.headers.get('content-type') ?? '' });
-}
-
 /** Sample pictures as the member's own inputs, copied on the server (POST /api/assets/samples) rather than downloaded and uploaded back. */
 export async function copySamples(names: string[]): Promise<Img[]> {
   const out: Img[] = [];
@@ -169,20 +164,16 @@ export async function uploadImages(files: File[]): Promise<Img[]> {
 
 /**
  * One labelled upload slot: its thumbnails with a remove button each, and a tile that opens the file picker until the slot is full.
- * `samples` (sample names, lib/samples.ts) show while the slot is empty, as on the live Try On; a click uploads that sample like a file the user picked.
+ * `samples` (sample names, lib/samples.ts) show while the slot is empty, as on the live Try On; a click hands the name to `onSample`, which copies it on the server.
  * `icon` is the empty slot's icon: a picture by default, a plus on Advanced's wide slot, as on the live page.
  */
-export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRemove, samples = [], icon = 'image', onBrowse }: { label: string; empty: string; inputLabel: string; images: Img[]; max: number; busy: boolean; onAdd: (files: File[]) => void; onRemove: (id: string) => void; samples?: string[]; icon?: IconName; onBrowse?: () => void }) {
+export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRemove, samples = [], onSample, icon = 'image', onBrowse }: { label: string; empty: string; inputLabel: string; images: Img[]; max: number; busy: boolean; onAdd: (files: File[]) => void; onRemove: (id: string) => void; samples?: string[]; onSample?: (name: string) => void; icon?: IconName; onBrowse?: () => void }) {
   const hydrated = useHydrated();
   const input = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
   const labelId = useId();
   const full = images.length >= max;
   const offer = images.length === 0 ? samples : [];
-  async function pickSample(name: string) {
-    const file = await sampleFile(name).catch(() => null);
-    if (file) onAdd([file]);
-  }
   function onDrop(e: DragEvent) {
     e.preventDefault();
     setOver(false);
@@ -229,7 +220,7 @@ export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRem
           <ul className="slot-samples" aria-label={`${label}: ảnh mẫu`}>
             {offer.map((name, i) => (
               <li key={name}>
-                <button type="button" aria-label={`Dùng ảnh mẫu ${i + 1} cho ${label}`} disabled={!hydrated || busy} onClick={() => void pickSample(name)}>
+                <button type="button" aria-label={`Dùng ảnh mẫu ${i + 1} cho ${label}`} disabled={!hydrated || busy} onClick={() => onSample?.(name)}>
                   <img src={`/api/samples/${name}`} alt="" />
                 </button>
               </li>
