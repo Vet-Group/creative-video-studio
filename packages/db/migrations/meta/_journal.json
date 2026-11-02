@@ -316,6 +316,13 @@
       "when": 1794394956036,
       "tag": "0044_passkeys",
       "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1794394957036,
+      "tag": "0045_verdict_featured",
+      "breakpoints": true
     }
   ]
 }

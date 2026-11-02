@@ -75,7 +75,8 @@ export interface Clip {
   storeId: string | null;
   costUsd: string;
   costFinal: boolean;
-  verdict: { verdict: 'pass' | 'fail'; fault: string | null; markedBy: string } | null;
+  /** `featured`: a Pass shown first on Explore. */
+  verdict: { verdict: 'pass' | 'fail'; fault: string | null; featured: boolean; markedBy: string } | null;
   /** In the caller's own favourites. */
   favorite: boolean;
   canEdit: boolean;

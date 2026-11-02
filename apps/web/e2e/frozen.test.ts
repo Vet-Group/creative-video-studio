@@ -21,7 +21,7 @@ const clip = (n: number, ratio: '9:16' | '1:1', verdict: boolean) => ({
   storeId: null,
   costUsd: '0.0000',
   costFinal: true,
-  verdict: verdict ? { verdict: 'pass', fault: null, markedBy: 'frozen-user' } : null,
+  verdict: verdict ? { verdict: 'pass', fault: null, featured: false, markedBy: 'frozen-user' } : null,
   canEdit: true,
   downloadName: `2026102${n}-e2e-member-5-0000000${n}.mp4`,
 });

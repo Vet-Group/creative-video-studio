@@ -1,0 +1,2 @@
+ALTER TABLE "verdicts" ADD COLUMN "featured" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE "verdicts" ADD CONSTRAINT "verdicts_featured_check" CHECK ("verdicts"."verdict" = 'pass' or not "verdicts"."featured");
