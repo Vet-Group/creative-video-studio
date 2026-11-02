@@ -6,10 +6,13 @@ vi.mock('@/lib/auth', () => ({ pool: { query: vi.fn(async () => ({ rows: [] })) 
 vi.mock('@/lib/model-scores', () => ({ modelStats: vi.fn(async () => new Map()), rank: () => ({}), scoreOf: () => ({ score: 0 }) }));
 vi.mock('@/lib/samples', () => ({ listSamples: vi.fn(async () => []) }));
 vi.mock('@/lib/clips', () => ({ bestClips: vi.fn(async () => new Map()) }));
+vi.mock('@/lib/current-user', () => ({ currentUser: vi.fn(async () => ({ mustChangePassword: false })) }));
+vi.mock('next/navigation', () => ({ redirect: vi.fn((to: string) => { throw new Error(`redirect ${to}`); }) }));
 vi.mock('@/components/CardMedia', () => ({ CardMedia: ({ poster, video }: { poster: string; video: string }) => <img src={poster} data-video={video} alt="" /> }));
 
 import { pool } from '@/lib/auth';
 import { bestClips } from '@/lib/clips';
+import { currentUser } from '@/lib/current-user';
 import { listSamples } from '@/lib/samples';
 import ExplorePage from './page';
 
@@ -77,4 +80,11 @@ test("a model's best Library clip replaces its sample, and a model with a clip b
   expect(model('flux-3')).toContain('src="/api/samples/model-flux-3.jpg"'); // a clip without a poster keeps the sample still
   expect(model('flux-3')).toContain('data-video="/api/assets/f/content"');
   expect([...html.matchAll(/href="\/create\?model=([^"]+)"/g)].map((m) => m[1])).toEqual(['veo-3.1', 'flux-3', 'kling-2.6']);
+});
+
+test('a user who must change an Admin-set password is sent to the change page, as the layout does not rerun on a client navigation', async () => {
+  vi.mocked(currentUser).mockResolvedValueOnce({ mustChangePassword: true } as Awaited<ReturnType<typeof currentUser>>);
+  vi.mocked(pool.query).mockClear();
+  await expect(ExplorePage()).rejects.toThrow('redirect /account/password');
+  expect(pool.query).not.toHaveBeenCalled();
 });

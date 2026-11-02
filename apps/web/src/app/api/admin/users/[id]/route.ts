@@ -1,12 +1,10 @@
 import { type AuditEntry, audit } from '@cvs/core/audit';
-import { withTransaction } from '@cvs/core/ledger';
+import { type Queryable, withTransaction } from '@cvs/core/ledger';
+import { PASSWORD_LENGTH } from '@/lib/account-security';
 import { type RouteContext } from '@/lib/assets';
 import { auth, pool } from '@/lib/auth';
 import { authFailure, bad, readBody } from '@/lib/admin';
 import { guard } from '@/lib/session';
-
-/** better-auth's default password length limits (see lib/auth.ts, which does not change them). */
-const PASSWORD_LENGTH = { min: 8, max: 128 };
 
 /**
  * Admin: change one user. Any of `name`, `email` (unique; a first Google or Lark sign-in links by this address), `role` (member|admin),
@@ -42,13 +40,13 @@ export async function PATCH(request: Request, { params }: RouteContext) {
   // The change and its audit row share a transaction: `apply` (a better-auth call on its own connection) failing rolls the audit row back.
   // The users row is not locked, because better-auth updates it from another connection and would wait for us; an advisory lock
   // serialises Admins changing the same user instead, so the old value read here is the one the change replaces.
-  const change = (entry: (old: { role: string; banned: boolean }) => Omit<AuditEntry, 'actorId' | 'target'> | null, apply: () => Promise<unknown>) =>
+  const change = (entry: (old: { role: string; banned: boolean }) => Omit<AuditEntry, 'actorId' | 'target'> | null, apply: (tx: Queryable) => Promise<unknown>) =>
     withTransaction(pool, async (tx) => {
       await tx.query('select pg_advisory_xact_lock(hashtext($1))', [target]);
       const e = entry((await tx.query('select role, banned from users where id = $1', [id])).rows[0]);
       if (!e) return;
       await audit(tx, { actorId, target, ...e });
-      await apply();
+      await apply(tx);
     });
 
   try {
@@ -90,7 +88,11 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     if (temporaryPassword !== undefined) {
       await change(
         () => ({ action: 'user.password_set', newValue: { temporary: true } }),
-        () => auth.api.setUserPassword({ headers: request.headers, body: { userId: id, newPassword: temporaryPassword as string } }),
+        async (tx) => {
+          await auth.api.setUserPassword({ headers: request.headers, body: { userId: id, newPassword: temporaryPassword as string } });
+          // After better-auth's write, which would wait on this row lock; the user must replace the password at the next sign-in.
+          await tx.query('update users set must_change_password = true, updated_at = now() where id = $1', [id]);
+        },
       );
     }
   } catch (e) {

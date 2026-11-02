@@ -323,6 +323,13 @@
       "when": 1794394957036,
       "tag": "0045_verdict_featured",
       "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1794394958036,
+      "tag": "0046_must_change_password",
+      "breakpoints": true
     }
   ]
 }

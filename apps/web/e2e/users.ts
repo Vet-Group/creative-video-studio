@@ -63,6 +63,10 @@ export const USERS = {
   cvxr: { email: 'cvxr@e2e.test', name: 'E2E Create Extras Reuse', role: 'member' }, // its end frame and audio refilled from a template and from History
   famsa: { email: 'famsa@e2e.test', name: 'E2E Families A', role: 'member' }, // model-families.e2e
   passa: { email: 'passa@e2e.test', name: 'E2E Passkey A', role: 'member' }, // passkey.e2e
+  // account-security.e2e: a password change, a forced change of an Admin's temporary password and the sessions list.
+  seca: { email: 'seca@e2e.test', name: 'E2E Security A', role: 'member' },
+  secb: { email: 'secb@e2e.test', name: 'E2E Security B', role: 'member' },
+  secc: { email: 'secc@e2e.test', name: 'E2E Security C', role: 'member' },
   admin: { email: 'admin@e2e.test', name: 'E2E Admin', role: 'admin' },
 } as const;
 

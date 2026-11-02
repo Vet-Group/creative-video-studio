@@ -6,10 +6,12 @@ const handlers = toNextJsHandler(auth);
 /**
  * The admin plugin's own HTTP endpoints (remove-user, set-role, ban-user, ...) would let an Admin session skip the audit log, the team
  * rule and "users are never deleted". The Admin routes call `auth.api` directly, so every path under /api/auth/admin is closed.
+ * /list-sessions is closed too: it hands every session token to the page; /api/me/sessions lists them without. /get-access-token,
+ * /refresh-token and /account-info are closed: they hand out the Google or Lark tokens, which outlive a password change.
  */
 function closed(request: Request): boolean {
   try {
-    return /^\/api\/auth\/+admin(\/|$)/i.test(decodeURIComponent(new URL(request.url).pathname));
+    return /^\/api\/auth\/+(admin(\/|$)|(list-sessions|get-access-token|refresh-token|account-info)\/*$)/i.test(decodeURIComponent(new URL(request.url).pathname));
   } catch {
     return true;
   }

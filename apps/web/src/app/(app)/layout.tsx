@@ -11,6 +11,7 @@ import { userMethods } from '@/lib/user-methods';
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const user = await currentUser();
   if (!user) redirect(loginFor((await headers()).get('x-cvs-path'))); // set by src/proxy.ts
+  if (user.mustChangePassword) redirect('/account/password'); // an Admin's temporary password opens nothing else
   const isAdmin = user.role === 'admin';
   const [methods, profile] = await Promise.all([
     userMethods(pool, user.id),

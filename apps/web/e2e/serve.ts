@@ -70,6 +70,7 @@ await pool.query(
 await pool.query(`insert into stores (id, name, code) values ('store-e2e', 'E2E Shop', 'E2E-SEED')`);
 // Every spec runs jobs; the daily clip cap is not what is under test here.
 await pool.query('update settings set member_daily_clip_cap = 1000 where id = 1');
+// Straight through better-auth, not POST /api/admin/users, so must_change_password stays false and the specs sign in to the app itself.
 for (const u of Object.values(USERS)) await auth.api.createUser({ body: { email: u.email, name: u.name, password: PASSWORD, role: u.role, data: { emailVerified: true } } });
 await pool.end();
 
