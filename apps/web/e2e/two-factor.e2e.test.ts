@@ -147,11 +147,20 @@ test('an Admin turns off the 2FA of a user who lost the phone: the user is signe
   const row = page.getByRole('row').filter({ hasText: USERS.totpb.email });
   await expect(row.getByText('2FA', { exact: true })).toBeVisible();
   await row.getByRole('button', { name: `Sửa ${USERS.totpb.email}` }).click();
+  const off = page.getByRole('button', { name: `Tắt xác thực 2 lớp của ${USERS.totpb.email}` });
+  // A confirm step first: dismissing it changes nothing.
+  page.once('dialog', (d) => void d.dismiss());
+  await off.click();
+  await expect(off).toBeVisible();
+  page.once('dialog', (d) => {
+    expect(d.message()).toContain(USERS.totpb.email);
+    void d.accept();
+  });
   await Promise.all([
     page.waitForResponse((r) => r.url().includes('/api/admin/users/') && r.request().method() === 'PATCH' && r.ok()),
-    page.getByRole('button', { name: `Tắt xác thực 2 lớp của ${USERS.totpb.email}` }).click(),
+    off.click(),
   ]);
-  await expect(page.getByRole('button', { name: `Tắt xác thực 2 lớp của ${USERS.totpb.email}` })).toHaveCount(0);
+  await expect(off).toHaveCount(0);
   await page.keyboard.press('Escape');
   await expect(row.getByText('2FA', { exact: true })).toHaveCount(0);
 

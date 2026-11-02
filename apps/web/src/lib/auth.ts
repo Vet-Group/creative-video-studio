@@ -43,12 +43,13 @@ export const auth = betterAuth({
   // client address. The default x-forwarded-for takes what a client sends, and a forged one sends every sign-in to one shared limiter bucket.
   advanced: { ipAddress: { ipAddressHeaders: ['cf-connecting-ip'] } },
   // Each passkey options request stores a challenge row, and the login page asks for one on every visit; the office shares one address.
-  // The 2FA code checks get a per-minute cap on top of the plugin's 5 tries per challenge and 10 per account; the office shares one address.
+  // A loose per-address cap on the 2FA code checks, as the office shares one address; the real guard is the plugin's 5 tries per challenge
+  // and its 15-minute lock after 10 failures in a row on one account.
   rateLimit: {
     customRules: {
       '/passkey/generate-authenticate-options': { window: 60, max: 30 },
-      '/two-factor/verify-totp': { window: 60, max: 10 },
-      '/two-factor/verify-backup-code': { window: 60, max: 10 },
+      '/two-factor/verify-totp': { window: 60, max: 30 },
+      '/two-factor/verify-backup-code': { window: 60, max: 30 },
     },
   },
   hooks: {

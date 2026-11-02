@@ -34,6 +34,17 @@ address (`lib/auth.ts`), which Cloudflare sets to the one client address. That i
 on the new host `lan-guard.service` keeps port 3400 off the LAN (owner record, 2026-11-02). If another way in is ever added, it
 must set or strip that header, or every request it brings shares one limiter bucket.
 
+## Two-factor sign-in (TOTP)
+
+Each user may turn on an authenticator-app code for email and password sign-in (Settings, security section); Google, Lark and
+passkey sign-ins are not asked for it. The TOTP secret and the backup codes are stored encrypted with `BETTER_AUTH_SECRET`.
+
+- To recover an account that may be compromised, an Admin turns its 2FA off (Admin, Users, edit the user, the two-factor switch-off) AND sets a
+  temporary password. Turning 2FA off alone ends the user's sessions and trusted devices, but whoever knows the password can then
+  sign in with it; the temporary password closes that.
+- Rotating `BETTER_AUTH_SECRET` makes every stored TOTP secret and backup code undecryptable: those users can no longer pass the
+  code step. Turn their 2FA off first (or after, as an Admin), and every 2FA user must enrol again.
+
 ## Accepted dependency advisory: esbuild GHSA-67mh-4wv8-2f99
 
 `pnpm audit --prod` reports one moderate advisory (2026-11-02). It covers esbuild 0.24.2 and older, where any website can send requests to esbuild's development server and read the responses. The vulnerable esbuild comes only from `better-auth`'s optional peer `drizzle-kit`, by way of `@esbuild-kit/esm-loader`. Production never starts an esbuild development server: migrations run `drizzle-kit migrate`, and the web app runs the `next build` output. So production is not exposed. The risk is accepted, and no `pnpm.overrides` entry is added, because forcing esbuild 0.25 or later under `@esbuild-kit` could break `drizzle-kit migrate`. Look again when drizzle-kit drops `@esbuild-kit`, or if the advisory's scope changes.

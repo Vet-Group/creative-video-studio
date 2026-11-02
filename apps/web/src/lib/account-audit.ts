@@ -71,16 +71,28 @@ export function accountAuditHooks(q: Queryable) {
  * a passkey are audited like linking and unlinking a method, with provider 'passkey'. Both endpoints run in the caller's own session.
  * Deleting one also ends the user's other sessions, as an unlink does, since a lost passkey may have opened them.
  * A changed password is audited without either password, and it lifts the forced change an Admin's temporary password set.
- * Turning 2FA on (the first right code, checked in a session) and off are audited without the secret or any code.
+ * Turning 2FA on (the first right code, checked in a session) and off, new backup codes and refused codes are audited without the
+ * secret or any code.
  * shortcut: same out-of-transaction write as accountAuditHooks.
  */
 export function authAuditHook(q: Queryable) {
   return createAuthMiddleware(async (ctx) => {
     const done = ctx.context.returned;
     const session = ctx.context.session;
+    const twoFactorCheck = ctx.path === '/two-factor/verify-totp' || ctx.path === '/two-factor/verify-backup-code';
+    if (twoFactorCheck && done instanceof APIError) {
+      // A refused code, the account lock included, is audited with the refusal's code only. At sign-in there is no session yet; the
+      // two_factor cookie names the challenge, whose verification row holds the user. A challenge already spent or expired names no one.
+      let userId = session?.user.id;
+      if (!userId) {
+        const challenge = await ctx.getSignedCookie(ctx.context.createAuthCookie('two_factor').name, ctx.context.secret);
+        userId = challenge ? (await ctx.context.internalAdapter.findVerificationValue(challenge))?.value : undefined;
+      }
+      if (userId) await audit(q, { actorId: userId, action: 'user.two_factor_failed', target: `user:${userId}`, newValue: { code: (done.body as { code?: string } | undefined)?.code ?? null } });
+      return;
+    }
     if (!done || done instanceof APIError) return;
     // As for a changed password, the session a right code opens or renews travels in its httpOnly cookie only.
-    const twoFactorCheck = ctx.path === '/two-factor/verify-totp' || ctx.path === '/two-factor/verify-backup-code';
     if (!session) return twoFactorCheck ? ctx.json({ user: (done as { user: unknown }).user }) : undefined;
     const userId = session.user.id;
     const target = `user:${userId}`;
@@ -98,7 +110,11 @@ export function authAuditHook(q: Queryable) {
       // The session is the one read before the check, so a user without 2FA yet has just turned it on.
       await audit(q, { actorId: userId, action: 'user.two_factor_enable', target, newValue: { twoFactor: true } });
     } else if (ctx.path === '/two-factor/disable') {
+      // The plugin forgets only this device's trust; a device trusted with the old codes must not skip the step if 2FA comes back on.
+      await q.query(`delete from verifications where value = $1 and identifier like 'trust-device-%'`, [userId]);
       await audit(q, { actorId: userId, action: 'user.two_factor_disable', target, oldValue: { twoFactor: true }, newValue: { twoFactor: false } });
+    } else if (ctx.path === '/two-factor/generate-backup-codes') {
+      await audit(q, { actorId: userId, action: 'user.two_factor_backup_codes', target });
     }
     if (twoFactorCheck) return ctx.json({ user: (done as { user: unknown }).user });
   });

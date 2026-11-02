@@ -117,7 +117,9 @@ function UserEditor({ user, teams, reload }: { user: User; teams: Team[]; reload
                 type="button"
                 className="small danger"
                 aria-label={`Tắt xác thực 2 lớp của ${user.email}`}
-                onClick={() => void patch({ twoFactor: false }, 'Không tắt được xác thực 2 lớp.')}
+                onClick={() => {
+                  if (window.confirm(`Tắt xác thực 2 lớp của ${user.email}? Người này sẽ bị đăng xuất khỏi mọi thiết bị và chỉ cần mật khẩu để đăng nhập.`)) void patch({ twoFactor: false }, 'Không tắt được xác thực 2 lớp.');
+                }}
               >
                 Tắt xác thực 2 lớp
               </button>
