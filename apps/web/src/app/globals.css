@@ -991,6 +991,33 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .acct-row > button:hover, .acct-row > a:hover { background: var(--fill); }
 .acct-row > .acct-primary { border-color: var(--ink); background: var(--ink); color: var(--surface); }
 .acct-row > .acct-primary:hover { border-color: var(--zinc-700); background: var(--zinc-700); }
+/* Security: the password change form (also on the forced change page) and the sessions list under the sign-in rows. */
+.settings-kicker.settings-sub { margin: 24px 0 12px; }
+.settings-panel .acct-rows + .actions { margin-top: 12px; }
+.settings-panel .actions button { height: 36px; padding: 0 14px; font-size: 14px; }
+.settings-panel .actions button:hover:not(:disabled) { background: var(--fill); }
+.pw-form { display: grid; gap: 6px; max-width: 26rem; }
+.pw-form > label { margin: 8px 0 0; font-size: 14px; line-height: 21px; font-weight: 500; }
+.pw-form > label:first-child { margin-top: 0; }
+.pw-form > input { width: 100%; height: 40px; padding: 0 12px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface); color: var(--ink); font: inherit; font-size: 14px; }
+.pw-form > input:hover { border-color: var(--text-subtle); }
+.pw-form > input:focus-visible { border-color: var(--ink); outline: 1px solid var(--ink); outline-offset: 0; }
+.pw-hint { margin: 0; color: var(--text-muted); font-size: 12px; line-height: 18px; }
+.pw-form > .pw-show { display: flex; align-items: center; gap: 8px; margin-top: 4px; font-weight: 400; }
+.pw-show input { width: 16px; height: 16px; min-width: 0; margin: 0; accent-color: var(--ink-strong); }
+.pw-form > .error, .pw-done { margin: 4px 0 0; font-size: 14px; line-height: 20px; }
+.pw-done { color: var(--cat-utility-fg); font-weight: 500; }
+.pw-submit { justify-self: start; height: 40px; margin-top: 8px; padding: 0 16px; border-color: var(--ink); background: var(--ink); color: var(--surface); font-size: 14px; font-weight: 500; }
+.pw-submit:hover:not(:disabled) { border-color: var(--zinc-700); background: var(--zinc-700); }
+/* The forced change page: one card in the middle of the screen, nothing else of the app. */
+.forced-pw { display: grid; place-items: center; min-height: 100vh; min-height: 100dvh; padding: 24px 16px; background: var(--surface-1); }
+.forced-pw-card { width: 100%; max-width: 28rem; padding: 28px; border: 1px solid rgb(var(--shade) / .08); border-radius: 16px; background: var(--surface); box-shadow: 0 24px 64px -16px rgb(var(--shade) / .2); }
+.forced-pw-card h1 { margin: 16px 0 4px; font-size: 22px; line-height: 30px; font-weight: 600; }
+.forced-pw-card > .muted { margin: 0 0 20px; overflow-wrap: anywhere; }
+.forced-pw-card .pw-form { max-width: none; }
+.forced-pw-card .pw-submit { justify-self: stretch; }
+.forced-pw-signout { width: 100%; height: 40px; margin-top: 8px; border: 0; background: transparent; color: var(--text-2); font-size: 14px; }
+.forced-pw-signout:hover { background: var(--fill); color: var(--ink); }
 @media (min-width: 768px) {
   .settings-grid { grid-template-columns: 260px minmax(0, 1fr); }
   .settings-nav { border-right: 1px solid rgb(var(--shade) / .1); border-bottom: 0; }

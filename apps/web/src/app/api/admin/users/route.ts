@@ -22,6 +22,7 @@ export async function GET(request: Request) {
  * Admin: create a Member or Admin account (Q4: accounts are created by an Admin, never by sign-up).
  * The team is required and must be a visible one. The password is optional (interview round 8): a user without one can sign in only
  * with Lark or Google. The email counts as verified, which better-auth needs before it links a first social sign-in to the account.
+ * A password set here is known to the Admin, so the user must replace it at the first sign-in, as with a temporary one ([id]/route.ts).
  */
 export async function POST(request: Request) {
   const g = await guard(request, 'admin');
@@ -33,7 +34,7 @@ export async function POST(request: Request) {
   if (typeof teamId !== 'string') return bad('teamId is required');
   if (!(await pool.query('select 1 from teams where id = $1 and not hidden', [teamId])).rowCount) return bad('teamId must be the id of a visible team');
   try {
-    const { user } = await auth.api.createUser({ headers: request.headers, body: { email, name, password, role, data: { teamId, emailVerified: true } } });
+    const { user } = await auth.api.createUser({ headers: request.headers, body: { email, name, password, role, data: { teamId, emailVerified: true, mustChangePassword: typeof password === 'string' } } });
     return Response.json({ id: user.id, email: user.email, role, teamId }, { status: 201 });
   } catch (e) {
     return authFailure(e);

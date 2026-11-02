@@ -74,6 +74,8 @@ describe('/api/admin/users', () => {
     expect(res.status).toBe(201);
     expect(await res.json()).toMatchObject({ email: 'new@example.test', role: 'member', teamId: 'team-unassigned' });
     expect(await signIn('new@example.test')).toContain('better-auth.session_token');
+    // The Admin knows this password, so the app opens only the change page until the user sets their own.
+    expect((await pool.query(`select must_change_password from users where email = 'new@example.test'`)).rows[0].must_change_password).toBe(true);
   });
 
   test('creates users with a verified email, which better-auth needs before it links a social sign-in', async () => {
@@ -88,6 +90,7 @@ describe('/api/admin/users', () => {
     expect(res.status).toBe(201);
     const signIn = await auth.api.signInEmail({ body: { email: 'lark-only@example.test', password: PASSWORD }, asResponse: true });
     expect(signIn.status).toBe(401);
+    expect((await pool.query(`select must_change_password from users where email = 'lark-only@example.test'`)).rows[0].must_change_password).toBe(false);
   });
 
   test('rejects a password that is not a string', async () => {
@@ -184,6 +187,7 @@ describe('PATCH /api/admin/users/:id', () => {
     expect((await auth.api.signInEmail({ body: { email: m.email, password: 'temporary-pass-1' }, asResponse: true })).status).toBe(200);
     const log = await audits(m.id);
     expect(log).toEqual([{ actor_id: await adminId(), action: 'user.password_set', old_value: null, new_value: { temporary: true } }]);
+    expect((await pool.query('select must_change_password from users where id = $1', [m.id])).rows[0].must_change_password).toBe(true);
   });
 
   test('bans a user without a password and gives them a temporary one in the same request', async () => {
@@ -241,6 +245,7 @@ describe('PATCH /api/admin/users/:id', () => {
       expect(await state(), name).toEqual({ role: 'member', banned: false });
       expect(await audits(m.id), name).toEqual([]);
     }
+    expect((await pool.query('select must_change_password from users where id = $1', [m.id])).rows[0].must_change_password).toBe(false);
     expect((await auth.api.signInEmail({ body: { email: m.email, password: PASSWORD }, asResponse: true })).status).toBe(200);
   });
 

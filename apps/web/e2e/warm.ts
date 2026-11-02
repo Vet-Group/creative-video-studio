@@ -1,6 +1,6 @@
 // Global setup: `next dev` compiles a route on its first request, which can take longer than a spec's timeouts.
 // Request every page and route once, signed out, so the specs run against compiled routes. The accounts and data are made by serve.ts.
-const PAGES = ['/login', '/create', '/library', ...['overview', 'users', 'teams', 'stores', 'settings', 'presets', 'report', 'costs', 'audit'].map((p) => `/admin/${p}`)];
+const PAGES = ['/login', '/create', '/library', '/account/password', ...['overview', 'users', 'teams', 'stores', 'settings', 'presets', 'report', 'costs', 'audit'].map((p) => `/admin/${p}`)];
 const ROUTES = [
   '/api/jobs?mine',
   '/api/jobs/warm-up',
@@ -8,6 +8,7 @@ const ROUTES = [
   '/api/library',
   '/api/models?ratio=9:16&durationSec=5',
   '/api/stores',
+  '/api/me/sessions',
   '/api/presets',
   '/api/assets',
   '/api/assets/warm-up',

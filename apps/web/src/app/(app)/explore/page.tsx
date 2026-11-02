@@ -1,9 +1,11 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import { CardMedia } from '@/components/CardMedia';
 import { Icon } from '@/components/Icon';
 import { MODEL_CARD_TEXT } from '@/lib/about-content';
 import { pool } from '@/lib/auth';
 import { bestClips } from '@/lib/clips';
+import { currentUser } from '@/lib/current-user';
 import { cardSample, EXAMPLES, exampleForPreset, sampleSrc } from '@/lib/examples';
 import { modelStats, rank, scoreOf } from '@/lib/model-scores';
 import { listSamples } from '@/lib/samples';
@@ -37,6 +39,8 @@ const range = (values: number[]) => (values.length === 0 ? '' : values.length > 
 
 /** Explore: the start page of the live dashboard, with the tools, the enabled models and the company presets, each linking into Create. */
 export default async function ExplorePage() {
+  // The (app) layout does not rerun on a client navigation, so a page that reads data itself checks the forced password change again.
+  if ((await currentUser())?.mustChangePassword) redirect('/account/password');
   const [models, presets, samples, videoStats, imageStats, clips] = await Promise.all([
     // Video models open Create Videos and image models open Image Generation, as the live page features both.
     pool.query<{ id: string; label: string; provider: string; kind: string; ratios: string[]; durations_sec: number[]; usd_per_second: string | null; image_prices: Record<string, string> | null }>(

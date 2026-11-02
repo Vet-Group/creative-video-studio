@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { type CSSProperties, useEffect, useState } from 'react';
 import { api, sendJson } from '@/lib/api';
 import type { SignInMethod } from '@/lib/sign-in-methods';
+import { PasswordChange, Sessions } from './AccountSecurity';
 import { Icon, type IconName } from './Icon';
 import { Modal } from './Modal';
 import { ProviderMark, SignInMethods } from './SignInMethods';
@@ -123,6 +124,7 @@ function Limits() {
 
 export function Settings({ open, onClose, userName, account }: { open: boolean; onClose: () => void; userName: string; account: Account }) {
   const [section, setSection] = useState('profile');
+  const [changes, setChanges] = useState(0); // a password change signs the other devices out, so the sessions list reloads
   useEffect(() => {
     if (open) setSection('profile'); // every opening starts on the profile
   }, [open]);
@@ -212,6 +214,22 @@ export function Settings({ open, onClose, userName, account }: { open: boolean; 
                   <a href="/account/sign-in-methods">Quản lý passkey</a>
                 </li>
               </ul>
+              <p className="settings-kicker settings-sub" id="settings-password">
+                Đổi mật khẩu
+              </p>
+              {hasPassword ? (
+                <div className="settings-card" role="group" aria-labelledby="settings-password">
+                  <PasswordChange onDone={() => setChanges((n) => n + 1)} />
+                </div>
+              ) : (
+                <p className="muted">Tài khoản của bạn đăng nhập bằng Google, Lark hoặc passkey nên không có mật khẩu để đổi.</p>
+              )}
+              <p className="settings-kicker settings-sub" id="settings-sessions">
+                Phiên đăng nhập
+              </p>
+              <div role="group" aria-labelledby="settings-sessions">
+                <Sessions key={changes} />
+              </div>
             </section>
           )}
           {section === 'methods' && <SignInMethods methods={account.methods} googleEnabled={account.googleEnabled} larkEnabled={account.larkEnabled} />}

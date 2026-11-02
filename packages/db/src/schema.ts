@@ -76,6 +76,8 @@ export const users = pgTable(
     banReason: text('ban_reason'),
     banExpires: tstz('ban_expires'),
     emailVerified: boolean('email_verified').notNull().default(false),
+    // Set with an Admin's temporary password; the app lets the user do nothing but change it (lib/session.ts, (app)/layout.tsx).
+    mustChangePassword: boolean('must_change_password').notNull().default(false),
     image: text('image'),
     teamId: text('team_id')
       .notNull()

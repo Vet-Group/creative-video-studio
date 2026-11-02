@@ -70,9 +70,10 @@ export function accountAuditHooks(q: Queryable) {
  * hooks.after for the passkey plugin, which writes its rows with adapter.create, out of reach of databaseHooks.account. Adding and deleting
  * a passkey are audited like linking and unlinking a method, with provider 'passkey'. Both endpoints run in the caller's own session.
  * Deleting one also ends the user's other sessions, as an unlink does, since a lost passkey may have opened them.
+ * A changed password is audited without either password, and it lifts the forced change an Admin's temporary password set.
  * shortcut: same out-of-transaction write as accountAuditHooks.
  */
-export function passkeyAuditHook(q: Queryable) {
+export function authAuditHook(q: Queryable) {
   return createAuthMiddleware(async (ctx) => {
     const done = ctx.context.returned;
     const session = ctx.context.session;
@@ -84,6 +85,11 @@ export function passkeyAuditHook(q: Queryable) {
     } else if (ctx.path === '/passkey/delete-passkey') {
       await q.query('delete from sessions where user_id = $1 and id <> $2', [userId, session.session.id]);
       await audit(q, { actorId: userId, action: 'account.unlink', target, oldValue: { provider: 'passkey', accountId: (ctx.body as { id: string }).id, email: null }, newValue: { sessionsRevoked: true } });
+    } else if (ctx.path === '/change-password') {
+      await q.query('update users set must_change_password = false, updated_at = now() where id = $1', [userId]);
+      await audit(q, { actorId: userId, action: 'user.password_change', target, newValue: { sessionsRevoked: (ctx.body as { revokeOtherSessions?: boolean }).revokeOtherSessions === true } });
+      // The new session's token travels in its httpOnly cookie only, never in a body the page's scripts can read.
+      return ctx.json({ user: (done as { user: unknown }).user });
     }
   });
 }
