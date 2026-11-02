@@ -8,11 +8,12 @@ import { cardSample } from '@/lib/examples';
 import { useSamples } from '@/lib/use-samples';
 import { CardMedia } from './CardMedia';
 
-/** A sample's loop or still; the empty stripes while it is not uploaded, so the slot keeps its place. */
+/** A sample's loop or still; the empty stripes while it is not uploaded, so the slot keeps its place.
+ * About clips play under reduced motion too (owner, 2026-11-02): they show what a result looks like, and a still poster hid that. */
 function Media({ name }: { name: string }) {
   return (
     <span className="about-media">
-      <CardMedia {...cardSample(useSamples(), name)} />
+      <CardMedia {...cardSample(useSamples(), name)} always />
     </span>
   );
 }
@@ -70,7 +71,7 @@ function Block({ block }: { block: AboutBlock }) {
   if ('loop' in block)
     return (
       <span className="about-loop">
-        <CardMedia {...cardSample(useSamples(), block.loop)} />
+        <CardMedia {...cardSample(useSamples(), block.loop)} always />
       </span>
     );
   if ('pairs' in block)
