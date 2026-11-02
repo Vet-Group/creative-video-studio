@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { type CSSProperties, useEffect, useId, useRef, useState } from 'react';
 import { APP_ABOUT } from '@/lib/about-content';
 import { api, errorText, sendJson } from '@/lib/api';
-import { APPS, type AppConfig, appInputs, appReason, type AppCategory, motionReason, slotMax, splitImages } from '@/lib/apps';
+import { APPS, type AppConfig, appInputs, appReason, type AppCategory, motionReason, slotMax, splitImages, stockGroups } from '@/lib/apps';
 import { promptTooLong } from '@/lib/prompt-limit';
 import { confirmRun, runKey } from '@/lib/run-guard';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
@@ -17,7 +17,7 @@ import { useSamples } from '@/lib/use-samples';
 import { About } from './About';
 import { CardMedia, LoopVideo } from './CardMedia';
 import { Icon, type IconName } from './Icon';
-import { copyError, type Img, RATIO_LABEL, Slot, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
+import { copyError, copySamples, type Img, PhotoDialog, RATIO_LABEL, Slot, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
 import { FormContext, useJobs } from './jobs';
 import { type ModelOption, ModelPicker } from './ModelPicker';
 import { PromptTools } from './PromptTools';
@@ -100,6 +100,8 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
   const narrow = useMediaQuery(NARROW);
   const [images, setImages] = useState<Img[][]>(() => app.slots.map(() => []));
   const [prompt, setPrompt] = useState('');
+  const [picker, setPicker] = useState<number | null>(null); // the slot whose stock-photo dialog is open
+  const have = useSamples();
   const [tab, setTab] = useState<Tab | null>(null); // null: the default for the width (the form below 1024 px, else About)
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -157,6 +159,22 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
     };
   }
 
+  /** A stock photo is copied on the server as the member's own picture, so the job only ever holds the member's own assets. */
+  async function pickStock(slot: number, name: string) {
+    setError('');
+    setBusy(true);
+    try {
+      const copied = await copySamples([name]);
+      setImages((cur) => cur.map((list, i) => (i === slot ? copied : list)));
+    } catch (e) {
+      setError(copyError(e, UPLOAD_ERROR));
+    } finally {
+      setBusy(false);
+    }
+  }
+  const stockTiles = (slot: number, names: string[], label: string) => names.map((name, n) => ({ key: name, src: `/api/samples/${name}`, label: `${label} ${n + 1}`, pick: () => void pickStock(slot, name) }));
+  const stock = picker === null ? [] : stockGroups(app.slots[picker]!, have);
+
   async function run() {
     if (!confirmRun(pick.estimate)) return;
     setBusy(true);
@@ -209,9 +227,19 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
                   busy={busy}
                   onAdd={add(i)}
                   onRemove={(id) => setImages((cur) => cur.map((list, j) => (j === i ? list.filter((x) => x.id !== id) : list)))}
+                  onBrowse={stockGroups(s, have).length > 0 ? () => setPicker(i) : undefined}
                 />
               ))}
             </div>
+            <PhotoDialog
+              open={picker !== null}
+              title={picker === null ? '' : app.slots[picker]!.stock!.title}
+              tiles={stock.filter((g) => !g.label).flatMap((g) => stockTiles(picker!, g.names, 'Người mẫu có sẵn'))}
+              groups={stock.filter((g) => g.label).map((g) => ({ title: g.label!, tiles: stockTiles(picker!, g.names, g.label!) }))}
+              busy={busy}
+              onFile={(files) => void add(picker!)(files)}
+              onClose={() => setPicker(null)}
+            />
 
             {models && models.length > 1 && <ModelPicker models={pick.options} value={pick.modelId} onChange={pick.setModelId} />}
 

@@ -19,6 +19,8 @@ export interface AppSlot {
   optional?: boolean;
   /** Takes several images: up to the model's limit less one for each other slot (Jewelry Try-On's pieces). */
   many?: boolean;
+  /** Stock photos the slot offers in a dialog, from the samples an Admin uploaded: the ones named `<prefix>NN.jpg` of each group, a group with a `label` under its own heading. */
+  stock?: { title: string; groups: { label?: string; prefix: string }[] };
 }
 
 export interface AppConfig {
@@ -38,6 +40,11 @@ export interface AppConfig {
   /** An app that is not built yet: its page says so, and why. */
   soon?: string;
 }
+
+/** The template photos of Jewelry Try-On's wearer slot (samples `jewelry-template-<group>-NN.jpg`), in the reference site's order. */
+const JEWELRY_TEMPLATES = [
+  ['ear', 'Tai'], ['face', 'Mặt'], ['neck', 'Cổ & ngực'], ['beauty', 'Mặt & tay'], ['hand', 'Tay'], ['portrait', 'Chân dung'], ['lifestyle', 'Đời thường'],
+].map(([id, label]) => ({ label: label!, prefix: `jewelry-template-${id}-` }));
 
 export const APPS: AppConfig[] = [
   {
@@ -139,8 +146,22 @@ export const APPS: AppConfig[] = [
     category: 'fashion',
     slots: [
       { label: 'Trang sức', inputLabel: 'Ảnh trang sức', empty: 'Thêm 1 hoặc nhiều món trang sức, chụp rõ trên nền trơn', many: true },
-      { label: 'Người đeo', inputLabel: 'Ảnh người đeo', empty: 'Thêm 1 ảnh người sẽ đeo trang sức' },
+      { label: 'Người đeo', inputLabel: 'Ảnh người đeo', empty: 'Thêm 1 ảnh người sẽ đeo trang sức', stock: { title: 'Chọn mẫu', groups: JEWELRY_TEMPLATES } },
     ],
+    resolution: true,
+  },
+  {
+    slug: 'lingerie-try-on',
+    feature: 'lingerie_try_on',
+    name: 'Thử đồ lót',
+    description: 'Mặc đồ lót của bạn lên người mẫu, giữ đúng chất liệu ren, lưới và satin.',
+    category: 'fashion',
+    slots: [
+      { label: 'Đồ lót', inputLabel: 'Ảnh đồ lót', empty: 'Thêm 1 hoặc nhiều món đồ lót, chụp rõ trên nền trơn', many: true },
+      { label: 'Người mẫu', inputLabel: 'Ảnh người mẫu', empty: 'Thêm 1 ảnh người mẫu', stock: { title: 'Chọn người mẫu', groups: [{ prefix: 'lingerie-model-m' }] } },
+    ],
+    prompt: 'optional',
+    ratio: true,
     resolution: true,
   },
 ];
@@ -204,6 +225,16 @@ export function motionReason(d: MotionDraft): string | null {
   const allowed = d.model.durationsSec;
   if (!allowed.includes(Math.ceil(d.videoMs / 1000))) return `Video mẫu phải dài từ ${allowed[0]} đến ${allowed.at(-1)} giây.`;
   return null;
+}
+
+/** The stock photos of a slot that exist, group by group: the sample names `<prefix>NN.jpg` (or png, webp) in number order. Missing files simply do not show. */
+export function stockGroups(slot: AppSlot, have: ReadonlySet<string>): { label?: string; names: string[] }[] {
+  return (slot.stock?.groups ?? [])
+    .map((g) => ({
+      label: g.label,
+      names: [...have].filter((n) => n.startsWith(g.prefix) && /^\d+\.(jpg|png|webp)$/.test(n.slice(g.prefix.length))).sort((a, b) => parseInt(a.slice(g.prefix.length)) - parseInt(b.slice(g.prefix.length))),
+    }))
+    .filter((g) => g.names.length > 0);
 }
 
 /** The asset ids of a Run, slot by slot, and the prompt the body carries (only Background Changer sends one). */

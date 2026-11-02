@@ -77,6 +77,7 @@ export const FEATURE_PROMPTS: Record<string, string> = {
   face_swap: 'Swap the face from the first image onto the person in the second image.',
   background_remover: 'Remove the background.',
   jewelry_try_on: 'Put the jewelry from every image but the last on the person in the last image, each piece where it is worn and at a realistic scale. Keep its design, metal colour and stones exactly, and match its reflections and shadows to the light of the photo. Keep the person, face, pose, clothing and background exactly unchanged. Do not add any text, logos or watermarks.',
+  lingerie_try_on: 'Dress the person in the last image in the lingerie pieces from every image but the last, each piece worn as intended and fitted to the body. Keep the fabric details (lace, mesh, satin, straps, seams) and the colours exactly. Keep the face, body shape, pose, skin tone and background exactly unchanged. Do not add any text, logos or watermarks',
 };
 
 const FAL_KLING_PAGE = 'https://fal.ai/models/fal-ai/kling-video/o3/pro/reference-to-video';
