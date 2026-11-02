@@ -152,7 +152,7 @@ export function Sessions() {
         })}
       </ul>
       {hidden > 0 && (
-        <button type="button" className="link-button" aria-expanded={all} onClick={() => setAll((a) => !a)}>
+        <button type="button" className="link-button acct-more" aria-expanded={all} onClick={() => setAll((a) => !a)}>
           {all ? 'Thu gọn' : `Xem tất cả ${sessions.length} phiên`}
         </button>
       )}

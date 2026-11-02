@@ -997,6 +997,8 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .acct-row > button, .acct-row > a { display: inline-flex; align-items: center; height: 32px; padding: 0 12px; border: 1px solid var(--border-button); border-radius: 8px; background: var(--surface); color: var(--ink); font-size: 13px; text-decoration: none; white-space: nowrap; }
 .acct-row > button:hover, .acct-row > a:hover { background: var(--fill); }
 .acct-row > .acct-primary { border-color: var(--ink); background: var(--ink); color: var(--surface); }
+/* The sessions list's see-all toggle: a full 44px touch target, set apart from the list above. */
+.acct-more { display: inline-flex; align-items: center; min-height: 44px; margin-top: 8px; }
 .acct-row > .acct-primary:hover { border-color: var(--zinc-700); background: var(--zinc-700); }
 /* Security: the password change form (also on the forced change page) and the sessions list under the sign-in rows. */
 .settings-kicker.settings-sub { margin: 24px 0 12px; }
