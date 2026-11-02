@@ -1,4 +1,4 @@
-// Settings > Tuỳ chọn: what happens on this device when a job finishes, and the keyboard shortcuts. Each block is one subsection.
+// Settings > Preferences: what happens on this device when a job finishes, and the keyboard shortcuts. Each block is one subsection.
 import { type ReactNode, useId, useState } from 'react';
 import { chime, notificationState, readPref, writePref } from '@/lib/preferences';
 import { Icon, type IconName } from './Icon';

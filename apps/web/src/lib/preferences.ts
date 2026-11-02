@@ -1,4 +1,4 @@
-// Per-device preferences from Settings > Tuỳ chọn, in localStorage, and what they do when a job finishes (components/jobs.tsx).
+// Per-device preferences from Settings > Preferences, in localStorage, and what they do when a job finishes (components/jobs.tsx).
 
 const KEYS = { notify: 'cvs.pref.notify', chime: 'cvs.pref.chime' } as const;
 export type Pref = keyof typeof KEYS;
