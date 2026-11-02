@@ -5,7 +5,8 @@
 //                                   (an ownerDone step such as M.7b also needs --owner "<the owner's words>" for done and skip)
 //   verify                          anyone: machine check of all evidence (exit 1 on any error)
 //   notify "<headline>"             conductor: Lark DM to the owner plus the Run log issue
-//   guard-check                     vet.sh and the watchdog: exit 3 when a guard file changed (hard stop 2)
+//   ops-approve "<sentence>"       owner: record the standing operations permission (deploy, status, backup, drill; no expiry, no spend)
+//   guard-check [--verb v]          vet.sh and the watchdog: exit 3 when a guard file changed (hard stop 2), 4 when the verb is not approved
 //   lease-write --pid N --started ISO [--force] | should-relaunch --proc-started ISO|none   launcher and watchdog
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
@@ -14,11 +15,11 @@ import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { readLease, shouldRelaunch, writeLease } from './lease.ts';
 import {
-  approve, changedGuards, expireSteps, guardFiles, initManifest, parseCriteria, preapprovalValid, readManifest, readySteps, recordFailure,
+  approve, changedGuards, expireSteps, guardFiles, initManifest, parseCriteria, readManifest, readySteps, recordFailure, vetAllowed,
   renderEvidence, renewManifest, renderLark, renderProgress, renderRunLog, sha256, writeManifest, type Evidence, type Manifest,
 } from './manifest.ts';
 import { sendLark, updateRunLog, type Run } from './notify.ts';
-import { matchesPreapproval, PREAPPROVAL_SENTENCE } from './preapproval.ts';
+import { matchesOps, matchesPreapproval, OPS_SENTENCE, PREAPPROVAL_SENTENCE } from './preapproval.ts';
 import { ownerOpenId, type ItemResult } from './preflight.ts';
 import { STEPS } from './steps.ts';
 import { verify, type CiStatus } from './verify.ts';
@@ -76,7 +77,7 @@ const [cmd, ...rest] = process.argv.slice(2);
 const { values, positionals } = parseArgs({
   args: rest,
   allowPositionals: true,
-  options: { agent: { type: 'string' }, model: { type: 'string' }, evidence: { type: 'string' }, pid: { type: 'string' }, started: { type: 'string' }, force: { type: 'boolean' }, 'proc-started': { type: 'string' }, owner: { type: 'string' } },
+  options: { agent: { type: 'string' }, model: { type: 'string' }, evidence: { type: 'string' }, pid: { type: 'string' }, started: { type: 'string' }, force: { type: 'boolean' }, 'proc-started': { type: 'string' }, owner: { type: 'string' }, verb: { type: 'string' } },
 });
 const now = new Date();
 
@@ -118,6 +119,20 @@ switch (cmd) {
     m.guardHashes = Object.fromEntries(guardFiles(ROOT).map((f) => [f, sha256(join(ROOT, f))]));
     save(m);
     console.log(`Đã ghi câu duyệt (hết hạn ${m.preapproval!.expiresAt}). ${m.steps.filter((s) => s.status === 'skipped').length} bước bị bỏ qua.`);
+    break;
+  }
+  case 'ops-approve': {
+    if (!matchesOps(positionals.join(' '))) {
+      console.error(`Câu cấp quyền không khớp. Chép nguyên văn câu này:
+${OPS_SENTENCE}`);
+      process.exit(2);
+    }
+    if (!existsSync(MANIFEST)) throw new Error('no run manifest: run `pnpm preflight` and `pnpm run:approve` first');
+    const m = readManifest(MANIFEST);
+    m.ops = { sentence: OPS_SENTENCE, at: now.toISOString() };
+    m.guardHashes = Object.fromEntries(guardFiles(ROOT).map((f) => [f, sha256(join(ROOT, f))])); // the owner approves the gate as it stands now
+    save(m);
+    console.log('Đã ghi quyền vận hành thường trực: deploy, status, backup, drill; không hết hạn, không gồm chi tiền.');
     break;
   }
   case 'heartbeat': {
@@ -192,8 +207,8 @@ switch (cmd) {
     }
     const m = readManifest(MANIFEST);
     haltOnGuardChange(m);
-    if (!preapprovalValid(m, now)) {
-      console.error('pre-approval missing or expired: spend, deploy and VET steps are blocked');
+    if (!vetAllowed(m, now, values.verb)) {
+      console.error(`pre-approval missing or expired${values.verb ? ` and '${values.verb}' is not a standing operations verb` : ''}: spend, deploy and VET steps are blocked`);
       process.exit(4);
     }
     break;

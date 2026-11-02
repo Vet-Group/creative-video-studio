@@ -4,6 +4,20 @@
 (`systemctl --user` under root, `XDG_RUNTIME_DIR=/run/user/0`) in `/opt/creative-video-studio`, the same way Ideas Hub is run.
 Deploy only under the owner's pre-approval (plan section 3). Nothing here runs by itself.
 
+## Standing operations permission (owner, 2026-11-02)
+
+The run's pre-approval (`pnpm run:approve`) lasts 14 days and covers spend. For routine work after the run the owner
+types a second, standing permission once:
+
+```
+pnpm run:ops-approve "<sentence>"
+```
+
+Run it without the sentence (or with a wrong one) and it prints the exact Vietnamese sentence to copy. It never expires and
+opens only the `vet.sh` verbs `deploy`, `status`, `backup` and `drill`; every other verb and every spend step still needs a
+live run pre-approval. It includes no provider spend. Like `run:approve` it records the guard file hashes, so any change to
+a guard file (`vet.sh`, the server gate, `package.json`, ...) halts every verb until the owner types it again.
+
 ## Dry run first
 
 ```

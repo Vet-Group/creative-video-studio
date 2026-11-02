@@ -6,8 +6,9 @@ import { describe, expect, test } from 'vitest';
 import { shouldRelaunch, writeLease } from './lease.ts';
 import {
   approve, changedGuards, expireSteps, guardFiles, initManifest, parseCriteria, preapprovalValid, readManifest, readySteps, recordFailure, renewManifest,
-  sha256, validate, writeManifest, type Manifest,
+  sha256, validate, vetAllowed, writeManifest, type Manifest,
 } from './manifest.ts';
+import { OPS_SENTENCE, OPS_VERBS } from './preapproval.ts';
 import { sendLark } from './notify.ts';
 import { skippedSteps } from './preflight.ts';
 import { STEPS } from './steps.ts';
@@ -88,6 +89,33 @@ describe('steps', () => {
 describe('owner-closed steps', () => {
   const cli = (dir: string, ...args: string[]) =>
     spawnSync(process.execPath, [join(import.meta.dirname, 'cli.ts'), ...args], { encoding: 'utf8', env: { ...process.env, CVS_RUN_DIR: dir } });
+
+  test('ops-approve takes only the exact sentence; guard-check then lets a routine verb through, not another, and still halts on a changed guard', () => {
+    const dir = tmp();
+    const m = fresh();
+    approve(m, 'x', new Date('2026-10-01T00:00:00Z')); // long expired
+    writeManifest(join(dir, 'manifest.json'), m);
+    const wrong = cli(dir, 'ops-approve', 'Tôi cấp quyền tất cả');
+    expect(wrong.status, wrong.stderr).toBe(2);
+    expect(readManifest(join(dir, 'manifest.json')).ops).toBeUndefined();
+
+    const ok = cli(dir, 'ops-approve', ` ${OPS_SENTENCE.replace(/ /g, '  ')} `); // spacing is forgiven, as for the pre-approval
+    expect(ok.status, ok.stderr).toBe(0);
+    expect(readManifest(join(dir, 'manifest.json')).ops?.sentence).toBe(OPS_SENTENCE);
+    expect(cli(dir, 'guard-check', '--verb', 'status').status).toBe(0);
+    expect(cli(dir, 'guard-check', '--verb', 'deploy').status).toBe(0);
+    const other = cli(dir, 'guard-check', '--verb', 'fetch-inputs');
+    expect(other.status).toBe(4);
+    expect(other.stderr).toMatch(/not a standing operations verb/);
+    expect(cli(dir, 'guard-check').status).toBe(4); // the one-off key scripts pass no verb: they still need the run's approval
+
+    const saved = readManifest(join(dir, 'manifest.json'));
+    saved.guardHashes['scripts/run/vet.sh'] = '0'.repeat(64);
+    writeManifest(join(dir, 'manifest.json'), saved);
+    const halted = cli(dir, 'guard-check', '--verb', 'status');
+    expect(halted.status).toBe(3);
+    expect(halted.stderr).toMatch(/HARD STOP 2/);
+  });
 
   test('done and skip refuse M.7b without the owner words, and keep them as a note when given', () => {
     const dir = tmp();
@@ -177,6 +205,17 @@ describe('manifest', () => {
     approve(m, 'x', new Date('2026-10-23T00:00:00Z'));
     expect(preapprovalValid(m, new Date('2026-11-05T23:00:00Z'))).toBe(true);
     expect(preapprovalValid(m, new Date('2026-11-06T00:00:01Z'))).toBe(false);
+  });
+
+  test('the standing operations permission never expires but opens only deploy, status, backup and drill', () => {
+    const m = fresh();
+    approve(m, 'x', new Date('2026-10-23T00:00:00Z'));
+    const later = new Date('2027-06-01T00:00:00Z');
+    expect(vetAllowed(m, later, 'status')).toBe(false); // the run's approval ran out and there is no standing one yet
+    m.ops = { sentence: OPS_SENTENCE, at: '2026-11-02T00:00:00Z' };
+    for (const v of OPS_VERBS) expect(vetAllowed(m, later, v), v).toBe(true);
+    for (const v of ['check', 'sample-neighbours', 'fetch-inputs', 'uninstall', undefined]) expect(vetAllowed(m, later, v), String(v)).toBe(false);
+    expect(vetAllowed(m, new Date('2026-10-30T00:00:00Z'), 'fetch-inputs')).toBe(true); // a live run approval still opens every verb
   });
 
   test('writes atomically, keeps 20 history versions and refuses an invalid manifest', () => {

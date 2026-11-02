@@ -18,7 +18,7 @@ for a in "$@"; do
   [[ "$a" =~ ^[A-Za-z0-9._/:-]+$ ]] || { echo "vet.sh: refused argument" >&2; exit 2; }
 done
 
-env -u CVS_RUN_DIR node "$ROOT/scripts/run/cli.ts" guard-check || exit 3
+env -u CVS_RUN_DIR node "$ROOT/scripts/run/cli.ts" guard-check --verb "$VERB" || exit 3
 [[ -f "$KEY" ]] || { echo "vet.sh: gate key missing; run A.0c first" >&2; exit 2; }
 
 mkdir -p "$ROOT/.omc/run/logs"

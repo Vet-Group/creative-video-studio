@@ -13,7 +13,8 @@
     "services:down": "docker compose down",
     "preflight": "node --env-file-if-exists=.env scripts/preflight.ts",
     "run:approve": "node --env-file-if-exists=.env scripts/run/cli.ts approve",
-    "run:verify": "node --env-file-if-exists=.env scripts/run/cli.ts verify"
+    "run:verify": "node --env-file-if-exists=.env scripts/run/cli.ts verify",
+    "run:ops-approve": "node --env-file-if-exists=.env scripts/run/cli.ts ops-approve"
   },
   "devDependencies": {
     "@types/node": "24.19.0",
