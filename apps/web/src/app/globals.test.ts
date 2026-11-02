@@ -25,7 +25,7 @@ const declarations = (block: string) => [...block.matchAll(/(--[\w-]+|color-sche
 
 // The dark theme redefines tokens only, so a colour written straight into a rule would stay light in it.
 test('rules use colour tokens only: no hex, rgb() or named colour outside the token blocks', () => {
-  for (const name of ['./globals.css', '../components/MediaOptimizer.module.css']) {
+  for (const name of ['./globals.css', '../components/MediaOptimizer.module.css', '../components/PromptComposer.module.css']) {
     let css = readFileSync(new URL(name, import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
     for (const m of Object.values(tokenBlocks(css))) if (m) css = css.replace(m[0], '');
     const values = [...css.matchAll(/:\s*([^;{}]+)[;}]/g)].map((m) => m[1]!);

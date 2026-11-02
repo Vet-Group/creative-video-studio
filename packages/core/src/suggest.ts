@@ -50,6 +50,7 @@ export const PROMPT_TASKS = {
   character_swap: "a tool that replaces the person in a video with the seller's model photo. Describe how the new person should look and move",
   model_swap: "a tool that replaces the model in a fashion photo while keeping the outfit. Describe the new model's look and pose",
   background_changer: "a tool that puts the product photo on a new background. Describe only the new background as a short scene",
+  motion_control: "a tool that makes the person in the seller's photo copy the motion of a reference video. Describe the setting, the light and the mood, not the motion",
   lingerie_try_on: "a lingerie try-on on a model photo for a fashion shop. Describe a tasteful pose, the setting and the light, not the garment",
 } as const;
 

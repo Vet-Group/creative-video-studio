@@ -3,7 +3,7 @@ import { type DragEvent, type KeyboardEvent, useEffect, useId, useRef, useState 
 import { api, errorText, sendJson } from '@/lib/api';
 import { cardSample, type Example, exampleForPreset, examplesFor, sampleSrc, splitColumns } from '@/lib/examples';
 import { promptTooLong } from '@/lib/prompt-limit';
-import { confirmRun, runKey } from '@/lib/run-guard';
+import { confirmRun } from '@/lib/run-guard';
 import { NARROW, useMediaQuery, WIDE } from '@/lib/use-media-query';
 import { useHydrated } from '@/lib/use-hydrated';
 import { useRecall } from '@/lib/use-recall';
@@ -19,7 +19,7 @@ import { copyError, copySamples, GALLERY_SIZE_KEY, HISTORY_SIZE_KEY, photoImg, S
 import { FormContext, type Photo, Tap, useApplier, useHasHistory, useJobs, useRecreated } from './jobs';
 import { Modal } from './Modal';
 import { ModelPicker } from './ModelPicker';
-import { PromptTools } from './PromptTools';
+import { PromptComposer } from './PromptComposer';
 import { Preview } from './Preview';
 import { Select } from './Select';
 import { Tray } from './Shell';
@@ -571,27 +571,19 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
               </p>
             )}
 
-            <div className="field">
-              <div className="field-head">
-                <label htmlFor={promptId} className="field-label">
-                  Mô tả chuyển động
-                </label>
-                {presetId === '' && <PromptTools feature="video" value={prompt} onChange={setPrompt} maxLength={chosen?.maxPromptChars} onRun={() => canRun && void run()} />}
-              </div>
-              <div className="prompt-box" data-disabled={presetId !== ''}>
-                <textarea id={promptId} value={presetId === '' ? prompt : ''} maxLength={chosen?.maxPromptChars} disabled={presetId !== ''} placeholder={presetId === '' ? 'Mô tả video bạn muốn, nên viết bằng tiếng Anh' : 'Đang dùng mẫu. Chọn "Tự viết mô tả" trong danh sách mẫu để tự nhập'} onChange={(e) => setPrompt(e.target.value)} onKeyDown={runKey(() => canRun && void run())} />
-                {/* The row stays while a preset is in use, so the box keeps the live 121 px height. */}
-                <div className="prompt-foot">
-                  {presetId === '' && <EnhanceToggle on={enhance} onChange={setEnhance} />}
-                  {presetId === '' && (
-                    <span>
-                      {prompt.length}
-                      {chosen && `/${chosen.maxPromptChars}`}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
+            <PromptComposer
+              id={promptId}
+              label="Mô tả chuyển động"
+              feature="video"
+              value={prompt}
+              onChange={setPrompt}
+              maxLength={chosen?.maxPromptChars}
+              onRun={() => canRun && void run()}
+              disabled={presetId !== ''}
+              placeholder={presetId === '' ? 'Ví dụ: camera xoay chậm quanh sản phẩm, ánh sáng mềm (nên viết bằng tiếng Anh)' : 'Đang dùng mẫu. Chọn "Tự viết mô tả" trong danh sách mẫu để tự nhập'}
+              ask={() => ({ field: 'prompt', feature: 'video', text: prompt, ...(chosen && { room: chosen.maxPromptChars }) })}
+              enhance={<EnhanceToggle on={enhance} onChange={setEnhance} />}
+            />
 
             <Select label="Độ phân giải" icon="preset" heading="Độ phân giải" value={chosen?.resolution ?? ''} options={[{ value: chosen?.resolution ?? '', label: chosen?.resolution ?? 'Theo mô hình' }]} onChange={() => undefined} />
             <Select

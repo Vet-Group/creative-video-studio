@@ -41,12 +41,11 @@ test('an Advanced job runs from reference images, a brief, a script and audio on
   expect(placeBox!.x).toBeGreaterThan(hookBox!.x + hookBox!.width - 1);
   await expect(page.getByRole('button', { name: /^Hook/ })).toBeVisible();
   await expect(page.getByRole('button', { name: /^Bối cảnh/ })).toBeVisible();
-  await expect(brief(page)).toHaveAttribute('placeholder', 'Mô tả video marketing bạn muốn…');
+  await expect(brief(page)).toHaveAttribute('placeholder', 'Ví dụ: người mẫu mở hộp, cầm sản phẩm lên và nói cảm nhận đầu tiên…');
   await expect(script(page)).toBeVisible();
-  await expect(page.locator('.script-foot')).toHaveCount(0); // empty, the script box is as short as the live page's
   const [promptBox, scriptBox] = await page.locator('.prompt-box').all();
-  expect((await scriptBox!.boundingBox())!.height).toBeCloseTo(74, 0); // empty, the script box is 74 px as on Fash
-  expect((await promptBox!.boundingBox())!.height).toBeCloseTo(110, 0); // the prompt keeps its row for suggestions and the count
+  expect((await scriptBox!.boundingBox())!.height).toBeCloseTo(123, 0); // empty: the 76 px text and the toolbar, no starter chips
+  expect((await promptBox!.boundingBox())!.height).toBeCloseTo(161, 0); // the prompt adds one row of starter chips
   await expect(audio(page)).toHaveAttribute('aria-checked', 'true');
   await expect(modelButton(page)).toContainText('Mock E2E');
   await expect(runButton(page)).toContainText('$0.0000');

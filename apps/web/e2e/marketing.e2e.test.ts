@@ -215,12 +215,13 @@ test('the brief may take what the chosen model leaves; a switch to a model with 
   await page.getByLabel('Ảnh sản phẩm').setInputFiles(file('product.png'));
   await expect(modelButton(page)).toContainText('Mock E2E');
   const brief = page.getByRole('textbox', { name: 'Prompt (tuỳ chọn)' });
-  const counter = page.locator('.prompt-foot > span:last-child');
+  const counter = page.locator('.prompt-count');
   const room = async () => Number((await counter.textContent())!.split('/')[1]);
-  await expect(counter).toHaveText(/^0\/\d+$/);
-  expect(await room()).toBeGreaterThan(1100); // 2000 less the fixed part the page adds
+  await expect(counter).toHaveCount(0); // the count shows once there is text
   const text = 'x'.repeat(1100);
   await brief.fill(text);
+  await expect(counter).toHaveText(/^1100\/\d+$/);
+  expect(await room()).toBeGreaterThan(1100); // 2000 less the fixed part the page adds
   await expect(runButton(page)).toBeEnabled();
 
   // Mock E2E Wide takes 1000 characters: the text stays as written and Run waits.
@@ -442,7 +443,7 @@ test('as on the live form (measured 2026-10-29): 272 px content, 131x130 tiles 1
   near((await disc.boundingBox())!.width, 36);
   expect(await disc.evaluate((e) => getComputedStyle(e).backgroundColor)).toBe('rgba(0, 0, 0, 0.06)');
   expect(await hookBox.locator('.choice-label').evaluate((e) => [getComputedStyle(e).fontSize, getComputedStyle(e).color])).toEqual(['14px', 'rgb(102, 102, 102)']);
-  // The Prompt label row is 21 px tall (its suggestion link does not stretch it) and the box sits 4 px under it: label at 478, box at 503 on Fash.
+  // The Prompt label row is 21 px tall (its Optional chip does not stretch it) and the box sits 6 px under it.
   // The Change chip sits 4 px inside the banner's top right corner, in regular weight over a blur (Fash's .mkt-type-preview__change).
   const banner = (await page.locator('.marketing-head').boundingBox())!;
   const change = page.getByRole('button', { name: 'Đổi định dạng' });
@@ -450,9 +451,9 @@ test('as on the live form (measured 2026-10-29): 272 px content, 131x130 tiles 1
   near(chip.y - banner.y, 4);
   near(banner.x + banner.width - (chip.x + chip.width), 4);
   expect(await change.evaluate((e) => [getComputedStyle(e).fontWeight, getComputedStyle(e).backdropFilter])).toEqual(['400', 'blur(4.5px)']);
-  const head = (await page.locator('.field-head').filter({ has: page.locator('label', { hasText: 'Prompt' }) }).boundingBox())!;
+  const head = (await page.locator('label', { hasText: 'Prompt' }).locator('..').boundingBox())!;
   near(head.height, 21);
-  near((await page.locator('.prompt-box').boundingBox())!.y - (head.y + head.height), 4);
+  near((await page.locator('.prompt-box').boundingBox())!.y - (head.y + head.height), 6);
 
   await hookBox.click();
   const card = page.getByRole('dialog', { name: 'Chọn hook' }).getByRole('option', { name: hook.name, exact: true });
@@ -654,7 +655,8 @@ test('opening a menu low in the form neither scrolls the form nor hides under it
   expect(await form.evaluate((e) => e.scrollTop)).toBe(before);
   const [frame, menu] = [(await form.boundingBox())!, (await pop.boundingBox())!];
   const trigger = (await select(page, 'Thời lượng').boundingBox())!;
-  expect(menu.y, 'opens downward, as on the live page').toBeGreaterThan(trigger.y + trigger.height);
+  // Downward when the rows fit under the trigger, else upward: either way it leaves the trigger visible.
+  expect(menu.y >= trigger.y + trigger.height || menu.y + menu.height <= trigger.y, 'the menu does not cover its trigger').toBe(true);
   expect(menu.y, 'menu top inside the form').toBeGreaterThanOrEqual(frame.y - 1);
   expect(menu.y + menu.height, 'menu bottom inside the form').toBeLessThanOrEqual(frame.y + frame.height + 1);
   await page.keyboard.press('Escape');

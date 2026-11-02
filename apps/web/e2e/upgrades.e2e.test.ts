@@ -126,6 +126,8 @@ test('AC 12: Ctrl+Enter in the prompt runs once, Enter alone does not, and at 1.
   await barPrompt(page).press('Enter');
   await expect(barPrompt(page)).toHaveValue('keyboard picture\n');
   expect(posts()).toBe(0);
+  // Run waits for hydration and for the remembered settings to load, which a loaded machine makes slow.
+  await expect(barRun(page)).toBeEnabled();
   await barPrompt(page).press('Control+Enter');
   await expect(page.getByText('Đã gửi job')).toBeVisible();
   expect(posts()).toBe(1);
@@ -208,11 +210,11 @@ test('AC 14: the prompt box grows with the text up to a cap and then scrolls, an
   await page.goto('/try-on');
   await expect(modelButton(page)).toContainText('Mock image E2E');
   const prompt = page.getByLabel('Prompt (tuỳ chọn)');
-  expect(await prompt.evaluate((t: HTMLTextAreaElement) => t.offsetHeight)).toBe(64);
+  expect(await prompt.evaluate((t: HTMLTextAreaElement) => t.offsetHeight)).toBe(76); // the composer's start, under four lines
   await prompt.fill(text);
   const grown = await prompt.evaluate((t: HTMLTextAreaElement) => ({ h: t.clientHeight, sh: t.scrollHeight, offset: t.offsetHeight }));
-  expect(grown.offset).toBeGreaterThan(64);
-  expect(grown.offset).toBeLessThanOrEqual(600); // 60% of the viewport
+  expect(grown.offset).toBeGreaterThan(76);
+  expect(grown.offset).toBeLessThanOrEqual(500); // 50% of the viewport
   expect(grown.sh).toBeGreaterThan(grown.h);
   await page.getByRole('button', { name: 'Mở rộng' }).click();
   await expect(editor.getByRole('textbox', { name: 'Prompt mở rộng' })).toHaveValue(text);

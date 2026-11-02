@@ -1,0 +1,58 @@
+/* The prompt composer (PromptComposer.tsx) and its tools (PromptTools.tsx). Colours are theme tokens only (globals.test.ts). */
+/* minmax(0, 1fr) and min-width 0: the one-row chips scroll inside the box instead of widening the form column. */
+.composer { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; min-width: 0; }
+.head { display: flex; align-items: center; gap: 8px; min-height: 21px; }
+.optional { padding: 1px 8px; border-radius: 999px; background: rgb(var(--tint) / .06); color: var(--text-muted); font-size: 11px; font-weight: 500; line-height: 16px; }
+
+/* The box: a quiet fill at rest, the surface with a soft ring while typing; the popovers hang from it, full width. */
+.box { position: relative; display: flex; flex-direction: column; border: 1px solid var(--field-border); border-radius: 12px; background: var(--fill); transition: border-color .15s, background-color .15s, box-shadow .15s; }
+.box:hover { border-color: var(--border-strong); }
+.box:focus-within { border-color: var(--ink); background: var(--surface); box-shadow: 0 0 0 3px rgb(var(--tint) / .08); }
+.box[data-disabled] { opacity: .6; }
+.box[data-disabled]:hover { border-color: var(--field-border); }
+.input { display: block; width: 100%; min-height: 76px; max-height: 50vh; padding: 10px 12px 6px; border: 0; outline: none; background: transparent; color: inherit; font: inherit; font-size: 14px; line-height: 21px; resize: none; field-sizing: content; overflow-y: auto; }
+.input::placeholder { color: var(--text-muted); }
+.input:disabled { cursor: not-allowed; }
+
+/* Starter chips: dashed until hovered, so they read as suggestions, not as chosen tags. */
+.starters { display: flex; gap: 6px; padding: 0 10px 10px; overflow-x: auto; scrollbar-width: none; mask-image: linear-gradient(90deg, var(--ink) calc(100% - 24px), transparent); }
+.starters::-webkit-scrollbar { display: none; }
+.starter { flex: none; height: 28px; padding: 0 10px; border: 1px dashed var(--border-button); border-radius: 999px; background: var(--surface); color: var(--text-2); font: inherit; font-size: 12px; line-height: 18px; white-space: nowrap; cursor: pointer; }
+.starter:hover { border-style: solid; color: var(--ink); }
+
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 6px; border-top: 1px solid var(--field-border); }
+.tools { display: contents; }
+.tool { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent; color: var(--text-2); font: inherit; font-size: 12px; font-weight: 500; line-height: 18px; white-space: nowrap; cursor: pointer; }
+.tool:hover, .tool[aria-expanded='true'] { background: rgb(var(--tint) / .07); color: var(--ink); }
+.ai { color: var(--ink-strong); font-weight: 600; }
+.ai :global(.icon) { color: var(--brand); }
+.iconTool { width: 32px; padding: 0; justify-content: center; }
+.spacer { flex: 1; }
+/* The Enhance pill keeps its own look, a touch shorter to sit in the toolbar. */
+.toolbar > :global(.enhance) { height: 32px; }
+
+/* The lists: one at a time, under the box (over the bar in the Image Generation bar), as wide as the box. */
+.popover { position: absolute; top: calc(100% + 6px); left: -1px; right: -1px; z-index: 40; display: grid; gap: 2px; max-height: min(320px, 45vh); overflow-y: auto; padding: 6px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); box-shadow: 0 12px 32px rgb(var(--shade) / .16); }
+.popHead { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 28px; padding: 0 6px; color: var(--text-muted); font-size: 12px; font-weight: 600; }
+.popAction { padding: 2px 6px; border: 0; border-radius: 6px; background: none; color: var(--ink); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+.popAction:hover { background: rgb(var(--tint) / .07); }
+.option { display: -webkit-box; width: 100%; padding: 8px 10px; overflow: hidden; border: 0; border-radius: 8px; background: transparent; color: var(--ink-strong); font: inherit; font-size: 13px; line-height: 19px; text-align: left; cursor: pointer; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
+.option:hover, .option:focus-visible { background: rgb(var(--tint) / .06); }
+.skeleton { display: block; height: 38px; margin: 2px 4px; border-radius: 8px; background: linear-gradient(90deg, rgb(var(--tint) / .04), rgb(var(--tint) / .1), rgb(var(--tint) / .04)); background-size: 200% 100%; animation: shimmer 1.2s linear infinite; }
+@keyframes shimmer { to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .skeleton { animation: none; } }
+.error { margin: 0; padding: 6px; color: var(--danger-text); font-size: 13px; }
+
+/* Empty and unfocused, the meta row would hold only the hidden hint: it takes no room then. */
+.composer:not(:focus-within) .meta:not(:has(.count)) { display: none; }
+.meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 18px; padding: 0 2px; color: var(--text-muted); font-size: 12px; line-height: 18px; }
+.hint { opacity: 0; transition: opacity .15s; }
+.composer:focus-within .hint { opacity: 1; }
+.count { margin-left: auto; font-variant-numeric: tabular-nums; }
+.count[data-near] { color: var(--danger-text); font-weight: 600; }
+
+.editorFoot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; color: var(--text-muted); font-size: 12px; }
+
+/* The Image Generation bar: AI, recent words and the editor are round icons in the prompt row (globals.css .imagebar .prompt-tools), so the foot keeps one row. */
+.compact { position: static; }
+.compact .popover { top: auto; bottom: calc(100% + 6px); left: 0; right: 0; }

@@ -12,7 +12,8 @@ try {
   // No .env file; the settings come from the environment.
 }
 
-const db = await createTestDatabase('cvs_e2e');
+// CVS_E2E_DB lets a second checkout run its specs beside another's on the same Postgres.
+const db = await createTestDatabase(process.env.CVS_E2E_DB ?? 'cvs_e2e');
 process.env.DATABASE_URL = db.url;
 process.env.S3_BUCKET = 'cvs-e2e';
 process.env.CVS_MOCK_RUN_MS = '4000';
