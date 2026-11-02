@@ -527,12 +527,12 @@ test.describe('390x844', () => {
     });
   });
 
-  test('N1 top bar: 57 tall, sticky, white, above the content, hairline bottom border, 40x40 radius-10 menu button, 18px/600 title at x=52', async ({ page }) => {
+  test('N1 top bar: 57 tall, sticky, white, above the content, hairline bottom border, 44x44 radius-10 menu button, 18px/600 title at x=52', async ({ page }) => {
     const bar = page.locator('.topbar');
     near((await box(bar)).height, 57, 'top bar height');
     expect(await css(bar, 'position', 'background-color', 'z-index', 'border-bottom-width', 'border-bottom-color')).toEqual(['sticky', 'rgb(255, 255, 255)', '99', '1px', 'rgba(0, 0, 0, 0.1)']);
     const menu = page.getByRole('button', { name: 'Mở menu' });
-    sized(await box(menu), 40, 40, 'menu button');
+    sized(await box(menu), 44, 44, 'menu button'); // 44, not the reference 40: a full touch target
     expect(await css(menu, 'border-top-left-radius', 'border-top-width', 'background-color')).toEqual(['10px', '0px', 'rgba(0, 0, 0, 0)']);
     const title = bar.locator('strong');
     expect(await css(title, 'font-size', 'font-weight', 'color')).toEqual(['18px', '600', 'rgb(26, 26, 26)']);
