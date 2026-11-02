@@ -13,7 +13,7 @@ const render = (props: Partial<Parameters<typeof SignInMethods>[0]>) =>
 test('lists the linked methods, Google with its email, and offers no unlink for the password', () => {
   const html = render({ methods: [credential, google] });
   expect(html).toContain('Email và mật khẩu');
-  expect(html).toContain('Google (me@gmail.test)');
+  expect(html).toContain('<strong>Google</strong><span>me@gmail.test</span>');
   expect(html.match(/Huỷ liên kết/g)).toHaveLength(2); // the Google button's text and its aria-label
 });
 
@@ -37,7 +37,7 @@ test('shows the reason a failed link left in the URL', () => {
 
 test('lists the passkeys with their date and a delete button, and offers to add one once the page can run WebAuthn', () => {
   const html = render({ passkeys: [{ id: 'p1', createdAt: '2026-11-01T18:30:00.000Z' }] });
-  expect(html).toContain('Passkey · 02/11/2026'); // the day in Vietnam
+  expect(html).toContain('Thêm ngày 02/11/2026'); // the day in Vietnam
   expect(html).toContain('aria-label="Xoá passkey ngày 02/11/2026"');
   expect(html).toContain('<button type="button" disabled="">Thêm passkey</button>');
   expect(html).not.toContain('Quản lý passkey');

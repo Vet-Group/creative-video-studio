@@ -812,8 +812,12 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .settings-grid { display: grid; min-height: min(640px, calc(100vh - 160px)); }
 .settings-nav { display: grid; align-content: start; gap: 8px; padding: 16px; border-bottom: 1px solid rgb(var(--shade) / .1); }
 .settings-kicker { margin: 0 0 4px; color: var(--text-2); font-size: 12px; line-height: 18px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
-.settings-nav button { height: 44px; padding: 0 16px; border: 0; border-radius: 8px; background: transparent; color: var(--ink); font-size: 14px; text-align: left; }
+.settings-nav button { display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 16px; border: 0; border-radius: 8px; background: transparent; color: var(--ink); font-size: 14px; text-align: left; white-space: nowrap; }
+.settings-nav button .icon { flex: none; color: var(--text-icon); }
 .settings-nav button:hover, .settings-nav button[aria-current='true'] { background: var(--nav-hover); }
+.settings-nav button[aria-current='true'] { font-weight: 600; }
+.settings-nav button[aria-current='true'] .icon { color: var(--brand); }
+.settings-nav .settings-signout .icon { color: currentColor; }
 .settings-nav .settings-signout { margin-top: 16px; background: var(--danger-soft); color: var(--danger-text); }
 .settings-nav .settings-signout:hover { background: var(--danger-soft-hover); }
 .settings-panel { min-width: 0; padding: 20px; }
@@ -821,9 +825,65 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .settings-fields { display: grid; gap: 12px; margin: 0 0 12px; padding: 16px; border: 1px solid rgb(var(--shade) / .08); border-radius: 12px; background: var(--surface-1); }
 .settings-fields dt { color: var(--text-2); font-size: 12px; line-height: 18px; font-weight: 500; }
 .settings-fields dd { margin: 0; overflow-wrap: anywhere; }
+.settings-fields-pair { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+.settings-panel > section { animation: settings-in .22s cubic-bezier(.2, .7, .2, 1); }
+@keyframes settings-in { from { opacity: 0; transform: translateY(6px); } }
+.settings-panel > section > .muted { margin: 12px 0 0; }
+.settings-card { margin: 0; padding: 20px; border: 1px solid rgb(var(--shade) / .08); border-radius: 12px; background: var(--surface-1); }
+/* Profile: the person's colour tints the card, so each account looks like its own. */
+.profile-card { display: flex; align-items: center; gap: 16px; margin: 0 0 12px; padding: 20px; border: 1px solid rgb(var(--shade) / .08); border-radius: 14px; background: linear-gradient(120deg, color-mix(in srgb, var(--avatar) 16%, var(--surface)), var(--surface) 75%); }
+.avatar { display: grid; flex: none; place-items: center; width: 56px; height: 56px; border-radius: 50%; background: var(--avatar); box-shadow: 0 0 0 3px var(--surface), 0 2px 10px color-mix(in srgb, var(--avatar) 40%, transparent); color: var(--on-dark); font-size: 20px; line-height: 1; font-weight: 600; letter-spacing: .02em; }
+.profile-who { flex: 1; min-width: 0; }
+.profile-name { margin: 0; font-size: 18px; line-height: 26px; font-weight: 600; overflow-wrap: anywhere; }
+.profile-email { margin: 0; color: var(--text-muted); font-size: 14px; line-height: 20px; overflow-wrap: anywhere; }
+.role-badge { flex: none; padding: 2px 10px; border-radius: 999px; background: var(--fill); color: var(--text-2); font-size: 12px; line-height: 18px; font-weight: 600; }
+.role-badge[data-role='admin'] { background: var(--danger-soft); color: var(--danger); }
+/* Limits: one bar per cap, dark while there is room, amber from 80 %, red at the cap. */
+.meters { display: grid; gap: 22px; }
+.meter-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 14px; line-height: 20px; }
+.meter-head strong { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.meter-track { height: 8px; margin-top: 8px; overflow: hidden; border-radius: 999px; background: rgb(var(--shade) / .08); }
+.meter-track span { display: block; height: 100%; border-radius: inherit; background: var(--ink); transform-origin: left; animation: meter-fill .7s cubic-bezier(.2, .7, .2, 1); }
+@keyframes meter-fill { from { transform: scaleX(0); } }
+.meter[data-level='warn'] .meter-track span { background: var(--warn-border); }
+.meter[data-level='full'] .meter-track span { background: var(--brand); }
+.meter-left { margin: 6px 0 0; color: var(--text-muted); font-size: 12px; line-height: 18px; font-variant-numeric: tabular-nums; }
+.meter[data-level='full'] .meter-left { color: var(--danger); font-weight: 600; }
+/* Rows of sign-in methods and security facts: a mark, the words, a status and one action. Also on the sign-in methods page. */
+.acct-rows { margin: 12px 0 0; padding: 0; overflow: hidden; border: 1px solid rgb(var(--shade) / .08); border-radius: 12px; background: var(--surface); list-style: none; }
+.acct-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; min-height: 64px; padding: 12px 16px; }
+.acct-row + .acct-row { border-top: 1px solid rgb(var(--shade) / .08); }
+.acct-mark { display: grid; flex: none; place-items: center; width: 36px; height: 36px; border: 1px solid rgb(var(--shade) / .08); border-radius: 10px; background: var(--surface-1); color: var(--text-2); }
+.acct-text { display: grid; flex: 1 1 120px; min-width: 0; font-size: 14px; line-height: 20px; }
+.acct-text strong { font-weight: 600; }
+.acct-text span { color: var(--text-muted); font-size: 13px; line-height: 18px; overflow-wrap: anywhere; }
+.acct-status { padding: 2px 8px; border-radius: 999px; background: var(--fill); color: var(--text-2); font-size: 12px; line-height: 18px; font-weight: 500; white-space: nowrap; }
+.acct-status[data-on='true'] { background: var(--cat-utility-bg); color: var(--cat-utility-fg); }
+.acct-row > button, .acct-row > a { display: inline-flex; align-items: center; height: 32px; padding: 0 12px; border: 1px solid var(--border-button); border-radius: 8px; background: var(--surface); color: var(--ink); font-size: 13px; text-decoration: none; white-space: nowrap; }
+.acct-row > button:hover, .acct-row > a:hover { background: var(--fill); }
+.acct-row > .acct-primary { border-color: var(--ink); background: var(--ink); color: var(--surface); }
+.acct-row > .acct-primary:hover { border-color: var(--zinc-700); background: var(--zinc-700); }
 @media (min-width: 768px) {
   .settings-grid { grid-template-columns: 260px minmax(0, 1fr); }
   .settings-nav { border-right: 1px solid rgb(var(--shade) / .1); border-bottom: 0; }
+}
+/* Phones: the sections are a row of pills that scrolls sideways above the panel. */
+@media (max-width: 767px) {
+  .settings-nav { display: flex; gap: 6px; padding: 12px 16px; overflow-x: auto; scrollbar-width: none; }
+  .settings-nav .settings-kicker { display: none; }
+  .settings-nav button { flex: none; height: 36px; padding: 0 12px; border: 1px solid rgb(var(--shade) / .1); border-radius: 999px; font-size: 13px; }
+  .settings-nav button[aria-current='true'] { border-color: var(--ink); background: var(--ink); color: var(--surface); }
+  .settings-nav button[aria-current='true'] .icon { color: currentColor; }
+  .settings-nav .settings-signout { margin-top: 0; border-color: transparent; }
+  .settings-grid { align-content: start; }
+  .settings-panel { padding: 16px; }
+  .profile-card { display: grid; grid-template-columns: auto minmax(0, 1fr); padding: 16px; }
+  .profile-card .role-badge { grid-column: 2; justify-self: start; margin-top: -8px; }
+  .acct-row { display: grid; grid-template-columns: 36px minmax(0, 1fr); }
+  .acct-row > :not(.acct-mark, .acct-text) { grid-column: 2; justify-self: start; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .settings-panel > section, .meter-track span { animation: none; }
 }
 
 /* Explore. */

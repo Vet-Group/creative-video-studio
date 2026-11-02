@@ -1,6 +1,6 @@
 // The Run caps against a disposable database (needs the compose Postgres: `pnpm services:up`). The clock is the `at` argument; nothing sleeps.
 import { bookShared, lateBill, reserve, withTransaction } from '@cvs/core/ledger';
-import { checkCaps } from '@cvs/core/limits';
+import { checkCaps, memberUsage } from '@cvs/core/limits';
 import { createPool } from '@cvs/db/client';
 import { createTestDatabase } from '@cvs/db/testing';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
@@ -198,6 +198,53 @@ describe('image and apps features', () => {
     await featureJob(a, 'image', '2031-08-03T03:00:00Z', '10.0000');
     expect(await checkCaps(pool, a, '0.0001', at('2031-08-03T04:00:00Z'), 'image')).toBe('member_daily_usd');
     expect(await checkCaps(pool, b, '10.0000', at('2031-08-03T04:00:00Z'), 'image')).toBeNull();
+  });
+
+  test('memberUsage shows the numbers checkCaps refuses on: under the caps, then at each one, on ICT day and month boundaries', async () => {
+    await setCaps('200', 2);
+    await setFeatureCaps('260', '10', '50');
+    const u = await member();
+    await newJob(u, '2031-10-09T17:30:00Z', { estimate: '1.0000' }); // 00:30 ICT on 10 October
+    await featureJob(u, 'image', '2031-10-02T03:00:00Z', '40.0000');
+    await featureJob(u, 'try_on', '2031-10-10T03:00:00Z', '6.5000');
+    await newJob(await member(), '2031-10-10T03:00:00Z', { estimate: '1.0000' }); // someone else's clip
+    const noon = at('2031-10-10T05:00:00Z');
+    expect(await memberUsage(pool, u, noon)).toEqual({
+      clips: { used: 1, cap: 2 },
+      dayUsd: { used: '6.5000', cap: '10.0000' },
+      monthUsd: { used: '46.5000', cap: '50.0000' },
+    });
+    expect(await checkCaps(pool, u, '1.0000', noon)).toBeNull();
+    expect(await checkCaps(pool, u, '3.5000', noon, 'image')).toBeNull(); // 6.5 + 3.5 = 10 of the day
+
+    await newJob(u, '2031-10-10T04:00:00Z', { estimate: '1.0000' });
+    await featureJob(u, 'image', '2031-10-10T04:00:00Z', '3.5000');
+    expect(await memberUsage(pool, u, noon)).toEqual({
+      clips: { used: 2, cap: 2 },
+      dayUsd: { used: '10.0000', cap: '10.0000' },
+      monthUsd: { used: '50.0000', cap: '50.0000' },
+    });
+    expect(await checkCaps(pool, u, '1.0000', noon)).toBe('daily_clips');
+    expect(await checkCaps(pool, u, '0.0001', noon, 'image')).toBe('member_daily_usd');
+
+    // 00:00 ICT on 11 October: the day starts fresh, the month does not; 1 November starts both.
+    expect(await memberUsage(pool, u, at('2031-10-10T17:00:00Z'))).toMatchObject({ clips: { used: 0 }, dayUsd: { used: '0.0000' }, monthUsd: { used: '50.0000' } });
+    expect(await memberUsage(pool, u, at('2031-10-31T17:00:00Z'))).toMatchObject({ dayUsd: { used: '0.0000' }, monthUsd: { used: '0.0000' } });
+    await setCaps('200');
+  });
+
+  test('memberUsage counts an Admin like a Member: checkCaps has no exemption for the role', async () => {
+    await setCaps('200', 1);
+    await setFeatureCaps('260', '10', '50');
+    const a = await member();
+    await pool.query(`update users set role = 'admin' where id = $1`, [a]);
+    await newJob(a, '2031-11-03T03:00:00Z', { estimate: '1.0000' });
+    await featureJob(a, 'image', '2031-11-03T03:00:00Z', '10.0000');
+    const t = at('2031-11-03T04:00:00Z');
+    expect(await memberUsage(pool, a, t)).toEqual({ clips: { used: 1, cap: 1 }, dayUsd: { used: '10.0000', cap: '10.0000' }, monthUsd: { used: '10.0000', cap: '50.0000' } });
+    expect(await checkCaps(pool, a, '1.0000', t)).toBe('daily_clips');
+    expect(await checkCaps(pool, a, '0.0001', t, 'image')).toBe('member_daily_usd');
+    await setCaps('200');
   });
 
   test('shared ledger rows (no job) stay in the video month', async () => {

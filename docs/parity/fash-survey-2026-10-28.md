@@ -80,8 +80,8 @@ AC3 audit (all pages): 77 logged actions, 0 forbidden buttons clicked, refusals 
 
 | # | Screen / state | Fash evidence | Ours today | Status | Target |
 |---|----------------|---------------|-----------|--------|--------|
-| S1 | Settings dialog: Account list (Profile, Billing, Connected apps, Support, Logout) beside the pane | 01-settings-menu-1440 | Settings dialog: Profile, Linked accounts, Support, sign out | already matches (same dialog shape) | - |
-| S2 | Profile: first/last name, phone with country, company, web address, Save | 01-settings-menu-1440 | name and email from the company account | approved difference: profile data comes from the company account (Admin), not self-service |  - |
+| S1 | Settings dialog: Account list (Profile, Billing, Connected apps, Support, Logout) beside the pane | 01-settings-menu-1440 | Settings dialog: Profile, Limits, Security, Linked accounts, Support, sign out; on phones the list is a row of pills above the pane | same dialog shape; approved difference (owner decision 2026-11-02): two extra sections, Limits (the user's own clip and image/apps spend against the Admin caps) and Security (password and passkey summary), and no Billing | - |
+| S2 | Profile: first/last name, phone with country, company, web address, Save | 01-settings-menu-1440 | a read-only profile card: initials avatar, name, email, role badge, team and the month the account was created | approved difference: profile data comes from the company account (Admin), not self-service; richer read-only card (owner decision 2026-11-02) |  - |
 | S3 | Billing: plan, credits left, Top-Up, invoices (Stripe) | 02-billing-1440 | none | approved difference: internal app, real USD cost shown per Run and on the Admin Costs page, no credits or plans | - |
 | S4 | Connected apps: "No connected apps" (MCP for AI assistants) | 02-connected-apps-1440 | Linked accounts (Google, Lark sign-in) | approved difference: no external assistant access to company media | - |
 | S5 | Support: subject + message form, Send | 02-support-1440 | support email or "ask the Admin" | approved difference: an internal team reaches the Admin directly; no ticket backend | - |
