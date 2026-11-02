@@ -27,4 +27,12 @@ test('a phone can play and download a clip', async ({ page }) => {
 
   const [download] = await Promise.all([page.waitForEvent('download'), card.getByRole('button', { name: 'Tải xuống' }).click()]);
   expect(download.suggestedFilename()).toMatch(new RegExp(`^${today()}-e2e-member-3-[0-9a-f]{8}\\.mp4$`));
+
+  // Touch targets: every icon action of a result is at least 44 px square, on the grid card and in the list row.
+  const tooSmall = () => card.locator('.icon-button').evaluateAll((bs) => bs.filter((b) => b.getBoundingClientRect().width < 44 || b.getBoundingClientRect().height < 44).map((b) => b.getAttribute('aria-label')));
+  await expect(card.locator('.icon-button')).not.toHaveCount(0);
+  expect(await tooSmall()).toEqual([]);
+  await page.getByRole('button', { name: 'Danh sách', exact: true }).click();
+  await expect(card.locator('.lib-thumb')).toBeVisible();
+  expect(await tooSmall()).toEqual([]);
 });

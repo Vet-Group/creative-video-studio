@@ -111,7 +111,7 @@ button, .button { font: inherit; padding: .45rem .8rem; border: 1px solid var(--
 button:disabled { opacity: .5; cursor: not-allowed; }
 button[aria-pressed='true'] { background: var(--fill); border-color: var(--ink); }
 button.primary { background: var(--brand); border-color: var(--brand); color: var(--on-dark); margin-top: .5rem; }
-button.primary:hover:not(:disabled), .runbar button.primary.run:hover:not(:disabled), .detail-use:hover, .library-empty .button:hover, .bar-run:hover:not(:disabled) { border-color: var(--brand-hover); background: var(--brand-hover); }
+button.primary:hover:not(:disabled), .runbar button.primary.run:hover:not(:disabled), .detail-use:hover, .library-empty-actions .button:first-child:hover, .bar-run:hover:not(:disabled) { border-color: var(--brand-hover); background: var(--brand-hover); }
 :focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 select { border: 1px solid transparent; border-radius: 8px; background: var(--fill); }
 label { display: block; margin: .75rem 0; font-weight: 600; }
@@ -1306,16 +1306,35 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .about-long .about-cards { display: block; }
 .about-long .about-cards > li { margin: 0 0 20px; padding: 0; border: 0; font-size: 16px; line-height: 24px; }
 
-/* Library tools: favourites, sort and the card size slider; the empty state. */
+/* Library toolbar: search, sort, the grid or list switch, the card size and the select button on one row of 36 px controls; the filter pills; the empty states. */
 .library-sub { margin: -4px 0 16px; }
-.library-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; margin: 0 0 16px; }
+.library-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 12px; }
 .library-tools label, .gallery-tools label { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 14px; font-weight: 400; }
 .library-tools label input, .library-tools label select, .gallery-tools label input { display: inline-block; margin: 0; min-width: 0; }
-.library-tools input[type="checkbox"] { width: 16px; height: 16px; padding: 0; }
 .library-tools label { white-space: nowrap; }
-.library-tools select { padding: 6px 28px 6px 12px; border-color: rgb(var(--shade) / .15); background: var(--surface); font-size: 13px; }
+.library-search { flex: 1 1 14rem; height: 36px; padding: 0 12px; border: 1px solid rgb(var(--shade) / .1); border-radius: 8px; background: var(--surface); color: var(--text-subtle); cursor: text; }
+.library-search input { flex: 1; width: 100%; height: 34px; padding: 0; border: 0; outline: 0; background: none; color: var(--ink); font: inherit; font-size: 14px; }
+.library-search:focus-within { border-color: var(--ink); box-shadow: 0 0 0 1px var(--ink); }
+.library-field { display: flex; align-items: center; height: 36px; margin: 0; border: 1px solid rgb(var(--shade) / .1); border-radius: 8px; background: var(--surface); color: var(--text-subtle); font-size: 13px; line-height: 18px; font-weight: 500; white-space: nowrap; }
+.library-field > span:not(.sr-only) { padding: 0 0 0 10px; }
+.library-field :is(select, input) { width: auto; height: 34px; min-width: 0; margin: 0; padding: 0 8px; border: 0; border-radius: 8px; outline: 0; background: none; color: var(--ink); font: inherit; font-weight: 500; }
+.library-field:has(:focus-visible), .library-toggle:has(:focus-visible) { outline: 2px solid var(--ink); outline-offset: 2px; }
+.library-toggle { position: relative; display: flex; align-items: center; gap: 6px; height: 36px; margin: 0; padding: 0 12px; border: 1px solid rgb(var(--shade) / .1); border-radius: 8px; background: var(--surface); color: var(--text-muted); font-size: 13px; line-height: 18px; font-weight: 500; white-space: nowrap; cursor: pointer; }
+.library-toggle input { position: absolute; inset: 0; width: 100%; min-width: 0; height: 100%; margin: 0; padding: 0; opacity: 0; cursor: pointer; } /* the whole pill is the checkbox */
+.library-toggle:has(:checked) { border-color: var(--ink); background: var(--surface-2); color: var(--ink); }
+.library-toggle:has(:checked) .icon { color: var(--favorite); }
+.library-toggle:has(:checked) .icon path { fill: currentColor; }
+:is(.library-search, .library-field, .library-toggle, .library-tools .zip-toggle):hover:not(:focus-within) { border-color: rgb(var(--shade) / .22); }
+.segmented { display: inline-flex; gap: 2px; padding: 2px; border: 1px solid rgb(var(--shade) / .1); border-radius: 8px; background: var(--surface-1); }
+.segmented button { display: grid; place-items: center; width: 32px; height: 30px; padding: 0; border: 0; border-radius: 6px; background: none; color: var(--text-subtle); }
+.segmented button:hover { color: var(--ink); }
+.segmented button[aria-pressed='true'] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgb(var(--shade) / .08), 0 0 0 1px rgb(var(--shade) / .06); }
+.library-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 4px; }
+.library-filters > * { flex: none; }
+.library-active { display: inline-flex; align-items: center; gap: 10px; margin-left: 4px; color: var(--text-subtle); font-size: 13px; line-height: 18px; white-space: nowrap; }
+.library-active .link-button { font-size: 13px; }
 /* Select mode: a checkbox in the corner of each item with a result, and the bar that downloads the picked ones as one .zip. */
-.library-tools .zip-toggle { height: 32px; margin: -8px 0; padding: 0 12px; font-size: 13px; line-height: 30px; } /* takes no more height than the size slider, so a wrapped row on a phone keeps its height */
+.library-tools .zip-toggle { height: 36px; margin: 0 0 0 auto; padding: 0 14px; border-color: rgb(var(--shade) / .1); font-size: 13px; line-height: 34px; font-weight: 500; }
 .zip-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin: 12px 0 0; }
 .zip-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin: 0 0 16px; font-size: 14px; line-height: 21px; }
 .zip-tools .zip-bar { margin: 0; }
@@ -1323,14 +1342,28 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .card:has(> .zip-check), .job-card:has(> .zip-check) { position: relative; }
 .zip-check { position: absolute; top: 8px; left: 8px; z-index: 2; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 6px; background: var(--surface); }
 .zip-check input { width: 18px; height: 18px; margin: 0; }
-.library-size { margin-left: auto !important; color: var(--text-subtle); }
-.library-size input { width: 120px; padding: 0; }
-.library-empty { display: grid; justify-items: center; gap: 12px; padding: 64px 16px; color: var(--text-disabled); text-align: center; }
-.library-empty .muted { margin: 0; }
+.library-size { padding: 0 4px; color: var(--text-subtle); }
+.library-size input { width: 96px; padding: 0; }
+.library-empty { display: grid; justify-items: center; gap: 4px; padding: 48px 16px; text-align: center; }
+.library-art { margin: 0 0 12px; }
+.library-art .art-back { fill: var(--surface-2); stroke: var(--border); }
+.library-art .art-mid { fill: var(--surface-1); stroke: var(--border); }
+.library-art .art-front { fill: var(--surface); stroke: var(--border-strong); stroke-width: 1.5; }
+.library-art .art-play { fill: var(--brand); }
+.library-art .art-play-mark { fill: var(--on-dark); }
+.library-art .art-spark { fill: var(--brand); opacity: .45; }
+.library-art .art-line { stroke: var(--fill-strong); stroke-width: 4; stroke-linecap: round; }
+.library-art .art-lens { fill: var(--surface); stroke: var(--ink); stroke-width: 3; }
+.library-art .art-handle { stroke: var(--ink); stroke-width: 4; stroke-linecap: round; }
+.library-empty-title { margin: 0; color: var(--ink); font-size: 16px; line-height: 24px; font-weight: 600; }
+.library-empty .muted { margin: 0 0 16px; }
+.library-empty-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 0; }
+.library-empty :is(.button, button) { height: 36px; padding: 0 16px; border-color: rgb(var(--shade) / .15); border-radius: 8px; color: var(--ink); font-size: 14px; line-height: 34px; font-weight: 500; }
+.library-empty :is(.button, button):hover { background: var(--surface-1); }
 .card .favorite { display: inline-flex; align-items: center; gap: 6px; }
 .card .favorite[aria-pressed='true'], .job-actions .favorite[aria-pressed='true'] { color: var(--favorite); }
 .card .favorite[aria-pressed='true'] svg path { fill: currentColor; }
-.library-empty .button { padding: 10px 40px; border-color: var(--brand); border-radius: 8px; background: var(--brand); color: var(--on-dark); font-weight: 600; }
+.library-empty-actions .button:first-child { border-color: var(--brand); background: var(--brand); color: var(--on-dark); }
 
 /* Try On and Image Generation (REA, measured 2026-10-24 at 1424 px): Try On reuses the Create card and tabs; its upload slots are dashed boxes of 56 px thumbnails and a 56 px
    upload tile. Image Generation has tabs over a gallery and a floating bar, 818 wide and centred in the content area, with 24 px under it. */
@@ -1621,12 +1654,9 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .marketing-head { position: relative; justify-content: center; align-items: center; min-height: 130px; text-align: center; }
 @media (max-width: 1023.98px) { .marketing-head { min-height: 100px; } } /* Fash's format card is 100 px tall on a phone (measured at 390), 130 px on desktop */
 .field-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 8px; }
-/* Library filters: one row of equal 36 px controls styled like the app's selects. */
-.library-filters { gap: 12px; margin: 0 0 8px; }
-.library .kinds { gap: 6px; flex-wrap: nowrap; overflow-x: auto; padding-right: 24px; mask-image: linear-gradient(to right, rgb(var(--shade)) calc(100% - 24px), transparent); } /* one scrolling row, as on Fash, instead of a lone pill on a second line; the faded padding hints at more pills without covering the last one when all fit */
+/* Library kinds: one scrolling row of pills. */
+.library .kinds { margin: 0 0 12px; gap: 6px; flex-wrap: nowrap; overflow-x: auto; padding-right: 24px; mask-image: linear-gradient(to right, rgb(var(--shade)) calc(100% - 24px), transparent); } /* one scrolling row, as on Fash, instead of a lone pill on a second line; the faded padding hints at more pills without covering the last one when all fit */
 .library .kinds button { padding: 0 12px; }
-.library-filters label { margin: 0; color: var(--text-muted); font-size: 13px; line-height: 18px; font-weight: 500; }
-.library-filters select, .library-filters input { width: 10rem; min-width: 0; height: 36px; margin-top: 4px; padding: 0 10px; border: 1px solid rgb(var(--shade) / .1); border-radius: 8px; background: var(--surface); color: inherit; font: inherit; font-size: 13px; }
 .explore-sub { margin: -12px 0 20px; }
 /* Below 1024 px: centred empty Image Generation history, smaller Explore headings; tablets keep model, ratio and size on one row, as on Fash. */
 @media (max-width: 1023.98px) {
@@ -1731,3 +1761,61 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .library .card .actions .danger { order: 1; margin-left: auto; }
 .library .card .actions .verdict-buttons { display: flex; flex-basis: 100%; gap: 6px; order: 2; }
 .library .card .actions .verdict-buttons button { flex: 1; min-width: 0; padding: 0 4px; white-space: nowrap; } /* three marks fit the smallest card */
+
+/* Library results: hover border, the hover checkbox and floating selection bar, the list rows, the loading skeleton, and the phone layout. */
+.library .card { transition: border-color .15s, box-shadow .15s; }
+.library .card:hover { border-color: var(--border-strong); box-shadow: 0 2px 8px rgb(var(--shade) / .06); }
+.library .card:has(.zip-check :checked) { border-color: var(--ink); box-shadow: 0 0 0 1px var(--ink); }
+.library .zip-check input { min-width: 0; }
+.library .zip-check { top: 14px; left: 14px; border: 1px solid rgb(var(--shade) / .1); box-shadow: 0 1px 2px rgb(var(--shade) / .1); opacity: 0; transition: opacity .15s; }
+.library :is(.card, .lib-row):is(:hover, :focus-within) .zip-check, .library[data-selecting='true'] .zip-check { opacity: 1; }
+@media (hover: none) { .library:not([data-selecting='true']) .zip-check { display: none; } } /* no hover to reveal it: the select button turns the checkboxes on */
+.library :is(.grid, .library-list)[aria-busy='true'] { opacity: .6; transition: opacity .2s; }
+.library-list { display: grid; grid-template-columns: minmax(0, 1fr); margin: 16px 0; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.lib-row { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 12px; border-top: 1px solid var(--hairline); background: var(--surface); }
+.lib-row:first-child { border-top: 0; }
+.lib-row:hover { background: var(--surface-1); }
+.lib-row:has(.zip-check :checked) { background: var(--surface-2); }
+.lib-row .zip-check { top: 14px; left: 16px; width: 24px; height: 24px; } /* on the thumbnail corner, as on the grid card, so no gutter is kept for it */
+.lib-thumb { flex: none; width: 56px; height: 56px; overflow: hidden; border-radius: 8px; background: var(--fill); }
+.lib-thumb :is(img, video) { display: block; width: 100%; height: 100%; object-fit: cover; }
+.lib-row-main { flex: 1 1 0; min-width: 0; }
+.lib-row-main p { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lib-row-title { font-size: 14px; line-height: 20px; font-weight: 600; }
+.lib-row-prompt { color: var(--text-2); font-size: 13px; line-height: 20px; }
+.lib-row-prompt.none { color: var(--text-subtle); }
+.lib-row-meta { color: var(--text-subtle); font-size: 12px; line-height: 18px; }
+.lib-mark { margin-left: 8px; padding: 0 8px; border-radius: 999px; background: var(--cat-utility-bg); color: var(--cat-utility-fg); font-size: 11px; line-height: 18px; font-weight: 500; }
+.lib-mark.fail { background: var(--danger-soft); color: var(--danger); }
+.lib-row .actions { flex: none; gap: 2px; margin: 0; }
+.lib-row .icon-button { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border-color: transparent; background: none; color: var(--text-icon); }
+.lib-row .icon-button:hover { background: var(--fill); color: var(--ink); }
+.lib-row .favorite[aria-pressed='true'] { color: var(--favorite); }
+.lib-row .favorite[aria-pressed='true'] svg path { fill: currentColor; }
+.lib-row .danger:hover { background: var(--danger-soft); color: var(--danger); }
+.lib-row > :is([role='alertdialog'], .error) { flex-basis: 100%; margin: 0; padding-left: 68px; font-size: 13px; }
+.lib-row > [role='alertdialog'] button { height: 30px; padding: 0 10px; font-size: 12px; }
+.library-skeleton .skeleton { display: block; aspect-ratio: 3 / 4; border-radius: 14px; background: var(--surface-2); animation: skeleton-pulse 1.4s ease-in-out infinite; }
+.library-list.library-skeleton .skeleton { aspect-ratio: auto; height: 77px; border-radius: 0; border-top: 1px solid var(--hairline); }
+@keyframes skeleton-pulse { 50% { opacity: .5; } }
+@media (prefers-reduced-motion: reduce) { .library-skeleton .skeleton { animation: none; } }
+.library-more { display: block; height: 36px; margin: 0 auto; padding: 0 20px; border-color: rgb(var(--shade) / .15); font-size: 14px; font-weight: 500; }
+.zip-float { position: sticky; bottom: 16px; z-index: 5; width: fit-content; max-width: 100%; margin: 16px auto 0; padding: 6px 6px 6px 16px; gap: 8px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); box-shadow: 0 8px 24px rgb(var(--shade) / .12); }
+.zip-float > span { font-weight: 600; font-variant-numeric: tabular-nums; }
+.zip-float button { height: 36px; margin: 0; padding: 0 14px; font-size: 14px; line-height: 34px; font-weight: 500; }
+.zip-float button.primary { display: inline-flex; align-items: center; gap: 6px; }
+.zip-float .zip-clear { border-color: transparent; background: none; color: var(--text-muted); }
+.zip-float .zip-clear:hover { background: var(--fill); color: var(--ink); }
+.zip-float .error { padding: 0 10px 4px 0; font-size: 13px; }
+@media (pointer: coarse) { /* touch: every result action and the selection bar buttons get a 44 px target */
+  .lib-row .icon-button, .library .card .actions .icon-button { width: 44px; height: 44px; }
+  .library .card .actions :is(button, .button), .zip-float button { height: 44px; line-height: 42px; }
+}
+@media (max-width: 639.98px) {
+  .library-search { flex-basis: 100%; }
+  .library-tools .library-size { display: none; } /* a phone shows one column at every size */
+  .library-filters { flex-wrap: nowrap; margin: 0 -16px 4px; padding: 3px 16px; overflow-x: auto; scrollbar-width: none; } /* scrolls inside itself, edge to edge */
+  .library-active { order: -1; margin: 0 4px 0 0; }
+  .lib-row .actions { flex-basis: 100%; padding-left: 68px; }
+  .zip-float { bottom: 12px; }
+}
