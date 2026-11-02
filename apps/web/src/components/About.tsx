@@ -3,7 +3,7 @@
 // then sections of eyebrow, heading and lead with cards, steps, before-and-after pairs, tables, ratio tiles, example prompts and a FAQ).
 // `long` is the app pages' article style: plain headings, numbered steps and points without boxes.
 import Link from 'next/link';
-import type { AboutBlock, AboutCard, AboutPage } from '@/lib/about-content';
+import { type AboutBlock, type AboutCard, type AboutPage, type SpecModel, withLiveSpecs } from '@/lib/about-content';
 import { cardSample } from '@/lib/examples';
 import { useSamples } from '@/lib/use-samples';
 import { CardMedia } from './CardMedia';
@@ -44,13 +44,13 @@ function Card({ card }: { card: AboutCard }) {
   );
 }
 
-function Block({ block }: { block: AboutBlock }) {
+function Block({ block, models }: { block: AboutBlock; models?: SpecModel[] }) {
   if (typeof block === 'string') return <p>{block}</p>;
   if ('cards' in block)
     return (
       <ul className="about-cards" data-cols={block.cols ?? 2}>
         {block.cards.map((c) => (
-          <Card key={c.title} card={c} />
+          <Card key={c.title} card={withLiveSpecs(c, models)} />
         ))}
       </ul>
     );
@@ -168,7 +168,8 @@ function Block({ block }: { block: AboutBlock }) {
   );
 }
 
-export function About({ page, long = false }: { page: AboutPage; long?: boolean }) {
+/** `models`: the Create form's loaded model list, which family cards build their spec lines from. */
+export function About({ page, long = false, models }: { page: AboutPage; long?: boolean; models?: SpecModel[] }) {
   return (
     <article className={long ? 'about about-long' : 'about'}>
       <h2>{page.title}</h2>
@@ -178,7 +179,7 @@ export function About({ page, long = false }: { page: AboutPage; long?: boolean 
           {s.kicker && <p className="about-kicker">{s.kicker}</p>}
           <h3>{s.title}</h3>
           {s.lead && <p className="about-lead">{s.lead}</p>}
-          {s.blocks?.map((b, i) => <Block key={i} block={b} />)}
+          {s.blocks?.map((b, i) => <Block key={i} block={b} models={models} />)}
         </section>
       ))}
     </article>

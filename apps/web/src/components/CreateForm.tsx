@@ -676,7 +676,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
               ))}
             </div>
           ) : shown === 'about' ? (
-            <About page={ABOUT.create} />
+            <About page={ABOUT.create} models={models?.models} />
           ) : (
             <FormContext.Provider value={{ recreate, apply, photo: (p) => void take(p), prompt: copyPrompt }}>
               <Tray feature="video" />

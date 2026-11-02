@@ -13,6 +13,53 @@ export interface AboutCard {
   specs?: string[];
   /** A link closing the text, [label, href], as the live cards' "Open UGC Try-On." */
   link?: [string, string];
+  /** A model family's id prefix: with the Create form's model list loaded, the spec lines and a model-count tag are built from it (withLiveSpecs). */
+  family?: string;
+}
+
+/** The fields of a Create form model that a family card's spec lines are built from. */
+export interface SpecModel {
+  id: string;
+  label: string;
+  ratios: string[];
+  durationsSec: number[];
+  resolution: string | null;
+  maxImages: number;
+}
+
+function seconds(d: number[]): string {
+  const s = [...d].sort((a, b) => a - b);
+  if (s.length > 2 && s.at(-1)! - s[0]! === s.length - 1) return `${s[0]}–${s.at(-1)} giây`;
+  return `${s.length > 1 ? `${s.slice(0, -1).join(', ')} hoặc ${s.at(-1)}` : s[0]} giây`;
+}
+
+/** "name: value (variants) · value (variants)", or just the value when every model shares it; a biggest group of three or more is labelled as the other variants and goes last. */
+function specLine(name: string, ms: SpecModel[], short: (m: SpecModel) => string, value: (m: SpecModel) => string | null): string | null {
+  const groups = new Map<string, string[]>();
+  for (const m of ms) {
+    const v = value(m);
+    if (v) groups.set(v, [...(groups.get(v) ?? []), short(m)]);
+  }
+  if (groups.size <= 1) return groups.size ? `${name}: ${[...groups.keys()][0]}` : null;
+  const all = [...groups];
+  const big = all.reduce((a, b) => (b[1].length > a[1].length ? b : a));
+  const rest = big[1].length >= 3 ? [...all.filter((g) => g !== big), [big[0], ['các bản khác']] as const] : all;
+  return `${name}: ${rest.map(([v, who]) => `${v} (${who.join(', ')})`).join(' · ')}`;
+}
+
+/** A family card with its spec lines (and a model-count tag) built from the models the Create form loaded, so they follow Admin and migrations.
+ * The hand-written lines stay while the list is loading or when none of the family's models is on. */
+export function withLiveSpecs(card: AboutCard, models: SpecModel[] | undefined): AboutCard {
+  const ms = card.family && models ? models.filter((m) => m.id.startsWith(card.family!)) : [];
+  if (ms.length === 0) return card;
+  const short = (m: SpecModel) => (m.label.startsWith(`${card.title} `) ? m.label.slice(card.title.length + 1) : m.label);
+  const specs = [
+    specLine('Thời lượng', ms, short, (m) => (m.durationsSec.length ? seconds(m.durationsSec) : null)),
+    specLine('Độ phân giải', ms, short, (m) => m.resolution),
+    specLine('Tỉ lệ', ms, short, (m) => (m.ratios.length ? m.ratios.join(', ') : null)),
+    specLine('Ảnh', ms, short, (m) => (m.maxImages > 1 ? `tối đa ${m.maxImages}` : String(m.maxImages))),
+  ].filter((s): s is string => s !== null);
+  return { ...card, tag: card.tag && /^\d+ mô hình$/.test(card.tag) ? `${ms.length} mô hình` : card.tag, specs };
 }
 export interface AboutStep {
   title: string;
@@ -153,6 +200,7 @@ const create: AboutPage = {
               tag: '5 mô hình',
               title: 'Kling',
               media: 'model-kling-o3-pro',
+              family: 'kling-',
               text: 'Chuyển động chân thực theo vật lý. Kling O3 Pro dựng cảnh từ tối đa 7 ảnh tham chiếu và Kling o1 từ tối đa 4. Kling O3 Pro và 3.0 Pro cho clip 3–15 giây, còn Kling 2.6, 2.5 Turbo và o1 chạy nhanh các clip 5 hoặc 10 giây.',
               specs: ['Thời lượng: 3–15 giây (O3 Pro, 3.0 Pro) · 5 hoặc 10 giây (2.6, 2.5 Turbo, o1)', 'Độ phân giải: 1080p', 'Tỉ lệ: 9:16, 1:1 · thêm 16:9 (O3 Pro, o1)', 'Ảnh tham chiếu: tối đa 7 (O3 Pro) · 4 (o1)'],
             },
@@ -160,6 +208,7 @@ const create: AboutPage = {
               tag: '6 mô hình',
               title: 'Seedance',
               media: 'model-seedance-2-5-image',
+              family: 'seedance-',
               text: 'Kể chuyện điện ảnh với dải thời lượng rộng nhất. Seedance 2.5 Reference dựng clip tới 30 giây từ tối đa 7 ảnh, Seedance 2.0 Reference clip tới 15 giây từ tối đa 9 ảnh. Seedance 2.5 (5–10 giây) và 2.0 (4–15 giây) cũng nhận nhiều ảnh, còn 1.5 Pro và 1.0 Pro là lựa chọn tiết kiệm.',
               specs: ['Thời lượng: 4–30 giây (2.5 Reference) · 5–10 giây (2.5) · 4–15 giây (2.0, 2.0 Reference) · 4–12 giây (1.5 Pro) · 3–12 giây (1.0 Pro)', 'Độ phân giải: 720p (1.0 Pro: 1080p)', 'Tỉ lệ: 9:16, 1:1 · thêm 16:9 (2.0) · đủ 9:16, 1:1, 16:9, 4:3, 3:4 (bản Reference, 1.5 Pro, 1.0 Pro)', 'Ảnh: tối đa 9 (2.0 Reference) · 7 (2.5 Reference, 2.0) · 4 (2.5) · 1 (1.5 Pro, 1.0 Pro)'],
             },
@@ -167,6 +216,7 @@ const create: AboutPage = {
               tag: '2 mô hình',
               title: 'FLUX 3',
               media: 'model-flux-3',
+              family: 'flux-3',
               text: 'Mô hình video của Black Forest Labs, clip 5–20 giây ở 1080p. FLUX 3 và FLUX 3 Reference đều làm động một ảnh của bạn theo phong cách điện ảnh.',
               specs: ['Thời lượng: 5–20 giây', 'Độ phân giải: 1080p', 'Tỉ lệ: 9:16, 1:1, 16:9, 4:3, 3:4', 'Ảnh: 1'],
             },
@@ -174,6 +224,7 @@ const create: AboutPage = {
               tag: 'Thời lượng cố định',
               title: 'Google VEO 3.1',
               media: 'model-veo-3-1',
+              family: 'veo-',
               text: 'Mô hình điện ảnh của Google. Mỗi lần chạy trả về một clip 8 giây trau chuốt, dựng từ ảnh của bạn.',
               specs: ['Thời lượng: 8 giây (cố định)', 'Độ phân giải: 720p', 'Tỉ lệ: 9:16, 16:9'],
             },
@@ -181,6 +232,7 @@ const create: AboutPage = {
               tag: '2 mô hình',
               title: 'Gemini Omni Flash',
               media: 'model-gemini-omni-flash',
+              family: 'gemini-omni-flash',
               text: 'Mô hình nhanh của Google, bám sát mô tả, thời lượng linh hoạt 3–10 giây. Bản thường làm động một ảnh, bản Reference dựng cảnh từ tối đa 9 ảnh.',
               specs: ['Thời lượng: 3–10 giây', 'Độ phân giải: 720p', 'Tỉ lệ: 9:16, 16:9', 'Ảnh tham chiếu: tối đa 9 (Reference)'],
             },
@@ -188,6 +240,7 @@ const create: AboutPage = {
               tag: '2 mô hình',
               title: 'Grok Imagine',
               media: 'model-grok-imagine-1-5',
+              family: 'grok-imagine',
               text: 'Mô hình của xAI với clip từ 1 đến 15 giây. Grok Imagine 1.5 làm động một ảnh, bản Reference nhận tối đa 7 ảnh.',
               specs: ['Thời lượng: 1–15 giây (1.5) · 1–10 giây (Reference)', 'Độ phân giải: 720p', 'Tỉ lệ: 9:16, 1:1 · đủ 9:16, 1:1, 16:9, 4:3, 3:4 (Reference)', 'Ảnh tham chiếu: tối đa 7 (Reference)'],
             },
@@ -195,6 +248,7 @@ const create: AboutPage = {
               tag: '2 mô hình',
               title: 'WAN',
               media: 'model-wan-2-7',
+              family: 'wan-',
               text: 'Mô hình mã nguồn mở của Alibaba. WAN 2.7 cho clip 2–15 giây, WAN 2.7 Reference dựng cảnh từ tối đa 4 ảnh.',
               specs: ['Thời lượng: 2–15 giây (2.7) · 2–10 giây (Reference)', 'Độ phân giải: 720p', 'Tỉ lệ: 9:16, 1:1 · đủ 9:16, 1:1, 16:9, 4:3, 3:4 (Reference)', 'Ảnh tham chiếu: tối đa 4 (Reference)'],
             },
@@ -202,6 +256,7 @@ const create: AboutPage = {
               tag: '7 mô hình',
               title: 'Minimax',
               media: 'model-minimax-h3-max',
+              family: 'minimax-',
               text: 'Minimax H3 Max là bản chủ lực, clip 5–15 giây ở 768p, kèm bản 480p rẻ để thử nhanh và bản 1080p sắc nét hơn; H3 Max Reference dựng cảnh từ tối đa 9 ảnh, cũng ở ba độ phân giải đó. Hailuo 2.3 Pro là đường nhanh nhất tới một clip 1080p sắc nét: một ảnh vào, video 6 giây ra.',
               specs: ['Thời lượng: 5–15 giây (H3 Max) · 6 giây cố định (Hailuo 2.3 Pro)', 'Độ phân giải: 480p, 768p, 1080p (H3 Max) · 1080p (Hailuo)', 'Tỉ lệ: 9:16, 1:1 · đủ 9:16, 1:1, 16:9, 4:3, 3:4 (H3 Max Reference)', 'Ảnh tham chiếu: tối đa 9 (H3 Max Reference)'],
             },
