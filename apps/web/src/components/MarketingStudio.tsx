@@ -18,7 +18,7 @@ import { About } from './About';
 import { AudioSwitch } from './AudioSwitch';
 import { CardMedia, LoopVideo } from './CardMedia';
 import { Icon, type IconName } from './Icon';
-import { copySamples, Gallery, type Img, PhotoDialog, photoImg, Slot, uploadImages, UPLOAD_ERROR, WorkTabs } from './image-tools';
+import { copyError, copySamples, Gallery, type Img, PhotoDialog, photoImg, Slot, uploadImages, UPLOAD_ERROR, WorkTabs } from './image-tools';
 import { FormContext, type FormActions, type Photo, type PhotoRole, useApplier, useHasHistory, useJobs, useRecreated } from './jobs';
 import { Modal } from './Modal';
 import { ModelPicker } from './ModelPicker';
@@ -469,7 +469,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
         recreated(reuse);
         dropRefillQuery();
       })
-      .catch(() => setError('Không tìm thấy clip để dùng lại.'))
+      .catch((e) => setError(copyError(e, 'Không tìm thấy clip để dùng lại.')))
       .finally(loading('Đang tải ảnh...'));
     return () => {
       stale = true;
@@ -551,11 +551,17 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
   const short = n > 1 && clips !== null && clips.today + n > clips.cap ? `Hôm nay bạn chỉ còn ${Math.max(0, clips.cap - clips.today)} clip; bỏ bớt biến thể hook.` : null;
   const canRun = reason === null && short === null && !busy;
 
-  /** A stock model goes through the normal upload, like a file the member picked, so the job only ever holds the member's own assets. */
+  /** A stock model is copied on the server as the member's own picture, so the job only ever holds the member's own assets. */
   async function pickStock(name: string) {
-    const res = await fetch(`/api/samples/${name}`);
-    if (res.ok) await add(setPerson)([new File([await res.blob()], name, { type: res.headers.get('content-type') ?? 'image/jpeg' })]);
-    else setError(UPLOAD_ERROR);
+    setError('');
+    setBusy(true);
+    try {
+      setPerson(await copySamples([name]));
+    } catch (e) {
+      setError(copyError(e, UPLOAD_ERROR));
+    } finally {
+      setBusy(false);
+    }
   }
 
   /** Uploads the files into a slot: a one-image slot is replaced, the reference slot is added to, up to `max`. */
@@ -569,8 +575,8 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
       else if (role === 'model') setPerson([img]);
       else setProduct([img]);
       notify(advanced ? 'Đã thêm ảnh tham chiếu' : role === 'model' ? 'Đã dùng ảnh người mẫu' : 'Đã chọn ảnh sản phẩm');
-    } catch {
-      setError(UPLOAD_ERROR);
+    } catch (e) {
+      setError(copyError(e, UPLOAD_ERROR));
     }
   }
   const actions: FormActions = {

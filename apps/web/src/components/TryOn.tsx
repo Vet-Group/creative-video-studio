@@ -2,7 +2,7 @@
 // Try On: a settings card (garments, the model photo, an optional background, model, prompt, resolution, ratio) beside the History, Examples and About tabs,
 // laid out like Create. Run posts a try_on job; the inputs go in the order the API expects: the person first, then the garments, then the background.
 import { useEffect, useId, useState } from 'react';
-import { api, ApiError, errorText, sendJson } from '@/lib/api';
+import { api, errorText, sendJson } from '@/lib/api';
 import { promptTooLong } from '@/lib/prompt-limit';
 import { confirmRun, runKey } from '@/lib/run-guard';
 import { tryOnPrompt } from '@/lib/try-on-prompt';
@@ -12,7 +12,7 @@ import { useSamples } from '@/lib/use-samples';
 import { backgroundsIn, GARMENT_CATEGORIES, garmentsOf, posesOf, stockModels } from '@/lib/try-on-stock';
 import { ABOUT } from '@/lib/about-content';
 import { About } from './About';
-import { COPY_LIMIT_ERROR, copySamples, Gallery, type Img, LockedFields, PhotoDialog, photoImg, RATIO_LABEL, Slot, THINKING_LABEL, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
+import { copyError, copySamples, Gallery, type Img, LockedFields, PhotoDialog, photoImg, RATIO_LABEL, Slot, THINKING_LABEL, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
 import { FormContext, type Photo, type PhotoRole, useApplier, useHasHistory, useJobs } from './jobs';
 import { ModelPicker } from './ModelPicker';
 import { PromptTools } from './PromptTools';
@@ -89,7 +89,7 @@ export function TryOn({ reuse }: { reuse?: string }) {
       if (j.ratio) pick.setRatio(j.ratio);
       if (j.resolution) pick.setResolution(j.resolution);
     },
-    () => setError('Không tìm thấy ảnh để dùng lại.'),
+    (e) => setError(copyError(e, 'Không tìm thấy ảnh để dùng lại.')),
   );
 
   // The first thing that stops Run, in the order the form is filled; null when it can go.
@@ -123,8 +123,8 @@ export function TryOn({ reuse }: { reuse?: string }) {
       else if (role === 'background') setBackground([img]);
       else setGarments((cur) => (cur.length < MAX_GARMENTS ? [...cur, img] : cur));
       notify(note ?? (role === 'model' ? 'Đã dùng ảnh người mẫu' : role === 'background' ? 'Đã chọn bối cảnh' : 'Đã thêm trang phục'));
-    } catch {
-      setError(UPLOAD_ERROR);
+    } catch (e) {
+      setError(copyError(e, UPLOAD_ERROR));
     }
   }
 
@@ -135,7 +135,7 @@ export function TryOn({ reuse }: { reuse?: string }) {
       const assets = await get();
       set((cur) => [...cur, ...assets]);
     } catch (e) {
-      setError(e instanceof ApiError && e.status === 429 ? COPY_LIMIT_ERROR : UPLOAD_ERROR);
+      setError(copyError(e, UPLOAD_ERROR));
     } finally {
       setBusy(false);
     }

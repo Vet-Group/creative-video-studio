@@ -9,7 +9,7 @@ import { confirmRun, runKey } from '@/lib/run-guard';
 import { useHydrated } from '@/lib/use-hydrated';
 import { useRecall } from '@/lib/use-recall';
 import { About } from './About';
-import { Gallery, type Img, photoImg, RATIO_LABEL, THINKING_LABEL, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
+import { copyError, Gallery, type Img, photoImg, RATIO_LABEL, THINKING_LABEL, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
 import { EnhanceToggle } from './EnhanceToggle';
 import { Icon } from './Icon';
 import { FormContext, type Photo, useApplier, useJobs } from './jobs';
@@ -62,8 +62,8 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
       const img = await photoImg(p).finally(loading('Đang tải ảnh...'));
       setImages((cur) => (cur.length < max ? [...cur, img] : cur));
       notify('Đã thêm ảnh vào đầu vào');
-    } catch {
-      setError(UPLOAD_ERROR);
+    } catch (e) {
+      setError(copyError(e, UPLOAD_ERROR));
     }
   }
 
@@ -79,7 +79,7 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
       if (j.ratio) pick.setRatio(j.ratio);
       if (j.resolution) pick.setResolution(j.resolution);
     },
-    () => setError('Không tìm thấy ảnh để dùng lại.'),
+    (e) => setError(copyError(e, 'Không tìm thấy ảnh để dùng lại.')),
   );
 
   // The first thing that stops Run; null when it can go.

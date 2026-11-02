@@ -271,7 +271,19 @@ describe('GET /api/assets/:id/content', () => {
     expect(res.headers.get('accept-ranges')).toBe('bytes');
     expect(res.headers.get('content-disposition')).toMatch(/^inline;/);
     expect(res.headers.get('cache-control')).toBe('private, max-age=86400'); // a day: the bytes never change under an id, but a browser should not hold a deleted clip for a year
+    expect(res.headers.get('etag')).toBe(`"${id}"`);
     expect(new Uint8Array(await res.arrayBuffer())).toEqual(bytes);
+  });
+
+  test('after a day the browser asks with the ETag: the owner gets a 304 without a byte, anyone else still a refusal', async () => {
+    const again = await GET_CONTENT(get(`/api/assets/${id}/content`, ownerCookie, { 'if-none-match': `"${id}"` }), ctx(id));
+    expect(again.status).toBe(304);
+    expect(again.headers.get('etag')).toBe(`"${id}"`);
+    expect(again.headers.get('cache-control')).toBe('private, max-age=86400');
+    expect((await again.arrayBuffer()).byteLength).toBe(0);
+    expect((await GET_CONTENT(get(`/api/assets/${id}/content`, ownerCookie, { 'if-none-match': '"another"' }), ctx(id))).status).toBe(200);
+    expect((await GET_CONTENT(get(`/api/assets/${id}/content`, otherCookie, { 'if-none-match': `"${id}"` }), ctx(id))).status).toBe(403);
+    expect((await GET_CONTENT(get(`/api/assets/${id}/content`, undefined, { 'if-none-match': `"${id}"` }), ctx(id))).status).toBe(401);
   });
 
   test.each([

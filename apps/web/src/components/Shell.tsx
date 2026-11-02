@@ -320,8 +320,8 @@ function NavPending() {
 
 /**
  * A thin bar along the top while any link of the app opens another page (Explore cards, Dùng lại, Dùng mẫu này, the sidebar too), shown after 150 ms.
- * The App Router has no navigation events: a plain click on a same-site link to another address starts it, the address changing (Next sets it when
- * the new page shows) or Back ends it, and it gives up after 15 s in case a link handled the click without navigating.
+ * The App Router has no navigation events: a plain click on a same-site link to another address starts it, the new page showing (Next then sets the
+ * address and a new history.state, also when a redirect lands back on the current address) or Back ends it, and it gives up after 15 s in case a link handled the click without navigating.
  */
 function NavProgress() {
   const [on, setOn] = useState(false);
@@ -339,10 +339,12 @@ function NavProgress() {
       if (!a || (a.target && a.target !== '_self') || a.hasAttribute('download') || a.origin !== location.origin) return;
       if (a.pathname === location.pathname && a.search === location.search) return; // the same page, or only its #fragment
       const from = location.href;
+      const state = history.state;
       stop();
       setOn(true);
       const watch = () => {
-        if (location.href !== from) return stop();
+        // The router writes a new history.state each time a page commits, even when a redirect lands on the address already shown.
+        if (location.href !== from || history.state !== state) return stop();
         poll = requestAnimationFrame(watch);
       };
       poll = requestAnimationFrame(watch);

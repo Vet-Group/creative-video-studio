@@ -317,7 +317,9 @@ test('with stock models uploaded, the empty model slot opens the stock model dia
     expect(await dialog.getByRole('heading', { name: 'Chọn người mẫu' }).evaluate((e) => { const c = getComputedStyle(e); return [c.fontSize, c.fontWeight, c.borderBottomStyle]; })).toEqual(['16px', '500', 'solid']);
     await expect(dialog.getByRole('button', { name: 'Người mẫu có sẵn 1' }).locator('img')).toHaveAttribute('src', '/api/samples/marketing-model-1.png');
     await expect(dialog.getByRole('button', { name: 'Người mẫu có sẵn 3' }).locator('img')).toHaveAttribute('src', '/api/samples/marketing-model-10.png');
+    const copied = page.waitForResponse((r) => new URL(r.url()).pathname === '/api/assets/samples' && r.request().method() === 'POST');
     await dialog.getByRole('button', { name: 'Người mẫu có sẵn 2' }).click();
+    expect((await copied).status()).toBe(201); // copied on the server, not downloaded and uploaded back
     await expect(dialog).toBeHidden();
     await expect(page.getByLabel('Người mẫu: ảnh đã chọn').getByRole('img', { name: 'marketing-model-2.png' })).toBeVisible();
 

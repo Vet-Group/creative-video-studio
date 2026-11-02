@@ -17,7 +17,7 @@ import { useSamples } from '@/lib/use-samples';
 import { About } from './About';
 import { CardMedia, LoopVideo } from './CardMedia';
 import { Icon, type IconName } from './Icon';
-import { type Img, RATIO_LABEL, Slot, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
+import { copyError, type Img, RATIO_LABEL, Slot, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
 import { FormContext, useJobs } from './jobs';
 import { type ModelOption, ModelPicker } from './ModelPicker';
 import { PromptTools } from './PromptTools';
@@ -133,7 +133,7 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
       if (j.ratio) pick.setRatio(j.ratio);
       if (j.resolution) pick.setResolution(j.resolution);
     },
-    () => setError('Không tìm thấy ảnh để dùng lại.'),
+    (e) => setError(copyError(e, 'Không tìm thấy ảnh để dùng lại.')),
   );
   // The swaps add the member's text to their fixed instruction, so it shares the model's limit with it.
   const fixed = app.prompt === 'optional' ? FEATURE_PROMPTS[app.feature]!.length + 2 : 0;

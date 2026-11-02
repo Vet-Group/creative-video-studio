@@ -28,8 +28,27 @@ test('a link anywhere in the app, not only the sidebar, shows the top progress b
   });
   await page.getByRole('list', { name: 'Mẫu' }).getByRole('link', { name: 'Xoay quanh chậm' }).click();
   await expect(bar).toHaveAttribute('data-on', 'true');
+  await page.waitForTimeout(300); // past its 150 ms delay: already a third of the width, easy to see on a phone
+  expect((await bar.boundingBox())!.width).toBeGreaterThanOrEqual(0.3 * page.viewportSize()!.width - 1);
   await expect(page).toHaveURL(/\/create\?preset=slow-orbit$/);
   await expect(bar).toHaveAttribute('data-on', 'false');
+  await page.unroute(/[?&]_rsc=/);
+});
+
+test('the top bar also ends when the page commits without the address changing, as when a redirect lands back on the page shown', async ({ page }) => {
+  await signIn(page, 'member1');
+  await page.goto('/explore');
+  const bar = page.locator('.nav-progress');
+  await page.route(/[?&]_rsc=/, async (route) => {
+    await new Promise((r) => setTimeout(r, 8000));
+    await route.continue().catch(() => {}); // the page may be gone by then
+  });
+  await page.getByRole('list', { name: 'Mẫu' }).getByRole('link', { name: 'Xoay quanh chậm' }).click();
+  await expect(bar).toHaveAttribute('data-on', 'true');
+  // What the router does when a page commits: a new history.state under the address it lands on, here the one already shown.
+  await page.evaluate(() => history.replaceState({ ...history.state }, '', location.href));
+  await expect(bar).toHaveAttribute('data-on', 'false', { timeout: 2000 }); // not the 15 s fallback
+  await expect(page).toHaveURL(/\/explore$/);
   await page.unroute(/[?&]_rsc=/);
 });
 
