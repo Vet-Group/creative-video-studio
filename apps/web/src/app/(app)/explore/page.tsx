@@ -1,24 +1,34 @@
+import { dailyClips } from '@cvs/core/limits';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { CardMedia } from '@/components/CardMedia';
-import { Icon } from '@/components/Icon';
+import { Icon, type IconName } from '@/components/Icon';
 import { MODEL_CARD_TEXT } from '@/lib/about-content';
 import { pool } from '@/lib/auth';
 import { bestClips } from '@/lib/clips';
 import { currentUser } from '@/lib/current-user';
 import { cardSample, EXAMPLES, exampleForPreset, sampleSrc } from '@/lib/examples';
+import { continueJobs, greeting, isRunning } from '@/lib/explore';
+import { featureLabel } from '@/lib/features';
 import { modelStats, rank, scoreOf } from '@/lib/model-scores';
+import { pageOf } from '@/lib/reuse';
 import { listSamples } from '@/lib/samples';
 
 // The tools the app has, in the live sidebar order; uploaded samples override these fallback posters.
-const FEATURES = [
-  { href: '/try-on', sample: 'feature-try-on', title: 'Thử đồ', text: 'Mặc trang phục lên người mẫu từ ảnh, giữ nguyên người và bối cảnh.', poster: EXAMPLES[2]!.poster },
-  { href: '/image-generation', sample: 'feature-image-generation', title: 'Tạo ảnh', text: 'Tạo hoặc chỉnh ảnh sản phẩm từ ảnh tham chiếu và một mô tả.', poster: EXAMPLES[3]!.poster },
-  { href: '/create', sample: 'feature-create-videos', title: 'Tạo video', text: 'Biến ảnh sản phẩm thành video ngắn bằng các mô hình AI.', poster: EXAMPLES[0]!.poster },
-  { href: '/marketing-studio', sample: 'feature-marketing-studio', title: 'Marketing Studio', text: 'Tạo video kiểu người sáng tạo nội dung từ ảnh người mẫu và ảnh sản phẩm.', poster: EXAMPLES[0]!.poster },
-  { href: '/apps', sample: 'feature-apps', title: 'Ứng dụng', text: 'Đổi nhân vật, đổi nền, xoá nền, phóng to ảnh và các công cụ AI một chạm khác.', poster: '/artwork/explore-apps.svg' },
-  { href: '/library', sample: 'feature-library', title: 'Thư viện', text: 'Xem, tải xuống và đánh giá mọi clip của công ty.', poster: '/artwork/explore-library.svg' },
+const FEATURES: { href: string; sample: string; title: string; icon: IconName; poster: string }[] = [
+  { href: '/try-on', sample: 'feature-try-on', title: 'Thử đồ', icon: 'tryon', poster: EXAMPLES[2]!.poster },
+  { href: '/image-generation', sample: 'feature-image-generation', title: 'Tạo ảnh', icon: 'image', poster: EXAMPLES[3]!.poster },
+  { href: '/create', sample: 'feature-create-videos', title: 'Tạo video', icon: 'create', poster: EXAMPLES[0]!.poster },
+  { href: '/marketing-studio', sample: 'feature-marketing-studio', title: 'Marketing Studio', icon: 'megaphone', poster: EXAMPLES[0]!.poster },
+  { href: '/apps', sample: 'feature-apps', title: 'Ứng dụng', icon: 'apps', poster: '/artwork/explore-apps.svg' },
+  { href: '/library', sample: 'feature-library', title: 'Thư viện', icon: 'library', poster: '/artwork/explore-library.svg' },
 ];
+
+const TZ = 'Asia/Ho_Chi_Minh';
+const fmtDay = new Intl.DateTimeFormat('vi-VN', { weekday: 'long', day: 'numeric', month: 'numeric', timeZone: TZ });
+const fmtTime = new Intl.DateTimeFormat('vi-VN', { hour: '2-digit', minute: '2-digit', timeZone: TZ });
+const fmtDate = new Intl.DateTimeFormat('vi-VN', { day: 'numeric', month: 'numeric', timeZone: TZ });
+const content = (id: string) => `/api/assets/${id}/content`;
 
 /** The sample name of a model card; ids such as seedance-2.5 keep only letters, digits and dashes in sample names.
  * A variant without its own sample (a -vertex, -reference, -replicate, -1080p or -480p id) shows the sample of the model it varies. */
@@ -37,11 +47,13 @@ const FEATURED = ['seedance-2.5-image', 'seedance-2.5', 'kling-o3-pro', 'gemini-
 
 const range = (values: number[]) => (values.length === 0 ? '' : values.length > 1 ? `${Math.min(...values)}–${Math.max(...values)} giây` : `${values[0]} giây`);
 
-/** Explore: the start page of the live dashboard, with the tools, the enabled models and the company presets, each linking into Create. */
+/** Explore: the member's start page: a greeting with their day and recent work, then the tools, the enabled models and the company presets, each linking into Create. */
 export default async function ExplorePage() {
   // The (app) layout does not rerun on a client navigation, so a page that reads data itself checks the forced password change again.
-  if ((await currentUser())?.mustChangePassword) redirect('/account/password');
-  const [models, presets, samples, videoStats, imageStats, clips] = await Promise.all([
+  const user = await currentUser();
+  if (user?.mustChangePassword) redirect('/account/password');
+  const now = new Date();
+  const [models, presets, samples, videoStats, imageStats, clips, jobs, today] = await Promise.all([
     // Video models open Create Videos and image models open Image Generation, as the live page features both.
     pool.query<{ id: string; label: string; provider: string; kind: string; ratios: string[]; durations_sec: number[]; usd_per_second: string | null; image_prices: Record<string, string> | null }>(
       `select id, label, provider, kind, ratios, durations_sec, usd_per_second, image_prices from model_configs where enabled and kind = any(features) and kind in ('video', 'image') order by kind desc, label, id`,
@@ -52,7 +64,24 @@ export default async function ExplorePage() {
     modelStats(null),
     modelStats('image'),
     bestClips(),
+    // shortcut: a running job older than the latest 20 is left out, as the jobs tray leaves it; widen if members queue that many.
+    pool.query<{ id: string; status: string; feature: string; poster_asset_id: string | null; output_asset_id: string | null; input_id: string | null; resolution: string | null; finished_at: Date | null; created_at: Date }>(
+      `select id, status, feature, poster_asset_id, output_asset_id, input_asset_ids[1] as input_id, params->>'resolution' as resolution, finished_at, created_at
+         from jobs where user_id = $1 and deleted_at is null and purged_at is null order by created_at desc, id desc limit 20`,
+      [user?.id],
+    ),
+    dailyClips(pool, user?.id ?? ''),
   ]);
+  const running = jobs.rows.filter(isRunning).length;
+  const recent = continueJobs(jobs.rows);
+  const status = [running > 0 && `${running} job đang chạy`, `Hôm nay bạn còn ${Math.max(0, today.cap - today.today)}/${today.cap} clip video`].filter(Boolean).join(' · ');
+  /** A recent job's picture: an image job's result, a clip's poster, else the first photo it was given (a running or failed job). */
+  const jobPicture = (j: (typeof recent)[number]) => {
+    const done = j.status === 'succeeded' ? (j.resolution ? j.output_asset_id : j.poster_asset_id) : null;
+    const id = done ?? j.input_id;
+    return id ? content(id) : null;
+  };
+  const jobNote = (j: (typeof recent)[number]) => (isRunning(j) ? 'Đang tạo' : j.status === 'succeeded' ? `${fmtTime.format(j.finished_at ?? j.created_at)} · ${fmtDate.format(j.finished_at ?? j.created_at)}` : 'Không thành công');
   const have = new Set(samples.map((s) => s.name));
   /** A model's card picture: the company's best Library clip of it, else its uploaded sample; a clip without a poster keeps the sample's still. */
   const media = (id: string) => {
@@ -74,25 +103,54 @@ export default async function ExplorePage() {
   const recommended = new Set(['video', 'image'].map((kind) => rank(scored.filter((m) => m.kind === kind)).recommended));
   return (
     <div className="explore">
-      <h1>Bắt đầu sáng tạo</h1>
-      <ul className="explore-features" aria-label="Công cụ">
+      <header className="explore-hero">
+        <p className="explore-slate">
+          <span className="explore-dot" data-live={running > 0} aria-hidden="true" />
+          {fmtDay.format(now)}
+        </p>
+        <h1>{greeting(user?.name, now)}</h1>
+        <p className="explore-status">{status}</p>
+        {recent.length === 0 && <p className="muted explore-first">Bạn chưa tạo clip hay ảnh nào. Chọn một công cụ bên dưới: tải ảnh sản phẩm lên, chọn mẫu và nhận kết quả sau vài phút.</p>}
+      </header>
+
+      {recent.length > 0 && (
+        <section aria-labelledby="explore-continue">
+          <h2 id="explore-continue">Tiếp tục</h2>
+          <p className="muted explore-sub">Việc bạn đang chạy và vừa làm xong.</p>
+          <ul className="explore-jobs" aria-label="Việc gần đây">
+            {recent.map((j) => {
+              const picture = jobPicture(j);
+              return (
+                <li key={j.id}>
+                  <Link href={pageOf(j.feature) ?? '/library'} className="explore-job" data-status={isRunning(j) ? 'running' : j.status}>
+                    <span className="explore-job-media">{picture ? <img src={picture} alt="" /> : <span className="banner-empty" aria-hidden="true" />}</span>
+                    <strong>{featureLabel(j.feature)}</strong>
+                    <span className="muted">{jobNote(j)}</span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+
+      <h2>Công cụ</h2>
+      <ul className="explore-tools" aria-label="Công cụ">
         {FEATURES.map((f) => (
           <li key={f.href}>
-            <Link href={f.href} className="explore-feature">
+            <Link href={f.href} className="explore-tool">
               <CardMedia {...cardSample(have, f.sample, f.poster)} />
-              <span className="explore-feature-head">
+              <span className="explore-tool-name">
+                <Icon name={f.icon} size={16} />
                 <strong>{f.title}</strong>
-                <span className="explore-arrow" aria-hidden="true">
-                  <Icon name="arrow" size={16} />
-                </span>
               </span>
-              <span className="muted">{f.text}</span>
             </Link>
           </li>
         ))}
       </ul>
 
       <h2>Mô hình nổi bật</h2>
+      <p className="muted explore-sub">Mở Tạo video hoặc Tạo ảnh với mô hình đã chọn sẵn.</p>
       {models.rows.length === 0 ? (
         <p className="muted">Chưa có mô hình nào được bật.</p>
       ) : (

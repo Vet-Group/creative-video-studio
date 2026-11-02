@@ -7,6 +7,7 @@ vi.mock('@/lib/model-scores', () => ({ modelStats: vi.fn(async () => new Map()),
 vi.mock('@/lib/samples', () => ({ listSamples: vi.fn(async () => []) }));
 vi.mock('@/lib/clips', () => ({ bestClips: vi.fn(async () => new Map()) }));
 vi.mock('@/lib/current-user', () => ({ currentUser: vi.fn(async () => ({ mustChangePassword: false })) }));
+vi.mock('@cvs/core/limits', () => ({ dailyClips: vi.fn(async () => ({ today: 2, cap: 5 })) }));
 vi.mock('next/navigation', () => ({ redirect: vi.fn((to: string) => { throw new Error(`redirect ${to}`); }) }));
 vi.mock('@/components/CardMedia', () => ({ CardMedia: ({ poster, video }: { poster: string; video: string }) => <img src={poster} data-video={video} alt="" /> }));
 
@@ -87,4 +88,52 @@ test('a user who must change an Admin-set password is sent to the change page, a
   vi.mocked(pool.query).mockClear();
   await expect(ExplorePage()).rejects.toThrow('redirect /account/password');
   expect(pool.query).not.toHaveBeenCalled();
+});
+
+/** The page's markup with these recent jobs (newest first) for a signed-in Phạm Quốc Hưng at 14:00 in Vietnam. */
+async function withJobs(jobs: Record<string, unknown>[]) {
+  vi.setSystemTime(new Date('2026-11-02T07:00:00Z'));
+  vi.mocked(currentUser).mockResolvedValueOnce({ id: 'u1', name: 'Phạm Quốc Hưng', mustChangePassword: false } as Awaited<ReturnType<typeof currentUser>>);
+  vi.mocked(pool.query).mockImplementation((async (sql: string) => ({ rows: sql.includes('from jobs') ? jobs : [] })) as never);
+  try {
+    return renderToStaticMarkup(await ExplorePage());
+  } finally {
+    vi.mocked(pool.query).mockImplementation((async () => ({ rows: [] })) as never);
+    vi.useRealTimers();
+  }
+}
+const job = (id: string, status: string, more: Record<string, unknown> = {}) => ({
+  id, status, feature: 'video', poster_asset_id: null, output_asset_id: null, input_id: null, resolution: null, finished_at: null, created_at: new Date('2026-11-02T06:00:00Z'), ...more,
+});
+
+test('the hero greets the member by given name for the time of day in Vietnam, with their clips left today', async () => {
+  const html = await withJobs([]);
+  expect(html).toMatch(/<h1>Chào buổi chiều, Hưng<\/h1>/);
+  expect(html).toContain('Hôm nay bạn còn 3/5 clip video');
+  expect(html).not.toContain('đang chạy');
+  expect(html).not.toContain('Tiếp tục'); // no jobs: the first-run line instead
+  expect(html).toContain('Bạn chưa tạo clip hay ảnh nào');
+});
+
+test('Continue shows running jobs first, then the latest finished, at most four, each opening its own page', async () => {
+  const html = await withJobs([
+    job('done-1', 'succeeded', { poster_asset_id: 'p1', output_asset_id: 'o1' }),
+    job('img-1', 'succeeded', { feature: 'image', resolution: '1K', output_asset_id: 'i1' }),
+    job('run-1', 'running', { feature: 'try_on', input_id: 'in1' }),
+    job('bad-1', 'failed', { feature: 'marketing' }),
+    job('done-2', 'succeeded'),
+  ]);
+  expect(html).toContain('1 job đang chạy · Hôm nay bạn còn 3/5 clip video');
+  expect(html).not.toContain('Bạn chưa tạo clip hay ảnh nào');
+  const list = html.match(/<ul class="explore-jobs"[^>]*>([\s\S]*?)<\/ul>/)![1]!;
+  const attr = (tag: string, name: string) => tag.match(new RegExp(` ${name}="([^"]+)"`))?.[1] ?? null;
+  const cards = [...list.matchAll(/(<a [^>]*>)([\s\S]*?)<\/a>/g)].map(([, tag, inner]) => [attr(tag!, 'href'), attr(tag!, 'data-status'), attr(inner!, 'src')]);
+  expect(cards).toEqual([
+    ['/try-on', 'running', '/api/assets/in1/content'], // a running job shows the photo it was given
+    ['/create', 'succeeded', '/api/assets/p1/content'], // a clip shows its poster
+    ['/image-generation', 'succeeded', '/api/assets/i1/content'], // an image shows itself
+    ['/marketing-studio', 'failed', null],
+  ]);
+  expect(list).toContain('Đang tạo');
+  expect(list).toContain('Không thành công');
 });

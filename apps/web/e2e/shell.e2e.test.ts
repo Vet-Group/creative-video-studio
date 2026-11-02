@@ -56,7 +56,7 @@ test('Explore links into Create with the chosen preset or model already picked',
   await signIn(page, 'member1');
   await nav(page).getByRole('link', { name: 'Khám phá' }).click();
   await expect(page).toHaveURL(/\/explore$/);
-  await expect(page.getByRole('heading', { name: 'Bắt đầu sáng tạo' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(/^Chào buổi (sáng|chiều|tối), 1$/); // E2E Member 1: the last word is the given name
   const tools = page.getByRole('list', { name: 'Công cụ' }).getByRole('link');
   await expect(tools).toHaveCount(6);
   await expect(tools.locator('strong')).toHaveText(['Thử đồ', 'Tạo ảnh', 'Tạo video', 'Marketing Studio', 'Ứng dụng', 'Thư viện']);
