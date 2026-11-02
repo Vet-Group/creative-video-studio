@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ABOUT, type AboutBlock, type AboutPage, APP_ABOUT, MODEL_CARD_TEXT } from './about-content';
+import { ABOUT, type AboutBlock, type AboutPage, APP_ABOUT, MODEL_CARD_TEXT, withLiveSpecs } from './about-content';
 import { APPS } from './apps';
 import { sampleType } from './samples';
 
@@ -74,5 +74,41 @@ describe('the About pages', () => {
 
   it('describes the featured Explore models', () => {
     for (const id of ['seedance-2.5-image', 'kling-o3-pro', 'gemini-omni-flash', 'kling-3.0-pro', 'seedance-2.0', 'nano-banana-pro', 'gpt-image-2']) expect(MODEL_CARD_TEXT[id]).toBeTruthy();
+  });
+});
+
+describe('withLiveSpecs', () => {
+  const m = (id: string, label: string, durationsSec: number[], resolution: string, ratios: string[], maxImages: number) => ({ id, label, durationsSec, resolution, ratios, maxImages });
+  const kling = ABOUT.create.sections.flatMap((s) => s.blocks ?? []).flatMap((b) => (typeof b === 'object' && 'cards' in b ? b.cards : [])).find((c) => c.title === 'Kling')!;
+  const range = (a: number, b: number) => Array.from({ length: b - a + 1 }, (_, i) => a + i);
+  const models = [
+    m('kling-o3-pro', 'Kling O3 Pro', range(3, 15), '1080p', ['9:16', '1:1', '16:9'], 7),
+    m('kling-o1', 'Kling o1', [5, 10], '1080p', ['9:16', '1:1', '16:9'], 4),
+    m('kling-2.6', 'Kling 2.6', [5, 10], '1080p', ['9:16', '1:1'], 1),
+    m('kling-2.5-turbo', 'Kling 2.5 Turbo', [5, 10], '1080p', ['9:16', '1:1'], 1),
+    m('kling-3.0-pro', 'Kling 3.0 Pro', range(3, 15), '1080p', ['9:16', '1:1'], 1),
+    m('veo-3.1', 'Google VEO 3.1', [8], '720p', ['9:16', '16:9'], 1),
+  ];
+
+  it("builds a family card's spec lines and model count from the loaded models", () => {
+    const card = withLiveSpecs(kling, models);
+    expect(card.tag).toBe('5 mô hình');
+    expect(card.specs).toEqual([
+      'Thời lượng: 3–15 giây (O3 Pro, 3.0 Pro) · 5 hoặc 10 giây (các bản khác)',
+      'Độ phân giải: 1080p',
+      'Tỉ lệ: 9:16, 1:1, 16:9 (O3 Pro, o1) · 9:16, 1:1 (các bản khác)',
+      'Ảnh: tối đa 7 (O3 Pro) · tối đa 4 (o1) · 1 (các bản khác)',
+    ]);
+  });
+
+  it('follows what Admin turned off, and keeps the written lines while nothing of the family is loaded', () => {
+    expect(withLiveSpecs(kling, models.slice(0, 1)).tag).toBe('1 mô hình');
+    expect(withLiveSpecs(kling, undefined)).toBe(kling);
+    expect(withLiveSpecs(kling, models.slice(5))).toBe(kling);
+  });
+
+  it('gives each video family card a prefix that matches its own models only', () => {
+    const fams = ABOUT.create.sections.flatMap((s) => s.blocks ?? []).flatMap((b) => (typeof b === 'object' && 'cards' in b ? b.cards : [])).filter((c) => c.family);
+    expect(fams.map((c) => c.family)).toEqual(['kling-', 'seedance-', 'flux-3', 'veo-', 'gemini-omni-flash', 'grok-imagine', 'wan-', 'minimax-']);
   });
 });
