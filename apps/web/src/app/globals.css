@@ -939,24 +939,35 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
   label input, label select { min-width: 0; width: 100%; }
 }
 
-/* Settings: the account sections on the left, the chosen one on the right. */
+/* Settings: the account sections on the left (sign-out at the foot), the chosen one on the right under its title. */
 .settings { width: min(960px, calc(100vw - 32px)); max-width: none; padding: 0; border: 0; border-radius: 16px; }
 .settings .modal-body { padding: 0; }
-.settings .modal-close { top: 18px; right: 18px; display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 8px; background: transparent; font-size: 22px; }
-.settings-title { margin: 0; padding: 20px; border-bottom: 1px solid rgb(var(--shade) / .1); font-size: 18px; line-height: 28px; font-weight: 600; }
+.settings .modal-close { top: 14px; right: 14px; display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 8px; background: transparent; font-size: 22px; }
+.settings .modal-close:hover { background: var(--fill); }
+.settings-title { margin: 0; padding: 16px 20px; border-bottom: 1px solid var(--border); font-size: 16px; line-height: 28px; font-weight: 600; }
 .settings-grid { display: grid; min-height: min(640px, calc(100vh - 160px)); }
-.settings-nav { display: grid; align-content: start; gap: 8px; padding: 16px; border-bottom: 1px solid rgb(var(--shade) / .1); }
+.settings-nav { display: flex; flex-direction: column; gap: 4px; padding: 16px 12px; border-bottom: 1px solid var(--border); background: var(--surface-1); }
 .settings-kicker { margin: 0 0 4px; color: var(--text-2); font-size: 12px; line-height: 18px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
-.settings-nav button { display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 16px; border: 0; border-radius: 8px; background: transparent; color: var(--ink); font-size: 14px; text-align: left; white-space: nowrap; }
+.settings-nav > .settings-kicker { padding: 0 12px; color: var(--muted); }
+.settings-nav-list { display: grid; gap: 2px; }
+.settings-nav button { display: flex; align-items: center; gap: 10px; width: 100%; height: 40px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; color: var(--ink); font-size: 14px; text-align: left; white-space: nowrap; }
 .settings-nav button .icon { flex: none; color: var(--text-icon); }
-.settings-nav button:hover, .settings-nav button[aria-current='true'] { background: var(--nav-hover); }
-.settings-nav button[aria-current='true'] { font-weight: 600; }
+.settings-nav-icon { display: grid; flex: none; place-items: center; }
+.settings-nav-text { display: grid; flex: 1; min-width: 0; }
+.settings-nav-desc, .settings-nav-chevron { display: none; }
+.settings-nav button:hover { background: var(--fill); }
+.settings-nav button[aria-current='true'] { background: var(--surface); box-shadow: 0 0 0 1px var(--border); font-weight: 600; }
 .settings-nav button[aria-current='true'] .icon { color: var(--brand); }
+.settings-nav .settings-signout { margin-top: auto; color: var(--danger-text); }
 .settings-nav .settings-signout .icon { color: currentColor; }
-.settings-nav .settings-signout { margin-top: 16px; background: var(--danger-soft); color: var(--danger-text); }
-.settings-nav .settings-signout:hover { background: var(--danger-soft-hover); }
-.settings-panel { min-width: 0; padding: 20px; }
+.settings-nav .settings-signout:hover { background: var(--danger-soft); }
+.settings-panel { min-width: 0; padding: 24px 28px 28px; }
 .settings-panel h1 { font-size: 16px; line-height: 24px; }
+.settings-head { margin: 0 0 20px; }
+.settings-head h3 { margin: 0; font-size: 18px; line-height: 26px; font-weight: 600; }
+.settings-lede { margin: 2px 0 0; color: var(--text-muted); font-size: 14px; line-height: 20px; }
+.settings-back { display: none; }
+.settings-note { margin: 12px 0 0; color: var(--text-muted); font-size: 13px; line-height: 20px; }
 .settings-fields { display: grid; gap: 12px; margin: 0 0 12px; padding: 16px; border: 1px solid rgb(var(--shade) / .08); border-radius: 12px; background: var(--surface-1); }
 .settings-fields dt { color: var(--text-2); font-size: 12px; line-height: 18px; font-weight: 500; }
 .settings-fields dd { margin: 0; overflow-wrap: anywhere; }
@@ -965,9 +976,57 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 @keyframes settings-in { from { opacity: 0; transform: translateY(6px); } }
 .settings-panel > section > .muted { margin: 12px 0 0; }
 .settings-card { margin: 0; padding: 20px; border: 1px solid rgb(var(--shade) / .08); border-radius: 12px; background: var(--surface-1); }
-/* Profile: the person's colour tints the card, so each account looks like its own. */
-.profile-card { display: flex; align-items: center; gap: 16px; margin: 0 0 12px; padding: 20px; border: 1px solid rgb(var(--shade) / .08); border-radius: 14px; background: linear-gradient(120deg, color-mix(in srgb, var(--avatar) 16%, var(--surface)), var(--surface) 75%); }
-.avatar { display: grid; flex: none; place-items: center; width: 56px; height: 56px; border-radius: 50%; background: var(--avatar); box-shadow: 0 0 0 3px var(--surface), 0 2px 10px color-mix(in srgb, var(--avatar) 40%, transparent); color: var(--on-dark); font-size: 20px; line-height: 1; font-weight: 600; letter-spacing: .02em; }
+/* Profile: the person's own colour on the avatar; the edit button opens the name and colour form inside the card. */
+.profile-card { display: grid; gap: 20px; margin: 0 0 16px; padding: 20px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+.profile-top { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; column-gap: 16px; }
+.profile-top .avatar { grid-row: span 2; }
+.profile-top .role-badge { grid-column: 2; grid-row: 2; justify-self: start; margin-top: 6px; }
+.profile-top .profile-edit-button { grid-column: 3; grid-row: 1 / span 2; }
+.avatar { display: grid; flex: none; place-items: center; width: 56px; height: 56px; border-radius: 50%; background: var(--avatar); color: var(--on-dark); font-size: 20px; line-height: 1; font-weight: 600; letter-spacing: .02em; transition: background-color .2s; }
+.profile-edit-button { display: inline-flex; flex: none; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border: 1px solid var(--border-button); border-radius: 8px; background: var(--surface); color: var(--ink); font-size: 13px; }
+.profile-edit-button:hover { background: var(--fill); }
+.pw-form.profile-edit { max-width: none; padding-top: 20px; border-top: 1px solid var(--border); }
+.profile-edit > input { max-width: 26rem; }
+.swatches { display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; margin: 10px 0 0; padding: 0; border: 0; }
+.swatches legend { margin: 0 0 8px; padding: 0; font-size: 14px; line-height: 21px; font-weight: 500; }
+.swatch { position: relative; display: grid; place-items: center; width: 36px; height: 36px; margin: 0; cursor: pointer; }
+.swatch input { position: absolute; inset: 0; width: 100%; min-width: 0; height: 100%; margin: 0; padding: 0; opacity: 0; cursor: pointer; }
+.swatch span { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--swatch); color: var(--on-dark); pointer-events: none; transition: box-shadow .15s; }
+.swatch span .icon { opacity: 0; }
+.swatch input:checked + span { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--swatch); }
+.swatch input:checked + span .icon { opacity: 1; }
+.swatch input:focus-visible + span { outline: 2px solid var(--ink); outline-offset: 5px; }
+/* The protection score: a ring of the checks met, then one row per check with a way to the missing ones. */
+.protect { margin: 0 0 16px; padding: 20px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+.protect-head { display: flex; align-items: center; gap: 14px; }
+.protect-ring { flex: none; width: 48px; height: 48px; }
+.protect-ring circle { fill: none; stroke: rgb(var(--shade) / .08); stroke-width: 4; }
+.protect-ring circle + circle { stroke: var(--ink); stroke-linecap: round; }
+.protect[data-full='true'] .protect-ring circle + circle { stroke: var(--cat-utility-fg); }
+.protect-ring text { fill: var(--ink); font-size: 11px; font-weight: 600; }
+.protect-title { margin: 0; font-size: 15px; line-height: 22px; font-weight: 600; }
+.protect-sub { margin: 0; color: var(--text-muted); font-size: 13px; line-height: 20px; }
+.protect-list { display: grid; margin: 16px 0 0; padding: 0; list-style: none; }
+.protect-list li { display: flex; align-items: center; gap: 12px; min-height: 48px; border-top: 1px solid var(--border); }
+.protect-mark { display: grid; flex: none; place-items: center; width: 20px; height: 20px; border: 1.5px dashed var(--border-strong); border-radius: 50%; color: var(--on-dark); }
+.protect-list li[data-done='true'] .protect-mark { border: 0; background: var(--cat-utility-fg); }
+.protect-label { flex: 1; min-width: 0; font-size: 14px; line-height: 20px; }
+.protect-state { color: var(--text-muted); font-size: 13px; line-height: 20px; }
+.protect-list button { height: 32px; padding: 0 12px; border: 1px solid var(--border-button); border-radius: 8px; background: var(--surface); color: var(--ink); font-size: 13px; }
+.protect-list button:hover { background: var(--fill); }
+/* Today: the day's clips and spend at a glance, with the way to the full Limits section. */
+.today { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 24px; margin: 0 0 16px; padding: 12px 20px 20px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+.today-head { display: flex; grid-column: 1 / -1; align-items: center; justify-content: space-between; gap: 12px; }
+.today-head .settings-kicker { margin: 0; }
+.today > .muted, .today > .error { grid-column: 1 / -1; margin: 0; }
+.today-cell { display: grid; min-width: 0; }
+.today-cell > span:first-child { color: var(--text-muted); font-size: 12px; line-height: 18px; }
+.today-cell strong { font-size: 15px; line-height: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.today-bar { height: 4px; margin-top: 6px; overflow: hidden; border-radius: 999px; background: rgb(var(--shade) / .08); }
+.today-bar span { display: block; height: 100%; border-radius: inherit; background: var(--ink); }
+.today-cell[data-level='warn'] .today-bar span { background: var(--warn-border); }
+.today-cell[data-level='full'] .today-bar span { background: var(--brand); }
+.today-more { min-height: 32px; font-size: 13px; white-space: nowrap; }
 .profile-who { flex: 1; min-width: 0; }
 .profile-name { margin: 0; font-size: 18px; line-height: 26px; font-weight: 600; overflow-wrap: anywhere; }
 .profile-email { margin: 0; color: var(--text-muted); font-size: 14px; line-height: 20px; overflow-wrap: anywhere; }
@@ -1002,6 +1061,17 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .acct-row > .acct-primary:hover { border-color: var(--zinc-700); background: var(--zinc-700); }
 /* Security: the password change form (also on the forced change page) and the sessions list under the sign-in rows. */
 .settings-kicker.settings-sub { margin: 24px 0 12px; }
+.acct-row > button[aria-expanded] { gap: 6px; }
+.acct-row.acct-form { display: block; padding: 4px 16px 20px 64px; border-top: 0; }
+.acct-row.pw-done { margin: 0; min-height: 0; }
+/* Preferences: switches named by their row, and the keyboard shortcuts as keycaps. */
+.acct-row > .switch { margin-left: auto; height: 24px; padding: 0; border: 0; border-radius: 12px; background: var(--fill-strong); }
+.acct-row > .switch:hover { background: var(--border-strong); }
+.acct-row > .switch[aria-checked='true'] { background: var(--ink-strong); }
+.acct-row > .switch[aria-checked='true']:hover { background: var(--zinc-700); }
+.key-row { min-height: 52px; }
+.keys { display: flex; flex: none; gap: 4px; min-width: 104px; }
+.keys kbd { display: inline-grid; place-items: center; min-width: 26px; height: 24px; padding: 0 6px; border: 1px solid var(--border-strong); border-bottom-width: 2px; border-radius: 6px; background: var(--surface-1); color: var(--ink); font-family: inherit; font-size: 12px; line-height: 1; font-weight: 600; }
 .settings-panel .acct-rows + .actions { margin-top: 12px; }
 .settings-panel .actions button { height: 36px; padding: 0 14px; font-size: 14px; }
 .settings-panel .actions button:hover:not(:disabled) { background: var(--fill); }
@@ -1040,21 +1110,45 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .forced-pw-signout { width: 100%; height: 40px; margin-top: 8px; border: 0; background: transparent; color: var(--text-2); font-size: 14px; }
 .forced-pw-signout:hover { background: var(--fill); color: var(--ink); }
 @media (min-width: 768px) {
-  .settings-grid { grid-template-columns: 260px minmax(0, 1fr); }
-  .settings-nav { border-right: 1px solid rgb(var(--shade) / .1); border-bottom: 0; }
+  /* One height for every section, so the dialog does not jump; the panel scrolls under the fixed nav. */
+  .settings-grid { grid-template-columns: 260px minmax(0, 1fr); height: min(680px, calc(100vh - 96px)); min-height: 0; }
+  .settings-panel { overflow-y: auto; }
+  .settings-nav { border-right: 1px solid var(--border); border-bottom: 0; }
 }
-/* Phones: the sections are a row of pills that wraps above the panel. */
+/* Phones: the sections are a list (icon, title, one line, chevron); a tap slides the section in as its own page with a back button.
+   The slide plays whatever the motion setting, as the owner asked, and stays short. */
 @media (max-width: 767px) {
-  .settings-nav { display: flex; gap: 6px; padding: 12px 16px; flex-wrap: wrap; }
-  .settings-nav .settings-kicker { display: none; }
-  .settings-nav button { flex: none; height: 36px; padding: 0 12px; border: 1px solid rgb(var(--shade) / .1); border-radius: 999px; font-size: 13px; }
-  .settings-nav button[aria-current='true'] { border-color: var(--ink); background: var(--ink); color: var(--surface); }
-  .settings-nav button[aria-current='true'] .icon { color: currentColor; }
-  .settings-nav .settings-signout { margin-top: 0; border-color: transparent; }
-  .settings-grid { align-content: start; }
-  .settings-panel { padding: 16px; }
-  .profile-card { display: grid; grid-template-columns: auto minmax(0, 1fr); padding: 16px; }
-  .profile-card .role-badge { grid-column: 2; justify-self: start; margin-top: -8px; }
+  .settings-grid { align-content: start; min-height: 0; overflow-x: clip; }
+  .settings-grid[data-view='page'] .settings-nav, .settings-grid:not([data-view='page']) .settings-panel { display: none; }
+  .settings .modal-body:has(.settings-grid[data-view='page']) .settings-title { display: none; }
+  .settings-grid[data-view='page'] .settings-panel { animation: settings-push .22s cubic-bezier(.2, .7, .2, 1); }
+  .settings-grid[data-view='back'] .settings-nav { animation: settings-pop .22s cubic-bezier(.2, .7, .2, 1); }
+  .settings-nav { gap: 16px; padding: 16px; border-bottom: 0; background: var(--surface); }
+  .settings-nav > .settings-kicker { display: none; }
+  .settings-nav-list { gap: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 12px; }
+  .settings-nav button { gap: 12px; height: auto; min-height: 60px; padding: 10px 12px; border-radius: 0; white-space: normal; }
+  .settings-nav-list button + button { border-top: 1px solid var(--border); }
+  .settings-nav button[aria-current='true'] { background: transparent; box-shadow: none; font-weight: 400; }
+  .settings-nav button[aria-current='true'] .icon { color: var(--text-icon); }
+  .settings-nav-list button:active { background: var(--fill); }
+  .settings-nav-icon { width: 32px; height: 32px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-1); }
+  .settings-nav-text > :first-child { font-size: 15px; line-height: 22px; font-weight: 500; }
+  .settings-nav-desc { display: block; overflow: hidden; color: var(--text-muted); font-size: 13px; line-height: 18px; text-overflow: ellipsis; white-space: nowrap; }
+  .settings-nav-chevron { display: grid; flex: none; color: var(--text-subtle); }
+  .settings-nav .settings-signout { justify-content: center; min-height: 48px; margin-top: 0; border: 1px solid var(--border); border-radius: 12px; font-weight: 500; }
+  .settings-panel { padding: 8px 16px 24px; }
+  .settings-panel > section { animation: none; }
+  .settings-back { display: inline-flex; align-items: center; gap: 2px; height: 44px; margin: 0 0 4px -8px; padding: 0 8px; border: 0; border-radius: 8px; background: transparent; color: var(--ink); font-size: 15px; font-weight: 500; }
+  .settings-head h3 { font-size: 22px; line-height: 30px; }
+  .profile-card { padding: 16px; }
+  .profile-top { column-gap: 14px; }
+  .profile-top .profile-edit-button { grid-row: 1; }
+  .protect { padding: 16px; }
+  .today { gap: 12px 16px; padding: 12px 16px 16px; }
+  .acct-row.acct-form { padding: 4px 16px 16px; }
+  .acct-row.key-row { display: flex; }
+  .acct-row.pref-row { grid-template-columns: 36px minmax(0, 1fr) auto; }
+  .acct-row.pref-row > .switch { grid-column: 3; justify-self: end; align-self: center; margin: 0; }
   .acct-row { display: grid; grid-template-columns: 36px minmax(0, 1fr); }
   .acct-row > :not(.acct-mark, .acct-text) { grid-column: 2; justify-self: start; }
   .tf-setup { grid-template-columns: minmax(0, 1fr); }
@@ -1063,6 +1157,8 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 @media (prefers-reduced-motion: reduce) {
   .settings-panel > section, .meter-track span { animation: none; }
 }
+@keyframes settings-push { from { transform: translateX(100%); } }
+@keyframes settings-pop { from { opacity: .4; transform: translateX(-30%); } }
 
 /* Explore. */
 .explore h1 { margin: 8px 0 48px; font-size: 26px; line-height: 32px; font-weight: 600; }

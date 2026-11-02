@@ -69,6 +69,16 @@ describe('/api/auth/admin/*', () => {
   );
 });
 
+describe('/api/auth/update-user', () => {
+  test.each(['/api/auth/update-user', '/api/auth/Update-User', '/api/auth//update-user/', '/api/auth/%75pdate-user'])(
+    'answers 404 to POST %s and leaves the name as it was, as PATCH /api/me/profile checks and audits renames',
+    async (path) => {
+      expect((await route.POST(call(victim.cookie, path, 'POST', { name: 'Renamed', image: 'https://example.test/x.png' }))).status).toBe(404);
+      expect((await pool.query('select name, image from users where id = $1', [victim.id])).rows[0]).toEqual({ name: 'victim@example.test', image: null });
+    },
+  );
+});
+
 describe('the other auth paths', () => {
   test('sign-in with a password still works, and so does reading the session', async () => {
     const res = await route.POST(call(undefined, '/api/auth/sign-in/email', 'POST', { email: 'victim@example.test', password: PASSWORD }));

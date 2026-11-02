@@ -81,6 +81,8 @@ export const users = pgTable(
     // better-auth's twoFactor plugin: set once the user confirms a TOTP code, asked only at email+password sign-in.
     twoFactorEnabled: boolean('two_factor_enabled').notNull().default(false),
     image: text('image'),
+    // A colour from the app's avatar palette (apps/web/src/lib/profile.ts), chosen by the user; null is the colour derived from the name.
+    avatarColor: text('avatar_color'),
     teamId: text('team_id')
       .notNull()
       .default(DEFAULT_TEAM_ID)

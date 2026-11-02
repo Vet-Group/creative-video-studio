@@ -17,7 +17,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     userMethods(pool, user.id),
     // Read here, not from the session, which may be cached from before an Admin moved the user to another team.
     pool.query(
-      `select t.name as team, u.created_at, u.two_factor_enabled, (select count(*)::int from passkeys p where p.user_id = u.id) as passkeys from users u join teams t on t.id = u.team_id where u.id = $1`,
+      `select t.name as team, u.created_at, u.two_factor_enabled, u.avatar_color, (select count(*)::int from passkeys p where p.user_id = u.id) as passkeys from users u join teams t on t.id = u.team_id where u.id = $1`,
       [user.id],
     ),
   ]);
@@ -28,6 +28,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     memberSince: new Date(profile.rows[0]?.created_at ?? user.createdAt).toISOString(),
     passkeys: profile.rows[0]?.passkeys ?? 0,
     twoFactor: profile.rows[0]?.two_factor_enabled === true,
+    avatarColor: profile.rows[0]?.avatar_color ?? null,
     methods: methods.get(user.id) ?? [],
     googleEnabled: googleLoginEnabled,
     larkEnabled: larkLoginEnabled,

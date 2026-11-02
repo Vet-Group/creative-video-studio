@@ -344,6 +344,13 @@
       "when": 1794394960036,
       "tag": "0048_two_factor",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1794394961036,
+      "tag": "0049_user_avatar_color",
+      "breakpoints": true
     }
   ]
 }
