@@ -3,7 +3,7 @@ import { authFailure, bad, readBody } from '@/lib/admin';
 import { guard } from '@/lib/session';
 import { userMethods } from '@/lib/user-methods';
 
-/** Admin: list users, each with the sign-in methods linked to the account, its passkeys last. */
+/** Admin: list users, each with the sign-in methods linked to the account, its passkeys last, and whether 2FA is on. */
 export async function GET(request: Request) {
   const g = await guard(request, 'admin');
   if (g.error) return g.error;
@@ -14,7 +14,7 @@ export async function GET(request: Request) {
     methods.set(p.user_id, [...(methods.get(p.user_id) ?? []), { id: p.id, provider: 'passkey', email: null, createdAt: p.created_at.toISOString() }]);
   }
   return Response.json({
-    users: users.map((u) => ({ id: u.id, email: u.email, name: u.name, role: u.role, banned: u.banned, teamId: (u as typeof u & { teamId: string }).teamId, methods: methods.get(u.id) ?? [] })),
+    users: users.map((u) => ({ id: u.id, email: u.email, name: u.name, role: u.role, banned: u.banned, teamId: (u as typeof u & { teamId: string }).teamId, twoFactor: (u as typeof u & { twoFactorEnabled?: boolean }).twoFactorEnabled === true, methods: methods.get(u.id) ?? [] })),
   });
 }
 

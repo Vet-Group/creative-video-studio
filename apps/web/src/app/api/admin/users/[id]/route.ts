@@ -8,7 +8,8 @@ import { guard } from '@/lib/session';
 
 /**
  * Admin: change one user. Any of `name`, `email` (unique; a first Google or Lark sign-in links by this address), `role` (member|admin),
- * `teamId` (a visible team), `banned` (boolean, with an optional `banReason`) and `temporaryPassword` in one body. Every field is checked before anything is written. Each change that differs from the current state is
+ * `teamId` (a visible team), `banned` (boolean, with an optional `banReason`), `temporaryPassword` and `twoFactor: false` (turns the
+ * user's 2FA off, for a lost phone, and ends the user's sessions) in one body. Every field is checked before anything is written. Each change that differs from the current state is
  * audited with its old and new value, in the transaction of the change itself: the audit row commits only if the change was made. The
  * password itself is never stored. A team change touches only users.team_id: jobs keep the team they were run under.
  */
@@ -17,8 +18,8 @@ export async function PATCH(request: Request, { params }: RouteContext) {
   if (g.error) return g.error;
   const { id } = await params;
   const actorId = g.session.user.id;
-  const { name, email, role, teamId, banned, banReason, temporaryPassword } = (await readBody(request)) ?? {};
-  if ([name, email, role, teamId, banned, temporaryPassword].every((v) => v === undefined)) return bad('give at least one of name, email, role, teamId, banned, temporaryPassword');
+  const { name, email, role, teamId, banned, banReason, temporaryPassword, twoFactor } = (await readBody(request)) ?? {};
+  if ([name, email, role, teamId, banned, temporaryPassword, twoFactor].every((v) => v === undefined)) return bad('give at least one of name, email, role, teamId, banned, temporaryPassword, twoFactor');
   const newName = typeof name === 'string' ? name.trim() : name;
   const newEmail = typeof email === 'string' ? email.trim().toLowerCase() : email;
   if (newName !== undefined && !(typeof newName === 'string' && newName.length >= 1 && newName.length <= 100)) return bad('name must have 1 to 100 characters');
@@ -30,6 +31,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
   if (temporaryPassword !== undefined && !(typeof temporaryPassword === 'string' && temporaryPassword.length >= PASSWORD_LENGTH.min && temporaryPassword.length <= PASSWORD_LENGTH.max)) {
     return bad(`temporaryPassword must have ${PASSWORD_LENGTH.min} to ${PASSWORD_LENGTH.max} characters`);
   }
+  if (twoFactor !== undefined && twoFactor !== false) return bad('twoFactor can only be turned off (false); the user turns it on');
   if (id === actorId && ((role !== undefined && role !== g.session.user.role) || banned === true)) return bad('you cannot change your own role or ban yourself');
 
   if (!(await pool.query('select 1 from users where id = $1', [id])).rowCount) return bad('not found', 404);
@@ -94,6 +96,17 @@ export async function PATCH(request: Request, { params }: RouteContext) {
           await tx.query('update users set must_change_password = true, updated_at = now() where id = $1', [id]);
         },
       );
+    }
+    if (twoFactor === false) {
+      await withTransaction(pool, async (tx) => {
+        await tx.query('select pg_advisory_xact_lock(hashtext($1))', [target]);
+        if (!(await tx.query('update users set two_factor_enabled = false, updated_at = now() where id = $1 and two_factor_enabled', [id])).rowCount) return;
+        await tx.query('delete from two_factors where user_id = $1', [id]);
+        // A device trusted with the lost phone's codes must not skip the step once 2FA is back on; a session it opened ends, like an unlink.
+        await tx.query(`delete from verifications where value = $1 and identifier like 'trust-device-%'`, [id]);
+        await tx.query('delete from sessions where user_id = $1', [id]);
+        await audit(tx, { actorId, action: 'user.two_factor_disable', target, oldValue: { twoFactor: true }, newValue: { twoFactor: false, sessionsRevoked: true } });
+      });
     }
   } catch (e) {
     return authFailure(e);

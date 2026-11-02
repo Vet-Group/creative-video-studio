@@ -22,3 +22,10 @@ test('never counts an X-Forwarded-For address, which a client can make up', () =
 test('gives the passkey options request its own limit', () => {
   expect(auth.options.rateLimit?.customRules?.['/passkey/generate-authenticate-options']).toEqual({ window: 60, max: 30 });
 });
+
+test('caps the 2FA code checks per minute, on top of the plugin\'s per-challenge and per-account tries', () => {
+  const rules = auth.options.rateLimit?.customRules ?? {};
+  for (const path of ['/two-factor/verify-totp', '/two-factor/verify-backup-code'] as const) expect(rules[path]).toEqual({ window: 60, max: 10 });
+  // The plugin's own rule for /two-factor/* stays for the other 2FA endpoints.
+  expect(auth.options.plugins?.find((p) => p.id === 'two-factor')?.rateLimit?.[0]?.pathMatcher('/two-factor/enable')).toBe(true);
+});

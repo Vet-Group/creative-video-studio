@@ -1,10 +1,10 @@
 import { passkey } from '@better-auth/passkey';
-import { accounts, passkeys, sessions, users, verifications } from '@cvs/db';
+import { accounts, passkeys, sessions, twoFactors, users, verifications } from '@cvs/db';
 import { createDb, createPool, databaseUrl } from '@cvs/db/client';
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { APIError, createAuthMiddleware, getSessionFromCtx } from 'better-auth/api';
-import { admin, lastLoginMethod } from 'better-auth/plugins';
+import { admin, lastLoginMethod, twoFactor } from 'better-auth/plugins';
 import { adminAc, userAc } from 'better-auth/plugins/admin/access';
 import { genericOAuth } from 'better-auth/plugins/generic-oauth';
 import { accountAuditHooks, authAuditHook } from './account-audit';
@@ -38,12 +38,19 @@ export const auth = betterAuth({
   baseURL: process.env.APP_URL,
   secret: process.env.BETTER_AUTH_SECRET,
   telemetry: { enabled: false },
-  database: drizzleAdapter(createDb(pool), { provider: 'pg', usePlural: true, schema: { users, sessions, accounts, verifications, passkeys } }),
+  database: drizzleAdapter(createDb(pool), { provider: 'pg', usePlural: true, schema: { users, sessions, accounts, verifications, passkeys, twoFactors } }),
   // Production is reached only through the Cloudflare tunnel (lan-guard keeps port 3400 off the LAN), and Cloudflare sets this header to the one
   // client address. The default x-forwarded-for takes what a client sends, and a forged one sends every sign-in to one shared limiter bucket.
   advanced: { ipAddress: { ipAddressHeaders: ['cf-connecting-ip'] } },
   // Each passkey options request stores a challenge row, and the login page asks for one on every visit; the office shares one address.
-  rateLimit: { customRules: { '/passkey/generate-authenticate-options': { window: 60, max: 30 } } },
+  // The 2FA code checks get a per-minute cap on top of the plugin's 5 tries per challenge and 10 per account; the office shares one address.
+  rateLimit: {
+    customRules: {
+      '/passkey/generate-authenticate-options': { window: 60, max: 30 },
+      '/two-factor/verify-totp': { window: 60, max: 10 },
+      '/two-factor/verify-backup-code': { window: 60, max: 10 },
+    },
+  },
   hooks: {
     before: createAuthMiddleware(async (ctx) => {
       const body = ctx.body as { currentPassword?: unknown; newPassword?: unknown; revokeOtherSessions?: unknown } | undefined;
@@ -55,8 +62,8 @@ export const auth = betterAuth({
         if (body?.revokeOtherSessions !== true) throw new APIError('BAD_REQUEST', { message: 'A password change signs the other sessions out', code: 'REVOKE_REQUIRED' });
       }
       // Until the temporary password is replaced, its holder may not add, keep or manage another way in, which would outlive the change.
-      // A denylist, so the Google and Lark sign-in callbacks still run.
-      if (FORCED_CHANGE_CLOSED.has(ctx.path) && (await getSessionFromCtx(ctx))?.user.mustChangePassword) {
+      // A denylist, so the Google and Lark sign-in callbacks still run. The 2FA step of a sign-in has no session yet, so it is never refused here.
+      if ((FORCED_CHANGE_CLOSED.has(ctx.path) || ctx.path.startsWith('/two-factor/')) && (await getSessionFromCtx(ctx))?.user.mustChangePassword) {
         throw new APIError('FORBIDDEN', { message: 'Change the temporary password first', code: 'PASSWORD_CHANGE_REQUIRED' });
       }
     }),
@@ -102,6 +109,9 @@ export const auth = betterAuth({
         },
       },
     }),
+    // Optional TOTP, asked only at email+password sign-in: the plugin's sign-in hook matches /sign-in/email, never OAuth or passkey sign-ins.
+    // Turning it on, getting new backup codes and turning it off all need the password; a user without one cannot turn it on.
+    twoFactor({ issuer: 'VET Creative Video Studio' }),
     // A cookie only (email, google, lark or passkey), so the login page can mark the method this browser used last.
     lastLoginMethod(),
   ],

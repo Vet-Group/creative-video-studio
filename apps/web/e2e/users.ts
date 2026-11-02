@@ -69,6 +69,10 @@ export const USERS = {
   seca: { email: 'seca@e2e.test', name: 'E2E Security A', role: 'member' },
   secb: { email: 'secb@e2e.test', name: 'E2E Security B', role: 'member' },
   secc: { email: 'secc@e2e.test', name: 'E2E Security C', role: 'member' },
+  // two-factor.e2e: totpa turns 2FA on and signs in with it, totpb has it turned off by an Admin, totpc signs in with a passkey.
+  totpa: { email: 'totpa@e2e.test', name: 'E2E Two Factor A', role: 'member' },
+  totpb: { email: 'totpb@e2e.test', name: 'E2E Two Factor B', role: 'member' },
+  totpc: { email: 'totpc@e2e.test', name: 'E2E Two Factor C', role: 'member' },
   admin: { email: 'admin@e2e.test', name: 'E2E Admin', role: 'admin' },
 } as const;
 

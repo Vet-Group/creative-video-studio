@@ -71,13 +71,17 @@ export function accountAuditHooks(q: Queryable) {
  * a passkey are audited like linking and unlinking a method, with provider 'passkey'. Both endpoints run in the caller's own session.
  * Deleting one also ends the user's other sessions, as an unlink does, since a lost passkey may have opened them.
  * A changed password is audited without either password, and it lifts the forced change an Admin's temporary password set.
+ * Turning 2FA on (the first right code, checked in a session) and off are audited without the secret or any code.
  * shortcut: same out-of-transaction write as accountAuditHooks.
  */
 export function authAuditHook(q: Queryable) {
   return createAuthMiddleware(async (ctx) => {
     const done = ctx.context.returned;
     const session = ctx.context.session;
-    if (!done || done instanceof APIError || !session) return;
+    if (!done || done instanceof APIError) return;
+    // As for a changed password, the session a right code opens or renews travels in its httpOnly cookie only.
+    const twoFactorCheck = ctx.path === '/two-factor/verify-totp' || ctx.path === '/two-factor/verify-backup-code';
+    if (!session) return twoFactorCheck ? ctx.json({ user: (done as { user: unknown }).user }) : undefined;
     const userId = session.user.id;
     const target = `user:${userId}`;
     if (ctx.path === '/passkey/verify-registration') {
@@ -90,6 +94,12 @@ export function authAuditHook(q: Queryable) {
       await audit(q, { actorId: userId, action: 'user.password_change', target, newValue: { sessionsRevoked: (ctx.body as { revokeOtherSessions?: boolean }).revokeOtherSessions === true } });
       // The new session's token travels in its httpOnly cookie only, never in a body the page's scripts can read.
       return ctx.json({ user: (done as { user: unknown }).user });
+    } else if (ctx.path === '/two-factor/verify-totp' && !session.user.twoFactorEnabled) {
+      // The session is the one read before the check, so a user without 2FA yet has just turned it on.
+      await audit(q, { actorId: userId, action: 'user.two_factor_enable', target, newValue: { twoFactor: true } });
+    } else if (ctx.path === '/two-factor/disable') {
+      await audit(q, { actorId: userId, action: 'user.two_factor_disable', target, oldValue: { twoFactor: true }, newValue: { twoFactor: false } });
     }
+    if (twoFactorCheck) return ctx.json({ user: (done as { user: unknown }).user });
   });
 }
