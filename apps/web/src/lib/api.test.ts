@@ -28,3 +28,8 @@ test('a 401 on a page sends the user to the login, to come back to that page', a
   await api('/x').catch(() => {});
   expect(assign).toHaveBeenCalledWith('/login?next=%2Flibrary%3Ftab%3Dvideo');
 });
+
+test('a better-auth refusal carries its code', async () => {
+  const e = (await failure(401, {}, { code: 'USER_NOT_VERIFIED', message: 'User verification required' })) as ApiError;
+  expect([e.status, e.code]).toEqual([401, 'USER_NOT_VERIFIED']);
+});

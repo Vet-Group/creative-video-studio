@@ -35,6 +35,14 @@ test('a member adds a passkey, signs in with it, sees it marked as used last, an
 
   await signOut(page);
   const button = page.getByRole('button', { name: 'Đăng nhập bằng passkey', exact: true });
+  // A server refusal for a missing PIN or fingerprint gets its own message.
+  await page.route('**/api/auth/passkey/verify-authentication', (route) =>
+    route.fulfill({ status: 401, contentType: 'application/json', body: JSON.stringify({ code: 'USER_NOT_VERIFIED', message: 'User verification required' }) }),
+  );
+  await button.click();
+  await expect(page.getByRole('alert').filter({ hasText: 'Passkey chưa xác minh bạn bằng vân tay hoặc mã PIN.' })).toBeVisible();
+  await page.unroute('**/api/auth/passkey/verify-authentication');
+
   await button.click();
   await expect(page).toHaveURL(/\/create$/);
 

@@ -59,3 +59,11 @@ test('marks no method without the cookie, and keeps the Caps Lock line empty unt
   expect(html).not.toContain('Lần trước');
   expect(html).toContain('<p class="login-hint login-caps" aria-live="polite"></p>');
 });
+
+test('a passkey refused for a missing PIN or fingerprint says so; other failures stay general', async () => {
+  const { passkeyFailure } = await import('./LoginForm');
+  const { ApiError } = await import('@/lib/api');
+  expect(passkeyFailure(new ApiError(401, 'x', null, 'USER_NOT_VERIFIED'))).toBe('Passkey chưa xác minh bạn bằng vân tay hoặc mã PIN. Hãy thử lại và xác nhận khi trình duyệt hỏi.');
+  expect(passkeyFailure(new ApiError(401, 'x', null, 'PASSKEY_NOT_FOUND'))).toBe('Không đăng nhập được bằng passkey.');
+  expect(passkeyFailure(new Error('boom'))).toBe('Không đăng nhập được bằng passkey.');
+});
