@@ -3,6 +3,7 @@ import { CardMedia } from '@/components/CardMedia';
 import { Icon } from '@/components/Icon';
 import { MODEL_CARD_TEXT } from '@/lib/about-content';
 import { pool } from '@/lib/auth';
+import { bestClips } from '@/lib/clips';
 import { cardSample, EXAMPLES, exampleForPreset, sampleSrc } from '@/lib/examples';
 import { modelStats, rank, scoreOf } from '@/lib/model-scores';
 import { listSamples } from '@/lib/samples';
@@ -28,7 +29,7 @@ const modelSample = (have: ReadonlySet<string>, id: string) => {
   }
 };
 
-/** The live page's featured models, in its order; they lead the row, then the other models with a sample loop, then those with a still, then the rest.
+/** The live page's featured models, in its order; they lead the row, then the other models with a loop (Library clip or sample), then those with a still, then the rest.
  * seedance-2.5 and seedance-2.0-replicate keep the live order when the -image and base rows are disabled. */
 const FEATURED = ['seedance-2.5-image', 'seedance-2.5', 'kling-o3-pro', 'gemini-omni-flash', 'kling-3.0-pro', 'seedance-2.0', 'seedance-2.0-replicate'];
 
@@ -36,7 +37,7 @@ const range = (values: number[]) => (values.length === 0 ? '' : values.length > 
 
 /** Explore: the start page of the live dashboard, with the tools, the enabled models and the company presets, each linking into Create. */
 export default async function ExplorePage() {
-  const [models, presets, samples, videoStats, imageStats] = await Promise.all([
+  const [models, presets, samples, videoStats, imageStats, clips] = await Promise.all([
     // Video models open Create Videos and image models open Image Generation, as the live page features both.
     pool.query<{ id: string; label: string; provider: string; kind: string; ratios: string[]; durations_sec: number[]; usd_per_second: string | null; image_prices: Record<string, string> | null }>(
       `select id, label, provider, kind, ratios, durations_sec, usd_per_second, image_prices from model_configs where enabled and kind = any(features) and kind in ('video', 'image') order by kind desc, label, id`,
@@ -46,8 +47,14 @@ export default async function ExplorePage() {
     // The same scores as the pickers: every mark for a video model, the Image Generation marks for an image model.
     modelStats(null),
     modelStats('image'),
+    bestClips(),
   ]);
   const have = new Set(samples.map((s) => s.name));
+  /** A model's card picture: the company's best Library clip of it, else its uploaded sample; a clip without a poster keeps the sample's still. */
+  const media = (id: string) => {
+    const sample = cardSample(have, modelSample(have, id)), clip = clips.get(id);
+    return clip ? { video: clip.video, poster: clip.poster ?? sample.poster } : sample;
+  };
   const scored = models.rows.map((m) => {
     const st = (m.kind === 'video' ? videoStats : imageStats).get(m.id) ?? { passes: 0, total: 0, ok: 0, bad: 0 };
     const usd = m.kind === 'video' ? Number(m.usd_per_second ?? 0) : Math.min(...Object.values(m.image_prices ?? {}).map(Number));
@@ -56,8 +63,8 @@ export default async function ExplorePage() {
   const rankOf = (id: string) => {
     const featured = FEATURED.indexOf(id);
     if (featured >= 0) return featured;
-    const media = cardSample(have, modelSample(have, id));
-    return FEATURED.length + (media.video ? 0 : media.poster ? 1 : 2);
+    const shown = media(id);
+    return FEATURED.length + (shown.video ? 0 : shown.poster ? 1 : 2);
   };
   scored.sort((a, b) => rankOf(a.id) - rankOf(b.id)); // stable: within a group the query's kind and label order stays
   const recommended = new Set(['video', 'image'].map((kind) => rank(scored.filter((m) => m.kind === kind)).recommended));
@@ -89,7 +96,7 @@ export default async function ExplorePage() {
           {scored.map((m) => (
             <li key={m.id}>
               <Link href={`${m.kind === 'video' ? '/create' : '/image-generation'}?model=${encodeURIComponent(m.id)}`} className="explore-card">
-                <CardMedia {...cardSample(have, modelSample(have, m.id))} always />
+                <CardMedia {...media(m.id)} always />
                 <strong>
                   {m.label}
                   {recommended.has(m.id) && <span className="badge badge-recommended">Đề xuất</span>}
