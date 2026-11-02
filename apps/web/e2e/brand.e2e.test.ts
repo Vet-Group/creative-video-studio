@@ -33,6 +33,7 @@ test.describe('narrow', () => {
     await expect(avatar).toBeVisible();
     const b = (await avatar.boundingBox())!;
     expect(b.x + b.width).toBeLessThanOrEqual(390 - 6 + 0.5);
+    expect([b.width, b.height]).toEqual([44, 44]); // a full touch target
     expect(Math.round((await page.locator('.topbar strong').boundingBox())!.x)).toBe(52);
   });
 });

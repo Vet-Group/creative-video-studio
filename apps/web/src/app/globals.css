@@ -301,7 +301,7 @@ legend { font-weight: 600; padding: 0 .25rem; }
 .account-email { color: var(--text-muted); font-size: 12px; line-height: 16px; }
 .account-chevron { display: grid; flex: none; color: var(--text-subtle); transition: transform .15s; }
 .account-chip[aria-expanded='true'] .account-chevron { transform: rotate(180deg); }
-.account-button { display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 10px; background: transparent; }
+.account-button { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 10px; background: transparent; }
 .account-button:hover, .account-button[aria-expanded='true'] { background: var(--fill); }
 .account-button .avatar { width: 30px; height: 30px; }
 .account-menu { position: absolute; z-index: 60; left: 0; right: 0; bottom: calc(100% + 6px); display: grid; padding: 4px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); box-shadow: 0 8px 24px rgb(var(--shade) / .12); }
@@ -1993,4 +1993,9 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
   .library-active { order: -1; margin: 0 4px 0 0; }
   .lib-row .actions { flex-basis: 100%; padding-left: 68px; }
   .zip-float { bottom: 12px; }
+}
+/* Touch phones: the 44 px action targets overlap the row's gap and padding, so the icons sit under the text and the row stays short. */
+@media (max-width: 639.98px) and (pointer: coarse) {
+  .lib-row { row-gap: 4px; padding: 8px 12px; }
+  .lib-row .actions { margin: -12px 0 -8px; padding-left: 56px; }
 }
