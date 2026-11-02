@@ -2,7 +2,7 @@
 // Not a client entry: only client components (Settings, ForcedChange) import it, so its function props never cross from the server.
 import { type FormEvent, useCallback, useEffect, useId, useState } from 'react';
 import { encode } from 'uqr';
-import { changeFailure, deviceLabel, PASSWORD_LENGTH, passwordProblem, sessionTime } from '@/lib/account-security';
+import { changeFailure, deviceLabel, PASSWORD_LENGTH, passwordProblem, SESSIONS_SHOWN, sessionTime, visibleSessions } from '@/lib/account-security';
 import { api, sendJson } from '@/lib/api';
 import { backupCodesText, manualSecret, twoFactorCall, twoFactorFailure } from '@/lib/two-factor';
 import { Icon } from './Icon';
@@ -94,6 +94,7 @@ export function Sessions() {
   const [sessions, setSessions] = useState<SessionItem[] | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [all, setAll] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -120,10 +121,11 @@ export function Sessions() {
 
   if (!sessions) return error ? <p className="error" role="alert">{error}</p> : <p className="muted">Đang tải phiên đăng nhập...</p>;
   const others = sessions.filter((s) => !s.current).length;
+  const hidden = sessions.length - SESSIONS_SHOWN;
   return (
     <>
       <ul className="acct-rows" aria-label="Phiên đăng nhập">
-        {sessions.map((s) => {
+        {visibleSessions(sessions, all).map((s) => {
           const device = deviceLabel(s.userAgent);
           return (
             <li key={s.id} className="acct-row">
@@ -149,6 +151,11 @@ export function Sessions() {
           );
         })}
       </ul>
+      {hidden > 0 && (
+        <button type="button" className="link-button" aria-expanded={all} onClick={() => setAll((a) => !a)}>
+          {all ? 'Thu gọn' : `Xem tất cả ${sessions.length} phiên`}
+        </button>
+      )}
       {error && (
         <p className="error" role="alert">
           {error}

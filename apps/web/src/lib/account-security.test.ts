@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { changeFailure, deviceLabel, passwordProblem, sessionTime } from './account-security';
+import { changeFailure, deviceLabel, passwordProblem, SESSIONS_SHOWN, sessionTime, visibleSessions } from './account-security';
 import { ApiError } from './api';
 
 test('names the browser and the system of common user agents', () => {
@@ -37,4 +37,13 @@ test('a wrong current password, a reused one and the limiter each get their own 
 
 test('session times read in Vietnam time', () => {
   expect(sessionTime('2026-11-01T18:05:00.000Z')).toBe('01:05 02/11/2026');
+});
+
+test('the sessions list puts this device first and shows five until all are asked for', () => {
+  const sessions = Array.from({ length: 8 }, (_, i) => ({ id: `s${i}`, current: i === 6 }));
+  const shown = visibleSessions(sessions, false);
+  expect(shown.map((s) => s.id)).toEqual(['s6', 's0', 's1', 's2', 's3']);
+  expect(shown).toHaveLength(SESSIONS_SHOWN);
+  expect(visibleSessions(sessions, true).map((s) => s.id)).toEqual(['s6', 's0', 's1', 's2', 's3', 's4', 's5', 's7']);
+  expect(visibleSessions(sessions.slice(0, 3), false)).toHaveLength(3);
 });
