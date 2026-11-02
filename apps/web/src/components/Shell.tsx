@@ -311,8 +311,6 @@ function Toasts() {
   );
 }
 
-// The sidebar in the live order; later features slot in where the live sidebar has them.
-
 /**
  * A thin bar along the top while any link of the app opens another page (Explore cards, Dùng lại, Dùng mẫu này, the sidebar too), shown after 150 ms.
  * The App Router has no navigation events: a plain click on a same-site link to another address starts it, the new page showing (Next then sets the
@@ -356,6 +354,7 @@ function NavProgress() {
   return <div className="nav-progress" data-on={on} aria-hidden="true" />;
 }
 
+// The sidebar in the live order; later features slot in where the live sidebar has them.
 const NAV: { href: string; text: string; icon: IconName; badge?: string }[] = [
   { href: '/explore', text: 'Khám phá', icon: 'home' },
   { href: '/try-on', text: 'Thử đồ', icon: 'tryon' },

@@ -145,10 +145,10 @@ legend { font-weight: 600; padding: 0 .25rem; }
 .sidebar nav { display: grid; gap: 2px; }
 .sidebar nav a { display: flex; align-items: center; height: 37px; padding: 8px 12px; border-radius: 10px; color: var(--text-2); font-size: 14px; line-height: 21px; font-weight: 500; text-decoration: none; transition: background-color .15s; }
 .nav-icon { display: grid; place-items: center; flex: none; width: 20px; margin-right: 12px; color: var(--text-subtle); }
-/* The live sidebar's red "New" pill beside Marketing Studio. */
 .nav-progress { position: fixed; top: 0; left: 0; z-index: 1000; width: 100%; height: 2px; background: var(--brand); transform-origin: left; transform: scaleX(0); opacity: 0; pointer-events: none; }
 .nav-progress[data-on='true'] { opacity: 1; transition: opacity 0s .15s; animation: nav-progress 8s linear .15s forwards; }
 @keyframes nav-progress { 0% { transform: scaleX(.3); } 12.5% { transform: scaleX(.55); } 25% { transform: scaleX(.7); } 100% { transform: scaleX(.9); } } /* 30% at once, 70% by 2 s, then slower; linear so the stops set the curve */
+/* The live sidebar's red "New" pill beside Marketing Studio. */
 .nav-badge { flex: none; margin-left: 6px; padding: 0 7px; border-radius: 999px; background: #f04438; color: #fff; font-size: 11px; line-height: 16px; font-weight: 600; }
 .sidebar nav a:hover, .sidebar nav a[aria-current='page'] { background: var(--fill); }
 .sidebar nav a[aria-current='page'] { color: var(--ink); }
