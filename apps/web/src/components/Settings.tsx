@@ -116,7 +116,7 @@ function Limits() {
           left={`Còn ${usd(Number(monthUsd.cap) - Number(monthUsd.used))}`}
         />
       </div>
-      <p className="muted">Hạn mức ngày đặt lại lúc 0:00 giờ Việt Nam, hạn mức tháng vào ngày 1. Admin đặt các hạn mức này.</p>
+      <p className="muted">Hạn mức ngày đặt lại lúc 0:00 giờ Việt Nam, hạn mức tháng vào ngày 1. Admin đặt các hạn mức này. Khi ngân sách chung của công ty đã hết, Run cũng tạm dừng dù thanh của bạn còn trống.</p>
     </>
   );
 }
@@ -180,7 +180,7 @@ export function Settings({ open, onClose, userName, account }: { open: boolean; 
             </section>
           )}
           {section === 'limits' && (
-            <section aria-labelledby="settings-limits">
+            <section aria-labelledby="settings-limits" aria-live="polite">
               <p className="settings-kicker" id="settings-limits">
                 Hạn mức của bạn
               </p>
