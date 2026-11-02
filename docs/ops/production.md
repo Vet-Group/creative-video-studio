@@ -33,3 +33,7 @@ better-auth's limiter (3 sign-ins per 10 s per address and path, in memory, prod
 address (`lib/auth.ts`), which Cloudflare sets to the one client address. That is safe only while the tunnel is the only way in:
 on the new host `lan-guard.service` keeps port 3400 off the LAN (owner record, 2026-11-02). If another way in is ever added, it
 must set or strip that header, or every request it brings shares one limiter bucket.
+
+## Accepted dependency advisory: esbuild GHSA-67mh-4wv8-2f99
+
+`pnpm audit --prod` reports one moderate advisory (2026-11-02). It covers esbuild 0.24.2 and older, where any website can send requests to esbuild's development server and read the responses. The vulnerable esbuild comes only from `better-auth`'s optional peer `drizzle-kit`, by way of `@esbuild-kit/esm-loader`. Production never starts an esbuild development server: migrations run `drizzle-kit migrate`, and the web app runs the `next build` output. So production is not exposed. The risk is accepted, and no `pnpm.overrides` entry is added, because forcing esbuild 0.25 or later under `@esbuild-kit` could break `drizzle-kit migrate`. Look again when drizzle-kit drops `@esbuild-kit`, or if the advisory's scope changes.

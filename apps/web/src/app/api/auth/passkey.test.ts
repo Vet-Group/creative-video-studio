@@ -144,8 +144,10 @@ describe('an Admin and the passkeys of a user', () => {
     const [adminCookie, memberCookie] = [await cookieOf('admin@example.test'), await cookieOf('lost@example.test')];
 
     const res = await listUsers(new Request(`${ORIGIN}/api/admin/users`, { headers: { cookie: adminCookie } }));
-    const { users } = (await res.json()) as { users: { id: string; methods: { id: string; provider: string }[] }[] };
+    const { users } = (await res.json()) as { users: { id: string; methods: { id: string; provider: string; createdAt?: string }[] }[] };
     expect(users.find((u) => u.id === id)?.methods.map((m) => [m.provider, m.id])).toEqual([['credential', expect.any(String)], ['passkey', pk]]);
+    // The Admin page labels each passkey with the day it was added.
+    expect(users.find((u) => u.id === id)?.methods[1]?.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
 
     const del = (cookie: string, userId: string) =>
       adminDelete(new Request(`${ORIGIN}/x`, { method: 'DELETE', headers: { cookie } }), { params: Promise.resolve({ id: userId, accountId: pk }) });

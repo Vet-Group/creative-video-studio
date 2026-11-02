@@ -8,16 +8,22 @@ export interface PasskeyItem {
   createdAt: string;
 }
 
-/** A linked method as the pages list it; `email` is the provider's own address when it is known. */
+/** A linked method as the pages list it; `email` is the provider's own address when it is known, `createdAt` set for a passkey. */
 export interface SignInMethod {
   id: string;
   provider: string;
   email: string | null;
+  createdAt?: string;
 }
 
+/** The day a passkey was added, as dd/mm/yyyy in Vietnam time. */
+export const passkeyDate = (iso: string) =>
+  new Intl.DateTimeFormat('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date(iso));
+
 export const providerLabel = (provider: string) => METHOD_LABEL[provider] ?? provider;
-/** How a linked method reads in a list: its name, then the provider's own email when it is known. */
-export const methodText = (m: SignInMethod) => `${providerLabel(m.provider)}${m.email ? ` (${m.email})` : ''}`;
+/** How a linked method reads in a list: its name, then the provider's own email when it is known, or the day a passkey was added. */
+export const methodText = (m: SignInMethod) =>
+  `${providerLabel(m.provider)}${m.email ? ` (${m.email})` : ''}${m.createdAt ? ` · ${passkeyDate(m.createdAt)}` : ''}`;
 
 /** What a user reads for each `?error=` code better-auth puts in the URL after a failed social sign-in or link. */
 const AUTH_ERROR_TEXT: Record<string, string> = {
