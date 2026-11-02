@@ -6,8 +6,14 @@ import { EXAMPLES } from '../src/lib/examples';
 import { freezeData } from './frozen.test';
 import { expectOptions, jpg, modelButton, optionsOf, pickModel, png, presetOf, select, selectValue, signIn } from './support.test';
 
-// Posters and a frozen clock: reduced motion keeps every clip on its poster, so a second run paints the same frame.
+// Posters and a frozen clock, so a second run paints the same frame. Clips play under reduced motion too (2026-11-02), so play() is a no-op
+// here and every clip stays on its poster; reduced motion still stills the CSS transitions.
 test.use({ contextOptions: { reducedMotion: 'reduce' } });
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    HTMLMediaElement.prototype.play = () => Promise.resolve();
+  });
+});
 
 const SIZES = [
   { width: 1440, height: 1000 },
@@ -35,7 +41,7 @@ async function openCreate(page: Page): Promise<void> {
 
 const narrow = (page: Page) => (page.viewportSize()?.width ?? 0) < 1024;
 
-/** Opens a sample's details: the whole tile is the button, but its centre holds the play button under reduced motion, so click a corner. */
+/** Opens a sample's details: the whole tile is the button, but its centre holds the play button when autoplay is blocked, so click a corner. */
 const openTile = (page: Page, title: string) => page.getByRole('button', { name: title, exact: true }).click({ position: { x: 12, y: 12 } });
 
 for (const size of SIZES) {
@@ -57,7 +63,6 @@ for (const size of SIZES) {
     await expect(page).toHaveScreenshot(`create-history-${at}.png`, SHOT);
 
     await page.getByRole('tab', { name: 'Ví dụ' }).click();
-    await expect(page.getByRole('button', { name: /^Phát / })).toHaveCount(EXAMPLES.length);
     await expect(page.locator('.masonry video')).toHaveCount(EXAMPLES.length);
     await expect.poll(() => page.locator('.masonry video').evaluateAll((vs) => vs.every((v) => (v as HTMLVideoElement).poster !== '' && v.getBoundingClientRect().height > 0))).toBe(true);
     await expect(page).toHaveScreenshot(`create-examples-${at}.png`, SHOT);

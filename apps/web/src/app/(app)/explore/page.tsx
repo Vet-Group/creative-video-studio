@@ -96,7 +96,7 @@ export default async function ExplorePage() {
           {scored.map((m) => (
             <li key={m.id}>
               <Link href={`${m.kind === 'video' ? '/create' : '/image-generation'}?model=${encodeURIComponent(m.id)}`} className="explore-card">
-                <CardMedia {...media(m.id)} always />
+                <CardMedia {...media(m.id)} />
                 <strong>
                   {m.label}
                   {recommended.has(m.id) && <span className="badge badge-recommended">Đề xuất</span>}
@@ -121,7 +121,7 @@ export default async function ExplorePage() {
           return (
             <li key={p.id}>
               <Link href={`/create?preset=${encodeURIComponent(p.id)}`} className="explore-prompt" aria-label={p.label}>
-                <CardMedia video={media.video ?? (ex ? sampleSrc(have, ex.src) : null)} poster={media.poster} always />
+                <CardMedia video={media.video ?? (ex ? sampleSrc(have, ex.src) : null)} poster={media.poster} />
                 <span className="explore-prompt-hover" aria-hidden="true">
                   <strong>{p.label}</strong>
                   <span className="explore-prompt-go">

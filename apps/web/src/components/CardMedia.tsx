@@ -1,16 +1,14 @@
 'use client';
 // The picture of a card: the sample's muted loop when one is uploaded, as the reference site plays on its cards (docs/UI-MOTION-PARITY.md), else its still.
-// The loop plays only while the card is on screen and the tab is shown; reduced motion keeps the poster unless `always` is set.
+// The loop plays only while the card is on screen and the tab is shown. Reduced motion does not stop it: the reference site plays its loops
+// regardless, and the owner chose the same for every sample (2026-11-02).
 import { useEffect, useRef } from 'react';
-import { REDUCED_MOTION, useMediaQuery } from '@/lib/use-media-query';
 
-/** `always`: play under reduced motion too, as the reference site's Explore prompt grid, Featured models and Apps pages do (checked 2026-10-26), and its Marketing format header and pickers (checked 2026-10-29); About clips too, on the owner's word (2026-11-02). */
-export function LoopVideo({ src, poster, always = false }: { src: string; poster: string | null; always?: boolean }) {
+export function LoopVideo({ src, poster }: { src: string; poster: string | null }) {
   const ref = useRef<HTMLVideoElement>(null);
-  const reduced = useMediaQuery(REDUCED_MOTION) && !always;
   useEffect(() => {
     const v = ref.current;
-    if (!v || reduced) return;
+    if (!v) return;
     let seen = false;
     const sync = () => {
       if (seen && document.visibilityState === 'visible') v.play().catch(() => {}); // a refused autoplay leaves the poster
@@ -27,12 +25,12 @@ export function LoopVideo({ src, poster, always = false }: { src: string; poster
       document.removeEventListener('visibilitychange', sync);
       v.pause();
     };
-  }, [reduced, src]); // a new src (another preset chosen) loads paused, so the watch starts again
+  }, [src]); // a new src (another preset chosen) loads paused, so the watch starts again
   return <video ref={ref} src={src} poster={poster ?? undefined} muted loop playsInline preload="none" aria-hidden="true" />;
 }
 
 /** A card's loop, else its still, else the empty stripes. `cardSample` (lib/examples.ts) picks the sources. */
-export function CardMedia({ video, poster, always }: { video: string | null; poster: string | null; always?: boolean }) {
-  if (video) return <LoopVideo src={video} poster={poster} always={always} />;
+export function CardMedia({ video, poster }: { video: string | null; poster: string | null }) {
+  if (video) return <LoopVideo src={video} poster={poster} />;
   return poster ? <img src={poster} alt="" /> : <span className="banner-empty" aria-hidden="true" />;
 }
