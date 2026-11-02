@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
@@ -77,6 +77,18 @@ describe('vet.sh (client side)', () => {
 
 describe('gate key install and removal (dry run on a 3-key authorized_keys copy)', () => {
   const others = ['ssh-ed25519 AAAAone podstudio', 'ssh-ed25519 AAAAtwo ideashub_ro', 'ssh-rsa AAAAthree owner'].join('\n');
+
+  test('uploads the gate through a temp file, never /dev/stdin, with mode 0755', () => {
+    const src = readFileSync(join(ROOT, 'scripts/run/install-gate-key.sh'), 'utf8');
+    expect(src).not.toContain('/dev/stdin');
+    const cmd = src.match(/^GATE_INSTALL='(.*)'$/m)?.[1];
+    expect(cmd).toBeDefined();
+    const dest = join(tmp(), 'cvs-run-gate').replace(/\\/g, '/');
+    const r = spawnSync('bash', ['-c', cmd!.replace('/usr/local/sbin/cvs-run-gate', dest)], { input: '#!/bin/bash\necho gate\n', encoding: 'utf8' });
+    expect(r.status, r.stderr).toBe(0);
+    expect(readFileSync(dest, 'utf8')).toBe('#!/bin/bash\necho gate\n');
+    if (process.platform !== 'win32') expect(statSync(dest).mode & 0o777).toBe(0o755);
+  });
 
   test('adds exactly one forced-command line and removes exactly that line', () => {
     const dir = tmp();
