@@ -67,7 +67,7 @@ export const auth = betterAuth({
   // disableSignUp, not disableImplicitSignUp: a client bypasses the latter with requestSignUp: true. A social sign-in only ever
   // enters an existing, unbanned user, whose email the provider reports; it never creates one.
   socialProviders: googleLoginEnabled
-    ? { google: { clientId: GOOGLE_CLIENT_ID!, clientSecret: GOOGLE_CLIENT_SECRET!, disableDefaultScope: true, scope: ['openid', 'email', 'profile'], disableSignUp: true } }
+    ? { google: { clientId: GOOGLE_CLIENT_ID!, clientSecret: GOOGLE_CLIENT_SECRET!, disableDefaultScope: true, scope: ['openid', 'email', 'profile'], disableSignUp: true, disableIdTokenSignIn: true } }
     : {},
   account: {
     // Google stays untrusted, so better-auth links it only when Google reports email_verified. Lark is trusted: its identity is gated by

@@ -149,5 +149,6 @@ describe('the sessions list', () => {
     expect(await audits(other)).toEqual([]);
     expect((await sessions('')).status).toBe(401);
     expect((await get('/list-sessions', here)).status).toBe(404); // closed: it would hand every token to the page
+    for (const path of ['/get-access-token', '/refresh-token', '/account-info']) expect((await get(path, here)).status, path).toBe(404); // provider tokens outlive a password change
   });
 });
