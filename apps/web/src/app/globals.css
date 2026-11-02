@@ -638,8 +638,9 @@ dialog.admin-modal { width: min(36rem, calc(100vw - 2rem)); }
 .admin .model-checks { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(16rem, 100%), 1fr)); gap: 0 12px; }
 .admin .save-bar { position: sticky; bottom: 12px; z-index: 20; display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin: 16px 0 0; padding: 10px 12px 10px 16px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); box-shadow: 0 8px 28px rgb(var(--shade) / .12); }
 .admin .save-bar p { flex: 1 1 12rem; margin: 0; font-weight: 600; }
-.admin .save-bar p[role='status']::before { content: ''; display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: var(--cat-utility-fg); vertical-align: 1px; }
-.admin .save-bar[data-dirty='true'] p[role='status']::before { background: var(--warn-border); }
+.admin .save-bar p:not(.error)::before { content: ''; display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: var(--warn-border); vertical-align: 1px; }
+.admin .save-note { margin: 12px 0 0; color: var(--cat-utility-fg); font-weight: 600; }
+.admin .save-note:empty { margin: 0; }
 
 /* Create: a settings card beside the Examples/History pane; below 1024 px the same parts are tabs and the card fills the screen under them. */
 .create-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }

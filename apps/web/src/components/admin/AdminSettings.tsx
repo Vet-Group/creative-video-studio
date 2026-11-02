@@ -58,13 +58,15 @@ function SettingsForm({ settings, reload }: { settings: Settings; reload: () => 
   const [query, setQuery] = useState('');
   const [saved, setSaved] = useState(false);
 
+  // By value: the server answers "250.0000" for a typed "250"; an empty field always counts as a change.
+  const differs = (typed: string | undefined, stored: string | number) => !typed?.trim() || Number(typed) !== Number(stored);
   const dirty =
-    monthly !== settings.monthlyCapUsd ||
-    daily !== String(settings.memberDailyClipCap) ||
-    features !== settings.featuresMonthlyCapUsd ||
-    memberDay !== settings.memberDailyUsdCap ||
-    memberMonth !== settings.memberMonthlyUsdCap ||
-    settings.featureCaps.some((c) => soft[c.feature] !== c.monthlyUsd) ||
+    differs(monthly, settings.monthlyCapUsd) ||
+    differs(daily, settings.memberDailyClipCap) ||
+    differs(features, settings.featuresMonthlyCapUsd) ||
+    differs(memberDay, settings.memberDailyUsdCap) ||
+    differs(memberMonth, settings.memberMonthlyUsdCap) ||
+    settings.featureCaps.some((c) => differs(soft[c.feature], c.monthlyUsd)) ||
     settings.models.some((m) => enabled[m.id] !== m.enabled);
 
   function undo() {
@@ -159,10 +161,10 @@ function SettingsForm({ settings, reload }: { settings: Settings; reload: () => 
                 <span className="muted">
                   {all.filter((m) => enabled[m.id]).length}/{all.length} đang bật
                 </span>
-                <button type="button" className="small" onClick={() => setMany(models, true)}>
+                <button type="button" className="small" aria-label={`Bật tất cả ${PROVIDER_NAME[p] ?? p}${q ? ' đang hiện' : ''}`} onClick={() => setMany(models, true)}>
                   Bật tất cả
                 </button>
-                <button type="button" className="small" onClick={() => setMany(models, false)}>
+                <button type="button" className="small" aria-label={`Tắt tất cả ${PROVIDER_NAME[p] ?? p}${q ? ' đang hiện' : ''}`} onClick={() => setMany(models, false)}>
                   Tắt tất cả
                 </button>
               </div>
@@ -184,14 +186,17 @@ function SettingsForm({ settings, reload }: { settings: Settings; reload: () => 
         {matching.length === 0 && <p className="muted">Không có mô hình nào khớp “{query.trim()}”.</p>}
       </fieldset>
       <p className="muted">Mức mới áp dụng từ lần bấm Run tiếp theo, được ghi vào Nhật ký và tính theo giờ Việt Nam (tháng bắt đầu ngày 1, ngày bắt đầu lúc 0 giờ). Đặt 0 để khoá hẳn phần đó.</p>
-      {(dirty || problem || saved) && (
-        <div className="save-bar" role="region" aria-label="Lưu cài đặt" data-dirty={dirty}>
+      <p role="status" className="save-note">
+        {saved && !dirty ? 'Đã lưu cài đặt.' : ''}
+      </p>
+      {(dirty || problem) && (
+        <div className="save-bar" role="region" aria-label="Lưu cài đặt">
           {problem ? (
             <p className="error" role="alert">
               {problem}
             </p>
           ) : (
-            <p role="status">{dirty ? 'Có thay đổi chưa lưu.' : 'Đã lưu cài đặt.'}</p>
+            <p>Có thay đổi chưa lưu.</p>
           )}
           {dirty && (
             <>

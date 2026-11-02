@@ -21,7 +21,6 @@ interface Team {
   name: string;
   hidden: boolean;
 }
-type Run = ReturnType<typeof useAction>['run'];
 
 /** Lower case without accents, so a search typed without accents still finds an accented name. */
 const fold = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '').replace(/đ/gi, 'd').toLowerCase();
@@ -32,7 +31,9 @@ const initials = (name: string) => {
 };
 
 /** Everything an Admin changes on one user: name and email, role, team, sign-in methods, a temporary password, lock. */
-function UserEditor({ user, teams, run, problem }: { user: User; teams: Team[]; run: Run; problem: string }) {
+function UserEditor({ user, teams, reload }: { user: User; teams: Team[]; reload: () => void }) {
+  // Its own action state, so a failure here and one in the add form never show in each other's place.
+  const { problem, run } = useAction(reload);
   const [password, setPassword] = useState<string | null>(null);
   const [name, setName] = useState(user.name);
   const [email, setEmail] = useState(user.email);
@@ -265,7 +266,7 @@ export function AdminUsers() {
           </p>
         </details>
       </fieldset>
-      {problem && editing === null && (
+      {problem && (
         <p className="error" role="alert">
           {problem}
         </p>
@@ -305,7 +306,7 @@ export function AdminUsers() {
         </div>
       )}
       <Modal open={editUser !== undefined} onClose={() => setEditing(null)} label={editUser ? `Sửa người dùng ${editUser.email}` : 'Sửa người dùng'} className="admin-modal">
-        {editUser && <UserEditor key={editUser.id} user={editUser} teams={allTeams} run={run} problem={problem} />}
+        {editUser && <UserEditor key={editUser.id} user={editUser} teams={allTeams} reload={users.reload} />}
       </Modal>
     </section>
   );

@@ -267,6 +267,26 @@ test('the audit reads a switched-off model as enabled: true → false', async ({
   await expect(latest).not.toContainText('{');
 });
 
+test('a saved Settings change clears the save bar and says it was saved', async ({ page }) => {
+  await signIn(page, 'admin');
+  await page.goto('/admin/settings');
+  const budget = page.getByLabel('Ngân sách tháng cho video (USD)');
+  const before = await budget.inputValue();
+  const bar = page.getByRole('region', { name: 'Lưu cài đặt' });
+  await expect(bar).toHaveCount(0);
+  try {
+    // The server answers 250.0000 for 250: the same amount, so nothing is left unsaved.
+    await budget.fill('250');
+    await expect(bar).toContainText('Có thay đổi chưa lưu.');
+    await Promise.all([page.waitForResponse((r) => r.url().endsWith('/api/admin/settings') && r.request().method() === 'PUT' && r.ok()), bar.getByRole('button', { name: 'Lưu cài đặt' }).click()]);
+    await expect(page.getByRole('status').filter({ hasText: 'Đã lưu cài đặt.' })).toBeVisible();
+    await expect(bar).toHaveCount(0);
+    await expect(budget).toHaveValue('250');
+  } finally {
+    expect((await page.request.put('/api/admin/settings', { data: { monthlyCapUsd: before } })).ok()).toBe(true);
+  }
+});
+
 test('an Admin can edit presets and read audit details at 390px without horizontal scrolling', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await signIn(page, 'admin');

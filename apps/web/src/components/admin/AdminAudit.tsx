@@ -25,7 +25,8 @@ const SHOWN_CHANGES = 3;
 const fmtTime = (iso: string) => new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'medium', timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date(iso));
 
 function AuditRow({ e }: { e: Entry }) {
-  const changes = auditChanges(e.oldValue, e.newValue);
+  // Changed fields (old → new) first, so the cut to a few lines keeps what changed.
+  const changes = auditChanges(e.oldValue, e.newValue).sort((a, b) => Number(b.text.includes(' → ')) - Number(a.text.includes(' → ')));
   // The raw JSON is rendered only while open, so a closed row carries no braces.
   const [open, setOpen] = useState(false);
   return (
@@ -55,9 +56,9 @@ function AuditRow({ e }: { e: Entry }) {
             {open && (
               <div>
                 <p>Trước</p>
-                <pre>{JSON.stringify(e.oldValue, null, 2) ?? '—'}</pre>
+                <pre>{e.oldValue == null ? '—' : JSON.stringify(e.oldValue, null, 2)}</pre>
                 <p>Sau</p>
-                <pre>{JSON.stringify(e.newValue, null, 2) ?? '—'}</pre>
+                <pre>{e.newValue == null ? '—' : JSON.stringify(e.newValue, null, 2)}</pre>
               </div>
             )}
           </details>
