@@ -544,13 +544,15 @@ test('Try On: the sample pictures in an empty slot upload like a picked file, an
     // The garments' white ground takes the tray's grey; the model photos keep their own colours.
     expect(await samplesOf('Trang phục').first().locator('img').evaluate((e) => getComputedStyle(e).mixBlendMode)).toBe('multiply');
     expect(await samplesOf('Người mẫu').first().locator('img').evaluate((e) => getComputedStyle(e).mixBlendMode)).toBe('normal');
+    const copied = page.waitForResponse((r) => new URL(r.url()).pathname === '/api/assets/samples' && r.request().method() === 'POST');
     await page.getByRole('button', { name: 'Dùng ảnh mẫu 2 cho Trang phục' }).click();
+    expect((await copied).status()).toBe(201); // copied on the server, not downloaded and uploaded back
     await expect(page.getByLabel('Trang phục: ảnh đã chọn').getByRole('img', { name: 'try-on-garment-2.png' })).toBeVisible();
     await expect(samplesOf('Trang phục')).toHaveCount(0);
     await expect(run).toBeDisabled();
     await page.getByRole('button', { name: 'Dùng ảnh mẫu 1 cho Người mẫu' }).click();
     await expect(page.getByLabel('Người mẫu: ảnh đã chọn').getByRole('img', { name: 'try-on-model-1.png' })).toBeVisible();
-    await expect(run).toBeEnabled(); // the samples went through the normal upload, so they count as the run's images
+    await expect(run).toBeEnabled(); // the copies are the caller's own input assets, so they count as the run's images
 
     await page.getByRole('button', { name: 'Bỏ ảnh try-on-model-1.png' }).click();
     await expect(samplesOf('Người mẫu')).toHaveCount(1);

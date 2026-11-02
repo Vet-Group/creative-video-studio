@@ -1,5 +1,6 @@
 import { insertAssets } from '@cvs/db/assets';
 import { db, MAX_BYTES, MAX_FILES, sniffImage } from '@/lib/assets';
+import { pool } from '@/lib/auth';
 import { headSample, SAMPLE_PREFIX, sampleType } from '@/lib/samples';
 import { guard } from '@/lib/session';
 import { deleteObject, getObject, putObject } from '@/lib/storage';
@@ -8,7 +9,10 @@ import { deleteObject, getObject, putObject } from '@/lib/storage';
  * Copies 1-4 sample pictures (`{ names: ['try-on-model-1.jpg', ...] }`) into the caller's own input assets on the server, as if the caller had uploaded them.
  * A Recreate or "Use this" on an example used to download each sample to the browser and upload it back, two trips over a slow link for every photo.
  * The same checks as an upload apply: a JPEG, PNG or WebP image of at most 10 MB, by its magic bytes; all or nothing.
+ * 429 once the caller has added COPY_HOURLY_LIMIT pictures (uploads included) in the last hour, so a loop cannot fill the bucket.
  */
+export const COPY_HOURLY_LIMIT = 200;
+
 export async function POST(request: Request) {
   const g = await guard(request, 'member');
   if (g.error) return g.error;
@@ -17,6 +21,9 @@ export async function POST(request: Request) {
   if (!Array.isArray(names) || names.length === 0 || names.length > MAX_FILES || !names.every((n) => typeof n === 'string' && sampleType(n)?.startsWith('image/'))) {
     return Response.json({ error: `send 1 to ${MAX_FILES} sample picture names in "names"` }, { status: 400 });
   }
+  // shortcut: two copies sent at once can both pass the count and go a few over, fine for a guard against loops; take an advisory lock if it must be exact.
+  const { n } = (await pool.query(`select count(*)::int as n from assets where owner_id = $1 and kind = 'input' and created_at > now() - interval '1 hour'`, [g.session.user.id])).rows[0];
+  if (n + names.length > COPY_HOURLY_LIMIT) return Response.json({ error: `at most ${COPY_HOURLY_LIMIT} new pictures an hour; try again later` }, { status: 429 });
   const copies: { id: string; name: string; bytes: Uint8Array; mime: string }[] = [];
   for (const name of names as string[]) {
     const found = await headSample(name);

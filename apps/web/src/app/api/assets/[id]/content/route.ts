@@ -10,5 +10,5 @@ export async function GET(request: Request, { params }: RouteContext) {
   const found = await readableAsset(g.session, id);
   if (found.error) return found.error;
   const download = new URL(request.url).searchParams.has('download');
-  return streamAsset(request, found.asset, download ? 'attachment' : 'inline', 'private, max-age=31536000, immutable');
+  return streamAsset(request, found.asset, download ? 'attachment' : 'inline', 'private, max-age=86400');
 }

@@ -16,7 +16,7 @@ const { sampleBytesMatch, sampleType } = await import('@/lib/samples');
 const { GET: LIST } = await import('./route');
 const { GET: ONE } = await import('./[name]/route');
 const { PUT, DELETE } = await import('../admin/samples/[name]/route');
-const { POST: COPY } = await import('../assets/samples/route');
+const { POST: COPY, COPY_HOURLY_LIMIT } = await import('../assets/samples/route');
 
 const PASSWORD = 'correct-horse-battery';
 const ctx = (name: string) => ({ params: Promise.resolve({ name }) });
@@ -140,5 +140,24 @@ describe('POST /api/assets/samples', () => {
     const rows = (await pool.query(`select a.id, a.kind, a.s3_key, u.email from assets a join users u on u.id = a.owner_id where a.id = any($1) order by a.filename`, [assets.map((a) => a.id)])).rows;
     expect(rows.map((r) => [r.kind, r.s3_key, r.email])).toEqual(assets.map((a) => ['input', `assets/${a.id}`, 'member@example.test']));
     expect((await pool.query('select count(*)::int as n from assets')).rows[0].n).toBe(before + 2);
+  });
+
+  test('stops a caller who added the hourly limit of pictures in the last hour, counting older ones out', async () => {
+    await auth.api.createUser({ body: { email: 'busy@example.test', name: 'Busy', password: PASSWORD, role: 'member' } });
+    const busy = await signIn('busy@example.test');
+    const add = (count: number, age: string) =>
+      pool.query(
+        `insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, created_at)
+           select g || '-' || $3, u.id, 'input', 'busy/' || g || '-' || $3, 'x.jpg', 'image/jpeg', 1, now() - $2::interval
+           from users u, generate_series(1, $1) g where u.email = 'busy@example.test'`,
+        [count, age, age.replace(' ', '')],
+      );
+    await add(COPY_HOURLY_LIMIT, '2 hours'); // older than the hour: not counted
+    await add(COPY_HOURLY_LIMIT - 1, '1 minute');
+    expect((await copy(busy, { names: ['copy-a.jpg'] })).status).toBe(201); // the 200th
+    const res = await copy(busy, { names: ['copy-a.jpg'] });
+    expect(res.status).toBe(429);
+    expect((await res.json()).error).toMatch(/hour/);
+    expect((await copy(member, { names: ['copy-a.jpg'] })).status).toBe(201); // another member is not held back
   });
 });

@@ -12,7 +12,7 @@ import { useSamples } from '@/lib/use-samples';
 import { backgroundsIn, GARMENT_CATEGORIES, garmentsOf, posesOf, stockModels } from '@/lib/try-on-stock';
 import { ABOUT } from '@/lib/about-content';
 import { About } from './About';
-import { Gallery, type Img, LockedFields, PhotoDialog, photoImg, RATIO_LABEL, Slot, THINKING_LABEL, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
+import { copySamples, Gallery, type Img, LockedFields, PhotoDialog, photoImg, RATIO_LABEL, Slot, THINKING_LABEL, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
 import { FormContext, type Photo, type PhotoRole, useApplier, useHasHistory, useJobs } from './jobs';
 import { ModelPicker } from './ModelPicker';
 import { PromptTools } from './PromptTools';
@@ -128,21 +128,21 @@ export function TryOn({ reuse }: { reuse?: string }) {
     }
   }
 
-  function add(set: (f: (cur: Img[]) => Img[]) => void) {
-    return async (files: File[]) => {
-      if (files.length === 0) return;
-      setError('');
-      setBusy(true);
-      try {
-        const assets = await uploadImages(files);
-        set((cur) => [...cur, ...assets]);
-      } catch {
-        setError(UPLOAD_ERROR);
-      } finally {
-        setBusy(false);
-      }
-    };
+  async function put(set: (f: (cur: Img[]) => Img[]) => void, get: () => Promise<Img[]>) {
+    setError('');
+    setBusy(true);
+    try {
+      const assets = await get();
+      set((cur) => [...cur, ...assets]);
+    } catch {
+      setError(UPLOAD_ERROR);
+    } finally {
+      setBusy(false);
+    }
   }
+  const add = (set: (f: (cur: Img[]) => Img[]) => void) => (files: File[]) => void (files.length > 0 && put(set, () => uploadImages(files)));
+  /** A sample under an empty slot, copied on the server like Recreate's photos. */
+  const addSample = (set: (f: (cur: Img[]) => Img[]) => void) => (name: string) => void put(set, () => copySamples([name]));
 
   async function run() {
     if (!confirmRun(pick.estimate)) return;
@@ -186,9 +186,9 @@ export function TryOn({ reuse }: { reuse?: string }) {
 
         <div className="card form-card" id="tryon-panel-create" role={narrow ? 'tabpanel' : undefined} aria-labelledby={narrow ? 'tryon-tab-create' : undefined} hidden={narrow && shown !== 'create'} onPointerDownCapture={recall.touch} onKeyDownCapture={recall.touch}>
           <div className="form-scroll">
-            <Slot label="Trang phục" empty="Thêm 1 đến 5 ảnh trang phục" inputLabel="Ảnh trang phục" images={garments} max={MAX_GARMENTS} busy={busy} onAdd={add(setGarments)} onRemove={(id) => setGarments((c) => c.filter((i) => i.id !== id))} samples={categories.length > 0 ? [] : samplesOf('garment')} onBrowse={categories.length > 0 ? () => setPicker({ role: 'garment' }) : undefined} />
-            <Slot label="Người mẫu" empty="Thêm 1 ảnh người mẫu" inputLabel="Ảnh người mẫu" images={person} max={1} busy={busy} onAdd={add(setPerson)} onRemove={(id) => setPerson((c) => c.filter((i) => i.id !== id))} samples={models0.length > 0 ? [] : samplesOf('model')} onBrowse={models0.length + myModels.length > 0 ? () => setPicker({ role: 'model' }) : undefined} />
-            <Slot label="Bối cảnh (tuỳ chọn)" empty="Thêm 1 ảnh bối cảnh nếu muốn" inputLabel="Ảnh bối cảnh" images={background} max={1} busy={busy} onAdd={add(setBackground)} onRemove={(id) => setBackground((c) => c.filter((i) => i.id !== id))} samples={backgrounds.length > 0 ? [] : samplesOf('background')} onBrowse={backgrounds.length > 0 ? () => setPicker({ role: 'background' }) : undefined} />
+            <Slot label="Trang phục" empty="Thêm 1 đến 5 ảnh trang phục" inputLabel="Ảnh trang phục" images={garments} max={MAX_GARMENTS} busy={busy} onAdd={add(setGarments)} onRemove={(id) => setGarments((c) => c.filter((i) => i.id !== id))} samples={categories.length > 0 ? [] : samplesOf('garment')} onSample={addSample(setGarments)} onBrowse={categories.length > 0 ? () => setPicker({ role: 'garment' }) : undefined} />
+            <Slot label="Người mẫu" empty="Thêm 1 ảnh người mẫu" inputLabel="Ảnh người mẫu" images={person} max={1} busy={busy} onAdd={add(setPerson)} onRemove={(id) => setPerson((c) => c.filter((i) => i.id !== id))} samples={models0.length > 0 ? [] : samplesOf('model')} onSample={addSample(setPerson)} onBrowse={models0.length + myModels.length > 0 ? () => setPicker({ role: 'model' }) : undefined} />
+            <Slot label="Bối cảnh (tuỳ chọn)" empty="Thêm 1 ảnh bối cảnh nếu muốn" inputLabel="Ảnh bối cảnh" images={background} max={1} busy={busy} onAdd={add(setBackground)} onRemove={(id) => setBackground((c) => c.filter((i) => i.id !== id))} samples={backgrounds.length > 0 ? [] : samplesOf('background')} onSample={addSample(setBackground)} onBrowse={backgrounds.length > 0 ? () => setPicker({ role: 'background' }) : undefined} />
             <PhotoDialog
               open={picker !== null}
               title={picker?.of ? (picker.role === 'model' ? 'Chọn tư thế' : GARMENT_CATEGORIES.find((c) => c.id === picker.of)!.label) : picker?.role === 'model' ? 'Chọn người mẫu' : picker?.role === 'garment' ? 'Chọn trang phục' : 'Chọn bối cảnh'}

@@ -318,6 +318,47 @@ function NavPending() {
   return <span className={pending ? 'nav-pending is-pending' : 'nav-pending'} aria-hidden="true" />;
 }
 
+/**
+ * A thin bar along the top while any link of the app opens another page (Explore cards, Dùng lại, Dùng mẫu này, the sidebar too), shown after 150 ms.
+ * The App Router has no navigation events: a plain click on a same-site link to another address starts it, the address changing (Next sets it when
+ * the new page shows) or Back ends it, and it gives up after 15 s in case a link handled the click without navigating.
+ */
+function NavProgress() {
+  const [on, setOn] = useState(false);
+  useEffect(() => {
+    let timer = 0;
+    let poll = 0;
+    const stop = () => {
+      clearTimeout(timer);
+      cancelAnimationFrame(poll);
+      setOn(false);
+    };
+    const click = (e: MouseEvent) => {
+      if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      const a = e.target instanceof Element ? e.target.closest<HTMLAnchorElement>('a[href]') : null;
+      if (!a || (a.target && a.target !== '_self') || a.hasAttribute('download') || a.origin !== location.origin) return;
+      if (a.pathname === location.pathname && a.search === location.search) return; // the same page, or only its #fragment
+      const from = location.href;
+      stop();
+      setOn(true);
+      const watch = () => {
+        if (location.href !== from) return stop();
+        poll = requestAnimationFrame(watch);
+      };
+      poll = requestAnimationFrame(watch);
+      timer = window.setTimeout(stop, 15_000);
+    };
+    document.addEventListener('click', click, true); // capture: Next's Link cancels the click's default before the bubble phase
+    window.addEventListener('popstate', stop);
+    return () => {
+      document.removeEventListener('click', click, true);
+      window.removeEventListener('popstate', stop);
+      stop();
+    };
+  }, []);
+  return <div className="nav-progress" data-on={on} aria-hidden="true" />;
+}
+
 const NAV: { href: string; text: string; icon: IconName; badge?: string }[] = [
   { href: '/explore', text: 'Khám phá', icon: 'home' },
   { href: '/try-on', text: 'Thử đồ', icon: 'tryon' },
@@ -399,6 +440,7 @@ export function Shell({ userId, userName, isAdmin, account, initialCollapsed, ch
     <JobsProvider userId={userId}>
       <AdminContext value={isAdmin}>
         <div className="app" data-collapsed={collapsed}>
+          <NavProgress />
           <div className="scrim" data-open={open} onClick={() => setOpen(false)} aria-hidden="true" />
           <div
             ref={sidebar}

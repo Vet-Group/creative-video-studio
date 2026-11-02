@@ -17,6 +17,22 @@ test('the sidebar lists Explore, Try On, Image Generation, Create, Marketing Stu
   await expect(nav(page).locator('.nav-label')).toHaveText(['Khám phá', 'Thử đồ', 'Tạo ảnh', 'Tạo video', 'Marketing Studio', 'Ứng dụng', 'Thư viện', 'Quản trị']);
 });
 
+test('a link anywhere in the app, not only the sidebar, shows the top progress bar until the next page is up', async ({ page }) => {
+  await signIn(page, 'member1');
+  await page.goto('/explore');
+  const bar = page.locator('.nav-progress');
+  await expect(bar).toHaveAttribute('data-on', 'false');
+  await page.route(/[?&]_rsc=/, async (route) => {
+    await new Promise((r) => setTimeout(r, 1500)); // a slow line, so the wait is visible
+    await route.continue();
+  });
+  await page.getByRole('list', { name: 'Mẫu' }).getByRole('link', { name: 'Xoay quanh chậm' }).click();
+  await expect(bar).toHaveAttribute('data-on', 'true');
+  await expect(page).toHaveURL(/\/create\?preset=slow-orbit$/);
+  await expect(bar).toHaveAttribute('data-on', 'false');
+  await page.unroute(/[?&]_rsc=/);
+});
+
 test('Explore links into Create with the chosen preset or model already picked', async ({ page }) => {
   await signIn(page, 'member1');
   await nav(page).getByRole('link', { name: 'Khám phá' }).click();
