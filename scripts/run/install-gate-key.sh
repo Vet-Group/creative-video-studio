@@ -29,8 +29,13 @@ append_gate_line() {
   echo "appended 1 line (backup $bak)"
 }
 
+# install cannot read its source from SSH stdin ("install: No such file or directory", 2026-11-02), so go through a temp file.
+# shellcheck disable=SC2016 # the $vars are meant to expand on the server, not here
+GATE_INSTALL='t=$(mktemp) && cat >"$t" && install -m 0755 "$t" /usr/local/sbin/cvs-run-gate; rc=$?; rm -f "$t"; exit $rc'
+
 upload_gate() {
-  ssh vet-linux 'install -m 0755 /dev/stdin /usr/local/sbin/cvs-run-gate' <"$ROOT/deploy/linux/cvs-run-gate"
+  # shellcheck disable=SC2029 # $GATE_INSTALL is a fixed local string; its own $vars expand on the server
+  ssh vet-linux "$GATE_INSTALL" <"$ROOT/deploy/linux/cvs-run-gate"
   remote_sum=$(ssh vet-linux 'sha256sum /usr/local/sbin/cvs-run-gate' | cut -d' ' -f1)
   [[ "$remote_sum" == "$(sha256sum "$ROOT/deploy/linux/cvs-run-gate" | cut -d' ' -f1)" ]] || { echo "gate upload mismatch" >&2; exit 1; }
 }
