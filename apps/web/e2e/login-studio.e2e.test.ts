@@ -296,8 +296,16 @@ test.describe('living studio', () => {
     const mascot = page.locator('.mascot');
     const angle = () => mascot.evaluate((e) => (e as SVGGElement).style.getPropertyValue('--lens-angle'));
     const m = await box(mascot);
-    await page.mouse.move(m.x + m.width + 300, m.y - 200);
+    await page.mouse.move(m.x + m.width + 40, 0); // steeply up, past the 40° limit
     const up = await angle();
+    // Turned up to its limit the lens still leaves REC and the tally light in view; measured once its turn has finished.
+    await page.locator('.mascot-lens').evaluate((e) => Promise.all(e.getAnimations().map((a) => a.finished)));
+    const lens = await box(page.locator('.mascot-lens'));
+    for (const part of ['.mascot-rec', '.mascot-tally']) {
+      const b = await box(page.locator(part));
+      const apart = b.x + b.width <= lens.x || lens.x + lens.width <= b.x || b.y + b.height <= lens.y || lens.y + lens.height <= b.y;
+      expect(apart, part).toBe(true);
+    }
     await page.mouse.move(m.x + m.width + 300, m.y + m.height);
     expect(up).not.toBe('');
     expect(await angle()).not.toBe(up);

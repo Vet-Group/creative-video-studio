@@ -50,8 +50,9 @@ export function StudioScene({ mascot }: { mascot: Ref<SVGGElement> }) {
         <path className="scene-stand" d="M100 386l-30 118 M100 386l30 118 M100 386v122" />
         <rect className="mascot-body" x="62" y="334" width="76" height="54" rx="12" />
         <rect className="mascot-body" x="76" y="320" width="32" height="18" rx="5" />
-        <circle className="mascot-tally" cx="124" cy="346" r="4" />
-        <text className="mascot-rec" x="114" y="330">
+        {/* Left of the lens pivot and above the handle: the lens, turned up to its 40° limit, never covers them. */}
+        <circle className="mascot-tally" cx="72" cy="346" r="4" />
+        <text className="mascot-rec" x="80" y="315">
           REC
         </text>
         <g transform="translate(100 361)">
