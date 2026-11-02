@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
-import { modelButton, presetOf, select, signIn } from './support.test';
+import { accountButton, modelButton, openSettings, presetOf, select, signIn } from './support.test';
 
 const sidebar = (page: Page) => page.locator('.sidebar');
 const nav = (page: Page) => page.getByRole('navigation', { name: 'Điều hướng chính' });
@@ -9,8 +9,7 @@ test('the sidebar lists Explore, Try On, Image Generation, Create, Marketing Stu
   await expect(nav(page).getByRole('link')).toHaveCount(7);
   await expect(nav(page).locator('.nav-label')).toHaveText(['Khám phá', 'Thử đồ', 'Tạo ảnh', 'Tạo video', 'Marketing Studio', 'Ứng dụng', 'Thư viện']);
   await expect(nav(page).getByRole('link', { name: 'Marketing Studio', exact: true })).toBeVisible(); // the badge is not part of the name
-  await page.getByRole('button', { name: 'Cài đặt' }).click();
-  await page.getByRole('dialog', { name: 'Cài đặt' }).getByRole('button', { name: 'Đăng xuất' }).click();
+  await (await openSettings(page)).getByRole('button', { name: 'Đăng xuất' }).click();
   await expect(page).toHaveURL(/\/login$/);
   await signIn(page, 'admin');
   await expect(nav(page).getByRole('link')).toHaveCount(8);
@@ -89,13 +88,18 @@ test('Explore links into Create with the chosen preset or model already picked',
   await expect(presetOf(page)).toHaveAttribute('data-value', ''); // the default free prompt
 });
 
-test('at 1440 the sidebar rhythm is the live one: the first item at 81 px, one every 41 px, solid 16 px icons and a red "Mới" pill on Marketing Studio', async ({ page }) => {
+test('at 1440 the sidebar keeps the live rhythm: the first item at 81 px, one every 41 px within a group, quiet group labels, solid 16 px icons and a red "Mới" pill on Marketing Studio', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await signIn(page, 'member1');
   const links = nav(page).getByRole('link');
   const ys = await links.evaluateAll((as) => as.map((a) => Math.round(a.getBoundingClientRect().y)));
   expect(ys[0]).toBe(81);
-  for (let i = 1; i < ys.length; i++) expect(ys[i]! - ys[i - 1]!).toBe(41);
+  for (let i = 2; i < 6; i++) expect(ys[i]! - ys[i - 1]!).toBe(41); // the create group: Try On to Apps
+  // The groups the nav reads as, each named by its label (Explore, the home page, has none).
+  await expect(nav(page).getByRole('group', { name: 'Sáng tạo' }).getByRole('link')).toHaveCount(5);
+  await expect(nav(page).getByRole('group', { name: 'Của bạn' }).getByRole('link')).toHaveText(['Thư viện']);
+  await expect(nav(page).locator('.nav-group-label')).toHaveText(['Sáng tạo', 'Của bạn']);
+  await expect(page.locator('.brand strong')).toHaveText('Video Studio'); // the app, not the user, heads the sidebar
   const icon = links.first().locator('svg');
   await expect(icon).toHaveAttribute('fill', 'currentColor');
   expect((await icon.boundingBox())!.width).toBe(16);
@@ -121,6 +125,15 @@ test('the sidebar collapses to a 64 px icon rail that keeps its labels for scree
   await expect(label).toHaveCSS('clip-path', 'inset(50%)');
   await expect(label).not.toHaveCSS('display', 'none');
   await expect(nav(page).getByRole('link', { name: 'Thư viện' })).toHaveAttribute('title', 'Thư viện');
+  // The account chip shrinks to its avatar, named and titled by the user; the group labels are clipped like the item labels.
+  const chip = accountButton(page);
+  await expect(chip).toHaveAccessibleName('Tài khoản: E2E Member 1');
+  await expect(chip).toHaveAttribute('title', 'E2E Member 1');
+  await expect(chip.locator('.account-who')).toBeHidden();
+  const c = (await chip.boundingBox())!;
+  expect(c.x).toBeGreaterThanOrEqual(8);
+  expect(c.x + c.width).toBeLessThanOrEqual(56);
+  await expect(nav(page).locator('.nav-group-label').first()).toHaveCSS('clip-path', 'inset(50%)');
 
   // The server renders the remembered rail, so the first paint is already 64 px wide.
   const html = await (await page.request.get('/create')).text();
@@ -153,8 +166,7 @@ test('the Apps pages widen the sidebar to 280 px as Fash does, and the icon rail
 
 test('Settings shows the profile, the own caps, the sign-in summary, the support contact and no billing', async ({ page }) => {
   await signIn(page, 'member1');
-  await page.getByRole('button', { name: 'Cài đặt' }).click();
-  const settings = page.getByRole('dialog', { name: 'Cài đặt' });
+  const settings = await openSettings(page);
   await expect(settings.getByRole('navigation', { name: 'Tài khoản' }).getByRole('button')).toHaveText([/^Hồ sơ/, /^Hạn mức/, /^Bảo mật/, /^Tuỳ chọn/, /^Tài khoản liên kết/, /^Hỗ trợ/, 'Đăng xuất']);
   await expect(settings.getByRole('button', { name: 'Hồ sơ' })).toHaveAttribute('aria-current', 'true');
   await expect(settings.getByText('member1@e2e.test')).toBeVisible();
@@ -172,16 +184,14 @@ test('Settings shows the profile, the own caps, the sign-in summary, the support
   await expect(settings.getByRole('link', { name: 'support@e2e.test' })).toHaveAttribute('href', 'mailto:support@e2e.test');
   await page.keyboard.press('Escape');
   await expect(settings).toBeHidden();
-  await expect(page.getByRole('button', { name: 'Cài đặt' })).toBeFocused();
+  await expect(accountButton(page)).toBeFocused(); // the menu handed the focus back to its button before the dialog opened
 });
 
 for (const [width, height] of [[390, 844], [1024, 768]] as const) {
   test(`at ${width} px the shell fits the width and Settings opens inside the screen`, async ({ page }) => {
     await page.setViewportSize({ width, height });
     await signIn(page, 'member1');
-    if (width < 1024) await page.getByRole('button', { name: 'Mở menu' }).click();
-    await page.getByRole('button', { name: 'Cài đặt' }).click();
-    const box = (await page.getByRole('dialog', { name: 'Cài đặt' }).boundingBox())!;
+    const box = (await (await openSettings(page)).boundingBox())!; // the top bar's avatar below 1024 px
     expect(box.x).toBeGreaterThanOrEqual(16);
     expect(box.x + box.width).toBeLessThanOrEqual(width - 16);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
@@ -189,3 +199,115 @@ for (const [width, height] of [[390, 844], [1024, 768]] as const) {
     else await expect(page.getByRole('button', { name: 'Thu gọn thanh bên' })).toBeHidden();
   });
 }
+
+test('the account menu works by keyboard: Enter opens it on Cài đặt, the arrows wrap, Esc closes it and returns the focus, a click outside closes it', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await signIn(page, 'member1');
+  const chip = accountButton(page);
+  await expect(chip).toHaveAttribute('aria-haspopup', 'menu');
+  await expect(chip).toContainText('member1@e2e.test');
+  await chip.focus();
+  await page.keyboard.press('Enter');
+  await expect(chip).toHaveAttribute('aria-expanded', 'true');
+  const menu = page.getByRole('menu', { name: 'Tài khoản: E2E Member 1' });
+  const items = menu.getByRole('menuitem');
+  await expect(items).toHaveText([/^Cài đặt/, /^Hạn mức hôm nay/, 'Bảo mật', 'Trợ giúp', 'Đăng xuất']);
+  await expect(items.first()).toBeFocused();
+  await expect(items.first()).toHaveAttribute('aria-keyshortcuts', 'Control+Comma');
+  await expect(items.nth(1)).toContainText('/ 1000 clip'); // today's clips against the cap serve.ts sets, fetched on open
+  // It opens upward from the chip at the bottom of the sidebar.
+  const m = (await menu.boundingBox())!;
+  expect(m.y + m.height).toBeLessThanOrEqual((await chip.boundingBox())!.y);
+  await page.keyboard.press('ArrowUp');
+  await expect(items.last()).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(items.first()).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(items.nth(1)).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(menu).toBeHidden();
+  await expect(chip).toBeFocused();
+  await expect(chip).toHaveAttribute('aria-expanded', 'false');
+  await chip.click();
+  await expect(menu).toBeVisible();
+  await page.mouse.click(900, 450);
+  await expect(menu).toBeHidden();
+});
+
+test('a menu item opens Settings on its section: Bảo mật on Security, Hạn mức hôm nay on Limits, Trợ giúp on Support', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await signIn(page, 'member1');
+  const settings = page.getByRole('dialog', { name: 'Cài đặt' });
+  for (const [item, section] of [['Bảo mật', 'Bảo mật'], [/^Hạn mức hôm nay/, 'Hạn mức'], ['Trợ giúp', 'Hỗ trợ']] as const) {
+    await accountButton(page).click();
+    await page.getByRole('menuitem', { name: item }).click();
+    await expect(settings.getByRole('heading', { name: section, exact: true })).toBeVisible();
+    await expect(settings.getByRole('navigation', { name: 'Tài khoản' }).getByRole('button', { name: section, exact: true })).toHaveAttribute('aria-current', 'true');
+    await page.keyboard.press('Escape');
+    await expect(settings).toBeHidden();
+    await expect(accountButton(page)).toBeFocused();
+  }
+  await expect(page.getByRole('menu')).toHaveCount(0);
+});
+
+test('Ctrl+, opens Settings from anywhere, even while typing, and not a second time over a dialog already open', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await signIn(page, 'member1');
+  const prompt = page.getByRole('textbox').first();
+  await prompt.click();
+  await page.keyboard.press('Control+Comma');
+  const settings = page.getByRole('dialog', { name: 'Cài đặt' });
+  await expect(settings).toBeVisible();
+  await expect(settings.getByRole('heading', { name: 'Hồ sơ' })).toBeVisible();
+  await settings.getByRole('button', { name: 'Bảo mật' }).click();
+  await page.keyboard.press('Control+Comma'); // ignored: the open dialog stays on its section
+  await expect(settings.getByRole('heading', { name: 'Bảo mật', exact: true })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(settings).toBeHidden();
+  await expect(prompt).toBeFocused();
+});
+
+test('at 390 px the top bar shows the avatar, which opens the account menu below it, inside the screen', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await signIn(page, 'member1');
+  const avatar = page.locator('.topbar').getByRole('button', { name: 'Tài khoản: E2E Member 1' });
+  await expect(page.locator('.topbar .vet-logo')).toHaveCount(0); // the drawer's brand row has the logo
+  const a = (await avatar.boundingBox())!;
+  expect(a.x + a.width).toBeLessThanOrEqual(390 - 6 + 0.5);
+  await avatar.click();
+  const menu = page.getByRole('menu', { name: 'Tài khoản: E2E Member 1' });
+  await expect(menu).toBeVisible();
+  const m = (await menu.boundingBox())!;
+  expect(m.y).toBeGreaterThanOrEqual(a.y + a.height);
+  expect(m.x).toBeGreaterThanOrEqual(16);
+  expect(m.x + m.width).toBeLessThanOrEqual(390);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
+  await menu.getByRole('menuitem', { name: 'Bảo mật' }).click();
+  const settings = page.getByRole('dialog', { name: 'Cài đặt' });
+  await expect(settings.getByRole('heading', { name: 'Bảo mật', exact: true })).toBeVisible(); // the phone layout opens the section's own page
+  await expect(settings.getByRole('navigation', { name: 'Tài khoản' })).toBeHidden();
+  await page.keyboard.press('Escape');
+  await expect(avatar).toBeFocused();
+
+  // The drawer has the same chip at its bottom.
+  await page.getByRole('button', { name: 'Mở menu' }).click();
+  const chip = page.locator('.sidebar').getByRole('button', { name: 'Tài khoản: E2E Member 1' });
+  await expect(chip).toBeVisible();
+  const c = (await chip.boundingBox())!;
+  expect(c.y + c.height).toBeGreaterThan(844 - 80);
+  await chip.click();
+  await expect(menu).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(menu).toBeHidden();
+  await expect(page.locator('.sidebar')).toBeVisible(); // Esc closed only the menu, not the drawer
+});
+
+test.describe('on touch', () => {
+  test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } });
+
+  test('the account menu rows are at least 44 px tall', async ({ page }) => {
+    await signIn(page, 'member1');
+    await accountButton(page).click();
+    for (const item of await page.getByRole('menuitem').all()) expect((await item.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  });
+});

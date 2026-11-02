@@ -1,10 +1,5 @@
-import { expect, type Page, test } from '@playwright/test';
-import { signIn } from './support.test';
-
-async function openSettings(page: Page) {
-  await page.getByRole('button', { name: 'Cài đặt' }).click();
-  return page.getByRole('dialog', { name: 'Cài đặt' });
-}
+import { expect, test } from '@playwright/test';
+import { accountButton, openSettings, signIn } from './support.test';
 
 test('a user renames themselves and picks an avatar colour; both stay after a reload, in the dialog and the sidebar', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -31,9 +26,10 @@ test('a user renames themselves and picks an avatar colour; both stay after a re
   await expect(settings.getByRole('button', { name: 'Sửa tên và màu' })).toBeFocused();
 
   await page.keyboard.press('Escape');
-  await expect(page.locator('.sidebar .who')).toHaveText('E2E Đổi Tên'); // router.refresh() reran the layout
+  await expect(accountButton(page)).toHaveAccessibleName('Tài khoản: E2E Đổi Tên'); // router.refresh() reran the layout
+  await expect(page.locator('.account-chip .avatar')).toHaveCSS('background-color', 'rgb(67, 56, 202)');
   await page.reload();
-  await expect(page.locator('.sidebar .who')).toHaveText('E2E Đổi Tên');
+  await expect(page.locator('.account-chip .account-name')).toHaveText('E2E Đổi Tên');
   settings = await openSettings(page);
   await expect(settings.getByText('E2E Đổi Tên', { exact: true })).toBeVisible();
   await expect(settings.locator('.profile-card .avatar')).toHaveCSS('background-color', 'rgb(67, 56, 202)');
@@ -62,8 +58,7 @@ test('the protection card scores the account and jumps to the missing check; the
 test('on a phone Settings is a list of sections; a section opens as a page with a back button, and Esc still closes', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await signIn(page, 'setb');
-  await page.getByRole('button', { name: 'Mở menu' }).click();
-  const settings = await openSettings(page);
+  const settings = await openSettings(page); // from the top bar's avatar
   const nav = settings.getByRole('navigation', { name: 'Tài khoản' });
   await expect(nav).toBeVisible();
   await expect(settings.getByText('Mật khẩu, xác thực 2 lớp, thiết bị')).toBeVisible();
@@ -102,7 +97,7 @@ test('the preferences switch on (with the notification permission) and stay on a
   await expect(notify).toHaveAttribute('aria-checked', 'false');
   await expect(sound).toHaveAttribute('aria-checked', 'false');
   await expect(settings.getByText('chỉ áp dụng trên thiết bị và trình duyệt này', { exact: false })).toBeVisible();
-  await expect(settings.getByRole('list', { name: 'Phím tắt' }).getByRole('listitem')).toHaveCount(3);
+  await expect(settings.getByRole('list', { name: 'Phím tắt' }).getByRole('listitem')).toHaveCount(4);
   await notify.click();
   await sound.click();
   await expect(notify).toHaveAttribute('aria-checked', 'true');

@@ -27,11 +27,11 @@ test.describe('wide', () => {
 test.describe('narrow', () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
-  test('the top bar shows the VET logo at its right end and keeps the title at x=52', async ({ page }) => {
+  test('the top bar shows the account avatar at its right end and keeps the title at x=52', async ({ page }) => {
     await signIn(page, 'member1');
-    const logo = page.locator('.topbar > .vet-logo');
-    await expect(logo).toBeVisible();
-    const b = (await logo.boundingBox())!;
+    const avatar = page.locator('.topbar').getByRole('button', { name: 'Tài khoản: E2E Member 1' });
+    await expect(avatar).toBeVisible();
+    const b = (await avatar.boundingBox())!;
     expect(b.x + b.width).toBeLessThanOrEqual(390 - 6 + 0.5);
     expect(Math.round((await page.locator('.topbar strong').boundingBox())!.x)).toBe(52);
   });

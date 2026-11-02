@@ -624,7 +624,9 @@ for (const width of [1440, 1280, 390]) {
         copy.querySelectorAll('[aria-hidden="true"]').forEach((n) => n.remove());
         return el.getAttribute('aria-label') ?? copy.textContent?.trim();
       });
-    const order = wideScreen ? ['Thu gọn thanh bên', 'Cài đặt', 'Khám phá', 'Thử đồ', 'Tạo ảnh', 'Tạo video', 'Marketing Studio', 'Ứng dụng', 'Thư viện', 'Ví dụ'] : ['Mở menu', 'Tạo']; // the open tab takes the tab stop
+    // The account chip closes the sidebar (the top bar's avatar below 1024 px); the open tab takes the tab stop.
+    const account = 'Tài khoản: E2E Member 5';
+    const order = wideScreen ? ['Thu gọn thanh bên', 'Khám phá', 'Thử đồ', 'Tạo ảnh', 'Tạo video', 'Marketing Studio', 'Ứng dụng', 'Thư viện', account, 'Ví dụ'] : ['Mở menu', account, 'Tạo'];
 
     for (const name of order) {
       await page.keyboard.press('Tab');
@@ -635,7 +637,7 @@ for (const width of [1440, 1280, 390]) {
       // The persistent sidebar navigates without a mouse.
       await page.goto('/create');
       await expect(page.getByRole('tab', { name: 'Lịch sử' })).toBeVisible();
-      for (let i = 0; i < 9; i++) await page.keyboard.press('Tab');
+      for (let i = 0; i < 8; i++) await page.keyboard.press('Tab');
       await expect.poll(focused).toBe('Thư viện');
       await page.keyboard.press('Enter');
       await expect(page).toHaveURL(/\/library$/);

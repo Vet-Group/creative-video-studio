@@ -1,15 +1,10 @@
 import { expect, type Page, test } from '@playwright/test';
-import { signIn } from './support.test';
+import { openSettings, signIn } from './support.test';
 import { totpCode, wrongCode } from './totp';
 import { PASSWORD, USERS, type UserKey } from './users';
 
 async function signOut(page: Page) {
-  const dialog = page.getByRole('dialog', { name: 'Cài đặt' });
-  // Right after a navigation the page may not be hydrated yet, and a click on Settings then does nothing; click again until it opens.
-  await expect(async () => {
-    await page.getByRole('button', { name: 'Cài đặt' }).click();
-    await expect(dialog).toBeVisible({ timeout: 2_000 });
-  }).toPass();
+  const dialog = await openSettings(page); // retries the menu until the page has hydrated
   await dialog.getByRole('button', { name: 'Đăng xuất' }).click();
   await expect(page).toHaveURL(/\/login$/);
 }
@@ -36,8 +31,7 @@ async function enableByApi(page: Page): Promise<string> {
 
 test('a member turns 2FA on in Settings, then a password sign-in asks for a code, a backup code works once, and a trusted device skips the step', async ({ page }) => {
   await signIn(page, 'totpa');
-  await page.getByRole('button', { name: 'Cài đặt' }).click();
-  const settings = page.getByRole('dialog', { name: 'Cài đặt' });
+  const settings = await openSettings(page);
   await settings.getByRole('button', { name: 'Bảo mật' }).click();
   const box = settings.getByRole('group', { name: 'Xác thực 2 lớp' });
   await expect(box.getByText('Đang tắt')).toBeVisible();
