@@ -81,6 +81,8 @@ export interface Clip {
   verdict: { verdict: 'pass' | 'fail'; fault: string | null; featured: boolean; markedBy: string } | null;
   /** In the caller's own favourites. */
   favorite: boolean;
+  /** The creator's own words (a free prompt on Create video or Image Generation), else null. */
+  prompt: string | null;
   canEdit: boolean;
   downloadName: string;
 }

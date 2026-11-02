@@ -1,15 +1,27 @@
 'use client';
 // Many results at once: the select toggle shows a checkbox per item with an output, and the bar downloads the picked ones as one .zip (POST for a signed link, then the link).
-import { type ReactNode, useState } from 'react';
+// With `hover` (the Library) every item has its checkbox, shown on hover or focus by CSS; picking one starts the selection, and Esc or the clear button ends it.
+import { type ReactNode, useEffect, useState } from 'react';
 import { api, ApiError, sendJson } from '@/lib/api';
+import { Icon } from './Icon';
 
 const MAX = 50; // what /api/library/zip takes
 
-export function useZipDownload(): { toggle: ReactNode; bar: ReactNode; check: (id: string, label: string) => ReactNode } {
+export function useZipDownload({ hover = false } = {}): { active: boolean; toggle: ReactNode; bar: ReactNode; check: (id: string, label: string) => ReactNode } {
   const [on, setOn] = useState(false);
   const [ids, setIds] = useState<string[]>([]);
   const [problem, setProblem] = useState('');
   const [busy, setBusy] = useState(false);
+  const active = on || ids.length > 0;
+  const clear = () => (setOn(false), setIds([]), setProblem(''));
+
+  useEffect(() => {
+    if (!hover || !active) return;
+    // An open dialog (the detail view) takes Esc for itself.
+    const esc = (e: KeyboardEvent) => e.key === 'Escape' && !document.querySelector('dialog[open]') && clear();
+    document.addEventListener('keydown', esc);
+    return () => document.removeEventListener('keydown', esc);
+  }, [hover, active]);
 
   function pick(id: string, yes: boolean) {
     setProblem('');
@@ -37,17 +49,24 @@ export function useZipDownload(): { toggle: ReactNode; bar: ReactNode; check: (i
   }
 
   return {
+    active,
     toggle: (
-      <button type="button" className="zip-toggle" aria-pressed={on} onClick={() => (setOn(!on), setIds([]), setProblem(''))}>
+      <button type="button" className="zip-toggle" aria-pressed={active} onClick={() => (active ? clear() : setOn(true))}>
         Chọn
       </button>
     ),
-    bar: on && (
-      <div className="zip-bar" role="group" aria-label="Tải nhiều mục">
-        <span>Đã chọn {ids.length}</span>
-        <button type="button" className="link-button" disabled={ids.length === 0 || busy} onClick={() => void download()}>
+    bar: active && (
+      <div className={hover ? 'zip-bar zip-float' : 'zip-bar'} role="group" aria-label="Tải nhiều mục">
+        <span aria-live="polite">Đã chọn {ids.length}</span>
+        <button type="button" className={hover ? 'primary' : 'link-button'} disabled={ids.length === 0 || busy} onClick={() => void download()}>
+          {hover && <Icon name="download" />}
           Tải xuống .zip
         </button>
+        {hover && (
+          <button type="button" className="zip-clear" onClick={clear}>
+            Bỏ chọn
+          </button>
+        )}
         {problem && (
           <p className="error" role="alert">
             {problem}
@@ -56,7 +75,7 @@ export function useZipDownload(): { toggle: ReactNode; bar: ReactNode; check: (i
       </div>
     ),
     check: (id, label) =>
-      on && (
+      (on || hover) && (
         <label className="zip-check">
           <input type="checkbox" checked={ids.includes(id)} onChange={(e) => pick(id, e.target.checked)} aria-label={`Chọn ${label}`} />
         </label>

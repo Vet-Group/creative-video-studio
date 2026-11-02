@@ -169,7 +169,7 @@ describe('GET /api/library', () => {
     expect(body.clips.find((c) => c.id === a)).toEqual({
       id: a, creator: { id: alice.id, name: 'Nguyễn Văn Đạt' }, createdAt: '2026-10-22T17:30:00.000Z', modelId: 'fal-test', modelLabel: 'Fal test', ratio: '1:1', durationSec: 8,
       feature: 'video', mediaType: 'video', resolution: null, isMock: false, videoAssetId: 'lib-a-video', posterAssetId: 'lib-a-poster', storeId: null, costUsd: '1.6000', costFinal: true, verdict: { verdict: 'fail', fault: 'flicker', featured: false, markedBy: alice.id },
-      favorite: false, canEdit: false, downloadName: expect.stringMatching(/^20261023-nguyen-van-dat-lib-a\.mp4$/),
+      favorite: false, prompt: null, canEdit: false, downloadName: expect.stringMatching(/^20261023-nguyen-van-dat-lib-a\.mp4$/),
     });
     expect(body.clips.find((c) => c.id === b)).toMatchObject({ isMock: true, costFinal: false, verdict: null, canEdit: true }); // bob is the creator
     expect(body.creators).toEqual(expect.arrayContaining([{ id: alice.id, name: 'Nguyễn Văn Đạt' }, { id: bob.id, name: 'Bob' }]));
@@ -220,6 +220,33 @@ describe('GET /api/library', () => {
     expect(await (await fav('lib-a', bob.cookie, false)).json()).toEqual({ favorite: false });
     expect((await fav('lib-a', bob.cookie, false)).status).toBe(200);
     expect(await lib(bob.cookie, '?favorites=1')).toEqual([]);
+  });
+
+  test('searches the model name and the creator own prompt, case-insensitive and with LIKE wildcards taken literally', async () => {
+    // Switched-off models of their own, so the model scores the later tests check stay the same.
+    await pool.query(
+      `insert into model_configs (id, provider, endpoint, label, ratios, durations_sec, max_images, output_resolution, usd_per_second, sources, enabled) values
+         ('find-a', 'fal', 'x', 'Alpha search', '{9:16}', '{8}', 2, '720p', 0.1, '{}', false), ('find-b', 'fal', 'x', 'Beta', '{9:16}', '{8}', 2, '720p', 0.1, '{}', false)`,
+    );
+    const free = await clip(alice.id, { id: 'find-free', model: 'find-b' });
+    await pool.query(`update jobs set preset_id = null, prompt = 'Áo khoác DENIM 100% cotton' where id = $1`, [free]);
+    const snake = await clip(alice.id, { id: 'find-snake', model: 'find-a' });
+    await pool.query(`update jobs set feature = 'image', preset_id = null, prompt = 'serum_bottle on marble' where id = $1`, [snake]);
+    const composed = await clip(alice.id, { id: 'find-composed', model: 'find-a' }); // a preset's prompt is not the creator's words
+    await pool.query(`update jobs set prompt = 'denim jacket preset' where id = $1`, [composed]);
+    const found = async (q: string) => (await libraryIds(bob.cookie, `?q=${encodeURIComponent(q)}`)).filter((id) => id.startsWith('find-')).sort();
+    expect(await found('denim')).toEqual([free]);
+    expect(await found('  Áo khoác  ')).toEqual([free]);
+    expect(await found('%')).toEqual([free]);
+    expect(await found('_')).toEqual([snake]);
+    expect(await found('alpha SEARCH')).toEqual([composed, snake].sort());
+    expect(await found('   ')).toEqual([composed, free, snake].sort()); // blank is no search
+    const items = ((await (await GET_LIBRARY(req('/api/library?q=find', bob.cookie))).json()) as { clips: unknown[] }).clips;
+    expect(items).toEqual([]); // ids are not searched
+    const all = ((await (await GET_LIBRARY(req('/api/library', bob.cookie))).json()) as { clips: { id: string; prompt: string | null }[] }).clips;
+    expect(Object.fromEntries(all.filter((c) => c.id.startsWith('find-')).map((c) => [c.id, c.prompt]))).toEqual({ [free]: 'Áo khoác DENIM 100% cotton', [snake]: 'serum_bottle on marble', [composed]: null });
+    expect((await GET_LIBRARY(req(`/api/library?q=${'x'.repeat(201)}`, bob.cookie))).status).toBe(400);
+    expect((await GET_LIBRARY(req(`/api/library?q=${'x'.repeat(200)}`, bob.cookie))).status).toBe(200);
   });
 
   test('pages by 24', async () => {
