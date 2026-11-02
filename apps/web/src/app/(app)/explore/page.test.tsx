@@ -67,12 +67,14 @@ test("a model's best Library clip replaces its sample, and a model with a clip b
   const ids = ['kling-2.6', 'veo-3.1', 'flux-3'];
   const rows = ids.map((id) => ({ id, label: id, provider: 'fal', kind: 'video', ratios: ['9:16'], durations_sec: [5], usd_per_second: '0.1', image_prices: null }));
   vi.mocked(pool.query).mockResolvedValueOnce({ rows } as never);
-  vi.mocked(listSamples).mockResolvedValue(['model-veo-3-1.mp4', 'model-veo-3-1.jpg', 'model-kling-2-6.jpg'].map((name) => ({ name })) as Awaited<ReturnType<typeof listSamples>>);
+  vi.mocked(listSamples).mockResolvedValue(['model-veo-3-1.mp4', 'model-veo-3-1.jpg', 'model-kling-2-6.jpg', 'model-flux-3.jpg'].map((name) => ({ name })) as Awaited<ReturnType<typeof listSamples>>);
   vi.mocked(bestClips).mockResolvedValueOnce(new Map([['veo-3.1', { video: '/api/assets/v/content', poster: '/api/assets/p/content' }], ['flux-3', { video: '/api/assets/f/content', poster: null }]]));
   const html = renderToStaticMarkup(await ExplorePage());
   const model = (id: string) => card(html, `/create\\?model=${id}`);
   expect(model('veo-3.1')).toContain('data-video="/api/assets/v/content"');
   expect(model('veo-3.1')).toContain('src="/api/assets/p/content"');
   expect(model('kling-2.6')).toContain('src="/api/samples/model-kling-2-6.jpg"'); // no clip: the sample stays
+  expect(model('flux-3')).toContain('src="/api/samples/model-flux-3.jpg"'); // a clip without a poster keeps the sample still
+  expect(model('flux-3')).toContain('data-video="/api/assets/f/content"');
   expect([...html.matchAll(/href="\/create\?model=([^"]+)"/g)].map((m) => m[1])).toEqual(['veo-3.1', 'flux-3', 'kling-2.6']);
 });

@@ -50,8 +50,11 @@ export default async function ExplorePage() {
     bestClips(),
   ]);
   const have = new Set(samples.map((s) => s.name));
-  /** A model's card picture: the company's best Library clip of it, else its uploaded sample. */
-  const media = (id: string) => clips.get(id) ?? cardSample(have, modelSample(have, id));
+  /** A model's card picture: the company's best Library clip of it, else its uploaded sample; a clip without a poster keeps the sample's still. */
+  const media = (id: string) => {
+    const sample = cardSample(have, modelSample(have, id)), clip = clips.get(id);
+    return clip ? { video: clip.video, poster: clip.poster ?? sample.poster } : sample;
+  };
   const scored = models.rows.map((m) => {
     const st = (m.kind === 'video' ? videoStats : imageStats).get(m.id) ?? { passes: 0, total: 0, ok: 0, bad: 0 };
     const usd = m.kind === 'video' ? Number(m.usd_per_second ?? 0) : Math.min(...Object.values(m.image_prices ?? {}).map(Number));

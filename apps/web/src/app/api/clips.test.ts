@@ -638,7 +638,9 @@ describe('bestClips', () => {
     const failed = await clip(alice.id, { model: 'best-video' });
     const deleted = await clip(alice.id, { model: 'best-video' });
     const mock = await clip(alice.id, { model: 'best-video' });
-    for (const id of [old, newer, deleted, mock]) await mark(id, 'pass');
+    const tryOn = await clip(alice.id, { model: 'best-video' });
+    await pool.query(`update jobs set feature = 'try_on' where id = $1`, [tryOn]); // a staff photo result never shows on Explore
+    for (const id of [old, newer, deleted, mock, tryOn]) await mark(id, 'pass');
     await mark(failed, 'fail');
     await pool.query(`update jobs set deleted_at = now() where id = $1`, [deleted]);
     await pool.query(`update jobs set is_mock = true where id = $1`, [mock]);
@@ -648,6 +650,7 @@ describe('bestClips', () => {
     expect((await bestClips()).get('best-video')?.video).toBe(`/api/assets/${old}-video/content`); // the favourite outranks the newer one
 
     const image = await clip(alice.id, { model: 'best-image' });
+    await pool.query(`update jobs set feature = 'image' where id = $1`, [image]);
     await pool.query(`update assets set mime = 'image/png' where id = $1`, [`${image}-video`]);
     await mark(image, 'pass');
     await clip(alice.id, { model: 'best-none' });

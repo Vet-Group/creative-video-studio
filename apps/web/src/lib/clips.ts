@@ -4,15 +4,16 @@ import { pool } from './auth';
 /** SQL for a job (alias `j`) that is a clip in the Library: succeeded, not deleted, not purged. */
 export const LIVE_CLIP = `j.status = 'succeeded' and j.deleted_at is null and j.purged_at is null and j.output_asset_id is not null`;
 
-/** Per model, the company's best Library clip as card media: a real (not mock) clip marked Pass, the most favourited, then the newest.
- * A video clip gives its loop and poster, an image its still; any member may read both (`readableAsset`). */
+/** Per model, the company's best Library clip as card media: a real (not mock) Create Videos or Image Generation clip marked Pass, the most favourited, then the newest.
+ * A video clip gives its loop and poster, an image its still; any member may read both (`readableAsset`).
+ * Other features (Try On, Face Swap and the apps) run on the same models but show staff photos, so they never qualify. */
 export async function bestClips(): Promise<Map<string, { video: string | null; poster: string | null }>> {
   const { rows } = await pool.query<{ model: string; output_asset_id: string; poster_asset_id: string | null; mime: string }>(
     `select distinct on (j.model) j.model, j.output_asset_id, j.poster_asset_id, o.mime
        from jobs j
        join verdicts v on v.job_id = j.id and v.verdict = 'pass'
        join assets o on o.id = j.output_asset_id
-      where ${LIVE_CLIP} and not j.is_mock and (o.mime like 'video/%' or o.mime like 'image/%')
+      where ${LIVE_CLIP} and not j.is_mock and j.feature in ('video', 'image') and (o.mime like 'video/%' or o.mime like 'image/%')
       order by j.model, (select count(*) from favorites f where f.job_id = j.id) desc, j.created_at desc, j.id desc`,
   );
   const content = (id: string | null) => (id ? `/api/assets/${id}/content` : null);
