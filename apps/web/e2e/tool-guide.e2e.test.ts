@@ -8,15 +8,25 @@ test('the sidebar tells what each creative tool is for, and "Chọn công cụ n
   await page.goto('/library');
   const nav = page.getByRole('navigation', { name: 'Điều hướng chính' });
   const tryOn = nav.getByRole('link', { name: 'Thử đồ', exact: true });
-  await expect(tryOn).toHaveAccessibleDescription(/^Thử đồ Mặc quần áo của bạn lên người mẫu/);
-  const hint = page.locator('#nav-hint-tryon');
+  await expect(tryOn).toHaveAccessibleDescription(/^Mặc quần áo của bạn lên người mẫu/);
+  const hint = page.locator('.nav-item').filter({ has: page.getByRole('link', { name: 'Thử đồ', exact: true }) }).locator('.nav-hint');
   await expect(hint).toBeHidden();
   await tryOn.hover();
   await expect(hint).toBeVisible();
   await page.mouse.move(800, 600);
   await expect(hint).toBeHidden();
-  await nav.getByRole('link', { name: 'Tạo video', exact: true }).focus();
-  await expect(page.locator('#nav-hint-create')).toBeVisible(); // a keyboard user reads it too
+  // A keyboard user reads it too, and Esc puts it away.
+  await nav.getByRole('link', { name: 'Thư viện', exact: true }).focus();
+  await page.keyboard.press('Shift+Tab');
+  const video = page.locator('.nav-item').filter({ has: page.getByRole('link', { name: 'Ứng dụng', exact: true }) }).locator('.nav-hint');
+  await expect(video).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(video).toBeHidden();
+  // A click leaves focus on the link, but not the line over the page.
+  await nav.getByRole('link', { name: 'Tạo ảnh', exact: true }).click();
+  await expect(page).toHaveURL(/\/image-generation$/);
+  await page.mouse.move(800, 600);
+  await expect(page.locator('.nav-item').filter({ has: page.getByRole('link', { name: 'Tạo ảnh', exact: true }) }).locator('.nav-hint')).toBeHidden();
 
   await nav.getByRole('button', { name: 'Chọn công cụ nào?' }).click();
   const guide = page.getByRole('dialog', { name: 'Chọn công cụ nào?' });
@@ -56,14 +66,14 @@ test('Explore starts from what you need, and the drawer on a phone shows each to
   const start = page.getByRole('list', { name: 'Bắt đầu từ đâu' });
   await expect(start.getByRole('link')).toHaveCount(6);
   await expect(start.getByRole('link', { name: /^Có ảnh quần áo, cần ảnh người mẫu mặc nó/ })).toHaveAttribute('href', '/try-on');
-  await expect(page.getByRole('list', { name: 'Công cụ' }).getByRole('link', { name: /^Tạo ảnh Một ảnh và một câu mô tả/ })).toBeVisible();
+  await expect(page.getByRole('list', { name: 'Công cụ' }).getByRole('link', { name: /^Tạo ảnh Ảnh mới từ một câu mô tả/ })).toBeVisible();
 
   await page.setViewportSize({ width: 390, height: 844 });
   const fits = () => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
   expect(await fits()).toBe(true);
   await page.getByRole('button', { name: 'Mở menu' }).click();
   const drawer = page.getByRole('dialog', { name: 'Menu' });
-  await expect(drawer.locator('#nav-hint-apps')).toBeVisible();
+  await expect(drawer.locator('.nav-hint').filter({ hasText: 'Công cụ một việc' })).toBeVisible();
   await drawer.getByRole('button', { name: 'Chọn công cụ nào?' }).click();
   await expect(drawer).toHaveCount(0); // the drawer gives way to the guide
   await expect(page.getByRole('dialog', { name: 'Chọn công cụ nào?' })).toBeVisible();

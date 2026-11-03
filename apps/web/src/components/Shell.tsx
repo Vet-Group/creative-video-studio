@@ -2,7 +2,7 @@
 // The frame of every signed-in page: navigation, the "My jobs" tray and the toasts.
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { createContext, type ReactNode, useContext, useEffect, useRef, useState } from 'react';
+import { createContext, type ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { api, errorText, sendJson, type JobStatus, type TrayJob } from '@/lib/api';
 import { appBySlug } from '@/lib/apps';
 import { featureLabel } from '@/lib/features';
@@ -404,6 +404,8 @@ export function Shell({ userId, userName, isAdmin, account, initialCollapsed, ch
   const [collapsed, setCollapsed] = useState(initialCollapsed); // the icon rail, from 1024 px
   const [settings, setSettings] = useState<Section | null>(null); // the open Settings dialog's first section
   const [guide, setGuide] = useState(false); // the "Chọn công cụ nào?" dialog
+  const openGuide = useCallback(() => (setOpen(false), setGuide(true)), []);
+  const [hintOff, setHintOff] = useState(false); // Esc hides a sidebar line until focus or the pointer moves on
   const link = (href: string, text: string, icon: IconName, current = pathname === href, badge?: string, hint?: string) => {
     const a = (
       <Link key={href} href={href} aria-current={current ? 'page' : undefined} aria-describedby={hint ? `nav-hint-${icon}` : undefined} title={collapsed && !hint ? text : undefined}>
@@ -419,9 +421,9 @@ export function Shell({ userId, userName, isAdmin, account, initialCollapsed, ch
     return (
       <div key={href} className="nav-item">
         {a}
-        <span className="nav-hint" id={`nav-hint-${icon}`}>
+        <span className="nav-hint">
           <strong>{text}</strong>
-          {hint}
+          <span id={`nav-hint-${icon}`}>{hint}</span>
         </span>
       </div>
     );
@@ -466,7 +468,7 @@ export function Shell({ userId, userName, isAdmin, account, initialCollapsed, ch
   return (
     <JobsProvider userId={userId}>
       <AdminContext value={isAdmin}>
-        <OpenToolGuide value={() => (setOpen(false), setGuide(true))}>
+        <OpenToolGuide value={openGuide}>
           <div className="app" data-collapsed={collapsed}>
             <NavProgress />
             <div className="scrim" data-open={open} onClick={() => setOpen(false)} aria-hidden="true" />
@@ -494,7 +496,7 @@ export function Shell({ userId, userName, isAdmin, account, initialCollapsed, ch
                   <Icon name="x" size={16} />
                 </button>
               </div>
-              <nav aria-label="Điều hướng chính">
+              <nav aria-label="Điều hướng chính" data-hint-off={hintOff || undefined} onKeyDown={(e) => e.key === 'Escape' && setHintOff(true)} onFocus={() => setHintOff(false)} onPointerOver={() => hintOff && setHintOff(false)}>
                 {navGroups(isAdmin).map((g, i) => (
                   <div key={g.label ?? 'home'} className="nav-group" role={g.label ? 'group' : undefined} aria-labelledby={g.label ? `nav-group-${i}` : undefined}>
                     {g.label && (
