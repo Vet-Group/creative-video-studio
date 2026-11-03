@@ -16,6 +16,7 @@ import { Icon, type IconName } from './Icon';
 import { JobPrompt, JobsProvider, Recreate, roleOf, Tap, toggleFullscreen, useForm, useJobs } from './jobs';
 import { type Account, type Section, Settings } from './Settings';
 import { SaveTemplateDialog } from './Templates';
+import { OpenToolGuide, ToolGuide, ToolGuideButton } from './ToolGuide';
 import { VetLogo } from './VetLogo';
 import { useZipDownload } from './ZipDownload';
 
@@ -402,15 +403,29 @@ export function Shell({ userId, userName, isAdmin, account, initialCollapsed, ch
   const sidebar = useRef<HTMLDivElement>(null);
   const [collapsed, setCollapsed] = useState(initialCollapsed); // the icon rail, from 1024 px
   const [settings, setSettings] = useState<Section | null>(null); // the open Settings dialog's first section
-  const link = (href: string, text: string, icon: IconName, current = pathname === href, badge?: string) => (
-    <Link key={href} href={href} aria-current={current ? 'page' : undefined} title={collapsed ? text : undefined}>
-      <span className="nav-icon">
-        <Icon name={icon} size={16} filled />
-      </span>
-      <span className="nav-label">{text}</span>
-      {badge && <span className="nav-badge" aria-hidden="true">{badge}</span>}
-    </Link>
-  );
+  const [guide, setGuide] = useState(false); // the "Chọn công cụ nào?" dialog
+  const link = (href: string, text: string, icon: IconName, current = pathname === href, badge?: string, hint?: string) => {
+    const a = (
+      <Link key={href} href={href} aria-current={current ? 'page' : undefined} aria-describedby={hint ? `nav-hint-${icon}` : undefined} title={collapsed && !hint ? text : undefined}>
+        <span className="nav-icon">
+          <Icon name={icon} size={16} filled />
+        </span>
+        <span className="nav-label">{text}</span>
+        {badge && <span className="nav-badge" aria-hidden="true">{badge}</span>}
+      </Link>
+    );
+    if (!hint) return a;
+    // Beside the link, not in it, so the link's name stays the page's name.
+    return (
+      <div key={href} className="nav-item">
+        {a}
+        <span className="nav-hint" id={`nav-hint-${icon}`}>
+          <strong>{text}</strong>
+          {hint}
+        </span>
+      </div>
+    );
+  };
   function toggleRail() {
     document.cookie = `${COLLAPSED_COOKIE}=${collapsed ? '0' : '1'}; path=/; max-age=31536000; samesite=lax`;
     setCollapsed(!collapsed);
@@ -451,63 +466,69 @@ export function Shell({ userId, userName, isAdmin, account, initialCollapsed, ch
   return (
     <JobsProvider userId={userId}>
       <AdminContext value={isAdmin}>
-        <div className="app" data-collapsed={collapsed}>
-          <NavProgress />
-          <div className="scrim" data-open={open} onClick={() => setOpen(false)} aria-hidden="true" />
-          <div
-            ref={sidebar}
-            className="sidebar"
-            id="sidebar"
-            data-open={open}
-            role={narrow && open ? 'dialog' : undefined}
-            aria-modal={narrow && open ? true : undefined}
-            aria-label={narrow && open ? 'Menu' : undefined}
-            onClick={(e) => e.target instanceof Element && e.target.closest('a') && setOpen(false)} // any link, even to the page already open
-          >
-            <div className="brand">
-              <span className="logo" aria-hidden="true">
-                <VetLogo size={28} />
-              </span>
-              <strong>Video Studio</strong>
-              <span className="brand-tools">
-                <button type="button" className="rail-toggle" aria-label="Thu gọn thanh bên" title="Thu gọn thanh bên" aria-pressed={collapsed} onClick={toggleRail}>
-                  <Icon name="panel" size={16} />
+        <OpenToolGuide value={() => (setOpen(false), setGuide(true))}>
+          <div className="app" data-collapsed={collapsed}>
+            <NavProgress />
+            <div className="scrim" data-open={open} onClick={() => setOpen(false)} aria-hidden="true" />
+            <div
+              ref={sidebar}
+              className="sidebar"
+              id="sidebar"
+              data-open={open}
+              role={narrow && open ? 'dialog' : undefined}
+              aria-modal={narrow && open ? true : undefined}
+              aria-label={narrow && open ? 'Menu' : undefined}
+              onClick={(e) => e.target instanceof Element && e.target.closest('a') && setOpen(false)} // any link, even to the page already open
+            >
+              <div className="brand">
+                <span className="logo" aria-hidden="true">
+                  <VetLogo size={28} />
+                </span>
+                <strong>Video Studio</strong>
+                <span className="brand-tools">
+                  <button type="button" className="rail-toggle" aria-label="Thu gọn thanh bên" title="Thu gọn thanh bên" aria-pressed={collapsed} onClick={toggleRail}>
+                    <Icon name="panel" size={16} />
+                  </button>
+                </span>
+                <button type="button" className="drawer-close" aria-label="Đóng menu" onClick={() => setOpen(false)}>
+                  <Icon name="x" size={16} />
                 </button>
-              </span>
-              <button type="button" className="drawer-close" aria-label="Đóng menu" onClick={() => setOpen(false)}>
-                <Icon name="x" size={16} />
-              </button>
+              </div>
+              <nav aria-label="Điều hướng chính">
+                {navGroups(isAdmin).map((g, i) => (
+                  <div key={g.label ?? 'home'} className="nav-group" role={g.label ? 'group' : undefined} aria-labelledby={g.label ? `nav-group-${i}` : undefined}>
+                    {g.label && (
+                      <div className="nav-group-head">
+                        <p className="nav-group-label" id={`nav-group-${i}`}>
+                          {g.label}
+                        </p>
+                        {g.items.some((n) => n.hint) && <ToolGuideButton className="nav-guide">Chọn công cụ nào?</ToolGuideButton>}
+                      </div>
+                    )}
+                    {g.items.map((n) => link(n.href, n.text, n.icon, current(n.href), n.badge, n.hint))}
+                  </div>
+                ))}
+              </nav>
+              {accountMenu('chip')}
             </div>
-            <nav aria-label="Điều hướng chính">
-              {navGroups(isAdmin).map((g, i) => (
-                <div key={g.label ?? 'home'} className="nav-group" role={g.label ? 'group' : undefined} aria-labelledby={g.label ? `nav-group-${i}` : undefined}>
-                  {g.label && (
-                    <p className="nav-group-label" id={`nav-group-${i}`}>
-                      {g.label}
-                    </p>
-                  )}
-                  {g.items.map((n) => link(n.href, n.text, n.icon, current(n.href), n.badge))}
-                </div>
-              ))}
-            </nav>
-            {accountMenu('chip')}
-          </div>
-          <Settings open={settings !== null} onClose={() => setSettings(null)} userName={userName} account={account} start={settings ?? 'profile'} />
-          <div className="content" inert={narrow && open}>
-            <header className="topbar">
-              <button ref={menuButton} type="button" className="menu-button" aria-label="Mở menu" aria-expanded={open} aria-controls="sidebar" onClick={() => setOpen(true)}>
-                <Icon name="menu" size={20} />
-              </button>
-              <strong>{title}</strong>
-              {accountMenu('avatar')}
-            </header>
-            <div className="frame">
-              <main>{children}</main>
-              {!hasOwnHistory(pathname) && <Tray />}
+            <Settings open={settings !== null} onClose={() => setSettings(null)} userName={userName} account={account} start={settings ?? 'profile'} />
+            <div className="content" inert={narrow && open}>
+              <header className="topbar">
+                <button ref={menuButton} type="button" className="menu-button" aria-label="Mở menu" aria-expanded={open} aria-controls="sidebar" onClick={() => setOpen(true)}>
+                  <Icon name="menu" size={20} />
+                </button>
+                <strong>{title}</strong>
+                {accountMenu('avatar')}
+              </header>
+              <div className="frame">
+                <main>{children}</main>
+                {!hasOwnHistory(pathname) && <Tray />}
+              </div>
             </div>
+            <Toasts />
           </div>
-          <Toasts />
-        </div>
+          <ToolGuide open={guide} onClose={() => setGuide(false)} />
+        </OpenToolGuide>
       </AdminContext>
     </JobsProvider>
   );

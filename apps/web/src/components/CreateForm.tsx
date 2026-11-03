@@ -24,6 +24,7 @@ import { Preview } from './Preview';
 import { Select } from './Select';
 import { Tray } from './Shell';
 import { Templates } from './Templates';
+import { PageHint } from './ToolGuide';
 
 interface Model {
   id: string;
@@ -454,6 +455,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
 
         <div className="card form-card" id="create-panel-create" role={narrow ? 'tabpanel' : undefined} aria-labelledby={narrow ? 'create-tab-create' : undefined} hidden={narrow && shown !== 'create'} onPointerDownCapture={recall.touch} onKeyDownCapture={recall.touch}>
           <div className="form-scroll">
+            <PageHint href="/create" />
             <div className="banner" aria-busy={presets === null}>
               <CardMedia video={banner.video} poster={banner.poster} />
               <div className="banner-text">
