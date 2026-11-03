@@ -396,8 +396,8 @@ legend { font-weight: 600; padding: 0 .25rem; }
 .job-prompt { display: grid; gap: 6px; padding: 10px; border-radius: 10px; background: var(--fill); }
 .job-prompt .job-text { display: -webkit-box; max-height: none; overflow: hidden; color: var(--text-2); font-size: 13px; line-height: 19px; -webkit-box-orient: vertical; -webkit-line-clamp: 4; }
 .job-prompt[data-open] .job-text { display: block; max-height: 260px; overflow-y: auto; }
-.job-prompt-tools { display: flex; gap: 12px; }
-.job-prompt-tools button { display: inline-flex; align-items: center; gap: 4px; padding: 0; border: 0; background: none; color: var(--ink); font: inherit; font-size: 12px; font-weight: 600; line-height: 18px; cursor: pointer; }
+.job-prompt-tools { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.job-prompt-tools button { display: inline-flex; white-space: nowrap; align-items: center; gap: 4px; padding: 0; border: 0; background: none; color: var(--ink); font: inherit; font-size: 12px; font-weight: 600; line-height: 18px; cursor: pointer; }
 .job-prompt-tools button:hover { text-decoration: underline; text-underline-offset: 3px; }
 .job-translation { margin-top: 8px; padding: 8px 10px; border-left: 2px solid var(--border-strong); color: var(--text-2); font-size: 13px; line-height: 20px; white-space: pre-line; overflow-wrap: anywhere; } /* the Translate button's Vietnamese reading, under the tools */
 .job-inputs { display: flex; flex-wrap: wrap; gap: 8px !important; margin: 0; padding: 0; list-style: none; }

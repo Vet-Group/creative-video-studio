@@ -143,8 +143,9 @@ test('Dịch shows a Vietnamese reading of English words under the box, asks onc
 });
 
 test('a History card translates its English prompt on Dịch and hides it again', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
   await signIn(page, 'sugga');
-  const prompt = 'a model turning slowly by the window, soft morning light';
+  const prompt = 'a model turning slowly by the window, soft morning light, a quiet room with linen curtains, a wooden chair and a small table with a cup of tea, shot on film with a shallow depth of field and gentle grain';
   expect((await page.request.post('/api/jobs', { data: { feature: 'image', modelId: 'mock-image-e2e', assetIds: [], ratio: '1:1', prompt, enhance: false, params: { resolution: '1K' } } })).status()).toBe(201);
   await page.goto('/image-generation');
   await page.getByRole('tab', { name: 'Lịch sử' }).click();
@@ -152,6 +153,10 @@ test('a History card translates its English prompt on Dịch and hides it again'
   await card.getByRole('button', { name: 'Dịch', exact: true }).click({ timeout: 60_000 });
   const reading = card.getByRole('group', { name: 'Bản dịch tiếng Việt' });
   await expect(reading).toHaveText(`Translation: ${prompt}`, { timeout: 20_000 });
+  // In the narrow card each tool label stays on one line (the row wraps instead): an 18px line-height, so under 1.6x of it.
+  const tools = card.locator('.job-prompt-tools button');
+  expect(await tools.count()).toBe(3); // show more, copy, hide translation
+  for (const tool of await tools.all()) expect((await tool.boundingBox())!.height).toBeLessThan(18 * 1.6);
   await card.getByRole('button', { name: 'Ẩn bản dịch' }).click();
   await expect(reading).toHaveCount(0);
 });
