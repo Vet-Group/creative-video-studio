@@ -13,6 +13,18 @@ import { Modal } from './Modal';
 import { VerdictGuide } from './VerdictGuide';
 import { useZipDownload } from './ZipDownload';
 
+const PLACE_KEY = 'cvs.library.place';
+const MAX_RESTORE = 240; // ten pages at most, so a long scroll does not turn into a long wait
+function readPlace(): { query: string; count: number; y: number } | null {
+  try {
+    const p = JSON.parse(sessionStorage.getItem(PLACE_KEY) ?? 'null') as { query?: unknown; count?: unknown; y?: unknown } | null;
+    return p && typeof p.query === 'string' && typeof p.count === 'number' && typeof p.y === 'number' ? (p as { query: string; count: number; y: number }) : null;
+  } catch {
+    return null;
+  }
+}
+/** Today in Vietnam as YYYY-MM-DD, the latest day the calendar offers. */
+const today = () => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date());
 const fmtTime = (iso: string) => new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date(iso));
 /** The Library filters in the reference order; the id is the `kind` the API takes. */
 const KINDS = [
@@ -622,6 +634,7 @@ export function Library() {
   const [unmarked, setUnmarked] = useState(0); // the items the viewer may mark that have no mark yet, for the verdict filter
   const latest = useRef(0);
   const set = (patch: Partial<LibraryFilters>) => setFilters((cur) => ({ ...cur, ...patch }));
+  const [pickDay, setPickDay] = useState(false); // "Chọn một ngày…" shows the calendar field
   const active = activeFilters(filters);
   // An item that no longer matches Favourites only or the verdict filter leaves the list, so the next page's offset stays right; the detail view then shows the next one.
   const counted = useRef(new Set<string>()); // first marks already taken off the count: two quick marks on one item see the same unmarked render
@@ -641,28 +654,89 @@ export function Library() {
   }, [clips, detail]);
 
   const load = useCallback(
-    async (offset: number) => {
+    // How many came while more wait, null at the end or on an error, undefined when a newer load took over.
+    async (offset: number): Promise<number | null | undefined> => {
       const ticket = ++latest.current;
       try {
         const r = await api<{ hasMore: boolean; isAdmin: boolean; unmarked: number; creators: { id: string; name: string }[]; clips: Clip[] }>(`/api/library?${libraryQuery(filters, offset)}`);
-        if (ticket !== latest.current) return;
+        if (ticket !== latest.current) return undefined;
         setIsAdmin(r.isAdmin);
         setUnmarked(r.unmarked);
         setClips((cur) => (offset > 0 ? [...cur, ...r.clips] : r.clips));
         setCreators(r.creators);
         setHasMore(r.hasMore);
         setState('ready');
+        return r.hasMore ? r.clips.length : null;
       } catch {
-        if (ticket === latest.current) setState('error');
+        if (ticket !== latest.current) return undefined;
+        setState('error');
       }
+      return null;
     },
     [filters],
   );
 
+  // Coming back to the Library with the same filters loads as many items as were shown and scrolls back to the same place.
+  const restoring = useRef(true);
+  const loadingMore = useRef(false); // also held while restoring, so the end of the list does not load pages twice
+  const shown = useRef({ query: '', count: 0 });
+  shown.current = { query: libraryQuery(filters, 0), count: clips.length };
   useEffect(() => {
     setState('loading');
-    void load(0);
+    void (async () => {
+      let got = await load(0);
+      if (got === undefined || !restoring.current) return;
+      restoring.current = false;
+      const saved = readPlace();
+      if (!saved || saved.query !== libraryQuery(filters, 0)) return;
+      loadingMore.current = true;
+      try {
+        let n = 0;
+        while (typeof got === 'number' && got > 0 && (n += got) < Math.min(saved.count, MAX_RESTORE)) got = await load(n);
+      } finally {
+        loadingMore.current = false;
+      }
+      if (got === undefined) return; // the filters changed meanwhile
+      setTimeout(() => window.scrollTo(0, saved.y), 50); // after the restored pages have rendered
+    })();
   }, [load]);
+  // Saved while scrolling here: by the time the page unmounts, the next page has already scrolled to its top.
+  useEffect(() => {
+    let frame = 0;
+    const save = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        if (location.pathname !== '/library' || shown.current.count === 0) return;
+        try {
+          sessionStorage.setItem(PLACE_KEY, JSON.stringify({ ...shown.current, y: window.scrollY }));
+        } catch {} // blocked storage: the Library opens at the top
+      });
+    };
+    window.addEventListener('scroll', save, { passive: true });
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener('scroll', save);
+    };
+  }, []);
+
+  // More items load as the end comes near; the Tải thêm button stays for the keyboard.
+  const moreButton = useRef<HTMLButtonElement>(null);
+  const loadMore = useCallback(async () => {
+    if (loadingMore.current) return;
+    loadingMore.current = true;
+    try {
+      await load(shown.current.count);
+    } finally {
+      loadingMore.current = false;
+    }
+  }, [load]);
+  useEffect(() => {
+    const el = moreButton.current;
+    if (!el || !hasMore || state !== 'ready') return;
+    const io = new IntersectionObserver((seen) => seen[0]?.isIntersecting && void loadMore(), { rootMargin: '800px 0px' });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [hasMore, state, loadMore]);
   // shortcut: a fresh result reloads the first page, so pages added with "Xem thêm" close; merge them if that bothers anyone.
   useFreshResults(() => void load(0));
 
@@ -691,6 +765,7 @@ export function Library() {
   }
   function clearFilters() {
     setSearch('');
+    setPickDay(false);
     setFilters((cur) => ({ ...NO_FILTERS, sort: cur.sort }));
   }
 
@@ -760,8 +835,27 @@ export function Library() {
         </label>
         <label className="library-field">
           <span>Ngày</span>
-          <input type="date" value={filters.date} onChange={(e) => set({ date: e.target.value })} />
+          <select
+            value={filters.days ? `d${filters.days}` : filters.date || pickDay ? 'pick' : ''}
+            onChange={(e) => {
+              const v = e.target.value;
+              setPickDay(v === 'pick');
+              set(v === 'pick' ? { days: '' } : { days: v.slice(1) as LibraryFilters['days'], date: '' });
+            }}
+          >
+            <option value="">Mọi ngày</option>
+            <option value="d1">Hôm nay</option>
+            <option value="d7">7 ngày qua</option>
+            <option value="d30">30 ngày qua</option>
+            <option value="pick">Chọn một ngày…</option>
+          </select>
         </label>
+        {(pickDay || filters.date) && (
+          <label className="library-field">
+            <span className="sr-only">Ngày cụ thể</span>
+            <input type="date" value={filters.date} max={today()} onChange={(e) => set({ date: e.target.value })} />
+          </label>
+        )}
         <label className="library-field">
           <span>Tỉ lệ</span>
           <select value={filters.ratio} onChange={(e) => set({ ratio: e.target.value })}>
@@ -849,7 +943,7 @@ export function Library() {
       </div>
       {detail !== null && clips[detail] && <ClipDetail clips={clips} index={detail} stores={isAdmin ? stores : undefined} onIndex={setDetail} onChange={update} />}
       {hasMore && (
-        <button type="button" className="library-more" onClick={() => void load(clips.length)}>
+        <button ref={moreButton} type="button" className="library-more" onClick={() => void loadMore()}>
           Tải thêm
         </button>
       )}

@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { CardMedia } from '@/components/CardMedia';
 import { Icon, type IconName } from '@/components/Icon';
 import { ToolGuideButton } from '@/components/ToolGuide';
+import { Welcome } from '@/components/Welcome';
 import { MODEL_CARD_TEXT } from '@/lib/about-content';
 import { pool } from '@/lib/auth';
 import { bestClips } from '@/lib/clips';
@@ -112,6 +113,7 @@ export default async function ExplorePage() {
         </p>
         <h1>{greeting(user?.name, now)}</h1>
         <p className="explore-status">{status}</p>
+        {recent.length === 0 && <Welcome />}
         {recent.length === 0 && <p className="muted explore-first">Bạn chưa tạo clip hay ảnh nào. Chọn một công cụ bên dưới: tải ảnh sản phẩm lên, chọn mẫu và nhận kết quả sau vài phút.</p>}
       </header>
 

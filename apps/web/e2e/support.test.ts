@@ -34,7 +34,9 @@ export async function loginReady(page: Page): Promise<void> {
   await expect(page.getByRole('button', { name: 'Đăng nhập', exact: true })).toBeEnabled();
 }
 
-export async function signIn(page: Page, who: UserKey): Promise<void> {
+/** Signs in through the form; the first-visit card on Explore counts as already closed unless `welcome` asks for it. */
+export async function signIn(page: Page, who: UserKey, { welcome = false } = {}): Promise<void> {
+  if (!welcome) await page.addInitScript(() => localStorage.setItem('cvs.welcome.done', '1'));
   await page.goto('/login');
   await loginReady(page);
   await page.getByLabel('Email').fill(USERS[who].email);

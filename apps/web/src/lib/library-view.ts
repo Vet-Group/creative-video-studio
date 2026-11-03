@@ -7,6 +7,8 @@ export interface LibraryFilters {
   q: string;
   creator: string;
   date: string;
+  /** '1' (today), '7' or '30': the last days in Vietnam time; '' for any day. */
+  days: '' | '1' | '7' | '30';
   ratio: string;
   kind: string;
   verdict: VerdictFilter;
@@ -14,7 +16,7 @@ export interface LibraryFilters {
   sort: 'newest' | 'oldest';
 }
 
-export const NO_FILTERS: LibraryFilters = { q: '', creator: '', date: '', ratio: '', kind: 'all', verdict: '', favoritesOnly: false, sort: 'newest' };
+export const NO_FILTERS: LibraryFilters = { q: '', creator: '', date: '', days: '', ratio: '', kind: 'all', verdict: '', favoritesOnly: false, sort: 'newest' };
 
 /** Whether an item with this mark belongs under the verdict filter, so a fresh mark can take it out of the list. */
 export function matchesVerdict(filter: VerdictFilter, mark: { verdict: 'pass' | 'fail'; featured: boolean } | null): boolean {
@@ -30,6 +32,7 @@ export function libraryQuery(f: LibraryFilters, offset: number): string {
   if (f.q.trim()) q.set('q', f.q.trim());
   if (f.creator) q.set('creator', f.creator);
   if (f.date) q.set('date', f.date);
+  if (f.days) q.set('days', f.days);
   if (f.ratio) q.set('ratio', f.ratio);
   if (f.kind !== 'all') q.set('kind', f.kind);
   if (f.verdict) q.set('verdict', f.verdict);
@@ -40,7 +43,7 @@ export function libraryQuery(f: LibraryFilters, offset: number): string {
 }
 
 /** How many filters narrow the list; the sort only orders it, so it is not one. */
-export const activeFilters = (f: LibraryFilters): number => [f.q.trim(), f.creator, f.date, f.ratio, f.kind !== 'all', f.verdict, f.favoritesOnly].filter(Boolean).length;
+export const activeFilters = (f: LibraryFilters): number => [f.q.trim(), f.creator, f.date, f.days, f.ratio, f.kind !== 'all', f.verdict, f.favoritesOnly].filter(Boolean).length;
 
 export type LibraryView = 'grid' | 'list';
 export const VIEW_KEY = 'cvs.library.view';
