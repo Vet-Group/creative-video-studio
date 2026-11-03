@@ -118,9 +118,10 @@ export function PromptTools({ feature, format, value, onChange, maxLength, onRun
       {open === 'ai' && (
         <div ref={list} className={s.popover} role="group" aria-label={aiLabel} aria-busy={ai.busy}>
           <div className={s.popHead}>
-            <span>{ai.busy ? 'AI đang viết 3 gợi ý…' : 'Bấm một gợi ý để dùng'}</span>
+            <span>{ai.busy ? 'AI đang viết 3 gợi ý…' : 'Chọn một gợi ý'}</span>
             {!ai.busy && (
               <button type="button" className={s.popAction} onClick={suggest}>
+                <Icon name="wand" size={12} />
                 Gợi ý khác
               </button>
             )}

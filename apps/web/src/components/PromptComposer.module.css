@@ -31,14 +31,17 @@
 /* The Enhance pill keeps its own look, a touch shorter to sit in the toolbar. */
 .toolbar > :global(.enhance) { height: 32px; }
 
-/* The lists: one at a time, under the box (over the bar in the Image Generation bar), as wide as the box. */
-.popover { position: absolute; top: calc(100% + 6px); left: -1px; right: -1px; z-index: 40; display: grid; gap: 2px; max-height: min(320px, 45vh); overflow-y: auto; padding: 6px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); box-shadow: 0 12px 32px rgb(var(--shade) / .16); }
-.popHead { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 28px; padding: 0 6px; color: var(--text-muted); font-size: 12px; font-weight: 600; }
-.popAction { padding: 2px 6px; border: 0; border-radius: 6px; background: none; color: var(--ink); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
-.popAction:hover { background: rgb(var(--tint) / .07); }
-.option { display: -webkit-box; width: 100%; padding: 8px 10px; overflow: hidden; border: 0; border-radius: 8px; background: transparent; color: var(--ink-strong); font: inherit; font-size: 13px; line-height: 19px; text-align: left; cursor: pointer; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
-.option:hover, .option:focus-visible { background: rgb(var(--tint) / .06); }
-.skeleton { display: block; height: 38px; margin: 2px 4px; border-radius: 8px; background: linear-gradient(90deg, rgb(var(--tint) / .04), rgb(var(--tint) / .1), rgb(var(--tint) / .04)); background-size: 200% 100%; animation: shimmer 1.2s linear infinite; }
+/* The lists: one at a time, a last full-width row of the box under the toolbar, so the form grows and scrolls as one (owner, 2026-11-03: the
+   floating list was a small scroll box over the fields below, and its 3-line clamp hid most of each prompt). Each option shows its whole text. */
+.popover { order: 99; flex-basis: calc(100% + 12px); display: grid; gap: 6px; margin: 2px -6px -6px; padding: 8px; border-top: 1px solid var(--field-border); }
+.popHead { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 32px; padding: 0 2px; color: var(--ink-strong); font-size: 13px; font-weight: 600; line-height: 20px; }
+.popAction { display: inline-flex; flex: none; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border: 1px solid var(--border-button); border-radius: 999px; background: var(--surface); color: var(--ink); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+.popAction:hover { border-color: var(--ink); }
+.popAction :global(.icon) { color: var(--brand); }
+.option { display: block; width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--ink-strong); font: inherit; font-size: 13px; line-height: 20px; text-align: left; white-space: pre-line; overflow-wrap: anywhere; cursor: pointer; transition: border-color .15s, box-shadow .15s; }
+.option:hover { border-color: var(--ink); box-shadow: 0 2px 8px rgb(var(--shade) / .08); }
+.option:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; }
+.skeleton { display: block; height: 80px; border-radius: 10px; background: linear-gradient(90deg, rgb(var(--tint) / .04), rgb(var(--tint) / .1), rgb(var(--tint) / .04)); background-size: 200% 100%; animation: shimmer 1.2s linear infinite; }
 @keyframes shimmer { to { background-position: -200% 0; } }
 @media (prefers-reduced-motion: reduce) { .skeleton { animation: none; } }
 .error { margin: 0; padding: 6px; color: var(--danger-text); font-size: 13px; }
@@ -55,4 +58,5 @@
 
 /* The Image Generation bar: AI, recent words and the editor are round icons in the prompt row (globals.css .imagebar .prompt-tools), so the foot keeps one row. */
 .compact { position: static; }
-.compact .popover { top: auto; bottom: calc(100% + 6px); left: 0; right: 0; }
+/* There the list still floats over the bar at the foot of the page, scrolling inside a taller box. */
+.compact .popover { position: absolute; bottom: calc(100% + 6px); left: 0; right: 0; z-index: 40; max-height: min(480px, 60vh); overflow-y: auto; margin: 0; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); box-shadow: 0 12px 32px rgb(var(--shade) / .16); }
