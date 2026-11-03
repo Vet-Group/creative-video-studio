@@ -4,7 +4,7 @@
 //   tables.list: https://cloud.google.com/bigquery/docs/reference/rest/v2/tables/list; jobs.query (maximumBytesBilled, timeoutMs, jobComplete):
 //   https://cloud.google.com/bigquery/docs/reference/rest/v2/jobs/query; Cloud Billing Catalog services.skus.list (currencyCode, pageToken):
 //   https://cloud.google.com/billing/docs/reference/rest/v1/services.skus/list
-import { ProviderHttpError, timeout, type Fetch } from './http';
+import { boundedText, ProviderHttpError, timeout, type Fetch } from './http';
 
 /** The Vertex AI service in the Cloud Billing Catalog. */
 export const VERTEX_SERVICE = 'services/C7E2-9256-1C43';
@@ -45,22 +45,7 @@ async function googleJson(f: Fetch, what: string, url: string, token: () => Prom
     headers: { Authorization: `Bearer ${await token()}`, ...(body !== undefined && { 'Content-Type': 'application/json' }) },
     ...(body !== undefined && { body: JSON.stringify(body) }),
   });
-  const reader = res.body?.getReader();
-  if (!reader) throw new Error(`${what} returned an empty response`);
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  try {
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      size += value.byteLength;
-      if (size > MAX_BYTES) throw new Error(`${what} response exceeds ${MAX_BYTES} bytes`);
-      chunks.push(value);
-    }
-  } finally {
-    await reader.cancel();
-  }
-  const text = Buffer.concat(chunks).toString('utf8');
+  const text = await boundedText(res, what, MAX_BYTES);
   if (!res.ok) throw new ProviderHttpError(res.status, text, `${what}: HTTP ${res.status} ${text.slice(0, 300)}`);
   return JSON.parse(text);
 }

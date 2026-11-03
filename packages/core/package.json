@@ -12,6 +12,7 @@
     "./providers/vertex-video": "./src/providers/vertex-video.ts",
     "./providers/vertex-accounts": "./src/providers/vertex-accounts.ts",
     "./providers/vertex-billing": "./src/providers/vertex-billing.ts",
+    "./providers/balances": "./src/providers/balances.ts",
     "./providers/mock": "./src/providers/mock.ts",
     "./providers/http": "./src/providers/http.ts",
     "./presets": "./src/presets.ts",

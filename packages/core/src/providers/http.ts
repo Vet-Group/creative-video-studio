@@ -32,6 +32,26 @@ export type ReadImage = (url: string, opts?: { ratio?: string }) => Promise<{ by
 /** Every request after submit gets a bounded wait, so a stuck provider cannot hang a poll. */
 export const timeout = (): AbortSignal => AbortSignal.timeout(30_000);
 
+/** A response body as text, refused past `max` bytes so a misbehaving server cannot fill memory. */
+export async function boundedText(res: Response, what: string, max: number): Promise<string> {
+  const reader = res.body?.getReader();
+  if (!reader) throw new Error(`${what} returned an empty response`);
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > max) throw new Error(`${what} response exceeds ${max} bytes`);
+      chunks.push(value);
+    }
+  } finally {
+    await reader.cancel();
+  }
+  return Buffer.concat(chunks).toString('utf8');
+}
+
 export async function sendJson(f: Fetch, what: string, url: string, init: RequestInit): Promise<unknown> {
   const res = await f(url, init);
   const text = await res.text();

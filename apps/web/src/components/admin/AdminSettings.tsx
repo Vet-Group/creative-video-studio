@@ -22,6 +22,9 @@ interface Settings {
   models: Model[];
   vertexActiveProject: string | null;
   vertexAccounts: VertexAccount[];
+  balanceWarningUsd: string;
+  replicateCreditUsd: string | null;
+  replicateCreditSince: string | null;
 }
 interface VertexAccount {
   projectId: string;
@@ -64,6 +67,8 @@ function SettingsForm({ settings, reload }: { settings: Settings; reload: () => 
   const [features, setFeatures] = useState(settings.featuresMonthlyCapUsd);
   const [memberDay, setMemberDay] = useState(settings.memberDailyUsdCap);
   const [memberMonth, setMemberMonth] = useState(settings.memberMonthlyUsdCap);
+  const [warning, setWarning] = useState(settings.balanceWarningUsd);
+  const [replicate, setReplicate] = useState(settings.replicateCreditUsd ?? '');
   const softOf = (s: Settings) => Object.fromEntries(s.featureCaps.map((c) => [c.feature, c.monthlyUsd]));
   const enabledOf = (s: Settings) => Object.fromEntries(s.models.map((m) => [m.id, m.enabled]));
   const [soft, setSoft] = useState(() => softOf(settings));
@@ -83,6 +88,8 @@ function SettingsForm({ settings, reload }: { settings: Settings; reload: () => 
     differs(features, settings.featuresMonthlyCapUsd) ||
     differs(memberDay, settings.memberDailyUsdCap) ||
     differs(memberMonth, settings.memberMonthlyUsdCap) ||
+    differs(warning, settings.balanceWarningUsd) ||
+    (replicate.trim() ? settings.replicateCreditUsd === null || Number(replicate) !== Number(settings.replicateCreditUsd) : settings.replicateCreditUsd !== null) ||
     settings.featureCaps.some((c) => differs(soft[c.feature], c.monthlyUsd)) ||
     settings.models.some((m) => enabled[m.id] !== m.enabled) ||
     settings.vertexAccounts.some((a) => {
@@ -98,6 +105,8 @@ function SettingsForm({ settings, reload }: { settings: Settings; reload: () => 
     setFeatures(settings.featuresMonthlyCapUsd);
     setMemberDay(settings.memberDailyUsdCap);
     setMemberMonth(settings.memberMonthlyUsdCap);
+    setWarning(settings.balanceWarningUsd);
+    setReplicate(settings.replicateCreditUsd ?? '');
     setSoft(softOf(settings));
     setEnabled(enabledOf(settings));
     setVertex(vertexOf(settings));
@@ -115,6 +124,8 @@ function SettingsForm({ settings, reload }: { settings: Settings; reload: () => 
             featuresMonthlyCapUsd: features,
             memberDailyUsdCap: memberDay,
             memberMonthlyUsdCap: memberMonth,
+            balanceWarningUsd: warning,
+            replicateCreditUsd: replicate.trim() || null,
             featureCaps: settings.featureCaps.map((c) => ({ feature: c.feature, monthlyUsd: soft[c.feature] })),
             models: settings.models.map((m) => ({ id: m.id, enabled: enabled[m.id] })),
             vertexAccounts: settings.vertexAccounts.map((a) => {
@@ -156,6 +167,20 @@ function SettingsForm({ settings, reload }: { settings: Settings; reload: () => 
           <Field label="Ngân sách tháng cho ảnh và ứng dụng" unit="USD" value={features} onChange={setFeatures} hint="Trần chung của cả công ty. Chạm mức thì các trang này không bấm Run được tới ngày 1 tháng sau." />
           <Field label="Hạn mức mỗi Member mỗi ngày" unit="USD" value={memberDay} onChange={setMemberDay} />
           <Field label="Hạn mức mỗi Member mỗi tháng" unit="USD" value={memberMonth} onChange={setMemberMonth} />
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Số dư nhà cung cấp</legend>
+        <p className="muted">Số dư hiện trên trang Chi phí; nạp tiền ở trang thanh toán của từng nhà cung cấp.</p>
+        <div className="fields">
+          <Field label="Ngưỡng cảnh báo số dư" unit="USD" value={warning} onChange={setWarning} hint="Số dư dưới mức này hiện màu đỏ trên trang Chi phí." />
+          <Field
+            label="Số tiền đã nạp vào Replicate"
+            unit="USD"
+            value={replicate}
+            onChange={setReplicate}
+            hint={`Replicate không có API số dư: app lấy số này trừ chi phí Replicate ghi trong sổ cái từ lúc lưu. Nhập số mới thì đếm lại từ lúc lưu; còn dưới 2 USD thì hệ thống tự tắt các mô hình Replicate và bật bản fal tương ứng. Để trống nếu không theo dõi.${settings.replicateCreditSince ? ` Nhập lúc ${new Date(settings.replicateCreditSince).toLocaleString('vi-VN')}.` : ''}`}
+          />
         </div>
       </fieldset>
       <fieldset>
