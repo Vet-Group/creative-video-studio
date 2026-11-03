@@ -154,10 +154,12 @@ const VERTEX_ERROR: Record<string, (project: string) => string> = {
 export const VertexError = ({ projectId, reason, message }: { projectId: string; reason: string; message: string }) => (
   <>
     <p className="error">{(VERTEX_ERROR[reason] ?? VERTEX_ERROR.failed!)(projectId)}</p>
-    <details className="raw">
-      <summary>Chi tiết</summary>
-      <pre>{message.slice(0, 500)}</pre>
-    </details>
+    {message && (
+      <details className="raw">
+        <summary>Chi tiết</summary>
+        <pre>{message.slice(0, 500)}</pre>
+      </details>
+    )}
   </>
 );
 const usd4 = (n: number | null) => (n === null ? '—' : `$${n.toFixed(4)}`);

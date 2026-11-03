@@ -29,6 +29,12 @@ test('the folded answer is capped at 500 characters', () => {
   expect(html).toContain(`<pre>${'x'.repeat(500)}</pre>`);
 });
 
+test('an empty error message shows the sentence without an empty Chi tiết block', () => {
+  const html = renderToStaticMarkup(<VertexError projectId="p-1" reason="failed" message="" />);
+  expect(sentence(html)).toBe('Không đọc được billing của p-1.');
+  expect(html).not.toContain('<details');
+});
+
 test('an unknown reason falls back to the generic sentence', () => {
   expect(sentence(renderToStaticMarkup(<VertexError projectId="p-1" reason="other" message="boom" />))).toBe('Không đọc được billing của p-1.');
 });
