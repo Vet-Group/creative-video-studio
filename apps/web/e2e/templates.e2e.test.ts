@@ -123,7 +123,7 @@ test('Dùng mẫu này on a company result in Ví dụ fills Try On, Image Gener
   await expect(other).toHaveURL((u) => u.pathname === '/try-on' && u.search === ''); // in place, as Fash's Recreate
   await expect(other.getByLabel('Người mẫu: ảnh đã chọn').getByRole('img')).toHaveAttribute('alt', 'use-person.png');
   await expect(other.getByLabel('Trang phục: ảnh đã chọn').getByRole('img')).toHaveAttribute('alt', 'use-garment.png');
-  await expect(other.getByRole('textbox', { name: 'Prompt (tuỳ chọn)' })).toHaveValue(''); // the creator's own words stay theirs
+  await expect(other.getByRole('textbox', { name: 'Prompt (tuỳ chọn)' })).toHaveValue('blue coat'); // a result's words are open to every member too (owner, 2026-11-03)
 
   await other.goto('/image-generation');
   await use(ids.image).click();

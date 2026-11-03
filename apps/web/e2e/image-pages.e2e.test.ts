@@ -362,7 +362,7 @@ test('Image Generation: the bar needs a prompt (and an image only on a model wit
   await libraryChip(page, 'Tạo ảnh');
   const mine = page.getByRole('article').filter({ hasText: 'E2E Member 10' });
   await expect(mine).toHaveCount(1);
-  await expect(mine.getByText('Mock image E2E · 1:1 · 2K')).toBeVisible();
+  await expect(mine.getByText('Mock image E2E', { exact: true })).toBeVisible(); // the ratio and resolution are in its detail view
   for (const chip of ['Thử đồ', 'Tất cả video', 'Ứng dụng']) {
     await page.getByRole('group', { name: 'Loại' }).getByRole('button', { name: chip, exact: true }).click();
     await expect(mine).toHaveCount(0);

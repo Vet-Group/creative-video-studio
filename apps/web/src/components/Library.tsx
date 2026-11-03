@@ -4,6 +4,7 @@ import { type CSSProperties, type ReactNode, useCallback, useEffect, useRef, use
 import { api, type Clip, errorText, sendJson } from '@/lib/api';
 import { FAULTS } from '@/lib/faults';
 import { featureLabel } from '@/lib/features';
+import { HOOKS, LOCATIONS } from '@/lib/marketing';
 import { activeFilters, type LibraryFilters, type LibraryView, libraryQuery, matchesVerdict, NO_FILTERS, readView, saveView, type VerdictFilter } from '@/lib/library-view';
 import { reuseHref } from '@/lib/reuse';
 import { Icon } from './Icon';
@@ -37,18 +38,44 @@ interface StoreOption {
   hidden: boolean;
 }
 
-/** The Pass, featured Pass and Fail marks (Fail asks for the fault) on an item its viewer may edit: the grid card, the list row and the detail view. */
-function VerdictMarks({ clip, onChange }: { clip: Clip; onChange: (c: Clip) => void }) {
+/** Keys that type into a field are not shortcuts. */
+// A focused player keeps its own keys too: ←/→ seek there.
+const typing = (t: EventTarget | null) => t instanceof HTMLElement && (t.isContentEditable || ['INPUT', 'SELECT', 'TEXTAREA', 'VIDEO', 'AUDIO'].includes(t.tagName));
+
+/**
+ * The Pass, featured Pass and Fail marks (Fail asks for the fault) on an item its viewer may edit: the grid card, the list row and the detail view.
+ * With `keys` (the detail view) 1, 2 and 3 press Pass, featured Pass and Fail, which then focuses the fault list.
+ */
+function VerdictMarks({ clip, onChange, keys = false }: { clip: Clip; onChange: (c: Clip) => void; keys?: boolean }) {
   const [failing, setFailing] = useState(false);
   const [fault, setFault] = useState('');
   const [problem, setProblem] = useState('');
+  const faultList = useRef<HTMLSelectElement>(null);
   const noun = clip.mediaType === 'image' ? 'ảnh' : 'clip';
+  const latest = useRef({ clip, onChange });
+  latest.current = { clip, onChange };
+
+  useEffect(() => {
+    if (!keys) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.repeat || e.ctrlKey || e.metaKey || e.altKey || typing(e.target) || !['1', '2', '3'].includes(e.key)) return;
+      e.preventDefault();
+      if (e.key === '3') setFailing(true);
+      else void mark(e.key === '1' ? { verdict: 'pass' } : { verdict: 'pass', featured: true });
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [keys]); // mark reads the latest clip through a ref
+  useEffect(() => {
+    if (failing && keys) faultList.current?.focus();
+  }, [failing, keys]);
 
   async function mark(body: { verdict: 'pass'; featured?: boolean } | { verdict: 'fail'; fault: string }) {
     setProblem('');
     try {
-      const r = await api<{ verdict: NonNullable<Clip['verdict']> }>(`/api/jobs/${clip.id}/verdict`, sendJson('PUT', body));
-      onChange({ ...clip, verdict: r.verdict });
+      const { clip: now, onChange: changed } = latest.current; // a shortcut's listener outlives the render that added it
+      const r = await api<{ verdict: NonNullable<Clip['verdict']> }>(`/api/jobs/${now.id}/verdict`, sendJson('PUT', body));
+      changed({ ...now, verdict: r.verdict });
       setFailing(false);
       setFault('');
     } catch {
@@ -74,7 +101,7 @@ function VerdictMarks({ clip, onChange }: { clip: Clip; onChange: (c: Clip) => v
         <>
           <label>
             Lỗi gặp phải
-            <select value={fault} onChange={(e) => setFault(e.target.value)}>
+            <select ref={faultList} value={fault} onChange={(e) => setFault(e.target.value)}>
               <option value="">Chọn lỗi</option>
               {FAULTS.map((f) => (
                 <option key={f.id} value={f.id}>
@@ -93,23 +120,19 @@ function VerdictMarks({ clip, onChange }: { clip: Clip; onChange: (c: Clip) => v
   );
 }
 
-/** `stores` is given to Admins only: it switches on the store control. A `list` row keeps the clip actions and the marks; the store stays on the grid card. */
-function ClipCard({ clip, view, stores, select, onChange, onDeleted, onOpen }: { clip: Clip; view: LibraryView; stores?: StoreOption[]; select?: ReactNode; onChange: (c: Clip) => void; onDeleted: (id: string) => void; onOpen: () => void }) {
+/** An item's mark in a few words, for its badge: Pass, featured, or Fail with the fault. */
+const verdictText = (v: Clip['verdict']) => v && (v.verdict === 'fail' ? `Không đạt · ${faultLabel(v.fault)}` : v.featured ? 'Nổi bật' : 'Đạt');
+const verdictClass = (v: NonNullable<Clip['verdict']>) => (v.verdict === 'fail' ? ' fail' : v.featured ? ' featured' : '');
+
+/** A grid card puts the result first: its type and length on the media, the mark in its corner, the actions over it on hover (always on touch), two short lines under it and the marks for whoever may edit; Reuse and the store live in the detail view. A `list` row keeps the clip actions and the marks. */
+function ClipCard({ clip, view, select, onChange, onDeleted, onOpen }: { clip: Clip; view: LibraryView; select?: ReactNode; onChange: (c: Clip) => void; onDeleted: (id: string) => void; onOpen: () => void }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [problem, setProblem] = useState('');
   const [saving, setSaving] = useState(false);
   const image = clip.mediaType === 'image';
   const noun = image ? 'ảnh' : 'clip';
-
-  async function reassign(storeId: string) {
-    setProblem('');
-    try {
-      await api(`/api/admin/jobs/${clip.id}/store`, sendJson('PUT', { storeId: storeId || null }));
-      onChange({ ...clip, storeId: storeId || null });
-    } catch {
-      setProblem('Không đổi được cửa hàng.');
-    }
-  }
+  const mark = verdictText(clip.verdict);
+  const video = useRef<HTMLVideoElement>(null);
 
   async function remove() {
     setProblem('');
@@ -164,7 +187,6 @@ function ClipCard({ clip, view, stores, select, onChange, onDeleted, onOpen }: {
 
   if (view === 'list') {
     const thumb = image ? clip.videoAssetId : clip.posterAssetId;
-    const verdict = clip.verdict && (clip.verdict.verdict === 'fail' ? `Không đạt · ${faultLabel(clip.verdict.fault)}` : clip.verdict.featured ? 'Nổi bật' : 'Đạt');
     return (
       <article className="lib-row" aria-label={name}>
         {select}
@@ -176,7 +198,7 @@ function ClipCard({ clip, view, stores, select, onChange, onDeleted, onOpen }: {
             {clip.modelLabel}
             {clip.feature !== 'video' && clip.prompt && <span className="tag feature-tag">{featureLabel(clip.feature)}</span>}
             {clip.isMock && <span className="badge">MOCK</span>}
-            {verdict && <span className={`lib-mark${clip.verdict!.verdict === 'fail' ? ' fail' : ''}`}>{verdict}</span>}
+            {mark && <span className={`lib-mark${verdictClass(clip.verdict!)}`}>{mark}</span>}
           </p>
           <p className={clip.prompt ? 'lib-row-prompt' : 'lib-row-prompt none'} title={clip.prompt ?? undefined}>
             {clip.prompt ?? featureLabel(clip.feature)}
@@ -208,72 +230,58 @@ function ClipCard({ clip, view, stores, select, onChange, onDeleted, onOpen }: {
     );
   }
 
+  const tools = (
+    <div className="lib-tools">
+      <button type="button" className="favorite icon-button" aria-pressed={clip.favorite} disabled={saving} onClick={() => void toggleFavorite()} aria-label="Yêu thích" title="Yêu thích">
+        <Icon name="star" />
+      </button>
+      <button type="button" className="icon-button" onClick={() => void download()} aria-label="Tải xuống" title="Tải xuống">
+        <Icon name="download" />
+      </button>
+      {clip.canEdit && (
+        <button type="button" className="danger icon-button" onClick={() => setConfirmDelete(true)} aria-label="Xóa" title="Xóa">
+          <Icon name="x" />
+        </button>
+      )}
+    </div>
+  );
+  // A video plays muted while a mouse rests on it, so the grid can be skimmed without opening each item.
+  const play = (on: boolean) => {
+    const v = video.current;
+    if (v) on ? void v.play().catch(() => undefined) : v.pause();
+  };
   return (
-    <article className="card" aria-label={name}>
+    <article className="card lib-card" aria-label={name}>
       {select}
-      {image ? (
-        <img className="output" src={`/api/assets/${clip.videoAssetId}/content`} alt={clip.downloadName} loading="lazy" />
-      ) : (
-        <video
-          controls
-          playsInline
-          preload="metadata"
-          poster={clip.posterAssetId ? `/api/assets/${clip.posterAssetId}/content` : undefined}
-          src={`/api/assets/${clip.videoAssetId}/content`}
-          className={clip.ratio === '1:1' ? 'square' : 'tall'}
-        />
-      )}
-      <p>
-        <strong>{clip.creator.name}</strong>
-        {clip.feature !== 'video' && <span className="tag feature-tag">{featureLabel(clip.feature)}</span>}
-        {clip.isMock && <span className="badge">MOCK</span>}
-      </p>
-      <p className="muted">
-        {fmtTime(clip.createdAt)} · {clip.modelLabel} · {clip.ratio} · {image ? clip.resolution : `${clip.durationSec} giây`}
-      </p>
-      <p>
-        Chi phí thật: ${clip.costUsd}
-        {!clip.costFinal && <span className="tag">Tạm tính</span>}
-      </p>
-      {clip.verdict && (
-        <p>{clip.verdict.verdict === 'fail' ? `Kết quả: Không đạt (${faultLabel(clip.verdict.fault)})` : clip.verdict.featured ? 'Kết quả: Đạt · Nổi bật' : 'Kết quả: Đạt'}</p>
-      )}
-      {stores && (
-        <label>
-          Cửa hàng
-          <select value={clip.storeId ?? ''} onChange={(e) => void reassign(e.target.value)}>
-            <option value="">Không gắn cửa hàng</option>
-            {stores
-              .filter((s) => !s.hidden || s.id === clip.storeId)
-              .map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-          </select>
-        </label>
-      )}
-
-      <div className="actions">
-        <button type="button" className="favorite icon-button" aria-pressed={clip.favorite} disabled={saving} onClick={() => void toggleFavorite()} aria-label="Yêu thích" title="Yêu thích">
-          <Icon name="star" />
-        </button>
-        <button type="button" className="icon-button" onClick={() => void download()} aria-label="Tải xuống" title="Tải xuống">
-          <Icon name="download" />
-        </button>
-        <button type="button" className="icon-button" onClick={onOpen} aria-label="Xem chi tiết" title="Xem chi tiết">
-          <Icon name="eye" />
-        </button>
-        {reuseHref(clip) && (
-          <Link href={reuseHref(clip)!} className="button">
-            Dùng lại
-          </Link>
+      <div className="lib-media" onPointerEnter={(e) => e.pointerType === 'mouse' && play(true)} onPointerLeave={() => play(false)}>
+        {image ? (
+          <img className="output" src={`/api/assets/${clip.videoAssetId}/content`} alt={clip.downloadName} loading="lazy" />
+        ) : (
+          <video ref={video} muted loop playsInline preload="metadata" poster={clip.posterAssetId ? `/api/assets/${clip.posterAssetId}/content` : undefined} src={`/api/assets/${clip.videoAssetId}/content`} />
         )}
-        {clip.canEdit && (
-          <button type="button" className="danger icon-button" onClick={() => setConfirmDelete(true)} aria-label="Xóa" title="Xóa">
-            <Icon name="x" />
-          </button>
+        {/* Over the media rather than around it, so the picture keeps its own name for screen readers. */}
+        <button type="button" className="lib-open" onClick={onOpen} aria-label="Xem chi tiết" title="Xem chi tiết" />
+        <span className="lib-chips">
+          {clip.feature !== 'video' && <span className="lib-chip">{featureLabel(clip.feature)}</span>}
+          {!image && <span className="lib-chip">{clip.durationSec}s</span>}
+          {clip.isMock && <span className="badge">MOCK</span>}
+        </span>
+        {mark && (
+          <span className={`lib-verdict${verdictClass(clip.verdict!)}`} title={`Kết quả: ${mark}`}>
+            {mark}
+          </span>
         )}
+        {tools}
+      </div>
+      <div className="lib-info">
+        <p className="lib-title">{clip.modelLabel}</p>
+        <p className="lib-meta">
+          {clip.creator.name} · {fmtTime(clip.createdAt)} ·{' '}
+          <span title={clip.costFinal ? 'Chi phí thật' : 'Chi phí thật, tạm tính'}>
+            ${clip.costUsd}
+            {!clip.costFinal && '*'}
+          </span>
+        </p>
       </div>
       {clip.canEdit && <VerdictMarks clip={clip} onChange={onChange} />}
       {confirm}
@@ -282,34 +290,70 @@ function ClipCard({ clip, view, stores, select, onChange, onDeleted, onOpen }: {
   );
 }
 
-/** What the detail view reads from GET /api/jobs/:id beyond the Library row. */
+/** What the detail view reads from GET /api/jobs/:id beyond the Library row: the recipe behind the result. */
 interface ClipInputs {
   prompt: string | null;
   presetId: string | null;
+  enhance: boolean | null;
+  enhancedPrompt: string | null;
+  audio: string | null;
   brief: string | null;
+  script: string | null;
   format: string | null;
+  hook: string | null;
+  location: string | null;
   images: { id: string; filename: string }[];
 }
+const NO_INPUTS: ClipInputs = { prompt: null, presetId: null, enhance: null, enhancedPrompt: null, audio: null, brief: null, script: null, format: null, hook: null, location: null, images: [] };
+
+/** The preset names, read once per page load for the detail view's template row; a failed read is tried again next time. */
+let presetNames: Promise<Map<string, string>> | null = null;
+const loadPresetNames = () =>
+  (presetNames ??= api<{ presets: { id: string; label: string }[] }>('/api/presets').then(
+    (r) => new Map(r.presets.map((p) => [p.id, p.label])),
+    () => ((presetNames = null), new Map<string, string>()),
+  ));
+/** A Marketing choice's name; a member's own hook or location shows as their own. */
+const choiceName = (list: { id: string; name: string }[], id: string | null) => id && (list.find((c) => c.id === id)?.name ?? 'Tự tạo');
 
 /**
- * Fash's item detail (survey L3): the result large on the left; beside it the title, the words behind it, the inputs, the length and ratio
- * chips, the date, download / fullscreen / open in a new tab / copy the words, and Dùng lại; arrows step through the loaded items.
+ * Fash's item detail (survey L3), grown into the recipe of the result: the result large on the left; beside it the title and mark, the words behind it
+ * (the creator's prompt, or Marketing's brief and script, the enhanced prompt and the prompt the model got), the inputs, the model, template and
+ * settings, who made it, when and for how much, the store for an Admin, download / fullscreen / open in a new tab / copy, the marks and Reuse.
+ * Arrows and ←/→ step through the loaded items; 1, 2 and 3 mark.
  */
-function ClipDetail({ clips, index, onIndex, onChange }: { clips: Clip[]; index: number; onIndex: (i: number | null) => void; onChange: (c: Clip) => void }) {
+function ClipDetail({ clips, index, stores, onIndex, onChange }: { clips: Clip[]; index: number; stores?: StoreOption[]; onIndex: (i: number | null) => void; onChange: (c: Clip) => void }) {
   const clip = clips[index]!;
   const image = clip.mediaType === 'image';
   const [job, setJob] = useState<ClipInputs | null>(null);
+  const [presets, setPresets] = useState<Map<string, string>>(new Map());
   const [note, setNote] = useState('');
   const media = useRef<HTMLVideoElement & HTMLImageElement>(null);
   const content = (id: string) => `/api/assets/${id}/content`;
   useEffect(() => {
     setJob(null);
     setNote('');
-    api<ClipInputs>(`/api/jobs/${clip.id}`).then(setJob, () => setJob({ prompt: null, presetId: null, brief: null, format: null, images: [] }));
+    api<ClipInputs>(`/api/jobs/${clip.id}`).then(setJob, () => setJob(NO_INPUTS));
   }, [clip.id]);
-  // The creator's own words: their brief (shown to them only), else a free prompt on Create video and Image Generation; others are composed.
-  const text = job && (job.brief ?? ((clip.feature === 'video' && !job.presetId) || clip.feature === 'image' ? job.prompt : null));
+  useEffect(() => void loadPresetNames().then(setPresets), []);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey || typing(e.target) || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+      const next = index + (e.key === 'ArrowLeft' ? -1 : 1);
+      if (next < 0 || next >= clips.length) return;
+      e.preventDefault();
+      onIndex(next);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [index, clips.length, onIndex]);
+
+  // The creator's own words: a free prompt on Create video and Image Generation; Marketing keeps a brief and a script; the other features compose theirs.
+  const own = job && ((clip.feature === 'video' && !job.presetId) || clip.feature === 'image' ? job.prompt : null);
+  const sent = job?.prompt && job.prompt !== own ? job.prompt : null; // what the model got, when it is not the creator's words as typed
   const title = clip.feature === 'marketing' ? (job?.format === 'advanced' ? 'Marketing nâng cao' : 'UGC Thử đồ') : featureLabel(clip.feature);
+  const copyText = own ?? job?.brief ?? job?.prompt ?? null;
+  const mark = verdictText(clip.verdict);
 
   async function act(what: () => Promise<unknown>, fail: string) {
     setNote('');
@@ -328,7 +372,27 @@ function ClipDetail({ clips, index, onIndex, onChange }: { clips: Clip[]; index:
       a.click();
       a.remove();
     }, 'Không tải xuống được.');
-  const copy = () => act(async () => (await navigator.clipboard.writeText(text ?? ''), setNote('Đã sao chép.')), 'Không sao chép được.');
+  const copy = () => act(async () => (await navigator.clipboard.writeText(copyText ?? ''), setNote('Đã sao chép.')), 'Không sao chép được.');
+  const reassign = (storeId: string) =>
+    act(async () => {
+      await api(`/api/admin/jobs/${clip.id}/store`, sendJson('PUT', { storeId: storeId || null }));
+      onChange({ ...clip, storeId: storeId || null });
+    }, 'Không đổi được cửa hàng.');
+
+  const words = (label: string, text: string | null | undefined) =>
+    text && (
+      <div className="recipe-text">
+        <h3>{label}</h3>
+        <p>{text}</p>
+      </div>
+    );
+  const row = (label: string, value: string | null | undefined) =>
+    value && (
+      <div>
+        <dt>{label}</dt>
+        <dd>{value}</dd>
+      </div>
+    );
 
   return (
     <Modal open onClose={() => onIndex(null)} label={`Chi tiết: ${title}`} className="lightbox">
@@ -340,25 +404,65 @@ function ClipDetail({ clips, index, onIndex, onChange }: { clips: Clip[]; index:
         )}
       </div>
       <div className="lightbox-side">
-        <h2>{title}</h2>
-        {text && <p className="job-text">{text}</p>}
-        {job && job.images.length > 0 && clip.feature !== 'motion_control' && (
-          <ul className="job-inputs" aria-label="Ảnh đầu vào">
-            {job.images.map((i) => (
-              <li key={i.id}>
-                <img src={content(i.id)} alt={i.filename} />
-              </li>
-            ))}
-          </ul>
+        <h2>
+          {title}
+          {mark && <span className={`lib-mark${verdictClass(clip.verdict!)}`}>{mark}</span>}
+        </h2>
+        {words(clip.feature === 'marketing' ? 'Mô tả' : 'Prompt', own ?? job?.brief)}
+        {words('Lời thoại', job?.script)}
+        {job?.enhance && words('Prompt sau khi AI cải thiện', job.enhancedPrompt)}
+        {sent && (
+          <details className="recipe-sent">
+            <summary>Prompt gửi cho mô hình</summary>
+            <p>{sent}</p>
+          </details>
         )}
-        <p className="job-chips">
-          <span>{image ? clip.resolution : `${clip.durationSec}s`}</span>
-          <span>{clip.ratio}</span>
-        </p>
-        <p className="job-when">
-          {clip.creator.name} · {fmtTime(clip.createdAt)}
-        </p>
-        {note && <p className="muted" role="status">{note}</p>}
+        {job && job.images.length > 0 && clip.feature !== 'motion_control' && (
+          <div className="recipe-text">
+            <h3>Ảnh đầu vào</h3>
+            <ul className="job-inputs" aria-label="Ảnh đầu vào">
+              {job.images.map((i) => (
+                <li key={i.id}>
+                  <a href={content(i.id)} target="_blank" rel="noreferrer" title="Mở ảnh trong tab mới">
+                    <img src={content(i.id)} alt={i.filename} />
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        <dl className="recipe" aria-label="Cách tạo">
+          {row('Mô hình', clip.modelLabel)}
+          {row('Mẫu', job?.presetId && (presets.get(job.presetId) ?? job.presetId))}
+          {row('Hook', choiceName(HOOKS, job?.hook ?? null))}
+          {row('Bối cảnh', choiceName(LOCATIONS, job?.location ?? null))}
+          {row('Tỉ lệ', clip.ratio)}
+          {row(image ? 'Độ phân giải' : 'Thời lượng', image ? clip.resolution : `${clip.durationSec} giây`)}
+          {row('Âm thanh', job?.audio === 'on' ? 'Có' : job?.audio === 'off' ? 'Không' : null)}
+          {row('AI cải thiện', job?.enhance ? 'Có' : null)}
+          {row('Người tạo', `${clip.creator.name} · ${fmtTime(clip.createdAt)}`)}
+          {row('Chi phí thật', `$${clip.costUsd}${clip.costFinal ? '' : ' (tạm tính)'}`)}
+        </dl>
+        {stores && (
+          <label className="recipe-store">
+            Cửa hàng
+            <select value={clip.storeId ?? ''} onChange={(e) => void reassign(e.target.value)}>
+              <option value="">Không gắn cửa hàng</option>
+              {stores
+                .filter((s) => !s.hidden || s.id === clip.storeId)
+                .map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+            </select>
+          </label>
+        )}
+        {note && (
+          <p className="muted" role="status">
+            {note}
+          </p>
+        )}
         <div className="job-actions">
           <button type="button" className="icon-button" onClick={() => void download()} aria-label="Tải xuống" title="Tải xuống">
             <Icon name="download" />
@@ -369,13 +473,14 @@ function ClipDetail({ clips, index, onIndex, onChange }: { clips: Clip[]; index:
           <a className="icon-button" href={content(clip.videoAssetId)} target="_blank" rel="noreferrer" aria-label="Mở trong tab mới" title="Mở trong tab mới">
             <Icon name="external" />
           </a>
-          {text && (
+          {copyText && (
             <button type="button" className="icon-button" onClick={() => void copy()} aria-label="Sao chép mô tả" title="Sao chép mô tả">
               <Icon name="copy" />
             </button>
           )}
         </div>
-        {clip.canEdit && <VerdictMarks key={clip.id} clip={clip} onChange={onChange} />}
+        {clip.canEdit && <VerdictMarks key={clip.id} clip={clip} onChange={onChange} keys />}
+        {clip.canEdit && <p className="recipe-keys">Phím tắt: 1 Đạt · 2 Nổi bật · 3 Không đạt · ←/→ mục trước, sau</p>}
         {reuseHref(clip) && (
           <Link href={reuseHref(clip)!} className="lightbox-reuse">
             Dùng lại
@@ -393,6 +498,85 @@ function ClipDetail({ clips, index, onIndex, onChange }: { clips: Clip[]; index:
         </button>
       )}
     </Modal>
+  );
+}
+
+/**
+ * The selection bar's own actions: Pass, or Fail with one fault, for the picked items the viewer may edit, and for an Admin one store for every
+ * picked item. Each item is saved on its own, so one refusal does not stop the rest; the note says how many were saved and why others were not.
+ */
+function BulkActions({ ids, clips, stores, onChange }: { ids: string[]; clips: Clip[]; stores?: StoreOption[]; onChange: (c: Clip) => void }) {
+  const [fault, setFault] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState('');
+  const picked = clips.filter((c) => ids.includes(c.id));
+  const editable = picked.filter((c) => c.canEdit);
+
+  async function each(items: Clip[], save: (c: Clip) => Promise<Clip>) {
+    setBusy(true);
+    setNote('');
+    let saved = 0;
+    for (const c of items) {
+      try {
+        onChange(await save(c));
+        saved++;
+      } catch {} // counted below
+    }
+    setBusy(false);
+    const skipped = picked.length - items.length;
+    const failed = items.length - saved;
+    setNote([`Đã lưu ${saved} mục`, skipped > 0 && `bỏ qua ${skipped} mục không phải của bạn`, failed > 0 && `${failed} mục chưa lưu được`].filter(Boolean).join(', ') + '.');
+  }
+  // A bulk Pass keeps a featured item featured: the Explore cards show those first.
+  const mark = (body: { verdict: 'pass' } | { verdict: 'fail'; fault: string }) =>
+    each(editable, async (c) => {
+      const sent = body.verdict === 'pass' && c.verdict?.featured ? { verdict: 'pass', featured: true } : body;
+      return { ...c, verdict: (await api<{ verdict: NonNullable<Clip['verdict']> }>(`/api/jobs/${c.id}/verdict`, sendJson('PUT', sent))).verdict };
+    });
+  const store = (storeId: string) =>
+    each(picked, async (c) => (await api(`/api/admin/jobs/${c.id}/store`, sendJson('PUT', { storeId: storeId || null })), { ...c, storeId: storeId || null }));
+
+  return (
+    <span className="bulk-actions" role="group" aria-label="Chấm nhiều mục">
+      <button type="button" disabled={busy || editable.length === 0} onClick={() => void mark({ verdict: 'pass' })}>
+        Đạt
+      </button>
+      <label>
+        <span className="sr-only">Lỗi cho Không đạt</span>
+        <select value={fault} disabled={busy || editable.length === 0} onChange={(e) => setFault(e.target.value)}>
+          <option value="">Lỗi gặp phải…</option>
+          {FAULTS.map((f) => (
+            <option key={f.id} value={f.id}>
+              {f.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <button type="button" disabled={busy || !fault || editable.length === 0} onClick={() => void mark({ verdict: 'fail', fault })}>
+        Không đạt
+      </button>
+      {stores && (
+        <label>
+          <span className="sr-only">Gắn cửa hàng cho các mục chọn</span>
+          <select value="" disabled={busy} onChange={(e) => e.target.value && void store(e.target.value === 'none' ? '' : e.target.value)}>
+            <option value="">Gắn cửa hàng…</option>
+            <option value="none">Không gắn cửa hàng</option>
+            {stores
+              .filter((s) => !s.hidden)
+              .map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+          </select>
+        </label>
+      )}
+      {note && (
+        <span className="bulk-note" role="status">
+          {note}
+        </span>
+      )}
+    </span>
   );
 }
 
@@ -421,7 +605,6 @@ function EmptyArt({ search }: { search?: boolean }) {
 }
 
 export function Library() {
-  const zip = useZipDownload({ hover: true });
   const [detail, setDetail] = useState<number | null>(null); // the item open in the detail view, by its place in the list
   const [filters, setFilters] = useState<LibraryFilters>(NO_FILTERS);
   const [search, setSearch] = useState(''); // the search box; its words reach the filters once typing pauses
@@ -434,12 +617,23 @@ export function Library() {
   const [stores, setStores] = useState<StoreOption[]>([]);
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [guide, setGuide] = useState(false);
+  const [unmarked, setUnmarked] = useState(0); // the items the viewer may mark that have no mark yet, for the verdict filter
   const latest = useRef(0);
   const set = (patch: Partial<LibraryFilters>) => setFilters((cur) => ({ ...cur, ...patch }));
   const active = activeFilters(filters);
   // An item that no longer matches Favourites only or the verdict filter leaves the list, so the next page's offset stays right; the detail view then shows the next one.
-  const update = (next: Clip) =>
+  const counted = useRef(new Set<string>()); // first marks already taken off the count: two quick marks on one item see the same unmarked render
+  const uncount = (c: Clip | undefined) => {
+    if (!c || c.verdict || !c.canEdit || counted.current.has(c.id)) return;
+    counted.current.add(c.id);
+    setUnmarked((n) => Math.max(0, n - 1));
+  };
+  const update = (next: Clip) => {
+    if (next.verdict) uncount(clips.find((x) => x.id === next.id)); // a first mark
     setClips((cur) => ((filters.favoritesOnly && !next.favorite) || !matchesVerdict(filters.verdict, next.verdict) ? cur.filter((x) => x.id !== next.id) : cur.map((x) => (x.id === next.id ? next : x))));
+  };
+  // Declared after `update`: the bar renders the bulk actions while this hook runs.
+  const zip = useZipDownload({ hover: true, actions: (ids) => <BulkActions ids={ids} clips={clips} stores={isAdmin ? stores : undefined} onChange={update} /> });
   useEffect(() => {
     if (detail !== null && !clips[detail]) setDetail(null); // the last item left the list under a filter
   }, [clips, detail]);
@@ -448,9 +642,10 @@ export function Library() {
     async (offset: number) => {
       const ticket = ++latest.current;
       try {
-        const r = await api<{ hasMore: boolean; isAdmin: boolean; creators: { id: string; name: string }[]; clips: Clip[] }>(`/api/library?${libraryQuery(filters, offset)}`);
+        const r = await api<{ hasMore: boolean; isAdmin: boolean; unmarked: number; creators: { id: string; name: string }[]; clips: Clip[] }>(`/api/library?${libraryQuery(filters, offset)}`);
         if (ticket !== latest.current) return;
         setIsAdmin(r.isAdmin);
+        setUnmarked(r.unmarked);
         setClips((cur) => (offset > 0 ? [...cur, ...r.clips] : r.clips));
         setCreators(r.creators);
         setHasMore(r.hasMore);
@@ -577,7 +772,7 @@ export function Library() {
           <span>Kết quả</span>
           <select value={filters.verdict} onChange={(e) => set({ verdict: e.target.value as VerdictFilter })}>
             <option value="">Tất cả</option>
-            <option value="none">Chưa chấm</option>
+            <option value="none">Chưa chấm{unmarked > 0 ? ` (${unmarked})` : ''}</option>
             <option value="pass">Đạt</option>
             <option value="featured">Nổi bật</option>
             <option value="fail">Không đạt</option>
@@ -640,15 +835,17 @@ export function Library() {
             key={c.id}
             clip={c}
             view={view}
-            stores={isAdmin ? stores : undefined}
             select={zip.check(c.id, c.downloadName)}
             onChange={update}
-            onDeleted={(id) => setClips((cur) => cur.filter((x) => x.id !== id))}
+            onDeleted={(id) => {
+              uncount(clips.find((x) => x.id === id));
+              setClips((cur) => cur.filter((x) => x.id !== id));
+            }}
             onOpen={() => setDetail(i)}
           />
         ))}
       </div>
-      {detail !== null && clips[detail] && <ClipDetail clips={clips} index={detail} onIndex={setDetail} onChange={update} />}
+      {detail !== null && clips[detail] && <ClipDetail clips={clips} index={detail} stores={isAdmin ? stores : undefined} onIndex={setDetail} onChange={update} />}
       {hasMore && (
         <button type="button" className="library-more" onClick={() => void load(clips.length)}>
           Tải thêm

@@ -78,6 +78,9 @@ export const USERS = {
   setb: { email: 'setb@e2e.test', name: 'E2E Settings B', role: 'member' },
   explorea: { email: 'explorea@e2e.test', name: 'E2E Explore Lan', role: 'member' }, // explore.e2e: the greeting by given name and the Continue strip
   libv: { email: 'libv@e2e.test', name: 'E2E Library View', role: 'member' }, // library.e2e: grid or list, the selection bar, search and the empty states
+  // library.e2e: libra marks from the detail view and in bulk, librb owns the item libra may read but not mark.
+  libra: { email: 'libra@e2e.test', name: 'E2E Library Recipe A', role: 'member' },
+  librb: { email: 'librb@e2e.test', name: 'E2E Library Recipe B', role: 'member' },
   thema: { email: 'thema@e2e.test', name: 'E2E Theme A', role: 'member' }, // theme.e2e: light, dark or the system's theme from Settings
   admin: { email: 'admin@e2e.test', name: 'E2E Admin', role: 'admin' },
 } as const;

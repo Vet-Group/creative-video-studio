@@ -42,6 +42,7 @@ function TrayItem({ job, isAdmin }: { job: TrayJob; isAdmin: boolean }) {
   const { refresh } = useJobs();
   const [problem, setProblem] = useState('');
   const failure = FAILURE_TEXT(job.resolution ? 'ảnh' : 'clip')[job.status];
+  const thumb = job.posterAssetId ?? (job.resolution ? job.outputAssetId : null); // an image job's output is its own picture
   async function retry() {
     if (!confirmRun(job.estimateUsd, `Thử lại job này với giá khoảng $${job.estimateUsd}?`)) return;
     setProblem('');
@@ -54,7 +55,7 @@ function TrayItem({ job, isAdmin }: { job: TrayJob; isAdmin: boolean }) {
   }
   return (
     <li className={`job job-${job.status}`}>
-      {job.posterAssetId && <img className="job-poster" src={`/api/assets/${job.posterAssetId}/content`} alt="" />}
+      {thumb && <img className="job-poster" src={`/api/assets/${thumb}/content`} alt="" />}
       <div className="job-body">
         <p>
           <strong>{STATUS_LABEL[job.status]}</strong>
@@ -66,8 +67,12 @@ function TrayItem({ job, isAdmin }: { job: TrayJob; isAdmin: boolean }) {
         </p>
         {failure && <p className="error">{failure}</p>}
         {isAdmin && job.error && <p className="muted">{job.error}</p>}
-        {job.status === 'succeeded' && <Link href="/library">Xem trong Thư viện</Link>}
-        {reuseHref(job) && <Link href={reuseHref(job)!}>Dùng lại</Link>}
+        {(job.status === 'succeeded' || reuseHref(job)) && (
+          <p className="job-links">
+            {job.status === 'succeeded' && <Link href="/library">Xem trong Thư viện</Link>}
+            {reuseHref(job) && <Link href={reuseHref(job)!}>Dùng lại</Link>}
+          </p>
+        )}
         {RETRYABLE.includes(job.status) && !job.retried && !job.retryOf && (
           <button type="button" onClick={() => void retry()}>
             Thử lại
@@ -367,8 +372,8 @@ function NavProgress() {
 /** The pages that show their own History tab instead of the tray beside them. */
 const OWN_HISTORY = ['/create', '/try-on', '/image-generation', '/marketing-studio'];
 
-/** Explore and the Apps index give the full width to their card grids, as on the live site, and the Admin pages to their tables; the jobs show in Library and in the History tabs. */
-const NO_TRAY = ['/explore', '/apps'];
+/** Explore, the Apps index and the Library give the full width to their grids (the Library already lists every result), and the Admin pages to their tables; the jobs show in Library and in the History tabs. */
+const NO_TRAY = ['/explore', '/apps', '/library'];
 
 /** The app pages have a History tab too; the coming-soon pages keep the tray. */
 const hasOwnHistory = (path: string): boolean => {

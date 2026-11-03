@@ -211,6 +211,21 @@ describe('GET /api/library', () => {
     expect(await lib(`?verdict=none&creator=${bob.id}`)).toEqual([]);
   });
 
+  test('counts the unmarked items the caller may mark: their own, or every one for an Admin', async () => {
+    const unmarked = async (cookie: string) => ((await (await GET_LIBRARY(req('/api/library', cookie))).json()) as { unmarked: number }).unmarked;
+    const before = { alice: await unmarked(alice.cookie), bob: await unmarked(bob.cookie), admin: await unmarked(admin.cookie) };
+    // A switched-off model of their own, so these clips leave the model scores the later tests check alone.
+    await pool.query(
+      `insert into model_configs (id, provider, endpoint, label, ratios, durations_sec, max_images, output_resolution, usd_per_second, sources, enabled) values ('um-model', 'fal', 'x', 'Unmarked count', '{9:16}', '{8}', 2, '720p', 0.1, '{}', false)`,
+    );
+    await clip(alice.id, { id: 'um-a1', model: 'um-model' });
+    const marked = await clip(alice.id, { id: 'um-a2', model: 'um-model' });
+    await pool.query(`insert into verdicts (id, job_id, output_asset_id, verdict, fault, featured, marked_by) values ('um1', $1, $1 || '-video', 'pass', null, false, $2)`, [marked, alice.id]);
+    expect(await unmarked(alice.cookie)).toBe(before.alice + 1); // her new unmarked clip; the marked one does not count
+    expect(await unmarked(bob.cookie)).toBe(before.bob); // he may not mark hers
+    expect(await unmarked(admin.cookie)).toBe(before.admin + 1);
+  });
+
   test.each(['?date=2026-13-45', '?date=yesterday', '?ratio=16:9', '?offset=-1', '?offset=x', '?favorites=0', '?sort=random', '?verdict=good', '?verdict=', '?verdict=toString'])('answers 400 for %s', async (query) => {
     expect((await GET_LIBRARY(req(`/api/library${query}`, bob.cookie))).status).toBe(400);
   });
@@ -366,12 +381,12 @@ describe('images in the Library', () => {
     expect(tray.jobs.find((j) => j.id === video)).toMatchObject({ feature: 'video', resolution: null });
     expect(await (await GET_JOB(req(`/api/jobs/${id}`, alice.cookie), ctx(id))).json()).toMatchObject({ feature: 'image', resolution: '4K', durationSec: 0 });
   });
-  test("returns a Marketing job's own inputs for reuse: hook, location and format to anyone who may see it, the brief and the script to the creator only", async () => {
+  test("returns a Marketing job's own inputs for reuse and the Library recipe: hook, location, format, the brief and the script to anyone who may see it", async () => {
     const id = await clip(alice.id, { id: 'mkt-reuse' });
     await pool.query(`update jobs set feature = 'marketing', params = $2 where id = $1`, [id, { format: 'advanced', audio: 'on', hook: 'product-catch', location: 'bedroom', brief: 'my brief', script: 'my lines' }]);
     const as = async (cookie: string) => (await (await GET_JOB(req(`/api/jobs/${id}`, cookie), ctx(id))).json()) as Record<string, unknown>;
     expect(await as(alice.cookie)).toMatchObject({ format: 'advanced', hook: 'product-catch', location: 'bedroom', brief: 'my brief', script: 'my lines' });
-    for (const cookie of [bob.cookie, admin.cookie]) expect(await as(cookie)).toMatchObject({ format: 'advanced', hook: 'product-catch', location: 'bedroom', brief: null, script: null });
+    for (const cookie of [bob.cookie, admin.cookie]) expect(await as(cookie)).toMatchObject({ format: 'advanced', hook: 'product-catch', location: 'bedroom', brief: 'my brief', script: 'my lines' });
   });
 });
 

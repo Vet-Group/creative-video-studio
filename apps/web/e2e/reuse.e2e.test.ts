@@ -50,7 +50,8 @@ test('the reuse link in History refills a UGC job, and an Advanced job opens on 
   await expect.poll(async () => ((await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { status: string }[] }).jobs.filter((j) => j.status === 'succeeded').length, { timeout: 60_000 }).toBe(2);
   await page.goto('/library');
   const card = page.getByRole('article').filter({ hasText: 'E2E Mkt E' }).first();
-  await expect(card.getByRole('link', { name: 'Dùng lại' })).toHaveAttribute('href', /^\/marketing-studio\?reuse=/);
+  await card.getByRole('button', { name: 'Xem chi tiết' }).click();
+  await expect(page.getByRole('dialog').getByRole('link', { name: 'Dùng lại' })).toHaveAttribute('href', /^\/marketing-studio\?reuse=/);
 });
 
 test('the reuse link refills Try On (person, garments, background, text, model, ratio, resolution), Image Generation and an app', async ({ page }) => {
