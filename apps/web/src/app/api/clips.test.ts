@@ -189,6 +189,9 @@ describe('GET /api/library', () => {
     expect(await lib('?ratio=1:1')).toEqual(['lib-a']);
     expect(await lib('?ratio=9:16')).toEqual(['lib-b']);
     expect(await lib(`?creator=${bob.id}&ratio=1:1`)).toEqual([]);
+    // The last days count from today in Ho Chi Minh time; both ran in October 2026, so a week ago or more by now (e2e covers today's items).
+    expect(await lib('?days=7')).toEqual([]);
+    expect(await lib('?days=1')).toEqual([]);
   });
 
   test('filters by verdict: unmarked, any Pass, featured only, or Fail', async () => {
@@ -226,7 +229,7 @@ describe('GET /api/library', () => {
     expect(await unmarked(admin.cookie)).toBe(before.admin + 1);
   });
 
-  test.each(['?date=2026-13-45', '?date=yesterday', '?ratio=16:9', '?offset=-1', '?offset=x', '?favorites=0', '?sort=random', '?verdict=good', '?verdict=', '?verdict=toString'])('answers 400 for %s', async (query) => {
+  test.each(['?date=2026-13-45', '?date=yesterday', '?days=2', '?days=', '?ratio=16:9', '?offset=-1', '?offset=x', '?favorites=0', '?sort=random', '?verdict=good', '?verdict=', '?verdict=toString'])('answers 400 for %s', async (query) => {
     expect((await GET_LIBRARY(req(`/api/library${query}`, bob.cookie))).status).toBe(400);
   });
 

@@ -43,6 +43,7 @@ export async function GET(request: Request) {
   const q = new URL(request.url).searchParams;
   const creator = q.get('creator');
   const date = q.get('date');
+  const days = q.get('days');
   const ratio = q.get('ratio');
   const kind = q.get('kind') ?? 'all';
   const favorites = q.get('favorites');
@@ -52,6 +53,7 @@ export async function GET(request: Request) {
   const offset = Number(q.get('offset') ?? 0);
   const day = date === null ? null : new Date(`${date}T00:00:00Z`);
   if (date !== null && (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(day!.getTime()) || day!.toISOString().slice(0, 10) !== date)) return bad('date must be a valid YYYY-MM-DD');
+  if (days !== null && !['1', '7', '30'].includes(days)) return bad('days must be 1, 7 or 30');
   if (ratio !== null && !(ASPECTS as readonly string[]).includes(ratio)) return bad(`ratio must be one of ${ASPECTS.join(', ')}`);
   if (!Object.hasOwn(KINDS, kind)) return bad(`kind must be one of ${Object.keys(KINDS).join(', ')}`);
   if (verdict !== null && !Object.hasOwn(VERDICTS, verdict)) return bad(`verdict must be one of ${Object.keys(VERDICTS).join(', ')}`);
@@ -75,6 +77,7 @@ export async function GET(request: Request) {
         where ${LIVE_CLIP}
           and ($1::text is null or j.user_id = $1)
           and ($2::date is null or (j.created_at at time zone 'Asia/Ho_Chi_Minh')::date = $2::date)
+          and ($9::int is null or (j.created_at at time zone 'Asia/Ho_Chi_Minh')::date > (now() at time zone 'Asia/Ho_Chi_Minh')::date - $9::int)
           and ($3::text is null or j.aspect = $3)
           and ${KINDS[kind]}
           and ${verdict === null ? 'true' : VERDICTS[verdict]}
@@ -82,7 +85,7 @@ export async function GET(request: Request) {
           and ($8::text is null or m.label ilike $8 or ${OWN_PROMPT} ilike $8)
         order by j.created_at ${sort === 'oldest' ? 'asc' : 'desc'}, j.id ${sort === 'oldest' ? 'asc' : 'desc'} limit $4 offset $5`,
       // The words match literally: LIKE's own wildcards and escape are escaped.
-      [creator, date, ratio, PAGE + 1, offset, me.id, favorites === '1', text === null ? null : `%${text.replace(/[\\%_]/g, '\\$&')}%`],
+      [creator, date, ratio, PAGE + 1, offset, me.id, favorites === '1', text === null ? null : `%${text.replace(/[\\%_]/g, '\\$&')}%`, days === null ? null : Number(days)],
     ),
     pool.query(`select distinct u.id, u.name from jobs j join users u on u.id = j.user_id where ${LIVE_CLIP} order by u.name, u.id`),
     pool.query(`select count(*)::int as n from jobs j where ${LIVE_CLIP} and ($1::boolean or j.user_id = $2) and not exists (select 1 from verdicts v where v.job_id = j.id)`, [me.role === 'admin', me.id]),

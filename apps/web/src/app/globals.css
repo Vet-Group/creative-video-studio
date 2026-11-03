@@ -2151,3 +2151,14 @@ dialog.modal.tool-guide { width: min(52rem, calc(100vw - 2rem)); }
 @media (min-width: 720px) { .explore-start .tool-goals { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (min-width: 1200px) { .explore-start .tool-goals { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 .explore-tool-text { display: -webkit-box; padding: 0 12px 12px; overflow: hidden; font-size: 12px; line-height: 17px; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
+
+/* Explore's first-visit card: three steps, closed for good with its button. */
+.welcome { position: relative; margin: 16px 0 0; padding: 16px 48px 16px 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--fill); }
+.welcome h2 { margin: 0 0 8px; color: var(--ink-strong); font-size: 15px; line-height: 22px; font-weight: 600; }
+.welcome ol { display: grid; gap: 6px; margin: 0; padding-left: 20px; color: var(--text-2); font-size: 14px; line-height: 21px; }
+.welcome strong { color: var(--ink); font-weight: 600; }
+.welcome a, .welcome .link-button { color: var(--ink-strong); font-weight: 500; text-decoration: underline; text-underline-offset: 3px; }
+.welcome .link-button .icon { display: none; }
+.welcome-close { position: absolute; top: 8px; right: 8px; display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 8px; background: none; color: var(--text-muted); }
+.welcome-close:hover { background: var(--surface); color: var(--ink); }
+@media (pointer: coarse) { .welcome-close { width: 44px; height: 44px; top: 2px; right: 2px; } }
