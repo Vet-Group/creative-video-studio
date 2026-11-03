@@ -192,6 +192,16 @@ describe('GET /api/library', () => {
     // The last days count from today in Ho Chi Minh time; both ran in October 2026, so a week ago or more by now (e2e covers today's items).
     expect(await lib('?days=7')).toEqual([]);
     expect(await lib('?days=1')).toEqual([]);
+    // Whole days back from now keep the same Vietnam clock time, so a week ago is the first day left out.
+    const ago = (d: number) => new Date(Date.now() - d * 86_400_000).toISOString();
+    await clip(alice.id, { id: 'lib-now', createdAt: ago(0) });
+    await clip(alice.id, { id: 'lib-6d', createdAt: ago(6) });
+    await clip(alice.id, { id: 'lib-7d', createdAt: ago(7) });
+    expect(await lib('?days=1')).toEqual(['lib-now']);
+    expect(await lib('?days=7')).toEqual(['lib-now', 'lib-6d']);
+    expect((await lib('?days=30')).slice(0, 3)).toEqual(['lib-now', 'lib-6d', 'lib-7d']);
+    // Out of the later lists and scores: deleted, on a disabled model (costs are append-only, so the rows stay).
+    await pool.query(`update jobs set deleted_at = now(), model = 'kling-o3-pro' where id = any($1)`, [['lib-now', 'lib-6d', 'lib-7d']]);
   });
 
   test('filters by verdict: unmarked, any Pass, featured only, or Fail', async () => {

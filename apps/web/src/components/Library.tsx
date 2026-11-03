@@ -668,7 +668,8 @@ export function Library() {
         setState('ready');
         return r.hasMore ? r.clips.length : null;
       } catch {
-        if (ticket === latest.current) setState('error');
+        if (ticket !== latest.current) return undefined;
+        setState('error');
       }
       return null;
     },
@@ -677,6 +678,7 @@ export function Library() {
 
   // Coming back to the Library with the same filters loads as many items as were shown and scrolls back to the same place.
   const restoring = useRef(true);
+  const loadingMore = useRef(false); // also held while restoring, so the end of the list does not load pages twice
   const shown = useRef({ query: '', count: 0 });
   shown.current = { query: libraryQuery(filters, 0), count: clips.length };
   useEffect(() => {
@@ -687,7 +689,14 @@ export function Library() {
       restoring.current = false;
       const saved = readPlace();
       if (!saved || saved.query !== libraryQuery(filters, 0)) return;
-      for (let n = got ?? 0; typeof got === 'number' && n < Math.min(saved.count, MAX_RESTORE); n += got ?? 0) got = await load(n);
+      loadingMore.current = true;
+      try {
+        let n = 0;
+        while (typeof got === 'number' && got > 0 && (n += got) < Math.min(saved.count, MAX_RESTORE)) got = await load(n);
+      } finally {
+        loadingMore.current = false;
+      }
+      if (got === undefined) return; // the filters changed meanwhile
       setTimeout(() => window.scrollTo(0, saved.y), 50); // after the restored pages have rendered
     })();
   }, [load]);
@@ -712,16 +721,15 @@ export function Library() {
 
   // More items load as the end comes near; the Tải thêm button stays for the keyboard.
   const moreButton = useRef<HTMLButtonElement>(null);
-  const loadingMore = useRef(false);
   const loadMore = useCallback(async () => {
     if (loadingMore.current) return;
     loadingMore.current = true;
     try {
-      await load(clips.length);
+      await load(shown.current.count);
     } finally {
       loadingMore.current = false;
     }
-  }, [load, clips.length]);
+  }, [load]);
   useEffect(() => {
     const el = moreButton.current;
     if (!el || !hasMore || state !== 'ready') return;
