@@ -2,6 +2,7 @@
 // The prompt's tools: AI suggestions (three options from the worker), the member's recent words on this page, and a tall editor bound to the same
 // text, with an undo for the last pick. In the prompt composer they sit in the box's toolbar; in the Image Generation bar (`compact`) they are
 // round icons beside the text, so the bar's foot keeps one row. Only one list is open at a time; Escape or a click outside closes it.
+// Translate shows a Vietnamese reading of English text for the staff to read; the prompt itself stays English (the models read it best).
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
 import { runKey } from '@/lib/run-guard';
@@ -9,9 +10,9 @@ import { Icon } from './Icon';
 import { useJobs } from './jobs';
 import { Modal } from './Modal';
 import s from './PromptComposer.module.css';
-import { type Ask, useSuggest } from './Suggestions';
+import { type Ask, isVietnamese, useSuggest, useTranslate } from './Suggestions';
 
-export type PromptPart = 'ai' | 'recent' | 'clear' | 'expand';
+export type PromptPart = 'ai' | 'recent' | 'translate' | 'clear' | 'expand';
 
 interface Props {
   feature: string;
@@ -30,17 +31,20 @@ interface Props {
   compact?: boolean;
 }
 
-export function PromptTools({ feature, format, value, onChange, maxLength, onRun, ask, aiLabel = 'Gợi ý AI', parts = ['ai', 'recent', 'clear', 'expand'], compact }: Props) {
+export function PromptTools({ feature, format, value, onChange, maxLength, onRun, ask, aiLabel = 'Gợi ý AI', parts = ['ai', 'recent', 'translate', 'clear', 'expand'], compact }: Props) {
   const { jobs } = useJobs();
   const ai = useSuggest();
+  const tr = useTranslate(value.trim());
   const [prompts, setPrompts] = useState<string[]>([]);
-  const [open, setOpen] = useState<'ai' | 'recent' | null>(null);
+  const [open, setOpen] = useState<'ai' | 'recent' | 'vi' | null>(null);
+  // A reading is of the words it was asked for: new words close it.
+  useEffect(() => setOpen((o) => (o === 'vi' ? null : o)), [value]);
   const [editing, setEditing] = useState(false);
   const [undo, setUndo] = useState<{ before: string; after: string } | null>(null);
   const root = useRef<HTMLSpanElement>(null);
   const list = useRef<HTMLDivElement>(null);
   // An open list low in the form's scroll box would sit under Run: bring it into view, without moving the page when it already shows.
-  useEffect(() => void (open && list.current?.scrollIntoView({ block: 'nearest' })), [open, ai.options.length]);
+  useEffect(() => void (open && list.current?.scrollIntoView({ block: 'nearest' })), [open, ai.options.length, tr.vi]);
   const has = (p: PromptPart) => parts.includes(p);
 
   const load = useCallback(
@@ -102,6 +106,13 @@ export function PromptTools({ feature, format, value, onChange, maxLength, onRun
           {!compact && 'Hoàn tác'}
         </button>
       )}
+      {/* Only for words that are not Vietnamese already; not in the Image Generation bar, whose 2x2 icons would grow a third row. */}
+      {has('translate') && !compact && value.trim() && !isVietnamese(value) && (
+        <button type="button" className={btn} aria-expanded={open === 'vi'} onClick={() => (open === 'vi' ? setOpen(null) : (setOpen('vi'), tr.translate()))}>
+          <Icon name="translate" size={13} />
+          Dịch
+        </button>
+      )}
       {!compact && <span className={s.spacer} />}
       {/* Clear sits right, beside the editor; not in the Image Generation bar, whose 2x2 icons would grow a third row. */}
       {has('clear') && !compact && value && (
@@ -127,14 +138,43 @@ export function PromptTools({ feature, format, value, onChange, maxLength, onRun
             )}
           </div>
           {ai.busy && [0, 1, 2].map((i) => <span key={i} className={s.skeleton} />)}
-          {ai.options.map((o) => (
-            <button key={o} type="button" className={s.option} onClick={() => pick(o)}>
-              {o}
-            </button>
-          ))}
+          {/* Numbered to compare; the Vietnamese reading first to read fast, the English the field takes under it (owner, 2026-11-03). */}
+          {ai.options.map((o, i) => {
+            const vi = ai.meanings[i];
+            return (
+              <button key={o} type="button" className={s.option} onClick={() => pick(o)}>
+                <span className={s.optionLabel}>Gợi ý {i + 1}</span>
+                {vi && vi !== o ? (
+                  <>
+                    <span className={s.optionVi}>{vi}</span>
+                    <span className={s.optionEn} lang="en">
+                      {o}
+                    </span>
+                  </>
+                ) : (
+                  <span>{o}</span>
+                )}
+              </button>
+            );
+          })}
           {ai.error && (
             <p className={s.error} role="alert">
               {ai.error}
+            </p>
+          )}
+        </div>
+      )}
+      {open === 'vi' && (
+        <div ref={list} className={s.popover} role="group" aria-label="Bản dịch tiếng Việt" aria-busy={tr.busy}>
+          <div className={s.popHead}>
+            <span>Bản dịch tiếng Việt</span>
+          </div>
+          <p className={s.popNote}>Chỉ để đọc. Prompt gửi đi vẫn là tiếng Anh.</p>
+          {tr.busy && <span className={s.skeleton} />}
+          {tr.vi && <p className={s.translation}>{tr.vi}</p>}
+          {tr.error && (
+            <p className={s.error} role="alert">
+              {tr.error}
             </p>
           )}
         </div>

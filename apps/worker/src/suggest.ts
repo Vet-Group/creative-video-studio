@@ -12,16 +12,18 @@ export async function runSuggestion(pool: WorkerDeps['pool'], suggest: Suggester
   if (!run) return;
   try {
     if (!suggest) throw new Error('no suggester: FAL_KEY is not set');
-    const { options, costUsd } = await suggest(run.input as SuggestInput);
-    await pool.query(`update suggestion_runs set status = 'succeeded', output = $2, cost_usd = $3 where id = $1 and status = 'queued'`, [runId, JSON.stringify(options), costUsd]);
+    const { options, meanings, costUsd } = await suggest(run.input as SuggestInput);
+    // An option with a Vietnamese reading is stored as { text, vi }, one without as its text (as every run before the readings).
+    const output = options.map((text, i) => (meanings?.[i] ? { text, vi: meanings[i] } : text));
+    await pool.query(`update suggestion_runs set status = 'succeeded', output = $2, cost_usd = $3 where id = $1 and status = 'queued'`, [runId, JSON.stringify(output), costUsd]);
   } catch (e) {
     await pool.query(`update suggestion_runs set status = 'failed' where id = $1 and status = 'queued'`, [runId]);
     throw e;
   }
 }
 
-/** The e2e worker's stand-in (CVS_FAKE_SUGGEST=1, never with a fal key): three numbered options built from the input, no network. */
-export const fakeSuggester: Suggester = async (i) => ({
-  options: [1, 2, 3].map((n) => `Option ${n}: ${i.text || i.field}`.slice(0, i.max)),
-  costUsd: 0,
-});
+/** The e2e worker's stand-in (CVS_FAKE_SUGGEST=1, never with a fal key): three numbered options built from the input with their readings, or one translation; no network. */
+export const fakeSuggester: Suggester = async (i) =>
+  i.field === 'translate'
+    ? { options: [`Translation: ${i.text}`], costUsd: 0 }
+    : { options: [1, 2, 3].map((n) => `Option ${n}: ${i.text || i.field}`.slice(0, i.max)), meanings: [1, 2, 3].map((n) => `Reading ${n}: ${i.text || i.field}`), costUsd: 0 };

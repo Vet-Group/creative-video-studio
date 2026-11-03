@@ -9,6 +9,7 @@ import { api, type TrayJob } from '@/lib/api';
 import { announce } from '@/lib/preferences';
 import { useTabReturn } from '@/lib/use-tab-return';
 import { Icon } from './Icon';
+import { isVietnamese, useTranslate } from './Suggestions';
 
 const POLL_MS = 5_000;
 const SEEN_KEY = 'cvs.tray.seenUntil';
@@ -76,6 +77,8 @@ export function Tap({ on, label, className, children }: { on?: () => void; label
 /** A job's or an example's words: four lines with show more for the rest (no inner scroll bar), copy, and beside a form a click puts them in its prompt box. */
 export function JobPrompt({ text, onUse }: { text: string; onUse?: () => void }) {
   const [open, setOpen] = useState(false);
+  const [reading, setReading] = useState(false);
+  const tr = useTranslate(text.trim());
   const [long, setLong] = useState(false);
   const [copied, setCopied] = useState<'ok' | 'failed' | null>(null);
   const box = useRef<HTMLDivElement>(null);
@@ -115,11 +118,24 @@ export function JobPrompt({ text, onUse }: { text: string; onUse?: () => void })
           <Icon name={copied === 'ok' ? 'check' : 'copy'} size={12} />
           {copied === 'ok' ? 'Đã chép' : copied === 'failed' ? 'Không chép được' : 'Sao chép'}
         </button>
+        {/* A Vietnamese reading of English words, to read only; the job keeps its prompt. */}
+        {!isVietnamese(text) && (
+          <button type="button" aria-expanded={reading} onClick={() => (setReading(!reading), !reading && tr.translate())}>
+            <Icon name="translate" size={12} />
+            {reading ? 'Ẩn bản dịch' : 'Dịch'}
+          </button>
+        )}
         {/* aria-live without role status: the card keeps its own status line (the save-as-template note), found by role. */}
         <span className="sr-only" aria-live="polite">
           {copied === 'ok' ? 'Đã chép prompt.' : copied === 'failed' ? 'Không sao chép được.' : ''}
         </span>
       </div>
+      {reading && (
+        <div className="job-translation" role="group" aria-label="Bản dịch tiếng Việt" aria-busy={tr.busy}>
+          {tr.busy ? 'Đang dịch…' : tr.vi}
+          {tr.error && <span role="alert">{tr.error}</span>}
+        </div>
+      )}
     </div>
   );
 }

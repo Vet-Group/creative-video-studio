@@ -52,5 +52,16 @@ test('a failed call or a missing suggester marks the run failed; a run past the 
 });
 
 test('the e2e stand-in answers three options from the text, within the limit', async () => {
-  expect(await fakeSuggester({ field: 'script', text: '', context: '', max: 12 })).toEqual({ options: ['Option 1: sc', 'Option 2: sc', 'Option 3: sc'], costUsd: 0 });
+  expect(await fakeSuggester({ field: 'script', text: '', context: '', max: 12 })).toEqual({
+    options: ['Option 1: sc', 'Option 2: sc', 'Option 3: sc'],
+    meanings: ['Reading 1: script', 'Reading 2: script', 'Reading 3: script'],
+    costUsd: 0,
+  });
+  expect(await fakeSuggester({ field: 'translate', text: 'slow turn', context: '', max: 100 })).toEqual({ options: ['Translation: slow turn'], costUsd: 0 });
+});
+
+test('an option with a Vietnamese reading is stored as text and vi, one without as its text', async () => {
+  const id = await queued();
+  await runSuggestion(pool, async () => ({ options: ['a', 'b'], meanings: ['nghĩa a', null], costUsd: 0 }), id);
+  expect((await row(id)).output).toEqual([{ text: 'a', vi: 'nghĩa a' }, 'b']);
 });

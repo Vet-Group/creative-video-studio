@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import { ENHANCE_MODEL, ENHANCE_URL } from './enhance';
-import { createFalSuggester, parseSuggestions, PROMPT_SYSTEM, PROMPT_TASKS, SCENE_SYSTEM, SUGGEST_SYSTEM, suggestPrompt } from './suggest';
+import { createFalSuggester, parseSuggestions, PROMPT_SYSTEM, PROMPT_TASKS, SCENE_SYSTEM, SUGGEST_SYSTEM, suggestPrompt, TRANSLATE_SYSTEM } from './suggest';
 
 const answer = (body: unknown, status = 200) => Promise.resolve(new Response(JSON.stringify(body), { status }));
 const input = { field: 'script' as const, text: 'váy linen mùa hè', context: 'The product crashes into the scene.', max: 40 };
@@ -14,7 +14,7 @@ test('asks the OpenRouter router for three options with the hook, location and t
       return answer({ output: '```json\n["Một", "Hai", "Ba"]\n```', usage: { cost: 0.0003 } });
     },
   });
-  expect(await suggest(input)).toEqual({ options: ['Một', 'Hai', 'Ba'], costUsd: 0.0003 });
+  expect(await suggest(input)).toEqual({ options: ['Một', 'Hai', 'Ba'], meanings: [null, null, null], costUsd: 0.0003 });
   expect(calls[0]!.url).toBe(ENHANCE_URL);
   const body = JSON.parse(String(calls[0]!.init.body));
   expect(body).toMatchObject({ model: ENHANCE_MODEL, system_prompt: SUGGEST_SYSTEM });
@@ -40,7 +40,7 @@ test('the prompt leaves out an empty context and empty notes', () => {
 });
 
 test('options are trimmed, cut to the limit, de-duplicated and at most three; a non-array or empty answer throws', () => {
-  expect(parseSuggestions('[" a ", "a", "' + 'x'.repeat(50) + '", "b", "c", 1]', 10)).toEqual(['a', 'x'.repeat(10), 'b']);
+  expect(parseSuggestions('[" a ", "a", "' + 'x'.repeat(50) + '", "b", "c", 1]', 10).options).toEqual(['a', 'x'.repeat(10), 'b']);
   expect(() => parseSuggestions('Here are some ideas', 10)).toThrow('not a JSON array');
   expect(() => parseSuggestions('{"a": 1}', 10)).toThrow('not a JSON array');
   expect(() => parseSuggestions('["  "]', 10)).toThrow('no options');
@@ -59,5 +59,20 @@ test("a tool's prompt asks for English under its own system prompt, naming the s
   expect(PROMPT_SYSTEM).toMatch(/plain, concrete English/);
   expect(bodies[0]!.prompt).toBe(`Write three different prompts, one or two sentences each, for ${PROMPT_TASKS.try_on}.
 The seller's notes: đứng ở bãi biển
-Each string at most 500 characters.`);
+Each text at most 500 characters.`);
+});
+
+test('each option may come with its Vietnamese reading: objects keep text and vi, plain strings and an empty vi have none', () => {
+  const answer = JSON.stringify([{ text: ' The creator turns slowly ', vi: ' Người mẫu xoay chậm ' }, 'Close-up of the fabric', { text: 'A walk', vi: '' }, { vi: 'no text' }]);
+  expect(parseSuggestions(answer, 100)).toEqual({ options: ['The creator turns slowly', 'Close-up of the fabric', 'A walk'], meanings: ['Người mẫu xoay chậm', null, null] });
+  // Every system prompt that writes options asks for the readings; the field is only ever filled with the text.
+  for (const system of [SUGGEST_SYSTEM, SCENE_SYSTEM, PROMPT_SYSTEM]) expect(system).toMatch(/\{"text": the suggestion, "vi": the same suggestion in natural Vietnamese/);
+});
+
+test('a translation sends the prompt under its own system prompt, cool and long enough, and answers one option with no reading', async () => {
+  const bodies: { system_prompt: string; prompt: string; temperature: number; max_tokens: number }[] = [];
+  const suggest = createFalSuggester({ apiKey: 'k', fetch: (_url, init) => (bodies.push(JSON.parse(String(init!.body))), answer({ output: '["Người mẫu xoay chậm dưới ánh sáng cửa sổ"]', usage: { cost: 0.0001 } })) });
+  expect(await suggest({ field: 'translate', text: 'The model turns slowly in window light', context: '', max: 10_000 })).toEqual({ options: ['Người mẫu xoay chậm dưới ánh sáng cửa sổ'], costUsd: 0.0001 });
+  expect(bodies[0]).toMatchObject({ system_prompt: TRANSLATE_SYSTEM, prompt: 'The prompt:\nThe model turns slowly in window light', temperature: 0.2, max_tokens: 3000 });
+  expect(TRANSLATE_SYSTEM).toMatch(/natural, plain Vietnamese/);
 });
