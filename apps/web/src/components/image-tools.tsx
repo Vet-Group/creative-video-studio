@@ -191,7 +191,7 @@ export async function photoImg(p: Photo): Promise<Img> {
 
 /** What a slot takes: the types and size POST /api/assets accepts (it checks the bytes; the browser's type and size are checked first, to say why before sending). */
 const KINDS = {
-  image: { what: 'Ảnh', types: ['image/jpeg', 'image/png', 'image/webp'], formats: 'JPEG, PNG hoặc WebP', max: MAX_BYTES },
+  image: { what: 'Ảnh', types: ['image/jpeg', 'image/jpg', 'image/pjpeg', 'image/png', 'image/webp'], formats: 'JPEG, PNG hoặc WebP', max: MAX_BYTES },
   video: { what: 'Video', types: ['video/mp4', 'video/quicktime'], formats: 'MP4 hoặc MOV', max: MAX_VIDEO_BYTES },
   audio: { what: 'Tệp âm thanh', types: ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-wav', 'audio/wave', 'audio/vnd.wave'], formats: 'MP3 hoặc WAV', max: MAX_AUDIO_BYTES },
 };
