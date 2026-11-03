@@ -11,7 +11,7 @@ import { Modal } from './Modal';
 import s from './PromptComposer.module.css';
 import { type Ask, useSuggest } from './Suggestions';
 
-export type PromptPart = 'ai' | 'recent' | 'expand';
+export type PromptPart = 'ai' | 'recent' | 'clear' | 'expand';
 
 interface Props {
   feature: string;
@@ -30,7 +30,7 @@ interface Props {
   compact?: boolean;
 }
 
-export function PromptTools({ feature, format, value, onChange, maxLength, onRun, ask, aiLabel = 'Gợi ý AI', parts = ['ai', 'recent', 'expand'], compact }: Props) {
+export function PromptTools({ feature, format, value, onChange, maxLength, onRun, ask, aiLabel = 'Gợi ý AI', parts = ['ai', 'recent', 'clear', 'expand'], compact }: Props) {
   const { jobs } = useJobs();
   const ai = useSuggest();
   const [prompts, setPrompts] = useState<string[]>([]);
@@ -102,13 +102,17 @@ export function PromptTools({ feature, format, value, onChange, maxLength, onRun
           {!compact && 'Hoàn tác'}
         </button>
       )}
+      {!compact && <span className={s.spacer} />}
+      {/* Clear sits right, beside the editor; not in the Image Generation bar, whose 2x2 icons would grow a third row. */}
+      {has('clear') && !compact && value && (
+        <button type="button" className={`${btn} ${s.iconTool}`} aria-label="Xoá prompt" title="Xoá prompt" onClick={() => pick('')}>
+          <Icon name="x" size={13} />
+        </button>
+      )}
       {has('expand') && (
-        <>
-          {!compact && <span className={s.spacer} />}
-          <button type="button" className={compact ? btn : `${s.tool} ${s.iconTool}`} aria-label="Mở rộng" title="Mở rộng" onClick={() => setEditing(true)}>
-            <Icon name="expand" size={13} />
-          </button>
-        </>
+        <button type="button" className={compact ? btn : `${s.tool} ${s.iconTool}`} aria-label="Mở rộng" title="Mở rộng" onClick={() => setEditing(true)}>
+          <Icon name="expand" size={13} />
+        </button>
       )}
 
       {open === 'ai' && (

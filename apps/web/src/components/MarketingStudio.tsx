@@ -719,7 +719,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
                 placeholder="Viết lời thoại bạn muốn nhân vật nói…"
                 ask={() => ({ field: 'script', format: 'advanced', text: script || prompt, hook: hooks[0], location: location || undefined })}
                 aiLabel="Gợi ý lời thoại"
-                parts={['ai', 'expand']}
+                parts={['ai', 'clear', 'expand']}
                 starters={[]}
                 // About two words a second (the About tab).
                 meta={words > 0 ? <span>{`${words} từ, khoảng ${Math.ceil(words / 2)} giây`}</span> : undefined}
