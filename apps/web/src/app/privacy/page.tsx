@@ -24,9 +24,9 @@ export default async function PrivacyPage() {
       <h2>Chia sẻ và lưu trữ</h2>
       <p>Chúng tôi không chia sẻ hay bán dữ liệu này cho bên thứ ba. Dữ liệu nằm trên máy chủ của VET và trong các bản sao lưu đã mã hóa của máy chủ đó.</p>
 
-      <h2>Xóa dữ liệu</h2>
+      <h2>Xoá dữ liệu</h2>
       <p>
-        Bạn có thể yêu cầu xóa dữ liệu của mình bất cứ lúc nào.{' '}
+        Bạn có thể yêu cầu xoá dữ liệu của mình bất cứ lúc nào.{' '}
         {support ? (
           <>
             Liên hệ: <a href={`mailto:${support}`}>{support}</a>.

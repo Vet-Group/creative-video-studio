@@ -17,7 +17,7 @@ const sentence = (html: string) => html.match(/<p class="error">([^<]*)<\/p>/)?.
 test('a Vertex 403 shows one short sentence with the fix, and Google raw answer folded under a closed Chi tiết', () => {
   const raw = 'bigquery tables: HTTP 403 { "error": { "code": 403, "message": "Access Denied: Dataset cvs-vertex:billing_export" } }';
   const html = renderToStaticMarkup(<VertexError projectId="cvs-vertex" reason="no_access" message={raw} />);
-  expect(sentence(html)).toBe('Chưa có quyền đọc billing export của cvs-vertex: cấp BigQuery Data Viewer và BigQuery Job User cho khóa của app.');
+  expect(sentence(html)).toBe('Chưa có quyền đọc billing export của cvs-vertex: cấp BigQuery Data Viewer và BigQuery Job User cho khoá của app.');
   expect(sentence(html)).not.toContain('HTTP 403');
   expect(html).toMatch(/<details class="raw"><summary>Chi tiết<\/summary><pre>bigquery tables: HTTP 403/);
   expect(html).not.toContain('<details class="raw" open');

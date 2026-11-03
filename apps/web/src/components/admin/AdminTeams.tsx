@@ -80,7 +80,7 @@ export function AdminTeams() {
             Tạo nhóm
           </button>
         </div>
-        <p className="muted">Nhóm không bao giờ bị xóa. Nhóm đã ẩn không còn được chọn cho người dùng mới; lịch sử chi phí giữ nguyên.</p>
+        <p className="muted">Nhóm không bao giờ bị xoá. Nhóm đã ẩn không còn được chọn cho người dùng mới; lịch sử chi phí giữ nguyên.</p>
       </fieldset>
       {problem && (
         <p className="error" role="alert">

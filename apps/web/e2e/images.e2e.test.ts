@@ -41,7 +41,7 @@ test('a mock image job made through the API is an image card under "Tất cả �
   await expect(image).toBeVisible();
   await expect.poll(() => image.evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0);
   await expect(card.locator('video')).toHaveCount(0);
-  for (const name of ['Tải xuống', 'Đạt', 'Nổi bật', 'Không đạt', 'Xóa']) await expect(card.getByRole('button', { name, exact: true })).toBeVisible();
+  for (const name of ['Tải xuống', 'Đạt', 'Nổi bật', 'Không đạt', 'Xoá']) await expect(card.getByRole('button', { name, exact: true })).toBeVisible();
   // The detail view tells how it was made, and its Reuse reopens Image Generation.
   await card.getByRole('button', { name: 'Xem chi tiết' }).click();
   const recipe = page.getByRole('dialog').getByRole('definition');
@@ -64,8 +64,8 @@ test('a mock image job made through the API is an image card under "Tất cả �
   const [download] = await Promise.all([page.waitForEvent('download'), card.getByRole('button', { name: 'Tải xuống' }).click()]);
   expect(download.suggestedFilename()).toMatch(new RegExp(`^${today()}-e2e-member-8-[0-9a-f]{8}\.png$`));
 
-  await card.getByRole('button', { name: 'Xóa' }).click();
-  await expect(page.getByRole('alertdialog', { name: 'Xác nhận xóa' })).toContainText('Xóa ảnh này?');
-  await page.getByRole('button', { name: 'Xác nhận xóa' }).click();
+  await card.getByRole('button', { name: 'Xoá' }).click();
+  await expect(page.getByRole('alertdialog', { name: 'Xác nhận xoá' })).toContainText('Xoá ảnh này?');
+  await page.getByRole('button', { name: 'Xác nhận xoá' }).click();
   await expect(card).toHaveCount(0);
 });

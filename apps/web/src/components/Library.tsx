@@ -159,7 +159,7 @@ function ClipCard({ clip, view, select, onChange, onDeleted, onOpen }: { clip: C
       await api(`/api/jobs/${clip.id}`, { method: 'DELETE' });
       onDeleted(clip.id);
     } catch {
-      setProblem(`Không xóa được ${noun}.`);
+      setProblem(`Không xoá được ${noun}.`);
     } finally {
       setSaving(false);
     }
@@ -195,13 +195,13 @@ function ClipCard({ clip, view, select, onChange, onDeleted, onOpen }: { clip: C
 
   const name = `${image ? 'Ảnh' : 'Clip'} ${clip.downloadName}`;
   const confirm = confirmDelete && (
-    <div className="actions" role="alertdialog" aria-label="Xác nhận xóa">
-      <span>Xóa {noun} này?</span>
+    <div className="actions" role="alertdialog" aria-label="Xác nhận xoá">
+      <span>Xoá {noun} này?</span>
       <button type="button" disabled={saving} onClick={() => void remove()}>
-        Xác nhận xóa
+        Xác nhận xoá
       </button>
       <button type="button" onClick={() => setConfirmDelete(false)}>
-        Hủy
+        Huỷ
       </button>
     </div>
   );
@@ -239,7 +239,7 @@ function ClipCard({ clip, view, select, onChange, onDeleted, onOpen }: { clip: C
             <Icon name="eye" />
           </button>
           {clip.canEdit && (
-            <button type="button" className="danger icon-button" onClick={() => setConfirmDelete(true)} aria-label="Xóa" title="Xóa">
+            <button type="button" className="danger icon-button" onClick={() => setConfirmDelete(true)} aria-label="Xoá" title="Xoá">
               <Icon name="x" />
             </button>
           )}
@@ -260,7 +260,7 @@ function ClipCard({ clip, view, select, onChange, onDeleted, onOpen }: { clip: C
         <Icon name="download" />
       </button>
       {clip.canEdit && (
-        <button type="button" className="danger icon-button" onClick={() => setConfirmDelete(true)} aria-label="Xóa" title="Xóa">
+        <button type="button" className="danger icon-button" onClick={() => setConfirmDelete(true)} aria-label="Xoá" title="Xoá">
           <Icon name="x" />
         </button>
       )}

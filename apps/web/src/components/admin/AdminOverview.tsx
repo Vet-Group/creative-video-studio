@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { LoadError } from '@/components/LoadError';
-import { useFetch } from '@/lib/admin-ui';
+import { auditLabel, useFetch } from '@/lib/admin-ui';
 import type { AdminOverview as Data } from '@/lib/overview';
 import { Empty, PageHead } from './PageHead';
 
@@ -60,7 +60,7 @@ export function AdminOverview() {
             <Link className="kpi" href="/admin/users">
               <p className="kpi-label">Người dùng hoạt động</p>
               <p className="kpi-value">{data.users.active}</p>
-              <p className="kpi-sub">{data.users.locked} tài khoản đã khóa</p>
+              <p className="kpi-sub">{data.users.locked} tài khoản đã khoá</p>
             </Link>
             <Link className="kpi" href="/admin/settings">
               <p className="kpi-label">Mô hình đang bật</p>
@@ -83,7 +83,9 @@ export function AdminOverview() {
                   <li key={e.id}>
                     <time dateTime={e.createdAt}>{fmtTime(e.createdAt)}</time>
                     <span className="recent-who">{e.actorName}</span>
-                    <code className="event">{e.action}</code>
+                    <code className="event" title={e.action}>
+                      {auditLabel(e.action)}
+                    </code>
                     <span className="recent-target" title={e.target}>
                       {e.target}
                     </span>

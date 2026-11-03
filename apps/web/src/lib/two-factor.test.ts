@@ -10,7 +10,7 @@ test('says why a code was refused, in Vietnamese', () => {
   expect(twoFactorFailure(refused(400, 'INVALID_PASSWORD'))).toBe('Mật khẩu không đúng.');
   expect(twoFactorFailure(refused(429, null, 42))).toBe('Bạn thử quá nhiều lần. Hãy đợi 42 giây rồi thử lại.');
   // The account lock is a 429 too, but has no wait the limiter counts.
-  expect(twoFactorFailure(refused(429, 'ACCOUNT_TEMPORARILY_LOCKED'))).toMatch(/tạm khóa 15 phút/);
+  expect(twoFactorFailure(refused(429, 'ACCOUNT_TEMPORARILY_LOCKED'))).toMatch(/tạm khoá 15 phút/);
   expect(twoFactorFailure(new Error('offline'))).toBe('Không xác thực được. Hãy thử lại sau.');
 });
 
