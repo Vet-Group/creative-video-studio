@@ -22,10 +22,11 @@ test('Gợi ý AI fills the brief with the picked option and can be undone, and 
   await ai.click();
   const options = page.getByRole('group', { name: 'Gợi ý AI' }).getByRole('button', { name: /^Option/ });
   await expect(options).toHaveText(['Option 1: váy linen mùa hè', 'Option 2: váy linen mùa hè', 'Option 3: váy linen mùa hè'], { timeout: 20_000 });
-  // The list hangs under the box, as wide as it.
+  // The list is the box's last row, under the toolbar and as wide as the box, so it pushes the fields below down instead of covering them.
   const box = (await brief.locator('..').boundingBox())!;
   const list = (await page.getByRole('group', { name: 'Gợi ý AI' }).boundingBox())!;
-  expect(list.y).toBeGreaterThan(box.y);
+  expect(list.y).toBeGreaterThan((await ai.boundingBox())!.y);
+  expect(list.y + list.height).toBeLessThanOrEqual(box.y + box.height + 1);
   expect(Math.abs(list.x - box.x)).toBeLessThanOrEqual(2);
   expect(Math.abs(list.width - box.width)).toBeLessThanOrEqual(3);
   let asks = 0;
@@ -70,6 +71,25 @@ test('every other prompt asks for its own tool: Create sends the video feature a
   await page.getByRole('group', { name: 'Gợi ý AI' }).getByRole('button', { name: /^Option 3/ }).click({ timeout: 20_000 });
   await expect(page.getByLabel('Mô tả chuyển động')).toHaveValue('Option 3: slow turn');
   expect(sent).toMatchObject({ field: 'prompt', feature: 'video', text: 'slow turn' });
+});
+
+test('a long suggestion shows its whole text in the narrow form column, with no inner scroll box', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await signIn(page, 'sugga');
+  await page.goto('/create');
+  const long = Array.from({ length: 12 }, (_, i) => `the creator turns the product slowly in soft window light, beat ${i + 1}`).join(', ');
+  await page.getByLabel('Mô tả chuyển động').fill(long);
+  await page.getByRole('button', { name: 'Gợi ý AI' }).click();
+  const group = page.getByRole('group', { name: 'Gợi ý AI' });
+  const first = group.getByRole('button', { name: /^Option 1/ });
+  await expect(first).toHaveText(/^Option 1: the creator turns .*, beat \d+/, { timeout: 20_000 });
+  // Every line shows: far more than the old three-line clamp, and nothing cut off inside the option or the list.
+  const fit = await first.evaluate((e) => ({ h: e.clientHeight, sh: e.scrollHeight, lh: parseFloat(getComputedStyle(e).lineHeight) }));
+  expect(fit.sh).toBeLessThanOrEqual(fit.h);
+  expect(fit.h).toBeGreaterThan(fit.lh * 6);
+  expect(await group.evaluate((e) => e.scrollHeight <= e.clientHeight)).toBe(true);
+  // The header reads at body size.
+  expect(await group.getByText('Chọn một gợi ý').evaluate((e) => getComputedStyle(e).fontSize)).toBe('13px');
 });
 
 test('a refused or failed run says so in Vietnamese', async ({ page }) => {
