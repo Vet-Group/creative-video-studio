@@ -2,7 +2,7 @@ export type Ratio = '9:16' | '1:1' | '16:9';
 
 export interface ModelConfig {
   id: string;
-  provider: 'fal' | 'replicate' | 'vertex' | 'mock';
+  provider: 'fal' | 'replicate' | 'vertex' | 'byteplus' | 'mock';
   /** The provider's model path. */
   endpoint: string;
   label: string;
@@ -23,7 +23,7 @@ export interface ModelConfig {
 /** An image model: priced per image and resolution, with no durations. `ratios` may include 'auto' (follow the input). */
 export interface ImageModelConfig {
   id: string;
-  provider: 'fal' | 'replicate' | 'vertex' | 'mock';
+  provider: 'fal' | 'replicate' | 'vertex' | 'byteplus' | 'mock';
   endpoint: string;
   label: string;
   ratios: string[];
@@ -51,7 +51,13 @@ export const FAL_TEXT_ENDPOINTS: Record<string, string> = {
 
 /** Whether an image model makes a picture from words alone, as Fash's text-to-image examples do: a fal edit endpoint with a text twin, a Gemini model on Vertex (generateContent takes text only), or a mock. */
 export const textToImage = (m: { provider: string; endpoint: string }): boolean =>
-  m.provider === 'mock' || (m.provider === 'vertex' ? m.endpoint.startsWith('gemini-') : Object.hasOwn(FAL_TEXT_ENDPOINTS, m.endpoint));
+  m.provider === 'mock' || m.provider === 'byteplus' || (m.provider === 'vertex' ? m.endpoint.startsWith('gemini-') : Object.hasOwn(FAL_TEXT_ENDPOINTS, m.endpoint));
+
+/** USD per input image after the first, by endpoint: Seedream 5.0 Pro on BytePlus (https://docs.byteplus.com/en/docs/modelark/model-pricing, read 2026-11-03); Flash input images are free. */
+export const EXTRA_INPUT_IMAGE_USD: Record<string, number> = { 'dola-seedream-5-0-pro-260628': 0.003 };
+
+/** What `images` input images add to an image job's price on this endpoint. */
+export const extraInputUsd = (endpoint: string, images: number): number => (Object.hasOwn(EXTRA_INPUT_IMAGE_USD, endpoint) ? Number((EXTRA_INPUT_IMAGE_USD[endpoint]! * Math.max(0, images - 1)).toFixed(4)) : 0);
 
 /** An image model row's prices (resolution to USD) at a thinking level: its `thinking_prices` for the level, or for the default (first) level when the job names none; else `image_prices`. */
 export function imagePricesFor(

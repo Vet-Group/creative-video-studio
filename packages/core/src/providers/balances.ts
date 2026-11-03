@@ -7,6 +7,7 @@ export const BILLING_URLS = {
   fal: 'https://fal.ai/dashboard/billing',
   vertex: 'https://console.cloud.google.com/billing',
   replicate: 'https://replicate.com/account/billing',
+  byteplus: 'https://console.byteplus.com/finance/overview',
 } as const;
 
 /** A balance under the Admin's warning threshold shows red; an unknown one never does. */

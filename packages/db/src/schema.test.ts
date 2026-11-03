@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { AUDIO_USD_PER_SECOND, BAKEOFF_MODELS } from '../../core/src/models';
+import { tokenCost } from '../../core/src/providers/byteplus';
 import { VIDEO_BODIES } from '../../core/src/providers/fal';
 import { PRESETS } from '../../core/src/presets';
 import { createTestDatabase } from './testing';
@@ -215,7 +216,7 @@ describe('migration 0031 Vertex models', () => {
     expect([tryOn.features, tryOn.ratios, tryOn.max_images]).toEqual([['try_on'], ['auto'], 2]);
   });
 
-  test('vertex is a provider for models and jobs, and an unknown one is still refused', async () => {
+  test('vertex and byteplus are providers for models and jobs, and an unknown one is still refused', async () => {
     await pool.query(`update model_configs set enabled = true where id = 'virtual-try-on-vertex'`);
     await pool.query(`update model_configs set enabled = false where id = 'virtual-try-on-vertex'`);
     const user = await insertUser();
@@ -224,7 +225,19 @@ describe('migration 0031 Vertex models', () => {
        values ($1, $2, 'team-unassigned', 'try_on', 'virtual-try-on-vertex', 'vertex', '', 'auto', 0, '{"resolution": "1K"}', '{}')`,
       [next(), user],
     );
-    await expect(pool.query(`update model_configs set provider = 'byteplus' where id = 'virtual-try-on-vertex'`)).rejects.toThrow(/model_configs_provider_check/);
+    await expect(pool.query(`update model_configs set provider = 'openai' where id = 'virtual-try-on-vertex'`)).rejects.toThrow(/model_configs_provider_check/);
+    await expect(
+      pool.query(
+        `insert into jobs (id, user_id, team_id, feature, model, provider, prompt, aspect, duration_s, params, input_asset_ids)
+         values ($1, $2, 'team-unassigned', 'try_on', 'virtual-try-on-vertex', 'openai', '', 'auto', 0, '{"resolution": "1K"}', '{}')`,
+        [next(), user],
+      ),
+    ).rejects.toThrow(/jobs_provider_check/);
+    await pool.query(
+      `insert into jobs (id, user_id, team_id, feature, model, provider, prompt, aspect, duration_s, params, input_asset_ids)
+       values ($1, $2, 'team-unassigned', 'image', 'seedream-5-pro-byteplus', 'byteplus', '', '1:1', 0, '{"resolution": "1K"}', '{}')`,
+      [next(), user],
+    );
   });
 });
 
@@ -248,7 +261,7 @@ describe('migration 0035 user choices', () => {
 
 describe('migration 0007 image models', () => {
   test('seeds the seven fal image models disabled, each with its prices, ratios and features', async () => {
-    const { rows } = await pool.query(`select id, endpoint, features, ratios, durations_sec, max_images, image_prices, usd_per_second, enabled, sources from model_configs where kind = 'image' and cardinality(features) > 0 and not features && ARRAY['character_swap', 'model_swap', 'background_changer', 'reframe', 'image_upscale', 'face_swap', 'background_remover']::text[] and id not like 'gpt-image-2.5%' and provider <> 'vertex' order by id`);
+    const { rows } = await pool.query(`select id, endpoint, features, ratios, durations_sec, max_images, image_prices, usd_per_second, enabled, sources from model_configs where kind = 'image' and cardinality(features) > 0 and not features && ARRAY['character_swap', 'model_swap', 'background_changer', 'reframe', 'image_upscale', 'face_swap', 'background_remover']::text[] and id not like 'gpt-image-2.5%' and provider = 'fal' order by id`);
     expect(rows.map((r) => [r.id, r.endpoint, r.features, r.image_prices])).toEqual([
       ['fashn-v1.6', 'fal-ai/fashn/tryon/v1.6', ['try_on'], { '1K': '0.075' }],
       ['gpt-image-2', 'openai/gpt-image-2/edit', ['image'], { '1K': '0.281', '2K': '0.301', '4K': '0.530' }],
@@ -495,7 +508,7 @@ describe('migration 0042 Veo 3.1 on Vertex', () => {
 
 describe('migration 0043 Seedance 2.0 label', () => {
   test('drops the provider suffix from the Replicate Seedance 2.0 label and changes nothing else', async () => {
-    const { rows } = await pool.query(`select id, label from model_configs where label like 'Seedance 2.0%' order by id`);
+    const { rows } = await pool.query(`select id, label from model_configs where label like 'Seedance 2.0%' and provider <> 'byteplus' order by id`);
     expect(rows).toEqual([
       { id: 'seedance-2.0', label: 'Seedance 2.0' },
       { id: 'seedance-2.0-reference', label: 'Seedance 2.0 Reference' },
@@ -519,6 +532,71 @@ describe('migration 0051 provider balances', () => {
   test('starts with no Replicate credit and a 10 USD balance warning', async () => {
     const { rows } = await pool.query('select replicate_credit_usd, replicate_credit_since, balance_warning_usd::text as warning from settings where id = 1');
     expect(rows).toEqual([{ replicate_credit_usd: null, replicate_credit_since: null, warning: '10.0000' }]);
+  });
+});
+
+describe('migration 0056 BytePlus', () => {
+  const link = (page: string) => `https://ai.byteplus.com/ark/region:ap-southeast-1/docs/${page}.md`;
+
+  test('adds the six Seedance rows disabled, at the list price per second of the row resolution (million-token price x tokens per second)', async () => {
+    const { rows } = await pool.query(
+      `select id, provider, endpoint, enabled, kind, features, ratios, durations_sec, max_images, output_resolution, usd_per_second::text as usd, billed_amount_field from model_configs where provider = 'byteplus' and kind = 'video' order by id`,
+    );
+    // tokens per second: 21,600 at 720p (1280x720), 48,960 at Seedance 1.0's 1080p (1920x1088); USD per million tokens from the pricing page, read 2026-11-03.
+    const per = (usdPerMillion: number, tokensPerSecond: number) => (Math.ceil((usdPerMillion * tokensPerSecond) / 100) / 10_000).toFixed(4);
+    const range = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => from + i);
+    const ratios = ['9:16', '1:1', '16:9', '4:3', '3:4'];
+    const row = (id: string, endpoint: string, durations: number[], maxImages: number, resolution: string, usd: string) => ({
+      id, provider: 'byteplus', endpoint, enabled: false, kind: 'video', features: ['video'], ratios, durations_sec: durations, max_images: maxImages, output_resolution: resolution, usd, billed_amount_field: 'usage.completion_tokens',
+    });
+    expect(rows).toEqual([
+      row('seedance-1.0-pro-byteplus', 'seedance-1-0-pro-250528', range(2, 12), 1, '1080p', per(2.5, 48_960)),
+      row('seedance-1.0-pro-fast-byteplus', 'seedance-1-0-pro-fast-251015', range(2, 12), 1, '1080p', per(1, 48_960)),
+      row('seedance-2.0-byteplus', 'dreamina-seedance-2-0-260128', range(4, 15), 9, '720p', per(7, 21_600)),
+      row('seedance-2.0-fast-byteplus', 'dreamina-seedance-2-0-fast-260128', range(4, 15), 9, '720p', per(5.6, 21_600)),
+      row('seedance-2.0-mini-byteplus', 'dreamina-seedance-2-0-mini-260615', range(4, 15), 9, '720p', per(3.5, 21_600)),
+      row('seedance-2.5-byteplus', 'dreamina-seedance-2-5-260628', range(4, 15), 9, '720p', per(10.7, 21_600)), // 4 to 30 s on the API; 15 s until a canary measures the latency (the docs' own 11 s example took 581 s)
+    ]);
+    // 5 s at 720p on Seedance 2.5: 108,000 tokens at $10.70 per million.
+    expect(rows.find((r) => r.id === 'seedance-2.5-byteplus')!.usd).toBe('0.2312');
+  });
+
+  test('the adapter turns reported tokens into the same USD as the list price per million tokens, for every row price here', async () => {
+    // The frame of each row's resolution as the API renders it (create page, pixel table): 1280x720 for Seedance 2.x at 720p, 1920x1088 for Seedance 1.0 at 1080p.
+    const list: Record<string, [number, number]> = {
+      'seedance-2.5-byteplus': [10.7, 1280 * 720], 'seedance-2.0-byteplus': [7, 1280 * 720], 'seedance-2.0-fast-byteplus': [5.6, 1280 * 720], 'seedance-2.0-mini-byteplus': [3.5, 1280 * 720],
+      'seedance-1.0-pro-byteplus': [2.5, 1920 * 1088], 'seedance-1.0-pro-fast-byteplus': [1, 1920 * 1088],
+    };
+    const { rows } = await pool.query(`select id, endpoint, output_resolution, usd_per_second::float as usd from model_configs where provider = 'byteplus' and kind = 'video' order by id`);
+    expect(rows.map((r) => r.id)).toEqual(Object.keys(list).sort());
+    for (const r of rows) {
+      const [usdPerMillion, pixels] = list[r.id]!;
+      const tokens = (5 * pixels * 24) / 1024; // tokens = seconds x width x height x 24 / 1024
+      const booked = tokenCost({ endpoint: r.endpoint, outputResolution: r.output_resolution, usdPerSecond: r.usd }, tokens)!;
+      expect(booked, r.id).toBeCloseTo((usdPerMillion * tokens) / 1e6, 2); // the row price is rounded up to 4 decimals of USD per second
+      expect(booked, r.id).toBeGreaterThanOrEqual(Number(((usdPerMillion * tokens) / 1e6).toFixed(4)));
+    }
+  });
+
+  test('adds Seedream 5.0 Pro and Flash disabled, with the features, ratios and limits of the fal Pro row and the per-image list price', async () => {
+    const pick = `select kind, features, ratios, max_images, max_prompt_chars from model_configs where id = $1`;
+    const [twin] = (await pool.query(pick, ['seedream-5-pro'])).rows;
+    for (const id of ['seedream-5-pro-byteplus', 'seedream-5-flash-byteplus']) expect((await pool.query(pick, [id])).rows[0], id).toEqual(twin);
+    const { rows } = await pool.query(`select id, provider, endpoint, enabled, image_prices, durations_sec from model_configs where provider = 'byteplus' and kind = 'image' order by id`);
+    expect(rows).toEqual([
+      { id: 'seedream-5-flash-byteplus', provider: 'byteplus', endpoint: 'dola-seedream-5-0-flash-260915', enabled: false, image_prices: { '1K': '0.018', '2K': '0.018' }, durations_sec: [] },
+      { id: 'seedream-5-pro-byteplus', provider: 'byteplus', endpoint: 'dola-seedream-5-0-pro-260628', enabled: false, image_prices: { '1K': '0.045', '2K': '0.09' }, durations_sec: [] },
+    ]);
+  });
+
+  test('records where each fact was read, and changes no row that is enabled today', async () => {
+    const { rows } = await pool.query(`select id, sources from model_configs where provider = 'byteplus' order by id`);
+    for (const { id, sources } of rows) {
+      const price = sources.usdPerSecond ?? sources.imagePrices;
+      expect(price, id).toMatchObject({ url: 'https://docs.byteplus.com/en/docs/modelark/model-pricing', readAt: '2026-11-03' });
+      expect(sources.endpoint, id).toEqual({ url: link('model-list'), readAt: '2026-11-04' });
+    }
+    expect((await pool.query(`select count(*)::int as n from model_configs where provider = 'byteplus' and enabled`)).rows).toEqual([{ n: 0 }]);
   });
 });
 

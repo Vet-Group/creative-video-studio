@@ -8,7 +8,8 @@
 //   image endpoints (read 2026-10-24) and the other video endpoints (read 2026-10-25): https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=<endpoint>,
 //   one per entry of IMAGE_BODIES and VIDEO_BODIES
 import { imageSize } from './image-size';
-import { estimate, ImageReadError, imageEstimate, imageTokens, packJobId, plainImage, ProviderHttpError, resolveImages, sendJson, timeout, unpackJobId, type Fetch, type ReadImage } from './http';
+import { estimate, ImageReadError, imageEstimate, imageTokens, packJobId, plainImage, ProviderHttpError, resolveImages, sendJson, sizeFor, timeout, unpackJobId, type Fetch, type ReadImage } from './http';
+import { isByteplusVideo } from './byteplus';
 import { REPLICATE_BODIES } from './replicate';
 import { FAL_TEXT_ENDPOINTS } from '../models';
 import type { ImageProvider, ImageSubmitRequest, ProviderStatus, SubmitRequest, VideoProvider } from './types';
@@ -155,6 +156,8 @@ export const VIDEO_BODIES: Record<string, VideoBody> = {
  */
 export function videoInputs(endpoint: string) {
   const spec: VideoBody | undefined = Object.hasOwn(VIDEO_BODIES, endpoint) ? VIDEO_BODIES[endpoint] : Object.hasOwn(REPLICATE_BODIES, endpoint) ? REPLICATE_BODIES[endpoint] : undefined;
+  // BytePlus Seedance runs from the prompt alone and takes neither an end frame nor reference audio (byteplus.ts).
+  if (isByteplusVideo(endpoint)) return { endFrame: false, textOnly: true, audioClips: null };
   return { endFrame: spec?.end !== undefined, textOnly: spec?.text !== undefined, audioClips: spec?.audio ? { max: spec.audio.max, seconds: spec.audio.seconds } : null };
 }
 
@@ -270,13 +273,6 @@ const gptImage: ImageBody = (req, image_urls) => {
   if (!image_size) throw new ImageReadError(`GPT Image does not offer ratio ${req.ratio}`);
   return { prompt: req.prompt, image_urls, image_size, quality: req.quality ?? 'high', num_images: 1, output_format: 'png' };
 };
-
-/** A width and height in the ratio with about `pixels` pixels in total, each a multiple of 16. */
-function sizeFor(ratio: string, pixels: number): { width: number; height: number } {
-  const [w, h] = ratio.split(':').map(Number) as [number, number];
-  const round = (n: number) => Math.round(n / 16) * 16;
-  return { width: round(Math.sqrt((pixels * w) / h)), height: round(Math.sqrt((pixels * h) / w)) };
-}
 
 /**
  * Seedream takes 'auto_1K' or 'auto_2K', or a size whose total pixels are between 1024x1024 and 2048x2048 (its schema description). The targets sit

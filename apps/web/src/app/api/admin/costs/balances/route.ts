@@ -26,5 +26,6 @@ export async function GET(request: Request) {
     fal: { ...fal, billingUrl: BILLING_URLS.fal, low: fal.ok && isLow(fal.currency === 'USD' ? fal.balance : null, warningUsd) },
     replicate: { credit, billingUrl: BILLING_URLS.replicate, low: isLow(credit?.remainingUsd ?? null, warningUsd) },
     vertex: { billingUrl: BILLING_URLS.vertex },
+    byteplus: { billingUrl: BILLING_URLS.byteplus },
   });
 }

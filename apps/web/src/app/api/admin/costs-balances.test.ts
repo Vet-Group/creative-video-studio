@@ -60,6 +60,7 @@ describe('GET /api/admin/costs/balances', () => {
       fal: { ok: false, reason: 'no_key', error: 'FAL_KEY is not set', billingUrl: 'https://fal.ai/dashboard/billing', low: false },
       replicate: { credit: null, billingUrl: 'https://replicate.com/account/billing', low: false },
       vertex: { billingUrl: 'https://console.cloud.google.com/billing' },
+      byteplus: { billingUrl: 'https://console.byteplus.com/finance/overview' },
     });
     expect(calls).toEqual([]);
   });
