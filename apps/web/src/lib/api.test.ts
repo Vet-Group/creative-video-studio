@@ -1,6 +1,6 @@
 // The fetch wrapper's error: status, the server's message and the limiter's wait.
 import { afterEach, expect, test, vi } from 'vitest';
-import { ApiError, api } from './api';
+import { ApiError, api, startSignOut } from './api';
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -32,4 +32,13 @@ test('a 401 on a page sends the user to the login, to come back to that page', a
 test('a better-auth refusal carries its code', async () => {
   const e = (await failure(401, {}, { code: 'USER_NOT_VERIFIED', message: 'User verification required' })) as ApiError;
   expect([e.status, e.code]).toEqual([401, 'USER_NOT_VERIFIED']);
+});
+
+test('after a sign-out starts, a 401 from a call in flight no longer sends the user to the login with this page', async () => {
+  const assign = vi.fn();
+  vi.stubGlobal('window', { location: { pathname: '/account/sign-in-methods', search: '', assign } });
+  vi.stubGlobal('fetch', async () => new Response('{}', { status: 401 }));
+  startSignOut();
+  await api('/x').catch(() => {});
+  expect(assign).not.toHaveBeenCalled();
 });
