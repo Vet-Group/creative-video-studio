@@ -96,6 +96,31 @@ describe('fal image submit', () => {
     expect(calls).toHaveLength(0);
   });
 
+  test('GPT Image 2 at 2K and 4K sends a custom size in the ratio, edges in multiples of 16, within the priced pixels and the schema limits', async () => {
+    const gpt = model('openai/gpt-image-2/edit', { '1K': '0.21', '2K': '0.234', '4K': '0.413' });
+    const sizeOf = async (r: ImageSubmitRequest, readImage?: Parameters<typeof bodyFor>[1]) => ((await bodyFor(r, readImage)).body as { image_size: { width: number; height: number } }).image_size;
+    expect(await sizeOf(req(gpt, { ratio: '16:9', resolution: '2K' }))).toEqual({ width: 2560, height: 1440 });
+    expect(await sizeOf(req(gpt, { ratio: '9:16', resolution: '4K' }))).toEqual({ width: 2160, height: 3840 });
+    for (const [resolution, pixels] of [['2K', 2560 * 1440], ['4K', 3840 * 2160]] as const) {
+      for (const ratio of ['1:1', '9:16', '16:9', '3:4', '4:3']) {
+        const { width, height } = await sizeOf(req(gpt, { ratio, resolution }));
+        const [w, h] = ratio.split(':').map(Number) as [number, number];
+        expect([width % 16, height % 16, width * h - height * w]).toEqual([0, 0, 0]);
+        expect(width * height).toBeLessThanOrEqual(pixels);
+        expect(width * height).toBeGreaterThan(pixels * 0.95);
+        expect(Math.max(width, height)).toBeLessThanOrEqual(3840);
+      }
+    }
+    // auto: the shape of the first image (a 900x1200 png is 3:4), or square when the image cannot be measured.
+    const png = new Uint8Array(33);
+    png.set([0x89, 0x50, 0x4e, 0x47], 0);
+    new DataView(png.buffer).setUint32(16, 900);
+    new DataView(png.buffer).setUint32(20, 1200);
+    const readImage = async () => ({ bytes: png, contentType: 'image/png' });
+    expect(await sizeOf(req(gpt, { ratio: 'auto', resolution: '4K', imageUrls: ['s3://in/1.png'] }), readImage)).toEqual({ width: 2448, height: 3264 });
+    expect(await sizeOf(req(gpt, { ratio: 'auto', resolution: '2K' }))).toEqual({ width: 1920, height: 1920 });
+  });
+
   test('GPT Image 2.5 Flare and Sunburst take the same body as GPT Image 2', async () => {
     for (const endpoint of ['openai/gpt-image-2.5/flare/edit', 'openai/gpt-image-2.5/sunburst/edit']) {
       const { url, body } = await bodyFor(req(model(endpoint, { '1K': '0.21' }), { ratio: '3:4' }));

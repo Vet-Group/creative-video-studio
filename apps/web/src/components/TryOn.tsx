@@ -86,9 +86,7 @@ export function TryOn({ reuse }: { reuse?: string }) {
       setGarments(j.images.slice(1, 1 + n));
       setBackground(j.images.slice(1 + n, 2 + n));
       setPrompt(j.brief ?? '');
-      if (j.modelId) pick.setModelId(j.modelId);
-      if (j.ratio) pick.setRatio(j.ratio);
-      if (j.resolution) pick.setResolution(j.resolution);
+      pick.refill(j);
     },
     (e) => setError(copyError(e, 'Không tìm thấy ảnh để dùng lại.')),
   );
@@ -256,6 +254,7 @@ export function TryOn({ reuse }: { reuse?: string }) {
                 {error}
               </p>
             )}
+            {pick.note && <p className="help" role="status">{pick.note}</p>}
             {notice && <p role="status">{notice}</p>}
           </div>
           <div className="runbar">

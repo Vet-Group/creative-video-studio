@@ -131,9 +131,7 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
       recall.touch();
       setImages(splitImages(app, j.images));
       setPrompt(j.brief ?? '');
-      if (j.modelId) pick.setModelId(j.modelId);
-      if (j.ratio) pick.setRatio(j.ratio);
-      if (j.resolution) pick.setResolution(j.resolution);
+      pick.refill(j);
     },
     (e) => setError(copyError(e, 'Không tìm thấy ảnh để dùng lại.')),
   );
@@ -278,6 +276,7 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
                 {error}
               </p>
             )}
+            {pick.note && <p className="help" role="status">{pick.note}</p>}
             {notice && <p role="status">{notice}</p>}
           </div>
           <div className="runbar">

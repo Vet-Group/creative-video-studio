@@ -1,8 +1,8 @@
-// Upload batching, the empty slot's icon and the audio switch's closed state.
+// Upload batching, the empty slot's icon, the audio switch's closed state and the refill fallback with its note.
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, expect, test, vi } from 'vitest';
 import { AudioSwitch } from './AudioSwitch';
-import { Slot, uploadImages } from './image-tools';
+import { nearestOption, refillNote, Slot, uploadImages } from './image-tools';
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -36,4 +36,23 @@ test('the audio switch reads on when available and on, and is off and disabled w
   expect(fixed).toContain('aria-checked="false"');
   expect(fixed).toContain('disabled');
   expect(fixed).toContain('Mô hình này không tạo được âm thanh');
+});
+
+test('a ratio or resolution the model lacks falls back to the nearest it has, and anything it cannot compare to the first', () => {
+  const gpt = ['auto', '1:1', '9:16', '16:9', '3:4', '4:3'];
+  expect(nearestOption(gpt, '4:5')).toBe('3:4');
+  expect(nearestOption(gpt, '21:9')).toBe('16:9');
+  expect(nearestOption(gpt, '9:16')).toBe('9:16');
+  expect(nearestOption(['1:1', '16:9'], 'auto')).toBe('1:1');
+  expect(nearestOption(['1K', '2K'], '4K')).toBe('2K');
+  expect(nearestOption(['2K', '4K'], '1K')).toBe('2K');
+  expect(nearestOption(['1K'], 'auto')).toBe('1K');
+});
+
+test('a refill says which setting the model lacks and what it chose instead, and nothing when it has both', () => {
+  expect(refillNote({ ratio: '4:5', resolution: '1K' }, '3:4', '1K')).toBe('Mẫu dùng tỉ lệ 4:5; mô hình này không có nên đã chọn 3:4.');
+  expect(refillNote({ ratio: '4:5', resolution: '4K' }, '3:4', '2K')).toBe('Mẫu dùng tỉ lệ 4:5, độ phân giải 4K; mô hình này không có nên đã chọn 3:4, 2K.');
+  expect(refillNote({ ratio: 'auto', resolution: null }, '1:1', '1K')).toBe('Mẫu dùng tỉ lệ Tự động; mô hình này không có nên đã chọn 1:1.');
+  expect(refillNote({ ratio: '16:9', resolution: '2K' }, '16:9', '2K')).toBe('');
+  expect(refillNote({ ratio: null, resolution: null }, 'auto', '1K')).toBe('');
 });
