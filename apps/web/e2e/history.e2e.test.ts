@@ -176,3 +176,33 @@ test('the Library item detail shows the result large with its words, inputs and 
   await page.keyboard.press('Escape');
   await expect(detail).toHaveCount(0);
 });
+
+test('a failed read of the job list says so with Thử lại instead of a blank History; a later failure keeps the list with a notice', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await signIn(page, 'loada');
+  await clearMyJobs(page);
+  let fail = true;
+  await page.route(/\/api\/jobs\?mine/, (r) => (fail ? r.fulfill({ status: 500, json: { error: 'down' } }) : r.fallback()));
+  await page.goto('/image-generation');
+  await page.getByRole('tab', { name: 'Lịch sử' }).click();
+  const history = page.getByRole('complementary', { name: 'Job của tôi' });
+  await expect(history.getByText('Không tải được danh sách job.')).toBeVisible();
+  await expect(history.getByText('Chưa có job nào.')).toHaveCount(0); // not read, so not known to be empty
+
+  fail = false;
+  await history.getByRole('button', { name: 'Thử lại' }).click();
+  await expect(history.getByText('Chưa có job nào.')).toBeVisible();
+  await expect(history.getByRole('alert')).toHaveCount(0);
+
+  // The empty History points to the form beside it.
+  await history.getByRole('button', { name: 'Bắt đầu ngay' }).click();
+  await expect(page.getByRole('group', { name: 'Thanh tạo ảnh' }).getByRole('button', { name: 'Thêm ảnh tham chiếu' })).toBeFocused();
+
+  // The next poll fails: what was read stays, with a short notice.
+  fail = true;
+  await expect(history.getByText('Không cập nhật được danh sách job.')).toBeVisible({ timeout: 15_000 });
+  await expect(history.getByText('Chưa có job nào.')).toBeVisible();
+  fail = false;
+  await history.getByRole('button', { name: 'Thử lại' }).click();
+  await expect(history.getByRole('alert')).toHaveCount(0);
+});

@@ -12,7 +12,7 @@ import { useSamples } from '@/lib/use-samples';
 import { backgroundsIn, GARMENT_CATEGORIES, garmentsOf, posesOf, stockModels } from '@/lib/try-on-stock';
 import { ABOUT } from '@/lib/about-content';
 import { About } from './About';
-import { copyError, copySamples, Gallery, type Img, LockedFields, PhotoDialog, photoImg, RATIO_LABEL, Slot, THINKING_LABEL, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
+import { copyError, copySamples, Gallery, type Img, LockedFields, PhotoDialog, photoImg, RATIO_LABEL, Slot, THINKING_LABEL, uploadError, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
 import { FormContext, type Photo, type PhotoRole, useApplier, useHasHistory, useJobs } from './jobs';
 import { ModelPicker } from './ModelPicker';
 import { PromptComposer } from './PromptComposer';
@@ -134,12 +134,12 @@ export function TryOn({ reuse }: { reuse?: string }) {
       const assets = await get();
       set((cur) => [...cur, ...assets]);
     } catch (e) {
-      setError(copyError(e, UPLOAD_ERROR));
+      setError(copyError(e, uploadError(e)));
     } finally {
       setBusy(false);
     }
   }
-  const add = (set: (f: (cur: Img[]) => Img[]) => void) => (files: File[]) => void (files.length > 0 && put(set, () => uploadImages(files)));
+  const add = (set: (f: (cur: Img[]) => Img[]) => void) => (files: File[]) => void (files.length > 0 && put(set, () => uploadImages(files).finally(loading('Đang tải lên…'))));
   /** A sample under an empty slot, copied on the server like Recreate's photos. */
   const addSample = (set: (f: (cur: Img[]) => Img[]) => void) => (name: string) => void put(set, () => copySamples([name]));
 

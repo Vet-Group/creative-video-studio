@@ -85,6 +85,7 @@ export const USERS = {
   libx: { email: 'libx@e2e.test', name: 'E2E Library Extras', role: 'member' }, // library-extras.e2e: the date presets
   toolg: { email: 'toolg@e2e.test', name: 'E2E Tool Guide', role: 'member' }, // tool-guide.e2e: the sidebar lines, the guide, the page hints and Explore's start list
   thema: { email: 'thema@e2e.test', name: 'E2E Theme A', role: 'member' }, // theme.e2e: light, dark or the system's theme from Settings
+  loada: { email: 'loada@e2e.test', name: 'E2E Load A', role: 'member' }, // history, library and image-pages e2e: a failed read and its retry, the upload reasons
   admin: { email: 'admin@e2e.test', name: 'E2E Admin', role: 'admin' },
 } as const;
 

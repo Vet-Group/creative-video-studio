@@ -1,5 +1,6 @@
 'use client';
 import { useId, useState } from 'react';
+import { LoadError } from '@/components/LoadError';
 import { api, sendJson } from '@/lib/api';
 import { useAction, useFetch } from '@/lib/admin-ui';
 import { featureLabel } from '@/lib/features';
@@ -326,7 +327,7 @@ export function AdminSettings() {
   return (
     <section aria-labelledby="settings-title">
       <PageHead id="settings-title" title="Cài đặt" lead="Ngân sách tháng, hạn mức mỗi người và các mô hình được dùng. Sửa xong bấm “Lưu cài đặt” ở thanh dưới cùng." />
-      {data ? <SettingsForm settings={data} reload={reload} /> : failed ? <p className="error">Không tải được cài đặt.</p> : <p role="status">Đang tải...</p>}
+      {data ? <SettingsForm settings={data} reload={reload} /> : failed ? <LoadError text="Không tải được cài đặt." onRetry={reload} /> : <p role="status">Đang tải...</p>}
     </section>
   );
 }

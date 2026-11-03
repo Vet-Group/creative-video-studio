@@ -15,7 +15,7 @@ import { AudioSwitch } from './AudioSwitch';
 import { CardMedia } from './CardMedia';
 import { EnhanceToggle } from './EnhanceToggle';
 import { Icon } from './Icon';
-import { copyError, copySamples, GALLERY_SIZE_KEY, HISTORY_SIZE_KEY, photoImg, RunSummary, SizeSlider, Slot, UPLOAD_ERROR, uploadImages, useSize } from './image-tools';
+import { copyError, copySamples, GALLERY_SIZE_KEY, HISTORY_SIZE_KEY, photoImg, RunSummary, SizeSlider, Slot, uploadError, uploadImages, useSize } from './image-tools';
 import { FormContext, type Photo, Tap, useApplier, useHasHistory, useJobs, useRecreated } from './jobs';
 import { Modal } from './Modal';
 import { ModelPicker } from './ModelPicker';
@@ -280,14 +280,12 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
     if (files.length === 0) return;
     setError('');
     if (images.length + files.length > maxImages) return setError(`Tối đa ${maxImages} ảnh.`);
-    const form = new FormData();
-    for (const f of files) form.append('file', f);
     setBusy(true);
     try {
-      const r = await api<{ assets: Image[] }>('/api/assets', { method: 'POST', body: form });
-      setImages((cur) => [...cur, ...r.assets]);
-    } catch {
-      setError('Không tải ảnh lên được. Ảnh phải là JPEG, PNG hoặc WebP, tối đa 10 MB mỗi ảnh.');
+      const assets = (await uploadImages(files).finally(loading('Đang tải lên…'))) as Image[];
+      setImages((cur) => [...cur, ...assets]);
+    } catch (e) {
+      setError(uploadError(e));
     } finally {
       setBusy(false);
     }
@@ -300,11 +298,11 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
     if (clips.length + files.length > takes.max) return setError(`Tối đa ${takes.max} tệp âm thanh.`);
     setBusy(true);
     try {
-      const added = (await uploadImages(files)) as Clip[]; // the assets API answers every upload with its length
+      const added = (await uploadImages(files, 'audio').finally(loading('Đang tải lên…'))) as Clip[]; // the assets API answers every upload with its length
       if (added.some((c) => c.durationMs < MIN_CLIP_MS)) setError('Mỗi tệp âm thanh phải dài ít nhất 2 giây.');
       setClips((cur) => [...cur, ...added.filter((c) => c.durationMs >= MIN_CLIP_MS)]);
-    } catch {
-      setError('Không tải âm thanh lên được. Tệp phải là MP3 hoặc WAV, tối đa 15 MB.');
+    } catch (e) {
+      setError(uploadError(e, 'audio'));
     } finally {
       setBusy(false);
     }
@@ -522,7 +520,8 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
                   setError('');
                   setBusy(true);
                   uploadImages(files)
-                    .then(([img]) => img && setEndFrame(img), () => setError(UPLOAD_ERROR))
+                    .finally(loading('Đang tải lên…'))
+                    .then(([img]) => img && setEndFrame(img), (e) => setError(uploadError(e)))
                     .finally(() => setBusy(false));
                 }}
                 onRemove={() => setEndFrame(null)}

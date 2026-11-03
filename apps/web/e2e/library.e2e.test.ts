@@ -256,3 +256,16 @@ test('Library detail: how an item was made for anyone, marks by keyboard, ←/�
   for (const id of [newer, older]) expect((await page.request.delete(`/api/jobs/${id}`)).ok()).toBe(true);
   expect((await other.request.delete(`/api/jobs/${theirs}`)).ok()).toBe(true);
 });
+
+test('a failed Library read says so, and Thử lại loads it without a page reload', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await signIn(page, 'loada');
+  let fail = true;
+  await page.route(/\/api\/library(\?|$)/, (r) => (fail ? r.fulfill({ status: 500, json: { error: 'down' } }) : r.fallback()));
+  await page.goto('/library');
+  await expect(page.getByText('Không tải được thư viện.')).toBeVisible();
+  fail = false;
+  await page.getByRole('button', { name: 'Thử lại' }).click();
+  await expect(page.getByText('Không tải được thư viện.')).toHaveCount(0);
+  await expect(page.locator('.library-empty, .grid .card').first()).toBeVisible(); // the company's items, or the empty state on a fresh database
+});

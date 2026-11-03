@@ -185,6 +185,8 @@ interface JobsState {
   /** The video clips made today against the daily clip cap; null until the first load. */
   clips: { today: number; cap: number } | null;
   loaded: boolean;
+  /** The last read of the list failed (the list, if one was read before, stays as it was); the next poll or refresh tries again. */
+  failed: boolean;
   /** The newest finish time among the user's jobs (ms), 0 until one has finished: pages that list results reload when it moves. */
   lastFinished: number;
   toasts: Toast[];
@@ -223,7 +225,7 @@ export function useFreshResults(run: () => void): void {
 }
 
 export function JobsProvider({ userId, children }: { userId: string; children: ReactNode }) {
-  const [data, setData] = useState({ jobs: [] as TrayJob[], workerOffline: false, clips: null as JobsState['clips'], loaded: false, lastFinished: 0 });
+  const [data, setData] = useState({ jobs: [] as TrayJob[], workerOffline: false, clips: null as JobsState['clips'], loaded: false, failed: false, lastFinished: 0 });
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [news, setNews] = useState(false);
   const nextId = useRef(0);
@@ -231,10 +233,10 @@ export function JobsProvider({ userId, children }: { userId: string; children: R
 
   const refresh = useCallback(async () => {
     const r = await api<{ jobs: TrayJob[]; workerOffline: boolean; clips: { today: number; cap: number } }>('/api/jobs?mine').catch(() => null);
-    if (!r) return;
+    if (!r) return setData((cur) => (cur.failed ? cur : { ...cur, failed: true }));
     const finished = r.jobs.filter((j) => FINISHED.includes(j.status) && j.finishedAt);
     const times = finished.map((j) => Date.parse(j.finishedAt!));
-    setData({ jobs: r.jobs, workerOffline: r.workerOffline, clips: r.clips, loaded: true, lastFinished: Math.max(0, ...times) });
+    setData({ jobs: r.jobs, workerOffline: r.workerOffline, clips: r.clips, loaded: true, failed: false, lastFinished: Math.max(0, ...times) });
     const seenKey = `${SEEN_KEY}.${userId}`; // per user, so two accounts in one browser do not hide each other's news
     let fresh: TrayJob[];
     try {

@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { Icon } from '@/components/Icon';
+import { LoadError } from '@/components/LoadError';
 import { api, sendJson } from '@/lib/api';
 import { useAction, useFetch } from '@/lib/admin-ui';
 import { Budget } from './AdminOverview';
@@ -185,13 +186,13 @@ export const TopUp = ({ href }: { href: string }) => (
  * a failed read leaves the rest of the page; the Vertex rows reuse the Vertex section's answer instead of reading Google twice.
  */
 function ProviderBalances({ vertex }: { vertex: VertexCostsData | undefined }) {
-  const { data, failed } = useFetch<Balances>('/api/admin/costs/balances');
+  const { data, failed, reload } = useFetch<Balances>('/api/admin/costs/balances');
   const under = (low: boolean) => (low && data ? ` (dưới ngưỡng $${data.warningUsd})` : '');
   return (
     <section className="panel" aria-label="Số dư nhà cung cấp">
       <h2>Số dư nhà cung cấp</h2>
       {!data ? (
-        failed ? <p className="error">Không tải được số dư nhà cung cấp.</p> : <p role="status">Đang đọc số dư...</p>
+        failed ? <LoadError text="Không tải được số dư nhà cung cấp." onRetry={reload} /> : <p role="status">Đang đọc số dư...</p>
       ) : (
         <div className="table-wrap">
           <table>
@@ -269,22 +270,22 @@ function ProviderBalances({ vertex }: { vertex: VertexCostsData | undefined }) {
 
 /** The balances and the Vertex section share one read of Google. */
 function ProviderSections({ month }: { month: string }) {
-  const { data, failed } = useFetch<VertexCostsData>(`/api/admin/costs/vertex?month=${month}`);
+  const { data, failed, reload } = useFetch<VertexCostsData>(`/api/admin/costs/vertex?month=${month}`);
   return (
     <>
       <ProviderBalances vertex={data} />
-      <VertexCosts month={month} data={data} failed={failed} />
+      <VertexCosts month={month} data={data} failed={failed} reload={reload} />
     </>
   );
 }
 
 /** Google's own figures, read live from each account's billing export; loaded on its own so a Google failure leaves the rest of the page. */
-function VertexCosts({ month, data, failed }: { month: string; data: VertexCostsData | undefined; failed: boolean }) {
+function VertexCosts({ month, data, failed, reload }: { month: string; data: VertexCostsData | undefined; failed: boolean; reload: () => void }) {
   return (
     <section className="panel" aria-label="Vertex (Google Cloud)">
       <h2>Vertex (Google Cloud)</h2>
       {!data ? (
-        failed ? <p className="error">Không tải được số liệu Vertex từ Google.</p> : <p role="status">Đang đọc số liệu từ Google...</p>
+        failed ? <LoadError text="Không tải được số liệu Vertex từ Google." onRetry={reload} /> : <p role="status">Đang đọc số liệu từ Google...</p>
       ) : !data.configured ? (
         data.error ? <p className="error">Không đọc được khóa Vertex trên máy chủ ({data.error}).</p> : <p className="muted">Máy chủ chưa có khóa Vertex nào.</p>
       ) : (
@@ -513,10 +514,10 @@ export function AdminCosts() {
         )}
       </PageHead>
       {!data ? (
-        failed ? <p className="error">Không tải được chi phí.</p> : <p role="status">Đang tải...</p>
+        failed ? <LoadError text="Không tải được chi phí." onRetry={reload} /> : <p role="status">Đang tải...</p>
       ) : (
         <>
-          {failed && <p className="error">Không tải được tháng này, đang hiện tháng trước đó.</p>}
+          {failed && <LoadError text="Không tải được tháng này, đang hiện tháng trước đó." onRetry={reload} />}
           <CostsBody key={`${data.month}-${data.asOf}`} data={data} reload={reload} />
           <ProviderSections month={data.month} />
         </>

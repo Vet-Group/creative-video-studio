@@ -1,5 +1,6 @@
 'use client';
 import Link from 'next/link';
+import { LoadError } from '@/components/LoadError';
 import { useFetch } from '@/lib/admin-ui';
 import type { AdminOverview as Data } from '@/lib/overview';
 import { Empty, PageHead } from './PageHead';
@@ -28,12 +29,12 @@ export function Budget({ title, used, cap }: { title: string; used: string; cap:
 }
 
 export function AdminOverview() {
-  const { data, failed } = useFetch<Data>('/api/admin/overview', { onTabReturn: true });
+  const { data, failed, reload } = useFetch<Data>('/api/admin/overview', { onTabReturn: true });
   return (
     <section aria-labelledby="overview-title">
       <PageHead id="overview-title" title="Tổng quan" lead={data ? `Ngân sách, job và hoạt động gần đây của tháng ${data.month} (giờ Việt Nam).` : 'Ngân sách, job và hoạt động gần đây.'} />
       {!data ? (
-        failed ? <p className="error">Không tải được tổng quan.</p> : <p role="status">Đang tải...</p>
+        failed ? <LoadError text="Không tải được tổng quan." onRetry={reload} /> : <p role="status">Đang tải...</p>
       ) : (
         <>
           <div className="kpis kpis-wide" aria-label="Ngân sách tháng" role="group">

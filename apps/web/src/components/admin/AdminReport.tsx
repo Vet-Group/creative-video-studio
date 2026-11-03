@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { Icon } from '@/components/Icon';
+import { LoadError } from '@/components/LoadError';
 import { useFetch } from '@/lib/admin-ui';
 import { Budget } from './AdminOverview';
 import { Empty, PageHead } from './PageHead';
@@ -27,7 +28,7 @@ const percent = (fraction: number | string, digits: number) => `${(Number(fracti
 
 export function AdminReport() {
   const [week, setWeek] = useState('');
-  const { data, failed } = useFetch<Report>(`/api/admin/report${week ? `?week=${week}` : ''}`, { onTabReturn: true });
+  const { data, failed, reload } = useFetch<Report>(`/api/admin/report${week ? `?week=${week}` : ''}`, { onTabReturn: true });
   return (
     <section aria-labelledby="report-title">
       <PageHead id="report-title" title="Báo cáo tuần" lead="Job, clip đạt, chi phí và tỉ lệ lỗi của từng người trong một tuần (giờ Việt Nam, thứ Hai đến Chủ nhật).">
@@ -45,10 +46,10 @@ export function AdminReport() {
         )}
       </PageHead>
       {!data ? (
-        failed ? <p className="error">Không tải được báo cáo.</p> : <p role="status">Đang tải...</p>
+        failed ? <LoadError text="Không tải được báo cáo." onRetry={reload} /> : <p role="status">Đang tải...</p>
       ) : (
         <>
-          {failed && <p className="error">Không tải được tuần này, đang hiện tuần trước đó.</p>}
+          {failed && <LoadError text="Không tải được tuần này, đang hiện tuần trước đó." onRetry={reload} />}
           <div className="kpis">
             <div className="kpi">
               <p className="kpi-label">Tuần</p>

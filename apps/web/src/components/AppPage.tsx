@@ -17,7 +17,7 @@ import { useSamples } from '@/lib/use-samples';
 import { About } from './About';
 import { CardMedia, LoopVideo } from './CardMedia';
 import { Icon, type IconName } from './Icon';
-import { copyError, copySamples, type Img, PhotoDialog, RATIO_LABEL, Slot, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
+import { copyError, copySamples, type Img, PhotoDialog, RATIO_LABEL, Slot, uploadError, uploadImages, UPLOAD_ERROR, type UploadKind, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
 import { FormContext, useJobs } from './jobs';
 import { type ModelOption, ModelPicker } from './ModelPicker';
 import { PromptComposer } from './PromptComposer';
@@ -96,7 +96,7 @@ export function AppHeader({ app }: { app: AppConfig }) {
 }
 
 function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
-  const { refresh } = useJobs();
+  const { refresh, loading } = useJobs();
   const narrow = useMediaQuery(NARROW);
   const [images, setImages] = useState<Img[][]>(() => app.slots.map(() => []));
   const [prompt, setPrompt] = useState('');
@@ -147,10 +147,10 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
       setError('');
       setBusy(true);
       try {
-        const assets = await uploadImages(files);
+        const assets = await uploadImages(files).finally(loading('Đang tải lên…'));
         setImages((cur) => cur.map((list, i) => (i === slot ? [...list, ...assets] : list)));
-      } catch {
-        setError(UPLOAD_ERROR);
+      } catch (e) {
+        setError(uploadError(e));
       } finally {
         setBusy(false);
       }
@@ -329,7 +329,6 @@ interface RefVideo {
 }
 type MotionModel = ModelOption & { durationsSec: number[]; maxPromptChars: number };
 type Uploaded = Img & { durationMs: number | null };
-const VIDEO_UPLOAD_ERROR = 'Không tải video lên được. Video phải là MP4 hoặc MOV, tối đa 20 MB.';
 
 /** Motion Control's video slot: one MP4 or MOV, shown with its length. */
 function VideoSlot({ video, busy, onAdd, onRemove }: { video: RefVideo | null; busy: boolean; onAdd: (file: File) => void; onRemove: () => void }) {
@@ -378,7 +377,7 @@ function VideoSlot({ video, busy, onAdd, onRemove }: { video: RefVideo | null; b
 
 /** Motion Control: a character image and a reference video, a model of the feature, an optional prompt. The cost follows the video's length. */
 function MotionForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
-  const { refresh } = useJobs();
+  const { refresh, loading } = useJobs();
   const narrow = useMediaQuery(NARROW);
   const [image, setImage] = useState<Img[]>([]);
   const [video, setVideo] = useState<RefVideo | null>(null);
@@ -419,16 +418,14 @@ function MotionForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
   const reason = (recall.answered ? null : 'Đang tải cài đặt đã dùng...') ?? motionReason({ image: image.length > 0, videoMs: video?.durationMs ?? null, model: list === null ? null : chosen, failed: list?.failed ?? false }) ?? promptTooLong(chosen, prompt.trim().length);
   const canRun = reason === null && !busy;
 
-  async function upload(files: File[], then: (assets: Uploaded[]) => void, message: string) {
+  async function upload(files: File[], then: (assets: Uploaded[]) => void, kind: UploadKind) {
     if (files.length === 0) return;
     setError('');
     setBusy(true);
     try {
-      const form = new FormData();
-      for (const f of files) form.append('file', f);
-      then((await api<{ assets: Uploaded[] }>('/api/assets', { method: 'POST', body: form })).assets);
-    } catch {
-      setError(message);
+      then((await uploadImages(files, kind).finally(loading('Đang tải lên…'))) as Uploaded[]);
+    } catch (e) {
+      setError(uploadError(e, kind));
     } finally {
       setBusy(false);
     }
@@ -476,13 +473,13 @@ function MotionForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
                 images={image}
                 max={1}
                 busy={busy}
-                onAdd={(files) => void upload(files, setImage, UPLOAD_ERROR)}
+                onAdd={(files) => void upload(files, setImage, 'image')}
                 onRemove={() => setImage([])}
               />
               <VideoSlot
                 video={video}
                 busy={busy}
-                onAdd={(file) => void upload([file], ([v]) => v && setVideo({ id: v.id, filename: v.filename, durationMs: v.durationMs ?? 0 }), VIDEO_UPLOAD_ERROR)}
+                onAdd={(file) => void upload([file], ([v]) => v && setVideo({ id: v.id, filename: v.filename, durationMs: v.durationMs ?? 0 }), 'video')}
                 onRemove={() => setVideo(null)}
               />
             </div>

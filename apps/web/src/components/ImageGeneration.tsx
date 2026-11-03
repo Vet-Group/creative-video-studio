@@ -9,7 +9,7 @@ import { confirmRun, runKey } from '@/lib/run-guard';
 import { useHydrated } from '@/lib/use-hydrated';
 import { useRecall } from '@/lib/use-recall';
 import { About } from './About';
-import { copyError, Gallery, type Img, photoImg, RATIO_LABEL, THINKING_LABEL, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
+import { copyError, Gallery, type Img, photoImg, RATIO_LABEL, THINKING_LABEL, uploadError, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
 import { EnhanceToggle } from './EnhanceToggle';
 import { Icon } from './Icon';
 import { FormContext, type Photo, useApplier, useJobs } from './jobs';
@@ -106,13 +106,16 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
 
   async function upload(files: File[]) {
     if (files.length === 0) return;
+    const room = Math.max(0, max - images.length);
+    if (room === 0) return notify(`Tối đa ${max} ảnh`);
+    if (files.length > room) notify(`Chỉ lấy ${room} ảnh đầu`);
     setError('');
     setBusy(true);
     try {
-      const assets = await uploadImages(files.slice(0, Math.max(0, max - images.length)));
+      const assets = await uploadImages(files.slice(0, room)).finally(loading('Đang tải lên…'));
       setImages((cur) => [...cur, ...assets]);
-    } catch {
-      setError(UPLOAD_ERROR);
+    } catch (e) {
+      setError(uploadError(e));
     } finally {
       setBusy(false);
     }

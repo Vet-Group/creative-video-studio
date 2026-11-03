@@ -7,6 +7,7 @@ import { api, sendJson } from '@/lib/api';
 import { backupCodesText, manualSecret, twoFactorCall, twoFactorFailure } from '@/lib/two-factor';
 import { confirmDialog } from './Confirm';
 import { Icon } from './Icon';
+import { LoadError } from './LoadError';
 
 /** The caller's session as GET /api/me/sessions lists it. */
 interface SessionItem {
@@ -101,7 +102,7 @@ export function Sessions() {
     try {
       setSessions((await api<{ sessions: SessionItem[] }>('/api/me/sessions')).sessions);
     } catch {
-      setError('Không tải được danh sách phiên đăng nhập. Hãy thử lại sau.');
+      setError('Không tải được danh sách phiên đăng nhập.');
     }
   }, []);
   useEffect(() => {
@@ -120,7 +121,7 @@ export function Sessions() {
     setBusy(false);
   }
 
-  if (!sessions) return error ? <p className="error" role="alert">{error}</p> : <p className="muted">Đang tải phiên đăng nhập...</p>;
+  if (!sessions) return error ? <LoadError text={error} onRetry={() => (setError(''), load())} /> : <p className="muted">Đang tải phiên đăng nhập...</p>;
   const others = sessions.filter((s) => !s.current).length;
   const hidden = sessions.length - SESSIONS_SHOWN;
   return (

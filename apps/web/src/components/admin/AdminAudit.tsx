@@ -1,5 +1,6 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { LoadError } from '@/components/LoadError';
 import { auditChanges } from '@/lib/admin-ui';
 import { api } from '@/lib/api';
 import { useTabReturn } from '@/lib/use-tab-return';
@@ -118,7 +119,7 @@ export function AdminAudit() {
         </div>
       </PageHead>
       {state === 'loading' && <p role="status">Đang tải...</p>}
-      {state === 'error' && <p className="error">Không tải được nhật ký.</p>}
+      {state === 'error' && <LoadError text="Không tải được nhật ký." onRetry={() => (setState('loading'), load(0))} />}
       {state === 'ready' && entries.length === 0 && <Empty title="Chưa có sự kiện nào khớp bộ lọc" />}
       {entries.length > 0 && (
         <div className="table-wrap">
