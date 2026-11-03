@@ -139,9 +139,9 @@ export async function catalogUsdPrices(o: { skuIds: string[]; token: () => Promi
   const want = new Set(o.skuIds);
   const out: Record<string, number> = {};
   let pageToken = '';
-  // The Vertex catalog is a few pages of 5000; the bound stops a server that keeps answering with a page token.
+  // The Vertex catalog has ~10k SKUs: pages of 1000 stay under the 4 MiB response bound (a page of 5000 exceeded it on 2026-11-03), and the page bound stops a server that keeps answering with a page token.
   for (let page = 0; page < 20 && Object.keys(out).length < want.size; page++) {
-    const url = `https://cloudbilling.googleapis.com/v1/${VERTEX_SERVICE}/skus?currencyCode=USD&pageSize=5000${pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : ''}`;
+    const url = `https://cloudbilling.googleapis.com/v1/${VERTEX_SERVICE}/skus?currencyCode=USD&pageSize=1000${pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : ''}`;
     const data = await googleJson(f, 'billing catalog', url, o.token);
     for (const sku of (data.skus ?? []) as CatalogSku[]) {
       if (!want.has(sku.skuId)) continue;

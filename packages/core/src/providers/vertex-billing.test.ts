@@ -76,8 +76,8 @@ describe('catalogUsdPrices', () => {
     );
     expect(await catalogUsdPrices({ skuIds: ['4D50-275D-FC3F', 'F64B-2A78-7BAE'], token, fetch: fn })).toEqual({ '4D50-275D-FC3F': 0.2, 'F64B-2A78-7BAE': 0.4 });
     expect(calls.map((c) => c.url)).toEqual([
-      'https://cloudbilling.googleapis.com/v1/services/C7E2-9256-1C43/skus?currencyCode=USD&pageSize=5000',
-      'https://cloudbilling.googleapis.com/v1/services/C7E2-9256-1C43/skus?currencyCode=USD&pageSize=5000&pageToken=page%202',
+      'https://cloudbilling.googleapis.com/v1/services/C7E2-9256-1C43/skus?currencyCode=USD&pageSize=1000',
+      'https://cloudbilling.googleapis.com/v1/services/C7E2-9256-1C43/skus?currencyCode=USD&pageSize=1000&pageToken=page%202',
     ]);
   });
 
