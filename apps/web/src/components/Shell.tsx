@@ -74,16 +74,24 @@ function TrayItem({ job, isAdmin }: { job: TrayJob; isAdmin: boolean }) {
         </p>
         {failure && <p className="error">{failure}</p>}
         {isAdmin && job.error && <p className="muted">{job.error}</p>}
-        {(job.status === 'succeeded' || reuseHref(job)) && (
+        {job.status === 'succeeded' && (
           <p className="job-links">
-            {job.status === 'succeeded' && <Link href="/library">Xem trong Thư viện</Link>}
-            {reuseHref(job) && <Link href={reuseHref(job)!}>Dùng lại</Link>}
+            <Link href="/library">Xem trong Thư viện</Link>
           </p>
         )}
-        {RETRYABLE.includes(job.status) && !job.retried && !job.retryOf && (
-          <button type="button" disabled={sending} onClick={() => void retry()}>
-            Thử lại
-          </button>
+        {((RETRYABLE.includes(job.status) && !job.retried && !job.retryOf) || reuseHref(job)) && (
+          <div className="job-main">
+            {RETRYABLE.includes(job.status) && !job.retried && !job.retryOf && (
+              <button type="button" className="job-reuse job-primary" disabled={sending} onClick={() => void retry()}>
+                <Icon name="arrow" /> Thử lại
+              </button>
+            )}
+            {reuseHref(job) && (
+              <Link href={reuseHref(job)!} className="job-reuse">
+                <Icon name="copy" /> Dùng lại
+              </Link>
+            )}
+          </div>
         )}
         {job.retried && <p className="muted">Đã thử lại</p>}
         {problem && <p className="error">{problem}</p>}
@@ -131,7 +139,7 @@ function HistoryCard({ job, isAdmin, select }: { job: TrayJob; isAdmin: boolean;
   const toggleFavorite = () => act(async () => setFavorite((await api<{ favorite: boolean }>(`/api/jobs/${job.id}/favorite`, sendJson('PUT', { favorite: !favorite }))).favorite), 'Không lưu được mục yêu thích.');
   const remove = async () => {
     if (!(await confirmDialog({ title: `Xoá ${image ? 'ảnh' : 'clip'} này?`, body: 'Nó cũng biến khỏi Thư viện.', confirmLabel: 'Xoá', danger: true }))) return;
-    void act(async () => (await api(`/api/jobs/${job.id}`, { method: 'DELETE' }), await refresh()), `Không xóa được ${image ? 'ảnh' : 'clip'}.`);
+    void act(async () => (await api(`/api/jobs/${job.id}`, { method: 'DELETE' }), await refresh()), `Không xoá được ${image ? 'ảnh' : 'clip'}.`);
   };
   // Save template from a card: the job's own uploads, words and settings become a template of its page (POST /api/templates fromJob).
   // Its name carries the time, not the card title, so it never matches a Run button's name such as 'Tạo video'.
@@ -273,7 +281,7 @@ function HistoryCard({ job, isAdmin, select }: { job: TrayJob; isAdmin: boolean;
               </button>
             )}
             {out && (
-              <button type="button" className="danger icon-button" onClick={() => void remove()} aria-label="Xóa" title="Xóa">
+              <button type="button" className="danger icon-button" onClick={() => void remove()} aria-label="Xoá" title="Xoá">
                 <Icon name="x" />
               </button>
             )}
@@ -319,7 +327,7 @@ export function Tray({ feature }: { feature?: string }) {
   return (
     <aside className={feature ? 'tray history' : 'tray'} aria-label="Job của tôi">
       <h2>Job của tôi</h2>
-      {workerOffline && <p className="warn">Worker offline: chưa nhận được tín hiệu từ máy xử lý, job sẽ chạy khi worker hoạt động lại.</p>}
+      {workerOffline && <p className="warn">Máy xử lý đang tạm ngừng: chưa nhận được tín hiệu, job sẽ chạy khi máy hoạt động lại.</p>}
       {failed && <LoadError text={loaded ? 'Không cập nhật được danh sách job.' : 'Không tải được danh sách job.'} onRetry={refresh} />}
       {loaded && jobs.length === 0 && (feature ? <HistoryEmpty /> : <p className="muted">Chưa có job nào.</p>)}
       <ul>

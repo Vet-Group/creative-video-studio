@@ -770,7 +770,7 @@ td code { white-space: pre-wrap; overflow-wrap: anywhere; }
 .admin .status { display: inline-block; padding: 0 10px; border-radius: 999px; background: var(--cat-utility-bg); color: var(--cat-utility-fg); font-size: 12px; line-height: 24px; font-weight: 600; white-space: nowrap; }
 .admin .status.off { background: var(--danger-soft); color: var(--danger); }
 .admin .methods li { gap: 8px; }
-.admin code.event { padding: 2px 8px; border-radius: 6px; background: var(--fill); font-family: ui-monospace, Consolas, monospace; font-size: 12px; white-space: nowrap; }
+.admin code.event { padding: 2px 8px; border-radius: 6px; background: var(--fill); font-family: inherit; font-size: 12px; white-space: nowrap; } /* a Vietnamese label now; its code is the title */
 .admin .changes { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
 .admin .changes li { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .admin .changes .key { color: var(--text-sub); font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
@@ -1528,6 +1528,7 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .zip-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin: 12px 0 0; }
 .zip-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin: 0 0 16px; font-size: 14px; line-height: 21px; }
 .zip-tools .zip-bar { margin: 0; }
+.zip-tools .zip-toggle { height: 36px; padding: 0 14px; font-size: 13px; line-height: 34px; font-weight: 500; } /* History's select toggle matches the Library's and the cards' buttons */
 .zip-bar .error { flex-basis: 100%; margin: 0; }
 .card:has(> .zip-check), .job-card:has(> .zip-check) { position: relative; }
 .zip-check { position: absolute; top: 8px; left: 8px; z-index: 2; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 6px; background: var(--surface); }

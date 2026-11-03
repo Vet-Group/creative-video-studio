@@ -207,8 +207,8 @@ test('an Admin re-assigns a clip store from the Library and Reuse follows it', a
   // The Library is shared by every spec, which filter it by ratio and date: leave no clip of this spec behind.
   await page.getByRole('link', { name: 'Thư viện' }).first().click();
   const mine = page.getByRole('article', { name: (await page.getByRole('article').first().getAttribute('aria-label'))!, exact: true });
-  await mine.getByRole('button', { name: 'Xóa', exact: true }).click();
-  await mine.getByRole('button', { name: 'Xác nhận xóa' }).click();
+  await mine.getByRole('button', { name: 'Xoá', exact: true }).click();
+  await mine.getByRole('button', { name: 'Xác nhận xoá' }).click();
   await expect(mine).toHaveCount(0);
 });
 
@@ -252,7 +252,8 @@ test('an Admin changes the code of a store that has costs after a confirm, and t
   const entry = page.getByRole('row').filter({ hasText: `code: ${code} → ${code}-B` });
   await expect(entry).toContainText(`store:${storeId}`);
   await expect(entry).toContainText(`name: ${name}`);
-  await expect(entry.locator('code.event')).toHaveText('store.update');
+  await expect(entry.locator('code.event')).toHaveText('Sửa cửa hàng');
+  await expect(entry.locator('code.event')).toHaveAttribute('title', 'store.update');
 
   // The Library is shared by every spec: leave no clip of this one behind.
   await expect.poll(async () => ((await (await page.request.get(`/api/jobs/${jobId}`)).json()) as { status: string }).status, { timeout: 60_000 }).toBe('succeeded');

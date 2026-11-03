@@ -103,7 +103,7 @@ test('a Member runs a mock job and works through the Library', async ({ page }) 
   await expect(card.getByTitle('Kết quả: Không đạt · Sai màu', { exact: true })).toBeVisible();
 
   // Delete.
-  await card.getByRole('button', { name: 'Xóa', exact: true }).click();
-  await card.getByRole('button', { name: 'Xác nhận xóa' }).click();
+  await card.getByRole('button', { name: 'Xoá', exact: true }).click();
+  await card.getByRole('button', { name: 'Xác nhận xoá' }).click();
   await expect(card).toHaveCount(0);
 });

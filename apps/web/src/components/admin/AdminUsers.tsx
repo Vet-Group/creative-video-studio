@@ -72,7 +72,7 @@ function UserEditor({ user, teams, reload }: { user: User; teams: Team[]; reload
           <label>
             Vai trò
             <select aria-label={`Vai trò của ${user.email}`} value={user.role} disabled={pending} onChange={(e) => void patch({ role: e.target.value }, 'Không đổi được vai trò.')}>
-              <option value="member">Member</option>
+              <option value="member">Thành viên</option>
               <option value="admin">Admin</option>
             </select>
           </label>
@@ -171,10 +171,10 @@ function UserEditor({ user, teams, reload }: { user: User; teams: Team[]; reload
             disabled={pending}
             onClick={async () => {
               if (!user.banned && !(await confirmDialog({ title: `Khoá tài khoản ${user.email}?`, body: 'Người này sẽ không đăng nhập được cho đến khi được mở khoá.', confirmLabel: 'Khoá', danger: true }))) return;
-              void patch({ banned: !user.banned }, user.banned ? 'Không mở khóa được.' : 'Không khóa được.');
+              void patch({ banned: !user.banned }, user.banned ? 'Không mở khoá được.' : 'Không khoá được.');
             }}
           >
-            {user.banned ? 'Mở khóa' : 'Khóa'}
+            {user.banned ? 'Mở khoá' : 'Khoá'}
           </button>
         </div>
       </div>
@@ -197,7 +197,7 @@ function UserRow({ user, team, onEdit }: { user: User; team: string; onEdit: () 
         </div>
       </td>
       <td data-label="Vai trò">
-        <span className={user.role === 'admin' ? 'role admin' : 'role'}>{user.role === 'admin' ? 'Admin' : 'Member'}</span>
+        <span className={user.role === 'admin' ? 'role admin' : 'role'}>{user.role === 'admin' ? 'Admin' : 'Thành viên'}</span>
       </td>
       <td data-label="Nhóm">{team}</td>
       <td data-label="Đăng nhập">
@@ -215,7 +215,7 @@ function UserRow({ user, team, onEdit }: { user: User; team: string; onEdit: () 
         </ul>
       </td>
       <td data-label="Trạng thái">
-        <span className={user.banned ? 'status off' : 'status'}>{user.banned ? 'Đã khóa' : 'Hoạt động'}</span>
+        <span className={user.banned ? 'status off' : 'status'}>{user.banned ? 'Đã khoá' : 'Hoạt động'}</span>
       </td>
       <td className="row-end">
         <button type="button" className="small" aria-label={`Sửa ${user.email}`} onClick={onEdit}>
@@ -239,7 +239,7 @@ export function AdminUsers() {
   const [query, setQuery] = useState('');
   const [editing, setEditing] = useState<string | null>(null);
 
-  const head = <PageHead id="users-title" title="Người dùng" lead="Tạo tài khoản cho nhân viên; bấm “Sửa” ở mỗi dòng để đổi tên, email, vai trò, nhóm, mật khẩu tạm hoặc khóa tài khoản." />;
+  const head = <PageHead id="users-title" title="Người dùng" lead="Tạo tài khoản cho nhân viên; bấm “Sửa” ở mỗi dòng để đổi tên, email, vai trò, nhóm, mật khẩu tạm hoặc khoá tài khoản." />;
   if (!users.data || !teams.data)
     return (
       <section aria-labelledby="users-title">
@@ -290,7 +290,7 @@ export function AdminUsers() {
           <label>
             Vai trò của người dùng mới
             <select value={role} onChange={(e) => setRole(e.target.value)}>
-              <option value="member">Member</option>
+              <option value="member">Thành viên</option>
               <option value="admin">Admin</option>
             </select>
           </label>

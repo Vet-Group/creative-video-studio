@@ -1,7 +1,7 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { LoadError } from '@/components/LoadError';
-import { auditChanges } from '@/lib/admin-ui';
+import { AUDIT_ACTIONS, auditChanges, auditLabel } from '@/lib/admin-ui';
 import { api } from '@/lib/api';
 import { useTabReturn } from '@/lib/use-tab-return';
 import { Empty, PageHead } from './PageHead';
@@ -16,11 +16,6 @@ interface Entry {
   createdAt: string;
 }
 
-// The events the audit log records, for the filter.
-const ACTIONS = [
-  'account.link', 'account.unlink', 'clip.delete', 'cost.manual_adjustment', 'invoice.enter', 'model.set_enabled', 'preset.update', 'rate.update', 'sample.delete', 'sample.put', 'settings.update', 'store.create', 'store.hide',
-  'store.reassign', 'store.update', 'team.create', 'team.hide', 'team.rename', 'user.ban', 'user.delete', 'user.password_change', 'user.password_set', 'user.profile_update', 'user.role_change', 'user.sessions_revoke', 'user.team_change', 'user.two_factor_backup_codes', 'user.two_factor_disable', 'user.two_factor_enable', 'user.two_factor_failed', 'user.unban', 'user.update', 'verdict.set',
-];
 const SHOWN_CHANGES = 3;
 
 const fmtTime = (iso: string) => new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'medium', timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date(iso));
@@ -37,7 +32,9 @@ function AuditRow({ e }: { e: Entry }) {
       </td>
       <td data-label="Người thực hiện">{e.actorName}</td>
       <td data-label="Sự kiện">
-        <code className="event">{e.action}</code>
+        <code className="event" title={e.action}>
+          {auditLabel(e.action)}
+        </code>
       </td>
       <td data-label="Đối tượng" className="clip" title={e.target}>
         {e.target}
@@ -109,9 +106,9 @@ export function AdminAudit() {
             Loại sự kiện
             <select value={action} onChange={(e) => setAction(e.target.value)}>
               <option value="">Tất cả</option>
-              {ACTIONS.map((a) => (
+              {Object.entries(AUDIT_ACTIONS).map(([a, label]) => (
                 <option key={a} value={a}>
-                  {a}
+                  {label}
                 </option>
               ))}
             </select>

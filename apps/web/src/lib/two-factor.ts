@@ -18,7 +18,7 @@ export const challengeEnded = (e: unknown) => e instanceof ApiError && (e.code =
 /** The Vietnamese message for a refused 2FA call. */
 export function twoFactorFailure(e: unknown): string {
   if (!(e instanceof ApiError)) return 'Không xác thực được. Hãy thử lại sau.';
-  if (e.code === 'ACCOUNT_TEMPORARILY_LOCKED') return 'Bạn nhập sai quá nhiều lần nên xác thực 2 lớp tạm khóa 15 phút. Hãy thử lại sau.';
+  if (e.code === 'ACCOUNT_TEMPORARILY_LOCKED') return 'Bạn nhập sai quá nhiều lần nên xác thực 2 lớp tạm khoá 15 phút. Hãy thử lại sau.';
   if (e.status === 429) return `Bạn thử quá nhiều lần. Hãy đợi ${e.retryAfter ?? 60} giây rồi thử lại.`;
   if (challengeEnded(e)) return 'Phiên xác thực đã hết hạn hoặc bạn đã thử quá nhiều lần. Hãy đăng nhập lại.';
   if (e.code === 'INVALID_CODE') return 'Mã xác thực không đúng.';

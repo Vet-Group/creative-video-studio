@@ -22,7 +22,7 @@ test.each([
 test.each([
   ['signup_disabled', 'Email này chưa được cấp quyền. Liên hệ Admin.'],
   ['account_not_linked', 'chưa liên kết với cách đăng nhập vừa dùng'],
-  ['BANNED_USER', 'Tài khoản này đã bị khóa. Liên hệ Admin.'],
+  ['BANNED_USER', 'Tài khoản này đã bị khoá. Liên hệ Admin.'],
   ['account_already_linked_to_different_user', 'đã được liên kết với một người dùng khác'],
   ['email_does_not_match', 'không khớp với tài khoản đang đăng nhập'],
   ['unable_to_get_user_info', 'Không lấy được thông tin tài khoản'],

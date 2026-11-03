@@ -271,7 +271,7 @@ function SettingsForm({ settings, reload }: { settings: Settings; reload: () => 
                 <div className="model-set-head">
                   <h3>{a.projectId}</h3>
                   {a.projectId === settings.vertexActiveProject && <span className="tag">Đang dùng</span>}
-                  {!a.configured && <span className="tag">Chưa có khóa trên máy chủ</span>}
+                  {!a.configured && <span className="tag">Chưa có khoá trên máy chủ</span>}
                 </div>
                 <div className="fields">
                   <Field label="Tổng credits" unit={v.creditCurrency || '—'} value={v.creditTotal} onChange={(x) => setAccount(a.projectId, { creditTotal: x })} hint="Để trống nếu chưa biết." />

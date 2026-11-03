@@ -35,7 +35,7 @@ test('a History card shows the text, inputs and chips, and its favourite, new-ta
   await card.getByRole('button', { name: 'Tải xuống' }).click();
   expect((await download).suggestedFilename()).toMatch(/\.(png|jpg|jpeg|webp)$/);
 
-  await card.getByRole('button', { name: 'Xóa' }).click();
+  await card.getByRole('button', { name: 'Xoá' }).click();
   await page.getByRole('dialog', { name: /^Xoá (ảnh|clip) này\?$/ }).getByRole('button', { name: 'Xoá', exact: true }).click();
   await expect(card).toHaveCount(0);
   expect(((await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { id: string }[] }).jobs.some((j) => j.id === id)).toBe(false);

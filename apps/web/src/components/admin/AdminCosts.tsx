@@ -146,7 +146,7 @@ type VertexCostsData =
   | { configured: true; accounts: VertexAccountCosts[]; totalMonthUsd: number; prices: { label: string; appUsd: number | null; googleUsd: number | null; red: boolean }[] };
 
 const VERTEX_ERROR: Record<string, (project: string) => string> = {
-  no_access: (p) => `Chưa có quyền đọc billing export của ${p}: cấp BigQuery Data Viewer và BigQuery Job User cho khóa của app.`,
+  no_access: (p) => `Chưa có quyền đọc billing export của ${p}: cấp BigQuery Data Viewer và BigQuery Job User cho khoá của app.`,
   no_export: (p) => `${p} chưa có bảng billing export (dataset billing_export).`,
   failed: (p) => `Không đọc được billing của ${p}.`,
 };
@@ -287,7 +287,7 @@ function VertexCosts({ month, data, failed, reload }: { month: string; data: Ver
       {!data ? (
         failed ? <LoadError text="Không tải được số liệu Vertex từ Google." onRetry={reload} /> : <p role="status">Đang đọc số liệu từ Google...</p>
       ) : !data.configured ? (
-        data.error ? <p className="error">Không đọc được khóa Vertex trên máy chủ ({data.error}).</p> : <p className="muted">Máy chủ chưa có khóa Vertex nào.</p>
+        data.error ? <p className="error">Không đọc được khoá Vertex trên máy chủ ({data.error}).</p> : <p className="muted">Máy chủ chưa có khoá Vertex nào.</p>
       ) : (
         <>
           <p>

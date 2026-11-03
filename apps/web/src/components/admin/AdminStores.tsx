@@ -87,7 +87,7 @@ export function AdminStores() {
             Tạo cửa hàng
           </button>
         </div>
-        <p className="muted">Cửa hàng không bao giờ bị xóa và mã là duy nhất. Đổi mã thì chi phí cũ vẫn thuộc cửa hàng này; báo cáo và CSV từ giờ dùng mã mới.</p>
+        <p className="muted">Cửa hàng không bao giờ bị xoá và mã là duy nhất. Đổi mã thì chi phí cũ vẫn thuộc cửa hàng này; báo cáo và CSV từ giờ dùng mã mới.</p>
       </fieldset>
       {problem && (
         <p className="error" role="alert">
