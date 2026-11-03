@@ -359,7 +359,9 @@ test('as on Fash, a sample with a details file shows its prompt, input photos, s
     await signIn(page, 'cvexa');
     await openCreate(page);
     await page.getByRole('tab', { name: 'Ví dụ' }).click();
-    await openTile(page, 'Xoay quanh chậm');
+    // A tile is named from its details file (the preset, or "Tự viết mô tả" for a prompt), not from the fixture it took the place of.
+    await expect(page.getByRole('button', { name: 'Dùng mẫu này: Ngắm trọn bộ đồ' })).toBeVisible();
+    await openTile(page, 'Tự viết mô tả');
     const detail = page.getByRole('dialog', { name: 'Chi tiết mẫu' });
     await expect(detail.locator('.detail-prompt')).toHaveText(details.prompt);
     await expect(detail.getByRole('list', { name: 'Ảnh đầu vào' }).getByRole('img')).toHaveCount(2);
@@ -368,7 +370,7 @@ test('as on Fash, a sample with a details file shows its prompt, input photos, s
     // As on Fash: the model above the prompt, no preset chip for a sample made from a prompt, and the title only for screen readers.
     await expect(detail.locator('.detail-model')).toHaveText('Mock E2E');
     await expect(detail.locator('.detail-chip')).toHaveCount(0);
-    await expect(detail.getByRole('heading', { name: 'Xoay quanh chậm' })).toHaveClass('sr-only');
+    await expect(detail.getByRole('heading', { name: 'Tự viết mô tả' })).toHaveClass('sr-only');
     // A sample made from a preset shows the preset's chip, with its name, and no prompt.
     await detail.getByRole('button', { name: 'Mẫu sau' }).click();
     await expect(detail.locator('.detail-chip')).toHaveText('Ngắm trọn bộ đồ');
@@ -399,6 +401,13 @@ test('as on Fash, a sample with a details file shows its prompt, input photos, s
     await expect(page.getByRole('textbox', { name: 'Mô tả chuyển động' })).toHaveValue(details.prompt);
     await expect(select(page, 'Tỉ lệ khung hình')).toHaveAttribute('data-value', '1:1');
     await expect(select(page, 'Thời lượng')).toHaveAttribute('data-value', '8');
+
+    // The tile's own "Dùng mẫu này" refills from the details file too: the preset it names and its photo, not the fixture's preset.
+    await page.keyboard.press('Escape');
+    await expect(detail).toBeHidden();
+    await page.getByRole('button', { name: 'Dùng mẫu này: Ngắm trọn bộ đồ' }).click();
+    await expect(page.locator('.banner-text strong')).toHaveAttribute('data-value', 'outfit-check');
+    await expect(page.getByLabel('Ảnh đã chọn').getByRole('img', { name: 'example-2-input.png' })).toBeVisible();
   } finally {
     await asAdmin((name) => page.request.delete(`/api/admin/samples/${name}`));
   }
@@ -425,7 +434,7 @@ test("as on Fash's Recreate, a sample's model name and its resolution put that m
     await selectValue(page, 'Tỉ lệ khung hình', '9:16');
     await selectValue(page, 'Thời lượng', '5');
     await page.getByRole('tab', { name: 'Ví dụ' }).click();
-    await openTile(page, 'Xoay quanh chậm');
+    await openTile(page, 'Tự viết mô tả');
     const detail = page.getByRole('dialog', { name: 'Chi tiết mẫu' });
     const note = (text: string) => page.getByRole('region', { name: 'Thông báo' }).getByText(text);
     await detail.getByRole('button', { name: 'Dùng mô hình Short model' }).click();
@@ -439,7 +448,7 @@ test("as on Fash's Recreate, a sample's model name and its resolution put that m
     await selectValue(page, 'Tỉ lệ khung hình', '9:16');
     await selectValue(page, 'Thời lượng', '5');
     await expect(modelButton(page)).toContainText('Wide model');
-    await openTile(page, 'Xoay quanh chậm');
+    await openTile(page, 'Tự viết mô tả');
     await detail.getByRole('list', { name: 'Thông số' }).getByRole('button', { name: '720p' }).click();
     await expect(note('Đã chọn độ phân giải 720p')).toBeVisible();
     await expect(modelButton(page)).toContainText('Short model');

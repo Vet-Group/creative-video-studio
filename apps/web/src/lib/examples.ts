@@ -103,12 +103,18 @@ const UPLOADED_SIZE: Record<string, [Aspect, number, number]> = {
   'example-10': ['1:1', 1440, 1440],
 };
 
+/** An uploaded clip is another video than the fixture it replaced, so it drops the fixture's title and preset too: its details file names them (exampleTitle). */
 function uploaded(e: Example, have: ReadonlySet<string>): Example {
-  const size = have.has(`${e.id}.mp4`) ? UPLOADED_SIZE[e.id] : undefined;
-  if (!size) return e;
+  if (!have.has(`${e.id}.mp4`)) return e;
   const { ratio: _fixtureRatio, ...rest } = e;
-  const [aspect, width, height] = size;
-  return { ...rest, aspect, width, height, ...(aspect === '9:16' || aspect === '1:1' ? { ratio: aspect } : {}) };
+  const [aspect, width, height] = UPLOADED_SIZE[e.id] ?? [e.aspect, e.width, e.height];
+  return { ...rest, title: `Video mẫu ${e.id.slice('example-'.length)}`, presetId: '', fixture: false, aspect, width, height, ...(aspect === '9:16' || aspect === '1:1' ? { ratio: aspect } : {}) };
+}
+
+/** A tile's name: the preset its details file names, "Tự viết mô tả" for a free prompt, else (no details yet) the clip's own title. */
+export function exampleTitle(ex: Example, details: { presetId: string | null } | undefined, presets: readonly { id: string; label: string }[] | null): string {
+  if (!details) return ex.title;
+  return (details.presetId && presets?.find((p) => p.id === details.presetId)?.label) || 'Tự viết mô tả';
 }
 
 /** The Examples tab: the ten fixture-backed clips, then each further sample clip that is uploaded. */
@@ -130,7 +136,8 @@ export function numberedSamples(have: ReadonlySet<string>, prefix: string, ext: 
   return [...have].filter((name) => name.startsWith(prefix) && name.endsWith(`.${ext}`) && /^[1-9]\d*$/.test(name.slice(prefix.length, -ext.length - 1))).sort((a, b) => n(a) - n(b));
 }
 
-export const exampleForPreset = (presetId: string): Example | undefined => EXAMPLES.find((e) => e.presetId === presetId);
+/** The fixture clip that stands for a preset, unless an uploaded clip (another video) has taken its name. */
+export const exampleForPreset = (presetId: string, have: ReadonlySet<string>): Example | undefined => EXAMPLES.find((e) => e.presetId === presetId && !have.has(`${e.id}.mp4`));
 
 /** Deals the tiles into columns, each to the currently shortest one, so the columns end level and every tile keeps its aspect ratio. */
 export function splitColumns(items: Example[], count: number): Example[][] {

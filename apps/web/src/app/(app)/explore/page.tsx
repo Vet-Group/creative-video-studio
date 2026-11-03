@@ -178,7 +178,7 @@ export default async function ExplorePage() {
       {/* A masonry of looping tiles like the live page: the name and a Create button show on hover or focus. The first tile is the free prompt. */}
       <ul className="explore-prompts" aria-label="Mẫu">
         {[{ id: 'none', label: 'Tự viết mô tả', sample: 'preset-general' }, ...presets.rows.map((p) => ({ ...p, sample: `preset-${p.id}` }))].map((p) => {
-          const ex = exampleForPreset(p.id);
+          const ex = exampleForPreset(p.id, have);
           const media = cardSample(have, p.sample, ex ? sampleSrc(have, ex.poster) : null);
           return (
             <li key={p.id}>
