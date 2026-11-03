@@ -22,6 +22,25 @@ const SMALL_URL = `data:image/png;base64,${Buffer.from(small).toString('base64')
 afterEach(() => vi.unstubAllGlobals());
 
 describe('realProviders', () => {
+  test('the LLM calls go to OpenAI when OPENAI_API_KEY is set, else to fal, and nowhere without either key', async () => {
+    const urls: string[] = [];
+    vi.stubGlobal('fetch', async (url: string) => {
+      urls.push(String(url));
+      const usage = { prompt_tokens: 10, completion_tokens: 10 };
+      return new Response(JSON.stringify(url.includes('openai') ? { choices: [{ message: { content: '["a", "b", "c"]' } }], usage } : { output: '["a", "b", "c"]', usage: { cost: 0.001 } }));
+    });
+    const both = realProviders(pool([]), { FAL_KEY: 'k', OPENAI_API_KEY: 'sk' });
+    expect(await both.enhance!('p', 'video', 100)).toMatchObject({ provider: 'openai', model: 'gpt-6-luna' });
+    expect(await both.suggest!({ field: 'brief', text: '', context: '', max: 100 })).toMatchObject({ provider: 'openai', model: 'gpt-6-luna' });
+    expect(Object.keys(both.providers)).toEqual(['fal']); // the video models stay on fal
+    const fal = realProviders(pool([]), { FAL_KEY: 'k' });
+    expect(await fal.enhance!('p', 'video', 100)).toMatchObject({ provider: 'fal', model: 'google/gemini-2.5-flash' });
+    expect(await fal.suggest!({ field: 'brief', text: '', context: '', max: 100 })).toMatchObject({ provider: 'fal' });
+    expect(urls).toEqual(['https://api.openai.com/v1/chat/completions', 'https://api.openai.com/v1/chat/completions', 'https://fal.run/openrouter/router', 'https://fal.run/openrouter/router']);
+    const none = realProviders(pool([]), {});
+    expect([none.enhance, none.suggest]).toEqual([undefined, undefined]);
+  });
+
   test('wires fal (video and image) and Replicate only when their keys are set', () => {
     expect(realProviders(pool([]), {})).toEqual({ providers: {}, imageProviders: {}, vertexAccounts: [] });
     const fal = realProviders(pool([]), { FAL_KEY: 'k' });

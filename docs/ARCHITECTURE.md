@@ -97,7 +97,7 @@ Every money event is a row in `cost_entries`. The ledger is the only place cost 
 | `manual_adjustment` | An Admin adds a correction. A note is required. |
 | `invoice_diff` | An Admin enters a provider's monthly invoice total. |
 | `store_reassign` | An Admin moves a clip to another store. It is a pair: minus X on the old store, plus X on the new one. |
-| `llm` | fal reports the cost of an LLM call: a job's Enhance, or a suggestion or translation run. One row per source, by `ref` (`llm:enhance:<job id>`, `llm:suggestion:<run id>`). |
+| `llm` | The cost of an LLM call (fal reports it; OpenAI's is computed from the usage tokens in `packages/core/src/enhance.ts`): a job's Enhance, or a suggestion or translation run. One row per source, by `ref` (`llm:enhance:<job id>`, `llm:suggestion:<run id>`). |
 
 **Row shape.**
 - Exact decimal `usd numeric(12,4)`, never a float.
