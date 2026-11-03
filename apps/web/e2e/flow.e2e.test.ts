@@ -54,9 +54,10 @@ test('a Member runs a mock job and works through the Library', async ({ page }) 
   await expect(page.getByText('Chưa có clip nào khớp bộ lọc.')).toBeVisible();
   await page.getByLabel('Tỉ lệ').selectOption('1:1');
   await expect(card).toHaveCount(1);
-  await page.getByLabel('Ngày').fill('2000-01-01');
+  await page.getByRole('combobox', { name: 'Ngày', exact: true }).selectOption({ label: 'Chọn một ngày…' });
+  await page.getByLabel('Ngày cụ thể').fill('2000-01-01');
   await expect(page.getByText('Chưa có clip nào khớp bộ lọc.')).toBeVisible();
-  await page.getByLabel('Ngày').fill('');
+  await page.getByLabel('Ngày cụ thể').fill('');
   await expect(card).toHaveCount(1);
 
   // Reuse, from the detail view, pre-fills the Create form, and it stays editable.
