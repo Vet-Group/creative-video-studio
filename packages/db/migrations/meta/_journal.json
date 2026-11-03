@@ -372,6 +372,13 @@
       "when": 1794394964036,
       "tag": "0052_gpt_image_2_2k_4k",
       "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1794394965036,
+      "tag": "0053_gpt_image_2_1k_price",
+      "breakpoints": true
     }
   ]
 }
