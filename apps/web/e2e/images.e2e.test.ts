@@ -36,13 +36,19 @@ test('a mock image job made through the API is an image card under "Tất cả �
   const card = cards.filter({ hasText: 'E2E Member 8' });
   await expect(card).toHaveCount(1);
   await expect(card).toHaveAccessibleName(/^Ảnh /);
-  await expect(card.getByText('Mock image E2E · 3:4 · 1K')).toBeVisible();
+  await expect(card.getByText('Mock image E2E', { exact: true })).toBeVisible();
   const image = card.getByRole('img');
   await expect(image).toBeVisible();
   await expect.poll(() => image.evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0);
   await expect(card.locator('video')).toHaveCount(0);
-  await expect(card.getByRole('link', { name: 'Dùng lại' })).toHaveAttribute('href', /^\/image-generation\?reuse=/); // an image reopens Image Generation
   for (const name of ['Tải xuống', 'Đạt', 'Nổi bật', 'Không đạt', 'Xóa']) await expect(card.getByRole('button', { name, exact: true })).toBeVisible();
+  // The detail view tells how it was made, and its Reuse reopens Image Generation.
+  await card.getByRole('button', { name: 'Xem chi tiết' }).click();
+  const recipe = page.getByRole('dialog').getByRole('definition');
+  await expect(recipe.filter({ hasText: /^3:4$/ })).toHaveCount(1);
+  await expect(recipe.filter({ hasText: /^1K$/ })).toHaveCount(1);
+  await expect(page.getByRole('dialog').getByRole('link', { name: 'Dùng lại' })).toHaveAttribute('href', /^\/image-generation\?reuse=/);
+  await page.keyboard.press('Escape');
 
   // The Library is company-wide, so other specs' clips may be listed; this member's image must be in none of the other kinds.
   for (const name of ['Tất cả video', 'Thử đồ', 'Tạo video', 'Marketing Studio', 'Ứng dụng']) {

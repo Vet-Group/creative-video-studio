@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { runViaApi, signIn } from './support.test';
+import { png, runViaApi, signIn } from './support.test';
 
 test('Library tools: favourites only, oldest first, the size slider and the empty state', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
@@ -164,9 +164,90 @@ test('Library views: grid or list remembered, a selection bar with the zip, sear
   expect(await fits()).toBe(true);
 
   // No items at all: the first-use state leads to Create video and Image Generation.
-  await page.route(/\/api\/library(\?|$)/, (r) => r.fulfill({ json: { hasMore: false, isAdmin: false, creators: [], clips: [] } }));
+  await page.route(/\/api\/library(\?|$)/, (r) => r.fulfill({ json: { hasMore: false, isAdmin: false, unmarked: 0, creators: [], clips: [] } }));
   await page.reload();
   await expect(page.getByText('Thư viện còn trống')).toBeVisible();
   await expect(page.locator('.library-empty').getByRole('link', { name: 'Tạo video' })).toHaveAttribute('href', '/create');
   await expect(page.locator('.library-empty').getByRole('link', { name: 'Tạo ảnh' })).toHaveAttribute('href', '/image-generation');
+});
+
+test('Library detail: how an item was made for anyone, marks by keyboard, ←/→ between items, bulk marks that skip the items of others, the unmarked count and no tray', async ({ page, browser }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  const image = async (p: typeof page, prompt: string) => {
+    const up = (await (await p.request.post('/api/assets', { multipart: { file: { name: 'recipe.png', mimeType: 'image/png', buffer: png() } } })).json()) as { assets: { id: string }[] };
+    const res = await p.request.post('/api/jobs', { data: { feature: 'image', modelId: 'mock-image-e2e', assetIds: [up.assets[0]!.id], ratio: '3:4', prompt, enhance: false, params: { resolution: '1K' } } });
+    expect(res.status()).toBe(201);
+    return ((await res.json()) as { id: string }).id;
+  };
+  const done = (p: typeof page, ids: string[]) =>
+    expect.poll(async () => ((await (await p.request.get('/api/jobs?mine')).json()) as { jobs: { id: string; status: string }[] }).jobs.filter((j) => ids.includes(j.id) && j.status === 'succeeded').length, { timeout: 60_000 }).toBe(ids.length);
+  const other = await (await browser.newContext()).newPage();
+  await signIn(other, 'librb');
+  const theirs = await image(other, 'words of member B');
+  await signIn(page, 'libra');
+  const older = await image(page, 'recipe words one');
+  const newer = await image(page, 'recipe words two');
+  await done(other, [theirs]);
+  await done(page, [older, newer]);
+
+  await page.goto('/library');
+  await expect(page.getByRole('complementary', { name: 'Job của tôi' })).toHaveCount(0); // the Library already lists every result
+  const item = (id: string) => page.getByRole('article', { name: new RegExp(`${id.slice(0, 8)}\\.[a-z0-9]+$`) });
+  const detail = page.getByRole('dialog');
+  const recipe = detail.getByRole('definition');
+  // The label carries no count at 0 (and before the first page arrives, so the first read waits for 2 or more).
+  const unmarked = async () => Number((await page.getByLabel('Kết quả').locator('option[value="none"]').textContent())?.match(/^Chưa chấm(?: \((\d+)\))?$/)?.[1] ?? 0);
+  await expect.poll(unmarked).toBeGreaterThanOrEqual(2);
+  const before = await unmarked();
+
+  // Another member's item: its prompt, model and settings are open to everyone, its marks are not.
+  await item(theirs).getByRole('button', { name: 'Xem chi tiết' }).click();
+  await expect(detail.getByText('words of member B', { exact: true })).toBeVisible();
+  await expect(recipe.filter({ hasText: /^Mock image E2E$/ })).toHaveCount(1);
+  await expect(recipe.filter({ hasText: /^E2E Library Recipe B · / })).toHaveCount(1);
+  await expect(detail.getByRole('button', { name: 'Đạt', exact: true })).toHaveCount(0);
+  await page.keyboard.press('Escape');
+
+  // Own items, newest first: 2 marks the open one featured, → moves to the older one, 1 passes it, 3 opens the fault list.
+  await page.getByLabel('Người tạo').selectOption({ label: 'E2E Library Recipe A' });
+  await expect(page.getByRole('article')).toHaveCount(2);
+  await item(newer).getByRole('button', { name: 'Xem chi tiết' }).click();
+  await expect(detail.getByText('recipe words two', { exact: true })).toBeVisible();
+  await page.keyboard.press('2');
+  await expect(detail.locator('h2 .lib-mark')).toHaveText('Nổi bật');
+  await page.keyboard.press('ArrowRight');
+  await expect(detail.getByText('recipe words one', { exact: true })).toBeVisible();
+  await expect(detail.locator('h2 .lib-mark')).toHaveCount(0);
+  await page.keyboard.press('1');
+  await expect(detail.locator('h2 .lib-mark')).toHaveText('Đạt');
+  await page.keyboard.press('3');
+  await expect(detail.getByLabel('Lỗi gặp phải')).toBeFocused();
+  await detail.getByLabel('Lỗi gặp phải').selectOption({ label: 'Sai màu' });
+  await detail.getByRole('button', { name: 'Xác nhận không đạt' }).click();
+  await expect(detail.locator('h2 .lib-mark')).toHaveText('Không đạt · Sai màu');
+  await page.locator('body').press('ArrowLeft');
+  await expect(detail.getByText('recipe words two', { exact: true })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(item(newer).getByTitle('Kết quả: Nổi bật', { exact: true })).toBeVisible();
+  await expect(item(older).getByTitle('Kết quả: Không đạt · Sai màu', { exact: true })).toBeVisible();
+  await expect.poll(unmarked).toBe(before - 2);
+
+  // Bulk: marks only the caller's own items and says how many it left alone.
+  await page.getByLabel('Người tạo').selectOption('');
+  await page.getByRole('button', { name: 'Chọn', exact: true }).click();
+  for (const id of [newer, older, theirs]) await item(id).getByRole('checkbox').check();
+  const bulk = page.getByRole('group', { name: 'Chấm nhiều mục' });
+  await bulk.getByRole('button', { name: 'Đạt', exact: true }).click();
+  await expect(bulk.getByRole('status')).toHaveText('Đã lưu 2 mục, bỏ qua 1 mục không phải của bạn.');
+  await expect(item(newer).getByTitle('Kết quả: Nổi bật', { exact: true })).toBeVisible(); // a bulk Pass keeps it featured
+  await expect(item(older).getByTitle('Kết quả: Đạt', { exact: true })).toBeVisible();
+  await expect(item(theirs).getByTitle(/^Kết quả:/)).toHaveCount(0);
+  await bulk.getByLabel('Lỗi cho Không đạt').selectOption({ label: 'Nhấp nháy hoặc giật hình' });
+  await bulk.getByRole('button', { name: 'Không đạt', exact: true }).click();
+  await expect(item(older).getByTitle('Kết quả: Không đạt · Nhấp nháy hoặc giật hình', { exact: true })).toBeVisible();
+  await expect.poll(unmarked).toBe(before - 2); // a changed mark is not a first one
+
+  // Leave nothing behind for the other specs that read the shared Library.
+  for (const id of [newer, older]) expect((await page.request.delete(`/api/jobs/${id}`)).ok()).toBe(true);
+  expect((await other.request.delete(`/api/jobs/${theirs}`)).ok()).toBe(true);
 });

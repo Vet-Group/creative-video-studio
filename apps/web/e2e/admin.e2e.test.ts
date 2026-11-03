@@ -189,13 +189,19 @@ test('an Admin re-assigns a clip store from the Library and Reuse follows it', a
   await expect(page.getByRole('region', { name: 'Thông báo' }).getByText('Clip đã xong')).toBeVisible({ timeout: 60_000 });
 
   await page.getByRole('link', { name: 'Thư viện' }).first().click();
-  const card = page.getByRole('article').first();
-  await expect(card.getByLabel('Cửa hàng').locator('option:checked')).toHaveText('Reuse Shop A');
-  await card.getByLabel('Cửa hàng').selectOption({ label: 'Reuse Shop B' });
+  // An Admin re-assigns the store in the detail view.
+  const open = () => page.getByRole('article').first().getByRole('button', { name: 'Xem chi tiết' }).click();
+  const store = page.getByRole('dialog').getByLabel('Cửa hàng');
+  await open();
+  await expect(store.locator('option:checked')).toHaveText('Reuse Shop A');
+  const saved = page.waitForResponse((r) => r.url().endsWith('/store') && r.request().method() === 'PUT');
+  await store.selectOption({ label: 'Reuse Shop B' });
+  expect((await saved).ok()).toBe(true);
   await page.reload();
-  await expect(page.getByRole('article').first().getByLabel('Cửa hàng').locator('option:checked')).toHaveText('Reuse Shop B');
+  await open();
+  await expect(store.locator('option:checked')).toHaveText('Reuse Shop B');
 
-  await page.getByRole('article').first().getByRole('link', { name: 'Dùng lại' }).click();
+  await page.getByRole('dialog').getByRole('link', { name: 'Dùng lại' }).click();
   await expect(select(page, 'Cửa hàng/Thương hiệu')).toHaveText('Reuse Shop B');
 
   // The Library is shared by every spec, which filter it by ratio and date: leave no clip of this spec behind.

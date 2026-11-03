@@ -1,13 +1,19 @@
 'use client';
 // Many results at once: the select toggle shows a checkbox per item with an output, and the bar downloads the picked ones as one .zip (POST for a signed link, then the link).
 // With `hover` (the Library) every item has its checkbox, shown on hover or focus by CSS; picking one starts the selection, and Esc or the clear button ends it.
+// `actions` adds the page's own controls for the picked ids to the bar (the Library's marks and store).
 import { type ReactNode, useEffect, useState } from 'react';
 import { api, ApiError, sendJson } from '@/lib/api';
 import { Icon } from './Icon';
 
 const MAX = 50; // what /api/library/zip takes
 
-export function useZipDownload({ hover = false } = {}): { active: boolean; toggle: ReactNode; bar: ReactNode; check: (id: string, label: string) => ReactNode } {
+export function useZipDownload({ hover = false, actions }: { hover?: boolean; actions?: (ids: string[]) => ReactNode } = {}): {
+  active: boolean;
+  toggle: ReactNode;
+  bar: ReactNode;
+  check: (id: string, label: string) => ReactNode;
+} {
   const [on, setOn] = useState(false);
   const [ids, setIds] = useState<string[]>([]);
   const [problem, setProblem] = useState('');
@@ -62,6 +68,7 @@ export function useZipDownload({ hover = false } = {}): { active: boolean; toggl
           {hover && <Icon name="download" />}
           Tải xuống .zip
         </button>
+        {ids.length > 0 && actions?.(ids)}
         {hover && (
           <button type="button" className="zip-clear" onClick={clear}>
             Bỏ chọn

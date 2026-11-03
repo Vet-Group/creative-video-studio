@@ -35,7 +35,7 @@ const OWN_PROMPT = `case when j.feature = 'image' or (j.feature = 'video' and j.
  * The Library: every user's live clips and images, newest first. Filters: `creator` (a user id), `date` (YYYY-MM-DD, Asia/Ho_Chi_Minh), `ratio` and
  * `kind` (`all` by default, `images`, `videos`, one feature of `try_on`, `image`, `video`, `marketing` (or one of its formats, `marketing_ugc` and `marketing_advanced`), or `apps` for every app feature),
  * `verdict` (`none` for unmarked items, `pass`, `featured` or `fail`), `favorites=1` (only the caller's favourites), `q` (words in the model name or the creator's own `prompt`, case-insensitive, up to 200 characters) and `sort` (`newest`, the default, or `oldest`); `offset` pages by 24. `favorite` says whether the caller marked an item. Each item has its `feature` and `mediaType` (`video` or `image`, from the output asset); `videoAssetId` is the output asset
- * either way, and an image item has `durationSec` 0 and its `resolution`. `creators` fills the creator filter. `costUsd` is the job's ledger total, provisional while `costFinal` is false.
+ * either way, and an image item has `durationSec` 0 and its `resolution`. `creators` fills the creator filter. `unmarked` counts the live items the caller may mark (their own, or all for an Admin) that have no mark yet. `costUsd` is the job's ledger total, provisional while `costFinal` is false.
  */
 export async function GET(request: Request) {
   const g = await guard(request, 'member');
@@ -61,7 +61,7 @@ export async function GET(request: Request) {
   if (text !== null && text.length > 200) return bad('q must be at most 200 characters');
   const me = g.session.user;
 
-  const [clips, creators] = await Promise.all([
+  const [clips, creators, unmarked] = await Promise.all([
     pool.query(
       `select j.id, j.user_id, u.name as creator_name, j.created_at, ${ICT_DAY} as day, j.model, m.label as model_label, j.aspect, j.duration_s, j.is_mock, j.feature, j.params, o.mime as output_mime, o.filename as output_filename,
               j.output_asset_id, j.poster_asset_id, j.store_id, coalesce(c.usd, 0)::numeric(12, 4)::text as cost_usd, coalesce(c.is_final, false) as cost_final, v.verdict, v.fault, v.featured, v.marked_by, ${OWN_PROMPT} as prompt,
@@ -85,11 +85,13 @@ export async function GET(request: Request) {
       [creator, date, ratio, PAGE + 1, offset, me.id, favorites === '1', text === null ? null : `%${text.replace(/[\\%_]/g, '\\$&')}%`],
     ),
     pool.query(`select distinct u.id, u.name from jobs j join users u on u.id = j.user_id where ${LIVE_CLIP} order by u.name, u.id`),
+    pool.query(`select count(*)::int as n from jobs j where ${LIVE_CLIP} and ($1::boolean or j.user_id = $2) and not exists (select 1 from verdicts v where v.job_id = j.id)`, [me.role === 'admin', me.id]),
   ]);
   return Response.json({
     hasMore: clips.rows.length > PAGE,
     isAdmin: me.role === 'admin',
     creators: creators.rows,
+    unmarked: unmarked.rows[0].n,
     clips: clips.rows.slice(0, PAGE).map((r) => ({
       id: r.id,
       creator: { id: r.user_id, name: r.creator_name },

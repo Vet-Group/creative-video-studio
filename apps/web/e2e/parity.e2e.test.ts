@@ -70,7 +70,7 @@ for (const size of SIZES) {
     // The Library: the grid of clips with controls, poster, cost and verdict.
     await page.goto('/library');
     await expect(page.getByRole('article')).toHaveCount(3);
-    await expect(page.getByText('Chi phí thật: $0.0000')).toHaveCount(3);
+    await expect(page.getByTitle('Chi phí thật', { exact: true })).toHaveText(['$0.0000', '$0.0000', '$0.0000']);
     await expect.poll(() => page.locator('.card video').evaluateAll((vs) => vs.every((v) => (v as HTMLVideoElement).readyState >= 1))).toBe(true);
     await expect(page).toHaveScreenshot(`library-${at}.png`, SHOT);
 

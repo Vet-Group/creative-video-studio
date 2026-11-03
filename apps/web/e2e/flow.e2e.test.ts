@@ -24,14 +24,16 @@ test('a Member runs a mock job and works through the Library', async ({ page }) 
   await expect(page.getByRole('region', { name: 'Thông báo' }).getByText('Clip đã xong')).toBeVisible({ timeout: 60_000 });
   await expect(tray.getByText('Hoàn tất')).toBeVisible();
 
-  // Library: the card carries the MOCK badge and the real cost.
+  // Library: the card carries the MOCK badge and the real cost (in its title).
   await page.getByRole('link', { name: 'Thư viện' }).first().click();
   const card = page.getByRole('article').filter({ hasText: 'E2E Member 1' });
   await expect(card).toHaveCount(1);
   await expect(card.getByText('MOCK', { exact: true })).toBeVisible();
-  await expect(card.getByText('Chi phí thật: $0.0000')).toBeVisible();
-  // Re-assigning the store is for Admins: a Member has no such control.
-  await expect(card.getByLabel('Cửa hàng')).toHaveCount(0);
+  await expect(card.getByTitle('Chi phí thật', { exact: true })).toHaveText('$0.0000');
+  // Re-assigning the store is for Admins, in the detail view: a Member has no such control there.
+  await card.getByRole('button', { name: 'Xem chi tiết' }).click();
+  await expect(page.getByRole('dialog').getByLabel('Cửa hàng')).toHaveCount(0);
+  await page.keyboard.press('Escape');
 
   // Play.
   const video = card.locator('video');
@@ -57,8 +59,9 @@ test('a Member runs a mock job and works through the Library', async ({ page }) 
   await page.getByLabel('Ngày').fill('');
   await expect(card).toHaveCount(1);
 
-  // Reuse pre-fills the Create form, and it stays editable.
-  await card.getByRole('link', { name: 'Dùng lại' }).click();
+  // Reuse, from the detail view, pre-fills the Create form, and it stays editable.
+  await card.getByRole('button', { name: 'Xem chi tiết' }).click();
+  await page.getByRole('dialog').getByRole('link', { name: 'Dùng lại' }).click();
   await expect(page.getByRole('img', { name: 'shirt.png' })).toBeVisible();
   await expect(page).toHaveURL((u) => u.pathname === '/create' && u.search === ''); // the link opened the refill, then the address drops its query
   await expect(presetOf(page)).toHaveAttribute('data-value', 'slow-orbit');
@@ -84,19 +87,19 @@ test('a Member runs a mock job and works through the Library', async ({ page }) 
   await page.getByLabel('Mô tả chuyển động').fill('Slow turn of the shirt.');
   await expect(page.getByRole('button', { name: 'Tạo video' })).toBeEnabled();
 
-  // Pass, then a featured Pass ("Đạt · Nổi bật"), then Fail, which needs a fault.
+  // Pass, then a featured Pass, then Fail, which needs a fault; the badge on the media says which.
   await page.getByRole('link', { name: 'Thư viện' }).first().click();
   await card.getByRole('button', { name: 'Đạt', exact: true }).click();
-  await expect(card.getByText('Kết quả: Đạt', { exact: true })).toBeVisible();
+  await expect(card.getByTitle('Kết quả: Đạt', { exact: true })).toBeVisible();
   await card.getByRole('button', { name: 'Nổi bật', exact: true }).click();
-  await expect(card.getByText('Kết quả: Đạt · Nổi bật', { exact: true })).toBeVisible();
+  await expect(card.getByTitle('Kết quả: Nổi bật', { exact: true })).toBeVisible();
   await expect(card.getByRole('button', { name: 'Nổi bật', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect(card.getByRole('button', { name: 'Đạt', exact: true })).toHaveAttribute('aria-pressed', 'false');
   await card.getByRole('button', { name: 'Không đạt', exact: true }).click();
   await expect(card.getByRole('button', { name: 'Xác nhận không đạt' })).toBeDisabled();
   await card.getByLabel('Lỗi gặp phải').selectOption({ label: 'Sai màu' });
   await card.getByRole('button', { name: 'Xác nhận không đạt' }).click();
-  await expect(card.getByText('Kết quả: Không đạt (Sai màu)')).toBeVisible();
+  await expect(card.getByTitle('Kết quả: Không đạt · Sai màu', { exact: true })).toBeVisible();
 
   // Delete.
   await card.getByRole('button', { name: 'Xóa', exact: true }).click();

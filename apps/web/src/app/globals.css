@@ -2029,3 +2029,58 @@ dialog.modal.verdict-guide { width: min(40rem, calc(100vw - 2rem)); }
 .verdict-guide .verdict-guide-marks { grid-template-columns: max-content 1fr; column-gap: 16px; }
 .verdict-guide .muted { margin: 8px 0 0; }
 .library-sub .link-button { margin-left: 6px; }
+
+/* The Library grid card, media first: a fixed 4:5 frame so rows line up, the result contained in it, its type and length bottom left, the mark top
+   right, the actions bottom right on hover (always on touch), two short lines below and the marks for whoever may edit. */
+.library .lib-card { position: relative; display: flex; flex-direction: column; }
+.lib-media { position: relative; overflow: hidden; aspect-ratio: 4 / 5; border-radius: 10px; background: var(--fill); }
+.library .lib-media > :is(img, video) { display: block; width: 100%; height: 100%; max-height: none; object-fit: contain; border-radius: 0; background: none; }
+.lib-open { position: absolute; inset: 0; width: 100%; height: 100%; padding: 0; border: 0; border-radius: 0; background: none; cursor: zoom-in; }
+.lib-open:focus-visible { outline: 2px solid var(--ink-strong); outline-offset: -2px; }
+.lib-chips { position: absolute; bottom: 8px; left: 8px; display: flex; gap: 4px; max-width: calc(100% - 124px); pointer-events: none; }
+.lib-chip { overflow: hidden; padding: 0 8px; border-radius: 999px; background: rgb(var(--shade) / .6); color: var(--on-dark); font-size: 11px; line-height: 20px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.lib-chips .badge { flex: none; }
+.lib-verdict { position: absolute; top: 8px; right: 8px; max-width: calc(100% - 52px); overflow: hidden; padding: 0 8px; border-radius: 999px; background: var(--cat-utility-solid); color: var(--on-dark); font-size: 11px; line-height: 20px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; pointer-events: none; }
+.lib-verdict.featured { background: var(--favorite); color: var(--on-ink); }
+.lib-verdict.fail { background: var(--danger); color: var(--on-dark); }
+.lib-tools { position: absolute; right: 8px; bottom: 8px; display: flex; gap: 4px; }
+.lib-tools .icon-button { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 8px; background: rgb(var(--shade) / .6); color: var(--on-dark); opacity: 0; transition: opacity .15s; }
+.lib-card:is(:hover, :focus-within) .lib-tools .icon-button, .lib-tools .favorite[aria-pressed='true'] { opacity: 1; }
+.lib-tools .favorite[aria-pressed='true'] { color: var(--favorite); }
+.lib-tools .favorite[aria-pressed='true'] svg path { fill: currentColor; }
+.lib-tools .danger:hover { background: var(--danger); }
+@media (hover: none) { .lib-tools .icon-button { opacity: 1; } }
+@media (pointer: coarse) { .lib-tools .icon-button { width: 44px; height: 44px; } .lib-chips { max-width: calc(100% - 164px); } }
+.lib-info { min-width: 0; padding: 8px 2px 0; }
+.lib-info p { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lib-title { color: var(--ink-strong); font-size: 13px; line-height: 18px; font-weight: 600; }
+.lib-meta { color: var(--text-muted); font-size: 12px; line-height: 17px; }
+.lib-mark.featured { background: var(--favorite); color: var(--on-ink); }
+
+/* The detail view's recipe: a wider side column with the words, the inputs and a label/value list of how the result was made. */
+.modal.lightbox { width: min(1080px, calc(100vw - 32px)); }
+.lightbox .modal-body { grid-template-columns: minmax(0, 1fr) 320px; }
+.lightbox-side h2 { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.lightbox-side h2 .lib-mark { margin-left: 0; }
+.recipe-text h3 { margin: 0 0 4px; color: var(--text-muted); font-size: 12px; line-height: 16px; font-weight: 600; }
+.recipe-text p { max-height: 160px; margin: 0; overflow-y: auto; color: var(--ink); font-size: 13px; line-height: 19px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.recipe-sent summary { color: var(--text-muted); font-size: 12px; font-weight: 600; cursor: pointer; }
+.recipe-sent p { max-height: 160px; margin: 6px 0 0; overflow-y: auto; color: var(--text-2); font-size: 12px; line-height: 18px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.recipe { display: grid; gap: 6px; margin: 0; padding-top: 12px; border-top: 1px solid var(--hairline); }
+.recipe > div { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 8px; }
+.recipe dt { color: var(--text-muted); font-size: 12px; line-height: 18px; }
+.recipe dd { margin: 0; color: var(--ink); font-size: 12px; line-height: 18px; overflow-wrap: anywhere; }
+.recipe-store { display: grid; gap: 4px; margin: 0; color: var(--text-muted); font-size: 12px; font-weight: 500; }
+.recipe-store select { height: 32px; font-size: 13px; }
+.recipe-keys { margin: 0; color: var(--text-subtle); font-size: 11px; line-height: 16px; }
+@media (hover: none) { .recipe-keys { display: none; } }
+@media (max-width: 760px) { .lightbox .modal-body { grid-template-columns: 1fr; } }
+
+/* The selection bar's marks and store, beside the zip download. */
+.bulk-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.bulk-actions label { margin: 0; }
+.bulk-actions select { height: 36px; max-width: 12rem; font-size: 13px; }
+.bulk-note { color: var(--text-muted); font-size: 12px; }
+
+/* A tray job's links: the Library link and Reuse side by side. */
+.job-links { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 2px 0 0; }
