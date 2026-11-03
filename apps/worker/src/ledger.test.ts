@@ -1,5 +1,5 @@
 // The cost ledger functions against a disposable database (needs the compose Postgres: `pnpm services:up`).
-import { bookInvoice, bookShared, close24h, lateBill, reassignStore, release, reserve, settle, withTransaction } from '@cvs/core/ledger';
+import { bookInvoice, bookLlm, bookShared, close24h, lateBill, reassignStore, release, reserve, settle, withTransaction } from '@cvs/core/ledger';
 import { createPool } from '@cvs/db/client';
 import { createTestDatabase } from '@cvs/db/testing';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
@@ -246,6 +246,43 @@ describe('bookShared', () => {
       await expect(bookShared(pool, { kind: 'bakeoff', usd: 1, month: '2026-10', provider: 'fal', ref } as unknown as Parameters<typeof bookShared>[1])).rejects.toThrow(/needs a ref/);
     }
     expect((await pool.query('select count(*)::int as n from cost_entries')).rows[0].n).toBe(before);
+  });
+});
+
+describe('bookLlm', () => {
+  const llmRows = (ref: string) =>
+    pool.query(`select usd::text, month, day::text, user_id, team_id, store_id, job_id, provider, model, is_final from cost_entries where ref = $1`, [ref]).then((r) => r.rows);
+
+  test("books a job's Enhance once on the job, without closing it, and settling neither absorbs nor releases it", async () => {
+    const id = await reservedJob('1.0000', { status: 'running', storeId: 'store-a', createdAt: '2026-10-31T18:30:00Z' });
+    expect(await bookLlm(pool, { enhance: id }, { costUsd: 0.00041, provider: 'fal', model: 'google/gemini-2.5-flash' })).toBe(true);
+    expect(await bookLlm(pool, { enhance: id }, { costUsd: 0.00041, provider: 'fal', model: 'google/gemini-2.5-flash' })).toBe(false); // a retry books nothing
+    expect(await llmRows(`llm:enhance:${id}`)).toEqual([
+      { usd: '0.0004', month: '2026-11', day: '2026-11-01', user_id: 'u1', team_id: 'team-b', store_id: 'store-a', job_id: id, provider: 'fal', model: 'google/gemini-2.5-flash', is_final: false },
+    ]);
+    expect(await total(id)).toEqual({ usd: '1.0004', is_final: false });
+    expect(await settle(pool, id, { status: 'succeeded', costUsd: '1.5000', outputAssetId: await asset(), posterAssetId: null })).toBe(true);
+    expect(await total(id)).toEqual({ usd: '1.5004', is_final: true });
+    const unbilled = await reservedJob('1.0000', { status: 'running' });
+    await bookLlm(pool, { enhance: unbilled }, { costUsd: 0.0003, provider: 'fal', model: 'm' });
+    expect(await release(pool, unbilled, 'refused')).toBe(true);
+    expect(await total(unbilled)).toEqual({ usd: '0.0003', is_final: true }); // the provider run is released, the LLM call stays billed
+  });
+
+  test("books a suggestion or translation run without a job, on the member and the member's team, final", async () => {
+    await pool.query(`insert into users (id, email, name, team_id) values ('u-llm', 'u-llm@example.test', 'u-llm', 'team-b')`);
+    await pool.query(`insert into suggestion_runs (id, user_id, input, created_at) values ('run-llm', 'u-llm', '{}', '2026-10-30T03:00:00Z')`);
+    expect(await bookLlm(pool, { suggestion: 'run-llm' }, { costUsd: 0.00055, provider: 'openai', model: 'gpt-6-luna' })).toBe(true);
+    expect(await bookLlm(pool, { suggestion: 'run-llm' }, { costUsd: 0.00055, provider: 'openai', model: 'gpt-6-luna' })).toBe(false);
+    expect(await llmRows('llm:suggestion:run-llm')).toEqual([
+      { usd: '0.0006', month: '2026-10', day: '2026-10-30', user_id: 'u-llm', team_id: 'team-b', store_id: null, job_id: null, provider: 'openai', model: 'gpt-6-luna', is_final: true },
+    ]);
+  });
+
+  test('books nothing for a null cost, a 0 cost or one that rounds to 0 USD', async () => {
+    const id = await reservedJob('1.0000', { status: 'running' });
+    for (const cost of [null, 0, 0.00004]) expect(await bookLlm(pool, { enhance: id }, { costUsd: cost, provider: 'fal', model: 'm' })).toBe(false);
+    expect((await rowsOf(id)).map((r) => r.kind)).toEqual(['estimate']);
   });
 });
 

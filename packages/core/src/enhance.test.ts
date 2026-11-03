@@ -12,7 +12,7 @@ test('sends the prompt with the kind’s system prompt to the OpenRouter router 
       return answer({ output: '  "A slow push-in on [Image1] as soft light sweeps across the fabric."  ', usage: { cost: 0.00042 } });
     },
   });
-  expect(await enhance('push in on [Image1]', 'video', 2000)).toEqual({ prompt: 'A slow push-in on [Image1] as soft light sweeps across the fabric.', costUsd: 0.00042 });
+  expect(await enhance('push in on [Image1]', 'video', 2000)).toEqual({ prompt: 'A slow push-in on [Image1] as soft light sweeps across the fabric.', costUsd: 0.00042, provider: 'fal', model: ENHANCE_MODEL });
   expect(calls[0]!.url).toBe(ENHANCE_URL);
   expect((calls[0]!.init.headers as Record<string, string>).Authorization).toBe('Key k');
   expect(JSON.parse(String(calls[0]!.init.body))).toMatchObject({ model: ENHANCE_MODEL, prompt: 'push in on [Image1]', system_prompt: SYSTEM_PROMPTS.video });
@@ -23,7 +23,7 @@ test('uses the image system prompt for an image job, cuts a long answer to the m
   const enhance = createFalEnhancer({ apiKey: 'k', fetch: (_u, init) => ((sent = String(init!.body)), answer({ output: 'x'.repeat(2550) })) });
   const r = await enhance('a red dress on a beach', 'image', 2500);
   expect(JSON.parse(sent).system_prompt).toBe(SYSTEM_PROMPTS.image);
-  expect(r).toEqual({ prompt: 'x'.repeat(2500), costUsd: null });
+  expect(r).toEqual({ prompt: 'x'.repeat(2500), costUsd: null, provider: 'fal', model: ENHANCE_MODEL });
 });
 
 test('an empty answer, an error field or an HTTP error throws, so the caller keeps the member’s prompt', async () => {

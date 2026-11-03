@@ -69,12 +69,13 @@ async function lockJob(tx: Queryable, jobId: string): Promise<JobRow> {
   return rows[0];
 }
 
-/** The job's rows so far: their sum and the sum of the estimate, in 1/10000 USD, how many there are, and whether one closes the job. */
+/** The job's provider rows so far: their sum and the sum of the estimate, in 1/10000 USD, how many there are, and whether one closes the job.
+ * The job's llm row (its Enhance) is billed apart from the provider's run, so settling never absorbs or releases it. */
 async function balance(tx: Queryable, jobId: string): Promise<{ total: number; estimate: number; rows: number; final: boolean }> {
   const { rows } = await tx.query(
     `select coalesce(sum(usd), 0)::text as total, coalesce(sum(usd) filter (where kind = 'estimate'), 0)::text as estimate,
             count(*)::int as rows, coalesce(bool_or(is_final), false) as final
-       from cost_entries where job_id = $1`,
+       from cost_entries where job_id = $1 and kind <> 'llm'`,
     [jobId],
   );
   return { total: units(rows[0].total), estimate: units(rows[0].estimate), rows: rows[0].rows, final: rows[0].final };
@@ -189,6 +190,33 @@ export async function bookShared(
   const { rowCount } = await db.query(
     `insert into cost_entries (kind, usd, month, provider, model, is_final, ref, note) values ($1, $2, $3, $4, $5, true, $6, $7) on conflict (ref) do nothing`,
     [e.kind, fmt(units(e.usd)), e.month, e.provider ?? null, e.model ?? null, e.ref, e.note ?? null],
+  );
+  return rowCount === 1;
+}
+
+/**
+ * The cost of one LLM call, with the provider and model that answered it, once per source: a job's Enhance (on the job, its user, team, store and Run day; not final, as it never closes the
+ * job) or a suggestion or translation run (no job; the run's user, that user's team now and the run's ICT day; final). False when the cost is null
+ * or rounds to 0 USD, or the source was booked before.
+ */
+export async function bookLlm(
+  db: Queryable,
+  source: { enhance: string } | { suggestion: string },
+  call: { costUsd: number | null; provider: string; model: string },
+): Promise<boolean> {
+  const usd = call.costUsd === null ? 0 : units(call.costUsd);
+  if (usd === 0) return false;
+  const [from, id, ref] = 'enhance' in source
+    ? [`select created_at, user_id, team_id, store_id, id as job_id, false as is_final from jobs where id = $4`, source.enhance, `llm:enhance:${source.enhance}`]
+    : [`select r.created_at, r.user_id, u.team_id, null::text as store_id, null::text as job_id, true as is_final
+          from suggestion_runs r join users u on u.id = r.user_id where r.id = $4`, source.suggestion, `llm:suggestion:${source.suggestion}`];
+  const { rowCount } = await db.query(
+    `insert into cost_entries (kind, usd, month, day, user_id, team_id, store_id, job_id, provider, model, is_final, ref)
+     select 'llm', $1, to_char(s.created_at at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM'), (s.created_at at time zone 'Asia/Ho_Chi_Minh')::date,
+            s.user_id, s.team_id, s.store_id, s.job_id, $5, $2, s.is_final, $3
+       from (${from}) s
+     on conflict (ref) do nothing`,
+    [fmt(usd), call.model, ref, id, call.provider],
   );
   return rowCount === 1;
 }

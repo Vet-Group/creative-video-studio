@@ -564,6 +564,30 @@ describe('cost_entries', () => {
     await expect(pool.query(`insert into cost_entries (kind, usd, month, user_id) values ('bakeoff', 1, '2026-10', $1)`, [userId])).rejects.toThrow(/cost_entries_shared_unattributed_check/);
   });
 
+  test('migration 0055: an llm row may go without a job but names its user, team, day and a unique ref; the other kinds keep their rules', async () => {
+    const llm = (jobId: string | null, ref: string | null, o: { user?: string | null; team?: string | null; day?: string | null; isFinal?: boolean } = {}) =>
+      pool.query(
+        `insert into cost_entries (kind, usd, month, day, user_id, team_id, job_id, provider, model, is_final, ref) values ('llm', 0.0004, '2026-11', $1, $2, $3, $4, 'fal', 'm', $5, $6)`,
+        [o.day === undefined ? '2026-11-04' : o.day, o.user === undefined ? userId : o.user, o.team === undefined ? 'team-unassigned' : o.team, jobId, o.isFinal ?? jobId === null, ref],
+      );
+    const job = await insertJob(userId);
+    await llm(null, 'llm:suggestion:s1');
+    await llm(job, 'llm:enhance:j1');
+    await expect(llm(null, 'llm:suggestion:s1')).rejects.toThrow(/cost_entries_ref_unique/);
+    await expect(llm(null, null)).rejects.toThrow(/cost_entries_llm_check/);
+    await expect(llm(null, 'llm:x1', { user: null })).rejects.toThrow(/cost_entries_llm_check/);
+    await expect(llm(null, 'llm:x2', { team: null })).rejects.toThrow(/cost_entries_llm_check/);
+    await expect(llm(null, 'llm:x3', { day: null })).rejects.toThrow(/cost_entries_llm_check/);
+    await expect(llm(job, 'llm:x4', { isFinal: true })).rejects.toThrow(/cost_entries_llm_check/); // a job's llm row never closes it
+    await expect(llm(null, 'llm:x5', { isFinal: false })).rejects.toThrow(/cost_entries_llm_check/); // a job-less one is always final
+    // The rules of the other kinds are unchanged.
+    await expect(entry('store_reassign', null, '1')).rejects.toThrow(/cost_entries_job_shared_check/);
+    await expect(entry('invoice_diff', job, '1')).rejects.toThrow(/cost_entries_job_shared_check/);
+    await expect(pool.query(`insert into cost_entries (kind, usd, month, team_id) values ('invoice_diff', 1, '2026-10', 'team-unassigned')`)).rejects.toThrow(/cost_entries_shared_unattributed_check/);
+    await expect(pool.query(`insert into cost_entries (kind, usd, month, day, job_id) values ('estimate', 1, '2026-10', null, $1)`, [job])).rejects.toThrow(/cost_entries_day_check/);
+    await expect(pool.query(`insert into cost_entries (kind, usd, month, day, job_id) values ('token', 1, '2026-10', '2026-10-01', $1)`, [job])).rejects.toThrow(/cost_entries_kind_check/);
+  });
+
   test('job_costs sums the rows of a job and is final once a row closes it', async () => {
     const job = await insertJob(userId);
     await entry('estimate', job, '2.0000');

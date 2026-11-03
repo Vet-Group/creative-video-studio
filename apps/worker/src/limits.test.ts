@@ -1,5 +1,5 @@
 // The Run caps against a disposable database (needs the compose Postgres: `pnpm services:up`). The clock is the `at` argument; nothing sleeps.
-import { bookShared, lateBill, reserve, withTransaction } from '@cvs/core/ledger';
+import { bookLlm, bookShared, lateBill, release, reserve, withTransaction } from '@cvs/core/ledger';
 import { checkCaps, memberUsage } from '@cvs/core/limits';
 import { createPool } from '@cvs/db/client';
 import { createTestDatabase } from '@cvs/db/testing';
@@ -76,6 +76,16 @@ describe('daily clips per Member (ICT day)', () => {
       [jobs[0]],
     );
     expect(await checkCaps(pool, u, '1.0000', at('2026-10-31T06:00:00Z'))).toBeNull(); // failed and total 0: the slot is back
+  });
+
+  test('a failed, released job gets its slot back even with an Enhance cost on it', async () => {
+    const u = await member();
+    const jobs: string[] = [];
+    for (let i = 0; i < 5; i++) jobs.push(await newJob(u, '2026-10-30T05:00:00Z', { estimate: '1.0000', status: 'running' }));
+    expect(await checkCaps(pool, u, '1.0000', at('2026-10-30T06:00:00Z'))).toBe('daily_clips');
+    expect(await bookLlm(pool, { enhance: jobs[0]! }, { costUsd: 0.0004, provider: 'fal', model: 'm' })).toBe(true);
+    expect(await release(pool, jobs[0]!, 'provider refused')).toBe(true);
+    expect(await checkCaps(pool, u, '1.0000', at('2026-10-30T06:00:00Z'))).toBeNull();
   });
 });
 
@@ -257,5 +267,36 @@ describe('image and apps features', () => {
     expect(await checkCaps(pool, u, '0.0001', at('2031-09-10T03:00:00Z'))).toBe('monthly_usd');
     await setCaps('200');
     await setFeatureCaps('260', '10', '50');
+  });
+});
+
+describe('LLM calls', () => {
+  test('count toward no cap: not the company month, the daily clips, the member day or month, nor the image and apps month', async () => {
+    await setCaps('10', 5);
+    await pool.query('update settings set features_monthly_cap_usd = 10, member_daily_usd_cap = 10, member_monthly_usd_cap = 10');
+    const u = await member();
+    const llm = { provider: 'fal', model: 'm' };
+    // A video job and an image job in May 2032, each with a large Enhance, and a job-less suggestion run.
+    const video = await newJob(u, '2032-05-10T03:00:00Z', { estimate: '1.0000', status: 'running' });
+    await bookLlm(pool, { enhance: video }, { costUsd: 500, ...llm });
+    const image = next('job');
+    await pool.query(
+      `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, created_at, feature)
+       values ($1, $2, 'team-b', 'kling-o3-pro', 'fal', 'p', '1:1', 5, '{}', '2032-05-10T03:00:00Z', 'image')`,
+      [image, u],
+    );
+    expect(await withTransaction(pool, (tx) => reserve(tx, image, '1.0000'))).toBe(true);
+    await bookLlm(pool, { enhance: image }, { costUsd: 500, ...llm });
+    await pool.query(`insert into suggestion_runs (id, user_id, input, created_at) values ('limits-run', $1, '{}', '2032-05-10T03:00:00Z')`, [u]);
+    await bookLlm(pool, { suggestion: 'limits-run' }, { costUsd: 500, ...llm });
+    const when = at('2032-05-10T04:00:00Z');
+    expect(await checkCaps(pool, u, '9.0000', when)).toBeNull(); // video month: 1 + 9 = 10
+    expect(await checkCaps(pool, u, '9.0001', when)).toBe('monthly_usd');
+    expect(await checkCaps(pool, u, '9.0000', when, 'image')).toBeNull(); // member day and month, image and apps month: 1 + 9 = 10
+    expect(await checkCaps(pool, u, '9.0001', when, 'image')).toBe('member_daily_usd');
+    const usage = await memberUsage(pool, u, when);
+    expect([usage.clips.used, usage.dayUsd.used, usage.monthUsd.used]).toEqual([1, '1.0000', '1.0000']);
+    await setCaps('200');
+    await pool.query('update settings set features_monthly_cap_usd = 260, member_daily_usd_cap = 10, member_monthly_usd_cap = 50');
   });
 });

@@ -11,7 +11,7 @@ import { pipeline } from 'node:stream/promises';
 import type { ReadableStream as WebReadableStream } from 'node:stream/web';
 import { fileURLToPath } from 'node:url';
 import type { Enhancer } from '@cvs/core/enhance';
-import { close24h, lateBill, type LedgerPool, release, settle, withTransaction } from '@cvs/core/ledger';
+import { bookLlm, close24h, lateBill, type LedgerPool, release, settle, withTransaction } from '@cvs/core/ledger';
 import { type ImageModelConfig, imagePricesFor, type ModelConfig, promptLimit, usdPerSecondFor } from '@cvs/core/models';
 import { ImageReadError } from '@cvs/core/providers/http';
 import type { ImageProvider, ImageProviderJob, ImageSubmitRequest, ProviderJob, ProviderStatus, SubmitRequest, VideoProvider } from '@cvs/core/providers';
@@ -201,7 +201,10 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
       if (job.enhance && !job.enhanced_prompt && deps.enhance && !job.is_mock) {
         try {
           const r = await abortable(deps.enhance(job.prompt, job.kind === 'image' ? 'image' : 'video', promptLimit(job.max_prompt_chars)), signal);
-          await pool.query('update jobs set enhanced_prompt = $2, enhance_cost_usd = $3 where id = $1', [jobId, r.prompt, r.costUsd]);
+          await withTransaction(pool, async (tx) => {
+            await tx.query('update jobs set enhanced_prompt = $2, enhance_cost_usd = $3 where id = $1', [jobId, r.prompt, r.costUsd]);
+            await bookLlm(tx, { enhance: jobId }, r);
+          });
           job.enhanced_prompt = r.prompt;
         } catch (e) {
           // Shutting down before the provider call: nothing was submitted, so the estimate is released.

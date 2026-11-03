@@ -386,6 +386,13 @@
       "when": 1794394966036,
       "tag": "0054_gpt_image_2_measured_price",
       "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "7",
+      "when": 1794394967036,
+      "tag": "0055_llm_costs_in_ledger",
+      "breakpoints": true
     }
   ]
 }

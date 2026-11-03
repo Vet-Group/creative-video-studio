@@ -7,11 +7,14 @@ export type CapRefusal = 'daily_clips' | 'monthly_usd' | 'features_monthly_usd' 
 const VIDEO_FEATURES = ['video', 'marketing'];
 /** Ledger rows of the image and apps features; shared rows (no job) belong to the video budget. */
 const budgetRow = (features: string) => `exists (select 1 from jobs bj where bj.id = cost_entries.job_id and bj.feature <> all(${features}::text[]))`;
+/** LLM calls (Enhance, suggestions, translations) never count toward a cap (owner decision, 2026-11-04); the Costs page still shows them. */
+const capRow = `cost_entries.kind <> 'llm'`;
 
 /** The video clips (features in parameter `features`) the user in parameter `user` made on the ICT day of `t.at`, as the daily clip cap counts them:
- * `failed` jobs with nothing booked do not count. */
-const dayClips = (user: string, features: string) => `select count(*) from jobs j left join job_costs c on c.job_id = j.id
-           where j.user_id = ${user} and j.feature = any(${features}::text[]) and not (j.status = 'failed' and coalesce(c.usd, 0) = 0)
+ * `failed` jobs with no provider cost booked (an Enhance llm row aside) do not count. */
+const dayClips = (user: string, features: string) => `select count(*) from jobs j
+           where j.user_id = ${user} and j.feature = any(${features}::text[])
+             and not (j.status = 'failed' and coalesce((select sum(usd) from cost_entries where cost_entries.job_id = j.id and ${capRow}), 0) = 0)
              and (j.created_at at time zone 'Asia/Ho_Chi_Minh')::date = (t.at at time zone 'Asia/Ho_Chi_Minh')::date`;
 
 /** The video clips `userId` made today and the daily clip cap, for the page to say how many a Run would use before it is sent. */
@@ -30,9 +33,9 @@ export async function memberUsage(q: Queryable, userId: string, at?: Date) {
     `with t as (select coalesce($2::timestamptz, now()) as at),
           m as (select to_char(t.at at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM') as month, (t.at at time zone 'Asia/Ho_Chi_Minh')::date as day from t)
      select (${dayClips('$1', '$3')})::int as clips, s.member_daily_clip_cap as clip_cap,
-       (select coalesce(sum(usd), 0.0000) from cost_entries, m where cost_entries.user_id = $1 and cost_entries.day = m.day and ${budgetRow('$3')})::text as day_usd,
+       (select coalesce(sum(usd), 0.0000) from cost_entries, m where cost_entries.user_id = $1 and cost_entries.day = m.day and ${capRow} and ${budgetRow('$3')})::text as day_usd,
        s.member_daily_usd_cap::text as day_cap_usd,
-       (select coalesce(sum(usd), 0.0000) from cost_entries, m where cost_entries.user_id = $1 and cost_entries.month = m.month and ${budgetRow('$3')})::text as month_usd,
+       (select coalesce(sum(usd), 0.0000) from cost_entries, m where cost_entries.user_id = $1 and cost_entries.month = m.month and ${capRow} and ${budgetRow('$3')})::text as month_usd,
        s.member_monthly_usd_cap::text as month_cap_usd
      from t, settings s where s.id = 1`,
     [userId, at?.toISOString() ?? null, VIDEO_FEATURES],
@@ -48,10 +51,11 @@ export async function memberUsage(q: Queryable, userId: string, at?: Date) {
 /**
  * Whether one more Run by `userId` of `feature` with the given estimate would break a cap, or null. Call it in the transaction that inserts the job,
  * under `pg_advisory_xact_lock(hashtext('caps'))`, so two Runs cannot both take the last slot. `at` is the clock (default now()).
- * - Video (`video`, `marketing`): the daily clip count (jobs the user created that ICT day, except `failed` jobs whose ledger total is 0;
+ * - Video (`video`, `marketing`): the daily clip count (jobs the user created that ICT day, except `failed` jobs whose provider rows total 0;
  *   timed_out and failed_unknown count), then the company month: every ledger row of the ICT month outside the image and apps features plus the estimate.
  * - Image and apps features: the member's ICT day and month, then the month for everyone, each over those features' ledger rows plus the estimate.
  *   The per-feature caps (feature_caps) never refuse; the Costs page shows them.
+ * - llm rows count toward none of these.
  */
 export async function checkCaps(tx: Queryable, userId: string, estimateUsd: string, at?: Date, feature = 'video'): Promise<CapRefusal | null> {
   const values = [userId, estimateUsd, at?.toISOString() ?? null, VIDEO_FEATURES];
@@ -61,7 +65,7 @@ export async function checkCaps(tx: Queryable, userId: string, estimateUsd: stri
        select
          (${dayClips('$1', '$4')}) >= s.member_daily_clip_cap as day_full,
          (select coalesce(sum(usd), 0) from cost_entries
-           where month = to_char(t.at at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM') and not ${budgetRow('$4')}) + $2::numeric > s.monthly_cap_usd as month_full
+           where month = to_char(t.at at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM') and ${capRow} and not ${budgetRow('$4')}) + $2::numeric > s.monthly_cap_usd as month_full
        from t, settings s where s.id = 1`,
       values,
     );
@@ -72,9 +76,9 @@ export async function checkCaps(tx: Queryable, userId: string, estimateUsd: stri
     `with t as (select coalesce($3::timestamptz, now()) as at),
           m as (select to_char(t.at at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM') as month, (t.at at time zone 'Asia/Ho_Chi_Minh')::date as day from t)
      select
-       (select coalesce(sum(usd), 0) from cost_entries, m where cost_entries.user_id = $1 and cost_entries.day = m.day and ${budgetRow('$4')}) + $2::numeric > s.member_daily_usd_cap as member_day_full,
-       (select coalesce(sum(usd), 0) from cost_entries, m where cost_entries.user_id = $1 and cost_entries.month = m.month and ${budgetRow('$4')}) + $2::numeric > s.member_monthly_usd_cap as member_month_full,
-       (select coalesce(sum(usd), 0) from cost_entries, m where cost_entries.month = m.month and ${budgetRow('$4')}) + $2::numeric > s.features_monthly_cap_usd as month_full
+       (select coalesce(sum(usd), 0) from cost_entries, m where cost_entries.user_id = $1 and cost_entries.day = m.day and ${capRow} and ${budgetRow('$4')}) + $2::numeric > s.member_daily_usd_cap as member_day_full,
+       (select coalesce(sum(usd), 0) from cost_entries, m where cost_entries.user_id = $1 and cost_entries.month = m.month and ${capRow} and ${budgetRow('$4')}) + $2::numeric > s.member_monthly_usd_cap as member_month_full,
+       (select coalesce(sum(usd), 0) from cost_entries, m where cost_entries.month = m.month and ${capRow} and ${budgetRow('$4')}) + $2::numeric > s.features_monthly_cap_usd as month_full
      from settings s where s.id = 1`,
     values,
   );

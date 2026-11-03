@@ -22,7 +22,8 @@ export interface SuggestInput {
 }
 
 /** `meanings[i]` is option i in Vietnamese for the member to read (null when the model gave none); only `options` ever fill a field. */
-export type Suggester = (input: SuggestInput) => Promise<{ options: string[]; meanings?: (string | null)[]; costUsd: number | null }>;
+/** `provider` and `model`: who answered and with what, for the call's ledger row. */
+export type Suggester = (input: SuggestInput) => Promise<{ options: string[]; meanings?: (string | null)[]; costUsd: number | null; provider: string; model: string }>;
 
 // Each option comes with a Vietnamese reading (owner, 2026-11-03): the staff read Vietnamese faster, the video models read English best.
 const REPLY =
@@ -119,8 +120,8 @@ export function createFalSuggester({ apiKey, fetch: f = fetch, model = ENHANCE_M
     if (out.error) throw new Error(`fal suggest: ${String(out.error)}`);
     const cost = Number(out.usage?.cost);
     const { options, meanings } = parseSuggestions(typeof out.output === 'string' ? out.output : '', input.max);
-    const costUsd = Number.isFinite(cost) ? cost : null;
+    const call = { costUsd: Number.isFinite(cost) ? cost : null, provider: 'fal', model };
     // A translation is its one option, with no reading of its own.
-    return input.field === 'translate' ? { options: options.slice(0, 1), costUsd } : { options, meanings, costUsd };
+    return input.field === 'translate' ? { options: options.slice(0, 1), ...call } : { options, meanings, ...call };
   };
 }

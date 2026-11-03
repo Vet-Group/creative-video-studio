@@ -8,7 +8,8 @@ export const ENHANCE_URL = 'https://fal.run/openrouter/router';
 export const ENHANCE_MODEL = 'google/gemini-2.5-flash';
 export type EnhanceKind = 'video' | 'image';
 /** `maxChars`: the job's model prompt limit (promptLimit in models.ts), which the rewrite is cut to. */
-export type Enhancer = (prompt: string, kind: EnhanceKind, maxChars: number) => Promise<{ prompt: string; costUsd: number | null }>;
+/** `provider` and `model`: who answered and with what, for the call's ledger row. */
+export type Enhancer = (prompt: string, kind: EnhanceKind, maxChars: number) => Promise<{ prompt: string; costUsd: number | null; provider: string; model: string }>;
 
 // The brief is written from the text alone, and a first trial made up logo text and garment colours; so nothing visual may be invented.
 const KEEP =
@@ -44,6 +45,6 @@ export function createFalEnhancer({ apiKey, fetch: f = fetch, model = ENHANCE_MO
     const text = typeof out.output === 'string' ? out.output.trim().replace(/^"(.*)"$/s, '$1').trim() : '';
     if (text === '') throw new Error('fal enhance: empty answer');
     const cost = Number(out.usage?.cost);
-    return { prompt: text.slice(0, maxChars), costUsd: Number.isFinite(cost) ? cost : null };
+    return { prompt: text.slice(0, maxChars), costUsd: Number.isFinite(cost) ? cost : null, provider: 'fal', model };
   };
 }
