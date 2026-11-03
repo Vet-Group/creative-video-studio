@@ -2089,7 +2089,9 @@ dialog.modal.verdict-guide { width: min(40rem, calc(100vw - 2rem)); }
 .job-links { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 2px 0 0; }
 
 /* Which tool when: the sidebar's line per creative tool, the guide dialog, each tool page's hint strip and Explore's "start here" list. */
-.nav-group-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding-right: 12px; }
+.nav-group-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding-right: 4px; }
+.nav-group-head > * { white-space: nowrap; } /* one line each, or the label and the button wrap in the narrow sidebar */
+.nav-guide .icon { display: none; } /* no room beside the label; the words say it */
 .nav-guide { display: inline-flex; align-items: center; gap: 4px; padding: 0; border: 0; background: none; color: var(--text-subtle); font-size: 12px; line-height: 16px; cursor: pointer; }
 .nav-guide:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
 .nav-hint { display: block; padding: 0 12px 6px 40px; color: var(--text-muted); font-size: 12px; line-height: 16px; }
@@ -2147,6 +2149,7 @@ dialog.modal.tool-guide { width: min(52rem, calc(100vw - 2rem)); }
 
 .explore-start { margin-bottom: 8px; }
 .explore-start-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 16px; }
+.explore-start-head .link-button { display: inline-flex; align-items: center; gap: 4px; }
 .explore-start .tool-goals { grid-template-columns: minmax(0, 1fr); }
 @media (min-width: 720px) { .explore-start .tool-goals { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (min-width: 1200px) { .explore-start .tool-goals { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
