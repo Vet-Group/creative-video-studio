@@ -243,7 +243,7 @@ describe('Enhance', () => {
 
   test('sends the rewritten brief, cut to the model’s prompt limit, saves it with its cost and keeps the member’s prompt', async () => {
     const asked: [string, string, number][] = [];
-    const prompts = await startWithEnhance(async (p, kind, max) => (asked.push([p, kind, max]), { prompt: `A detailed brief for ${p}.`, costUsd: 0.0004 }));
+    const prompts = await startWithEnhance(async (p, kind, max) => (asked.push([p, kind, max]), { prompt: `A detailed brief for ${p}.`, costUsd: 0.0004, provider: 'fal', model: 'google/gemini-2.5-flash' }));
     const id = await enhanced(await newJob('u1', { prompt: 'push in' }));
     await send(id, 'u1');
     await waitFor('the job to succeed', async () => (await status(id)) === 'succeeded'); // finished, so it holds no slot of the later tests
@@ -251,6 +251,20 @@ describe('Enhance', () => {
     expect(prompts).toEqual(['A detailed brief for push in.']);
     const j = await job(id);
     expect([j.prompt, j.enhanced_prompt, Number(j.enhance_cost_usd)]).toEqual(['push in', 'A detailed brief for push in.', 0.0004]);
+    // One llm row on the job, beside the provider rows; settling closed the provider run alone.
+    const rows = await costs(id);
+    expect(rows.filter((r) => r.kind === 'llm')).toEqual([{ kind: 'llm', usd: '0.0004', is_final: false }]);
+    const provider = rows.filter((r) => r.kind !== 'llm').reduce((t, r) => t + Math.round(Number(r.usd) * 1e4), 0);
+    expect(await total(id)).toEqual({ usd: ((provider + 4) / 1e4).toFixed(4), is_final: true });
+  });
+
+  test('books no llm row when Enhance reports no cost', async () => {
+    await startWithEnhance(async (p) => ({ prompt: `Brief for ${p}.`, costUsd: null, provider: 'fal', model: 'm' }));
+    const id = await enhanced(await newJob('u1', { prompt: 'tilt up' }));
+    await send(id, 'u1');
+    await waitFor('the job to succeed', async () => (await status(id)) === 'succeeded');
+    expect((await job(id)).enhanced_prompt).toBe('Brief for tilt up.');
+    expect((await costs(id)).map((r) => r.kind)).not.toContain('llm');
   });
 
   test('falls back to the member’s prompt when the LLM fails, and never calls it with Enhance off', async () => {
@@ -267,6 +281,7 @@ describe('Enhance', () => {
     expect(prompts.sort()).toEqual(['as written', 'slow orbit']);
     expect(calls).toBe(1);
     expect((await job(failed)).enhanced_prompt).toBeNull();
+    for (const id of [failed, off]) expect((await costs(id)).map((r) => r.kind)).not.toContain('llm');
   });
 });
 

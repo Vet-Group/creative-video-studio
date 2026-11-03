@@ -8,6 +8,7 @@ import { featureLabel } from '@/lib/features';
 
 const NO_STORE = 'Không gắn cửa hàng';
 const SHARED = 'Chi phí chung';
+const LLM = 'LLM (Dịch/Gợi ý/Cải thiện)';
 
 interface Row {
   id: number;
@@ -136,6 +137,8 @@ export function snapshot(requestedMonth: string | null, upTo: number | null = nu
 }
 
 const units = (usd: string) => BigInt(usd.replace('.', ''));
+/** A row of a job, or an llm row (a suggestion or translation has no job), counts for its user, team and store; the rest are shared. */
+const attributed = (r: Row) => r.job_id !== null || r.kind === 'llm';
 const fixed = (n: bigint, scale: number) => {
   const a = n < 0n ? -n : n;
   const p = 10n ** BigInt(scale);
@@ -159,7 +162,7 @@ function aggregate(rows: Row[], rowKey: (r: Row) => string, jobKey: (r: Row) => 
   const at = (k: string) => out.get(k) ?? out.set(k, blank()).get(k)!;
   const counted = new Set<string>();
   for (const r of rows) {
-    if (!r.job_id) continue;
+    if (!attributed(r)) continue;
     const a = at(rowKey(r));
     const usd = units(r.usd);
     const vnd = BigInt(r.vnd ?? 0);
@@ -167,7 +170,7 @@ function aggregate(rows: Row[], rowKey: (r: Row) => string, jobKey: (r: Row) => 
     a.vnd += vnd;
     if (r.verdict === 'fail') { a.fvUsd += usd; a.fvVnd += vnd; }
     if (r.fail_status) { a.fsUsd += usd; a.fsVnd += vnd; }
-    if (r.verdict === 'pass' && !counted.has(r.job_id)) { counted.add(r.job_id); at(jobKey(r)).accepted++; }
+    if (r.verdict === 'pass' && r.job_id && !counted.has(r.job_id)) { counted.add(r.job_id); at(jobKey(r)).accepted++; }
   }
   return out;
 }
@@ -190,7 +193,7 @@ function figures(s: Snapshot, a: Agg) {
 
 function groups(s: Snapshot, rowKey: (r: Row) => string, jobKey: (r: Row) => string, label: (r: Row) => Record<string, unknown>) {
   const labels = new Map<string, Record<string, unknown>>();
-  for (const r of s.rows) if (r.job_id && !labels.has(rowKey(r))) labels.set(rowKey(r), label(r));
+  for (const r of s.rows) if (attributed(r) && !labels.has(rowKey(r))) labels.set(rowKey(r), label(r));
   return [...aggregate(s.rows, rowKey, jobKey)]
     .sort(([ka, a], [kb, b]) => (a.usd === b.usd ? ka.localeCompare(kb) : a.usd < b.usd ? 1 : -1))
     .map(([id, a]) => ({ id, ...labels.get(id), ...figures(s, a) }));
@@ -198,7 +201,7 @@ function groups(s: Snapshot, rowKey: (r: Row) => string, jobKey: (r: Row) => str
 
 /** The shared rows (bake-off, manual adjustments, invoice differences): the general-cost line. */
 function sharedLine(s: Snapshot) {
-  const shared = s.rows.filter((r) => !r.job_id);
+  const shared = s.rows.filter((r) => !attributed(r));
   const sum = (rows: Row[]) => ({ usd: rows.reduce((t, r) => t + units(r.usd), 0n), vnd: rows.reduce((t, r) => t + BigInt(r.vnd ?? 0), 0n) });
   const byKind = Object.fromEntries(['bakeoff', 'manual_adjustment', 'invoice_diff'].map((k) => [k, fixed(sum(shared.filter((r) => r.kind === k)).usd, 4)]));
   return { ...money(s, sum(shared).usd, sum(shared).vnd), rows: shared.length, byKind };
@@ -217,7 +220,8 @@ export function costsPage(s: Snapshot) {
     byUser: groups(s, (r) => r.user_id ?? '', (r) => r.job_user ?? '', (r) => ({ name: r.user_name, email: r.email })),
     byTeam: groups(s, (r) => r.team_id ?? '', (r) => r.job_team ?? '', (r) => ({ name: r.team_name, costCentreCode: r.cost_centre_code })),
     byStore: groups(s, (r) => r.store_id ?? '', (r) => r.job_store ?? '', (r) => ({ name: r.store_name ?? NO_STORE, code: r.store_code })),
-    byFeature: groups(s, (r) => r.feature ?? '', (r) => r.feature ?? '', (r) => ({ name: featureLabel(r.feature) })),
+    // Every LLM call (Enhance on a job too) is one line; the soft feature caps still count a job's Enhance with its feature.
+    byFeature: groups(s, (r) => (r.kind === 'llm' ? 'llm' : (r.feature ?? '')), (r) => r.feature ?? '', (r) => ({ name: r.kind === 'llm' ? LLM : featureLabel(r.feature) })),
     capUsage: { usd: s.capUsageUsd, monthlyCapUsd: s.monthlyCapUsd },
     featuresCapUsage: { usd: s.featuresCapUsageUsd, monthlyCapUsd: s.featuresMonthlyCapUsd },
     featureCaps: featureCapLines(s),
@@ -256,7 +260,7 @@ export function detailCsv(s: Snapshot) {
 export function summaryCsv(s: Snapshot) {
   const labels = new Map<string, Row>();
   const key = (team: string | null, store: string | null) => `${team ?? ''}\t${store ?? ''}`;
-  for (const r of s.rows) if (r.job_id && !labels.has(key(r.team_id, r.store_id))) labels.set(key(r.team_id, r.store_id), r);
+  for (const r of s.rows) if (attributed(r) && !labels.has(key(r.team_id, r.store_id))) labels.set(key(r.team_id, r.store_id), r);
   const line = (head: (string | null)[], f: ReturnType<typeof figures>) => [s.month, ...head, f.usd, f.vnd, f.failedByVerdict.usd, f.failedByStatus.usd, String(f.acceptedClips), f.costPerAcceptedUsd];
   const teamStore = [...aggregate(s.rows, (r) => key(r.team_id, r.store_id), (r) => key(r.job_team, r.job_store))].map(([k, a]) => {
     const r = labels.get(k);

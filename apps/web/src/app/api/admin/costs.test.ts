@@ -587,6 +587,13 @@ describe("a Member's own month-to-date total", () => {
     await succeed('mtd-1', '2.0000'); // +0.4
     expect(await toDate()).toEqual({ usd: '2.0000', provisional: false });
     expect(await ledgerSum()).toBe('2.0000');
+
+    // A suggestion run has no job, and still counts.
+    await pool.query(`insert into suggestion_runs (id, user_id, input, status, cost_usd) values ('mtd-run', $1, '{}', 'succeeded', 0.0005)`, [member.id]);
+    const { bookLlm } = await import('@cvs/core/ledger');
+    await bookLlm(pool, { suggestion: 'mtd-run' }, { costUsd: 0.0005, provider: 'fal', model: 'google/gemini-2.5-flash' });
+    expect(await toDate()).toEqual({ usd: '2.0005', provisional: false });
+    expect(await ledgerSum()).toBe('2.0005');
   });
 });
 
@@ -623,5 +630,36 @@ describe('the image and apps features on the Costs page', () => {
     const level = Object.fromEntries(p.featureCaps.map((c) => [c.feature, c.level]));
     expect(level).toMatchObject({ face_swap: 100, background_remover: 80, image: null, try_on: null });
     expect(p.featureCaps.find((c) => c.feature === 'face_swap')).toMatchObject({ spentUsd: '5.0000', capUsd: '5.0000' });
+  });
+});
+
+describe('LLM calls on the Costs page', () => {
+  const LM = '2031-09';
+  test("counts an Enhance on its job and a job-less suggestion run for the member's user, team and store, as one LLM line and not as shared cost", async () => {
+    const { bookLlm } = await import('@cvs/core/ledger');
+    // Alice (Gamma, Shop A): a video job estimated 2.0 with its Enhance 0.0004. Bob (Beta): a suggestion run 0.0006 with no job.
+    await open('lj1', 'alice', 't3', 's1', 'fal', '2031-09-10T03:00:00Z', '2.0000');
+    expect(await bookLlm(pool, { enhance: 'lj1' }, { costUsd: 0.0004, provider: 'fal', model: 'google/gemini-2.5-flash' })).toBe(true);
+    await pool.query(`insert into suggestion_runs (id, user_id, input, status, cost_usd, created_at) values ('lr1', 'bob', '{}', 'succeeded', 0.0006, '2031-09-11T03:00:00Z')`);
+    expect(await bookLlm(pool, { suggestion: 'lr1' }, { costUsd: 0.0006, provider: 'fal', model: 'google/gemini-2.5-flash' })).toBe(true);
+
+    const p = (await page(LM)) as Page & { byFeature: { id: string; name: string; usd: string }[] };
+    expect(p.total.usd).toBe('2.0010');
+    expect(p.shared).toMatchObject({ usd: '0.0000', rows: 0 });
+    expect(p.byUser.map((u) => [u.id, u.usd])).toEqual([['alice', '2.0004'], ['bob', '0.0006']]);
+    expect(p.byTeam.map((t) => [t.id, t.name, t.usd])).toEqual([['t3', 'Gamma', '2.0004'], ['t2', 'Beta', '0.0006']]);
+    expect(p.byStore.map((s) => [s.id, s.name, s.usd])).toEqual([['s1', 'Shop A', '2.0004'], ['', 'Không gắn cửa hàng', '0.0006']]);
+    expect(p.byFeature.map((f) => [f.id, f.name, f.usd])).toEqual([['video', 'Tạo video', '2.0000'], ['llm', 'LLM (Dịch/Gợi ý/Cải thiện)', '0.0010']]);
+    expect(p.capUsage.usd).toBe('2.0010'); // the job-less run is in the video budget, as every job-less row is
+
+    const d = await detail(LM);
+    const kind = d.header.indexOf('entry kind');
+    expect(d.rows.map((r) => [r[2], r[d.header.indexOf('user')], r[d.header.indexOf('model')], r[kind], r[d.header.indexOf('USD')]])).toEqual([
+      ['lj1', 'Alice', 'fal-test', 'estimate', '2.0000'],
+      ['lj1', 'Alice', 'google/gemini-2.5-flash', 'llm', '0.0004'],
+      ['', 'Bob', 'google/gemini-2.5-flash', 'llm', '0.0006'],
+    ]);
+    const s = await summary(LM);
+    expect(s.rows.map((r) => [r[1], r[3], r[5]])).toEqual([['Beta', 'Không gắn cửa hàng', '0.0006'], ['Gamma', 'Shop A', '2.0004'], ['Chi phí chung', '', '0.0000']]);
   });
 });

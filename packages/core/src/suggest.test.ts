@@ -14,7 +14,7 @@ test('asks the OpenRouter router for three options with the hook, location and t
       return answer({ output: '```json\n["Một", "Hai", "Ba"]\n```', usage: { cost: 0.0003 } });
     },
   });
-  expect(await suggest(input)).toEqual({ options: ['Một', 'Hai', 'Ba'], meanings: [null, null, null], costUsd: 0.0003 });
+  expect(await suggest(input)).toEqual({ options: ['Một', 'Hai', 'Ba'], meanings: [null, null, null], costUsd: 0.0003, provider: 'fal', model: ENHANCE_MODEL });
   expect(calls[0]!.url).toBe(ENHANCE_URL);
   const body = JSON.parse(String(calls[0]!.init.body));
   expect(body).toMatchObject({ model: ENHANCE_MODEL, system_prompt: SUGGEST_SYSTEM });
@@ -72,7 +72,7 @@ test('each option may come with its Vietnamese reading: objects keep text and vi
 test('a translation sends the prompt under its own system prompt, cool and long enough, and answers one option with no reading', async () => {
   const bodies: { system_prompt: string; prompt: string; temperature: number; max_tokens: number }[] = [];
   const suggest = createFalSuggester({ apiKey: 'k', fetch: (_url, init) => (bodies.push(JSON.parse(String(init!.body))), answer({ output: '["Người mẫu xoay chậm dưới ánh sáng cửa sổ"]', usage: { cost: 0.0001 } })) });
-  expect(await suggest({ field: 'translate', text: 'The model turns slowly in window light', context: '', max: 10_000 })).toEqual({ options: ['Người mẫu xoay chậm dưới ánh sáng cửa sổ'], costUsd: 0.0001 });
+  expect(await suggest({ field: 'translate', text: 'The model turns slowly in window light', context: '', max: 10_000 })).toEqual({ options: ['Người mẫu xoay chậm dưới ánh sáng cửa sổ'], costUsd: 0.0001, provider: 'fal', model: ENHANCE_MODEL });
   expect(bodies[0]).toMatchObject({ system_prompt: TRANSLATE_SYSTEM, prompt: 'The prompt:\nThe model turns slowly in window light', temperature: 0.2, max_tokens: 3000 });
   expect(TRANSLATE_SYSTEM).toMatch(/natural, plain Vietnamese/);
 });

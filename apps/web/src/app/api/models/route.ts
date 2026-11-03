@@ -47,7 +47,7 @@ export async function GET(request: Request) {
     ),
     pool.query(
       `with m as (select job_id, sum(usd) as usd from cost_entries where user_id = $1 and month = ${MONTH} group by job_id)
-       select coalesce(sum(m.usd), 0)::numeric(12, 4)::text as usd, coalesce(bool_or(not c.is_final), false) as provisional from m join job_costs c on c.job_id = m.job_id`,
+       select coalesce(sum(m.usd), 0)::numeric(12, 4)::text as usd, coalesce(bool_or(not c.is_final), false) as provisional from m left join job_costs c on c.job_id = m.job_id`,
       [userId],
     ),
     g.session.user.role === 'admin'

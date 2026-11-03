@@ -38,7 +38,7 @@ export const FEATURES = [
 ] as const;
 /** The features under settings.features_monthly_cap_usd and the per-member USD caps. */
 export const FEATURE_BUDGET = FEATURES.filter((f) => f !== 'video' && f !== 'marketing');
-export const COST_KINDS = ['estimate', 'actual_adjustment', 'release', 'late_bill', 'bakeoff', 'manual_adjustment', 'invoice_diff', 'store_reassign'] as const;
+export const COST_KINDS = ['estimate', 'actual_adjustment', 'release', 'late_bill', 'bakeoff', 'manual_adjustment', 'invoice_diff', 'store_reassign', 'llm'] as const;
 export type CostKind = (typeof COST_KINDS)[number];
 export const VERDICTS = ['pass', 'fail'] as const;
 
@@ -391,7 +391,7 @@ export const costEntries = pgTable(
     jobId: text('job_id').references(() => jobs.id, { onDelete: 'restrict' }),
     provider: text('provider'),
     model: text('model'),
-    /** True on the row that closes the job; shared rows are always final. */
+    /** True on the row that closes the job; shared rows and job-less llm rows are always final, a job's llm row never closes it. */
     isFinal: boolean('is_final').notNull().default(false),
     ref: text('ref').unique(),
     note: text('note'),
@@ -406,12 +406,14 @@ export const costEntries = pgTable(
       .where(sql`${t.kind} in ('estimate', 'actual_adjustment', 'release', 'late_bill')`),
     check(
       'cost_entries_kind_check',
-      sql`${t.kind} in ('estimate', 'actual_adjustment', 'release', 'late_bill', 'bakeoff', 'manual_adjustment', 'invoice_diff', 'store_reassign')`,
+      sql`${t.kind} in ('estimate', 'actual_adjustment', 'release', 'late_bill', 'bakeoff', 'manual_adjustment', 'invoice_diff', 'store_reassign', 'llm')`,
     ),
-    check('cost_entries_job_shared_check', sql`(${t.jobId} is null) = (${t.kind} in ('bakeoff', 'manual_adjustment', 'invoice_diff'))`),
+    check('cost_entries_job_shared_check', sql`${t.kind} = 'llm' or (${t.jobId} is null) = (${t.kind} in ('bakeoff', 'manual_adjustment', 'invoice_diff'))`),
     check('cost_entries_manual_note_check', sql`${t.kind} <> 'manual_adjustment' or coalesce(length(trim(${t.note})), 0) > 0`),
     check('cost_entries_month_check', sql`${t.month} ~ '^[0-9]{4}-(0[1-9]|1[0-2])$'`),
-    check('cost_entries_shared_unattributed_check', sql`${t.jobId} is not null or (${t.userId} is null and ${t.teamId} is null and ${t.storeId} is null)`),
+    check('cost_entries_shared_unattributed_check', sql`${t.jobId} is not null or ${t.kind} = 'llm' or (${t.userId} is null and ${t.teamId} is null and ${t.storeId} is null)`),
+    // An LLM call (Enhance on a job, or a suggestion or translation run without one) always names its user and team, its ICT day, and its source ref.
+    check('cost_entries_llm_check', sql`${t.kind} <> 'llm' or (${t.userId} is not null and ${t.teamId} is not null and ${t.day} is not null and ${t.ref} is not null)`),
     check('cost_entries_day_check', sql`${t.jobId} is null or ${t.day} is not null`),
   ],
 );

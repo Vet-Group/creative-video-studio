@@ -10,7 +10,7 @@ process.env.BETTER_AUTH_SECRET = randomBytes(32).toString('hex');
 process.env.APP_URL = 'http://localhost';
 
 const { auth, pool } = await import('@/lib/auth');
-const { reserve } = await import('@cvs/core/ledger');
+const { bookLlm, reserve } = await import('@cvs/core/ledger');
 const { GET } = await import('./report/route');
 const { GET: GET_CSV } = await import('./report/csv/route');
 
@@ -140,6 +140,18 @@ describe('GET /api/admin/report', () => {
       '2026-10-12,Rep One,rep1@example.test,Report Team,4,2,8.0000,4.0000,200,0.25,0.0400',
       '2026-10-12,Rep Two,rep2@example.test,Report Team,2,1,3.0000,3.0000,60,0.5,0.0150',
       '',
+    ]);
+  });
+
+  test("adds a member's Enhance and suggestion runs to the spend, and lists a member whose only spend is a suggestion run", async () => {
+    // Week of Monday 2026-11-09: a video job of Rep One with its Enhance, and a translation run of Rep Two, who made no job.
+    await job('r9', 'rep1', '2026-11-10 10:00:00+07', 'succeeded', 40, '2.0000', 'pass');
+    await bookLlm(pool, { enhance: 'r9' }, { costUsd: 0.0004, provider: 'fal', model: 'google/gemini-2.5-flash' });
+    await pool.query(`insert into suggestion_runs (id, user_id, input, status, cost_usd, created_at) values ('rr1', 'rep2', '{}', 'succeeded', 0.0006, '2026-11-11 09:00:00+07')`);
+    await bookLlm(pool, { suggestion: 'rr1' }, { costUsd: 0.0006, provider: 'fal', model: 'google/gemini-2.5-flash' });
+    expect((await report('?week=2026-11-12')).users).toEqual([
+      { userId: 'rep1', name: 'Rep One', email: 'rep1@example.test', team: 'Report Team', jobs: 1, acceptedClips: 1, spendUsd: '2.0004', costPerAcceptedUsd: '2.0004', medianRunSeconds: 40, failureRate: 0, spendOfCap: '0.0100' },
+      { userId: 'rep2', name: 'Rep Two', email: 'rep2@example.test', team: 'Report Team', jobs: 0, acceptedClips: 0, spendUsd: '0.0006', costPerAcceptedUsd: null, medianRunSeconds: null, failureRate: null, spendOfCap: '0.0000' },
     ]);
   });
 

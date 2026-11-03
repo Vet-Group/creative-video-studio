@@ -97,18 +97,20 @@ Every money event is a row in `cost_entries`. The ledger is the only place cost 
 | `manual_adjustment` | An Admin adds a correction. A note is required. |
 | `invoice_diff` | An Admin enters a provider's monthly invoice total. |
 | `store_reassign` | An Admin moves a clip to another store. It is a pair: minus X on the old store, plus X on the new one. |
+| `llm` | fal reports the cost of an LLM call: a job's Enhance, or a suggestion or translation run. One row per source, by `ref` (`llm:enhance:<job id>`, `llm:suggestion:<run id>`). |
 
 **Row shape.**
 - Exact decimal `usd numeric(12,4)`, never a float.
 - ICT `month` and `day`, nullable `user_id`, `team_id`, `store_id` and `job_id`, `provider`, `model`, `is_final`, a nullable unique `ref` and a `note`.
 - `bakeoff`, `manual_adjustment` and `invoice_diff` rows have no job, user or team. They appear as a shared "general cost" line and are never allocated.
+- An `llm` row always names its user, team and ICT day. An Enhance row is on its job (and counts in the job's cost); a suggestion or translation run has no job and counts for the member and the member's team. Settling a job ignores its `llm` row.
 - A partial unique index on `(job_id, kind)` for the job kinds stops two reconcile loops from booking the same job twice. A shared row's `ref` is unique, so a re-run of the seed or the install script cannot book twice.
 - A mock job writes rows of 0 USD, so development data never uses the cap.
 
 **Finality.**
 - `is_final = true` means "this row closes the job". A job is final when any of its rows is.
 - A job still unresolved 24 h after its timeout gets a final `actual_adjustment` of 0 USD, which keeps its estimate.
-- Shared rows are always final.
+- Shared rows and job-less `llm` rows are always final. A job's `llm` row never closes the job.
 - The UI labels a job's cost, and a month's total, as provisional until every job is final.
 
 **Month rule.**
