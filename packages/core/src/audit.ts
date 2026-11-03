@@ -2,7 +2,8 @@
 import type { Queryable } from './ledger';
 
 export interface AuditEntry {
-  actorId: string;
+  /** Null for the system (the worker). */
+  actorId: string | null;
   /** The event type, for example 'verdict.set' or 'clip.delete'. */
   action: string;
   /** What was touched, as 'kind:id' (for example 'job:<id>'). */

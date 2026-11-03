@@ -126,7 +126,126 @@ function InvoiceForm({ provider, month, invoice, run }: { provider: string; mont
           · Tổng theo tháng UTC: ${invoice.utcMonthUsd}
         </p>
       )}
+      {provider === 'vertex' && <p className="muted">Hóa đơn vertex được hệ thống tự ghi mỗi ngày từ billing export của Google (tổng mọi tài khoản Vertex).</p>}
     </li>
+  );
+}
+
+interface VertexAccountCosts {
+  projectId: string;
+  active: boolean;
+  error?: { reason: 'no_access' | 'no_export' | 'failed'; message: string };
+  monthUsd: number;
+  monthCreditsUsd: number;
+  skus: { skuId: string; sku: string; usage: number; unit: string; costUsd: number; creditsUsd: number }[];
+  credit: { total: number | null; currency: string; used: number | null; remaining: number | null; remainingUsd: number | null; expiresOn: string | null; stopWhenCreditsEnd: boolean; unverified: boolean };
+}
+type VertexCostsData =
+  | { configured: false }
+  | { configured: true; accounts: VertexAccountCosts[]; totalMonthUsd: number; prices: { label: string; appUsd: number | null; googleUsd: number | null; red: boolean }[] };
+
+const VERTEX_ERROR: Record<string, (project: string) => string> = {
+  no_access: (p) => `Chưa có quyền đọc billing export của ${p}.`,
+  no_export: (p) => `${p} chưa có bảng billing export (dataset billing_export).`,
+  failed: (p) => `Không đọc được billing của ${p}.`,
+};
+const usd4 = (n: number | null) => (n === null ? '—' : `$${n.toFixed(4)}`);
+const credits = (n: number | null, currency: string) => (n === null ? '—' : `${n.toLocaleString('vi-VN', { maximumFractionDigits: 2 })} ${currency}`);
+
+/** Google's own figures, read live from each account's billing export; loaded on its own so a Google failure leaves the rest of the page. */
+function VertexCosts({ month }: { month: string }) {
+  const { data, failed } = useFetch<VertexCostsData>(`/api/admin/costs/vertex?month=${month}`);
+  return (
+    <section className="panel" aria-label="Vertex (Google Cloud)">
+      <h2>Vertex (Google Cloud)</h2>
+      {!data ? (
+        failed ? <p className="error">Không tải được số liệu Vertex từ Google.</p> : <p role="status">Đang đọc số liệu từ Google...</p>
+      ) : !data.configured ? (
+        <p className="muted">Máy chủ chưa có khóa Vertex nào.</p>
+      ) : (
+        <>
+          <p>
+            Google tính Vertex tháng {month}: <strong>{usd4(data.totalMonthUsd)}</strong> (mọi tài khoản, trước khi trừ credits; billing export trễ vài giờ).
+          </p>
+          {data.accounts.map((a) => (
+            <div key={a.projectId}>
+              <h3>
+                {a.projectId}
+                {a.active && <span className="tag">Đang dùng</span>}
+                {a.credit.unverified && <span className="tag">Chưa xác minh credits</span>}
+              </h3>
+              {a.error && (
+                <p className="error">
+                  {VERTEX_ERROR[a.error.reason]!(a.projectId)} <span className="muted">({a.error.message.slice(0, 200)})</span>
+                </p>
+              )}
+              <ul className="lines">
+                <li>
+                  Chi phí tháng: {usd4(a.monthUsd)} · Credits đã trừ: {usd4(a.monthCreditsUsd)}
+                </li>
+                <li>
+                  Credits: đã dùng {credits(a.credit.used, a.credit.currency)} trên {credits(a.credit.total, a.credit.currency)}, còn {credits(a.credit.remaining, a.credit.currency)}
+                  {a.credit.remainingUsd !== null && ` (≈ $${a.credit.remainingUsd.toFixed(2)})`} · Hết hạn: {a.credit.expiresOn ?? '—'}
+                  {a.credit.stopWhenCreditsEnd && ' · Dừng khi hết credits'}
+                </li>
+              </ul>
+              {a.skus.length > 0 && (
+                <div className="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th scope="col">SKU</th>
+                        <th scope="col" className="num">Lượng dùng</th>
+                        <th scope="col" className="num">USD</th>
+                        <th scope="col" className="num">Credits (USD)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {a.skus.map((s) => (
+                        <tr key={s.skuId}>
+                          <td>
+                            {s.sku} <span className="muted">({s.skuId})</span>
+                          </td>
+                          <td className="num">
+                            {s.usage.toLocaleString('vi-VN')} {s.unit}
+                          </td>
+                          <td className="num">{usd4(s.costUsd)}</td>
+                          <td className="num">{usd4(s.creditsUsd)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          ))}
+          <h3>Kiểm tra giá với Google</h3>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col">Mô hình</th>
+                  <th scope="col" className="num">Giá trong app (USD/giây)</th>
+                  <th scope="col" className="num">Giá Google (USD/giây)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.prices.map((p) => (
+                  <tr key={p.label} className={p.red ? 'error' : undefined}>
+                    <td>
+                      {p.label}
+                      {p.red && ' (lệch quá 1%)'}
+                    </td>
+                    <td className="num">{p.appUsd ?? '—'}</td>
+                    <td className="num">{p.googleUsd ?? '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </section>
   );
 }
 
@@ -278,6 +397,7 @@ export function AdminCosts() {
         <>
           {failed && <p className="error">Không tải được tháng này, đang hiện tháng trước đó.</p>}
           <CostsBody key={`${data.month}-${data.asOf}`} data={data} reload={reload} />
+          <VertexCosts month={data.month} />
         </>
       )}
     </section>

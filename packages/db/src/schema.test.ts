@@ -504,6 +504,17 @@ describe('migration 0043 Seedance 2.0 label', () => {
   });
 });
 
+describe('migration 0050 Vertex accounts', () => {
+  test('seeds cvs-vertex with its FreeTrial credit, starts with no active account and lets the system write an audit entry', async () => {
+    const pick = `select project_id, credit_total::text as total, credit_currency, credit_expires_on::text as expires, stop_when_credits_end as stop from vertex_accounts where project_id = $1`;
+    expect((await pool.query(pick, ['cvs-vertex'])).rows).toEqual([{ project_id: 'cvs-vertex', total: '7825800', credit_currency: 'VND', expires: '2026-12-30', stop: true }]);
+    await pool.query(`insert into vertex_accounts (project_id) values ('next-project')`);
+    expect((await pool.query(pick, ['next-project'])).rows).toEqual([{ project_id: 'next-project', total: null, credit_currency: 'USD', expires: null, stop: false }]);
+    expect((await pool.query('select vertex_active_project from settings where id = 1')).rows).toEqual([{ vertex_active_project: null }]);
+    await pool.query(`insert into audit_entries (actor_id, action, target) values (null, 'vertex.switch_account', 'settings:1')`);
+  });
+});
+
 describe('cost_entries', () => {
   test('is append-only: UPDATE, DELETE and TRUNCATE raise', async () => {
     const job = await insertJob(userId);

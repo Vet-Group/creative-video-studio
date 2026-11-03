@@ -284,10 +284,23 @@ export const settings = pgTable(
     featuresMonthlyCapUsd: numeric('features_monthly_cap_usd', { precision: 12, scale: 4 }).notNull().default('260'),
     memberDailyUsdCap: numeric('member_daily_usd_cap', { precision: 12, scale: 4 }).notNull().default('10'),
     memberMonthlyUsdCap: numeric('member_monthly_usd_cap', { precision: 12, scale: 4 }).notNull().default('50'),
+    /** The Vertex account (its project id) new Vertex jobs go to; the worker's credits guard writes it, null when no account is usable. */
+    vertexActiveProject: text('vertex_active_project'),
     updatedAt: tstz('updated_at').notNull().defaultNow(),
   },
   (t) => [check('settings_singleton_check', sql`${t.id} = 1`)],
 );
+
+// The Admin-entered credits of each Vertex account (docs/ops/vertex-accounts.md); Google has no API for the balance, so remaining = total - credits used.
+export const vertexAccounts = pgTable('vertex_accounts', {
+  projectId: text('project_id').primaryKey(),
+  creditTotal: numeric('credit_total'),
+  creditCurrency: text('credit_currency').notNull().default('USD'),
+  creditExpiresOn: date('credit_expires_on', { mode: 'string' }),
+  /** Stop sending jobs to this account when its credits run low or expire, so its card is never charged. */
+  stopWhenCreditsEnd: boolean('stop_when_credits_end').notNull().default(false),
+  updatedAt: tstz('updated_at').notNull().defaultNow(),
+});
 
 // Job rows are tombstones once purged (purged_at); they are never deleted, because the cost ledger points at them.
 // There are no money columns: cost lives only in cost_entries.
@@ -510,9 +523,8 @@ export const auditEntries = pgTable(
   'audit_entries',
   {
     id: bigserial('id', { mode: 'number' }).primaryKey(),
-    actorId: text('actor_id')
-      .notNull()
-      .references(() => users.id, { onDelete: 'restrict' }),
+    /** Null for the system (the worker), for example vertex.switch_account. */
+    actorId: text('actor_id').references(() => users.id, { onDelete: 'restrict' }),
     /** The event type, for example 'verdict.set' or 'clip.delete'. */
     action: text('action').notNull(),
     /** What the action touched, as 'kind:id' (for example 'job:<id>'). */

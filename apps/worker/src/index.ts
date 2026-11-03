@@ -1,9 +1,12 @@
 // The worker process: `pnpm --filter @cvs/worker start`. The mock provider always runs; fal and Replicate run when FAL_KEY and REPLICATE_API_TOKEN are set (M.6).
+import { serviceAccountToken } from '@cvs/core/providers/vertex';
+import { readVertexBilling } from '@cvs/core/providers/vertex-billing';
 import { createPool, databaseUrl } from '@cvs/db/client';
 import { createMockImageProvider, createMockProvider } from './mock-provider';
 import { realProviders } from './real-providers';
 import { fakeSuggester } from './suggest';
 import { ensureBucket } from './storage';
+import { VERTEX_TICK_MS, vertexTick } from './vertex-accounts';
 import { startWorker } from './worker';
 
 const connectionString = databaseUrl();
@@ -22,6 +25,17 @@ const worker = await startWorker({
   suggest: real.suggest ?? (process.env.CVS_FAKE_SUGGEST === '1' ? fakeSuggester : undefined),
 });
 console.log(`worker ${worker.id} is running`);
+
+// The Vertex credits guard and the daily invoice booking (docs/ops/vertex-accounts.md); unref'd so it never keeps the process alive.
+if (real.vertexAccounts.length) {
+  const accounts = real.vertexAccounts.map(({ project, key }) => {
+    const token = serviceAccountToken(key);
+    return { project, read: () => readVertexBilling({ project, token }) };
+  });
+  const tick = () => vertexTick(pool, accounts).catch((e) => console.error('worker: vertex tick:', e instanceof Error ? e.message : e));
+  void tick();
+  setInterval(tick, VERTEX_TICK_MS).unref();
+}
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.once(signal, async () => {
