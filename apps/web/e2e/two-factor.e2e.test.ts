@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
-import { openSettings, signIn } from './support.test';
+import { loginReady, openSettings, signIn } from './support.test';
 import { totpCode, wrongCode } from './totp';
 import { PASSWORD, USERS, type UserKey } from './users';
 
@@ -11,6 +11,7 @@ async function signOut(page: Page) {
 
 /** Gives the email and password on the login page; an account with 2FA on then shows the code step. */
 async function password(page: Page, who: UserKey) {
+  await loginReady(page);
   await page.getByLabel('Email').fill(USERS[who].email);
   await page.getByLabel('Mật khẩu').fill(PASSWORD);
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();

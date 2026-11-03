@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { signIn } from './support.test';
+import { loginReady, signIn } from './support.test';
 import { PASSWORD, USERS } from './users';
 
 test('the login page refuses a wrong password and has no Lark button while Lark is not configured', async ({ page }) => {
@@ -7,6 +7,7 @@ test('the login page refuses a wrong password and has no Lark button while Lark 
   await expect(page).toHaveURL(/\/login$/);
   await expect(page.getByRole('button', { name: /Lark/ })).toHaveCount(0);
 
+  await loginReady(page);
   await page.getByLabel('Email').fill(USERS.member1.email);
   await page.getByLabel('Mật khẩu').fill(`${PASSWORD}-wrong`);
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
@@ -21,6 +22,7 @@ test('only an Admin sees the remaining company budget', async ({ page }) => {
 test('a signed-out visit to the Library goes to the login page and back to the Library after the sign-in', async ({ page }) => {
   await page.goto('/library?tab=video');
   await expect(page).toHaveURL(/\/login\?next=%2Flibrary%3Ftab%3Dvideo$/);
+  await loginReady(page);
   await page.getByLabel('Email').fill(USERS.member1.email);
   await page.getByLabel('Mật khẩu').fill(PASSWORD);
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
@@ -29,6 +31,7 @@ test('a signed-out visit to the Library goes to the login page and back to the L
 
 test('a login link that points at another site still lands on Create', async ({ page }) => {
   await page.goto('/login?next=%2F%2Fevil.example');
+  await loginReady(page);
   await page.getByLabel('Email').fill(USERS.member1.email);
   await page.getByLabel('Mật khẩu').fill(PASSWORD);
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
@@ -40,6 +43,7 @@ test('a limiter refusal says how long to wait instead of blaming the password', 
     route.fulfill({ status: 429, headers: { 'content-type': 'application/json', 'x-retry-after': '7' }, body: JSON.stringify({ message: 'Too many requests.' }) }),
   );
   await page.goto('/login');
+  await loginReady(page);
   await page.getByLabel('Email').fill(USERS.member1.email);
   await page.getByLabel('Mật khẩu').fill(PASSWORD);
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
@@ -56,6 +60,7 @@ test('the password field warns while Caps Lock is on, and the camera shakes its 
   await key(false);
   await expect(page.getByText('Caps Lock đang bật.')).toHaveCount(0);
 
+  await loginReady(page);
   await page.getByLabel('Email').fill(USERS.member1.email);
   await password.fill(`${PASSWORD}-wrong`);
   // The shake lasts less than a second, so an observer set up before the click catches the mark however late the answer comes.

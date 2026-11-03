@@ -1,5 +1,5 @@
 import { type Browser, expect, type Page, test } from '@playwright/test';
-import { openSettings, signIn } from './support.test';
+import { loginReady, openSettings, signIn } from './support.test';
 import { PASSWORD, USERS, type UserKey } from './users';
 
 // Built from the fixture password so no password-like literal sits in the source (the secret scan flags those).
@@ -8,6 +8,7 @@ const TEMP_PASSWORD = `${PASSWORD}-tam`;
 /** Signs in on the login page with any password and waits for the page the app opens. */
 async function logIn(page: Page, who: UserKey, password: string, landing: RegExp) {
   await page.goto('/login');
+  await loginReady(page);
   await page.getByLabel('Email').fill(USERS[who].email);
   await page.getByLabel('Mật khẩu').fill(password);
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
@@ -59,6 +60,7 @@ test('a user changes their password in Settings: the old one stops working and t
 
   await settings.getByRole('button', { name: 'Đăng xuất', exact: true }).click();
   await expect(page).toHaveURL(/\/login$/);
+  await loginReady(page);
   await page.getByLabel('Email').fill(USERS.seca.email);
   await page.getByLabel('Mật khẩu').fill(PASSWORD);
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
