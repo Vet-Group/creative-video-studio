@@ -375,9 +375,9 @@ export function PhotoDialog({ open, title, sub, tiles, busy, onFile, onClose, on
     </button>
   );
   const [over, setOver] = useState(false);
-  const take = (files: File[]) => {
-    const photo = files.find((f) => f.type.startsWith('image/'));
-    if (photo) (onClose(), onFile([photo]));
+  // A drop can carry any file and still lands while busy, so it is checked here; the picker already filters on accept.
+  const take = (photo: File | undefined) => {
+    if (photo && !busy) (onClose(), onFile([photo]));
   };
   return (
     <Modal open={open} onClose={onClose} label={title} className="choice-dialog">
@@ -396,12 +396,12 @@ export function PhotoDialog({ open, title, sub, tiles, busy, onFile, onClose, on
           data-over={over || undefined}
           onDragOver={(e) => (e.preventDefault(), setOver(true))}
           onDragLeave={() => setOver(false)}
-          onDrop={(e) => (e.preventDefault(), setOver(false), take([...e.dataTransfer.files]))}
+          onDrop={(e) => (e.preventDefault(), setOver(false), take([...e.dataTransfer.files].find((f) => f.type.startsWith('image/'))))}
         >
           <Icon name="upload" size={20} />
           <span className="model-upload-title">Tải lên ảnh của bạn</span>
           <span className="model-upload-hint">hoặc kéo thả ảnh vào đây</span>
-          <input type="file" accept="image/*" className="sr-only" disabled={busy} onChange={(e) => take([...(e.target.files ?? [])])} />
+          <input type="file" accept="image/*" className="sr-only" disabled={busy} onChange={(e) => take(e.target.files?.[0])} />
         </label>
         {tiles.map(tile)}
       </div>
