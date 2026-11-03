@@ -15,11 +15,17 @@ export class ApiError extends Error {
   }
 }
 
+// Set by a sign-out: a call still in flight then gets a 401, which must not send the user to /login?next=<this page> over the plain /login.
+let signingOut = false;
+export const startSignOut = () => {
+  signingOut = true;
+};
+
 /** Fetches a route and returns its JSON. A 401 outside the login page sends the user there, to come back to this page after the sign-in; any other failure throws an ApiError carrying the server's message. */
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, init);
   const body = (await res.json().catch(() => null)) as (T & { error?: string; code?: string }) | null;
-  if (res.status === 401 && window.location.pathname !== '/login') window.location.assign(loginFor(window.location.pathname + window.location.search));
+  if (res.status === 401 && !signingOut && window.location.pathname !== '/login') window.location.assign(loginFor(window.location.pathname + window.location.search));
   if (!res.ok) throw new ApiError(res.status, body?.error ?? `HTTP ${res.status}`, Number(res.headers.get('x-retry-after')) || null, body?.code ?? null);
   return body as T;
 }

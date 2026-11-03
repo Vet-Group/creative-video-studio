@@ -4,7 +4,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { type CSSProperties, type FormEvent, useEffect, useRef, useState } from 'react';
-import { api, sendJson } from '@/lib/api';
+import { api, sendJson, startSignOut } from '@/lib/api';
 import { AVATAR_COLORS, NAME_LENGTH, nameProblem, protection, userAvatarColor } from '@/lib/profile';
 import type { SignInMethod } from '@/lib/sign-in-methods';
 import { useMediaQuery } from '@/lib/use-media-query';
@@ -316,6 +316,7 @@ function Protection({ account, twoFactor, onFix }: { account: Account; twoFactor
 const PASSWORD_DONE = 'Đã đổi mật khẩu. Các thiết bị khác đã được đăng xuất.';
 
 export async function signOut() {
+  startSignOut();
   await api('/api/auth/sign-out', sendJson('POST', {})).catch(() => null);
   window.location.assign('/login');
 }
