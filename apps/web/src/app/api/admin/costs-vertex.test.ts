@@ -51,8 +51,8 @@ const FIELDS = ['credits_all_time', 'credits_all_time_usd', 'currency', 'rate', 
 const row = (...v: (string | null)[]) => ({ f: v.map((x) => ({ v: x })) });
 const sku = (skuId: string, units: string, nanos: number) => ({ skuId, pricingInfo: [{ pricingExpression: { tieredRates: [{ unitPrice: { units, nanos } }] } }] });
 
-/** Google as the route sees it: account 1 has an export with two months, account 2 is refused (403); the Catalog answers `catalog`. */
-function fakeGoogle(catalog: unknown[]) {
+/** Google as the route sees it: account 1 has an export with two months, account 2 is refused (403); the Catalog answers `catalog` or fails. */
+function fakeGoogle(catalog: unknown[] | 'fail') {
   const calls: string[] = [];
   vi.stubGlobal('fetch', async (url: string) => {
     calls.push(url);
@@ -69,7 +69,7 @@ function fakeGoogle(catalog: unknown[]) {
         ],
       });
     }
-    if (url.startsWith('https://cloudbilling.googleapis.com/')) return Response.json({ skus: catalog });
+    if (url.startsWith('https://cloudbilling.googleapis.com/')) return catalog === 'fail' ? Response.json({}, { status: 500 }) : Response.json({ skus: catalog });
     return Response.json({}, { status: 500 });
   });
   return calls;
@@ -105,9 +105,36 @@ describe('GET /api/admin/costs/vertex', () => {
       { label: 'Veo 3.1 (Vertex), không tiếng', appUsd: 0.2, googleUsd: 0.2, red: false },
       { label: 'Veo 3.1 (Vertex), có tiếng', appUsd: 0.4, googleUsd: 0.4, red: false },
     ]);
+    // An answer with a refused account is not kept: the next open asks Google again.
     const n = calls.length;
     expect((await get('2026-11')).body).toEqual(body);
-    expect(calls).toHaveLength(n);
+    expect(calls.length).toBeGreaterThan(n);
+  });
+
+  test('keeps a full answer 5 minutes, never one whose Catalog read failed, and empties the cache past 24 months', async () => {
+    process.env.GOOGLE_APPLICATION_CREDENTIALS = KEY1;
+    const calls = fakeGoogle('fail');
+    await get('2025-01');
+    let n = calls.length;
+    await get('2025-01');
+    expect(calls.length).toBeGreaterThan(n); // the failed Catalog read was not cached
+    fakeGoogle([sku('4D50-275D-FC3F', '0', 200_000_000), sku('F64B-2A78-7BAE', '0', 400_000_000)]);
+    const months = Array.from({ length: 24 }, (_, i) => `${2023 + Math.floor(i / 12)}-${String((i % 12) + 1).padStart(2, '0')}`);
+    for (const m of months) await get(m);
+    const full = fakeGoogle([sku('4D50-275D-FC3F', '0', 200_000_000), sku('F64B-2A78-7BAE', '0', 400_000_000)]);
+    await get(months[0]!);
+    expect(full).toHaveLength(0); // cached
+    await get('2025-02'); // the 25th month empties the cache first
+    n = full.length;
+    await get(months[0]!);
+    expect(full.length).toBeGreaterThan(n);
+  });
+
+  test('a key file that cannot be read is a readable answer, not a 500', async () => {
+    process.env.GOOGLE_APPLICATION_CREDENTIALS = join(dir, 'missing.json');
+    const { status, body } = await get('2026-11');
+    expect(status).toBe(200);
+    expect(body).toEqual({ configured: false, error: expect.stringMatching(/ENOENT|no such file/) });
   });
 
   test('marks a price off by more than 1% red, and leaves the Google price empty when the Catalog does not list it or fails', async () => {

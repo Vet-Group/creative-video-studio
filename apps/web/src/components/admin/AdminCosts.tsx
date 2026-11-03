@@ -141,7 +141,7 @@ interface VertexAccountCosts {
   credit: { total: number | null; currency: string; used: number | null; remaining: number | null; remainingUsd: number | null; expiresOn: string | null; stopWhenCreditsEnd: boolean; unverified: boolean };
 }
 type VertexCostsData =
-  | { configured: false }
+  | { configured: false; error?: string }
   | { configured: true; accounts: VertexAccountCosts[]; totalMonthUsd: number; prices: { label: string; appUsd: number | null; googleUsd: number | null; red: boolean }[] };
 
 const VERTEX_ERROR: Record<string, (project: string) => string> = {
@@ -161,7 +161,7 @@ function VertexCosts({ month }: { month: string }) {
       {!data ? (
         failed ? <p className="error">Không tải được số liệu Vertex từ Google.</p> : <p role="status">Đang đọc số liệu từ Google...</p>
       ) : !data.configured ? (
-        <p className="muted">Máy chủ chưa có khóa Vertex nào.</p>
+        data.error ? <p className="error">Không đọc được khóa Vertex trên máy chủ ({data.error}).</p> : <p className="muted">Máy chủ chưa có khóa Vertex nào.</p>
       ) : (
         <>
           <p>

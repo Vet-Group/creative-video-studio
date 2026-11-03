@@ -22,11 +22,16 @@ export function vertexAccounts(env: NodeJS.ProcessEnv, read: (path: string) => s
     if (!project) throw new Error('GOOGLE_CLOUD_PROJECT is not set and the key file has no project_id');
     accounts.push({ project, key });
   }
+  // Account 2 is optional: a key that is missing, unreadable or wrong is logged and left out, so it never stops account 1 or the worker.
   if (env.GOOGLE_APPLICATION_CREDENTIALS_NEXT) {
-    const key = JSON.parse(read(env.GOOGLE_APPLICATION_CREDENTIALS_NEXT)) as ServiceAccountKey & { project_id?: string };
-    if (!key.project_id) throw new Error('the GOOGLE_APPLICATION_CREDENTIALS_NEXT key file has no project_id');
-    if (accounts.some((a) => a.project === key.project_id)) throw new Error(`both Vertex keys name project ${key.project_id}`);
-    accounts.push({ project: key.project_id, key });
+    try {
+      const key = JSON.parse(read(env.GOOGLE_APPLICATION_CREDENTIALS_NEXT)) as ServiceAccountKey & { project_id?: string };
+      if (!key.project_id) throw new Error('the key file has no project_id');
+      if (accounts.some((a) => a.project === key.project_id)) throw new Error(`both Vertex keys name project ${key.project_id}`);
+      accounts.push({ project: key.project_id, key });
+    } catch (e) {
+      console.error('vertex: GOOGLE_APPLICATION_CREDENTIALS_NEXT is left out:', e instanceof Error ? e.message : e);
+    }
   }
   return accounts;
 }
@@ -48,7 +53,7 @@ export interface CreditState {
   remainingUsd: number | null;
   expiresOn: string | null;
   stopWhenCreditsEnd: boolean;
-  /** The export could not tell how much credit is used, so only the expiry can stop the account. */
+  /** The export could not tell how much credit is used. */
   unverified: boolean;
   usable: boolean;
 }
@@ -60,7 +65,8 @@ const dayBefore = (date: string): string => new Date(Date.parse(`${date}T00:00:0
 
 /**
  * Google has no API for the credit balance, so remaining = the Admin's total - |credits used| from the export, in the total's currency (USD at the
- * latest rate for the threshold). An unreadable export (`billing` undefined or not ok) keeps the account usable, flagged unverified. `today` is a UTC date.
+ * latest rate for the threshold). An unreadable export (`billing` undefined or not ok) flags the account unverified; one set to stop is then not
+ * usable (fail closed: its card must never be charged), one that is not keeps being used. `today` is a UTC date.
  */
 export function creditState(row: CreditRow | undefined, billing: VertexBilling | undefined, today: string): CreditState {
   const currency = row?.creditCurrency ?? 'USD';
@@ -71,7 +77,7 @@ export function creditState(row: CreditRow | undefined, billing: VertexBilling |
   const remainingUsd = remaining === null ? null : currency === 'USD' ? remaining : read?.rate ? remaining / read.rate : null;
   const expiresOn = row?.creditExpiresOn ?? null;
   const stopWhenCreditsEnd = row?.stopWhenCreditsEnd ?? false;
-  const ended = (remainingUsd !== null && remainingUsd < LOW_CREDIT_USD) || (expiresOn !== null && today >= dayBefore(expiresOn));
+  const ended = !read || (remainingUsd !== null && remainingUsd < LOW_CREDIT_USD) || (expiresOn !== null && today >= dayBefore(expiresOn));
   return { total, currency, used, remaining, remainingUsd, expiresOn, stopWhenCreditsEnd, unverified: used === null, usable: !(stopWhenCreditsEnd && ended) };
 }
 

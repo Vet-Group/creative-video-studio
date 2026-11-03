@@ -19,10 +19,21 @@ describe('vertexAccounts', () => {
     expect(vertexAccounts({ GOOGLE_APPLICATION_CREDENTIALS: '/nop.json', GOOGLE_CLOUD_PROJECT: 'override' }, read).map((a) => a.project)).toEqual(['override']);
   });
 
-  test('refuses a key without a project and two keys of one project', () => {
+  test('refuses account 1 without a project, and leaves out an account 2 key that is missing, unreadable, without a project or of the same project', () => {
     expect(() => vertexAccounts({ GOOGLE_APPLICATION_CREDENTIALS: '/nop.json' }, read)).toThrow(/GOOGLE_CLOUD_PROJECT/);
-    expect(() => vertexAccounts({ GOOGLE_APPLICATION_CREDENTIALS: '/k1.json', GOOGLE_APPLICATION_CREDENTIALS_NEXT: '/nop.json' }, read)).toThrow(/NEXT key file has no project_id/);
-    expect(() => vertexAccounts({ GOOGLE_APPLICATION_CREDENTIALS: '/k1.json', GOOGLE_APPLICATION_CREDENTIALS_NEXT: '/k1.json' }, read)).toThrow(/both Vertex keys/);
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      const reader = (p: string) => {
+        if (p === '/gone.json') throw new Error('ENOENT: no such file');
+        return p === '/junk.json' ? 'not json' : read(p);
+      };
+      for (const next of ['/gone.json', '/junk.json', '/nop.json', '/k1.json']) {
+        expect(vertexAccounts({ GOOGLE_APPLICATION_CREDENTIALS: '/k1.json', GOOGLE_APPLICATION_CREDENTIALS_NEXT: next }, reader).map((a) => a.project)).toEqual(['cvs-vertex']);
+      }
+      expect(logged.mock.calls.map((c) => String(c[1]))).toEqual([expect.stringMatching(/ENOENT/), expect.stringMatching(/JSON/), 'the key file has no project_id', 'both Vertex keys name project cvs-vertex']);
+    } finally {
+      logged.mockRestore();
+    }
   });
 });
 
@@ -47,9 +58,11 @@ describe('creditState and activeAccount', () => {
     ['two days before expiry', VND, read(0), '2026-12-28', true],
     ['after expiry', VND, read(0), '2027-01-02', false],
     ['low credit but not set to stop', { ...VND, stopWhenCreditsEnd: false }, read(7_825_800), '2027-01-02', true],
-    ['export unreadable: usable, unverified', VND, { ok: false, reason: 'no_access', error: '403' } as VertexBilling, TODAY, true],
-    ['export read failed: usable, unverified', VND, undefined, TODAY, true],
-    ['export unreadable still stops at expiry', VND, undefined, '2026-12-29', false],
+    ['set to stop, no access to the export: fails closed', VND, { ok: false, reason: 'no_access', error: '403' } as VertexBilling, TODAY, false],
+    ['set to stop, no export yet: fails closed', VND, { ok: false, reason: 'no_export', error: '404' } as VertexBilling, TODAY, false],
+    ['set to stop, export read failed: fails closed', VND, undefined, TODAY, false],
+    ['not set to stop, export unreadable: still usable', { ...VND, stopWhenCreditsEnd: false }, { ok: false, reason: 'no_access', error: '403' } as VertexBilling, TODAY, true],
+    ['not set to stop, export read failed: still usable', { ...VND, stopWhenCreditsEnd: false }, undefined, '2027-01-02', true],
     ['no row: usable', undefined, read(0), TODAY, true],
   ])('%s', (_, row, billing, today, usable) => {
     const s = creditState(row as CreditRow | undefined, billing as VertexBilling | undefined, today as string);

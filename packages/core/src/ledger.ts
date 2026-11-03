@@ -196,10 +196,10 @@ export async function bookShared(
 /**
  * Records the provider's invoice total for a month and books the difference to everything the ledger already holds for that
  * provider and month (job rows, bake-off rows, earlier invoice_diff rows), so entering the same invoice again books nothing
- * and a corrected total books only the new difference. Returns the difference booked now, in USD. With `actorId`, an entry that changes the
- * invoice total or books a difference is audited as invoice.enter in the same transaction.
+ * and a corrected total books only the new difference. Returns the difference booked now, in USD. With `actorId` (null for the system: the
+ * worker's daily Vertex booking), an entry that changes the invoice total or books a difference is audited as invoice.enter in the same transaction.
  */
-export async function bookInvoice(pool: LedgerPool, i: { month: string; provider: string; totalUsd: string | number }, actorId?: string): Promise<string> {
+export async function bookInvoice(pool: LedgerPool, i: { month: string; provider: string; totalUsd: string | number }, actorId?: string | null): Promise<string> {
   if (!MONTH.test(i.month)) throw new Error(`not a month: ${i.month}`);
   return withTransaction(pool, async (tx) => {
     await tx.query('select pg_advisory_xact_lock(hashtext($1))', [`invoice:${i.month}:${i.provider}`]);
@@ -220,7 +220,7 @@ export async function bookInvoice(pool: LedgerPool, i: { month: string; provider
         [fmt(diff), i.month, i.provider, `invoice-${i.month}-${i.provider}-${rows[0].diffs + 1}`],
       );
     }
-    if (actorId && (before !== fmt(units(i.totalUsd)) || diff !== 0)) {
+    if (actorId !== undefined && (before !== fmt(units(i.totalUsd)) || diff !== 0)) {
       await audit(tx, {
         actorId, action: 'invoice.enter', target: `invoice:${i.month}:${i.provider}`,
         oldValue: before === undefined ? null : { totalUsd: before }, newValue: { totalUsd: fmt(units(i.totalUsd)), bookedUsd: fmt(diff) },
