@@ -9,7 +9,7 @@ export const WELCOME_KEY = 'cvs.welcome.done';
 
 export function Welcome() {
   // Hidden until storage is read, so a member who closed it never sees it flash.
-  const [show, setShow] = useState(false);
+  const [show, setShow] = useState<boolean | null>(null);
   useEffect(() => {
     try {
       setShow(localStorage.getItem(WELCOME_KEY) !== '1');
@@ -17,6 +17,7 @@ export function Welcome() {
       setShow(true); // blocked storage: shown, and closing it lasts for this visit
     }
   }, []);
+  if (show === null) return <span className="welcome-pending" hidden />; // keeps Explore's first-run line hidden until storage is read
   if (!show) return null;
   function close() {
     setShow(false);

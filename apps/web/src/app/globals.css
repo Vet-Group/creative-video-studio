@@ -2135,7 +2135,7 @@ dialog.modal.tool-guide { width: min(52rem, calc(100vw - 2rem)); }
   .tool-compare tr { padding: 10px 12px; border-bottom: 1px solid var(--hairline); }
   .tool-compare :is(th, td), .tool-compare tr:last-child :is(th, td) { padding: 2px 0; border: 0; }
   .tool-compare tr:last-child { border-bottom: 0; }
-  .tool-compare tbody th { padding-bottom: 4px; }
+  .tool-compare tbody tr:nth-child(n) th { padding-bottom: 4px; } /* beats the last-row rule above */
   .tool-compare td::before { content: attr(data-label) ': '; color: var(--text-muted); font-weight: 600; }
 }
 .tool-entry { padding-top: 4px; border-top: 1px solid var(--hairline); margin-top: 20px; }
@@ -2168,7 +2168,7 @@ dialog.modal.tool-guide { width: min(52rem, calc(100vw - 2rem)); }
 
 /* Explore's first-visit card: three steps, closed for good with its button. */
 .welcome { position: relative; margin: 16px 0 0; padding: 16px 48px 16px 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--fill); }
-.welcome + .explore-first { display: none; } /* the card says it already; the line returns once the card is closed */
+:is(.welcome, .welcome-pending) + .explore-first { display: none; } /* the card says it already; the line returns once the card is closed */
 .welcome h2 { margin: 0 0 8px; color: var(--ink-strong); font-size: 15px; line-height: 22px; font-weight: 600; }
 .welcome ol { display: grid; gap: 6px; margin: 0; padding-left: 20px; color: var(--text-2); font-size: 14px; line-height: 21px; }
 .welcome strong { color: var(--ink); font-weight: 600; }
