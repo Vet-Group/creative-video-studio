@@ -412,8 +412,12 @@ export const costEntries = pgTable(
     check('cost_entries_manual_note_check', sql`${t.kind} <> 'manual_adjustment' or coalesce(length(trim(${t.note})), 0) > 0`),
     check('cost_entries_month_check', sql`${t.month} ~ '^[0-9]{4}-(0[1-9]|1[0-2])$'`),
     check('cost_entries_shared_unattributed_check', sql`${t.jobId} is not null or ${t.kind} = 'llm' or (${t.userId} is null and ${t.teamId} is null and ${t.storeId} is null)`),
-    // An LLM call (Enhance on a job, or a suggestion or translation run without one) always names its user and team, its ICT day, and its source ref.
-    check('cost_entries_llm_check', sql`${t.kind} <> 'llm' or (${t.userId} is not null and ${t.teamId} is not null and ${t.day} is not null and ${t.ref} is not null)`),
+    // An LLM call (Enhance on a job, or a suggestion or translation run without one) always names its user and team, its ICT day, and its source ref;
+    // it is final exactly when it has no job, so it never closes a job.
+    check(
+      'cost_entries_llm_check',
+      sql`${t.kind} <> 'llm' or (${t.userId} is not null and ${t.teamId} is not null and ${t.day} is not null and ${t.ref} is not null and (${t.jobId} is null) = ${t.isFinal})`,
+    ),
     check('cost_entries_day_check', sql`${t.jobId} is null or ${t.day} is not null`),
   ],
 );

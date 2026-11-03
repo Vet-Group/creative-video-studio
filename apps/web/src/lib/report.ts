@@ -25,7 +25,7 @@ export async function weeklyReport(week: string | null) {
           who as (select user_id from per_user union select user_id from spend)
      select w.start::text as start, (w.start + 6)::text as "end",
             to_char(w.start::timestamp, 'YYYY-MM') as cap_month, s.monthly_cap_usd::text as monthly_cap, s.member_daily_clip_cap as daily_cap,
-            coalesce((select sum(usd) from cost_entries ce where month = to_char(w.start::timestamp, 'YYYY-MM') and not exists (select 1 from jobs j where j.id = ce.job_id and j.feature not in ('video', 'marketing'))), 0)::numeric(12, 4)::text as cap_used,
+            coalesce((select sum(usd) from cost_entries ce where month = to_char(w.start::timestamp, 'YYYY-MM') and ce.kind <> 'llm' and not exists (select 1 from jobs j where j.id = ce.job_id and j.feature not in ('video', 'marketing'))), 0)::numeric(12, 4)::text as cap_used,
             u.id as user_id, u.name, u.email, t.name as team, coalesce(p.jobs, 0) as jobs, coalesce(p.accepted, 0) as accepted,
             coalesce(p.failed, 0) as failed, coalesce(p.finished, 0) as finished, p.median_s,
             coalesce(sp.usd, 0)::numeric(12, 4)::text as spend, round(sp.usd / nullif(p.accepted, 0), 4)::text as per_accepted,

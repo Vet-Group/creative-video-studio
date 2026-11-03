@@ -61,7 +61,7 @@ export interface Snapshot {
   asOf: number;
   rate: string | null;
   rows: Row[];
-  /** The video budget: every ledger row of the month outside the image and apps features (shared rows included), and its cap. */
+  /** The video budget: every ledger row of the month outside the image and apps features (shared rows included, LLM calls left out), and its cap. */
   capUsageUsd: string;
   monthlyCapUsd: string;
   /** The image and apps budget and its hard cap. */
@@ -102,8 +102,9 @@ export function snapshot(requestedMonth: string | null, upTo: number | null = nu
     const month = requestedMonth ?? ((await tx.query(`select to_char(now() at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM') as m`)).rows[0].m as string);
     const rate = await tx.query('select vnd_per_usd::text as rate from monthly_rates where month = $1', [month]);
     const cap = await tx.query(
+      // LLM calls never count toward a cap (owner decision, 2026-11-04).
       `with b as (select ce.usd, exists (select 1 from jobs j where j.id = ce.job_id and j.feature not in ('video', 'marketing')) as budget
-                    from cost_entries ce where ce.month = $1)
+                    from cost_entries ce where ce.month = $1 and ce.kind <> 'llm')
        select coalesce((select sum(usd) from b where not budget), 0)::numeric(12, 4)::text as used,
               coalesce((select sum(usd) from b where budget), 0)::numeric(12, 4)::text as features_used,
               s.monthly_cap_usd::text as cap, s.features_monthly_cap_usd::text as features_cap
@@ -116,7 +117,8 @@ export function snapshot(requestedMonth: string | null, upTo: number | null = nu
               ce.job_id, j.feature, ce.provider, ce.model, ce.user_id, u.name as user_name, u.email, ce.team_id, t.name as team_name, t.cost_centre_code,
               ce.store_id, s.name as store_name, s.code as store_code, j.user_id as job_user, j.team_id as job_team, j.store_id as job_store,
               coalesce(jc.is_final, true) as final, v.verdict,
-              coalesce(j.status in ('failed', 'timed_out') and jc.usd > 0 and v.verdict is distinct from 'fail', false) as fail_status
+              coalesce(j.status in ('failed', 'timed_out') and v.verdict is distinct from 'fail'
+                       and (select sum(p.usd) from cost_entries p where p.job_id = ce.job_id and p.kind <> 'llm') > 0, false) as fail_status
          from cost_entries ce
          left join monthly_rates r on r.month = ce.month
          left join users u on u.id = ce.user_id
@@ -220,7 +222,7 @@ export function costsPage(s: Snapshot) {
     byUser: groups(s, (r) => r.user_id ?? '', (r) => r.job_user ?? '', (r) => ({ name: r.user_name, email: r.email })),
     byTeam: groups(s, (r) => r.team_id ?? '', (r) => r.job_team ?? '', (r) => ({ name: r.team_name, costCentreCode: r.cost_centre_code })),
     byStore: groups(s, (r) => r.store_id ?? '', (r) => r.job_store ?? '', (r) => ({ name: r.store_name ?? NO_STORE, code: r.store_code })),
-    // Every LLM call (Enhance on a job too) is one line; the soft feature caps still count a job's Enhance with its feature.
+    // Every LLM call (Enhance on a job too) is one line.
     byFeature: groups(s, (r) => (r.kind === 'llm' ? 'llm' : (r.feature ?? '')), (r) => r.feature ?? '', (r) => ({ name: r.kind === 'llm' ? LLM : featureLabel(r.feature) })),
     capUsage: { usd: s.capUsageUsd, monthlyCapUsd: s.monthlyCapUsd },
     featuresCapUsage: { usd: s.featuresCapUsageUsd, monthlyCapUsd: s.featuresMonthlyCapUsd },
@@ -229,9 +231,9 @@ export function costsPage(s: Snapshot) {
   };
 }
 
-/** Each soft per-feature cap with the month's spend and 80 or 100 once that share is reached (null below 80%). */
+/** Each soft per-feature cap with the month's spend without LLM calls, and 80 or 100 once that share is reached (null below 80%). */
 function featureCapLines(s: Snapshot) {
-  const spent = aggregate(s.rows, (r) => r.feature ?? '', (r) => r.feature ?? '');
+  const spent = aggregate(s.rows.filter((r) => r.kind !== 'llm'), (r) => r.feature ?? '', (r) => r.feature ?? '');
   return s.featureCaps.map(({ feature, monthlyUsd }) => {
     const usd = spent.get(feature)?.usd ?? 0n;
     const cap = units(monthlyUsd);

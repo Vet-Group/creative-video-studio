@@ -650,7 +650,7 @@ describe('LLM calls on the Costs page', () => {
     expect(p.byTeam.map((t) => [t.id, t.name, t.usd])).toEqual([['t3', 'Gamma', '2.0004'], ['t2', 'Beta', '0.0006']]);
     expect(p.byStore.map((s) => [s.id, s.name, s.usd])).toEqual([['s1', 'Shop A', '2.0004'], ['', 'Không gắn cửa hàng', '0.0006']]);
     expect(p.byFeature.map((f) => [f.id, f.name, f.usd])).toEqual([['video', 'Tạo video', '2.0000'], ['llm', 'LLM (Dịch/Gợi ý/Cải thiện)', '0.0010']]);
-    expect(p.capUsage.usd).toBe('2.0010'); // the job-less run is in the video budget, as every job-less row is
+    expect(p.capUsage.usd).toBe('2.0000'); // LLM calls count toward no cap
 
     const d = await detail(LM);
     const kind = d.header.indexOf('entry kind');
@@ -661,5 +661,17 @@ describe('LLM calls on the Costs page', () => {
     ]);
     const s = await summary(LM);
     expect(s.rows.map((r) => [r[1], r[3], r[5]])).toEqual([['Beta', 'Không gắn cửa hàng', '0.0006'], ['Gamma', 'Shop A', '2.0004'], ['Chi phí chung', '', '0.0000']]);
+  });
+
+  test('a failed job the provider did not bill is not a billed failure for its Enhance cost alone', async () => {
+    const { bookLlm } = await import('@cvs/core/ledger');
+    const FM = '2031-10';
+    await open('lj2', 'bob', 't2', null, 'fal', '2031-10-10T03:00:00Z', '2.0000');
+    await running('lj2');
+    expect(await bookLlm(pool, { enhance: 'lj2' }, { costUsd: 0.0004, provider: 'fal', model: 'google/gemini-2.5-flash' })).toBe(true);
+    await settle(pool, 'lj2', { status: 'failed', costUsd: '0', error: 'provider refused' });
+    const p = await page(FM);
+    expect(p.byUser.map((u) => [u.id, u.usd, u.failedByStatus.usd])).toEqual([['bob', '0.0004', '0.0000']]);
+    expect(p.capUsage.usd).toBe('0.0000');
   });
 });

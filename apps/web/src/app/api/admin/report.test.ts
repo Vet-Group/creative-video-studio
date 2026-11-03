@@ -146,10 +146,13 @@ describe('GET /api/admin/report', () => {
   test("adds a member's Enhance and suggestion runs to the spend, and lists a member whose only spend is a suggestion run", async () => {
     // Week of Monday 2026-11-09: a video job of Rep One with its Enhance, and a translation run of Rep Two, who made no job.
     await job('r9', 'rep1', '2026-11-10 10:00:00+07', 'succeeded', 40, '2.0000', 'pass');
+    const capBefore = (await report('?week=2026-11-12')).cap.usedUsd;
     await bookLlm(pool, { enhance: 'r9' }, { costUsd: 0.0004, provider: 'fal', model: 'google/gemini-2.5-flash' });
     await pool.query(`insert into suggestion_runs (id, user_id, input, status, cost_usd, created_at) values ('rr1', 'rep2', '{}', 'succeeded', 0.0006, '2026-11-11 09:00:00+07')`);
     await bookLlm(pool, { suggestion: 'rr1' }, { costUsd: 0.0006, provider: 'fal', model: 'google/gemini-2.5-flash' });
-    expect((await report('?week=2026-11-12')).users).toEqual([
+    const r = await report('?week=2026-11-12');
+    expect(r.cap.usedUsd).toBe(capBefore); // LLM calls count toward no cap
+    expect(r.users).toEqual([
       { userId: 'rep1', name: 'Rep One', email: 'rep1@example.test', team: 'Report Team', jobs: 1, acceptedClips: 1, spendUsd: '2.0004', costPerAcceptedUsd: '2.0004', medianRunSeconds: 40, failureRate: 0, spendOfCap: '0.0100' },
       { userId: 'rep2', name: 'Rep Two', email: 'rep2@example.test', team: 'Report Team', jobs: 0, acceptedClips: 0, spendUsd: '0.0006', costPerAcceptedUsd: null, medianRunSeconds: null, failureRate: null, spendOfCap: '0.0000' },
     ]);

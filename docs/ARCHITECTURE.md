@@ -123,9 +123,11 @@ Every money event is a row in `cost_entries`. The ledger is the only place cost 
 - VND is computed per row as `round_half_even(usd x the month's rate)` to whole VND, by one SQL function used by the page and both CSVs. Postgres `round()` rounds half away from zero, so it is not used. Every VND total is the sum of the row values, so the detail and the summary match.
 - The rate is entered by an Admin per month. Changing one month's rate never changes another month. A month without a rate shows USD only.
 
-**Caps read the ledger.** The monthly cap check sums the ICT month's rows under the advisory lock. The daily clip count includes every job created that ICT day except failed jobs whose total is 0.
+**Caps read the ledger.** The monthly cap check sums the ICT month's rows under the advisory lock. The daily clip count includes every job created that ICT day except failed jobs whose provider rows total 0.
 
-**Consistency.** The Costs page and both CSVs are read in one `REPEATABLE READ` transaction. Four totals match to the cent: the CSV detail, the CSV summary, the Costs page total and the cap usage for that month. A test checks this against hand-computed totals that cover every kind.
+**LLM calls are outside every cap** (owner decision, 2026-11-04). `llm` rows count toward no hard or soft cap (company month, member day and month, image and apps month, daily clips, per-feature caps) and no cap meter. They stay in the Costs page totals, both CSVs, the report spend, the Library job cost and the member's month spend.
+
+**Consistency.** The Costs page and both CSVs are read in one `REPEATABLE READ` transaction. Four totals match to the cent: the CSV detail, the CSV summary, the Costs page total and the cap usage for that month (when the month has no `llm` rows, which the cap usage leaves out). A test checks this against hand-computed totals that cover every kind.
 
 **How team budgets are added later (cost spec AC 11).**
 - `team_id` is already on `users` and on every ledger row, as a snapshot at Run.

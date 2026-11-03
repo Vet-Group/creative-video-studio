@@ -1,7 +1,7 @@
 ALTER TABLE "cost_entries" DROP CONSTRAINT "cost_entries_kind_check";--> statement-breakpoint
 ALTER TABLE "cost_entries" DROP CONSTRAINT "cost_entries_job_shared_check";--> statement-breakpoint
 ALTER TABLE "cost_entries" DROP CONSTRAINT "cost_entries_shared_unattributed_check";--> statement-breakpoint
-ALTER TABLE "cost_entries" ADD CONSTRAINT "cost_entries_llm_check" CHECK ("cost_entries"."kind" <> 'llm' or ("cost_entries"."user_id" is not null and "cost_entries"."team_id" is not null and "cost_entries"."day" is not null and "cost_entries"."ref" is not null));--> statement-breakpoint
+ALTER TABLE "cost_entries" ADD CONSTRAINT "cost_entries_llm_check" CHECK ("cost_entries"."kind" <> 'llm' or ("cost_entries"."user_id" is not null and "cost_entries"."team_id" is not null and "cost_entries"."day" is not null and "cost_entries"."ref" is not null and ("cost_entries"."job_id" is null) = "cost_entries"."is_final"));--> statement-breakpoint
 ALTER TABLE "cost_entries" ADD CONSTRAINT "cost_entries_kind_check" CHECK ("cost_entries"."kind" in ('estimate', 'actual_adjustment', 'release', 'late_bill', 'bakeoff', 'manual_adjustment', 'invoice_diff', 'store_reassign', 'llm'));--> statement-breakpoint
 ALTER TABLE "cost_entries" ADD CONSTRAINT "cost_entries_job_shared_check" CHECK ("cost_entries"."kind" = 'llm' or ("cost_entries"."job_id" is null) = ("cost_entries"."kind" in ('bakeoff', 'manual_adjustment', 'invoice_diff')));--> statement-breakpoint
 ALTER TABLE "cost_entries" ADD CONSTRAINT "cost_entries_shared_unattributed_check" CHECK ("cost_entries"."job_id" is not null or "cost_entries"."kind" = 'llm' or ("cost_entries"."user_id" is null and "cost_entries"."team_id" is null and "cost_entries"."store_id" is null));--> statement-breakpoint
