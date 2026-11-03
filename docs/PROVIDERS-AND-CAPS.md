@@ -11,7 +11,7 @@ Every image and app feature runs on fal.ai: one key, one invoice, and the `fal` 
 | Feature | fal endpoint | Price per run (2026-10-24) |
 |---|---|---|
 | Try On | `fal-ai/nano-banana-pro/edit` (default); `google/nano-banana-2.1/edit`; `fal-ai/fashn/tryon/v1.6` | $0.15; ~$0.044 (tokens); $0.075 |
-| Image Generation | Nano Banana Pro, Nano Banana 2.1, Nano Banana 2, Nano Banana, GPT Image 2, GPT Image 2.5 Flare and Sunburst, Seedream 5.0 Pro | $0.04 to $0.30 by model and size; GPT Image is billed in tokens |
+| Image Generation | Nano Banana Pro, Nano Banana 2.1, Nano Banana 2, Nano Banana, GPT Image 2, GPT Image 2.5 Flare and Sunburst, Seedream 5.0 Pro | $0.04 to $0.413 by model and size; GPT Image is billed in tokens |
 | Character Swap, Model Swap | `fal-ai/nano-banana-pro/edit` | $0.15 |
 | Background Changer | `fal-ai/bria/background/replace` | $0.04 |
 | Reframe | `fal-ai/ideogram/v3/reframe` (fallback `fal-ai/bria/expand`, $0.04) | $0.03 |
@@ -38,6 +38,6 @@ The hard caps are checked in `packages/core/src/limits.ts` (`checkCaps` with the
 
 ## Image models and jobs (migration 0007)
 
-`model_configs` has a `kind` (`video` or `image`), the `features` a model may serve, and, for an image model, `image_prices` (resolution label to USD per image) instead of `usd_per_second` and durations. Migration 0007 seeds seven fal image models **disabled**; an Admin switches them on in Settings (the database refuses an image model without prices, a limit and a ratio). Their ratios and request fields come from each endpoint's fal OpenAPI schema (`sources` records the URL and the read date); the prices are the ones in the table above, per image. Where a schema has no resolution input (Nano Banana, GPT Image 2, FASHN) the only price label is `1K` and nothing is sent; Seedream takes `auto_1K`/`auto_2K` or a computed size.
+`model_configs` has a `kind` (`video` or `image`), the `features` a model may serve, and, for an image model, `image_prices` (resolution label to USD per image) instead of `usd_per_second` and durations. Migration 0007 seeds seven fal image models **disabled**; an Admin switches them on in Settings (the database refuses an image model without prices, a limit and a ratio). Their ratios and request fields come from each endpoint's fal OpenAPI schema (`sources` records the URL and the read date); the prices are the ones in the table above, per image. Where a schema has no resolution input (Nano Banana, FASHN) the only price label is `1K` and nothing is sent; Seedream takes `auto_1K`/`auto_2K` or a computed size, and GPT Image 2 a preset at 1K and a custom size at 2K and 4K (migration 0052).
 
 An image job (`POST /api/jobs` with `feature` other than `video` or `marketing`) stores `duration_s = 0` and `params` (`resolution`, optional `quality`, which only GPT Image reads and which defaults to the `high` tier its price assumes). Its estimate is `image_prices[resolution]`, booked at Run and settled to the larger of that and the reported cost, like a video. Try On needs the person image first and at least one garment image, and may omit the prompt: the API then stores a fixed English default, so the row shows what was sent.

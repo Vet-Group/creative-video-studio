@@ -241,12 +241,32 @@ const nano =
     prompt: req.prompt, image_urls, aspect_ratio: req.ratio, ...(withResolution && { resolution: req.resolution }), ...(req.thinking && { thinking_level: req.thinking }), num_images: 1, output_format: 'png',
   });
 
-/** GPT Image 2 takes only these preset sizes (its schema states no limits for a custom size). */
+/** GPT Image's 1K: the schema's preset sizes. */
 const GPT_SIZES: Record<string, string> = { auto: 'auto', '1:1': 'square_hd', '3:4': 'portrait_4_3', '9:16': 'portrait_16_9', '4:3': 'landscape_4_3', '16:9': 'landscape_16_9' };
+
+type Size = { width: number; height: number };
+/**
+ * GPT Image 2's 2K and 4K (owner decision, 2026-11-03): per ratio, the largest size in exactly that ratio with both edges multiples of 16 and no more
+ * pixels than the 2560x1440 and 3840x2160 rows of fal's pricing table (https://fal.ai/models/openai/gpt-image-2/edit, read 2026-11-03), whose prices
+ * the row carries. The text-to-image schema of the same model caps a custom size at a 3840 px edge and 8,294,400 pixels.
+ */
+const GPT_LARGE: Record<string, Record<string, Size>> = {
+  '2K': { '1:1': { width: 1920, height: 1920 }, '16:9': { width: 2560, height: 1440 }, '9:16': { width: 1440, height: 2560 }, '4:3': { width: 2176, height: 1632 }, '3:4': { width: 1632, height: 2176 } },
+  '4K': { '1:1': { width: 2880, height: 2880 }, '16:9': { width: 3840, height: 2160 }, '9:16': { width: 2160, height: 3840 }, '4:3': { width: 3264, height: 2448 }, '3:4': { width: 2448, height: 3264 } },
+};
+
+/** fal's 'auto' size takes no resolution, so 'auto' at 2K or 4K is the size nearest the first image's shape, square when there is no image it can measure. */
+function nearestSize(sizes: Record<string, Size>, image: string | undefined): Size {
+  const size = image?.startsWith('data:') ? imageSize(Buffer.from(image.slice(image.indexOf(',') + 1), 'base64')) : undefined;
+  const shape = size ? Math.log(size.width / size.height) : 0;
+  const off = (s: Size) => Math.abs(Math.log(s.width / s.height) - shape);
+  return Object.values(sizes).reduce((a, b) => (off(b) < off(a) ? b : a));
+}
 
 /** The GPT Image edit endpoints. The model's price assumes the high quality tier (the schema default); it is sent so a default change cannot raise the price. */
 const gptImage: ImageBody = (req, image_urls) => {
-  const image_size = GPT_SIZES[req.ratio];
+  const large = GPT_LARGE[req.resolution];
+  const image_size = large ? (req.ratio === 'auto' ? nearestSize(large, image_urls[0]) : large[req.ratio]) : GPT_SIZES[req.ratio];
   if (!image_size) throw new ImageReadError(`GPT Image does not offer ratio ${req.ratio}`);
   return { prompt: req.prompt, image_urls, image_size, quality: req.quality ?? 'high', num_images: 1, output_format: 'png' };
 };

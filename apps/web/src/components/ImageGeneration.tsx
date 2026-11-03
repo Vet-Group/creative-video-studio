@@ -76,9 +76,7 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
       setImages(j.images);
       setPrompt(j.prompt ?? '');
       setEnhance(j.enhance ?? true);
-      if (j.modelId) pick.setModelId(j.modelId);
-      if (j.ratio) pick.setRatio(j.ratio);
-      if (j.resolution) pick.setResolution(j.resolution);
+      pick.refill(j);
     },
     (e) => setError(copyError(e, 'Không tìm thấy ảnh để dùng lại.')),
   );
@@ -189,7 +187,7 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
           <textarea aria-label="Mô tả cảnh bạn muốn tạo" placeholder="Mô tả cảnh bạn muốn tạo…" value={prompt} maxLength={chosen?.maxPromptChars} rows={2} onChange={(e) => setPrompt(e.target.value)} onKeyDown={runKey(() => canRun && void run())} />
           <PromptTools compact feature="image" value={prompt} onChange={setPrompt} maxLength={chosen?.maxPromptChars} onRun={() => canRun && void run()} ask={() => ({ field: 'prompt', feature: 'image', text: prompt, ...(chosen && { room: chosen.maxPromptChars }) })} />
         </div>
-        {(reason || error || notice || count) && (
+        {(reason || error || notice || count || pick.note) && (
           <div className="bar-message">
             {count && <p className="help bar-count">{count}</p>}
             {reason && (
@@ -207,6 +205,7 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
                 {error}
               </p>
             )}
+            {pick.note && <p className="help" role="status">{pick.note}</p>}
             {notice && <p role="status">{notice}</p>}
           </div>
         )}

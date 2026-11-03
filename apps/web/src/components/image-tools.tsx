@@ -68,25 +68,58 @@ export function useImageModels(feature: string): { models: ImageModel[] | null; 
   return state;
 }
 
+/** The option nearest `want` (a w:h ratio by shape, a resolution by its K), else the first: a 4:5 sample on a model without 4:5 gets 3:4, a 4K one 2K. */
+export function nearestOption(options: string[], want: string): string {
+  if (options.includes(want)) return want;
+  const value = (s: string) => {
+    const [, a, b] = s.match(/^(\d+):(\d+)$/) ?? s.match(/^(\d+)(K)$/) ?? [];
+    return a === undefined ? undefined : Math.log(Number(a) / (b === 'K' ? 1 : Number(b)));
+  };
+  const w = value(want);
+  const off = (o: string) => Math.abs((value(o) ?? Infinity) - (w ?? 0));
+  return w === undefined ? options[0]! : options.reduce((a, b) => (off(b) < off(a) ? b : a));
+}
+
+/** The line a refill shows when the model lacks the ratio or resolution it asked for, empty when it has both. */
+export function refillNote(asked: { ratio?: string | null; resolution?: string | null }, ratio: string, resolution: string): string {
+  const missed = [
+    ...(asked.ratio && asked.ratio !== ratio ? [[`tỉ lệ ${RATIO_LABEL[asked.ratio] ?? asked.ratio}`, RATIO_LABEL[ratio] ?? ratio]] : []),
+    ...(asked.resolution && asked.resolution !== resolution ? [[`độ phân giải ${asked.resolution}`, resolution]] : []),
+  ];
+  return missed.length === 0 ? '' : `Mẫu dùng ${missed.map((m) => m[0]).join(', ')}; mô hình này không có nên đã chọn ${missed.map((m) => m[1]).join(', ')}.`;
+}
+
 /**
  * The model, ratio, resolution and thinking level of a Run. The chosen model stays while it is listed (until one is chosen, the recommended model that takes the inputs);
- * a ratio, resolution or thinking level the model lacks falls back to its first (a model with no levels has none),
+ * a ratio or resolution the model lacks falls back to its nearest, a thinking level to its first (a model with no levels has none),
  * so the options always match the model. `images` is how many inputs the Run has: a model that takes fewer is shown as not supported.
+ * `refill` sets what a sample or job asks for, and `note` says what the model could not take until the member picks a setting.
  */
 export function useImageChoice(models: ImageModel[] | null, images: number, initialModel = '') {
-  const [modelId, setModelId] = useState(initialModel);
-  const [wantRatio, setRatio] = useState('auto');
-  const [wantResolution, setResolution] = useState('1K');
+  const [modelId, pickModel] = useState(initialModel);
+  const [wantRatio, pickRatio] = useState('auto');
+  const [wantResolution, pickResolution] = useState('1K');
   const [wantThinking, setThinking] = useState('');
+  const [asked, setAsked] = useState<{ ratio: string | null; resolution: string | null } | null>(null);
   const fits = (m: ImageModel) => m.maxImages >= images;
   const chosen = models?.find((m) => m.id === modelId) ?? models?.find((m) => m.recommended && fits(m)) ?? models?.find(fits) ?? models?.[0];
-  const ratio = chosen && !chosen.ratios.includes(wantRatio) ? chosen.ratios[0]! : wantRatio;
-  const resolution = chosen && !chosen.resolutions.includes(wantResolution) ? chosen.resolutions[0]! : wantResolution;
+  const ratio = chosen ? nearestOption(chosen.ratios, wantRatio) : wantRatio;
+  const resolution = chosen ? nearestOption(chosen.resolutions, wantResolution) : wantResolution;
   const thinking = chosen?.thinking.includes(wantThinking) ? wantThinking : chosen?.thinking[0];
   const options: ModelOption[] = (models ?? []).map((m) => ({
     id: m.id, label: m.label, isMock: m.isMock, supported: fits(m), estimateUsd: m.prices[resolution] ?? Object.values(m.prices)[0] ?? '0.0000', score: m.score, recommended: m.recommended, resolution: m.resolutions.join('/'), isNew: m.isNew,
   }));
-  return { chosen, ratio, resolution, thinking, estimate: (thinking && chosen?.thinkingPrices[thinking]?.[resolution]) || chosen?.prices[resolution], options, modelId: chosen?.id ?? '', setModelId, setRatio, setResolution, setThinking };
+  const user = <T,>(set: (v: T) => void) => (v: T) => (setAsked(null), set(v));
+  function refill(j: { modelId: string | null; ratio: string | null; resolution: string | null }) {
+    if (j.modelId) pickModel(j.modelId);
+    if (j.ratio) pickRatio(j.ratio);
+    if (j.resolution) pickResolution(j.resolution);
+    setAsked({ ratio: j.ratio, resolution: j.resolution });
+  }
+  return {
+    chosen, ratio, resolution, thinking, estimate: (thinking && chosen?.thinkingPrices[thinking]?.[resolution]) || chosen?.prices[resolution], options, modelId: chosen?.id ?? '',
+    setModelId: user(pickModel), setRatio: user(pickRatio), setResolution: user(pickResolution), setThinking, refill, note: chosen && asked ? refillNote(asked, ratio, resolution) : '',
+  };
 }
 
 /** What the reuse link reads back from a job (GET /api/jobs/:id) to refill an image page. */
