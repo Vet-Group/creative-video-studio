@@ -11,7 +11,7 @@
 //   service-account token (JWT bearer grant): https://developers.google.com/identity/protocols/oauth2/service-account#httprest
 //   billing: "You're charged only for requests that return a 200 response code" (https://cloud.google.com/vertex-ai/generative-ai/pricing)
 import { createSign, randomUUID } from 'node:crypto';
-import { ImageReadError, imageEstimate, ProviderHttpError, resolveImages, sendJson, type Fetch, type ReadImage } from './http';
+import { ImageReadError, imageEstimate, ProviderHttpError, resolveImages, sendJson, timeout, type Fetch, type ReadImage } from './http';
 import type { ImageProvider, ImageSubmitRequest, ProviderStatus } from './types';
 
 /** The fields of a service account JSON key that the token grant needs. */
@@ -37,6 +37,7 @@ export function serviceAccountToken(key: ServiceAccountKey, f: Fetch = fetch, no
     const assertion = `${unsigned}.${createSign('RSA-SHA256').update(unsigned).sign(key.private_key, 'base64url')}`;
     const res = (await sendJson(f, 'vertex token', TOKEN_URL, {
       method: 'POST',
+      signal: timeout(),
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({ grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion }).toString(),
     })) as { access_token?: string; expires_in?: number };

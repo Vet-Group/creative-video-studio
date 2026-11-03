@@ -16,8 +16,8 @@ export async function adminOverview() {
     pool.query('select count(*) filter (where not banned)::int as active, count(*) filter (where banned)::int as locked from users'),
     pool.query('select count(*) filter (where enabled)::int as enabled, count(*)::int as total from model_configs'),
     pool.query(
-      `select a.id::int as id, u.name as "actorName", a.action, a.target, a.created_at as "createdAt"
-         from audit_entries a join users u on u.id = a.actor_id order by a.id desc limit 5`,
+      `select a.id::int as id, coalesce(u.name, 'Hệ thống') as "actorName", a.action, a.target, a.created_at as "createdAt"
+         from audit_entries a left join users u on u.id = a.actor_id order by a.id desc limit 5`,
     ),
   ]);
   return {

@@ -23,7 +23,7 @@ afterEach(() => vi.unstubAllGlobals());
 
 describe('realProviders', () => {
   test('wires fal (video and image) and Replicate only when their keys are set', () => {
-    expect(realProviders(pool([]), {})).toEqual({ providers: {}, imageProviders: {} });
+    expect(realProviders(pool([]), {})).toEqual({ providers: {}, imageProviders: {}, vertexAccounts: [] });
     const fal = realProviders(pool([]), { FAL_KEY: 'k' });
     expect([Object.keys(fal.providers), Object.keys(fal.imageProviders!)]).toEqual([['fal'], ['fal']]);
     const both = realProviders(pool([]), { FAL_KEY: 'k', REPLICATE_API_TOKEN: 't' });
@@ -37,6 +37,7 @@ describe('realProviders', () => {
     try {
       const vertex = realProviders(pool([]), { GOOGLE_APPLICATION_CREDENTIALS: file });
       expect([Object.keys(vertex.providers), Object.keys(vertex.imageProviders!)]).toEqual([['vertex'], ['vertex']]);
+      expect(vertex.vertexAccounts.map((a) => a.project)).toEqual(['from-key']);
       writeFileSync(file, JSON.stringify({ client_email: 'sa@p.iam.gserviceaccount.com', private_key: 'unused' }));
       expect(Object.keys(realProviders(pool([]), { GOOGLE_APPLICATION_CREDENTIALS: file, GOOGLE_CLOUD_PROJECT: 'p' }).imageProviders!)).toEqual(['vertex']);
       expect(() => realProviders(pool([]), { GOOGLE_APPLICATION_CREDENTIALS: file })).toThrow(/GOOGLE_CLOUD_PROJECT/);
@@ -59,11 +60,13 @@ describe('realProviders', () => {
       return Response.json({ name: 'projects/test/locations/us-central1/publishers/google/models/veo-3.1-generate-001/operations/abc' });
     });
     try {
-      const db = pool([{ ...asset, mime }]);
+      // The same fake row answers the asset lookup and the active account (settings.vertex_active_project).
+      const db = pool([{ ...asset, mime, vertex_active_project: 'test' }]);
       const unchanged = await assetReader(db, async () => bytes)('asset://a');
       expect(unchanged.contentType).toBe('image/webp');
       const { providers } = realProviders(db, { GOOGLE_APPLICATION_CREDENTIALS: file }, async () => bytes);
-      await providers.vertex!.submit({ model: { ...BAKEOFF_MODELS[0]!, provider: 'vertex', endpoint: 'veo-3.1-generate-001', outputResolution: '720p' }, prompt: 'p', imageUrls: ['asset://a'], ratio: '16:9', durationSec: 4 });
+      const { providerJobId } = await providers.vertex!.submit({ model: { ...BAKEOFF_MODELS[0]!, provider: 'vertex', endpoint: 'veo-3.1-generate-001', outputResolution: '720p' }, prompt: 'p', imageUrls: ['asset://a'], ratio: '16:9', durationSec: 4 });
+      expect(providerJobId).toMatch(/^acct:test\|vertex-veo-v1:/);
       expect(predictions).toHaveLength(1);
       const image = predictions[0].instances[0].image;
       expect(image.mimeType).toBe('image/png');

@@ -20,11 +20,11 @@ const req = (m: ImageModelConfig, extra: Partial<ImageSubmitRequest> = {}): Imag
   model: m, prompt: 'a bottle on a marble table', imageUrls: [A, B], ratio: '9:16', resolution: '1K', ...extra,
 });
 
-type Call = { url: string; headers: Record<string, string>; body: string };
+type Call = { url: string; headers: Record<string, string>; body: string; signal?: AbortSignal | null };
 function fakeFetch(...answers: ([number, unknown] | Error)[]) {
   const calls: Call[] = [];
   const fn = (async (url: string, init: RequestInit = {}) => {
-    calls.push({ url, headers: init.headers as Record<string, string>, body: init.body as string });
+    calls.push({ url, headers: init.headers as Record<string, string>, body: init.body as string, signal: init.signal });
     const a = answers.shift() ?? [500, {}];
     if (a instanceof Error) throw a;
     return new Response(JSON.stringify(a[1]), { status: a[0] });
@@ -176,6 +176,7 @@ describe('serviceAccountToken', () => {
     expect(await token()).toBe('a1');
     expect(calls[0]!.url).toBe('https://oauth2.googleapis.com/token');
     expect(calls[0]!.headers['Content-Type']).toBe('application/x-www-form-urlencoded');
+    expect(calls[0]!.signal).toBeInstanceOf(AbortSignal); // a stuck token endpoint cannot hang a job or the billing tick
     const form = new URLSearchParams(calls[0]!.body);
     expect(form.get('grant_type')).toBe('urn:ietf:params:oauth:grant-type:jwt-bearer');
     const [head, claims, sig] = form.get('assertion')!.split('.');

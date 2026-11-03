@@ -20,7 +20,20 @@ interface Settings {
   memberMonthlyUsdCap: string;
   featureCaps: { feature: string; monthlyUsd: string }[];
   models: Model[];
+  vertexActiveProject: string | null;
+  vertexAccounts: VertexAccount[];
 }
+interface VertexAccount {
+  projectId: string;
+  creditTotal: string | null;
+  creditCurrency: string;
+  creditExpiresOn: string | null;
+  stopWhenCreditsEnd: boolean;
+  /** The worker has this account's key. */
+  configured: boolean;
+}
+/** A Vertex account's credits as typed: an empty total or date means none. */
+type VertexForm = { creditTotal: string; creditCurrency: string; creditExpiresOn: string; stopWhenCreditsEnd: boolean };
 
 const PROVIDER_NAME: Record<string, string> = { fal: 'fal.ai', replicate: 'Replicate', vertex: 'Google Vertex AI', mock: 'Mô hình thử (mock)' };
 /** Lower case without accents, so a search typed without accents still finds a model. */
@@ -55,6 +68,10 @@ function SettingsForm({ settings, reload }: { settings: Settings; reload: () => 
   const enabledOf = (s: Settings) => Object.fromEntries(s.models.map((m) => [m.id, m.enabled]));
   const [soft, setSoft] = useState(() => softOf(settings));
   const [enabled, setEnabled] = useState(() => enabledOf(settings));
+  const vertexOf = (s: Settings): Record<string, VertexForm> =>
+    Object.fromEntries(s.vertexAccounts.map((a) => [a.projectId, { creditTotal: a.creditTotal ?? '', creditCurrency: a.creditCurrency, creditExpiresOn: a.creditExpiresOn ?? '', stopWhenCreditsEnd: a.stopWhenCreditsEnd }]));
+  const [vertex, setVertex] = useState(() => vertexOf(settings));
+  const setAccount = (id: string, change: Partial<VertexForm>) => setVertex((cur) => ({ ...cur, [id]: { ...cur[id]!, ...change } }));
   const [query, setQuery] = useState('');
   const [saved, setSaved] = useState(false);
 
@@ -67,7 +84,13 @@ function SettingsForm({ settings, reload }: { settings: Settings; reload: () => 
     differs(memberDay, settings.memberDailyUsdCap) ||
     differs(memberMonth, settings.memberMonthlyUsdCap) ||
     settings.featureCaps.some((c) => differs(soft[c.feature], c.monthlyUsd)) ||
-    settings.models.some((m) => enabled[m.id] !== m.enabled);
+    settings.models.some((m) => enabled[m.id] !== m.enabled) ||
+    settings.vertexAccounts.some((a) => {
+      const v = vertex[a.projectId]!;
+      const total = v.creditTotal.trim();
+      return (total ? a.creditTotal === null || Number(total) !== Number(a.creditTotal) : a.creditTotal !== null) ||
+        v.creditCurrency !== a.creditCurrency || (v.creditExpiresOn || null) !== a.creditExpiresOn || v.stopWhenCreditsEnd !== a.stopWhenCreditsEnd;
+    });
 
   function undo() {
     setMonthly(settings.monthlyCapUsd);
@@ -77,6 +100,7 @@ function SettingsForm({ settings, reload }: { settings: Settings; reload: () => 
     setMemberMonth(settings.memberMonthlyUsdCap);
     setSoft(softOf(settings));
     setEnabled(enabledOf(settings));
+    setVertex(vertexOf(settings));
   }
 
   async function save() {
@@ -93,6 +117,10 @@ function SettingsForm({ settings, reload }: { settings: Settings; reload: () => 
             memberMonthlyUsdCap: memberMonth,
             featureCaps: settings.featureCaps.map((c) => ({ feature: c.feature, monthlyUsd: soft[c.feature] })),
             models: settings.models.map((m) => ({ id: m.id, enabled: enabled[m.id] })),
+            vertexAccounts: settings.vertexAccounts.map((a) => {
+              const v = vertex[a.projectId]!;
+              return { projectId: a.projectId, creditTotal: v.creditTotal.trim() || null, creditCurrency: v.creditCurrency.trim().toUpperCase(), creditExpiresOn: v.creditExpiresOn || null, stopWhenCreditsEnd: v.stopWhenCreditsEnd };
+            }),
           }),
         ),
       'Không lưu được cài đặt.',
@@ -185,6 +213,51 @@ function SettingsForm({ settings, reload }: { settings: Settings; reload: () => 
         })}
         {matching.length === 0 && <p className="muted">Không có mô hình nào khớp “{query.trim()}”.</p>}
       </fieldset>
+      {settings.vertexAccounts.length > 0 && (
+        <fieldset>
+          <legend>Tài khoản Vertex (Google Cloud)</legend>
+          <p className="muted">
+            Job Vertex mới đi vào tài khoản dùng được đầu tiên theo thứ tự dưới đây. Tài khoản bật “Dừng khi hết credits” thôi nhận job khi credits còn dưới 15 USD hoặc từ 1 ngày
+            trước ngày hết hạn; hệ thống kiểm tra mỗi ngày và tự chuyển. Google không có API số dư nên credits còn lại = tổng nhập ở đây trừ credits đã dùng trong billing export.
+          </p>
+          <p>
+            {settings.vertexActiveProject ? (
+              <>
+                Đang dùng: <strong>{settings.vertexActiveProject}</strong>
+              </>
+            ) : (
+              <span className="error">Chưa có tài khoản Vertex nào dùng được: job Vertex mới sẽ bị từ chối.</span>
+            )}
+          </p>
+          {settings.vertexAccounts.map((a) => {
+            const v = vertex[a.projectId]!;
+            return (
+              <section key={a.projectId} className="model-set" aria-label={a.projectId}>
+                <div className="model-set-head">
+                  <h3>{a.projectId}</h3>
+                  {a.projectId === settings.vertexActiveProject && <span className="tag">Đang dùng</span>}
+                  {!a.configured && <span className="tag">Chưa có khóa trên máy chủ</span>}
+                </div>
+                <div className="fields">
+                  <Field label="Tổng credits" unit={v.creditCurrency || '—'} value={v.creditTotal} onChange={(x) => setAccount(a.projectId, { creditTotal: x })} hint="Để trống nếu chưa biết." />
+                  <label>
+                    Đơn vị tiền
+                    <input value={v.creditCurrency} maxLength={3} onChange={(e) => setAccount(a.projectId, { creditCurrency: e.target.value.toUpperCase() })} />
+                  </label>
+                  <label>
+                    Credits hết hạn ngày
+                    <input type="date" value={v.creditExpiresOn} onChange={(e) => setAccount(a.projectId, { creditExpiresOn: e.target.value })} />
+                  </label>
+                </div>
+                <label className="model">
+                  <input type="checkbox" checked={v.stopWhenCreditsEnd} onChange={(e) => setAccount(a.projectId, { stopWhenCreditsEnd: e.target.checked })} />
+                  <span>Dừng khi hết credits (không để Google trừ tiền thẻ)</span>
+                </label>
+              </section>
+            );
+          })}
+        </fieldset>
+      )}
       <p className="muted">Mức mới áp dụng từ lần bấm Run tiếp theo, được ghi vào Nhật ký và tính theo giờ Việt Nam (tháng bắt đầu ngày 1, ngày bắt đầu lúc 0 giờ). Đặt 0 để khoá hẳn phần đó.</p>
       <p role="status" className="save-note">
         {saved && !dirty ? 'Đã lưu cài đặt.' : ''}

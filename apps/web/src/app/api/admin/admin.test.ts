@@ -344,6 +344,39 @@ describe('settings', () => {
     expect(await auditCount()).toBe(before);
     expect((await put({ models: [{ id: 'no-such-model', enabled: true }] })).status).toBe(404);
   });
+
+  test('reads the Vertex accounts and the active one, and changes their credits, each change audited once', async () => {
+    type Vertex = { projectId: string; creditTotal: string | null; creditCurrency: string; creditExpiresOn: string | null; stopWhenCreditsEnd: boolean; configured: boolean };
+    const vertex = async () => (await (await settingsRoute.GET(call(admin.cookie, '/api/admin/settings'))).json()) as { vertexActiveProject: string | null; vertexAccounts: Vertex[] };
+    const before = await vertex();
+    expect(before.vertexActiveProject).toBeNull();
+    expect(before.vertexAccounts.find((a) => a.projectId === 'cvs-vertex')).toMatchObject({ creditTotal: '7825800', creditCurrency: 'VND', creditExpiresOn: '2026-12-30', stopWhenCreditsEnd: true });
+    const seeded = { projectId: 'cvs-vertex', creditTotal: 7825800, creditCurrency: 'VND', creditExpiresOn: '2026-12-30', stopWhenCreditsEnd: true };
+    const next = { projectId: 'creative-video-studio', creditTotal: '300', creditCurrency: 'USD', creditExpiresOn: null, stopWhenCreditsEnd: false };
+    expect((await put({ vertexAccounts: [seeded, next] })).status).toBe(200);
+    expect(await audits('vertex_account:cvs-vertex')).toEqual([]); // unchanged
+    expect(await audits('vertex_account:creative-video-studio')).toEqual([
+      { actor_id: admin.id, action: 'vertex_account.update', old_value: null, new_value: { creditTotal: '300.0000', creditCurrency: 'USD', creditExpiresOn: null, stopWhenCreditsEnd: false } },
+    ]);
+    expect((await put({ vertexAccounts: [{ ...seeded, stopWhenCreditsEnd: false, creditExpiresOn: '2027-01-15' }] })).status).toBe(200);
+    expect(await audits('vertex_account:cvs-vertex')).toEqual([
+      {
+        actor_id: admin.id, action: 'vertex_account.update',
+        old_value: { creditTotal: '7825800', creditCurrency: 'VND', creditExpiresOn: '2026-12-30', stopWhenCreditsEnd: true },
+        new_value: { creditTotal: '7825800.0000', creditCurrency: 'VND', creditExpiresOn: '2027-01-15', stopWhenCreditsEnd: false },
+      },
+    ]);
+    expect((await vertex()).vertexAccounts.find((a) => a.projectId === 'creative-video-studio')).toMatchObject({ creditTotal: '300.0000', creditCurrency: 'USD', creditExpiresOn: null });
+  });
+
+  const credits = { projectId: 'cvs-vertex', creditTotal: '1', creditCurrency: 'VND', creditExpiresOn: null, stopWhenCreditsEnd: true };
+  test.each([
+    { vertexAccounts: 'all' }, { vertexAccounts: [null] }, { vertexAccounts: [{ ...credits, projectId: 'X' }] }, { vertexAccounts: [{ ...credits, creditTotal: -1 }] },
+    { vertexAccounts: [{ ...credits, creditCurrency: 'vnd' }] }, { vertexAccounts: [{ ...credits, creditExpiresOn: '2026-02-30' }] }, { vertexAccounts: [{ ...credits, creditExpiresOn: 'soon' }] },
+    { vertexAccounts: [{ ...credits, stopWhenCreditsEnd: 'yes' }] }, { vertexAccounts: [credits, credits] },
+  ])('refuses %j', async (body) => {
+    expect((await put(body)).status).toBe(400);
+  });
 });
 
 describe('presets', () => {
@@ -405,6 +438,11 @@ describe('GET /api/admin/audit', () => {
     const second = await get('?limit=2&offset=2');
     expect(second.body.entries[0]!.id).toBeLessThan(first.body.entries[1]!.id);
     expect((await get('?action=no.such.action')).body).toEqual({ entries: [], hasMore: false });
+  });
+
+  test('names the system as the actor of an entry the worker wrote', async () => {
+    await pool.query(`insert into audit_entries (actor_id, action, target, new_value) values (null, 'vertex.switch_account', 'settings:1', '{"project":"cvs-vertex"}')`);
+    expect((await get('?action=vertex.switch_account')).body.entries).toEqual([expect.objectContaining({ actorName: 'Hệ thống', newValue: { project: 'cvs-vertex' } })]);
   });
 
   test.each(['?limit=0', '?limit=201', '?limit=x', '?offset=-1'])('answers 400 for %s', async (query) => {
