@@ -28,13 +28,21 @@ test('a phone can play and download a clip', async ({ page }) => {
   const [download] = await Promise.all([page.waitForEvent('download'), card.getByRole('button', { name: 'Tải xuống' }).click()]);
   expect(download.suggestedFilename()).toMatch(new RegExp(`^${today()}-e2e-member-3-[0-9a-f]{8}\\.mp4$`));
 
-  // Touch targets: every icon action of a result is at least 44 px square, on the grid card and in the list row.
-  const tooSmall = () => card.locator('.icon-button').evaluateAll((bs) => bs.filter((b) => b.getBoundingClientRect().width < 44 || b.getBoundingClientRect().height < 44).map((b) => b.getAttribute('aria-label')));
+  // Touch targets: every icon action of a result is at least 44 px square and every mark 44 px tall, on the grid card and in the list row.
+  const tooSmall = () =>
+    card.locator('.icon-button, .verdict-buttons button').evaluateAll((bs) =>
+      bs.filter((b) => b.getBoundingClientRect().height < 44 || (b.classList.contains('icon-button') && b.getBoundingClientRect().width < 44)).map((b) => b.getAttribute('aria-label') ?? b.textContent),
+    );
   await expect(card.locator('.icon-button')).not.toHaveCount(0);
   expect(await tooSmall()).toEqual([]);
   await page.getByRole('button', { name: 'Danh sách', exact: true }).click();
   await expect(card.locator('.lib-thumb')).toBeVisible();
   expect(await tooSmall()).toEqual([]);
-  // The 44 px targets overlap the row's padding, so a list row stays short on a touch phone.
-  expect((await card.boundingBox())!.height).toBeLessThanOrEqual(104);
+  // The 44 px targets overlap the row's padding, so a list row stays short on a touch phone down to its icons; the creator's marks add one line below them, never over them.
+  const row = (await card.boundingBox())!;
+  const icons = (await card.locator('.actions').first().boundingBox())!;
+  const marks = (await card.locator('.verdict-marks').boundingBox())!;
+  expect(icons.y + icons.height - row.y).toBeLessThanOrEqual(104);
+  expect(marks.y).toBeGreaterThanOrEqual(icons.y + icons.height);
+  expect(marks.height).toBeLessThanOrEqual(44);
 });

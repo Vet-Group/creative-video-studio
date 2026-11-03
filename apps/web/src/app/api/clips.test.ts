@@ -191,7 +191,27 @@ describe('GET /api/library', () => {
     expect(await lib(`?creator=${bob.id}&ratio=1:1`)).toEqual([]);
   });
 
-  test.each(['?date=2026-13-45', '?date=yesterday', '?ratio=16:9', '?offset=-1', '?offset=x', '?favorites=0', '?sort=random'])('answers 400 for %s', async (query) => {
+  test('filters by verdict: unmarked, any Pass, featured only, or Fail', async () => {
+    // A switched-off model of their own, so these marks leave the model scores the later tests check alone.
+    await pool.query(
+      `insert into model_configs (id, provider, endpoint, label, ratios, durations_sec, max_images, output_resolution, usd_per_second, sources, enabled) values ('vf-model', 'fal', 'x', 'Verdict filter', '{9:16}', '{8}', 2, '720p', 0.1, '{}', false)`,
+    );
+    const [plain, pass, star, fail] = await Promise.all(['vf-plain', 'vf-pass', 'vf-star', 'vf-fail'].map((id) => clip(alice.id, { id, model: 'vf-model' })));
+    await pool.query(
+      `insert into verdicts (id, job_id, output_asset_id, verdict, fault, featured, marked_by) values
+         ('vf1', $1, $1 || '-video', 'pass', null, false, $4), ('vf2', $2, $2 || '-video', 'pass', null, true, $4), ('vf3', $3, $3 || '-video', 'fail', 'flicker', false, $4)`,
+      [pass, star, fail, alice.id],
+    );
+    const lib = async (query: string) => (await libraryIds(bob.cookie, query)).filter((id) => id.startsWith('vf-')).sort();
+    expect(await lib('')).toEqual([fail, pass, plain, star].sort());
+    expect(await lib('?verdict=none')).toEqual([plain]);
+    expect(await lib('?verdict=pass')).toEqual([pass, star].sort());
+    expect(await lib('?verdict=featured')).toEqual([star]);
+    expect(await lib('?verdict=fail')).toEqual([fail]);
+    expect(await lib(`?verdict=none&creator=${bob.id}`)).toEqual([]);
+  });
+
+  test.each(['?date=2026-13-45', '?date=yesterday', '?ratio=16:9', '?offset=-1', '?offset=x', '?favorites=0', '?sort=random', '?verdict=good', '?verdict=', '?verdict=toString'])('answers 400 for %s', async (query) => {
     expect((await GET_LIBRARY(req(`/api/library${query}`, bob.cookie))).status).toBe(400);
   });
 

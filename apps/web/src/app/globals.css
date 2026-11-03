@@ -1935,9 +1935,9 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .form-card:has(.slot):not(:has(.slot-thumbs li)) .form-message p.help[role='status'], .form-message p.help[role='status'][data-quiet] { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .library .card video.tall { display: block; width: auto; max-width: 100%; margin: 0 auto; background: transparent; }
 .job-body a { color: var(--ink-link); font-size: 13px; text-decoration-color: rgb(var(--tint) / .3); text-underline-offset: 2px; }
-/* Library card actions: the clip actions on one row with Delete at its end, the verdict buttons together on the next. */
+/* Library card actions: the clip actions on one row with Delete at its end; the verdict buttons sit together in their own block below. */
 .library .card .actions .danger { order: 1; margin-left: auto; }
-.library .card .actions .verdict-buttons { display: flex; flex-basis: 100%; gap: 6px; order: 2; }
+.library .card .actions .verdict-buttons { display: flex; flex-basis: 100%; gap: 6px; }
 .library .card .actions .verdict-buttons button { flex: 1; min-width: 0; padding: 0 4px; white-space: nowrap; } /* three marks fit the smallest card */
 
 /* Library results: hover border, the hover checkbox and floating selection bar, the list rows, the loading skeleton, and the phone layout. */
@@ -1966,6 +1966,14 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .lib-mark { margin-left: 8px; padding: 0 8px; border-radius: 999px; background: var(--cat-utility-bg); color: var(--cat-utility-fg); font-size: 11px; line-height: 18px; font-weight: 500; }
 .lib-mark.fail { background: var(--danger-soft); color: var(--danger); }
 .lib-row .actions { flex: none; gap: 2px; margin: 0; }
+:is(.lib-row, .lightbox-side) .verdict-marks { gap: 6px; margin: 0; }
+:is(.lib-row, .lightbox-side) .verdict-buttons { display: flex; gap: 4px; }
+:is(.lib-row, .lightbox-side) .verdict-marks button { height: 30px; padding: 0 10px; font-size: 12px; white-space: nowrap; }
+:is(.lib-row, .lightbox-side) .verdict-marks label { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 12px; font-weight: 500; white-space: nowrap; }
+:is(.lib-row, .lightbox-side) .verdict-marks select { flex: 1; min-width: 0; height: 30px; font-size: 12px; }
+/* The detail side is narrow: the three marks share one row, as on the smallest grid card, and the fault picker takes a row of its own. */
+.lightbox-side .verdict-buttons, .lightbox-side .verdict-marks label { flex-basis: 100%; }
+.lightbox-side .verdict-buttons button { flex: auto; padding: 0 6px; } /* sized by their words, so the Fail label fits the narrow side */
 .lib-row .icon-button { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border-color: transparent; background: none; color: var(--text-icon); }
 .lib-row .icon-button:hover { background: var(--fill); color: var(--ink); }
 .lib-row .favorite[aria-pressed='true'] { color: var(--favorite); }
@@ -1988,6 +1996,7 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 @media (pointer: coarse) { /* touch: every result action and the selection bar buttons get a 44 px target */
   .lib-row .icon-button, .library .card .actions .icon-button { width: 44px; height: 44px; }
   .library .card .actions :is(button, .button), .zip-float button { height: 44px; line-height: 42px; }
+  :is(.lib-row, .lightbox-side) .verdict-marks :is(button, select) { height: 44px; }
 }
 @media (max-width: 639.98px) {
   .library-search { flex-basis: 100%; }
@@ -2001,4 +2010,21 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 @media (max-width: 639.98px) and (pointer: coarse) {
   .lib-row { row-gap: 4px; padding: 8px 12px; }
   .lib-row .actions { margin: -12px 0 -8px; padding-left: 56px; }
+  .lib-row .actions.verdict-marks { margin: 6px 0 0; } /* the marks line starts below the icons' overlap, not on it */
 }
+
+/* The Library marking guide: a readable column of short sections. */
+dialog.modal.verdict-guide { width: min(40rem, calc(100vw - 2rem)); }
+.verdict-guide .modal-body { padding: 24px; }
+.verdict-guide h2 { margin: 0 32px 4px 0; font-size: 18px; line-height: 26px; font-weight: 600; }
+.verdict-guide h3 { margin: 20px 0 6px; color: var(--ink-strong); font-size: 15px; line-height: 22px; font-weight: 600; }
+.verdict-guide :is(ul, ol) { margin: 0; padding-left: 20px; }
+.verdict-guide :is(li, dd, p) { font-size: 14px; line-height: 21px; }
+.verdict-guide li + li { margin-top: 6px; }
+.verdict-guide dl { display: grid; gap: 8px; margin: 0; }
+.verdict-guide dl > div { display: grid; gap: 2px; }
+.verdict-guide dt { color: var(--ink-strong); font-size: 14px; font-weight: 600; }
+.verdict-guide dd { margin: 0; color: var(--text-2); }
+.verdict-guide .verdict-guide-marks { grid-template-columns: max-content 1fr; column-gap: 16px; }
+.verdict-guide .muted { margin: 8px 0 0; }
+.library-sub .link-button { margin-left: 6px; }

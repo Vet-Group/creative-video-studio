@@ -86,6 +86,31 @@ test('Library views: grid or list remembered, a selection bar with the zip, sear
   await mineOnly();
   await expect(page.locator('.lib-row')).toHaveCount(2);
 
+  // Marks work on a list row and in the detail view; Kết quả finds the unmarked items, and a fresh mark takes one out of that list.
+  await item(first).getByRole('button', { name: 'Đạt', exact: true }).click();
+  await expect(item(first).locator('.lib-mark')).toHaveText('Đạt');
+  const verdict = page.getByLabel('Kết quả');
+  await verdict.selectOption('none');
+  await expect(page.locator('.lib-row')).toHaveCount(1);
+  await item(second).getByRole('button', { name: 'Xem chi tiết' }).click();
+  const detail = page.getByRole('dialog');
+  await detail.getByRole('button', { name: 'Nổi bật', exact: true }).click();
+  await expect(page.getByText('Chưa có clip nào khớp bộ lọc.')).toBeVisible();
+  await expect(detail).toHaveCount(0); // the last unmarked item left, so the detail view closed
+  await verdict.selectOption('featured');
+  await expect(page.locator('.lib-row')).toHaveCount(1);
+  await expect(item(second).locator('.lib-mark')).toHaveText('Nổi bật');
+  await verdict.selectOption('');
+  await expect(page.locator('.lib-row')).toHaveCount(2);
+
+  // The marking guide says why and how to mark, with an example for every fault, and Esc closes it.
+  await page.getByRole('button', { name: 'Hướng dẫn chấm điểm' }).click();
+  const guide = page.getByRole('dialog', { name: 'Hướng dẫn chấm điểm' });
+  await expect(guide.getByRole('heading', { name: 'Chấm để làm gì?' })).toBeVisible();
+  await expect(guide.locator('.verdict-guide-faults dd')).toHaveCount(6);
+  await page.keyboard.press('Escape');
+  await expect(guide).toHaveCount(0);
+
   // Picking a checkbox from the keyboard starts the selection; the bar counts, offers the zip, and Esc ends it.
   const bar = page.getByRole('group', { name: 'Tải nhiều mục' });
   const checks = page.getByRole('checkbox', { name: /^Chọn \d{8}-e2e-library-view-/ });

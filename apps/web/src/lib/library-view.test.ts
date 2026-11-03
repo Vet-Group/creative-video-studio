@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { activeFilters, libraryQuery, NO_FILTERS, readView, saveView, VIEW_KEY } from './library-view';
+import { activeFilters, libraryQuery, matchesVerdict, NO_FILTERS, readView, saveView, VIEW_KEY } from './library-view';
 
 describe('libraryQuery', () => {
   it('leaves the defaults out', () => {
@@ -7,8 +7,8 @@ describe('libraryQuery', () => {
   });
 
   it('sends every filter, the trimmed words, the sort and the offset', () => {
-    const q = new URLSearchParams(libraryQuery({ q: '  áo  khoác ', creator: 'u1', date: '2026-10-23', ratio: '1:1', kind: 'images', favoritesOnly: true, sort: 'oldest' }, 24));
-    expect(Object.fromEntries(q)).toEqual({ q: 'áo  khoác', creator: 'u1', date: '2026-10-23', ratio: '1:1', kind: 'images', favorites: '1', sort: 'oldest', offset: '24' });
+    const q = new URLSearchParams(libraryQuery({ q: '  áo  khoác ', creator: 'u1', date: '2026-10-23', ratio: '1:1', kind: 'images', verdict: 'none', favoritesOnly: true, sort: 'oldest' }, 24));
+    expect(Object.fromEntries(q)).toEqual({ q: 'áo  khoác', creator: 'u1', date: '2026-10-23', ratio: '1:1', kind: 'images', verdict: 'none', favorites: '1', sort: 'oldest', offset: '24' });
   });
 
   it('drops blank words', () => {
@@ -21,7 +21,21 @@ describe('activeFilters', () => {
     expect(activeFilters(NO_FILTERS)).toBe(0);
     expect(activeFilters({ ...NO_FILTERS, sort: 'oldest', q: ' ' })).toBe(0);
     expect(activeFilters({ ...NO_FILTERS, kind: 'videos' })).toBe(1);
-    expect(activeFilters({ q: 'x', creator: 'u1', date: '2026-10-23', ratio: '9:16', kind: 'apps', favoritesOnly: true, sort: 'newest' })).toBe(6);
+    expect(activeFilters({ ...NO_FILTERS, verdict: 'fail' })).toBe(1);
+    expect(activeFilters({ q: 'x', creator: 'u1', date: '2026-10-23', ratio: '9:16', kind: 'apps', verdict: 'pass', favoritesOnly: true, sort: 'newest' })).toBe(7);
+  });
+});
+
+describe('matchesVerdict', () => {
+  const pass = { verdict: 'pass' as const, featured: false };
+  const featured = { verdict: 'pass' as const, featured: true };
+  const fail = { verdict: 'fail' as const, featured: false };
+  it('keeps every item without the filter, and sorts the marks under each choice', () => {
+    for (const mark of [null, pass, featured, fail]) expect(matchesVerdict('', mark)).toBe(true);
+    expect([null, pass, featured, fail].map((m) => matchesVerdict('none', m))).toEqual([true, false, false, false]);
+    expect([null, pass, featured, fail].map((m) => matchesVerdict('pass', m))).toEqual([false, true, true, false]); // a featured item is a Pass too
+    expect([null, pass, featured, fail].map((m) => matchesVerdict('featured', m))).toEqual([false, false, true, false]);
+    expect([null, pass, featured, fail].map((m) => matchesVerdict('fail', m))).toEqual([false, false, false, true]);
   });
 });
 
