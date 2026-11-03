@@ -43,7 +43,7 @@ test('the size slider sets the Examples columns and the History layout on Create
   await signIn(page, 'sizea');
   await checkExamples(page);
   await checkHistory(page);
-  await page.getByRole('link', { name: 'Marketing Studio' }).click();
+  await page.getByRole('navigation', { name: 'Điều hướng chính' }).getByRole('link', { name: 'Marketing Studio' }).click();
   await expect(page).toHaveURL(/\/marketing-studio$/);
   await checkExamples(page);
   await checkHistory(page);

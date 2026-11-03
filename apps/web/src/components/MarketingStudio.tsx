@@ -27,6 +27,7 @@ import { Select } from './Select';
 import { Tray } from './Shell';
 import { Templates } from './Templates';
 import { SuggestButton } from './Suggestions';
+import { PageHint } from './ToolGuide';
 
 interface VideoModel {
   id: string;
@@ -665,6 +666,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
 
         <div className="card form-card" id="marketing-panel-create" role={narrow ? 'tabpanel' : undefined} aria-labelledby={narrow ? 'marketing-tab-create' : undefined} hidden={narrow && shown !== 'create'} onPointerDownCapture={recall.touch} onKeyDownCapture={recall.touch}>
           <div className="form-scroll">
+            <PageHint href="/marketing-studio" />
             <div className="app-head marketing-head" data-category="video" data-photo={have.has(photo) || undefined} style={have.has(photo) ? ({ '--photo': `url(/api/samples/${photo})` } as CSSProperties) : undefined}>
               {have.has(loop) && (
                 <span className="head-loop">

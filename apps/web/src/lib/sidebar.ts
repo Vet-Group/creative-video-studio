@@ -1,4 +1,5 @@
 import type { IconName } from '@/components/Icon';
+import { toolGuide } from './tool-guide';
 
 /** A cookie, so the server renders the rail already collapsed and the page does not jump on load. Shared by the layout and the Shell. */
 export const COLLAPSED_COOKIE = 'cvs_sidebar_collapsed';
@@ -8,6 +9,8 @@ interface NavItem {
   text: string;
   icon: IconName;
   badge?: string;
+  /** What the tool is for, beside the item on hover or focus and under it in the phone drawer. */
+  hint?: string;
 }
 
 interface NavGroup {
@@ -31,6 +34,8 @@ const GROUPS: NavGroup[] = [
   { label: 'Của bạn', items: [{ href: '/library', text: 'Thư viện', icon: 'library' }] },
 ];
 const ADMIN: NavGroup = { label: 'Quản lý', items: [{ href: '/admin/overview', text: 'Quản trị', icon: 'admin' }] };
+
+for (const item of GROUPS[1]!.items) item.hint = toolGuide(item.href)!.oneLine;
 
 export const navGroups = (isAdmin: boolean): NavGroup[] => (isAdmin ? [...GROUPS, ADMIN] : GROUPS);
 

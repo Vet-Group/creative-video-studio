@@ -5,6 +5,7 @@ import { useId, useState } from 'react';
 import { type AppCategory, CATEGORIES, filterApps } from '@/lib/apps';
 import { AppArt } from './AppPage';
 import { Icon } from './Icon';
+import { PageHint } from './ToolGuide';
 
 export function AppsIndex() {
   const [category, setCategory] = useState<AppCategory | 'all'>('all');
@@ -15,6 +16,7 @@ export function AppsIndex() {
     <section aria-labelledby="apps-title" className="apps">
       <h1 id="apps-title">Ứng dụng</h1>
       <p className="muted apps-sub">Công cụ AI một chạm cho ảnh và video của công ty.</p>
+      <PageHint href="/apps" />
       <div className="apps-tools">
         <div className="apps-search">
           <label htmlFor={searchId} className="sr-only">

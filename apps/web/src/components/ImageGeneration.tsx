@@ -18,6 +18,7 @@ import { PromptTools } from './PromptTools';
 import { Select } from './Select';
 import { Tray } from './Shell';
 import { Templates } from './Templates';
+import { PageHint } from './ToolGuide';
 
 type Tab = 'history' | 'examples' | 'about';
 const TAB_LABEL: Record<Tab, string> = { history: 'Lịch sử', examples: 'Ví dụ', about: 'Giới thiệu' };
@@ -142,6 +143,7 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
       <h1 id="imagegen-title" className="sr-only">
         Tạo ảnh
       </h1>
+      <PageHint href="/image-generation" />
       <WorkTabs prefix="imagegen" tabs={TABS} labels={TAB_LABEL} shown={tab} onSelect={setTab} />
       {/* Above the gallery, not in the prompt bar, which keeps Fash's one-row height. */}
       <Templates feature="image" data={() => ({ images: images.map((i) => i.id), prompt: prompt.trim(), enhance, ratio: pick.ratio, resolution: pick.resolution, modelId: pick.modelId })} />

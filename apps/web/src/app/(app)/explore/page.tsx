@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { CardMedia } from '@/components/CardMedia';
 import { Icon, type IconName } from '@/components/Icon';
+import { ToolGuideButton } from '@/components/ToolGuide';
 import { MODEL_CARD_TEXT } from '@/lib/about-content';
 import { pool } from '@/lib/auth';
 import { bestClips } from '@/lib/clips';
@@ -13,6 +14,7 @@ import { featureLabel } from '@/lib/features';
 import { modelStats, rank, scoreOf } from '@/lib/model-scores';
 import { pageOf } from '@/lib/reuse';
 import { listSamples } from '@/lib/samples';
+import { TOOL_GOALS, toolGuide } from '@/lib/tool-guide';
 
 // The tools the app has, in the live sidebar order; uploaded samples override these fallback posters.
 const FEATURES: { href: string; sample: string; title: string; icon: IconName; poster: string }[] = [
@@ -134,6 +136,27 @@ export default async function ExplorePage() {
         </section>
       )}
 
+      <section aria-labelledby="explore-start" className="explore-start">
+        <div className="explore-start-head">
+          <h2 id="explore-start">Bắt đầu từ đâu</h2>
+          <ToolGuideButton className="link-button">So sánh các công cụ</ToolGuideButton>
+        </div>
+        <p className="muted explore-sub">Chọn việc bạn cần; mỗi dòng mở đúng công cụ.</p>
+        <ul className="tool-goals" aria-label="Bắt đầu từ đâu">
+          {TOOL_GOALS.map((g) => (
+            <li key={g.need}>
+              <Link href={g.href}>
+                <span>{g.need}</span>
+                <strong>
+                  {g.go}
+                  <Icon name="right" size={14} />
+                </strong>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </section>
+
       <h2>Công cụ</h2>
       <ul className="explore-tools" aria-label="Công cụ">
         {FEATURES.map((f) => (
@@ -144,6 +167,7 @@ export default async function ExplorePage() {
                 <Icon name={f.icon} size={16} />
                 <strong>{f.title}</strong>
               </span>
+              <span className="muted explore-tool-text">{toolGuide(f.href)?.oneLine ?? 'Mọi clip và ảnh công ty đã tạo, để xem, tải xuống và chấm điểm.'}</span>
             </Link>
           </li>
         ))}

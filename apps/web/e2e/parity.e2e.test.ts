@@ -142,6 +142,8 @@ test('below 1024 px the drawer opens and closes by keyboard and navigates withou
   await expect(menu).toHaveAttribute('aria-expanded', 'true');
   await expect(nav.getByRole('link', { name: 'Khám phá' })).toBeFocused();
   // The page behind the drawer is out of the focus order.
+  await page.keyboard.press('Tab');
+  await expect(nav.getByRole('button', { name: 'Chọn công cụ nào?' })).toBeFocused(); // beside the Sáng tạo label
   for (const name of ['Thử đồ', 'Tạo ảnh', 'Tạo video', 'Marketing Studio', 'Ứng dụng', 'Thư viện']) {
     await page.keyboard.press('Tab');
     await expect(nav.getByRole('link', { name })).toBeFocused();
@@ -153,7 +155,7 @@ test('below 1024 px the drawer opens and closes by keyboard and navigates withou
 
   await page.keyboard.press('Enter');
   await expect(nav).toBeVisible();
-  for (let i = 0; i < 6; i++) await page.keyboard.press('Tab');
+  for (let i = 0; i < 7; i++) await page.keyboard.press('Tab'); // with the guide button beside the Sáng tạo label
   await page.keyboard.press('Enter');
   await expect(page).toHaveURL(/\/library$/);
   await expect(nav).toBeHidden();
@@ -635,7 +637,7 @@ for (const width of [1440, 1280, 390]) {
       });
     // The account chip closes the sidebar (the top bar's avatar below 1024 px); the open tab takes the tab stop.
     const account = 'Tài khoản: E2E Member 5';
-    const order = wideScreen ? ['Thu gọn thanh bên', 'Khám phá', 'Thử đồ', 'Tạo ảnh', 'Tạo video', 'Marketing Studio', 'Ứng dụng', 'Thư viện', account, 'Ví dụ'] : ['Mở menu', account, 'Tạo'];
+    const order = wideScreen ? ['Thu gọn thanh bên', 'Khám phá', 'Chọn công cụ nào?', 'Thử đồ', 'Tạo ảnh', 'Tạo video', 'Marketing Studio', 'Ứng dụng', 'Thư viện', account, 'Ví dụ'] : ['Mở menu', account, 'Tạo'];
 
     for (const name of order) {
       await page.keyboard.press('Tab');
@@ -646,7 +648,7 @@ for (const width of [1440, 1280, 390]) {
       // The persistent sidebar navigates without a mouse.
       await page.goto('/create');
       await expect(page.getByRole('tab', { name: 'Lịch sử' })).toBeVisible();
-      for (let i = 0; i < 8; i++) await page.keyboard.press('Tab');
+      for (let i = 0; i < 9; i++) await page.keyboard.press('Tab'); // with the guide button beside the Sáng tạo label
       await expect.poll(focused).toBe('Thư viện');
       await page.keyboard.press('Enter');
       await expect(page).toHaveURL(/\/library$/);

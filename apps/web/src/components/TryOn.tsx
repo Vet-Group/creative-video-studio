@@ -19,6 +19,7 @@ import { PromptComposer } from './PromptComposer';
 import { Select } from './Select';
 import { Tray } from './Shell';
 import { Templates } from './Templates';
+import { PageHint } from './ToolGuide';
 
 type Tab = 'create' | 'history' | 'examples' | 'about';
 const TAB_LABEL: Record<Tab, string> = { create: 'Tạo', history: 'Lịch sử', examples: 'Ví dụ', about: 'Giới thiệu' };
@@ -186,6 +187,7 @@ export function TryOn({ reuse }: { reuse?: string }) {
 
         <div className="card form-card" id="tryon-panel-create" role={narrow ? 'tabpanel' : undefined} aria-labelledby={narrow ? 'tryon-tab-create' : undefined} hidden={narrow && shown !== 'create'} onPointerDownCapture={recall.touch} onKeyDownCapture={recall.touch}>
           <div className="form-scroll">
+            <PageHint href="/try-on" />
             <Slot label="Trang phục" empty="Thêm 1 đến 5 ảnh trang phục" inputLabel="Ảnh trang phục" images={garments} max={MAX_GARMENTS} busy={busy} onAdd={add(setGarments)} onRemove={(id) => setGarments((c) => c.filter((i) => i.id !== id))} samples={categories.length > 0 ? [] : samplesOf('garment')} onSample={addSample(setGarments)} onBrowse={categories.length > 0 ? () => setPicker({ role: 'garment' }) : undefined} />
             <Slot label="Người mẫu" empty="Thêm 1 ảnh người mẫu" inputLabel="Ảnh người mẫu" images={person} max={1} busy={busy} onAdd={add(setPerson)} onRemove={(id) => setPerson((c) => c.filter((i) => i.id !== id))} samples={models0.length > 0 ? [] : samplesOf('model')} onSample={addSample(setPerson)} onBrowse={models0.length + myModels.length > 0 ? () => setPicker({ role: 'model' }) : undefined} />
             <Slot label="Bối cảnh (tuỳ chọn)" empty="Thêm 1 ảnh bối cảnh nếu muốn" inputLabel="Ảnh bối cảnh" images={background} max={1} busy={busy} onAdd={add(setBackground)} onRemove={(id) => setBackground((c) => c.filter((i) => i.id !== id))} samples={backgrounds.length > 0 ? [] : samplesOf('background')} onSample={addSample(setBackground)} onBrowse={backgrounds.length > 0 ? () => setPicker({ role: 'background' }) : undefined} />
