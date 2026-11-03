@@ -55,9 +55,9 @@ export function ToolGuide({ open, onClose }: { open: boolean; onClose: () => voi
             {TOOL_GUIDE.map((t) => (
               <tr key={t.href}>
                 <th scope="row">{t.title}</th>
-                <td>{t.have}</td>
-                <td>{t.get}</td>
-                <td>{t.wait}</td>
+                <td data-label="Bạn đưa vào">{t.have}</td>
+                <td data-label="Bạn nhận về">{t.get}</td>
+                <td data-label="Thời gian chờ">{t.wait}</td>
               </tr>
             ))}
           </tbody>

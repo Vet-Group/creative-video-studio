@@ -635,6 +635,20 @@ export function Library() {
   const latest = useRef(0);
   const set = (patch: Partial<LibraryFilters>) => setFilters((cur) => ({ ...cur, ...patch }));
   const [pickDay, setPickDay] = useState(false); // "Chọn một ngày…" shows the calendar field
+  const calendar = useRef<HTMLInputElement>(null);
+  const openCalendar = useRef(false);
+  useEffect(() => {
+    // Opened right after "Chọn một ngày…", and scrolled into the filter row, which scrolls sideways on a phone.
+    const el = calendar.current;
+    if (!pickDay || !el || !openCalendar.current) return;
+    openCalendar.current = false;
+    el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    try {
+      el.showPicker();
+    } catch {
+      el.focus(); // no picker in this browser, or no user gesture left
+    }
+  }, [pickDay]);
   const active = activeFilters(filters);
   // An item that no longer matches Favourites only or the verdict filter leaves the list, so the next page's offset stays right; the detail view then shows the next one.
   const counted = useRef(new Set<string>()); // first marks already taken off the count: two quick marks on one item see the same unmarked render
@@ -839,6 +853,7 @@ export function Library() {
             value={filters.days ? `d${filters.days}` : filters.date || pickDay ? 'pick' : ''}
             onChange={(e) => {
               const v = e.target.value;
+              openCalendar.current = v === 'pick';
               setPickDay(v === 'pick');
               set(v === 'pick' ? { days: '' } : { days: v.slice(1) as LibraryFilters['days'], date: '' });
             }}
@@ -847,13 +862,13 @@ export function Library() {
             <option value="d1">Hôm nay</option>
             <option value="d7">7 ngày qua</option>
             <option value="d30">30 ngày qua</option>
-            <option value="pick">Chọn một ngày…</option>
+            <option value="pick">{filters.date ? filters.date.split('-').reverse().join('/') : 'Chọn một ngày…'}</option>
           </select>
         </label>
         {(pickDay || filters.date) && (
           <label className="library-field">
             <span className="sr-only">Ngày cụ thể</span>
-            <input type="date" value={filters.date} max={today()} onChange={(e) => set({ date: e.target.value })} />
+            <input ref={calendar} type="date" value={filters.date} max={today()} onChange={(e) => set({ date: e.target.value })} />
           </label>
         )}
         <label className="library-field">
