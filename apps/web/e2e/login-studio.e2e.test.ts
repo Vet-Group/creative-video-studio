@@ -3,7 +3,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, type Locator, type Page, test } from '@playwright/test';
 import { REACH } from '../src/app/login/beam';
-import { signIn } from './support.test';
+import { loginReady, signIn } from './support.test';
 
 const DESKTOP = { width: 1440, height: 900 };
 
@@ -105,6 +105,7 @@ test.describe('desktop', () => {
       await gate;
       await route.fulfill({ status: 401, contentType: 'application/json', body: JSON.stringify({ code: 'INVALID_EMAIL_OR_PASSWORD' }) });
     });
+    await loginReady(page);
     await page.getByLabel('Email').fill('nobody@e2e.test');
     await pw.fill('secret-1');
     await eye.click();
@@ -314,6 +315,7 @@ test.describe('living studio', () => {
   test('a successful sign-in flashes and claps before the next page opens', async ({ page }) => {
     await page.route('**/api/auth/sign-in/email', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: '{}' }));
     const { pw, submit, card } = await open(page);
+    await loginReady(page);
     await page.getByLabel('Email').fill('someone@example.test');
     await pw.fill('anything');
     // The mocked sign-in sets no session, so Create sends the browser back here; the request for it is what shows the page moved on.
