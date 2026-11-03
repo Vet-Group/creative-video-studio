@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
-import { ENHANCE_MODEL, ENHANCE_URL } from './enhance';
-import { createFalSuggester, parseSuggestions, PROMPT_SYSTEM, PROMPT_TASKS, SCENE_SYSTEM, SUGGEST_SYSTEM, suggestPrompt, TRANSLATE_SYSTEM } from './suggest';
+import { ENHANCE_MODEL, ENHANCE_URL, OPENAI_URL } from './enhance';
+import { createFalSuggester, createOpenAiSuggester, parseSuggestions, PROMPT_SYSTEM, PROMPT_TASKS, SCENE_SYSTEM, SUGGEST_SYSTEM, suggestPrompt, TRANSLATE_SYSTEM } from './suggest';
 
 const answer = (body: unknown, status = 200) => Promise.resolve(new Response(JSON.stringify(body), { status }));
 const input = { field: 'script' as const, text: 'váy linen mùa hè', context: 'The product crashes into the scene.', max: 40 };
@@ -75,4 +75,41 @@ test('a translation sends the prompt under its own system prompt, cool and long 
   expect(await suggest({ field: 'translate', text: 'The model turns slowly in window light', context: '', max: 10_000 })).toEqual({ options: ['Người mẫu xoay chậm dưới ánh sáng cửa sổ'], costUsd: 0.0001, provider: 'fal', model: ENHANCE_MODEL });
   expect(bodies[0]).toMatchObject({ system_prompt: TRANSLATE_SYSTEM, prompt: 'The prompt:\nThe model turns slowly in window light', temperature: 0.2, max_tokens: 3000 });
   expect(TRANSLATE_SYSTEM).toMatch(/natural, plain Vietnamese/);
+});
+
+const chat = (content: unknown, usage?: unknown) => answer({ choices: [{ message: { role: 'assistant', content } }], usage });
+
+test('OpenAI: the same system prompt, user turn and limits, and the options with their readings and cost', async () => {
+  const calls: { url: string; init: RequestInit }[] = [];
+  const suggest = createOpenAiSuggester({
+    apiKey: 'sk',
+    fetch: (url, init) => {
+      calls.push({ url: String(url), init: init! });
+      return chat('[{"text": "Một", "vi": "Một"}, {"text": "Hai"}, "Ba"]', { prompt_tokens: 500, completion_tokens: 200, prompt_tokens_details: { cached_tokens: 0 } });
+    },
+  });
+  expect(await suggest(input)).toEqual({ options: ['Một', 'Hai', 'Ba'], meanings: ['Một', null, null], costUsd: (500 * 0.1 + 200 * 0.5) / 1e6, provider: 'openai', model: 'gpt-6-luna' });
+  expect(calls[0]!.url).toBe(OPENAI_URL);
+  expect((calls[0]!.init.headers as Record<string, string>).Authorization).toBe('Bearer sk');
+  expect(JSON.parse(String(calls[0]!.init.body))).toEqual({
+    model: 'gpt-6-luna',
+    messages: [{ role: 'developer', content: SUGGEST_SYSTEM }, { role: 'user', content: suggestPrompt(input) }],
+    reasoning_effort: 'none',
+    temperature: 0.9,
+    max_completion_tokens: 1600,
+  });
+});
+
+test('OpenAI: a translation is its one option, at a low temperature and with room for a long prompt', async () => {
+  let body: { messages: { content: string }[]; temperature: number; max_completion_tokens: number } | undefined;
+  const suggest = createOpenAiSuggester({ apiKey: 'sk', fetch: (_u, init) => ((body = JSON.parse(String(init!.body))), chat('["Người mẫu xoay chậm bên cửa sổ"]')) });
+  expect(await suggest({ field: 'translate', text: 'a model turning slowly by the window', context: '', max: 3000 })).toEqual({ options: ['Người mẫu xoay chậm bên cửa sổ'], costUsd: null, provider: 'openai', model: 'gpt-6-luna' });
+  expect(body!.messages[0]!.content).toBe(TRANSLATE_SYSTEM);
+  expect([body!.temperature, body!.max_completion_tokens]).toEqual([0.2, 3000]);
+});
+
+test('OpenAI: a non-JSON or empty answer, or an HTTP error, throws', async () => {
+  await expect(createOpenAiSuggester({ apiKey: 'k', fetch: () => chat('Here are some ideas') })(input)).rejects.toThrow('not a JSON array');
+  await expect(createOpenAiSuggester({ apiKey: 'k', fetch: () => chat(null) })(input)).rejects.toThrow('not a JSON array');
+  await expect(createOpenAiSuggester({ apiKey: 'k', fetch: () => answer({ error: { message: 'quota' } }, 429) })(input)).rejects.toThrow('openai suggest: HTTP 429');
 });

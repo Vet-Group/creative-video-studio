@@ -1,6 +1,6 @@
 // M.6: the real adapters, each wired only when its key is set, so a worker without keys still runs the mock models and the tests.
-import { createFalEnhancer } from '@cvs/core/enhance';
-import { createFalSuggester } from '@cvs/core/suggest';
+import { createFalEnhancer, createOpenAiEnhancer } from '@cvs/core/enhance';
+import { createFalSuggester, createOpenAiSuggester } from '@cvs/core/suggest';
 import { createFalImageProvider, createFalProvider } from '@cvs/core/providers/fal';
 import type { ReadImage } from '@cvs/core/providers/http';
 import { createReplicateProvider } from '@cvs/core/providers/replicate';
@@ -71,6 +71,11 @@ export function realProviders(
     imageProviders.fal = createFalImageProvider({ apiKey: env.FAL_KEY, readImage });
     enhance = createFalEnhancer({ apiKey: env.FAL_KEY });
     suggest = createFalSuggester({ apiKey: env.FAL_KEY });
+  }
+  // The LLM calls (Enhance, suggestions, translations) go to OpenAI when its key is set, else stay on fal.
+  if (env.OPENAI_API_KEY) {
+    enhance = createOpenAiEnhancer({ apiKey: env.OPENAI_API_KEY });
+    suggest = createOpenAiSuggester({ apiKey: env.OPENAI_API_KEY });
   }
   if (env.REPLICATE_API_TOKEN) providers.replicate = createReplicateProvider({ apiToken: env.REPLICATE_API_TOKEN, readImage });
   const accounts = vertexAccounts(env);

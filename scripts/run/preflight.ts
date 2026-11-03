@@ -158,7 +158,7 @@ export async function checkItem(id: string, deps: Deps): Promise<ItemResult> {
 
 /** Every value that must never appear in output. */
 export function secretValues(env: Env): string[] {
-  const keys = ['FAL_KEY', 'REPLICATE_API_TOKEN', 'LARK_APP_SECRET', 'CVS_R2_ACCESS_KEY_ID', 'CVS_R2_SECRET_ACCESS_KEY', 'CVS_RESTIC_PASSWORD', 'CLOUDFLARE_API_TOKEN', 'CVS_ADMIN_PASSWORD', 'BETTER_AUTH_SECRET'];
+  const keys = ['FAL_KEY', 'OPENAI_API_KEY', 'REPLICATE_API_TOKEN', 'LARK_APP_SECRET', 'CVS_R2_ACCESS_KEY_ID', 'CVS_R2_SECRET_ACCESS_KEY', 'CVS_RESTIC_PASSWORD', 'CLOUDFLARE_API_TOKEN', 'CVS_ADMIN_PASSWORD', 'BETTER_AUTH_SECRET'];
   return keys.map((k) => env[k]).filter((v): v is string => !!v && v.length >= 4);
 }
 

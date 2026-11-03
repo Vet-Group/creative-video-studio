@@ -57,6 +57,9 @@ It copies only the names in `.env.example` from this checkout's `.env` (so `FAL_
 prepares `/opt/creative-video-studio` as a checkout with the right `origin`, so the gate's `deploy <commit>` fetches into it. Run it
 again after changing a value in `.env`; then `deploy` again so the services read it.
 
+The worker loads the whole `.env` itself. With `OPENAI_API_KEY` set, Enhance, suggestions and translations run on OpenAI's `gpt-6-luna`;
+without it they stay on fal (`FAL_KEY`). After adding or removing the key, restart the worker (`cvs-worker`).
+
 ## What install.sh does, in order
 
 0. Checks the preconditions (it forces `HOME=/root`, so `systemctl --user` and `~/.config/systemd/user` agree; `CVS_APP_DIR` must be

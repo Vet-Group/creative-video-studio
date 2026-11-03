@@ -1,7 +1,7 @@
 // Suggestions (a feature Fash lacks): three short options for Marketing Studio's brief (UGC) or spoken lines (Advanced), the English
 // scene of a member's own hook or location from its Vietnamese name and description, or the English prompt of any other tool, written by
-// the same fal OpenRouter call as Enhance (enhance.ts), in the worker, which holds the fal key. The member picks one; nothing is generated.
-import { ENHANCE_MODEL, ENHANCE_URL } from './enhance';
+// the same LLM call as Enhance (enhance.ts: OpenAI, else fal), in the worker, which holds the keys. The member picks one; nothing is generated.
+import { ENHANCE_MODEL, ENHANCE_URL, OPENAI_MODEL, openAiChat } from './enhance';
 import { sendJson, timeout, type Fetch } from './providers/http';
 
 export const SUGGESTIONS = 3;
@@ -123,5 +123,16 @@ export function createFalSuggester({ apiKey, fetch: f = fetch, model = ENHANCE_M
     const call = { costUsd: Number.isFinite(cost) ? cost : null, provider: 'fal', model };
     // A translation is its one option, with no reading of its own.
     return input.field === 'translate' ? { options: options.slice(0, 1), ...call } : { options, meanings, ...call };
+  };
+}
+
+/** The OpenAI twin of createFalSuggester, with the same prompts, limits and parsing. */
+export function createOpenAiSuggester({ apiKey, fetch: f = fetch, model = OPENAI_MODEL }: { apiKey: string; fetch?: Fetch; model?: string }): Suggester {
+  return async (input) => {
+    const translate = input.field === 'translate';
+    const { text, costUsd } = await openAiChat(f, 'openai suggest', apiKey, model, SYSTEMS[input.field], suggestPrompt(input), translate ? 0.2 : 0.9, translate ? 3000 : 1600);
+    const { options, meanings } = parseSuggestions(text, input.max);
+    const call = { costUsd, provider: 'openai', model };
+    return translate ? { options: options.slice(0, 1), ...call } : { options, meanings, ...call };
   };
 }
