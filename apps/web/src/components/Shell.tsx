@@ -15,6 +15,7 @@ import { AccountMenu } from './AccountMenu';
 import { ConfirmHost, confirmDialog } from './Confirm';
 import { Icon, type IconName } from './Icon';
 import { JobPrompt, JobsProvider, Recreate, roleOf, Tap, toggleFullscreen, useForm, useJobs } from './jobs';
+import { LoadError } from './LoadError';
 import { type Account, type Section, Settings } from './Settings';
 import { SaveTemplateDialog } from './Templates';
 import { OpenToolGuide, ToolGuide, ToolGuideButton } from './ToolGuide';
@@ -286,19 +287,41 @@ function HistoryCard({ job, isAdmin, select }: { job: TrayJob; isAdmin: boolean;
 
 const AdminContext = createContext(false);
 
+/** The History of a page with no job yet, in the Library's empty style: one line and a way to the form. On a phone the form is its own tab, which this opens first. */
+function HistoryEmpty() {
+  const toForm = () => {
+    const form = document.querySelector<HTMLElement>('.form-card, .imagebar');
+    if (!form) return;
+    if (form.hidden) document.getElementById(form.getAttribute('aria-labelledby') ?? '')?.click();
+    // After the tab has rendered the form.
+    requestAnimationFrame(() => form.querySelector<HTMLElement>('textarea, select, input:not([type=file]):not([hidden]), button:not(:disabled)')?.focus());
+  };
+  return (
+    <div className="library-empty">
+      <p className="muted">Chưa có job nào.</p>
+      <p className="library-empty-actions">
+        <button type="button" onClick={toForm}>
+          Bắt đầu ngay
+        </button>
+      </p>
+    </div>
+  );
+}
+
 /** The "My jobs" list. It sits beside the page, or in the History tab of Create. With `feature`, only the jobs of that feature (the History tab of Try On and Image Generation).
  * Beside a form (FormContext), the cards' chips set their value on it and Dùng lại refills it in place. */
 export function Tray({ feature }: { feature?: string }) {
   const isAdmin = useContext(AdminContext);
   const all = useJobs();
-  const { workerOffline, loaded } = all;
+  const { workerOffline, loaded, failed, refresh } = all;
   const jobs = feature ? all.jobs.filter((j) => j.feature === feature) : all.jobs;
   const zip = useZipDownload();
   return (
     <aside className={feature ? 'tray history' : 'tray'} aria-label="Job của tôi">
       <h2>Job của tôi</h2>
       {workerOffline && <p className="warn">Worker offline: chưa nhận được tín hiệu từ máy xử lý, job sẽ chạy khi worker hoạt động lại.</p>}
-      {loaded && jobs.length === 0 && <p className="muted">Chưa có job nào.</p>}
+      {failed && <LoadError text={loaded ? 'Không cập nhật được danh sách job.' : 'Không tải được danh sách job.'} onRetry={refresh} />}
+      {loaded && jobs.length === 0 && (feature ? <HistoryEmpty /> : <p className="muted">Chưa có job nào.</p>)}
       <ul>
         {jobs.map((j) => (feature ? <HistoryCard key={j.id} job={j} isAdmin={isAdmin} select={zip.check(j.id, `${cardTitle(j)} ${fmtTime(j.createdAt)}`)} /> : <TrayItem key={j.id} job={j} isAdmin={isAdmin} />))}
       </ul>

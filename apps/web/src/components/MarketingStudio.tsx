@@ -19,7 +19,7 @@ import { About } from './About';
 import { AudioSwitch } from './AudioSwitch';
 import { CardMedia, LoopVideo } from './CardMedia';
 import { Icon, type IconName } from './Icon';
-import { copyError, copySamples, Gallery, HISTORY_SIZE_KEY, type Img, PhotoDialog, photoImg, RunSummary, SizeSlider, Slot, uploadImages, UPLOAD_ERROR, useSize, WorkTabs } from './image-tools';
+import { copyError, copySamples, Gallery, HISTORY_SIZE_KEY, type Img, PhotoDialog, photoImg, RunSummary, SizeSlider, Slot, uploadError, uploadImages, UPLOAD_ERROR, useSize, WorkTabs } from './image-tools';
 import { FormContext, type FormActions, type Photo, type PhotoRole, useApplier, useHasHistory, useJobs, useRecreated } from './jobs';
 import { Modal } from './Modal';
 import { ModelPicker } from './ModelPicker';
@@ -626,13 +626,14 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
   function add(set: (f: (cur: Img[]) => Img[]) => void, max = 1) {
     return async (files: File[]) => {
       if (files.length === 0) return;
+      if (files.length > max) notify(`Chỉ lấy ${max} ảnh đầu`);
       setError('');
       setBusy(true);
       try {
-        const assets = await uploadImages(files);
+        const assets = await uploadImages(files.slice(0, max)).finally(loading('Đang tải lên…'));
         set((cur) => [...(max > 1 ? cur : []), ...assets].slice(0, max));
-      } catch {
-        setError(UPLOAD_ERROR);
+      } catch (e) {
+        setError(uploadError(e));
       } finally {
         setBusy(false);
       }

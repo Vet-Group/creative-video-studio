@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { LoadError } from '@/components/LoadError';
 import { api, sendJson } from '@/lib/api';
 import { useAction, useFetch } from '@/lib/admin-ui';
 import { Empty, PageHead } from './PageHead';
@@ -59,7 +60,7 @@ export function AdminPresets() {
         </p>
       )}
       {!data ? (
-        failed ? <p className="error">Không tải được danh sách mẫu.</p> : <p role="status">Đang tải...</p>
+        failed ? <LoadError text="Không tải được danh sách mẫu." onRetry={reload} /> : <p role="status">Đang tải...</p>
       ) : data.presets.length === 0 ? (
         <Empty title="Chưa có mẫu chuyển động nào" />
       ) : (

@@ -9,8 +9,10 @@ import { NARROW, useMediaQuery, WIDE } from '@/lib/use-media-query';
 import { numberedSamples } from '@/lib/examples';
 import { useHydrated } from '@/lib/use-hydrated';
 import { useSamples } from '@/lib/use-samples';
+import { MAX_AUDIO_BYTES, MAX_BYTES, MAX_VIDEO_BYTES } from '@/lib/upload-limits';
 import { type Photo, Recreate, useForm, useFreshResults, useJobs, useRecreated } from './jobs';
 import { Icon, type IconName } from './Icon';
+import { LoadError } from './LoadError';
 import { Modal } from './Modal';
 import { Preview } from './Preview';
 import { SampleDetail } from './SampleDetail';
@@ -50,7 +52,7 @@ export interface Img {
 export const RATIO_LABEL: Record<string, string> = { auto: 'Tự động' };
 /** Fash's Minimal, Medium and High. */
 export const THINKING_LABEL: Record<string, string> = { minimal: 'Tối thiểu', medium: 'Vừa', high: 'Cao' };
-export const UPLOAD_ERROR = 'Không tải ảnh lên được. Ảnh phải là JPEG, PNG hoặc WebP, tối đa 10 MB mỗi ảnh.';
+export const UPLOAD_ERROR = 'Không tải ảnh lên được do lỗi mạng hoặc máy chủ. Hãy thử lại.';
 /** The 429 of POST /api/assets/samples: the hourly cap on new pictures. */
 export const COPY_LIMIT_ERROR = 'Bạn đã thêm quá nhiều ảnh trong một giờ. Hãy thử lại sau.';
 /** The text for a failed sample copy: the hourly cap has its own, anything else is `text`. */
@@ -187,7 +189,32 @@ export async function photoImg(p: Photo): Promise<Img> {
   return { id: a.id, filename: a.filename };
 }
 
-export async function uploadImages(files: File[]): Promise<Img[]> {
+/** What a slot takes: the types and size POST /api/assets accepts (it checks the bytes; the browser's type and size are checked first, to say why before sending). */
+const KINDS = {
+  image: { what: 'Ảnh', types: ['image/jpeg', 'image/jpg', 'image/pjpeg', 'image/png', 'image/webp'], formats: 'JPEG, PNG hoặc WebP', max: MAX_BYTES },
+  video: { what: 'Video', types: ['video/mp4', 'video/quicktime'], formats: 'MP4 hoặc MOV', max: MAX_VIDEO_BYTES },
+  audio: { what: 'Tệp âm thanh', types: ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-wav', 'audio/wave', 'audio/vnd.wave'], formats: 'MP3 hoặc WAV', max: MAX_AUDIO_BYTES },
+};
+export type UploadKind = keyof typeof KINDS;
+const wrongType = (kind: UploadKind, name = '') => `${KINDS[kind].what}${name && ` "${name}"`} không đúng định dạng: chỉ nhận ${KINDS[kind].formats}.`;
+const tooLarge = (kind: UploadKind, name = '') => `${KINDS[kind].what}${name && ` "${name}"`} quá lớn: tối đa ${KINDS[kind].max / 1024 / 1024} MB.`;
+/** A file refused before it is sent; the message says why. */
+class Refused extends Error {}
+
+/** What to show for a failed upload: the file's format or size (seen here or by the server), else the network or the server. */
+export function uploadError(e: unknown, kind: UploadKind = 'image'): string {
+  if (e instanceof Refused) return e.message;
+  if (e instanceof ApiError && e.status === 413) return tooLarge(kind);
+  if (e instanceof ApiError && e.status === 415) return wrongType(kind);
+  return kind === 'image' ? UPLOAD_ERROR : `Không tải ${KINDS[kind].what.toLowerCase()} lên được do lỗi mạng hoặc máy chủ. Hãy thử lại.`;
+}
+
+/** Uploads files of one kind; a file of another type or over the size is refused before anything is sent (a file the browser gives no type is left to the server). */
+export async function uploadImages(files: File[], kind: UploadKind = 'image'): Promise<Img[]> {
+  for (const f of files) {
+    if (f.type && !KINDS[kind].types.includes(f.type)) throw new Refused(wrongType(kind, f.name));
+    if (f.size > KINDS[kind].max) throw new Refused(tooLarge(kind, f.name));
+  }
   const out: Img[] = [];
   for (let i = 0; i < files.length; i += PER_UPLOAD) {
     const form = new FormData();
@@ -206,13 +233,19 @@ export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRem
   const hydrated = useHydrated();
   const input = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
+  const [cut, setCut] = useState(0); // how many files a drop or a pick kept when it had more than the slot has room for
   const labelId = useId();
   const full = images.length >= max;
   const offer = images.length === 0 ? samples : [];
+  function add(files: File[]) {
+    const room = max - images.length;
+    setCut(files.length > room ? room : 0);
+    onAdd(files.slice(0, room));
+  }
   function onDrop(e: DragEvent) {
     e.preventDefault();
     setOver(false);
-    if (hydrated && !full && !busy) onAdd([...e.dataTransfer.files].slice(0, max - images.length));
+    if (hydrated && !full && !busy) add([...e.dataTransfer.files]);
   }
   return (
     <div className="field">
@@ -229,9 +262,9 @@ export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRem
           aria-label={inputLabel}
           disabled={!hydrated}
           onChange={(e) => {
-            const files = [...(e.target.files ?? [])].slice(0, max - images.length);
+            const files = [...(e.target.files ?? [])];
             e.target.value = '';
-            onAdd(files);
+            add(files);
           }}
         />
         {images.length > 0 && (
@@ -244,7 +277,7 @@ export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRem
                     {label}
                   </span>
                 )}
-                <button type="button" aria-label={`Bỏ ảnh ${i.filename}`} onClick={() => onRemove(i.id)}>
+                <button type="button" aria-label={`Bỏ ảnh ${i.filename}`} onClick={() => (setCut(0), onRemove(i.id))}>
                   <Icon name="x" size={12} />
                 </button>
               </li>
@@ -275,6 +308,11 @@ export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRem
           </button>
         )}
       </div>
+      {cut > 0 && (
+        <p className="help" role="status">
+          Chỉ lấy {cut} ảnh đầu.
+        </p>
+      )}
     </div>
   );
 }
@@ -479,11 +517,12 @@ export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4
     void load(0);
   }, [kind]);
   useFreshResults(() => void load(0));
+  const retry = () => (setState('loading'), load(0));
 
   // The fixed samples show at once; only the company's own outputs wait for the request.
   if (sampleTiles.length === 0) {
     if (state === 'loading') return <p role="status" className="muted">Đang tải...</p>;
-    if (state === 'error') return <p className="error">Không tải được ảnh mẫu.</p>;
+    if (state === 'error') return <LoadError text="Không tải được ảnh mẫu." onRetry={retry} />;
     if (items.length === 0) return <p className="muted">{emptyText}</p>;
   }
   const tiles: (Clip | string)[] = [...sampleTiles, ...items];
@@ -531,7 +570,7 @@ export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4
         ))}
       </div>
       {open !== null && <SampleDetail names={detailed} index={open} onIndex={setOpen} />}
-      {state === 'error' && sampleTiles.length > 0 && <p className="error">Không tải được kết quả của công ty.</p>}
+      {state === 'error' && sampleTiles.length > 0 && <LoadError text="Không tải được kết quả của công ty." onRetry={retry} />}
       {hasMore && (
         <button type="button" className="gallery-more" onClick={() => void load(items.length)}>
           Tải thêm

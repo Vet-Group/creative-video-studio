@@ -5,6 +5,7 @@ import { useEffect, useId, useState } from 'react';
 import { api, errorText, sendJson } from '@/lib/api';
 import { MAX_TEMPLATE_NAME, type TemplateData } from '@/lib/templates';
 import { confirmDialog } from './Confirm';
+import { LoadError } from './LoadError';
 import { Modal } from './Modal';
 
 interface Template {
@@ -65,9 +66,13 @@ export function Templates({ feature, data }: { feature: string; data: () => Temp
   const [open, setOpen] = useState<'list' | 'save' | null>(null);
   const [list, setList] = useState<{ templates: Template[]; canShare: boolean } | null>(null);
   const [error, setError] = useState('');
+  const [failed, setFailed] = useState(false);
   const [notice, setNotice] = useState('');
 
-  const load = () => api<{ templates: Template[]; canShare: boolean }>(`/api/templates?feature=${feature}`).then(setList, () => setError('Không tải được danh sách mẫu.'));
+  const load = () => {
+    setFailed(false);
+    return api<{ templates: Template[]; canShare: boolean }>(`/api/templates?feature=${feature}`).then(setList, () => setFailed(true));
+  };
   const show = (which: 'list' | 'save') => {
     setError('');
     setNotice('');
@@ -103,7 +108,7 @@ export function Templates({ feature, data }: { feature: string; data: () => Temp
       <Modal open={open === 'list'} onClose={() => setOpen(null)} label="Mẫu của tôi" className="choice-dialog">
         <h2>Mẫu của tôi</h2>
         {list === null ? (
-          <p>Đang tải...</p>
+          !failed && <p>Đang tải...</p>
         ) : list.templates.length === 0 ? (
           <p>Chưa có mẫu nào. Điền form rồi bấm &quot;Lưu mẫu&quot; để dùng lại sau.</p>
         ) : (
@@ -123,6 +128,7 @@ export function Templates({ feature, data }: { feature: string; data: () => Temp
             ))}
           </ul>
         )}
+        {failed && <LoadError text="Không tải được danh sách mẫu." onRetry={load} />}
         {error && (
           <p className="error" role="alert">
             {error}

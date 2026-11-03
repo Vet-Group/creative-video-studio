@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { confirmDialog } from '@/components/Confirm';
+import { LoadError } from '@/components/LoadError';
 import { api, sendJson } from '@/lib/api';
 import { useAction, useFetch } from '@/lib/admin-ui';
 import { Empty, PageHead } from './PageHead';
@@ -56,7 +57,7 @@ export function AdminStores() {
     return (
       <section aria-labelledby="stores-title">
         {head}
-        {failed ? <p className="error">Không tải được danh sách cửa hàng.</p> : <p role="status">Đang tải...</p>}
+        {failed ? <LoadError text="Không tải được danh sách cửa hàng." onRetry={reload} /> : <p role="status">Đang tải...</p>}
       </section>
     );
 

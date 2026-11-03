@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { LoadError } from '@/components/LoadError';
 import { api, sendJson } from '@/lib/api';
 import { useAction, useFetch } from '@/lib/admin-ui';
 import { Empty, PageHead } from './PageHead';
@@ -49,7 +50,7 @@ export function AdminTeams() {
     return (
       <section aria-labelledby="teams-title">
         {head}
-        {failed ? <p className="error">Không tải được danh sách nhóm.</p> : <p role="status">Đang tải...</p>}
+        {failed ? <LoadError text="Không tải được danh sách nhóm." onRetry={reload} /> : <p role="status">Đang tải...</p>}
       </section>
     );
 

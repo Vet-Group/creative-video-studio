@@ -9,6 +9,7 @@ import { activeFilters, type LibraryFilters, type LibraryView, libraryQuery, mat
 import { reuseHref } from '@/lib/reuse';
 import { Icon } from './Icon';
 import { useFreshResults } from './jobs';
+import { LoadError } from './LoadError';
 import { Modal } from './Modal';
 import { VerdictGuide } from './VerdictGuide';
 import { useZipDownload } from './ZipDownload';
@@ -920,7 +921,7 @@ export function Library() {
           ))}
         </div>
       )}
-      {state === 'error' && <p className="error">Không tải được thư viện.</p>}
+      {state === 'error' && <LoadError text="Không tải được thư viện." onRetry={() => (setState('loading'), load(0))} />}
       {state === 'ready' && clips.length === 0 && (
         <div className="library-empty">
           <EmptyArt search={active > 0} />

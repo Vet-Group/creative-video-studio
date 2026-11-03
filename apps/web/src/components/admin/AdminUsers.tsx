@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { confirmDialog } from '@/components/Confirm';
 import { Icon } from '@/components/Icon';
 import { Modal } from '@/components/Modal';
+import { LoadError } from '@/components/LoadError';
 import { api, sendJson } from '@/lib/api';
 import { useAction, useFetch } from '@/lib/admin-ui';
 import { methodText, providerLabel, type SignInMethod } from '@/lib/sign-in-methods';
@@ -243,7 +244,7 @@ export function AdminUsers() {
     return (
       <section aria-labelledby="users-title">
         {head}
-        {users.failed || teams.failed ? <p className="error">Không tải được danh sách người dùng.</p> : <p role="status">Đang tải...</p>}
+        {users.failed || teams.failed ? <LoadError text="Không tải được danh sách người dùng." onRetry={() => (users.reload(), teams.reload())} /> : <p role="status">Đang tải...</p>}
       </section>
     );
   const allTeams = teams.data.teams;

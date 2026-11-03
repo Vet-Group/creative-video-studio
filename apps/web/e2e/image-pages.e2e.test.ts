@@ -28,6 +28,7 @@ test('Try On takes 5 garments, as Fash does with Nano Banana Pro, when the model
   await expect(page.getByText('Thêm 1 đến 5 ảnh trang phục')).toBeVisible();
   await page.getByLabel('Ảnh trang phục').setInputFiles([1, 2, 3, 4, 5, 6].map((n) => file(`g${n}.png`)));
   await expect(page.getByLabel('Trang phục: ảnh đã chọn').getByRole('img')).toHaveCount(5); // the sixth is left out
+  await expect(page.getByText('Chỉ lấy 5 ảnh đầu.')).toBeVisible(); // and the slot says so
   await page.getByLabel('Ảnh người mẫu').setInputFiles(file('person.png'));
   await page.getByLabel('Ảnh bối cảnh').setInputFiles(file('scene.png'));
   await expect(page.getByRole('button', { name: /^Thử đồ/ })).toBeEnabled(); // 7 photos: under the model's 14
@@ -623,4 +624,29 @@ test("Try On, as Fash's pickers: a stock model then its pose, a garment category
   } finally {
     await asAdmin((name) => page.request.delete(`/api/admin/samples/${name}`));
   }
+});
+
+test('an upload says why it failed: a wrong format or a file over 10 MB before anything is sent, the server reading the bytes, or the network', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await signIn(page, 'loada');
+  const posts: string[] = [];
+  page.on('request', (r) => void (r.method() === 'POST' && new URL(r.url()).pathname === '/api/assets' && posts.push(r.url())));
+  await page.goto('/image-generation');
+  const bar = page.getByRole('group', { name: 'Thanh tạo ảnh' });
+  const input = bar.getByLabel('Ảnh tham chiếu', { exact: true });
+  await expect(modelButton(page)).toContainText('Mock image E2E');
+  await input.setInputFiles({ name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('hello') });
+  await expect(bar.getByRole('alert')).toHaveText('Ảnh "notes.txt" không đúng định dạng: chỉ nhận JPEG, PNG hoặc WebP.');
+  await input.setInputFiles({ name: 'big.png', mimeType: 'image/png', buffer: Buffer.alloc(10 * 1024 * 1024 + 1) });
+  await expect(bar.getByRole('alert')).toHaveText('Ảnh "big.png" quá lớn: tối đa 10 MB.');
+  expect(posts).toEqual([]); // both refused in the browser
+
+  await input.setInputFiles({ name: 'fake.png', mimeType: 'image/png', buffer: Buffer.from('not a picture') });
+  await expect(bar.getByRole('alert')).toHaveText('Ảnh không đúng định dạng: chỉ nhận JPEG, PNG hoặc WebP.'); // the server's 415
+  expect(posts).toHaveLength(1);
+
+  await page.route('**/api/assets', (r) => r.abort());
+  await input.setInputFiles(file('ok.png'));
+  await expect(bar.getByRole('alert')).toHaveText('Không tải ảnh lên được do lỗi mạng hoặc máy chủ. Hãy thử lại.');
+  await expect(bar.getByRole('img', { name: 'ok.png' })).toHaveCount(0);
 });

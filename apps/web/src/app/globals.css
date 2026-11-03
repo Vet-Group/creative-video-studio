@@ -1596,7 +1596,6 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 
 .imagegen { display: flex; flex-direction: column; min-height: calc(100dvh - 105px); }
 .imagegen .tabs { align-self: center; }
-.imagegen-side .tray > p.muted { padding: 96px 0; text-align: center; }
 @media (max-width: 1023.98px) {
   .imagegen .tabs { align-self: stretch; }
 }
@@ -1863,9 +1862,8 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .library .kinds { margin: 0 0 12px; gap: 6px; flex-wrap: nowrap; overflow-x: auto; padding-right: 24px; mask-image: linear-gradient(to right, rgb(var(--shade)) calc(100% - 24px), transparent); } /* one scrolling row, as on Fash, instead of a lone pill on a second line; the faded padding hints at more pills without covering the last one when all fit */
 .library .kinds button { padding: 0 12px; }
 .explore-sub { margin: -12px 0 20px; }
-/* Below 1024 px: centred empty Image Generation history, smaller Explore headings; tablets keep model, ratio and size on one row, as on Fash. */
+/* Below 1024 px: smaller Explore headings; tablets keep model, ratio and size on one row, as on Fash. */
 @media (max-width: 1023.98px) {
-  .imagegen-side .tray > p.muted { padding: 22vh 0 0; }
   .explore-hero { padding: 20px; }
   .explore-hero h1 { font-size: 26px; line-height: 32px; }
   .explore h2 { margin-top: 36px; font-size: 18px; line-height: 26px; }
@@ -1880,6 +1878,7 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 /* Fash centres the empty Library in the space left under the toolbar: the page fills the viewport (less the frame padding, and the phone top bar) and the empty state takes the rest. */
 .library:has(> .library-empty) { display: flex; flex-direction: column; min-height: calc(100dvh - 48px); }
 .library-empty { flex: 1; align-content: center; padding: 0 16px; }
+.tray .library-empty { padding: 48px 16px; } /* a History with no job: the same state in a tab, not a full-height page */
 @media (max-width: 1023.98px) { .library:has(> .library-empty) { min-height: calc(100dvh - 105px); } }
 /* From 768 px the kind pills wrap instead of running under the edge; phones keep the scrolling row. */
 @media (min-width: 768px) { .kinds { flex-wrap: wrap; overflow-x: visible; } }
