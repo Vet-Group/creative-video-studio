@@ -91,7 +91,7 @@ describe('/api/suggestions', () => {
   test('refuses a bad field, a script outside Advanced, over-long text and unknown choices, and queues nothing', async () => {
     const u = await newUser();
     const before = sent.length;
-    expect(await error(await ask(u, { field: 'title' }))).toBe('field must be brief, script, hook or location');
+    expect(await error(await ask(u, { field: 'title' }))).toBe('field must be brief, script, hook, location or prompt');
     expect(await error(await ask(u, { field: 'script' }))).toBe('a script is for Advanced only');
     expect((await ask(u, { field: 'script', format: 'advanced', text: 'x'.repeat(ADVANCED_MAX_SCRIPT + 1) })).status).toBe(202); // the brief as notes for lines
     expect(await error(await ask(u, { field: 'script', format: 'advanced', text: 'x'.repeat(5001) }))).toBe('text may be at most 5000 characters');
@@ -101,6 +101,21 @@ describe('/api/suggestions', () => {
     expect(await error(await ask(u, { field: 'brief', location: 'moon' }))).toBe('location is not a location');
     expect(sent.length).toBe(before + 1);
     expect(await runs(u.id)).toBe(1);
+  });
+
+  test("a prompt asks for the tool's own task by feature, with the member's notes and room, and refuses an unknown feature", async () => {
+    const u = await newUser();
+    const res = await ask(u, { field: 'prompt', feature: 'video', text: ' xoay chậm ', room: 800, hook: 'ignored' });
+    expect(res.status).toBe(202);
+    const { id } = (await res.json()) as { id: string };
+    const { PROMPT_TASKS } = await import('@cvs/core/suggest');
+    expect((await pool.query('select input from suggestion_runs where id = $1', [id])).rows[0].input).toEqual({ field: 'prompt', task: PROMPT_TASKS.video, text: 'xoay chậm', context: '', max: 800 });
+    expect((await ask(u, { field: 'prompt', feature: 'background_changer' })).status).toBe(202);
+    expect(await error(await ask(u, { field: 'prompt', feature: 'toString' }))).toMatch(/^feature must be one of video, image, try_on/);
+    expect(await error(await ask(u, { field: 'prompt' }))).toMatch(/^feature must be one of/);
+    expect(await error(await ask(u, { field: 'prompt', feature: 'image', room: 0 }))).toBe('room must be a whole number of characters');
+    expect(await error(await ask(u, { field: 'prompt', feature: 'image', text: 'x'.repeat(5001) }))).toBe('text may be at most 5000 characters');
+    expect(await runs(u.id)).toBe(2);
   });
 
   test('a hook or a location asks for the English scene from the name and description, counts against the day, and needs some text', async () => {

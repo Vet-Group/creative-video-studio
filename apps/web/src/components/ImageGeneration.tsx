@@ -185,7 +185,7 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
             )}
           </ul>
           <textarea aria-label="Mô tả cảnh bạn muốn tạo" placeholder="Mô tả cảnh bạn muốn tạo…" value={prompt} maxLength={chosen?.maxPromptChars} rows={2} onChange={(e) => setPrompt(e.target.value)} onKeyDown={runKey(() => canRun && void run())} />
-          <PromptTools bare feature="image" value={prompt} onChange={setPrompt} maxLength={chosen?.maxPromptChars} onRun={() => canRun && void run()} />
+          <PromptTools compact feature="image" value={prompt} onChange={setPrompt} maxLength={chosen?.maxPromptChars} onRun={() => canRun && void run()} ask={() => ({ field: 'prompt', feature: 'image', text: prompt, ...(chosen && { room: chosen.maxPromptChars }) })} />
         </div>
         {(reason || error || notice || count) && (
           <div className="bar-message">

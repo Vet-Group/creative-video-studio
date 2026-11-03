@@ -8,7 +8,7 @@ import { ABOUT } from '@/lib/about-content';
 import { api, errorText, sendJson } from '@/lib/api';
 import { ADVANCED_MAX_IMAGES, ADVANCED_MAX_SCRIPT, advancedPrompt, briefRoom, HOOKS, LOCATIONS, MAX_CHOICE_DESC, MAX_CHOICE_NAME, MAX_CHOICE_PHRASE, type MarketingChoice, marketingPrompt } from '@/lib/marketing';
 import { promptTooLong } from '@/lib/prompt-limit';
-import { confirmRun, runKey } from '@/lib/run-guard';
+import { confirmRun } from '@/lib/run-guard';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { useRecall } from '@/lib/use-recall';
 import { useSamples } from '@/lib/use-samples';
@@ -22,7 +22,7 @@ import { copyError, copySamples, Gallery, HISTORY_SIZE_KEY, type Img, PhotoDialo
 import { FormContext, type FormActions, type Photo, type PhotoRole, useApplier, useHasHistory, useJobs, useRecreated } from './jobs';
 import { Modal } from './Modal';
 import { ModelPicker } from './ModelPicker';
-import { PromptTools } from './PromptTools';
+import { PromptComposer } from './PromptComposer';
 import { Select } from './Select';
 import { Tray } from './Shell';
 import { Templates } from './Templates';
@@ -684,46 +684,38 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
               <ChoiceBox label="Bối cảnh (tuỳ chọn)" icon="sliders" media={location ? cardSample(have, `marketing-location-${location}`) : undefined} value={locationList.find((c) => c.id === location)?.name} onOpen={() => setPicker('location')} onClear={() => setLocation('')} />
             </div>
 
-            <div className="field">
-              <div className="field-head">
-                <label htmlFor={promptId} className="field-label">
-                  {advanced ? 'Prompt' : 'Prompt (tuỳ chọn)'}
-                </label>
-                <PromptTools feature="marketing" format={advanced ? 'advanced' : undefined} value={prompt} onChange={setPrompt} maxLength={room} onRun={() => canRun && void run()} />
-              </div>
-              <div className="prompt-box">
-                <textarea id={promptId} value={prompt} maxLength={room} aria-required={advanced || undefined} placeholder="Mô tả video marketing bạn muốn…" onChange={(e) => setPrompt(e.target.value)} onKeyDown={runKey(() => canRun && void run())} />
-                {/* Gợi ý in the box's foot, as Create's Enhance pill: beside the label it pushed the head onto two lines. */}
-                <div className="prompt-foot">
-                  <SuggestButton label="Gợi ý mô tả" ask={() => ({ field: 'brief', ...(advanced && { format: 'advanced' }), text: prompt, hook: hooks[0], location: location || undefined, ...(room !== undefined && { room }) })} onPick={setPrompt} />
-                  <span>
-                    {prompt.length}
-                    {room !== undefined && `/${room}`}
-                  </span>
-                </div>
-              </div>
-            </div>
+            <PromptComposer
+              id={promptId}
+              label="Prompt"
+              optional={!advanced}
+              required={advanced}
+              feature="marketing"
+              format={advanced ? 'advanced' : undefined}
+              value={prompt}
+              onChange={setPrompt}
+              maxLength={room}
+              onRun={() => canRun && void run()}
+              placeholder="Ví dụ: người mẫu mở hộp, cầm sản phẩm lên và nói cảm nhận đầu tiên…"
+              ask={() => ({ field: 'brief', ...(advanced && { format: 'advanced' }), text: prompt, hook: hooks[0], location: location || undefined, ...(room !== undefined && { room }) })}
+            />
             {advanced && (
-              <div className="field">
-                <div className="field-head">
-                  <label htmlFor={scriptId} className="field-label">
-                    Lời thoại (tuỳ chọn)
-                  </label>
-                  <SuggestButton label="Gợi ý lời thoại" ask={() => ({ field: 'script', format: 'advanced', text: script || prompt, hook: hooks[0], location: location || undefined })} onPick={setScript} />
-                </div>
-                <div className="prompt-box">
-                  <textarea id={scriptId} value={script} maxLength={ADVANCED_MAX_SCRIPT} placeholder="Viết lời thoại bạn muốn nhân vật nói (tuỳ chọn)…" onChange={(e) => setScript(e.target.value)} />
-                  {/* Empty, the box is as short as the live page's; once lines are typed, their length in words, seconds (about two words a second, the About tab) and characters shows. */}
-                  {script && (
-                    <div className="prompt-foot script-foot">
-                      <span>{words > 0 && `${words} từ, khoảng ${Math.ceil(words / 2)} giây`}</span>
-                      <span>
-                        {script.length}/{ADVANCED_MAX_SCRIPT}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
+              <PromptComposer
+                id={scriptId}
+                label="Lời thoại"
+                optional
+                feature="marketing"
+                value={script}
+                onChange={setScript}
+                maxLength={ADVANCED_MAX_SCRIPT}
+                onRun={() => canRun && void run()}
+                placeholder="Viết lời thoại bạn muốn nhân vật nói…"
+                ask={() => ({ field: 'script', format: 'advanced', text: script || prompt, hook: hooks[0], location: location || undefined })}
+                aiLabel="Gợi ý lời thoại"
+                parts={['ai', 'expand']}
+                starters={[]}
+                // About two words a second (the About tab).
+                meta={words > 0 ? <span>{`${words} từ, khoảng ${Math.ceil(words / 2)} giây`}</span> : undefined}
+              />
             )}
 
             <div className="field-row">

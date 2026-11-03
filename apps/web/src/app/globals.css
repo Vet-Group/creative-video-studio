@@ -879,12 +879,6 @@ dialog.admin-modal { width: min(36rem, calc(100vw - 2rem)); }
 .thumbs img { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: 12px; }
 .thumbs button { position: absolute; top: -6px; right: -6px; display: grid; place-items: center; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%; background: var(--ink); color: var(--on-ink); }
 
-.prompt-box { display: flex; flex-direction: column; gap: 6px; padding: 0 8px 8px; border: 1px solid var(--field-border); border-radius: 8px; background: var(--fill); }
-.prompt-box[data-disabled='true'] { opacity: .6; }
-.prompt-box:has(textarea:focus-visible) { outline: 2px solid var(--ink); outline-offset: 2px; }
-.prompt-box textarea { display: block; width: 100%; min-height: 75px; max-height: 60vh; padding: 8px 0; border: 0; outline: none; background: transparent; color: inherit; font: inherit; font-size: 14px; line-height: 21px; resize: none; field-sizing: content; overflow-y: auto; }
-.prompt-foot { display: flex; align-items: center; justify-content: space-between; height: 30px; color: var(--text-muted); font-size: 12px; line-height: 18px; }
-.prompt-foot > :only-child { margin-left: auto; }
 /* Suggestions: a quiet link in the field's foot or head; the three options open over the form beneath it. */
 .suggest { position: relative; }
 .suggest-button { display: inline-flex; align-items: center; gap: 4px; padding: 0; border: 0; background: none; color: var(--ink-strong); font: inherit; font-size: 12px; font-weight: 500; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
@@ -894,31 +888,20 @@ dialog.admin-modal { width: min(36rem, calc(100vw - 2rem)); }
 .suggestion:hover { border-color: var(--text-disabled); }
 .suggestions .error { margin: 0; font-size: 13px; }
 .field-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-/* A list opened from the field's head or the box's foot spans the field: a 460 px list under a link in the narrow form ran off its left edge. */
-.field-head .suggestions, .prompt-foot .suggestions { left: 0; right: 0; width: auto; }
-.field-head .suggest, .prompt-foot .suggest { position: static; }
-.prompt-box:has(.prompt-foot .suggest) { position: relative; }
-/* In the foot, suggestions use a pill like Create's Enhance. */
-.prompt-foot .suggest-button { height: 30px; padding: 0 10px; border: 1px solid var(--border-button); border-radius: 999px; background: var(--surface); color: var(--ink); text-decoration: none; white-space: nowrap; }
-/* The recent prompts and expand tools: quiet links beside the label (icons at the end of the Image Generation bar's prompt row); the list opens over the form, above the bar. */
-.prompt-tools { display: inline-flex; align-items: center; gap: 12px; }
-/* The list spans the field (or the bar), not the width of the suggestions under a narrow form's link. */
+/* A list opened from a field's head (the add-hook dialog's AI help) spans the field: a 460 px list under a link in a narrow form ran off its left edge.
+   The prompt fields' own tools and lists are in components/PromptComposer.module.css. */
 .field-head { position: relative; }
-.prompt-tools > .suggest { position: static; }
-.prompt-tools .suggestions { left: 0; right: 0; width: auto; }
-.prompt-tools .suggest-button { line-height: 18px; } /* under the label's 21 px, so the field head keeps its height */
-.imagebar .prompt-tools .suggestions { top: auto; bottom: calc(100% + 6px); }
+.field-head .suggestions { left: 0; right: 0; width: auto; }
+.field-head .suggest { position: static; }
 /* In the bar, a column at the end of the prompt row, as tall as the one-row bar's textarea, so the bar keeps its height. */
-.imagebar .prompt-tools { flex: none; flex-direction: column; gap: 4px; }
+.imagebar .prompt-tools { flex: none; display: grid; grid-template-columns: repeat(2, auto); gap: 4px; } /* two by two: as tall as the 56 px text */
 .imagebar .prompt-tools .icon-button { display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 1px solid var(--field-border); border-radius: 50%; background: var(--surface); color: var(--ink); }
 .prompt-editor textarea { display: block; width: 100%; height: 60vh; padding: 8px; border: 1px solid var(--field-border); border-radius: 8px; background: var(--fill); color: inherit; font: inherit; font-size: 14px; line-height: 21px; resize: vertical; }
-.prompt-editor .help { text-align: right; }
 /* Enhance: Fash's pill in the prompt box, filled when on, outlined when off. */
 .enhance { display: inline-flex; align-items: center; gap: 4px; height: 30px; padding: 0 10px; border: 1px solid var(--ink); border-radius: 999px; background: var(--ink); color: var(--on-ink); font: inherit; font-size: 12px; font-weight: 600; line-height: 18px; white-space: nowrap; cursor: pointer; }
 .enhance[aria-pressed='true'] { background: var(--ink); } /* beats the generic pressed-button fill, which hid the white label */
 .enhance[aria-pressed='false'] { border-color: var(--border-button); background: var(--surface); color: var(--ink); font-weight: 500; }
 .enhance:disabled { cursor: not-allowed; opacity: .6; }
-.prompt-foot > .enhance:only-child { margin-left: 0; }
 /* The live Generate Audio switch: a 44x24 pill with a white knob, the state beside it. */
 .switch-row { display: flex; align-items: center; gap: 10px; color: var(--text-2); font-size: 14px; line-height: 21px; }
 .switch { position: relative; flex: none; width: 44px; height: 24px; padding: 0; border: 0; border-radius: 12px; background: var(--fill-strong); }
@@ -1697,7 +1680,6 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 /* Half-width slots name themselves inside, as on the live app pages; the label stays for screen readers. */
 .app-slots[data-two='true'] .field-label { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 /* An app's own prompt is an optional extra line, so its box is shorter than Create's. */
-[aria-labelledby='app-title'] .prompt-box textarea { min-height: 56px; }
 .soon { display: grid; justify-items: center; gap: 12px; max-width: 32rem; margin: 32px auto; padding: 24px; text-align: center; }
 .soon .app-art { width: 100%; border-radius: 14px; }
 .soon p { margin: 0; }
@@ -1815,12 +1797,9 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .choice-box .slot-icon { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: var(--divider); color: var(--text-icon); }
 /* Ratio and duration sit side by side without labels, and the prompt is 75 px, as on the live Marketing Studio. */
 [aria-labelledby='marketing-title'] .field-row .field-label { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-[aria-labelledby='marketing-title'] .prompt-box textarea { min-height: 75px; }
 /* An app's Run follows its slots without a rule, as on the live app pages. */
 [aria-labelledby='app-title'] .runbar { border-top: 0; }
 /* Try On's optional prompt is a 74 px box without a counter row (as in Marketing Studio), so Ratio clears the Run bar as on the live page. */
-[aria-labelledby='tryon-title'] .prompt-box textarea { min-height: 64px; }
-[aria-labelledby='tryon-title'] .prompt-foot { display: none; }
 /* The live Try On form starts at its first label and leaves 32 px between one picture tray and the next. */
 [aria-labelledby='tryon-title'] .form-scroll > .field:first-child { margin-top: 0; }
 [aria-labelledby='tryon-title'] .field:has(> .slot) + .field:has(> .slot) { margin-top: 32px; }
@@ -1870,7 +1849,7 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
   .bar-message { padding-top: 2px; font-size: 12px; line-height: 16px; }
   .imagebar .pills { gap: 6px; }
   .imagebar .select-trigger { max-width: none; height: 28px; padding: 0 8px; gap: 6px; font-size: 12px; }
-  .imagebar .prompt-tools { flex-direction: row; } /* a 40 px row has room for one icon high */
+  .imagebar .prompt-tools { grid-template-columns: none; grid-auto-flow: column; } /* a 40 px row has room for one icon high */
   .imagebar .prompt-tools .icon-button { width: 28px; height: 28px; }
   .bar-run { flex: 1 0 100%; margin-left: 0; }
 }
@@ -1897,7 +1876,6 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 /* C4 round 5. */
 /* Marketing Studio: the boxes start 16 px under the banner. The prompt keeps its row for suggestions and the count (owner, 2026-10-30: the head was too crowded); an empty script box has none and is 74 px tall, as on Fash. */
 .marketing-head { margin-bottom: 0; }
-.form-scroll:has(> .marketing-head) .prompt-box textarea { min-height: 64px; }
 /* 1024-1439 px: Image Generation's size slider shares the tab row too, as Try On's does. */
 @media (min-width: 1024px) and (max-width: 1439.98px) {
   .imagegen-side .gallery-tools { height: 37px; align-items: center; margin: -69px 0 32px; }

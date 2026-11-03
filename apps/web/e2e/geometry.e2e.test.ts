@@ -297,7 +297,9 @@ test.describe('1440x1000', () => {
     const pop = page.locator('.select-pop');
     const t = await box(trigger);
     const p = await box(pop);
-    near(p.y, t.y + t.height + 3, 'popover top');
+    // 3 px under the trigger, or 3 px over it when the rows do not fit below (the taller prompt box can push the trigger low).
+    if (p.y >= t.y) near(p.y, t.y + t.height + 3, 'popover top');
+    else near(p.y + p.height, t.y - 3, 'popover bottom');
     near(p.width, t.width, 'popover width', 1);
     expect(await css(pop, 'max-height', 'padding-top', 'overflow-y', 'border-top-left-radius')).toEqual(['280px', '6px', 'auto', '8px']);
     const heading = page.locator('.select-heading');
@@ -342,13 +344,16 @@ test.describe('1440x1000', () => {
     await expect(panel).toBeHidden();
   });
 
-  test('K4 prompt box: wrapper rgb(242,242,242) with a 1px rgb(230,230,230) border, radius 8, padding 0 8px 8px, 268x121; textarea 250x75, 14px/21px, transparent', async ({ page }) => {
+  test('K4 prompt box: as wide as the form, radius 12 with a 1px border; textarea 76 tall, 14px/21px, transparent; the starter chips scroll in one row inside it', async ({ page }) => {
     const wrapper = page.locator('.prompt-box');
-    sized(await box(wrapper), 268, 121, 'prompt box', 2);
-    expect(await css(wrapper, 'background-color', 'border-top-width', 'border-top-color', 'border-top-left-radius', 'padding-top', 'padding-right', 'padding-bottom')).toEqual(['rgb(242, 242, 242)', '1px', 'rgb(230, 230, 230)', '8px', '0px', '8px', '8px']);
+    near((await box(wrapper)).width, 268, 'prompt box width');
+    expect(await css(wrapper, 'border-top-width', 'border-top-left-radius')).toEqual(['1px', '12px']);
     const area = page.getByLabel('Mô tả chuyển động');
-    sized(await box(area), 250, 75, 'textarea');
-    expect(await css(area, 'font-size', 'line-height', 'background-color')).toEqual(['14px', '21px', 'rgba(0, 0, 0, 0)']);
+    near((await box(area)).width, 266, 'textarea width');
+    expect(await css(area, 'min-height', 'font-size', 'line-height', 'background-color')).toEqual(['76px', '14px', '21px', 'rgba(0, 0, 0, 0)']); // it grows with the text (the placeholder's lines too)
+    const chips = wrapper.getByRole('group', { name: 'Gợi ý nhanh' });
+    near((await box(chips)).height, 38, 'one row of chips');
+    expect(await chips.evaluate((e) => e.scrollWidth > e.clientWidth), 'the rest scroll sideways').toBe(true);
   });
 
   test('T1 pill tabs: 37 tall, padding 8px 20px, radius 8, 14px/600, active black on white, inactive rgb(102,102,102) on no background, no bottom border', async ({ page }) => {

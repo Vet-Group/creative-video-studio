@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import { ENHANCE_MODEL, ENHANCE_URL } from './enhance';
-import { createFalSuggester, parseSuggestions, SCENE_SYSTEM, SUGGEST_SYSTEM, suggestPrompt } from './suggest';
+import { createFalSuggester, parseSuggestions, PROMPT_SYSTEM, PROMPT_TASKS, SCENE_SYSTEM, SUGGEST_SYSTEM, suggestPrompt } from './suggest';
 
 const answer = (body: unknown, status = 200) => Promise.resolve(new Response(JSON.stringify(body), { status }));
 const input = { field: 'script' as const, text: 'váy linen mùa hè', context: 'The product crashes into the scene.', max: 40 };
@@ -49,4 +49,15 @@ test('options are trimmed, cut to the limit, de-duplicated and at most three; a 
 test('an error field or an HTTP error throws', async () => {
   await expect(createFalSuggester({ apiKey: 'k', fetch: () => answer({ output: '["a"]', error: 'rate limited' }) })(input)).rejects.toThrow('rate limited');
   await expect(createFalSuggester({ apiKey: 'k', fetch: () => answer({ detail: 'no' }, 401) })(input)).rejects.toThrow('HTTP 401');
+});
+
+test("a tool's prompt asks for English under its own system prompt, naming the server's task and keeping the member's notes", async () => {
+  const bodies: { system_prompt: string; prompt: string }[] = [];
+  const suggest = createFalSuggester({ apiKey: 'k', fetch: (_url, init) => (bodies.push(JSON.parse(String(init!.body))), answer({ output: '["a", "b", "c"]' })) });
+  expect((await suggest({ field: 'prompt', task: PROMPT_TASKS.try_on, text: 'đứng ở bãi biển', context: '', max: 500 })).options).toEqual(['a', 'b', 'c']);
+  expect(bodies[0]!.system_prompt).toBe(PROMPT_SYSTEM);
+  expect(PROMPT_SYSTEM).toMatch(/plain, concrete English/);
+  expect(bodies[0]!.prompt).toBe(`Write three different prompts, one or two sentences each, for ${PROMPT_TASKS.try_on}.
+The seller's notes: đứng ở bãi biển
+Each string at most 500 characters.`);
 });
