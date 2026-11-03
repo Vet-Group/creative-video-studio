@@ -4,6 +4,7 @@ import { readVertexBilling } from '@cvs/core/providers/vertex-billing';
 import { createPool, databaseUrl } from '@cvs/db/client';
 import { createMockImageProvider, createMockProvider } from './mock-provider';
 import { realProviders } from './real-providers';
+import { replicateGuard } from './replicate-guard';
 import { fakeSuggester } from './suggest';
 import { ensureBucket } from './storage';
 import { VERTEX_TICK_MS, vertexTicker } from './vertex-accounts';
@@ -39,6 +40,15 @@ if (real.vertexAccounts.length) {
   void tick();
   setInterval(tick, VERTEX_TICK_MS).unref();
 }
+
+// The hourly Replicate guard (docs/ops/provider-balances.md): under 2 USD of Replicate credit its models go off and their fal twins on.
+const replicateTick = () =>
+  replicateGuard(pool, Boolean(process.env.FAL_KEY)).then(
+    (off) => off.length && console.log(`worker: replicate credit is low; turned off ${off.join(', ')}`),
+    (e) => console.error('worker: replicate guard:', e instanceof Error ? e.message : e),
+  );
+void replicateTick();
+setInterval(replicateTick, VERTEX_TICK_MS).unref();
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.once(signal, async () => {

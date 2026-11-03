@@ -515,6 +515,13 @@ describe('migration 0050 Vertex accounts', () => {
   });
 });
 
+describe('migration 0051 provider balances', () => {
+  test('starts with no Replicate credit and a 10 USD balance warning', async () => {
+    const { rows } = await pool.query('select replicate_credit_usd, replicate_credit_since, balance_warning_usd::text as warning from settings where id = 1');
+    expect(rows).toEqual([{ replicate_credit_usd: null, replicate_credit_since: null, warning: '10.0000' }]);
+  });
+});
+
 describe('cost_entries', () => {
   test('is append-only: UPDATE, DELETE and TRUNCATE raise', async () => {
     const job = await insertJob(userId);

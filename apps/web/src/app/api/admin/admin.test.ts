@@ -377,6 +377,60 @@ describe('settings', () => {
   ])('refuses %j', async (body) => {
     expect((await put(body)).status).toBe(400);
   });
+
+  test('reads and changes the balance warning and the Replicate credit; a new credit restarts its count, an unchanged one does not, each change audited once', async () => {
+    type Balances = { balanceWarningUsd: string; replicateCreditUsd: string | null; replicateCreditSince: string | null };
+    const balances = async () => (await (await settingsRoute.GET(call(admin.cookie, '/api/admin/settings'))).json()) as Balances;
+    expect(await balances()).toMatchObject({ balanceWarningUsd: '10.0000', replicateCreditUsd: null, replicateCreditSince: null });
+    const n = (await audits('settings:1')).length;
+
+    expect((await put({ balanceWarningUsd: '15', replicateCreditUsd: '25.5' })).status).toBe(200);
+    const first = await balances();
+    expect(first).toMatchObject({ balanceWarningUsd: '15.0000', replicateCreditUsd: '25.5000' });
+    expect(Date.now() - Date.parse(first.replicateCreditSince!)).toBeLessThan(60_000);
+    expect((await audits('settings:1')).slice(n)).toEqual([
+      { actor_id: admin.id, action: 'settings.update', old_value: { balanceWarningUsd: '10.0000' }, new_value: { balanceWarningUsd: '15.0000' } },
+      { actor_id: admin.id, action: 'settings.update', old_value: { replicateCreditUsd: null, replicateCreditSince: null }, new_value: { replicateCreditUsd: '25.5000', replicateCreditSince: first.replicateCreditSince } },
+    ]);
+
+    // The form sends every field on save: the same amount keeps its start, so the count is not reset.
+    expect((await put({ balanceWarningUsd: 15, replicateCreditUsd: 25.5 })).status).toBe(200);
+    expect(await balances()).toEqual(expect.objectContaining({ replicateCreditSince: first.replicateCreditSince }));
+    expect(await audits('settings:1')).toHaveLength(n + 2);
+
+    expect((await put({ replicateCreditUsd: '40' })).status).toBe(200);
+    const second = await balances();
+    expect(second.replicateCreditUsd).toBe('40.0000');
+    expect(Date.parse(second.replicateCreditSince!)).toBeGreaterThan(Date.parse(first.replicateCreditSince!));
+
+    // After a top-up the balance may read the same again: a recount restarts the count with the amount unchanged, audited the same way.
+    const n2 = (await audits('settings:1')).length;
+    expect((await put({ replicateCreditUsd: '40', replicateCreditRecount: false })).status).toBe(200);
+    expect((await balances()).replicateCreditSince).toBe(second.replicateCreditSince);
+    expect((await put({ replicateCreditUsd: '40', replicateCreditRecount: true })).status).toBe(200);
+    const third = await balances();
+    expect(third.replicateCreditUsd).toBe('40.0000');
+    expect(Date.parse(third.replicateCreditSince!)).toBeGreaterThan(Date.parse(second.replicateCreditSince!));
+    expect((await audits('settings:1')).slice(n2)).toEqual([
+      {
+        actor_id: admin.id, action: 'settings.update',
+        old_value: { replicateCreditUsd: '40.0000', replicateCreditSince: second.replicateCreditSince }, new_value: { replicateCreditUsd: '40.0000', replicateCreditSince: third.replicateCreditSince },
+      },
+    ]);
+    expect((await put({ replicateCreditRecount: true })).status).toBe(200); // the recount alone keeps the stored amount
+    expect(Date.parse((await balances()).replicateCreditSince!)).toBeGreaterThan(Date.parse(third.replicateCreditSince!));
+
+    expect((await put({ replicateCreditUsd: null })).status).toBe(200);
+    expect(await balances()).toMatchObject({ replicateCreditUsd: null, replicateCreditSince: null });
+    expect((await audits('settings:1')).at(-1)).toMatchObject({ old_value: { replicateCreditUsd: '40.0000' }, new_value: { replicateCreditUsd: null, replicateCreditSince: null } });
+  });
+
+  test.each([{ balanceWarningUsd: -1 }, { balanceWarningUsd: null }, { balanceWarningUsd: 'low' }, { replicateCreditUsd: -5 }, { replicateCreditUsd: '1.23456' }, { replicateCreditUsd: 'lots' }, { replicateCreditRecount: 'yes' }])(
+    'refuses %j',
+    async (body) => {
+      expect((await put(body)).status).toBe(400);
+    },
+  );
 });
 
 describe('presets', () => {

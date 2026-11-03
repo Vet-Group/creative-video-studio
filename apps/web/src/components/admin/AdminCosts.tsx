@@ -152,9 +152,112 @@ const VERTEX_ERROR: Record<string, (project: string) => string> = {
 const usd4 = (n: number | null) => (n === null ? '—' : `$${n.toFixed(4)}`);
 const credits = (n: number | null, currency: string) => (n === null ? '—' : `${n.toLocaleString('vi-VN', { maximumFractionDigits: 2 })} ${currency}`);
 
-/** Google's own figures, read live from each account's billing export; loaded on its own so a Google failure leaves the rest of the page. */
-function VertexCosts({ month }: { month: string }) {
+interface Balances {
+  warningUsd: number;
+  fal: ({ ok: true; balance: number; currency: string } | { ok: false; reason: 'no_key' | 'failed'; error: string }) & { billingUrl: string; low: boolean };
+  replicate: { credit: { creditUsd: string; since: string; spentUsd: string; remainingUsd: number } | null; billingUrl: string; low: boolean };
+  vertex: { billingUrl: string };
+}
+
+const TopUp = ({ href }: { href: string }) => (
+  <a href={href} target="_blank" rel="noreferrer">
+    Nạp tiền
+  </a>
+);
+
+/**
+ * One row per provider with its billing page: no provider sells credit by API, so the app only shows balances and warns. Loaded on its own, so
+ * a failed read leaves the rest of the page; the Vertex rows reuse the Vertex section's answer instead of reading Google twice.
+ */
+function ProviderBalances({ vertex }: { vertex: VertexCostsData | undefined }) {
+  const { data, failed } = useFetch<Balances>('/api/admin/costs/balances');
+  const under = (low: boolean) => (low && data ? ` (dưới ngưỡng $${data.warningUsd})` : '');
+  return (
+    <section className="panel" aria-label="Số dư nhà cung cấp">
+      <h2>Số dư nhà cung cấp</h2>
+      {!data ? (
+        failed ? <p className="error">Không tải được số dư nhà cung cấp.</p> : <p role="status">Đang đọc số dư...</p>
+      ) : (
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Nhà cung cấp</th>
+                <th scope="col">Số dư</th>
+                <th scope="col">Thanh toán</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className={data.fal.low ? 'error' : undefined}>
+                <td>fal.ai</td>
+                <td>
+                  {data.fal.ok
+                    ? `${data.fal.currency === 'USD' ? '$' : ''}${data.fal.balance.toFixed(2)}${data.fal.currency === 'USD' ? '' : ` ${data.fal.currency}`}${under(data.fal.low)}`
+                    : data.fal.reason === 'no_key'
+                      ? 'Máy chủ chưa có FAL_KEY.'
+                      : `Không đọc được số dư fal (${data.fal.error.slice(0, 200)}).`}
+                </td>
+                <td>
+                  <TopUp href={data.fal.billingUrl} />
+                </td>
+              </tr>
+              {!vertex || !vertex.configured ? (
+                <tr>
+                  <td>Google Vertex AI</td>
+                  <td className="muted">{!vertex ? 'Đang đọc từ Google...' : 'Chưa có số liệu (xem phần Vertex bên dưới).'}</td>
+                  <td>
+                    <TopUp href={data.vertex.billingUrl} />
+                  </td>
+                </tr>
+              ) : (
+                vertex.accounts.map((a) => {
+                  const low = a.credit.remainingUsd !== null && a.credit.remainingUsd < data.warningUsd;
+                  return (
+                    <tr key={a.projectId} className={low ? 'error' : undefined}>
+                      <td>Vertex · {a.projectId}</td>
+                      <td>
+                        {a.credit.remainingUsd === null ? (a.credit.unverified ? 'Chưa xác minh credits' : 'Chưa nhập tổng credits') : `≈ $${a.credit.remainingUsd.toFixed(2)} credits${under(low)}`}
+                        {a.credit.expiresOn && ` · hết hạn ${a.credit.expiresOn}`}
+                      </td>
+                      <td>
+                        <TopUp href={data.vertex.billingUrl} />
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+              <tr className={data.replicate.low ? 'error' : undefined}>
+                <td>Replicate</td>
+                <td>
+                  {data.replicate.credit
+                    ? `Còn $${data.replicate.credit.remainingUsd.toFixed(2)}${under(data.replicate.low)} · số dư nhập $${Number(data.replicate.credit.creditUsd).toFixed(2)} lúc ${new Date(data.replicate.credit.since).toLocaleString('vi-VN')}, sổ cái đã ghi $${Number(data.replicate.credit.spentUsd).toFixed(2)} từ đó`
+                    : 'Chưa nhập số dư Replicate (Cài đặt). Replicate không có API số dư.'}
+                </td>
+                <td>
+                  <TopUp href={data.replicate.billingUrl} />
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
+
+/** The balances and the Vertex section share one read of Google. */
+function ProviderSections({ month }: { month: string }) {
   const { data, failed } = useFetch<VertexCostsData>(`/api/admin/costs/vertex?month=${month}`);
+  return (
+    <>
+      <ProviderBalances vertex={data} />
+      <VertexCosts month={month} data={data} failed={failed} />
+    </>
+  );
+}
+
+/** Google's own figures, read live from each account's billing export; loaded on its own so a Google failure leaves the rest of the page. */
+function VertexCosts({ month, data, failed }: { month: string; data: VertexCostsData | undefined; failed: boolean }) {
   return (
     <section className="panel" aria-label="Vertex (Google Cloud)">
       <h2>Vertex (Google Cloud)</h2>
@@ -397,7 +500,7 @@ export function AdminCosts() {
         <>
           {failed && <p className="error">Không tải được tháng này, đang hiện tháng trước đó.</p>}
           <CostsBody key={`${data.month}-${data.asOf}`} data={data} reload={reload} />
-          <VertexCosts month={data.month} />
+          <ProviderSections month={data.month} />
         </>
       )}
     </section>
