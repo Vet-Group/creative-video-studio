@@ -138,9 +138,13 @@ const CHOICE_HELP = {
   },
 } as const;
 
-/** Add a hook or a location: a name, an optional card line and the English scene the prompt takes, saved to the member's account; an Admin may share it. An example fills all three. */
-function AddChoice({ kind, canShare, onAdded }: { kind: 'hook' | 'location'; canShare: boolean; onAdded: (c: Choice) => void }) {
-  const [open, setOpen] = useState(false);
+/** "12/40" beside a field once it is near its limit. */
+function CharCount({ value, max }: { value: string; max: number }) {
+  return value.length >= max * 0.7 ? <span className="char-count">{value.length}/{max}</span> : null;
+}
+
+/** Add a hook or a location: a name, an optional card line and the English scene the prompt takes, saved to the member's account and chosen at once; an Admin may share it. An example fills all three. */
+function AddChoice({ kind, canShare, onAdded, onCancel }: { kind: 'hook' | 'location'; canShare: boolean; onAdded: (c: Choice) => void; onCancel: () => void }) {
   const [name, setName] = useState('');
   const [phrase, setPhrase] = useState('');
   const [desc, setDesc] = useState('');
@@ -156,11 +160,6 @@ function AddChoice({ kind, canShare, onAdded }: { kind: 'hook' | 'location'; can
     setError('');
     try {
       const c = await api<Omit<Choice, 'mine'>>('/api/choices', sendJson('POST', { kind, name: name.trim(), phrase: scene, ...(desc.trim() && { desc: desc.trim() }), ...(share && { isCompany: true }) }));
-      setOpen(false);
-      setName('');
-      setPhrase('');
-      setDesc('');
-      setShare(false);
       onAdded({ ...c, mine: true });
     } catch (e) {
       setError(errorText(e, `Không lưu được ${KIND_NAME[kind]}, hãy thử lại.`));
@@ -168,16 +167,8 @@ function AddChoice({ kind, canShare, onAdded }: { kind: 'hook' | 'location'; can
       setBusy(false);
     }
   }
-  if (!open) {
-    return (
-      <button type="button" className="link-button choice-add" onClick={() => setOpen(true)}>
-        <Icon name="plus" size={12} /> Thêm {KIND_NAME[kind]}
-      </button>
-    );
-  }
   return (
     <div className="choice-form" role="group" aria-label={`Thêm ${KIND_NAME[kind]}`}>
-      <h3>Thêm {KIND_NAME[kind]} của bạn</h3>
       <p className="help">{help.intro}</p>
       <div className="choice-examples" role="group" aria-label="Điền thử một ví dụ">
         <span aria-hidden="true">Điền thử:</span>
@@ -187,18 +178,25 @@ function AddChoice({ kind, canShare, onAdded }: { kind: 'hook' | 'location'; can
           </button>
         ))}
       </div>
-      <label className="field-label" htmlFor={ids.name}>
-        Tên
-      </label>
+      <div className="field-head">
+        <label className="field-label" htmlFor={ids.name}>
+          Tên
+        </label>
+        <CharCount value={name} max={MAX_CHOICE_NAME} />
+      </div>
       <input id={ids.name} value={name} maxLength={MAX_CHOICE_NAME} placeholder={help.name} autoFocus onChange={(e) => setName(e.target.value)} />
-      <label className="field-label" htmlFor={ids.desc}>
-        Mô tả ngắn (tuỳ chọn)
-      </label>
+      <div className="field-head">
+        <label className="field-label" htmlFor={ids.desc}>
+          Mô tả ngắn (tuỳ chọn)
+        </label>
+        <CharCount value={desc} max={MAX_CHOICE_DESC} />
+      </div>
       <input id={ids.desc} value={desc} maxLength={MAX_CHOICE_DESC} placeholder={help.desc} onChange={(e) => setDesc(e.target.value)} />
       <div className="field-head">
         <label className="field-label" htmlFor={ids.phrase}>
           Cảnh cho AI (tiếng Anh)
         </label>
+        <CharCount value={phrase} max={MAX_CHOICE_PHRASE} />
         {/* Written from the Vietnamese name and description, so it waits for a name. */}
         <SuggestButton label="AI viết giúp" disabled={!name.trim()} ask={() => ({ field: kind, text: [name.trim(), desc.trim()].filter(Boolean).join(' - ') })} onPick={setPhrase} />
       </div>
@@ -206,6 +204,11 @@ function AddChoice({ kind, canShare, onAdded }: { kind: 'hook' | 'location'; can
       <p id={ids.help} className="help">
         {/[À-ỹ]/.test(phrase) ? 'Có vẻ đây là tiếng Việt. Nên viết bằng tiếng Anh để AI hiểu đúng cảnh.' : help.phraseHelp}
       </p>
+      {scene && (
+        <p className="choice-preview">
+          <span>Trong prompt:</span> <q lang="en">{kind === 'hook' ? scene : `Set in ${scene}.`}</q>
+        </p>
+      )}
       {canShare && (
         <label className="template-share">
           <input type="checkbox" checked={share} onChange={(e) => setShare(e.target.checked)} /> Chia sẻ cho cả công ty
@@ -217,11 +220,11 @@ function AddChoice({ kind, canShare, onAdded }: { kind: 'hook' | 'location'; can
         </p>
       )}
       <div className="choice-form-actions">
-        <button type="button" onClick={() => setOpen(false)}>
+        <button type="button" onClick={onCancel}>
           Huỷ
         </button>
         <button type="button" className="primary" disabled={busy || !name.trim() || !scene} onClick={() => void save()}>
-          Lưu
+          {busy ? 'Đang lưu…' : 'Lưu & chọn'}
         </button>
       </div>
     </div>
@@ -235,6 +238,9 @@ function AddChoice({ kind, canShare, onAdded }: { kind: 'hook' | 'location'; can
  */
 function ChoiceDialog({ open, title, sub, kind, choices, often, posters, custom, canShare, selected, onPick, onAdded, onDelete, onClose, footer }: { open: boolean; title: string; sub: string; kind: 'hook' | 'location'; choices: MarketingChoice[]; often: string[]; posters: Record<string, string>; custom: Choice[]; canShare: boolean; selected: string[]; onPick: (id: string) => void; onAdded: (c: Choice) => void; onDelete: (c: Choice) => void; onClose: () => void; footer?: ReactNode }) {
   const grid = useRef<HTMLDivElement>(null);
+  const addCard = useRef<HTMLButtonElement>(null);
+  const [adding, setAdding] = useState(false);
+  useEffect(() => setAdding(false), [open]);
   const have = useSamples();
   // showModal (in Modal's effect, which runs first) focuses the close button, so the chosen card (else the first) takes the focus afterwards.
   useEffect(() => {
@@ -263,33 +269,53 @@ function ChoiceDialog({ open, title, sub, kind, choices, often, posters, custom,
   );
   const owned = custom.filter((c) => c.mine || (c.isCompany && canShare));
   const ownLabel = kind === 'hook' ? 'Hook của bạn' : 'Bối cảnh của bạn';
+  const back = () => (setAdding(false), requestAnimationFrame(() => addCard.current?.focus()));
+  if (adding) {
+    return (
+      <Modal open={open} onClose={onClose} label={title} className="choice-dialog">
+        <h2>
+          <button type="button" className="photo-back" aria-label="Quay lại" onClick={back}>
+            <Icon name="left" size={16} />
+          </button>
+          Thêm {KIND_NAME[kind]} của bạn
+        </h2>
+        <AddChoice kind={kind} canShare={canShare} onAdded={onAdded} onCancel={back} />
+      </Modal>
+    );
+  }
   return (
     <Modal open={open} onClose={onClose} label={title} className="choice-dialog">
       <h2>{title}</h2>
       <p className="modal-sub">{sub}</p>
-      <div ref={grid} className="choice-grid" role="listbox" aria-label={title} onKeyDown={onKey}>
-        {/* As on Fash, no "none" card: the X on the chosen box clears it. */}
-        {top.length > 0 ? (
-          <>
-            <div role="group" aria-label="Hay dùng" className="choice-group">
-              <p className="choice-group-title" aria-hidden="true">
-                Hay dùng
-              </p>
-              {top.map(card)}
-            </div>
-            <div role="group" aria-label={`Tất cả ${KIND_NAME[kind]}`} className="choice-group">
-              <p className="choice-group-title" aria-hidden="true">
-                Tất cả {KIND_NAME[kind]}
-              </p>
-              {rest.map(card)}
-            </div>
-          </>
-        ) : (
-          rest.map(card)
-        )}
+      {/* The listbox lays its cards out in the grid around it (display: contents), so the add card can close the grid without being an option. */}
+      <div ref={grid} className="choice-grid">
+        <div className="choice-options" role="listbox" aria-label={title} onKeyDown={onKey}>
+          {/* As on Fash, no "none" card: the X on the chosen box clears it. */}
+          {top.length > 0 ? (
+            <>
+              <div role="group" aria-label="Hay dùng" className="choice-group">
+                <p className="choice-group-title" aria-hidden="true">
+                  Hay dùng
+                </p>
+                {top.map(card)}
+              </div>
+              <div role="group" aria-label={`Tất cả ${KIND_NAME[kind]}`} className="choice-group">
+                <p className="choice-group-title" aria-hidden="true">
+                  Tất cả {KIND_NAME[kind]}
+                </p>
+                {rest.map(card)}
+              </div>
+            </>
+          ) : (
+            rest.map(card)
+          )}
+        </div>
+        <button ref={addCard} type="button" className="choice-add-card" onClick={() => setAdding(true)}>
+          <Icon name="plus" size={20} />
+          Thêm {KIND_NAME[kind]} của bạn
+        </button>
       </div>
       {footer}
-      <AddChoice kind={kind} canShare={canShare} onAdded={onAdded} />
       {owned.length > 0 && (
         <section className="choice-own" aria-label={ownLabel}>
           <h3>{ownLabel}</h3>

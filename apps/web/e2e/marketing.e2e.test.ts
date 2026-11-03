@@ -311,9 +311,10 @@ test('with stock models uploaded, the empty model slot opens the stock model dia
       await page.getByRole('button', { name: 'Tải lên Người mẫu' }).click();
       await expect(dialog).toBeVisible({ timeout: 1000 });
     }).toPass();
-    // Only the stock models, in number order (10 after 2), as on the live dialog: no subtitle and no upload tile in the grid.
+    // The stock models in number order (10 after 2), no subtitle, and the own-photo upload as the grid's first tile (owner, 2026-11-04).
     await expect(dialog.getByRole('button', { name: /^Người mẫu có sẵn/ })).toHaveCount(3);
-    await expect(dialog.locator('.model-grid > *')).toHaveCount(3);
+    await expect(dialog.locator('.model-grid > *')).toHaveCount(4);
+    await expect(dialog.locator('.model-grid > *').first()).toHaveClass('model-upload');
     await expect(dialog.locator('.modal-sub')).toHaveCount(0);
     // Its header as on the live dialog: a 16 px medium title over a full-width rule.
     expect(await dialog.getByRole('heading', { name: 'Chọn người mẫu' }).evaluate((e) => { const c = getComputedStyle(e); return [c.fontSize, c.fontWeight, c.borderBottomStyle]; })).toEqual(['16px', '500', 'solid']);
@@ -325,7 +326,7 @@ test('with stock models uploaded, the empty model slot opens the stock model dia
     await expect(dialog).toBeHidden();
     await expect(page.getByLabel('Người mẫu: ảnh đã chọn').getByRole('img', { name: 'marketing-model-2.png' })).toBeVisible();
 
-    // Removing it brings the dialog back; the header's own-photo link uploads like the slot's file input.
+    // Removing it brings the dialog back; the upload tile takes a photo like the slot's file input.
     await page.getByRole('button', { name: 'Bỏ ảnh marketing-model-2.png' }).click();
     await page.getByRole('button', { name: 'Tải lên Người mẫu' }).click();
     await dialog.getByLabel('Tải lên ảnh của bạn').setInputFiles(file('mine.png'));
