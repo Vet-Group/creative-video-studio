@@ -3,7 +3,10 @@ import { type RouteContext } from '@/lib/assets';
 import { pool } from '@/lib/auth';
 import { guard } from '@/lib/session';
 
-/** A suggestion run, to the member who asked: `queued`, `succeeded` with its options, or `failed`. One still queued after a minute turns `failed`. */
+/**
+ * A suggestion run, to the member who asked: `queued`, `succeeded` with its options and their Vietnamese `meanings` (null where none), or
+ * `failed`. One still queued after a minute turns `failed`.
+ */
 export async function GET(request: Request, { params }: RouteContext) {
   const g = await guard(request, 'member');
   if (g.error) return g.error;
@@ -14,5 +17,11 @@ export async function GET(request: Request, { params }: RouteContext) {
     [id, g.session.user.id, SUGGEST_EXPIRY_SECONDS],
   );
   if (!rows[0]) return Response.json({ error: 'not found' }, { status: 404 });
-  return Response.json({ id, status: rows[0].status, options: rows[0].output ?? [] });
+  const output = (rows[0].output ?? []) as (string | { text: string; vi: string })[];
+  return Response.json({
+    id,
+    status: rows[0].status,
+    options: output.map((o) => (typeof o === 'string' ? o : o.text)),
+    meanings: output.map((o) => (typeof o === 'string' ? null : o.vi)),
+  });
 }

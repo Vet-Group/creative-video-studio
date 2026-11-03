@@ -53,9 +53,10 @@ describe('/api/suggestions', () => {
     const { id } = (await res.json()) as { id: string };
     expect(sent.at(-1)).toEqual({ name: 'suggest', data: { runId: id } });
     expect((await pool.query('select input from suggestion_runs where id = $1', [id])).rows[0].input).toEqual({ field: 'brief', text: 'linen dress', context: hook.phrase, max: 1234 }); // the room the chosen model leaves
-    expect(await (await poll(u, id)).json()).toEqual({ id, status: 'queued', options: [] });
-    await pool.query(`update suggestion_runs set status = 'succeeded', output = '["a","b","c"]' where id = $1`, [id]);
-    expect(await (await poll(u, id)).json()).toEqual({ id, status: 'succeeded', options: ['a', 'b', 'c'] });
+    expect(await (await poll(u, id)).json()).toEqual({ id, status: 'queued', options: [], meanings: [] });
+    // Runs from before the readings hold plain strings; newer ones may hold { text, vi }.
+    await pool.query(`update suggestion_runs set status = 'succeeded', output = '["a",{"text":"b","vi":"nghĩa b"},"c"]' where id = $1`, [id]);
+    expect(await (await poll(u, id)).json()).toEqual({ id, status: 'succeeded', options: ['a', 'b', 'c'], meanings: [null, 'nghĩa b', null] });
     expect((await poll(other, id)).status).toBe(404);
   });
 
@@ -91,7 +92,7 @@ describe('/api/suggestions', () => {
   test('refuses a bad field, a script outside Advanced, over-long text and unknown choices, and queues nothing', async () => {
     const u = await newUser();
     const before = sent.length;
-    expect(await error(await ask(u, { field: 'title' }))).toBe('field must be brief, script, hook, location or prompt');
+    expect(await error(await ask(u, { field: 'title' }))).toBe('field must be brief, script, hook, location, prompt or translate');
     expect(await error(await ask(u, { field: 'script' }))).toBe('a script is for Advanced only');
     expect((await ask(u, { field: 'script', format: 'advanced', text: 'x'.repeat(ADVANCED_MAX_SCRIPT + 1) })).status).toBe(202); // the brief as notes for lines
     expect(await error(await ask(u, { field: 'script', format: 'advanced', text: 'x'.repeat(5001) }))).toBe('text may be at most 5000 characters');
@@ -100,6 +101,17 @@ describe('/api/suggestions', () => {
     expect(await error(await ask(u, { field: 'brief', hook: 'nope' }))).toBe('hook is not a hook');
     expect(await error(await ask(u, { field: 'brief', location: 'moon' }))).toBe('location is not a location');
     expect(sent.length).toBe(before + 1);
+    expect(await runs(u.id)).toBe(1);
+  });
+
+  test('a translation queues the English text as it is, counted like any run, and refuses empty or over-long text', async () => {
+    const u = await newUser();
+    const res = await ask(u, { field: 'translate', text: ' The model turns slowly ', feature: 'ignored' });
+    expect(res.status).toBe(202);
+    const { id } = (await res.json()) as { id: string };
+    expect((await pool.query('select input from suggestion_runs where id = $1', [id])).rows[0].input).toEqual({ field: 'translate', text: 'The model turns slowly', context: '', max: 10_000 });
+    expect(await error(await ask(u, { field: 'translate', text: '  ' }))).toBe('text must be 1 to 5000 characters');
+    expect(await error(await ask(u, { field: 'translate', text: 'x'.repeat(5001) }))).toBe('text must be 1 to 5000 characters');
     expect(await runs(u.id)).toBe(1);
   });
 

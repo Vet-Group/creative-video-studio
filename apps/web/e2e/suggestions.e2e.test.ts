@@ -1,7 +1,8 @@
 import { expect, test } from '@playwright/test';
 import { signIn } from './support.test';
 
-// Suggestions come from the e2e worker's stand-in (CVS_FAKE_SUGGEST, no fal key): "Option n: <the member's text>".
+// Suggestions come from the e2e worker's stand-in (CVS_FAKE_SUGGEST, no fal key): "Option n: <the member's text>" with the reading
+// "Reading n: <the member's text>", and a translation is "Translation: <text>". A card is named by its number, its reading, then the option.
 test('Gợi ý AI fills the brief with the picked option and can be undone, and Gợi ý lời thoại fills the lines on Advanced', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await signIn(page, 'sugga');
@@ -20,8 +21,8 @@ test('Gợi ý AI fills the brief with the picked option and can be undone, and 
   await expect(starters).toHaveCount(0);
   await brief.fill('váy linen mùa hè');
   await ai.click();
-  const options = page.getByRole('group', { name: 'Gợi ý AI' }).getByRole('button', { name: /^Option/ });
-  await expect(options).toHaveText(['Option 1: váy linen mùa hè', 'Option 2: váy linen mùa hè', 'Option 3: váy linen mùa hè'], { timeout: 20_000 });
+  const options = page.getByRole('group', { name: 'Gợi ý AI' }).getByRole('button', { name: /^Gợi ý \d/ });
+  await expect(options).toHaveText([/Option 1: váy linen mùa hè$/, /Option 2: váy linen mùa hè$/, /Option 3: váy linen mùa hè$/], { timeout: 20_000 });
   // The list is the box's last row, under the toolbar and as wide as the box, so it pushes the fields below down instead of covering them.
   const box = (await brief.locator('..').boundingBox())!;
   const list = (await page.getByRole('group', { name: 'Gợi ý AI' }).boundingBox())!;
@@ -57,7 +58,7 @@ test('Gợi ý AI fills the brief with the picked option and can be undone, and 
   await page.goto('/marketing-studio/advanced');
   await page.getByRole('textbox', { name: 'Prompt', exact: true }).fill('ra mắt áo khoác');
   await page.getByRole('button', { name: 'Gợi ý lời thoại' }).click();
-  await page.getByRole('group', { name: 'Gợi ý lời thoại' }).getByRole('button', { name: /^Option/ }).first().click({ timeout: 20_000 });
+  await page.getByRole('group', { name: 'Gợi ý lời thoại' }).getByRole('button', { name: /^Gợi ý 1/ }).click({ timeout: 20_000 });
   await expect(page.getByRole('textbox', { name: 'Lời thoại (tuỳ chọn)' })).toHaveValue('Option 1: ra mắt áo khoác');
 });
 
@@ -68,7 +69,7 @@ test('every other prompt asks for its own tool: Create sends the video feature a
   page.on('request', (r) => r.url().endsWith('/api/suggestions') && r.method() === 'POST' && (sent = r.postDataJSON()));
   await page.getByLabel('Mô tả chuyển động').fill('slow turn');
   await page.getByRole('button', { name: 'Gợi ý AI' }).click();
-  await page.getByRole('group', { name: 'Gợi ý AI' }).getByRole('button', { name: /^Option 3/ }).click({ timeout: 20_000 });
+  await page.getByRole('group', { name: 'Gợi ý AI' }).getByRole('button', { name: /^Gợi ý 3/ }).click({ timeout: 20_000 });
   await expect(page.getByLabel('Mô tả chuyển động')).toHaveValue('Option 3: slow turn');
   expect(sent).toMatchObject({ field: 'prompt', feature: 'video', text: 'slow turn' });
 });
@@ -81,8 +82,8 @@ test('a long suggestion shows its whole text in the narrow form column, with no 
   await page.getByLabel('Mô tả chuyển động').fill(long);
   await page.getByRole('button', { name: 'Gợi ý AI' }).click();
   const group = page.getByRole('group', { name: 'Gợi ý AI' });
-  const first = group.getByRole('button', { name: /^Option 1/ });
-  await expect(first).toHaveText(/^Option 1: the creator turns .*, beat \d+/, { timeout: 20_000 });
+  const first = group.getByRole('button', { name: /^Gợi ý 1/ });
+  await expect(first).toHaveText(/Option 1: the creator turns .*, beat \d+$/, { timeout: 20_000 });
   // Every line shows: far more than the old three-line clamp, and nothing cut off inside the option or the list.
   const fit = await first.evaluate((e) => ({ h: e.clientHeight, sh: e.scrollHeight, lh: parseFloat(getComputedStyle(e).lineHeight) }));
   expect(fit.sh).toBeLessThanOrEqual(fit.h);
@@ -90,6 +91,69 @@ test('a long suggestion shows its whole text in the narrow form column, with no 
   expect(await group.evaluate((e) => e.scrollHeight <= e.clientHeight)).toBe(true);
   // The header reads at body size.
   expect(await group.getByText('Chọn một gợi ý').evaluate((e) => getComputedStyle(e).fontSize)).toBe('13px');
+});
+
+test('each card is numbered, with the Vietnamese reading first and the English it puts in the box under it, smaller', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await signIn(page, 'sugga');
+  await page.goto('/create');
+  const box = page.getByLabel('Mô tả chuyển động');
+  await box.fill('slow turn');
+  await page.getByRole('button', { name: 'Gợi ý AI' }).click();
+  const group = page.getByRole('group', { name: 'Gợi ý AI' });
+  const cards = group.getByRole('button', { name: /^Gợi ý \d/ });
+  await expect(cards).toHaveCount(3, { timeout: 20_000 });
+  for (const n of [1, 2, 3]) {
+    const card = cards.nth(n - 1);
+    await expect(card.getByText(`Gợi ý ${n}`, { exact: true })).toBeVisible();
+    const vi = card.getByText(`Reading ${n}: slow turn`, { exact: true });
+    const en = card.getByText(`Option ${n}: slow turn`, { exact: true });
+    expect((await vi.boundingBox())!.y).toBeLessThan((await en.boundingBox())!.y);
+    expect(await vi.evaluate((e) => getComputedStyle(e).fontSize)).toBe('13px');
+    expect(await en.evaluate((e) => getComputedStyle(e).fontSize)).toBe('12px');
+    await expect(en).toHaveAttribute('lang', 'en');
+  }
+  await cards.nth(1).click();
+  await expect(box).toHaveValue('Option 2: slow turn'); // the English goes in, never the reading
+});
+
+test('Dịch shows a Vietnamese reading of English words under the box, asks once per text, and is not offered for Vietnamese words', async ({ page }) => {
+  await signIn(page, 'sugga');
+  await page.goto('/create');
+  let asks = 0;
+  page.on('request', (r) => r.url().endsWith('/api/suggestions') && r.method() === 'POST' && asks++);
+  const box = page.getByLabel('Mô tả chuyển động');
+  await box.fill('slow turn in window light');
+  const translate = page.getByRole('button', { name: 'Dịch', exact: true });
+  await translate.click();
+  const reading = page.getByRole('group', { name: 'Bản dịch tiếng Việt' });
+  await expect(reading.getByText('Translation: slow turn in window light')).toBeVisible({ timeout: 20_000 });
+  await expect(reading.getByText('Chỉ để đọc. Prompt gửi đi vẫn là tiếng Anh.')).toBeVisible();
+  await expect(box).toHaveValue('slow turn in window light'); // the prompt stays English
+  // Closing and opening again shows the same reading without another run.
+  await translate.click();
+  await expect(reading).toHaveCount(0);
+  await translate.click();
+  await expect(reading.getByText('Translation: slow turn in window light')).toBeVisible();
+  expect(asks).toBe(1);
+  // New words close the reading; Vietnamese words need none.
+  await box.fill('xoay chậm dưới ánh nắng');
+  await expect(reading).toHaveCount(0);
+  await expect(translate).toHaveCount(0);
+});
+
+test('a History card translates its English prompt on Dịch and hides it again', async ({ page }) => {
+  await signIn(page, 'sugga');
+  const prompt = 'a model turning slowly by the window, soft morning light';
+  expect((await page.request.post('/api/jobs', { data: { feature: 'image', modelId: 'mock-image-e2e', assetIds: [], ratio: '1:1', prompt, enhance: false, params: { resolution: '1K' } } })).status()).toBe(201);
+  await page.goto('/image-generation');
+  await page.getByRole('tab', { name: 'Lịch sử' }).click();
+  const card = page.getByRole('complementary', { name: 'Job của tôi' }).getByRole('listitem').filter({ hasText: 'turning slowly by the window' });
+  await card.getByRole('button', { name: 'Dịch', exact: true }).click({ timeout: 60_000 });
+  const reading = card.getByRole('group', { name: 'Bản dịch tiếng Việt' });
+  await expect(reading).toHaveText(`Translation: ${prompt}`, { timeout: 20_000 });
+  await card.getByRole('button', { name: 'Ẩn bản dịch' }).click();
+  await expect(reading).toHaveCount(0);
 });
 
 test('a refused or failed run says so in Vietnamese', async ({ page }) => {

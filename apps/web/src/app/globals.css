@@ -399,6 +399,7 @@ legend { font-weight: 600; padding: 0 .25rem; }
 .job-prompt-tools { display: flex; gap: 12px; }
 .job-prompt-tools button { display: inline-flex; align-items: center; gap: 4px; padding: 0; border: 0; background: none; color: var(--ink); font: inherit; font-size: 12px; font-weight: 600; line-height: 18px; cursor: pointer; }
 .job-prompt-tools button:hover { text-decoration: underline; text-underline-offset: 3px; }
+.job-translation { margin-top: 8px; padding: 8px 10px; border-left: 2px solid var(--border-strong); color: var(--text-2); font-size: 13px; line-height: 20px; white-space: pre-line; overflow-wrap: anywhere; } /* the Translate button's Vietnamese reading, under the tools */
 .job-inputs { display: flex; flex-wrap: wrap; gap: 8px !important; margin: 0; padding: 0; list-style: none; }
 .job-inputs img { display: block; width: 48px; height: 48px; object-fit: cover; border-radius: 6px; background: var(--fill); }
 .job-chips { display: flex; gap: 6px; margin: 0; }

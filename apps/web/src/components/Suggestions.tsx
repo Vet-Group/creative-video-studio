@@ -10,7 +10,7 @@ const GIVE_UP_MS = 65_000;
 const UNAVAILABLE = 'Chưa lấy được gợi ý lúc này, hãy thử lại sau.';
 
 export interface Ask {
-  field: 'brief' | 'script' | 'hook' | 'location' | 'prompt';
+  field: 'brief' | 'script' | 'hook' | 'location' | 'prompt' | 'translate';
   /** For a prompt: the page's feature, which the server maps to the tool's task. */
   feature?: string;
   format?: 'advanced';
@@ -22,10 +22,11 @@ export interface Ask {
   room?: number;
 }
 
-/** One suggestion request at a time: `run` asks and polls; `options` or `error` hold the answer until `clear`. */
+/** One suggestion request at a time: `run` asks and polls; `options` (with their Vietnamese `meanings`, null where none) or `error` hold the answer until `clear`. */
 export function useSuggest() {
   const [busy, setBusy] = useState(false);
   const [options, setOptions] = useState<string[]>([]);
+  const [meanings, setMeanings] = useState<(string | null)[]>([]);
   const [error, setError] = useState('');
   const alive = useRef(true);
   // Set on every mount: Strict Mode mounts twice, and the first cleanup would otherwise leave the page looking unmounted.
@@ -42,8 +43,8 @@ export function useSuggest() {
       const { id } = await api<{ id: string }>('/api/suggestions', sendJson('POST', ask));
       for (const until = Date.now() + GIVE_UP_MS; alive.current && Date.now() < until; ) {
         await new Promise((r) => setTimeout(r, POLL_MS));
-        const state = await api<{ status: string; options: string[] }>(`/api/suggestions/${encodeURIComponent(id)}`);
-        if (state.status === 'succeeded') return setOptions(state.options);
+        const state = await api<{ status: string; options: string[]; meanings?: (string | null)[] }>(`/api/suggestions/${encodeURIComponent(id)}`);
+        if (state.status === 'succeeded') return (setMeanings(state.meanings ?? []), setOptions(state.options));
         if (state.status === 'failed') break;
       }
       setError(UNAVAILABLE);
@@ -53,7 +54,31 @@ export function useSuggest() {
       if (alive.current) setBusy(false);
     }
   }
-  return { busy, options, error, run, clear: () => (setOptions([]), setError('')) };
+  return { busy, options, meanings, error, run, clear: () => (setOptions([]), setError('')) };
+}
+
+/** Text that already reads as Vietnamese (any of its tone or vowel marks) needs no translation. */
+export const isVietnamese = (text: string) => /[ăâđêôơưàáảãạằắẳẵặầấẩẫậèéẻẽẹềếểễệìíỉĩịòóỏõọồốổỗộờớởỡợùúủũụừứửữựỳýỷỹỵ]/i.test(text);
+
+// shortcut: kept for the page's life only, so a reload asks again; store them server side if staff translate the same prompts often.
+const translations = new Map<string, string>();
+
+/** The Translate button's reading of `text`: one run per text, then the remembered answer, so asking again costs nothing. */
+export function useTranslate(text: string) {
+  const { busy, options, error, run } = useSuggest();
+  const [asked, setAsked] = useState<string | null>(null);
+  const fresh = asked === text ? options[0] : undefined;
+  useEffect(() => void (asked && options[0] && translations.set(asked, options[0])), [asked, options]);
+  return {
+    vi: translations.get(text) ?? fresh,
+    busy: busy && asked === text,
+    error: asked === text ? error : '',
+    translate: () => {
+      if (translations.has(text) || (busy && asked === text)) return;
+      setAsked(text);
+      void run({ field: 'translate', text });
+    },
+  };
 }
 
 export function SuggestButton({ ask, label, onPick, disabled }: { ask: () => Ask; label: string; onPick: (text: string) => void; disabled?: boolean }) {

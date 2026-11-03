@@ -12,7 +12,8 @@ const bad = (error: string, status = 400) => Response.json({ error }, { status }
 
 /**
  * Asks the worker for three Marketing Studio suggestions: `field` (`brief`, `script` on Advanced, or `hook` or `location` for the English scene of
- * a new one from its Vietnamese name and description in `text`, or `prompt` for the English prompt of the tool `feature`, a PROMPT_TASKS key), `format` ('advanced' or absent), the
+ * a new one from its Vietnamese name and description in `text`, `prompt` for the English prompt of the tool `feature`, a PROMPT_TASKS key, or `translate`
+ * for one Vietnamese reading of the English prompt in `text`), `format` ('advanced' or absent), the
  * member's `text` so far, the chosen `hook` and `location`, and for a brief the `room` the chosen model leaves for it (the page computes it). Answers 202 with the run's id for the page to poll (GET /api/suggestions/:id),
  * 429 past the daily limit, 503 when the queue cannot take it (the run is not counted then).
  */
@@ -20,7 +21,15 @@ export async function POST(request: Request) {
   const g = await guard(request, 'member');
   if (g.error) return g.error;
   const b = (await request.json().catch(() => null)) as { field?: unknown; format?: unknown; feature?: unknown; text?: unknown; hook?: unknown; location?: unknown; room?: unknown } | null;
-  if (b?.field !== 'brief' && b?.field !== 'script' && b?.field !== 'hook' && b?.field !== 'location' && b?.field !== 'prompt') return bad('field must be brief, script, hook, location or prompt');
+  if (b?.field !== 'brief' && b?.field !== 'script' && b?.field !== 'hook' && b?.field !== 'location' && b?.field !== 'prompt' && b?.field !== 'translate') {
+    return bad('field must be brief, script, hook, location, prompt or translate');
+  }
+  if (b.field === 'translate') {
+    // The Translate button: a Vietnamese reading of an English prompt, for the member to read; it counts as a run like any other.
+    const text = typeof b.text === 'string' ? b.text.trim() : '';
+    if (!text || text.length > PROMPT_CEILING) return bad(`text must be 1 to ${PROMPT_CEILING} characters`);
+    return queue(g.session.user.id, { field: 'translate', text, context: '', max: PROMPT_CEILING * 2 });
+  }
   if (b.field === 'prompt') {
     // Any other page's prompt: the tool's task is the server's own text, so the member's words only ever reach the model as their notes.
     const task = typeof b.feature === 'string' && Object.hasOwn(PROMPT_TASKS, b.feature) ? PROMPT_TASKS[b.feature as keyof typeof PROMPT_TASKS] : undefined;
