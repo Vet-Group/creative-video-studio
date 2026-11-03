@@ -44,6 +44,14 @@ test('Gợi ý AI fills the brief with the picked option and can be undone, and 
   await page.keyboard.press('Escape');
   await expect(page.getByRole('group', { name: 'Gợi ý AI' })).toHaveCount(0);
   await expect(ai).toBeFocused();
+  // The clear button empties the box (back to the starter chips) and can be undone too.
+  await page.getByRole('button', { name: 'Xoá prompt' }).click();
+  await expect(brief).toHaveValue('');
+  await expect(brief).toBeFocused();
+  await expect(starters).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Xoá prompt' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Hoàn tác' }).click();
+  await expect(brief).toHaveValue('váy linen mùa hè');
 
   await page.goto('/marketing-studio/advanced');
   await page.getByRole('textbox', { name: 'Prompt', exact: true }).fill('ra mắt áo khoác');
