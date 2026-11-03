@@ -276,7 +276,9 @@ function ClipCard({ clip, view, select, onChange, onDeleted, onOpen }: { clip: C
       <div className="lib-info">
         <p className="lib-title">{clip.modelLabel}</p>
         <p className="lib-meta">
-          {clip.creator.name} · {fmtTime(clip.createdAt)} ·{' '}
+          <span className="lib-who">
+            {clip.creator.name} · {fmtTime(clip.createdAt)} ·
+          </span>
           <span title={clip.costFinal ? 'Chi phí thật' : 'Chi phí thật, tạm tính'}>
             ${clip.costUsd}
             {!clip.costFinal && '*'}

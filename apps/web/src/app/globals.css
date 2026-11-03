@@ -1038,7 +1038,7 @@ dialog.modal { position: fixed; width: min(45rem, calc(100vw - 2rem)); max-heigh
 @media (max-width: 760px) {
   .lightbox .modal-body { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) auto; }
   .lightbox-side { max-height: 45dvh; }
-  .lightbox-step { top: auto; bottom: 16px; transform: none; }
+  .lightbox-step { top: 25dvh; transform: none; } /* over the picture, clear of the marks below */
 }
 dialog.modal::backdrop { background: rgb(var(--shade) / .5); }
 .modal-close { position: absolute; top: 18px; right: 18px; z-index: 3; display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; background: transparent; font-size: 24px; line-height: 1; }
@@ -2054,7 +2054,10 @@ dialog.modal.verdict-guide { width: min(40rem, calc(100vw - 2rem)); }
 .lib-info { min-width: 0; padding: 8px 2px 0; }
 .lib-info p { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lib-title { color: var(--ink-strong); font-size: 13px; line-height: 18px; font-weight: 600; }
-.lib-meta { color: var(--text-muted); font-size: 12px; line-height: 17px; }
+/* A long name gives way, never the cost. */
+.lib-info .lib-meta { display: flex; gap: 4px; color: var(--text-muted); font-size: 12px; line-height: 17px; }
+.lib-who { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.lib-meta > span:last-child { flex: none; }
 .lib-mark.featured { background: var(--favorite); color: var(--on-ink); }
 
 /* The detail view's recipe: a wider side column with the words, the inputs and a label/value list of how the result was made. */
