@@ -178,7 +178,8 @@ test.describe('1440x1000', () => {
     expect((await css(page.locator('.form-scroll'), 'overflow-y'))[0]).toBe('auto');
     const bar = page.locator('.runbar');
     expect(await css(bar, 'border-top-width', 'border-top-style', 'border-top-color', 'padding-top')).toEqual(['1px', 'solid', 'rgb(204, 204, 204)', '16px']);
-    near((await box(bar)).height, 73, 'run wrapper height');
+    near((await box(bar)).height, 99, 'run wrapper height'); // 73 plus the 26 px summary line over Run (model, ratio, length, sound)
+    await expect(bar.locator('.run-summary')).toHaveText(/giây/);
     await tab(page, 'Lịch sử').click(); // the Examples pane scrolls the page, as on the live site; an empty History keeps it one screen tall
     expect(await page.evaluate(() => document.documentElement.scrollHeight <= window.innerHeight)).toBe(true);
   });

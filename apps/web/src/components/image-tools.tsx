@@ -246,6 +246,16 @@ export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRem
   );
 }
 
+/** One quiet line over Run with what it will make (model, ratio, length, sound), so the choices lower in a scrolled form stay in sight. */
+export function RunSummary({ items }: { items: (string | false | null | undefined)[] }) {
+  const shown = items.filter(Boolean);
+  return shown.length > 0 ? (
+    <p className="run-summary" aria-hidden="true">
+      {shown.join(' · ')}
+    </p>
+  ) : null;
+}
+
 /** The tab strip of a page: arrows, Home and End move between the tabs. */
 export function WorkTabs<T extends string>({ prefix, tabs, labels, shown, onSelect }: { prefix: string; tabs: T[]; labels: Record<T, string>; shown: T; onSelect: (t: T) => void }) {
   function onKey(e: KeyboardEvent) {

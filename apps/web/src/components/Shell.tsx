@@ -13,7 +13,7 @@ import { confirmRun } from '@/lib/run-guard';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { AccountMenu } from './AccountMenu';
 import { Icon, type IconName } from './Icon';
-import { JobsProvider, Recreate, roleOf, Tap, useForm, useJobs } from './jobs';
+import { JobPrompt, JobsProvider, Recreate, roleOf, Tap, toggleFullscreen, useForm, useJobs } from './jobs';
 import { type Account, type Section, Settings } from './Settings';
 import { SaveTemplateDialog } from './Templates';
 import { VetLogo } from './VetLogo';
@@ -146,10 +146,22 @@ function HistoryCard({ job, isAdmin, select }: { job: TrayJob; isAdmin: boolean;
           image ? (
             <img ref={media} src={content(out)} alt={cardTitle(job)} loading="lazy" />
           ) : (
-            <video ref={media} controls playsInline preload="metadata" poster={job.posterAssetId ? content(job.posterAssetId) : undefined} src={content(out)} />
+            // F opens full screen, as in most players; Space and the arrows are the video's own keys.
+            <video ref={media} controls playsInline preload="metadata" poster={job.posterAssetId ? content(job.posterAssetId) : undefined} src={content(out)} onKeyDown={(e) => e.key.toLowerCase() === 'f' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && (e.preventDefault(), toggleFullscreen(media.current))} />
           )
         ) : (
           <span className="job-media-empty">{STATUS_LABEL[job.status]}</span>
+        )}
+        {/* On the picture, where the eye already is: full screen and a new tab; they show on hover or focus. */}
+        {out && (
+          <div className="job-media-tools">
+            <button type="button" className="icon-button" onClick={() => toggleFullscreen(media.current)} aria-label="Toàn màn hình" title="Toàn màn hình (F)">
+              <Icon name="eye" />
+            </button>
+            <a className="icon-button" href={content(out)} target="_blank" rel="noreferrer" aria-label="Mở trong tab mới" title="Mở trong tab mới">
+              <Icon name="external" />
+            </a>
+          </div>
         )}
       </div>
       <div className="job-body">
@@ -158,12 +170,11 @@ function HistoryCard({ job, isAdmin, select }: { job: TrayJob; isAdmin: boolean;
           {job.isMock && <span className="badge">MOCK</span>}
           {job.retryOf && <span className="tag">Thử lại</span>}
         </h3>
+        <p className="job-when" data-status={job.status}>
+          <strong>{STATUS_LABEL[job.status]}</strong> · {fmtTime(job.createdAt)}
+        </p>
         {/* As on Fash, the words, each input and the result can go on the form beside the History. */}
-        {job.text && (
-          <Tap on={form?.prompt && (() => form.prompt!(job.text!))} label="Chép prompt vào ô Prompt" className="job-text">
-            {job.text}
-          </Tap>
-        )}
+        {job.text && <JobPrompt text={job.text} onUse={form?.prompt && (() => form.prompt!(job.text!))} />}
         {job.inputAssetIds.length > 0 && job.feature !== 'motion_control' && (
           <ul className="job-inputs" aria-label="Ảnh đầu vào">
             {job.inputAssetIds.map((id, n) => (
@@ -199,60 +210,57 @@ function HistoryCard({ job, isAdmin, select }: { job: TrayJob; isAdmin: boolean;
             <span>{job.ratio}</span>
           </p>
         )}
-        <p className="job-when">
-          <strong>{STATUS_LABEL[job.status]}</strong> · {fmtTime(job.createdAt)}
-        </p>
         {failure && <p className="error">{failure}</p>}
         {isAdmin && job.error && <p className="muted">{job.error}</p>}
         {job.retried && <p className="muted">Đã thử lại</p>}
         {problem && <p className="error">{problem}</p>}
         {saved && <p role="status">Đã lưu mẫu.</p>}
-        <div className="job-actions">
+        <div className="job-main">
           {RETRYABLE.includes(job.status) && !job.retried && !job.retryOf && (
-            <button type="button" className="icon-button" onClick={() => void retry()} aria-label="Thử lại" title="Thử lại">
-              <Icon name="arrow" />
+            <button type="button" className="job-reuse job-primary" onClick={() => void retry()}>
+              <Icon name="arrow" /> Thử lại
             </button>
           )}
-          {savable && (
-            <button type="button" className="icon-button" onClick={() => void openSave()} aria-label={`Lưu mẫu từ job lúc ${fmtTime(job.createdAt)}`} title="Lưu mẫu">
-              <Icon name="plus" />
-            </button>
+          {reuseHref(job) && (
+            <Recreate href={reuseHref(job)!} from={refillFrom({ reuse: job.id })!} className={out ? 'job-reuse job-primary' : 'job-reuse'}>
+              <Icon name="copy" /> Dùng lại
+            </Recreate>
           )}
           {out && (
-            <>
-              <button type="button" className="icon-button" onClick={() => void download()} aria-label="Tải xuống" title="Tải xuống">
-                <Icon name="download" />
-              </button>
-              <button type="button" className="icon-button" onClick={() => void media.current?.requestFullscreen?.()} aria-label="Toàn màn hình" title="Toàn màn hình">
-                <Icon name="eye" />
-              </button>
-              <a className="icon-button" href={content(out)} target="_blank" rel="noreferrer" aria-label="Mở trong tab mới" title="Mở trong tab mới">
-                <Icon name="external" />
-              </a>
-              <button type="button" className="favorite icon-button" aria-pressed={favorite} onClick={() => void toggleFavorite()} aria-label="Yêu thích" title="Yêu thích">
+            <button type="button" className="job-reuse" onClick={() => void download()}>
+              <Icon name="download" /> Tải xuống
+            </button>
+          )}
+          {out && image && form?.result && (
+            <button type="button" className="job-reuse job-result" onClick={() => form.result!({ asset: out })}>
+              <Icon name="right" /> Dùng kết quả
+            </button>
+          )}
+          {/* Fash's Generate Video on an image: Create video opens with the picture as its first image. */}
+          {out && image && (
+            <Link href={`/create?image=${out}`} className="job-reuse">
+              <Icon name="film" /> Tạo video
+            </Link>
+          )}
+        </div>
+        {(savable || out) && (
+          <div className="job-actions" role="group" aria-label="Thao tác khác">
+            {out && (
+              <button type="button" className="favorite icon-button" aria-pressed={favorite} onClick={() => void toggleFavorite()} aria-label="Yêu thích" title={favorite ? 'Bỏ yêu thích' : 'Yêu thích'}>
                 <Icon name="star" filled={favorite} />
               </button>
+            )}
+            {savable && (
+              <button type="button" className="icon-button" onClick={() => void openSave()} aria-label={`Lưu mẫu từ job lúc ${fmtTime(job.createdAt)}`} title="Lưu thành mẫu">
+                <Icon name="plus" />
+              </button>
+            )}
+            {out && (
               <button type="button" className="danger icon-button" onClick={remove} aria-label="Xóa" title="Xóa">
                 <Icon name="x" />
               </button>
-            </>
-          )}
-        </div>
-        {reuseHref(job) && (
-          <Recreate href={reuseHref(job)!} from={refillFrom({ reuse: job.id })!} className="job-reuse">
-            <Icon name="copy" /> Dùng lại
-          </Recreate>
-        )}
-        {out && image && form?.result && (
-          <button type="button" className="job-reuse job-result" onClick={() => form.result!({ asset: out })}>
-            <Icon name="right" /> Dùng kết quả
-          </button>
-        )}
-        {/* Fash's Generate Video on an image: Create video opens with the picture as its first image. */}
-        {out && image && (
-          <Link href={`/create?image=${out}`} className="job-reuse">
-            <Icon name="film" /> Tạo video
-          </Link>
+            )}
+          </div>
         )}
       </div>
       {savable && <SaveTemplateDialog open={saving !== null} onClose={() => setSaving(null)} onSave={saveTemplate} canShare={saving?.canShare ?? false} name={cardTitle(job)} />}

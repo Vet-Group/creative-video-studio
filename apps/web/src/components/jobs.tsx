@@ -4,10 +4,11 @@
 // is announced when the user returns, and old results are not announced again.
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, type ReactNode, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { api, type TrayJob } from '@/lib/api';
 import { announce } from '@/lib/preferences';
 import { useTabReturn } from '@/lib/use-tab-return';
+import { Icon } from './Icon';
 
 const POLL_MS = 5_000;
 const SEEN_KEY = 'cvs.tray.seenUntil';
@@ -72,6 +73,67 @@ export function Tap({ on, label, className, children }: { on?: () => void; label
     </button>
   );
 }
+/** A job's or an example's words: four lines with show more for the rest (no inner scroll bar), copy, and beside a form a click puts them in its prompt box. */
+export function JobPrompt({ text, onUse }: { text: string; onUse?: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [long, setLong] = useState(false);
+  const [copied, setCopied] = useState<'ok' | 'failed' | null>(null);
+  const box = useRef<HTMLDivElement>(null);
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  // Show more only when the four-line clamp really cuts the text (measured; once open, the clamp is off and the button stays).
+  // shortcut: measured on mount and on a new text, not on resize; a card does not change width while it shows.
+  useLayoutEffect(() => {
+    const t = box.current?.querySelector('.job-text');
+    if (t && !open) setLong(t.scrollHeight > t.clientHeight + 1);
+  }, [text, open]);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  const copy = () => {
+    const done = (r: 'ok' | 'failed') => {
+      setCopied(r);
+      clearTimeout(timer.current);
+      timer.current = setTimeout(() => setCopied(null), 1500);
+    };
+    // No clipboard outside a secure context (the LAN address over http): say so rather than do nothing.
+    if (!navigator.clipboard) return done('failed');
+    void navigator.clipboard.writeText(text).then(
+      () => done('ok'),
+      () => done('failed'),
+    );
+  };
+  return (
+    <div ref={box} className="job-prompt" data-open={open || undefined}>
+      <Tap on={onUse} label="Chép prompt vào ô Prompt" className="job-text">
+        {text}
+      </Tap>
+      <div className="job-prompt-tools">
+        {long && (
+          <button type="button" aria-expanded={open} onClick={() => setOpen(!open)}>
+            {open ? 'Thu gọn' : 'Xem thêm'}
+          </button>
+        )}
+        <button type="button" onClick={copy} aria-label="Sao chép prompt">
+          <Icon name={copied === 'ok' ? 'check' : 'copy'} size={12} />
+          {copied === 'ok' ? 'Đã chép' : copied === 'failed' ? 'Không chép được' : 'Sao chép'}
+        </button>
+        {/* aria-live without role status: the card keeps its own status line (the save-as-template note), found by role. */}
+        <span className="sr-only" aria-live="polite">
+          {copied === 'ok' ? 'Đã chép prompt.' : copied === 'failed' ? 'Không sao chép được.' : ''}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/** Full screen for a result, and out again on a second press. iPhone Safari has no element full screen: a video takes its own player, a picture opens in a new tab. */
+export function toggleFullscreen(el: HTMLElement | null): void {
+  if (!el) return;
+  if (document.fullscreenElement) return void document.exitFullscreen().catch(() => undefined);
+  if (el.requestFullscreen) return void el.requestFullscreen().catch(() => undefined);
+  const video = el as HTMLVideoElement & { webkitEnterFullscreen?: () => void };
+  if (video.webkitEnterFullscreen) return video.webkitEnterFullscreen();
+  if (el instanceof HTMLImageElement) window.open(el.src, '_blank', 'noreferrer');
+}
+
 export const FormContext = createContext<FormActions | null>(null);
 export const useForm = (): FormActions | null => useContext(FormContext);
 

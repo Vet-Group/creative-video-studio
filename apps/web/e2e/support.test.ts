@@ -107,8 +107,13 @@ export const modelButton = (page: Page): Locator => page.getByRole('button', { n
 
 /** Opens the model panel, searches for the name (so a model in a family flyout is found too) and picks the model whose row matches. The name's source must be plain text. */
 export async function pickModel(page: Page, name: RegExp): Promise<void> {
-  await modelButton(page).click();
-  await page.getByRole('dialog', { name: 'Chọn mô hình' }).getByRole('combobox', { name: 'Tìm mô hình' }).fill(name.source);
+  // Retries the button, as a click before hydration does nothing (as openSettings does with the account menu).
+  const dialog = page.getByRole('dialog', { name: 'Chọn mô hình' });
+  await expect(async () => {
+    if (!(await dialog.isVisible())) await modelButton(page).click();
+    await expect(dialog).toBeVisible({ timeout: 2_000 });
+  }).toPass();
+  await dialog.getByRole('combobox', { name: 'Tìm mô hình' }).fill(name.source);
   await page.getByRole('option', { name }).click();
 }
 
