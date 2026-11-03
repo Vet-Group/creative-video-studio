@@ -63,12 +63,16 @@ export function PromptTools({ feature, format, value, onChange, maxLength, onRun
   }, []);
   useEffect(() => {
     if (!open) return;
-    const away = (e: PointerEvent) => root.current && !root.current.contains(e.target as Node) && setOpen(null);
+    // A click, not a press, so a touch that scrolls the form keeps the list; a press on a scroll bar (past the element's client box) only
+    // scrolls too. The reading stays until Translate, Escape or new words: the member reads it while working on the form (owner, 2026-11-03).
+    const onBar = (e: MouseEvent) => e.target instanceof Element && e.target.clientWidth > 0 && (e.offsetX >= e.target.clientWidth || e.offsetY >= e.target.clientHeight);
+    // The path, not contains(): by the time a click reaches the document, React may have removed its button (Suggest again while busy).
+    const away = (e: MouseEvent) => open !== 'vi' && !onBar(e) && root.current && !e.composedPath().includes(root.current) && setOpen(null);
     // On the document too: Safari does not focus a clicked button, so the key may not pass through the tools.
     const esc = (e: KeyboardEvent) => e.key === 'Escape' && close();
-    document.addEventListener('pointerdown', away);
+    document.addEventListener('click', away);
     document.addEventListener('keydown', esc);
-    return () => (document.removeEventListener('pointerdown', away), document.removeEventListener('keydown', esc));
+    return () => (document.removeEventListener('click', away), document.removeEventListener('keydown', esc));
   }, [open, close]);
 
   const pick = (text: string) => {
