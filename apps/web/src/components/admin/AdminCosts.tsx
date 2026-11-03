@@ -145,10 +145,23 @@ type VertexCostsData =
   | { configured: true; accounts: VertexAccountCosts[]; totalMonthUsd: number; prices: { label: string; appUsd: number | null; googleUsd: number | null; red: boolean }[] };
 
 const VERTEX_ERROR: Record<string, (project: string) => string> = {
-  no_access: (p) => `Chưa có quyền đọc billing export của ${p}.`,
+  no_access: (p) => `Chưa có quyền đọc billing export của ${p}: cấp BigQuery Data Viewer và BigQuery Job User cho khóa của app.`,
   no_export: (p) => `${p} chưa có bảng billing export (dataset billing_export).`,
   failed: (p) => `Không đọc được billing của ${p}.`,
 };
+
+/** One short sentence per Vertex read error; Google's raw answer sits folded under "Chi tiết", so touch screens and keyboards can open it too. */
+export const VertexError = ({ projectId, reason, message }: { projectId: string; reason: string; message: string }) => (
+  <>
+    <p className="error">{(VERTEX_ERROR[reason] ?? VERTEX_ERROR.failed!)(projectId)}</p>
+    {message && (
+      <details className="raw">
+        <summary>Chi tiết</summary>
+        <pre>{message.slice(0, 500)}</pre>
+      </details>
+    )}
+  </>
+);
 const usd4 = (n: number | null) => (n === null ? '—' : `$${n.toFixed(4)}`);
 const credits = (n: number | null, currency: string) => (n === null ? '—' : `${n.toLocaleString('vi-VN', { maximumFractionDigits: 2 })} ${currency}`);
 
@@ -159,8 +172,9 @@ interface Balances {
   vertex: { billingUrl: string };
 }
 
-const TopUp = ({ href }: { href: string }) => (
-  <a href={href} target="_blank" rel="noreferrer">
+/** A neutral button, not a red link: red on this panel means a balance under the warning threshold. */
+export const TopUp = ({ href }: { href: string }) => (
+  <a className="button" href={href} target="_blank" rel="noreferrer">
     Nạp tiền
   </a>
 );
@@ -277,11 +291,7 @@ function VertexCosts({ month, data, failed }: { month: string; data: VertexCosts
                 {a.active && <span className="tag">Đang dùng</span>}
                 {a.credit.unverified && <span className="tag">Chưa xác minh credits</span>}
               </h3>
-              {a.error && (
-                <p className="error">
-                  {VERTEX_ERROR[a.error.reason]!(a.projectId)} <span className="muted">({a.error.message.slice(0, 200)})</span>
-                </p>
-              )}
+              {a.error && <VertexError projectId={a.projectId} reason={a.error.reason} message={a.error.message} />}
               <ul className="lines">
                 <li>
                   Chi phí tháng: {usd4(a.monthUsd)} · Credits đã trừ: {usd4(a.monthCreditsUsd)}
