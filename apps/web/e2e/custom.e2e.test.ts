@@ -46,19 +46,31 @@ test('the add form says what a hook is, an example fills it, a Vietnamese scene 
   await page.goto('/marketing-studio');
   await hookBox(page).click();
   const hooks = page.getByRole('dialog', { name: 'Chọn hook' });
-  // The variants row belongs to the picking, so it sits under the cards, above the add link.
+  // The add card closes the grid of hooks; the variants row belongs to the picking, so it sits under the grid.
+  const addCard = hooks.getByRole('button', { name: 'Thêm hook của bạn' });
   const variantsY = (await hooks.getByText(/^Tạo nhiều biến thể/).boundingBox())!.y;
-  expect(variantsY).toBeLessThan((await hooks.getByRole('button', { name: 'Thêm hook' }).boundingBox())!.y);
-  await hooks.getByRole('button', { name: 'Thêm hook' }).click();
+  expect(variantsY).toBeGreaterThan((await addCard.boundingBox())!.y);
+  expect(await hooks.getByRole('listbox').getByRole('button', { name: 'Thêm hook của bạn' }).count()).toBe(0); // not one of the options
+  // The form takes the dialog's place, and its back button returns to the cards.
+  await addCard.click();
+  await expect(hooks.getByRole('heading', { name: 'Thêm hook của bạn' })).toBeVisible();
+  await expect(hooks.getByRole('listbox')).toHaveCount(0);
+  await hooks.getByRole('button', { name: 'Quay lại' }).click();
+  await expect(addCard).toBeFocused();
+  await addCard.click();
   const form = hooks.getByRole('group', { name: 'Thêm hook' });
   await expect(form).toContainText('Hook là 1-2 giây mở đầu clip');
   await expect(form.getByLabel('Tên', { exact: true })).toBeFocused();
+  await expect(form.locator('.char-count')).toHaveCount(0); // a count shows only near the limit
+  await form.getByLabel('Tên', { exact: true }).fill('x'.repeat(30));
+  await expect(form.locator('.char-count')).toHaveText('30/40');
   await form.getByRole('group', { name: 'Điền thử một ví dụ' }).getByRole('button', { name: 'Trước và sau' }).click();
   await expect(form.getByLabel('Tên', { exact: true })).toHaveValue('Trước và sau');
   await expect(form.getByLabel('Mô tả ngắn (tuỳ chọn)')).toHaveValue(/bộ đồ mới/);
   const scene = form.getByLabel('Cảnh cho AI (tiếng Anh)');
   await expect(scene).toHaveValue(/^The clip opens with the creator in a plain old outfit/);
   await expect(scene).toHaveAccessibleDescription(/tiếng Anh tốt nhất/);
+  await expect(form.locator('.choice-preview')).toContainText('Trong prompt: The clip opens with the creator in a plain old outfit');
   // AI viết giúp writes the English scene from the Vietnamese name and description (the e2e worker's stand-in echoes them), and waits for a name.
   const write = form.getByRole('button', { name: 'AI viết giúp' });
   await form.getByLabel('Tên', { exact: true }).fill('');
@@ -104,11 +116,11 @@ test('Thêm hook and Thêm bối cảnh save the member’s own, choose them at 
 
   await hookBox(page).click();
   const hooks = page.getByRole('dialog', { name: 'Chọn hook' });
-  await hooks.getByRole('button', { name: 'Thêm hook' }).click();
+  await hooks.getByRole('button', { name: 'Thêm hook của bạn' }).click();
   const hookForm = hooks.getByRole('group', { name: 'Thêm hook' });
   await hookForm.getByLabel('Tên', { exact: true }).fill(hook.name);
   await hookForm.getByLabel('Cảnh cho AI (tiếng Anh)').fill(hook.phrase);
-  await hookForm.getByRole('button', { name: 'Lưu', exact: true }).click();
+  await hookForm.getByRole('button', { name: 'Lưu & chọn' }).click();
   await expect(hooks).toBeHidden();
   await expect(hookBox(page)).toContainText(hook.name);
   await hookBox(page).click();
@@ -118,12 +130,13 @@ test('Thêm hook and Thêm bối cảnh save the member’s own, choose them at 
 
   await locationBox(page).click();
   const places = page.getByRole('dialog', { name: 'Chọn bối cảnh' });
-  await places.getByRole('button', { name: 'Thêm bối cảnh' }).click();
+  await places.getByRole('button', { name: 'Thêm bối cảnh của bạn' }).click();
   const spotForm = places.getByRole('group', { name: 'Thêm bối cảnh' });
   await spotForm.getByLabel('Tên', { exact: true }).fill(spot.name);
   await spotForm.getByLabel('Cảnh cho AI (tiếng Anh)').fill(spot.phrase);
   await spotForm.getByLabel('Mô tả ngắn (tuỳ chọn)').fill('Góc quán quen');
-  await spotForm.getByRole('button', { name: 'Lưu', exact: true }).click();
+  await expect(spotForm.locator('.choice-preview')).toContainText(`Set in ${spot.phrase}.`); // a location goes in as "Set in …"
+  await spotForm.getByRole('button', { name: 'Lưu & chọn' }).click();
   await expect(places).toBeHidden();
   await expect(locationBox(page)).toContainText(spot.name);
 

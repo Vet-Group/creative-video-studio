@@ -367,19 +367,18 @@ export function SizeSlider({ size, last = 2, onChange }: { size: number; last?: 
  * `samples` names the fixed sample tiles shown first: the uploaded samples `<samples><n>.jpg` (or `.mp4` with a `.jpg` poster for `video`). */
 type PhotoTile = { key: string; src: string; label: string; pick: () => void };
 
-/** A photo dialog of a slot, as on Fash (Marketing's model and product, Try On's model, garments and background): the photos to pick, 4 per row of 3:4 portraits. The product dialog has a subtitle and an upload tile first; a stock dialog's own-photo upload is a link in the header. A tile that opens a deeper list (a model's poses, a category) sets the dialog again after it closes; `onBack` returns. */
+/** A photo dialog of a slot, as on Fash (Marketing's model and product, Try On's model, garments and background): the photos to pick, 4 per row of 3:4 portraits, after an upload tile that also takes a dropped photo. A tile that opens a deeper list (a model's poses, a category) sets the dialog again after it closes; `onBack` returns. */
 export function PhotoDialog({ open, title, sub, tiles, busy, onFile, onClose, onBack, mine, groups = [] }: { open: boolean; title: string; sub?: string; tiles: PhotoTile[]; busy: boolean; onFile: (files: File[]) => void; onClose: () => void; onBack?: () => void; mine?: { title: string; tiles: PhotoTile[] }; groups?: { title: string; tiles: PhotoTile[] }[] }) {
   const tile = (t: PhotoTile) => (
     <button key={t.key} type="button" aria-label={t.label} disabled={busy} onClick={() => (onClose(), t.pick())}>
       {open && <img src={t.src} alt="" />}
     </button>
   );
-  const upload = (
-    <>
-      Tải lên ảnh của bạn
-      <input type="file" accept="image/*" className="sr-only" onChange={(e) => (onClose(), onFile([...(e.target.files ?? [])].slice(0, 1)))} />
-    </>
-  );
+  const [over, setOver] = useState(false);
+  // A drop can carry any file and still lands while busy, so it is checked here; the picker already filters on accept.
+  const take = (photo: File | undefined) => {
+    if (photo && !busy) (onClose(), onFile([photo]));
+  };
   return (
     <Modal open={open} onClose={onClose} label={title} className="choice-dialog">
       <h2>
@@ -391,14 +390,19 @@ export function PhotoDialog({ open, title, sub, tiles, busy, onFile, onClose, on
         {title}
       </h2>
       {sub && <p className="modal-sub">{sub}</p>}
-      {!sub && <label className="photo-upload-link">{upload}</label>}
       <div className="choice-grid model-grid">
-        {sub && (
-          <label className="model-upload">
-            <Icon name="plus" size={16} />
-            {upload}
-          </label>
-        )}
+        <label
+          className="model-upload"
+          data-over={over || undefined}
+          onDragOver={(e) => (e.preventDefault(), setOver(true))}
+          onDragLeave={() => setOver(false)}
+          onDrop={(e) => (e.preventDefault(), setOver(false), take([...e.dataTransfer.files].find((f) => f.type.startsWith('image/'))))}
+        >
+          <Icon name="upload" size={20} />
+          <span className="model-upload-title">Tải lên ảnh của bạn</span>
+          <span className="model-upload-hint">hoặc kéo thả ảnh vào đây</span>
+          <input type="file" accept="image/*" className="sr-only" disabled={busy} onChange={(e) => take(e.target.files?.[0])} />
+        </label>
         {tiles.map(tile)}
       </div>
       {/* Headed groups of photos (Jewelry Try-On's templates), then the member's own photos of this slot under their own heading, as Fash's My Models. */}
