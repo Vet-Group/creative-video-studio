@@ -4,11 +4,12 @@ import { type CSSProperties, type ReactNode, useCallback, useEffect, useRef, use
 import { api, type Clip, errorText, sendJson } from '@/lib/api';
 import { FAULTS } from '@/lib/faults';
 import { featureLabel } from '@/lib/features';
-import { activeFilters, type LibraryFilters, type LibraryView, libraryQuery, NO_FILTERS, readView, saveView } from '@/lib/library-view';
+import { activeFilters, type LibraryFilters, type LibraryView, libraryQuery, matchesVerdict, NO_FILTERS, readView, saveView, type VerdictFilter } from '@/lib/library-view';
 import { reuseHref } from '@/lib/reuse';
 import { Icon } from './Icon';
 import { useFreshResults } from './jobs';
 import { Modal } from './Modal';
+import { VerdictGuide } from './VerdictGuide';
 import { useZipDownload } from './ZipDownload';
 
 const fmtTime = (iso: string) => new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date(iso));
@@ -36,15 +37,12 @@ interface StoreOption {
   hidden: boolean;
 }
 
-/** `stores` is given to Admins only: it switches on the store control. A `list` row keeps the clip actions; marking and the store stay on the grid card. */
-function ClipCard({ clip, view, stores, select, onChange, onDeleted, onOpen }: { clip: Clip; view: LibraryView; stores?: StoreOption[]; select?: ReactNode; onChange: (c: Clip) => void; onDeleted: (id: string) => void; onOpen: () => void }) {
+/** The Pass, featured Pass and Fail marks (Fail asks for the fault) on an item its viewer may edit: the grid card, the list row and the detail view. */
+function VerdictMarks({ clip, onChange }: { clip: Clip; onChange: (c: Clip) => void }) {
   const [failing, setFailing] = useState(false);
   const [fault, setFault] = useState('');
-  const [confirmDelete, setConfirmDelete] = useState(false);
   const [problem, setProblem] = useState('');
-  const [saving, setSaving] = useState(false);
-  const image = clip.mediaType === 'image';
-  const noun = image ? 'ảnh' : 'clip';
+  const noun = clip.mediaType === 'image' ? 'ảnh' : 'clip';
 
   async function mark(body: { verdict: 'pass'; featured?: boolean } | { verdict: 'fail'; fault: string }) {
     setProblem('');
@@ -57,6 +55,51 @@ function ClipCard({ clip, view, stores, select, onChange, onDeleted, onOpen }: {
       setProblem('Không lưu được đánh giá.');
     }
   }
+
+  return (
+    <div className="actions verdict-marks">
+      <span className="verdict-buttons">
+        <button type="button" aria-pressed={clip.verdict?.verdict === 'pass' && !clip.verdict.featured} onClick={() => void mark({ verdict: 'pass' })}>
+          Đạt
+        </button>
+        {/* A Pass worth showing the whole company: Explore model cards show these first. */}
+        <button type="button" aria-pressed={clip.verdict?.featured === true} title={`Đạt và đẹp, nên làm mẫu: ${noun} nổi bật hiện trước trên thẻ mô hình ở Khám phá`} onClick={() => void mark({ verdict: 'pass', featured: true })}>
+          Nổi bật
+        </button>
+        <button type="button" aria-pressed={failing || clip.verdict?.verdict === 'fail'} onClick={() => setFailing((f) => !f)}>
+          Không đạt
+        </button>
+      </span>
+      {failing && (
+        <>
+          <label>
+            Lỗi gặp phải
+            <select value={fault} onChange={(e) => setFault(e.target.value)}>
+              <option value="">Chọn lỗi</option>
+              {FAULTS.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button type="button" disabled={!fault} onClick={() => void mark({ verdict: 'fail', fault })}>
+            Xác nhận không đạt
+          </button>
+        </>
+      )}
+      {problem && <p className="error">{problem}</p>}
+    </div>
+  );
+}
+
+/** `stores` is given to Admins only: it switches on the store control. A `list` row keeps the clip actions and the marks; the store stays on the grid card. */
+function ClipCard({ clip, view, stores, select, onChange, onDeleted, onOpen }: { clip: Clip; view: LibraryView; stores?: StoreOption[]; select?: ReactNode; onChange: (c: Clip) => void; onDeleted: (id: string) => void; onOpen: () => void }) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [problem, setProblem] = useState('');
+  const [saving, setSaving] = useState(false);
+  const image = clip.mediaType === 'image';
+  const noun = image ? 'ảnh' : 'clip';
 
   async function reassign(storeId: string) {
     setProblem('');
@@ -158,6 +201,7 @@ function ClipCard({ clip, view, stores, select, onChange, onDeleted, onOpen }: {
             </button>
           )}
         </div>
+        {clip.canEdit && <VerdictMarks clip={clip} onChange={onChange} />}
         {confirm}
         {problem && <p className="error">{problem}</p>}
       </article>
@@ -226,44 +270,12 @@ function ClipCard({ clip, view, stores, select, onChange, onDeleted, onOpen }: {
           </Link>
         )}
         {clip.canEdit && (
-          <>
-            <span className="verdict-buttons">
-              <button type="button" aria-pressed={clip.verdict?.verdict === 'pass' && !clip.verdict.featured} onClick={() => void mark({ verdict: 'pass' })}>
-                Đạt
-              </button>
-              {/* A Pass worth showing the whole company: Explore model cards show these first. */}
-              <button type="button" aria-pressed={clip.verdict?.featured === true} title={`Đạt và đẹp, nên làm mẫu: ${noun} nổi bật hiện trước trên thẻ mô hình ở Khám phá`} onClick={() => void mark({ verdict: 'pass', featured: true })}>
-                Nổi bật
-              </button>
-              <button type="button" aria-pressed={failing || clip.verdict?.verdict === 'fail'} onClick={() => setFailing((f) => !f)}>
-                Không đạt
-              </button>
-            </span>
-            <button type="button" className="danger icon-button" onClick={() => setConfirmDelete(true)} aria-label="Xóa" title="Xóa">
-              <Icon name="x" />
-            </button>
-          </>
+          <button type="button" className="danger icon-button" onClick={() => setConfirmDelete(true)} aria-label="Xóa" title="Xóa">
+            <Icon name="x" />
+          </button>
         )}
       </div>
-
-      {failing && (
-        <div className="actions">
-          <label>
-            Lỗi gặp phải
-            <select value={fault} onChange={(e) => setFault(e.target.value)}>
-              <option value="">Chọn lỗi</option>
-              {FAULTS.map((f) => (
-                <option key={f.id} value={f.id}>
-                  {f.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button type="button" disabled={!fault} onClick={() => void mark({ verdict: 'fail', fault })}>
-            Xác nhận không đạt
-          </button>
-        </div>
-      )}
+      {clip.canEdit && <VerdictMarks clip={clip} onChange={onChange} />}
       {confirm}
       {problem && <p className="error">{problem}</p>}
     </article>
@@ -283,7 +295,7 @@ interface ClipInputs {
  * Fash's item detail (survey L3): the result large on the left; beside it the title, the words behind it, the inputs, the length and ratio
  * chips, the date, download / fullscreen / open in a new tab / copy the words, and Dùng lại; arrows step through the loaded items.
  */
-function ClipDetail({ clips, index, onIndex }: { clips: Clip[]; index: number; onIndex: (i: number | null) => void }) {
+function ClipDetail({ clips, index, onIndex, onChange }: { clips: Clip[]; index: number; onIndex: (i: number | null) => void; onChange: (c: Clip) => void }) {
   const clip = clips[index]!;
   const image = clip.mediaType === 'image';
   const [job, setJob] = useState<ClipInputs | null>(null);
@@ -363,6 +375,7 @@ function ClipDetail({ clips, index, onIndex }: { clips: Clip[]; index: number; o
             </button>
           )}
         </div>
+        {clip.canEdit && <VerdictMarks key={clip.id} clip={clip} onChange={onChange} />}
         {reuseHref(clip) && (
           <Link href={reuseHref(clip)!} className="lightbox-reuse">
             Dùng lại
@@ -420,9 +433,16 @@ export function Library() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [stores, setStores] = useState<StoreOption[]>([]);
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [guide, setGuide] = useState(false);
   const latest = useRef(0);
   const set = (patch: Partial<LibraryFilters>) => setFilters((cur) => ({ ...cur, ...patch }));
   const active = activeFilters(filters);
+  // An item that no longer matches Favourites only or the verdict filter leaves the list, so the next page's offset stays right; the detail view then shows the next one.
+  const update = (next: Clip) =>
+    setClips((cur) => ((filters.favoritesOnly && !next.favorite) || !matchesVerdict(filters.verdict, next.verdict) ? cur.filter((x) => x.id !== next.id) : cur.map((x) => (x.id === next.id ? next : x))));
+  useEffect(() => {
+    if (detail !== null && !clips[detail]) setDetail(null); // the last item left the list under a filter
+  }, [clips, detail]);
 
   const load = useCallback(
     async (offset: number) => {
@@ -484,7 +504,13 @@ export function Library() {
   return (
     <section className="library" aria-labelledby="library-title" data-selecting={zip.active}>
       <h1 id="library-title">Thư viện</h1>
-      <p className="muted library-sub">Mọi thứ công ty đã tạo, ở cùng một chỗ.</p>
+      <p className="muted library-sub">
+        Mọi thứ công ty đã tạo, ở cùng một chỗ.
+        <button type="button" className="link-button" onClick={() => setGuide(true)}>
+          Hướng dẫn chấm điểm
+        </button>
+      </p>
+      <VerdictGuide open={guide} onClose={() => setGuide(false)} />
       <div className="library-tools">
         <label className="library-search">
           <Icon name="search" />
@@ -547,6 +573,16 @@ export function Library() {
             <option value="1:1">1:1</option>
           </select>
         </label>
+        <label className="library-field">
+          <span>Kết quả</span>
+          <select value={filters.verdict} onChange={(e) => set({ verdict: e.target.value as VerdictFilter })}>
+            <option value="">Tất cả</option>
+            <option value="none">Chưa chấm</option>
+            <option value="pass">Đạt</option>
+            <option value="featured">Nổi bật</option>
+            <option value="fail">Không đạt</option>
+          </select>
+        </label>
         <label className="library-toggle">
           <input type="checkbox" checked={filters.favoritesOnly} onChange={(e) => set({ favoritesOnly: e.target.checked })} aria-label="Chỉ mục yêu thích" />
           <Icon name="star" />
@@ -606,14 +642,13 @@ export function Library() {
             view={view}
             stores={isAdmin ? stores : undefined}
             select={zip.check(c.id, c.downloadName)}
-            // Under Favourites only an unmarked item leaves the list, so the next page's offset stays right.
-            onChange={(next) => setClips((cur) => (filters.favoritesOnly && !next.favorite ? cur.filter((x) => x.id !== next.id) : cur.map((x) => (x.id === next.id ? next : x))))}
+            onChange={update}
             onDeleted={(id) => setClips((cur) => cur.filter((x) => x.id !== id))}
             onOpen={() => setDetail(i)}
           />
         ))}
       </div>
-      {detail !== null && clips[detail] && <ClipDetail clips={clips} index={detail} onIndex={setDetail} />}
+      {detail !== null && clips[detail] && <ClipDetail clips={clips} index={detail} onIndex={setDetail} onChange={update} />}
       {hasMore && (
         <button type="button" className="library-more" onClick={() => void load(clips.length)}>
           Tải thêm

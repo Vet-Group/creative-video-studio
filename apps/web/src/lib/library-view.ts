@@ -1,16 +1,28 @@
 // The Library page's filters as the /api/library query, how many of them narrow the list, and the grid or list view remembered per browser.
 
+/** The verdict filter: every item (''), the unmarked ones, any Pass (a featured one too), only featured, or Fail. */
+export type VerdictFilter = '' | 'none' | 'pass' | 'featured' | 'fail';
+
 export interface LibraryFilters {
   q: string;
   creator: string;
   date: string;
   ratio: string;
   kind: string;
+  verdict: VerdictFilter;
   favoritesOnly: boolean;
   sort: 'newest' | 'oldest';
 }
 
-export const NO_FILTERS: LibraryFilters = { q: '', creator: '', date: '', ratio: '', kind: 'all', favoritesOnly: false, sort: 'newest' };
+export const NO_FILTERS: LibraryFilters = { q: '', creator: '', date: '', ratio: '', kind: 'all', verdict: '', favoritesOnly: false, sort: 'newest' };
+
+/** Whether an item with this mark belongs under the verdict filter, so a fresh mark can take it out of the list. */
+export function matchesVerdict(filter: VerdictFilter, mark: { verdict: 'pass' | 'fail'; featured: boolean } | null): boolean {
+  if (filter === '') return true;
+  if (filter === 'none') return mark === null;
+  if (filter === 'featured') return mark?.featured === true;
+  return mark?.verdict === filter;
+}
 
 /** The /api/library query for these filters and a page offset; a default is left out. */
 export function libraryQuery(f: LibraryFilters, offset: number): string {
@@ -20,6 +32,7 @@ export function libraryQuery(f: LibraryFilters, offset: number): string {
   if (f.date) q.set('date', f.date);
   if (f.ratio) q.set('ratio', f.ratio);
   if (f.kind !== 'all') q.set('kind', f.kind);
+  if (f.verdict) q.set('verdict', f.verdict);
   if (f.favoritesOnly) q.set('favorites', '1');
   if (f.sort !== 'newest') q.set('sort', f.sort);
   if (offset > 0) q.set('offset', String(offset));
@@ -27,7 +40,7 @@ export function libraryQuery(f: LibraryFilters, offset: number): string {
 }
 
 /** How many filters narrow the list; the sort only orders it, so it is not one. */
-export const activeFilters = (f: LibraryFilters): number => [f.q.trim(), f.creator, f.date, f.ratio, f.kind !== 'all', f.favoritesOnly].filter(Boolean).length;
+export const activeFilters = (f: LibraryFilters): number => [f.q.trim(), f.creator, f.date, f.ratio, f.kind !== 'all', f.verdict, f.favoritesOnly].filter(Boolean).length;
 
 export type LibraryView = 'grid' | 'list';
 export const VIEW_KEY = 'cvs.library.view';
