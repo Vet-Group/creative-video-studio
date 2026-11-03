@@ -1528,7 +1528,7 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .zip-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin: 12px 0 0; }
 .zip-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin: 0 0 16px; font-size: 14px; line-height: 21px; }
 .zip-tools .zip-bar { margin: 0; }
-.zip-tools .zip-toggle { height: 36px; padding: 0 14px; font-size: 13px; line-height: 34px; font-weight: 500; } /* History's "Chọn" matches the Library's and the cards' buttons */
+.zip-tools .zip-toggle { height: 36px; padding: 0 14px; font-size: 13px; line-height: 34px; font-weight: 500; } /* History's select toggle matches the Library's and the cards' buttons */
 .zip-bar .error { flex-basis: 100%; margin: 0; }
 .card:has(> .zip-check), .job-card:has(> .zip-check) { position: relative; }
 .zip-check { position: absolute; top: 8px; left: 8px; z-index: 2; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 6px; background: var(--surface); }
