@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { confirmDialog } from '@/components/Confirm';
 import { Icon } from '@/components/Icon';
 import { Modal } from '@/components/Modal';
 import { api, sendJson } from '@/lib/api';
@@ -35,7 +36,7 @@ const initials = (name: string) => {
 /** Everything an Admin changes on one user: name and email, role, team, sign-in methods, a temporary password, lock. */
 function UserEditor({ user, teams, reload }: { user: User; teams: Team[]; reload: () => void }) {
   // Its own action state, so a failure here and one in the add form never show in each other's place.
-  const { problem, run } = useAction(reload);
+  const { problem, pending, run } = useAction(reload);
   const [password, setPassword] = useState<string | null>(null);
   const [name, setName] = useState(user.name);
   const [email, setEmail] = useState(user.email);
@@ -62,21 +63,21 @@ function UserEditor({ user, teams, reload }: { user: User; teams: Team[]; reload
           </label>
         </div>
         {edited && (
-          <button type="button" className="primary" disabled={name.trim() === '' || email.trim() === ''} onClick={() => void patch({ name, email }, 'Không lưu được tên hoặc email.')}>
+          <button type="button" className="primary" disabled={pending || name.trim() === '' || email.trim() === ''} onClick={() => void patch({ name, email }, 'Không lưu được tên hoặc email.')}>
             Lưu tên, email
           </button>
         )}
         <div className="row">
           <label>
             Vai trò
-            <select aria-label={`Vai trò của ${user.email}`} value={user.role} onChange={(e) => void patch({ role: e.target.value }, 'Không đổi được vai trò.')}>
+            <select aria-label={`Vai trò của ${user.email}`} value={user.role} disabled={pending} onChange={(e) => void patch({ role: e.target.value }, 'Không đổi được vai trò.')}>
               <option value="member">Member</option>
               <option value="admin">Admin</option>
             </select>
           </label>
           <label>
             Nhóm
-            <select aria-label={`Nhóm của ${user.email}`} value={user.teamId} onChange={(e) => void patch({ teamId: e.target.value }, 'Không đổi được nhóm.')}>
+            <select aria-label={`Nhóm của ${user.email}`} value={user.teamId} disabled={pending} onChange={(e) => void patch({ teamId: e.target.value }, 'Không đổi được nhóm.')}>
               {teams
                 .filter((t) => !t.hidden || t.id === user.teamId)
                 .map((t) => (
@@ -101,7 +102,17 @@ function UserEditor({ user, teams, reload }: { user: User; teams: Team[]; reload
                   type="button"
                   className="small"
                   aria-label={m.provider === 'passkey' ? `Xoá ${methodText(m)} của ${user.email}` : `Huỷ liên kết ${providerLabel(m.provider)} của ${user.email}`}
-                  onClick={() => void run(() => api(`/api/admin/users/${user.id}/accounts/${m.id}`, { method: 'DELETE' }), 'Không huỷ được liên kết.')}
+                  disabled={pending}
+                  onClick={async () => {
+                    const passkey = m.provider === 'passkey';
+                    const yes = await confirmDialog({
+                      title: passkey ? `Xoá ${methodText(m)} của ${user.email}?` : `Huỷ liên kết ${providerLabel(m.provider)} của ${user.email}?`,
+                      body: 'Người này sẽ không đăng nhập bằng cách này được nữa.',
+                      confirmLabel: passkey ? 'Xoá' : 'Huỷ liên kết',
+                      danger: true,
+                    });
+                    if (yes) void run(() => api(`/api/admin/users/${user.id}/accounts/${m.id}`, { method: 'DELETE' }), 'Không huỷ được liên kết.');
+                  }}
                 >
                   {m.provider === 'passkey' ? 'Xoá' : 'Huỷ liên kết'}
                 </button>
@@ -117,8 +128,10 @@ function UserEditor({ user, teams, reload }: { user: User; teams: Team[]; reload
                 type="button"
                 className="small danger"
                 aria-label={`Tắt xác thực 2 lớp của ${user.email}`}
-                onClick={() => {
-                  if (window.confirm(`Tắt xác thực 2 lớp của ${user.email}? Người này sẽ bị đăng xuất khỏi mọi thiết bị và chỉ cần mật khẩu để đăng nhập.`)) void patch({ twoFactor: false }, 'Không tắt được xác thực 2 lớp.');
+                disabled={pending}
+                onClick={async () => {
+                  const yes = await confirmDialog({ title: `Tắt xác thực 2 lớp của ${user.email}?`, body: 'Người này sẽ bị đăng xuất khỏi mọi thiết bị và chỉ cần mật khẩu để đăng nhập.', confirmLabel: 'Tắt xác thực 2 lớp', danger: true });
+                  if (yes) void patch({ twoFactor: false }, 'Không tắt được xác thực 2 lớp.');
                 }}
               >
                 Tắt xác thực 2 lớp
@@ -141,7 +154,7 @@ function UserEditor({ user, teams, reload }: { user: User; teams: Team[]; reload
               <button
                 type="button"
                 className="primary"
-                disabled={password.trim() === ''}
+                disabled={pending || password.trim() === ''}
                 onClick={() => void patch({ temporaryPassword: password }, 'Không đặt được mật khẩu tạm.').then((ok) => ok && setPassword(null))}
               >
                 Lưu mật khẩu
@@ -151,7 +164,15 @@ function UserEditor({ user, teams, reload }: { user: User; teams: Team[]; reload
               </button>
             </>
           )}
-          <button type="button" className={user.banned ? undefined : 'danger'} onClick={() => void patch({ banned: !user.banned }, user.banned ? 'Không mở khóa được.' : 'Không khóa được.')}>
+          <button
+            type="button"
+            className={user.banned ? undefined : 'danger'}
+            disabled={pending}
+            onClick={async () => {
+              if (!user.banned && !(await confirmDialog({ title: `Khoá tài khoản ${user.email}?`, body: 'Người này sẽ không đăng nhập được cho đến khi được mở khoá.', confirmLabel: 'Khoá', danger: true }))) return;
+              void patch({ banned: !user.banned }, user.banned ? 'Không mở khóa được.' : 'Không khóa được.');
+            }}
+          >
             {user.banned ? 'Mở khóa' : 'Khóa'}
           </button>
         </div>
@@ -208,7 +229,7 @@ function UserRow({ user, team, onEdit }: { user: User; team: string; onEdit: () 
 export function AdminUsers() {
   const users = useFetch<{ users: User[] }>('/api/admin/users');
   const teams = useFetch<{ teams: Team[] }>('/api/admin/teams?includeHidden=1');
-  const { problem, run } = useAction(users.reload);
+  const { problem, pending, run } = useAction(users.reload);
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
@@ -276,7 +297,7 @@ export function AdminUsers() {
             Mật khẩu (không bắt buộc)
             <input type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} />
           </label>
-          <button type="button" className="primary" disabled={!email.trim() || !name.trim() || !teamId} onClick={() => void add()}>
+          <button type="button" className="primary" disabled={pending || !email.trim() || !name.trim() || !teamId} onClick={() => void add()}>
             Thêm người dùng
           </button>
         </div>

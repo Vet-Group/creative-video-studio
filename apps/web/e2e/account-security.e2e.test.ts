@@ -112,6 +112,7 @@ test('the sessions list shows both devices and signs the other one out', async (
   await expect(rows.filter({ hasText: 'Thiết bị này' })).toHaveCount(1);
   await expect(rows.first()).toContainText(/(Edge|Chrome) trên Windows/);
   await settings.getByRole('button', { name: 'Đăng xuất các thiết bị khác' }).click();
+  await page.getByRole('dialog', { name: 'Đăng xuất các thiết bị khác?' }).getByRole('button', { name: 'Đăng xuất', exact: true }).click();
   await expect(rows).toHaveCount(1);
   await expect(rows.first()).toContainText('Thiết bị này');
   await expect(settings.getByText('Không có thiết bị nào khác đang đăng nhập.')).toBeVisible();

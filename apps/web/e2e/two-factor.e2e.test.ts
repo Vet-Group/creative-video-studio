@@ -144,16 +144,15 @@ test('an Admin turns off the 2FA of a user who lost the phone: the user is signe
   await row.getByRole('button', { name: `Sửa ${USERS.totpb.email}` }).click();
   const off = page.getByRole('button', { name: `Tắt xác thực 2 lớp của ${USERS.totpb.email}` });
   // A confirm step first: dismissing it changes nothing.
-  page.once('dialog', (d) => void d.dismiss());
+  const confirm = page.getByRole('dialog', { name: `Tắt xác thực 2 lớp của ${USERS.totpb.email}?` });
   await off.click();
+  await confirm.getByRole('button', { name: 'Huỷ', exact: true }).click();
+  await expect(confirm).toBeHidden();
   await expect(off).toBeVisible();
-  page.once('dialog', (d) => {
-    expect(d.message()).toContain(USERS.totpb.email);
-    void d.accept();
-  });
+  await off.click();
   await Promise.all([
     page.waitForResponse((r) => r.url().includes('/api/admin/users/') && r.request().method() === 'PATCH' && r.ok()),
-    off.click(),
+    confirm.getByRole('button', { name: 'Tắt xác thực 2 lớp', exact: true }).click(),
   ]);
   await expect(off).toHaveCount(0);
   await page.keyboard.press('Escape');

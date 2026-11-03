@@ -61,7 +61,7 @@ function Field({ label, unit, hint, value, onChange, numeric = false }: { label:
 }
 
 function SettingsForm({ settings, reload }: { settings: Settings; reload: () => void }) {
-  const { problem, run } = useAction(reload);
+  const { problem, pending, run } = useAction(reload);
   const [monthly, setMonthly] = useState(settings.monthlyCapUsd);
   const [daily, setDaily] = useState(String(settings.memberDailyClipCap));
   const [features, setFeatures] = useState(settings.featuresMonthlyCapUsd);
@@ -310,7 +310,7 @@ function SettingsForm({ settings, reload }: { settings: Settings; reload: () => 
               <button type="button" onClick={undo}>
                 Hoàn tác
               </button>
-              <button type="button" className="primary" disabled={[monthly, daily, features, memberDay, memberMonth, ...Object.values(soft)].some((v) => v.trim() === '')} onClick={() => void save()}>
+              <button type="button" className="primary" disabled={pending || [monthly, daily, features, memberDay, memberMonth, ...Object.values(soft)].some((v) => v.trim() === '')} onClick={() => void save()}>
                 Lưu cài đặt
               </button>
             </>

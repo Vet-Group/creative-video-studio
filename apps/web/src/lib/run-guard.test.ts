@@ -1,21 +1,21 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { confirmDialog } from '@/components/Confirm';
 import { confirmRun, runKey } from './run-guard';
 
-afterEach(() => vi.unstubAllGlobals());
+vi.mock('@/components/Confirm', () => ({ confirmDialog: vi.fn() }));
 
 describe('confirmRun', () => {
-  it('asks only from 1 USD, with the price in the question, and returns the answer', () => {
-    const confirm = vi.fn(() => false);
-    vi.stubGlobal('window', { confirm });
-    expect(confirmRun('0.9999')).toBe(true);
-    expect(confirmRun(undefined)).toBe(true);
-    expect(confirmRun(null)).toBe(true);
+  it('asks only from 1 USD, with the price in the question, and returns the answer', async () => {
+    const confirm = vi.mocked(confirmDialog).mockResolvedValue(false);
+    expect(await confirmRun('0.9999')).toBe(true);
+    expect(await confirmRun(undefined)).toBe(true);
+    expect(await confirmRun(null)).toBe(true);
     expect(confirm).not.toHaveBeenCalled();
-    expect(confirmRun('1.0000')).toBe(false);
-    expect(confirm).toHaveBeenLastCalledWith('Chạy job này với giá $1.0000?');
-    confirm.mockReturnValue(true);
-    expect(confirmRun(1.5, 'Tạo 2 clip?')).toBe(true);
-    expect(confirm).toHaveBeenLastCalledWith('Tạo 2 clip?');
+    expect(await confirmRun('1.0000')).toBe(false);
+    expect(confirm).toHaveBeenLastCalledWith({ title: 'Chạy job này với giá $1.0000?', confirmLabel: 'Tiếp tục' });
+    confirm.mockResolvedValue(true);
+    expect(await confirmRun(1.5, 'Tạo 2 clip?')).toBe(true);
+    expect(confirm).toHaveBeenLastCalledWith({ title: 'Tạo 2 clip?', confirmLabel: 'Tiếp tục' });
   });
 });
 

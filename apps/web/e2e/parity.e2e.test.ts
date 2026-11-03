@@ -479,6 +479,14 @@ test('a dialog closes on its backdrop, not on a click inside it', async ({ page 
   await detail.getByText('Mẫu minh họa').click();
   await expect(detail).toBeVisible();
 
+  // A drag that starts inside (selecting text) and ends on the backdrop keeps it open.
+  const text = (await detail.getByText('Mẫu minh họa').boundingBox())!;
+  await page.mouse.move(text.x + 2, text.y + text.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(5, 5, { steps: 5 });
+  await page.mouse.up();
+  await expect(detail).toBeVisible();
+
   await page.mouse.click(5, 5); // the backdrop
   await expect(detail).toBeHidden();
 });

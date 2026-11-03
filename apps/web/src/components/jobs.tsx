@@ -236,15 +236,20 @@ export function JobsProvider({ userId, children }: { userId: string; children: R
     const times = finished.map((j) => Date.parse(j.finishedAt!));
     setData({ jobs: r.jobs, workerOffline: r.workerOffline, clips: r.clips, loaded: true, lastFinished: Math.max(0, ...times) });
     const seenKey = `${SEEN_KEY}.${userId}`; // per user, so two accounts in one browser do not hide each other's news
-    const stored = localStorage.getItem(seenKey);
-    if (stored === null) {
-      // First visit of this user in this browser: results that already exist are not news.
-      localStorage.setItem(seenKey, String(Math.max(0, ...times)));
-      return;
+    let fresh: TrayJob[];
+    try {
+      const stored = localStorage.getItem(seenKey);
+      if (stored === null) {
+        // First visit of this user in this browser: results that already exist are not news.
+        localStorage.setItem(seenKey, String(Math.max(0, ...times)));
+        return;
+      }
+      fresh = finished.filter((j) => Date.parse(j.finishedAt!) > Number(stored));
+      if (fresh.length === 0) return;
+      localStorage.setItem(seenKey, String(Math.max(...times)));
+    } catch {
+      return; // storage blocked (a privacy setting, a full quota): no news toasts, but the tray still updates
     }
-    const fresh = finished.filter((j) => Date.parse(j.finishedAt!) > Number(stored));
-    if (fresh.length === 0) return;
-    localStorage.setItem(seenKey, String(Math.max(...times)));
     setNews(true);
     const done = fresh.map((j) => ({ ok: j.status === 'succeeded', text: j.status === 'succeeded' ? (j.resolution ? 'Ảnh đã xong' : 'Clip đã xong') : 'Một job không thành công' }));
     setToasts((cur) => [...cur, ...done.map((n) => ({ id: nextId.current++, ...n }))]);

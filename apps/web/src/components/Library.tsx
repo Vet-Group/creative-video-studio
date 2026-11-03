@@ -62,10 +62,11 @@ function VerdictMarks({ clip, onChange, keys = false }: { clip: Clip; onChange: 
   const [failing, setFailing] = useState(false);
   const [fault, setFault] = useState('');
   const [problem, setProblem] = useState('');
+  const [saving, setSaving] = useState(false);
   const faultList = useRef<HTMLSelectElement>(null);
   const noun = clip.mediaType === 'image' ? 'ảnh' : 'clip';
-  const latest = useRef({ clip, onChange });
-  latest.current = { clip, onChange };
+  const latest = useRef({ clip, onChange, saving });
+  latest.current = { clip, onChange, saving };
 
   useEffect(() => {
     if (!keys) return;
@@ -83,29 +84,33 @@ function VerdictMarks({ clip, onChange, keys = false }: { clip: Clip; onChange: 
   }, [failing, keys]);
 
   async function mark(body: { verdict: 'pass'; featured?: boolean } | { verdict: 'fail'; fault: string }) {
+    const { clip: now, onChange: changed, saving: busy } = latest.current; // a shortcut's listener outlives the render that added it
+    if (busy) return; // a key pressed again before the answer
+    setSaving(true);
     setProblem('');
     try {
-      const { clip: now, onChange: changed } = latest.current; // a shortcut's listener outlives the render that added it
       const r = await api<{ verdict: NonNullable<Clip['verdict']> }>(`/api/jobs/${now.id}/verdict`, sendJson('PUT', body));
       changed({ ...now, verdict: r.verdict });
       setFailing(false);
       setFault('');
     } catch {
       setProblem('Không lưu được đánh giá.');
+    } finally {
+      setSaving(false);
     }
   }
 
   return (
     <div className="actions verdict-marks">
       <span className="verdict-buttons">
-        <button type="button" aria-pressed={clip.verdict?.verdict === 'pass' && !clip.verdict.featured} onClick={() => void mark({ verdict: 'pass' })}>
+        <button type="button" aria-pressed={clip.verdict?.verdict === 'pass' && !clip.verdict.featured} disabled={saving} onClick={() => void mark({ verdict: 'pass' })}>
           Đạt
         </button>
         {/* A Pass worth showing the whole company: Explore model cards show these first. */}
-        <button type="button" aria-pressed={clip.verdict?.featured === true} title={`Đạt và đẹp, nên làm mẫu: ${noun} nổi bật hiện trước trên thẻ mô hình ở Khám phá`} onClick={() => void mark({ verdict: 'pass', featured: true })}>
+        <button type="button" aria-pressed={clip.verdict?.featured === true} disabled={saving} title={`Đạt và đẹp, nên làm mẫu: ${noun} nổi bật hiện trước trên thẻ mô hình ở Khám phá`} onClick={() => void mark({ verdict: 'pass', featured: true })}>
           Nổi bật
         </button>
-        <button type="button" aria-pressed={failing || clip.verdict?.verdict === 'fail'} onClick={() => setFailing((f) => !f)}>
+        <button type="button" aria-pressed={failing || clip.verdict?.verdict === 'fail'} disabled={saving} onClick={() => setFailing((f) => !f)}>
           Không đạt
         </button>
       </span>
@@ -122,7 +127,7 @@ function VerdictMarks({ clip, onChange, keys = false }: { clip: Clip; onChange: 
               ))}
             </select>
           </label>
-          <button type="button" disabled={!fault} onClick={() => void mark({ verdict: 'fail', fault })}>
+          <button type="button" disabled={saving || !fault} onClick={() => void mark({ verdict: 'fail', fault })}>
             Xác nhận không đạt
           </button>
         </>
@@ -148,11 +153,14 @@ function ClipCard({ clip, view, select, onChange, onDeleted, onOpen }: { clip: C
 
   async function remove() {
     setProblem('');
+    setSaving(true);
     try {
       await api(`/api/jobs/${clip.id}`, { method: 'DELETE' });
       onDeleted(clip.id);
     } catch {
       setProblem(`Không xóa được ${noun}.`);
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -188,7 +196,7 @@ function ClipCard({ clip, view, select, onChange, onDeleted, onOpen }: { clip: C
   const confirm = confirmDelete && (
     <div className="actions" role="alertdialog" aria-label="Xác nhận xóa">
       <span>Xóa {noun} này?</span>
-      <button type="button" onClick={() => void remove()}>
+      <button type="button" disabled={saving} onClick={() => void remove()}>
         Xác nhận xóa
       </button>
       <button type="button" onClick={() => setConfirmDelete(false)}>

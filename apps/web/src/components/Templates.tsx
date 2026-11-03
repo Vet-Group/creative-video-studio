@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useId, useState } from 'react';
 import { api, errorText, sendJson } from '@/lib/api';
 import { MAX_TEMPLATE_NAME, type TemplateData } from '@/lib/templates';
+import { confirmDialog } from './Confirm';
 import { Modal } from './Modal';
 
 interface Template {
@@ -81,7 +82,7 @@ export function Templates({ feature, data }: { feature: string; data: () => Temp
   }
 
   async function remove(t: Template) {
-    if (!window.confirm(`Xoá mẫu "${t.name}"?`)) return;
+    if (!(await confirmDialog({ title: `Xoá mẫu "${t.name}"?`, confirmLabel: 'Xoá', danger: true }))) return;
     try {
       await api(`/api/templates/${encodeURIComponent(t.id)}`, { method: 'DELETE' });
       void load();

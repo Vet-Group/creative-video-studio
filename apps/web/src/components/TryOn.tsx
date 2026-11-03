@@ -144,7 +144,7 @@ export function TryOn({ reuse }: { reuse?: string }) {
   const addSample = (set: (f: (cur: Img[]) => Img[]) => void) => (name: string) => void put(set, () => copySamples([name]));
 
   async function run() {
-    if (!confirmRun(pick.estimate)) return;
+    if (!(await confirmRun(pick.estimate))) return;
     setBusy(true);
     setError('');
     setNotice('');

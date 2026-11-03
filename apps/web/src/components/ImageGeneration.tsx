@@ -119,7 +119,7 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
   }
 
   async function run() {
-    if (!confirmRun(pick.estimate)) return;
+    if (!(await confirmRun(pick.estimate))) return;
     setBusy(true);
     setError('');
     setNotice('');
