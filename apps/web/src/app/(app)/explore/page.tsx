@@ -34,12 +34,12 @@ const fmtDate = new Intl.DateTimeFormat('vi-VN', { day: 'numeric', month: 'numer
 const content = (id: string) => `/api/assets/${id}/content`;
 
 /** The sample name of a model card; ids such as seedance-2.5 keep only letters, digits and dashes in sample names.
- * A variant without its own sample (a -vertex, -reference, -replicate, -1080p or -480p id) shows the sample of the model it varies. */
+ * A variant without its own sample (a -vertex, -reference, -replicate, -byteplus, -1080p or -480p id) shows the sample of the model it varies. */
 const modelSample = (have: ReadonlySet<string>, id: string) => {
   const own = `model-${id.replace(/[^a-z0-9-]/g, '-')}`;
   for (let base = own, next = ''; ; base = next) {
     if (have.has(`${base}.mp4`) || have.has(`${base}.jpg`)) return base;
-    next = base.replace(/-(vertex|reference|replicate|1080p|480p)$/, '');
+    next = base.replace(/-(vertex|reference|replicate|byteplus|1080p|480p)$/, '');
     if (next === base) return own;
   }
 };

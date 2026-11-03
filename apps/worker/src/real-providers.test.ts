@@ -47,6 +47,8 @@ describe('realProviders', () => {
     expect([Object.keys(fal.providers), Object.keys(fal.imageProviders!)]).toEqual([['fal'], ['fal']]);
     const both = realProviders(pool([]), { FAL_KEY: 'k', REPLICATE_API_TOKEN: 't' });
     expect([Object.keys(both.providers), Object.keys(both.imageProviders!)]).toEqual([['fal', 'replicate'], ['fal']]);
+    const byteplus = realProviders(pool([]), { BYTEPLUS_ARK_API_KEY: 'k' });
+    expect([Object.keys(byteplus.providers), Object.keys(byteplus.imageProviders!)]).toEqual([['byteplus'], ['byteplus']]);
   });
 
   test('wires Vertex image models from the key file, with the project from the env or else the key', () => {

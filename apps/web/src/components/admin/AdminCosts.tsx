@@ -46,7 +46,7 @@ interface Costs {
   invoices: Invoice[];
 }
 
-const PROVIDERS = ['fal', 'replicate', 'vertex'];
+const PROVIDERS = ['fal', 'replicate', 'vertex', 'byteplus'];
 const KIND_LABEL: Record<string, string> = { bakeoff: 'Thử nghiệm mô hình', manual_adjustment: 'Điều chỉnh tay', invoice_diff: 'Chênh lệch hóa đơn' };
 const vnd = (v: string | null) => (v === null ? '—' : `${Number(v).toLocaleString('vi-VN')} ₫`);
 
@@ -170,6 +170,7 @@ interface Balances {
   fal: ({ ok: true; balance: number; currency: string } | { ok: false; reason: 'no_key' | 'failed'; error: string }) & { billingUrl: string; low: boolean };
   replicate: { credit: { creditUsd: string; since: string; spentUsd: string; remainingUsd: number } | null; billingUrl: string; low: boolean };
   vertex: { billingUrl: string };
+  byteplus: { billingUrl: string };
 }
 
 /** A neutral button, not a red link: red on this panel means a balance under the warning threshold. */
@@ -249,6 +250,13 @@ function ProviderBalances({ vertex }: { vertex: VertexCostsData | undefined }) {
                 </td>
                 <td>
                   <TopUp href={data.replicate.billingUrl} />
+                </td>
+              </tr>
+              <tr>
+                <td>BytePlus ModelArk</td>
+                <td className="muted">Không có API số dư; xem trên trang thanh toán của BytePlus.</td>
+                <td>
+                  <TopUp href={data.byteplus.billingUrl} />
                 </td>
               </tr>
             </tbody>

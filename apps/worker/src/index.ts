@@ -1,4 +1,4 @@
-// The worker process: `pnpm --filter @cvs/worker start`. The mock provider always runs; fal and Replicate run when FAL_KEY and REPLICATE_API_TOKEN are set (M.6).
+// The worker process: `pnpm --filter @cvs/worker start`. The mock provider always runs; fal, Replicate and BytePlus run when FAL_KEY, REPLICATE_API_TOKEN and BYTEPLUS_ARK_API_KEY are set (M.6).
 import { serviceAccountToken } from '@cvs/core/providers/vertex';
 import { readVertexBilling } from '@cvs/core/providers/vertex-billing';
 import { createPool, databaseUrl } from '@cvs/db/client';

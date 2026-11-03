@@ -1,6 +1,6 @@
 import { reserve, withTransaction } from '@cvs/core/ledger';
 import { type CapRefusal, checkCaps, dailyClips } from '@cvs/core/limits';
-import { estimateUsd, FEATURE_PROMPTS, imagePricesFor, PROMPT_CEILING, promptLimit, textToImage, usdPerSecondFor } from '@cvs/core/models';
+import { estimateUsd, extraInputUsd, FEATURE_PROMPTS, imagePricesFor, PROMPT_CEILING, promptLimit, textToImage, usdPerSecondFor } from '@cvs/core/models';
 import { videoInputs } from '@cvs/core/providers/fal';
 import { VIDEO_QUEUE, videoSendOptions } from '@cvs/core/queue';
 import { FEATURES } from '@cvs/db';
@@ -261,7 +261,7 @@ export async function POST(request: Request) {
     const provider = original?.provider ?? model.provider;
     const perSecond = isImage ? null : usdPerSecondFor({ endpoint: model.endpoint, usdPerSecond: model.usd_per_second }, params.audio);
     if (!isImage && perSecond === undefined) return bad('the model cannot generate audio');
-    const estimate = isImage ? Number(imagePrice).toFixed(4) : estimateUsd(perSecond!, durationSec);
+    const estimate = isImage ? (Number(imagePrice) + extraInputUsd(model.endpoint, assetIds.length)).toFixed(4) : estimateUsd(perSecond!, durationSec);
     // A mock job books 0 USD (see the ledger), so it adds nothing to the monthly cap.
     const cap = await checkCaps(tx, userId, provider === 'mock' ? '0' : estimate, undefined, feature);
     if (cap) return Response.json({ error: CAP_MESSAGES[cap] }, { status: 429 });

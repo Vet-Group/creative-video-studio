@@ -466,7 +466,9 @@ describe('POST /api/jobs for an image feature', () => {
          ('img-only', 'fal', 'x', 'Img only', 'image', '{image}', '{auto,1:1}', '{}', 2, '{"1K": "0.0398"}', '{}', true),
          ('img-off', 'fal', 'x', 'Img off', 'image', '{image}', '{auto}', '{}', 2, '{"1K": "0.1"}', '{}', false),
          ('img-mock', 'mock', 'mock', 'Img mock', 'image', '{image}', '{auto,1:1}', '{}', 2, '{"1K": "0.2000"}', '{}', true),
-         ('img-text', 'fal', 'fal-ai/nano-banana-pro/edit', 'Img text', 'image', '{image,try_on}', '{auto,1:1,3:4}', '{}', 2, '{"1K": "0.1500", "2K": "0.1500"}', '{}', true)`,
+         ('img-text', 'fal', 'fal-ai/nano-banana-pro/edit', 'Img text', 'image', '{image,try_on}', '{auto,1:1,3:4}', '{}', 2, '{"1K": "0.1500", "2K": "0.1500"}', '{}', true),
+         ('img-bp-pro', 'byteplus', 'dola-seedream-5-0-pro-260628', 'Img BytePlus Pro', 'image', '{image}', '{auto,1:1,3:4}', '{}', 4, '{"1K": "0.0450", "2K": "0.0900"}', '{}', true),
+         ('img-bp-flash', 'byteplus', 'dola-seedream-5-0-flash-260915', 'Img BytePlus Flash', 'image', '{image}', '{auto,1:1,3:4}', '{}', 4, '{"1K": "0.0180", "2K": "0.0180"}', '{}', true)`,
     );
     await pool.query(
       // Minimal unlike image_prices, so a job that names no level shows it takes the first level's price.
@@ -486,6 +488,24 @@ describe('POST /api/jobs for an image feature', () => {
     ]);
     expect((await pool.query('select kind, usd::text as usd from cost_entries where job_id = $1', [id])).rows).toEqual([{ kind: 'estimate', usd: '0.3000' }]);
     expect(await sentCount(m.id)).toBe(1);
+  });
+
+  test('reserves $0.003 for each input image after the first on BytePlus Seedream Pro, and nothing extra on Flash or on a one-image Run', async () => {
+    const m = await newMember();
+    const assetIds = [m.asset];
+    for (const n of [2, 3]) {
+      await insertAsset(`${m.id}-bp-${n}`, m.id);
+      assetIds.push(`${m.id}-bp-${n}`);
+    }
+    const reserved = async (modelId: string, ids: string[]) => {
+      const res = await runImage(m, { modelId, assetIds: ids, params: { resolution: '1K' } });
+      expect(res.status).toBe(201);
+      const { id } = (await res.json()) as { id: string };
+      return (await pool.query('select usd::text as usd from cost_entries where job_id = $1', [id])).rows;
+    };
+    expect(await reserved('img-bp-pro', assetIds)).toEqual([{ usd: '0.0510' }]);
+    expect(await reserved('img-bp-pro', assetIds.slice(0, 1))).toEqual([{ usd: '0.0450' }]);
+    expect(await reserved('img-bp-flash', assetIds)).toEqual([{ usd: '0.0180' }]);
   });
 
   test('as on Fash, Image Generation takes no image on a model with a text-to-image twin, and refuses it elsewhere and on Try On', async () => {

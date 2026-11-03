@@ -3,6 +3,7 @@ import { createFalEnhancer, createOpenAiEnhancer } from '@cvs/core/enhance';
 import { createFalSuggester, createOpenAiSuggester } from '@cvs/core/suggest';
 import { createFalImageProvider, createFalProvider } from '@cvs/core/providers/fal';
 import type { ReadImage } from '@cvs/core/providers/http';
+import { createByteplusImageProvider, createByteplusProvider } from '@cvs/core/providers/byteplus';
 import { createReplicateProvider } from '@cvs/core/providers/replicate';
 import { createVertexImageProvider } from '@cvs/core/providers/vertex';
 import { pinToAccounts, type VertexAccount, vertexAccounts } from '@cvs/core/providers/vertex-accounts';
@@ -55,7 +56,7 @@ export const assetReader =
   };
 
 /**
- * fal and Vertex serve video and image models; Replicate serves video models. Vertex has one provider per account (a key file each), and a new job
+ * fal, Vertex and BytePlus serve video and image models; Replicate serves video models. Vertex has one provider per account (a key file each), and a new job
  * goes to the account the credits guard made active (settings.vertex_active_project); `vertexAccounts` is that list, for the guard.
  */
 export function realProviders(
@@ -78,6 +79,10 @@ export function realProviders(
     suggest = createOpenAiSuggester({ apiKey: env.OPENAI_API_KEY });
   }
   if (env.REPLICATE_API_TOKEN) providers.replicate = createReplicateProvider({ apiToken: env.REPLICATE_API_TOKEN, readImage });
+  if (env.BYTEPLUS_ARK_API_KEY) {
+    providers.byteplus = createByteplusProvider({ apiKey: env.BYTEPLUS_ARK_API_KEY, readImage });
+    imageProviders.byteplus = createByteplusImageProvider({ apiKey: env.BYTEPLUS_ARK_API_KEY, readImage });
+  }
   const accounts = vertexAccounts(env);
   if (accounts.length) {
     const active = async () => ((await pool.query('select vertex_active_project from settings where id = 1')).rows[0]?.vertex_active_project as string | null) ?? null;

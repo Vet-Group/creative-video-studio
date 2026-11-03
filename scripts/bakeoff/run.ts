@@ -102,6 +102,7 @@ function plan(deps: RunDeps, opts: StageOptions): { jobs: Planned[]; prompt: str
   for (const image of images) {
     for (const model of models) {
       if (model.provider === 'vertex') throw new Error('Vertex is not supported by the bake-off runner');
+      if (model.provider === 'byteplus') throw new Error('BytePlus is not supported by the bake-off runner');
       const durationSec = model.thrift?.durationSec ?? fail(`${model.id} has no thrift settings`);
       if (model.thrift!.resolution !== model.outputResolution) fail(`${model.id}: thrift resolution differs from the resolution the adapter sends`);
       const bad = validateRequest(model, { ratio: THRIFT_RATIO, durationSec, imageCount: 1 });

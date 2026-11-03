@@ -67,7 +67,7 @@ export async function sendJson(f: Fetch, what: string, url: string, init: Reques
  */
 export const MAX_INLINE_CHARS = 3_600_000;
 
-export async function resolveImages(urls: string[], readImage?: ReadImage, opts?: { ratio?: string }): Promise<string[]> {
+export async function resolveImages(urls: string[], readImage?: ReadImage, opts?: { ratio?: string; maxChars?: number }): Promise<string[]> {
   const out = await Promise.all(
     urls.map(async (url) => {
       if (url.startsWith('https:')) return url;
@@ -81,7 +81,8 @@ export async function resolveImages(urls: string[], readImage?: ReadImage, opts?
     }),
   );
   const chars = out.reduce((a, u) => a + (u.startsWith('data:') ? u.length : 0), 0);
-  if (chars > MAX_INLINE_CHARS) throw new ImageReadError(`the inlined images add up to ${chars} characters, over the ${MAX_INLINE_CHARS} a provider is known to accept`);
+  const max = opts?.maxChars ?? MAX_INLINE_CHARS;
+  if (chars > max) throw new ImageReadError(`the inlined images add up to ${chars} characters, over the ${max} a provider is known to accept`);
   return out;
 }
 
@@ -113,4 +114,11 @@ export function imageEstimate(job: Pick<ImageProviderJob, 'model' | 'resolution'
   const price = job.model.imagePrices[job.resolution];
   if (price === undefined) throw new Error(`model ${job.model.id} has no price for resolution ${job.resolution}`);
   return { costUsd: Number(price), costSource: 'estimate' as const };
+}
+
+/** A width and height in the ratio with about `pixels` pixels in total, each a multiple of 16. */
+export function sizeFor(ratio: string, pixels: number): { width: number; height: number } {
+  const [w, h] = ratio.split(':').map(Number) as [number, number];
+  const round = (n: number) => Math.round(n / 16) * 16;
+  return { width: round(Math.sqrt((pixels * w) / h)), height: round(Math.sqrt((pixels * h) / w)) };
 }
