@@ -1,7 +1,7 @@
 'use client';
 import { type DragEvent, type KeyboardEvent, useEffect, useId, useRef, useState } from 'react';
 import { api, errorText, sendJson } from '@/lib/api';
-import { cardSample, type Example, exampleForPreset, examplesFor, sampleSrc, splitColumns } from '@/lib/examples';
+import { cardSample, type Example, exampleForPreset, examplesFor, exampleTitle, sampleSrc, splitColumns } from '@/lib/examples';
 import { promptTooLong } from '@/lib/prompt-limit';
 import { confirmRun } from '@/lib/run-guard';
 import { NARROW, useMediaQuery, WIDE } from '@/lib/use-media-query';
@@ -147,6 +147,8 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
   const [picking, setPicking] = useState(false);
   const [detail, setDetail] = useState<Example | null>(null);
   const [details, setDetails] = useState<SampleDetails | null>(null);
+  const [tileDetails, setTileDetails] = useState<Record<string, SampleDetails>>({});
+  const askedDetails = useRef(new Set<string>());
   // The member's last model and settings, unless a refill or an Explore link opens the page. The model is honoured once, as Explore's is.
   const recall = useRecall(
     'video',
@@ -333,13 +335,26 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
   const media = (path: string) => sampleSrc(have, path);
   /** A preset's loop: its own `preset-<id>` sample (`preset-general` for the free prompt), else the sample clip that stands for it. */
   const presetMedia = (id: string) => {
-    const ex = exampleForPreset(id);
+    const ex = exampleForPreset(id, have);
     const own = cardSample(have, `preset-${id || 'general'}`, ex ? media(ex.poster) : null);
     return { video: own.video ?? (ex ? media(ex.src) : null), poster: own.poster, ex };
   };
   const banner = presetMedia(presetId);
   const free = presetMedia('');
   const examples = examplesFor(have);
+  // Each tile is named from its clip's details file, read once when the Examples tab opens.
+  useEffect(() => {
+    if (shown !== 'examples') return;
+    for (const { id } of examplesFor(have)) {
+      if (!have.has(`${id}.json`) || askedDetails.current.has(id)) continue;
+      askedDetails.current.add(id);
+      api<SampleDetails>(`/api/samples/${id}.json`).then(
+        (d) => setTileDetails((t) => ({ ...t, [id]: d })),
+        () => undefined, // the tile keeps its own name
+      );
+    }
+  }, [shown, have]);
+  const titleOf = (ex: Example) => exampleTitle(ex, tileDetails[ex.id], presets);
   const detailAt = detail ? examples.findIndex((e) => e.id === detail.id) : -1;
   // As on Fash, a sample with a details file shows its own prompt, input photos, settings and date, and Dùng lại refills the form from it.
   const detailed = detail !== null && have.has(`${detail.id}.json`) ? detail.id : null;
@@ -653,14 +668,14 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
                 <ul key={c} className="masonry-col">
                   {column.map((ex) => (
                     <li key={ex.id} className="example">
-                      <Preview src={media(ex.src)} poster={media(ex.poster)} width={ex.width} height={ex.height} title={ex.title} paused={picking || detail !== null} />
+                      <Preview src={media(ex.src)} poster={media(ex.poster)} width={ex.width} height={ex.height} title={titleOf(ex)} paused={picking || detail !== null} />
                       <span className="chips">
                         {ex.fixture && media(ex.src) === ex.src && <span className="chip">fixture</span>}
                       </span>
                       <button type="button" className="example-open" onClick={() => setDetail(ex)}>
-                        <span className="example-caption">{ex.title}</span>
+                        <span className="example-caption">{titleOf(ex)}</span>
                       </button>
-                      <button type="button" className="example-use" aria-label={`Dùng mẫu này: ${ex.title}`} onClick={() => fillFromExample(ex)}>
+                      <button type="button" className="example-use" aria-label={`Dùng mẫu này: ${titleOf(ex)}`} onClick={() => (have.has(`${ex.id}.json`) ? recreate(exampleFrom({ example: ex.id })!) : fillFromExample(ex))}>
                         Dùng mẫu này
                       </button>
                     </li>
@@ -725,7 +740,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
         {detail && (
           <>
             <div className="detail-media">
-              <Preview key={detail.id} src={media(detail.src)} poster={media(detail.poster)} width={detail.width} height={detail.height} title={detail.title} />
+              <Preview key={detail.id} src={media(detail.src)} poster={media(detail.poster)} width={detail.width} height={detail.height} title={titleOf(detail)} />
             </div>
             {/* Before the details, so Tab meets Previous and Next first. Stepping onto an end hides the pressed button, so the focus moves to the other one. */}
             <button
@@ -765,11 +780,11 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
                 )
               ) : (
                 <span className="detail-chip">
-                  <img src={media(exampleForPreset(detail.presetId)?.poster ?? detail.poster)} alt="" width={36} height={36} />
+                  <img src={media(exampleForPreset(detail.presetId, have)?.poster ?? detail.poster)} alt="" width={36} height={36} />
                   {presets?.find((p) => p.id === detail.presetId)?.label}
                 </span>
               )}
-              <h2 className={details ? 'sr-only' : undefined}>{detail.title}</h2>
+              <h2 className={details ? 'sr-only' : undefined}>{titleOf(detail)}</h2>
               {detailModel && (
                 <Tap on={() => pickModel(details!.modelId!, `Đã chọn mô hình ${detailModel}`)} label={`Dùng mô hình ${detailModel}`} className="detail-model">
                   {detailModel}

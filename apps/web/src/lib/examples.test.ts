@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { cardSample, EXAMPLES, examplesFor, numberedSamples, splitColumns } from './examples';
+import { cardSample, EXAMPLES, exampleForPreset, examplesFor, exampleTitle, numberedSamples, splitColumns } from './examples';
 
 test('the samples cover four aspects and never set a ratio the job form lacks', () => {
   expect(new Set(EXAMPLES.map((e) => e.aspect))).toEqual(new Set(['16:9', '1:1', '3:4', '9:16']));
@@ -52,4 +52,21 @@ test('an uploaded clip that replaces a fixture keeps its own size, and "use this
   expect(sixth).toMatchObject({ id: 'example-6', aspect: '16:9', width: 1920, height: 1080 });
   expect(sixth!.ratio).toBeUndefined();
   expect(examplesFor(new Set(['example-2.mp4']))[1]).toMatchObject({ aspect: '9:16', ratio: '9:16', width: 1088, height: 1920 });
+});
+
+test('an uploaded clip drops the fixture title and preset, and is named from its details file', () => {
+  const presets = [{ id: 'head-to-toe-shot', label: 'Quét từ chân lên đầu' }];
+  const ninth = examplesFor(new Set(['example-9.mp4']))[8]!;
+  expect(ninth).toMatchObject({ id: 'example-9', title: 'Video mẫu 9', presetId: '', fixture: false });
+  expect(exampleTitle(ninth, { presetId: 'head-to-toe-shot' }, presets)).toBe('Quét từ chân lên đầu');
+  expect(exampleTitle(ninth, { presetId: null }, presets)).toBe('Tự viết mô tả');
+  expect(exampleTitle(ninth, { presetId: 'gone' }, presets)).toBe('Tự viết mô tả');
+  expect(exampleTitle(ninth, undefined, presets)).toBe('Video mẫu 9');
+  expect(exampleTitle(EXAMPLES[8]!, undefined, null)).toBe('Bàn làm việc ngang'); // the fixture still stands for its preset
+});
+
+test('a preset borrows its fixture clip only while no uploaded clip has taken the name', () => {
+  expect(exampleForPreset('lifestyle-table', new Set())?.id).toBe('example-3');
+  expect(exampleForPreset('lifestyle-table', new Set(['example-3.mp4']))?.id).toBe('example-9');
+  expect(exampleForPreset('lifestyle-table', new Set(['example-3.mp4', 'example-9.mp4']))).toBeUndefined();
 });

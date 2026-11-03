@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
 import { exampleFrom } from '@/lib/reuse';
+import { BACKGROUNDS } from '@/lib/try-on-stock';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { Icon } from './Icon';
 import { useImageModels } from './image-tools';
@@ -81,6 +82,8 @@ export function SampleDetail({ names, index, onIndex }: { names: string[]; index
   );
   const apply = form?.apply;
   const backdrop = details?.background ? details.images.at(-1) : undefined;
+  // The picker's name for the same picture: the reference site's file sometimes shortens it ("Poolside").
+  const backdropLabel = BACKGROUNDS.find(([value]) => backdrop?.sample === `try-on-bg-${value}.jpg`)?.[1] ?? details?.background;
 
   return (
     <Modal open onClose={() => onIndex(null)} label={`Chi tiết: ${title}`} className="lightbox">
@@ -99,7 +102,7 @@ export function SampleDetail({ names, index, onIndex }: { names: string[]; index
             {chip(details.ratio, apply && (() => apply({ ratio: details.ratio })), 'Dùng tỉ lệ này')}
           </p>
         )}
-        {details?.background && <p className="job-chips">{chip(details.background, form?.photo && backdrop && (() => form.photo!(backdrop, 'background')), 'Dùng bối cảnh này')}</p>}
+        {details?.background && <p className="job-chips">{chip(backdropLabel!, form?.photo && backdrop && (() => form.photo!(backdrop, 'background')), 'Dùng bối cảnh này')}</p>}
         {details?.date && <p className="job-when">{fmtDate(details.date)}</p>}
         {note && (
           <p className="muted" role="status">
