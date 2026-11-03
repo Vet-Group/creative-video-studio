@@ -230,8 +230,8 @@ function ProviderBalances({ vertex }: { vertex: VertexCostsData | undefined }) {
                 <td>Replicate</td>
                 <td>
                   {data.replicate.credit
-                    ? `Còn $${data.replicate.credit.remainingUsd.toFixed(2)}${under(data.replicate.low)} · đã nạp $${Number(data.replicate.credit.creditUsd).toFixed(2)} lúc ${new Date(data.replicate.credit.since).toLocaleString('vi-VN')}, sổ cái đã ghi $${Number(data.replicate.credit.spentUsd).toFixed(2)}`
-                    : 'Chưa nhập số tiền đã nạp (Cài đặt). Replicate không có API số dư.'}
+                    ? `Còn $${data.replicate.credit.remainingUsd.toFixed(2)}${under(data.replicate.low)} · số dư nhập $${Number(data.replicate.credit.creditUsd).toFixed(2)} lúc ${new Date(data.replicate.credit.since).toLocaleString('vi-VN')}, sổ cái đã ghi $${Number(data.replicate.credit.spentUsd).toFixed(2)} từ đó`
+                    : 'Chưa nhập số dư Replicate (Cài đặt). Replicate không có API số dư.'}
                 </td>
                 <td>
                   <TopUp href={data.replicate.billingUrl} />

@@ -73,7 +73,8 @@ export async function GET(request: Request) {
 
 /**
  * Admin: change `monthlyCapUsd`, `memberDailyClipCap`, `featuresMonthlyCapUsd`, `memberDailyUsdCap`, `memberMonthlyUsdCap`, `balanceWarningUsd`,
- * `replicateCreditUsd` (null clears it; a new amount restarts its count now), `featureCaps` (a list of
+ * `replicateCreditUsd` (null clears it; a new amount restarts its count now), `replicateCreditRecount` (true restarts the count now even when the
+ * amount is unchanged, after a top-up), `featureCaps` (a list of
  * `{ feature, monthlyUsd }`), `models` (a list of `{ id, enabled }`) and/or `vertexAccounts` (a list of `{ projectId, creditTotal, creditCurrency,
  * creditExpiresOn, stopWhenCreditsEnd }`, total and date nullable). All or nothing. Changed caps are audited as settings.update, each changed
  * soft cap as feature_cap.update, each changed model as model.set_enabled and each changed Vertex account as vertex_account.update. Any model can
@@ -105,14 +106,16 @@ export async function PUT(request: Request) {
   }
   const replicateCredit = body.replicateCreditUsd == null ? null : money(body.replicateCreditUsd);
   if (body.replicateCreditUsd != null && replicateCredit === null) return bad('replicateCreditUsd must be an amount of 0 or more with at most 4 decimals, or null');
+  const recount = body.replicateCreditRecount;
+  if (recount !== undefined && typeof recount !== 'boolean') return bad('replicateCreditRecount must be true or false');
   if (monthlyCapUsd !== undefined && usd === null) return bad('monthlyCapUsd must be an amount of 0 or more with at most 4 decimals');
   if (memberDailyClipCap !== undefined && !(Number.isInteger(memberDailyClipCap) && (memberDailyClipCap as number) >= 0 && (memberDailyClipCap as number) <= 100_000)) {
     return bad('memberDailyClipCap must be a whole number of 0 or more');
   }
   const list = models === undefined ? [] : models;
   if (!Array.isArray(list) || list.some((m) => typeof m?.id !== 'string' || typeof m?.enabled !== 'boolean')) return bad('models must be a list of { id, enabled }');
-  if ([monthlyCapUsd, memberDailyClipCap, models, featureCaps, body.vertexAccounts, body.replicateCreditUsd, ...MEMBER_CAPS.map((k) => body[k])].every((v) => v === undefined)) {
-    return bad(`give at least one of monthlyCapUsd, memberDailyClipCap, ${MEMBER_CAPS.join(', ')}, replicateCreditUsd, featureCaps, models, vertexAccounts`);
+  if ([monthlyCapUsd, memberDailyClipCap, models, featureCaps, body.vertexAccounts, body.replicateCreditUsd, recount, ...MEMBER_CAPS.map((k) => body[k])].every((v) => v === undefined)) {
+    return bad(`give at least one of monthlyCapUsd, memberDailyClipCap, ${MEMBER_CAPS.join(', ')}, replicateCreditUsd, replicateCreditRecount, featureCaps, models, vertexAccounts`);
   }
   const features = [...new Set((softCaps as { feature: string }[]).map((c) => c.feature))];
   if (features.length !== softCaps.length) return bad('featureCaps must name each feature once');
@@ -145,16 +148,18 @@ export async function PUT(request: Request) {
           oldValue: Object.fromEntries(changed.map((k) => [k, oldCaps[k]])), newValue: Object.fromEntries(changed.map((k) => [k, memberCaps[k]])),
         });
       }
-      if (body.replicateCreditUsd !== undefined) {
+      if (body.replicateCreditUsd !== undefined || recount) {
         const old = (await tx.query('select replicate_credit_usd::text as usd, replicate_credit_since as since from settings where id = 1 for update')).rows[0];
-        if (old.usd === null ? replicateCredit !== null : replicateCredit === null || Number(old.usd) !== Number(replicateCredit)) {
-          // A new amount restarts the count: only ledger rows after this moment are taken off it.
+        const credit = body.replicateCreditUsd === undefined ? old.usd : replicateCredit;
+        const changed = old.usd === null ? credit !== null : credit === null || Number(old.usd) !== Number(credit);
+        // A new amount, or a recount asked for after a top-up, restarts the count: only spending after this moment is taken off it.
+        if (changed || (recount && credit !== null)) {
           const { since } = (
-            await tx.query('update settings set replicate_credit_usd = $1, replicate_credit_since = case when $1::numeric is null then null else now() end, updated_at = now() where id = 1 returning replicate_credit_since as since', [replicateCredit])
+            await tx.query('update settings set replicate_credit_usd = $1, replicate_credit_since = case when $1::numeric is null then null else now() end, updated_at = now() where id = 1 returning replicate_credit_since as since', [credit])
           ).rows[0];
           await audit(tx, {
             actorId, action: 'settings.update', target: 'settings:1',
-            oldValue: { replicateCreditUsd: old.usd, replicateCreditSince: old.since }, newValue: { replicateCreditUsd: replicateCredit, replicateCreditSince: since },
+            oldValue: { replicateCreditUsd: old.usd, replicateCreditSince: old.since }, newValue: { replicateCreditUsd: credit, replicateCreditSince: since },
           });
         }
       }

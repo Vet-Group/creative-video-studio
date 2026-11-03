@@ -43,7 +43,7 @@ if (real.vertexAccounts.length) {
 
 // The hourly Replicate guard (docs/ops/provider-balances.md): under 2 USD of Replicate credit its models go off and their fal twins on.
 const replicateTick = () =>
-  replicateGuard(pool).then(
+  replicateGuard(pool, Boolean(process.env.FAL_KEY)).then(
     (off) => off.length && console.log(`worker: replicate credit is low; turned off ${off.join(', ')}`),
     (e) => console.error('worker: replicate guard:', e instanceof Error ? e.message : e),
   );

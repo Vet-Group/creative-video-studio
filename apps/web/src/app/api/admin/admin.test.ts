@@ -402,12 +402,30 @@ describe('settings', () => {
     const second = await balances();
     expect(second.replicateCreditUsd).toBe('40.0000');
     expect(Date.parse(second.replicateCreditSince!)).toBeGreaterThan(Date.parse(first.replicateCreditSince!));
+
+    // After a top-up the balance may read the same again: a recount restarts the count with the amount unchanged, audited the same way.
+    const n2 = (await audits('settings:1')).length;
+    expect((await put({ replicateCreditUsd: '40', replicateCreditRecount: false })).status).toBe(200);
+    expect((await balances()).replicateCreditSince).toBe(second.replicateCreditSince);
+    expect((await put({ replicateCreditUsd: '40', replicateCreditRecount: true })).status).toBe(200);
+    const third = await balances();
+    expect(third.replicateCreditUsd).toBe('40.0000');
+    expect(Date.parse(third.replicateCreditSince!)).toBeGreaterThan(Date.parse(second.replicateCreditSince!));
+    expect((await audits('settings:1')).slice(n2)).toEqual([
+      {
+        actor_id: admin.id, action: 'settings.update',
+        old_value: { replicateCreditUsd: '40.0000', replicateCreditSince: second.replicateCreditSince }, new_value: { replicateCreditUsd: '40.0000', replicateCreditSince: third.replicateCreditSince },
+      },
+    ]);
+    expect((await put({ replicateCreditRecount: true })).status).toBe(200); // the recount alone keeps the stored amount
+    expect(Date.parse((await balances()).replicateCreditSince!)).toBeGreaterThan(Date.parse(third.replicateCreditSince!));
+
     expect((await put({ replicateCreditUsd: null })).status).toBe(200);
     expect(await balances()).toMatchObject({ replicateCreditUsd: null, replicateCreditSince: null });
     expect((await audits('settings:1')).at(-1)).toMatchObject({ old_value: { replicateCreditUsd: '40.0000' }, new_value: { replicateCreditUsd: null, replicateCreditSince: null } });
   });
 
-  test.each([{ balanceWarningUsd: -1 }, { balanceWarningUsd: null }, { balanceWarningUsd: 'low' }, { replicateCreditUsd: -5 }, { replicateCreditUsd: '1.23456' }, { replicateCreditUsd: 'lots' }])(
+  test.each([{ balanceWarningUsd: -1 }, { balanceWarningUsd: null }, { balanceWarningUsd: 'low' }, { replicateCreditUsd: -5 }, { replicateCreditUsd: '1.23456' }, { replicateCreditUsd: 'lots' }, { replicateCreditRecount: 'yes' }])(
     'refuses %j',
     async (body) => {
       expect((await put(body)).status).toBe(400);
