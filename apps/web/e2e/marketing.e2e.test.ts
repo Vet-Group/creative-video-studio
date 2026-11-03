@@ -29,6 +29,10 @@ test('a mock marketing job runs from two photos, a hook and a location, and show
   await expect(formats.getByRole('button', { name: /^(UGC Thử đồ|Nâng cao|Mở hộp|Đánh giá sản phẩm)/ })).toHaveCount(4);
   await expect(formats.getByRole('button', { name: 'UGC Thử đồ' })).toHaveAttribute('aria-pressed', 'true');
   await expect(formats.getByRole('button', { disabled: true })).toHaveCount(2);
+  // Without sample clips (as here), each card's name still sits inside its card, under a short placeholder.
+  for (const card of await formats.getByRole('button', { name: /^(UGC Thử đồ|Nâng cao)/ }).all()) {
+    expect(await card.evaluate((b) => b.querySelector('.choice-name')!.getBoundingClientRect().bottom <= b.getBoundingClientRect().bottom)).toBe(true);
+  }
   await formats.getByRole('button', { name: 'UGC Thử đồ' }).click();
   await expect(formats).toBeHidden();
   await expect(page.locator('.slot')).toHaveCount(2);

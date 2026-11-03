@@ -761,7 +761,7 @@ td code { white-space: pre-wrap; overflow-wrap: anywhere; }
   .admin .mobile-records thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
   .admin .mobile-records tbody { display: block; }
   .admin .mobile-records tr { display: grid; padding: 12px 0; border-bottom: 1px solid var(--border); }
-  .admin .mobile-records td { display: block; min-width: 0; padding: 8px 12px; border: 0; white-space: normal; overflow-wrap: anywhere; }
+  .admin .mobile-records td { display: block; width: auto; min-width: 0; padding: 8px 12px; border: 0; white-space: normal; overflow-wrap: anywhere; }
   .admin .mobile-records td::before { display: block; margin-bottom: 6px; color: var(--text-subtle); font-size: 12px; content: attr(data-label); }
   .admin .mobile-records input:not([type='checkbox']) { width: 100%; }
   .admin .mobile-records .changes { min-width: 0; }
@@ -1012,6 +1012,7 @@ dialog.admin-modal { width: min(36rem, calc(100vw - 2rem)); }
 .preset-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; max-height: min(620px, calc(100vh - 250px)); scrollbar-width: thin; margin: 0; padding: 4px; overflow-y: auto; list-style: none; }
 .preset-card { position: relative; display: grid; align-content: start; gap: 6px; }
 .preset-card > :first-child { border-radius: 8px; }
+.preset-card > .banner-empty { height: auto; aspect-ratio: 3 / 4; }
 .preset-card button { padding: 0; border: 0; background: transparent; color: var(--ink); font-size: 13px; line-height: 18px; font-weight: 600; text-align: left; }
 .preset-card:has(> button[aria-pressed='true']) > :first-child { outline: 2px solid var(--ink-strong); outline-offset: 2px; }
 @media (min-width: 768px) {
@@ -1800,6 +1801,7 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .choice-grid:has(button > :is(video, img)) button:not(:has(> video, > img))[aria-selected='true']::after { content: '\2713'; position: absolute; top: 8px; right: 8px; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--ink-strong); color: var(--on-ink); font-size: 12px; line-height: 1; }
 /* A member's own hook or location has no sample: among sample cards it is the light tile with its name. */
 .choice-grid:has(button > :is(video, img)) button > .banner-empty { display: none; }
+.choice-grid:not(:has(button > :is(video, img))) button > .banner-empty { height: auto; aspect-ratio: 16 / 9; margin-bottom: 6px; border-radius: 6px; }
 /* The often-used group, then the rest: each group's title spans the grid, its cards stay in the grid's columns. */
 .choice-group { display: contents; }
 .choice-group-title { grid-column: 1 / -1; margin: 4px 0 0; color: var(--text-sub); font-size: 13px; line-height: 18px; font-weight: 600; }
