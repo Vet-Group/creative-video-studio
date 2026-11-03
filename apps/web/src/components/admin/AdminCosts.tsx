@@ -150,11 +150,15 @@ const VERTEX_ERROR: Record<string, (project: string) => string> = {
   failed: (p) => `Không đọc được billing của ${p}.`,
 };
 
-/** One short sentence per Vertex read error; Google's raw answer stays in the tooltip instead of the page. */
+/** One short sentence per Vertex read error; Google's raw answer sits folded under "Chi tiết", so touch screens and keyboards can open it too. */
 export const VertexError = ({ projectId, reason, message }: { projectId: string; reason: string; message: string }) => (
-  <p className="error" title={message.slice(0, 500)}>
-    {(VERTEX_ERROR[reason] ?? VERTEX_ERROR.failed!)(projectId)}
-  </p>
+  <>
+    <p className="error">{(VERTEX_ERROR[reason] ?? VERTEX_ERROR.failed!)(projectId)}</p>
+    <details className="raw">
+      <summary>Chi tiết</summary>
+      <pre>{message.slice(0, 500)}</pre>
+    </details>
+  </>
 );
 const usd4 = (n: number | null) => (n === null ? '—' : `$${n.toFixed(4)}`);
 const credits = (n: number | null, currency: string) => (n === null ? '—' : `${n.toLocaleString('vi-VN', { maximumFractionDigits: 2 })} ${currency}`);
