@@ -76,7 +76,13 @@ test('Explore starts from what you need, and the drawer on a phone shows each to
   await expect(drawer.locator('.nav-hint').filter({ hasText: 'Công cụ một việc' })).toBeVisible();
   await drawer.getByRole('button', { name: 'Chọn công cụ nào?' }).click();
   await expect(drawer).toHaveCount(0); // the drawer gives way to the guide
-  await expect(page.getByRole('dialog', { name: 'Chọn công cụ nào?' })).toBeVisible();
+  const guide = page.getByRole('dialog', { name: 'Chọn công cụ nào?' });
+  await expect(guide).toBeVisible();
+  // On a phone the comparison is one card per tool, each line labelled, with nothing to scroll sideways.
+  const compare = guide.locator('.tool-compare-wrap');
+  await compare.scrollIntoViewIfNeeded();
+  expect(await compare.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+  expect(await guide.getByRole('cell').first().evaluate((el) => getComputedStyle(el, '::before').content)).toBe('"Bạn đưa vào: "');
   await page.keyboard.press('Escape');
   await page.goto('/try-on');
   await expect(page.getByRole('complementary', { name: 'Khi nào dùng Thử đồ' })).toBeVisible();

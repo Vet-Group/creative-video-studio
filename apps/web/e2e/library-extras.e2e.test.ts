@@ -23,6 +23,7 @@ test('the Library date presets: today, the last 7 or 30 days, or one day picked 
   const calendar = page.getByLabel('Ngày cụ thể');
   await calendar.fill('2026-01-01');
   await expect(page.getByText('Chưa có clip nào khớp bộ lọc.')).toBeVisible();
+  await expect(day.locator('option:checked')).toHaveText('01/01/2026'); // the picked day shows in the preset field itself
   await page.locator('.library-empty').getByRole('button', { name: 'Xoá lọc' }).click();
   await expect(day).toHaveValue('');
   await expect(calendar).toHaveCount(0);
@@ -67,11 +68,14 @@ test('a first visit to Explore shows the three steps, which open the guide and s
   await page.goto('/explore');
   const card = page.getByRole('region', { name: 'Bắt đầu trong 3 bước' });
   await expect(card.getByRole('listitem')).toHaveCount(3);
+  const firstLine = page.getByText('Bạn chưa tạo clip hay ảnh nào');
+  await expect(firstLine).toBeHidden(); // the card already says it
   await card.getByRole('button', { name: 'Chọn công cụ nào?' }).click();
   await expect(page.getByRole('dialog', { name: 'Chọn công cụ nào?' })).toBeVisible();
   await page.keyboard.press('Escape');
   await card.getByRole('button', { name: 'Đã hiểu, ẩn hướng dẫn' }).click();
   await expect(card).toHaveCount(0);
+  await expect(firstLine).toBeVisible();
   await page.reload();
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
   await expect(page.getByRole('region', { name: 'Bắt đầu trong 3 bước' })).toHaveCount(0);
