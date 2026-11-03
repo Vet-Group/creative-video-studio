@@ -164,7 +164,7 @@ test('the Library item detail shows the result large with its words, inputs and 
   const detail = page.getByRole('dialog', { name: 'Chi tiết: Tạo ảnh' });
   await expect(detail.getByText('second detail shot')).toBeVisible(); // newest first
   await expect(detail.getByRole('img', { name: 'detail-in.png' })).toBeVisible();
-  await expect(detail.locator('.job-chips span')).toHaveText(['1K', '3:4']);
+  await expect(detail.getByRole('definition').filter({ hasText: /^(1K|3:4)$/ })).toHaveText(['3:4', '1K']); // how it was made
   await expect(detail.getByRole('link', { name: 'Dùng lại' })).toHaveAttribute('href', `/image-generation?reuse=${ids[1]}`);
   await expect(detail.getByRole('link', { name: 'Mở trong tab mới' })).toHaveAttribute('href', /^\/api\/assets\/.+\/content$/);
 

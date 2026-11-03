@@ -173,9 +173,10 @@ test('Library views: grid or list remembered, a selection bar with the zip, sear
 
 test('Library detail: how an item was made for anyone, marks by keyboard, ←/→ between items, bulk marks that skip the items of others, the unmarked count and no tray', async ({ page, browser }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
-  const image = async (p: typeof page, prompt: string) => {
+  // Free-prompt clips on the mock video model, which the other Library specs already mark Pass: a mark stays after its job is deleted and moves the Recommended badge.
+  const clip = async (p: typeof page, prompt: string) => {
     const up = (await (await p.request.post('/api/assets', { multipart: { file: { name: 'recipe.png', mimeType: 'image/png', buffer: png() } } })).json()) as { assets: { id: string }[] };
-    const res = await p.request.post('/api/jobs', { data: { feature: 'image', modelId: 'mock-image-e2e', assetIds: [up.assets[0]!.id], ratio: '3:4', prompt, enhance: false, params: { resolution: '1K' } } });
+    const res = await p.request.post('/api/jobs', { data: { assetIds: [up.assets[0]!.id], modelId: 'mock-e2e', prompt, enhance: false, ratio: '9:16', durationSec: 5 } });
     expect(res.status()).toBe(201);
     return ((await res.json()) as { id: string }).id;
   };
@@ -183,10 +184,10 @@ test('Library detail: how an item was made for anyone, marks by keyboard, ←/�
     expect.poll(async () => ((await (await p.request.get('/api/jobs?mine')).json()) as { jobs: { id: string; status: string }[] }).jobs.filter((j) => ids.includes(j.id) && j.status === 'succeeded').length, { timeout: 60_000 }).toBe(ids.length);
   const other = await (await browser.newContext()).newPage();
   await signIn(other, 'librb');
-  const theirs = await image(other, 'words of member B');
+  const theirs = await clip(other, 'words of member B');
   await signIn(page, 'libra');
-  const older = await image(page, 'recipe words one');
-  const newer = await image(page, 'recipe words two');
+  const older = await clip(page, 'recipe words one');
+  const newer = await clip(page, 'recipe words two');
   await done(other, [theirs]);
   await done(page, [older, newer]);
 
@@ -203,7 +204,8 @@ test('Library detail: how an item was made for anyone, marks by keyboard, ←/�
   // Another member's item: its prompt, model and settings are open to everyone, its marks are not.
   await item(theirs).getByRole('button', { name: 'Xem chi tiết' }).click();
   await expect(detail.getByText('words of member B', { exact: true })).toBeVisible();
-  await expect(recipe.filter({ hasText: /^Mock image E2E$/ })).toHaveCount(1);
+  await expect(recipe.filter({ hasText: /^Mock E2E$/ })).toHaveCount(1);
+  await expect(recipe.filter({ hasText: /^5 giây$/ })).toHaveCount(1);
   await expect(recipe.filter({ hasText: /^E2E Library Recipe B · / })).toHaveCount(1);
   await expect(detail.getByRole('button', { name: 'Đạt', exact: true })).toHaveCount(0);
   await page.keyboard.press('Escape');
@@ -246,6 +248,9 @@ test('Library detail: how an item was made for anyone, marks by keyboard, ←/�
   await bulk.getByRole('button', { name: 'Không đạt', exact: true }).click();
   await expect(item(older).getByTitle('Kết quả: Không đạt · Nhấp nháy hoặc giật hình', { exact: true })).toBeVisible();
   await expect.poll(unmarked).toBe(before - 2); // a changed mark is not a first one
+  // End on Pass, as the other Library specs leave this model.
+  await bulk.getByRole('button', { name: 'Đạt', exact: true }).click();
+  await expect(item(older).getByTitle('Kết quả: Đạt', { exact: true })).toBeVisible();
 
   // Leave nothing behind for the other specs that read the shared Library.
   for (const id of [newer, older]) expect((await page.request.delete(`/api/jobs/${id}`)).ok()).toBe(true);
