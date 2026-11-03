@@ -1,13 +1,14 @@
 // What every form's Run goes through: a confirm before a costly job, and Ctrl+Enter (Cmd+Enter) in the prompt.
 import type { KeyboardEvent } from 'react';
+import { confirmDialog } from '@/components/Confirm';
 
 /** A Run whose button shows this many USD or more asks first. */
 export const RUN_CONFIRM_USD = 1;
 
 /** True when the Run may go: the price is unknown or under RUN_CONFIRM_USD, or the member said yes. */
-export function confirmRun(usd: string | number | null | undefined, text?: string): boolean {
+export async function confirmRun(usd: string | number | null | undefined, text?: string): Promise<boolean> {
   if (usd === null || usd === undefined || !(Number(usd) >= RUN_CONFIRM_USD)) return true;
-  return window.confirm(text ?? `Chạy job này với giá $${usd}?`);
+  return confirmDialog({ title: text ?? `Chạy job này với giá $${usd}?`, confirmLabel: 'Tiếp tục' });
 }
 
 type RunKeyEvent = Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'metaKey' | 'repeat' | 'preventDefault'> & { nativeEvent: { isComposing: boolean } };

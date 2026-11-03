@@ -12,7 +12,7 @@ interface Preset {
   sortOrder: number;
 }
 
-function PresetRow({ preset, run }: { preset: Preset; run: ReturnType<typeof useAction>['run'] }) {
+function PresetRow({ preset, run, pending }: { preset: Preset; run: ReturnType<typeof useAction>['run']; pending: boolean }) {
   const [label, setLabel] = useState(preset.label);
   const [prompt, setPrompt] = useState(preset.prompt);
   const [sortOrder, setSortOrder] = useState(String(preset.sortOrder));
@@ -37,7 +37,7 @@ function PresetRow({ preset, run }: { preset: Preset; run: ReturnType<typeof use
       <td data-label="Thao tác">
         <button
           type="button"
-          disabled={!label.trim() || !prompt.trim() || sortOrder.trim() === '' || !Number.isInteger(order)}
+          disabled={pending || !label.trim() || !prompt.trim() || sortOrder.trim() === '' || !Number.isInteger(order)}
           onClick={() => void run(() => api(`/api/admin/presets/${preset.id}`, sendJson('PATCH', { label, prompt, sortOrder: order, enabled })), 'Không lưu được mẫu.')}
         >
           Lưu
@@ -49,7 +49,7 @@ function PresetRow({ preset, run }: { preset: Preset; run: ReturnType<typeof use
 
 export function AdminPresets() {
   const { data, failed, reload } = useFetch<{ presets: Preset[] }>('/api/admin/presets');
-  const { problem, run } = useAction(reload);
+  const { problem, pending, run } = useAction(reload);
   return (
     <section aria-labelledby="presets-title">
       <PageHead id="presets-title" title="Mẫu chuyển động" lead="Các mẫu người dùng chọn ở trang Tạo video. Mô tả nên viết bằng tiếng Anh vì mô hình hiểu tốt nhất tiếng Anh." />
@@ -76,7 +76,7 @@ export function AdminPresets() {
             </thead>
             <tbody>
               {data.presets.map((p) => (
-                <PresetRow key={p.id} preset={p} run={run} />
+                <PresetRow key={p.id} preset={p} run={run} pending={pending} />
               ))}
             </tbody>
           </table>

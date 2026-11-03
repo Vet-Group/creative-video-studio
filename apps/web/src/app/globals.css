@@ -1042,6 +1042,14 @@ dialog.modal { position: fixed; width: min(45rem, calc(100vw - 2rem)); max-heigh
   .lightbox-step { top: 25dvh; transform: none; } /* over the picture, clear of the marks below */
 }
 dialog.modal::backdrop { background: rgb(var(--shade) / .5); }
+/* The in-app confirm: a short question, a cancel button and the action; a destructive action's button is red in both themes. */
+dialog.modal.confirm { width: min(26rem, calc(100vw - 2rem)); }
+.confirm .modal-body { padding: 24px; }
+.confirm h2 { margin: 0 32px 8px 0; font-size: 18px; line-height: 26px; font-weight: 600; }
+.confirm p { margin: 0; color: var(--text-sub); font-size: 14px; line-height: 20px; }
+.confirm .actions { justify-content: flex-end; margin-top: 20px; }
+.confirm .actions .primary { margin-top: 0; }
+.confirm button.primary.danger, .confirm button.primary.danger:hover:not(:disabled) { border-color: var(--danger); background: var(--danger); color: var(--surface); }
 .modal-close { position: absolute; top: 18px; right: 18px; z-index: 3; display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; background: transparent; font-size: 24px; line-height: 1; }
 /* A picker's header: the title, a grey line under it and a rule across the dialog. */
 .modal-body:has(> .modal-sub) { padding: 24px; }

@@ -99,7 +99,7 @@ function Breakdown({ title, groups, label }: { title: string; groups: Group[]; l
   );
 }
 
-function InvoiceForm({ provider, month, invoice, run }: { provider: string; month: string; invoice?: Invoice; run: ReturnType<typeof useAction>['run'] }) {
+function InvoiceForm({ provider, month, invoice, run, pending }: { provider: string; month: string; invoice?: Invoice; run: ReturnType<typeof useAction>['run']; pending: boolean }) {
   const [total, setTotal] = useState(invoice ? invoice.totalUsd : '');
   return (
     <li>
@@ -110,7 +110,7 @@ function InvoiceForm({ provider, month, invoice, run }: { provider: string; mont
         </label>
         <button
           type="button"
-          disabled={total.trim() === ''}
+          disabled={pending || total.trim() === ''}
           onClick={() => void run(() => api('/api/admin/invoices', sendJson('PUT', { month, provider, totalUsd: total.trim() })), 'Không ghi được hóa đơn.')}
         >
           Ghi hóa đơn {provider}
@@ -371,7 +371,7 @@ function VertexCosts({ month, data, failed }: { month: string; data: VertexCosts
 }
 
 function CostsBody({ data, reload }: { data: Costs; reload: () => void }) {
-  const { problem, run } = useAction(reload);
+  const { problem, pending, run } = useAction(reload);
   const [rate, setRate] = useState(data.rateVndPerUsd ?? '');
   const [adjustUsd, setAdjustUsd] = useState('');
   const [note, setNote] = useState('');
@@ -431,7 +431,7 @@ function CostsBody({ data, reload }: { data: Costs; reload: () => void }) {
           Tỉ giá VND/USD của tháng {month}
           <input inputMode="decimal" value={rate} onChange={(e) => setRate(e.target.value)} />
         </label>
-        <button type="button" disabled={rate.trim() === ''} onClick={() => void run(() => api(`/api/admin/rates/${month}`, sendJson('PUT', { vndPerUsd: rate.trim() })), 'Không lưu được tỉ giá.')}>
+        <button type="button" disabled={pending || rate.trim() === ''} onClick={() => void run(() => api(`/api/admin/rates/${month}`, sendJson('PUT', { vndPerUsd: rate.trim() })), 'Không lưu được tỉ giá.')}>
           Lưu tỉ giá
         </button>
       </div>
@@ -469,7 +469,7 @@ function CostsBody({ data, reload }: { data: Costs; reload: () => void }) {
               Ghi chú (bắt buộc)
               <input value={note} onChange={(e) => setNote(e.target.value)} />
             </label>
-            <button type="button" disabled={adjustUsd.trim() === '' || note.trim() === ''} onClick={() => void adjust()}>
+            <button type="button" disabled={pending || adjustUsd.trim() === '' || note.trim() === ''} onClick={() => void adjust()}>
               Thêm điều chỉnh
             </button>
           </div>
@@ -480,7 +480,7 @@ function CostsBody({ data, reload }: { data: Costs; reload: () => void }) {
           <p className="muted">Nhập tổng hóa đơn của tháng; hệ thống ghi phần chênh lệch với sổ cái. Lệch quá 5% được tô đỏ.</p>
           <ul className="invoices">
             {PROVIDERS.map((p) => (
-              <InvoiceForm key={p} provider={p} month={month} invoice={data.invoices.find((i) => i.provider === p)} run={run} />
+              <InvoiceForm key={p} provider={p} month={month} invoice={data.invoices.find((i) => i.provider === p)} run={run} pending={pending} />
             ))}
           </ul>
         </section>

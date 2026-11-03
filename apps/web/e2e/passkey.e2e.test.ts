@@ -46,7 +46,21 @@ test('a member adds a passkey, signs in with it, sees it marked as used last, an
 
   await signIn(page, 'passa');
   await page.goto('/account/sign-in-methods');
-  await page.getByRole('button', { name: /^Xoá passkey ngày / }).click();
+  // A delete asks first, with focus on the cancel button; cancel and Esc keep the passkey.
+  const remove = page.getByRole('button', { name: /^Xoá passkey ngày / });
+  const confirm = page.getByRole('dialog', { name: /^Xoá passkey ngày .+\?$/ });
+  await remove.click();
+  await expect(confirm.getByRole('button', { name: 'Huỷ', exact: true })).toBeFocused();
+  await confirm.getByRole('button', { name: 'Huỷ', exact: true }).click();
+  await expect(confirm).toBeHidden();
+  await remove.click();
+  await expect(confirm).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(confirm).toBeHidden();
+  await page.reload();
+  await expect(page.getByText(/^Thêm ngày /)).toHaveCount(1);
+  await remove.click();
+  await confirm.getByRole('button', { name: 'Xoá', exact: true }).click();
   await expect(page.getByText(/^Thêm ngày /)).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Thêm passkey' })).toBeEnabled();
 });

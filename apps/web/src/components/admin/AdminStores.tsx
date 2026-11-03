@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { confirmDialog } from '@/components/Confirm';
 import { api, sendJson } from '@/lib/api';
 import { useAction, useFetch } from '@/lib/admin-ui';
 import { Empty, PageHead } from './PageHead';
@@ -12,13 +13,13 @@ interface Store {
   hasCost: boolean;
 }
 
-function StoreRow({ store, run }: { store: Store; run: ReturnType<typeof useAction>['run'] }) {
+function StoreRow({ store, run, pending }: { store: Store; run: ReturnType<typeof useAction>['run']; pending: boolean }) {
   const [name, setName] = useState(store.name);
   const [code, setCode] = useState(store.code);
   const patch = (body: Record<string, unknown>, fallback: string) => run(() => api(`/api/admin/stores/${store.id}`, sendJson('PATCH', body)), fallback);
-  function save() {
+  async function save() {
     // Costs point at the store by id, so they stay with it; only what is written from now on carries the new code.
-    if (store.hasCost && code.trim() !== store.code && !window.confirm('Cửa hàng này đã có chi phí. Báo cáo và CSV từ giờ dùng mã mới; file đã xuất trước đó vẫn mang mã cũ. Đổi mã?')) return;
+    if (store.hasCost && code.trim() !== store.code && !(await confirmDialog({ title: 'Đổi mã cửa hàng?', body: 'Cửa hàng này đã có chi phí. Báo cáo và CSV từ giờ dùng mã mới; file đã xuất trước đó vẫn mang mã cũ.', confirmLabel: 'Đổi mã' }))) return;
     void patch({ name, code }, 'Không lưu được cửa hàng.');
   }
   return (
@@ -32,10 +33,10 @@ function StoreRow({ store, run }: { store: Store; run: ReturnType<typeof useActi
       </td>
       <td data-label="Thao tác">
         <div className="actions">
-          <button type="button" disabled={!name.trim() || !code.trim()} onClick={save}>
+          <button type="button" disabled={pending || !name.trim() || !code.trim()} onClick={() => void save()}>
             Lưu
           </button>
-          <button type="button" onClick={() => void patch({ hidden: !store.hidden }, 'Không đổi được trạng thái ẩn.')}>
+          <button type="button" disabled={pending} onClick={() => void patch({ hidden: !store.hidden }, 'Không đổi được trạng thái ẩn.')}>
             {store.hidden ? 'Hiện lại' : 'Ẩn'}
           </button>
         </div>
@@ -46,7 +47,7 @@ function StoreRow({ store, run }: { store: Store; run: ReturnType<typeof useActi
 
 export function AdminStores() {
   const { data, failed, reload } = useFetch<{ stores: Store[] }>('/api/admin/stores?includeHidden=1');
-  const { problem, run } = useAction(reload);
+  const { problem, pending, run } = useAction(reload);
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
 
@@ -81,7 +82,7 @@ export function AdminStores() {
             Mã cửa hàng (store_id của POD Studio)
             <input value={code} onChange={(e) => setCode(e.target.value)} />
           </label>
-          <button type="button" className="primary" disabled={!name.trim() || !code.trim()} onClick={() => void create()}>
+          <button type="button" className="primary" disabled={pending || !name.trim() || !code.trim()} onClick={() => void create()}>
             Tạo cửa hàng
           </button>
         </div>
@@ -106,7 +107,7 @@ export function AdminStores() {
             </thead>
             <tbody>
               {data.stores.map((s) => (
-                <StoreRow key={s.id} store={s} run={run} />
+                <StoreRow key={s.id} store={s} run={run} pending={pending} />
               ))}
             </tbody>
           </table>

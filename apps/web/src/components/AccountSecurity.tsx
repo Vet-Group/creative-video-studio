@@ -5,6 +5,7 @@ import { encode } from 'uqr';
 import { changeFailure, deviceLabel, PASSWORD_LENGTH, passwordProblem, SESSIONS_SHOWN, sessionTime, visibleSessions } from '@/lib/account-security';
 import { api, sendJson } from '@/lib/api';
 import { backupCodesText, manualSecret, twoFactorCall, twoFactorFailure } from '@/lib/two-factor';
+import { confirmDialog } from './Confirm';
 import { Icon } from './Icon';
 
 /** The caller's session as GET /api/me/sessions lists it. */
@@ -163,7 +164,13 @@ export function Sessions() {
       )}
       {others > 0 ? (
         <div className="actions">
-          <button type="button" disabled={busy} onClick={() => void revoke()}>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={async () => {
+              if (await confirmDialog({ title: 'Đăng xuất các thiết bị khác?', body: 'Mọi thiết bị khác đang đăng nhập tài khoản này sẽ phải đăng nhập lại.', confirmLabel: 'Đăng xuất', danger: true })) void revoke();
+            }}
+          >
             Đăng xuất các thiết bị khác
           </button>
         </div>

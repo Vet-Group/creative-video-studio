@@ -6,6 +6,7 @@ import { ApiError, api, sendJson } from '@/lib/api';
 import { addPasskey, cancelled } from '@/lib/passkey';
 import { authErrorText, METHOD_LABEL, type PasskeyItem, passkeyDate, providerLabel, type SignInMethod } from '@/lib/sign-in-methods';
 import { useHydrated } from '@/lib/use-hydrated';
+import { confirmDialog } from './Confirm';
 import { Icon } from './Icon';
 
 const PAGE = '/account/sign-in-methods';
@@ -41,6 +42,7 @@ export function SignInMethods({
   }
 
   async function remove(p: PasskeyItem) {
+    if (!(await confirmDialog({ title: `Xoá passkey ngày ${passkeyDate(p.createdAt)}?`, body: 'Thiết bị giữ passkey này sẽ không đăng nhập bằng nó được nữa.', confirmLabel: 'Xoá', danger: true }))) return;
     setProblem('');
     try {
       await api('/api/auth/passkey/delete-passkey', sendJson('POST', { id: p.id }));
@@ -62,6 +64,7 @@ export function SignInMethods({
   }
 
   async function unlink(m: SignInMethod) {
+    if (!(await confirmDialog({ title: `Huỷ liên kết ${providerLabel(m.provider)}?`, body: 'Bạn sẽ không đăng nhập bằng cách này được nữa cho đến khi liên kết lại.', confirmLabel: 'Huỷ liên kết', danger: true }))) return;
     setProblem('');
     try {
       await api('/api/auth/unlink-account', sendJson('POST', { accountId: m.id }));

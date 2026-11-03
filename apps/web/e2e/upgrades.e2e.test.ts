@@ -22,9 +22,12 @@ async function priceImages(page: Page, usd: string) {
   });
 }
 
-/** The answer of the next dialog, after checking its text. */
-function nextDialog(page: Page, accept: boolean): Promise<string> {
-  return new Promise((resolve) => page.once('dialog', (d) => (resolve(d.message()), void (accept ? d.accept() : d.dismiss()))));
+/** Answers the in-app confirm that asks `question`, yes or no. */
+async function answer(page: Page, question: string, yes: boolean) {
+  const confirm = page.getByRole('dialog', { name: question });
+  await expect(confirm).toBeVisible();
+  await confirm.getByRole('button', { name: yes ? 'Tiếp tục' : 'Huỷ', exact: true }).click();
+  await expect(confirm).toBeHidden();
 }
 
 const bar = (page: Page) => page.getByRole('group', { name: 'Thanh tạo ảnh' });
@@ -41,28 +44,24 @@ test('AC 11: Image Generation asks before a Run of 1 USD or more; No sends nothi
   await barPrompt(page).fill('a guarded picture');
   await expect(barRun(page)).toContainText('$1.2000');
 
-  let asked = nextDialog(page, false);
   await barRun(page).click();
-  expect(await asked).toBe('Chạy job này với giá $1.2000?');
+  await answer(page, 'Chạy job này với giá $1.2000?', false);
   await expect(barRun(page)).toBeEnabled();
   expect(posts()).toBe(0);
 
-  asked = nextDialog(page, true);
   await barRun(page).click();
-  expect(await asked).toBe('Chạy job này với giá $1.2000?');
+  await answer(page, 'Chạy job này với giá $1.2000?', true);
   await expect(page.getByText('Đã gửi job')).toBeVisible();
   expect(posts()).toBe(1);
 
   await priceImages(page, '0.5000');
   await page.reload();
-  let dialogs = 0;
-  page.on('dialog', (d) => (dialogs++, void d.dismiss()));
   await barPrompt(page).fill('a cheap picture');
   await expect(barRun(page)).toContainText('$0.5000');
   await barRun(page).click();
   await expect(page.getByText('Đã gửi job')).toBeVisible();
   expect(posts()).toBe(2);
-  expect(dialogs, 'no question under 1 USD').toBe(0);
+  await expect(page.locator('dialog.confirm[open]'), 'no question under 1 USD').toHaveCount(0);
   await page.unrouteAll({ behavior: 'ignoreErrors' }); // the list refetched after a Run may still be in flight
 });
 
@@ -79,14 +78,41 @@ test("AC 11: Thử lại on a failed job of 1 USD or more asks with the job's pr
   await page.goto('/image-generation');
   await page.getByRole('tab', { name: 'Lịch sử' }).click();
   const card = page.getByRole('complementary', { name: 'Job của tôi' }).getByRole('listitem').filter({ hasText: 'a costly retry' });
-  let asked = nextDialog(page, false);
   await card.getByRole('button', { name: 'Thử lại' }).click();
-  expect(await asked).toBe('Thử lại job này với giá khoảng $3.0000?');
+  await answer(page, 'Thử lại job này với giá khoảng $3.0000?', false);
   expect(retried).toBe(0);
-  asked = nextDialog(page, true);
   await card.getByRole('button', { name: 'Thử lại' }).click();
-  await asked;
+  await answer(page, 'Thử lại job này với giá khoảng $3.0000?', true);
   await expect.poll(() => retried).toBe(1);
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
+});
+
+test('Thử lại is disabled while the retry is sent, so a double click sends one job', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await signIn(page, 'upgd');
+  const failed = {
+    id: 'retry-cheap', status: 'failed', error: null, isMock: false, feature: 'image', ratio: '1:1', durationSec: 0, resolution: '1K', modelId: 'mock-image-e2e', retryOf: null, retried: false,
+    outputAssetId: null, posterAssetId: null, createdAt: new Date().toISOString(), finishedAt: new Date().toISOString(), text: 'a cheap retry', inputAssetIds: [], garments: null, format: null, favorite: false, estimateUsd: '0.5000',
+  };
+  await page.route(/\/api\/jobs\?mine/, async (r) => r.fulfill({ json: { ...((await (await r.fetch()).json()) as object), jobs: [failed] } }));
+  let release = () => {};
+  const held = new Promise<void>((resolve) => (release = resolve));
+  let retried = 0;
+  await page.route('**/api/jobs', async (r) => {
+    if (r.request().method() !== 'POST') return r.fallback();
+    retried++;
+    await held; // the answer waits until the button has been checked
+    return r.fulfill({ status: 201, json: { id: 'retry-3', status: 'queued' } });
+  });
+  await page.goto('/image-generation');
+  await page.getByRole('tab', { name: 'Lịch sử' }).click();
+  const retry = page.getByRole('complementary', { name: 'Job của tôi' }).getByRole('listitem').filter({ hasText: 'a cheap retry' }).getByRole('button', { name: 'Thử lại' });
+  await retry.dblclick();
+  await expect(retry).toBeDisabled();
+  await expect.poll(() => retried).toBe(1);
+  release();
+  await expect(retry).toBeEnabled(); // the mocked list still shows the job as not retried
+  expect(retried).toBe(1);
   await page.unrouteAll({ behavior: 'ignoreErrors' });
 });
 
@@ -104,13 +130,11 @@ test('AC 11: Create asks with the price its Run button shows', async ({ page }) 
   const run = page.getByRole('button', { name: /^Tạo video/ });
   await expect(run).toContainText('$1.5000');
 
-  let asked = nextDialog(page, false);
   await run.click();
-  expect(await asked).toBe('Chạy job này với giá $1.5000?');
+  await answer(page, 'Chạy job này với giá $1.5000?', false);
   expect(posts()).toBe(0);
-  asked = nextDialog(page, true);
   await run.click();
-  expect(await asked).toBe('Chạy job này với giá $1.5000?');
+  await answer(page, 'Chạy job này với giá $1.5000?', true);
   await expect(page.getByText('Đã gửi job')).toBeVisible();
   expect(posts()).toBe(1);
   await page.unrouteAll({ behavior: 'ignoreErrors' });
@@ -136,9 +160,8 @@ test('AC 12: Ctrl+Enter in the prompt runs once, Enter alone does not, and at 1.
   await page.reload();
   await barPrompt(page).fill('keyboard costly picture');
   await expect(barRun(page)).toContainText('$1.2000');
-  const asked = nextDialog(page, false);
   await barPrompt(page).press('Control+Enter');
-  expect(await asked).toBe('Chạy job này với giá $1.2000?');
+  await answer(page, 'Chạy job này với giá $1.2000?', false);
   expect(posts()).toBe(1);
   await page.unrouteAll({ behavior: 'ignoreErrors' });
 });

@@ -9,6 +9,7 @@ import { api, errorText, sendJson } from '@/lib/api';
 import { ADVANCED_MAX_IMAGES, ADVANCED_MAX_SCRIPT, advancedPrompt, briefRoom, HOOKS, LOCATIONS, MAX_CHOICE_DESC, MAX_CHOICE_NAME, MAX_CHOICE_PHRASE, type MarketingChoice, marketingPrompt } from '@/lib/marketing';
 import { promptTooLong } from '@/lib/prompt-limit';
 import { confirmRun } from '@/lib/run-guard';
+import { confirmDialog } from './Confirm';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { useRecall } from '@/lib/use-recall';
 import { useSamples } from '@/lib/use-samples';
@@ -528,7 +529,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
     else (setLocation(c.id), setPicker(null));
   }
   async function removeChoice(c: Choice) {
-    if (!window.confirm(`Xoá "${c.name}"?`)) return;
+    if (!(await confirmDialog({ title: `Xoá "${c.name}"?`, confirmLabel: 'Xoá', danger: true }))) return;
     try {
       await api(`/api/choices/${encodeURIComponent(c.id)}`, { method: 'DELETE' });
       await loadChoices();
@@ -641,7 +642,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
   /** One job per hook variant, sent one after another (the API takes one job per POST); a refused variant does not stop the rest. */
   async function run() {
     // One question: the variants one when there are several, else the price one from 1 USD.
-    if (!(n > 1 ? window.confirm(`Tạo ${n} clip, mỗi hook một clip, tổng $${total}?`) : confirmRun(total))) return;
+    if (!(await (n > 1 ? confirmDialog({ title: `Tạo ${n} clip, mỗi hook một clip, tổng $${total}?`, confirmLabel: 'Tiếp tục' }) : confirmRun(total)))) return;
     setBusy(true);
     setError('');
     setNotice('');

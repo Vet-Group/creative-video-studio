@@ -12,6 +12,7 @@ import { COLLAPSED_COOKIE, isMac, isSettingsShortcut, navGroups } from '@/lib/si
 import { confirmRun } from '@/lib/run-guard';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { AccountMenu } from './AccountMenu';
+import { ConfirmHost, confirmDialog } from './Confirm';
 import { Icon, type IconName } from './Icon';
 import { JobPrompt, JobsProvider, Recreate, roleOf, Tap, toggleFullscreen, useForm, useJobs } from './jobs';
 import { type Account, type Section, Settings } from './Settings';
@@ -42,17 +43,21 @@ const fmtTime = (iso: string) => new Intl.DateTimeFormat('vi-VN', { dateStyle: '
 function TrayItem({ job, isAdmin }: { job: TrayJob; isAdmin: boolean }) {
   const { refresh } = useJobs();
   const [problem, setProblem] = useState('');
+  const [sending, setSending] = useState(false);
   const failure = FAILURE_TEXT(job.resolution ? 'ảnh' : 'clip')[job.status];
   const thumb = job.posterAssetId ?? (job.resolution ? job.outputAssetId : null); // an image job's output is its own picture
   async function retry() {
-    if (!confirmRun(job.estimateUsd, `Thử lại job này với giá khoảng $${job.estimateUsd}?`)) return;
-    setProblem('');
-    try {
-      await api('/api/jobs', sendJson('POST', { retryOf: job.id }));
-      await refresh();
-    } catch (e) {
-      setProblem(errorText(e, 'Không thử lại được'));
+    setSending(true); // from the click on, so a double click cannot send two paid jobs
+    if (await confirmRun(job.estimateUsd, `Thử lại job này với giá khoảng $${job.estimateUsd}?`)) {
+      setProblem('');
+      try {
+        await api('/api/jobs', sendJson('POST', { retryOf: job.id }));
+        await refresh();
+      } catch (e) {
+        setProblem(errorText(e, 'Không thử lại được'));
+      }
     }
+    setSending(false);
   }
   return (
     <li className={`job job-${job.status}`}>
@@ -75,7 +80,7 @@ function TrayItem({ job, isAdmin }: { job: TrayJob; isAdmin: boolean }) {
           </p>
         )}
         {RETRYABLE.includes(job.status) && !job.retried && !job.retryOf && (
-          <button type="button" onClick={() => void retry()}>
+          <button type="button" disabled={sending} onClick={() => void retry()}>
             Thử lại
           </button>
         )}
@@ -98,6 +103,7 @@ function HistoryCard({ job, isAdmin, select }: { job: TrayJob; isAdmin: boolean;
   const apply = form?.apply;
   const { refresh } = useJobs();
   const [problem, setProblem] = useState('');
+  const [sending, setSending] = useState(false);
   const [favorite, setFavorite] = useState(job.favorite);
   /** Save template: null while closed, else whether the member may share it with the company (asked when the dialog opens). */
   const [saving, setSaving] = useState<{ canShare: boolean } | null>(null);
@@ -116,10 +122,14 @@ function HistoryCard({ job, isAdmin, select }: { job: TrayJob; isAdmin: boolean;
       setProblem(errorText(e, fail));
     }
   }
-  const retry = () => confirmRun(job.estimateUsd, `Thử lại job này với giá khoảng $${job.estimateUsd}?`) && act(async () => (await api('/api/jobs', sendJson('POST', { retryOf: job.id })), await refresh()), 'Không thử lại được');
+  const retry = async () => {
+    setSending(true); // from the click on, so a double click cannot send two paid jobs
+    if (await confirmRun(job.estimateUsd, `Thử lại job này với giá khoảng $${job.estimateUsd}?`)) await act(async () => (await api('/api/jobs', sendJson('POST', { retryOf: job.id })), await refresh()), 'Không thử lại được');
+    setSending(false);
+  };
   const toggleFavorite = () => act(async () => setFavorite((await api<{ favorite: boolean }>(`/api/jobs/${job.id}/favorite`, sendJson('PUT', { favorite: !favorite }))).favorite), 'Không lưu được mục yêu thích.');
-  const remove = () => {
-    if (!window.confirm(`Xóa ${image ? 'ảnh' : 'clip'} này? Nó cũng biến khỏi Thư viện.`)) return;
+  const remove = async () => {
+    if (!(await confirmDialog({ title: `Xoá ${image ? 'ảnh' : 'clip'} này?`, body: 'Nó cũng biến khỏi Thư viện.', confirmLabel: 'Xoá', danger: true }))) return;
     void act(async () => (await api(`/api/jobs/${job.id}`, { method: 'DELETE' }), await refresh()), `Không xóa được ${image ? 'ảnh' : 'clip'}.`);
   };
   // Save template from a card: the job's own uploads, words and settings become a template of its page (POST /api/templates fromJob).
@@ -223,7 +233,7 @@ function HistoryCard({ job, isAdmin, select }: { job: TrayJob; isAdmin: boolean;
         {saved && <p role="status">Đã lưu mẫu.</p>}
         <div className="job-main">
           {RETRYABLE.includes(job.status) && !job.retried && !job.retryOf && (
-            <button type="button" className="job-reuse job-primary" onClick={() => void retry()}>
+            <button type="button" className="job-reuse job-primary" disabled={sending} onClick={() => void retry()}>
               <Icon name="arrow" /> Thử lại
             </button>
           )}
@@ -262,7 +272,7 @@ function HistoryCard({ job, isAdmin, select }: { job: TrayJob; isAdmin: boolean;
               </button>
             )}
             {out && (
-              <button type="button" className="danger icon-button" onClick={remove} aria-label="Xóa" title="Xóa">
+              <button type="button" className="danger icon-button" onClick={() => void remove()} aria-label="Xóa" title="Xóa">
                 <Icon name="x" />
               </button>
             )}
@@ -530,6 +540,7 @@ export function Shell({ userId, userName, isAdmin, account, initialCollapsed, ch
             <Toasts />
           </div>
           <ToolGuide open={guide} onClose={() => setGuide(false)} />
+          <ConfirmHost />
         </OpenToolGuide>
       </AdminContext>
     </JobsProvider>

@@ -366,8 +366,10 @@ test('hook variants: up to 3 hooks make one clip each, with the total, the daily
   for (const [i, h] of picks.slice(0, 3).entries()) await expect(page.locator('.prompt-preview p').nth(i)).toContainText(h.phrase);
 
   // Dismissing the confirm sends nothing.
-  page.once('dialog', (d) => void d.dismiss());
+  const confirm = page.getByRole('dialog', { name: /^Tạo 3 clip/ });
   await runButton(page).click();
+  await confirm.getByRole('button', { name: 'Huỷ', exact: true }).click();
+  await expect(confirm).toBeHidden();
   await expect(page.getByText(/Đã gửi/)).toHaveCount(0);
 
   // The server refuses the second variant (as when a cap is reached meanwhile); the other two go, one after another, and the refusal is named.
@@ -378,11 +380,8 @@ test('hook variants: up to 3 hooks make one clip each, with the total, the daily
     if (posts === 2) return route.fulfill({ status: 429, contentType: 'application/json', body: JSON.stringify({ error: 'Bạn đã dùng hết số clip trong ngày hôm nay' }) });
     return route.continue();
   });
-  page.once('dialog', (d) => {
-    expect(d.message()).toContain('Tạo 3 clip');
-    void d.accept();
-  });
   await runButton(page).click();
+  await confirm.getByRole('button', { name: 'Tiếp tục', exact: true }).click();
   await expect(page.getByText(`Đã gửi 2/3 biến thể: ${picks[0]!.name}, ${picks[2]!.name}.`)).toBeVisible();
   await expect(page.locator('.form-message').getByRole('alert')).toContainText(`Không gửi được ${picks[1]!.name}: Bạn đã dùng hết số clip trong ngày hôm nay`);
   const jobs = (await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { id: string }[]; clips: { today: number } };

@@ -1,5 +1,5 @@
 // Browser-side helpers shared by the Admin pages.
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api, ApiError } from './api';
 import { useTabReturn } from './use-tab-return';
 
@@ -32,10 +32,18 @@ export function useFetch<T>(path: string, { onTabReturn = false } = {}) {
 /** The Vietnamese text for a failed Admin call, followed by the server's reason, which Admins may read. */
 export const failText = (e: unknown, fallback: string): string => (e instanceof ApiError ? `${fallback} (${e.message})` : fallback);
 
-/** Runs a change, reloads the page data after it and keeps the reason when it fails; `run` says whether it worked. */
+/**
+ * Runs a change, reloads the page data after it and keeps the reason when it fails; `run` says whether it worked. One change at a time: `pending`
+ * disables the buttons while one is sent, and a call made meanwhile (a double click) is dropped and returns false.
+ */
 export function useAction(reload: () => void) {
   const [problem, setProblem] = useState('');
+  const [pending, setPending] = useState(false);
+  const busy = useRef(false);
   async function run(change: () => Promise<unknown>, fallback: string): Promise<boolean> {
+    if (busy.current) return false;
+    busy.current = true;
+    setPending(true);
     setProblem('');
     try {
       await change();
@@ -44,9 +52,12 @@ export function useAction(reload: () => void) {
     } catch (e) {
       setProblem(failText(e, fallback));
       return false;
+    } finally {
+      busy.current = false;
+      setPending(false);
     }
   }
-  return { problem, run };
+  return { problem, pending, run };
 }
 
 const auditText = (v: unknown): string => (v === null || v === undefined ? '—' : typeof v === 'object' ? JSON.stringify(v) : String(v));

@@ -58,9 +58,9 @@ test('Try On: a saved template lists under Mẫu của tôi and refills the pers
   await expect(other.getByText('Không tìm thấy ảnh để dùng lại.')).toBeVisible();
   await other.close();
 
-  page.once('dialog', (d) => void d.accept());
   await page.getByRole('button', { name: 'Mẫu của tôi' }).click();
   await list.getByRole('button', { name: 'Xoá mẫu Váy đỏ' }).click();
+  await page.getByRole('dialog', { name: 'Xoá mẫu "Váy đỏ"?' }).getByRole('button', { name: 'Xoá', exact: true }).click();
   await expect(list).toContainText('Chưa có mẫu nào.');
 });
 

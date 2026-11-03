@@ -174,7 +174,7 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
   const stock = picker === null ? [] : stockGroups(app.slots[picker]!, have);
 
   async function run() {
-    if (!confirmRun(pick.estimate)) return;
+    if (!(await confirmRun(pick.estimate))) return;
     setBusy(true);
     setError('');
     setNotice('');
@@ -435,7 +435,7 @@ function MotionForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
   }
 
   async function run() {
-    if (!confirmRun(chosen?.estimateUsd)) return;
+    if (!(await confirmRun(chosen?.estimateUsd))) return;
     setBusy(true);
     setError('');
     setNotice('');

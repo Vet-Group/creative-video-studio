@@ -232,19 +232,17 @@ test('an Admin changes the code of a store that has costs after a confirm, and t
   const save = () => page.getByRole('row').filter({ has: field() }).getByRole('button', { name: 'Lưu', exact: true });
   await expect(field()).toBeEnabled();
   // Dismissed, nothing is sent; accepted, the new code is saved.
+  const confirm = page.getByRole('dialog', { name: 'Đổi mã cửa hàng?' });
   await field().fill(`${code}-B`);
-  page.once('dialog', (d) => void d.dismiss());
   await save().click();
+  await confirm.getByRole('button', { name: 'Huỷ', exact: true }).click();
+  await expect(confirm).toBeHidden();
   await page.reload();
   await expect(field()).toHaveValue(code);
   await field().fill(`${code}-B`);
-  let asked = '';
-  page.once('dialog', (d) => {
-    asked = d.message();
-    void d.accept();
-  });
-  await Promise.all([page.waitForResponse((r) => r.url().includes(`/api/admin/stores/${storeId}`) && r.ok()), save().click()]);
-  expect(asked).toContain('Cửa hàng này đã có chi phí');
+  await save().click();
+  await expect(confirm).toContainText('Cửa hàng này đã có chi phí');
+  await Promise.all([page.waitForResponse((r) => r.url().includes(`/api/admin/stores/${storeId}`) && r.ok()), confirm.getByRole('button', { name: 'Đổi mã', exact: true }).click()]);
   await page.reload();
   await expect(field()).toHaveValue(`${code}-B`);
 

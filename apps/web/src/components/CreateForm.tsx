@@ -311,7 +311,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
   }
 
   async function run() {
-    if (!confirmRun(chosen && (audioOn ? chosen.audioEstimateUsd : chosen.estimateUsd))) return;
+    if (!(await confirmRun(chosen && (audioOn ? chosen.audioEstimateUsd : chosen.estimateUsd)))) return;
     setBusy(true);
     setError('');
     setNotice('');
