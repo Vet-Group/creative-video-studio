@@ -320,6 +320,19 @@ test('an Admin can edit presets and read audit details at 390px without horizont
   await changes.scrollIntoViewIfNeeded();
   await expect(changes).toBeInViewport({ ratio: 1 });
   expect(await page.locator('.table-wrap').evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+  // A phone record's actions cell spans the card, so its "Thao tác" label reads on one line.
+  await page.goto('/admin/stores');
+  const actions = page.locator('.mobile-records td[data-label="Thao tác"]').first();
+  await actions.scrollIntoViewIfNeeded();
+  expect(await actions.evaluate((td) => parseFloat(getComputedStyle(td, '::before').height))).toBeLessThan(24);
+});
+
+test('an unknown address shows a Vietnamese not-found page with a way back', async ({ page }) => {
+  await signIn(page, 'member4');
+  const res = await page.goto('/khong-co-trang-nay');
+  expect(res?.status()).toBe(404);
+  await expect(page.getByRole('heading', { name: 'Không tìm thấy trang' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Về trang chính' })).toHaveAttribute('href', '/');
 });
 
 test('a Member cannot see the Admin pages', async ({ page }) => {

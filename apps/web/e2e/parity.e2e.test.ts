@@ -215,6 +215,7 @@ test('the preset picker is a vertically scrolling grid like the live one: 4 colu
     expect(Math.round(card.y - (sub.y + sub.height))).toBe(16);
     expect(Math.round(clip.y - card.y)).toBe(0);
     expect(Math.round(name.y - (clip.y + clip.height))).toBe(6);
+    expect(Math.abs(clip.height - (clip.width * 4) / 3)).toBeLessThan(2); // the free prompt's placeholder is a 3:4 tile like the clips, not a line
     await page.keyboard.press('Escape');
     await expect(grid).toBeHidden();
     await expect(page.getByRole('button', { name: 'Chọn mẫu khác' })).toBeFocused();
