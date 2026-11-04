@@ -27,7 +27,9 @@ describe('realProviders', () => {
     vi.stubGlobal('fetch', async (url: string) => {
       urls.push(String(url));
       const usage = { prompt_tokens: 10, completion_tokens: 10 };
-      return new Response(JSON.stringify(url.includes('openai') ? { choices: [{ message: { content: '["a", "b", "c"]' } }], usage } : { output: '["a", "b", "c"]', usage: { cost: 0.001 } }));
+      // One option long enough for its range, so a suggestion run is its three direction calls with no second call.
+      const content = JSON.stringify({ text: 'x'.repeat(80) });
+      return new Response(JSON.stringify(url.includes('openai') ? { choices: [{ message: { content } }], usage } : { output: content, usage: { cost: 0.001 } }));
     });
     const both = realProviders(pool([]), { FAL_KEY: 'k', OPENAI_API_KEY: 'sk' });
     expect(await both.enhance!('p', 'video', 100)).toMatchObject({ provider: 'openai', model: 'gpt-6-luna' });
@@ -36,7 +38,7 @@ describe('realProviders', () => {
     const fal = realProviders(pool([]), { FAL_KEY: 'k' });
     expect(await fal.enhance!('p', 'video', 100)).toMatchObject({ provider: 'fal', model: 'google/gemini-2.5-flash' });
     expect(await fal.suggest!({ field: 'brief', text: '', context: '', max: 100 })).toMatchObject({ provider: 'fal' });
-    expect(urls).toEqual(['https://api.openai.com/v1/chat/completions', 'https://api.openai.com/v1/chat/completions', 'https://fal.run/openrouter/router', 'https://fal.run/openrouter/router']);
+    expect(urls).toEqual([...Array(4).fill('https://api.openai.com/v1/chat/completions'), ...Array(4).fill('https://fal.run/openrouter/router')]); // enhance, then 3 directions
     const none = realProviders(pool([]), {});
     expect([none.enhance, none.suggest]).toEqual([undefined, undefined]);
   });

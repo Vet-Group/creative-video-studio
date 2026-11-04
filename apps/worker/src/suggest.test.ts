@@ -49,7 +49,7 @@ test('books no ledger row for a run without a cost or a failed call', async () =
   for (const id of [free, unknown, failing]) expect(await ledger(id)).toEqual([]);
 });
 
-test('a failed call or a missing suggester marks the run failed; a run past the minute is not sent at all', async () => {
+test("a failed call or a missing suggester marks the run failed; a run past the page's wait (90 s) is not sent at all", async () => {
   const failing = await queued();
   await expect(runSuggestion(pool, async () => Promise.reject(new Error('rate limited')), failing)).rejects.toThrow('rate limited');
   expect((await row(failing)).status).toBe('failed');
@@ -57,7 +57,7 @@ test('a failed call or a missing suggester marks the run failed; a run past the 
   await expect(runSuggestion(pool, undefined, none)).rejects.toThrow('FAL_KEY');
   expect((await row(none)).status).toBe('failed');
   let called = false;
-  const stale = await queued(61);
+  const stale = await queued(91);
   await runSuggestion(pool, async () => ((called = true), { options: ['x'], costUsd: null, provider: 'fal', model: 'google/gemini-2.5-flash' }), stale);
   expect(called).toBe(false);
   expect((await row(stale)).status).toBe('queued'); // the page marks it failed when it polls

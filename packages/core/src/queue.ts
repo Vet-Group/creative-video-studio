@@ -8,11 +8,11 @@ export const VIDEO_QUEUE_OPTIONS = { retryLimit: 0, expireInSeconds: 900 } as co
 export const PURGE_QUEUE = 'purge';
 export const PURGE_CRON = '0 3 * * *';
 
-/** Marketing Studio suggestions (suggest.ts): one LLM call per run, never retried; a run still waiting after a minute is given up. */
+/** Suggestions (suggest.ts): a few LLM calls per run, never retried. pg-boss's own expiry only marks the job; the handler still writes the run. */
 export const SUGGEST_QUEUE = 'suggest';
 export const SUGGEST_QUEUE_OPTIONS = { retryLimit: 0, expireInSeconds: 60 } as const;
-/** How long a page waits for a suggestion run before it is marked failed. */
-export const SUGGEST_EXPIRY_SECONDS = 60;
+/** How long a page waits for a suggestion run before it is marked failed: a short option takes a second call after the first (about 35 s at worst, 2026-11-04). */
+export const SUGGEST_EXPIRY_SECONDS = 90;
 
 export interface SuggestJobData {
   runId: string;

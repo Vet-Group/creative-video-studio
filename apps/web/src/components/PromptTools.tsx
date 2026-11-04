@@ -31,6 +31,9 @@ interface Props {
   compact?: boolean;
 }
 
+/** The three directions the options take, in the order the worker writes them (core/suggest.ts DIRECTIONS); the first is named for a plain take when the box was empty. */
+const DIRECTION_LABELS = ['Sát ý bạn', 'Sáng tạo', 'Nổi bật'];
+
 export function PromptTools({ feature, format, value, onChange, maxLength, onRun, ask, aiLabel = 'Gợi ý AI', parts = ['ai', 'recent', 'translate', 'clear', 'expand'], compact }: Props) {
   const { jobs } = useJobs();
   const ai = useSuggest();
@@ -142,12 +145,14 @@ export function PromptTools({ feature, format, value, onChange, maxLength, onRun
             )}
           </div>
           {ai.busy && [0, 1, 2].map((i) => <span key={i} className={s.skeleton} />)}
-          {/* Numbered to compare; the Vietnamese reading first to read fast, the English the field takes under it (owner, 2026-11-03). */}
+          {/* Numbered to compare, with its direction and length; the Vietnamese summary first to read fast, the English the field takes under it (owner, 2026-11-03). */}
           {ai.options.map((o, i) => {
             const vi = ai.meanings[i];
             return (
               <button key={o} type="button" className={s.option} onClick={() => pick(o)}>
-                <span className={s.optionLabel}>Gợi ý {i + 1}</span>
+                <span className={s.optionLabel}>
+                  Gợi ý {i + 1} · {i === 0 && !value.trim() ? 'Cơ bản' : DIRECTION_LABELS[i]} · {o.length.toLocaleString('vi-VN')} ký tự
+                </span>
                 {vi && vi !== o ? (
                   <>
                     <span className={s.optionVi}>{vi}</span>

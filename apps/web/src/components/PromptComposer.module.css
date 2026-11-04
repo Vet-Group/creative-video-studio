@@ -41,10 +41,11 @@
 .option { display: block; width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--ink-strong); font: inherit; font-size: 13px; line-height: 20px; text-align: left; white-space: pre-line; overflow-wrap: anywhere; cursor: pointer; transition: border-color .15s, box-shadow .15s; }
 .option:hover { border-color: var(--ink); box-shadow: 0 2px 8px rgb(var(--shade) / .08); }
 .option:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; }
-/* An option: its number, the Vietnamese reading at body size, then the English the field takes, smaller and muted but whole. */
+/* An option: its number, direction and length, the Vietnamese summary at body size, then the English the field takes, smaller and muted, its
+   first six lines only: an option fills most of the model's room (thousands of characters), and a pick puts it whole in the box. */
 .optionLabel { display: block; margin-bottom: 4px; color: var(--text-muted); font-size: 11px; font-weight: 600; line-height: 16px; }
 .optionVi { display: block; }
-.optionEn { display: block; margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--border); color: var(--text-muted); font-size: 12px; line-height: 18px; }
+.optionEn { display: -webkit-box; margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--border); color: var(--text-muted); font-size: 12px; line-height: 18px; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 6; line-clamp: 6; }
 .popNote { margin: -2px 2px 0; color: var(--text-muted); font-size: 12px; line-height: 18px; }
 .translation { margin: 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--ink-strong); font-size: 13px; line-height: 20px; white-space: pre-line; overflow-wrap: anywhere; }
 .skeleton { display: block; height: 80px; border-radius: 10px; background: linear-gradient(90deg, rgb(var(--tint) / .04), rgb(var(--tint) / .1), rgb(var(--tint) / .04)); background-size: 200% 100%; animation: shimmer 1.2s linear infinite; }
