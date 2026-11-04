@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { SUGGEST_QUEUE } from '@cvs/core/queue';
 import { PROMPT_CEILING } from '@cvs/core/models';
-import { PROMPT_TASKS, type SuggestInput } from '@cvs/core/suggest';
+import { modelNote, PROMPT_TASKS, type SuggestInput } from '@cvs/core/suggest';
 import { pool } from '@/lib/auth';
 import { findChoice } from '@/lib/choices';
 import { ADVANCED_MAX_SCRIPT, MAX_CHOICE_DESC, MAX_CHOICE_NAME, MAX_CHOICE_PHRASE, SUGGEST_DAILY_LIMIT } from '@/lib/marketing';
@@ -14,13 +14,16 @@ const bad = (error: string, status = 400) => Response.json({ error }, { status }
  * Asks the worker for three Marketing Studio suggestions: `field` (`brief`, `script` on Advanced, or `hook` or `location` for the English scene of
  * a new one from its Vietnamese name and description in `text`, `prompt` for the English prompt of the tool `feature`, a PROMPT_TASKS key, or `translate`
  * for one Vietnamese reading of the English prompt in `text`), `format` ('advanced' or absent), the
- * member's `text` so far, the chosen `hook` and `location`, and for a brief the `room` the chosen model leaves for it (the page computes it). Answers 202 with the run's id for the page to poll (GET /api/suggestions/:id),
+ * member's `text` so far, the chosen `hook` and `location`, and for a brief the `room` the chosen model leaves for it (the page computes it); for a
+ * brief, a script or a prompt, the page's chosen `model` (an enabled model's id), its `audio` switch and the clip's `seconds`, when it has them. Answers 202 with the run's id for the page to poll (GET /api/suggestions/:id),
  * 429 past the daily limit, 503 when the queue cannot take it (the run is not counted then).
  */
 export async function POST(request: Request) {
   const g = await guard(request, 'member');
   if (g.error) return g.error;
-  const b = (await request.json().catch(() => null)) as { field?: unknown; format?: unknown; feature?: unknown; text?: unknown; hook?: unknown; location?: unknown; room?: unknown } | null;
+  const b = (await request.json().catch(() => null)) as {
+    field?: unknown; format?: unknown; feature?: unknown; text?: unknown; hook?: unknown; location?: unknown; room?: unknown; model?: unknown; audio?: unknown; seconds?: unknown;
+  } | null;
   if (b?.field !== 'brief' && b?.field !== 'script' && b?.field !== 'hook' && b?.field !== 'location' && b?.field !== 'prompt' && b?.field !== 'translate') {
     return bad('field must be brief, script, hook, location, prompt or translate');
   }
@@ -37,7 +40,9 @@ export async function POST(request: Request) {
     if (b.room !== undefined && !(Number.isInteger(b.room) && (b.room as number) >= 1)) return bad('room must be a whole number of characters');
     const text = typeof b.text === 'string' ? b.text.trim() : b.text === undefined ? '' : null;
     if (text === null || text.length > PROMPT_CEILING) return bad(`text may be at most ${PROMPT_CEILING} characters`);
-    return queue(g.session.user.id, { field: 'prompt', task, text, context: '', max: Math.min((b.room as number | undefined) ?? PROMPT_CEILING, PROMPT_CEILING) });
+    const extra = await modelAndPace(b);
+    if (typeof extra === 'string') return bad(extra);
+    return queue(g.session.user.id, { field: 'prompt', task, text, context: '', max: Math.min((b.room as number | undefined) ?? PROMPT_CEILING, PROMPT_CEILING), ...extra });
   }
   if (b.field === 'hook' || b.field === 'location') {
     // The add form's AI help: the English scene of a new hook or location from its Vietnamese name and description, as long as the field takes.
@@ -59,9 +64,24 @@ export async function POST(request: Request) {
   if (b.hook !== undefined && !hook) return bad('hook is not a hook');
   const location = typeof b.location === 'string' ? await findChoice(userId, 'location', b.location) : undefined;
   if (b.location !== undefined && !location) return bad('location is not a location');
-  const input: SuggestInput = { field: b.field, text, context: [hook?.phrase, location && `Set in ${location.phrase}.`].filter(Boolean).join(' '), max };
+  const extra = await modelAndPace(b);
+  if (typeof extra === 'string') return bad(extra);
+  const input: SuggestInput = { field: b.field, text, context: [hook?.phrase, location && `Set in ${location.phrase}.`].filter(Boolean).join(' '), max, ...extra };
 
   return queue(userId, input);
+}
+
+/**
+ * The chosen model's note (its name, how to write for it and whether the clip has sound) and the clip's length, or the error. Only an enabled
+ * model is named to the LLM, so the member's request never reaches it as words.
+ */
+async function modelAndPace(b: { model?: unknown; audio?: unknown; seconds?: unknown }): Promise<Pick<SuggestInput, 'model' | 'seconds'> | string> {
+  if (b.audio !== undefined && typeof b.audio !== 'boolean') return 'audio must be true or false';
+  if (b.seconds !== undefined && !(Number.isInteger(b.seconds) && (b.seconds as number) >= 1 && (b.seconds as number) <= 60)) return 'seconds must be a whole number from 1 to 60';
+  if (b.model === undefined) return { ...(b.seconds !== undefined && { seconds: b.seconds as number }) };
+  const model = typeof b.model === 'string' ? (await pool.query('select id, label, endpoint from model_configs where id = $1 and enabled', [b.model])).rows[0] : undefined;
+  if (!model) return 'model is not an enabled model';
+  return { model: modelNote(model, b.audio === true), ...(b.seconds !== undefined && { seconds: b.seconds as number }) };
 }
 
 /** Counts the run against the member's daily limit, stores it and hands it to the worker. */

@@ -60,10 +60,12 @@ describe('/api/suggestions', () => {
     expect((await poll(other, id)).status).toBe(404);
   });
 
-  test('a run still queued after 60 s turns failed when polled', async () => {
+  test('a run still queued after 90 s turns failed when polled, and not before', async () => {
     const u = await newUser();
     const { id } = (await (await ask(u, { field: 'brief' })).json()) as { id: string };
     await pool.query(`update suggestion_runs set created_at = now() - interval '61 seconds' where id = $1`, [id]);
+    expect(((await (await poll(u, id)).json()) as { status: string }).status).toBe('queued'); // a short option's second call may still be running
+    await pool.query(`update suggestion_runs set created_at = now() - interval '91 seconds' where id = $1`, [id]);
     expect(((await (await poll(u, id)).json()) as { status: string }).status).toBe('failed');
   });
 
@@ -127,6 +129,31 @@ describe('/api/suggestions', () => {
     expect(await error(await ask(u, { field: 'prompt' }))).toMatch(/^feature must be one of/);
     expect(await error(await ask(u, { field: 'prompt', feature: 'image', room: 0 }))).toBe('room must be a whole number of characters');
     expect(await error(await ask(u, { field: 'prompt', feature: 'image', text: 'x'.repeat(5001) }))).toBe('text may be at most 5000 characters');
+    expect(await runs(u.id)).toBe(2);
+  });
+
+  test("names only an enabled model to the LLM, with its tip and sound, and the clip's seconds; refuses an unknown or disabled model and bad values", async () => {
+    const u = await newUser();
+    await pool.query(
+      `insert into model_configs (id, provider, endpoint, label, kind, features, ratios, durations_sec, max_images, output_resolution, usd_per_second, sources, enabled)
+       values ('kling-t', 'fal', 'fal-ai/kling-video/v2.6/pro/image-to-video', 'Kling T', 'video', '{video}', '{9:16}', '{5}', 4, '1080p', 0.07, '{}', true),
+              ('kling-off', 'fal', 'x', 'Kling Off', 'video', '{video}', '{9:16}', '{5}', 4, '1080p', 0.07, '{}', false)`,
+    );
+    const { modelNote, PROMPT_TASKS } = await import('@cvs/core/suggest');
+    const res = await ask(u, { field: 'prompt', feature: 'video', text: 'xoay', room: 2500, model: 'kling-t', audio: true, seconds: 10 });
+    expect(res.status).toBe(202);
+    const { id } = (await res.json()) as { id: string };
+    const input = (await pool.query('select input from suggestion_runs where id = $1', [id])).rows[0].input;
+    expect(input).toEqual({ field: 'prompt', task: PROMPT_TASKS.video, text: 'xoay', context: '', max: 2500, seconds: 10, model: modelNote({ id: 'kling-t', label: 'Kling T', endpoint: 'fal-ai/kling-video/v2.6/pro/image-to-video' }, true) });
+    expect(input.model).toMatch(/^The model: Kling T\. Kling follows .* The clip has sound/);
+    // A brief takes them too; audio off leaves the sound out on a model that can be silent.
+    const brief = (await (await ask(u, { field: 'brief', model: 'kling-t', audio: false })).json()) as { id: string };
+    expect((await pool.query('select input from suggestion_runs where id = $1', [brief.id])).rows[0].input.model).not.toMatch(/sound/);
+    expect(await error(await ask(u, { field: 'prompt', feature: 'video', model: 'kling-off' }))).toBe('model is not an enabled model');
+    expect(await error(await ask(u, { field: 'prompt', feature: 'video', model: 'nope' }))).toBe('model is not an enabled model');
+    expect(await error(await ask(u, { field: 'brief', seconds: 0 }))).toBe('seconds must be a whole number from 1 to 60');
+    expect(await error(await ask(u, { field: 'brief', seconds: 61 }))).toBe('seconds must be a whole number from 1 to 60');
+    expect(await error(await ask(u, { field: 'brief', audio: 'on' }))).toBe('audio must be true or false');
     expect(await runs(u.id)).toBe(2);
   });
 

@@ -5,8 +5,8 @@ import { api, errorText, sendJson } from '@/lib/api';
 import { Icon } from './Icon';
 
 const POLL_MS = 1_500;
-/** A little past the server's 60 s expiry, so the last poll sees `failed` rather than giving up first. */
-const GIVE_UP_MS = 65_000;
+/** A little past the server's expiry (SUGGEST_EXPIRY_SECONDS), so the last poll sees `failed` rather than giving up first. */
+const GIVE_UP_MS = 95_000;
 const UNAVAILABLE = 'Chưa lấy được gợi ý lúc này, hãy thử lại sau.';
 
 export interface Ask {
@@ -20,6 +20,10 @@ export interface Ask {
   location?: string;
   /** For a brief: the characters the chosen model leaves for it. */
   room?: number;
+  /** The page's chosen model, its audio switch and the clip's length, so the options are written for that model and fit the clip. */
+  model?: string;
+  audio?: boolean;
+  seconds?: number;
 }
 
 /** One suggestion request at a time: `run` asks and polls; `options` (with their Vietnamese `meanings`, null where none) or `error` hold the answer until `clear`. */

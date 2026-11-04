@@ -1,10 +1,21 @@
-// Suggestions (a feature Fash lacks): three short options for Marketing Studio's brief (UGC) or spoken lines (Advanced), the English
+// Suggestions (a feature Fash lacks): three options for Marketing Studio's brief (UGC) or spoken lines (Advanced), the English
 // scene of a member's own hook or location from its Vietnamese name and description, or the English prompt of any other tool, written by
-// the same LLM call as Enhance (enhance.ts: OpenAI, else fal), in the worker, which holds the keys. The member picks one; nothing is generated.
+// the same LLM as Enhance (enhance.ts: OpenAI, else fal), in the worker, which holds the keys. The member picks one; nothing is generated.
 import { ENHANCE_MODEL, ENHANCE_URL, OPENAI_MODEL, openAiChat } from './enhance';
+import { ALWAYS_AUDIO, AUDIO_USD_PER_SECOND } from './models';
 import { sendJson, timeout, type Fetch } from './providers/http';
 
 export const SUGGESTIONS = 3;
+
+/** Each option aims for 70 to 90 % of its field's limit (owner, 2026-11-04: the options were about a tenth of the room the model takes). */
+export const TARGET_SHARE = { low: 0.7, high: 0.9 } as const;
+/** Speech at a natural pace, for lines that must fit the clip: about 2.5 words a second, about 6 characters a word with its space. */
+const WORDS_PER_SECOND = 2.5;
+const CHARS_PER_WORD = 6;
+/** A 20-word sentence of description, measured on the answers of 2026-11-04. */
+const CHARS_PER_SENTENCE = 125;
+/** The Vietnamese summary asks for 300 characters and sometimes runs over; past this it is cut. */
+const MAX_SUMMARY = 400;
 
 export interface SuggestInput {
   /** `brief`: what the creator should do and say about the product; `script`: the exact lines the creator speaks; `hook` and `location`: the
@@ -19,36 +30,47 @@ export interface SuggestInput {
   context: string;
   /** The field's character limit. */
   max: number;
+  /** The chosen model's name and how to write for it (modelNote, built by the server from an enabled model), when the page has one. */
+  model?: string;
+  /** The clip's length in seconds, when the page has one: lines must fit it, and a brief or a video prompt paces its beats to it. */
+  seconds?: number;
 }
 
 /** `meanings[i]` is option i in Vietnamese for the member to read (null when the model gave none); only `options` ever fill a field. */
 /** `provider` and `model`: who answered and with what, for the call's ledger row. */
 export type Suggester = (input: SuggestInput) => Promise<{ options: string[]; meanings?: (string | null)[]; costUsd: number | null; provider: string; model: string }>;
 
-// Each option comes with a Vietnamese reading (owner, 2026-11-03): the staff read Vietnamese faster, the video models read English best.
+// Each option comes with a short Vietnamese summary (owner, 2026-11-03: the staff read Vietnamese faster, the video models read English best);
+// a summary rather than a full reading since the options fill most of the room, and the Translate button gives the full reading.
 const REPLY =
-  `Reply with a JSON array of exactly ${SUGGESTIONS} different objects and nothing else: {"text": the suggestion, "vi": the same suggestion in ` +
-  'natural Vietnamese, only for the seller to read (the same as text when text is already Vietnamese)}.';
+  'Reply with a JSON object and nothing else: {"text": the text, "vi": a short summary of it in natural Vietnamese, at most 300 characters, ' +
+  'only for the seller to read and choose}.';
+
+/** How every option is written, whatever the field: what makes a video or image model follow a prompt. */
+const PRINCIPLES =
+  'Write as direct, visual description in the present tense. Be concrete: the action, the setting, the light, the camera and the mood, with ' +
+  'sensory detail. Say what to show, never what to avoid. Give one clear main action at a time and, for a clip, the beats in the order they ' +
+  'happen. Add no on-screen text, captions, logos or watermarks unless the seller asked for them. Fill the length you are given with useful, ' +
+  'specific detail, never with filler, repetition or praise.';
+
+const UNSEEN =
+  'You cannot see the photos of the person or the product: never invent their colours, printed text, logos, brand or looks; say "the product", ' +
+  '"the outfit" or "the model", or use the seller\'s own words.';
 
 export const SUGGEST_SYSTEM =
-  'You help a fashion seller write a short UGC (user-generated content) video. You cannot see the photos of the creator or the product: never ' +
-  'invent their colours, printed text, logos, brand or looks; say "the product", "the outfit" or use the seller\'s own words. Keep every concrete ' +
-  "detail the seller gave. Write the text in the language of the seller's text, or in Vietnamese when it is empty. " +
-  REPLY;
+  'You help a fashion seller write a short UGC (user-generated content) video. ' + UNSEEN + ' Keep every concrete detail the seller gave. ' + PRINCIPLES +
+  " Write the text in the language of the seller's text, or in Vietnamese when it is empty. " + REPLY;
 
 /** For a hook or a location the answer is always English, whatever the member wrote: the video models read English best. */
 export const SCENE_SYSTEM =
   "You write the English scene text an AI video model reads for a fashion UGC clip, from a seller's short Vietnamese name and description of it. " +
   "Keep their meaning and every concrete detail, add nothing about the product's colours, printed text, logos or brand, and write the text in plain English " +
-  'with no Vietnamese. ' +
-  REPLY;
+  'with no Vietnamese. ' + PRINCIPLES + ' ' + REPLY;
 
 /** For a prompt, the answer is English too, and it describes only what the tool's prompt controls. */
 export const PROMPT_SYSTEM =
-  'You write prompts for an AI tool a fashion seller uses on their own photos. You cannot see the photos: never invent the colours, printed ' +
-  'text, logos, brand or looks of the product, garment or person; say "the product", "the outfit" or "the model" instead. Keep every concrete ' +
-  'detail the seller gave, translated to English when needed. Write the text in plain, concrete English with no Vietnamese. ' +
-  REPLY;
+  'You write prompts for an AI tool a fashion seller uses on their own photos. ' + UNSEEN + ' Keep every concrete detail the seller gave, translated ' +
+  'to English when needed. ' + PRINCIPLES + ' Write the text in plain, concrete English with no Vietnamese. ' + REPLY;
 
 /** The Translate button: a Vietnamese reading of an English prompt, shown beside it and never sent to a model. */
 export const TRANSLATE_SYSTEM =
@@ -67,72 +89,169 @@ export const PROMPT_TASKS = {
   lingerie_try_on: "a lingerie try-on on a model photo for a fashion shop. Describe a tasteful pose, the setting and the light, not the garment",
 } as const;
 
-const ASK = {
-  brief: 'Write three different creator briefs: what the creator does on camera and what they say about the product, as one or two sentences each.',
-  script: 'Write three different scripts: the exact words the creator speaks to camera, natural and casual, one or two short sentences each.',
-  hook: 'Write three different hooks: one English sentence each on what happens in the first one or two seconds of the clip, starting "The clip opens".',
-  location: 'Write three different places the clip is set in: a short English noun phrase each, such as "a cozy corner cafe with warm light", not a sentence.',
-  prompt: 'Write three different prompts, one or two sentences each, for',
-};
-
-/** The user turn of the call: the task, the hook and location when chosen, the member's text and the length limit. */
-export function suggestPrompt(i: SuggestInput): string {
-  if (i.field === 'translate') return `The prompt:\n${i.text}`;
-  return [i.field === 'prompt' ? `${ASK.prompt} ${i.task}.` : ASK[i.field], i.context && `The video: ${i.context}`, i.text && `The seller's notes: ${i.text}`, `Each text at most ${i.max} characters.`].filter(Boolean).join('\n');
-}
+/** How to write for each model family, by the start of its id: what each provider's own prompt guide stresses. */
+const FAMILY_TIPS: [RegExp, string][] = [
+  [/^veo/, 'Veo follows cinematic direction: name the shot size, the camera move and the lens look, and describe the sound in its own sentence.'],
+  [/^kling/, 'Kling follows a clear order: the subject, its action, the setting, then the camera move and the light, in plain camera terms (slow push-in, orbit, tracking shot, handheld).'],
+  [/^seedance/, 'Seedance can play several shots in one clip: give them in order as short beats, each with its framing and camera move, keeping the same person and product.'],
+  [/^gemini-omni/, 'Gemini Omni reads a natural paragraph well: describe the action as it unfolds, the camera, the light and the sound.'],
+  [/^grok-imagine/, 'Grok Imagine follows short, vivid sentences: one action per sentence, the camera, the light and the sound.'],
+  [/^wan/, 'WAN rewards detail: how fast things move and which parts of the body move, the camera, the light and the textures.'],
+  [/^(minimax|hailuo)/, 'MiniMax follows clear camera direction and natural, physical motion: say how each movement starts and ends.'],
+  [/^flux/, 'FLUX follows a precise description of the motion, the camera and the light, most important first.'],
+  [/^nano-banana/, 'Nano Banana reads a natural descriptive paragraph better than a list of keywords; with reference photos, say what stays as it is and what changes.'],
+  [/^gpt-image/, 'GPT Image follows long, precise instructions: state each requirement plainly (composition, light, background, what stays as in the photo).'],
+  [/^seedream/, 'Seedream: lead with the subject and the action, then the setting, the style and the light, in short concrete sentences.'],
+];
 
 /**
- * The options from the model's answer: a JSON array (possibly in a code fence) of strings or `{ text, vi }` objects, trimmed, de-duplicated by
- * text, cut to `max`, at most three, each with its Vietnamese reading or null.
+ * The model line of the user turn: the model's name, its family's tip and, for a clip with sound (an endpoint that always makes it, or one that
+ * can with the page's audio switch on), a sentence on the sound.
  */
-export function parseSuggestions(answer: string, max: number): { options: string[]; meanings: (string | null)[] } {
-  const json = answer.trim().replace(/^```(?:json)?\s*([\s\S]*?)\s*```$/, '$1');
-  let list: unknown;
-  try {
-    list = JSON.parse(json);
-  } catch {
-    throw new Error('fal suggest: the answer is not a JSON array');
-  }
-  if (!Array.isArray(list)) throw new Error('fal suggest: the answer is not a JSON array');
-  const seen = new Map<string, string | null>();
-  for (const item of list) {
-    const o = typeof item === 'string' ? { text: item } : (item as { text?: unknown; vi?: unknown } | null);
-    const text = typeof o?.text === 'string' ? o.text.trim().slice(0, max).trim() : '';
-    if (!text || seen.has(text)) continue;
-    seen.set(text, typeof o?.vi === 'string' && o.vi.trim() ? o.vi.trim() : null);
-  }
-  const options = [...seen.keys()].slice(0, SUGGESTIONS);
-  if (options.length === 0) throw new Error('fal suggest: no options');
-  return { options, meanings: options.map((t) => seen.get(t) ?? null) };
+export function modelNote(model: { id: string; label: string; endpoint: string }, audio: boolean): string {
+  const tip = FAMILY_TIPS.find(([re]) => re.test(model.id))?.[1];
+  const sound = ALWAYS_AUDIO.has(model.endpoint) || (audio && Object.hasOwn(AUDIO_USD_PER_SECOND, model.endpoint));
+  return [`The model: ${model.label}.`, tip, sound && 'The clip has sound: add one sentence on the ambient sound, with any spoken line in double quotes.'].filter(Boolean).join(' ');
 }
+
+const ASK = {
+  brief: 'Write one creator brief: what the creator does on camera, beat by beat, and what they say about the product, as flowing prose.',
+  script: 'Write one script: only the exact words the creator speaks to camera, natural and casual, with no stage directions.',
+  hook: 'Write one hook: what happens in the first one or two seconds of the clip, in English, starting "The clip opens".',
+  location: 'Write one place the clip is set in: an English noun phrase, not a sentence, rich in concrete detail (the space, the light, the props and the mood), such as "a cozy corner cafe with warm light".',
+  prompt: 'Write one prompt for',
+};
+
+/** The three directions, one call each, in the order the page names them (Suggestions: DIRECTION_LABELS). */
+export const DIRECTIONS = [
+  "Faithful: build directly on the seller's notes (or the most natural take on the task when there are none), polished and completed.",
+  'Creative: a fresh angle on the same goal, different from the obvious take.',
+  'Bold: the most eye-catching, scroll-stopping version.',
+] as const;
+
+/** The length each option aims for: 70 to 90 % of the limit, or of the lines that fit the clip for a script. */
+export function targetRange(i: Pick<SuggestInput, 'field' | 'max' | 'seconds'>): { low: number; high: number; max: number } {
+  const max = i.field === 'script' && i.seconds ? Math.min(i.max, Math.round(i.seconds * WORDS_PER_SECOND) * CHARS_PER_WORD) : i.max;
+  return { low: Math.floor(max * TARGET_SHARE.low), high: Math.floor(max * TARGET_SHARE.high), max };
+}
+
+/** The length line: models count sentences far better than characters, so a long text is also asked as a number of sentences. */
+function lengthLine(i: SuggestInput): string {
+  const { low, high, max } = targetRange(i);
+  const sentences = high >= 2 * CHARS_PER_SENTENCE ? `, that is about ${Math.round(high / CHARS_PER_SENTENCE)} sentences of about 20 words each` : '';
+  return `About ${high} characters long${sentences}: never fewer than ${low} characters or more than ${max}.`;
+}
+
+/** The user turn of the call for direction `d` (0 to 2): the task, the direction, the model, the pace, the hook and location, the notes and the length. */
+export function suggestPrompt(i: SuggestInput, d = 0): string {
+  if (i.field === 'translate') return `The prompt:\n${i.text}`;
+  const pace =
+    i.seconds &&
+    (i.field === 'script' ? `The lines are spoken in a ${i.seconds}-second clip.` : i.field === 'brief' || i.task === PROMPT_TASKS.video ? `The clip lasts ${i.seconds} seconds: pace the beats to it.` : '');
+  return [
+    i.field === 'prompt' ? `${ASK.prompt} ${i.task}.` : ASK[i.field],
+    `Direction: ${DIRECTIONS[d]}`,
+    i.model,
+    pace,
+    i.context && `The video: ${i.context}`,
+    i.text && `The seller's notes: ${i.text}`,
+    lengthLine(i),
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+/** The second turn for an option that came back short of the range: the same text, longer, with more of the same kind of detail. */
+export function lengthenPrompt(i: SuggestInput, text: string): string {
+  return [
+    'Rewrite the text below longer. Keep its direction, its order, its language and every detail, and add concrete detail of the same kind.',
+    i.model,
+    lengthLine(i),
+    `The text:\n${text}`,
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+/** An answer's token budget: one text at the top of the range and its summary (about 3 characters a token, Vietnamese included). */
+function maxTokens(i: SuggestInput): number {
+  return i.field === 'translate' ? 6000 : Math.ceil(targetRange(i).high / 3) + 600;
+}
+
+/** Cuts `text` to `max` at the last sentence end, else the last word, so an over-long option never stops mid-word. */
+export function cutTo(text: string, max: number): string {
+  if (text.length <= max) return text;
+  const head = text.slice(0, max);
+  const end = Math.max(...['. ', '! ', '? ', '." ', '!" ', '?" '].map((m) => (head.lastIndexOf(m) < 0 ? -1 : head.lastIndexOf(m) + m.length - 1)));
+  if (end >= max * 0.5) return head.slice(0, end).trim(); // a whole sentence beats a fuller cut one
+  const space = head.lastIndexOf(' ');
+  return (space > 0 ? head.slice(0, space) : head).trim();
+}
+
+/** One option from an answer: a JSON object `{ text, vi }` (or a one-item array of it, or a bare string), possibly in a code fence; text cut to `max`. */
+export function parseOption(answer: string, max: number): { text: string; vi: string | null } {
+  let v: unknown;
+  try {
+    v = JSON.parse(answer.trim().replace(/^```(?:json)?\s*([\s\S]*?)\s*```$/, '$1'));
+  } catch {
+    throw new Error('suggest: the answer is not JSON');
+  }
+  if (Array.isArray(v)) v = v[0];
+  const o = typeof v === 'string' ? { text: v } : (v as { text?: unknown; vi?: unknown } | null);
+  const text = typeof o?.text === 'string' ? cutTo(o.text.trim(), max) : '';
+  if (!text) throw new Error('suggest: no text in the answer');
+  return { text, vi: typeof o?.vi === 'string' && o.vi.trim() ? cutTo(o.vi.trim(), MAX_SUMMARY) : null };
+}
+
+/** One LLM call: a system prompt, a user turn, a temperature and a token budget in; the answer's text and its cost out. */
+type Chat = (system: string, user: string, temperature: number, maxTokens: number) => Promise<{ text: string; costUsd: number | null }>;
 
 const SYSTEMS: Record<SuggestInput['field'], string> = { brief: SUGGEST_SYSTEM, script: SUGGEST_SYSTEM, hook: SCENE_SYSTEM, location: SCENE_SYSTEM, prompt: PROMPT_SYSTEM, translate: TRANSLATE_SYSTEM };
 
+const sum = (costs: (number | null)[]): number | null => (costs.every((c) => c === null) ? null : costs.reduce<number>((a, c) => a + (c ?? 0), 0));
+
+/**
+ * The run: a translation is one call; otherwise one call per direction, all at once (one answer each reaches the length far more often than three
+ * in one answer), and a second call for an option still short of the range. Any failed call fails the run, so option i is always direction i.
+ */
+async function suggestWith(chat: Chat, input: SuggestInput): Promise<{ options: string[]; meanings?: (string | null)[]; costUsd: number | null }> {
+  const system = SYSTEMS[input.field];
+  if (input.field === 'translate') {
+    const { text, costUsd } = await chat(system, suggestPrompt(input), 0.2, maxTokens(input));
+    return { options: [parseOption(text, input.max).text], costUsd };
+  }
+  const { low, max } = targetRange(input);
+  const answers = await Promise.all(
+    DIRECTIONS.map(async (_, d) => {
+      const first = await chat(system, suggestPrompt(input, d), 0.9, maxTokens(input));
+      const option = parseOption(first.text, max);
+      if (option.text.length >= low) return { ...option, costs: [first.costUsd] };
+      const second = await chat(system, lengthenPrompt(input, option.text), 0.7, maxTokens(input));
+      const longer = parseOption(second.text, max);
+      // A rewrite that came back shorter still is no better: keep the first.
+      return { ...(longer.text.length > option.text.length ? longer : option), costs: [first.costUsd, second.costUsd] };
+    }),
+  );
+  return { options: answers.map((a) => a.text), meanings: answers.map((a) => a.vi), costUsd: sum(answers.flatMap((a) => a.costs)) };
+}
+
 export function createFalSuggester({ apiKey, fetch: f = fetch, model = ENHANCE_MODEL }: { apiKey: string; fetch?: Fetch; model?: string }): Suggester {
-  return async (input) => {
+  const chat: Chat = async (system, user, temperature, maxTokens) => {
     const out = (await sendJson(f, 'fal suggest', ENHANCE_URL, {
       method: 'POST',
       headers: { Authorization: `Key ${apiKey}`, 'Content-Type': 'application/json' },
-      // The Vietnamese readings about double the answer, and a translation may be as long as the longest prompt.
-      body: JSON.stringify({ model, system_prompt: SYSTEMS[input.field], prompt: suggestPrompt(input), temperature: input.field === 'translate' ? 0.2 : 0.9, max_tokens: input.field === 'translate' ? 3000 : 1600 }),
+      body: JSON.stringify({ model, system_prompt: system, prompt: user, temperature, max_tokens: maxTokens }),
       signal: timeout(),
     })) as { output?: unknown; error?: unknown; usage?: { cost?: unknown } };
     if (out.error) throw new Error(`fal suggest: ${String(out.error)}`);
     const cost = Number(out.usage?.cost);
-    const { options, meanings } = parseSuggestions(typeof out.output === 'string' ? out.output : '', input.max);
-    const call = { costUsd: Number.isFinite(cost) ? cost : null, provider: 'fal', model };
-    // A translation is its one option, with no reading of its own.
-    return input.field === 'translate' ? { options: options.slice(0, 1), ...call } : { options, meanings, ...call };
+    return { text: typeof out.output === 'string' ? out.output : '', costUsd: Number.isFinite(cost) ? cost : null };
   };
+  return async (input) => ({ ...(await suggestWith(chat, input)), provider: 'fal', model });
 }
 
 /** The OpenAI twin of createFalSuggester, with the same prompts, limits and parsing. */
 export function createOpenAiSuggester({ apiKey, fetch: f = fetch, model = OPENAI_MODEL }: { apiKey: string; fetch?: Fetch; model?: string }): Suggester {
-  return async (input) => {
-    const translate = input.field === 'translate';
-    const { text, costUsd } = await openAiChat(f, 'openai suggest', apiKey, model, SYSTEMS[input.field], suggestPrompt(input), translate ? 0.2 : 0.9, translate ? 3000 : 1600);
-    const { options, meanings } = parseSuggestions(text, input.max);
-    const call = { costUsd, provider: 'openai', model };
-    return translate ? { options: options.slice(0, 1), ...call } : { options, meanings, ...call };
-  };
+  const chat: Chat = (system, user, temperature, maxTokens) => openAiChat(f, 'openai suggest', apiKey, model, system, user, temperature, maxTokens);
+  return async (input) => ({ ...(await suggestWith(chat, input)), provider: 'openai', model });
 }

@@ -606,7 +606,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
               onRun={() => canRun && void run()}
               disabled={presetId !== ''}
               placeholder={presetId === '' ? 'Ví dụ: camera xoay chậm quanh sản phẩm, ánh sáng mềm (nên viết bằng tiếng Anh)' : 'Đang dùng mẫu. Chọn "Tự viết mô tả" trong danh sách mẫu để tự nhập'}
-              ask={() => ({ field: 'prompt', feature: 'video', text: prompt, ...(chosen && { room: chosen.maxPromptChars }) })}
+              ask={() => ({ field: 'prompt', feature: 'video', text: prompt, seconds: durationSec, audio, ...(chosen && { room: chosen.maxPromptChars, model: chosen.id }) })}
               enhance={<EnhanceToggle on={enhance} onChange={setEnhance} />}
             />
 

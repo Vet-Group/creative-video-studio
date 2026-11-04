@@ -93,7 +93,7 @@ test('a long suggestion shows its whole text in the narrow form column, with no 
   expect(await group.getByText('Chọn một gợi ý').evaluate((e) => getComputedStyle(e).fontSize)).toBe('13px');
 });
 
-test('each card is numbered, with the Vietnamese reading first and the English it puts in the box under it, smaller', async ({ page }) => {
+test('each card is numbered with its direction and length, with the Vietnamese summary first and the English it puts in the box under it, smaller and at most six lines', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await signIn(page, 'sugga');
   await page.goto('/create');
@@ -105,13 +105,15 @@ test('each card is numbered, with the Vietnamese reading first and the English i
   await expect(cards).toHaveCount(3, { timeout: 20_000 });
   for (const n of [1, 2, 3]) {
     const card = cards.nth(n - 1);
-    await expect(card.getByText(`Gợi ý ${n}`, { exact: true })).toBeVisible();
+    const english = `Option ${n}: slow turn`;
+    await expect(card.getByText(`Gợi ý ${n} · ${['Sát ý bạn', 'Sáng tạo', 'Nổi bật'][n - 1]} · ${english.length} ký tự`, { exact: true })).toBeVisible();
     const vi = card.getByText(`Reading ${n}: slow turn`, { exact: true });
     const en = card.getByText(`Option ${n}: slow turn`, { exact: true });
     expect((await vi.boundingBox())!.y).toBeLessThan((await en.boundingBox())!.y);
     expect(await vi.evaluate((e) => getComputedStyle(e).fontSize)).toBe('13px');
     expect(await en.evaluate((e) => getComputedStyle(e).fontSize)).toBe('12px');
     await expect(en).toHaveAttribute('lang', 'en');
+    expect(await en.evaluate((e) => getComputedStyle(e).webkitLineClamp)).toBe('6'); // an option of thousands of characters stays a short card
   }
   await cards.nth(1).click();
   await expect(box).toHaveValue('Option 2: slow turn'); // the English goes in, never the reading
