@@ -9,10 +9,12 @@ import { promisify } from 'node:util';
 import { ImageReadError, ProviderHttpError, resolveImages, sendJson, timeout, type Fetch, type ReadImage } from '@cvs/core/providers/http';
 import { shuffle } from './anonymise.ts';
 import { ffmpeg } from './common.ts';
-import { appendLine, latest, readLines, spend, type JobKey, type JobLine } from './jobs.ts';
+import { appendLine, latest, readLines, spend, type JobKey, type JobLine, type SetName } from './jobs.ts';
 
 const execFileAsync = promisify(execFile);
 export const IMAGE_ROUND ='replicate-2026-11-images';
+/** The image round of a Replicate set: each set keeps its own job log and blind folder. */
+const imageRound = (set: string): string => `${set}-images`;
 const API = 'https://api.replicate.com/v1';
 // Without a User-Agent the API answers 403 (providers/replicate.ts).
 const USER_AGENT = 'creative-video-studio/1.0';
@@ -52,6 +54,8 @@ export interface ImageDeps {
   download: (url: string, dest: string) => Promise<void>;
   sleep: (ms: number) => Promise<void>;
   capUsd: number;
+  /** The Replicate set whose log this run writes to; default 'replicate-2026-11'. */
+  set?: SetName;
   pollMs?: number;
   /** Wait this long between two submits (Replicate throttles an account under $5 of credit to 6 creates a minute); default none. */
   submitGapMs?: number;
@@ -70,11 +74,11 @@ const FINAL = ['succeeded', 'failed', 'unknown', 'refused'];
 /** Runs every (model, image) job once: a key already in the log is polled or skipped, never submitted twice. */
 export async function runImages(deps: ImageDeps, jobs: { model: ImageModel; image: number }[]): Promise<ImageResult> {
   const headers = { Authorization: `Bearer ${deps.apiToken}`, 'Content-Type': 'application/json', 'User-Agent': USER_AGENT };
-  const key = (j: { model: ImageModel; image: number }): JobKey => ({ image: j.image, model: j.model.id, round: IMAGE_ROUND });
+  const key = (j: { model: ImageModel; image: number }): JobKey => ({ image: j.image, model: j.model.id, round: imageRound(deps.set ?? 'replicate-2026-11') });
   const id = (k: JobKey): string => `${k.image}|${k.model}|${k.round}`;
   const current = (k: JobKey): JobLine | undefined => latest(readLines(deps.outDir)).get(id(k));
   const line = (j: { model: ImageModel; image: number }, l: Partial<JobLine> & Pick<JobLine, 'status'>): void =>
-    appendLine(deps.outDir, { ...l, ...key(j), at: new Date().toISOString(), provider: 'replicate', estimateUsd: j.model.usdPerImage, set: 'replicate-2026-11' });
+    appendLine(deps.outDir, { ...l, ...key(j), at: new Date().toISOString(), provider: 'replicate', estimateUsd: j.model.usdPerImage, set: deps.set ?? 'replicate-2026-11' });
   if (new Set(jobs.map((j) => id(key(j)))).size !== jobs.length) throw new Error('the plan has duplicate job keys');
   let outcome: ImageResult['outcome'] = 'complete';
   let reason: string | undefined;
@@ -193,19 +197,22 @@ export interface BlindImagesOpts {
   /** The source file of image n (inputs.json). */
   sourceFile: (n: number) => string;
   rubricPath: string;
+  /** The Replicate set whose images are blinded; default 'replicate-2026-11'. */
+  set?: SetName;
   newId?: () => string;
   shuffle?: <T>(xs: T[]) => T[];
 }
 
 /**
- * blind/replicate-2026-11-images/image-<random>/ holds image.png (metadata stripped) and source.<ext>, plus rubric.md and BRIEF.md beside them.
+ * blind/<set>-images/image-<random>/ holds image.png (metadata stripped) and source.<ext>, plus rubric.md and BRIEF.md beside them.
  * The map is written to `mapPath` before each folder exists, as anonymise.ts does for clips.
  */
 export async function blindImages(o: BlindImagesOpts): Promise<Record<string, { model: string; image: number }>> {
   if (relative(resolve(o.root), resolve(o.mapPath)).split(sep)[0] !== '..') throw new Error('the map must be outside the cvs-bakeoff folder, where a judge could read it');
-  const setDir = join(o.root, 'blind', IMAGE_ROUND);
+  const round = imageRound(o.set ?? 'replicate-2026-11');
+  const setDir = join(o.root, 'blind', round);
   if (existsSync(setDir) && readdirSync(setDir).length) throw new Error(`${setDir} already holds images; the id map for them would be lost`);
-  const done = [...latest(readLines(o.outDir)).values()].filter((l) => l.round === IMAGE_ROUND && l.status === 'succeeded' && l.clip);
+  const done = [...latest(readLines(o.outDir)).values()].filter((l) => l.round === round && l.status === 'succeeded' && l.clip);
   if (!done.length) throw new Error('no succeeded images');
   const newId = o.newId ?? (() => `image-${randomBytes(4).toString('hex')}`);
   const map: Record<string, { model: string; image: number }> = {};
@@ -214,7 +221,7 @@ export async function blindImages(o: BlindImagesOpts): Promise<Record<string, { 
     let id = newId();
     while (map[id]) id = newId();
     map[id] = { model: l.model, image: l.image };
-    writeFileSync(o.mapPath, `${JSON.stringify({ set: IMAGE_ROUND, images: map }, null, 2)}\n`);
+    writeFileSync(o.mapPath, `${JSON.stringify({ set: round, images: map }, null, 2)}\n`);
     const dir = join(setDir, id);
     mkdirSync(dir, { recursive: true });
     await ffmpeg(['-y', '-v', 'error', '-i', join(o.outDir, l.clip!), '-map_metadata', '-1', '-frames:v', '1', join(dir, 'image.png')]);
@@ -225,12 +232,12 @@ export async function blindImages(o: BlindImagesOpts): Promise<Record<string, { 
   writeFileSync(
     join(setDir, 'BRIEF.md'),
     [
-      `# Judge brief: set ${IMAGE_ROUND}`,
+      `# Judge brief: set ${round}`,
       '',
       'Read rubric.md first. Then judge every image folder below against its `source.<ext>` photo, using `image.png`.',
       'Do not look for, guess or record which model made an image. Do not open anything outside this folder.',
       '',
-      `Write \`scores-${IMAGE_ROUND}.csv\` in this folder with the header \`id,pass,faults,note\`, one row per folder, as rubric.md describes.`,
+      `Write \`scores-${round}.csv\` in this folder with the header \`id,pass,faults,note\`, one row per folder, as rubric.md describes.`,
       '',
       ...Object.keys(map).sort().map((id) => `- ${id}`),
       '',
