@@ -82,11 +82,11 @@ describe('migration 0002 seed data', () => {
     for (const r of rows) expect(r.label).not.toMatch(/^[A-Z][a-z-]+( [A-Z&][a-z-]*)+$/);
   });
 
-  test('seeds the two models with price, limits and bake-off record (migration 0013: Kling enabled, Seedance disabled; 0022: Kling takes 7 references), and the settings row', async () => {
+  test('seeds the two models with price, limits and bake-off record (migration 0013: Kling enabled, Seedance disabled; 0022: Kling takes 7 references; 0057 adds the Replicate round to Seedance), and the settings row', async () => {
     const models = await pool.query(`select id, provider, endpoint, enabled, usd_per_second::text as usd, max_images, output_resolution, pass_seed_passes as passes, pass_seed_total as total from model_configs where id in ('kling-o3-pro', 'seedance-2.5') order by id`);
     expect(models.rows).toEqual([
       { id: 'kling-o3-pro', provider: 'fal', endpoint: 'fal-ai/kling-video/o3/pro/reference-to-video', enabled: true, usd: '0.1120', max_images: 7, output_resolution: '1080p', passes: 7, total: 10 },
-      { id: 'seedance-2.5', provider: 'replicate', endpoint: 'bytedance/seedance-2.5', enabled: false, usd: '0.2312', max_images: 4, output_resolution: '720p', passes: 6, total: 9 },
+      { id: 'seedance-2.5', provider: 'replicate', endpoint: 'bytedance/seedance-2.5', enabled: false, usd: '0.2312', max_images: 4, output_resolution: '720p', passes: 7, total: 12 },
     ]);
     // 0022 also widens Kling to every ratio and duration fal accepts, matching the model facts in packages/core.
     const kling = BAKEOFF_MODELS.find((m) => m.id === 'kling-o3-pro')!;
@@ -134,7 +134,7 @@ describe('migration 0015 Fash video models', () => {
       expect(VIDEO_BODIES[r.endpoint], r.id).toBeDefined();
       expect(r.ratios.length * r.durations_sec.length * r.max_images * r.usd, r.id).toBeGreaterThan(0);
       expect(['720p', '768p', '1080p'], r.id).toContain(r.output_resolution);
-      expect(Object.keys(r.sources).filter((k) => k !== 'maxPromptChars').sort(), r.id).toEqual(['durationsSec', 'maxImages', 'outputResolution', 'ratios', 'usdPerSecond']); // 0028 adds the prompt limit's source
+      expect(Object.keys(r.sources).filter((k) => k !== 'maxPromptChars' && k !== 'passSeed').sort(), r.id).toEqual(['durationsSec', 'maxImages', 'outputResolution', 'ratios', 'usdPerSecond']); // 0028 adds the prompt limit's source, 0057 the bake-off prior's
     }
     expect(rows.find((r) => r.id === 'veo-3.1')).toMatchObject({ ratios: ['9:16', '16:9'], durations_sec: [8] }); // no 1:1, and Fash's 8 s only; 0037 adds 16:9
     await pool.query(`update model_configs set enabled = true where id = 'kling-3.0-pro'`); // complete enough for the enable check
@@ -366,8 +366,30 @@ describe('migration 0013 real video models', () => {
         provider: m.provider, endpoint: m.endpoint, label: m.label, ratios: m.ratios, durations_sec: m.durationsSec, max_images: m.maxImages,
         output_resolution: m.outputResolution, usd: m.usdPerSecond, billed_amount_field: m.billedAmountField, sources: m.sources,
       });
-      const [, passes, total] = new RegExp(`\\| ${m.id} \\| (\\d+)/(\\d+) \\|`).exec(doc)!;
-      expect([row.pass_seed_passes, row.pass_seed_total], m.id).toEqual([Number(passes), Number(total)]);
+      // Later rounds (0057) add to the row, so the prior is the sum of every table row of this model.
+      const counts = [...doc.matchAll(new RegExp(`\\| ${m.id} \\| (\\d+)/(\\d+) \\|`, 'g'))].map(([, p, t]): [number, number] => [Number(p), Number(t)]);
+      expect(counts.length, m.id).toBeGreaterThan(0);
+      expect([row.pass_seed_passes, row.pass_seed_total], m.id).toEqual(counts.reduce(([p, t], [q, u]) => [p + q, t + u], [0, 0]));
+    }
+  });
+});
+
+describe('migration 0057 Replicate round scores', () => {
+  test('every row of a model carries the same prior, and the Replicate-round twins carry the docs/BAKEOFF.md totals', async () => {
+    const twins: [number, number, string[]][] = [
+      [3, 10, ['seedance-2.0', 'seedance-2.0-replicate', 'seedance-2.0-byteplus']],
+      [7, 12, ['seedance-2.5', 'seedance-2.5-byteplus']],
+      [1, 4, ['veo-3.1', 'veo-3.1-replicate', 'veo-3.1-vertex']],
+      [8, 18, ['seedream-5-pro', 'seedream-5-pro-byteplus']],
+      [10, 18, ['nano-banana-2', 'nano-banana-2-vertex']],
+      [4, 18, ['nano-banana', 'nano-banana-vertex']],
+      [9, 10, ['nano-banana-2.1', 'nano-banana-2.1-vertex']],
+    ];
+    const doc = readFileSync(new URL('../../../docs/BAKEOFF.md', import.meta.url), 'utf8');
+    for (const [passes, total, ids] of twins) {
+      const { rows } = await pool.query(`select id, pass_seed_passes as p, pass_seed_total as t from model_configs where id = any($1)`, [ids]);
+      expect(rows.map((r) => [r.id, r.p, r.t]).sort()).toEqual([...ids].sort().map((id) => [id, passes, total]));
+      if (passes !== 9) expect(doc).toContain(`${passes}/${total}`);
     }
   });
 });
