@@ -1,6 +1,6 @@
 // Bake-off runner (plan B.4): 2 models x 10 images at 9:16, the thrift duration and resolution, the safe preset.
 //   tsx scripts/bakeoff/run.ts --set canary|half-1|half-2|extra [--models id,id] [--images 1,2,3] [--preset id] [--root dir] [--inputs file]
-// FAL_KEY and REPLICATE_API_TOKEN come from the environment. Sets: canary = image 1; half-1 = images 1-5 (image 1 is polled, not
+// FAL_KEY comes from the environment (the Replicate adapter was removed on 2026-11-04, so only fal models can run for real). Sets: canary = image 1; half-1 = images 1-5 (image 1 is polled, not
 // resubmitted); half-2 = images 6-10 (pass --models with the models still able to pass); extra = at most 5 images of one model with a
 // preset other than the safe one, round "extra". The logic is in runStage so tests drive it on the mock adapter, never a real provider.
 import { closeSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync, writeSync } from 'node:fs';
@@ -10,12 +10,11 @@ import { BAKEOFF_MODELS, estimateUsd, validateRequest, type ModelConfig } from '
 import { BAKEOFF_PRESET, PRESETS } from '@cvs/core/presets';
 import { ImageReadError, isFundingRefusal, ProviderHttpError } from '@cvs/core/providers/http';
 import { createFalProvider } from '@cvs/core/providers/fal';
-import { createReplicateProvider } from '@cvs/core/providers/replicate';
 import type { VideoProvider } from '@cvs/core/providers';
 import { defaultRoot, isMain } from './common.ts';
 import { imageUrl, loadInputs, localReadImage, type Inputs } from './inputs.ts';
 import {
-  appendLine, defaultImages, isReplicateSet, keyId, latest, parseSet, readLines, roundOf, spend, type JobKey, type JobLine, type JobStatus, type SetName,
+  appendLine, defaultImages, keyId, latest, parseSet, readLines, roundOf, spend, type JobKey, type JobLine, type JobStatus, type SetName,
 } from './jobs.ts';
 
 // Lowered from $40 by the owner on 2026-10-24: the canary, the 20 bake-off clips and the server smoke clip fit (about $19.30 at 5 s).
@@ -36,8 +35,6 @@ export interface RunDeps {
   capUsd?: number;
   marginUsd?: number;
   pollMs?: number;
-  /** Wait this long between two submits; default none. */
-  submitGapMs?: number;
   maxPolls?: number;
 }
 
@@ -48,8 +45,6 @@ export interface StageOptions {
   /** Image numbers; only for the extra set. */
   images?: number[];
   presetId?: string;
-  /** The replicate sets only: exactly these (image, model) jobs, each model at its own thrift duration. */
-  jobs?: { image: number; model: string }[];
 }
 
 export interface StageResult {
@@ -90,10 +85,7 @@ function plan(deps: RunDeps, opts: StageOptions): { jobs: Planned[]; prompt: str
   if (!models.length) throw new Error('no model selected');
   let images: number[];
   let prompt = BAKEOFF_PRESET.prompt;
-  if (isReplicateSet(opts.set)) {
-    if (!opts.jobs?.length || opts.images || opts.presetId) throw new Error(`the ${opts.set} set takes jobs only`);
-    images = opts.jobs.map((j) => j.image);
-  } else if (opts.set === 'extra') {
+  if (opts.set === 'extra') {
     images = opts.images ?? [];
     if (!images.length || images.length > 5) throw new Error('extra needs 1 to 5 --images');
     if (models.length !== 1) throw new Error('extra runs one model');
@@ -101,14 +93,12 @@ function plan(deps: RunDeps, opts: StageOptions): { jobs: Planned[]; prompt: str
     if (!p || p.id === BAKEOFF_PRESET.id) throw new Error('extra needs --preset naming a preset other than the safe one');
     prompt = p.prompt;
   } else {
-    if (opts.images || opts.presetId || opts.jobs) throw new Error(`--images and --preset apply only to the extra set, jobs to the replicate sets`);
+    if (opts.images || opts.presetId) throw new Error(`--images and --preset apply only to the extra set`);
     images = defaultImages(opts.set);
   }
   for (const n of images) if (!Number.isInteger(n) || n < 1 || n > deps.inputs.images.length) throw new Error(`image ${n} is not in inputs.json`);
   const jobs: Planned[] = [];
-  const pairs = opts.jobs
-    ? opts.jobs.map((j) => ({ image: j.image, model: deps.models.find((m) => m.id === j.model) ?? fail(`unknown model ${j.model}`) }))
-    : images.flatMap((image) => models.map((model) => ({ image, model })));
+  const pairs = images.flatMap((image) => models.map((model) => ({ image, model })));
   for (const { image, model } of pairs) {
     if (model.provider === 'vertex') throw new Error('Vertex is not supported by the bake-off runner');
     if (model.provider === 'byteplus') throw new Error('BytePlus is not supported by the bake-off runner');
@@ -173,7 +163,7 @@ async function runLocked(deps: RunDeps, opts: StageOptions): Promise<StageResult
   const toSubmit = jobs.filter((p) => submittable(current(p)?.status));
   if (toSubmit.length) {
     const falCost = toSubmit.filter((p) => p.model.provider === 'fal').reduce((a, p) => a + p.estimateUsd, 0);
-    // A stage with no fal job (the Replicate round) neither reads nor gates on the fal balance: the log alone is its spend.
+    // A stage with no fal job neither reads nor gates on the fal balance: the log alone is its spend.
     const usesFal = toSubmit.some((p) => p.model.provider === 'fal');
     if (usesFal) {
       try {
@@ -189,7 +179,6 @@ async function runLocked(deps: RunDeps, opts: StageOptions): Promise<StageResult
     }
     if ((lastBalance !== null || !usesFal) && outcome === 'complete') {
       const baseline = usesFal ? (readBaseline(deps.outDir) ?? writeBaseline(deps.outDir, lastBalance!, now())) : 0;
-      let gapped = 0;
       for (const p of toSubmit) {
         let have = 0;
         if (usesFal) {
@@ -203,7 +192,7 @@ async function runLocked(deps: RunDeps, opts: StageOptions): Promise<StageResult
           lastBalance = have;
         }
         const s = spend(readLines(deps.outDir));
-        // The larger of the job log and the balance fall since preflight (fal) plus the Replicate log; a top-up only lowers the fall.
+        // The larger of the job log and the balance fall since preflight (fal) plus the other providers' log; a top-up only lowers the fall.
         // Written so that a NaN anywhere stops the stage instead of passing the check.
         const spent = usesFal ? Math.max(s.total, baseline - have + (s.byProvider.replicate ?? 0)) : s.total;
         if (!(spent + p.estimateUsd <= cap + 1e-9)) {
@@ -214,8 +203,6 @@ async function runLocked(deps: RunDeps, opts: StageOptions): Promise<StageResult
         const provider = deps.providers[p.model.provider] ?? fail(`no provider for ${p.model.provider}`);
         // The key may have changed since the plan was read; submit only a key nobody has submitted.
         if (!submittable(current(p)?.status)) continue;
-        // Replicate throttles an account under $5 of credit to 6 creates a minute with a burst of 1; a gap keeps the stage from stopping on a 429.
-        if (deps.submitGapMs && gapped++) await deps.sleep(deps.submitGapMs);
         line(p, { status: 'submitting' });
         try {
           const { providerJobId } = await provider.submit({ model: p.model, prompt, imageUrls: [imageUrl(deps.inputs, p.key.image)], ratio: THRIFT_RATIO, durationSec: p.durationSec });
@@ -340,7 +327,7 @@ async function realDeps(root: string, inputsPath: string, ids: string[]): Promis
   const key = (name: string): string => process.env[name] || fail(`${name} is not set`);
   const providers: RunDeps['providers'] = {};
   if (need.has('fal')) providers.fal = createFalProvider({ apiKey: key('FAL_KEY'), readImage });
-  if (need.has('replicate')) providers.replicate = createReplicateProvider({ apiToken: key('REPLICATE_API_TOKEN'), readImage });
+  if (need.has('replicate')) fail('the Replicate adapter was removed on 2026-11-04; pass --models with fal models only');
   return {
     outDir: join(root, 'out'),
     inputs,

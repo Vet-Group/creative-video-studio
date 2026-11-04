@@ -3,7 +3,7 @@ import { byFamily, FEATURED, familyOf, featured } from './model-families';
 
 test('a model falls into its family by id, provider twins included; an unknown id falls into the other family', () => {
   const keys = (ids: string[]) => ids.map((id) => familyOf(id).key);
-  expect(keys(['seedance-2.0', 'seedance-2.0-replicate', 'seedance-2.5-reference'])).toEqual(['seedance', 'seedance', 'seedance']);
+  expect(keys(['seedance-2.0', 'seedance-2.0-byteplus', 'seedance-2.5-reference'])).toEqual(['seedance', 'seedance', 'seedance']);
   expect(keys(['kling-o3-pro', 'kling-v3-motion-pro'])).toEqual(['kling', 'kling']);
   expect(keys(['gemini-omni-flash', 'veo-3.1', 'nano-banana-2-vertex', 'virtual-try-on-vertex', 'product-recontext-vertex'])).toEqual(['google', 'google', 'google', 'google', 'google']);
   expect(keys(['flux-3', 'grok-imagine-1.5', 'wan-2.7', 'minimax-h3-max', 'gpt-image-2.5-flare', 'seedream-5-pro'])).toEqual(['flux', 'xai', 'alibaba', 'minimax', 'openai', 'seedream']);

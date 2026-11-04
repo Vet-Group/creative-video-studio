@@ -24,7 +24,6 @@ export const ITEMS: { id: string; label: string; required?: boolean; skips: stri
   { id: 'docker', label: 'Docker trên máy này', required: true, skips: [] },
   { id: 'ssh', label: 'ssh vet-linux', skips: ['A.0c', 'B.3', 'B.5a', 'B.5', 'B.6', 'B.7', 'D.3', 'D.5'] },
   { id: 'fal', label: 'fal (FAL_KEY)', skips: ['B.5a', 'B.5', 'B.6', 'B.7', 'M.6'] },
-  { id: 'replicate', label: 'Replicate (REPLICATE_API_TOKEN)', skips: ['B.5a', 'B.5', 'B.6', 'B.7', 'M.6'] },
   { id: 'lark-app', label: 'App Lark OAuth', skips: ['D.5-lark'] },
   { id: 'google-app', label: 'App Google OAuth', skips: ['D.5-google'] },
   { id: 'r2', label: 'Cloudflare R2 cho sao lưu', skips: ['D.2-r2'] },
@@ -82,9 +81,6 @@ export async function checkItem(id: string, deps: Deps): Promise<ItemResult> {
     case 'fal':
       if (!e.FAL_KEY) return missing(id, 'điền FAL_KEY');
       return bearer(deps, id, `https://api.fal.ai/v1/models/pricing?endpoint_id=${FAL_PROBE_ENDPOINT}`, `Key ${e.FAL_KEY}`);
-    case 'replicate':
-      if (!e.REPLICATE_API_TOKEN) return missing(id, 'điền REPLICATE_API_TOKEN');
-      return bearer(deps, id, 'https://api.replicate.com/v1/account', `Bearer ${e.REPLICATE_API_TOKEN}`);
     case 'google-app': {
       if (!e.GOOGLE_CLIENT_ID || !e.GOOGLE_CLIENT_SECRET) return missing(id, 'điền GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET');
       // Exchanging a dummy code costs nothing: a valid client gets invalid_grant, a wrong ID or secret gets invalid_client.

@@ -95,7 +95,8 @@ const READ_AT = '2026-10-23';
 // Migration 0013 (M.6) copies these facts into the seeded model_configs rows; packages/db/src/schema.test.ts keeps the two in step.
 /**
  * The two bake-off candidates. `ratios`, `durationsSec` and `maxImages` are the app's subset of what the provider accepts (see `sources`);
- * Kling offers all of fal's, as the reference site does (migration 0022).
+ * Kling offers all of fal's, as the reference site does (migration 0022). Seedance 2.5 ran on Replicate, whose adapter was removed on 2026-11-04:
+ * the entry stays as the record of the finished bake-off (docs/BAKEOFF.md), not as a model any provider can run.
  */
 export const BAKEOFF_MODELS: ModelConfig[] = [
   {
@@ -167,8 +168,7 @@ export const validateRequest = (model: ModelConfig, req: { ratio: string; durati
  * USD per second with native audio on, by endpoint: the endpoints whose request builder sends the audio switch (fal.ts), at the price their fal model
  * page states (read 2026-10-26, https://fal.ai/models/<endpoint>), for the resolution the builder asks for. Kling O3 Pro $0.112 -> $0.14, Kling 3.0 Pro
  * $0.112 -> $0.168, Kling 2.6 Pro $0.07 -> $0.14, Veo 3.1 $0.20 -> $0.40 (720p/1080p), Seedance 1.5 Pro $1.20 -> $2.40 per million tokens (so twice the
- * stored $0.0259). Seedance 2.0 and 2.5 and FLUX 3 price by resolution and tokens only, so audio costs nothing more. Veo 3.1 on Replicate (replicate.ts)
- * is $0.20 -> $0.40 too (https://replicate.com/google/veo-3.1, read 2026-10-30). Veo 3.1 on Vertex (vertex-video.ts) lists $0.20 -> $0.40 per 1 count at
+ * stored $0.0259). Seedance 2.0 and 2.5 and FLUX 3 price by resolution and tokens only, so audio costs nothing more. Veo 3.1 on Vertex (vertex-video.ts) lists $0.20 -> $0.40 per 1 count at
  * 720p, an estimate that takes one count as one second (migration 0042). The mock endpoint takes the switch so the specs can drive it; a mock
  * job books 0 regardless.
  */
@@ -184,7 +184,6 @@ export const AUDIO_USD_PER_SECOND: Record<string, number> = {
   'bytedance/seedance-2.5/us/reference-to-video': 0.473,
   'blackforestlabs/flux-3/image-to-video': 0.29,
   'blackforestlabs/flux-3/keyframes-to-video': 0.29,
-  'google/veo-3.1': 0.4,
   'veo-3.1-generate-001': 0.4,
   mock: 0,
 };

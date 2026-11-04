@@ -9,7 +9,7 @@ Browser ── Next.js web (UI + route handlers) ──┐
                                                ├── Postgres (app data + pg-boss queue)
            worker (pg-boss consumer) ──────────┤
                │                               └── MinIO (inputs, outputs)
-               └── VideoProvider adapter ── mock | fal | replicate
+               └── VideoProvider adapter ── mock | fal | vertex | byteplus   (Replicate removed 2026-11-04)
 ```
 
 ## Stack [approved]
@@ -139,7 +139,7 @@ Every money event is a row in `cost_entries`. The ledger is the only place cost 
 | Model | Route | List price (2026-10-22) | Clip of 8 s |
 |---|---|---|---|
 | Kling o3 Pro (reference), resolution not stated by fal; measured at B.5a, no audio | fal | $0.112–0.14/s (the range spans fal and Kling direct; B.1 records the fal price) | ~$0.90–1.12 |
-| Seedance 2.5 (reference), 720p | Replicate | $0.2312/s | ~$1.85 |
+| Seedance 2.5 (reference), 720p | Replicate (removed 2026-11-04) | $0.2312/s | ~$1.85 |
 | Not a fallback: Veo 3.1 needs a new decision and budget (see the go/no-go gate) | Vertex / fal | $0.40/s | $3.20 |
 
 The prices come from the session pricing report (audited 53/53 against saved pages) and have not been checked with real API calls. The input limits per model must come from the provider API schema, not from Fash UI labels (RESEARCH-GAPS R3).
@@ -175,6 +175,8 @@ Sources: [API Services terms](https://fal.ai/legal/api-services), [DPA](https://
 - **Residual:** the model page shows `is_partner_api: true`, which means "Client Content will be transferred to such a third party", here Kling/Kuaishou. The fal no-training commitment binds fal, not Kuaishou.
 
 ### Replicate + Seedance 2.5: PASS (inferred from the licence scope)
+
+> Replicate was removed from the product on 2026-11-04 (its credit was spent; Vertex and BytePlus are now primary, fal the fallback). This check is kept as the record of the 2026-10-22 decision.
 
 Sources: [Terms](https://replicate.com/terms) (last updated 2026-04-01), [data retention](https://replicate.com/docs/topics/predictions/data-retention).
 

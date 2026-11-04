@@ -24,8 +24,6 @@ interface Settings {
   vertexActiveProject: string | null;
   vertexAccounts: VertexAccount[];
   balanceWarningUsd: string;
-  replicateCreditUsd: string | null;
-  replicateCreditSince: string | null;
 }
 interface VertexAccount {
   projectId: string;
@@ -69,8 +67,6 @@ function SettingsForm({ settings, reload }: { settings: Settings; reload: () => 
   const [memberDay, setMemberDay] = useState(settings.memberDailyUsdCap);
   const [memberMonth, setMemberMonth] = useState(settings.memberMonthlyUsdCap);
   const [warning, setWarning] = useState(settings.balanceWarningUsd);
-  const [replicate, setReplicate] = useState(settings.replicateCreditUsd ?? '');
-  const [recount, setRecount] = useState(false);
   const softOf = (s: Settings) => Object.fromEntries(s.featureCaps.map((c) => [c.feature, c.monthlyUsd]));
   const enabledOf = (s: Settings) => Object.fromEntries(s.models.map((m) => [m.id, m.enabled]));
   const [soft, setSoft] = useState(() => softOf(settings));
@@ -91,8 +87,6 @@ function SettingsForm({ settings, reload }: { settings: Settings; reload: () => 
     differs(memberDay, settings.memberDailyUsdCap) ||
     differs(memberMonth, settings.memberMonthlyUsdCap) ||
     differs(warning, settings.balanceWarningUsd) ||
-    recount ||
-    (replicate.trim() ? settings.replicateCreditUsd === null || Number(replicate) !== Number(settings.replicateCreditUsd) : settings.replicateCreditUsd !== null) ||
     settings.featureCaps.some((c) => differs(soft[c.feature], c.monthlyUsd)) ||
     settings.models.some((m) => enabled[m.id] !== m.enabled) ||
     settings.vertexAccounts.some((a) => {
@@ -109,8 +103,6 @@ function SettingsForm({ settings, reload }: { settings: Settings; reload: () => 
     setMemberDay(settings.memberDailyUsdCap);
     setMemberMonth(settings.memberMonthlyUsdCap);
     setWarning(settings.balanceWarningUsd);
-    setReplicate(settings.replicateCreditUsd ?? '');
-    setRecount(false);
     setSoft(softOf(settings));
     setEnabled(enabledOf(settings));
     setVertex(vertexOf(settings));
@@ -129,8 +121,6 @@ function SettingsForm({ settings, reload }: { settings: Settings; reload: () => 
             memberDailyUsdCap: memberDay,
             memberMonthlyUsdCap: memberMonth,
             balanceWarningUsd: warning,
-            replicateCreditUsd: replicate.trim() || null,
-            replicateCreditRecount: recount,
             featureCaps: settings.featureCaps.map((c) => ({ feature: c.feature, monthlyUsd: soft[c.feature] })),
             models: settings.models.map((m) => ({ id: m.id, enabled: enabled[m.id] })),
             vertexAccounts: settings.vertexAccounts.map((a) => {
@@ -141,7 +131,6 @@ function SettingsForm({ settings, reload }: { settings: Settings; reload: () => 
         ),
       'Không lưu được cài đặt.',
     );
-    if (ok) setRecount(false);
     setSaved(ok);
   }
 
@@ -180,18 +169,7 @@ function SettingsForm({ settings, reload }: { settings: Settings; reload: () => 
         <p className="muted">Số dư hiện trên trang Chi phí; nạp tiền ở trang thanh toán của từng nhà cung cấp.</p>
         <div className="fields">
           <Field label="Ngưỡng cảnh báo số dư" unit="USD" value={warning} onChange={setWarning} hint="Số dư dưới mức này hiện màu đỏ trên trang Chi phí." />
-          <Field
-            label="Số dư Replicate hiện tại"
-            unit="USD"
-            value={replicate}
-            onChange={setReplicate}
-            hint={`Xem trên trang thanh toán của Replicate rồi nhập vào đây (Replicate không có API số dư). App lấy số này trừ chi phí Replicate của các job chạy từ lúc lưu; nhập số khác thì đếm lại từ lúc lưu. Còn dưới 2 USD thì hệ thống tự tắt các mô hình Replicate và bật bản fal tương ứng (kiểm tra mỗi giờ). Để trống nếu không theo dõi.${settings.replicateCreditSince ? ` Đang đếm từ ${new Date(settings.replicateCreditSince).toLocaleString('vi-VN')}.` : ''}`}
-          />
         </div>
-        <label className="model">
-          <input type="checkbox" checked={recount} disabled={!replicate.trim()} onChange={(e) => setRecount(e.target.checked)} />
-          <span>Đếm lại từ bây giờ (sau khi nạp thêm mà số dư nhập vẫn như cũ)</span>
-        </label>
       </fieldset>
       <fieldset>
         <legend>Cảnh báo theo mục</legend>

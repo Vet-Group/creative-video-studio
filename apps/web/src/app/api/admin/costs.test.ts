@@ -11,7 +11,7 @@ process.env.BETTER_AUTH_SECRET = randomBytes(32).toString('hex');
 process.env.APP_URL = 'http://localhost';
 
 const { auth, pool } = await import('@/lib/auth');
-const { bookShared, lateBill, reassignStore, reserve, settle } = await import('@cvs/core/ledger');
+const { bookInvoice, bookShared, lateBill, reassignStore, reserve, settle } = await import('@cvs/core/ledger');
 const { checkCaps } = await import('@cvs/core/limits');
 const costsRoute = await import('./costs/route');
 const detailRoute = await import('./costs/detail/route');
@@ -19,6 +19,7 @@ const summaryRoute = await import('./costs/summary/route');
 const adjustRoute = await import('./costs/adjustments/route');
 const rateRoute = await import('./rates/[month]/route');
 const invoicesRoute = await import('./invoices/route');
+const { invoiceRows } = await import('@/lib/costs');
 const modelsRoute = await import('../models/route');
 
 const PASSWORD = 'correct-horse-battery';
@@ -181,7 +182,8 @@ beforeAll(async () => {
   expect((await postAdjustment({ month: M, usd: '-1.0000', note: ' Refund for a duplicate charge ' })).status).toBe(201);
   // Everything the ledger holds for fal: 2.0 + 1.6 + 0 + 1.8 + 1.6 + 3.0 = 10.0; for replicate: 2.5.
   falInvoice = await (await putInvoice({ month: M, provider: 'fal', totalUsd: '10.5' })).json();
-  replicateInvoice = await (await putInvoice({ month: M, provider: 'replicate', totalUsd: 2 })).json();
+  // Replicate invoices can no longer be entered through the API; this one is history from before the removal, booked as the route used to.
+  replicateInvoice = { bookedUsd: await bookInvoice(pool, { month: M, provider: 'replicate', totalUsd: '2.0000' }, admin.id), invoice: (await invoiceRows(pool, M, 'replicate'))[0]! };
 });
 
 afterAll(async () => {
@@ -300,7 +302,7 @@ describe('the Costs page for September 2026', () => {
     // fal: invoice 10.5 - ledger 10.0 = 0.5, 4.76% of the invoice. j5 was submitted on 31 August in UTC, so the UTC month holds 10.0 - 1.8.
     expect(falInvoice).toEqual({ month: M, bookedUsd: '0.5000', invoice: { provider: 'fal', totalUsd: '10.5000', ledgerUsd: '10.0000', diffUsd: '0.5000', red: false, utcMonthUsd: '8.2000' } });
     // replicate: invoice 2.0 - ledger 2.5 = -0.5, 25% of the invoice.
-    expect(replicateInvoice).toEqual({ month: M, bookedUsd: '-0.5000', invoice: { provider: 'replicate', totalUsd: '2.0000', ledgerUsd: '2.5000', diffUsd: '-0.5000', red: true, utcMonthUsd: '2.5000' } });
+    expect({ month: M, ...replicateInvoice }).toEqual({ month: M, bookedUsd: '-0.5000', invoice: { provider: 'replicate', totalUsd: '2.0000', ledgerUsd: '2.5000', diffUsd: '-0.5000', red: true, utcMonthUsd: '2.5000' } });
     expect(p.invoices).toEqual([falInvoice.invoice, replicateInvoice.invoice]);
   });
 
@@ -458,6 +460,12 @@ describe('invoices', () => {
     return (await res.json()) as { month: string; bookedUsd: string; invoice: Invoice };
   };
   const diffRows = async (month: string) => (await pool.query(`select usd::text as usd from cost_entries where kind = 'invoice_diff' and month = $1 and provider = 'fal' order by id`, [month])).rows.map((r) => r.usd);
+
+  test('refuses an invoice for Replicate, which was removed, and books nothing', async () => {
+    const [ledger, audit] = [await ledgerCount(), await auditCount()];
+    expect((await putInvoice({ month: '2026-08', provider: 'replicate', totalUsd: 1 })).status).toBe(400);
+    expect([await ledgerCount(), await auditCount()]).toEqual([ledger, audit]);
+  });
 
   test('audits the entry of the fixture once, with the old and new total and the difference booked', async () => {
     expect(await audits(`invoice:${M}:fal`)).toEqual([{ actor_id: admin.id, action: 'invoice.enter', old_value: null, new_value: { totalUsd: '10.5000', bookedUsd: '0.5000' } }]);

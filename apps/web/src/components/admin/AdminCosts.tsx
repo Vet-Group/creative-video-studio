@@ -47,7 +47,7 @@ interface Costs {
   invoices: Invoice[];
 }
 
-const PROVIDERS = ['fal', 'replicate', 'vertex', 'byteplus'];
+const PROVIDERS = ['fal', 'vertex', 'byteplus'];
 const KIND_LABEL: Record<string, string> = { bakeoff: 'Thử nghiệm mô hình', manual_adjustment: 'Điều chỉnh tay', invoice_diff: 'Chênh lệch hóa đơn' };
 const vnd = (v: string | null) => (v === null ? '—' : `${Number(v).toLocaleString('vi-VN')} ₫`);
 
@@ -169,7 +169,6 @@ const credits = (n: number | null, currency: string) => (n === null ? '—' : `$
 interface Balances {
   warningUsd: number;
   fal: ({ ok: true; balance: number; currency: string } | { ok: false; reason: 'no_key' | 'failed'; error: string }) & { billingUrl: string; low: boolean };
-  replicate: { credit: { creditUsd: string; since: string; spentUsd: string; remainingUsd: number } | null; billingUrl: string; low: boolean };
   vertex: { billingUrl: string };
   byteplus: { billingUrl: string };
 }
@@ -242,17 +241,6 @@ function ProviderBalances({ vertex }: { vertex: VertexCostsData | undefined }) {
                   );
                 })
               )}
-              <tr className={data.replicate.low ? 'error' : undefined}>
-                <td>Replicate</td>
-                <td>
-                  {data.replicate.credit
-                    ? `Còn $${data.replicate.credit.remainingUsd.toFixed(2)}${under(data.replicate.low)} · số dư nhập $${Number(data.replicate.credit.creditUsd).toFixed(2)} lúc ${new Date(data.replicate.credit.since).toLocaleString('vi-VN')}, sổ cái đã ghi $${Number(data.replicate.credit.spentUsd).toFixed(2)} từ đó`
-                    : 'Chưa nhập số dư Replicate (Cài đặt). Replicate không có API số dư.'}
-                </td>
-                <td>
-                  <TopUp href={data.replicate.billingUrl} />
-                </td>
-              </tr>
               <tr>
                 <td>BytePlus ModelArk</td>
                 <td className="muted">Không có API số dư; xem trên trang thanh toán của BytePlus.</td>

@@ -62,8 +62,8 @@ export async function sendJson(f: Fetch, what: string, url: string, init: Reques
 /**
  * https: URLs pass through. Any other scheme is read with `readImage` and inlined as a data URL, before any network call to the provider, so a
  * failed read submits nothing. shortcut: both providers document data URLs for inputs, but neither readable doc page shows a plain-HTTP upload
- * endpoint (fal CDN, Replicate Files API); the worker shrinks inputs instead (apps/worker/src/real-providers.ts), and inputs that still add up
- * to more than MAX_INLINE_CHARS are refused here, because the bake-off saw Replicate reset a 3.8 MB body with no answer.
+ * endpoint (fal CDN); the worker shrinks inputs instead (apps/worker/src/real-providers.ts), and inputs that still add up
+ * to more than MAX_INLINE_CHARS are refused here, because the bake-off saw a provider reset a 3.8 MB body with no answer.
  */
 export const MAX_INLINE_CHARS = 3_600_000;
 

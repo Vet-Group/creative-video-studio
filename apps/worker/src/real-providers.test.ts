@@ -41,12 +41,12 @@ describe('realProviders', () => {
     expect([none.enhance, none.suggest]).toEqual([undefined, undefined]);
   });
 
-  test('wires fal (video and image) and Replicate only when their keys are set', () => {
+  test('wires fal (video and image) only when its key is set, and no longer wires Replicate', () => {
     expect(realProviders(pool([]), {})).toEqual({ providers: {}, imageProviders: {}, vertexAccounts: [] });
     const fal = realProviders(pool([]), { FAL_KEY: 'k' });
     expect([Object.keys(fal.providers), Object.keys(fal.imageProviders!)]).toEqual([['fal'], ['fal']]);
-    const both = realProviders(pool([]), { FAL_KEY: 'k', REPLICATE_API_TOKEN: 't' });
-    expect([Object.keys(both.providers), Object.keys(both.imageProviders!)]).toEqual([['fal', 'replicate'], ['fal']]);
+    const stale = realProviders(pool([]), { FAL_KEY: 'k', REPLICATE_API_TOKEN: 't' }); // a leftover token on a server enables nothing
+    expect([Object.keys(stale.providers), Object.keys(stale.imageProviders!)]).toEqual([['fal'], ['fal']]);
     const byteplus = realProviders(pool([]), { BYTEPLUS_ARK_API_KEY: 'k' });
     expect([Object.keys(byteplus.providers), Object.keys(byteplus.imageProviders!)]).toEqual([['byteplus'], ['byteplus']]);
   });

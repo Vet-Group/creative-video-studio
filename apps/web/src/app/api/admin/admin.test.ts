@@ -345,6 +345,22 @@ describe('settings', () => {
     expect((await put({ models: [{ id: 'no-such-model', enabled: true }] })).status).toBe(404);
   });
 
+  test('a model of a removed provider (Replicate) stays listed but cannot be enabled, and nothing else changes with it', async () => {
+    await pool.query(
+      `insert into model_configs (id, provider, endpoint, label, ratios, durations_sec, max_images, output_resolution, usd_per_second, sources, enabled)
+       values ('rep-old', 'replicate', 'x', 'Old Replicate', '{9:16}', '{5}', 2, '720p', 0.4, '{}', false)`,
+    );
+    expect((await get()).models.find((m) => m.id === 'rep-old')).toMatchObject({ enabled: false, priced: false });
+    const before = await auditCount();
+    const res = await put({ monthlyCapUsd: 777, models: [{ id: 'rep-old', enabled: true }] });
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { error: string }).error).toMatch(/rep-old.*removed/);
+    expect((await get()).monthlyCapUsd).toBe('350.5000');
+    expect((await get()).models.find((m) => m.id === 'rep-old')?.enabled).toBe(false);
+    expect(await auditCount()).toBe(before);
+    expect((await put({ models: [{ id: 'rep-old', enabled: false }] })).status).toBe(200); // the form sends every row; an off one is not a change
+  });
+
   test('reads the Vertex accounts and the active one, and changes their credits, each change audited once', async () => {
     type Vertex = { projectId: string; creditTotal: string | null; creditCurrency: string; creditExpiresOn: string | null; stopWhenCreditsEnd: boolean; configured: boolean };
     const vertex = async () => (await (await settingsRoute.GET(call(admin.cookie, '/api/admin/settings'))).json()) as { vertexActiveProject: string | null; vertexAccounts: Vertex[] };
@@ -378,59 +394,26 @@ describe('settings', () => {
     expect((await put(body)).status).toBe(400);
   });
 
-  test('reads and changes the balance warning and the Replicate credit; a new credit restarts its count, an unchanged one does not, each change audited once', async () => {
-    type Balances = { balanceWarningUsd: string; replicateCreditUsd: string | null; replicateCreditSince: string | null };
+  test('reads and changes the balance warning, audited once; the Replicate credit is gone from the answer and ignored on save', async () => {
+    type Balances = { balanceWarningUsd: string; replicateCreditUsd?: string | null };
     const balances = async () => (await (await settingsRoute.GET(call(admin.cookie, '/api/admin/settings'))).json()) as Balances;
-    expect(await balances()).toMatchObject({ balanceWarningUsd: '10.0000', replicateCreditUsd: null, replicateCreditSince: null });
+    expect(await balances()).toMatchObject({ balanceWarningUsd: '10.0000' });
+    expect('replicateCreditUsd' in (await balances())).toBe(false);
     const n = (await audits('settings:1')).length;
 
     expect((await put({ balanceWarningUsd: '15', replicateCreditUsd: '25.5' })).status).toBe(200);
-    const first = await balances();
-    expect(first).toMatchObject({ balanceWarningUsd: '15.0000', replicateCreditUsd: '25.5000' });
-    expect(Date.now() - Date.parse(first.replicateCreditSince!)).toBeLessThan(60_000);
+    expect(await balances()).toMatchObject({ balanceWarningUsd: '15.0000' });
+    expect((await pool.query('select replicate_credit_usd from settings where id = 1')).rows).toEqual([{ replicate_credit_usd: null }]);
     expect((await audits('settings:1')).slice(n)).toEqual([
       { actor_id: admin.id, action: 'settings.update', old_value: { balanceWarningUsd: '10.0000' }, new_value: { balanceWarningUsd: '15.0000' } },
-      { actor_id: admin.id, action: 'settings.update', old_value: { replicateCreditUsd: null, replicateCreditSince: null }, new_value: { replicateCreditUsd: '25.5000', replicateCreditSince: first.replicateCreditSince } },
     ]);
-
-    // The form sends every field on save: the same amount keeps its start, so the count is not reset.
-    expect((await put({ balanceWarningUsd: 15, replicateCreditUsd: 25.5 })).status).toBe(200);
-    expect(await balances()).toEqual(expect.objectContaining({ replicateCreditSince: first.replicateCreditSince }));
-    expect(await audits('settings:1')).toHaveLength(n + 2);
-
-    expect((await put({ replicateCreditUsd: '40' })).status).toBe(200);
-    const second = await balances();
-    expect(second.replicateCreditUsd).toBe('40.0000');
-    expect(Date.parse(second.replicateCreditSince!)).toBeGreaterThan(Date.parse(first.replicateCreditSince!));
-
-    // After a top-up the balance may read the same again: a recount restarts the count with the amount unchanged, audited the same way.
-    const n2 = (await audits('settings:1')).length;
-    expect((await put({ replicateCreditUsd: '40', replicateCreditRecount: false })).status).toBe(200);
-    expect((await balances()).replicateCreditSince).toBe(second.replicateCreditSince);
-    expect((await put({ replicateCreditUsd: '40', replicateCreditRecount: true })).status).toBe(200);
-    const third = await balances();
-    expect(third.replicateCreditUsd).toBe('40.0000');
-    expect(Date.parse(third.replicateCreditSince!)).toBeGreaterThan(Date.parse(second.replicateCreditSince!));
-    expect((await audits('settings:1')).slice(n2)).toEqual([
-      {
-        actor_id: admin.id, action: 'settings.update',
-        old_value: { replicateCreditUsd: '40.0000', replicateCreditSince: second.replicateCreditSince }, new_value: { replicateCreditUsd: '40.0000', replicateCreditSince: third.replicateCreditSince },
-      },
-    ]);
-    expect((await put({ replicateCreditRecount: true })).status).toBe(200); // the recount alone keeps the stored amount
-    expect(Date.parse((await balances()).replicateCreditSince!)).toBeGreaterThan(Date.parse(third.replicateCreditSince!));
-
-    expect((await put({ replicateCreditUsd: null })).status).toBe(200);
-    expect(await balances()).toMatchObject({ replicateCreditUsd: null, replicateCreditSince: null });
-    expect((await audits('settings:1')).at(-1)).toMatchObject({ old_value: { replicateCreditUsd: '40.0000' }, new_value: { replicateCreditUsd: null, replicateCreditSince: null } });
+    expect((await put({ balanceWarningUsd: 15 })).status).toBe(200);
+    expect(await audits('settings:1')).toHaveLength(n + 1);
   });
 
-  test.each([{ balanceWarningUsd: -1 }, { balanceWarningUsd: null }, { balanceWarningUsd: 'low' }, { replicateCreditUsd: -5 }, { replicateCreditUsd: '1.23456' }, { replicateCreditUsd: 'lots' }, { replicateCreditRecount: 'yes' }])(
-    'refuses %j',
-    async (body) => {
-      expect((await put(body)).status).toBe(400);
-    },
-  );
+  test.each([{ balanceWarningUsd: -1 }, { balanceWarningUsd: null }, { balanceWarningUsd: 'low' }, { replicateCreditUsd: '40' }])('refuses %j', async (body) => {
+    expect((await put(body)).status).toBe(400);
+  });
 });
 
 describe('presets', () => {

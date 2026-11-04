@@ -4,7 +4,6 @@ import { createFalSuggester, createOpenAiSuggester } from '@cvs/core/suggest';
 import { createFalImageProvider, createFalProvider } from '@cvs/core/providers/fal';
 import type { ReadImage } from '@cvs/core/providers/http';
 import { createByteplusImageProvider, createByteplusProvider } from '@cvs/core/providers/byteplus';
-import { createReplicateProvider } from '@cvs/core/providers/replicate';
 import { createVertexImageProvider } from '@cvs/core/providers/vertex';
 import { pinToAccounts, type VertexAccount, vertexAccounts } from '@cvs/core/providers/vertex-accounts';
 import { createVertexVideoProvider } from '@cvs/core/providers/vertex-video';
@@ -12,7 +11,7 @@ import sharp from 'sharp';
 import type { WorkerDeps } from './worker';
 import { deleteObject, getObject, putObject } from './storage';
 
-// Inputs are inlined as base64 in the JSON body. In the bake-off Replicate reset a 3.8 MB body while 3.7 MB passed, so with up to 4 images
+// Inputs are inlined as base64 in the JSON body. In the bake-off a provider reset a 3.8 MB body while 3.7 MB passed, so with up to 4 images
 // each one is kept at or under 600 KB (4 x 600 KB is about 3.2 MB of base64). The videos are 1080p at most, so 2048 px loses nothing.
 export const MAX_INLINE_BYTES = 600_000;
 const MAX_SIDE = 2048;
@@ -56,7 +55,7 @@ export const assetReader =
   };
 
 /**
- * fal, Vertex and BytePlus serve video and image models; Replicate serves video models. Vertex has one provider per account (a key file each), and a new job
+ * fal, Vertex and BytePlus serve video and image models. Vertex has one provider per account (a key file each), and a new job
  * goes to the account the credits guard made active (settings.vertex_active_project); `vertexAccounts` is that list, for the guard.
  */
 export function realProviders(
@@ -78,7 +77,6 @@ export function realProviders(
     enhance = createOpenAiEnhancer({ apiKey: env.OPENAI_API_KEY });
     suggest = createOpenAiSuggester({ apiKey: env.OPENAI_API_KEY });
   }
-  if (env.REPLICATE_API_TOKEN) providers.replicate = createReplicateProvider({ apiToken: env.REPLICATE_API_TOKEN, readImage });
   if (env.BYTEPLUS_ARK_API_KEY) {
     providers.byteplus = createByteplusProvider({ apiKey: env.BYTEPLUS_ARK_API_KEY, readImage });
     imageProviders.byteplus = createByteplusImageProvider({ apiKey: env.BYTEPLUS_ARK_API_KEY, readImage });

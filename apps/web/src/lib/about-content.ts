@@ -2525,7 +2525,7 @@ export const MODEL_CARD_TEXT: Record<string, string> = {
   'seedance-2.5-image': 'Chuyển động sắc nét hơn và bám mô tả chặt hơn, với clip dài tới 30 giây.',
   'seedance-2.5-reference': 'Ghép tối đa 7 ảnh tham chiếu thành clip điện ảnh dài tới 30 giây.',
   'seedance-2.0': 'Thế hệ video mới với chuyển động chân thực và linh hoạt sáng tạo, clip tới 15 giây.',
-  'seedance-2.0-replicate': 'Thế hệ video mới với chuyển động chân thực và linh hoạt sáng tạo, clip tới 15 giây.',
+  'seedance-2.0-byteplus': 'Thế hệ video mới với chuyển động chân thực và linh hoạt sáng tạo, clip tới 15 giây.',
   'seedance-2.0-reference': 'Dựng cảnh từ tối đa 9 ảnh tham chiếu, clip 4–15 giây.',
   'seedance-1.5-pro': 'Lựa chọn tiết kiệm của Seedance cho clip 4–12 giây.',
   'seedance-1.0-pro': 'Clip 3–12 giây ở 1080p, lựa chọn bền bỉ với chi phí vừa phải.',

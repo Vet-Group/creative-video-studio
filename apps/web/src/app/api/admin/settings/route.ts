@@ -5,6 +5,9 @@ import { bad, money, pgCode, readBody } from '@/lib/admin';
 import { pool } from '@/lib/auth';
 import { guard } from '@/lib/session';
 
+/** Providers with no adapter any more: their rows stay for the history of jobs and the ledger, but no model of them may be enabled. */
+const REMOVED_PROVIDERS = ['replicate'];
+
 const MEMBER_CAPS = ['featuresMonthlyCapUsd', 'memberDailyUsdCap', 'memberMonthlyUsdCap', 'balanceWarningUsd'] as const;
 const CAP_COLUMNS: Record<(typeof MEMBER_CAPS)[number], string> = {
   featuresMonthlyCapUsd: 'features_monthly_cap_usd',
@@ -41,7 +44,7 @@ const sameCredits = (a: VertexCredits, b: VertexCredits) =>
 
 /**
  * Admin: the caps (video month, daily clips, the image and apps month, each member's USD day and month), the balance warning threshold, the
- * Replicate prepaid credit and when it was entered, the soft per-feature caps, every model, and the Vertex accounts: the configured ones in order (`configured`), then any other with credits on record, and the active one.
+ * soft per-feature caps, every model, and the Vertex accounts: the configured ones in order (`configured`), then any other with credits on record, and the active one.
  */
 export async function GET(request: Request) {
   const g = await guard(request, 'admin');
@@ -50,11 +53,12 @@ export async function GET(request: Request) {
     await pool.query(
       `select monthly_cap_usd::text as "monthlyCapUsd", member_daily_clip_cap as "memberDailyClipCap", features_monthly_cap_usd::text as "featuresMonthlyCapUsd",
               member_daily_usd_cap::text as "memberDailyUsdCap", member_monthly_usd_cap::text as "memberMonthlyUsdCap", vertex_active_project as "vertexActiveProject",
-              balance_warning_usd::text as "balanceWarningUsd", replicate_credit_usd::text as "replicateCreditUsd", replicate_credit_since as "replicateCreditSince"
+              balance_warning_usd::text as "balanceWarningUsd"
          from settings where id = 1`,
     )
   ).rows[0];
-  const models = await pool.query('select id, label, provider, enabled, (usd_per_second is not null or image_prices is not null) as priced from model_configs order by provider, id');
+  // `priced` is what lets the Admin switch a row on: recorded price, and a provider that still has an adapter.
+  const models = await pool.query('select id, label, provider, enabled, ((usd_per_second is not null or image_prices is not null) and provider <> all($1::text[])) as priced from model_configs order by provider, id', [REMOVED_PROVIDERS]);
   const featureCaps = await pool.query('select feature, monthly_usd::text as "monthlyUsd" from feature_caps order by feature');
   let configured: string[] = [];
   try {
@@ -73,13 +77,11 @@ export async function GET(request: Request) {
 
 /**
  * Admin: change `monthlyCapUsd`, `memberDailyClipCap`, `featuresMonthlyCapUsd`, `memberDailyUsdCap`, `memberMonthlyUsdCap`, `balanceWarningUsd`,
- * `replicateCreditUsd` (null clears it; a new amount restarts its count now), `replicateCreditRecount` (true restarts the count now even when the
- * amount is unchanged, after a top-up), `featureCaps` (a list of
- * `{ feature, monthlyUsd }`), `models` (a list of `{ id, enabled }`) and/or `vertexAccounts` (a list of `{ projectId, creditTotal, creditCurrency,
+ * `featureCaps` (a list of `{ feature, monthlyUsd }`), `models` (a list of `{ id, enabled }`) and/or `vertexAccounts` (a list of `{ projectId, creditTotal, creditCurrency,
  * creditExpiresOn, stopWhenCreditsEnd }`, total and date nullable). All or nothing. Changed caps are audited as settings.update, each changed
  * soft cap as feature_cap.update, each changed model as model.set_enabled and each changed Vertex account as vertex_account.update. Any model can
  * be enabled (the owner opened them all on 2026-10-25; its bake-off record only feeds the recommendation score), but the database refuses one
- * whose limits and price are not recorded: 400 and nothing is changed.
+ * whose limits and price are not recorded, and one of a removed provider (REMOVED_PROVIDERS) is refused too: 400 and nothing is changed.
  */
 export async function PUT(request: Request) {
   const g = await guard(request, 'admin');
@@ -104,24 +106,23 @@ export async function PUT(request: Request) {
   if (!Array.isArray(softCaps) || softCaps.some((c) => typeof c?.feature !== 'string' || money(c?.monthlyUsd) === null)) {
     return bad('featureCaps must be a list of { feature, monthlyUsd }');
   }
-  const replicateCredit = body.replicateCreditUsd == null ? null : money(body.replicateCreditUsd);
-  if (body.replicateCreditUsd != null && replicateCredit === null) return bad('replicateCreditUsd must be an amount of 0 or more with at most 4 decimals, or null');
-  const recount = body.replicateCreditRecount;
-  if (recount !== undefined && typeof recount !== 'boolean') return bad('replicateCreditRecount must be true or false');
   if (monthlyCapUsd !== undefined && usd === null) return bad('monthlyCapUsd must be an amount of 0 or more with at most 4 decimals');
   if (memberDailyClipCap !== undefined && !(Number.isInteger(memberDailyClipCap) && (memberDailyClipCap as number) >= 0 && (memberDailyClipCap as number) <= 100_000)) {
     return bad('memberDailyClipCap must be a whole number of 0 or more');
   }
   const list = models === undefined ? [] : models;
   if (!Array.isArray(list) || list.some((m) => typeof m?.id !== 'string' || typeof m?.enabled !== 'boolean')) return bad('models must be a list of { id, enabled }');
-  if ([monthlyCapUsd, memberDailyClipCap, models, featureCaps, body.vertexAccounts, body.replicateCreditUsd, recount, ...MEMBER_CAPS.map((k) => body[k])].every((v) => v === undefined)) {
-    return bad(`give at least one of monthlyCapUsd, memberDailyClipCap, ${MEMBER_CAPS.join(', ')}, replicateCreditUsd, replicateCreditRecount, featureCaps, models, vertexAccounts`);
+  if ([monthlyCapUsd, memberDailyClipCap, models, featureCaps, body.vertexAccounts, ...MEMBER_CAPS.map((k) => body[k])].every((v) => v === undefined)) {
+    return bad(`give at least one of monthlyCapUsd, memberDailyClipCap, ${MEMBER_CAPS.join(', ')}, featureCaps, models, vertexAccounts`);
   }
   const features = [...new Set((softCaps as { feature: string }[]).map((c) => c.feature))];
   if (features.length !== softCaps.length) return bad('featureCaps must name each feature once');
   if ((await pool.query('select 1 from feature_caps where feature = any($1::text[])', [features])).rowCount !== features.length) return bad('unknown feature', 404);
   const ids = [...new Set((list as { id: string }[]).map((m) => m.id))];
   if ((await pool.query('select 1 from model_configs where id = any($1::text[])', [ids])).rowCount !== ids.length) return bad('unknown model', 404);
+  const enabling = (list as { id: string; enabled: boolean }[]).filter((m) => m.enabled).map((m) => m.id);
+  const removed = (await pool.query('select id from model_configs where id = any($1::text[]) and provider = any($2::text[]) order by id', [enabling, REMOVED_PROVIDERS])).rows as { id: string }[];
+  if (removed.length) return bad(`${removed.map((m) => m.id).join(', ')} belong to a provider that was removed and cannot be enabled`);
   const actorId = g.session.user.id;
 
   try {
@@ -147,21 +148,6 @@ export async function PUT(request: Request) {
           actorId, action: 'settings.update', target: 'settings:1',
           oldValue: Object.fromEntries(changed.map((k) => [k, oldCaps[k]])), newValue: Object.fromEntries(changed.map((k) => [k, memberCaps[k]])),
         });
-      }
-      if (body.replicateCreditUsd !== undefined || recount) {
-        const old = (await tx.query('select replicate_credit_usd::text as usd, replicate_credit_since as since from settings where id = 1 for update')).rows[0];
-        const credit = body.replicateCreditUsd === undefined ? old.usd : replicateCredit;
-        const changed = old.usd === null ? credit !== null : credit === null || Number(old.usd) !== Number(credit);
-        // A new amount, or a recount asked for after a top-up, restarts the count: only spending after this moment is taken off it.
-        if (changed || (recount && credit !== null)) {
-          const { since } = (
-            await tx.query('update settings set replicate_credit_usd = $1, replicate_credit_since = case when $1::numeric is null then null else now() end, updated_at = now() where id = 1 returning replicate_credit_since as since', [credit])
-          ).rows[0];
-          await audit(tx, {
-            actorId, action: 'settings.update', target: 'settings:1',
-            oldValue: { replicateCreditUsd: old.usd, replicateCreditSince: old.since }, newValue: { replicateCreditUsd: credit, replicateCreditSince: since },
-          });
-        }
       }
       for (const c of softCaps as { feature: string; monthlyUsd: unknown }[]) {
         const old = (await tx.query('select monthly_usd::text as usd from feature_caps where feature = $1 for update', [c.feature])).rows[0];
