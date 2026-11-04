@@ -204,6 +204,16 @@ describe('byteplus images', () => {
     expect(big.calls[0]!.body).toMatchObject({ size: '2000x2000', image: ['https://img/1.jpg', 'https://img/2.jpg'] });
   });
 
+  test('Seedream 4.5 and 4.0 get no output_format (the API refuses it for them, canary 2026-11-04) and bill the flat price whatever the input images', async () => {
+    for (const [endpoint, usd] of [['seedream-4-5-251128', '0.04'], ['seedream-4-0-250828', '0.03']] as const) {
+      const { p, calls } = images([200, ok]);
+      const m = model(endpoint, { '1K': usd, '2K': usd });
+      const { providerJobId } = await p.submit(req({ model: m, ratio: 'auto', imageUrls: ['https://img/1.jpg', 'https://img/2.jpg'] }));
+      expect(calls[0]!.body).toEqual({ model: endpoint, prompt: 'a bottle on a table', image: ['https://img/1.jpg', 'https://img/2.jpg'], size: '1K', response_format: 'url', watermark: false });
+      expect(await p.status({ providerJobId, model: m, resolution: '1K' })).toMatchObject({ state: 'succeeded', costUsd: Number(usd) });
+    }
+  });
+
   test('every size sits inside the API range of 921,600 to 4,624,220 pixels, and the 2K ones are above the 2.61 MP of the cheaper tier', async () => {
     for (const ratio of ['1:1', '9:16', '16:9', '3:4', '4:3', '2:3', '3:2', '4:5', '5:4', '21:9']) {
       for (const [resolution, low, high] of [['1K', 921_600, 2_610_000], ['2K', 2_610_001, 4_624_220]] as const) {

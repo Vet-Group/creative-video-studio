@@ -600,12 +600,14 @@ describe('migration 0056 BytePlus', () => {
     }
   });
 
-  test('adds Seedream 5.0 Pro and Flash disabled, with the features, ratios and limits of the fal Pro row and the per-image list price', async () => {
+  test('adds Seedream 5.0 Pro and Flash and (0059) 4.5 and 4.0 disabled, with the features, ratios and limits of the fal Pro row and the per-image list price', async () => {
     const pick = `select kind, features, ratios, max_images, max_prompt_chars from model_configs where id = $1`;
     const [twin] = (await pool.query(pick, ['seedream-5-pro'])).rows;
-    for (const id of ['seedream-5-pro-byteplus', 'seedream-5-flash-byteplus']) expect((await pool.query(pick, [id])).rows[0], id).toEqual(twin);
+    for (const id of ['seedream-5-pro-byteplus', 'seedream-5-flash-byteplus', 'seedream-4.5-byteplus', 'seedream-4.0-byteplus']) expect((await pool.query(pick, [id])).rows[0], id).toEqual(twin);
     const { rows } = await pool.query(`select id, provider, endpoint, enabled, image_prices, durations_sec from model_configs where provider = 'byteplus' and kind = 'image' order by id`);
     expect(rows).toEqual([
+      { id: 'seedream-4.0-byteplus', provider: 'byteplus', endpoint: 'seedream-4-0-250828', enabled: false, image_prices: { '1K': '0.03', '2K': '0.03' }, durations_sec: [] },
+      { id: 'seedream-4.5-byteplus', provider: 'byteplus', endpoint: 'seedream-4-5-251128', enabled: false, image_prices: { '2K': '0.04' }, durations_sec: [] },
       { id: 'seedream-5-flash-byteplus', provider: 'byteplus', endpoint: 'dola-seedream-5-0-flash-260915', enabled: false, image_prices: { '1K': '0.018', '2K': '0.018' }, durations_sec: [] },
       { id: 'seedream-5-pro-byteplus', provider: 'byteplus', endpoint: 'dola-seedream-5-0-pro-260628', enabled: false, image_prices: { '1K': '0.045', '2K': '0.09' }, durations_sec: [] },
     ]);
@@ -615,7 +617,7 @@ describe('migration 0056 BytePlus', () => {
     const { rows } = await pool.query(`select id, sources from model_configs where provider = 'byteplus' order by id`);
     for (const { id, sources } of rows) {
       const price = sources.usdPerSecond ?? sources.imagePrices;
-      expect(price, id).toMatchObject({ url: 'https://docs.byteplus.com/en/docs/modelark/model-pricing', readAt: '2026-11-03' });
+      expect(price, id).toMatchObject({ url: 'https://docs.byteplus.com/en/docs/modelark/model-pricing', readAt: id.startsWith('seedream-4') ? '2026-11-04' : '2026-11-03' });
       expect(sources.endpoint, id).toEqual({ url: link('model-list'), readAt: '2026-11-04' });
     }
     expect((await pool.query(`select count(*)::int as n from model_configs where provider = 'byteplus' and enabled`)).rows).toEqual([{ n: 0 }]);
