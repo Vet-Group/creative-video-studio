@@ -173,16 +173,22 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
 
   // The enabled presets the Admin set up; as on the live form, it starts on a free prompt unless Explore links to a preset.
   useEffect(() => {
+    let stale = false; // a superseded answer would put the preset back over the member's pick
     api<{ presets: { id: string; label: string }[] }>('/api/presets').then(
       (r) => {
+        if (stale) return;
         setPresets(r.presets);
         if (!reuse) setPresetId(r.presets.find((p) => p.id === preset)?.id ?? '');
       },
       () => {
+        if (stale) return;
         setPresets([]);
         setError('Không tải được danh sách mẫu chuyển động.');
       },
     );
+    return () => {
+      stale = true;
+    };
   }, [reuse, preset]);
 
   // A picture from History (Fash's Generate Video): it becomes the first image, the rest of the form stays at its defaults.

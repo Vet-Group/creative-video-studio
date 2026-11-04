@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
-import { clearMyJobs, png, runViaApi, select, selectValue, signIn } from './support.test';
+import { clearMyJobs, openTab, png, runViaApi, select, selectValue, signIn } from './support.test';
 
 // A page's History tab lists the member's jobs as Fash's History cards: the result, the member's words, the inputs, chips, and the actions.
 test('a History card shows the text, inputs and chips, and its favourite, new-tab, download, delete and Dùng lại actions work', async ({ page }) => {
@@ -11,7 +11,7 @@ test('a History card shows the text, inputs and chips, and its favourite, new-ta
   const { id } = (await res.json()) as { id: string };
 
   await page.goto('/image-generation');
-  await page.getByRole('tab', { name: 'Lịch sử' }).click();
+  await openTab(page, 'Lịch sử');
   const card = page.getByRole('complementary', { name: 'Job của tôi' }).getByRole('listitem').filter({ hasText: 'a studio shot of the bag' });
   await expect(card.getByText('Hoàn tất')).toBeVisible({ timeout: 60_000 });
   await expect(card.getByRole('heading', { name: /Tạo ảnh/ })).toBeVisible();
@@ -28,7 +28,7 @@ test('a History card shows the text, inputs and chips, and its favourite, new-ta
   await favourite.click();
   await expect(favourite).toHaveAttribute('aria-pressed', 'true');
   await page.reload();
-  await page.getByRole('tab', { name: 'Lịch sử' }).click();
+  await openTab(page, 'Lịch sử');
   await expect(card.getByRole('button', { name: 'Yêu thích' })).toHaveAttribute('aria-pressed', 'true'); // kept on the server
 
   const download = page.waitForEvent('download');

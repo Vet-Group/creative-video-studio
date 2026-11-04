@@ -50,4 +50,5 @@ test('the size slider sets the Examples columns and the History layout on Create
   // Below 1024 px the columns are fixed and the slider is gone.
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(slider(page)).toHaveCount(0);
+  await page.unrouteAll({ behavior: 'ignoreErrors' }); // a samples call still in flight at the end would fail the test once the page closes
 });

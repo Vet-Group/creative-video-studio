@@ -3,7 +3,7 @@
 import { type FormEvent, useCallback, useEffect, useId, useState } from 'react';
 import { encode } from 'uqr';
 import { changeFailure, deviceLabel, PASSWORD_LENGTH, passwordProblem, SESSIONS_SHOWN, sessionTime, visibleSessions } from '@/lib/account-security';
-import { api, sendJson } from '@/lib/api';
+import { api, rotatingSession, sendJson } from '@/lib/api';
 import { backupCodesText, manualSecret, twoFactorCall, twoFactorFailure } from '@/lib/two-factor';
 import { confirmDialog } from './Confirm';
 import { Icon } from './Icon';
@@ -37,7 +37,7 @@ export function PasswordChange({ onDone, submitText = 'Đổi mật khẩu' }: {
     if (problem) return;
     setBusy(true);
     try {
-      await api('/api/auth/change-password', sendJson('POST', { currentPassword: current, newPassword: next, revokeOtherSessions: true }));
+      await rotatingSession(() => api('/api/auth/change-password', sendJson('POST', { currentPassword: current, newPassword: next, revokeOtherSessions: true })));
       setCurrent('');
       setNext('');
       setConfirm('');

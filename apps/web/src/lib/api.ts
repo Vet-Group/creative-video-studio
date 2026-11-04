@@ -22,11 +22,27 @@ export const startSignOut = () => {
   signingOut = true;
 };
 
+// A password change deletes every session before it sets the new cookie: a call sent on the old one meanwhile gets a 401 that is not a sign-out.
+let rotating = 0;
+let rotations = 0;
+/** Runs a call that replaces the session cookie; a 401 for any call sent before it ends does not send the user to the login. */
+export async function rotatingSession<T>(run: () => Promise<T>): Promise<T> {
+  rotating++;
+  try {
+    return await run();
+  } finally {
+    rotating--;
+    rotations++;
+  }
+}
+
 /** Fetches a route and returns its JSON. A 401 outside the login page sends the user there, to come back to this page after the sign-in; any other failure throws an ApiError carrying the server's message. */
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
+  const sentAt = rotations;
   const res = await fetch(path, init);
   const body = (await res.json().catch(() => null)) as (T & { error?: string; code?: string }) | null;
-  if (res.status === 401 && !signingOut && window.location.pathname !== '/login') window.location.assign(loginFor(window.location.pathname + window.location.search));
+  const stale = rotating > 0 || sentAt !== rotations;
+  if (res.status === 401 && !signingOut && !stale && window.location.pathname !== '/login') window.location.assign(loginFor(window.location.pathname + window.location.search));
   if (!res.ok) throw new ApiError(res.status, body?.error ?? `HTTP ${res.status}`, Number(res.headers.get('x-retry-after')) || null, body?.code ?? null);
   return body as T;
 }
