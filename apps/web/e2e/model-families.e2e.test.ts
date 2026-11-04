@@ -12,7 +12,7 @@ const model = (id: string, label: string, score: number, more: object = {}) => (
 });
 const MODELS = [
   model('seedance-2.0', 'Seedance 2.0', 80, { recommended: true, audioEstimateUsd: '1.5000' }),
-  model('seedance-2.0-replicate', 'Seedance 2.0 (Replicate)', 75),
+  model('seedance-2.0-byteplus', 'Seedance 2.0 (BytePlus)', 75),
   model('kling-3.0-pro', 'Kling 3.0 Pro', 70, { isNew: true }),
   model('kling-2.6', 'Kling 2.6', 40, { resolution: '720p', durationsSec: [5, 10] }),
   model('veo-3.1', 'Google VEO 3.1', 65, { audioEstimateUsd: '2.0000' }),
@@ -39,7 +39,7 @@ async function open(page: Page, width: number): Promise<{ panel: Locator; list: 
 test('the picker opens on the featured models and the families; a family opens beside the panel by pointer and by keyboard', async ({ page }, testInfo) => {
   const { panel, list } = await open(page, 1440);
   const featured = list.getByRole('group', { name: 'Model nổi bật' }).getByRole('option');
-  await expect(featured).toHaveText([/^Seedance 2\.0Có âm thanhĐề xuất/, /^Seedance 2\.0 \(Replicate\)/, /^Kling 3\.0 ProMỚI/, /^Google VEO 3\.1Có âm thanh/, /^Gemini Omni Flash/]);
+  await expect(featured).toHaveText([/^Seedance 2\.0Có âm thanhĐề xuất/, /^Seedance 2\.0 \(BytePlus\)/, /^Kling 3\.0 ProMỚI/, /^Google VEO 3\.1Có âm thanh/, /^Gemini Omni Flash/]);
   await expect(featured.first()).toContainText('1080p4s-15s$1.5000Điểm 80'); // the audio estimate, as the form starts with audio on
   await expect(featured.first()).toHaveAttribute('aria-selected', 'true');
   const families = list.getByRole('group', { name: 'Tất cả model' }).getByRole('option');

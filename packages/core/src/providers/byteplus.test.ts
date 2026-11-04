@@ -86,7 +86,7 @@ describe('byteplus video submit', () => {
     expect(none.calls).toEqual([]);
   });
 
-  test('nine inlined images pass where Replicate would refuse them (the cap is the 64 MB body, not 3.6 MB)', async () => {
+  test('nine inlined images pass where the default 3.6 MB inline cap would refuse them (the cap is the 64 MB body, not 3.6 MB)', async () => {
     const big = async () => ({ bytes: new Uint8Array(Math.ceil((MAX_INLINE_CHARS * 3) / 4 / 5)), contentType: 'image/png' });
     const { fn, calls } = fakeFetch([200, { id: 'cgt-1' }]);
     await provider(fn, big).submit({ ...base, model: S25, imageUrls: Array.from({ length: 9 }, (_, i) => `asset://a${i}`) });

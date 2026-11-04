@@ -1,12 +1,10 @@
-// Provider balances for Admin Costs and the worker's Replicate guard (docs/ops/provider-balances.md). No provider has an API to buy credit, so
+// Provider balances for Admin Costs (docs/ops/provider-balances.md). No provider has an API to buy credit, so
 // the app only shows the balances, warns when one is low and links to each provider's billing page.
-import type { Queryable } from '../ledger';
 import { boundedText, timeout, type Fetch } from './http';
 
 export const BILLING_URLS = {
   fal: 'https://fal.ai/dashboard/billing',
   vertex: 'https://console.cloud.google.com/billing',
-  replicate: 'https://replicate.com/account/billing',
   byteplus: 'https://console.byteplus.com/finance/overview',
 } as const;
 
@@ -33,33 +31,4 @@ export async function readFalBalance(o: { key: string | undefined; fetch?: Fetch
   } catch (e) {
     return { ok: false, reason: 'failed', error: e instanceof Error ? e.message : String(e) };
   }
-}
-
-export interface ReplicateCredit {
-  creditUsd: string;
-  /** When the Admin entered the credit (ISO time). */
-  since: string;
-  spentUsd: string;
-  remainingUsd: number;
-}
-
-/**
- * Replicate has no balance API (GET /v1/account/billing answers 404), so remaining = the Admin-entered balance minus the replicate spending of
- * the credit period: every ledger row of a job created after the balance was entered (holds of jobs in flight included), and the rows without a
- * job (bake-off, manual) booked after it. A job sent before belongs to the old balance even when it settles later; an invoice difference is a
- * month's correction, not spending from this balance. Null when no balance was entered.
- */
-export async function replicateCredit(q: Queryable): Promise<ReplicateCredit | null> {
-  const { rows } = await q.query(
-    `select s.replicate_credit_usd::text as "creditUsd", s.replicate_credit_since as since, coalesce(sum(c.usd), 0)::numeric(12, 4)::text as "spentUsd",
-            (s.replicate_credit_usd - coalesce(sum(c.usd), 0))::text as remaining
-       from settings s
-       left join cost_entries c on c.provider = 'replicate' and c.kind <> 'invoice_diff'
-            and case when c.job_id is null then c.created_at > s.replicate_credit_since
-                     else exists (select 1 from jobs j where j.id = c.job_id and j.created_at > s.replicate_credit_since) end
-      where s.id = 1 group by s.id`,
-  );
-  const r = rows[0];
-  if (!r || r.creditUsd === null || r.since === null) return null;
-  return { creditUsd: r.creditUsd, since: new Date(r.since).toISOString(), spentUsd: r.spentUsd, remainingUsd: Number(r.remaining) };
 }

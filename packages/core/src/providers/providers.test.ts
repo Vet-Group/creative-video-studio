@@ -1,10 +1,9 @@
-// Hand-written fixtures until B.5a replaces them with recorded real responses. No test reads FAL_KEY or REPLICATE_API_TOKEN.
+// Hand-written fixtures until B.5a replaces them with recorded real responses. No test reads FAL_KEY.
 import { describe, expect, test } from 'vitest';
 import { AUDIO_USD_PER_SECOND, BAKEOFF_MODELS } from '../models';
 import { createFalProvider, VIDEO_BODIES, videoInputs } from './fal';
-import { ImageReadError, isFundingRefusal, MAX_INLINE_CHARS, ProviderHttpError, unpackJobId } from './http';
+import { ImageReadError, isFundingRefusal, MAX_INLINE_CHARS, ProviderHttpError, resolveImages, unpackJobId } from './http';
 import { createMockVideoProvider, MOCK_FAIL } from './mock';
-import { createReplicateProvider, REPLICATE_BODIES } from './replicate';
 import type { ProviderJob, SubmitRequest } from './types';
 
 const [kling, seedance] = BAKEOFF_MODELS as [(typeof BAKEOFF_MODELS)[0], (typeof BAKEOFF_MODELS)[0]];
@@ -120,7 +119,7 @@ describe('fal', () => {
     const provider = createFalProvider({ apiKey: 'k', fetch: fn });
     for (const endpoint of endpoints) await provider.submit({ ...req, audio: true, model: { ...kling, endpoint } });
     const sent = calls.map((c) => (c.body as { generate_audio?: boolean }).generate_audio);
-    expect(endpoints.filter((_e, i) => sent[i] === true).sort()).toEqual(Object.keys(AUDIO_USD_PER_SECOND).filter((e) => e !== 'mock' && e !== 'veo-3.1-generate-001' && !Object.hasOwn(REPLICATE_BODIES, e)).sort());
+    expect(endpoints.filter((_e, i) => sent[i] === true).sort()).toEqual(Object.keys(AUDIO_USD_PER_SECOND).filter((e) => e !== 'mock' && e !== 'veo-3.1-generate-001').sort());
     expect(sent).not.toContain(false);
     await provider.submit({ ...req, model: { ...kling, endpoint: 'bytedance/seedance-2.5/us/reference-to-video' } });
     expect(calls.at(-1)!.body).toMatchObject({ generate_audio: false }); // audio off unless the job asks
@@ -370,134 +369,13 @@ describe('fal Motion Control', () => {
   });
 });
 
-describe('replicate', () => {
-  const req: SubmitRequest = { ...base, model: seedance };
-  const job: ProviderJob = { providerJobId: '5:pred-1', model: seedance };
-
-  test('submit sends auth, User-Agent and the Seedance body at 720p with audio off', async () => {
-    const { fn, calls } = fakeFetch([201, { id: 'pred-1', status: 'starting' }]);
-    const out = await createReplicateProvider({ apiToken: 't', fetch: fn }).submit(req);
-    expect(out.providerJobId).toBe('5:pred-1');
-    expect(calls[0]!.url).toBe('https://api.replicate.com/v1/models/bytedance/seedance-2.5/predictions');
-    expect(calls[0]!.method).toBe('POST');
-    expect(calls[0]!.headers.Authorization).toBe('Bearer t');
-    expect(calls[0]!.headers['User-Agent']).toBeTruthy();
-    expect(calls[0]!.body).toEqual({
-      input: {
-        prompt: 'a bottle on a table',
-        reference_images: ['https://img/1.jpg', 'https://img/2.jpg'],
-        aspect_ratio: '9:16',
-        duration: 5,
-        generate_audio: false,
-        resolution: '720p',
-      },
-    });
-  });
-
-  test('Veo 3.1 sends the start frame as image, the end frame as last_frame, the row resolution and audio as the job asks; with no image, the prompt alone', async () => {
-    const veo = { ...seedance, endpoint: 'google/veo-3.1', outputResolution: '720p' };
-    const { fn, calls } = fakeFetch([201, { id: 'v1' }], [201, { id: 'v2' }], [201, { id: 'v3' }]);
-    const p = createReplicateProvider({ apiToken: 't', fetch: fn });
-    await p.submit({ ...req, model: veo, prompt: 'The bottle in [Image1] turns', imageUrls: ['https://img/1.jpg'], durationSec: 8, endImageUrl: 'https://img/end.jpg' });
-    await p.submit({ ...req, model: veo, imageUrls: ['https://img/1.jpg'], durationSec: 8, audio: true });
-    await p.submit({ ...req, model: veo, imageUrls: [], ratio: '16:9', durationSec: 8 });
-    expect(calls.map((c) => c.url)).toEqual(Array(3).fill('https://api.replicate.com/v1/models/google/veo-3.1/predictions'));
-    expect(calls.map((c) => (c.body as { input: unknown }).input)).toEqual([
-      { prompt: 'The bottle in image 1 turns', image: 'https://img/1.jpg', last_frame: 'https://img/end.jpg', aspect_ratio: '9:16', duration: 8, resolution: '720p', generate_audio: false },
-      { prompt: 'a bottle on a table', image: 'https://img/1.jpg', aspect_ratio: '9:16', duration: 8, resolution: '720p', generate_audio: true },
-      { prompt: 'a bottle on a table', aspect_ratio: '16:9', duration: 8, resolution: '720p', generate_audio: false },
-    ]);
-    expect(videoInputs('google/veo-3.1')).toEqual({ endFrame: true, textOnly: true, audioClips: null });
-    expect(videoInputs(seedance.endpoint)).toEqual({ endFrame: false, textOnly: false, audioClips: null });
-  });
-
-  test('Seedance refuses an end frame before any call', async () => {
-    const { fn, calls } = fakeFetch([201, { id: 'pred-1' }]);
-    await expect(createReplicateProvider({ apiToken: 't', fetch: fn }).submit({ ...req, endImageUrl: 'https://img/end.jpg' })).rejects.toThrow(ImageReadError);
-    expect(calls).toHaveLength(0);
-  });
-
-  test.each([
-    ['starting', 'queued'],
-    ['processing', 'running'],
-  ])('maps %s to %s', async (repStatus, state) => {
-    const { fn, calls } = fakeFetch([200, { id: 'pred-1', status: repStatus }]);
-    expect(await createReplicateProvider({ apiToken: 't', fetch: fn }).status(job)).toEqual({ state });
-    expect(calls[0]!.url).toBe('https://api.replicate.com/v1/predictions/pred-1');
-    expect(calls[0]!.headers['User-Agent']).toBeTruthy();
-  });
-
-  test('succeeded returns the output URL (string or list) and the estimate', async () => {
-    const want = { state: 'succeeded', outputUrl: 'https://replicate.delivery/a.mp4', costUsd: 1.156, costSource: 'estimate' };
-    for (const output of ['https://replicate.delivery/a.mp4', ['https://replicate.delivery/a.mp4']]) {
-      const { fn } = fakeFetch([200, { status: 'succeeded', output }]);
-      expect(await createReplicateProvider({ apiToken: 't', fetch: fn }).status(job)).toEqual(want);
-    }
-  });
-
-  test('succeeded without output (deleted after an hour) is failed', async () => {
-    const { fn } = fakeFetch([200, { status: 'succeeded', output: null }]);
-    expect(await createReplicateProvider({ apiToken: 't', fetch: fn }).status(job)).toMatchObject({ state: 'failed', costSource: 'estimate' });
-  });
-
-  test('failed and canceled carry the error and the estimate', async () => {
-    const f1 = fakeFetch([200, { status: 'failed', error: 'NSFW' }]);
-    expect(await createReplicateProvider({ apiToken: 't', fetch: f1.fn }).status(job)).toEqual({ state: 'failed', error: 'NSFW', costUsd: 1.156, costSource: 'estimate' });
-    const f2 = fakeFetch([200, { status: 'canceled', error: null }]);
-    expect(await createReplicateProvider({ apiToken: 't', fetch: f2.fn }).status(job)).toEqual({ state: 'canceled', error: 'canceled', costUsd: 1.156, costSource: 'estimate' });
-  });
-
-  test('status and cancel requests carry a timeout signal', async () => {
-    const { fn, calls } = fakeFetch([200, { status: 'processing' }], [200, {}]);
-    const p = createReplicateProvider({ apiToken: 't', fetch: fn });
-    await p.status(job);
-    await p.cancel(job);
-    expect(calls.map((c) => c.signal instanceof AbortSignal)).toEqual([true, true]);
-  });
-
-  test('uploads non-https images before submit and sends the uploaded form', async () => {
-    const { fn, calls } = fakeFetch([201, { id: 'pred-1' }]);
-    await createReplicateProvider({ apiToken: 't', fetch: fn, readImage }).submit({ ...req, imageUrls: ['asset://a1', 'https://img/2.jpg'] });
-    expect(calls).toHaveLength(1);
-    expect((calls[0]!.body as { input: { reference_images: string[] } }).input.reference_images).toEqual([DATA_URL, 'https://img/2.jpg']);
-  });
-
-  test('a failed image read submits nothing, and a non-https URL without a resolver throws before any call', async () => {
-    const { fn, calls } = fakeFetch([201, { id: 'pred-1' }]);
-    await expect(createReplicateProvider({ apiToken: 't', fetch: fn, readImage }).submit({ ...req, imageUrls: ['asset://missing'] })).rejects.toThrow('asset not found');
-    await expect(createReplicateProvider({ apiToken: 't', fetch: fn }).submit({ ...req, imageUrls: ['asset://a1'] })).rejects.toThrow('readImage');
-    expect(calls).toHaveLength(0);
-  });
-
-  test('inlined images over MAX_INLINE_CHARS in total are refused before any call (Replicate reset a 3.8 MB body)', async () => {
-    const { fn, calls } = fakeFetch([201, { id: 'pred-1' }]);
-    const big = async () => ({ bytes: new Uint8Array(Math.ceil((MAX_INLINE_CHARS * 3) / 8)), contentType: 'image/png' });
-    await expect(createReplicateProvider({ apiToken: 't', fetch: fn, readImage: big }).submit({ ...req, imageUrls: ['asset://a1', 'asset://a2'] })).rejects.toThrow(ImageReadError);
-    expect(calls).toHaveLength(0);
-    const { fn: ok } = fakeFetch([201, { id: 'pred-1' }]);
-    await expect(createReplicateProvider({ apiToken: 't', fetch: ok, readImage: big }).submit({ ...req, imageUrls: ['asset://a1'] })).resolves.toEqual({ providerJobId: '5:pred-1' });
-  });
-
-  test.each([
-    ['402', 402, { detail: 'Payment required' }],
-    ['403 exhausted balance', 403, { detail: 'Your account has insufficient credit; set up billing' }],
-  ])('a %s refusal is a funding refusal', async (_n, status, body) => {
-    const { fn } = fakeFetch([status, body]);
-    const err = await createReplicateProvider({ apiToken: 't', fetch: fn }).submit(req).catch((e) => e);
-    expect(isFundingRefusal(err)).toBe(true);
-    expect(err.body).toContain(JSON.stringify(body));
-  });
-
-  test('cancel posts to the cancel endpoint', async () => {
-    const { fn, calls } = fakeFetch([200, { status: 'canceled' }]);
-    expect(await createReplicateProvider({ apiToken: 't', fetch: fn }).cancel(job)).toEqual({ supported: true });
-    expect(calls[0]!.url).toBe('https://api.replicate.com/v1/predictions/pred-1/cancel');
-    expect(calls[0]!.method).toBe('POST');
-    expect(calls[0]!.headers['User-Agent']).toBeTruthy();
-  });
-});
-
 describe('shared helpers', () => {
+  test('inlined images over MAX_INLINE_CHARS in total are refused before any is returned (a provider reset a 3.8 MB body in the bake-off)', async () => {
+    const big = async () => ({ bytes: new Uint8Array(Math.ceil((MAX_INLINE_CHARS * 3) / 8)), contentType: 'image/png' });
+    await expect(resolveImages(['asset://a1', 'asset://a2'], big)).rejects.toThrow(ImageReadError);
+    await expect(resolveImages(['asset://a1'], big)).resolves.toHaveLength(1);
+  });
+
   test('other refusals are not funding refusals', () => {
     expect(isFundingRefusal(new ProviderHttpError(403, 'forbidden', 'x'))).toBe(false);
     // A rate limit is never a credit refusal, even when its body mentions payment or credit.

@@ -286,7 +286,7 @@ export const settings = pgTable(
     memberMonthlyUsdCap: numeric('member_monthly_usd_cap', { precision: 12, scale: 4 }).notNull().default('50'),
     /** The Vertex account (its project id) new Vertex jobs go to; the worker's credits guard writes it, null when no account is usable. */
     vertexActiveProject: text('vertex_active_project'),
-    /** Replicate has no balance API: the Admin-entered prepaid credit and when it was entered; remaining = credit - the ledger's replicate rows since. */
+    /** Unused since Replicate was removed (2026-11-04, migration 0062): the Admin-entered prepaid credit and when it was entered. */
     replicateCreditUsd: numeric('replicate_credit_usd', { precision: 12, scale: 4 }),
     replicateCreditSince: tstz('replicate_credit_since'),
     /** Admin Costs shows a provider balance under this many USD in red. */

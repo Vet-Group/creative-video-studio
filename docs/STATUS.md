@@ -1,5 +1,7 @@
 # Status — Creative Video Studio (internal)
 
+**Replicate removed (2026-11-04).** Its prepaid credit is spent, so the adapter, the credit guard, the Admin credit field and the balance row are gone; Vertex (Veo, Nano Banana) and BytePlus (Seedance, Seedream) are the primary providers and fal is the fallback. Replicate rows with history stay in `model_configs`, disabled, and old ledger rows still read (migration 0062; `docs/ops/provider-balances.md`). Every mention of Replicate below as a live provider is history. On the server, remove `REPLICATE_API_TOKEN` from `.env`.
+
 Last updated: 2026-10-24 (main after #42; see "Overnight 2026-10-24" below). Earlier: 2026-10-23, 11:45 ICT (main after #16). The autonomous run is under way under the plan v5.1 pre-approval; the current state is in "Run state" below. Earlier sections keep the research record. The deep-interview decisions are recorded in the section after Q9; where they differ from Q1–Q9, they win.
 
 ## Workspace

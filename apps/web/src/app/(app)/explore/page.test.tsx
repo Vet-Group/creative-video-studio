@@ -45,27 +45,27 @@ test('uploaded Apps and Library posters and loops override local artwork', async
 });
 
 test('a model variant without its own sample shows the sample of the model it varies', async () => {
-  const ids = ['seedance-2.0-replicate', 'minimax-h3-max-reference-1080p', 'seedance-2.0-reference', 'kling-2.6'];
+  const ids = ['seedance-2.0-byteplus', 'minimax-h3-max-reference-1080p', 'seedance-2.0-reference', 'kling-2.6'];
   const rows = ids.map((id) => ({ id, label: id, provider: 'fal', kind: 'video', ratios: ['9:16'], durations_sec: [5], usd_per_second: '0.1', image_prices: null }));
   vi.mocked(pool.query).mockResolvedValueOnce({ rows } as never);
   vi.mocked(listSamples).mockResolvedValue(['model-seedance-2-0.mp4', 'model-seedance-2-0.jpg', 'model-minimax-h3-max.jpg', 'model-seedance-2-0-reference.jpg'].map((name) => ({ name })) as Awaited<ReturnType<typeof listSamples>>);
   const html = renderToStaticMarkup(await ExplorePage());
   const model = (id: string) => card(html, `/create\\?model=${id}`);
-  expect(model('seedance-2.0-replicate')).toContain('data-video="/api/samples/model-seedance-2-0.mp4"');
+  expect(model('seedance-2.0-byteplus')).toContain('data-video="/api/samples/model-seedance-2-0.mp4"');
   expect(model('minimax-h3-max-reference-1080p')).toContain('src="/api/samples/model-minimax-h3-max.jpg"');
   expect(model('seedance-2.0-reference')).toContain('src="/api/samples/model-seedance-2-0-reference.jpg"'); // its own sample wins
   expect(model('kling-2.6')).not.toContain('src=');
 });
 
-test('Seedance 2.5 and the Replicate Seedance 2.0 keep their featured places when the -image and base rows are off', async () => {
-  const ids = ['flux-3', 'seedance-2.0-replicate', 'kling-o3-pro', 'seedance-2.5'];
+test('Seedance 2.5 and the BytePlus Seedance 2.0 keep their featured places when the -image and base rows are off', async () => {
+  const ids = ['flux-3', 'seedance-2.0-byteplus', 'kling-o3-pro', 'seedance-2.5'];
   const rows = ids.map((id) => ({ id, label: id, provider: 'fal', kind: 'video', ratios: ['9:16'], durations_sec: [5], usd_per_second: '0.1', image_prices: null }));
   vi.mocked(pool.query).mockResolvedValueOnce({ rows } as never);
   vi.mocked(listSamples).mockResolvedValue(['model-flux-3.mp4'].map((name) => ({ name })) as Awaited<ReturnType<typeof listSamples>>);
   const html = renderToStaticMarkup(await ExplorePage());
   const order = [...html.matchAll(/href="\/create\?model=([^"]+)"/g)].map((m) => m[1]);
-  expect(order).toEqual(['seedance-2.5', 'kling-o3-pro', 'seedance-2.0-replicate', 'flux-3']);
-  expect(html).toMatch(/model=seedance-2\.0-replicate"[^<]*<img[^>]*><strong>[^<]*<\/strong><span[^>]*>Thế hệ video mới/); // a description, not the spec line
+  expect(order).toEqual(['seedance-2.5', 'kling-o3-pro', 'seedance-2.0-byteplus', 'flux-3']);
+  expect(html).toMatch(/model=seedance-2\.0-byteplus"[^<]*<img[^>]*><strong>[^<]*<\/strong><span[^>]*>Thế hệ video mới/); // a description, not the spec line
 });
 
 test("a model's best Library clip replaces its sample, and a model with a clip but no sample moves up to the loops", async () => {

@@ -129,16 +129,16 @@ describe('a disabled model', () => {
 describe('PUT /api/admin/settings', () => {
   const put = (body: unknown) => PUT_SETTINGS(call(admin.cookie, '/api/admin/settings', 'PUT', body));
 
-  test('enables a video model with no bake-off record, and one under 70% (Seedance 2.5, 7/12): the record only feeds the score; each change audited', async () => {
+  test('enables a video model with no bake-off record, and one under 70% (Seedance 2.5 on BytePlus, 7/12): the record only feeds the score; each change audited', async () => {
     await pool.query(
       `insert into model_configs (id, provider, endpoint, label, ratios, durations_sec, max_images, output_resolution, usd_per_second, sources)
        values ('new-model', 'fal', 'x', 'New model', '{9:16}', '{5}', 2, '720p', 0.2, '{}')`,
     );
-    expect((await put({ models: [{ id: 'new-model', enabled: true }, { id: 'seedance-2.5', enabled: true }] })).status).toBe(200);
-    expect([await enabled('new-model'), await enabled('seedance-2.5')]).toEqual([true, true]);
+    expect((await put({ models: [{ id: 'new-model', enabled: true }, { id: 'seedance-2.5-byteplus', enabled: true }] })).status).toBe(200);
+    expect([await enabled('new-model'), await enabled('seedance-2.5-byteplus')]).toEqual([true, true]);
     const audits = (await pool.query(`select count(*)::int as n from audit_entries where action = 'model.set_enabled'`)).rows[0].n;
     expect(audits).toBe(2);
-    await put({ models: [{ id: 'new-model', enabled: false }, { id: 'seedance-2.5', enabled: false }] });
+    await put({ models: [{ id: 'new-model', enabled: false }, { id: 'seedance-2.5-byteplus', enabled: false }] });
   });
 
   test('still refuses a model whose price is not recorded, and changes nothing', async () => {

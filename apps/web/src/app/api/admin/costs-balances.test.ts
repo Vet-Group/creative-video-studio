@@ -1,7 +1,6 @@
 // Integration test of GET /api/admin/costs/balances against a disposable database on the compose Postgres (`pnpm services:up`). fal is a fake
 // fetch, so no test reaches a provider.
 import { randomBytes } from 'node:crypto';
-import { bookShared } from '@cvs/core/ledger';
 import { createTestDatabase } from '@cvs/db/testing';
 import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
 
@@ -51,14 +50,13 @@ describe('GET /api/admin/costs/balances', () => {
     expect((await get('')).status).toBe(401);
   });
 
-  test('without FAL_KEY or a Replicate credit: readable answers, nothing red, and every billing page', async () => {
+  test('without FAL_KEY: readable answers, nothing red, and every billing page', async () => {
     const calls = fakeFal(() => Response.json({}));
     const { status, body } = await get();
     expect(status).toBe(200);
     expect(body).toEqual({
       warningUsd: 10,
       fal: { ok: false, reason: 'no_key', error: 'FAL_KEY is not set', billingUrl: 'https://fal.ai/dashboard/billing', low: false },
-      replicate: { credit: null, billingUrl: 'https://replicate.com/account/billing', low: false },
       vertex: { billingUrl: 'https://console.cloud.google.com/billing' },
       byteplus: { billingUrl: 'https://console.byteplus.com/finance/overview' },
     });
@@ -75,18 +73,15 @@ describe('GET /api/admin/costs/balances', () => {
     expect(calls).toHaveLength(2);
   });
 
-  test("fal's balance under the threshold is red and kept a minute; Replicate's remaining is its credit minus the ledger since it was entered", async () => {
+  test("fal's balance under the threshold is red and kept a minute, and the answer no longer has a Replicate entry", async () => {
     process.env.FAL_KEY = FAL_FIXTURE;
     const calls = fakeFal(() => Response.json({ username: 'vet', credits: { current_balance: 8.5, currency: 'USD' } }));
-    await bookShared(pool, { kind: 'bakeoff', usd: '3', month: '2026-11', provider: 'replicate', ref: 'balances-before', note: 'before the credit' });
-    await pool.query(`update settings set replicate_credit_usd = 20, replicate_credit_since = now() where id = 1`);
-    await bookShared(pool, { kind: 'bakeoff', usd: '12.5', month: '2026-11', provider: 'replicate', ref: 'balances-after', note: 'after the credit' });
     const { body } = await get();
     expect(body.fal).toEqual({ ok: true, balance: 8.5, currency: 'USD', billingUrl: 'https://fal.ai/dashboard/billing', low: true });
-    expect(body.replicate).toMatchObject({ credit: { creditUsd: '20.0000', spentUsd: '12.5000', remainingUsd: 7.5 }, low: true });
+    expect(body).not.toHaveProperty('replicate');
     await pool.query(`update settings set balance_warning_usd = 5 where id = 1`);
     const again = (await get()).body;
-    expect([again.warningUsd, again.fal.low, again.replicate.low]).toEqual([5, false, false]);
+    expect([again.warningUsd, again.fal.low]).toEqual([5, false]);
     expect(calls).toHaveLength(1); // the second open used the cached fal balance
   });
 });

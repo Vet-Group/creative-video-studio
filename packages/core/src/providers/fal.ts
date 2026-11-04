@@ -10,7 +10,6 @@
 import { imageSize } from './image-size';
 import { estimate, ImageReadError, imageEstimate, imageTokens, packJobId, plainImage, ProviderHttpError, resolveImages, sendJson, sizeFor, timeout, unpackJobId, type Fetch, type ReadImage } from './http';
 import { isByteplusVideo } from './byteplus';
-import { REPLICATE_BODIES } from './replicate';
 import { FAL_TEXT_ENDPOINTS } from '../models';
 import type { ImageProvider, ImageSubmitRequest, ProviderStatus, SubmitRequest, VideoProvider } from './types';
 
@@ -153,10 +152,10 @@ export const VIDEO_BODIES: Record<string, VideoBody> = {
 
 /**
  * What a video model takes besides its images, by endpoint, for the models and jobs APIs: `endFrame`, an end frame; `textOnly`, a Run with no image;
- * `audioClips`, reference audio up to `max` clips and `seconds` in all (null when none). Replicate endpoints answer from REPLICATE_BODIES.
+ * `audioClips`, reference audio up to `max` clips and `seconds` in all (null when none).
  */
 export function videoInputs(endpoint: string) {
-  const spec: VideoBody | undefined = Object.hasOwn(VIDEO_BODIES, endpoint) ? VIDEO_BODIES[endpoint] : Object.hasOwn(REPLICATE_BODIES, endpoint) ? REPLICATE_BODIES[endpoint] : undefined;
+  const spec: VideoBody | undefined = Object.hasOwn(VIDEO_BODIES, endpoint) ? VIDEO_BODIES[endpoint] : undefined;
   // BytePlus Seedance runs from the prompt alone and takes neither an end frame nor reference audio (byteplus.ts).
   if (isByteplusVideo(endpoint)) return { endFrame: false, textOnly: true, audioClips: null };
   return { endFrame: spec?.end !== undefined, textOnly: spec?.text !== undefined, audioClips: spec?.audio ? { max: spec.audio.max, seconds: spec.audio.seconds } : null };

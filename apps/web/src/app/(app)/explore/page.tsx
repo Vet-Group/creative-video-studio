@@ -34,19 +34,19 @@ const fmtDate = new Intl.DateTimeFormat('vi-VN', { day: 'numeric', month: 'numer
 const content = (id: string) => `/api/assets/${id}/content`;
 
 /** The sample name of a model card; ids such as seedance-2.5 keep only letters, digits and dashes in sample names.
- * A variant without its own sample (a -vertex, -reference, -replicate, -byteplus, -1080p or -480p id) shows the sample of the model it varies. */
+ * A variant without its own sample (a -vertex, -reference, -byteplus, -1080p or -480p id) shows the sample of the model it varies. */
 const modelSample = (have: ReadonlySet<string>, id: string) => {
   const own = `model-${id.replace(/[^a-z0-9-]/g, '-')}`;
   for (let base = own, next = ''; ; base = next) {
     if (have.has(`${base}.mp4`) || have.has(`${base}.jpg`)) return base;
-    next = base.replace(/-(vertex|reference|replicate|byteplus|1080p|480p)$/, '');
+    next = base.replace(/-(vertex|reference|byteplus|1080p|480p)$/, '');
     if (next === base) return own;
   }
 };
 
 /** The live page's featured models, in its order; they lead the row, then the other models with a loop (Library clip or sample), then those with a still, then the rest.
- * seedance-2.5 and seedance-2.0-replicate keep the live order when the -image and base rows are disabled. */
-const FEATURED = ['seedance-2.5-image', 'seedance-2.5', 'kling-o3-pro', 'gemini-omni-flash', 'kling-3.0-pro', 'seedance-2.0', 'seedance-2.0-replicate'];
+ * seedance-2.5 and seedance-2.0-byteplus keep the live order when the -image and base rows are disabled. */
+const FEATURED = ['seedance-2.5-image', 'seedance-2.5', 'kling-o3-pro', 'gemini-omni-flash', 'kling-3.0-pro', 'seedance-2.0', 'seedance-2.0-byteplus'];
 
 const range = (values: number[]) => (values.length === 0 ? '' : values.length > 1 ? `${Math.min(...values)}–${Math.max(...values)} giây` : `${values[0]} giây`);
 
