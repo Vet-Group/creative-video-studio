@@ -462,7 +462,8 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
         <div className="card form-card" id="create-panel-create" role={narrow ? 'tabpanel' : undefined} aria-labelledby={narrow ? 'create-tab-create' : undefined} hidden={narrow && shown !== 'create'} onPointerDownCapture={recall.touch} onKeyDownCapture={recall.touch}>
           <div className="form-scroll">
             <PageHint href="/create" />
-            <div className="banner" aria-busy={presets === null}>
+            {/* A click anywhere on the banner opens the picker too; the chip stays the keyboard and screen-reader way in. */}
+            <div className="banner" aria-busy={presets === null} onClick={() => setPicking(true)}>
               <CardMedia video={banner.video} poster={banner.poster} />
               <div className="banner-text">
                 <strong data-value={presetId}>{current?.label ?? 'Tự viết mô tả'}</strong>
