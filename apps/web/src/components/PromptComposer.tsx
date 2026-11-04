@@ -25,7 +25,7 @@ interface Props {
   placeholder: string;
   /** Read-only with this placeholder (Create while a preset is in use). */
   disabled?: boolean;
-  ask?: () => Ask;
+  ask?: (() => Ask) | null;
   aiLabel?: string;
   parts?: readonly PromptPart[];
   /** The page's Enhance pill, first in the toolbar. */

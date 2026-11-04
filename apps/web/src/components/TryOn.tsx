@@ -219,7 +219,7 @@ export function TryOn({ reuse }: { reuse?: string }) {
               maxLength={room}
               onRun={() => canRun && void run()}
               placeholder="Ví dụ: người mẫu đứng trong studio sáng, toàn thân"
-              ask={() => ({ field: 'prompt', feature: 'try_on', text: prompt, ...(room !== undefined && { room }), ...(chosen && { model: chosen.id }) })}
+              ask={chosen ? () => ({ field: 'prompt', feature: 'try_on', text: prompt, ...(room !== undefined && { room }), model: chosen.id }) : null}
             />
 
             {models !== null && !failed && !chosen && <LockedFields />}

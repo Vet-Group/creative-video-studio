@@ -136,6 +136,28 @@ test('with an empty prompt box on Create, the first card is labelled Cơ bản a
   await expect(cards.first().getByText(/Sát ý bạn/)).toHaveCount(0);
 });
 
+test('Gợi ý AI stays off until the page knows its model, then asks with the model and its room, on Create, Marketing Studio and Image', async ({ page }) => {
+  await signIn(page, 'sugga');
+  let sent: unknown;
+  page.on('request', (r) => r.url().endsWith('/api/suggestions') && r.method() === 'POST' && (sent = r.postDataJSON()));
+  for (const path of ['/create', '/marketing-studio', '/image-generation']) {
+    // Hold the model list, as on a slow line: a click then would ask without the model's room and get options longer than the box takes.
+    let release!: () => void;
+    const held = new Promise<void>((r) => (release = r));
+    await page.route(/\/api\/(image-)?models/, async (route) => (await held, route.continue()));
+    await page.goto(path);
+    const ai = page.getByRole('button', { name: 'Gợi ý AI' });
+    await expect(ai).toBeDisabled();
+    release();
+    await expect(ai).toBeEnabled();
+    await page.unroute(/\/api\/(image-)?models/);
+    sent = undefined;
+    await ai.click();
+    await expect(page.getByRole('group', { name: 'Gợi ý AI' }).getByRole('button', { name: /^Gợi ý \d/ })).toHaveCount(3, { timeout: 20_000 });
+    expect(sent, path).toMatchObject({ model: expect.any(String), room: expect.any(Number) });
+  }
+});
+
 test('Dịch shows a Vietnamese reading of English words under the box, asks once per text, and is not offered for Vietnamese words', async ({ page }) => {
   await signIn(page, 'sugga');
   await page.goto('/create');

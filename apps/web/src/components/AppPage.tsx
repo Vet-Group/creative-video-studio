@@ -252,7 +252,7 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
                 maxLength={room}
                 onRun={() => canRun && void run()}
                 placeholder={app.prompt === 'background' ? 'Ví dụ: quán cà phê ngoài trời đầy nắng, bàn đá cẩm thạch' : 'Mô tả điều bạn muốn thêm...'}
-                ask={() => ({ field: 'prompt', feature: app.feature, text: prompt, ...(room !== undefined && { room }), ...(chosen && { model: chosen.id }) })}
+                ask={chosen ? () => ({ field: 'prompt', feature: app.feature, text: prompt, ...(room !== undefined && { room }), model: chosen.id }) : null}
               />
             )}
 
@@ -497,7 +497,7 @@ function MotionForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
               maxLength={chosen?.maxPromptChars}
               onRun={() => canRun && void run()}
               placeholder="Ví dụ: sân khấu ánh đèn ấm, nhân vật mặc nguyên bộ đồ trong ảnh"
-              ask={() => ({ field: 'prompt', feature: app.feature, text: prompt, ...(chosen && { room: chosen.maxPromptChars, model: chosen.id }) })}
+              ask={chosen ? () => ({ field: 'prompt', feature: app.feature, text: prompt, room: chosen.maxPromptChars, model: chosen.id }) : null}
             />
             <Templates feature={app.feature} data={() => ({ images: [...image, ...(video ? [video] : [])].map((i) => i.id), prompt: prompt.trim(), modelId: chosen?.id })} />
           </div>
