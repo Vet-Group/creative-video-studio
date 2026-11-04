@@ -1,7 +1,7 @@
 import { expect, type Page, test } from '@playwright/test';
 import { png, select, selectText, signIn } from './support.test';
 
-// Saved forms: Save template keeps the page's inputs under a name, My templates reopens the page filled from one. Nothing is run.
+// Saved forms: Save template keeps the page's inputs under a name, My templates reopens the page filled from one. Only the store template is run, on the mock model.
 const file = (name: string) => ({ name, mimeType: 'image/png', buffer: png() });
 
 async function saveAs(page: Page, name: string) {
@@ -64,9 +64,11 @@ test('Try On: a saved template lists under Mẫu của tôi and refills the pers
   await expect(list).toContainText('Chưa có mẫu nào.');
 });
 
-test('Create: a template saved to the store chosen on the form is listed, tagged with the store, to another member who picks that store, and applies there', async ({ page, browser }) => {
+test("Create: a template saved to the store chosen on the form is listed, tagged with the store, to another member who picks that store, and applies there with the author's photo, which that member's Run takes", async ({ page, browser }) => {
   await signIn(page, 'stpla');
   await page.goto('/create');
+  await page.getByLabel('Ảnh sản phẩm').setInputFiles(file('shop-bag.png'));
+  await expect(page.getByRole('img', { name: 'shop-bag.png' })).toBeVisible();
   await page.getByLabel('Mô tả chuyển động').fill('The shop bag spins slowly.');
   await page.getByRole('button', { name: 'Lưu mẫu', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Lưu mẫu' });
@@ -95,6 +97,16 @@ test('Create: a template saved to the store chosen on the form is listed, tagged
   await item.getByRole('link', { name: 'Túi xoay' }).click();
   await expect(other.getByLabel('Mô tả chuyển động')).toHaveValue('The shop bag spins slowly.');
   await expect(select(other, 'Cửa hàng/Thương hiệu')).toHaveText('E2E Shop');
+  // The author's photo comes as this member's own copy, so the preview shows and the Run (the mock model) takes it.
+  const photo = other.getByRole('img', { name: 'shop-bag.png' });
+  await expect(photo).toBeVisible();
+  await expect.poll(() => photo.evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0); // the copy's bytes load
+  await expect(other.getByRole('button', { name: /^Mô hình / })).toContainText('Mock E2E');
+  const run = other.getByRole('button', { name: /^Tạo video/ });
+  await expect(run).toBeEnabled();
+  const created = other.waitForResponse((r) => r.url().endsWith('/api/jobs') && r.request().method() === 'POST');
+  await run.click();
+  expect((await created).status()).toBe(201);
   await other.close();
 
   // The author deletes it, so no other spec that picks this store lists it.

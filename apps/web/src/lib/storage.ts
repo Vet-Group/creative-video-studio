@@ -1,5 +1,5 @@
 // The S3 client for the app's own MinIO (127.0.0.1 only, so every byte goes through our routes).
-import { CreateBucketCommand, DeleteObjectCommand, GetObjectCommand, HeadBucketCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { CopyObjectCommand, CreateBucketCommand, DeleteObjectCommand, GetObjectCommand, HeadBucketCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 
 /** A setting from the environment, else from the repo's .env (local runs; variables already set win). */
 function env(name: string): string {
@@ -42,6 +42,11 @@ export async function ensureBucket(): Promise<void> {
 
 export async function putObject(key: string, body: Uint8Array, contentType: string): Promise<void> {
   await s3().send(new PutObjectCommand({ Bucket: bucketName(), Key: key, Body: body, ContentType: contentType }));
+}
+
+/** Copies an object inside the bucket on the storage server; no byte passes through the app. */
+export async function copyObject(from: string, to: string): Promise<void> {
+  await s3().send(new CopyObjectCommand({ Bucket: bucketName(), Key: to, CopySource: `${bucketName()}/${from}` }));
 }
 
 export async function deleteObject(key: string): Promise<void> {

@@ -1,16 +1,20 @@
-// Integration test against a disposable database on the compose Postgres (`pnpm services:up`).
+// Integration test against a disposable database and bucket on the compose Postgres and MinIO (`pnpm services:up`).
 import { randomBytes } from 'node:crypto';
+import { DeleteBucketCommand, DeleteObjectsCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { createTestDatabase } from '@cvs/db/testing';
-import { afterAll, describe, expect, test } from 'vitest';
+import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
 const testDb = await createTestDatabase();
 process.env.DATABASE_URL = testDb.url;
 process.env.BETTER_AUTH_SECRET = randomBytes(32).toString('hex');
 process.env.APP_URL = 'http://localhost';
+process.env.S3_BUCKET = `cvs-test-${randomBytes(6).toString('hex')}`;
 
 const { auth, pool } = await import('@/lib/auth');
+const { bucketName, ensureBucket, getObject, putObject, s3 } = await import('@/lib/storage');
 const { GET: list, POST } = await import('./route');
 const { GET: one, DELETE } = await import('./[id]/route');
+const { GET: content } = await import('../assets/[id]/content/route');
 
 const PASSWORD = 'correct-horse-battery';
 let seq = 0;
@@ -21,6 +25,7 @@ async function newUser(role: 'member' | 'admin' = 'member') {
   const res = await auth.api.signInEmail({ body: { email, password: PASSWORD }, asResponse: true });
   const cookie = res.headers.getSetCookie().map((c) => c.split(';')[0]).join('; ');
   await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) values ($1, $2, 'input', $1, 'own.png', 'image/png', 1)`, [`${user.id}-a`, user.id]);
+  await putObject(`${user.id}-a`, new Uint8Array([user.id.length]), 'image/png');
   return { id: user.id, cookie, asset: `${user.id}-a` };
 }
 type User = Awaited<ReturnType<typeof newUser>>;
@@ -31,7 +36,13 @@ const save = (u: User, body: Record<string, unknown>) => POST(req(u, '/api/templ
 const error = async (res: Response) => ((await res.json()) as { error: string }).error;
 const tryOn = (u: User) => ({ feature: 'try_on', name: 'Red dress', data: { images: [u.asset], brief: 'red dress', garments: 1, ratio: '3:4', resolution: '2K', modelId: 'm1' } });
 
+beforeAll(() => ensureBucket());
+
 afterAll(async () => {
+  const Bucket = bucketName();
+  const { Contents = [] } = await s3().send(new ListObjectsV2Command({ Bucket }));
+  if (Contents.length) await s3().send(new DeleteObjectsCommand({ Bucket, Delete: { Objects: Contents.map(({ Key }) => ({ Key: Key! })) } }));
+  await s3().send(new DeleteBucketCommand({ Bucket }));
   await pool.end();
   await testDb.drop();
 });
@@ -101,18 +112,20 @@ describe('/api/templates', () => {
     expect([res.status, await error(res)]).toEqual([409, 'you can keep at most 50 templates; delete one first']);
   });
 
-  test("shares an Admin's company template with everyone, without the Admin's photos, and only an Admin deletes it", async () => {
+  test("shares an Admin's company template with everyone, its photos as the member's own copies, and only an Admin deletes it", async () => {
     const [admin, m] = [await newUser('admin'), await newUser()];
     const { id } = (await (await save(admin, { ...tryOn(admin), isCompany: true })).json()) as { id: string };
     expect(await (await list(req(m, '/api/templates?feature=try_on'))).json()).toEqual({ templates: [{ id, name: 'Red dress', isCompany: true, storeId: null, storeName: null, mine: false }], canShare: false });
     expect(((await (await list(req(admin, '/api/templates?feature=try_on'))).json()) as { canShare: boolean }).canShare).toBe(true);
-    expect(await (await one(req(m, `/api/templates/${id}`), ctx(id))).json()).toMatchObject({ images: [], brief: 'red dress', garments: 1 });
+    const got = (await (await one(req(m, `/api/templates/${id}`), ctx(id))).json()) as { images: { id: string }[] };
+    expect(got).toMatchObject({ images: [{ filename: 'own.png' }], brief: 'red dress', garments: 1 });
+    expect((await pool.query('select owner_id from assets where id = $1', [got.images[0]!.id])).rows[0].owner_id).toBe(m.id);
     expect((await DELETE(req(m, `/api/templates/${id}`, { method: 'DELETE' }), ctx(id))).status).toBe(403);
     const other = await newUser('admin');
     expect((await DELETE(req(other, `/api/templates/${id}`, { method: 'DELETE' }), ctx(id))).status).toBe(204);
   });
 
-  test("shares a member's store template with whoever lists that store, without the author's photos; its author, an Admin or an editor deletes it", async () => {
+  test("shares a member's store template with whoever lists that store, its photos as their own copies; its author, an Admin or an editor deletes it", async () => {
     const [a, b, admin, editor] = [await newUser(), await newUser(), await newUser('admin'), await newUser()];
     await pool.query(`update users set can_edit_templates = true where id = $1`, [editor.id]);
     await pool.query(`insert into stores (id, name, code, hidden) values ('st-a', 'Shop A', 'STA', false), ('st-gone', 'Gone', 'STG', true)`);
@@ -124,7 +137,7 @@ describe('/api/templates', () => {
     expect(await (await list(req(b, '/api/templates?feature=try_on'))).json()).toEqual({ templates: [], canShare: false });
     expect(await (await list(req(b, '/api/templates?feature=try_on&storeId=other'))).json()).toEqual({ templates: [], canShare: false });
     expect(await (await list(req(a, '/api/templates?feature=try_on'))).json()).toEqual({ templates: [{ ...entry, mine: true }], canShare: false }); // the author's own, with or without the store
-    expect(await (await one(req(b, `/api/templates/${id}`), ctx(id))).json()).toMatchObject({ images: [], brief: 'red dress', garments: 1 });
+    expect(await (await one(req(b, `/api/templates/${id}`), ctx(id))).json()).toMatchObject({ images: [{ filename: 'own.png' }], brief: 'red dress', garments: 1 });
     expect(((await (await list(req(editor, '/api/templates?feature=try_on'))).json()) as { canShare: boolean }).canShare).toBe(true);
 
     for (const [body, message] of [
@@ -147,6 +160,48 @@ describe('/api/templates', () => {
     expect((await del(editor, third)).status).toBe(204);
     // A template editor shares with the company too.
     expect((await save(editor, { ...tryOn(editor), isCompany: true })).status).toBe(201);
+  });
+
+  test("hands a store template's live photos, end frame and clips to the member who applies it as that member's copies, once, and nothing else of the author's", async () => {
+    const [a, b] = [await newUser(), await newUser()];
+    await pool.query(`insert into stores (id, name, code, hidden) values ('st-copy', 'Shop C', 'STC', false)`);
+    const upload = async (id: string, mime = 'image/png') => {
+      const audio = mime === 'audio/mpeg';
+      await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, duration_ms) values ($1, $2, 'input', $1, $3, $4, 3, $5)`, [id, a.id, audio ? 'a.mp3' : 'x.png', mime, audio ? 3000 : null]);
+      await putObject(id, new Uint8Array([1, 2, 3]), mime);
+    };
+    const [clip, deleted, purged, unused] = [`${a.id}-clip`, `${a.id}-deleted`, `${a.id}-purged`, `${a.id}-unused`];
+    for (const id of [deleted, purged, unused]) await upload(id);
+    await upload(clip, 'audio/mpeg');
+    const video = { feature: 'video', name: 'Spin', data: { images: [a.asset, deleted, purged], endFrame: a.asset, clips: [clip], prompt: 'spin' } };
+    const shared = ((await (await save(a, { ...video, storeId: 'st-copy' })).json()) as { id: string }).id;
+    const personal = ((await (await save(a, video)).json()) as { id: string }).id;
+    // An upload deleted since, or gone with the retention purge, is left out, as before.
+    await pool.query('update assets set deleted_at = now() where id = $1', [deleted]);
+    await pool.query('delete from assets where id = $1', [purged]);
+
+    type Got = { images: { id: string }[]; endFrame: { id: string } | null; clips: { id: string }[] };
+    const apply = async (u: User, id: string) => (await (await one(req(u, `/api/templates/${id}`), ctx(id))).json()) as Got;
+    const got = await apply(b, shared);
+    expect(got).toMatchObject({ images: [{ filename: 'own.png', mime: 'image/png' }], endFrame: { filename: 'own.png' }, clips: [{ filename: 'a.mp3', mime: 'audio/mpeg', durationMs: 3000 }], prompt: 'spin' });
+    const [photo, sound] = [got.images[0]!.id, got.clips[0]!.id];
+    expect(got.endFrame!.id).toBe(photo); // the same photo twice is one copy
+    expect([photo, sound]).not.toContain(a.asset);
+    // B's own live inputs now, each in its own object, so the jobs and templates routes take them as B's uploads.
+    const mine = await pool.query(`select id from assets where owner_id = $1 and kind = 'input' and deleted_at is null`, [b.id]);
+    expect(mine.rows.map((r) => r.id).sort()).toEqual([b.asset, photo, sound].sort());
+    expect(new Uint8Array(await new Response(await getObject(`assets/${photo}`)).arrayBuffer())).toEqual(new Uint8Array([a.id.length]));
+    expect((await save(b, { feature: 'video', name: 'Mine', data: { images: [photo], endFrame: photo, clips: [sound] } })).status).toBe(201);
+    // Applied again: the same copies, nothing new.
+    expect(await apply(b, shared)).toMatchObject({ images: [{ id: photo }], clips: [{ id: sound }] });
+    expect((await pool.query('select count(*)::int as n from assets where owner_id = $1', [b.id])).rows[0].n).toBe(3);
+    // B reads the copies, never the author's uploads, referenced or not.
+    const read = async (id: string) => (await content(req(b, `/api/assets/${id}/content`), ctx(id))).status;
+    expect([await read(photo), await read(sound), await read(a.asset), await read(clip), await read(unused)]).toEqual([200, 200, 403, 403, 403]);
+    // The author keeps getting their own uploads; a personal template stays the author's alone and copies nothing.
+    expect(await apply(a, shared)).toMatchObject({ images: [{ id: a.asset }], clips: [{ id: clip }] });
+    expect((await one(req(b, `/api/templates/${personal}`), ctx(personal))).status).toBe(404);
+    expect((await pool.query('select count(*)::int as n from assets where owner_id = $1', [b.id])).rows[0].n).toBe(3);
   });
 
   test("takes own and company custom hooks and locations in data, refuses another member's private one, and keeps a company template to built-in or company ones", async () => {
