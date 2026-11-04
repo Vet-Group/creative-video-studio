@@ -109,7 +109,7 @@
   --ink-zinc: #3f3f46;
   --ink-tag: #27272a;
   --media-text: #e4e4e7;
-  --badge-new: #f04438;
+  --badge-new: #d92d20; /* white text on it reads at 4.8:1 (AA); #f04438 was 3.8:1 */
   --lightbox-bg: #1f1f1f;
   --warn-fill: #b45309;
   --garment-blend: multiply;
@@ -276,7 +276,7 @@ legend { font-weight: 600; padding: 0 .25rem; }
 .logo { display: grid; place-items: center; width: 28px; height: 28px; }
 .sidebar nav { display: grid; gap: 12px; }
 .nav-group { display: grid; gap: 2px; }
-.nav-group-label { margin: 0; padding: 0 12px 2px; color: var(--text-subtle); font-size: 12px; line-height: 16px; font-weight: 500; }
+.nav-group-label { margin: 0; padding: 0 12px 2px; color: var(--text-muted); font-size: 12px; line-height: 16px; font-weight: 500; }
 .sidebar nav a { display: flex; align-items: center; height: 37px; padding: 8px 12px; border-radius: 10px; color: var(--text-2); font-size: 14px; line-height: 21px; font-weight: 500; text-decoration: none; transition: background-color .15s; }
 .nav-icon { display: grid; place-items: center; flex: none; width: 20px; margin-right: 12px; color: var(--text-subtle); }
 .nav-progress { position: fixed; top: 0; left: 0; z-index: 1000; width: 100%; height: 2px; background: var(--brand); transform-origin: left; transform: scaleX(0); opacity: 0; pointer-events: none; }
@@ -1506,7 +1506,7 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .library-search input { flex: 1; width: 100%; height: 34px; padding: 0; border: 0; outline: 0; background: none; color: var(--ink); font: inherit; font-size: 14px; }
 .library-search:focus-within { border-color: var(--ink); box-shadow: 0 0 0 1px var(--ink); }
 .library-field { display: flex; align-items: center; height: 36px; margin: 0; border: 1px solid rgb(var(--tint) / .1); border-radius: 8px; background: var(--surface); color: var(--text-subtle); font-size: 13px; line-height: 18px; font-weight: 500; white-space: nowrap; }
-.library-field > span:not(.sr-only) { padding: 0 0 0 10px; }
+.library-field > span:not(.sr-only) { padding: 0 0 0 10px; color: var(--text-muted); } /* the label reads at AA on white; --text-subtle was 3.9:1 */
 .library-field :is(select, input) { width: auto; height: 34px; min-width: 0; margin: 0; padding: 0 8px; border: 0; border-radius: 8px; outline: 0; background: none; color: var(--ink); font: inherit; font-weight: 500; }
 .library-field:has(:focus-visible), .library-toggle:has(:focus-visible) { outline: 2px solid var(--ink); outline-offset: 2px; }
 .library-toggle { position: relative; display: flex; align-items: center; gap: 6px; height: 36px; margin: 0; padding: 0 12px; border: 1px solid rgb(var(--tint) / .1); border-radius: 8px; background: var(--surface); color: var(--text-muted); font-size: 13px; line-height: 18px; font-weight: 500; white-space: nowrap; cursor: pointer; }
@@ -2117,7 +2117,7 @@ dialog.modal.verdict-guide { width: min(40rem, calc(100vw - 2rem)); }
 .nav-group-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding-right: 4px; }
 .nav-group-head > * { white-space: nowrap; } /* one line each, or the label and the button wrap in the narrow sidebar */
 .nav-guide .icon { display: none; } /* no room beside the label; the words say it */
-.nav-guide { display: inline-flex; align-items: center; gap: 4px; padding: 0; border: 0; background: none; color: var(--text-subtle); font-size: 12px; line-height: 16px; cursor: pointer; }
+.nav-guide { display: inline-flex; align-items: center; gap: 4px; padding: 0; border: 0; background: none; color: var(--text-muted); font-size: 12px; line-height: 16px; cursor: pointer; }
 .nav-guide:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
 .nav-hint { display: block; padding: 0 12px 6px 40px; color: var(--text-muted); font-size: 12px; line-height: 16px; }
 .nav-hint strong { display: none; }
