@@ -930,6 +930,8 @@ dialog.admin-modal { width: min(36rem, calc(100vw - 2rem)); }
 .dropzone-foot { position: relative; z-index: 1; height: 0; }
 .dropzone-foot .uploads-link { position: absolute; right: 12px; bottom: 10px; }
 .dropzone[data-filled='true'] .dropzone-pick { padding-right: 84px; } /* the bottom hint keeps clear of the link */
+.uploads-filter { max-width: 280px; margin-bottom: 16px; } /* the picker's store filter, under the dialog's heading */
+.uploads-filter > .field { margin-top: 0; }
 /* In the bar, a column at the end of the prompt row, as tall as the one-row bar's textarea, so the bar keeps its height. */
 .imagebar .prompt-tools { flex: none; display: grid; grid-template-columns: repeat(2, auto); gap: 4px; } /* two by two: as tall as the 56 px text */
 .imagebar .prompt-tools .icon-button { display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 1px solid var(--field-border); border-radius: 50%; background: var(--surface); color: var(--ink); }

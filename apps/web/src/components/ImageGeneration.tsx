@@ -120,7 +120,7 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
     setError('');
     setBusy(true);
     try {
-      const assets = await uploadImages(files.slice(0, room)).finally(loading('Đang tải lên…'));
+      const assets = await uploadImages(files.slice(0, room), 'image', storeId).finally(loading('Đang tải lên…'));
       setImages((cur) => [...cur, ...assets]);
     } catch (e) {
       setError(uploadError(e));
@@ -198,7 +198,7 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
             )}
             {images.length < max && (
               <li>
-                <UploadedPhotos className="bar-add" name="Ảnh đã tải" taken={images} disabled={!hydrated || busy} onPick={(img) => setImages((cur) => (cur.length < max ? [...cur, img] : cur))}>
+                <UploadedPhotos className="bar-add" name="Ảnh đã tải" taken={images} disabled={!hydrated || busy} storeId={storeId} onPick={(img) => setImages((cur) => (cur.length < max ? [...cur, img] : cur))}>
                   <Icon name="library" size={16} />
                 </UploadedPhotos>
               </li>

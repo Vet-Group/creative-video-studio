@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { modelButton, pickPreset, png, signIn } from './support.test';
+import { modelButton, pickPreset, png, selectText, signIn } from './support.test';
 
 test('a photo uploaded on Image Generation is offered by "Ảnh đã tải" on Create and Try On, and a pick fills the form as an upload would', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
@@ -57,4 +57,43 @@ test('a photo uploaded on Image Generation is offered by "Ảnh đã tải" on C
   await bar.click();
   await page.getByRole('dialog', { name: 'Ảnh đã tải' }).getByRole('button', { name: `Dùng ${name}` }).click();
   await expect(page.getByLabel('Ảnh đã chọn').getByRole('img', { name })).toBeVisible();
+});
+
+test('an upload carries the store chosen on its page, and the picker opens on the page store with every store one pick away', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await signIn(page, 'uploadsb');
+  const store = 'Cửa hàng/Thương hiệu';
+  const [onA, onB] = [`store-a-${Date.now()}.png`, `store-b-${Date.now()}.png`]; // a retry finds the first try's photos too, under other names
+  // Create with store A (signIn leaves the form hydrated).
+  await selectText(page, store, 'E2E Shop');
+  await page.getByLabel('Ảnh sản phẩm').setInputFiles({ name: onA, mimeType: 'image/png', buffer: png() });
+  await expect(page.getByLabel('Ảnh đã chọn').getByRole('img', { name: onA })).toBeVisible();
+
+  // Image Generation with store B, from the store picker above the tabs.
+  await page.goto('/image-generation');
+  await expect(page.getByLabel('Ảnh tham chiếu', { exact: true })).toBeEnabled();
+  await selectText(page, store, 'E2E Brand Shop');
+  await page.getByLabel('Ảnh tham chiếu', { exact: true }).setInputFiles({ name: onB, mimeType: 'image/png', buffer: png() });
+  await expect(page.getByLabel('Ảnh đã chọn').getByRole('img', { name: onB })).toBeVisible();
+
+  // Back on Create with store A: the picker shows A's photo only, and "Tất cả cửa hàng" shows both.
+  await page.goto('/create');
+  await expect(page.getByLabel('Ảnh sản phẩm')).toBeEnabled();
+  await selectText(page, store, 'E2E Shop');
+  const open = page.getByRole('button', { name: 'Ảnh đã tải', exact: true });
+  await open.click();
+  const dialog = page.getByRole('dialog', { name: 'Ảnh đã tải' });
+  const filter = dialog.getByRole('combobox', { name: 'Lọc theo cửa hàng' });
+  await expect(filter).toHaveText('E2E Shop');
+  await expect(dialog.getByRole('button', { name: `Dùng ${onA}` })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: `Dùng ${onB}` })).toHaveCount(0);
+  await filter.click();
+  await dialog.getByRole('option', { name: 'Tất cả cửa hàng' }).click();
+  await expect(filter).toHaveText('Tất cả cửa hàng');
+  await expect(filter).toBeFocused(); // a pick keeps focus on the filter, inside the dialog
+  await expect(dialog.getByRole('button', { name: `Dùng ${onA}` })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: `Dùng ${onB}` })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await expect(open).toBeFocused();
 });

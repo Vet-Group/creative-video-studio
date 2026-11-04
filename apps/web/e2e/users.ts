@@ -105,6 +105,7 @@ export const USERS = {
   branded: { email: 'branded@e2e.test', name: 'E2E Brand Editor', role: 'member' },
   brandm: { email: 'brandm@e2e.test', name: 'E2E Brand Member', role: 'member' },
   uploadsa: { email: 'uploadsa@e2e.test', name: 'E2E Uploads A', role: 'member' }, // uploads.e2e: a photo uploaded on one page is picked from the uploaded-photos picker on others
+  uploadsb: { email: 'uploadsb@e2e.test', name: 'E2E Uploads B', role: 'member' }, // uploads.e2e: uploads carry the page's store and the picker filters by it
   admin: { email: 'admin@e2e.test', name: 'E2E Admin', role: 'admin' },
 } as const;
 

@@ -212,11 +212,14 @@ export const assets = pgTable(
     height: integer('height'),
     /** The length of an input video (Motion Control's reference), read from its MP4/MOV header at upload; null for images and outputs. */
     durationMs: integer('duration_ms'),
+    /** The store chosen on the page an input was uploaded from, for the uploaded-photos picker's store filter; null when none was chosen. */
+    storeId: text('store_id').references(() => stores.id, { onDelete: 'set null' }),
     createdAt: tstz('created_at').notNull().defaultNow(),
     deletedAt: tstz('deleted_at'),
   },
   (t) => [
     index('assets_owner_id_idx').on(t.ownerId),
+    index('assets_owner_id_store_id_created_at_idx').on(t.ownerId, t.storeId, t.createdAt),
     check('assets_kind_check', sql`${t.kind} in ('input', 'output')`),
   ],
 );
