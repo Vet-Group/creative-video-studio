@@ -52,6 +52,15 @@ export async function signIn(page: Page, who: UserKey, { welcome = false } = {})
 /** The account button: the sidebar's bottom chip, or the avatar in the top bar below 1024 px. */
 export const accountButton = (page: Page): Locator => page.getByRole('button', { name: /^Tài khoản: / });
 
+/** Opens a page tab such as History. Retries the click, as a click before hydration does nothing (as openSettings does with the account menu). */
+export async function openTab(page: Page, name: string): Promise<void> {
+  const tab = page.getByRole('tab', { name });
+  await expect(async () => {
+    await tab.click();
+    await expect(tab).toHaveAttribute('aria-selected', 'true', { timeout: 2_000 });
+  }).toPass();
+}
+
 /** Opens Settings the way a user does: the account menu, then its first item. Retries the menu, as a click before hydration does nothing. */
 export async function openSettings(page: Page): Promise<Locator> {
   const menu = page.getByRole('menu', { name: /^Tài khoản: / });

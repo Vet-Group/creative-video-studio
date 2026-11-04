@@ -3,6 +3,11 @@ import { clearMyJobs, modelButton, pickModel, png, select, selectValue, signIn }
 import type { UserKey } from './users';
 
 const file = (name: string) => ({ name, mimeType: 'image/png', buffer: png() });
+/** Sets a photo once the input is enabled: it stays disabled until hydration, and a file set before that is dropped. */
+async function upload(page: Page, label: string, name: string): Promise<void> {
+  await expect(page.getByLabel(label)).toBeEnabled();
+  await page.getByLabel(label).setInputFiles(file(name));
+}
 const sent = (page: Page) => expect(page.getByText('Đã gửi job')).toBeVisible();
 const enhance = (page: Page) => page.getByRole('button', { name: 'Cải thiện mô tả bằng AI' });
 
@@ -59,7 +64,7 @@ test("each page opens with the model and settings of the member's last Run, afte
   await sent(page);
 
   await page.goto('/create');
-  await page.getByLabel('Ảnh sản phẩm').setInputFiles(file('shirt.png'));
+  await upload(page, 'Ảnh sản phẩm', 'shirt.png');
   await page.getByLabel('Mô tả chuyển động').fill('Slow turn of the shirt.');
   await selectValue(page, 'Tỉ lệ khung hình', '1:1');
   await selectValue(page, 'Thời lượng', '5');
@@ -68,8 +73,8 @@ test("each page opens with the model and settings of the member's last Run, afte
   await sent(page);
 
   await page.goto('/marketing-studio');
-  await page.getByLabel('Ảnh người mẫu').setInputFiles(file('model.png'));
-  await page.getByLabel('Ảnh sản phẩm').setInputFiles(file('product.png'));
+  await upload(page, 'Ảnh người mẫu', 'model.png');
+  await upload(page, 'Ảnh sản phẩm', 'product.png');
   // The remembered settings land first (Run waits for them): a pick before that would be redrawn under the pointer.
   await expect(page.getByRole('button', { name: /^Tạo video/ })).toBeEnabled();
   await pickModel(page, /Mock E2E Wide/); // it moves the ratio and the duration to its own 16:9 and 10 s
@@ -78,15 +83,15 @@ test("each page opens with the model and settings of the member's last Run, afte
   await sent(page);
 
   await page.goto('/try-on');
-  await page.getByLabel('Ảnh trang phục').setInputFiles(file('garment.png'));
-  await page.getByLabel('Ảnh người mẫu').setInputFiles(file('person.png'));
+  await upload(page, 'Ảnh trang phục', 'garment.png');
+  await upload(page, 'Ảnh người mẫu', 'person.png');
   await selectValue(page, 'Tỉ lệ', '3:4');
   await selectValue(page, 'Độ phân giải', '2K');
   await page.getByRole('button', { name: /^Thử đồ/ }).click();
   await sent(page);
 
   await page.goto('/apps/reframe');
-  await page.getByLabel('Ảnh cần đổi khung').setInputFiles(file('photo.png'));
+  await upload(page, 'Ảnh cần đổi khung', 'photo.png');
   await expect(modelButton(page)).toContainText('Mock apps E2E');
   await selectValue(page, 'Tỉ lệ', '9:16');
   await page.getByRole('button', { name: /^Chạy/ }).click();

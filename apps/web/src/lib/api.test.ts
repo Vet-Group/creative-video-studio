@@ -1,6 +1,6 @@
 // The fetch wrapper's error: status, the server's message and the limiter's wait.
 import { afterEach, expect, test, vi } from 'vitest';
-import { ApiError, api, startSignOut } from './api';
+import { ApiError, api, rotatingSession, startSignOut } from './api';
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -34,6 +34,30 @@ test('a better-auth refusal carries its code', async () => {
   expect([e.status, e.code]).toEqual([401, 'USER_NOT_VERIFIED']);
 });
 
+test('a 401 from a call sent on the cookie a password change replaces does not send the user to the login; one sent after the change does', async () => {
+  const assign = vi.fn();
+  vi.stubGlobal('window', { location: { pathname: '/library', search: '', assign } });
+  let answer!: (r: Response) => void;
+  vi.stubGlobal('fetch', () => new Promise<Response>((resolve) => (answer = resolve)));
+  let changed!: () => void;
+  const change = rotatingSession(() => new Promise<void>((resolve) => (changed = resolve)));
+  const during = api('/during').catch(() => {});
+  answer(new Response('{}', { status: 401 }));
+  await during;
+  const before = api('/before').catch(() => {}); // sent before the new cookie, answered after it
+  changed();
+  await change;
+  answer(new Response('{}', { status: 401 }));
+  await before;
+  expect(assign).not.toHaveBeenCalled();
+
+  const after = api('/after').catch(() => {});
+  answer(new Response('{}', { status: 401 }));
+  await after;
+  expect(assign).toHaveBeenCalledWith('/login?next=%2Flibrary');
+});
+
+// Last: a sign-out stays set for the rest of the file.
 test('after a sign-out starts, a 401 from a call in flight no longer sends the user to the login with this page', async () => {
   const assign = vi.fn();
   vi.stubGlobal('window', { location: { pathname: '/account/sign-in-methods', search: '', assign } });
