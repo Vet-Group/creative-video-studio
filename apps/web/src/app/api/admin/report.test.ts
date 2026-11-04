@@ -158,6 +158,18 @@ describe('GET /api/admin/report', () => {
     ]);
   });
 
+  test("measures a member's spend of the cap without LLM calls, like the cap meters", async () => {
+    // Rep Two's only spend is a 0.0006 suggestion run, so a cap of 0.5 gives 0.0012 if the run counted and 0 if it does not.
+    const { rows } = await pool.query(`select monthly_cap_usd::text as cap from settings where id = 1`);
+    await pool.query(`update settings set monthly_cap_usd = 0.5 where id = 1`);
+    try {
+      const r = await report('?week=2026-11-12');
+      expect(r.users.map((u) => [u.userId, u.spendUsd, u.spendOfCap])).toEqual([['rep1', '2.0004', '4.0000'], ['rep2', '0.0006', '0.0000']]);
+    } finally {
+      await pool.query(`update settings set monthly_cap_usd = $1 where id = 1`, [rows[0].cap]);
+    }
+  });
+
   test('a hidden team and a hidden store keep their history in the report', async () => {
     const before = await report('?week=2026-10-14');
     await pool.query(`update teams set hidden = true where id = 'rt'`);

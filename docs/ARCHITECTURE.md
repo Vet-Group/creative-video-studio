@@ -100,7 +100,7 @@ Every money event is a row in `cost_entries`. The ledger is the only place cost 
 | `llm` | The cost of an LLM call (fal reports it; OpenAI's is computed from the usage tokens in `packages/core/src/enhance.ts`): a job's Enhance, or a suggestion or translation run. One row per source, by `ref` (`llm:enhance:<job id>`, `llm:suggestion:<run id>`). |
 
 **Row shape.**
-- Exact decimal `usd numeric(12,4)`, never a float.
+- Exact decimal `usd numeric(12,4)`, never a float. The ledger keeps 4 decimals, so an LLM call that rounds to $0.0000 books no row (a translation on gpt-6-luna costs about $0.00002-0.00004); suggestions and Enhance (about $0.0001 and up) are booked. The owner accepted this (under $0.01 a month).
 - ICT `month` and `day`, nullable `user_id`, `team_id`, `store_id` and `job_id`, `provider`, `model`, `is_final`, a nullable unique `ref` and a `note`.
 - `bakeoff`, `manual_adjustment` and `invoice_diff` rows have no job, user or team. They appear as a shared "general cost" line and are never allocated.
 - An `llm` row always names its user, team and ICT day. An Enhance row is on its job (and counts in the job's cost); a suggestion or translation run has no job and counts for the member and the member's team. Settling a job ignores its `llm` row.
