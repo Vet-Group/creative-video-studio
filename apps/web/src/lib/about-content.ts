@@ -1169,13 +1169,13 @@ const marketing: AboutPage = {
       kicker: 'Âm thanh',
       title: 'Video có tiếng không?',
       blocks: [
-        'Có. Như trên Fash, Tạo âm thanh bật sẵn: clip có tiếng như quay bằng điện thoại, gồm âm thanh căn phòng và vài câu phản ứng ngắn, tự nhiên của người mẫu về sản phẩm, không có nhạc nền. Tắt công tắc để có clip im lặng. Muốn viết đúng từng chữ người mẫu nói, hãy dùng định dạng Nâng cao.',
+        'Có. Như trên Fash, Tạo âm thanh bật sẵn: clip có tiếng như quay bằng điện thoại, gồm âm thanh căn phòng và vài câu phản ứng ngắn, tự nhiên của người mẫu về sản phẩm, không có nhạc nền. Với Kling O3 Pro và hai bản Seedance, tắt công tắc để có clip im lặng; Gemini Omni Flash, Grok Imagine, WAN 2.7 và Minimax H3 Max luôn tạo tiếng nên công tắc khoá ở Bật. Muốn viết đúng từng chữ người mẫu nói, hãy dùng định dạng Nâng cao.',
         {
           cols: 3,
           cards: [
             { title: 'Dáng quay điện thoại thật', text: 'Ánh sáng tự nhiên, máy hơi rung tay, chất hình chân thật. Đoạn quay giống người sáng tạo nội dung thật hơn là quảng cáo bóng bẩy, vì đó là thứ hiệu quả trên bảng tin.' },
             { title: 'Đúng người, đúng sản phẩm', text: 'Chỉ dẫn cố định yêu cầu giữ khuôn mặt và dáng người theo ảnh người mẫu, cùng hình dáng, màu sắc và chi tiết theo ảnh sản phẩm.' },
-            { title: 'Tiếng như quay điện thoại', text: 'Âm thanh căn phòng và lời phản ứng ngắn của người mẫu, không nhạc nền. Cần nhạc, phụ đề hay giọng thương hiệu thì tắt âm thanh và thêm trong phần mềm dựng.' },
+            { title: 'Tiếng như quay điện thoại', text: 'Âm thanh căn phòng và lời phản ứng ngắn của người mẫu, không nhạc nền. Cần nhạc, phụ đề hay giọng thương hiệu thì chọn Kling O3 Pro hoặc Seedance, tắt âm thanh và thêm trong phần mềm dựng.' },
           ],
         },
         'Muốn lái video? Ô Prompt (tuỳ chọn) nhận ghi chú về chi tiết sản phẩm, không khí hay một khoảnh khắc bạn muốn; ghi chú được ghép vào cuối chỉ dẫn cố định của công cụ.',
@@ -1185,7 +1185,7 @@ const marketing: AboutPage = {
       kicker: 'Thị trường',
       title: 'Video UGC Thử đồ dùng cho nhiều thị trường được không?',
       blocks: [
-        'Được. Lời phản ứng trong clip ngắn và tự nhiên; với thị trường dùng ngôn ngữ khác, tắt Tạo âm thanh để có clip không lời, rồi thêm phụ đề hay lồng tiếng theo từng thị trường trong phần mềm dựng.',
+        'Được. Lời phản ứng trong clip ngắn và tự nhiên; với thị trường dùng ngôn ngữ khác, chọn Kling O3 Pro hoặc Seedance và tắt Tạo âm thanh để có clip không lời, rồi thêm phụ đề hay lồng tiếng theo từng thị trường trong phần mềm dựng.',
         'Hợp thị trường còn hơn cả ngôn ngữ. Ảnh người mẫu quyết định khán giả thấy ai, nên chạy cùng sản phẩm với một người mẫu khác cho mỗi thị trường một gương mặt giống khách hàng ở đó. Bảng chọn bối cảnh đổi khung cảnh, nên cùng một chiếc áo khoác có thể xuất hiện trong phòng ngủ cho thị trường này và trên sân thượng thành phố cho thị trường khác.',
         'Giữ nguyên ảnh sản phẩm trong cả bộ và chỉ đổi người mẫu và bối cảnh. Các quảng cáo khi đó đọc như một chiến dịch với gương mặt địa phương, đúng dáng vẻ của một đợt triển khai theo từng thị trường.',
       ],
@@ -1208,6 +1208,26 @@ const marketing: AboutPage = {
       ],
     },
     {
+      kicker: 'Mô hình',
+      title: 'Marketing Studio dùng những mô hình nào?',
+      lead: 'Có 9 mô hình, đều dựng cảnh từ nhiều ảnh tham chiếu và tự tạo tiếng. Menu Mô hình chỉ hiện các mô hình Admin đã bật, kèm chi phí ước tính và điểm đề xuất của công ty; chọn một mô hình thì tỉ lệ và thời lượng tự chuyển sang mức mô hình đó có.',
+      blocks: [
+        {
+          table: [
+            ['Mô hình', 'Độ phân giải', 'Thời lượng', 'Tỉ lệ', 'Âm thanh'],
+            ['Kling O3 Pro', '1080p', '3–15 giây', '9:16, 1:1, 16:9', 'Bật hoặc tắt'],
+            ['Seedance 2.0 Reference', '720p', '4–15 giây', '9:16, 1:1, 16:9', 'Bật hoặc tắt'],
+            ['Seedance 2.5 Reference', '720p', '4–30 giây', '9:16, 1:1, 16:9', 'Bật hoặc tắt'],
+            ['Gemini Omni Flash Reference', '720p', '3–10 giây', '9:16, 16:9', 'Luôn có'],
+            ['Grok Imagine Reference', '720p', '1–10 giây', '9:16, 1:1, 16:9', 'Luôn có'],
+            ['WAN 2.7 Reference', '720p', '2–10 giây', '9:16, 1:1, 16:9', 'Luôn có'],
+            ['Minimax H3 Max Reference (3 mức)', '480p, 768p hoặc 1080p', '5–15 giây', '9:16, 1:1, 16:9', 'Luôn có'],
+          ],
+        },
+        'Minimax H3 Max Reference có ba bản theo độ phân giải: 480p rẻ để thử nhanh, 768p là bản chính và 1080p sắc nét hơn. Ở Kling O3 Pro, bật âm thanh làm giá cao hơn; giá trên nút Tạo video luôn đã tính nó.',
+      ],
+    },
+    {
       kicker: 'Khung hình',
       title: 'Nên chọn tỉ lệ khung hình nào?',
       lead: 'Tỉ lệ quyết định hình dạng video. Hãy chọn theo nền tảng sẽ đăng, vì cắt một video đã xong là cắt vào phần hành động bạn đã trả tiền.',
@@ -1219,13 +1239,13 @@ const marketing: AboutPage = {
             ['16:9', 'YouTube, trang web và quảng cáo ngang'],
           ],
         },
-        'Menu Tỉ lệ chỉ có các tỉ lệ mà mô hình đã bật cho Marketing Studio hỗ trợ; Kling O3 Pro có 9:16 và 1:1.',
+        'Mô hình nào cũng có 9:16 và 16:9, và mọi mô hình trừ Gemini Omni Flash Reference có thêm 1:1. Với tỉ lệ 1:1, Gemini Omni Flash Reference không chạy được; chọn mô hình này thì tỉ lệ tự chuyển về 9:16.',
       ],
     },
     {
       kicker: 'Thời lượng',
       title: 'Video nên dài bao lâu?',
-      lead: 'Thời lượng đi theo mô hình đã bật cho Marketing Studio: Kling O3 Pro cho 5 đến 10 giây. Thời lượng cũng là thứ đổi chi phí, vì chi phí tính theo giây, nên hãy chọn theo việc cần làm thay vì mặc định chọn tối đa.',
+      lead: 'Thời lượng đi theo mô hình đã chọn, từ 1–10 giây ở Grok Imagine Reference tới 4–30 giây ở Seedance 2.5 Reference; bảng Mô hình ở trên ghi dải của từng mô hình. Thời lượng cũng là thứ đổi chi phí, vì chi phí tính theo giây, nên hãy chọn theo việc cần làm thay vì mặc định chọn tối đa.',
       blocks: [
         {
           cols: 3,
@@ -1235,7 +1255,7 @@ const marketing: AboutPage = {
             { tag: 'Kể chuyện', title: '9–10 giây', text: 'Thêm một hai cảnh quay, cho clip kể trọn câu chuyện hơn.' },
           ],
         },
-        'Video dài hơn tốn hơn, và chi phí ước tính luôn ghi trên nút Tạo video trước khi chạy. Kling O3 Pro xuất video ở 1080p.',
+        'Video dài hơn tốn hơn, và chi phí ước tính luôn ghi trên nút Tạo video trước khi chạy. Kling O3 Pro xuất video ở 1080p, Minimax H3 Max Reference ở 480p, 768p hoặc 1080p, các mô hình còn lại ở 720p.',
       ],
     },
     {
@@ -1267,7 +1287,7 @@ const marketing: AboutPage = {
             ['Hook trong video UGC là gì?', `Hook là khoảnh khắc mở đầu gây chú ý, vài giây đầu quyết định người xem ở lại hay lướt qua. Chọn một trong ${HOOKS.length} hook có sẵn: ${hookNames}. AI mở video bằng hook đó rồi chuyển sang phần thử đồ.`],
             ['Cần gì để tạo một video UGC Thử đồ?', 'Hai ảnh: một người mẫu và một sản phẩm. Hook, bối cảnh và một ghi chú ngắn là tuỳ chọn.'],
             ['Một video UGC Thử đồ tốn bao nhiêu?', 'Chi phí tuỳ mô hình và thời lượng, vì chi phí tính theo giây. Nút Tạo video ghi chi phí ước tính bằng USD trước khi bạn chạy. Âm thanh làm giá cao hơn ở một số mô hình, và giá trên nút đã tính nó. Video dùng chung ngân sách với Tạo video: hạn mức số clip theo ngày của bạn và ngân sách video theo tháng của công ty.'],
-            ['Video có giọng nói không?', 'Có, khi Tạo âm thanh bật (mặc định): người mẫu nói vài câu phản ứng ngắn, kèm âm thanh căn phòng, không nhạc nền. Tắt công tắc để có clip im lặng; muốn viết lời thoại chính xác thì dùng định dạng Nâng cao.'],
+            ['Video có giọng nói không?', 'Có, khi Tạo âm thanh bật (mặc định): người mẫu nói vài câu phản ứng ngắn, kèm âm thanh căn phòng, không nhạc nền. Với Kling O3 Pro và Seedance, tắt công tắc để có clip im lặng; bốn mô hình còn lại luôn có tiếng. Muốn viết lời thoại chính xác thì dùng định dạng Nâng cao.'],
             ['Kiểm soát được nội dung video không?', 'Ô Prompt (tuỳ chọn) lái video. Nhắc chi tiết sản phẩm, không khí hay khoảnh khắc bạn muốn; ghi chú được ghép vào cuối chỉ dẫn cố định. Hook và bối cảnh cho bạn thêm hai cách kiểm soát nữa.'],
             ['Dùng cho nhiều ngôn ngữ và thị trường được không?', 'Được. Tắt Tạo âm thanh để có clip không lời, dùng được ở mọi ngôn ngữ; thêm phụ đề hay lồng tiếng theo từng thị trường khi dựng. Đổi ảnh người mẫu và bối cảnh để mỗi thị trường có gương mặt và khung cảnh của riêng mình.'],
             ['Video đặt được ở những bối cảnh nào?', `${LOCATIONS.length} bối cảnh có sẵn: ${locationNames}. Mỗi bối cảnh đặt người trong video vào một khung cảnh đáng tin với ánh sáng và không khí phù hợp, và bảng chọn có video xem trước cho từng lựa chọn.`],
@@ -1342,7 +1362,7 @@ const advanced: AboutPage = {
             'Lời bạn viết thành lời nói khớp khẩu hình của người trong video. Mô hình được dặn không nói thêm chữ nào ngoài lời thoại.',
             'Khoảng hai từ mỗi giây: video 10 giây nên có khoảng hai mươi từ.',
             'Không có lời thoại: chỉ có lời nói khi brief yêu cầu; còn lại là âm thanh nền hoặc nhạc.',
-            'Tắt Tạo âm thanh để có video im lặng, rồi thêm giọng đọc hoặc nhạc của riêng bạn khi dựng. Mô hình không tạo được âm thanh thì công tắc ở Tắt, và ở một số mô hình âm thanh làm giá cao hơn.',
+            'Tắt Tạo âm thanh để có video im lặng, rồi thêm giọng đọc hoặc nhạc của riêng bạn khi dựng. Chỉ Kling O3 Pro và Seedance tắt được âm thanh; Gemini Omni Flash, Grok Imagine, WAN 2.7 và Minimax H3 Max luôn tạo tiếng nên công tắc khoá ở Bật. Ở Kling O3 Pro, âm thanh làm giá cao hơn.',
           ],
         },
       ],
@@ -1414,9 +1434,9 @@ const advanced: AboutPage = {
           faq: [
             ['Video marketing nâng cao là gì?', 'Là định dạng marketing toàn quyền kiểm soát: bạn tải tối đa 7 ảnh tham chiếu của mình, viết một bản brief sáng tạo, và thêm hook, bối cảnh và lời thoại nếu muốn. AI dựng tất cả thành một video marketing riêng.'],
             ['Nâng cao khác UGC Thử đồ thế nào?', 'UGC Thử đồ là định dạng gọn: hai ảnh vào, một video thử đồ kiểu người sáng tạo nội dung ra, theo chỉ dẫn cố định. Nâng cao trao bạn ghế đạo diễn: bản brief là nguồn sự thật, bạn đưa tối đa 7 ảnh và viết lời thoại.'],
-            ['Dùng được bao nhiêu ảnh tham chiếu?', 'Tối đa 7, hoặc ít hơn nếu mô hình đã chọn nhận ít ảnh hơn. Mỗi ảnh có thể là người, sản phẩm, bối cảnh hay ảnh phong cách. AI giữ chi tiết nhìn thấy được của chúng và dựng video quanh chúng.'],
+            ['Dùng được bao nhiêu ảnh tham chiếu?', 'Tối đa 7, hoặc ít hơn nếu mô hình đã chọn nhận ít ảnh hơn: WAN 2.7 Reference nhận tối đa 4. Mỗi ảnh có thể là người, sản phẩm, bối cảnh hay ảnh phong cách. AI giữ chi tiết nhìn thấy được của chúng và dựng video quanh chúng.'],
             ['Có bắt buộc chọn hook hay bối cảnh không?', 'Không, cả hai đều tuỳ chọn. Có hook, video mở bằng khoảnh khắc đó trước khi vào ý tưởng của bạn; có bối cảnh, cảnh được đặt ở đó. Không có, AI theo bản brief.'],
-            ['Video có lời thoại không?', 'Có. Tạo âm thanh bật sẵn; lời bạn viết trong ô Lời thoại được đọc đúng từng chữ, khớp khẩu hình. Không viết lời thoại thì chỉ có lời nói khi brief yêu cầu. Tắt công tắc để có clip im lặng.'],
+            ['Video có lời thoại không?', 'Có. Tạo âm thanh bật sẵn; lời bạn viết trong ô Lời thoại được đọc đúng từng chữ, khớp khẩu hình. Không viết lời thoại thì chỉ có lời nói khi brief yêu cầu. Với Kling O3 Pro và Seedance, tắt công tắc để có clip im lặng; các mô hình còn lại luôn có tiếng.'],
             ['Một video nâng cao tốn bao nhiêu?', 'Chi phí tuỳ mô hình và thời lượng, vì chi phí tính theo giây. Âm thanh làm giá cao hơn ở một số mô hình. Chi phí ước tính, đã tính âm thanh, luôn ghi trên nút chạy trước khi bạn tạo, và video dùng chung ngân sách với Tạo video.'],
             ['Video có chữ hay phụ đề trên hình không?', 'Nên dặn rõ trong brief là không có chữ, logo hay watermark. Thêm phụ đề sau trong phần mềm dựng, nơi bạn kiểm soát phông chữ và vị trí.'],
             ['Video thuộc về ai?', `Video là tài sản của công ty, dùng cho trang sản phẩm, mạng xã hội và quảng cáo của công ty. ${RIGHTS}`],
