@@ -151,7 +151,8 @@ export function createByteplusImageProvider(opts: { apiKey: string; fetch?: Fetc
         ...(images.length > 0 && { image: images.length === 1 ? images[0] : images }),
         size: dims ? `${dims.width}x${dims.height}` : req.resolution,
         response_format: 'url',
-        output_format: 'png',
+        // Seedream 4.0 and 4.5 refuse output_format (400, canary 2026-11-04) and answer in jpeg; 5.0 takes it.
+        ...(!req.model.endpoint.startsWith('seedream-4-') && { output_format: 'png' }),
         watermark: false,
       };
       let outcome: ProviderStatus;
