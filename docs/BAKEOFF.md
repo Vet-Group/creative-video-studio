@@ -96,3 +96,15 @@ Migration 0057 adds each count to the row's earlier prior and writes the total t
 rank alike and a tie goes to the cheaper row: Seedance 2.0 3/10, Seedance 2.5 7/12, Veo 3.1 1/4, Seedream 5 Pro 8/18, Nano Banana 2 10/18, Nano Banana 4/18.
 Nano Banana 2.1 keeps its 9/10 from the Try On rounds: the prior is not per feature, and this restyle round would rank it below FASHN in Try On on
 evidence from another feature. Samples are small (Wilson intervals span 40 points or more), so these are priors, not verdicts; staff marks keep adding to them.
+
+A second round spent the last of the credit (estimated $2.69 of the $3.19 left): Veo 3.1 at 4 s on images 3, 5 and 10, and three restyle models on
+images 7 and 9, judged blind the same way.
+
+| Row | Passed | Faults |
+|---|---|---|
+| veo-3.1-replicate | 1/3 | print 2 (the hoodie print turned into embroidery; map labels garbled) |
+| seedream-5-pro | 1/2 | print 1 |
+| nano-banana-2 | 0/2 | print 2 |
+| nano-banana-2.1, kept at 9/10 | 0/2 | print 2, deformed 2 |
+
+Migration 0061 adds them to 0057's totals: Veo 3.1 2/7, Seedream 5 Pro 9/20, Nano Banana 2 10/20.
