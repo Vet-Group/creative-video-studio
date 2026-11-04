@@ -1,4 +1,4 @@
-import { estimateUsd, promptLimit, usdPerSecondFor } from '@cvs/core/models';
+import { ALWAYS_AUDIO, estimateUsd, promptLimit, usdPerSecondFor } from '@cvs/core/models';
 import { videoInputs } from '@cvs/core/providers/fal';
 import { ASPECTS } from '@cvs/db';
 import { pool } from '@/lib/auth';
@@ -18,7 +18,7 @@ const MONTH = `to_char(now() at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM')`;
  * unless every supported model scores the same. Pass rate = (seed passes + marked passes) / (seed total + marked total) over every marked clip, deleted or
  * purged ones included; null while nothing is counted. The score also weighs how often real jobs of the model end well (lib/model-scores.ts).
  * `?feature=video`, `marketing` or `motion_control` keeps the models whose `features` lists it (Marketing Studio also accepts ratio 16:9, Motion Control takes only `auto`); without it every enabled video model is listed.
- * `audioEstimateUsd` is the estimate with native audio on, null for a model that cannot make audio. `endFrame` is true for a model that takes an end frame, `textOnly` for one that runs from the prompt alone, and `audioClips` the reference audio it takes ({ max, seconds }, or null; videoInputs).
+ * `audioEstimateUsd` is the estimate with native audio on, null for a model that cannot make audio; `alwaysAudio` is true for one that cannot be silent (ALWAYS_AUDIO). `endFrame` is true for a model that takes an end frame, `textOnly` for one that runs from the prompt alone, and `audioClips` the reference audio it takes ({ max, seconds }, or null; videoInputs).
  * `isNew` is true for a model added in the last 14 days (the picker's badge).
  * `monthToDate` is the caller's own total this ICT month, provisional while a job of it has no closing row. `remainingBudgetUsd` is for Admins only.
  */
@@ -73,6 +73,7 @@ export async function GET(request: Request) {
       estimateUsd: r.provider === 'mock' ? '0.0000' : estimateUsd(r.usd_per_second, durationSec),
       // With native audio on (Marketing Studio Advanced); null when the endpoint cannot make audio.
       audioEstimateUsd: audioEstimate(r, durationSec),
+      alwaysAudio: ALWAYS_AUDIO.has(r.endpoint),
       ...videoInputs(r.endpoint),
       ...scoreOf(st),
       passes: st.passes,

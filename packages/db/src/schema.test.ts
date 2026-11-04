@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
-import { AUDIO_USD_PER_SECOND, BAKEOFF_MODELS } from '../../core/src/models';
+import { ALWAYS_AUDIO, AUDIO_USD_PER_SECOND, BAKEOFF_MODELS } from '../../core/src/models';
 import { tokenCost } from '../../core/src/providers/byteplus';
 import { VIDEO_BODIES } from '../../core/src/providers/fal';
 import { PRESETS } from '../../core/src/presets';
@@ -134,7 +134,7 @@ describe('migration 0015 Fash video models', () => {
       expect(VIDEO_BODIES[r.endpoint], r.id).toBeDefined();
       expect(r.ratios.length * r.durations_sec.length * r.max_images * r.usd, r.id).toBeGreaterThan(0);
       expect(['720p', '768p', '1080p'], r.id).toContain(r.output_resolution);
-      expect(Object.keys(r.sources).filter((k) => k !== 'maxPromptChars' && k !== 'passSeed').sort(), r.id).toEqual(['durationsSec', 'maxImages', 'outputResolution', 'ratios', 'usdPerSecond']); // 0028 adds the prompt limit's source, 0057 the bake-off prior's
+      expect(Object.keys(r.sources).filter((k) => k !== 'maxPromptChars' && k !== 'passSeed' && k !== 'nativeAudio').sort(), r.id).toEqual(['durationsSec', 'maxImages', 'outputResolution', 'ratios', 'usdPerSecond']); // 0028 adds the prompt limit's source, 0057 the bake-off prior's, 0060 the audio test's
     }
     expect(rows.find((r) => r.id === 'veo-3.1')).toMatchObject({ ratios: ['9:16', '16:9'], durations_sec: [8] }); // no 1:1, and Fash's 8 s only; 0037 adds 16:9
     await pool.query(`update model_configs set enabled = true where id = 'kling-3.0-pro'`); // complete enough for the enable check
@@ -142,15 +142,23 @@ describe('migration 0015 Fash video models', () => {
   });
 });
 
-describe('migration 0023 Seedance in Marketing Studio', () => {
-  test('lists the two Seedance reference models for marketing with 16:9, 7 references and an audio price, and no other video model gains it', async () => {
-    const { rows } = await pool.query(`select id, endpoint, ratios, max_images from model_configs where 'marketing' = any(features) and provider <> 'mock' order by id`);
+describe('migrations 0023 and 0060 in Marketing Studio', () => {
+  test('lists Kling O3 Pro, the two Seedance reference models and the four always-audio reference models for marketing, each able to make audio, and no other video model', async () => {
+    const { rows } = await pool.query(`select id, endpoint, ratios, max_images, sources->'nativeAudio'->>'readAt' as audio_read from model_configs where 'marketing' = any(features) and provider <> 'mock' order by id`);
     expect(rows.map((r) => [r.id, r.ratios, r.max_images])).toEqual([
+      ['gemini-omni-flash-reference', ['9:16', '16:9'], 9], // no 1:1 in its schema
+      ['grok-imagine-reference', ['9:16', '1:1', '16:9', '4:3', '3:4'], 7],
       ['kling-o3-pro', ['9:16', '1:1', '16:9'], 7],
+      ['minimax-h3-max-reference', ['9:16', '1:1', '16:9', '4:3', '3:4'], 9],
+      ['minimax-h3-max-reference-1080p', ['9:16', '1:1', '16:9', '4:3', '3:4'], 9],
+      ['minimax-h3-max-reference-480p', ['9:16', '1:1', '16:9', '4:3', '3:4'], 9],
       ['seedance-2.0-reference', ['9:16', '1:1', '16:9', '4:3', '3:4'], 9], // 0037 widens both Seedance rows and gives 2.0 its 9 references
       ['seedance-2.5-reference', ['9:16', '1:1', '16:9', '4:3', '3:4'], 7],
+      ['wan-2.7-reference', ['9:16', '1:1', '16:9', '4:3', '3:4'], 4], // the app caps Advanced at the row's 4
     ]);
-    for (const r of rows) expect(AUDIO_USD_PER_SECOND[r.endpoint], r.id).toBeDefined();
+    // An audio switch with its own price (0023), or always sound at the stored price with the paid test's note (0060).
+    for (const r of rows) expect(r.endpoint in AUDIO_USD_PER_SECOND || (ALWAYS_AUDIO.has(r.endpoint) && r.audio_read === '2026-11-04'), r.id).toBe(true);
+    for (const e of ALWAYS_AUDIO) expect(e in AUDIO_USD_PER_SECOND, e).toBe(false);
   });
 });
 

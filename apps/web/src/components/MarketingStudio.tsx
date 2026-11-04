@@ -39,6 +39,8 @@ interface VideoModel {
   estimateUsd: string;
   /** The estimate with native audio on; null when the model cannot make audio. */
   audioEstimateUsd: string | null;
+  /** The model always makes sound, so the audio switch stays on. */
+  alwaysAudio: boolean;
   maxImages: number;
   /** The model's prompt limit (the API caps it at PROMPT_CEILING). */
   maxPromptChars: number;
@@ -429,8 +431,8 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
   const fresh = list !== null && list.key === key;
   // Advanced: the slot takes up to the chosen model's reference cap (7 at most); a model that takes fewer images than are chosen cannot be picked.
   const maxRefs = Math.min(ADVANCED_MAX_IMAGES, chosen?.maxImages ?? ADVANCED_MAX_IMAGES);
-  // Native audio is on by default in both formats, as on the reference site, on a model that can make it.
-  const audioOn = audio && chosen?.audioEstimateUsd != null;
+  // Native audio is on by default in both formats, as on the reference site, on a model that can make it, and always on one that cannot be silent.
+  const audioOn = (audio || chosen?.alwaysAudio === true) && chosen?.audioEstimateUsd != null;
   const cost = audioOn ? chosen!.audioEstimateUsd! : chosen?.estimateUsd;
   const words = script.trim() ? script.trim().split(/\s+/).length : 0;
   /** The English prompt Run sends, shown as is under the form. */
@@ -765,7 +767,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
                 <Select label="Thời lượng" icon="clock" heading="Chọn thời lượng" value={String(durationSec)} options={durations.map((d) => ({ value: String(d), label: `${d} giây` }))} onChange={(v) => setDurationSec(Number(v))} />
               )}
             </div>
-            <AudioSwitch on={audio} available={chosen?.audioEstimateUsd != null} onChange={setAudio} />
+            <AudioSwitch on={audio} available={chosen?.audioEstimateUsd != null} always={chosen?.alwaysAudio} onChange={setAudio} />
             {models && models.length > 0 && <ModelPicker models={models.map((m) => ({ id: m.id, label: m.label, isMock: m.isMock, supported: !advanced || m.maxImages >= refs.length, estimateUsd: audio && m.audioEstimateUsd != null ? m.audioEstimateUsd : m.estimateUsd, score: m.score, recommended: m.recommended, resolution: m.resolution, durationsSec: m.durationsSec, audio: m.audioEstimateUsd != null, isNew: m.isNew }))} value={chosen?.id ?? ''} onChange={(id) => pickModel(models.find((m) => m.id === id)!)} />}
             {/* Under the model, so the ratio row sits right under the prompt box as on Fash. */}
             <details className="prompt-preview">

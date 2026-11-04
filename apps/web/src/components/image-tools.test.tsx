@@ -27,7 +27,7 @@ test('an empty slot shows a picture by default and the icon it is given, as the 
   expect(slot('plus')).toContain('Tối đa 7 ảnh tham chiếu');
 });
 
-test('the audio switch reads on when available and on, and is off and disabled with a reason when the model cannot make audio', () => {
+test('the audio switch reads on when available and on, is off and disabled with a reason when the model cannot make audio, and on and disabled when it always does', () => {
   const on = renderToStaticMarkup(<AudioSwitch on available onChange={() => undefined} />);
   expect(on).toContain('aria-checked="true"');
   expect(on).toContain('>Bật<');
@@ -36,6 +36,10 @@ test('the audio switch reads on when available and on, and is off and disabled w
   expect(fixed).toContain('aria-checked="false"');
   expect(fixed).toContain('disabled');
   expect(fixed).toContain('Mô hình này không tạo được âm thanh');
+  const always = renderToStaticMarkup(<AudioSwitch on={false} available always onChange={() => undefined} />);
+  expect(always).toContain('aria-checked="true"');
+  expect(always).toContain('disabled');
+  expect(always).toContain('Mô hình này luôn tạo âm thanh');
 });
 
 test('a ratio or resolution the model lacks falls back to the nearest it has, and anything it cannot compare to the first', () => {

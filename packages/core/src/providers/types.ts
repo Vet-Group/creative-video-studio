@@ -8,7 +8,7 @@ export interface SubmitRequest {
   /** 'auto' only for Motion Control, whose output follows its reference video. */
   ratio: Ratio | 'auto';
   durationSec: number;
-  /** Native audio on; only the endpoints of AUDIO_USD_PER_SECOND read it, and the others stay silent. */
+  /** Native audio on; only the endpoints of AUDIO_USD_PER_SECOND read it, those of ALWAYS_AUDIO make sound regardless, and the others stay silent. */
   audio?: boolean;
   /** The image the clip ends on, on a model that takes one (fal's VIDEO_BODIES `end`). */
   endImageUrl?: string;
