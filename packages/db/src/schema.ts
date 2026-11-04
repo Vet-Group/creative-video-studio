@@ -61,6 +61,10 @@ export const stores = pgTable('stores', {
   name: text('name').notNull(),
   code: text('code').notNull().unique(),
   hidden: boolean('hidden').notNull().default(false),
+  /** The store's brand kit (owner decision, 2026-11-04), added to Marketing Studio and Image Generation prompts on request; validated by the API (lib/brand.ts). */
+  brandVoice: text('brand_voice'),
+  brandColors: text('brand_colors').array().notNull().default(sql`'{}'`),
+  brandTagline: text('brand_tagline'),
   createdAt: tstz('created_at').notNull().defaultNow(),
 });
 

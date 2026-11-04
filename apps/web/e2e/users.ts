@@ -101,6 +101,9 @@ export const USERS = {
   clickc: { email: 'clickc@e2e.test', name: 'E2E Click C', role: 'member' },
   clickd: { email: 'clickd@e2e.test', name: 'E2E Click D', role: 'member' },
   stylea: { email: 'stylea@e2e.test', name: 'E2E Style A', role: 'member' }, // image-styles.e2e: picks a style on Image Generation and runs it on a mock model
+  // store-brand.e2e: branded is a template editor (e2e/serve.ts sets it) who fills a store's brand kit, brandm a member who runs with it.
+  branded: { email: 'branded@e2e.test', name: 'E2E Brand Editor', role: 'member' },
+  brandm: { email: 'brandm@e2e.test', name: 'E2E Brand Member', role: 'member' },
   admin: { email: 'admin@e2e.test', name: 'E2E Admin', role: 'admin' },
 } as const;
 

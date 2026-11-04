@@ -11,6 +11,7 @@ export interface Recalled {
   audio: boolean | null;
   enhance: boolean | null;
   storeId: string | null;
+  brand: boolean | null;
 }
 
 /** How long Run waits for the remembered settings before it goes on the defaults. */

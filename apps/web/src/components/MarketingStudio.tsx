@@ -17,6 +17,7 @@ import { cardSample } from '@/lib/examples';
 import { dropRefillQuery, queryOf } from '@/lib/reuse';
 import { About } from './About';
 import { AudioSwitch } from './AudioSwitch';
+import { BrandPicker } from './BrandKit';
 import { CardMedia, LoopVideo } from './CardMedia';
 import { Icon, type IconName } from './Icon';
 import { copyError, copySamples, Gallery, HISTORY_SIZE_KEY, type Img, PhotoDialog, photoImg, RunSummary, SizeSlider, Slot, uploadError, uploadImages, UPLOAD_ERROR, useSize, WorkTabs } from './image-tools';
@@ -392,6 +393,8 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
   const [modelId, setModelId] = useState('');
   const [ratio, setRatio] = useState('9:16');
   const [durationSec, setDurationSec] = useState(10);
+  const [storeId, setStoreId] = useState('');
+  const [useBrand, setUseBrand] = useState(false); // the chosen store's brand kit, added to the prompt on the server
   // The member's last model and settings on this format, unless a refill opens the page; the list then follows the ratio and duration.
   const recall = useRecall(
     'marketing',
@@ -400,6 +403,8 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
       if (s.ratio) setRatio(s.ratio);
       if (s.durationSec) setDurationSec(s.durationSec);
       if (s.audio !== null) setAudio(s.audio);
+      if (s.storeId) setStoreId(s.storeId);
+      if (s.brand !== null) setUseBrand(s.brand);
     },
     { format: advanced ? 'advanced' : undefined, skip: reuse !== undefined },
   );
@@ -663,9 +668,11 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
             prompt: sent[i],
             ratio,
             durationSec,
+            storeId: storeId || null,
+            useBrand,
             params: { format: 'advanced', audio: audioOn ? 'on' : 'off', ...inputs, ...(script.trim() && { script: script.trim() }) },
           }
-        : { feature: 'marketing', assetIds: [person[0]!.id, product[0]!.id], modelId: chosen!.id, prompt: sent[i], ratio, durationSec, params: { audio: audioOn ? 'on' : 'off', ...inputs } };
+        : { feature: 'marketing', assetIds: [person[0]!.id, product[0]!.id], modelId: chosen!.id, prompt: sent[i], ratio, durationSec, storeId: storeId || null, useBrand, params: { audio: audioOn ? 'on' : 'off', ...inputs } };
       try {
         await api('/api/jobs', sendJson('POST', body));
         sentOk.push(hookName(hook));
@@ -780,6 +787,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
                 </p>
               ))}
             </details>
+            <BrandPicker storeId={storeId} onStore={setStoreId} on={useBrand} onToggle={setUseBrand} />
             <Templates
               feature="marketing"
               data={() => ({

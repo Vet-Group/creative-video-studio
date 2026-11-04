@@ -70,12 +70,14 @@ await pool.query(
 );
 // A store the Create picker offers, for the specs that tag a clip with one.
 await pool.query(`insert into stores (id, name, code) values ('store-e2e', 'E2E Shop', 'E2E-SEED')`);
+// A store whose brand kit store-brand.e2e fills, so no other spec's store gets one.
+await pool.query(`insert into stores (id, name, code) values ('store-brand', 'E2E Brand Shop', 'E2E-BRAND')`);
 // Every spec runs jobs; the daily clip cap is not what is under test here.
 await pool.query('update settings set member_daily_clip_cap = 1000 where id = 1');
 // Straight through better-auth, not POST /api/admin/users, so must_change_password stays false and the specs sign in to the app itself.
 for (const u of Object.values(USERS)) await auth.api.createUser({ body: { email: u.email, name: u.name, password: PASSWORD, role: u.role, data: { emailVerified: true } } });
-// An Admin made this member a template editor (Admin > Users), for preset-edit.e2e.
-await pool.query('update users set can_edit_templates = true where email = $1', [USERS.tpled.email]);
+// An Admin made these members template editors (Admin > Users), for preset-edit.e2e and store-brand.e2e.
+await pool.query('update users set can_edit_templates = true where email = any($1)', [[USERS.tpled.email, USERS.branded.email]]);
 await pool.end();
 
 const children: ChildProcess[] = [

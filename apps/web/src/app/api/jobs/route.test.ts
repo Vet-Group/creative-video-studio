@@ -1011,6 +1011,6 @@ describe('GET /api/stores', () => {
   test('lists the visible stores and leaves out a hidden one', async () => {
     const res = await GET(new Request('http://localhost/api/stores', { headers: { cookie: ownerCookie } }));
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ stores: [{ id: 'store-ok', name: 'Store', code: 'S1' }] });
+    expect(await res.json()).toEqual({ stores: [{ id: 'store-ok', name: 'Store', code: 'S1', brandVoice: null, brandColors: [], brandTagline: null }], canEdit: false });
   });
 });

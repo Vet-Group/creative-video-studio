@@ -1,6 +1,7 @@
 import { usdPerSecondFor } from '@cvs/core/models';
 import { FEATURES } from '@cvs/db';
 import { pool } from '@/lib/auth';
+import { BRAND_FEATURES } from '@/lib/brand';
 import { guard } from '@/lib/session';
 
 const bad = (error: string) => Response.json({ error }, { status: 400 });
@@ -43,6 +44,8 @@ export async function GET(request: Request) {
       // Enhance rewrites the member's own prompt, so only a free-prompt job says whether it was on.
       enhance: feature === 'image' || (feature === 'video' && r.preset_id === null) ? (r.enhance as boolean) : null,
       storeId: r.store_ok ? (r.store_id as string) : null,
+      // Whether the brand kit switch was on (POST /api/jobs marks a job its kit was added to), on the pages that have it.
+      brand: BRAND_FEATURES.includes(feature) ? params.brand === 'on' : null,
     },
   });
 }
