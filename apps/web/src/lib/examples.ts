@@ -34,11 +34,11 @@ const clip = (n: number, title: string, presetId: string, aspect: Aspect, width:
 
 // Keep the sizes in step with apps/worker/src/example-fixtures.test.ts.
 export const EXAMPLES: Example[] = [
-  clip(1, 'Tiến gần nhẹ nhàng', 'gentle-push-in', '9:16', 180, 320),
-  clip(2, 'Xoay quanh chậm', 'slow-orbit', '1:1', 240, 240),
+  clip(1, 'Cận cảnh lấp lánh', 'gentle-push-in', '9:16', 180, 320),
+  clip(2, 'Xoay chậm tại chỗ', 'slow-orbit', '1:1', 240, 240),
   clip(3, 'Đặt trên bàn đời thường', 'lifestyle-table', '9:16', 180, 320),
-  clip(4, 'Ánh sáng quét nhẹ', 'light-sweep', '1:1', 240, 240),
-  clip(5, 'Sản phẩm bay lên', 'floating-reveal', '9:16', 180, 320),
+  clip(4, 'Lướt gần lấp lánh', 'light-sweep', '1:1', 240, 240),
+  clip(5, 'Sản phẩm lơ lửng', 'floating-reveal', '9:16', 180, 320),
   clip(6, 'Cầm trên tay', 'handheld-product', '9:16', 180, 320),
   clip(7, 'Toàn cảnh trượt ngang', 'light-sweep', '16:9', 320, 180),
   clip(8, 'Cận cảnh chi tiết', 'gentle-push-in', '3:4', 240, 320),

@@ -470,7 +470,7 @@ test.describe('1280x800', () => {
   test('V01 example dialog at 1440 matches the live measurements: clip on black, Close top-left, details column, tools, the use button and Previous/Next at the viewport edges', async ({ page }) => {
     await page.setViewportSize(DESKTOP);
     await tab(page, 'Ví dụ').click();
-    await page.getByRole('button', { name: 'Xoay quanh chậm', exact: true }).click({ position: { x: 12, y: 12 } });
+    await page.getByRole('button', { name: 'Xoay chậm tại chỗ', exact: true }).click({ position: { x: 12, y: 12 } });
     await checkExampleDialog(page, {
       dialog: [170, 250, 1100, 501],
       media: [880, 500],
@@ -517,7 +517,7 @@ test.describe('390x844', () => {
 
   test('V01 example dialog at 390 matches the live measurements: stacked, a 400 px clip, 79 px tools, a full-width use button and 36 px Previous/Next', async ({ page }) => {
     await tab(page, 'Ví dụ').click();
-    await page.getByRole('button', { name: 'Xoay quanh chậm', exact: true }).click({ position: { x: 12, y: 12 } });
+    await page.getByRole('button', { name: 'Xoay chậm tại chỗ', exact: true }).click({ position: { x: 12, y: 12 } });
     await checkExampleDialog(page, {
       dialog: [16, 54, 358, 737],
       media: [358, 400],

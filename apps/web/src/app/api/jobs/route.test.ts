@@ -92,7 +92,7 @@ describe('POST /api/jobs', () => {
       user_id: ownerId, team_id: 'team-b', store_id: 'store-ok', model: 'fal-test', provider: 'fal', preset_id: 'gentle-push-in',
       aspect: '9:16', duration_s: 5, input_asset_ids: ['own-1', 'own-2'], status: 'queued', is_mock: false,
     });
-    expect(job.prompt).toMatch(/^Slow, gentle push-in/);
+    expect(job.prompt).toMatch(/^An extreme macro close-up/);
     const { rows } = await pool.query(`select kind, usd::text as usd, team_id, store_id, month, is_final from cost_entries where job_id = $1`, [id]);
     expect(rows).toEqual([{ kind: 'estimate', usd: '1.0000', team_id: 'team-b', store_id: 'store-ok', month: expect.stringMatching(/^\d{4}-\d{2}$/), is_final: false }]);
 

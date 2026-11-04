@@ -245,15 +245,15 @@ test('choosing a preset or using an example fills the form and creates no job', 
 
   // The picker: a card fills the preset and closes the dialog.
   await page.getByRole('button', { name: 'Chọn mẫu khác' }).click();
-  await page.getByRole('list', { name: 'Danh sách mẫu' }).getByRole('button', { name: 'Ánh sáng quét nhẹ', exact: true }).click();
+  await page.getByRole('list', { name: 'Danh sách mẫu' }).getByRole('button', { name: 'Lướt gần lấp lánh', exact: true }).click();
   await expect(page.getByRole('list', { name: 'Danh sách mẫu' })).toBeHidden();
   await expect(presetSelect).toHaveAttribute('data-value', 'light-sweep');
   expect(before).not.toBe('light-sweep');
-  await expect(page.locator('.banner-text strong')).toHaveText('Ánh sáng quét nhẹ');
+  await expect(page.locator('.banner-text strong')).toHaveText('Lướt gần lấp lánh');
 
   // An example: a click shows the details with a "use this sample" button, which fills preset, ratio and duration.
   await page.getByRole('tab', { name: 'Ví dụ' }).click();
-  await openTile(page, 'Xoay quanh chậm');
+  await openTile(page, 'Xoay chậm tại chỗ');
   const detail = page.getByRole('dialog', { name: 'Chi tiết mẫu' });
   await expect(detail).toContainText('Mẫu minh họa');
   await expect(presetSelect).toHaveAttribute('data-value', 'light-sweep');
@@ -470,7 +470,7 @@ test('a dialog closes on its backdrop, not on a click inside it', async ({ page 
   await signIn(page, 'member5');
   await openCreate(page);
   await page.getByRole('tab', { name: 'Ví dụ' }).click();
-  await openTile(page, 'Xoay quanh chậm');
+  await openTile(page, 'Xoay chậm tại chỗ');
   const detail = page.getByRole('dialog', { name: 'Chi tiết mẫu' });
   await expect(detail).toBeVisible();
 

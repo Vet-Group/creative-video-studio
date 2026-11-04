@@ -83,7 +83,7 @@ export const TOOL_GUIDE: ToolGuide[] = [
       { text: 'Ảnh mở đầu chưa đẹp hay sai bối cảnh: sửa ảnh trước', href: '/image-generation', go: 'Tạo ảnh' },
       { text: 'Muốn chép đúng một chuyển động từ video có sẵn', href: '/apps/motion-control', go: 'Điều khiển chuyển động' },
     ],
-    example: { have: 'Ảnh người mẫu mặc váy và mẫu chuyển động “Xoay một vòng”.', get: 'Clip 5 giây dọc 9:16, người mẫu xoay, váy bay theo.' },
+    example: { have: 'Ảnh người mẫu mặc váy và mẫu chuyển động “Lia vòng ra sau lưng”.', get: 'Clip 5 giây dọc 9:16, máy quay lia vòng ra sau lưng người mẫu, váy khẽ bay.' },
     wait: 'Thường vài phút, tuỳ mô hình và thời lượng.',
   },
   {

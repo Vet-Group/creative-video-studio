@@ -33,7 +33,8 @@ async function newUser(email: string, role: 'member' | 'admin') {
   const res = await auth.api.signInEmail({ body: { email, password: PASSWORD }, asResponse: true });
   return { id, cookie: res.headers.getSetCookie().map((c) => c.split(';')[0]).join('; ') };
 }
-const audits = async (target: string) => (await pool.query('select actor_id, action, old_value, new_value from audit_entries where target = $1 order by id', [target])).rows;
+// Rows by a person: migration 0065 audits its own prompt changes as the system (no actor).
+const audits = async (target: string) => (await pool.query('select actor_id, action, old_value, new_value from audit_entries where target = $1 and actor_id is not null order by id', [target])).rows;
 const preset = async (id: string) => (await pool.query('select id, label, prompt, enabled, sort_order as "sortOrder" from presets where id = $1', [id])).rows[0];
 const list = async (cookie: string) => (await (await presetsRoute.GET(call(cookie))).json()) as { presets: Record<string, unknown>[]; canEdit: boolean };
 const propose = (cookie: string, body: unknown) => proposalsRoute.POST(call(cookie, 'POST', body));
@@ -169,7 +170,7 @@ describe('proposals', () => {
 
     const own = (await (await proposalsRoute.GET(call(member.cookie))).json()).proposals;
     expect(own).toHaveLength(1);
-    expect(own[0]).toMatchObject({ id, mine: true, current: { label: 'Xoay quanh chậm' } });
+    expect(own[0]).toMatchObject({ id, mine: true, current: { label: 'Xoay chậm tại chỗ' } });
     expect(own[0].current).not.toHaveProperty('prompt'); // a member never reads a preset's prompt
     const other = await newUser('other@example.test', 'member');
     expect((await (await proposalsRoute.GET(call(other.cookie))).json()).proposals).toEqual([]);
