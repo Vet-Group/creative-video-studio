@@ -35,7 +35,8 @@ async function newUser(email: string, role: 'member' | 'admin') {
 const call = (cookie: string | undefined, path: string, method = 'GET', body?: unknown) =>
   new Request(`http://localhost${path}`, { method, headers: { ...(cookie ? { cookie } : {}), 'content-type': 'application/json' }, ...(body === undefined || method === 'GET' ? {} : { body: JSON.stringify(body) }) });
 
-const audits = async (target: string) => (await pool.query('select actor_id, action, old_value, new_value from audit_entries where target = $1 order by id', [target])).rows;
+// Rows by a person: migration 0065 audits its own prompt changes as the system (no actor).
+const audits = async (target: string) => (await pool.query('select actor_id, action, old_value, new_value from audit_entries where target = $1 and actor_id is not null order by id', [target])).rows;
 const auditCount = async () => (await pool.query('select count(*)::int as n from audit_entries')).rows[0].n as number;
 
 let admin: Awaited<ReturnType<typeof newUser>>;
