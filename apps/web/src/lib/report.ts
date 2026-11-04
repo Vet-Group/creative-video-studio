@@ -14,7 +14,7 @@ export async function weeklyReport(week: string | null) {
     `with w as (select date_trunc('week', coalesce($1::date, (now() at time zone ${ICT})::date)::timestamp)::date as start),
           wj as (select j.* from jobs j, w where j.feature in ('video', 'marketing') and (j.created_at at time zone ${ICT})::date >= w.start and (j.created_at at time zone ${ICT})::date < w.start + 7),
           -- The video jobs' rows, and the member's suggestion and translation runs (llm rows without a job).
-          spend as (select ce.user_id, sum(ce.usd) as usd from cost_entries ce left join jobs j on j.id = ce.job_id cross join w
+          spend as (select ce.user_id, sum(ce.usd) as usd, sum(ce.usd) filter (where ce.kind <> 'llm') as usd_cap from cost_entries ce left join jobs j on j.id = ce.job_id cross join w
                      where (j.feature in ('video', 'marketing') or (ce.job_id is null and ce.kind = 'llm')) and ce.day >= w.start and ce.day < w.start + 7 group by ce.user_id),
           per_user as (
             select j.user_id, count(*)::int as jobs, (count(*) filter (where v.verdict = 'pass'))::int as accepted,
@@ -29,7 +29,7 @@ export async function weeklyReport(week: string | null) {
             u.id as user_id, u.name, u.email, t.name as team, coalesce(p.jobs, 0) as jobs, coalesce(p.accepted, 0) as accepted,
             coalesce(p.failed, 0) as failed, coalesce(p.finished, 0) as finished, p.median_s,
             coalesce(sp.usd, 0)::numeric(12, 4)::text as spend, round(sp.usd / nullif(p.accepted, 0), 4)::text as per_accepted,
-            round(coalesce(sp.usd, 0) / nullif(s.monthly_cap_usd, 0), 4)::text as of_cap
+            round(coalesce(sp.usd_cap, 0) / nullif(s.monthly_cap_usd, 0), 4)::text as of_cap
        from w cross join settings s
        left join who on true
        left join per_user p on p.user_id = who.user_id
