@@ -92,7 +92,7 @@ test('C2: a broken source keeps a poster-sized placeholder, not a gap', async ({
   // The first tile is on screen at once, so its broken source is hit at once.
   await page.route('**/fixtures/examples/example-1.mp4', (r) => r.fulfill({ status: 404, body: 'gone' }));
   const videos = await openExamples(page);
-  const placeholder = page.getByRole('img', { name: /Tiến gần nhẹ nhàng: không tải được video/ });
+  const placeholder = page.getByRole('img', { name: /Cận cảnh lấp lánh: không tải được video/ });
   await expect(placeholder).toBeVisible();
   const box = (await placeholder.boundingBox())!;
   expect(box.width).toBeGreaterThan(50);
@@ -138,7 +138,7 @@ test('the preset banner keeps looping when another preset swaps its clip in plac
   await expect.poll(moving).toBe(true);
   const before = await banner.getAttribute('src');
   await page.getByRole('button', { name: 'Chọn mẫu khác' }).click();
-  await page.getByRole('list', { name: 'Danh sách mẫu' }).getByRole('button', { name: 'Xoay quanh chậm', exact: true }).click();
+  await page.getByRole('list', { name: 'Danh sách mẫu' }).getByRole('button', { name: 'Xoay chậm tại chỗ', exact: true }).click();
   await expect(banner).not.toHaveAttribute('src', before!); // the same element, a new source
   await expect.poll(moving).toBe(true);
 });
@@ -151,12 +151,12 @@ test('with reduced motion the Create banner, the preset picker and the Explore p
   const banner = page.locator('.banner video');
   await expect.poll(() => banner.evaluate((v: HTMLVideoElement) => !v.paused && v.currentTime > 0)).toBe(true);
   await page.getByRole('button', { name: 'Chọn mẫu khác' }).click();
-  const picked = page.getByRole('list', { name: 'Danh sách mẫu' }).locator('li', { hasText: 'Xoay quanh chậm' }).locator('video');
+  const picked = page.getByRole('list', { name: 'Danh sách mẫu' }).locator('li', { hasText: 'Xoay chậm tại chỗ' }).locator('video');
   await expect.poll(() => picked.evaluate((v: HTMLVideoElement) => !v.paused && v.currentTime > 0)).toBe(true);
   await page.keyboard.press('Escape');
 
   await page.goto('/explore');
-  const tile = page.getByRole('list', { name: 'Mẫu' }).getByRole('link', { name: 'Xoay quanh chậm' }).locator('video');
+  const tile = page.getByRole('list', { name: 'Mẫu' }).getByRole('link', { name: 'Xoay chậm tại chỗ' }).locator('video');
   await tile.scrollIntoViewIfNeeded();
   await expect.poll(() => tile.evaluate((v: HTMLVideoElement) => !v.paused && v.currentTime > 0)).toBe(true);
 });

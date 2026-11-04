@@ -15,32 +15,32 @@ export const KEEP =
 export const PRESETS: Preset[] = [
   {
     id: 'gentle-push-in',
-    label: 'Tiến gần nhẹ nhàng',
-    prompt: `Slow, gentle push-in toward the product on a clean, plain background with soft even lighting. ${KEEP}`,
+    label: 'Cận cảnh lấp lánh',
+    prompt: `An extreme macro close-up of the product filling the frame, with a nearly still camera that drifts only very slightly. Bright, sparkling highlights glint and shimmer across its surfaces, set against a softly blurred background of glittering bokeh in warm, low light. Keep the product, its shape, colours and any printed text exactly unchanged. Do not add any text, logos or watermarks. No faces. Smooth, stable camera.`,
     isBakeoffSafe: true,
   },
   {
     id: 'slow-orbit',
-    label: 'Xoay quanh chậm',
-    prompt: `The camera moves in a slow, small arc in front of the product on a clean background, showing only the sides visible in the image. ${KEEP}`,
+    label: 'Xoay chậm tại chỗ',
+    prompt: `The product slowly rotates in place, as if on a turntable, while the camera holds still at eye level. A dark, plain backdrop and a warm, low-key side light pick out its form, with soft highlights moving across the surface as it turns. Keep the product, its shape, colours and any printed text exactly unchanged. Do not add any text, logos or watermarks. No faces. Smooth, stable camera.`,
     isBakeoffSafe: false,
   },
   {
     id: 'lifestyle-table',
     label: 'Đặt trên bàn đời thường',
-    prompt: `The product sits on a tidy wooden table in a bright, cozy room, with a slow subtle camera drift and natural daylight. ${KEEP}`,
+    prompt: `The product sits on a rustic, dark wooden table with everyday props softly blurred around it, in warm, moody indoor light. The camera holds still at a close, slightly high angle with a shallow depth of field, keeping the product sharp and centred. Keep the product, its shape, colours and any printed text exactly unchanged. Do not add any text, logos or watermarks. No faces. Smooth, stable camera.`,
     isBakeoffSafe: false,
   },
   {
     id: 'light-sweep',
-    label: 'Ánh sáng quét nhẹ',
-    prompt: `A soft band of light slowly sweeps across the product, adding gentle highlights and reflections, with a nearly still camera. ${KEEP}`,
+    label: 'Lướt gần lấp lánh',
+    prompt: `The camera glides slowly and smoothly closer to the product, which rests on a dark, polished wooden surface. Warm, dim light catches its edges, so small sparkling highlights travel and twinkle across it as the view shifts, with a shallow depth of field and a softly blurred background. Keep the product, its shape, colours and any printed text exactly unchanged. Do not add any text, logos or watermarks. No faces. Smooth, stable camera.`,
     isBakeoffSafe: false,
   },
   {
     id: 'floating-reveal',
-    label: 'Sản phẩm bay lên',
-    prompt: `The product floats up slowly into frame and settles in the centre against a soft gradient background, with a gentle camera rise. ${KEEP}`,
+    label: 'Sản phẩm lơ lửng',
+    prompt: `The product hovers in mid-air at the centre of the frame above a seamless, warm pastel floor, bobbing very gently, with a soft shadow on the ground beneath it. The camera stays still, and soft, even studio lighting keeps the scene clean and minimal. Keep the product, its shape, colours and any printed text exactly unchanged. Do not add any text, logos or watermarks. No faces. Smooth, stable camera.`,
     isBakeoffSafe: false,
   },
   {

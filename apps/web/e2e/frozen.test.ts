@@ -59,11 +59,11 @@ export async function freezeData(page: Page): Promise<void> {
     r.fulfill({
       json: {
         presets: [
-          { id: 'gentle-push-in', label: 'Tiến gần nhẹ nhàng' },
-          { id: 'slow-orbit', label: 'Xoay quanh chậm' },
+          { id: 'gentle-push-in', label: 'Cận cảnh lấp lánh' },
+          { id: 'slow-orbit', label: 'Xoay chậm tại chỗ' },
           { id: 'lifestyle-table', label: 'Đặt trên bàn đời thường' },
-          { id: 'light-sweep', label: 'Ánh sáng quét nhẹ' },
-          { id: 'floating-reveal', label: 'Sản phẩm bay lên' },
+          { id: 'light-sweep', label: 'Lướt gần lấp lánh' },
+          { id: 'floating-reveal', label: 'Sản phẩm lơ lửng' },
           { id: 'handheld-product', label: 'Cầm trên tay' },
         ],
       },

@@ -25,7 +25,7 @@ test('a link anywhere in the app, not only the sidebar, shows the top progress b
     await new Promise((r) => setTimeout(r, 1500)); // a slow line, so the wait is visible
     await route.continue();
   });
-  await page.getByRole('list', { name: 'Mẫu' }).getByRole('link', { name: 'Xoay quanh chậm' }).click();
+  await page.getByRole('list', { name: 'Mẫu' }).getByRole('link', { name: 'Xoay chậm tại chỗ' }).click();
   await expect(bar).toHaveAttribute('data-on', 'true');
   await page.waitForTimeout(300); // past its 150 ms delay: already a third of the width, easy to see on a phone
   expect((await bar.boundingBox())!.width).toBeGreaterThanOrEqual(0.3 * page.viewportSize()!.width - 1);
@@ -42,7 +42,7 @@ test('the top bar also ends when the page commits without the address changing, 
     await new Promise((r) => setTimeout(r, 8000));
     await route.continue().catch(() => {}); // the page may be gone by then
   });
-  await page.getByRole('list', { name: 'Mẫu' }).getByRole('link', { name: 'Xoay quanh chậm' }).click();
+  await page.getByRole('list', { name: 'Mẫu' }).getByRole('link', { name: 'Xoay chậm tại chỗ' }).click();
   await expect(bar).toHaveAttribute('data-on', 'true');
   // What the router does when a page commits: a new history.state under the address it lands on, here the one already shown.
   await page.evaluate(() => history.replaceState({ ...history.state }, '', location.href));
@@ -60,7 +60,7 @@ test('Explore links into Create with the chosen preset or model already picked',
   await expect(tools).toHaveCount(6);
   await expect(tools.locator('strong')).toHaveText(['Thử đồ', 'Tạo ảnh', 'Tạo video', 'Marketing Studio', 'Ứng dụng', 'Thư viện']);
 
-  await page.getByRole('list', { name: 'Mẫu' }).getByRole('link', { name: 'Xoay quanh chậm' }).click();
+  await page.getByRole('list', { name: 'Mẫu' }).getByRole('link', { name: 'Xoay chậm tại chỗ' }).click();
   await expect(page).toHaveURL(/\/create\?preset=slow-orbit$/);
   await expect(presetOf(page)).toHaveAttribute('data-value', 'slow-orbit');
 

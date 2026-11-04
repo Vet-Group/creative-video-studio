@@ -76,10 +76,21 @@ describe('migration 0002 seed data', () => {
 
   test('migration 0024 gives the motion templates Vietnamese labels, as the company presets have', async () => {
     const { rows } = await pool.query(`select id, label from presets where sort_order >= 10 order by sort_order`);
-    expect(rows.at(0)).toEqual({ id: 'shoulder-sequence', label: 'Cận vai rồi toàn thân' });
+    expect(rows.at(0)).toEqual({ id: 'shoulder-sequence', label: 'Cận chi tiết rồi toàn thân' }); // renamed by 0065
     expect(rows.at(-1)).toEqual({ id: 'golden-hour-wall', label: 'Tường nắng hoàng hôn' });
     expect(new Set(rows.map((r) => r.label)).size).toBe(19);
     for (const r of rows) expect(r.label).not.toMatch(/^[A-Z][a-z-]+( [A-Z&][a-z-]*)+$/);
+  });
+
+  test('migration 0065 applies the reviewed prompts and labels and audits each change as the system', async () => {
+    const turn = (await pool.query(`select label, prompt from presets where id = 'turn-around'`)).rows[0];
+    expect(turn.label).toBe('Lia vòng ra sau lưng');
+    expect(turn.prompt).toMatch(/^The camera orbits slowly around the model/);
+    const untouched = (await pool.query(`select label from presets where id = 'arc-left'`)).rows[0];
+    expect(untouched.label).toBe('Lia vòng sang trái');
+    const audit = (await pool.query(`select target, old_value, new_value from audit_entries where action = 'preset.update' and actor_id is null order by target`)).rows;
+    expect(audit).toHaveLength(13);
+    expect(audit.find((a) => a.target === 'preset:turn-around')).toMatchObject({ old_value: { label: 'Xoay một vòng' }, new_value: { label: 'Lia vòng ra sau lưng' } });
   });
 
   test('seeds the two models with price, limits and bake-off record (migration 0013: Kling enabled, Seedance disabled; 0022: Kling takes 7 references; 0057 adds the Replicate round to Seedance), and the settings row', async () => {
