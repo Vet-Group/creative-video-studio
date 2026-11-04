@@ -52,13 +52,16 @@ test('the add form says what a hook is, an example fills it, a Vietnamese scene 
   expect(variantsY).toBeGreaterThan((await addCard.boundingBox())!.y);
   expect(await hooks.getByRole('listbox').getByRole('button', { name: 'Thêm hook của bạn' }).count()).toBe(0); // not one of the options
   // The form takes the dialog's place, and its back button returns to the cards.
+  // The form view is named after the form, and its heading reads without the back button's name.
+  const adding = page.getByRole('dialog', { name: 'Thêm hook của bạn', exact: true });
   await addCard.click();
-  await expect(hooks.getByRole('heading', { name: 'Thêm hook của bạn' })).toBeVisible();
-  await expect(hooks.getByRole('listbox')).toHaveCount(0);
-  await hooks.getByRole('button', { name: 'Quay lại' }).click();
+  await expect(adding.getByRole('heading', { name: 'Thêm hook của bạn', exact: true })).toBeVisible();
+  await expect(hooks).toHaveCount(0);
+  await expect(adding.getByRole('listbox')).toHaveCount(0);
+  await adding.getByRole('button', { name: 'Quay lại' }).click();
   await expect(addCard).toBeFocused();
   await addCard.click();
-  const form = hooks.getByRole('group', { name: 'Thêm hook' });
+  const form = adding.getByRole('group', { name: 'Thêm hook' });
   await expect(form).toContainText('Hook là 1-2 giây mở đầu clip');
   await expect(form.getByLabel('Tên', { exact: true })).toBeFocused();
   await expect(form.locator('.char-count')).toHaveCount(0); // a count shows only near the limit
@@ -91,8 +94,8 @@ test('the add form says what a hook is, an example fills it, a Vietnamese scene 
     await admin.setViewportSize({ width: 1440, height: 1000 });
     await admin.goto('/marketing-studio');
     await hookBox(admin).click();
-    const dialog = admin.getByRole('dialog', { name: 'Chọn hook' });
-    await dialog.getByRole('button', { name: 'Thêm hook' }).click();
+    await admin.getByRole('dialog', { name: 'Chọn hook' }).getByRole('button', { name: 'Thêm hook của bạn' }).click();
+    const dialog = admin.getByRole('dialog', { name: 'Thêm hook của bạn' });
     const box = (await dialog.getByRole('checkbox', { name: 'Chia sẻ cho cả công ty' }).boundingBox())!;
     const label = (await dialog.locator('label.template-share').boundingBox())!;
     expect(box.width).toBeLessThanOrEqual(20);
@@ -117,11 +120,12 @@ test('Thêm hook and Thêm bối cảnh save the member’s own, choose them at 
   await hookBox(page).click();
   const hooks = page.getByRole('dialog', { name: 'Chọn hook' });
   await hooks.getByRole('button', { name: 'Thêm hook của bạn' }).click();
-  const hookForm = hooks.getByRole('group', { name: 'Thêm hook' });
+  const addingHook = page.getByRole('dialog', { name: 'Thêm hook của bạn' });
+  const hookForm = addingHook.getByRole('group', { name: 'Thêm hook' });
   await hookForm.getByLabel('Tên', { exact: true }).fill(hook.name);
   await hookForm.getByLabel('Cảnh cho AI (tiếng Anh)').fill(hook.phrase);
   await hookForm.getByRole('button', { name: 'Lưu & chọn' }).click();
-  await expect(hooks).toBeHidden();
+  await expect(addingHook).toBeHidden();
   await expect(hookBox(page)).toContainText(hook.name);
   await hookBox(page).click();
   await expect(hooks.getByRole('option', { name: hook.name, exact: true })).toHaveAttribute('aria-selected', 'true');
@@ -131,13 +135,14 @@ test('Thêm hook and Thêm bối cảnh save the member’s own, choose them at 
   await locationBox(page).click();
   const places = page.getByRole('dialog', { name: 'Chọn bối cảnh' });
   await places.getByRole('button', { name: 'Thêm bối cảnh của bạn' }).click();
-  const spotForm = places.getByRole('group', { name: 'Thêm bối cảnh' });
+  const addingSpot = page.getByRole('dialog', { name: 'Thêm bối cảnh của bạn' });
+  const spotForm = addingSpot.getByRole('group', { name: 'Thêm bối cảnh' });
   await spotForm.getByLabel('Tên', { exact: true }).fill(spot.name);
   await spotForm.getByLabel('Cảnh cho AI (tiếng Anh)').fill(spot.phrase);
   await spotForm.getByLabel('Mô tả ngắn (tuỳ chọn)').fill('Góc quán quen');
   await expect(spotForm.locator('.choice-preview')).toContainText(`Set in ${spot.phrase}.`); // a location goes in as "Set in …"
   await spotForm.getByRole('button', { name: 'Lưu & chọn' }).click();
-  await expect(places).toBeHidden();
+  await expect(addingSpot).toBeHidden();
   await expect(locationBox(page)).toContainText(spot.name);
 
   await page.getByText('Xem prompt gửi đi').click();

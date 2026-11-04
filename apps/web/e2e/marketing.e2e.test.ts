@@ -333,7 +333,9 @@ test('with stock models uploaded, the empty model slot opens the stock model dia
     // Removing it brings the dialog back; the upload tile takes a photo like the slot's file input.
     await page.getByRole('button', { name: 'Bỏ ảnh marketing-model-2.png' }).click();
     await page.getByRole('button', { name: 'Tải lên Người mẫu' }).click();
-    await dialog.getByLabel('Tải lên ảnh của bạn').setInputFiles(file('mine.png'));
+    const upload = dialog.getByLabel('Tải lên ảnh của bạn', { exact: true }); // named by the tile's title alone; the drop line describes it
+    await expect(upload).toHaveAccessibleDescription('hoặc kéo thả ảnh vào đây');
+    await upload.setInputFiles(file('mine.png'));
     await expect(dialog).toBeHidden();
     await expect(page.getByLabel('Người mẫu: ảnh đã chọn').getByRole('img', { name: 'mine.png' })).toBeVisible();
   } finally {

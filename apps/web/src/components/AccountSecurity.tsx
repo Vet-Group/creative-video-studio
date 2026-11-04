@@ -145,7 +145,14 @@ export function Sessions() {
                   Thiết bị này
                 </span>
               ) : (
-                <button type="button" aria-label={`Đăng xuất ${device}`} disabled={busy} onClick={() => void revoke(s.id)}>
+                <button
+                  type="button"
+                  aria-label={`Đăng xuất ${device}`}
+                  disabled={busy}
+                  onClick={async () => {
+                    if (await confirmDialog({ title: `Đăng xuất ${device}?`, body: 'Thiết bị đó sẽ phải đăng nhập lại.', confirmLabel: 'Đăng xuất', danger: true })) void revoke(s.id);
+                  }}
+                >
                   Đăng xuất
                 </button>
               )}
