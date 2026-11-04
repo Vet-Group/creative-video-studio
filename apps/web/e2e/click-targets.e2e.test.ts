@@ -126,7 +126,7 @@ test('an image result opens full screen from the picture in History, and an imag
         const opened = page.context().waitForEvent('page', { timeout: 5_000 });
         await page.mouse.click(...(await at(tile, undefined, 12))); // near the top, clear of the Use this template pill
         const tab = await opened;
-        expect(new URL(tab.url()).pathname).toBe(src);
+        await tab.waitForURL((u) => u.pathname === src); // a new tab reports an empty URL until its first navigation commits
         await tab.close();
       }
     } finally {
