@@ -4,6 +4,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
+import { frameTimes } from '@cvs/core/suggest';
 import ffmpegPath from 'ffmpeg-static';
 import ffprobe from 'ffprobe-static';
 import sharp from 'sharp';
@@ -45,11 +46,8 @@ export async function extractPoster(video: string, jpeg: string): Promise<void> 
   await run(requireFfmpeg(), ['-y', '-v', 'error', '-i', video, '-frames:v', '1', '-vf', "scale='min(480,iw)':-2", '-q:v', '3', jpeg]);
 }
 
-/** `n` times spread evenly over a clip of `seconds`, each in the middle of its slice, so no still is the very first or last frame. */
-export const frameTimes = (seconds: number, n: number): number[] => Array.from({ length: n }, (_, i) => ((i + 0.5) * seconds) / n);
-
-/** `n` evenly spaced stills of an MP4 as small JPEGs (512 px on the long side at most), in time order. */
-export async function extractFrames(video: Uint8Array, n: number): Promise<Uint8Array[]> {
+/** `n` evenly spaced stills of an MP4 as small JPEGs (512 px on the long side at most), in time order, and the clip's length in seconds. */
+export async function extractFrames(video: Uint8Array, n: number): Promise<{ seconds: number; stills: Uint8Array[] }> {
   const dir = await mkdtemp(join(tmpdir(), 'cvs-frames-'));
   try {
     const file = join(dir, 'clip.mp4');
@@ -57,7 +55,7 @@ export async function extractFrames(video: Uint8Array, n: number): Promise<Uint8
     const { stdout } = await run(ffprobe.path, ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', file]);
     const seconds = Number(stdout.trim());
     if (!(seconds > 0)) throw new Error('the clip has no duration');
-    return await Promise.all(
+    const stills = await Promise.all(
       frameTimes(seconds, n).map(async (t, i) => {
         const jpeg = join(dir, `${i}.jpg`);
         const scale = 'scale=512:512:force_original_aspect_ratio=decrease:force_divisible_by=2';
@@ -65,6 +63,7 @@ export async function extractFrames(video: Uint8Array, n: number): Promise<Uint8
         return new Uint8Array(await readFile(jpeg));
       }),
     );
+    return { seconds, stills };
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
