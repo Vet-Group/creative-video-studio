@@ -119,6 +119,23 @@ test('each card is numbered with its direction and length, with the Vietnamese s
   await expect(box).toHaveValue('Option 2: slow turn'); // the English goes in, never the reading
 });
 
+test('with an empty prompt box on Create, the first card is labelled Cơ bản and the other two keep their direction', async ({ page }) => {
+  await signIn(page, 'sugga');
+  await page.goto('/create');
+  const box = page.getByLabel('Mô tả chuyển động');
+  await box.fill('');
+  let sent: unknown;
+  page.on('request', (r) => r.url().endsWith('/api/suggestions') && r.method() === 'POST' && (sent = r.postDataJSON()));
+  await page.getByRole('button', { name: 'Gợi ý AI' }).click();
+  const cards = page.getByRole('group', { name: 'Gợi ý AI' }).getByRole('button', { name: /^Gợi ý \d/ });
+  await expect(cards).toHaveCount(3, { timeout: 20_000 });
+  expect(sent).toMatchObject({ field: 'prompt', feature: 'video', text: '' });
+  for (const [n, label] of [[1, 'Cơ bản'], [2, 'Sáng tạo'], [3, 'Nổi bật']] as const) {
+    await expect(cards.nth(n - 1).getByText(`Gợi ý ${n} · ${label} · ${`Option ${n}: prompt`.length} ký tự`, { exact: true })).toBeVisible();
+  }
+  await expect(cards.first().getByText(/Sát ý bạn/)).toHaveCount(0);
+});
+
 test('Dịch shows a Vietnamese reading of English words under the box, asks once per text, and is not offered for Vietnamese words', async ({ page }) => {
   await signIn(page, 'sugga');
   await page.goto('/create');
