@@ -65,7 +65,7 @@ Company staff turn existing product images into short product videos without lea
   - Day and month are counted in Asia/Ho_Chi_Minh time.
   - At a cap, Run is blocked and the screen says why. A Member sees only that the company's monthly budget is used up; the remaining budget is shown to Admins only.
 - Concurrency: at most 2 running jobs per user and 5 for the whole app; the rest wait in the queue.
-- A job still running after 10 minutes is marked timed out. The user can retry it manually once, and never automatically. Retries count toward the caps.
+- A job still running after 20 minutes is marked timed out (10 until 2026-11-04, raised for BytePlus Seedance 2.0). The user can retry it manually once, and never automatically. Retries count toward the caps.
 - Delete rules:
   - A Member deletes their own videos; an Admin deletes any video.
   - Deleted videos are soft-deleted for 30 days, then purged together with their input images. An input image that another live video still uses (through Reuse) is kept.
@@ -105,7 +105,7 @@ Milestone 0 runs on the mock provider.
 2. Uploads that break a rule are rejected on the server: a 5th image, a file over 10 MB, a non-image file.
 3. A Run beyond either cap is refused on the server, and nothing is sent to the provider.
 4. A 3rd concurrent job from one user waits in the queue rather than starting.
-5. A job past 10 minutes ends as timed out. One manual retry is allowed and a second is refused.
+5. A job past 20 minutes ends as timed out. One manual retry is allowed and a second is refused.
 6. A Member cannot delete another Member's video. Soft-deleted items disappear from the Library and are purged after 30 days.
 7. Mock output is labelled "MOCK" in the UI and in the job record.
 

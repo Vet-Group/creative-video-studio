@@ -20,7 +20,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from 'vite
 import { closestRatio, requireFfmpeg } from './media';
 import { createMockImageProvider, createMockProvider, MOCK_FAIL } from './mock-provider';
 import { bucketName, ensureBucket, putObject, s3 } from './storage';
-import { type RunningWorker, startWorker, type WorkerOptions } from './worker';
+import { DEFAULT_OPTIONS, type RunningWorker, startWorker, type WorkerOptions } from './worker';
 
 vi.setConfig({ testTimeout: 90_000, hookTimeout: 90_000 });
 
@@ -104,6 +104,13 @@ async function start(provider: VideoProvider, options: Partial<WorkerOptions> = 
   workers.push(w);
   return w;
 }
+
+describe('run timeout', () => {
+  test('outlasts the slowest measured render: BytePlus Seedance 2.0 took 627 s for one 5 s clip (2026-11-04 canary)', () => {
+    expect(DEFAULT_OPTIONS.runTimeoutMs).toBe(20 * 60_000);
+    expect(DEFAULT_OPTIONS.runTimeoutMs).toBeGreaterThan(627_000);
+  });
+});
 
 describe('the mock lifecycle', () => {
   test('runs a job from queued to succeeded, with the output and poster in MinIO and nothing billed', async () => {

@@ -49,7 +49,8 @@ export const DEFAULT_OPTIONS: WorkerOptions = {
   reconcileEveryMs: 15_000,
   heartbeatEveryMs: 10_000,
   heartbeatStaleMs: 60_000,
-  runTimeoutMs: 10 * 60_000,
+  // BytePlus Seedance 2.0 took 627 s for one 5 s 720p clip in the 2026-11-04 canary, so 10 minutes cut real jobs short.
+  runTimeoutMs: 20 * 60_000,
   resendAfterMs: 30_000,
   perUserLimit: 2,
   globalLimit: 5,
