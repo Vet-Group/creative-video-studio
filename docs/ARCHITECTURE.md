@@ -60,7 +60,7 @@ Layout [proposed]: a pnpm workspace with `apps/web`, `apps/worker` and `packages
    2. The handler stays active until the job is final, so the pg-boss limits cover the time the provider is running.
    3. A reconcile loop (about every 15 s, and at start-up) is the only code that polls `provider.status`. A webhook can replace polling later.
    4. On success, copy the output into MinIO, check with `ffprobe` that it is at least 720p, extract a poster, write the cost rows and mark the job `succeeded`.
-3. A job not finished 10 minutes after it starts running is marked `timed_out`. Queue wait does not count.
+3. A job not finished 20 minutes after it starts running is marked `timed_out`. Queue wait does not count.
    - The worker tries to cancel the job at the provider, best effort.
    - fal reports `requestCancellationEnabled: false` for Kling o3 Pro reference-to-video (model page read 2026-10-22). A timed-out job can therefore still finish and be billed. The worker keeps polling quietly, for up to 24 h, so the cost is recorded, but it does not deliver the late result.
 4. Retry creates a new job with `retry_of` set. It is allowed only once per original job, and never happens automatically.

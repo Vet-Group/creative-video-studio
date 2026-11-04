@@ -68,7 +68,7 @@ Last updated: 2026-10-24 (main after #42; see "Overnight 2026-10-24" below). Ear
     - Each Member: 5 clips/day, counted in clips (retries included). This was 20 until Q5b.
     - At a cap, Run is blocked with a message. Jobs never retry automatically.
   - Concurrency: at most 2 running jobs per user and 5 for the whole app. Extra jobs wait in a queue.
-  - A job still unfinished 10 minutes after it starts running is marked failed (status `timed_out`; queue wait not counted, as clarified when writing ARCHITECTURE). The user may retry it manually once; the retry counts toward the caps.
+  - A job still unfinished 20 minutes after it starts running is marked failed (status `timed_out`; queue wait not counted, as clarified when writing ARCHITECTURE). The user may retry it manually once; the retry counts toward the caps.
   - Design volume: 5–7 clips/day for the first month. This was 20–50 until Q5b.
   - **Q5b (2026-10-22):**
     - The $200 cap is kept for month 1 as a pilot.
