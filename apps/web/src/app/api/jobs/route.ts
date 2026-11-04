@@ -7,6 +7,7 @@ import { FEATURES } from '@cvs/db';
 import { pool } from '@/lib/auth';
 import { boss } from '@/lib/queue';
 import { findChoice } from '@/lib/choices';
+import { inputRefusal } from '@/lib/job-failure';
 import { ADVANCED_MAX_SCRIPT } from '@/lib/marketing';
 import { guard } from '@/lib/session';
 
@@ -47,6 +48,7 @@ const CAP_MESSAGES: Record<CapRefusal, string> = {
 /**
  * `?mine`: the "My jobs" tray. The caller's 20 latest jobs that are not deleted, newest first, whether the worker is offline
  * (no heartbeat for 60 s), and `clips`: the video clips made today against the daily clip cap. `retried` is true once the job has its one manual retry.
+ * `failureReason` is `real_person` or `sensitive_input` when the provider refused the job's input image (read from `error`), else null.
  */
 export async function GET(request: Request) {
   const g = await guard(request, 'member');
@@ -68,7 +70,7 @@ export async function GET(request: Request) {
     workerOffline: worker.rows[0].offline,
     clips,
     jobs: jobs.rows.map((r) => ({
-      id: r.id, status: r.status, error: r.error, isMock: r.is_mock, feature: r.feature, ratio: r.aspect, durationSec: r.duration_s, resolution: r.params.resolution ?? null, modelId: r.model, retryOf: r.retry_of,
+      id: r.id, status: r.status, error: r.error, failureReason: inputRefusal(r.error)?.reason ?? null, isMock: r.is_mock, feature: r.feature, ratio: r.aspect, durationSec: r.duration_s, resolution: r.params.resolution ?? null, modelId: r.model, retryOf: r.retry_of,
       retried: r.retried, outputAssetId: r.output_asset_id, posterAssetId: r.poster_asset_id, createdAt: r.created_at, finishedAt: r.finished_at,
       // For the History card: the member's own words (a free prompt on Create video and Image Generation; elsewhere the prompt is composed, so the kept brief),
       // the inputs, the format and the caller's favourite.

@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 import { clearMyJobs, png, runViaApi, select, selectValue, signIn } from './support.test';
 
 // A page's History tab lists the member's jobs as Fash's History cards: the result, the member's words, the inputs, chips, and the actions.
@@ -241,4 +241,57 @@ test('the compact tray beside a page without its own History gives a failed job 
   await expect(done.getByRole('link', { name: 'Dùng lại' })).toHaveClass('job-reuse');
   await expect(done.getByRole('link', { name: 'Xem trong Thư viện' })).toHaveAttribute('href', '/library');
   for (const j of ((await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { id: string }[] }).jobs) await page.request.delete(`/api/jobs/${j.id}`); // the Library is shared by every spec
+});
+
+// A provider's refusal of the input photo (a real person) says so to everyone, offers no retry with the same photo, and fits a phone.
+const REFUSED = 'byteplus submit: HTTP 400 {"error":{"code":"InputImageSensitiveContentDetected.PrivacyInformation","message":"The request failed because the input image \'content[1]\' may contain real person. Request id: 0217","param":"content[1]","type":"BadRequest"}}';
+const REAL_PERSON = 'Mô hình này không nhận ảnh có người thật. Hãy dùng ảnh chỉ có sản phẩm, hoặc chọn mô hình khác.';
+const refusedJob = {
+  id: 'refused-job-1', status: 'failed', error: REFUSED, failureReason: 'real_person', isMock: false, feature: 'video', ratio: '9:16', durationSec: 5, resolution: null, modelId: 'mock-e2e', retryOf: null, retried: false,
+  outputAssetId: null, posterAssetId: null, createdAt: '2026-11-04T03:00:00.000Z', finishedAt: '2026-11-04T03:01:00.000Z', text: null, inputAssetIds: [], garments: null, format: null, favorite: false, estimateUsd: '0.5000',
+};
+const answerWithRefusal = (page: Page) => page.route(/\/api\/jobs\?mine/, (r) => r.fulfill({ json: { workerOffline: false, clips: { today: 0, cap: 20 }, jobs: [refusedJob] } }));
+const fits = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
+
+test('on a phone a Member reads the real-person sentence on the failed card, with Dùng lại but no Thử lại, and no raw error', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await signIn(page, 'loada');
+  await answerWithRefusal(page);
+  await page.goto('/create');
+  await page.getByRole('tab', { name: 'Lịch sử' }).click();
+  const card = page.getByRole('complementary', { name: 'Job của tôi' }).getByRole('listitem').filter({ hasText: 'Thất bại' });
+  await expect(card.getByText(REAL_PERSON)).toBeVisible();
+  await expect(card.getByRole('button', { name: 'Thử lại' })).toHaveCount(0);
+  await expect(card.getByRole('button', { name: 'Dùng lại' })).toBeVisible(); // beside the form it refills in place
+  await expect(card.getByText('InputImageSensitiveContentDetected')).toHaveCount(0);
+  expect(await fits(page)).toBe(true);
+});
+
+test('on a phone an Admin sees the provider code on the failed card and opens the raw error without overflow', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await signIn(page, 'admin');
+  await answerWithRefusal(page);
+  await page.goto('/create');
+  await page.getByRole('tab', { name: 'Lịch sử' }).click();
+  const card = page.getByRole('complementary', { name: 'Job của tôi' }).getByRole('listitem').filter({ hasText: 'Thất bại' });
+  await expect(card.getByText(REAL_PERSON)).toBeVisible();
+  await expect(card.getByText('byteplus · InputImageSensitiveContentDetected.PrivacyInformation')).toBeVisible();
+  await expect(card.locator('details')).not.toHaveAttribute('open', ''); // the raw error is folded
+  expect(await fits(page)).toBe(true);
+  await card.getByText('byteplus · InputImageSensitiveContentDetected.PrivacyInformation').click();
+  await expect(card.locator('details')).toHaveAttribute('open', '');
+  await expect(card.locator('details')).toContainText('Request id: 0217');
+  expect(await fits(page)).toBe(true);
+  await expect(card.getByRole('button', { name: 'Thử lại' })).toHaveCount(0);
+});
+
+test('the compact tray gives the refused job the same sentence and no Thử lại', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await signIn(page, 'loada');
+  await answerWithRefusal(page);
+  await page.goto('/account/sign-in-methods');
+  const failed = page.getByRole('complementary', { name: 'Job của tôi' }).getByRole('listitem').filter({ hasText: 'Thất bại' });
+  await expect(failed.getByText(REAL_PERSON)).toBeVisible();
+  await expect(failed.getByRole('button', { name: 'Thử lại' })).toHaveCount(0);
+  await expect(failed.getByRole('link', { name: 'Dùng lại' })).toBeVisible();
 });
