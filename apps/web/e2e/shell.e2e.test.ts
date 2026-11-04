@@ -105,7 +105,7 @@ test('at 1440 the sidebar keeps the live rhythm: the first item at 81 px, one ev
   expect((await icon.boundingBox())!.width).toBe(16);
   const badge = links.nth(4).locator('.nav-badge');
   await expect(badge).toHaveText('Mới');
-  await expect(badge).toHaveCSS('background-color', 'rgb(240, 68, 56)');
+  await expect(badge).toHaveCSS('background-color', 'rgb(217, 45, 32)');
   expect((await links.nth(4).locator('.nav-label').boundingBox())!.height).toBe(21); // one line, the pill beside it
   const pill = (await badge.boundingBox())!, row = (await links.nth(4).boundingBox())!;
   expect(pill.x + pill.width).toBeLessThanOrEqual(row.x + row.width);
