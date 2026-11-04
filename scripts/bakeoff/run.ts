@@ -46,6 +46,8 @@ export interface StageOptions {
   /** Image numbers; only for the extra set. */
   images?: number[];
   presetId?: string;
+  /** The replicate-2026-11 set only: exactly these (image, model) jobs, each model at its own thrift duration. */
+  jobs?: { image: number; model: string }[];
 }
 
 export interface StageResult {
@@ -86,7 +88,10 @@ function plan(deps: RunDeps, opts: StageOptions): { jobs: Planned[]; prompt: str
   if (!models.length) throw new Error('no model selected');
   let images: number[];
   let prompt = BAKEOFF_PRESET.prompt;
-  if (opts.set === 'extra') {
+  if (opts.set === 'replicate-2026-11') {
+    if (!opts.jobs?.length || opts.images || opts.presetId) throw new Error('the replicate-2026-11 set takes jobs only');
+    images = opts.jobs.map((j) => j.image);
+  } else if (opts.set === 'extra') {
     images = opts.images ?? [];
     if (!images.length || images.length > 5) throw new Error('extra needs 1 to 5 --images');
     if (models.length !== 1) throw new Error('extra runs one model');
@@ -94,21 +99,22 @@ function plan(deps: RunDeps, opts: StageOptions): { jobs: Planned[]; prompt: str
     if (!p || p.id === BAKEOFF_PRESET.id) throw new Error('extra needs --preset naming a preset other than the safe one');
     prompt = p.prompt;
   } else {
-    if (opts.images || opts.presetId) throw new Error(`--images and --preset apply only to the extra set`);
+    if (opts.images || opts.presetId || opts.jobs) throw new Error(`--images and --preset apply only to the extra set, jobs to replicate-2026-11`);
     images = defaultImages(opts.set);
   }
   for (const n of images) if (!Number.isInteger(n) || n < 1 || n > deps.inputs.images.length) throw new Error(`image ${n} is not in inputs.json`);
   const jobs: Planned[] = [];
-  for (const image of images) {
-    for (const model of models) {
-      if (model.provider === 'vertex') throw new Error('Vertex is not supported by the bake-off runner');
-      if (model.provider === 'byteplus') throw new Error('BytePlus is not supported by the bake-off runner');
-      const durationSec = model.thrift?.durationSec ?? fail(`${model.id} has no thrift settings`);
-      if (model.thrift!.resolution !== model.outputResolution) fail(`${model.id}: thrift resolution differs from the resolution the adapter sends`);
-      const bad = validateRequest(model, { ratio: THRIFT_RATIO, durationSec, imageCount: 1 });
-      if (bad) fail(`${model.id}: ${bad}`);
-      jobs.push({ key: { image, model: model.id, round: roundOf(opts.set) }, model, provider: model.provider, durationSec, estimateUsd: Number(estimateUsd(model.usdPerSecond, durationSec)) });
-    }
+  const pairs = opts.jobs
+    ? opts.jobs.map((j) => ({ image: j.image, model: deps.models.find((m) => m.id === j.model) ?? fail(`unknown model ${j.model}`) }))
+    : images.flatMap((image) => models.map((model) => ({ image, model })));
+  for (const { image, model } of pairs) {
+    if (model.provider === 'vertex') throw new Error('Vertex is not supported by the bake-off runner');
+    if (model.provider === 'byteplus') throw new Error('BytePlus is not supported by the bake-off runner');
+    const durationSec = model.thrift?.durationSec ?? fail(`${model.id} has no thrift settings`);
+    if (model.thrift!.resolution !== model.outputResolution) fail(`${model.id}: thrift resolution differs from the resolution the adapter sends`);
+    const bad = validateRequest(model, { ratio: THRIFT_RATIO, durationSec, imageCount: 1 });
+    if (bad) fail(`${model.id}: ${bad}`);
+    jobs.push({ key: { image, model: model.id, round: roundOf(opts.set) }, model, provider: model.provider, durationSec, estimateUsd: Number(estimateUsd(model.usdPerSecond, durationSec)) });
   }
   // One job per key: a duplicate would be submitted twice before the log could show the first.
   if (new Set(jobs.map((j) => keyId(j.key))).size !== jobs.length) throw new Error('the plan has duplicate job keys');
@@ -165,32 +171,38 @@ async function runLocked(deps: RunDeps, opts: StageOptions): Promise<StageResult
   const toSubmit = jobs.filter((p) => submittable(current(p)?.status));
   if (toSubmit.length) {
     const falCost = toSubmit.filter((p) => p.model.provider === 'fal').reduce((a, p) => a + p.estimateUsd, 0);
-    try {
-      lastBalance = await deps.falBalance();
-    } catch (e) {
-      outcome = 'stuck: not funded';
-      reason = `the fal balance could not be read: ${(e as Error).message}`;
+    // A stage with no fal job (the Replicate round) neither reads nor gates on the fal balance: the log alone is its spend.
+    const usesFal = toSubmit.some((p) => p.model.provider === 'fal');
+    if (usesFal) {
+      try {
+        lastBalance = await deps.falBalance();
+      } catch (e) {
+        outcome = 'stuck: not funded';
+        reason = `the fal balance could not be read: ${(e as Error).message}`;
+      }
+      if (lastBalance !== null && !(lastBalance >= falCost + margin)) {
+        outcome = 'stuck: not funded';
+        reason = `fal balance $${lastBalance} is not a number at or above the stage's fal cost $${falCost.toFixed(2)} plus $${margin.toFixed(2)}`;
+      }
     }
-    if (lastBalance !== null && !(lastBalance >= falCost + margin)) {
-      outcome = 'stuck: not funded';
-      reason = `fal balance $${lastBalance} is not a number at or above the stage's fal cost $${falCost.toFixed(2)} plus $${margin.toFixed(2)}`;
-    }
-    if (lastBalance !== null && outcome === 'complete') {
-      const baseline = readBaseline(deps.outDir) ?? writeBaseline(deps.outDir, lastBalance, now());
+    if ((lastBalance !== null || !usesFal) && outcome === 'complete') {
+      const baseline = usesFal ? (readBaseline(deps.outDir) ?? writeBaseline(deps.outDir, lastBalance!, now())) : 0;
       for (const p of toSubmit) {
-        let have: number;
-        try {
-          have = await deps.falBalance();
-        } catch (e) {
-          outcome = 'stuck: not funded';
-          reason = `the fal balance could not be read: ${(e as Error).message}`;
-          break;
+        let have = 0;
+        if (usesFal) {
+          try {
+            have = await deps.falBalance();
+          } catch (e) {
+            outcome = 'stuck: not funded';
+            reason = `the fal balance could not be read: ${(e as Error).message}`;
+            break;
+          }
+          lastBalance = have;
         }
-        lastBalance = have;
         const s = spend(readLines(deps.outDir));
         // The larger of the job log and the balance fall since preflight (fal) plus the Replicate log; a top-up only lowers the fall.
         // Written so that a NaN anywhere stops the stage instead of passing the check.
-        const spent = Math.max(s.total, baseline - have + (s.byProvider.replicate ?? 0));
+        const spent = usesFal ? Math.max(s.total, baseline - have + (s.byProvider.replicate ?? 0)) : s.total;
         if (!(spent + p.estimateUsd <= cap + 1e-9)) {
           outcome = 'stopped: cap';
           reason = `spent $${spent} plus $${p.estimateUsd.toFixed(2)} for ${keyId(p.key)} would pass the $${cap} cap, or the amounts are not numbers`;

@@ -109,16 +109,19 @@ export function spend(lines: JobLine[]): { total: number; byProvider: Record<str
   return { total, byProvider };
 }
 
-export type SetName = 'canary' | 'half-1' | 'half-2' | 'extra';
-export const SET_NAMES: SetName[] = ['canary', 'half-1', 'half-2', 'extra'];
-const SET_IMAGES: Record<Exclude<SetName, 'extra'>, number[]> = { canary: [1], 'half-1': [1, 2, 3, 4, 5], 'half-2': [6, 7, 8, 9, 10] };
+/** 'replicate-2026-11' is the one-off Replicate round (replicate-round.ts): its jobs come from the caller, not from a fixed list of images. */
+export type SetName = 'canary' | 'half-1' | 'half-2' | 'extra' | 'replicate-2026-11';
+export const SET_NAMES: SetName[] = ['canary', 'half-1', 'half-2', 'extra', 'replicate-2026-11'];
+const SET_IMAGES: Partial<Record<SetName, number[]>> = { canary: [1], 'half-1': [1, 2, 3, 4, 5], 'half-2': [6, 7, 8, 9, 10] };
 
 /** half-1 contains the canary image, whose jobs are already in the log and are polled, not resubmitted. */
-export const inSet = (set: SetName, k: JobKey): boolean =>
-  set === 'extra' ? k.round === 'extra' : k.round === 'bakeoff' && SET_IMAGES[set].includes(k.image);
+export const inSet = (set: SetName, k: JobKey): boolean => {
+  const images = SET_IMAGES[set];
+  return images ? k.round === 'bakeoff' && images.includes(k.image) : k.round === roundOf(set);
+};
 
-export const roundOf = (set: SetName): string => (set === 'extra' ? 'extra' : 'bakeoff');
-export const defaultImages = (set: Exclude<SetName, 'extra'>): number[] => SET_IMAGES[set];
+export const roundOf = (set: SetName): string => (SET_IMAGES[set] ? 'bakeoff' : set);
+export const defaultImages = (set: SetName): number[] => SET_IMAGES[set] ?? [];
 
 export function parseSet(v: string | undefined): SetName {
   if (!SET_NAMES.includes(v as SetName)) throw new Error(`--set must be one of ${SET_NAMES.join(', ')}`);

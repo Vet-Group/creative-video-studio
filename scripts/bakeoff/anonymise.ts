@@ -28,8 +28,10 @@ export interface AnonymiseOpts {
   newId?: () => string;
   /** Test hook; the default shuffles with crypto randomness. */
   shuffle?: <T>(xs: T[]) => T[];
-  /** The length every blind clip is cut or padded to; default the thrift duration. */
-  durationSec?: number;
+  /** The length every blind clip is cut or padded to, or a function of the clip's model; default the thrift duration. */
+  durationSec?: number | ((model: string) => number);
+  /** The folder holding jobs.jsonl and clips/; default `<root>/out`. */
+  outDir?: string;
 }
 
 /** Fisher-Yates with crypto randomness; returns a new array. */
@@ -57,11 +59,10 @@ export async function anonymise(o: AnonymiseOpts): Promise<ClipMap> {
   if (!outside(o.root, o.mapPath)) throw new Error('--map must be outside the cvs-bakeoff folder, where a judge could read it');
   const setDir = join(o.root, 'blind', o.set);
   if (existsSync(setDir) && readdirSync(setDir).length) throw new Error(`${setDir} already holds clips; the id map for them would be lost`);
-  const outDir = join(o.root, 'out');
+  const outDir = o.outDir ?? join(o.root, 'out');
   const done = [...latest(readLines(outDir)).values()].filter((l) => l.status === 'succeeded' && l.clip && inSet(o.set, l));
   if (!done.length) throw new Error(`no succeeded clips for set ${o.set}`);
   const newId = o.newId ?? (() => `clip-${randomBytes(4).toString('hex')}`);
-  const secs = o.durationSec ?? THRIFT_SEC;
   const map: ClipMap = { set: o.set, clips: {} };
   mkdirSync(dirname(o.mapPath), { recursive: true });
   const writeMap = (): void => writeFileSync(o.mapPath, `${JSON.stringify(map, null, 2)}\n`);
@@ -75,6 +76,7 @@ export async function anonymise(o: AnonymiseOpts): Promise<ClipMap> {
     const dir = join(setDir, id);
     mkdirSync(dir, { recursive: true });
     const clip = join(dir, 'clip.mp4');
+    const secs = typeof o.durationSec === 'function' ? o.durationSec(l.model) : (o.durationSec ?? THRIFT_SEC);
     // Every blind clip gets the same size, frame rate and length, whatever the model returned: fit into 720x1280 with bars, 24 fps,
     // the last frame held if the clip is short, cut at the thrift duration. Container and stream metadata are dropped.
     await ffmpeg([
