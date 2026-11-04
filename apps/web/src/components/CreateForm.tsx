@@ -15,7 +15,7 @@ import { AudioSwitch } from './AudioSwitch';
 import { CardMedia } from './CardMedia';
 import { EnhanceToggle } from './EnhanceToggle';
 import { Icon } from './Icon';
-import { copyError, copySamples, GALLERY_SIZE_KEY, HISTORY_SIZE_KEY, photoImg, RunSummary, SizeSlider, Slot, uploadError, uploadImages, useSize } from './image-tools';
+import { copyError, copySamples, GALLERY_SIZE_KEY, HISTORY_SIZE_KEY, photoImg, RunSummary, SizeSlider, Slot, UploadedPhotos, uploadError, uploadImages, useSize } from './image-tools';
 import { FormContext, type Photo, Tap, useApplier, useHasHistory, useJobs, useRecreated } from './jobs';
 import { Modal } from './Modal';
 import { ModelPicker } from './ModelPicker';
@@ -556,6 +556,9 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
                 </ul>
               )}
             </div>
+            <div className="dropzone-foot">
+              <UploadedPhotos taken={images} disabled={!hydrated || busy || images.length >= maxImages} onPick={(img) => (setError(''), setImages((cur) => (cur.length < maxImages ? [...cur, img] : cur)))} />
+            </div>
             {chosen?.endFrame && (
               <Slot
                 label="Khung hình cuối"
@@ -573,6 +576,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
                     .finally(() => setBusy(false));
                 }}
                 onRemove={() => setEndFrame(null)}
+                onPick={setEndFrame}
               />
             )}
             {takes && (

@@ -14,7 +14,7 @@ const { auth, pool } = await import('@/lib/auth');
 const { MAX_BODY } = await import('@/lib/assets');
 const { signDownloadToken } = await import('@/lib/download-token');
 const { bucketName, ensureBucket, s3 } = await import('@/lib/storage');
-const { POST } = await import('./route');
+const { POST, UPLOADS_LIMIT } = await import('./route');
 const { GET: GET_DETAILS } = await import('./[id]/route');
 const { GET: GET_CONTENT } = await import('./[id]/content/route');
 const { GET: GET_DOWNLOAD } = await import('./[id]/download/route');
@@ -466,5 +466,61 @@ describe('GET /api/assets?recent=marketing-product', () => {
     expect(((await (await recent(otherCookie)).json()) as { assets: unknown[] }).assets).toEqual([]);
     expect((await recent('')).status).toBe(401);
     expect((await recent(ownerCookie, '?recent=other')).status).toBe(400);
+  });
+});
+
+describe('GET /api/assets?recent=uploads', () => {
+  let cookie = '';
+  let userId = '';
+  beforeAll(async () => {
+    userId = (await auth.api.createUser({ body: { email: 'uploader@example.test', name: 'Uploader', password: PASSWORD, role: 'member' } })).user.id;
+    cookie = await signIn('uploader@example.test');
+  });
+  const uploads = async (who: string) => {
+    const { GET } = await import('./route');
+    const res = await GET(new Request(`${BASE}?recent=uploads`, { headers: { cookie: who } }));
+    expect(res.status).toBe(200);
+    return ((await res.json()) as { assets: { id: string; filename: string }[] }).assets;
+  };
+  /** Sets an asset's upload time `minutesAgo` back, so the order does not hang on clock ticks. */
+  const age = (id: string, minutesAgo: number) => pool.query('update assets set created_at = now() - make_interval(mins => $2) where id = $1', [id, minutesAgo]);
+  async function job(inputs: string[], { deleted = false, endAssetId }: { deleted?: boolean; endAssetId?: string } = {}) {
+    await pool.query(
+      `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, status, feature, params, deleted_at)
+       values ($1, $2, 'team-unassigned', 'fal-test', 'fal', 'p', '9:16', 5, $3, 'succeeded', 'marketing', $4, $5)`,
+      [`upl-${randomBytes(4).toString('hex')}`, userId, inputs, endAssetId ? { endAssetId } : {}, deleted ? new Date() : null],
+    );
+  }
+
+  test("lists the caller's own live photos newest first, without videos, audio, outputs, deleted files or photos only deleted jobs used", async () => {
+    const up = (name: string) => uploadOne(cookie, png(64), name);
+    const [old, mid, fresh, gone, onlyDeleted, endOnlyDeleted, kept] = [await up('old.png'), await up('mid.png'), await up('fresh.png'), await up('gone.png'), await up('dead.png'), await up('end.png'), await up('kept.png')];
+    const video = await uploadOne(cookie, mp4(3000), 'clip.mp4');
+    const audio = await uploadOne(cookie, wav(2500), 'voice.wav');
+    await uploadOne(ownerCookie, png(64), 'not-mine.png');
+    for (const [id, ago] of [[old, 50], [mid, 40], [kept, 30], [fresh, 10]] as const) await age(id, ago);
+    await pool.query('update assets set deleted_at = now() where id = $1', [gone]);
+    await pool.query(`update assets set kind = 'output' where id = $1`, [await up('result.png')]);
+    await job([onlyDeleted], { deleted: true });
+    await job([mid], { deleted: true, endAssetId: endOnlyDeleted });
+    await job([kept], { deleted: true });
+    await job([kept, mid]); // a live job still runs from both
+    const list = await uploads(cookie);
+    expect(list.map((a) => a.filename)).toEqual(['fresh.png', 'kept.png', 'mid.png', 'old.png']);
+    expect(list.map((a) => a.id)).not.toContain(video);
+    expect(list.map((a) => a.id)).not.toContain(audio);
+  });
+
+  test(`stops at ${UPLOADS_LIMIT}, the oldest left out, and asks for a session`, async () => {
+    await pool.query(
+      `insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, created_at)
+       select 'bulk-' || n, $1, 'input', 'assets/bulk-' || n, 'bulk-' || n || '.png', 'image/png', 64, now() - make_interval(days => n) from generate_series(1, $2::int) n`,
+      [userId, UPLOADS_LIMIT + 1],
+    );
+    const list = await uploads(cookie);
+    expect(list).toHaveLength(UPLOADS_LIMIT);
+    expect(list.map((a) => a.id)).not.toContain(`bulk-${UPLOADS_LIMIT + 1}`);
+    const { GET } = await import('./route');
+    expect((await GET(new Request(`${BASE}?recent=uploads`))).status).toBe(401);
   });
 });
