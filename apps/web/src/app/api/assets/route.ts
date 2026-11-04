@@ -24,16 +24,34 @@ const RECENT: Record<string, { feature: string; at: number }> = {
   'try-on-model': { feature: 'try_on', at: 1 },
 };
 
+/** How many photos `?recent=uploads` lists. */
+export const UPLOADS_LIMIT = 60;
+/** SQL for every image a job (alias `j`) ran from: its inputs and Create video's end frame, as the worker's purge counts them. */
+const imagesOf = (j: string) => `${j}.input_asset_ids || coalesce(string_to_array(${j}.params->>'endAssetId', ','), '{}')`;
+
 /**
  * `?recent=marketing-product`: the caller's own product photos from their UGC Marketing Studio jobs (the second input), for the product slot's My products
  * dialog (Fash's My Products); `?recent=try-on-model`: the model photos of their Try On jobs (the first input), for the model picker's My models. Newest use
  * first, each once, at most 12. Advanced references and deleted files are left out.
+ * `?recent=uploads`: every photo the caller uploaded on any page, for the shared uploaded-photos picker; newest upload first, at most UPLOADS_LIMIT.
+ * Deleted files, videos and audio are left out, and so is a photo that only deleted jobs ran from: the purge removes it once those are purged.
  */
 export async function GET(request: Request) {
   const g = await guard(request, 'member');
   if (g.error) return g.error;
   const key = new URL(request.url).searchParams.get('recent') ?? '';
-  if (!Object.hasOwn(RECENT, key)) return Response.json({ error: `?recent= must be one of ${Object.keys(RECENT).join(', ')}` }, { status: 400 });
+  if (key === 'uploads') {
+    const { rows } = await pool.query(
+      `select a.id, a.filename from assets a
+        where a.owner_id = $1 and a.kind = 'input' and a.deleted_at is null and a.mime like 'image/%'
+          and (exists (select 1 from jobs j where a.id = any(${imagesOf('j')}) and j.deleted_at is null)
+            or not exists (select 1 from jobs j where a.id = any(${imagesOf('j')})))
+        order by a.created_at desc, a.id limit $2`,
+      [g.session.user.id, UPLOADS_LIMIT],
+    );
+    return Response.json({ assets: rows });
+  }
+  if (!Object.hasOwn(RECENT, key)) return Response.json({ error: `?recent= must be one of ${[...Object.keys(RECENT), 'uploads'].join(', ')}` }, { status: 400 });
   const recent = RECENT[key]!;
   const { rows } = await pool.query(
     `select id, filename from (

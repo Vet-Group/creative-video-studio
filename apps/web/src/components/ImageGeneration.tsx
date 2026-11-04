@@ -10,7 +10,7 @@ import { useHydrated } from '@/lib/use-hydrated';
 import { useRecall } from '@/lib/use-recall';
 import { About } from './About';
 import { BrandPicker } from './BrandKit';
-import { copyError, Gallery, type Img, photoImg, RATIO_LABEL, THINKING_LABEL, uploadError, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
+import { copyError, Gallery, type Img, photoImg, RATIO_LABEL, THINKING_LABEL, UploadedPhotos, uploadError, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
 import { EnhanceToggle } from './EnhanceToggle';
 import { Icon } from './Icon';
 import { FormContext, type Photo, useApplier, useJobs } from './jobs';
@@ -194,6 +194,13 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
                 <button type="button" className="bar-add" aria-label="Thêm ảnh tham chiếu" disabled={!hydrated || busy} onClick={() => input.current?.click()}>
                   <Icon name="plus" size={16} />
                 </button>
+              </li>
+            )}
+            {images.length < max && (
+              <li>
+                <UploadedPhotos className="bar-add" name="Ảnh đã tải" taken={images} disabled={!hydrated || busy} onPick={(img) => setImages((cur) => (cur.length < max ? [...cur, img] : cur))}>
+                  <Icon name="library" size={16} />
+                </UploadedPhotos>
               </li>
             )}
           </ul>

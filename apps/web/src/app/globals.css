@@ -923,6 +923,13 @@ dialog.admin-modal { width: min(36rem, calc(100vw - 2rem)); }
 .field-head { position: relative; }
 .field-head .suggestions { left: 0; right: 0; width: auto; }
 .field-head .suggest { position: static; }
+/* The uploaded-photos picker: a quiet link on a slot's label line, or in Create's drop zone, that opens the member's earlier uploads. */
+.uploads-link { font-size: 12px; line-height: 18px; white-space: nowrap; }
+.uploads-link:disabled { color: var(--text-muted); text-decoration: none; cursor: default; }
+/* Create's link sits over the drop zone's bottom-right corner from a zero-height row after it, so the form keeps its height and a drop on its dialog never reaches the zone. */
+.dropzone-foot { position: relative; z-index: 1; height: 0; }
+.dropzone-foot .uploads-link { position: absolute; right: 12px; bottom: 10px; }
+.dropzone[data-filled='true'] .dropzone-pick { padding-right: 84px; } /* the bottom hint keeps clear of the link */
 /* In the bar, a column at the end of the prompt row, as tall as the one-row bar's textarea, so the bar keeps its height. */
 .imagebar .prompt-tools { flex: none; display: grid; grid-template-columns: repeat(2, auto); gap: 4px; } /* two by two: as tall as the 56 px text */
 .imagebar .prompt-tools .icon-button { display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 1px solid var(--field-border); border-radius: 50%; background: var(--surface); color: var(--ink); }
@@ -1760,6 +1767,10 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 /* A field head with a link is as tall as its 21 px label and sits 4 px over its box, as on Fash's Prompt. */
 .form-scroll:has(> .marketing-head) .field:has(> .field-head) { gap: 4px; }
 .form-scroll:has(> .marketing-head) .field-head { height: 21px; }
+/* A half-width slot names itself inside, so its uploaded-photos link sits in the box's bottom-right corner (clear of a photo's remove button and name chip) instead of adding a label line. */
+.app-slots[data-two='true'] > .field:has(> .field-head) { position: relative; }
+.app-slots[data-two='true'] > .field > .field-head { position: absolute; right: 8px; bottom: 8px; z-index: 2; height: auto; }
+.app-slots[data-two='true'] > .field .uploads-link { padding: 2px 8px; border-radius: 10px; background: var(--surface); }
 /* As on Fash (measured 2026-10-29): the form scrolls without a scrollbar, so a short window keeps the full 272 px; the ratio and duration pills set a 12 px clock or an 8x14 ratio box 6 px before the value and a 10 px chevron. */
 .form-scroll:has(> .marketing-head) { scrollbar-width: none; }
 .form-scroll:has(> .marketing-head) .field-row .select-trigger { gap: 6px; }

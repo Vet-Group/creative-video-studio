@@ -1,7 +1,7 @@
 'use client';
 // What the Try On and Image Generation pages share: the image-model picker data, the choice of model, ratio and resolution, the upload slot,
 // the tab strip and the gallery of the company's outputs.
-import { type DragEvent, type KeyboardEvent, useEffect, useId, useRef, useState } from 'react';
+import { type DragEvent, type KeyboardEvent, type ReactNode, useEffect, useId, useRef, useState } from 'react';
 import Link from 'next/link';
 import { api, ApiError, type Clip, sendJson } from '@/lib/api';
 import { dropRefillQuery, exampleFrom, refillFrom, reuseHref } from '@/lib/reuse';
@@ -230,8 +230,9 @@ export async function uploadImages(files: File[], kind: UploadKind = 'image'): P
  * One labelled upload slot: its thumbnails with a remove button each, and a tile that opens the file picker until the slot is full.
  * `samples` (sample names, lib/samples.ts) show while the slot is empty, as on the live Try On; a click hands the name to `onSample`, which copies it on the server.
  * `icon` is the empty slot's icon: a picture by default, a plus on Advanced's wide slot, as on the live page.
+ * `onPick` adds the "Ảnh đã tải" link to the label's line while the slot has room (a one-photo slot always: a pick replaces its photo).
  */
-export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRemove, samples = [], onSample, icon = 'image', onBrowse }: { label: string; empty: string; inputLabel: string; images: Img[]; max: number; busy: boolean; onAdd: (files: File[]) => void; onRemove: (id: string) => void; samples?: string[]; onSample?: (name: string) => void; icon?: IconName; onBrowse?: () => void }) {
+export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRemove, samples = [], onSample, icon = 'image', onBrowse, onPick }: { label: string; empty: string; inputLabel: string; images: Img[]; max: number; busy: boolean; onAdd: (files: File[]) => void; onRemove: (id: string) => void; samples?: string[]; onSample?: (name: string) => void; icon?: IconName; onBrowse?: () => void; onPick?: (img: Img) => void }) {
   const hydrated = useHydrated();
   const input = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
@@ -249,11 +250,21 @@ export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRem
     setOver(false);
     if (hydrated && !full && !busy) add([...e.dataTransfer.files]);
   }
+  const name = (
+    <span id={labelId} className="field-label">
+      {label}
+    </span>
+  );
   return (
     <div className="field">
-      <span id={labelId} className="field-label">
-        {label}
-      </span>
+      {onPick ? (
+        <div className="field-head">
+          {name}
+          {(!full || max === 1) && <UploadedPhotos name={`Ảnh đã tải cho ${label}`} taken={images} disabled={!hydrated || busy} onPick={(img) => (setCut(0), onPick(img))} />}
+        </div>
+      ) : (
+        name
+      )}
       <div className="slot" role="group" aria-labelledby={labelId} data-over={over} data-one={(max === 1 && images.length === 1) || undefined} onDragOver={(e) => (e.preventDefault(), setOver(true))} onDragLeave={() => setOver(false)} onDrop={onDrop}>
         <input
           ref={input}
@@ -407,8 +418,8 @@ export function SizeSlider({ size, last = 2, onChange }: { size: number; last?: 
  * `samples` names the fixed sample tiles shown first: the uploaded samples `<samples><n>.jpg` (or `.mp4` with a `.jpg` poster for `video`). */
 type PhotoTile = { key: string; src: string; label: string; pick: () => void };
 
-/** A photo dialog of a slot, as on Fash (Marketing's model and product, Try On's model, garments and background): the photos to pick, 4 per row of 3:4 portraits, after an upload tile that also takes a dropped photo. A tile that opens a deeper list (a model's poses, a category) sets the dialog again after it closes; `onBack` returns. */
-export function PhotoDialog({ open, title, sub, tiles, busy, onFile, onClose, onBack, mine, groups = [] }: { open: boolean; title: string; sub?: string; tiles: PhotoTile[]; busy: boolean; onFile: (files: File[]) => void; onClose: () => void; onBack?: () => void; mine?: { title: string; tiles: PhotoTile[] }; groups?: { title: string; tiles: PhotoTile[] }[] }) {
+/** A photo dialog of a slot, as on Fash (Marketing's model and product, Try On's model, garments and background): the photos to pick, 4 per row of 3:4 portraits, after an upload tile that also takes a dropped photo (with `onFile`). A tile that opens a deeper list (a model's poses, a category) sets the dialog again after it closes; `onBack` returns. */
+export function PhotoDialog({ open, title, sub, tiles, busy, onFile, onClose, onBack, mine, groups = [] }: { open: boolean; title: string; sub?: string; tiles: PhotoTile[]; busy: boolean; onFile?: (files: File[]) => void; onClose: () => void; onBack?: () => void; mine?: { title: string; tiles: PhotoTile[] }; groups?: { title: string; tiles: PhotoTile[] }[] }) {
   const tile = (t: PhotoTile) => (
     <button key={t.key} type="button" aria-label={t.label} disabled={busy} onClick={() => (onClose(), t.pick())}>
       {open && <img src={t.src} alt="" />}
@@ -418,7 +429,7 @@ export function PhotoDialog({ open, title, sub, tiles, busy, onFile, onClose, on
   const ids = { head: useId(), upload: useId(), hint: useId() };
   // A drop can carry any file and still lands while busy, so it is checked here; the picker already filters on accept.
   const take = (photo: File | undefined) => {
-    if (photo && !busy) (onClose(), onFile([photo]));
+    if (photo && !busy) (onClose(), onFile?.([photo]));
   };
   return (
     <Modal open={open} onClose={onClose} label={title} className="choice-dialog">
@@ -432,22 +443,24 @@ export function PhotoDialog({ open, title, sub, tiles, busy, onFile, onClose, on
       </h2>
       {sub && <p className="modal-sub">{sub}</p>}
       <div className="choice-grid model-grid">
-        <label
-          className="model-upload"
-          data-over={over || undefined}
-          onDragOver={(e) => (e.preventDefault(), setOver(true))}
-          onDragLeave={() => setOver(false)}
-          onDrop={(e) => (e.preventDefault(), setOver(false), take([...e.dataTransfer.files].find((f) => f.type.startsWith('image/'))))}
-        >
-          <Icon name="upload" size={20} />
-          <span className="model-upload-title" id={ids.upload}>
-            Tải lên ảnh của bạn
-          </span>
-          <span className="model-upload-hint" id={ids.hint}>
-            hoặc kéo thả ảnh vào đây
-          </span>
-          <input type="file" accept="image/*" className="sr-only" aria-labelledby={ids.upload} aria-describedby={ids.hint} disabled={busy} onChange={(e) => take(e.target.files?.[0])} />
-        </label>
+        {onFile && (
+          <label
+            className="model-upload"
+            data-over={over || undefined}
+            onDragOver={(e) => (e.preventDefault(), setOver(true))}
+            onDragLeave={() => setOver(false)}
+            onDrop={(e) => (e.preventDefault(), setOver(false), take([...e.dataTransfer.files].find((f) => f.type.startsWith('image/'))))}
+          >
+            <Icon name="upload" size={20} />
+            <span className="model-upload-title" id={ids.upload}>
+              Tải lên ảnh của bạn
+            </span>
+            <span className="model-upload-hint" id={ids.hint}>
+              hoặc kéo thả ảnh vào đây
+            </span>
+            <input type="file" accept="image/*" className="sr-only" aria-labelledby={ids.upload} aria-describedby={ids.hint} disabled={busy} onChange={(e) => take(e.target.files?.[0])} />
+          </label>
+        )}
         {tiles.map(tile)}
       </div>
       {/* Headed groups of photos (Jewelry Try-On's templates), then the member's own photos of this slot under their own heading, as Fash's My Models. */}
@@ -461,6 +474,36 @@ export function PhotoDialog({ open, title, sub, tiles, busy, onFile, onClose, on
           ),
       )}
     </Modal>
+  );
+}
+
+/**
+ * "Ảnh đã tải": a button that opens the member's own photos uploaded on any page (GET /api/assets?recent=uploads, newest first), shared by Create, Try On,
+ * Image Generation and Marketing Studio. A pick hands the asset to `onPick` as an upload would (the same id, nothing sent again); photos already in the
+ * form (`taken`) are left out, as a job takes each input once. The list is read on every open, so a photo just uploaded elsewhere is there.
+ */
+export function UploadedPhotos({ name, taken, disabled, onPick, className = 'link-button uploads-link', children = 'Ảnh đã tải' }: { name?: string; taken: Img[]; disabled?: boolean; onPick: (img: Img) => void; className?: string; children?: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const [list, setList] = useState<Img[] | 'failed' | null>(null);
+  function show() {
+    setOpen(true);
+    setList(null);
+    api<{ assets: Img[] }>('/api/assets?recent=uploads').then(
+      (r) => setList(r.assets),
+      () => setList('failed'),
+    );
+  }
+  const shown = Array.isArray(list) ? list.filter((a) => !taken.some((t) => t.id === a.id)) : [];
+  const sub =
+    list === null ? 'Đang tải ảnh...' : list === 'failed' ? 'Không tải được ảnh đã tải. Hãy đóng và mở lại.' : shown.length === 0 ? 'Chưa có ảnh nào khác. Ảnh bạn tải lên ở mọi trang sẽ hiện ở đây.' : 'Ảnh bạn đã tải lên ở mọi trang, mới nhất trước.';
+  return (
+    <>
+      {/* An icon-only button (Image Generation's bar) takes its name as a tooltip too. */}
+      <button type="button" className={className} aria-label={name} title={typeof children === 'string' ? undefined : name} aria-haspopup="dialog" disabled={disabled} onClick={show}>
+        {children}
+      </button>
+      <PhotoDialog open={open} title="Ảnh đã tải" sub={sub} tiles={shown.map((a) => ({ key: a.id, src: `/api/assets/${a.id}/content`, label: `Dùng ${a.filename}`, pick: () => onPick(a) }))} busy={false} onClose={() => setOpen(false)} />
+    </>
   );
 }
 
