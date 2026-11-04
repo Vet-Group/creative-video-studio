@@ -367,7 +367,7 @@ export function ModelPicker({ models: given, value, onChange }: { models: ModelO
               ) : (
                 <>
                   {group('Mô hình phù hợp', true)}
-                  {group('Không hỗ trợ lựa chọn này', false)}
+                  {group('Không dùng được lúc này', false)}
                 </>
               )}
               {rows.length === 0 && <p className="model-empty">Không có mô hình nào khớp.</p>}
