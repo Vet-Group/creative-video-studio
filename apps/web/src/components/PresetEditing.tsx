@@ -3,8 +3,10 @@
 // members' proposals; any other member proposes a change or a new preset, and one editor's approval applies it.
 import { useEffect, useId, useState } from 'react';
 import { api, ApiError, errorText, sendJson } from '@/lib/api';
-import { reloadSamples } from '@/lib/use-samples';
+import { reloadSamples, useSamples } from '@/lib/use-samples';
+import { Icon } from './Icon';
 import { Modal } from './Modal';
+import { useSuggest } from './Suggestions';
 
 /** A preset as GET /api/presets gives it: id and label to a member; prompt, enabled and sortOrder too to an editor. */
 export interface PresetRow {
@@ -49,7 +51,17 @@ export function PresetForm({ draft, onClose, onSaved, onWritten }: { draft: Pres
   // The preset as last saved: the draft's, then what a save returned, so a second Save after a failed upload changes it rather than adding another.
   const [preset, setPreset] = useState<PresetRow | null>(null);
   const propose = draft?.propose === true;
+  // The prompt-from-video button: a vision LLM reads the preset's saved clip and its answer fills the prompt field; nothing is saved before Save.
+  const have = useSamples();
+  const fromVideo = useSuggest();
+  const [askedFor, setAskedFor] = useState<string | null>(null); // the preset asked about, so a late answer never fills another preset's form
+  const clipSaved = preset !== null && have.has(`preset-${preset.id}.mp4`);
+  const answer = fromVideo.options[0];
   useEffect(() => {
+    if (answer && askedFor !== null && askedFor === preset?.id) setPrompt(answer);
+  }, [answer, askedFor, preset?.id]);
+  useEffect(() => {
+    setAskedFor(null);
     if (!draft) return;
     setPreset(draft.preset);
     setLabel(draft.preset?.label ?? '');
@@ -115,10 +127,41 @@ export function PresetForm({ draft, onClose, onSaved, onWritten }: { draft: Pres
         Tên mẫu
       </label>
       <input id={`${id}-label`} value={label} maxLength={100} onChange={(e) => setLabel(e.target.value)} />
-      <label className="field-label" htmlFor={`${id}-prompt`}>
-        {propose && editing ? 'Mô tả chuyển động mới (tiếng Anh)' : 'Mô tả chuyển động (tiếng Anh)'}
-      </label>
+      <div className="field-head">
+        <label className="field-label" htmlFor={`${id}-prompt`}>
+          {propose && editing ? 'Mô tả chuyển động mới (tiếng Anh)' : 'Mô tả chuyển động (tiếng Anh)'}
+        </label>
+        {!propose && editing && (
+          <button
+            type="button"
+            className="suggest-button"
+            aria-describedby={`${id}-from-video`}
+            disabled={fromVideo.busy || !clipSaved || video !== null}
+            onClick={() => {
+              setAskedFor(preset!.id);
+              void fromVideo.run({ field: 'video', preset: preset!.id, text: '' });
+            }}
+          >
+            <Icon name="wand" size={12} />
+            {fromVideo.busy ? 'Đang phân tích video…' : 'Gợi ý prompt từ video'}
+          </button>
+        )}
+      </div>
       <textarea id={`${id}-prompt`} rows={4} value={prompt} placeholder={propose && editing ? 'Để trống nếu giữ nguyên mô tả hiện tại' : undefined} onChange={(e) => setPrompt(e.target.value)} />
+      {!propose && editing && (
+        <p className="help" id={`${id}-from-video`}>
+          {!clipSaved
+            ? 'Mẫu này chưa có video mẫu để gợi ý mô tả.'
+            : video !== null
+              ? 'Bấm Lưu để tải video mới lên trước khi gợi ý từ video.'
+              : 'AI xem video mẫu đã lưu và điền mô tả, có thể mất vài chục giây. Mô tả chỉ được lưu khi bạn bấm Lưu.'}
+        </p>
+      )}
+      {fromVideo.error && askedFor !== null && (
+        <p className="error" role="alert">
+          {fromVideo.error}
+        </p>
+      )}
       {propose ? (
         <>
           <label className="field-label" htmlFor={`${id}-note`}>

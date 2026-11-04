@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 import { ENHANCE_MODEL, ENHANCE_URL, OPENAI_URL } from './enhance';
 import {
   createFalSuggester, createOpenAiSuggester, cutTo, DIRECTIONS, lengthenPrompt, modelNote, parseOption, PROMPT_SYSTEM, PROMPT_TASKS, SCENE_SYSTEM, SUGGEST_SYSTEM,
-  suggestPrompt, targetRange, TRANSLATE_SYSTEM,
+  parseVideoAnswer, PERSON_KEEP, PRODUCT_KEEP, suggestPrompt, targetRange, TRANSLATE_SYSTEM, VIDEO_SYSTEM, videoPrompt,
 } from './suggest';
 
 const answer = (body: unknown, status = 200) => Promise.resolve(new Response(JSON.stringify(body), { status }));
@@ -161,4 +161,48 @@ test('OpenAI: a non-JSON or empty answer, or an HTTP error, fails the run', asyn
   await expect(createOpenAiSuggester({ apiKey: 'k', fetch: () => chat('Here are some ideas') })(input)).rejects.toThrow('not JSON');
   await expect(createOpenAiSuggester({ apiKey: 'k', fetch: () => chat(null) })(input)).rejects.toThrow('not JSON');
   await expect(createOpenAiSuggester({ apiKey: 'k', fetch: () => answer({ error: { message: 'quota' } }, 429) })(input)).rejects.toThrow('openai suggest: HTTP 429');
+});
+
+const video = { field: 'video' as const, text: '', context: '', max: 5000, clip: 'preset-walk-left.mp4' };
+const stills = ['data:image/jpeg;base64,AAAA', 'data:image/jpeg;base64,BBBB'];
+const motion = 'The model walks to the left while the camera tracks alongside.';
+
+test('a preset prompt is the motion, then the keep clauses of a person or of a product (no faces), then the stable line when the camera is', () => {
+  expect(videoPrompt({ motion, person: true, stable: true }, 5000)).toBe(`${motion} ${PERSON_KEEP} Smooth, stable camera.`);
+  expect(videoPrompt({ motion: ` ${motion} `, person: false, stable: false }, 5000)).toBe(`${motion} ${PRODUCT_KEEP}`);
+  expect(PRODUCT_KEEP).toContain('No faces.');
+  // The motion is cut so the clauses always fit the limit.
+  const out = videoPrompt({ motion: 'A slow drift. '.repeat(40), person: false, stable: true }, 200);
+  expect(out.length).toBeLessThanOrEqual(200);
+  expect(out.endsWith(`${PRODUCT_KEEP} Smooth, stable camera.`)).toBe(true);
+});
+
+test('the vision answer is a JSON object in a fence or not; a camera not said to shake is stable; no motion or no JSON throws', () => {
+  expect(parseVideoAnswer('```json\n' + JSON.stringify({ motion, person: true, stable: true }) + '\n```', 5000)).toBe(videoPrompt({ motion, person: true, stable: true }, 5000));
+  expect(parseVideoAnswer(JSON.stringify({ motion }), 5000)).toBe(videoPrompt({ motion, person: false, stable: true }, 5000));
+  expect(() => parseVideoAnswer(JSON.stringify({ motion: ' ' }), 5000)).toThrow('no motion');
+  expect(() => parseVideoAnswer('The camera pushes in.', 5000)).toThrow('not JSON');
+});
+
+test("fal: a preset prompt is one call to the router's vision endpoint with the stills and the video system prompt", async () => {
+  const calls: { url: string; body: FalBody & { image_urls?: string[] } }[] = [];
+  const suggest = createFalSuggester({
+    apiKey: 'k',
+    fetch: (url, init) => (calls.push({ url: String(url), body: JSON.parse(String(init!.body)) }), answer({ output: JSON.stringify({ motion, person: true, stable: true }), usage: { cost: 0.0012 } })),
+  });
+  expect(await suggest(video, stills)).toEqual({ options: [videoPrompt({ motion, person: true, stable: true }, 5000)], costUsd: 0.0012, provider: 'fal', model: ENHANCE_MODEL });
+  expect(calls).toHaveLength(1);
+  expect(calls[0]!.url).toBe(`${ENHANCE_URL}/vision`);
+  expect(calls[0]!.body).toMatchObject({ model: ENHANCE_MODEL, system_prompt: VIDEO_SYSTEM, prompt: suggestPrompt(video), image_urls: stills });
+  await expect(suggest(video)).rejects.toThrow('no stills'); // never a vision call without the clip
+});
+
+test('OpenAI: a preset prompt sends the stills as image parts after the text', async () => {
+  let body: { messages: { role: string; content: unknown }[] } | undefined;
+  const suggest = createOpenAiSuggester({ apiKey: 'sk', fetch: (_u, init) => ((body = JSON.parse(String(init!.body))), chat(JSON.stringify({ motion, person: false, stable: true }))) });
+  expect((await suggest(video, stills)).options).toEqual([videoPrompt({ motion, person: false, stable: true }, 5000)]);
+  expect(body!.messages).toEqual([
+    { role: 'developer', content: VIDEO_SYSTEM },
+    { role: 'user', content: [{ type: 'text', text: suggestPrompt(video) }, ...stills.map((url) => ({ type: 'image_url', image_url: { url } }))] },
+  ]);
 });

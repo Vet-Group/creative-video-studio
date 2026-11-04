@@ -1,8 +1,11 @@
 // The suggestion run against a disposable database on the compose Postgres (`pnpm services:up`). The suggester is a fake: no call reaches fal.
+import { readFile } from 'node:fs/promises';
 import { createPool } from '@cvs/db/client';
 import { createTestDatabase } from '@cvs/db/testing';
-import type { Suggester } from '@cvs/core/suggest';
-import { afterAll, beforeAll, expect, test } from 'vitest';
+import { type Suggester, VIDEO_FRAMES } from '@cvs/core/suggest';
+import sharp from 'sharp';
+import { afterAll, beforeAll, expect, test, vi } from 'vitest';
+import { extractFrames, frameTimes } from './media';
 import { fakeSuggester, runSuggestion } from './suggest';
 
 const testDb = await createTestDatabase();
@@ -10,9 +13,9 @@ const pool = createPool(testDb.url, 2);
 const input = { field: 'brief', text: 'linen dress', context: '', max: 1200 };
 let seq = 0;
 
-async function queued(ageSeconds = 0): Promise<string> {
+async function queued(ageSeconds = 0, i: object = input): Promise<string> {
   const id = `run-${++seq}`;
-  await pool.query(`insert into suggestion_runs (id, user_id, input, created_at) values ($1, 'u1', $2, now() - make_interval(secs => $3))`, [id, JSON.stringify(input), ageSeconds]);
+  await pool.query(`insert into suggestion_runs (id, user_id, input, created_at) values ($1, 'u1', $2, now() - make_interval(secs => $3))`, [id, JSON.stringify(i), ageSeconds]);
   return id;
 }
 const row = async (id: string) => (await pool.query('select status, output, cost_usd from suggestion_runs where id = $1', [id])).rows[0];
@@ -78,4 +81,58 @@ test('an option with a Vietnamese reading is stored as text and vi, one without 
   const id = await queued();
   await runSuggestion(pool, async () => ({ options: ['a', 'b'], meanings: ['nghĩa a', null], costUsd: 0, provider: 'fal', model: 'google/gemini-2.5-flash' }), id);
   expect((await row(id)).output).toEqual([{ text: 'a', vi: 'nghĩa a' }, 'b']);
+});
+
+// An example clip from the repo's fixtures stands in for a preset's clip in the bucket.
+const clip = () => readFile(new URL('../../web/public/fixtures/examples/example-1.mp4', import.meta.url));
+const videoInput = { field: 'video', text: '', context: '', max: 5000, clip: 'preset-walk-left.mp4' };
+
+test('the stills sit in the middle of equal slices of the clip, in order', () => {
+  expect(frameTimes(6, 6)).toEqual([0.5, 1.5, 2.5, 3.5, 4.5, 5.5]);
+  expect(frameTimes(3, 2)).toEqual([0.75, 2.25]);
+});
+
+test('a clip gives the asked number of small JPEG stills', async () => {
+  const frames = await extractFrames(new Uint8Array(await clip()), VIDEO_FRAMES);
+  expect(frames).toHaveLength(VIDEO_FRAMES);
+  for (const f of frames) {
+    const { format, width = 0, height = 0 } = await sharp(f).metadata();
+    expect(format).toBe('jpeg');
+    expect(Math.max(width, height)).toBeLessThanOrEqual(512);
+  }
+});
+
+test("a video run reads the preset's clip from the bucket, sends its stills as JPEG data URLs, and books the call like any suggestion", async () => {
+  const keys: string[] = [];
+  const seen: { input: unknown; frames?: string[] }[] = [];
+  const suggest: Suggester = async (i, frames) => (seen.push({ input: i, frames }), { options: ['The camera tracks left.'], costUsd: 0.0012, provider: 'fal', model: 'google/gemini-2.5-flash' });
+  const id = await queued(0, videoInput);
+  await runSuggestion(pool, suggest, id, async (key) => (keys.push(key), new Uint8Array(await clip())));
+  expect(keys).toEqual(['samples/preset-walk-left.mp4']);
+  expect(seen[0]!.input).toEqual(videoInput);
+  expect(seen[0]!.frames).toHaveLength(VIDEO_FRAMES);
+  seen[0]!.frames!.forEach((f) => expect(f).toMatch(/^data:image\/jpeg;base64,\/9j\//));
+  expect(await row(id)).toEqual({ status: 'succeeded', output: ['The camera tracks left.'], cost_usd: '0.001200' });
+  expect(await ledger(id)).toEqual([{ kind: 'llm', usd: '0.0012', user_id: 'u1', team_id: 'team-unassigned', job_id: null, model: 'google/gemini-2.5-flash', is_final: true }]);
+});
+
+test('a clip that cannot be read fails the run without calling the suggester', async () => {
+  let called = false;
+  const id = await queued(0, videoInput);
+  await expect(runSuggestion(pool, async () => ((called = true), { options: ['x'], costUsd: null, provider: 'fal', model: 'm' }), id, () => Promise.reject(new Error('NoSuchKey')))).rejects.toThrow('NoSuchKey');
+  expect(called).toBe(false);
+  expect((await row(id)).status).toBe('failed');
+});
+
+test('the e2e stand-in writes a house-style preset prompt from the stills without any network call', async () => {
+  const fetchSpy = vi.spyOn(globalThis, 'fetch');
+  try {
+    const out = await fakeSuggester({ field: 'video', text: '', context: '', max: 5000, clip: 'preset-x.mp4' }, ['a', 'b', 'c', 'd', 'e', 'f']);
+    expect(out.options).toHaveLength(1);
+    expect(out.options[0]).toMatch(/^Mock motion read from 6 stills: .* Keep the person, their face, the outfit, .* Smooth, stable camera\.$/);
+    expect(out.costUsd).toBe(0);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  } finally {
+    fetchSpy.mockRestore();
+  }
 });

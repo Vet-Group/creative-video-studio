@@ -1,5 +1,7 @@
-// Integration test against a disposable database on the compose Postgres (`pnpm services:up`). The queue is a stub: nothing reaches the worker or fal.
+// Integration test against a disposable database and bucket on the compose Postgres and MinIO (`pnpm services:up`). The queue is a stub: nothing
+// reaches the worker or fal.
 import { randomBytes } from 'node:crypto';
+import { DeleteBucketCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { createTestDatabase } from '@cvs/db/testing';
 import { afterAll, describe, expect, test, vi } from 'vitest';
 
@@ -19,8 +21,10 @@ const testDb = await createTestDatabase();
 process.env.DATABASE_URL = testDb.url;
 process.env.BETTER_AUTH_SECRET = randomBytes(32).toString('hex');
 process.env.APP_URL = 'http://localhost';
+process.env.S3_BUCKET = `cvs-test-${randomBytes(6).toString('hex')}`;
 
 const { auth, pool } = await import('@/lib/auth');
+const { bucketName, ensureBucket, putObject, s3 } = await import('@/lib/storage');
 const { POST } = await import('./route');
 const { GET } = await import('./[id]/route');
 const { ADVANCED_MAX_SCRIPT, HOOKS, SUGGEST_DAILY_LIMIT } = await import('@/lib/marketing');
@@ -40,6 +44,8 @@ const error = async (res: Response) => ((await res.json()) as { error: string })
 const runs = async (userId: string) => (await pool.query('select count(*)::int as n from suggestion_runs where user_id = $1', [userId])).rows[0].n as number;
 
 afterAll(async () => {
+  await s3().send(new DeleteObjectCommand({ Bucket: bucketName(), Key: 'samples/preset-walk-left.mp4' }));
+  await s3().send(new DeleteBucketCommand({ Bucket: bucketName() }));
   await pool.end();
   await testDb.drop();
 });
@@ -94,7 +100,7 @@ describe('/api/suggestions', () => {
   test('refuses a bad field, a script outside Advanced, over-long text and unknown choices, and queues nothing', async () => {
     const u = await newUser();
     const before = sent.length;
-    expect(await error(await ask(u, { field: 'title' }))).toBe('field must be brief, script, hook, location, prompt or translate');
+    expect(await error(await ask(u, { field: 'title' }))).toBe('field must be brief, script, hook, location, prompt, translate or video');
     expect(await error(await ask(u, { field: 'script' }))).toBe('a script is for Advanced only');
     expect((await ask(u, { field: 'script', format: 'advanced', text: 'x'.repeat(ADVANCED_MAX_SCRIPT + 1) })).status).toBe(202); // the brief as notes for lines
     expect(await error(await ask(u, { field: 'script', format: 'advanced', text: 'x'.repeat(5001) }))).toBe('text may be at most 5000 characters');
@@ -182,5 +188,39 @@ describe('/api/suggestions', () => {
     expect([res.status, await error(res)]).toEqual([400, 'hook is not a hook']);
     expect(await error(await ask(u, { field: 'brief', location: `${u.id}-hook` }))).toBe('location is not a location'); // a hook is not a location
     expect(await runs(u.id)).toBe(1);
+  });
+});
+
+describe('/api/suggestions for a preset prompt from its clip', () => {
+  /** A member an Admin made a template editor. */
+  async function newEditor() {
+    const u = await newUser();
+    await pool.query('update users set can_edit_templates = true where id = $1', [u.id]);
+    const res = await auth.api.signInEmail({ body: { email: `s${seq}@example.test`, password: PASSWORD }, asResponse: true });
+    return { id: u.id, cookie: res.headers.getSetCookie().map((c) => c.split(';')[0]).join('; ') };
+  }
+
+  test("queues a run on the preset's saved clip for a template editor, counted against the day like any suggestion", async () => {
+    await ensureBucket();
+    await putObject('samples/preset-walk-left.mp4', new Uint8Array([0, 0, 0, 0x18, ...[...'ftypisom'].map((c) => c.charCodeAt(0))]), 'video/mp4');
+    const u = await newEditor();
+    const res = await ask(u, { field: 'video', preset: 'walk-left', text: 'ignored' });
+    expect(res.status).toBe(202);
+    const { id } = (await res.json()) as { id: string };
+    expect(sent.at(-1)).toEqual({ name: 'suggest', data: { runId: id } });
+    expect((await pool.query('select input from suggestion_runs where id = $1', [id])).rows[0].input).toEqual({ field: 'video', text: '', context: '', max: 5000, clip: 'preset-walk-left.mp4' });
+    await pool.query(`insert into suggestion_runs (id, user_id, input) select 'v-seed-' || g, $1, '{}' from generate_series(1, $2) g`, [u.id, SUGGEST_DAILY_LIMIT - 1]);
+    expect((await ask(u, { field: 'video', preset: 'walk-left' })).status).toBe(429);
+  });
+
+  test('refuses a member with 403, and an unknown preset or one with no saved clip with 400, queuing nothing', async () => {
+    const before = sent.length;
+    const member = await newUser();
+    expect([(await ask(member, { field: 'video', preset: 'walk-left' })).status, await runs(member.id)]).toEqual([403, 0]);
+    const u = await newEditor();
+    expect(await error(await ask(u, { field: 'video', preset: 'no-such-preset' }))).toBe('preset is not a preset');
+    expect(await error(await ask(u, { field: 'video' }))).toBe('preset is not a preset');
+    expect(await error(await ask(u, { field: 'video', preset: 'walk-right' }))).toBe('the preset has no clip');
+    expect([await runs(u.id), sent.length]).toEqual([0, before]);
   });
 });
