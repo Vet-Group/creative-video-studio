@@ -95,6 +95,11 @@ export const USERS = {
   // templates.e2e: stpla saves a template to a store on Create, stplb picks that store and applies it.
   stpla: { email: 'stpla@e2e.test', name: 'E2E Store Template A', role: 'member' },
   stplb: { email: 'stplb@e2e.test', name: 'E2E Store Template B', role: 'member' },
+  // click-targets.e2e: a click anywhere on a card, tile, pill, row or label reaches its control (clicka the slots and banner, clickb Create, clickc an image result, clickd templates).
+  clicka: { email: 'clicka@e2e.test', name: 'E2E Click A', role: 'member' },
+  clickb: { email: 'clickb@e2e.test', name: 'E2E Click B', role: 'member' },
+  clickc: { email: 'clickc@e2e.test', name: 'E2E Click C', role: 'member' },
+  clickd: { email: 'clickd@e2e.test', name: 'E2E Click D', role: 'member' },
   admin: { email: 'admin@e2e.test', name: 'E2E Admin', role: 'admin' },
 } as const;
 

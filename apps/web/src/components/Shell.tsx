@@ -160,7 +160,8 @@ function HistoryCard({ job, isAdmin, select }: { job: TrayJob; isAdmin: boolean;
       <div className="job-media">
         {out ? (
           image ? (
-            <img ref={media} src={content(out)} alt={cardTitle(job)} loading="lazy" />
+            // A click on the picture is the eye's full screen; the eye stays the keyboard and screen-reader way in.
+            <img ref={media} src={content(out)} alt={cardTitle(job)} loading="lazy" onClick={() => toggleFullscreen(media.current)} />
           ) : (
             // F opens full screen, as in most players; Space and the arrows are the video's own keys.
             <video ref={media} controls playsInline preload="metadata" poster={job.posterAssetId ? content(job.posterAssetId) : undefined} src={content(out)} onKeyDown={(e) => e.key.toLowerCase() === 'f' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && (e.preventDefault(), toggleFullscreen(media.current))} />

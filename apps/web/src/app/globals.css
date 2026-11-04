@@ -382,6 +382,7 @@ legend { font-weight: 600; padding: 0 .25rem; }
 .job-card.job-failed, .job-card.job-failed_unknown, .job-card.job-timed_out { box-shadow: 0 0 0 1px var(--danger-border); }
 .job-media { display: flex; align-items: center; justify-content: center; height: 500px; background: var(--fill); }
 .job-media img, .job-media video { display: block; max-width: 100%; height: 100%; object-fit: contain; }
+.job-media img { cursor: zoom-in; }
 .job-media-empty { color: var(--text-muted); font-size: 14px; }
 .job-media { position: relative; }
 .job-media-tools { position: absolute; top: 10px; right: 10px; display: flex; gap: 6px; opacity: 0; transition: opacity .15s; }
@@ -870,8 +871,10 @@ dialog.admin-modal { width: min(36rem, calc(100vw - 2rem)); }
 .templates > [role='status'] { margin: 0 auto 0 0; color: var(--text-muted); }
 .link-button { padding: 0; border: 0; background: none; color: var(--ink-strong); font: inherit; font-weight: 500; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 .template-list { display: grid; gap: 8px; margin: 0 0 12px; padding: 0; list-style: none; }
-.template-list li { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; }
+.template-list li { position: relative; display: flex; align-items: center; gap: 8px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; }
 .template-list li a { flex: 1; color: var(--ink-strong); font-weight: 500; }
+.template-list li a::before { content: ''; position: absolute; inset: 0; } /* the whole row opens the template; its Delete button stays on top */
+.template-list li button { position: relative; }
 .choice-dialog input:not([type]) { width: 100%; height: 40px; margin: 6px 0 12px; padding: 0 12px; border: 1px solid var(--border); border-radius: 8px; font: inherit; }
 .template-share { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; font-size: 14px; }
 .template-share input { width: 16px; min-width: 0; height: 16px; margin: 0; padding: 0; } /* the generic label-input min width pushed the box away from its text */
@@ -897,9 +900,9 @@ dialog.admin-modal { width: min(36rem, calc(100vw - 2rem)); }
 .dropzone-plus { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: rgb(var(--tint) / .06); color: var(--text-muted); }
 /* Up to 9 images (a fal reference model's limit) shrink to share the row. */
 .thumbs { position: absolute; top: 16px; left: 0; right: 0; display: flex; justify-content: center; gap: 8px; margin: 0; padding: 0 12px; list-style: none; pointer-events: none; }
-.thumbs li { position: relative; flex: 0 1 56px; min-width: 0; aspect-ratio: 1; pointer-events: auto; }
+.thumbs li { position: relative; flex: 0 1 56px; min-width: 0; aspect-ratio: 1; } /* a click on a picture adds more, as the rest of the drop zone does */
 .thumbs img { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: 12px; }
-.thumbs button { position: absolute; top: -6px; right: -6px; display: grid; place-items: center; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%; background: var(--ink); color: var(--on-ink); }
+.thumbs button { pointer-events: auto; position: absolute; top: -6px; right: -6px; display: grid; place-items: center; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%; background: var(--ink); color: var(--on-ink); }
 
 /* Suggestions: a quiet link in the field's foot or head; the three options open over the form beneath it. */
 .suggest { position: relative; }
@@ -1093,12 +1096,13 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .detail-chip img { width: 36px; height: 36px; border-radius: 8px; object-fit: cover; }
 .detail-model { margin: 0; font-size: 14px; line-height: 21px; font-weight: 600; }
 .tap.detail-model:hover, .detail-pills .tap:hover { text-decoration: underline; text-underline-offset: 3px; }
+.detail-pills .tap::before { content: ''; position: absolute; inset: 0; } /* the whole pill applies its setting, not only its text */
 .detail-info h2 { margin: 0; font-size: 14px; line-height: 21px; font-weight: 600; }
 .detail-input { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; background: var(--fill); }
 .detail-inputs { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .detail-prompt { max-height: 120px; margin: 0; overflow-y: auto; color: var(--text-2); font-size: 12px; line-height: 18px; white-space: pre-line; }
 .detail-pills { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
-.detail-pills li { padding: 4px 10px; border: .8px solid var(--border-strong); border-radius: 20px; background: var(--surface); color: var(--text-2); font-size: 12px; line-height: 18px; }
+.detail-pills li { position: relative; padding: 4px 10px; border: .8px solid var(--border-strong); border-radius: 20px; background: var(--surface); color: var(--text-2); font-size: 12px; line-height: 18px; }
 .detail-foot { display: flex; flex-direction: column; align-self: stretch; margin-top: auto; }
 .detail-date { margin: 0; color: var(--text-subtle); font-size: 12px; line-height: 18px; }
 .detail-tools { display: flex; gap: 6px; margin-top: 12px; padding-top: 11px; border-top: 1px solid var(--divider); }
@@ -1578,8 +1582,12 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 
 /* Try On and Image Generation (REA, measured 2026-10-24 at 1424 px): Try On reuses the Create card and tabs; its upload slots are dashed boxes of 56 px thumbnails and a 56 px
    upload tile. Image Generation has tabs over a gallery and a floating bar, 818 wide and centred in the content area, with 24 px under it. */
-.slot { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-height: 82px; padding: 12px; border: 1px dashed var(--text-disabled); border-radius: 18px; transition: border-color .15s, background-color .15s; }
+.slot { position: relative; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-height: 82px; padding: 12px; border: 1px dashed var(--text-disabled); border-radius: 18px; transition: border-color .15s, background-color .15s; }
 .slot:hover, .slot[data-over='true'] { border-color: var(--ink); background: var(--surface-1); }
+/* The whole dashed slot is its upload button, as Create's drop zone is; the remove buttons, the samples and the audio clips stay on top. */
+.slot-add::before { content: ''; position: absolute; inset: 0; }
+.slot-thumbs button { z-index: 1; }
+.slot-samples li, .clips button { position: relative; z-index: 1; }
 .slot-thumbs { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .slot-thumbs li, .bar-thumbs li { position: relative; width: 56px; height: 56px; }
 .slot-thumbs img, .slot-thumbs video, .bar-thumbs img { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: 12px; }
@@ -1876,7 +1884,7 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 [aria-labelledby='tryon-title'] .field:has(> .slot) + .field:has(> .slot) { margin-top: 32px; }
 .choice-label { color: var(--text-2); font-size: 13px; line-height: 18px; white-space: pre-line; }
 .marketing-slots .choice-value { font-weight: 500; color: var(--text-subtle); }
-.marketing-head { position: relative; justify-content: center; align-items: center; min-height: 130px; text-align: center; }
+.marketing-head { position: relative; justify-content: center; align-items: center; min-height: 130px; text-align: center; cursor: pointer; }
 @media (max-width: 1023.98px) { .marketing-head { min-height: 100px; } } /* Fash's format card is 100 px tall on a phone (measured at 390), 130 px on desktop */
 .field-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 8px; }
 /* Library kinds: one scrolling row of pills. */

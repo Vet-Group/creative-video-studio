@@ -544,12 +544,11 @@ export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4
                     <a href={`/api/samples/${it}`} target="_blank" rel="noreferrer" aria-label={detailed.includes(it) ? 'Xem chi tiết video mẫu' : 'Mở video mẫu trong tab mới'} onClick={detailed.includes(it) ? (e) => (e.preventDefault(), setOpen(detailed.indexOf(it))) : undefined}>
                       <Preview src={`/api/samples/${it}`} poster={`/api/samples/${it.replace(/\.mp4$/, '.jpg')}`} width={9} height={16} title="Video mẫu" />
                     </a>
-                  ) : detailed.includes(it) ? (
-                    <a href={`/api/samples/${it}`} target="_blank" rel="noreferrer" aria-label="Xem chi tiết ảnh mẫu" onClick={(e) => (e.preventDefault(), setOpen(detailed.indexOf(it)))}>
+                  ) : (
+                    // A picture opens as a clip does: its details in place, else a new tab.
+                    <a href={`/api/samples/${it}`} target="_blank" rel="noreferrer" aria-label={detailed.includes(it) ? 'Xem chi tiết ảnh mẫu' : 'Mở ảnh mẫu trong tab mới'} onClick={detailed.includes(it) ? (e) => (e.preventDefault(), setOpen(detailed.indexOf(it))) : undefined}>
                       <img src={`/api/samples/${it}`} alt="Ảnh mẫu" loading="lazy" />
                     </a>
-                  ) : (
-                    <img src={`/api/samples/${it}`} alt="Ảnh mẫu" loading="lazy" />
                   )}
                   {detailed.includes(it) && <SampleActions name={it} />}
                 </li>
@@ -560,7 +559,9 @@ export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4
                     <Preview src={`/api/assets/${it.videoAssetId}/content`} poster={it.posterAssetId ? `/api/assets/${it.posterAssetId}/content` : ''} width={Number(it.ratio.split(':')[0]) || 9} height={Number(it.ratio.split(':')[1]) || 16} title={`${it.modelLabel}, ${it.ratio}`} />
                   </a>
                 ) : (
-                  <img src={`/api/assets/${it.videoAssetId}/content`} alt={`${it.modelLabel}, ${it.ratio}`} loading="lazy" />
+                  <a href={`/api/assets/${it.videoAssetId}/content`} target="_blank" rel="noreferrer" aria-label={`Mở ảnh ${it.modelLabel}, ${it.ratio} trong tab mới`}>
+                    <img src={`/api/assets/${it.videoAssetId}/content`} alt={`${it.modelLabel}, ${it.ratio}`} loading="lazy" />
+                  </a>
                 )}
                 {/* Fash's "Use this template": the page's form filled from this result's inputs (a Library clip's inputs are open to every member). */}
                 {reuseHref(it) && (

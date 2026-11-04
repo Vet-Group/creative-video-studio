@@ -286,12 +286,14 @@ export function ModelPicker({ models, value, onChange }: { models: ModelOption[]
 
   return (
     <div className="field">
-      <span id={labelId} className="field-label">
+      {/* A label, so a click on it opens the picker as a select's label does. */}
+      <label id={labelId} htmlFor={`${uid}-trigger`} className="field-label">
         Mô hình
-      </span>
+      </label>
       <div className="select" data-open={open}>
         <button
           ref={trigger}
+          id={`${uid}-trigger`}
           type="button"
           className="select-trigger"
           data-value={value}

@@ -11,11 +11,12 @@ export function AudioSwitch({ on, available, always = false, onChange }: { on: b
   const why = !available ? 'Mô hình này không tạo được âm thanh' : always ? 'Mô hình này luôn tạo âm thanh' : null;
   return (
     <div className="field">
-      <span className="field-label" id={id}>
+      {/* A label, so a click on it flips the switch; a fixed switch says why on hover. */}
+      <label className="field-label" id={id} htmlFor={`${id}-switch`}>
         Tạo âm thanh
-      </span>
-      <span className="switch-row">
-        <button type="button" role="switch" className="switch" aria-checked={shown} aria-labelledby={id} aria-describedby={why ? `${id}-why` : undefined} disabled={why !== null} onClick={() => onChange(!on)} />
+      </label>
+      <span className="switch-row" title={why ?? undefined}>
+        <button type="button" id={`${id}-switch`} role="switch" className="switch" aria-checked={shown} aria-labelledby={id} aria-describedby={why ? `${id}-why` : undefined} disabled={why !== null} onClick={() => onChange(!on)} />
         <span>{shown ? 'Bật' : 'Tắt'}</span>
         {why && (
           <span id={`${id}-why`} className="sr-only">
