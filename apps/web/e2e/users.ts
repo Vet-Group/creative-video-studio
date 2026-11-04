@@ -89,6 +89,9 @@ export const USERS = {
   traya: { email: 'traya@e2e.test', name: 'E2E Tray A', role: 'member' }, // history e2e: the compact tray's buttons beside a page without its own History
   loada: { email: 'loada@e2e.test', name: 'E2E Load A', role: 'member' }, // history, library and image-pages e2e: a failed read and its retry, the upload reasons
   preseta: { email: 'preseta@e2e.test', name: 'E2E Preset A', role: 'member' }, // preset-pick.e2e: a late preset list does not undo a pick
+  // preset-edit.e2e: tpled is a template editor (e2e/serve.ts sets it), tplprop a plain member who proposes.
+  tpled: { email: 'tpled@e2e.test', name: 'E2E Template Editor', role: 'member' },
+  tplprop: { email: 'tplprop@e2e.test', name: 'E2E Template Proposer', role: 'member' },
   admin: { email: 'admin@e2e.test', name: 'E2E Admin', role: 'admin' },
 } as const;
 
