@@ -3,6 +3,7 @@
 CREATE TABLE "preset_proposals" (
 	"id" text PRIMARY KEY NOT NULL,
 	"preset_id" text,
+	"base_updated_at" timestamp with time zone,
 	"label" text,
 	"prompt" text,
 	"enabled" boolean,
@@ -15,6 +16,7 @@ CREATE TABLE "preset_proposals" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "preset_proposals_status_check" CHECK ("preset_proposals"."status" in ('pending', 'approved', 'rejected')),
 	CONSTRAINT "preset_proposals_new_check" CHECK ("preset_proposals"."preset_id" is not null or ("preset_proposals"."label" is not null and "preset_proposals"."prompt" is not null)),
+	CONSTRAINT "preset_proposals_base_check" CHECK (("preset_proposals"."preset_id" is null) = ("preset_proposals"."base_updated_at" is null)),
 	CONSTRAINT "preset_proposals_decided_check" CHECK (("preset_proposals"."status" = 'pending') = ("preset_proposals"."decided_by" is null) and ("preset_proposals"."status" = 'pending') = ("preset_proposals"."decided_at" is null))
 );
 --> statement-breakpoint

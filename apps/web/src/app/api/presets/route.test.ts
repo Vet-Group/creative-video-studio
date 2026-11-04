@@ -44,12 +44,13 @@ describe('GET /api/presets', () => {
     expect((await GET(call(undefined, '/api/presets'))).status).toBe(401);
   });
 
-  test('lists the enabled presets in display order with only the id and the label', async () => {
+  test('lists the enabled presets in display order with only the id and the label to a member, and every column to an Admin', async () => {
     const all = (await pool.query('select id, label from presets order by sort_order, id')).rows;
     expect(all.length).toBeGreaterThan(1);
     const body = await (await GET(call(memberCookie, '/api/presets'))).json();
-    expect(body).toEqual({ presets: all });
-    expect(await list(adminCookie)).toEqual(all);
+    expect(body).toEqual({ presets: all, canEdit: false });
+    const full = (await pool.query('select id, label, prompt, enabled, sort_order as "sortOrder" from presets order by sort_order, id')).rows;
+    expect(await (await GET(call(adminCookie, '/api/presets'))).json()).toEqual({ presets: full, canEdit: true });
   });
 
   test('leaves out a disabled preset and shows an edited label and order', async () => {
@@ -62,8 +63,11 @@ describe('GET /api/presets', () => {
     expect((await list())[0]!.id).toBe(third!.id);
   });
 
-  test('is empty when every preset is disabled', async () => {
+  test('is empty for a member when every preset is disabled; an Admin still reads them all, switched off', async () => {
     for (const p of await list()) expect((await patch(p.id, { enabled: false })).status).toBe(200);
     expect(await list()).toEqual([]);
+    const admin = (await list(adminCookie)) as { enabled?: boolean }[];
+    expect(admin.length).toBeGreaterThan(1);
+    expect(admin.every((p) => p.enabled === false)).toBe(true);
   });
 });

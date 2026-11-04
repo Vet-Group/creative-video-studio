@@ -78,7 +78,8 @@ describe('/api/samples', () => {
     expect((await PUT(req(admin, { method: 'PUT', body: mp4(6000) }), ctx('example-1.mp4'))).status).toBe(200);
 
     expect((await LIST(req(undefined))).status).toBe(401);
-    expect(await (await LIST(req(member))).json()).toEqual({ samples: [{ name: 'example-1.mp4', bytes: 6000 }, { name: 'poster-1.jpg', bytes: 8 }] });
+    const version = expect.stringMatching(/^[0-9a-f-]+$/); // the store's ETag, without its quotes
+    expect(await (await LIST(req(member))).json()).toEqual({ samples: [{ name: 'example-1.mp4', bytes: 6000, version }, { name: 'poster-1.jpg', bytes: 8, version }] });
 
     expect((await ONE(req(undefined), ctx('example-1.mp4'))).status).toBe(401);
     const full = await ONE(req(member), ctx('example-1.mp4'));

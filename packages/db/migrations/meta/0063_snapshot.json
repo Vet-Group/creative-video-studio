@@ -1,5 +1,5 @@
 {
-  "id": "80a236d1-8793-4be2-ad9c-ad1d6a375f5f",
+  "id": "8736d592-0ca4-4b68-86bc-a022227187ae",
   "prevId": "cd2bfaca-4212-4f09-bc7a-8c2d9737e668",
   "version": "7",
   "dialect": "postgresql",
@@ -1417,6 +1417,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "base_updated_at": {
+          "name": "base_updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "label": {
           "name": "label",
           "type": "text",
@@ -1570,6 +1576,10 @@
         "preset_proposals_new_check": {
           "name": "preset_proposals_new_check",
           "value": "\"preset_proposals\".\"preset_id\" is not null or (\"preset_proposals\".\"label\" is not null and \"preset_proposals\".\"prompt\" is not null)"
+        },
+        "preset_proposals_base_check": {
+          "name": "preset_proposals_base_check",
+          "value": "(\"preset_proposals\".\"preset_id\" is null) = (\"preset_proposals\".\"base_updated_at\" is null)"
         },
         "preset_proposals_decided_check": {
           "name": "preset_proposals_decided_check",

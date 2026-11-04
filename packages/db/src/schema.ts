@@ -237,6 +237,8 @@ export const presetProposals = pgTable(
   {
     id: text('id').primaryKey(),
     presetId: text('preset_id').references(() => presets.id, { onDelete: 'restrict' }),
+    /** The preset's updated_at when proposed: an approval is refused once the preset was changed since, so it never undoes a newer edit. */
+    baseUpdatedAt: tstz('base_updated_at'),
     /** A null value is left as it is; a new preset needs a label and a prompt. */
     label: text('label'),
     prompt: text('prompt'),
@@ -256,6 +258,7 @@ export const presetProposals = pgTable(
     index('preset_proposals_proposed_by_idx').on(t.proposedBy),
     check('preset_proposals_status_check', sql`${t.status} in ('pending', 'approved', 'rejected')`),
     check('preset_proposals_new_check', sql`${t.presetId} is not null or (${t.label} is not null and ${t.prompt} is not null)`),
+    check('preset_proposals_base_check', sql`(${t.presetId} is null) = (${t.baseUpdatedAt} is null)`),
     check('preset_proposals_decided_check', sql`(${t.status} = 'pending') = (${t.decidedBy} is null) and (${t.status} = 'pending') = (${t.decidedAt} is null)`),
   ],
 );

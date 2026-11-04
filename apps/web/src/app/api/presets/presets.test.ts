@@ -20,6 +20,7 @@ const proposalsRoute = await import('../preset-proposals/route');
 const decisionRoute = await import('../preset-proposals/[id]/decision/route');
 const samplesRoute = await import('../admin/samples/[name]/route');
 const { PATCH: PATCH_USER } = await import('../admin/users/[id]/route');
+const { GET: GET_USERS } = await import('../admin/users/route');
 
 const PASSWORD = 'correct-horse-battery';
 const ctx = <K extends string>(key: K, value: string) => ({ params: Promise.resolve({ [key]: value } as Record<K, string>) });
@@ -71,6 +72,8 @@ describe('the template editor permission', () => {
     await toggle(admin.cookie, false);
     expect((await list(editor.cookie)).canEdit).toBe(false);
     await toggle(admin.cookie, true);
+    const users = (await (await GET_USERS(call(admin.cookie))).json()).users as { id: string; canEditTemplates: boolean }[];
+    expect(users.map((u) => [u.id, u.canEditTemplates])).toEqual(expect.arrayContaining([[editor.id, true], [member.id, false], [admin.id, false]]));
     expect((await audits(`user:${editor.id}`)).map((a) => [a.action, a.new_value])).toEqual([
       ['user.template_editor', { canEditTemplates: true }],
       ['user.template_editor', { canEditTemplates: false }],
@@ -172,18 +175,41 @@ describe('proposals', () => {
     expect((await (await proposalsRoute.GET(call(other.cookie))).json()).proposals).toEqual([]);
     const seen = (await (await proposalsRoute.GET(call(editor.cookie))).json()).proposals;
     expect(seen.find((p: { id: string }) => p.id === id)).toMatchObject({ mine: false, current: { prompt: expect.any(String) } });
+
+    // A switched-off preset stays hidden from members: no proposal names it, and the list no longer shows it as it is now.
+    await pool.query(`update presets set enabled = false where id = 'slow-orbit'`);
+    expect((await propose(member.cookie, { presetId: 'slow-orbit', label: 'X' })).status).toBe(404);
+    expect((await (await proposalsRoute.GET(call(member.cookie))).json()).proposals[0]).toMatchObject({ id, presetId: 'slow-orbit', current: null });
+    expect((await propose(editor.cookie, { presetId: 'slow-orbit', label: 'Bật lại' })).status).toBe(201);
+    await pool.query(`update presets set enabled = true where id = 'slow-orbit'`);
   });
 
   test('a member has at most 20 pending at a time', async () => {
     const busy = await newUser('busy@example.test', 'member');
     for (let i = 0; i < 20; i++) expect((await propose(busy.cookie, { label: `Mẫu ${i}`, prompt: 'Slow pan.' })).status).toBe(201);
     expect((await propose(busy.cookie, { label: 'One more', prompt: 'Slow pan.' })).status).toBe(429);
+    // An editor reads every pending one, oldest first, and their number; a member reads no count.
+    const { proposals, pendingCount } = await (await proposalsRoute.GET(call(admin.cookie))).json();
+    const total = (await pool.query(`select count(*)::int as n from preset_proposals where status = 'pending'`)).rows[0].n;
+    expect([pendingCount, proposals.length]).toEqual([total, total]);
+    const times = proposals.map((p: { createdAt: string }) => p.createdAt);
+    expect(times).toEqual([...times].sort());
+    expect(await (await proposalsRoute.GET(call(busy.cookie))).json()).not.toHaveProperty('pendingCount');
   });
 
-  test("one editor's approval applies the proposal over the preset's current values, audited with it; a decided one is never decided again", async () => {
+  test("one editor's approval applies the proposal, audited with it, unless the preset was edited since; a decided one is never decided again", async () => {
+    // A preset edited after the proposal: approving it would undo the newer edit, so it is refused and can only be rejected.
+    const { id: stale } = await (await propose(member.cookie, { presetId: 'lifestyle-table', label: 'Bàn cũ' })).json();
+    expect((await presetRoute.PATCH(call(editor.cookie, 'PATCH', { sortOrder: 77 }), ctx('id', 'lifestyle-table'))).status).toBe(200);
+    const refused = await decide(editor.cookie, stale, true);
+    expect([refused.status, (await refused.json()).error]).toEqual([409, 'Mẫu đã được sửa sau khi có đề xuất này; hãy xem lại.']);
+    expect((await preset('lifestyle-table')).label).not.toBe('Bàn cũ');
+    expect(await audits(`preset_proposal:${stale}`)).toEqual([]);
+    expect((await (await decide(editor.cookie, stale, false)).json()).status).toBe('rejected');
+
     const { id } = await (await propose(member.cookie, { presetId: 'lifestyle-table', label: 'Bàn gỗ', prompt: 'A wooden table, slow drift.', note: 'rõ hơn' })).json();
-    await pool.query(`update presets set sort_order = 77 where id = 'lifestyle-table'`); // changed since the proposal: the order stays
     const old = await preset('lifestyle-table');
+    expect(old.sortOrder).toBe(77);
     expect((await decide(member.cookie, id, true)).status).toBe(403);
     expect((await decide(editor.cookie, id, 'yes')).status).toBe(400);
     expect((await decide(editor.cookie, 'no-such', true)).status).toBe(404);
@@ -191,16 +217,16 @@ describe('proposals', () => {
     expect(res.status).toBe(200);
     expect((await res.json()).status).toBe('approved');
     expect(await preset('lifestyle-table')).toEqual({ ...old, label: 'Bàn gỗ', prompt: 'A wooden table, slow drift.' });
-    expect(await audits('preset:lifestyle-table')).toEqual([
+    expect((await audits('preset:lifestyle-table')).at(-1)).toEqual(
       { actor_id: editor.id, action: 'preset.update', old_value: { label: old.label, prompt: old.prompt }, new_value: { label: 'Bàn gỗ', prompt: 'A wooden table, slow drift.' } },
-    ]);
+    );
     expect(await audits(`preset_proposal:${id}`)).toEqual([
       { actor_id: editor.id, action: 'preset_proposal.approve', old_value: { status: 'pending' }, new_value: { status: 'approved', proposedBy: member.id, presetId: 'lifestyle-table' } },
     ]);
     expect((await pool.query('select status, decided_by from preset_proposals where id = $1', [id])).rows[0]).toEqual({ status: 'approved', decided_by: editor.id });
     expect((await decide(admin.cookie, id, false)).status).toBe(409);
     expect((await decide(editor.cookie, id, true)).status).toBe(409);
-    expect(await audits('preset:lifestyle-table')).toHaveLength(1);
+    expect(await audits('preset:lifestyle-table')).toHaveLength(2); // the order edit and the approval, nothing more
   });
 
   test('an approved new preset is created with its slug; a rejection changes no preset; the approval rolls back with a failed write', async () => {

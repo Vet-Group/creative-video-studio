@@ -2,7 +2,7 @@
 // Preset management in Create's preset picker: a template editor (an Admin, or a user an Admin allowed) edits or adds a preset and decides the
 // members' proposals; any other member proposes a change or a new preset, and one editor's approval applies it.
 import { useEffect, useId, useState } from 'react';
-import { api, errorText, sendJson } from '@/lib/api';
+import { api, ApiError, errorText, sendJson } from '@/lib/api';
 import { reloadSamples } from '@/lib/use-samples';
 import { Modal } from './Modal';
 
@@ -31,8 +31,11 @@ export interface Proposal {
   current: { label: string; prompt?: string; enabled: boolean; sortOrder: number } | null;
 }
 
-/** Edit or add a preset (an editor), or propose either (a member). `onSaved` gets the notice to show once it is done. */
-export function PresetForm({ draft, onClose, onSaved }: { draft: PresetDraft | null; onClose: () => void; onSaved: (notice: string) => void }) {
+/**
+ * Edit or add a preset (an editor), or propose either (a member). `onSaved` gets the notice to show once it is done; `onWritten` runs after
+ * a preset was saved but its clip or poster was not, so the form stays open on it.
+ */
+export function PresetForm({ draft, onClose, onSaved, onWritten }: { draft: PresetDraft | null; onClose: () => void; onSaved: (notice: string) => void; onWritten: () => void }) {
   const id = useId();
   const [label, setLabel] = useState('');
   const [prompt, setPrompt] = useState('');
@@ -43,10 +46,12 @@ export function PresetForm({ draft, onClose, onSaved }: { draft: PresetDraft | n
   const [poster, setPoster] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const preset = draft?.preset ?? null;
+  // The preset as last saved: the draft's, then what a save returned, so a second Save after a failed upload changes it rather than adding another.
+  const [preset, setPreset] = useState<PresetRow | null>(null);
   const propose = draft?.propose === true;
   useEffect(() => {
     if (!draft) return;
+    setPreset(draft.preset);
     setLabel(draft.preset?.label ?? '');
     // A member never sees a preset's prompt (it stays on the server), so a proposed change starts empty and an empty one keeps it.
     setPrompt(draft.propose ? '' : (draft.preset?.prompt ?? ''));
@@ -58,10 +63,15 @@ export function PresetForm({ draft, onClose, onSaved }: { draft: PresetDraft | n
     setError('');
   }, [draft]);
 
-  const title = propose ? (preset ? 'Đề xuất sửa mẫu' : 'Đề xuất mẫu mới') : preset ? 'Sửa mẫu' : 'Thêm mẫu';
+  const editing = draft?.preset != null; // the title and hints follow the draft, not a preset the form has just added
+  const title = propose ? (editing ? 'Đề xuất sửa mẫu' : 'Đề xuất mẫu mới') : editing ? 'Sửa mẫu' : 'Thêm mẫu';
   const orderOk = order.trim() === '' ? !(preset && !propose) : Number.isInteger(Number(order));
   const changed = preset ? label.trim() !== preset.label || prompt.trim() !== '' : true;
-  const ready = label.trim() !== '' && orderOk && (propose ? (preset ? changed : prompt.trim() !== '') : prompt.trim() !== '');
+  const next = { label: label.trim(), prompt: prompt.trim(), enabled, ...(order.trim() !== '' && { sortOrder: Number(order) }) };
+  // Only what the editor changed, so an edit another editor made meanwhile to the other fields stays.
+  const diff = preset ? Object.fromEntries(Object.entries(next).filter(([k, v]) => v !== preset[k as keyof PresetRow])) : next;
+  const dirty = Object.keys(diff).length > 0 || video !== null || poster !== null;
+  const ready = label.trim() !== '' && orderOk && (propose ? (preset ? changed : prompt.trim() !== '') : prompt.trim() !== '' && dirty);
 
   async function save() {
     setBusy(true);
@@ -74,13 +84,22 @@ export function PresetForm({ draft, onClose, onSaved }: { draft: PresetDraft | n
         await api('/api/preset-proposals', sendJson('POST', { ...change, ...(note.trim() && { note: note.trim() }) }));
         return onSaved('Đã gửi đề xuất, chờ người có quyền duyệt.');
       }
-      const fields = { label: label.trim(), prompt: prompt.trim(), enabled, ...(order.trim() !== '' && { sortOrder: Number(order) }) };
-      const saved = await api<PresetRow>(preset ? `/api/presets/${preset.id}` : '/api/presets', sendJson(preset ? 'PATCH' : 'POST', fields));
-      for (const [file, ext] of [[video, 'mp4'], [poster, 'jpg']] as const) {
-        if (file) await api(`/api/admin/samples/preset-${saved.id}.${ext}`, { method: 'PUT', body: file });
+      const saved = Object.keys(diff).length === 0 ? preset! : await api<PresetRow>(preset ? `/api/presets/${preset.id}` : '/api/presets', sendJson(preset ? 'PATCH' : 'POST', diff));
+      setPreset(saved);
+      setOrder(String(saved.sortOrder));
+      try {
+        for (const [file, ext, clear] of [[video, 'mp4', setVideo], [poster, 'jpg', setPoster]] as const) {
+          if (!file) continue;
+          await api(`/api/admin/samples/preset-${saved.id}.${ext}`, { method: 'PUT', body: file });
+          clear(null);
+        }
+      } catch {
+        reloadSamples();
+        onWritten();
+        return setError('Đã lưu mẫu nhưng chưa tải lên được video mẫu hoặc ảnh bìa. Bấm Lưu để thử lại.');
       }
       if (video || poster) reloadSamples();
-      onSaved(preset ? 'Đã lưu mẫu.' : 'Đã thêm mẫu.');
+      onSaved(editing ? 'Đã lưu mẫu.' : 'Đã thêm mẫu.');
     } catch (e) {
       setError(errorText(e, propose ? 'Không gửi được đề xuất, hãy thử lại.' : 'Không lưu được mẫu, hãy thử lại.'));
     } finally {
@@ -97,9 +116,9 @@ export function PresetForm({ draft, onClose, onSaved }: { draft: PresetDraft | n
       </label>
       <input id={`${id}-label`} value={label} maxLength={100} onChange={(e) => setLabel(e.target.value)} />
       <label className="field-label" htmlFor={`${id}-prompt`}>
-        {propose && preset ? 'Mô tả chuyển động mới (tiếng Anh)' : 'Mô tả chuyển động (tiếng Anh)'}
+        {propose && editing ? 'Mô tả chuyển động mới (tiếng Anh)' : 'Mô tả chuyển động (tiếng Anh)'}
       </label>
-      <textarea id={`${id}-prompt`} rows={4} value={prompt} placeholder={propose && preset ? 'Để trống nếu giữ nguyên mô tả hiện tại' : undefined} onChange={(e) => setPrompt(e.target.value)} />
+      <textarea id={`${id}-prompt`} rows={4} value={prompt} placeholder={propose && editing ? 'Để trống nếu giữ nguyên mô tả hiện tại' : undefined} onChange={(e) => setPrompt(e.target.value)} />
       {propose ? (
         <>
           <label className="field-label" htmlFor={`${id}-note`}>
@@ -112,7 +131,7 @@ export function PresetForm({ draft, onClose, onSaved }: { draft: PresetDraft | n
           <label className="field-label" htmlFor={`${id}-order`}>
             Thứ tự
           </label>
-          <input id={`${id}-order`} inputMode="numeric" value={order} placeholder={preset ? undefined : 'Để trống: xếp cuối'} onChange={(e) => setOrder(e.target.value)} />
+          <input id={`${id}-order`} inputMode="numeric" value={order} placeholder={editing ? undefined : 'Để trống: xếp cuối'} onChange={(e) => setOrder(e.target.value)} />
           <label className="template-share">
             <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} /> Đang bật
           </label>
@@ -139,7 +158,7 @@ export function PresetForm({ draft, onClose, onSaved }: { draft: PresetDraft | n
 }
 
 /** The pending proposals for an editor, each with the preset's values now beside the proposed ones, approved or rejected one at a time. */
-export function PendingProposals({ open, proposals, onClose, onDecided }: { open: boolean; proposals: Proposal[] | null; onClose: () => void; onDecided: (notice: string) => void }) {
+export function PendingProposals({ open, proposals, onClose, onDecided }: { open: boolean; proposals: Proposal[] | null; onClose: () => void; onDecided: (notice: string | null) => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   useEffect(() => {
@@ -152,7 +171,10 @@ export function PendingProposals({ open, proposals, onClose, onDecided }: { open
       await api(`/api/preset-proposals/${p.id}/decision`, sendJson('POST', { approve }));
       onDecided(approve ? 'Đã duyệt đề xuất.' : 'Đã từ chối đề xuất.');
     } catch (e) {
-      setError(errorText(e, 'Không lưu được quyết định, hãy thử lại.'));
+      // A 409 says why (decided by someone else, or the preset was edited since the proposal) and the list is read again.
+      const conflict = e instanceof ApiError && e.status === 409;
+      setError(conflict ? e.message : errorText(e, 'Không lưu được quyết định, hãy thử lại.'));
+      if (conflict) onDecided(null);
     } finally {
       setBusy(false);
     }
@@ -211,7 +233,8 @@ export function PendingProposals({ open, proposals, onClose, onDecided }: { open
   );
 }
 
-/** The pending proposals an editor decides, from GET /api/preset-proposals (which also lists the caller's own decided ones). */
-export async function loadPending(): Promise<Proposal[]> {
-  return (await api<{ proposals: Proposal[] }>('/api/preset-proposals')).proposals.filter((p) => p.status === 'pending');
+/** The pending proposals an editor decides, oldest first, from GET /api/preset-proposals (which also lists the caller's own decided ones), and how many wait in all. */
+export async function loadPending(): Promise<{ list: Proposal[]; count: number }> {
+  const r = await api<{ proposals: Proposal[]; pendingCount: number }>('/api/preset-proposals');
+  return { list: r.proposals.filter((p) => p.status === 'pending'), count: r.pendingCount };
 }

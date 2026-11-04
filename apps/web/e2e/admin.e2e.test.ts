@@ -155,7 +155,8 @@ test('an Admin sets up a team, a store and a user, then reconciles the month cos
   await page.reload();
   await expect(page.getByRole('textbox', { name: /^Tên mẫu / }).first()).toHaveValue(`${before} (sửa)`);
 
-  // The Create form follows the presets: the new label shows, a preset switched off disappears and comes back when switched on.
+  // The Create form follows the presets: the new label shows, and a preset switched off can no longer be picked until it is switched on again.
+  // The Admin is a template editor, so the picker still shows it, dimmed and marked off; a member does not see it (api/presets/route.test.ts).
   await page.goto('/create');
   await page.getByRole('button', { name: 'Chọn mẫu khác' }).click();
   const picker = presetCards(page);
@@ -171,7 +172,10 @@ test('an Admin sets up a team, a store and a user, then reconciles the month cos
   await page.goto('/create');
   await page.getByRole('button', { name: 'Chọn mẫu khác' }).click();
   await expect(picker.filter({ hasText: `${before} (sửa)` })).toHaveCount(1);
-  await expect(picker.filter({ hasText: secondLabel })).toHaveCount(0);
+  await expect(picker.filter({ hasText: secondLabel })).toHaveCount(0); // no pick button for it
+  const offCard = page.getByRole('list', { name: 'Danh sách mẫu' }).getByRole('listitem').filter({ hasText: secondLabel });
+  await expect(offCard).toHaveClass(/(^| )off( |$)/);
+  await expect(offCard.getByText('Đang tắt')).toBeVisible();
   await page.goto('/admin/presets');
   await setSecond(true);
   await page.goto('/create');

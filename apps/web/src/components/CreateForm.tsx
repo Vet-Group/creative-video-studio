@@ -7,7 +7,7 @@ import { confirmRun } from '@/lib/run-guard';
 import { NARROW, useMediaQuery, WIDE } from '@/lib/use-media-query';
 import { useHydrated } from '@/lib/use-hydrated';
 import { useRecall } from '@/lib/use-recall';
-import { useSamples } from '@/lib/use-samples';
+import { useSamples, versionedSample } from '@/lib/use-samples';
 import { ABOUT } from '@/lib/about-content';
 import { dropRefillQuery, exampleFrom } from '@/lib/reuse';
 import { About } from './About';
@@ -122,7 +122,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
   const [editable, setEditable] = useState<PresetRow[] | null>(null);
   const [canEdit, setCanEdit] = useState(false);
   const [draft, setDraft] = useState<PresetDraft | null>(null);
-  const [pending, setPending] = useState<Proposal[] | null>(null); // the proposals waiting for an editor
+  const [pending, setPending] = useState<{ list: Proposal[]; count: number } | null>(null); // the proposals waiting for an editor
   const [reviewing, setReviewing] = useState(false);
   const [presetId, setPresetId] = useState(''); // '' means a free prompt
   const [enhance, setEnhance] = useState(true); // on by default, as on Fash; it rewrites a free prompt only
@@ -221,7 +221,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
     let stale = false;
     loadPending().then(
       (p) => !stale && setPending(p),
-      () => !stale && setPending([]),
+      () => !stale && setPending({ list: [], count: 0 }),
     );
     return () => {
       stale = true;
@@ -381,7 +381,9 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
   const presetMedia = (id: string) => {
     const ex = exampleForPreset(id, have);
     const own = cardSample(have, `preset-${id || 'general'}`, ex ? media(ex.poster) : null);
-    return { video: own.video ?? (ex ? media(ex.src) : null), poster: own.poster, ex };
+    // An editor replaces these in the picker: the versioned URL shows the new file at once.
+    const fresh = (src: string | null) => (src?.startsWith('/api/samples/preset-') ? versionedSample(src) : src);
+    return { video: fresh(own.video) ?? (ex ? media(ex.src) : null), poster: fresh(own.poster), ex };
   };
   const banner = presetMedia(presetId);
   const free = presetMedia('');
@@ -798,7 +800,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
           </button>
           {canEdit && (
             <button type="button" className="link-button" onClick={() => setReviewing(true)}>
-              Chờ duyệt ({pending?.length ?? 0})
+              Chờ duyệt ({pending?.count ?? 0})
             </button>
           )}
         </div>
@@ -811,15 +813,16 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
           notify(text);
           void refreshPresets();
         }}
+        onWritten={() => void refreshPresets()}
       />
       <PendingProposals
         open={reviewing}
-        proposals={pending}
+        proposals={pending?.list ?? null}
         onClose={() => setReviewing(false)}
         onDecided={(text) => {
-          notify(text);
+          if (text) notify(text);
           void refreshPresets();
-          void loadPending().then(setPending, () => setPending([]));
+          void loadPending().then(setPending, () => setPending({ list: [], count: 0 }));
         }}
       />
 
