@@ -878,7 +878,7 @@ dialog.admin-modal { width: min(36rem, calc(100vw - 2rem)); }
 .field-label { margin: 0; color: var(--ink-strong); font-size: 14px; line-height: 21px; font-weight: 500; }
 .help { margin: 8px 0 0; color: var(--text-muted); font-size: 12px; line-height: 18px; }
 
-.banner { position: relative; width: 100%; height: 130px; overflow: hidden; border-radius: 18px; background: var(--border); }
+.banner { position: relative; width: 100%; height: 130px; overflow: hidden; border-radius: 18px; background: var(--border); cursor: pointer; }
 .banner img, .banner video, .banner-empty { display: block; width: 100%; height: 100%; object-fit: cover; }
 .banner-empty { background: repeating-linear-gradient(135deg, var(--border) 0 10px, var(--surface-zinc) 10px 20px); }
 .banner::after { content: ''; position: absolute; inset: 0; background: rgb(var(--shade) / .1); pointer-events: none; }
@@ -1014,6 +1014,9 @@ dialog.admin-modal { width: min(36rem, calc(100vw - 2rem)); }
 .preset-card > :first-child { border-radius: 8px; }
 .preset-card > .banner-empty { height: auto; aspect-ratio: 3 / 4; }
 .preset-card button { padding: 0; border: 0; background: transparent; color: var(--ink); font-size: 13px; line-height: 18px; font-weight: 600; text-align: left; }
+/* The name's button covers the whole card, so a click on the clip picks the preset; the play button stays above it. */
+.preset-card button::before { content: ''; position: absolute; inset: 0; }
+.preset-card .preview-play { z-index: 1; }
 .preset-card:has(> button[aria-pressed='true']) > :first-child { outline: 2px solid var(--ink-strong); outline-offset: 2px; }
 @media (min-width: 768px) {
   .preset-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }

@@ -18,3 +18,16 @@ test('a late answer for the preset list does not undo the preset the member pick
   await expect.poll(() => answered === asked && asked > 0, { timeout: 10_000 }).toBe(true);
   await expect(presetOf(page)).toHaveAttribute('data-value', 'gentle-push-in');
 });
+
+// Members click the clip, not the name under it: the whole card picks the preset, and the banner clip opens the picker.
+test('a click on a preset clip picks it, and a click on the banner clip opens the picker', async ({ page }) => {
+  await signIn(page, 'preseta');
+  await page.goto('/create');
+  await expect(page.getByLabel('Ảnh sản phẩm')).toBeEnabled();
+  await page.locator('.banner').click(); // the clip, or its placeholder when the preset has none
+  const card = page.locator('.preset-card').filter({ has: page.locator('[data-value="slow-orbit"]') });
+  const clip = (await card.locator(':scope > :first-child').boundingBox())!;
+  await page.mouse.click(clip.x + clip.width / 2, clip.y + clip.height / 2); // where a member clicks, whatever lies on top
+  await expect(presetOf(page)).toHaveAttribute('data-value', 'slow-orbit');
+  await expect(page.getByRole('heading', { name: 'Chọn mẫu' })).toBeHidden();
+});
