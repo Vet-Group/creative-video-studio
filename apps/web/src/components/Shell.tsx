@@ -14,6 +14,7 @@ import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { AccountMenu } from './AccountMenu';
 import { ConfirmHost, confirmDialog } from './Confirm';
 import { Icon, type IconName } from './Icon';
+import { JobFailureNote, canRetry } from './JobFailure';
 import { JobPrompt, JobsProvider, Recreate, roleOf, Tap, toggleFullscreen, useForm, useJobs } from './jobs';
 import { LoadError } from './LoadError';
 import { type Account, type Section, Settings } from './Settings';
@@ -31,13 +32,6 @@ const STATUS_LABEL: Record<JobStatus, string> = {
   failed_unknown: 'Thất bại (không rõ kết quả)',
   timed_out: 'Quá thời gian',
 };
-const RETRYABLE: JobStatus[] = ['failed', 'failed_unknown', 'timed_out'];
-// What a Member reads about a job that did not finish; the raw error is for Admins.
-const FAILURE_TEXT = (noun: string): Partial<Record<JobStatus, string>> => ({
-  failed: `Không tạo được ${noun}. Hãy thử lại, hoặc đổi ảnh hay mô hình.`,
-  failed_unknown: `Không rõ ${noun} đã được tạo hay chưa. Hãy thử lại.`,
-  timed_out: `Việc tạo ${noun} mất quá nhiều thời gian. Hãy thử lại.`,
-});
 
 const fmtTime = (iso: string) => new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date(iso));
 
@@ -45,7 +39,6 @@ function TrayItem({ job, isAdmin }: { job: TrayJob; isAdmin: boolean }) {
   const { refresh } = useJobs();
   const [problem, setProblem] = useState('');
   const [sending, setSending] = useState(false);
-  const failure = FAILURE_TEXT(job.resolution ? 'ảnh' : 'clip')[job.status];
   const thumb = job.posterAssetId ?? (job.resolution ? job.outputAssetId : null); // an image job's output is its own picture
   async function retry() {
     setSending(true); // from the click on, so a double click cannot send two paid jobs
@@ -72,16 +65,15 @@ function TrayItem({ job, isAdmin }: { job: TrayJob; isAdmin: boolean }) {
         <p className="muted">
           {job.ratio} · {job.resolution ?? `${job.durationSec}s`} · {fmtTime(job.createdAt)}
         </p>
-        {failure && <p className="error">{failure}</p>}
-        {isAdmin && job.error && <p className="muted">{job.error}</p>}
+        <JobFailureNote job={job} isAdmin={isAdmin} />
         {job.status === 'succeeded' && (
           <p className="job-links">
             <Link href="/library">Xem trong Thư viện</Link>
           </p>
         )}
-        {((RETRYABLE.includes(job.status) && !job.retried && !job.retryOf) || reuseHref(job)) && (
+        {(canRetry(job) || reuseHref(job)) && (
           <div className="job-main">
-            {RETRYABLE.includes(job.status) && !job.retried && !job.retryOf && (
+            {canRetry(job) && (
               <button type="button" className="job-reuse job-primary" disabled={sending} onClick={() => void retry()}>
                 <Icon name="arrow" /> Thử lại
               </button>
@@ -120,7 +112,6 @@ function HistoryCard({ job, isAdmin, select }: { job: TrayJob; isAdmin: boolean;
   const media = useRef<HTMLVideoElement & HTMLImageElement>(null);
   const image = job.resolution !== null;
   const out = job.status === 'succeeded' ? job.outputAssetId : null;
-  const failure = FAILURE_TEXT(image ? 'ảnh' : 'clip')[job.status];
   const content = (id: string) => `/api/assets/${id}/content`;
 
   async function act(what: () => Promise<unknown>, fail: string) {
@@ -235,13 +226,12 @@ function HistoryCard({ job, isAdmin, select }: { job: TrayJob; isAdmin: boolean;
             <span>{job.ratio}</span>
           </p>
         )}
-        {failure && <p className="error">{failure}</p>}
-        {isAdmin && job.error && <p className="muted">{job.error}</p>}
+        <JobFailureNote job={job} isAdmin={isAdmin} />
         {job.retried && <p className="muted">Đã thử lại</p>}
         {problem && <p className="error">{problem}</p>}
         {saved && <p role="status">Đã lưu mẫu.</p>}
         <div className="job-main">
-          {RETRYABLE.includes(job.status) && !job.retried && !job.retryOf && (
+          {canRetry(job) && (
             <button type="button" className="job-reuse job-primary" disabled={sending} onClick={() => void retry()}>
               <Icon name="arrow" /> Thử lại
             </button>

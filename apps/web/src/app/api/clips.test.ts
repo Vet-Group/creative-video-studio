@@ -137,6 +137,19 @@ describe('GET /api/jobs?mine', () => {
     await pool.query('update jobs set deleted_at = now() where id = any($1)', [[preset, free, marketing]]);
   });
 
+  test('names the reason when the provider refused the input image, and leaves it null for any other failure', async () => {
+    // A disabled model of its own, so these failures move no other model's score.
+    await pool.query(`insert into model_configs (id, provider, endpoint, label, ratios, durations_sec, max_images, output_resolution, usd_per_second, sources, enabled) values ('refusal-test', 'fal', 'x', 'Refusal test', '{9:16}', '{8}', 2, '720p', 0.2, '{}', false)`);
+    const refused = await clip(alice.id, { status: 'failed', model: 'refusal-test' });
+    await pool.query(`update jobs set error = $2 where id = $1`, [refused, 'byteplus submit: HTTP 400 {"error":{"code":"InputImageSensitiveContentDetected.PrivacyInformation","message":"may contain real person"}}']);
+    const other = await clip(alice.id, { status: 'failed', model: 'refusal-test' });
+    await pool.query(`update jobs set error = 'submit failed: socket hang up' where id = $1`, [other]);
+    const { jobs } = (await (await GET_MINE(req('/api/jobs?mine', alice.cookie))).json()) as { jobs: { id: string; failureReason: string | null }[] };
+    const reason = (id: string) => jobs.find((j) => j.id === id)?.failureReason;
+    expect([reason(refused), reason(other)]).toEqual(['real_person', null]);
+    await pool.query('update jobs set deleted_at = now() where id = any($1)', [[refused, other]]);
+  });
+
   test('reports the worker offline until a heartbeat is under 60 s old', async () => {
     const offline = async () => ((await (await GET_MINE(req('/api/jobs?mine', alice.cookie))).json()) as { workerOffline: boolean }).workerOffline;
     expect(await offline()).toBe(true);

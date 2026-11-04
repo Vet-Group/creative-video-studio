@@ -1,5 +1,6 @@
 // Browser-side helpers: the JSON fetch wrapper and the shapes of the API responses the pages read.
 
+import type { FailureReason } from './job-failure';
 import { loginFor } from './return-to';
 
 export class ApiError extends Error {
@@ -41,6 +42,8 @@ export interface TrayJob {
   id: string;
   status: JobStatus;
   error: string | null;
+  /** Set when the provider refused the job's input image: a retry with the same inputs cannot succeed. */
+  failureReason: FailureReason | null;
   isMock: boolean;
   feature: string;
   ratio: string;
