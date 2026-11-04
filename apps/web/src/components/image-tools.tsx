@@ -129,10 +129,12 @@ export interface ReuseJob {
   feature: string;
   /** A sample's details file (`?example=`) names its photos as samples; a job or a template has uploaded images. */
   images: (Img | { sample: string })[];
-  /** The job's prompt: the member's own text on Image Generation, a composed prompt elsewhere. */
+  /** The job's prompt: the member's own text on Image Generation without a style, a composed prompt elsewhere. */
   prompt: string | null;
-  /** The member's own text, kept for reuse (Try On and the apps). */
+  /** The member's own text, kept for reuse (Try On, the apps, and Image Generation beside a style). */
   brief: string | null;
+  /** Image Generation's style (a job's or a template's); left out by a sample's details file. */
+  presetId?: string | null;
   garments: number | null;
   enhance: boolean | null;
   ratio: string | null;

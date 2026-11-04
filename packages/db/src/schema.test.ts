@@ -57,13 +57,13 @@ describe('migration 0002 seed data', () => {
   });
 
   test('seeds the six presets from packages/core/src/presets.ts, the safe one flagged once', async () => {
-    const { rows } = await pool.query(`select id, label, prompt, is_bakeoff_safe as "isBakeoffSafe" from presets where sort_order < 10 order by sort_order`);
+    const { rows } = await pool.query(`select id, label, prompt, is_bakeoff_safe as "isBakeoffSafe" from presets where feature = 'video' and sort_order < 10 order by sort_order`);
     expect(rows).toEqual(PRESETS.map((p) => ({ id: p.id, label: p.label, prompt: p.prompt, isBakeoffSafe: p.isBakeoffSafe })));
     expect((await pool.query('select id from presets where is_bakeoff_safe')).rows).toHaveLength(1);
   });
 
   test('migration 0020 adds the 19 motion templates after the company presets, enabled, not bake-off safe, with ASCII prompts that keep the person and outfit', async () => {
-    const { rows } = await pool.query(`select id, label, prompt, enabled, is_bakeoff_safe as safe, sort_order as sort from presets where sort_order >= 10 order by sort_order`);
+    const { rows } = await pool.query(`select id, label, prompt, enabled, is_bakeoff_safe as safe, sort_order as sort from presets where feature = 'video' and sort_order >= 10 order by sort_order`);
     expect(rows).toHaveLength(19);
     expect(rows.slice(0, 2).map((r) => r.id)).toEqual(['shoulder-sequence', 'turn-around']);
     expect(rows.at(-1)).toMatchObject({ id: 'golden-hour-wall', sort: 28 });
@@ -75,7 +75,7 @@ describe('migration 0002 seed data', () => {
   });
 
   test('migration 0024 gives the motion templates Vietnamese labels, as the company presets have', async () => {
-    const { rows } = await pool.query(`select id, label from presets where sort_order >= 10 order by sort_order`);
+    const { rows } = await pool.query(`select id, label from presets where feature = 'video' and sort_order >= 10 order by sort_order`);
     expect(rows.at(0)).toEqual({ id: 'shoulder-sequence', label: 'Cận chi tiết rồi toàn thân' }); // renamed by 0065
     expect(rows.at(-1)).toEqual({ id: 'golden-hour-wall', label: 'Tường nắng hoàng hôn' });
     expect(new Set(rows.map((r) => r.label)).size).toBe(19);
@@ -91,6 +91,23 @@ describe('migration 0002 seed data', () => {
     const audit = (await pool.query(`select target, old_value, new_value from audit_entries where action = 'preset.update' and actor_id is null order by target`)).rows;
     expect(audit).toHaveLength(13);
     expect(audit.find((a) => a.target === 'preset:turn-around')).toMatchObject({ old_value: { label: 'Xoay một vòng' }, new_value: { label: 'Lia vòng ra sau lưng' } });
+  });
+
+  test('migration 0066 makes every earlier preset a Create one and adds eight enabled Image Generation styles with ASCII prompts that keep the subject', async () => {
+    expect((await pool.query(`select count(*)::int as n from presets where feature = 'video'`)).rows[0].n).toBe(25);
+    const { rows } = await pool.query(`select id, label, prompt, enabled, sort_order as sort from presets where feature = 'image' order by sort_order`);
+    expect(rows.map((r) => r.sort)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+    expect(rows.at(0)).toMatchObject({ id: 'style-white-studio', label: 'Studio nền trắng' });
+    expect(rows.at(-1)).toMatchObject({ id: 'style-flat-lay', label: 'Phẳng nằm' });
+    expect(rows.map((r) => r.label)).toContain('Ngoài trời giờ vàng');
+    for (const r of rows) {
+      expect(r.enabled).toBe(true);
+      expect(r.label).toMatch(/[^ -~]/); // Vietnamese, with its marks
+      expect(r.prompt).toMatch(/^[ -~]+$/);
+      expect(r.prompt).toContain('Keep the product and any person exactly unchanged');
+      expect(r.prompt).toContain('Do not add any text, logos or watermarks.');
+    }
+    await expect(pool.query(`update presets set feature = 'audio' where id = 'style-street'`)).rejects.toThrow(/presets_feature_check/);
   });
 
   test('seeds the two models with price, limits and bake-off record (migration 0013: Kling enabled, Seedance disabled; 0022: Kling takes 7 references; 0057 adds the Replicate round to Seedance), and the settings row', async () => {

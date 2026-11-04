@@ -28,7 +28,7 @@ const MIN_AUDIO_MS = 2000;
 /** The apps whose fixed instruction a member's own prompt is added to, not replaced by. */
 const APPEND_TO_INSTRUCTION = ['character_swap', 'model_swap', 'lingerie_try_on'];
 const MIN_INPUTS: Record<string, number> = { character_swap: 2, model_swap: 2, face_swap: 2, jewelry_try_on: 2, lingerie_try_on: 2 };
-/** `presetId` is null for a free prompt, and `prompt` is null when a preset supplies it (or, in a retry, when the original's is copied). An image job has no preset and `durationSec` 0. */
+/** `presetId` is null for a free prompt, and `prompt` is null when a preset supplies it (or, in a retry, when the original's is copied). An image job has `durationSec` 0, and no preset but Image Generation's style. */
 type Spec = {
   assetIds: string[]; modelId: string; presetId: string | null; prompt: string | null; ratio: string; durationSec: number; storeId: string | null;
   feature: string; params: Record<string, string>;
@@ -89,7 +89,7 @@ export async function GET(request: Request) {
  * `params.audioAssetIds`, reference audio: the caller's own MP3/WAV clips (comma-separated ids), each at least 2 s, within the model's count and total length; and no other `params`. `marketing` needs exactly 2 inputs (the model photo, then the product photo) and a prompt, no preset;
  * with `params.format` 'advanced' (Marketing Studio Advanced) it takes 1 to 7 reference images instead, up to the model's `max_images`. A video job's optional `params.audio` 'on' prices
  * it at the endpoint's audio price (AUDIO_USD_PER_SECOND; refused on a model without one), and 'off' or none keeps it silent; an ALWAYS_AUDIO model has sound either way, at its stored price. Any other feature is an
- * image job: an enabled image model that lists the feature, no preset, a prompt (the apps in FEATURE_PROMPTS may omit it and get that one), 1 to the model's `max_images`
+ * image job: an enabled image model that lists the feature, no preset (Image Generation may name one of its enabled styles, whose prompt follows the member's, who keeps theirs as `params.brief`), a prompt (the apps in FEATURE_PROMPTS may omit it and get that one), 1 to the model's `max_images`
  * inputs (Try On, the two swaps and Face Swap need at least 2; Background Changer takes a prompt or a second image as the reference), one of the model's ratios (or `auto`), `params.resolution` (a key of the model's `image_prices`, which also sets the
  * estimate), an optional `params.quality` and an optional `params.thinking` (one of the model's `thinking_levels`; its `thinking_prices` set the estimate, the first level's when none is named). `durationSec` is not read and the job stores 0.
  * `motion_control` takes a video model that lists it, exactly 2 inputs (the character image, then an MP4/MOV reference video), ratio `auto`, no preset and
@@ -155,9 +155,9 @@ export async function POST(request: Request) {
     if (given.garments !== undefined && !(/^[1-9]$/.test(given.garments) && Number(given.garments) <= assetIds.length - 1)) {
       return bad(`params.garments must count the garment images (1 to ${assetIds.length - 1})`);
     }
-    // The PRD gives "an optional prompt, or one of the presets" for video: exactly one of the two. An image job has no presets.
-    if (!motion && (isImage ? presetId !== null || (freePrompt === null && !Object.hasOwn(FEATURE_PROMPTS, feature)) : (presetId === null) === (freePrompt === null))) {
-      return bad(isImage ? 'an image job takes a prompt and no preset (only the apps may omit the prompt)' : 'give either a presetId or a prompt, not both and not neither');
+    // The PRD gives "an optional prompt, or one of the presets" for video: exactly one of the two. An image job has no presets, but Image Generation adds a style to its prompt.
+    if (!motion && (isImage ? (presetId !== null && feature !== 'image') || (freePrompt === null && !Object.hasOwn(FEATURE_PROMPTS, feature)) : (presetId === null) === (freePrompt === null))) {
+      return bad(isImage ? 'an image job takes a prompt and no preset (only the apps may omit the prompt, and only Image Generation takes a style)' : 'give either a presetId or a prompt, not both and not neither');
     }
     // The presets move the product in the image, the end frame is where the first image goes, and the reference endpoints that take audio need an image too.
     if (feature === 'video' && assetIds.length === 0 && (presetId !== null || given.endAssetId !== undefined || given.audioAssetIds !== undefined)) {
@@ -166,7 +166,7 @@ export async function POST(request: Request) {
     // Background Changer takes a prompt (one image) or a reference image (two images), the schema says not both.
     if (feature === 'background_changer' && (assetIds.length > 1) === (freePrompt !== null)) return bad('Background Changer takes a prompt or a reference image (the second image), not both and not neither');
     if (typeof enhance !== 'boolean') return bad('enhance must be true or false');
-    if (enhance && (!ENHANCE_FEATURES.includes(feature) || presetId !== null)) return bad('Enhance rewrites your own prompt in Create video and Image Generation only');
+    if (enhance && (!ENHANCE_FEATURES.includes(feature) || (presetId !== null && !isImage))) return bad('Enhance rewrites your own prompt in Create video and Image Generation only');
     const written = freePrompt?.trim();
     const prompt = written && APPEND_TO_INSTRUCTION.includes(feature) ? `${FEATURE_PROMPTS[feature]}. ${written}` : (written ?? FEATURE_PROMPTS[feature] ?? (motion ? '' : null));
     if (prompt !== null && ((prompt === '' && !motion) || prompt.length > PROMPT_CEILING)) return bad(`the prompt must have 1 to ${PROMPT_CEILING} characters`);
@@ -197,7 +197,9 @@ export async function POST(request: Request) {
       if (!end.rows[0]?.mime.startsWith('image/')) return bad('params.endAssetId must be one of your own images');
     }
     const length = motion ? Math.ceil(byId.get(assetIds[1] as string)!.duration_ms! / 1000) : (durationSec as number);
-    spec = { assetIds, modelId, presetId, prompt, ratio, durationSec: isImage ? 0 : length, storeId: storeId as string | null, feature, params: params as Record<string, string>, enhance };
+    // A style's prompt joins the member's under the lock below; their own words stay the brief, as History and Reuse read them.
+    const kept = isImage && presetId !== null ? { ...(params as Record<string, string>), brief: written! } : (params as Record<string, string>);
+    spec = { assetIds, modelId, presetId, prompt, ratio, durationSec: isImage ? 0 : length, storeId: storeId as string | null, feature, params: kept, enhance };
   }
 
   const id = crypto.randomUUID();
@@ -250,8 +252,10 @@ export async function POST(request: Request) {
     let prompt = original?.prompt ?? freePrompt;
     if (!original) {
       if (presetId !== null) {
-        prompt = (await tx.query('select prompt from presets where id = $1 and enabled', [presetId])).rows[0]?.prompt;
-        if (prompt === undefined) return bad('the preset does not exist or is not enabled');
+        // A Create preset on Create video, an Image Generation style on an image job: never the other page's.
+        const preset: string | undefined = (await tx.query('select prompt from presets where id = $1 and enabled and feature = $2', [presetId, isImage ? 'image' : 'video'])).rows[0]?.prompt;
+        if (preset === undefined) return bad('the preset does not exist or is not enabled');
+        prompt = isImage ? `${freePrompt}\n\n${preset}` : preset;
       }
       // Checked here, before anything is reserved, rather than refused by the provider after the money is held. A retry sends the prompt it was checked with.
       const limit = promptLimit(model.max_prompt_chars);

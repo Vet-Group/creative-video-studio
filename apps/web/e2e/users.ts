@@ -100,6 +100,7 @@ export const USERS = {
   clickb: { email: 'clickb@e2e.test', name: 'E2E Click B', role: 'member' },
   clickc: { email: 'clickc@e2e.test', name: 'E2E Click C', role: 'member' },
   clickd: { email: 'clickd@e2e.test', name: 'E2E Click D', role: 'member' },
+  stylea: { email: 'stylea@e2e.test', name: 'E2E Style A', role: 'member' }, // image-styles.e2e: picks a style on Image Generation and runs it on a mock model
   admin: { email: 'admin@e2e.test', name: 'E2E Admin', role: 'admin' },
 } as const;
 

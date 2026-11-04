@@ -1,6 +1,6 @@
 'use client';
-// Preset management in Create's preset picker: a template editor (an Admin, or a user an Admin allowed) edits or adds a preset and decides the
-// members' proposals; any other member proposes a change or a new preset, and one editor's approval applies it.
+// Preset management in Create's preset picker and Image Generation's style picker: a template editor (an Admin, or a user an Admin allowed) edits
+// or adds a preset and decides the members' proposals; any other member proposes a change or a new preset, and one editor's approval applies it.
 import { useEffect, useId, useState } from 'react';
 import { api, ApiError, errorText, sendJson } from '@/lib/api';
 import { reloadSamples, useSamples } from '@/lib/use-samples';
@@ -33,11 +33,14 @@ export interface Proposal {
   current: { label: string; prompt?: string; enabled: boolean; sortOrder: number } | null;
 }
 
+/** The page a preset belongs to (presets.feature): Create's motion presets, or Image Generation's styles, which have an example picture and no clip. */
+export type PresetFeature = 'video' | 'image';
+
 /**
  * Edit or add a preset (an editor), or propose either (a member). `onSaved` gets the notice to show once it is done; `onWritten` runs after
  * a preset was saved but its clip or poster was not, so the form stays open on it.
  */
-export function PresetForm({ draft, onClose, onSaved, onWritten }: { draft: PresetDraft | null; onClose: () => void; onSaved: (notice: string) => void; onWritten: () => void }) {
+export function PresetForm({ draft, feature = 'video', onClose, onSaved, onWritten }: { draft: PresetDraft | null; feature?: PresetFeature; onClose: () => void; onSaved: (notice: string) => void; onWritten: () => void }) {
   const id = useId();
   const [label, setLabel] = useState('');
   const [prompt, setPrompt] = useState('');
@@ -51,6 +54,7 @@ export function PresetForm({ draft, onClose, onSaved, onWritten }: { draft: Pres
   // The preset as last saved: the draft's, then what a save returned, so a second Save after a failed upload changes it rather than adding another.
   const [preset, setPreset] = useState<PresetRow | null>(null);
   const propose = draft?.propose === true;
+  const style = feature === 'image';
   // The prompt-from-video button: a vision LLM reads the preset's saved clip and its answer fills the prompt field; nothing is saved before Save.
   const have = useSamples();
   const fromVideo = useSuggest();
@@ -92,11 +96,11 @@ export function PresetForm({ draft, onClose, onSaved, onWritten }: { draft: Pres
       if (propose) {
         const change = preset
           ? { presetId: preset.id, ...(label.trim() !== preset.label && { label: label.trim() }), ...(prompt.trim() && { prompt: prompt.trim() }) }
-          : { label: label.trim(), prompt: prompt.trim() };
+          : { label: label.trim(), prompt: prompt.trim(), feature };
         await api('/api/preset-proposals', sendJson('POST', { ...change, ...(note.trim() && { note: note.trim() }) }));
         return onSaved('Đã gửi đề xuất, chờ người có quyền duyệt.');
       }
-      const saved = Object.keys(diff).length === 0 ? preset! : await api<PresetRow>(preset ? `/api/presets/${preset.id}` : '/api/presets', sendJson(preset ? 'PATCH' : 'POST', diff));
+      const saved = Object.keys(diff).length === 0 ? preset! : await api<PresetRow>(preset ? `/api/presets/${preset.id}` : '/api/presets', sendJson(preset ? 'PATCH' : 'POST', preset ? diff : { ...diff, feature }));
       setPreset(saved);
       setOrder(String(saved.sortOrder));
       try {
@@ -108,7 +112,7 @@ export function PresetForm({ draft, onClose, onSaved, onWritten }: { draft: Pres
       } catch {
         reloadSamples();
         onWritten();
-        return setError('Đã lưu mẫu nhưng chưa tải lên được video mẫu hoặc ảnh bìa. Bấm Lưu để thử lại.');
+        return setError(style ? 'Đã lưu mẫu nhưng chưa tải lên được ảnh ví dụ. Bấm Lưu để thử lại.' : 'Đã lưu mẫu nhưng chưa tải lên được video mẫu hoặc ảnh bìa. Bấm Lưu để thử lại.');
       }
       if (video || poster) reloadSamples();
       onSaved(editing ? 'Đã lưu mẫu.' : 'Đã thêm mẫu.');
@@ -129,9 +133,9 @@ export function PresetForm({ draft, onClose, onSaved, onWritten }: { draft: Pres
       <input id={`${id}-label`} value={label} maxLength={100} onChange={(e) => setLabel(e.target.value)} />
       <div className="field-head">
         <label className="field-label" htmlFor={`${id}-prompt`}>
-          {propose && editing ? 'Mô tả chuyển động mới (tiếng Anh)' : 'Mô tả chuyển động (tiếng Anh)'}
+          {`Mô tả ${style ? 'phong cách' : 'chuyển động'}${propose && editing ? ' mới' : ''} (tiếng Anh)`}
         </label>
-        {!propose && editing && (
+        {!propose && editing && !style && (
           <button
             type="button"
             className="suggest-button"
@@ -148,7 +152,7 @@ export function PresetForm({ draft, onClose, onSaved, onWritten }: { draft: Pres
         )}
       </div>
       <textarea id={`${id}-prompt`} rows={4} value={prompt} placeholder={propose && editing ? 'Để trống nếu giữ nguyên mô tả hiện tại' : undefined} onChange={(e) => setPrompt(e.target.value)} />
-      {!propose && editing && (
+      {!propose && editing && !style && (
         <p className="help" id={`${id}-from-video`}>
           {!clipSaved
             ? 'Mẫu này chưa có video mẫu để gợi ý mô tả.'
@@ -178,12 +182,16 @@ export function PresetForm({ draft, onClose, onSaved, onWritten }: { draft: Pres
           <label className="template-share">
             <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} /> Đang bật
           </label>
-          <label className="field-label" htmlFor={`${id}-video`}>
-            Thay video mẫu (MP4)
-          </label>
-          <input id={`${id}-video`} type="file" accept="video/mp4" onChange={(e) => setVideo(e.target.files?.[0] ?? null)} />
+          {!style && (
+            <>
+              <label className="field-label" htmlFor={`${id}-video`}>
+                Thay video mẫu (MP4)
+              </label>
+              <input id={`${id}-video`} type="file" accept="video/mp4" onChange={(e) => setVideo(e.target.files?.[0] ?? null)} />
+            </>
+          )}
           <label className="field-label" htmlFor={`${id}-poster`}>
-            Thay ảnh bìa (JPG)
+            {style ? 'Thay ảnh ví dụ (JPG)' : 'Thay ảnh bìa (JPG)'}
           </label>
           <input id={`${id}-poster`} type="file" accept="image/jpeg" onChange={(e) => setPoster(e.target.files?.[0] ?? null)} />
         </>
@@ -201,7 +209,7 @@ export function PresetForm({ draft, onClose, onSaved, onWritten }: { draft: Pres
 }
 
 /** The pending proposals for an editor, each with the preset's values now beside the proposed ones, approved or rejected one at a time. */
-export function PendingProposals({ open, proposals, onClose, onDecided }: { open: boolean; proposals: Proposal[] | null; onClose: () => void; onDecided: (notice: string | null) => void }) {
+export function PendingProposals({ open, proposals, feature = 'video', onClose, onDecided }: { open: boolean; proposals: Proposal[] | null; feature?: PresetFeature; onClose: () => void; onDecided: (notice: string | null) => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   useEffect(() => {
@@ -225,7 +233,7 @@ export function PendingProposals({ open, proposals, onClose, onDecided }: { open
   const rows = (p: Proposal) =>
     [
       ['Tên mẫu', p.current?.label, p.label],
-      ['Mô tả chuyển động', p.current?.prompt, p.prompt],
+      [feature === 'image' ? 'Mô tả phong cách' : 'Mô tả chuyển động', p.current?.prompt, p.prompt],
       ['Thứ tự', p.current?.sortOrder, p.sortOrder],
       ['Trạng thái', p.current && (p.current.enabled ? 'Đang bật' : 'Đang tắt'), p.enabled === null ? null : p.enabled ? 'Đang bật' : 'Đang tắt'],
     ].filter(([, , next]) => next !== null) as [string, string | number | undefined, string | number][];
@@ -276,8 +284,8 @@ export function PendingProposals({ open, proposals, onClose, onDecided }: { open
   );
 }
 
-/** The pending proposals an editor decides, oldest first, from GET /api/preset-proposals (which also lists the caller's own decided ones), and how many wait in all. */
-export async function loadPending(): Promise<{ list: Proposal[]; count: number }> {
-  const r = await api<{ proposals: Proposal[]; pendingCount: number }>('/api/preset-proposals');
+/** The pending proposals of one picker an editor decides, oldest first, from GET /api/preset-proposals (which also lists the caller's own decided ones), and how many wait in all. */
+export async function loadPending(feature: PresetFeature = 'video'): Promise<{ list: Proposal[]; count: number }> {
+  const r = await api<{ proposals: Proposal[]; pendingCount: number }>(`/api/preset-proposals?feature=${feature}`);
   return { list: r.proposals.filter((p) => p.status === 'pending'), count: r.pendingCount };
 }

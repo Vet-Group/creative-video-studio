@@ -61,7 +61,7 @@ export default async function ExplorePage() {
     pool.query<{ id: string; label: string; provider: string; kind: string; ratios: string[]; durations_sec: number[]; usd_per_second: string | null; image_prices: Record<string, string> | null }>(
       `select id, label, provider, kind, ratios, durations_sec, usd_per_second, image_prices from model_configs where enabled and kind = any(features) and kind in ('video', 'image') order by kind desc, label, id`,
     ),
-    pool.query<{ id: string; label: string }>('select id, label from presets where enabled order by sort_order, id'),
+    pool.query<{ id: string; label: string }>(`select id, label from presets where feature = 'video' and enabled order by sort_order, id`),
     listSamples().catch(() => []), // without the bucket the page keeps its fallbacks
     // The same scores as the pickers: every mark for a video model, the Image Generation marks for an image model.
     modelStats(null),

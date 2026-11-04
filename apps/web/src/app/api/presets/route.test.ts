@@ -45,11 +45,11 @@ describe('GET /api/presets', () => {
   });
 
   test('lists the enabled presets in display order with only the id and the label to a member, and every column to an Admin', async () => {
-    const all = (await pool.query('select id, label from presets order by sort_order, id')).rows;
+    const all = (await pool.query(`select id, label from presets where feature = 'video' order by sort_order, id`)).rows;
     expect(all.length).toBeGreaterThan(1);
     const body = await (await GET(call(memberCookie, '/api/presets'))).json();
     expect(body).toEqual({ presets: all, canEdit: false });
-    const full = (await pool.query('select id, label, prompt, enabled, sort_order as "sortOrder" from presets order by sort_order, id')).rows;
+    const full = (await pool.query(`select id, label, prompt, enabled, sort_order as "sortOrder" from presets where feature = 'video' order by sort_order, id`)).rows;
     expect(await (await GET(call(adminCookie, '/api/presets'))).json()).toEqual({ presets: full, canEdit: true });
   });
 

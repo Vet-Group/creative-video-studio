@@ -329,11 +329,11 @@ interface ClipInputs {
 }
 const NO_INPUTS: ClipInputs = { prompt: null, presetId: null, enhance: null, enhancedPrompt: null, audio: null, brief: null, script: null, format: null, hook: null, location: null, images: [] };
 
-/** The preset names, read once per page load for the detail view's template row; a failed read is tried again next time. */
+/** The preset and image style names, read once per page load for the detail view's template row; a failed read is tried again next time. */
 let presetNames: Promise<Map<string, string>> | null = null;
 const loadPresetNames = () =>
-  (presetNames ??= api<{ presets: { id: string; label: string }[] }>('/api/presets').then(
-    (r) => new Map(r.presets.map((p) => [p.id, p.label])),
+  (presetNames ??= Promise.all(['video', 'image'].map((f) => api<{ presets: { id: string; label: string }[] }>(`/api/presets?feature=${f}`))).then(
+    (r) => new Map(r.flatMap((l) => l.presets).map((p) => [p.id, p.label])),
     () => ((presetNames = null), new Map<string, string>()),
   ));
 /** A Marketing choice's name; a member's own hook or location shows as their own. */
@@ -371,8 +371,8 @@ function ClipDetail({ clips, index, stores, onIndex, onChange }: { clips: Clip[]
     return () => document.removeEventListener('keydown', onKey);
   }, [index, clips.length, onIndex]);
 
-  // The creator's own words: a free prompt on Create video and Image Generation; Marketing keeps a brief and a script; the other features compose theirs.
-  const own = job && ((clip.feature === 'video' && !job.presetId) || clip.feature === 'image' ? job.prompt : null);
+  // The creator's own words: a free prompt on Create video and Image Generation (a brief with an image style); Marketing keeps a brief and a script; the other features compose theirs.
+  const own = job && ((clip.feature === 'video' || clip.feature === 'image') && !job.presetId ? job.prompt : null);
   const sent = job?.prompt && job.prompt !== own ? job.prompt : null; // what the model got, when it is not the creator's words as typed
   const title = clip.feature === 'marketing' ? (job?.format === 'advanced' ? 'Marketing nâng cao' : 'UGC Thử đồ') : featureLabel(clip.feature);
   const copyText = own ?? job?.brief ?? job?.prompt ?? null;
