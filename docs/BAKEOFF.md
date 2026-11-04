@@ -69,3 +69,30 @@ all hold. Judged blind, the key read after the verdicts (2026-10-29).
 | virtual-try-on on Vertex | - | 8/10 | 3/5 | pair 2; pair 4 "MATTERS" garbled |
 
 Nano Banana 2.1 passes at 27% of Pro's price, so migration 0032 records 9/10 as its prior and the Try On picker recommends it. Migration 0034 gives the Vertex row the same prior, so on the tie the picker recommends the cheaper Vertex row and the fal row stays as the fallback.
+
+## Replicate round
+
+The owner spent the last Replicate credit (2026-11-04, cap $20.75, estimated spend $20.62) on the Replicate twins of models CVS also serves on BytePlus
+and Vertex (`scripts/bakeoff/replicate-round.ts`). Video: the inputs.json images as 9:16 720p clips at each model's thrift length, the rubric of
+`scripts/bakeoff/rubric.md`. Images: the Image feature's restyle of eight product photos at 1K (Seedream 5 lite at 2K, its smallest size), the rubric of
+`scripts/bakeoff/rubric-image.md`. Two independent agents judged blind, the key read after the verdicts. A job the provider's sensitive-content filter
+refused (E005) counts as a fail.
+
+| Row | Passed | Faults |
+|---|---|---|
+| seedance-2.0-replicate | 3/10 | 2 refused (images 6, 9), print 2, flicker 2, deformed 1 |
+| seedance-2.5 | 1/3 | 1 refused (image 6), print 1 |
+| veo-3.1-replicate | 1/4 | print 1, colour 1, flicker 1 |
+| nano-banana-2 | 5/8 | 1 refused (image 3), print 2 |
+| seedream-5-pro | 3/8 | print 5 |
+| nano-banana-2.1, kept at 9/10 | 3/8 | print 5 |
+| seedream-5-lite, no CVS row | 3/8 | print 4, colour 1 |
+| nano-banana | 1/8 | 1 refused (image 3), print 5, deformed 2, colour 1 |
+
+Printed words and artwork are what fails: 21 of the 23 failed images and 4 of the 9 failed clips redraw them. Four of the five image models passed the glass and
+ornament photos (images 2, 8, 10), and so did Seedance 2.0; the cap, the map blanket and the slogan tees failed almost everywhere.
+
+Migration 0057 adds each count to the row's earlier prior and writes the total to every row of the same model (Replicate, BytePlus, Vertex and fal), so twins
+rank alike and a tie goes to the cheaper row: Seedance 2.0 3/10, Seedance 2.5 7/12, Veo 3.1 1/4, Seedream 5 Pro 8/18, Nano Banana 2 10/18, Nano Banana 4/18.
+Nano Banana 2.1 keeps its 9/10 from the Try On rounds: the prior is not per feature, and this restyle round would rank it below FASHN in Try On on
+evidence from another feature. Samples are small (Wilson intervals span 40 points or more), so these are priors, not verdicts; staff marks keep adding to them.
