@@ -801,6 +801,24 @@ describe('POST /api/jobs for an image feature', () => {
         }
       });
 
+      test('runs an always-audio model (0060) at its stored price with audio on, within its own max_images and ratios', async () => {
+        await pool.query(`update model_configs set enabled = true where id in ('wan-2.7-reference', 'gemini-omni-flash-reference')`);
+        try {
+          const m = await newMember();
+          const wan = { modelId: 'wan-2.7-reference', ratio: '9:16', durationSec: 5 };
+          const res = await advanced(m, 4, wan);
+          expect(res.status).toBe(201);
+          const { id } = (await res.json()) as { id: string };
+          expect((await pool.query(`select usd::text from cost_entries where job_id = $1`, [id])).rows).toEqual([{ usd: '0.5000' }]); // $0.10/s, sound included
+          const before = await jobCount();
+          expect(await error(await advanced(m, 5, wan))).toMatch(/ratio, duration or number of images/); // WAN takes 4
+          expect(await error(await advanced(m, 2, { modelId: 'gemini-omni-flash-reference', ratio: '1:1', durationSec: 5 }))).toMatch(/ratio, duration or number of images/); // no 1:1
+          expect(await jobCount()).toBe(before);
+        } finally {
+          await pool.query(`update model_configs set enabled = false where id in ('wan-2.7-reference', 'gemini-omni-flash-reference')`);
+        }
+      });
+
       test('refuses no image, an eighth image, a missing prompt, a preset, and unknown format or audio values, in English', async () => {
         const m = await newMember();
         const before = await jobCount();

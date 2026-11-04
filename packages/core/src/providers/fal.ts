@@ -68,7 +68,8 @@ const oneShot = (prompt: string) => `${prompt} One continuous shot that starts o
 /**
  * How each fal video endpoint takes a Run, built from its input schema (read 2026-10-25, sources in migration 0015; Kling O3 Pro 2026-10-23). `crop`: the
  * endpoint has no ratio field and follows the input image, so the worker centre-crops the inputs to the chosen ratio first.
- * Audio follows the job wherever the schema has the switch (the stored prices are for audio off), and the resolution is the one the stored price is for.
+ * Audio follows the job wherever the schema has the switch (the stored prices are for audio off); the ALWAYS_AUDIO endpoints have none and always make
+ * sound at the stored price (models.ts). The resolution is the one the stored price is for.
  */
 interface VideoBody {
   crop?: boolean;

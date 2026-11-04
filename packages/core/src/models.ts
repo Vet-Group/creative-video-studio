@@ -189,9 +189,15 @@ export const AUDIO_USD_PER_SECOND: Record<string, number> = {
   mock: 0,
 };
 
+/**
+ * The endpoints that always make sound: their fal schemas have no audio switch, and the owner's paid test of 2026-11-04 (migration 0060) heard real
+ * speech from each at the row's own price, so audio on costs the stored price and the switch cannot turn it off.
+ */
+export const ALWAYS_AUDIO: ReadonlySet<string> = new Set(['google/gemini-omni-flash/v1.1/reference-to-video', 'minimax/h3-max/reference-to-video', 'xai/grok-imagine-video/reference-to-video', 'fal-ai/wan/v2.7/reference-to-video']);
+
 /** The model's price per second for a job, with audio on when `audio` is 'on' (a job's params.audio); undefined when the endpoint cannot make audio. */
 export const usdPerSecondFor = (model: { endpoint: string; usdPerSecond: number | string }, audio: string | undefined): number | string | undefined =>
-  audio === 'on' ? (Object.hasOwn(AUDIO_USD_PER_SECOND, model.endpoint) ? AUDIO_USD_PER_SECOND[model.endpoint] : undefined) : model.usdPerSecond;
+  audio !== 'on' || ALWAYS_AUDIO.has(model.endpoint) ? model.usdPerSecond : Object.hasOwn(AUDIO_USD_PER_SECOND, model.endpoint) ? AUDIO_USD_PER_SECOND[model.endpoint] : undefined;
 
 /** The USD a Run of `durationSec` reserves at the model's price, as a 4-decimal string (a mock job books 0 in the ledger regardless). */
 export const estimateUsd = (usdPerSecond: number | string, durationSec: number): string => (Number(usdPerSecond) * durationSec).toFixed(4);

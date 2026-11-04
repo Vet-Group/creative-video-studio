@@ -414,6 +414,13 @@
       "when": 1794394970036,
       "tag": "0059_seedream_4_byteplus",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1794394971036,
+      "tag": "0060_marketing_more_models",
+      "breakpoints": true
     }
   ]
 }

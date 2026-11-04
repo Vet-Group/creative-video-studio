@@ -40,6 +40,8 @@ interface Model {
   estimateUsd: string;
   /** The estimate with native audio on; null when the model cannot make audio. */
   audioEstimateUsd: string | null;
+  /** The model always makes sound, so the audio switch stays on. */
+  alwaysAudio: boolean;
   /** The model takes an end frame. */
   endFrame: boolean;
   /** The model runs from the prompt alone, with no image. */
@@ -259,7 +261,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
   }, [ready, recall.answered, ratio, durationSec, refetch]);
 
   const chosen = models?.models.find((m) => m.id === modelId);
-  const audioOn = audio && chosen?.audioEstimateUsd != null;
+  const audioOn = (audio || chosen?.alwaysAudio === true) && chosen?.audioEstimateUsd != null;
   const endAssetId = chosen?.endFrame && images.length > 0 ? endFrame?.id : undefined;
   // As on Fash, a model with a text twin runs from the prompt alone; a preset moves the product in an image, so it needs one.
   const wordsOnly = images.length === 0 && chosen?.textOnly === true;
@@ -618,7 +620,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
               options={[...new Set(ratios)].map((r) => ({ value: r, label: RATIO_LABEL[r] ?? r }))}
               onChange={setRatio}
             />
-            <AudioSwitch on={audio} available={chosen?.audioEstimateUsd != null} onChange={setAudio} />
+            <AudioSwitch on={audio} available={chosen?.audioEstimateUsd != null} always={chosen?.alwaysAudio} onChange={setAudio} />
             <Select
               label="Cửa hàng/Thương hiệu"
               icon="store"

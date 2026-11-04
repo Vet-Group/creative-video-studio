@@ -1,0 +1,8 @@
+-- Marketing Studio gets four more reference-to-video models (owner, 2026-11-04): Gemini Omni Flash, Minimax H3 Max at 768P, 480P and 1080P, Grok Imagine
+-- and WAN 2.7. Each takes a list of reference images (the model photo and the product photo, or up to Advanced's 7 within the row's own max_images:
+-- Gemini and Minimax 9, Grok 7, WAN 4), and makes sound on its own: none of the four fal input schemas has a generate_audio switch. The owner-approved
+-- paid test of 2026-11-04 (one 5 s 9:16 clip each straight on fal, two reference images, a Vietnamese line in the prompt) got an AAC audio track with
+-- real speech from all four (gpt-transcribe read the Vietnamese line back; WAN garbled its first words), at fal costs of Grok $0.354, Gemini $0.503,
+-- WAN $0.50 and Minimax 768P $0.40, the rows' own prices per second, so audio on costs nothing more (ALWAYS_AUDIO in packages/core/src/models.ts).
+-- The rows keep their ratios, durations and limits; Marketing Studio offers only 9:16, 1:1 and 16:9 of them (the models API), and Gemini has no 1:1.
+UPDATE "model_configs" SET "features" = array_append("features", 'marketing'), "sources" = "sources" || jsonb_build_object('nativeAudio', jsonb_build_object('url', 'https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=' || "endpoint", 'readAt', '2026-11-04', 'note', 'no generate_audio field; the owner-approved paid test of 2026-11-04 heard real speech at the stored price')), "updated_at" = now() WHERE "id" IN ('gemini-omni-flash-reference', 'minimax-h3-max-reference', 'minimax-h3-max-reference-480p', 'minimax-h3-max-reference-1080p', 'grok-imagine-reference', 'wan-2.7-reference') AND NOT 'marketing' = ANY("features");
