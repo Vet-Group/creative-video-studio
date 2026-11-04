@@ -8,6 +8,7 @@ import { pool } from '@/lib/auth';
 import { boss } from '@/lib/queue';
 import { findChoice } from '@/lib/choices';
 import { inputRefusal } from '@/lib/job-failure';
+import { BRAND_FEATURES, withBrand } from '@/lib/brand';
 import { ADVANCED_MAX_SCRIPT } from '@/lib/marketing';
 import { guard } from '@/lib/session';
 
@@ -34,6 +35,8 @@ type Spec = {
   feature: string; params: Record<string, string>;
   /** Enhance: the worker has an LLM rewrite the member's own prompt first (Create video and Image Generation only). */
   enhance: boolean;
+  /** Add the chosen store's brand kit to the prompt (Marketing Studio and Image Generation only, lib/brand.ts). */
+  useBrand: boolean;
 };
 const bad = (error: string) => Response.json({ error }, { status: 400 });
 /** Member-facing text for a Run a cap refused. */
@@ -94,7 +97,7 @@ export async function GET(request: Request) {
  * estimate), an optional `params.quality` and an optional `params.thinking` (one of the model's `thinking_levels`; its `thinking_prices` set the estimate, the first level's when none is named). `durationSec` is not read and the job stores 0.
  * `motion_control` takes a video model that lists it, exactly 2 inputs (the character image, then an MP4/MOV reference video), ratio `auto`, no preset and
  * an optional prompt; its duration is the reference video's length rounded up (the body's `durationSec` is not read), which the model must allow.
- * Every other feature takes images only.
+ * Every other feature takes images only. `useBrand` (Marketing Studio and Image Generation) adds the chosen store's brand kit to the prompt (lib/brand.ts).
  * `retryOf` retries the caller's own failed job once: the inputs, model, preset, prompt, ratio, duration, team and store all come from the
  * original (the body may carry just `retryOf`), the estimate from the model's current price.
  */
@@ -109,7 +112,7 @@ export async function POST(request: Request) {
   // A retry takes everything from the original job, so only a new Run is validated against the body.
   let spec: Spec | null = null;
   if (retryOf === null) {
-    const { assetIds, modelId, presetId = null, prompt: rawPrompt = null, ratio, durationSec, storeId = null, feature = 'video', params: rawParams, enhance = false } = body ?? {};
+    const { assetIds, modelId, presetId = null, prompt: rawPrompt = null, ratio, durationSec, storeId = null, feature = 'video', params: rawParams, enhance = false, useBrand = false } = body ?? {};
     const params = rawParams ?? {}; // null as well as absent: video clients may send it
     if (typeof feature !== 'string' || !(FEATURES as readonly string[]).includes(feature)) return bad(`feature must be one of ${FEATURES.join(', ')}`);
     const isImage = !VIDEO_FEATURES.includes(feature);
@@ -167,6 +170,8 @@ export async function POST(request: Request) {
     if (feature === 'background_changer' && (assetIds.length > 1) === (freePrompt !== null)) return bad('Background Changer takes a prompt or a reference image (the second image), not both and not neither');
     if (typeof enhance !== 'boolean') return bad('enhance must be true or false');
     if (enhance && (!ENHANCE_FEATURES.includes(feature) || (presetId !== null && !isImage))) return bad('Enhance rewrites your own prompt in Create video and Image Generation only');
+    if (typeof useBrand !== 'boolean') return bad('useBrand must be true or false');
+    if (useBrand && !BRAND_FEATURES.includes(feature)) return bad('the brand kit is for Marketing Studio and Image Generation only');
     const written = freePrompt?.trim();
     const prompt = written && APPEND_TO_INSTRUCTION.includes(feature) ? `${FEATURE_PROMPTS[feature]}. ${written}` : (written ?? FEATURE_PROMPTS[feature] ?? (motion ? '' : null));
     if (prompt !== null && ((prompt === '' && !motion) || prompt.length > PROMPT_CEILING)) return bad(`the prompt must have 1 to ${PROMPT_CEILING} characters`);
@@ -199,7 +204,7 @@ export async function POST(request: Request) {
     const length = motion ? Math.ceil(byId.get(assetIds[1] as string)!.duration_ms! / 1000) : (durationSec as number);
     // A style's prompt joins the member's under the lock below; their own words stay the brief, as History and Reuse read them.
     const kept = isImage && presetId !== null ? { ...(params as Record<string, string>), brief: written! } : (params as Record<string, string>);
-    spec = { assetIds, modelId, presetId, prompt, ratio, durationSec: isImage ? 0 : length, storeId: storeId as string | null, feature, params: kept, enhance };
+    spec = { assetIds, modelId, presetId, prompt, ratio, durationSec: isImage ? 0 : length, storeId: storeId as string | null, feature, params: kept, enhance, useBrand };
   }
 
   const id = crypto.randomUUID();
@@ -217,10 +222,12 @@ export async function POST(request: Request) {
       if (o.retry_of !== null || (await tx.query('select 1 from jobs where retry_of = $1', [retryOf])).rowCount) {
         return Response.json({ error: 'a job can be retried only once, and a retry cannot be retried' }, { status: 409 });
       }
-      s = { assetIds: o.input_asset_ids, modelId: o.model, presetId: o.preset_id, prompt: o.prompt, ratio: o.aspect, durationSec: o.duration_s, storeId: o.store_id, feature: o.feature, params: o.params, enhance: o.enhance };
+      s = { assetIds: o.input_asset_ids, modelId: o.model, presetId: o.preset_id, prompt: o.prompt, ratio: o.aspect, durationSec: o.duration_s, storeId: o.store_id, feature: o.feature, params: o.params, enhance: o.enhance, useBrand: false };
       original = o;
     }
-    const { assetIds, modelId, presetId, prompt: freePrompt, ratio, durationSec, storeId, feature, params, enhance } = s!;
+    const { assetIds, modelId, presetId, prompt: freePrompt, ratio, durationSec, storeId, feature, enhance, useBrand } = s!;
+    // A retry's prompt already carries the brand block it was sent with, so the brand is added to a new Run only.
+    let params = s!.params;
     const isImage = !VIDEO_FEATURES.includes(feature);
     // A new Run was checked before the lock and a retry never was, so both look again: an image deleted meanwhile is refused.
     const clips = params.audioAssetIds?.split(',') ?? [];
@@ -257,12 +264,18 @@ export async function POST(request: Request) {
         if (preset === undefined) return bad('the preset does not exist or is not enabled');
         prompt = isImage ? `${freePrompt}\n\n${preset}` : preset;
       }
+      const store = storeId === null ? null : (await tx.query(`select brand_voice as "brandVoice", brand_colors as "brandColors", brand_tagline as "brandTagline" from stores where id = $1 and not hidden`, [storeId])).rows[0];
+      if (storeId !== null && !store) return bad('the store does not exist or is hidden');
+      // The brand kit goes after the member's words and the style, into the stored prompt, so History, Retry and the worker all see what the provider got;
+      // `params.brand` marks it for the switch's memory, and on Image Generation the member's own words stay the one brief (a style already set it).
+      const branded = useBrand && store && prompt ? withBrand(prompt, store, feature) : prompt;
+      if (branded !== prompt) {
+        params = { ...params, brand: 'on', ...(feature === 'image' && params.brief === undefined && { brief: freePrompt! }) };
+        prompt = branded;
+      }
       // Checked here, before anything is reserved, rather than refused by the provider after the money is held. A retry sends the prompt it was checked with.
       const limit = promptLimit(model.max_prompt_chars);
       if (prompt && prompt.length > limit) return bad(`the prompt may be at most ${limit} characters on this model`);
-      if (storeId !== null && (await tx.query('select 1 from stores where id = $1 and not hidden', [storeId])).rowCount === 0) {
-        return bad('the store does not exist or is hidden');
-      }
     }
     const provider = original?.provider ?? model.provider;
     const perSecond = isImage ? null : usdPerSecondFor({ endpoint: model.endpoint, usdPerSecond: model.usd_per_second }, params.audio);

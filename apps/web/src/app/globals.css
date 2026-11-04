@@ -869,6 +869,11 @@ dialog.admin-modal { width: min(36rem, calc(100vw - 2rem)); }
 /* Saved forms: two quiet links above Run, and their dialogs. */
 .templates { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 16px; margin: 16px 0 12px; font-size: 14px; line-height: 21px; }
 .templates > [role='status'] { margin: 0 auto 0 0; color: var(--text-muted); }
+/* The brand kit picker (components/BrandKit.tsx): the store select, the switch and an editor's edit button on one wrapping row; swatches preview the colours. */
+.brand-picker { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.brand-picker > .error { flex-basis: 100%; margin: 0; }
+.brand-colors { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.brand-swatch { width: 16px; height: 16px; border: 1px solid var(--border-button); border-radius: 4px; }
 .link-button { padding: 0; border: 0; background: none; color: var(--ink-strong); font: inherit; font-weight: 500; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 .template-list { display: grid; gap: 8px; margin: 0 0 12px; padding: 0; list-style: none; }
 .template-list li { position: relative; display: flex; align-items: center; gap: 8px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; }
@@ -1658,6 +1663,7 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .pills { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-width: 0; }
 .imagebar .field { display: block; margin: 0; }
 .imagegen > .templates { margin: 12px 0 0; }
+.imagegen > .brand-picker { margin: 12px 0 0; }
 .imagebar .field-label { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .imagebar .select-trigger { width: auto; max-width: 14rem; height: 34px; padding: 0 12px; border: 1px solid var(--field-border); border-radius: 17px; background: var(--surface); font-size: 13px; }
 .imagebar .select-trigger:hover, .imagebar .select[data-open='true'] .select-trigger { border-color: var(--text-disabled); }

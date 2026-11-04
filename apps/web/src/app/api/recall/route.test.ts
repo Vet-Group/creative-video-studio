@@ -64,8 +64,8 @@ describe('/api/recall', () => {
     await job(a, { aspect: '9:16', duration: 5, deleted: true });
     await job(b, { aspect: '9:16', duration: 5 });
     await job(a, { feature: 'image', model: 'ri', aspect: '3:4', duration: 0, params: { resolution: '2K' } });
-    expect(await settings(a, 'feature=video')).toEqual({ modelId: 'rv', ratio: '1:1', durationSec: 8, resolution: null, audio: true, enhance: true, storeId: 'st' });
-    expect(await settings(a, 'feature=image')).toEqual({ modelId: 'ri', ratio: '3:4', durationSec: null, resolution: '2K', audio: null, enhance: false, storeId: null });
+    expect(await settings(a, 'feature=video')).toEqual({ modelId: 'rv', ratio: '1:1', durationSec: 8, resolution: null, audio: true, enhance: true, storeId: 'st', brand: null });
+    expect(await settings(a, 'feature=image')).toEqual({ modelId: 'ri', ratio: '3:4', durationSec: null, resolution: '2K', audio: null, enhance: false, storeId: null, brand: false });
     expect(await settings(b, 'feature=image')).toBeNull();
   });
 

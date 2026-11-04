@@ -1,20 +1,19 @@
 'use client';
 import { useState } from 'react';
+import { BrandKitForm, type BrandStore } from '@/components/BrandKit';
 import { confirmDialog } from '@/components/Confirm';
 import { LoadError } from '@/components/LoadError';
 import { api, sendJson } from '@/lib/api';
 import { useAction, useFetch } from '@/lib/admin-ui';
 import { Empty, PageHead } from './PageHead';
 
-interface Store {
-  id: string;
-  name: string;
+interface Store extends BrandStore {
   code: string;
   hidden: boolean;
   hasCost: boolean;
 }
 
-function StoreRow({ store, run, pending }: { store: Store; run: ReturnType<typeof useAction>['run']; pending: boolean }) {
+function StoreRow({ store, run, pending, onBrand }: { store: Store; run: ReturnType<typeof useAction>['run']; pending: boolean; onBrand: () => void }) {
   const [name, setName] = useState(store.name);
   const [code, setCode] = useState(store.code);
   const patch = (body: Record<string, unknown>, fallback: string) => run(() => api(`/api/admin/stores/${store.id}`, sendJson('PATCH', body)), fallback);
@@ -40,6 +39,9 @@ function StoreRow({ store, run, pending }: { store: Store; run: ReturnType<typeo
           <button type="button" disabled={pending} onClick={() => void patch({ hidden: !store.hidden }, 'Không đổi được trạng thái ẩn.')}>
             {store.hidden ? 'Hiện lại' : 'Ẩn'}
           </button>
+          <button type="button" aria-label={`Bộ nhận diện của ${store.name}`} onClick={onBrand}>
+            Bộ nhận diện
+          </button>
         </div>
       </td>
     </tr>
@@ -51,6 +53,7 @@ export function AdminStores() {
   const { problem, pending, run } = useAction(reload);
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
+  const [brand, setBrand] = useState<Store | null>(null); // the store whose brand kit is being edited
 
   const head = <PageHead id="stores-title" title="Cửa hàng" lead="Cửa hàng/thương hiệu gắn với mỗi clip; mã cửa hàng là store_id của POD Studio." />;
   if (!data)
@@ -108,12 +111,13 @@ export function AdminStores() {
             </thead>
             <tbody>
               {data.stores.map((s) => (
-                <StoreRow key={s.id} store={s} run={run} pending={pending} />
+                <StoreRow key={s.id} store={s} run={run} pending={pending} onBrand={() => setBrand(s)} />
               ))}
             </tbody>
           </table>
         </div>
       )}
+      <BrandKitForm store={brand} onClose={() => setBrand(null)} onSaved={() => (setBrand(null), reload())} />
     </section>
   );
 }

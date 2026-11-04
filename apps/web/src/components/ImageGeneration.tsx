@@ -9,6 +9,7 @@ import { confirmRun, runKey } from '@/lib/run-guard';
 import { useHydrated } from '@/lib/use-hydrated';
 import { useRecall } from '@/lib/use-recall';
 import { About } from './About';
+import { BrandPicker } from './BrandKit';
 import { copyError, Gallery, type Img, photoImg, RATIO_LABEL, THINKING_LABEL, uploadError, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
 import { EnhanceToggle } from './EnhanceToggle';
 import { Icon } from './Icon';
@@ -32,6 +33,8 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
   const [prompt, setPrompt] = useState('');
   const [styleId, setStyleId] = useState(''); // '' for no style
   const [enhance, setEnhance] = useState(true); // on by default, as on Fash
+  const [storeId, setStoreId] = useState('');
+  const [useBrand, setUseBrand] = useState(false); // the chosen store's brand kit, added to the prompt on the server
   const [tab, setTab] = useState<Tab>('examples');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -47,6 +50,8 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
       if (s.ratio) pick.setRatio(s.ratio);
       if (s.resolution) pick.setResolution(s.resolution);
       if (s.enhance !== null) setEnhance(s.enhance);
+      if (s.storeId) setStoreId(s.storeId);
+      if (s.brand !== null) setUseBrand(s.brand);
     },
     { skip: reuse !== undefined || model !== undefined },
   );
@@ -76,7 +81,7 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
     (j) => {
       recall.touch();
       setImages(j.images);
-      setPrompt(j.brief ?? j.prompt ?? ''); // with a style, the job's prompt is composed and the member's own words are the brief
+      setPrompt(j.brief ?? j.prompt ?? ''); // with a style or the brand kit, the job's prompt is composed and the member's own words are the brief
       setStyleId(j.presetId ?? '');
       setEnhance(j.enhance ?? true);
       pick.refill(j);
@@ -130,7 +135,7 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
     setError('');
     setNotice('');
     try {
-      const body = { feature: 'image', modelId: pick.modelId, assetIds: images.map((i) => i.id), prompt: prompt.trim(), ...(styleId && { presetId: styleId }), enhance, ratio: pick.ratio, params: { resolution: pick.resolution, ...(pick.thinking && { thinking: pick.thinking }) } };
+      const body = { feature: 'image', modelId: pick.modelId, assetIds: images.map((i) => i.id), prompt: prompt.trim(), ...(styleId && { presetId: styleId }), enhance, ratio: pick.ratio, storeId: storeId || null, useBrand, params: { resolution: pick.resolution, ...(pick.thinking && { thinking: pick.thinking }) } };
       await api('/api/jobs', sendJson('POST', body));
       setNotice('Đã gửi job. Theo dõi trong tab "Lịch sử".');
       setTab('history');
@@ -148,6 +153,8 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
         Tạo ảnh
       </h1>
       <PageHint href="/image-generation" />
+      {/* Above the tabs: the gallery's size slider is pulled up into the tabs row, over whatever sits between the tabs and the gallery. */}
+      <BrandPicker storeId={storeId} onStore={(v) => (recall.touch(), setStoreId(v))} on={useBrand} onToggle={(v) => (recall.touch(), setUseBrand(v))} />
       <WorkTabs prefix="imagegen" tabs={TABS} labels={TAB_LABEL} shown={tab} onSelect={setTab} />
       {/* Above the gallery, not in the prompt bar, which keeps Fash's one-row height. */}
       <Templates feature="image" data={() => ({ images: images.map((i) => i.id), prompt: prompt.trim(), presetId: styleId, enhance, ratio: pick.ratio, resolution: pick.resolution, modelId: pick.modelId })} />

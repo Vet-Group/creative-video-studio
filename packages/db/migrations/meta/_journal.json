@@ -463,6 +463,13 @@
       "when": 1794394977036,
       "tag": "0066_image_styles",
       "breakpoints": true
+    },
+    {
+      "idx": 66,
+      "version": "7",
+      "when": 1794394978036,
+      "tag": "0067_store_brand_kit",
+      "breakpoints": true
     }
   ]
 }
