@@ -413,19 +413,20 @@ export function PhotoDialog({ open, title, sub, tiles, busy, onFile, onClose, on
     </button>
   );
   const [over, setOver] = useState(false);
+  const ids = { head: useId(), upload: useId(), hint: useId() };
   // A drop can carry any file and still lands while busy, so it is checked here; the picker already filters on accept.
   const take = (photo: File | undefined) => {
     if (photo && !busy) (onClose(), onFile([photo]));
   };
   return (
     <Modal open={open} onClose={onClose} label={title} className="choice-dialog">
-      <h2>
+      <h2 aria-labelledby={onBack ? ids.head : undefined}>
         {onBack && (
           <button type="button" className="photo-back" aria-label="Quay lại" onClick={onBack}>
             <Icon name="left" size={16} />
           </button>
         )}
-        {title}
+        <span id={ids.head}>{title}</span>
       </h2>
       {sub && <p className="modal-sub">{sub}</p>}
       <div className="choice-grid model-grid">
@@ -437,9 +438,13 @@ export function PhotoDialog({ open, title, sub, tiles, busy, onFile, onClose, on
           onDrop={(e) => (e.preventDefault(), setOver(false), take([...e.dataTransfer.files].find((f) => f.type.startsWith('image/'))))}
         >
           <Icon name="upload" size={20} />
-          <span className="model-upload-title">Tải lên ảnh của bạn</span>
-          <span className="model-upload-hint">hoặc kéo thả ảnh vào đây</span>
-          <input type="file" accept="image/*" className="sr-only" disabled={busy} onChange={(e) => take(e.target.files?.[0])} />
+          <span className="model-upload-title" id={ids.upload}>
+            Tải lên ảnh của bạn
+          </span>
+          <span className="model-upload-hint" id={ids.hint}>
+            hoặc kéo thả ảnh vào đây
+          </span>
+          <input type="file" accept="image/*" className="sr-only" aria-labelledby={ids.upload} aria-describedby={ids.hint} disabled={busy} onChange={(e) => take(e.target.files?.[0])} />
         </label>
         {tiles.map(tile)}
       </div>

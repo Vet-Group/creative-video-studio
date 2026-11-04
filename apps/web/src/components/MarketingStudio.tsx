@@ -240,6 +240,7 @@ function AddChoice({ kind, canShare, onAdded, onCancel }: { kind: 'hook' | 'loca
 function ChoiceDialog({ open, title, sub, kind, choices, often, posters, custom, canShare, selected, onPick, onAdded, onDelete, onClose, footer }: { open: boolean; title: string; sub: string; kind: 'hook' | 'location'; choices: MarketingChoice[]; often: string[]; posters: Record<string, string>; custom: Choice[]; canShare: boolean; selected: string[]; onPick: (id: string) => void; onAdded: (c: Choice) => void; onDelete: (c: Choice) => void; onClose: () => void; footer?: ReactNode }) {
   const grid = useRef<HTMLDivElement>(null);
   const addCard = useRef<HTMLButtonElement>(null);
+  const formHead = useId();
   const [adding, setAdding] = useState(false);
   useEffect(() => setAdding(false), [open]);
   const have = useSamples();
@@ -273,12 +274,12 @@ function ChoiceDialog({ open, title, sub, kind, choices, often, posters, custom,
   const back = () => (setAdding(false), requestAnimationFrame(() => addCard.current?.focus()));
   if (adding) {
     return (
-      <Modal open={open} onClose={onClose} label={title} className="choice-dialog">
-        <h2>
+      <Modal open={open} onClose={onClose} label={`Thêm ${KIND_NAME[kind]} của bạn`} className="choice-dialog">
+        <h2 aria-labelledby={formHead}>
           <button type="button" className="photo-back" aria-label="Quay lại" onClick={back}>
             <Icon name="left" size={16} />
           </button>
-          Thêm {KIND_NAME[kind]} của bạn
+          <span id={formHead}>Thêm {KIND_NAME[kind]} của bạn</span>
         </h2>
         <AddChoice kind={kind} canShare={canShare} onAdded={onAdded} onCancel={back} />
       </Modal>

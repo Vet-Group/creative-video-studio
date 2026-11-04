@@ -111,6 +111,13 @@ test('the sessions list shows both devices and signs the other one out', async (
   await expect(rows).toHaveCount(2);
   await expect(rows.filter({ hasText: 'Thiết bị này' })).toHaveCount(1);
   await expect(rows.first()).toContainText(/(Edge|Chrome) trên Windows/);
+  // One device's sign-out asks first; Huỷ keeps it signed in.
+  await rows.filter({ hasNotText: 'Thiết bị này' }).getByRole('button', { name: /^Đăng xuất / }).click();
+  const one = page.getByRole('dialog', { name: /^Đăng xuất .+\?$/ });
+  await expect(one).toContainText('Thiết bị đó sẽ phải đăng nhập lại.');
+  await expect(one.getByRole('button', { name: 'Huỷ' })).toBeFocused();
+  await one.getByRole('button', { name: 'Huỷ' }).click();
+  await expect(rows).toHaveCount(2);
   await settings.getByRole('button', { name: 'Đăng xuất các thiết bị khác' }).click();
   await page.getByRole('dialog', { name: 'Đăng xuất các thiết bị khác?' }).getByRole('button', { name: 'Đăng xuất', exact: true }).click();
   await expect(rows).toHaveCount(1);

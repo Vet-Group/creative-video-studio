@@ -206,3 +206,39 @@ test('a failed read of the job list says so with Thử lại instead of a blank 
   await history.getByRole('button', { name: 'Thử lại' }).click();
   await expect(history.getByRole('alert')).toHaveCount(0);
 });
+
+test('on a phone, Bắt đầu ngay in an empty History opens the form tab and puts the cursor in it', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await signIn(page, 'emptya');
+  await page.goto('/create');
+  await page.getByRole('tab', { name: 'Lịch sử' }).click();
+  const history = page.getByRole('complementary', { name: 'Job của tôi' });
+  await expect(history.getByText('Chưa có job nào.')).toBeVisible();
+  await history.getByRole('button', { name: 'Bắt đầu ngay' }).click();
+  await expect(page.getByRole('tab', { name: 'Tạo' })).toHaveAttribute('aria-selected', 'true');
+  await expect(history).toBeHidden();
+  await expect.poll(() => page.evaluate(() => document.activeElement?.closest('.form-card') !== null)).toBe(true);
+});
+
+test('the compact tray beside a page without its own History gives a failed job and a finished one the History card buttons', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await signIn(page, 'traya');
+  await clearMyJobs(page);
+  const up = await page.request.post('/api/assets', { multipart: { file: { name: 'shirt.png', mimeType: 'image/png', buffer: png() } } });
+  const { assets } = (await up.json()) as { assets: { id: string }[] };
+  for (const prompt of ['slow pan over the shirt', 'slow pan MOCK_FAIL']) {
+    const r = await page.request.post('/api/jobs', { data: { assetIds: [assets[0]!.id], modelId: 'mock-e2e', prompt, ratio: '9:16', durationSec: 5 } });
+    expect(r.status()).toBe(201);
+  }
+  const mine = async () => ((await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { status: string }[] }).jobs;
+  await expect.poll(async () => (await mine()).map((j) => j.status).sort(), { timeout: 60_000 }).toEqual(['failed', 'succeeded']);
+  await page.goto('/account/sign-in-methods');
+  const tray = page.getByRole('complementary', { name: 'Job của tôi' });
+  const failed = tray.getByRole('listitem').filter({ hasText: 'Thất bại' });
+  const done = tray.getByRole('listitem').filter({ hasText: 'Hoàn tất' });
+  await expect(failed.getByRole('button', { name: 'Thử lại' })).toHaveClass('job-reuse job-primary');
+  await expect(failed.getByRole('link', { name: 'Dùng lại' })).toHaveClass('job-reuse');
+  await expect(done.getByRole('link', { name: 'Dùng lại' })).toHaveClass('job-reuse');
+  await expect(done.getByRole('link', { name: 'Xem trong Thư viện' })).toHaveAttribute('href', '/library');
+  for (const j of ((await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { id: string }[] }).jobs) await page.request.delete(`/api/jobs/${j.id}`); // the Library is shared by every spec
+});
