@@ -1017,6 +1017,23 @@ dialog.admin-modal { width: min(36rem, calc(100vw - 2rem)); }
 /* The name's button covers the whole card, so a click on the clip picks the preset; the play button stays above it. */
 .preset-card button::before { content: ''; position: absolute; inset: 0; }
 .preset-card .preview-play { z-index: 1; }
+/* Edit (an editor) or Propose an edit (a member) on each card, above the name's card-wide click area; a switched-off preset shows dimmed to editors. */
+.preset-card .preset-edit { position: absolute; top: 8px; left: 8px; z-index: 2; padding: 2px 8px; border-radius: 12px; background: rgb(var(--shade) / .6); color: var(--on-dark); font-size: 12px; line-height: 18px; font-weight: 500; }
+.preset-card .preset-edit::before { content: none; }
+.preset-card.off > :first-child { opacity: .45; }
+.preset-name { color: var(--text-sub); font-size: 13px; line-height: 18px; font-weight: 600; }
+.preset-actions { display: flex; flex-wrap: wrap; gap: 16px; padding-top: 16px; font-size: 14px; }
+.preset-form textarea { width: 100%; margin: 6px 0 12px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; font: inherit; }
+.preset-form input[type='file'] { display: block; margin: 6px 0 12px; }
+.proposal-list { display: grid; gap: 16px; margin: 0; padding: 0; list-style: none; }
+.proposal-list > li { padding-bottom: 16px; border-bottom: 1px solid var(--hairline); }
+.proposal-list p { margin: 0; }
+.proposal-list dl { display: grid; gap: 6px; margin: 8px 0; font-size: 13px; line-height: 18px; }
+.proposal-list dt { color: var(--text-sub); }
+.proposal-list dd { display: grid; gap: 2px; margin: 0; overflow-wrap: anywhere; }
+.proposal-list del { color: var(--text-muted); }
+.proposal-list ins { text-decoration: none; }
+.proposal-list .actions { display: flex; gap: 8px; margin-top: 8px; }
 .preset-card:has(> button[aria-pressed='true']) > :first-child { outline: 2px solid var(--ink-strong); outline-offset: 2px; }
 @media (min-width: 768px) {
   .preset-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }

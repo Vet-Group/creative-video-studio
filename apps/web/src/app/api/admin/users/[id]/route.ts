@@ -8,8 +8,8 @@ import { guard } from '@/lib/session';
 
 /**
  * Admin: change one user. Any of `name`, `email` (unique; a first Google or Lark sign-in links by this address), `role` (member|admin),
- * `teamId` (a visible team), `banned` (boolean, with an optional `banReason`), `temporaryPassword` and `twoFactor: false` (turns the
- * user's 2FA off, for a lost phone, and ends the user's sessions) in one body. Every field is checked before anything is written. Each change that differs from the current state is
+ * `teamId` (a visible team), `banned` (boolean, with an optional `banReason`), `temporaryPassword`, `twoFactor: false` (turns the
+ * user's 2FA off, for a lost phone, and ends the user's sessions) and `canEditTemplates` (boolean: a template editor, lib/session.ts) in one body. Every field is checked before anything is written. Each change that differs from the current state is
  * audited with its old and new value, in the transaction of the change itself: the audit row commits only if the change was made. The
  * password itself is never stored. A team change touches only users.team_id: jobs keep the team they were run under.
  */
@@ -18,8 +18,10 @@ export async function PATCH(request: Request, { params }: RouteContext) {
   if (g.error) return g.error;
   const { id } = await params;
   const actorId = g.session.user.id;
-  const { name, email, role, teamId, banned, banReason, temporaryPassword, twoFactor } = (await readBody(request)) ?? {};
-  if ([name, email, role, teamId, banned, temporaryPassword, twoFactor].every((v) => v === undefined)) return bad('give at least one of name, email, role, teamId, banned, temporaryPassword, twoFactor');
+  const { name, email, role, teamId, banned, banReason, temporaryPassword, twoFactor, canEditTemplates } = (await readBody(request)) ?? {};
+  if ([name, email, role, teamId, banned, temporaryPassword, twoFactor, canEditTemplates].every((v) => v === undefined)) {
+    return bad('give at least one of name, email, role, teamId, banned, temporaryPassword, twoFactor, canEditTemplates');
+  }
   const newName = typeof name === 'string' ? name.trim() : name;
   const newEmail = typeof email === 'string' ? email.trim().toLowerCase() : email;
   if (newName !== undefined && !(typeof newName === 'string' && newName.length >= 1 && newName.length <= 100)) return bad('name must have 1 to 100 characters');
@@ -32,6 +34,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     return bad(`temporaryPassword must have ${PASSWORD_LENGTH.min} to ${PASSWORD_LENGTH.max} characters`);
   }
   if (twoFactor !== undefined && twoFactor !== false) return bad('twoFactor can only be turned off (false); the user turns it on');
+  if (canEditTemplates !== undefined && typeof canEditTemplates !== 'boolean') return bad('canEditTemplates must be true or false');
   if (id === actorId && ((role !== undefined && role !== g.session.user.role) || banned === true)) return bad('you cannot change your own role or ban yourself');
 
   if (!(await pool.query('select 1 from users where id = $1', [id])).rowCount) return bad('not found', 404);
@@ -76,6 +79,12 @@ export async function PATCH(request: Request, { params }: RouteContext) {
         await audit(tx, { actorId, action: 'user.team_change', target, oldValue: { teamId: old }, newValue: { teamId } });
       });
     }
+    if (typeof canEditTemplates === 'boolean') {
+      await withTransaction(pool, async (tx) => {
+        if (!(await tx.query('update users set can_edit_templates = $2, updated_at = now() where id = $1 and can_edit_templates <> $2', [id, canEditTemplates])).rowCount) return;
+        await audit(tx, { actorId, action: 'user.template_editor', target, oldValue: { canEditTemplates: !canEditTemplates }, newValue: { canEditTemplates } });
+      });
+    }
     if (banned === true) {
       await change(
         (old) => (old.banned ? null : { action: 'user.ban', oldValue: { banned: false }, newValue: { banned: true, reason: banReason ?? null } }),
@@ -111,6 +120,6 @@ export async function PATCH(request: Request, { params }: RouteContext) {
   } catch (e) {
     return authFailure(e);
   }
-  const now = (await pool.query('select id, email, name, role, banned, team_id from users where id = $1', [id])).rows[0];
-  return Response.json({ id: now.id, email: now.email, name: now.name, role: now.role, banned: now.banned, teamId: now.team_id });
+  const now = (await pool.query('select id, email, name, role, banned, team_id, can_edit_templates from users where id = $1', [id])).rows[0];
+  return Response.json({ id: now.id, email: now.email, name: now.name, role: now.role, banned: now.banned, teamId: now.team_id, canEditTemplates: now.can_edit_templates });
 }

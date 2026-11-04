@@ -7,7 +7,7 @@ import { confirmRun } from '@/lib/run-guard';
 import { NARROW, useMediaQuery, WIDE } from '@/lib/use-media-query';
 import { useHydrated } from '@/lib/use-hydrated';
 import { useRecall } from '@/lib/use-recall';
-import { useSamples } from '@/lib/use-samples';
+import { useSamples, versionedSample } from '@/lib/use-samples';
 import { ABOUT } from '@/lib/about-content';
 import { dropRefillQuery, exampleFrom } from '@/lib/reuse';
 import { About } from './About';
@@ -19,6 +19,7 @@ import { copyError, copySamples, GALLERY_SIZE_KEY, HISTORY_SIZE_KEY, photoImg, R
 import { FormContext, type Photo, Tap, useApplier, useHasHistory, useJobs, useRecreated } from './jobs';
 import { Modal } from './Modal';
 import { ModelPicker } from './ModelPicker';
+import { loadPending, PendingProposals, type PresetDraft, PresetForm, type PresetRow, type Proposal } from './PresetEditing';
 import { PromptComposer } from './PromptComposer';
 import { Preview } from './Preview';
 import { Select } from './Select';
@@ -116,7 +117,13 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
   const hydrated = useHydrated();
   const [images, setImages] = useState<Image[]>([]);
   const [endFrame, setEndFrame] = useState<Image | null>(null); // the image the clip ends on, as Fash's End frame; sent only on a model that takes one
-  const [presets, setPresets] = useState<{ id: string; label: string }[] | null>(null);
+  const [presets, setPresets] = useState<PresetRow[] | null>(null); // the enabled presets, which a Run may use
+  // A template editor's view of the picker: every preset, switched-off ones too, with what the edit form shows; null for a member.
+  const [editable, setEditable] = useState<PresetRow[] | null>(null);
+  const [canEdit, setCanEdit] = useState(false);
+  const [draft, setDraft] = useState<PresetDraft | null>(null);
+  const [pending, setPending] = useState<{ list: Proposal[]; count: number } | null>(null); // the proposals waiting for an editor
+  const [reviewing, setReviewing] = useState(false);
   const [presetId, setPresetId] = useState(''); // '' means a free prompt
   const [enhance, setEnhance] = useState(true); // on by default, as on Fash; it rewrites a free prompt only
   const [audio, setAudio] = useState(true); // native audio, on by default as on Fash, on a model that can make it
@@ -171,14 +178,22 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
     api<{ stores: { id: string; name: string }[] }>('/api/stores').then((r) => setStores(r.stores), () => setError('Không tải được danh sách cửa hàng.'));
   }, []);
 
+  /** Takes a GET /api/presets answer: the enabled presets to pick from and, for a template editor, all of them. */
+  const takePresets = (r: { presets: PresetRow[]; canEdit: boolean }) => {
+    const enabled = r.presets.filter((p) => p.enabled !== false);
+    setPresets(enabled);
+    setEditable(r.canEdit ? r.presets : null);
+    setCanEdit(r.canEdit);
+    return enabled;
+  };
   // The enabled presets the Admin set up; as on the live form, it starts on a free prompt unless Explore links to a preset.
   useEffect(() => {
     let stale = false; // a superseded answer would put the preset back over the member's pick
-    api<{ presets: { id: string; label: string }[] }>('/api/presets').then(
+    api<{ presets: PresetRow[]; canEdit: boolean }>('/api/presets').then(
       (r) => {
         if (stale) return;
-        setPresets(r.presets);
-        if (!reuse) setPresetId(r.presets.find((p) => p.id === preset)?.id ?? '');
+        const enabled = takePresets(r);
+        if (!reuse) setPresetId(enabled.find((p) => p.id === preset)?.id ?? '');
       },
       () => {
         if (stale) return;
@@ -190,6 +205,28 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
       stale = true;
     };
   }, [reuse, preset]);
+
+  /** After an edit or a decision in the picker: the presets again; a pick that was switched off falls back to the free prompt. */
+  const refreshPresets = () =>
+    api<{ presets: PresetRow[]; canEdit: boolean }>('/api/presets').then(
+      (r) => {
+        const enabled = takePresets(r);
+        setPresetId((cur) => (cur === '' || enabled.some((p) => p.id === cur) ? cur : ''));
+      },
+      () => setError('Không tải được danh sách mẫu chuyển động.'),
+    );
+  // An editor sees how many proposals wait each time the picker opens.
+  useEffect(() => {
+    if (!picking || !canEdit) return;
+    let stale = false;
+    loadPending().then(
+      (p) => !stale && setPending(p),
+      () => !stale && setPending({ list: [], count: 0 }),
+    );
+    return () => {
+      stale = true;
+    };
+  }, [picking, canEdit]);
 
   // A picture from History (Fash's Generate Video): it becomes the first image, the rest of the form stays at its defaults.
   useEffect(() => {
@@ -238,7 +275,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
     return () => {
       stale = true;
     };
-  }, [source, presets]);
+  }, [source, presets === null]); // once the presets are known: a reload after an edit in the picker must not refill the form again
 
   // The picker follows the ratio and duration; the chosen model stays while it supports them, else the server's default takes over.
   useEffect(() => {
@@ -344,7 +381,9 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
   const presetMedia = (id: string) => {
     const ex = exampleForPreset(id, have);
     const own = cardSample(have, `preset-${id || 'general'}`, ex ? media(ex.poster) : null);
-    return { video: own.video ?? (ex ? media(ex.src) : null), poster: own.poster, ex };
+    // An editor replaces these in the picker: the versioned URL shows the new file at once.
+    const fresh = (src: string | null) => (src?.startsWith('/api/samples/preset-') ? versionedSample(src) : src);
+    return { video: fresh(own.video) ?? (ex ? media(ex.src) : null), poster: fresh(own.poster), ex };
   };
   const banner = presetMedia(presetId);
   const free = presetMedia('');
@@ -722,27 +761,70 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
               Tự viết mô tả
             </button>
           </li>
-          {presets?.map((p) => {
+          {(editable ?? presets)?.map((p) => {
             const m = presetMedia(p.id);
+            const off = p.enabled === false; // shown to an editor only, who can switch it back on
             return (
-              <li key={p.id} className="preset-card">
+              <li key={p.id} className={off ? 'preset-card off' : 'preset-card'}>
                 {m.video ? <Preview src={m.video} poster={m.poster ?? ''} width={3} height={4} title={p.label} /> : <div className="banner-empty" />}
-                <button
-                  type="button"
-                  data-value={p.id}
-                  aria-pressed={p.id === presetId}
-                  onClick={() => {
-                    setPresetId(p.id);
-                    setPicking(false);
-                  }}
-                >
-                  {p.label}
+                {off ? (
+                  <span className="preset-name">
+                    {p.label}
+                    <span className="tag">Đang tắt</span>
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    data-value={p.id}
+                    aria-pressed={p.id === presetId}
+                    onClick={() => {
+                      setPresetId(p.id);
+                      setPicking(false);
+                    }}
+                  >
+                    {p.label}
+                  </button>
+                )}
+                {/* After the name, so the picker's buttons still read name first; it sits above the name's card-wide click area. */}
+                <button type="button" className="preset-edit" aria-label={canEdit ? `Sửa mẫu ${p.label}` : `Đề xuất sửa mẫu ${p.label}`} onClick={() => setDraft({ preset: p, propose: !canEdit })}>
+                  {canEdit ? 'Sửa' : 'Đề xuất sửa'}
                 </button>
               </li>
             );
           })}
         </ul>
+        {/* Below the grid, so the first row keeps its place under the header. */}
+        <div className="preset-actions">
+          <button type="button" className="link-button" onClick={() => setDraft({ preset: null, propose: !canEdit })}>
+            {canEdit ? 'Thêm mẫu' : 'Đề xuất mẫu mới'}
+          </button>
+          {canEdit && (
+            <button type="button" className="link-button" onClick={() => setReviewing(true)}>
+              Chờ duyệt ({pending?.count ?? 0})
+            </button>
+          )}
+        </div>
       </Modal>
+      <PresetForm
+        draft={draft}
+        onClose={() => setDraft(null)}
+        onSaved={(text) => {
+          setDraft(null);
+          notify(text);
+          void refreshPresets();
+        }}
+        onWritten={() => void refreshPresets()}
+      />
+      <PendingProposals
+        open={reviewing}
+        proposals={pending?.list ?? null}
+        onClose={() => setReviewing(false)}
+        onDecided={(text) => {
+          if (text) notify(text);
+          void refreshPresets();
+          void loadPending().then(setPending, () => setPending({ list: [], count: 0 }));
+        }}
+      />
 
       {/* The live Example dialog (REA-video V01, measured 2026-10-23): the clip on black with Close at its top-left, the details column,
           and Previous/Next as round buttons at the viewport edges that stop at the first and last sample. Nothing here submits a job. */}

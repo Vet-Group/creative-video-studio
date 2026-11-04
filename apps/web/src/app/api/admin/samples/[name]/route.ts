@@ -8,11 +8,21 @@ import { deleteObject, putObject } from '@/lib/storage';
 
 type Ctx = { params: Promise<{ name: string }> };
 
-/** Admin: upload or replace one sample; the raw body is the file and its bytes must match the name's type. Audited as sample.put. */
+/** An Admin writes any sample; a template editor only the clip or poster of an existing preset, `preset-<id>.mp4` or `preset-<id>.jpg`. Null when allowed. */
+async function refusal(user: { role?: string | null }, name: string): Promise<Response | null> {
+  if (user.role === 'admin') return null;
+  const id = /^preset-(.+)\.(?:mp4|jpg)$/.exec(name)?.[1];
+  if (id && sampleType(name) && (await pool.query('select 1 from presets where id = $1', [id])).rowCount) return null;
+  return bad('forbidden', 403);
+}
+
+/** Admin, or a template editor for a preset's clip or poster: upload or replace one sample; the raw body is the file and its bytes must match the name's type. Audited as sample.put. */
 export async function PUT(request: Request, { params }: Ctx) {
-  const g = await guard(request, 'admin');
+  const g = await guard(request, 'editor');
   if (g.error) return g.error;
   const { name } = await params;
+  const refused = await refusal(g.session.user, name);
+  if (refused) return refused;
   const mime = sampleType(name);
   if (!mime) return bad('name must be lower-case words joined by dashes with .mp4, .jpg, .png or .webp');
   if (Number(request.headers.get('content-length') ?? 0) > MAX_SAMPLE_BYTES) return bad(`a sample is at most ${MAX_SAMPLE_BYTES} bytes`, 413);
@@ -28,11 +38,13 @@ export async function PUT(request: Request, { params }: Ctx) {
   return Response.json({ name, bytes: body.byteLength }, { status: old ? 200 : 201 });
 }
 
-/** Admin: remove one sample, so its slot shows the built-in fallback again. Audited as sample.delete. */
+/** Admin, or a template editor for a preset's clip or poster: remove one sample, so its slot shows the built-in fallback again. Audited as sample.delete. */
 export async function DELETE(request: Request, { params }: Ctx) {
-  const g = await guard(request, 'admin');
+  const g = await guard(request, 'editor');
   if (g.error) return g.error;
   const { name } = await params;
+  const refused = await refusal(g.session.user, name);
+  if (refused) return refused;
   const old = sampleType(name) && (await headSample(name));
   if (!old) return bad('not found', 404);
   await withTransaction(pool, async (tx) => {

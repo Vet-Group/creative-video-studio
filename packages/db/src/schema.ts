@@ -83,6 +83,8 @@ export const users = pgTable(
     image: text('image'),
     // A colour from the app's avatar palette (apps/web/src/lib/profile.ts), chosen by the user; null is the colour derived from the name.
     avatarColor: text('avatar_color'),
+    // Set by an Admin: the user edits the motion presets and decides the members' proposals, as an Admin does (lib/session.ts).
+    canEditTemplates: boolean('can_edit_templates').notNull().default(false),
     teamId: text('team_id')
       .notNull()
       .default(DEFAULT_TEAM_ID)
@@ -226,6 +228,40 @@ export const presets = pgTable('presets', {
   sortOrder: integer('sort_order').notNull().default(0),
   updatedAt: tstz('updated_at').notNull().defaultNow(),
 });
+
+export const PROPOSAL_STATUSES = ['pending', 'approved', 'rejected'] as const;
+
+// A member's proposed change to a preset, or a new preset when preset_id is null. One Admin or template editor approves it, which applies it, or rejects it.
+export const presetProposals = pgTable(
+  'preset_proposals',
+  {
+    id: text('id').primaryKey(),
+    presetId: text('preset_id').references(() => presets.id, { onDelete: 'restrict' }),
+    /** The preset's updated_at when proposed: an approval is refused once the preset was changed since, so it never undoes a newer edit. */
+    baseUpdatedAt: tstz('base_updated_at'),
+    /** A null value is left as it is; a new preset needs a label and a prompt. */
+    label: text('label'),
+    prompt: text('prompt'),
+    enabled: boolean('enabled'),
+    sortOrder: integer('sort_order'),
+    note: text('note'),
+    proposedBy: text('proposed_by')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    status: text('status', { enum: PROPOSAL_STATUSES }).notNull().default('pending'),
+    decidedBy: text('decided_by').references(() => users.id, { onDelete: 'restrict' }),
+    decidedAt: tstz('decided_at'),
+    createdAt: tstz('created_at').notNull().defaultNow(),
+  },
+  (t) => [
+    index('preset_proposals_status_idx').on(t.status, t.createdAt),
+    index('preset_proposals_proposed_by_idx').on(t.proposedBy),
+    check('preset_proposals_status_check', sql`${t.status} in ('pending', 'approved', 'rejected')`),
+    check('preset_proposals_new_check', sql`${t.presetId} is not null or (${t.label} is not null and ${t.prompt} is not null)`),
+    check('preset_proposals_base_check', sql`(${t.presetId} is null) = (${t.baseUpdatedAt} is null)`),
+    check('preset_proposals_decided_check', sql`(${t.status} = 'pending') = (${t.decidedBy} is null) and (${t.status} = 'pending') = (${t.decidedAt} is null)`),
+  ],
+);
 
 // The limits and price are NULL (or empty) until B.1 records them from the provider schema; such a model cannot be enabled.
 // A video model is priced per second (usd_per_second); an image model per image and resolution (image_prices), and has no durations.

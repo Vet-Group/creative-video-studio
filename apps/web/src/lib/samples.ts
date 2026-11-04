@@ -30,12 +30,13 @@ export function sampleBytesMatch(type: string, b: Uint8Array): boolean {
   return at(4, 'ftyp');
 }
 
-export async function listSamples(): Promise<{ name: string; bytes: number }[]> {
-  const out: { name: string; bytes: number }[] = [];
+/** Every sample with its size and `version`, the store's ETag, which changes when the file is replaced (a page puts it in the URL to skip the cache). */
+export async function listSamples(): Promise<{ name: string; bytes: number; version: string }[]> {
+  const out: { name: string; bytes: number; version: string }[] = [];
   let token: string | undefined;
   do {
     const res = await s3().send(new ListObjectsV2Command({ Bucket: bucketName(), Prefix: SAMPLE_PREFIX, ContinuationToken: token }));
-    for (const o of res.Contents ?? []) if (o.Key) out.push({ name: o.Key.slice(SAMPLE_PREFIX.length), bytes: o.Size ?? 0 });
+    for (const o of res.Contents ?? []) if (o.Key) out.push({ name: o.Key.slice(SAMPLE_PREFIX.length), bytes: o.Size ?? 0, version: o.ETag?.replaceAll('"', '') ?? '' });
     token = res.NextContinuationToken;
   } while (token);
   return out.filter((s) => sampleType(s.name)).sort((a, b) => a.name.localeCompare(b.name));

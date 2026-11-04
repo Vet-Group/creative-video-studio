@@ -18,6 +18,8 @@ interface User {
   teamId: string;
   /** Whether a password sign-in also asks for a TOTP code. */
   twoFactor: boolean;
+  /** A template editor: edits the motion presets on Create and decides the members' proposals, as an Admin does. */
+  canEditTemplates: boolean;
   methods: SignInMethod[];
 }
 interface Team {
@@ -90,7 +92,17 @@ function UserEditor({ user, teams, reload }: { user: User; teams: Team[]; reload
             </select>
           </label>
         </div>
-        <small className="muted">Vai trò và nhóm lưu ngay khi chọn. Đổi nhóm chỉ áp dụng cho các job mới.</small>
+        <label className="check">
+          <input
+            type="checkbox"
+            aria-label={`Biên tập mẫu: ${user.email}`}
+            checked={user.role === 'admin' || user.canEditTemplates}
+            disabled={pending || user.role === 'admin'}
+            onChange={(e) => void patch({ canEditTemplates: e.target.checked }, 'Không đổi được quyền biên tập mẫu.')}
+          />
+          Biên tập mẫu
+        </label>
+        <small className="muted">Vai trò, nhóm và quyền biên tập mẫu lưu ngay khi chọn. Đổi nhóm chỉ áp dụng cho các job mới. Người biên tập mẫu sửa, thêm mẫu chuyển động và duyệt đề xuất ở trang Tạo video; Admin luôn có quyền này.</small>
       </div>
       <div className="editor-section">
         <h3>Phương thức đăng nhập</h3>
@@ -198,6 +210,7 @@ function UserRow({ user, team, onEdit }: { user: User; team: string; onEdit: () 
       </td>
       <td data-label="Vai trò">
         <span className={user.role === 'admin' ? 'role admin' : 'role'}>{user.role === 'admin' ? 'Admin' : 'Thành viên'}</span>
+        {user.role !== 'admin' && user.canEditTemplates && <span className="tag">Biên tập mẫu</span>}
       </td>
       <td data-label="Nhóm">{team}</td>
       <td data-label="Đăng nhập">
