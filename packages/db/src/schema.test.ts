@@ -382,14 +382,14 @@ describe('migration 0013 real video models', () => {
   });
 });
 
-describe('migration 0057 Replicate round scores', () => {
+describe('migrations 0057 and 0061 Replicate round scores', () => {
   test('every row of a model carries the same prior, and the Replicate-round twins carry the docs/BAKEOFF.md totals', async () => {
     const twins: [number, number, string[]][] = [
       [3, 10, ['seedance-2.0', 'seedance-2.0-replicate', 'seedance-2.0-byteplus']],
       [7, 12, ['seedance-2.5', 'seedance-2.5-byteplus']],
-      [1, 4, ['veo-3.1', 'veo-3.1-replicate', 'veo-3.1-vertex']],
-      [8, 18, ['seedream-5-pro', 'seedream-5-pro-byteplus']],
-      [10, 18, ['nano-banana-2', 'nano-banana-2-vertex']],
+      [2, 7, ['veo-3.1', 'veo-3.1-replicate', 'veo-3.1-vertex']],
+      [9, 20, ['seedream-5-pro', 'seedream-5-pro-byteplus']],
+      [10, 20, ['nano-banana-2', 'nano-banana-2-vertex']],
       [4, 18, ['nano-banana', 'nano-banana-vertex']],
       [9, 10, ['nano-banana-2.1', 'nano-banana-2.1-vertex']],
     ];
@@ -397,7 +397,7 @@ describe('migration 0057 Replicate round scores', () => {
     for (const [passes, total, ids] of twins) {
       const { rows } = await pool.query(`select id, pass_seed_passes as p, pass_seed_total as t from model_configs where id = any($1)`, [ids]);
       expect(rows.map((r) => [r.id, r.p, r.t]).sort()).toEqual([...ids].sort().map((id) => [id, passes, total]));
-      if (passes !== 9) expect(doc).toContain(`${passes}/${total}`);
+      if (ids[0] !== 'nano-banana-2.1') expect(doc).toContain(`${passes}/${total}`);
     }
   });
 });
