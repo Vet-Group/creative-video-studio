@@ -1,7 +1,7 @@
 // Integration test against a disposable database on the compose Postgres (`pnpm services:up`); the pg-boss job lands in the same database.
 import { randomBytes } from 'node:crypto';
 import { createTestDatabase } from '@cvs/db/testing';
-import { afterAll, beforeAll, describe, expect, test } from 'vitest';
+import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 
 const testDb = await createTestDatabase();
 process.env.DATABASE_URL = testDb.url;
@@ -13,6 +13,7 @@ const { stopBoss } = await import('@/lib/queue');
 const { GET: listJobs, POST } = await import('./route');
 const { GET } = await import('../stores/route');
 const { settle } = await import('@cvs/core/ledger');
+const { forgetFalBalance } = await import('@/lib/provider-credit');
 
 const PASSWORD = 'correct-horse-battery';
 
@@ -1012,5 +1013,43 @@ describe('GET /api/stores', () => {
     const res = await GET(new Request('http://localhost/api/stores', { headers: { cookie: ownerCookie } }));
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ stores: [{ id: 'store-ok', name: 'Store', code: 'S1', brandVoice: null, brandColors: [], brandTagline: null }], canEdit: false });
+  });
+});
+
+describe('the fal credit lock', () => {
+  const inFlight = async () =>
+    Number(
+      (
+        await pool.query(
+          `select coalesce(sum(c.usd), 0)::text as usd from cost_entries c join jobs j on j.id = c.job_id where c.kind = 'estimate' and j.provider = 'fal' and not j.is_mock and j.status in ('queued', 'submitting', 'running')`,
+        )
+      ).rows[0].usd,
+    );
+
+  test('refuses a fal Run over the balance minus the unfinished fal jobs, lets a mock Run through, and unlocks when a fal job ends', async () => {
+    const m = await newMember();
+    // fal answers a balance with room for one 1.0000 estimate beside the jobs other tests left queued.
+    const balance = (await inFlight()) + 1.5;
+    vi.stubGlobal('fetch', async (url: string) =>
+      url.startsWith('https://api.fal.ai/v1/account/billing') ? Response.json({ credits: { current_balance: balance, currency: 'USD' } }) : new Response('unexpected', { status: 500 }),
+    );
+    process.env.FAL_KEY = 'fal-fixture-value'; // a made-up value, never a real key
+    forgetFalBalance();
+    try {
+      const first = await runAs(m);
+      expect(first.status).toBe(201);
+      const refused = await runAs(m);
+      expect(refused.status).toBe(429);
+      expect(await refused.json()).toEqual({ error: 'fal.ai chỉ còn $0.50, không đủ cho lần chạy này (khoảng $1.00). Hãy chọn model rẻ hơn hoặc báo Admin nạp thêm credits.' });
+      expect((await pool.query('select count(*)::int as n from jobs where user_id = $1', [m.id])).rows[0].n).toBe(1);
+      expect((await runAs(m, { modelId: 'mock-sample' })).status).toBe(201); // a mock job never reaches fal
+
+      await pool.query(`update jobs set status = 'succeeded' where id = $1`, [((await first.json()) as { id: string }).id]);
+      expect((await runAs(m)).status).toBe(201);
+    } finally {
+      vi.unstubAllGlobals();
+      process.env.FAL_KEY = ''; // vitest.setup.ts
+      forgetFalBalance();
+    }
   });
 });

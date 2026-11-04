@@ -3,6 +3,7 @@ import { videoInputs } from '@cvs/core/providers/fal';
 import { ASPECTS } from '@cvs/db';
 import { pool } from '@/lib/auth';
 import { modelStats, rank, scoreOf } from '@/lib/model-scores';
+import { falBalance, falCreditUsd, overCredit } from '@/lib/provider-credit';
 import { guard } from '@/lib/session';
 
 function audioEstimate(r: { provider: string; endpoint: string; usd_per_second: string }, durationSec: number): string | null {
@@ -20,6 +21,8 @@ const MONTH = `to_char(now() at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM')`;
  * `?feature=video`, `marketing` or `motion_control` keeps the models whose `features` lists it (Marketing Studio also accepts ratio 16:9, Motion Control takes only `auto`); without it every enabled video model is listed.
  * `audioEstimateUsd` is the estimate with native audio on, null for a model that cannot make audio; `alwaysAudio` is true for one that cannot be silent (ALWAYS_AUDIO). `endFrame` is true for a model that takes an end frame, `textOnly` for one that runs from the prompt alone, and `audioClips` the reference audio it takes ({ max, seconds }, or null; videoInputs).
  * `isNew` is true for a model added in the last 14 days (the picker's badge).
+ * `creditUsd` is what the model's provider can still spend (lib/provider-credit.ts; fal only, null otherwise): the picker locks a model whose estimate is over it, and the
+ * model to pre-select is never one of those.
  * `monthToDate` is the caller's own total this ICT month, provisional while a job of it has no closing row. `remainingBudgetUsd` is for Admins only.
  */
 export async function GET(request: Request) {
@@ -37,7 +40,8 @@ export async function GET(request: Request) {
   }
   const userId = g.session.user.id;
 
-  const [models, mine, budget, stats] = await Promise.all([
+  const fal = await falBalance();
+  const [models, mine, budget, stats, falCredit] = await Promise.all([
     pool.query(
       `select m.id, m.label, m.provider, m.endpoint, m.ratios, m.durations_sec, m.max_images, m.max_prompt_chars, m.usd_per_second, m.output_resolution,
               m.created_at > now() - interval '14 days' as is_new
@@ -54,6 +58,7 @@ export async function GET(request: Request) {
       ? pool.query(`select (s.monthly_cap_usd - coalesce((select sum(usd) from cost_entries ce where month = ${MONTH} and ce.kind <> 'llm' and not exists (select 1 from jobs j where j.id = ce.job_id and j.feature not in ('video', 'marketing'))), 0))::text as remaining from settings s where s.id = 1`)
       : undefined,
     modelStats(null),
+    falCreditUsd(pool, fal),
   ]);
 
   const list = models.rows.map((r) => {
@@ -79,9 +84,10 @@ export async function GET(request: Request) {
       passes: st.passes,
       total: st.total,
       supported: r.ratios.includes(ratio) && r.durations_sec.includes(durationSec),
+      creditUsd: r.provider === 'fal' ? falCredit : null,
     };
   });
-  const supported = list.filter((m) => m.supported).map((m) => ({ id: m.id, score: m.score, usd: Number(m.estimateUsd) }));
+  const supported = list.filter((m) => m.supported && !overCredit(m.provider, m.estimateUsd, m.creditUsd)).map((m) => ({ id: m.id, score: m.score, usd: Number(m.estimateUsd) }));
   const { best, recommended } = rank(supported);
   return Response.json({
     models: list.map((m) => ({ ...m, recommended: m.id === recommended })),

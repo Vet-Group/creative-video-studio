@@ -26,7 +26,15 @@ export interface ModelOption {
   audio?: boolean;
   /** Added in the last 14 days (the API's `isNew`). */
   isNew?: boolean;
+  /** What the model's provider can still spend (the API's `creditUsd`): a model whose estimate is over it is locked until the provider is topped up. */
+  creditUsd?: string | null;
+  /** Set by the picker on a model `creditUsd` locks. */
+  locked?: boolean;
 }
+
+/** A model over its provider's credit cannot be picked, like one the settings rule out. */
+export const withCredit = (m: ModelOption): ModelOption =>
+  m.creditUsd != null && Number(m.estimateUsd) > Number(m.creditUsd) ? { ...m, supported: false, locked: true } : m;
 
 const PANEL = { width: 334, height: 446, gap: 8 };
 const FLYOUT = { width: PANEL.width, row: 56 }; // as wide as the panel, so a row's details stay on one line
@@ -48,7 +56,8 @@ const lengths = (d: number[] | undefined) => {
   return min === max ? `${min}s` : `${min}s-${max}s`;
 };
 
-export function ModelPicker({ models, value, onChange }: { models: ModelOption[]; value: string; onChange: (id: string) => void }) {
+export function ModelPicker({ models: given, value, onChange }: { models: ModelOption[]; value: string; onChange: (id: string) => void }) {
+  const models = given.map(withCredit);
   const uid = useId();
   const labelId = `${uid}-label`;
   const valueId = `${uid}-value`;
@@ -210,7 +219,7 @@ export function ModelPicker({ models, value, onChange }: { models: ModelOption[]
           <span>${m.estimateUsd}</span>
           {m.score !== undefined && <span>Điểm {m.score}</span>}
           {m.rate !== undefined && <span>Đạt {m.rate}</span>}
-          {!m.supported && <span>Không hỗ trợ lựa chọn này</span>}
+          {m.locked ? <span>Hết credits: còn ${Math.max(0, Number(m.creditUsd)).toFixed(2)}</span> : !m.supported && <span>Không hỗ trợ lựa chọn này</span>}
         </span>
       </div>
       {m.id === value && <Icon name="check" />}
