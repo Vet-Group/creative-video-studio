@@ -2,23 +2,31 @@ import { randomUUID } from 'node:crypto';
 import { pool } from '@/lib/auth';
 import { findChoice } from '@/lib/choices';
 import { canReuse } from '@/lib/reuse';
-import { guard } from '@/lib/session';
+import { guard, isEditor } from '@/lib/session';
 import { MAX_TEMPLATE_NAME, MAX_TEMPLATES, templateData } from '@/lib/templates';
 
 const bad = (error: string, status = 400) => Response.json({ error }, { status });
 
-/** `?feature=`: the caller's own templates of that page, then the company's (an Admin shared them), newest first in each; `canShare` for an Admin. */
+/**
+ * `?feature=`: the caller's own templates of that page, then the company's and, with `?storeId=` (the store chosen on the form; a hidden one gives none), that
+ * store's, newest first in each; `canShare` for a template editor (an Admin too), who shares with the company and deletes any company or store template.
+ */
 export async function GET(request: Request) {
   const g = await guard(request, 'member');
   if (g.error) return g.error;
-  const feature = new URL(request.url).searchParams.get('feature') ?? '';
+  const params = new URL(request.url).searchParams;
+  const feature = params.get('feature') ?? '';
   if (!canReuse(feature)) return bad('feature must be a page that takes templates');
   const { rows } = await pool.query(
-    `select id, name, is_company, user_id = $1 as mine from user_templates where feature = $2 and (user_id = $1 or is_company)
-      order by (user_id = $1) desc, created_at desc`,
-    [g.session.user.id, feature],
+    `select t.id, t.name, t.is_company, t.store_id, s.name as store_name, t.user_id = $1 as mine from user_templates t left join stores s on s.id = t.store_id
+      where t.feature = $2 and (t.user_id = $1 or t.is_company or (t.store_id = $3 and not s.hidden))
+      order by (t.user_id = $1) desc, t.created_at desc`,
+    [g.session.user.id, feature, params.get('storeId') ?? ''],
   );
-  return Response.json({ templates: rows.map((r) => ({ id: r.id, name: r.name, isCompany: r.is_company, mine: r.mine })), canShare: g.session.user.role === 'admin' });
+  return Response.json({
+    templates: rows.map((r) => ({ id: r.id, name: r.name, isCompany: r.is_company, storeId: r.store_id, storeName: r.store_name, mine: r.mine })),
+    canShare: isEditor(g.session.user),
+  });
 }
 
 /** What a job of the caller gives a template (`fromJob`), in the shape GET /api/jobs/:id exposes it; null when it is not the caller's live job. */
@@ -55,15 +63,15 @@ async function jobData(jobId: string, userId: string): Promise<{ feature: string
 
 /**
  * Saves the caller's form as a template: `feature` (a page that refills), `name` (1 to 60 characters), `data` (lib/templates.ts) whose images, end frame and clips must be
- * the caller's own live uploads, and `isCompany` (Admin only) to share it. A member keeps at most 50. The hook and the location must be ones the caller
- * may use (lib/choices.ts), and a company template may hold only built-in or company ones.
+ * the caller's own live uploads, and `isCompany` (a template editor only) or `storeId` (any member; a store that is not hidden) to share it. A member keeps at most 50. The hook and the location must be ones the caller
+ * may use (lib/choices.ts), and a company or store template may hold only built-in or company ones.
  * `fromJob` (instead of `feature` and `data`) saves what one of the caller's own jobs was made from, as a History card's Save template does: its own live uploads,
  * its words and its settings; a hook or location the caller can no longer use is left out.
  */
 export async function POST(request: Request) {
   const g = await guard(request, 'member');
   if (g.error) return g.error;
-  const body = (await request.json().catch(() => null)) as { feature?: unknown; name?: unknown; data?: unknown; isCompany?: unknown; fromJob?: unknown } | null;
+  const body = (await request.json().catch(() => null)) as { feature?: unknown; name?: unknown; data?: unknown; isCompany?: unknown; storeId?: unknown; fromJob?: unknown } | null;
   const fromJob = body?.fromJob;
   if (fromJob !== undefined && (typeof fromJob !== 'string' || body?.feature !== undefined || body?.data !== undefined)) return bad('fromJob is a job id, given without feature and data');
   if (fromJob === undefined && !canReuse(typeof body?.feature === 'string' ? body.feature : '')) return bad('feature must be a page that takes templates');
@@ -71,7 +79,10 @@ export async function POST(request: Request) {
   if (name.length < 1 || name.length > MAX_TEMPLATE_NAME) return bad(`name must have 1 to ${MAX_TEMPLATE_NAME} characters`);
   if (body?.isCompany !== undefined && typeof body.isCompany !== 'boolean') return bad('isCompany must be true or false');
   const isCompany = body?.isCompany === true;
-  if (isCompany && g.session.user.role !== 'admin') return bad('only an Admin shares a template with the company', 403);
+  if (isCompany && !isEditor(g.session.user)) return bad('only an Admin or a template editor shares a template with the company', 403);
+  const storeId = body?.storeId ?? null;
+  if (storeId !== null && (typeof storeId !== 'string' || isCompany)) return bad('storeId is a store id, given without isCompany');
+  if (storeId !== null && !(await pool.query('select 1 from stores where id = $1 and not hidden', [storeId])).rowCount) return bad('storeId is not a store');
   const userId = g.session.user.id;
   const job = typeof fromJob === 'string' ? await jobData(fromJob, userId) : null;
   if (typeof fromJob === 'string' && !job) return bad('the job does not exist', 404);
@@ -84,7 +95,7 @@ export async function POST(request: Request) {
     const choice = await findChoice(userId, key, data[key]);
     if (!choice && job) delete data[key]; // a choice deleted since the job ran
     else if (!choice) return bad(`data.${key} is not a ${key}`);
-    else if (isCompany && !choice.builtIn && !choice.isCompany) return bad('a company template may use only built-in or company hooks and locations');
+    else if ((isCompany || storeId) && !choice.builtIn && !choice.isCompany) return bad('a company or store template may use only built-in or company hooks and locations');
   }
   for (const [key, ids] of [['images', data.images], ['endFrame', data.endFrame ? [data.endFrame] : []], ['clips', data.clips ?? []]] as const) {
     if (ids.length === 0) continue;
@@ -102,7 +113,7 @@ export async function POST(request: Request) {
       await client.query('rollback');
       return bad(`you can keep at most ${MAX_TEMPLATES} templates; delete one first`, 409);
     }
-    await client.query('insert into user_templates (id, user_id, feature, name, data, is_company) values ($1, $2, $3, $4, $5, $6)', [id, userId, feature, name, JSON.stringify(data), isCompany]);
+    await client.query('insert into user_templates (id, user_id, feature, name, data, is_company, store_id) values ($1, $2, $3, $4, $5, $6, $7)', [id, userId, feature, name, JSON.stringify(data), isCompany, storeId]);
     await client.query('commit');
   } catch (e) {
     await client.query('rollback');
@@ -110,5 +121,5 @@ export async function POST(request: Request) {
   } finally {
     client.release();
   }
-  return Response.json({ id, name, isCompany }, { status: 201 });
+  return Response.json({ id, name, isCompany, storeId }, { status: 201 });
 }

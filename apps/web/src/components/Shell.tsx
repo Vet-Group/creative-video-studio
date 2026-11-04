@@ -18,7 +18,7 @@ import { JobFailureNote, canRetry } from './JobFailure';
 import { JobPrompt, JobsProvider, Recreate, roleOf, Tap, toggleFullscreen, useForm, useJobs } from './jobs';
 import { LoadError } from './LoadError';
 import { type Account, type Section, Settings } from './Settings';
-import { SaveTemplateDialog } from './Templates';
+import { SaveTemplateDialog, type Scope } from './Templates';
 import { OpenToolGuide, ToolGuide, ToolGuideButton } from './ToolGuide';
 import { VetLogo } from './VetLogo';
 import { useZipDownload } from './ZipDownload';
@@ -140,8 +140,8 @@ function HistoryCard({ job, isAdmin, select }: { job: TrayJob; isAdmin: boolean;
       setSaved(false);
       setSaving({ canShare: (await api<{ canShare: boolean }>(`/api/templates?feature=${job.feature}`)).canShare });
     }, 'Không mở được Lưu mẫu.');
-  async function saveTemplate(name: string, share: boolean) {
-    await api('/api/templates', sendJson('POST', { name, fromJob: job.id, ...(share && { isCompany: true }) }));
+  async function saveTemplate(name: string, scope: Scope) {
+    await api('/api/templates', sendJson('POST', { name, fromJob: job.id, ...(scope === 'company' && { isCompany: true }) }));
     setSaving(null);
     setSaved(true);
   }

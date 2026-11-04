@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
-import { png, select, signIn } from './support.test';
+import { png, select, selectText, signIn } from './support.test';
 
 // Saved forms: Save template keeps the page's inputs under a name, My templates reopens the page filled from one. Nothing is run.
 const file = (name: string) => ({ name, mimeType: 'image/png', buffer: png() });
@@ -62,6 +62,46 @@ test('Try On: a saved template lists under Mẫu của tôi and refills the pers
   await list.getByRole('button', { name: 'Xoá mẫu Váy đỏ' }).click();
   await page.getByRole('dialog', { name: 'Xoá mẫu "Váy đỏ"?' }).getByRole('button', { name: 'Xoá', exact: true }).click();
   await expect(list).toContainText('Chưa có mẫu nào.');
+});
+
+test('Create: a template saved to the store chosen on the form is listed, tagged with the store, to another member who picks that store, and applies there', async ({ page, browser }) => {
+  await signIn(page, 'stpla');
+  await page.goto('/create');
+  await page.getByLabel('Mô tả chuyển động').fill('The shop bag spins slowly.');
+  await page.getByRole('button', { name: 'Lưu mẫu', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Lưu mẫu' });
+  await expect(dialog.getByRole('radio', { name: 'Cửa hàng', exact: true })).toBeDisabled(); // no store chosen on the form yet
+  await expect(dialog.getByRole('radio', { name: 'Công ty' })).toHaveCount(0); // a member shares with no company
+  await dialog.getByRole('button', { name: 'Đóng' }).click();
+  await selectText(page, 'Cửa hàng/Thương hiệu', 'E2E Shop');
+  await page.getByRole('button', { name: 'Lưu mẫu', exact: true }).click();
+  await dialog.getByLabel('Tên mẫu').fill('Túi xoay');
+  await dialog.getByRole('radio', { name: 'Cửa hàng E2E Shop' }).check();
+  await dialog.getByRole('button', { name: 'Lưu', exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Đã lưu mẫu.' })).toBeVisible();
+
+  const other = await (await browser.newContext()).newPage();
+  await signIn(other, 'stplb');
+  await other.goto('/create');
+  const list = other.getByRole('dialog', { name: 'Mẫu của tôi' });
+  await other.getByRole('button', { name: 'Mẫu của tôi' }).click();
+  await expect(list).toContainText('Chưa có mẫu nào.'); // without the store, not listed
+  await list.getByRole('button', { name: 'Đóng' }).click();
+  await selectText(other, 'Cửa hàng/Thương hiệu', 'E2E Shop');
+  await other.getByRole('button', { name: 'Mẫu của tôi' }).click();
+  const item = list.getByRole('listitem').filter({ hasText: 'Túi xoay' });
+  await expect(item.locator('.tag')).toHaveText('Cửa hàng: E2E Shop');
+  await expect(item.getByRole('button', { name: 'Xoá mẫu Túi xoay' })).toHaveCount(0); // only its author, an Admin or an editor deletes it
+  await item.getByRole('link', { name: 'Túi xoay' }).click();
+  await expect(other.getByLabel('Mô tả chuyển động')).toHaveValue('The shop bag spins slowly.');
+  await expect(select(other, 'Cửa hàng/Thương hiệu')).toHaveText('E2E Shop');
+  await other.close();
+
+  // The author deletes it, so no other spec that picks this store lists it.
+  await page.getByRole('button', { name: 'Mẫu của tôi' }).click();
+  await page.getByRole('dialog', { name: 'Mẫu của tôi' }).getByRole('button', { name: 'Xoá mẫu Túi xoay' }).click();
+  await page.getByRole('dialog', { name: 'Xoá mẫu "Túi xoay"?' }).getByRole('button', { name: 'Xoá', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Mẫu của tôi' })).toContainText('Chưa có mẫu nào.');
 });
 
 test('Image Generation: a saved template refills the prompt and Enhance', async ({ page }) => {

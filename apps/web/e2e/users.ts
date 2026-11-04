@@ -92,6 +92,9 @@ export const USERS = {
   // preset-edit.e2e: tpled is a template editor (e2e/serve.ts sets it), tplprop a plain member who proposes.
   tpled: { email: 'tpled@e2e.test', name: 'E2E Template Editor', role: 'member' },
   tplprop: { email: 'tplprop@e2e.test', name: 'E2E Template Proposer', role: 'member' },
+  // templates.e2e: stpla saves a template to a store on Create, stplb picks that store and applies it.
+  stpla: { email: 'stpla@e2e.test', name: 'E2E Store Template A', role: 'member' },
+  stplb: { email: 'stplb@e2e.test', name: 'E2E Store Template B', role: 'member' },
   admin: { email: 'admin@e2e.test', name: 'E2E Admin', role: 'admin' },
 } as const;
 

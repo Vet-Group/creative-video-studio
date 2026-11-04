@@ -686,6 +686,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
             <Templates
               feature="video"
               data={() => ({ images: images.map((i) => i.id), endFrame: endAssetId, clips: audioAssetIds ? clips.map((c) => c.id) : undefined, ...(presetId ? { presetId } : { prompt: prompt.trim(), enhance }), audio: audio ? 'on' : 'off', ratio, durationSec, modelId, storeId })}
+              store={stores.find((s) => s.id === storeId) ?? null}
             />
           </div>
 

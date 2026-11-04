@@ -42,7 +42,7 @@ describe('/api/templates', () => {
     const res = await save(u, tryOn(u));
     expect(res.status).toBe(201);
     const { id } = (await res.json()) as { id: string };
-    expect(await (await list(req(u, '/api/templates?feature=try_on'))).json()).toEqual({ templates: [{ id, name: 'Red dress', isCompany: false, mine: true }], canShare: false });
+    expect(await (await list(req(u, '/api/templates?feature=try_on'))).json()).toEqual({ templates: [{ id, name: 'Red dress', isCompany: false, storeId: null, storeName: null, mine: true }], canShare: false });
     expect(await (await one(req(u, `/api/templates/${id}`), ctx(id))).json()).toMatchObject({
       id, feature: 'try_on', images: [{ id: u.asset, filename: 'own.png' }], brief: 'red dress', garments: 1, ratio: '3:4', resolution: '2K', modelId: 'm1', prompt: null,
     });
@@ -68,7 +68,7 @@ describe('/api/templates', () => {
     expect(await error(await save(a, { ...tryOn(a), data: { images: [], hook: 'nope' } }))).toBe('data.hook is not a hook');
     expect(await error(await save(a, { ...tryOn(a), feature: 'media_optimizer' }))).toBe('feature must be a page that takes templates'); // Motion Control refills since History saves it
     const shared = await save(a, { ...tryOn(a), isCompany: true });
-    expect([shared.status, await error(shared)]).toEqual([403, 'only an Admin shares a template with the company']);
+    expect([shared.status, await error(shared)]).toEqual([403, 'only an Admin or a template editor shares a template with the company']);
     expect((await pool.query('select count(*)::int as n from user_templates where user_id = $1', [a.id])).rows[0].n).toBe(0);
   });
 
@@ -104,12 +104,49 @@ describe('/api/templates', () => {
   test("shares an Admin's company template with everyone, without the Admin's photos, and only an Admin deletes it", async () => {
     const [admin, m] = [await newUser('admin'), await newUser()];
     const { id } = (await (await save(admin, { ...tryOn(admin), isCompany: true })).json()) as { id: string };
-    expect(await (await list(req(m, '/api/templates?feature=try_on'))).json()).toEqual({ templates: [{ id, name: 'Red dress', isCompany: true, mine: false }], canShare: false });
+    expect(await (await list(req(m, '/api/templates?feature=try_on'))).json()).toEqual({ templates: [{ id, name: 'Red dress', isCompany: true, storeId: null, storeName: null, mine: false }], canShare: false });
     expect(((await (await list(req(admin, '/api/templates?feature=try_on'))).json()) as { canShare: boolean }).canShare).toBe(true);
     expect(await (await one(req(m, `/api/templates/${id}`), ctx(id))).json()).toMatchObject({ images: [], brief: 'red dress', garments: 1 });
-    expect((await DELETE(req(m, `/api/templates/${id}`, { method: 'DELETE' }), ctx(id))).status).toBe(404);
+    expect((await DELETE(req(m, `/api/templates/${id}`, { method: 'DELETE' }), ctx(id))).status).toBe(403);
     const other = await newUser('admin');
     expect((await DELETE(req(other, `/api/templates/${id}`, { method: 'DELETE' }), ctx(id))).status).toBe(204);
+  });
+
+  test("shares a member's store template with whoever lists that store, without the author's photos; its author, an Admin or an editor deletes it", async () => {
+    const [a, b, admin, editor] = [await newUser(), await newUser(), await newUser('admin'), await newUser()];
+    await pool.query(`update users set can_edit_templates = true where id = $1`, [editor.id]);
+    await pool.query(`insert into stores (id, name, code, hidden) values ('st-a', 'Shop A', 'STA', false), ('st-gone', 'Gone', 'STG', true)`);
+    const res = await save(a, { ...tryOn(a), storeId: 'st-a' });
+    expect(res.status).toBe(201);
+    const { id } = (await res.json()) as { id: string };
+    const entry = { id, name: 'Red dress', isCompany: false, storeId: 'st-a', storeName: 'Shop A', mine: false };
+    expect(await (await list(req(b, '/api/templates?feature=try_on&storeId=st-a'))).json()).toEqual({ templates: [entry], canShare: false });
+    expect(await (await list(req(b, '/api/templates?feature=try_on'))).json()).toEqual({ templates: [], canShare: false });
+    expect(await (await list(req(b, '/api/templates?feature=try_on&storeId=other'))).json()).toEqual({ templates: [], canShare: false });
+    expect(await (await list(req(a, '/api/templates?feature=try_on'))).json()).toEqual({ templates: [{ ...entry, mine: true }], canShare: false }); // the author's own, with or without the store
+    expect(await (await one(req(b, `/api/templates/${id}`), ctx(id))).json()).toMatchObject({ images: [], brief: 'red dress', garments: 1 });
+    expect(((await (await list(req(editor, '/api/templates?feature=try_on'))).json()) as { canShare: boolean }).canShare).toBe(true);
+
+    for (const [body, message] of [
+      [{ storeId: 'nope' }, 'storeId is not a store'],
+      [{ storeId: 'st-gone' }, 'storeId is not a store'],
+      [{ storeId: 1 }, 'storeId is a store id, given without isCompany'],
+    ] as const) {
+      const bad = await save(a, { ...tryOn(a), ...body });
+      expect([bad.status, await error(bad)]).toEqual([400, message]);
+    }
+    const both = await save(admin, { ...tryOn(admin), storeId: 'st-a', isCompany: true });
+    expect([both.status, await error(both)]).toEqual([400, 'storeId is a store id, given without isCompany']);
+
+    const del = (u: User, tid: string) => DELETE(req(u, `/api/templates/${tid}`, { method: 'DELETE' }), ctx(tid));
+    expect((await del(b, id)).status).toBe(403);
+    expect((await del(a, id)).status).toBe(204);
+    const second = ((await (await save(a, { ...tryOn(a), storeId: 'st-a' })).json()) as { id: string }).id;
+    expect((await del(admin, second)).status).toBe(204);
+    const third = ((await (await save(a, { ...tryOn(a), storeId: 'st-a' })).json()) as { id: string }).id;
+    expect((await del(editor, third)).status).toBe(204);
+    // A template editor shares with the company too.
+    expect((await save(editor, { ...tryOn(editor), isCompany: true })).status).toBe(201);
   });
 
   test("takes own and company custom hooks and locations in data, refuses another member's private one, and keeps a company template to built-in or company ones", async () => {
@@ -126,7 +163,7 @@ describe('/api/templates', () => {
     expect(await error(await marketing(a, { hook: 5 }))).toBe('data.hook is not a hook');
     expect((await marketing(admin, { hook: 'blizzard', location: `${admin.id}-spot` }, { isCompany: true })).status).toBe(201);
     const leak = await marketing(admin, { hook: `${admin.id}-hook` }, { isCompany: true });
-    expect([leak.status, await error(leak)]).toEqual([400, 'a company template may use only built-in or company hooks and locations']);
+    expect([leak.status, await error(leak)]).toEqual([400, 'a company or store template may use only built-in or company hooks and locations']);
     expect((await marketing(admin, { hook: `${admin.id}-hook` })).status).toBe(201); // private, it may
   });
 
@@ -208,7 +245,7 @@ describe('/api/templates', () => {
       expect(await error(await fromJob(u, id, { feature: 'image' }))).toBe('fromJob is a job id, given without feature and data');
       expect(await error(await fromJob(u, 5))).toBe('fromJob is a job id, given without feature and data');
       const shared = await fromJob(u, id, { isCompany: true });
-      expect([shared.status, await error(shared)]).toEqual([403, 'only an Admin shares a template with the company']);
+      expect([shared.status, await error(shared)]).toEqual([403, 'only an Admin or a template editor shares a template with the company']);
       const soon = await job(u, { feature: 'media_optimizer', model: 'nano-banana-pro', inputs: [u.asset] });
       expect(await error(await fromJob(u, soon))).toBe('the job is of a page that takes no templates');
       const purged = await job(u, { feature: 'video', model: 'kling-o3-pro', prompt: 'p', duration: 5, inputs: [u.asset] });
@@ -224,7 +261,7 @@ describe('/api/templates', () => {
       // A company template from a job may not hold the Admin's private hook.
       await pool.query(`insert into user_choices (id, user_id, kind, name, phrase) values ($1, $2, 'hook', 'n', 'p')`, [`${admin.id}-hook`, admin.id]);
       const mkt = await job(admin, { feature: 'marketing', model: 'kling-o3-pro', duration: 5, params: { hook: `${admin.id}-hook` }, inputs: [admin.asset] });
-      expect(await error(await fromJob(admin, mkt, { isCompany: true }))).toBe('a company template may use only built-in or company hooks and locations');
+      expect(await error(await fromJob(admin, mkt, { isCompany: true }))).toBe('a company or store template may use only built-in or company hooks and locations');
     });
   });
 });

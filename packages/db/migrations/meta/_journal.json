@@ -442,6 +442,13 @@
       "when": 1794394974036,
       "tag": "0063_template_editors",
       "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "7",
+      "when": 1794394975036,
+      "tag": "0064_store_templates",
+      "breakpoints": true
     }
   ]
 }
