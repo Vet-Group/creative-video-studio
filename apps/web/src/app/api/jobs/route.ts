@@ -10,6 +10,7 @@ import { findChoice } from '@/lib/choices';
 import { inputRefusal } from '@/lib/job-failure';
 import { BRAND_FEATURES, withBrand } from '@/lib/brand';
 import { ADVANCED_MAX_SCRIPT } from '@/lib/marketing';
+import { falBalance, falCreditUsd, overCredit } from '@/lib/provider-credit';
 import { guard } from '@/lib/session';
 
 /** Create Video takes up to 9 images (the most a fal reference schema allows, as Fash offers); the model's max_images is checked under the lock. */
@@ -86,7 +87,7 @@ export async function GET(request: Request) {
 /**
  * Create a video job: 1-9 input images the caller may use (none on a model with a text-to-video twin, videoInputs `textOnly`: then a free prompt, no preset or end frame) (their own, or the inputs of a succeeded Library clip for Reuse), an enabled
  * model, a preset or a free prompt (exactly one; a free prompt is trimmed, 1 character up to the model's prompt limit (promptLimit), and stored with a null preset), the ratio and duration the model allows, and an optional visible store. The caps are checked and the job and its
- * `estimate` ledger row are written in one transaction (429 when a cap refuses, nothing sent); the pg-boss job is sent afterwards.
+ * `estimate` ledger row are written in one transaction (429 when a cap refuses, or when a fal Run's estimate is over what fal can still spend, lib/provider-credit.ts; nothing sent); the pg-boss job is sent afterwards.
  * `feature` (default `video`) picks the kind of job. `video` and `marketing` take a video model and the durations above, and an optional `params.audio` (below); `video` also takes
  * an optional `params.endAssetId`, the end frame: one of the caller's own live images, on a model whose fal request builder takes one (videoInputs), and an optional
  * `params.audioAssetIds`, reference audio: the caller's own MP3/WAV clips (comma-separated ids), each at least 2 s, within the model's count and total length; and no other `params`. `marketing` needs exactly 2 inputs (the model photo, then the product photo) and a prompt, no preset;
@@ -208,6 +209,7 @@ export async function POST(request: Request) {
   }
 
   const id = crypto.randomUUID();
+  const fal = await falBalance();
   const refused = await withTransaction(pool, async (tx): Promise<Response | null> => {
     // One writer at a time, so two Runs cannot both take the last daily slot or the last dollars of the month.
     await tx.query(`select pg_advisory_xact_lock(hashtext('caps'))`);
@@ -284,6 +286,11 @@ export async function POST(request: Request) {
     // A mock job books 0 USD (see the ledger), so it adds nothing to the monthly cap.
     const cap = await checkCaps(tx, userId, provider === 'mock' ? '0' : estimate, undefined, feature);
     if (cap) return Response.json({ error: CAP_MESSAGES[cap] }, { status: 429 });
+    // Under the same lock, so two Runs cannot both spend fal's last dollars.
+    const credit = provider === 'fal' ? await falCreditUsd(tx, fal) : null;
+    if (overCredit(provider, estimate, credit)) {
+      return Response.json({ error: `fal.ai chỉ còn $${Math.max(0, Number(credit)).toFixed(2)}, không đủ cho lần chạy này (khoảng $${Number(estimate).toFixed(2)}). Hãy chọn model rẻ hơn hoặc báo Admin nạp thêm credits.` }, { status: 429 });
+    }
     await tx.query(
       // A retry keeps the original's brief, so it is not rewritten (and paid for) again.
       `insert into jobs (id, user_id, team_id, store_id, retry_of, feature, model, provider, preset_id, prompt, aspect, duration_s, params, input_asset_ids, is_mock, enhance, enhanced_prompt)

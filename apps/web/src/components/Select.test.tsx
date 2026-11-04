@@ -1,7 +1,7 @@
 // The closed state of the custom controls: roles, names and the chosen value that the e2e specs and screen readers rely on.
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, test } from 'vitest';
-import { ModelPicker } from './ModelPicker';
+import { ModelPicker, withCredit } from './ModelPicker';
 import { Select } from './Select';
 
 test('a closed select is a labelled combobox showing the chosen option, with no list in the page', () => {
@@ -38,4 +38,12 @@ test('the model picker shows the chosen model on its button and keeps the panel 
   expect(html).toContain('MOCK');
   expect(html).not.toContain('Alpha');
   expect(html).not.toContain('role="dialog"');
+});
+
+test('a model whose estimate is over its provider credit is locked like an unsupported one; at or under it, or with no credit known, it stays', () => {
+  const m = { id: 'a', label: 'Alpha', isMock: false, supported: true, estimateUsd: '1.0000' };
+  expect(withCredit({ ...m, creditUsd: '0.9999' })).toMatchObject({ supported: false, locked: true });
+  expect(withCredit({ ...m, creditUsd: '1.0000' })).toEqual({ ...m, creditUsd: '1.0000' });
+  expect(withCredit({ ...m, creditUsd: null })).toEqual({ ...m, creditUsd: null });
+  expect(withCredit(m)).toEqual(m);
 });

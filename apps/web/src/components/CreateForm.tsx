@@ -54,6 +54,7 @@ interface Model {
   recommended: boolean;
   /** Added in the last 14 days. */
   isNew: boolean;
+  creditUsd: string | null;
   passes: number;
   total: number;
   supported: boolean;
@@ -625,7 +626,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
 
             {models && models.models.length > 0 && (
               <ModelPicker
-                models={models.models.map((m) => ({ id: m.id, label: m.label, isMock: m.isMock, supported: m.supported, rate: ratePct(m), estimateUsd: audio && m.audioEstimateUsd != null ? m.audioEstimateUsd : m.estimateUsd, score: m.score, recommended: m.recommended, resolution: m.resolution, durationsSec: m.durationsSec, audio: m.audioEstimateUsd != null, isNew: m.isNew }))}
+                models={models.models.map((m) => ({ id: m.id, label: m.label, isMock: m.isMock, supported: m.supported, rate: ratePct(m), estimateUsd: audio && m.audioEstimateUsd != null ? m.audioEstimateUsd : m.estimateUsd, score: m.score, recommended: m.recommended, resolution: m.resolution, durationsSec: m.durationsSec, audio: m.audioEstimateUsd != null, isNew: m.isNew, creditUsd: m.creditUsd }))}
                 value={modelId}
                 onChange={setModelId}
               />

@@ -26,6 +26,15 @@ Section provider balances:
 - The balance warning threshold (USD): a balance under it shows red.
 The threshold is validated as an amount of 0 or more with at most 4 decimals and audited as `settings.update` with the old and new values (migration 0051).
 
+## fal credit lock (2026-11-05)
+
+A fal model is locked while one Run of it would cost more than fal can still spend: fal's live USD balance minus the estimates of the fal jobs that
+have not ended (`queued`, `submitting`, `running`), since fal bills a job when it ends (`apps/web/src/lib/provider-credit.ts`). The pickers show such a
+model as not selectable with the credit left; `POST /api/jobs` refuses it with 429 under the caps lock, so two Runs cannot spend the same last dollars.
+A good balance read is kept a minute, so a top-up unlocks the models within a minute. When the balance cannot be read or is not in USD, nothing is
+locked and fal itself refuses a job it cannot pay for. Other providers are not locked: BytePlus bills the card, and a Vertex account stops through its
+own credits guard.
+
 ## Replicate (removed 2026-11-04)
 
 Replicate has no adapter any more: no code path submits to it, `REPLICATE_API_TOKEN` is no longer read, and the hourly Replicate guard and its fal twin
