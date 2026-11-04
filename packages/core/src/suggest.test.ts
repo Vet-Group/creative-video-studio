@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 import { ENHANCE_MODEL, ENHANCE_URL, OPENAI_URL } from './enhance';
 import {
   createFalSuggester, createOpenAiSuggester, cutTo, DIRECTIONS, lengthenPrompt, modelNote, parseOption, PROMPT_SYSTEM, PROMPT_TASKS, SCENE_SYSTEM, SUGGEST_SYSTEM,
-  parseVideoAnswer, PERSON_KEEP, PRODUCT_KEEP, suggestPrompt, targetRange, TRANSLATE_SYSTEM, VIDEO_SYSTEM, videoPrompt,
+  frameTimes, parseVideoAnswer, PERSON_KEEP, PRODUCT_KEEP, suggestPrompt, targetRange, TRANSLATE_SYSTEM, VIDEO_FRAMES, VIDEO_SYSTEM, videoPrompt,
 } from './suggest';
 
 const answer = (body: unknown, status = 200) => Promise.resolve(new Response(JSON.stringify(body), { status }));
@@ -164,8 +164,30 @@ test('OpenAI: a non-JSON or empty answer, or an HTTP error, fails the run', asyn
 });
 
 const video = { field: 'video' as const, text: '', context: '', max: 5000, clip: 'preset-walk-left.mp4' };
-const stills = ['data:image/jpeg;base64,AAAA', 'data:image/jpeg;base64,BBBB'];
+const stills = Array.from({ length: VIDEO_FRAMES }, (_, k) => `data:image/jpeg;base64,${'ABCDEFGH'[k]}AAA`);
 const motion = 'The model walks to the left while the camera tracks alongside.';
+
+test('the video system prompt keeps the model to what the stills clearly show', () => {
+  for (const rule of [
+    'only the subjects, objects, motion and camera moves that are clearly visible in the stills',
+    'Never infer events between stills.',
+    'If something appears in only one still or is unclear, leave it out.',
+    'Prefer fewer, certain details over more, uncertain ones.',
+    'Never invent props, particles, pieces, people or text',
+    'Write 40 to 90 words',
+    'Do not say what must stay unchanged; that is added after.',
+  ]) expect(VIDEO_SYSTEM).toContain(rule);
+});
+
+test('eight stills, evenly spaced, each numbered with its time when the clip length is known', () => {
+  expect(VIDEO_FRAMES).toBe(8);
+  expect(frameTimes(8, VIDEO_FRAMES)).toEqual([0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5]);
+  expect(suggestPrompt({ ...video, seconds: 5 })).toBe(
+    "The 8 stills of the template's sample clip follow in time order, evenly spaced over it (5.0 seconds long): still 1 of 8 at 0.3 s, still 2 of 8 at 0.9 s, " +
+      'still 3 of 8 at 1.6 s, still 4 of 8 at 2.2 s, still 5 of 8 at 2.8 s, still 6 of 8 at 3.4 s, still 7 of 8 at 4.1 s, still 8 of 8 at 4.7 s.',
+  );
+  expect(suggestPrompt(video)).toBe("The 8 stills of the template's sample clip follow in time order, evenly spaced over it.");
+});
 
 test('a preset prompt is the motion, then the keep clauses of a person or of a product (no faces), then the stable line when the camera is', () => {
   expect(videoPrompt({ motion, person: true, stable: true }, 5000)).toBe(`${motion} ${PERSON_KEEP} Smooth, stable camera.`);
@@ -190,10 +212,13 @@ test("fal: a preset prompt is one call to the router's vision endpoint with the 
     apiKey: 'k',
     fetch: (url, init) => (calls.push({ url: String(url), body: JSON.parse(String(init!.body)) }), answer({ output: JSON.stringify({ motion, person: true, stable: true }), usage: { cost: 0.0012 } })),
   });
-  expect(await suggest(video, stills)).toEqual({ options: [videoPrompt({ motion, person: true, stable: true }, 5000)], costUsd: 0.0012, provider: 'fal', model: ENHANCE_MODEL });
+  const out = await suggest(video, stills);
+  expect(out).toEqual({ options: [videoPrompt({ motion, person: true, stable: true }, 5000)], costUsd: 0.0012, provider: 'fal', model: ENHANCE_MODEL });
+  expect(out.options[0]).toBe(`${motion} ${PERSON_KEEP} Smooth, stable camera.`); // the keep clauses come from code, after the model's motion
   expect(calls).toHaveLength(1);
   expect(calls[0]!.url).toBe(`${ENHANCE_URL}/vision`);
   expect(calls[0]!.body).toMatchObject({ model: ENHANCE_MODEL, system_prompt: VIDEO_SYSTEM, prompt: suggestPrompt(video), image_urls: stills });
+  expect(calls[0]!.body.image_urls).toHaveLength(8);
   await expect(suggest(video)).rejects.toThrow('no stills'); // never a vision call without the clip
 });
 

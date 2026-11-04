@@ -24,7 +24,7 @@ test("a template editor fills a preset's prompt from its saved clip, and the pro
 
     await form.getByRole('button', { name: 'Gợi ý prompt từ video' }).click();
     await expect(form.getByRole('button', { name: 'Đang phân tích video…' })).toBeDisabled();
-    await expect(prompt).toHaveValue(/^Mock motion read from 6 stills: .* Keep the person, their face, the outfit, .* Smooth, stable camera\.$/);
+    await expect(prompt).toHaveValue(/^Mock motion read from 8 stills: .* Keep the person, their face, the outfit, .* Smooth, stable camera\.$/);
     const suggested = await prompt.inputValue();
     await expect(form.getByRole('button', { name: 'Gợi ý prompt từ video' })).toBeEnabled();
 

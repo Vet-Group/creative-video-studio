@@ -17,8 +17,9 @@ export async function runSuggestion(pool: WorkerDeps['pool'], suggest: Suggester
   try {
     if (!suggest) throw new Error('no suggester: FAL_KEY is not set');
     const input = run.input as SuggestInput;
-    const frames = input.clip && (await extractFrames(await read(`samples/${input.clip}`), VIDEO_FRAMES)).map((b) => `data:image/jpeg;base64,${Buffer.from(b).toString('base64')}`);
-    const call = await suggest(input, frames || undefined);
+    const clip = input.clip ? await extractFrames(await read(`samples/${input.clip}`), VIDEO_FRAMES) : undefined;
+    // The clip's length goes with its stills so the call can say when each was taken.
+    const call = await suggest(clip ? { ...input, seconds: clip.seconds } : input, clip?.stills.map((b) => `data:image/jpeg;base64,${Buffer.from(b).toString('base64')}`));
     const { options, meanings, costUsd } = call;
     // An option with a Vietnamese reading is stored as { text, vi }, one without as its text (as every run before the readings).
     const output = options.map((text, i) => (meanings?.[i] ? { text, vi: meanings[i] } : text));

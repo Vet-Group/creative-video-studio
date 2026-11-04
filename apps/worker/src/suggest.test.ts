@@ -2,10 +2,10 @@
 import { readFile } from 'node:fs/promises';
 import { createPool } from '@cvs/db/client';
 import { createTestDatabase } from '@cvs/db/testing';
-import { type Suggester, VIDEO_FRAMES } from '@cvs/core/suggest';
+import { frameTimes, type Suggester, VIDEO_FRAMES } from '@cvs/core/suggest';
 import sharp from 'sharp';
 import { afterAll, beforeAll, expect, test, vi } from 'vitest';
-import { extractFrames, frameTimes } from './media';
+import { extractFrames } from './media';
 import { fakeSuggester, runSuggestion } from './suggest';
 
 const testDb = await createTestDatabase();
@@ -88,14 +88,15 @@ const clip = () => readFile(new URL('../../web/public/fixtures/examples/example-
 const videoInput = { field: 'video', text: '', context: '', max: 5000, clip: 'preset-walk-left.mp4' };
 
 test('the stills sit in the middle of equal slices of the clip, in order', () => {
-  expect(frameTimes(6, 6)).toEqual([0.5, 1.5, 2.5, 3.5, 4.5, 5.5]);
+  expect(frameTimes(8, VIDEO_FRAMES)).toEqual([0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5]);
   expect(frameTimes(3, 2)).toEqual([0.75, 2.25]);
 });
 
-test('a clip gives the asked number of small JPEG stills', async () => {
-  const frames = await extractFrames(new Uint8Array(await clip()), VIDEO_FRAMES);
-  expect(frames).toHaveLength(VIDEO_FRAMES);
-  for (const f of frames) {
+test('a clip gives eight small JPEG stills and its length', async () => {
+  const { seconds, stills } = await extractFrames(new Uint8Array(await clip()), VIDEO_FRAMES);
+  expect(seconds).toBeGreaterThan(0);
+  expect(stills).toHaveLength(8);
+  for (const f of stills) {
     const { format, width = 0, height = 0 } = await sharp(f).metadata();
     expect(format).toBe('jpeg');
     expect(Math.max(width, height)).toBeLessThanOrEqual(512);
@@ -109,8 +110,8 @@ test("a video run reads the preset's clip from the bucket, sends its stills as J
   const id = await queued(0, videoInput);
   await runSuggestion(pool, suggest, id, async (key) => (keys.push(key), new Uint8Array(await clip())));
   expect(keys).toEqual(['samples/preset-walk-left.mp4']);
-  expect(seen[0]!.input).toEqual(videoInput);
-  expect(seen[0]!.frames).toHaveLength(VIDEO_FRAMES);
+  expect(seen[0]!.input).toEqual({ ...videoInput, seconds: expect.any(Number) }); // the measured length times each still in the call
+  expect(seen[0]!.frames).toHaveLength(8);
   seen[0]!.frames!.forEach((f) => expect(f).toMatch(/^data:image\/jpeg;base64,\/9j\//));
   expect(await row(id)).toEqual({ status: 'succeeded', output: ['The camera tracks left.'], cost_usd: '0.001200' });
   expect(await ledger(id)).toEqual([{ kind: 'llm', usd: '0.0012', user_id: 'u1', team_id: 'team-unassigned', job_id: null, model: 'google/gemini-2.5-flash', is_final: true }]);
@@ -127,9 +128,9 @@ test('a clip that cannot be read fails the run without calling the suggester', a
 test('the e2e stand-in writes a house-style preset prompt from the stills without any network call', async () => {
   const fetchSpy = vi.spyOn(globalThis, 'fetch');
   try {
-    const out = await fakeSuggester({ field: 'video', text: '', context: '', max: 5000, clip: 'preset-x.mp4' }, ['a', 'b', 'c', 'd', 'e', 'f']);
+    const out = await fakeSuggester({ field: 'video', text: '', context: '', max: 5000, clip: 'preset-x.mp4' }, ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']);
     expect(out.options).toHaveLength(1);
-    expect(out.options[0]).toMatch(/^Mock motion read from 6 stills: .* Keep the person, their face, the outfit, .* Smooth, stable camera\.$/);
+    expect(out.options[0]).toMatch(/^Mock motion read from 8 stills: .* Keep the person, their face, the outfit, .* Smooth, stable camera\.$/);
     expect(out.costUsd).toBe(0);
     expect(fetchSpy).not.toHaveBeenCalled();
   } finally {

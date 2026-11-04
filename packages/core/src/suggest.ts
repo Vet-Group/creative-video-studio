@@ -36,7 +36,8 @@ export interface SuggestInput {
   max: number;
   /** The chosen model's name and how to write for it (modelNote, built by the server from an enabled model), when the page has one. */
   model?: string;
-  /** The clip's length in seconds, when the page has one: lines must fit it, and a brief or a video prompt paces its beats to it. */
+  /** The clip's length in seconds, when the page has one: lines must fit it, and a brief or a video prompt paces its beats to it. For `video`, the
+   * sample clip's length the worker measured, which times each still. */
   seconds?: number;
 }
 
@@ -82,15 +83,24 @@ export const TRANSLATE_SYSTEM =
   'quickly. Keep the meaning and every detail, add and drop nothing. Reply with a JSON array of exactly one string, the translation, and nothing else.';
 
 /** How many stills of a preset's clip the vision call gets, evenly spread over it. */
-export const VIDEO_FRAMES = 6;
+export const VIDEO_FRAMES = 8;
 
-/** The prompt-from-video button: the motion of a preset's clip as a prompt that works for any seller's photo; the keep clauses are added by videoPrompt. */
+/** `n` times spread evenly over a clip of `seconds`, each in the middle of its slice, so no still is the very first or last frame. */
+export const frameTimes = (seconds: number, n: number): number[] => Array.from({ length: n }, (_, i) => ((i + 0.5) * seconds) / n);
+
+/**
+ * The prompt-from-video button: the motion of a preset's clip as a prompt that works for any seller's photo; the keep clauses are added by videoPrompt.
+ * The grounding rules stop the model filling the gaps between stills with events the clip never shows (a prod call on floating-reveal, 2026-11-05).
+ */
 export const VIDEO_SYSTEM =
   "You write the English motion prompt of a template for an image-to-video model that animates a fashion seller's product or model photo. " +
-  'You get evenly spaced stills of the template\'s sample clip, in time order. Describe only what the stills show: the camera move, how the subject ' +
-  'moves, the pacing, the framing and the light. The template is used with any product or person, so say "the product", "the model" or "the outfit" ' +
-  'and never name or describe the specific object, garment, brand, colours, printed text or the person\'s looks. Write 40 to 90 words of direct, ' +
-  'visual description in the present tense, the beats in the order they happen, as one plain paragraph, in the voice of: "The camera arcs smoothly ' +
+  'You get evenly spaced stills of the template\'s sample clip, numbered in time order. Describe the camera move, how the subject moves, the ' +
+  'pacing, the framing and the light, and only the subjects, objects, motion and camera moves that are clearly visible in the stills. Never infer ' +
+  'events between stills. If something appears in only one still or is unclear, leave it out. Prefer fewer, certain details over more, uncertain ' +
+  'ones. Never invent props, particles, pieces, people or text the stills do not show. The template is used with any product or person, so say ' +
+  '"the product", "the model" or "the outfit" and never name or describe the specific object, garment, brand, colours, printed text or the ' +
+  "person's looks. Write 40 to 90 words (near 40 when the stills show little) of direct, visual description in the present tense, the beats " +
+  'in the order they happen, as one plain paragraph, in the voice of: "The camera arcs smoothly ' +
   'to the right around the standing model, moving from a front view towards a side and back view of the outfit." Do not say what must stay ' +
   'unchanged; that is added after. Reply with a JSON object and nothing else: {"motion": the paragraph, "person": true when a model or another ' +
   'person is shown (a hand alone is not), else false, "stable": true when the camera moves smoothly or stays still, false when it shakes or cuts}.';
@@ -187,7 +197,11 @@ function lengthLine(i: SuggestInput): string {
 /** The user turn of the call for direction `d` (0 to 2): the task, the direction, the model, the pace, the hook and location, the notes and the length. */
 export function suggestPrompt(i: SuggestInput, d = 0): string {
   if (i.field === 'translate') return `The prompt:\n${i.text}`;
-  if (i.field === 'video') return "The stills of the template's sample clip, in time order, follow.";
+  if (i.field === 'video') {
+    // Each still's number and time, so the model can read their order.
+    const at = i.seconds ? frameTimes(i.seconds, VIDEO_FRAMES).map((t, k) => `still ${k + 1} of ${VIDEO_FRAMES} at ${t.toFixed(1)} s`) : [];
+    return `The ${VIDEO_FRAMES} stills of the template's sample clip follow in time order, evenly spaced over it${at.length ? ` (${i.seconds!.toFixed(1)} seconds long): ${at.join(', ')}` : ''}.`;
+  }
   const pace =
     i.seconds &&
     (i.field === 'script' ? `The lines are spoken in a ${i.seconds}-second clip.` : i.field === 'brief' || i.task === PROMPT_TASKS.video ? `The clip lasts ${i.seconds} seconds: pace the beats to it.` : '');
