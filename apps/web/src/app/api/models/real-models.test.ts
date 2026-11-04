@@ -51,14 +51,14 @@ describe('the model picker', () => {
 
     await pool.query(`update model_configs set enabled = true where id = 'seedance-2.5'`);
     const both = await picker(member.cookie);
-    expect(both.models.map((m) => [m.id, m.passes, m.total, m.estimateUsd])).toEqual([['kling-o3-pro', 7, 10, '0.8960'], ['seedance-2.5', 6, 9, '1.8496']]);
+    expect(both.models.map((m) => [m.id, m.passes, m.total, m.estimateUsd])).toEqual([['kling-o3-pro', 7, 10, '0.8960'], ['seedance-2.5', 7, 12, '1.8496']]); // 6/9 (0013) + 1/3 (0057)
     expect(both.models.map((m) => m.resolution)).toEqual(['1080p', '720p']); // what the Create form shows as the fixed resolution
     expect(both.models.map((m) => m.maxPromptChars)).toEqual([2500, 2000]); // Kling O3 Pro's fal schema (migration 0041); Replicate's own 2000 (0029)
     // Kling's audio price is $0.14/s (Marketing Studio Advanced); Replicate Seedance has no audio switch.
     expect(both.models.map((m) => m.audioEstimateUsd)).toEqual(['1.1200', null]);
-    expect(both.models[1]!.passRate).toBeCloseTo(6 / 9);
-    expect(both.defaultModelId).toBe('kling-o3-pro'); // 70% against 67%
-    expect(both.models.map((m) => [m.id, m.score, m.recommended])).toEqual([['kling-o3-pro', 64, true], ['seedance-2.5', 62, false]]);
+    expect(both.models[1]!.passRate).toBeCloseTo(7 / 12);
+    expect(both.defaultModelId).toBe('kling-o3-pro'); // 70% against 58%
+    expect(both.models.map((m) => [m.id, m.score, m.recommended])).toEqual([['kling-o3-pro', 64, true], ['seedance-2.5', 56, false]]);
     expect(before.models[0]!.recommended).toBe(false); // one model: nothing to recommend between
     await pool.query(`update model_configs set enabled = false where id = 'seedance-2.5'`);
   });
@@ -73,7 +73,7 @@ describe('the model picker', () => {
       [member.id],
     );
     const after = await picker(member.cookie);
-    expect(after.models.map((m) => [m.id, m.score, m.recommended])).toEqual([['kling-o3-pro', 43, false], ['seedance-2.5', 62, true]]); // 9/14 x 4/6
+    expect(after.models.map((m) => [m.id, m.score, m.recommended])).toEqual([['kling-o3-pro', 43, false], ['seedance-2.5', 56, true]]); // 9/14 x 4/6 against 9/16
     expect(after.defaultModelId).toBe('seedance-2.5');
     await pool.query(`delete from jobs where id in ('fail-1', 'fail-2', 'fail-mock')`);
     await pool.query(`update model_configs set enabled = false where id = 'seedance-2.5'`);
@@ -111,7 +111,7 @@ describe('a disabled model', () => {
 describe('PUT /api/admin/settings', () => {
   const put = (body: unknown) => PUT_SETTINGS(call(admin.cookie, '/api/admin/settings', 'PUT', body));
 
-  test('enables a video model with no bake-off record, and one under 70% (Seedance 2.5, 6/9): the record only feeds the score; each change audited', async () => {
+  test('enables a video model with no bake-off record, and one under 70% (Seedance 2.5, 7/12): the record only feeds the score; each change audited', async () => {
     await pool.query(
       `insert into model_configs (id, provider, endpoint, label, ratios, durations_sec, max_images, output_resolution, usd_per_second, sources)
        values ('new-model', 'fal', 'x', 'New model', '{9:16}', '{5}', 2, '720p', 0.2, '{}')`,
