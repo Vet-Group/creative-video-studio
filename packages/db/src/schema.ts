@@ -217,17 +217,25 @@ export const assets = pgTable(
   ],
 );
 
-export const presets = pgTable('presets', {
-  id: text('id').primaryKey(),
-  /** Vietnamese UI label. */
-  label: text('label').notNull(),
-  /** English prompt sent to the video model. */
-  prompt: text('prompt').notNull(),
-  enabled: boolean('enabled').notNull().default(true),
-  isBakeoffSafe: boolean('is_bakeoff_safe').notNull().default(false),
-  sortOrder: integer('sort_order').notNull().default(0),
-  updatedAt: tstz('updated_at').notNull().defaultNow(),
-});
+export const PRESET_FEATURES = ['video', 'image'] as const;
+
+export const presets = pgTable(
+  'presets',
+  {
+    id: text('id').primaryKey(),
+    /** Vietnamese UI label. */
+    label: text('label').notNull(),
+    /** English prompt: the whole prompt of a Create video Run, or a style added to the member's prompt on Image Generation. */
+    prompt: text('prompt').notNull(),
+    enabled: boolean('enabled').notNull().default(true),
+    isBakeoffSafe: boolean('is_bakeoff_safe').notNull().default(false),
+    sortOrder: integer('sort_order').notNull().default(0),
+    /** The page it belongs to: a motion preset on Create (`video`) or a style on Image Generation (`image`). */
+    feature: text('feature', { enum: PRESET_FEATURES }).notNull().default('video'),
+    updatedAt: tstz('updated_at').notNull().defaultNow(),
+  },
+  (t) => [check('presets_feature_check', sql`${t.feature} in ('video', 'image')`)],
+);
 
 export const PROPOSAL_STATUSES = ['pending', 'approved', 'rejected'] as const;
 
@@ -244,6 +252,8 @@ export const presetProposals = pgTable(
     prompt: text('prompt'),
     enabled: boolean('enabled'),
     sortOrder: integer('sort_order'),
+    /** The preset's feature (presets.feature): given for a new preset, the named preset's otherwise. */
+    feature: text('feature', { enum: PRESET_FEATURES }).notNull().default('video'),
     note: text('note'),
     proposedBy: text('proposed_by')
       .notNull()
@@ -257,6 +267,7 @@ export const presetProposals = pgTable(
     index('preset_proposals_status_idx').on(t.status, t.createdAt),
     index('preset_proposals_proposed_by_idx').on(t.proposedBy),
     check('preset_proposals_status_check', sql`${t.status} in ('pending', 'approved', 'rejected')`),
+    check('preset_proposals_feature_check', sql`${t.feature} in ('video', 'image')`),
     check('preset_proposals_new_check', sql`${t.presetId} is not null or (${t.label} is not null and ${t.prompt} is not null)`),
     check('preset_proposals_base_check', sql`(${t.presetId} is null) = (${t.baseUpdatedAt} is null)`),
     check('preset_proposals_decided_check', sql`(${t.status} = 'pending') = (${t.decidedBy} is null) and (${t.status} = 'pending') = (${t.decidedAt} is null)`),

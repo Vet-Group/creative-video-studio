@@ -20,7 +20,7 @@ export async function POST(request: Request, { params }: RouteContext) {
   if (typeof approve !== 'boolean') return bad('approve must be true or false');
   const actorId = g.session.user.id;
   return withTransaction(pool, async (tx): Promise<Response> => {
-    const p = (await tx.query('select preset_id, label, prompt, enabled, sort_order, proposed_by, status from preset_proposals where id = $1 for update', [id])).rows[0];
+    const p = (await tx.query('select preset_id, label, prompt, enabled, sort_order, feature, proposed_by, status from preset_proposals where id = $1 for update', [id])).rows[0];
     if (!p) return bad('not found', 404);
     if (p.status !== 'pending') return bad('Đề xuất này đã được duyệt hoặc từ chối.', 409);
     // Compared in SQL, at the microseconds a JS Date drops; the preset row is locked, so no edit lands between this check and the change.
@@ -29,7 +29,7 @@ export async function POST(request: Request, { params }: RouteContext) {
     if (approve && edited) return bad('Mẫu đã được sửa sau khi có đề xuất này; hãy xem lại.', 409);
     const fields = Object.fromEntries(Object.entries({ label: p.label, prompt: p.prompt, enabled: p.enabled, sortOrder: p.sort_order }).filter(([, v]) => v !== null));
     // The preset cannot be gone: presets are never deleted and the proposal's key restricts it.
-    const preset = !approve ? null : p.preset_id === null ? await createPreset(tx, actorId, { ...fields, label: p.label, prompt: p.prompt }) : await updatePreset(tx, actorId, p.preset_id, fields);
+    const preset = !approve ? null : p.preset_id === null ? await createPreset(tx, actorId, { ...fields, label: p.label, prompt: p.prompt }, p.feature) : await updatePreset(tx, actorId, p.preset_id, fields);
     const status = approve ? 'approved' : 'rejected';
     await tx.query('update preset_proposals set status = $2, decided_by = $3, decided_at = now() where id = $1', [id, status, actorId]);
     await audit(tx, {

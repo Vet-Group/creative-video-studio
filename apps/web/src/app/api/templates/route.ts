@@ -46,8 +46,8 @@ async function jobData(jobId: string, userId: string): Promise<{ feature: string
   ).rows[0];
   if (!j) return null;
   const p = j.params as Record<string, string>;
-  // The member's own prompt: a free prompt on Create video, Image Generation and Motion Control; elsewhere the prompt is composed, so the kept brief.
-  const ownPrompt = (j.feature === 'video' && !j.preset_id) || j.feature === 'image' || j.feature === 'motion_control';
+  // The member's own prompt: a free prompt on Create video, Image Generation and Motion Control; elsewhere (and beside an image style) the prompt is composed, so the kept brief.
+  const ownPrompt = ((j.feature === 'video' || j.feature === 'image') && !j.preset_id) || j.feature === 'motion_control';
   const data = {
     images: j.images ?? [],
     endFrame: j.end_frame, clips: j.clips,

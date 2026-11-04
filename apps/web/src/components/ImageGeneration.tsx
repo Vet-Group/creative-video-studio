@@ -17,6 +17,7 @@ import { ModelPicker } from './ModelPicker';
 import { PromptTools } from './PromptTools';
 import { Select } from './Select';
 import { Tray } from './Shell';
+import { StylePicker } from './StylePicker';
 import { Templates } from './Templates';
 import { PageHint } from './ToolGuide';
 
@@ -29,6 +30,7 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
   const hydrated = useHydrated();
   const [images, setImages] = useState<Img[]>([]);
   const [prompt, setPrompt] = useState('');
+  const [styleId, setStyleId] = useState(''); // '' for no style
   const [enhance, setEnhance] = useState(true); // on by default, as on Fash
   const [tab, setTab] = useState<Tab>('examples');
   const [busy, setBusy] = useState(false);
@@ -74,7 +76,8 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
     (j) => {
       recall.touch();
       setImages(j.images);
-      setPrompt(j.prompt ?? '');
+      setPrompt(j.brief ?? j.prompt ?? ''); // with a style, the job's prompt is composed and the member's own words are the brief
+      setStyleId(j.presetId ?? '');
       setEnhance(j.enhance ?? true);
       pick.refill(j);
     },
@@ -127,7 +130,7 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
     setError('');
     setNotice('');
     try {
-      const body = { feature: 'image', modelId: pick.modelId, assetIds: images.map((i) => i.id), prompt: prompt.trim(), enhance, ratio: pick.ratio, params: { resolution: pick.resolution, ...(pick.thinking && { thinking: pick.thinking }) } };
+      const body = { feature: 'image', modelId: pick.modelId, assetIds: images.map((i) => i.id), prompt: prompt.trim(), ...(styleId && { presetId: styleId }), enhance, ratio: pick.ratio, params: { resolution: pick.resolution, ...(pick.thinking && { thinking: pick.thinking }) } };
       await api('/api/jobs', sendJson('POST', body));
       setNotice('Đã gửi job. Theo dõi trong tab "Lịch sử".');
       setTab('history');
@@ -147,7 +150,7 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
       <PageHint href="/image-generation" />
       <WorkTabs prefix="imagegen" tabs={TABS} labels={TAB_LABEL} shown={tab} onSelect={setTab} />
       {/* Above the gallery, not in the prompt bar, which keeps Fash's one-row height. */}
-      <Templates feature="image" data={() => ({ images: images.map((i) => i.id), prompt: prompt.trim(), enhance, ratio: pick.ratio, resolution: pick.resolution, modelId: pick.modelId })} />
+      <Templates feature="image" data={() => ({ images: images.map((i) => i.id), prompt: prompt.trim(), presetId: styleId, enhance, ratio: pick.ratio, resolution: pick.resolution, modelId: pick.modelId })} />
       <div className="imagegen-side" id={`imagegen-panel-${tab}`} role="tabpanel" aria-labelledby={`imagegen-tab-${tab}`}>
         <FormContext.Provider value={{ recreate: (from) => (recall.touch(), recreate(from)), apply, photo: (p) => void take(p), prompt: (text) => (setPrompt(text), notify('Đã chép prompt')), result: (p) => void take(p) }}>
           {tab === 'examples' ? <Gallery kind="image" samples="image-example-" label="Ảnh của công ty" emptyText="Chưa có ảnh nào trong công ty. Hãy tạo ảnh đầu tiên bên dưới." /> : tab === 'about' ? <About page={ABOUT.image} /> : <Tray feature="image" />}
@@ -187,6 +190,8 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
               </li>
             )}
           </ul>
+          {/* In the top row, beside the inputs: the bottom row has no room left for another pill. */}
+          <StylePicker value={styleId} onChange={setStyleId} />
           <textarea aria-label="Mô tả cảnh bạn muốn tạo" placeholder="Mô tả cảnh bạn muốn tạo…" value={prompt} maxLength={chosen?.maxPromptChars} rows={2} onChange={(e) => setPrompt(e.target.value)} onKeyDown={runKey(() => canRun && void run())} />
           <PromptTools compact feature="image" value={prompt} onChange={setPrompt} maxLength={chosen?.maxPromptChars} onRun={() => canRun && void run()} ask={chosen ? () => ({ field: 'prompt', feature: 'image', text: prompt, room: chosen.maxPromptChars, model: chosen.id }) : null} />
         </div>

@@ -10,7 +10,7 @@ process.env.APP_URL = 'http://localhost';
 
 const { auth, pool } = await import('@/lib/auth');
 const { stopBoss } = await import('@/lib/queue');
-const { POST } = await import('./route');
+const { GET: listJobs, POST } = await import('./route');
 const { GET } = await import('../stores/route');
 const { settle } = await import('@cvs/core/ledger');
 
@@ -488,6 +488,32 @@ describe('POST /api/jobs for an image feature', () => {
     ]);
     expect((await pool.query('select kind, usd::text as usd from cost_entries where job_id = $1', [id])).rows).toEqual([{ kind: 'estimate', usd: '0.3000' }]);
     expect(await sentCount(m.id)).toBe(1);
+  });
+
+  test('adds an Image Generation style after the member prompt, keeps their words as the brief, and refuses a Create preset, a switched-off style and a style elsewhere', async () => {
+    const m = await newMember();
+    const style = (await pool.query(`select prompt from presets where id = 'style-street'`)).rows[0].prompt as string;
+    const res = await runImage(m, { presetId: 'style-street', enhance: true });
+    expect(res.status).toBe(201);
+    const { id } = (await res.json()) as { id: string };
+    expect((await pool.query('select preset_id, prompt, params, enhance from jobs where id = $1', [id])).rows).toEqual([
+      { preset_id: 'style-street', prompt: `a bottle on marble${String.fromCharCode(10).repeat(2)}${style}`, params: { resolution: '2K', brief: 'a bottle on marble' }, enhance: true },
+    ]);
+    // History shows the member's own words, not the style's prompt.
+    const listed = (await (await listJobs(new Request('http://localhost/api/jobs?mine', { headers: { cookie: m.cookie } }))).json()) as { jobs: { id: string; text: string }[] };
+    expect(listed.jobs.find((j) => j.id === id)?.text).toBe('a bottle on marble');
+
+    expect(await error(await runImage(m, { presetId: 'gentle-push-in' }))).toBe('the preset does not exist or is not enabled');
+    expect(await error(await run(m.cookie, { ...base, assetIds: [m.asset], presetId: 'style-street' }))).toBe('the preset does not exist or is not enabled');
+    await pool.query(`update presets set enabled = false where id = 'style-flat-lay'`);
+    try {
+      expect(await error(await runImage(m, { presetId: 'style-flat-lay' }))).toBe('the preset does not exist or is not enabled');
+    } finally {
+      await pool.query(`update presets set enabled = true where id = 'style-flat-lay'`);
+    }
+    await insertAsset(`${m.id}-garment`, m.id);
+    expect(await error(await runImage(m, { feature: 'try_on', presetId: 'style-street', assetIds: [m.asset, `${m.id}-garment`] }))).toMatch(/only Image Generation takes a style/);
+    expect((await pool.query('select count(*)::int as n from jobs where user_id = $1', [m.id])).rows[0].n).toBe(1);
   });
 
   test('reserves $0.003 for each input image after the first on BytePlus Seedream Pro, and nothing extra on Flash or on a one-image Run', async () => {

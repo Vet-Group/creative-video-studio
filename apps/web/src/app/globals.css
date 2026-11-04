@@ -2230,3 +2230,16 @@ dialog.modal.tool-guide { width: min(52rem, calc(100vw - 2rem)); }
 .welcome-close { position: absolute; top: 8px; right: 8px; display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 8px; background: none; color: var(--text-muted); }
 .welcome-close:hover { background: var(--surface); color: var(--ink); }
 @media (pointer: coarse) { .welcome-close { width: 44px; height: 44px; top: 2px; right: 2px; } }
+
+/* Image Generation's style chip (StylePicker.tsx), beside the inputs: the chosen style's example picture (or an icon until an editor uploads one) and its
+   name, filled like Enhance when a style is on. Phones keep the icon only, so the prompt keeps its width; the name stays for screen readers. */
+.imagebar .style-pill { flex: none; max-width: 11rem; }
+.imagebar .style-pill[data-on='true'] { border-color: var(--ink); background: var(--ink); color: var(--on-ink); }
+.imagebar .style-pill[data-on='true'] .icon { color: inherit; }
+.style-pill img { flex: none; width: 20px; height: 20px; border-radius: 4px; object-fit: cover; }
+.style-pill > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 599.98px) {
+  .imagebar .style-pill { width: 28px; padding: 0; justify-content: center; }
+  .imagebar .style-pill > span { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); }
+}
+.preset-card > img { display: block; width: 100%; aspect-ratio: 3 / 4; object-fit: cover; }

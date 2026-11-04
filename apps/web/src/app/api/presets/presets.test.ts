@@ -120,13 +120,13 @@ describe('editing presets on Create', () => {
 
     expect((await presetsRoute.POST(call(editor.cookie, 'POST', { label: 'Only a label' }))).status).toBe(400);
     const add = async (label: string, extra = {}) => (await presetsRoute.POST(call(editor.cookie, 'POST', { label, prompt: 'Slow pan across the product.', ...extra }))).json();
-    const max = (await pool.query('select max(sort_order) as n from presets')).rows[0].n;
+    const max = (await pool.query(`select max(sort_order) as n from presets where feature = 'video'`)).rows[0].n;
     expect(await add('Đẩy máy chậm')).toEqual({ id: 'day-may-cham', label: 'Đẩy máy chậm', prompt: 'Slow pan across the product.', sortOrder: max + 1, enabled: true });
     expect((await add('Đẩy  máy, chậm!', { sortOrder: 3, enabled: false })).id).toBe('day-may-cham-2');
     expect((await add('General')).id).toBe('general-2'); // preset-general is the free prompt's sample
     expect(await preset('day-may-cham-2')).toMatchObject({ sortOrder: 3, enabled: false });
     expect(await audits('preset:day-may-cham')).toEqual([
-      { actor_id: editor.id, action: 'preset.create', old_value: null, new_value: { label: 'Đẩy máy chậm', prompt: 'Slow pan across the product.', sortOrder: max + 1, enabled: true } },
+      { actor_id: editor.id, action: 'preset.create', old_value: null, new_value: { label: 'Đẩy máy chậm', prompt: 'Slow pan across the product.', sortOrder: max + 1, enabled: true, feature: 'video' } },
     ]);
   });
 
@@ -191,7 +191,7 @@ describe('proposals', () => {
     expect((await propose(busy.cookie, { label: 'One more', prompt: 'Slow pan.' })).status).toBe(429);
     // An editor reads every pending one, oldest first, and their number; a member reads no count.
     const { proposals, pendingCount } = await (await proposalsRoute.GET(call(admin.cookie))).json();
-    const total = (await pool.query(`select count(*)::int as n from preset_proposals where status = 'pending'`)).rows[0].n;
+    const total = (await pool.query(`select count(*)::int as n from preset_proposals where status = 'pending' and feature = 'video'`)).rows[0].n;
     expect([pendingCount, proposals.length]).toEqual([total, total]);
     const times = proposals.map((p: { createdAt: string }) => p.createdAt);
     expect(times).toEqual([...times].sort());
@@ -251,5 +251,38 @@ describe('proposals', () => {
     expect((await pool.query('select status from preset_proposals where id = $1', [bad])).rows[0].status).toBe('pending');
     expect(await audits(`preset_proposal:${bad}`)).toEqual([]);
     expect(await preset('gentle-push-in')).toEqual(before);
+  });
+});
+
+describe('Image Generation styles', () => {
+  const styles = async (cookie: string) => (await (await presetsRoute.GET(new Request('http://localhost/api/presets?feature=image', { headers: { cookie } }))).json()) as { presets: Record<string, unknown>[] };
+
+  test('the picker of ?feature=image lists only the styles, and an unknown feature is refused', async () => {
+    const ids = (await styles(member.cookie)).presets.map((p) => p.id);
+    expect(ids).toHaveLength(8);
+    expect(ids.every((id) => String(id).startsWith('style-'))).toBe(true);
+    expect((await list(member.cookie)).presets.map((p) => p.id)).not.toContain('style-street'); // Create's picker keeps to its presets
+    expect((await presetsRoute.GET(new Request('http://localhost/api/presets?feature=audio', { headers: { cookie: member.cookie } }))).status).toBe(400);
+  });
+
+  test('an editor adds a style last in its own picker, and a style proposed by a member lands there on approval, listed with the styles only', async () => {
+    const res = await presetsRoute.POST(call(editor.cookie, 'POST', { label: 'Bể bơi', prompt: 'By a sunny pool.', feature: 'image' }));
+    expect(res.status).toBe(201);
+    expect(await res.json()).toMatchObject({ id: 'be-boi', sortOrder: 9 });
+    expect((await pool.query(`select feature from presets where id = 'be-boi'`)).rows[0].feature).toBe('image');
+    expect((await audits('preset:be-boi'))[0].new_value).toMatchObject({ feature: 'image' });
+    expect((await presetsRoute.POST(call(editor.cookie, 'POST', { label: 'X', prompt: 'Y', feature: 'audio' }))).status).toBe(400);
+
+    const asked = await (await propose(member.cookie, { label: 'Tuyết', prompt: 'In soft falling snow.', feature: 'image' })).json();
+    const change = await (await propose(member.cookie, { presetId: 'style-street', label: 'Phố đêm' })).json();
+    const pending = async (feature: string) => (await (await proposalsRoute.GET(new Request(`http://localhost/api/preset-proposals?feature=${feature}`, { headers: { cookie: editor.cookie } }))).json()) as { proposals: { id: string }[]; pendingCount: number };
+    const image = await pending('image');
+    expect(image.proposals.map((p) => p.id).sort()).toEqual([asked.id, change.id].sort());
+    expect(image.pendingCount).toBe(2);
+    expect((await pending('video')).proposals.map((p) => p.id)).not.toContain(asked.id);
+    const approved = await (await decide(editor.cookie, asked.id, true)).json();
+    expect(approved.preset).toMatchObject({ id: 'tuyet', sortOrder: 10 });
+    expect((await pool.query(`select feature from presets where id = 'tuyet'`)).rows[0].feature).toBe('image');
+    expect((await decide(editor.cookie, change.id, false)).status).toBe(200);
   });
 });

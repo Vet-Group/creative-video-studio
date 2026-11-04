@@ -28,8 +28,8 @@ const VERDICTS: Record<string, string> = {
   featured: 'v.featured is true',
   fail: `v.verdict = 'fail'`,
 };
-/** The creator's own words, as the detail view shows them: a free prompt on Create video and Image Generation; the other features compose theirs. */
-const OWN_PROMPT = `case when j.feature = 'image' or (j.feature = 'video' and j.preset_id is null) then j.prompt end`;
+/** The creator's own words, as the detail view shows them: a free prompt on Create video and Image Generation (kept as the brief beside a style); the other features compose theirs. */
+const OWN_PROMPT = `case when j.feature in ('image', 'video') and j.preset_id is null then j.prompt when j.feature = 'image' then j.params->>'brief' end`;
 
 /**
  * The Library: every user's live clips and images, newest first. Filters: `creator` (a user id), `date` (YYYY-MM-DD, Asia/Ho_Chi_Minh), `ratio` and

@@ -2,6 +2,7 @@
 import { audit } from '@cvs/core/audit';
 import { type Queryable, withTransaction } from '@cvs/core/ledger';
 import { PROMPT_CEILING } from '@cvs/core/models';
+import { PRESET_FEATURES } from '@cvs/db';
 import { bad, nonEmpty, readBody } from './admin';
 import { pool } from './auth';
 import { guard } from './session';
@@ -14,6 +15,13 @@ export interface Preset {
   enabled: boolean;
 }
 export type PresetFields = Partial<Omit<Preset, 'id'>>;
+export type PresetFeature = (typeof PRESET_FEATURES)[number];
+
+/** The page a preset belongs to, from a query or a body: `video` (Create) when left out, `image` (Image Generation), or null when it is neither. */
+export function presetFeature(value: unknown): PresetFeature | null {
+  if (value === undefined || value === null) return 'video';
+  return (PRESET_FEATURES as readonly unknown[]).includes(value) ? (value as PresetFeature) : null;
+}
 
 export const MAX_PRESET_LABEL = 100;
 
@@ -53,18 +61,18 @@ export async function updatePreset(tx: Queryable, actorId: string, id: string, f
 }
 
 /**
- * Adds a preset, audited as preset.create. Its id is the label's slug, with -2, -3... when taken; `general` is kept for the free prompt's
- * sample (preset-general). It is enabled and last in the picker unless `fields` says otherwise.
+ * Adds a preset to `feature`'s picker, audited as preset.create. Its id is the label's slug, with -2, -3... when taken; `general` is kept for the
+ * free prompt's sample (preset-general). It is enabled and last in its picker unless `fields` says otherwise.
  */
-export async function createPreset(tx: Queryable, actorId: string, fields: PresetFields & Pick<Preset, 'label' | 'prompt'>): Promise<Preset> {
+export async function createPreset(tx: Queryable, actorId: string, fields: PresetFields & Pick<Preset, 'label' | 'prompt'>, feature: PresetFeature = 'video'): Promise<Preset> {
   await tx.query(`select pg_advisory_xact_lock(hashtext('preset.create'))`); // two adds of one label must not pick the same id
   const base = presetSlug(fields.label);
   let id = base;
   for (let n = 2; id === 'general' || (await tx.query('select 1 from presets where id = $1', [id])).rowCount; n++) id = `${base}-${n}`;
-  const sortOrder = fields.sortOrder ?? (await tx.query('select coalesce(max(sort_order), 0) + 1 as n from presets')).rows[0].n;
+  const sortOrder = fields.sortOrder ?? (await tx.query('select coalesce(max(sort_order), 0) + 1 as n from presets where feature = $1', [feature])).rows[0].n;
   const preset = { id, label: fields.label, prompt: fields.prompt, sortOrder, enabled: fields.enabled ?? true };
-  await tx.query('insert into presets (id, label, prompt, sort_order, enabled) values ($1, $2, $3, $4, $5)', [id, preset.label, preset.prompt, sortOrder, preset.enabled]);
-  await audit(tx, { actorId, action: 'preset.create', target: `preset:${id}`, newValue: { label: preset.label, prompt: preset.prompt, sortOrder, enabled: preset.enabled } });
+  await tx.query('insert into presets (id, label, prompt, sort_order, enabled, feature) values ($1, $2, $3, $4, $5, $6)', [id, preset.label, preset.prompt, sortOrder, preset.enabled, feature]);
+  await audit(tx, { actorId, action: 'preset.create', target: `preset:${id}`, newValue: { label: preset.label, prompt: preset.prompt, sortOrder, enabled: preset.enabled, feature } });
   return preset;
 }
 
