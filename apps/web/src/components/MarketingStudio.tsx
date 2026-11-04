@@ -738,7 +738,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
               maxLength={room}
               onRun={() => canRun && void run()}
               placeholder="Ví dụ: người mẫu mở hộp, cầm sản phẩm lên và nói cảm nhận đầu tiên…"
-              ask={() => ({ field: 'brief', ...(advanced && { format: 'advanced' }), text: prompt, hook: hooks[0], location: location || undefined, seconds: durationSec, audio, ...(room !== undefined && { room }), ...(chosen && { model: chosen.id }) })}
+              ask={chosen ? () => ({ field: 'brief', ...(advanced && { format: 'advanced' }), text: prompt, hook: hooks[0], location: location || undefined, seconds: durationSec, audio, ...(room !== undefined && { room }), model: chosen.id }) : null}
             />
             {advanced && (
               <PromptComposer
@@ -751,7 +751,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
                 maxLength={ADVANCED_MAX_SCRIPT}
                 onRun={() => canRun && void run()}
                 placeholder="Viết lời thoại bạn muốn nhân vật nói…"
-                ask={() => ({ field: 'script', format: 'advanced', text: script || prompt, hook: hooks[0], location: location || undefined, seconds: durationSec, audio, ...(chosen && { model: chosen.id }) })}
+                ask={chosen ? () => ({ field: 'script', format: 'advanced', text: script || prompt, hook: hooks[0], location: location || undefined, seconds: durationSec, audio, model: chosen.id }) : null}
                 aiLabel="Gợi ý lời thoại"
                 parts={['ai', 'translate', 'clear', 'expand']}
                 starters={[]}

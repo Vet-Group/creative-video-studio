@@ -22,8 +22,8 @@ interface Props {
   maxLength?: number;
   /** Presses Run; false when Run is off (the editor then stays open). */
   onRun: () => boolean | void;
-  /** The AI request for this field; without it there is no AI button. */
-  ask?: () => Ask;
+  /** The AI request for this field; without it there is no AI button. Null keeps the button off until the page knows its model, so a request never goes without the model's room. */
+  ask?: (() => Ask) | null;
   /** The AI button's name, e.g. the lines' own one on Advanced. */
   aiLabel?: string;
   parts?: readonly PromptPart[];
@@ -95,8 +95,8 @@ export function PromptTools({ feature, format, value, onChange, maxLength, onRun
 
   return (
     <span ref={root} className={compact ? `prompt-tools ${s.compact}` : s.tools} onKeyDown={(e) => e.key === 'Escape' && open && (e.stopPropagation(), close())}>
-      {has('ai') && ask && (
-        <button type="button" className={`${btn} ${s.ai}`} aria-expanded={open === 'ai'} aria-label={compact ? aiName : undefined} title={compact ? aiName : undefined} onClick={toggleAi}>
+      {has('ai') && ask !== undefined && (
+        <button type="button" className={`${btn} ${s.ai}`} disabled={!ask} aria-expanded={open === 'ai'} aria-label={compact ? aiName : undefined} title={compact ? aiName : undefined} onClick={toggleAi}>
           <Icon name="wand" size={13} />
           {!compact && aiName}
         </button>
@@ -138,7 +138,7 @@ export function PromptTools({ feature, format, value, onChange, maxLength, onRun
           <div className={s.popHead}>
             <span>{ai.busy ? 'AI đang viết 3 gợi ý…' : 'Chọn một gợi ý'}</span>
             {!ai.busy && (
-              <button type="button" className={s.popAction} onClick={suggest}>
+              <button type="button" className={s.popAction} disabled={!ask} onClick={suggest}>
                 <Icon name="wand" size={12} />
                 Gợi ý khác
               </button>
