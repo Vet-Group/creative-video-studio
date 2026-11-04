@@ -1,6 +1,7 @@
 // Suggestions (a feature Fash lacks): three options for Marketing Studio's brief (UGC) or spoken lines (Advanced), the English
 // scene of a member's own hook or location from its Vietnamese name and description, or the English prompt of any other tool, written by
 // the same LLM as Enhance (enhance.ts: OpenAI, else fal), in the worker, which holds the keys. The member picks one; nothing is generated.
+// For a template editor it also writes a motion preset's prompt from stills of the preset's clip (`video`, a vision call).
 import { ENHANCE_MODEL, ENHANCE_URL, OPENAI_MODEL, openAiChat } from './enhance';
 import { ALWAYS_AUDIO, AUDIO_USD_PER_SECOND } from './models';
 import { sendJson, timeout, type Fetch } from './providers/http';
@@ -20,8 +21,11 @@ const MAX_SUMMARY = 400;
 export interface SuggestInput {
   /** `brief`: what the creator should do and say about the product; `script`: the exact lines the creator speaks; `hook` and `location`: the
    * English scene of a new hook or location (the phrase the prompt takes), from the member's Vietnamese name and description in `text`;
-   * `prompt`: the English prompt of the tool in `task`; `translate`: one Vietnamese reading of the English `text`, for the member only. */
-  field: 'brief' | 'script' | 'hook' | 'location' | 'prompt' | 'translate';
+   * `prompt`: the English prompt of the tool in `task`; `translate`: one Vietnamese reading of the English `text`, for the member only;
+   * `video`: one motion preset prompt from stills of the clip in `clip`, for a template editor. */
+  field: 'brief' | 'script' | 'hook' | 'location' | 'prompt' | 'translate' | 'video';
+  /** For `video`: the sample clip's name under samples/ (`preset-<id>.mp4`), whose stills the worker sends. */
+  clip?: string;
   /** For a prompt: what the tool does and what its prompt should say (PROMPT_TASKS, picked by the server, never the member's words). */
   task?: string;
   /** The member's own text so far (may be empty). */
@@ -37,8 +41,8 @@ export interface SuggestInput {
 }
 
 /** `meanings[i]` is option i in Vietnamese for the member to read (null when the model gave none); only `options` ever fill a field. */
-/** `provider` and `model`: who answered and with what, for the call's ledger row. */
-export type Suggester = (input: SuggestInput) => Promise<{ options: string[]; meanings?: (string | null)[]; costUsd: number | null; provider: string; model: string }>;
+/** `provider` and `model`: who answered and with what, for the call's ledger row. `frames`: a `video` run's stills, as JPEG data URLs in time order. */
+export type Suggester = (input: SuggestInput, frames?: string[]) => Promise<{ options: string[]; meanings?: (string | null)[]; costUsd: number | null; provider: string; model: string }>;
 
 // Each option comes with a short Vietnamese summary (owner, 2026-11-03: the staff read Vietnamese faster, the video models read English best);
 // a summary rather than a full reading since the options fill most of the room, and the Translate button gives the full reading.
@@ -76,6 +80,44 @@ export const PROMPT_SYSTEM =
 export const TRANSLATE_SYSTEM =
   'You translate the English prompt a fashion seller gives an AI video or image model into natural, plain Vietnamese, so the seller can read it ' +
   'quickly. Keep the meaning and every detail, add and drop nothing. Reply with a JSON array of exactly one string, the translation, and nothing else.';
+
+/** How many stills of a preset's clip the vision call gets, evenly spread over it. */
+export const VIDEO_FRAMES = 6;
+
+/** The prompt-from-video button: the motion of a preset's clip as a prompt that works for any seller's photo; the keep clauses are added by videoPrompt. */
+export const VIDEO_SYSTEM =
+  "You write the English motion prompt of a template for an image-to-video model that animates a fashion seller's product or model photo. " +
+  'You get evenly spaced stills of the template\'s sample clip, in time order. Describe only what the stills show: the camera move, how the subject ' +
+  'moves, the pacing, the framing and the light. The template is used with any product or person, so say "the product", "the model" or "the outfit" ' +
+  'and never name or describe the specific object, garment, brand, colours, printed text or the person\'s looks. Write 40 to 90 words of direct, ' +
+  'visual description in the present tense, the beats in the order they happen, as one plain paragraph, in the voice of: "The camera arcs smoothly ' +
+  'to the right around the standing model, moving from a front view towards a side and back view of the outfit." Do not say what must stay ' +
+  'unchanged; that is added after. Reply with a JSON object and nothing else: {"motion": the paragraph, "person": true when a model or another ' +
+  'person is shown (a hand alone is not), else false, "stable": true when the camera moves smoothly or stays still, false when it shakes or cuts}.';
+
+/** What the house prompts (migration 0020, presets.ts) say must stay as it is, for a product shot and for a person. */
+export const PRODUCT_KEEP = 'Keep the product, its shape, colours and any printed text exactly unchanged. Do not add any text, logos or watermarks. No faces.';
+export const PERSON_KEEP = 'Keep the person, their face, the outfit, its colours and any printed text exactly as in the image. Do not add any text, logos or watermarks.';
+const STABLE = 'Smooth, stable camera.';
+
+/** A preset prompt in the house shape: the motion, then the keep clauses for a person or a product, then the stable-camera line when it is; at most `max` characters. */
+export function videoPrompt(a: { motion: string; person: boolean; stable: boolean }, max: number): string {
+  const tail = [a.person ? PERSON_KEEP : PRODUCT_KEEP, a.stable && STABLE].filter(Boolean).join(' ');
+  return `${cutTo(a.motion.trim(), max - tail.length - 1)} ${tail}`;
+}
+
+/** The vision answer, `{ motion, person, stable }` (possibly in a code fence), as the preset prompt; a camera not said to shake counts as stable. */
+export function parseVideoAnswer(answer: string, max: number): string {
+  let v: { motion?: unknown; person?: unknown; stable?: unknown } | null;
+  try {
+    v = JSON.parse(unfence(answer));
+  } catch {
+    throw new Error('suggest: the answer is not JSON');
+  }
+  const motion = typeof v?.motion === 'string' ? v.motion.trim() : '';
+  if (!motion) throw new Error('suggest: no motion in the answer');
+  return videoPrompt({ motion, person: v!.person === true, stable: v!.stable !== false }, max);
+}
 
 /** What each tool's prompt should say, by feature (the Create, Image Generation, Try On and app pages that take a prompt). */
 export const PROMPT_TASKS = {
@@ -145,6 +187,7 @@ function lengthLine(i: SuggestInput): string {
 /** The user turn of the call for direction `d` (0 to 2): the task, the direction, the model, the pace, the hook and location, the notes and the length. */
 export function suggestPrompt(i: SuggestInput, d = 0): string {
   if (i.field === 'translate') return `The prompt:\n${i.text}`;
+  if (i.field === 'video') return "The stills of the template's sample clip, in time order, follow.";
   const pace =
     i.seconds &&
     (i.field === 'script' ? `The lines are spoken in a ${i.seconds}-second clip.` : i.field === 'brief' || i.task === PROMPT_TASKS.video ? `The clip lasts ${i.seconds} seconds: pace the beats to it.` : '');
@@ -188,11 +231,13 @@ export function cutTo(text: string, max: number): string {
   return (space > 0 ? head.slice(0, space) : head).trim();
 }
 
+const unfence = (answer: string): string => answer.trim().replace(/^```(?:json)?\s*([\s\S]*?)\s*```$/, '$1');
+
 /** One option from an answer: a JSON object `{ text, vi }` (or a one-item array of it, or a bare string), possibly in a code fence; text cut to `max`. */
 export function parseOption(answer: string, max: number): { text: string; vi: string | null } {
   let v: unknown;
   try {
-    v = JSON.parse(answer.trim().replace(/^```(?:json)?\s*([\s\S]*?)\s*```$/, '$1'));
+    v = JSON.parse(unfence(answer));
   } catch {
     throw new Error('suggest: the answer is not JSON');
   }
@@ -203,19 +248,26 @@ export function parseOption(answer: string, max: number): { text: string; vi: st
   return { text, vi: typeof o?.vi === 'string' && o.vi.trim() ? cutTo(o.vi.trim(), MAX_SUMMARY) : null };
 }
 
-/** One LLM call: a system prompt, a user turn, a temperature and a token budget in; the answer's text and its cost out. */
-type Chat = (system: string, user: string, temperature: number, maxTokens: number) => Promise<{ text: string; costUsd: number | null }>;
+/** One LLM call: a system prompt, a user turn, a temperature, a token budget and any images (data URLs) in; the answer's text and its cost out. */
+type Chat = (system: string, user: string, temperature: number, maxTokens: number, images?: string[]) => Promise<{ text: string; costUsd: number | null }>;
 
-const SYSTEMS: Record<SuggestInput['field'], string> = { brief: SUGGEST_SYSTEM, script: SUGGEST_SYSTEM, hook: SCENE_SYSTEM, location: SCENE_SYSTEM, prompt: PROMPT_SYSTEM, translate: TRANSLATE_SYSTEM };
+const SYSTEMS: Record<SuggestInput['field'], string> = {
+  brief: SUGGEST_SYSTEM, script: SUGGEST_SYSTEM, hook: SCENE_SYSTEM, location: SCENE_SYSTEM, prompt: PROMPT_SYSTEM, translate: TRANSLATE_SYSTEM, video: VIDEO_SYSTEM,
+};
 
 const sum = (costs: (number | null)[]): number | null => (costs.every((c) => c === null) ? null : costs.reduce<number>((a, c) => a + (c ?? 0), 0));
 
 /**
- * The run: a translation is one call; otherwise one call per direction, all at once (one answer each reaches the length far more often than three
+ * The run: a translation is one call, and so is a preset prompt from its clip's stills; otherwise one call per direction, all at once (one answer each reaches the length far more often than three
  * in one answer), and a second call for an option still short of the range. Any failed call fails the run, so option i is always direction i.
  */
-async function suggestWith(chat: Chat, input: SuggestInput): Promise<{ options: string[]; meanings?: (string | null)[]; costUsd: number | null }> {
+async function suggestWith(chat: Chat, input: SuggestInput, frames: string[] = []): Promise<{ options: string[]; meanings?: (string | null)[]; costUsd: number | null }> {
   const system = SYSTEMS[input.field];
+  if (input.field === 'video') {
+    if (!frames.length) throw new Error('suggest: no stills of the clip');
+    const { text, costUsd } = await chat(system, suggestPrompt(input), 0.4, 800, frames);
+    return { options: [parseVideoAnswer(text, input.max)], costUsd };
+  }
   if (input.field === 'translate') {
     const { text, costUsd } = await chat(system, suggestPrompt(input), 0.2, maxTokens(input));
     return { options: [parseOption(text, input.max).text], costUsd };
@@ -236,22 +288,24 @@ async function suggestWith(chat: Chat, input: SuggestInput): Promise<{ options: 
 }
 
 export function createFalSuggester({ apiKey, fetch: f = fetch, model = ENHANCE_MODEL }: { apiKey: string; fetch?: Fetch; model?: string }): Suggester {
-  const chat: Chat = async (system, user, temperature, maxTokens) => {
-    const out = (await sendJson(f, 'fal suggest', ENHANCE_URL, {
+  // With images the call goes to the router's vision endpoint, which takes the same fields plus `image_urls` (data URLs accepted; docs read 2026-11-04:
+  // https://fal.ai/models/openrouter/router/vision/api).
+  const chat: Chat = async (system, user, temperature, maxTokens, images = []) => {
+    const out = (await sendJson(f, 'fal suggest', images.length ? `${ENHANCE_URL}/vision` : ENHANCE_URL, {
       method: 'POST',
       headers: { Authorization: `Key ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model, system_prompt: system, prompt: user, temperature, max_tokens: maxTokens }),
+      body: JSON.stringify({ model, system_prompt: system, prompt: user, temperature, max_tokens: maxTokens, ...(images.length > 0 && { image_urls: images }) }),
       signal: timeout(),
     })) as { output?: unknown; error?: unknown; usage?: { cost?: unknown } };
     if (out.error) throw new Error(`fal suggest: ${String(out.error)}`);
     const cost = Number(out.usage?.cost);
     return { text: typeof out.output === 'string' ? out.output : '', costUsd: Number.isFinite(cost) ? cost : null };
   };
-  return async (input) => ({ ...(await suggestWith(chat, input)), provider: 'fal', model });
+  return async (input, frames) => ({ ...(await suggestWith(chat, input, frames)), provider: 'fal', model });
 }
 
 /** The OpenAI twin of createFalSuggester, with the same prompts, limits and parsing. */
 export function createOpenAiSuggester({ apiKey, fetch: f = fetch, model = OPENAI_MODEL }: { apiKey: string; fetch?: Fetch; model?: string }): Suggester {
-  const chat: Chat = (system, user, temperature, maxTokens) => openAiChat(f, 'openai suggest', apiKey, model, system, user, temperature, maxTokens);
-  return async (input) => ({ ...(await suggestWith(chat, input)), provider: 'openai', model });
+  const chat: Chat = (system, user, temperature, maxTokens, images) => openAiChat(f, 'openai suggest', apiKey, model, system, user, temperature, maxTokens, images);
+  return async (input, frames) => ({ ...(await suggestWith(chat, input, frames)), provider: 'openai', model });
 }

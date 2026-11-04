@@ -6,7 +6,8 @@ import { pool } from '@/lib/auth';
 import { findChoice } from '@/lib/choices';
 import { ADVANCED_MAX_SCRIPT, MAX_CHOICE_DESC, MAX_CHOICE_NAME, MAX_CHOICE_PHRASE, SUGGEST_DAILY_LIMIT } from '@/lib/marketing';
 import { boss } from '@/lib/queue';
-import { guard } from '@/lib/session';
+import { headSample } from '@/lib/samples';
+import { guard, isEditor } from '@/lib/session';
 
 const bad = (error: string, status = 400) => Response.json({ error }, { status });
 
@@ -15,17 +16,27 @@ const bad = (error: string, status = 400) => Response.json({ error }, { status }
  * a new one from its Vietnamese name and description in `text`, `prompt` for the English prompt of the tool `feature`, a PROMPT_TASKS key, or `translate`
  * for one Vietnamese reading of the English prompt in `text`), `format` ('advanced' or absent), the
  * member's `text` so far, the chosen `hook` and `location`, and for a brief the `room` the chosen model leaves for it (the page computes it); for a
- * brief, a script or a prompt, the page's chosen `model` (an enabled model's id), its `audio` switch and the clip's `seconds`, when it has them. Answers 202 with the run's id for the page to poll (GET /api/suggestions/:id),
+ * brief, a script or a prompt, the page's chosen `model` (an enabled model's id), its `audio` switch and the clip's `seconds`, when it has them;
+ * or `video` for a template editor only: the English prompt of the motion preset `preset`, from stills of its saved clip. Answers 202 with the run's id for the page to poll (GET /api/suggestions/:id),
  * 429 past the daily limit, 503 when the queue cannot take it (the run is not counted then).
  */
 export async function POST(request: Request) {
   const g = await guard(request, 'member');
   if (g.error) return g.error;
   const b = (await request.json().catch(() => null)) as {
-    field?: unknown; format?: unknown; feature?: unknown; text?: unknown; hook?: unknown; location?: unknown; room?: unknown; model?: unknown; audio?: unknown; seconds?: unknown;
+    field?: unknown; format?: unknown; feature?: unknown; text?: unknown; hook?: unknown; location?: unknown; room?: unknown; model?: unknown; audio?: unknown; seconds?: unknown; preset?: unknown;
   } | null;
-  if (b?.field !== 'brief' && b?.field !== 'script' && b?.field !== 'hook' && b?.field !== 'location' && b?.field !== 'prompt' && b?.field !== 'translate') {
-    return bad('field must be brief, script, hook, location, prompt or translate');
+  if (b?.field !== 'brief' && b?.field !== 'script' && b?.field !== 'hook' && b?.field !== 'location' && b?.field !== 'prompt' && b?.field !== 'translate' && b?.field !== 'video') {
+    return bad('field must be brief, script, hook, location, prompt, translate or video');
+  }
+  if (b.field === 'video') {
+    // The prompt-from-video button in the preset edit form: a vision call on the preset's saved clip, for the people who edit presets.
+    if (!isEditor(g.session.user)) return bad('forbidden', 403);
+    const preset = typeof b.preset === 'string' ? (await pool.query('select id from presets where id = $1', [b.preset])).rows[0] : undefined;
+    if (!preset) return bad('preset is not a preset');
+    const clip = `preset-${preset.id}.mp4`;
+    if (!(await headSample(clip))) return bad('the preset has no clip');
+    return queue(g.session.user.id, { field: 'video', text: '', context: '', max: PROMPT_CEILING, clip });
   }
   if (b.field === 'translate') {
     // The Translate button: a Vietnamese reading of an English prompt, for the member to read; it counts as a run like any other.

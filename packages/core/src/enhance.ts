@@ -74,16 +74,20 @@ export function openAiCost(usage: OpenAiUsage | undefined): number | null {
 /**
  * One Chat Completions call: the answer's text (trimmed, '' when there is none) and its cost. Effort `none`: the tasks are short rewrites and
  * translations that need no planning, it is the fastest and cheapest setting, and it is the only one that keeps our temperatures.
+ * `images` (data URLs) follow the user turn's text as image parts.
  */
 export async function openAiChat(
-  f: Fetch, what: string, apiKey: string, model: string, system: string, user: string, temperature: number, maxTokens: number,
+  f: Fetch, what: string, apiKey: string, model: string, system: string, user: string, temperature: number, maxTokens: number, images: string[] = [],
 ): Promise<{ text: string; costUsd: number | null }> {
   const out = (await sendJson(f, what, OPENAI_URL, {
     method: 'POST',
     headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model,
-      messages: [{ role: 'developer', content: system }, { role: 'user', content: user }],
+      messages: [
+        { role: 'developer', content: system },
+        { role: 'user', content: images.length ? [{ type: 'text', text: user }, ...images.map((url) => ({ type: 'image_url', image_url: { url } }))] : user },
+      ],
       reasoning_effort: 'none',
       temperature,
       max_completion_tokens: maxTokens,
