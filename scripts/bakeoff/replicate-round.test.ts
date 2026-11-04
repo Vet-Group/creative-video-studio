@@ -80,6 +80,14 @@ describe('runStage on the replicate set', () => {
     expect(new Set(r.submits.map((s) => `${s.model.id}|${s.imageUrls[0]}`)).size).toBe(VIDEO_JOBS.length);
   });
 
+  test('waits between two submits, not before the first', async () => {
+    const waits: number[] = [];
+    const r = rig({ submitGapMs: 11_000, sleep: async (ms) => void waits.push(ms) });
+    await runStage(r.deps, { set: SET, jobs: canary(VIDEO_JOBS, (j) => j.model) });
+    expect(waits.slice(0, 2)).toEqual([11_000, 11_000]);
+    expect(r.submits).toHaveLength(3);
+  });
+
   test('stops at the cap before a job that would pass it', async () => {
     const r = rig({ capUsd: 2.5 });
     const res = await runStage(r.deps, { set: SET, jobs: canary(VIDEO_JOBS, (j) => j.model) });

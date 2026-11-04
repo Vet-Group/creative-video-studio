@@ -36,6 +36,8 @@ export interface RunDeps {
   capUsd?: number;
   marginUsd?: number;
   pollMs?: number;
+  /** Wait this long between two submits; default none. */
+  submitGapMs?: number;
   maxPolls?: number;
 }
 
@@ -187,6 +189,7 @@ async function runLocked(deps: RunDeps, opts: StageOptions): Promise<StageResult
     }
     if ((lastBalance !== null || !usesFal) && outcome === 'complete') {
       const baseline = usesFal ? (readBaseline(deps.outDir) ?? writeBaseline(deps.outDir, lastBalance!, now())) : 0;
+      let gapped = 0;
       for (const p of toSubmit) {
         let have = 0;
         if (usesFal) {
@@ -211,6 +214,8 @@ async function runLocked(deps: RunDeps, opts: StageOptions): Promise<StageResult
         const provider = deps.providers[p.model.provider] ?? fail(`no provider for ${p.model.provider}`);
         // The key may have changed since the plan was read; submit only a key nobody has submitted.
         if (!submittable(current(p)?.status)) continue;
+        // Replicate throttles an account under $5 of credit to 6 creates a minute with a burst of 1; a gap keeps the stage from stopping on a 429.
+        if (deps.submitGapMs && gapped++) await deps.sleep(deps.submitGapMs);
         line(p, { status: 'submitting' });
         try {
           const { providerJobId } = await provider.submit({ model: p.model, prompt, imageUrls: [imageUrl(deps.inputs, p.key.image)], ratio: THRIFT_RATIO, durationSec: p.durationSec });

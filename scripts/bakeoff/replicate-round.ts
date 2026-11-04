@@ -19,8 +19,10 @@ import { metricsForSet } from './metrics.ts';
 import { blindImages, downloadTo, IMAGE_MODELS, runImages } from './replicate-images.ts';
 import { runStage, type RunDeps } from './run.ts';
 
-/** Replicate prepaid credit ~$20.75 minus a $1.50 margin: past the credit Replicate charges the card. */
-export const CAP_USD = 19.25;
+/** The whole Replicate prepaid credit (owner, 2026-11-04); auto-reload is off on the account, so a job past it is refused, not charged. */
+export const CAP_USD = 20.75;
+/** Under $5 of credit Replicate allows 6 creates a minute with a burst of 1. */
+const SUBMIT_GAP_MS = 11_000;
 export const SET = 'replicate-2026-11' as const;
 /** The worker keeps every inlined input at or under this (apps/worker/src/real-providers.ts); Replicate reset a 3.8 MB body in the first bake-off. */
 const MAX_INLINE_BYTES = 600_000;
@@ -45,9 +47,9 @@ export const VIDEO_MODELS: ModelConfig[] = [
 ];
 
 // Image numbers of inputs.json: 1 3 5 long-sleeve and hoodie mockups (apparel), 2 glass, 4 dreamcatcher, 6 woven throw (blanket), 8 10 ornaments. Counts follow
-// the cap: 8 + 4 + 3 clips cost $7.20 + $6.40 + $3.47, which leaves about $1.5 for the images.
+// the cap: 10 + 4 + 3 clips cost $9.00 + $6.40 + $3.47, which leaves about $1.9 for the images.
 export const VIDEO_JOBS: { image: number; model: string }[] = [
-  ...[1, 2, 3, 4, 5, 6, 8, 10].map((image) => ({ image, model: 'seedance-2.0-replicate' })),
+  ...[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((image) => ({ image, model: 'seedance-2.0-replicate' })),
   ...[1, 2, 6, 8].map((image) => ({ image, model: 'veo-3.1-replicate' })),
   ...[3, 6, 10].map((image) => ({ image, model: 'seedance-2.5' })),
 ];
@@ -89,6 +91,7 @@ if (isMain(import.meta.url)) {
       download: downloadTo,
       sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
       capUsd: CAP_USD,
+      submitGapMs: SUBMIT_GAP_MS,
     };
     const result = await runStage(deps, { set: SET, jobs: stage === 'canary' ? canary(VIDEO_JOBS, (j) => j.model) : VIDEO_JOBS });
     console.log(JSON.stringify(result, null, 2));
@@ -96,7 +99,7 @@ if (isMain(import.meta.url)) {
   } else if (cmd === 'images' && (stage === 'canary' || stage === 'all')) {
     const jobs = IMAGE_MODELS.flatMap((model) => IMAGE_PICKS.map((image) => ({ model, image })));
     const result = await runImages(
-      { outDir, fetch, apiToken, readImage, imageUrl: (n) => imageUrl(inputs, n), download: downloadTo, sleep: (ms) => new Promise((r) => setTimeout(r, ms)), capUsd: CAP_USD },
+      { outDir, fetch, apiToken, readImage, imageUrl: (n) => imageUrl(inputs, n), download: downloadTo, sleep: (ms) => new Promise((r) => setTimeout(r, ms)), capUsd: CAP_USD, submitGapMs: SUBMIT_GAP_MS },
       stage === 'canary' ? canary(jobs, (j) => j.model.id) : jobs,
     );
     console.log(JSON.stringify(result, null, 2));

@@ -53,6 +53,8 @@ export interface ImageDeps {
   sleep: (ms: number) => Promise<void>;
   capUsd: number;
   pollMs?: number;
+  /** Wait this long between two submits (Replicate throttles an account under $5 of credit to 6 creates a minute); default none. */
+  submitGapMs?: number;
   maxPolls?: number;
 }
 
@@ -77,6 +79,7 @@ export async function runImages(deps: ImageDeps, jobs: { model: ImageModel; imag
   let outcome: ImageResult['outcome'] = 'complete';
   let reason: string | undefined;
 
+  let gapped = 0;
   for (const j of jobs) {
     if (current(key(j))?.status === 'submitting') line(j, { status: 'unknown', error: 'the run stopped before the provider answered' });
     // Only a key that never reached the provider may be submitted again.
@@ -88,6 +91,7 @@ export async function runImages(deps: ImageDeps, jobs: { model: ImageModel; imag
       reason = `spent $${spent.toFixed(4)} plus $${j.model.usdPerImage} for ${id(key(j))} would pass the $${deps.capUsd} cap`;
       break;
     }
+    if (deps.submitGapMs && gapped++) await deps.sleep(deps.submitGapMs);
     try {
       const images = await resolveImages([deps.imageUrl(j.image)], deps.readImage);
       const input = { prompt: RESTYLE_PROMPT, image_input: images, aspect_ratio: 'match_input_image', output_format: 'png', ...j.model.extra };
