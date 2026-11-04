@@ -1,9 +1,10 @@
 // One-off round (owner-approved, 2026-11-04): spend the last Replicate credit on the Replicate twins of models CVS also serves on BytePlus and Vertex, so
 // their scores can seed those twins before Replicate is removed. Generation only; a separate blind judge scores the outputs.
-//   tsx scripts/bakeoff/replicate-round.ts video canary|all
-//   tsx scripts/bakeoff/replicate-round.ts images canary|all
-//   tsx scripts/bakeoff/replicate-round.ts blind --map <file outside cvs-bakeoff>
-// REPLICATE_API_TOKEN comes from the environment. Everything lives in <root>/out/replicate-2026-11, one job log for video and images, so one cap covers both.
+//   tsx scripts/bakeoff/replicate-round.ts video canary|all [--set replicate-2026-11b]
+//   tsx scripts/bakeoff/replicate-round.ts images canary|all [--set replicate-2026-11b]
+//   tsx scripts/bakeoff/replicate-round.ts blind --map <file outside cvs-bakeoff> [--set replicate-2026-11b]
+// REPLICATE_API_TOKEN comes from the environment. Everything lives in <root>/out/<set> (replicate-2026-11, or 11b, the second round that spends the last $3.10),
+// one job log for video and images, so one cap per set covers both.
 import { randomBytes } from 'node:crypto';
 import { readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -55,6 +56,15 @@ export const VIDEO_JOBS: { image: number; model: string }[] = [
 ];
 export const IMAGE_PICKS = [1, 2, 3, 4, 5, 6, 8, 10];
 
+/** Round b (owner-approved, 2026-11-04): the $3.19 left on the account, $3.10 of it as the cap. More samples for models CVS also serves on Vertex. */
+export const SET_B = 'replicate-2026-11b' as const;
+export const CAP_B_USD = 3.1;
+/** Veo takes 4, 6 or 8 s (the model schema, read 2026-11-04); 4 s keeps three clips at $0.80 inside the cap. */
+export const VIDEO_MODELS_B: ModelConfig[] = [video({ id: 'veo-3.1-replicate', endpoint: 'google/veo-3.1', label: 'Google VEO 3.1 (Replicate)', maxImages: 1, usdPerSecond: 0.2, durationSec: 4 })];
+export const VIDEO_JOBS_B: { image: number; model: string }[] = [3, 5, 10].map((image) => ({ image, model: 'veo-3.1-replicate' }));
+export const IMAGE_MODELS_B = IMAGE_MODELS.filter((m) => ['nano-banana-2.1-replicate', 'nano-banana-2-replicate', 'seedream-5-pro-replicate'].includes(m.id));
+export const IMAGE_PICKS_B = [7, 9];
+
 /** The first job of each model, so one clip of each is checked (clip length, cost, silence) before the rest is paid for. */
 export const canary = <T>(jobs: T[], modelOf: (j: T) => string): T[] => jobs.filter((j, i) => jobs.findIndex((k) => modelOf(k) === modelOf(j)) === i);
 
@@ -64,8 +74,13 @@ const fail = (msg: string): never => {
 
 if (isMain(import.meta.url)) {
   const [cmd, stage] = process.argv.slice(2);
+  const setArg = process.argv[process.argv.indexOf('--set') + 1];
+  const set = process.argv.includes('--set') ? (setArg === SET_B ? SET_B : setArg === SET ? SET : fail(`--set must be ${SET} or ${SET_B}`)) : SET;
+  const round = set === SET_B
+    ? { capUsd: CAP_B_USD, videoModels: VIDEO_MODELS_B, videoJobs: VIDEO_JOBS_B, imageModels: IMAGE_MODELS_B, imagePicks: IMAGE_PICKS_B }
+    : { capUsd: CAP_USD, videoModels: VIDEO_MODELS, videoJobs: VIDEO_JOBS, imageModels: IMAGE_MODELS, imagePicks: IMAGE_PICKS };
   const root = defaultRoot();
-  const outDir = join(root, 'out', SET);
+  const outDir = join(root, 'out', set);
   const apiToken = process.env.REPLICATE_API_TOKEN ?? fail('REPLICATE_API_TOKEN is not set');
   const { inputs, dir } = loadInputs(join(root, 'inputs', 'inputs.json'));
   const raw = localReadImage(dir);
@@ -85,21 +100,21 @@ if (isMain(import.meta.url)) {
     const deps: RunDeps = {
       outDir,
       inputs,
-      models: VIDEO_MODELS,
+      models: round.videoModels,
       providers: { replicate: createReplicateProvider({ apiToken, readImage }) },
       falBalance: async () => fail('no fal job in this round'),
       download: downloadTo,
       sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
-      capUsd: CAP_USD,
+      capUsd: round.capUsd,
       submitGapMs: SUBMIT_GAP_MS,
     };
-    const result = await runStage(deps, { set: SET, jobs: stage === 'canary' ? canary(VIDEO_JOBS, (j) => j.model) : VIDEO_JOBS });
+    const result = await runStage(deps, { set, jobs: stage === 'canary' ? canary(round.videoJobs, (j) => j.model) : round.videoJobs });
     console.log(JSON.stringify(result, null, 2));
     process.exit(result.outcome === 'complete' ? 0 : 3);
   } else if (cmd === 'images' && (stage === 'canary' || stage === 'all')) {
-    const jobs = IMAGE_MODELS.flatMap((model) => IMAGE_PICKS.map((image) => ({ model, image })));
+    const jobs = round.imageModels.flatMap((model) => round.imagePicks.map((image) => ({ model, image })));
     const result = await runImages(
-      { outDir, fetch, apiToken, readImage, imageUrl: (n) => imageUrl(inputs, n), download: downloadTo, sleep: (ms) => new Promise((r) => setTimeout(r, ms)), capUsd: CAP_USD, submitGapMs: SUBMIT_GAP_MS },
+      { outDir, fetch, apiToken, readImage, imageUrl: (n) => imageUrl(inputs, n), download: downloadTo, sleep: (ms) => new Promise((r) => setTimeout(r, ms)), capUsd: round.capUsd, submitGapMs: SUBMIT_GAP_MS, set },
       stage === 'canary' ? canary(jobs, (j) => j.model.id) : jobs,
     );
     console.log(JSON.stringify(result, null, 2));
@@ -107,17 +122,17 @@ if (isMain(import.meta.url)) {
   } else if (cmd === 'blind') {
     const mapPath = process.argv[process.argv.indexOf('--map') + 1] ?? fail('--map is required');
     // Each blind clip keeps its own model's length: cutting Veo's 8 s to 5 s would hide the end of the clip from the judge.
-    const secs = (id: string): number => VIDEO_MODELS.find((m) => m.id === id)!.thrift!.durationSec;
-    const map = await anonymise({ root, set: SET, mapPath, inputs, inputsDir: dir, outDir, durationSec: secs });
-    await metricsForSet(root, SET);
-    console.log(`${Object.keys(map.clips).length} clips; brief ${prepareBrief(root, SET)}`);
+    const secs = (id: string): number => round.videoModels.find((m) => m.id === id)!.thrift!.durationSec;
+    const map = await anonymise({ root, set, mapPath, inputs, inputsDir: dir, outDir, durationSec: secs });
+    await metricsForSet(root, set);
+    console.log(`${Object.keys(map.clips).length} clips; brief ${prepareBrief(root, set)}`);
     const images = await blindImages({
-      root, outDir, mapPath: mapPath.replace(/\.json$/, '-images.json'), inputsDir: dir, sourceFile: (n) => inputs.images[n - 1]!.file,
+      root, outDir, set, mapPath: mapPath.replace(/\.json$/, '-images.json'), inputsDir: dir, sourceFile: (n) => inputs.images[n - 1]!.file,
       rubricPath: join(dirname(fileURLToPath(import.meta.url)), 'rubric-image.md'),
     });
     console.log(`${Object.keys(images).length} images`);
   } else {
-    console.log('usage: replicate-round.ts video|images canary|all   |   blind --map <file outside the cvs-bakeoff folder>');
+    console.log('usage: replicate-round.ts video|images canary|all   |   blind --map <file outside the cvs-bakeoff folder>   (each with an optional --set replicate-2026-11b)');
     process.exit(2);
   }
 }

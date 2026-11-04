@@ -8,7 +8,7 @@ import { describe, expect, test } from 'vitest';
 import type { Inputs } from './inputs.ts';
 import { readLines, spend } from './jobs.ts';
 import { blindImages, IMAGE_MODELS, IMAGE_ROUND, runImages, type ImageDeps } from './replicate-images.ts';
-import { canary, CAP_USD, IMAGE_PICKS, SET, VIDEO_JOBS, VIDEO_MODELS } from './replicate-round.ts';
+import { canary, CAP_B_USD, CAP_USD, IMAGE_MODELS_B, IMAGE_PICKS, IMAGE_PICKS_B, SET, SET_B, VIDEO_JOBS, VIDEO_JOBS_B, VIDEO_MODELS, VIDEO_MODELS_B } from './replicate-round.ts';
 import { runStage, type RunDeps } from './run.ts';
 
 const tmp = (): string => mkdtempSync(join(tmpdir(), 'cvs-replicate-round-test-'));
@@ -27,6 +27,61 @@ describe('the planned round', () => {
       { image: 1, model: 'veo-3.1-replicate' },
       { image: 3, model: 'seedance-2.5' },
     ]);
+  });
+});
+
+describe('the second round (replicate-2026-11b)', () => {
+  test('three 4 s Veo clips and six restyled images stay under the $3.10 cap at their estimates', () => {
+    const veo = VIDEO_MODELS_B[0]!;
+    const usd = VIDEO_JOBS_B.length * veo.usdPerSecond * veo.thrift!.durationSec + IMAGE_MODELS_B.reduce((a, m) => a + IMAGE_PICKS_B.length * m.usdPerImage, 0);
+    expect(veo.thrift!.durationSec).toBe(4);
+    expect(IMAGE_MODELS_B.map((m) => m.id).sort()).toEqual(['nano-banana-2-replicate', 'nano-banana-2.1-replicate', 'seedream-5-pro-replicate']);
+    expect(usd).toBeCloseTo(2.4 + 2 * (0.0336 + 0.067 + 0.045), 6);
+    expect(usd).toBeLessThanOrEqual(CAP_B_USD);
+  });
+  test('submits Veo at 4 s into its own set and refuses a job past its cap', async () => {
+    const outDir = join(tmp(), 'out');
+    const durations: number[] = [];
+    const inner = createMockVideoProvider();
+    const deps: RunDeps = {
+      outDir,
+      inputs,
+      models: VIDEO_MODELS_B,
+      providers: { replicate: { ...inner, submit: async (req) => (durations.push(req.durationSec), inner.submit(req)) } },
+      falBalance: async () => {
+        throw new Error('the fal balance must not be read');
+      },
+      download: async (_url, dest) => {
+        mkdirSync(join(dest, '..'), { recursive: true });
+        writeFileSync(dest, 'clip');
+      },
+      sleep: async () => {},
+      capUsd: 1.7,
+    };
+    const res = await runStage(deps, { set: SET_B, jobs: VIDEO_JOBS_B });
+    expect(durations).toEqual([4, 4]);
+    expect(res.outcome).toBe('stopped: cap');
+    expect(readLines(outDir).every((l) => l.round === SET_B && l.set === SET_B)).toBe(true);
+  });
+  test('image jobs of the second round are logged under their own image round', async () => {
+    const outDir = join(tmp(), 'out');
+    const fetchFake = async (_url: string | URL | Request, init?: RequestInit): Promise<Response> =>
+      init?.method === 'POST' ? Response.json({ id: 'p1' }) : Response.json({ status: 'succeeded', output: ['https://replicate.delivery/x.png'] });
+    const res = await runImages(
+      {
+        outDir, fetch: fetchFake as typeof fetch, apiToken: 'test-token', set: SET_B, capUsd: CAP_B_USD,
+        readImage: async () => ({ bytes: new Uint8Array([1]), contentType: 'image/jpeg' }),
+        imageUrl: (i) => `input:img${i}.jpg`,
+        download: async (_url, dest) => {
+          mkdirSync(join(dest, '..'), { recursive: true });
+          writeFileSync(dest, 'png');
+        },
+        sleep: async () => {},
+      },
+      [{ model: IMAGE_MODELS_B[0]!, image: IMAGE_PICKS_B[0]! }],
+    );
+    expect(res.outcome).toBe('complete');
+    expect(readLines(outDir).every((l) => l.round === 'replicate-2026-11b-images' && l.set === SET_B)).toBe(true);
   });
 });
 

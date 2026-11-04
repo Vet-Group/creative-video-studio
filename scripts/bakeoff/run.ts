@@ -15,7 +15,7 @@ import type { VideoProvider } from '@cvs/core/providers';
 import { defaultRoot, isMain } from './common.ts';
 import { imageUrl, loadInputs, localReadImage, type Inputs } from './inputs.ts';
 import {
-  appendLine, defaultImages, keyId, latest, parseSet, readLines, roundOf, spend, type JobKey, type JobLine, type JobStatus, type SetName,
+  appendLine, defaultImages, isReplicateSet, keyId, latest, parseSet, readLines, roundOf, spend, type JobKey, type JobLine, type JobStatus, type SetName,
 } from './jobs.ts';
 
 // Lowered from $40 by the owner on 2026-10-24: the canary, the 20 bake-off clips and the server smoke clip fit (about $19.30 at 5 s).
@@ -48,7 +48,7 @@ export interface StageOptions {
   /** Image numbers; only for the extra set. */
   images?: number[];
   presetId?: string;
-  /** The replicate-2026-11 set only: exactly these (image, model) jobs, each model at its own thrift duration. */
+  /** The replicate sets only: exactly these (image, model) jobs, each model at its own thrift duration. */
   jobs?: { image: number; model: string }[];
 }
 
@@ -90,8 +90,8 @@ function plan(deps: RunDeps, opts: StageOptions): { jobs: Planned[]; prompt: str
   if (!models.length) throw new Error('no model selected');
   let images: number[];
   let prompt = BAKEOFF_PRESET.prompt;
-  if (opts.set === 'replicate-2026-11') {
-    if (!opts.jobs?.length || opts.images || opts.presetId) throw new Error('the replicate-2026-11 set takes jobs only');
+  if (isReplicateSet(opts.set)) {
+    if (!opts.jobs?.length || opts.images || opts.presetId) throw new Error(`the ${opts.set} set takes jobs only`);
     images = opts.jobs.map((j) => j.image);
   } else if (opts.set === 'extra') {
     images = opts.images ?? [];
@@ -101,7 +101,7 @@ function plan(deps: RunDeps, opts: StageOptions): { jobs: Planned[]; prompt: str
     if (!p || p.id === BAKEOFF_PRESET.id) throw new Error('extra needs --preset naming a preset other than the safe one');
     prompt = p.prompt;
   } else {
-    if (opts.images || opts.presetId || opts.jobs) throw new Error(`--images and --preset apply only to the extra set, jobs to replicate-2026-11`);
+    if (opts.images || opts.presetId || opts.jobs) throw new Error(`--images and --preset apply only to the extra set, jobs to the replicate sets`);
     images = defaultImages(opts.set);
   }
   for (const n of images) if (!Number.isInteger(n) || n < 1 || n > deps.inputs.images.length) throw new Error(`image ${n} is not in inputs.json`);

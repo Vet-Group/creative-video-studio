@@ -109,9 +109,10 @@ export function spend(lines: JobLine[]): { total: number; byProvider: Record<str
   return { total, byProvider };
 }
 
-/** 'replicate-2026-11' is the one-off Replicate round (replicate-round.ts): its jobs come from the caller, not from a fixed list of images. */
-export type SetName = 'canary' | 'half-1' | 'half-2' | 'extra' | 'replicate-2026-11';
-export const SET_NAMES: SetName[] = ['canary', 'half-1', 'half-2', 'extra', 'replicate-2026-11'];
+/** 'replicate-2026-11' and its follow-up 'replicate-2026-11b' are the one-off Replicate rounds (replicate-round.ts): their jobs come from the caller, not from a fixed list of images. */
+export type SetName = 'canary' | 'half-1' | 'half-2' | 'extra' | 'replicate-2026-11' | 'replicate-2026-11b';
+export const SET_NAMES: SetName[] = ['canary', 'half-1', 'half-2', 'extra', 'replicate-2026-11', 'replicate-2026-11b'];
+export const isReplicateSet = (set: SetName): boolean => set === 'replicate-2026-11' || set === 'replicate-2026-11b';
 const SET_IMAGES: Partial<Record<SetName, number[]>> = { canary: [1], 'half-1': [1, 2, 3, 4, 5], 'half-2': [6, 7, 8, 9, 10] };
 
 /** half-1 contains the canary image, whose jobs are already in the log and are polled, not resubmitted. */
