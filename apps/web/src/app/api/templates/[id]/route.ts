@@ -1,20 +1,21 @@
 import { type RouteContext } from '@/lib/assets';
 import { pool } from '@/lib/auth';
-import { guard } from '@/lib/session';
+import { guard, isEditor } from '@/lib/session';
 import type { TemplateData } from '@/lib/templates';
 
 const notFound = () => Response.json({ error: 'not found' }, { status: 404 });
 
 /**
- * A template in the shape the pages refill from (as GET /api/jobs/:id): to its owner, or to anyone when the company shares it. The images, end frame
- * and audio clips are re-checked here: only the viewer's own live uploads come back, so a shared template never hands out the Admin's photos.
+ * A template in the shape the pages refill from (as GET /api/jobs/:id): to its owner, or to anyone when the company or a store shares it (stores have no
+ * members). The images, end frame and audio clips are re-checked here: only the viewer's own live uploads come back, so a shared template never hands out
+ * its author's photos.
  */
 export async function GET(request: Request, { params }: RouteContext) {
   const g = await guard(request, 'member');
   if (g.error) return g.error;
   const { id } = await params;
   const userId = g.session.user.id;
-  const t = (await pool.query('select id, feature, name, data, is_company from user_templates where id = $1 and (user_id = $2 or is_company)', [id, userId])).rows[0];
+  const t = (await pool.query('select id, feature, name, data, is_company from user_templates where id = $1 and (user_id = $2 or is_company or store_id is not null)', [id, userId])).rows[0];
   if (!t) return notFound();
   const data = t.data as TemplateData;
   const own = async (ids: string[]) =>
@@ -33,12 +34,13 @@ export async function GET(request: Request, { params }: RouteContext) {
   });
 }
 
-/** Deletes the caller's own template; an Admin may also delete a company one. */
+/** Deletes the caller's own template; an Admin or a template editor may also delete a company or a store one (403 for others). */
 export async function DELETE(request: Request, { params }: RouteContext) {
   const g = await guard(request, 'member');
   if (g.error) return g.error;
   const { id } = await params;
-  const admin = g.session.user.role === 'admin';
-  const res = await pool.query('delete from user_templates where id = $1 and (user_id = $2 or ($3 and is_company))', [id, g.session.user.id, admin]);
-  return res.rowCount ? new Response(null, { status: 204 }) : notFound();
+  const res = await pool.query('delete from user_templates where id = $1 and (user_id = $2 or ($3 and (is_company or store_id is not null)))', [id, g.session.user.id, isEditor(g.session.user)]);
+  if (res.rowCount) return new Response(null, { status: 204 });
+  // A shared template the caller sees but may not delete.
+  return (await pool.query('select 1 from user_templates where id = $1 and (is_company or store_id is not null)', [id])).rowCount ? Response.json({ error: 'forbidden' }, { status: 403 }) : notFound();
 }

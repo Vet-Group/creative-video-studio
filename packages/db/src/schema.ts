@@ -504,7 +504,8 @@ export const favorites = pgTable(
 );
 
 // A member's saved form (Save template): the inputs of one page, in the shape the reuse link reads from a job, so applying it refills the form the same way.
-// `is_company` (set by an Admin) shares it with everyone; others never see the Admin's own photos in it.
+// `is_company` (set by an Admin or a template editor) shares it with everyone, `store_id` with every member who picks that store on the form;
+// others never see the author's own photos in it.
 export const userTemplates = pgTable(
   'user_templates',
   {
@@ -516,9 +517,15 @@ export const userTemplates = pgTable(
     name: text('name').notNull(),
     data: jsonb('data').notNull(),
     isCompany: boolean('is_company').notNull().default(false),
+    storeId: text('store_id').references(() => stores.id, { onDelete: 'set null' }),
     createdAt: tstz('created_at').notNull().defaultNow(),
   },
-  (t) => [index('user_templates_user_id_idx').on(t.userId), check('user_templates_name_check', sql`char_length(${t.name}) between 1 and 60`)],
+  (t) => [
+    index('user_templates_user_id_idx').on(t.userId),
+    index('user_templates_store_id_idx').on(t.storeId),
+    check('user_templates_name_check', sql`char_length(${t.name}) between 1 and 60`),
+    check('user_templates_scope_check', sql`not (${t.isCompany} and ${t.storeId} is not null)`),
+  ],
 );
 
 export const CHOICE_KINDS = ['hook', 'location'] as const;
