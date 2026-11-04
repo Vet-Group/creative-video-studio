@@ -55,3 +55,41 @@ test('0055 books the recorded Enhance and suggestion costs as llm rows once, in 
   // The job's llm row adds to its cost without closing it.
   expect((await pool.query(`select usd::text, is_final from job_costs where job_id = 'j1'`)).rows).toEqual([{ usd: '0.0004', is_final: false }]);
 });
+
+test('0068 gives uploads a store column (FK set null, owner/store/date index) and tags each input with the store of its owner\'s latest job with a store', async () => {
+  await pool.query(`insert into stores (id, name, code) values ('sc', 'Shop C', 'SC'), ('sd', 'Shop D', 'SD')`);
+  const asset = (id: string, owner: string, kind = 'input') =>
+    pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) values ($1, $2, $3, $1, 'f.jpg', 'image/jpeg', 1)`, [id, owner, kind]);
+  for (const id of ['a1', 'a2', 'a3', 'a4', 'a5']) await asset(id, 'u1');
+  await asset('b1', 'u2');
+  await asset('o1', 'u1', 'output');
+  const job = (id: string, store: string | null, inputs: string[], createdAt: string, params = '{}') =>
+    pool.query(
+      `insert into jobs (id, user_id, team_id, store_id, model, provider, prompt, aspect, duration_s, input_asset_ids, created_at, params)
+       values ($1, 'u1', 'team-unassigned', $2, 'kling-o3-pro', 'fal', 'p', '9:16', 5, $3, $4, $5)`,
+      [id, store, inputs, createdAt, params],
+    );
+  await job('k1', 'sc', ['a1', 'a2', 'b1', 'o1'], '2026-11-01 10:00:00+07');
+  await job('k2', 'sd', ['a2'], '2026-11-02 10:00:00+07');
+  await job('k3', null, ['a1', 'a3'], '2026-11-03 10:00:00+07');
+  await job('k4', 'sd', [], '2026-11-03 10:00:00+07', '{"endAssetId":"a5"}');
+  const file = readFileSync(new URL('../migrations/0068_upload_store.sql', import.meta.url), 'utf8');
+  await pool.query(file.slice(file.indexOf('-- Backfill')));
+  const { rows } = await pool.query(`select id, store_id from assets where id in ('a1', 'a2', 'a3', 'a4', 'a5', 'b1', 'o1') order by id`);
+  // A store-less job leaves the tag alone; another member's photo and an output are never tagged.
+  expect(rows).toEqual([
+    { id: 'a1', store_id: 'sc' },
+    { id: 'a2', store_id: 'sd' },
+    { id: 'a3', store_id: null },
+    { id: 'a4', store_id: null },
+    { id: 'a5', store_id: 'sd' },
+    { id: 'b1', store_id: null },
+    { id: 'o1', store_id: null },
+  ]);
+  const index = await pool.query(`select indexdef from pg_indexes where indexname = 'assets_owner_id_store_id_created_at_idx'`);
+  expect(index.rows[0].indexdef).toContain('(owner_id, store_id, created_at)');
+  await expect(pool.query(`update assets set store_id = 'nope' where id = 'a4'`)).rejects.toThrow(/assets_store_id_stores_id_fk/);
+  await pool.query(`update jobs set store_id = null where store_id = 'sc'`);
+  await pool.query(`delete from stores where id = 'sc'`);
+  expect((await pool.query(`select store_id from assets where id = 'a1'`)).rows).toEqual([{ store_id: null }]);
+});

@@ -15,6 +15,7 @@ import { Icon, type IconName } from './Icon';
 import { LoadError } from './LoadError';
 import { Modal } from './Modal';
 import { Preview } from './Preview';
+import { Select } from './Select';
 import { SampleDetail } from './SampleDetail';
 import type { ModelOption } from './ModelPicker';
 
@@ -204,16 +205,20 @@ const tooLarge = (kind: UploadKind, name = '') => `${KINDS[kind].what}${name && 
 /** A file refused before it is sent; the message says why. */
 class Refused extends Error {}
 
-/** What to show for a failed upload: the file's format or size (seen here or by the server), else the network or the server. */
+/** What to show for a failed upload: the file's format or size (seen here or by the server), a store that was hidden, else the network or the server. */
 export function uploadError(e: unknown, kind: UploadKind = 'image'): string {
   if (e instanceof Refused) return e.message;
   if (e instanceof ApiError && e.status === 413) return tooLarge(kind);
   if (e instanceof ApiError && e.status === 415) return wrongType(kind);
+  if (e instanceof ApiError && e.status === 400) return 'Cửa hàng đã chọn không còn dùng được. Hãy chọn cửa hàng khác rồi tải lên lại.'; // the page always sends 1-4 files, so only its store is refused
   return kind === 'image' ? UPLOAD_ERROR : `Không tải ${KINDS[kind].what.toLowerCase()} lên được do lỗi mạng hoặc máy chủ. Hãy thử lại.`;
 }
 
-/** Uploads files of one kind; a file of another type or over the size is refused before anything is sent (a file the browser gives no type is left to the server). */
-export async function uploadImages(files: File[], kind: UploadKind = 'image'): Promise<Img[]> {
+/**
+ * Uploads files of one kind; a file of another type or over the size is refused before anything is sent (a file the browser gives no type is left to the server).
+ * `storeId` tags them with the store chosen on the page, for the uploaded-photos picker's store filter.
+ */
+export async function uploadImages(files: File[], kind: UploadKind = 'image', storeId = ''): Promise<Img[]> {
   for (const f of files) {
     if (f.type && !KINDS[kind].types.includes(f.type)) throw new Refused(wrongType(kind, f.name));
     if (f.size > KINDS[kind].max) throw new Refused(tooLarge(kind, f.name));
@@ -222,6 +227,7 @@ export async function uploadImages(files: File[], kind: UploadKind = 'image'): P
   for (let i = 0; i < files.length; i += PER_UPLOAD) {
     const form = new FormData();
     for (const f of files.slice(i, i + PER_UPLOAD)) form.append('file', f);
+    if (storeId) form.append('storeId', storeId);
     out.push(...(await api<{ assets: Img[] }>('/api/assets', { method: 'POST', body: form })).assets);
   }
   return out;
@@ -231,9 +237,9 @@ export async function uploadImages(files: File[], kind: UploadKind = 'image'): P
  * One labelled upload slot: its thumbnails with a remove button each, and a tile that opens the file picker until the slot is full.
  * `samples` (sample names, lib/samples.ts) show while the slot is empty, as on the live Try On; a click hands the name to `onSample`, which copies it on the server.
  * `icon` is the empty slot's icon: a picture by default, a plus on Advanced's wide slot, as on the live page.
- * `onPick` adds the "Ảnh đã tải" link to the label's line while the slot has room (a one-photo slot always: a pick replaces its photo).
+ * `onPick` adds the "Ảnh đã tải" link to the label's line while the slot has room (a one-photo slot always: a pick replaces its photo); `storeId` is the page's store, its first filter.
  */
-export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRemove, samples = [], onSample, icon = 'image', onBrowse, onPick }: { label: string; empty: string; inputLabel: string; images: Img[]; max: number; busy: boolean; onAdd: (files: File[]) => void; onRemove: (id: string) => void; samples?: string[]; onSample?: (name: string) => void; icon?: IconName; onBrowse?: () => void; onPick?: (img: Img) => void }) {
+export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRemove, samples = [], onSample, icon = 'image', onBrowse, onPick, storeId }: { label: string; empty: string; inputLabel: string; images: Img[]; max: number; busy: boolean; onAdd: (files: File[]) => void; onRemove: (id: string) => void; samples?: string[]; onSample?: (name: string) => void; icon?: IconName; onBrowse?: () => void; onPick?: (img: Img) => void; storeId?: string }) {
   const hydrated = useHydrated();
   const input = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
@@ -261,7 +267,7 @@ export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRem
       {onPick ? (
         <div className="field-head">
           {name}
-          {(!full || max === 1) && <UploadedPhotos name={`Ảnh đã tải cho ${label}`} taken={images} disabled={!hydrated || busy} onPick={(img) => (setCut(0), onPick(img))} />}
+          {(!full || max === 1) && <UploadedPhotos name={`Ảnh đã tải cho ${label}`} taken={images} disabled={!hydrated || busy} storeId={storeId} onPick={(img) => (setCut(0), onPick(img))} />}
         </div>
       ) : (
         name
@@ -419,8 +425,8 @@ export function SizeSlider({ size, last = 2, onChange }: { size: number; last?: 
  * `samples` names the fixed sample tiles shown first: the uploaded samples `<samples><n>.jpg` (or `.mp4` with a `.jpg` poster for `video`). */
 type PhotoTile = { key: string; src: string; label: string; pick: () => void };
 
-/** A photo dialog of a slot, as on Fash (Marketing's model and product, Try On's model, garments and background): the photos to pick, 4 per row of 3:4 portraits, after an upload tile that also takes a dropped photo (with `onFile`). A tile that opens a deeper list (a model's poses, a category) sets the dialog again after it closes; `onBack` returns. */
-export function PhotoDialog({ open, title, sub, tiles, busy, onFile, onClose, onBack, mine, groups = [] }: { open: boolean; title: string; sub?: string; tiles: PhotoTile[]; busy: boolean; onFile?: (files: File[]) => void; onClose: () => void; onBack?: () => void; mine?: { title: string; tiles: PhotoTile[] }; groups?: { title: string; tiles: PhotoTile[] }[] }) {
+/** A photo dialog of a slot, as on Fash (Marketing's model and product, Try On's model, garments and background): the photos to pick, 4 per row of 3:4 portraits, after an upload tile that also takes a dropped photo (with `onFile`). A tile that opens a deeper list (a model's poses, a category) sets the dialog again after it closes; `onBack` returns. `filter` shows above the photos. */
+export function PhotoDialog({ open, title, sub, tiles, busy, onFile, onClose, onBack, mine, groups = [], filter }: { open: boolean; title: string; sub?: string; tiles: PhotoTile[]; busy: boolean; onFile?: (files: File[]) => void; onClose: () => void; onBack?: () => void; mine?: { title: string; tiles: PhotoTile[] }; groups?: { title: string; tiles: PhotoTile[] }[]; filter?: ReactNode }) {
   const tile = (t: PhotoTile) => (
     <button key={t.key} type="button" aria-label={t.label} disabled={busy} onClick={() => (onClose(), t.pick())}>
       {open && <img src={t.src} alt="" />}
@@ -443,6 +449,7 @@ export function PhotoDialog({ open, title, sub, tiles, busy, onFile, onClose, on
         <span id={ids.head}>{title}</span>
       </h2>
       {sub && <p className="modal-sub">{sub}</p>}
+      {filter}
       <div className="choice-grid model-grid">
         {onFile && (
           <label
@@ -482,28 +489,50 @@ export function PhotoDialog({ open, title, sub, tiles, busy, onFile, onClose, on
  * "Ảnh đã tải": a button that opens the member's own photos uploaded on any page (GET /api/assets?recent=uploads, newest first), shared by Create, Try On,
  * Image Generation and Marketing Studio. A pick hands the asset to `onPick` as an upload would (the same id, nothing sent again); photos already in the
  * form (`taken`) are left out, as a job takes each input once. The list is read on every open, so a photo just uploaded elsewhere is there.
+ * A store filter narrows it to the photos uploaded with a store chosen; it opens on the page's store (`storeId`), else on every store.
  */
-export function UploadedPhotos({ name, taken, disabled, onPick, className = 'link-button uploads-link', children = 'Ảnh đã tải' }: { name?: string; taken: Img[]; disabled?: boolean; onPick: (img: Img) => void; className?: string; children?: ReactNode }) {
+export function UploadedPhotos({ name, taken, disabled, onPick, storeId = '', className = 'link-button uploads-link', children = 'Ảnh đã tải' }: { name?: string; taken: Img[]; disabled?: boolean; onPick: (img: Img) => void; storeId?: string; className?: string; children?: ReactNode }) {
   const [open, setOpen] = useState(false);
+  const [store, setStore] = useState('');
+  const [stores, setStores] = useState<{ id: string; name: string }[]>([]);
   const [list, setList] = useState<Img[] | 'failed' | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    let live = true; // a later filter's answer wins over a slower earlier one
+    setList(null);
+    api<{ assets: Img[] }>(`/api/assets?recent=uploads${store ? `&storeId=${encodeURIComponent(store)}` : ''}`).then(
+      (r) => live && setList(r.assets),
+      () => live && setList('failed'),
+    );
+    return () => void (live = false);
+  }, [open, store]);
   function show() {
     setOpen(true);
-    setList(null);
-    api<{ assets: Img[] }>('/api/assets?recent=uploads').then(
-      (r) => setList(r.assets),
-      () => setList('failed'),
-    );
+    setStore(storeId);
+    if (stores.length === 0) api<{ stores: { id: string; name: string }[] }>('/api/stores').then((r) => setStores(r.stores), () => undefined); // without the list the filter offers every store only
   }
   const shown = Array.isArray(list) ? list.filter((a) => !taken.some((t) => t.id === a.id)) : [];
   const sub =
-    list === null ? 'Đang tải ảnh...' : list === 'failed' ? 'Không tải được ảnh đã tải. Hãy đóng và mở lại.' : shown.length === 0 ? 'Chưa có ảnh nào khác. Ảnh bạn tải lên ở mọi trang sẽ hiện ở đây.' : 'Ảnh bạn đã tải lên ở mọi trang, mới nhất trước.';
+    list === null ? 'Đang tải ảnh...' : list === 'failed' ? 'Không tải được ảnh đã tải. Hãy đóng và mở lại.' : shown.length === 0 ? (store ? 'Chưa có ảnh nào khác của cửa hàng này. Chọn "Tất cả cửa hàng" để xem mọi ảnh.' : 'Chưa có ảnh nào khác. Ảnh bạn tải lên ở mọi trang sẽ hiện ở đây.') : 'Ảnh bạn đã tải lên ở mọi trang, mới nhất trước.';
   return (
     <>
       {/* An icon-only button (Image Generation's bar) takes its name as a tooltip too. */}
       <button type="button" className={className} aria-label={name} title={typeof children === 'string' ? undefined : name} aria-haspopup="dialog" disabled={disabled} onClick={show}>
         {children}
       </button>
-      <PhotoDialog open={open} title="Ảnh đã tải" sub={sub} tiles={shown.map((a) => ({ key: a.id, src: `/api/assets/${a.id}/content`, label: `Dùng ${a.filename}`, pick: () => onPick(a) }))} busy={false} onClose={() => setOpen(false)} />
+      <PhotoDialog
+        open={open}
+        title="Ảnh đã tải"
+        sub={sub}
+        tiles={shown.map((a) => ({ key: a.id, src: `/api/assets/${a.id}/content`, label: `Dùng ${a.filename}`, pick: () => onPick(a) }))}
+        busy={false}
+        onClose={() => setOpen(false)}
+        filter={
+          <div className="uploads-filter">
+            <Select label="Lọc theo cửa hàng" icon="store" heading="Lọc theo cửa hàng" value={store} options={[{ value: '', label: 'Tất cả cửa hàng' }, ...stores.map((s) => ({ value: s.id, label: s.name }))]} onChange={setStore} />
+          </div>
+        }
+      />
     </>
   );
 }

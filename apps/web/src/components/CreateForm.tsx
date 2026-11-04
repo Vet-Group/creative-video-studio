@@ -328,7 +328,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
     if (images.length + files.length > maxImages) return setError(`Tối đa ${maxImages} ảnh.`);
     setBusy(true);
     try {
-      const assets = (await uploadImages(files).finally(loading('Đang tải lên…'))) as Image[];
+      const assets = (await uploadImages(files, 'image', storeId).finally(loading('Đang tải lên…'))) as Image[];
       setImages((cur) => [...cur, ...assets]);
     } catch (e) {
       setError(uploadError(e));
@@ -558,7 +558,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
               )}
             </div>
             <div className="dropzone-foot">
-              <UploadedPhotos taken={images} disabled={!hydrated || busy || images.length >= maxImages} onPick={(img) => (setError(''), setImages((cur) => (cur.length < maxImages ? [...cur, img] : cur)))} />
+              <UploadedPhotos taken={images} disabled={!hydrated || busy || images.length >= maxImages} storeId={storeId} onPick={(img) => (setError(''), setImages((cur) => (cur.length < maxImages ? [...cur, img] : cur)))} />
             </div>
             {chosen?.endFrame && (
               <Slot
@@ -571,13 +571,14 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
                 onAdd={(files) => {
                   setError('');
                   setBusy(true);
-                  uploadImages(files)
+                  uploadImages(files, 'image', storeId)
                     .finally(loading('Đang tải lên…'))
                     .then(([img]) => img && setEndFrame(img), (e) => setError(uploadError(e)))
                     .finally(() => setBusy(false));
                 }}
                 onRemove={() => setEndFrame(null)}
                 onPick={setEndFrame}
+                storeId={storeId}
               />
             )}
             {takes && (

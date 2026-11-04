@@ -73,9 +73,10 @@ function mp3(ms: number, xing?: number): Uint8Array<ArrayBuffer> {
 const get = (path: string, cookie?: string, headers: Record<string, string> = {}) =>
   new Request(`http://localhost${path}`, { headers: { ...(cookie ? { cookie } : {}), ...headers } });
 
-function upload(cookie: string | undefined, ...files: { name: string; bytes: Uint8Array<ArrayBuffer>; type?: string }[]) {
+function upload(cookie: string | undefined, ...files: { name: string; bytes: Uint8Array<ArrayBuffer>; type?: string; storeId?: string }[]) {
   const form = new FormData();
   for (const f of files) form.append('file', new File([f.bytes], f.name, { type: f.type ?? 'application/octet-stream' }));
+  if (files[0]?.storeId !== undefined) form.append('storeId', files[0].storeId);
   return POST(new Request(BASE, { method: 'POST', body: form, headers: cookie ? { cookie } : {} }));
 }
 
@@ -476,9 +477,9 @@ describe('GET /api/assets?recent=uploads', () => {
     userId = (await auth.api.createUser({ body: { email: 'uploader@example.test', name: 'Uploader', password: PASSWORD, role: 'member' } })).user.id;
     cookie = await signIn('uploader@example.test');
   });
-  const uploads = async (who: string) => {
+  const uploads = async (who: string, query = '') => {
     const { GET } = await import('./route');
-    const res = await GET(new Request(`${BASE}?recent=uploads`, { headers: { cookie: who } }));
+    const res = await GET(new Request(`${BASE}?recent=uploads${query}`, { headers: { cookie: who } }));
     expect(res.status).toBe(200);
     return ((await res.json()) as { assets: { id: string; filename: string }[] }).assets;
   };
@@ -509,6 +510,25 @@ describe('GET /api/assets?recent=uploads', () => {
     expect(list.map((a) => a.filename)).toEqual(['fresh.png', 'kept.png', 'mid.png', 'old.png']);
     expect(list.map((a) => a.id)).not.toContain(video);
     expect(list.map((a) => a.id)).not.toContain(audio);
+  });
+
+  test("tags an upload with a visible store, refuses a hidden or unknown one, and filters by store among the caller's own photos only", async () => {
+    await pool.query(`insert into stores (id, name, code, hidden) values ('st-a', 'Shop A', 'STA', false), ('st-b', 'Shop B', 'STB', false), ('st-h', 'Shop H', 'STH', true)`);
+    const send = (who: string, name: string, storeId?: string) => upload(who, { name, bytes: png(64), storeId });
+    const before = await assetCount();
+    expect((await send(cookie, 'hidden.png', 'st-h')).status).toBe(400);
+    expect((await send(cookie, 'unknown.png', 'st-x')).status).toBe(400);
+    expect(await assetCount()).toBe(before);
+    for (const [name, store] of [['a1.png', 'st-a'], ['b1.png', 'st-b'], ['none.png', ''], ['a2.png', 'st-a']] as const) expect((await send(cookie, name, store)).status).toBe(201);
+    expect((await send(ownerCookie, 'theirs-a.png', 'st-a')).status).toBe(201);
+    for (const [name, ago] of [['a1.png', 4], ['b1.png', 3], ['none.png', 2], ['a2.png', 1]] as const) await pool.query('update assets set created_at = now() - make_interval(mins => $2) where filename = $1', [name, ago]);
+    const tags = await pool.query(`select filename, store_id from assets where filename in ('a1.png', 'b1.png', 'none.png') order by filename`);
+    expect(tags.rows).toEqual([{ filename: 'a1.png', store_id: 'st-a' }, { filename: 'b1.png', store_id: 'st-b' }, { filename: 'none.png', store_id: null }]);
+    const names = async (query: string) => (await uploads(cookie, query)).map((a) => a.filename);
+    expect(await names('&storeId=st-a')).toEqual(['a2.png', 'a1.png']);
+    expect(await names('&storeId=st-b')).toEqual(['b1.png']);
+    expect(await names('&storeId=st-x')).toEqual([]);
+    expect((await names('')).slice(0, 4)).toEqual(['a2.png', 'none.png', 'b1.png', 'a1.png']);
   });
 
   test(`stops at ${UPLOADS_LIMIT}, the oldest left out, and asks for a session`, async () => {

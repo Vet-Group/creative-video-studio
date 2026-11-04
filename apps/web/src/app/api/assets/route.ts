@@ -16,7 +16,7 @@ function shortName(name: string): string {
 /**
  * Upload 1-4 input files (multipart field `file`), all or nothing: JPEG/PNG/WebP images of at most 10 MB, or MP4/MOV videos (Motion Control's reference)
  * of at most 20 MB whose header gives their length (`durationMs`), or MP3/WAV clips (Create video's reference audio) of at most 15 MB, measured the same way.
- * The type comes from the magic bytes.
+ * The type comes from the magic bytes. An optional `storeId` field tags the files with the store chosen on the page; it must be a store that is not hidden.
  */
 /** The photo of a slot the caller used before, by `?recent=`: the feature and the input's place (1-based) in its jobs. */
 const RECENT: Record<string, { feature: string; at: number }> = {
@@ -35,19 +35,22 @@ const imagesOf = (j: string) => `${j}.input_asset_ids || coalesce(string_to_arra
  * first, each once, at most 12. Advanced references and deleted files are left out.
  * `?recent=uploads`: every photo the caller uploaded on any page, for the shared uploaded-photos picker; newest upload first, at most UPLOADS_LIMIT.
  * Deleted files, videos and audio are left out, and so is a photo that only deleted jobs ran from: the purge removes it once those are purged.
+ * `&storeId=` keeps the photos uploaded with that store chosen; without it, every store and none.
  */
 export async function GET(request: Request) {
   const g = await guard(request, 'member');
   if (g.error) return g.error;
-  const key = new URL(request.url).searchParams.get('recent') ?? '';
+  const params = new URL(request.url).searchParams;
+  const key = params.get('recent') ?? '';
   if (key === 'uploads') {
     const { rows } = await pool.query(
       `select a.id, a.filename from assets a
         where a.owner_id = $1 and a.kind = 'input' and a.deleted_at is null and a.mime like 'image/%'
+          and ($3::text is null or a.store_id = $3)
           and (exists (select 1 from jobs j where a.id = any(${imagesOf('j')}) and j.deleted_at is null)
             or not exists (select 1 from jobs j where a.id = any(${imagesOf('j')})))
         order by a.created_at desc, a.id limit $2`,
-      [g.session.user.id, UPLOADS_LIMIT],
+      [g.session.user.id, UPLOADS_LIMIT, params.get('storeId') || null],
     );
     return Response.json({ assets: rows });
   }
@@ -73,6 +76,10 @@ export async function POST(request: Request) {
   const files = (form?.getAll('file') ?? []).filter((f): f is File => typeof f !== 'string');
   if (files.length === 0 || files.length > MAX_FILES) {
     return Response.json({ error: `send 1 to ${MAX_FILES} files in the "file" field` }, { status: 400 });
+  }
+  const storeId = form?.get('storeId') || null;
+  if (storeId !== null && (typeof storeId !== 'string' || (await pool.query('select 1 from stores where id = $1 and not hidden', [storeId])).rowCount === 0)) {
+    return Response.json({ error: 'the store does not exist or is hidden' }, { status: 400 });
   }
   const checked: { id: string; file: File; bytes: Uint8Array; mime: string; durationMs: number | null }[] = [];
   for (const file of files) {
@@ -107,6 +114,7 @@ export async function POST(request: Request) {
     mime,
     bytes: bytes.length,
     durationMs,
+    storeId,
   }));
   const puts = await Promise.allSettled(checked.map(({ id, bytes, mime }) => putObject(`assets/${id}`, bytes, mime)));
   try {
