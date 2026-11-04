@@ -698,7 +698,8 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
         <div className="card form-card" id="marketing-panel-create" role={narrow ? 'tabpanel' : undefined} aria-labelledby={narrow ? 'marketing-tab-create' : undefined} hidden={narrow && shown !== 'create'} onPointerDownCapture={recall.touch} onKeyDownCapture={recall.touch}>
           <div className="form-scroll">
             <PageHint href="/marketing-studio" />
-            <div className="app-head marketing-head" data-category="video" data-photo={have.has(photo) || undefined} style={have.has(photo) ? ({ '--photo': `url(/api/samples/${photo})` } as CSSProperties) : undefined}>
+            {/* A click anywhere on the banner opens the format picker, as Create's banner opens its presets; the chip stays the keyboard and screen-reader way in. */}
+            <div className="app-head marketing-head" data-category="video" data-photo={have.has(photo) || undefined} style={have.has(photo) ? ({ '--photo': `url(/api/samples/${photo})` } as CSSProperties) : undefined} onClick={() => setPicker('format')}>
               {have.has(loop) && (
                 <span className="head-loop">
                   <LoopVideo src={`/api/samples/${loop}`} poster={have.has(photo) ? `/api/samples/${photo}` : null} />
