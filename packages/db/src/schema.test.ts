@@ -420,15 +420,15 @@ describe('migration 0013 real video models', () => {
   });
 });
 
-describe('migrations 0057 and 0061 Replicate round scores', () => {
+describe('migrations 0057, 0061 and 0070 Replicate round scores', () => {
   // The Replicate twins of Seedance 2.0 and Veo 3.1 carried these totals too; migration 0062 deleted those rows, so the rows left are listed.
   test('every row of a model carries the same prior, and the Replicate-round twins carry the docs/BAKEOFF.md totals', async () => {
     const twins: [number, number, string[]][] = [
       [3, 10, ['seedance-2.0', 'seedance-2.0-byteplus']],
       [7, 12, ['seedance-2.5', 'seedance-2.5-byteplus']],
       [2, 7, ['veo-3.1', 'veo-3.1-vertex']],
-      [9, 20, ['seedream-5-pro', 'seedream-5-pro-byteplus']],
-      [10, 20, ['nano-banana-2', 'nano-banana-2-vertex']],
+      [11, 25, ['seedream-5-pro', 'seedream-5-pro-byteplus']],
+      [13, 25, ['nano-banana-2', 'nano-banana-2-vertex']],
       [4, 18, ['nano-banana', 'nano-banana-vertex']],
       [9, 10, ['nano-banana-2.1', 'nano-banana-2.1-vertex']],
     ];

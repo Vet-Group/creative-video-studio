@@ -484,6 +484,13 @@
       "when": 1794395039036,
       "tag": "0069_floating_reveal_prompt",
       "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "7",
+      "when": 1794395099036,
+      "tag": "0070_replicate_round3_scores",
+      "breakpoints": true
     }
   ]
 }
