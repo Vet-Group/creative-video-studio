@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { type Browser, expect, type Page, test } from '@playwright/test';
 import { HOOKS } from '../src/lib/marketing';
-import { optionsOf, png, select, signIn } from './support.test';
+import { openTemplates, optionsOf, png, select, signIn } from './support.test';
 
 // A member's own hooks and locations on Marketing Studio, Save template from a History card, and the often-used group. Runs use the mock models only.
 // Every company hook made here is deleted in `finally`: marketing.e2e.test.ts counts HOOKS.length cards.
@@ -208,7 +208,7 @@ test('Lưu mẫu on a History card saves that job as a template of its page, whi
     await expect(card.getByRole('status')).toHaveText('Đã lưu mẫu.');
   }
   async function openTemplate(path: RegExp, name: string) {
-    await page.getByRole('button', { name: 'Mẫu của tôi' }).click();
+    await openTemplates(page);
     await page.getByRole('dialog', { name: 'Mẫu của tôi' }).getByRole('link', { name }).click();
     await expect(page).toHaveURL(path);
   }

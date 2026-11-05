@@ -65,6 +65,16 @@ export async function openTab(page: Page, name: string): Promise<void> {
   }).toPass();
 }
 
+/** Opens "Mẫu của tôi". Retries the click, as a click before hydration only focuses the button (as openTab does with a tab). */
+export async function openTemplates(page: Page): Promise<Locator> {
+  const dialog = page.getByRole('dialog', { name: 'Mẫu của tôi' });
+  await expect(async () => {
+    if (!(await dialog.isVisible())) await page.getByRole('button', { name: 'Mẫu của tôi' }).click();
+    await expect(dialog).toBeVisible({ timeout: 2_000 });
+  }).toPass();
+  return dialog;
+}
+
 /** Opens Settings the way a user does: the account menu, then its first item. Retries the menu, as a click before hydration does nothing. */
 export async function openSettings(page: Page): Promise<Locator> {
   const menu = page.getByRole('menu', { name: /^Tài khoản: / });
