@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { type CSSProperties, Fragment, useState } from 'react';
 import { Icon } from '@/components/Icon';
 import { LoadError } from '@/components/LoadError';
 import { api, sendJson } from '@/lib/api';
@@ -19,9 +19,14 @@ interface Group extends Money {
   code?: string | null;
   failedByVerdict: Money;
   failedByStatus: Money;
+  acceptedResults: number;
   acceptedClips: number;
   costPerAcceptedUsd: string | null;
 }
+type GroupBy = 'user' | 'team' | 'store' | 'feature';
+interface ModelLine { provider: string | null; model: string | null; label: string; jobs: number; calls: number; usd: string; usdDisplay: string }
+interface JobLine { jobId: string; createdAt: string | null; feature: string; model: string; status: string | null; verdict: 'pass' | 'fail' | null; final: boolean; usd: string }
+interface GroupJobs { jobs: JobLine[]; more: number; llm: { calls: number; usd: string } | null }
 interface Invoice {
   provider: string;
   totalUsd: string;
@@ -45,22 +50,103 @@ interface Costs {
   featuresCapUsage: { usd: string; monthlyCapUsd: string };
   featureCaps: { feature: string; name: string; capUsd: string; spentUsd: string; level: 80 | 100 | null }[];
   invoices: Invoice[];
+  previousMonth: Money;
+  attributed: Money;
+  byModel: ModelLine[];
+  byDay: { day: string; usd: string }[];
 }
 
 const PROVIDERS = ['fal', 'vertex', 'byteplus'];
 const KIND_LABEL: Record<string, string> = { bakeoff: 'Thử nghiệm mô hình', manual_adjustment: 'Điều chỉnh tay', invoice_diff: 'Chênh lệch hóa đơn' };
 const vnd = (v: string | null) => (v === null ? '—' : `${Number(v).toLocaleString('vi-VN')} ₫`);
 
-/** The 2-decimal display value with the exact 4-decimal amount beside it, and the VND when asked for. */
-function Usd({ m, withVnd = false }: { m: Money; withVnd?: boolean }) {
+/** A USD amount with its sign before the dollar: -$0.12, not $-0.12. */
+export const dollars = (v: string | number, digits = 2) => {
+  const s = typeof v === 'number' ? v.toFixed(digits) : v;
+  return s.startsWith('-') ? `-$${s.slice(1)}` : `$${s}`;
+};
+const STATUS: Record<string, string> = { queued: 'Đang chờ', running: 'Đang tạo', succeeded: 'Xong', failed: 'Lỗi', timed_out: 'Quá giờ', failed_unknown: 'Lỗi', canceled: 'Đã huỷ' };
+const PROVIDER: Record<string, string> = { fal: 'fal.ai', vertex: 'Vertex', byteplus: 'BytePlus', openai: 'OpenAI', replicate: 'Replicate', mock: 'Mock' };
+
+/**
+ * The 2-decimal amount; the exact 4-decimal amount (and the VND) shows on hover, and is read out to screen readers, which do not read a title.
+ * `dashZero` shows a zero as a dash.
+ */
+export function Usd({ m, dashZero = false }: { m: Money; dashZero?: boolean }) {
+  if (dashZero && /^-?0\.0+$/.test(m.usd)) return <span className="muted">—</span>;
+  const exact = `${dollars(m.usd)}${m.vnd === null ? '' : ` · ${vnd(m.vnd)}`}`;
   return (
-    <span>
-      ${m.usdDisplay} <span className="muted">(${m.usd}{withVnd && ` · ${vnd(m.vnd)}`})</span>
+    <span title={exact}>
+      {dollars(m.usdDisplay)}
+      <span className="sr-only"> ({exact})</span>
     </span>
   );
 }
 
-function Breakdown({ title, groups, label }: { title: string; groups: Group[]; label: (g: Group) => string }) {
+/** The jobs behind one line, loaded when the line is opened. */
+function JobList({ month, asOf, by, id }: { month: string; asOf: number; by: GroupBy; id: string }) {
+  const { data, failed, reload } = useFetch<GroupJobs>(`/api/admin/costs/jobs?month=${month}&asOf=${asOf}&by=${by}&id=${encodeURIComponent(id)}`);
+  if (!data) return failed ? <LoadError text="Không tải được danh sách job." onRetry={reload} /> : <p role="status">Đang tải job...</p>;
+  if (data.jobs.length === 0 && !data.llm) return <p className="muted">Không có job nào.</p>;
+  return (
+    <>
+      <table className="jobs">
+        <thead>
+          <tr>
+            <th scope="col">Lúc gửi</th>
+            <th scope="col">Mục</th>
+            <th scope="col">Mô hình</th>
+            <th scope="col">Trạng thái</th>
+            <th scope="col" className="num">USD</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.jobs.map((j) => (
+            <tr key={j.jobId}>
+              <td>
+                {j.createdAt ? new Date(j.createdAt).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', dateStyle: 'short', timeStyle: 'short' }) : '—'}{' '}
+                <span className="muted" title={j.jobId}>
+                  {j.jobId.slice(0, 8)}
+                </span>
+              </td>
+              <td>{j.feature}</td>
+              <td>{j.model}</td>
+              <td>
+                {STATUS[j.status ?? ''] ?? j.status ?? '—'}
+                {j.verdict && <span className="tag">{j.verdict === 'pass' ? 'Đạt' : 'Không đạt'}</span>}
+                {!j.final && <span className="tag">Tạm tính</span>}
+              </td>
+              <td className="num">{dollars(j.usd, 4)}</td>
+            </tr>
+          ))}
+          {data.llm && (
+            <tr>
+              <td colSpan={4}>LLM không gắn job (Gợi ý, Dịch): {data.llm.calls} lượt</td>
+              <td className="num">{dollars(data.llm.usd, 4)}</td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+      {data.more > 0 && <p className="muted">Còn {data.more} job cũ hơn; tải CSV chi tiết sổ cái để xem đủ.</p>}
+    </>
+  );
+}
+
+interface BreakdownProps {
+  title: string;
+  by: GroupBy;
+  groups: Group[];
+  label: (g: Group) => string;
+  /** A second, muted line under the name. */
+  sub?: (g: Group) => string | null | undefined;
+  month: string;
+  asOf: number;
+  withVnd: boolean;
+}
+
+/** One breakdown table; a line's name opens the jobs behind it under the line. */
+function Breakdown({ title, by, groups, label, sub, month, asOf, withVnd }: BreakdownProps) {
+  const [open, setOpen] = useState<string | null>(null);
   return (
     <section aria-label={title}>
       <h2>{title}</h2>
@@ -73,29 +159,126 @@ function Breakdown({ title, groups, label }: { title: string; groups: Group[]; l
               <tr>
                 <th scope="col">Tên</th>
                 <th scope="col" className="num">USD</th>
-                <th scope="col" className="num">VND</th>
-                <th scope="col" className="num">Trong đó: clip Không đạt (USD)</th>
-                <th scope="col" className="num">Trong đó: job lỗi hoặc quá giờ (USD)</th>
-                <th scope="col" className="num">Clip đạt</th>
-                <th scope="col" className="num">Chi phí mỗi clip đạt (USD)</th>
+                {withVnd && <th scope="col" className="num">VND</th>}
+                <th scope="col" className="num">Không đạt</th>
+                <th scope="col" className="num">Lỗi hoặc quá giờ</th>
+                <th scope="col" className="num">Đạt</th>
+                <th scope="col" className="num">Mỗi clip đạt</th>
               </tr>
             </thead>
             <tbody>
-              {groups.map((g) => (
-                <tr key={g.id}>
-                  <td>{label(g)}</td>
-                  <td className="num"><Usd m={g} /></td>
-                  <td className="num">{vnd(g.vnd)}</td>
-                  <td className="num"><Usd m={g.failedByVerdict} withVnd /></td>
-                  <td className="num"><Usd m={g.failedByStatus} withVnd /></td>
-                  <td className="num">{g.acceptedClips}</td>
-                  <td className="num">{g.costPerAcceptedUsd ?? '—'}</td>
-                </tr>
-              ))}
+              {groups.map((g) => {
+                const rowId = `${by}-jobs-${g.id || 'none'}`;
+                const expanded = open === g.id;
+                return (
+                  <Fragment key={g.id}>
+                    <tr>
+                      <td>
+                        <button type="button" className="link-button" aria-expanded={expanded} aria-controls={expanded ? rowId : undefined} onClick={() => setOpen(expanded ? null : g.id)}>
+                          <span aria-hidden="true">{expanded ? '▾' : '▸'}</span> {label(g)}
+                        </button>
+                        {sub?.(g) && <span className="muted who">{sub(g)}</span>}
+                      </td>
+                      <td className="num"><Usd m={g} /></td>
+                      {withVnd && <td className="num">{vnd(g.vnd)}</td>}
+                      <td className="num"><Usd m={g.failedByVerdict} dashZero /></td>
+                      <td className="num"><Usd m={g.failedByStatus} dashZero /></td>
+                      <td className="num">{g.acceptedResults || <span className="muted">—</span>}</td>
+                      <td className="num">{g.costPerAcceptedUsd === null ? <span className="muted">—</span> : dollars(g.costPerAcceptedUsd, 4)}</td>
+                    </tr>
+                    {expanded && (
+                      <tr id={rowId} className="drill">
+                        <td colSpan={withVnd ? 7 : 6}>
+                          <JobList month={month} asOf={asOf} by={by} id={g.id} />
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                );
+              })}
             </tbody>
           </table>
         </div>
       )}
+    </section>
+  );
+}
+
+/** One bar per day of the month; the table under it holds the same figures for screen readers and exact amounts. */
+export function DailySpend({ days }: { days: { day: string; usd: string }[] }) {
+  const max = Math.max(...days.map((d) => Number(d.usd)), 0);
+  if (max <= 0) return null;
+  const date = (day: string) => `${day.slice(8)}/${day.slice(5, 7)}`;
+  return (
+    <section aria-label="Chi theo ngày">
+      <h2>Chi theo ngày</h2>
+      <ol className="day-bars" aria-hidden="true" style={{ '--days': days.length } as CSSProperties}>
+        {days.map((d) => {
+          const n = Number(d.day.slice(8));
+          return (
+            <li key={d.day} title={`${date(d.day)}: ${dollars(d.usd, 4)}`}>
+              <span style={{ height: `${(Math.max(Number(d.usd), 0) / max) * 100}%` }} />
+              {(n === 1 || n % 5 === 0) && <small>{n}</small>}
+            </li>
+          );
+        })}
+      </ol>
+      <p className="muted">Theo ngày chạy job. Chi phí chung (thử nghiệm, điều chỉnh tay, chênh lệch hóa đơn) không gắn ngày nên không có trong biểu đồ.</p>
+      <details>
+        <summary>Xem dạng bảng</summary>
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Ngày</th>
+              <th scope="col" className="num">USD</th>
+            </tr>
+          </thead>
+          <tbody>
+            {days
+              .filter((d) => Number(d.usd) !== 0)
+              .map((d) => (
+                <tr key={d.day}>
+                  <td>{date(d.day)}</td>
+                  <td className="num">{dollars(d.usd, 4)}</td>
+                </tr>
+              ))}
+          </tbody>
+        </table>
+      </details>
+    </section>
+  );
+}
+
+/** Every ledger row of the month by provider and model, shared rows included, largest first. */
+export function ByModel({ lines }: { lines: ModelLine[] }) {
+  if (lines.length === 0) return null;
+  return (
+    <section aria-label="Theo nhà cung cấp và mô hình">
+      <h2>Theo nhà cung cấp và mô hình</h2>
+      <div className="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Mô hình</th>
+              <th scope="col">Nhà cung cấp</th>
+              <th scope="col" className="num">Số lượng</th>
+              <th scope="col" className="num">USD</th>
+            </tr>
+          </thead>
+          <tbody>
+            {lines.map((l) => (
+              <tr key={`${l.provider}-${l.model ?? l.label}`}>
+                <td>{l.label}</td>
+                <td>{l.provider ? (PROVIDER[l.provider] ?? l.provider) : '—'}</td>
+                <td className="num">{[l.jobs && `${l.jobs} job`, l.calls && `${l.calls} lượt`].filter(Boolean).join(' · ') || '—'}</td>
+                <td className="num" title={dollars(l.usd, 4)}>
+                  {dollars(l.usdDisplay)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </section>
   );
 }
@@ -118,14 +301,19 @@ function InvoiceForm({ provider, month, invoice, run, pending }: { provider: str
         </button>
       </div>
       {invoice && (
-        <p>
-          Sổ cái: ${invoice.ledgerUsd} · Chênh lệch:{' '}
-          <strong className={invoice.red ? 'error' : undefined}>
-            ${invoice.diffUsd}
-            {invoice.red && ' (lệch quá 5%)'}
-          </strong>{' '}
-          · Tổng theo tháng UTC: ${invoice.utcMonthUsd}
-        </p>
+        <>
+          <p>
+            Trong app ghi: {dollars(invoice.ledgerUsd, 4)} · Chênh lệch:{' '}
+            <strong className={invoice.red ? 'error' : undefined}>
+              {dollars(invoice.diffUsd, 4)}
+              {invoice.red && ' (lệch quá 5%)'}
+            </strong>
+            {invoice.utcMonthUsd !== invoice.ledgerUsd && ` · Nếu tính theo tháng UTC: ${dollars(invoice.utcMonthUsd, 4)}`}
+          </p>
+          {Number(invoice.diffUsd) > 0 && (
+            <p className="muted">Phần chênh là tiền nhà cung cấp tính ngoài các job của app (chạy thử, canary trên cùng tài khoản) và đã được tính vào Chi phí chung.</p>
+          )}
+        </>
       )}
       {provider === 'vertex' && <p className="muted">Hóa đơn vertex được hệ thống tự ghi mỗi ngày từ billing export của Google (tổng mọi tài khoản Vertex).</p>}
     </li>
@@ -163,7 +351,8 @@ export const VertexError = ({ projectId, reason, message }: { projectId: string;
     )}
   </>
 );
-const usd4 = (n: number | null) => (n === null ? '—' : `$${n.toFixed(4)}`);
+const usd4 = (n: number | null) => (n === null ? '—' : dollars(n, 4));
+const UNIT: Record<string, string> = { count: 'lượt', second: 'giây', seconds: 'giây' };
 const credits = (n: number | null, currency: string) => (n === null ? '—' : `${n.toLocaleString('vi-VN', { maximumFractionDigits: 2 })} ${currency}`);
 
 interface Balances {
@@ -304,10 +493,10 @@ function VertexCosts({ month, data, failed, reload }: { month: string; data: Ver
                   <table>
                     <thead>
                       <tr>
-                        <th scope="col">SKU</th>
+                        <th scope="col">Hạng mục Google</th>
                         <th scope="col" className="num">Lượng dùng</th>
                         <th scope="col" className="num">USD</th>
-                        <th scope="col" className="num">Credits (USD)</th>
+                        <th scope="col" className="num">Credits đã trừ (USD)</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -317,7 +506,7 @@ function VertexCosts({ month, data, failed, reload }: { month: string; data: Ver
                             {s.sku} <span className="muted">({s.skuId})</span>
                           </td>
                           <td className="num">
-                            {s.usage.toLocaleString('vi-VN')} {s.unit}
+                            {s.usage.toLocaleString('vi-VN')} {UNIT[s.unit] ?? s.unit}
                           </td>
                           <td className="num">{usd4(s.costUsd)}</td>
                           <td className="num">{usd4(s.creditsUsd)}</td>
@@ -374,12 +563,13 @@ function CostsBody({ data, reload }: { data: Costs; reload: () => void }) {
     }
   }
 
-  const breakdowns: [string, Group[], (g: Group) => string][] = [
-    ['Theo người dùng', data.byUser, (g) => `${g.name ?? g.id} (${g.email ?? ''})`],
-    ['Theo nhóm', data.byTeam, (g) => g.name ?? g.id],
-    ['Theo cửa hàng', data.byStore, (g) => g.name ?? g.id],
-    ['Theo mục', data.byFeature, (g) => g.name ?? g.id],
+  const breakdowns: [string, GroupBy, Group[], (g: Group) => string, ((g: Group) => string | null | undefined)?][] = [
+    ['Theo người dùng', 'user', data.byUser, (g) => g.name ?? g.id, (g) => g.email],
+    ['Theo nhóm', 'team', data.byTeam, (g) => g.name ?? g.id],
+    ['Theo cửa hàng', 'store', data.byStore, (g) => g.name ?? g.id],
+    ['Theo mục', 'feature', data.byFeature, (g) => g.name ?? g.id],
   ];
+  const withVnd = data.rateVndPerUsd !== null;
 
   return (
     <>
@@ -389,15 +579,20 @@ function CostsBody({ data, reload }: { data: Costs; reload: () => void }) {
             Tổng chi phí tháng {month}
             {data.provisional && <span className="tag">Tạm tính</span>}
           </p>
-          <p className="kpi-value">${data.total.usdDisplay}</p>
+          <p className="kpi-value">{dollars(data.total.usdDisplay)}</p>
           <p className="kpi-sub">
-            ${data.total.usd} · {vnd(data.total.vnd)}
+            {dollars(data.total.usd)}
+            {withVnd && ` · ${vnd(data.total.vnd)}`}
           </p>
+          <p className="kpi-sub">
+            Job và LLM {dollars(data.attributed.usdDisplay)} · Chi phí chung {dollars(data.shared.usdDisplay)}
+          </p>
+          <p className="kpi-sub">Tháng trước: {dollars(data.previousMonth.usdDisplay)}</p>
         </div>
         <Budget title="Ngân sách video" used={data.capUsage.usd} cap={data.capUsage.monthlyCapUsd} />
         <Budget title="Ngân sách ảnh và ứng dụng" used={data.featuresCapUsage.usd} cap={data.featuresCapUsage.monthlyCapUsd} />
       </div>
-      <p className="muted">Số liệu tính đến bút toán #{data.asOf} (as_of).</p>
+      <p className="muted">Số liệu tính đến dòng sổ cái #{data.asOf}; rê chuột lên một số tiền để xem số lẻ 4 chữ số.</p>
       {data.featureCaps.some((c) => c.level !== null) && (
         <ul className="warn" aria-label="Cảnh báo hạn mức theo mục">
           {data.featureCaps
@@ -424,27 +619,39 @@ function CostsBody({ data, reload }: { data: Costs; reload: () => void }) {
           Lưu tỉ giá
         </button>
       </div>
-      {data.rateVndPerUsd === null && <p className="warn">Tháng này chưa có tỉ giá nên cột VND để trống.</p>}
+      {!withVnd && <p className="muted">Tháng này chưa có tỉ giá; nhập tỉ giá để thêm cột VND.</p>}
 
-      {breakdowns.every(([, groups]) => groups.length === 0) ? (
+      <DailySpend days={data.byDay} />
+
+      {breakdowns.every(([, , groups]) => groups.length === 0) ? (
         <section aria-label="Chi phí theo người dùng, nhóm, cửa hàng và mục">
           <h2>Chi tiết chi phí</h2>
           <Empty title={`Chưa có chi phí nào trong tháng ${month}.`}>Khi có job chạy, chi phí hiện ở đây theo người dùng, nhóm, cửa hàng và mục.</Empty>
         </section>
       ) : (
-        breakdowns.map(([title, groups, label]) => <Breakdown key={title} title={title} groups={groups} label={label} />)
+        <>
+          <p className="muted">
+            Bấm một tên để xem các job của dòng đó. Không đạt: tiền của kết quả bị chấm Không đạt. Lỗi hoặc quá giờ: job lỗi mà vẫn bị tính tiền. Đạt: số kết quả được chấm Đạt.
+            Mỗi clip đạt: tiền của Tạo video và Marketing Studio chia cho số clip được chấm Đạt.
+          </p>
+          {breakdowns.map(([title, by, groups, label, sub]) => (
+            <Breakdown key={title} title={title} by={by} groups={groups} label={label} sub={sub} month={month} asOf={data.asOf} withVnd={withVnd} />
+          ))}
+        </>
       )}
+      <ByModel lines={data.byModel} />
 
       <div className="cost-cards">
         <section className="panel" aria-label="Chi phí chung">
           <h2>Chi phí chung</h2>
           <p className="panel-figure">
-            <Usd m={data.shared} withVnd />
+            <Usd m={data.shared} />
+            {withVnd && <span className="muted"> · {vnd(data.shared.vnd)}</span>}
           </p>
           <ul className="lines">
             {Object.entries(data.shared.byKind).map(([kind, usd]) => (
               <li key={kind}>
-                {KIND_LABEL[kind] ?? kind}: ${usd}
+                {KIND_LABEL[kind] ?? kind}: {dollars(usd, 4)}
               </li>
             ))}
           </ul>

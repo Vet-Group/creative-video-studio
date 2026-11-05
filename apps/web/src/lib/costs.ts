@@ -22,6 +22,11 @@ interface Row {
   feature: string | null;
   provider: string | null;
   model: string | null;
+  /** The model's label in model_configs; null for a model the table no longer holds and for shared rows. */
+  model_label: string | null;
+  job_status: string | null;
+  /** The job's submit time in UTC, ISO 8601. */
+  job_created_at: string | null;
   user_id: string | null;
   user_name: string | null;
   email: string | null;
@@ -70,6 +75,8 @@ export interface Snapshot {
   /** The soft per-feature caps. */
   featureCaps: { feature: string; monthlyUsd: string }[];
   invoices: InvoiceRow[];
+  /** Every ledger row of the month before, to compare the total with. */
+  previousMonthUsd: string;
 }
 
 /** The invoices entered for `month` (one provider when given), with the difference to the ledger. */
@@ -89,6 +96,46 @@ export async function invoiceRows(db: Queryable, month: string, provider?: strin
   return rows;
 }
 
+/** The month's ledger rows up to id `asOf`, with what the page and the job lists show about each. */
+const readRows = async (tx: Queryable, month: string, asOf: number): Promise<Row[]> =>
+  (
+    await tx.query(
+      `select ce.id::int as id, ce.kind, ce.usd::text as usd, round_half_even(ce.usd * r.vnd_per_usd)::text as vnd, ce.month, ce.day::text as day,
+              ce.job_id, j.feature, ce.provider, ce.model, mc.label as model_label, j.status as job_status, to_char(j.created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as job_created_at, ce.user_id, u.name as user_name, u.email, ce.team_id, t.name as team_name, t.cost_centre_code,
+              ce.store_id, s.name as store_name, s.code as store_code, j.user_id as job_user, j.team_id as job_team, j.store_id as job_store,
+              coalesce(jc.is_final, true) as final, v.verdict,
+              coalesce(j.status in ('failed', 'timed_out') and v.verdict is distinct from 'fail'
+                       and (select sum(p.usd) from cost_entries p where p.job_id = ce.job_id and p.kind <> 'llm') > 0, false) as fail_status
+         from cost_entries ce
+         left join monthly_rates r on r.month = ce.month
+         left join users u on u.id = ce.user_id
+         left join teams t on t.id = ce.team_id
+         left join stores s on s.id = ce.store_id
+         left join jobs j on j.id = ce.job_id
+         left join model_configs mc on mc.id = ce.model
+         left join job_costs jc on jc.job_id = ce.job_id
+         left join verdicts v on v.job_id = ce.job_id
+        where ce.month = $1 and ce.id <= $2 order by ce.id`,
+      [month, asOf],
+    )
+  ).rows;
+
+/** The cut-off for `upTo` and the month (null: this ICT month) inside a REPEATABLE READ transaction. */
+async function cutOff(tx: Queryable, requestedMonth: string | null, upTo: number | null) {
+  await tx.query('set transaction isolation level repeatable read read only');
+  const latest = (await tx.query('select coalesce(max(id), 0)::int as n from cost_entries')).rows[0].n as number;
+  const asOf = upTo === null ? latest : Math.min(upTo, latest);
+  const month = requestedMonth ?? ((await tx.query(`select to_char(now() at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM') as m`)).rows[0].m as string);
+  return { asOf, month };
+}
+
+/** Only the ledger rows of `month` up to `upTo`: what a job list needs, without the caps, invoices and last month of the full snapshot. */
+export const monthRows = (month: string, upTo: number | null): Promise<Row[]> =>
+  withTransaction(pool, async (tx) => {
+    const w = await cutOff(tx, month, upTo);
+    return readRows(tx, w.month, w.asOf);
+  });
+
 /**
  * Reads the month's ledger rows, rate, cap usage and invoices in one REPEATABLE READ transaction; null means the current ICT month.
  * `upTo` keeps only the rows with an id up to it, so a CSV can show the rows the Costs page showed (the page's as_of).
@@ -96,10 +143,7 @@ export async function invoiceRows(db: Queryable, month: string, provider?: strin
  */
 export function snapshot(requestedMonth: string | null, upTo: number | null = null): Promise<Snapshot> {
   return withTransaction(pool, async (tx) => {
-    await tx.query('set transaction isolation level repeatable read read only');
-    const latest = (await tx.query('select coalesce(max(id), 0)::int as n from cost_entries')).rows[0].n as number;
-    const asOf = upTo === null ? latest : Math.min(upTo, latest);
-    const month = requestedMonth ?? ((await tx.query(`select to_char(now() at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM') as m`)).rows[0].m as string);
+    const { asOf, month } = await cutOff(tx, requestedMonth, upTo);
     const rate = await tx.query('select vnd_per_usd::text as rate from monthly_rates where month = $1', [month]);
     const cap = await tx.query(
       // LLM calls never count toward a cap (owner decision, 2026-11-04).
@@ -112,28 +156,15 @@ export function snapshot(requestedMonth: string | null, upTo: number | null = nu
       [month],
     );
     const featureCaps = await tx.query('select feature, monthly_usd::text as "monthlyUsd" from feature_caps order by feature');
-    const rows = await tx.query(
-      `select ce.id::int as id, ce.kind, ce.usd::text as usd, round_half_even(ce.usd * r.vnd_per_usd)::text as vnd, ce.month, ce.day::text as day,
-              ce.job_id, j.feature, ce.provider, ce.model, ce.user_id, u.name as user_name, u.email, ce.team_id, t.name as team_name, t.cost_centre_code,
-              ce.store_id, s.name as store_name, s.code as store_code, j.user_id as job_user, j.team_id as job_team, j.store_id as job_store,
-              coalesce(jc.is_final, true) as final, v.verdict,
-              coalesce(j.status in ('failed', 'timed_out') and v.verdict is distinct from 'fail'
-                       and (select sum(p.usd) from cost_entries p where p.job_id = ce.job_id and p.kind <> 'llm') > 0, false) as fail_status
-         from cost_entries ce
-         left join monthly_rates r on r.month = ce.month
-         left join users u on u.id = ce.user_id
-         left join teams t on t.id = ce.team_id
-         left join stores s on s.id = ce.store_id
-         left join jobs j on j.id = ce.job_id
-         left join job_costs jc on jc.job_id = ce.job_id
-         left join verdicts v on v.job_id = ce.job_id
-        where ce.month = $1 and ce.id <= $2 order by ce.id`,
-      [month, asOf],
+    const rows = await readRows(tx, month, asOf);
+    const previous = await tx.query(
+      `select coalesce(sum(usd), 0)::numeric(12, 4)::text as usd from cost_entries where month = to_char(($1 || '-01')::date - interval '1 month', 'YYYY-MM')`,
+      [month],
     );
     return {
-      month, asOf, rate: rate.rows[0]?.rate ?? null, rows: rows.rows, capUsageUsd: cap.rows[0].used, monthlyCapUsd: cap.rows[0].cap,
+      month, asOf, rate: rate.rows[0]?.rate ?? null, rows, capUsageUsd: cap.rows[0].used, monthlyCapUsd: cap.rows[0].cap,
       featuresCapUsageUsd: cap.rows[0].features_used, featuresMonthlyCapUsd: cap.rows[0].features_cap, featureCaps: featureCaps.rows,
-      invoices: await invoiceRows(tx, month),
+      invoices: await invoiceRows(tx, month), previousMonthUsd: previous.rows[0].usd,
     };
   });
 }
@@ -155,10 +186,18 @@ function divEven(n: bigint, d: bigint): bigint {
   return n < 0n ? -q : q;
 }
 
-interface Agg { usd: bigint; vnd: bigint; fvUsd: bigint; fvVnd: bigint; fsUsd: bigint; fsVnd: bigint; accepted: number }
-const blank = (): Agg => ({ usd: 0n, vnd: 0n, fvUsd: 0n, fvVnd: 0n, fsUsd: 0n, fsVnd: 0n, accepted: 0 });
+/** The features whose results are clips: the cost per accepted clip counts only their provider rows (no LLM call) and their Pass verdicts. */
+const CLIP_FEATURES = new Set(['video', 'marketing']);
+const isClip = (r: Row) => r.job_id !== null && r.kind !== 'llm' && CLIP_FEATURES.has(r.feature ?? '');
 
-/** Sums the job rows per `rowKey`; each job with a Pass verdict counts once as an accepted clip for its `jobKey`. */
+interface Agg {
+  usd: bigint; vnd: bigint; fvUsd: bigint; fvVnd: bigint; fsUsd: bigint; fsVnd: bigint;
+  /** Pass verdicts on any feature, and on clips only, with the clip rows' spend. */
+  passes: number; accepted: number; clipUsd: bigint; clipVnd: bigint;
+}
+const blank = (): Agg => ({ usd: 0n, vnd: 0n, fvUsd: 0n, fvVnd: 0n, fsUsd: 0n, fsVnd: 0n, passes: 0, accepted: 0, clipUsd: 0n, clipVnd: 0n });
+
+/** Sums the job rows per `rowKey`; each job with a Pass verdict counts once for its `jobKey`, as an accepted clip when it is a clip. */
 function aggregate(rows: Row[], rowKey: (r: Row) => string, jobKey: (r: Row) => string): Map<string, Agg> {
   const out = new Map<string, Agg>();
   const at = (k: string) => out.get(k) ?? out.set(k, blank()).get(k)!;
@@ -172,7 +211,13 @@ function aggregate(rows: Row[], rowKey: (r: Row) => string, jobKey: (r: Row) => 
     a.vnd += vnd;
     if (r.verdict === 'fail') { a.fvUsd += usd; a.fvVnd += vnd; }
     if (r.fail_status) { a.fsUsd += usd; a.fsVnd += vnd; }
-    if (r.verdict === 'pass' && r.job_id && !counted.has(r.job_id)) { counted.add(r.job_id); at(jobKey(r)).accepted++; }
+    if (isClip(r)) { a.clipUsd += usd; a.clipVnd += vnd; }
+    if (r.verdict === 'pass' && r.job_id && !counted.has(r.job_id)) {
+      counted.add(r.job_id);
+      const j = at(jobKey(r));
+      j.passes++;
+      if (CLIP_FEATURES.has(r.feature ?? '')) j.accepted++;
+    }
   }
   return out;
 }
@@ -187,9 +232,11 @@ function figures(s: Snapshot, a: Agg) {
     ...money(s, a.usd, a.vnd),
     failedByVerdict: money(s, a.fvUsd, a.fvVnd),
     failedByStatus: money(s, a.fsUsd, a.fsVnd),
+    acceptedResults: a.passes,
     acceptedClips: a.accepted,
-    costPerAcceptedUsd: a.accepted ? fixed(divEven(a.usd, n), 4) : null,
-    costPerAcceptedVnd: a.accepted && hasRate(s) ? String(divEven(a.vnd, n)) : null,
+    // Only the clip rows: an image or an LLM call is not part of what a clip cost.
+    costPerAcceptedUsd: a.accepted ? fixed(divEven(a.clipUsd, n), 4) : null,
+    costPerAcceptedVnd: a.accepted && hasRate(s) ? String(divEven(a.clipVnd, n)) : null,
   };
 }
 
@@ -209,25 +256,98 @@ function sharedLine(s: Snapshot) {
   return { ...money(s, sum(shared).usd, sum(shared).vnd), rows: shared.length, byKind };
 }
 
+/** How each breakdown of the page keys a row; the job list of one group uses the same keys. */
+export const GROUP_KEYS = {
+  user: (r: Row) => r.user_id ?? '',
+  team: (r: Row) => r.team_id ?? '',
+  store: (r: Row) => r.store_id ?? '',
+  // Every LLM call (Enhance on a job too) is one line.
+  feature: (r: Row) => (r.kind === 'llm' ? 'llm' : (r.feature ?? '')),
+} as const;
+export type GroupBy = keyof typeof GROUP_KEYS;
+
+const SHARED_KIND: Record<string, string> = { bakeoff: 'Thử nghiệm mô hình', manual_adjustment: 'Điều chỉnh tay', invoice_diff: 'Chênh lệch hóa đơn' };
+
+/** Every row of the month (shared rows too) by provider and model, largest first, with how many jobs each holds. */
+function byModel(s: Snapshot) {
+  const out = new Map<string, { provider: string | null; model: string | null; label: string; usd: bigint; jobs: Set<string>; calls: number }>();
+  for (const r of s.rows) {
+    const shared = SHARED_KIND[r.kind];
+    const key = `${r.provider ?? ''}	${shared ?? r.model ?? ''}`;
+    const g = out.get(key) ?? out.set(key, { provider: r.provider, model: shared ? null : r.model, label: shared ?? r.model_label ?? r.model ?? 'Không rõ', usd: 0n, jobs: new Set(), calls: 0 }).get(key)!;
+    g.usd += units(r.usd);
+    if (r.job_id) g.jobs.add(r.job_id);
+    else if (r.kind === 'llm') g.calls++;
+  }
+  return [...out.values()]
+    .sort((a, b) => (a.usd === b.usd ? a.label.localeCompare(b.label) : a.usd < b.usd ? 1 : -1))
+    .map((g) => ({ provider: g.provider, model: g.model, label: g.label, jobs: g.jobs.size, calls: g.calls, usd: fixed(g.usd, 4), usdDisplay: fixed(divEven(g.usd, 100n), 2) }));
+}
+
+/** The month's rows by ICT day, one entry per calendar day of the month; rows without a day (some shared rows) are left out. */
+function byDay(s: Snapshot) {
+  const [y, m] = s.month.split('-').map(Number) as [number, number];
+  const days = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const sums = new Map<string, bigint>();
+  for (const r of s.rows) if (r.day) sums.set(r.day, (sums.get(r.day) ?? 0n) + units(r.usd));
+  return Array.from({ length: days }, (_, i) => {
+    const day = `${s.month}-${String(i + 1).padStart(2, '0')}`;
+    return { day, usd: fixed(sums.get(day) ?? 0n, 4) };
+  });
+}
+
 /** The Costs page: totals by user, team and store, the general-cost line, the grand total, cap usage and invoices. */
 export function costsPage(s: Snapshot) {
   const all = s.rows.reduce((t, r) => ({ usd: t.usd + units(r.usd), vnd: t.vnd + BigInt(r.vnd ?? 0) }), { usd: 0n, vnd: 0n });
+  const shared = sharedLine(s);
   return {
     month: s.month,
     asOf: s.asOf,
     provisional: s.rows.some((r) => r.job_id && !r.final),
     rateVndPerUsd: s.rate,
     total: money(s, all.usd, all.vnd),
-    shared: sharedLine(s),
-    byUser: groups(s, (r) => r.user_id ?? '', (r) => r.job_user ?? '', (r) => ({ name: r.user_name, email: r.email })),
-    byTeam: groups(s, (r) => r.team_id ?? '', (r) => r.job_team ?? '', (r) => ({ name: r.team_name, costCentreCode: r.cost_centre_code })),
-    byStore: groups(s, (r) => r.store_id ?? '', (r) => r.job_store ?? '', (r) => ({ name: r.store_name ?? NO_STORE, code: r.store_code })),
-    // Every LLM call (Enhance on a job too) is one line.
-    byFeature: groups(s, (r) => (r.kind === 'llm' ? 'llm' : (r.feature ?? '')), (r) => r.feature ?? '', (r) => ({ name: r.kind === 'llm' ? LLM : featureLabel(r.feature) })),
+    shared,
+    previousMonth: money(s, units(s.previousMonthUsd), 0n),
+    /** The job and LLM rows: the total without the shared line. */
+    attributed: money(s, all.usd - units(shared.usd), all.vnd - BigInt(shared.vnd ?? 0)),
+    byUser: groups(s, GROUP_KEYS.user, (r) => r.job_user ?? '', (r) => ({ name: r.user_name, email: r.email })),
+    byTeam: groups(s, GROUP_KEYS.team, (r) => r.job_team ?? '', (r) => ({ name: r.team_name, costCentreCode: r.cost_centre_code })),
+    byStore: groups(s, GROUP_KEYS.store, (r) => r.job_store ?? '', (r) => ({ name: r.store_name ?? NO_STORE, code: r.store_code })),
+    byFeature: groups(s, GROUP_KEYS.feature, (r) => r.feature ?? '', (r) => ({ name: r.kind === 'llm' ? LLM : featureLabel(r.feature) })),
+    byModel: byModel(s),
+    byDay: byDay(s),
     capUsage: { usd: s.capUsageUsd, monthlyCapUsd: s.monthlyCapUsd },
     featuresCapUsage: { usd: s.featuresCapUsageUsd, monthlyCapUsd: s.featuresMonthlyCapUsd },
     featureCaps: featureCapLines(s),
     invoices: s.invoices,
+  };
+}
+
+/** The cap on the job list of one group: the CSV holds every row. */
+export const JOB_LIST_LIMIT = 200;
+
+/**
+ * The jobs behind one line of a breakdown (`by` and the line's id), newest first, each with its rows summed; the group's LLM calls without a
+ * job are one more line. At most JOB_LIST_LIMIT jobs; `more` counts the rest.
+ */
+export function groupJobs(rows: Row[], by: GroupBy, id: string) {
+  const key = GROUP_KEYS[by];
+  const jobs = new Map<string, { jobId: string; createdAt: string | null; feature: string; model: string; status: string | null; verdict: 'pass' | 'fail' | null; final: boolean; usd: bigint }>();
+  let llm = { usd: 0n, calls: 0 };
+  for (const r of rows) {
+    if (!attributed(r) || key(r) !== id) continue;
+    if (!r.job_id) {
+      llm = { usd: llm.usd + units(r.usd), calls: llm.calls + 1 };
+      continue;
+    }
+    const j = jobs.get(r.job_id) ?? jobs.set(r.job_id, { jobId: r.job_id, createdAt: r.job_created_at, feature: featureLabel(r.feature), model: r.model_label ?? r.model ?? 'Không rõ', status: r.job_status, verdict: r.verdict, final: r.final, usd: 0n }).get(r.job_id)!;
+    j.usd += units(r.usd);
+  }
+  const all = [...jobs.values()].sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+  return {
+    jobs: all.slice(0, JOB_LIST_LIMIT).map((j) => ({ ...j, usd: fixed(j.usd, 4) })),
+    more: Math.max(all.length - JOB_LIST_LIMIT, 0),
+    llm: llm.calls ? { calls: llm.calls, usd: fixed(llm.usd, 4) } : null,
   };
 }
 
