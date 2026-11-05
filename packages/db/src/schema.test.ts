@@ -89,8 +89,18 @@ describe('migration 0002 seed data', () => {
     const untouched = (await pool.query(`select label from presets where id = 'arc-left'`)).rows[0];
     expect(untouched.label).toBe('Lia vòng sang trái');
     const audit = (await pool.query(`select target, old_value, new_value from audit_entries where action = 'preset.update' and actor_id is null order by target`)).rows;
-    expect(audit).toHaveLength(13);
+    expect(audit).toHaveLength(14); // 13 from 0065, one more for floating-reveal from 0069
     expect(audit.find((a) => a.target === 'preset:turn-around')).toMatchObject({ old_value: { label: 'Xoay một vòng' }, new_value: { label: 'Lia vòng ra sau lưng' } });
+  });
+
+  test('migration 0069 adds the opening and the golden rods to floating-reveal and audits the change as the system', async () => {
+    const { prompt } = (await pool.query(`select prompt from presets where id = 'floating-reveal'`)).rows[0];
+    expect(prompt).toMatch(/^The product hovers in mid-air at the centre of the frame above a small round opening/);
+    expect(prompt).toContain('Two small golden rods slide across the floor');
+    const audit = (await pool.query(`select old_value, new_value from audit_entries where target = 'preset:floating-reveal' and actor_id is null order by id`)).rows;
+    expect(audit).toHaveLength(2);
+    expect(audit[1].old_value.prompt).toContain('with a soft shadow on the ground beneath it');
+    expect(audit[1].new_value.prompt).toBe(prompt);
   });
 
   test('migration 0066 makes every earlier preset a Create one and adds eight enabled Image Generation styles with ASCII prompts that keep the subject', async () => {

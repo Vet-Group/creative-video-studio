@@ -40,7 +40,7 @@ export const PRESETS: Preset[] = [
   {
     id: 'floating-reveal',
     label: 'Sản phẩm lơ lửng',
-    prompt: `The product hovers in mid-air at the centre of the frame above a seamless, warm pastel floor, bobbing very gently, with a soft shadow on the ground beneath it. The camera stays still, and soft, even studio lighting keeps the scene clean and minimal. Keep the product, its shape, colours and any printed text exactly unchanged. Do not add any text, logos or watermarks. No faces. Smooth, stable camera.`,
+    prompt: `The product hovers in mid-air at the centre of the frame above a small round opening in a seamless, warm pastel floor, bobbing very gently. Two small golden rods slide across the floor, tip into the opening and disappear, then come back out and slide apart. The camera stays still, and soft, even studio lighting keeps the scene clean and minimal. Keep the product, its shape, colours and any printed text exactly unchanged. Do not add any text, logos or watermarks. No faces. Smooth, stable camera.`,
     isBakeoffSafe: false,
   },
   {
