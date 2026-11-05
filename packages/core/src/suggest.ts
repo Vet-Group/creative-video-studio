@@ -90,7 +90,7 @@ export const frameTimes = (seconds: number, n: number): number[] => Array.from({
 
 /**
  * The prompt-from-video button: the motion of a preset's clip as a prompt that works for any seller's photo; the keep clauses are added by videoPrompt.
- * The grounding rules stop the model filling the gaps between stills with events the clip never shows (a prod call on floating-reveal, 2026-11-05).
+ * The grounding rules keep the model to what the stills clearly show, so it does not fill the gaps between them with events of its own.
  */
 export const VIDEO_SYSTEM =
   "You write the English motion prompt of a template for an image-to-video model that animates a fashion seller's product or model photo. " +
