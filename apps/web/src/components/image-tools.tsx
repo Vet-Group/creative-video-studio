@@ -239,7 +239,7 @@ export async function uploadImages(files: File[], kind: UploadKind = 'image', st
  * `icon` is the empty slot's icon: a picture by default, a plus on Advanced's wide slot, as on the live page.
  * `onPick` adds the "Ảnh đã tải" link to the label's line while the slot has room (a one-photo slot always: a pick replaces its photo); `storeId` is the page's store, its first filter.
  */
-export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRemove, samples = [], onSample, icon = 'image', onBrowse, onPick, storeId }: { label: string; empty: string; inputLabel: string; images: Img[]; max: number; busy: boolean; onAdd: (files: File[]) => void; onRemove: (id: string) => void; samples?: string[]; onSample?: (name: string) => void; icon?: IconName; onBrowse?: () => void; onPick?: (img: Img) => void; storeId?: string }) {
+export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRemove, samples = [], onSample, icon = 'image', onBrowse, onPick, storeId, optional }: { label: string; empty: string; inputLabel: string; images: Img[]; max: number; busy: boolean; onAdd: (files: File[]) => void; onRemove: (id: string) => void; samples?: string[]; onSample?: (name: string) => void; icon?: IconName; onBrowse?: () => void; onPick?: (img: Img) => void; storeId?: string; optional?: boolean }) {
   const hydrated = useHydrated();
   const input = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
@@ -257,10 +257,22 @@ export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRem
     setOver(false);
     if (hydrated && !full && !busy) add([...e.dataTransfer.files]);
   }
-  const name = (
+  const labelText = (
     <span id={labelId} className="field-label">
       {label}
+      {optional && <span className="sr-only"> (tuỳ chọn)</span>}
     </span>
+  );
+  // An optional slot shows the optional pill beside its name, as the prompt boxes do.
+  const name = optional ? (
+    <span className="optional-head">
+      {labelText}
+      <span className="choice-optional" aria-hidden="true">
+        Tuỳ chọn
+      </span>
+    </span>
+  ) : (
+    labelText
   );
   return (
     <div className="field">

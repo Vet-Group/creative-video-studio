@@ -5,8 +5,10 @@
 import { type ReactNode, useEffect, useId, useRef, useState } from 'react';
 import { MAX_ENDING, MAX_HOOK } from '@/lib/marketing';
 import type { PromptTemplate } from '@/lib/prompt-starters';
+import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { confirmDialog } from './Confirm';
 import { Icon } from './Icon';
+import { Modal } from './Modal';
 import { PromptComposer } from './PromptComposer';
 import s from './PromptComposer.module.css';
 import { PromptTools } from './PromptTools';
@@ -73,6 +75,7 @@ export function PromptSections({ feature, format, mode, onMode, hook, ending, en
   const listId = useId();
   const [open, setOpen] = useState(false);
   const opener = useRef<HTMLButtonElement>(null);
+  const narrow = useMediaQuery(NARROW);
   async function pick(t: PromptTemplate) {
     setOpen(false);
     if (filled && !(await confirmDialog({ title: `Thay prompt đang viết bằng mẫu "${t.name}"?`, confirmLabel: 'Thay' }))) return;
@@ -84,6 +87,17 @@ export function PromptSections({ feature, format, mode, onMode, hook, ending, en
       {p.hint && <p className="help">{p.hint}</p>}
       <PromptComposer id={id} label={label} optional feature={feature} format={format} value={p.text} onChange={p.onText} maxLength={max} onRun={onRun} placeholder={placeholder} ask={p.ask} aiLabel={aiLabel} parts={['ai', 'translate']} starters={[]} />
     </>
+  );
+  const list = (
+    <div id={listId} className="prompt-templates" role="group" aria-label="Mẫu prompt" onKeyDown={(e) => e.key === 'Escape' && (e.stopPropagation(), setOpen(false), opener.current?.focus())}>
+      <p className="help">Điền cả Hook · Diễn biến · Kết</p>
+      {templates.map((t) => (
+        <button key={t.name} type="button" className={s.option} onClick={() => void pick(t)}>
+          <span className={s.optionLabel}>{t.name}</span>
+          <span lang="en">{t.body}</span>
+        </button>
+      ))}
+    </div>
   );
   return (
     <div className="prompt-sections">
@@ -101,16 +115,16 @@ export function PromptSections({ feature, format, mode, onMode, hook, ending, en
           Mẫu prompt
         </button>
       </div>
-      {open && (
-        <div id={listId} className="prompt-templates" role="group" aria-label="Mẫu prompt" onKeyDown={(e) => e.key === 'Escape' && (e.stopPropagation(), setOpen(false), opener.current?.focus())}>
-          {templates.map((t) => (
-            <button key={t.name} type="button" className={s.option} onClick={() => void pick(t)}>
-              <span className={s.optionLabel}>{t.name}</span>
-              <span lang="en">{t.body}</span>
-            </button>
-          ))}
-        </div>
-      )}
+      {open &&
+        (narrow ? (
+          // On a phone the list in the form would open under the sticky Run bar, so it is a bottom sheet over it.
+          <Modal open onClose={() => setOpen(false)} label="Mẫu prompt" className="template-sheet">
+            <h2>Mẫu prompt</h2>
+            {list}
+          </Modal>
+        ) : (
+          list
+        ))}
       {mode === 'free' ? (
         children
       ) : (
@@ -121,9 +135,8 @@ export function PromptSections({ feature, format, mode, onMode, hook, ending, en
           <Section title="② Diễn biến" rule="Một hành động chính, thì hiện tại, nói rõ ánh sáng và máy quay.">
             {children}
           </Section>
-          <Section title="③ Kết · cảnh cuối" rule={`Một cảnh dừng rõ ràng: giơ sản phẩm, mỉm cười, cận chi tiết. ${endText ? 'Cần chữ thì dùng ô Chữ trên khung cuối.' : 'Không chữ trên hình.'}`}>
+          <Section title="③ Kết · cảnh cuối" rule={`Một cảnh dừng rõ ràng: giơ sản phẩm, mỉm cười, cận chi tiết. ${endText ? 'Cần chữ thì dùng ô Chữ trên khung cuối.' : 'Không chữ trên hình.'}`} after={ending.extra}>
             {part(endingId, 'Cảnh kết', ending, MAX_ENDING, 'Gợi ý cảnh kết', 'Ví dụ: The clip ends with the model smiling at the camera')}
-            {ending.extra}
           </Section>
         </>
       )}
@@ -131,7 +144,8 @@ export function PromptSections({ feature, format, mode, onMode, hook, ending, en
   );
 }
 
-function Section({ title, rule, children }: { title: string; rule: string; children: ReactNode }) {
+/** The rule sits under the section's own text, above `after` (③'s end frame and end text). */
+function Section({ title, rule, after, children }: { title: string; rule: string; after?: ReactNode; children: ReactNode }) {
   const id = useId();
   return (
     <div className="prompt-part" role="group" aria-labelledby={id}>
@@ -140,20 +154,29 @@ function Section({ title, rule, children }: { title: string; rule: string; child
       </p>
       {children}
       <p className="help prompt-part-rule">{rule}</p>
+      {after}
     </div>
   );
 }
 
 /**
- * The exact English prompt Run sends, one per hook variant (`labels` names them), folded: with Translate for a Vietnamese reading of the first and the
- * longest one's length against the model's `limit`, red past it (Run then waits with the reason on the page).
+ * The exact English prompt Run sends, one per hook variant (`labels` names them): open on a computer, folded on a phone. The summary keeps the longest
+ * one's length against the model's `limit`, red past it (Run then waits with the reason on the page); open, Translate gives a Vietnamese reading of the first.
  */
 export function PromptPreview({ feature, prompts, labels, limit }: { feature: string; prompts: string[]; labels?: (string | null)[]; limit?: number }) {
-  const [open, setOpen] = useState(false);
+  const narrow = useMediaQuery(NARROW, true);
+  const [toggled, setToggled] = useState<boolean | null>(null); // the person's own choice beats the screen's default
+  const open = toggled ?? !narrow;
   const longest = Math.max(0, ...prompts.map((p) => p.length));
   return (
-    <details className="prompt-preview" onToggle={(e) => setOpen(e.currentTarget.open)}>
-      <summary>Xem prompt gửi đi (EN)</summary>
+    <details className="prompt-preview" open={open} onToggle={(e) => e.currentTarget.open !== open && setToggled(e.currentTarget.open)}>
+      <summary>
+        Xem prompt gửi đi (EN)
+        <span className="prompt-preview-count" data-over={(limit !== undefined && longest > limit) || undefined}>
+          {longest}
+          {limit !== undefined && `/${limit}`} ký tự
+        </span>
+      </summary>
       {prompts.map((p, i) => (
         <p key={labels?.[i] ?? i} lang="en">
           {labels?.[i] && <strong lang="vi">{labels[i]}: </strong>}
@@ -164,10 +187,6 @@ export function PromptPreview({ feature, prompts, labels, limit }: { feature: st
       {open && (
         <div className="prompt-preview-foot">
           <PromptTools feature={feature} value={prompts[0] ?? ''} onChange={() => undefined} onRun={() => false} parts={['translate']} />
-          <span className="prompt-preview-count" data-over={(limit !== undefined && longest > limit) || undefined}>
-            {longest}
-            {limit !== undefined && `/${limit}`} ký tự
-          </span>
         </div>
       )}
     </details>

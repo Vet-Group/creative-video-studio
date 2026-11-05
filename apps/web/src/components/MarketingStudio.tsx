@@ -446,10 +446,15 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
   const endExtras = (
     <>
       {chosen?.endFrame && (
-        <Slot label="Khung hình cuối" empty="Ảnh clip kết thúc ở đó (không bắt buộc)" inputLabel="Ảnh khung hình cuối" images={endFrame ? [endFrame] : []} max={1} busy={busy} onAdd={add((f) => setEndFrame(f([])[0] ?? null))} onRemove={() => setEndFrame(null)} onPick={setEndFrame} storeId={storeId} />
+        <Slot label="Khung hình cuối" optional empty="Ảnh clip kết thúc ở đó" inputLabel="Ảnh khung hình cuối" images={endFrame ? [endFrame] : []} max={1} busy={busy} onAdd={add((f) => setEndFrame(f([])[0] ?? null))} onRemove={() => setEndFrame(null)} onPick={setEndFrame} storeId={storeId} />
       )}
       <EndScene text={endText} onText={setEndText} position={endTextPos} onPosition={setEndTextPos} />
     </>
+  );
+
+  /** The library hook, up to three variants: in ① Hook when writing by sections, in the photo grid as on Fash when writing freely. */
+  const hookBox = (
+    <ChoiceBox label="Hook (tuỳ chọn)" icon="film" media={hooks[0] ? cardSample(have, `marketing-hook-${hooks[0]}`) : undefined} value={hooks.length === 0 ? undefined : hooks.length === 1 ? hookName(hooks[0]!) : `${hooks.length} biến thể: ${hooks.map(hookName).join(', ')}`} onOpen={() => setPicker('hook')} onClear={() => setHooks([])} />
   );
 
   const tabs: Tab[] = narrow ? ['create', 'history', 'examples', 'about'] : ['history', 'examples', 'about'];
@@ -491,7 +496,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
                   <Slot label="Sản phẩm" empty="Thêm 1 ảnh sản phẩm" inputLabel="Ảnh sản phẩm" images={product} max={1} busy={busy} onAdd={add(setProduct)} onRemove={() => setProduct([])} onBrowse={myProducts.length > 0 ? () => setPicker('product') : undefined} onPick={(a) => setProduct([a])} storeId={storeId} />
                 </>
               )}
-              <ChoiceBox label="Hook (tuỳ chọn)" icon="film" media={hooks[0] ? cardSample(have, `marketing-hook-${hooks[0]}`) : undefined} value={hooks.length === 0 ? undefined : hooks.length === 1 ? hookName(hooks[0]!) : `${hooks.length} biến thể: ${hooks.map(hookName).join(', ')}`} onOpen={() => setPicker('hook')} onClear={() => setHooks([])} />
+              {!sec && hookBox}
               <ChoiceBox label="Bối cảnh (tuỳ chọn)" icon="sliders" media={location ? cardSample(have, `marketing-location-${location}`) : undefined} value={locationList.find((c) => c.id === location)?.name} onOpen={() => setPicker('location')} onClear={() => setLocation('')} />
             </div>
 
@@ -501,9 +506,9 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
               mode={mode}
               onMode={(next) => (next === 'free' && setFreeText(sectionPrompt({ hook: hooks.length > 0 ? '' : hookText, body: prompt, ending })), setMode(next))}
               hook={{
-                // The library pick is the Hook box above (with its variants); the own words stand in for it.
-                box: null,
-                hint: hooks.length > 0 ? 'Đang dùng hook đã chọn ở ô Hook phía trên; chữ tự viết chỉ dùng khi bỏ chọn hook đó.' : 'Chọn hook có sẵn ở ô Hook phía trên, hoặc tự viết ở đây. Chữ tự viết chỉ dùng khi chưa chọn hook.',
+                // The library pick (with its variants); the own words stand in for it.
+                box: hookBox,
+                hint: hooks.length > 0 ? 'Đang dùng hook đã chọn; chữ tự viết chỉ dùng khi bỏ chọn hook đó.' : 'Chọn hook có sẵn ở trên hoặc tự viết bên dưới. Chữ tự viết chỉ dùng khi chưa chọn hook.',
                 text: hookText,
                 onText: setHookText,
                 ask: chosen ? () => ({ field: 'hook', text: hookText, rest: sectionPrompt({ body: prompt, ending }), model: chosen.id, audio, seconds: durationSec }) : null,

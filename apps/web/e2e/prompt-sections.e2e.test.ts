@@ -62,7 +62,7 @@ test('Create: the sections show by default, Mẫu prompt fills all three, the pr
   await expect(page.getByRole('button', { name: /^Cảnh kết có sẵn/ })).toContainText(ENDINGS[2]!.name);
 
   const composed = `${t.hook} ${t.body} ${ENDINGS[2]!.phrase}`;
-  await page.getByText('Xem prompt gửi đi').click();
+  await expect(page.locator('.prompt-preview')).toHaveAttribute('open', ''); // open by default on a computer
   await expect(preview(page)).toHaveText([composed]);
   await expect(page.locator('.prompt-preview-count')).toHaveText(`${composed.length}/2000 ký tự`);
   await runButton(page).click();
@@ -104,19 +104,26 @@ test('Marketing Studio: the own hook counts only with no hook chosen, the job ke
   await expect(modelButton(page)).toContainText('Mock E2E');
   // ③ holds the end text box beside the last shot.
   await expect(part(page, '③ Kết · cảnh cuối').getByLabel('Chữ trên khung cuối (tuỳ chọn)')).toBeVisible();
+  // The end text is optional the one way the sections use: the optional pill beside its name.
+  await expect(part(page, '③ Kết · cảnh cuối').locator('.optional-head', { hasText: 'Chữ trên khung cuối' }).locator('.choice-optional')).toHaveText('Tuỳ chọn');
+  // Its rule line sits right under the Cảnh kết box, above the end text.
+  const ruleY = (await part(page, '③ Kết · cảnh cuối').locator('.prompt-part-rule').boundingBox())!.y;
+  expect(ruleY).toBeGreaterThan((await endingBox(page).boundingBox())!.y);
+  expect(ruleY).toBeLessThan((await page.getByLabel('Chữ trên khung cuối (tuỳ chọn)').boundingBox())!.y);
 
   const t = PROMPT_TEMPLATES.marketing[0]!;
   await useTemplate(page, t.name);
   await expect(hookBox(page)).toHaveValue(t.hook);
   await expect(page.getByRole('textbox', { name: 'Prompt (tuỳ chọn)' })).toHaveValue(t.body);
   await expect(endingBox(page)).toHaveValue(t.ending);
-  await page.getByText('Xem prompt gửi đi').click();
   await expect(preview(page)).toContainText(`${t.hook} Creator notes: ${t.body} ${t.ending}`);
 
-  // A chosen hook wins over the own words, and the section says so.
-  await page.getByRole('button', { name: /^Hook/ }).click();
+  // The library hook sits in ① beside the own words, out of the photo grid where Bối cảnh stays; a chosen hook wins over the own words, and the section says so.
+  await expect(page.locator('.marketing-slots').getByRole('button', { name: /^Hook/ })).toHaveCount(0);
+  await expect(page.locator('.marketing-slots').getByRole('button', { name: /^Bối cảnh/ })).toBeVisible();
+  await part(page, '① Hook · 0–2 giây đầu').getByRole('button', { name: /^Hook/ }).click();
   await page.getByRole('dialog', { name: 'Chọn hook' }).getByRole('option', { name: HOOKS[0]!.name, exact: true }).click();
-  await expect(part(page, '① Hook · 0–2 giây đầu')).toContainText('Đang dùng hook đã chọn ở ô Hook phía trên');
+  await expect(part(page, '① Hook · 0–2 giây đầu')).toContainText('Đang dùng hook đã chọn; chữ tự viết chỉ dùng khi bỏ chọn hook đó.');
   await expect(preview(page)).toContainText(HOOKS[0]!.phrase);
   await expect(preview(page)).not.toContainText(t.hook);
   await page.getByRole('button', { name: 'Bỏ Hook' }).click();
@@ -136,6 +143,7 @@ test('Marketing Studio: the own hook counts only with no hook chosen, the job ke
   // free writing: the sections' words in today's one box, the end text still there, and Run sends the box's words as the brief.
   await mode(page).getByText('Viết tự do').click();
   await expect(hookBox(page)).toHaveCount(0);
+  await expect(page.locator('.marketing-slots').getByRole('button', { name: /^Hook/ })).toBeVisible(); // the library hook goes back to the grid
   await expect(page.getByRole('textbox', { name: 'Prompt (tuỳ chọn)' })).toHaveValue(`${t.hook} ${t.body} ${t.ending}`);
   await expect(page.getByLabel('Chữ trên khung cuối (tuỳ chọn)')).toBeVisible();
   await page.getByRole('textbox', { name: 'Prompt (tuỳ chọn)' }).fill('mở hộp và cười');
@@ -155,15 +163,32 @@ test('Marketing Studio: the own hook counts only with no hook chosen, the job ke
   await page.unrouteAll({ behavior: 'ignoreErrors' });
 });
 
-test('at 390 px the sections, the templates menu and the preview fit with no sideways scroll, on Create and Marketing Studio', async ({ page }) => {
+test('at 390 px the templates open as a sheet over the Run bar with the last one in reach, the sections and the folded preview fit, on Create and Marketing Studio', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await signIn(page, 'secta');
-  for (const [path, name] of [['/create', PROMPT_TEMPLATES.video[4]!.name], ['/marketing-studio', PROMPT_TEMPLATES.marketing[2]!.name]] as const) {
+  for (const [path, t, body] of [
+    ['/create', PROMPT_TEMPLATES.video.at(-1)!, 'Mô tả chuyển động'],
+    ['/marketing-studio', PROMPT_TEMPLATES.marketing.at(-1)!, 'Prompt (tuỳ chọn)'],
+  ] as const) {
     await page.goto(path);
     await expect(part(page, '② Diễn biến')).toBeVisible();
     await page.getByRole('button', { name: 'Mẫu prompt' }).click();
+    const sheet = page.getByRole('dialog', { name: 'Mẫu prompt' });
+    await expect(sheet).toBeVisible();
+    await expect(sheet.getByText('Điền cả Hook · Diễn biến · Kết')).toBeVisible();
+    const last = sheet.getByRole('button', { name: new RegExp(`^${t.name}`) });
+    // Whole on the screen and on top, with no scrolling first: nothing (the sticky Run bar) covers its middle.
+    await expect(last).toBeInViewport({ ratio: 1 });
+    expect(await last.evaluate((el) => { const r = el.getBoundingClientRect(); return el.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)); })).toBe(true);
     expect(await fits(page)).toBe(true);
-    await page.getByRole('group', { name: 'Mẫu prompt' }).getByRole('button', { name: new RegExp(`^${name}`) }).click();
+    await last.click();
+    await expect(sheet).toHaveCount(0);
+    await expect(hookBox(page)).toHaveValue(t.hook);
+    await expect(page.getByRole('textbox', { name: body })).toHaveValue(t.body);
+    await expect(endingBox(page)).toHaveValue(t.ending);
+    // On a phone the preview starts folded, its length still in sight.
+    await expect(page.locator('.prompt-preview')).not.toHaveAttribute('open');
+    await expect(page.locator('.prompt-preview summary .prompt-preview-count')).toBeVisible();
     await page.getByText('Xem prompt gửi đi').click();
     await expect(preview(page).first()).toBeVisible();
     expect(await fits(page)).toBe(true);

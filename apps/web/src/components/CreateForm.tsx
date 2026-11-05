@@ -539,7 +539,8 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
   const endSlot = chosen?.endFrame && (
     <Slot
       label="Khung hình cuối"
-      empty="Ảnh clip kết thúc ở đó (không bắt buộc)"
+      optional
+      empty="Ảnh clip kết thúc ở đó"
       inputLabel="Ảnh khung hình cuối"
       images={endFrame ? [endFrame] : []}
       max={1}

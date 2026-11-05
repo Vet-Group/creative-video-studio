@@ -35,12 +35,17 @@ test('an Advanced job runs from reference images, a brief, a script and audio on
   // One wide reference slot, the hook and location boxes, the brief, the script and the audio switch, on by default.
   await expect(page.locator('.slot')).toHaveCount(1);
   await expect(page.getByText('Tối đa 4 ảnh tham chiếu')).toBeVisible(); // Mock E2E takes 4
-  // As on Fash, the hook and location boxes share the row under the wide slot.
-  const [hookBox, placeBox] = await Promise.all([/^Hook/, /^Bối cảnh/].map((name) => page.getByRole('button', { name }).boundingBox()));
+  // Writing by sections, the library hook is in ① Hook and the location box stays under the wide slot.
+  await expect(page.getByRole('group', { name: '① Hook · 0–2 giây đầu', exact: true }).getByRole('button', { name: /^Hook/ })).toBeVisible();
+  await expect(page.locator('.marketing-slots').getByRole('button', { name: /^Hook/ })).toHaveCount(0);
+  await expect(page.locator('.marketing-slots').getByRole('button', { name: /^Bối cảnh/ })).toBeVisible();
+  // Writing freely, as on Fash, the hook and location boxes share the row under the wide slot.
+  const way = page.getByRole('radiogroup', { name: 'Cách viết prompt' });
+  await way.getByText('Viết tự do').click();
+  const [hookBox, placeBox] = await Promise.all([/^Hook/, /^Bối cảnh/].map((name) => page.locator('.marketing-slots').getByRole('button', { name }).boundingBox()));
   expect(Math.abs(hookBox!.y - placeBox!.y)).toBeLessThan(1);
   expect(placeBox!.x).toBeGreaterThan(hookBox!.x + hookBox!.width - 1);
-  await expect(page.getByRole('button', { name: /^Hook/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: /^Bối cảnh/ })).toBeVisible();
+  await way.getByText('Theo phần').click();
   await expect(brief(page)).toHaveAttribute('placeholder', 'Ví dụ: người mẫu mở hộp, cầm sản phẩm lên và nói cảm nhận đầu tiên…');
   await expect(script(page)).toBeVisible();
   // Empty, each box is its text and the toolbar, with no row of starter chips (the templates menu replaced them): the script's 76 px text, and the
@@ -77,7 +82,6 @@ test('an Advanced job runs from reference images, a brief, a script and audio on
   await page.getByRole('dialog', { name: 'Chọn bối cảnh' }).getByRole('option', { name: spot.name, exact: true }).click();
   await script(page).fill('These are so comfy. Grab yours today!');
   await expect(page.getByText('7 từ, khoảng 4 giây')).toBeVisible();
-  await page.getByText('Xem prompt gửi đi').click();
   const shown = await page.locator('.prompt-preview p').innerText();
 
   await runButton(page).click();

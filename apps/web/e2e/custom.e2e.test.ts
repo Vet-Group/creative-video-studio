@@ -146,7 +146,6 @@ test('Thêm hook and Thêm bối cảnh save the member’s own, choose them at 
   await expect(addingSpot).toBeHidden();
   await expect(locationBox(page)).toContainText(spot.name);
 
-  await page.getByText('Xem prompt gửi đi').click();
   const preview = page.locator('.prompt-preview p');
   await expect(preview).toContainText(`${hook.phrase} Set in ${spot.phrase}.`);
   await runButton(page).click();
@@ -159,7 +158,6 @@ test('Thêm hook and Thêm bối cảnh save the member’s own, choose them at 
   await history(page).getByRole('button', { name: 'Dùng lại' }).first().click();
   await expect(hookBox(page)).toContainText(hook.name);
   await expect(locationBox(page)).toContainText(spot.name);
-  await page.getByText('Xem prompt gửi đi').click();
   await expect(preview).toContainText(`${hook.phrase} Set in ${spot.phrase}.`);
 });
 

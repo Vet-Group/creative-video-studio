@@ -97,8 +97,7 @@ test('a mock marketing job runs from two photos, a hook and a location, and show
   await expect(locationBox).toContainText(spot.name);
 
   await page.getByRole('textbox', { name: 'Prompt (tuỳ chọn)' }).fill('soft morning light');
-  // The folded preview shows the English prompt Run is about to send.
-  await page.getByText('Xem prompt gửi đi').click();
+  // The preview, open on a computer, shows the English prompt Run is about to send.
   const preview = page.locator('.prompt-preview p');
   await expect(preview).toContainText(' soft morning light Natural sound recorded on the phone:');
   const shown = await preview.innerText();
@@ -363,7 +362,6 @@ test('hook variants: up to 3 hooks make one clip each, with the total, the daily
   await expect(runButton(page)).toContainText('3 clip');
   await expect(runButton(page)).toContainText('$0.0000'); // the mock model books 0 USD, so 3 x 0
   await expect(page.locator('.variants-usage')).toContainText(/3 biến thể, tổng \$0\.0000: dùng 3 trong \d+ clip mỗi ngày của bạn \(hôm nay đã dùng 0\)/);
-  await page.getByText('Xem prompt gửi đi').click();
   await expect(page.locator('.prompt-preview p')).toHaveCount(3);
   for (const [i, h] of picks.slice(0, 3).entries()) await expect(page.locator('.prompt-preview p').nth(i)).toContainText(h.phrase);
 
@@ -446,6 +444,8 @@ test('as on the live form (measured 2026-10-29): 272 px content, 131x130 tiles 1
   near(model.width, 131);
   near(model.height, 130);
   near(product.x - (model.x + model.width), 10);
+  // The hook tile is in the photo grid when writing freely, as on Fash.
+  await page.getByRole('radiogroup', { name: 'Cách viết prompt' }).getByText('Viết tự do').click();
   const hookBox = page.getByRole('button', { name: /^Hook/ });
   near((await hookBox.boundingBox())!.height, 130);
   const disc = hookBox.locator('.slot-icon');
@@ -560,7 +560,10 @@ test('as on Fash, a filled photo slot and a chosen hook or location show the pic
     await expect.poll(() => slot.evaluate((e) => getComputedStyle(e).borderTopStyle)).toBe('dashed');
     await expect.poll(() => slot.evaluate((e) => getComputedStyle(e).borderTopColor)).not.toBe('rgba(0, 0, 0, 0)');
 
-    const hookBox = page.getByRole('button', { name: /^Hook/ });
+    // The hook tile is in the photo grid when writing freely, as on Fash (by sections it is a row in ① Hook, below).
+    const way = page.getByRole('radiogroup', { name: 'Cách viết prompt' });
+    await way.getByText('Viết tự do').click();
+    const hookBox = page.locator('.marketing-slots').getByRole('button', { name: /^Hook/ });
     await hookBox.click();
     await page.getByRole('dialog', { name: 'Chọn hook' }).getByRole('option', { name: hook.name, exact: true }).click();
     await expect(hookBox.locator('img')).toHaveAttribute('src', `/api/samples/marketing-hook-${hook.id}.jpg`);
@@ -573,6 +576,18 @@ test('as on Fash, a filled photo slot and a chosen hook or location show the pic
     await page.getByRole('button', { name: 'Bỏ Hook' }).click();
     await expect(hookBox.locator('img')).toHaveCount(0);
     await expect(hookBox).not.toContainText(hook.name);
+    // In ① Hook the chosen card is a small picture beside its name, on one row.
+    await way.getByText('Theo phần').click();
+    const rowBox = page.getByRole('group', { name: '① Hook · 0–2 giây đầu', exact: true }).getByRole('button', { name: /^Hook/ });
+    await rowBox.click();
+    await page.getByRole('dialog', { name: 'Chọn hook' }).getByRole('option', { name: hook.name, exact: true }).click();
+    await expect(rowBox.locator('.choice-value')).toHaveText(hook.name);
+    const [rb, ri, rv] = [(await rowBox.boundingBox())!, (await rowBox.locator('img').boundingBox())!, (await rowBox.locator('.choice-value').boundingBox())!];
+    expect(ri.width).toBeCloseTo(40, 0);
+    expect(rv.x).toBeGreaterThan(ri.x + ri.width);
+    expect(rb.height).toBeLessThan(80);
+    await page.getByRole('button', { name: 'Bỏ Hook' }).click();
+    await expect(rowBox.locator('img')).toHaveCount(0);
 
     // A choice without an uploaded sample keeps the plain box with the name.
     const placeBox = page.getByRole('button', { name: /^Bối cảnh/ });

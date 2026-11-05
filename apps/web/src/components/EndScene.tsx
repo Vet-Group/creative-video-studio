@@ -13,9 +13,15 @@ export function EndScene({ text, onText, position, onPosition }: { text: string;
   return (
     <div className="end-scene">
       <div className="field">
-        <label className="field-label" htmlFor={textId}>
-          Chữ trên khung cuối (tuỳ chọn)
-        </label>
+        {/* The name keeps the optional note for screen readers; the eye gets the pill, as on the prompt boxes. */}
+        <div className="optional-head">
+          <label className="field-label" htmlFor={textId}>
+            Chữ trên khung cuối<span className="sr-only"> (tuỳ chọn)</span>
+          </label>
+          <span className="choice-optional" aria-hidden="true">
+            Tuỳ chọn
+          </span>
+        </div>
         <input id={textId} type="text" value={text} maxLength={MAX_END_TEXT} placeholder="Ví dụ: Giảm 50% hôm nay" aria-describedby={helpId} onChange={(e) => onText(e.target.value)} />
         <p id={helpId} className="help">
           Chèn vào 2 giây cuối của video, không tốn thêm phí.

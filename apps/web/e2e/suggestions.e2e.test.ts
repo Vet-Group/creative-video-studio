@@ -164,7 +164,8 @@ test('Dịch shows a Vietnamese reading of English words under the box, asks onc
   page.on('request', (r) => r.url().endsWith('/api/suggestions') && r.method() === 'POST' && asks++);
   const box = page.getByLabel('Mô tả chuyển động');
   await box.fill('slow turn in window light');
-  const translate = page.getByRole('button', { name: 'Dịch', exact: true });
+  // The box's own Translate: the preview under the model, open on a computer, has one for the composed prompt too.
+  const translate = page.getByRole('group', { name: '② Diễn biến', exact: true }).getByRole('button', { name: 'Dịch', exact: true });
   await translate.click();
   const reading = page.getByRole('group', { name: 'Bản dịch tiếng Việt' });
   await expect(reading.getByText('Translation: slow turn in window light')).toBeVisible({ timeout: 20_000 });

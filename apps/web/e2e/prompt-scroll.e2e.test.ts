@@ -19,7 +19,7 @@ test("a press on the form's scroll bar keeps an open list; the reading stays unt
   };
   const outside = () => page.getByText('Mô tả chuyển động', { exact: true }).click(); // the field's label, outside the tools
 
-  await page.getByRole('button', { name: 'Dịch', exact: true }).click();
+  await page.getByRole('group', { name: '② Diễn biến', exact: true }).getByRole('button', { name: 'Dịch', exact: true }).click(); // the box's, not the open preview's
   const reading = page.getByRole('group', { name: 'Bản dịch tiếng Việt' });
   await expect(reading.getByText('Translation: slow turn in window light')).toBeVisible({ timeout: 20_000 });
   await onBar();
