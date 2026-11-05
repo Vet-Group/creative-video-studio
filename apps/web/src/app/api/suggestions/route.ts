@@ -4,7 +4,7 @@ import { PROMPT_CEILING } from '@cvs/core/models';
 import { modelNote, PROMPT_TASKS, type SuggestInput } from '@cvs/core/suggest';
 import { pool } from '@/lib/auth';
 import { findChoice } from '@/lib/choices';
-import { ADVANCED_MAX_SCRIPT, MAX_CHOICE_DESC, MAX_CHOICE_NAME, MAX_CHOICE_PHRASE, SUGGEST_DAILY_LIMIT } from '@/lib/marketing';
+import { ADVANCED_MAX_SCRIPT, MAX_CHOICE_DESC, MAX_CHOICE_NAME, MAX_CHOICE_PHRASE, MAX_ENDING, MAX_HOOK, SUGGEST_DAILY_LIMIT } from '@/lib/marketing';
 import { boss } from '@/lib/queue';
 import { headSample } from '@/lib/samples';
 import { guard, isEditor } from '@/lib/session';
@@ -12,8 +12,9 @@ import { guard, isEditor } from '@/lib/session';
 const bad = (error: string, status = 400) => Response.json({ error }, { status });
 
 /**
- * Asks the worker for three Marketing Studio suggestions: `field` (`brief`, `script` on Advanced, or `hook` or `location` for the English scene of
- * a new one from its Vietnamese name and description in `text`, `prompt` for the English prompt of the tool `feature`, a PROMPT_TASKS key, or `translate`
+ * Asks the worker for three Marketing Studio suggestions: `field` (`brief`, `script` on Advanced, or `hook`, `location` or `ending` for the English scene of
+ * a new one from its Vietnamese name and description in `text`; with `rest`, the prompt's other sections, `hook` or `ending` is a sectioned prompt's
+ * hook or last shot, from the member's own words in `text` (which may be empty) and written for the page's model and pace; `prompt` for the English prompt of the tool `feature`, a PROMPT_TASKS key, or `translate`
  * for one Vietnamese reading of the English prompt in `text`), `format` ('advanced' or absent), the
  * member's `text` so far, the chosen `hook` and `location`, and for a brief the `room` the chosen model leaves for it (the page computes it); for a
  * brief, a script or a prompt, the page's chosen `model` (an enabled model's id), its `audio` switch and the clip's `seconds`, when it has them;
@@ -24,10 +25,10 @@ export async function POST(request: Request) {
   const g = await guard(request, 'member');
   if (g.error) return g.error;
   const b = (await request.json().catch(() => null)) as {
-    field?: unknown; format?: unknown; feature?: unknown; text?: unknown; hook?: unknown; location?: unknown; room?: unknown; model?: unknown; audio?: unknown; seconds?: unknown; preset?: unknown;
+    field?: unknown; format?: unknown; feature?: unknown; text?: unknown; hook?: unknown; location?: unknown; room?: unknown; model?: unknown; audio?: unknown; seconds?: unknown; preset?: unknown; rest?: unknown;
   } | null;
-  if (b?.field !== 'brief' && b?.field !== 'script' && b?.field !== 'hook' && b?.field !== 'location' && b?.field !== 'prompt' && b?.field !== 'translate' && b?.field !== 'video') {
-    return bad('field must be brief, script, hook, location, prompt, translate or video');
+  if (b?.field !== 'brief' && b?.field !== 'script' && b?.field !== 'hook' && b?.field !== 'location' && b?.field !== 'ending' && b?.field !== 'prompt' && b?.field !== 'translate' && b?.field !== 'video') {
+    return bad('field must be brief, script, hook, location, ending, prompt, translate or video');
   }
   if (b.field === 'video') {
     // The prompt-from-video button in the preset edit form: a vision call on the preset's saved clip, for the people who edit presets.
@@ -55,11 +56,21 @@ export async function POST(request: Request) {
     if (typeof extra === 'string') return bad(extra);
     return queue(g.session.user.id, { field: 'prompt', task, text, context: '', max: Math.min((b.room as number | undefined) ?? PROMPT_CEILING, PROMPT_CEILING), ...extra });
   }
-  if (b.field === 'hook' || b.field === 'location') {
-    // The add form's AI help: the English scene of a new hook or location from its Vietnamese name and description, as long as the field takes.
+  if ((b.field === 'hook' || b.field === 'ending') && b.rest !== undefined) {
+    // A sectioned prompt's Hook or Ending section: the member's words so far, as long as the section takes, and the other sections as the context.
+    const max = b.field === 'hook' ? MAX_HOOK : MAX_ENDING;
+    const text = typeof b.text === 'string' ? b.text.trim() : b.text === undefined ? '' : null;
+    if (text === null || text.length > max) return bad(`text may be at most ${max} characters`);
+    if (typeof b.rest !== 'string' || b.rest.length > PROMPT_CEILING) return bad(`rest must be text of at most ${PROMPT_CEILING} characters`);
+    const extra = await modelAndPace(b);
+    if (typeof extra === 'string') return bad(extra);
+    return queue(g.session.user.id, { field: b.field, text, context: b.rest.trim(), max, ...extra });
+  }
+  if (b.field === 'hook' || b.field === 'location' || b.field === 'ending') {
+    // The add form's AI help: the English scene of a new hook, location or ending from its Vietnamese name and description, as long as the field takes.
     const text = typeof b.text === 'string' ? b.text.trim() : '';
     if (!text || text.length > MAX_CHOICE_NAME + MAX_CHOICE_DESC + 3) return bad(`text must be the name and description, 1 to ${MAX_CHOICE_NAME + MAX_CHOICE_DESC + 3} characters`);
-    return queue(g.session.user.id, { field: b.field, text, context: '', max: MAX_CHOICE_PHRASE });
+    return queue(g.session.user.id, { field: b.field, text, context: '', max: b.field === 'ending' ? MAX_ENDING : MAX_CHOICE_PHRASE });
   }
   if (b.format !== undefined && b.format !== 'advanced') return bad('format must be advanced or left out');
   const advanced = b.format === 'advanced';

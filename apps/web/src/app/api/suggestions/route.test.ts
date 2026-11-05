@@ -100,7 +100,7 @@ describe('/api/suggestions', () => {
   test('refuses a bad field, a script outside Advanced, over-long text and unknown choices, and queues nothing', async () => {
     const u = await newUser();
     const before = sent.length;
-    expect(await error(await ask(u, { field: 'title' }))).toBe('field must be brief, script, hook, location, prompt, translate or video');
+    expect(await error(await ask(u, { field: 'title' }))).toBe('field must be brief, script, hook, location, ending, prompt, translate or video');
     expect(await error(await ask(u, { field: 'script' }))).toBe('a script is for Advanced only');
     expect((await ask(u, { field: 'script', format: 'advanced', text: 'x'.repeat(ADVANCED_MAX_SCRIPT + 1) })).status).toBe(202); // the brief as notes for lines
     expect(await error(await ask(u, { field: 'script', format: 'advanced', text: 'x'.repeat(5001) }))).toBe('text may be at most 5000 characters');
@@ -174,6 +174,35 @@ describe('/api/suggestions', () => {
     expect(await error(await ask(u, { field: 'hook', text: '  ' }))).toBe('text must be the name and description, 1 to 143 characters');
     expect(await error(await ask(u, { field: 'hook', text: 'x'.repeat(144) }))).toBe('text must be the name and description, 1 to 143 characters');
     expect(await runs(u.id)).toBe(2);
+  });
+
+  test("a sectioned prompt's hook or ending takes the member's words (maybe none) and the other sections, for the page's model and pace, counted like any run", async () => {
+    const u = await newUser();
+    await pool.query(
+      `insert into model_configs (id, provider, endpoint, label, kind, features, ratios, durations_sec, max_images, output_resolution, usd_per_second, sources, enabled)
+       values ('kling-s', 'fal', 'fal-ai/kling-video/v2.6/pro/image-to-video', 'Kling S', 'video', '{video}', '{9:16}', '{5}', 4, '1080p', 0.07, '{}', true)`,
+    );
+    const { modelNote } = await import('@cvs/core/suggest');
+    const input = async (body: Record<string, unknown>) => {
+      const res = await ask(u, body);
+      expect(res.status).toBe(202);
+      const { id } = (await res.json()) as { id: string };
+      return (await pool.query('select input from suggestion_runs where id = $1', [id])).rows[0].input;
+    };
+    const rest = ' The clip opens on a spin. The model walks to the window. ';
+    expect(await input({ field: 'ending', text: ' mỉm cười ', rest, model: 'kling-s', audio: false, seconds: 5 })).toEqual({
+      field: 'ending', text: 'mỉm cười', context: rest.trim(), max: 200, seconds: 5, model: modelNote({ id: 'kling-s', label: 'Kling S', endpoint: 'fal-ai/kling-video/v2.6/pro/image-to-video' }, false),
+    });
+    expect(await input({ field: 'hook', rest: '' })).toEqual({ field: 'hook', text: '', context: '', max: 200 });
+    // The add form's ending: from the name and description, as short as the section.
+    expect(await input({ field: 'ending', text: 'Vẫy tay - Vẫy tay chào' })).toEqual({ field: 'ending', text: 'Vẫy tay - Vẫy tay chào', context: '', max: 200 });
+    const before = await runs(u.id);
+    expect(await error(await ask(u, { field: 'ending', text: 'x'.repeat(201), rest: '' }))).toBe('text may be at most 200 characters');
+    expect(await error(await ask(u, { field: 'hook', text: 5, rest: '' }))).toBe('text may be at most 200 characters');
+    expect(await error(await ask(u, { field: 'hook', rest: 'x'.repeat(5001) }))).toBe('rest must be text of at most 5000 characters');
+    expect(await error(await ask(u, { field: 'ending', rest: 7 }))).toBe('rest must be text of at most 5000 characters');
+    expect(await error(await ask(u, { field: 'ending', rest: '', model: 'nope' }))).toBe('model is not an enabled model');
+    expect(await runs(u.id)).toBe(before);
   });
 
   test("puts the member's own hook and location phrases in the context, and refuses another member's private one", async () => {

@@ -10,7 +10,7 @@ const GIVE_UP_MS = 95_000;
 const UNAVAILABLE = 'Chưa lấy được gợi ý lúc này, hãy thử lại sau.';
 
 export interface Ask {
-  field: 'brief' | 'script' | 'hook' | 'location' | 'prompt' | 'translate' | 'video';
+  field: 'brief' | 'script' | 'hook' | 'location' | 'ending' | 'prompt' | 'translate' | 'video';
   /** For `video` (a template editor): the motion preset whose saved clip is read. */
   preset?: string;
   /** For a prompt: the page's feature, which the server maps to the tool's task. */
@@ -20,6 +20,8 @@ export interface Ask {
   /** Left out (undefined) when none is chosen. */
   hook?: string;
   location?: string;
+  /** For a sectioned prompt's hook or ending: its other sections, which the option must fit (the add form sends none). */
+  rest?: string;
   /** For a brief: the characters the chosen model leaves for it. */
   room?: number;
   /** The page's chosen model, its audio switch and the clip's length, so the options are written for that model and fit the clip. */

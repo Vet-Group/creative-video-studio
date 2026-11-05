@@ -280,6 +280,17 @@ describe('/api/templates', () => {
       });
     });
 
+    test("keeps a Create job's prompt sections, and a saved form's sections and prompt mode, which the template gives back", async () => {
+      const u = await newUser();
+      const sections = { hookText: 'The clip opens on a spin.', ending: 'The clip ends with a wave.' };
+      const id = await job(u, { feature: 'video', model: 'kling-o3-pro', duration: 5, prompt: 'The clip opens on a spin. p The clip ends with a wave.', params: { audio: 'off', ...sections }, inputs: [u.asset] });
+      const { data } = await saved(await fromJob(u, id));
+      expect(data).toMatchObject({ prompt: 'The clip opens on a spin. p The clip ends with a wave.', ...sections });
+      const res = await save(u, { feature: 'video', name: 'Free', data: { images: [], prompt: 'p', promptMode: 'free' } });
+      const tid = ((await res.json()) as { id: string }).id;
+      expect(await (await one(req(u, `/api/templates/${tid}`), ctx(tid))).json()).toMatchObject({ prompt: 'p', promptMode: 'free', hookText: null, ending: null });
+    });
+
     test("keeps a Marketing job's end frame, last shot and end text, which the template gives back; refuses them over their limits", async () => {
       const u = await newUser();
       const end = { ending: 'She waves goodbye.', endText: 'Mua ngay hôm nay!', endTextPos: 'top' };
@@ -293,6 +304,8 @@ describe('/api/templates', () => {
         [{ ending: 'x'.repeat(201) }, 'data.ending must be text of at most 200 characters'],
         [{ endText: 'x'.repeat(61) }, 'data.endText must be text of at most 60 characters'],
         [{ endText: 'ok', endTextPos: 'left' }, 'data.endTextPos must be one of bottom, middle, top'],
+        [{ hookText: 'x'.repeat(201) }, 'data.hookText must be text of at most 200 characters'],
+        [{ promptMode: 'tabs' }, 'data.promptMode must be sections or free'],
       ] as const) {
         expect(await error(await save(u, { name: 'Too long', feature: 'marketing', data: { images: [], ...data } }))).toBe(message);
       }

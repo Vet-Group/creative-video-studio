@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ADVANCED_MAX_IMAGES, ADVANCED_MAX_SCRIPT, advancedPrompt, briefRoom, HOOKS, LOCATIONS, marketingPrompt } from './marketing';
+import { ADVANCED_MAX_IMAGES, ADVANCED_MAX_SCRIPT, advancedPrompt, briefRoom, ENDINGS, endingLine, HOOKS, LOCATIONS, marketingPrompt, sectionBody, sectionPrompt } from './marketing';
 
 describe('HOOKS and LOCATIONS', () => {
   it.each([['HOOKS', HOOKS], ['LOCATIONS', LOCATIONS]])('%s has 6 to 12 unique choices with a Vietnamese name and description and an English phrase', (_, list) => {
@@ -154,6 +154,48 @@ describe('the last shot (Cảnh kết)', () => {
     expect(adv).toMatch(/Do not add on-screen text, captions or watermarks\.$/); // the end text is the worker's, never the model's
     expect(marketingPrompt({ prompt: 'smiles', ending: '   ' })).toBe(marketingPrompt({ prompt: 'smiles' }));
     expect(advancedPrompt({ brief: 'x', images: 0, ending: null, audio: true })).toBe(advancedPrompt({ brief: 'x', images: 0, audio: true }));
+  });
+});
+
+describe('the sectioned prompt (Theo phần)', () => {
+  it('is the body exactly as typed, spaces and lines included, when the hook and the ending are empty', () => {
+    for (const body of ['slow turn', '  The camera orbits.\n Soft light.  ', '']) {
+      expect(sectionPrompt({ body })).toBe(body);
+      expect(sectionPrompt({ hook: '  ', body, ending: '\n' })).toBe(body);
+    }
+  });
+
+  it('puts the hook first and the ending last, one sentence each, with no doubled prefix or full stop', () => {
+    expect(sectionPrompt({ hook: 'The clip opens on a spin', body: ' The model walks.  ', ending: 'she smiles!' })).toBe('The clip opens on a spin. The model walks. It ends with: she smiles.');
+    // A library hook's phrase and a library ending's phrase (or a suggestion) read as written.
+    const ending = ENDINGS[0]!.phrase;
+    expect(sectionPrompt({ hook: HOOKS[2]!.phrase, body: 'x', ending })).toBe(`${HOOKS[2]!.phrase} x ${ending}`);
+    expect(endingLine('The clip ends on a still close-up')).toBe('The clip ends on a still close-up.');
+    expect(endingLine('it ends with a wave.')).toBe('it ends with a wave.');
+    expect(endingLine('endless spin')).toBe('It ends with: endless spin.');
+    for (const e of ENDINGS) expect(endingLine(e.phrase)).toBe(e.phrase);
+    // A hook or an ending alone still makes a prompt.
+    expect(sectionPrompt({ hook: 'Hộp quà bật mở', body: '' })).toBe('Hộp quà bật mở.');
+  });
+
+  it('gives back the body of a prompt it made, for Dùng lại, and null for one it did not', () => {
+    const parts = { hook: 'The clip opens on a spin.', body: 'The model walks to the window.', ending: 'The clip ends with a wave.' };
+    expect(sectionBody(sectionPrompt(parts), parts.hook, parts.ending)).toBe(parts.body);
+    expect(sectionBody(sectionPrompt({ ...parts, ending: '' }), parts.hook, null)).toBe(parts.body);
+    expect(sectionBody(sectionPrompt({ ...parts, hook: '' }), undefined, parts.ending)).toBe(parts.body);
+    expect(sectionBody('  as typed ', null, '')).toBe('  as typed ');
+    expect(sectionBody('Another prompt altogether.', parts.hook, parts.ending)).toBeNull();
+  });
+
+  it("uses the member's own hook on Marketing Studio only when no library hook is chosen, where the library one goes, and adds nothing when blank", () => {
+    const base = { location: 'kitchen', prompt: 'notes', audio: true, ratio: '9:16' };
+    expect(marketingPrompt({ ...base, hookText: '  ' })).toBe(marketingPrompt(base));
+    expect(marketingPrompt({ ...base, hookText: 'The clip opens with a jump' })).toBe(marketingPrompt(base).replace('Set in', 'The clip opens with a jump. Set in'));
+    expect(marketingPrompt({ ...base, hook: HOOKS[0]!.id, hookText: 'ignored' })).toBe(marketingPrompt({ ...base, hook: HOOKS[0]!.id }));
+    const adv = { brief: 'b', images: 1, audio: false };
+    expect(advancedPrompt({ ...adv, hookText: 'A jump.' })).toContain('Brief: b A jump. The video is completely silent');
+    expect(advancedPrompt({ ...adv, hook: HOOKS[1]!.id, hookText: 'A jump.' })).toBe(advancedPrompt({ ...adv, hook: HOOKS[1]!.id }));
+    expect(advancedPrompt({ ...adv, hookText: '' })).toBe(advancedPrompt(adv));
   });
 });
 

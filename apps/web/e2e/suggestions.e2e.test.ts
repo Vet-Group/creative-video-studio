@@ -14,11 +14,11 @@ test('Gợi ý AI fills the brief with the picked option and can be undone, and 
   const ai = page.getByRole('button', { name: 'Gợi ý AI' });
   expect((await ai.boundingBox())!.y).toBeGreaterThan((await brief.boundingBox())!.y);
   expect((await page.getByRole('button', { name: 'Mở rộng' }).boundingBox())!.y).toBeGreaterThan((await brief.boundingBox())!.y);
-  // Starter chips while the box is empty; one click fills it, and they go.
-  const starters = page.getByRole('group', { name: 'Gợi ý nhanh' });
-  await starters.getByRole('button', { name: 'Mở hộp' }).click();
-  await expect(brief).toHaveValue(/^Người sáng tạo mở hộp/);
-  await expect(starters).toHaveCount(0);
+  // The templates menu replaced the starter chips: a template fills the brief, the hook and the ending at once.
+  await expect(page.getByRole('group', { name: 'Gợi ý nhanh' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Mẫu prompt' }).click();
+  await page.getByRole('group', { name: 'Mẫu prompt' }).getByRole('button', { name: /^Mở hộp/ }).click();
+  await expect(brief).toHaveValue(/^The creator lifts the product out of the box/);
   await brief.fill('váy linen mùa hè');
   await ai.click();
   const options = page.getByRole('group', { name: 'Gợi ý AI' }).getByRole('button', { name: /^Gợi ý \d/ });
@@ -46,11 +46,10 @@ test('Gợi ý AI fills the brief with the picked option and can be undone, and 
   await page.keyboard.press('Escape');
   await expect(page.getByRole('group', { name: 'Gợi ý AI' })).toHaveCount(0);
   await expect(ai).toBeFocused();
-  // The clear button empties the box (back to the starter chips) and can be undone too.
+  // The clear button empties the box and can be undone too.
   await page.getByRole('button', { name: 'Xoá prompt' }).click();
   await expect(brief).toHaveValue('');
   await expect(brief).toBeFocused();
-  await expect(starters).toBeVisible();
   await expect(page.getByRole('button', { name: 'Xoá prompt' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Hoàn tác' }).click();
   await expect(brief).toHaveValue('váy linen mùa hè');
@@ -165,7 +164,8 @@ test('Dịch shows a Vietnamese reading of English words under the box, asks onc
   page.on('request', (r) => r.url().endsWith('/api/suggestions') && r.method() === 'POST' && asks++);
   const box = page.getByLabel('Mô tả chuyển động');
   await box.fill('slow turn in window light');
-  const translate = page.getByRole('button', { name: 'Dịch', exact: true });
+  // The box's own Translate: the preview under the model, open on a computer, has one for the composed prompt too.
+  const translate = page.getByRole('group', { name: '② Diễn biến', exact: true }).getByRole('button', { name: 'Dịch', exact: true });
   await translate.click();
   const reading = page.getByRole('group', { name: 'Bản dịch tiếng Việt' });
   await expect(reading.getByText('Translation: slow turn in window light')).toBeVisible({ timeout: 20_000 });

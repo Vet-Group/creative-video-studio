@@ -112,6 +112,9 @@ export const USERS = {
   chsa: { email: 'chsa@e2e.test', name: 'E2E Choices A', role: 'member' },
   chsb: { email: 'chsb@e2e.test', name: 'E2E Choices B', role: 'member' },
   chsed: { email: 'chsed@e2e.test', name: 'E2E Choices Editor', role: 'member' },
+  // prompt-sections.e2e: the sectioned prompt on Create (secta) and Marketing Studio (sectb).
+  secta: { email: 'secta@e2e.test', name: 'E2E Sections A', role: 'member' },
+  sectb: { email: 'sectb@e2e.test', name: 'E2E Sections B', role: 'member' },
   admin: { email: 'admin@e2e.test', name: 'E2E Admin', role: 'admin' },
 } as const;
 

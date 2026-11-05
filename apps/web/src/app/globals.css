@@ -933,6 +933,7 @@ dialog.admin-modal { width: min(36rem, calc(100vw - 2rem)); }
 .suggestion:hover { border-color: var(--text-disabled); }
 .suggestions .error { margin: 0; font-size: 13px; }
 .field-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.optional-head { display: flex; align-items: center; gap: 8px; } /* a field name with the optional pill beside it */
 /* A list opened from a field's head (the add-hook dialog's AI help) spans the field: a 460 px list under a link in a narrow form ran off its left edge.
    The prompt fields' own tools and lists are in components/PromptComposer.module.css. */
 .field-head { position: relative; }
@@ -1526,9 +1527,38 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .about-faq summary::-webkit-details-marker { display: none; }
 .about-faq summary::after { content: ''; flex: none; width: 7px; height: 7px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); transition: transform .2s; }
 .about-faq details[open] summary::after { transform: rotate(-135deg); }
-/* Marketing Studio: the exact English prompt Run sends, folded under the model picker. */
+/* Create and Marketing Studio: the exact English prompt Run sends (folded on a phone), its length against the model's limit in the summary, and Translate. */
 .prompt-preview { margin: 12px 0 0; font-size: 12px; line-height: 18px; }
 .prompt-preview summary { color: var(--text-subtle); cursor: pointer; }
+.prompt-preview-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 6px; }
+.prompt-preview-count { color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.prompt-preview-count[data-over] { color: var(--danger-text); font-weight: 600; }
+.prompt-preview summary .prompt-preview-count { margin-left: 8px; }
+/* The sectioned prompt (PromptSections.tsx): the way of writing and the templates menu on one row, then ① Hook, ② Body and ③ Ending as quiet cards. */
+.prompt-sections { min-width: 0; margin-top: 16px; }
+.prompt-sections-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.prompt-sections-head .theme-choice { margin: 0; }
+.prompt-sections-head .theme-choice label:not(:has(:checked), :hover) { color: var(--text-2); } /* the form card's grey, where the subtle one is too light to read */
+.prompt-sections-head .link-button { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; font-size: 13px; }
+.prompt-templates { display: grid; gap: 6px; margin-top: 8px; }
+.prompt-templates > .help { margin: 0; }
+/* On a phone the templates open as a sheet from the bottom edge, over the sticky Run bar. */
+dialog.modal.template-sheet { width: 100%; max-width: none; margin: auto 0 0; border-radius: 16px 16px 0 0; }
+.template-sheet h2 { margin: 0 32px 4px 0; font-size: 18px; line-height: 26px; }
+.prompt-part { min-width: 0; margin-top: 12px; padding: 12px; border: 1px solid var(--border); border-radius: 14px; }
+.prompt-part-title { margin: 0; color: var(--ink-strong); font-size: 13px; line-height: 20px; font-weight: 600; }
+.prompt-part .field { margin-top: 10px; }
+.prompt-part .help { margin-top: 8px; }
+/* A section's library box: one row, not a tall tile. */
+.prompt-part .field:has(> .choice-box) { position: relative; }
+.prompt-part .choice-box { flex-direction: row; justify-content: flex-start; gap: 10px; min-height: 0; padding: 8px 40px 8px 10px; border-radius: 12px; text-align: left; }
+.prompt-part .choice-box .slot-icon { flex: none; width: 28px; height: 28px; }
+.prompt-part .choice-value { margin-left: auto; text-align: right; }
+.prompt-part .choice-clear { top: 50%; right: 10px; transform: translateY(-50%); }
+/* A chosen hook in ①: its card as a small thumbnail beside the name, not a cover. */
+.prompt-part .choice-box[data-filled] { padding: 8px 40px 8px 10px; }
+.prompt-part .choice-box[data-filled] > :is(video, img) { position: static; flex: none; width: 40px; height: 40px; border-radius: 8px; object-fit: cover; }
+.prompt-part .choice-box[data-filled] .choice-value { position: static; margin-left: 0; max-width: none; padding: 0; background: none; color: var(--ink); font-size: 13px; line-height: 18px; text-align: left; white-space: normal; }
 /* Hook variants: the switch and Done under the hook grid. */
 .variants { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; margin-top: 16px; font-size: 13px; line-height: 18px; }
 .variants label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
@@ -1893,9 +1923,8 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .choice-form :is(input:not([type]), textarea) { background: var(--surface); }
 .choice-form textarea { display: block; width: 100%; margin: 6px 0 0; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; color: inherit; font: inherit; font-size: 14px; line-height: 21px; resize: vertical; }
 .choice-form textarea + .help { margin: 6px 0 12px; }
-/* Marketing Studio's end scene and end text boxes, styled like the choice form's fields. */
-.end-scene :is(textarea, input[type='text']) { display: block; width: 100%; min-width: 0; margin: 0; padding: 8px 12px; border: 1px solid var(--field-border); border-radius: 8px; background: var(--fill); color: inherit; font: inherit; font-size: 14px; line-height: 21px; }
-.end-scene textarea { resize: vertical; field-sizing: content; }
+/* Marketing Studio's end text box, styled like the choice form's fields. */
+.end-scene input[type='text'] { display: block; width: 100%; min-width: 0; margin: 0; padding: 8px 12px; border: 1px solid var(--field-border); border-radius: 8px; background: var(--fill); color: inherit; font: inherit; font-size: 14px; line-height: 21px; }
 .end-scene .help { margin-top: 0; }
 .end-scene .theme-choice { justify-self: start; margin: 0; }
 .choice-examples { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 12px 0 16px; color: var(--text-sub); font-size: 13px; }

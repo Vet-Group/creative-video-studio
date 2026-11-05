@@ -78,6 +78,25 @@ test("a hook or a location asks for English scene text under its own system prom
   for (const system of [SUGGEST_SYSTEM, SCENE_SYSTEM, PROMPT_SYSTEM]) expect(system).toMatch(/\{"text": the text, "vi": a short summary of it in natural Vietnamese/);
 });
 
+test("a sectioned prompt's ending is English scene text that starts \"The clip ends\" and fits the rest of the clip, under the scene system prompt", async () => {
+  const bodies: FalBody[] = [];
+  const suggest = createFalSuggester({ apiKey: 'k', fetch: (_url, init) => (bodies.push(JSON.parse(String(init!.body))), falText('The clip ends with the model smiling at the camera.'.padEnd(150, '.'))) });
+  const out = await suggest({ field: 'ending', text: 'mỉm cười', context: 'The clip opens with a spin. The model walks to the window.', max: 200, model: 'The model: Kling.' });
+  expect(out.options).toHaveLength(3);
+  expect(bodies.map((b) => b.system_prompt)).toEqual(Array(3).fill(SCENE_SYSTEM));
+  // The same rules as every option: unseen photos and the writing principles.
+  expect(SCENE_SYSTEM).toMatch(/You cannot see the photos .* present tense/);
+  const user = bodies[0]!.prompt.split('\n');
+  expect(user[0]).toMatch(/^Write one ending: the last shot .*starting "The clip ends"\.$/);
+  expect(user).toContain('The model: Kling.');
+  expect(user).toContain('The rest of the clip: The clip opens with a spin. The model walks to the window.');
+  expect(user).toContain("The seller's notes: mỉm cười");
+  expect(user.at(-1)).toBe('About 180 characters long: never fewer than 140 characters or more than 200.');
+  // A section's hook reads the rest of the clip the same way; a brief keeps "The video" for its hook and location.
+  expect(suggestPrompt({ field: 'hook', text: '', context: 'The model walks.', max: 200 })).toContain('\nThe rest of the clip: The model walks.\n');
+  expect(suggestPrompt({ field: 'brief', text: '', context: 'The model walks.', max: 200 })).toContain('\nThe video: The model walks.\n');
+});
+
 test('the prompt leaves out an empty context, empty notes, no model and no seconds', () => {
   expect(suggestPrompt({ field: 'brief', text: '', context: '', max: 1200 })).not.toMatch(/The video|The seller's notes|The model|seconds/);
 });

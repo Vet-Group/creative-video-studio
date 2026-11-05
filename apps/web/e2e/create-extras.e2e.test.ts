@@ -39,6 +39,10 @@ test('the End frame slot shows only for a model that takes one, and its image go
   await withExtras(page, { endFrame: true });
   await page.reload();
   await expect(endSlot(page)).toBeVisible();
+  // Optional the one way the sections use: the pill beside the name, not a note in the text.
+  await expect(page.locator('.optional-head', { hasText: 'Khung hình cuối' }).locator('.choice-optional')).toHaveText('Tuỳ chọn');
+  await expect(endSlot(page)).toContainText('Ảnh clip kết thúc ở đó');
+  await expect(endSlot(page)).not.toContainText('không bắt buộc');
   await page.getByLabel('Ảnh sản phẩm').setInputFiles({ name: 'start.png', mimeType: 'image/png', buffer: png() });
   await page.getByLabel('Ảnh khung hình cuối').setInputFiles({ name: 'end.png', mimeType: 'image/png', buffer: png() });
   await expect(endSlot(page).getByRole('img', { name: 'end.png' })).toBeVisible();
