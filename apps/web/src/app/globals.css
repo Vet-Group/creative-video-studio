@@ -723,7 +723,7 @@ td code { white-space: pre-wrap; overflow-wrap: anywhere; }
   .admin table.jobs td:first-child { flex: 1 1 0; min-width: 0; }
   .admin table.jobs td.num { margin-left: auto; font-weight: 600; white-space: nowrap; }
   .admin table.jobs td:not(:first-child, .num) { order: 2; color: var(--text-sub); }
-  .admin table.jobs td.model::before { content: '· '; }
+  .admin table.jobs td.model::before { content: '\b7\20'; }
 }
 /* Costs: one bar per day, thin, rounded at the data end, with a 2px gap; day numbers every five days. */
 .admin .day-bars { display: grid; grid-template-columns: repeat(var(--days, 31), minmax(0, 1fr)); gap: 2px; align-items: end; height: 140px; margin: 0 0 24px; padding: 0; list-style: none; border-bottom: 1px solid var(--hairline); }
