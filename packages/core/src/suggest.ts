@@ -1,5 +1,6 @@
 // Suggestions (a feature Fash lacks): three options for Marketing Studio's brief (UGC) or spoken lines (Advanced), the English
-// scene of a member's own hook or location from its Vietnamese name and description, or the English prompt of any other tool, written by
+// scene of a member's own hook, location or ending from its Vietnamese name and description, a sectioned prompt's hook or ending written to
+// fit its other sections, or the English prompt of any other tool, written by
 // the same LLM as Enhance (enhance.ts: OpenAI, else fal), in the worker, which holds the keys. The member picks one; nothing is generated.
 // For a template editor it also writes a motion preset's prompt from stills of the preset's clip (`video`, a vision call).
 import { ENHANCE_MODEL, ENHANCE_URL, OPENAI_MODEL, openAiChat } from './enhance';
@@ -19,18 +20,19 @@ const CHARS_PER_SENTENCE = 125;
 const MAX_SUMMARY = 400;
 
 export interface SuggestInput {
-  /** `brief`: what the creator should do and say about the product; `script`: the exact lines the creator speaks; `hook` and `location`: the
-   * English scene of a new hook or location (the phrase the prompt takes), from the member's Vietnamese name and description in `text`;
+  /** `brief`: what the creator should do and say about the product; `script`: the exact lines the creator speaks; `hook`, `location` and
+   * `ending`: the English scene of a new hook, location or ending (the phrase the prompt takes), from the member's Vietnamese name and description
+   * in `text`, or a sectioned prompt's hook or ending from the member's own words so far, with the prompt's other sections in `context`;
    * `prompt`: the English prompt of the tool in `task`; `translate`: one Vietnamese reading of the English `text`, for the member only;
    * `video`: one motion preset prompt from stills of the clip in `clip`, for a template editor. */
-  field: 'brief' | 'script' | 'hook' | 'location' | 'prompt' | 'translate' | 'video';
+  field: 'brief' | 'script' | 'hook' | 'location' | 'ending' | 'prompt' | 'translate' | 'video';
   /** For `video`: the sample clip's name under samples/ (`preset-<id>.mp4`), whose stills the worker sends. */
   clip?: string;
   /** For a prompt: what the tool does and what its prompt should say (PROMPT_TASKS, picked by the server, never the member's words). */
   task?: string;
   /** The member's own text so far (may be empty). */
   text: string;
-  /** The chosen hook and location as the English phrases the prompt uses, when chosen. */
+  /** The chosen hook and location as the English phrases the prompt uses, when chosen; for a sectioned prompt's hook or ending, its other sections. */
   context: string;
   /** The field's character limit. */
   max: number;
@@ -66,11 +68,11 @@ export const SUGGEST_SYSTEM =
   'You help a fashion seller write a short UGC (user-generated content) video. ' + UNSEEN + ' Keep every concrete detail the seller gave. ' + PRINCIPLES +
   " Write the text in the language of the seller's text, or in Vietnamese when it is empty. " + REPLY;
 
-/** For a hook or a location the answer is always English, whatever the member wrote: the video models read English best. */
+/** For a hook, a location or an ending the answer is always English, whatever the member wrote: the video models read English best. */
 export const SCENE_SYSTEM =
-  "You write the English scene text an AI video model reads for a fashion UGC clip, from a seller's short Vietnamese name and description of it. " +
-  "Keep their meaning and every concrete detail, add nothing about the product's colours, printed text, logos or brand, and write the text in plain English " +
-  'with no Vietnamese. ' + PRINCIPLES + ' ' + REPLY;
+  "You write the English scene text an AI video model reads for a fashion UGC clip, from a seller's short notes on it (a Vietnamese name and " +
+  'description, or their own words so far, which may be empty) and, when given, the rest of the clip, which the scene must fit. ' + UNSEEN +
+  " Keep the notes' meaning and every concrete detail, and write the text in plain English with no Vietnamese. " + PRINCIPLES + ' ' + REPLY;
 
 /** For a prompt, the answer is English too, and it describes only what the tool's prompt controls. */
 export const PROMPT_SYSTEM =
@@ -170,6 +172,7 @@ const ASK = {
   brief: 'Write one creator brief: what the creator does on camera, beat by beat, and what they say about the product, as flowing prose.',
   script: 'Write one script: only the exact words the creator speaks to camera, natural and casual, with no stage directions.',
   hook: 'Write one hook: what happens in the first one or two seconds of the clip, in English, starting "The clip opens".',
+  ending: 'Write one ending: the last shot of the clip, one clear final action or pose that comes to rest, in English, starting "The clip ends".',
   location: 'Write one place the clip is set in: an English noun phrase, not a sentence, rich in concrete detail (the space, the light, the props and the mood), such as "a cozy corner cafe with warm light".',
   prompt: 'Write one prompt for',
 };
@@ -210,7 +213,7 @@ export function suggestPrompt(i: SuggestInput, d = 0): string {
     `Direction: ${DIRECTIONS[d]}`,
     i.model,
     pace,
-    i.context && `The video: ${i.context}`,
+    i.context && (i.field === 'hook' || i.field === 'ending' ? `The rest of the clip: ${i.context}` : `The video: ${i.context}`),
     i.text && `The seller's notes: ${i.text}`,
     lengthLine(i),
   ]
@@ -266,7 +269,7 @@ export function parseOption(answer: string, max: number): { text: string; vi: st
 type Chat = (system: string, user: string, temperature: number, maxTokens: number, images?: string[]) => Promise<{ text: string; costUsd: number | null }>;
 
 const SYSTEMS: Record<SuggestInput['field'], string> = {
-  brief: SUGGEST_SYSTEM, script: SUGGEST_SYSTEM, hook: SCENE_SYSTEM, location: SCENE_SYSTEM, prompt: PROMPT_SYSTEM, translate: TRANSLATE_SYSTEM, video: VIDEO_SYSTEM,
+  brief: SUGGEST_SYSTEM, script: SUGGEST_SYSTEM, hook: SCENE_SYSTEM, location: SCENE_SYSTEM, ending: SCENE_SYSTEM, prompt: PROMPT_SYSTEM, translate: TRANSLATE_SYSTEM, video: VIDEO_SYSTEM,
 };
 
 const sum = (costs: (number | null)[]): number | null => (costs.every((c) => c === null) ? null : costs.reduce<number>((a, c) => a + (c ?? 0), 0));

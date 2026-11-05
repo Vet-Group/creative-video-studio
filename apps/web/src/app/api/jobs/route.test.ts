@@ -855,8 +855,8 @@ describe('POST /api/jobs for an image feature', () => {
         expect(await error(await advanced(m, 2, { presetId: 'gentle-push-in' }))).toMatch(/prompt and no preset/);
         expect(await error(await advanced(m, 2, { params: { format: 'unboxing' } }))).toMatch(/params.format must be advanced/);
         expect(await error(await advanced(m, 2, { params: { format: 'advanced', audio: 'yes' } }))).toMatch(/params.audio must be on or off/);
-        expect(await error(await advanced(m, 2, { params: { format: 'advanced', resolution: '1K' } }))).toMatch(/params may hold only format, audio, endAssetId, hook, location, brief, script, ending, endText and endTextPos, as text/);
-        expect(await error(await advanced(m, 2, { feature: 'video', prompt: 'x', params: { format: 'advanced' } }))).toMatch(/params may hold only audio, endAssetId and audioAssetIds, as text/);
+        expect(await error(await advanced(m, 2, { params: { format: 'advanced', resolution: '1K' } }))).toMatch(/params may hold only format, audio, endAssetId, hook, hookText, location, brief, script, ending, endText and endTextPos, as text/);
+        expect(await error(await advanced(m, 2, { feature: 'video', prompt: 'x', params: { format: 'advanced' } }))).toMatch(/params may hold only audio, endAssetId, audioAssetIds, hookText and ending, as text/);
         expect(await jobCount()).toBe(before);
       });
 

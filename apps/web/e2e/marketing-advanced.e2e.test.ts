@@ -43,9 +43,11 @@ test('an Advanced job runs from reference images, a brief, a script and audio on
   await expect(page.getByRole('button', { name: /^Bối cảnh/ })).toBeVisible();
   await expect(brief(page)).toHaveAttribute('placeholder', 'Ví dụ: người mẫu mở hộp, cầm sản phẩm lên và nói cảm nhận đầu tiên…');
   await expect(script(page)).toBeVisible();
-  const [promptBox, scriptBox] = await page.locator('.prompt-box').all();
-  expect((await scriptBox!.boundingBox())!.height).toBeCloseTo(123, 0); // empty: the 76 px text and the toolbar, no starter chips
-  expect((await promptBox!.boundingBox())!.height).toBeCloseTo(161, 0); // the prompt adds one row of starter chips
+  // Empty, each box is its text and the toolbar, with no row of starter chips (the templates menu replaced them): the script's 76 px text, and the
+  // brief's placeholder, which takes a third line in the narrower Body section.
+  expect((await script(page).locator('..').boundingBox())!.height).toBeCloseTo(123, 0);
+  expect((await brief(page).locator('..').boundingBox())!.height).toBeCloseTo(126, 0);
+  await expect(page.getByRole('group', { name: 'Gợi ý nhanh' })).toHaveCount(0);
   await expect(audio(page)).toHaveAttribute('aria-checked', 'true');
   await expect(modelButton(page)).toContainText('Mock E2E');
   await expect(runButton(page)).toContainText('$0.0000');

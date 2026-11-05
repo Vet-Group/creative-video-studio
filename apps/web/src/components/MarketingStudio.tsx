@@ -6,7 +6,8 @@ import { useRouter } from 'next/navigation';
 import { type CSSProperties, useEffect, useId, useState } from 'react';
 import { ABOUT } from '@/lib/about-content';
 import { api, errorText, sendJson } from '@/lib/api';
-import { ADVANCED_MAX_IMAGES, ADVANCED_MAX_SCRIPT, advancedPrompt, briefRoom, END_TEXT_POSITIONS, type EndTextPosition, marketingPrompt } from '@/lib/marketing';
+import { ADVANCED_MAX_IMAGES, ADVANCED_MAX_SCRIPT, advancedPrompt, briefRoom, END_TEXT_POSITIONS, type EndTextPosition, marketingPrompt, sectionPrompt } from '@/lib/marketing';
+import { PROMPT_TEMPLATES } from '@/lib/prompt-starters';
 import { promptTooLong } from '@/lib/prompt-limit';
 import { confirmRun } from '@/lib/run-guard';
 import { confirmDialog } from './Confirm';
@@ -19,7 +20,7 @@ import { About } from './About';
 import { AudioSwitch } from './AudioSwitch';
 import { BrandPicker } from './BrandKit';
 import { CardMedia, LoopVideo } from './CardMedia';
-import { builtInChoices, type Choice, ChoiceBox, ChoiceDialog, type ChoiceLists } from './Choices';
+import { builtInChoices, type Choice, ChoiceBox, ChoiceDialog, PhraseChoice, useChoiceLists } from './Choices';
 import { EndScene } from './EndScene';
 import { Icon } from './Icon';
 import { copyError, copySamples, Gallery, HISTORY_SIZE_KEY, type Img, PhotoDialog, photoImg, RunSummary, SizeSlider, Slot, uploadError, uploadImages, UPLOAD_ERROR, useSize, WorkTabs } from './image-tools';
@@ -27,6 +28,7 @@ import { FormContext, type FormActions, type Photo, type PhotoRole, useApplier, 
 import { Modal } from './Modal';
 import { ModelPicker } from './ModelPicker';
 import { PromptComposer } from './PromptComposer';
+import { PromptPreview, PromptSections, usePromptMode } from './PromptSections';
 import { Select } from './Select';
 import { Tray } from './Shell';
 import { Templates } from './Templates';
@@ -83,6 +85,9 @@ interface MarketingJob {
   format: string | null;
   images: (Img | { sample: string })[];
   hook: string | null;
+  /** The member's own hook and how a template's prompt was written; an older job has neither. */
+  hookText?: string | null;
+  promptMode?: 'sections' | 'free' | null;
   location: string | null;
   brief: string | null;
   script: string | null;
@@ -110,7 +115,11 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
   const [refs, setRefs] = useState<Img[]>([]);
   const [script, setScript] = useState('');
   const [endFrame, setEndFrame] = useState<Img | null>(null); // sent only on a model that takes one
-  const [ending, setEnding] = useState('');
+  const [ending, setEnding] = useState(''); // ③ Ending of the sections, with the own hook of ①; the brief is ② Body
+  const [hookText, setHookText] = useState('');
+  const [freeText, setFreeText] = useState(''); // the free writing box, which keeps its own words
+  const [mode, setMode] = usePromptMode(advanced ? 'marketing-advanced' : 'marketing');
+  const sec = mode === 'sections';
   const [endText, setEndText] = useState('');
   const [endTextPos, setEndTextPos] = useState<EndTextPosition>('bottom');
   const [audio, setAudio] = useState(true);
@@ -118,8 +127,9 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
   const [hooks, setHooks] = useState<string[]>([]);
   const [many, setMany] = useState(false);
   const [location, setLocation] = useState('');
-  /** The member's own and the company's hooks and locations, and the often-used ids; null until loaded (the built-in ones show meanwhile). */
-  const [custom, setCustom] = useState<ChoiceLists | null>(null);
+  /** The member's own and the company's hooks, locations and endings, and the often-used ids; null until loaded (the built-in ones show meanwhile). */
+  const choices = useChoiceLists(advanced ? 'advanced' : undefined);
+  const { lists: custom, setLists: setCustom, reload: loadChoices, remove: removeChoice } = choices;
   const [picker, setPicker] = useState<'hook' | 'location' | 'format' | 'model' | 'product' | null>(null);
   /** The member's past UGC product photos (Fash's My Products), offered by the product slot. */
   const [myProducts, setMyProducts] = useState<Img[]>([]);
@@ -181,9 +191,13 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
   const hookList = custom?.hooks ?? builtInChoices('hook');
   const locationList = custom?.locations ?? builtInChoices('location');
   const own = { hooks: custom?.hooks, locations: custom?.locations };
+  /** The words of ② Body, or of the free writing box; the own hook (used only while no hook is chosen) and the last shot count in the sections only. */
+  const brief = sec ? prompt : freeText;
+  const parts = { hookText: sec ? hookText : '', ending: sec ? ending : '' };
   const composeFor = (hook: string, brief: string) =>
-    advanced ? advancedPrompt({ brief, images: refs.length, hook, location, script, ending, audio: audioOn }, own) : marketingPrompt({ hook, location, prompt: brief, ending, audio: audioOn, ratio }, own);
-  const compose = (hook: string) => composeFor(hook, prompt);
+    advanced ? advancedPrompt({ brief, images: refs.length, hook, location, script, ...parts, audio: audioOn }, own) : marketingPrompt({ hook, location, prompt: brief, ...parts, audio: audioOn, ratio }, own);
+  const compose = (hook: string) => composeFor(hook, brief);
+  const line = (text: string) => text.replace(/\s+/g, ' ').trim();
   const endAssetId = chosen?.endFrame ? endFrame?.id : undefined;
   /** What the brief may take: the chosen model's limit less what the page adds around it, for the longest variant. */
   const room = chosen && Math.min(...variants.map((h) => briefRoom((b) => composeFor(h, b), chosen.maxPromptChars)));
@@ -240,7 +254,12 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
         else (setPerson(inputs.slice(0, 1)), setProduct(inputs.slice(1, 2)));
         setHooks(j.hook ? [j.hook] : []);
         setLocation(j.location ?? '');
-        setPrompt(j.brief ?? '');
+        // A job with an own hook or a last shot was written in sections; a template keeps the way it was written; else the brief goes where the member writes now.
+        const next = j.promptMode ?? (j.hookText || j.ending ? 'sections' : mode);
+        if (next !== mode) setMode(next);
+        if (next === 'free') setFreeText(j.brief ?? '');
+        else setPrompt(j.brief ?? '');
+        setHookText(j.hookText ?? '');
         setScript(j.script ?? '');
         setEndFrame(j.endFrame ?? null);
         setEnding(j.ending ?? '');
@@ -262,8 +281,6 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
     };
   }, [source]);
 
-  const loadChoices = () => api<ChoiceLists>(`/api/choices${advanced ? '?format=advanced' : ''}`).then(setCustom, () => {}); // a failure leaves the built-in ones
-  useEffect(() => void loadChoices(), [advanced]);
   useEffect(() => void api<{ stores: { id: string; name: string }[] }>('/api/stores').then((r) => setStores(r.stores), () => {}), []); // a failure leaves no store filter
   // A refilled hook or location that no longer exists (deleted, or another member's) is dropped once the lists are known.
   useEffect(() => {
@@ -277,15 +294,6 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
     if (!custom) void loadChoices(); // the lists failed to load at first: fetch them, so the new one has its phrase and name
     if (kind === 'hook') pickHook(c.id);
     else (setLocation(c.id), setPicker(null));
-  }
-  async function removeChoice(c: Choice) {
-    if (!(await confirmDialog({ title: `Xoá "${c.name}"?`, confirmLabel: 'Xoá', danger: true }))) return;
-    try {
-      await api(`/api/choices/${encodeURIComponent(c.id)}`, { method: 'DELETE' });
-      await loadChoices();
-    } catch (e) {
-      notify(errorText(e, 'Không xoá được.'));
-    }
   }
   const pickHook = (id: string) => (many && id ? setHooks((cur) => (cur.includes(id) ? cur.filter((h) => h !== id) : cur.length < MAX_VARIANTS ? [...cur, id] : cur)) : (setHooks(id ? [id] : []), setPicker(null)));
 
@@ -325,7 +333,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
                     ? 'Tải lên ít nhất 1 ảnh tham chiếu.'
                     : refs.length > chosen!.maxImages
                       ? `Mô hình này nhận tối đa ${chosen!.maxImages} ảnh tham chiếu. Bỏ bớt ảnh hoặc chọn mô hình khác.`
-                      : prompt.trim() === ''
+                      : brief.trim() === ''
                         ? 'Viết prompt mô tả video bạn muốn.'
                         : null
                   : person.length === 0
@@ -370,7 +378,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
     recreate: (from) => (recall.touch(), setSource({ from }), narrow && setTab('create')),
     apply,
     photo: (p, role) => void take(p, role),
-    prompt: (text) => (setPrompt(text), notify('Đã chép prompt')),
+    prompt: (text) => ((sec ? setPrompt : setFreeText)(text), notify('Đã chép prompt')),
   };
 
   function add(set: (f: (cur: Img[]) => Img[]) => void, max = 1) {
@@ -402,7 +410,8 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
     for (const [i, hook] of variants.entries()) {
       // The form's own inputs ride along in params so History can refill the form (reuse); the worker never reads them.
       // The end frame and the end text are the worker's (the end text is burned in after the provider), so they go too.
-      const inputs = { ...(hook && { hook }), ...(location && { location }), ...(prompt.trim() && { brief: prompt.trim() }), ...(endAssetId && { endAssetId }), ...(ending.trim() && { ending: ending.trim() }), ...(endText.trim() && { endText: endText.trim(), endTextPos }) };
+      // The own hook only where the prompt has it: no hook chosen for this variant.
+      const inputs = { ...(hook && { hook }), ...(!hook && line(parts.hookText) && { hookText: line(parts.hookText) }), ...(location && { location }), ...(brief.trim() && { brief: brief.trim() }), ...(endAssetId && { endAssetId }), ...(line(parts.ending) && { ending: line(parts.ending) }), ...(endText.trim() && { endText: endText.trim(), endTextPos }) };
       const body = advanced
         ? {
             feature: 'marketing',
@@ -432,6 +441,16 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
     void loadChoices(); // the often-used group counts this Run
     setBusy(false);
   }
+
+  /** The end frame (on a model that takes one) and the end text the worker burns in. */
+  const endExtras = (
+    <>
+      {chosen?.endFrame && (
+        <Slot label="Khung hình cuối" empty="Ảnh clip kết thúc ở đó (không bắt buộc)" inputLabel="Ảnh khung hình cuối" images={endFrame ? [endFrame] : []} max={1} busy={busy} onAdd={add((f) => setEndFrame(f([])[0] ?? null))} onRemove={() => setEndFrame(null)} onPick={setEndFrame} storeId={storeId} />
+      )}
+      <EndScene text={endText} onText={setEndText} position={endTextPos} onPosition={setEndTextPos} />
+    </>
+  );
 
   const tabs: Tab[] = narrow ? ['create', 'history', 'examples', 'about'] : ['history', 'examples', 'about'];
   const shown: Tab = narrow ? (tab ?? 'create') : tab === null || tab === 'create' ? opening : tab;
@@ -476,20 +495,48 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
               <ChoiceBox label="Bối cảnh (tuỳ chọn)" icon="sliders" media={location ? cardSample(have, `marketing-location-${location}`) : undefined} value={locationList.find((c) => c.id === location)?.name} onOpen={() => setPicker('location')} onClear={() => setLocation('')} />
             </div>
 
-            <PromptComposer
-              id={promptId}
-              label="Prompt"
-              optional={!advanced}
-              required={advanced}
+            <PromptSections
               feature="marketing"
               format={advanced ? 'advanced' : undefined}
-              value={prompt}
-              onChange={setPrompt}
-              maxLength={room}
+              mode={mode}
+              onMode={(next) => (next === 'free' && setFreeText(sectionPrompt({ hook: hooks.length > 0 ? '' : hookText, body: prompt, ending })), setMode(next))}
+              hook={{
+                // The library pick is the Hook box above (with its variants); the own words stand in for it.
+                box: null,
+                hint: hooks.length > 0 ? 'Đang dùng hook đã chọn ở ô Hook phía trên; chữ tự viết chỉ dùng khi bỏ chọn hook đó.' : 'Chọn hook có sẵn ở ô Hook phía trên, hoặc tự viết ở đây. Chữ tự viết chỉ dùng khi chưa chọn hook.',
+                text: hookText,
+                onText: setHookText,
+                ask: chosen ? () => ({ field: 'hook', text: hookText, rest: sectionPrompt({ body: prompt, ending }), model: chosen.id, audio, seconds: durationSec }) : null,
+              }}
+              ending={{
+                box: <PhraseChoice kind="ending" label="Cảnh kết có sẵn" title="Chọn cảnh kết" sub="Cảnh cuối clip dừng lại ở đó. Chọn một cảnh kết để điền vào phần Kết, rồi sửa nếu cần." choices={choices} stores={stores} storeId={storeId} text={ending} onText={setEnding} />,
+                text: ending,
+                onText: setEnding,
+                ask: chosen ? () => ({ field: 'ending', text: ending, rest: sectionPrompt({ hook: hooks[0] ? hookList.find((c) => c.id === hooks[0])?.phrase : hookText, body: prompt }), model: chosen.id, audio, seconds: durationSec }) : null,
+                extra: endExtras,
+              }}
+              endText
+              templates={PROMPT_TEMPLATES.marketing}
+              // A template's own hook counts only with no hook chosen, so the chosen ones go.
+              onTemplate={(t) => (sec ? (setHooks([]), setHookText(t.hook), setPrompt(t.body), setEnding(t.ending)) : setFreeText(sectionPrompt(t)))}
+              filled={(sec ? hookText + prompt + ending : freeText).trim() !== ''}
               onRun={() => canRun && void run()}
-              placeholder="Ví dụ: người mẫu mở hộp, cầm sản phẩm lên và nói cảm nhận đầu tiên…"
-              ask={chosen ? () => ({ field: 'brief', ...(advanced && { format: 'advanced' }), text: prompt, hook: hooks[0], location: location || undefined, seconds: durationSec, audio, ...(room !== undefined && { room }), model: chosen.id }) : null}
-            />
+            >
+              <PromptComposer
+                id={promptId}
+                label="Prompt"
+                optional={!advanced}
+                required={advanced}
+                feature="marketing"
+                format={advanced ? 'advanced' : undefined}
+                value={brief}
+                onChange={sec ? setPrompt : setFreeText}
+                maxLength={room}
+                onRun={() => canRun && void run()}
+                placeholder="Ví dụ: người mẫu mở hộp, cầm sản phẩm lên và nói cảm nhận đầu tiên…"
+                ask={chosen ? () => ({ field: 'brief', ...(advanced && { format: 'advanced' }), text: brief, hook: hooks[0], location: location || undefined, seconds: durationSec, audio, ...(room !== undefined && { room }), model: chosen.id }) : null}
+              />
+            </PromptSections>
             {advanced && (
               <PromptComposer
                 id={scriptId}
@@ -501,7 +548,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
                 maxLength={ADVANCED_MAX_SCRIPT}
                 onRun={() => canRun && void run()}
                 placeholder="Viết lời thoại bạn muốn nhân vật nói…"
-                ask={chosen ? () => ({ field: 'script', format: 'advanced', text: script || prompt, hook: hooks[0], location: location || undefined, seconds: durationSec, audio, model: chosen.id }) : null}
+                ask={chosen ? () => ({ field: 'script', format: 'advanced', text: script || brief, hook: hooks[0], location: location || undefined, seconds: durationSec, audio, model: chosen.id }) : null}
                 aiLabel="Gợi ý lời thoại"
                 parts={['ai', 'translate', 'clear', 'expand']}
                 starters={[]}
@@ -520,21 +567,10 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
             </div>
             <AudioSwitch on={audio} available={chosen?.audioEstimateUsd != null} always={chosen?.alwaysAudio} onChange={setAudio} />
             {models && models.length > 0 && <ModelPicker models={models.map((m) => ({ id: m.id, label: m.label, isMock: m.isMock, supported: !advanced || m.maxImages >= refs.length, estimateUsd: audio && m.audioEstimateUsd != null ? m.audioEstimateUsd : m.estimateUsd, score: m.score, recommended: m.recommended, resolution: m.resolution, durationsSec: m.durationsSec, audio: m.audioEstimateUsd != null, isNew: m.isNew, creditUsd: m.creditUsd }))} value={chosen?.id ?? ''} onChange={(id) => pickModel(models.find((m) => m.id === id)!)} />}
-            {/* Under the model, so the ratio row sits right under the prompt box as on Fash. */}
-            <details className="prompt-preview">
-              <summary>Xem prompt gửi đi</summary>
-              {sent.map((p, i) => (
-                <p key={variants[i] || 'none'} lang="en">
-                  {n > 1 && <strong lang="vi">Biến thể {i + 1} ({hookName(variants[i]!)}): </strong>}
-                  {p}
-                </p>
-              ))}
-            </details>
-            {/* Under the model and the prompt preview, so the ratio row stays right under the prompt box as on Fash. */}
-            {chosen?.endFrame && (
-              <Slot label="Khung hình cuối" empty="Ảnh clip kết thúc ở đó (không bắt buộc)" inputLabel="Ảnh khung hình cuối" images={endFrame ? [endFrame] : []} max={1} busy={busy} onAdd={add((f) => setEndFrame(f([])[0] ?? null))} onRemove={() => setEndFrame(null)} onPick={setEndFrame} storeId={storeId} />
-            )}
-            <EndScene ending={ending} onEnding={setEnding} text={endText} onText={setEndText} position={endTextPos} onPosition={setEndTextPos} />
+            {/* Under the model, so in free writing the ratio row sits right under the prompt box as on Fash. */}
+            <PromptPreview feature="marketing" prompts={sent} labels={n > 1 ? variants.map((h, i) => `Biến thể ${i + 1} (${hookName(h)})`) : undefined} limit={chosen?.maxPromptChars} />
+            {/* In the sections they sit in ③ Ending; in free writing, under the prompt preview. */}
+            {!sec && endExtras}
             <BrandPicker storeId={storeId} onStore={setStoreId} on={useBrand} onToggle={setUseBrand} />
             <Templates
               feature="marketing"
@@ -543,9 +579,11 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
                 ...(advanced && { format: 'advanced', script: script.trim() }),
                 hook: hooks[0],
                 location,
-                brief: prompt.trim(),
+                brief: brief.trim(),
+                ...(sec && line(hookText) && { hookText: line(hookText) }),
+                ...(sec && line(ending) && { ending: line(ending) }),
+                promptMode: mode,
                 endFrame: endAssetId,
-                ending: ending.trim(),
                 ...(endText.trim() && { endText: endText.trim(), endTextPos }),
                 audio: audio ? 'on' : 'off',
                 ratio,

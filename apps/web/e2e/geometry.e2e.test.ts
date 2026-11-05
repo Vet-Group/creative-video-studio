@@ -345,16 +345,15 @@ test.describe('1440x1000', () => {
     await expect(panel).toBeHidden();
   });
 
-  test('K4 prompt box: as wide as the form, radius 12 with a 1px border; textarea 76 tall, 14px/21px, transparent; the starter chips scroll in one row inside it', async ({ page }) => {
+  test('K4 prompt box (Viết tự do, the one box): as wide as the form, radius 12 with a 1px border; textarea 76 tall, 14px/21px, transparent; no starter chips (Mẫu prompt replaced them)', async ({ page }) => {
+    await page.getByRole('radiogroup', { name: 'Cách viết prompt' }).getByText('Viết tự do').click();
     const wrapper = page.locator('.prompt-box');
     near((await box(wrapper)).width, 268, 'prompt box width');
     expect(await css(wrapper, 'border-top-width', 'border-top-left-radius')).toEqual(['1px', '12px']);
     const area = page.getByLabel('Mô tả chuyển động');
     near((await box(area)).width, 266, 'textarea width');
     expect(await css(area, 'min-height', 'font-size', 'line-height', 'background-color')).toEqual(['76px', '14px', '21px', 'rgba(0, 0, 0, 0)']); // it grows with the text (the placeholder's lines too)
-    const chips = wrapper.getByRole('group', { name: 'Gợi ý nhanh' });
-    near((await box(chips)).height, 38, 'one row of chips');
-    expect(await chips.evaluate((e) => e.scrollWidth > e.clientWidth), 'the rest scroll sideways').toBe(true);
+    await expect(wrapper.getByRole('group', { name: 'Gợi ý nhanh' })).toHaveCount(0);
   });
 
   test('T1 pill tabs: 37 tall, padding 8px 20px, radius 8, 14px/600, active black on white, inactive rgb(102,102,102) on no background, no bottom border', async ({ page }) => {

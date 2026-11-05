@@ -2,6 +2,8 @@
 import { type DragEvent, type KeyboardEvent, useEffect, useId, useRef, useState } from 'react';
 import { api, errorText, sendJson } from '@/lib/api';
 import { cardSample, type Example, exampleForPreset, examplesFor, exampleTitle, sampleSrc, splitColumns } from '@/lib/examples';
+import { briefRoom, sectionBody, sectionPrompt } from '@/lib/marketing';
+import { PROMPT_TEMPLATES } from '@/lib/prompt-starters';
 import { promptTooLong } from '@/lib/prompt-limit';
 import { confirmRun } from '@/lib/run-guard';
 import { NARROW, useMediaQuery, WIDE } from '@/lib/use-media-query';
@@ -13,6 +15,7 @@ import { dropRefillQuery, exampleFrom } from '@/lib/reuse';
 import { About } from './About';
 import { AudioSwitch } from './AudioSwitch';
 import { CardMedia } from './CardMedia';
+import { PhraseChoice, useChoiceLists } from './Choices';
 import { EnhanceToggle } from './EnhanceToggle';
 import { Icon } from './Icon';
 import { copyError, copySamples, GALLERY_SIZE_KEY, HISTORY_SIZE_KEY, photoImg, RunSummary, SizeSlider, Slot, UploadedPhotos, uploadError, uploadImages, useSize } from './image-tools';
@@ -21,6 +24,7 @@ import { Modal } from './Modal';
 import { ModelPicker } from './ModelPicker';
 import { loadPending, PendingProposals, type PresetDraft, PresetForm, type PresetRow, type Proposal } from './PresetEditing';
 import { PromptComposer } from './PromptComposer';
+import { PromptPreview, PromptSections, usePromptMode } from './PromptSections';
 import { Preview } from './Preview';
 import { Select } from './Select';
 import { Tray } from './Shell';
@@ -87,6 +91,10 @@ interface JobDetail {
   /** The end frame and reference audio a job or a template still has; a sample has none. */
   endFrame?: Image | null;
   clips?: Clip[];
+  /** The prompt's sections a job or a template kept, and how a template's prompt was written. */
+  hookText?: string | null;
+  ending?: string | null;
+  promptMode?: 'sections' | 'free' | null;
 }
 
 /** A sample clip's details file (`example-<n>.json` beside the clip): what the reference site's Example dialog shows, read as a refill too. */
@@ -128,7 +136,14 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
   const [presetId, setPresetId] = useState(''); // '' means a free prompt
   const [enhance, setEnhance] = useState(true); // on by default, as on Fash; it rewrites a free prompt only
   const [audio, setAudio] = useState(true); // native audio, on by default as on Fash, on a model that can make it
-  const [prompt, setPrompt] = useState('');
+  const [prompt, setPrompt] = useState(''); // ② Body of a sectioned prompt
+  // The other sections and the free writing box, which keeps its own words: switching back to the sections finds them as they were.
+  const [hookText, setHookText] = useState('');
+  const [ending, setEnding] = useState('');
+  const [freeText, setFreeText] = useState('');
+  const [mode, setMode] = usePromptMode('video');
+  const sec = mode === 'sections';
+  const choices = useChoiceLists();
   const [ratio, setRatio] = useState('9:16');
   const [durationSec, setDurationSec] = useState(8);
   const [modelId, setModelId] = useState(model ?? '');
@@ -259,7 +274,14 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
         setEndFrame(j.endFrame ?? null);
         setClips(j.clips ?? []);
         setPresetId(preset ?? '');
-        if (!preset) setPrompt(j.prompt ?? '');
+        if (!preset) {
+          // A prompt made of sections refills them; a template keeps the way it was written; else the words go where the member writes now.
+          const body = j.hookText || j.ending ? sectionBody(j.prompt ?? '', j.hookText, j.ending) : null;
+          const next = j.promptMode ?? (body !== null ? 'sections' : mode);
+          if (next !== mode) setMode(next);
+          if (next === 'free') setFreeText(j.prompt ?? '');
+          else (setPrompt(body ?? j.prompt ?? ''), setHookText(body !== null ? (j.hookText ?? '') : ''), setEnding(body !== null ? (j.ending ?? '') : ''));
+        }
         setEnhance(j.presetId === null ? (j.enhance ?? true) : true); // a preset job never had Enhance, so the default stays
         setAudio(j.audio === 'on'); // a clip from before the switch was silent
         // A saved template may leave these out; the form's defaults stay.
@@ -318,8 +340,14 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
   const tooMany = chosen !== undefined && images.length > chosen.maxImages;
   // The upload limit follows the chosen model (REA-video V02); the server caps every model at MAX_IMAGES.
   const maxImages = Math.min(MAX_IMAGES, chosen?.maxImages ?? MAX_IMAGES);
-  const tooLong = presetId === '' ? promptTooLong(chosen, prompt.trim().length) : null;
-  const promptOk = presetId !== '' || (prompt.trim() !== '' && tooLong === null);
+  /** What Run sends as the free prompt: the sections composed (the body as typed while the hook and the ending are empty), or the free writing box. */
+  const composed = sec ? sectionPrompt({ hook: hookText, body: prompt, ending }) : freeText;
+  /** What the body may take: the model's limit less the hook and the ending around it. */
+  const room = chosen && (sec ? briefRoom((b) => sectionPrompt({ hook: hookText, body: b, ending }), chosen.maxPromptChars) : chosen.maxPromptChars);
+  const line = (text: string) => text.replace(/\s+/g, ' ').trim();
+  const sections = { ...(sec && line(hookText) && { hookText: line(hookText) }), ...(sec && line(ending) && { ending: line(ending) }) };
+  const tooLong = presetId === '' ? promptTooLong(chosen, composed.trim().length) : null;
+  const promptOk = presetId !== '' || (composed.trim() !== '' && tooLong === null);
   const canRun = ready && recall.answered && !busy && (images.length > 0 || (wordsOnly && presetId === '')) && chosen?.supported === true && !tooMany && !clipsOver && promptOk;
 
   async function upload(files: File[]) {
@@ -360,7 +388,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
     setError('');
     setNotice('');
     try {
-      await api('/api/jobs', sendJson('POST', { assetIds: images.map((i) => i.id), modelId, ...(presetId ? { presetId } : { prompt, enhance }), ratio, durationSec, storeId: storeId || null, params: { audio: audioOn ? 'on' : 'off', ...(endAssetId && { endAssetId }), ...(audioAssetIds && { audioAssetIds }) } }));
+      await api('/api/jobs', sendJson('POST', { assetIds: images.map((i) => i.id), modelId, ...(presetId ? { presetId } : { prompt: composed, enhance }), ratio, durationSec, storeId: storeId || null, params: { audio: audioOn ? 'on' : 'off', ...(endAssetId && { endAssetId }), ...(audioAssetIds && { audioAssetIds }), ...(!presetId && sections) } }));
       setNotice('Đã gửi job. Theo dõi trong tab "Lịch sử".');
       setRefetch((n) => n + 1);
       if (!narrow) setTab('history'); // beside the form, the new job shows in History
@@ -462,11 +490,17 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
       setError(copyError(e, 'Không tải lên được ảnh.'));
     }
   }
-  /** A detail's words as the free prompt (a preset has none of its own text). */
+  /** A detail's words as the free prompt (a preset has none of its own text); in sections, the body, with the hook and the ending emptied so Run sends them as they are. */
   function copyPrompt(text: string) {
     setPresetId('');
-    setPrompt(text);
+    if (sec) (setPrompt(text), setHookText(''), setEnding(''));
+    else setFreeText(text);
     notify('Đã chép prompt');
+  }
+  /** Free writing starts from what the sections would send. */
+  function switchMode(next: typeof mode) {
+    if (next === 'free') setFreeText(composed);
+    setMode(next);
   }
   /** Fash's Recreate: the form refills in place; on a narrow screen the form is its own tab, so it opens. */
   function recreate(from: string) {
@@ -484,6 +518,45 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
     setPicking(false);
     if (narrow) setTab('create');
   }
+
+  // ② Body of the sections, the one box of free writing, and the read-only box of a preset.
+  const body = (
+    <PromptComposer
+      id={promptId}
+      label="Mô tả chuyển động"
+      feature="video"
+      value={sec ? prompt : freeText}
+      onChange={sec ? setPrompt : setFreeText}
+      maxLength={room}
+      onRun={() => canRun && void run()}
+      disabled={presetId !== ''}
+      placeholder={presetId === '' ? 'Ví dụ: camera xoay chậm quanh sản phẩm, ánh sáng mềm (nên viết bằng tiếng Anh)' : 'Đang dùng mẫu. Chọn "Tự viết mô tả" trong danh sách mẫu để tự nhập'}
+      ask={chosen ? () => ({ field: 'prompt', feature: 'video', text: sec ? prompt : freeText, seconds: durationSec, audio, room: room!, model: chosen.id }) : null}
+      enhance={<EnhanceToggle on={enhance} onChange={setEnhance} />}
+    />
+  );
+  // In the sections, the end frame sits in ③ Ending beside the last shot; with free writing or a preset, under the photos.
+  const endSlot = chosen?.endFrame && (
+    <Slot
+      label="Khung hình cuối"
+      empty="Ảnh clip kết thúc ở đó (không bắt buộc)"
+      inputLabel="Ảnh khung hình cuối"
+      images={endFrame ? [endFrame] : []}
+      max={1}
+      busy={busy}
+      onAdd={(files) => {
+        setError('');
+        setBusy(true);
+        uploadImages(files, 'image', storeId)
+          .finally(loading('Đang tải lên…'))
+          .then(([img]) => img && setEndFrame(img), (e) => setError(uploadError(e)))
+          .finally(() => setBusy(false));
+      }}
+      onRemove={() => setEndFrame(null)}
+      onPick={setEndFrame}
+      storeId={storeId}
+    />
+  );
 
   return (
     <section aria-labelledby="create-title" className="create">
@@ -560,27 +633,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
             <div className="dropzone-foot">
               <UploadedPhotos taken={images} disabled={!hydrated || busy || images.length >= maxImages} storeId={storeId} onPick={(img) => (setError(''), setImages((cur) => (cur.length < maxImages ? [...cur, img] : cur)))} />
             </div>
-            {chosen?.endFrame && (
-              <Slot
-                label="Khung hình cuối"
-                empty="Ảnh clip kết thúc ở đó (không bắt buộc)"
-                inputLabel="Ảnh khung hình cuối"
-                images={endFrame ? [endFrame] : []}
-                max={1}
-                busy={busy}
-                onAdd={(files) => {
-                  setError('');
-                  setBusy(true);
-                  uploadImages(files, 'image', storeId)
-                    .finally(loading('Đang tải lên…'))
-                    .then(([img]) => img && setEndFrame(img), (e) => setError(uploadError(e)))
-                    .finally(() => setBusy(false));
-                }}
-                onRemove={() => setEndFrame(null)}
-                onPick={setEndFrame}
-                storeId={storeId}
-              />
-            )}
+            {(!sec || presetId !== '') && endSlot}
             {takes && (
               <div className="field">
                 <span id={clipsId} className="field-label">
@@ -641,19 +694,36 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
               </p>
             )}
 
-            <PromptComposer
-              id={promptId}
-              label="Mô tả chuyển động"
-              feature="video"
-              value={prompt}
-              onChange={setPrompt}
-              maxLength={chosen?.maxPromptChars}
-              onRun={() => canRun && void run()}
-              disabled={presetId !== ''}
-              placeholder={presetId === '' ? 'Ví dụ: camera xoay chậm quanh sản phẩm, ánh sáng mềm (nên viết bằng tiếng Anh)' : 'Đang dùng mẫu. Chọn "Tự viết mô tả" trong danh sách mẫu để tự nhập'}
-              ask={chosen ? () => ({ field: 'prompt', feature: 'video', text: prompt, seconds: durationSec, audio, room: chosen.maxPromptChars, model: chosen.id }) : null}
-              enhance={<EnhanceToggle on={enhance} onChange={setEnhance} />}
-            />
+            {/* A preset's prompt replaces everything, so its box stands alone, read-only, without the sections. */}
+            {presetId !== '' ? (
+              body
+            ) : (
+              <PromptSections
+                feature="video"
+                mode={mode}
+                onMode={switchMode}
+                hook={{
+                  box: <PhraseChoice kind="hook" label="Hook có sẵn" title="Chọn hook" sub="Cảnh mở đầu giữ chân người xem trong 2 giây đầu. Chọn một hook để điền vào phần Hook, rồi sửa nếu cần." choices={choices} stores={stores} storeId={storeId} text={hookText} onText={setHookText} />,
+                  text: hookText,
+                  onText: setHookText,
+                  ask: chosen ? () => ({ field: 'hook', text: hookText, rest: sectionPrompt({ body: prompt, ending }), model: chosen.id, audio, seconds: durationSec }) : null,
+                }}
+                ending={{
+                  box: <PhraseChoice kind="ending" label="Cảnh kết có sẵn" title="Chọn cảnh kết" sub="Cảnh cuối clip dừng lại ở đó. Chọn một cảnh kết để điền vào phần Kết, rồi sửa nếu cần." choices={choices} stores={stores} storeId={storeId} text={ending} onText={setEnding} />,
+                  text: ending,
+                  onText: setEnding,
+                  ask: chosen ? () => ({ field: 'ending', text: ending, rest: sectionPrompt({ hook: hookText, body: prompt }), model: chosen.id, audio, seconds: durationSec }) : null,
+                  extra: endSlot,
+                }}
+                templates={PROMPT_TEMPLATES.video}
+                onTemplate={(t) => (sec ? (setHookText(t.hook), setPrompt(t.body), setEnding(t.ending)) : setFreeText(sectionPrompt(t)))}
+                filled={(sec ? hookText + prompt + ending : freeText).trim() !== ''}
+                onRun={() => canRun && void run()}
+              >
+                {body}
+              </PromptSections>
+            )}
+            {presetId === '' && sec && <PromptPreview feature="video" prompts={[composed]} limit={chosen?.maxPromptChars} />}
 
             <Select label="Độ phân giải" icon="preset" heading="Độ phân giải" value={chosen?.resolution ?? ''} options={[{ value: chosen?.resolution ?? '', label: chosen?.resolution ?? 'Theo mô hình' }]} onChange={() => undefined} />
             <Select
@@ -691,7 +761,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
             )}
             <Templates
               feature="video"
-              data={() => ({ images: images.map((i) => i.id), endFrame: endAssetId, clips: audioAssetIds ? clips.map((c) => c.id) : undefined, ...(presetId ? { presetId } : { prompt: prompt.trim(), enhance }), audio: audio ? 'on' : 'off', ratio, durationSec, modelId, storeId })}
+              data={() => ({ images: images.map((i) => i.id), endFrame: endAssetId, clips: audioAssetIds ? clips.map((c) => c.id) : undefined, ...(presetId ? { presetId } : { prompt: composed.trim(), enhance, ...sections, promptMode: mode }), audio: audio ? 'on' : 'off', ratio, durationSec, modelId, storeId })}
               store={stores.find((s) => s.id === storeId) ?? null}
             />
           </div>

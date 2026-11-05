@@ -147,6 +147,28 @@ describe('reference audio', () => {
   });
 });
 
+describe('the prompt sections (Theo phần)', () => {
+  const paramsOf = async (res: Response) => (await pool.query('select prompt, params from jobs where id = $1', [((await res.json()) as { id: string }).id])).rows[0];
+
+  test('Create video and Marketing Studio keep the own hook and the last shot of the prompt they sent', async () => {
+    const sections = { hookText: 'The clip opens on a spin.', ending: 'The clip ends with a wave.' };
+    const res = await run({ prompt: 'The clip opens on a spin. A slow turn. The clip ends with a wave.', params: { audio: 'off', ...sections } });
+    expect(res.status).toBe(201);
+    expect(await paramsOf(res)).toEqual({ prompt: 'The clip opens on a spin. A slow turn. The clip ends with a wave.', params: { audio: 'off', ...sections } });
+    const mkt = await run({ feature: 'marketing', assetIds: ['img'], params: { format: 'advanced', hookText: 'x'.repeat(200) } });
+    expect(mkt.status).toBe(201);
+  });
+
+  test('refuses an over-long or blank section, one with a line break or a control character, and sections beside a preset', async () => {
+    for (const key of ['hookText', 'ending']) {
+      expect(await errorOf(await run({ params: { [key]: 'x'.repeat(201) } }))).toBe(`params.${key} may be at most 200 characters`);
+      for (const text of ['  ', 'two\nlines', 'bell\u0007']) expect(await errorOf(await run({ params: { [key]: text } }))).toBe(`params.${key} must be one line of text`);
+    }
+    expect(await errorOf(await run({ prompt: null, presetId: 'gentle-push-in', params: { hookText: 'A spin.' } }))).toBe('params.hookText and params.ending go with a free prompt, not a preset');
+    expect(await errorOf(await run({ feature: 'marketing', assetIds: ['img'], params: { format: 'advanced', ending: 'a\tb' } }))).toBe('params.ending must be one line of text');
+  });
+});
+
 describe('Marketing Studio: end frame, last shot and end text', () => {
   const ugc = (body: Record<string, unknown>) => run({ feature: 'marketing', assetIds: ['img', 'prod'], ...body });
   const paramsOf = async (res: Response) => (await pool.query('select params from jobs where id = $1', [((await res.json()) as { id: string }).id])).rows[0].params;

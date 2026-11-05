@@ -419,10 +419,12 @@ test('hook variants beyond the clips left today are refused before anything is s
   await expect(runButton(page)).toBeEnabled();
 });
 
-test('as on Fash, the ratio row sits 16 px under the prompt box, and the sent-prompt disclosure folds under the model picker', async ({ page }) => {
+test('as on Fash, in Viết tự do the ratio row sits 16 px under the prompt box, and the sent-prompt disclosure folds under the model picker', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await signIn(page, 'mktb');
   await page.goto('/marketing-studio');
+  // In the sections, ③ Ending sits between the prompt box and the ratio row; free writing is today's one box.
+  await page.getByRole('radiogroup', { name: 'Cách viết prompt' }).getByText('Viết tự do').click();
   const box = (await page.locator('.prompt-box').boundingBox())!;
   const row = (await select(page, 'Tỉ lệ').boundingBox())!;
   const gap = row.y - (box.y + box.height);
@@ -460,7 +462,7 @@ test('as on the live form (measured 2026-10-29): 272 px content, 131x130 tiles 1
   expect(await change.evaluate((e) => [getComputedStyle(e).fontWeight, getComputedStyle(e).backdropFilter])).toEqual(['400', 'blur(4.5px)']);
   const head = (await page.locator('label', { hasText: 'Prompt' }).locator('..').boundingBox())!;
   near(head.height, 21);
-  near((await page.locator('.prompt-box').boundingBox())!.y - (head.y + head.height), 6);
+  near((await page.getByRole('textbox', { name: 'Prompt (tuỳ chọn)' }).locator('..').boundingBox())!.y - (head.y + head.height), 6);
 
   await hookBox.click();
   const card = page.getByRole('dialog', { name: 'Chọn hook' }).getByRole('option', { name: hook.name, exact: true });
@@ -650,6 +652,8 @@ test('opening a menu low in the form neither scrolls the form nor hides under it
   await signIn(page, 'mktp');
   await page.goto('/marketing-studio');
   const form = page.locator('.form-scroll');
+  // The prompt sections put the duration below the fold: bring it into view first, so only the menu's own scrolling is measured.
+  await select(page, 'Thời lượng').scrollIntoViewIfNeeded();
   const before = await form.evaluate((e) => e.scrollTop);
   await select(page, 'Thời lượng').click();
   const pop = page.locator('.select-pop');

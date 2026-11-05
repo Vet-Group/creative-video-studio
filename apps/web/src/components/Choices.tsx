@@ -7,8 +7,10 @@ import { cardSample } from '@/lib/examples';
 import { BUILT_IN_CHOICES, MAX_CHOICE_DESC, MAX_CHOICE_NAME, MAX_CHOICE_NICHE, MAX_CHOICE_PHRASE, type MarketingChoice } from '@/lib/marketing';
 import { useSamples } from '@/lib/use-samples';
 import { CardMedia } from './CardMedia';
+import { confirmDialog } from './Confirm';
 import { Icon, type IconName } from './Icon';
 import { type Img, Slot, uploadError, uploadImages } from './image-tools';
+import { useJobs } from './jobs';
 import { Modal } from './Modal';
 import { Select } from './Select';
 import { SuggestButton } from './Suggestions';
@@ -76,6 +78,50 @@ export interface ChoiceLists {
 /** The built-in choices of `kind` in the list's shape, shown until the lists load. */
 export const builtInChoices = (kind: ChoiceKind): Choice[] =>
   BUILT_IN_CHOICES[kind].map((c) => ({ ...c, group: 'builtin', isCompany: false, mine: false, storeId: null, storeName: null, niche: null, imageAssetId: null }));
+
+/** The page's lists (null until they load; the built-in ones show meanwhile), `reload` after a change, and `remove`, which asks first. */
+export function useChoiceLists(format?: 'advanced') {
+  const { notify } = useJobs();
+  const [lists, setLists] = useState<ChoiceLists | null>(null);
+  const reload = () => api<ChoiceLists>(`/api/choices${format ? `?format=${format}` : ''}`).then(setLists, () => {}); // a failure leaves the built-in ones
+  useEffect(() => void reload(), [format]);
+  async function remove(c: Choice) {
+    if (!(await confirmDialog({ title: `Xoá "${c.name}"?`, confirmLabel: 'Xoá', danger: true }))) return;
+    try {
+      await api(`/api/choices/${encodeURIComponent(c.id)}`, { method: 'DELETE' });
+      await reload();
+    } catch (e) {
+      notify(errorText(e, 'Không xoá được.'));
+    }
+  }
+  return { lists, setLists, reload, remove };
+}
+
+/** Each kind's list in GET /api/choices. */
+export const LIST_OF = { hook: 'hooks', location: 'locations', ending: 'endings' } as const;
+
+/**
+ * A prompt section's library box (PromptSections.tsx): a pick, or a new hook or ending saved in the dialog, fills the section's words with its phrase,
+ * which stay the member's to edit; the box names the choice while the words are its phrase, and its X empties them.
+ */
+export function PhraseChoice({ kind, label, title, sub, choices, stores, storeId, text, onText }: { kind: 'hook' | 'ending'; label: string; title: string; sub: string; choices: ReturnType<typeof useChoiceLists>; stores: Store[]; storeId: string; text: string; onText: (text: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const list = choices.lists?.[LIST_OF[kind]] ?? builtInChoices(kind);
+  const picked = list.filter((c) => c.phrase === text.trim());
+  const take = (phrase: string) => (onText(phrase), setOpen(false));
+  function added(c: Choice) {
+    choices.setLists((cur) => cur && { ...cur, [LIST_OF[kind]]: [c, ...cur[LIST_OF[kind]]] });
+    if (!choices.lists) void choices.reload(); // the lists failed to load at first: fetch them, so the new one is listed
+    take(c.phrase);
+  }
+  return (
+    <>
+      <ChoiceBox label={label} icon={kind === 'hook' ? 'film' : 'check'} value={picked[0]?.name} onOpen={() => setOpen(true)} onClear={() => onText('')} />
+      <ChoiceDialog open={open} title={title} sub={sub} kind={kind} choices={list} often={choices.lists?.often[kind] ?? []} posters={choices.lists?.posters[kind] ?? {}} canShare={choices.lists?.canShare ?? false} stores={stores} storeId={storeId}
+        selected={picked.map((c) => c.id)} onPick={(id) => take(list.find((c) => c.id === id)?.phrase ?? '')} onAdded={added} onDelete={(c) => void choices.remove(c)} onClose={() => setOpen(false)} />
+    </>
+  );
+}
 
 const KIND_NAME = { hook: 'hook', location: 'bối cảnh', ending: 'cảnh kết' } as const;
 
@@ -204,8 +250,8 @@ function AddChoice({ kind, canShare, store, niche: initialNiche, onAdded, onCanc
           Cảnh cho AI (tiếng Anh)
         </label>
         <CharCount value={phrase} max={MAX_CHOICE_PHRASE} />
-        {/* Written from the Vietnamese name and description, so it waits for a name. The suggestions have no ending field yet. */}
-        {kind !== 'ending' && <SuggestButton label="AI viết giúp" disabled={!name.trim()} ask={() => ({ field: kind, text: [name.trim(), desc.trim()].filter(Boolean).join(' - ') })} onPick={setPhrase} />}
+        {/* Written from the Vietnamese name and description, so it waits for a name. */}
+        <SuggestButton label="AI viết giúp" disabled={!name.trim()} ask={() => ({ field: kind, text: [name.trim(), desc.trim()].filter(Boolean).join(' - ') })} onPick={setPhrase} />
       </div>
       <textarea id={ids.phrase} lang="en" rows={3} value={phrase} maxLength={MAX_CHOICE_PHRASE} placeholder={help.phrase} aria-describedby={ids.help} onChange={(e) => setPhrase(e.target.value)} />
       <p id={ids.help} className="help">
