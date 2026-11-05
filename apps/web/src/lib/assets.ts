@@ -130,12 +130,19 @@ export function audioDurationMs(b: Uint8Array, mime: string): number | undefined
   return Math.round(((b.length - p) * 8) / (mpeg1 ? MP3_KBPS.mpeg1 : MP3_KBPS.mpeg2)[rate]!);
 }
 
-/** The asset for a signed-in user: 404 when it does not exist, 403 unless the user owns it, is an Admin, or it belongs to a Library clip (its video, poster or input images). */
+/**
+ * The asset for a signed-in user: 404 when it does not exist, 403 unless the user owns it, is an Admin, or it belongs to a Library clip (its video, poster
+ * or input images) or is the photo of a company or store choice (user_choices), which every member sees.
+ */
 export async function readableAsset(session: Session, id: string): Promise<{ asset: Asset; error?: never } | { asset?: never; error: Response }> {
   const asset = await findAsset(db, id);
   if (!asset) return { error: Response.json({ error: 'not found' }, { status: 404 }) };
   if (asset.ownerId !== session.user.id && session.user.role !== 'admin') {
-    const inLibrary = await pool.query(`select 1 from jobs j where ${LIVE_CLIP} and ($1 in (j.output_asset_id, j.poster_asset_id) or $1 = any(j.input_asset_ids)) limit 1`, [id]);
+    const inLibrary = await pool.query(
+      `select 1 from jobs j where ${LIVE_CLIP} and ($1 in (j.output_asset_id, j.poster_asset_id) or $1 = any(j.input_asset_ids))
+       union all select 1 from user_choices c where c.image_asset_id = $1 and (c.is_company or c.store_id is not null) limit 1`,
+      [id],
+    );
     if (!inLibrary.rowCount) return { error: Response.json({ error: 'forbidden' }, { status: 403 }) };
   }
   return { asset };

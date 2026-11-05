@@ -76,8 +76,8 @@ await pool.query(`insert into stores (id, name, code) values ('store-brand', 'E2
 await pool.query('update settings set member_daily_clip_cap = 1000 where id = 1');
 // Straight through better-auth, not POST /api/admin/users, so must_change_password stays false and the specs sign in to the app itself.
 for (const u of Object.values(USERS)) await auth.api.createUser({ body: { email: u.email, name: u.name, password: PASSWORD, role: u.role, data: { emailVerified: true } } });
-// An Admin made these members template editors (Admin > Users), for preset-edit.e2e and store-brand.e2e.
-await pool.query('update users set can_edit_templates = true where email = any($1)', [[USERS.tpled.email, USERS.branded.email]]);
+// An Admin made these members template editors (Admin > Users), for preset-edit.e2e, store-brand.e2e and choices-store.e2e.
+await pool.query('update users set can_edit_templates = true where email = any($1)', [[USERS.tpled.email, USERS.branded.email, USERS.chsed.email]]);
 await pool.end();
 
 const children: ChildProcess[] = [

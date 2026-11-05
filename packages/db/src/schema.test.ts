@@ -751,3 +751,29 @@ describe('migration 0062 Replicate removed', () => {
     expect((await pool.query(`select count(*)::int as n from jobs where id = 'rep-job-1'`)).rows[0].n).toBe(1);
   });
 });
+
+describe('migration 0071 choices by store', () => {
+  test('lets a choice be an ending, carry a store (FK set null, store/kind index), a niche of 1 to 30 characters and a photo (FK set null), never store and company at once', async () => {
+    const user = await insertUser();
+    await pool.query(`insert into stores (id, name, code) values ('cs1', 'Shop CS', 'CS1')`);
+    await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) values ('ca1', $1, 'input', 'ca1', 'f.jpg', 'image/jpeg', 1)`, [user]);
+    const choice = (id: string, extra: Record<string, unknown> = {}) => {
+      const row = { id, user_id: user, kind: 'ending', name: 'n', phrase: 'p', ...extra };
+      const cols = Object.keys(row);
+      return pool.query(`insert into user_choices (${cols.join(', ')}) values (${cols.map((_, i) => `$${i + 1}`).join(', ')})`, Object.values(row));
+    };
+    await choice('c1', { store_id: 'cs1', niche: 'Áo dài', image_asset_id: 'ca1' });
+    await expect(choice('c2', { kind: 'music' })).rejects.toThrow(/user_choices_kind_check/);
+    await expect(choice('c3', { niche: '' })).rejects.toThrow(/user_choices_niche_check/);
+    await expect(choice('c4', { niche: 'x'.repeat(31) })).rejects.toThrow(/user_choices_niche_check/);
+    await expect(choice('c5', { store_id: 'cs1', is_company: true })).rejects.toThrow(/user_choices_scope_check/);
+    await expect(choice('c6', { store_id: 'nope' })).rejects.toThrow(/user_choices_store_id_stores_id_fk/);
+    await expect(choice('c7', { image_asset_id: 'nope' })).rejects.toThrow(/user_choices_image_asset_id_assets_id_fk/);
+    await choice('c8', { kind: 'hook', niche: 'x'.repeat(30), is_company: true });
+    const index = await pool.query(`select indexdef from pg_indexes where indexname = 'user_choices_store_id_kind_idx'`);
+    expect(index.rows[0].indexdef).toContain('(store_id, kind)');
+    await pool.query(`delete from assets where id = 'ca1'`);
+    await pool.query(`delete from stores where id = 'cs1'`);
+    expect((await pool.query(`select store_id, image_asset_id, niche from user_choices where id = 'c1'`)).rows).toEqual([{ store_id: null, image_asset_id: null, niche: 'Áo dài' }]);
+  });
+});

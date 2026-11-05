@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { type Browser, expect, type Page, test } from '@playwright/test';
 import { HOOKS } from '../src/lib/marketing';
-import { png, signIn } from './support.test';
+import { optionsOf, png, select, signIn } from './support.test';
 
 // A member's own hooks and locations on Marketing Studio, Save template from a History card, and the often-used group. Runs use the mock models only.
 // Every company hook made here is deleted in `finally`: marketing.e2e.test.ts counts HOOKS.length cards.
@@ -40,7 +40,7 @@ async function asAdmin(browser: Browser): Promise<Page> {
   return page;
 }
 
-test('the add form says what a hook is, an example fills it, a Vietnamese scene gets a hint, and the share box sits by its words', async ({ page, browser }) => {
+test('the add form says what a hook is, an example fills it, a Vietnamese scene gets a hint, and only an Admin may share with the company', async ({ page, browser }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await signIn(page, 'custa');
   await page.goto('/marketing-studio');
@@ -87,7 +87,11 @@ test('the add form says what a hook is, an example fills it, a Vietnamese scene 
   await expect(scene).toHaveValue('Option 3: Mở hộp - Hộp quà bật mở');
   await scene.fill('Cô gái mở hộp quà');
   await expect(scene).toHaveAccessibleDescription(/Có vẻ đây là tiếng Việt/);
-  await expect(form.getByRole('checkbox')).toHaveCount(0); // only an Admin shares
+  // A member keeps it or shares it with the chosen store (none chosen here); only a template editor or an Admin shares with the company.
+  await select(page, 'Chia sẻ').click();
+  await expect(optionsOf(page, 'Chia sẻ')).toHaveText(['Chỉ mình tôi', 'Cửa hàng đang chọn']);
+  await expect(optionsOf(page, 'Chia sẻ').nth(1)).toHaveAttribute('aria-disabled', 'true');
+  await page.keyboard.press('Escape');
 
   const admin = await asAdmin(browser);
   try {
@@ -95,11 +99,8 @@ test('the add form says what a hook is, an example fills it, a Vietnamese scene 
     await admin.goto('/marketing-studio');
     await hookBox(admin).click();
     await admin.getByRole('dialog', { name: 'Chọn hook' }).getByRole('button', { name: 'Thêm hook của bạn' }).click();
-    const dialog = admin.getByRole('dialog', { name: 'Thêm hook của bạn' });
-    const box = (await dialog.getByRole('checkbox', { name: 'Chia sẻ cho cả công ty' }).boundingBox())!;
-    const label = (await dialog.locator('label.template-share').boundingBox())!;
-    expect(box.width).toBeLessThanOrEqual(20);
-    expect(box.x - label.x).toBeLessThan(4);
+    await select(admin, 'Chia sẻ').click();
+    await expect(optionsOf(admin, 'Chia sẻ')).toHaveText(['Chỉ mình tôi', 'Cửa hàng đang chọn', 'Toàn công ty']);
   } finally {
     await admin.context().close();
   }

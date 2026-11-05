@@ -26,11 +26,24 @@ export const LOCATIONS: MarketingChoice[] = [
   { id: 'street', name: 'Đường phố', desc: 'Đường phố nhộn nhịp ban ngày', phrase: 'a lively city street in the daytime' },
 ];
 
-/** A member's own hooks and locations (user_choices): the most of each kind one member keeps, and their fields' limits. */
+/** How the clip ends: the last shot, for a sectioned prompt's ending part. No sample loops yet. */
+export const ENDINGS: MarketingChoice[] = [
+  { id: 'hold-up-smile', name: 'Giơ sản phẩm, mỉm cười', desc: 'Người mẫu giơ sản phẩm về phía máy quay và mỉm cười', phrase: 'The clip ends with the model holding the product up to the camera and smiling.' },
+  { id: 'product-close-up', name: 'Cận cảnh sản phẩm', desc: 'Máy quay tiến sát, dừng ở cận cảnh sản phẩm', phrase: 'The clip ends as the camera moves in to a still close-up of the product.' },
+  { id: 'wave-goodbye', name: 'Vẫy tay chào', desc: 'Người mẫu vẫy tay chào người xem', phrase: 'The clip ends with the model waving goodbye to the camera.' },
+  { id: 'full-outfit-pose', name: 'Tạo dáng toàn thân', desc: 'Lùi lại, tạo dáng khoe trọn bộ đồ', phrase: 'The clip ends with the model stepping back and striking a pose that shows the whole outfit.' },
+  { id: 'thumbs-up', name: 'Giơ ngón cái', desc: 'Người mẫu gật đầu và giơ ngón cái', phrase: 'The clip ends with the model nodding and giving a thumbs up next to the product.' },
+];
+
+/** The built-in choices of each kind of the choices library (user_choices kinds). */
+export const BUILT_IN_CHOICES = { hook: HOOKS, location: LOCATIONS, ending: ENDINGS } as const;
+
+/** A member's own hooks, locations and endings (user_choices): the most of each kind one member keeps private, and their fields' limits. */
 export const MAX_CHOICES = 50;
 export const MAX_CHOICE_NAME = 40;
 export const MAX_CHOICE_PHRASE = 300;
 export const MAX_CHOICE_DESC = 100;
+export const MAX_CHOICE_NICHE = 30;
 /** The member's own and the company's hooks and locations, looked up after the built-in ones. */
 export type CustomChoices = { hooks?: MarketingChoice[]; locations?: MarketingChoice[] };
 
