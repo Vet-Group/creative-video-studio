@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
-import { png, select, selectText, signIn } from './support.test';
+import { openTemplates, png, select, selectText, signIn } from './support.test';
 
 // Saved forms: Save template keeps the page's inputs under a name, My templates reopens the page filled from one. Only the store template is run, on the mock model.
 const file = (name: string) => ({ name, mimeType: 'image/png', buffer: png() });
@@ -36,7 +36,7 @@ test('Try On: a saved template lists under Mẫu của tôi and refills the pers
 
   await page.goto('/try-on');
   await expect(page.getByRole('textbox', { name: 'Prompt (tuỳ chọn)' })).toHaveValue('');
-  await page.getByRole('button', { name: 'Mẫu của tôi' }).click();
+  await openTemplates(page);
   const list = page.getByRole('dialog', { name: 'Mẫu của tôi' });
   const link = list.getByRole('link', { name: 'Váy đỏ' });
   const url = new URL((await link.getAttribute('href'))!, page.url()).href; // the template link, for another member below
@@ -52,13 +52,13 @@ test('Try On: a saved template lists under Mẫu của tôi and refills the pers
   const other = await (await browser.newContext()).newPage();
   await signIn(other, 'tplb');
   await other.goto('/try-on');
-  await other.getByRole('button', { name: 'Mẫu của tôi' }).click();
+  await openTemplates(other);
   await expect(other.getByRole('dialog', { name: 'Mẫu của tôi' })).toContainText('Chưa có mẫu nào.');
   await other.goto(url);
   await expect(other.getByText('Không tìm thấy ảnh để dùng lại.')).toBeVisible();
   await other.close();
 
-  await page.getByRole('button', { name: 'Mẫu của tôi' }).click();
+  await openTemplates(page);
   await list.getByRole('button', { name: 'Xoá mẫu Váy đỏ' }).click();
   await page.getByRole('dialog', { name: 'Xoá mẫu "Váy đỏ"?' }).getByRole('button', { name: 'Xoá', exact: true }).click();
   await expect(list).toContainText('Chưa có mẫu nào.');
@@ -86,11 +86,11 @@ test("Create: a template saved to the store chosen on the form is listed, tagged
   await signIn(other, 'stplb');
   await other.goto('/create');
   const list = other.getByRole('dialog', { name: 'Mẫu của tôi' });
-  await other.getByRole('button', { name: 'Mẫu của tôi' }).click();
+  await openTemplates(other);
   await expect(list).toContainText('Chưa có mẫu nào.'); // without the store, not listed
   await list.getByRole('button', { name: 'Đóng' }).click();
   await selectText(other, 'Cửa hàng/Thương hiệu', 'E2E Shop');
-  await other.getByRole('button', { name: 'Mẫu của tôi' }).click();
+  await openTemplates(other);
   const item = list.getByRole('listitem').filter({ hasText: 'Túi xoay' });
   await expect(item.locator('.tag')).toHaveText('Cửa hàng: E2E Shop');
   await expect(item.getByRole('button', { name: 'Xoá mẫu Túi xoay' })).toHaveCount(0); // only its author, an Admin or an editor deletes it
@@ -110,7 +110,7 @@ test("Create: a template saved to the store chosen on the form is listed, tagged
   await other.close();
 
   // The author deletes it, so no other spec that picks this store lists it.
-  await page.getByRole('button', { name: 'Mẫu của tôi' }).click();
+  await openTemplates(page);
   await page.getByRole('dialog', { name: 'Mẫu của tôi' }).getByRole('button', { name: 'Xoá mẫu Túi xoay' }).click();
   await page.getByRole('dialog', { name: 'Xoá mẫu "Túi xoay"?' }).getByRole('button', { name: 'Xoá', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'Mẫu của tôi' })).toContainText('Chưa có mẫu nào.');
@@ -124,7 +124,7 @@ test('Image Generation: a saved template refills the prompt and Enhance', async 
   await saveAs(page, 'Studio');
   await page.goto('/image-generation');
   await expect(prompt).toHaveValue('');
-  await page.getByRole('button', { name: 'Mẫu của tôi' }).click();
+  await openTemplates(page);
   await page.getByRole('dialog', { name: 'Mẫu của tôi' }).getByRole('link', { name: 'Studio' }).click();
   await expect(prompt).toHaveValue('a studio shot');
 });
@@ -139,7 +139,7 @@ test('Marketing Studio: an Advanced template chosen on the UGC page opens the Ad
   const saved = await page.request.post('/api/templates', { data: { feature: 'marketing', name: 'Launch', data: { images: refs, format: 'advanced', brief: 'my brief', script: 'my lines', audio: 'on' } } });
   expect(saved.status()).toBe(201);
   await page.goto('/marketing-studio');
-  await page.getByRole('button', { name: 'Mẫu của tôi' }).click();
+  await openTemplates(page);
   await page.getByRole('dialog', { name: 'Mẫu của tôi' }).getByRole('link', { name: 'Launch' }).click();
   await expect(page.getByLabel('Ảnh tham chiếu: ảnh đã chọn').getByRole('img')).toHaveCount(2);
   await expect(page).toHaveURL((u) => u.pathname === '/marketing-studio/advanced' && u.search === ''); // the link opened the refill, then the address drops its query

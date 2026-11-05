@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
-import { pickPreset, png, signIn } from './support.test';
+import { openTemplates, pickPreset, png, signIn } from './support.test';
 
 // What Create video adds on a fal model that takes it, as Fash's Create Videos page does: an End frame slot, a Run from the prompt alone and reference
 // audio. The mock model takes none (the models API reads them from fal's request builders), so the spec gives it the flags in the models answer and
@@ -149,7 +149,7 @@ test('a saved template and History’s Dùng lại refill the end frame and the 
   await page.goto('/create');
   await expect(endSlot(page)).toBeVisible();
   await expect(endSlot(page).getByRole('img')).toHaveCount(0);
-  await page.getByRole('button', { name: 'Mẫu của tôi' }).click();
+  await openTemplates(page);
   await page.getByRole('dialog', { name: 'Mẫu của tôi' }).getByRole('link', { name: 'Kết thúc có nhạc' }).click();
   await expect(endSlot(page).getByRole('img', { name: 'end.png' })).toBeVisible();
   await expect(picker.getByRole('listitem')).toHaveText(['voice.wav · 2.5 giây', 'song.wav · 4.0 giây']);
@@ -179,7 +179,7 @@ test('a saved template and History’s Dùng lại refill the end frame and the 
   // On a model that takes neither, the template refills the image and leaves the end frame and the audio out of the Run.
   await page.unrouteAll({ behavior: 'ignoreErrors' });
   await page.goto('/create');
-  await page.getByRole('button', { name: 'Mẫu của tôi' }).click();
+  await openTemplates(page);
   await page.getByRole('dialog', { name: 'Mẫu của tôi' }).getByRole('link', { name: 'Kết thúc có nhạc' }).click();
   await expect(page.getByLabel('Mô tả chuyển động')).toHaveValue('The bottle turns to face the camera.');
   await expect(endSlot(page)).toHaveCount(0);
