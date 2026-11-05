@@ -108,3 +108,16 @@ images 7 and 9, judged blind the same way.
 | nano-banana-2.1, kept at 9/10 | 0/2 | print 2, deformed 2 |
 
 Migration 0061 adds them to 0057's totals: Veo 3.1 2/7, Seedream 5 Pro 9/20, Nano Banana 2 10/20.
+
+A third round (2026-11-05) spent the last ~$0.50 the invoices left (estimated $0.56; the owner accepted the overflow to the card) on the two closest image
+models, the same restyle on images 1, 7, 8, 9 and 10 (picked at random), set `replicate-2026-11c`. Two agents judged blind and agreed on every image.
+
+| Row | Passed | Faults |
+|---|---|---|
+| nano-banana-2 | 3/5 | print 1 (image 7, the hoodie artwork redrawn), deformed 1 (image 8, the drum's cord gains knots) |
+| seedream-5-pro | 2/5 | print 2 (images 7 and 9), colour 1 (image 9, the red sweater turns brick red), deformed 1 (image 8) |
+
+Migration 0070 adds them to 0061's totals: Seedream 5 Pro 11/25, Nano Banana 2 13/25.
+
+Replicate billed $29.50 in all: $9.248 in October (the first bake-off) and $20.254 in November before this round (invoice drafts of 2026-11-05),
+all paid from the $30 prepaid credit.
