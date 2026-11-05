@@ -15,7 +15,7 @@ describe('report', () => {
       { image, model, round: 'bakeoff', provider, estimateUsd, status: 'submitted', at: '2026-10-24T10:00:00Z' },
       { image, model, round: 'bakeoff', provider, estimateUsd, status: 'succeeded', costUsd: estimateUsd, at: '2026-10-24T10:03:00Z' },
     ];
-    const lines = [1, 2, 3].flatMap((i) => [...job(i, 'a', 'fal', 0.5), ...job(i, 'b', 'replicate', 1)]);
+    const lines = [1, 2, 3].flatMap((i) => [...job(i, 'a', 'fal', 0.5), ...job(i, 'b', 'mock', 1)]);
     const v = (id: string, model: string, image: number, pass: boolean): Verdict => ({ id, set: 'half-1', model, image, pass, faults: pass ? [] : ['print'] });
     const verdicts = [v('c1', 'a', 1, true), v('c2', 'a', 2, true), v('c3', 'a', 3, false), v('c4', 'b', 1, true), v('c5', 'b', 2, true), v('c6', 'b', 3, true)];
     lines[0]!.providerJobId = 'p1';
@@ -25,17 +25,17 @@ describe('report', () => {
     expect(md).toContain('| b | 3/3 | 100% |');
     expect(md).toContain('**Go.** Enable b; the picker pre-selects b');
     expect(md).toContain('1/2 clips got the same pass or fail');
-    expect(md).toContain('Counted against the spend stop $4.50 (fal $1.50, replicate $3.00)');
+    expect(md).toContain('Counted against the spend stop $4.50 (fal $1.50, mock $3.00)');
     expect(md).toContain('Every planned clip rendered');
     expect(md).not.toContain('Billed');
-    const billed = buildReport({ lines, verdicts, rejudge: {}, billed: { fal: { usd: 1.5, source: 'fal usage' }, replicate: { usd: 2.248, source: 'replicate billing' } } });
-    expect(billed).toContain('Billed $3.75 (fal $1.50, replicate $2.25)');
-    expect(billed).toContain('- replicate: replicate billing');
+    const billed = buildReport({ lines, verdicts, rejudge: {}, billed: { fal: { usd: 1.5, source: 'fal usage' }, mock: { usd: 2.248, source: 'mock billing' } } });
+    expect(billed).toContain('Billed $3.75 (fal $1.50, mock $2.25)');
+    expect(billed).toContain('- mock: mock billing');
     expect(md).toContain('| half-1 | 3 | a | no | print | - | 3.0 |');
   });
 
   test('a provider-failed render counts as a fail and a key that never reached the provider is listed, not rated', () => {
-    const base = { model: 'b', round: 'bakeoff', provider: 'replicate' as const, estimateUsd: 1, at: '2026-10-24T10:00:00Z', set: 'half-2' };
+    const base = { model: 'b', round: 'bakeoff', provider: 'mock' as const, estimateUsd: 1, at: '2026-10-24T10:00:00Z', set: 'half-2' };
     const lines: JobLine[] = [{ ...base, image: 6, status: 'failed', error: 'flagged' }, { ...base, image: 9, status: 'unknown', error: 'fetch failed' }];
     const md = buildReport({ lines, verdicts: [{ id: 'c1', set: 'half-2', model: 'b', image: 7, pass: true, faults: [] }], rejudge: {} });
     expect(md).toContain('| b | 1/2 | 50% |');

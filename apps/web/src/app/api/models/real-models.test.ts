@@ -49,22 +49,22 @@ describe('the model picker', () => {
     expect(before.models.map((m) => m.id)).toEqual(['kling-o3-pro']);
     expect(before).toMatchObject({ defaultModelId: 'kling-o3-pro', models: [{ passRate: 0.7, passes: 7, total: 10, estimateUsd: '0.8960' }] });
 
-    await pool.query(`update model_configs set enabled = true where id = 'seedance-2.5'`);
+    await pool.query(`update model_configs set enabled = true where id = 'seedance-2.5-byteplus'`);
     const both = await picker(member.cookie);
-    expect(both.models.map((m) => [m.id, m.passes, m.total, m.estimateUsd])).toEqual([['kling-o3-pro', 7, 10, '0.8960'], ['seedance-2.5', 7, 12, '1.8496']]); // 6/9 (0013) + 1/3 (0057)
+    expect(both.models.map((m) => [m.id, m.passes, m.total, m.estimateUsd])).toEqual([['kling-o3-pro', 7, 10, '0.8960'], ['seedance-2.5-byteplus', 7, 12, '1.8496']]); // 6/9 (0013) + 1/3 (0057)
     expect(both.models.map((m) => m.resolution)).toEqual(['1080p', '720p']); // what the Create form shows as the fixed resolution
     expect(both.models.map((m) => m.maxPromptChars)).toEqual([2500, 2000]); // Kling O3 Pro's fal schema (migration 0041); Replicate's own 2000 (0029)
     // Kling's audio price is $0.14/s (Marketing Studio Advanced); Replicate Seedance has no audio switch.
     expect(both.models.map((m) => m.audioEstimateUsd)).toEqual(['1.1200', null]);
     expect(both.models[1]!.passRate).toBeCloseTo(7 / 12);
     expect(both.defaultModelId).toBe('kling-o3-pro'); // 70% against 58%
-    expect(both.models.map((m) => [m.id, m.score, m.recommended])).toEqual([['kling-o3-pro', 64, true], ['seedance-2.5', 56, false]]);
+    expect(both.models.map((m) => [m.id, m.score, m.recommended])).toEqual([['kling-o3-pro', 64, true], ['seedance-2.5-byteplus', 56, false]]);
     expect(before.models[0]!.recommended).toBe(false); // one model: nothing to recommend between
-    await pool.query(`update model_configs set enabled = false where id = 'seedance-2.5'`);
+    await pool.query(`update model_configs set enabled = false where id = 'seedance-2.5-byteplus'`);
   });
 
   test('real jobs that fail lower the score, so the badge and the pre-selection move to the other model; mock jobs do not count', async () => {
-    await pool.query(`update model_configs set enabled = true where id = 'seedance-2.5'`);
+    await pool.query(`update model_configs set enabled = true where id = 'seedance-2.5-byteplus'`);
     await pool.query(
       `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, status, is_mock) values
          ('fail-1', $1, 'team-unassigned', 'kling-o3-pro', 'fal', 'p', '9:16', 8, '{}', 'failed', false),
@@ -73,10 +73,10 @@ describe('the model picker', () => {
       [member.id],
     );
     const after = await picker(member.cookie);
-    expect(after.models.map((m) => [m.id, m.score, m.recommended])).toEqual([['kling-o3-pro', 43, false], ['seedance-2.5', 56, true]]); // 9/14 x 4/6 against 9/16
-    expect(after.defaultModelId).toBe('seedance-2.5');
+    expect(after.models.map((m) => [m.id, m.score, m.recommended])).toEqual([['kling-o3-pro', 43, false], ['seedance-2.5-byteplus', 56, true]]); // 9/14 x 4/6 against 9/16
+    expect(after.defaultModelId).toBe('seedance-2.5-byteplus');
     await pool.query(`delete from jobs where id in ('fail-1', 'fail-2', 'fail-mock')`);
-    await pool.query(`update model_configs set enabled = false where id = 'seedance-2.5'`);
+    await pool.query(`update model_configs set enabled = false where id = 'seedance-2.5-byteplus'`);
   });
 
   test('adds the marked clips of a model to its seed: (seed passes + marked passes) / (seed n + marked n)', async () => {
@@ -119,7 +119,7 @@ describe('a disabled model', () => {
   const job = (modelId: string) => POST_JOB(call(member.cookie, '/api/jobs', 'POST', { modelId, presetId: 'gentle-push-in', ratio: '9:16', durationSec: 8, assetIds: ['in-1'] }));
 
   test('is refused by the server when a Run names it, and accepted once enabled', async () => {
-    const refused = await job('seedance-2.5');
+    const refused = await job('seedance-2.5-byteplus');
     expect(refused.status).toBe(400);
     expect(((await refused.json()) as { error: string }).error).toMatch(/not enabled/);
     expect((await job('kling-o3-pro')).status).toBe(201);

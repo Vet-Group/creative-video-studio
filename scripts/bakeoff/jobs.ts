@@ -23,7 +23,7 @@ const STATUSES: JobStatus[] = ['submitting', 'submitted', 'succeeded', 'failed',
 
 export interface JobLine extends JobKey {
   at: string;
-  provider: 'fal' | 'replicate' | 'mock';
+  provider: 'fal' | 'mock';
   status: JobStatus;
   estimateUsd: number;
   set?: string;

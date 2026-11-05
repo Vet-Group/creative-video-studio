@@ -5,9 +5,6 @@ import { bad, money, pgCode, readBody } from '@/lib/admin';
 import { pool } from '@/lib/auth';
 import { guard } from '@/lib/session';
 
-/** Providers with no adapter any more: their rows stay for the history of jobs and the ledger, but no model of them may be enabled. */
-const REMOVED_PROVIDERS = ['replicate'];
-
 const MEMBER_CAPS = ['featuresMonthlyCapUsd', 'memberDailyUsdCap', 'memberMonthlyUsdCap', 'balanceWarningUsd'] as const;
 const CAP_COLUMNS: Record<(typeof MEMBER_CAPS)[number], string> = {
   featuresMonthlyCapUsd: 'features_monthly_cap_usd',
@@ -57,8 +54,8 @@ export async function GET(request: Request) {
          from settings where id = 1`,
     )
   ).rows[0];
-  // `priced` is what lets the Admin switch a row on: recorded price, and a provider that still has an adapter.
-  const models = await pool.query('select id, label, provider, enabled, ((usd_per_second is not null or image_prices is not null) and provider <> all($1::text[])) as priced from model_configs order by provider, id', [REMOVED_PROVIDERS]);
+  // `priced` is what lets the Admin switch a row on: a recorded price.
+  const models = await pool.query('select id, label, provider, enabled, (usd_per_second is not null or image_prices is not null) as priced from model_configs order by provider, id');
   const featureCaps = await pool.query('select feature, monthly_usd::text as "monthlyUsd" from feature_caps order by feature');
   let configured: string[] = [];
   try {
@@ -81,7 +78,7 @@ export async function GET(request: Request) {
  * creditExpiresOn, stopWhenCreditsEnd }`, total and date nullable). All or nothing. Changed caps are audited as settings.update, each changed
  * soft cap as feature_cap.update, each changed model as model.set_enabled and each changed Vertex account as vertex_account.update. Any model can
  * be enabled (the owner opened them all on 2026-10-25; its bake-off record only feeds the recommendation score), but the database refuses one
- * whose limits and price are not recorded, and one of a removed provider (REMOVED_PROVIDERS) is refused too: 400 and nothing is changed.
+ * whose limits and price are not recorded: 400 and nothing is changed.
  */
 export async function PUT(request: Request) {
   const g = await guard(request, 'admin');
@@ -120,9 +117,6 @@ export async function PUT(request: Request) {
   if ((await pool.query('select 1 from feature_caps where feature = any($1::text[])', [features])).rowCount !== features.length) return bad('unknown feature', 404);
   const ids = [...new Set((list as { id: string }[]).map((m) => m.id))];
   if ((await pool.query('select 1 from model_configs where id = any($1::text[])', [ids])).rowCount !== ids.length) return bad('unknown model', 404);
-  const enabling = (list as { id: string; enabled: boolean }[]).filter((m) => m.enabled).map((m) => m.id);
-  const removed = (await pool.query('select id from model_configs where id = any($1::text[]) and provider = any($2::text[]) order by id', [enabling, REMOVED_PROVIDERS])).rows as { id: string }[];
-  if (removed.length) return bad(`${removed.map((m) => m.id).join(', ')} belong to a provider that was removed and cannot be enabled`);
   const actorId = g.session.user.id;
 
   try {

@@ -30,7 +30,7 @@ export const ASPECTS = ['9:16', '1:1'] as const;
 /** Every ratio a job may store: 'auto' (follow the input) and the image models' ratios. A video Run is still limited to its model's own ratios. */
 export const IMAGE_RATIOS = ['auto', '1:1', '9:16', '16:9', '3:4', '4:3', '2:3', '3:2', '4:5', '5:4', '21:9', '4:1', '1:4', '8:1', '1:8'] as const;
 export const MODEL_KINDS = ['video', 'image'] as const;
-export const PROVIDERS = ['fal', 'replicate', 'vertex', 'byteplus', 'mock'] as const;
+export const PROVIDERS = ['fal', 'vertex', 'byteplus', 'mock'] as const;
 /** What a job is for. `video` and `marketing` spend the company video budget; the rest share the image and apps budget (FEATURE_BUDGET). */
 export const FEATURES = [
   'video', 'marketing', 'try_on', 'image', 'character_swap', 'model_swap', 'background_changer', 'reframe', 'image_upscale', 'face_swap',
@@ -317,7 +317,7 @@ export const modelConfigs = pgTable(
     updatedAt: tstz('updated_at').notNull().defaultNow(),
   },
   (t) => [
-    check('model_configs_provider_check', sql`${t.provider} in ('fal', 'replicate', 'vertex', 'byteplus', 'mock')`),
+    check('model_configs_provider_check', sql`${t.provider} in ('fal', 'vertex', 'byteplus', 'mock')`),
     check('model_configs_kind_check', sql`${t.kind} in ('video', 'image')`),
     check('model_configs_max_prompt_chars_check', sql`${t.maxPromptChars} > 0`),
     check(
@@ -340,9 +340,6 @@ export const settings = pgTable(
     memberMonthlyUsdCap: numeric('member_monthly_usd_cap', { precision: 12, scale: 4 }).notNull().default('50'),
     /** The Vertex account (its project id) new Vertex jobs go to; the worker's credits guard writes it, null when no account is usable. */
     vertexActiveProject: text('vertex_active_project'),
-    /** Unused since Replicate was removed (2026-11-04, migration 0062): the Admin-entered prepaid credit and when it was entered. */
-    replicateCreditUsd: numeric('replicate_credit_usd', { precision: 12, scale: 4 }),
-    replicateCreditSince: tstz('replicate_credit_since'),
     /** Admin Costs shows a provider balance under this many USD in red. */
     balanceWarningUsd: numeric('balance_warning_usd', { precision: 12, scale: 4 }).notNull().default('10'),
     updatedAt: tstz('updated_at').notNull().defaultNow(),
@@ -415,7 +412,7 @@ export const jobs = pgTable(
     index('jobs_status_idx').on(t.status),
     check('jobs_status_check', sql`${t.status} in ('queued', 'submitting', 'running', 'succeeded', 'failed', 'failed_unknown', 'timed_out')`),
     check('jobs_aspect_check', sql`${t.aspect} in ('auto', '1:1', '9:16', '16:9', '3:4', '4:3', '2:3', '3:2', '4:5', '5:4', '21:9', '4:1', '1:4', '8:1', '1:8')`),
-    check('jobs_provider_check', sql`${t.provider} in ('fal', 'replicate', 'vertex', 'byteplus', 'mock')`),
+    check('jobs_provider_check', sql`${t.provider} in ('fal', 'vertex', 'byteplus', 'mock')`),
     check('jobs_feature_check', sql`${t.feature} in ('video', 'marketing', 'try_on', 'image', 'character_swap', 'model_swap', 'background_changer', 'reframe', 'image_upscale', 'face_swap', 'background_remover', 'motion_control', 'media_optimizer', 'jewelry_try_on', 'lingerie_try_on')`),
   ],
 );

@@ -27,17 +27,15 @@ describe.each(BAKEOFF_MODELS)('$id', (model) => {
   });
 });
 
-test('ids and labels match the rows seeded by migration 0002, and Kling carries the resolution B.5a measured', () => {
-  expect(BAKEOFF_MODELS.map((m) => [m.id, m.label])).toEqual([['kling-o3-pro', 'Kling O3 Pro'], ['seedance-2.5', 'Seedance 2.5']]);
-  expect(BAKEOFF_MODELS.map((m) => m.outputResolution)).toEqual(['1080p', '720p']);
+test('ids and labels match the row seeded by migration 0002, and Kling carries the resolution B.5a measured', () => {
+  expect(BAKEOFF_MODELS.map((m) => [m.id, m.label])).toEqual([['kling-o3-pro', 'Kling O3 Pro']]);
+  expect(BAKEOFF_MODELS.map((m) => m.outputResolution)).toEqual(['1080p']);
 });
 
 test('estimates the cost of a thrift clip and of an 8 s staff clip', () => {
-  const [kling, seedance] = BAKEOFF_MODELS;
+  const [kling] = BAKEOFF_MODELS;
   expect(estimateUsd(kling!.usdPerSecond, kling!.thrift!.durationSec)).toBe('0.5600');
-  expect(estimateUsd(seedance!.usdPerSecond, seedance!.thrift!.durationSec)).toBe('1.1560');
   expect(estimateUsd(kling!.usdPerSecond, 8)).toBe('0.8960');
-  expect(estimateUsd(seedance!.usdPerSecond, 8)).toBe('1.8496');
 });
 
 test('audio on takes the endpoint audio price, audio off or absent the stored price, an always-audio endpoint its stored price, and an endpoint without audio has none', () => {

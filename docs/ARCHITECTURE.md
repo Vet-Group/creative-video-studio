@@ -9,7 +9,7 @@ Browser ── Next.js web (UI + route handlers) ──┐
                                                ├── Postgres (app data + pg-boss queue)
            worker (pg-boss consumer) ──────────┤
                │                               └── MinIO (inputs, outputs)
-               └── VideoProvider adapter ── mock | fal | vertex | byteplus   (Replicate removed 2026-11-04)
+               └── VideoProvider adapter ── mock | fal | vertex | byteplus   (Replicate removed 2026-11-04; migration 0072, 2026-11-05, dropped its last rows and columns)
 ```
 
 ## Stack [approved]

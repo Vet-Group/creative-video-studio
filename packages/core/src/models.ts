@@ -2,7 +2,7 @@ export type Ratio = '9:16' | '1:1' | '16:9';
 
 export interface ModelConfig {
   id: string;
-  provider: 'fal' | 'replicate' | 'vertex' | 'byteplus' | 'mock';
+  provider: 'fal' | 'vertex' | 'byteplus' | 'mock';
   /** The provider's model path. */
   endpoint: string;
   label: string;
@@ -23,7 +23,7 @@ export interface ModelConfig {
 /** An image model: priced per image and resolution, with no durations. `ratios` may include 'auto' (follow the input). */
 export interface ImageModelConfig {
   id: string;
-  provider: 'fal' | 'replicate' | 'vertex' | 'byteplus' | 'mock';
+  provider: 'fal' | 'vertex' | 'byteplus' | 'mock';
   endpoint: string;
   label: string;
   ratios: string[];
@@ -88,15 +88,13 @@ export const FEATURE_PROMPTS: Record<string, string> = {
 
 const FAL_KLING_PAGE = 'https://fal.ai/models/fal-ai/kling-video/o3/pro/reference-to-video';
 const FAL_KLING_SCHEMA = 'https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=fal-ai/kling-video/o3/pro/reference-to-video';
-const REPLICATE_PAGE = 'https://replicate.com/bytedance/seedance-2.5';
-const REPLICATE_SCHEMA = 'https://api.replicate.com/v1/models/bytedance/seedance-2.5';
 const READ_AT = '2026-10-23';
 
 // Migration 0013 (M.6) copies these facts into the seeded model_configs rows; packages/db/src/schema.test.ts keeps the two in step.
 /**
- * The two bake-off candidates. `ratios`, `durationsSec` and `maxImages` are the app's subset of what the provider accepts (see `sources`);
- * Kling offers all of fal's, as the reference site does (migration 0022). Seedance 2.5 ran on Replicate, whose adapter was removed on 2026-11-04:
- * the entry stays as the record of the finished bake-off (docs/BAKEOFF.md), not as a model any provider can run.
+ * The bake-off model the tests and scripts still run against. `ratios`, `durationsSec` and `maxImages` are the app's subset of what the provider
+ * accepts (see `sources`); Kling offers all of fal's, as the reference site does (migration 0022). The other candidate, Seedance 2.5 on Replicate,
+ * was removed with Replicate (migration 0072); its result stays in docs/BAKEOFF.md.
  */
 export const BAKEOFF_MODELS: ModelConfig[] = [
   {
@@ -125,33 +123,6 @@ export const BAKEOFF_MODELS: ModelConfig[] = [
       outputResolution: { url: 'scripts/bakeoff/rubric.md', readAt: READ_AT },
       usdPerSecond: { url: FAL_KLING_PAGE, readAt: READ_AT },
       billedAmountField: { url: 'https://fal.ai/docs/model-apis/model-endpoints/queue', readAt: READ_AT },
-    },
-  },
-  {
-    id: 'seedance-2.5',
-    provider: 'replicate',
-    endpoint: 'bytedance/seedance-2.5',
-    label: 'Seedance 2.5',
-    // Replicate accepts 16:9, 4:3, 1:1, 3:4, 9:16, 21:9 and adaptive.
-    ratios: ['9:16', '1:1'],
-    // Replicate accepts an integer from -1 to 30.
-    durationsSec: [5, 6, 7, 8, 9, 10],
-    // The model page says "up to 30 images"; the app sends at most 4.
-    maxImages: 4,
-    // resolution is 480p or 720p; the app needs at least 720p.
-    outputResolution: '720p',
-    // non_video_in at 720p; the app sends images only.
-    usdPerSecond: 0.2312,
-    // A prediction has id, status, output, metrics.predict_time and so on, but no cost field.
-    billedAmountField: null,
-    thrift: { durationSec: 5, resolution: '720p' },
-    sources: {
-      ratios: { url: REPLICATE_SCHEMA, readAt: READ_AT },
-      durationsSec: { url: REPLICATE_SCHEMA, readAt: READ_AT },
-      maxImages: { url: REPLICATE_PAGE, readAt: READ_AT },
-      outputResolution: { url: REPLICATE_SCHEMA, readAt: READ_AT },
-      usdPerSecond: { url: REPLICATE_PAGE, readAt: READ_AT },
-      billedAmountField: { url: 'https://replicate.com/docs/reference/http', readAt: READ_AT },
     },
   },
 ];

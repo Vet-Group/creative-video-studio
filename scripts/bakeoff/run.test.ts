@@ -2,7 +2,7 @@
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { BAKEOFF_MODELS } from '@cvs/core/models';
+import { BAKEOFF_MODELS, type ModelConfig } from '@cvs/core/models';
 import { BAKEOFF_PRESET, PRESETS } from '@cvs/core/presets';
 import { createFalProvider } from '@cvs/core/providers/fal';
 import { ProviderHttpError } from '@cvs/core/providers/http';
@@ -14,7 +14,11 @@ import { appendLine, JOBS_FILE, readLines, spend, type JobLine } from './jobs.ts
 import { parseFalBalance, runStage, type RunDeps, type StageOptions } from './run.ts';
 
 const KLING = BAKEOFF_MODELS[0]!;
-const SEEDANCE = BAKEOFF_MODELS[1]!;
+// A second candidate on the mock provider, priced as Seedance 2.5 was; the real one left with Replicate (migration 0072).
+const SEEDANCE: ModelConfig = {
+  ...KLING, id: 'seedance-2.5', provider: 'mock', endpoint: 'seedance-2.5', label: 'Seedance 2.5', ratios: ['9:16', '1:1'], durationsSec: [5, 6, 7, 8, 9, 10],
+  maxImages: 4, outputResolution: '720p', usdPerSecond: 0.2312, thrift: { durationSec: 5, resolution: '720p' },
+};
 const tmp = (): string => mkdtempSync(join(tmpdir(), 'cvs-bakeoff-test-'));
 
 const sampleInputs = (): Inputs => ({
@@ -31,7 +35,7 @@ interface Rig {
 }
 
 /** A rig of two mock providers (one per real provider name) that records every submit. */
-function rig(over: { fal?: (inner: VideoProvider) => VideoProvider; replicate?: (inner: VideoProvider) => VideoProvider } & Partial<RunDeps> = {}): Rig {
+function rig(over: { fal?: (inner: VideoProvider) => VideoProvider; mock?: (inner: VideoProvider) => VideoProvider } & Partial<RunDeps> = {}): Rig {
   const outDir = join(tmp(), 'out');
   const submits: string[] = [];
   const prompts: string[] = [];
@@ -45,9 +49,9 @@ function rig(over: { fal?: (inner: VideoProvider) => VideoProvider; replicate?: 
   });
   const balance = { usd: 100 };
   let t = 0;
-  const { fal, replicate, ...deps } = over;
+  const { fal, mock, ...deps } = over;
   const falP = record(createMockVideoProvider());
-  const repP = record(createMockVideoProvider());
+  const mockP = record(createMockVideoProvider());
   return {
     outDir,
     submits,
@@ -56,8 +60,8 @@ function rig(over: { fal?: (inner: VideoProvider) => VideoProvider; replicate?: 
     deps: {
       outDir,
       inputs: sampleInputs(),
-      models: BAKEOFF_MODELS,
-      providers: { fal: fal ? fal(falP) : falP, replicate: replicate ? replicate(repP) : repP },
+      models: [KLING, SEEDANCE],
+      providers: { fal: fal ? fal(falP) : falP, mock: mock ? mock(mockP) : mockP },
       falBalance: async () => balance.usd,
       download: async (_url, dest) => {
         mkdirSync(join(dest, '..'), { recursive: true });
@@ -212,9 +216,9 @@ describe('runStage', () => {
     // Killed between the submitting line and the provider answer: Kling image 1.
     appendLine(r.outDir, line({ status: 'submitting' }));
     // Killed after the provider answered: Seedance image 1 has an id the mock knows.
-    const { providerJobId } = await r.deps.providers.replicate!.submit({ model: SEEDANCE, prompt: 'p', imageUrls: ['input:img1.jpg'], ratio: '9:16', durationSec: 5 });
+    const { providerJobId } = await r.deps.providers.mock!.submit({ model: SEEDANCE, prompt: 'p', imageUrls: ['input:img1.jpg'], ratio: '9:16', durationSec: 5 });
     r.submits.length = 0;
-    appendLine(r.outDir, line({ provider: 'replicate', model: SEEDANCE.id, status: 'submitted', estimateUsd: SEEDANCE_5S, providerJobId }));
+    appendLine(r.outDir, line({ provider: 'mock', model: SEEDANCE.id, status: 'submitted', estimateUsd: SEEDANCE_5S, providerJobId }));
 
     const res = await runStage(r.deps, canary);
     expect(r.submits).toEqual([]);
@@ -482,7 +486,7 @@ describe('runStage money safety', () => {
     r.balance.usd = 77;
     const res = await runStage(r.deps, canary);
     expect(res.spentByProvider.fal).toBeCloseTo(KLING_5S, 6);
-    expect(res.spentByProvider.replicate).toBeCloseTo(SEEDANCE_5S, 6);
+    expect(res.spentByProvider.mock).toBeCloseTo(SEEDANCE_5S, 6);
     expect(res.falBalanceUsd).toBe(77);
     expect((await runStage(rig().deps, canary)).falBalanceUsd).toBe(100);
   });

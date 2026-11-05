@@ -196,7 +196,7 @@ describe('POST /api/jobs', () => {
     ['more images than the model takes', { assetIds: ['own-1', 'own-2', 'own-3'] }],
     ['an unknown store', { assetIds: ['own-1'], storeId: 'nope' }],
     ['a hidden store', { assetIds: ['own-1'], storeId: 'store-hidden' }],
-    ['a disabled model', { assetIds: ['own-1'], modelId: 'seedance-2.5' }],
+    ['a disabled model', { assetIds: ['own-1'], modelId: 'seedance-2.5-byteplus' }],
     ['an unknown model', { assetIds: ['own-1'], modelId: 'nope' }],
     ['a ratio the model lacks', { assetIds: ['own-1'], ratio: '16:9' }],
     ['a duration the model lacks', { assetIds: ['own-1'], durationSec: 7 }],

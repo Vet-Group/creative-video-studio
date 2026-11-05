@@ -12,7 +12,7 @@ import { buildBrief, FAULT_CODES, parseCsv, prepareBrief, validateScores } from 
 import { clipMetrics, flagsFor, metricsForSet, motionStats, readThresholds, RUBRIC } from './metrics.ts';
 
 const KLING = BAKEOFF_MODELS[0]!.id;
-const SEEDANCE = BAKEOFF_MODELS[1]!.id;
+const SEEDANCE = 'seedance-2.5';
 const work = mkdtempSync(join(tmpdir(), 'cvs-bakeoff-judging-'));
 const steady = join(work, 'steady.mp4');
 const flicker = join(work, 'flicker.mp4');

@@ -1,6 +1,6 @@
 // Bake-off runner (plan B.4): 2 models x 10 images at 9:16, the thrift duration and resolution, the safe preset.
 //   tsx scripts/bakeoff/run.ts --set canary|half-1|half-2|extra [--models id,id] [--images 1,2,3] [--preset id] [--root dir] [--inputs file]
-// FAL_KEY comes from the environment (the Replicate adapter was removed on 2026-11-04, so only fal models can run for real). Sets: canary = image 1; half-1 = images 1-5 (image 1 is polled, not
+// FAL_KEY comes from the environment (only fal models can run for real). Sets: canary = image 1; half-1 = images 1-5 (image 1 is polled, not
 // resubmitted); half-2 = images 6-10 (pass --models with the models still able to pass); extra = at most 5 images of one model with a
 // preset other than the safe one, round "extra". The logic is in runStage so tests drive it on the mock adapter, never a real provider.
 import { closeSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync, writeSync } from 'node:fs';
@@ -192,9 +192,9 @@ async function runLocked(deps: RunDeps, opts: StageOptions): Promise<StageResult
           lastBalance = have;
         }
         const s = spend(readLines(deps.outDir));
-        // The larger of the job log and the balance fall since preflight (fal) plus the other providers' log; a top-up only lowers the fall.
+        // The larger of the job log and the balance fall since preflight (fal); a top-up only lowers the fall.
         // Written so that a NaN anywhere stops the stage instead of passing the check.
-        const spent = usesFal ? Math.max(s.total, baseline - have + (s.byProvider.replicate ?? 0)) : s.total;
+        const spent = usesFal ? Math.max(s.total, baseline - have) : s.total;
         if (!(spent + p.estimateUsd <= cap + 1e-9)) {
           outcome = 'stopped: cap';
           reason = `spent $${spent} plus $${p.estimateUsd.toFixed(2)} for ${keyId(p.key)} would pass the $${cap} cap, or the amounts are not numbers`;
@@ -327,7 +327,6 @@ async function realDeps(root: string, inputsPath: string, ids: string[]): Promis
   const key = (name: string): string => process.env[name] || fail(`${name} is not set`);
   const providers: RunDeps['providers'] = {};
   if (need.has('fal')) providers.fal = createFalProvider({ apiKey: key('FAL_KEY'), readImage });
-  if (need.has('replicate')) fail('the Replicate adapter was removed on 2026-11-04; pass --models with fal models only');
   return {
     outDir: join(root, 'out'),
     inputs,
