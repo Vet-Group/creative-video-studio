@@ -375,3 +375,45 @@ test("an Admin opens a member's line on Costs and sees the job behind it", async
   await line.click();
   await expect(jobs).toHaveCount(0);
 });
+
+test('on a phone each job of a Costs line is a two-line block with the time and the USD on top, all inside the table', async ({ browser, page }) => {
+  const member = await browser.newPage();
+  await signIn(member, 'costb');
+  const jobId = await runViaApi(member);
+  await member.close();
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await signIn(page, 'admin');
+  await page.goto('/admin/costs');
+  const users = page.getByRole('region', { name: 'Theo người dùng' });
+  await users.getByRole('button', { name: 'E2E Costs B' }).click();
+  const row = users.locator('tr.drill table.jobs tbody tr').filter({ hasText: jobId.slice(0, 8) });
+  await expect(row).toContainText('Mock E2E');
+  const box = (await users.locator('.table-wrap').boundingBox())!;
+  const box$ = async (cell: ReturnType<typeof row.locator>) => (await cell.boundingBox())!;
+  const [when, feature, model, usd] = [await box$(row.locator('td').first()), await box$(row.locator('td').nth(1)), await box$(row.locator('td.model')), await box$(row.locator('td.num'))];
+  // Every cell is inside the table's box: nothing needs a sideways swipe.
+  for (const cell of [when, feature, model, usd]) {
+    expect(cell.x).toBeGreaterThanOrEqual(box.x);
+    expect(cell.x + cell.width).toBeLessThanOrEqual(box.x + box.width + 1);
+  }
+  // The time and the USD share the top line; the feature and model sit on the line under it.
+  expect(Math.abs(usd.y - when.y)).toBeLessThan(8);
+  expect(usd.x).toBeGreaterThan(when.x);
+  expect(feature.y).toBeGreaterThanOrEqual(when.y + when.height - 1);
+  expect(Math.abs(model.y - feature.y)).toBeLessThan(8);
+  expect(await page.evaluate(() => document.scrollingElement!.scrollWidth <= innerWidth)).toBe(true);
+  // The "·" is drawn 9 px left of the model: inside the row next to the feature, past the row's clipped left edge once a long name wraps.
+  const dot = () =>
+    row.evaluate((r) => {
+      const model = r.querySelector('td.model')!.getBoundingClientRect();
+      return { shown: model.left - 9 >= r.getBoundingClientRect().left, wrapped: model.top > r.children[1]!.getBoundingClientRect().top + 4, clips: getComputedStyle(r).overflowX === 'clip' };
+    });
+  expect(await dot()).toEqual({ shown: true, wrapped: false, clips: true });
+  await row.locator('td.model').evaluate((td) => { td.textContent = 'Nano Banana Pro (Character Swap) Nano Banana Pro'; });
+  expect(await dot()).toEqual({ shown: false, wrapped: true, clips: true });
+  // The blocks still read as a table: five column headers, and five cells in the job's row.
+  const table = users.getByRole('table', { name: 'Job của dòng này' });
+  await expect(table.getByRole('columnheader')).toHaveText(['Lúc gửi', 'Mục', 'Mô hình', 'Trạng thái', 'USD']);
+  await expect(table.getByRole('row').filter({ hasText: jobId.slice(0, 8) }).getByRole('cell')).toHaveCount(5);
+});

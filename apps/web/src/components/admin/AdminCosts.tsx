@@ -90,39 +90,39 @@ function JobList({ month, asOf, by, id }: { month: string; asOf: number; by: Gro
   if (data.jobs.length === 0 && !data.llm) return <p className="muted">Không có job nào.</p>;
   return (
     <>
-      <table className="jobs">
-        <thead>
-          <tr>
-            <th scope="col">Lúc gửi</th>
-            <th scope="col">Mục</th>
-            <th scope="col">Mô hình</th>
-            <th scope="col">Trạng thái</th>
-            <th scope="col" className="num">USD</th>
+      <table className="jobs" role="table" aria-label="Job của dòng này">
+        <thead role="rowgroup">
+          <tr role="row">
+            <th role="columnheader" scope="col">Lúc gửi</th>
+            <th role="columnheader" scope="col">Mục</th>
+            <th role="columnheader" scope="col">Mô hình</th>
+            <th role="columnheader" scope="col">Trạng thái</th>
+            <th role="columnheader" scope="col" className="num">USD</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody role="rowgroup">
           {data.jobs.map((j) => (
-            <tr key={j.jobId}>
-              <td>
+            <tr key={j.jobId} role="row">
+              <td role="cell">
                 {j.createdAt ? new Date(j.createdAt).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', dateStyle: 'short', timeStyle: 'short' }) : '—'}{' '}
                 <span className="muted" title={j.jobId}>
                   {j.jobId.slice(0, 8)}
                 </span>
               </td>
-              <td>{j.feature}</td>
-              <td>{j.model}</td>
-              <td>
+              <td role="cell">{j.feature}</td>
+              <td role="cell" className="model">{j.model}</td>
+              <td role="cell">
                 {STATUS[j.status ?? ''] ?? j.status ?? '—'}
                 {j.verdict && <span className="tag">{j.verdict === 'pass' ? 'Đạt' : 'Không đạt'}</span>}
                 {!j.final && <span className="tag">Tạm tính</span>}
               </td>
-              <td className="num">{dollars(j.usd, 4)}</td>
+              <td role="cell" className="num">{dollars(j.usd, 4)}</td>
             </tr>
           ))}
           {data.llm && (
-            <tr>
-              <td colSpan={4}>LLM không gắn job (Gợi ý, Dịch): {data.llm.calls} lượt</td>
-              <td className="num">{dollars(data.llm.usd, 4)}</td>
+            <tr role="row">
+              <td role="cell" colSpan={4}>LLM không gắn job (Gợi ý, Dịch): {data.llm.calls} lượt</td>
+              <td role="cell" className="num">{dollars(data.llm.usd, 4)}</td>
             </tr>
           )}
         </tbody>
