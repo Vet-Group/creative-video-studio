@@ -691,6 +691,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
         selected={hooks}
         onPick={pickHook}
         onAdded={(c) => added('hook', c)}
+        onEdited={() => void loadChoices()}
         onDelete={(c) => void removeChoice(c)}
         onClose={() => setPicker(null)}
         footer={
@@ -708,7 +709,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
         }
       />
       <ChoiceDialog open={picker === 'location'} title="Chọn bối cảnh" sub="Nơi người mẫu xuất hiện trong video. Có thể bỏ qua." kind="location" choices={locationList} often={custom?.often.location ?? []} posters={custom?.posters.location ?? {}} canShare={custom?.canShare ?? false} stores={stores} storeId={storeId}
-        selected={location ? [location] : []} onPick={(id) => (setLocation(id), setPicker(null))} onAdded={(c) => added('location', c)} onDelete={(c) => void removeChoice(c)} onClose={() => setPicker(null)} />
+        selected={location ? [location] : []} onPick={(id) => (setLocation(id), setPicker(null))} onAdded={(c) => added('location', c)} onEdited={() => void loadChoices()} onDelete={(c) => void removeChoice(c)} onClose={() => setPicker(null)} />
     </section>
   );
 }

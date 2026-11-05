@@ -5,6 +5,7 @@
 import { type ReactNode, useEffect, useId, useRef, useState } from 'react';
 import { MAX_ENDING, MAX_HOOK } from '@/lib/marketing';
 import type { PromptTemplate } from '@/lib/prompt-starters';
+import { useHydrated } from '@/lib/use-hydrated';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { confirmDialog } from './Confirm';
 import { Icon } from './Icon';
@@ -78,7 +79,7 @@ export function PromptSections({ feature, format, mode, onMode, hook, ending, en
   const narrow = useMediaQuery(NARROW);
   async function pick(t: PromptTemplate) {
     setOpen(false);
-    if (filled && !(await confirmDialog({ title: `Thay prompt đang viết bằng mẫu "${t.name}"?`, confirmLabel: 'Thay' }))) return;
+    if (filled && !(await confirmDialog({ title: `Thay prompt đang viết bằng khung "${t.name}"?`, confirmLabel: 'Thay' }))) return;
     onTemplate(t);
   }
   const part = (id: string, label: string, p: Part, max: number, aiLabel: string, placeholder: string) => (
@@ -89,12 +90,23 @@ export function PromptSections({ feature, format, mode, onMode, hook, ending, en
     </>
   );
   const list = (
-    <div id={listId} className="prompt-templates" role="group" aria-label="Mẫu prompt" onKeyDown={(e) => e.key === 'Escape' && (e.stopPropagation(), setOpen(false), opener.current?.focus())}>
+    <div id={listId} className="prompt-templates" role="group" aria-label="Khung prompt" onKeyDown={(e) => e.key === 'Escape' && (e.stopPropagation(), setOpen(false), opener.current?.focus())}>
       <p className="help">Điền cả Hook · Diễn biến · Kết</p>
       {templates.map((t) => (
         <button key={t.name} type="button" className={s.option} onClick={() => void pick(t)}>
           <span className={s.optionLabel}>{t.name}</span>
-          <span lang="en">{t.body}</span>
+          <span>{t.desc}</span>
+          {/* Create's sheet has room for what the template opens and ends on; Marketing Studio's, taller, keeps the one line. */}
+          {feature === 'video' && (
+            <>
+              <span className="prompt-template-line">
+                Hook: <span lang="en">{t.hook}</span>
+              </span>
+              <span className="prompt-template-line">
+                Kết: <span lang="en">{t.ending}</span>
+              </span>
+            </>
+          )}
         </button>
       ))}
     </div>
@@ -112,14 +124,14 @@ export function PromptSections({ feature, format, mode, onMode, hook, ending, en
         </div>
         <button ref={opener} type="button" className="link-button" aria-expanded={open} aria-controls={open ? listId : undefined} onClick={() => setOpen(!open)}>
           <Icon name="preset" size={12} />
-          Mẫu prompt
+          Khung prompt
         </button>
       </div>
       {open &&
         (narrow ? (
           // On a phone the list in the form would open under the sticky Run bar, so it is a bottom sheet over it.
-          <Modal open onClose={() => setOpen(false)} label="Mẫu prompt" className="template-sheet">
-            <h2>Mẫu prompt</h2>
+          <Modal open onClose={() => setOpen(false)} label="Khung prompt" className="template-sheet">
+            <h2>Khung prompt</h2>
             {list}
           </Modal>
         ) : (
@@ -162,14 +174,16 @@ function Section({ title, rule, after, children }: { title: string; rule: string
 /**
  * The exact English prompt Run sends, one per hook variant (`labels` names them): open on a computer, folded on a phone. The summary keeps the longest
  * one's length against the model's `limit`, red past it (Run then waits with the reason on the page); open, Translate gives a Vietnamese reading of the first.
+ * The server renders it open, and until hydration CSS (data-ssr) shows it folded on a phone, so neither screen flashes the other's state on load.
  */
 export function PromptPreview({ feature, prompts, labels, limit }: { feature: string; prompts: string[]; labels?: (string | null)[]; limit?: number }) {
-  const narrow = useMediaQuery(NARROW, true);
+  const narrow = useMediaQuery(NARROW);
+  const hydrated = useHydrated();
   const [toggled, setToggled] = useState<boolean | null>(null); // the person's own choice beats the screen's default
   const open = toggled ?? !narrow;
   const longest = Math.max(0, ...prompts.map((p) => p.length));
   return (
-    <details className="prompt-preview" open={open} onToggle={(e) => e.currentTarget.open !== open && setToggled(e.currentTarget.open)}>
+    <details className="prompt-preview" data-ssr={hydrated ? undefined : ''} open={open} onToggle={(e) => e.currentTarget.open !== open && setToggled(e.currentTarget.open)}>
       <summary>
         Xem prompt gửi đi (EN)
         <span className="prompt-preview-count" data-over={(limit !== undefined && longest > limit) || undefined}>

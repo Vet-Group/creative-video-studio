@@ -68,6 +68,7 @@ export function MediaOptimizer({ app }: { app: AppConfig }) {
   const narrow = useMediaQuery(NARROW);
   const image = useRef<ImageBitmap | null>(null);
   const generation = useRef(0);
+  const alive = useRef(false);
   const nextId = useRef(1);
   const kept = useRef<OptimizerEntry[]>([]); // the same list as `entries`, for the unmount cleanup
   const [file, setFile] = useState<File | null>(null);
@@ -82,14 +83,16 @@ export function MediaOptimizer({ app }: { app: AppConfig }) {
   const [notice, setNotice] = useState('');
   const sizeId = useId();
   const reasonId = useId();
-  useEffect(
-    () => () => {
-      generation.current++;
+  // Unmount marks the page gone rather than bumping `generation`: React may run this cleanup and the setup again on a live page (StrictMode in dev,
+  // Fast Refresh), and a decode or run in flight then must still land and clear `busy`.
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
       image.current?.close();
       for (const e of kept.current) URL.revokeObjectURL(e.url);
-    },
-    [],
-  );
+    };
+  }, []);
   useEffect(() => {
     if (!file) {
       setPreview('');
@@ -117,7 +120,7 @@ export function MediaOptimizer({ app }: { app: AppConfig }) {
     setBusy(true);
     try {
       const decoded = await decodeOptimizerImage(next);
-      if (current !== generation.current) {
+      if (current !== generation.current || !alive.current) {
         decoded.close();
         return;
       }
@@ -150,7 +153,7 @@ export function MediaOptimizer({ app }: { app: AppConfig }) {
     setNotice('');
     try {
       const blob = await optimizeImage(image.current, size.width, size.height, format);
-      if (current !== generation.current) return;
+      if (current !== generation.current || !alive.current) return;
       const name = `${file.name.replace(/\.[^.]+$/, '')}-optimized.${format === 'image/jpeg' ? 'jpg' : format.split('/')[1]}`;
       const made = addHistory(kept.current, { id: nextId.current++, url: URL.createObjectURL(blob), name, before: file.size, after: blob.size, width: size.width, height: size.height, format });
       kept.current = made.list;

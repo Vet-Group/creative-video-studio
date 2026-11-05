@@ -345,7 +345,7 @@ test.describe('1440x1000', () => {
     await expect(panel).toBeHidden();
   });
 
-  test('K4 prompt box (Viết tự do, the one box): as wide as the form, radius 12 with a 1px border; textarea 76 tall, 14px/21px, transparent; no starter chips (Mẫu prompt replaced them)', async ({ page }) => {
+  test('K4 prompt box (Viết tự do, the one box): as wide as the form, radius 12 with a 1px border; textarea 76 tall, 14px/21px, transparent; no starter chips (Khung prompt replaced them)', async ({ page }) => {
     await page.getByRole('radiogroup', { name: 'Cách viết prompt' }).getByText('Viết tự do').click();
     const wrapper = page.locator('.prompt-box');
     near((await box(wrapper)).width, 268, 'prompt box width');

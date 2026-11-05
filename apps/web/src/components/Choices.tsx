@@ -118,7 +118,7 @@ export function PhraseChoice({ kind, label, title, sub, choices, stores, storeId
     <>
       <ChoiceBox label={label} icon={kind === 'hook' ? 'film' : 'check'} value={picked[0]?.name} onOpen={() => setOpen(true)} onClear={() => onText('')} />
       <ChoiceDialog open={open} title={title} sub={sub} kind={kind} choices={list} often={choices.lists?.often[kind] ?? []} posters={choices.lists?.posters[kind] ?? {}} canShare={choices.lists?.canShare ?? false} stores={stores} storeId={storeId}
-        selected={picked.map((c) => c.id)} onPick={(id) => take(list.find((c) => c.id === id)?.phrase ?? '')} onAdded={added} onDelete={(c) => void choices.remove(c)} onClose={() => setOpen(false)} />
+        selected={picked.map((c) => c.id)} onPick={(id) => take(list.find((c) => c.id === id)?.phrase ?? '')} onAdded={added} onEdited={() => void choices.reload()} onDelete={(c) => void choices.remove(c)} onClose={() => setOpen(false)} />
     </>
   );
 }
@@ -176,15 +176,15 @@ type Share = 'mine' | 'store' | 'company';
 /**
  * Add a choice: a name, an optional card line, niche tag and photo, and the English scene the prompt takes, saved and chosen at once. It stays the
  * member's own, or goes to `store` (the store the dialog shows; none for every store) or, for a template editor (`canShare`), to the company. An example
- * fills the words.
+ * fills the words. With `edit`, the same form starts from that choice and saves its changes (PATCH /api/choices/:id).
  */
-function AddChoice({ kind, canShare, store, niche: initialNiche, onAdded, onCancel }: { kind: ChoiceKind; canShare: boolean; store: Store | undefined; niche: string; onAdded: (c: Choice) => void; onCancel: () => void }) {
-  const [name, setName] = useState('');
-  const [phrase, setPhrase] = useState('');
-  const [desc, setDesc] = useState('');
-  const [niche, setNiche] = useState(initialNiche);
-  const [photo, setPhoto] = useState<Img[]>([]);
-  const [share, setShare] = useState<Share>('mine');
+function AddChoice({ kind, canShare, store, niche: initialNiche, edit, onAdded, onCancel }: { kind: ChoiceKind; canShare: boolean; store: Store | undefined; niche: string; edit?: Choice; onAdded: (c: Choice) => void; onCancel: () => void }) {
+  const [name, setName] = useState(edit?.name ?? '');
+  const [phrase, setPhrase] = useState(edit?.phrase ?? '');
+  const [desc, setDesc] = useState(edit?.desc ?? '');
+  const [niche, setNiche] = useState(edit ? (edit.niche ?? '') : initialNiche);
+  const [photo, setPhoto] = useState<Img[]>(edit?.imageAssetId ? [{ id: edit.imageAssetId, filename: edit.name }] : []);
+  const [share, setShare] = useState<Share>(edit?.isCompany ? 'company' : edit?.storeId ? 'store' : 'mine');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const ids = { name: useId(), phrase: useId(), desc: useId(), niche: useId(), help: useId() };
@@ -207,7 +207,10 @@ function AddChoice({ kind, canShare, store, niche: initialNiche, onAdded, onCanc
     setError('');
     try {
       const shared = share === 'company' ? { isCompany: true } : share === 'store' && store ? { storeId: store.id } : {};
-      const c = await api<Choice>('/api/choices', sendJson('POST', { kind, name: name.trim(), phrase: scene, ...(desc.trim() && { desc: desc.trim() }), ...(niche.trim() && { niche: niche.trim() }), ...(photo[0] && { imageAssetId: photo[0].id }), ...shared }));
+      const c = edit
+        ? // Every field, so a cleared one is cleared and the share level is the form's.
+          await api<Choice>(`/api/choices/${encodeURIComponent(edit.id)}`, sendJson('PATCH', { name: name.trim(), phrase: scene, desc: desc.trim(), niche: niche.trim() || null, imageAssetId: photo[0]?.id ?? null, isCompany: false, storeId: null, ...shared }))
+        : await api<Choice>('/api/choices', sendJson('POST', { kind, name: name.trim(), phrase: scene, ...(desc.trim() && { desc: desc.trim() }), ...(niche.trim() && { niche: niche.trim() }), ...(photo[0] && { imageAssetId: photo[0].id }), ...shared }));
       onAdded(c);
     } catch (e) {
       setError(errorText(e, `Không lưu được ${KIND_NAME[kind]}, hãy thử lại.`));
@@ -218,19 +221,21 @@ function AddChoice({ kind, canShare, store, niche: initialNiche, onAdded, onCanc
   const shares = [
     { value: 'mine', label: 'Chỉ mình tôi' },
     { value: 'store', label: store ? `Cửa hàng đang chọn (${store.name})` : 'Cửa hàng đang chọn', disabled: !store },
-    ...(canShare ? [{ value: 'company', label: 'Toàn công ty' }] : []),
+    ...(canShare || edit?.isCompany ? [{ value: 'company', label: 'Toàn công ty' }] : []),
   ];
   return (
-    <div className="choice-form" role="group" aria-label={`Thêm ${KIND_NAME[kind]}`}>
+    <div className="choice-form" role="group" aria-label={`${edit ? 'Sửa' : 'Thêm'} ${KIND_NAME[kind]}`}>
       <p className="help">{help.intro}</p>
-      <div className="choice-examples" role="group" aria-label="Điền thử một ví dụ">
-        <span aria-hidden="true">Điền thử:</span>
-        {help.examples.map((e) => (
-          <button key={e.name} type="button" onClick={() => (setName(e.name), setDesc(e.desc), setPhrase(e.phrase))}>
-            {e.name}
-          </button>
-        ))}
-      </div>
+      {!edit && (
+        <div className="choice-examples" role="group" aria-label="Điền thử một ví dụ">
+          <span aria-hidden="true">Điền thử:</span>
+          {help.examples.map((e) => (
+            <button key={e.name} type="button" onClick={() => (setName(e.name), setDesc(e.desc), setPhrase(e.phrase))}>
+              {e.name}
+            </button>
+          ))}
+        </div>
+      )}
       <div className="field-head">
         <label className="field-label" htmlFor={ids.name}>
           Tên
@@ -281,7 +286,7 @@ function AddChoice({ kind, canShare, store, niche: initialNiche, onAdded, onCanc
           Huỷ
         </button>
         <button type="button" className="primary" disabled={busy || !name.trim() || !scene} onClick={() => void save()}>
-          {busy ? 'Đang lưu…' : 'Lưu & chọn'}
+          {busy ? 'Đang lưu…' : edit ? 'Lưu' : 'Lưu & chọn'}
         </button>
       </div>
     </div>
@@ -293,17 +298,18 @@ function AddChoice({ kind, canShare, store, niche: initialNiche, onAdded, onCanc
  * the member's latest clip with it) and name in a grid, the member's often-used group first when it has any, then by who shares them: each store's, the
  * company's, the member's own, the built-in ones. A store filter (the page's `storeId` first, or every store) and niche chips narrow the list. Arrows move
  * the focus between the cards, Enter or Space picks, Escape closes. Below: the footer (the variants row), the add form, and the member's own (for a
- * template editor also the shared ones) with a delete button.
+ * template editor also the shared ones) with edit and delete buttons, as PATCH and DELETE /api/choices/:id allow; `onEdited` follows a saved edit.
  */
-export function ChoiceDialog({ open, title, sub, kind, choices, often, posters, canShare, stores, storeId, selected, onPick, onAdded, onDelete, onClose, footer }: { open: boolean; title: string; sub: string; kind: ChoiceKind; choices: Choice[]; often: string[]; posters: Record<string, string>; canShare: boolean; stores: Store[]; storeId: string; selected: string[]; onPick: (id: string) => void; onAdded: (c: Choice) => void; onDelete: (c: Choice) => void; onClose: () => void; footer?: ReactNode }) {
+export function ChoiceDialog({ open, title, sub, kind, choices, often, posters, canShare, stores, storeId, selected, onPick, onAdded, onEdited, onDelete, onClose, footer }: { open: boolean; title: string; sub: string; kind: ChoiceKind; choices: Choice[]; often: string[]; posters: Record<string, string>; canShare: boolean; stores: Store[]; storeId: string; selected: string[]; onPick: (id: string) => void; onAdded: (c: Choice) => void; onEdited: () => void; onDelete: (c: Choice) => void; onClose: () => void; footer?: ReactNode }) {
   const grid = useRef<HTMLDivElement>(null);
   const addCard = useRef<HTMLButtonElement>(null);
   const formHead = useId();
   const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState<Choice | null>(null);
   /** The store filter: null follows the page's store; '' is every store. */
   const [store, setStore] = useState<string | null>(null);
   const [niche, setNiche] = useState('');
-  useEffect(() => setAdding(false), [open]);
+  useEffect(() => (setAdding(false), setEditing(null)), [open]);
   // Closed, the filters go back to the page's store and every niche, so the next opening starts from them.
   useEffect(() => {
     if (!open) (setStore(null), setNiche(''));
@@ -358,17 +364,20 @@ export function ChoiceDialog({ open, title, sub, kind, choices, often, posters, 
   );
   const owned = shown.filter((c) => c.group !== 'builtin' && (c.mine || (canShare && (c.isCompany || c.storeId !== null))));
   const ownLabel = `${KIND_NAME[kind][0]!.toUpperCase()}${KIND_NAME[kind].slice(1)} của bạn`;
-  const back = () => (setAdding(false), requestAnimationFrame(() => addCard.current?.focus()));
-  if (adding) {
+  const back = () => (setAdding(false), setEditing(null), requestAnimationFrame(() => addCard.current?.focus()));
+  if (adding || editing) {
+    const head = editing ? `Sửa ${KIND_NAME[kind]} ${editing.name}` : `Thêm ${KIND_NAME[kind]} của bạn`;
+    // An edited store entry offers its own store as the store choice; a new one, the dialog's.
+    const store = editing?.storeId ? { id: editing.storeId, name: editing.storeName ?? '' } : stores.find((s) => s.id === filter);
     return (
-      <Modal open={open} onClose={onClose} label={`Thêm ${KIND_NAME[kind]} của bạn`} className="choice-dialog">
+      <Modal open={open} onClose={onClose} label={head} className="choice-dialog">
         <h2 aria-labelledby={formHead}>
           <button type="button" className="photo-back" aria-label="Quay lại" onClick={back}>
             <Icon name="left" size={16} />
           </button>
-          <span id={formHead}>Thêm {KIND_NAME[kind]} của bạn</span>
+          <span id={formHead}>{head}</span>
         </h2>
-        <AddChoice kind={kind} canShare={canShare} store={stores.find((s) => s.id === filter)} niche={niche} onAdded={onAdded} onCancel={back} />
+        <AddChoice kind={kind} canShare={canShare} store={store} niche={niche} edit={editing ?? undefined} onAdded={editing ? () => (onEdited(), back()) : onAdded} onCancel={back} />
       </Modal>
     );
   }
@@ -415,6 +424,9 @@ export function ChoiceDialog({ open, title, sub, kind, choices, often, posters, 
                 {c.niche && <span className="tag">{c.niche}</span>}
                 {c.isCompany && <span className="tag">Công ty</span>}
                 {c.storeName && <span className="tag">Cửa hàng: {c.storeName}</span>}
+                <button type="button" className="link-button" aria-label={`Sửa ${KIND_NAME[kind]} ${c.name}`} onClick={() => setEditing(c)}>
+                  Sửa
+                </button>
                 <button type="button" className="link-button" aria-label={`Xoá ${KIND_NAME[kind]} ${c.name}`} onClick={() => onDelete(c)}>
                   Xoá
                 </button>
