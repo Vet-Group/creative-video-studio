@@ -34,14 +34,18 @@ export async function loginReady(page: Page): Promise<void> {
   await expect(page.getByRole('button', { name: 'Đăng nhập', exact: true })).toBeEnabled();
 }
 
+/** Goes to `path` from an app page whose session just ended: that page sends itself to /login?next=… on its next 401 (lib/api.ts), which aborts this goto, so go again. */
+export async function gotoPastSignOut(page: Page, path: string): Promise<void> {
+  await page.goto(path).catch(async (e: Error) => {
+    if (!e.message.includes('ERR_ABORTED')) throw e;
+    await page.goto(path);
+  });
+}
+
 /** Signs in through the form; the first-visit card on Explore counts as already closed unless `welcome` asks for it. */
 export async function signIn(page: Page, who: UserKey, { welcome = false } = {}): Promise<void> {
   if (!welcome) await page.addInitScript(() => localStorage.setItem('cvs.welcome.done', '1'));
-  // An app page whose cookies a test just cleared sends itself to /login?next=… on its next 401 (lib/api.ts), which aborts this goto: go again.
-  await page.goto('/login').catch(async (e: Error) => {
-    if (!e.message.includes('ERR_ABORTED')) throw e;
-    await page.goto('/login');
-  });
+  await gotoPastSignOut(page, '/login');
   await loginReady(page);
   await page.getByLabel('Email').fill(USERS[who].email);
   await page.getByLabel('Mật khẩu').fill(PASSWORD);

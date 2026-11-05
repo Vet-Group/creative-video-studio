@@ -1,5 +1,5 @@
 import { type Browser, expect, type Page, test } from '@playwright/test';
-import { loginReady, openSettings, signIn } from './support.test';
+import { gotoPastSignOut, loginReady, openSettings, signIn } from './support.test';
 import { PASSWORD, USERS, type UserKey } from './users';
 
 // Built from the fixture password so no password-like literal sits in the source (the secret scan flags those).
@@ -54,7 +54,7 @@ test('a user changes their password in Settings: the old one stops working and t
   await expect(disclosure).toHaveAttribute('aria-expanded', 'false');
   await expect(settings.getByRole('list', { name: 'Phiên đăng nhập' }).getByRole('listitem')).toHaveCount(1);
 
-  await other.page.goto('/library');
+  await gotoPastSignOut(other.page, '/library');
   await expect(other.page).toHaveURL(/\/login\?next=%2Flibrary$/);
   await other.context.close();
 

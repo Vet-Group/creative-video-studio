@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
-import { loginReady, openSettings, signIn } from './support.test';
+import { gotoPastSignOut, loginReady, openSettings, signIn } from './support.test';
 import { totpCode, wrongCode } from './totp';
 import { PASSWORD, USERS, type UserKey } from './users';
 
@@ -158,7 +158,7 @@ test('an Admin turns off the 2FA of a user who lost the phone: the user is signe
   await page.keyboard.press('Escape');
   await expect(row.getByText('2FA', { exact: true })).toHaveCount(0);
 
-  await userPage.goto('/library');
+  await gotoPastSignOut(userPage, '/library');
   await expect(userPage).toHaveURL(/\/login\?next=%2Flibrary$/);
   await password(userPage, 'totpb');
   await expect(userPage).toHaveURL(/\/library$/);
