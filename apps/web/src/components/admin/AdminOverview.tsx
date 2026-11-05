@@ -8,8 +8,22 @@ import { Empty, PageHead } from './PageHead';
 const usd = (v: string) => `$${Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const fmtTime = (iso: string) => new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date(iso));
 
-/** Spend against a monthly cap: the amount, a bar that turns amber from 80% and red at the cap, and what is left. A cap of 0 locks that budget. */
+/** A cap this high stands for "no cap": the owner set $100,000 rather than a real limit. */
+export const NO_CAP_USD = 100_000;
+
+/**
+ * Spend against a monthly cap: the amount, a bar that turns amber from 80% and red at the cap, and what is left. A cap of 0 locks that budget;
+ * a cap from NO_CAP_USD up shows the spend alone.
+ */
 export function Budget({ title, used, cap }: { title: string; used: string; cap: string }) {
+  if (Number(cap) >= NO_CAP_USD)
+    return (
+      <div className="kpi budget">
+        <p className="kpi-label">{title}</p>
+        <p className="kpi-value">{usd(used)}</p>
+        <p className="kpi-sub">Chưa đặt hạn mức (đang để {usd(cap)})</p>
+      </div>
+    );
   const share = Number(cap) > 0 ? Number(used) / Number(cap) : 1;
   const level = share >= 1 ? 'full' : share >= 0.8 ? 'high' : 'ok';
   return (

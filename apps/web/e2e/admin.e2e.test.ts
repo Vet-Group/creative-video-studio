@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
-import { optionsOf, png, presetCards, runInUi, select, signIn } from './support.test';
+import { optionsOf, png, presetCards, runInUi, runViaApi, select, signIn } from './support.test';
 
 const nav = (page: Page, name: string) => page.getByRole('navigation', { name: 'Các trang quản trị' }).getByRole('link', { name, exact: true });
 
@@ -101,14 +101,21 @@ test('an Admin sets up a team, a store and a user, then reconciles the month cos
   const invoice = page.getByRole('listitem').filter({ hasText: 'Tổng hóa đơn fal (USD)' });
   await expect(invoice.locator('.error')).toContainText('$12.5000');
   await expect(invoice.locator('.error')).toContainText('lệch quá 5%');
-  await expect(invoice).toContainText('Tổng theo tháng UTC: $0.0000');
+  await expect(invoice).toContainText('Trong app ghi: $0.0000');
+  // The UTC month total shows only when it differs from the ledger; a positive difference says where it went.
+  await expect(invoice).not.toContainText('tháng UTC');
+  await expect(invoice).toContainText('đã được tính vào Chi phí chung');
 
   await page.getByLabel('Số tiền điều chỉnh (USD, có thể âm)').fill('-1.5');
   await page.getByLabel('Ghi chú (bắt buộc)').fill('Test adjustment');
   await page.getByRole('button', { name: 'Thêm điều chỉnh' }).click();
   const shared = page.getByRole('region', { name: 'Chi phí chung' });
   await expect(shared).toContainText('Chênh lệch hóa đơn: $12.5000');
-  await expect(shared).toContainText('Điều chỉnh tay: $-1.5000');
+  await expect(shared).toContainText('Điều chỉnh tay: -$1.5000');
+  // The provider and model table holds both shared rows under their kind.
+  const byModel = page.getByRole('region', { name: 'Theo nhà cung cấp và mô hình' });
+  await expect(byModel.getByRole('row', { name: /Chênh lệch hóa đơn/ })).toContainText('$12.50');
+  await expect(byModel.getByRole('row', { name: /Điều chỉnh tay/ })).toContainText('-$1.50');
   // The total card shows the 2-decimal value with the exact 4-decimal USD and the VND under it, not in a tooltip.
   const total = page.getByRole('group', { name: 'Tổng chi phí' });
   await expect(total.locator('.kpi-value')).toHaveText('$11.00');
@@ -346,4 +353,25 @@ test('a Member cannot see the Admin pages', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Người dùng' })).toHaveCount(0);
   await expect(page.getByLabel('Email', { exact: true })).toHaveCount(0);
   expect((await page.request.get('/api/admin/users')).status()).toBe(403);
+});
+
+test("an Admin opens a member's line on Costs and sees the job behind it", async ({ browser, page }) => {
+  // The member runs one mock job this month.
+  const member = await browser.newPage();
+  await signIn(member, 'costa');
+  const jobId = await runViaApi(member);
+  await member.close();
+
+  await signIn(page, 'admin');
+  await page.goto('/admin/costs');
+  const users = page.getByRole('region', { name: 'Theo người dùng' });
+  const line = users.getByRole('button', { name: 'E2E Costs A' });
+  await expect(line).toHaveAttribute('aria-expanded', 'false');
+  await line.click();
+  await expect(line).toHaveAttribute('aria-expanded', 'true');
+  const jobs = users.locator('tr.drill');
+  await expect(jobs.getByRole('row', { name: new RegExp(jobId.slice(0, 8)) })).toContainText('Tạo video');
+  await expect(jobs).toContainText('Mock E2E');
+  await line.click();
+  await expect(jobs).toHaveCount(0);
 });

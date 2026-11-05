@@ -16,6 +16,7 @@ const { checkCaps } = await import('@cvs/core/limits');
 const costsRoute = await import('./costs/route');
 const detailRoute = await import('./costs/detail/route');
 const summaryRoute = await import('./costs/summary/route');
+const jobsRoute = await import('./costs/jobs/route');
 const adjustRoute = await import('./costs/adjustments/route');
 const rateRoute = await import('./rates/[month]/route');
 const invoicesRoute = await import('./invoices/route');
@@ -45,6 +46,7 @@ interface Figures extends Money {
   code?: string | null;
   failedByVerdict: Money;
   failedByStatus: Money;
+  acceptedResults: number;
   acceptedClips: number;
   costPerAcceptedUsd: string | null;
   costPerAcceptedVnd: string | null;
@@ -216,6 +218,7 @@ describe('authorization', () => {
     ['GET /api/admin/costs', (c) => costsRoute.GET(call(c, `/api/admin/costs?month=${M}`))],
     ['GET /api/admin/costs/detail', (c) => detailRoute.GET(call(c, `/api/admin/costs/detail?month=${M}`))],
     ['GET /api/admin/costs/summary', (c) => summaryRoute.GET(call(c, `/api/admin/costs/summary?month=${M}`))],
+    ['GET /api/admin/costs/jobs', (c) => jobsRoute.GET(call(c, `/api/admin/costs/jobs?month=${M}&by=user&id=alice`))],
     ['POST /api/admin/costs/adjustments', (c) => adjustRoute.POST(call(c, '/api/admin/costs/adjustments', 'POST', { month: M, usd: '1', note: 'x' }))],
     ['PUT /api/admin/rates/[month]', (c) => rateRoute.PUT(call(c, `/api/admin/rates/${M}`, 'PUT', { vndPerUsd: 1 }), ctxMonth(M))],
     ['PUT /api/admin/invoices', (c) => invoicesRoute.PUT(call(c, '/api/admin/invoices', 'PUT', { month: M, provider: 'fal', totalUsd: 1 }))],
@@ -681,5 +684,98 @@ describe('LLM calls on the Costs page', () => {
     const p = await page(FM);
     expect(p.byUser.map((u) => [u.id, u.usd, u.failedByStatus.usd])).toEqual([['bob', '0.0004', '0.0000']]);
     expect(p.capUsage.usd).toBe('0.0000');
+  });
+});
+
+describe('the analysis on the Costs page: cost per accepted clip, by model, by day, last month and the jobs of a line', () => {
+  // February 2032 (29 days). Alice: a video clip cj1 (2.0, Pass) on the 3rd with an Enhance (0.0010), a Try On image cj2 (0.5, Pass) on the
+  // 5th and a suggestion run (0.0006, no job); a shared bake-off row of 1.0. January 2032 holds one bake-off row of 4.0.
+  const AM = '2032-02';
+  type Analysis = Page & {
+    attributed: Money;
+    previousMonth: Money;
+    byFeature: Figures[];
+    byModel: { provider: string | null; model: string | null; label: string; jobs: number; calls: number; usd: string; usdDisplay: string }[];
+    byDay: { day: string; usd: string }[];
+  };
+  const jobs = async (query: string, cookie = admin.cookie) => jobsRoute.GET(call(cookie, `/api/admin/costs/jobs?${query}`));
+
+  beforeAll(async () => {
+    const { bookLlm } = await import('@cvs/core/ledger');
+    await open('cj1', 'alice', 't3', null, 'fal', '2032-02-03T03:00:00Z', '2.0000');
+    await running('cj1');
+    await succeed('cj1', '2.0000');
+    expect(await bookLlm(pool, { enhance: 'cj1' }, { costUsd: 0.001, provider: 'openai', model: 'gpt-6-luna' })).toBe(true);
+    await pool.query(
+      `insert into jobs (id, user_id, team_id, store_id, model, provider, prompt, aspect, duration_s, input_asset_ids, created_at, feature)
+       values ('cj2', 'alice', 't3', null, 'fal-test', 'fal', 'p', '1:1', 5, '{}', '2032-02-05T03:00:00Z', 'try_on')`,
+    );
+    await reserve(pool, 'cj2', '0.5000');
+    await pool.query(`insert into verdicts (id, job_id, verdict, fault, marked_by) values ('cv1', 'cj1', 'pass', null, $1), ('cv2', 'cj2', 'pass', null, $1)`, [admin.id]);
+    await pool.query(`insert into suggestion_runs (id, user_id, input, status, cost_usd, created_at) values ('cr1', 'alice', '{}', 'succeeded', 0.0006, '2032-02-05T04:00:00Z')`);
+    expect(await bookLlm(pool, { suggestion: 'cr1' }, { costUsd: 0.0006, provider: 'openai', model: 'gpt-6-luna' })).toBe(true);
+    await bookShared(pool, { kind: 'bakeoff', usd: '1.0000', month: AM, provider: 'fal', ref: 'bakeoff-fal-2032-02' });
+    await bookShared(pool, { kind: 'bakeoff', usd: '4.0000', month: '2032-01', provider: 'fal', ref: 'bakeoff-fal-2032-01' });
+  });
+
+  test('the cost per accepted clip counts only clip provider rows and clip passes, the same on every breakdown; an accepted image is counted but not priced as a clip', async () => {
+    const p = (await page(AM)) as Analysis;
+    expect(p.total.usd).toBe('3.5016');
+    expect(p.attributed.usd).toBe('2.5016');
+    expect(p.previousMonth).toEqual({ usd: '4.0000', usdDisplay: '4.00', vnd: null });
+    // 2.0 / 1, not (2.0 + 0.001 + 0.5 + 0.0006) / 1: neither the Enhance nor the image nor the suggestion is part of what the clip cost.
+    expect(p.byUser[0]).toMatchObject({ id: 'alice', usd: '2.5016', acceptedResults: 2, acceptedClips: 1, costPerAcceptedUsd: '2.0000' });
+    expect(p.byTeam[0]).toMatchObject({ id: 't3', acceptedClips: 1, costPerAcceptedUsd: '2.0000' });
+    expect(p.byStore[0]).toMatchObject({ id: '', acceptedClips: 1, costPerAcceptedUsd: '2.0000' });
+    const feature = Object.fromEntries(p.byFeature.map((f) => [f.id, [f.usd, f.acceptedResults, f.acceptedClips, f.costPerAcceptedUsd]]));
+    expect(feature).toEqual({ video: ['2.0000', 1, 1, '2.0000'], try_on: ['0.5000', 1, 0, null], llm: ['0.0016', 0, 0, null] });
+    const s = await summary(AM);
+    expect(s.rows.find((r) => r[1] === 'Gamma')!.slice(9)).toEqual(['1', '2.0000']);
+  });
+
+  test('lists every row by provider and model, shared rows by their kind, largest first', async () => {
+    const p = (await page(AM)) as Analysis;
+    expect(p.byModel).toEqual([
+      { provider: 'fal', model: 'fal-test', label: 'Fal test', jobs: 2, calls: 0, usd: '2.5000', usdDisplay: '2.50' },
+      { provider: 'fal', model: null, label: 'Thử nghiệm mô hình', jobs: 0, calls: 0, usd: '1.0000', usdDisplay: '1.00' },
+      { provider: 'openai', model: 'gpt-6-luna', label: 'gpt-6-luna', jobs: 1, calls: 1, usd: '0.0016', usdDisplay: '0.00' },
+    ]);
+    expect(sumUsd(p.byModel.map((l) => l.usd))).toBe(p.total.usd);
+  });
+
+  test('has one entry per calendar day of the month, with the job and LLM rows on their ICT day and shared rows left out', async () => {
+    const p = (await page(AM)) as Analysis;
+    expect(p.byDay).toHaveLength(29);
+    expect(p.byDay[0]).toEqual({ day: '2032-02-01', usd: '0.0000' });
+    expect(p.byDay.filter((d) => d.usd !== '0.0000')).toEqual([{ day: '2032-02-03', usd: '2.0010' }, { day: '2032-02-05', usd: '0.5006' }]);
+  });
+
+  test('the jobs of a line: newest first with their summed rows, and the line LLM calls without a job', async () => {
+    const res = await jobs(`month=${AM}&by=user&id=alice`);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      jobs: [
+        { jobId: 'cj2', createdAt: '2032-02-05T03:00:00Z', feature: 'Thử đồ', model: 'Fal test', status: 'queued', verdict: 'pass', final: false, usd: '0.5000' },
+        { jobId: 'cj1', createdAt: '2032-02-03T03:00:00Z', feature: 'Tạo video', model: 'Fal test', status: 'succeeded', verdict: 'pass', final: true, usd: '2.0010' },
+      ],
+      more: 0,
+      llm: { calls: 1, usd: '0.0006' },
+    });
+    // The same keys as the page: the Try On line holds cj2 only, the LLM line the Enhance on cj1 and the call, the line with no store both jobs.
+    expect((await (await jobs(`month=${AM}&by=feature&id=try_on`)).json()).jobs.map((j: { jobId: string }) => j.jobId)).toEqual(['cj2']);
+    expect(await (await jobs(`month=${AM}&by=feature&id=llm`)).json()).toMatchObject({ jobs: [{ jobId: 'cj1', usd: '0.0010' }], more: 0, llm: { calls: 1, usd: '0.0006' } });
+    expect((await (await jobs(`month=${AM}&by=store&id=`)).json()).jobs).toHaveLength(2);
+    expect(await (await jobs(`month=${AM}&by=team&id=nobody`)).json()).toEqual({ jobs: [], more: 0, llm: null });
+  });
+
+  test.each([
+    ['no month', 'by=user&id=alice'],
+    ['a bad month', 'month=2032-13&by=user&id=alice'],
+    ['a bad by', `month=${AM}&by=model&id=alice`],
+    ['an inherited key as by', `month=${AM}&by=toString&id=alice`],
+    ['no id', `month=${AM}&by=user`],
+    ['a bad asOf', `month=${AM}&by=user&id=alice&asOf=0`],
+  ])('the jobs of a line refuse %s with 400', async (_name, query) => {
+    expect((await jobs(query)).status).toBe(400);
   });
 });
