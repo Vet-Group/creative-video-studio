@@ -280,6 +280,24 @@ describe('/api/templates', () => {
       });
     });
 
+    test("keeps a Marketing job's end frame, last shot and end text, which the template gives back; refuses them over their limits", async () => {
+      const u = await newUser();
+      const end = { ending: 'She waves goodbye.', endText: 'Mua ngay hôm nay!', endTextPos: 'top' };
+      const id = await job(u, { feature: 'marketing', model: 'kling-o3-pro', duration: 5, params: { audio: 'on', brief: 'b', endAssetId: u.asset, ...end }, inputs: [u.asset] });
+      const res = await fromJob(u, id);
+      const { data } = await saved(res.clone());
+      expect(data).toEqual({ images: [u.asset], endFrame: u.asset, brief: 'b', ...end, audio: 'on', ratio: '9:16', modelId: 'kling-o3-pro', durationSec: 5 });
+      const tid = ((await res.json()) as { id: string }).id;
+      expect(await (await one(req(u, `/api/templates/${tid}`), ctx(tid))).json()).toMatchObject({ ...end, endFrame: { id: u.asset } });
+      for (const [data, message] of [
+        [{ ending: 'x'.repeat(201) }, 'data.ending must be text of at most 200 characters'],
+        [{ endText: 'x'.repeat(61) }, 'data.endText must be text of at most 60 characters'],
+        [{ endText: 'ok', endTextPos: 'left' }, 'data.endTextPos must be one of bottom, middle, top'],
+      ] as const) {
+        expect(await error(await save(u, { name: 'Too long', feature: 'marketing', data: { images: [], ...data } }))).toBe(message);
+      }
+    });
+
     test("leaves out another member's and deleted inputs, a hidden store and a hook the member cannot use, and keeps a visible store", async () => {
       const [u, other] = [await newUser(), await newUser()];
       await pool.query(`insert into stores (id, name, code, hidden) values ('tpl-ok', 'Ok', 'TPLOK', false), ('tpl-hidden', 'Hidden', 'TPLH', true)`);

@@ -1,4 +1,4 @@
-// Create video's end frame and Run from the prompt alone on the rows the migrations seed (Kling O3 Pro takes both, Kling O1 neither), against a
+// Create video's end frame and Run from the prompt alone on the rows the migrations seed (Kling O3 Pro takes both, Kling O1 neither), and Marketing Studio's end frame and end inputs, against a
 // disposable database on the compose Postgres.
 import { randomBytes } from 'node:crypto';
 import { createTestDatabase } from '@cvs/db/testing';
@@ -75,7 +75,6 @@ describe('the end frame', () => {
     for (const endAssetId of ['theirs', 'vid', 'nope']) expect(await errorOf(await run({ params: { endAssetId } }))).toBe('params.endAssetId must be one of your own images');
     expect(await errorOf(await run({ params: { endAssetId: ['end'] } }))).toMatch(/as text/);
     expect(await errorOf(await run({ modelId: 'kling-o1', params: { endAssetId: 'end' } }))).toBe('the model does not take an end frame');
-    expect(await errorOf(await run({ feature: 'marketing', assetIds: ['img', 'end'], params: { endAssetId: 'end' } }))).toMatch(/params may hold only/);
   });
 
   test('a retry is refused once its end frame was deleted', async () => {
@@ -145,5 +144,41 @@ describe('reference audio', () => {
     expect(await errorOf(await run({ params: { audioAssetIds: 'c5a' } }))).toBe('the model does not take reference audio');
     expect(await errorOf(await run({ ...ref20, assetIds: ['img', 'c5a'] }))).toBe('an audio clip goes in params.audioAssetIds, not assetIds');
     expect(await errorOf(await run({ ...ref20, assetIds: [], params: { audioAssetIds: 'c5a' } }))).toBe('a Run with no image takes a prompt, and no preset, end frame or audio');
+  });
+});
+
+describe('Marketing Studio: end frame, last shot and end text', () => {
+  const ugc = (body: Record<string, unknown>) => run({ feature: 'marketing', assetIds: ['img', 'prod'], ...body });
+  const paramsOf = async (res: Response) => (await pool.query('select params from jobs where id = $1', [((await res.json()) as { id: string }).id])).rows[0].params;
+  beforeAll(async () => {
+    await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) select 'prod', owner_id, 'input', 'prod', 'p.png', 'image/png', 1 from assets where id = 'img'`);
+    await pool.query(`update model_configs set enabled = true where id = 'seedance-2.0-reference'`);
+  });
+
+  test('the Marketing picker says which models take an end frame', async () => {
+    const r = (await (await GET_MODELS(call('/api/models?feature=marketing&ratio=9:16&durationSec=5'))).json()) as { models: { id: string; endFrame: boolean }[] };
+    expect(Object.fromEntries(r.models.map((m) => [m.id, m.endFrame]))).toMatchObject({ 'kling-o3-pro': true, 'seedance-2.0-reference': false });
+  });
+
+  test('a UGC or Advanced Run keeps the end frame, the last shot and the end text on a model that takes an end frame', async () => {
+    const all = { audio: 'off', endAssetId: 'end', ending: 'Cô ấy vẫy tay chào.', endText: 'Mua ngay hôm nay!', endTextPos: 'top' };
+    const res = await ugc({ params: all });
+    expect(res.status).toBe(201);
+    expect(await paramsOf(res)).toEqual(all);
+    const adv = await run({ feature: 'marketing', assetIds: ['img'], params: { format: 'advanced', endAssetId: 'end', endText: 'x'.repeat(60) } });
+    expect(adv.status).toBe(201);
+    // The end text needs no end frame, and goes on any model: the worker draws it.
+    expect((await ugc({ modelId: 'seedance-2.0-reference', params: { ending: 'x'.repeat(200), endText: 'Giảm 50%' } })).status).toBe(201);
+  });
+
+  test('refuses an end frame on a model without one or that is not the caller’s own image, and over-long or malformed end inputs', async () => {
+    expect(await errorOf(await ugc({ modelId: 'seedance-2.0-reference', params: { endAssetId: 'end' } }))).toBe('the model does not take an end frame');
+    for (const endAssetId of ['theirs', 'vid', 'nope']) expect(await errorOf(await ugc({ params: { endAssetId } }))).toBe('params.endAssetId must be one of your own images');
+    expect(await errorOf(await ugc({ params: { ending: 'x'.repeat(201) } }))).toBe('params.ending may be at most 200 characters');
+    expect(await errorOf(await ugc({ params: { endText: 'x'.repeat(61) } }))).toBe('params.endText may be at most 60 characters');
+    for (const endText of ['   ', 'two\nlines', 'tab\there']) expect(await errorOf(await ugc({ params: { endText } }))).toBe('params.endText must be one line of text');
+    expect(await errorOf(await ugc({ params: { endText: 'ok', endTextPos: 'left' } }))).toMatch(/^params.endTextPos goes with params.endText and must be one of bottom, middle, top/);
+    expect(await errorOf(await ugc({ params: { endTextPos: 'top' } }))).toMatch(/^params.endTextPos goes with params.endText/);
+    expect(await errorOf(await run({ params: { endText: 'Create video has none' } }))).toMatch(/params may hold only/);
   });
 });

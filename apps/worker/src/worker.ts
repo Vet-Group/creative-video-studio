@@ -20,7 +20,7 @@ import type { Suggester } from '@cvs/core/suggest';
 import { insertAssets } from '@cvs/db/assets';
 import { createDb, type createPool } from '@cvs/db/client';
 import { type Job, PgBoss } from 'pg-boss';
-import { closestRatio, extractPoster, probeSize, sniffImage } from './media';
+import { burnEndText, closestRatio, extractPoster, probeSize, sniffImage } from './media';
 import { purgeDeletedClips } from './purge';
 import { deleteObject, getObject, putObject } from './storage';
 import { runSuggestion } from './suggest';
@@ -291,20 +291,34 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
    * Copies the output into MinIO, checks it is at least 720p (or the row's own resolution when that is lower, as on a 480p draft row), cuts the poster
    * and settles the job. A failure that may pass leaves the job running for the next pass.
    */
-  async function deliver(job: { id: string; user_id: string; provider: string; kind: string; output_resolution?: string | null }, outputUrl: string, costUsd: number): Promise<void> {
+  async function deliver(job: { id: string; user_id: string; provider: string; kind: string; output_resolution?: string | null; params?: Record<string, string> }, outputUrl: string, costUsd: number): Promise<void> {
     if (job.kind === 'image') return deliverImage(job, outputUrl, costUsd);
     const dir = await mkdtemp(join(tmpdir(), 'cvs-deliver-'));
     const outputId = randomUUID();
     const posterId = randomUUID();
     const keys: string[] = [];
+    let warning: string | null = null;
     try {
-      const video = join(dir, 'output.mp4');
+      let video = join(dir, 'output.mp4');
       await download(outputUrl, video, job.provider);
       const { width, height } = await probeSize(video);
       const floor = Math.min(720, Number.parseInt(job.output_resolution ?? '', 10) || 720);
       if (Math.min(width, height) < floor) {
         await settle(pool, job.id, { status: 'failed', costUsd, billed: true, error: `the output is ${width}x${height}, below ${floor}p` });
         return;
+      }
+      // Marketing Studio's end text (params.endText), burned in here rather than asked of the model. The provider already billed the clip, so a failed
+      // overlay keeps the clip as it came and leaves a warning in the job's error, which an Admin sees on the History card.
+      const endText = job.params?.endText?.replace(/\s+/g, ' ').trim();
+      if (endText) {
+        const marked = join(dir, 'marked.mp4');
+        try {
+          await burnEndText(video, marked, endText, (['top', 'middle'] as const).find((p) => p === job.params?.endTextPos) ?? 'bottom');
+          video = marked;
+        } catch (e) {
+          warning = `the end text was not added: ${e instanceof Error ? e.message : e}`.slice(0, 500);
+          log(`end text ${job.id}`, e);
+        }
       }
       const poster = join(dir, 'poster.jpg');
       await extractPoster(video, poster);
@@ -317,7 +331,10 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
         { id: outputId, ownerId: job.user_id, kind: 'output', s3Key: keys[0]!, filename: `video-${name}.mp4`, mime: 'video/mp4', bytes: videoBytes.length, width, height },
         { id: posterId, ownerId: job.user_id, kind: 'output', s3Key: keys[1]!, filename: `poster-${name}.jpg`, mime: 'image/jpeg', bytes: posterBytes.length },
       ]);
-      if (await settle(pool, job.id, { status: 'succeeded', costUsd, outputAssetId: outputId, posterAssetId: posterId })) return;
+      if (await settle(pool, job.id, { status: 'succeeded', costUsd, outputAssetId: outputId, posterAssetId: posterId })) {
+        if (warning) await pool.query('update jobs set error = $2 where id = $1', [job.id, warning]).catch((err) => log(`end text warning ${job.id}`, err));
+        return;
+      }
       throw new Error('the job was settled by someone else');
     } catch (e) {
       await pool.query('delete from assets where id = any($1::text[])', [[outputId, posterId]]).catch((err) => log('cleanup', err));

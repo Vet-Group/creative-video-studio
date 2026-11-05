@@ -56,16 +56,28 @@ const instruction = (ratio?: string | null) =>
   "The creator in [Image1] wears or holds the product in [Image2]; keep their face, hair and body and the product's shape, colours, print and details exactly as in the photos. " +
   'Show the whole look, a close-up of the product, then a natural move or turn that shows the fit. Soft natural light, authentic energy. No on-screen text, logos or watermarks.';
 
+/** The end scene: the member's description of the last shot, added to the prompt as its closing sentence (endingLine). */
+export const MAX_ENDING = 200;
+/** The end text: what the worker burns over the last 2 s of the clip, and where (apps/worker/src/media.ts); the model is never asked to draw it. */
+export const MAX_END_TEXT = 60;
+export const END_TEXT_POSITIONS = ['bottom', 'middle', 'top'] as const;
+export type EndTextPosition = (typeof END_TEXT_POSITIONS)[number];
+/** The closing sentence for the last shot, or null when there is none; a final full stop is not doubled. */
+const endingLine = (ending?: string | null) => {
+  const text = ending?.trim().replace(/\s+/g, ' ');
+  return text ? `It ends with: ${text.replace(/[.!?]+$/, '')}.` : null;
+};
+
 /**
  * The one English prompt a Marketing Studio run sends: the fixed try-on instruction for the ratio, then the hook and the location when chosen, then the
- * member's own text as creator notes. An unknown or empty hook or location id adds nothing. `audio` adds the sound rule (UGC_SOUND or SILENT); left out,
- * the prompt says nothing about sound.
+ * member's own text as creator notes and the last shot (`ending`). An unknown or empty hook or location id adds nothing. `audio` adds the sound rule
+ * (UGC_SOUND or SILENT); left out, the prompt says nothing about sound.
  */
-export function marketingPrompt({ hook, location, prompt, audio, ratio }: { hook?: string | null; location?: string | null; prompt?: string | null; audio?: boolean; ratio?: string | null }, custom: CustomChoices = {}): string {
+export function marketingPrompt({ hook, location, prompt, ending, audio, ratio }: { hook?: string | null; location?: string | null; prompt?: string | null; ending?: string | null; audio?: boolean; ratio?: string | null }, custom: CustomChoices = {}): string {
   const h = [...HOOKS, ...(custom.hooks ?? [])].find((c) => c.id === hook);
   const l = [...LOCATIONS, ...(custom.locations ?? [])].find((c) => c.id === location);
   const text = prompt?.trim();
-  return [instruction(ratio), h?.phrase, l && `Set in ${l.phrase}.`, text && `Creator notes: ${text}`, audio === undefined ? null : audio ? UGC_SOUND : SILENT].filter(Boolean).join(' ');
+  return [instruction(ratio), h?.phrase, l && `Set in ${l.phrase}.`, text && `Creator notes: ${text}`, endingLine(ending), audio === undefined ? null : audio ? UGC_SOUND : SILENT].filter(Boolean).join(' ');
 }
 
 /** Sound of a UGC clip with audio on: what a phone records, as on the reference site's UGC clips. */
@@ -86,10 +98,10 @@ export const SUGGEST_DAILY_LIMIT = 20;
 
 /**
  * The one English prompt a Marketing Studio Advanced run sends. The member's brief is the source of truth, the reference images are named
- * [Image1]..[ImageN] (each adapter rewrites them for its schema), the hook and the location follow when chosen, then one dialogue rule:
+ * [Image1]..[ImageN] (each adapter rewrites them for its schema), the hook, the location and the last shot follow when chosen, then one dialogue rule:
  * audio off is silent; a script is spoken word for word and nothing else; with no script there is speech only when the brief asks for it.
  */
-export function advancedPrompt({ brief, images, hook, location, script, audio }: { brief: string; images: number; hook?: string | null; location?: string | null; script?: string | null; audio: boolean }, custom: CustomChoices = {}): string {
+export function advancedPrompt({ brief, images, hook, location, script, ending, audio }: { brief: string; images: number; hook?: string | null; location?: string | null; script?: string | null; ending?: string | null; audio: boolean }, custom: CustomChoices = {}): string {
   const h = [...HOOKS, ...(custom.hooks ?? [])].find((c) => c.id === hook);
   const l = [...LOCATIONS, ...(custom.locations ?? [])].find((c) => c.id === location);
   const refs = Array.from({ length: images }, (_, i) => `[Image${i + 1}]`).join(', ');
@@ -105,6 +117,7 @@ export function advancedPrompt({ brief, images, hook, location, script, audio }:
     `Brief: ${brief.trim()}`,
     h?.phrase,
     l && `Set in ${l.phrase}.`,
+    endingLine(ending),
     dialogue,
     'Do not add on-screen text, captions or watermarks.',
   ]

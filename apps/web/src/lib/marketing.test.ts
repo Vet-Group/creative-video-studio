@@ -145,6 +145,18 @@ describe('advancedPrompt', () => {
   });
 });
 
+describe('the last shot (Cảnh kết)', () => {
+  it('closes the brief as one sentence in both formats, before the sound rule, and adds nothing when blank', () => {
+    const ugc = marketingPrompt({ prompt: 'smiles', ending: '  She waves goodbye\n to the camera. ', audio: false, ratio: '9:16' });
+    expect(ugc).toContain('Creator notes: smiles It ends with: She waves goodbye to the camera. The video is completely silent');
+    const adv = advancedPrompt({ brief: 'a bottle', images: 1, location: 'kitchen', ending: 'the bottle on the shelf!', audio: false });
+    expect(adv).toContain('Set in a modern kitchen in warm light. It ends with: the bottle on the shelf. The video is completely silent');
+    expect(adv).toMatch(/Do not add on-screen text, captions or watermarks\.$/); // the end text is the worker's, never the model's
+    expect(marketingPrompt({ prompt: 'smiles', ending: '   ' })).toBe(marketingPrompt({ prompt: 'smiles' }));
+    expect(advancedPrompt({ brief: 'x', images: 0, ending: null, audio: true })).toBe(advancedPrompt({ brief: 'x', images: 0, audio: true }));
+  });
+});
+
 describe('custom hooks and locations', () => {
   const custom = { hooks: [{ id: 'c-hook', name: 'Của tôi', desc: '', phrase: 'The creator waves at the camera.' }], locations: [{ id: 'c-spot', name: 'Quán', desc: '', phrase: 'a small corner cafe' }] };
   const builtIn = { hooks: [{ ...HOOKS[0]!, id: 'c-hook' }], locations: [{ ...LOCATIONS[0]!, id: 'c-spot' }] };

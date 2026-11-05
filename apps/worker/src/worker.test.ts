@@ -1,7 +1,7 @@
 // The worker against a disposable database and bucket on the compose Postgres and MinIO (`pnpm services:up`), with the mock provider.
 import { randomBytes, randomUUID } from 'node:crypto';
 import { execFile } from 'node:child_process';
-import { mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdir, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -322,6 +322,34 @@ describe('Create video extras', () => {
     expect(by.framed).toMatchObject({ imageUrls: ['asset://start'], endImageUrl: 'asset://last', audioUrls: ['asset://song', 'asset://voice'] });
     expect([by.plain!.endImageUrl, by.plain!.audioUrls]).toEqual([undefined, undefined]);
     await waitFor('both jobs to finish', async () => (await status(framed)) === 'succeeded' && (await status(plain)) === 'succeeded');
+  });
+});
+
+describe('Marketing Studio end text', () => {
+  test("burns params.endText into the delivered clip; when the overlay fails, the provider's clip is kept and the job says why", async () => {
+    // A clip with PCM sound (in Matroska), which cannot be copied into an MP4, so the overlay fails after the provider has billed.
+    const odd = join(mockDir, `${randomUUID()}-pcm.mp4`);
+    await mkdir(mockDir, { recursive: true });
+    await run(requireFfmpeg(), ['-y', '-v', 'error', '-f', 'lavfi', '-i', 'testsrc2=size=720x1280:rate=24', '-f', 'lavfi', '-i', 'sine', '-t', '1', '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', '-c:a', 'pcm_s16le', '-f', 'matroska', odd]);
+    await start(counting(300, (inner) => ({ ...inner, status: async (pj) => {
+      const s = await inner.status(pj);
+      return s.state === 'succeeded' && (await pool.query(`select 1 from jobs where provider_job_id = $1 and prompt = 'odd'`, [pj.providerJobId])).rowCount ? { ...s, outputUrl: pathToFileURL(odd).href } : s;
+    } })));
+    const marked = await newJob('u1', { prompt: 'marked' });
+    const odds = await newJob('u2', { prompt: 'odd' });
+    for (const id of [marked, odds]) await pool.query(`update jobs set feature = 'marketing', params = '{"endText":"Mua ngay hôm nay!","endTextPos":"top"}' where id = $1`, [id]);
+    await send(marked, 'u1');
+    await send(odds, 'u2');
+    await waitFor('both jobs to succeed', async () => (await status(marked)) === 'succeeded' && (await status(odds)) === 'succeeded');
+    const m = await job(marked);
+    expect(m.error).toBeNull();
+    // The stored clip is the re-encoded one, not the mock's own file.
+    const stored = (await pool.query('select bytes from assets where id = $1', [m.output_asset_id])).rows[0].bytes;
+    expect(stored).not.toBe((await stat(join(mockDir, `${m.provider_job_id.split(':')[3]}.mp4`))).size);
+    const kept = await job(odds);
+    expect(kept.error).toMatch(/^the end text was not added: /);
+    const asset = (await pool.query('select width, height, bytes from assets where id = $1', [kept.output_asset_id])).rows[0];
+    expect(asset).toEqual({ width: 720, height: 1280, bytes: (await stat(odd)).size }); // the provider's clip as it came
   });
 });
 

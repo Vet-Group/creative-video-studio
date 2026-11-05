@@ -1,8 +1,9 @@
 // ffprobe and ffmpeg (the static binaries from npm) for checking an output clip, cutting its poster and taking stills of a preset clip.
 import { execFile } from 'node:child_process';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { copyFile, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { frameTimes } from '@cvs/core/suggest';
 import ffmpegPath from 'ffmpeg-static';
@@ -64,6 +65,67 @@ export async function extractFrames(video: Uint8Array, n: number): Promise<{ sec
       }),
     );
     return { seconds, stills };
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
+/** Be Vietnam Pro Bold (SIL Open Font License 1.1, assets/fonts/OFL.txt): a bold face with every Vietnamese glyph, shipped with the worker's checkout. */
+const END_FONT = fileURLToPath(new URL('../assets/fonts/BeVietnamPro-Bold.ttf', import.meta.url));
+/** How long the end text stays on screen, at the end of the clip. */
+export const END_TEXT_SECONDS = 2;
+export type EndTextPosition = 'bottom' | 'middle' | 'top';
+
+/** `text` in lines of at most `max` characters, broken at spaces; a word longer than a line is cut. */
+export function wrapText(text: string, max: number): string[] {
+  const lines: string[] = [];
+  for (const word of text.split(/\s+/).filter(Boolean)) {
+    const last = lines.at(-1);
+    if (last !== undefined && last.length + 1 + word.length <= max) lines[lines.length - 1] = `${last} ${word}`;
+    else for (let i = 0; i < word.length; i += max) lines.push(word.slice(i, i + max));
+  }
+  return lines;
+}
+
+/**
+ * The font size and lines of the end text on a `width` x `height` frame: about 7% of the short side, shrunk until the text fits in 3 lines across 88% of
+ * the width (a bold glyph is taken as 0.6 of the size wide), but never under 4%.
+ */
+export function endTextLayout(text: string, width: number, height: number): { size: number; lines: string[] } {
+  const short = Math.min(width, height);
+  for (let size = Math.round(short * 0.07); ; size = Math.round(size * 0.9)) {
+    const lines = wrapText(text, Math.max(1, Math.floor((width * 0.88) / (size * 0.6))));
+    if (lines.length <= 3 || size * 0.9 < short * 0.04) return { size, lines };
+  }
+}
+
+/**
+ * Burns `text` (the member's own words) over the last END_TEXT_SECONDS of `video` into `out`: white bold lines centred on a translucent dark band at the
+ * bottom, middle or top, clear of the margins a phone app draws over. The text and the font go to ffmpeg as files in a scratch folder it runs in, so
+ * nothing the member typed is parsed by the filter graph and no path needs escaping; `expansion=none` keeps drawtext from reading %{...} in it. The video
+ * is re-encoded (H.264, yuv420p) and the sound copied as it is.
+ */
+export async function burnEndText(video: string, out: string, text: string, position: EndTextPosition): Promise<void> {
+  const dir = await mkdtemp(join(tmpdir(), 'cvs-endtext-'));
+  try {
+    const [{ width, height }, { stdout }] = await Promise.all([probeSize(video), run(ffprobe.path, ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', video])]);
+    const seconds = Number(stdout.trim());
+    if (!(seconds > 0)) throw new Error('the clip has no duration');
+    const { size, lines } = endTextLayout(text.normalize('NFC'), width, height);
+    if (lines.length === 0) throw new Error('the end text is empty');
+    const lineHeight = Math.round(size * 1.35);
+    const pad = Math.round(size * 0.5);
+    const band = lines.length * lineHeight + 2 * pad;
+    const top = position === 'top' ? Math.round(height * 0.08) : position === 'middle' ? Math.round((height - band) / 2) : height - Math.round(height * 0.12) - band;
+    const on = `enable='gte(t,${Math.max(0, seconds - END_TEXT_SECONDS).toFixed(3)})'`;
+    await copyFile(END_FONT, join(dir, 'font.ttf'));
+    await Promise.all(lines.map((line, i) => writeFile(join(dir, `line${i}.txt`), line, 'utf8')));
+    // drawtext puts a line's highest glyph at y, so y = baseline - ascent sets every line on its own baseline whatever its accents.
+    const filters = [
+      `drawbox=x=0:y=${top}:w=iw:h=${band}:color=black@0.55:t=fill:${on}`,
+      ...lines.map((_, i) => `drawtext=fontfile=font.ttf:textfile=line${i}.txt:expansion=none:fontcolor=white:fontsize=${size}:x=(w-text_w)/2:y=${top + pad + i * lineHeight + Math.round(size * 1.02)}-ascent:${on}`),
+    ];
+    await run(requireFfmpeg(), ['-y', '-v', 'error', '-i', video, '-vf', filters.join(','), '-map', '0:v:0', '-map', '0:a?', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '18', '-pix_fmt', 'yuv420p', '-c:a', 'copy', '-movflags', '+faststart', out], { cwd: dir });
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

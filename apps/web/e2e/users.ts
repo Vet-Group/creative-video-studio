@@ -28,6 +28,7 @@ export const USERS = {
   mkte: { email: 'mkte@e2e.test', name: 'E2E Mkt E', role: 'member' },
   mktf: { email: 'mktf@e2e.test', name: 'E2E Mkt F', role: 'member' },
   mktg: { email: 'mktg@e2e.test', name: 'E2E Mkt G', role: 'member' },
+  mkth: { email: 'mkth@e2e.test', name: 'E2E Mkt H', role: 'member' }, // marketing-end.e2e: the end frame, the end scene and the end text
   reusea: { email: 'reusea@e2e.test', name: 'E2E Reuse A', role: 'member' },
   tpla: { email: 'tpla@e2e.test', name: 'E2E Templates A', role: 'member' },
   tplb: { email: 'tplb@e2e.test', name: 'E2E Templates B', role: 'member' },

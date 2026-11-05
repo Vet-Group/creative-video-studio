@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { type CSSProperties, useEffect, useId, useState } from 'react';
 import { ABOUT } from '@/lib/about-content';
 import { api, errorText, sendJson } from '@/lib/api';
-import { ADVANCED_MAX_IMAGES, ADVANCED_MAX_SCRIPT, advancedPrompt, briefRoom, marketingPrompt } from '@/lib/marketing';
+import { ADVANCED_MAX_IMAGES, ADVANCED_MAX_SCRIPT, advancedPrompt, briefRoom, END_TEXT_POSITIONS, type EndTextPosition, marketingPrompt } from '@/lib/marketing';
 import { promptTooLong } from '@/lib/prompt-limit';
 import { confirmRun } from '@/lib/run-guard';
 import { confirmDialog } from './Confirm';
@@ -20,6 +20,7 @@ import { AudioSwitch } from './AudioSwitch';
 import { BrandPicker } from './BrandKit';
 import { CardMedia, LoopVideo } from './CardMedia';
 import { builtInChoices, type Choice, ChoiceBox, ChoiceDialog, type ChoiceLists } from './Choices';
+import { EndScene } from './EndScene';
 import { Icon } from './Icon';
 import { copyError, copySamples, Gallery, HISTORY_SIZE_KEY, type Img, PhotoDialog, photoImg, RunSummary, SizeSlider, Slot, uploadError, uploadImages, UPLOAD_ERROR, useSize, WorkTabs } from './image-tools';
 import { FormContext, type FormActions, type Photo, type PhotoRole, useApplier, useHasHistory, useJobs, useRecreated } from './jobs';
@@ -50,6 +51,8 @@ interface VideoModel {
   recommended: boolean;
   /** The output resolution, e.g. '1080p'. */
   resolution: string | null;
+  /** The model takes an end frame (videoInputs). */
+  endFrame: boolean;
   /** Added in the last 14 days. */
   isNew: boolean;
   creditUsd: string | null;
@@ -83,6 +86,11 @@ interface MarketingJob {
   location: string | null;
   brief: string | null;
   script: string | null;
+  /** The end frame, last shot and end text; a sample or an older job has none. */
+  endFrame?: Img | null;
+  ending?: string | null;
+  endText?: string | null;
+  endTextPos?: string | null;
   audio: string | null;
   ratio: string | null;
   durationSec: number | null;
@@ -101,6 +109,10 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
   const [product, setProduct] = useState<Img[]>([]);
   const [refs, setRefs] = useState<Img[]>([]);
   const [script, setScript] = useState('');
+  const [endFrame, setEndFrame] = useState<Img | null>(null); // sent only on a model that takes one
+  const [ending, setEnding] = useState('');
+  const [endText, setEndText] = useState('');
+  const [endTextPos, setEndTextPos] = useState<EndTextPosition>('bottom');
   const [audio, setAudio] = useState(true);
   /** The chosen hooks: one, or with variants on up to MAX_VARIANTS, one clip each. */
   const [hooks, setHooks] = useState<string[]>([]);
@@ -170,8 +182,9 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
   const locationList = custom?.locations ?? builtInChoices('location');
   const own = { hooks: custom?.hooks, locations: custom?.locations };
   const composeFor = (hook: string, brief: string) =>
-    advanced ? advancedPrompt({ brief, images: refs.length, hook, location, script, audio: audioOn }, own) : marketingPrompt({ hook, location, prompt: brief, audio: audioOn, ratio }, own);
+    advanced ? advancedPrompt({ brief, images: refs.length, hook, location, script, ending, audio: audioOn }, own) : marketingPrompt({ hook, location, prompt: brief, ending, audio: audioOn, ratio }, own);
   const compose = (hook: string) => composeFor(hook, prompt);
+  const endAssetId = chosen?.endFrame ? endFrame?.id : undefined;
   /** What the brief may take: the chosen model's limit less what the page adds around it, for the longest variant. */
   const room = chosen && Math.min(...variants.map((h) => briefRoom((b) => composeFor(h, b), chosen.maxPromptChars)));
   /** What a Run sends for each variant, in order. */
@@ -229,6 +242,10 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
         setLocation(j.location ?? '');
         setPrompt(j.brief ?? '');
         setScript(j.script ?? '');
+        setEndFrame(j.endFrame ?? null);
+        setEnding(j.ending ?? '');
+        setEndText(j.endText ?? '');
+        setEndTextPos((END_TEXT_POSITIONS as readonly string[]).includes(j.endTextPos ?? '') ? (j.endTextPos as EndTextPosition) : 'bottom');
         setAudio(j.audio !== 'off');
         // A saved template may leave these out; the form's defaults stay.
         if (j.ratio) setRatio(j.ratio);
@@ -384,7 +401,8 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
     const refused: string[] = [];
     for (const [i, hook] of variants.entries()) {
       // The form's own inputs ride along in params so History can refill the form (reuse); the worker never reads them.
-      const inputs = { ...(hook && { hook }), ...(location && { location }), ...(prompt.trim() && { brief: prompt.trim() }) };
+      // The end frame and the end text are the worker's (the end text is burned in after the provider), so they go too.
+      const inputs = { ...(hook && { hook }), ...(location && { location }), ...(prompt.trim() && { brief: prompt.trim() }), ...(endAssetId && { endAssetId }), ...(ending.trim() && { ending: ending.trim() }), ...(endText.trim() && { endText: endText.trim(), endTextPos }) };
       const body = advanced
         ? {
             feature: 'marketing',
@@ -512,6 +530,11 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
                 </p>
               ))}
             </details>
+            {/* Under the model and the prompt preview, so the ratio row stays right under the prompt box as on Fash. */}
+            {chosen?.endFrame && (
+              <Slot label="Khung hình cuối" empty="Ảnh clip kết thúc ở đó (không bắt buộc)" inputLabel="Ảnh khung hình cuối" images={endFrame ? [endFrame] : []} max={1} busy={busy} onAdd={add((f) => setEndFrame(f([])[0] ?? null))} onRemove={() => setEndFrame(null)} onPick={setEndFrame} storeId={storeId} />
+            )}
+            <EndScene ending={ending} onEnding={setEnding} text={endText} onText={setEndText} position={endTextPos} onPosition={setEndTextPos} />
             <BrandPicker storeId={storeId} onStore={setStoreId} on={useBrand} onToggle={setUseBrand} />
             <Templates
               feature="marketing"
@@ -521,6 +544,9 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
                 hook: hooks[0],
                 location,
                 brief: prompt.trim(),
+                endFrame: endAssetId,
+                ending: ending.trim(),
+                ...(endText.trim() && { endText: endText.trim(), endTextPos }),
                 audio: audio ? 'on' : 'off',
                 ratio,
                 durationSec,
