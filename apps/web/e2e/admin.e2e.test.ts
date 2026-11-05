@@ -403,6 +403,15 @@ test('on a phone each job of a Costs line is a two-line block with the time and 
   expect(feature.y).toBeGreaterThanOrEqual(when.y + when.height - 1);
   expect(Math.abs(model.y - feature.y)).toBeLessThan(8);
   expect(await page.evaluate(() => document.scrollingElement!.scrollWidth <= innerWidth)).toBe(true);
+  // The "·" is drawn 9 px left of the model: inside the row next to the feature, past the row's clipped left edge once a long name wraps.
+  const dot = () =>
+    row.evaluate((r) => {
+      const model = r.querySelector('td.model')!.getBoundingClientRect();
+      return { shown: model.left - 9 >= r.getBoundingClientRect().left, wrapped: model.top > r.children[1]!.getBoundingClientRect().top + 4, clips: getComputedStyle(r).overflowX === 'clip' };
+    });
+  expect(await dot()).toEqual({ shown: true, wrapped: false, clips: true });
+  await row.locator('td.model').evaluate((td) => { td.textContent = 'Nano Banana Pro (Character Swap) Nano Banana Pro'; });
+  expect(await dot()).toEqual({ shown: false, wrapped: true, clips: true });
   // The blocks still read as a table: five column headers, and five cells in the job's row.
   const table = users.getByRole('table', { name: 'Job của dòng này' });
   await expect(table.getByRole('columnheader')).toHaveText(['Lúc gửi', 'Mục', 'Mô hình', 'Trạng thái', 'USD']);

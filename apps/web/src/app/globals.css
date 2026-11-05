@@ -717,13 +717,15 @@ td code { white-space: pre-wrap; overflow-wrap: anywhere; }
   .admin table.jobs, .admin table.jobs tbody { display: block; }
   /* The row is as wide as the scrolling breakdown table; the list keeps to the visible box (the Admin area less the cell padding and border). */
   .admin table.jobs { position: sticky; left: 12px; width: calc(100cqi - 26px); }
-  .admin table.jobs tr { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; padding: 10px 0; border-bottom: 1px solid var(--hairline); }
+  .admin table.jobs tr { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 14px; padding: 10px 0; border-bottom: 1px solid var(--hairline); overflow-x: clip; }
   .admin table.jobs tr::after { content: ''; order: 1; flex-basis: 100%; }
   .admin table.jobs td { padding: 0; border: 0; white-space: normal; }
   .admin table.jobs td:first-child { flex: 1 1 0; min-width: 0; }
   .admin table.jobs td.num { margin-left: auto; font-weight: 600; white-space: nowrap; }
   .admin table.jobs td:not(:first-child, .num) { order: 2; color: var(--text-sub); }
-  .admin table.jobs td.model::before { content: '\b7\20'; }
+  /* The separator sits in the gap left of the model; when the model wraps to the start of a line it falls past the row's left edge and is clipped. */
+  .admin table.jobs td.model { position: relative; }
+  .admin table.jobs td.model::before { content: '\b7'; position: absolute; left: -9px; }
 }
 /* Costs: one bar per day, thin, rounded at the data end, with a 2px gap; day numbers every five days. */
 .admin .day-bars { display: grid; grid-template-columns: repeat(var(--days, 31), minmax(0, 1fr)); gap: 2px; align-items: end; height: 140px; margin: 0 0 24px; padding: 0; list-style: none; border-bottom: 1px solid var(--hairline); }
