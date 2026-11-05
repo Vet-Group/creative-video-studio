@@ -653,6 +653,8 @@ td code { white-space: pre-wrap; overflow-wrap: anywhere; }
 .admin-head p { max-width: 72ch; margin: 0; color: var(--text-sub); }
 .admin-head-tools { display: flex; flex: 1 1 auto; flex-wrap: wrap; gap: 8px 12px; align-items: flex-end; justify-content: flex-end; }
 .admin-head-tools label, .admin-head-tools .filters > :is(label, p) { flex: 0 1 14rem; margin: 0; }
+/* A long button label wraps on a narrow phone or with large text, instead of widening the page; one line keeps the 36 px height. */
+.admin .admin-head-tools > .button { height: auto; min-height: 36px; padding-block: 6px; white-space: normal; text-align: center; }
 .admin-empty { display: grid; justify-items: center; gap: 6px; margin: 8px 0 16px; padding: 28px 16px; border: 1px dashed var(--border-strong); border-radius: 14px; background: var(--surface-1); color: var(--muted); text-align: center; }
 .admin-empty .icon { width: 36px; height: 36px; padding: 9px; border-radius: 50%; background: var(--fill); color: var(--icon-muted); }
 .admin-empty p { max-width: 48ch; margin: 0; }
