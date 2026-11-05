@@ -37,7 +37,7 @@ interface VertexAccount {
 /** A Vertex account's credits as typed: an empty total or date means none. */
 type VertexForm = { creditTotal: string; creditCurrency: string; creditExpiresOn: string; stopWhenCreditsEnd: boolean };
 
-const PROVIDER_NAME: Record<string, string> = { fal: 'fal.ai', replicate: 'Replicate', vertex: 'Google Vertex AI', byteplus: 'BytePlus ModelArk', mock: 'Mô hình thử (mock)' };
+const PROVIDER_NAME: Record<string, string> = { fal: 'fal.ai', vertex: 'Google Vertex AI', byteplus: 'BytePlus ModelArk', mock: 'Mô hình thử (mock)' };
 /** Lower case without accents, so a search typed without accents still finds a model. */
 const fold = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
 

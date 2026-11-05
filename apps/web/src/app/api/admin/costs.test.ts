@@ -11,7 +11,7 @@ process.env.BETTER_AUTH_SECRET = randomBytes(32).toString('hex');
 process.env.APP_URL = 'http://localhost';
 
 const { auth, pool } = await import('@/lib/auth');
-const { bookInvoice, bookShared, lateBill, reassignStore, reserve, settle } = await import('@cvs/core/ledger');
+const { bookShared, lateBill, reassignStore, reserve, settle } = await import('@cvs/core/ledger');
 const { checkCaps } = await import('@cvs/core/limits');
 const costsRoute = await import('./costs/route');
 const detailRoute = await import('./costs/detail/route');
@@ -20,7 +20,6 @@ const jobsRoute = await import('./costs/jobs/route');
 const adjustRoute = await import('./costs/adjustments/route');
 const rateRoute = await import('./rates/[month]/route');
 const invoicesRoute = await import('./invoices/route');
-const { invoiceRows } = await import('@/lib/costs');
 const modelsRoute = await import('../models/route');
 
 const PASSWORD = 'correct-horse-battery';
@@ -123,11 +122,11 @@ const sumVnd = (values: string[]) => String(values.reduce((t, v) => t + BigInt(v
 
 // --- The fixture -----------------------------------------------------------------------------------------------------------
 
-async function open(id: string, userId: string, teamId: string, storeId: string | null, provider: 'fal' | 'replicate', createdAt: string, estimate: string) {
+async function open(id: string, userId: string, teamId: string, storeId: string | null, provider: 'fal' | 'vertex', createdAt: string, estimate: string) {
   await pool.query(
     `insert into jobs (id, user_id, team_id, store_id, model, provider, prompt, aspect, duration_s, input_asset_ids, created_at)
      values ($1, $2, $3, $4, $5, $6, 'p', '9:16', 5, '{}', $7)`,
-    [id, userId, teamId, storeId, provider === 'fal' ? 'fal-test' : 'rep-test', provider, createdAt],
+    [id, userId, teamId, storeId, provider === 'fal' ? 'fal-test' : 'vtx-test', provider, createdAt],
   );
   await reserve(pool, id, estimate);
 }
@@ -135,7 +134,7 @@ const running = (id: string) => pool.query(`update jobs set status = 'running' w
 const succeed = (id: string, costUsd: string) => settle(pool, id, { status: 'succeeded', costUsd, outputAssetId: 'out', posterAssetId: null });
 
 let falInvoice: { bookedUsd: string; invoice: Invoice };
-let replicateInvoice: { bookedUsd: string; invoice: Invoice };
+let vertexInvoice: { bookedUsd: string; invoice: Invoice };
 
 beforeAll(async () => {
   admin = await newUser('admin@example.test', 'admin');
@@ -147,7 +146,7 @@ beforeAll(async () => {
   );
   await pool.query(
     `insert into model_configs (id, provider, endpoint, label, ratios, durations_sec, max_images, output_resolution, usd_per_second, sources, enabled)
-     values ('fal-test', 'fal', 'x', 'Fal test', '{9:16}', '{5}', 2, '720p', 0.2, '{}', true), ('rep-test', 'replicate', 'x', 'Replicate test', '{9:16}', '{5}', 2, '720p', 0.4, '{}', true)`,
+     values ('fal-test', 'fal', 'x', 'Fal test', '{9:16}', '{5}', 2, '720p', 0.2, '{}', true), ('vtx-test', 'vertex', 'x', 'Vertex test', '{9:16}', '{5}', 2, '720p', 0.4, '{}', true)`,
   );
   await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) values ('out', 'alice', 'output', 'out.mp4', 'out.mp4', 'video/mp4', 1)`);
 
@@ -166,8 +165,8 @@ beforeAll(async () => {
   await open('j3', 'bob', 't2', null, 'fal', '2026-09-13 09:00:00+07', '1.6000');
   await running('j3');
   await settle(pool, 'j3', { status: 'failed', costUsd: '0', error: 'provider refused' });
-  // j4: Bob in Beta, Shop B, Replicate. Estimate 2.0, failed but billed 2.5 -> +0.5.
-  await open('j4', 'bob', 't2', 's2', 'replicate', '2026-09-14 09:00:00+07', '2.0000');
+  // j4: Bob in Beta, Shop B, Vertex. Estimate 2.0, failed but billed 2.5 -> +0.5.
+  await open('j4', 'bob', 't2', 's2', 'vertex', '2026-09-14 09:00:00+07', '2.0000');
   await running('j4');
   await settle(pool, 'j4', { status: 'failed', costUsd: '2.5000', error: 'rejected clip', billed: true });
   // j5: Carol in Alpha, Shop A. Run at 03:00 ICT on 1 September (still 31 August in UTC); timed out, then late-billed 1.8 -> +0.2.
@@ -182,10 +181,9 @@ beforeAll(async () => {
   // Shared rows: a bake-off row, a manual adjustment and one invoice per provider.
   await bookShared(pool, { kind: 'bakeoff', usd: '3.0000', month: M, provider: 'fal', ref: 'bakeoff-fal-2026-09' });
   expect((await postAdjustment({ month: M, usd: '-1.0000', note: ' Refund for a duplicate charge ' })).status).toBe(201);
-  // Everything the ledger holds for fal: 2.0 + 1.6 + 0 + 1.8 + 1.6 + 3.0 = 10.0; for replicate: 2.5.
+  // Everything the ledger holds for fal: 2.0 + 1.6 + 0 + 1.8 + 1.6 + 3.0 = 10.0; for vertex: 2.5.
   falInvoice = await (await putInvoice({ month: M, provider: 'fal', totalUsd: '10.5' })).json();
-  // Replicate invoices can no longer be entered through the API; this one is history from before the removal, booked as the route used to.
-  replicateInvoice = { bookedUsd: await bookInvoice(pool, { month: M, provider: 'replicate', totalUsd: '2.0000' }, admin.id), invoice: (await invoiceRows(pool, M, 'replicate'))[0]! };
+  vertexInvoice = await (await putInvoice({ month: M, provider: 'vertex', totalUsd: '2.0' })).json();
 });
 
 afterAll(async () => {
@@ -304,9 +302,9 @@ describe('the Costs page for September 2026', () => {
     const p = await page();
     // fal: invoice 10.5 - ledger 10.0 = 0.5, 4.76% of the invoice. j5 was submitted on 31 August in UTC, so the UTC month holds 10.0 - 1.8.
     expect(falInvoice).toEqual({ month: M, bookedUsd: '0.5000', invoice: { provider: 'fal', totalUsd: '10.5000', ledgerUsd: '10.0000', diffUsd: '0.5000', red: false, utcMonthUsd: '8.2000' } });
-    // replicate: invoice 2.0 - ledger 2.5 = -0.5, 25% of the invoice.
-    expect({ month: M, ...replicateInvoice }).toEqual({ month: M, bookedUsd: '-0.5000', invoice: { provider: 'replicate', totalUsd: '2.0000', ledgerUsd: '2.5000', diffUsd: '-0.5000', red: true, utcMonthUsd: '2.5000' } });
-    expect(p.invoices).toEqual([falInvoice.invoice, replicateInvoice.invoice]);
+    // vertex: invoice 2.0 - ledger 2.5 = -0.5, 25% of the invoice.
+    expect(vertexInvoice).toEqual({ month: M, bookedUsd: '-0.5000', invoice: { provider: 'vertex', totalUsd: '2.0000', ledgerUsd: '2.5000', diffUsd: '-0.5000', red: true, utcMonthUsd: '2.5000' } });
+    expect(p.invoices).toEqual([falInvoice.invoice, vertexInvoice.invoice]);
   });
 
   test('four totals match to the cent: CSV detail, CSV summary, Costs page and the month cap usage', async () => {
@@ -374,7 +372,7 @@ describe('the Costs page for September 2026', () => {
       [M, '', '', '', '', '', '', '', '', 'fal', '', 'bakeoff', '3.0000', '75002', 'Thật', ''],
       [M, '', '', '', '', '', '', '', '', '', '', 'manual_adjustment', '-1.0000', '-25000', 'Thật', ''],
       [M, '', '', '', '', '', '', '', '', 'fal', '', 'invoice_diff', '0.5000', '12500', 'Thật', ''],
-      [M, '', '', '', '', '', '', '', '', 'replicate', '', 'invoice_diff', '-0.5000', '-12500', 'Thật', ''],
+      [M, '', '', '', '', '', '', '', '', 'vertex', '', 'invoice_diff', '-0.5000', '-12500', 'Thật', ''],
     ]);
   });
 
@@ -472,7 +470,7 @@ describe('invoices', () => {
 
   test('audits the entry of the fixture once, with the old and new total and the difference booked', async () => {
     expect(await audits(`invoice:${M}:fal`)).toEqual([{ actor_id: admin.id, action: 'invoice.enter', old_value: null, new_value: { totalUsd: '10.5000', bookedUsd: '0.5000' } }]);
-    expect(await audits(`invoice:${M}:replicate`)).toHaveLength(1);
+    expect(await audits(`invoice:${M}:vertex`)).toHaveLength(1);
   });
 
   test('books the difference to the ledger, flags red only above 5% of the invoice, and books only the new difference when it is entered again', async () => {

@@ -6,7 +6,7 @@ import { ImageReadError, isFundingRefusal, MAX_INLINE_CHARS, ProviderHttpError, 
 import { createMockVideoProvider, MOCK_FAIL } from './mock';
 import type { ProviderJob, SubmitRequest } from './types';
 
-const [kling, seedance] = BAKEOFF_MODELS as [(typeof BAKEOFF_MODELS)[0], (typeof BAKEOFF_MODELS)[0]];
+const [kling] = BAKEOFF_MODELS as [(typeof BAKEOFF_MODELS)[0]];
 const base: Omit<SubmitRequest, 'model'> = { prompt: 'a bottle on a table', imageUrls: ['https://img/1.jpg', 'https://img/2.jpg'], ratio: '9:16', durationSec: 5 };
 
 type Call = { url: string; method: string; headers: Record<string, string>; body: unknown; signal?: AbortSignal | null };
@@ -405,7 +405,7 @@ describe('shared helpers', () => {
 });
 
 describe('mock', () => {
-  const mockModel = { ...seedance, provider: 'mock' as const };
+  const mockModel = { ...kling, provider: 'mock' as const, usdPerSecond: 0.2312 };
 
   test('walks queued, running, succeeded and estimates the cost', async () => {
     const p = createMockVideoProvider();

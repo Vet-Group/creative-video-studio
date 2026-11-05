@@ -1,5 +1,5 @@
 // Integration test of migration 0002 on a disposable database (needs the compose Postgres: `pnpm services:up`).
-import { readdirSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { ALWAYS_AUDIO, AUDIO_USD_PER_SECOND, BAKEOFF_MODELS } from '../../core/src/models';
@@ -120,11 +120,10 @@ describe('migration 0002 seed data', () => {
     await expect(pool.query(`update presets set feature = 'audio' where id = 'style-street'`)).rejects.toThrow(/presets_feature_check/);
   });
 
-  test('seeds the two models with price, limits and bake-off record (migration 0013: Kling enabled, Seedance disabled; 0022: Kling takes 7 references; 0057 adds the Replicate round to Seedance), and the settings row', async () => {
-    const models = await pool.query(`select id, provider, endpoint, enabled, usd_per_second::text as usd, max_images, output_resolution, pass_seed_passes as passes, pass_seed_total as total from model_configs where id in ('kling-o3-pro', 'seedance-2.5') order by id`);
+  test('seeds Kling with price, limits and bake-off record (migration 0013; 0022: Kling takes 7 references; Seedance 2.5 on Replicate was deleted by 0072), and the settings row', async () => {
+    const models = await pool.query(`select id, provider, endpoint, enabled, usd_per_second::text as usd, max_images, output_resolution, pass_seed_passes as passes, pass_seed_total as total from model_configs where id in ('kling-o3-pro', 'seedance-2.5')`);
     expect(models.rows).toEqual([
       { id: 'kling-o3-pro', provider: 'fal', endpoint: 'fal-ai/kling-video/o3/pro/reference-to-video', enabled: true, usd: '0.1120', max_images: 7, output_resolution: '1080p', passes: 7, total: 10 },
-      { id: 'seedance-2.5', provider: 'replicate', endpoint: 'bytedance/seedance-2.5', enabled: false, usd: '0.2312', max_images: 4, output_resolution: '720p', passes: 7, total: 12 },
     ]);
     // 0022 also widens Kling to every ratio and duration fal accepts, matching the model facts in packages/core.
     const kling = BAKEOFF_MODELS.find((m) => m.id === 'kling-o3-pro')!;
@@ -134,7 +133,7 @@ describe('migration 0002 seed data', () => {
   });
 
   test('refuses to enable a model that has no price or limits', async () => {
-    await expect(pool.query(`update model_configs set enabled = true, usd_per_second = null where id = 'seedance-2.5'`)).rejects.toThrow(/model_configs_enabled_complete_check/);
+    await expect(pool.query(`update model_configs set enabled = true, usd_per_second = null where id = 'seedance-2.5-byteplus'`)).rejects.toThrow(/model_configs_enabled_complete_check/);
   });
 });
 
@@ -156,8 +155,6 @@ describe('migration 0028 prompt limits', () => {
     expect(by['kling-2.6'].src).toEqual({ url: `https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=${by['kling-2.6'].endpoint}`, readAt: '2026-10-28' });
     // 0028 read no limit for Kling O3 Pro; 0041 found 2500 inside the schema's anyOf.
     expect(by['kling-o3-pro'].src).toEqual({ url: `https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=${by['kling-o3-pro'].endpoint}`, readAt: '2026-10-30' });
-    const seedance = (await pool.query(`select max_prompt_chars as n, sources->'maxPromptChars'->>'url' as url from model_configs where id = 'seedance-2.5'`)).rows[0];
-    expect(seedance).toEqual({ n: 2000, url: 'https://replicate.com/bytedance/seedance-2.5/api/schema' }); // 0029: Replicate's own 2000
     await expect(pool.query(`update model_configs set max_prompt_chars = 0 where id = 'veo-3.1'`)).rejects.toThrow(/model_configs_max_prompt_chars_check/);
   });
 });
@@ -337,8 +334,8 @@ describe('migration 0007 image models', () => {
       await expect(pool.query(`update model_configs set ${set}, enabled = true where id = 'nano-banana-pro'`), what).rejects.toThrow(/model_configs_enabled_complete_check/);
     }
     // A video row is still judged by the video rule, whatever else it carries.
-    await expect(pool.query(`update model_configs set image_prices = '{"1K": "1"}'::jsonb, max_images = 4, ratios = '{9:16}', usd_per_second = null, enabled = true where id = 'seedance-2.5'`)).rejects.toThrow(/model_configs_enabled_complete_check/);
-    await expect(pool.query(`update model_configs set kind = 'audio' where id = 'seedance-2.5'`)).rejects.toThrow(/model_configs_kind_check/);
+    await expect(pool.query(`update model_configs set image_prices = '{"1K": "1"}'::jsonb, max_images = 4, ratios = '{9:16}', usd_per_second = null, enabled = true where id = 'seedance-2.5-byteplus'`)).rejects.toThrow(/model_configs_enabled_complete_check/);
+    await expect(pool.query(`update model_configs set kind = 'audio' where id = 'seedance-2.5-byteplus'`)).rejects.toThrow(/model_configs_kind_check/);
   });
 
   test('a job takes the image ratios and params; 0 seconds and the default params are fine', async () => {
@@ -421,11 +418,11 @@ describe('migration 0013 real video models', () => {
 });
 
 describe('migrations 0057, 0061 and 0070 Replicate round scores', () => {
-  // The Replicate twins of Seedance 2.0 and Veo 3.1 carried these totals too; migration 0062 deleted those rows, so the rows left are listed.
+  // The Replicate twins of Seedance 2.0 and Veo 3.1 carried these totals too; migrations 0062 and 0072 deleted those rows, so the rows left are listed.
   test('every row of a model carries the same prior, and the Replicate-round twins carry the docs/BAKEOFF.md totals', async () => {
     const twins: [number, number, string[]][] = [
       [3, 10, ['seedance-2.0', 'seedance-2.0-byteplus']],
-      [7, 12, ['seedance-2.5', 'seedance-2.5-byteplus']],
+      [7, 12, ['seedance-2.5-byteplus']],
       [2, 7, ['veo-3.1', 'veo-3.1-vertex']],
       [11, 25, ['seedream-5-pro', 'seedream-5-pro-byteplus']],
       [13, 25, ['nano-banana-2', 'nano-banana-2-vertex']],
@@ -569,9 +566,9 @@ describe('migration 0050 Vertex accounts', () => {
 });
 
 describe('migration 0051 provider balances', () => {
-  test('starts with a 10 USD balance warning, and the unused Replicate credit columns are still there and empty (0062 left them)', async () => {
-    const { rows } = await pool.query('select replicate_credit_usd, replicate_credit_since, balance_warning_usd::text as warning from settings where id = 1');
-    expect(rows).toEqual([{ replicate_credit_usd: null, replicate_credit_since: null, warning: '10.0000' }]);
+  test('starts with a 10 USD balance warning', async () => {
+    const { rows } = await pool.query('select balance_warning_usd::text as warning from settings where id = 1');
+    expect(rows).toEqual([{ warning: '10.0000' }]);
   });
 });
 
@@ -717,38 +714,25 @@ describe('cost_entries', () => {
   });
 });
 
-describe('migration 0062 Replicate removed', () => {
-  const sql = readdirSync(new URL('../migrations', import.meta.url)).find((f) => f.endsWith('_remove_replicate.sql'))!;
-  const statements = readFileSync(new URL(`../migrations/${sql}`, import.meta.url), 'utf8').split('--> statement-breakpoint');
-  const model = (id: string, provider: string, enabled: boolean) =>
-    pool.query(
-      `insert into model_configs (id, provider, endpoint, label, ratios, durations_sec, max_images, output_resolution, usd_per_second, sources, enabled)
-       values ($1, $2, 'x', $1, '{9:16}', '{5}', 2, '720p', 0.4, '{}', $3)`,
-      [id, provider, enabled],
-    );
-
-  test('on the migrated database only the Replicate row the ledger names is left, disabled', async () => {
-    const { rows } = await pool.query(`select id, enabled from model_configs where provider = 'replicate' order by id`);
-    expect(rows).toEqual([{ id: 'seedance-2.5', enabled: false }]); // 0012 booked the bake-off spend against it
-    expect((await pool.query(`select count(*)::int as n from cost_entries where provider = 'replicate' and model = 'seedance-2.5'`)).rows[0].n).toBe(1);
+describe('migration 0072 Replicate dropped', () => {
+  test('leaves no Replicate model row and no Replicate credit column, and the provider checks refuse the value', async () => {
+    expect((await pool.query(`select count(*)::int as n from model_configs where provider = 'replicate' or id = 'seedance-2.5'`)).rows[0].n).toBe(0);
+    expect((await pool.query(`select column_name from information_schema.columns where table_name = 'settings' and column_name like 'replicate%'`)).rows).toEqual([]);
+    await expect(
+      pool.query(
+        `insert into model_configs (id, provider, endpoint, label, ratios, durations_sec, max_images, output_resolution, usd_per_second, sources, enabled)
+         values ('rep-new', 'replicate', 'x', 'x', '{9:16}', '{5}', 2, '720p', 0.4, '{}', false)`,
+      ),
+    ).rejects.toThrow(/model_configs_provider_check/);
+    const user = await insertUser();
+    await expect(
+      pool.query(`insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids) values ('rep-job', $1, 'team-unassigned', 'kling-o3-pro', 'replicate', 'p', '9:16', 5, '{}')`, [user]),
+    ).rejects.toThrow(/jobs_provider_check/);
   });
 
-  test('deletes a Replicate row nothing names, keeps one a job or a ledger row names (disabled), and leaves other providers alone', async () => {
-    const user = await insertUser();
-    await model('rep-free', 'replicate', true);
-    await model('rep-job', 'replicate', true);
-    await model('rep-ledger', 'replicate', true);
-    await model('fal-on', 'fal', true);
-    await pool.query(
-      `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids) values ('rep-job-1', $1, 'team-unassigned', 'rep-job', 'replicate', 'p', '9:16', 5, '{}')`,
-      [user],
-    );
-    await pool.query(`insert into cost_entries (kind, usd, month, provider, model, is_final, ref) values ('bakeoff', '1.0000', '2026-10', 'replicate', 'rep-ledger', true, 'rep-ledger-1')`);
-    await expect(pool.query(`delete from model_configs where id = 'rep-job'`)).rejects.toThrow(/jobs_model_model_configs_id_fk/); // why the row must stay
-    for (const statement of statements) await pool.query(statement);
-    const { rows } = await pool.query(`select id, enabled from model_configs where id in ('rep-free', 'rep-job', 'rep-ledger', 'fal-on') order by id`);
-    expect(rows).toEqual([{ id: 'fal-on', enabled: true }, { id: 'rep-job', enabled: false }, { id: 'rep-ledger', enabled: false }]);
-    expect((await pool.query(`select count(*)::int as n from jobs where id = 'rep-job-1'`)).rows[0].n).toBe(1);
+  test('leaves the October bake-off ledger line untouched (append-only, model is plain text), so month totals do not change', async () => {
+    const { rows } = await pool.query(`select usd::text as usd, provider, model from cost_entries where ref = 'bakeoff-2026-10-replicate'`);
+    expect(rows).toEqual([{ usd: '9.2480', provider: 'replicate', model: 'seedance-2.5' }]);
   });
 });
 

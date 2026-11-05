@@ -1,6 +1,6 @@
 # Status — Creative Video Studio (internal)
 
-**Replicate removed (2026-11-04).** Its prepaid credit is spent, so the adapter, the credit guard, the Admin credit field and the balance row are gone; Vertex (Veo, Nano Banana) and BytePlus (Seedance, Seedream) are the primary providers and fal is the fallback. Replicate rows with history stay in `model_configs`, disabled, and old ledger rows still read (migration 0062; `docs/ops/provider-balances.md`). Every mention of Replicate below as a live provider is history. On the server, remove `REPLICATE_API_TOKEN` from `.env`.
+**Replicate removed (2026-11-04).** Its prepaid credit is spent, so the adapter, the credit guard, the Admin credit field and the balance row are gone; Vertex (Veo, Nano Banana) and BytePlus (Seedance, Seedream) are the primary providers and fal is the fallback. Migration 0062 removed the adapter and turned its rows off; migration 0072 (2026-11-05) removed the rest: the `replicate` model rows, the provider value in the checks and the `settings.replicate_credit_*` columns. Old ledger lines (the October bake-off, $9.248) and invoices still read as provider `replicate` (`docs/ops/provider-balances.md`). Every mention of Replicate below as a live provider is history. On the server, remove `REPLICATE_API_TOKEN` from `.env`.
 
 Last updated: 2026-10-24 (main after #42; see "Overnight 2026-10-24" below). Earlier: 2026-10-23, 11:45 ICT (main after #16). The autonomous run is under way under the plan v5.1 pre-approval; the current state is in "Run state" below. Earlier sections keep the research record. The deep-interview decisions are recorded in the section after Q9; where they differ from Q1–Q9, they win.
 
@@ -95,7 +95,7 @@ Last updated: 2026-10-24 (main after #42; see "Overnight 2026-10-24" below). Ear
     - a Next.js web app and a worker that calls providers;
     - Postgres with Drizzle, the pg-boss queue, MinIO (S3 API) and better-auth;
     - Postgres and MinIO run with docker-compose; web and worker run as systemd units (plan step D.4).
-  - Providers sit behind an adapter layer: a mock adapter for tests, plus real adapters for fal and Replicate; only models that pass the bake-off are enabled.
+  - Providers sit behind an adapter layer: a mock adapter for tests, plus real adapters for fal, Vertex and BytePlus (Replicate was removed, migration 0072); only models that pass the bake-off are enabled.
   - The app runs on the company VET Linux server, with its own Postgres and MinIO (no shared database with Ideas Hub or POD Studio).
   - Deploying needs owner approval because the server is production. The plan collects it once, as the pre-approval sentence (section 3).
   - Maintainer: the owner, under the usual repo workflow.

@@ -3,7 +3,6 @@ import { checkItem, runPreflight, skippedSteps, type Deps, type Env } from './pr
 
 const FAKE: Env = {
   FAL_KEY: 'fal-secret-1111',
-  REPLICATE_API_TOKEN: 'r8_secret-2222',
   LARK_APP_ID: 'cli_app',
   LARK_APP_SECRET: 'lark-secret-3333',
   LARK_TENANT_KEY: 'tenant',

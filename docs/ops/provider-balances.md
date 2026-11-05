@@ -38,8 +38,7 @@ own credits guard.
 ## Replicate (removed 2026-11-04)
 
 Replicate has no adapter any more: no code path submits to it, `REPLICATE_API_TOKEN` is no longer read, and the hourly Replicate guard and its fal twin
-switching are gone. The `settings.replicate_credit_usd` and `replicate_credit_since` columns stay in the schema, unused. Migration 0062 turned off every
-`replicate` row of `model_configs` and deleted the ones no job and no ledger row names; the rest stay, disabled, because `jobs.model` references
-`model_configs.id` and the Costs and Library pages read old jobs. The settings API refuses to enable a model of a removed provider (`REMOVED_PROVIDERS`
-in `apps/web/src/app/api/admin/settings/route.ts`), and Admin Settings shows such rows as switched off. Old `replicate` rows in the ledger and in
-`provider_invoices` still show in Admin Costs; new Replicate invoices can no longer be entered.
+switching are gone. Migration 0072 (2026-11-05) removed the rest: the `replicate` rows of `model_configs`, the `replicate` value of the provider checks
+of `model_configs` and `jobs`, and the `settings.replicate_credit_usd` and `replicate_credit_since` columns. Old `replicate` rows in the ledger
+(the October 2026 bake-off line, $9.248, which keeps its model text because `cost_entries` is append-only) and in `provider_invoices` still show in Admin
+Costs as "Replicate"; new Replicate invoices can no longer be entered.

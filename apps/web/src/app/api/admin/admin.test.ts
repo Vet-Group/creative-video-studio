@@ -346,22 +346,6 @@ describe('settings', () => {
     expect((await put({ models: [{ id: 'no-such-model', enabled: true }] })).status).toBe(404);
   });
 
-  test('a model of a removed provider (Replicate) stays listed but cannot be enabled, and nothing else changes with it', async () => {
-    await pool.query(
-      `insert into model_configs (id, provider, endpoint, label, ratios, durations_sec, max_images, output_resolution, usd_per_second, sources, enabled)
-       values ('rep-old', 'replicate', 'x', 'Old Replicate', '{9:16}', '{5}', 2, '720p', 0.4, '{}', false)`,
-    );
-    expect((await get()).models.find((m) => m.id === 'rep-old')).toMatchObject({ enabled: false, priced: false });
-    const before = await auditCount();
-    const res = await put({ monthlyCapUsd: 777, models: [{ id: 'rep-old', enabled: true }] });
-    expect(res.status).toBe(400);
-    expect(((await res.json()) as { error: string }).error).toMatch(/rep-old.*removed/);
-    expect((await get()).monthlyCapUsd).toBe('350.5000');
-    expect((await get()).models.find((m) => m.id === 'rep-old')?.enabled).toBe(false);
-    expect(await auditCount()).toBe(before);
-    expect((await put({ models: [{ id: 'rep-old', enabled: false }] })).status).toBe(200); // the form sends every row; an off one is not a change
-  });
-
   test('reads the Vertex accounts and the active one, and changes their credits, each change audited once', async () => {
     type Vertex = { projectId: string; creditTotal: string | null; creditCurrency: string; creditExpiresOn: string | null; stopWhenCreditsEnd: boolean; configured: boolean };
     const vertex = async () => (await (await settingsRoute.GET(call(admin.cookie, '/api/admin/settings'))).json()) as { vertexActiveProject: string | null; vertexAccounts: Vertex[] };
@@ -404,7 +388,6 @@ describe('settings', () => {
 
     expect((await put({ balanceWarningUsd: '15', replicateCreditUsd: '25.5' })).status).toBe(200);
     expect(await balances()).toMatchObject({ balanceWarningUsd: '15.0000' });
-    expect((await pool.query('select replicate_credit_usd from settings where id = 1')).rows).toEqual([{ replicate_credit_usd: null }]);
     expect((await audits('settings:1')).slice(n)).toEqual([
       { actor_id: admin.id, action: 'settings.update', old_value: { balanceWarningUsd: '10.0000' }, new_value: { balanceWarningUsd: '15.0000' } },
     ]);

@@ -289,19 +289,19 @@ describe('bookLlm', () => {
 describe('bookInvoice', () => {
   test('books the difference to the ledger, and a re-entry books only what is new', async () => {
     const month = '2026-09';
-    const id = await reservedJob('2.0000', { createdAt: '2026-09-15T05:00:00Z', provider: 'replicate', status: 'running' });
+    const id = await reservedJob('2.0000', { createdAt: '2026-09-15T05:00:00Z', provider: 'vertex', status: 'running' });
     await settle(pool, id, { status: 'succeeded', costUsd: 5, outputAssetId: await asset(), posterAssetId: null });
-    await bookShared(pool, { kind: 'bakeoff', usd: 2, month, provider: 'replicate', ref: 'bakeoff-2026-09-replicate' });
+    await bookShared(pool, { kind: 'bakeoff', usd: 2, month, provider: 'vertex', ref: 'bakeoff-2026-09-vertex' });
     const invoiceDiffs = async () => (await pool.query(`select usd::text, ref from cost_entries where kind = 'invoice_diff' and month = $1 order by id`, [month])).rows;
 
-    expect(await bookInvoice(pool, { month, provider: 'replicate', totalUsd: 10 })).toBe('3.0000'); // 10 - (5 + 2)
-    expect(await bookInvoice(pool, { month, provider: 'replicate', totalUsd: '10.0000' })).toBe('0.0000');
-    expect(await invoiceDiffs()).toEqual([{ usd: '3.0000', ref: 'invoice-2026-09-replicate-1' }]);
+    expect(await bookInvoice(pool, { month, provider: 'vertex', totalUsd: 10 })).toBe('3.0000'); // 10 - (5 + 2)
+    expect(await bookInvoice(pool, { month, provider: 'vertex', totalUsd: '10.0000' })).toBe('0.0000');
+    expect(await invoiceDiffs()).toEqual([{ usd: '3.0000', ref: 'invoice-2026-09-vertex-1' }]);
 
-    expect(await bookInvoice(pool, { month, provider: 'replicate', totalUsd: 9.5 })).toBe('-0.5000');
-    expect(await invoiceDiffs()).toEqual([{ usd: '3.0000', ref: 'invoice-2026-09-replicate-1' }, { usd: '-0.5000', ref: 'invoice-2026-09-replicate-2' }]);
-    expect((await pool.query(`select sum(usd)::text as usd from cost_entries where month = $1 and provider = 'replicate'`, [month])).rows[0].usd).toBe('9.5000');
-    expect((await pool.query(`select total_usd::text from provider_invoices where month = $1 and provider = 'replicate'`, [month])).rows).toEqual([{ total_usd: '9.5000' }]);
+    expect(await bookInvoice(pool, { month, provider: 'vertex', totalUsd: 9.5 })).toBe('-0.5000');
+    expect(await invoiceDiffs()).toEqual([{ usd: '3.0000', ref: 'invoice-2026-09-vertex-1' }, { usd: '-0.5000', ref: 'invoice-2026-09-vertex-2' }]);
+    expect((await pool.query(`select sum(usd)::text as usd from cost_entries where month = $1 and provider = 'vertex'`, [month])).rows[0].usd).toBe('9.5000');
+    expect((await pool.query(`select total_usd::text from provider_invoices where month = $1 and provider = 'vertex'`, [month])).rows).toEqual([{ total_usd: '9.5000' }]);
   });
 
   test('refuses a month that is not YYYY-MM', async () => {
