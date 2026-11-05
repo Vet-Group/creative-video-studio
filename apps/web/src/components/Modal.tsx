@@ -12,8 +12,9 @@ export function Modal({ open, onClose, label, className, children }: { open: boo
     if (open && !d.open) d.showModal();
     if (!open && d.open) d.close();
   }, [open]);
+  // React passes a nested dialog's close event (a photo picker over a form) up the component tree, so only this dialog's own close closes it.
   return (
-    <dialog ref={ref} className={className ? `modal ${className}` : 'modal'} aria-label={label} onClose={onClose} onMouseDown={(e) => (pressed.current = e.target)} onClick={(e) => e.target === e.currentTarget && pressed.current === e.currentTarget && onClose()}>
+    <dialog ref={ref} className={className ? `modal ${className}` : 'modal'} aria-label={label} onClose={(e) => e.target === e.currentTarget && onClose()} onMouseDown={(e) => (pressed.current = e.target)} onClick={(e) => e.target === e.currentTarget && pressed.current === e.currentTarget && onClose()}>
       {open && (
         <>
           <button type="button" className="modal-close" aria-label="Đóng" onClick={onClose}>

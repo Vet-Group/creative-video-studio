@@ -546,10 +546,11 @@ export const userTemplates = pgTable(
   ],
 );
 
-export const CHOICE_KINDS = ['hook', 'location'] as const;
+export const CHOICE_KINDS = ['hook', 'location', 'ending'] as const;
 export type ChoiceKind = (typeof CHOICE_KINDS)[number];
 
-// A member's own Marketing Studio hook or location: private, or shared by an Admin as a company one, as templates are.
+// A member's own hook, location or ending (how the clip ends): private, shared with one store (any member), or with the company (a template
+// editor), as templates are. It may carry a niche tag and a photo (one of the owner's uploads).
 export const userChoices = pgTable(
   'user_choices',
   {
@@ -562,11 +563,17 @@ export const userChoices = pgTable(
     phrase: text('phrase').notNull(),
     description: text('description'),
     isCompany: boolean('is_company').notNull().default(false),
+    storeId: text('store_id').references(() => stores.id, { onDelete: 'set null' }),
+    niche: text('niche'),
+    imageAssetId: text('image_asset_id').references(() => assets.id, { onDelete: 'set null' }),
     createdAt: tstz('created_at').notNull().defaultNow(),
   },
   (t) => [
     index('user_choices_user_id_idx').on(t.userId),
-    check('user_choices_kind_check', sql`${t.kind} in ('hook', 'location')`),
+    index('user_choices_store_id_kind_idx').on(t.storeId, t.kind),
+    check('user_choices_kind_check', sql`${t.kind} in ('hook', 'location', 'ending')`),
+    check('user_choices_niche_check', sql`${t.niche} is null or char_length(${t.niche}) between 1 and 30`),
+    check('user_choices_scope_check', sql`not (${t.isCompany} and ${t.storeId} is not null)`),
     check('user_choices_name_check', sql`char_length(${t.name}) between 1 and 40`),
     check('user_choices_phrase_check', sql`char_length(${t.phrase}) between 1 and 300`),
     check('user_choices_description_check', sql`${t.description} is null or char_length(${t.description}) <= 100`),

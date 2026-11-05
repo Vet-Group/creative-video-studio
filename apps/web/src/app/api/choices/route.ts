@@ -1,32 +1,42 @@
 import { randomUUID } from 'node:crypto';
 import { CHOICE_KINDS, type ChoiceKind } from '@cvs/db';
 import { pool } from '@/lib/auth';
+import { CHOICE_SQL, choiceFields, listedChoice, type ListedChoice } from '@/lib/choices';
 import { LIVE_CLIP } from '@/lib/clips';
-import { HOOKS, LOCATIONS, MAX_CHOICE_DESC, MAX_CHOICE_NAME, MAX_CHOICE_PHRASE, MAX_CHOICES } from '@/lib/marketing';
-import { guard } from '@/lib/session';
+import { BUILT_IN_CHOICES, MAX_CHOICES } from '@/lib/marketing';
+import { guard, isEditor } from '@/lib/session';
 
 const bad = (error: string, status = 400) => Response.json({ error }, { status });
 /** The most ids one often-used list holds. */
 const OFTEN_MAX = 12;
-const CONTROL = /[\p{Cc}\p{Zl}\p{Zp}]/u; // newlines and other control characters would break the one-line prompt
+const LISTS = { hook: 'hooks', location: 'locations', ending: 'endings' } as const;
 
 /**
- * The Marketing Studio pickers' own lists: the caller's hooks and locations, then the company's, newest first in each; `often` (the often-used group), the ids
- * of the hooks and locations the caller's own `marketing` jobs of that format (`?format=advanced`, else UGC) used at least twice in 90 days, retries
- * and deleted jobs left out, most used first, only ids still in the lists; `posters`, for each often-used id, the poster asset of the caller's latest
- * live clip with it (none when every such clip is gone), the card's picture when it has no sample; `canShare` for an Admin.
+ * The pickers' lists of hooks, locations and endings, each choice with its `group`: the stores' (`?storeId=` keeps that store's only; a hidden store's
+ * never show), the company's and the caller's own private ones, the caller's first, newest first, then the built-in ones; `?kind=` fills that list only,
+ * `?niche=` keeps the entries with that niche tag (so no built-in one). `often` (the often-used group), the ids of the hooks and locations the caller's
+ * own `marketing` jobs of that format (`?format=advanced`, else UGC) used at least twice in 90 days, retries and deleted jobs left out, most used first,
+ * only ids still in the lists; `posters`, for each often-used id, the poster asset of the caller's latest live clip with it (none when every such clip is
+ * gone), the card's picture when it has no sample; `canShare` for a template editor (an Admin too), who shares with the company and edits or deletes
+ * shared entries.
  */
 export async function GET(request: Request) {
   const g = await guard(request, 'member');
   if (g.error) return g.error;
-  const format = new URL(request.url).searchParams.get('format');
+  const params = new URL(request.url).searchParams;
+  const format = params.get('format');
   if (format !== null && format !== 'advanced') return bad('format must be advanced or left out');
+  const kind = params.get('kind') as ChoiceKind | null;
+  if (kind !== null && !CHOICE_KINDS.includes(kind)) return bad('kind must be hook, location or ending');
+  const niche = params.get('niche') || null;
   const userId = g.session.user.id;
-  const [own, used, latest] = await Promise.all([
+  const [rows, used, latest] = await Promise.all([
     pool.query(
-      `select id, kind, name, description, phrase, is_company, user_id = $1 as mine from user_choices where user_id = $1 or is_company
-        order by (user_id = $1) desc, created_at desc, id`,
-      [userId],
+      `${CHOICE_SQL}
+        where ((c.store_id is null and (c.is_company or c.user_id = $1)) or (not s.hidden and ($2::text is null or c.store_id = $2)))
+          and ($3::text is null or c.kind = $3) and ($4::text is null or c.niche = $4)
+        order by (c.user_id = $1) desc, c.created_at desc, c.id`,
+      [userId, params.get('storeId') || null, kind, niche],
     ),
     pool.query(
       `select c.kind, c.id from jobs j, lateral (values ('hook', j.params->>'hook'), ('location', j.params->>'location')) as c (kind, id)
@@ -43,39 +53,36 @@ export async function GET(request: Request) {
       [userId, format === 'advanced'],
     ),
   ]);
-  const choices = own.rows.map((r) => ({ kind: r.kind as ChoiceKind, id: r.id as string, name: r.name, desc: r.description ?? '', phrase: r.phrase, isCompany: r.is_company, mine: r.mine }));
-  const of = (kind: ChoiceKind) => choices.filter((c) => c.kind === kind).map(({ kind: _, ...c }) => c);
-  const [hooks, locations] = [of('hook'), of('location')];
-  const often = (kind: ChoiceKind, list: { id: string }[]) => {
-    const known = new Set(list.map((c) => c.id));
-    return used.rows.filter((r) => r.kind === kind && known.has(r.id)).slice(0, OFTEN_MAX).map((r) => r.id as string);
-  };
-  const oftenIds = { hook: often('hook', [...HOOKS, ...hooks]), location: often('location', [...LOCATIONS, ...locations]) };
-  const posters = (kind: ChoiceKind) => Object.fromEntries(latest.rows.filter((r) => r.kind === kind && oftenIds[kind].includes(r.id)).map((r) => [r.id as string, r.poster_asset_id as string]));
-  return Response.json({ hooks, locations, often: oftenIds, posters: { hook: posters('hook'), location: posters('location') }, canShare: g.session.user.role === 'admin' });
+  const choices = rows.rows.map(listedChoice);
+  const builtIn = (k: ChoiceKind): ListedChoice[] =>
+    niche ? [] : BUILT_IN_CHOICES[k].map((c) => ({ ...c, kind: k, group: 'builtin', isCompany: false, mine: false, storeId: null, storeName: null, niche: null, imageAssetId: null }));
+  const lists = Object.fromEntries(
+    CHOICE_KINDS.map((k) => [k, kind !== null && kind !== k ? [] : [...choices.filter((c) => c.kind === k), ...builtIn(k)].map(({ kind: _, ...c }) => c)]),
+  ) as Record<ChoiceKind, Omit<ListedChoice, 'kind'>[]>;
+  const often = Object.fromEntries(
+    CHOICE_KINDS.map((k) => {
+      const known = new Set(lists[k].map((c) => c.id));
+      return [k, used.rows.filter((r) => r.kind === k && known.has(r.id)).slice(0, OFTEN_MAX).map((r) => r.id as string)];
+    }),
+  ) as Record<ChoiceKind, string[]>;
+  const posters = Object.fromEntries(
+    CHOICE_KINDS.map((k) => [k, Object.fromEntries(latest.rows.filter((r) => r.kind === k && often[k].includes(r.id)).map((r) => [r.id as string, r.poster_asset_id as string]))]),
+  );
+  return Response.json({ ...Object.fromEntries(CHOICE_KINDS.map((k) => [LISTS[k], lists[k]])), often, posters, canShare: isEditor(g.session.user) });
 }
 
 /**
- * Adds one of the caller's own hooks or locations: `kind`, `name` (1 to 40 characters), `phrase` (the English words the prompt takes, 1 to 300), an
- * optional `desc` (up to 100) and `isCompany` (Admin only) to share it; none may hold a newline or another control character. A member keeps at
- * most 50 of each kind.
+ * Adds one of the caller's own hooks, locations or endings: `kind` and the fields lib/choices.ts choiceFields reads (name, phrase, desc, niche, the share
+ * level and the photo). A member keeps at most 50 private ones of each kind; shared ones do not count. Answers with the choice as GET lists it.
  */
 export async function POST(request: Request) {
   const g = await guard(request, 'member');
   if (g.error) return g.error;
-  const b = (await request.json().catch(() => null)) as { kind?: unknown; name?: unknown; phrase?: unknown; desc?: unknown; isCompany?: unknown } | null;
+  const b = (await request.json().catch(() => null)) as Record<string, unknown> | null;
   const kind = b?.kind as ChoiceKind;
-  if (!CHOICE_KINDS.includes(kind)) return bad('kind must be hook or location');
-  const text = (v: unknown, max: number, min = 1) => (typeof v === 'string' && !CONTROL.test(v) && v.trim().length >= min && v.trim().length <= max ? v.trim() : null);
-  const name = text(b?.name, MAX_CHOICE_NAME);
-  if (name === null) return bad(`name must have 1 to ${MAX_CHOICE_NAME} characters on one line`);
-  const phrase = text(b?.phrase, MAX_CHOICE_PHRASE);
-  if (phrase === null) return bad(`phrase must have 1 to ${MAX_CHOICE_PHRASE} characters on one line`);
-  const desc = b?.desc === undefined ? '' : text(b.desc, MAX_CHOICE_DESC, 0);
-  if (desc === null) return bad(`desc may have at most ${MAX_CHOICE_DESC} characters on one line`);
-  if (b?.isCompany !== undefined && typeof b.isCompany !== 'boolean') return bad('isCompany must be true or false');
-  const isCompany = b?.isCompany === true;
-  if (isCompany && g.session.user.role !== 'admin') return bad('only an Admin shares a hook or location with the company', 403);
+  if (!b || !CHOICE_KINDS.includes(kind)) return bad('kind must be hook, location or ending');
+  const f = await choiceFields(b, g.session.user);
+  if ('error' in f) return bad(f.error, f.status);
   const userId = g.session.user.id;
   const id = randomUUID();
   // One writer per member, so two adds cannot both take the 50th place (the shape of POST /api/templates).
@@ -83,12 +90,15 @@ export async function POST(request: Request) {
   try {
     await client.query('begin');
     await client.query(`select pg_advisory_xact_lock(hashtext('choices:' || $1))`, [userId]);
-    const count = (await client.query('select count(*)::int as n from user_choices where user_id = $1 and kind = $2', [userId, kind])).rows[0].n;
-    if (count >= MAX_CHOICES) {
+    const count = (await client.query('select count(*)::int as n from user_choices where user_id = $1 and kind = $2 and store_id is null and not is_company', [userId, kind])).rows[0].n;
+    if (!f.isCompany && f.storeId === null && count >= MAX_CHOICES) {
       await client.query('rollback');
       return bad(`you can keep at most ${MAX_CHOICES} ${kind}s; delete one first`, 409);
     }
-    await client.query('insert into user_choices (id, user_id, kind, name, phrase, description, is_company) values ($1, $2, $3, $4, $5, $6, $7)', [id, userId, kind, name, phrase, desc || null, isCompany]);
+    await client.query(
+      'insert into user_choices (id, user_id, kind, name, phrase, description, is_company, store_id, niche, image_asset_id) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)',
+      [id, userId, kind, f.name, f.phrase, f.desc || null, f.isCompany, f.storeId, f.niche, f.imageAssetId],
+    );
     await client.query('commit');
   } catch (e) {
     await client.query('rollback');
@@ -96,5 +106,5 @@ export async function POST(request: Request) {
   } finally {
     client.release();
   }
-  return Response.json({ id, kind, name, desc, phrase, isCompany }, { status: 201 });
+  return Response.json(listedChoice((await pool.query(`${CHOICE_SQL} where c.id = $2`, [userId, id])).rows[0]), { status: 201 });
 }

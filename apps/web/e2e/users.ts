@@ -107,6 +107,10 @@ export const USERS = {
   brandm: { email: 'brandm@e2e.test', name: 'E2E Brand Member', role: 'member' },
   uploadsa: { email: 'uploadsa@e2e.test', name: 'E2E Uploads A', role: 'member' }, // uploads.e2e: a photo uploaded on one page is picked from the uploaded-photos picker on others
   uploadsb: { email: 'uploadsb@e2e.test', name: 'E2E Uploads B', role: 'member' }, // uploads.e2e: uploads carry the page's store and the picker filters by it
+  // choices-store.e2e: chsa shares a hook with a store, chsb sees it under that store only, chsed is a template editor (e2e/serve.ts sets it) who shares with the company.
+  chsa: { email: 'chsa@e2e.test', name: 'E2E Choices A', role: 'member' },
+  chsb: { email: 'chsb@e2e.test', name: 'E2E Choices B', role: 'member' },
+  chsed: { email: 'chsed@e2e.test', name: 'E2E Choices Editor', role: 'member' },
   admin: { email: 'admin@e2e.test', name: 'E2E Admin', role: 'admin' },
 } as const;
 
