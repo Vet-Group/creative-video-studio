@@ -122,6 +122,8 @@ test('Media Optimizer: removing the image during a run frees the form instead of
   });
   await signIn(page, 'appsa');
   await page.goto('/apps/media-optimizer');
+  // Hydrated first: a file set while the page hydrates is dropped, or (before the app fix) its decode was dropped by the dev-only effect re-run.
+  await expect(page.getByLabel('Ảnh cần tối ưu')).toBeEnabled();
   await page.getByLabel('Ảnh cần tối ưu').setInputFiles(file('shot.png'));
   await expect(runButton(page)).toBeEnabled();
   await runButton(page).click();

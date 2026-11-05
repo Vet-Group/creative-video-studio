@@ -109,3 +109,59 @@ test('a template editor shares a hook with the company, which every member sees 
     await member?.context().close();
   }
 });
+
+test('Sửa in the library: a member edits their own hook from the prefilled form and sees the new name; a company hook has Sửa for an editor only', async ({ browser }) => {
+  const mine = `Của tôi ${unique()}`;
+  const renamed = `Đã sửa ${unique()}`;
+  const company = `Công ty sửa ${unique()}`;
+  const editor = await as(browser, 'chsed');
+  const member = await as(browser, 'chsa');
+  try {
+    expect((await editor.request.post('/api/choices', { data: { kind: 'hook', name: company, phrase: 'The creator waves at the camera.', isCompany: true } })).status()).toBe(201);
+    const up = (await (await member.request.post('/api/assets', { multipart: { file: { name: 'spot.png', mimeType: 'image/png', buffer: png() } } })).json()) as { assets: { id: string }[] };
+    const own = { kind: 'hook', name: mine, phrase: 'The creator spins once.', desc: 'Xoay một vòng', niche: 'Áo dài', imageAssetId: up.assets[0]!.id };
+    expect((await member.request.post('/api/choices', { data: own })).status()).toBe(201);
+    await member.reload(); // the page reads the lists when it opens
+
+    await hookBox(member).click();
+    const hooks = member.getByRole('dialog', { name: 'Chọn hook' });
+    const ownList = hooks.getByRole('region', { name: 'Hook của bạn' });
+    await expect(hooks.getByRole('group', { name: 'Công ty' }).getByRole('option', { name: company, exact: true })).toBeVisible();
+    await expect(member.getByRole('button', { name: `Sửa hook ${company}` })).toHaveCount(0); // a member does not edit a company hook
+    // A card with no photo or sample keeps its line under its name, not run into it.
+    const plain = hooks.getByRole('group', { name: 'Có sẵn' }).getByRole('option').filter({ hasNot: member.locator('img, video') }).first();
+    const nameBox = (await plain.locator('.choice-name').boundingBox())!;
+    expect((await plain.locator('.choice-desc').boundingBox())!.y).toBeGreaterThanOrEqual(nameBox.y + nameBox.height - 1);
+    await ownList.getByRole('button', { name: `Sửa hook ${mine}` }).click();
+    // The add form, filled with the hook: name, line, scene, niche, photo and share level.
+    const form = member.getByRole('dialog', { name: `Sửa hook ${mine}` }).getByRole('group', { name: 'Sửa hook' });
+    await expect(form.getByLabel('Tên', { exact: true })).toHaveValue(mine);
+    await expect(form.getByLabel('Mô tả ngắn (tuỳ chọn)')).toHaveValue(own.desc);
+    await expect(form.getByLabel('Cảnh cho AI (tiếng Anh)')).toHaveValue(own.phrase);
+    await expect(form.getByLabel('Ngách (tuỳ chọn)')).toHaveValue(own.niche);
+    await expect(form.getByRole('img', { name: mine })).toHaveAttribute('src', `/api/assets/${own.imageAssetId}/content`);
+    await expect(select(member, 'Chia sẻ')).toHaveText('Chỉ mình tôi');
+    await expect(form.getByRole('group', { name: 'Điền thử một ví dụ' })).toHaveCount(0);
+    await form.getByLabel('Tên', { exact: true }).fill(renamed);
+    await form.getByRole('button', { name: 'Lưu', exact: true }).click();
+    // Back on the list, reloaded: the card and the own list carry the new name; the rest is kept.
+    await expect(hooks.getByRole('option', { name: renamed, exact: true })).toBeVisible();
+    await expect(hooks.getByRole('option', { name: mine, exact: true })).toHaveCount(0);
+    await expect(ownList.getByRole('button', { name: `Sửa hook ${renamed}` })).toBeVisible();
+    const { hooks: listed } = (await (await member.request.get('/api/choices?kind=hook')).json()) as { hooks: { name: string; phrase: string; desc: string; niche: string | null; imageAssetId: string | null }[] };
+    expect(listed.find((c) => c.name === renamed)).toMatchObject({ phrase: own.phrase, desc: own.desc, niche: own.niche, imageAssetId: own.imageAssetId });
+
+    // The editor: Sửa on the company hook, its form on the company share.
+    await editor.reload();
+    await hookBox(editor).click();
+    await editor.getByRole('dialog', { name: 'Chọn hook' }).getByRole('button', { name: `Sửa hook ${company}` }).click();
+    await expect(editor.getByRole('dialog', { name: `Sửa hook ${company}` }).getByLabel('Tên', { exact: true })).toHaveValue(company);
+    await expect(select(editor, 'Chia sẻ')).toHaveText('Toàn công ty');
+  } finally {
+    for (const [page, names] of [[member, [mine, renamed]], [editor, [company]]] as const) {
+      const { hooks } = (await (await page.request.get('/api/choices?kind=hook')).json()) as { hooks: { id: string; name: string }[] };
+      for (const h of hooks.filter((c) => names.includes(c.name))) expect((await page.request.delete(`/api/choices/${h.id}`)).status()).toBe(204);
+      await page.context().close();
+    }
+  }
+});

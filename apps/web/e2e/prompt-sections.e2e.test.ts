@@ -17,8 +17,8 @@ const preview = (page: Page) => page.locator('.prompt-preview p');
 const fits = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
 
 async function useTemplate(page: Page, name: string): Promise<void> {
-  await page.getByRole('button', { name: 'Mẫu prompt' }).click();
-  await page.getByRole('group', { name: 'Mẫu prompt' }).getByRole('button', { name: new RegExp(`^${name}`) }).click();
+  await page.getByRole('button', { name: 'Khung prompt' }).click();
+  await page.getByRole('group', { name: 'Khung prompt' }).getByRole('button', { name: new RegExp(`^${name}`) }).click();
 }
 
 /** The member's newest job of `feature` once it is done, as GET /api/jobs/:id answers it. */
@@ -28,7 +28,7 @@ async function newest(page: Page, feature: string): Promise<Record<string, unkno
   return (await (await page.request.get(`/api/jobs/${(await mine())[0]!.id}`)).json()) as Record<string, unknown>;
 }
 
-test('Create: the sections show by default, Mẫu prompt fills all three, the preview is what the job gets, and Dùng lại refills the sections', async ({ page }) => {
+test('Create: the sections show by default, Khung prompt fills all three, the preview is what the job gets, and Dùng lại refills the sections', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await signIn(page, 'secta');
   await page.goto('/create');
@@ -134,6 +134,13 @@ test('Marketing Studio: the own hook counts only with no hook chosen, the job ke
   await expect(page.getByText('Đã gửi job')).toBeVisible();
   const job = await newest(page, 'marketing');
   expect(job).toMatchObject({ prompt: shown, hookText: t.hook, brief: t.body, ending: t.ending, hook: null });
+  // The Library detail shows the member's own hook beside the brief and the ending.
+  await page.goto('/library');
+  await page.getByRole('article', { name: new RegExp(`${String(job.id).slice(0, 8)}\\.[a-z0-9]+$`) }).getByRole('button', { name: 'Xem chi tiết' }).click();
+  const recipe = page.getByRole('dialog').locator('.recipe-text');
+  await expect(recipe.filter({ has: page.getByRole('heading', { name: 'Hook tự viết' }) })).toContainText(t.hook);
+  await expect(recipe.filter({ has: page.getByRole('heading', { name: 'Cảnh kết' }) })).toContainText(t.ending);
+  await page.keyboard.press('Escape');
 
   await page.goto(`/marketing-studio?reuse=${job.id}`);
   await expect(page.getByRole('textbox', { name: 'Prompt (tuỳ chọn)' })).toHaveValue(t.body);
@@ -166,17 +173,25 @@ test('Marketing Studio: the own hook counts only with no hook chosen, the job ke
 test('at 390 px the templates open as a sheet over the Run bar with the last one in reach, the sections and the folded preview fit, on Create and Marketing Studio', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await signIn(page, 'secta');
-  for (const [path, t, body] of [
-    ['/create', PROMPT_TEMPLATES.video.at(-1)!, 'Mô tả chuyển động'],
-    ['/marketing-studio', PROMPT_TEMPLATES.marketing.at(-1)!, 'Prompt (tuỳ chọn)'],
+  for (const [path, list, body] of [
+    ['/create', PROMPT_TEMPLATES.video, 'Mô tả chuyển động'],
+    ['/marketing-studio', PROMPT_TEMPLATES.marketing, 'Prompt (tuỳ chọn)'],
   ] as const) {
+    const t = list.at(-1)!;
     await page.goto(path);
     await expect(part(page, '② Diễn biến')).toBeVisible();
-    await page.getByRole('button', { name: 'Mẫu prompt' }).click();
-    const sheet = page.getByRole('dialog', { name: 'Mẫu prompt' });
+    await page.getByRole('button', { name: 'Khung prompt' }).click();
+    const sheet = page.getByRole('dialog', { name: 'Khung prompt' });
     await expect(sheet).toBeVisible();
     await expect(sheet.getByText('Điền cả Hook · Diễn biến · Kết')).toBeVisible();
     const last = sheet.getByRole('button', { name: new RegExp(`^${t.name}`) });
+    // Each template: its Vietnamese line; on Create also what it opens and ends on, one muted line each. Marketing Studio's taller sheet keeps the one line.
+    for (const x of list) await expect(sheet.getByRole('button', { name: new RegExp(`^${x.name}`) })).toContainText(x.desc);
+    if (path === '/create') {
+      await expect(last).toContainText(`Hook: ${t.hook}`);
+      await expect(last).toContainText(`Kết: ${t.ending}`);
+      for (const line of await sheet.locator('.prompt-template-line').all()) expect((await line.boundingBox())!.height).toBe(18);
+    } else await expect(sheet.locator('.prompt-template-line')).toHaveCount(0);
     // Whole on the screen and on top, with no scrolling first: nothing (the sticky Run bar) covers its middle.
     await expect(last).toBeInViewport({ ratio: 1 });
     expect(await last.evaluate((el) => { const r = el.getBoundingClientRect(); return el.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)); })).toBe(true);
@@ -197,5 +212,22 @@ test('at 390 px the templates open as a sheet over the Run bar with the last one
       expect(box.x).toBeGreaterThanOrEqual(0);
       expect(box.x + box.width).toBeLessThanOrEqual(390);
     }
+  }
+});
+
+test('the preview is open on a computer and folded on a phone from the first paint: the server renders it open, and CSS folds it on a phone until hydration', async ({ page, browser }) => {
+  await signIn(page, 'secta');
+  const noScript = await browser.newContext({ javaScriptEnabled: false, storageState: await page.context().storageState() });
+  try {
+    const p = await noScript.newPage();
+    for (const [width, open] of [[1440, true], [390, false]] as const) {
+      await p.setViewportSize({ width, height: 900 });
+      await p.goto('/create');
+      await expect(p.locator('.prompt-preview')).toHaveAttribute('open', '');
+      await expect(p.locator('.prompt-preview summary')).toBeVisible();
+      await expect(p.locator('.prompt-preview > :not(summary)').first()).toBeVisible({ visible: open });
+    }
+  } finally {
+    await noScript.close();
   }
 });
