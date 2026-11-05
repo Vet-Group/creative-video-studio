@@ -343,13 +343,15 @@ describe('/api/choices by store, niche, photo and ending', { timeout: 30_000 }, 
     expect(await findChoice(u.id, 'hook', ending.id)).toBeUndefined();
   });
 
-  test('the 50 a member keeps are private ones only: shared ones do not count, and making one private again needs room', async () => {
+  test('the 50 a member keeps count store ones too, company ones do not; taking a company one back needs room', async () => {
     const u = await newUser();
     const s = await store();
     await pool.query(`insert into user_choices (id, user_id, kind, name, phrase) select $1 || g, $1, 'hook', 'h' || g, 'p' from generate_series(1, 50) g`, [u.id]);
     expect((await add(u, hook)).status).toBe(409);
-    const shared = await created(await add(u, { ...hook, storeId: s }));
-    const res = await change(u, shared.id, { storeId: null });
-    expect([res.status, await error(res)]).toEqual([409, 'the owner keeps at most 50 private hooks; delete one first']);
+    expect((await add(u, { ...hook, storeId: s })).status).toBe(409);
+    await pool.query("update users set can_edit_templates = true where id = $1", [u.id]);
+    const company = await created(await add(u, { ...hook, isCompany: true }));
+    const res = await change(u, company.id, { isCompany: false, storeId: s });
+    expect([res.status, await error(res)]).toEqual([409, 'the owner keeps at most 50 hooks; delete one first']);
   });
 });

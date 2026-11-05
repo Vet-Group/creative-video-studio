@@ -8,7 +8,7 @@ const notFound = () => Response.json({ error: 'not found' }, { status: 404 });
 
 /**
  * Changes a choice: its owner their own, a template editor (an Admin too) any company or store one; 404 for any other. The body holds the fields to
- * change (lib/choices.ts choiceFields). Making a shared one private again needs room in the owner's 50. Answers with the choice as GET lists it.
+ * change (lib/choices.ts choiceFields). Taking a company one back to private or a store needs room in the owner's 50. Answers with the choice as GET lists it.
  */
 export async function PATCH(request: Request, { params }: RouteContext) {
   const g = await guard(request, 'member');
@@ -28,10 +28,10 @@ export async function PATCH(request: Request, { params }: RouteContext) {
   const current = { name: r.name, phrase: r.phrase, desc: r.description ?? '', isCompany: r.is_company, storeId: r.store_id, niche: r.niche, imageAssetId: r.image_asset_id };
   const f = await choiceFields(b, g.session.user, current);
   if ('error' in f) return Response.json({ error: f.error }, { status: f.status });
-  // shortcut: no lock, so two racing changes may both make the owner's 50th private one; take POST's advisory lock if that ever matters.
-  if (!f.isCompany && f.storeId === null && (current.isCompany || current.storeId !== null)) {
-    const n = (await pool.query('select count(*)::int as n from user_choices where user_id = $1 and kind = $2 and store_id is null and not is_company', [r.user_id, r.kind])).rows[0].n;
-    if (n >= MAX_CHOICES) return Response.json({ error: `the owner keeps at most ${MAX_CHOICES} private ${r.kind}s; delete one first` }, { status: 409 });
+  // shortcut: no lock, so two racing changes may both take the owner's 50th place; take POST's advisory lock if that ever matters.
+  if (!f.isCompany && current.isCompany) {
+    const n = (await pool.query('select count(*)::int as n from user_choices where user_id = $1 and kind = $2 and not is_company', [r.user_id, r.kind])).rows[0].n;
+    if (n >= MAX_CHOICES) return Response.json({ error: `the owner keeps at most ${MAX_CHOICES} ${r.kind}s; delete one first` }, { status: 409 });
   }
   await pool.query('update user_choices set name = $2, phrase = $3, description = $4, is_company = $5, store_id = $6, niche = $7, image_asset_id = $8 where id = $1', [
     id, f.name, f.phrase, f.desc || null, f.isCompany, f.storeId, f.niche, f.imageAssetId,

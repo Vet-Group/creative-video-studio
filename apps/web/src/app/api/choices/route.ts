@@ -73,7 +73,7 @@ export async function GET(request: Request) {
 
 /**
  * Adds one of the caller's own hooks, locations or endings: `kind` and the fields lib/choices.ts choiceFields reads (name, phrase, desc, niche, the share
- * level and the photo). A member keeps at most 50 private ones of each kind; shared ones do not count. Answers with the choice as GET lists it.
+ * level and the photo). A member keeps at most 50 of each kind, private and store ones together, so no one fills a store's list; company ones (an editor's) do not count. Answers with the choice as GET lists it.
  */
 export async function POST(request: Request) {
   const g = await guard(request, 'member');
@@ -90,8 +90,8 @@ export async function POST(request: Request) {
   try {
     await client.query('begin');
     await client.query(`select pg_advisory_xact_lock(hashtext('choices:' || $1))`, [userId]);
-    const count = (await client.query('select count(*)::int as n from user_choices where user_id = $1 and kind = $2 and store_id is null and not is_company', [userId, kind])).rows[0].n;
-    if (!f.isCompany && f.storeId === null && count >= MAX_CHOICES) {
+    const count = (await client.query('select count(*)::int as n from user_choices where user_id = $1 and kind = $2 and not is_company', [userId, kind])).rows[0].n;
+    if (!f.isCompany && count >= MAX_CHOICES) {
       await client.query('rollback');
       return bad(`you can keep at most ${MAX_CHOICES} ${kind}s; delete one first`, 409);
     }
