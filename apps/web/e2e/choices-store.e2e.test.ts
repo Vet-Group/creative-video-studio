@@ -128,6 +128,10 @@ test('Sửa in the library: a member edits their own hook from the prefilled for
     const ownList = hooks.getByRole('region', { name: 'Hook của bạn' });
     await expect(hooks.getByRole('group', { name: 'Công ty' }).getByRole('option', { name: company, exact: true })).toBeVisible();
     await expect(member.getByRole('button', { name: `Sửa hook ${company}` })).toHaveCount(0); // a member does not edit a company hook
+    // A card with no photo or sample keeps its line under its name, not run into it.
+    const plain = hooks.getByRole('group', { name: 'Có sẵn' }).getByRole('option').filter({ hasNot: member.locator('img, video') }).first();
+    const nameBox = (await plain.locator('.choice-name').boundingBox())!;
+    expect((await plain.locator('.choice-desc').boundingBox())!.y).toBeGreaterThanOrEqual(nameBox.y + nameBox.height - 1);
     await ownList.getByRole('button', { name: `Sửa hook ${mine}` }).click();
     // The add form, filled with the hook: name, line, scene, niche, photo and share level.
     const form = member.getByRole('dialog', { name: `Sửa hook ${mine}` }).getByRole('group', { name: 'Sửa hook' });
