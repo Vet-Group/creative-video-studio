@@ -160,6 +160,8 @@ test('AC 12: Ctrl+Enter in the prompt runs once, Enter alone does not, and at 1.
   await page.reload();
   await barPrompt(page).fill('keyboard costly picture');
   await expect(barRun(page)).toContainText('$1.2000');
+  // The same wait as above: after the reload Run is locked again until the remembered settings load, and Ctrl+Enter on a locked Run does nothing.
+  await expect(barRun(page)).toBeEnabled();
   await barPrompt(page).press('Control+Enter');
   await answer(page, 'Chạy job này với giá $1.2000?', false);
   expect(posts()).toBe(1);
