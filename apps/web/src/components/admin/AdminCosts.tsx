@@ -110,7 +110,7 @@ function JobList({ month, asOf, by, id }: { month: string; asOf: number; by: Gro
                 </span>
               </td>
               <td>{j.feature}</td>
-              <td>{j.model}</td>
+              <td className="model">{j.model}</td>
               <td>
                 {STATUS[j.status ?? ''] ?? j.status ?? '—'}
                 {j.verdict && <span className="tag">{j.verdict === 'pass' ? 'Đạt' : 'Không đạt'}</span>}

@@ -375,3 +375,32 @@ test("an Admin opens a member's line on Costs and sees the job behind it", async
   await line.click();
   await expect(jobs).toHaveCount(0);
 });
+
+test('on a phone each job of a Costs line is a two-line block with the time and the USD on top, all inside the table', async ({ browser, page }) => {
+  const member = await browser.newPage();
+  await signIn(member, 'costb');
+  const jobId = await runViaApi(member);
+  await member.close();
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await signIn(page, 'admin');
+  await page.goto('/admin/costs');
+  const users = page.getByRole('region', { name: 'Theo người dùng' });
+  await users.getByRole('button', { name: 'E2E Costs B' }).click();
+  const row = users.locator('tr.drill table.jobs tbody tr').filter({ hasText: jobId.slice(0, 8) });
+  await expect(row).toContainText('Mock E2E');
+  const box = (await users.locator('.table-wrap').boundingBox())!;
+  const box$ = async (cell: ReturnType<typeof row.locator>) => (await cell.boundingBox())!;
+  const [when, feature, model, usd] = [await box$(row.locator('td').first()), await box$(row.locator('td').nth(1)), await box$(row.locator('td.model')), await box$(row.locator('td.num'))];
+  // Every cell is inside the table's box: nothing needs a sideways swipe.
+  for (const cell of [when, feature, model, usd]) {
+    expect(cell.x).toBeGreaterThanOrEqual(box.x);
+    expect(cell.x + cell.width).toBeLessThanOrEqual(box.x + box.width + 1);
+  }
+  // The time and the USD share the top line; the feature and model sit on the line under it.
+  expect(Math.abs(usd.y - when.y)).toBeLessThan(8);
+  expect(usd.x).toBeGreaterThan(when.x);
+  expect(feature.y).toBeGreaterThanOrEqual(when.y + when.height - 1);
+  expect(Math.abs(model.y - feature.y)).toBeLessThan(8);
+  expect(await page.evaluate(() => document.scrollingElement!.scrollWidth <= innerWidth)).toBe(true);
+});
