@@ -403,4 +403,8 @@ test('on a phone each job of a Costs line is a two-line block with the time and 
   expect(feature.y).toBeGreaterThanOrEqual(when.y + when.height - 1);
   expect(Math.abs(model.y - feature.y)).toBeLessThan(8);
   expect(await page.evaluate(() => document.scrollingElement!.scrollWidth <= innerWidth)).toBe(true);
+  // The blocks still read as a table: five column headers, and five cells in the job's row.
+  const table = users.getByRole('table', { name: 'Job của dòng này' });
+  await expect(table.getByRole('columnheader')).toHaveText(['Lúc gửi', 'Mục', 'Mô hình', 'Trạng thái', 'USD']);
+  await expect(table.getByRole('row').filter({ hasText: jobId.slice(0, 8) }).getByRole('cell')).toHaveCount(5);
 });
