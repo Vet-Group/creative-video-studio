@@ -86,6 +86,15 @@ describe('fal', () => {
     expect(calls).toHaveLength(withEnd.length);
   });
 
+  test("a Marketing Studio end frame on the reference endpoints that take one rides beside the model and product photos, not among them", async () => {
+    for (const [endpoint, images] of [['fal-ai/kling-video/o3/pro/reference-to-video', 'image_urls'], ['minimax/h3-max/reference-to-video', 'reference_image_urls']] as const) {
+      const { fn, calls } = fakeFetch([200, { request_id: 'r' }]);
+      const read = async (url: string) => ({ bytes: new Uint8Array(url === 'asset://end' ? [9, 9] : [1, 2, 3]), contentType: 'image/png' });
+      await createFalProvider({ apiKey: 'k', fetch: fn, readImage: read }).submit({ ...req, imageUrls: ['asset://model', 'asset://product'], endImageUrl: 'asset://end', model: { ...kling, endpoint } });
+      expect(calls[0]!.body).toMatchObject({ [images]: [DATA_URL, DATA_URL], end_image_url: 'data:image/png;base64,CQk=' });
+    }
+  });
+
   test('an endpoint without a request builder is refused before any call', async () => {
     const { fn, calls } = fakeFetch();
     await expect(createFalProvider({ apiKey: 'k', fetch: fn }).submit({ ...req, model: { ...kling, endpoint: 'fal-ai/unknown' } })).rejects.toThrow(ImageReadError);

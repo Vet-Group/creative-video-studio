@@ -9,7 +9,7 @@ import { boss } from '@/lib/queue';
 import { findChoice } from '@/lib/choices';
 import { inputRefusal } from '@/lib/job-failure';
 import { BRAND_FEATURES, withBrand } from '@/lib/brand';
-import { ADVANCED_MAX_SCRIPT } from '@/lib/marketing';
+import { ADVANCED_MAX_SCRIPT, END_TEXT_POSITIONS, MAX_END_TEXT, MAX_ENDING } from '@/lib/marketing';
 import { falBalance, falCreditUsd, overCredit } from '@/lib/provider-credit';
 import { guard } from '@/lib/session';
 
@@ -88,10 +88,12 @@ export async function GET(request: Request) {
  * Create a video job: 1-9 input images the caller may use (none on a model with a text-to-video twin, videoInputs `textOnly`: then a free prompt, no preset or end frame) (their own, or the inputs of a succeeded Library clip for Reuse), an enabled
  * model, a preset or a free prompt (exactly one; a free prompt is trimmed, 1 character up to the model's prompt limit (promptLimit), and stored with a null preset), the ratio and duration the model allows, and an optional visible store. The caps are checked and the job and its
  * `estimate` ledger row are written in one transaction (429 when a cap refuses, or when a fal Run's estimate is over what fal can still spend, lib/provider-credit.ts; nothing sent); the pg-boss job is sent afterwards.
- * `feature` (default `video`) picks the kind of job. `video` and `marketing` take a video model and the durations above, and an optional `params.audio` (below); `video` also takes
- * an optional `params.endAssetId`, the end frame: one of the caller's own live images, on a model whose fal request builder takes one (videoInputs), and an optional
+ * `feature` (default `video`) picks the kind of job. `video` and `marketing` take a video model and the durations above, an optional `params.audio` (below), and
+ * an optional `params.endAssetId`, the end frame: one of the caller's own live images, on a model whose fal request builder takes one (videoInputs); `video` also takes an optional
  * `params.audioAssetIds`, reference audio: the caller's own MP3/WAV clips (comma-separated ids), each at least 2 s, within the model's count and total length; and no other `params`. `marketing` needs exactly 2 inputs (the model photo, then the product photo) and a prompt, no preset;
- * with `params.format` 'advanced' (Marketing Studio Advanced) it takes 1 to 7 reference images instead, up to the model's `max_images`. A video job's optional `params.audio` 'on' prices
+ * with `params.format` 'advanced' (Marketing Studio Advanced) it takes 1 to 7 reference images instead, up to the model's `max_images`. Marketing also keeps `params.ending` (the last shot,
+ * already in its prompt, up to 200 characters) and `params.endText` (one line, up to 60 characters) with its optional `params.endTextPos` (bottom, middle or top), which the worker burns
+ * over the clip's last 2 s. A video job's optional `params.audio` 'on' prices
  * it at the endpoint's audio price (AUDIO_USD_PER_SECOND; refused on a model without one), and 'off' or none keeps it silent; an ALWAYS_AUDIO model has sound either way, at its stored price. Any other feature is an
  * image job: an enabled image model that lists the feature, no preset (Image Generation may name one of its enabled styles, whose prompt follows the member's, who keeps theirs as `params.brief`), a prompt (the apps in FEATURE_PROMPTS may omit it and get that one), 1 to the model's `max_images`
  * inputs (Try On, the two swaps and Face Swap need at least 2; Background Changer takes a prompt or a second image as the reference), one of the model's ratios (or `auto`), `params.resolution` (a key of the model's `image_prices`, which also sets the
@@ -138,8 +140,9 @@ export async function POST(request: Request) {
     }
     const entries = params && typeof params === 'object' && !Array.isArray(params) ? Object.entries(params) : null;
     // Images take resolution, quality and thinking, plus the member's own text (and Try On its garment count) kept for reuse; Marketing Studio takes format ('advanced'),
-    // audio ('on' or 'off') and the form's own inputs. The kept inputs are never read by the worker. Create video takes audio, an end frame and reference audio; the others none.
-    const keys = isImage ? ['resolution', 'quality', 'thinking', 'brief', ...(feature === 'try_on' ? ['garments'] : [])] : feature === 'marketing' ? ['format', 'audio', 'hook', 'location', 'brief', 'script'] : feature === 'video' ? ['audio', 'endAssetId', 'audioAssetIds'] : [];
+    // audio ('on' or 'off'), an end frame, the end text the worker burns in (endText, endTextPos) and the form's own inputs. The kept inputs are never read by the
+    // worker. Create video takes audio, an end frame and reference audio; the others none.
+    const keys = isImage ? ['resolution', 'quality', 'thinking', 'brief', ...(feature === 'try_on' ? ['garments'] : [])] : feature === 'marketing' ? ['format', 'audio', 'endAssetId', 'hook', 'location', 'brief', 'script', 'ending', 'endText', 'endTextPos'] : feature === 'video' ? ['audio', 'endAssetId', 'audioAssetIds'] : [];
     if (!entries || entries.some(([k, v]) => !keys.includes(k) || typeof v !== 'string')) {
       return bad(keys.length > 0 ? `params may hold only ${keys.length > 1 ? `${keys.slice(0, -1).join(', ')} and ${keys.at(-1)}` : keys[0]}, as text` : 'params are for image features, Create video and Marketing Studio only');
     }
@@ -151,9 +154,15 @@ export async function POST(request: Request) {
     for (const key of ['hook', 'location'] as const) {
       if (given[key] !== undefined && !(await findChoice(userId, key, given[key]))) return bad(`params.${key} must be one of the built-in ${key}s, your own or the company's`);
     }
-    // The member's text kept for reuse: the brief is part of the prompt, which the model's limit holds below; the script is held to what a clip can say.
-    for (const [key, max] of [['brief', PROMPT_CEILING], ['script', ADVANCED_MAX_SCRIPT]] as const) {
+    // The member's text kept for reuse: the brief and the last shot are part of the prompt, which the model's limit holds below; the script is held to what a clip
+    // can say, and the end text to what fits on the last frame.
+    for (const [key, max] of [['brief', PROMPT_CEILING], ['script', ADVANCED_MAX_SCRIPT], ['ending', MAX_ENDING], ['endText', MAX_END_TEXT]] as const) {
       if (given[key] !== undefined && given[key].length > max) return bad(`params.${key} may be at most ${max} characters`);
+    }
+    // One line of the member's own words, which the worker draws as they are.
+    if (given.endText !== undefined && (given.endText.trim() === '' || /\p{Cc}/u.test(given.endText))) return bad('params.endText must be one line of text');
+    if (given.endTextPos !== undefined && (given.endText === undefined || !(END_TEXT_POSITIONS as readonly string[]).includes(given.endTextPos))) {
+      return bad(`params.endTextPos goes with params.endText and must be one of ${END_TEXT_POSITIONS.join(', ')}`);
     }
     if (given.script !== undefined && !advanced) return bad('params.script is for Advanced only');
     if (given.garments !== undefined && !(/^[1-9]$/.test(given.garments) && Number(given.garments) <= assetIds.length - 1)) {

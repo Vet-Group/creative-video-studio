@@ -1,5 +1,6 @@
 // Saved forms (user_templates): the inputs of one page in the shape the reuse link reads from a job, so a template refills a form the same way.
 import { PROMPT_CEILING } from '@cvs/core/models';
+import { END_TEXT_POSITIONS, MAX_END_TEXT, MAX_ENDING } from './marketing';
 
 /** The most templates one member keeps. */
 export const MAX_TEMPLATES = 50;
@@ -16,6 +17,10 @@ export type TemplateData = {
   prompt?: string;
   brief?: string;
   script?: string;
+  /** Marketing Studio's last shot and the end text burned over the clip, with its position. */
+  ending?: string;
+  endText?: string;
+  endTextPos?: string;
   hook?: string;
   location?: string;
   format?: string;
@@ -32,7 +37,7 @@ export type TemplateData = {
 
 const TEXT = ['prompt', 'brief', 'script'] as const;
 const SHORT = ['ratio', 'resolution', 'modelId', 'presetId', 'storeId', 'endFrame'] as const;
-const FIELDS = new Set<string>(['images', 'clips', ...TEXT, ...SHORT, 'hook', 'location', 'format', 'audio', 'enhance', 'garments', 'durationSec']);
+const FIELDS = new Set<string>(['images', 'clips', ...TEXT, ...SHORT, 'ending', 'endText', 'endTextPos', 'hook', 'location', 'format', 'audio', 'enhance', 'garments', 'durationSec']);
 const whole = (v: unknown, min: number, max: number) => Number.isInteger(v) && (v as number) >= min && (v as number) <= max;
 
 /** The checked data of a template, or the reason it is refused. Unknown keys, wrong types and over-long text are refused; the route checks the hook and the location. */
@@ -54,6 +59,8 @@ export function templateData(raw: unknown): TemplateData | string {
   // The route resolves the hook and the location with findChoice (lib/choices.ts): a built-in or a member's own id.
   if (d.hook !== undefined && (typeof d.hook !== 'string' || d.hook.length > 100)) return 'data.hook is not a hook';
   if (d.location !== undefined && (typeof d.location !== 'string' || d.location.length > 100)) return 'data.location is not a location';
+  for (const [k, max] of [['ending', MAX_ENDING], ['endText', MAX_END_TEXT]] as const) if (d[k] !== undefined && (typeof d[k] !== 'string' || (d[k] as string).length > max)) return `data.${k} must be text of at most ${max} characters`;
+  if (d.endTextPos !== undefined && !(END_TEXT_POSITIONS as readonly unknown[]).includes(d.endTextPos)) return `data.endTextPos must be one of ${END_TEXT_POSITIONS.join(', ')}`;
   if (d.format !== undefined && d.format !== 'advanced') return 'data.format must be advanced';
   if (d.audio !== undefined && d.audio !== 'on' && d.audio !== 'off') return 'data.audio must be on or off';
   if (d.enhance !== undefined && typeof d.enhance !== 'boolean') return 'data.enhance must be true or false';

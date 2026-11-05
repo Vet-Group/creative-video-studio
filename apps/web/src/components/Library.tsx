@@ -322,12 +322,14 @@ interface ClipInputs {
   audio: string | null;
   brief: string | null;
   script: string | null;
+  ending: string | null;
+  endText: string | null;
   format: string | null;
   hook: string | null;
   location: string | null;
   images: { id: string; filename: string }[];
 }
-const NO_INPUTS: ClipInputs = { prompt: null, presetId: null, enhance: null, enhancedPrompt: null, audio: null, brief: null, script: null, format: null, hook: null, location: null, images: [] };
+const NO_INPUTS: ClipInputs = { prompt: null, presetId: null, enhance: null, enhancedPrompt: null, audio: null, brief: null, script: null, ending: null, endText: null, format: null, hook: null, location: null, images: [] };
 
 /** The preset and image style names, read once per page load for the detail view's template row; a failed read is tried again next time. */
 let presetNames: Promise<Map<string, string>> | null = null;
@@ -433,6 +435,8 @@ function ClipDetail({ clips, index, stores, onIndex, onChange }: { clips: Clip[]
         </h2>
         {words(clip.feature === 'marketing' ? 'Mô tả' : 'Prompt', own ?? job?.brief)}
         {words('Lời thoại', job?.script)}
+        {words('Cảnh kết', job?.ending)}
+        {words('Chữ trên khung cuối', job?.endText)}
         {job?.enhance && words('Prompt sau khi AI cải thiện', job.enhancedPrompt)}
         {sent && (
           <details className="recipe-sent">
