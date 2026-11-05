@@ -417,3 +417,15 @@ test('on a phone each job of a Costs line is a two-line block with the time and 
   await expect(table.getByRole('columnheader')).toHaveText(['Lúc gửi', 'Mục', 'Mô hình', 'Trạng thái', 'USD']);
   await expect(table.getByRole('row').filter({ hasText: jobId.slice(0, 8) }).getByRole('cell')).toHaveCount(5);
 });
+
+test('on a 320 px phone the Costs header buttons wrap their label instead of widening the page', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 700 });
+  await signIn(page, 'admin');
+  await page.goto('/admin/costs');
+  const csv = page.getByRole('link', { name: /Tải CSV tổng hợp/ });
+  await expect(csv).toBeVisible();
+  const box = (await csv.boundingBox())!;
+  expect(box.x + box.width).toBeLessThanOrEqual(320);
+  expect(box.height).toBeGreaterThanOrEqual(36);
+  expect(await page.evaluate(() => document.scrollingElement!.scrollWidth <= innerWidth)).toBe(true);
+});
