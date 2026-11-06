@@ -1564,15 +1564,26 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .prompt-sections-head .theme-choice { margin: 0; }
 .prompt-sections-head .theme-choice label:not(:has(:checked), :hover) { color: var(--text-2); } /* the form card's grey, where the subtle one is too light to read */
 .prompt-sections-head .link-button { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; font-size: 13px; }
-.prompt-templates { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; margin-top: 8px; } /* minmax: a one-line, cut template line must not widen the column */
-.prompt-templates > .help { margin: 0; }
+/* The Khung prompt dialog's cards, in the choice grid: text only, so wider than a sample card and left-aligned. min-width 0: a one-line, cut template line must not widen its card. */
+.choice-grid.prompt-template-grid { grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); }
+.choice-grid.prompt-template-grid button { display: grid; align-content: start; gap: 2px; min-width: 0; text-align: left; }
+.prompt-template-grid .choice-name { font-weight: 600; }
+/* The recent group: the member's last hooks and endings under the cards, each a full-width button of its own words (two lines at most). */
+.prompt-recent h3 { margin: 20px 0 4px; font-size: 14px; line-height: 20px; font-weight: 600; }
+.prompt-recent .help { margin-top: 8px; }
+.prompt-recent button { display: -webkit-box; width: 100%; margin-top: 6px; padding: 8px 12px; overflow: hidden; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); font-size: 13px; line-height: 19px; text-align: left; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
+.prompt-recent button:hover { border-color: var(--text-disabled); }
 /* Create's template: what it opens and ends on, one muted line each, so the sheet still shows the last template whole at 390x844. */
 .prompt-template-line { display: block; margin-top: 2px; overflow: hidden; color: var(--text-muted); font-size: 12px; line-height: 18px; white-space: nowrap; text-overflow: ellipsis; }
 /* On a phone the templates open as a sheet from the bottom edge, over the sticky Run bar. */
 dialog.modal.template-sheet { width: 100%; max-width: none; margin: auto 0 0; border-radius: 16px 16px 0 0; }
-.template-sheet h2 { margin: 0 32px 4px 0; font-size: 18px; line-height: 26px; }
+.template-sheet .modal-body:has(> .modal-sub) { padding: 16px; }
+.template-sheet .modal-sub { margin: 0 0 8px; padding: 0; border: 0; color: var(--text-muted); font-size: 12px; line-height: 18px; }
+.template-sheet .choice-grid.prompt-template-grid { grid-template-columns: minmax(0, 1fr); gap: 6px; }
 .prompt-part { min-width: 0; margin-top: 12px; padding: 12px; border: 1px solid var(--border); border-radius: 14px; }
 .prompt-part-title { margin: 0; color: var(--ink-strong); font-size: 13px; line-height: 20px; font-weight: 600; }
+.video-settings { min-width: 0; margin-top: 16px; } /* The video settings: ratio, length, sound and model under one title; no card edge, so the controls keep the widths of the Fash parity specs */
+.video-settings-title { margin: 0; color: var(--ink-strong); font-size: 13px; line-height: 20px; font-weight: 600; }
 .prompt-part .field { margin-top: 10px; }
 .prompt-part .help { margin-top: 8px; }
 /* A section's library box: one row, not a tall tile. */

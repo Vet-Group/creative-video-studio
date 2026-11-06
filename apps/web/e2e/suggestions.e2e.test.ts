@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { signIn } from './support.test';
+import { openPromptTemplates, signIn } from './support.test';
 
 // Suggestions come from the e2e worker's stand-in (CVS_FAKE_SUGGEST, no fal key): "Option n: <the member's text>" with the reading
 // "Reading n: <the member's text>", and a translation is "Translation: <text>". A card is named by its number, its reading, then the option.
@@ -16,8 +16,7 @@ test('Gợi ý AI fills the brief with the picked option and can be undone, and 
   expect((await page.getByRole('button', { name: 'Mở rộng' }).boundingBox())!.y).toBeGreaterThan((await brief.boundingBox())!.y);
   // The templates menu replaced the starter chips: a template fills the brief, the hook and the ending at once.
   await expect(page.getByRole('group', { name: 'Gợi ý nhanh' })).toHaveCount(0);
-  await page.getByRole('button', { name: 'Khung prompt' }).click();
-  await page.getByRole('group', { name: 'Khung prompt' }).getByRole('button', { name: /^Mở hộp/ }).click();
+  await (await openPromptTemplates(page)).getByRole('group', { name: 'Khung prompt' }).getByRole('button', { name: /^Mở hộp/ }).click();
   await expect(brief).toHaveValue(/^The creator lifts the product out of the box/);
   await brief.fill('váy linen mùa hè');
   await ai.click();

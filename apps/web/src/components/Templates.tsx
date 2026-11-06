@@ -134,6 +134,7 @@ export function Templates({ feature, data, store }: { feature: string; data: () 
       </button>
       <Modal open={open === 'list'} onClose={() => setOpen(null)} label="Mẫu của tôi" className="choice-dialog">
         <h2>Mẫu của tôi</h2>
+        <p className="modal-sub">Lưu cả form (ảnh, cài đặt) để dùng lại.</p>
         {list === null ? (
           !failed && <p>Đang tải...</p>
         ) : list.templates.length === 0 ? (

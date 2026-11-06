@@ -74,10 +74,30 @@ describe('GET /api/recent-prompts', () => {
     expect(await prompts(alice.cookie, 'feature=motion_control')).toEqual(['dance on stage']);
   });
 
+  test('field=hook|ending lists the own hookText or ending per page and format, distinct, newest first, deleted jobs left out', async () => {
+    await job(alice.id, 'video', { prompt: 'composed', params: { hookText: 'hook one', ending: 'end one' } });
+    await job(alice.id, 'video', { prompt: 'composed', params: { hookText: 'hook two' } });
+    await job(alice.id, 'video', { prompt: 'composed', params: { hookText: ' hook one ', ending: 'end two' } });
+    await job(alice.id, 'video', { prompt: 'composed', params: { hookText: 'deleted hook' }, deleted: true });
+    await job(alice.id, 'video', { prompt: 'composed', params: { hookText: '  ' } });
+    await job(bob.id, 'video', { prompt: 'composed', params: { hookText: 'bob hook' } });
+    await job(alice.id, 'marketing', { params: { hookText: 'ugc hook', ending: 'ugc end' } });
+    await job(alice.id, 'marketing', { params: { format: 'advanced', hookText: 'advanced hook' } });
+    expect(await prompts(alice.cookie, 'feature=video&field=hook')).toEqual(['hook one', 'hook two']);
+    expect(await prompts(alice.cookie, 'feature=video&field=ending')).toEqual(['end two', 'end one']);
+    expect(await prompts(bob.cookie, 'feature=video&field=hook')).toEqual(['bob hook']);
+    expect(await prompts(bob.cookie, 'feature=video&field=ending')).toEqual([]);
+    expect(await prompts(alice.cookie, 'feature=marketing&field=hook')).toEqual(['ugc hook']);
+    expect(await prompts(alice.cookie, 'feature=marketing&field=ending')).toEqual(['ugc end']);
+    expect(await prompts(alice.cookie, 'feature=marketing&format=advanced&field=hook')).toEqual(['advanced hook']);
+  });
+
   test('checks the session and the query', async () => {
     expect((await GET(req('/api/recent-prompts?feature=video'))).status).toBe(401);
     expect((await GET(req('/api/recent-prompts', alice.cookie))).status).toBe(400);
     expect((await GET(req('/api/recent-prompts?feature=nope', alice.cookie))).status).toBe(400);
     expect((await GET(req('/api/recent-prompts?feature=marketing&format=ugc', alice.cookie))).status).toBe(400);
+    expect((await GET(req('/api/recent-prompts?feature=video&field=brief', alice.cookie))).status).toBe(400);
+    expect((await GET(req('/api/recent-prompts?feature=video&field=toString', alice.cookie))).status).toBe(400);
   });
 });

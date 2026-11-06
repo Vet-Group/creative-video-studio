@@ -30,6 +30,7 @@ import { Select } from './Select';
 import { Tray } from './Shell';
 import { Templates } from './Templates';
 import { PageHint } from './ToolGuide';
+import { VideoSettings } from './VideoSettings';
 
 interface Model {
   id: string;
@@ -682,16 +683,6 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
             )}
             {clipsOver && <p className="error">Mô hình này nhận tối đa {takes!.max} tệp âm thanh, tổng {takes!.seconds} giây.</p>}
 
-            {models && models.models.length > 0 && (
-              <ModelPicker
-                models={models.models.map((m) => ({ id: m.id, label: m.label, isMock: m.isMock, supported: m.supported, rate: ratePct(m), estimateUsd: audio && m.audioEstimateUsd != null ? m.audioEstimateUsd : m.estimateUsd, score: m.score, recommended: m.recommended, resolution: m.resolution, durationsSec: m.durationsSec, audio: m.audioEstimateUsd != null, isNew: m.isNew, creditUsd: m.creditUsd }))}
-                value={modelId}
-                onChange={setModelId}
-              />
-            )}
-            {models && models.models.length === 0 && <p className="help">Chưa bật mô hình video nào. Admin bật trong Quản trị → Cài đặt → Mô hình.</p>}
-            {tooMany && chosen && <p className="error">Mô hình này nhận tối đa {chosen.maxImages} ảnh.</p>}
-            {endOver && <p className="error">Mô hình này chỉ nhận khung hình cuối cho clip tối đa {chosen!.endMaxSec} giây.</p>}
             {wordsOnly && presetId !== '' && <p className="help">Mẫu chuyển động cần ảnh sản phẩm. Không có ảnh thì chọn &quot;Tự viết mô tả&quot;.</p>}
             {tooLong && (
               <p className="error" id={tooLongId}>
@@ -730,24 +721,36 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
             )}
             {presetId === '' && sec && <PromptPreview feature="video" prompts={[composed]} limit={chosen?.maxPromptChars} />}
 
-            <Select label="Độ phân giải" icon="preset" heading="Độ phân giải" value={chosen?.resolution ?? ''} options={[{ value: chosen?.resolution ?? '', label: chosen?.resolution ?? 'Theo mô hình' }]} onChange={() => undefined} />
-            <Select
-              label="Thời lượng"
-              icon="clock"
-              heading="Chọn thời lượng"
-              value={String(durationSec)}
-              options={durations.map((d) => ({ value: String(d), label: `${d} giây` }))}
-              onChange={(v) => setDurationSec(Number(v))}
-            />
-            <Select
-              label="Tỉ lệ khung hình"
-              icon="ratio"
-              heading="Chọn tỉ lệ khung hình"
-              value={ratio}
-              options={[...new Set(ratios)].map((r) => ({ value: r, label: RATIO_LABEL[r] ?? r }))}
-              onChange={setRatio}
-            />
-            <AudioSwitch on={audio} available={chosen?.audioEstimateUsd != null} always={chosen?.alwaysAudio} onChange={setAudio} />
+            <VideoSettings>
+              {models && models.models.length > 0 && (
+                <ModelPicker
+                  models={models.models.map((m) => ({ id: m.id, label: m.label, isMock: m.isMock, supported: m.supported, rate: ratePct(m), estimateUsd: audio && m.audioEstimateUsd != null ? m.audioEstimateUsd : m.estimateUsd, score: m.score, recommended: m.recommended, resolution: m.resolution, durationsSec: m.durationsSec, audio: m.audioEstimateUsd != null, isNew: m.isNew, creditUsd: m.creditUsd }))}
+                  value={modelId}
+                  onChange={setModelId}
+                />
+              )}
+              {models && models.models.length === 0 && <p className="help">Chưa bật mô hình video nào. Admin bật trong Quản trị → Cài đặt → Mô hình.</p>}
+              {tooMany && chosen && <p className="error">Mô hình này nhận tối đa {chosen.maxImages} ảnh.</p>}
+              {endOver && <p className="error">Mô hình này chỉ nhận khung hình cuối cho clip tối đa {chosen!.endMaxSec} giây.</p>}
+              <Select label="Độ phân giải" icon="preset" heading="Độ phân giải" value={chosen?.resolution ?? ''} options={[{ value: chosen?.resolution ?? '', label: chosen?.resolution ?? 'Theo mô hình' }]} onChange={() => undefined} />
+              <Select
+                label="Thời lượng"
+                icon="clock"
+                heading="Chọn thời lượng"
+                value={String(durationSec)}
+                options={durations.map((d) => ({ value: String(d), label: `${d} giây` }))}
+                onChange={(v) => setDurationSec(Number(v))}
+              />
+              <Select
+                label="Tỉ lệ khung hình"
+                icon="ratio"
+                heading="Chọn tỉ lệ khung hình"
+                value={ratio}
+                options={[...new Set(ratios)].map((r) => ({ value: r, label: RATIO_LABEL[r] ?? r }))}
+                onChange={setRatio}
+              />
+              <AudioSwitch on={audio} available={chosen?.audioEstimateUsd != null} always={chosen?.alwaysAudio} onChange={setAudio} />
+            </VideoSettings>
             <Select
               label="Cửa hàng/Thương hiệu"
               icon="store"
@@ -826,7 +829,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
 
       <Modal open={picking} onClose={() => setPicking(false)} label="Bộ sưu tập mẫu">
         <h2>Chọn mẫu</h2>
-        <p className="modal-sub">Mỗi mẫu là một kiểu chuyển động đã thử, kèm video ví dụ. Chọn một mẫu hoặc tự viết mô tả.</p>
+        <p className="modal-sub">Mỗi mẫu là một kiểu chuyển động có sẵn, kèm video ví dụ; chọn mẫu sẽ thay cả prompt. Hoặc tự viết mô tả.</p>
         <ul className="preset-grid" aria-label="Danh sách mẫu">
           {/* The free prompt leads, as "General" does on the live picker: it is the default choice. */}
           <li className="preset-card">

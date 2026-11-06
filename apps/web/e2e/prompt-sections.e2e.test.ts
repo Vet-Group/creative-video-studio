@@ -1,7 +1,7 @@
 import { expect, type Page, test } from '@playwright/test';
 import { ENDINGS, HOOKS } from '../src/lib/marketing';
 import { PROMPT_TEMPLATES } from '../src/lib/prompt-starters';
-import { modelButton, png, signIn } from './support.test';
+import { modelButton, openPromptTemplates, openTemplates, png, signIn } from './support.test';
 
 // The sectioned prompt (owner 2026-11-05) on Create and Marketing Studio: ① Hook, ② Body (the page's own prompt box) and ③ Ending,
 // a templates menu that fills all three, the English preview of what Run sends, Reuse, and free writing. Suggestions come from the e2e worker's
@@ -17,8 +17,7 @@ const preview = (page: Page) => page.locator('.prompt-preview p');
 const fits = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
 
 async function useTemplate(page: Page, name: string): Promise<void> {
-  await page.getByRole('button', { name: 'Khung prompt' }).click();
-  await page.getByRole('group', { name: 'Khung prompt' }).getByRole('button', { name: new RegExp(`^${name}`) }).click();
+  await (await openPromptTemplates(page)).getByRole('group', { name: 'Khung prompt' }).getByRole('button', { name: new RegExp(`^${name}`) }).click();
 }
 
 /** The member's newest job of `feature` once it is done, as GET /api/jobs/:id answers it. */
@@ -118,9 +117,13 @@ test('Marketing Studio: the own hook counts only with no hook chosen, the job ke
   await expect(endingBox(page)).toHaveValue(t.ending);
   await expect(preview(page)).toContainText(`${t.hook} Creator notes: ${t.body} ${t.ending}`);
 
-  // The library hook sits in ① beside the own words, out of the photo grid where Bối cảnh stays; a chosen hook wins over the own words, and the section says so.
+  // The library hook sits in ① beside the own words, out of the photo grid; a chosen hook wins over the own words, and the section says so.
   await expect(page.locator('.marketing-slots').getByRole('button', { name: /^Hook/ })).toHaveCount(0);
-  await expect(page.locator('.marketing-slots').getByRole('button', { name: /^Bối cảnh/ })).toBeVisible();
+  // Bối cảnh sits in ② Diễn biến, above the body box, as the hook box sits in ①.
+  await expect(page.locator('.marketing-slots').getByRole('button', { name: /^Bối cảnh/ })).toHaveCount(0);
+  const location = part(page, '② Diễn biến').getByRole('button', { name: /^Bối cảnh/ });
+  await expect(location).toBeVisible();
+  expect((await location.boundingBox())!.y).toBeLessThan((await page.getByRole('textbox', { name: 'Prompt (tuỳ chọn)' }).boundingBox())!.y);
   await part(page, '① Hook · 0–2 giây đầu').getByRole('button', { name: /^Hook/ }).click();
   await page.getByRole('dialog', { name: 'Chọn hook' }).getByRole('option', { name: HOOKS[0]!.name, exact: true }).click();
   await expect(part(page, '① Hook · 0–2 giây đầu')).toContainText('Đang dùng hook đã chọn; chữ tự viết chỉ dùng khi bỏ chọn hook đó.');
@@ -151,6 +154,8 @@ test('Marketing Studio: the own hook counts only with no hook chosen, the job ke
   await mode(page).getByText('Viết tự do').click();
   await expect(hookBox(page)).toHaveCount(0);
   await expect(page.locator('.marketing-slots').getByRole('button', { name: /^Hook/ })).toBeVisible(); // the library hook goes back to the grid
+  await expect(page.locator('.marketing-slots').getByRole('button', { name: /^Bối cảnh/ })).toBeVisible(); // and so does the location
+  await expect(part(page, '② Diễn biến')).toHaveCount(0);
   await expect(page.getByRole('textbox', { name: 'Prompt (tuỳ chọn)' })).toHaveValue(`${t.hook} ${t.body} ${t.ending}`);
   await expect(page.getByLabel('Chữ trên khung cuối (tuỳ chọn)')).toBeVisible();
   await page.getByRole('textbox', { name: 'Prompt (tuỳ chọn)' }).fill('mở hộp và cười');
@@ -180,10 +185,9 @@ test('at 390 px the templates open as a sheet over the Run bar with the last one
     const t = list.at(-1)!;
     await page.goto(path);
     await expect(part(page, '② Diễn biến')).toBeVisible();
-    await page.getByRole('button', { name: 'Khung prompt' }).click();
-    const sheet = page.getByRole('dialog', { name: 'Khung prompt' });
-    await expect(sheet).toBeVisible();
-    await expect(sheet.getByText('Điền cả Hook · Diễn biến · Kết')).toBeVisible();
+    const sheet = await openPromptTemplates(page);
+    await expect(sheet).toHaveClass(/template-sheet/);
+    await expect(sheet.getByText('Điền sẵn Hook · Diễn biến · Kết để bạn sửa tiếp.')).toBeVisible();
     const last = sheet.getByRole('button', { name: new RegExp(`^${t.name}`) });
     // Each template: its Vietnamese line; on Create also what it opens and ends on, one muted line each. Marketing Studio's taller sheet keeps the one line.
     for (const x of list) await expect(sheet.getByRole('button', { name: new RegExp(`^${x.name}`) })).toContainText(x.desc);
@@ -230,4 +234,90 @@ test('the preview is open on a computer and folded on a phone from the first pai
   } finally {
     await noScript.close();
   }
+});
+
+test('Create: Khung prompt opens as a card dialog on a computer, and its Gần đây group lists the last hooks and endings and fills one section each', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await signIn(page, 'sectc');
+  await page.goto('/create');
+  await expect(page.getByLabel('Ảnh sản phẩm')).toBeEnabled();
+  const second = part(page, '② Diễn biến');
+  const before = (await second.boundingBox())!;
+  const dialog = await openPromptTemplates(page);
+  // A dialog like the hook picker (not the phone's sheet), and the form under it stays where it was: nothing opens inline.
+  await expect(dialog).toHaveClass(/choice-dialog/);
+  await expect(dialog).not.toHaveClass(/template-sheet/);
+  await expect(dialog.getByText('Điền sẵn Hook · Diễn biến · Kết để bạn sửa tiếp.')).toBeVisible();
+  expect(await second.boundingBox()).toEqual(before);
+  for (const t of PROMPT_TEMPLATES.video) await expect(dialog.getByRole('button', { name: new RegExp(`^${t.name}`) })).toContainText(t.desc);
+  expect(await fits(page)).toBe(true);
+  await expect(dialog.getByRole('region', { name: 'Gần đây' })).toHaveCount(0); // no jobs yet
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await expect(page.getByRole('button', { name: 'Khung prompt' })).toBeFocused();
+
+  // Five jobs: hook "one" twice, so the list has four distinct hooks, of which the newest three show; two endings.
+  const up = await page.request.post('/api/assets', { multipart: { file: { name: 'shirt.png', mimeType: 'image/png', buffer: png() } } });
+  const { assets } = (await up.json()) as { assets: { id: string }[] };
+  for (const [hookText, ending] of [['hook one', 'end one'], ['hook two', undefined], ['hook three', 'end two'], ['hook one', undefined], ['hook four', undefined]] as const) {
+    const sent = await page.request.post('/api/jobs', { data: { assetIds: [assets[0]!.id], modelId: 'mock-e2e', prompt: `${hookText} body`, ratio: '9:16', durationSec: 5, params: { hookText, ...(ending && { ending }) } } });
+    expect(sent.status()).toBe(201);
+  }
+  await page.goto('/create');
+  const again = await openPromptTemplates(page);
+  const recent = again.getByRole('region', { name: 'Gần đây' });
+  await expect(recent.getByRole('group', { name: 'Hook gần đây' }).getByRole('button')).toHaveText(['hook four', 'hook one', 'hook three']);
+  await expect(recent.getByRole('group', { name: 'Kết gần đây' }).getByRole('button')).toHaveText(['end two', 'end one']);
+  // A recent hook fills ① only, with no question while the box is empty.
+  await recent.getByRole('button', { name: 'hook four' }).click();
+  await expect(again).toBeHidden();
+  await expect(hookBox(page)).toHaveValue('hook four');
+  await expect(endingBox(page)).toHaveValue('');
+  await expect(page.getByLabel('Mô tả chuyển động')).toHaveValue('');
+  // With words in the box it asks first: a refusal keeps them, a yes replaces them.
+  await (await openPromptTemplates(page)).getByRole('button', { name: 'hook three' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Huỷ' }).click();
+  await expect(hookBox(page)).toHaveValue('hook four');
+  await (await openPromptTemplates(page)).getByRole('button', { name: 'hook three' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Thay', exact: true }).click();
+  await expect(hookBox(page)).toHaveValue('hook three');
+  // A recent ending fills ③ only.
+  await (await openPromptTemplates(page)).getByRole('button', { name: 'end one' }).click();
+  await expect(endingBox(page)).toHaveValue('end one');
+  await expect(hookBox(page)).toHaveValue('hook three');
+  // In free writing there are no sections to fill, so the group is not offered; and a failed fetch leaves the templates alone.
+  await mode(page).getByText('Viết tự do').click();
+  await expect((await openPromptTemplates(page)).getByRole('region', { name: 'Gần đây' })).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await mode(page).getByText('Theo phần').click();
+  await page.route('**/api/recent-prompts*', (route) => route.abort());
+  const failed = await openPromptTemplates(page);
+  await expect(failed.getByRole('button', { name: new RegExp(`^${PROMPT_TEMPLATES.video[0]!.name}`) })).toBeVisible();
+  await expect(failed.getByRole('region', { name: 'Gần đây' })).toHaveCount(0);
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
+});
+
+test('Create and Marketing Studio: Cài đặt video groups ratio, length, sound and model under one title, and each template kind says what it is', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await signIn(page, 'secta');
+  for (const [path, ratio] of [['/create', 'Tỉ lệ khung hình'], ['/marketing-studio', 'Tỉ lệ']] as const) {
+    await page.goto(path);
+    await expect(modelButton(page)).toContainText('Mock E2E');
+    const block = page.getByRole('group', { name: 'Cài đặt video', exact: true });
+    await expect(block.getByText('Cài đặt video', { exact: true })).toBeVisible();
+    for (const control of [block.getByRole('combobox', { name: ratio, exact: true }), block.getByRole('combobox', { name: 'Thời lượng', exact: true }), block.getByRole('switch', { name: 'Tạo âm thanh' }), block.getByRole('button', { name: /^Mô hình / })]) await expect(control).toBeVisible();
+    // Each page's own order, and the block is not wider than the form.
+    const y = async (c: ReturnType<typeof block.locator>) => (await c.boundingBox())!.y;
+    const order = [block.getByRole('combobox', { name: 'Thời lượng', exact: true }), block.getByRole('switch', { name: 'Tạo âm thanh' })];
+    if (path === '/marketing-studio') order.push(block.getByRole('button', { name: /^Mô hình / }));
+    for (let i = 1; i < order.length; i++) expect(await y(order[i]!)).toBeGreaterThan(await y(order[i - 1]!));
+    expect(await fits(page)).toBe(true);
+    // Templates: the line of "Mẫu của tôi" says it saves the whole form.
+    const mine = await openTemplates(page);
+    await expect(mine.getByText('Lưu cả form (ảnh, cài đặt) để dùng lại.')).toBeVisible();
+    await page.keyboard.press('Escape');
+  }
+  await page.goto('/create');
+  await page.getByRole('button', { name: 'Chọn mẫu khác' }).click();
+  await expect(page.getByRole('dialog', { name: 'Bộ sưu tập mẫu' }).getByText('chọn mẫu sẽ thay cả prompt', { exact: false })).toBeVisible();
 });

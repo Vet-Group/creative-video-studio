@@ -79,6 +79,16 @@ export async function openTemplates(page: Page): Promise<Locator> {
   return dialog;
 }
 
+/** Opens the Khung prompt dialog. Retries the click, as a click before hydration does nothing (as openTemplates does). */
+export async function openPromptTemplates(page: Page): Promise<Locator> {
+  const dialog = page.getByRole('dialog', { name: 'Khung prompt' });
+  await expect(async () => {
+    if (!(await dialog.isVisible())) await page.getByRole('button', { name: 'Khung prompt' }).click();
+    await expect(dialog).toBeVisible({ timeout: 2_000 });
+  }).toPass();
+  return dialog;
+}
+
 /** Opens Settings the way a user does: the account menu, then its first item. Retries the menu, as a click before hydration does nothing. */
 export async function openSettings(page: Page): Promise<Locator> {
   const menu = page.getByRole('menu', { name: /^Tài khoản: / });

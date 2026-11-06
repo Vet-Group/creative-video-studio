@@ -1,8 +1,9 @@
 'use client';
 // The sectioned prompt of Create and Marketing Studio: ① Hook, the first 0-2 s; ② Body, the page's own prompt box; ③ Ending, the
-// last shot. Each section has its rule (in line with the suggestions' PRINCIPLES, core/suggest.ts) and its own AI suggestions; the templates menu fills all
-// three, and free writing keeps the page's one box. The page composes the prompt (lib/marketing.ts); PromptPreview shows the English it sends.
-import { type ReactNode, useEffect, useId, useRef, useState } from 'react';
+// last shot. Each section has its rule (in line with the suggestions' PRINCIPLES, core/suggest.ts) and its own AI suggestions; the templates dialog fills all
+// three (and lists the member's recent hooks and endings, which fill one section), and free writing keeps the page's one box. The page composes the prompt (lib/marketing.ts); PromptPreview shows the English it sends.
+import { type ReactNode, useEffect, useId, useState } from 'react';
+import { api } from '@/lib/api';
 import { MAX_ENDING, MAX_HOOK } from '@/lib/marketing';
 import type { PromptTemplate } from '@/lib/prompt-starters';
 import { useHydrated } from '@/lib/use-hydrated';
@@ -11,7 +12,6 @@ import { confirmDialog } from './Confirm';
 import { Icon } from './Icon';
 import { Modal } from './Modal';
 import { PromptComposer } from './PromptComposer';
-import s from './PromptComposer.module.css';
 import { PromptTools } from './PromptTools';
 import type { Ask } from './Suggestions';
 
@@ -69,18 +69,33 @@ interface Props {
   children: ReactNode;
 }
 
+/** How many recent hooks, and as many endings, the templates dialog lists. */
+const RECENT_MAX = 3;
+
 export function PromptSections({ feature, format, mode, onMode, hook, ending, endText, templates, onTemplate, filled, onRun, children }: Props) {
   const name = useId();
   const hookId = useId();
   const endingId = useId();
-  const listId = useId();
   const [open, setOpen] = useState(false);
-  const opener = useRef<HTMLButtonElement>(null);
+  /** The member's own last hooks and endings (GET /api/recent-prompts?field=), fetched each time the dialog opens; empty when there are none or the fetch fails. */
+  const [recent, setRecent] = useState<{ hook: string[]; ending: string[] }>({ hook: [], ending: [] });
   const narrow = useMediaQuery(NARROW);
+  useEffect(() => {
+    if (!open) return;
+    setRecent({ hook: [], ending: [] });
+    const url = (field: string) => `/api/recent-prompts?feature=${feature}${format ? `&format=${format}` : ''}&field=${field}`;
+    for (const field of ['hook', 'ending'] as const) void api<{ prompts: string[] }>(url(field)).then((r) => setRecent((cur) => ({ ...cur, [field]: r.prompts.slice(0, RECENT_MAX) })), () => undefined);
+  }, [open, feature, format]);
   async function pick(t: PromptTemplate) {
     setOpen(false);
     if (filled && !(await confirmDialog({ title: `Thay prompt đang viết bằng khung "${t.name}"?`, confirmLabel: 'Thay' }))) return;
     onTemplate(t);
+  }
+  /** A recent hook or ending fills only its own section, after the member confirms replacing words already there. */
+  async function takeRecent(p: Part, words: string, what: string) {
+    setOpen(false);
+    if (p.text.trim() !== '' && p.text.trim() !== words && !(await confirmDialog({ title: `Thay ${what} đang viết bằng câu này?`, confirmLabel: 'Thay' }))) return;
+    p.onText(words);
   }
   const part = (id: string, label: string, p: Part, max: number, aiLabel: string, placeholder: string) => (
     <>
@@ -89,27 +104,46 @@ export function PromptSections({ feature, format, mode, onMode, hook, ending, en
       <PromptComposer id={id} label={label} optional feature={feature} format={format} value={p.text} onChange={p.onText} maxLength={max} onRun={onRun} placeholder={placeholder} ask={p.ask} aiLabel={aiLabel} parts={['ai', 'translate']} starters={[]} />
     </>
   );
+  const recents = mode === 'sections' ? ([['Hook', 'hook', hook, 'hook'], ['Kết', 'ending', ending, 'cảnh kết']] as const).filter(([, key]) => recent[key].length > 0) : [];
   const list = (
-    <div id={listId} className="prompt-templates" role="group" aria-label="Khung prompt" onKeyDown={(e) => e.key === 'Escape' && (e.stopPropagation(), setOpen(false), opener.current?.focus())}>
-      <p className="help">Điền cả Hook · Diễn biến · Kết</p>
-      {templates.map((t) => (
-        <button key={t.name} type="button" className={s.option} onClick={() => void pick(t)}>
-          <span className={s.optionLabel}>{t.name}</span>
-          <span>{t.desc}</span>
-          {/* Create's sheet has room for what the template opens and ends on; Marketing Studio's, taller, keeps the one line. */}
-          {feature === 'video' && (
-            <>
-              <span className="prompt-template-line">
-                Hook: <span lang="en">{t.hook}</span>
-              </span>
-              <span className="prompt-template-line">
-                Kết: <span lang="en">{t.ending}</span>
-              </span>
-            </>
-          )}
-        </button>
-      ))}
-    </div>
+    <>
+      <h2>Khung prompt</h2>
+      <p className="modal-sub">Điền sẵn Hook · Diễn biến · Kết để bạn sửa tiếp.</p>
+      <div className="choice-grid prompt-template-grid" role="group" aria-label="Khung prompt">
+        {templates.map((t) => (
+          <button key={t.name} type="button" onClick={() => void pick(t)}>
+            <span className="choice-name">{t.name}</span>
+            <span className="choice-desc">{t.desc}</span>
+            {/* Create's dialog has room for what the template opens and ends on; Marketing Studio's, taller, keeps the one line. */}
+            {feature === 'video' && (
+              <>
+                <span className="prompt-template-line">
+                  Hook: <span lang="en">{t.hook}</span>
+                </span>
+                <span className="prompt-template-line">
+                  Kết: <span lang="en">{t.ending}</span>
+                </span>
+              </>
+            )}
+          </button>
+        ))}
+      </div>
+      {recents.length > 0 && (
+        <section className="prompt-recent" aria-label="Gần đây">
+          <h3>Gần đây</h3>
+          {recents.map(([label, key, p, what]) => (
+            <div key={key} role="group" aria-label={`${label} gần đây`}>
+              <p className="help">{label}</p>
+              {recent[key].map((words) => (
+                <button key={words} type="button" lang="en" onClick={() => void takeRecent(p, words, what)}>
+                  {words}
+                </button>
+              ))}
+            </div>
+          ))}
+        </section>
+      )}
+    </>
   );
   return (
     <div className="prompt-sections">
@@ -122,21 +156,15 @@ export function PromptSections({ feature, format, mode, onMode, hook, ending, en
             </label>
           ))}
         </div>
-        <button ref={opener} type="button" className="link-button" aria-expanded={open} aria-controls={open ? listId : undefined} onClick={() => setOpen(!open)}>
+        <button type="button" className="link-button" aria-haspopup="dialog" onClick={() => setOpen(true)}>
           <Icon name="preset" size={12} />
           Khung prompt
         </button>
       </div>
-      {open &&
-        (narrow ? (
-          // On a phone the list in the form would open under the sticky Run bar, so it is a bottom sheet over it.
-          <Modal open onClose={() => setOpen(false)} label="Khung prompt" className="template-sheet">
-            <h2>Khung prompt</h2>
-            {list}
-          </Modal>
-        ) : (
-          list
-        ))}
+      {/* On a phone the dialog is a bottom sheet over the sticky Run bar; on a computer, a card dialog like the hook picker. */}
+      <Modal open={open} onClose={() => setOpen(false)} label="Khung prompt" className={narrow ? 'template-sheet' : 'choice-dialog'}>
+        {list}
+      </Modal>
       {mode === 'free' ? (
         children
       ) : (
