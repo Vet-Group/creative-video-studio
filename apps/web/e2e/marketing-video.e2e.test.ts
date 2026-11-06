@@ -19,7 +19,7 @@ const brief = (page: Page) => page.getByRole('textbox', { name: 'Prompt', exact:
 const part = (page: Page, name: string) => page.getByRole('group', { name, exact: true });
 const hookPart = (page: Page) => part(page, '① Hook · 0–2 giây đầu');
 const refsInput = (page: Page) => page.getByRole('group', { name: 'Ảnh tham chiếu' }).getByLabel('Ảnh tham chiếu', { exact: true });
-// The group's name is its label with the screen-reader-only "(tuỳ chọn)"; the History link sits on the label's line, outside the group.
+// The group's name is its label plus a screen-reader-only optional note; the History link sits on the label's line, outside the group.
 const videoSlot = (page: Page) => page.getByRole('group', { name: 'Video tham chiếu (tuỳ chọn)', exact: true });
 const historyLink = (page: Page) => page.getByRole('button', { name: 'Từ Lịch sử' });
 
