@@ -437,7 +437,7 @@ function ClipDetail({ clips, index, stores, onIndex, onChange }: { clips: Clip[]
           {mark && <span className={`lib-mark${verdictClass(clip.verdict!)}`}>{mark}</span>}
         </h2>
         {words('Hook tự viết', job?.hookText)}
-        {words(clip.feature === 'marketing' ? 'Mô tả' : 'Prompt', own ?? job?.brief)}
+        {words('Mô tả', own ?? job?.brief)}
         {words('Lời thoại', job?.script)}
         {words('Cảnh kết', job?.ending)}
         {words('Chữ trên khung cuối', job?.endText)}

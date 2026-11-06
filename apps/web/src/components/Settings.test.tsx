@@ -2,7 +2,7 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, test, vi } from 'vitest';
 import { avatarColor } from '@/lib/profile';
-import { type Account, initials, Settings } from './Settings';
+import { type Account, initials, Settings, supportMail } from './Settings';
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: () => undefined }) }));
 
@@ -51,4 +51,11 @@ test('the profile shows the picked avatar colour, the protection score and a way
   expect(html).toContain('aria-label="Thiết lập Xác thực 2 lớp"');
   expect(html).not.toContain('Thiết lập Passkey');
   expect(render({ methods: [{ id: 'g1', provider: 'google', email: null }], passkeys: 0 })).toContain('aria-label="Đạt 1 trên 2"');
+});
+
+test('the support mail names the page and the account in its body', () => {
+  const url = new URL(supportMail('help@vetgroup.net', 'an@vetgroup.net', 'https://video.vetgroup.net/try-on'));
+  expect([url.protocol, url.pathname]).toEqual(['mailto:', 'help@vetgroup.net']);
+  expect(url.searchParams.get('subject')).toBe('Cần hỗ trợ Creative Video Studio');
+  expect(url.searchParams.get('body')).toBe('Trang: https://video.vetgroup.net/try-on\nTài khoản: an@vetgroup.net\n\nMô tả vấn đề (kèm ảnh chụp màn hình nếu có):\n');
 });

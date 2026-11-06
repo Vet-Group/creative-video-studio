@@ -195,7 +195,7 @@ function AddChoice({ kind, canShare, store, niche: initialNiche, edit, onAdded, 
     setBusy(true);
     setError('');
     try {
-      setPhoto(await uploadImages(files.slice(0, 1), 'image', store?.id));
+      setPhoto(await uploadImages(files.slice(0, 1), 'image', store?.id, 'illustration'));
     } catch (e) {
       setError(uploadError(e));
     } finally {

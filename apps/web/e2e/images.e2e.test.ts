@@ -13,7 +13,7 @@ test('a mock image job made through the API is an image card under "Tất cả �
   expect(created.status()).toBe(201);
 
   // The tray shows the resolution where a video shows its duration, and the toast says it is an image. Create's history lists videos only; the image is in the Image Generation history.
-  const tray = page.getByRole('complementary', { name: 'Job của tôi' });
+  const tray = page.getByRole('complementary', { name: 'Lượt tạo của tôi' });
   await expect(page.getByRole('region', { name: 'Thông báo' }).getByText('Ảnh đã xong')).toBeVisible({ timeout: 60_000 });
   await expect(tray.getByText('Hoàn tất')).toHaveCount(0);
   await page.getByRole('navigation', { name: 'Điều hướng chính' }).getByRole('link', { name: 'Tạo ảnh' }).click();

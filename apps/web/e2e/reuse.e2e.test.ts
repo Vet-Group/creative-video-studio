@@ -22,14 +22,14 @@ test('the reuse link in History refills a UGC job, and an Advanced job opens on 
 
   await page.goto('/marketing-studio');
   await page.getByRole('tab', { name: 'Lịch sử' }).click();
-  const tray = page.getByRole('complementary', { name: 'Job của tôi' });
+  const tray = page.getByRole('complementary', { name: 'Lượt tạo của tôi' });
   await tray.getByRole('button', { name: 'Dùng lại' }).first().click();
   await expect(page).toHaveURL((u) => u.pathname === '/marketing-studio' && u.search === ''); // in place, as Fash's Recreate: the URL stays
   await expect(page.getByLabel('Người mẫu: ảnh đã chọn').getByRole('img', { name: 'model.png' })).toBeVisible();
   await expect(page.getByLabel('Sản phẩm: ảnh đã chọn').getByRole('img', { name: 'product.png' })).toBeVisible();
   await expect(page.getByRole('button', { name: /^Hook/ })).toContainText(hook.name);
   await expect(page.getByRole('button', { name: /^Bối cảnh/ })).toContainText(spot.name);
-  await expect(page.getByRole('textbox', { name: 'Prompt (tuỳ chọn)' })).toHaveValue('soft light');
+  await expect(page.getByRole('textbox', { name: 'Mô tả (tuỳ chọn)' })).toHaveValue('soft light');
   await expect(page.getByRole('switch', { name: 'Tạo âm thanh' })).toHaveAttribute('aria-checked', 'false');
   await expect(select(page, 'Tỉ lệ')).toHaveAttribute('data-value', '1:1');
   await expect(select(page, 'Thời lượng')).toHaveAttribute('data-value', '5');
@@ -42,7 +42,7 @@ test('the reuse link in History refills a UGC job, and an Advanced job opens on 
   await page.goto(`/marketing-studio?reuse=${advanced}`);
   await expect(page.getByLabel('Ảnh tham chiếu: ảnh đã chọn').getByRole('img')).toHaveCount(2);
   await expect(page).toHaveURL((u) => u.pathname === '/marketing-studio/advanced' && u.search === ''); // the link opened the refill, then the address drops its query
-  await expect(page.getByRole('textbox', { name: 'Prompt', exact: true })).toHaveValue('my brief');
+  await expect(page.getByRole('textbox', { name: 'Mô tả', exact: true })).toHaveValue('my brief');
   await expect(page.getByRole('textbox', { name: 'Lời thoại (tuỳ chọn)' })).toHaveValue('my lines');
   await expect(page.getByRole('button', { name: /^Hook/ })).not.toContainText(hook.name);
 
@@ -69,7 +69,7 @@ test('the reuse link refills Try On (person, garments, background, text, model, 
   await expect(page.getByLabel('Người mẫu: ảnh đã chọn').getByRole('img')).toHaveAttribute('alt', 'person.png');
   await expect(page.getByLabel('Trang phục: ảnh đã chọn').getByRole('img')).toHaveCount(2);
   await expect(page.getByLabel('Bối cảnh (tuỳ chọn): ảnh đã chọn').getByRole('img')).toHaveAttribute('alt', 'bg.png');
-  await expect(page.getByRole('textbox', { name: 'Prompt (tuỳ chọn)' })).toHaveValue('red dress');
+  await expect(page.getByRole('textbox', { name: 'Mô tả (tuỳ chọn)' })).toHaveValue('red dress');
   await expect(select(page, 'Tỉ lệ')).toHaveAttribute('data-value', '3:4');
   await expect(select(page, 'Độ phân giải')).toHaveAttribute('data-value', '2K');
 
@@ -85,7 +85,7 @@ test('the reuse link refills Try On (person, garments, background, text, model, 
   await page.goto(`/apps/character-swap?reuse=${swap}`);
   await expect(page.getByLabel('Nhân vật mới: ảnh đã chọn').getByRole('img')).toHaveAttribute('alt', 'person.png');
   await expect(page.getByLabel('Ảnh đích: ảnh đã chọn').getByRole('img')).toHaveAttribute('alt', 'bg.png');
-  await expect(page.getByRole('textbox', { name: 'Prompt (tuỳ chọn)' })).toHaveValue('keep the pose');
+  await expect(page.getByRole('textbox', { name: 'Mô tả (tuỳ chọn)' })).toHaveValue('keep the pose');
 
   // A job of another feature is not refilled.
   await page.goto(`/try-on?reuse=${image}`);

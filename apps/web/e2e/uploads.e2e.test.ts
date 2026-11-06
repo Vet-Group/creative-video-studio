@@ -21,7 +21,7 @@ test('a photo uploaded on Image Generation is offered by "Ảnh đã tải" on C
   await expect(page.getByLabel('Ảnh đã chọn').getByRole('img', { name })).toBeVisible();
   // A photo already in the form is not offered twice: a job takes each input once.
   await open.click();
-  await expect(dialog.getByText('Ảnh bạn đã tải lên ở mọi trang, mới nhất trước.').or(dialog.getByText(/^Chưa có ảnh nào khác/))).toBeVisible();
+  await expect(dialog.getByText('Ảnh bạn đã tải lên ở mọi trang, mỗi ảnh một lần, mới nhất trước.').or(dialog.getByText(/^Chưa có ảnh nào khác/))).toBeVisible();
   await expect(dialog.getByRole('button', { name: `Dùng ${name}` })).toHaveCount(0);
   await page.keyboard.press('Escape');
   await expect(dialog).toBeHidden();
@@ -31,13 +31,16 @@ test('a photo uploaded on Image Generation is offered by "Ảnh đã tải" on C
   const run = page.getByRole('button', { name: 'Tạo video' });
   await expect(run).toBeEnabled();
   await run.click();
-  await expect(page.getByText('Đã gửi job')).toBeVisible();
+  await expect(page.getByText('Đã gửi lượt tạo')).toBeVisible();
 
   // Try On: the model slot's own link fills its one photo.
   await page.goto('/try-on');
   const model = page.getByRole('button', { name: 'Ảnh đã tải cho Người mẫu' });
   await expect(model).toBeEnabled();
   await model.click();
+  // The picker opens on its slot's photos; the Image Generation upload is one pick of "Tất cả mục" away.
+  await expect(page.getByRole('dialog', { name: 'Ảnh đã tải' }).getByText('Chưa có ảnh người mẫu nào khác. Chọn "Tất cả mục" để xem mọi ảnh.')).toBeVisible();
+  await selectText(page, 'Lọc theo mục', 'Tất cả mục');
   await page.getByRole('dialog', { name: 'Ảnh đã tải' }).getByRole('button', { name: `Dùng ${name}` }).click();
   await expect(page.getByLabel('Người mẫu: ảnh đã chọn').getByRole('img', { name })).toBeVisible();
 
@@ -46,6 +49,7 @@ test('a photo uploaded on Image Generation is offered by "Ảnh đã tải" on C
   const product = page.getByRole('button', { name: 'Ảnh đã tải cho Sản phẩm' });
   await expect(product).toBeEnabled();
   await product.click();
+  await selectText(page, 'Lọc theo mục', 'Tất cả mục');
   await page.getByRole('dialog', { name: 'Ảnh đã tải' }).getByRole('button', { name: `Dùng ${name}` }).click();
   await expect(page.getByLabel('Sản phẩm: ảnh đã chọn').getByRole('img', { name })).toBeVisible();
   await expect(product).toBeVisible(); // still over the filled photo, to swap it

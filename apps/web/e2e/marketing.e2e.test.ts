@@ -98,16 +98,16 @@ test('a mock marketing job runs from two photos, a hook and a location, and show
   await places.getByRole('option', { name: spot.name, exact: true }).click();
   await expect(locationBox).toContainText(spot.name);
 
-  await page.getByRole('textbox', { name: 'Prompt (tuỳ chọn)' }).fill('soft morning light');
+  await page.getByRole('textbox', { name: 'Mô tả (tuỳ chọn)' }).fill('soft morning light');
   // The preview, open on a computer, shows the English prompt Run is about to send.
   const preview = page.locator('.prompt-preview p');
   await expect(preview).toContainText(' soft morning light Natural sound recorded on the phone:');
   const shown = await preview.innerText();
   await runButton(page).click();
-  await expect(page.getByText('Đã gửi job')).toBeVisible();
+  await expect(page.getByText('Đã gửi lượt tạo')).toBeVisible();
   await expect(page.getByRole('tab', { name: 'Lịch sử' })).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByRole('region', { name: 'Thông báo' }).getByText('Clip đã xong')).toBeVisible({ timeout: 60_000 });
-  await expect(page.getByRole('complementary', { name: 'Job của tôi' }).getByText('Hoàn tất')).toHaveCount(1);
+  await expect(page.getByRole('complementary', { name: 'Lượt tạo của tôi' }).getByText('Hoàn tất')).toHaveCount(1);
 
   const jobs = (await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { id: string; feature: string; ratio: string; durationSec: number }[] };
   expect(jobs.jobs.map((j) => [j.feature, j.ratio])).toEqual([['marketing', '9:16']]);
@@ -204,7 +204,7 @@ test('a second model with other ratios and durations can be picked: the menus of
   await expect(select(page, 'Thời lượng')).toHaveAttribute('data-value', '10'); // moved to the model's own duration
   await expect(runButton(page)).toBeEnabled();
   await runButton(page).click();
-  await expect(page.getByText('Đã gửi job')).toBeVisible();
+  await expect(page.getByText('Đã gửi lượt tạo')).toBeVisible();
   await expect.poll(async () => ((await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { feature: string; ratio: string; durationSec: number; modelId: string }[] }).jobs.map((j) => [j.feature, j.modelId, j.ratio, j.durationSec])).toEqual([['marketing', 'mock-e2e-wide', '16:9', 10]]);
 
   // Back to the first model: the ratio and the duration move to its own.
@@ -220,7 +220,7 @@ test('the brief may take what the chosen model leaves; a switch to a model with 
   await page.getByLabel('Ảnh người mẫu').setInputFiles(file('model.png'));
   await page.getByLabel('Ảnh sản phẩm').setInputFiles(file('product.png'));
   await expect(modelButton(page)).toContainText('Mock E2E');
-  const brief = page.getByRole('textbox', { name: 'Prompt (tuỳ chọn)' });
+  const brief = page.getByRole('textbox', { name: 'Mô tả (tuỳ chọn)' });
   const counter = page.locator('.prompt-count');
   const room = async () => Number((await counter.textContent())!.split('/')[1]);
   await expect(counter).toHaveCount(0); // the count shows once there is text
@@ -465,9 +465,9 @@ test('as on the live form (measured 2026-10-29): 272 px content, 131x130 tiles 1
   near(chip.y - banner.y, 4);
   near(banner.x + banner.width - (chip.x + chip.width), 4);
   expect(await change.evaluate((e) => [getComputedStyle(e).fontWeight, getComputedStyle(e).backdropFilter])).toEqual(['400', 'blur(4.5px)']);
-  const head = (await page.locator('label', { hasText: 'Prompt' }).locator('..').boundingBox())!;
+  const head = (await page.locator('label', { hasText: 'Mô tả' }).locator('..').boundingBox())!;
   near(head.height, 21);
-  near((await page.getByRole('textbox', { name: 'Prompt (tuỳ chọn)' }).locator('..').boundingBox())!.y - (head.y + head.height), 6);
+  near((await page.getByRole('textbox', { name: 'Mô tả (tuỳ chọn)' }).locator('..').boundingBox())!.y - (head.y + head.height), 6);
 
   await hookBox.click();
   const card = page.getByRole('dialog', { name: 'Chọn hook' }).getByRole('option', { name: hook.name, exact: true });

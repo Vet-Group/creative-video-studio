@@ -27,6 +27,7 @@ import { EndScene } from './EndScene';
 import { Highlights } from './Highlights';
 import { Icon } from './Icon';
 import { copyError, copySamples, Gallery, HISTORY_SIZE_KEY, type Img, PhotoDialog, photoImg, RunSummary, SizeSlider, Slot, uploadError, uploadImages, UPLOAD_ERROR, useSize, WorkTabs } from './image-tools';
+import type { UploadSlot } from '@/lib/upload-slots';
 import { FormContext, type FormActions, type Photo, type PhotoRole, useApplier, useHasHistory, useJobs, useRecreated } from './jobs';
 import { Modal } from './Modal';
 import { ModelPicker } from './ModelPicker';
@@ -65,6 +66,9 @@ interface VideoModel {
   /** Added in the last 14 days. */
   isNew: boolean;
   creditUsd: string | null;
+  creditShown: boolean;
+  /** How many marks the score rests on. */
+  total: number;
 }
 
 const VIDEO_ERROR = 'Không tải được video. Hãy thử lại.';
@@ -77,7 +81,7 @@ const TAB_LABEL: Record<Tab, string> = { create: 'Tạo', history: 'Lịch sử'
 /** The ratios of the page, in the order of the menu; a model offers some of them. */
 const RATIO_LABEL: Record<string, string> = { '9:16': '9:16 (dọc)', '16:9': '16:9 (ngang)', '1:1': '1:1 (vuông)' };
 
-const QUIET_REASONS = ['Tải lên ảnh người mẫu.', 'Tải lên ảnh sản phẩm.', 'Viết prompt mô tả video bạn muốn.'];
+const QUIET_REASONS = ['Tải lên ảnh người mẫu.', 'Tải lên ảnh sản phẩm.', 'Viết mô tả video bạn muốn.'];
 
 /** The formats of the format picker, each with the name of its sample photo and loop (Review's keeps the name the first upload used). */
 const FORMATS: { id: MarketingFormat; sample: string }[] = [
@@ -388,7 +392,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
                   (pf && images.length > chosen!.maxImages
                     ? `Mô hình này nhận tối đa ${chosen!.maxImages} ảnh tham chiếu. Bỏ bớt ảnh hoặc chọn mô hình khác.`
                     : advanced
-                      ? (videoReason(video, chosen!.videoRefs, refs.length) ?? (brief.trim() === '' ? 'Viết prompt mô tả video bạn muốn.' : null))
+                      ? (videoReason(video, chosen!.videoRefs, refs.length) ?? (brief.trim() === '' ? 'Viết mô tả video bạn muốn.' : null))
                       : review && highlightLines(highlights).length === 0
                         ? 'Nhập ít nhất 1 điểm nổi bật.'
                         : null);
@@ -402,7 +406,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
     setError('');
     setBusy(true);
     try {
-      setPerson(await copySamples([name]));
+      setPerson(await copySamples([name], 'model'));
     } catch (e) {
       setError(copyError(e, UPLOAD_ERROR));
     } finally {
@@ -443,7 +447,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
     recreate: (from) => (recall.touch(), setSource({ from }), narrow && setTab('create')),
     apply,
     photo: (p, role) => void take(p, role),
-    prompt: (text) => ((sec ? setPrompt : setFreeText)(text), notify('Đã chép prompt')),
+    prompt: (text) => ((sec ? setPrompt : setFreeText)(text), notify('Đã chép mô tả')),
     // An example's hook (the library one, else its own words) and its ending go in ① and ③, which only the sections have; the photos and the rest stay.
     hook: (h) => {
       if (!sec) setMode('sections');
@@ -468,14 +472,14 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
     video: advanced ? (sample) => takeVideo(() => copySamples([sample]) as Promise<RefVideo[]>, (e) => copyError(e, VIDEO_ERROR)) : undefined,
   };
 
-  function add(set: (f: (cur: Img[]) => Img[]) => void, max = 1) {
+  function add(set: (f: (cur: Img[]) => Img[]) => void, slot: UploadSlot, max = 1) {
     return async (files: File[]) => {
       if (files.length === 0) return;
       if (files.length > max) notify(`Chỉ lấy ${max} ảnh đầu`);
       setError('');
       setBusy(true);
       try {
-        const assets = await uploadImages(files.slice(0, max), 'image', storeId).finally(loading('Đang tải lên…'));
+        const assets = await uploadImages(files.slice(0, max), 'image', storeId, slot).finally(loading('Đang tải lên…'));
         set((cur) => [...(max > 1 ? cur : []), ...assets].slice(0, max));
       } catch (e) {
         setError(uploadError(e));
@@ -518,11 +522,11 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
         await api('/api/jobs', sendJson('POST', body));
         sentOk.push(hookName(hook));
       } catch (e) {
-        refused.push(n > 1 ? `${hookName(hook)}: ${errorText(e, 'không gửi được')}` : errorText(e, 'Không gửi được job, hãy thử lại.'));
+        refused.push(n > 1 ? `${hookName(hook)}: ${errorText(e, 'không gửi được')}` : errorText(e, 'Không gửi được lượt tạo, hãy thử lại.'));
       }
     }
     if (sentOk.length > 0) {
-      setNotice(n > 1 ? `Đã gửi ${sentOk.length}/${n} biến thể: ${sentOk.join(', ')}. Theo dõi trong tab "Lịch sử".` : 'Đã gửi job. Theo dõi trong tab "Lịch sử".');
+      setNotice(n > 1 ? `Đã gửi ${sentOk.length}/${n} biến thể: ${sentOk.join(', ')}. Theo dõi trong tab "Lịch sử".` : 'Đã gửi lượt tạo. Theo dõi trong tab "Lịch sử".');
       if (!narrow) setTab('history');
     }
     if (refused.length > 0) setError(n > 1 ? `Không gửi được ${refused.join('; ')}` : refused[0]!);
@@ -536,7 +540,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
     <>
       {chosen?.endFrame && !endAllowed && <p className="help">Mô hình này không nhận khung hình cuối khi có video tham chiếu. Bỏ video để dùng khung hình cuối.</p>}
       {endAllowed && (
-        <Slot label="Khung hình cuối" optional empty="Ảnh clip kết thúc ở đó" inputLabel="Ảnh khung hình cuối" images={endFrame ? [endFrame] : []} max={1} busy={busy} onAdd={add((f) => setEndFrame(f([])[0] ?? null))} onRemove={() => setEndFrame(null)} onPick={setEndFrame} storeId={storeId} />
+        <Slot label="Khung hình cuối" optional empty="Ảnh clip kết thúc ở đó" inputLabel="Ảnh khung hình cuối" images={endFrame ? [endFrame] : []} max={1} busy={busy} onAdd={add((f) => setEndFrame(f([])[0] ?? null), 'end-frame')} onRemove={() => setEndFrame(null)} onPick={setEndFrame} storeId={storeId} />
       )}
       <EndScene text={endText} onText={setEndText} position={endTextPos} onPosition={setEndTextPos} />
     </>
@@ -583,13 +587,13 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
             <div className="app-slots marketing-slots" data-two="true">
               {advanced ? (
                 <div className="slot-wide">
-                  <Slot label="Ảnh tham chiếu" empty={`Tối đa ${maxRefs} ảnh tham chiếu`} inputLabel="Ảnh tham chiếu" images={refs} max={maxRefs} busy={busy} onAdd={add(setRefs, maxRefs)} onRemove={(id) => setRefs((cur) => cur.filter((r) => r.id !== id))} icon="plus" onPick={(a) => setRefs((cur) => [...cur, a].slice(0, maxRefs))} storeId={storeId} />
+                  <Slot label="Ảnh tham chiếu" empty={`Tối đa ${maxRefs} ảnh tham chiếu`} inputLabel="Ảnh tham chiếu" images={refs} max={maxRefs} busy={busy} onAdd={add(setRefs, 'reference', maxRefs)} onRemove={(id) => setRefs((cur) => cur.filter((r) => r.id !== id))} icon="plus" onPick={(a) => setRefs((cur) => [...cur, a].slice(0, maxRefs))} storeId={storeId} />
                 </div>
               ) : (
                 <>
-                  <Slot label="Người mẫu" optional={unboxing} empty="Thêm 1 ảnh người mẫu" inputLabel="Ảnh người mẫu" images={person} max={1} busy={busy} onAdd={add(setPerson)} onRemove={() => setPerson([])} onBrowse={stockModels.length > 0 ? () => setPicker('model') : undefined} onPick={(a) => setPerson([a])} storeId={storeId} />
-                  <Slot label="Sản phẩm" empty="Thêm 1 ảnh sản phẩm" inputLabel="Ảnh sản phẩm" images={product} max={1} busy={busy} onAdd={add(setProduct)} onRemove={() => setProduct([])} onBrowse={!unboxing && myProducts.length > 0 ? () => setPicker('product') : undefined} onPick={(a) => setProduct([a])} storeId={storeId} />
-                  {unboxing && <Slot label="Bao bì" optional empty="Thêm 1 ảnh hộp hoặc bao bì" inputLabel="Ảnh bao bì" images={packaging} max={1} busy={busy} onAdd={add(setPackaging)} onRemove={() => setPackaging([])} onPick={(a) => setPackaging([a])} storeId={storeId} />}
+                  <Slot label="Người mẫu" optional={unboxing} empty="Thêm 1 ảnh người mẫu" inputLabel="Ảnh người mẫu" images={person} max={1} busy={busy} onAdd={add(setPerson, 'model')} onRemove={() => setPerson([])} onBrowse={stockModels.length > 0 ? () => setPicker('model') : undefined} onPick={(a) => setPerson([a])} storeId={storeId} />
+                  <Slot label="Sản phẩm" empty="Thêm 1 ảnh sản phẩm" inputLabel="Ảnh sản phẩm" images={product} max={1} busy={busy} onAdd={add(setProduct, 'product')} onRemove={() => setProduct([])} onBrowse={!unboxing && myProducts.length > 0 ? () => setPicker('product') : undefined} onPick={(a) => setProduct([a])} storeId={storeId} />
+                  {unboxing && <Slot label="Bao bì" optional empty="Thêm 1 ảnh hộp hoặc bao bì" inputLabel="Ảnh bao bì" images={packaging} max={1} busy={busy} onAdd={add(setPackaging, 'packaging')} onRemove={() => setPackaging([])} onPick={(a) => setPackaging([a])} storeId={storeId} />}
                 </>
               )}
               {!sec && hookBox}
@@ -630,7 +634,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
               {sec && locationBox}
               <PromptComposer
                 id={promptId}
-                label="Prompt"
+                label="Mô tả"
                 optional={!advanced}
                 required={advanced}
                 feature="marketing"
@@ -673,7 +677,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
                 )}
               </div>
               <AudioSwitch on={audio} available={chosen?.audioEstimateUsd != null} always={chosen?.alwaysAudio} reason={silentWithVideo ? 'Mô hình này không tạo âm thanh khi có video tham chiếu, nên lời thoại cũng không có tác dụng.' : undefined} onChange={setAudio} />
-              {models && models.length > 0 && <ModelPicker models={models.map((m) => ({ id: m.id, label: m.label, isMock: m.isMock, supported: !pf || (m.maxImages >= images.length && (!advanced || videoReason(video, m.videoRefs, refs.length) === null)), estimateUsd: audio && m.audioEstimateUsd != null ? m.audioEstimateUsd : m.estimateUsd, score: m.score, recommended: m.recommended, resolution: m.resolution, durationsSec: m.durationsSec, audio: m.audioEstimateUsd != null, isNew: m.isNew, creditUsd: m.creditUsd }))} value={chosen?.id ?? ''} onChange={(id) => pickModel(models.find((m) => m.id === id)!)} />}
+              {models && models.length > 0 && <ModelPicker models={models.map((m) => ({ id: m.id, label: m.label, isMock: m.isMock, supported: !pf || (m.maxImages >= images.length && (!advanced || videoReason(video, m.videoRefs, refs.length) === null)), estimateUsd: audio && m.audioEstimateUsd != null ? m.audioEstimateUsd : m.estimateUsd, score: m.score, recommended: m.recommended, resolution: m.resolution, durationsSec: m.durationsSec, audio: m.audioEstimateUsd != null, isNew: m.isNew, creditUsd: m.creditUsd, creditShown: m.creditShown, marks: m.total }))} value={chosen?.id ?? ''} onChange={(id) => pickModel(models.find((m) => m.id === id)!)} />}
             </VideoSettings>
             {/* Under the model, so in free writing the ratio row sits right under the prompt box as on Fash. */}
             <PromptPreview feature="marketing" prompts={sent} labels={n > 1 ? variants.map((h, i) => `Biến thể ${i + 1} (${hookName(h)})`) : undefined} limit={chosen?.maxPromptChars} />
@@ -773,7 +777,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
         title="Chọn người mẫu"
         tiles={stockModels.map((name, i) => ({ key: name, src: `/api/samples/${name}`, label: `Người mẫu có sẵn ${i + 1}`, pick: () => void pickStock(name) }))}
         busy={busy}
-        onFile={(files) => void add(setPerson)(files)}
+        onFile={(files) => void add(setPerson, 'model')(files)}
         onClose={() => setPicker(null)}
       />
       <PhotoDialog
@@ -782,7 +786,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
         sub="Sản phẩm của tôi: các ảnh sản phẩm bạn đã dùng, hoặc tải lên ảnh mới."
         tiles={myProducts.map((a) => ({ key: a.id, src: `/api/assets/${a.id}/content`, label: `Dùng lại ${a.filename}`, pick: () => setProduct([a]) }))}
         busy={busy}
-        onFile={(files) => void add(setProduct)(files)}
+        onFile={(files) => void add(setProduct, 'product')(files)}
         onClose={() => setPicker(null)}
       />
       <ChoiceDialog open={picker === 'hook'} title="Chọn hook" sub="Cảnh mở đầu giữ chân người xem trong vài giây đầu. Có thể bỏ qua." kind="hook"

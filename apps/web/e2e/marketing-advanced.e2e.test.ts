@@ -8,7 +8,7 @@ const nav = (page: Page) => page.getByRole('navigation', { name: 'Điều hướ
 const file = (name: string) => ({ name, mimeType: 'image/png', buffer: png() });
 const runButton = (page: Page) => page.getByRole('button', { name: /^Tạo video/ });
 const reasonOf = (page: Page) => page.locator('.form-message').getByRole('status');
-const brief = (page: Page) => page.getByRole('textbox', { name: 'Prompt', exact: true });
+const brief = (page: Page) => page.getByRole('textbox', { name: 'Mô tả', exact: true });
 /** The file input of the reference slot; the slot group and its upload button carry the same name. */
 const refsInput = (page: Page) => page.getByRole('group', { name: 'Ảnh tham chiếu' }).getByLabel('Ảnh tham chiếu', { exact: true });
 const script = (page: Page) => page.getByRole('textbox', { name: 'Lời thoại (tuỳ chọn)' });
@@ -64,7 +64,7 @@ test('an Advanced job runs from reference images, a brief, a script and audio on
   await expect(reasonOf(page)).toHaveText('Tải lên ít nhất 1 ảnh tham chiếu.');
   await refsInput(page).setInputFiles([file('model.png'), file('product.png'), file('style.png')]);
   await expect(page.getByRole('img', { name: 'style.png' })).toBeVisible();
-  await expect(reasonOf(page)).toHaveText('Viết prompt mô tả video bạn muốn.');
+  await expect(reasonOf(page)).toHaveText('Viết mô tả video bạn muốn.');
   // The empty prompt box already asks for it: the reason is read out but not drawn over the form's foot.
   expect((await reasonOf(page).boundingBox())!.height).toBeLessThanOrEqual(1);
   await expect(runButton(page)).toBeDisabled();
@@ -87,7 +87,7 @@ test('an Advanced job runs from reference images, a brief, a script and audio on
   const shown = await page.locator('.prompt-preview p').innerText();
 
   await runButton(page).click();
-  await expect(page.getByText('Đã gửi job')).toBeVisible();
+  await expect(page.getByText('Đã gửi lượt tạo')).toBeVisible();
   await expect(page.getByRole('tab', { name: 'Lịch sử' })).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByRole('region', { name: 'Thông báo' }).getByText('Clip đã xong')).toBeVisible({ timeout: 60_000 });
 
@@ -126,7 +126,7 @@ test('audio off makes a silent job, the reference slot stops at the model cap, a
   await expect(audio(page)).toHaveAttribute('aria-checked', 'false');
   await expect(page.locator('.switch-row')).toContainText('Tắt');
   await runButton(page).click();
-  await expect(page.getByText('Đã gửi job')).toBeVisible();
+  await expect(page.getByText('Đã gửi lượt tạo')).toBeVisible();
   const jobs = (await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { id: string }[] };
   const detail = (await (await page.request.get(`/api/jobs/${jobs.jobs[0]!.id}`)).json()) as { prompt: string };
   expect(detail.prompt).toContain('The video is completely silent');

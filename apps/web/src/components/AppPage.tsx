@@ -187,11 +187,11 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
         params: { resolution: pick.resolution, ...(app.prompt && prompt.trim() && { brief: prompt.trim() }) }, // the member's own text, kept for reuse
       };
       await api('/api/jobs', sendJson('POST', body));
-      setNotice('Đã gửi job. Theo dõi trong tab "Lịch sử".');
+      setNotice('Đã gửi lượt tạo. Theo dõi trong tab "Lịch sử".');
       if (!narrow) setTab('history');
       await refresh();
     } catch (e) {
-      setError(errorText(e, 'Không gửi được job, hãy thử lại.'));
+      setError(errorText(e, 'Không gửi được lượt tạo, hãy thử lại.'));
     } finally {
       setBusy(false);
     }
@@ -244,7 +244,7 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
             {app.prompt && (
               <PromptComposer
                 id={promptId}
-                label={app.prompt === 'background' ? 'Mô tả nền' : 'Prompt'}
+                label={app.prompt === 'background' ? 'Mô tả nền' : 'Mô tả'}
                 optional
                 feature={app.feature}
                 value={prompt}
@@ -440,11 +440,11 @@ function MotionForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
       const written = prompt.trim();
       const body = { feature: app.feature, modelId: chosen!.id, assetIds: [image[0]!.id, video!.id], ratio: 'auto', ...(written && { prompt: written }) };
       await api('/api/jobs', sendJson('POST', body));
-      setNotice('Đã gửi job. Theo dõi trong tab "Lịch sử".');
+      setNotice('Đã gửi lượt tạo. Theo dõi trong tab "Lịch sử".');
       if (!narrow) setTab('history');
       await refresh();
     } catch (e) {
-      setError(errorText(e, 'Không gửi được job, hãy thử lại.'));
+      setError(errorText(e, 'Không gửi được lượt tạo, hãy thử lại.'));
     } finally {
       setBusy(false);
     }
@@ -489,7 +489,7 @@ function MotionForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
 
             <PromptComposer
               id={promptId}
-              label="Prompt"
+              label="Mô tả"
               optional
               feature={app.feature}
               value={prompt}

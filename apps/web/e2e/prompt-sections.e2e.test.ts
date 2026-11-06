@@ -65,7 +65,7 @@ test('Create: the sections show by default, Khung prompt fills all three, the pr
   await expect(preview(page)).toHaveText([composed]);
   await expect(page.locator('.prompt-preview-count')).toHaveText(`${composed.length}/2000 ký tự`);
   await runButton(page).click();
-  await expect(page.getByText('Đã gửi job')).toBeVisible();
+  await expect(page.getByText('Đã gửi lượt tạo')).toBeVisible();
   const job = await newest(page, 'video');
   expect(job).toMatchObject({ prompt: composed, hookText: t.hook, ending: ENDINGS[2]!.phrase });
 
@@ -113,7 +113,7 @@ test('Marketing Studio: the own hook counts only with no hook chosen, the job ke
   const t = PROMPT_TEMPLATES.marketing[0]!;
   await useTemplate(page, t.name);
   await expect(hookBox(page)).toHaveValue(t.hook);
-  await expect(page.getByRole('textbox', { name: 'Prompt (tuỳ chọn)' })).toHaveValue(t.body);
+  await expect(page.getByRole('textbox', { name: 'Mô tả (tuỳ chọn)' })).toHaveValue(t.body);
   await expect(endingBox(page)).toHaveValue(t.ending);
   await expect(preview(page)).toContainText(`${t.hook} Creator notes: ${t.body} ${t.ending}`);
 
@@ -123,7 +123,7 @@ test('Marketing Studio: the own hook counts only with no hook chosen, the job ke
   await expect(page.locator('.marketing-slots').getByRole('button', { name: /^Bối cảnh/ })).toHaveCount(0);
   const location = part(page, '② Diễn biến').getByRole('button', { name: /^Bối cảnh/ });
   await expect(location).toBeVisible();
-  expect((await location.boundingBox())!.y).toBeLessThan((await page.getByRole('textbox', { name: 'Prompt (tuỳ chọn)' }).boundingBox())!.y);
+  expect((await location.boundingBox())!.y).toBeLessThan((await page.getByRole('textbox', { name: 'Mô tả (tuỳ chọn)' }).boundingBox())!.y);
   await part(page, '① Hook · 0–2 giây đầu').getByRole('button', { name: /^Hook/ }).click();
   await page.getByRole('dialog', { name: 'Chọn hook' }).getByRole('option', { name: HOOKS[0]!.name, exact: true }).click();
   await expect(part(page, '① Hook · 0–2 giây đầu')).toContainText('Đang dùng hook đã chọn; chữ tự viết chỉ dùng khi bỏ chọn hook đó.');
@@ -134,7 +134,7 @@ test('Marketing Studio: the own hook counts only with no hook chosen, the job ke
 
   const shown = await preview(page).innerText();
   await runButton(page).click();
-  await expect(page.getByText('Đã gửi job')).toBeVisible();
+  await expect(page.getByText('Đã gửi lượt tạo')).toBeVisible();
   const job = await newest(page, 'marketing');
   expect(job).toMatchObject({ prompt: shown, hookText: t.hook, brief: t.body, ending: t.ending, hook: null });
   // The Library detail shows the member's own hook beside the brief and the ending.
@@ -146,7 +146,7 @@ test('Marketing Studio: the own hook counts only with no hook chosen, the job ke
   await page.keyboard.press('Escape');
 
   await page.goto(`/marketing-studio?reuse=${job.id}`);
-  await expect(page.getByRole('textbox', { name: 'Prompt (tuỳ chọn)' })).toHaveValue(t.body);
+  await expect(page.getByRole('textbox', { name: 'Mô tả (tuỳ chọn)' })).toHaveValue(t.body);
   await expect(hookBox(page)).toHaveValue(t.hook);
   await expect(endingBox(page)).toHaveValue(t.ending);
 
@@ -156,9 +156,9 @@ test('Marketing Studio: the own hook counts only with no hook chosen, the job ke
   await expect(page.locator('.marketing-slots').getByRole('button', { name: /^Hook/ })).toBeVisible(); // the library hook goes back to the grid
   await expect(page.locator('.marketing-slots').getByRole('button', { name: /^Bối cảnh/ })).toBeVisible(); // and so does the location
   await expect(part(page, '② Diễn biến')).toHaveCount(0);
-  await expect(page.getByRole('textbox', { name: 'Prompt (tuỳ chọn)' })).toHaveValue(`${t.hook} ${t.body} ${t.ending}`);
+  await expect(page.getByRole('textbox', { name: 'Mô tả (tuỳ chọn)' })).toHaveValue(`${t.hook} ${t.body} ${t.ending}`);
   await expect(page.getByLabel('Chữ trên khung cuối (tuỳ chọn)')).toBeVisible();
-  await page.getByRole('textbox', { name: 'Prompt (tuỳ chọn)' }).fill('mở hộp và cười');
+  await page.getByRole('textbox', { name: 'Mô tả (tuỳ chọn)' }).fill('mở hộp và cười');
   const sentJob = new Promise<{ prompt: string; params: Record<string, unknown> }>((resolve) => {
     void page.route('**/api/jobs', async (route) => {
       if (route.request().method() !== 'POST') return route.fallback();
@@ -180,7 +180,7 @@ test('at 390 px the templates open as a sheet over the Run bar with the last one
   await signIn(page, 'secta');
   for (const [path, list, body] of [
     ['/create', PROMPT_TEMPLATES.video, 'Mô tả chuyển động'],
-    ['/marketing-studio', PROMPT_TEMPLATES.marketing, 'Prompt (tuỳ chọn)'],
+    ['/marketing-studio', PROMPT_TEMPLATES.marketing, 'Mô tả (tuỳ chọn)'],
   ] as const) {
     const t = list.at(-1)!;
     await page.goto(path);

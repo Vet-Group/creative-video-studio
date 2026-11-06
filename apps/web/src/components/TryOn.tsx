@@ -13,6 +13,7 @@ import { backgroundsIn, GARMENT_CATEGORIES, garmentsOf, posesOf, stockModels } f
 import { ABOUT } from '@/lib/about-content';
 import { About } from './About';
 import { copyError, copySamples, Gallery, type Img, LockedFields, PhotoDialog, photoImg, RATIO_LABEL, Slot, THINKING_LABEL, uploadError, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
+import type { UploadSlot } from '@/lib/upload-slots';
 import { FormContext, type Photo, type PhotoRole, useApplier, useHasHistory, useJobs } from './jobs';
 import { ModelPicker } from './ModelPicker';
 import { PromptComposer } from './PromptComposer';
@@ -139,9 +140,9 @@ export function TryOn({ reuse }: { reuse?: string }) {
       setBusy(false);
     }
   }
-  const add = (set: (f: (cur: Img[]) => Img[]) => void) => (files: File[]) => void (files.length > 0 && put(set, () => uploadImages(files).finally(loading('Đang tải lên…'))));
+  const add = (set: (f: (cur: Img[]) => Img[]) => void, slot: UploadSlot) => (files: File[]) => void (files.length > 0 && put(set, () => uploadImages(files, 'image', '', slot).finally(loading('Đang tải lên…'))));
   /** A sample under an empty slot, copied on the server like Recreate's photos. */
-  const addSample = (set: (f: (cur: Img[]) => Img[]) => void) => (name: string) => void put(set, () => copySamples([name]));
+  const addSample = (set: (f: (cur: Img[]) => Img[]) => void, slot: UploadSlot) => (name: string) => void put(set, () => copySamples([name], slot));
 
   async function run() {
     if (!(await confirmRun(pick.estimate))) return;
@@ -161,11 +162,11 @@ export function TryOn({ reuse }: { reuse?: string }) {
         ...(sent ? { prompt: sent } : {}),
       };
       await api('/api/jobs', sendJson('POST', body));
-      setNotice('Đã gửi job. Theo dõi trong tab "Lịch sử".');
+      setNotice('Đã gửi lượt tạo. Theo dõi trong tab "Lịch sử".');
       if (!narrow) setTab('history');
       await refresh();
     } catch (e) {
-      setError(errorText(e, 'Không gửi được job, hãy thử lại.'));
+      setError(errorText(e, 'Không gửi được lượt tạo, hãy thử lại.'));
     } finally {
       setBusy(false);
     }
@@ -186,9 +187,9 @@ export function TryOn({ reuse }: { reuse?: string }) {
         <div className="card form-card" id="tryon-panel-create" role={narrow ? 'tabpanel' : undefined} aria-labelledby={narrow ? 'tryon-tab-create' : undefined} hidden={narrow && shown !== 'create'} onPointerDownCapture={recall.touch} onKeyDownCapture={recall.touch}>
           <div className="form-scroll">
             <PageHint href="/try-on" />
-            <Slot label="Trang phục" empty="Thêm 1 đến 5 ảnh trang phục" inputLabel="Ảnh trang phục" images={garments} max={MAX_GARMENTS} busy={busy} onAdd={add(setGarments)} onRemove={(id) => setGarments((c) => c.filter((i) => i.id !== id))} samples={categories.length > 0 ? [] : samplesOf('garment')} onSample={addSample(setGarments)} onBrowse={categories.length > 0 ? () => setPicker({ role: 'garment' }) : undefined} onPick={(a) => setGarments((c) => (c.length < MAX_GARMENTS ? [...c, a] : c))} />
-            <Slot label="Người mẫu" empty="Thêm 1 ảnh người mẫu" inputLabel="Ảnh người mẫu" images={person} max={1} busy={busy} onAdd={add(setPerson)} onRemove={(id) => setPerson((c) => c.filter((i) => i.id !== id))} samples={models0.length > 0 ? [] : samplesOf('model')} onSample={addSample(setPerson)} onBrowse={models0.length + myModels.length > 0 ? () => setPicker({ role: 'model' }) : undefined} onPick={(a) => setPerson([a])} />
-            <Slot label="Bối cảnh (tuỳ chọn)" empty="Thêm 1 ảnh bối cảnh nếu muốn" inputLabel="Ảnh bối cảnh" images={background} max={1} busy={busy} onAdd={add(setBackground)} onRemove={(id) => setBackground((c) => c.filter((i) => i.id !== id))} samples={backgrounds.length > 0 ? [] : samplesOf('background')} onSample={addSample(setBackground)} onBrowse={backgrounds.length > 0 ? () => setPicker({ role: 'background' }) : undefined} onPick={(a) => setBackground([a])} />
+            <Slot label="Trang phục" empty="Thêm 1 đến 5 ảnh trang phục" inputLabel="Ảnh trang phục" images={garments} max={MAX_GARMENTS} busy={busy} onAdd={add(setGarments, 'garment')} onRemove={(id) => setGarments((c) => c.filter((i) => i.id !== id))} samples={categories.length > 0 ? [] : samplesOf('garment')} onSample={addSample(setGarments, 'garment')} onBrowse={categories.length > 0 ? () => setPicker({ role: 'garment' }) : undefined} onPick={(a) => setGarments((c) => (c.length < MAX_GARMENTS ? [...c, a] : c))} />
+            <Slot label="Người mẫu" empty="Thêm 1 ảnh người mẫu" inputLabel="Ảnh người mẫu" images={person} max={1} busy={busy} onAdd={add(setPerson, 'model')} onRemove={(id) => setPerson((c) => c.filter((i) => i.id !== id))} samples={models0.length > 0 ? [] : samplesOf('model')} onSample={addSample(setPerson, 'model')} onBrowse={models0.length + myModels.length > 0 ? () => setPicker({ role: 'model' }) : undefined} onPick={(a) => setPerson([a])} />
+            <Slot label="Bối cảnh (tuỳ chọn)" empty="Thêm 1 ảnh bối cảnh nếu muốn" inputLabel="Ảnh bối cảnh" images={background} max={1} busy={busy} onAdd={add(setBackground, 'background')} onRemove={(id) => setBackground((c) => c.filter((i) => i.id !== id))} samples={backgrounds.length > 0 ? [] : samplesOf('background')} onSample={addSample(setBackground, 'background')} onBrowse={backgrounds.length > 0 ? () => setPicker({ role: 'background' }) : undefined} onPick={(a) => setBackground([a])} />
             <PhotoDialog
               open={picker !== null}
               title={picker?.of ? (picker.role === 'model' ? 'Chọn tư thế' : GARMENT_CATEGORIES.find((c) => c.id === picker.of)!.label) : picker?.role === 'model' ? 'Chọn người mẫu' : picker?.role === 'garment' ? 'Chọn trang phục' : 'Chọn bối cảnh'}
@@ -201,7 +202,7 @@ export function TryOn({ reuse }: { reuse?: string }) {
                 backgrounds.map((b) => ({ key: b.name, src: `/api/samples/${b.name}`, label: b.label, pick: () => void take({ sample: b.name }, 'background') }))
               }
               busy={busy}
-              onFile={(files) => void add(picker?.role === 'model' ? setPerson : picker?.role === 'background' ? setBackground : setGarments)(files)}
+              onFile={(files) => void (picker?.role === 'model' ? add(setPerson, 'model') : picker?.role === 'background' ? add(setBackground, 'background') : add(setGarments, 'garment'))(files)}
               onClose={() => setPicker(null)}
               onBack={picker?.of ? () => setPicker({ role: picker.role }) : undefined}
               mine={picker?.role === 'model' && !picker.of ? { title: 'Người mẫu của tôi', tiles: myModels.map((a) => ({ key: a.id, src: `/api/assets/${a.id}/content`, label: `Dùng lại ${a.filename}`, pick: () => setPerson([a]) })) } : undefined}
@@ -211,7 +212,7 @@ export function TryOn({ reuse }: { reuse?: string }) {
 
             <PromptComposer
               id={promptId}
-              label="Prompt"
+              label="Mô tả"
               optional
               feature="try_on"
               value={prompt}
@@ -271,7 +272,7 @@ export function TryOn({ reuse }: { reuse?: string }) {
               recreate: (from) => (recall.touch(), recreate(from), narrow && setTab('create')),
               apply,
               photo: (p, role) => void take(p, role),
-              prompt: (text) => (setPrompt(text), notify('Đã chép prompt')),
+              prompt: (text) => (setPrompt(text), notify('Đã chép mô tả')),
               result: (p) => void take(p, 'model', 'Đã dùng kết quả làm ảnh người mẫu'),
             }}
           >

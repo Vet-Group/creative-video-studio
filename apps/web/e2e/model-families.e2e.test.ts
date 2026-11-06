@@ -7,7 +7,7 @@ import { modelButton, pickModel, signIn } from './support.test';
 
 const model = (id: string, label: string, score: number, more: object = {}) => ({
   id, label, provider: 'fal', isMock: false, ratios: ['9:16', '1:1'], durationsSec: [4, 8, 15], maxImages: 4, maxPromptChars: 2000, resolution: '1080p',
-  estimateUsd: '1.0000', audioEstimateUsd: null, endFrame: false, endMaxSec: null, textOnly: false, audioClips: null, passRate: null, passes: 0, total: 0,
+  estimateUsd: '1.0000', audioEstimateUsd: null, endFrame: false, endMaxSec: null, textOnly: false, audioClips: null, passRate: null, passes: 8, total: 10,
   score, recommended: false, isNew: false, supported: true, ...more,
 });
 const MODELS = [
@@ -40,7 +40,7 @@ test('the picker opens on the featured models and the families; a family opens b
   const { panel, list } = await open(page, 1440);
   const featured = list.getByRole('group', { name: 'Model nổi bật' }).getByRole('option');
   await expect(featured).toHaveText([/^Seedance 2\.0Có âm thanhĐề xuất/, /^Seedance 2\.0 \(BytePlus\)/, /^Kling 3\.0 ProMỚI/, /^Google VEO 3\.1Có âm thanh/, /^Gemini Omni Flash/]);
-  await expect(featured.first()).toContainText('1080p4s-15s$1.5000Điểm 80'); // the audio estimate, as the form starts with audio on
+  await expect(featured.first()).toContainText('1080p4–15 giây$1.5000Điểm 80'); // the audio estimate, as the form starts with audio on
   await expect(featured.first()).toHaveAttribute('aria-selected', 'true');
   const families = list.getByRole('group', { name: 'Tất cả model' }).getByRole('option');
   await expect(families).toHaveText([/^Seedance/, /^Kling/, /^Google/, /^xAI/, /^Alibaba/, /^MiniMax/, /^Khác/]);
@@ -49,7 +49,7 @@ test('the picker opens on the featured models and the families; a family opens b
   // Hovering a family opens its models beside the panel, the supported first; picking one closes the panel.
   await families.filter({ hasText: /^Kling/ }).hover();
   const kling = list.getByRole('group', { name: 'Kling' });
-  await expect(kling.getByRole('option')).toHaveText([/^Kling 3\.0 Pro/, /^Kling 2\.6.*720p5s-10s/]);
+  await expect(kling.getByRole('option')).toHaveText([/^Kling 3\.0 Pro/, /^Kling 2\.6.*720p5–10 giây/]);
   const p = (await panel.boundingBox())!;
   const f = (await kling.boundingBox())!;
   expect(Math.abs(f.x - (p.x + p.width + 8))).toBeLessThanOrEqual(2);
@@ -64,7 +64,7 @@ test('the picker opens on the featured models and the families; a family opens b
   await families.filter({ hasText: /^Kling/ }).hover();
   await expect(families.filter({ hasText: /^Kling/ })).toHaveAttribute('data-open', 'true');
   await expect(featured.first().getByText('Điểm 80')).toBeVisible();
-  await expect(featured.first().locator('.model-sub')).toHaveText('1080p4s-15s$1.5000Điểm 80');
+  await expect(featured.first().locator('.model-sub')).toHaveText('1080p4–15 giây$1.5000Điểm 80');
   await page.screenshot({ path: testInfo.outputPath('picker-desktop-light.png') });
   await page.emulateMedia({ colorScheme: 'dark' });
   await expect(panel).toHaveCSS('background-color', 'rgb(22, 22, 24)'); // the app's dark --surface: the picker follows the app theme

@@ -68,6 +68,6 @@ test('Marketing Studio UGC: Tạo âm thanh is on by default and the job asks fo
   const sent = await body;
   expect(sent.params).toEqual({ audio: 'on' });
   expect(sent.prompt).toMatch(/Natural sound recorded on the phone/);
-  await expect(page.getByText('Đã gửi job')).toBeVisible();
+  await expect(page.getByText('Đã gửi lượt tạo')).toBeVisible();
   await remove(page, sent.id);
 });

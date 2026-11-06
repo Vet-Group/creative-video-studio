@@ -29,13 +29,13 @@ test('Try On: a saved template lists under Mẫu của tôi and refills the pers
   await page.getByLabel('Ảnh trang phục').setInputFiles(file('garment.png'));
   await page.getByLabel('Ảnh người mẫu').setInputFiles(file('person.png'));
   await expect(page.getByRole('img', { name: 'person.png' })).toBeVisible();
-  await page.getByRole('textbox', { name: 'Prompt (tuỳ chọn)' }).fill('red dress');
+  await page.getByRole('textbox', { name: 'Mô tả (tuỳ chọn)' }).fill('red dress');
   await select(page, 'Độ phân giải').click();
   await page.getByRole('option', { name: '2K' }).click();
   await saveAs(page, 'Váy đỏ');
 
   await page.goto('/try-on');
-  await expect(page.getByRole('textbox', { name: 'Prompt (tuỳ chọn)' })).toHaveValue('');
+  await expect(page.getByRole('textbox', { name: 'Mô tả (tuỳ chọn)' })).toHaveValue('');
   await openTemplates(page);
   const list = page.getByRole('dialog', { name: 'Mẫu của tôi' });
   const link = list.getByRole('link', { name: 'Váy đỏ' });
@@ -44,7 +44,7 @@ test('Try On: a saved template lists under Mẫu của tôi and refills the pers
   await expect(page.getByLabel('Người mẫu: ảnh đã chọn').getByRole('img')).toHaveAttribute('alt', 'person.png');
   await expect(page).toHaveURL((u) => u.pathname === '/try-on' && u.search === ''); // the link opened the refill, then the address drops its query
   await expect(page.getByLabel('Trang phục: ảnh đã chọn').getByRole('img')).toHaveAttribute('alt', 'garment.png');
-  await expect(page.getByRole('textbox', { name: 'Prompt (tuỳ chọn)' })).toHaveValue('red dress');
+  await expect(page.getByRole('textbox', { name: 'Mô tả (tuỳ chọn)' })).toHaveValue('red dress');
   await expect(select(page, 'Độ phân giải')).toHaveAttribute('data-value', '2K');
   await expect(page.getByRole('region', { name: 'Thông báo' }).getByText('Sẵn sàng tạo lại')).toHaveCount(0); // a saved template is not a recreate
 
@@ -143,7 +143,7 @@ test('Marketing Studio: an Advanced template chosen on the UGC page opens the Ad
   await page.getByRole('dialog', { name: 'Mẫu của tôi' }).getByRole('link', { name: 'Launch' }).click();
   await expect(page.getByLabel('Ảnh tham chiếu: ảnh đã chọn').getByRole('img')).toHaveCount(2);
   await expect(page).toHaveURL((u) => u.pathname === '/marketing-studio/advanced' && u.search === ''); // the link opened the refill, then the address drops its query
-  await expect(page.getByRole('textbox', { name: 'Prompt', exact: true })).toHaveValue('my brief');
+  await expect(page.getByRole('textbox', { name: 'Mô tả', exact: true })).toHaveValue('my brief');
   await expect(page.getByRole('textbox', { name: 'Lời thoại (tuỳ chọn)' })).toHaveValue('my lines');
 });
 
@@ -175,7 +175,7 @@ test('Dùng mẫu này on a company result in Ví dụ fills Try On, Image Gener
   await expect(other).toHaveURL((u) => u.pathname === '/try-on' && u.search === ''); // in place, as Fash's Recreate
   await expect(other.getByLabel('Người mẫu: ảnh đã chọn').getByRole('img')).toHaveAttribute('alt', 'use-person.png');
   await expect(other.getByLabel('Trang phục: ảnh đã chọn').getByRole('img')).toHaveAttribute('alt', 'use-garment.png');
-  await expect(other.getByRole('textbox', { name: 'Prompt (tuỳ chọn)' })).toHaveValue('blue coat'); // a result's words are open to every member too (owner, 2026-11-03)
+  await expect(other.getByRole('textbox', { name: 'Mô tả (tuỳ chọn)' })).toHaveValue('blue coat'); // a result's words are open to every member too (owner, 2026-11-03)
 
   await other.goto('/image-generation');
   await use(ids.image).click();

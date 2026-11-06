@@ -85,7 +85,7 @@ test('Mở hộp: only the product photo is required; the model and packaging ar
 
   const shown = await preview(page).innerText();
   await runButton(page).click();
-  await expect(page.getByText('Đã gửi job')).toBeVisible();
+  await expect(page.getByText('Đã gửi lượt tạo')).toBeVisible();
   await expect(page.getByRole('region', { name: 'Thông báo' }).getByText('Clip đã xong')).toBeVisible({ timeout: 60_000 });
   const job = await lastJob(page);
   expect(job).toMatchObject({ format: 'unboxing', roles: 'model,product,packaging', audio: 'on', highlights: null });
@@ -98,7 +98,7 @@ test('Mở hộp with the product alone sends one photo and says its role, and t
   await pick(page, 'unboxing');
   await page.getByLabel('Ảnh sản phẩm').setInputFiles(file('product.png'));
   await runButton(page).click();
-  await expect(page.getByText('Đã gửi job')).toBeVisible();
+  await expect(page.getByText('Đã gửi lượt tạo')).toBeVisible();
   const job = await lastJob(page);
   expect(job).toMatchObject({ format: 'unboxing', roles: 'product' });
   expect(job.images.map((i) => i.filename)).toEqual(['product.png']);
@@ -167,7 +167,7 @@ test('Đánh giá sản phẩm: the sent prompt names the model and the product,
 
   const shown = await preview(page).innerText();
   await runButton(page).click();
-  await expect(page.getByText('Đã gửi job')).toBeVisible();
+  await expect(page.getByText('Đã gửi lượt tạo')).toBeVisible();
   await expect(page.getByRole('region', { name: 'Thông báo' }).getByText('Clip đã xong')).toBeVisible({ timeout: 60_000 });
   const job = await lastJob(page);
   expect(job).toMatchObject({ format: 'review', highlights: ['Vải mềm'], script: 'Mình rất thích cái áo này.', audio: 'on', roles: null });

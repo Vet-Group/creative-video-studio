@@ -120,7 +120,7 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
     setError('');
     setBusy(true);
     try {
-      const assets = await uploadImages(files.slice(0, room), 'image', storeId).finally(loading('Đang tải lên…'));
+      const assets = await uploadImages(files.slice(0, room), 'image', storeId, 'image').finally(loading('Đang tải lên…'));
       setImages((cur) => [...cur, ...assets]);
     } catch (e) {
       setError(uploadError(e));
@@ -137,11 +137,11 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
     try {
       const body = { feature: 'image', modelId: pick.modelId, assetIds: images.map((i) => i.id), prompt: prompt.trim(), ...(styleId && { presetId: styleId }), enhance, ratio: pick.ratio, storeId: storeId || null, useBrand, params: { resolution: pick.resolution, ...(pick.thinking && { thinking: pick.thinking }) } };
       await api('/api/jobs', sendJson('POST', body));
-      setNotice('Đã gửi job. Theo dõi trong tab "Lịch sử".');
+      setNotice('Đã gửi lượt tạo. Theo dõi trong tab "Lịch sử".');
       setTab('history');
       await refresh();
     } catch (e) {
-      setError(errorText(e, 'Không gửi được job, hãy thử lại.'));
+      setError(errorText(e, 'Không gửi được lượt tạo, hãy thử lại.'));
     } finally {
       setBusy(false);
     }
@@ -159,7 +159,7 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
       {/* Above the gallery, not in the prompt bar, which keeps Fash's one-row height. */}
       <Templates feature="image" data={() => ({ images: images.map((i) => i.id), prompt: prompt.trim(), presetId: styleId, enhance, ratio: pick.ratio, resolution: pick.resolution, modelId: pick.modelId })} />
       <div className="imagegen-side" id={`imagegen-panel-${tab}`} role="tabpanel" aria-labelledby={`imagegen-tab-${tab}`}>
-        <FormContext.Provider value={{ recreate: (from) => (recall.touch(), recreate(from)), apply, photo: (p) => void take(p), prompt: (text) => (setPrompt(text), notify('Đã chép prompt')), result: (p) => void take(p) }}>
+        <FormContext.Provider value={{ recreate: (from) => (recall.touch(), recreate(from)), apply, photo: (p) => void take(p), prompt: (text) => (setPrompt(text), notify('Đã chép mô tả')), result: (p) => void take(p) }}>
           {tab === 'examples' ? <Gallery kind="image" samples="image-example-" label="Ảnh của công ty" emptyText="Chưa có ảnh nào trong công ty. Hãy tạo ảnh đầu tiên bên dưới." /> : tab === 'about' ? <About page={ABOUT.image} /> : <Tray feature="image" />}
         </FormContext.Provider>
       </div>

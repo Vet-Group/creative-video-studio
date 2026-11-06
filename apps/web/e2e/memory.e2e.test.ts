@@ -8,7 +8,7 @@ async function upload(page: Page, label: string, name: string): Promise<void> {
   await expect(page.getByLabel(label)).toBeEnabled();
   await page.getByLabel(label).setInputFiles(file(name));
 }
-const sent = (page: Page) => expect(page.getByText('Đã gửi job')).toBeVisible();
+const sent = (page: Page) => expect(page.getByText('Đã gửi lượt tạo')).toBeVisible();
 const enhance = (page: Page) => page.getByRole('button', { name: 'Cải thiện mô tả bằng AI' });
 
 /** A fresh browser (no cookies) signed in as `who`: the memory is on the account, not in the browser. */
@@ -209,7 +209,7 @@ test('Dùng lại clicked before the memory answers wins: a field the job leaves
   });
   await page.goto('/image-generation');
   await page.getByRole('tab', { name: 'Lịch sử' }).click();
-  await page.getByRole('complementary', { name: 'Job của tôi' }).getByRole('listitem').filter({ hasText: 'recreate race' }).getByRole('button', { name: 'Dùng lại' }).click();
+  await page.getByRole('complementary', { name: 'Lượt tạo của tôi' }).getByRole('listitem').filter({ hasText: 'recreate race' }).getByRole('button', { name: 'Dùng lại' }).click();
   await expect(page.getByRole('group', { name: 'Thanh tạo ảnh' }).getByRole('textbox', { name: 'Mô tả cảnh bạn muốn tạo' })).toHaveValue('recreate race', { timeout: 20_000 });
   await expect(select(page, 'Tỉ lệ')).toHaveAttribute('data-value', 'auto');
   await expect(select(page, 'Độ phân giải')).toHaveAttribute('data-value', '1K');

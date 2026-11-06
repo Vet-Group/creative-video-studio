@@ -1,8 +1,10 @@
-import { insertAssets } from '@cvs/db/assets';
+import { createHash } from 'node:crypto';
+import { insertAssets, keptInputs } from '@cvs/db/assets';
 import { db, MAX_BYTES, MAX_FILES, mp4DurationMs, sniffImage, sniffVideo } from '@/lib/assets';
 import { pool } from '@/lib/auth';
 import { headSample, MAX_SAMPLE_BYTES, SAMPLE_PREFIX, sampleType } from '@/lib/samples';
 import { guard } from '@/lib/session';
+import { isUploadSlot } from '@/lib/upload-slots';
 import { deleteObject, getObject, putObject } from '@/lib/storage';
 
 /**
@@ -11,6 +13,7 @@ import { deleteObject, getObject, putObject } from '@/lib/storage';
  * The same checks as an upload apply: a JPEG, PNG or WebP image of at most 10 MB, by its magic bytes; all or nothing. A sample clip (`marketing-example-1.mp4`) is copied the
  * same way, as an MP4 of at most 50 MB whose header gives its length (`durationMs`), for Marketing Studio Advanced's reference video; at most one clip a request, as the
  * server holds every file in memory.
+ * An optional `slot` records the form slot they went into, as on an upload; a sample the caller already copied comes back as that copy, not a new one.
  * 429 once the caller has added COPY_HOURLY_LIMIT pictures (uploads included) in the last hour: here a tiny request makes the server copy up to 4 files of 10 MB, so a loop is held back (uploads themselves are not capped).
  */
 export const COPY_HOURLY_LIMIT = 200;
@@ -18,7 +21,7 @@ export const COPY_HOURLY_LIMIT = 200;
 export async function POST(request: Request) {
   const g = await guard(request, 'member');
   if (g.error) return g.error;
-  const body = (await request.json().catch(() => null)) as { names?: unknown } | null;
+  const body = (await request.json().catch(() => null)) as { names?: unknown; slot?: unknown } | null;
   const names = body?.names;
   if (!Array.isArray(names) || names.length === 0 || names.length > MAX_FILES || !names.every((n) => typeof n === 'string' && (sampleType(n)?.startsWith('image/') || sampleType(n) === 'video/mp4')) || names.filter((n) => sampleType(n as string) === 'video/mp4').length > 1) {
     return Response.json({ error: `send 1 to ${MAX_FILES} sample picture names in "names", or one sample clip` }, { status: 400 });
@@ -43,8 +46,12 @@ export async function POST(request: Request) {
     if (!mime) return Response.json({ error: `${name} is not a JPEG, PNG or WebP image` }, { status: 415 });
     copies.push({ id: crypto.randomUUID(), name, bytes, mime, durationMs: null });
   }
-  const rows = copies.map(({ id, name, bytes, mime, durationMs }) => ({ id, ownerId: g.session.user.id, kind: 'input' as const, s3Key: `assets/${id}`, filename: name, mime, bytes: bytes.length, durationMs }));
-  const puts = await Promise.allSettled(copies.map(({ id, bytes, mime }) => putObject(`assets/${id}`, bytes, mime)));
+  const slot = isUploadSlot(body?.slot) ? body.slot : null;
+  const hashes = copies.map((c) => createHash('sha256').update(c.bytes).digest('hex'));
+  const kept = await keptInputs(pool, g.session.user.id, [...new Set(hashes)], slot);
+  const fresh = copies.map((c, i) => ({ ...c, sha256: hashes[i]! })).filter((c, i) => !kept.has(c.sha256) && hashes.indexOf(c.sha256) === i);
+  const rows = fresh.map(({ id, name, bytes, mime, durationMs, sha256 }) => ({ id, ownerId: g.session.user.id, kind: 'input' as const, s3Key: `assets/${id}`, filename: name, mime, bytes: bytes.length, durationMs, sha256, slot }));
+  const puts = await Promise.allSettled(fresh.map(({ id, bytes, mime }) => putObject(`assets/${id}`, bytes, mime)));
   try {
     const failed = puts.find((p): p is PromiseRejectedResult => p.status === 'rejected');
     if (failed) throw failed.reason;
@@ -54,5 +61,6 @@ export async function POST(request: Request) {
     await Promise.allSettled(rows.map((r) => deleteObject(r.s3Key)));
     throw e;
   }
-  return Response.json({ assets: rows.map((r) => ({ id: r.id, filename: r.filename, mime: r.mime, bytes: r.bytes, durationMs: r.durationMs })) }, { status: 201 });
+  const stored = new Map(rows.map((r) => [r.sha256, { id: r.id, filename: r.filename, mime: r.mime, bytes: r.bytes, durationMs: r.durationMs }]));
+  return Response.json({ assets: hashes.map((h) => kept.get(h) ?? stored.get(h)!) }, { status: 201 });
 }

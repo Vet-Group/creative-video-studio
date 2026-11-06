@@ -30,7 +30,14 @@ export interface ModelOption {
   creditUsd?: string | null;
   /** Set by the picker on a model `creditUsd` locks. */
   locked?: boolean;
+  /** Whether the viewer may see the provider's balance (Admins); a member sees only that the model is out of budget. */
+  creditShown?: boolean;
+  /** How many marks the score rests on: a model nobody has marked shows no score. */
+  marks?: number;
 }
+
+/** Why a locked model cannot be picked: an Admin sees the provider's balance, a member only that it is out of budget (owner decision 2026-11-06). */
+export const lockedText = (m: ModelOption) => (m.creditShown ? `Hết credits: còn $${Math.max(0, Number(m.creditUsd)).toFixed(2)}` : 'Tạm hết ngân sách, báo Admin');
 
 /** A model over its provider's credit cannot be picked, like one the settings rule out. */
 export const withCredit = (m: ModelOption): ModelOption =>
@@ -50,10 +57,11 @@ const rowsFor = (models: ModelOption[], query: string): Row[] => {
   if (q || models.length <= FEATURED) return sorted.filter((m) => m.label.toLowerCase().includes(q)).map((model) => ({ model }));
   return [...featured(models).map((model) => ({ model })), ...byFamily(sorted)];
 };
-const lengths = (d: number[] | undefined) => {
+/** A model's clip lengths under its name, e.g. '4–15 giây'. */
+export const lengths = (d: number[] | undefined) => {
   if (!d?.length) return null;
   const [min, max] = [Math.min(...d), Math.max(...d)];
-  return min === max ? `${min}s` : `${min}s-${max}s`;
+  return min === max ? `${min} giây` : `${min}–${max} giây`;
 };
 
 export function ModelPicker({ models: given, value, onChange }: { models: ModelOption[]; value: string; onChange: (id: string) => void }) {
@@ -217,9 +225,9 @@ export function ModelPicker({ models: given, value, onChange }: { models: ModelO
           {m.resolution && <span>{m.resolution}</span>}
           {lengths(m.durationsSec) && <span>{lengths(m.durationsSec)}</span>}
           <span>${m.estimateUsd}</span>
-          {m.score !== undefined && <span>Điểm {m.score}</span>}
+          {m.score !== undefined && m.marks !== 0 && <span>Điểm {m.score}</span>}
           {m.rate !== undefined && <span>Đạt {m.rate}</span>}
-          {m.locked ? <span>Hết credits: còn ${Math.max(0, Number(m.creditUsd)).toFixed(2)}</span> : !m.supported && <span>Không hỗ trợ lựa chọn này</span>}
+          {m.locked ? <span>{lockedText(m)}</span> : !m.supported && <span>Không hỗ trợ lựa chọn này</span>}
         </span>
       </div>
       {m.id === value && <Icon name="check" />}

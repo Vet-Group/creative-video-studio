@@ -62,6 +62,7 @@ interface Model {
   /** Added in the last 14 days. */
   isNew: boolean;
   creditUsd: string | null;
+  creditShown: boolean;
   passes: number;
   total: number;
   supported: boolean;
@@ -360,7 +361,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
     if (images.length + files.length > maxImages) return setError(`Tối đa ${maxImages} ảnh.`);
     setBusy(true);
     try {
-      const assets = (await uploadImages(files, 'image', storeId).finally(loading('Đang tải lên…'))) as Image[];
+      const assets = (await uploadImages(files, 'image', storeId, 'video').finally(loading('Đang tải lên…'))) as Image[];
       setImages((cur) => [...cur, ...assets]);
     } catch (e) {
       setError(uploadError(e));
@@ -393,12 +394,12 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
     setNotice('');
     try {
       await api('/api/jobs', sendJson('POST', { assetIds: images.map((i) => i.id), modelId, ...(presetId ? { presetId } : { prompt: composed, enhance }), ratio, durationSec, storeId: storeId || null, params: { audio: audioOn ? 'on' : 'off', ...(endAssetId && { endAssetId }), ...(audioAssetIds && { audioAssetIds }), ...(!presetId && sections) } }));
-      setNotice('Đã gửi job. Theo dõi trong tab "Lịch sử".');
+      setNotice('Đã gửi lượt tạo. Theo dõi trong tab "Lịch sử".');
       setRefetch((n) => n + 1);
       if (!narrow) setTab('history'); // beside the form, the new job shows in History
       await refresh();
     } catch (e) {
-      setError(errorText(e, 'Không gửi được job, hãy thử lại.'));
+      setError(errorText(e, 'Không gửi được lượt tạo, hãy thử lại.'));
     } finally {
       setBusy(false);
     }
@@ -499,7 +500,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
     setPresetId('');
     if (sec) (setPrompt(text), setHookText(''), setEnding(''));
     else setFreeText(text);
-    notify('Đã chép prompt');
+    notify('Đã chép mô tả');
   }
   /** Free writing starts from what the sections would send. */
   function switchMode(next: typeof mode) {
@@ -552,7 +553,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
       onAdd={(files) => {
         setError('');
         setBusy(true);
-        uploadImages(files, 'image', storeId)
+        uploadImages(files, 'image', storeId, 'end-frame')
           .finally(loading('Đang tải lên…'))
           .then(([img]) => img && setEndFrame(img), (e) => setError(uploadError(e)))
           .finally(() => setBusy(false));
@@ -724,7 +725,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
             <VideoSettings>
               {models && models.models.length > 0 && (
                 <ModelPicker
-                  models={models.models.map((m) => ({ id: m.id, label: m.label, isMock: m.isMock, supported: m.supported, rate: ratePct(m), estimateUsd: audio && m.audioEstimateUsd != null ? m.audioEstimateUsd : m.estimateUsd, score: m.score, recommended: m.recommended, resolution: m.resolution, durationsSec: m.durationsSec, audio: m.audioEstimateUsd != null, isNew: m.isNew, creditUsd: m.creditUsd }))}
+                  models={models.models.map((m) => ({ id: m.id, label: m.label, isMock: m.isMock, supported: m.supported, rate: ratePct(m), estimateUsd: audio && m.audioEstimateUsd != null ? m.audioEstimateUsd : m.estimateUsd, score: m.score, recommended: m.recommended, resolution: m.resolution, durationsSec: m.durationsSec, audio: m.audioEstimateUsd != null, isNew: m.isNew, creditUsd: m.creditUsd, creditShown: m.creditShown, marks: m.total }))}
                   value={modelId}
                   onChange={setModelId}
                 />
@@ -968,7 +969,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
                 </Tap>
               )}
               {details?.prompt && (
-                <Tap on={() => copyPrompt(details.prompt!)} label="Chép prompt vào ô Prompt" className="detail-prompt">
+                <Tap on={() => copyPrompt(details.prompt!)} label="Chép vào ô mô tả" className="detail-prompt">
                   {details.prompt}
                 </Tap>
               )}

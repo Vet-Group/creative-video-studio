@@ -10,7 +10,7 @@ const file = (name: string) => ({ name, mimeType: 'image/png', buffer: png() });
 const runButton = (page: Page) => page.getByRole('button', { name: /^Tạo video/ });
 const hookBox = (page: Page) => page.getByRole('button', { name: /^Hook/ });
 const locationBox = (page: Page) => page.getByRole('button', { name: /^Bối cảnh/ });
-const history = (page: Page) => page.getByRole('complementary', { name: 'Job của tôi' });
+const history = (page: Page) => page.getByRole('complementary', { name: 'Lượt tạo của tôi' });
 const unique = () => Date.now().toString(36); // a retry makes new items, so names never clash with the first attempt's
 
 async function upload(page: Page, name: string): Promise<string> {
@@ -149,7 +149,7 @@ test('Thêm hook and Thêm bối cảnh save the member’s own, choose them at 
   const preview = page.locator('.prompt-preview p');
   await expect(preview).toContainText(`${hook.phrase} Set in ${spot.phrase}.`);
   await runButton(page).click();
-  await expect(page.getByText('Đã gửi job')).toBeVisible();
+  await expect(page.getByText('Đã gửi lượt tạo')).toBeVisible();
   await expect(page.getByRole('region', { name: 'Thông báo' }).getByText('Clip đã xong')).toBeVisible({ timeout: 60_000 });
 
   // A fresh page refilled from History has the same choices and the same prompt.
@@ -216,17 +216,17 @@ test('Lưu mẫu on a History card saves that job as a template of its page, whi
   await page.goto('/try-on');
   await saveFromCard(`Áo xanh ${tag}`);
   await page.goto('/try-on');
-  await expect(page.getByRole('textbox', { name: 'Prompt (tuỳ chọn)' })).toHaveValue('');
+  await expect(page.getByRole('textbox', { name: 'Mô tả (tuỳ chọn)' })).toHaveValue('');
   await openTemplate(/\/try-on\?template=/, `Áo xanh ${tag}`);
   await expect(page.getByLabel('Người mẫu: ảnh đã chọn').getByRole('img')).toHaveAttribute('alt', 'cust-person.png');
   await expect(page.getByLabel('Trang phục: ảnh đã chọn').getByRole('img')).toHaveAttribute('alt', 'cust-garment.png');
-  await expect(page.getByRole('textbox', { name: 'Prompt (tuỳ chọn)' })).toHaveValue('blue coat');
+  await expect(page.getByRole('textbox', { name: 'Mô tả (tuỳ chọn)' })).toHaveValue('blue coat');
 
   await page.goto('/marketing-studio');
   await saveFromCard(`Bão ${tag}`);
   await page.goto('/marketing-studio');
   await openTemplate(/\/marketing-studio\?template=/, `Bão ${tag}`);
-  await expect(page.getByRole('textbox', { name: 'Prompt (tuỳ chọn)' })).toHaveValue('tpl brief');
+  await expect(page.getByRole('textbox', { name: 'Mô tả (tuỳ chọn)' })).toHaveValue('tpl brief');
   await expect(hookBox(page)).toContainText(HOOKS[0]!.name);
   await expect(page.getByRole('img', { name: 'cust-person.png' })).toBeVisible();
 });

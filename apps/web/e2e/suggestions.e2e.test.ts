@@ -8,9 +8,9 @@ test('Gợi ý AI fills the brief with the picked option and can be undone, and 
   await signIn(page, 'sugga');
   await page.goto('/marketing-studio');
   // The label stays one line with its Optional chip; the tools sit in the box's toolbar, under the text.
-  const label = (await page.locator('label', { hasText: 'Prompt' }).first().boundingBox())!;
+  const label = (await page.locator('label', { hasText: 'Mô tả' }).first().boundingBox())!;
   expect(label.height).toBeLessThanOrEqual(22);
-  const brief = page.getByRole('textbox', { name: 'Prompt (tuỳ chọn)' });
+  const brief = page.getByRole('textbox', { name: 'Mô tả (tuỳ chọn)' });
   const ai = page.getByRole('button', { name: 'Gợi ý AI' });
   expect((await ai.boundingBox())!.y).toBeGreaterThan((await brief.boundingBox())!.y);
   expect((await page.getByRole('button', { name: 'Mở rộng' }).boundingBox())!.y).toBeGreaterThan((await brief.boundingBox())!.y);
@@ -46,15 +46,15 @@ test('Gợi ý AI fills the brief with the picked option and can be undone, and 
   await expect(page.getByRole('group', { name: 'Gợi ý AI' })).toHaveCount(0);
   await expect(ai).toBeFocused();
   // The clear button empties the box and can be undone too.
-  await page.getByRole('button', { name: 'Xoá prompt' }).click();
+  await page.getByRole('button', { name: 'Xoá mô tả' }).click();
   await expect(brief).toHaveValue('');
   await expect(brief).toBeFocused();
-  await expect(page.getByRole('button', { name: 'Xoá prompt' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Xoá mô tả' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Hoàn tác' }).click();
   await expect(brief).toHaveValue('váy linen mùa hè');
 
   await page.goto('/marketing-studio/advanced');
-  await page.getByRole('textbox', { name: 'Prompt', exact: true }).fill('ra mắt áo khoác');
+  await page.getByRole('textbox', { name: 'Mô tả', exact: true }).fill('ra mắt áo khoác');
   await page.getByRole('button', { name: 'Gợi ý lời thoại' }).click();
   await page.getByRole('group', { name: 'Gợi ý lời thoại' }).getByRole('button', { name: /^Gợi ý 1/ }).click({ timeout: 20_000 });
   await expect(page.getByRole('textbox', { name: 'Lời thoại (tuỳ chọn)' })).toHaveValue('Option 1: ra mắt áo khoác');
@@ -189,7 +189,7 @@ test('a History card translates its English prompt on Dịch and hides it again'
   expect((await page.request.post('/api/jobs', { data: { feature: 'image', modelId: 'mock-image-e2e', assetIds: [], ratio: '1:1', prompt, enhance: false, params: { resolution: '1K' } } })).status()).toBe(201);
   await page.goto('/image-generation');
   await page.getByRole('tab', { name: 'Lịch sử' }).click();
-  const card = page.getByRole('complementary', { name: 'Job của tôi' }).getByRole('listitem').filter({ hasText: 'turning slowly by the window' });
+  const card = page.getByRole('complementary', { name: 'Lượt tạo của tôi' }).getByRole('listitem').filter({ hasText: 'turning slowly by the window' });
   await card.getByRole('button', { name: 'Dịch', exact: true }).click({ timeout: 60_000 });
   const reading = card.getByRole('group', { name: 'Bản dịch tiếng Việt' });
   await expect(reading).toHaveText(`Translation: ${prompt}`, { timeout: 20_000 });

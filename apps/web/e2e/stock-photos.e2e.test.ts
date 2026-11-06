@@ -28,7 +28,7 @@ test('the stock models of Lingerie Try-On and the templates of Jewelry Try-On fi
     // Lingerie Try-On: the pieces (several) and the model, with the optional text, ratio and resolution fields.
     await page.goto('/apps/lingerie-try-on');
     await expect(page.getByRole('group', { name: 'Đồ lót' })).toBeVisible();
-    await expect(page.getByLabel('Prompt (tuỳ chọn)')).toBeVisible();
+    await expect(page.getByLabel('Mô tả (tuỳ chọn)')).toBeVisible();
     await expect(page.getByRole('combobox', { name: 'Tỉ lệ', exact: true })).toBeVisible();
     await expect(page.getByRole('combobox', { name: 'Độ phân giải', exact: true })).toBeVisible();
     await expect(reasonOf(page)).toHaveText('Tải lên ảnh: Đồ lót.');

@@ -93,6 +93,7 @@ export async function GET(request: Request) {
       total: st.total,
       supported: r.ratios.includes(ratio) && r.durations_sec.includes(durationSec),
       creditUsd: r.provider === 'fal' ? falCredit : null,
+      creditShown: g.session.user.role === 'admin', // members see that a model is out of budget, not the provider's balance
     };
   });
   const supported = list.filter((m) => m.supported && !overCredit(m.provider, m.estimateUsd, m.creditUsd)).map((m) => ({ id: m.id, score: m.score, usd: Number(m.estimateUsd) }));

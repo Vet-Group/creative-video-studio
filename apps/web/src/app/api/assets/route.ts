@@ -1,7 +1,9 @@
-import { insertAssets } from '@cvs/db/assets';
+import { createHash } from 'node:crypto';
+import { insertAssets, keptInputs } from '@cvs/db/assets';
 import { pool } from '@/lib/auth';
 import { audioDurationMs, db, MAX_AUDIO_BYTES, MAX_BYTES, MAX_FILENAME, MAX_FILES, MAX_VIDEO_BYTES, mp4DurationMs, readUploadForm, sniffAudio, sniffImage, sniffVideo } from '@/lib/assets';
 import { guard } from '@/lib/session';
+import { isUploadSlot } from '@/lib/upload-slots';
 import { deleteObject, putObject } from '@/lib/storage';
 
 /** Cut a file name to MAX_FILENAME code points (never splitting a surrogate pair), keeping a short extension. */
@@ -17,6 +19,8 @@ function shortName(name: string): string {
  * Upload 1-4 input files (multipart field `file`), all or nothing: JPEG/PNG/WebP images of at most 10 MB, or MP4/MOV videos (Motion Control's reference)
  * of at most 20 MB whose header gives their length (`durationMs`), or MP3/WAV clips (Create video's reference audio) of at most 15 MB, measured the same way.
  * The type comes from the magic bytes. An optional `storeId` field tags the files with the store chosen on the page; it must be a store that is not hidden.
+ * An optional `slot` field (lib/upload-slots.ts) records the form slot the files went into, for the uploaded-photos picker's filter; another value is ignored.
+ * A file the caller already has (the same bytes, by SHA-256) is not stored again: its existing input comes back in its place.
  */
 /** The photo of a slot the caller used before, by `?recent=`: the feature and the input's place (1-based) in its jobs. */
 const RECENT: Record<string, { feature: string; at: number }> = {
@@ -35,7 +39,8 @@ const imagesOf = (j: string) => `${j}.input_asset_ids || coalesce(string_to_arra
  * first, each once, at most 12. Photos of the Advanced and Unboxing formats (the product's place varies) and deleted files are left out.
  * `?recent=uploads`: every photo the caller uploaded on any page, for the shared uploaded-photos picker; newest upload first, at most UPLOADS_LIMIT.
  * Deleted files, videos and audio are left out, and so is a photo that only deleted jobs ran from: the purge removes it once those are purged.
- * `&storeId=` keeps the photos uploaded with that store chosen; without it, every store and none.
+ * `&storeId=` keeps the photos uploaded with that store chosen; without it, every store and none. `&slot=` keeps the photos of that form slot (lib/upload-slots.ts).
+ * A file kept in several copies (uploaded before uploads were hashed, or used by a job) shows once, as its newest copy.
  */
 export async function GET(request: Request) {
   const g = await guard(request, 'member');
@@ -44,13 +49,15 @@ export async function GET(request: Request) {
   const key = params.get('recent') ?? '';
   if (key === 'uploads') {
     const { rows } = await pool.query(
-      `select a.id, a.filename from assets a
-        where a.owner_id = $1 and a.kind = 'input' and a.deleted_at is null and a.mime like 'image/%'
-          and ($3::text is null or a.store_id = $3)
-          and (exists (select 1 from jobs j where a.id = any(${imagesOf('j')}) and j.deleted_at is null)
-            or not exists (select 1 from jobs j where a.id = any(${imagesOf('j')})))
-        order by a.created_at desc, a.id limit $2`,
-      [g.session.user.id, UPLOADS_LIMIT, params.get('storeId') || null],
+      `select id, filename from (
+         select distinct on (coalesce(nullif(a.sha256, 'unreadable'), a.id)) a.id, a.filename, a.created_at from assets a
+          where a.owner_id = $1 and a.kind = 'input' and a.deleted_at is null and a.mime like 'image/%'
+            and ($3::text is null or a.store_id = $3) and ($4::text is null or a.slot = $4)
+            and (exists (select 1 from jobs j where a.id = any(${imagesOf('j')}) and j.deleted_at is null)
+              or not exists (select 1 from jobs j where a.id = any(${imagesOf('j')})))
+          order by coalesce(nullif(a.sha256, 'unreadable'), a.id), a.created_at desc, a.id) u
+        order by created_at desc, id limit $2`,
+      [g.session.user.id, UPLOADS_LIMIT, params.get('storeId') || null, isUploadSlot(params.get('slot')) ? params.get('slot') : null],
     );
     return Response.json({ assets: rows });
   }
@@ -105,7 +112,13 @@ export async function POST(request: Request) {
     if (!mime) return Response.json({ error: `${file.name} is not a JPEG, PNG or WebP image, an MP4 or MOV video, or an MP3 or WAV clip` }, { status: 415 });
     checked.push({ id: crypto.randomUUID(), file, bytes, mime, durationMs: null });
   }
-  const rows = checked.map(({ id, file, bytes, mime, durationMs }) => ({
+  const slotField = form?.get('slot');
+  const slot = isUploadSlot(slotField) ? slotField : null;
+  const hashes = checked.map((c) => createHash('sha256').update(c.bytes).digest('hex'));
+  const kept = await keptInputs(pool, g.session.user.id, [...new Set(hashes)], slot, storeId);
+  // Only the first of the new files with one hash is stored; a repeat in the same upload and a file the caller already has return that one.
+  const fresh = checked.map((c, i) => ({ ...c, sha256: hashes[i]! })).filter((c, i) => !kept.has(c.sha256) && hashes.indexOf(c.sha256) === i);
+  const rows = fresh.map(({ id, file, bytes, mime, durationMs, sha256 }) => ({
     id,
     ownerId: g.session.user.id,
     kind: 'input' as const,
@@ -115,8 +128,10 @@ export async function POST(request: Request) {
     bytes: bytes.length,
     durationMs,
     storeId,
+    sha256,
+    slot,
   }));
-  const puts = await Promise.allSettled(checked.map(({ id, bytes, mime }) => putObject(`assets/${id}`, bytes, mime)));
+  const puts = await Promise.allSettled(fresh.map(({ id, bytes, mime }) => putObject(`assets/${id}`, bytes, mime)));
   try {
     const failed = puts.find((p): p is PromiseRejectedResult => p.status === 'rejected');
     if (failed) throw failed.reason;
@@ -126,5 +141,6 @@ export async function POST(request: Request) {
     await Promise.allSettled(rows.map((r) => deleteObject(r.s3Key)));
     throw e;
   }
-  return Response.json({ assets: rows.map((r) => ({ id: r.id, filename: r.filename, mime: r.mime, bytes: r.bytes, durationMs: r.durationMs })) }, { status: 201 });
+  const stored = new Map(rows.map((r) => [r.sha256, { id: r.id, filename: r.filename, mime: r.mime, bytes: r.bytes, durationMs: r.durationMs }]));
+  return Response.json({ assets: hashes.map((h) => kept.get(h) ?? stored.get(h)!) }, { status: 201 });
 }

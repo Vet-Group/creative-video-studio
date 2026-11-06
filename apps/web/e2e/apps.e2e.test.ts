@@ -152,10 +152,10 @@ test('Background Remover (one slot): Run needs the image, a mock job reaches His
   await expect(runButton(page)).toBeEnabled();
   await expect(runButton(page)).toContainText('$0.0000'); // a mock model books nothing
   await runButton(page).click();
-  await expect(page.getByText('Đã gửi job')).toBeVisible();
+  await expect(page.getByText('Đã gửi lượt tạo')).toBeVisible();
   await expect(page.getByRole('tab', { name: 'Lịch sử' })).toHaveAttribute('aria-selected', 'true');
   await expect(toast(page, 'Ảnh đã xong')).toBeVisible({ timeout: 60_000 });
-  const tray = page.getByRole('complementary', { name: 'Job của tôi' });
+  const tray = page.getByRole('complementary', { name: 'Lượt tạo của tôi' });
   await expect(tray.getByText('Hoàn tất')).toHaveCount(1);
 
   const jobs = (await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { id: string; feature: string }[] };
@@ -213,7 +213,7 @@ test('Face Swap (two slots): each required slot has its reason, and a mock job t
   await expect(runButton(page)).toBeEnabled();
   await runButton(page).click();
   await expect(toast(page, 'Ảnh đã xong')).toBeVisible({ timeout: 60_000 });
-  await expect(page.getByRole('complementary', { name: 'Job của tôi' }).getByText('Hoàn tất')).toHaveCount(1);
+  await expect(page.getByRole('complementary', { name: 'Lượt tạo của tôi' }).getByText('Hoàn tất')).toHaveCount(1);
 
   const jobs = (await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { id: string; feature: string }[] };
   const job = jobs.jobs.find((j) => j.feature === 'face_swap')!;
@@ -239,7 +239,7 @@ test('Reframe (a field): the ratio field comes from the model, and the chosen ra
   await expect(select(page, 'Tỉ lệ')).toHaveAttribute('data-value', '1:1');
   await runButton(page).click();
   await expect(toast(page, 'Ảnh đã xong')).toBeVisible({ timeout: 60_000 });
-  await expect(page.getByRole('complementary', { name: 'Job của tôi' }).locator('.job-chips').first().locator('span')).toHaveText(['1K', '1:1']); // resolution and ratio chips
+  await expect(page.getByRole('complementary', { name: 'Lượt tạo của tôi' }).locator('.job-chips').first().locator('span')).toHaveText(['1K', '1:1']); // resolution and ratio chips
   const jobs = (await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { feature: string; ratio: string }[] };
   expect(jobs.jobs.map((j) => [j.feature, j.ratio])).toEqual([['reframe', '1:1']]);
 });
@@ -289,7 +289,7 @@ test('a priced model: Upscale shows its price and stores the chosen resolution, 
   await selectValue(page, 'Độ phân giải', '4K');
   await expect(runButton(page)).toContainText('$0.0800');
   await runButton(page).click();
-  await expect(page.getByText('Đã gửi job')).toBeVisible();
+  await expect(page.getByText('Đã gửi lượt tạo')).toBeVisible();
   await expect.poll(async () => (await jobs()).filter((j) => j.feature === 'image_upscale').map((j) => j.resolution)).toEqual(['4K']);
 
   await openApp(page, 'Đổi khung hình', 'reframe');
@@ -300,25 +300,25 @@ test('a priced model: Upscale shows its price and stores the chosen resolution, 
   await expect(runButton(page)).toContainText('$0.0800');
   await selectValue(page, 'Tỉ lệ', '16:9');
   await runButton(page).click();
-  await expect(page.getByText('Đã gửi job')).toBeVisible();
+  await expect(page.getByText('Đã gửi lượt tạo')).toBeVisible();
   await expect.poll(async () => (await jobs()).filter((j) => j.feature === 'reframe').map((j) => [j.ratio, j.resolution])).toEqual([['16:9', '2K']]);
 });
 
 test('the swaps take an optional prompt that is added to their fixed instruction', async ({ page }) => {
   await signIn(page, 'appsc');
   await openApp(page, 'Đổi nhân vật', 'character-swap');
-  const prompt = page.getByRole('textbox', { name: 'Prompt (tuỳ chọn)' });
+  const prompt = page.getByRole('textbox', { name: 'Mô tả (tuỳ chọn)' });
   await page.locator('input[type=file][aria-label="Ảnh nhân vật mới"]').setInputFiles(file('new.png'));
   await page.locator('input[type=file][aria-label="Ảnh đích"]').setInputFiles(file('target.png'));
   await expect(runButton(page)).toBeEnabled(); // the prompt is not required
   await prompt.fill('keep the red hat');
   await runButton(page).click();
-  await expect(page.getByText('Đã gửi job')).toBeVisible();
+  await expect(page.getByText('Đã gửi lượt tạo')).toBeVisible();
   const mine = (await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { id: string; feature: string }[] };
   const detail = (await (await page.request.get(`/api/jobs/${mine.jobs.find((j) => j.feature === 'character_swap')!.id}`)).json()) as { prompt: string };
   expect(detail.prompt).toBe('replace the whole person in the second image with the person from the first image, keep the background. keep the red hat');
   await openApp(page, 'Đổi người mẫu', 'model-swap');
-  await expect(page.getByRole('textbox', { name: 'Prompt (tuỳ chọn)' })).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Mô tả (tuỳ chọn)' })).toBeVisible();
   await openApp(page, 'Đổi khuôn mặt', 'face-swap');
   await expect(page.getByRole('textbox')).toHaveCount(0);
 });
@@ -366,7 +366,7 @@ test('the change-app menu returns focus to its button on Escape, closes when foc
 test('each upload button names its slot, and the tray stays off the image-only optimizer', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await signIn(page, 'appsc');
-  const tray = page.getByRole('complementary', { name: 'Job của tôi' });
+  const tray = page.getByRole('complementary', { name: 'Lượt tạo của tôi' });
   await page.goto('/apps/face-swap');
   await expect(page.getByRole('button', { name: 'Tải lên Khuôn mặt nguồn' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Tải lên Ảnh đích' })).toBeVisible();
@@ -431,7 +431,7 @@ test('Motion Control: the image and the reference video, a length check, and a R
   const form = (await page.locator('.form-scroll').boundingBox())!;
   expect(picker.x + picker.width).toBeLessThanOrEqual(form.x + form.width);
   await runButton(page).click();
-  await expect(page.getByText('Đã gửi job. Theo dõi trong tab "Lịch sử".')).toBeVisible();
+  await expect(page.getByText('Đã gửi lượt tạo. Theo dõi trong tab "Lịch sử".')).toBeVisible();
   expect(sent).toMatchObject({ feature: 'motion_control', modelId: 'kling-v3-motion-standard', ratio: 'auto' });
   expect((sent as unknown as { assetIds: string[] }).assetIds).toHaveLength(2);
   expect(sent).not.toHaveProperty('prompt');

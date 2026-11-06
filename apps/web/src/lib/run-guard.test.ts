@@ -12,7 +12,7 @@ describe('confirmRun', () => {
     expect(await confirmRun(null)).toBe(true);
     expect(confirm).not.toHaveBeenCalled();
     expect(await confirmRun('1.0000')).toBe(false);
-    expect(confirm).toHaveBeenLastCalledWith({ title: 'Chạy job này với giá $1.0000?', confirmLabel: 'Tiếp tục' });
+    expect(confirm).toHaveBeenLastCalledWith({ title: 'Tạo lượt này với giá $1.0000?', confirmLabel: 'Tiếp tục' });
     confirm.mockResolvedValue(true);
     expect(await confirmRun(1.5, 'Tạo 2 clip?')).toBe(true);
     expect(confirm).toHaveBeenLastCalledWith({ title: 'Tạo 2 clip?', confirmLabel: 'Tiếp tục' });

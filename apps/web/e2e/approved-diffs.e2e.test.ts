@@ -32,7 +32,7 @@ test('Marketing Studio at 390 px opens on the form, with no "best on desktop" in
 test('the swap apps keep their own optional Prompt field', async ({ page }) => {
   await signIn(page, 'mkta');
   await page.goto('/apps/character-swap');
-  await expect(page.getByRole('textbox', { name: 'Prompt (tuỳ chọn)' })).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Mô tả (tuỳ chọn)' })).toBeVisible();
 });
 
 test('an Admin keeps the Quản trị entry in the sidebar, and a member does not see it', async ({ page }) => {

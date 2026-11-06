@@ -138,7 +138,7 @@ describe('sample caching', () => {
 describe('POST /api/assets/samples', () => {
   const copy = (cookie: string | undefined, body: unknown) => COPY(new Request('http://localhost/api/assets/samples', { method: 'POST', body: JSON.stringify(body), headers: { 'content-type': 'application/json', ...(cookie ? { cookie } : {}) } }));
   test('copies sample pictures into the caller own input assets on the server, all or nothing', async () => {
-    for (const [name, type, body] of [['copy-a.jpg', 'image/jpeg', jpeg], ['copy-b.jpg', 'image/jpeg', jpeg], ['copy-clip.mp4', 'video/mp4', clip(7400)], ['copy-bad.mp4', 'video/mp4', mp4(64)]] as const) {
+    for (const [name, type, body] of [['copy-a.jpg', 'image/jpeg', jpeg], ['copy-b.jpg', 'image/jpeg', new Uint8Array([...jpeg, 7])], ['copy-clip.mp4', 'video/mp4', clip(7400)], ['copy-bad.mp4', 'video/mp4', mp4(64)]] as const) {
       expect((await PUT(req(admin, { method: 'PUT', body, headers: { 'content-type': type } }), ctx(name))).ok, name).toBe(true);
     }
     expect((await copy(undefined, { names: ['copy-a.jpg'] })).status).toBe(401);
@@ -152,10 +152,16 @@ describe('POST /api/assets/samples', () => {
     const res = await copy(member, { names: ['copy-a.jpg', 'copy-b.jpg'] });
     expect(res.status).toBe(201);
     const { assets } = (await res.json()) as { assets: { id: string; filename: string; mime: string; bytes: number }[] };
-    expect(assets.map((a) => [a.filename, a.mime, a.bytes])).toEqual([['copy-a.jpg', 'image/jpeg', jpeg.length], ['copy-b.jpg', 'image/jpeg', jpeg.length]]);
+    expect(assets.map((a) => [a.filename, a.mime, a.bytes])).toEqual([['copy-a.jpg', 'image/jpeg', jpeg.length], ['copy-b.jpg', 'image/jpeg', jpeg.length + 1]]);
     const rows = (await pool.query(`select a.id, a.kind, a.s3_key, u.email from assets a join users u on u.id = a.owner_id where a.id = any($1) order by a.filename`, [assets.map((a) => a.id)])).rows;
     expect(rows.map((r) => [r.kind, r.s3_key, r.email])).toEqual(assets.map((a) => ['input', `assets/${a.id}`, 'member@example.test']));
     expect((await pool.query('select count(*)::int as n from assets')).rows[0].n).toBe(before + 2);
+
+    // A sample the caller already copied comes back as that copy, taking the slot it is copied into; a repeat in one request is stored once.
+    const again = await copy(member, { names: ['copy-a.jpg', 'copy-a.jpg'], slot: 'garment' });
+    expect(((await again.json()) as { assets: { id: string }[] }).assets.map((a) => a.id)).toEqual([assets[0]!.id, assets[0]!.id]);
+    expect((await pool.query('select count(*)::int as n from assets')).rows[0].n).toBe(before + 2);
+    expect((await pool.query('select slot from assets where id = $1', [assets[0]!.id])).rows[0].slot).toBe('garment');
 
     // A sample clip is copied as an MP4 input with its length (Advanced's reference video).
     const video = await copy(member, { names: ['copy-clip.mp4'] });
@@ -179,8 +185,8 @@ describe('POST /api/assets/samples', () => {
     await add(COPY_HOURLY_LIMIT - 2, '1 minute');
     await add(5, '30 seconds');
     await pool.query(`update assets set kind = 'output' where id like '%-30seconds'`); // results are not new pictures
-    expect((await copy(busy, { names: ['copy-a.jpg', 'copy-a.jpg', 'copy-a.jpg', 'copy-a.jpg'] })).status).toBe(429); // 198 + 4 would pass the limit
-    expect((await copy(busy, { names: ['copy-a.jpg', 'copy-a.jpg'] })).status).toBe(201); // 198 + 2 is the limit itself
+    expect((await copy(busy, { names: ['copy-a.jpg', 'copy-b.jpg', 'copy-a.jpg', 'copy-b.jpg'] })).status).toBe(429); // 198 + 4 would pass the limit
+    expect((await copy(busy, { names: ['copy-a.jpg', 'copy-b.jpg'] })).status).toBe(201); // 198 + 2 is the limit itself
     const res = await copy(busy, { names: ['copy-a.jpg'] });
     expect(res.status).toBe(429);
     expect((await res.json()).error).toMatch(/hour/);

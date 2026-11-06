@@ -10,6 +10,7 @@ import { numberedSamples } from '@/lib/examples';
 import { useHydrated } from '@/lib/use-hydrated';
 import { useSamples } from '@/lib/use-samples';
 import { MAX_AUDIO_BYTES, MAX_BYTES, MAX_VIDEO_BYTES } from '@/lib/upload-limits';
+import { slotOfLabel, UPLOAD_SLOTS, type UploadSlot } from '@/lib/upload-slots';
 import { type Photo, Recreate, useForm, useFreshResults, useJobs, useRecreated } from './jobs';
 import { Icon, type IconName } from './Icon';
 import { LoadError } from './LoadError';
@@ -43,6 +44,9 @@ export interface ImageModel {
   /** Added in the last 14 days. */
   isNew: boolean;
   creditUsd: string | null;
+  creditShown: boolean;
+  /** How many marks the score rests on. */
+  total: number;
 }
 export interface Img {
   id: string;
@@ -111,7 +115,7 @@ export function useImageChoice(models: ImageModel[] | null, images: number, init
   const resolution = chosen ? nearestOption(chosen.resolutions, wantResolution) : wantResolution;
   const thinking = chosen?.thinking.includes(wantThinking) ? wantThinking : chosen?.thinking[0];
   const options: ModelOption[] = (models ?? []).map((m) => ({
-    id: m.id, label: m.label, isMock: m.isMock, supported: fits(m), estimateUsd: m.prices[resolution] ?? Object.values(m.prices)[0] ?? '0.0000', score: m.score, recommended: m.recommended, resolution: m.resolutions.join('/'), isNew: m.isNew, creditUsd: m.creditUsd,
+    id: m.id, label: m.label, isMock: m.isMock, supported: fits(m), estimateUsd: m.prices[resolution] ?? Object.values(m.prices)[0] ?? '0.0000', score: m.score, recommended: m.recommended, resolution: m.resolutions.join('/'), isNew: m.isNew, creditUsd: m.creditUsd, creditShown: m.creditShown, marks: m.total,
   }));
   const user = <T,>(set: (v: T) => void) => (v: T) => (setAsked(null), set(v));
   function refill(j: { modelId: string | null; ratio: string | null; resolution: string | null }) {
@@ -179,10 +183,10 @@ export function useReuse(reuse: string | undefined, feature: string, fill: (j: O
 /** The most files one POST /api/assets takes (MAX_FILES in lib/assets.ts); a larger pick (Advanced takes 7) goes up in batches. */
 const PER_UPLOAD = 4;
 
-/** Sample pictures as the member's own inputs, copied on the server (POST /api/assets/samples) rather than downloaded and uploaded back. */
-export async function copySamples(names: string[]): Promise<Img[]> {
+/** Sample pictures as the member's own inputs, copied on the server (POST /api/assets/samples) rather than downloaded and uploaded back; `slot` files them under a form slot. */
+export async function copySamples(names: string[], slot?: UploadSlot): Promise<Img[]> {
   const out: Img[] = [];
-  for (let i = 0; i < names.length; i += PER_UPLOAD) out.push(...(await api<{ assets: Img[] }>('/api/assets/samples', sendJson('POST', { names: names.slice(i, i + PER_UPLOAD) }))).assets);
+  for (let i = 0; i < names.length; i += PER_UPLOAD) out.push(...(await api<{ assets: Img[] }>('/api/assets/samples', sendJson('POST', { names: names.slice(i, i + PER_UPLOAD), slot }))).assets);
   return out;
 }
 
@@ -216,9 +220,9 @@ export function uploadError(e: unknown, kind: UploadKind = 'image'): string {
 
 /**
  * Uploads files of one kind; a file of another type or over the size is refused before anything is sent (a file the browser gives no type is left to the server).
- * `storeId` tags them with the store chosen on the page, for the uploaded-photos picker's store filter.
+ * `storeId` tags them with the store chosen on the page and `slot` with the form slot they went into, for the uploaded-photos picker's filters.
  */
-export async function uploadImages(files: File[], kind: UploadKind = 'image', storeId = ''): Promise<Img[]> {
+export async function uploadImages(files: File[], kind: UploadKind = 'image', storeId = '', slot?: UploadSlot): Promise<Img[]> {
   for (const f of files) {
     if (f.type && !KINDS[kind].types.includes(f.type)) throw new Refused(wrongType(kind, f.name));
     if (f.size > KINDS[kind].max) throw new Refused(tooLarge(kind, f.name));
@@ -228,6 +232,7 @@ export async function uploadImages(files: File[], kind: UploadKind = 'image', st
     const form = new FormData();
     for (const f of files.slice(i, i + PER_UPLOAD)) form.append('file', f);
     if (storeId) form.append('storeId', storeId);
+    if (slot) form.append('slot', slot);
     out.push(...(await api<{ assets: Img[] }>('/api/assets', { method: 'POST', body: form })).assets);
   }
   return out;
@@ -279,7 +284,7 @@ export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRem
       {onPick ? (
         <div className="field-head">
           {name}
-          {(!full || max === 1) && <UploadedPhotos name={`Ảnh đã tải cho ${label}`} taken={images} disabled={!hydrated || busy} storeId={storeId} onPick={(img) => (setCut(0), onPick(img))} />}
+          {(!full || max === 1) && <UploadedPhotos name={`Ảnh đã tải cho ${label}`} taken={images} disabled={!hydrated || busy} storeId={storeId} slot={slotOfLabel(label)} onPick={(img) => (setCut(0), onPick(img))} />}
         </div>
       ) : (
         name
@@ -503,29 +508,31 @@ export function PhotoDialog({ open, title, sub, tiles, busy, onFile, onClose, on
  * form (`taken`) are left out, as a job takes each input once. The list is read on every open, so a photo just uploaded elsewhere is there.
  * A store filter narrows it to the photos uploaded with a store chosen; it opens on the page's store (`storeId`), else on every store.
  */
-export function UploadedPhotos({ name, taken, disabled, onPick, storeId = '', className = 'link-button uploads-link', children = 'Ảnh đã tải' }: { name?: string; taken: Img[]; disabled?: boolean; onPick: (img: Img) => void; storeId?: string; className?: string; children?: ReactNode }) {
+export function UploadedPhotos({ name, taken, disabled, onPick, storeId = '', slot, className = 'link-button uploads-link', children = 'Ảnh đã tải' }: { name?: string; taken: Img[]; disabled?: boolean; onPick: (img: Img) => void; storeId?: string; slot?: UploadSlot; className?: string; children?: ReactNode }) {
   const [open, setOpen] = useState(false);
   const [store, setStore] = useState('');
+  const [kind, setKind] = useState<UploadSlot | ''>('');
   const [stores, setStores] = useState<{ id: string; name: string }[]>([]);
   const [list, setList] = useState<Img[] | 'failed' | null>(null);
   useEffect(() => {
     if (!open) return;
     let live = true; // a later filter's answer wins over a slower earlier one
     setList(null);
-    api<{ assets: Img[] }>(`/api/assets?recent=uploads${store ? `&storeId=${encodeURIComponent(store)}` : ''}`).then(
+    api<{ assets: Img[] }>(`/api/assets?recent=uploads${store ? `&storeId=${encodeURIComponent(store)}` : ''}${kind ? `&slot=${kind}` : ''}`).then(
       (r) => live && setList(r.assets),
       () => live && setList('failed'),
     );
     return () => void (live = false);
-  }, [open, store]);
+  }, [open, store, kind]);
   function show() {
     setOpen(true);
     setStore(storeId);
+    setKind(slot ?? '');
     if (stores.length === 0) api<{ stores: { id: string; name: string }[] }>('/api/stores').then((r) => setStores(r.stores), () => undefined); // without the list the filter offers every store only
   }
   const shown = Array.isArray(list) ? list.filter((a) => !taken.some((t) => t.id === a.id)) : [];
   const sub =
-    list === null ? 'Đang tải ảnh...' : list === 'failed' ? 'Không tải được ảnh đã tải. Hãy đóng và mở lại.' : shown.length === 0 ? (store ? 'Chưa có ảnh nào khác của cửa hàng này. Chọn "Tất cả cửa hàng" để xem mọi ảnh.' : 'Chưa có ảnh nào khác. Ảnh bạn tải lên ở mọi trang sẽ hiện ở đây.') : 'Ảnh bạn đã tải lên ở mọi trang, mới nhất trước.';
+    list === null ? 'Đang tải ảnh...' : list === 'failed' ? 'Không tải được ảnh đã tải. Hãy đóng và mở lại.' : shown.length === 0 ? (kind ? `Chưa có ảnh ${UPLOAD_SLOTS[kind].toLowerCase()} nào khác. Chọn "Tất cả mục" để xem mọi ảnh.` : store ? 'Chưa có ảnh nào khác của cửa hàng này. Chọn "Tất cả cửa hàng" để xem mọi ảnh.' : 'Chưa có ảnh nào khác. Ảnh bạn tải lên ở mọi trang sẽ hiện ở đây.') : kind ? `Ảnh bạn đã tải cho mục ${UPLOAD_SLOTS[kind]}, mỗi ảnh một lần, mới nhất trước.` : 'Ảnh bạn đã tải lên ở mọi trang, mỗi ảnh một lần, mới nhất trước.';
   return (
     <>
       {/* An icon-only button (Image Generation's bar) takes its name as a tooltip too. */}
@@ -541,6 +548,7 @@ export function UploadedPhotos({ name, taken, disabled, onPick, storeId = '', cl
         onClose={() => setOpen(false)}
         filter={
           <div className="uploads-filter">
+            <Select label="Lọc theo mục" icon="image" heading="Lọc theo mục" value={kind} options={[{ value: '', label: 'Tất cả mục' }, ...(Object.keys(UPLOAD_SLOTS) as UploadSlot[]).map((k) => ({ value: k, label: UPLOAD_SLOTS[k] }))]} onChange={(v) => setKind(v as UploadSlot | '')} />
             <Select label="Lọc theo cửa hàng" icon="store" heading="Lọc theo cửa hàng" value={store} options={[{ value: '', label: 'Tất cả cửa hàng' }, ...stores.map((s) => ({ value: s.id, label: s.name }))]} onChange={setStore} />
           </div>
         }
