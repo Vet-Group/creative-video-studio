@@ -13,6 +13,7 @@ import { cardSample, EXAMPLES, exampleForPreset, sampleSrc } from '@/lib/example
 import { continueJobs, greeting, isRunning } from '@/lib/explore';
 import { featureLabel } from '@/lib/features';
 import { modelStats, rank, scoreOf } from '@/lib/model-scores';
+import { onePerPair } from '@/lib/model-twins';
 import { pageOf } from '@/lib/reuse';
 import { listSamples } from '@/lib/samples';
 import { TOOL_GOALS, toolGuide } from '@/lib/tool-guide';
@@ -58,8 +59,8 @@ export default async function ExplorePage() {
   const now = new Date();
   const [models, presets, samples, videoStats, imageStats, clips, jobs, today] = await Promise.all([
     // Video models open Create Videos and image models open Image Generation, as the live page features both.
-    pool.query<{ id: string; label: string; provider: string; kind: string; ratios: string[]; durations_sec: number[]; usd_per_second: string | null; image_prices: Record<string, string> | null }>(
-      `select id, label, provider, kind, ratios, durations_sec, usd_per_second, image_prices from model_configs where enabled and kind = any(features) and kind in ('video', 'image') order by kind desc, label, id`,
+    pool.query<{ id: string; label: string; provider: string; kind: string; ratios: string[]; durations_sec: number[]; usd_per_second: string | null; image_prices: Record<string, string> | null; twin_of: string | null }>(
+      `select id, label, provider, kind, ratios, durations_sec, usd_per_second, image_prices, twin_of from model_configs where enabled and kind = any(features) and kind in ('video', 'image') order by kind desc, label, id`,
     ),
     pool.query<{ id: string; label: string }>(`select id, label from presets where feature = 'video' and enabled order by sort_order, id`),
     listSamples().catch(() => []), // without the bucket the page keeps its fallbacks
@@ -75,6 +76,8 @@ export default async function ExplorePage() {
     ),
     dailyClips(pool, user?.id ?? ''),
   ]);
+  // One model of each duplicate pair (lib/model-twins.ts); fal's balance lock is not read here, as the cards name no price to lock.
+  const offered = await onePerPair(pool, models.rows);
   const running = jobs.rows.filter(isRunning).length;
   const recent = continueJobs(jobs.rows);
   const status = [running > 0 && `${running} job đang chạy`, `Hôm nay bạn còn ${Math.max(0, today.cap - today.today)}/${today.cap} clip video`].filter(Boolean).join(' · ');
@@ -91,7 +94,7 @@ export default async function ExplorePage() {
     const sample = cardSample(have, modelSample(have, id)), clip = clips.get(id);
     return clip ? { video: clip.video, poster: clip.poster ?? sample.poster } : sample;
   };
-  const scored = models.rows.map((m) => {
+  const scored = offered.map((m) => {
     const st = (m.kind === 'video' ? videoStats : imageStats).get(m.id) ?? { passes: 0, total: 0, ok: 0, bad: 0 };
     const usd = m.kind === 'video' ? Number(m.usd_per_second ?? 0) : Math.min(...Object.values(m.image_prices ?? {}).map(Number));
     return { ...m, score: scoreOf(st).score, marks: st.total, usd };
@@ -177,7 +180,7 @@ export default async function ExplorePage() {
 
       <h2>Mô hình nổi bật</h2>
       <p className="muted explore-sub">Mở Tạo video hoặc Tạo ảnh với mô hình đã chọn sẵn.</p>
-      {models.rows.length === 0 ? (
+      {offered.length === 0 ? (
         <p className="muted">Chưa có mô hình nào được bật.</p>
       ) : (
         <ul className="explore-cards" aria-label="Mô hình">

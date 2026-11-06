@@ -46,6 +46,7 @@ beforeAll(async () => {
        ('fal-test', 'fal', 'x', 'Fal test', '{9:16,1:1}', '{5,10}', 2, '720p', 0.2, '{}', true),
        ('mock-sample', 'mock', 'mock', 'Mock', '{9:16}', '{5}', 4, '720p', 0.1, '{}', true)`,
   );
+  await pool.query(`update model_configs set enabled = false where id in ('veo-3.1', 'veo-3.1-vertex')`); // migration 0075 enables them; this file lists only its own models
   ownerId = (await auth.api.createUser({ body: { email: 'owner@example.test', name: 'Owner', password: PASSWORD, role: 'member', data: { teamId: 'team-b' } } })).user.id;
   await auth.api.createUser({ body: { email: 'other@example.test', name: 'Other', password: PASSWORD, role: 'member' } });
   ownerCookie = await signIn('owner@example.test');

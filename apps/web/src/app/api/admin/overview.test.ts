@@ -102,6 +102,12 @@ describe('GET /api/admin/overview', () => {
     await pool.query('update users set banned = false where id = $1', [member.id]);
   });
 
+  test('leaves the dearer row of a duplicate pair out of the model counts, as Admin Settings does not list it', async () => {
+    const { rows } = await pool.query('select count(*) filter (where twin_of is null)::int as visible, count(*)::int as all from model_configs');
+    expect(rows[0].all).toBeGreaterThan(rows[0].visible);
+    expect((await overview()).models.total).toBe(rows[0].visible);
+  });
+
   test('lists the 5 newest audit entries, newest first, with the actor name', async () => {
     for (let i = 1; i <= 6; i++) await audit(pool, { actorId: admin.id, action: 'team.rename', target: `team:t${i}` });
     const entries = (await overview()).audit;

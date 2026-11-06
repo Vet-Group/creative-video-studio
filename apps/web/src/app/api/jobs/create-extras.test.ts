@@ -42,6 +42,7 @@ beforeAll(async () => {
     [user.id, other.user.id],
   );
   await pool.query(`update model_configs set enabled = true where id in ('kling-o3-pro', 'kling-o1')`);
+  await pool.query(`update model_configs set enabled = false where id in ('veo-3.1', 'veo-3.1-vertex')`); // migration 0075 enables them; this file lists only its own models
   // The caps are not under test here, and this file queues more jobs than a day's 5 clips.
   await pool.query('update settings set member_daily_clip_cap = 1000, member_daily_usd_cap = 1000 where id = 1');
 });

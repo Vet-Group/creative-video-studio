@@ -7,6 +7,12 @@ const RETRYABLE: JobStatus[] = ['failed', 'failed_unknown', 'timed_out'];
 /** The one manual retry, which sends the same inputs again: not offered once retried, for a retry itself, or when the provider refused the input image. */
 export const canRetry = (job: TrayJob): boolean => RETRYABLE.includes(job.status) && !job.retried && !job.retryOf && !job.failureReason;
 
+/** A job BytePlus refused for a real person can be sent once to its fal twin, which takes such a photo (POST /api/jobs `onTwin`). */
+export const canRetryOnTwin = (job: TrayJob): boolean => RETRYABLE.includes(job.status) && !job.retried && !job.retryOf && job.failureReason === 'real_person' && !!job.twin;
+
+/** The retry button's label and the confirmation's question for a twin run, with its price as the twin would book it. */
+export const twinRetryText = (job: TrayJob) => ({ button: `Chạy lại bằng ${job.twin!.label}`, ask: `Chạy lại job này bằng ${job.twin!.label} với giá khoảng $${job.twin!.estimateUsd}?` });
+
 // What a Member reads about a job that did not finish; the raw error is for Admins.
 const FAILURE_TEXT = (noun: string): Partial<Record<JobStatus, string>> => ({
   failed: `Không tạo được ${noun}. Hãy thử lại, hoặc đổi ảnh hay mô hình.`,

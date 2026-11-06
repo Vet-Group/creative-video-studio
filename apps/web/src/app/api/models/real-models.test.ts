@@ -34,6 +34,7 @@ let member: Awaited<ReturnType<typeof newUser>>;
 beforeAll(async () => {
   admin = await newUser('admin@example.test', 'admin');
   member = await newUser('member@example.test', 'member');
+  await pool.query(`update model_configs set enabled = false where id in ('veo-3.1', 'veo-3.1-vertex')`); // migration 0075 enables them; this file lists only its own models
   await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) values ('in-1', $1, 'input', 'in-1', 'a.png', 'image/png', 1)`, [member.id]);
 });
 

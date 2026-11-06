@@ -41,7 +41,7 @@ const sameCredits = (a: VertexCredits, b: VertexCredits) =>
 
 /**
  * Admin: the caps (video month, daily clips, the image and apps month, each member's USD day and month), the balance warning threshold, the
- * soft per-feature caps, every model, and the Vertex accounts: the configured ones in order (`configured`), then any other with credits on record, and the active one.
+ * soft per-feature caps, every model but the dearer row of a pair of duplicates (`twin_of`, migration 0075: the owner keeps only the cheaper one on offer), and the Vertex accounts: the configured ones in order (`configured`), then any other with credits on record, and the active one.
  */
 export async function GET(request: Request) {
   const g = await guard(request, 'admin');
@@ -55,7 +55,7 @@ export async function GET(request: Request) {
     )
   ).rows[0];
   // `priced` is what lets the Admin switch a row on: a recorded price.
-  const models = await pool.query('select id, label, provider, enabled, (usd_per_second is not null or image_prices is not null) as priced from model_configs order by provider, id');
+  const models = await pool.query('select id, label, provider, enabled, (usd_per_second is not null or image_prices is not null) as priced from model_configs where twin_of is null order by provider, id');
   const featureCaps = await pool.query('select feature, monthly_usd::text as "monthlyUsd" from feature_caps order by feature');
   let configured: string[] = [];
   try {
@@ -78,7 +78,7 @@ export async function GET(request: Request) {
  * creditExpiresOn, stopWhenCreditsEnd }`, total and date nullable). All or nothing. Changed caps are audited as settings.update, each changed
  * soft cap as feature_cap.update, each changed model as model.set_enabled and each changed Vertex account as vertex_account.update. Any model can
  * be enabled (the owner opened them all on 2026-10-25; its bake-off record only feeds the recommendation score), but the database refuses one
- * whose limits and price are not recorded: 400 and nothing is changed.
+ * whose limits and price are not recorded: 400 and nothing is changed. A duplicate's dearer row (`twin_of`) is not the Admin's to switch: 400.
  */
 export async function PUT(request: Request) {
   const g = await guard(request, 'admin');
@@ -117,6 +117,7 @@ export async function PUT(request: Request) {
   if ((await pool.query('select 1 from feature_caps where feature = any($1::text[])', [features])).rowCount !== features.length) return bad('unknown feature', 404);
   const ids = [...new Set((list as { id: string }[]).map((m) => m.id))];
   if ((await pool.query('select 1 from model_configs where id = any($1::text[])', [ids])).rowCount !== ids.length) return bad('unknown model', 404);
+  if ((await pool.query('select 1 from model_configs where id = any($1::text[]) and twin_of is not null', [ids])).rowCount) return bad('a duplicate model follows its twin and cannot be switched here');
   const actorId = g.session.user.id;
 
   try {

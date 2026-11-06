@@ -60,6 +60,8 @@ export interface TrayJob {
   error: string | null;
   /** Set when the provider refused the job's input image: a retry with the same inputs cannot succeed. */
   failureReason: FailureReason | null;
+  /** The twin model a job refused for a real person can be re-run on (a button; migration 0075) with the price of that run, else null. */
+  twin: { label: string; estimateUsd: string | null } | null;
   isMock: boolean;
   feature: string;
   ratio: string;

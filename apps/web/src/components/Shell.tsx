@@ -14,7 +14,7 @@ import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { AccountMenu } from './AccountMenu';
 import { ConfirmHost, confirmDialog } from './Confirm';
 import { Icon, type IconName } from './Icon';
-import { JobFailureNote, canRetry } from './JobFailure';
+import { JobFailureNote, canRetry, canRetryOnTwin, twinRetryText } from './JobFailure';
 import { JobPrompt, JobsProvider, Recreate, roleOf, Tap, toggleFullscreen, useForm, useJobs } from './jobs';
 import { LoadError } from './LoadError';
 import { type Account, type Section, Settings } from './Settings';
@@ -40,12 +40,12 @@ function TrayItem({ job, isAdmin }: { job: TrayJob; isAdmin: boolean }) {
   const [problem, setProblem] = useState('');
   const [sending, setSending] = useState(false);
   const thumb = job.posterAssetId ?? (job.resolution ? job.outputAssetId : null); // an image job's output is its own picture
-  async function retry() {
+  async function retry(onTwin = false) {
     setSending(true); // from the click on, so a double click cannot send two paid jobs
-    if (await confirmRun(job.estimateUsd, `Thử lại job này với giá khoảng $${job.estimateUsd}?`)) {
+    if (await confirmRun(onTwin ? job.twin!.estimateUsd : job.estimateUsd, onTwin ? twinRetryText(job).ask : `Thử lại job này với giá khoảng $${job.estimateUsd}?`)) {
       setProblem('');
       try {
-        await api('/api/jobs', sendJson('POST', { retryOf: job.id }));
+        await api('/api/jobs', sendJson('POST', { retryOf: job.id, ...(onTwin && { onTwin }) }));
         await refresh();
       } catch (e) {
         setProblem(errorText(e, 'Không thử lại được'));
@@ -71,11 +71,16 @@ function TrayItem({ job, isAdmin }: { job: TrayJob; isAdmin: boolean }) {
             <Link href="/library">Xem trong Thư viện</Link>
           </p>
         )}
-        {(canRetry(job) || reuseHref(job)) && (
+        {(canRetry(job) || canRetryOnTwin(job) || reuseHref(job)) && (
           <div className="job-main">
             {canRetry(job) && (
               <button type="button" className="job-reuse job-primary" disabled={sending} onClick={() => void retry()}>
                 <Icon name="arrow" /> Thử lại
+              </button>
+            )}
+            {canRetryOnTwin(job) && (
+              <button type="button" className="job-reuse job-primary" disabled={sending} onClick={() => void retry(true)}>
+                <Icon name="arrow" /> {twinRetryText(job).button}
               </button>
             )}
             {reuseHref(job) && (
@@ -122,9 +127,9 @@ function HistoryCard({ job, isAdmin, select }: { job: TrayJob; isAdmin: boolean;
       setProblem(errorText(e, fail));
     }
   }
-  const retry = async () => {
+  const retry = async (onTwin = false) => {
     setSending(true); // from the click on, so a double click cannot send two paid jobs
-    if (await confirmRun(job.estimateUsd, `Thử lại job này với giá khoảng $${job.estimateUsd}?`)) await act(async () => (await api('/api/jobs', sendJson('POST', { retryOf: job.id })), await refresh()), 'Không thử lại được');
+    if (await confirmRun(onTwin ? job.twin!.estimateUsd : job.estimateUsd, onTwin ? twinRetryText(job).ask : `Thử lại job này với giá khoảng $${job.estimateUsd}?`)) await act(async () => (await api('/api/jobs', sendJson('POST', { retryOf: job.id, ...(onTwin && { onTwin }) })), await refresh()), 'Không thử lại được');
     setSending(false);
   };
   const toggleFavorite = () => act(async () => setFavorite((await api<{ favorite: boolean }>(`/api/jobs/${job.id}/favorite`, sendJson('PUT', { favorite: !favorite }))).favorite), 'Không lưu được mục yêu thích.');
@@ -235,6 +240,11 @@ function HistoryCard({ job, isAdmin, select }: { job: TrayJob; isAdmin: boolean;
           {canRetry(job) && (
             <button type="button" className="job-reuse job-primary" disabled={sending} onClick={() => void retry()}>
               <Icon name="arrow" /> Thử lại
+            </button>
+          )}
+          {canRetryOnTwin(job) && (
+            <button type="button" className="job-reuse job-primary" disabled={sending} onClick={() => void retry(true)}>
+              <Icon name="arrow" /> {twinRetryText(job).button}
             </button>
           )}
           {reuseHref(job) && (
