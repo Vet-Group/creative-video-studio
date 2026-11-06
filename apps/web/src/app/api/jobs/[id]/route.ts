@@ -36,14 +36,14 @@ export async function GET(request: Request, { params }: RouteContext) {
       `select id, filename, mime, duration_ms as "durationMs" from assets where id = any($1::text[]) and owner_id = $2 and kind = 'input' and deleted_at is null order by array_position($1::text[], id)`,
       [own ? ids : [], job.user_id],
     );
-  const [end, clips] = await Promise.all([owned(job.params.endAssetId ? [job.params.endAssetId] : []), owned(job.params.audioAssetIds?.split(',') ?? [])]);
+  const [end, clips, video] = await Promise.all([owned(job.params.endAssetId ? [job.params.endAssetId] : []), owned(job.params.audioAssetIds?.split(',') ?? []), owned(job.params.videoAssetId ? [job.params.videoAssetId] : [])]);
   return Response.json({
     id: job.id, userId: job.user_id, status: job.status, error: job.error, isMock: job.is_mock, feature: job.feature, resolution: job.params.resolution ?? null, presetId: job.preset_id, prompt: job.prompt, enhance: job.enhance, enhancedPrompt: job.enhanced_prompt, audio: job.params.audio ?? null, ratio: job.aspect,
     // The form inputs kept for reuse (Marketing Studio's, the image pages' own text, Try On's garment count). The brief and the script show to everyone who may see the job (owner, 2026-11-03):
     // the Library is where staff learn how a result was made, and the composed prompt carries them anyway.
     garments: job.params.garments ? Number(job.params.garments) : null, format: job.params.format ?? null, hook: job.params.hook ?? null, location: job.params.location ?? null, brief: job.params.brief ?? null, script: job.params.script ?? null, brand: job.params.brand === 'on',
     hookText: job.params.hookText ?? null, ending: job.params.ending ?? null, endText: job.params.endText ?? null, endTextPos: job.params.endTextPos ?? null,
-    durationSec: job.duration_s, modelId: job.model, storeId: job.store_id, outputAssetId: job.output_asset_id, posterAssetId: job.poster_asset_id, images: images.rows, endFrame: end.rows[0] ?? null, clips: clips.rows,
+    durationSec: job.duration_s, modelId: job.model, storeId: job.store_id, outputAssetId: job.output_asset_id, posterAssetId: job.poster_asset_id, images: images.rows, endFrame: end.rows[0] ?? null, videoRef: video.rows[0] ?? null, clips: clips.rows,
   });
 }
 

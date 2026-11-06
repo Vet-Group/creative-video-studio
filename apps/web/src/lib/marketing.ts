@@ -132,8 +132,9 @@ export const SUGGEST_DAILY_LIMIT = 20;
  * The one English prompt a Marketing Studio Advanced run sends. The member's brief is the source of truth, the reference images are named
  * [Image1]..[ImageN] (each adapter rewrites them for its schema), the hook (or the member's own `hookText`), the location and the last shot follow when chosen, then one dialogue rule:
  * audio off is silent; a script is spoken word for word and nothing else; with no script there is speech only when the brief asks for it.
+ * With a reference `video` one more sentence names it [Video1] (each adapter rewrites it for its schema, as the images) and says what to take from it.
  */
-export function advancedPrompt({ brief, images, hook, hookText, location, script, ending, audio }: { brief: string; images: number; hook?: string | null; hookText?: string | null; location?: string | null; script?: string | null; ending?: string | null; audio: boolean }, custom: CustomChoices = {}): string {
+export function advancedPrompt({ brief, images, video, hook, hookText, location, script, ending, audio }: { brief: string; images: number; video?: boolean; hook?: string | null; hookText?: string | null; location?: string | null; script?: string | null; ending?: string | null; audio: boolean }, custom: CustomChoices = {}): string {
   const h = [...HOOKS, ...(custom.hooks ?? [])].find((c) => c.id === hook);
   const l = [...LOCATIONS, ...(custom.locations ?? [])].find((c) => c.id === location);
   const refs = Array.from({ length: images }, (_, i) => `[Image${i + 1}]`).join(', ');
@@ -146,6 +147,7 @@ export function advancedPrompt({ brief, images, hook, hookText, location, script
   return [
     'Marketing video. The brief below is the source of truth; follow it.',
     images > 0 && `The reference images ${refs} show the people, products, settings or style to use; keep their faces, shapes, colours, text and logos true to the photos.`,
+    video && 'Follow the motion, camera framing and pace of [Video1]; do not copy its people, products or setting.',
     `Brief: ${brief.trim()}`,
     h?.phrase ?? hookLine(hookText),
     l && `Set in ${l.phrase}.`,

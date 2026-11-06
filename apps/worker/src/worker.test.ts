@@ -325,6 +325,23 @@ describe('Create video extras', () => {
   });
 });
 
+describe('Marketing Studio reference video', () => {
+  test("a job's params.videoAssetId reaches the adapter as the one clip's asset URL; without it the request has none", async () => {
+    const requests: SubmitRequest[] = [];
+    await start(counting(300, (inner) => ({ ...inner, submit: async (req) => (requests.push(req), inner.submit(req)) })));
+    const guided = await newJob('u1', { prompt: 'guided' });
+    await pool.query(`update jobs set input_asset_ids = '{start}', params = '{"format":"advanced","audio":"off","videoAssetId":"motion"}' where id = $1`, [guided]);
+    const plain = await newJob('u2', { prompt: 'plain' });
+    await send(guided, 'u1');
+    await send(plain, 'u2');
+    await waitFor('both submits', async () => requests.length === 2);
+    const by = Object.fromEntries(requests.map((r) => [r.prompt, r]));
+    expect(by.guided!.videoUrls).toEqual(['asset://motion']);
+    expect(by.plain!.videoUrls).toBeUndefined();
+    await waitFor('both jobs to finish', async () => (await status(guided)) === 'succeeded' && (await status(plain)) === 'succeeded');
+  });
+});
+
 describe('Marketing Studio end text', () => {
   test("burns params.endText into the delivered clip; when the overlay fails, the provider's clip is kept and the job says why", async () => {
     // A clip with PCM sound (in Matroska), which cannot be copied into an MP4, so the overlay fails after the provider has billed.

@@ -170,5 +170,29 @@ export const ALWAYS_AUDIO: ReadonlySet<string> = new Set(['google/gemini-omni-fl
 export const usdPerSecondFor = (model: { endpoint: string; usdPerSecond: number | string }, audio: string | undefined): number | string | undefined =>
   audio !== 'on' || ALWAYS_AUDIO.has(model.endpoint) ? model.usdPerSecond : Object.hasOwn(AUDIO_USD_PER_SECOND, model.endpoint) ? AUDIO_USD_PER_SECOND[model.endpoint] : undefined;
 
+/**
+ * What a reference video (params.videoAssetId) does to a Run's price, by endpoint, from the fal model pages (read 2026-11-06, https://fal.ai/models/<endpoint>):
+ * `usd` is the price per second at 720p with a video given, `billsInput` that the reference's seconds are billed too.
+ * Seedance 2.0 US Reference: $0.0168 per 1,000 tokens, tokens = height x width x (input s + output s) x 24 / 1024, x0.6 with a video input, "roughly $0.222 per
+ * second" with video inputs at 720p (the $0.37 audio-on price x 0.6; the page does not say which seconds that figure counts, the formula counts input and output).
+ * Seedance 2.5 US Reference: $0.0214 per 1,000 tokens, the same formula, "roughly $0.2838 per second of generated video" at 720p with video (the $0.473 x 0.6), and
+ * "with video references, you will be charged for both input and output videos". Kling O3 Pro Video to Video Reference
+ * (https://fal.ai/models/fal-ai/kling-video/o3/pro/video-to-video/reference): "for every second of video you generated you will be charged $0.168", with no audio
+ * price and no audio switch in its schema, so audio on or off books the same. Gemini Omni Flash 1.2: "reference images and videos are not billed", so it is not here.
+ * The Kling key is the image row's endpoint: the request builder switches to the video-to-video sibling when a video is given (fal.ts).
+ */
+export const VIDEO_REF_USD: Record<string, { usd: number; billsInput: boolean }> = {
+  'bytedance/seedance-2.0/us/reference-to-video': { usd: 0.222, billsInput: true },
+  'bytedance/seedance-2.5/us/reference-to-video': { usd: 0.2838, billsInput: true },
+  'fal-ai/kling-video/o3/pro/reference-to-video': { usd: 0.168, billsInput: false },
+};
+
+/**
+ * The price per second of output for a Run with a reference video of `refSec` seconds, so that rate x `durationSec` is the whole bill (the ledger and the worker
+ * only know a rate per output second). An endpoint that is not in VIDEO_REF_USD keeps `usdPerSecond`.
+ */
+export const usdPerSecondWithVideo = (endpoint: string, usdPerSecond: number | string, durationSec: number, refSec: number): number | string =>
+  Object.hasOwn(VIDEO_REF_USD, endpoint) ? (VIDEO_REF_USD[endpoint]!.usd * (durationSec + (VIDEO_REF_USD[endpoint]!.billsInput ? refSec : 0))) / durationSec : usdPerSecond;
+
 /** The USD a Run of `durationSec` reserves at the model's price, as a 4-decimal string (a mock job books 0 in the ledger regardless). */
 export const estimateUsd = (usdPerSecond: number | string, durationSec: number): string => (Number(usdPerSecond) * durationSec).toFixed(4);

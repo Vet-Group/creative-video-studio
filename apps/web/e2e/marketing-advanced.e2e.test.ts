@@ -32,8 +32,9 @@ test('an Advanced job runs from reference images, a brief, a script and audio on
   await signIn(page, 'mktd');
   await openAdvanced(page);
   await expect(nav(page).getByRole('link', { name: 'Marketing Studio' })).toHaveAttribute('aria-current', 'page');
-  // One wide reference slot, the hook and location boxes, the brief, the script and the audio switch, on by default.
-  await expect(page.locator('.slot')).toHaveCount(1);
+  // One wide reference slot and the optional reference video slot, the hook and location boxes, the brief, the script and the audio switch, on by default.
+  await expect(page.locator('.slot')).toHaveCount(2);
+  await expect(page.locator('.slot-wide .slot')).toHaveCount(1);
   await expect(page.getByText('Tối đa 4 ảnh tham chiếu')).toBeVisible(); // Mock E2E takes 4
   // Writing by sections, the library hook is in ① Hook and the location box in the body section, both out of the photo grid.
   await expect(page.getByRole('group', { name: '① Hook · 0–2 giây đầu', exact: true }).getByRole('button', { name: /^Hook/ })).toBeVisible();

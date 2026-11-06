@@ -8,7 +8,7 @@
 //   image endpoints (read 2026-10-24) and the other video endpoints (read 2026-10-25): https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=<endpoint>,
 //   one per entry of IMAGE_BODIES and VIDEO_BODIES
 import { imageSize } from './image-size';
-import { estimate, ImageReadError, imageEstimate, imageTokens, packJobId, plainImage, ProviderHttpError, resolveImages, sendJson, sizeFor, timeout, unpackJobId, type Fetch, type ReadImage } from './http';
+import { estimate, ImageReadError, imageEstimate, imageTokens, packJobId, plainImage, ProviderHttpError, resolveImages, sendJson, sizeFor, timeout, unpackJobId, videoTokens, type Fetch, type ReadImage } from './http';
 import { isByteplusVideo } from './byteplus';
 import { VERTEX_OMNI_MODEL } from './vertex-omni';
 import { FAL_TEXT_ENDPOINTS } from '../models';
@@ -59,6 +59,7 @@ async function pollFal(
 }
 
 const atImage = (n: string) => `@Image${n}`;
+const atVideo = (n: string) => `@Video${n}`;
 /**
  * The smoke run of 2026-10-25 saw Seedance 2.5 and FLUX 3 Reference show the input as the first frame, then cut to the plain studio a preset asks for.
  * These endpoints start from the input image, so they are told to stay in its scene in one shot.
@@ -96,6 +97,14 @@ interface VideoBody {
    * images (its page gives no count per clip), past which the estimate is short.
    */
   audio?: { field: string; max: number; seconds: number };
+  /**
+   * A reference video (MP4 or MOV, schemas read 2026-11-06): the body `field` (a list, or one URL when `single`), the clip's shortest and longest length in
+   * seconds, its size cap in MB and the most images that fit with it where the schema states them, and how the prompt names it (`name`, for the app's [Video1]). The app sends one clip. It goes
+   * to fal's storage (uploadInputs). Pricing: VIDEO_REF_USD in models.ts.
+   */
+  video?: { field: string; single?: boolean; minSec: number; maxSec: number; maxMb?: number; maxImages?: number; name: (n: string) => string };
+  /** The endpoint of the same app that takes a reference video, where a Run with one goes (as `text` does for a Run with no image); it carries the `video` limits. */
+  videoTwin?: string;
   build: (req: SubmitRequest, images: string[]) => Record<string, unknown>;
 }
 const seconds = (req: SubmitRequest) => String(req.durationSec);
@@ -105,15 +114,18 @@ const first = (images: string[]) => ({ image_url: images[0] });
 const words = (req: SubmitRequest, duration: string | number, rest: Record<string, unknown> = {}) => ({ prompt: req.prompt, aspect_ratio: req.ratio, duration, ...rest });
 export const VIDEO_BODIES: Record<string, VideoBody> = {
   // Audio is on only for a job that asks for it (params.audio 'on'), priced by AUDIO_USD_PER_SECOND.
-  'fal-ai/kling-video/o3/pro/reference-to-video': { end: 'end_image_url', text: 'fal-ai/kling-video/o3/pro/text-to-video', build: (req, images) => ({ prompt: imageTokens(req.prompt, atImage), ...ref(images), aspect_ratio: req.ratio, duration: seconds(req), generate_audio: req.audio === true }) },
+  'fal-ai/kling-video/o3/pro/reference-to-video': { end: 'end_image_url', text: 'fal-ai/kling-video/o3/pro/text-to-video', videoTwin: 'fal-ai/kling-video/o3/pro/video-to-video/reference', build: (req, images) => ({ prompt: imageTokens(req.prompt, atImage), ...ref(images), aspect_ratio: req.ratio, duration: seconds(req), generate_audio: req.audio === true }) },
+  // Reference video (schema read 2026-11-06): one .mp4/.mov of 3 to 15 s and at most 200 MB, at most 4 images and elements in all, ratios auto, 16:9, 9:16 and 1:1.
+  // The schema has no audio switch, only keep_audio for the reference's own sound, which the app drops as it does everywhere (audio is the job's own switch).
+  'fal-ai/kling-video/o3/pro/video-to-video/reference': { video: { field: 'video_url', single: true, minSec: 3, maxSec: 15, maxMb: 200, maxImages: 4, name: atVideo }, build: (req, images) => ({ prompt: imageTokens(req.prompt, atImage), ...(images.length > 0 && ref(images)), aspect_ratio: req.ratio, duration: seconds(req), keep_audio: false }) },
   'fal-ai/kling-video/o1/reference-to-video': { build: (req, images) => ({ prompt: imageTokens(req.prompt, atImage), ...ref(images), aspect_ratio: req.ratio, duration: seconds(req) }) },
   'fal-ai/kling-video/v3/pro/image-to-video': { crop: true, end: 'end_image_url', text: 'fal-ai/kling-video/v3/pro/text-to-video', build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), start_image_url: images[0], duration: seconds(req), generate_audio: req.audio === true }) },
   'fal-ai/kling-video/v2.6/pro/image-to-video': { crop: true, end: 'end_image_url', text: 'fal-ai/kling-video/v2.6/pro/text-to-video', build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), start_image_url: images[0], duration: seconds(req), generate_audio: req.audio === true }) },
   'fal-ai/kling-video/v2.5-turbo/pro/image-to-video': { crop: true, end: 'tail_image_url', text: 'fal-ai/kling-video/v2.5-turbo/pro/text-to-video', build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), duration: seconds(req) }) },
   // "Up to 10 files", each 1.8 to 30.2 s and 30.2 s in all (the schema's description; it states no maxItems).
-  'bytedance/seedance-2.5/us/reference-to-video': { text: 'bytedance/seedance-2.5/us/text-to-video', audio: { field: 'audio_urls', max: 10, seconds: 30 }, build: (req, images) => ({ prompt: imageTokens(req.prompt, atImage), ...ref(images), aspect_ratio: req.ratio, duration: seconds(req), resolution: '720p', generate_audio: req.audio === true }) },
+  'bytedance/seedance-2.5/us/reference-to-video': { text: 'bytedance/seedance-2.5/us/text-to-video', audio: { field: 'audio_urls', max: 10, seconds: 30 }, video: { field: 'video_urls', minSec: 1.8, maxSec: 30.2, maxMb: 200, name: atVideo }, build: (req, images) => ({ prompt: imageTokens(req.prompt, atImage), ...ref(images), aspect_ratio: req.ratio, duration: seconds(req), resolution: '720p', generate_audio: req.audio === true }) },
   'bytedance/seedance-2.5/us/image-to-video': { crop: true, end: 'end_image_url', text: 'bytedance/seedance-2.5/us/text-to-video', build: (req, images) => ({ prompt: oneShot(imageTokens(req.prompt, plainImage)), ...first(images), duration: seconds(req), resolution: '720p', generate_audio: req.audio === true }) },
-  'bytedance/seedance-2.0/us/reference-to-video': { text: 'bytedance/seedance-2.0/us/text-to-video', audio: { field: 'audio_urls', max: 3, seconds: 15 }, build: (req, images) => ({ prompt: imageTokens(req.prompt, atImage), ...ref(images), aspect_ratio: req.ratio, duration: seconds(req), resolution: '720p', generate_audio: req.audio === true }) },
+  'bytedance/seedance-2.0/us/reference-to-video': { text: 'bytedance/seedance-2.0/us/text-to-video', audio: { field: 'audio_urls', max: 3, seconds: 15 }, video: { field: 'video_urls', minSec: 2, maxSec: 15, maxMb: 50, name: atVideo }, build: (req, images) => ({ prompt: imageTokens(req.prompt, atImage), ...ref(images), aspect_ratio: req.ratio, duration: seconds(req), resolution: '720p', generate_audio: req.audio === true }) },
   'bytedance/seedance-2.0/us/image-to-video': { end: 'end_image_url', build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), aspect_ratio: req.ratio, duration: seconds(req), resolution: '720p', generate_audio: req.audio === true }) },
   'fal-ai/bytedance/seedance/v1.5/pro/image-to-video': { end: 'end_image_url', text: 'fal-ai/bytedance/seedance/v1.5/pro/text-to-video', build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), aspect_ratio: req.ratio, duration: seconds(req), resolution: '720p', generate_audio: req.audio === true }) },
   // Seedance 1.0 Pro and FLUX 3 render "720p" 9:16 as 704 px wide, under the worker's 720p floor (smoke run 2026-10-25), so they ask for 1080p.
@@ -121,7 +133,7 @@ export const VIDEO_BODIES: Record<string, VideoBody> = {
   // fal has no FLUX 3 reference endpoint; keyframes pins the product image as the first frame, the closest match to Fash's "FLUX 3 Reference".
   'blackforestlabs/flux-3/keyframes-to-video': { text: 'blackforestlabs/flux-3/text-to-video', build: (req, images) => ({ prompt: oneShot(imageTokens(req.prompt, plainImage)), keyframes: [{ image_url: images[0], frame_index: 0 }], aspect_ratio: req.ratio, duration: req.durationSec, resolution: '1080p', generate_audio: req.audio === true }) },
   'blackforestlabs/flux-3/image-to-video': { text: 'blackforestlabs/flux-3/text-to-video', build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), aspect_ratio: req.ratio, duration: req.durationSec, resolution: '1080p', generate_audio: req.audio === true }) },
-  'google/gemini-omni-flash/v1.2/reference-to-video': { text: 'google/gemini-omni-flash/v1.2/text-to-video', build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...ref(images), aspect_ratio: req.ratio, duration: req.durationSec, resolution: '720p' }) },
+  'google/gemini-omni-flash/v1.2/reference-to-video': { text: 'google/gemini-omni-flash/v1.2/text-to-video', video: { field: 'reference_video_urls', minSec: 0, maxSec: 15, name: () => 'the reference video' }, build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...ref(images), aspect_ratio: req.ratio, duration: req.durationSec, resolution: '720p' }) },
   'google/gemini-omni-flash/v1.2/image-to-video': { end: 'end_image_url', endMaxSec: 10, text: 'google/gemini-omni-flash/v1.2/text-to-video', build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), aspect_ratio: req.ratio, duration: req.durationSec, resolution: '720p' }) },
   'fal-ai/veo3.1/image-to-video': { text: 'fal-ai/veo3.1', build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), aspect_ratio: req.ratio, duration: `${req.durationSec}s`, resolution: '720p', generate_audio: req.audio === true }) },
   'xai/grok-imagine-video/reference-to-video': { build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), reference_image_urls: images, aspect_ratio: req.ratio, duration: req.durationSec, resolution: '720p' }) },
@@ -155,15 +167,20 @@ export const VIDEO_BODIES: Record<string, VideoBody> = {
 
 /**
  * What a video model takes besides its images, by endpoint, for the models and jobs APIs: `endFrame`, an end frame; `textOnly`, a Run with no image;
- * `audioClips`, reference audio up to `max` clips and `seconds` in all (null when none).
+ * `audioClips`, reference audio up to `max` clips and `seconds` in all (null when none); `videoRefs`, the reference video it takes (one clip, `minSec` to `maxSec` long,
+ * `maxMb` where the schema caps the size; null when none): a model with a `videoTwin` takes the twin's.
  */
 export function videoInputs(endpoint: string) {
   const spec: VideoBody | undefined = Object.hasOwn(VIDEO_BODIES, endpoint) ? VIDEO_BODIES[endpoint] : undefined;
   // BytePlus Seedance runs from the prompt alone and takes neither an end frame nor reference audio (byteplus.ts).
-  if (isByteplusVideo(endpoint)) return { endFrame: false, endMaxSec: null, textOnly: true, audioClips: null };
+  if (isByteplusVideo(endpoint)) return { endFrame: false, endMaxSec: null, textOnly: true, audioClips: null, videoRefs: null };
   // Vertex Omni runs from the prompt alone, takes a last frame with one first frame up to 10 s, and no reference audio (vertex-omni.ts).
-  if (endpoint === VERTEX_OMNI_MODEL) return { endFrame: true, endMaxSec: 10, textOnly: true, audioClips: null };
-  return { endFrame: spec?.end !== undefined, endMaxSec: spec?.endMaxSec ?? null, textOnly: spec?.text !== undefined, audioClips: spec?.audio ? { max: spec.audio.max, seconds: spec.audio.seconds } : null };
+  if (endpoint === VERTEX_OMNI_MODEL) return { endFrame: true, endMaxSec: 10, textOnly: true, audioClips: null, videoRefs: null };
+  const video = spec?.videoTwin ? VIDEO_BODIES[spec.videoTwin]?.video : spec?.video;
+  return {
+    endFrame: spec?.end !== undefined, endMaxSec: spec?.endMaxSec ?? null, textOnly: spec?.text !== undefined, audioClips: spec?.audio ? { max: spec.audio.max, seconds: spec.audio.seconds } : null,
+    videoRefs: video ? { max: 1, minSec: video.minSec, maxSec: video.maxSec, maxMb: video.maxMb ?? null, maxImages: video.maxImages ?? null } : null,
+  };
 }
 
 /**
@@ -190,8 +207,8 @@ async function uploadInputs(f: Fetch, apiKey: string, urls: string[], readImage?
         const init = (await sendJson(f, 'fal upload', `${REST}/storage/upload/initiate?storage_type=fal-cdn-v3`, {
           method: 'POST',
           headers: { Authorization: `Key ${apiKey}`, 'Content-Type': 'application/json', 'X-Fal-Object-Lifecycle': LIFECYCLE },
-          // audio/mpeg is an .mp3; the endpoints that take audio list MP3 and WAV.
-          body: JSON.stringify({ content_type: contentType, file_name: `input.${contentType === 'audio/mpeg' ? 'mp3' : (contentType.split('/')[1] ?? 'bin')}` }),
+          // audio/mpeg is an .mp3 and video/quicktime a .mov; the endpoints that take audio list MP3 and WAV, those that take a video MP4 and MOV.
+          body: JSON.stringify({ content_type: contentType, file_name: `input.${contentType === 'audio/mpeg' ? 'mp3' : contentType === 'video/quicktime' ? 'mov' : (contentType.split('/')[1] ?? 'bin')}` }),
         })) as { upload_url?: string; file_url?: string };
         if (!init.upload_url || !init.file_url) throw new Error('fal upload: no upload_url or file_url');
         const put = await f(init.upload_url, { method: 'PUT', headers: { 'Content-Type': contentType }, body: Buffer.from(bytes) });
@@ -215,16 +232,23 @@ export function createFalProvider(opts: { apiKey: string; fetch?: Fetch; readIma
       const own = VIDEO_BODIES[req.model.endpoint];
       if (!own) throw new ImageReadError(`fal video: no request builder for ${req.model.endpoint}`);
       // No image: the text-to-video twin, same app (so the status URL is the same), with its own builder.
-      const endpoint = req.imageUrls.length === 0 ? own.text : req.model.endpoint;
+      // A reference video goes to the sibling endpoint that takes one, where the row has one (Kling O3 Pro).
+      const endpoint = req.videoUrls?.length && own.videoTwin ? own.videoTwin : req.imageUrls.length === 0 ? own.text : req.model.endpoint;
       const spec = endpoint ? VIDEO_BODIES[endpoint] : undefined;
       if (!endpoint || !spec) throw new ImageReadError(`fal video: ${req.model.endpoint} needs an input image`);
       if (req.endImageUrl && !spec.end) throw new ImageReadError(`fal video: ${req.model.endpoint} takes no end frame`);
       if (req.audioUrls?.length && !spec.audio) throw new ImageReadError(`fal video: ${req.model.endpoint} takes no reference audio`);
+      if (req.videoUrls?.length && (!spec.video || req.videoUrls.length > 1)) throw new ImageReadError(`fal video: ${req.model.endpoint} takes ${spec.video ? 'one' : 'no'} reference video`);
       const inputs = spec.upload || req.imageUrls.length > MAX_INLINE_INPUTS ? await uploadInputs(f, opts.apiKey, req.imageUrls, opts.readImage) : await resolveImages(req.imageUrls, opts.readImage, spec.crop ? { ratio: req.ratio } : undefined);
       const body = spec.build(req, inputs);
       // The end frame is read like the inputs, cropped to the ratio where they are, so both frames have one shape.
       if (req.endImageUrl) [body[spec.end!]] = await resolveImages([req.endImageUrl], opts.readImage, spec.crop ? { ratio: req.ratio } : undefined);
       if (req.audioUrls?.length) body[spec.audio!.field] = await uploadInputs(f, opts.apiKey, req.audioUrls, opts.readImage);
+      if (req.videoUrls?.length) {
+        const [url] = await uploadInputs(f, opts.apiKey, req.videoUrls, opts.readImage);
+        body[spec.video!.field] = spec.video!.single ? url : [url];
+        body.prompt = videoTokens(body.prompt as string, spec.video!.name);
+      }
       const res = (await sendJson(f, 'fal submit', `${QUEUE}/${endpoint}`, { method: 'POST', headers, body: JSON.stringify(body) })) as { request_id?: string };
       if (!res.request_id) throw new Error('fal submit: no request_id in the response');
       return { providerJobId: packJobId(req.durationSec, res.request_id) };

@@ -796,7 +796,7 @@ describe('migration 0074 Gemini Omni 1.2 Flash on Vertex', () => {
       expect(ALWAYS_AUDIO.has(row.endpoint), id).toBe(true);
     }
     expect((await pool.query(`select features from model_configs where id = 'gemini-omni-flash-reference-vertex'`)).rows[0].features).toContain('marketing');
-    expect(videoInputs(VERTEX_OMNI_MODEL)).toEqual({ endFrame: true, endMaxSec: 10, textOnly: true, audioClips: null });
+    expect(videoInputs(VERTEX_OMNI_MODEL)).toEqual({ endFrame: true, endMaxSec: 10, textOnly: true, audioClips: null, videoRefs: null });
   });
 });
 

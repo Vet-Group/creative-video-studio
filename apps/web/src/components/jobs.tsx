@@ -53,6 +53,18 @@ export interface FormActions {
   prompt?: (text: string) => void;
   /** Fash's Use Result: the result on the form (Try On's model photo, Image Generation's inputs). */
   result?: (p: Photo) => void;
+  /** Marketing Studio's use-this-hook button: an example's hook (a library hook id, else its own words) and its ending on the form; the photos and the rest stay. */
+  hook?: (h: ExampleHook) => void;
+  /** Marketing Studio's save-as-my-hook button: the example's hook saved as the member's own and chosen, with the example's poster (a sample name) as its photo. */
+  saveHook?: (h: ExampleHook & { name: string; poster: string }) => Promise<void>;
+  /** Marketing Advanced's use-as-reference-video button: an example clip (a sample name) as the reference video; absent where the form takes none. */
+  video?: (sample: string) => Promise<void>;
+}
+/** The hook and the ending of an example's details file. */
+export interface ExampleHook {
+  hook?: string | null;
+  hookText?: string | null;
+  ending?: string | null;
 }
 /** A photo a detail hands the form: a sample (uploaded as the member's own first, as a picked sample is) or an asset (a job's input or result). */
 export type Photo = { sample: string } | { asset: string };

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { BAKEOFF_MODELS, estimateUsd, imagePricesFor, PROMPT_CEILING, promptLimit, usdPerSecondFor, validateRequest } from './models';
+import { BAKEOFF_MODELS, estimateUsd, imagePricesFor, PROMPT_CEILING, promptLimit, usdPerSecondFor, usdPerSecondWithVideo, validateRequest } from './models';
 
 describe.each(BAKEOFF_MODELS)('$id', (model) => {
   const ok = { ratio: '9:16', durationSec: 5, imageCount: 1 };
@@ -61,4 +61,22 @@ test('an image job is priced at its thinking level, the default (first) level wh
   expect(imagePricesFor(row, 'medium')).toEqual(row.image_prices);
   expect(imagePricesFor(row, 'constructor')).toEqual(row.image_prices);
   expect(imagePricesFor({ ...row, thinking_levels: [], thinking_prices: null })).toEqual(row.image_prices);
+});
+
+describe('a reference video prices the Run (fal model pages, read 2026-11-06)', () => {
+  const bill = (endpoint: string, out: number, ref: number) => estimateUsd(usdPerSecondWithVideo(endpoint, 0.37, out, ref), out);
+
+  test('Seedance bills the input seconds too, at the x0.6 video rate', () => {
+    expect(bill('bytedance/seedance-2.0/us/reference-to-video', 8, 5)).toBe('2.8860'); // 0.222 x (8 + 5)
+    expect(bill('bytedance/seedance-2.5/us/reference-to-video', 10, 3)).toBe('3.6894'); // 0.2838 x (10 + 3)
+  });
+
+  test('Kling O3 bills the output seconds only, at $0.168 whatever the audio switch says', () => {
+    expect(bill('fal-ai/kling-video/o3/pro/reference-to-video', 10, 15)).toBe('1.6800');
+  });
+
+  test('an endpoint that does not bill references keeps its own rate', () => {
+    expect(usdPerSecondWithVideo('google/gemini-omni-flash/v1.2/reference-to-video', 0.0819, 8, 5)).toBe(0.0819);
+    expect(usdPerSecondWithVideo('constructor', 0.5, 8, 5)).toBe(0.5);
+  });
 });

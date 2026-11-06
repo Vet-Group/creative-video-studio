@@ -28,6 +28,7 @@ import { FormContext, type FormActions, type Photo, type PhotoRole, useApplier, 
 import { Modal } from './Modal';
 import { ModelPicker } from './ModelPicker';
 import { PromptComposer } from './PromptComposer';
+import { ReferenceVideoSlot, type RefVideo, videoReason, type VideoRefs } from './ReferenceVideo';
 import { PromptPreview, PromptSections, usePromptMode } from './PromptSections';
 import { Select } from './Select';
 import { Tray } from './Shell';
@@ -56,10 +57,14 @@ interface VideoModel {
   resolution: string | null;
   /** The model takes an end frame (videoInputs). */
   endFrame: boolean;
+  /** The reference video it takes, null when none (videoInputs). */
+  videoRefs: VideoRefs | null;
   /** Added in the last 14 days. */
   isNew: boolean;
   creditUsd: string | null;
 }
+
+const VIDEO_ERROR = 'Không tải được video. Hãy thử lại.';
 
 /** The most hook variants one Run makes, one clip each. */
 const MAX_VARIANTS = 3;
@@ -94,6 +99,8 @@ interface MarketingJob {
   script: string | null;
   /** The end frame, last shot and end text; a sample or an older job has none. */
   endFrame?: Img | null;
+  /** Advanced's reference video; a sample or an older job has none. */
+  videoRef?: RefVideo | null;
   ending?: string | null;
   endText?: string | null;
   endTextPos?: string | null;
@@ -116,6 +123,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
   const [refs, setRefs] = useState<Img[]>([]);
   const [script, setScript] = useState('');
   const [endFrame, setEndFrame] = useState<Img | null>(null); // sent only on a model that takes one
+  const [video, setVideo] = useState<RefVideo | null>(null); // Advanced's reference video, sent only on a model that takes one (the Run says so otherwise)
   const [ending, setEnding] = useState(''); // ③ Ending of the sections, with the own hook of ①; the brief is ② Body
   const [hookText, setHookText] = useState('');
   const [freeText, setFreeText] = useState(''); // the free writing box, which keeps its own words
@@ -179,7 +187,9 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
   const chosen = models?.find((m) => m.id === modelId);
   const ratios = Object.keys(RATIO_LABEL).filter((r) => models?.some((m) => m.ratios.includes(r)));
   const durations = [...new Set(models?.flatMap((m) => m.durationsSec))].sort((a, b) => a - b);
-  const key = `${ratio}/${durationSec}`;
+  // A reference video's billed seconds change some estimates, so the list follows its length.
+  const videoSec = advanced && video ? Math.ceil(video.durationMs / 1000) : 0;
+  const key = `${ratio}/${durationSec}/${videoSec}`;
   const fresh = list !== null && list.key === key;
   // Advanced: the slot takes up to the chosen model's reference cap (7 at most); a model that takes fewer images than are chosen cannot be picked.
   const maxRefs = Math.min(ADVANCED_MAX_IMAGES, chosen?.maxImages ?? ADVANCED_MAX_IMAGES);
@@ -196,7 +206,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
   const brief = sec ? prompt : freeText;
   const parts = { hookText: sec ? hookText : '', ending: sec ? ending : '' };
   const composeFor = (hook: string, brief: string) =>
-    advanced ? advancedPrompt({ brief, images: refs.length, hook, location, script, ...parts, audio: audioOn }, own) : marketingPrompt({ hook, location, prompt: brief, ...parts, audio: audioOn, ratio }, own);
+    advanced ? advancedPrompt({ brief, images: refs.length, video: video !== null, hook, location, script, ...parts, audio: audioOn }, own) : marketingPrompt({ hook, location, prompt: brief, ...parts, audio: audioOn, ratio }, own);
   const compose = (hook: string) => composeFor(hook, brief);
   const line = (text: string) => text.replace(/\s+/g, ' ').trim();
   const endAssetId = chosen?.endFrame ? endFrame?.id : undefined;
@@ -227,7 +237,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
   // The list (with the estimate for this duration) is fetched again when the ratio or the duration changes, or when the member retries after a failure.
   useEffect(() => {
     let stale = false;
-    api<{ models: VideoModel[]; defaultModelId: string | null }>(`/api/models?feature=marketing&ratio=${encodeURIComponent(ratio)}&durationSec=${durationSec}`).then(
+    api<{ models: VideoModel[]; defaultModelId: string | null }>(`/api/models?feature=marketing&ratio=${encodeURIComponent(ratio)}&durationSec=${durationSec}${videoSec > 0 ? `&videoSec=${videoSec}` : ''}`).then(
       (r) => !stale && (setList({ key, models: r.models, defaultId: r.defaultModelId }), setFailed(false)),
       () => !stale && setFailed(true),
     );
@@ -263,6 +273,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
         setHookText(j.hookText ?? '');
         setScript(j.script ?? '');
         setEndFrame(j.endFrame ?? null);
+        setVideo(advanced ? (j.videoRef ?? null) : null);
         setEnding(j.ending ?? '');
         setEndText(j.endText ?? '');
         setEndTextPos((END_TEXT_POSITIONS as readonly string[]).includes(j.endTextPos ?? '') ? (j.endTextPos as EndTextPosition) : 'bottom');
@@ -334,9 +345,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
                     ? 'Tải lên ít nhất 1 ảnh tham chiếu.'
                     : refs.length > chosen!.maxImages
                       ? `Mô hình này nhận tối đa ${chosen!.maxImages} ảnh tham chiếu. Bỏ bớt ảnh hoặc chọn mô hình khác.`
-                      : brief.trim() === ''
-                        ? 'Viết prompt mô tả video bạn muốn.'
-                        : null
+                      : (videoReason(video, chosen!.videoRefs, refs.length) ?? (brief.trim() === '' ? 'Viết prompt mô tả video bạn muốn.' : null))
                   : person.length === 0
                     ? 'Tải lên ảnh người mẫu.'
                     : product.length === 0
@@ -375,11 +384,46 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
       setError(copyError(e, UPLOAD_ERROR));
     }
   }
+  /** Advanced's reference video: always the member's own input asset (uploaded, or copied on the server from History or an Example). */
+  async function takeVideo(get: () => Promise<RefVideo[]>, failed: (e: unknown) => string) {
+    setError('');
+    setBusy(true);
+    try {
+      setVideo((await get().finally(loading('Đang tải video...')))[0]!);
+      notify('Đã dùng video tham chiếu');
+    } catch (e) {
+      setError(failed(e));
+    } finally {
+      setBusy(false);
+    }
+  }
   const actions: FormActions = {
     recreate: (from) => (recall.touch(), setSource({ from }), narrow && setTab('create')),
     apply,
     photo: (p, role) => void take(p, role),
     prompt: (text) => ((sec ? setPrompt : setFreeText)(text), notify('Đã chép prompt')),
+    // An example's hook (the library one, else its own words) and its ending go in ① and ③, which only the sections have; the photos and the rest stay.
+    hook: (h) => {
+      if (!sec) setMode('sections');
+      if (h.hook) setHooks([h.hook]);
+      else if (h.hookText) (setHooks([]), setHookText(h.hookText));
+      if (h.ending) setEnding(h.ending);
+      notify('Đã dùng hook của ví dụ');
+    },
+    // The hook as the member's own: the phrase of the library hook or the example's own words, the example's poster as its photo (without one, no photo).
+    saveHook: async (h) => {
+      const phrase = line(h.hook ? (hookList.find((c) => c.id === h.hook)?.phrase ?? h.hookText ?? '') : (h.hookText ?? '')).slice(0, 300);
+      if (!phrase) return notify('Ví dụ này không có hook để lưu');
+      setError('');
+      try {
+        const poster = await copySamples([h.poster]).then((a) => a[0], () => undefined);
+        added('hook', await api<Choice>('/api/choices', sendJson('POST', { kind: 'hook', name: h.name.slice(0, 40), phrase, ...(poster && { imageAssetId: poster.id }) })));
+        notify('Đã lưu và chọn hook của bạn');
+      } catch (e) {
+        setError(errorText(e, 'Không lưu được hook, hãy thử lại.'));
+      }
+    },
+    video: advanced ? (sample) => takeVideo(() => copySamples([sample]) as Promise<RefVideo[]>, (e) => copyError(e, VIDEO_ERROR)) : undefined,
   };
 
   function add(set: (f: (cur: Img[]) => Img[]) => void, max = 1) {
@@ -423,7 +467,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
             durationSec,
             storeId: storeId || null,
             useBrand,
-            params: { format: 'advanced', audio: audioOn ? 'on' : 'off', ...inputs, ...(script.trim() && { script: script.trim() }) },
+            params: { format: 'advanced', audio: audioOn ? 'on' : 'off', ...inputs, ...(script.trim() && { script: script.trim() }), ...(video && { videoAssetId: video.id }) },
           }
         : { feature: 'marketing', assetIds: [person[0]!.id, product[0]!.id], modelId: chosen!.id, prompt: sent[i], ratio, durationSec, storeId: storeId || null, useBrand, params: { audio: audioOn ? 'on' : 'off', ...inputs } };
       try {
@@ -506,6 +550,8 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
               {!sec && locationBox}
             </div>
 
+            {advanced && <ReferenceVideoSlot video={video} busy={busy} onFile={(f) => void takeVideo(() => uploadImages([f], 'video', storeId) as Promise<RefVideo[]>, (e) => uploadError(e, 'video'))} onHistory={(id) => void takeVideo(() => api<{ assets: RefVideo[] }>('/api/assets/copy', sendJson('POST', { assetId: id })).then((r) => r.assets), (e) => copyError(e, VIDEO_ERROR))} onRemove={() => setVideo(null)} />}
+
             <PromptSections
               feature="marketing"
               format={advanced ? 'advanced' : undefined}
@@ -579,7 +625,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
                 )}
               </div>
               <AudioSwitch on={audio} available={chosen?.audioEstimateUsd != null} always={chosen?.alwaysAudio} onChange={setAudio} />
-              {models && models.length > 0 && <ModelPicker models={models.map((m) => ({ id: m.id, label: m.label, isMock: m.isMock, supported: !advanced || m.maxImages >= refs.length, estimateUsd: audio && m.audioEstimateUsd != null ? m.audioEstimateUsd : m.estimateUsd, score: m.score, recommended: m.recommended, resolution: m.resolution, durationsSec: m.durationsSec, audio: m.audioEstimateUsd != null, isNew: m.isNew, creditUsd: m.creditUsd }))} value={chosen?.id ?? ''} onChange={(id) => pickModel(models.find((m) => m.id === id)!)} />}
+              {models && models.length > 0 && <ModelPicker models={models.map((m) => ({ id: m.id, label: m.label, isMock: m.isMock, supported: !advanced || (m.maxImages >= refs.length && videoReason(video, m.videoRefs, refs.length) === null), estimateUsd: audio && m.audioEstimateUsd != null ? m.audioEstimateUsd : m.estimateUsd, score: m.score, recommended: m.recommended, resolution: m.resolution, durationsSec: m.durationsSec, audio: m.audioEstimateUsd != null, isNew: m.isNew, creditUsd: m.creditUsd }))} value={chosen?.id ?? ''} onChange={(id) => pickModel(models.find((m) => m.id === id)!)} />}
             </VideoSettings>
             {/* Under the model, so in free writing the ratio row sits right under the prompt box as on Fash. */}
             <PromptPreview feature="marketing" prompts={sent} labels={n > 1 ? variants.map((h, i) => `Biến thể ${i + 1} (${hookName(h)})`) : undefined} limit={chosen?.maxPromptChars} />
@@ -590,7 +636,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
               feature="marketing"
               data={() => ({
                 images: (advanced ? refs : [...person, ...product]).map((i) => i.id),
-                ...(advanced && { format: 'advanced', script: script.trim() }),
+                ...(advanced && { format: 'advanced', script: script.trim(), ...(video && { videoRef: video.id }) }),
                 hook: hooks[0],
                 location,
                 brief: brief.trim(),

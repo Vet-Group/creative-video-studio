@@ -4,9 +4,9 @@ import { type LedgerPool, withTransaction } from '@cvs/core/ledger';
 
 export const PURGE_AFTER = '30 days';
 
-/** SQL for every input a job (alias `j`) ran from: its images, then Create video's end frame and reference audio, which its params name. */
+/** SQL for every input a job (alias `j`) ran from: its images, then the end frame, reference audio and reference video, which its params name. */
 const inputsOf = (j: string) =>
-  `${j}.input_asset_ids || coalesce(string_to_array(${j}.params->>'endAssetId', ','), '{}') || coalesce(string_to_array(${j}.params->>'audioAssetIds', ','), '{}')`;
+  `${j}.input_asset_ids || coalesce(string_to_array(${j}.params->>'endAssetId', ','), '{}') || coalesce(string_to_array(${j}.params->>'audioAssetIds', ','), '{}') || coalesce(string_to_array(${j}.params->>'videoAssetId', ','), '{}')`;
 
 /** Purges every due clip, one transaction each; returns how many were purged. `removeObject` runs after the commit, so a failure there only leaves an orphan object (logged). */
 export async function purgeDeletedClips(pool: LedgerPool, removeObject: (key: string) => Promise<void>, log: (what: string, e: unknown) => void): Promise<number> {

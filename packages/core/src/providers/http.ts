@@ -89,6 +89,8 @@ export async function resolveImages(urls: string[], readImage?: ReadImage, opts?
 /** The app writes [Image1], [Image2]; each schema names them its own way. A digit right after the token gets a space, so "[Image1]2" does not become @Image12. */
 export const imageTokens = (prompt: string, name: (n: string) => string) => prompt.replace(/\[Image(\d+)\](\d?)/g, (_, n: string, d: string) => `${name(n)}${d ? ` ${d}` : ''}`);
 export const plainImage = (n: string) => `image ${n}`;
+/** The app writes the reference video as [Video1]; the endpoints that take one name it @Video1, or (Gemini Omni, which takes them in list order) say "the reference video". */
+export const videoTokens = (prompt: string, name: (n: string) => string) => prompt.replace(/\[Video(\d+)\](\d?)/g, (_, n: string, d: string) => `${name(n)}${d ? ` ${d}` : ''}`);
 
 /** An input image could not be read, measured or accepted locally; thrown before any network call, so nothing was submitted or billed (the worker releases the estimate). */
 /** An input refused before any call to the provider (unreadable, too large, or a request the builder cannot make): nothing was sent, so the worker releases the estimate. */

@@ -13,6 +13,8 @@ const MAX_CLIPS = 10; // the most reference audio clips a model takes (Seedance 
 export type TemplateData = {
   images: string[];
   endFrame?: string;
+  /** Marketing Studio Advanced's reference video (an asset id). */
+  videoRef?: string;
   clips?: string[];
   prompt?: string;
   brief?: string;
@@ -39,7 +41,7 @@ export type TemplateData = {
 };
 
 const TEXT = ['prompt', 'brief', 'script'] as const;
-const SHORT = ['ratio', 'resolution', 'modelId', 'presetId', 'storeId', 'endFrame'] as const;
+const SHORT = ['ratio', 'resolution', 'modelId', 'presetId', 'storeId', 'endFrame', 'videoRef'] as const;
 const FIELDS = new Set<string>(['images', 'clips', ...TEXT, ...SHORT, 'hookText', 'ending', 'promptMode', 'endText', 'endTextPos', 'hook', 'location', 'format', 'audio', 'enhance', 'garments', 'durationSec']);
 const whole = (v: unknown, min: number, max: number) => Number.isInteger(v) && (v as number) >= min && (v as number) <= max;
 

@@ -27,6 +27,20 @@ const mp4 = (size: number) => {
   b.set([0, 0, 0, 0x18, ...[...'ftypisom'].map((c) => c.charCodeAt(0))]);
   return b;
 };
+/** An MP4 whose header gives its length: ftyp, moov holding an mvhd (version 0, timescale 1000) of `ms`, then an mdat (as the assets route test builds one). */
+const clip = (ms: number, size = 64) => {
+  const bytes = new Uint8Array(size);
+  const v = new DataView(bytes.buffer);
+  const box = (at: number, len: number, type: string) => (v.setUint32(at, len), [...type].forEach((c, i) => (bytes[at + 4 + i] = c.charCodeAt(0))));
+  box(0, 16, 'ftyp');
+  [...'isom'].forEach((c, i) => (bytes[8 + i] = c.charCodeAt(0)));
+  box(16, 36, 'moov');
+  box(24, 28, 'mvhd');
+  v.setUint32(44, 1000);
+  v.setUint32(48, ms);
+  box(52, size - 52, 'mdat');
+  return bytes;
+};
 const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4]);
 
 async function signIn(email: string): Promise<string> {
@@ -124,14 +138,15 @@ describe('sample caching', () => {
 describe('POST /api/assets/samples', () => {
   const copy = (cookie: string | undefined, body: unknown) => COPY(new Request('http://localhost/api/assets/samples', { method: 'POST', body: JSON.stringify(body), headers: { 'content-type': 'application/json', ...(cookie ? { cookie } : {}) } }));
   test('copies sample pictures into the caller own input assets on the server, all or nothing', async () => {
-    for (const [name, type, body] of [['copy-a.jpg', 'image/jpeg', jpeg], ['copy-b.jpg', 'image/jpeg', jpeg], ['copy-clip.mp4', 'video/mp4', mp4(64)]] as const) {
+    for (const [name, type, body] of [['copy-a.jpg', 'image/jpeg', jpeg], ['copy-b.jpg', 'image/jpeg', jpeg], ['copy-clip.mp4', 'video/mp4', clip(7400)], ['copy-bad.mp4', 'video/mp4', mp4(64)]] as const) {
       expect((await PUT(req(admin, { method: 'PUT', body, headers: { 'content-type': type } }), ctx(name))).ok, name).toBe(true);
     }
     expect((await copy(undefined, { names: ['copy-a.jpg'] })).status).toBe(401);
-    for (const names of [undefined, [], ['copy-a.jpg', 'copy-a.jpg', 'copy-a.jpg', 'copy-a.jpg', 'copy-a.jpg'], ['copy-clip.mp4'], ['../copy-a.jpg'], [1]]) {
+    for (const names of [undefined, [], ['copy-a.jpg', 'copy-a.jpg', 'copy-a.jpg', 'copy-a.jpg', 'copy-a.jpg'], ['copy-notes.json'], ['../copy-a.jpg'], [1]]) {
       expect((await copy(member, { names })).status, JSON.stringify(names)).toBe(400);
     }
     expect((await copy(member, { names: ['copy-a.jpg', 'no-such.jpg'] })).status).toBe(404);
+    expect((await copy(member, { names: ['copy-bad.mp4'] })).status).toBe(415); // a clip needs a length in its header
     const before = (await pool.query('select count(*)::int as n from assets')).rows[0].n;
 
     const res = await copy(member, { names: ['copy-a.jpg', 'copy-b.jpg'] });
@@ -141,6 +156,13 @@ describe('POST /api/assets/samples', () => {
     const rows = (await pool.query(`select a.id, a.kind, a.s3_key, u.email from assets a join users u on u.id = a.owner_id where a.id = any($1) order by a.filename`, [assets.map((a) => a.id)])).rows;
     expect(rows.map((r) => [r.kind, r.s3_key, r.email])).toEqual(assets.map((a) => ['input', `assets/${a.id}`, 'member@example.test']));
     expect((await pool.query('select count(*)::int as n from assets')).rows[0].n).toBe(before + 2);
+
+    // A sample clip is copied as an MP4 input with its length (Advanced's reference video).
+    const video = await copy(member, { names: ['copy-clip.mp4'] });
+    expect(video.status).toBe(201);
+    const [copied] = ((await video.json()) as { assets: { id: string; mime: string; durationMs: number }[] }).assets;
+    expect([copied!.mime, copied!.durationMs]).toEqual(['video/mp4', 7400]);
+    expect((await pool.query('select kind, duration_ms from assets where id = $1', [copied!.id])).rows[0]).toEqual({ kind: 'input', duration_ms: 7400 });
   });
 
   test('stops a caller who added the hourly limit of pictures in the last hour, counting older ones out', async () => {
