@@ -1115,7 +1115,7 @@ const marketing: AboutPage = {
             { title: 'Không chữ trên hình', text: 'Không chữ, không logo, không watermark được dựng lên hình. Bạn tự thêm phụ đề trong phần mềm dựng theo ý mình.' },
           ],
         },
-        'Marketing Studio hiện có định dạng UGC Thử đồ. Các định dạng Mở hộp và Đánh giá sản phẩm hiện trong bảng chọn định dạng nhưng chưa được xây dựng.',
+        'Marketing Studio có bốn định dạng: UGC Thử đồ, Nâng cao, Mở hộp và Đánh giá sản phẩm. Đổi định dạng ở bảng chọn định dạng ngay trên đầu trang.',
       ],
     },
     {
@@ -1313,7 +1313,7 @@ const advanced: AboutPage = {
     {
       kicker: 'Chọn công cụ',
       title: 'UGC Thử đồ hay Nâng cao?',
-      lead: 'Marketing Studio có hai định dạng trên cùng một nền tảng. Chọn theo mức kiểm soát bạn muốn.',
+      lead: 'Marketing Studio có bốn định dạng trên cùng một nền tảng. UGC Thử đồ và Nâng cao khác nhau ở mức kiểm soát bạn muốn: chọn theo đó.',
       blocks: [
         {
           cards: [
@@ -1439,6 +1439,164 @@ const advanced: AboutPage = {
             ['Video có lời thoại không?', 'Có. Tạo âm thanh bật sẵn; lời bạn viết trong ô Lời thoại được đọc đúng từng chữ, khớp khẩu hình. Không viết lời thoại thì chỉ có lời nói khi brief yêu cầu. Với Kling O3 Pro và Seedance, tắt công tắc để có clip im lặng; các mô hình còn lại luôn có tiếng.'],
             ['Một video nâng cao tốn bao nhiêu?', 'Chi phí tuỳ mô hình và thời lượng, vì chi phí tính theo giây. Âm thanh làm giá cao hơn ở một số mô hình. Chi phí ước tính, đã tính âm thanh, luôn ghi trên nút chạy trước khi bạn tạo, và video dùng chung ngân sách với Tạo video.'],
             ['Video có chữ hay phụ đề trên hình không?', 'Nên dặn rõ trong brief là không có chữ, logo hay watermark. Thêm phụ đề sau trong phần mềm dựng, nơi bạn kiểm soát phông chữ và vị trí.'],
+            ['Video thuộc về ai?', `Video là tài sản của công ty, dùng cho trang sản phẩm, mạng xã hội và quảng cáo của công ty. ${RIGHTS}`],
+            PRIVACY,
+          ],
+        },
+      ],
+    },
+  ],
+};
+
+/** Marketing Studio, Mở hộp. */
+const unboxing: AboutPage = {
+  title: 'Mở hộp: video bóc hộp kiểu người sáng tạo nội dung',
+  lead: 'Một ảnh sản phẩm vào, một video mở hộp ra. Thêm ảnh người mẫu nếu muốn thấy người mở hộp; bỏ trống thì video quay góc nhìn thứ nhất, chỉ thấy đôi tay. Chỉ dẫn mở hộp được cố định để sản phẩm luôn đúng hình dáng, màu sắc và chi tiết như ảnh.',
+  sections: [
+    {
+      kicker: 'Từng bước',
+      title: 'Video mở hộp hoạt động thế nào?',
+      lead: 'Chỉ ảnh sản phẩm là bắt buộc. Hai ảnh còn lại làm video thật hơn nhưng có thể bỏ qua.',
+      blocks: [
+        {
+          steps: [
+            { title: 'Thêm ảnh', text: 'Tải ảnh sản phẩm (bắt buộc). Thêm ảnh người mẫu nếu muốn họ mở hộp trước ống kính, và ảnh hộp hoặc bao bì nếu muốn video mở đúng chiếc hộp đó.' },
+            { title: 'Thêm hook, kết và ý riêng', text: `Nếu muốn, mở đầu bằng một trong ${HOOKS.length} hook, đặt cảnh ở một trong ${LOCATIONS.length} bối cảnh, hoặc điền sẵn Hook, Diễn biến và Kết từ một Khung prompt như Hộp quà, POV tay hay Mở nhanh ASMR.` },
+            { title: 'Chạy và nhận video', text: 'Chọn tỉ lệ, thời lượng và âm thanh, rồi bấm Tạo video, với chi phí ước tính bằng USD ghi trên nút. Video xong nằm trong tab Lịch sử và trong Thư viện.' },
+          ],
+        },
+      ],
+    },
+    {
+      kicker: 'Ảnh vào',
+      title: 'Ba ảnh của Mở hộp',
+      blocks: [
+        {
+          table: [
+            ['Ảnh', 'Bắt buộc', 'Vai trò trong video'],
+            ['Sản phẩm', 'Có', 'Thứ được lấy ra khỏi hộp, giữ đúng hình dáng, màu sắc, hoa văn và chi tiết'],
+            ['Người mẫu', 'Không', 'Người mở hộp, giữ đúng khuôn mặt, tóc và dáng người; không có ảnh này thì video là góc nhìn thứ nhất, chỉ thấy tay'],
+            ['Bao bì', 'Không', 'Chiếc hộp hoặc túi bên ngoài, để video mở đúng kiểu bao bì của bạn'],
+          ],
+        },
+        'Video luôn có các cảnh: hộp còn đóng, lúc mở, sản phẩm được nhấc ra và xoay về phía máy quay, rồi cận cảnh chi tiết. Không có chữ, logo hay watermark trên hình.',
+      ],
+    },
+    {
+      kicker: 'Âm thanh',
+      title: 'Âm thanh khi mở hộp',
+      lead: 'Tạo âm thanh bật sẵn.',
+      blocks: [
+        {
+          list: [
+            'Bật: tiếng giấy, băng keo và nắp hộp mở, cùng một câu phản ứng ngắn của người sáng tạo, không có nhạc nền.',
+            'Tắt: video im lặng hoàn toàn, để bạn thêm giọng đọc hoặc nhạc khi dựng.',
+            'Một số mô hình luôn có âm thanh; nút âm thanh sẽ nói rõ khi đó.',
+          ],
+        },
+      ],
+    },
+    {
+      kicker: 'Tạo tiếp',
+      title: 'Làm gì với kết quả?',
+      blocks: [
+        {
+          links: [
+            ['Đánh giá sản phẩm', '/marketing-studio/review', 'cho người mẫu nói về những điểm nổi bật của sản phẩm.'],
+            ['UGC Thử đồ', '/marketing-studio', 'cho người mẫu mặc hoặc cầm sản phẩm.'],
+            ['Nâng cao', '/marketing-studio/advanced', 'khi bạn muốn tự viết brief và lời thoại với tối đa 7 ảnh.'],
+          ],
+        },
+      ],
+    },
+    {
+      kicker: 'Hỏi đáp',
+      title: 'Câu hỏi thường gặp',
+      blocks: [
+        {
+          faq: [
+            ['Mở hộp cần mấy ảnh?', 'Tối thiểu 1: ảnh sản phẩm. Thêm tối đa 2 ảnh nữa là người mẫu và bao bì, tuỳ mô hình đã chọn nhận bao nhiêu ảnh.'],
+            ['Không có ảnh người mẫu thì sao?', 'Video quay theo góc nhìn thứ nhất: chỉ thấy đôi tay mở hộp và nhấc sản phẩm ra, không có khuôn mặt.'],
+            ['Có thể tự viết cảnh không?', 'Có. Điền Hook, Diễn biến và Kết bằng chữ của bạn, hoặc bắt đầu từ một Khung prompt rồi sửa. Chỉ dẫn mở hộp cố định luôn được giữ.'],
+            ['Một video mở hộp tốn bao nhiêu?', 'Chi phí tuỳ mô hình và thời lượng, vì chi phí tính theo giây. Chi phí ước tính, đã tính âm thanh, luôn ghi trên nút Tạo video.'],
+            ['Video thuộc về ai?', `Video là tài sản của công ty, dùng cho trang sản phẩm, mạng xã hội và quảng cáo của công ty. ${RIGHTS}`],
+            PRIVACY,
+          ],
+        },
+      ],
+    },
+  ],
+};
+
+/** Marketing Studio, Đánh giá sản phẩm. */
+const review: AboutPage = {
+  title: 'Đánh giá sản phẩm: người mẫu nói về những điểm nổi bật',
+  lead: 'Một ảnh người mẫu, một ảnh sản phẩm và từ một đến ba điểm nổi bật bạn muốn nhấn mạnh, AI dựng clip người sáng tạo nội dung cầm hoặc mặc sản phẩm và nói về đúng những điểm đó. Âm thanh bật sẵn.',
+  sections: [
+    {
+      kicker: 'Từng bước',
+      title: 'Video đánh giá hoạt động thế nào?',
+      blocks: [
+        {
+          steps: [
+            { title: 'Thêm ảnh', text: 'Tải ảnh người mẫu rồi ảnh sản phẩm. Cả hai đều bắt buộc.' },
+            { title: 'Viết điểm nổi bật', text: 'Nhập từ một đến ba ý ngắn, mỗi ý tối đa 60 ký tự, ví dụ “Vải mềm, không nhăn”. Người mẫu sẽ nói về các ý này.' },
+            { title: 'Thêm hook, kết hoặc lời thoại', text: `Nếu muốn, chọn một trong ${HOOKS.length} hook, một bối cảnh, một Khung prompt như Review thật, Ưu và nhược hay Mặc cả ngày, hoặc viết đúng lời nhân vật sẽ nói.` },
+            { title: 'Chạy và nhận video', text: 'Chọn tỉ lệ, thời lượng và âm thanh, rồi bấm Tạo video, với chi phí ước tính bằng USD ghi trên nút.' },
+          ],
+        },
+      ],
+    },
+    {
+      kicker: 'Điểm nổi bật',
+      title: 'Viết điểm nổi bật sao cho hiệu quả?',
+      blocks: [
+        {
+          list: [
+            'Cần ít nhất 1 điểm và tối đa 3 điểm; mỗi điểm một dòng, tối đa 60 ký tự.',
+            'Mỗi điểm là một ý cụ thể, như chất liệu, độ vừa vặn hay giá, thay vì lời khen chung chung.',
+            'Có thể viết tiếng Việt: lời được đưa vào prompt đúng như bạn viết.',
+          ],
+        },
+      ],
+    },
+    {
+      kicker: 'Lời thoại',
+      title: 'Quy tắc của âm thanh và lời thoại',
+      lead: 'Tạo âm thanh bật sẵn. Ô Lời thoại (tuỳ chọn) quyết định nhân vật nói gì.',
+      blocks: [
+        {
+          list: [
+            'Không có lời thoại: người mẫu nói tự nhiên, thật thà về các điểm nổi bật, như quay bằng điện thoại, không có nhạc nền.',
+            'Có lời thoại: lời bạn viết được nói đúng từng chữ, khớp khẩu hình, và không có lời nào khác.',
+            'Tắt Tạo âm thanh: video im lặng hoàn toàn, lời thoại không được dùng.',
+            'Khoảng hai từ mỗi giây: video 10 giây nên có khoảng hai mươi từ.',
+          ],
+        },
+      ],
+    },
+    {
+      kicker: 'Tạo tiếp',
+      title: 'Làm gì với kết quả?',
+      blocks: [
+        {
+          links: [
+            ['Mở hộp', '/marketing-studio/unboxing', 'cho video bóc hộp, có thể chỉ thấy đôi tay.'],
+            ['UGC Thử đồ', '/marketing-studio', 'cho người mẫu mặc hoặc cầm sản phẩm, không có điểm nổi bật.'],
+            ['Nâng cao', '/marketing-studio/advanced', 'khi bạn muốn tự viết brief với tối đa 7 ảnh.'],
+          ],
+        },
+      ],
+    },
+    {
+      kicker: 'Hỏi đáp',
+      title: 'Câu hỏi thường gặp',
+      blocks: [
+        {
+          faq: [
+            ['Đánh giá sản phẩm khác UGC Thử đồ thế nào?', 'UGC Thử đồ chỉ cho người mẫu thử sản phẩm. Đánh giá thêm các điểm nổi bật bạn chọn để người mẫu nói về chúng, và có ô Lời thoại.'],
+            ['Bắt buộc phải có điểm nổi bật không?', 'Có, ít nhất 1 điểm. Nút Tạo video sẽ nói rõ khi còn thiếu.'],
+            ['Một video đánh giá tốn bao nhiêu?', 'Chi phí tuỳ mô hình và thời lượng, vì chi phí tính theo giây. Chi phí ước tính, đã tính âm thanh, luôn ghi trên nút Tạo video.'],
             ['Video thuộc về ai?', `Video là tài sản của công ty, dùng cho trang sản phẩm, mạng xã hội và quảng cáo của công ty. ${RIGHTS}`],
             PRIVACY,
           ],
@@ -2532,7 +2690,7 @@ export const APP_ABOUT: Record<string, AboutPage> = {
 };
 
 /** The long About tabs of the tools; `advanced` is for the Advanced marketing page. */
-export const ABOUT = { create, tryOn, image, marketing, advanced };
+export const ABOUT = { create, tryOn, image, marketing, advanced, unboxing, review };
 
 /** The short description of a model on the Explore "Featured models" cards, by model id. */
 export const MODEL_CARD_TEXT: Record<string, string> = {

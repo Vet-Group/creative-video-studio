@@ -4,7 +4,7 @@
 import { type KeyboardEvent, type ReactNode, useEffect, useId, useRef, useState } from 'react';
 import { api, errorText, sendJson } from '@/lib/api';
 import { cardSample } from '@/lib/examples';
-import { BUILT_IN_CHOICES, MAX_CHOICE_DESC, MAX_CHOICE_NAME, MAX_CHOICE_NICHE, MAX_CHOICE_PHRASE, type MarketingChoice } from '@/lib/marketing';
+import { BUILT_IN_CHOICES, MAX_CHOICE_DESC, MAX_CHOICE_NAME, MAX_CHOICE_NICHE, MAX_CHOICE_PHRASE, type MarketingChoice, type ParamFormat } from '@/lib/marketing';
 import { useSamples } from '@/lib/use-samples';
 import { CardMedia } from './CardMedia';
 import { confirmDialog } from './Confirm';
@@ -80,7 +80,7 @@ export const builtInChoices = (kind: ChoiceKind): Choice[] =>
   BUILT_IN_CHOICES[kind].map((c) => ({ ...c, group: 'builtin', isCompany: false, mine: false, storeId: null, storeName: null, niche: null, imageAssetId: null }));
 
 /** The page's lists (null until they load; the built-in ones show meanwhile), `reload` after a change, and `remove`, which asks first. */
-export function useChoiceLists(format?: 'advanced') {
+export function useChoiceLists(format?: ParamFormat) {
   const { notify } = useJobs();
   const [lists, setLists] = useState<ChoiceLists | null>(null);
   const reload = () => api<ChoiceLists>(`/api/choices${format ? `?format=${format}` : ''}`).then(setLists, () => {}); // a failure leaves the built-in ones

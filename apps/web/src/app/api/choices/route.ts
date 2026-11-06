@@ -3,7 +3,7 @@ import { CHOICE_KINDS, type ChoiceKind } from '@cvs/db';
 import { pool } from '@/lib/auth';
 import { CHOICE_SQL, choiceFields, listedChoice, type ListedChoice } from '@/lib/choices';
 import { LIVE_CLIP } from '@/lib/clips';
-import { BUILT_IN_CHOICES, MAX_CHOICES } from '@/lib/marketing';
+import { BUILT_IN_CHOICES, isParamFormat, MAX_CHOICES, PARAM_FORMATS } from '@/lib/marketing';
 import { guard, isEditor } from '@/lib/session';
 
 const bad = (error: string, status = 400) => Response.json({ error }, { status });
@@ -15,7 +15,7 @@ const LISTS = { hook: 'hooks', location: 'locations', ending: 'endings' } as con
  * The pickers' lists of hooks, locations and endings, each choice with its `group`: the stores' (`?storeId=` keeps that store's only; a hidden store's
  * never show), the company's and the caller's own private ones, the caller's first, newest first, then the built-in ones; `?kind=` fills that list only,
  * `?niche=` keeps the entries with that niche tag (so no built-in one). `often` (the often-used group), the ids of the hooks and locations the caller's
- * own `marketing` jobs of that format (`?format=advanced`, else UGC) used at least twice in 90 days, retries and deleted jobs left out, most used first,
+ * own `marketing` jobs of that format (`?format=advanced`, `unboxing` or `review`, else UGC) used at least twice in 90 days, retries and deleted jobs left out, most used first,
  * only ids still in the lists; `posters`, for each often-used id, the poster asset of the caller's latest live clip with it (none when every such clip is
  * gone), the card's picture when it has no sample; `canShare` for a template editor (an Admin too), who shares with the company and edits or deletes
  * shared entries.
@@ -25,7 +25,7 @@ export async function GET(request: Request) {
   if (g.error) return g.error;
   const params = new URL(request.url).searchParams;
   const format = params.get('format');
-  if (format !== null && format !== 'advanced') return bad('format must be advanced or left out');
+  if (format !== null && !isParamFormat(format)) return bad(`format must be one of ${PARAM_FORMATS.join(', ')} or left out`);
   const kind = params.get('kind') as ChoiceKind | null;
   if (kind !== null && !CHOICE_KINDS.includes(kind)) return bad('kind must be hook, location or ending');
   const niche = params.get('niche') || null;
@@ -40,17 +40,17 @@ export async function GET(request: Request) {
     ),
     pool.query(
       `select c.kind, c.id from jobs j, lateral (values ('hook', j.params->>'hook'), ('location', j.params->>'location')) as c (kind, id)
-        where j.user_id = $1 and j.feature = 'marketing' and coalesce(j.params->>'format' = 'advanced', false) = $2 and j.retry_of is null and j.deleted_at is null
+        where j.user_id = $1 and j.feature = 'marketing' and j.params->>'format' is not distinct from $2::text and j.retry_of is null and j.deleted_at is null
           and j.created_at > now() - interval '90 days' and c.id is not null
         group by c.kind, c.id having count(*) >= 2 order by count(*) desc, max(j.created_at) desc`,
-      [userId, format === 'advanced'],
+      [userId, format],
     ),
     pool.query(
       `select distinct on (c.kind, c.id) c.kind, c.id, j.poster_asset_id from jobs j join assets p on p.id = j.poster_asset_id and p.deleted_at is null,
               lateral (values ('hook', j.params->>'hook'), ('location', j.params->>'location')) as c (kind, id)
-        where j.user_id = $1 and j.feature = 'marketing' and coalesce(j.params->>'format' = 'advanced', false) = $2 and ${LIVE_CLIP} and c.id is not null
+        where j.user_id = $1 and j.feature = 'marketing' and j.params->>'format' is not distinct from $2::text and ${LIVE_CLIP} and c.id is not null
         order by c.kind, c.id, j.created_at desc, j.id desc`,
-      [userId, format === 'advanced'],
+      [userId, format],
     ),
   ]);
   const choices = rows.rows.map(listedChoice);

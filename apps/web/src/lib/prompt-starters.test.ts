@@ -18,3 +18,15 @@ describe('PROMPT_TEMPLATES', () => {
     }
   });
 });
+
+describe('PROMPT_TEMPLATES across pages', () => {
+  it('names the three templates of each Marketing Studio format and never offers one template on two pages', () => {
+    expect(PROMPT_TEMPLATES.marketing.map((t) => t.name)).toEqual(['Trước / sau', 'Cận chất liệu', 'Phối đồ']);
+    expect(PROMPT_TEMPLATES.advanced.map((t) => t.name)).toEqual(['Giới thiệu nhanh', 'Một ngày cùng sản phẩm', 'Vấn đề và giải pháp']);
+    expect(PROMPT_TEMPLATES.unboxing.map((t) => t.name)).toEqual(['Hộp quà', 'POV tay', 'Mở nhanh ASMR']);
+    expect(PROMPT_TEMPLATES.review.map((t) => t.name)).toEqual(['Review thật', 'Ưu và nhược', 'Mặc cả ngày']);
+    const all = Object.values(PROMPT_TEMPLATES).flat();
+    for (const key of ['name', 'hook', 'body', 'ending'] as const) expect(new Set(all.map((t) => t[key])).size).toBe(all.length);
+  });
+});
+

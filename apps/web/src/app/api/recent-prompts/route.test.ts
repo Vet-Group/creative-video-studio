@@ -66,11 +66,15 @@ describe('GET /api/recent-prompts', () => {
     await job(alice.id, 'try_on', { prompt: 'server default' });
     await job(alice.id, 'marketing', { params: { brief: 'ugc brief' } });
     await job(alice.id, 'marketing', { params: { brief: 'advanced brief', format: 'advanced' } });
+    await job(alice.id, 'marketing', { params: { brief: 'review brief', format: 'review' } });
+    await job(alice.id, 'marketing', { params: { brief: 'unboxing brief', format: 'unboxing' } });
     await job(alice.id, 'motion_control', { prompt: 'dance on stage' });
     await job(alice.id, 'motion_control', { prompt: '' });
     expect(await prompts(alice.cookie, 'feature=try_on')).toEqual(['red dress']);
     expect(await prompts(alice.cookie, 'feature=marketing')).toEqual(['ugc brief']);
     expect(await prompts(alice.cookie, 'feature=marketing&format=advanced')).toEqual(['advanced brief']);
+    expect(await prompts(alice.cookie, 'feature=marketing&format=review')).toEqual(['review brief']);
+    expect(await prompts(alice.cookie, 'feature=marketing&format=unboxing')).toEqual(['unboxing brief']);
     expect(await prompts(alice.cookie, 'feature=motion_control')).toEqual(['dance on stage']);
   });
 

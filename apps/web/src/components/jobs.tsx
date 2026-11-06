@@ -68,12 +68,15 @@ export interface ExampleHook {
 }
 /** A photo a detail hands the form: a sample (uploaded as the member's own first, as a picked sample is) or an asset (a job's input or result). */
 export type Photo = { sample: string } | { asset: string };
-export type PhotoRole = 'model' | 'garment' | 'background' | 'product' | 'input';
+export type PhotoRole = 'model' | 'garment' | 'background' | 'product' | 'packaging' | 'input';
 
-/** The role of a job's or a sample's n-th photo: Try On sends the person, the garments, then the background; UGC the person, then the product. */
-export function roleOf(feature: string, n: number, opts: { garments?: number | null; advanced?: boolean }): PhotoRole {
+/** The role of a job's or a sample's n-th photo: Try On sends the person, the garments, then the background; UGC and Review the person, then the product; the other formats' photos are plain inputs. */
+export function roleOf(feature: string, n: number, opts: { garments?: number | null; format?: string | null; roles?: string | null }): PhotoRole {
   if (feature === 'try_on') return n === 0 ? 'model' : n <= (opts.garments ?? Infinity) ? 'garment' : 'background';
-  if (feature === 'marketing' && !opts.advanced) return n === 0 ? 'model' : 'product';
+  if (feature === 'marketing' && (!opts.format || opts.format === 'review')) return n === 0 ? 'model' : 'product';
+  // Unboxing names its photos in the job's roles (model, product, packaging); a sample has none, so its photos are plain inputs.
+  const role = feature === 'marketing' && opts.format === 'unboxing' ? opts.roles?.split(',')[n] : undefined;
+  if (role === 'model' || role === 'product' || role === 'packaging') return role;
   return 'input';
 }
 

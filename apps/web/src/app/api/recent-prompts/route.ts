@@ -1,5 +1,6 @@
 import { FEATURES } from '@cvs/db';
 import { pool } from '@/lib/auth';
+import { isParamFormat, PARAM_FORMATS } from '@/lib/marketing';
 import { guard } from '@/lib/session';
 
 const bad = (error: string) => Response.json({ error }, { status: 400 });
@@ -11,7 +12,7 @@ const BRIEF_WORDS = `coalesce(nullif(j.params->>'brief', ''), case when (j.featu
 /**
  * `?feature=&format=`: the caller's last 10 distinct own words on that page, newest first, from the latest 200 jobs (deleted ones left out).
  * Own words are the kept brief, else the prompt of a free-prompt Create video, an Image Generation or a Motion Control job (elsewhere the prompt is composed).
- * `format` is `advanced` for Marketing Studio Advanced; without it only jobs with no format count.
+ * `format` is `advanced`, `unboxing` or `review` for those Marketing Studio formats; without it only jobs with no format count.
  * `field=hook|ending` lists the member's own `params.hookText` or `params.ending` of the sectioned prompt instead (the prompt templates dialog's recent group), with the same scoping.
  */
 export async function GET(request: Request) {
@@ -22,7 +23,7 @@ export async function GET(request: Request) {
   const format = q.get('format');
   const field = q.get('field');
   if (!(FEATURES as readonly string[]).includes(feature)) return bad(`feature must be one of ${FEATURES.join(', ')}`);
-  if (format !== null && format !== 'advanced') return bad('format must be advanced when given');
+  if (format !== null && !isParamFormat(format)) return bad(`format must be one of ${PARAM_FORMATS.join(', ')} when given`);
   if (field !== null && !Object.hasOwn(FIELD_WORDS, field)) return bad('field must be hook or ending when given');
   const { rows } = await pool.query(
     `select p from (

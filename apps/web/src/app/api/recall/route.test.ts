@@ -98,12 +98,23 @@ describe('/api/recall', () => {
     expect(await settings(u, 'feature=marketing')).toMatchObject({ ratio: '9:16', durationSec: 5, audio: true });
   });
 
+  test('keeps each Marketing Studio format apart, Unboxing and Review too', async () => {
+    const u = await newUser();
+    await job(u, { feature: 'marketing', aspect: '1:1', duration: 8, params: { format: 'unboxing', roles: 'product', audio: 'off' } });
+    await job(u, { feature: 'marketing', aspect: '9:16', duration: 5, params: { format: 'review', highlights: 'a', audio: 'on' } });
+    await job(u, { feature: 'marketing', aspect: '9:16', duration: 5, params: { audio: 'on' } });
+    expect(await settings(u, 'feature=marketing&format=unboxing')).toMatchObject({ ratio: '1:1', durationSec: 8, audio: false });
+    expect(await settings(u, 'feature=marketing&format=review')).toMatchObject({ ratio: '9:16', durationSec: 5, audio: true });
+    expect(await settings(u, 'feature=marketing&format=advanced')).toBeNull();
+  });
+
   test('refuses a bad feature or format, and a caller who is not signed in', async () => {
     const u = await newUser();
     expect((await recall(u, 'feature=nope')).status).toBe(400);
     expect((await recall(u, '')).status).toBe(400);
     expect((await recall(u, 'feature=video&format=advanced')).status).toBe(400);
     expect((await recall(u, 'feature=marketing&format=ugc')).status).toBe(400);
+    expect((await recall(u, 'feature=video&format=review')).status).toBe(400);
     expect((await recall(null, 'feature=video')).status).toBe(401);
   });
 });

@@ -6,6 +6,7 @@ import { createContext, type ReactNode, useCallback, useContext, useEffect, useR
 import { api, errorText, sendJson, type JobStatus, type TrayJob } from '@/lib/api';
 import { appBySlug } from '@/lib/apps';
 import { featureLabel } from '@/lib/features';
+import { cardTitleOfFormat } from '@/lib/marketing';
 import { canReuse, refillFrom, reuseHref } from '@/lib/reuse';
 import { userAvatarColor } from '@/lib/profile';
 import { COLLAPSED_COOKIE, isMac, isSettingsShortcut, navGroups } from '@/lib/sidebar';
@@ -98,7 +99,7 @@ function TrayItem({ job, isAdmin }: { job: TrayJob; isAdmin: boolean }) {
 }
 
 /** The History card's title: the page's own name for what made it, as Fash titles its cards ("UGC Try On"). */
-const cardTitle = (job: TrayJob): string => (job.feature === 'marketing' ? (job.format === 'advanced' ? 'Marketing nâng cao' : 'UGC Thử đồ') : featureLabel(job.feature));
+const cardTitle = (job: TrayJob): string => (job.feature === 'marketing' ? cardTitleOfFormat(job.format) : featureLabel(job.feature));
 
 /**
  * One job in a page's History tab, laid out as Fash's History card: the result on the left; on the right the title, the member's own words,
@@ -201,7 +202,7 @@ function HistoryCard({ job, isAdmin, select }: { job: TrayJob; isAdmin: boolean;
           <ul className="job-inputs" aria-label="Ảnh đầu vào">
             {job.inputAssetIds.map((id, n) => (
               <li key={id}>
-                <Tap on={form?.photo && (() => form.photo!({ asset: id }, roleOf(job.feature, n, { garments: job.garments, advanced: job.format === 'advanced' })))} label={`Dùng ảnh đầu vào ${n + 1}`}>
+                <Tap on={form?.photo && (() => form.photo!({ asset: id }, roleOf(job.feature, n, { garments: job.garments, format: job.format, roles: job.roles })))} label={`Dùng ảnh đầu vào ${n + 1}`}>
                   <img src={content(id)} alt="" loading="lazy" />
                 </Tap>
               </li>

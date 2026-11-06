@@ -4,7 +4,7 @@
 // three (and lists the member's recent hooks and endings, which fill one section), and free writing keeps the page's one box. The page composes the prompt (lib/marketing.ts); PromptPreview shows the English it sends.
 import { type ReactNode, useEffect, useId, useState } from 'react';
 import { api } from '@/lib/api';
-import { MAX_ENDING, MAX_HOOK } from '@/lib/marketing';
+import { MAX_ENDING, MAX_HOOK, type ParamFormat } from '@/lib/marketing';
 import type { PromptTemplate } from '@/lib/prompt-starters';
 import { useHydrated } from '@/lib/use-hydrated';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
@@ -53,7 +53,7 @@ interface Part {
 
 interface Props {
   feature: 'video' | 'marketing';
-  format?: 'advanced';
+  format?: ParamFormat;
   mode: PromptMode;
   onMode: (mode: PromptMode) => void;
   hook: Part;

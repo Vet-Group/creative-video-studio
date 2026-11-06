@@ -3,6 +3,7 @@
 // grows with the text, starter chips while it is empty, a toolbar (Enhance when the page has it, AI suggestions, recent words, the tall editor)
 // and a meta row with the Ctrl+Enter hint while typing and the count, red near the model's limit.
 import type { ReactNode } from 'react';
+import type { ParamFormat } from '@/lib/marketing';
 import { runKey } from '@/lib/run-guard';
 import { type Starter, STARTERS } from '@/lib/prompt-starters';
 import s from './PromptComposer.module.css';
@@ -17,7 +18,7 @@ interface Props {
   label: string;
   optional?: boolean;
   feature: string;
-  format?: 'advanced';
+  format?: ParamFormat;
   value: string;
   onChange: (text: string) => void;
   maxLength?: number;

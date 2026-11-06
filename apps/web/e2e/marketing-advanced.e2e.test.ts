@@ -22,7 +22,7 @@ async function openAdvanced(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'Đổi định dạng' }).click();
   const formats = page.getByRole('dialog', { name: 'Chọn định dạng' });
   await expect(formats.getByRole('button', { name: 'Nâng cao' })).toBeEnabled();
-  await expect(formats.getByRole('button', { disabled: true })).toHaveCount(2); // Unboxing and Product Review are still to come
+  await expect(formats.getByRole('button', { disabled: true })).toHaveCount(0); // all four formats are built
   await formats.getByRole('button', { name: 'Nâng cao' }).click();
   await expect(page).toHaveURL(/\/marketing-studio\/advanced$/);
   await expect(page.locator('.app-head strong')).toHaveText('Nâng cao');

@@ -854,9 +854,9 @@ describe('POST /api/jobs for an image feature', () => {
         expect(await error(await advanced(m, 8))).toMatch(/assetIds must list 1 to 7/);
         expect(await error(await advanced(m, 2, { prompt: '  ' }))).toMatch(/prompt and no preset/);
         expect(await error(await advanced(m, 2, { presetId: 'gentle-push-in' }))).toMatch(/prompt and no preset/);
-        expect(await error(await advanced(m, 2, { params: { format: 'unboxing' } }))).toMatch(/params.format must be advanced/);
+        expect(await error(await advanced(m, 2, { params: { format: 'bogus' } }))).toMatch(/params.format must be one of advanced, unboxing, review/);
         expect(await error(await advanced(m, 2, { params: { format: 'advanced', audio: 'yes' } }))).toMatch(/params.audio must be on or off/);
-        expect(await error(await advanced(m, 2, { params: { format: 'advanced', resolution: '1K' } }))).toMatch(/params may hold only format, audio, endAssetId, videoAssetId, hook, hookText, location, brief, script, ending, endText and endTextPos, as text/);
+        expect(await error(await advanced(m, 2, { params: { format: 'advanced', resolution: '1K' } }))).toMatch(/params may hold only format, audio, endAssetId, videoAssetId, hook, hookText, location, brief, script, ending, endText, endTextPos, roles and highlights, as text/);
         expect(await error(await advanced(m, 2, { feature: 'video', prompt: 'x', params: { format: 'advanced' } }))).toMatch(/params may hold only audio, endAssetId, audioAssetIds, hookText and ending, as text/);
         expect(await jobCount()).toBe(before);
       });
@@ -873,7 +873,7 @@ describe('POST /api/jobs for an image feature', () => {
         expect(await error(await advanced(m, 2, { params: { format: 'advanced', location: 'moon' } }))).toMatch(/params.location must be one of/);
         expect(await error(await advanced(m, 2, { params: { format: 'advanced', brief: 'x'.repeat(5001) } }))).toMatch(/params.brief may be at most 5000/);
         expect(await error(await advanced(m, 2, { params: { format: 'advanced', script: 'x'.repeat(301) } }))).toMatch(/params.script may be at most 300/);
-        expect(await error(await runAs(m, { feature: 'marketing', presetId: null, prompt, ...kling, assetIds: await refs(m, 2), params: { script: 's' } }))).toMatch(/params.script is for Advanced only/);
+        expect(await error(await runAs(m, { feature: 'marketing', presetId: null, prompt, ...kling, assetIds: await refs(m, 2), params: { script: 's' } }))).toMatch(/params.script is for Advanced and Review only/);
         expect(await jobCount()).toBe(before);
       });
 
@@ -930,6 +930,88 @@ describe('POST /api/jobs for an image feature', () => {
         const retry = ((await res.json()) as { id: string }).id;
         expect((await pool.query('select params from jobs where id = $1', [retry])).rows[0].params).toEqual({ format: 'advanced', audio: 'on' });
         expect((await pool.query(`select usd::text from cost_entries where job_id = $1`, [retry])).rows).toEqual([{ usd: '0.7000' }]);
+      });
+
+      test('refuses an unknown params.format in English', async () => {
+        const m = await newMember();
+        expect(await error(await advanced(m, 2, { params: { format: 'bogus' } }))).toBe('params.format must be one of advanced, unboxing, review');
+      });
+
+      describe('Unboxing (params.format unboxing)', () => {
+        const unboxing = (m: Member, n: number, roles: string | undefined, extra: Record<string, unknown> = {}) =>
+          advanced(m, n, { params: { format: 'unboxing', audio: 'off', ...(roles && { roles }) }, ...extra });
+
+        test('takes the photos named by params.roles in the order sent, with or without a model and a packaging photo, and keeps the roles', async () => {
+          const m = await newMember();
+          for (const [n, roles] of [[1, 'product'], [2, 'model,product'], [2, 'product,packaging'], [3, 'model,product,packaging']] as const) {
+            const res = await unboxing(m, n, roles);
+            expect(res.status, roles).toBe(201);
+            const { id } = (await res.json()) as { id: string };
+            const row = (await pool.query('select params, input_asset_ids from jobs where id = $1', [id])).rows[0];
+            expect(row.params).toEqual({ format: 'unboxing', audio: 'off', roles });
+            expect(row.input_asset_ids).toHaveLength(n);
+          }
+        });
+
+        test('refuses no roles, roles that do not match the photos, an unknown layout, roles on another format, and a fourth photo', async () => {
+          const m = await newMember();
+          const before = await jobCount();
+          const roleError = /params.roles goes with the unboxing format/;
+          expect(await error(await unboxing(m, 1, undefined))).toMatch(roleError);
+          expect(await error(await unboxing(m, 2, 'product'))).toMatch(roleError);
+          expect(await error(await unboxing(m, 1, 'model,product'))).toMatch(roleError);
+          expect(await error(await unboxing(m, 2, 'product,model'))).toMatch(roleError);
+          expect(await error(await unboxing(m, 3, 'model,product,box'))).toMatch(roleError);
+          expect(await error(await advanced(m, 2, { params: { format: 'review', audio: 'off', roles: 'model,product', highlights: 'x' } }))).toMatch(roleError);
+          expect(await error(await advanced(m, 2, { params: { audio: 'off', roles: 'model,product' } }))).toMatch(roleError);
+          expect(await error(await unboxing(m, 4, 'model,product,packaging'))).toMatch(roleError);
+          expect(await error(await unboxing(m, 0, 'product'))).toMatch(/assetIds must list 1 to 9/);
+          expect(await jobCount()).toBe(before);
+        });
+
+        test('keeps the hook, ending and notes as UGC does, and takes no script', async () => {
+          const m = await newMember();
+          const kept = { format: 'unboxing', audio: 'on', roles: 'product', hook: 'product-drop', location: 'kitchen', brief: 'b', hookText: 'The clip opens on a box.', ending: 'The clip ends on a nod.' };
+          const res = await unboxing(m, 1, 'product', { params: kept });
+          expect(res.status).toBe(201);
+          expect(await error(await unboxing(m, 1, 'product', { params: { format: 'unboxing', roles: 'product', script: 's' } }))).toMatch(/params.script is for Advanced and Review only/);
+        });
+      });
+
+      describe('Review (params.format review)', () => {
+        const review = (m: Member, highlights: string | undefined, params: Record<string, string> = {}, n = 2) =>
+          advanced(m, n, { params: { format: 'review', audio: 'on', ...(highlights !== undefined && { highlights }), ...params } });
+
+        test('takes the model and the product photo with 1 to 3 highlight lines, keeps them one per line, and takes a script', async () => {
+          const m = await newMember();
+          for (const highlights of ['Vải mềm', 'Vải mềm\nVừa vặn', `${'a'.repeat(60)}\nb\nc`]) {
+            const res = await review(m, highlights, { script: 'Mình rất thích.' });
+            expect(res.status, highlights).toBe(201);
+            const { id } = (await res.json()) as { id: string };
+            const row = (await pool.query('select params, input_asset_ids from jobs where id = $1', [id])).rows[0];
+            expect(row.params).toEqual({ format: 'review', audio: 'on', highlights, script: 'Mình rất thích.' });
+            expect(row.input_asset_ids).toHaveLength(2);
+          }
+        });
+
+        test('refuses missing, empty, too many, over-long and control-character highlights, other photo counts, and highlights on another format', async () => {
+          const m = await newMember();
+          const before = await jobCount();
+          const lineError = /params.highlights goes with the review format: 1 to 3 lines/;
+          expect(await error(await review(m, undefined))).toMatch(lineError);
+          expect(await error(await review(m, ''))).toMatch(lineError);
+          expect(await error(await review(m, 'a\n\nb'))).toMatch(lineError);
+          expect(await error(await review(m, '  '))).toMatch(lineError);
+          expect(await error(await review(m, 'a\nb\nc\nd'))).toMatch(lineError);
+          expect(await error(await review(m, 'a'.repeat(61)))).toMatch(lineError);
+          expect(await error(await review(m, 'a\tb'))).toMatch(lineError);
+          expect(await error(await review(m, 'a', {}, 1))).toMatch(/exactly 2 images/);
+          expect(await error(await review(m, 'a', {}, 3))).toMatch(/exactly 2 images/);
+          expect(await error(await advanced(m, 2, { params: { format: 'advanced', audio: 'on', highlights: 'a' } }))).toMatch(lineError);
+          expect(await error(await advanced(m, 2, { params: { audio: 'on', highlights: 'a' } }))).toMatch(lineError);
+          expect(await error(await review(m, 'a', { script: 'x'.repeat(301) }))).toMatch(/params.script may be at most 300/);
+          expect(await jobCount()).toBe(before);
+        });
       });
     });
   });

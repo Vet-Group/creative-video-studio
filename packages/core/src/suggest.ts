@@ -41,7 +41,15 @@ export interface SuggestInput {
   /** The clip's length in seconds, when the page has one: lines must fit it, and a brief or a video prompt paces its beats to it. For `video`, the
    * sample clip's length the worker measured, which times each still. */
   seconds?: number;
+  /** The Marketing Studio format whose page asks, when it is not UGC or Advanced: its clip is told to the model (FORMAT_NOTES). */
+  format?: keyof typeof FORMAT_NOTES;
 }
+
+/** What the clip of an Unboxing or Review page is, so a suggestion fits it. */
+export const FORMAT_NOTES = {
+  unboxing: 'The clip is an unboxing: the creator, or only their hands when no one is shown, opens a package and reveals the product.',
+  review: 'The clip is a product review: the creator talks to the camera about what they like in the product and shows it up close.',
+} as const;
 
 /** `meanings[i]` is option i in Vietnamese for the member to read (null when the model gave none); only `options` ever fill a field. */
 /** `provider` and `model`: who answered and with what, for the call's ledger row. `frames`: a `video` run's stills, as JPEG data URLs in time order. */
@@ -212,6 +220,7 @@ export function suggestPrompt(i: SuggestInput, d = 0): string {
     i.field === 'prompt' ? `${ASK.prompt} ${i.task}.` : ASK[i.field],
     `Direction: ${DIRECTIONS[d]}`,
     i.model,
+    i.format && FORMAT_NOTES[i.format],
     pace,
     i.context && (i.field === 'hook' || i.field === 'ending' ? `The rest of the clip: ${i.context}` : `The video: ${i.context}`),
     i.text && `The seller's notes: ${i.text}`,

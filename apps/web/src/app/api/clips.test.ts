@@ -132,7 +132,11 @@ describe('GET /api/jobs?mine', () => {
     const byId = (id: string) => jobs.find((j) => j.id === id);
     expect(byId(preset)).toMatchObject({ text: null, inputAssetIds: ['in-1', 'in-2'], format: null, favorite: false }); // a preset's prompt is not the member's, and Bob's favourite is his
     expect(byId(free)).toMatchObject({ text: 'my own words', favorite: true });
-    expect(byId(marketing)).toMatchObject({ text: 'my brief', format: 'advanced' }); // never the composed prompt
+    expect(byId(marketing)).toMatchObject({ text: 'my brief', format: 'advanced', roles: null }); // never the composed prompt
+    // An Unboxing job names its photos, so the tray puts each one in its slot.
+    await pool.query(`update jobs set params = '{"format": "unboxing", "roles": "product,packaging"}' where id = $1`, [marketing]);
+    const again = (await (await GET_MINE(req('/api/jobs?mine', alice.cookie))).json()) as { jobs: { id: string }[] };
+    expect(again.jobs.find((j) => j.id === marketing)).toMatchObject({ format: 'unboxing', roles: 'product,packaging' });
     // Leave the shared fixtures as found: later tests count Alice's favourites and every clip.
     await pool.query('delete from favorites where job_id = any($1)', [[preset, free]]);
     await pool.query('update jobs set deleted_at = now() where id = any($1)', [[preset, free, marketing]]);
@@ -352,27 +356,33 @@ describe('images in the Library', () => {
     expect(day.find((c) => c.id === 'lib-a')).toMatchObject({ feature: 'video', mediaType: 'video', resolution: null });
   });
 
-  test('filters by kind: images, videos, one feature, the two Marketing Studio formats, and every app feature', async () => {
+  test('filters by kind: images, videos, one feature, the four Marketing Studio formats, and every app feature', async () => {
     const v = await clip(alice.id, { id: 'kind-video' });
     const mk = await clip(alice.id, { id: 'kind-marketing' });
     await pool.query(`update jobs set feature = 'marketing' where id = $1`, [mk]);
     const ma = await clip(alice.id, { id: 'kind-marketing-advanced' });
     await pool.query(`update jobs set feature = 'marketing', params = '{"format":"advanced","audio":"on"}' where id = $1`, [ma]);
+    const mu = await clip(alice.id, { id: 'kind-marketing-unboxing', model: 'kling-o3-pro' }); // a model the later score tests do not rank
+    await pool.query(`update jobs set feature = 'marketing', params = '{"format":"unboxing","audio":"on","roles":"product"}' where id = $1`, [mu]);
+    const mr = await clip(alice.id, { id: 'kind-marketing-review', model: 'kling-o3-pro' });
+    await pool.query(`update jobs set feature = 'marketing', params = '{"format":"review","audio":"on","highlights":"a"}' where id = $1`, [mr]);
     const im = await imageClip(alice.id, { id: 'kind-image', feature: 'image' });
     const to = await imageClip(alice.id, { id: 'kind-tryon', feature: 'try_on' });
     const rf = await imageClip(alice.id, { id: 'kind-reframe', feature: 'reframe' });
     const mc = await imageClip(alice.id, { id: 'kind-motion', feature: 'motion_control' });
     await pool.query(`update assets set mime = 'video/mp4' where id = $1`, [`${mc}-out`]); // an app that outputs a video
     const kind = async (k: string) => (await items(bob.cookie, `?kind=${k}`)).map((c) => c.id as string).filter((id) => id.startsWith('kind-')).sort();
-    expect(await kind('all')).toEqual([im, mk, ma, mc, rf, to, v].sort());
+    expect(await kind('all')).toEqual([im, mk, ma, mu, mr, mc, rf, to, v].sort());
     expect(await kind('images')).toEqual([im, rf, to].sort());
-    expect(await kind('videos')).toEqual([mc, mk, ma, v].sort());
+    expect(await kind('videos')).toEqual([mc, mk, ma, mu, mr, v].sort());
     expect(await kind('try_on')).toEqual([to]);
     expect(await kind('image')).toEqual([im]);
     expect(await kind('video')).toEqual([v]);
-    expect(await kind('marketing')).toEqual([mk, ma].sort());
+    expect(await kind('marketing')).toEqual([mk, ma, mu, mr].sort());
     expect(await kind('marketing_ugc')).toEqual([mk]);
     expect(await kind('marketing_advanced')).toEqual([ma]);
+    expect(await kind('marketing_unboxing')).toEqual([mu]);
+    expect(await kind('marketing_review')).toEqual([mr]);
     expect(await kind('apps')).toEqual([mc, rf].sort());
     expect((await items(bob.cookie)).map((c) => c.id)).toEqual(expect.arrayContaining([v, im])); // no kind is all
     expect((await GET_LIBRARY(req('/api/library?kind=cats', bob.cookie))).status).toBe(400);
@@ -414,6 +424,14 @@ describe('images in the Library', () => {
     const as = async (cookie: string) => (await (await GET_JOB(req(`/api/jobs/${id}`, cookie), ctx(id))).json()) as Record<string, unknown>;
     expect(await as(alice.cookie)).toMatchObject({ format: 'advanced', hook: 'product-catch', location: 'bedroom', brief: 'my brief', script: 'my lines' });
     for (const cookie of [bob.cookie, admin.cookie]) expect(await as(cookie)).toMatchObject({ format: 'advanced', hook: 'product-catch', location: 'bedroom', brief: 'my brief', script: 'my lines' });
+  });
+  test("returns an Unboxing job's photo roles and a Review job's highlight lines as a list", async () => {
+    const id = await clip(alice.id, { id: 'mkt-formats', model: 'kling-o3-pro' });
+    const as = async () => (await (await GET_JOB(req(`/api/jobs/${id}`, bob.cookie), ctx(id))).json()) as Record<string, unknown>;
+    await pool.query(`update jobs set feature = 'marketing', params = $2 where id = $1`, [id, { format: 'unboxing', audio: 'on', roles: 'model,product,packaging' }]);
+    expect(await as()).toMatchObject({ format: 'unboxing', roles: 'model,product,packaging', highlights: null });
+    await pool.query(`update jobs set params = $2 where id = $1`, [id, { format: 'review', audio: 'on', highlights: 'Vải mềm\nVừa vặn' }]);
+    expect(await as()).toMatchObject({ format: 'review', roles: null, highlights: ['Vải mềm', 'Vừa vặn'] });
   });
 });
 
@@ -546,7 +564,7 @@ describe('GET /api/jobs/:id', () => {
     const res = await detail(bob.cookie, id);
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
-      id, userId: alice.id, status: 'succeeded', error: null, isMock: false, feature: 'video', resolution: null, presetId: 'gentle-push-in', prompt: 'a prompt', enhance: false, enhancedPrompt: null, audio: null, ratio: '1:1', garments: null, format: null, hook: null, location: null, brief: null, script: null, brand: false, hookText: null, ending: null, endText: null, endTextPos: null, durationSec: 8, modelId: 'fal-test',
+      id, userId: alice.id, status: 'succeeded', error: null, isMock: false, feature: 'video', resolution: null, presetId: 'gentle-push-in', prompt: 'a prompt', enhance: false, enhancedPrompt: null, audio: null, ratio: '1:1', garments: null, format: null, hook: null, location: null, brief: null, script: null, roles: null, highlights: null, brand: false, hookText: null, ending: null, endText: null, endTextPos: null, durationSec: 8, modelId: 'fal-test',
       storeId: 'store-ok', outputAssetId: `${id}-video`, posterAssetId: `${id}-poster`,
       images: [{ id: 'd-in-2', filename: 'in.png', width: null, height: null, mime: 'image/png', durationMs: null }, { id: 'd-in-1', filename: 'in.png', width: null, height: null, mime: 'image/png', durationMs: null }],
       endFrame: null, videoRef: null, clips: [],

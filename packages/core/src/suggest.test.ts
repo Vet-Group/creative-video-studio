@@ -94,6 +94,9 @@ test("a sectioned prompt's ending is English scene text that starts \"The clip e
   expect(user.at(-1)).toBe('About 180 characters long: never fewer than 140 characters or more than 200.');
   // A section's hook reads the rest of the clip the same way; a brief keeps "The video" for its hook and location.
   expect(suggestPrompt({ field: 'hook', text: '', context: 'The model walks.', max: 200 })).toContain('\nThe rest of the clip: The model walks.\n');
+  expect(suggestPrompt({ field: 'brief', text: '', context: '', max: 500, format: 'unboxing' })).toContain('\nThe clip is an unboxing: the creator, or only their hands when no one is shown, opens a package and reveals the product.\n');
+  expect(suggestPrompt({ field: 'ending', text: '', context: '', max: 200, format: 'review' })).toContain('\nThe clip is a product review: the creator talks to the camera about what they like in the product and shows it up close.\n');
+  expect(suggestPrompt({ field: 'brief', text: '', context: '', max: 500 })).not.toContain('The clip is a');
   expect(suggestPrompt({ field: 'brief', text: '', context: 'The model walks.', max: 200 })).toContain('\nThe video: The model walks.\n');
 });
 

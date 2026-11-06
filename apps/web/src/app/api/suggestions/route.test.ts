@@ -101,7 +101,7 @@ describe('/api/suggestions', () => {
     const u = await newUser();
     const before = sent.length;
     expect(await error(await ask(u, { field: 'title' }))).toBe('field must be brief, script, hook, location, ending, prompt, translate or video');
-    expect(await error(await ask(u, { field: 'script' }))).toBe('a script is for Advanced only');
+    expect(await error(await ask(u, { field: 'script' }))).toBe('a script is for Advanced and Review only');
     expect((await ask(u, { field: 'script', format: 'advanced', text: 'x'.repeat(ADVANCED_MAX_SCRIPT + 1) })).status).toBe(202); // the brief as notes for lines
     expect(await error(await ask(u, { field: 'script', format: 'advanced', text: 'x'.repeat(5001) }))).toBe('text may be at most 5000 characters');
     expect(await error(await ask(u, { field: 'brief', room: 0 }))).toBe('room must be a whole number of characters');
@@ -203,6 +203,23 @@ describe('/api/suggestions', () => {
     expect(await error(await ask(u, { field: 'ending', rest: 7 }))).toBe('rest must be text of at most 5000 characters');
     expect(await error(await ask(u, { field: 'ending', rest: '', model: 'nope' }))).toBe('model is not an enabled model');
     expect(await runs(u.id)).toBe(before);
+  });
+
+  test('tells the model what an Unboxing or Review clip is, takes a script on Review only, and refuses an unknown format', async () => {
+    const u = await newUser();
+    const input = async (body: Record<string, unknown>) => {
+      const res = await ask(u, body);
+      expect(res.status).toBe(202);
+      const { id } = (await res.json()) as { id: string };
+      return (await pool.query('select input from suggestion_runs where id = $1', [id])).rows[0].input;
+    };
+    expect(await input({ field: 'brief', format: 'unboxing', text: 'n' })).toMatchObject({ field: 'brief', format: 'unboxing' });
+    expect(await input({ field: 'script', format: 'review', text: 'n' })).toMatchObject({ field: 'script', format: 'review' });
+    expect(await input({ field: 'hook', format: 'review', rest: 'The creator waves.' })).toMatchObject({ field: 'hook', format: 'review', context: 'The creator waves.' });
+    expect(await input({ field: 'ending', format: 'unboxing', rest: '' })).toMatchObject({ field: 'ending', format: 'unboxing' });
+    expect(await input({ field: 'brief', format: 'advanced' })).not.toHaveProperty('format'); // Advanced adds nothing to the model's context
+    expect(await error(await ask(u, { field: 'script', format: 'unboxing' }))).toBe('a script is for Advanced and Review only');
+    expect(await error(await ask(u, { field: 'brief', format: 'bogus' }))).toBe('format must be advanced, unboxing, review or left out');
   });
 
   test("puts the member's own hook and location phrases in the context, and refuses another member's private one", async () => {

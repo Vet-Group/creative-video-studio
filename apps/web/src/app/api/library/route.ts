@@ -16,9 +16,11 @@ const KINDS: Record<string, string> = {
   image: `j.feature = 'image'`,
   video: `j.feature = 'video'`,
   marketing: `j.feature = 'marketing'`,
-  // The two Marketing Studio formats, as the reference Library splits them: Advanced jobs carry params.format 'advanced'.
+  // The Marketing Studio formats, as the reference Library splits them: a job of a format other than UGC carries it as params.format.
   marketing_ugc: `j.feature = 'marketing' and j.params->>'format' is null`,
   marketing_advanced: `j.feature = 'marketing' and j.params->>'format' = 'advanced'`,
+  marketing_unboxing: `j.feature = 'marketing' and j.params->>'format' = 'unboxing'`,
+  marketing_review: `j.feature = 'marketing' and j.params->>'format' = 'review'`,
   apps: `j.feature in (${APP_FEATURES})`,
 };
 /** The `verdict` filters, as SQL over the item's mark `v`: unmarked, any Pass (a featured one too), featured only, or Fail. */
@@ -33,7 +35,7 @@ const OWN_PROMPT = `case when j.feature in ('image', 'video') and j.preset_id is
 
 /**
  * The Library: every user's live clips and images, newest first. Filters: `creator` (a user id), `date` (YYYY-MM-DD, Asia/Ho_Chi_Minh), `ratio` and
- * `kind` (`all` by default, `images`, `videos`, one feature of `try_on`, `image`, `video`, `marketing` (or one of its formats, `marketing_ugc` and `marketing_advanced`), or `apps` for every app feature),
+ * `kind` (`all` by default, `images`, `videos`, one feature of `try_on`, `image`, `video`, `marketing` (or one of its formats, `marketing_ugc`, `marketing_advanced`, `marketing_unboxing` and `marketing_review`), or `apps` for every app feature),
  * `verdict` (`none` for unmarked items, `pass`, `featured` or `fail`), `favorites=1` (only the caller's favourites), `q` (words in the model name or the creator's own `prompt`, case-insensitive, up to 200 characters) and `sort` (`newest`, the default, or `oldest`); `offset` pages by 24. `favorite` says whether the caller marked an item. Each item has its `feature` and `mediaType` (`video` or `image`, from the output asset); `videoAssetId` is the output asset
  * either way, and an image item has `durationSec` 0 and its `resolution`. `creators` fills the creator filter. `unmarked` counts the live items the caller may mark (their own, or all for an Admin) that have no mark yet. `costUsd` is the job's ledger total, provisional while `costFinal` is false.
  */

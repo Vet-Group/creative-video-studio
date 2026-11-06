@@ -4,7 +4,7 @@ import { type CSSProperties, type ReactNode, useCallback, useEffect, useRef, use
 import { api, type Clip, errorText, sendJson } from '@/lib/api';
 import { FAULTS } from '@/lib/faults';
 import { featureLabel } from '@/lib/features';
-import { HOOKS, LOCATIONS } from '@/lib/marketing';
+import { cardTitleOfFormat, HOOKS, LOCATIONS } from '@/lib/marketing';
 import { activeFilters, type LibraryFilters, type LibraryView, libraryQuery, matchesVerdict, NO_FILTERS, readView, saveView, type VerdictFilter } from '@/lib/library-view';
 import { reuseHref } from '@/lib/reuse';
 import { Icon } from './Icon';
@@ -38,6 +38,8 @@ const KINDS = [
   { id: 'marketing', label: 'Marketing Studio' },
   { id: 'marketing_ugc', label: 'UGC Thử đồ' },
   { id: 'marketing_advanced', label: 'Nâng cao' },
+  { id: 'marketing_unboxing', label: 'Mở hộp' },
+  { id: 'marketing_review', label: 'Đánh giá sản phẩm' },
   { id: 'apps', label: 'Ứng dụng' },
 ];
 /** The size slider: card widths from small to large, remembered per browser. */
@@ -377,7 +379,7 @@ function ClipDetail({ clips, index, stores, onIndex, onChange }: { clips: Clip[]
   // The creator's own words: a free prompt on Create video and Image Generation (a brief with an image style); Marketing keeps a brief and a script; the other features compose theirs.
   const own = job && ((clip.feature === 'video' || clip.feature === 'image') && !job.presetId ? job.prompt : null);
   const sent = job?.prompt && job.prompt !== own ? job.prompt : null; // what the model got, when it is not the creator's words as typed
-  const title = clip.feature === 'marketing' ? (job?.format === 'advanced' ? 'Marketing nâng cao' : 'UGC Thử đồ') : featureLabel(clip.feature);
+  const title = clip.feature === 'marketing' ? cardTitleOfFormat(job?.format) : featureLabel(clip.feature);
   const copyText = own ?? job?.brief ?? job?.prompt ?? null;
   const mark = verdictText(clip.verdict);
 

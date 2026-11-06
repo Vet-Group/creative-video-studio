@@ -5,6 +5,7 @@
 // Translate shows a Vietnamese reading of English text for the staff to read; the prompt itself stays English (the models read it best).
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
+import type { ParamFormat } from '@/lib/marketing';
 import { runKey } from '@/lib/run-guard';
 import { Icon } from './Icon';
 import { useJobs } from './jobs';
@@ -16,7 +17,7 @@ export type PromptPart = 'ai' | 'recent' | 'translate' | 'clear' | 'expand';
 
 interface Props {
   feature: string;
-  format?: 'advanced';
+  format?: ParamFormat;
   value: string;
   onChange: (text: string) => void;
   maxLength?: number;
