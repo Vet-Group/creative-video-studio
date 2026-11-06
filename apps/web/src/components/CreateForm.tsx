@@ -49,6 +49,8 @@ interface Model {
   alwaysAudio: boolean;
   /** The model takes an end frame. */
   endFrame: boolean;
+  /** The longest clip in seconds that may carry an end frame; null when there is no limit. */
+  endMaxSec: number | null;
   /** The model runs from the prompt alone, with no image. */
   textOnly: boolean;
   /** The reference audio the model takes: how many clips and how many seconds in all; null when none. */
@@ -338,6 +340,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
   const durations = [...new Set(chosen ? chosen.durationsSec : (models?.models.flatMap((m) => m.durationsSec) ?? [durationSec]))].sort((a, b) => a - b);
   const ratios = chosen ? chosen.ratios : (models?.models.flatMap((m) => m.ratios) ?? [ratio]);
   const tooMany = chosen !== undefined && images.length > chosen.maxImages;
+  const endOver = endAssetId !== undefined && chosen?.endMaxSec != null && durationSec > chosen.endMaxSec;
   // The upload limit follows the chosen model (REA-video V02); the server caps every model at MAX_IMAGES.
   const maxImages = Math.min(MAX_IMAGES, chosen?.maxImages ?? MAX_IMAGES);
   /** What Run sends as the free prompt: the sections composed (the body as typed while the hook and the ending are empty), or the free writing box. */
@@ -348,7 +351,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
   const sections = { ...(sec && line(hookText) && { hookText: line(hookText) }), ...(sec && line(ending) && { ending: line(ending) }) };
   const tooLong = presetId === '' ? promptTooLong(chosen, composed.trim().length) : null;
   const promptOk = presetId !== '' || (composed.trim() !== '' && tooLong === null);
-  const canRun = ready && recall.answered && !busy && (images.length > 0 || (wordsOnly && presetId === '')) && chosen?.supported === true && !tooMany && !clipsOver && promptOk;
+  const canRun = ready && recall.answered && !busy && (images.length > 0 || (wordsOnly && presetId === '')) && chosen?.supported === true && !tooMany && !clipsOver && !endOver && promptOk;
 
   async function upload(files: File[]) {
     if (files.length === 0) return;
@@ -688,6 +691,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
             )}
             {models && models.models.length === 0 && <p className="help">Chưa bật mô hình video nào. Admin bật trong Quản trị → Cài đặt → Mô hình.</p>}
             {tooMany && chosen && <p className="error">Mô hình này nhận tối đa {chosen.maxImages} ảnh.</p>}
+            {endOver && <p className="error">Mô hình này chỉ nhận khung hình cuối cho clip tối đa {chosen!.endMaxSec} giây.</p>}
             {wordsOnly && presetId !== '' && <p className="help">Mẫu chuyển động cần ảnh sản phẩm. Không có ảnh thì chọn &quot;Tự viết mô tả&quot;.</p>}
             {tooLong && (
               <p className="error" id={tooLongId}>

@@ -80,6 +80,8 @@ interface VideoBody {
    * Minimax H3 Max Reference: there it counts toward the 4,096 free reference tokens (576 to about 1,008 at 768P), past which the estimate is short.
    */
   end?: string;
+  /** The longest clip, in seconds, that takes an end frame (Gemini Omni Flash 1.2: "At most 10 seconds when an end image is provided", schema read 2026-11-06). */
+  endMaxSec?: number;
   /**
    * The text-to-video endpoint of the same app, where a Run with no image goes (as on Fash, the model runs from the prompt). Set only where its model
    * page (https://fal.ai/models/<endpoint>, read 2026-10-30) gives the same price as the row's, audio on and off, at the resolution the builders ask
@@ -118,8 +120,8 @@ export const VIDEO_BODIES: Record<string, VideoBody> = {
   // fal has no FLUX 3 reference endpoint; keyframes pins the product image as the first frame, the closest match to Fash's "FLUX 3 Reference".
   'blackforestlabs/flux-3/keyframes-to-video': { text: 'blackforestlabs/flux-3/text-to-video', build: (req, images) => ({ prompt: oneShot(imageTokens(req.prompt, plainImage)), keyframes: [{ image_url: images[0], frame_index: 0 }], aspect_ratio: req.ratio, duration: req.durationSec, resolution: '1080p', generate_audio: req.audio === true }) },
   'blackforestlabs/flux-3/image-to-video': { text: 'blackforestlabs/flux-3/text-to-video', build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), aspect_ratio: req.ratio, duration: req.durationSec, resolution: '1080p', generate_audio: req.audio === true }) },
-  'google/gemini-omni-flash/v1.1/reference-to-video': { text: 'google/gemini-omni-flash/v1.1/text-to-video', build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...ref(images), aspect_ratio: req.ratio, duration: req.durationSec, resolution: '720p' }) },
-  'google/gemini-omni-flash/v1.1/image-to-video': { end: 'end_image_url', text: 'google/gemini-omni-flash/v1.1/text-to-video', build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), aspect_ratio: req.ratio, duration: req.durationSec, resolution: '720p' }) },
+  'google/gemini-omni-flash/v1.2/reference-to-video': { text: 'google/gemini-omni-flash/v1.2/text-to-video', build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...ref(images), aspect_ratio: req.ratio, duration: req.durationSec, resolution: '720p' }) },
+  'google/gemini-omni-flash/v1.2/image-to-video': { end: 'end_image_url', endMaxSec: 10, text: 'google/gemini-omni-flash/v1.2/text-to-video', build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), aspect_ratio: req.ratio, duration: req.durationSec, resolution: '720p' }) },
   'fal-ai/veo3.1/image-to-video': { text: 'fal-ai/veo3.1', build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), aspect_ratio: req.ratio, duration: `${req.durationSec}s`, resolution: '720p', generate_audio: req.audio === true }) },
   'xai/grok-imagine-video/reference-to-video': { build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), reference_image_urls: images, aspect_ratio: req.ratio, duration: req.durationSec, resolution: '720p' }) },
   'xai/grok-imagine-video/v1.5/image-to-video': { crop: true, text: 'xai/grok-imagine-video/v1.5/text-to-video', build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), duration: req.durationSec, resolution: '720p' }) },
@@ -143,7 +145,7 @@ export const VIDEO_BODIES: Record<string, VideoBody> = {
   'fal-ai/bytedance/seedance/v1.5/pro/text-to-video': { build: (req) => words(req, seconds(req), { resolution: '720p', generate_audio: req.audio === true }) },
   'fal-ai/bytedance/seedance/v1/pro/text-to-video': { build: (req) => words(req, seconds(req), { resolution: '1080p' }) },
   'blackforestlabs/flux-3/text-to-video': { build: (req) => words(req, req.durationSec, { resolution: '1080p', generate_audio: req.audio === true }) },
-  'google/gemini-omni-flash/v1.1/text-to-video': { build: (req) => words(req, req.durationSec, { resolution: '720p' }) },
+  'google/gemini-omni-flash/v1.2/text-to-video': { build: (req) => words(req, req.durationSec, { resolution: '720p' }) },
   'fal-ai/veo3.1': { build: (req) => words(req, `${req.durationSec}s`, { resolution: '720p', generate_audio: req.audio === true }) },
   'xai/grok-imagine-video/v1.5/text-to-video': { build: (req) => words(req, req.durationSec, { resolution: '720p' }) },
   'fal-ai/wan/v2.7/text-to-video': { build: (req) => words(req, req.durationSec, { resolution: '720p' }) },
@@ -157,8 +159,8 @@ export const VIDEO_BODIES: Record<string, VideoBody> = {
 export function videoInputs(endpoint: string) {
   const spec: VideoBody | undefined = Object.hasOwn(VIDEO_BODIES, endpoint) ? VIDEO_BODIES[endpoint] : undefined;
   // BytePlus Seedance runs from the prompt alone and takes neither an end frame nor reference audio (byteplus.ts).
-  if (isByteplusVideo(endpoint)) return { endFrame: false, textOnly: true, audioClips: null };
-  return { endFrame: spec?.end !== undefined, textOnly: spec?.text !== undefined, audioClips: spec?.audio ? { max: spec.audio.max, seconds: spec.audio.seconds } : null };
+  if (isByteplusVideo(endpoint)) return { endFrame: false, endMaxSec: null, textOnly: true, audioClips: null };
+  return { endFrame: spec?.end !== undefined, endMaxSec: spec?.endMaxSec ?? null, textOnly: spec?.text !== undefined, audioClips: spec?.audio ? { max: spec.audio.max, seconds: spec.audio.seconds } : null };
 }
 
 /**

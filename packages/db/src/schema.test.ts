@@ -714,6 +714,25 @@ describe('cost_entries', () => {
   });
 });
 
+describe('migration 0073 Gemini Omni Flash 1.2', () => {
+  test('moves both rows to the v1.2 endpoints in place, at 3 to 15 s and $0.0819 a second, with every source on v1.2', async () => {
+    const { rows } = await pool.query(`select id, endpoint, ratios, durations_sec, max_images, max_prompt_chars, usd_per_second::float as usd, enabled, sources from model_configs where id like 'gemini-omni-flash%' order by id`);
+    expect(rows.map((r) => [r.id, r.endpoint, r.durations_sec, r.usd, r.max_images, r.max_prompt_chars])).toEqual([
+      ['gemini-omni-flash', 'google/gemini-omni-flash/v1.2/image-to-video', [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], 0.0819, 1, 20000],
+      ['gemini-omni-flash-reference', 'google/gemini-omni-flash/v1.2/reference-to-video', [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], 0.0819, 9, 20000],
+    ]);
+    for (const r of rows) {
+      expect(r.ratios, r.id).toEqual(['9:16', '16:9']);
+      expect(VIDEO_BODIES[r.endpoint], r.id).toBeDefined();
+      expect(JSON.stringify(r.sources), r.id).not.toContain('v1.1/');
+      for (const [k, v] of Object.entries(r.sources as Record<string, { url: string; readAt: string }>)) expect(v.url, `${r.id} ${k}`).toContain(`google/gemini-omni-flash/v1.2/${r.endpoint.split('/').pop()}`);
+      expect(r.sources.usdPerSecond.readAt, r.id).toBe('2026-11-06');
+    }
+    expect(rows[1].sources.nativeAudio.readAt).toBe('2026-11-04'); // the paid test ran on v1.1
+    expect(VIDEO_BODIES['google/gemini-omni-flash/v1.2/image-to-video']!.text).toBe('google/gemini-omni-flash/v1.2/text-to-video');
+  });
+});
+
 describe('migration 0072 Replicate dropped', () => {
   test('leaves no Replicate model row and no Replicate credit column, and the provider checks refuse the value', async () => {
     expect((await pool.query(`select count(*)::int as n from model_configs where provider = 'replicate' or id = 'seedance-2.5'`)).rows[0].n).toBe(0);

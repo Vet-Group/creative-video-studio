@@ -77,6 +77,20 @@ describe('the end frame', () => {
     expect(await errorOf(await run({ modelId: 'kling-o1', params: { endAssetId: 'end' } }))).toBe('the model does not take an end frame');
   });
 
+  test('Gemini Omni Flash takes an end frame on a clip of at most 10 s only (the picker says so), and a longer clip runs without one', async () => {
+    await pool.query(`update model_configs set enabled = true where id = 'gemini-omni-flash'`);
+    try {
+      const r = (await (await GET_MODELS(call('/api/models?feature=video&ratio=9:16&durationSec=5'))).json()) as { models: { id: string; endMaxSec: number | null }[] };
+      expect(Object.fromEntries(r.models.map((m) => [m.id, m.endMaxSec]))).toEqual({ 'kling-o3-pro': null, 'gemini-omni-flash': 10, 'kling-o1': null });
+      const omni = (params: Record<string, unknown>, durationSec: number) => run({ modelId: 'gemini-omni-flash', durationSec, params });
+      expect((await omni({ endAssetId: 'end' }, 10)).status).toBe(201);
+      expect(await errorOf(await omni({ endAssetId: 'end' }, 11))).toBe('the model takes an end frame on clips of at most 10 seconds');
+      expect((await omni({}, 15)).status).toBe(201);
+    } finally {
+      await pool.query(`update model_configs set enabled = false where id = 'gemini-omni-flash'`);
+    }
+  });
+
   test('a retry is refused once its end frame was deleted', async () => {
     await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) select 'end2', owner_id, 'input', 'end2', 'e.png', 'image/png', 1 from assets where id = 'img'`);
     const { id } = (await (await run({ params: { endAssetId: 'end2' } })).json()) as { id: string };

@@ -259,6 +259,8 @@ export async function POST(request: Request) {
     // A retry copies a Run this check already passed.
     if (!original && feature === 'video' && assetIds.length === 0 && !videoInputs(model.endpoint).textOnly) return bad('the model needs at least one input image');
     if (params.endAssetId !== undefined && !videoInputs(model.endpoint).endFrame) return bad('the model does not take an end frame');
+    const endMax = videoInputs(model.endpoint).endMaxSec;
+    if (params.endAssetId !== undefined && endMax !== null && durationSec > endMax) return bad(`the model takes an end frame on clips of at most ${endMax} seconds`);
     if (clips.length > 0) {
       const takes = videoInputs(model.endpoint).audioClips;
       const ms = (await tx.query('select coalesce(sum(duration_ms), 0)::int as ms from assets where id = any($1::text[])', [clips])).rows[0].ms as number;

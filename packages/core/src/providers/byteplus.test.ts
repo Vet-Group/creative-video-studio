@@ -117,7 +117,7 @@ describe('byteplus video submit', () => {
 
   test('every row of migration 0056 runs from the prompt alone and takes no end frame or audio clips', () => {
     for (const endpoint of ['dreamina-seedance-2-5-260628', 'dreamina-seedance-2-0-260128', 'dreamina-seedance-2-0-fast-260128', 'dreamina-seedance-2-0-mini-260615', 'seedance-1-0-pro-250528', 'seedance-1-0-pro-fast-251015']) {
-      expect([isByteplusVideo(endpoint), videoInputs(endpoint)]).toEqual([true, { endFrame: false, textOnly: true, audioClips: null }]);
+      expect([isByteplusVideo(endpoint), videoInputs(endpoint)]).toEqual([true, { endFrame: false, endMaxSec: null, textOnly: true, audioClips: null }]);
     }
     expect(isByteplusVideo('bytedance/seedance-2.0')).toBe(false);
   });
