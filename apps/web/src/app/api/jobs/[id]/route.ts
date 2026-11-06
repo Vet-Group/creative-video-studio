@@ -31,12 +31,13 @@ export async function GET(request: Request, { params }: RouteContext) {
     'select id, filename, width, height, mime, duration_ms as "durationMs" from assets where id = any($1::text[]) and deleted_at is null order by array_position($1::text[], id)',
     [job.input_asset_ids],
   );
-  const owned = (ids: string[]) =>
+  // `bytes` adds the size, which the reference video's form check reads (ReferenceVideo.tsx); the other inputs do not carry it.
+  const owned = (ids: string[], bytes = false) =>
     pool.query(
-      `select id, filename, mime, duration_ms as "durationMs" from assets where id = any($1::text[]) and owner_id = $2 and kind = 'input' and deleted_at is null order by array_position($1::text[], id)`,
+      `select id, filename, mime${bytes ? ', bytes' : ''}, duration_ms as "durationMs" from assets where id = any($1::text[]) and owner_id = $2 and kind = 'input' and deleted_at is null order by array_position($1::text[], id)`,
       [own ? ids : [], job.user_id],
     );
-  const [end, clips, video] = await Promise.all([owned(job.params.endAssetId ? [job.params.endAssetId] : []), owned(job.params.audioAssetIds?.split(',') ?? []), owned(job.params.videoAssetId ? [job.params.videoAssetId] : [])]);
+  const [end, clips, video] = await Promise.all([owned(job.params.endAssetId ? [job.params.endAssetId] : []), owned(job.params.audioAssetIds?.split(',') ?? []), owned(job.params.videoAssetId ? [job.params.videoAssetId] : [], true)]);
   return Response.json({
     id: job.id, userId: job.user_id, status: job.status, error: job.error, isMock: job.is_mock, feature: job.feature, resolution: job.params.resolution ?? null, presetId: job.preset_id, prompt: job.prompt, enhance: job.enhance, enhancedPrompt: job.enhanced_prompt, audio: job.params.audio ?? null, ratio: job.aspect,
     // The form inputs kept for reuse (Marketing Studio's, the image pages' own text, Try On's garment count). The brief and the script show to everyone who may see the job (owner, 2026-11-03):

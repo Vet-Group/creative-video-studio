@@ -9,7 +9,8 @@ import { deleteObject, getObject, putObject } from '@/lib/storage';
  * Copies 1-4 sample pictures (`{ names: ['try-on-model-1.jpg', ...] }`) into the caller's own input assets on the server, as if the caller had uploaded them.
  * A Recreate or "Use this" on an example used to download each sample to the browser and upload it back, two trips over a slow link for every photo.
  * The same checks as an upload apply: a JPEG, PNG or WebP image of at most 10 MB, by its magic bytes; all or nothing. A sample clip (`marketing-example-1.mp4`) is copied the
- * same way, as an MP4 of at most 50 MB whose header gives its length (`durationMs`), for Marketing Studio Advanced's reference video.
+ * same way, as an MP4 of at most 50 MB whose header gives its length (`durationMs`), for Marketing Studio Advanced's reference video; at most one clip a request, as the
+ * server holds every file in memory.
  * 429 once the caller has added COPY_HOURLY_LIMIT pictures (uploads included) in the last hour: here a tiny request makes the server copy up to 4 files of 10 MB, so a loop is held back (uploads themselves are not capped).
  */
 export const COPY_HOURLY_LIMIT = 200;
@@ -19,8 +20,8 @@ export async function POST(request: Request) {
   if (g.error) return g.error;
   const body = (await request.json().catch(() => null)) as { names?: unknown } | null;
   const names = body?.names;
-  if (!Array.isArray(names) || names.length === 0 || names.length > MAX_FILES || !names.every((n) => typeof n === 'string' && (sampleType(n)?.startsWith('image/') || sampleType(n) === 'video/mp4'))) {
-    return Response.json({ error: `send 1 to ${MAX_FILES} sample picture or clip names in "names"` }, { status: 400 });
+  if (!Array.isArray(names) || names.length === 0 || names.length > MAX_FILES || !names.every((n) => typeof n === 'string' && (sampleType(n)?.startsWith('image/') || sampleType(n) === 'video/mp4')) || names.filter((n) => sampleType(n as string) === 'video/mp4').length > 1) {
+    return Response.json({ error: `send 1 to ${MAX_FILES} sample picture names in "names", or one sample clip` }, { status: 400 });
   }
   // shortcut: two copies sent at once can both pass the count and go a few over, fine for a guard against loops; take an advisory lock if it must be exact.
   const { n } = (await pool.query(`select count(*)::int as n from assets where owner_id = $1 and kind = 'input' and created_at > now() - interval '1 hour'`, [g.session.user.id])).rows[0];

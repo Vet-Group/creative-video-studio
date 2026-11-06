@@ -55,25 +55,29 @@ export function sniffVideo(b: Uint8Array): 'video/mp4' | 'video/quicktime' | und
   return String.fromCharCode(...b.subarray(8, 12)) === 'qt  ' ? 'video/quicktime' : 'video/mp4';
 }
 
+/** The [start, end) of the body of every box of `type` between `from` and `to`; 64-bit sizes (1) and "to the end" (0) are handled. */
+function mp4Boxes(b: Uint8Array, from: number, to: number, type: string): [number, number][] {
+  const v = new DataView(b.buffer, b.byteOffset, b.byteLength);
+  const out: [number, number][] = [];
+  for (let i = from; i + 8 <= to; ) {
+    let size = v.getUint32(i);
+    let head = 8;
+    if (size === 1) {
+      if (i + 16 > to) break;
+      size = Number(v.getBigUint64(i + 8));
+      head = 16;
+    } else if (size === 0) size = to - i;
+    if (size < head) break;
+    if (String.fromCharCode(...b.subarray(i + 4, i + 8)) === type) out.push([i + head, Math.min(i + size, to)]);
+    i += size;
+  }
+  return out;
+}
+
 /** The length of an MP4/MOV in ms, from its movie header (the `mvhd` box inside `moov`), or undefined when there is none. */
 export function mp4DurationMs(b: Uint8Array): number | undefined {
   const v = new DataView(b.buffer, b.byteOffset, b.byteLength);
-  // The [start, end) of the body of the first box of `type` between `from` and `to`; 64-bit sizes (1) and "to the end" (0) are handled.
-  const find = (from: number, to: number, type: string): [number, number] | undefined => {
-    for (let i = from; i + 8 <= to; ) {
-      let size = v.getUint32(i);
-      let head = 8;
-      if (size === 1) {
-        if (i + 16 > to) return undefined;
-        size = Number(v.getBigUint64(i + 8));
-        head = 16;
-      } else if (size === 0) size = to - i;
-      if (size < head) return undefined;
-      if (String.fromCharCode(...b.subarray(i + 4, i + 8)) === type) return [i + head, Math.min(i + size, to)];
-      i += size;
-    }
-    return undefined;
-  };
+  const find = (from: number, to: number, type: string): [number, number] | undefined => mp4Boxes(b, from, to, type)[0];
   const moov = find(0, b.length, 'moov');
   const mvhd = moov && find(moov[0], moov[1], 'mvhd');
   if (!mvhd) return undefined;
@@ -83,6 +87,48 @@ export function mp4DurationMs(b: Uint8Array): number | undefined {
   const scale = v.getUint32(p + (v1 ? 20 : 12));
   const duration = v1 ? Number(v.getBigUint64(p + 24)) : v.getUint32(p + 16);
   return scale > 0 && duration > 0 ? Math.round((duration * 1000) / scale) : undefined;
+}
+
+/**
+ * The first video track's picture size and frame rate, from its boxes in `moov`: `tkhd` (size, swapped when the matrix turns it a quarter), `mdhd` (time scale and
+ * length) and `stts` (sample count), so fps is the average rate. Undefined when there is no readable video track; `fps` is null when only that part is unreadable.
+ */
+export function mp4VideoInfo(b: Uint8Array): { width: number; height: number; fps: number | null } | undefined {
+  const v = new DataView(b.buffer, b.byteOffset, b.byteLength);
+  const first = (from: number, to: number, type: string) => mp4Boxes(b, from, to, type)[0];
+  const moov = first(0, b.length, 'moov');
+  if (!moov) return undefined;
+  for (const [ts, te] of mp4Boxes(b, moov[0], moov[1], 'trak')) {
+    const mdia = first(ts, te, 'mdia');
+    const hdlr = mdia && first(mdia[0], mdia[1], 'hdlr');
+    if (!mdia || !hdlr || hdlr[0] + 12 > hdlr[1] || String.fromCharCode(...b.subarray(hdlr[0] + 8, hdlr[0] + 12)) !== 'vide') continue;
+    const tkhd = first(ts, te, 'tkhd');
+    if (!tkhd) continue;
+    const p = tkhd[0];
+    const wide = b[p] === 1;
+    const m = p + (wide ? 52 : 40); // the matrix: a b u c d v x y w, 16.16 fixed point
+    const at = p + (wide ? 88 : 76);
+    if (at + 8 > tkhd[1]) continue;
+    let width = Math.round(v.getUint32(at) / 65536);
+    let height = Math.round(v.getUint32(at + 4) / 65536);
+    if (v.getInt32(m) === 0 && v.getInt32(m + 16) === 0) [width, height] = [height, width];
+    if (width <= 0 || height <= 0) continue;
+    const mdhd = first(mdia[0], mdia[1], 'mdhd');
+    const minf = first(mdia[0], mdia[1], 'minf');
+    const stbl = minf && first(minf[0], minf[1], 'stbl');
+    const stts = stbl && first(stbl[0], stbl[1], 'stts');
+    let fps: number | null = null;
+    if (mdhd && stts && stts[0] + 8 <= stts[1]) {
+      const w1 = b[mdhd[0]] === 1;
+      const scale = v.getUint32(mdhd[0] + (w1 ? 20 : 12));
+      const length = w1 ? Number(v.getBigUint64(mdhd[0] + 24)) : v.getUint32(mdhd[0] + 16);
+      let samples = 0;
+      for (let e = 0, n = v.getUint32(stts[0] + 4); e < n && stts[0] + 8 + e * 8 + 8 <= stts[1]; e++) samples += v.getUint32(stts[0] + 8 + e * 8);
+      if (scale > 0 && length > 0 && samples > 0) fps = (samples * scale) / length;
+    }
+    return { width, height, fps };
+  }
+  return undefined;
 }
 
 /** MP3 (an ID3 tag, or an MPEG Layer III frame header) or WAV (`RIFF....WAVE`) from the file's first bytes: reference audio on Create video. */

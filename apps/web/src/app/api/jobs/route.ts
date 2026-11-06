@@ -1,10 +1,11 @@
 import { reserve, withTransaction } from '@cvs/core/ledger';
 import { type CapRefusal, checkCaps, dailyClips } from '@cvs/core/limits';
 import { estimateUsd, extraInputUsd, FEATURE_PROMPTS, imagePricesFor, PROMPT_CEILING, promptLimit, textToImage, usdPerSecondFor, usdPerSecondWithVideo } from '@cvs/core/models';
-import { videoInputs } from '@cvs/core/providers/fal';
+import { videoInputs, videoRefProblem } from '@cvs/core/providers/fal';
 import { VIDEO_QUEUE, videoSendOptions } from '@cvs/core/queue';
 import { FEATURES } from '@cvs/db';
 import { pool } from '@/lib/auth';
+import { mp4VideoInfo } from '@/lib/assets';
 import { boss } from '@/lib/queue';
 import { findChoice } from '@/lib/choices';
 import { inputRefusal } from '@/lib/job-failure';
@@ -13,6 +14,7 @@ import { BRAND_FEATURES, withBrand } from '@/lib/brand';
 import { ADVANCED_MAX_SCRIPT, END_TEXT_POSITIONS, MAX_END_TEXT, MAX_ENDING, MAX_HOOK } from '@/lib/marketing';
 import { falBalance, falCreditUsd, overCredit } from '@/lib/provider-credit';
 import { guard } from '@/lib/session';
+import { getObject } from '@/lib/storage';
 
 /** Create Video takes up to 9 images (the most a fal reference schema allows, as Fash offers); the model's max_images is checked under the lock. */
 const MAX_IMAGES = 9;
@@ -236,8 +238,22 @@ export async function POST(request: Request) {
     // The reference video is the caller's own MP4 or MOV clip, on Advanced only (whether the model takes one, and its length and size, are checked with the model below).
     if (given.videoAssetId !== undefined) {
       if (!advanced) return bad('params.videoAssetId is for Advanced only');
-      const clip = await pool.query(`select mime from assets where id = $1 and owner_id = $2 and kind = 'input' and deleted_at is null`, [given.videoAssetId, userId]);
+      const clip = await pool.query(`select mime, s3_key from assets where id = $1 and owner_id = $2 and kind = 'input' and deleted_at is null`, [given.videoAssetId, userId]);
       if (!clip.rows[0]?.mime.startsWith('video/')) return bad('params.videoAssetId must be one of your own videos');
+      // Its picture size and frame rate against the model's limits (videoRefProblem), read from the file's header here, outside the lock. A file or a header that cannot
+      // be read passes (as does a frame rate the header does not give): fal then decides.
+      const endpoint = (await pool.query('select endpoint from model_configs where id = $1', [modelId])).rows[0]?.endpoint as string | undefined;
+      if (endpoint && videoInputs(endpoint).videoRefs) {
+        const info = await (async () => {
+          try {
+            return mp4VideoInfo(new Uint8Array(await new Response(await getObject(clip.rows[0].s3_key)).arrayBuffer()));
+          } catch {
+            return undefined;
+          }
+        })();
+        const problem = info && videoRefProblem(endpoint, info);
+        if (problem) return bad(problem);
+      }
     }
     // The end frame is the caller's own image (whether the model takes one is checked with the model below).
     if (given.endAssetId !== undefined) {
@@ -292,11 +308,13 @@ export async function POST(request: Request) {
     if (feature === 'image' && assetIds.length === 0 && !textToImage(model)) return bad('the model needs at least one input image');
     // A retry copies a Run this check already passed.
     if (!original && feature === 'video' && assetIds.length === 0 && !videoInputs(model.endpoint).textOnly) return bad('the model needs at least one input image');
-    if (params.endAssetId !== undefined && !videoInputs(model.endpoint).endFrame) return bad('the model does not take an end frame');
-    const endMax = videoInputs(model.endpoint).endMaxSec;
+    // What the model takes is read for the request the worker will make: with a reference video that is the video-to-video sibling where the row has one (Kling O3 Pro).
+    const takesNow = videoInputs(model.endpoint, params.videoAssetId !== undefined);
+    if (params.endAssetId !== undefined && !takesNow.endFrame) return bad(takesNow.endFrame !== videoInputs(model.endpoint).endFrame ? 'the model takes no end frame together with a reference video' : 'the model does not take an end frame');
+    const endMax = takesNow.endMaxSec;
     if (params.endAssetId !== undefined && endMax !== null && durationSec > endMax) return bad(`the model takes an end frame on clips of at most ${endMax} seconds`);
     if (clips.length > 0) {
-      const takes = videoInputs(model.endpoint).audioClips;
+      const takes = takesNow.audioClips;
       const ms = (await tx.query('select coalesce(sum(duration_ms), 0)::int as ms from assets where id = any($1::text[])', [clips])).rows[0].ms as number;
       if (!takes || clips.length > takes.max || ms > takes.seconds * 1000) return bad(takes ? `the model takes at most ${takes.max} audio clips, ${takes.seconds} seconds in all` : 'the model does not take reference audio');
     }
@@ -305,6 +323,7 @@ export async function POST(request: Request) {
     if (params.videoAssetId !== undefined) {
       const takes = videoInputs(model.endpoint).videoRefs;
       if (!takes) return bad('the model does not take a reference video');
+      if (takes.silent && params.audio === 'on') return bad('the model makes no sound with a reference video; send params.audio off');
       const clip = (await tx.query('select duration_ms, bytes from assets where id = $1', [params.videoAssetId])).rows[0] as { duration_ms: number | null; bytes: number };
       if (clip.duration_ms === null || clip.duration_ms < takes.minSec * 1000 || clip.duration_ms > takes.maxSec * 1000) return bad(`the reference video must last ${takes.minSec} to ${takes.maxSec} seconds on this model`);
       if (takes.maxMb !== null && clip.bytes > takes.maxMb * 1024 * 1024) return bad(`the reference video may be at most ${takes.maxMb} MB on this model`);

@@ -13,6 +13,8 @@ export interface RefVideo {
   id: string;
   filename: string;
   durationMs: number;
+  /** The file's size in bytes, where the answer that gave the clip carried it. */
+  bytes?: number;
 }
 
 /** A model's reference video limits as the models API gives them (videoInputs `videoRefs`). */
@@ -23,6 +25,10 @@ export interface VideoRefs {
   maxMb: number | null;
   /** The most input images that fit with a video, where the model caps them. */
   maxImages: number | null;
+  /** The request a Run with a video makes takes an end frame. */
+  endFrame: boolean;
+  /** That request has no audio switch: the clip is silent. */
+  silent: boolean;
 }
 
 /** Why the model cannot take this video, or null when it can. Without a video there is nothing to refuse. */
@@ -31,6 +37,7 @@ export function videoReason(video: RefVideo | null, takes: VideoRefs | null | un
   if (!takes) return 'Mô hình này không nhận video tham chiếu. Bỏ video hoặc chọn mô hình khác.';
   const sec = video.durationMs / 1000;
   if (sec < takes.minSec || sec > takes.maxSec) return `Mô hình này nhận video tham chiếu dài ${takes.minSec} đến ${takes.maxSec} giây. Chọn video khác hoặc mô hình khác.`;
+  if (takes.maxMb !== null && video.bytes !== undefined && video.bytes > takes.maxMb * 1024 * 1024) return `Mô hình này nhận video tham chiếu tối đa ${takes.maxMb} MB. Chọn video khác hoặc mô hình khác.`;
   if (takes.maxImages !== null && images > takes.maxImages) return `Với video tham chiếu, mô hình này nhận tối đa ${takes.maxImages} ảnh. Bỏ bớt ảnh hoặc chọn mô hình khác.`;
   return null;
 }

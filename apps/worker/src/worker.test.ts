@@ -342,6 +342,25 @@ describe('Marketing Studio reference video', () => {
   });
 });
 
+describe('Marketing Studio reference video price', () => {
+  test('the submit and the status that settles the job both see the rate that includes the clip: $0.222 x (5 s out + 5 s reference) / 5 s on Seedance 2.0 Reference', async () => {
+    const rates: [string, number][] = [];
+    await start(counting(300, (inner) => ({ ...inner, submit: async (req) => (rates.push(['submit', req.model.usdPerSecond]), inner.submit(req)), status: async (job) => (rates.push(['status', job.model.usdPerSecond]), inner.status(job)) })));
+    await pool.query(
+      `insert into model_configs (id, provider, endpoint, label, ratios, durations_sec, max_images, output_resolution, usd_per_second, sources, enabled)
+       values ('mock-seedance-ref', 'mock', 'bytedance/seedance-2.0/us/reference-to-video', 'Mock Seedance', '{9:16}', '{5}', 4, '720p', 0.37, '{}', true)`,
+    );
+    await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, duration_ms) values ('ref-clip', 'u1', 'input', 'assets/ref-clip', 'r.mp4', 'video/mp4', 1, 4200)`);
+    const guided = await newJob('u1', { prompt: 'priced', model: 'mock-seedance-ref' });
+    await pool.query(`update jobs set input_asset_ids = '{start}', params = '{"format":"advanced","audio":"off","videoAssetId":"ref-clip"}' where id = $1`, [guided]);
+    await send(guided, 'u1');
+    await waitFor('the job to finish', async () => (await status(guided)) === 'succeeded');
+    expect(rates.length).toBeGreaterThanOrEqual(2);
+    for (const [, rate] of rates) expect(rate).toBeCloseTo((0.222 * (5 + 5)) / 5, 6); // 4.2 s counts as 5
+    expect(new Set(rates.map(([at]) => at))).toEqual(new Set(['submit', 'status']));
+  });
+});
+
 describe('Marketing Studio end text', () => {
   test("burns params.endText into the delivered clip; when the overlay fails, the provider's clip is kept and the job says why", async () => {
     // A clip with PCM sound (in Matroska), which cannot be copied into an MP4, so the overlay fails after the provider has billed.

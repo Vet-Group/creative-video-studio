@@ -1,7 +1,7 @@
 // Hand-written fixtures until B.5a replaces them with recorded real responses. No test reads FAL_KEY.
 import { describe, expect, test } from 'vitest';
 import { AUDIO_USD_PER_SECOND, BAKEOFF_MODELS } from '../models';
-import { createFalProvider, VIDEO_BODIES, videoInputs } from './fal';
+import { createFalProvider, VIDEO_BODIES, videoInputs, videoRefProblem } from './fal';
 import { ImageReadError, isFundingRefusal, MAX_INLINE_CHARS, ProviderHttpError, resolveImages, unpackJobId } from './http';
 import { createMockVideoProvider, MOCK_FAIL } from './mock';
 import type { ProviderJob, SubmitRequest } from './types';
@@ -342,15 +342,42 @@ describe('fal reference video', () => {
   test('the endpoints that take one, with the limits their schemas state (read 2026-11-06)', () => {
     const takes = Object.keys(VIDEO_BODIES).filter((e) => videoInputs(e).videoRefs).map((e) => [e, videoInputs(e).videoRefs]);
     expect(takes).toEqual([
-      ['fal-ai/kling-video/o3/pro/reference-to-video', { max: 1, minSec: 3, maxSec: 15, maxMb: 200, maxImages: 4 }],
-      ['fal-ai/kling-video/o3/pro/video-to-video/reference', { max: 1, minSec: 3, maxSec: 15, maxMb: 200, maxImages: 4 }], // the sibling, never a model row itself
-      ['bytedance/seedance-2.5/us/reference-to-video', { max: 1, minSec: 1.8, maxSec: 30.2, maxMb: 200, maxImages: null }],
-      ['bytedance/seedance-2.0/us/reference-to-video', { max: 1, minSec: 2, maxSec: 15, maxMb: 50, maxImages: null }],
-      ['google/gemini-omni-flash/v1.2/reference-to-video', { max: 1, minSec: 0, maxSec: 15, maxMb: null, maxImages: null }],
+      ['fal-ai/kling-video/o3/pro/reference-to-video', { max: 1, minSec: 3, maxSec: 15, maxMb: 200, maxImages: 4, endFrame: false, silent: true }],
+      ['fal-ai/kling-video/o3/pro/video-to-video/reference', { max: 1, minSec: 3, maxSec: 15, maxMb: 200, maxImages: 4, endFrame: false, silent: true }], // the sibling, never a model row itself
+      ['bytedance/seedance-2.5/us/reference-to-video', { max: 1, minSec: 1.8, maxSec: 30.2, maxMb: 200, maxImages: null, endFrame: false, silent: false }],
+      ['bytedance/seedance-2.0/us/reference-to-video', { max: 1, minSec: 2, maxSec: 15, maxMb: 50, maxImages: null, endFrame: false, silent: false }],
+      ['google/gemini-omni-flash/v1.2/reference-to-video', { max: 1, minSec: 0, maxSec: 15, maxMb: null, maxImages: null, endFrame: false, silent: false }],
     ]);
     // Left out: MiniMax (video tokens unpriced), Wan, Grok, Veo, Kling O1, (the O3 row reaches the sibling).
     expect(videoInputs('minimax/h3-max/reference-to-video').videoRefs).toBeNull();
     expect(videoInputs('fal-ai/kling-video/o1/reference-to-video').videoRefs).toBeNull();
+  });
+
+  test('with a video Kling O3 is read as its video-to-video sibling: no end frame, no sound; without one it keeps both', () => {
+    const o3 = 'fal-ai/kling-video/o3/pro/reference-to-video';
+    expect([videoInputs(o3).endFrame, videoInputs(o3, true).endFrame, videoInputs(o3, true).textOnly]).toEqual([true, false, false]);
+    expect(videoInputs(o3).videoRefs).toMatchObject({ endFrame: false, silent: true });
+    expect(videoInputs('bytedance/seedance-2.0/us/reference-to-video', true)).toEqual(videoInputs('bytedance/seedance-2.0/us/reference-to-video'));
+  });
+
+  test('the picture size and frame rate checks follow the schemas, and an unreadable frame rate passes', () => {
+    const s20 = 'bytedance/seedance-2.0/us/reference-to-video';
+    const s25 = 'bytedance/seedance-2.5/us/reference-to-video';
+    const o3 = 'fal-ai/kling-video/o3/pro/reference-to-video';
+    const at = (endpoint: string, width: number, height: number, fps: number | null = 30) => videoRefProblem(endpoint, { width, height, fps });
+    expect([at(s20, 720, 1280), at(s20, 1280, 720), at(s20, 960, 960), at(s20, 834, 1112), at(s20, 640, 640)]).toEqual([null, null, null, null, null]);
+    expect(at(s20, 320, 240)).toMatch(/320x240/);
+    expect(at(s20, 1080, 1920)).toMatch(/1080x1920/); // ~2 Mpx, past ~720p
+    expect([at(s25, 1080, 1920), at(s25, 300, 300, 24), at(s25, 1280, 720, 60)]).toEqual([null, null, null]);
+    expect([at(s25, 200, 400), at(s25, 6001, 3000), at(s25, 1000, 300)].map((r) => r !== null)).toEqual([true, true, true]); // a side under 300 or over 6,000; aspect 3.3
+    expect(at(s25, 1280, 720, 12)).toMatch(/12 fps/);
+    expect(at(s25, 1280, 720, 120)).toMatch(/120 fps/);
+    expect(at(s25, 1280, 720, null)).toBeNull();
+    expect([at(o3, 1280, 720), at(o3, 720, 1280), at(o3, 3840, 2160)]).toEqual([null, null, null]);
+    expect([at(o3, 640, 360), at(o3, 3841, 1080)].map((r) => r !== null)).toEqual([true, true]);
+    expect(at(o3, 1280, 720, 12)).toBeNull(); // Kling states no frame rate
+    expect(at('google/gemini-omni-flash/v1.2/reference-to-video', 100, 100, 5)).toBeNull(); // nor does Omni, or an endpoint without video
+    expect(at('minimax/h3-max/reference-to-video', 100, 100)).toBeNull();
   });
 
   test('Seedance 2.0 and 2.5 get video_urls in fal storage and @Video1 in the prompt; the images stay inline', async () => {

@@ -179,6 +179,7 @@ export const usdPerSecondFor = (model: { endpoint: string; usdPerSecond: number 
  * "with video references, you will be charged for both input and output videos". Kling O3 Pro Video to Video Reference
  * (https://fal.ai/models/fal-ai/kling-video/o3/pro/video-to-video/reference): "for every second of video you generated you will be charged $0.168", with no audio
  * price and no audio switch in its schema, so audio on or off books the same. Gemini Omni Flash 1.2: "reference images and videos are not billed", so it is not here.
+ * The Seedance rates are per second at the 720p tier, which is one pixel area for every ratio (a 1:1 clip is taken as 960x960, UNVERIFIED: the schema gives no per-ratio size).
  * The Kling key is the image row's endpoint: the request builder switches to the video-to-video sibling when a video is given (fal.ts).
  */
 export const VIDEO_REF_USD: Record<string, { usd: number; billsInput: boolean }> = {

@@ -142,7 +142,7 @@ describe('POST /api/assets/samples', () => {
       expect((await PUT(req(admin, { method: 'PUT', body, headers: { 'content-type': type } }), ctx(name))).ok, name).toBe(true);
     }
     expect((await copy(undefined, { names: ['copy-a.jpg'] })).status).toBe(401);
-    for (const names of [undefined, [], ['copy-a.jpg', 'copy-a.jpg', 'copy-a.jpg', 'copy-a.jpg', 'copy-a.jpg'], ['copy-notes.json'], ['../copy-a.jpg'], [1]]) {
+    for (const names of [undefined, [], ['copy-a.jpg', 'copy-a.jpg', 'copy-a.jpg', 'copy-a.jpg', 'copy-a.jpg'], ['copy-notes.json'], ['../copy-a.jpg'], [1], ['copy-clip.mp4', 'copy-clip.mp4'], ['copy-clip.mp4', 'copy-bad.mp4'], ['copy-a.jpg', 'copy-clip.mp4', 'copy-bad.mp4']]) {
       expect((await copy(member, { names })).status, JSON.stringify(names)).toBe(400);
     }
     expect((await copy(member, { names: ['copy-a.jpg', 'no-such.jpg'] })).status).toBe(404);

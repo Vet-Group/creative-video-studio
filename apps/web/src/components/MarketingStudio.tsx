@@ -194,7 +194,9 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
   // Advanced: the slot takes up to the chosen model's reference cap (7 at most); a model that takes fewer images than are chosen cannot be picked.
   const maxRefs = Math.min(ADVANCED_MAX_IMAGES, chosen?.maxImages ?? ADVANCED_MAX_IMAGES);
   // Native audio is on by default in both formats, as on the reference site, on a model that can make it, and always on one that cannot be silent.
-  const audioOn = (audio || chosen?.alwaysAudio === true) && chosen?.audioEstimateUsd != null;
+  // A Run with a reference video on a model whose video request has no audio switch (Kling O3) comes out silent, so sound and a script mean nothing.
+  const silentWithVideo = advanced && video !== null && chosen?.videoRefs?.silent === true;
+  const audioOn = (audio || chosen?.alwaysAudio === true) && chosen?.audioEstimateUsd != null && !silentWithVideo;
   const cost = audioOn ? chosen!.audioEstimateUsd! : chosen?.estimateUsd;
   const words = script.trim() ? script.trim().split(/\s+/).length : 0;
   /** The English prompt Run sends, shown as is under the form. */
@@ -209,7 +211,9 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
     advanced ? advancedPrompt({ brief, images: refs.length, video: video !== null, hook, location, script, ...parts, audio: audioOn }, own) : marketingPrompt({ hook, location, prompt: brief, ...parts, audio: audioOn, ratio }, own);
   const compose = (hook: string) => composeFor(hook, brief);
   const line = (text: string) => text.replace(/\s+/g, ' ').trim();
-  const endAssetId = chosen?.endFrame ? endFrame?.id : undefined;
+  // The request a Run with a video makes may take no end frame (Kling O3): the slot is replaced by a note and the frame is not sent.
+  const endAllowed = chosen?.endFrame === true && !(advanced && video !== null && chosen.videoRefs !== null && !chosen.videoRefs.endFrame);
+  const endAssetId = endAllowed ? endFrame?.id : undefined;
   /** What the brief may take: the chosen model's limit less what the page adds around it, for the longest variant. */
   const room = chosen && Math.min(...variants.map((h) => briefRoom((b) => composeFor(h, b), chosen.maxPromptChars)));
   /** What a Run sends for each variant, in order. */
@@ -490,7 +494,8 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
   /** The end frame (on a model that takes one) and the end text the worker burns in. */
   const endExtras = (
     <>
-      {chosen?.endFrame && (
+      {chosen?.endFrame && !endAllowed && <p className="help">Mô hình này không nhận khung hình cuối khi có video tham chiếu. Bỏ video để dùng khung hình cuối.</p>}
+      {endAllowed && (
         <Slot label="Khung hình cuối" optional empty="Ảnh clip kết thúc ở đó" inputLabel="Ảnh khung hình cuối" images={endFrame ? [endFrame] : []} max={1} busy={busy} onAdd={add((f) => setEndFrame(f([])[0] ?? null))} onRemove={() => setEndFrame(null)} onPick={setEndFrame} storeId={storeId} />
       )}
       <EndScene text={endText} onText={setEndText} position={endTextPos} onPosition={setEndTextPos} />
@@ -624,7 +629,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
                   <Select label="Thời lượng" icon="clock" heading="Chọn thời lượng" value={String(durationSec)} options={durations.map((d) => ({ value: String(d), label: `${d} giây` }))} onChange={(v) => setDurationSec(Number(v))} />
                 )}
               </div>
-              <AudioSwitch on={audio} available={chosen?.audioEstimateUsd != null} always={chosen?.alwaysAudio} onChange={setAudio} />
+              <AudioSwitch on={audio} available={chosen?.audioEstimateUsd != null} always={chosen?.alwaysAudio} reason={silentWithVideo ? 'Mô hình này không tạo âm thanh khi có video tham chiếu, nên lời thoại cũng không có tác dụng.' : undefined} onChange={setAudio} />
               {models && models.length > 0 && <ModelPicker models={models.map((m) => ({ id: m.id, label: m.label, isMock: m.isMock, supported: !advanced || (m.maxImages >= refs.length && videoReason(video, m.videoRefs, refs.length) === null), estimateUsd: audio && m.audioEstimateUsd != null ? m.audioEstimateUsd : m.estimateUsd, score: m.score, recommended: m.recommended, resolution: m.resolution, durationsSec: m.durationsSec, audio: m.audioEstimateUsd != null, isNew: m.isNew, creditUsd: m.creditUsd }))} value={chosen?.id ?? ''} onChange={(id) => pickModel(models.find((m) => m.id === id)!)} />}
             </VideoSettings>
             {/* Under the model, so in free writing the ratio row sits right under the prompt box as on Fash. */}

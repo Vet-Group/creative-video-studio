@@ -1,17 +1,24 @@
 // Marketing Studio Advanced's reference video (params.videoAssetId): who may name it, which models take it and within what limits, and the estimate that includes its
 // billed seconds, against a disposable database on the compose Postgres.
 import { randomBytes } from 'node:crypto';
+import { DeleteBucketCommand, DeleteObjectsCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { videoInputs } from '@cvs/core/providers/fal';
 import { createTestDatabase } from '@cvs/db/testing';
-import { afterAll, beforeAll, describe, expect, test } from 'vitest';
+import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
+
+// Each Run here reads a clip's header from the store and queues a job; several in one test pass 5 s on a busy machine.
+vi.setConfig({ testTimeout: 30_000 });
 
 const testDb = await createTestDatabase();
 process.env.DATABASE_URL = testDb.url;
 process.env.BETTER_AUTH_SECRET = randomBytes(32).toString('hex');
 process.env.APP_URL = 'http://localhost';
+process.env.S3_BUCKET = `cvs-test-${randomBytes(6).toString('hex')}`;
 
 const { auth, pool } = await import('@/lib/auth');
 const { stopBoss } = await import('@/lib/queue');
+const { bucketName, ensureBucket, putObject, s3 } = await import('@/lib/storage');
+const { mp4Fixture } = await import('@/lib/mp4-fixture');
 const { POST } = await import('./route');
 const { GET: GET_MODELS } = await import('../models/route');
 
@@ -46,14 +53,24 @@ beforeAll(async () => {
        ('rv-long', $1, 'input', 'rv-long', 'l.mp4', 'video/mp4', 1000, 20000),
        ('rv-big', $1, 'input', 'rv-big', 'b.mp4', 'video/mp4', 60000000, 5000),
        ('rv-theirs', $2, 'input', 'rv-theirs', 't.mp4', 'video/mp4', 1000, 5000),
+       ('rv-small', $1, 'input', 'rv-small', 'small.mp4', 'video/mp4', 1000, 5000),
+       ('rv-slow', $1, 'input', 'rv-slow', 'slow.mp4', 'video/mp4', 1000, 5000),
+       ('rv-720', $1, 'input', 'rv-720', 'ok.mp4', 'video/mp4', 1000, 5000),
        ('aud', $1, 'input', 'aud', 'a.mp3', 'audio/mpeg', 1, 5000)`,
     [user.id, other.user.id],
   );
+  // Files whose headers give a picture size and a frame rate; the other clips have no object, so their headers cannot be read.
+  await ensureBucket();
+  for (const [key, w, h, fps] of [['rv-small', 320, 240, 30], ['rv-slow', 1280, 720, 12], ['rv-720', 1280, 720, 30]] as const) await putObject(key, mp4Fixture({ ms: 5000, width: w, height: h, fps }), 'video/mp4');
   await pool.query(`update model_configs set enabled = true where id in ('kling-o3-pro', 'seedance-2.0-reference', 'seedance-2.5-reference')`);
   await pool.query('update settings set member_daily_clip_cap = 1000, member_daily_usd_cap = 1000 where id = 1');
 });
 
 afterAll(async () => {
+  const Bucket = bucketName();
+  const { Contents = [] } = await s3().send(new ListObjectsV2Command({ Bucket }));
+  if (Contents.length) await s3().send(new DeleteObjectsCommand({ Bucket, Delete: { Objects: Contents.map(({ Key }) => ({ Key: Key! })) } }));
+  await s3().send(new DeleteBucketCommand({ Bucket }));
   await stopBoss();
   await pool.end();
   await testDb.drop();
@@ -63,8 +80,8 @@ describe('the models API', () => {
   test('gives each model its reference video limits, and prices the Run with the clip’s seconds when videoSec is given', async () => {
     const get = async (q = '') => ((await (await GET_MODELS(call(`/api/models?feature=marketing&ratio=9:16&durationSec=5${q}`))).json()) as { models: { id: string; videoRefs: unknown; estimateUsd: string }[] }).models;
     const plain = Object.fromEntries((await get()).map((m) => [m.id, m]));
-    expect(plain['seedance-2.0-reference']!.videoRefs).toEqual({ max: 1, minSec: 2, maxSec: 15, maxMb: 50, maxImages: null });
-    expect(plain['kling-o3-pro']!.videoRefs).toEqual({ max: 1, minSec: 3, maxSec: 15, maxMb: 200, maxImages: 4 });
+    expect(plain['seedance-2.0-reference']!.videoRefs).toEqual({ max: 1, minSec: 2, maxSec: 15, maxMb: 50, maxImages: null, endFrame: false, silent: false });
+    expect(plain['kling-o3-pro']!.videoRefs).toEqual({ max: 1, minSec: 3, maxSec: 15, maxMb: 200, maxImages: 4, endFrame: false, silent: true });
     const withVideo = Object.fromEntries((await get('&videoSec=5')).map((m) => [m.id, m]));
     expect(withVideo['seedance-2.0-reference']!.estimateUsd).toBe('2.2200'); // 0.222 x (5 + 5)
     expect(withVideo['kling-o3-pro']!.estimateUsd).toBe('0.8400'); // 0.168 x 5, the reference is not billed
@@ -80,7 +97,24 @@ describe('a Run with a reference video', () => {
     expect((await pool.query('select params, input_asset_ids from jobs where id = $1', [id])).rows[0]).toEqual({ params: { format: 'advanced', audio: 'off', videoAssetId: 'rv' }, input_asset_ids: ['img'] });
     expect((await pool.query(`select usd::text from cost_entries where job_id = $1`, [id])).rows[0].usd).toBe('2.2200'); // 4.2 s counts as 5: 0.222 x (5 + 5)
     expect(await estimateOf(await advanced({ modelId: 'seedance-2.5-reference', params: { videoAssetId: 'rv-mov' } }))).toBe('2.8380'); // 0.2838 x (5 + 5)
-    expect(await estimateOf(await advanced({ modelId: 'kling-o3-pro', params: { videoAssetId: 'rv-mov', audio: 'on' } }))).toBe('0.8400'); // 0.168 x 5 with or without sound
+    expect(await estimateOf(await advanced({ modelId: 'kling-o3-pro', params: { videoAssetId: 'rv-mov', audio: 'off' } }))).toBe('0.8400'); // 0.168 x 5, no audio price on that endpoint
+  });
+
+  test('Kling O3 is silent with a video (the sibling has no audio switch): sound on is refused, and the end frame it takes alone is refused with a video', async () => {
+    expect(await errorOf(await advanced({ modelId: 'kling-o3-pro', params: { audio: 'on' } }))).toBe('the model makes no sound with a reference video; send params.audio off');
+    expect((await advanced({ modelId: 'seedance-2.0-reference', params: { audio: 'on' } })).status).toBe(201); // Seedance keeps its audio switch
+    const noVideo = await POST(call('/api/jobs', 'POST', { feature: 'marketing', modelId: 'kling-o3-pro', prompt: 'p', ratio: '9:16', durationSec: 5, assetIds: ['img'], params: { format: 'advanced', audio: 'off', endAssetId: 'img2' } }));
+    expect(noVideo.status).toBe(201); // the end frame is taken without a video
+    expect(await errorOf(await advanced({ modelId: 'kling-o3-pro', params: { endAssetId: 'img2' } }))).toBe('the model takes no end frame together with a reference video');
+  });
+
+  test('refuses a clip whose picture size or frame rate the model does not take, and lets one whose header cannot be read pass', async () => {
+    expect(await errorOf(await advanced({ params: { videoAssetId: 'rv-small' } }))).toBe('the reference video is 320x240, a size this model does not take'); // Seedance 2.0: ~480p to ~720p
+    expect(await errorOf(await advanced({ modelId: 'kling-o3-pro', params: { videoAssetId: 'rv-small' } }))).toBe('the reference video is 320x240, a size this model does not take'); // Kling: 720 px and up
+    expect(await errorOf(await advanced({ modelId: 'seedance-2.5-reference', params: { videoAssetId: 'rv-slow' } }))).toBe('the reference video runs at 12 fps, outside the 24 to 60 this model takes');
+    for (const modelId of ['seedance-2.0-reference', 'seedance-2.5-reference', 'kling-o3-pro']) expect((await advanced({ modelId, params: { videoAssetId: 'rv-720' } })).status, modelId).toBe(201);
+    expect((await advanced({ modelId: 'seedance-2.5-reference', params: { videoAssetId: 'rv-mov' } })).status).toBe(201); // no object in the store: not readable, so fal decides
+    expect((await advanced({ modelId: 'kling-o3-pro', params: { videoAssetId: 'rv-slow' } })).status).toBe(201); // Kling states no frame rate
   });
 
   test('is for Advanced and the caller’s own MP4 or MOV only', async () => {

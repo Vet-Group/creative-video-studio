@@ -48,14 +48,15 @@ export async function GET(request: Request, { params }: RouteContext) {
   if (!t) return notFound();
   const data = t.data as TemplateData;
   const copies = t.user_id === userId ? null : await copiesOf([...data.images, ...(data.endFrame ? [data.endFrame] : []), ...(data.videoRef ? [data.videoRef] : []), ...(data.clips ?? [])], t.user_id, userId);
-  const own = async (ids: string[]) =>
+  // `bytes` adds the size, which the reference video's form check reads (ReferenceVideo.tsx); the other inputs do not carry it.
+  const own = async (ids: string[], bytes = false) =>
     (
       await pool.query(
-        `select id, filename, mime, duration_ms as "durationMs" from assets where id = any($1::text[]) and owner_id = $2 and kind = 'input' and deleted_at is null order by array_position($1::text[], id)`,
+        `select id, filename, mime${bytes ? ', bytes' : ''}, duration_ms as "durationMs" from assets where id = any($1::text[]) and owner_id = $2 and kind = 'input' and deleted_at is null order by array_position($1::text[], id)`,
         [copies ? ids.flatMap((i) => copies.get(i) ?? []) : ids, userId],
       )
     ).rows;
-  const [images, endFrame, videoRef, clips] = await Promise.all([own(data.images), own(data.endFrame ? [data.endFrame] : []), own(data.videoRef ? [data.videoRef] : []), own(data.clips ?? [])]);
+  const [images, endFrame, videoRef, clips] = await Promise.all([own(data.images), own(data.endFrame ? [data.endFrame] : []), own(data.videoRef ? [data.videoRef] : [], true), own(data.clips ?? [])]);
   return Response.json({
     id: t.id, name: t.name, isCompany: t.is_company, feature: t.feature, images, endFrame: endFrame[0] ?? null, videoRef: videoRef[0] ?? null, clips,
     prompt: data.prompt ?? null, brief: data.brief ?? null, script: data.script ?? null, hookText: data.hookText ?? null, ending: data.ending ?? null, endText: data.endText ?? null, endTextPos: data.endTextPos ?? null,

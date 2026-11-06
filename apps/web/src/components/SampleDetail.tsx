@@ -139,7 +139,7 @@ export function SampleDetail({ names, index, onIndex }: { names: string[]; index
         {video && details && (form?.hook || form?.saveHook || form?.video) && (
           <div>
             {form.hook && (
-              <button type="button" className="lightbox-result" disabled={!hooked && !details.ending} onClick={() => void act(() => form.hook!({ hook: details.hook, hookText: details.hookText, ending: details.ending }))()}>
+              <button type="button" className="lightbox-result" disabled={busy || (!hooked && !details.ending)} onClick={() => void act(() => form.hook!({ hook: details.hook, hookText: details.hookText, ending: details.ending }))()}>
                 Dùng hook này
               </button>
             )}
