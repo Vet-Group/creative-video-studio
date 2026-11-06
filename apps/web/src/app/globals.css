@@ -1582,9 +1582,8 @@ dialog.modal.template-sheet { width: 100%; max-width: none; margin: auto 0 0; bo
 .template-sheet .choice-grid.prompt-template-grid { grid-template-columns: minmax(0, 1fr); gap: 6px; }
 .prompt-part { min-width: 0; margin-top: 12px; padding: 12px; border: 1px solid var(--border); border-radius: 14px; }
 .prompt-part-title { margin: 0; color: var(--ink-strong); font-size: 13px; line-height: 20px; font-weight: 600; }
-.video-settings { min-width: 0; margin-top: 16px; padding: 12px; border: 1px solid var(--border); border-radius: 14px; } /* The video settings: ratio, length, sound and model in one card, like the prompt's sections */
+.video-settings { min-width: 0; margin-top: 16px; } /* The video settings: ratio, length, sound and model under one title; no card edge, so the controls keep the widths of the Fash parity specs */
 .video-settings-title { margin: 0; color: var(--ink-strong); font-size: 13px; line-height: 20px; font-weight: 600; }
-.video-settings > :nth-child(2) { margin-top: 10px; } /* the first control sits under the title, not 16 px away */
 .prompt-part .field { margin-top: 10px; }
 .prompt-part .help { margin-top: 8px; }
 /* A section's library box: one row, not a tall tile. */

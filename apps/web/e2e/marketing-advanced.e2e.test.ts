@@ -35,10 +35,11 @@ test('an Advanced job runs from reference images, a brief, a script and audio on
   // One wide reference slot, the hook and location boxes, the brief, the script and the audio switch, on by default.
   await expect(page.locator('.slot')).toHaveCount(1);
   await expect(page.getByText('Tối đa 4 ảnh tham chiếu')).toBeVisible(); // Mock E2E takes 4
-  // Writing by sections, the library hook is in ① Hook and the location box stays under the wide slot.
+  // Writing by sections, the library hook is in ① Hook and the location box in the body section, both out of the photo grid.
   await expect(page.getByRole('group', { name: '① Hook · 0–2 giây đầu', exact: true }).getByRole('button', { name: /^Hook/ })).toBeVisible();
   await expect(page.locator('.marketing-slots').getByRole('button', { name: /^Hook/ })).toHaveCount(0);
-  await expect(page.locator('.marketing-slots').getByRole('button', { name: /^Bối cảnh/ })).toBeVisible();
+  await expect(page.locator('.marketing-slots').getByRole('button', { name: /^Bối cảnh/ })).toHaveCount(0);
+  await expect(page.getByRole('group', { name: '② Diễn biến', exact: true }).getByRole('button', { name: /^Bối cảnh/ })).toBeVisible();
   // Writing freely, as on Fash, the hook and location boxes share the row under the wide slot.
   const way = page.getByRole('radiogroup', { name: 'Cách viết prompt' });
   await way.getByText('Viết tự do').click();

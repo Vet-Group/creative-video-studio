@@ -417,17 +417,20 @@ test('hook variants beyond the clips left today are refused before anything is s
   await expect(runButton(page)).toBeEnabled();
 });
 
-test('as on Fash, in Viết tự do the ratio row sits 16 px under the prompt box, and the sent-prompt disclosure folds under the model picker', async ({ page }) => {
+test('as on Fash, in Viết tự do the Cài đặt video block sits 16 px under the prompt box with the ratio row right under its title, and the sent-prompt disclosure folds under the model picker', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await signIn(page, 'mktb');
   await page.goto('/marketing-studio');
   // In the sections, ③ Ending sits between the prompt box and the ratio row; free writing is today's one box.
   await page.getByRole('radiogroup', { name: 'Cách viết prompt' }).getByText('Viết tự do').click();
   const box = (await page.locator('.prompt-box').boundingBox())!;
+  const block = (await page.getByRole('group', { name: 'Cài đặt video', exact: true }).boundingBox())!;
+  const gap = block.y - (box.y + box.height);
+  expect(gap, 'prompt box to settings block').toBeGreaterThanOrEqual(14);
+  expect(gap, 'prompt box to settings block').toBeLessThanOrEqual(18);
+  // The title takes one 20 px line, and the ratio row follows it.
   const row = (await select(page, 'Tỉ lệ').boundingBox())!;
-  const gap = row.y - (box.y + box.height);
-  expect(gap, 'prompt box to ratio row').toBeGreaterThanOrEqual(14);
-  expect(gap, 'prompt box to ratio row').toBeLessThanOrEqual(18);
+  expect(row.y - block.y, 'settings title to ratio row').toBeLessThanOrEqual(20 + 16 + 4);
   const model = (await modelButton(page).boundingBox())!;
   expect((await page.getByText('Xem prompt gửi đi').boundingBox())!.y).toBeGreaterThanOrEqual(model.y + model.height + 8);
 });
