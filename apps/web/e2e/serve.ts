@@ -83,7 +83,11 @@ await pool.end();
 
 const children: ChildProcess[] = [
   spawn(process.execPath, ['--import', 'tsx', 'src/index.ts'], { cwd: fileURLToPath(new URL('../../worker', import.meta.url)), stdio: 'inherit' }),
-  spawn(process.execPath, ['scripts/next.ts', 'dev'], { cwd: fileURLToPath(new URL('..', import.meta.url)), stdio: 'inherit' }),
+  spawn(process.execPath, ['scripts/next.ts', 'dev'], {
+    cwd: fileURLToPath(new URL('..', import.meta.url)),
+    stdio: 'inherit',
+    env: { ...process.env, NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --require ${fileURLToPath(new URL('keep-alive.cjs', import.meta.url)).replaceAll('\\', '/')}`.trim() },
+  }),
 ];
 const stop = () => {
   for (const c of children) c.kill();
