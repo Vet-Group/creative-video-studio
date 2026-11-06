@@ -1,5 +1,5 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
-import { jpg, modelButton, optionsOf, png, select, signIn } from './support.test';
+import { gotoTryOn, jpg, modelButton, optionsOf, png, select, settled, signIn } from './support.test';
 
 const nav = (page: Page) => page.getByRole('navigation', { name: 'Điều hướng chính' });
 const file = (name: string) => ({ name, mimeType: 'image/png', buffer: png() });
@@ -131,7 +131,7 @@ test('Try On, as on Fash: a sample picture with a details file opens in place wi
   const asAdmin = async (each: (name: string, data: Buffer, type: string) => Promise<{ ok(): boolean }>) => {
     await page.context().clearCookies();
     await signIn(page, 'admin');
-    for (const [name, data, type] of files) expect((await each(name, data, type)).ok(), name).toBe(true);
+    for (const [name, data, type] of files) await settled(() => each(name, data, type), name);
     await page.context().clearCookies();
   };
   await asAdmin((name, data, type) => page.request.put(`/api/admin/samples/${name}`, { data, headers: { 'content-type': type } }));
@@ -195,7 +195,7 @@ test('Image Generation, as on Fash: a sample picture with a details file opens i
   const asAdmin = async (each: (name: string, data: Buffer, type: string) => Promise<{ ok(): boolean }>) => {
     await page.context().clearCookies();
     await signIn(page, 'admin');
-    for (const [name, data, type] of files) expect((await each(name, data, type)).ok(), name).toBe(true);
+    for (const [name, data, type] of files) await settled(() => each(name, data, type), name);
     await page.context().clearCookies();
   };
   await asAdmin((name, data, type) => page.request.put(`/api/admin/samples/${name}`, { data, headers: { 'content-type': type } }));
@@ -525,14 +525,14 @@ test('Try On: the sample pictures in an empty slot upload like a picked file, an
   const asAdmin = async (each: (name: string) => Promise<{ ok(): boolean }>) => {
     await page.context().clearCookies();
     await signIn(page, 'admin');
-    for (const name of names) expect((await each(name)).ok()).toBe(true);
+    for (const name of names) await settled(() => each(name), name);
     await page.context().clearCookies();
   };
   await asAdmin((name) => page.request.put(`/api/admin/samples/${name}`, { data: png(), headers: { 'content-type': 'image/png' } }));
   try {
     await page.setViewportSize({ width: 1440, height: 1000 });
     await signIn(page, 'member9');
-    await page.goto('/try-on');
+    await gotoTryOn(page);
     const samplesOf = (slot: string) => page.getByRole('list', { name: `${slot}: ảnh mẫu` }).getByRole('button');
     const run = page.getByRole('button', { name: /^Thử đồ/ });
     await expect(samplesOf('Trang phục')).toHaveCount(2);
@@ -570,7 +570,7 @@ test("Try On, as Fash's pickers: a stock model then its pose, a garment category
   const asAdmin = async (each: (name: string) => Promise<{ ok(): boolean }>) => {
     await page.context().clearCookies();
     await signIn(page, 'admin');
-    for (const name of names) expect((await each(name)).ok(), name).toBe(true);
+    for (const name of names) await settled(() => each(name), name);
     await page.context().clearCookies();
   };
   await asAdmin((name) => page.request.put(`/api/admin/samples/${name}`, { data: jpg(), headers: { 'content-type': 'image/jpeg' } }));

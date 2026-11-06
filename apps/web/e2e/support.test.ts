@@ -57,6 +57,22 @@ export async function signIn(page: Page, who: UserKey, { welcome = false } = {})
   await page.mouse.move(0, 0);
 }
 
+/**
+ * Sends an Admin sample request until it succeeds. Under a full run the dev server can drop a connection (ECONNRESET), and a PUT or DELETE of a
+ * sample gives the same result when sent again, so a dropped one is retried rather than failing the spec in its setup or cleanup.
+ */
+export const settled = (send: () => Promise<{ ok(): boolean }>, name: string): Promise<void> =>
+  expect(async () => expect((await send()).ok(), name).toBe(true)).toPass({ timeout: 30_000 });
+
+/** Opens Try On and waits until its form has hydrated (as signIn waits for Create's), opening it again if another page answered the first time. */
+export async function gotoTryOn(page: Page): Promise<void> {
+  await expect(async () => {
+    await page.goto('/try-on');
+    await expect(page).toHaveURL(/\/try-on$/, { timeout: 5_000 });
+    await expect(page.getByLabel('Ảnh trang phục')).toBeEnabled({ timeout: 10_000 });
+  }).toPass({ timeout: 60_000 });
+}
+
 /** The account button: the sidebar's bottom chip, or the avatar in the top bar below 1024 px. */
 export const accountButton = (page: Page): Locator => page.getByRole('button', { name: /^Tài khoản: / });
 
