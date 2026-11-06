@@ -271,6 +271,11 @@ describe('reviewPrompt', () => {
     expect(reviewPrompt({ highlights: ['Soft fabric', 'Fits well', 'Good price'], ratio: '9:16' })).toBe(`${head}The creator talks to the camera about: Soft fabric; Fits well; Good price. ${tail}`);
   });
 
+  it('leaves the talking-points sentence out until a highlight is written, so the preview never reads "about: ."', () => {
+    expect(reviewPrompt({ highlights: ['', '  '], ratio: '9:16' })).toBe(`${head}${tail}`);
+    expect(reviewPrompt({ highlights: [''], ratio: '9:16', audio: false })).toBe(`${head}${tail} The video is completely silent: no speech, no music and no sound.`);
+  });
+
   it('speaks about the points when sound is on, says the script exactly when there is one, and is silent when off', () => {
     const base = reviewPrompt({ highlights: ['Soft fabric'], ratio: '9:16' });
     expect(reviewPrompt({ highlights: ['Soft fabric'], ratio: '9:16', audio: true })).toBe(`${base} The creator speaks to the camera in a casual, honest tone about these points, recorded on the phone, with no background music.`);
