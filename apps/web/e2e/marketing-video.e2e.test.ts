@@ -19,7 +19,9 @@ const brief = (page: Page) => page.getByRole('textbox', { name: 'Prompt', exact:
 const part = (page: Page, name: string) => page.getByRole('group', { name, exact: true });
 const hookPart = (page: Page) => part(page, '① Hook · 0–2 giây đầu');
 const refsInput = (page: Page) => page.getByRole('group', { name: 'Ảnh tham chiếu' }).getByLabel('Ảnh tham chiếu', { exact: true });
-const videoSlot = (page: Page) => page.getByRole('group', { name: 'Video tham chiếu', exact: true });
+// The group's name is its label with the screen-reader-only "(tuỳ chọn)"; the History link sits on the label's line, outside the group.
+const videoSlot = (page: Page) => page.getByRole('group', { name: 'Video tham chiếu (tuỳ chọn)', exact: true });
+const historyLink = (page: Page) => page.getByRole('button', { name: 'Từ Lịch sử' });
 
 const fixture = (name: string) => readFileSync(fileURLToPath(new URL(`../public/fixtures/examples/${name}`, import.meta.url)));
 const json = (v: object) => Buffer.from(JSON.stringify(v));
@@ -94,7 +96,6 @@ test('Advanced: an Example becomes the reference video, the prompt names it, and
     await expect(refsInput(page)).toBeEnabled(); // files set before hydration are dropped
     await refsInput(page).setInputFiles(file('product.png'));
     await brief(page).fill('A woman walks along the shore.');
-    await expect(videoSlot(page)).toContainText('Tuỳ chọn');
     await expect(videoSlot(page).getByRole('button', { name: 'Tải lên video tham chiếu' })).toBeVisible();
 
     const detail = await openExample(page, 1);
@@ -195,10 +196,10 @@ test('Advanced: a clip of the member’s History becomes the reference video, co
   try {
     await page.goto('/marketing-studio/advanced');
     await expect(refsInput(page)).toBeEnabled();
-    await videoSlot(page).getByRole('button', { name: 'Từ Lịch sử' }).click();
+    await historyLink(page).click();
     await page.getByRole('dialog', { name: 'Chọn video từ Lịch sử' }).getByRole('button', { name: 'Dùng video 1 từ Lịch sử' }).click();
     await expect(videoSlot(page).getByRole('list', { name: 'Video tham chiếu: video đã chọn' })).toBeVisible();
-    await expect(videoSlot(page).getByRole('button', { name: 'Từ Lịch sử' })).toHaveCount(0); // the slot is full
+    await expect(historyLink(page)).toHaveCount(0); // the slot is full
     const kept = (await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { outputAssetId: string }[] };
     const src = await videoSlot(page).locator('video').getAttribute('src');
     expect(src).toMatch(/^\/api\/assets\/[0-9a-f-]{36}\/content$/);

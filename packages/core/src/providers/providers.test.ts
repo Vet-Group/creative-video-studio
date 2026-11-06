@@ -391,7 +391,7 @@ describe('fal reference video', () => {
 
   test('a model without it, two clips or a failed upload submit nothing', async () => {
     const none = falFake();
-    const submit = (req: Partial<Parameters<ReturnType<typeof createFalProvider>['submit']>[0]>, f = none) => createFalProvider({ apiKey: 'k', fetch: f.fn, readImage: read }).submit({ ...base, imageUrls: ['asset://img'], videoUrls: ['asset://clip.mp4'], ...req });
+    const submit = (req: Pick<SubmitRequest, 'model'> & Partial<SubmitRequest>, f = none) => createFalProvider({ apiKey: 'k', fetch: f.fn, readImage: read }).submit({ ...base, imageUrls: ['asset://img'], videoUrls: ['asset://clip.mp4'], ...req });
     await expect(submit({ model: seedance('minimax/h3-max/reference-to-video') })).rejects.toThrow(ImageReadError);
     await expect(submit({ videoUrls: ['asset://clip.mp4', 'asset://clip2.mp4'], model: seedance('bytedance/seedance-2.0/us/reference-to-video') })).rejects.toThrow(ImageReadError);
     expect(none.calls).toHaveLength(0);
