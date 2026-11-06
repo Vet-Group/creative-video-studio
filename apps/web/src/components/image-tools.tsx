@@ -342,6 +342,12 @@ export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRem
             {/* A half-width slot shows just its name, as on the live pages; the full hint is its tooltip there. */}
             {images.length === 0 && offer.length === 0 && <span className="slot-hint">{empty}</span>}
             {images.length === 0 && offer.length === 0 && <span className="slot-name">{label}</span>}
+            {/* A half-width tile has no room beside its name, so the optional pill takes a line of its own under it. */}
+            {optional && images.length === 0 && offer.length === 0 && (
+              <span className="choice-optional slot-optional" aria-hidden="true">
+                Tuỳ chọn
+              </span>
+            )}
           </button>
         )}
       </div>

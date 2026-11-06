@@ -83,7 +83,7 @@ describe('a reference video prices the Run (fal model pages, read 2026-11-06)', 
 
 describe('the Seedance token math at 720p, whatever the ratio', () => {
   // fal's schema gives no output size per ratio; its own limits text calls a 3:4 clip "~720p (834x1112)", about 0.93 Mpx, and the page's "$0.37/second" fits 1280x720 (0.92 Mpx).
-  // So "720p" is a pixel-area tier shared by every ratio (a 1:1 clip is taken as 960x960, UNVERIFIED), not a 720 px side: 720x720 would be 45% cheaper than the flat rate.
+  // So "720p" is a pixel-area tier shared by every ratio (a 1:1 clip is 960x960 per Leonardo's Seedance 2.0 size table, https://docs.leonardo.ai/v1.0/docs/seedance-20), not a 720 px side: 720x720 would be 45% cheaper than the flat rate.
   const perSecond = (w: number, h: number) => (w * h * 24 * 0.0168) / 1024 / 1000;
 
   test('1280x720, 720x1280, 834x1112 and 960x960 all land on the flat rate of the model page; 720x720 does not', () => {

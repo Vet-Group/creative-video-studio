@@ -190,7 +190,7 @@ export function reviewPrompt({ highlights, script, ...parts }: Parts & { highlig
     `UGC product review video, ${frameOf(parts.ratio)}, filmed handheld on a phone by a real creator. ` +
     `The creator in [Image1] reviews the product in [Image2], wearing or holding it; ${KEEP_LOOKS} ` +
     // With sound off nobody speaks, so the points are shown rather than talked about.
-    `${parts.audio === false ? 'The creator shows each of these points' : 'The creator talks to the camera about'}: ${points.join('; ')}. ` +
+    (points.length ? `${parts.audio === false ? 'The creator shows each of these points' : 'The creator talks to the camera about'}: ${points.join('; ')}. ` : '') +
     `Show the product up close and a natural move that shows how it fits or works. Soft natural light, honest energy. ${NO_TEXT}`;
   const sound = parts.audio === undefined ? null : !parts.audio ? SILENT : lines ? `The creator says exactly: "${lines}", lip-synced, and no other spoken words.` : REVIEW_SOUND;
   return compose(head, parts, custom, sound);

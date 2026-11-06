@@ -63,6 +63,20 @@ test('Mở hộp: only the product photo is required; the model and packaging ar
   await expect(runButton(page)).toBeDisabled();
   await expect(reasonOf(page)).toHaveText('Tải lên ảnh sản phẩm.');
   await expect(page.getByText('Không có ảnh người mẫu: video quay theo góc nhìn thứ nhất, chỉ thấy đôi tay mở hộp.')).toBeVisible();
+  // The optional pill sits on one line under the tile's name, clear of the name and of the uploaded-photos link.
+  for (const name of ['Người mẫu', 'Bao bì']) {
+    const tile = page.locator('.marketing-slots > .field').filter({ has: page.getByRole('button', { name: `Tải lên ${name}` }) });
+    const pill = tile.locator('.slot-optional');
+    await expect(pill).toHaveText('Tuỳ chọn');
+    await expect(tile.locator('.optional-head .choice-optional')).toBeHidden();
+    const [label, chip, link] = await Promise.all([tile.locator('.slot-name').boundingBox(), pill.boundingBox(), tile.locator('.uploads-link').boundingBox()]);
+    expect(chip!.height).toBeLessThan(22);
+    expect(chip!.y).toBeGreaterThanOrEqual(label!.y + label!.height);
+    expect(chip!.y + chip!.height).toBeLessThanOrEqual(link!.y);
+    // Every tile in the row starts its icon at the same height.
+    expect((await tile.locator('.slot-icon').boundingBox())!.y - (await tile.locator('.slot').boundingBox())!.y).toBe(29);
+  }
+  await expect(page.locator('.marketing-slots > .field').filter({ has: page.getByRole('button', { name: 'Tải lên Sản phẩm' }) }).locator('.slot-optional')).toHaveCount(0);
   await page.getByLabel('Ảnh sản phẩm').setInputFiles(file('product.png'));
   await expect(page.getByRole('img', { name: 'product.png' })).toBeVisible();
   await expect(runButton(page)).toBeEnabled();
@@ -114,6 +128,10 @@ test('Đánh giá sản phẩm: Run asks for the model, the product and a highli
   await signIn(page, 'fmtd');
   await pick(page, 'review');
   await expect(page.locator('.slot')).toHaveCount(2);
+  // Điểm nổi bật keeps the form's 16 px from the photo tiles above it, and the preview says nothing about points until one is written.
+  const [tiles, points] = await Promise.all([page.locator('.marketing-slots').boundingBox(), page.locator('.highlights').boundingBox()]);
+  expect(points!.y - (tiles!.y + tiles!.height)).toBeGreaterThanOrEqual(16);
+  await expect(preview(page)).not.toContainText('talks to the camera about');
   await expect(audio(page)).toHaveAttribute('aria-checked', 'true');
   await expect(script(page)).toBeVisible();
   await expect(runButton(page)).toBeDisabled();
