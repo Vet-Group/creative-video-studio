@@ -306,9 +306,25 @@ describe('/api/templates', () => {
         [{ endText: 'ok', endTextPos: 'left' }, 'data.endTextPos must be one of bottom, middle, top'],
         [{ hookText: 'x'.repeat(201) }, 'data.hookText must be text of at most 200 characters'],
         [{ promptMode: 'tabs' }, 'data.promptMode must be sections or free'],
+        [{ format: 'bogus' }, 'data.format must be one of advanced, unboxing, review'],
+        [{ roles: 'box,product' }, 'data.roles must be one of product | model,product | product,packaging | model,product,packaging'],
+        [{ highlights: ['a', 'b', 'c', 'd'] }, 'data.highlights must list up to 3 lines of at most 60 characters'],
+        [{ highlights: ['x'.repeat(61)] }, 'data.highlights must list up to 3 lines of at most 60 characters'],
+        [{ highlights: 'one' }, 'data.highlights must list up to 3 lines of at most 60 characters'],
       ] as const) {
         expect(await error(await save(u, { name: 'Too long', feature: 'marketing', data: { images: [], ...data } }))).toBe(message);
       }
+    });
+
+    test("saves an Unboxing job's photo roles and a Review job's highlights as a template that refills the same way", async () => {
+      const u = await newUser();
+      const unboxing = await job(u, { feature: 'marketing', model: 'kling-o3-pro', duration: 5, params: { format: 'unboxing', audio: 'on', roles: 'product' }, inputs: [u.asset] });
+      expect((await saved(await fromJob(u, unboxing))).data).toMatchObject({ format: 'unboxing', roles: 'product' });
+      const review = await job(u, { feature: 'marketing', model: 'kling-o3-pro', duration: 5, params: { format: 'review', audio: 'on', highlights: 'Vải mềm\nVừa vặn', script: 's' }, inputs: [u.asset] });
+      const res = await fromJob(u, review);
+      expect((await saved(res.clone())).data).toMatchObject({ format: 'review', highlights: ['Vải mềm', 'Vừa vặn'], script: 's' });
+      const tid = ((await res.json()) as { id: string }).id;
+      expect(await (await one(req(u, `/api/templates/${tid}`), ctx(tid))).json()).toMatchObject({ format: 'review', roles: null, highlights: ['Vải mềm', 'Vừa vặn'] });
     });
 
     test("leaves out another member's and deleted inputs, a hidden store and a hook the member cannot use, and keeps a visible store", async () => {

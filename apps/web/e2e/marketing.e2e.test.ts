@@ -23,14 +23,16 @@ test('a mock marketing job runs from two photos, a hook and a location, and show
   await openPage(page);
   await expect(nav(page).getByRole('link', { name: 'Marketing Studio' })).toHaveAttribute('aria-current', 'page');
   await expect(page.locator('.app-head strong')).toHaveText('UGC Thử đồ');
-  // The format picker, as on the live page: UGC and Advanced are built (marketing-advanced.e2e.test.ts); the other two are shown but cannot be picked yet.
+  // The format picker, as on the live page: all four formats are built (marketing-advanced and marketing-formats specs), none is marked as coming.
   await page.getByRole('button', { name: 'Đổi định dạng' }).click();
   const formats = page.getByRole('dialog', { name: 'Chọn định dạng' });
   await expect(formats.getByRole('button', { name: /^(UGC Thử đồ|Nâng cao|Mở hộp|Đánh giá sản phẩm)/ })).toHaveCount(4);
   await expect(formats.getByRole('button', { name: 'UGC Thử đồ' })).toHaveAttribute('aria-pressed', 'true');
-  await expect(formats.getByRole('button', { disabled: true })).toHaveCount(2);
+  await expect(formats.getByRole('button', { disabled: true })).toHaveCount(0);
+  await expect(formats.getByText('Sắp có')).toHaveCount(0);
+  await expect(formats.getByText(/sẽ có sau/)).toHaveCount(0);
   // Without sample clips (as here), each card's name still sits inside its card, under a short placeholder.
-  for (const card of await formats.getByRole('button', { name: /^(UGC Thử đồ|Nâng cao)/ }).all()) {
+  for (const card of await formats.getByRole('button', { name: /^(UGC Thử đồ|Nâng cao|Mở hộp|Đánh giá sản phẩm)/ }).all()) {
     expect(await card.evaluate((b) => b.querySelector('.choice-name')!.getBoundingClientRect().bottom <= b.getBoundingClientRect().bottom)).toBe(true);
   }
   await formats.getByRole('button', { name: 'UGC Thử đồ' }).click();
@@ -162,7 +164,7 @@ test('the model, ratio and duration come from the marketing model, the About tab
 
   await page.getByRole('tab', { name: 'Giới thiệu' }).click();
   await expect(page.getByRole('heading', { level: 2, name: /UGC Thử đồ/ })).toBeVisible();
-  await expect(page.getByText(/chưa được xây dựng/)).toBeVisible();
+  await expect(page.getByText(/có bốn định dạng/)).toBeVisible();
 });
 
 test('with one photo tile still empty, a reason about the model stays on screen and Run points to it', async ({ page }) => {

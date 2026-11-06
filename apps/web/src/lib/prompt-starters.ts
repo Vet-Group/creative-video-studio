@@ -14,8 +14,8 @@ export interface PromptTemplate {
   ending: string;
 }
 
-/** By page feature: Create's (`video`) and Marketing Studio's (`marketing`, UGC and Advanced), each hook and ending a sentence of its own. */
-export const PROMPT_TEMPLATES: Record<'video' | 'marketing', PromptTemplate[]> = {
+/** By page: Create's (`video`) and Marketing Studio's formats (`marketing` for UGC, `unboxing`, `review`; Advanced has none), each hook and ending a sentence of its own. */
+export const PROMPT_TEMPLATES: Record<'video' | 'marketing' | 'unboxing' | 'review', PromptTemplate[]> = {
   video: [
     {
       name: 'Xoay 360°',
@@ -55,20 +55,6 @@ export const PROMPT_TEMPLATES: Record<'video' | 'marketing', PromptTemplate[]> =
   ],
   marketing: [
     {
-      name: 'Mở hộp',
-      desc: 'Mở hộp, lấy sản phẩm ra và phản ứng thật',
-      hook: 'The clip opens with the creator holding a sealed box up to the camera and tearing it open in one quick move.',
-      body: 'The creator lifts the product out of the box, turns it slowly toward the camera to show each detail and shares a genuine first reaction. Soft window light, a handheld phone camera, close and steady.',
-      ending: 'The clip ends with the creator holding the product up to the camera and smiling.',
-    },
-    {
-      name: 'Review thật',
-      desc: 'Mặc thử, đi vài bước và nhận xét thật lòng',
-      hook: 'The clip opens on a close-up of the creator wearing the product, looking straight into the camera.',
-      body: 'The creator walks a few steps, turns to show the fit and talks honestly about what they like and what could be better, as if chatting with a friend. Bright daylight, a handheld phone camera at eye level.',
-      ending: 'The clip ends with the creator nodding and giving a thumbs up next to the product.',
-    },
-    {
       name: 'Trước / sau',
       desc: 'Từ bộ đồ cũ sang sản phẩm mới trong một cú chuyển cảnh',
       hook: 'The clip opens with the creator in a plain, dull outfit, then a quick snap transition reveals them wearing the product.',
@@ -88,6 +74,52 @@ export const PROMPT_TEMPLATES: Record<'video' | 'marketing', PromptTemplate[]> =
       hook: 'The clip opens with the creator spinning once in the first look, the product in the centre of the frame.',
       body: 'The creator shows three ways to style the product, for work, for a day out and for a party, switching looks with quick cuts and a short pose in each. Bright, even light, a steady phone camera that frames the full body.',
       ending: 'The clip ends with the creator in the favourite look, waving goodbye to the camera.',
+    },
+  ],
+  unboxing: [
+    {
+      name: 'Hộp quà',
+      desc: 'Gỡ nơ hộp quà và bất ngờ với sản phẩm',
+      hook: 'The clip opens on a gift box tied with a ribbon as hands pull the ribbon loose.',
+      body: 'The lid lifts to reveal the product wrapped in tissue paper; it is lifted out and turned slowly toward the camera to show each detail. Warm soft light, a handheld phone camera, close and steady.',
+      ending: 'The clip ends with the product held up next to its open box.',
+    },
+    {
+      name: 'POV tay',
+      desc: 'Góc nhìn thứ nhất, chỉ thấy tay mở hộp',
+      hook: 'The clip opens from a first-person view as two hands slide a sealed package onto the table.',
+      body: 'The hands cut the tape, fold back the flaps and lift the product out, turning it to catch the light. Bright daylight from a window, a top-down handheld phone camera.',
+      ending: 'The clip ends with the hands placing the product neatly on top of its box.',
+    },
+    {
+      name: 'Mở nhanh ASMR',
+      desc: 'Mở nhanh, cận cảnh tiếng giấy và băng keo',
+      hook: 'The clip opens on an extreme close-up of tape being peeled off a box with a crisp sound.',
+      body: 'Quick close cuts follow the box opening, the tissue paper rustling and the product being lifted out, each sound clear and close. Soft side light, macro handheld shots.',
+      ending: 'The clip ends on a still close-up of the product resting in its open box.',
+    },
+  ],
+  review: [
+    {
+      name: 'Review thật',
+      desc: 'Mặc thử, đi vài bước và nhận xét thật lòng',
+      hook: 'The clip opens on a close-up of the creator wearing the product, looking straight into the camera.',
+      body: 'The creator walks a few steps, turns to show the fit and talks honestly about what they like and what could be better, as if chatting with a friend. Bright daylight, a handheld phone camera at eye level.',
+      ending: 'The clip ends with the creator nodding and giving a thumbs up next to the product.',
+    },
+    {
+      name: 'Ưu và nhược',
+      desc: 'Hai điểm thích và một điểm cần lưu ý',
+      hook: 'The clip opens with the creator holding the product up to the camera and saying they have used it for a week.',
+      body: 'The creator counts on their fingers two things they love about the product and one thing to know before buying, showing each point on the product. Bright daylight, a handheld phone camera at eye level.',
+      ending: 'The clip ends with the creator giving the product a confident nod.',
+    },
+    {
+      name: 'Mặc cả ngày',
+      desc: 'Từ sáng tới tối, sản phẩm vẫn chỉn chu',
+      hook: 'The clip opens with the creator checking the time on a phone in the morning, wearing the product.',
+      body: 'Quick cuts follow the creator through the day, at work, on the street and in the evening, the product still looking neat in each shot. Natural light that shifts from morning to evening, a handheld phone camera.',
+      ending: 'The clip ends with the creator back home at night, smiling and pointing at the product.',
     },
   ],
 };

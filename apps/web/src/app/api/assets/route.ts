@@ -32,7 +32,7 @@ const imagesOf = (j: string) => `${j}.input_asset_ids || coalesce(string_to_arra
 /**
  * `?recent=marketing-product`: the caller's own product photos from their UGC Marketing Studio jobs (the second input), for the product slot's My products
  * dialog (Fash's My Products); `?recent=try-on-model`: the model photos of their Try On jobs (the first input), for the model picker's My models. Newest use
- * first, each once, at most 12. Advanced references and deleted files are left out.
+ * first, each once, at most 12. Photos of the Advanced and Unboxing formats (the product's place varies) and deleted files are left out.
  * `?recent=uploads`: every photo the caller uploaded on any page, for the shared uploaded-photos picker; newest upload first, at most UPLOADS_LIMIT.
  * Deleted files, videos and audio are left out, and so is a photo that only deleted jobs ran from: the purge removes it once those are purged.
  * `&storeId=` keeps the photos uploaded with that store chosen; without it, every store and none.
@@ -59,7 +59,7 @@ export async function GET(request: Request) {
   const { rows } = await pool.query(
     `select id, filename from (
        select distinct on (a.id) a.id, a.filename, j.created_at from jobs j join assets a on a.id = j.input_asset_ids[$2]
-        where j.user_id = $1 and j.feature = $3 and coalesce(j.params->>'format', '') <> 'advanced' and j.deleted_at is null
+        where j.user_id = $1 and j.feature = $3 and coalesce(j.params->>'format', '') in ('', 'review') and j.deleted_at is null
           and a.owner_id = $1 and a.deleted_at is null
         order by a.id, j.created_at desc) p
      order by created_at desc limit 12`,

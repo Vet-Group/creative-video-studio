@@ -161,6 +161,8 @@ describe('/api/choices', () => {
     await job(u.id, { hook: 'product-catch' }, { deleted: true }); // nor does a deleted job
     await job(u.id, { hook: 'dramatic-arrival', format: 'advanced' });
     await job(u.id, { hook: 'dramatic-arrival', format: 'advanced' }); // Advanced only
+    await job(u.id, { hook: 'strange-mic', format: 'review' });
+    await job(u.id, { hook: 'strange-mic', format: 'review' }); // Review only
     await job(u.id, { hook: gone.id });
     await job(u.id, { hook: gone.id });
     await remove(u, gone.id); // deleted since: not offered
@@ -168,6 +170,8 @@ describe('/api/choices', () => {
     await job(other.id, { hook: 'flip-fail' });
     expect((await lists(u)).often).toEqual({ hook: [mine.id, 'blizzard'], location: ['kitchen', 'gym'], ending: [] });
     expect((await lists(u, '?format=advanced')).often).toEqual({ hook: ['dramatic-arrival'], location: [], ending: [] });
+    expect((await lists(u, '?format=review')).often).toEqual({ hook: ['strange-mic'], location: [], ending: [] });
+    expect((await lists(u, '?format=unboxing')).often).toEqual({ hook: [], location: [], ending: [] });
     expect((await lists(await newUser())).often).toEqual({ hook: [], location: [], ending: [] });
 
     // At most 12: 13 own hooks used twice each.

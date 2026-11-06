@@ -61,7 +61,7 @@ export async function GET(request: Request, { params }: RouteContext) {
     id: t.id, name: t.name, isCompany: t.is_company, feature: t.feature, images, endFrame: endFrame[0] ?? null, videoRef: videoRef[0] ?? null, clips,
     prompt: data.prompt ?? null, brief: data.brief ?? null, script: data.script ?? null, hookText: data.hookText ?? null, ending: data.ending ?? null, endText: data.endText ?? null, endTextPos: data.endTextPos ?? null,
     hook: data.hook ?? null, location: data.location ?? null,
-    format: data.format ?? null, promptMode: data.promptMode ?? null, audio: data.audio ?? null, enhance: data.enhance ?? null, garments: data.garments ?? null, durationSec: data.durationSec ?? null,
+    format: data.format ?? null, roles: data.roles ?? null, highlights: data.highlights ?? null, promptMode: data.promptMode ?? null, audio: data.audio ?? null, enhance: data.enhance ?? null, garments: data.garments ?? null, durationSec: data.durationSec ?? null,
     ratio: data.ratio ?? null, resolution: data.resolution ?? null, modelId: data.modelId ?? null, presetId: data.presetId ?? null, storeId: data.storeId ?? null,
   });
 }

@@ -1916,9 +1916,6 @@ dialog.modal.template-sheet { width: 100%; max-width: none; margin: auto 0 0; bo
 .photo-back:hover { background: var(--fill); }
 .photo-mine { margin: 20px 0 10px; font-size: 14px; line-height: 20px; font-weight: 500; }
 .model-upload:focus-within { outline: 2px solid var(--ink-strong); outline-offset: 2px; }
-/* A format that is not ready yet: its clip washed out and a light pill centred under the name, as on the live picker. */
-.choice-grid button:has(.badge-soon) > :is(video, img) { opacity: .85; }
-.choice-grid button:has(.badge-soon) .choice-name { color: var(--text-subtle); }
 /* A choice with a sample loop: the bare 3:4 clip with its name left-aligned below, like the live pickers; the chosen one gets a ring and a check badge. */
 .choice-grid:has(button > :is(video, img)) { grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr)); gap: 16px; padding: 4px; }
 @media (max-width: 480px) { .choice-grid:has(button > :is(video, img)) { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; } } /* two per row on a phone, not one card a screen tall */
@@ -1965,6 +1962,13 @@ dialog.modal.template-sheet { width: 100%; max-width: none; margin: auto 0 0; bo
 .end-scene input[type='text'] { display: block; width: 100%; min-width: 0; margin: 0; padding: 8px 12px; border: 1px solid var(--field-border); border-radius: 8px; background: var(--fill); color: inherit; font: inherit; font-size: 14px; line-height: 21px; }
 .end-scene .help { margin-top: 0; }
 .end-scene .theme-choice { justify-self: start; margin: 0; }
+/* Review's highlight lines: one input per line, styled like the end text box. */
+.highlights { display: grid; gap: 8px; }
+.highlight-row { display: flex; align-items: center; gap: 8px; }
+.highlights input[type='text'] { display: block; flex: 1; width: 100%; min-width: 0; margin: 0; padding: 8px 12px; border: 1px solid var(--field-border); border-radius: 8px; background: var(--fill); color: inherit; font: inherit; font-size: 14px; line-height: 21px; }
+.highlight-remove { flex: none; display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--ink); }
+.highlights .help { margin: 0; }
+.highlight-add { justify-self: start; display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 12px; border-radius: 999px; font-size: 13px; }
 .choice-examples { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 12px 0 16px; color: var(--text-sub); font-size: 13px; }
 .choice-examples button { height: 28px; padding: 0 12px; border-radius: 999px; font-size: 13px; }
 .choice-form-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }

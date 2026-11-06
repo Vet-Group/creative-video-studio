@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ADVANCED_MAX_IMAGES, ADVANCED_MAX_SCRIPT, advancedPrompt, briefRoom, ENDINGS, endingLine, HOOKS, LOCATIONS, marketingPrompt, sectionBody, sectionPrompt } from './marketing';
+import { ADVANCED_MAX_IMAGES, ADVANCED_MAX_SCRIPT, advancedPrompt, briefRoom, ENDINGS, endingLine, highlightLines, hrefOfFormat, HOOKS, LOCATIONS, marketingPrompt, reviewPrompt, sectionBody, sectionPrompt, unboxingPrompt, unboxingRoles, UNBOXING_ROLES } from './marketing';
 
 describe('HOOKS and LOCATIONS', () => {
   it.each([['HOOKS', HOOKS], ['LOCATIONS', LOCATIONS]])('%s has 6 to 12 unique choices with a Vietnamese name and description and an English phrase', (_, list) => {
@@ -225,5 +225,71 @@ describe('custom hooks and locations', () => {
     expect(marketingPrompt(args, {})).toBe(marketingPrompt(args));
     expect(marketingPrompt({ hook: 'c-hook', location: 'c-spot' })).toBe(marketingPrompt({}));
     expect(advancedPrompt({ brief: 'b', images: 1, audio: false, hook: 'c-hook' })).toBe(advancedPrompt({ brief: 'b', images: 1, audio: false }));
+  });
+});
+
+describe('unboxingPrompt', () => {
+  const beats = 'Show the closed package, the opening, the product lifted out and turned toward the camera, then a close look at the details. Soft natural light, authentic energy. No on-screen text, logos or watermarks.';
+  const withModel = "UGC unboxing video, vertical 9:16 frame, filmed handheld on a phone by a real creator. The creator in [Image1] opens a package and reveals the product in [Image2]; keep their face, hair and body and the product's shape, colours, print and details exactly as in the photos.";
+  const pov = "POV unboxing video, horizontal 16:9 frame, filmed handheld on a phone from the creator's point of view: only their hands are seen. The hands open a package and reveal the product in [Image1]; keep the product's shape, colours, print and details exactly as in the photo.";
+
+  it('pins the instruction with a model photo', () => {
+    expect(unboxingPrompt({ model: true, packaging: false, ratio: '9:16' })).toBe(`${withModel} ${beats}`);
+  });
+
+  it('is a point-of-view clip with only hands when there is no model photo', () => {
+    expect(unboxingPrompt({ model: false, packaging: false, ratio: '16:9' })).toBe(`${pov} ${beats}`);
+  });
+
+  it('names the packaging photo as the last image, after the model and product, or right after the product with no model', () => {
+    expect(unboxingPrompt({ model: true, packaging: true, ratio: '9:16' })).toBe(`${withModel} The box or packaging looks like [Image3]. ${beats}`);
+    expect(unboxingPrompt({ model: false, packaging: true, ratio: '16:9' })).toBe(`${pov} The box or packaging looks like [Image2]. ${beats}`);
+  });
+
+  it('adds the hook, location, notes, last shot and the unboxing sound in the UGC order', () => {
+    const p = unboxingPrompt({ model: false, packaging: false, ratio: '1:1', hook: 'product-drop', location: 'kitchen', prompt: 'Calm.', ending: 'the product on its box', audio: true });
+    expect(p).toBe(
+      `${pov.replace('horizontal 16:9', 'square 1:1')} ${beats} ${HOOKS.find((c) => c.id === 'product-drop')!.phrase} Set in ${LOCATIONS.find((c) => c.id === 'kitchen')!.phrase}. Creator notes: Calm. It ends with: the product on its box. ` +
+        "Natural sound recorded on the phone: the rustle of paper, the tape and the box opening, and the creator's short, casual spoken reaction to the product, with no background music.",
+    );
+    expect(unboxingPrompt({ model: true, packaging: false, ratio: '9:16', audio: false })).toBe(`${withModel} ${beats} The video is completely silent: no speech, no music and no sound.`);
+  });
+});
+
+describe('reviewPrompt', () => {
+  const head = "UGC product review video, vertical 9:16 frame, filmed handheld on a phone by a real creator. The creator in [Image1] reviews the product in [Image2], wearing or holding it; keep their face, hair and body and the product's shape, colours, print and details exactly as in the photos. ";
+  const tail = 'Show the product up close and a natural move that shows how it fits or works. Soft natural light, honest energy. No on-screen text, logos or watermarks.';
+
+  it('pins the instruction with the highlights joined by semicolons, as written', () => {
+    expect(reviewPrompt({ highlights: ['Vải mềm, không nhăn.', '  Giá  hợp lý ', ''], ratio: '9:16' })).toBe(`${head}The creator talks to the camera about: Vải mềm, không nhăn; Giá hợp lý. ${tail}`);
+    expect(reviewPrompt({ highlights: ['Soft fabric', 'Fits well', 'Good price'], ratio: '9:16' })).toBe(`${head}The creator talks to the camera about: Soft fabric; Fits well; Good price. ${tail}`);
+  });
+
+  it('speaks about the points when sound is on, says the script exactly when there is one, and is silent when off', () => {
+    const base = reviewPrompt({ highlights: ['Soft fabric'], ratio: '9:16' });
+    expect(reviewPrompt({ highlights: ['Soft fabric'], ratio: '9:16', audio: true })).toBe(`${base} The creator speaks to the camera in a casual, honest tone about these points, recorded on the phone, with no background music.`);
+    expect(reviewPrompt({ highlights: ['Soft fabric'], ratio: '9:16', audio: true, script: '  Mình   rất thích.  ' })).toBe(`${base} The creator says exactly: "Mình rất thích.", lip-synced, and no other spoken words.`);
+    expect(reviewPrompt({ highlights: ['Soft fabric'], ratio: '9:16', audio: false, script: 'ignored' })).toBe(`${base} The video is completely silent: no speech, no music and no sound.`);
+  });
+
+  it('puts the hook, location, notes and last shot between the instruction and the sound', () => {
+    const p = reviewPrompt({ highlights: ['Soft fabric'], ratio: '9:16', hookText: 'The clip opens on the box', location: 'bedroom', prompt: 'Warm.', ending: 'The clip ends on a nod.', audio: false });
+    expect(p).toBe(`${head}The creator talks to the camera about: Soft fabric. ${tail} The clip opens on the box. Set in ${LOCATIONS.find((c) => c.id === 'bedroom')!.phrase}. Creator notes: Warm. The clip ends on a nod. The video is completely silent: no speech, no music and no sound.`);
+  });
+});
+
+describe('format helpers', () => {
+  it('lists the photo roles of each unboxing layout and keeps them in step with the sent order', () => {
+    expect(unboxingRoles({ model: false, packaging: false })).toBe('product');
+    expect(unboxingRoles({ model: true, packaging: true })).toBe('model,product,packaging');
+    for (const o of [{ model: false, packaging: false }, { model: true, packaging: false }, { model: false, packaging: true }, { model: true, packaging: true }]) expect(UNBOXING_ROLES).toContain(unboxingRoles(o));
+  });
+
+  it('drops empty highlight lines and collapses spaces', () => {
+    expect(highlightLines([' a   b ', '', '  '])).toEqual(['a b']);
+  });
+
+  it('maps a job format to its page, UGC for none', () => {
+    expect([null, 'advanced', 'unboxing', 'review', 'other'].map(hrefOfFormat)).toEqual(['/marketing-studio', '/marketing-studio/advanced', '/marketing-studio/unboxing', '/marketing-studio/review', '/marketing-studio']);
   });
 });

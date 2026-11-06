@@ -3,6 +3,7 @@
 // settings, and the reuse link (Fash's Recreate). The details come from the sample's own file (`<sample>.json`, uploaded by an Admin beside it); nothing here runs a job.
 import { useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
+import { FORMAT_NAME, hrefOfFormat, isParamFormat } from '@/lib/marketing';
 import { exampleFrom } from '@/lib/reuse';
 import { BACKGROUNDS } from '@/lib/try-on-stock';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
@@ -70,14 +71,13 @@ export function SampleDetail({ names, index, onIndex }: { names: string[]; index
   const tryOn = base.startsWith('try-on-');
   const feature = video ? 'marketing' : tryOn ? 'try_on' : 'image';
   const text = details?.brief ?? details?.prompt ?? null;
-  const advanced = details?.format === 'advanced';
-  const title = tryOn ? 'Thử đồ' : picture ? 'Tạo ảnh' : advanced ? 'Nâng cao' : 'UGC Thử đồ';
+  const title = tryOn ? 'Thử đồ' : picture ? 'Tạo ảnh' : FORMAT_NAME[isParamFormat(details?.format) ? details.format : 'ugc'];
   // As on Fash, each photo, the words, a chip and the result can go on the form beside the Examples.
   const inputs = details && details.images.length > 0 && (
     <ul className="job-inputs" aria-label="Ảnh đầu vào">
       {details.images.map((i, n) => (
         <li key={i.sample}>
-          <Tap on={form?.photo && (() => form.photo!(i, roleOf(feature, n, { garments: details.garments, advanced })))}>
+          <Tap on={form?.photo && (() => form.photo!(i, roleOf(feature, n, { garments: details.garments, format: details.format })))}>
             <img src={`/api/samples/${i.sample}`} alt={i.sample} />
           </Tap>
         </li>
@@ -156,7 +156,7 @@ export function SampleDetail({ names, index, onIndex }: { names: string[]; index
           </div>
         )}
         {details && (
-          <Recreate href={tryOn ? `/try-on?example=${base}` : picture ? `/image-generation?example=${base}` : `/marketing-studio${advanced ? '/advanced' : ''}?example=${base}`} from={exampleFrom({ example: base })!} className="lightbox-reuse" onDone={() => narrow && onIndex(null)}>
+          <Recreate href={tryOn ? `/try-on?example=${base}` : picture ? `/image-generation?example=${base}` : `${hrefOfFormat(details.format)}?example=${base}`} from={exampleFrom({ example: base })!} className="lightbox-reuse" onDone={() => narrow && onIndex(null)}>
             Dùng lại
           </Recreate>
         )}

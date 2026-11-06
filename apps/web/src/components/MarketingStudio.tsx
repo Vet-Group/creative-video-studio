@@ -1,12 +1,14 @@
 'use client';
-// Marketing Studio, in two formats. UGC Try On: a creator-style try-on video from two photos (the model, then the product), laid out like Try On.
-// Advanced (/marketing-studio/advanced): 1 to 7 reference images, the member's brief, an optional script and the audio switch. Each composes one English
-// prompt (lib/marketing.ts) and posts a `marketing` video job on a video model that lists the feature; Advanced adds params format and audio.
+// Marketing Studio, in four formats. UGC Try On: a creator-style try-on video from two photos (the model, then the product), laid out like Try On.
+// Advanced (/marketing-studio/advanced): 1 to 7 reference images, the member's brief, an optional script and the audio switch. Unboxing
+// (/marketing-studio/unboxing): the product photo, with an optional model photo (none: POV, hands only) and an optional packaging photo. Review
+// (/marketing-studio/review): the model and the product photos, 1 to 3 highlight lines and an optional script. Each composes one English prompt
+// (lib/marketing.ts) and posts a `marketing` video job on a video model that lists the feature; the other formats add params format and audio.
 import { useRouter } from 'next/navigation';
 import { type CSSProperties, useEffect, useId, useState } from 'react';
 import { ABOUT } from '@/lib/about-content';
 import { api, errorText, sendJson } from '@/lib/api';
-import { ADVANCED_MAX_IMAGES, ADVANCED_MAX_SCRIPT, advancedPrompt, briefRoom, END_TEXT_POSITIONS, type EndTextPosition, marketingPrompt, sectionPrompt } from '@/lib/marketing';
+import { ADVANCED_MAX_IMAGES, ADVANCED_MAX_SCRIPT, advancedPrompt, briefRoom, END_TEXT_POSITIONS, type EndTextPosition, FORMAT_HREF, FORMAT_NAME, highlightLines, hrefOfFormat, marketingPrompt, type MarketingFormat, reviewPrompt, sectionPrompt, unboxingPrompt, unboxingRoles } from '@/lib/marketing';
 import { PROMPT_TEMPLATES } from '@/lib/prompt-starters';
 import { promptTooLong } from '@/lib/prompt-limit';
 import { confirmRun } from '@/lib/run-guard';
@@ -22,6 +24,7 @@ import { BrandPicker } from './BrandKit';
 import { CardMedia, LoopVideo } from './CardMedia';
 import { builtInChoices, type Choice, ChoiceBox, ChoiceDialog, PhraseChoice, useChoiceLists } from './Choices';
 import { EndScene } from './EndScene';
+import { Highlights } from './Highlights';
 import { Icon } from './Icon';
 import { copyError, copySamples, Gallery, HISTORY_SIZE_KEY, type Img, PhotoDialog, photoImg, RunSummary, SizeSlider, Slot, uploadError, uploadImages, UPLOAD_ERROR, useSize, WorkTabs } from './image-tools';
 import { FormContext, type FormActions, type Photo, type PhotoRole, useApplier, useHasHistory, useJobs, useRecreated } from './jobs';
@@ -76,13 +79,12 @@ const RATIO_LABEL: Record<string, string> = { '9:16': '9:16 (dọc)', '16:9': '1
 
 const QUIET_REASONS = ['Tải lên ảnh người mẫu.', 'Tải lên ảnh sản phẩm.', 'Viết prompt mô tả video bạn muốn.'];
 
-export type MarketingFormat = 'ugc' | 'advanced';
-/** The formats of the live format picker, each with its page and sample loop; the ones not built yet say why they cannot be picked. */
-const FORMATS = [
-  { id: 'ugc', name: 'UGC Thử đồ', href: '/marketing-studio', soon: null },
-  { id: 'advanced', name: 'Nâng cao', href: '/marketing-studio/advanced', soon: null },
-  { id: 'unboxing', name: 'Mở hộp', href: null, soon: 'Sắp có' },
-  { id: 'product-review', name: 'Đánh giá sản phẩm', href: null, soon: 'Sắp có' },
+/** The formats of the format picker, each with the name of its sample photo and loop (Review's keeps the name the first upload used). */
+const FORMATS: { id: MarketingFormat; sample: string }[] = [
+  { id: 'ugc', sample: 'marketing-format-ugc' },
+  { id: 'advanced', sample: 'marketing-format-advanced' },
+  { id: 'unboxing', sample: 'marketing-format-unboxing' },
+  { id: 'review', sample: 'marketing-format-product-review' },
 ];
 
 /** What the reuse link reads back from a Marketing Studio job (GET /api/jobs/:id), a saved template (GET /api/templates/:id) or a sample on the Examples tab (its details file, photos named as samples). */
@@ -97,6 +99,9 @@ interface MarketingJob {
   location: string | null;
   brief: string | null;
   script: string | null;
+  /** Unboxing's photo roles in the order of `images`, and Review's highlight lines. */
+  roles?: string | null;
+  highlights?: string[] | null;
   /** The end frame, last shot and end text; a sample or an older job has none. */
   endFrame?: Img | null;
   /** Advanced's reference video; a sample or an older job has none. */
@@ -112,6 +117,10 @@ interface MarketingJob {
 
 export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingFormat; reuse?: string }) {
   const advanced = format === 'advanced';
+  const unboxing = format === 'unboxing';
+  const review = format === 'review';
+  /** The format the API and the page's own lists are told (UGC, the one with none, leaves it out). */
+  const pf = format === 'ugc' ? undefined : format;
   const router = useRouter();
   const have = useSamples();
   const { refresh, clips, notify, loading } = useJobs();
@@ -121,13 +130,15 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
   const [person, setPerson] = useState<Img[]>([]);
   const [product, setProduct] = useState<Img[]>([]);
   const [refs, setRefs] = useState<Img[]>([]);
+  const [packaging, setPackaging] = useState<Img[]>([]); // Unboxing's optional box photo
+  const [highlights, setHighlights] = useState(['']); // Review's lines
   const [script, setScript] = useState('');
   const [endFrame, setEndFrame] = useState<Img | null>(null); // sent only on a model that takes one
   const [video, setVideo] = useState<RefVideo | null>(null); // Advanced's reference video, sent only on a model that takes one (the Run says so otherwise)
   const [ending, setEnding] = useState(''); // ③ Ending of the sections, with the own hook of ①; the brief is ② Body
   const [hookText, setHookText] = useState('');
   const [freeText, setFreeText] = useState(''); // the free writing box, which keeps its own words
-  const [mode, setMode] = usePromptMode(advanced ? 'marketing-advanced' : 'marketing');
+  const [mode, setMode] = usePromptMode(pf ? `marketing-${pf}` : 'marketing');
   const sec = mode === 'sections';
   const [endText, setEndText] = useState('');
   const [endTextPos, setEndTextPos] = useState<EndTextPosition>('bottom');
@@ -137,7 +148,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
   const [many, setMany] = useState(false);
   const [location, setLocation] = useState('');
   /** The member's own and the company's hooks, locations and endings, and the often-used ids; null until loaded (the built-in ones show meanwhile). */
-  const choices = useChoiceLists(advanced ? 'advanced' : undefined);
+  const choices = useChoiceLists(pf);
   const { lists: custom, setLists: setCustom, reload: loadChoices, remove: removeChoice } = choices;
   const [picker, setPicker] = useState<'hook' | 'location' | 'format' | 'model' | 'product' | null>(null);
   /** The member's past UGC product photos (Fash's My Products), offered by the product slot. */
@@ -161,7 +172,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
       if (s.storeId) setStoreId(s.storeId);
       if (s.brand !== null) setUseBrand(s.brand);
     },
-    { format: advanced ? 'advanced' : undefined, skip: reuse !== undefined },
+    { format: pf, skip: reuse !== undefined },
   );
   const apply = useApplier((s) => {
     recall.touch();
@@ -207,8 +218,18 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
   /** The words of ② Body, or of the free writing box; the own hook (used only while no hook is chosen) and the last shot count in the sections only. */
   const brief = sec ? prompt : freeText;
   const parts = { hookText: sec ? hookText : '', ending: sec ? ending : '' };
-  const composeFor = (hook: string, brief: string) =>
-    advanced ? advancedPrompt({ brief, images: refs.length, video: video !== null, hook, location, script, ...parts, audio: audioOn }, own) : marketingPrompt({ hook, location, prompt: brief, ...parts, audio: audioOn, ratio }, own);
+  /** The photos a Run sends, in the order the prompt names them [Image1]..: Unboxing's model is left out for POV and its packaging comes last. */
+  const images = advanced ? refs : unboxing ? [...person, ...product, ...packaging] : [...person, ...product];
+  const composeFor = (hook: string, brief: string) => {
+    const shared = { hook, location, prompt: brief, ...parts, audio: audioOn, ratio };
+    return advanced
+      ? advancedPrompt({ brief, images: refs.length, video: video !== null, hook, location, script, ...parts, audio: audioOn }, own)
+      : unboxing
+        ? unboxingPrompt({ ...shared, model: person.length > 0, packaging: packaging.length > 0 }, own)
+        : review
+          ? reviewPrompt({ ...shared, highlights, script }, own)
+          : marketingPrompt(shared, own);
+  };
   const compose = (hook: string) => composeFor(hook, brief);
   const line = (text: string) => text.replace(/\s+/g, ' ').trim();
   // The request a Run with a video makes may take no end frame (Kling O3): the slot is replaced by a note and the frame is not sent.
@@ -222,12 +243,13 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
   /** The estimate of the whole Run, at the estimate's own precision. */
   const total = cost === undefined ? undefined : (Number(cost) * n).toFixed(cost.split('.')[1]?.length ?? 2);
   const hookName = (id: string) => hookList.find((c) => c.id === id)?.name ?? id;
-  const name = FORMATS.find((f) => f.id === format)!.name;
+  const name = FORMAT_NAME[format];
+  const sample = FORMATS.find((f) => f.id === format)!.sample;
   /** The sample photo and loop behind the format header, when an Admin uploaded them. */
-  const photo = `marketing-format-${format}.jpg`;
+  const photo = `${sample}.jpg`;
   /** The stock model photos an Admin uploaded (`marketing-model-1.jpg`...), offered by the model slot as on Fash's Choose model dialog. */
   const stockModels = [...have].filter((n) => /^marketing-model-\d+\.(jpg|png|webp)$/.test(n)).sort((a, b) => parseInt(a.slice(16)) - parseInt(b.slice(16)));
-  const loop = `marketing-format-${format}.mp4`;
+  const loop = `${sample}.mp4`;
 
   // Every model can be picked (the picker is told all are supported): switching moves the ratio and the duration to the model's own.
   function pickModel(m: VideoModel) {
@@ -260,13 +282,21 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
       .then(async (j) => {
         if (stale) return;
         if (j.feature !== 'marketing') return setError('Không tìm thấy clip để dùng lại.');
-        if ((j.format === 'advanced') !== advanced) return router.replace(`/marketing-studio${j.format === 'advanced' ? '/advanced' : ''}?${queryOf(reuse)}`);
+        if (hrefOfFormat(j.format) !== FORMAT_HREF[format]) return router.replace(`${hrefOfFormat(j.format)}?${queryOf(reuse)}`);
         // A sample's photos become this member's inputs first, copied on the server.
         const samples = j.images.map((i) => ('sample' in i ? i.sample : null)).filter((s) => s !== null);
         const inputs = samples.length > 0 ? await copySamples(samples) : (j.images as Img[]);
         if (stale) return; // superseded while the photos were copied
         if (advanced) setRefs(inputs);
-        else (setPerson(inputs.slice(0, 1)), setProduct(inputs.slice(1, 2)));
+        else if (unboxing) {
+          // The photos come in the order sent; the roles say which of them the job had.
+          const roles = j.roles?.split(',') ?? ['model', 'product'];
+          const photo = (role: string) => inputs.filter((_, n) => roles[n] === role).slice(0, 1);
+          setPerson(photo('model'));
+          setProduct(photo('product'));
+          setPackaging(photo('packaging'));
+        } else (setPerson(inputs.slice(0, 1)), setProduct(inputs.slice(1, 2)));
+        if (review) setHighlights(j.highlights?.length ? j.highlights : ['']);
         setHooks(j.hook ? [j.hook] : []);
         setLocation(j.location ?? '');
         // A job with an own hook or a last shot was written in sections; a template keeps the way it was written; else the brief goes where the member writes now.
@@ -315,12 +345,12 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
 
   // My products: loaded once; a failure just leaves the plain upload slot.
   useEffect(() => {
-    if (advanced) return;
+    if (advanced || unboxing) return;
     api<{ assets: Img[] }>('/api/assets?recent=marketing-product').then(
       (r) => setMyProducts(r.assets),
       () => {},
     );
-  }, [advanced]);
+  }, [advanced, unboxing]);
 
   // The first list picks the server's default model (the best of those that offer the starting ratio and duration), else the first; a model switched off since is replaced the same way.
   // It waits for the remembered model: a list that lands just before it would otherwise pick the default after it.
@@ -330,6 +360,16 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
     if (first) pickModel(first);
   }, [list, recall.answered]);
 
+  /** The photo the format still needs: Advanced one reference, Unboxing the product (its model and packaging are optional), the others the model and the product. */
+  const photoReason = advanced
+    ? refs.length === 0
+      ? 'Tải lên ít nhất 1 ảnh tham chiếu.'
+      : null
+    : !unboxing && person.length === 0
+      ? 'Tải lên ảnh người mẫu.'
+      : product.length === 0
+        ? 'Tải lên ảnh sản phẩm.'
+        : null;
   // The first thing that stops Run, in the order the form is filled; null when it can go. The prompt's length comes last.
   const formReason =
     !recall.answered
@@ -344,17 +384,14 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
               ? 'Các mô hình này không có tỉ lệ hoặc thời lượng dùng được cho Marketing Studio.'
               : !chosen!.supported
                 ? 'Mô hình này không có tỉ lệ hoặc thời lượng đã chọn. Chọn mô hình khác, hoặc đổi tỉ lệ hoặc thời lượng.'
-                : advanced
-                  ? refs.length === 0
-                    ? 'Tải lên ít nhất 1 ảnh tham chiếu.'
-                    : refs.length > chosen!.maxImages
-                      ? `Mô hình này nhận tối đa ${chosen!.maxImages} ảnh tham chiếu. Bỏ bớt ảnh hoặc chọn mô hình khác.`
-                      : (videoReason(video, chosen!.videoRefs, refs.length) ?? (brief.trim() === '' ? 'Viết prompt mô tả video bạn muốn.' : null))
-                  : person.length === 0
-                    ? 'Tải lên ảnh người mẫu.'
-                    : product.length === 0
-                      ? 'Tải lên ảnh sản phẩm.'
-                      : null;
+                : photoReason ??
+                  (pf && images.length > chosen!.maxImages
+                    ? `Mô hình này nhận tối đa ${chosen!.maxImages} ảnh tham chiếu. Bỏ bớt ảnh hoặc chọn mô hình khác.`
+                    : advanced
+                      ? (videoReason(video, chosen!.videoRefs, refs.length) ?? (brief.trim() === '' ? 'Viết prompt mô tả video bạn muốn.' : null))
+                      : review && highlightLines(highlights).length === 0
+                        ? 'Nhập ít nhất 1 điểm nổi bật.'
+                        : null);
   const reason = formReason ?? promptTooLong(chosen, Math.max(...sent.map((s) => s.length)));
   /** Hook variants beyond the clips left today are refused before anything is sent. */
   const short = n > 1 && clips !== null && clips.today + n > clips.cap ? `Hôm nay bạn chỉ còn ${Math.max(0, clips.cap - clips.today)} clip; bỏ bớt biến thể hook.` : null;
@@ -447,6 +484,10 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
     };
   }
 
+  /** What only Unboxing and Review keep in their params: the photo roles in the order sent, the highlight lines one per line. */
+  const roles = unboxingRoles({ model: person.length > 0, packaging: packaging.length > 0 });
+  const formInputs = unboxing ? { roles } : review ? { highlights: highlightLines(highlights).join('\n') } : {};
+
   /** One job per hook variant, sent one after another (the API takes one job per POST); a refused variant does not stop the rest. */
   async function run() {
     // One question: the variants one when there are several, else the price one from 1 USD.
@@ -461,19 +502,17 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
       // The end frame and the end text are the worker's (the end text is burned in after the provider), so they go too.
       // The own hook only where the prompt has it: no hook chosen for this variant.
       const inputs = { ...(hook && { hook }), ...(!hook && line(parts.hookText) && { hookText: line(parts.hookText) }), ...(location && { location }), ...(brief.trim() && { brief: brief.trim() }), ...(endAssetId && { endAssetId }), ...(line(parts.ending) && { ending: line(parts.ending) }), ...(endText.trim() && { endText: endText.trim(), endTextPos }) };
-      const body = advanced
-        ? {
-            feature: 'marketing',
-            assetIds: refs.map((r) => r.id),
-            modelId: chosen!.id,
-            prompt: sent[i],
-            ratio,
-            durationSec,
-            storeId: storeId || null,
-            useBrand,
-            params: { format: 'advanced', audio: audioOn ? 'on' : 'off', ...inputs, ...(script.trim() && { script: script.trim() }), ...(video && { videoAssetId: video.id }) },
-          }
-        : { feature: 'marketing', assetIds: [person[0]!.id, product[0]!.id], modelId: chosen!.id, prompt: sent[i], ratio, durationSec, storeId: storeId || null, useBrand, params: { audio: audioOn ? 'on' : 'off', ...inputs } };
+      const body = {
+        feature: 'marketing',
+        assetIds: images.map((r) => r.id),
+        modelId: chosen!.id,
+        prompt: sent[i],
+        ratio,
+        durationSec,
+        storeId: storeId || null,
+        useBrand,
+        params: { ...(pf && { format: pf }), audio: audioOn ? 'on' : 'off', ...inputs, ...(script.trim() && (advanced || review) && { script: script.trim() }), ...formInputs, ...(advanced && video && { videoAssetId: video.id }) },
+      };
       try {
         await api('/api/jobs', sendJson('POST', body));
         sentOk.push(hookName(hook));
@@ -547,19 +586,22 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
                 </div>
               ) : (
                 <>
-                  <Slot label="Người mẫu" empty="Thêm 1 ảnh người mẫu" inputLabel="Ảnh người mẫu" images={person} max={1} busy={busy} onAdd={add(setPerson)} onRemove={() => setPerson([])} onBrowse={stockModels.length > 0 ? () => setPicker('model') : undefined} onPick={(a) => setPerson([a])} storeId={storeId} />
-                  <Slot label="Sản phẩm" empty="Thêm 1 ảnh sản phẩm" inputLabel="Ảnh sản phẩm" images={product} max={1} busy={busy} onAdd={add(setProduct)} onRemove={() => setProduct([])} onBrowse={myProducts.length > 0 ? () => setPicker('product') : undefined} onPick={(a) => setProduct([a])} storeId={storeId} />
+                  <Slot label="Người mẫu" optional={unboxing} empty="Thêm 1 ảnh người mẫu" inputLabel="Ảnh người mẫu" images={person} max={1} busy={busy} onAdd={add(setPerson)} onRemove={() => setPerson([])} onBrowse={stockModels.length > 0 ? () => setPicker('model') : undefined} onPick={(a) => setPerson([a])} storeId={storeId} />
+                  <Slot label="Sản phẩm" empty="Thêm 1 ảnh sản phẩm" inputLabel="Ảnh sản phẩm" images={product} max={1} busy={busy} onAdd={add(setProduct)} onRemove={() => setProduct([])} onBrowse={!unboxing && myProducts.length > 0 ? () => setPicker('product') : undefined} onPick={(a) => setProduct([a])} storeId={storeId} />
+                  {unboxing && <Slot label="Bao bì" optional empty="Thêm 1 ảnh hộp hoặc bao bì" inputLabel="Ảnh bao bì" images={packaging} max={1} busy={busy} onAdd={add(setPackaging)} onRemove={() => setPackaging([])} onPick={(a) => setPackaging([a])} storeId={storeId} />}
                 </>
               )}
               {!sec && hookBox}
               {!sec && locationBox}
             </div>
+            {unboxing && person.length === 0 && <p className="help">Không có ảnh người mẫu: video quay theo góc nhìn thứ nhất, chỉ thấy đôi tay mở hộp.</p>}
+            {review && <Highlights lines={highlights} onChange={setHighlights} />}
 
             {advanced && <ReferenceVideoSlot video={video} busy={busy} onFile={(f) => void takeVideo(() => uploadImages([f], 'video', storeId) as Promise<RefVideo[]>, (e) => uploadError(e, 'video'))} onHistory={(id) => void takeVideo(() => api<{ assets: RefVideo[] }>('/api/assets/copy', sendJson('POST', { assetId: id })).then((r) => r.assets), (e) => copyError(e, VIDEO_ERROR))} onRemove={() => setVideo(null)} />}
 
             <PromptSections
               feature="marketing"
-              format={advanced ? 'advanced' : undefined}
+              format={pf}
               mode={mode}
               onMode={(next) => (next === 'free' && setFreeText(sectionPrompt({ hook: hooks.length > 0 ? '' : hookText, body: prompt, ending })), setMode(next))}
               hook={{
@@ -568,17 +610,17 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
                 hint: hooks.length > 0 ? 'Đang dùng hook đã chọn; chữ tự viết chỉ dùng khi bỏ chọn hook đó.' : 'Chọn hook có sẵn ở trên hoặc tự viết bên dưới. Chữ tự viết chỉ dùng khi chưa chọn hook.',
                 text: hookText,
                 onText: setHookText,
-                ask: chosen ? () => ({ field: 'hook', text: hookText, rest: sectionPrompt({ body: prompt, ending }), model: chosen.id, audio, seconds: durationSec }) : null,
+                ask: chosen ? () => ({ field: 'hook', ...(pf && { format: pf }), text: hookText, rest: sectionPrompt({ body: prompt, ending }), model: chosen.id, audio, seconds: durationSec }) : null,
               }}
               ending={{
                 box: <PhraseChoice kind="ending" label="Cảnh kết có sẵn" title="Chọn cảnh kết" sub="Cảnh cuối clip dừng lại ở đó. Chọn một cảnh kết để điền vào phần Kết, rồi sửa nếu cần." choices={choices} stores={stores} storeId={storeId} text={ending} onText={setEnding} />,
                 text: ending,
                 onText: setEnding,
-                ask: chosen ? () => ({ field: 'ending', text: ending, rest: sectionPrompt({ hook: hooks[0] ? hookList.find((c) => c.id === hooks[0])?.phrase : hookText, body: prompt }), model: chosen.id, audio, seconds: durationSec }) : null,
+                ask: chosen ? () => ({ field: 'ending', ...(pf && { format: pf }), text: ending, rest: sectionPrompt({ hook: hooks[0] ? hookList.find((c) => c.id === hooks[0])?.phrase : hookText, body: prompt }), model: chosen.id, audio, seconds: durationSec }) : null,
                 extra: endExtras,
               }}
               endText
-              templates={PROMPT_TEMPLATES.marketing}
+              templates={PROMPT_TEMPLATES[unboxing ? 'unboxing' : review ? 'review' : 'marketing']}
               // A template's own hook counts only with no hook chosen, so the chosen ones go.
               onTemplate={(t) => (sec ? (setHooks([]), setHookText(t.hook), setPrompt(t.body), setEnding(t.ending)) : setFreeText(sectionPrompt(t)))}
               filled={(sec ? hookText + prompt + ending : freeText).trim() !== ''}
@@ -591,16 +633,16 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
                 optional={!advanced}
                 required={advanced}
                 feature="marketing"
-                format={advanced ? 'advanced' : undefined}
+                format={pf}
                 value={brief}
                 onChange={sec ? setPrompt : setFreeText}
                 maxLength={room}
                 onRun={() => canRun && void run()}
                 placeholder="Ví dụ: người mẫu mở hộp, cầm sản phẩm lên và nói cảm nhận đầu tiên…"
-                ask={chosen ? () => ({ field: 'brief', ...(advanced && { format: 'advanced' }), text: brief, hook: hooks[0], location: location || undefined, seconds: durationSec, audio, ...(room !== undefined && { room }), model: chosen.id }) : null}
+                ask={chosen ? () => ({ field: 'brief', ...(pf && { format: pf }), text: brief, hook: hooks[0], location: location || undefined, seconds: durationSec, audio, ...(room !== undefined && { room }), model: chosen.id }) : null}
               />
             </PromptSections>
-            {advanced && (
+            {(advanced || review) && (
               <PromptComposer
                 id={scriptId}
                 label="Lời thoại"
@@ -611,7 +653,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
                 maxLength={ADVANCED_MAX_SCRIPT}
                 onRun={() => canRun && void run()}
                 placeholder="Viết lời thoại bạn muốn nhân vật nói…"
-                ask={chosen ? () => ({ field: 'script', format: 'advanced', text: script || brief, hook: hooks[0], location: location || undefined, seconds: durationSec, audio, model: chosen.id }) : null}
+                ask={chosen ? () => ({ field: 'script', format: pf!, text: script || (review ? highlightLines(highlights).join('; ') : brief), hook: hooks[0], location: location || undefined, seconds: durationSec, audio, model: chosen.id }) : null}
                 aiLabel="Gợi ý lời thoại"
                 parts={['ai', 'translate', 'clear', 'expand']}
                 starters={[]}
@@ -630,7 +672,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
                 )}
               </div>
               <AudioSwitch on={audio} available={chosen?.audioEstimateUsd != null} always={chosen?.alwaysAudio} reason={silentWithVideo ? 'Mô hình này không tạo âm thanh khi có video tham chiếu, nên lời thoại cũng không có tác dụng.' : undefined} onChange={setAudio} />
-              {models && models.length > 0 && <ModelPicker models={models.map((m) => ({ id: m.id, label: m.label, isMock: m.isMock, supported: !advanced || (m.maxImages >= refs.length && videoReason(video, m.videoRefs, refs.length) === null), estimateUsd: audio && m.audioEstimateUsd != null ? m.audioEstimateUsd : m.estimateUsd, score: m.score, recommended: m.recommended, resolution: m.resolution, durationsSec: m.durationsSec, audio: m.audioEstimateUsd != null, isNew: m.isNew, creditUsd: m.creditUsd }))} value={chosen?.id ?? ''} onChange={(id) => pickModel(models.find((m) => m.id === id)!)} />}
+              {models && models.length > 0 && <ModelPicker models={models.map((m) => ({ id: m.id, label: m.label, isMock: m.isMock, supported: !pf || (m.maxImages >= images.length && (!advanced || videoReason(video, m.videoRefs, refs.length) === null)), estimateUsd: audio && m.audioEstimateUsd != null ? m.audioEstimateUsd : m.estimateUsd, score: m.score, recommended: m.recommended, resolution: m.resolution, durationsSec: m.durationsSec, audio: m.audioEstimateUsd != null, isNew: m.isNew, creditUsd: m.creditUsd }))} value={chosen?.id ?? ''} onChange={(id) => pickModel(models.find((m) => m.id === id)!)} />}
             </VideoSettings>
             {/* Under the model, so in free writing the ratio row sits right under the prompt box as on Fash. */}
             <PromptPreview feature="marketing" prompts={sent} labels={n > 1 ? variants.map((h, i) => `Biến thể ${i + 1} (${hookName(h)})`) : undefined} limit={chosen?.maxPromptChars} />
@@ -640,8 +682,12 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
             <Templates
               feature="marketing"
               data={() => ({
-                images: (advanced ? refs : [...person, ...product]).map((i) => i.id),
-                ...(advanced && { format: 'advanced', script: script.trim(), ...(video && { videoRef: video.id }) }),
+                images: images.map((i) => i.id),
+                ...(pf && { format: pf }),
+                ...((advanced || review) && { script: script.trim() }),
+                ...(advanced && video && { videoRef: video.id }),
+                ...(unboxing && { roles }),
+                ...(review && { highlights: highlightLines(highlights) }),
                 hook: hooks[0],
                 location,
                 brief: brief.trim(),
@@ -699,7 +745,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
               <Gallery kind="marketing" video samples="marketing-example-" label="Video Marketing Studio của công ty" emptyText="Chưa có video Marketing Studio nào trong công ty." />
             </FormContext.Provider>
           ) : shown === 'about' ? (
-            <About page={advanced ? ABOUT.advanced : ABOUT.marketing} />
+            <About page={ABOUT[advanced ? 'advanced' : unboxing ? 'unboxing' : review ? 'review' : 'marketing']} />
           ) : (
             <FormContext.Provider value={actions}>
               {!narrow && <SizeSlider size={historySize} last={1} onChange={resizeHistory} />}
@@ -711,15 +757,12 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
 
       <Modal open={picker === 'format'} onClose={() => setPicker(null)} label="Chọn định dạng" className="choice-dialog">
         <h2>Chọn định dạng</h2>
-        <p className="modal-sub">Kiểu video marketing sẽ tạo. Hiện có UGC Thử đồ và Nâng cao; các định dạng khác sẽ có sau.</p>
+        <p className="modal-sub">Kiểu video marketing sẽ tạo.</p>
         <div className="choice-grid">
           {FORMATS.map((f) => (
-            <button key={f.id} type="button" aria-pressed={f.id === format} disabled={f.href === null} onClick={() => (setPicker(null), f.href && f.id !== format && router.push(f.href))}>
-              {picker === 'format' && <CardMedia {...cardSample(have, `marketing-format-${f.id}`)} />}
-              <span className="choice-name">
-                {f.name}
-                {f.soon && <span className="badge-soon">{f.soon}</span>}
-              </span>
+            <button key={f.id} type="button" aria-pressed={f.id === format} onClick={() => (setPicker(null), f.id !== format && router.push(FORMAT_HREF[f.id]))}>
+              {picker === 'format' && <CardMedia {...cardSample(have, f.sample)} />}
+              <span className="choice-name">{FORMAT_NAME[f.id]}</span>
             </button>
           ))}
         </div>

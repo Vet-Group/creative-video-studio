@@ -11,7 +11,7 @@ import { findChoice } from '@/lib/choices';
 import { inputRefusal } from '@/lib/job-failure';
 import { offeredNow, twinEstimate } from '@/lib/model-twins';
 import { BRAND_FEATURES, withBrand } from '@/lib/brand';
-import { ADVANCED_MAX_SCRIPT, END_TEXT_POSITIONS, MAX_END_TEXT, MAX_ENDING, MAX_HOOK } from '@/lib/marketing';
+import { ADVANCED_MAX_SCRIPT, END_TEXT_POSITIONS, isParamFormat, MAX_END_TEXT, MAX_ENDING, MAX_HIGHLIGHT, MAX_HIGHLIGHTS, MAX_HOOK, PARAM_FORMATS, UNBOXING_ROLES } from '@/lib/marketing';
 import { falBalance, falCreditUsd, overCredit } from '@/lib/provider-credit';
 import { guard } from '@/lib/session';
 import { getObject } from '@/lib/storage';
@@ -148,6 +148,8 @@ export async function POST(request: Request) {
     const freePrompt = (isImage || motion) && typeof rawPrompt === 'string' && rawPrompt.trim() === '' ? null : rawPrompt;
     const given = (rawParams && typeof rawParams === 'object' && !Array.isArray(rawParams) ? rawParams : {}) as Record<string, string>;
     const advanced = feature === 'marketing' && given.format === 'advanced';
+    const review = feature === 'marketing' && given.format === 'review';
+    const unboxing = feature === 'marketing' && given.format === 'unboxing';
     const maxInputs = isImage ? MAX_IMAGE_INPUTS : advanced ? MAX_ADVANCED_IMAGES : MAX_IMAGES;
     // Image Generation and Create video may have no image (text to image or video, on a model that offers it: checked with the model below).
     const fewest = feature === 'image' || feature === 'video' ? 0 : 1;
@@ -155,7 +157,7 @@ export async function POST(request: Request) {
       return bad(`assetIds must list ${fewest} to ${maxInputs} different asset ids`);
     }
     if (feature === 'try_on' && assetIds.length < 2) return bad('Try On needs the person image and at least one garment image');
-    if (feature === 'marketing' && !advanced && assetIds.length !== 2) return bad('Marketing Studio needs exactly 2 images: the model photo first, then the product photo');
+    if (feature === 'marketing' && !advanced && !unboxing && assetIds.length !== 2) return bad('Marketing Studio needs exactly 2 images: the model photo first, then the product photo');
     if (feature === 'marketing' && (presetId !== null || typeof freePrompt !== 'string' || freePrompt.trim() === '')) return bad('Marketing Studio takes a prompt and no preset');
     if (assetIds.length < (MIN_INPUTS[feature] ?? fewest)) return bad(`${feature} needs ${MIN_INPUTS[feature]} images`);
     if (motion && (assetIds.length !== 2 || presetId !== null)) return bad('Motion Control needs exactly 2 inputs (the character image, then the reference video) and no preset');
@@ -163,15 +165,28 @@ export async function POST(request: Request) {
       return bad('modelId, ratio, durationSec (a whole number, video only), a presetId or a prompt, and an optional storeId are required');
     }
     const entries = params && typeof params === 'object' && !Array.isArray(params) ? Object.entries(params) : null;
-    // Images take resolution, quality and thinking, plus the member's own text (and Try On its garment count) kept for reuse; Marketing Studio takes format ('advanced'),
+    // Images take resolution, quality and thinking, plus the member's own text (and Try On its garment count) kept for reuse; Marketing Studio takes format ('advanced', 'unboxing' or 'review'),
     // audio ('on' or 'off'), an end frame, the end text the worker burns in (endText, endTextPos) and the form's own inputs. The kept inputs are never read by the
     // worker. Create video takes audio, an end frame, reference audio and its prompt's sections (hookText, ending); the others none.
-    const keys = isImage ? ['resolution', 'quality', 'thinking', 'brief', ...(feature === 'try_on' ? ['garments'] : [])] : feature === 'marketing' ? ['format', 'audio', 'endAssetId', 'videoAssetId', 'hook', 'hookText', 'location', 'brief', 'script', 'ending', 'endText', 'endTextPos'] : feature === 'video' ? ['audio', 'endAssetId', 'audioAssetIds', 'hookText', 'ending'] : [];
+    const keys = isImage ? ['resolution', 'quality', 'thinking', 'brief', ...(feature === 'try_on' ? ['garments'] : [])] : feature === 'marketing' ? ['format', 'audio', 'endAssetId', 'videoAssetId', 'hook', 'hookText', 'location', 'brief', 'script', 'ending', 'endText', 'endTextPos', 'roles', 'highlights'] : feature === 'video' ? ['audio', 'endAssetId', 'audioAssetIds', 'hookText', 'ending'] : [];
     if (!entries || entries.some(([k, v]) => !keys.includes(k) || typeof v !== 'string')) {
       return bad(keys.length > 0 ? `params may hold only ${keys.length > 1 ? `${keys.slice(0, -1).join(', ')} and ${keys.at(-1)}` : keys[0]}, as text` : 'params are for image features, Create video and Marketing Studio only');
     }
     if (isImage && given.resolution === undefined) return bad('params.resolution is required');
-    if (given.format !== undefined && given.format !== 'advanced') return bad('params.format must be advanced');
+    if (given.format !== undefined && !isParamFormat(given.format)) return bad(`params.format must be one of ${PARAM_FORMATS.join(', ')}`);
+    // Unboxing names its photos in the order sent (the model when there is one, the product, the packaging when there is one); Review lists 1 to 3 highlight lines, one per line.
+    if (given.roles !== undefined || unboxing) {
+      const roles = given.roles?.split(',');
+      if (!unboxing || !(UNBOXING_ROLES as readonly string[]).includes(given.roles ?? '') || roles!.length !== assetIds.length) {
+        return bad(`params.roles goes with the unboxing format and must be one of ${UNBOXING_ROLES.join(' | ')}, naming each of its photos`);
+      }
+    }
+    if (given.highlights !== undefined || review) {
+      const lines = given.highlights?.split('\n') ?? [];
+      if (!review || lines.length < 1 || lines.length > MAX_HIGHLIGHTS || lines.some((l) => l.trim() === '' || l.length > MAX_HIGHLIGHT || /\p{Cc}/u.test(l))) {
+        return bad(`params.highlights goes with the review format: 1 to ${MAX_HIGHLIGHTS} lines of text, one per line, each at most ${MAX_HIGHLIGHT} characters`);
+      }
+    }
     if (given.audio !== undefined && given.audio !== 'on' && given.audio !== 'off') return bad('params.audio must be on or off');
     if (given.quality !== undefined && !QUALITIES.includes(given.quality)) return bad(`params.quality must be one of ${QUALITIES.join(', ')}`);
     // A built-in hook or location, or the member's own or a company one (lib/choices.ts).
@@ -193,7 +208,7 @@ export async function POST(request: Request) {
     if (given.endTextPos !== undefined && (given.endText === undefined || !(END_TEXT_POSITIONS as readonly string[]).includes(given.endTextPos))) {
       return bad(`params.endTextPos goes with params.endText and must be one of ${END_TEXT_POSITIONS.join(', ')}`);
     }
-    if (given.script !== undefined && !advanced) return bad('params.script is for Advanced only');
+    if (given.script !== undefined && !advanced && !review) return bad('params.script is for Advanced and Review only');
     if (given.garments !== undefined && !(/^[1-9]$/.test(given.garments) && Number(given.garments) <= assetIds.length - 1)) {
       return bad(`params.garments must count the garment images (1 to ${assetIds.length - 1})`);
     }

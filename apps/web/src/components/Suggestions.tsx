@@ -2,6 +2,7 @@
 // other tool's prompt, and fills the field with the one the member picks. It writes text only; nothing is generated or billed beyond the one LLM call.
 import { useEffect, useRef, useState } from 'react';
 import { api, errorText, sendJson } from '@/lib/api';
+import type { ParamFormat } from '@/lib/marketing';
 import { Icon } from './Icon';
 
 const POLL_MS = 1_500;
@@ -15,7 +16,7 @@ export interface Ask {
   preset?: string;
   /** For a prompt: the page's feature, which the server maps to the tool's task. */
   feature?: string;
-  format?: 'advanced';
+  format?: ParamFormat;
   text: string;
   /** Left out (undefined) when none is chosen. */
   hook?: string;

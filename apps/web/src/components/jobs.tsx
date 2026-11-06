@@ -70,10 +70,10 @@ export interface ExampleHook {
 export type Photo = { sample: string } | { asset: string };
 export type PhotoRole = 'model' | 'garment' | 'background' | 'product' | 'input';
 
-/** The role of a job's or a sample's n-th photo: Try On sends the person, the garments, then the background; UGC the person, then the product. */
-export function roleOf(feature: string, n: number, opts: { garments?: number | null; advanced?: boolean }): PhotoRole {
+/** The role of a job's or a sample's n-th photo: Try On sends the person, the garments, then the background; UGC and Review the person, then the product; the other formats' photos are plain inputs. */
+export function roleOf(feature: string, n: number, opts: { garments?: number | null; format?: string | null }): PhotoRole {
   if (feature === 'try_on') return n === 0 ? 'model' : n <= (opts.garments ?? Infinity) ? 'garment' : 'background';
-  if (feature === 'marketing' && !opts.advanced) return n === 0 ? 'model' : 'product';
+  if (feature === 'marketing' && (!opts.format || opts.format === 'review')) return n === 0 ? 'model' : 'product';
   return 'input';
 }
 

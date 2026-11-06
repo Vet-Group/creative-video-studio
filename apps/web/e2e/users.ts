@@ -121,6 +121,13 @@ export const USERS = {
   sectb: { email: 'sectb@e2e.test', name: 'E2E Sections B', role: 'member' },
   // prompt-sections.e2e: the prompt templates dialog's recent group (sectc), whose jobs must be the only ones the member has.
   sectc: { email: 'sectc@e2e.test', name: 'E2E Sections C', role: 'member' },
+  // marketing-formats.e2e: the Unboxing and Review formats, one member per test.
+  fmta: { email: 'fmta@e2e.test', name: 'E2E Formats A', role: 'member' },
+  fmtb: { email: 'fmtb@e2e.test', name: 'E2E Formats B', role: 'member' },
+  fmtc: { email: 'fmtc@e2e.test', name: 'E2E Formats C', role: 'member' },
+  fmtd: { email: 'fmtd@e2e.test', name: 'E2E Formats D', role: 'member' },
+  fmte: { email: 'fmte@e2e.test', name: 'E2E Formats E', role: 'member' },
+  fmtf: { email: 'fmtf@e2e.test', name: 'E2E Formats F', role: 'member' },
   admin: { email: 'admin@e2e.test', name: 'E2E Admin', role: 'admin' },
 } as const;
 

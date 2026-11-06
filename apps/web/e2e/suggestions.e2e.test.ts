@@ -16,8 +16,8 @@ test('Gợi ý AI fills the brief with the picked option and can be undone, and 
   expect((await page.getByRole('button', { name: 'Mở rộng' }).boundingBox())!.y).toBeGreaterThan((await brief.boundingBox())!.y);
   // The templates menu replaced the starter chips: a template fills the brief, the hook and the ending at once.
   await expect(page.getByRole('group', { name: 'Gợi ý nhanh' })).toHaveCount(0);
-  await (await openPromptTemplates(page)).getByRole('group', { name: 'Khung prompt' }).getByRole('button', { name: /^Mở hộp/ }).click();
-  await expect(brief).toHaveValue(/^The creator lifts the product out of the box/);
+  await (await openPromptTemplates(page)).getByRole('group', { name: 'Khung prompt' }).getByRole('button', { name: /^Trước \/ sau/ }).click();
+  await expect(brief).toHaveValue(/^The creator turns slowly to show the new look/);
   await brief.fill('váy linen mùa hè');
   await ai.click();
   const options = page.getByRole('group', { name: 'Gợi ý AI' }).getByRole('button', { name: /^Gợi ý \d/ });

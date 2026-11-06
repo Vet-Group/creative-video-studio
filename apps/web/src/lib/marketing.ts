@@ -49,12 +49,37 @@ export type CustomChoices = { hooks?: MarketingChoice[]; locations?: MarketingCh
 
 /** How the clip is framed, from the chosen ratio; the try-on instruction used to say "vertical" whatever the ratio. */
 const FRAMES: Record<string, string> = { '9:16': 'vertical 9:16 frame', '16:9': 'horizontal 16:9 frame', '1:1': 'square 1:1 frame' };
+const frameOf = (ratio?: string | null) => (ratio && FRAMES[ratio]) ?? (ratio ? `${ratio} frame` : 'vertical frame');
 
 /** The fixed try-on instruction: who and what must stay true to the photos, and the shots a try-on clip needs (the whole look, a product close-up, the fit in motion). */
 const instruction = (ratio?: string | null) =>
-  `UGC try-on video, ${(ratio && FRAMES[ratio]) ?? (ratio ? `${ratio} frame` : 'vertical frame')}, filmed handheld on a phone by a real creator. ` +
+  `UGC try-on video, ${frameOf(ratio)}, filmed handheld on a phone by a real creator. ` +
   "The creator in [Image1] wears or holds the product in [Image2]; keep their face, hair and body and the product's shape, colours, print and details exactly as in the photos. " +
   'Show the whole look, a close-up of the product, then a natural move or turn that shows the fit. Soft natural light, authentic energy. No on-screen text, logos or watermarks.';
+
+/** The formats whose jobs carry `params.format` (a UGC job carries none), each with its page. */
+export const PARAM_FORMATS = ['advanced', 'unboxing', 'review'] as const;
+export type ParamFormat = (typeof PARAM_FORMATS)[number];
+export const isParamFormat = (v: unknown): v is ParamFormat => (PARAM_FORMATS as readonly unknown[]).includes(v);
+export type MarketingFormat = 'ugc' | ParamFormat;
+/** The page of each format; a job's `format` (null for UGC) names its page. */
+export const FORMAT_HREF: Record<MarketingFormat, string> = { ugc: '/marketing-studio', advanced: '/marketing-studio/advanced', unboxing: '/marketing-studio/unboxing', review: '/marketing-studio/review' };
+const formatOf = (format: string | null | undefined): MarketingFormat => (isParamFormat(format) ? format : 'ugc');
+export const hrefOfFormat = (format: string | null | undefined): string => FORMAT_HREF[formatOf(format)];
+/** The format's name on the picker and the header, and the longer title of a History or Library card. */
+export const FORMAT_NAME: Record<MarketingFormat, string> = { ugc: 'UGC Thử đồ', advanced: 'Nâng cao', unboxing: 'Mở hộp', review: 'Đánh giá sản phẩm' };
+const CARD_TITLE: Record<MarketingFormat, string> = { ugc: 'UGC Thử đồ', advanced: 'Marketing nâng cao', unboxing: 'Marketing mở hộp', review: 'Marketing đánh giá sản phẩm' };
+export const cardTitleOfFormat = (format: string | null | undefined): string => CARD_TITLE[formatOf(format)];
+
+/** Unboxing's photos in the order they are sent: the model (none = POV, hands only), the product, the packaging (none = not shown); `params.roles` names them. */
+export const UNBOXING_ROLES = ['product', 'model,product', 'product,packaging', 'model,product,packaging'] as const;
+export const unboxingRoles = (o: { model: boolean; packaging: boolean }) => [o.model && 'model', 'product', o.packaging && 'packaging'].filter(Boolean).join(',');
+/** Review's "Điểm nổi bật": 1 to 3 short lines the creator talks about, kept in `params.highlights` one per line. */
+export const MAX_HIGHLIGHTS = 3;
+export const MAX_HIGHLIGHT = 60;
+const clean = (line: string) => line.replace(/\s+/g, ' ').trim();
+/** The member's highlight lines as the prompt takes them: spaces collapsed, empty lines dropped. */
+export const highlightLines = (lines: readonly string[]): string[] => lines.map(clean).filter(Boolean);
 
 /** The end scene: the member's description of the last shot, added to the prompt as its closing sentence (endingLine). */
 export const MAX_ENDING = 200;
@@ -100,16 +125,67 @@ export function sectionBody(prompt: string, hook?: string | null, ending?: strin
   return sectionPrompt({ hook, body, ending }) === prompt ? body : null;
 }
 
+type Parts = { hook?: string | null; hookText?: string | null; location?: string | null; prompt?: string | null; ending?: string | null; audio?: boolean; ratio?: string | null };
+
 /**
- * The one English prompt a Marketing Studio run sends: the fixed try-on instruction for the ratio, then the hook (the chosen one's phrase, else the
- * member's own `hookText`) and the location when chosen, then the member's own text as creator notes and the last shot (`ending`). An unknown or empty
- * hook or location id adds nothing. `audio` adds the sound rule (UGC_SOUND or SILENT); left out, the prompt says nothing about sound.
+ * The prompt of a UGC, unboxing or review run: the format's fixed `head`, then the hook (the chosen one's phrase, else the member's own `hookText`) and
+ * the location when chosen, then the member's own text as creator notes and the last shot (`ending`), then `sound` when `audio` is set. An unknown or
+ * empty hook or location id adds nothing.
  */
-export function marketingPrompt({ hook, hookText, location, prompt, ending, audio, ratio }: { hook?: string | null; hookText?: string | null; location?: string | null; prompt?: string | null; ending?: string | null; audio?: boolean; ratio?: string | null }, custom: CustomChoices = {}): string {
+function compose(head: string, { hook, hookText, location, prompt, ending }: Parts, custom: CustomChoices, sound: string | null): string {
   const h = [...HOOKS, ...(custom.hooks ?? [])].find((c) => c.id === hook);
   const l = [...LOCATIONS, ...(custom.locations ?? [])].find((c) => c.id === location);
   const text = prompt?.trim();
-  return [instruction(ratio), h?.phrase ?? hookLine(hookText), l && `Set in ${l.phrase}.`, text && `Creator notes: ${text}`, endingLine(ending), audio === undefined ? null : audio ? UGC_SOUND : SILENT].filter(Boolean).join(' ');
+  return [head, h?.phrase ?? hookLine(hookText), l && `Set in ${l.phrase}.`, text && `Creator notes: ${text}`, endingLine(ending), sound].filter(Boolean).join(' ');
+}
+
+/**
+ * The one English prompt a Marketing Studio UGC run sends: the fixed try-on instruction for the ratio, the hook and location, the creator notes and the
+ * last shot. `audio` adds the sound rule (UGC_SOUND or SILENT); left out, the prompt says nothing about sound.
+ */
+export function marketingPrompt(parts: Parts, custom: CustomChoices = {}): string {
+  return compose(instruction(parts.ratio), parts, custom, parts.audio === undefined ? null : parts.audio ? UGC_SOUND : SILENT);
+}
+
+/** Sound of an unboxing clip with audio on: the package, the paper and tape, and the creator's short reaction. */
+const UNBOXING_SOUND = "Natural sound recorded on the phone: the rustle of paper, the tape and the box opening, and the creator's short, casual spoken reaction to the product, with no background music.";
+
+/**
+ * The one English prompt an Unboxing run sends. The photos are [Image1].. in the order they are sent: the model when there is one, the product, the
+ * packaging when there is one. With no model it is a point-of-view clip, only the creator's hands seen.
+ */
+export function unboxingPrompt({ model, packaging, ...parts }: Parts & { model: boolean; packaging: boolean }, custom: CustomChoices = {}): string {
+  const product = model ? 2 : 1;
+  const frame = frameOf(parts.ratio);
+  const head = [
+    model
+      ? `UGC unboxing video, ${frame}, filmed handheld on a phone by a real creator. The creator in [Image1] opens a package and reveals the product in [Image2]; keep their face, hair and body and the product's shape, colours, print and details exactly as in the photos.`
+      : `POV unboxing video, ${frame}, filmed handheld on a phone from the creator's point of view: only their hands are seen. The hands open a package and reveal the product in [Image1]; keep the product's shape, colours, print and details exactly as in the photo.`,
+    packaging && `The box or packaging looks like [Image${product + 1}].`,
+    'Show the closed package, the opening, the product lifted out and turned toward the camera, then a close look at the details. Soft natural light, authentic energy. No on-screen text, logos or watermarks.',
+  ]
+    .filter(Boolean)
+    .join(' ');
+  return compose(head, parts, custom, parts.audio === undefined ? null : parts.audio ? UNBOXING_SOUND : SILENT);
+}
+
+/** Sound of a review clip with audio on and no script: the creator talks about the highlights, as recorded on the phone. */
+const REVIEW_SOUND = 'The creator speaks to the camera in a casual, honest tone about these points, recorded on the phone, with no background music.';
+
+/**
+ * The one English prompt a Review run sends: the model in [Image1] reviews the product in [Image2] and talks about the member's `highlights` (1 to 3
+ * lines). Sound on is speech about the points, or the exact `script` when there is one; off is silent.
+ */
+export function reviewPrompt({ highlights, script, ...parts }: Parts & { highlights: readonly string[]; script?: string | null }, custom: CustomChoices = {}): string {
+  const points = highlightLines(highlights).map((p) => p.replace(/[.;]+$/, ''));
+  const lines = script?.trim().replace(/\s+/g, ' ');
+  const head =
+    `UGC product review video, ${frameOf(parts.ratio)}, filmed handheld on a phone by a real creator. ` +
+    "The creator in [Image1] reviews the product in [Image2], wearing or holding it; keep their face, hair and body and the product's shape, colours, print and details exactly as in the photos. " +
+    `The creator talks to the camera about: ${points.join('; ')}. ` +
+    'Show the product up close and a natural move that shows how it fits or works. Soft natural light, honest energy. No on-screen text, logos or watermarks.';
+  const sound = parts.audio === undefined ? null : !parts.audio ? SILENT : lines ? `The creator says exactly: "${lines}", lip-synced, and no other spoken words.` : REVIEW_SOUND;
+  return compose(head, parts, custom, sound);
 }
 
 /** Sound of a UGC clip with audio on: what a phone records, as on the reference site's UGC clips. */
