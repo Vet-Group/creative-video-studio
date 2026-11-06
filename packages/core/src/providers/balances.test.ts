@@ -1,6 +1,6 @@
 // fal's balance reader against fixtures shaped like its billing answer, and the warning rule. No network, no key.
 import { describe, expect, test } from 'vitest';
-import { isLow, readFalBalance } from './balances';
+import { bytePlusPack, isLow, readFalBalance } from './balances';
 
 function fakeFetch(answer: Response | Error) {
   const calls: { url: string; auth: string | null; signal: boolean }[] = [];
@@ -40,4 +40,24 @@ test('isLow: under the threshold is red, at it or unknown is not', () => {
   expect(isLow(9.99, 10)).toBe(true);
   expect(isLow(10, 10)).toBe(false);
   expect(isLow(null, 10)).toBe(false);
+});
+
+describe('bytePlusPack', () => {
+  const now = new Date('2026-11-10T00:00:00Z');
+  const pack = { totalTokens: 7_000_000, tokens: 6_891_100, usedSince: 0, expiresAt: new Date('2027-02-01T15:59:59Z') };
+
+  test('subtracts the tokens used since the as-of moment and prices what is left at $7 per million tokens', () => {
+    expect(bytePlusPack({ ...pack, usedSince: 91_100 }, now)).toMatchObject({ totalTokens: 7_000_000, tokensLeft: 6_800_000, expiresAt: '2027-02-01T15:59:59.000Z', expired: false, low: false });
+    expect(bytePlusPack({ ...pack, usedSince: 91_100 }, now).percentLeft).toBeCloseTo(97.142857, 5);
+    expect(bytePlusPack({ ...pack, usedSince: 91_100 }, now).usdLeft).toBeCloseTo(47.6, 9);
+  });
+
+  test('is red under 20% of the tokens or within 14 days of the expiry, and the tokens never go under 0', () => {
+    expect(bytePlusPack({ ...pack, usedSince: 5_491_101 }, now).low).toBe(true); // 1,399,999 of 7,000,000 is just under 20%
+    expect(bytePlusPack({ ...pack, usedSince: 5_491_100 }, now).low).toBe(false); // exactly 20%
+    expect(bytePlusPack(pack, new Date('2027-01-18T15:59:59Z')).low).toBe(false); // 14 days left
+    expect(bytePlusPack(pack, new Date('2027-01-18T16:00:00Z')).low).toBe(true);
+    expect(bytePlusPack(pack, new Date('2027-02-02T00:00:00Z'))).toMatchObject({ expired: true, low: true });
+    expect(bytePlusPack({ ...pack, usedSince: 9_000_000 }, now)).toMatchObject({ tokensLeft: 0, percentLeft: 0, usdLeft: 0, low: true });
+  });
 });

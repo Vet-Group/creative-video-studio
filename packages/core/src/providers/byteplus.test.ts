@@ -134,12 +134,14 @@ describe('byteplus video status and cancel', () => {
   test('succeeded books the reported tokens at the row price, and an answer without usage falls back to the estimate', async () => {
     // 5 s at 720p is 108,000 tokens: 108,000 / 21,600 x 0.2312 = 1.156; the docs' own example reports 108,900.
     const ok = { status: 'succeeded', content: { video_url: 'https://tos/v.mp4' }, usage: { completion_tokens: 108_900, total_tokens: 108_900 } };
-    expect(await poll(S25, ok)).toEqual({ state: 'succeeded', outputUrl: 'https://tos/v.mp4', costUsd: 1.1656, costSource: 'reported' });
+    expect(await poll(S25, ok)).toEqual({ state: 'succeeded', outputUrl: 'https://tos/v.mp4', costUsd: 1.1656, costSource: 'reported', tokens: 108_900 });
     expect(await poll(S20, ok)).toMatchObject({ costUsd: 0.7623, costSource: 'reported' });
     // Seedance 1.0 at 1080p is 48,960 tokens per second: 244,800 tokens for 5 s are 5 x 0.1224.
     expect(await poll(S10, { ...ok, usage: { completion_tokens: 244_800 } })).toMatchObject({ costUsd: 0.612, costSource: 'reported' });
     expect(await poll(S25, { status: 'succeeded', content: { video_url: 'https://tos/v.mp4' } })).toEqual({ state: 'succeeded', outputUrl: 'https://tos/v.mp4', costUsd: 1.156, costSource: 'estimate' });
-    expect(await poll(video('dreamina-seedance-2-0-260128', 0.1, '480p'), ok)).toMatchObject({ costSource: 'estimate', costUsd: 0.5 });
+    expect(await poll(video('dreamina-seedance-2-0-260128', 0.1, '480p'), ok)).toMatchObject({ costSource: 'estimate', costUsd: 0.5, tokens: 108_900 }); // the billed tokens are passed on even when the cost is the estimate
+    // Only a whole, positive count is a billed token count (the resource pack balance sums it).
+    for (const bad of [0, -5, 1.5, '108900']) expect(await poll(S25, { ...ok, usage: { completion_tokens: bad } }), String(bad)).not.toHaveProperty('tokens', bad);
   });
 
   test('succeeded without a video URL is failed but still billed', async () => {

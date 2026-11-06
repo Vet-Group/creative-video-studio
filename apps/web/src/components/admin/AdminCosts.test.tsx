@@ -1,7 +1,7 @@
 // The provider balances panel's top-up link and the Vertex read error: a neutral button, and one short sentence without Google's raw answer.
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, test } from 'vitest';
-import { ByModel, DailySpend, dollars, TopUp, Usd, VertexError } from './AdminCosts';
+import { ByModel, DailySpend, dollars, packText, TopUp, Usd, VertexError } from './AdminCosts';
 import { Budget } from './AdminOverview';
 
 test('the top-up link is a neutral button that opens the provider billing page in a new tab', () => {
@@ -91,4 +91,13 @@ test('a budget of $100,000 or more reads as no cap, without a bar; a real cap ke
   const real = renderToStaticMarkup(<Budget title="Ngân sách video" used="50" cap="200" />);
   expect(real).toContain('meter');
   expect(real).toContain('Đã dùng 25%');
+});
+
+test('the Seedance 2.0 pack line shows tokens left of the total, the percent, about how many dollars and the expiry day, and says why it is red', () => {
+  const pack = { totalTokens: 7_000_000, tokensLeft: 6_891_100, percentLeft: 98.44, usdLeft: 48.2377, expiresAt: '2027-02-01T15:59:59.000Z', expired: false, daysLeft: 87.2, low: false };
+  const n = (v: number) => v.toLocaleString('vi-VN');
+  expect(packText(pack)).toBe(`Còn ${n(6_891_100)} / ${n(7_000_000)} token (98.4%) · ≈ $48.24 theo giá lẻ · hết hạn 2027-02-01`);
+  expect(packText({ ...pack, tokensLeft: 1_000_000, percentLeft: 14.29, usdLeft: 7, low: true })).toBe(`Còn ${n(1_000_000)} / ${n(7_000_000)} token (14.3%) · ≈ $7.00 theo giá lẻ · hết hạn 2027-02-01 (dưới 20%)`);
+  expect(packText({ ...pack, daysLeft: 9.2, low: true })).toContain('(còn 10 ngày)');
+  expect(packText({ ...pack, daysLeft: -1, expired: true, low: true })).toContain('(đã hết hạn)');
 });

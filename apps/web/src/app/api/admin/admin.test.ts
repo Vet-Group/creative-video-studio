@@ -392,6 +392,48 @@ describe('settings', () => {
     expect((await put(body)).status).toBe(400);
   });
 
+  describe('the BytePlus Seedance 2.0 resource pack', () => {
+    type Pack = { totalTokens: number; tokens: number; asOf: string; expiresAt: string } | null;
+    const pack = async () => ((await (await settingsRoute.GET(call(admin.cookie, '/api/admin/settings'))).json()) as { byteplusPack: Pack }).byteplusPack;
+    const entry = { totalTokens: 7_000_000, tokens: 6_500_000, asOf: new Date(Date.now() - 3_600_000).toISOString().slice(0, 19) + 'Z', expiresAt: '2027-02-01T15:59:59Z' };
+
+    test('reads the seed of migration 0076, and a new pack replaces it, audited once with the old and new values', async () => {
+      expect(await pack()).toEqual({ totalTokens: 7_000_000, tokens: 6_891_100, asOf: '2026-11-06T02:50:00Z', expiresAt: '2027-02-01T15:59:59Z' });
+      const n = (await audits('settings:1')).length;
+      expect((await put({ byteplusPack: entry })).status).toBe(200);
+      expect(await pack()).toEqual(entry);
+      expect((await audits('settings:1')).slice(n)).toEqual([
+        { actor_id: admin.id, action: 'settings.update', old_value: { byteplusPack: { totalTokens: 7_000_000, tokens: 6_891_100, asOf: '2026-11-06T02:50:00Z', expiresAt: '2027-02-01T15:59:59Z' } }, new_value: { byteplusPack: entry } },
+      ]);
+    });
+
+    test('takes now as the as-of moment when it is left out', async () => {
+      const { asOf: _asOf, ...noAsOf } = entry;
+      const before = Date.now();
+      expect((await put({ byteplusPack: noAsOf })).status).toBe(200);
+      const at = Date.parse((await pack())!.asOf);
+      expect(at).toBeGreaterThanOrEqual(before - 1000);
+      expect(at).toBeLessThanOrEqual(Date.now());
+    });
+
+    test.each([
+      null, 'all', {}, { ...entry, totalTokens: 0 }, { ...entry, totalTokens: 1.5 }, { ...entry, totalTokens: '7000000' }, { ...entry, tokens: -1 }, { ...entry, tokens: 7_000_001 }, { ...entry, tokens: 1.5 },
+      { ...entry, totalTokens: 3_000_000_000, tokens: 1 }, { ...entry, asOf: '2026-11-07' }, { ...entry, asOf: '2026-11-07T01:00:00+07:00' }, { ...entry, asOf: '2026-02-30T00:00:00Z' },
+      { ...entry, asOf: '2999-01-01T00:00:00Z' }, { ...entry, expiresAt: '2027-02-01' }, { ...entry, expiresAt: entry.asOf }, { ...entry, expiresAt: '2026-11-01T00:00:00Z' },
+    ])('refuses %j and changes nothing', async (byteplusPack) => {
+      const before = await pack();
+      const n = (await audits('settings:1')).length;
+      expect((await put({ byteplusPack })).status).toBe(400);
+      expect(await pack()).toEqual(before);
+      expect(await audits('settings:1')).toHaveLength(n);
+    });
+
+    test('the database refuses a pack with some fields missing or tokens above the total', async () => {
+      await expect(pool.query('update settings set byteplus_pack_tokens = null where id = 1')).rejects.toThrow(/settings_byteplus_pack_check/);
+      await expect(pool.query('update settings set byteplus_pack_tokens = byteplus_pack_total_tokens + 1 where id = 1')).rejects.toThrow(/settings_byteplus_pack_check/);
+    });
+  });
+
   test('reads and changes the balance warning, audited once; the Replicate credit is gone from the answer and ignored on save', async () => {
     type Balances = { balanceWarningUsd: string; replicateCreditUsd?: string | null };
     const balances = async () => (await (await settingsRoute.GET(call(admin.cookie, '/api/admin/settings'))).json()) as Balances;

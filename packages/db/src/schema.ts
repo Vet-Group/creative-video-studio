@@ -345,9 +345,24 @@ export const settings = pgTable(
     vertexActiveProject: text('vertex_active_project'),
     /** Admin Costs shows a provider balance under this many USD in red. */
     balanceWarningUsd: numeric('balance_warning_usd', { precision: 12, scale: 4 }).notNull().default('10'),
+    /**
+     * The BytePlus Seedance 2.0 prepaid resource pack (docs/ops/provider-balances.md). BytePlus has no API for a pack's balance, so the Admin enters the tokens
+     * left at a moment and the app subtracts the tokens of the jobs finished after it. All four are set together or all null.
+     */
+    byteplusPackTotalTokens: integer('byteplus_pack_total_tokens'),
+    byteplusPackTokens: integer('byteplus_pack_tokens'),
+    byteplusPackAsOf: tstz('byteplus_pack_as_of'),
+    byteplusPackExpiresAt: tstz('byteplus_pack_expires_at'),
     updatedAt: tstz('updated_at').notNull().defaultNow(),
   },
-  (t) => [check('settings_singleton_check', sql`${t.id} = 1`)],
+  (t) => [
+    check('settings_singleton_check', sql`${t.id} = 1`),
+    check(
+      'settings_byteplus_pack_check',
+      sql`(${t.byteplusPackTotalTokens} is null) = (${t.byteplusPackTokens} is null) and (${t.byteplusPackTotalTokens} is null) = (${t.byteplusPackAsOf} is null) and (${t.byteplusPackTotalTokens} is null) = (${t.byteplusPackExpiresAt} is null)
+        and (${t.byteplusPackTotalTokens} is null or (${t.byteplusPackTotalTokens} > 0 and ${t.byteplusPackTokens} between 0 and ${t.byteplusPackTotalTokens}))`,
+    ),
+  ],
 );
 
 // The Admin-entered credits of each Vertex account (docs/ops/vertex-accounts.md); Google has no API for the balance, so remaining = total - credits used.
@@ -400,6 +415,8 @@ export const jobs = pgTable(
     /** The worker instance that moved the job from queued to submitting. */
     claimedBy: text('claimed_by'),
     error: text('error'),
+    /** The tokens the provider billed the job, when it reports them (BytePlus Seedance's usage.completion_tokens); the pack balance sums them. */
+    providerTokens: integer('provider_tokens'),
     isMock: boolean('is_mock').notNull().default(false),
     outputAssetId: text('output_asset_id').references(() => assets.id, { onDelete: 'restrict' }),
     posterAssetId: text('poster_asset_id').references(() => assets.id, { onDelete: 'restrict' }),

@@ -28,7 +28,8 @@ export type CostSource = 'reported' | 'estimate';
 
 export type ProviderStatus =
   | { state: 'queued' | 'running' }
-  | { state: 'succeeded'; outputUrl: string; costUsd: number; costSource: CostSource }
+  /** `tokens`: the tokens the provider billed, when it reports them (BytePlus Seedance); it feeds the resource pack balance. */
+  | { state: 'succeeded'; outputUrl: string; costUsd: number; costSource: CostSource; tokens?: number }
   | { state: 'failed' | 'canceled'; error: string; costUsd: number; costSource: CostSource };
 
 export interface VideoProvider {

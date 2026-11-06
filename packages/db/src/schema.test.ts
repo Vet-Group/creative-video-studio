@@ -735,6 +735,29 @@ describe('migration 0073 Gemini Omni Flash 1.2', () => {
   });
 });
 
+describe('migration 0076 BytePlus Seedance 2.0 resource pack', () => {
+  test('seeds the pack read from the BytePlus bill on 2026-11-06 and adds the per-job token count', async () => {
+    const { rows } = await pool.query(
+      `select byteplus_pack_total_tokens as total, byteplus_pack_tokens as tokens, byteplus_pack_as_of as as_of, byteplus_pack_expires_at as expires from settings where id = 1`,
+    );
+    expect(rows).toEqual([{ total: 7_000_000, tokens: 6_891_100, as_of: new Date('2026-11-06T02:50:00Z'), expires: new Date('2027-02-01T15:59:59Z') }]);
+    expect((await pool.query(`select is_nullable from information_schema.columns where table_name = 'jobs' and column_name = 'provider_tokens'`)).rows).toEqual([{ is_nullable: 'YES' }]);
+    expect((await pool.query(`select count(*)::int as n from jobs where provider_tokens is not null`)).rows[0].n).toBe(0);
+  });
+
+  test('the pack is all set or all null, and its tokens stay within 0 and the total (a NULL cannot slip past the check)', async () => {
+    const bad = (set: string) => expect(pool.query(`update settings set ${set} where id = 1`), set).rejects.toThrow(/settings_byteplus_pack_check/);
+    await bad('byteplus_pack_tokens = null');
+    await bad('byteplus_pack_as_of = null');
+    await bad('byteplus_pack_expires_at = null');
+    await bad('byteplus_pack_tokens = -1');
+    await bad('byteplus_pack_tokens = byteplus_pack_total_tokens + 1');
+    await bad('byteplus_pack_total_tokens = 0, byteplus_pack_tokens = 0');
+    await pool.query(`update settings set byteplus_pack_total_tokens = null, byteplus_pack_tokens = null, byteplus_pack_as_of = null, byteplus_pack_expires_at = null where id = 1`);
+    await pool.query(`update settings set byteplus_pack_total_tokens = 7000000, byteplus_pack_tokens = 6891100, byteplus_pack_as_of = '2026-11-06T02:50:00Z', byteplus_pack_expires_at = '2027-02-01T15:59:59Z' where id = 1`);
+  });
+});
+
 describe('migration 0075 hide the pricier duplicate models', () => {
   const PAIRS = [
     ['nano-banana', 'nano-banana-vertex'],
