@@ -48,7 +48,7 @@ describe('fal', () => {
     };
     expect(await body('bytedance/seedance-2.5/us/reference-to-video')).toEqual({ prompt: 'put @Image1 on @Image2', image_urls: ['https://img/1.jpg', 'https://img/2.jpg'], aspect_ratio: '9:16', duration: '5', resolution: '720p', generate_audio: false });
     expect(await body('fal-ai/kling-video/v3/pro/image-to-video')).toEqual({ prompt: 'put image 1 on image 2', start_image_url: 'https://img/1.jpg', duration: '5', generate_audio: false });
-    expect(await body('google/gemini-omni-flash/v1.1/image-to-video')).toEqual({ prompt: 'put image 1 on image 2', image_url: 'https://img/1.jpg', aspect_ratio: '9:16', duration: 5, resolution: '720p' });
+    expect(await body('google/gemini-omni-flash/v1.2/image-to-video')).toEqual({ prompt: 'put image 1 on image 2', image_url: 'https://img/1.jpg', aspect_ratio: '9:16', duration: 5, resolution: '720p' });
     expect(await body('fal-ai/veo3.1/image-to-video')).toMatchObject({ duration: '5s', generate_audio: false });
     expect(await body('blackforestlabs/flux-3/keyframes-to-video')).toMatchObject({ keyframes: [{ image_url: 'https://img/1.jpg', frame_index: 0 }], duration: 5, resolution: '1080p' });
     expect(await body('blackforestlabs/flux-3/image-to-video')).toMatchObject({ resolution: '1080p' }); // 720p comes back 704 px wide
@@ -70,7 +70,7 @@ describe('fal', () => {
     expect(withEnd.sort()).toEqual([
       'bytedance/seedance-2.0/us/image-to-video', 'bytedance/seedance-2.5/us/image-to-video', 'fal-ai/bytedance/seedance/v1.5/pro/image-to-video', 'fal-ai/bytedance/seedance/v1/pro/image-to-video',
       'fal-ai/kling-video/o3/pro/reference-to-video', 'fal-ai/kling-video/v2.5-turbo/pro/image-to-video', 'fal-ai/kling-video/v2.6/pro/image-to-video', 'fal-ai/kling-video/v3/pro/image-to-video',
-      'fal-ai/wan/v2.7/image-to-video', 'google/gemini-omni-flash/v1.1/image-to-video', 'minimax/h3-max/image-to-video', 'minimax/h3-max/reference-to-video',
+      'fal-ai/wan/v2.7/image-to-video', 'google/gemini-omni-flash/v1.2/image-to-video', 'minimax/h3-max/image-to-video', 'minimax/h3-max/reference-to-video',
     ]);
     const crops: Record<string, (string | undefined)[]> = {};
     const { fn, calls } = fakeFetch(...withEnd.map(() => [200, { request_id: 'r' }] as [number, unknown]));
@@ -149,8 +149,8 @@ describe('fal', () => {
       'fal-ai/bytedance/seedance/v1/pro/image-to-video': 'fal-ai/bytedance/seedance/v1/pro/text-to-video',
       'blackforestlabs/flux-3/keyframes-to-video': 'blackforestlabs/flux-3/text-to-video',
       'blackforestlabs/flux-3/image-to-video': 'blackforestlabs/flux-3/text-to-video',
-      'google/gemini-omni-flash/v1.1/reference-to-video': 'google/gemini-omni-flash/v1.1/text-to-video',
-      'google/gemini-omni-flash/v1.1/image-to-video': 'google/gemini-omni-flash/v1.1/text-to-video',
+      'google/gemini-omni-flash/v1.2/reference-to-video': 'google/gemini-omni-flash/v1.2/text-to-video',
+      'google/gemini-omni-flash/v1.2/image-to-video': 'google/gemini-omni-flash/v1.2/text-to-video',
       'fal-ai/veo3.1/image-to-video': 'fal-ai/veo3.1',
       'xai/grok-imagine-video/v1.5/image-to-video': 'xai/grok-imagine-video/v1.5/text-to-video',
       'fal-ai/wan/v2.7/reference-to-video': 'fal-ai/wan/v2.7/text-to-video',
@@ -308,7 +308,7 @@ describe('fal reference audio', () => {
       ['bytedance/seedance-2.0/us/reference-to-video', { max: 3, seconds: 15 }],
       ['minimax/h3-max/reference-to-video', { max: 3, seconds: 15 }],
     ]);
-    expect(videoInputs('mock')).toEqual({ endFrame: false, textOnly: false, audioClips: null });
+    expect(videoInputs('mock')).toEqual({ endFrame: false, endMaxSec: null, textOnly: false, audioClips: null });
   });
 
   test('uploads the clips to fal storage as .mp3 or .wav and sends their URLs in the endpoint’s own field; the images stay inline', async () => {

@@ -163,7 +163,7 @@ These are UI labels only. They are not validated constraints.
   - Seedance 2.5 / 2.5 Reference: 1080p, 4–30s.
   - Seedance 2.0 / 2.0 Reference: 1080p, 4–15s.
   - Kling o3 Pro Reference / Kling 3.0 Pro: 1080p, 3–15s.
-  - Gemini Omni Flash (+ Reference): 720p, 3–10s.
+  - Gemini Omni Flash (+ Reference): 720p, 3–15s (an end frame only up to 10s).
   - Veo 3.1: 1080p, 8s.
   - FLUX 3, Grok Imagine, WAN 2.7 and Minimax variants.
 - 19 "Steal our prompts" presets:

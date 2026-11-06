@@ -7,7 +7,7 @@ import { modelButton, pickModel, signIn } from './support.test';
 
 const model = (id: string, label: string, score: number, more: object = {}) => ({
   id, label, provider: 'fal', isMock: false, ratios: ['9:16', '1:1'], durationsSec: [4, 8, 15], maxImages: 4, maxPromptChars: 2000, resolution: '1080p',
-  estimateUsd: '1.0000', audioEstimateUsd: null, endFrame: false, textOnly: false, audioClips: null, passRate: null, passes: 0, total: 0,
+  estimateUsd: '1.0000', audioEstimateUsd: null, endFrame: false, endMaxSec: null, textOnly: false, audioClips: null, passRate: null, passes: 0, total: 0,
   score, recommended: false, isNew: false, supported: true, ...more,
 });
 const MODELS = [

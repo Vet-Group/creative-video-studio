@@ -105,7 +105,7 @@ describe('Marketing Studio', () => {
       type Row = { id: string; alwaysAudio: boolean; estimateUsd: string; audioEstimateUsd: string | null; maxImages: number; supported: boolean };
       const { models } = (await (await GET(call(member.cookie, '/api/models?feature=marketing&ratio=1:1&durationSec=5'))).json()) as { models: Row[] };
       expect(models.map((m) => [m.id, m.alwaysAudio, m.estimateUsd, m.audioEstimateUsd, m.maxImages, m.supported])).toEqual([
-        ['gemini-omni-flash-reference', true, '0.5000', '0.5000', 9, false], // no 1:1: the page moves the ratio to 9:16 on switching
+        ['gemini-omni-flash-reference', true, '0.4095', '0.4095', 9, false], // no 1:1: the page moves the ratio to 9:16 on switching
         ['kling-o3-pro', false, '0.5600', '0.7000', 7, true],
         ['wan-2.7-reference', true, '0.5000', '0.5000', 4, true],
       ]);
