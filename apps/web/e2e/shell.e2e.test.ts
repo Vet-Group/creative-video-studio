@@ -211,7 +211,7 @@ test('the account menu works by keyboard: Enter opens it on Cài đặt, the arr
   await expect(chip).toHaveAttribute('aria-expanded', 'true');
   const menu = page.getByRole('menu', { name: 'Tài khoản: E2E Member 1' });
   const items = menu.getByRole('menuitem');
-  await expect(items).toHaveText([/^Cài đặt/, /^Hạn mức hôm nay/, 'Bảo mật', 'Trợ giúp', 'Đăng xuất']);
+  await expect(items).toHaveText([/^Cài đặt/, /^Hạn mức hôm nay/, 'Bảo mật', 'Hỗ trợ', 'Đăng xuất']);
   await expect(items.first()).toBeFocused();
   await expect(items.first()).toHaveAttribute('aria-keyshortcuts', 'Control+Comma');
   await expect(items.nth(1)).toContainText('/ 1000 clip'); // today's clips against the cap serve.ts sets, fetched on open
@@ -234,11 +234,11 @@ test('the account menu works by keyboard: Enter opens it on Cài đặt, the arr
   await expect(menu).toBeHidden();
 });
 
-test('a menu item opens Settings on its section: Bảo mật on Security, Hạn mức hôm nay on Limits, Trợ giúp on Support', async ({ page }) => {
+test('a menu item opens Settings on its section: Bảo mật on Security, Hạn mức hôm nay on Limits, Hỗ trợ on Support', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await signIn(page, 'member1');
   const settings = page.getByRole('dialog', { name: 'Cài đặt' });
-  for (const [item, section] of [['Bảo mật', 'Bảo mật'], [/^Hạn mức hôm nay/, 'Hạn mức'], ['Trợ giúp', 'Hỗ trợ']] as const) {
+  for (const [item, section] of [['Bảo mật', 'Bảo mật'], [/^Hạn mức hôm nay/, 'Hạn mức'], ['Hỗ trợ', 'Hỗ trợ']] as const) {
     await accountButton(page).click();
     await page.getByRole('menuitem', { name: item }).click();
     await expect(settings.getByRole('heading', { name: section, exact: true })).toBeVisible();

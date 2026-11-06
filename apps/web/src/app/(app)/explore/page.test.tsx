@@ -17,6 +17,8 @@ import { currentUser } from '@/lib/current-user';
 import { listSamples } from '@/lib/samples';
 import ExplorePage from './page';
 
+const props = (models?: string) => ({ searchParams: Promise.resolve({ models }) });
+
 beforeEach(() => vi.mocked(listSamples).mockResolvedValue([]));
 
 function card(html: string, href: string) {
@@ -25,7 +27,7 @@ function card(html: string, href: string) {
 }
 
 test('Apps and Library use distinct existing local artwork without uploaded samples', async () => {
-  const html = renderToStaticMarkup(await ExplorePage());
+  const html = renderToStaticMarkup(await ExplorePage(props()));
   const posters = ['/apps', '/library'].map((href) => card(html, href).match(/src="([^"]+)"/)![1]!);
   expect(new Set(posters).size).toBe(2);
   for (const poster of posters) {
@@ -36,7 +38,7 @@ test('Apps and Library use distinct existing local artwork without uploaded samp
 
 test('uploaded Apps and Library posters and loops override local artwork', async () => {
   vi.mocked(listSamples).mockResolvedValue(['feature-apps.jpg', 'feature-apps.mp4', 'feature-library.jpg', 'feature-library.mp4'].map((name) => ({ name })) as Awaited<ReturnType<typeof listSamples>>);
-  const html = renderToStaticMarkup(await ExplorePage());
+  const html = renderToStaticMarkup(await ExplorePage(props()));
   for (const name of ['apps', 'library']) {
     const markup = card(html, `/${name}`);
     expect(markup).toContain(`src="/api/samples/feature-${name}.jpg"`);
@@ -49,7 +51,7 @@ test('a model variant without its own sample shows the sample of the model it va
   const rows = ids.map((id) => ({ id, label: id, provider: 'fal', kind: 'video', ratios: ['9:16'], durations_sec: [5], usd_per_second: '0.1', image_prices: null }));
   vi.mocked(pool.query).mockResolvedValueOnce({ rows } as never);
   vi.mocked(listSamples).mockResolvedValue(['model-seedance-2-0.mp4', 'model-seedance-2-0.jpg', 'model-minimax-h3-max.jpg', 'model-seedance-2-0-reference.jpg'].map((name) => ({ name })) as Awaited<ReturnType<typeof listSamples>>);
-  const html = renderToStaticMarkup(await ExplorePage());
+  const html = renderToStaticMarkup(await ExplorePage(props()));
   const model = (id: string) => card(html, `/create\\?model=${id}`);
   expect(model('seedance-2.0-byteplus')).toContain('data-video="/api/samples/model-seedance-2-0.mp4"');
   expect(model('minimax-h3-max-reference-1080p')).toContain('src="/api/samples/model-minimax-h3-max.jpg"');
@@ -62,7 +64,7 @@ test('Seedance 2.5 and the BytePlus Seedance 2.0 keep their featured places when
   const rows = ids.map((id) => ({ id, label: id, provider: 'fal', kind: 'video', ratios: ['9:16'], durations_sec: [5], usd_per_second: '0.1', image_prices: null }));
   vi.mocked(pool.query).mockResolvedValueOnce({ rows } as never);
   vi.mocked(listSamples).mockResolvedValue(['model-flux-3.mp4'].map((name) => ({ name })) as Awaited<ReturnType<typeof listSamples>>);
-  const html = renderToStaticMarkup(await ExplorePage());
+  const html = renderToStaticMarkup(await ExplorePage(props()));
   const order = [...html.matchAll(/href="\/create\?model=([^"]+)"/g)].map((m) => m[1]);
   expect(order).toEqual(['seedance-2.5', 'kling-o3-pro', 'seedance-2.0-byteplus', 'flux-3']);
   expect(html).toMatch(/model=seedance-2\.0-byteplus"[^<]*<img[^>]*><strong>[^<]*<\/strong><span[^>]*>Thế hệ video mới/); // a description, not the spec line
@@ -74,7 +76,7 @@ test("a model's best Library clip replaces its sample, and a model with a clip b
   vi.mocked(pool.query).mockResolvedValueOnce({ rows } as never);
   vi.mocked(listSamples).mockResolvedValue(['model-veo-3-1.mp4', 'model-veo-3-1.jpg', 'model-kling-2-6.jpg', 'model-flux-3.jpg'].map((name) => ({ name })) as Awaited<ReturnType<typeof listSamples>>);
   vi.mocked(bestClips).mockResolvedValueOnce(new Map([['veo-3.1', { video: '/api/assets/v/content', poster: '/api/assets/p/content' }], ['flux-3', { video: '/api/assets/f/content', poster: null }]]));
-  const html = renderToStaticMarkup(await ExplorePage());
+  const html = renderToStaticMarkup(await ExplorePage(props()));
   const model = (id: string) => card(html, `/create\\?model=${id}`);
   expect(model('veo-3.1')).toContain('data-video="/api/assets/v/content"');
   expect(model('veo-3.1')).toContain('src="/api/assets/p/content"');
@@ -87,7 +89,7 @@ test("a model's best Library clip replaces its sample, and a model with a clip b
 test('a user who must change an Admin-set password is sent to the change page, as the layout does not rerun on a client navigation', async () => {
   vi.mocked(currentUser).mockResolvedValueOnce({ mustChangePassword: true } as Awaited<ReturnType<typeof currentUser>>);
   vi.mocked(pool.query).mockClear();
-  await expect(ExplorePage()).rejects.toThrow('redirect /account/password');
+  await expect(ExplorePage(props())).rejects.toThrow('redirect /account/password');
   expect(pool.query).not.toHaveBeenCalled();
 });
 
@@ -97,7 +99,7 @@ async function withJobs(jobs: Record<string, unknown>[]) {
   vi.mocked(currentUser).mockResolvedValueOnce({ id: 'u1', name: 'Phạm Quốc Hưng', mustChangePassword: false } as Awaited<ReturnType<typeof currentUser>>);
   vi.mocked(pool.query).mockImplementation((async (sql: string) => ({ rows: sql.includes('from jobs') ? jobs : [] })) as never);
   try {
-    return renderToStaticMarkup(await ExplorePage());
+    return renderToStaticMarkup(await ExplorePage(props()));
   } finally {
     vi.mocked(pool.query).mockImplementation((async () => ({ rows: [] })) as never);
     vi.useRealTimers();
@@ -137,4 +139,33 @@ test('Continue shows running jobs first, then the latest finished, at most four,
   ]);
   expect(list).toContain('Đang tạo');
   expect(list).toContain('Không thành công');
+});
+
+const modelRows = (n: number, kind: 'video' | 'image') =>
+  Array.from({ length: n }, (_, i) => ({ id: `${kind}-${i}`, label: `${kind} ${i}`, provider: 'fal', kind, ratios: ['9:16'], durations_sec: [5], usd_per_second: '0.1', image_prices: kind === 'image' ? { '1K': '0.03' } : null }));
+const modelLinks = (html: string) => [...html.matchAll(/href="\/(?:create|image-generation)\?model=([^"]+)"/g)].map((m) => m[1]);
+
+test('the models row shows 7 video and 3 image models with a link to all of them, and ?models=all lists every one', async () => {
+  const rows = [...modelRows(9, 'video'), ...modelRows(5, 'image')];
+  vi.mocked(pool.query).mockResolvedValueOnce({ rows } as never);
+  const featured = renderToStaticMarkup(await ExplorePage(props()));
+  expect(modelLinks(featured)).toEqual([...rows.slice(0, 7), ...rows.slice(9, 12)].map((r) => r.id));
+  expect(featured).toContain('Mô hình nổi bật');
+  expect(featured).toContain('href="/explore?models=all#models"');
+  expect(featured).toContain('Xem tất cả 14 mô hình');
+
+  vi.mocked(pool.query).mockResolvedValueOnce({ rows } as never);
+  const all = renderToStaticMarkup(await ExplorePage(props('all')));
+  expect(modelLinks(all)).toHaveLength(14);
+  expect(all).toContain('Tất cả mô hình');
+  expect(all).toContain('Chỉ xem nổi bật');
+});
+
+test('a -vertex or -byteplus twin shows its model written description, not the spec line', async () => {
+  const rows = ['gemini-omni-flash-vertex', 'seedream-5-pro-byteplus'].map((id) => ({ ...modelRows(1, id.startsWith('seedream') ? 'image' : 'video')[0]!, id }));
+  vi.mocked(pool.query).mockResolvedValueOnce({ rows } as never);
+  const html = renderToStaticMarkup(await ExplorePage(props()));
+  expect(html).toContain('Mô hình video nhanh của Google');
+  expect(html).toContain('Mô hình của ByteDance cho người và khung cảnh chân thực');
+  expect(html).not.toContain('Điểm 0/100');
 });

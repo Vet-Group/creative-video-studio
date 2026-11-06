@@ -2353,3 +2353,5 @@ dialog.modal.tool-guide { width: min(52rem, calc(100vw - 2rem)); }
   .imagebar .style-pill > span { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); }
 }
 .preset-card > img { display: block; width: 100%; aspect-ratio: 3 / 4; object-fit: cover; }
+/* A touch screen has no hover: Explore's preset tiles show their name and Create button at once, over a lighter shade. */
+@media (hover: none) { .explore-prompt-hover { opacity: 1; background: rgb(var(--shade) / .2); } }

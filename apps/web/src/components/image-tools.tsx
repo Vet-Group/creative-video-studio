@@ -596,7 +596,8 @@ export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4
     loading.current = true;
     try {
       const r = await api<{ hasMore: boolean; clips: Clip[] }>(`/api/library?kind=${kind}${offset > 0 ? `&offset=${offset}` : ''}`);
-      setItems((cur) => (offset > 0 ? [...cur, ...r.clips] : r.clips));
+      // A result finished between two pages shifts the offset, so the next page can repeat a tile: keep each id once.
+      setItems((cur) => (offset > 0 ? [...cur, ...r.clips.filter((c) => !cur.some((o) => o.id === c.id))] : r.clips));
       setHasMore(r.hasMore);
       setState('ready');
     } catch {
@@ -614,7 +615,7 @@ export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4
   // The fixed samples show at once; only the company's own outputs wait for the request.
   if (sampleTiles.length === 0) {
     if (state === 'loading') return <p role="status" className="muted">Đang tải...</p>;
-    if (state === 'error') return <LoadError text="Không tải được ảnh mẫu." onRetry={retry} />;
+    if (state === 'error') return <LoadError text="Không tải được kết quả của công ty." onRetry={retry} />;
     if (items.length === 0) return <p className="muted">{emptyText}</p>;
   }
   const tiles: (Clip | string)[] = [...sampleTiles, ...items];
