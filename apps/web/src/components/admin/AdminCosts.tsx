@@ -376,7 +376,7 @@ interface BytePlusPackBalance {
 export const packText = (p: BytePlusPackBalance) => {
   const n = (v: number) => v.toLocaleString('vi-VN');
   const why = p.expired ? ' (đã hết hạn)' : p.daysLeft < 14 ? ` (còn ${Math.ceil(p.daysLeft)} ngày)` : p.percentLeft < 20 ? ' (dưới 20%)' : '';
-  return `Còn ${n(p.tokensLeft)} / ${n(p.totalTokens)} token (${p.percentLeft.toFixed(1)}%) · ≈ $${p.usdLeft.toFixed(2)} · hết hạn ${p.expiresAt.slice(0, 10)}${why}`;
+  return `Còn ${n(p.tokensLeft)} / ${n(p.totalTokens)} token (${p.percentLeft.toFixed(1)}%) · ≈ $${p.usdLeft.toFixed(2)} theo giá lẻ · hết hạn ${p.expiresAt.slice(0, 10)}${why}`;
 };
 
 /** A neutral button, not a red link: red on this panel means a balance under the warning threshold. */
