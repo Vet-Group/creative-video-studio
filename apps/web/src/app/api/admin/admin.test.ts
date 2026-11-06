@@ -284,14 +284,27 @@ describe('settings', () => {
   });
 
   test('lists the seeded image models as priced and lets an Admin switch one on and off, audited; one without prices cannot be enabled', async () => {
-    const pro = (await get()).models.find((m) => m.id === 'nano-banana-pro');
+    const pro = (await get()).models.find((m) => m.id === 'nano-banana-pro-vertex');
     expect(pro).toMatchObject({ enabled: false, priced: true });
-    expect((await put({ models: [{ id: 'nano-banana-pro', enabled: true }] })).status).toBe(200);
-    expect((await audits('model:nano-banana-pro')).at(-1)).toEqual({ actor_id: admin.id, action: 'model.set_enabled', old_value: { enabled: false }, new_value: { enabled: true } });
-    expect((await put({ models: [{ id: 'nano-banana-pro', enabled: false }] })).status).toBe(200);
+    expect((await put({ models: [{ id: 'nano-banana-pro-vertex', enabled: true }] })).status).toBe(200);
+    expect((await audits('model:nano-banana-pro-vertex')).at(-1)).toEqual({ actor_id: admin.id, action: 'model.set_enabled', old_value: { enabled: false }, new_value: { enabled: true } });
+    expect((await put({ models: [{ id: 'nano-banana-pro-vertex', enabled: false }] })).status).toBe(200);
     await pool.query(`insert into model_configs (id, provider, endpoint, label, kind, ratios, durations_sec, max_images, sources) values ('draft-image', 'fal', 'x', 'Draft image', 'image', '{auto}', '{}', 2, '{}')`);
     expect((await get()).models.find((m) => m.id === 'draft-image')).toMatchObject({ enabled: false, priced: false });
     expect((await put({ models: [{ id: 'draft-image', enabled: true }] })).status).toBe(400);
+  });
+
+  test('does not list the dearer row of a duplicate pair, refuses to switch it, and leaves it out of the Overview count', async () => {
+    const listed = (await get()).models.map((m) => m.id);
+    expect(listed).toContain('nano-banana-pro-vertex');
+    for (const id of ['nano-banana-pro', 'seedream-5-pro', 'veo-3.1-vertex']) expect(listed, id).not.toContain(id);
+    const hidden = (await pool.query('select count(*)::int as n from model_configs where twin_of is not null')).rows[0].n;
+    const total = (await pool.query('select count(*)::int as n from model_configs')).rows[0].n;
+    expect(listed).toHaveLength(total - hidden);
+    const before = (await pool.query(`select enabled from model_configs where id = 'nano-banana-pro'`)).rows[0];
+    expect((await put({ models: [{ id: 'nano-banana-pro', enabled: !before.enabled }] })).status).toBe(400);
+    expect((await pool.query(`select enabled from model_configs where id = 'nano-banana-pro'`)).rows[0]).toEqual(before);
+    expect(await audits('model:nano-banana-pro')).toEqual([]);
   });
 
   test('changes the caps, audited once with the old and new values, and writes nothing when they are unchanged', async () => {

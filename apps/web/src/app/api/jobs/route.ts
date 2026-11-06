@@ -8,6 +8,7 @@ import { pool } from '@/lib/auth';
 import { boss } from '@/lib/queue';
 import { findChoice } from '@/lib/choices';
 import { inputRefusal } from '@/lib/job-failure';
+import { offeredNow, twinEstimate } from '@/lib/model-twins';
 import { BRAND_FEATURES, withBrand } from '@/lib/brand';
 import { ADVANCED_MAX_SCRIPT, END_TEXT_POSITIONS, MAX_END_TEXT, MAX_ENDING, MAX_HOOK } from '@/lib/marketing';
 import { falBalance, falCreditUsd, overCredit } from '@/lib/provider-credit';
@@ -53,6 +54,7 @@ const CAP_MESSAGES: Record<CapRefusal, string> = {
  * `?mine`: the "My jobs" tray. The caller's 20 latest jobs that are not deleted, newest first, whether the worker is offline
  * (no heartbeat for 60 s), and `clips`: the video clips made today against the daily clip cap. `retried` is true once the job has its one manual retry.
  * `failureReason` is `real_person` or `sensitive_input` when the provider refused the job's input image (read from `error`), else null.
+ * `twin` is `{ label, estimateUsd }` of the enabled twin model (migration 0075) a job refused for a real person can be retried on (POST `onTwin`), else null.
  */
 export async function GET(request: Request) {
   const g = await guard(request, 'member');
@@ -70,12 +72,27 @@ export async function GET(request: Request) {
     pool.query(`select not exists (select 1 from worker_heartbeat where beat_at > now() - interval '60 seconds') as offline`),
     dailyClips(pool, g.session.user.id),
   ]);
+  // Only a job that BytePlus refused for a real person and has not been retried has a twin to offer; its price is what the new job's estimate would be.
+  const refused = jobs.rows.filter((r) => !r.retried && !r.retry_of && ['failed', 'failed_unknown', 'timed_out'].includes(r.status) && inputRefusal(r.error)?.reason === 'real_person');
+  const twins = new Map<string, { label: string; estimateUsd: string | null }>();
+  if (refused.length > 0) {
+    const { rows } = await pool.query(
+      `select j.id as job, h.label, h.endpoint, h.usd_per_second, h.image_prices, h.thinking_levels, h.thinking_prices
+         from jobs j join model_configs h on h.twin_of = j.model and h.enabled where j.id = any($1::text[]) order by h.id desc`,
+      [refused.map((r) => r.id)],
+    );
+    // `order by h.id desc` with a later row replacing an earlier one leaves the first id, the twin a retry takes.
+    for (const t of rows) {
+      const j = refused.find((r) => r.id === t.job)!;
+      twins.set(t.job, { label: t.label, estimateUsd: twinEstimate(t, { params: j.params, duration_s: j.duration_s, inputs: j.input_asset_ids.length }) });
+    }
+  }
   return Response.json({
     workerOffline: worker.rows[0].offline,
     clips,
     jobs: jobs.rows.map((r) => ({
       id: r.id, status: r.status, error: r.error, failureReason: inputRefusal(r.error)?.reason ?? null, isMock: r.is_mock, feature: r.feature, ratio: r.aspect, durationSec: r.duration_s, resolution: r.params.resolution ?? null, modelId: r.model, retryOf: r.retry_of,
-      retried: r.retried, outputAssetId: r.output_asset_id, posterAssetId: r.poster_asset_id, createdAt: r.created_at, finishedAt: r.finished_at,
+      retried: r.retried, twin: twins.get(r.id) ?? null, outputAssetId: r.output_asset_id, posterAssetId: r.poster_asset_id, createdAt: r.created_at, finishedAt: r.finished_at,
       // For the History card: the member's own words (a free prompt on Create video and Image Generation; elsewhere the prompt is composed, so the kept brief),
       // the inputs, the format and the caller's favourite.
       text: r.params.brief ?? ((r.feature === 'video' && !r.preset_id) || r.feature === 'image' ? r.prompt : null), inputAssetIds: r.input_asset_ids,
@@ -103,14 +120,17 @@ export async function GET(request: Request) {
  * an optional prompt; its duration is the reference video's length rounded up (the body's `durationSec` is not read), which the model must allow.
  * Every other feature takes images only. `useBrand` (Marketing Studio and Image Generation) adds the chosen store's brand kit to the prompt (lib/brand.ts).
  * `retryOf` retries the caller's own failed job once: the inputs, model, preset, prompt, ratio, duration, team and store all come from the
- * original (the body may carry just `retryOf`), the estimate from the model's current price.
+ * original (the body may carry just `retryOf`), the estimate from the model's current price. `onTwin: true` with `retryOf` runs it on the original model's enabled twin instead (migration 0075),
+ * only for a job whose input photo BytePlus refused as a real person (`failureReason` real_person), which the dearer fal twin accepts.
+ * A new Run may not name the dearer row of a pair of duplicate models while its twin can serve, nor the twin that cannot while the dearer one can (lib/model-twins.ts).
  */
 export async function POST(request: Request) {
   const g = await guard(request, 'member');
   if (g.error) return g.error;
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
-  const { retryOf = null } = body ?? {};
+  const { retryOf = null, onTwin = false } = body ?? {};
   if (retryOf !== null && typeof retryOf !== 'string') return bad('retryOf must be a job id');
+  if (typeof onTwin !== 'boolean' || (onTwin && retryOf === null)) return bad('onTwin must be true or false, and only retries a job');
   const userId = g.session.user.id;
 
   // A retry takes everything from the original job, so only a new Run is validated against the body.
@@ -232,14 +252,21 @@ export async function POST(request: Request) {
     let s = spec;
     let original: { team_id: string; provider: string; prompt: string; enhanced_prompt: string | null } | undefined;
     if (retryOf !== null) {
-      const o = (await tx.query('select user_id, team_id, store_id, status, retry_of, input_asset_ids, model, provider, preset_id, prompt, enhance, enhanced_prompt, aspect, duration_s, feature, params from jobs where id = $1', [retryOf])).rows[0];
+      const o = (await tx.query('select user_id, team_id, store_id, status, error, retry_of, input_asset_ids, model, provider, preset_id, prompt, enhance, enhanced_prompt, aspect, duration_s, feature, params from jobs where id = $1', [retryOf])).rows[0];
       if (!o) return Response.json({ error: 'the job to retry does not exist' }, { status: 404 });
       if (o.user_id !== userId) return Response.json({ error: 'only the owner of a job may retry it' }, { status: 403 });
       if (!['failed', 'timed_out', 'failed_unknown'].includes(o.status)) return Response.json({ error: 'only a failed job can be retried' }, { status: 409 });
       if (o.retry_of !== null || (await tx.query('select 1 from jobs where retry_of = $1', [retryOf])).rowCount) {
         return Response.json({ error: 'a job can be retried only once, and a retry cannot be retried' }, { status: 409 });
       }
-      s = { assetIds: o.input_asset_ids, modelId: o.model, presetId: o.preset_id, prompt: o.prompt, ratio: o.aspect, durationSec: o.duration_s, storeId: o.store_id, feature: o.feature, params: o.params, enhance: o.enhance, useBrand: false };
+      let modelId: string = o.model;
+      if (onTwin) {
+        if (inputRefusal(o.error)?.reason !== 'real_person') return Response.json({ error: 'only a job refused for a real person can be retried on its twin' }, { status: 409 });
+        const twin = (await tx.query('select id from model_configs where twin_of = $1 and enabled order by id limit 1', [o.model])).rows[0];
+        if (!twin) return Response.json({ error: 'the job has no enabled twin model' }, { status: 409 });
+        modelId = twin.id;
+      }
+      s = { assetIds: o.input_asset_ids, modelId, presetId: o.preset_id, prompt: o.prompt, ratio: o.aspect, durationSec: o.duration_s, storeId: o.store_id, feature: o.feature, params: o.params, enhance: o.enhance, useBrand: false };
       original = o;
     }
     const { assetIds, modelId, presetId, prompt: freePrompt, ratio, durationSec, storeId, feature, enhance, useBrand } = s!;
@@ -296,15 +323,20 @@ export async function POST(request: Request) {
       const limit = promptLimit(model.max_prompt_chars);
       if (prompt && prompt.length > limit) return bad(`the prompt may be at most ${limit} characters on this model`);
     }
-    const provider = original?.provider ?? model.provider;
+    // A retry on the twin goes to the twin's provider, not the failed job's.
+    const provider = onTwin ? model.provider : (original?.provider ?? model.provider);
     const perSecond = isImage ? null : usdPerSecondFor({ endpoint: model.endpoint, usdPerSecond: model.usd_per_second }, params.audio);
     if (!isImage && perSecond === undefined) return bad('the model cannot generate audio');
     const estimate = isImage ? (Number(imagePrice) + extraInputUsd(model.endpoint, assetIds.length)).toFixed(4) : estimateUsd(perSecond!, durationSec);
+    // Under the same lock, so two Runs cannot both spend fal's last dollars.
+    const credit = await falCreditUsd(tx, fal);
+    // A new Run takes the row the pickers offer of a pair of duplicate models; a retry copies a Run that was offered. The fal lock is read on video only (the one fal row with a twin is Veo).
+    if (!original && !(await offeredNow(tx, modelId, (v) => v.kind === 'video' && v.usd_per_second !== null && overCredit(v.provider, estimateUsd(v.usd_per_second, durationSec), credit)))) {
+      return bad('the model is not offered now: its duplicate twin serves in its place');
+    }
     // A mock job books 0 USD (see the ledger), so it adds nothing to the monthly cap.
     const cap = await checkCaps(tx, userId, provider === 'mock' ? '0' : estimate, undefined, feature);
     if (cap) return Response.json({ error: CAP_MESSAGES[cap] }, { status: 429 });
-    // Under the same lock, so two Runs cannot both spend fal's last dollars.
-    const credit = provider === 'fal' ? await falCreditUsd(tx, fal) : null;
     if (overCredit(provider, estimate, credit)) {
       return Response.json({ error: `fal.ai chỉ còn $${Math.max(0, Number(credit)).toFixed(2)}, không đủ cho lần chạy này (khoảng $${Number(estimate).toFixed(2)}). Hãy chọn model rẻ hơn hoặc báo Admin nạp thêm credits.` }, { status: 429 });
     }

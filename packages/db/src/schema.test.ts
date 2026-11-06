@@ -163,7 +163,7 @@ describe('migration 0028 prompt limits', () => {
 describe('migration 0015 Fash video models', () => {
   test('adds 22 fal video models, disabled and complete, each with a request builder and its sources', async () => {
     const { rows } = await pool.query(
-      `select id, endpoint, ratios, durations_sec, max_images, output_resolution, usd_per_second::float as usd, sources from model_configs where kind = 'video' and provider = 'fal' and id <> 'kling-o3-pro' and not 'motion_control' = any(features) and not enabled and id !~ '^minimax-h3-max.*-(480|1080)p$' order by id`, // 0036's resolution rows have their own test
+      `select id, endpoint, ratios, durations_sec, max_images, output_resolution, usd_per_second::float as usd, sources from model_configs where kind = 'video' and provider = 'fal' and id <> 'kling-o3-pro' and not 'motion_control' = any(features) and (not enabled or id = 'veo-3.1') and id !~ '^minimax-h3-max.*-(480|1080)p$' order by id`, // 0036's resolution rows have their own test; 0075 switches Veo 3.1 on
     );
     expect(rows).toHaveLength(22);
     for (const r of rows) {
@@ -539,7 +539,7 @@ describe('migration 0042 Veo 3.1 on Vertex', () => {
     expect(row).toEqual(twin);
     expect(row).toMatchObject({ ratios: ['9:16', '16:9'], durations_sec: [8], max_images: 1, output_resolution: '720p' });
     const [facts] = (await pool.query(`select provider, endpoint, label, enabled, usd_per_second::text as usd, sources from model_configs where id = 'veo-3.1-vertex'`)).rows;
-    expect(facts).toMatchObject({ provider: 'vertex', endpoint: 'veo-3.1-generate-001', label: 'Google VEO 3.1 (Vertex)', enabled: false, usd: '0.2000' });
+    expect(facts).toMatchObject({ provider: 'vertex', endpoint: 'veo-3.1-generate-001', label: 'Google VEO 3.1 (Vertex)', enabled: true, usd: '0.2000' }); // 0075 switches it on as the fallback of the fal row
     expect(facts.sources.usdPerSecond).toMatchObject({ url: 'https://cloud.google.com/vertex-ai/generative-ai/pricing', readAt: '2026-11-01' });
     expect(facts.sources.usdPerSecond.note).toMatch(/^estimate:/);
     expect(AUDIO_USD_PER_SECOND['veo-3.1-generate-001']).toBe(0.4);
@@ -732,6 +732,50 @@ describe('migration 0073 Gemini Omni Flash 1.2', () => {
     }
     expect(rows[1].sources.nativeAudio.readAt).toBe('2026-11-04'); // the paid test ran on v1.1
     expect(VIDEO_BODIES['google/gemini-omni-flash/v1.2/image-to-video']!.text).toBe('google/gemini-omni-flash/v1.2/text-to-video');
+  });
+});
+
+describe('migration 0075 hide the pricier duplicate models', () => {
+  const PAIRS = [
+    ['nano-banana', 'nano-banana-vertex'],
+    ['nano-banana-2', 'nano-banana-2-vertex'],
+    ['nano-banana-2.1', 'nano-banana-2.1-vertex'],
+    ['nano-banana-pro', 'nano-banana-pro-vertex'],
+    ['seedream-5-pro', 'seedream-5-pro-byteplus'],
+    ['seedance-1.0-pro', 'seedance-1.0-pro-byteplus'],
+    ['seedance-2.0', 'seedance-2.0-byteplus'],
+    ['gemini-omni-flash', 'gemini-omni-flash-vertex'],
+    ['gemini-omni-flash-reference', 'gemini-omni-flash-reference-vertex'],
+    ['veo-3.1-vertex', 'veo-3.1'],
+  ] as const;
+
+  test('points exactly ten dearer rows at the row that replaces each, and leaves the rows that have no like-for-like twin visible', async () => {
+    const { rows } = await pool.query(`select id, twin_of from model_configs where twin_of is not null order by id`);
+    expect(rows.map((r) => [r.id, r.twin_of])).toEqual([...PAIRS].sort((a, b) => a[0].localeCompare(b[0])));
+    // Marketing Studio lists the fal reference rows and the BytePlus rows are not for it; the 2.5 rows allow 30 s clips against 15 s.
+    const { rows: kept } = await pool.query(`select id, twin_of from model_configs where id in ('seedance-2.0-reference', 'seedance-2.5-reference', 'seedance-2.5-image', 'seedance-1.5-pro', 'nano-banana-pro-face-swap')`);
+    expect(kept.every((r) => r.twin_of === null)).toBe(true);
+  });
+
+  test('pairs rows of the same kind and features, with the replacing row no dearer, the dearer row never the one the Admin sees', async () => {
+    const price = `select kind, features, usd_per_second::float as usd, (select min(v::float) from jsonb_each_text(image_prices) e(k, v)) as image from model_configs where id = $1`;
+    for (const [dear, cheap] of PAIRS) {
+      const [d] = (await pool.query(price, [dear])).rows;
+      const [c] = (await pool.query(price, [cheap])).rows;
+      expect([c.kind, c.features], dear).toEqual([d.kind, d.features]);
+      expect(c.usd ?? c.image, dear).toBeLessThanOrEqual(d.usd ?? d.image);
+    }
+  });
+
+  test('switches Veo 3.1 on at fal with its Vertex row as the enabled fallback, and leaves the other pairs as they were', async () => {
+    const { rows } = await pool.query(`select id, enabled from model_configs where id in ('veo-3.1', 'veo-3.1-vertex', 'nano-banana', 'nano-banana-vertex', 'seedance-2.0') order by id`);
+    expect(rows.map((r) => [r.id, r.enabled])).toEqual([['nano-banana', false], ['nano-banana-vertex', false], ['seedance-2.0', false], ['veo-3.1', true], ['veo-3.1-vertex', true]]);
+  });
+
+  test('refuses a row that is its own twin or a twin that does not exist, and a twin cannot be deleted while another row points at it', async () => {
+    await expect(pool.query(`update model_configs set twin_of = id where id = 'kling-2.6'`)).rejects.toThrow(/model_configs_twin_of_check/);
+    await expect(pool.query(`update model_configs set twin_of = 'nope' where id = 'kling-2.6'`)).rejects.toThrow(/model_configs_twin_of_model_configs_id_fk/);
+    await expect(pool.query(`delete from model_configs where id = 'veo-3.1'`)).rejects.toThrow(/model_configs_twin_of_model_configs_id_fk/);
   });
 });
 

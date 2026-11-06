@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, test } from 'vitest';
 import type { TrayJob } from '@/lib/api';
 import { inputRefusal } from '@/lib/job-failure';
-import { canRetry, JobFailureNote } from './JobFailure';
+import { canRetry, canRetryOnTwin, JobFailureNote, twinRetryText } from './JobFailure';
 
 const RAW =
   'byteplus submit: HTTP 400 {"error":{"code":"InputImageSensitiveContentDetected.PrivacyInformation","message":"The request failed because the input image \'content[1]\' may contain real person.","param":"content[1]","type":"BadRequest"}}';
@@ -47,4 +47,17 @@ test('Thử lại is offered for a failed job once, and never for a refused inpu
   expect(canRetry(job({ retryOf: 'j0' }))).toBe(false);
   expect(canRetry(job({ status: 'succeeded' }))).toBe(false);
   expect(canRetry(refused(RAW))).toBe(false);
+});
+
+test('a job refused for a real person can go once to its fal twin, with the twin run priced in the question', () => {
+  const twin = { label: 'Seedance 1.0 Pro', estimateUsd: '0.6200' };
+  expect(canRetryOnTwin({ ...refused(RAW), twin })).toBe(true);
+  expect(canRetryOnTwin({ ...refused(RAW), status: 'timed_out', twin })).toBe(true);
+  expect(canRetryOnTwin(refused(RAW))).toBe(false); // no enabled twin
+  expect(canRetryOnTwin({ ...refused(RAW), twin, retried: true })).toBe(false);
+  expect(canRetryOnTwin({ ...refused(RAW), twin, retryOf: 'j0' })).toBe(false);
+  expect(canRetryOnTwin({ ...refused(RAW), twin, status: 'succeeded' })).toBe(false);
+  expect(canRetryOnTwin({ ...refused(RAW.replace('.PrivacyInformation', '.Other')), twin })).toBe(false); // another refusal is not a real person
+  expect(canRetryOnTwin(job({ error: 'boom', twin }))).toBe(false);
+  expect(twinRetryText({ ...refused(RAW), twin })).toEqual({ button: 'Chạy lại bằng Seedance 1.0 Pro', ask: 'Chạy lại job này bằng Seedance 1.0 Pro với giá khoảng $0.6200?' });
 });

@@ -313,10 +313,13 @@ export const modelConfigs = pgTable(
     enabled: boolean('enabled').notNull().default(false),
     passSeedPasses: integer('pass_seed_passes'),
     passSeedTotal: integer('pass_seed_total'),
+    /** Set on the dearer row of a duplicate pair: the row that replaces it. Admin Settings does not list it; the pickers offer it only while its twin cannot serve. */
+    twinOf: text('twin_of').references((): AnyPgColumn => modelConfigs.id, { onDelete: 'restrict' }),
     createdAt: tstz('created_at').notNull().defaultNow(),
     updatedAt: tstz('updated_at').notNull().defaultNow(),
   },
   (t) => [
+    check('model_configs_twin_of_check', sql`${t.twinOf} <> ${t.id}`),
     check('model_configs_provider_check', sql`${t.provider} in ('fal', 'vertex', 'byteplus', 'mock')`),
     check('model_configs_kind_check', sql`${t.kind} in ('video', 'image')`),
     check('model_configs_max_prompt_chars_check', sql`${t.maxPromptChars} > 0`),

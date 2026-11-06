@@ -34,6 +34,7 @@ beforeAll(async () => {
     [user.id],
   );
   await pool.query(`update model_configs set enabled = true where id in ('kling-v3-motion-pro', 'kling-v3-motion-standard', 'kling-o3-pro')`);
+  await pool.query(`update model_configs set enabled = false where id in ('veo-3.1', 'veo-3.1-vertex')`); // migration 0075 enables them; this file lists only its own models
 });
 
 afterAll(async () => {

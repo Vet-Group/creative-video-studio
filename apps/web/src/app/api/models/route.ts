@@ -3,6 +3,7 @@ import { videoInputs } from '@cvs/core/providers/fal';
 import { ASPECTS } from '@cvs/db';
 import { pool } from '@/lib/auth';
 import { modelStats, rank, scoreOf } from '@/lib/model-scores';
+import { onePerPair } from '@/lib/model-twins';
 import { falBalance, falCreditUsd, overCredit } from '@/lib/provider-credit';
 import { guard } from '@/lib/session';
 
@@ -21,6 +22,7 @@ const MONTH = `to_char(now() at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM')`;
  * `?feature=video`, `marketing` or `motion_control` keeps the models whose `features` lists it (Marketing Studio also accepts ratio 16:9, Motion Control takes only `auto`); without it every enabled video model is listed.
  * `audioEstimateUsd` is the estimate with native audio on, null for a model that cannot make audio; `alwaysAudio` is true for one that cannot be silent (ALWAYS_AUDIO). `endFrame` is true for a model that takes an end frame, `textOnly` for one that runs from the prompt alone, and `audioClips` the reference audio it takes ({ max, seconds }, or null; videoInputs).
  * `isNew` is true for a model added in the last 14 days (the picker's badge).
+ * Of a pair of duplicate models (`twin_of`, migration 0075) one is listed: the cheaper, or the dearer in its place while the cheaper cannot serve (lib/model-twins.ts).
  * `creditUsd` is what the model's provider can still spend (lib/provider-credit.ts; fal only, null otherwise): the picker locks a model whose estimate is over it, and the
  * model to pre-select is never one of those.
  * `monthToDate` is the caller's own total this ICT month, provisional while a job of it has no closing row. `remainingBudgetUsd` is for Admins only.
@@ -44,7 +46,7 @@ export async function GET(request: Request) {
   const [models, mine, budget, stats, falCredit] = await Promise.all([
     pool.query(
       `select m.id, m.label, m.provider, m.endpoint, m.ratios, m.durations_sec, m.max_images, m.max_prompt_chars, m.usd_per_second, m.output_resolution,
-              m.created_at > now() - interval '14 days' as is_new
+              m.created_at > now() - interval '14 days' as is_new, m.twin_of
          from model_configs m
         where m.enabled and m.kind = 'video' and ($1::text is null or $1 = any(m.features)) order by m.label, m.id`,
       [feature],
@@ -61,7 +63,9 @@ export async function GET(request: Request) {
     falCreditUsd(pool, fal),
   ]);
 
-  const list = models.rows.map((r) => {
+  // One model of each duplicate pair: the dearer one only while its twin cannot serve (lib/model-twins.ts); a fal twin is locked by the same estimate the picker shows.
+  const offered = await onePerPair(pool, models.rows, (v) => overCredit(v.provider, estimateUsd(v.usd_per_second, durationSec), falCredit));
+  const list = offered.map((r) => {
     const st = stats.get(r.id) ?? { passes: 0, total: 0, ok: 0, bad: 0 };
     return {
       id: r.id as string,
