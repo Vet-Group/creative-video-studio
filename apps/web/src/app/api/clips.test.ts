@@ -132,7 +132,11 @@ describe('GET /api/jobs?mine', () => {
     const byId = (id: string) => jobs.find((j) => j.id === id);
     expect(byId(preset)).toMatchObject({ text: null, inputAssetIds: ['in-1', 'in-2'], format: null, favorite: false }); // a preset's prompt is not the member's, and Bob's favourite is his
     expect(byId(free)).toMatchObject({ text: 'my own words', favorite: true });
-    expect(byId(marketing)).toMatchObject({ text: 'my brief', format: 'advanced' }); // never the composed prompt
+    expect(byId(marketing)).toMatchObject({ text: 'my brief', format: 'advanced', roles: null }); // never the composed prompt
+    // An Unboxing job names its photos, so the tray puts each one in its slot.
+    await pool.query(`update jobs set params = '{"format": "unboxing", "roles": "product,packaging"}' where id = $1`, [marketing]);
+    const again = (await (await GET_MINE(req('/api/jobs?mine', alice.cookie))).json()) as { jobs: { id: string }[] };
+    expect(again.jobs.find((j) => j.id === marketing)).toMatchObject({ format: 'unboxing', roles: 'product,packaging' });
     // Leave the shared fixtures as found: later tests count Alice's favourites and every clip.
     await pool.query('delete from favorites where job_id = any($1)', [[preset, free]]);
     await pool.query('update jobs set deleted_at = now() where id = any($1)', [[preset, free, marketing]]);

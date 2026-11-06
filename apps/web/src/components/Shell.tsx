@@ -202,7 +202,7 @@ function HistoryCard({ job, isAdmin, select }: { job: TrayJob; isAdmin: boolean;
           <ul className="job-inputs" aria-label="Ảnh đầu vào">
             {job.inputAssetIds.map((id, n) => (
               <li key={id}>
-                <Tap on={form?.photo && (() => form.photo!({ asset: id }, roleOf(job.feature, n, { garments: job.garments, format: job.format })))} label={`Dùng ảnh đầu vào ${n + 1}`}>
+                <Tap on={form?.photo && (() => form.photo!({ asset: id }, roleOf(job.feature, n, { garments: job.garments, format: job.format, roles: job.roles })))} label={`Dùng ảnh đầu vào ${n + 1}`}>
                   <img src={content(id)} alt="" loading="lazy" />
                 </Tap>
               </li>

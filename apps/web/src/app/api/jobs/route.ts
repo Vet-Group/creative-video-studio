@@ -98,7 +98,7 @@ export async function GET(request: Request) {
       // For the History card: the member's own words (a free prompt on Create video and Image Generation; elsewhere the prompt is composed, so the kept brief),
       // the inputs, the format and the caller's favourite.
       text: r.params.brief ?? ((r.feature === 'video' && !r.preset_id) || r.feature === 'image' ? r.prompt : null), inputAssetIds: r.input_asset_ids,
-      garments: r.params.garments ? Number(r.params.garments) : null, format: r.params.format ?? null, favorite: r.favorite, estimateUsd: r.estimate_usd,
+      garments: r.params.garments ? Number(r.params.garments) : null, format: r.params.format ?? null, roles: r.params.roles ?? null, favorite: r.favorite, estimateUsd: r.estimate_usd,
     })),
   });
 }

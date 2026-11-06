@@ -81,6 +81,8 @@ export interface TrayJob {
   /** How many of a Try On job's inputs are garments (after the person, before the background). */
   garments: number | null;
   format: string | null;
+  /** Unboxing's photo roles in the order of `inputAssetIds`. */
+  roles: string | null;
   favorite: boolean;
   /** The job's estimate in USD (4 decimals), which a retry costs again; null for a job without one. */
   estimateUsd: string | null;

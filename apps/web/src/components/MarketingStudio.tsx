@@ -419,8 +419,9 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
       const img = await photoImg(p).finally(loading('Đang tải ảnh...'));
       if (advanced) setRefs((cur) => (cur.length < maxRefs ? [...cur, img] : cur));
       else if (role === 'model') setPerson([img]);
+      else if (role === 'packaging') setPackaging([img]);
       else setProduct([img]);
-      notify(advanced ? 'Đã thêm ảnh tham chiếu' : role === 'model' ? 'Đã dùng ảnh người mẫu' : 'Đã chọn ảnh sản phẩm');
+      notify(advanced ? 'Đã thêm ảnh tham chiếu' : role === 'model' ? 'Đã dùng ảnh người mẫu' : role === 'packaging' ? 'Đã chọn ảnh bao bì' : 'Đã chọn ảnh sản phẩm');
     } catch (e) {
       setError(copyError(e, UPLOAD_ERROR));
     }
@@ -620,7 +621,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
                 extra: endExtras,
               }}
               endText
-              templates={PROMPT_TEMPLATES[unboxing ? 'unboxing' : review ? 'review' : 'marketing']}
+              templates={PROMPT_TEMPLATES[format === 'ugc' ? 'marketing' : format]}
               // A template's own hook counts only with no hook chosen, so the chosen ones go.
               onTemplate={(t) => (sec ? (setHooks([]), setHookText(t.hook), setPrompt(t.body), setEnding(t.ending)) : setFreeText(sectionPrompt(t)))}
               filled={(sec ? hookText + prompt + ending : freeText).trim() !== ''}

@@ -178,10 +178,10 @@ test('Đánh giá sản phẩm: the sent prompt names the model and the product,
   await expect(script(page)).toHaveValue('Mình rất thích cái áo này.');
 });
 
-test('each format lists its own Khung prompt templates, none of them another format’s', async ({ page }) => {
+test('each of the four formats lists its own Khung prompt templates, none of them another format’s', async ({ page }) => {
   await signIn(page, 'fmtf');
-  const lists = { ugc: PROMPT_TEMPLATES.marketing, unboxing: PROMPT_TEMPLATES.unboxing, review: PROMPT_TEMPLATES.review } as const;
-  for (const format of ['ugc', 'unboxing', 'review'] as const) {
+  const lists = { ugc: PROMPT_TEMPLATES.marketing, advanced: PROMPT_TEMPLATES.advanced, unboxing: PROMPT_TEMPLATES.unboxing, review: PROMPT_TEMPLATES.review } as const;
+  for (const format of ['ugc', 'advanced', 'unboxing', 'review'] as const) {
     await pick(page, format);
     const dialog = await openPromptTemplates(page);
     const group = dialog.getByRole('group', { name: 'Khung prompt' });

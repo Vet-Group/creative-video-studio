@@ -14,8 +14,8 @@ export interface PromptTemplate {
   ending: string;
 }
 
-/** By page: Create's (`video`) and Marketing Studio's formats (`marketing` for UGC, `unboxing`, `review`; Advanced has none), each hook and ending a sentence of its own. */
-export const PROMPT_TEMPLATES: Record<'video' | 'marketing' | 'unboxing' | 'review', PromptTemplate[]> = {
+/** By page: Create's (`video`) and Marketing Studio's formats (`marketing` for UGC, `advanced`, `unboxing`, `review`), each hook and ending a sentence of its own. */
+export const PROMPT_TEMPLATES: Record<'video' | 'marketing' | 'advanced' | 'unboxing' | 'review', PromptTemplate[]> = {
   video: [
     {
       name: 'Xoay 360°',
@@ -74,6 +74,29 @@ export const PROMPT_TEMPLATES: Record<'video' | 'marketing' | 'unboxing' | 'revi
       hook: 'The clip opens with the creator spinning once in the first look, the product in the centre of the frame.',
       body: 'The creator shows three ways to style the product, for work, for a day out and for a party, switching looks with quick cuts and a short pose in each. Bright, even light, a steady phone camera that frames the full body.',
       ending: 'The clip ends with the creator in the favourite look, waving goodbye to the camera.',
+    },
+  ],
+  advanced: [
+    {
+      name: 'Giới thiệu nhanh',
+      desc: 'Khoe sản phẩm từ ba góc trên nền sạch',
+      hook: 'The clip opens with the product snapping into frame on a clean background.',
+      body: 'The product is shown from three angles with quick, smooth camera moves, each angle highlighting one key detail. Clean studio light, steady gimbal shots.',
+      ending: 'The clip ends on a still hero shot of the product.',
+    },
+    {
+      name: 'Một ngày cùng sản phẩm',
+      desc: 'Sản phẩm đi cùng một người từ sáng tới tối',
+      hook: 'The clip opens with a person reaching for the product first thing in the morning.',
+      body: 'Short scenes follow the person using the product through the day, at home, on the go and with friends, in a warm, natural style. Natural light, a handheld camera.',
+      ending: 'The clip ends with the person smiling at the camera, the product in hand.',
+    },
+    {
+      name: 'Vấn đề và giải pháp',
+      desc: 'Một rắc rối nhỏ, rồi sản phẩm giải quyết gọn',
+      hook: 'The clip opens on a small everyday problem the product solves, shown in one quick moment.',
+      body: 'The person discovers the product, uses it, and the problem is solved in a clear, satisfying way. Bright, even light, close handheld shots.',
+      ending: 'The clip ends on a close-up of the product with the person giving a satisfied nod.',
     },
   ],
   unboxing: [
