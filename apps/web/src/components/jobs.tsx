@@ -120,7 +120,7 @@ export function JobPrompt({ text, onUse }: { text: string; onUse?: () => void })
   };
   return (
     <div ref={box} className="job-prompt" data-open={open || undefined}>
-      <Tap on={onUse} label="Chép prompt vào ô Prompt" className="job-text">
+      <Tap on={onUse} label="Chép vào ô mô tả" className="job-text">
         {text}
       </Tap>
       <div className="job-prompt-tools">
@@ -129,7 +129,7 @@ export function JobPrompt({ text, onUse }: { text: string; onUse?: () => void })
             {open ? 'Thu gọn' : 'Xem thêm'}
           </button>
         )}
-        <button type="button" onClick={copy} aria-label="Sao chép prompt">
+        <button type="button" onClick={copy} aria-label="Chép mô tả">
           <Icon name={copied === 'ok' ? 'check' : 'copy'} size={12} />
           {copied === 'ok' ? 'Đã chép' : copied === 'failed' ? 'Không chép được' : 'Sao chép'}
         </button>
@@ -142,7 +142,7 @@ export function JobPrompt({ text, onUse }: { text: string; onUse?: () => void })
         )}
         {/* aria-live without role status: the card keeps its own status line (the save-as-template note), found by role. */}
         <span className="sr-only" aria-live="polite">
-          {copied === 'ok' ? 'Đã chép prompt.' : copied === 'failed' ? 'Không sao chép được.' : ''}
+          {copied === 'ok' ? 'Đã chép mô tả.' : copied === 'failed' ? 'Không sao chép được.' : ''}
         </span>
       </div>
       {reading && (

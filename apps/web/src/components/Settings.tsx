@@ -33,6 +33,10 @@ export interface Account {
   supportEmail: string | null;
 }
 
+/** A mail to the company's support address with the open page and the account filled in, so a report says where it happened. */
+export const supportMail = (to: string, account: string, page: string) =>
+  `mailto:${to}?subject=${encodeURIComponent('Cần hỗ trợ Creative Video Studio')}&body=${encodeURIComponent(`Trang: ${page}\nTài khoản: ${account}\n\nMô tả vấn đề (kèm ảnh chụp màn hình nếu có):\n`)}`;
+
 /** GET /api/me/limits: the caller's use of each Run cap; USD amounts are numeric text. */
 export interface Usage {
   clips: { used: number; cap: number };
@@ -580,6 +584,12 @@ export function Settings({ open, onClose, userName, account, start = 'profile' }
                       <span>Hãy hỏi Admin của công ty.</span>
                     )}
                   </span>
+                  {account.supportEmail && (
+                    // The page is read on click: the dialog opens over whichever page the member is on.
+                    <a href={`mailto:${account.supportEmail}`} onClick={(e) => (e.currentTarget.href = supportMail(account.supportEmail!, account.email, location.href))}>
+                      Gửi email
+                    </a>
+                  )}
                 </li>
                 <li className="acct-row">
                   <span className="acct-mark" aria-hidden="true">

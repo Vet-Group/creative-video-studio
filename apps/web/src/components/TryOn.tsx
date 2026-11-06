@@ -212,7 +212,7 @@ export function TryOn({ reuse }: { reuse?: string }) {
 
             <PromptComposer
               id={promptId}
-              label="Prompt"
+              label="Mô tả"
               optional
               feature="try_on"
               value={prompt}
@@ -272,7 +272,7 @@ export function TryOn({ reuse }: { reuse?: string }) {
               recreate: (from) => (recall.touch(), recreate(from), narrow && setTab('create')),
               apply,
               photo: (p, role) => void take(p, role),
-              prompt: (text) => (setPrompt(text), notify('Đã chép prompt')),
+              prompt: (text) => (setPrompt(text), notify('Đã chép mô tả')),
               result: (p) => void take(p, 'model', 'Đã dùng kết quả làm ảnh người mẫu'),
             }}
           >

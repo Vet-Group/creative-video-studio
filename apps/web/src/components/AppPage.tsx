@@ -244,7 +244,7 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
             {app.prompt && (
               <PromptComposer
                 id={promptId}
-                label={app.prompt === 'background' ? 'Mô tả nền' : 'Prompt'}
+                label={app.prompt === 'background' ? 'Mô tả nền' : 'Mô tả'}
                 optional
                 feature={app.feature}
                 value={prompt}
@@ -489,7 +489,7 @@ function MotionForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
 
             <PromptComposer
               id={promptId}
-              label="Prompt"
+              label="Mô tả"
               optional
               feature={app.feature}
               value={prompt}

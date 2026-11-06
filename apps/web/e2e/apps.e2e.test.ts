@@ -307,7 +307,7 @@ test('a priced model: Upscale shows its price and stores the chosen resolution, 
 test('the swaps take an optional prompt that is added to their fixed instruction', async ({ page }) => {
   await signIn(page, 'appsc');
   await openApp(page, 'Đổi nhân vật', 'character-swap');
-  const prompt = page.getByRole('textbox', { name: 'Prompt (tuỳ chọn)' });
+  const prompt = page.getByRole('textbox', { name: 'Mô tả (tuỳ chọn)' });
   await page.locator('input[type=file][aria-label="Ảnh nhân vật mới"]').setInputFiles(file('new.png'));
   await page.locator('input[type=file][aria-label="Ảnh đích"]').setInputFiles(file('target.png'));
   await expect(runButton(page)).toBeEnabled(); // the prompt is not required
@@ -318,7 +318,7 @@ test('the swaps take an optional prompt that is added to their fixed instruction
   const detail = (await (await page.request.get(`/api/jobs/${mine.jobs.find((j) => j.feature === 'character_swap')!.id}`)).json()) as { prompt: string };
   expect(detail.prompt).toBe('replace the whole person in the second image with the person from the first image, keep the background. keep the red hat');
   await openApp(page, 'Đổi người mẫu', 'model-swap');
-  await expect(page.getByRole('textbox', { name: 'Prompt (tuỳ chọn)' })).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Mô tả (tuỳ chọn)' })).toBeVisible();
   await openApp(page, 'Đổi khuôn mặt', 'face-swap');
   await expect(page.getByRole('textbox')).toHaveCount(0);
 });

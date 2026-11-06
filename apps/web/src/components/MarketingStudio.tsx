@@ -66,6 +66,9 @@ interface VideoModel {
   /** Added in the last 14 days. */
   isNew: boolean;
   creditUsd: string | null;
+  creditShown: boolean;
+  /** How many marks the score rests on. */
+  total: number;
 }
 
 const VIDEO_ERROR = 'Không tải được video. Hãy thử lại.';
@@ -78,7 +81,7 @@ const TAB_LABEL: Record<Tab, string> = { create: 'Tạo', history: 'Lịch sử'
 /** The ratios of the page, in the order of the menu; a model offers some of them. */
 const RATIO_LABEL: Record<string, string> = { '9:16': '9:16 (dọc)', '16:9': '16:9 (ngang)', '1:1': '1:1 (vuông)' };
 
-const QUIET_REASONS = ['Tải lên ảnh người mẫu.', 'Tải lên ảnh sản phẩm.', 'Viết prompt mô tả video bạn muốn.'];
+const QUIET_REASONS = ['Tải lên ảnh người mẫu.', 'Tải lên ảnh sản phẩm.', 'Viết mô tả video bạn muốn.'];
 
 /** The formats of the format picker, each with the name of its sample photo and loop (Review's keeps the name the first upload used). */
 const FORMATS: { id: MarketingFormat; sample: string }[] = [
@@ -389,7 +392,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
                   (pf && images.length > chosen!.maxImages
                     ? `Mô hình này nhận tối đa ${chosen!.maxImages} ảnh tham chiếu. Bỏ bớt ảnh hoặc chọn mô hình khác.`
                     : advanced
-                      ? (videoReason(video, chosen!.videoRefs, refs.length) ?? (brief.trim() === '' ? 'Viết prompt mô tả video bạn muốn.' : null))
+                      ? (videoReason(video, chosen!.videoRefs, refs.length) ?? (brief.trim() === '' ? 'Viết mô tả video bạn muốn.' : null))
                       : review && highlightLines(highlights).length === 0
                         ? 'Nhập ít nhất 1 điểm nổi bật.'
                         : null);
@@ -444,7 +447,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
     recreate: (from) => (recall.touch(), setSource({ from }), narrow && setTab('create')),
     apply,
     photo: (p, role) => void take(p, role),
-    prompt: (text) => ((sec ? setPrompt : setFreeText)(text), notify('Đã chép prompt')),
+    prompt: (text) => ((sec ? setPrompt : setFreeText)(text), notify('Đã chép mô tả')),
     // An example's hook (the library one, else its own words) and its ending go in ① and ③, which only the sections have; the photos and the rest stay.
     hook: (h) => {
       if (!sec) setMode('sections');
@@ -631,7 +634,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
               {sec && locationBox}
               <PromptComposer
                 id={promptId}
-                label="Prompt"
+                label="Mô tả"
                 optional={!advanced}
                 required={advanced}
                 feature="marketing"
@@ -674,7 +677,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
                 )}
               </div>
               <AudioSwitch on={audio} available={chosen?.audioEstimateUsd != null} always={chosen?.alwaysAudio} reason={silentWithVideo ? 'Mô hình này không tạo âm thanh khi có video tham chiếu, nên lời thoại cũng không có tác dụng.' : undefined} onChange={setAudio} />
-              {models && models.length > 0 && <ModelPicker models={models.map((m) => ({ id: m.id, label: m.label, isMock: m.isMock, supported: !pf || (m.maxImages >= images.length && (!advanced || videoReason(video, m.videoRefs, refs.length) === null)), estimateUsd: audio && m.audioEstimateUsd != null ? m.audioEstimateUsd : m.estimateUsd, score: m.score, recommended: m.recommended, resolution: m.resolution, durationsSec: m.durationsSec, audio: m.audioEstimateUsd != null, isNew: m.isNew, creditUsd: m.creditUsd }))} value={chosen?.id ?? ''} onChange={(id) => pickModel(models.find((m) => m.id === id)!)} />}
+              {models && models.length > 0 && <ModelPicker models={models.map((m) => ({ id: m.id, label: m.label, isMock: m.isMock, supported: !pf || (m.maxImages >= images.length && (!advanced || videoReason(video, m.videoRefs, refs.length) === null)), estimateUsd: audio && m.audioEstimateUsd != null ? m.audioEstimateUsd : m.estimateUsd, score: m.score, recommended: m.recommended, resolution: m.resolution, durationsSec: m.durationsSec, audio: m.audioEstimateUsd != null, isNew: m.isNew, creditUsd: m.creditUsd, creditShown: m.creditShown, marks: m.total }))} value={chosen?.id ?? ''} onChange={(id) => pickModel(models.find((m) => m.id === id)!)} />}
             </VideoSettings>
             {/* Under the model, so in free writing the ratio row sits right under the prompt box as on Fash. */}
             <PromptPreview feature="marketing" prompts={sent} labels={n > 1 ? variants.map((h, i) => `Biến thể ${i + 1} (${hookName(h)})`) : undefined} limit={chosen?.maxPromptChars} />

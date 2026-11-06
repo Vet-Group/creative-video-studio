@@ -106,9 +106,9 @@ test("as on Fash, a History card's words, inputs and result go on the form besid
   await card.getByRole('button', { name: 'Dùng ảnh đầu vào 2' }).click();
   await expect(chosen.getByRole('img', { name: 'piece-2.png' })).toBeVisible();
   await expect(note('Đã thêm ảnh vào đầu vào')).toBeVisible();
-  await card.getByRole('button', { name: 'Chép prompt vào ô Prompt' }).click();
+  await card.getByRole('button', { name: 'Chép vào ô mô tả' }).click();
   await expect(page.getByRole('textbox', { name: 'Mô tả cảnh bạn muốn tạo' })).toHaveValue('pieces shot');
-  await expect(note('Đã chép prompt')).toBeVisible();
+  await expect(note('Đã chép mô tả')).toBeVisible();
   await card.getByRole('button', { name: 'Dùng kết quả' }).click(); // Fash's Use Result: the result as one more input
   await expect(chosen.getByRole('img')).toHaveCount(2);
   expect(await page.url()).toMatch(/\/image-generation$/);
@@ -116,8 +116,8 @@ test("as on Fash, a History card's words, inputs and result go on the form besid
   // Words that fit the four lines have no show more; the copy button puts them on the clipboard and says so.
   await expect(card.getByRole('button', { name: 'Xem thêm' })).toHaveCount(0);
   await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
-  await card.getByRole('button', { name: 'Sao chép prompt' }).click();
-  await expect(card.getByText('Đã chép prompt.')).toBeAttached();
+  await card.getByRole('button', { name: 'Chép mô tả' }).click();
+  await expect(card.getByText('Đã chép mô tả.')).toBeAttached();
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('pieces shot');
   // Longer words are cut at four lines with show more, which opens them all.
   const long = 'a linen summer dress on a model walking down a sunny old-town street, soft morning light, the camera follows from the side, then a close-up of the fabric moving in the breeze';

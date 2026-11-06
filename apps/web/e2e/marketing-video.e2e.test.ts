@@ -15,7 +15,7 @@ const NO_VIDEO = 'Mô hình này không nhận video tham chiếu. Bỏ video ho
 const file = (name: string) => ({ name, mimeType: 'image/png', buffer: png() });
 const runButton = (page: Page) => page.getByRole('button', { name: /^Tạo video/ });
 const reasonOf = (page: Page) => page.locator('.form-message').getByRole('status');
-const brief = (page: Page) => page.getByRole('textbox', { name: 'Prompt', exact: true });
+const brief = (page: Page) => page.getByRole('textbox', { name: 'Mô tả', exact: true });
 const part = (page: Page, name: string) => page.getByRole('group', { name, exact: true });
 const hookPart = (page: Page) => part(page, '① Hook · 0–2 giây đầu');
 const refsInput = (page: Page) => page.getByRole('group', { name: 'Ảnh tham chiếu' }).getByLabel('Ảnh tham chiếu', { exact: true });

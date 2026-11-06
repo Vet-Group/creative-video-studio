@@ -77,7 +77,7 @@ test('Try On: a missing slot keeps Run disabled with a reason, a mock run reache
 
   // A second run with a background: the garment is still second and the background last, and the prompt names each image's role.
   await page.getByLabel('Ảnh bối cảnh').setInputFiles(file('background.png'));
-  await page.getByLabel('Prompt (tuỳ chọn)').fill('soft studio light');
+  await page.getByLabel('Mô tả (tuỳ chọn)').fill('soft studio light');
   await run.click();
   await expect(tray.getByText('Hoàn tất')).toHaveCount(2, { timeout: 60_000 });
   const jobs = (await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { id: string; feature: string }[] };
@@ -161,8 +161,8 @@ test('Try On, as on Fash: a sample picture with a details file opens in place wi
     await detail.getByRole('button', { name: 'Seamless White' }).click();
     await expect(note('Đã chọn bối cảnh')).toBeVisible();
     await expect(page.getByLabel('Bối cảnh (tuỳ chọn): ảnh đã chọn').getByRole('img', { name: 'try-on-bg-test.jpg' })).toBeVisible();
-    await detail.getByRole('button', { name: 'Chép prompt vào ô Prompt' }).click();
-    await expect(page.getByRole('textbox', { name: 'Prompt (tuỳ chọn)' })).toHaveValue(details.brief);
+    await detail.getByRole('button', { name: 'Chép vào ô mô tả' }).click();
+    await expect(page.getByRole('textbox', { name: 'Mô tả (tuỳ chọn)' })).toHaveValue(details.brief);
     await detail.getByRole('button', { name: '3:4', exact: true }).click();
     await expect(select(page, 'Tỉ lệ')).toHaveAttribute('data-value', '3:4');
     await detail.getByRole('button', { name: 'Dùng kết quả' }).click();
@@ -179,7 +179,7 @@ test('Try On, as on Fash: a sample picture with a details file opens in place wi
     await expect(page.getByLabel('Người mẫu: ảnh đã chọn').getByRole('img', { name: 'try-on-example-1-model.png' })).toBeVisible();
     await expect(page.getByLabel('Trang phục: ảnh đã chọn').getByRole('img', { name: 'try-on-example-1-garment-1.png' })).toBeVisible();
     await expect(page.getByLabel('Bối cảnh (tuỳ chọn): ảnh đã chọn').getByRole('img', { name: 'try-on-bg-test.jpg' })).toBeVisible();
-    await expect(page.getByRole('textbox', { name: 'Prompt (tuỳ chọn)' })).toHaveValue(details.brief);
+    await expect(page.getByRole('textbox', { name: 'Mô tả (tuỳ chọn)' })).toHaveValue(details.brief);
     await expect(select(page, 'Tỉ lệ')).toHaveAttribute('data-value', '3:4');
     await expect(select(page, 'Độ phân giải')).toHaveAttribute('data-value', '1K');
   } finally {
@@ -447,7 +447,7 @@ test('geometry at 1440: the Try On card is 320 wide at x=288 and the image bar i
   expect(tabs.x + tabs.width / 2).toBeGreaterThan(c.x + c.width);
   near((await box(page.locator('.runbar'))).height, 73, 'run wrapper height');
   // Three slots, then the model picker, the prompt, the resolution and the ratio, in the order of the reference.
-  await expect(page.locator('.form-scroll .field-label')).toHaveText(['Trang phục', 'Người mẫu', 'Bối cảnh (tuỳ chọn)', 'Mô hình', 'Prompt (tuỳ chọn)', 'Độ phân giải', 'Tỉ lệ']);
+  await expect(page.locator('.form-scroll .field-label')).toHaveText(['Trang phục', 'Người mẫu', 'Bối cảnh (tuỳ chọn)', 'Mô hình', 'Mô tả (tuỳ chọn)', 'Độ phân giải', 'Tỉ lệ']);
   for (const slot of await page.locator('.slot').all()) near((await box(slot)).width, 268, 'slot width');
   // The live rhythm: the when-to-use hint at the top of the form, the first label 12 px under it, 32 px between one picture tray and the next label.
   const labels = page.locator('.form-scroll .field-label'), slots = page.locator('.slot');

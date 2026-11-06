@@ -88,7 +88,7 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
   const offered = await onePerPair(pool, models.rows);
   const running = jobs.rows.filter(isRunning).length;
   const recent = continueJobs(jobs.rows);
-  const status = [running > 0 && `${running} job đang chạy`, `Hôm nay bạn còn ${Math.max(0, today.cap - today.today)}/${today.cap} clip video`].filter(Boolean).join(' · ');
+  const status = [running > 0 && `${running} lượt tạo đang chạy`, `Hôm nay bạn còn ${Math.max(0, today.cap - today.today)}/${today.cap} clip video`].filter(Boolean).join(' · ');
   /** A recent job's picture: an image job's result, a clip's poster, else the first photo it was given (a running or failed job). */
   const jobPicture = (j: (typeof recent)[number]) => {
     const done = j.status === 'succeeded' ? (j.resolution ? j.output_asset_id : j.poster_asset_id) : null;

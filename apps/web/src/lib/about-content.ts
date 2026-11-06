@@ -124,7 +124,7 @@ const create: AboutPage = {
       blocks: [
         {
           cards: [
-            { title: 'Không tốn công sản xuất', text: 'Một buổi quay cần đạo diễn, người quay, ánh sáng và người dựng, và cần lại tất cả cho sản phẩm tiếp theo. Video tạo bằng AI chỉ cần một ảnh, một câu mô tả và chi phí mô hình ghi sẵn trên nút Run.' },
+            { title: 'Không tốn công sản xuất', text: 'Một buổi quay cần đạo diễn, người quay, ánh sáng và người dựng, và cần lại tất cả cho sản phẩm tiếp theo. Video tạo bằng AI chỉ cần một ảnh, một câu mô tả và chi phí mô hình ghi sẵn trên nút Tạo video.' },
             { title: 'Tính bằng phút, không phải ngày', text: 'Quay, dựng và xuất file biến một video sản phẩm thành việc của nhiều ngày. Ở đây clip về tab Lịch sử trong lúc bạn chuẩn bị clip tiếp theo.' },
             { title: 'Nội dung mới khi cần', text: 'Nền tảng quảng cáo ưu tiên nội dung mới và phạt nội dung đã cũ. Tạo nhiều biến thể cho cùng một sản phẩm để thử A/B hay chạy theo mùa mà không phải đặt lịch quay.' },
             { title: 'Video cho mọi sản phẩm', text: 'Thường chỉ sản phẩm chủ lực mới có video. Tạo bằng AI giúp cả những sản phẩm ít bán, vốn chỉ có ảnh tĩnh, cũng có video.' },
@@ -141,7 +141,7 @@ const create: AboutPage = {
           steps: [
             { title: 'Tải ảnh mở đầu', text: 'Thả ảnh bạn muốn làm động: ảnh sản phẩm, ảnh người mẫu hay một kết quả trước đó. Ảnh đầu tiên là ảnh chính. Mô hình tham chiếu nhận tối đa 9 ảnh, tuỳ mô hình, để dựng cảnh từ đó; mô hình ảnh-thành-video chỉ dùng ảnh đầu tiên.', media: 'about-create-step-1' },
             { title: 'Mô tả chuyển động', text: 'Chọn một mẫu chuyển động công ty đã thử, hoặc tự viết điều sẽ xảy ra tiếp theo. Ảnh đã quyết định sản phẩm, trang phục và bối cảnh, nên mô tả chỉ cần nói về chuyển động. Viết bằng tiếng Anh thường cho kết quả ổn định hơn.', media: 'about-create-step-2' },
-            { title: 'Chọn thông số và chạy', text: 'Chọn mô hình, rồi thời lượng và tỉ lệ mà mô hình đó hỗ trợ; độ phân giải đi theo mô hình. Nút Run ghi chi phí ước tính bằng USD trước khi bạn bấm, và job nằm trong tab Lịch sử cho đến khi clip xong.', media: 'about-create-step-3' },
+            { title: 'Chọn thông số và chạy', text: 'Chọn mô hình, rồi thời lượng và tỉ lệ mà mô hình đó hỗ trợ; độ phân giải đi theo mô hình. Nút Tạo video ghi chi phí ước tính bằng USD trước khi bạn bấm, và lượt tạo nằm trong tab Lịch sử cho đến khi clip xong.', media: 'about-create-step-3' },
           ],
         },
         { loop: 'about-create-loop' },
@@ -151,7 +151,7 @@ const create: AboutPage = {
       kicker: 'Trả lời nhanh',
       title: 'Cần mấy bước để có video từ một ảnh sản phẩm?',
       blocks: [
-        'Ba bước. Tải ảnh sản phẩm làm khung mở đầu, chọn mẫu hoặc viết một dòng tả chuyển động, rồi chọn mô hình và bấm Run. Không có timeline, không keyframe, không phần mềm dựng nào ở giữa.',
+        'Ba bước. Tải ảnh sản phẩm làm khung mở đầu, chọn mẫu hoặc viết một dòng tả chuyển động, rồi chọn mô hình và bấm Tạo video. Không có timeline, không keyframe, không phần mềm dựng nào ở giữa.',
         'Chính vì vậy cách làm này hấp dẫn: giữa lúc tải ảnh và lúc có clip không còn bước nào khác. Clip nằm sẵn trong Thư viện của công ty, xem và tải xuống được ngay.',
       ],
     },
@@ -415,7 +415,7 @@ const create: AboutPage = {
           list: [
             'Kết quả đứng yên quá? Nói rõ chuyển động và thêm một chuyển máy.',
             'Chuyển động giật hay tay chân méo? Thử một mô hình Kling, vốn mạnh về vật lý, hoặc rút ngắn thời lượng.',
-            'Job thất bại? Mỗi job được chạy lại một lần từ tab Lịch sử; job thất bại không tốn tiền thì không tính vào hạn mức.',
+            'Lượt tạo không thành công? Mỗi lượt tạo được chạy lại một lần từ tab Lịch sử; lượt tạo không thành công không tốn tiền thì không tính vào hạn mức.',
           ],
         },
       ],
@@ -448,7 +448,7 @@ const create: AboutPage = {
             { title: 'Video tham chiếu', text: 'Dựng một video mới từ nhiều ảnh tham chiếu, như người mẫu, trang phục và bối cảnh, thay vì một khung cố định. Ở đây nhận tối đa 9 ảnh, tuỳ mô hình.' },
             { title: 'Mẫu chuyển động', text: 'Câu lệnh chuyển động công ty đã thử và giữ lại. Chọn mẫu thay cho tự viết mô tả.' },
             { title: 'Mô tả chuyển động', text: 'Câu chỉ dẫn chuyển động: chủ thể làm gì, máy quay đi ra sao, nhịp độ thế nào.' },
-            { title: 'Điểm đề xuất', text: 'Điểm 0–100 của mỗi mô hình trong menu, tính từ đánh giá Đạt/Không đạt và tỉ lệ job thành công của công ty.' },
+            { title: 'Điểm đề xuất', text: 'Điểm 0–100 của mỗi mô hình trong menu, tính từ đánh giá Đạt/Không đạt và tỉ lệ lượt tạo thành công của công ty.' },
             { title: 'Thư viện', text: 'Nơi chứa mọi clip của công ty, để xem, tải xuống và đánh giá.' },
           ],
         },
@@ -460,13 +460,13 @@ const create: AboutPage = {
       blocks: [
         {
           faq: [
-            ['Cần biết dựng video mới biến được ảnh thành video không?', 'Không. Bạn tải ảnh lên, chọn mẫu hoặc viết một dòng tả chuyển động, chọn mô hình và bấm Run. Không có timeline, không keyframe, không phần mềm dựng nào, và clip xong nằm trong Thư viện, sẵn để tải xuống.'],
-            ['Một video tốn bao nhiêu?', 'Chi phí tuỳ mô hình và thời lượng, vì mọi mô hình tính tiền theo giây. Nút Run ghi chi phí ước tính bằng USD trước khi bạn bấm và cập nhật khi bạn đổi lựa chọn. Chi phí ghi trên clip là chi phí thật từ nhà cung cấp khi có; trước đó là số ước tính.'],
-            ['Có giới hạn số video không?', 'Có. Mỗi người có hạn mức số clip mỗi ngày theo giờ Việt Nam, do Admin đặt, và công ty có ngân sách video mỗi tháng. Run làm vượt hạn mức sẽ bị từ chối kèm lý do. Job thất bại không tốn tiền thì không tính.'],
+            ['Cần biết dựng video mới biến được ảnh thành video không?', 'Không. Bạn tải ảnh lên, chọn mẫu hoặc viết một dòng tả chuyển động, chọn mô hình và bấm Tạo video. Không có timeline, không keyframe, không phần mềm dựng nào, và clip xong nằm trong Thư viện, sẵn để tải xuống.'],
+            ['Một video tốn bao nhiêu?', 'Chi phí tuỳ mô hình và thời lượng, vì mọi mô hình tính tiền theo giây. Nút Tạo video ghi chi phí ước tính bằng USD trước khi bạn bấm và cập nhật khi bạn đổi lựa chọn. Chi phí ghi trên clip là chi phí thật từ nhà cung cấp khi có; trước đó là số ước tính.'],
+            ['Có giới hạn số video không?', 'Có. Mỗi người có hạn mức số clip mỗi ngày theo giờ Việt Nam, do Admin đặt, và công ty có ngân sách video mỗi tháng. Lượt tạo làm vượt hạn mức sẽ bị từ chối kèm lý do. Lượt tạo không thành công không tốn tiền thì không tính.'],
             ['AI biến ảnh thành video được không?', 'Được. Tải bất kỳ ảnh nào, ảnh sản phẩm, ảnh người mẫu hay một kết quả trước đó, làm khung mở đầu và tả chuyển động bạn muốn. AI làm động thành một video bắt đầu đúng từ ảnh đó. Mô hình tham chiếu cũng nhận ảnh của bạn nhưng dựng một cảnh mới từ chúng thay vì làm động một khung cố định.'],
             ['Xuất được cho nền tảng và định dạng nào?', 'Mọi mô hình có 9:16 cho Reels, TikTok và Stories, đa số có thêm 1:1 cho bảng tin và ô sản phẩm, và nhiều mô hình có 16:9, 4:3 hoặc 3:4. Bạn chọn tỉ lệ trước khi chạy, vì không có gì tự đổi cỡ sau đó.'],
             ['Có lồng tiếng bằng giọng thương hiệu được không?', 'Chưa: ứng dụng không có tải giọng hay nhân bản giọng. Khi Tạo âm thanh bật, clip có tiếng gốc của mô hình; muốn giọng riêng thì tắt âm thanh, tải clip xuống và lồng tiếng hoặc ghép nhạc trong phần mềm dựng.'],
-            ['Ứng dụng dùng những mô hình nào?', 'Danh mục có hơn 20 mô hình video thuộc các họ Kling, Seedance, FLUX 3, Google VEO, Gemini Omni Flash, Grok Imagine, WAN và Minimax. Admin bật mô hình nào thì menu có mô hình đó, và bạn chọn trước mỗi lần chạy. Đổi mô hình cũng đổi chi phí ghi trên nút Run.'],
+            ['Ứng dụng dùng những mô hình nào?', 'Danh mục có hơn 20 mô hình video thuộc các họ Kling, Seedance, FLUX 3, Google VEO, Gemini Omni Flash, Grok Imagine, WAN và Minimax. Admin bật mô hình nào thì menu có mô hình đó, và bạn chọn trước mỗi lần chạy. Đổi mô hình cũng đổi chi phí ghi trên nút Tạo video.'],
             ['Video dài tối đa bao lâu?', 'Từ 1 đến 30 giây tuỳ mô hình. Grok Imagine 1.5 từ 1 đến 15 giây, Kling O3 Pro và 3.0 Pro từ 3 đến 15, Seedance 2.0, WAN 2.7 và Minimax H3 Max tới 15, FLUX 3 từ 5 đến 20 và Seedance 2.5 Reference tới 30. Google VEO 3.1 luôn 8 giây, Hailuo 2.3 Pro luôn 6 giây.'],
             ['Nên chọn mô hình nào?', 'Kling mạnh về chuyển động chân thực và vật lý, ở 1080p. Seedance có dải thời lượng dài nhất. Google VEO 3.1 cho clip 8 giây trau chuốt. Grok Imagine hợp với clip dài mà tiết kiệm, FLUX 3 cho chuyển động điện ảnh tới 20 giây ở 1080p, và Hailuo 2.3 Pro là đường nhanh nhất tới clip 1080p. Khi phân vân, chọn mô hình có nhãn Đề xuất: đó là mô hình công ty chấm điểm cao nhất.'],
             ['Nút Cải thiện làm gì?', 'Khi Cải thiện bật (mặc định), AI viết lại mô tả ngắn của bạn thành một bản tả chi tiết bằng tiếng Anh trước khi chạy, và dịch nếu bạn viết tiếng Việt. Nó không nhìn thấy ảnh, nên chỉ thêm chi tiết về chuyển động, máy quay và nhịp độ, không bịa màu sắc, chữ hay logo. Tắt Cải thiện khi bạn muốn gửi đúng câu của mình.'],
@@ -536,7 +536,7 @@ const tryOn: AboutPage = {
           steps: [
             { title: 'Tải ảnh trang phục', text: 'Thêm 1 đến 5 ảnh trang phục: ảnh trải phẳng, ảnh ma-nơ-canh ẩn hay ảnh người mặc đều được. Có thể chồng áo, quần và giày để phối cả bộ trong một lần. Tổng số ảnh của một lần chạy (người mẫu, trang phục và bối cảnh) không vượt giới hạn của mô hình: 14 với Nano Banana Pro, 2 và 2.1, 4 với Nano Banana, 2 với FASHN v1.6.', media: 'try-on-garment-1' },
             { title: 'Chọn người mẫu', text: 'Tải ảnh một người, hoặc chọn một ảnh mẫu có sẵn nếu công ty đã đưa lên. Dùng ảnh toàn thân của một người nhìn thẳng vào máy; ảnh càng rõ, kết quả càng tốt.', media: 'try-on-model-1' },
-            { title: 'Chọn thông số và chạy', text: 'Chọn mô hình, độ phân giải và tỉ lệ, thêm ảnh bối cảnh hoặc prompt nếu muốn chỉ đạo cảnh, rồi bấm Thử đồ. Nút ghi chi phí ước tính bằng USD trước khi bạn bấm, và kết quả về tab Lịch sử.', media: 'try-on-example-1' },
+            { title: 'Chọn thông số và chạy', text: 'Chọn mô hình, độ phân giải và tỉ lệ, thêm ảnh bối cảnh hoặc mô tả nếu muốn chỉ đạo cảnh, rồi bấm Thử đồ. Nút ghi chi phí ước tính bằng USD trước khi bạn bấm, và kết quả về tab Lịch sử.', media: 'try-on-example-1' },
           ],
         },
         { loop: 'about-try-on-loop' },
@@ -585,7 +585,7 @@ const tryOn: AboutPage = {
           cards: [
             { title: 'Chụp váy giữ được dáng', text: 'Treo váy hoặc mặc lên ma-nơ-canh. Đó là cách AI đọc được dáng váy, vòng eo và chiều dài thật của đuôi váy.' },
             { title: 'Thêm voan và phụ kiện riêng', text: 'Tải voan, cài tóc hay giày thành ảnh riêng trong cùng lần chạy, trong giới hạn ảnh của mô hình, để AI phối trọn bộ cô dâu.' },
-            { title: 'Chọn bối cảnh', text: 'Thêm một ảnh bối cảnh, hoặc tả địa điểm trong prompt: một nhà thờ đá, một khu vườn lúc hoàng hôn, một sảnh tiệc ánh nến.' },
+            { title: 'Chọn bối cảnh', text: 'Thêm một ảnh bối cảnh, hoặc tả địa điểm trong ô mô tả: một nhà thờ đá, một khu vườn lúc hoàng hôn, một sảnh tiệc ánh nến.' },
           ],
         },
         'Ren, đính cườm và thêu sống nhờ độ phân giải. Chạy ảnh váy cưới trên Nano Banana Pro ở 2K hoặc 4K để chi tiết giữ được khi khách phóng to, rồi đưa ảnh sang trang Tạo video để có clip váy chuyển động.',
@@ -667,16 +667,16 @@ const tryOn: AboutPage = {
             { title: 'Thành phố', text: 'Ngõ phố, sân ga, sân thượng, phố cổ châu Âu. Bối cảnh thời trang đường phố cho ảnh chiến dịch và mạng xã hội.' },
           ],
         },
-        'Ô bối cảnh có thể hiện vài ảnh mẫu có sẵn nếu công ty đã đưa lên. Muốn một cảnh chưa có ảnh, hãy để trống ô và tả địa điểm trong prompt.',
+        'Ô bối cảnh có thể hiện vài ảnh mẫu có sẵn nếu công ty đã đưa lên. Muốn một cảnh chưa có ảnh, hãy để trống ô và tả địa điểm trong ô mô tả.',
       ],
     },
     {
       kicker: 'Chỉ đạo',
-      title: 'Viết prompt',
+      title: 'Viết mô tả',
       blocks: [
-        'Prompt là tuỳ chọn. Bỏ trống prompt và không thêm bối cảnh thì người mẫu mặc trang phục của bạn trong chính khung cảnh của ảnh người mẫu: ứng dụng dùng câu chỉ dẫn mặc định là mặc trang phục lên người mẫu, giữ nguyên người và bối cảnh. Viết prompt khi bạn muốn chỉ đạo cảnh: địa điểm, ánh sáng, tư thế, phong cách chụp.',
-        'Prompt điều khiển mọi thứ quanh trang phục. Trang phục vẫn bám sát ảnh bạn tải lên, nên hãy dùng ô này để tả thế giới mà bạn muốn nó được chụp trong đó.',
-        { example: { label: 'Prompt mẫu', text: 'Put the linen shirt from the garment photo on the model. A sunny street café in late-morning light, a relaxed half-body pose, natural photo style. Keep the shirt colour and buttons exactly as in the photo.', media: 'about-try-on-prompt' } },
+        'Mô tả là tuỳ chọn. Bỏ trống mô tả và không thêm bối cảnh thì người mẫu mặc trang phục của bạn trong chính khung cảnh của ảnh người mẫu: ứng dụng dùng câu chỉ dẫn mặc định là mặc trang phục lên người mẫu, giữ nguyên người và bối cảnh. Viết mô tả khi bạn muốn chỉ đạo cảnh: địa điểm, ánh sáng, tư thế, phong cách chụp.',
+        'Mô tả điều khiển mọi thứ quanh trang phục. Trang phục vẫn bám sát ảnh bạn tải lên, nên hãy dùng ô này để tả thế giới mà bạn muốn nó được chụp trong đó.',
+        { example: { label: 'Mô tả mẫu', text: 'Put the linen shirt from the garment photo on the model. A sunny street café in late-morning light, a relaxed half-body pose, natural photo style. Keep the shirt colour and buttons exactly as in the photo.', media: 'about-try-on-prompt' } },
         {
           list: [
             'Gọi tên trang phục đã tải lên để AI bám vào nó: “chiếc sơ mi linen trong ảnh trang phục”.',
@@ -702,7 +702,7 @@ const tryOn: AboutPage = {
         },
         {
           list: [
-            'Muốn bối cảnh khác? Thêm ảnh bối cảnh, hoặc tả cảnh trong prompt. Không động vào cả hai thì giữ khung cảnh của ảnh người mẫu.',
+            'Muốn bối cảnh khác? Thêm ảnh bối cảnh, hoặc tả cảnh trong ô mô tả. Không động vào cả hai thì giữ khung cảnh của ảnh người mẫu.',
             'Chi tiết trang phục bị mềm? Chạy lại với Nano Banana Pro ở 2K trở lên.',
             'Phối nhiều món? Thêm mỗi món thành một ảnh riêng thay vì một ảnh ghép.',
           ],
@@ -714,7 +714,7 @@ const tryOn: AboutPage = {
       title: 'Thử đồ có làm được cho nhiều sản phẩm cùng lúc không?',
       blocks: [
         'Được, khi bạn hiểu một lần chạy được tính thế nào. Mỗi lần chạy cho một ảnh từ tối đa 5 ảnh trang phục, và AI phối chúng thành một bộ trên một người mẫu. Một lần chạy, một bộ đồ.',
-        'Vì vậy phủ một danh mục là chuyện xếp hàng. Không có nhập từ bảng tính, nhưng bạn có thể gửi job tiếp theo trong lúc job trước đang chạy, và mỗi kết quả hiện trong tab Lịch sử ngay khi xong.',
+        'Vì vậy phủ một danh mục là chuyện xếp hàng. Không có nhập từ bảng tính, nhưng bạn có thể gửi lượt tạo tiếp theo trong lúc lượt trước đang chạy, và mỗi kết quả hiện trong tab Lịch sử ngay khi xong.',
       ],
     },
     {
@@ -804,7 +804,7 @@ const image: AboutPage = {
           cards: [
             { title: 'Ra mắt bộ sưu tập mới?', text: 'Hàng về và ba mươi sản phẩm cần ảnh trước khi trang bộ sưu tập lên được. Khi tự tạo ảnh trong nhà, ngày ra mắt không còn phụ thuộc lịch studio của người khác.' },
             { title: 'Làm lookbook?', text: 'Một lookbook cần một thế giới hình ảnh nhất quán qua hai ba chục ảnh. Viết ánh sáng và bối cảnh một lần, rồi đổi trang phục, và thế giới đó giữ được theo cách mà các ngày chụp riêng lẻ hiếm khi làm được.' },
-            { title: 'Lấp đầy danh mục?', text: 'Mọi mã hàng đều có ảnh đời thường, kể cả những sản phẩm chưa bao giờ đáng một buổi chụp. Mỗi lần chạy cho một ảnh và bạn có thể gửi tiếp trong lúc job trước đang chạy, nên danh mục thành một hàng đợi bạn làm dần.' },
+            { title: 'Lấp đầy danh mục?', text: 'Mọi mã hàng đều có ảnh đời thường, kể cả những sản phẩm chưa bao giờ đáng một buổi chụp. Mỗi lần chạy cho một ảnh và bạn có thể gửi tiếp trong lúc lượt trước đang chạy, nên danh mục thành một hàng đợi bạn làm dần.' },
           ],
         },
       ],
@@ -1178,7 +1178,7 @@ const marketing: AboutPage = {
             { title: 'Tiếng như quay điện thoại', text: 'Âm thanh căn phòng và lời phản ứng ngắn của người mẫu, không nhạc nền. Cần nhạc, phụ đề hay giọng thương hiệu thì chọn Kling O3 Pro hoặc Seedance, tắt âm thanh và thêm trong phần mềm dựng.' },
           ],
         },
-        'Muốn lái video? Ô Prompt (tuỳ chọn) nhận ghi chú về chi tiết sản phẩm, không khí hay một khoảnh khắc bạn muốn; ghi chú được ghép vào cuối chỉ dẫn cố định của công cụ.',
+        'Muốn lái video? Ô Mô tả (tuỳ chọn) nhận ghi chú về chi tiết sản phẩm, không khí hay một khoảnh khắc bạn muốn; ghi chú được ghép vào cuối chỉ dẫn cố định của công cụ.',
       ],
     },
     {
@@ -1288,7 +1288,7 @@ const marketing: AboutPage = {
             ['Cần gì để tạo một video UGC Thử đồ?', 'Hai ảnh: một người mẫu và một sản phẩm. Hook, bối cảnh và một ghi chú ngắn là tuỳ chọn.'],
             ['Một video UGC Thử đồ tốn bao nhiêu?', 'Chi phí tuỳ mô hình và thời lượng, vì chi phí tính theo giây. Nút Tạo video ghi chi phí ước tính bằng USD trước khi bạn chạy. Âm thanh làm giá cao hơn ở một số mô hình, và giá trên nút đã tính nó. Video dùng chung ngân sách với Tạo video: hạn mức số clip theo ngày của bạn và ngân sách video theo tháng của công ty.'],
             ['Video có giọng nói không?', 'Có, khi Tạo âm thanh bật (mặc định): người mẫu nói vài câu phản ứng ngắn, kèm âm thanh căn phòng, không nhạc nền. Với Kling O3 Pro và Seedance, tắt công tắc để có clip im lặng; bốn mô hình còn lại luôn có tiếng. Muốn viết lời thoại chính xác thì dùng định dạng Nâng cao.'],
-            ['Kiểm soát được nội dung video không?', 'Ô Prompt (tuỳ chọn) lái video. Nhắc chi tiết sản phẩm, không khí hay khoảnh khắc bạn muốn; ghi chú được ghép vào cuối chỉ dẫn cố định. Hook và bối cảnh cho bạn thêm hai cách kiểm soát nữa.'],
+            ['Kiểm soát được nội dung video không?', 'Ô Mô tả (tuỳ chọn) lái video. Nhắc chi tiết sản phẩm, không khí hay khoảnh khắc bạn muốn; ghi chú được ghép vào cuối chỉ dẫn cố định. Hook và bối cảnh cho bạn thêm hai cách kiểm soát nữa.'],
             ['Dùng cho nhiều ngôn ngữ và thị trường được không?', 'Được. Tắt Tạo âm thanh để có clip không lời, dùng được ở mọi ngôn ngữ; thêm phụ đề hay lồng tiếng theo từng thị trường khi dựng. Đổi ảnh người mẫu và bối cảnh để mỗi thị trường có gương mặt và khung cảnh của riêng mình.'],
             ['Video đặt được ở những bối cảnh nào?', `${LOCATIONS.length} bối cảnh có sẵn: ${locationNames}. Mỗi bối cảnh đặt người trong video vào một khung cảnh đáng tin với ánh sáng và không khí phù hợp, và bảng chọn có video xem trước cho từng lựa chọn.`],
             ['Có những tỉ lệ và độ dài nào?', 'Tỉ lệ và thời lượng đi theo mô hình đã chọn. Có 9:16 dọc (mặc định) cho Reels, TikTok và Stories, 1:1 và 16:9; riêng Gemini Omni Flash Reference không có 1:1. Thời lượng từ 1–10 giây ở Grok Imagine Reference tới 4–30 giây ở Seedance 2.5 Reference.'],
@@ -1744,7 +1744,7 @@ export const APP_ABOUT: Record<string, AboutPage> = {
           {
             steps: [
               { title: 'Tải nhân vật mới', text: 'Thêm ảnh người sẽ xuất hiện trong kết quả vào ô Nhân vật mới. Khuôn mặt, dáng người và trang phục trong kết quả đều lấy từ ảnh này.' },
-              { title: 'Tải ảnh đích', text: 'Thêm ảnh có người cần thay vào ô Ảnh đích. Kết quả giữ bối cảnh của ảnh này. Muốn dặn thêm thì viết một câu vào ô Prompt (tuỳ chọn).' },
+              { title: 'Tải ảnh đích', text: 'Thêm ảnh có người cần thay vào ô Ảnh đích. Kết quả giữ bối cảnh của ảnh này. Muốn dặn thêm thì viết một câu vào ô Mô tả (tuỳ chọn).' },
               { title: 'Chạy', text: 'Bấm Chạy. AI thay cả người trong ảnh đích bằng nhân vật mới; ảnh mới nằm trong tab Lịch sử và trong Thư viện, mục Ứng dụng.' },
             ],
           },
@@ -1825,7 +1825,7 @@ export const APP_ABOUT: Record<string, AboutPage> = {
           {
             steps: [
               { title: 'Tải người mẫu mới', text: 'Thêm ảnh người có khuôn mặt, màu da và dáng người sẽ xuất hiện trong kết quả vào ô Người mẫu mới.' },
-              { title: 'Tải ảnh đích', text: 'Thêm ảnh sản phẩm có người mẫu cần thay vào ô Ảnh đích. Kết quả giữ trang phục, phụ kiện, tư thế và bối cảnh của ảnh này. Muốn dặn thêm thì viết một câu vào ô Prompt (tuỳ chọn).' },
+              { title: 'Tải ảnh đích', text: 'Thêm ảnh sản phẩm có người mẫu cần thay vào ô Ảnh đích. Kết quả giữ trang phục, phụ kiện, tư thế và bối cảnh của ảnh này. Muốn dặn thêm thì viết một câu vào ô Mô tả (tuỳ chọn).' },
               { title: 'Chạy', text: 'Bấm Chạy. AI đặt người mẫu mới vào ảnh đích, và bộ đồ giữ đúng như lúc chụp.' },
             ],
           },
@@ -2601,13 +2601,13 @@ export const APP_ABOUT: Record<string, AboutPage> = {
       },
       {
         title: 'Dùng Điều khiển chuyển động thế nào',
-        lead: 'Tải ảnh nhân vật, tải video mẫu, thêm prompt nếu muốn, rồi bấm Chạy.',
+        lead: 'Tải ảnh nhân vật, tải video mẫu, thêm mô tả nếu muốn, rồi bấm Chạy.',
         blocks: [
           {
             steps: [
               { title: 'Tải ảnh nhân vật', text: 'Thêm ảnh nhân vật bạn muốn làm động. Ảnh rõ người, thấy cả thân càng tốt.' },
               { title: 'Tải video mẫu', text: 'Thêm một clip có chuyển động bạn muốn chép: MP4 hoặc MOV, dài 3 đến 30 giây, tối đa 20 MB, có một người làm động tác rõ ràng.' },
-              { title: 'Thêm prompt (tuỳ chọn)', text: 'Tả chuyển động, phong cách hay chuyển máy bạn muốn, hoặc để trống.' },
+              { title: 'Thêm mô tả (tuỳ chọn)', text: 'Tả chuyển động, phong cách hay chuyển máy bạn muốn, hoặc để trống.' },
               { title: 'Chạy', text: 'Bấm Chạy. AI chép chuyển động từ video mẫu lên nhân vật và trả về video cùng các động tác. Video nằm trong tab Lịch sử và trong Thư viện, mục Ứng dụng.' },
             ],
           },
@@ -2679,7 +2679,7 @@ export const APP_ABOUT: Record<string, AboutPage> = {
               ['Video mẫu dài được bao lâu?', 'Từ 3 đến 30 giây, file MP4 hoặc MOV tối đa 20 MB. Chọn clip chứa trọn chuyển động bạn muốn chép, từ bước đầu đến bước cuối.'],
               ['Làm động ảnh tĩnh bằng chuyển động từ video khác được không?', 'Được. Tải ảnh tĩnh làm nhân vật và video kia làm video mẫu. AI chép chuyển động từ video lên ảnh, nên người trong ảnh chuyển động y như vậy.'],
               ['Làm video nhảy với nhân vật của mình được không?', 'Được. Dùng một clip nhảy làm video mẫu và ảnh nhân vật của bạn làm nhân vật. Chỉ dùng nhân vật và clip nhảy mà công ty có quyền, và có sự đồng ý của người thật xuất hiện trong đó.'],
-              ['Có cần viết prompt không?', 'Không. Prompt là tuỳ chọn. Chuyển động đến từ video mẫu; chỉ thêm một prompt ngắn khi muốn lái chuyển động, phong cách hay chuyển máy.'],
+              ['Có cần viết mô tả không?', 'Không. Mô tả là tuỳ chọn. Chuyển động đến từ video mẫu; chỉ thêm một prompt ngắn khi muốn lái chuyển động, phong cách hay chuyển máy.'],
               ['Một lần chạy tốn bao nhiêu?', 'Chi phí tính theo số giây của video mẫu, làm tròn lên, và tính vào ngân sách ảnh và ứng dụng, tách khỏi ngân sách video. Nút Chạy ghi chi phí ước tính sau khi bạn tải video mẫu.'],
             ],
           },
@@ -2707,6 +2707,9 @@ export const MODEL_CARD_TEXT: Record<string, string> = {
   'seedance-2.0-reference': 'Dựng cảnh từ tối đa 9 ảnh tham chiếu, clip 4–15 giây.',
   'seedance-1.5-pro': 'Lựa chọn tiết kiệm của Seedance cho clip 4–12 giây.',
   'seedance-1.0-pro': 'Clip 3–12 giây ở 1080p, lựa chọn bền bỉ với chi phí vừa phải.',
+  'seedance-2.0-fast': 'Bản nhanh của Seedance 2.0: chuyển động chân thực ở 720p, clip 4–15 giây với chi phí thấp hơn.',
+  'seedance-2.0-mini': 'Bản gọn nhất của Seedance 2.0, rẻ nhất họ 2.0 cho clip 720p dài 4–15 giây.',
+  'seedance-1.0-pro-fast': 'Bản nhanh của Seedance 1.0 Pro: clip 2–12 giây ở 1080p với chi phí rất thấp.',
   'flux-3': 'Mô hình video của Black Forest Labs: chuyển động điện ảnh 5–20 giây ở 1080p.',
   'flux-3-reference': 'Làm động một ảnh tham chiếu theo phong cách điện ảnh của FLUX 3, 5–20 giây.',
   'veo-3.1': 'Mô hình điện ảnh của Google: mỗi lần chạy một clip 8 giây trau chuốt.',
@@ -2731,4 +2734,7 @@ export const MODEL_CARD_TEXT: Record<string, string> = {
   'gpt-image-2.5-flare': 'Bản GPT Image hằng ngày của OpenAI, nét hơn và nhanh hơn GPT Image 2.',
   'gpt-image-2.5-sunburst': 'GPT Image dành nhiều thời gian hơn cho mỗi ảnh để giữ chi tiết phức tạp.',
   'seedream-5-pro': 'Mô hình của ByteDance cho người và khung cảnh chân thực, ở 1K hoặc 2K.',
+  'seedream-5-flash': 'Bản Flash của Seedream 5.0: ảnh nhanh và rẻ ở 1K hoặc 2K.',
+  'seedream-4.5': 'Seedream 4.5 của ByteDance cho ảnh 2K chi tiết với giá vừa phải.',
+  'seedream-4.0': 'Seedream 4.0 của ByteDance: ảnh 1K hoặc 2K ổn định với chi phí thấp.',
 };

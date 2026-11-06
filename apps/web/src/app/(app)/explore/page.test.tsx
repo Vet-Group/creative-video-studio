@@ -126,7 +126,7 @@ test('Continue shows running jobs first, then the latest finished, at most four,
     job('bad-1', 'failed', { feature: 'marketing' }),
     job('done-2', 'succeeded'),
   ]);
-  expect(html).toContain('1 job đang chạy · Hôm nay bạn còn 3/5 clip video');
+  expect(html).toContain('1 lượt tạo đang chạy · Hôm nay bạn còn 3/5 clip video');
   expect(html).not.toContain('Bạn chưa tạo clip hay ảnh nào');
   const list = html.match(/<ul class="explore-jobs"[^>]*>([\s\S]*?)<\/ul>/)![1]!;
   const attr = (tag: string, name: string) => tag.match(new RegExp(` ${name}="([^"]+)"`))?.[1] ?? null;

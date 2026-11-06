@@ -50,6 +50,7 @@ export async function GET(request: Request) {
       thinkingPrices: Object.fromEntries((r.thinking_levels as string[]).map((t) => [t, Object.fromEntries(shown(imagePricesFor(r, t)))])),
       isNew: r.is_new as boolean,
       creditUsd: r.provider === 'fal' ? falCredit : null,
+      creditShown: g.session.user.role === 'admin', // members see that a model is out of budget, not the provider's balance
       ...scoreOf(st),
       passes: st.passes,
       total: st.total,

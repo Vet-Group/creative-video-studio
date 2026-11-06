@@ -44,6 +44,9 @@ export interface ImageModel {
   /** Added in the last 14 days. */
   isNew: boolean;
   creditUsd: string | null;
+  creditShown: boolean;
+  /** How many marks the score rests on. */
+  total: number;
 }
 export interface Img {
   id: string;
@@ -112,7 +115,7 @@ export function useImageChoice(models: ImageModel[] | null, images: number, init
   const resolution = chosen ? nearestOption(chosen.resolutions, wantResolution) : wantResolution;
   const thinking = chosen?.thinking.includes(wantThinking) ? wantThinking : chosen?.thinking[0];
   const options: ModelOption[] = (models ?? []).map((m) => ({
-    id: m.id, label: m.label, isMock: m.isMock, supported: fits(m), estimateUsd: m.prices[resolution] ?? Object.values(m.prices)[0] ?? '0.0000', score: m.score, recommended: m.recommended, resolution: m.resolutions.join('/'), isNew: m.isNew, creditUsd: m.creditUsd,
+    id: m.id, label: m.label, isMock: m.isMock, supported: fits(m), estimateUsd: m.prices[resolution] ?? Object.values(m.prices)[0] ?? '0.0000', score: m.score, recommended: m.recommended, resolution: m.resolutions.join('/'), isNew: m.isNew, creditUsd: m.creditUsd, creditShown: m.creditShown, marks: m.total,
   }));
   const user = <T,>(set: (v: T) => void) => (v: T) => (setAsked(null), set(v));
   function refill(j: { modelId: string | null; ratio: string | null; resolution: string | null }) {

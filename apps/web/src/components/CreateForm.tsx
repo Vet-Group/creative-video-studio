@@ -62,6 +62,7 @@ interface Model {
   /** Added in the last 14 days. */
   isNew: boolean;
   creditUsd: string | null;
+  creditShown: boolean;
   passes: number;
   total: number;
   supported: boolean;
@@ -499,7 +500,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
     setPresetId('');
     if (sec) (setPrompt(text), setHookText(''), setEnding(''));
     else setFreeText(text);
-    notify('Đã chép prompt');
+    notify('Đã chép mô tả');
   }
   /** Free writing starts from what the sections would send. */
   function switchMode(next: typeof mode) {
@@ -724,7 +725,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
             <VideoSettings>
               {models && models.models.length > 0 && (
                 <ModelPicker
-                  models={models.models.map((m) => ({ id: m.id, label: m.label, isMock: m.isMock, supported: m.supported, rate: ratePct(m), estimateUsd: audio && m.audioEstimateUsd != null ? m.audioEstimateUsd : m.estimateUsd, score: m.score, recommended: m.recommended, resolution: m.resolution, durationsSec: m.durationsSec, audio: m.audioEstimateUsd != null, isNew: m.isNew, creditUsd: m.creditUsd }))}
+                  models={models.models.map((m) => ({ id: m.id, label: m.label, isMock: m.isMock, supported: m.supported, rate: ratePct(m), estimateUsd: audio && m.audioEstimateUsd != null ? m.audioEstimateUsd : m.estimateUsd, score: m.score, recommended: m.recommended, resolution: m.resolution, durationsSec: m.durationsSec, audio: m.audioEstimateUsd != null, isNew: m.isNew, creditUsd: m.creditUsd, creditShown: m.creditShown, marks: m.total }))}
                   value={modelId}
                   onChange={setModelId}
                 />
@@ -968,7 +969,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
                 </Tap>
               )}
               {details?.prompt && (
-                <Tap on={() => copyPrompt(details.prompt!)} label="Chép prompt vào ô Prompt" className="detail-prompt">
+                <Tap on={() => copyPrompt(details.prompt!)} label="Chép vào ô mô tả" className="detail-prompt">
                   {details.prompt}
                 </Tap>
               )}

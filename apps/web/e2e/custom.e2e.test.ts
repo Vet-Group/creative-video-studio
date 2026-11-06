@@ -216,17 +216,17 @@ test('Lưu mẫu on a History card saves that job as a template of its page, whi
   await page.goto('/try-on');
   await saveFromCard(`Áo xanh ${tag}`);
   await page.goto('/try-on');
-  await expect(page.getByRole('textbox', { name: 'Prompt (tuỳ chọn)' })).toHaveValue('');
+  await expect(page.getByRole('textbox', { name: 'Mô tả (tuỳ chọn)' })).toHaveValue('');
   await openTemplate(/\/try-on\?template=/, `Áo xanh ${tag}`);
   await expect(page.getByLabel('Người mẫu: ảnh đã chọn').getByRole('img')).toHaveAttribute('alt', 'cust-person.png');
   await expect(page.getByLabel('Trang phục: ảnh đã chọn').getByRole('img')).toHaveAttribute('alt', 'cust-garment.png');
-  await expect(page.getByRole('textbox', { name: 'Prompt (tuỳ chọn)' })).toHaveValue('blue coat');
+  await expect(page.getByRole('textbox', { name: 'Mô tả (tuỳ chọn)' })).toHaveValue('blue coat');
 
   await page.goto('/marketing-studio');
   await saveFromCard(`Bão ${tag}`);
   await page.goto('/marketing-studio');
   await openTemplate(/\/marketing-studio\?template=/, `Bão ${tag}`);
-  await expect(page.getByRole('textbox', { name: 'Prompt (tuỳ chọn)' })).toHaveValue('tpl brief');
+  await expect(page.getByRole('textbox', { name: 'Mô tả (tuỳ chọn)' })).toHaveValue('tpl brief');
   await expect(hookBox(page)).toContainText(HOOKS[0]!.name);
   await expect(page.getByRole('img', { name: 'cust-person.png' })).toBeVisible();
 });

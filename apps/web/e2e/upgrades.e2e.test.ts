@@ -45,12 +45,12 @@ test('AC 11: Image Generation asks before a Run of 1 USD or more; No sends nothi
   await expect(barRun(page)).toContainText('$1.2000');
 
   await barRun(page).click();
-  await answer(page, 'Chạy job này với giá $1.2000?', false);
+  await answer(page, 'Tạo lượt này với giá $1.2000?', false);
   await expect(barRun(page)).toBeEnabled();
   expect(posts()).toBe(0);
 
   await barRun(page).click();
-  await answer(page, 'Chạy job này với giá $1.2000?', true);
+  await answer(page, 'Tạo lượt này với giá $1.2000?', true);
   await expect(page.getByText('Đã gửi lượt tạo')).toBeVisible();
   expect(posts()).toBe(1);
 
@@ -131,10 +131,10 @@ test('AC 11: Create asks with the price its Run button shows', async ({ page }) 
   await expect(run).toContainText('$1.5000');
 
   await run.click();
-  await answer(page, 'Chạy job này với giá $1.5000?', false);
+  await answer(page, 'Tạo lượt này với giá $1.5000?', false);
   expect(posts()).toBe(0);
   await run.click();
-  await answer(page, 'Chạy job này với giá $1.5000?', true);
+  await answer(page, 'Tạo lượt này với giá $1.5000?', true);
   await expect(page.getByText('Đã gửi lượt tạo')).toBeVisible();
   expect(posts()).toBe(1);
   await page.unrouteAll({ behavior: 'ignoreErrors' });
@@ -163,18 +163,18 @@ test('AC 12: Ctrl+Enter in the prompt runs once, Enter alone does not, and at 1.
   // The same wait as above: after the reload Run is locked again until the remembered settings load, and Ctrl+Enter on a locked Run does nothing.
   await expect(barRun(page)).toBeEnabled();
   await barPrompt(page).press('Control+Enter');
-  await answer(page, 'Chạy job này với giá $1.2000?', false);
+  await answer(page, 'Tạo lượt này với giá $1.2000?', false);
   expect(posts()).toBe(1);
   await page.unrouteAll({ behavior: 'ignoreErrors' });
 });
 
-test('AC 13: Prompt gần đây lists the last own words of the page, newest first, and a click fills the box', async ({ page }) => {
+test('AC 13: Mô tả gần đây lists the last own words of the page, newest first, and a click fills the box', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   const posts = jobPosts(page);
   await signIn(page, 'upgc');
   await page.goto('/image-generation');
   await expect(modelButton(page)).toContainText('Mock image E2E');
-  await expect(bar(page).getByRole('button', { name: 'Prompt gần đây' })).toHaveCount(0); // nothing run yet
+  await expect(bar(page).getByRole('button', { name: 'Mô tả gần đây' })).toHaveCount(0); // nothing run yet
   for (const [i, words] of ['first picture words', 'second picture words'].entries()) {
     await barPrompt(page).fill(words);
     await barRun(page).click();
@@ -182,30 +182,30 @@ test('AC 13: Prompt gần đây lists the last own words of the page, newest fir
     await expect(barRun(page)).toBeEnabled(); // the job is in
   }
   await barPrompt(page).fill('');
-  await bar(page).getByRole('button', { name: 'Prompt gần đây' }).click();
-  const list = page.getByRole('group', { name: 'Prompt gần đây' }).getByRole('button');
+  await bar(page).getByRole('button', { name: 'Mô tả gần đây' }).click();
+  const list = page.getByRole('group', { name: 'Mô tả gần đây' }).getByRole('button');
   await expect(list).toHaveText(['second picture words', 'first picture words']);
   await list.filter({ hasText: 'first picture words' }).click();
   await expect(barPrompt(page)).toHaveValue('first picture words');
-  await expect(page.getByRole('group', { name: 'Prompt gần đây' })).toHaveCount(0);
+  await expect(page.getByRole('group', { name: 'Mô tả gần đây' })).toHaveCount(0);
 
   await page.goto('/try-on');
   await expect(modelButton(page)).toContainText('Mock image E2E');
-  await expect(page.getByRole('button', { name: 'Prompt gần đây' })).toHaveCount(0); // Image Generation's words stay there
+  await expect(page.getByRole('button', { name: 'Mô tả gần đây' })).toHaveCount(0); // Image Generation's words stay there
   await page.getByLabel('Ảnh trang phục').setInputFiles(file('garment.png'));
   await page.getByLabel('Ảnh người mẫu').setInputFiles(file('person.png'));
-  const prompt = page.getByLabel('Prompt (tuỳ chọn)');
+  const prompt = page.getByLabel('Mô tả (tuỳ chọn)');
   for (const [i, words] of ['try on words one', 'try on words two'].entries()) {
     await prompt.fill(words);
     await page.getByRole('button', { name: /^Thử đồ/ }).click();
     await expect.poll(posts).toBe(3 + i);
     await expect(page.getByRole('button', { name: /^Thử đồ/ })).toBeEnabled();
   }
-  await page.getByRole('button', { name: 'Prompt gần đây' }).click();
+  await page.getByRole('button', { name: 'Mô tả gần đây' }).click();
   await expect(list).toHaveText(['try on words two', 'try on words one']);
   await page.keyboard.press('Escape');
-  await expect(page.getByRole('group', { name: 'Prompt gần đây' })).toHaveCount(0);
-  await page.getByRole('button', { name: 'Prompt gần đây' }).click();
+  await expect(page.getByRole('group', { name: 'Mô tả gần đây' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Mô tả gần đây' }).click();
   await list.filter({ hasText: 'try on words one' }).click();
   await expect(prompt).toHaveValue('try on words one');
 });
@@ -225,16 +225,16 @@ test('AC 14: the prompt box grows with the text up to a cap and then scrolls, an
   expect(tall.offset).toBeLessThanOrEqual(400); // 40% of the 1000 px viewport
   expect(tall.sh).toBeGreaterThan(tall.h);
   await bar(page).getByRole('button', { name: 'Mở rộng' }).click();
-  const editor = page.getByRole('dialog', { name: 'Sửa prompt' });
-  await expect(editor.getByRole('textbox', { name: 'Prompt mở rộng' })).toHaveValue(text);
-  await editor.getByRole('textbox', { name: 'Prompt mở rộng' }).fill('edited in the big box');
+  const editor = page.getByRole('dialog', { name: 'Sửa mô tả' });
+  await expect(editor.getByRole('textbox', { name: 'Mô tả mở rộng' })).toHaveValue(text);
+  await editor.getByRole('textbox', { name: 'Mô tả mở rộng' }).fill('edited in the big box');
   await expect(editor.locator('.help')).toHaveText('21/2000');
   await editor.getByRole('button', { name: 'Đóng' }).click();
   await expect(barPrompt(page)).toHaveValue('edited in the big box');
 
   await page.goto('/try-on');
   await expect(modelButton(page)).toContainText('Mock image E2E');
-  const prompt = page.getByLabel('Prompt (tuỳ chọn)');
+  const prompt = page.getByLabel('Mô tả (tuỳ chọn)');
   expect(await prompt.evaluate((t: HTMLTextAreaElement) => t.offsetHeight)).toBe(76); // the composer's start, under four lines
   await prompt.fill(text);
   const grown = await prompt.evaluate((t: HTMLTextAreaElement) => ({ h: t.clientHeight, sh: t.scrollHeight, offset: t.offsetHeight }));
@@ -242,8 +242,8 @@ test('AC 14: the prompt box grows with the text up to a cap and then scrolls, an
   expect(grown.offset).toBeLessThanOrEqual(500); // 50% of the viewport
   expect(grown.sh).toBeGreaterThan(grown.h);
   await page.getByRole('button', { name: 'Mở rộng' }).click();
-  await expect(editor.getByRole('textbox', { name: 'Prompt mở rộng' })).toHaveValue(text);
-  await editor.getByRole('textbox', { name: 'Prompt mở rộng' }).fill('short');
+  await expect(editor.getByRole('textbox', { name: 'Mô tả mở rộng' })).toHaveValue(text);
+  await editor.getByRole('textbox', { name: 'Mô tả mở rộng' }).fill('short');
   await expect(editor.locator('.help')).toHaveText(/^5(\/\d+)?$/);
   await page.keyboard.press('Escape');
   await expect(prompt).toHaveValue('short');

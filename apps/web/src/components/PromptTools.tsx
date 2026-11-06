@@ -103,7 +103,7 @@ export function PromptTools({ feature, format, value, onChange, maxLength, onRun
         </button>
       )}
       {has('recent') && prompts.length > 0 && (
-        <button type="button" className={btn} aria-expanded={open === 'recent'} aria-label="Prompt gần đây" title={compact ? 'Prompt gần đây' : undefined} onClick={() => (open === 'recent' ? setOpen(null) : (load(), setOpen('recent')))}>
+        <button type="button" className={btn} aria-expanded={open === 'recent'} aria-label="Mô tả gần đây" title={compact ? 'Mô tả gần đây' : undefined} onClick={() => (open === 'recent' ? setOpen(null) : (load(), setOpen('recent')))}>
           <Icon name="clock" size={13} />
           {!compact && <span aria-hidden="true">Gần đây</span>}
         </button>
@@ -124,7 +124,7 @@ export function PromptTools({ feature, format, value, onChange, maxLength, onRun
       {!compact && <span className={s.spacer} />}
       {/* Clear sits right, beside the editor; not in the Image Generation bar, whose 2x2 icons would grow a third row. */}
       {has('clear') && !compact && value && (
-        <button type="button" className={`${btn} ${s.iconTool}`} aria-label="Xoá prompt" title="Xoá prompt" onClick={() => pick('')}>
+        <button type="button" className={`${btn} ${s.iconTool}`} aria-label="Xoá mô tả" title="Xoá mô tả" onClick={() => pick('')}>
           <Icon name="x" size={13} />
         </button>
       )}
@@ -190,9 +190,9 @@ export function PromptTools({ feature, format, value, onChange, maxLength, onRun
         </div>
       )}
       {open === 'recent' && (
-        <div ref={list} className={s.popover} role="group" aria-label="Prompt gần đây">
+        <div ref={list} className={s.popover} role="group" aria-label="Mô tả gần đây">
           <div className={s.popHead}>
-            <span>Prompt bạn đã dùng gần đây</span>
+            <span>Mô tả bạn đã dùng gần đây</span>
           </div>
           {prompts.map((p) => (
             <button key={p} type="button" className={s.option} onClick={() => pick(p)}>
@@ -202,9 +202,9 @@ export function PromptTools({ feature, format, value, onChange, maxLength, onRun
         </div>
       )}
 
-      <Modal open={editing} onClose={() => setEditing(false)} label="Sửa prompt" className="choice-dialog prompt-editor">
-        <h2>Sửa prompt</h2>
-        <textarea aria-label="Prompt mở rộng" value={value} maxLength={maxLength} onChange={(e) => onChange(e.target.value)} onKeyDown={runKey(() => onRun() !== false && setEditing(false))} autoFocus />
+      <Modal open={editing} onClose={() => setEditing(false)} label="Sửa mô tả" className="choice-dialog prompt-editor">
+        <h2>Sửa mô tả</h2>
+        <textarea aria-label="Mô tả mở rộng" value={value} maxLength={maxLength} onChange={(e) => onChange(e.target.value)} onKeyDown={runKey(() => onRun() !== false && setEditing(false))} autoFocus />
         <div className={s.editorFoot}>
           <span>
             <span className="help">
