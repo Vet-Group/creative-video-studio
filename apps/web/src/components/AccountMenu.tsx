@@ -10,7 +10,7 @@ const ITEMS: readonly (readonly [Section, string, IconName])[] = [
   ['profile', 'Cài đặt', 'sliders'],
   ['limits', 'Hạn mức hôm nay', 'gauge'],
   ['security', 'Bảo mật', 'lock'],
-  ['support', 'Trợ giúp', 'help'],
+  ['support', 'Hỗ trợ', 'help'],
 ];
 
 export function AccountMenu({ name, email, color, variant, onSettings }: { name: string; email: string; color: string; variant: 'chip' | 'avatar'; onSettings: (start: Section) => void }) {

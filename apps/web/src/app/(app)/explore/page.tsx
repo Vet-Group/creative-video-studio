@@ -51,8 +51,16 @@ const FEATURED = ['seedance-2.5-image', 'seedance-2.5', 'kling-o3-pro', 'gemini-
 
 const range = (values: number[]) => (values.length === 0 ? '' : values.length > 1 ? `${Math.min(...values)}–${Math.max(...values)} giây` : `${values[0]} giây`);
 
-/** Explore: the member's start page: a greeting with their day and recent work, then the tools, the enabled models and the company presets, each linking into Create. */
-export default async function ExplorePage() {
+/** How many video and image models the row shows until "Xem tất cả" (owner, 2026-11-06: about ten featured, the rest one click away). */
+const SHOWN = { video: 7, image: 3 };
+
+/** A provider twin (-vertex, -byteplus) shares its model's written description. */
+const cardText = (id: string) => MODEL_CARD_TEXT[id] ?? MODEL_CARD_TEXT[id.replace(/-(vertex|byteplus)$/, '')];
+
+/** Explore: the member's start page: a greeting with their day and recent work, then the tools, the enabled models and the company presets, each linking into Create.
+ * `?models=all` lists every enabled model instead of the featured few. */
+export default async function ExplorePage({ searchParams }: { searchParams: Promise<{ models?: string | string[] }> }) {
+  const allModels = (await searchParams).models === 'all';
   // The (app) layout does not rerun on a client navigation, so a page that reads data itself checks the forced password change again.
   const user = await currentUser();
   if (user?.mustChangePassword) redirect('/account/password');
@@ -107,6 +115,12 @@ export default async function ExplorePage() {
   };
   scored.sort((a, b) => rankOf(a.id) - rankOf(b.id)); // stable: within a group the query's kind and label order stays
   const recommended = new Set(['video', 'image'].map((kind) => rank(scored.filter((m) => m.kind === kind)).recommended));
+  // The featured few: the recommended model of each kind first, then the row's order; the full list keeps the row's order.
+  const lead = (kind: 'video' | 'image') => {
+    const of = scored.filter((m) => m.kind === kind);
+    return [...of.filter((m) => recommended.has(m.id)), ...of.filter((m) => !recommended.has(m.id))].slice(0, SHOWN[kind]);
+  };
+  const shown = allModels ? scored : [...lead('video'), ...lead('image')];
   return (
     <div className="explore">
       <header className="explore-hero">
@@ -178,13 +192,20 @@ export default async function ExplorePage() {
         ))}
       </ul>
 
-      <h2>Mô hình nổi bật</h2>
+      <div className="explore-start-head" id="models">
+        <h2>{allModels ? 'Tất cả mô hình' : 'Mô hình nổi bật'}</h2>
+        {scored.length > shown.length || allModels ? (
+          <Link href={allModels ? '/explore#models' : '/explore?models=all#models'} className="link-button" scroll={false}>
+            {allModels ? 'Chỉ xem nổi bật' : `Xem tất cả ${scored.length} mô hình`}
+          </Link>
+        ) : null}
+      </div>
       <p className="muted explore-sub">Mở Tạo video hoặc Tạo ảnh với mô hình đã chọn sẵn.</p>
       {offered.length === 0 ? (
         <p className="muted">Chưa có mô hình nào được bật.</p>
       ) : (
         <ul className="explore-cards" aria-label="Mô hình">
-          {scored.map((m) => (
+          {shown.map((m) => (
             <li key={m.id}>
               <Link href={`${m.kind === 'video' ? '/create' : '/image-generation'}?model=${encodeURIComponent(m.id)}`} className="explore-card">
                 <CardMedia {...media(m.id)} />
@@ -192,9 +213,9 @@ export default async function ExplorePage() {
                   {m.label}
                   {recommended.has(m.id) && <span className="badge badge-recommended">Đề xuất</span>}
                 </strong>
-                {/* A short description like the live cards, clamped to three lines; a model without one keeps its spec line. */}
+                {/* A short description like the live cards, clamped to three lines; a model without one keeps its spec line, scored only once marked. */}
                 <span className="muted explore-card-text">
-                  {MODEL_CARD_TEXT[m.id] ?? [m.ratios.join(', '), range(m.durations_sec), `Điểm ${m.score}/100`, m.marks > 0 && `${m.marks} lượt đánh giá`].filter(Boolean).join(' · ')}
+                  {cardText(m.id) ?? [m.ratios.join(', '), range(m.durations_sec), m.marks > 0 && `Điểm ${m.score}/100 · ${m.marks} lượt đánh giá`].filter(Boolean).join(' · ')}
                 </span>
               </Link>
             </li>

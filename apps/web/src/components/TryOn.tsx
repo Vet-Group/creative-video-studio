@@ -196,7 +196,7 @@ export function TryOn({ reuse }: { reuse?: string }) {
                 !picker ? [] :
                 picker.role === 'model' && !picker.of ? models0.map((name, i) => ({ key: name, src: `/api/samples/${name}`, label: `Người mẫu có sẵn ${i + 1}`, pick: () => (posesOf(have, name).length > 0 ? setPicker({ role: 'model', of: name }) : void take({ sample: name }, 'model')) })) :
                 picker.role === 'model' ? posesOf(have, picker.of!).map((name, i) => ({ key: name, src: `/api/samples/${name}`, label: `Tư thế ${i + 1}`, pick: () => void take({ sample: name }, 'model') })) :
-                picker.role === 'garment' && !picker.of ? categories.map((c) => ({ key: c.id, src: `/api/samples/try-on-stock-${c.id}.jpg`, label: c.label, pick: () => setPicker({ role: 'garment', of: c.id }) })) :
+                picker.role === 'garment' && !picker.of ? categories.map((c) => ({ key: c.id, src: `/api/samples/${have.has(`try-on-stock-${c.id}.jpg`) ? `try-on-stock-${c.id}.jpg` : garmentsOf(have, c.id)[0]}`, label: c.label, pick: () => setPicker({ role: 'garment', of: c.id }) })) :
                 picker.role === 'garment' ? garmentsOf(have, picker.of!).map((name, i) => ({ key: name, src: `/api/samples/${name}`, label: `${GARMENT_CATEGORIES.find((c) => c.id === picker.of)!.label} ${i + 1}`, pick: () => void take({ sample: name }, 'garment') })) :
                 backgrounds.map((b) => ({ key: b.name, src: `/api/samples/${b.name}`, label: b.label, pick: () => void take({ sample: b.name }, 'background') }))
               }
