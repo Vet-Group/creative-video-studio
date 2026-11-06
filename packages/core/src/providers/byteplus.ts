@@ -105,11 +105,12 @@ export function createByteplusProvider(opts: { apiKey: string; fetch?: Fetch; re
       if (t.status !== 'succeeded') throw new Error(`byteplus status: unknown status ${String(t.status)}`);
       // The billed tokens are in the answer (Seedance 2.x bills a minimum, which it reports as the usage); the estimate covers an answer without them.
       const tokens = t.usage?.completion_tokens;
-      const reported = typeof tokens === 'number' && Number.isFinite(tokens) && tokens > 0 ? tokenCost(job.model, tokens) : undefined;
+      const billedTokens = typeof tokens === 'number' && Number.isInteger(tokens) && tokens > 0 ? tokens : undefined;
+      const reported = billedTokens === undefined ? undefined : tokenCost(job.model, billedTokens);
       const cost = reported === undefined ? estimate(job, durationSec) : { costUsd: reported, costSource: 'reported' as const };
       const outputUrl = t.content?.video_url;
       if (!outputUrl) return { state: 'failed', error: 'byteplus task has no video_url', ...cost };
-      return { state: 'succeeded', outputUrl, ...cost };
+      return { state: 'succeeded', outputUrl, ...cost, tokens: billedTokens };
     },
     async cancel(job) {
       const url = task(unpackJobId(job).id);

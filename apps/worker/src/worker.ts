@@ -297,7 +297,7 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
    * Copies the output into MinIO, checks it is at least 720p (or the row's own resolution when that is lower, as on a 480p draft row), cuts the poster
    * and settles the job. A failure that may pass leaves the job running for the next pass.
    */
-  async function deliver(job: { id: string; user_id: string; provider: string; kind: string; output_resolution?: string | null; params?: Record<string, string> }, outputUrl: string, costUsd: number): Promise<void> {
+  async function deliver(job: { id: string; user_id: string; provider: string; kind: string; output_resolution?: string | null; params?: Record<string, string> }, outputUrl: string, costUsd: number, tokens?: number): Promise<void> {
     if (job.kind === 'image') return deliverImage(job, outputUrl, costUsd);
     const dir = await mkdtemp(join(tmpdir(), 'cvs-deliver-'));
     const outputId = randomUUID();
@@ -310,7 +310,7 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
       const { width, height } = await probeSize(video);
       const floor = Math.min(720, Number.parseInt(job.output_resolution ?? '', 10) || 720);
       if (Math.min(width, height) < floor) {
-        await settle(pool, job.id, { status: 'failed', costUsd, billed: true, error: `the output is ${width}x${height}, below ${floor}p` });
+        await settle(pool, job.id, { status: 'failed', costUsd, billed: true, tokens, error: `the output is ${width}x${height}, below ${floor}p` });
         return;
       }
       // Marketing Studio's end text (params.endText), burned in here rather than asked of the model. The provider already billed the clip, so a failed
@@ -337,7 +337,7 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
         { id: outputId, ownerId: job.user_id, kind: 'output', s3Key: keys[0]!, filename: `video-${name}.mp4`, mime: 'video/mp4', bytes: videoBytes.length, width, height },
         { id: posterId, ownerId: job.user_id, kind: 'output', s3Key: keys[1]!, filename: `poster-${name}.jpg`, mime: 'image/jpeg', bytes: posterBytes.length },
       ]);
-      if (await settle(pool, job.id, { status: 'succeeded', costUsd, outputAssetId: outputId, posterAssetId: posterId })) {
+      if (await settle(pool, job.id, { status: 'succeeded', costUsd, outputAssetId: outputId, posterAssetId: posterId, tokens })) {
         if (warning) await pool.query('update jobs set error = $2 where id = $1', [job.id, warning]).catch((err) => log(`end text warning ${job.id}`, err));
         return;
       }
@@ -415,7 +415,7 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
         const adapter = await adapterFor(row);
         // Without an adapter the job can only time out.
         const status = adapter ? await adapter.status() : { state: 'running' as const };
-        if (status.state === 'succeeded') await deliver(row, status.outputUrl, status.costUsd);
+        if (status.state === 'succeeded') await deliver(row, status.outputUrl, status.costUsd, status.tokens);
         else if (status.state === 'failed' || status.state === 'canceled') await settle(pool, row.id, { status: 'failed', costUsd: status.costUsd, error: status.error });
         else if (row.expired && (await timeOut(row.id)) && adapter) await adapter.cancel().catch((e) => log(`cancel ${row.id}`, e));
       } catch (e) {
@@ -444,7 +444,7 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
         if (adapter) {
           const status = await adapter.status();
           if (status.state === 'succeeded' || status.state === 'failed' || status.state === 'canceled') {
-            await lateBill(pool, row.id, status.costUsd, status.state === 'succeeded');
+            await lateBill(pool, row.id, status.costUsd, status.state === 'succeeded', status.state === 'succeeded' ? status.tokens : undefined);
             continue;
           }
         }

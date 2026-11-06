@@ -148,6 +148,30 @@ describe('release', () => {
   });
 });
 
+describe('provider tokens', () => {
+  const tokens = async (id: string) => (await pool.query('select provider_tokens as t from jobs where id = $1', [id])).rows[0].t;
+
+  test('settle keeps the tokens the provider billed on a succeeded job and on a billed failure, and null when it did not say', async () => {
+    const ok = await reservedJob('1.0000', { status: 'running' });
+    const rejected = await reservedJob('1.0000', { status: 'running' });
+    const unsaid = await reservedJob('1.0000', { status: 'running' });
+    const free = await reservedJob('1.0000', { status: 'running' });
+    await settle(pool, ok, { status: 'succeeded', costUsd: 1, outputAssetId: await asset(), posterAssetId: null, tokens: 108_900 });
+    await settle(pool, rejected, { status: 'failed', costUsd: 1, billed: true, error: 'below 720p', tokens: 50_000 });
+    await settle(pool, unsaid, { status: 'succeeded', costUsd: 1, outputAssetId: await asset(), posterAssetId: null });
+    await settle(pool, free, { status: 'failed', costUsd: 0, error: 'rejected' });
+    expect(await Promise.all([ok, rejected, unsaid, free].map(tokens))).toEqual([108_900, 50_000, null, null]);
+  });
+
+  test('a late success keeps its tokens and a late failure does not', async () => {
+    const late = await reservedJob('1.0000', { status: 'timed_out' });
+    const failed = await reservedJob('1.0000', { status: 'timed_out' });
+    expect(await lateBill(pool, late, 1.2, true, 244_800)).toBe(true);
+    expect(await lateBill(pool, failed, 0, false)).toBe(true);
+    expect([await tokens(late), await tokens(failed)]).toEqual([244_800, null]);
+  });
+});
+
 describe('lateBill', () => {
   test('bills a timed-out job to the larger of the cost and the estimate, and keeps its status', async () => {
     const id = await reservedJob('2.0000', { status: 'timed_out' });

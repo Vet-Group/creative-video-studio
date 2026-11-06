@@ -14,10 +14,28 @@ page. One row per provider:
 |---|---|---|
 | fal | Live from `GET https://api.fal.ai/v1/account/billing?expand=credits` with `Authorization: Key <FAL_KEY>` (`credits.current_balance` and `credits.currency`). 30 s timeout, answer bounded to 64 KiB; a good read is kept 1 minute in memory, a failed one is retried on the next open. Without `FAL_KEY` or on an HTTP error the row says why. | https://fal.ai/dashboard/billing |
 | Vertex | Per account, the remaining credit and expiry the Vertex section already computes from the billing export ([vertex-accounts.md](vertex-accounts.md)); the panel reuses that answer and does not read Google again. | https://console.cloud.google.com/billing |
-| BytePlus | No balance read: the row only links to the billing page (the app books each job's cost in the ledger as for the others). | https://console.byteplus.com/finance/overview |
+| BytePlus | The row links to the billing page (the app books each job's cost in the ledger as for the others). A second row, the Seedance 2.0 pack, shows the prepaid resource pack (see below). | https://console.byteplus.com/finance/overview |
 
 A balance in USD under the Admin warning threshold (`settings.balance_warning_usd`, default 10 USD) shows red. A fal balance in
 another currency, or an unknown balance, is never red.
+
+## BytePlus Seedance 2.0 resource pack (2026-11-06)
+
+BytePlus has no working API for a pack's remaining amount on the international site (`ListResourcePackages` and `ListPackageUsageDetails` answer HTTP 500, checked
+2026-11-06), and no BytePlus billing key goes to the server, so the app computes it. The pack covers only `seedance-2.0-byteplus` (endpoint `dreamina-seedance-2-0-260128`);
+2.0 fast, 2.0 mini and 2.5 are pay-as-you-go. Remaining tokens = the tokens the Admin entered as left at a moment (`settings.byteplus_pack_tokens` at `byteplus_pack_as_of`)
+minus the sum of `jobs.provider_tokens` of that model's jobs with `finished_at` after that moment, read live on each open of the panel, never under 0.
+
+- `jobs.provider_tokens` is BytePlus's `usage.completion_tokens`, which the adapter returns with a succeeded task and the worker stores when it settles the job (`settle`, also a
+  clip we reject as below 720p, which BytePlus billed) or late-bills it (`lateBill`). A job without the count (an answer with no usage) subtracts nothing. A late-billed job is cut off
+  by its `finished_at`, which is its timeout moment, so one that finished at BytePlus just after the as-of moment can be off by its own tokens.
+- Migration 0076 seeds the pack read from the BytePlus bill on 2026-11-06 about 09:50 +07:00: 7 x "Dreamina_Seedance_2.0_pack_1000ktokens" = 7,000,000 tokens (`byteplus_pack_total_tokens`)
+  bought 2026-11-04, 6,891,100 left as of 2026-11-06T02:50:00Z (108,900 deducted by one canary run outside CVS), expiring 2027-02-01T15:59:59Z (23:59:59 +08:00).
+- The panel line shows tokens left of the total, the percent, about how many USD at $7 per million tokens, and the expiry day. It is red under 20% of the tokens or within
+  14 days of the expiry.
+- To enter a new pack, `PUT /api/admin/settings` with `byteplusPack: { totalTokens, tokens, asOf?, expiresAt }`: whole tokens, `tokens` from 0 to the total, `asOf` and `expiresAt`
+  UTC `YYYY-MM-DDTHH:MM:SSZ` (`asOf` defaults to now and cannot be in the future, the expiry must be after it). Audited as `settings.update` with the old and new pack. There is no
+  form for it in Admin Settings yet.
 
 ## Admin Settings
 

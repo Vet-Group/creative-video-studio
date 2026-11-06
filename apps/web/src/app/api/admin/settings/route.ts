@@ -35,6 +35,33 @@ function vertexCredits(v: unknown): VertexCredits | null {
   return { projectId: a.projectId, creditTotal: total, creditCurrency: a.creditCurrency, creditExpiresOn: expires as string | null, stopWhenCreditsEnd: a.stopWhenCreditsEnd };
 }
 
+interface BytePlusPack {
+  totalTokens: number;
+  tokens: number;
+  asOf: string;
+  expiresAt: string;
+}
+const PACK_COLUMNS = `byteplus_pack_total_tokens as "totalTokens", byteplus_pack_tokens as tokens, to_char(byteplus_pack_as_of at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as "asOf",
+  to_char(byteplus_pack_expires_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as "expiresAt"`;
+const MAX_TOKENS = 2_000_000_000;
+
+/** A UTC timestamp 'YYYY-MM-DDTHH:MM:SSZ' that is a real moment (an impossible day rolls over, so the round trip must give the same text back), as that text; null otherwise. */
+function utcMoment(v: unknown): string | null {
+  const m = typeof v === 'string' ? /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})Z$/.exec(v) : null;
+  return m && new Date(v as string).toISOString().startsWith(m[1]!) ? (v as string) : null;
+}
+
+/** `{ totalTokens, tokens, asOf?, expiresAt }` as stored (asOf defaults to now), or null when a field is malformed: whole tokens, 0 <= tokens <= total, asOf not in the future, expiry after asOf. */
+function bytePlusPack(v: unknown, now: Date): BytePlusPack | null {
+  const a = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>;
+  const whole = (n: unknown, min: number) => typeof n === 'number' && Number.isInteger(n) && n >= min && n <= MAX_TOKENS;
+  const asOf = a.asOf === undefined ? now.toISOString().slice(0, 19) + 'Z' : utcMoment(a.asOf);
+  const expiresAt = utcMoment(a.expiresAt);
+  if (!whole(a.totalTokens, 1) || !whole(a.tokens, 0) || (a.tokens as number) > (a.totalTokens as number) || !asOf || !expiresAt) return null;
+  if (Date.parse(asOf) > now.getTime() + 60_000 || Date.parse(expiresAt) <= Date.parse(asOf)) return null;
+  return { totalTokens: a.totalTokens as number, tokens: a.tokens as number, asOf, expiresAt };
+}
+
 const sameCredits = (a: VertexCredits, b: VertexCredits) =>
   (a.creditTotal === null ? b.creditTotal === null : b.creditTotal !== null && Number(a.creditTotal) === Number(b.creditTotal)) &&
   a.creditCurrency === b.creditCurrency && a.creditExpiresOn === b.creditExpiresOn && a.stopWhenCreditsEnd === b.stopWhenCreditsEnd;
@@ -54,6 +81,7 @@ export async function GET(request: Request) {
          from settings where id = 1`,
     )
   ).rows[0];
+  const pack = (await pool.query(`select ${PACK_COLUMNS} from settings where id = 1 and byteplus_pack_as_of is not null`)).rows[0] ?? null;
   // `priced` is what lets the Admin switch a row on: a recorded price.
   const models = await pool.query('select id, label, provider, enabled, (usd_per_second is not null or image_prices is not null) as priced from model_configs where twin_of is null order by provider, id');
   const featureCaps = await pool.query('select feature, monthly_usd::text as "monthlyUsd" from feature_caps order by feature');
@@ -69,14 +97,15 @@ export async function GET(request: Request) {
     ...configured.map((p) => rows.find((r) => r.projectId === p) ?? { projectId: p, creditTotal: null, creditCurrency: 'USD', creditExpiresOn: null, stopWhenCreditsEnd: false }),
     ...rows.filter((r) => !configured.includes(r.projectId)),
   ].map((a) => ({ ...a, configured: configured.includes(a.projectId) }));
-  return Response.json({ ...caps, featureCaps: featureCaps.rows, models: models.rows, vertexAccounts: vertex });
+  return Response.json({ ...caps, featureCaps: featureCaps.rows, models: models.rows, vertexAccounts: vertex, byteplusPack: pack });
 }
 
 /**
  * Admin: change `monthlyCapUsd`, `memberDailyClipCap`, `featuresMonthlyCapUsd`, `memberDailyUsdCap`, `memberMonthlyUsdCap`, `balanceWarningUsd`,
  * `featureCaps` (a list of `{ feature, monthlyUsd }`), `models` (a list of `{ id, enabled }`) and/or `vertexAccounts` (a list of `{ projectId, creditTotal, creditCurrency,
  * creditExpiresOn, stopWhenCreditsEnd }`, total and date nullable). All or nothing. Changed caps are audited as settings.update, each changed
- * soft cap as feature_cap.update, each changed model as model.set_enabled and each changed Vertex account as vertex_account.update. Any model can
+ * soft cap as feature_cap.update, each changed model as model.set_enabled and each changed Vertex account as vertex_account.update. `byteplusPack` sets the BytePlus
+ * Seedance 2.0 resource pack as `{ totalTokens, tokens, asOf?, expiresAt }`: the tokens left at `asOf` (UTC, default now) and the UTC expiry; audited as settings.update. Any model can
  * be enabled (the owner opened them all on 2026-10-25; its bake-off record only feeds the recommendation score), but the database refuses one
  * whose limits and price are not recorded: 400 and nothing is changed. A duplicate's dearer row (`twin_of`) is not the Admin's to switch: 400.
  */
@@ -91,6 +120,8 @@ export async function PUT(request: Request) {
     return bad('vertexAccounts must be a list of { projectId, creditTotal (amount or null), creditCurrency (3 letters), creditExpiresOn (YYYY-MM-DD or null), stopWhenCreditsEnd }');
   }
   if (new Set(credits.map((c) => c!.projectId)).size !== credits.length) return bad('vertexAccounts must name each project once');
+  const pack = body.byteplusPack === undefined ? undefined : bytePlusPack(body.byteplusPack, new Date());
+  if (pack === null) return bad('byteplusPack must be { totalTokens, tokens (0 to the total), asOf (UTC YYYY-MM-DDTHH:MM:SSZ, not in the future, optional), expiresAt (UTC, after asOf) } with whole tokens');
   const usd = money(monthlyCapUsd);
   const memberCaps: Partial<Record<(typeof MEMBER_CAPS)[number], string>> = {};
   for (const k of MEMBER_CAPS) {
@@ -109,8 +140,8 @@ export async function PUT(request: Request) {
   }
   const list = models === undefined ? [] : models;
   if (!Array.isArray(list) || list.some((m) => typeof m?.id !== 'string' || typeof m?.enabled !== 'boolean')) return bad('models must be a list of { id, enabled }');
-  if ([monthlyCapUsd, memberDailyClipCap, models, featureCaps, body.vertexAccounts, ...MEMBER_CAPS.map((k) => body[k])].every((v) => v === undefined)) {
-    return bad(`give at least one of monthlyCapUsd, memberDailyClipCap, ${MEMBER_CAPS.join(', ')}, featureCaps, models, vertexAccounts`);
+  if ([monthlyCapUsd, memberDailyClipCap, models, featureCaps, body.vertexAccounts, body.byteplusPack, ...MEMBER_CAPS.map((k) => body[k])].every((v) => v === undefined)) {
+    return bad(`give at least one of monthlyCapUsd, memberDailyClipCap, ${MEMBER_CAPS.join(', ')}, featureCaps, models, vertexAccounts, byteplusPack`);
   }
   const features = [...new Set((softCaps as { feature: string }[]).map((c) => c.feature))];
   if (features.length !== softCaps.length) return bad('featureCaps must name each feature once');
@@ -167,6 +198,14 @@ export async function PUT(request: Request) {
         );
         const oldValue = found && { creditTotal: found.creditTotal, creditCurrency: found.creditCurrency, creditExpiresOn: found.creditExpiresOn, stopWhenCreditsEnd: found.stopWhenCreditsEnd };
         await audit(tx, { actorId, action: 'vertex_account.update', target: `vertex_account:${projectId}`, oldValue, newValue: next });
+      }
+      if (pack) {
+        const found = (await tx.query(`select ${PACK_COLUMNS} from settings where id = 1 and byteplus_pack_as_of is not null for update`)).rows[0] as BytePlusPack | undefined;
+        await tx.query(
+          'update settings set byteplus_pack_total_tokens = $1, byteplus_pack_tokens = $2, byteplus_pack_as_of = $3, byteplus_pack_expires_at = $4, updated_at = now() where id = 1',
+          [pack.totalTokens, pack.tokens, pack.asOf, pack.expiresAt],
+        );
+        await audit(tx, { actorId, action: 'settings.update', target: 'settings:1', oldValue: { byteplusPack: found ?? null }, newValue: { byteplusPack: pack } });
       }
       return Response.json({ ok: true });
     });

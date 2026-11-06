@@ -109,9 +109,10 @@ export async function reserve(tx: Queryable, jobId: string, estimateUsd: string 
 }
 
 export type Settlement =
-  | { status: 'succeeded'; costUsd: string | number; outputAssetId: string; posterAssetId: string | null }
+  /** `tokens`: what the provider billed the job in tokens, when it says (jobs.provider_tokens). */
+  | { status: 'succeeded'; costUsd: string | number; outputAssetId: string; posterAssetId: string | null; tokens?: number }
   /** `billed`: the provider ran and billed the job though we fail it (a clip we reject), so cost 0 keeps the estimate instead of meaning unbilled. */
-  | { status: 'failed'; costUsd: string | number; error: string; billed?: boolean };
+  | { status: 'failed'; costUsd: string | number; error: string; billed?: boolean; tokens?: number };
 
 /** A running job reached the provider's final state: succeeded, or failed with the cost the provider reports (0 means unbilled). False when it is no longer running. */
 export async function settle(pool: LedgerPool, jobId: string, s: Settlement): Promise<boolean> {
@@ -122,9 +123,9 @@ export async function settle(pool: LedgerPool, jobId: string, s: Settlement): Pr
     const { kind, target } = closingRow(s.costUsd, bal.estimate, s.status === 'failed' && !s.billed);
     await bookTo(tx, job, kind, target, bal.total);
     if (s.status === 'succeeded') {
-      await tx.query(`update jobs set status = 'succeeded', output_asset_id = $2, poster_asset_id = $3, finished_at = now() where id = $1`, [jobId, s.outputAssetId, s.posterAssetId]);
+      await tx.query(`update jobs set status = 'succeeded', output_asset_id = $2, poster_asset_id = $3, provider_tokens = $4, finished_at = now() where id = $1`, [jobId, s.outputAssetId, s.posterAssetId, s.tokens ?? null]);
     } else {
-      await tx.query(`update jobs set status = 'failed', error = $2, finished_at = now() where id = $1`, [jobId, s.error]);
+      await tx.query(`update jobs set status = 'failed', error = $2, provider_tokens = $3, finished_at = now() where id = $1`, [jobId, s.error, s.tokens ?? null]);
     }
     return true;
   });
@@ -143,13 +144,14 @@ export async function release(pool: LedgerPool, jobId: string, error: string): P
 }
 
 /** The provider reported a final cost for a job we had given up on (timed_out or failed_unknown). A cost of 0 on a failed or canceled job means unbilled and releases the estimate; a late success keeps the larger of the cost and the estimate, as `settle` does. */
-export async function lateBill(pool: LedgerPool, jobId: string, costUsd: string | number, succeeded = false): Promise<boolean> {
+export async function lateBill(pool: LedgerPool, jobId: string, costUsd: string | number, succeeded = false, tokens?: number): Promise<boolean> {
   return withTransaction(pool, async (tx) => {
     const job = await lockJob(tx, jobId);
     const bal = await balance(tx, jobId);
     if (bal.final || bal.rows === 0 || !['timed_out', 'failed_unknown'].includes(job.status)) return false;
     const { kind, target } = closingRow(costUsd, bal.estimate, !succeeded);
     await bookTo(tx, job, kind === 'release' ? 'release' : 'late_bill', target, bal.total);
+    if (tokens !== undefined) await tx.query('update jobs set provider_tokens = $2 where id = $1', [jobId, tokens]);
     return true;
   });
 }

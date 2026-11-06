@@ -1,5 +1,6 @@
 // Provider balances for Admin Costs (docs/ops/provider-balances.md). No provider has an API to buy credit, so
 // the app only shows the balances, warns when one is low and links to each provider's billing page.
+import type { Queryable } from '../ledger';
 import { boundedText, timeout, type Fetch } from './http';
 
 export const BILLING_URLS = {
@@ -31,4 +32,54 @@ export async function readFalBalance(o: { key: string | undefined; fetch?: Fetch
   } catch (e) {
     return { ok: false, reason: 'failed', error: e instanceof Error ? e.message : String(e) };
   }
+}
+
+/** The one model the BytePlus Seedance 2.0 resource pack covers (2.0 fast, 2.0 mini and 2.5 are pay-as-you-go), and the pack's price per million tokens. */
+export const BYTEPLUS_PACK_MODEL = 'seedance-2.0-byteplus';
+const PACK_USD_PER_MTOKENS = 7;
+/** A pack under 20% of its tokens or within 14 days of its expiry shows red. */
+const PACK_LOW_FRACTION = 0.2;
+const PACK_LOW_DAYS = 14;
+
+export interface BytePlusPack {
+  totalTokens: number;
+  tokensLeft: number;
+  percentLeft: number;
+  usdLeft: number;
+  expiresAt: string;
+  expired: boolean;
+  daysLeft: number;
+  low: boolean;
+}
+
+/** What is left of the pack: the Admin's tokens at `asOf` minus the tokens the pack model's jobs were billed after it, never under 0 (see migration 0076). */
+export function bytePlusPack(p: { totalTokens: number; tokens: number; usedSince: number; expiresAt: Date }, now: Date): BytePlusPack {
+  const tokensLeft = Math.max(0, p.tokens - p.usedSince);
+  const percentLeft = (tokensLeft / p.totalTokens) * 100;
+  const daysLeft = (p.expiresAt.getTime() - now.getTime()) / 86_400_000;
+  return {
+    totalTokens: p.totalTokens,
+    tokensLeft,
+    percentLeft,
+    usdLeft: (tokensLeft / 1e6) * PACK_USD_PER_MTOKENS,
+    expiresAt: p.expiresAt.toISOString(),
+    expired: daysLeft <= 0,
+    daysLeft,
+    low: percentLeft < PACK_LOW_FRACTION * 100 || daysLeft < PACK_LOW_DAYS,
+  };
+}
+
+/**
+ * The pack the Admin entered (settings.byteplus_pack_*), or null when none is. BytePlus has no API for it: the tokens of the pack model's jobs that finished after the
+ * as-of moment are summed live from jobs.provider_tokens, which the worker fills from BytePlus's usage.completion_tokens when it settles the job.
+ */
+export async function readBytePlusPack(q: Queryable, now = new Date()): Promise<BytePlusPack | null> {
+  const { rows } = await q.query(
+    `select s.byteplus_pack_total_tokens as total, s.byteplus_pack_tokens as tokens, s.byteplus_pack_expires_at as expires,
+            (select coalesce(sum(j.provider_tokens), 0)::float8 from jobs j where j.model = $1 and j.provider_tokens is not null and j.finished_at > s.byteplus_pack_as_of) as used
+       from settings s where s.id = 1 and s.byteplus_pack_as_of is not null`,
+    [BYTEPLUS_PACK_MODEL],
+  );
+  const r = rows[0];
+  return r ? bytePlusPack({ totalTokens: r.total, tokens: r.tokens, usedSince: Number(r.used), expiresAt: new Date(r.expires) }, now) : null;
 }

@@ -359,8 +359,25 @@ interface Balances {
   warningUsd: number;
   fal: ({ ok: true; balance: number; currency: string } | { ok: false; reason: 'no_key' | 'failed'; error: string }) & { billingUrl: string; low: boolean };
   vertex: { billingUrl: string };
-  byteplus: { billingUrl: string };
+  byteplus: { billingUrl: string; pack: BytePlusPackBalance | null };
 }
+interface BytePlusPackBalance {
+  totalTokens: number;
+  tokensLeft: number;
+  percentLeft: number;
+  usdLeft: number;
+  expiresAt: string;
+  expired: boolean;
+  daysLeft: number;
+  low: boolean;
+}
+
+/** The Seedance 2.0 resource pack: tokens left of the total, ≈ USD at the pack's price, the expiry day, and why it is red when it is. */
+export const packText = (p: BytePlusPackBalance) => {
+  const n = (v: number) => v.toLocaleString('vi-VN');
+  const why = p.expired ? ' (đã hết hạn)' : p.daysLeft < 14 ? ` (còn ${Math.ceil(p.daysLeft)} ngày)` : p.percentLeft < 20 ? ' (dưới 20%)' : '';
+  return `Còn ${n(p.tokensLeft)} / ${n(p.totalTokens)} token (${p.percentLeft.toFixed(1)}%) · ≈ $${p.usdLeft.toFixed(2)} · hết hạn ${p.expiresAt.slice(0, 10)}${why}`;
+};
 
 /** A neutral button, not a red link: red on this panel means a balance under the warning threshold. */
 export const TopUp = ({ href }: { href: string }) => (
@@ -437,6 +454,15 @@ function ProviderBalances({ vertex }: { vertex: VertexCostsData | undefined }) {
                   <TopUp href={data.byteplus.billingUrl} />
                 </td>
               </tr>
+              {data.byteplus.pack && (
+                <tr className={data.byteplus.pack.low ? 'error' : undefined}>
+                  <td>BytePlus · Gói Seedance 2.0</td>
+                  <td>{packText(data.byteplus.pack)}</td>
+                  <td>
+                    <TopUp href={data.byteplus.billingUrl} />
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
