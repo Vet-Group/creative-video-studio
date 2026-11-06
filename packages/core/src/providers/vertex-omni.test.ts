@@ -3,7 +3,7 @@ import { generateKeyPairSync } from 'node:crypto';
 import type { ModelConfig } from '../models';
 import type { SubmitRequest } from './types';
 import { ImageReadError, ProviderHttpError } from './http';
-import { createVertexOmniProvider, MAX_RESPONSE_BYTES, MAX_VIDEO_BYTES } from './vertex-omni';
+import { createVertexOmniProvider, MAX_RESPONSE_BYTES, MAX_VIDEO_BYTES, SUBMIT_TIMEOUT_MS } from './vertex-omni';
 
 const model: ModelConfig = { id: 'omni', provider: 'vertex', endpoint: 'gemini-omni-1.2-flash', label: 'Omni', ratios: ['16:9', '9:16'], durationsSec: [3, 4, 5, 10, 15], maxImages: 9, outputResolution: '720p', usdPerSecond: 0.0695, billedAmountField: null, sources: {} };
 const request = (extra: Partial<SubmitRequest> = {}): SubmitRequest => ({ model, prompt: 'a cat', imageUrls: [], ratio: '9:16', durationSec: 5, ...extra });
@@ -36,6 +36,17 @@ describe('Vertex Omni', () => {
       response_format: [{ type: 'video', delivery: 'inline', aspect_ratio: '9:16', resolution: '720p', duration: '15s' }],
       generation_config: { video_config: { task: 'text_to_video' } },
     });
+  });
+  test('a create waits SUBMIT_TIMEOUT_MS, longer than the 30 s of a poll, since a slow create still runs and bills', async () => {
+    const spy = vi.spyOn(AbortSignal, 'timeout');
+    try {
+      const { provider } = setup({ id: 'abc', status: 'in_progress' }, { id: 'abc', status: 'in_progress' });
+      const job = await provider.submit(request());
+      expect(spy).toHaveBeenLastCalledWith(SUBMIT_TIMEOUT_MS);
+      await provider.status({ ...job, model });
+      expect(spy).toHaveBeenLastCalledWith(30_000);
+      expect(SUBMIT_TIMEOUT_MS).toBeGreaterThan(30_000);
+    } finally { spy.mockRestore(); }
   });
   test('image-to-video: one first frame, image tokens as plain words, WebP and the like passed as they are', async () => {
     const { provider, calls } = setup({ id: 'abc', status: 'in_progress' });

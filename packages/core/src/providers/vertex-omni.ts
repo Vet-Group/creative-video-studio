@@ -20,6 +20,8 @@ export const VERTEX_OMNI_MODEL = 'gemini-omni-1.2-flash';
 // shortcut: inline output is limited to 64 MiB (90 MiB JSON); a 15 s 720p clip is far below it, revisit before offering 1080p or 4k.
 export const MAX_VIDEO_BYTES = 64 * 1024 * 1024;
 export const MAX_RESPONSE_BYTES = 90 * 1024 * 1024;
+/** How long a create may take before the job is failed; GETs keep the shared 30 s. */
+export const SUBMIT_TIMEOUT_MS = 120_000;
 const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
 const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/heic', 'image/heif'];
 const PREFIX = 'vertex-omni-v1:';
@@ -41,7 +43,8 @@ export function createVertexOmniProvider(opts: {
   async function call(url: string, body?: unknown): Promise<any> {
     const headers: Record<string, string> = { Authorization: `Bearer ${await token()}` };
     if (body !== undefined) headers['Content-Type'] = 'application/json';
-    const res = await f(url, { method: body === undefined ? 'GET' : 'POST', signal: timeout(), headers, body: body === undefined ? undefined : JSON.stringify(body) });
+    // The canary's first create (2026-11-06) took over 30 s yet still ran and billed, so a create gets SUBMIT_TIMEOUT_MS before the job is failed.
+    const res = await f(url, { method: body === undefined ? 'GET' : 'POST', signal: body === undefined ? timeout() : AbortSignal.timeout(SUBMIT_TIMEOUT_MS), headers, body: body === undefined ? undefined : JSON.stringify(body) });
     const text = await boundedText(res, 'Vertex Omni', MAX_RESPONSE_BYTES);
     if (!res.ok) throw new ProviderHttpError(res.status, text, `Vertex Omni: HTTP ${res.status}`);
     const data = JSON.parse(text);
