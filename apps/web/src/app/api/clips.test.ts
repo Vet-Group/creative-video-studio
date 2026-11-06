@@ -549,7 +549,7 @@ describe('GET /api/jobs/:id', () => {
       id, userId: alice.id, status: 'succeeded', error: null, isMock: false, feature: 'video', resolution: null, presetId: 'gentle-push-in', prompt: 'a prompt', enhance: false, enhancedPrompt: null, audio: null, ratio: '1:1', garments: null, format: null, hook: null, location: null, brief: null, script: null, brand: false, hookText: null, ending: null, endText: null, endTextPos: null, durationSec: 8, modelId: 'fal-test',
       storeId: 'store-ok', outputAssetId: `${id}-video`, posterAssetId: `${id}-poster`,
       images: [{ id: 'd-in-2', filename: 'in.png', width: null, height: null, mime: 'image/png', durationMs: null }, { id: 'd-in-1', filename: 'in.png', width: null, height: null, mime: 'image/png', durationMs: null }],
-      endFrame: null, clips: [],
+      endFrame: null, videoRef: null, clips: [],
     });
   });
 

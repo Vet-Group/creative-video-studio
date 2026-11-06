@@ -105,6 +105,14 @@ describe('advancedPrompt', () => {
     expect(p.endsWith('Do not add on-screen text, captions or watermarks.')).toBe(true);
   });
 
+  it('with a reference video names it [Video1] in one sentence before the brief, and is unchanged without one', () => {
+    const p = advancedPrompt({ ...base, video: true });
+    expect(p).toContain('Follow the motion, camera framing and pace of [Video1]; do not copy its people, products or setting. Brief:');
+    expect(p.split('[Video1]')).toHaveLength(2);
+    expect(advancedPrompt({ ...base, video: false })).toBe(advancedPrompt(base));
+    expect(advancedPrompt(base)).not.toContain('Video');
+  });
+
   it('with no script adds speech only when the brief asks for it', () => {
     expect(advancedPrompt(base)).toContain('Add speech only if the brief asks for it; otherwise use ambient sound or music with no spoken words.');
     expect(advancedPrompt({ ...base, script: '   ' })).toBe(advancedPrompt(base));

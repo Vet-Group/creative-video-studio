@@ -37,6 +37,7 @@ async function jobData(jobId: string, userId: string): Promise<{ feature: string
               (select array_agg(a.id order by array_position(j.input_asset_ids, a.id)) from assets a
                 where a.id = any(j.input_asset_ids) and a.owner_id = $2 and a.kind = 'input' and a.deleted_at is null) as images,
               (select a.id from assets a where a.id = j.params->>'endAssetId' and a.owner_id = $2 and a.kind = 'input' and a.deleted_at is null) as end_frame,
+              (select a.id from assets a where a.id = j.params->>'videoAssetId' and a.owner_id = $2 and a.kind = 'input' and a.deleted_at is null) as video_ref,
               (select array_agg(a.id order by array_position(string_to_array(j.params->>'audioAssetIds', ','), a.id)) from assets a
                 where a.id = any(string_to_array(j.params->>'audioAssetIds', ',')) and a.owner_id = $2 and a.kind = 'input' and a.deleted_at is null) as clips,
               (select s.id from stores s where s.id = j.store_id and not s.hidden) as store_id
@@ -50,7 +51,7 @@ async function jobData(jobId: string, userId: string): Promise<{ feature: string
   const ownPrompt = ((j.feature === 'video' || j.feature === 'image') && !j.preset_id) || j.feature === 'motion_control';
   const data = {
     images: j.images ?? [],
-    endFrame: j.end_frame, clips: j.clips,
+    endFrame: j.end_frame, videoRef: j.video_ref, clips: j.clips,
     prompt: ownPrompt ? j.prompt : undefined,
     brief: p.brief, script: p.script, hookText: p.hookText, ending: p.ending, endText: p.endText, endTextPos: p.endTextPos, hook: p.hook, location: p.location, format: p.format, audio: p.audio,
     garments: p.garments ? Number(p.garments) : undefined,
@@ -97,7 +98,7 @@ export async function POST(request: Request) {
     else if (!choice) return bad(`data.${key} is not a ${key}`);
     else if ((isCompany || storeId) && !choice.builtIn && !choice.isCompany) return bad('a company or store template may use only built-in or company hooks and locations');
   }
-  for (const [key, ids] of [['images', data.images], ['endFrame', data.endFrame ? [data.endFrame] : []], ['clips', data.clips ?? []]] as const) {
+  for (const [key, ids] of [['images', data.images], ['endFrame', data.endFrame ? [data.endFrame] : []], ['videoRef', data.videoRef ? [data.videoRef] : []], ['clips', data.clips ?? []]] as const) {
     if (ids.length === 0) continue;
     const own = await pool.query(`select count(*)::int as n from assets where id = any($1::text[]) and owner_id = $2 and kind = 'input' and deleted_at is null`, [ids, userId]);
     if (own.rows[0].n !== ids.length) return bad(`data.${key} may hold only your own uploads`);

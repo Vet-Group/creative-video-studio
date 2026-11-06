@@ -1,10 +1,11 @@
 import { reserve, withTransaction } from '@cvs/core/ledger';
 import { type CapRefusal, checkCaps, dailyClips } from '@cvs/core/limits';
-import { estimateUsd, extraInputUsd, FEATURE_PROMPTS, imagePricesFor, PROMPT_CEILING, promptLimit, textToImage, usdPerSecondFor } from '@cvs/core/models';
-import { videoInputs } from '@cvs/core/providers/fal';
+import { estimateUsd, extraInputUsd, FEATURE_PROMPTS, imagePricesFor, PROMPT_CEILING, promptLimit, textToImage, usdPerSecondFor, usdPerSecondWithVideo } from '@cvs/core/models';
+import { videoInputs, videoRefProblem } from '@cvs/core/providers/fal';
 import { VIDEO_QUEUE, videoSendOptions } from '@cvs/core/queue';
 import { FEATURES } from '@cvs/db';
 import { pool } from '@/lib/auth';
+import { mp4VideoInfo } from '@/lib/assets';
 import { boss } from '@/lib/queue';
 import { findChoice } from '@/lib/choices';
 import { inputRefusal } from '@/lib/job-failure';
@@ -13,6 +14,7 @@ import { BRAND_FEATURES, withBrand } from '@/lib/brand';
 import { ADVANCED_MAX_SCRIPT, END_TEXT_POSITIONS, MAX_END_TEXT, MAX_ENDING, MAX_HOOK } from '@/lib/marketing';
 import { falBalance, falCreditUsd, overCredit } from '@/lib/provider-credit';
 import { guard } from '@/lib/session';
+import { getObject } from '@/lib/storage';
 
 /** Create Video takes up to 9 images (the most a fal reference schema allows, as Fash offers); the model's max_images is checked under the lock. */
 const MAX_IMAGES = 9;
@@ -109,7 +111,8 @@ export async function GET(request: Request) {
  * an optional `params.endAssetId`, the end frame: one of the caller's own live images, on a model whose fal request builder takes one (videoInputs); `video` also takes an optional
  * `params.audioAssetIds`, reference audio: the caller's own MP3/WAV clips (comma-separated ids), each at least 2 s, within the model's count and total length, and with a free
  * prompt its sections kept for reuse (`params.hookText` up to 200 characters and `params.ending` up to 200, already in the prompt); and no other `params`. `marketing` needs exactly 2 inputs (the model photo, then the product photo) and a prompt, no preset;
- * with `params.format` 'advanced' (Marketing Studio Advanced) it takes 1 to 7 reference images instead, up to the model's `max_images`. Marketing also keeps `params.hookText` (the member's
+ * with `params.format` 'advanced' (Marketing Studio Advanced) it takes 1 to 7 reference images instead, up to the model's `max_images`, and an optional `params.videoAssetId`, one of the caller's own
+ * MP4/MOV clips as the reference video, on a model that takes one (videoInputs `videoRefs`) within its length, size and image limits; the estimate then includes the clip's billed seconds (usdPerSecondWithVideo). Marketing also keeps `params.hookText` (the member's
  * own hook) and `params.ending` (the last shot), both already in its prompt, up to 200 characters, and `params.endText` (one line, up to 60 characters) with its optional `params.endTextPos` (bottom, middle or top), which the worker burns
  * over the clip's last 2 s. A video job's optional `params.audio` 'on' prices
  * it at the endpoint's audio price (AUDIO_USD_PER_SECOND; refused on a model without one), and 'off' or none keeps it silent; an ALWAYS_AUDIO model has sound either way, at its stored price. Any other feature is an
@@ -163,7 +166,7 @@ export async function POST(request: Request) {
     // Images take resolution, quality and thinking, plus the member's own text (and Try On its garment count) kept for reuse; Marketing Studio takes format ('advanced'),
     // audio ('on' or 'off'), an end frame, the end text the worker burns in (endText, endTextPos) and the form's own inputs. The kept inputs are never read by the
     // worker. Create video takes audio, an end frame, reference audio and its prompt's sections (hookText, ending); the others none.
-    const keys = isImage ? ['resolution', 'quality', 'thinking', 'brief', ...(feature === 'try_on' ? ['garments'] : [])] : feature === 'marketing' ? ['format', 'audio', 'endAssetId', 'hook', 'hookText', 'location', 'brief', 'script', 'ending', 'endText', 'endTextPos'] : feature === 'video' ? ['audio', 'endAssetId', 'audioAssetIds', 'hookText', 'ending'] : [];
+    const keys = isImage ? ['resolution', 'quality', 'thinking', 'brief', ...(feature === 'try_on' ? ['garments'] : [])] : feature === 'marketing' ? ['format', 'audio', 'endAssetId', 'videoAssetId', 'hook', 'hookText', 'location', 'brief', 'script', 'ending', 'endText', 'endTextPos'] : feature === 'video' ? ['audio', 'endAssetId', 'audioAssetIds', 'hookText', 'ending'] : [];
     if (!entries || entries.some(([k, v]) => !keys.includes(k) || typeof v !== 'string')) {
       return bad(keys.length > 0 ? `params may hold only ${keys.length > 1 ? `${keys.slice(0, -1).join(', ')} and ${keys.at(-1)}` : keys[0]}, as text` : 'params are for image features, Create video and Marketing Studio only');
     }
@@ -232,6 +235,26 @@ export async function POST(request: Request) {
       if (new Set(clips).size !== clips.length || own.rowCount !== clips.length || own.rows.some((r) => !r.mime.startsWith('audio/'))) return bad('params.audioAssetIds must list your own audio clips, separated by commas');
       if (own.rows.some((r) => r.duration_ms < MIN_AUDIO_MS)) return bad('each audio clip must last at least 2 seconds');
     }
+    // The reference video is the caller's own MP4 or MOV clip, on Advanced only (whether the model takes one, and its length and size, are checked with the model below).
+    if (given.videoAssetId !== undefined) {
+      if (!advanced) return bad('params.videoAssetId is for Advanced only');
+      const clip = await pool.query(`select mime, s3_key from assets where id = $1 and owner_id = $2 and kind = 'input' and deleted_at is null`, [given.videoAssetId, userId]);
+      if (!clip.rows[0]?.mime.startsWith('video/')) return bad('params.videoAssetId must be one of your own videos');
+      // Its picture size and frame rate against the model's limits (videoRefProblem), read from the file's header here, outside the lock. A file or a header that cannot
+      // be read passes (as does a frame rate the header does not give): fal then decides.
+      const endpoint = (await pool.query('select endpoint from model_configs where id = $1', [modelId])).rows[0]?.endpoint as string | undefined;
+      if (endpoint && videoInputs(endpoint).videoRefs) {
+        const info = await (async () => {
+          try {
+            return mp4VideoInfo(new Uint8Array(await new Response(await getObject(clip.rows[0].s3_key)).arrayBuffer()));
+          } catch {
+            return undefined;
+          }
+        })();
+        const problem = info && videoRefProblem(endpoint, info);
+        if (problem) return bad(problem);
+      }
+    }
     // The end frame is the caller's own image (whether the model takes one is checked with the model below).
     if (given.endAssetId !== undefined) {
       const end = await pool.query(`select mime from assets where id = $1 and owner_id = $2 and kind = 'input' and deleted_at is null`, [given.endAssetId, userId]);
@@ -276,7 +299,7 @@ export async function POST(request: Request) {
     // A new Run was checked before the lock and a retry never was, so both look again: an image deleted meanwhile is refused.
     const clips = params.audioAssetIds?.split(',') ?? [];
     // A Set: the end frame may be the first image again, for a clip that loops.
-    const inputs = [...new Set([...assetIds, ...(params.endAssetId ? [params.endAssetId] : []), ...clips])];
+    const inputs = [...new Set([...assetIds, ...(params.endAssetId ? [params.endAssetId] : []), ...(params.videoAssetId ? [params.videoAssetId] : []), ...clips])];
     const live = await tx.query('select 1 from assets where id = any($1::text[]) and deleted_at is null', [inputs]);
     if (live.rowCount !== inputs.length) return bad('one or more assets were deleted');
     const model = (await tx.query('select enabled, provider, endpoint, kind, features, ratios, thinking_levels, durations_sec, max_images, max_prompt_chars, usd_per_second, image_prices, thinking_prices from model_configs where id = $1', [modelId])).rows[0];
@@ -285,13 +308,27 @@ export async function POST(request: Request) {
     if (feature === 'image' && assetIds.length === 0 && !textToImage(model)) return bad('the model needs at least one input image');
     // A retry copies a Run this check already passed.
     if (!original && feature === 'video' && assetIds.length === 0 && !videoInputs(model.endpoint).textOnly) return bad('the model needs at least one input image');
-    if (params.endAssetId !== undefined && !videoInputs(model.endpoint).endFrame) return bad('the model does not take an end frame');
-    const endMax = videoInputs(model.endpoint).endMaxSec;
+    // What the model takes is read for the request the worker will make: with a reference video that is the video-to-video sibling where the row has one (Kling O3 Pro).
+    const takesNow = videoInputs(model.endpoint, params.videoAssetId !== undefined);
+    if (params.endAssetId !== undefined && !takesNow.endFrame) return bad(takesNow.endFrame !== videoInputs(model.endpoint).endFrame ? 'the model takes no end frame together with a reference video' : 'the model does not take an end frame');
+    const endMax = takesNow.endMaxSec;
     if (params.endAssetId !== undefined && endMax !== null && durationSec > endMax) return bad(`the model takes an end frame on clips of at most ${endMax} seconds`);
     if (clips.length > 0) {
-      const takes = videoInputs(model.endpoint).audioClips;
+      const takes = takesNow.audioClips;
       const ms = (await tx.query('select coalesce(sum(duration_ms), 0)::int as ms from assets where id = any($1::text[])', [clips])).rows[0].ms as number;
       if (!takes || clips.length > takes.max || ms > takes.seconds * 1000) return bad(takes ? `the model takes at most ${takes.max} audio clips, ${takes.seconds} seconds in all` : 'the model does not take reference audio');
+    }
+    // The reference video: the model must take one, the clip must fit its length and size, and the images fit with it (Kling O3 allows 4 in all); its seconds, rounded up, price the Run.
+    let refSec = 0;
+    if (params.videoAssetId !== undefined) {
+      const takes = videoInputs(model.endpoint).videoRefs;
+      if (!takes) return bad('the model does not take a reference video');
+      if (takes.silent && params.audio === 'on') return bad('the model makes no sound with a reference video; send params.audio off');
+      const clip = (await tx.query('select duration_ms, bytes from assets where id = $1', [params.videoAssetId])).rows[0] as { duration_ms: number | null; bytes: number };
+      if (clip.duration_ms === null || clip.duration_ms < takes.minSec * 1000 || clip.duration_ms > takes.maxSec * 1000) return bad(`the reference video must last ${takes.minSec} to ${takes.maxSec} seconds on this model`);
+      if (takes.maxMb !== null && clip.bytes > takes.maxMb * 1024 * 1024) return bad(`the reference video may be at most ${takes.maxMb} MB on this model`);
+      if (takes.maxImages !== null && assetIds.length > takes.maxImages) return bad(`the model takes at most ${takes.maxImages} images with a reference video`);
+      refSec = Math.ceil(clip.duration_ms / 1000);
     }
     // Own keys only, with a plain decimal price: `in` would also accept "constructor" and friends.
     const prices = isImage ? imagePricesFor(model, params.thinking) : {};
@@ -327,7 +364,7 @@ export async function POST(request: Request) {
     const provider = onTwin ? model.provider : (original?.provider ?? model.provider);
     const perSecond = isImage ? null : usdPerSecondFor({ endpoint: model.endpoint, usdPerSecond: model.usd_per_second }, params.audio);
     if (!isImage && perSecond === undefined) return bad('the model cannot generate audio');
-    const estimate = isImage ? (Number(imagePrice) + extraInputUsd(model.endpoint, assetIds.length)).toFixed(4) : estimateUsd(perSecond!, durationSec);
+    const estimate = isImage ? (Number(imagePrice) + extraInputUsd(model.endpoint, assetIds.length)).toFixed(4) : estimateUsd(refSec > 0 ? usdPerSecondWithVideo(model.endpoint, perSecond!, durationSec, refSec) : perSecond!, durationSec);
     // Under the same lock, so two Runs cannot both spend fal's last dollars.
     const credit = await falCreditUsd(tx, fal);
     // A new Run takes the row the pickers offer of a pair of duplicate models; a retry copies a Run that was offered. The fal lock is read on video only (the one fal row with a twin is Veo).

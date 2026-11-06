@@ -14,6 +14,8 @@ export interface SubmitRequest {
   endImageUrl?: string;
   /** Reference audio clips (MP3 or WAV), on a model that takes them (fal's VIDEO_BODIES `audio`). */
   audioUrls?: string[];
+  /** The reference video (MP4 or MOV, one clip), on a model that takes one (fal's VIDEO_BODIES `video`). */
+  videoUrls?: string[];
 }
 
 /** fal's queue URLs include the model endpoint, so polling needs the model as well as the id. */

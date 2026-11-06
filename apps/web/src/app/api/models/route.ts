@@ -1,4 +1,4 @@
-import { ALWAYS_AUDIO, estimateUsd, promptLimit, usdPerSecondFor } from '@cvs/core/models';
+import { ALWAYS_AUDIO, estimateUsd, promptLimit, usdPerSecondFor, usdPerSecondWithVideo } from '@cvs/core/models';
 import { videoInputs } from '@cvs/core/providers/fal';
 import { ASPECTS } from '@cvs/db';
 import { pool } from '@/lib/auth';
@@ -7,9 +7,10 @@ import { onePerPair } from '@/lib/model-twins';
 import { falBalance, falCreditUsd, overCredit } from '@/lib/provider-credit';
 import { guard } from '@/lib/session';
 
-function audioEstimate(r: { provider: string; endpoint: string; usd_per_second: string }, durationSec: number): string | null {
+/** `videoSec` is the length of the reference video, 0 for none: a model that bills it (VIDEO_REF_USD) then prices the Run with it. */
+function audioEstimate(r: { provider: string; endpoint: string; usd_per_second: string }, durationSec: number, videoSec: number): string | null {
   const perSecond = usdPerSecondFor({ endpoint: r.endpoint, usdPerSecond: r.usd_per_second }, 'on');
-  return perSecond === undefined ? null : r.provider === 'mock' ? '0.0000' : estimateUsd(perSecond, durationSec);
+  return perSecond === undefined ? null : r.provider === 'mock' ? '0.0000' : estimateUsd(videoSec > 0 ? usdPerSecondWithVideo(r.endpoint, perSecond, durationSec, videoSec) : perSecond, durationSec);
 }
 
 const MONTH = `to_char(now() at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM')`;
@@ -21,6 +22,7 @@ const MONTH = `to_char(now() at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM')`;
  * purged ones included; null while nothing is counted. The score also weighs how often real jobs of the model end well (lib/model-scores.ts).
  * `?feature=video`, `marketing` or `motion_control` keeps the models whose `features` lists it (Marketing Studio also accepts ratio 16:9, Motion Control takes only `auto`); without it every enabled video model is listed.
  * `audioEstimateUsd` is the estimate with native audio on, null for a model that cannot make audio; `alwaysAudio` is true for one that cannot be silent (ALWAYS_AUDIO). `endFrame` is true for a model that takes an end frame, `textOnly` for one that runs from the prompt alone, and `audioClips` the reference audio it takes ({ max, seconds }, or null; videoInputs).
+ * `videoRefs` is the reference video it takes ({ max, minSec, maxSec, maxMb, maxImages }, or null; videoInputs), and `?videoSec=` the length of the one chosen, which the estimates of the models that bill it then include.
  * `isNew` is true for a model added in the last 14 days (the picker's badge).
  * Of a pair of duplicate models (`twin_of`, migration 0075) one is listed: the cheaper, or the dearer in its place while the cheaper cannot serve (lib/model-twins.ts).
  * `creditUsd` is what the model's provider can still spend (lib/provider-credit.ts; fal only, null otherwise): the picker locks a model whose estimate is over it, and the
@@ -40,6 +42,8 @@ export async function GET(request: Request) {
   if (!ratios.includes(ratio) || !Number.isInteger(durationSec)) {
     return Response.json({ error: 'ratio and durationSec (a whole number) are required' }, { status: 400 });
   }
+  const videoSec = q.get('videoSec') === null ? 0 : Math.ceil(Number(q.get('videoSec')));
+  if (!Number.isInteger(videoSec) || videoSec < 0 || videoSec > 60) return Response.json({ error: 'videoSec must be a number of seconds from 0 to 60' }, { status: 400 });
   const userId = g.session.user.id;
 
   const fal = await falBalance();
@@ -79,9 +83,9 @@ export async function GET(request: Request) {
       resolution: r.output_resolution as string | null,
       isNew: r.is_new as boolean,
       // A mock job books 0 USD, so that is what the picker shows for it.
-      estimateUsd: r.provider === 'mock' ? '0.0000' : estimateUsd(r.usd_per_second, durationSec),
+      estimateUsd: r.provider === 'mock' ? '0.0000' : estimateUsd(videoSec > 0 ? usdPerSecondWithVideo(r.endpoint, r.usd_per_second, durationSec, videoSec) : r.usd_per_second, durationSec),
       // With native audio on (Marketing Studio Advanced); null when the endpoint cannot make audio.
-      audioEstimateUsd: audioEstimate(r, durationSec),
+      audioEstimateUsd: audioEstimate(r, durationSec, videoSec),
       alwaysAudio: ALWAYS_AUDIO.has(r.endpoint),
       ...videoInputs(r.endpoint),
       ...scoreOf(st),

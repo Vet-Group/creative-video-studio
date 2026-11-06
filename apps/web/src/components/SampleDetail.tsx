@@ -14,6 +14,10 @@ import { Modal } from './Modal';
 /** A sample's details file, in the shape its page refills from (`?example=`): Marketing's format and duration, or Try On's model, resolution and background. */
 interface SampleDetails {
   format?: string | null;
+  /** Marketing's library hook id, or its own hook words, and its last shot. */
+  hook?: string | null;
+  hookText?: string | null;
+  ending?: string | null;
   brief?: string | null;
   /** Image Generation's words (its jobs keep the prompt itself). */
   prompt?: string | null;
@@ -81,6 +85,18 @@ export function SampleDetail({ names, index, onIndex }: { names: string[]; index
     </ul>
   );
   const apply = form?.apply;
+  const [busy, setBusy] = useState(false);
+  /** Marketing Studio only: the example's hook and ending on the form, its hook saved as the member's own, its clip as Advanced's reference video. Each runs once at a time. */
+  const hooked = details && (details.hook || details.hookText);
+  const act = (run: () => Promise<void> | void) => async () => {
+    setBusy(true);
+    try {
+      await run();
+      if (narrow) onIndex(null); // the form is behind the dialog on a phone
+    } finally {
+      setBusy(false);
+    }
+  };
   const backdrop = details?.background ? details.images.at(-1) : undefined;
   // The picker's name for the same picture: the reference site's file sometimes shortens it ("Poolside").
   const backdropLabel = BACKGROUNDS.find(([value]) => backdrop?.sample === `try-on-bg-${value}.jpg`)?.[1] ?? details?.background;
@@ -120,6 +136,25 @@ export function SampleDetail({ names, index, onIndex }: { names: string[]; index
             <Icon name="external" />
           </a>
         </div>
+        {video && details && (form?.hook || form?.saveHook || form?.video) && (
+          <div>
+            {form.hook && (
+              <button type="button" className="lightbox-result" disabled={busy || (!hooked && !details.ending)} onClick={() => void act(() => form.hook!({ hook: details.hook, hookText: details.hookText, ending: details.ending }))()}>
+                Dùng hook này
+              </button>
+            )}
+            {form.saveHook && hooked && (
+              <button type="button" className="lightbox-result" disabled={busy} onClick={() => void act(() => form.saveHook!({ hook: details.hook, hookText: details.hookText, name: `${title} - ví dụ ${index + 1}`, poster: `${base}.jpg` }))()}>
+                Lưu thành hook của tôi
+              </button>
+            )}
+            {form.video && (
+              <button type="button" className="lightbox-result" disabled={busy} onClick={() => void act(() => form.video!(name))()}>
+                Dùng làm video tham chiếu
+              </button>
+            )}
+          </div>
+        )}
         {details && (
           <Recreate href={tryOn ? `/try-on?example=${base}` : picture ? `/image-generation?example=${base}` : `/marketing-studio${advanced ? '/advanced' : ''}?example=${base}`} from={exampleFrom({ example: base })!} className="lightbox-reuse" onDone={() => narrow && onIndex(null)}>
             Dùng lại

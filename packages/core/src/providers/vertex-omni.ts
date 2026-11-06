@@ -64,7 +64,7 @@ export function createVertexOmniProvider(opts: {
       const n = req.imageUrls.length;
       const hasEnd = req.endImageUrl !== undefined;
       // The last frame needs exactly one first frame and a clip of at most 10 s; images without it are references from the second one on.
-      if (req.model.endpoint !== VERTEX_OMNI_MODEL || req.model.outputResolution !== '720p' || !['16:9', '9:16'].includes(req.ratio) || !Number.isInteger(req.durationSec) || req.durationSec < 3 || req.durationSec > (hasEnd ? 10 : 15) || n > 10 || (hasEnd && n !== 1) || (req.audioUrls?.length ?? 0) > 0) throw new ImageReadError('Unsupported Vertex Omni input');
+      if (req.model.endpoint !== VERTEX_OMNI_MODEL || req.model.outputResolution !== '720p' || !['16:9', '9:16'].includes(req.ratio) || !Number.isInteger(req.durationSec) || req.durationSec < 3 || req.durationSec > (hasEnd ? 10 : 15) || n > 10 || (hasEnd && n !== 1) || (req.audioUrls?.length ?? 0) > 0 || (req.videoUrls?.length ?? 0) > 0) throw new ImageReadError('Unsupported Vertex Omni input');
       const { costUsd } = estimate(req, req.durationSec);
       if (!Number.isFinite(costUsd) || costUsd < 0) throw new ImageReadError('Invalid Vertex Omni estimate');
       const images = await Promise.all([...req.imageUrls, ...(hasEnd ? [req.endImageUrl!] : [])].map(image));

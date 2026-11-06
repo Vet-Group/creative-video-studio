@@ -1,7 +1,7 @@
 // Hand-written fixtures until B.5a replaces them with recorded real responses. No test reads FAL_KEY.
 import { describe, expect, test } from 'vitest';
 import { AUDIO_USD_PER_SECOND, BAKEOFF_MODELS } from '../models';
-import { createFalProvider, VIDEO_BODIES, videoInputs } from './fal';
+import { createFalProvider, VIDEO_BODIES, videoInputs, videoRefProblem } from './fal';
 import { ImageReadError, isFundingRefusal, MAX_INLINE_CHARS, ProviderHttpError, resolveImages, unpackJobId } from './http';
 import { createMockVideoProvider, MOCK_FAIL } from './mock';
 import type { ProviderJob, SubmitRequest } from './types';
@@ -308,7 +308,7 @@ describe('fal reference audio', () => {
       ['bytedance/seedance-2.0/us/reference-to-video', { max: 3, seconds: 15 }],
       ['minimax/h3-max/reference-to-video', { max: 3, seconds: 15 }],
     ]);
-    expect(videoInputs('mock')).toEqual({ endFrame: false, endMaxSec: null, textOnly: false, audioClips: null });
+    expect(videoInputs('mock')).toEqual({ endFrame: false, endMaxSec: null, textOnly: false, audioClips: null, videoRefs: null });
   });
 
   test('uploads the clips to fal storage as .mp3 or .wav and sends their URLs in the endpoint’s own field; the images stay inline', async () => {
@@ -330,6 +330,100 @@ describe('fal reference audio', () => {
     expect(none.calls).toHaveLength(0);
     const broken = falFake(500);
     await expect(createFalProvider({ apiKey: 'k', fetch: broken.fn, readImage: read }).submit({ ...base, audioUrls: ['asset://clip1'], model: { ...kling, endpoint: 'bytedance/seedance-2.0/us/reference-to-video' } })).rejects.toThrow(ImageReadError);
+    expect(broken.calls.some((c) => c.url.startsWith('https://queue.fal.run'))).toBe(false);
+  });
+});
+
+describe('fal reference video', () => {
+  const read = async (url: string) => (url.includes('clip') ? { bytes: new Uint8Array([0, 0, 0, 0x18]), contentType: url.endsWith('mov') ? 'video/quicktime' : 'video/mp4' } : readImage(url));
+  const seedance = (endpoint: string) => ({ ...kling, endpoint, outputResolution: '720p' });
+  const prompt = 'Follow the motion, camera framing and pace of [Video1]; a woman in [Image1].';
+
+  test('the endpoints that take one, with the limits their schemas state (read 2026-11-06)', () => {
+    const takes = Object.keys(VIDEO_BODIES).filter((e) => videoInputs(e).videoRefs).map((e) => [e, videoInputs(e).videoRefs]);
+    expect(takes).toEqual([
+      ['fal-ai/kling-video/o3/pro/reference-to-video', { max: 1, minSec: 3, maxSec: 15, maxMb: 200, maxImages: 4, endFrame: false, silent: true }],
+      ['fal-ai/kling-video/o3/pro/video-to-video/reference', { max: 1, minSec: 3, maxSec: 15, maxMb: 200, maxImages: 4, endFrame: false, silent: true }], // the sibling, never a model row itself
+      ['bytedance/seedance-2.5/us/reference-to-video', { max: 1, minSec: 1.8, maxSec: 30.2, maxMb: 200, maxImages: null, endFrame: false, silent: false }],
+      ['bytedance/seedance-2.0/us/reference-to-video', { max: 1, minSec: 2, maxSec: 15, maxMb: 50, maxImages: null, endFrame: false, silent: false }],
+      ['google/gemini-omni-flash/v1.2/reference-to-video', { max: 1, minSec: 0, maxSec: 15, maxMb: null, maxImages: null, endFrame: false, silent: false }],
+    ]);
+    // Left out: MiniMax (video tokens unpriced), Wan, Grok, Veo, Kling O1, (the O3 row reaches the sibling).
+    expect(videoInputs('minimax/h3-max/reference-to-video').videoRefs).toBeNull();
+    expect(videoInputs('fal-ai/kling-video/o1/reference-to-video').videoRefs).toBeNull();
+  });
+
+  test('with a video Kling O3 is read as its video-to-video sibling: no end frame, no sound; without one it keeps both', () => {
+    const o3 = 'fal-ai/kling-video/o3/pro/reference-to-video';
+    expect([videoInputs(o3).endFrame, videoInputs(o3, true).endFrame, videoInputs(o3, true).textOnly]).toEqual([true, false, false]);
+    expect(videoInputs(o3).videoRefs).toMatchObject({ endFrame: false, silent: true });
+    expect(videoInputs('bytedance/seedance-2.0/us/reference-to-video', true)).toEqual(videoInputs('bytedance/seedance-2.0/us/reference-to-video'));
+  });
+
+  test('the picture size and frame rate checks follow the schemas, and an unreadable frame rate passes', () => {
+    const s20 = 'bytedance/seedance-2.0/us/reference-to-video';
+    const s25 = 'bytedance/seedance-2.5/us/reference-to-video';
+    const o3 = 'fal-ai/kling-video/o3/pro/reference-to-video';
+    const at = (endpoint: string, width: number, height: number, fps: number | null = 30) => videoRefProblem(endpoint, { width, height, fps });
+    expect([at(s20, 720, 1280), at(s20, 1280, 720), at(s20, 960, 960), at(s20, 834, 1112), at(s20, 640, 640)]).toEqual([null, null, null, null, null]);
+    expect(at(s20, 320, 240)).toMatch(/320x240/);
+    expect(at(s20, 1080, 1920)).toMatch(/1080x1920/); // ~2 Mpx, past ~720p
+    expect([at(s25, 1080, 1920), at(s25, 300, 300, 24), at(s25, 1280, 720, 60)]).toEqual([null, null, null]);
+    expect([at(s25, 200, 400), at(s25, 6001, 3000), at(s25, 1000, 300)].map((r) => r !== null)).toEqual([true, true, true]); // a side under 300 or over 6,000; aspect 3.3
+    expect(at(s25, 1280, 720, 12)).toMatch(/12 fps/);
+    expect(at(s25, 1280, 720, 120)).toMatch(/120 fps/);
+    expect(at(s25, 1280, 720, null)).toBeNull();
+    expect([at(o3, 1280, 720), at(o3, 720, 1280), at(o3, 3840, 2160)]).toEqual([null, null, null]);
+    expect([at(o3, 640, 360), at(o3, 3841, 1080)].map((r) => r !== null)).toEqual([true, true]);
+    expect(at(o3, 1280, 720, 12)).toBeNull(); // Kling states no frame rate
+    expect(at('google/gemini-omni-flash/v1.2/reference-to-video', 100, 100, 5)).toBeNull(); // nor does Omni, or an endpoint without video
+    expect(at('minimax/h3-max/reference-to-video', 100, 100)).toBeNull();
+  });
+
+  test('Seedance 2.0 and 2.5 get video_urls in fal storage and @Video1 in the prompt; the images stay inline', async () => {
+    for (const [endpoint, name] of [['bytedance/seedance-2.0/us/reference-to-video', 'mp4'], ['bytedance/seedance-2.5/us/reference-to-video', 'mov']] as const) {
+      const { fn, calls } = falFake();
+      await createFalProvider({ apiKey: 'k', fetch: fn, readImage: read }).submit({ ...base, prompt, imageUrls: ['asset://img'], videoUrls: [`asset://clip.${name}`], audio: false, model: seedance(endpoint) });
+      expect(calls.filter((c) => c.url.includes('/storage/upload/initiate')).map((c) => c.body)).toEqual([name === 'mov' ? { content_type: 'video/quicktime', file_name: 'input.mov' } : { content_type: 'video/mp4', file_name: 'input.mp4' }]);
+      const submit = calls.at(-1)!;
+      expect(submit.url).toBe(`https://queue.fal.run/${endpoint}`);
+      expect(submit.body).toEqual({
+        prompt: 'Follow the motion, camera framing and pace of @Video1; a woman in @Image1.', image_urls: [DATA_URL], aspect_ratio: base.ratio, duration: String(base.durationSec), resolution: '720p', generate_audio: false,
+        video_urls: [name === 'mov' ? 'https://v3b.fal.media/files/video-quicktime' : 'https://v3b.fal.media/files/video-mp4'],
+      });
+    }
+  });
+
+  test('Gemini Omni gets reference_video_urls and a plain phrase, as it takes media in list order', async () => {
+    const { fn, calls } = falFake();
+    await createFalProvider({ apiKey: 'k', fetch: fn, readImage: read }).submit({ ...base, prompt, imageUrls: ['asset://img'], videoUrls: ['asset://clip.mp4'], model: seedance('google/gemini-omni-flash/v1.2/reference-to-video') });
+    const body = calls.at(-1)!.body as Record<string, unknown>;
+    expect(body.prompt).toBe('Follow the motion, camera framing and pace of the reference video; a woman in image 1.');
+    expect(body.reference_video_urls).toEqual(['https://v3b.fal.media/files/video-mp4']);
+  });
+
+  test('Kling O3 Pro goes to the video-to-video sibling with video_url, @Video1 and keep_audio off, and keeps its text twin without a video', async () => {
+    const { fn, calls } = falFake();
+    await createFalProvider({ apiKey: 'k', fetch: fn, readImage: read }).submit({ ...base, prompt, imageUrls: ['asset://img'], videoUrls: ['asset://clip.mp4'], audio: true, model: seedance('fal-ai/kling-video/o3/pro/reference-to-video') });
+    const submit = calls.at(-1)!;
+    expect(submit.url).toBe('https://queue.fal.run/fal-ai/kling-video/o3/pro/video-to-video/reference');
+    expect(submit.body).toEqual({
+      prompt: 'Follow the motion, camera framing and pace of @Video1; a woman in @Image1.', image_urls: [DATA_URL], aspect_ratio: base.ratio, duration: String(base.durationSec), keep_audio: false,
+      video_url: 'https://v3b.fal.media/files/video-mp4',
+    });
+    const plain = falFake();
+    await createFalProvider({ apiKey: 'k', fetch: plain.fn, readImage: read }).submit({ ...base, prompt: 'p', imageUrls: ['asset://img'], model: seedance('fal-ai/kling-video/o3/pro/reference-to-video') });
+    expect(plain.calls.at(-1)!.url).toBe('https://queue.fal.run/fal-ai/kling-video/o3/pro/reference-to-video');
+  });
+
+  test('a model without it, two clips or a failed upload submit nothing', async () => {
+    const none = falFake();
+    const submit = (req: Pick<SubmitRequest, 'model'> & Partial<SubmitRequest>, f = none) => createFalProvider({ apiKey: 'k', fetch: f.fn, readImage: read }).submit({ ...base, imageUrls: ['asset://img'], videoUrls: ['asset://clip.mp4'], ...req });
+    await expect(submit({ model: seedance('minimax/h3-max/reference-to-video') })).rejects.toThrow(ImageReadError);
+    await expect(submit({ videoUrls: ['asset://clip.mp4', 'asset://clip2.mp4'], model: seedance('bytedance/seedance-2.0/us/reference-to-video') })).rejects.toThrow(ImageReadError);
+    expect(none.calls).toHaveLength(0);
+    const broken = falFake(500);
+    await expect(submit({ model: seedance('bytedance/seedance-2.0/us/reference-to-video') }, broken)).rejects.toThrow(ImageReadError);
     expect(broken.calls.some((c) => c.url.startsWith('https://queue.fal.run'))).toBe(false);
   });
 });

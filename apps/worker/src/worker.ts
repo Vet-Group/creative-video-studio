@@ -12,7 +12,7 @@ import type { ReadableStream as WebReadableStream } from 'node:stream/web';
 import { fileURLToPath } from 'node:url';
 import type { Enhancer } from '@cvs/core/enhance';
 import { bookLlm, close24h, lateBill, type LedgerPool, release, settle, withTransaction } from '@cvs/core/ledger';
-import { type ImageModelConfig, imagePricesFor, type ModelConfig, promptLimit, usdPerSecondFor } from '@cvs/core/models';
+import { type ImageModelConfig, imagePricesFor, type ModelConfig, promptLimit, usdPerSecondFor, usdPerSecondWithVideo } from '@cvs/core/models';
 import { ImageReadError } from '@cvs/core/providers/http';
 import type { ImageProvider, ImageProviderJob, ImageSubmitRequest, ProviderJob, ProviderStatus, SubmitRequest, VideoProvider } from '@cvs/core/providers';
 import { PURGE_CRON, PURGE_QUEUE, SUGGEST_QUEUE, SUGGEST_QUEUE_OPTIONS, type SuggestJobData, VIDEO_QUEUE, VIDEO_QUEUE_OPTIONS, type VideoJobData, videoSendOptions } from '@cvs/core/queue';
@@ -125,14 +125,19 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
   const boss = new PgBoss({ connectionString: deps.connectionString, max: 4 });
   boss.on('error', (e) => log('pg-boss', e));
 
-  /** `audio` is the job's params.audio: with 'on' the price is the endpoint's audio price, which the API checked exists. */
-  async function loadModel(modelId: string, audio?: string): Promise<ModelConfig> {
+  /**
+   * `audio` is the job's params.audio: with 'on' the price is the endpoint's audio price, which the API checked exists. `job` carries the reference video of
+   * Marketing Studio Advanced (params.videoAssetId) and the clip's own duration: the rate then includes the video's billed seconds, as the jobs API estimated.
+   */
+  async function loadModel(modelId: string, audio?: string, job?: { videoAssetId?: string; durationSec: number }): Promise<ModelConfig> {
     const { rows } = await pool.query('select * from model_configs where id = $1', [modelId]);
     const r = rows[0];
     if (!r || r.usd_per_second == null || r.max_images == null || r.output_resolution == null) throw new Error(`model ${modelId} has no price or limits`);
+    const rate = usdPerSecondFor({ endpoint: r.endpoint, usdPerSecond: r.usd_per_second }, audio) ?? r.usd_per_second;
+    const refMs: number | null = job?.videoAssetId ? ((await pool.query('select duration_ms from assets where id = $1', [job.videoAssetId])).rows[0]?.duration_ms ?? null) : null;
     return {
       id: r.id, provider: r.provider, endpoint: r.endpoint, label: r.label, ratios: r.ratios, durationsSec: r.durations_sec, maxImages: r.max_images,
-      outputResolution: r.output_resolution, usdPerSecond: Number(usdPerSecondFor({ endpoint: r.endpoint, usdPerSecond: r.usd_per_second }, audio) ?? r.usd_per_second), billedAmountField: r.billed_amount_field, sources: r.sources,
+      outputResolution: r.output_resolution, usdPerSecond: Number(refMs && job ? usdPerSecondWithVideo(r.endpoint, rate, job.durationSec, Math.ceil(refMs / 1000)) : rate), billedAmountField: r.billed_amount_field, sources: r.sources,
     };
   }
 
@@ -151,7 +156,7 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
   }
 
   /** The status and cancel calls of a job that has a provider id: the model's kind picks the image or the video adapter. Undefined without an adapter. */
-  async function adapterFor(row: { provider: string; provider_job_id: string; model: string; kind: string; params: Record<string, string> }) {
+  async function adapterFor(row: { provider: string; provider_job_id: string; model: string; kind: string; duration_s: number; params: Record<string, string> }) {
     if (row.kind === 'image') {
       const provider = imageProviders[row.provider];
       if (!provider) return undefined;
@@ -160,7 +165,7 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
     }
     const provider = providers[row.provider];
     if (!provider) return undefined;
-    const job: ProviderJob = { providerJobId: row.provider_job_id, model: await loadModel(row.model, row.params.audio) };
+    const job: ProviderJob = { providerJobId: row.provider_job_id, model: await loadModel(row.model, row.params.audio, { videoAssetId: row.params.videoAssetId, durationSec: row.duration_s }) };
     return { status: (): Promise<ProviderStatus> => provider.status(job), cancel: () => provider.cancel(job) };
   }
 
@@ -231,9 +236,10 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
         const provider = providers[job.provider];
         if (!provider) throw new Error(`no adapter for provider ${job.provider}`);
         const request: SubmitRequest = {
-          model: await loadModel(job.model, job.params.audio), prompt: job.prompt, imageUrls, ratio: job.aspect, durationSec: job.duration_s, audio: job.params.audio === 'on',
+          model: await loadModel(job.model, job.params.audio, { videoAssetId: job.params.videoAssetId, durationSec: job.duration_s }), prompt: job.prompt, imageUrls, ratio: job.aspect, durationSec: job.duration_s, audio: job.params.audio === 'on',
           ...(job.params.endAssetId && { endImageUrl: `asset://${job.params.endAssetId}` }),
           ...(job.params.audioAssetIds && { audioUrls: (job.params.audioAssetIds as string).split(',').map((a) => `asset://${a}`) }),
+          ...(job.params.videoAssetId && { videoUrls: [`asset://${job.params.videoAssetId}`] }),
         };
         return { send: () => provider.submit(request) };
       })().catch(async (e) => {
@@ -400,7 +406,7 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
 
   async function pollRunning(): Promise<void> {
     const { rows } = await pool.query(
-      `select j.id, j.user_id, j.provider, j.provider_job_id, j.model, j.params, m.kind, m.output_resolution, (now() - j.started_at > ($1::float8 * interval '1 millisecond')) as expired
+      `select j.id, j.user_id, j.provider, j.provider_job_id, j.model, j.params, j.duration_s, m.kind, m.output_resolution, (now() - j.started_at > ($1::float8 * interval '1 millisecond')) as expired
          from jobs j join model_configs m on m.id = j.model where j.status = 'running'`,
       [o.runTimeoutMs],
     );
@@ -429,7 +435,7 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
   /** Timed-out and lost jobs: bill them when the provider reports a final state (the late result is not delivered), else close them after 24 h. */
   async function pollUnresolved(): Promise<void> {
     const { rows } = await pool.query(
-      `select j.id, j.provider, j.provider_job_id, j.model, j.params, m.kind from jobs j join model_configs m on m.id = j.model where j.status in ('timed_out', 'failed_unknown')
+      `select j.id, j.provider, j.provider_job_id, j.model, j.params, j.duration_s, m.kind from jobs j join model_configs m on m.id = j.model where j.status in ('timed_out', 'failed_unknown')
           and not exists (select 1 from job_costs c where c.job_id = j.id and c.is_final)`,
     );
     for (const row of rows) {

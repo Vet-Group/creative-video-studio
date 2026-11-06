@@ -60,7 +60,7 @@ export function createVertexVideoProvider(opts: {
   }
   return {
     async submit(req) {
-      if (req.model.endpoint !== MODEL || req.model.outputResolution !== '720p' || !['16:9', '9:16'].includes(req.ratio) || ![4, 6, 8].includes(req.durationSec) || req.imageUrls.length > 1 || req.endImageUrl !== undefined || (req.audioUrls?.length ?? 0) > 0 || (req.audio !== undefined && typeof req.audio !== 'boolean')) throw new ImageReadError('Unsupported Vertex Veo input');
+      if (req.model.endpoint !== MODEL || req.model.outputResolution !== '720p' || !['16:9', '9:16'].includes(req.ratio) || ![4, 6, 8].includes(req.durationSec) || req.imageUrls.length > 1 || req.endImageUrl !== undefined || (req.audioUrls?.length ?? 0) > 0 || (req.videoUrls?.length ?? 0) > 0 || (req.audio !== undefined && typeof req.audio !== 'boolean')) throw new ImageReadError('Unsupported Vertex Veo input');
       const { costUsd } = estimate(req, req.durationSec);
       if (!Number.isFinite(costUsd) || costUsd < 0) throw new ImageReadError('Invalid Vertex Veo estimate');
       const instance: Record<string, unknown> = { prompt: req.prompt };
