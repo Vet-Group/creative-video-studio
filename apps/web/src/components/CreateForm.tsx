@@ -360,7 +360,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
     if (images.length + files.length > maxImages) return setError(`Tối đa ${maxImages} ảnh.`);
     setBusy(true);
     try {
-      const assets = (await uploadImages(files, 'image', storeId).finally(loading('Đang tải lên…'))) as Image[];
+      const assets = (await uploadImages(files, 'image', storeId, 'video').finally(loading('Đang tải lên…'))) as Image[];
       setImages((cur) => [...cur, ...assets]);
     } catch (e) {
       setError(uploadError(e));
@@ -552,7 +552,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
       onAdd={(files) => {
         setError('');
         setBusy(true);
-        uploadImages(files, 'image', storeId)
+        uploadImages(files, 'image', storeId, 'end-frame')
           .finally(loading('Đang tải lên…'))
           .then(([img]) => img && setEndFrame(img), (e) => setError(uploadError(e)))
           .finally(() => setBusy(false));

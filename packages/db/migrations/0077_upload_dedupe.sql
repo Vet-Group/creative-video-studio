@@ -12,6 +12,7 @@ WITH uses AS (
 			CASE
 				WHEN j.feature = 'try_on' THEN CASE WHEN i.n = 1 THEN 'model' WHEN i.n <= 1 + CASE WHEN j.params->>'garments' ~ '^[0-9]+$' THEN (j.params->>'garments')::int ELSE cardinality(j.input_asset_ids) - 1 END THEN 'garment' ELSE 'background' END
 				WHEN j.feature = 'marketing' AND j.params->>'format' = 'advanced' THEN 'reference'
+    WHEN j.feature = 'marketing' AND j.params->>'roles' IS NOT NULL THEN nullif(split_part(j.params->>'roles', ',', i.n::int), '')
 				WHEN j.feature = 'marketing' THEN CASE i.n WHEN 1 THEN 'model' WHEN 2 THEN 'product' END
 				WHEN j.feature = 'video' THEN 'video'
 				WHEN j.feature = 'image' THEN 'image'

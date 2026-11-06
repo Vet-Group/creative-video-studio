@@ -7,6 +7,7 @@ export const UPLOAD_SLOTS = {
   model: 'Người mẫu',
   background: 'Bối cảnh',
   product: 'Sản phẩm',
+  packaging: 'Bao bì',
   reference: 'Ảnh tham chiếu',
   video: 'Ảnh tạo video',
   'end-frame': 'Khung hình cuối',

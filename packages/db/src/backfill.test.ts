@@ -2,6 +2,7 @@
 import { readFileSync } from 'node:fs';
 import pg from 'pg';
 import { afterAll, expect, test } from 'vitest';
+import { fillInputSlots } from './assets';
 import { createTestDatabase } from './testing';
 
 const testDb = await createTestDatabase();
@@ -97,7 +98,7 @@ test('0068 gives uploads a store column (FK set null, owner/store/date index) an
 test('0077 puts each earlier input in the slot of the first job that used it, and leaves outputs and unused inputs alone', async () => {
   const asset = (id: string, kind = 'input') =>
     pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) values ($1, 'u1', $2, $1, 'f.jpg', 'image/jpeg', 1)`, [id, kind]);
-  for (const id of ['s-person', 's-top', 's-skirt', 's-bg', 's-model', 's-product', 's-ref', 's-frame', 's-end', 's-img', 's-unused', 's-app']) await asset(id);
+  for (const id of ['s-person', 's-top', 's-skirt', 's-bg', 's-model', 's-product', 's-ref', 's-frame', 's-end', 's-img', 's-unused', 's-app', 's-box-product', 's-box-pack']) await asset(id);
   await asset('s-out', 'output');
   const job = (id: string, feature: string, inputs: string[], createdAt: string, params = '{}') =>
     pool.query(
@@ -111,12 +112,15 @@ test('0077 puts each earlier input in the slot of the first job that used it, an
   await job('s4', 'video', ['s-frame', 's-product'], '2026-11-02 10:00:00+07', '{"endAssetId":"s-end"}'); // s-product keeps its first slot
   await job('s5', 'image', ['s-img'], '2026-11-02 11:00:00+07');
   await job('s6', 'background_changer', ['s-app'], '2026-11-02 12:00:00+07');
+  await job('s7', 'marketing', ['s-box-product', 's-box-pack'], '2026-11-02 13:00:00+07', '{"format":"unboxing","roles":"product,packaging"}');
   const file = readFileSync(new URL('../migrations/0077_upload_dedupe.sql', import.meta.url), 'utf8');
   await pool.query(file.slice(file.indexOf('WITH uses')));
   const { rows } = await pool.query(`select id, slot from assets where id like 's-%' order by id`);
   expect(Object.fromEntries(rows.map((r: { id: string; slot: string | null }) => [r.id, r.slot]))).toEqual({
     's-app': null,
     's-bg': 'background',
+    's-box-pack': 'packaging',
+    's-box-product': 'product',
     's-end': 'end-frame',
     's-frame': 'video',
     's-img': 'image',
@@ -129,4 +133,11 @@ test('0077 puts each earlier input in the slot of the first job that used it, an
     's-top': 'garment',
     's-unused': null,
   });
+
+  // A new job records its inputs' slots the same way (api/jobs), in the order the jobs are made.
+  const slots = Object.fromEntries(rows.map((r: { id: string; slot: string | null }) => [r.id, r.slot]));
+  await pool.query(`update assets set slot = null where id like 's-%'`);
+  for (const id of ['s1', 's2', 's3', 's4', 's5', 's6', 's7']) await fillInputSlots(pool, id);
+  const again = await pool.query(`select id, slot from assets where id like 's-%' order by id`);
+  expect(Object.fromEntries(again.rows.map((r: { id: string; slot: string | null }) => [r.id, r.slot]))).toEqual(slots);
 });

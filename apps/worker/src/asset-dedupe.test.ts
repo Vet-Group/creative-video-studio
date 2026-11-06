@@ -32,7 +32,7 @@ async function input(id: string, content: string | null, minutes: number, owner 
 }
 const live = async () => (await pool.query(`select id from assets where deleted_at is null order by id`)).rows.map((r: { id: string }) => r.id);
 
-test('hashes old inputs, keeps the newest copy of a file and every copy something uses, and removes the rest', async () => {
+test('hashes old inputs, keeps the newest copy of a file the purge will not take and every copy something uses, and removes the rest', async () => {
   await input('a-new', 'shirt', 1);
   await input('a-mid', 'shirt', 2);
   await input('a-old', 'shirt', 3);
@@ -43,16 +43,22 @@ test('hashes old inputs, keeps the newest copy of a file and every copy somethin
   await input('b-only', 'coat', 8);
   await input('c-other', 'shirt', 9, 'u2'); // the same file, another owner
   await input('d-gone', null, 10); // its object is missing
+  await input('e-doomed', 'scarf', 1); // only a deleted job names it: the purge takes it with that job
+  await input('e-old', 'scarf', 11); // so this older copy is the one kept
   await pool.query(
     `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, status, params) values
        ('j1', 'u1', 'team-unassigned', 'm', 'mock', 'p', '9:16', 5, '{a-job}', 'succeeded', '{}'),
        ('j2', 'u1', 'team-unassigned', 'm', 'mock', 'p', '9:16', 5, '{b-only}', 'succeeded', '{"endAssetId": "a-end"}')`,
   );
+  await pool.query(
+    `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, status, params, deleted_at)
+     values ('j3', 'u1', 'team-unassigned', 'm', 'mock', 'p', '9:16', 5, '{e-doomed}', 'succeeded', '{}', now())`,
+  );
   await pool.query(`insert into user_templates (id, user_id, feature, name, data) values ('t1', 'u1', 'video', 'T', '{"images": ["a-tpl"]}')`);
   await pool.query(`insert into user_choices (id, user_id, kind, name, phrase, image_asset_id) values ('c1', 'u1', 'hook', 'H', 'p', 'a-choice')`);
 
-  expect(await dedupeTick(pool, read)).toEqual({ hashed: 10, removed: 2 });
-  expect(await live()).toEqual(['a-choice', 'a-end', 'a-job', 'a-new', 'a-tpl', 'b-only', 'c-other', 'd-gone']);
+  expect(await dedupeTick(pool, read)).toEqual({ hashed: 12, removed: 2 });
+  expect(await live()).toEqual(['a-choice', 'a-end', 'a-job', 'a-new', 'a-tpl', 'b-only', 'c-other', 'd-gone', 'e-doomed', 'e-old']);
   const hashes = Object.fromEntries((await pool.query(`select id, sha256 from assets`)).rows.map((r: { id: string; sha256: string }) => [r.id, r.sha256]));
   expect(hashes['a-new']).toBe(sha256(new TextEncoder().encode('shirt')));
   expect(hashes['d-gone']).toBe(UNREADABLE);

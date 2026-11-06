@@ -180,10 +180,10 @@ export function useReuse(reuse: string | undefined, feature: string, fill: (j: O
 /** The most files one POST /api/assets takes (MAX_FILES in lib/assets.ts); a larger pick (Advanced takes 7) goes up in batches. */
 const PER_UPLOAD = 4;
 
-/** Sample pictures as the member's own inputs, copied on the server (POST /api/assets/samples) rather than downloaded and uploaded back. */
-export async function copySamples(names: string[]): Promise<Img[]> {
+/** Sample pictures as the member's own inputs, copied on the server (POST /api/assets/samples) rather than downloaded and uploaded back; `slot` files them under a form slot. */
+export async function copySamples(names: string[], slot?: UploadSlot): Promise<Img[]> {
   const out: Img[] = [];
-  for (let i = 0; i < names.length; i += PER_UPLOAD) out.push(...(await api<{ assets: Img[] }>('/api/assets/samples', sendJson('POST', { names: names.slice(i, i + PER_UPLOAD) }))).assets);
+  for (let i = 0; i < names.length; i += PER_UPLOAD) out.push(...(await api<{ assets: Img[] }>('/api/assets/samples', sendJson('POST', { names: names.slice(i, i + PER_UPLOAD), slot }))).assets);
   return out;
 }
 
@@ -217,9 +217,9 @@ export function uploadError(e: unknown, kind: UploadKind = 'image'): string {
 
 /**
  * Uploads files of one kind; a file of another type or over the size is refused before anything is sent (a file the browser gives no type is left to the server).
- * `storeId` tags them with the store chosen on the page, for the uploaded-photos picker's store filter.
+ * `storeId` tags them with the store chosen on the page and `slot` with the form slot they went into, for the uploaded-photos picker's filters.
  */
-export async function uploadImages(files: File[], kind: UploadKind = 'image', storeId = ''): Promise<Img[]> {
+export async function uploadImages(files: File[], kind: UploadKind = 'image', storeId = '', slot?: UploadSlot): Promise<Img[]> {
   for (const f of files) {
     if (f.type && !KINDS[kind].types.includes(f.type)) throw new Refused(wrongType(kind, f.name));
     if (f.size > KINDS[kind].max) throw new Refused(tooLarge(kind, f.name));
@@ -229,6 +229,7 @@ export async function uploadImages(files: File[], kind: UploadKind = 'image', st
     const form = new FormData();
     for (const f of files.slice(i, i + PER_UPLOAD)) form.append('file', f);
     if (storeId) form.append('storeId', storeId);
+    if (slot) form.append('slot', slot);
     out.push(...(await api<{ assets: Img[] }>('/api/assets', { method: 'POST', body: form })).assets);
   }
   return out;

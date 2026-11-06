@@ -120,7 +120,7 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
     setError('');
     setBusy(true);
     try {
-      const assets = await uploadImages(files.slice(0, room), 'image', storeId).finally(loading('Đang tải lên…'));
+      const assets = await uploadImages(files.slice(0, room), 'image', storeId, 'image').finally(loading('Đang tải lên…'));
       setImages((cur) => [...cur, ...assets]);
     } catch (e) {
       setError(uploadError(e));

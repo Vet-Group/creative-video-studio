@@ -26,16 +26,24 @@ export async function hashInputs(pool: Pool, read: (key: string) => Promise<Uint
   return rows.length;
 }
 
-/** Soft-deletes the extra copies of a file (same owner and hash) that nothing refers to, keeping the newest copy; returns the ids it deleted. */
+/** SQL: a job (alias `j`) names asset `a`, as an input or in its params (end frame, reference audio or video). */
+const names = (j: string) => `(a.id = any(${j}.input_asset_ids) or strpos(${j}.params::text, a.id) > 0)`;
+
+/**
+ * Soft-deletes the extra copies of a file (same owner and hash) that nothing refers to, keeping the newest copy the purge will not take (one that only
+ * deleted jobs name goes with them), so the file stays in "Ảnh đã tải"; returns the ids it deleted.
+ */
 export async function removeDuplicateInputs(pool: Pool): Promise<string[]> {
   const { rows } = await pool.query(
     `with copies as (
-       select id, row_number() over (partition by owner_id, sha256 order by created_at desc, id) as n
-         from assets where kind = 'input' and deleted_at is null and sha256 ~ '^[0-9a-f]{64}$')
+       select a.id, row_number() over (partition by a.owner_id, a.sha256 order by
+           exists (select 1 from jobs j where j.deleted_at is not null and ${names('j')}) and not exists (select 1 from jobs j where j.deleted_at is null and ${names('j')}),
+           a.created_at desc, a.id) as n
+         from assets a where a.kind = 'input' and a.deleted_at is null and a.sha256 ~ '^[0-9a-f]{64}$')
      update assets a set deleted_at = now()
        from copies c
       where a.id = c.id and c.n > 1
-        and not exists (select 1 from jobs j where a.id = any(j.input_asset_ids) or strpos(j.params::text, a.id) > 0)
+        and not exists (select 1 from jobs j where ${names('j')})
         and not exists (select 1 from user_templates t where strpos(t.data::text, a.id) > 0)
         and not exists (select 1 from user_choices u where u.image_asset_id = a.id)
      returning a.id`,

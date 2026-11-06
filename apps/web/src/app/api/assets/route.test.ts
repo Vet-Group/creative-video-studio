@@ -1,5 +1,5 @@
 // Integration test against a disposable database and bucket on the compose Postgres and MinIO (`pnpm services:up`).
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { DeleteBucketCommand, DeleteObjectsCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { createTestDatabase } from '@cvs/db/testing';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
@@ -23,10 +23,15 @@ const PASSWORD = 'correct-horse-battery';
 const BASE = 'http://localhost/api/assets';
 const ctx = (id: string) => ({ params: Promise.resolve({ id }) });
 
-/** `size` bytes that start with `magic` and then count 0..250 over and over, so any slice is recognisable. */
+let made = 0;
+/**
+ * `size` bytes that start with `magic` and then count 0..250 over and over, so any slice is recognisable. The last four bytes number the call, so two files
+ * are never the same bytes (an upload of a file the caller already has returns that one).
+ */
 function file(magic: number[], size: number): Uint8Array<ArrayBuffer> {
   const bytes = new Uint8Array(new ArrayBuffer(size));
   bytes.forEach((_, i) => (bytes[i] = magic[i] ?? i % 251));
+  if (size >= magic.length + 4) new DataView(bytes.buffer).setUint32(size - 4, ++made);
   return bytes;
 }
 const png = (size: number) => file([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], size);
@@ -73,10 +78,11 @@ function mp3(ms: number, xing?: number): Uint8Array<ArrayBuffer> {
 const get = (path: string, cookie?: string, headers: Record<string, string> = {}) =>
   new Request(`http://localhost${path}`, { headers: { ...(cookie ? { cookie } : {}), ...headers } });
 
-function upload(cookie: string | undefined, ...files: { name: string; bytes: Uint8Array<ArrayBuffer>; type?: string; storeId?: string }[]) {
+function upload(cookie: string | undefined, ...files: { name: string; bytes: Uint8Array<ArrayBuffer>; type?: string; storeId?: string; slot?: string }[]) {
   const form = new FormData();
   for (const f of files) form.append('file', new File([f.bytes], f.name, { type: f.type ?? 'application/octet-stream' }));
   if (files[0]?.storeId !== undefined) form.append('storeId', files[0].storeId);
+  if (files[0]?.slot !== undefined) form.append('slot', files[0].slot);
   return POST(new Request(BASE, { method: 'POST', body: form, headers: cookie ? { cookie } : {} }));
 }
 
@@ -529,6 +535,35 @@ describe('GET /api/assets?recent=uploads', () => {
     expect(await names('&storeId=st-b')).toEqual(['b1.png']);
     expect(await names('&storeId=st-x')).toEqual([]);
     expect((await names('')).slice(0, 4)).toEqual(['a2.png', 'none.png', 'b1.png', 'a1.png']);
+  });
+
+  test('an upload of a file the caller already has returns that photo with its slot, and the picker filters by slot and shows each file once', async () => {
+    const bytes = png(64);
+    const send = async (who: string, name: string, slot?: string) => {
+      const res = await upload(who, { name, bytes, slot });
+      expect(res.status).toBe(201);
+      return ((await res.json()) as { assets: { id: string; filename: string }[] }).assets;
+    };
+    const [first] = await send(cookie, 'shirt.png', 'garment');
+    const before = await assetCount();
+    expect((await send(cookie, 'shirt-again.png', 'model')).map((a) => [a.id, a.filename])).toEqual([[first!.id, 'shirt.png']]); // the first slot stays
+    expect((await upload(cookie, { name: 'a.png', bytes }, { name: 'b.png', bytes })).status).toBe(201);
+    expect(await assetCount()).toBe(before);
+    expect((await pool.query('select slot, sha256 from assets where id = $1', [first!.id])).rows[0]).toEqual({ slot: 'garment', sha256: createHash('sha256').update(bytes).digest('hex') });
+    expect((await send(ownerCookie, 'theirs.png'))[0]!.id).not.toBe(first!.id); // another member's copy is their own
+
+    // An older copy (uploaded before hashing) shows once, as the newest; an unknown slot is ignored.
+    await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, sha256, slot, created_at)
+                      select 'old-copy', owner_id, 'input', 'assets/old-copy', 'old.png', mime, bytes, sha256, 'garment', now() - interval '1 day' from assets where id = $1`, [first!.id]);
+    const ids = async (query: string) => (await uploads(cookie, query)).map((a) => a.id);
+    expect((await ids('&slot=garment'))).toEqual([first!.id]);
+    expect(await ids('&slot=model')).toEqual([]);
+    expect((await ids('&slot=nonsense')).filter((id) => id === first!.id || id === 'old-copy')).toEqual([first!.id]);
+
+    // A copy that only a deleted job names goes with that job, so a new upload of its file is stored anew.
+    await job([first!.id], { deleted: true });
+    await pool.query(`update assets set deleted_at = now() where id = 'old-copy'`);
+    expect((await send(cookie, 'shirt-3.png'))[0]!.id).not.toBe(first!.id);
   });
 
   test(`stops at ${UPLOADS_LIMIT}, the oldest left out, and asks for a session`, async () => {

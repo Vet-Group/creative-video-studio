@@ -4,6 +4,7 @@ import { estimateUsd, extraInputUsd, FEATURE_PROMPTS, imagePricesFor, PROMPT_CEI
 import { videoInputs, videoRefProblem } from '@cvs/core/providers/fal';
 import { VIDEO_QUEUE, videoSendOptions } from '@cvs/core/queue';
 import { FEATURES } from '@cvs/db';
+import { fillInputSlots } from '@cvs/db/assets';
 import { pool } from '@/lib/auth';
 import { mp4VideoInfo } from '@/lib/assets';
 import { boss } from '@/lib/queue';
@@ -399,6 +400,7 @@ export async function POST(request: Request) {
       [id, userId, original?.team_id ?? null, storeId, retryOf, feature, modelId, provider, presetId, prompt, ratio, durationSec, JSON.stringify(params), assetIds, provider === 'mock', enhance, original?.enhanced_prompt ?? null],
     );
     await reserve(tx, id, estimate);
+    await fillInputSlots(tx, id); // the uploaded-photos picker files each photo under the slot it was first run from
     return null;
   });
   if (refused) return refused;
