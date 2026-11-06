@@ -33,6 +33,7 @@ import { Select } from './Select';
 import { Tray } from './Shell';
 import { Templates } from './Templates';
 import { PageHint } from './ToolGuide';
+import { VideoSettings } from './VideoSettings';
 
 interface VideoModel {
   id: string;
@@ -457,6 +458,11 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
     <ChoiceBox label="Hook (tuỳ chọn)" icon="film" media={hooks[0] ? cardSample(have, `marketing-hook-${hooks[0]}`) : undefined} value={hooks.length === 0 ? undefined : hooks.length === 1 ? hookName(hooks[0]!) : `${hooks.length} biến thể: ${hooks.map(hookName).join(', ')}`} onOpen={() => setPicker('hook')} onClear={() => setHooks([])} />
   );
 
+  /** The location: in ② Body when writing by sections, in the photo grid when writing freely. */
+  const locationBox = (
+    <ChoiceBox label="Bối cảnh (tuỳ chọn)" icon="sliders" media={location ? cardSample(have, `marketing-location-${location}`) : undefined} value={locationList.find((c) => c.id === location)?.name} onOpen={() => setPicker('location')} onClear={() => setLocation('')} />
+  );
+
   const tabs: Tab[] = narrow ? ['create', 'history', 'examples', 'about'] : ['history', 'examples', 'about'];
   const shown: Tab = narrow ? (tab ?? 'create') : tab === null || tab === 'create' ? opening : tab;
   const panel = shown === 'create' ? 'examples' : shown;
@@ -497,7 +503,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
                 </>
               )}
               {!sec && hookBox}
-              <ChoiceBox label="Bối cảnh (tuỳ chọn)" icon="sliders" media={location ? cardSample(have, `marketing-location-${location}`) : undefined} value={locationList.find((c) => c.id === location)?.name} onOpen={() => setPicker('location')} onClear={() => setLocation('')} />
+              {!sec && locationBox}
             </div>
 
             <PromptSections
@@ -527,6 +533,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
               filled={(sec ? hookText + prompt + ending : freeText).trim() !== ''}
               onRun={() => canRun && void run()}
             >
+              {sec && locationBox}
               <PromptComposer
                 id={promptId}
                 label="Prompt"
@@ -562,16 +569,18 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
               />
             )}
 
-            <div className="field-row">
-              {models && ratios.length > 0 && (
-                <Select label="Tỉ lệ" icon="ratio" heading="Chọn tỉ lệ" value={ratio} options={ratios.map((r) => ({ value: r, label: RATIO_LABEL[r]!, short: r }))} onChange={setRatio} />
-              )}
-              {models && durations.length > 0 && (
-                <Select label="Thời lượng" icon="clock" heading="Chọn thời lượng" value={String(durationSec)} options={durations.map((d) => ({ value: String(d), label: `${d} giây` }))} onChange={(v) => setDurationSec(Number(v))} />
-              )}
-            </div>
-            <AudioSwitch on={audio} available={chosen?.audioEstimateUsd != null} always={chosen?.alwaysAudio} onChange={setAudio} />
-            {models && models.length > 0 && <ModelPicker models={models.map((m) => ({ id: m.id, label: m.label, isMock: m.isMock, supported: !advanced || m.maxImages >= refs.length, estimateUsd: audio && m.audioEstimateUsd != null ? m.audioEstimateUsd : m.estimateUsd, score: m.score, recommended: m.recommended, resolution: m.resolution, durationsSec: m.durationsSec, audio: m.audioEstimateUsd != null, isNew: m.isNew, creditUsd: m.creditUsd }))} value={chosen?.id ?? ''} onChange={(id) => pickModel(models.find((m) => m.id === id)!)} />}
+            <VideoSettings>
+              <div className="field-row">
+                {models && ratios.length > 0 && (
+                  <Select label="Tỉ lệ" icon="ratio" heading="Chọn tỉ lệ" value={ratio} options={ratios.map((r) => ({ value: r, label: RATIO_LABEL[r]!, short: r }))} onChange={setRatio} />
+                )}
+                {models && durations.length > 0 && (
+                  <Select label="Thời lượng" icon="clock" heading="Chọn thời lượng" value={String(durationSec)} options={durations.map((d) => ({ value: String(d), label: `${d} giây` }))} onChange={(v) => setDurationSec(Number(v))} />
+                )}
+              </div>
+              <AudioSwitch on={audio} available={chosen?.audioEstimateUsd != null} always={chosen?.alwaysAudio} onChange={setAudio} />
+              {models && models.length > 0 && <ModelPicker models={models.map((m) => ({ id: m.id, label: m.label, isMock: m.isMock, supported: !advanced || m.maxImages >= refs.length, estimateUsd: audio && m.audioEstimateUsd != null ? m.audioEstimateUsd : m.estimateUsd, score: m.score, recommended: m.recommended, resolution: m.resolution, durationsSec: m.durationsSec, audio: m.audioEstimateUsd != null, isNew: m.isNew, creditUsd: m.creditUsd }))} value={chosen?.id ?? ''} onChange={(id) => pickModel(models.find((m) => m.id === id)!)} />}
+            </VideoSettings>
             {/* Under the model, so in free writing the ratio row sits right under the prompt box as on Fash. */}
             <PromptPreview feature="marketing" prompts={sent} labels={n > 1 ? variants.map((h, i) => `Biến thể ${i + 1} (${hookName(h)})`) : undefined} limit={chosen?.maxPromptChars} />
             {/* In the sections they sit in ③ Ending; in free writing, under the prompt preview. */}

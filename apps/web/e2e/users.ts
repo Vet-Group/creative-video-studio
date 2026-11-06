@@ -116,6 +116,8 @@ export const USERS = {
   // prompt-sections.e2e: the sectioned prompt on Create (secta) and Marketing Studio (sectb).
   secta: { email: 'secta@e2e.test', name: 'E2E Sections A', role: 'member' },
   sectb: { email: 'sectb@e2e.test', name: 'E2E Sections B', role: 'member' },
+  // prompt-sections.e2e: the prompt templates dialog's recent group (sectc), whose jobs must be the only ones the member has.
+  sectc: { email: 'sectc@e2e.test', name: 'E2E Sections C', role: 'member' },
   admin: { email: 'admin@e2e.test', name: 'E2E Admin', role: 'admin' },
 } as const;
 
