@@ -51,11 +51,15 @@ export type CustomChoices = { hooks?: MarketingChoice[]; locations?: MarketingCh
 const FRAMES: Record<string, string> = { '9:16': 'vertical 9:16 frame', '16:9': 'horizontal 16:9 frame', '1:1': 'square 1:1 frame' };
 const frameOf = (ratio?: string | null) => (ratio && FRAMES[ratio]) ?? (ratio ? `${ratio} frame` : 'vertical frame');
 
+/** Sentences the fixed instructions of the UGC, unboxing and review prompts share. */
+const KEEP_LOOKS = "keep their face, hair and body and the product's shape, colours, print and details exactly as in the photos.";
+const NO_TEXT = 'No on-screen text, logos or watermarks.';
+
 /** The fixed try-on instruction: who and what must stay true to the photos, and the shots a try-on clip needs (the whole look, a product close-up, the fit in motion). */
 const instruction = (ratio?: string | null) =>
   `UGC try-on video, ${frameOf(ratio)}, filmed handheld on a phone by a real creator. ` +
-  "The creator in [Image1] wears or holds the product in [Image2]; keep their face, hair and body and the product's shape, colours, print and details exactly as in the photos. " +
-  'Show the whole look, a close-up of the product, then a natural move or turn that shows the fit. Soft natural light, authentic energy. No on-screen text, logos or watermarks.';
+  `The creator in [Image1] wears or holds the product in [Image2]; ${KEEP_LOOKS} ` +
+  `Show the whole look, a close-up of the product, then a natural move or turn that shows the fit. Soft natural light, authentic energy. ${NO_TEXT}`;
 
 /** The formats whose jobs carry `params.format` (a UGC job carries none), each with its page. */
 export const PARAM_FORMATS = ['advanced', 'unboxing', 'review'] as const;
@@ -129,14 +133,14 @@ type Parts = { hook?: string | null; hookText?: string | null; location?: string
 
 /**
  * The prompt of a UGC, unboxing or review run: the format's fixed `head`, then the hook (the chosen one's phrase, else the member's own `hookText`) and
- * the location when chosen, then the member's own text as creator notes and the last shot (`ending`), then `sound` when `audio` is set. An unknown or
+ * the location when chosen, then the member's own text as creator notes and the last shot (`ending`), then `afterEnding` (a rule that must outrank both) and `sound` when `audio` is set. An unknown or
  * empty hook or location id adds nothing.
  */
-function compose(head: string, { hook, hookText, location, prompt, ending }: Parts, custom: CustomChoices, sound: string | null): string {
+function compose(head: string, { hook, hookText, location, prompt, ending }: Parts, custom: CustomChoices, sound: string | null, afterEnding: string | null = null): string {
   const h = [...HOOKS, ...(custom.hooks ?? [])].find((c) => c.id === hook);
   const l = [...LOCATIONS, ...(custom.locations ?? [])].find((c) => c.id === location);
   const text = prompt?.trim();
-  return [head, h?.phrase ?? hookLine(hookText), l && `Set in ${l.phrase}.`, text && `Creator notes: ${text}`, endingLine(ending), sound].filter(Boolean).join(' ');
+  return [head, h?.phrase ?? hookLine(hookText), l && `Set in ${l.phrase}.`, text && `Creator notes: ${text}`, endingLine(ending), afterEnding, sound].filter(Boolean).join(' ');
 }
 
 /**
@@ -146,6 +150,9 @@ function compose(head: string, { hook, hookText, location, prompt, ending }: Par
 export function marketingPrompt(parts: Parts, custom: CustomChoices = {}): string {
   return compose(instruction(parts.ratio), parts, custom, parts.audio === undefined ? null : parts.audio ? UGC_SOUND : SILENT);
 }
+
+/** The POV rule, after the hook and the last shot: a library hook or ending may show a person, which a clip of only hands cannot. */
+const POV_HANDS = "Throughout, only the creator's hands are seen, whatever the opening or the last shot describes.";
 
 /** Sound of an unboxing clip with audio on: the package, the paper and tape, and the creator's short reaction. */
 const UNBOXING_SOUND = "Natural sound recorded on the phone: the rustle of paper, the tape and the box opening, and the creator's short, casual spoken reaction to the product, with no background music.";
@@ -159,14 +166,14 @@ export function unboxingPrompt({ model, packaging, ...parts }: Parts & { model: 
   const frame = frameOf(parts.ratio);
   const head = [
     model
-      ? `UGC unboxing video, ${frame}, filmed handheld on a phone by a real creator. The creator in [Image1] opens a package and reveals the product in [Image2]; keep their face, hair and body and the product's shape, colours, print and details exactly as in the photos.`
+      ? `UGC unboxing video, ${frame}, filmed handheld on a phone by a real creator. The creator in [Image1] opens a package and reveals the product in [Image2]; ${KEEP_LOOKS}`
       : `POV unboxing video, ${frame}, filmed handheld on a phone from the creator's point of view: only their hands are seen. The hands open a package and reveal the product in [Image1]; keep the product's shape, colours, print and details exactly as in the photo.`,
     packaging && `The box or packaging looks like [Image${product + 1}].`,
-    'Show the closed package, the opening, the product lifted out and turned toward the camera, then a close look at the details. Soft natural light, authentic energy. No on-screen text, logos or watermarks.',
+    `Show the closed package, the opening, the product lifted out and turned toward the camera, then a close look at the details. Soft natural light, authentic energy. ${NO_TEXT}`,
   ]
     .filter(Boolean)
     .join(' ');
-  return compose(head, parts, custom, parts.audio === undefined ? null : parts.audio ? UNBOXING_SOUND : SILENT);
+  return compose(head, parts, custom, parts.audio === undefined ? null : parts.audio ? UNBOXING_SOUND : SILENT, model ? null : POV_HANDS);
 }
 
 /** Sound of a review clip with audio on and no script: the creator talks about the highlights, as recorded on the phone. */
@@ -174,16 +181,17 @@ const REVIEW_SOUND = 'The creator speaks to the camera in a casual, honest tone 
 
 /**
  * The one English prompt a Review run sends: the model in [Image1] reviews the product in [Image2] and talks about the member's `highlights` (1 to 3
- * lines). Sound on is speech about the points, or the exact `script` when there is one; off is silent.
+ * lines). Sound on is speech about the points, or the exact `script` when there is one; off is silent and the points are shown instead.
  */
 export function reviewPrompt({ highlights, script, ...parts }: Parts & { highlights: readonly string[]; script?: string | null }, custom: CustomChoices = {}): string {
   const points = highlightLines(highlights).map((p) => p.replace(/[.;]+$/, ''));
   const lines = script?.trim().replace(/\s+/g, ' ');
   const head =
     `UGC product review video, ${frameOf(parts.ratio)}, filmed handheld on a phone by a real creator. ` +
-    "The creator in [Image1] reviews the product in [Image2], wearing or holding it; keep their face, hair and body and the product's shape, colours, print and details exactly as in the photos. " +
-    `The creator talks to the camera about: ${points.join('; ')}. ` +
-    'Show the product up close and a natural move that shows how it fits or works. Soft natural light, honest energy. No on-screen text, logos or watermarks.';
+    `The creator in [Image1] reviews the product in [Image2], wearing or holding it; ${KEEP_LOOKS} ` +
+    // With sound off nobody speaks, so the points are shown rather than talked about.
+    `${parts.audio === false ? 'The creator shows each of these points' : 'The creator talks to the camera about'}: ${points.join('; ')}. ` +
+    `Show the product up close and a natural move that shows how it fits or works. Soft natural light, honest energy. ${NO_TEXT}`;
   const sound = parts.audio === undefined ? null : !parts.audio ? SILENT : lines ? `The creator says exactly: "${lines}", lip-synced, and no other spoken words.` : REVIEW_SOUND;
   return compose(head, parts, custom, sound);
 }

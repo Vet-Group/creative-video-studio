@@ -308,9 +308,17 @@ describe('/api/templates', () => {
         [{ promptMode: 'tabs' }, 'data.promptMode must be sections or free'],
         [{ format: 'bogus' }, 'data.format must be one of advanced, unboxing, review'],
         [{ roles: 'box,product' }, 'data.roles must be one of product | model,product | product,packaging | model,product,packaging'],
-        [{ highlights: ['a', 'b', 'c', 'd'] }, 'data.highlights must list up to 3 lines of at most 60 characters'],
-        [{ highlights: ['x'.repeat(61)] }, 'data.highlights must list up to 3 lines of at most 60 characters'],
-        [{ highlights: 'one' }, 'data.highlights must list up to 3 lines of at most 60 characters'],
+        [{ format: 'unboxing', roles: 'product' }, 'data.roles goes with the unboxing format and names each of its images'], // no image
+        [{ roles: 'product' }, 'data.roles goes with the unboxing format and names each of its images'], // no format
+        [{ format: 'review', roles: 'product' }, 'data.roles goes with the unboxing format and names each of its images'],
+        [{ format: 'review', highlights: ['a', 'b', 'c', 'd'] }, 'data.highlights must list 1 to 3 non-blank lines of at most 60 characters, one line each'],
+        [{ format: 'review', highlights: ['x'.repeat(61)] }, 'data.highlights must list 1 to 3 non-blank lines of at most 60 characters, one line each'],
+        [{ format: 'review', highlights: 'one' }, 'data.highlights must list 1 to 3 non-blank lines of at most 60 characters, one line each'],
+        [{ format: 'review', highlights: [] }, 'data.highlights must list 1 to 3 non-blank lines of at most 60 characters, one line each'],
+        [{ format: 'review', highlights: ['a', '  '] }, 'data.highlights must list 1 to 3 non-blank lines of at most 60 characters, one line each'],
+        [{ format: 'review', highlights: ['a\tb'] }, 'data.highlights must list 1 to 3 non-blank lines of at most 60 characters, one line each'],
+        [{ highlights: ['a'] }, 'data.highlights goes with the review format'],
+        [{ format: 'unboxing', highlights: ['a'] }, 'data.highlights goes with the review format'],
       ] as const) {
         expect(await error(await save(u, { name: 'Too long', feature: 'marketing', data: { images: [], ...data } }))).toBe(message);
       }

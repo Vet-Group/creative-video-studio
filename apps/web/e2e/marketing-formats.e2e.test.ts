@@ -133,6 +133,7 @@ test('Đánh giá sản phẩm: Run asks for the model, the product and a highli
   await line(page, 1).fill('Vải mềm, không nhăn');
   await expect(runButton(page)).toBeEnabled();
   await page.getByRole('button', { name: 'Thêm điểm nổi bật' }).click();
+  await expect(line(page, 2)).toBeFocused(); // Thêm moves focus to the new line
   await line(page, 2).fill('Giá hợp lý');
   await page.getByRole('button', { name: 'Thêm điểm nổi bật' }).click();
   await line(page, 3).fill('Giặt máy được');
@@ -140,6 +141,7 @@ test('Đánh giá sản phẩm: Run asks for the model, the product and a highli
   await expect(preview(page)).toContainText('The creator talks to the camera about: Vải mềm, không nhăn; Giá hợp lý; Giặt máy được.');
   await page.getByRole('button', { name: 'Xoá điểm nổi bật 2' }).click();
   await expect(line(page, 3)).toHaveCount(0);
+  await expect(line(page, 1)).toBeFocused(); // removing a line focuses the one before it
   await expect(line(page, 2)).toHaveValue('Giặt máy được');
   await expect(preview(page)).toContainText('about: Vải mềm, không nhăn; Giặt máy được.');
   await expect(page.getByRole('button', { name: 'Thêm điểm nổi bật' })).toBeVisible();

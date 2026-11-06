@@ -70,9 +70,16 @@ export function templateData(raw: unknown): TemplateData | string {
   for (const [k, max] of [['hookText', MAX_HOOK], ['ending', MAX_ENDING], ['endText', MAX_END_TEXT]] as const) if (d[k] !== undefined && (typeof d[k] !== 'string' || (d[k] as string).length > max)) return `data.${k} must be text of at most ${max} characters`;
   if (d.endTextPos !== undefined && !(END_TEXT_POSITIONS as readonly unknown[]).includes(d.endTextPos)) return `data.endTextPos must be one of ${END_TEXT_POSITIONS.join(', ')}`;
   if (d.format !== undefined && !isParamFormat(d.format)) return `data.format must be one of ${PARAM_FORMATS.join(', ')}`;
-  if (d.roles !== undefined && !(UNBOXING_ROLES as readonly unknown[]).includes(d.roles)) return `data.roles must be one of ${UNBOXING_ROLES.join(' | ')}`;
-  if (d.highlights !== undefined && (!Array.isArray(d.highlights) || d.highlights.length > MAX_HIGHLIGHTS || !d.highlights.every((h) => typeof h === 'string' && h.length <= MAX_HIGHLIGHT))) {
-    return `data.highlights must list up to ${MAX_HIGHLIGHTS} lines of at most ${MAX_HIGHLIGHT} characters`;
+  if (d.roles !== undefined) {
+    if (!(UNBOXING_ROLES as readonly unknown[]).includes(d.roles)) return `data.roles must be one of ${UNBOXING_ROLES.join(' | ')}`;
+    if (d.format !== 'unboxing' || (d.roles as string).split(',').length !== images.length) return 'data.roles goes with the unboxing format and names each of its images';
+  }
+  if (d.highlights !== undefined) {
+    const h = d.highlights;
+    if (!Array.isArray(h) || h.length < 1 || h.length > MAX_HIGHLIGHTS || !h.every((l) => typeof l === 'string' && l.trim() !== '' && l.length <= MAX_HIGHLIGHT && !/\p{Cc}/u.test(l))) {
+      return `data.highlights must list 1 to ${MAX_HIGHLIGHTS} non-blank lines of at most ${MAX_HIGHLIGHT} characters, one line each`;
+    }
+    if (d.format !== 'review') return 'data.highlights goes with the review format';
   }
   if (d.promptMode !== undefined && d.promptMode !== 'sections' && d.promptMode !== 'free') return 'data.promptMode must be sections or free';
   if (d.audio !== undefined && d.audio !== 'on' && d.audio !== 'off') return 'data.audio must be on or off';

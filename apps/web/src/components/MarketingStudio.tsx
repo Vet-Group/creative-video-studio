@@ -290,7 +290,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
         if (advanced) setRefs(inputs);
         else if (unboxing) {
           // The photos come in the order sent; the roles say which of them the job had.
-          const roles = j.roles?.split(',') ?? ['model', 'product'];
+          const roles = j.roles?.split(',') ?? (inputs.length === 1 ? ['product'] : ['model', 'product']);
           const photo = (role: string) => inputs.filter((_, n) => roles[n] === role).slice(0, 1);
           setPerson(photo('model'));
           setProduct(photo('product'));
@@ -419,9 +419,9 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
       const img = await photoImg(p).finally(loading('Đang tải ảnh...'));
       if (advanced) setRefs((cur) => (cur.length < maxRefs ? [...cur, img] : cur));
       else if (role === 'model') setPerson([img]);
-      else if (role === 'packaging') setPackaging([img]);
+      else if (role === 'packaging' && unboxing) setPackaging([img]);
       else setProduct([img]);
-      notify(advanced ? 'Đã thêm ảnh tham chiếu' : role === 'model' ? 'Đã dùng ảnh người mẫu' : role === 'packaging' ? 'Đã chọn ảnh bao bì' : 'Đã chọn ảnh sản phẩm');
+      notify(advanced ? 'Đã thêm ảnh tham chiếu' : role === 'model' ? 'Đã dùng ảnh người mẫu' : role === 'packaging' && unboxing ? 'Đã chọn ảnh bao bì' : 'Đã chọn ảnh sản phẩm');
     } catch (e) {
       setError(copyError(e, UPLOAD_ERROR));
     }
@@ -688,7 +688,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
                 ...((advanced || review) && { script: script.trim() }),
                 ...(advanced && video && { videoRef: video.id }),
                 ...(unboxing && { roles }),
-                ...(review && { highlights: highlightLines(highlights) }),
+                ...(review && highlightLines(highlights).length > 0 && { highlights: highlightLines(highlights) }),
                 hook: hooks[0],
                 location,
                 brief: brief.trim(),
