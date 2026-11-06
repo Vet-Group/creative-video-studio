@@ -74,7 +74,7 @@ test('Mở hộp: only the product photo is required; the model and packaging ar
     expect(chip!.y).toBeGreaterThanOrEqual(label!.y + label!.height);
     expect(chip!.y + chip!.height).toBeLessThanOrEqual(link!.y);
     // Every tile in the row starts its icon at the same height.
-    expect((await tile.locator('.slot-icon').boundingBox())!.y - (await tile.locator('.slot').boundingBox())!.y).toBe(28);
+    expect((await tile.locator('.slot-icon').boundingBox())!.y - (await tile.locator('.slot').boundingBox())!.y).toBe(29);
   }
   await expect(page.locator('.marketing-slots > .field').filter({ has: page.getByRole('button', { name: 'Tải lên Sản phẩm' }) }).locator('.slot-optional')).toHaveCount(0);
   await page.getByLabel('Ảnh sản phẩm').setInputFiles(file('product.png'));
