@@ -97,6 +97,30 @@ describe('realProviders', () => {
     } finally { rmSync(dir, { recursive: true }); }
   });
 
+  test('sends a Gemini Omni job to the Interactions API of the active Vertex account, with the WebP input as it is, and polls it there', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'cvs-omni-'));
+    const file = join(dir, 'key.json');
+    const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+    writeFileSync(file, JSON.stringify({ client_email: 'sa@test', private_key: privateKey.export({ type: 'pkcs8', format: 'pem' }), project_id: 'test' }));
+    const calls: { url: string; body?: any }[] = [];
+    vi.stubGlobal('fetch', async (url: string, init: RequestInit) => {
+      if (url.includes('oauth2.googleapis.com')) return Response.json({ access_token: 'fake', expires_in: 3600 });
+      calls.push({ url, body: init.body ? JSON.parse(init.body as string) : undefined });
+      return Response.json({ id: 'abc', status: 'in_progress' });
+    });
+    try {
+      const bytes = new Uint8Array(await sharp(small).webp().toBuffer());
+      const { providers } = realProviders(pool([{ ...asset, mime: 'image/webp', vertex_active_project: 'test' }]), { GOOGLE_APPLICATION_CREDENTIALS: file }, async () => bytes);
+      const model = { ...BAKEOFF_MODELS[0]!, provider: 'vertex' as const, endpoint: 'gemini-omni-1.2-flash', outputResolution: '720p', usdPerSecond: 0.0695 };
+      const { providerJobId } = await providers.vertex!.submit({ model, prompt: 'p', imageUrls: ['asset://a'], ratio: '9:16', durationSec: 5 });
+      expect(providerJobId).toMatch(/^acct:test\|vertex-omni-v1:/);
+      expect(calls[0]!.url).toBe('https://aiplatform.googleapis.com/v1beta1/projects/test/locations/global/interactions');
+      expect(calls[0]!.body.input[1]).toMatchObject({ type: 'image', mime_type: 'image/webp' });
+      expect(await providers.vertex!.status({ providerJobId, model })).toEqual({ state: 'running' });
+      expect(calls[1]!.url).toBe('https://aiplatform.googleapis.com/v1beta1/projects/test/locations/global/interactions/abc');
+    } finally { rmSync(dir, { recursive: true }); }
+  });
+
   test('submits a Kling job to fal with the input asset inlined from the bucket', async () => {
     const calls: { url: string; body: { image_urls: string[]; duration: string } }[] = [];
     vi.stubGlobal('fetch', async (url: string, init: { body: string }) => {

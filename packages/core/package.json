@@ -10,6 +10,7 @@
     "./providers/byteplus": "./src/providers/byteplus.ts",
     "./providers/vertex": "./src/providers/vertex.ts",
     "./providers/vertex-video": "./src/providers/vertex-video.ts",
+    "./providers/vertex-omni": "./src/providers/vertex-omni.ts",
     "./providers/vertex-accounts": "./src/providers/vertex-accounts.ts",
     "./providers/vertex-billing": "./src/providers/vertex-billing.ts",
     "./providers/balances": "./src/providers/balances.ts",
