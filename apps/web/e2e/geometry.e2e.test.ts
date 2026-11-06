@@ -434,7 +434,7 @@ test.describe('1440x1000', () => {
     await page.route(/\/api\/jobs\?mine/, (r) => r.fulfill({ json: { jobs: [], workerOffline: false } }));
     await page.reload();
     await page.getByRole('tab', { name: 'Lịch sử' }).click();
-    const empty = page.getByText('Chưa có job nào.');
+    const empty = page.getByText('Chưa có lượt tạo nào.');
     await expect(empty).toBeVisible();
     expect(await css(empty, 'font-size', 'color')).toEqual(['14px', 'rgb(102, 102, 102)']);
   });

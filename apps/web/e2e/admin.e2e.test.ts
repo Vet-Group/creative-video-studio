@@ -22,7 +22,7 @@ test('an Admin sets up a team, a store and a user, then reconciles the month cos
   await expect(page).toHaveURL(/\/admin\/overview$/);
   // The tab bar marks the page shown, and the Admin pages give the tray's width to their tables.
   await expect(nav(page, 'Tổng quan')).toHaveAttribute('aria-current', 'page');
-  await expect(page.getByRole('complementary', { name: 'Job của tôi' })).toHaveCount(0);
+  await expect(page.getByRole('complementary', { name: 'Lượt tạo của tôi' })).toHaveCount(0);
   await expect(page.getByText('Ngân sách video', { exact: true })).toBeVisible();
 
   // Teams: create one with a cost-centre code.

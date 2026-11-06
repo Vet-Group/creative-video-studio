@@ -33,7 +33,7 @@ const THEMES: readonly (readonly [Theme, string, IconName])[] = [
 ];
 
 const SHORTCUTS: readonly (readonly [string[], string])[] = [
-  [['Ctrl', 'Enter'], 'Chạy job khi đang nhập mô tả (⌘ + Enter trên Mac)'],
+  [['Ctrl', 'Enter'], 'Chạy lượt tạo khi đang nhập mô tả (⌘ + Enter trên Mac)'],
   [['Ctrl', ','], 'Mở Cài đặt từ bất kỳ trang nào (⌘ + , trên Mac)'],
   [['Esc'], 'Đóng hộp thoại, menu hoặc danh sách đang mở'],
   [['↑', '↓'], 'Di chuyển trong danh sách model và menu chọn, Enter để chọn'],

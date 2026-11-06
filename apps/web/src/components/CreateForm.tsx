@@ -393,12 +393,12 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
     setNotice('');
     try {
       await api('/api/jobs', sendJson('POST', { assetIds: images.map((i) => i.id), modelId, ...(presetId ? { presetId } : { prompt: composed, enhance }), ratio, durationSec, storeId: storeId || null, params: { audio: audioOn ? 'on' : 'off', ...(endAssetId && { endAssetId }), ...(audioAssetIds && { audioAssetIds }), ...(!presetId && sections) } }));
-      setNotice('Đã gửi job. Theo dõi trong tab "Lịch sử".');
+      setNotice('Đã gửi lượt tạo. Theo dõi trong tab "Lịch sử".');
       setRefetch((n) => n + 1);
       if (!narrow) setTab('history'); // beside the form, the new job shows in History
       await refresh();
     } catch (e) {
-      setError(errorText(e, 'Không gửi được job, hãy thử lại.'));
+      setError(errorText(e, 'Không gửi được lượt tạo, hãy thử lại.'));
     } finally {
       setBusy(false);
     }

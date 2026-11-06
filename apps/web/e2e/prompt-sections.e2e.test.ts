@@ -65,7 +65,7 @@ test('Create: the sections show by default, Khung prompt fills all three, the pr
   await expect(preview(page)).toHaveText([composed]);
   await expect(page.locator('.prompt-preview-count')).toHaveText(`${composed.length}/2000 ký tự`);
   await runButton(page).click();
-  await expect(page.getByText('Đã gửi job')).toBeVisible();
+  await expect(page.getByText('Đã gửi lượt tạo')).toBeVisible();
   const job = await newest(page, 'video');
   expect(job).toMatchObject({ prompt: composed, hookText: t.hook, ending: ENDINGS[2]!.phrase });
 
@@ -134,7 +134,7 @@ test('Marketing Studio: the own hook counts only with no hook chosen, the job ke
 
   const shown = await preview(page).innerText();
   await runButton(page).click();
-  await expect(page.getByText('Đã gửi job')).toBeVisible();
+  await expect(page.getByText('Đã gửi lượt tạo')).toBeVisible();
   const job = await newest(page, 'marketing');
   expect(job).toMatchObject({ prompt: shown, hookText: t.hook, brief: t.body, ending: t.ending, hook: null });
   // The Library detail shows the member's own hook beside the brief and the ending.

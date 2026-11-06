@@ -187,7 +187,7 @@ export async function runInUi(page: Page, options: { preset?: string; ratio?: st
   if (options.store) await selectText(page, 'Cửa hàng/Thương hiệu', options.store);
   await expect(modelButton(page)).toContainText('Mock E2E');
   await page.getByRole('button', { name: 'Tạo video' }).click();
-  await expect(page.getByText('Đã gửi job')).toBeVisible();
+  await expect(page.getByText('Đã gửi lượt tạo')).toBeVisible();
 }
 
 /** Starts a mock job through the API with the page's session; returns the job id. */

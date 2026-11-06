@@ -10,7 +10,7 @@ const file = (name: string) => ({ name, mimeType: 'image/png', buffer: png() });
 const runButton = (page: Page) => page.getByRole('button', { name: /^Tạo video/ });
 const hookBox = (page: Page) => page.getByRole('button', { name: /^Hook/ });
 const locationBox = (page: Page) => page.getByRole('button', { name: /^Bối cảnh/ });
-const history = (page: Page) => page.getByRole('complementary', { name: 'Job của tôi' });
+const history = (page: Page) => page.getByRole('complementary', { name: 'Lượt tạo của tôi' });
 const unique = () => Date.now().toString(36); // a retry makes new items, so names never clash with the first attempt's
 
 async function upload(page: Page, name: string): Promise<string> {
@@ -149,7 +149,7 @@ test('Thêm hook and Thêm bối cảnh save the member’s own, choose them at 
   const preview = page.locator('.prompt-preview p');
   await expect(preview).toContainText(`${hook.phrase} Set in ${spot.phrase}.`);
   await runButton(page).click();
-  await expect(page.getByText('Đã gửi job')).toBeVisible();
+  await expect(page.getByText('Đã gửi lượt tạo')).toBeVisible();
   await expect(page.getByRole('region', { name: 'Thông báo' }).getByText('Clip đã xong')).toBeVisible({ timeout: 60_000 });
 
   // A fresh page refilled from History has the same choices and the same prompt.

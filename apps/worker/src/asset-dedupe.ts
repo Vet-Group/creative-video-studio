@@ -1,4 +1,4 @@
-// Duplicate uploads (owner decision 2026-11-06: "Ảnh đã tải" shows each photo once, and copies nothing uses are removed). An upload hashes its bytes at once
+// Duplicate uploads (owner decision 2026-11-06: the uploaded-photos picker shows each photo once, and copies nothing uses are removed). An upload hashes its bytes at once
 // (assets.sha256); this sweep hashes the inputs uploaded before that, then soft-deletes every extra copy of the same file of one owner that no job, template
 // or choice refers to, keeping the newest. A copy something refers to stays (the picker shows its file once anyway). The purge's usual rules then apply.
 import { createHash } from 'node:crypto';
@@ -31,7 +31,7 @@ const names = (j: string) => `(a.id = any(${j}.input_asset_ids) or strpos(${j}.p
 
 /**
  * Soft-deletes the extra copies of a file (same owner and hash) that nothing refers to, keeping the newest copy the purge will not take (one that only
- * deleted jobs name goes with them), so the file stays in "Ảnh đã tải"; returns the ids it deleted.
+ * deleted jobs name goes with them), so the file stays in the uploaded-photos picker; returns the ids it deleted.
  */
 export async function removeDuplicateInputs(pool: Pool): Promise<string[]> {
   const { rows } = await pool.query(

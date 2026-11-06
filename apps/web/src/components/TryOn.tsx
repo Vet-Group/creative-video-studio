@@ -162,11 +162,11 @@ export function TryOn({ reuse }: { reuse?: string }) {
         ...(sent ? { prompt: sent } : {}),
       };
       await api('/api/jobs', sendJson('POST', body));
-      setNotice('Đã gửi job. Theo dõi trong tab "Lịch sử".');
+      setNotice('Đã gửi lượt tạo. Theo dõi trong tab "Lịch sử".');
       if (!narrow) setTab('history');
       await refresh();
     } catch (e) {
-      setError(errorText(e, 'Không gửi được job, hãy thử lại.'));
+      setError(errorText(e, 'Không gửi được lượt tạo, hãy thử lại.'));
     } finally {
       setBusy(false);
     }

@@ -104,10 +104,10 @@ test('a mock marketing job runs from two photos, a hook and a location, and show
   await expect(preview).toContainText(' soft morning light Natural sound recorded on the phone:');
   const shown = await preview.innerText();
   await runButton(page).click();
-  await expect(page.getByText('Đã gửi job')).toBeVisible();
+  await expect(page.getByText('Đã gửi lượt tạo')).toBeVisible();
   await expect(page.getByRole('tab', { name: 'Lịch sử' })).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByRole('region', { name: 'Thông báo' }).getByText('Clip đã xong')).toBeVisible({ timeout: 60_000 });
-  await expect(page.getByRole('complementary', { name: 'Job của tôi' }).getByText('Hoàn tất')).toHaveCount(1);
+  await expect(page.getByRole('complementary', { name: 'Lượt tạo của tôi' }).getByText('Hoàn tất')).toHaveCount(1);
 
   const jobs = (await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { id: string; feature: string; ratio: string; durationSec: number }[] };
   expect(jobs.jobs.map((j) => [j.feature, j.ratio])).toEqual([['marketing', '9:16']]);
@@ -204,7 +204,7 @@ test('a second model with other ratios and durations can be picked: the menus of
   await expect(select(page, 'Thời lượng')).toHaveAttribute('data-value', '10'); // moved to the model's own duration
   await expect(runButton(page)).toBeEnabled();
   await runButton(page).click();
-  await expect(page.getByText('Đã gửi job')).toBeVisible();
+  await expect(page.getByText('Đã gửi lượt tạo')).toBeVisible();
   await expect.poll(async () => ((await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { feature: string; ratio: string; durationSec: number; modelId: string }[] }).jobs.map((j) => [j.feature, j.modelId, j.ratio, j.durationSec])).toEqual([['marketing', 'mock-e2e-wide', '16:9', 10]]);
 
   // Back to the first model: the ratio and the duration move to its own.

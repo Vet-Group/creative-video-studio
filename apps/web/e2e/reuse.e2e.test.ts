@@ -22,7 +22,7 @@ test('the reuse link in History refills a UGC job, and an Advanced job opens on 
 
   await page.goto('/marketing-studio');
   await page.getByRole('tab', { name: 'Lịch sử' }).click();
-  const tray = page.getByRole('complementary', { name: 'Job của tôi' });
+  const tray = page.getByRole('complementary', { name: 'Lượt tạo của tôi' });
   await tray.getByRole('button', { name: 'Dùng lại' }).first().click();
   await expect(page).toHaveURL((u) => u.pathname === '/marketing-studio' && u.search === ''); // in place, as Fash's Recreate: the URL stays
   await expect(page.getByLabel('Người mẫu: ảnh đã chọn').getByRole('img', { name: 'model.png' })).toBeVisible();

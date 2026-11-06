@@ -2,8 +2,8 @@ ALTER TABLE "assets" ADD COLUMN "sha256" text;--> statement-breakpoint
 ALTER TABLE "assets" ADD COLUMN "slot" text;--> statement-breakpoint
 CREATE INDEX "assets_owner_id_sha256_idx" ON "assets" USING btree ("owner_id","sha256");--> statement-breakpoint
 -- Owner decision 2026-11-06: the uploaded-photos picker opens on the photos of the slot it was opened from. An input uploaded before this is put in the slot
--- of the first job that used it (lib/upload-slots.ts keys): Try On's person, garments and background; UGC Marketing Studio's model and product, and
--- Advanced's references; Create video's photos and end frame; Image Generation's photos. An input only an app used, or none, keeps null and shows under "Tất cả".
+-- of the first job that used it (lib/upload-slots.ts keys): Try On's person, garments and background; UGC Marketing Studio's model and product, Unboxing's photos by their roles, and
+-- Advanced's references; Create video's photos and end frame; Image Generation's photos. An input only an app used, or none, keeps null and shows only when no slot is chosen.
 WITH uses AS (
 	SELECT u.asset_id, u.slot, j.created_at
 	FROM jobs j

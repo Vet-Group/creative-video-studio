@@ -189,7 +189,7 @@ test('a History card translates its English prompt on Dịch and hides it again'
   expect((await page.request.post('/api/jobs', { data: { feature: 'image', modelId: 'mock-image-e2e', assetIds: [], ratio: '1:1', prompt, enhance: false, params: { resolution: '1K' } } })).status()).toBe(201);
   await page.goto('/image-generation');
   await page.getByRole('tab', { name: 'Lịch sử' }).click();
-  const card = page.getByRole('complementary', { name: 'Job của tôi' }).getByRole('listitem').filter({ hasText: 'turning slowly by the window' });
+  const card = page.getByRole('complementary', { name: 'Lượt tạo của tôi' }).getByRole('listitem').filter({ hasText: 'turning slowly by the window' });
   await card.getByRole('button', { name: 'Dịch', exact: true }).click({ timeout: 60_000 });
   const reading = card.getByRole('group', { name: 'Bản dịch tiếng Việt' });
   await expect(reading).toHaveText(`Translation: ${prompt}`, { timeout: 20_000 });

@@ -11,7 +11,7 @@ export const canRetry = (job: TrayJob): boolean => RETRYABLE.includes(job.status
 export const canRetryOnTwin = (job: TrayJob): boolean => RETRYABLE.includes(job.status) && !job.retried && !job.retryOf && job.failureReason === 'real_person' && !!job.twin;
 
 /** The retry button's label and the confirmation's question for a twin run, with its price as the twin would book it. */
-export const twinRetryText = (job: TrayJob) => ({ button: `Chạy lại bằng ${job.twin!.label}`, ask: `Chạy lại job này bằng ${job.twin!.label} với giá khoảng $${job.twin!.estimateUsd}?` });
+export const twinRetryText = (job: TrayJob) => ({ button: `Chạy lại bằng ${job.twin!.label}`, ask: `Chạy lại lượt tạo này bằng ${job.twin!.label} với giá khoảng $${job.twin!.estimateUsd}?` });
 
 // What a Member reads about a job that did not finish; the raw error is for Admins.
 const FAILURE_TEXT = (noun: string): Partial<Record<JobStatus, string>> => ({

@@ -268,7 +268,7 @@ export function JobsProvider({ userId, children }: { userId: string; children: R
       return; // storage blocked (a privacy setting, a full quota): no news toasts, but the tray still updates
     }
     setNews(true);
-    const done = fresh.map((j) => ({ ok: j.status === 'succeeded', text: j.status === 'succeeded' ? (j.resolution ? 'Ảnh đã xong' : 'Clip đã xong') : 'Một job không thành công' }));
+    const done = fresh.map((j) => ({ ok: j.status === 'succeeded', text: j.status === 'succeeded' ? (j.resolution ? 'Ảnh đã xong' : 'Clip đã xong') : 'Một lượt tạo không thành công' }));
     setToasts((cur) => [...cur, ...done.map((n) => ({ id: nextId.current++, ...n }))]);
     announce(done.map((n) => n.text));
   }, [userId]);

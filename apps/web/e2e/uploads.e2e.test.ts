@@ -31,7 +31,7 @@ test('a photo uploaded on Image Generation is offered by "Ảnh đã tải" on C
   const run = page.getByRole('button', { name: 'Tạo video' });
   await expect(run).toBeEnabled();
   await run.click();
-  await expect(page.getByText('Đã gửi job')).toBeVisible();
+  await expect(page.getByText('Đã gửi lượt tạo')).toBeVisible();
 
   // Try On: the model slot's own link fills its one photo.
   await page.goto('/try-on');

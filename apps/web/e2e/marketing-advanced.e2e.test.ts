@@ -87,7 +87,7 @@ test('an Advanced job runs from reference images, a brief, a script and audio on
   const shown = await page.locator('.prompt-preview p').innerText();
 
   await runButton(page).click();
-  await expect(page.getByText('Đã gửi job')).toBeVisible();
+  await expect(page.getByText('Đã gửi lượt tạo')).toBeVisible();
   await expect(page.getByRole('tab', { name: 'Lịch sử' })).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByRole('region', { name: 'Thông báo' }).getByText('Clip đã xong')).toBeVisible({ timeout: 60_000 });
 
@@ -126,7 +126,7 @@ test('audio off makes a silent job, the reference slot stops at the model cap, a
   await expect(audio(page)).toHaveAttribute('aria-checked', 'false');
   await expect(page.locator('.switch-row')).toContainText('Tắt');
   await runButton(page).click();
-  await expect(page.getByText('Đã gửi job')).toBeVisible();
+  await expect(page.getByText('Đã gửi lượt tạo')).toBeVisible();
   const jobs = (await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { id: string }[] };
   const detail = (await (await page.request.get(`/api/jobs/${jobs.jobs[0]!.id}`)).json()) as { prompt: string };
   expect(detail.prompt).toContain('The video is completely silent');

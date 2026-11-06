@@ -58,7 +58,7 @@ for (const size of SIZES) {
     await page.getByRole('tab', { name: 'Lịch sử' }).click();
     await expect(page.getByText('Hoàn tất')).toBeVisible();
     // The History card shows the clip's video with its poster: wait for the poster to load so the screenshot is stable.
-    const poster = await page.getByRole('complementary', { name: 'Job của tôi' }).locator('video').getAttribute('poster');
+    const poster = await page.getByRole('complementary', { name: 'Lượt tạo của tôi' }).locator('video').getAttribute('poster');
     await page.evaluate((src) => new Promise((done) => Object.assign(new Image(), { onload: done, src })), poster!);
     await expect(page).toHaveScreenshot(`create-history-${at}.png`, SHOT);
 
@@ -187,7 +187,7 @@ for (const width of [1280, 1023]) {
     await page.keyboard.press('Home');
     await expect(tab(width >= 1024 ? 'Lịch sử' : 'Tạo')).toHaveAttribute('aria-selected', 'true'); // the first tab in the row
     if (width < 1024) await expect(page.locator('.form-card')).toBeVisible();
-    else await expect(page.getByRole('complementary', { name: 'Job của tôi' })).toBeVisible();
+    else await expect(page.getByRole('complementary', { name: 'Lượt tạo của tôi' })).toBeVisible();
   });
 }
 
@@ -275,7 +275,7 @@ test('choosing a preset or using an example fills the form and creates no job', 
 
   // Nothing was submitted, and the history is still empty.
   await page.getByRole('tab', { name: 'Lịch sử' }).click();
-  await expect(page.getByText('Chưa có job nào.')).toBeVisible();
+  await expect(page.getByText('Chưa có lượt tạo nào.')).toBeVisible();
   expect(posts).toEqual([]);
 });
 

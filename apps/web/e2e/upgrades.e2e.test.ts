@@ -51,7 +51,7 @@ test('AC 11: Image Generation asks before a Run of 1 USD or more; No sends nothi
 
   await barRun(page).click();
   await answer(page, 'Chạy job này với giá $1.2000?', true);
-  await expect(page.getByText('Đã gửi job')).toBeVisible();
+  await expect(page.getByText('Đã gửi lượt tạo')).toBeVisible();
   expect(posts()).toBe(1);
 
   await priceImages(page, '0.5000');
@@ -59,7 +59,7 @@ test('AC 11: Image Generation asks before a Run of 1 USD or more; No sends nothi
   await barPrompt(page).fill('a cheap picture');
   await expect(barRun(page)).toContainText('$0.5000');
   await barRun(page).click();
-  await expect(page.getByText('Đã gửi job')).toBeVisible();
+  await expect(page.getByText('Đã gửi lượt tạo')).toBeVisible();
   expect(posts()).toBe(2);
   await expect(page.locator('dialog.confirm[open]'), 'no question under 1 USD').toHaveCount(0);
   await page.unrouteAll({ behavior: 'ignoreErrors' }); // the list refetched after a Run may still be in flight
@@ -77,12 +77,12 @@ test("AC 11: Thử lại on a failed job of 1 USD or more asks with the job's pr
   await page.route('**/api/jobs', (r) => (r.request().method() === 'POST' ? (retried++, r.fulfill({ status: 201, json: { id: 'retry-2', status: 'queued' } })) : r.fallback()));
   await page.goto('/image-generation');
   await page.getByRole('tab', { name: 'Lịch sử' }).click();
-  const card = page.getByRole('complementary', { name: 'Job của tôi' }).getByRole('listitem').filter({ hasText: 'a costly retry' });
+  const card = page.getByRole('complementary', { name: 'Lượt tạo của tôi' }).getByRole('listitem').filter({ hasText: 'a costly retry' });
   await card.getByRole('button', { name: 'Thử lại' }).click();
-  await answer(page, 'Thử lại job này với giá khoảng $3.0000?', false);
+  await answer(page, 'Thử lại lượt tạo này với giá khoảng $3.0000?', false);
   expect(retried).toBe(0);
   await card.getByRole('button', { name: 'Thử lại' }).click();
-  await answer(page, 'Thử lại job này với giá khoảng $3.0000?', true);
+  await answer(page, 'Thử lại lượt tạo này với giá khoảng $3.0000?', true);
   await expect.poll(() => retried).toBe(1);
   await page.unrouteAll({ behavior: 'ignoreErrors' });
 });
@@ -106,7 +106,7 @@ test('Thử lại is disabled while the retry is sent, so a double click sends o
   });
   await page.goto('/image-generation');
   await page.getByRole('tab', { name: 'Lịch sử' }).click();
-  const retry = page.getByRole('complementary', { name: 'Job của tôi' }).getByRole('listitem').filter({ hasText: 'a cheap retry' }).getByRole('button', { name: 'Thử lại' });
+  const retry = page.getByRole('complementary', { name: 'Lượt tạo của tôi' }).getByRole('listitem').filter({ hasText: 'a cheap retry' }).getByRole('button', { name: 'Thử lại' });
   await retry.dblclick();
   await expect(retry).toBeDisabled();
   await expect.poll(() => retried).toBe(1);
@@ -135,7 +135,7 @@ test('AC 11: Create asks with the price its Run button shows', async ({ page }) 
   expect(posts()).toBe(0);
   await run.click();
   await answer(page, 'Chạy job này với giá $1.5000?', true);
-  await expect(page.getByText('Đã gửi job')).toBeVisible();
+  await expect(page.getByText('Đã gửi lượt tạo')).toBeVisible();
   expect(posts()).toBe(1);
   await page.unrouteAll({ behavior: 'ignoreErrors' });
 });
@@ -153,7 +153,7 @@ test('AC 12: Ctrl+Enter in the prompt runs once, Enter alone does not, and at 1.
   // Run waits for hydration and for the remembered settings to load, which a loaded machine makes slow.
   await expect(barRun(page)).toBeEnabled();
   await barPrompt(page).press('Control+Enter');
-  await expect(page.getByText('Đã gửi job')).toBeVisible();
+  await expect(page.getByText('Đã gửi lượt tạo')).toBeVisible();
   expect(posts()).toBe(1);
 
   await priceImages(page, '1.2000');

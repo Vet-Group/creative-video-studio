@@ -12,7 +12,7 @@ test('a History card shows the text, inputs and chips, and its favourite, new-ta
 
   await page.goto('/image-generation');
   await openTab(page, 'Lịch sử');
-  const card = page.getByRole('complementary', { name: 'Job của tôi' }).getByRole('listitem').filter({ hasText: 'a studio shot of the bag' });
+  const card = page.getByRole('complementary', { name: 'Lượt tạo của tôi' }).getByRole('listitem').filter({ hasText: 'a studio shot of the bag' });
   await expect(card.getByText('Hoàn tất')).toBeVisible({ timeout: 60_000 });
   await expect(card.getByRole('heading', { name: /Tạo ảnh/ })).toBeVisible();
   await expect(card.getByRole('list', { name: 'Ảnh đầu vào' }).locator('img')).toHaveCount(2); // decorative thumbnails (alt="")
@@ -52,7 +52,7 @@ test('as on Fash, a History chip sets its resolution, ratio or duration on the f
 
   await page.goto('/image-generation');
   await page.getByRole('tab', { name: 'Lịch sử' }).click();
-  const card = page.getByRole('complementary', { name: 'Job của tôi' }).getByRole('listitem').filter({ hasText: 'chips shot' });
+  const card = page.getByRole('complementary', { name: 'Lượt tạo của tôi' }).getByRole('listitem').filter({ hasText: 'chips shot' });
   await expect(card.getByText('Hoàn tất')).toBeVisible({ timeout: 60_000 });
   // The page opens as this job ran (the remembered settings), so the form is moved off them before each chip.
   await expect(select(page, 'Độ phân giải')).toHaveAttribute('data-value', '2K');
@@ -73,7 +73,7 @@ test('as on Fash, a History chip sets its resolution, ratio or duration on the f
   await runViaApi(page); // 9:16, 5 s
   await page.goto('/create');
   await page.getByRole('tab', { name: 'Lịch sử' }).click();
-  const clip = page.getByRole('complementary', { name: 'Job của tôi' }).getByRole('listitem').first();
+  const clip = page.getByRole('complementary', { name: 'Lượt tạo của tôi' }).getByRole('listitem').first();
   await expect(clip.getByText('Hoàn tất')).toBeVisible({ timeout: 60_000 });
   await selectValue(page, 'Tỉ lệ khung hình', '1:1');
   await expect(select(page, 'Thời lượng')).toHaveAttribute('data-value', '5'); // remembered from the clip
@@ -99,7 +99,7 @@ test("as on Fash, a History card's words, inputs and result go on the form besid
 
   await page.goto('/image-generation');
   await page.getByRole('tab', { name: 'Lịch sử' }).click();
-  const card = page.getByRole('complementary', { name: 'Job của tôi' }).getByRole('listitem').filter({ hasText: 'pieces shot' });
+  const card = page.getByRole('complementary', { name: 'Lượt tạo của tôi' }).getByRole('listitem').filter({ hasText: 'pieces shot' });
   await expect(card.getByText('Hoàn tất')).toBeVisible({ timeout: 60_000 });
   const note = (text: string) => page.getByRole('region', { name: 'Thông báo' }).getByText(text);
   const chosen = page.getByRole('list', { name: 'Ảnh đã chọn' });
@@ -122,7 +122,7 @@ test("as on Fash, a History card's words, inputs and result go on the form besid
   // Longer words are cut at four lines with show more, which opens them all.
   const long = 'a linen summer dress on a model walking down a sunny old-town street, soft morning light, the camera follows from the side, then a close-up of the fabric moving in the breeze';
   expect((await page.request.post('/api/jobs', { data: { feature: 'image', modelId: 'mock-image-e2e', assetIds: [], ratio: '1:1', prompt: long, enhance: false, params: { resolution: '1K' } } })).status()).toBe(201);
-  const longCard = page.getByRole('complementary', { name: 'Job của tôi' }).getByRole('listitem').filter({ hasText: 'old-town street' });
+  const longCard = page.getByRole('complementary', { name: 'Lượt tạo của tôi' }).getByRole('listitem').filter({ hasText: 'old-town street' });
   await expect(longCard.getByText('Hoàn tất')).toBeVisible({ timeout: 60_000 });
   const more = longCard.getByRole('button', { name: 'Xem thêm' });
   await expect(more).toHaveAttribute('aria-expanded', 'false');
@@ -138,7 +138,7 @@ test("as Fash's Generate Video, an image in History opens Create video with the 
   expect(res.status()).toBe(201);
   await page.goto('/image-generation');
   await page.getByRole('tab', { name: 'Lịch sử' }).click();
-  const card = page.getByRole('complementary', { name: 'Job của tôi' }).getByRole('listitem').filter({ hasText: 'a picture to animate' });
+  const card = page.getByRole('complementary', { name: 'Lượt tạo của tôi' }).getByRole('listitem').filter({ hasText: 'a picture to animate' });
   await expect(card.getByText('Hoàn tất')).toBeVisible({ timeout: 60_000 });
   await card.getByRole('link', { name: 'Tạo video' }).click();
   await expect(page).toHaveURL(/\/create\?image=[\w-]+$/);
@@ -185,13 +185,13 @@ test('a failed read of the job list says so with Thử lại instead of a blank 
   await page.route(/\/api\/jobs\?mine/, (r) => (fail ? r.fulfill({ status: 500, json: { error: 'down' } }) : r.fallback()));
   await page.goto('/image-generation');
   await page.getByRole('tab', { name: 'Lịch sử' }).click();
-  const history = page.getByRole('complementary', { name: 'Job của tôi' });
-  await expect(history.getByText('Không tải được danh sách job.')).toBeVisible();
-  await expect(history.getByText('Chưa có job nào.')).toHaveCount(0); // not read, so not known to be empty
+  const history = page.getByRole('complementary', { name: 'Lượt tạo của tôi' });
+  await expect(history.getByText('Không tải được danh sách lượt tạo.')).toBeVisible();
+  await expect(history.getByText('Chưa có lượt tạo nào.')).toHaveCount(0); // not read, so not known to be empty
 
   fail = false;
   await history.getByRole('button', { name: 'Thử lại' }).click();
-  await expect(history.getByText('Chưa có job nào.')).toBeVisible();
+  await expect(history.getByText('Chưa có lượt tạo nào.')).toBeVisible();
   await expect(history.getByRole('alert')).toHaveCount(0);
 
   // The empty History points to the form beside it.
@@ -200,8 +200,8 @@ test('a failed read of the job list says so with Thử lại instead of a blank 
 
   // The next poll fails: what was read stays, with a short notice.
   fail = true;
-  await expect(history.getByText('Không cập nhật được danh sách job.')).toBeVisible({ timeout: 15_000 });
-  await expect(history.getByText('Chưa có job nào.')).toBeVisible();
+  await expect(history.getByText('Không cập nhật được danh sách lượt tạo.')).toBeVisible({ timeout: 15_000 });
+  await expect(history.getByText('Chưa có lượt tạo nào.')).toBeVisible();
   fail = false;
   await history.getByRole('button', { name: 'Thử lại' }).click();
   await expect(history.getByRole('alert')).toHaveCount(0);
@@ -212,8 +212,8 @@ test('on a phone, Bắt đầu ngay in an empty History opens the form tab and p
   await signIn(page, 'emptya');
   await page.goto('/create');
   await page.getByRole('tab', { name: 'Lịch sử' }).click();
-  const history = page.getByRole('complementary', { name: 'Job của tôi' });
-  await expect(history.getByText('Chưa có job nào.')).toBeVisible();
+  const history = page.getByRole('complementary', { name: 'Lượt tạo của tôi' });
+  await expect(history.getByText('Chưa có lượt tạo nào.')).toBeVisible();
   await history.getByRole('button', { name: 'Bắt đầu ngay' }).click();
   await expect(page.getByRole('tab', { name: 'Tạo' })).toHaveAttribute('aria-selected', 'true');
   await expect(history).toBeHidden();
@@ -233,7 +233,7 @@ test('the compact tray beside a page without its own History gives a failed job 
   const mine = async () => ((await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { status: string }[] }).jobs;
   await expect.poll(async () => (await mine()).map((j) => j.status).sort(), { timeout: 60_000 }).toEqual(['failed', 'succeeded']);
   await page.goto('/account/sign-in-methods');
-  const tray = page.getByRole('complementary', { name: 'Job của tôi' });
+  const tray = page.getByRole('complementary', { name: 'Lượt tạo của tôi' });
   const failed = tray.getByRole('listitem').filter({ hasText: 'Thất bại' });
   const done = tray.getByRole('listitem').filter({ hasText: 'Hoàn tất' });
   await expect(failed.getByRole('button', { name: 'Thử lại' })).toHaveClass('job-reuse job-primary');
@@ -259,7 +259,7 @@ test('on a phone a Member reads the real-person sentence on the failed card, wit
   await answerWithRefusal(page);
   await page.goto('/create');
   await page.getByRole('tab', { name: 'Lịch sử' }).click();
-  const card = page.getByRole('complementary', { name: 'Job của tôi' }).getByRole('listitem').filter({ hasText: 'Thất bại' });
+  const card = page.getByRole('complementary', { name: 'Lượt tạo của tôi' }).getByRole('listitem').filter({ hasText: 'Thất bại' });
   await expect(card.getByText(REAL_PERSON)).toBeVisible();
   await expect(card.getByRole('button', { name: 'Thử lại' })).toHaveCount(0);
   await expect(card.getByRole('button', { name: 'Dùng lại' })).toBeVisible(); // beside the form it refills in place
@@ -273,7 +273,7 @@ test('on a phone an Admin sees the provider code on the failed card and opens th
   await answerWithRefusal(page);
   await page.goto('/create');
   await page.getByRole('tab', { name: 'Lịch sử' }).click();
-  const card = page.getByRole('complementary', { name: 'Job của tôi' }).getByRole('listitem').filter({ hasText: 'Thất bại' });
+  const card = page.getByRole('complementary', { name: 'Lượt tạo của tôi' }).getByRole('listitem').filter({ hasText: 'Thất bại' });
   await expect(card.getByText(REAL_PERSON)).toBeVisible();
   await expect(card.getByText('byteplus · InputImageSensitiveContentDetected.PrivacyInformation')).toBeVisible();
   await expect(card.locator('details')).not.toHaveAttribute('open', ''); // the raw error is folded
@@ -290,7 +290,7 @@ test('the compact tray gives the refused job the same sentence and no Thử lạ
   await signIn(page, 'loada');
   await answerWithRefusal(page);
   await page.goto('/account/sign-in-methods');
-  const failed = page.getByRole('complementary', { name: 'Job của tôi' }).getByRole('listitem').filter({ hasText: 'Thất bại' });
+  const failed = page.getByRole('complementary', { name: 'Lượt tạo của tôi' }).getByRole('listitem').filter({ hasText: 'Thất bại' });
   await expect(failed.getByText(REAL_PERSON)).toBeVisible();
   await expect(failed.getByRole('button', { name: 'Thử lại' })).toHaveCount(0);
   await expect(failed.getByRole('link', { name: 'Dùng lại' })).toBeVisible();

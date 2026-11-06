@@ -172,7 +172,7 @@ test('a saved template and History’s Dùng lại refill the end frame and the 
   await withExtras(page, { endFrame: true, audioClips: { max: 2, seconds: 15 } });
   await page.goto('/create');
   await page.getByRole('tab', { name: 'Lịch sử' }).click();
-  await page.getByRole('complementary', { name: 'Job của tôi' }).getByRole('button', { name: 'Dùng lại' }).first().click();
+  await page.getByRole('complementary', { name: 'Lượt tạo của tôi' }).getByRole('button', { name: 'Dùng lại' }).first().click();
   await expect(endSlot(page).getByRole('img', { name: 'end.png' })).toBeVisible();
   await expect(picker.getByRole('listitem')).toHaveText(['song.wav · 4.0 giây', 'voice.wav · 2.5 giây']);
 

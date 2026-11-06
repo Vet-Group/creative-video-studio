@@ -68,10 +68,10 @@ test('Try On: a missing slot keeps Run disabled with a reason, a mock run reache
   await expect(select(page, 'Tỉ lệ')).toHaveAttribute('data-value', 'auto');
 
   await run.click();
-  await expect(page.getByText('Đã gửi job')).toBeVisible();
+  await expect(page.getByText('Đã gửi lượt tạo')).toBeVisible();
   await expect(page.getByRole('tab', { name: 'Lịch sử' })).toHaveAttribute('aria-selected', 'true');
   await expect(toast(page, 'Ảnh đã xong')).toBeVisible({ timeout: 60_000 });
-  const tray = page.getByRole('complementary', { name: 'Job của tôi' });
+  const tray = page.getByRole('complementary', { name: 'Lượt tạo của tôi' });
   await expect(tray.getByText('Hoàn tất')).toHaveCount(1);
   await expect(tray.locator('.job-chips').first().locator('button')).toHaveText(['1K', 'auto']); // the History card's resolution and ratio chips
 
@@ -109,7 +109,7 @@ test('Try On: a missing slot keeps Run disabled with a reason, a mock run reache
   await nav(page).getByRole('link', { name: 'Tạo video' }).click();
   await expect(page).toHaveURL(/\/create$/); // Try On has a History tab too; wait for Create's
   await page.getByRole('tab', { name: 'Lịch sử' }).click();
-  await expect(page.getByText('Chưa có job nào.')).toBeVisible();
+  await expect(page.getByText('Chưa có lượt tạo nào.')).toBeVisible();
   await expect(page.getByText('Hoàn tất')).toHaveCount(0);
 });
 
@@ -346,12 +346,12 @@ test('Image Generation: the bar needs a prompt (and an image only on a model wit
   await expect(enhance).toHaveText('Cải thiện: tắt');
 
   await run.click();
-  await expect(page.getByText('Đã gửi job')).toBeVisible();
+  await expect(page.getByText('Đã gửi lượt tạo')).toBeVisible();
   const sent = ((await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { id: string }[] }).jobs[0]!;
   expect(await (await page.request.get(`/api/jobs/${sent.id}`)).json()).toMatchObject({ prompt: 'a red shirt on a hanger', enhance: false, enhancedPrompt: null });
   await expect(page.getByRole('tab', { name: 'Lịch sử' })).toHaveAttribute('aria-selected', 'true');
   await expect(toast(page, 'Ảnh đã xong')).toBeVisible({ timeout: 60_000 });
-  const tray = page.getByRole('complementary', { name: 'Job của tôi' });
+  const tray = page.getByRole('complementary', { name: 'Lượt tạo của tôi' });
   await expect(tray.getByText('Hoàn tất')).toHaveCount(1);
   await expect(tray.locator('.job-chips').first().locator('button')).toHaveText(['2K', '1:1']);
 
@@ -380,7 +380,7 @@ test('Image Generation, as Fash text-to-image: words alone make a picture on a m
   await bar.getByRole('textbox', { name: 'Mô tả cảnh bạn muốn tạo' }).fill('a linen dress on a sunny balcony');
   await bar.getByRole('button', { name: /^Tạo ảnh/ }).click();
   await page.getByRole('tab', { name: 'Lịch sử' }).click();
-  const card = page.getByRole('complementary', { name: 'Job của tôi' }).getByRole('listitem').filter({ hasText: 'a linen dress on a sunny balcony' });
+  const card = page.getByRole('complementary', { name: 'Lượt tạo của tôi' }).getByRole('listitem').filter({ hasText: 'a linen dress on a sunny balcony' });
   await expect(card.getByText('Hoàn tất')).toBeVisible({ timeout: 60_000 });
 
   await page.route(/\/api\/image-models\?feature=image/, async (r) => {

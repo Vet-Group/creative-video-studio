@@ -519,11 +519,11 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
         await api('/api/jobs', sendJson('POST', body));
         sentOk.push(hookName(hook));
       } catch (e) {
-        refused.push(n > 1 ? `${hookName(hook)}: ${errorText(e, 'không gửi được')}` : errorText(e, 'Không gửi được job, hãy thử lại.'));
+        refused.push(n > 1 ? `${hookName(hook)}: ${errorText(e, 'không gửi được')}` : errorText(e, 'Không gửi được lượt tạo, hãy thử lại.'));
       }
     }
     if (sentOk.length > 0) {
-      setNotice(n > 1 ? `Đã gửi ${sentOk.length}/${n} biến thể: ${sentOk.join(', ')}. Theo dõi trong tab "Lịch sử".` : 'Đã gửi job. Theo dõi trong tab "Lịch sử".');
+      setNotice(n > 1 ? `Đã gửi ${sentOk.length}/${n} biến thể: ${sentOk.join(', ')}. Theo dõi trong tab "Lịch sử".` : 'Đã gửi lượt tạo. Theo dõi trong tab "Lịch sử".');
       if (!narrow) setTab('history');
     }
     if (refused.length > 0) setError(n > 1 ? `Không gửi được ${refused.join('; ')}` : refused[0]!);

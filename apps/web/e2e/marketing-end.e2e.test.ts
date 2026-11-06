@@ -72,7 +72,7 @@ test('a mock Run keeps Cảnh kết and Chữ trên khung cuối, the worker bur
   await openPage(page);
   await fill(page);
   await runButton(page).click();
-  await expect(page.getByText('Đã gửi job')).toBeVisible();
+  await expect(page.getByText('Đã gửi lượt tạo')).toBeVisible();
 
   const mine = async () => ((await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { id: string; status: string; feature: string }[] }).jobs.filter((j) => j.feature === 'marketing');
   await expect.poll(async () => (await mine())[0]?.status, { timeout: 60_000 }).toBe('succeeded');

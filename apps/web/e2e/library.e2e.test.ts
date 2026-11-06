@@ -192,7 +192,7 @@ test('Library detail: how an item was made for anyone, marks by keyboard, ←/�
   await done(page, [older, newer]);
 
   await page.goto('/library');
-  await expect(page.getByRole('complementary', { name: 'Job của tôi' })).toHaveCount(0); // the Library already lists every result
+  await expect(page.getByRole('complementary', { name: 'Lượt tạo của tôi' })).toHaveCount(0); // the Library already lists every result
   const item = (id: string) => page.getByRole('article', { name: new RegExp(`${id.slice(0, 8)}\\.[a-z0-9]+$`) });
   const detail = page.getByRole('dialog');
   const recipe = detail.getByRole('definition');

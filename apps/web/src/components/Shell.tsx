@@ -43,7 +43,7 @@ function TrayItem({ job, isAdmin }: { job: TrayJob; isAdmin: boolean }) {
   const thumb = job.posterAssetId ?? (job.resolution ? job.outputAssetId : null); // an image job's output is its own picture
   async function retry(onTwin = false) {
     setSending(true); // from the click on, so a double click cannot send two paid jobs
-    if (await confirmRun(onTwin ? job.twin!.estimateUsd : job.estimateUsd, onTwin ? twinRetryText(job).ask : `Thử lại job này với giá khoảng $${job.estimateUsd}?`)) {
+    if (await confirmRun(onTwin ? job.twin!.estimateUsd : job.estimateUsd, onTwin ? twinRetryText(job).ask : `Thử lại lượt tạo này với giá khoảng $${job.estimateUsd}?`)) {
       setProblem('');
       try {
         await api('/api/jobs', sendJson('POST', { retryOf: job.id, ...(onTwin && { onTwin }) }));
@@ -130,7 +130,7 @@ function HistoryCard({ job, isAdmin, select }: { job: TrayJob; isAdmin: boolean;
   }
   const retry = async (onTwin = false) => {
     setSending(true); // from the click on, so a double click cannot send two paid jobs
-    if (await confirmRun(onTwin ? job.twin!.estimateUsd : job.estimateUsd, onTwin ? twinRetryText(job).ask : `Thử lại job này với giá khoảng $${job.estimateUsd}?`)) await act(async () => (await api('/api/jobs', sendJson('POST', { retryOf: job.id, ...(onTwin && { onTwin }) })), await refresh()), 'Không thử lại được');
+    if (await confirmRun(onTwin ? job.twin!.estimateUsd : job.estimateUsd, onTwin ? twinRetryText(job).ask : `Thử lại lượt tạo này với giá khoảng $${job.estimateUsd}?`)) await act(async () => (await api('/api/jobs', sendJson('POST', { retryOf: job.id, ...(onTwin && { onTwin }) })), await refresh()), 'Không thử lại được');
     setSending(false);
   };
   const toggleFavorite = () => act(async () => setFavorite((await api<{ favorite: boolean }>(`/api/jobs/${job.id}/favorite`, sendJson('PUT', { favorite: !favorite }))).favorite), 'Không lưu được mục yêu thích.');
@@ -278,7 +278,7 @@ function HistoryCard({ job, isAdmin, select }: { job: TrayJob; isAdmin: boolean;
               </button>
             )}
             {savable && (
-              <button type="button" className="icon-button" onClick={() => void openSave()} aria-label={`Lưu mẫu từ job lúc ${fmtTime(job.createdAt)}`} title="Lưu thành mẫu">
+              <button type="button" className="icon-button" onClick={() => void openSave()} aria-label={`Lưu mẫu từ lượt tạo lúc ${fmtTime(job.createdAt)}`} title="Lưu thành mẫu">
                 <Icon name="plus" />
               </button>
             )}
@@ -308,7 +308,7 @@ function HistoryEmpty() {
   };
   return (
     <div className="library-empty">
-      <p className="muted">Chưa có job nào.</p>
+      <p className="muted">Chưa có lượt tạo nào.</p>
       <p className="library-empty-actions">
         <button type="button" onClick={toForm}>
           Bắt đầu ngay
@@ -327,11 +327,11 @@ export function Tray({ feature }: { feature?: string }) {
   const jobs = feature ? all.jobs.filter((j) => j.feature === feature) : all.jobs;
   const zip = useZipDownload();
   return (
-    <aside className={feature ? 'tray history' : 'tray'} aria-label="Job của tôi">
-      <h2>Job của tôi</h2>
-      {workerOffline && <p className="warn">Máy xử lý đang tạm ngừng: chưa nhận được tín hiệu, job sẽ chạy khi máy hoạt động lại.</p>}
-      {failed && <LoadError text={loaded ? 'Không cập nhật được danh sách job.' : 'Không tải được danh sách job.'} onRetry={refresh} />}
-      {loaded && jobs.length === 0 && (feature ? <HistoryEmpty /> : <p className="muted">Chưa có job nào.</p>)}
+    <aside className={feature ? 'tray history' : 'tray'} aria-label="Lượt tạo của tôi">
+      <h2>Lượt tạo của tôi</h2>
+      {workerOffline && <p className="warn">Máy xử lý đang tạm ngừng: chưa nhận được tín hiệu, lượt tạo sẽ chạy khi máy hoạt động lại.</p>}
+      {failed && <LoadError text={loaded ? 'Không cập nhật được danh sách lượt tạo.' : 'Không tải được danh sách lượt tạo.'} onRetry={refresh} />}
+      {loaded && jobs.length === 0 && (feature ? <HistoryEmpty /> : <p className="muted">Chưa có lượt tạo nào.</p>)}
       <ul>
         {jobs.map((j) => (feature ? <HistoryCard key={j.id} job={j} isAdmin={isAdmin} select={zip.check(j.id, `${cardTitle(j)} ${fmtTime(j.createdAt)}`)} /> : <TrayItem key={j.id} job={j} isAdmin={isAdmin} />))}
       </ul>

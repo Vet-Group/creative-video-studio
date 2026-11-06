@@ -137,11 +137,11 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
     try {
       const body = { feature: 'image', modelId: pick.modelId, assetIds: images.map((i) => i.id), prompt: prompt.trim(), ...(styleId && { presetId: styleId }), enhance, ratio: pick.ratio, storeId: storeId || null, useBrand, params: { resolution: pick.resolution, ...(pick.thinking && { thinking: pick.thinking }) } };
       await api('/api/jobs', sendJson('POST', body));
-      setNotice('Đã gửi job. Theo dõi trong tab "Lịch sử".');
+      setNotice('Đã gửi lượt tạo. Theo dõi trong tab "Lịch sử".');
       setTab('history');
       await refresh();
     } catch (e) {
-      setError(errorText(e, 'Không gửi được job, hãy thử lại.'));
+      setError(errorText(e, 'Không gửi được lượt tạo, hãy thử lại.'));
     } finally {
       setBusy(false);
     }

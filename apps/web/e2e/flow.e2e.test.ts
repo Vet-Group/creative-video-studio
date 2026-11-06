@@ -19,7 +19,7 @@ test('a Member runs a mock job and works through the Library', async ({ page }) 
   await runInUi(page, { preset: 'slow-orbit', ratio: '1:1', duration: '8', store: 'E2E Shop' });
 
   // The tray shows the live state, then the toast announces the result.
-  const tray = page.getByRole('complementary', { name: 'Job của tôi' });
+  const tray = page.getByRole('complementary', { name: 'Lượt tạo của tôi' });
   await expect(tray).toBeVisible();
   await expect(page.getByRole('region', { name: 'Thông báo' }).getByText('Clip đã xong')).toBeVisible({ timeout: 60_000 });
   await expect(tray.getByText('Hoàn tất')).toBeVisible();
