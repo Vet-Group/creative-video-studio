@@ -214,11 +214,17 @@ export const assets = pgTable(
     durationMs: integer('duration_ms'),
     /** The store chosen on the page an input was uploaded from, for the uploaded-photos picker's store filter; null when none was chosen. */
     storeId: text('store_id').references(() => stores.id, { onDelete: 'set null' }),
+    /** The hex SHA-256 of an input's bytes: an upload of a file the owner already has reuses that asset, and the uploaded-photos picker shows each file once.
+     * Null until hashed (an upload hashes at once; the worker hashes older inputs, apps/worker/src/asset-dedupe.ts). */
+    sha256: text('sha256'),
+    /** The form slot an input was uploaded or first used for (lib/upload-slots.ts: garment, model, product...), for the uploaded-photos picker's tabs; null when unknown. */
+    slot: text('slot'),
     createdAt: tstz('created_at').notNull().defaultNow(),
     deletedAt: tstz('deleted_at'),
   },
   (t) => [
     index('assets_owner_id_idx').on(t.ownerId),
+    index('assets_owner_id_sha256_idx').on(t.ownerId, t.sha256),
     index('assets_owner_id_store_id_created_at_idx').on(t.ownerId, t.storeId, t.createdAt),
     check('assets_kind_check', sql`${t.kind} in ('input', 'output')`),
   ],

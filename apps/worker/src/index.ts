@@ -2,6 +2,7 @@
 import { serviceAccountToken } from '@cvs/core/providers/vertex';
 import { readVertexBilling } from '@cvs/core/providers/vertex-billing';
 import { createPool, databaseUrl } from '@cvs/db/client';
+import { DEDUPE_TICK_MS, dedupeTick } from './asset-dedupe';
 import { createMockImageProvider, createMockProvider } from './mock-provider';
 import { realProviders } from './real-providers';
 import { fakeSuggester } from './suggest';
@@ -39,6 +40,14 @@ if (real.vertexAccounts.length) {
   void tick();
   setInterval(tick, VERTEX_TICK_MS).unref();
 }
+
+// Hash the inputs uploaded before uploads were hashed, and remove the copies of a file nothing uses (asset-dedupe.ts); unref'd like the Vertex tick.
+const dedupe = () =>
+  dedupeTick(pool)
+    .then(({ hashed, removed }) => (hashed || removed) && console.log(`worker: dedupe: hashed ${hashed}, removed ${removed} duplicate uploads`))
+    .catch((e) => console.error('worker: dedupe:', e instanceof Error ? e.message : e));
+void dedupe();
+setInterval(dedupe, DEDUPE_TICK_MS).unref();
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.once(signal, async () => {

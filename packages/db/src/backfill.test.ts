@@ -93,3 +93,40 @@ test('0068 gives uploads a store column (FK set null, owner/store/date index) an
   await pool.query(`delete from stores where id = 'sc'`);
   expect((await pool.query(`select store_id from assets where id = 'a1'`)).rows).toEqual([{ store_id: null }]);
 });
+
+test('0077 puts each earlier input in the slot of the first job that used it, and leaves outputs and unused inputs alone', async () => {
+  const asset = (id: string, kind = 'input') =>
+    pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) values ($1, 'u1', $2, $1, 'f.jpg', 'image/jpeg', 1)`, [id, kind]);
+  for (const id of ['s-person', 's-top', 's-skirt', 's-bg', 's-model', 's-product', 's-ref', 's-frame', 's-end', 's-img', 's-unused', 's-app']) await asset(id);
+  await asset('s-out', 'output');
+  const job = (id: string, feature: string, inputs: string[], createdAt: string, params = '{}') =>
+    pool.query(
+      `insert into jobs (id, user_id, team_id, feature, model, provider, prompt, aspect, duration_s, input_asset_ids, created_at, params)
+       values ($1, 'u1', 'team-unassigned', $2, 'kling-o3-pro', 'fal', 'p', '9:16', 5, $3, $4, $5)`,
+      [id, feature, inputs, createdAt, params],
+    );
+  await job('s1', 'try_on', ['s-person', 's-top', 's-skirt', 's-bg'], '2026-11-01 10:00:00+07', '{"garments":"2"}');
+  await job('s2', 'marketing', ['s-model', 's-product'], '2026-11-01 11:00:00+07');
+  await job('s3', 'marketing', ['s-ref', 's-out'], '2026-11-01 12:00:00+07', '{"format":"advanced"}');
+  await job('s4', 'video', ['s-frame', 's-product'], '2026-11-02 10:00:00+07', '{"endAssetId":"s-end"}'); // s-product keeps its first slot
+  await job('s5', 'image', ['s-img'], '2026-11-02 11:00:00+07');
+  await job('s6', 'background_changer', ['s-app'], '2026-11-02 12:00:00+07');
+  const file = readFileSync(new URL('../migrations/0077_upload_dedupe.sql', import.meta.url), 'utf8');
+  await pool.query(file.slice(file.indexOf('WITH uses')));
+  const { rows } = await pool.query(`select id, slot from assets where id like 's-%' order by id`);
+  expect(Object.fromEntries(rows.map((r: { id: string; slot: string | null }) => [r.id, r.slot]))).toEqual({
+    's-app': null,
+    's-bg': 'background',
+    's-end': 'end-frame',
+    's-frame': 'video',
+    's-img': 'image',
+    's-model': 'model',
+    's-out': null,
+    's-person': 'model',
+    's-product': 'product',
+    's-ref': 'reference',
+    's-skirt': 'garment',
+    's-top': 'garment',
+    's-unused': null,
+  });
+});
