@@ -512,6 +512,13 @@
       "when": 1794395279036,
       "tag": "0073_omni_flash_1_2",
       "breakpoints": true
+    },
+    {
+      "idx": 73,
+      "version": "7",
+      "when": 1794395339036,
+      "tag": "0074_vertex_omni_1_2",
+      "breakpoints": true
     }
   ]
 }

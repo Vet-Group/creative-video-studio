@@ -3,9 +3,11 @@ import { createFalEnhancer, createOpenAiEnhancer } from '@cvs/core/enhance';
 import { createFalSuggester, createOpenAiSuggester } from '@cvs/core/suggest';
 import { createFalImageProvider, createFalProvider } from '@cvs/core/providers/fal';
 import type { ReadImage } from '@cvs/core/providers/http';
+import type { VideoProvider } from '@cvs/core/providers';
 import { createByteplusImageProvider, createByteplusProvider } from '@cvs/core/providers/byteplus';
 import { createVertexImageProvider } from '@cvs/core/providers/vertex';
 import { pinToAccounts, type VertexAccount, vertexAccounts } from '@cvs/core/providers/vertex-accounts';
+import { createVertexOmniProvider, VERTEX_OMNI_MODEL } from '@cvs/core/providers/vertex-omni';
 import { createVertexVideoProvider } from '@cvs/core/providers/vertex-video';
 import sharp from 'sharp';
 import type { WorkerDeps } from './worker';
@@ -89,7 +91,14 @@ export function realProviders(
       if (image.contentType !== 'image/webp') return image;
       return { bytes: new Uint8Array(await sharp(image.bytes).png().toBuffer()), contentType: 'image/png' };
     };
-    providers.vertex = pinToAccounts(accounts.map(({ project, key }) => [project, createVertexVideoProvider({ key, project, region: 'us-central1', readImage: videoReadImage })]), active);
+    // One Vertex video provider per account over both adapters: Gemini Omni (Interactions API, global) by its endpoint, Veo (us-central1) for the rest.
+    const vertexVideo = (project: string, key: VertexAccount['key']): VideoProvider => {
+      const veo = createVertexVideoProvider({ key, project, region: 'us-central1', readImage: videoReadImage });
+      const omni = createVertexOmniProvider({ key, project, readImage });
+      const by = (model: { endpoint: string }) => (model.endpoint === VERTEX_OMNI_MODEL ? omni : veo);
+      return { submit: (req) => by(req.model).submit(req), status: (job) => by(job.model).status(job), cancel: (job) => by(job.model).cancel(job) };
+    };
+    providers.vertex = pinToAccounts(accounts.map(({ project, key }) => [project, vertexVideo(project, key)]), active);
     imageProviders.vertex = pinToAccounts(
       accounts.map(({ project, key }) => [project, createVertexImageProvider({ key, project, region: env.GOOGLE_CLOUD_LOCATION || undefined, readImage, store: { put: putObject, get: getObject, delete: deleteObject } })]),
       active,

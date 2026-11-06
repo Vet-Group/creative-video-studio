@@ -10,6 +10,7 @@
 import { imageSize } from './image-size';
 import { estimate, ImageReadError, imageEstimate, imageTokens, packJobId, plainImage, ProviderHttpError, resolveImages, sendJson, sizeFor, timeout, unpackJobId, type Fetch, type ReadImage } from './http';
 import { isByteplusVideo } from './byteplus';
+import { VERTEX_OMNI_MODEL } from './vertex-omni';
 import { FAL_TEXT_ENDPOINTS } from '../models';
 import type { ImageProvider, ImageSubmitRequest, ProviderStatus, SubmitRequest, VideoProvider } from './types';
 
@@ -160,6 +161,8 @@ export function videoInputs(endpoint: string) {
   const spec: VideoBody | undefined = Object.hasOwn(VIDEO_BODIES, endpoint) ? VIDEO_BODIES[endpoint] : undefined;
   // BytePlus Seedance runs from the prompt alone and takes neither an end frame nor reference audio (byteplus.ts).
   if (isByteplusVideo(endpoint)) return { endFrame: false, endMaxSec: null, textOnly: true, audioClips: null };
+  // Vertex Omni runs from the prompt alone, takes a last frame with one first frame up to 10 s, and no reference audio (vertex-omni.ts).
+  if (endpoint === VERTEX_OMNI_MODEL) return { endFrame: true, endMaxSec: 10, textOnly: true, audioClips: null };
   return { endFrame: spec?.end !== undefined, endMaxSec: spec?.endMaxSec ?? null, textOnly: spec?.text !== undefined, audioClips: spec?.audio ? { max: spec.audio.max, seconds: spec.audio.seconds } : null };
 }
 

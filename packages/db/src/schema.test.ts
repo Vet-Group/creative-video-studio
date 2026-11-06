@@ -4,7 +4,8 @@ import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { ALWAYS_AUDIO, AUDIO_USD_PER_SECOND, BAKEOFF_MODELS } from '../../core/src/models';
 import { tokenCost } from '../../core/src/providers/byteplus';
-import { VIDEO_BODIES } from '../../core/src/providers/fal';
+import { VIDEO_BODIES, videoInputs } from '../../core/src/providers/fal';
+import { VERTEX_OMNI_MODEL } from '../../core/src/providers/vertex-omni';
 import { PRESETS } from '../../core/src/presets';
 import { createTestDatabase } from './testing';
 
@@ -182,6 +183,7 @@ describe('migrations 0023 and 0060 in Marketing Studio', () => {
     const { rows } = await pool.query(`select id, endpoint, ratios, max_images, sources->'nativeAudio'->>'readAt' as audio_read from model_configs where 'marketing' = any(features) and provider <> 'mock' order by id`);
     expect(rows.map((r) => [r.id, r.ratios, r.max_images])).toEqual([
       ['gemini-omni-flash-reference', ['9:16', '16:9'], 9], // no 1:1 in its schema
+      ['gemini-omni-flash-reference-vertex', ['9:16', '16:9'], 9], // 0074, the Vertex twin: Google's ratios are the same two
       ['grok-imagine-reference', ['9:16', '1:1', '16:9', '4:3', '3:4'], 7],
       ['kling-o3-pro', ['9:16', '1:1', '16:9'], 7],
       ['minimax-h3-max-reference', ['9:16', '1:1', '16:9', '4:3', '3:4'], 9],
@@ -191,8 +193,8 @@ describe('migrations 0023 and 0060 in Marketing Studio', () => {
       ['seedance-2.5-reference', ['9:16', '1:1', '16:9', '4:3', '3:4'], 7],
       ['wan-2.7-reference', ['9:16', '1:1', '16:9', '4:3', '3:4'], 4], // the app caps Advanced at the row's 4
     ]);
-    // An audio switch with its own price (0023), or always sound at the stored price with the paid test's note (0060).
-    for (const r of rows) expect(r.endpoint in AUDIO_USD_PER_SECOND || (ALWAYS_AUDIO.has(r.endpoint) && r.audio_read === '2026-11-04'), r.id).toBe(true);
+    // An audio switch with its own price (0023), or always sound at the stored price with the paid test's note (0060; the Vertex Omni row has Google's statement of 2026-11-06 instead, 0074).
+    for (const r of rows) expect(r.endpoint in AUDIO_USD_PER_SECOND || (ALWAYS_AUDIO.has(r.endpoint) && r.audio_read === (r.id === 'gemini-omni-flash-reference-vertex' ? '2026-11-06' : '2026-11-04')), r.id).toBe(true);
     for (const e of ALWAYS_AUDIO) expect(e in AUDIO_USD_PER_SECOND, e).toBe(false);
   });
 });
@@ -716,7 +718,7 @@ describe('cost_entries', () => {
 
 describe('migration 0073 Gemini Omni Flash 1.2', () => {
   test('moves both rows to the v1.2 endpoints in place, at 3 to 15 s and $0.0819 a second, with every source on v1.2', async () => {
-    const { rows } = await pool.query(`select id, endpoint, ratios, durations_sec, max_images, max_prompt_chars, usd_per_second::float as usd, enabled, sources from model_configs where id like 'gemini-omni-flash%' order by id`);
+    const { rows } = await pool.query(`select id, endpoint, ratios, durations_sec, max_images, max_prompt_chars, usd_per_second::float as usd, enabled, sources from model_configs where id like 'gemini-omni-flash%' and provider = 'fal' order by id`);
     expect(rows.map((r) => [r.id, r.endpoint, r.durations_sec, r.usd, r.max_images, r.max_prompt_chars])).toEqual([
       ['gemini-omni-flash', 'google/gemini-omni-flash/v1.2/image-to-video', [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], 0.0819, 1, 20000],
       ['gemini-omni-flash-reference', 'google/gemini-omni-flash/v1.2/reference-to-video', [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], 0.0819, 9, 20000],
@@ -730,6 +732,27 @@ describe('migration 0073 Gemini Omni Flash 1.2', () => {
     }
     expect(rows[1].sources.nativeAudio.readAt).toBe('2026-11-04'); // the paid test ran on v1.1
     expect(VIDEO_BODIES['google/gemini-omni-flash/v1.2/image-to-video']!.text).toBe('google/gemini-omni-flash/v1.2/text-to-video');
+  });
+});
+
+describe('migration 0074 Gemini Omni 1.2 Flash on Vertex', () => {
+  test('adds two disabled Vertex rows that copy their fal twins within what the adapter sends, at $0.0695 a second, with Google sources', async () => {
+    const pick = `select kind, features, ratios, durations_sec, max_images, max_prompt_chars, pass_seed_passes, pass_seed_total from model_configs where id = $1`;
+    for (const [id, twin, label, images] of [
+      ['gemini-omni-flash-vertex', 'gemini-omni-flash', 'Gemini Omni Flash (Vertex)', 1],
+      ['gemini-omni-flash-reference-vertex', 'gemini-omni-flash-reference', 'Gemini Omni Flash Reference (Vertex)', 9],
+    ] as const) {
+      expect((await pool.query(pick, [id])).rows[0], id).toEqual((await pool.query(pick, [twin])).rows[0]);
+      const [row] = (await pool.query(`select provider, endpoint, label, enabled, ratios, durations_sec, max_images, output_resolution, usd_per_second::text as usd, sources from model_configs where id = $1`, [id])).rows;
+      expect(row, id).toMatchObject({ provider: 'vertex', endpoint: VERTEX_OMNI_MODEL, label, enabled: false, ratios: ['9:16', '16:9'], durations_sec: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], max_images: images, output_resolution: '720p', usd: '0.0695' });
+      expect(row.sources.usdPerSecond, id).toMatchObject({ url: 'https://cloud.google.com/gemini-enterprise-agent-platform/generative-ai/pricing', readAt: '2026-11-06' });
+      expect(row.sources.usdPerSecond.note, id).toMatch(/^estimate:/);
+      for (const k of ['endpoint', 'ratios', 'durationsSec', 'outputResolution', 'usdPerSecond', 'nativeAudio']) expect(row.sources[k], `${id} ${k}`).toMatchObject({ url: expect.stringContaining('google'), readAt: '2026-11-06' });
+      expect(row.sources.billedAmountField, id).toBeUndefined();
+      expect(ALWAYS_AUDIO.has(row.endpoint), id).toBe(true);
+    }
+    expect((await pool.query(`select features from model_configs where id = 'gemini-omni-flash-reference-vertex'`)).rows[0].features).toContain('marketing');
+    expect(videoInputs(VERTEX_OMNI_MODEL)).toEqual({ endFrame: true, endMaxSec: 10, textOnly: true, audioClips: null });
   });
 });
 
