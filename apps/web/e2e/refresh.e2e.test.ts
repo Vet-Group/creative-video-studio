@@ -42,6 +42,9 @@ test("Tạo ảnh's Ví dụ shows another member's new image when the tab comes
   const items = page.getByRole('group', { name: 'Ảnh của công ty' }).locator('.gallery-item');
   await expect(page.getByRole('group', { name: 'Ảnh của công ty' }).or(page.getByText(/^Chưa có ảnh nào trong công ty/))).toBeVisible(); // loaded, empty or not
   const before = await items.count();
+  // The gallery loads 24 at a time, so a full first page keeps its count: the newest company image (after the sample tiles) is what changes.
+  const newest = page.getByRole('group', { name: 'Ảnh của công ty' }).locator('.gallery-item a[href^="/api/assets/"]').first();
+  const was = (await newest.count()) ? await newest.getAttribute('href') : '';
 
   const b = await other(browser);
   const up = await b.request.post('/api/assets', { multipart: { file: { name: 'ref.png', mimeType: 'image/png', buffer: png() } } });
@@ -51,7 +54,8 @@ test("Tạo ảnh's Ví dụ shows another member's new image when the tab comes
   await finished(b, ((await job.json()) as { id: string }).id);
   await expect(items).toHaveCount(before);
   await tabReturn(page);
-  await expect(items).toHaveCount(before + 1);
+  await expect(newest).not.toHaveAttribute('href', was ?? '');
+  await expect(items).toHaveCount(Math.min(before + 1, 24));
 });
 
 test('Admin Costs, Report and Audit reload when the tab comes back', async ({ page, browser }) => {
