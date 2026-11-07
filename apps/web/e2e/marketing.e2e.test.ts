@@ -516,8 +516,9 @@ test('as on Fash, a sample in Ví dụ with a details file opens in place with i
 
     await detail.getByRole('button', { name: 'Dùng lại' }).click(); // in place, as Fash's Recreate
     await expect(page).toHaveURL(/\/marketing-studio$/);
-    await expect(page.getByRole('img', { name: 'marketing-example-1-model.jpg' })).toBeVisible();
-    await expect(page.getByRole('img', { name: 'marketing-example-1-product.png' })).toBeVisible();
+    // In the slots: the product's sample can also show among the slot's own sample offers.
+    await expect(page.getByLabel('Người mẫu: ảnh đã chọn').getByRole('img', { name: 'marketing-example-1-model.jpg' })).toBeVisible();
+    await expect(page.getByLabel('Sản phẩm: ảnh đã chọn').getByRole('img', { name: 'marketing-example-1-product.png' })).toBeVisible();
     await expect(page.getByRole('button', { name: /^Hook/ })).toContainText(hook.name);
     await expect(page.getByRole('button', { name: /^Bối cảnh/ })).toContainText(spot.name);
     await expect(select(page, 'Tỉ lệ')).toHaveAttribute('data-value', '1:1');
