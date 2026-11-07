@@ -51,7 +51,7 @@ const SECTIONS: readonly (readonly [Section, string, IconName, string])[] = [
   ['limits', 'Hạn mức', 'gauge', 'Clip và chi phí hôm nay, tháng này'],
   ['security', 'Bảo mật', 'lock', 'Mật khẩu, xác thực 2 lớp, thiết bị'],
   ['preferences', 'Tuỳ chọn', 'sliders', 'Giao diện, thông báo, phím tắt'],
-  ['methods', 'Tài khoản liên kết', 'link', 'Google, Lark và passkey'],
+  ['methods', 'Phương thức đăng nhập', 'link', 'Google, Lark và passkey'],
   ['support', 'Hỗ trợ', 'help', 'Liên hệ và quyền riêng tư'],
 ];
 

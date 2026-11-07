@@ -35,7 +35,7 @@ test('a name always gets the same avatar colour', () => {
 test('lists the sections in order with sign-out last, and the profile with team, role and the month joined in Vietnam time', () => {
   const html = render();
   expect([...html.matchAll(/<span id="settings-nav-[a-z]+">([^<]+)<\/span>|class="settings-signout"><svg[^>]*><path[^>]*><\/path><\/svg>([^<]+)</g)].map((m) => m[1] ?? m[2])).toEqual([
-    'Hồ sơ', 'Hạn mức', 'Bảo mật', 'Tuỳ chọn', 'Tài khoản liên kết', 'Hỗ trợ', 'Đăng xuất',
+    'Hồ sơ', 'Hạn mức', 'Bảo mật', 'Tuỳ chọn', 'Phương thức đăng nhập', 'Hỗ trợ', 'Đăng xuất',
   ]);
   expect(html).toContain('>NA</span>');
   expect(html).toContain('Team Ảnh');
