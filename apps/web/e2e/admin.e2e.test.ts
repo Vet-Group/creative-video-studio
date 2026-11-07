@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
-import { optionsOf, png, presetCards, runInUi, runViaApi, select, signIn } from './support.test';
+import { optionsOf, png, runInUi, runViaApi, select, signIn } from './support.test';
 
 const nav = (page: Page, name: string) => page.getByRole('navigation', { name: 'Các trang quản trị' }).getByRole('link', { name, exact: true });
 
@@ -150,44 +150,9 @@ test('an Admin sets up a team, a store and a user, then reconciles the month cos
   await expect(page.getByRole('cell', { name: /"name"/ })).toHaveCount(0); // read as fields, not raw JSON
   await expect(page.getByRole('cell', { name: 'store.create', exact: true })).toHaveCount(0);
 
-  // Settings and Presets load; a preset edit is saved.
+  // Settings load.
   await nav(page, 'Cài đặt').click();
   await expect(page.getByRole('checkbox', { name: 'Mock E2E (mock)', exact: true })).toBeChecked();
-  await nav(page, 'Mẫu chuyển động').click();
-  const label = page.getByRole('textbox', { name: /^Tên mẫu / }).first();
-  await expect(label).toBeVisible();
-  const before = await label.inputValue();
-  await label.fill(`${before} (sửa)`);
-  await Promise.all([page.waitForResponse((r) => r.url().includes('/api/admin/presets/') && r.ok()), page.getByRole('button', { name: 'Lưu', exact: true }).first().click()]);
-  await page.reload();
-  await expect(page.getByRole('textbox', { name: /^Tên mẫu / }).first()).toHaveValue(`${before} (sửa)`);
-
-  // The Create form follows the presets: the new label shows, and a preset switched off can no longer be picked until it is switched on again.
-  // The Admin is a template editor, so the picker still shows it, dimmed and marked off; a member does not see it (api/presets/route.test.ts).
-  await page.goto('/create');
-  await page.getByRole('button', { name: 'Chọn mẫu khác' }).click();
-  const picker = presetCards(page);
-  await expect(picker.nth(1)).toHaveText(`${before} (sửa)`); // after the free prompt card
-  await page.goto('/admin/presets');
-  const second = page.getByRole('row').nth(2);
-  const secondLabel = await second.getByRole('textbox').first().inputValue();
-  const setSecond = async (on: boolean) => {
-    await second.getByRole('checkbox', { name: 'Đang bật' }).setChecked(on);
-    await Promise.all([page.waitForResponse((r) => r.url().includes('/api/admin/presets/') && r.ok()), second.getByRole('button', { name: 'Lưu', exact: true }).click()]);
-  };
-  await setSecond(false);
-  await page.goto('/create');
-  await page.getByRole('button', { name: 'Chọn mẫu khác' }).click();
-  await expect(picker.filter({ hasText: `${before} (sửa)` })).toHaveCount(1);
-  await expect(picker.filter({ hasText: secondLabel })).toHaveCount(0); // no pick button for it
-  const offCard = page.getByRole('list', { name: 'Danh sách mẫu' }).getByRole('listitem').filter({ hasText: secondLabel });
-  await expect(offCard).toHaveClass(/(^| )off( |$)/);
-  await expect(offCard.getByText('Đang tắt')).toBeVisible();
-  await page.goto('/admin/presets');
-  await setSecond(true);
-  await page.goto('/create');
-  await page.getByRole('button', { name: 'Chọn mẫu khác' }).click();
-  await expect(picker.filter({ hasText: secondLabel })).toHaveCount(1);
 });
 
 test('an Admin re-assigns a clip store from the Library and Reuse follows it', async ({ page }) => {
@@ -303,26 +268,12 @@ test('a saved Settings change clears the save bar and says it was saved', async 
   }
 });
 
-test('an Admin can edit presets and read audit details at 390px without horizontal scrolling', async ({ page }) => {
+test('an Admin reads audit details at 390px without horizontal scrolling', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await signIn(page, 'admin');
-  await page.goto('/admin/presets');
-  const row = page.getByRole('row').filter({ has: page.getByRole('textbox', { name: /^Tên mẫu / }) }).first();
-  const label = row.getByRole('textbox', { name: /^Tên mẫu / });
-  const prompt = row.getByRole('textbox', { name: /^Mô tả của mẫu / });
-  const save = row.getByRole('button', { name: 'Lưu', exact: true });
-  for (const control of [label, prompt, save]) {
-    await control.scrollIntoViewIfNeeded();
-    await expect(control).toBeInViewport({ ratio: 1 });
-    const box = (await control.boundingBox())!;
-    expect(box.x).toBeGreaterThanOrEqual(0);
-    expect(box.x + box.width).toBeLessThanOrEqual(390);
-  }
-  const original = await label.inputValue();
-  await label.fill(`${original} mobile`);
-  await Promise.all([page.waitForResponse((r) => r.url().includes('/api/admin/presets/') && r.ok()), save.click()]);
-  await label.fill(original);
-  await Promise.all([page.waitForResponse((r) => r.url().includes('/api/admin/presets/') && r.ok()), save.click()]);
+  const { presets } = (await (await page.request.get('/api/presets')).json()) as { presets: { id: string; label: string }[] };
+  const { id, label: original } = presets[0]!;
+  for (const label of [`${original} mobile`, original]) expect((await page.request.patch(`/api/presets/${id}`, { data: { label } })).ok()).toBe(true);
   await page.goto('/admin/audit');
   await page.getByLabel('Loại sự kiện').selectOption('preset.update');
   const changes = page.locator('.changes').first();

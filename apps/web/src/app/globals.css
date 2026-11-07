@@ -1063,6 +1063,7 @@ dialog.admin-modal { width: min(36rem, calc(100vw - 2rem)); }
 .preset-card { position: relative; display: grid; align-content: start; gap: 6px; }
 .preset-card > :first-child { border-radius: 8px; }
 .preset-card > .banner-empty { height: auto; aspect-ratio: 3 / 4; }
+.preset-card > .style-none { display: grid; place-items: center; color: var(--text-muted); }
 .preset-card button { padding: 0; border: 0; background: transparent; color: var(--ink); font-size: 13px; line-height: 18px; font-weight: 600; text-align: left; }
 /* The name's button covers the whole card, so a click on the clip picks the preset; the play button stays above it. */
 .preset-card button::before { content: ''; position: absolute; inset: 0; }

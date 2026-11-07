@@ -11,7 +11,6 @@ const PAGES: [string, ReactNode, IconName][] = [
   ['teams', 'Nhóm', 'team'],
   ['stores', 'Cửa hàng', 'store'],
   ['settings', 'Cài đặt', 'gear'],
-  ['presets', <>Mẫu<span className="sr-only"> chuyển động</span></>, 'preset'],
   ['report', <>Báo cáo<span className="sr-only"> tuần</span></>, 'chart'],
   ['costs', 'Chi phí', 'coin'],
   ['audit', 'Nhật ký', 'log'],

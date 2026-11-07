@@ -19,8 +19,8 @@ const storeRoute = await import('./stores/[id]/route');
 const { GET: GET_PUBLIC_STORES } = await import('../stores/route');
 const { PUT: PUT_REASSIGN } = await import('./jobs/[id]/store/route');
 const settingsRoute = await import('./settings/route');
-const presetsRoute = await import('./presets/route');
-const presetRoute = await import('./presets/[id]/route');
+const presetsRoute = await import('../presets/route');
+const presetRoute = await import('../presets/[id]/route');
 const { GET: GET_AUDIT } = await import('./audit/route');
 
 const PASSWORD = 'correct-horse-battery';
@@ -71,7 +71,7 @@ describe('every /api/admin route', () => {
   });
 
   test('nothing is ever deleted: no route offers DELETE', () => {
-    for (const mod of [teamsRoute, teamRoute, storesRoute, storeRoute, presetsRoute, presetRoute]) expect(mod).not.toHaveProperty('DELETE');
+    for (const mod of [teamsRoute, teamRoute, storesRoute, storeRoute, presetRoute]) expect(mod).not.toHaveProperty('DELETE');
   });
 });
 
@@ -456,8 +456,9 @@ describe('settings', () => {
 });
 
 describe('presets', () => {
-  const patch = (id: string, body: unknown) => presetRoute.PATCH(call(admin.cookie, `/api/admin/presets/${id}`, 'PATCH', body), ctx(id));
-  const list = async () => ((await (await presetsRoute.GET(call(admin.cookie, '/api/admin/presets'))).json()) as { presets: { id: string; label: string; prompt: string; enabled: boolean; sortOrder: number }[] }).presets;
+  // An Admin edits presets as a template editor does, in the pickers (the Admin page for them is gone).
+  const patch = (id: string, body: unknown) => presetRoute.PATCH(call(admin.cookie, `/api/presets/${id}`, 'PATCH', body), ctx(id));
+  const list = async () => ((await (await presetsRoute.GET(call(admin.cookie, '/api/presets'))).json()) as { presets: { id: string; label: string; prompt: string; enabled: boolean; sortOrder: number }[] }).presets;
 
   test('lists the presets in display order, enabled or not', async () => {
     const presets = await list();

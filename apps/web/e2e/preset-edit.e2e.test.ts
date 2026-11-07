@@ -33,6 +33,42 @@ test('a template editor edits a preset label in the picker, and the picker shows
   await restoreLabel(page, 'arc-right', 'Lia vòng sang phải');
 });
 
+test('an Admin switches a preset off in the picker: a member no longer sees it, the Admin sees it dimmed, and switching it on brings it back', async ({ browser, page }) => {
+  await signIn(page, 'admin');
+  const { presets } = (await (await page.request.get('/api/presets')).json()) as { presets: { id: string; label: string }[] };
+  const { id, label } = presets.at(-1)!; // the last preset, which no other spec reads
+  const save = async (on: boolean) => {
+    await grid.getByRole('button', { name: `Sửa mẫu ${label}`, exact: true }).click();
+    const form = page.getByRole('dialog', { name: 'Sửa mẫu' });
+    await form.getByRole('checkbox', { name: 'Đang bật' }).setChecked(on);
+    await Promise.all([page.waitForResponse((r) => r.url().endsWith(`/api/presets/${id}`) && r.request().method() === 'PATCH' && r.ok()), form.getByRole('button', { name: 'Lưu', exact: true }).click()]);
+    await expect(form).toBeHidden();
+  };
+  const memberSees = async () => {
+    const member = await browser.newPage();
+    await signIn(member, 'member4');
+    const cards = await openPicker(member);
+    await expect(cards.getByRole('button').first()).toBeVisible();
+    const n = await cards.getByRole('button', { name: label, exact: true }).count();
+    await member.close();
+    return n;
+  };
+  const grid = await openPicker(page);
+  try {
+    await save(false);
+    const off = grid.getByRole('listitem').filter({ hasText: label });
+    await expect(off).toHaveClass(/(^| )off( |$)/);
+    await expect(off.getByText('Đang tắt')).toBeVisible();
+    await expect(off.getByRole('button', { name: label, exact: true })).toHaveCount(0); // no pick button for it
+    expect(await memberSees()).toBe(0);
+    await save(true);
+    await expect(grid.getByRole('button', { name: label, exact: true })).toBeVisible();
+    expect(await memberSees()).toBe(1);
+  } finally {
+    expect((await page.request.patch(`/api/presets/${id}`, { data: { enabled: true } })).ok()).toBe(true);
+  }
+});
+
 test('a member proposes a new label, an editor approves it from the pending list, and the picker shows it', async ({ page }) => {
   await signIn(page, 'tplprop');
   let grid = await openPicker(page);
