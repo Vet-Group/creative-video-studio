@@ -414,15 +414,15 @@ test('Motion Control: the image and the reference video, a length check, and a R
   await expect(reasonOf(page)).toHaveText('Tải lên ảnh: Nhân vật.');
   await page.getByLabel('Ảnh nhân vật').setInputFiles(file('dancer.png'));
   await expect(page.getByRole('img', { name: 'dancer.png' })).toBeVisible();
-  await expect(reasonOf(page)).toHaveText('Tải lên video mẫu.');
+  await expect(reasonOf(page)).toHaveText('Tải lên video chuyển động.');
 
-  await page.getByLabel('Video chuyển động mẫu').setInputFiles({ name: 'short.mp4', mimeType: 'video/mp4', buffer: mp4(1900) });
+  await page.getByLabel('Tệp video chuyển động').setInputFiles({ name: 'short.mp4', mimeType: 'video/mp4', buffer: mp4(1900) });
   await expect(page.getByText('short.mp4 · 1.9 giây')).toBeVisible();
-  await expect(reasonOf(page)).toHaveText('Video mẫu phải dài từ 3 đến 30 giây.');
+  await expect(reasonOf(page)).toHaveText('Video chuyển động phải dài từ 3 đến 30 giây.');
   await expect(runButton(page)).toBeDisabled();
 
   await page.getByRole('button', { name: 'Bỏ video short.mp4' }).click();
-  await page.getByLabel('Video chuyển động mẫu').setInputFiles({ name: 'dance.mp4', mimeType: 'video/mp4', buffer: mp4(5400) });
+  await page.getByLabel('Tệp video chuyển động').setInputFiles({ name: 'dance.mp4', mimeType: 'video/mp4', buffer: mp4(5400) });
   await expect(page.getByText('dance.mp4 · 5.4 giây')).toBeVisible();
   await expect(reasonOf(page)).toHaveCount(0);
   await expect(runButton(page)).toHaveText(/\$0\.7560/); // the recommended Standard model, 6 s

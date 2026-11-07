@@ -81,7 +81,7 @@ test('Create: a picked photo in the drop zone adds more like the rest of it, a w
 
     await page.getByRole('tab', { name: 'Ví dụ' }).click();
     await page.getByRole('button', { name: 'Tự viết mô tả', exact: true }).click({ position: { x: 12, y: 12 } });
-    const detail = page.getByRole('dialog', { name: 'Chi tiết mẫu' });
+    const detail = page.getByRole('dialog', { name: 'Chi tiết ví dụ' });
     const pill = detail.getByRole('list', { name: 'Thông số' }).getByRole('listitem', { name: 'Thời lượng 8 giây' });
     await page.mouse.click(...(await at(pill, 3))); // the pill's own padding, left of its text
     await expect(page.getByRole('region', { name: 'Thông báo' }).getByText('Đã chọn thời lượng 8s')).toBeVisible();
@@ -143,8 +143,8 @@ test('a saved template opens from anywhere on its row in My templates', async ({
   try {
     await page.goto('/try-on');
     await expect(page.getByLabel('Ảnh trang phục')).toBeEnabled();
-    await page.getByRole('button', { name: 'Mẫu của tôi' }).click();
-    const dialog = page.getByRole('dialog', { name: 'Mẫu của tôi' });
+    await page.getByRole('button', { name: 'Thiết lập đã lưu' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Thiết lập đã lưu' });
     const row = dialog.getByRole('listitem').filter({ hasText: 'Row click' });
     const refill = page.waitForRequest((r) => r.url().endsWith(`/api/templates/${id}`), { timeout: 5_000 });
     await page.mouse.click(...(await at(row, 4))); // the row's padding, left of the name

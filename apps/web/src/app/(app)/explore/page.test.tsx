@@ -118,7 +118,7 @@ test('the hero greets the member by given name for the time of day in Vietnam, w
   expect(html).toContain('Bạn chưa tạo clip hay ảnh nào');
 });
 
-test('Continue shows running jobs first, then the latest finished, at most four, each opening its own page', async () => {
+test('Continue shows running jobs first, then the latest finished, at most four; a finished one opens in the Library, the others on their page', async () => {
   const html = await withJobs([
     job('done-1', 'succeeded', { poster_asset_id: 'p1', output_asset_id: 'o1' }),
     job('img-1', 'succeeded', { feature: 'image', resolution: '1K', output_asset_id: 'i1' }),
@@ -133,8 +133,8 @@ test('Continue shows running jobs first, then the latest finished, at most four,
   const cards = [...list.matchAll(/(<a [^>]*>)([\s\S]*?)<\/a>/g)].map(([, tag, inner]) => [attr(tag!, 'href'), attr(tag!, 'data-status'), attr(inner!, 'src')]);
   expect(cards).toEqual([
     ['/try-on', 'running', '/api/assets/in1/content'], // a running job shows the photo it was given
-    ['/create', 'succeeded', '/api/assets/p1/content'], // a clip shows its poster
-    ['/image-generation', 'succeeded', '/api/assets/i1/content'], // an image shows itself
+    ['/library?item=done-1', 'succeeded', '/api/assets/p1/content'], // a clip shows its poster
+    ['/library?item=img-1', 'succeeded', '/api/assets/i1/content'], // an image shows itself
     ['/marketing-studio', 'failed', null],
   ]);
   expect(list).toContain('Đang tạo');

@@ -139,18 +139,18 @@ test('a saved template and History’s Dùng lại refill the end frame and the 
   ]);
   await expect(picker.getByRole('listitem')).toHaveCount(2);
   await page.getByLabel('Mô tả chuyển động').fill('The bottle turns to face the camera.');
-  await page.getByRole('button', { name: 'Lưu mẫu', exact: true }).click();
-  const dialog = page.getByRole('dialog', { name: 'Lưu mẫu' });
-  await dialog.getByLabel('Tên mẫu').fill('Kết thúc có nhạc');
+  await page.getByRole('button', { name: 'Lưu thiết lập', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Lưu thiết lập' });
+  await dialog.getByLabel('Tên thiết lập').fill('Kết thúc có nhạc');
   await dialog.getByRole('button', { name: 'Lưu', exact: true }).click();
-  await expect(page.getByRole('status').filter({ hasText: 'Đã lưu mẫu.' })).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: 'Đã lưu thiết lập.' })).toBeVisible();
 
   // A fresh form refilled from the template has the end frame and both clips back, and sends them with the Run.
   await page.goto('/create');
   await expect(endSlot(page)).toBeVisible();
   await expect(endSlot(page).getByRole('img')).toHaveCount(0);
   await openTemplates(page);
-  await page.getByRole('dialog', { name: 'Mẫu của tôi' }).getByRole('link', { name: 'Kết thúc có nhạc' }).click();
+  await page.getByRole('dialog', { name: 'Thiết lập đã lưu' }).getByRole('link', { name: 'Kết thúc có nhạc' }).click();
   await expect(endSlot(page).getByRole('img', { name: 'end.png' })).toBeVisible();
   await expect(picker.getByRole('listitem')).toHaveText(['voice.wav · 2.5 giây', 'song.wav · 4.0 giây']);
   const body = nextRun(page);
@@ -180,7 +180,7 @@ test('a saved template and History’s Dùng lại refill the end frame and the 
   await page.unrouteAll({ behavior: 'ignoreErrors' });
   await page.goto('/create');
   await openTemplates(page);
-  await page.getByRole('dialog', { name: 'Mẫu của tôi' }).getByRole('link', { name: 'Kết thúc có nhạc' }).click();
+  await page.getByRole('dialog', { name: 'Thiết lập đã lưu' }).getByRole('link', { name: 'Kết thúc có nhạc' }).click();
   await expect(page.getByLabel('Mô tả chuyển động')).toHaveValue('The bottle turns to face the camera.');
   await expect(endSlot(page)).toHaveCount(0);
   await expect(picker).toHaveCount(0);

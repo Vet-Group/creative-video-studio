@@ -1051,8 +1051,6 @@ dialog.admin-modal { width: min(36rem, calc(100vw - 2rem)); }
   .example, .example-caption, .example-use { transition: none; }
   .example:hover { transform: none; }
 }
-.chips { position: absolute; top: 8px; left: 8px; z-index: 2; display: flex; gap: 4px; pointer-events: none; }
-.chip { padding: 0 8px; border-radius: 999px; background: rgb(var(--shade) / .65); color: var(--on-dark); font-size: 11px; line-height: 18px; }
 
 /* Preview: the poster and a muted loop in a box that keeps the clip's aspect ratio, so a broken source leaves a placeholder, not a gap. */
 .preview { position: relative; width: 100%; overflow: hidden; border-radius: .75rem; background: var(--zinc-900); }

@@ -150,7 +150,7 @@ function SettingsForm({ settings, reload }: { settings: Settings; reload: () => 
             unit="USD"
             value={monthly}
             onChange={setMonthly}
-            hint="Trần chung của cả công ty. Chạm mức (tính cả tiền đang tạm giữ) thì không ai bấm Run video được tới ngày 1 tháng sau. 200 USD ≈ 350 clip Kling 5 giây."
+            hint="Trần chung của cả công ty. Chạm mức (tính cả tiền đang tạm giữ) thì không ai bấm Tạo video được tới ngày 1 tháng sau. 200 USD ≈ 350 clip Kling 5 giây."
           />
           <Field label="Số clip tối đa mỗi Member mỗi ngày" unit="clip" numeric value={daily} onChange={setDaily} hint="Clip lỗi không mất tiền thì không tính." />
         </div>
@@ -159,7 +159,7 @@ function SettingsForm({ settings, reload }: { settings: Settings; reload: () => 
         <legend>Ảnh và ứng dụng</legend>
         <p className="muted">Thử đồ, Tạo ảnh và các Ứng dụng ảnh; tách riêng khỏi ngân sách video, không tính video.</p>
         <div className="fields">
-          <Field label="Ngân sách tháng cho ảnh và ứng dụng" unit="USD" value={features} onChange={setFeatures} hint="Trần chung của cả công ty. Chạm mức thì các trang này không bấm Run được tới ngày 1 tháng sau." />
+          <Field label="Ngân sách tháng cho ảnh và ứng dụng" unit="USD" value={features} onChange={setFeatures} hint="Trần chung của cả công ty. Chạm mức thì các trang này không bấm Tạo được tới ngày 1 tháng sau." />
           <Field label="Hạn mức mỗi Member mỗi ngày" unit="USD" value={memberDay} onChange={setMemberDay} />
           <Field label="Hạn mức mỗi Member mỗi tháng" unit="USD" value={memberMonth} onChange={setMemberMonth} />
         </div>
@@ -271,7 +271,7 @@ function SettingsForm({ settings, reload }: { settings: Settings; reload: () => 
           })}
         </fieldset>
       )}
-      <p className="muted">Mức mới áp dụng từ lần bấm Run tiếp theo, được ghi vào Nhật ký và tính theo giờ Việt Nam (tháng bắt đầu ngày 1, ngày bắt đầu lúc 0 giờ). Đặt 0 để khoá hẳn phần đó.</p>
+      <p className="muted">Mức mới áp dụng từ lần bấm Tạo tiếp theo, được ghi vào Nhật ký và tính theo giờ Việt Nam (tháng bắt đầu ngày 1, ngày bắt đầu lúc 0 giờ). Đặt 0 để khoá hẳn phần đó.</p>
       <p role="status" className="save-note">
         {saved && !dirty ? 'Đã lưu cài đặt.' : ''}
       </p>

@@ -91,9 +91,9 @@ export async function openTab(page: Page, name: string): Promise<void> {
 
 /** Opens the My templates list. Retries the click, as a click before hydration only focuses the button (as openTab does with a tab). */
 export async function openTemplates(page: Page): Promise<Locator> {
-  const dialog = page.getByRole('dialog', { name: 'Mẫu của tôi' });
+  const dialog = page.getByRole('dialog', { name: 'Thiết lập đã lưu' });
   await expect(async () => {
-    if (!(await dialog.isVisible())) await page.getByRole('button', { name: 'Mẫu của tôi' }).click();
+    if (!(await dialog.isVisible())) await page.getByRole('button', { name: 'Thiết lập đã lưu' }).click();
     await expect(dialog).toBeVisible({ timeout: 2_000 });
   }).toPass();
   return dialog;

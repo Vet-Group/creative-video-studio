@@ -62,19 +62,19 @@ export function StylePicker({ value, onChange }: { value: string; onChange: (id:
       <button type="button" className="select-trigger style-pill" data-on={value !== ''} aria-haspopup="dialog" onClick={() => setPicking(true)}>
         {shown ? <img src={shown} alt="" width={20} height={20} /> : <Icon name="image" />}
         <span data-value={value}>
-          {current ? <span className="sr-only">Mẫu: </span> : null}
-          {current?.label ?? 'Mẫu'}
+          {current ? <span className="sr-only">Phong cách: </span> : null}
+          {current?.label ?? 'Phong cách'}
         </span>
       </button>
 
-      <Modal open={picking} onClose={() => setPicking(false)} label="Chọn mẫu">
-        <h2>Chọn mẫu</h2>
-        <p className="modal-sub">Mỗi mẫu là một phong cách ảnh, được thêm vào mô tả của bạn khi tạo ảnh. Chọn một mẫu hoặc không dùng mẫu.</p>
+      <Modal open={picking} onClose={() => setPicking(false)} label="Chọn phong cách">
+        <h2>Chọn phong cách</h2>
+        <p className="modal-sub">Mỗi phong cách được thêm vào mô tả của bạn khi tạo ảnh. Chọn một phong cách hoặc không dùng phong cách nào.</p>
         <ul className="preset-grid" aria-label="Danh sách phong cách">
           <li className="preset-card">
             <div className="banner-empty" />
             <button type="button" data-value="" aria-pressed={value === ''} onClick={() => pick('')}>
-              Không dùng mẫu
+              Không dùng phong cách
             </button>
           </li>
           {(editable ?? styles)?.map((p) => {
@@ -93,7 +93,7 @@ export function StylePicker({ value, onChange }: { value: string; onChange: (id:
                     {p.label}
                   </button>
                 )}
-                <button type="button" className="preset-edit" aria-label={canEdit ? `Sửa mẫu ${p.label}` : `Đề xuất sửa mẫu ${p.label}`} onClick={() => setDraft({ preset: p, propose: !canEdit })}>
+                <button type="button" className="preset-edit" aria-label={canEdit ? `Sửa phong cách ${p.label}` : `Đề xuất sửa phong cách ${p.label}`} onClick={() => setDraft({ preset: p, propose: !canEdit })}>
                   {canEdit ? 'Sửa' : 'Đề xuất sửa'}
                 </button>
               </li>
@@ -102,7 +102,7 @@ export function StylePicker({ value, onChange }: { value: string; onChange: (id:
         </ul>
         <div className="preset-actions">
           <button type="button" className="link-button" onClick={() => setDraft({ preset: null, propose: !canEdit })}>
-            {canEdit ? 'Thêm mẫu' : 'Đề xuất mẫu mới'}
+            {canEdit ? 'Thêm phong cách' : 'Đề xuất phong cách mới'}
           </button>
           {canEdit && (
             <button type="button" className="link-button" onClick={() => setReviewing(true)}>

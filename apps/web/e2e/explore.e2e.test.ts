@@ -24,8 +24,11 @@ test('Explore greets the member by given name and lists a job they start under C
   await expect(recent.locator('img')).toHaveAttribute('src', /^\/api\/assets\/[^/]+\/content$/);
   await expect(status).toHaveText(`Hôm nay bạn còn ${Number(left) - 1}/${cap} clip video`);
 
+  // Finished, the card opens the result in the Library's detail view.
+  await expect(recent).toHaveAttribute('href', /^\/library\?item=[0-9a-f-]+$/);
   await recent.click();
-  await expect(page).toHaveURL(/\/create$/);
+  await expect(page).toHaveURL(/\/library\?item=/);
+  await expect(page.getByRole('dialog', { name: /^Chi tiết: / })).toBeVisible();
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/explore');

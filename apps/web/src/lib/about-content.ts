@@ -432,7 +432,7 @@ const create: AboutPage = {
             ['Tăng độ phân giải', '/apps/image-upscale', 'làm nét ảnh mở đầu lên tới 4K trước khi làm động.'],
             ['Đổi khung hình', '/apps/reframe', 'mở rộng ảnh sang tỉ lệ bạn muốn cho video.'],
             ['UGC Thử đồ', '/marketing-studio', 'biến ảnh người mẫu và ảnh sản phẩm thành clip kiểu người sáng tạo nội dung.'],
-            ['Điều khiển chuyển động', '/apps/motion-control', 'chép chuyển động từ một video mẫu sang nhân vật trong ảnh.'],
+            ['Điều khiển chuyển động', '/apps/motion-control', 'chép chuyển động từ một video chuyển động sang nhân vật trong ảnh.'],
           ],
         },
       ],
@@ -676,7 +676,7 @@ const tryOn: AboutPage = {
       blocks: [
         'Mô tả là tuỳ chọn. Bỏ trống mô tả và không thêm bối cảnh thì người mẫu mặc trang phục của bạn trong chính khung cảnh của ảnh người mẫu: ứng dụng dùng câu chỉ dẫn mặc định là mặc trang phục lên người mẫu, giữ nguyên người và bối cảnh. Viết mô tả khi bạn muốn chỉ đạo cảnh: địa điểm, ánh sáng, tư thế, phong cách chụp.',
         'Mô tả điều khiển mọi thứ quanh trang phục. Trang phục vẫn bám sát ảnh bạn tải lên, nên hãy dùng ô này để tả thế giới mà bạn muốn nó được chụp trong đó.',
-        { example: { label: 'Mô tả mẫu', text: 'Put the linen shirt from the garment photo on the model. A sunny street café in late-morning light, a relaxed half-body pose, natural photo style. Keep the shirt colour and buttons exactly as in the photo.', media: 'about-try-on-prompt' } },
+        { example: { label: 'Ví dụ mô tả', text: 'Put the linen shirt from the garment photo on the model. A sunny street café in late-morning light, a relaxed half-body pose, natural photo style. Keep the shirt colour and buttons exactly as in the photo.', media: 'about-try-on-prompt' } },
         {
           list: [
             'Gọi tên trang phục đã tải lên để AI bám vào nó: “chiếc sơ mi linen trong ảnh trang phục”.',
@@ -2595,33 +2595,33 @@ export const APP_ABOUT: Record<string, AboutPage> = {
       {
         title: 'Kling Motion Control là gì?',
         blocks: [
-          'Điều khiển chuyển động là ứng dụng chép chuyển động từ một video mẫu lên ảnh nhân vật. Bạn tải một video ngắn có chuyển động và một ảnh nhân vật, và AI, chạy trên Kling V3 Motion Control, trả về video nhân vật của bạn làm đúng các động tác đó.',
-          'Ứng dụng giống chuyển video sang video với một khác biệt: chuyển động đến từ một clip, còn người trên màn hình đến từ ảnh của bạn. Bạn có thể thêm prompt tuỳ chọn để lái chuyển động, phong cách hay chuyển máy. Video kết quả dài bằng video mẫu và không có tiếng; chi phí tính theo số giây của video mẫu, làm tròn lên, và tính vào ngân sách ảnh và ứng dụng như các ứng dụng khác.',
+          'Điều khiển chuyển động là ứng dụng chép chuyển động từ một video chuyển động lên ảnh nhân vật. Bạn tải một video ngắn có chuyển động và một ảnh nhân vật, và AI, chạy trên Kling V3 Motion Control, trả về video nhân vật của bạn làm đúng các động tác đó.',
+          'Ứng dụng giống chuyển video sang video với một khác biệt: chuyển động đến từ một clip, còn người trên màn hình đến từ ảnh của bạn. Bạn có thể thêm prompt tuỳ chọn để lái chuyển động, phong cách hay chuyển máy. Video kết quả dài bằng video chuyển động và không có tiếng; chi phí tính theo số giây của video chuyển động, làm tròn lên, và tính vào ngân sách ảnh và ứng dụng như các ứng dụng khác.',
         ],
       },
       {
         title: 'Dùng Điều khiển chuyển động thế nào',
-        lead: 'Tải ảnh nhân vật, tải video mẫu, thêm mô tả nếu muốn, rồi bấm Chạy.',
+        lead: 'Tải ảnh nhân vật, tải video chuyển động, thêm mô tả nếu muốn, rồi bấm Chạy.',
         blocks: [
           {
             steps: [
               { title: 'Tải ảnh nhân vật', text: 'Thêm ảnh nhân vật bạn muốn làm động. Ảnh rõ người, thấy cả thân càng tốt.' },
-              { title: 'Tải video mẫu', text: 'Thêm một clip có chuyển động bạn muốn chép: MP4 hoặc MOV, dài 3 đến 30 giây, tối đa 20 MB, có một người làm động tác rõ ràng.' },
+              { title: 'Tải video chuyển động', text: 'Thêm một clip có chuyển động bạn muốn chép: MP4 hoặc MOV, dài 3 đến 30 giây, tối đa 20 MB, có một người làm động tác rõ ràng.' },
               { title: 'Thêm mô tả (tuỳ chọn)', text: 'Tả chuyển động, phong cách hay chuyển máy bạn muốn, hoặc để trống.' },
-              { title: 'Chạy', text: 'Bấm Chạy. AI chép chuyển động từ video mẫu lên nhân vật và trả về video cùng các động tác. Video nằm trong tab Lịch sử và trong Thư viện, mục Ứng dụng.' },
+              { title: 'Chạy', text: 'Bấm Chạy. AI chép chuyển động từ video chuyển động lên nhân vật và trả về video cùng các động tác. Video nằm trong tab Lịch sử và trong Thư viện, mục Ứng dụng.' },
             ],
           },
         ],
       },
       {
         title: 'Chép được những gì',
-        lead: 'Chuyển động cơ thể rõ ràng từ video mẫu, như điệu nhảy, dáng đi và cử chỉ, và prompt có thể thêm chuyển máy.',
+        lead: 'Chuyển động cơ thể rõ ràng từ video chuyển động, như điệu nhảy, dáng đi và cử chỉ, và prompt có thể thêm chuyển máy.',
         blocks: [
           {
             cards: [
-              { title: 'Điệu nhảy và xu hướng', text: 'Điệu nhảy đang thịnh hợp tự nhiên. Chọn clip điệu nhảy làm video mẫu, và nhân vật của bạn nhảy theo đúng động tác. Một clip dùng lại được với mọi nhân vật bạn tải lên.' },
-              { title: 'Dáng đi và catwalk', text: 'Một bước catwalk, một cú xoay cuối sàn diễn hay một bước dạo chậm chuyển từ video mẫu sang nhân vật. Ảnh người mẫu tĩnh chuyển động như trên sàn diễn, cùng nhịp và dáng như trong clip.' },
-              { title: 'Cử chỉ và dáng nói chuyện', text: 'Cử chỉ tay, quay đầu và ngôn ngữ cơ thể của người nói trước máy cũng chép được. Nhân vật có thể chuyển động như người dẫn hay người sáng tạo nội dung, cùng nhịp cử chỉ với người trong video mẫu.' },
+              { title: 'Điệu nhảy và xu hướng', text: 'Điệu nhảy đang thịnh hợp tự nhiên. Chọn clip điệu nhảy làm video chuyển động, và nhân vật của bạn nhảy theo đúng động tác. Một clip dùng lại được với mọi nhân vật bạn tải lên.' },
+              { title: 'Dáng đi và catwalk', text: 'Một bước catwalk, một cú xoay cuối sàn diễn hay một bước dạo chậm chuyển từ video chuyển động sang nhân vật. Ảnh người mẫu tĩnh chuyển động như trên sàn diễn, cùng nhịp và dáng như trong clip.' },
+              { title: 'Cử chỉ và dáng nói chuyện', text: 'Cử chỉ tay, quay đầu và ngôn ngữ cơ thể của người nói trước máy cũng chép được. Nhân vật có thể chuyển động như người dẫn hay người sáng tạo nội dung, cùng nhịp cử chỉ với người trong video chuyển động.' },
               { title: 'Chuyển máy qua prompt', text: 'Prompt tuỳ chọn có thể tả chuyển máy, như tiến chậm vào hay lia ngang. Giữ đơn giản và chỉ một chuyển máy mỗi lần chạy.' },
             ],
           },
@@ -2634,23 +2634,23 @@ export const APP_ABOUT: Record<string, AboutPage> = {
           {
             cards: [
               { title: 'Làm động ảnh người mẫu bằng bước catwalk', text: 'Ghép ảnh người mẫu với một clip catwalk, và người mẫu bước đi y như vậy trong kết quả: một ảnh lookbook thành video sàn diễn ngắn. Nếu trang phục chưa ở trên người mẫu, tạo ảnh người mẫu ở trang Thử đồ trước.' },
-              { title: 'Biến ảnh người mẫu mặc sản phẩm thành video mạng xã hội', text: 'Ảnh người mẫu mặc sản phẩm thành video ngắn khi thêm chuyển động từ một clip mẫu, như một cú xoay hay đổi tư thế. Video sản phẩm dựng từ mô tả thì dùng trang Tạo video.' },
-              { title: 'Một clip xu hướng, nhiều nhân vật', text: 'Một clip mẫu điều khiển được video cho nhiều nhân vật. Chạy cùng xu hướng với nhiều người mẫu để có bộ video cùng động tác. Muốn video thử đồ kiểu người sáng tạo nội dung, dùng Marketing Studio.' },
+              { title: 'Biến ảnh người mẫu mặc sản phẩm thành video mạng xã hội', text: 'Ảnh người mẫu mặc sản phẩm thành video ngắn khi thêm chuyển động từ một clip chuyển động, như một cú xoay hay đổi tư thế. Video sản phẩm dựng từ mô tả thì dùng trang Tạo video.' },
+              { title: 'Một clip xu hướng, nhiều nhân vật', text: 'Một clip chuyển động điều khiển được video cho nhiều nhân vật. Chạy cùng xu hướng với nhiều người mẫu để có bộ video cùng động tác. Muốn video thử đồ kiểu người sáng tạo nội dung, dùng Marketing Studio.' },
             ],
           },
-          'Chỉ dùng video mẫu và ảnh nhân vật mà công ty có quyền, và có sự đồng ý của bất kỳ ai có hình ảnh hay màn trình diễn xuất hiện trong đó. Muốn thay người trong ảnh tĩnh thay vì làm động, dùng Đổi nhân vật.',
+          'Chỉ dùng video chuyển động và ảnh nhân vật mà công ty có quyền, và có sự đồng ý của bất kỳ ai có hình ảnh hay màn trình diễn xuất hiện trong đó. Muốn thay người trong ảnh tĩnh thay vì làm động, dùng Đổi nhân vật.',
         ],
       },
       {
         title: 'Mẹo để chép chuyển động sạch',
-        lead: 'Một clip mẫu rõ ràng, một ảnh nhân vật cùng khung và một prompt ngắn.',
+        lead: 'Một clip chuyển động rõ ràng, một ảnh nhân vật cùng khung và một prompt ngắn.',
         blocks: [
           {
             list: [
-              'Một chủ thể rõ trong video mẫu: một người, thấy rõ từ đầu đến cuối, cho AI một chuyển động để theo. Đám đông hay người chồng lên nhau làm chuyển động khó đọc.',
-              'Thấy cả thân cho chuyển động cả thân: muốn nhân vật đi hay nhảy từ đầu đến chân, hãy dùng video mẫu và ảnh nhân vật đều thấy cả thân.',
-              'Khung hình giống nhau: ảnh nhân vật cùng khung với video mẫu, như toàn thân với toàn thân hay nửa người với nửa người, giữ chuyển động cân đối. Cần ảnh nhân vật mới thì tạo ở trang Tạo ảnh.',
-              'Độ dài trong giới hạn: video mẫu dài 3 đến 30 giây, tối đa 20 MB.',
+              'Một chủ thể rõ trong video chuyển động: một người, thấy rõ từ đầu đến cuối, cho AI một chuyển động để theo. Đám đông hay người chồng lên nhau làm chuyển động khó đọc.',
+              'Thấy cả thân cho chuyển động cả thân: muốn nhân vật đi hay nhảy từ đầu đến chân, hãy dùng video chuyển động và ảnh nhân vật đều thấy cả thân.',
+              'Khung hình giống nhau: ảnh nhân vật cùng khung với video chuyển động, như toàn thân với toàn thân hay nửa người với nửa người, giữ chuyển động cân đối. Cần ảnh nhân vật mới thì tạo ở trang Tạo ảnh.',
+              'Độ dài trong giới hạn: video chuyển động dài 3 đến 30 giây, tối đa 20 MB.',
               'Prompt ngắn: chuyển động đến từ video, nên prompt chỉ cần vài chữ về phong cách hay chuyển máy.',
             ],
           },
@@ -2662,12 +2662,12 @@ export const APP_ABOUT: Record<string, AboutPage> = {
           'Ứng dụng chạy trên Kling V3 Motion Control, phiên bản mới sau Kling 2.6 Motion Control. Danh mục có hai bản: Pro và Standard; khi Admin bật cả hai, menu Mô hình cho bạn chọn, và chi phí mỗi giây của từng bản ghi trên nút Chạy.',
           {
             table: [
-              ['Bản', 'Hợp nhất với', 'Độ dài video mẫu'],
+              ['Bản', 'Hợp nhất với', 'Độ dài video chuyển động'],
               ['Kling V3 Motion Control Pro', 'Chuyển động phức tạp, chất lượng cao nhất', '3 đến 30 giây'],
               ['Kling V3 Motion Control Standard', 'Thử nhanh với chi phí thấp hơn', '3 đến 30 giây'],
             ],
           },
-          'Tải video mẫu và nhân vật ở bên cạnh để chép chuyển động bằng Kling V3.',
+          'Tải video chuyển động và nhân vật ở bên cạnh để chép chuyển động bằng Kling V3.',
         ],
       },
       {
@@ -2675,12 +2675,12 @@ export const APP_ABOUT: Record<string, AboutPage> = {
         blocks: [
           {
             faq: [
-              ['Kling Motion Control là gì?', 'Là công cụ chép chuyển động từ một video mẫu lên ảnh nhân vật. Bạn tải một video mẫu ngắn và một ảnh nhân vật, và AI, chạy trên Kling V3, trả về video nhân vật của bạn làm cùng các động tác.'],
-              ['Video mẫu dài được bao lâu?', 'Từ 3 đến 30 giây, file MP4 hoặc MOV tối đa 20 MB. Chọn clip chứa trọn chuyển động bạn muốn chép, từ bước đầu đến bước cuối.'],
-              ['Làm động ảnh tĩnh bằng chuyển động từ video khác được không?', 'Được. Tải ảnh tĩnh làm nhân vật và video kia làm video mẫu. AI chép chuyển động từ video lên ảnh, nên người trong ảnh chuyển động y như vậy.'],
-              ['Làm video nhảy với nhân vật của mình được không?', 'Được. Dùng một clip nhảy làm video mẫu và ảnh nhân vật của bạn làm nhân vật. Chỉ dùng nhân vật và clip nhảy mà công ty có quyền, và có sự đồng ý của người thật xuất hiện trong đó.'],
-              ['Có cần viết mô tả không?', 'Không. Mô tả là tuỳ chọn. Chuyển động đến từ video mẫu; chỉ thêm một prompt ngắn khi muốn lái chuyển động, phong cách hay chuyển máy.'],
-              ['Một lần chạy tốn bao nhiêu?', 'Chi phí tính theo số giây của video mẫu, làm tròn lên, và tính vào ngân sách ảnh và ứng dụng, tách khỏi ngân sách video. Nút Chạy ghi chi phí ước tính sau khi bạn tải video mẫu.'],
+              ['Kling Motion Control là gì?', 'Là công cụ chép chuyển động từ một video chuyển động lên ảnh nhân vật. Bạn tải một video chuyển động ngắn và một ảnh nhân vật, và AI, chạy trên Kling V3, trả về video nhân vật của bạn làm cùng các động tác.'],
+              ['Video chuyển động dài được bao lâu?', 'Từ 3 đến 30 giây, file MP4 hoặc MOV tối đa 20 MB. Chọn clip chứa trọn chuyển động bạn muốn chép, từ bước đầu đến bước cuối.'],
+              ['Làm động ảnh tĩnh bằng chuyển động từ video khác được không?', 'Được. Tải ảnh tĩnh làm nhân vật và video kia làm video chuyển động. AI chép chuyển động từ video lên ảnh, nên người trong ảnh chuyển động y như vậy.'],
+              ['Làm video nhảy với nhân vật của mình được không?', 'Được. Dùng một clip nhảy làm video chuyển động và ảnh nhân vật của bạn làm nhân vật. Chỉ dùng nhân vật và clip nhảy mà công ty có quyền, và có sự đồng ý của người thật xuất hiện trong đó.'],
+              ['Có cần viết mô tả không?', 'Không. Mô tả là tuỳ chọn. Chuyển động đến từ video chuyển động; chỉ thêm một prompt ngắn khi muốn lái chuyển động, phong cách hay chuyển máy.'],
+              ['Một lần chạy tốn bao nhiêu?', 'Chi phí tính theo số giây của video chuyển động, làm tròn lên, và tính vào ngân sách ảnh và ứng dụng, tách khỏi ngân sách video. Nút Chạy ghi chi phí ước tính sau khi bạn tải video chuyển động.'],
             ],
           },
         ],

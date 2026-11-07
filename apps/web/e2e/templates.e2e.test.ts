@@ -5,11 +5,11 @@ import { openTemplates, png, select, selectText, signIn } from './support.test';
 const file = (name: string) => ({ name, mimeType: 'image/png', buffer: png() });
 
 async function saveAs(page: Page, name: string) {
-  await page.getByRole('button', { name: 'Lưu mẫu', exact: true }).click();
-  const dialog = page.getByRole('dialog', { name: 'Lưu mẫu' });
-  await dialog.getByLabel('Tên mẫu').fill(name);
+  await page.getByRole('button', { name: 'Lưu thiết lập', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Lưu thiết lập' });
+  await dialog.getByLabel('Tên thiết lập').fill(name);
   await dialog.getByRole('button', { name: 'Lưu', exact: true }).click();
-  await expect(page.getByRole('status').filter({ hasText: 'Đã lưu mẫu.' })).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: 'Đã lưu thiết lập.' })).toBeVisible();
 }
 
 test('on every form the template links scroll with the fields, and the fixed bar below holds only Run, as on the live page', async ({ page }) => {
@@ -17,13 +17,13 @@ test('on every form the template links scroll with the fields, and the fixed bar
   await signIn(page, 'tplpos');
   for (const path of ['/create', '/try-on', '/marketing-studio', '/apps/character-swap']) {
     await page.goto(path);
-    await expect(page.getByRole('button', { name: 'Lưu mẫu', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Lưu thiết lập', exact: true })).toBeVisible();
     await expect(page.locator('.form-scroll > .templates'), path).toHaveCount(1);
     await expect(page.locator('.runbar').getByRole('button'), path).toHaveCount(1);
   }
 });
 
-test('Try On: a saved template lists under Mẫu của tôi and refills the person, garment, text and resolution; another member does not see it; it can be deleted', async ({ page, browser }) => {
+test('Try On: a saved template lists under Thiết lập đã lưu and refills the person, garment, text and resolution; another member does not see it; it can be deleted', async ({ page, browser }) => {
   await signIn(page, 'tpla');
   await page.goto('/try-on');
   await page.getByLabel('Ảnh trang phục').setInputFiles(file('garment.png'));
@@ -37,7 +37,7 @@ test('Try On: a saved template lists under Mẫu của tôi and refills the pers
   await page.goto('/try-on');
   await expect(page.getByRole('textbox', { name: 'Mô tả (tuỳ chọn)' })).toHaveValue('');
   await openTemplates(page);
-  const list = page.getByRole('dialog', { name: 'Mẫu của tôi' });
+  const list = page.getByRole('dialog', { name: 'Thiết lập đã lưu' });
   const link = list.getByRole('link', { name: 'Váy đỏ' });
   const url = new URL((await link.getAttribute('href'))!, page.url()).href; // the template link, for another member below
   await link.click();
@@ -53,15 +53,15 @@ test('Try On: a saved template lists under Mẫu của tôi and refills the pers
   await signIn(other, 'tplb');
   await other.goto('/try-on');
   await openTemplates(other);
-  await expect(other.getByRole('dialog', { name: 'Mẫu của tôi' })).toContainText('Chưa có mẫu nào.');
+  await expect(other.getByRole('dialog', { name: 'Thiết lập đã lưu' })).toContainText('Chưa có thiết lập nào.');
   await other.goto(url);
   await expect(other.getByText('Không tìm thấy ảnh để dùng lại.')).toBeVisible();
   await other.close();
 
   await openTemplates(page);
-  await list.getByRole('button', { name: 'Xoá mẫu Váy đỏ' }).click();
-  await page.getByRole('dialog', { name: 'Xoá mẫu "Váy đỏ"?' }).getByRole('button', { name: 'Xoá', exact: true }).click();
-  await expect(list).toContainText('Chưa có mẫu nào.');
+  await list.getByRole('button', { name: 'Xoá thiết lập Váy đỏ' }).click();
+  await page.getByRole('dialog', { name: 'Xoá thiết lập "Váy đỏ"?' }).getByRole('button', { name: 'Xoá', exact: true }).click();
+  await expect(list).toContainText('Chưa có thiết lập nào.');
 });
 
 test("Create: a template saved to the store chosen on the form is listed, tagged with the store, to another member who picks that store, and applies there with the author's photo, which that member's Run takes", async ({ page, browser }) => {
@@ -70,30 +70,30 @@ test("Create: a template saved to the store chosen on the form is listed, tagged
   await page.getByLabel('Ảnh sản phẩm').setInputFiles(file('shop-bag.png'));
   await expect(page.getByRole('img', { name: 'shop-bag.png' })).toBeVisible();
   await page.getByLabel('Mô tả chuyển động').fill('The shop bag spins slowly.');
-  await page.getByRole('button', { name: 'Lưu mẫu', exact: true }).click();
-  const dialog = page.getByRole('dialog', { name: 'Lưu mẫu' });
+  await page.getByRole('button', { name: 'Lưu thiết lập', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Lưu thiết lập' });
   await expect(dialog.getByRole('radio', { name: 'Cửa hàng', exact: true })).toBeDisabled(); // no store chosen on the form yet
   await expect(dialog.getByRole('radio', { name: 'Công ty' })).toHaveCount(0); // a member shares with no company
   await dialog.getByRole('button', { name: 'Đóng' }).click();
   await selectText(page, 'Cửa hàng/Thương hiệu', 'E2E Shop');
-  await page.getByRole('button', { name: 'Lưu mẫu', exact: true }).click();
-  await dialog.getByLabel('Tên mẫu').fill('Túi xoay');
+  await page.getByRole('button', { name: 'Lưu thiết lập', exact: true }).click();
+  await dialog.getByLabel('Tên thiết lập').fill('Túi xoay');
   await dialog.getByRole('radio', { name: 'Cửa hàng E2E Shop' }).check();
   await dialog.getByRole('button', { name: 'Lưu', exact: true }).click();
-  await expect(page.getByRole('status').filter({ hasText: 'Đã lưu mẫu.' })).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: 'Đã lưu thiết lập.' })).toBeVisible();
 
   const other = await (await browser.newContext()).newPage();
   await signIn(other, 'stplb');
   await other.goto('/create');
-  const list = other.getByRole('dialog', { name: 'Mẫu của tôi' });
+  const list = other.getByRole('dialog', { name: 'Thiết lập đã lưu' });
   await openTemplates(other);
-  await expect(list).toContainText('Chưa có mẫu nào.'); // without the store, not listed
+  await expect(list).toContainText('Chưa có thiết lập nào.'); // without the store, not listed
   await list.getByRole('button', { name: 'Đóng' }).click();
   await selectText(other, 'Cửa hàng/Thương hiệu', 'E2E Shop');
   await openTemplates(other);
   const item = list.getByRole('listitem').filter({ hasText: 'Túi xoay' });
   await expect(item.locator('.tag')).toHaveText('Cửa hàng: E2E Shop');
-  await expect(item.getByRole('button', { name: 'Xoá mẫu Túi xoay' })).toHaveCount(0); // only its author, an Admin or an editor deletes it
+  await expect(item.getByRole('button', { name: 'Xoá thiết lập Túi xoay' })).toHaveCount(0); // only its author, an Admin or an editor deletes it
   await item.getByRole('link', { name: 'Túi xoay' }).click();
   await expect(other.getByLabel('Mô tả chuyển động')).toHaveValue('The shop bag spins slowly.');
   await expect(select(other, 'Cửa hàng/Thương hiệu')).toHaveText('E2E Shop');
@@ -111,9 +111,9 @@ test("Create: a template saved to the store chosen on the form is listed, tagged
 
   // The author deletes it, so no other spec that picks this store lists it.
   await openTemplates(page);
-  await page.getByRole('dialog', { name: 'Mẫu của tôi' }).getByRole('button', { name: 'Xoá mẫu Túi xoay' }).click();
-  await page.getByRole('dialog', { name: 'Xoá mẫu "Túi xoay"?' }).getByRole('button', { name: 'Xoá', exact: true }).click();
-  await expect(page.getByRole('dialog', { name: 'Mẫu của tôi' })).toContainText('Chưa có mẫu nào.');
+  await page.getByRole('dialog', { name: 'Thiết lập đã lưu' }).getByRole('button', { name: 'Xoá thiết lập Túi xoay' }).click();
+  await page.getByRole('dialog', { name: 'Xoá thiết lập "Túi xoay"?' }).getByRole('button', { name: 'Xoá', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Thiết lập đã lưu' })).toContainText('Chưa có thiết lập nào.');
 });
 
 test('Image Generation: a saved template refills the prompt and Enhance', async ({ page }) => {
@@ -125,7 +125,7 @@ test('Image Generation: a saved template refills the prompt and Enhance', async 
   await page.goto('/image-generation');
   await expect(prompt).toHaveValue('');
   await openTemplates(page);
-  await page.getByRole('dialog', { name: 'Mẫu của tôi' }).getByRole('link', { name: 'Studio' }).click();
+  await page.getByRole('dialog', { name: 'Thiết lập đã lưu' }).getByRole('link', { name: 'Studio' }).click();
   await expect(prompt).toHaveValue('a studio shot');
 });
 
@@ -140,14 +140,14 @@ test('Marketing Studio: an Advanced template chosen on the UGC page opens the Ad
   expect(saved.status()).toBe(201);
   await page.goto('/marketing-studio');
   await openTemplates(page);
-  await page.getByRole('dialog', { name: 'Mẫu của tôi' }).getByRole('link', { name: 'Launch' }).click();
+  await page.getByRole('dialog', { name: 'Thiết lập đã lưu' }).getByRole('link', { name: 'Launch' }).click();
   await expect(page.getByLabel('Ảnh tham chiếu: ảnh đã chọn').getByRole('img')).toHaveCount(2);
   await expect(page).toHaveURL((u) => u.pathname === '/marketing-studio/advanced' && u.search === ''); // the link opened the refill, then the address drops its query
   await expect(page.getByRole('textbox', { name: 'Mô tả', exact: true })).toHaveValue('my brief');
   await expect(page.getByRole('textbox', { name: 'Lời thoại (tuỳ chọn)' })).toHaveValue('my lines');
 });
 
-test('Dùng mẫu này on a company result in Ví dụ fills Try On, Image Generation and Marketing Studio from its inputs, for another member too; an Explore image model opens Image Generation on that model', async ({ page, browser }) => {
+test('Dùng ví dụ này on a company result in Ví dụ fills Try On, Image Generation and Marketing Studio from its inputs, for another member too; an Explore image model opens Image Generation on that model', async ({ page, browser }) => {
   await signIn(page, 'usea');
   const up = async (name: string) => ((await (await page.request.post('/api/assets', { multipart: { file: file(name) } })).json()) as { assets: { id: string }[] }).assets[0]!.id;
   const post = async (data: Record<string, unknown>) => {

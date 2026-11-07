@@ -222,7 +222,7 @@ describe('/api/templates', () => {
     expect((await marketing(admin, { hook: `${admin.id}-hook` })).status).toBe(201); // private, it may
   });
 
-  describe("fromJob (History's Lưu mẫu)", () => {
+  describe("fromJob (History's Lưu thiết lập)", () => {
     let jobSeq = 0;
     type Row = { feature: string; model: string; prompt?: string; preset?: string | null; aspect?: string; duration?: number; params?: Record<string, string>; inputs: string[]; store?: string | null; enhance?: boolean };
     async function job(u: User, row: Row) {

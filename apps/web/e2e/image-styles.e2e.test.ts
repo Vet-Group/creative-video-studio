@@ -9,19 +9,19 @@ async function openStyles(page: Page) {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto('/image-generation');
   await expect(modelButton(page)).toContainText('Mock image E2E');
-  await page.getByRole('group', { name: 'Thanh tạo ảnh' }).getByRole('button', { name: 'Mẫu', exact: true }).click();
-  return page.getByRole('dialog', { name: 'Chọn mẫu' }).getByRole('list', { name: 'Danh sách phong cách' });
+  await page.getByRole('group', { name: 'Thanh tạo ảnh' }).getByRole('button', { name: 'Phong cách', exact: true }).click();
+  return page.getByRole('dialog', { name: 'Chọn phong cách' }).getByRole('list', { name: 'Danh sách phong cách' });
 }
 
 test('a member picks a style, and a mock Run sends its id while History and Reuse keep the member’s own words', async ({ page }) => {
   await signIn(page, 'stylea');
   const grid = await openStyles(page);
-  await expect(grid.getByRole('button', { name: /^Đề xuất sửa mẫu / })).toHaveCount(8); // a member proposes and edits nothing directly
-  await expect(grid.getByRole('button', { name: /^Sửa mẫu / })).toHaveCount(0);
+  await expect(grid.getByRole('button', { name: /^Đề xuất sửa phong cách / })).toHaveCount(8); // a member proposes and edits nothing directly
+  await expect(grid.getByRole('button', { name: /^Sửa phong cách / })).toHaveCount(0);
   await grid.getByRole('button', { name: 'Đường phố', exact: true }).click();
   await expect(grid).toBeHidden();
   const bar = page.getByRole('group', { name: 'Thanh tạo ảnh' });
-  await expect(bar.getByRole('button', { name: 'Mẫu: Đường phố' })).toBeVisible();
+  await expect(bar.getByRole('button', { name: 'Phong cách: Đường phố' })).toBeVisible();
 
   await bar.getByRole('textbox', { name: 'Mô tả cảnh bạn muốn tạo' }).fill('a red shirt on a hanger');
   const [sent] = await Promise.all([
@@ -39,23 +39,23 @@ test('a member picks a style, and a mock Run sends its id while History and Reus
   // Reuse fills the member's words and the style back, not the composed prompt.
   await page.goto(`/image-generation?reuse=${id}`);
   await expect(page.getByRole('textbox', { name: 'Mô tả cảnh bạn muốn tạo' })).toHaveValue('a red shirt on a hanger');
-  await expect(page.getByRole('group', { name: 'Thanh tạo ảnh' }).getByRole('button', { name: 'Mẫu: Đường phố' })).toBeVisible();
+  await expect(page.getByRole('group', { name: 'Thanh tạo ảnh' }).getByRole('button', { name: 'Phong cách: Đường phố' })).toBeVisible();
 });
 
 test('a template editor renames a style in the picker, and the picker shows and picks it under the new label', async ({ page }) => {
   await signIn(page, 'tpled');
   const grid = await openStyles(page);
-  await grid.getByRole('button', { name: 'Sửa mẫu Phẳng nằm', exact: true }).click();
-  const form = page.getByRole('dialog', { name: 'Sửa mẫu' });
+  await grid.getByRole('button', { name: 'Sửa phong cách Phẳng nằm', exact: true }).click();
+  const form = page.getByRole('dialog', { name: 'Sửa phong cách' });
   await expect(form.getByLabel('Mô tả phong cách (tiếng Anh)')).toHaveValue(/^Flat lay shot/); // an editor reads the prompt it edits
   await expect(form.getByRole('button', { name: 'Gợi ý prompt từ video' })).toHaveCount(0); // a style has no clip to read
   await expect(form.getByLabel('Thay video mẫu (MP4)')).toHaveCount(0);
   await expect(form.getByLabel('Thay ảnh ví dụ (JPG)')).toBeVisible();
-  await form.getByLabel('Tên mẫu').fill('Phẳng nằm (sửa)');
+  await form.getByLabel('Tên phong cách').fill('Phẳng nằm (sửa)');
   await Promise.all([page.waitForResponse((r) => r.url().endsWith('/api/presets/style-flat-lay') && r.request().method() === 'PATCH' && r.ok()), form.getByRole('button', { name: 'Lưu', exact: true }).click()]);
   await expect(form).toBeHidden();
-  await expect(page.getByRole('region', { name: 'Thông báo' }).getByText('Đã lưu mẫu.')).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Thông báo' }).getByText('Đã lưu phong cách.')).toBeVisible();
   await grid.getByRole('button', { name: 'Phẳng nằm (sửa)', exact: true }).click();
-  await expect(page.getByRole('group', { name: 'Thanh tạo ảnh' }).getByRole('button', { name: 'Mẫu: Phẳng nằm (sửa)' })).toBeVisible();
+  await expect(page.getByRole('group', { name: 'Thanh tạo ảnh' }).getByRole('button', { name: 'Phong cách: Phẳng nằm (sửa)' })).toBeVisible();
   expect((await page.request.patch('/api/presets/style-flat-lay', { data: { label: 'Phẳng nằm' } })).ok()).toBe(true);
 });

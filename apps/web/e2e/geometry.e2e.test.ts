@@ -62,7 +62,7 @@ async function checkExampleDialog(
     step: [number, number, number, number];
   },
 ): Promise<void> {
-  const dialog = page.getByRole('dialog', { name: 'Chi tiết mẫu' });
+  const dialog = page.getByRole('dialog', { name: 'Chi tiết ví dụ' });
   const d = await box(dialog);
   near(d.x, m.dialog[0], 'dialog x');
   near(d.y, m.dialog[1], 'dialog y');
@@ -91,20 +91,20 @@ async function checkExampleDialog(
   near(p.height, 28, 'pill height');
   expect(await css(pill, 'border-top-left-radius', 'color', 'font-size')).toEqual(['20px', 'rgb(77, 77, 77)', '12px']);
   near((await box(dialog.locator('.detail-date'))).y, m.dateY, 'date y', 3);
-  const tool = dialog.getByRole('link', { name: 'Tải video mẫu' });
+  const tool = dialog.getByRole('link', { name: 'Tải video ví dụ' });
   const t = await box(tool);
   near(t.x, m.tool[0], 'first tool x');
   near(t.y, m.tool[1], 'tools y', 3);
   sized(t, m.tool[2], 32, 'tool');
   expect(await css(tool, 'background-color', 'border-top-left-radius')).toEqual(['rgb(242, 242, 242)', '6px']);
-  const use = dialog.getByRole('button', { name: 'Dùng mẫu này' });
+  const use = dialog.getByRole('button', { name: 'Dùng ví dụ này' });
   const u = await box(use);
   near(u.x, m.use[0], 'use button x');
   near(u.y, m.use[1], 'use button y', 3);
   sized(u, m.use[2], 36, 'use button');
   expect(await css(use, 'background-color', 'color', 'border-top-left-radius', 'font-size', 'font-weight')).toEqual(['rgb(220, 38, 38)', 'rgb(255, 255, 255)', '8px', '11px', '600']);
   const [leftX, rightX, stepY, size] = m.step;
-  for (const [name, x] of [['Mẫu trước', leftX], ['Mẫu sau', rightX]] as const) {
+  for (const [name, x] of [['Ví dụ trước', leftX], ['Ví dụ sau', rightX]] as const) {
     const b = page.getByRole('button', { name });
     const s = await box(b);
     sized(s, size, size, name);
@@ -404,7 +404,7 @@ test.describe('1440x1000', () => {
   test('G3 hover: the tile lifts 3 px with a shadow and a 180x46 radius-8 button fades in 15 px from the bottom', async ({ page }) => {
     await tab(page, 'Ví dụ').click();
     const tile = page.locator('.example').filter({ hasText: 'Toàn cảnh trượt ngang' });
-    const use = tile.getByRole('button', { name: 'Dùng mẫu này: Toàn cảnh trượt ngang' });
+    const use = tile.getByRole('button', { name: 'Dùng ví dụ này: Toàn cảnh trượt ngang' });
     await tile.scrollIntoViewIfNeeded();
     expect((await css(use, 'opacity'))[0]).toBe('0');
     await tile.hover();
