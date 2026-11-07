@@ -19,12 +19,15 @@ export function SignInMethods({
   googleEnabled,
   larkEnabled,
   error,
+  embedded = false,
 }: {
   methods: SignInMethod[];
   passkeys?: PasskeyItem[];
   googleEnabled: boolean;
   larkEnabled: boolean;
   error?: string;
+  /** Inside Settings, whose section heading already names it: no heading of its own. */
+  embedded?: boolean;
 }) {
   const router = useRouter();
   const [problem, setProblem] = useState(authErrorText(error) ?? '');
@@ -81,8 +84,8 @@ export function SignInMethods({
   }
 
   return (
-    <section aria-labelledby="methods-title">
-      <h1 id="methods-title">Phương thức đăng nhập</h1>
+    <section aria-labelledby={embedded ? 'settings-heading' : 'methods-title'}>
+      {!embedded && <h1 id="methods-title">Phương thức đăng nhập</h1>}
       <p className="muted">Mọi phương thức dưới đây đều đăng nhập vào cùng một tài khoản. Luôn phải còn ít nhất một phương thức.</p>
       {problem && (
         <p className="error" role="alert">

@@ -11,7 +11,7 @@ test('the login page explains a refused social sign-in and shows no social butto
 test('a user sees the password method under Settings, Connected accounts, and on the sign-in methods page', async ({ page }) => {
   await signIn(page, 'member1');
   const settings = await openSettings(page);
-  await settings.getByRole('button', { name: 'Tài khoản liên kết' }).click();
+  await settings.getByRole('button', { name: 'Phương thức đăng nhập' }).click();
   await expect(settings.getByRole('heading', { name: 'Phương thức đăng nhập' })).toBeVisible();
   await expect(settings.getByText('Email và mật khẩu')).toBeVisible();
   await expect(settings.getByRole('button', { name: /Liên kết|Huỷ liên kết/ })).toHaveCount(0);

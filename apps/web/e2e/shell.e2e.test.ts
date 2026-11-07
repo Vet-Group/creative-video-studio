@@ -167,7 +167,7 @@ test('the Apps pages widen the sidebar to 280 px as Fash does, and the icon rail
 test('Settings shows the profile, the own caps, the sign-in summary, the support contact and no billing', async ({ page }) => {
   await signIn(page, 'member1');
   const settings = await openSettings(page);
-  await expect(settings.getByRole('navigation', { name: 'Tài khoản' }).getByRole('button')).toHaveText([/^Hồ sơ/, /^Hạn mức/, /^Bảo mật/, /^Tuỳ chọn/, /^Tài khoản liên kết/, /^Hỗ trợ/, 'Đăng xuất']);
+  await expect(settings.getByRole('navigation', { name: 'Tài khoản' }).getByRole('button')).toHaveText([/^Hồ sơ/, /^Hạn mức/, /^Bảo mật/, /^Tuỳ chọn/, /^Phương thức đăng nhập/, /^Hỗ trợ/, 'Đăng xuất']);
   await expect(settings.getByRole('button', { name: 'Hồ sơ' })).toHaveAttribute('aria-current', 'true');
   await expect(settings.getByText('member1@e2e.test')).toBeVisible();
   await expect(settings.getByText('E2E Member 1')).toBeVisible();

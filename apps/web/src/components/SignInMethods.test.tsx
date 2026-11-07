@@ -48,3 +48,10 @@ test('without the passkeys (the Settings dialog) links to the page that manages 
   expect(html).toContain('<a href="/account/sign-in-methods">Quản lý passkey</a>');
   expect(html).not.toContain('Thêm passkey');
 });
+
+test('has its own heading on the page, and none inside Settings, whose section heading already names it', () => {
+  expect(render({})).toContain('<h1 id="methods-title">Phương thức đăng nhập</h1>');
+  const embedded = render({ embedded: true });
+  expect(embedded).not.toContain('<h1');
+  expect(embedded).toContain('aria-labelledby="settings-heading"');
+});
