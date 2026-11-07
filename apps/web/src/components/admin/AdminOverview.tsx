@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { LoadError } from '@/components/LoadError';
-import { auditLabel, useFetch } from '@/lib/admin-ui';
+import { auditLabel, auditTarget, groupRecent, useFetch } from '@/lib/admin-ui';
 import { NO_CAP } from '@/lib/caps';
 import type { AdminOverview as Data } from '@/lib/overview';
 import { Empty, PageHead } from './PageHead';
@@ -92,18 +92,23 @@ export function AdminOverview() {
               <Empty title="Chưa có hoạt động nào" />
             ) : (
               <ol className="recent">
-                {data.audit.map((e) => (
-                  <li key={e.id}>
-                    <time dateTime={e.createdAt}>{fmtTime(e.createdAt)}</time>
-                    <span className="recent-who">{e.actorName}</span>
-                    <code className="event" title={e.action}>
-                      {auditLabel(e.action)}
-                    </code>
-                    <span className="recent-target" title={e.target}>
-                      {e.target}
-                    </span>
-                  </li>
-                ))}
+                {groupRecent(data.audit)
+                  .slice(0, 5)
+                  .map((e) => (
+                    <li key={e.id}>
+                      <time dateTime={e.createdAt}>{fmtTime(e.createdAt)}</time>
+                      <span className="recent-who">{e.actorName}</span>
+                      <code className="event" title={e.action}>
+                        {auditLabel(e.action)}
+                        {e.count > 1 && ` ×${e.count}`}
+                      </code>
+                      {e.count === 1 && (
+                        <span className="recent-target" title={e.target}>
+                          {auditTarget(e.target)}
+                        </span>
+                      )}
+                    </li>
+                  ))}
               </ol>
             )}
           </section>

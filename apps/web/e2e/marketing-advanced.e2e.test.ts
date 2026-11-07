@@ -21,14 +21,14 @@ async function openAdvanced(page: Page): Promise<void> {
   await expect(page).toHaveURL(/\/marketing-studio$/);
   await page.getByRole('button', { name: 'Đổi định dạng' }).click();
   const formats = page.getByRole('dialog', { name: 'Chọn định dạng' });
-  await expect(formats.getByRole('button', { name: 'Nâng cao' })).toBeEnabled();
+  await expect(formats.getByRole('button', { name: 'Editorial' })).toBeEnabled();
   await expect(formats.getByRole('button', { disabled: true })).toHaveCount(0); // all four formats are built
-  await formats.getByRole('button', { name: 'Nâng cao' }).click();
+  await formats.getByRole('button', { name: 'Editorial' }).click();
   await expect(page).toHaveURL(/\/marketing-studio\/advanced$/);
-  await expect(page.locator('.app-head strong')).toHaveText('Nâng cao');
+  await expect(page.locator('.app-head strong')).toHaveText('Editorial');
 }
 
-test('an Advanced job runs from reference images, a brief, a script and audio on, and is filed under Nâng cao in the Library', async ({ page }) => {
+test('an Advanced job runs from reference images, a brief, a script and audio on, and is filed under Editorial in the Library', async ({ page }) => {
   await signIn(page, 'mktd');
   await openAdvanced(page);
   await expect(nav(page).getByRole('link', { name: 'Marketing Studio' })).toHaveAttribute('aria-current', 'page');
@@ -105,7 +105,7 @@ test('an Advanced job runs from reference images, a brief, a script and audio on
   await nav(page).getByRole('link', { name: 'Thư viện' }).click();
   const kinds = page.getByRole('group', { name: 'Loại' });
   const mine = page.getByRole('article').filter({ hasText: 'E2E Mkt D' });
-  await kinds.getByRole('button', { name: 'Nâng cao', exact: true }).click();
+  await kinds.getByRole('button', { name: 'Editorial', exact: true }).click();
   await expect(mine).toHaveCount(1);
   await kinds.getByRole('button', { name: 'UGC Thử đồ', exact: true }).click();
   await expect(mine).toHaveCount(0);
@@ -133,8 +133,8 @@ test('audio off makes a silent job, the reference slot stops at the model cap, a
   expect(detail.prompt).not.toContain('Never spoken');
 
   await page.getByRole('tab', { name: 'Giới thiệu' }).click();
-  await expect(page.getByRole('heading', { name: /Nâng cao/ }).first()).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'UGC Thử đồ hay Nâng cao?' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Editorial/ }).first()).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'UGC Thử đồ hay Editorial?' })).toBeVisible();
   await expect(page.getByText(/Khoảng hai từ mỗi giây/)).toBeVisible();
 });
 
@@ -143,7 +143,7 @@ test('the format picker goes back to UGC Thử đồ from Advanced', async ({ pa
   await page.goto('/marketing-studio/advanced');
   await page.getByRole('button', { name: 'Đổi định dạng' }).click();
   const formats = page.getByRole('dialog', { name: 'Chọn định dạng' });
-  await expect(formats.getByRole('button', { name: 'Nâng cao' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(formats.getByRole('button', { name: 'Editorial' })).toHaveAttribute('aria-pressed', 'true');
   await formats.getByRole('button', { name: 'UGC Thử đồ' }).click();
   await expect(page).toHaveURL(/\/marketing-studio$/);
   await expect(page.locator('.slot')).toHaveCount(2);

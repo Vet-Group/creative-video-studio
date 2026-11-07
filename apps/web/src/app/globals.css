@@ -1043,6 +1043,7 @@ dialog.admin-modal { width: min(36rem, calc(100vw - 2rem)); }
 .example-caption { position: absolute; top: 0; left: 0; right: 0; padding: 34px 12px 24px; background: linear-gradient(rgb(var(--shade) / .6), transparent); color: var(--on-dark); font-size: 13px; line-height: 18px; font-weight: 600; opacity: 0; transition: opacity .18s ease-in-out; }
 .example-use { position: absolute; z-index: 3; left: 0; right: 0; bottom: 15px; width: 180px; max-width: calc(100% - 24px); height: 46px; margin: 0 auto; padding: 0 12px; border: 0; border-radius: 8px; background: var(--surface); color: var(--ink); font-size: 14px; line-height: 21px; font-weight: 600; opacity: 0; transition: opacity .18s ease-in-out; }
 .example-use:focus-visible { outline-offset: -4px; }
+.example-model { display: block; font-weight: 400; opacity: .85; }
 .example:hover .example-caption, .example:focus-within .example-caption, .example:hover .example-use, .example:focus-within .example-use { opacity: 1; }
 @media (hover: none) {
   .example-caption, .example-use { opacity: 1; }

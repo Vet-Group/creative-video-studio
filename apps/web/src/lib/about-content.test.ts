@@ -61,7 +61,7 @@ describe('the About pages', () => {
     const cards = choose!.blocks!.flatMap((b) => (typeof b !== 'string' && 'cards' in b ? b.cards : []));
     expect(cards.map((c) => [c.title, c.link])).toEqual([
       ['UGC Thử đồ', ['Mở UGC Thử đồ', '/marketing-studio']],
-      ['Nâng cao', undefined],
+      ['Editorial', undefined],
     ]);
   });
 

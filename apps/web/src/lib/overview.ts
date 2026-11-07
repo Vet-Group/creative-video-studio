@@ -17,7 +17,7 @@ export async function adminOverview() {
     pool.query('select count(*) filter (where enabled)::int as enabled, count(*)::int as total from model_configs where twin_of is null'),
     pool.query(
       `select a.id::int as id, coalesce(u.name, 'Hệ thống') as "actorName", a.action, a.target, a.created_at as "createdAt"
-         from audit_entries a left join users u on u.id = a.actor_id order by a.id desc limit 5`,
+         from audit_entries a left join users u on u.id = a.actor_id order by a.id desc limit 40`,
     ),
   ]);
   return {

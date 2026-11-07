@@ -92,12 +92,12 @@ export const TOOL_GUIDE: ToolGuide[] = [
     icon: 'megaphone',
     oneLine: 'Video quảng cáo kiểu người sáng tạo nội dung: một người mẫu và một sản phẩm thành clip UGC cho TikTok, Reels.',
     useIf: 'Bạn cần video quảng cáo trông như người thật quay điện thoại giới thiệu sản phẩm.',
-    have: 'UGC Thử đồ: 1 ảnh người mẫu và 1 ảnh sản phẩm. Nâng cao: brief, tối đa 7 ảnh, hook, bối cảnh và lời thoại của bạn.',
+    have: 'UGC Thử đồ: 1 ảnh người mẫu và 1 ảnh sản phẩm. Editorial: brief, tối đa 7 ảnh, hook, bối cảnh và lời thoại của bạn.',
     get: 'Clip kiểu quay cầm tay, mặc định dọc 9:16 cho Reels, TikTok và Stories (có cả 16:9 và 1:1).',
     useWhen: [
       'Chạy quảng cáo mạng xã hội cần cảm giác chân thực, như lời giới thiệu của khách.',
       'Thử nhiều cách mở đầu (hook) và bối cảnh cho cùng một sản phẩm.',
-      'Cần nhân vật nói đúng lời thoại bạn viết (định dạng Nâng cao).',
+      'Cần nhân vật nói đúng lời thoại bạn viết (định dạng Editorial).',
     ],
     notWhen: [
       { text: 'Chỉ cần sản phẩm chuyển động đẹp, không cần người giới thiệu', href: '/create', go: 'Tạo video' },
