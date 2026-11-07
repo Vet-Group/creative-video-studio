@@ -80,6 +80,8 @@ export function ModelPicker({ models: given, value, onChange }: { models: ModelO
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
   const [fly, setFly] = useState<Fly | null>(null);
+  // Where the list last scrolled itself to show the active row: its scroll event comes a frame later and must not close a flyout opened since.
+  const selfScrolled = useRef<number | null>(null);
   const open = place !== null;
   const rows = rowsFor(models, query);
   const flyAt = fly ? rows.findIndex((r) => r.family?.key === fly.key) : -1;
@@ -104,6 +106,8 @@ export function ModelPicker({ models: given, value, onChange }: { models: ModelO
     const b = list.getBoundingClientRect();
     if (r.top < b.top) list.scrollTop -= b.top - r.top;
     else if (r.bottom > b.bottom) list.scrollTop += r.bottom - b.bottom;
+    else return;
+    if (list.id === listId) selfScrolled.current = list.scrollTop;
   }, [open, activeId, listId]);
   // The panel is fixed to the screen, so it closes when the page moves under it.
   useEffect(() => {
@@ -369,7 +373,17 @@ export function ModelPicker({ models: given, value, onChange }: { models: ModelO
               />
             </div>
             {/* A flyout beside the panel is fixed to the screen, so a scroll of the list would leave it beside the wrong row. */}
-            <div role="listbox" id={listId} aria-label="Mô hình" onScroll={(e) => e.target === e.currentTarget && fly?.style && setFly(null)}>
+            <div
+              role="listbox"
+              id={listId}
+              aria-label="Mô hình"
+              onScroll={(e) => {
+                if (e.target !== e.currentTarget) return;
+                const own = e.currentTarget.scrollTop === selfScrolled.current;
+                selfScrolled.current = null;
+                if (!own && fly?.style) setFly(null);
+              }}
+            >
               {rows.some((r) => r.family) ? (
                 sections()
               ) : (
