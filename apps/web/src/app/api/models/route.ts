@@ -81,7 +81,9 @@ export async function GET(request: Request) {
     // The twins taking the most images first, as servingRow orders them.
     const pair = [r, ...models.rows.filter((t) => t.twin_of === r.id).sort((a, b) => b.max_images - a.max_images || a.id.localeCompare(b.id))];
     const need = { durationSec, ratio: ratio!, images: 0, video: videoSec > 0, audioClips, endFrame };
-    const serving = pair.find((p) => canServe(p, { ...need, audio: false })) ?? r;
+    // Whether the entry makes this ratio and length at all; what the form adds only picks the row (the form leaves out what the chosen model does not take).
+    const plain = { ...need, video: false, audioClips: 0, endFrame: false, audio: false };
+    const serving = pair.find((p) => canServe(p, { ...need, audio: false })) ?? pair.find((p) => canServe(p, plain)) ?? r;
     const voiced = pair.find((p) => canServe(p, { ...need, audio: true })) ?? serving;
     // What the form may add (an end frame, audio clips, a reference video) comes from the rows that make this ratio and length.
     const fit = pair.filter((p) => p.ratios.includes(ratio) && p.durations_sec.includes(durationSec));
@@ -113,7 +115,7 @@ export async function GET(request: Request) {
       ...scoreOf(st),
       passes: st.passes,
       total: st.total,
-      supported: pair.some((p) => canServe(p, { ...need, audio: false })),
+      supported: pair.some((p) => canServe(p, plain)),
       // The rows of its pair, so a form reusing a job made on a twin keeps this entry.
       pairIds: pair.map((p) => p.id as string),
       creditUsd: serving.provider === 'fal' ? falCredit : null,

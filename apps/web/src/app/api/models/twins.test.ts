@@ -218,14 +218,16 @@ describe('a pair that acts as one model (migration 0078)', () => {
 describe('a pair priced for what the form adds (review of #342)', () => {
   const first = async (query: string) => ((await (await videoModels(as(`/api/models?${query}`))).json()) as { models: { id: string; provider: string; estimateUsd: string; supported: boolean; endFrame: boolean; pairIds: string[] }[] }).models[0]!;
 
-  test('prices an end frame or audio clips at the fal row they move the job to, and says when no row of the pair makes the request', async () => {
+  test('prices an end frame or audio clips at the fal row they move the job to, and is unsupported only for a ratio or length no row makes', async () => {
     await only(['seedance-2.5-byteplus', 'seedance-2.5-image', 'seedance-2.5-reference']);
     expect(await first('ratio=9:16&durationSec=8')).toMatchObject({ provider: 'byteplus', estimateUsd: '1.8496', endFrame: true, pairIds: ['seedance-2.5-byteplus', 'seedance-2.5-reference', 'seedance-2.5-image'] });
     expect(await first('ratio=9:16&durationSec=8&endFrame=1')).toMatchObject({ provider: 'fal', estimateUsd: '3.7840', supported: true }); // the image row takes the end frame
     expect(await first('ratio=9:16&durationSec=8&audioClips=1')).toMatchObject({ provider: 'fal', estimateUsd: '3.7840', supported: true }); // the reference row takes audio
     expect(await first('ratio=16:9&durationSec=8')).toMatchObject({ endFrame: false }); // the image row makes 9:16 and 1:1 only
     await only(['seedance-2.5-byteplus', 'seedance-2.5-image']);
-    expect(await first('ratio=16:9&durationSec=8&endFrame=1')).toMatchObject({ supported: false }); // BytePlus takes no end frame, the image row has no 16:9
+    // No row takes an end frame at 16:9 (the image row has none), so the entry stays on BytePlus, offers no end frame slot, and still makes the clip.
+    expect(await first('ratio=16:9&durationSec=8&endFrame=1')).toMatchObject({ provider: 'byteplus', endFrame: false, supported: true });
+    expect(await first('ratio=16:9&durationSec=40')).toMatchObject({ supported: false }); // no row makes 40 s
     expect((await videoModels(as('/api/models?ratio=9:16&durationSec=8&audioClips=x'))).status).toBe(400);
   });
 

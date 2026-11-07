@@ -398,7 +398,7 @@ function mp4(ms: number): Buffer {
 test('Motion Control: the image and the reference video, a length check, and a Run that sends both with ratio auto', async ({ page }) => {
   await signIn(page, 'appsa');
   const durationsSec = Array.from({ length: 28 }, (_, i) => i + 3);
-  const model = (id: string, label: string, usd: string) => ({ id, label, isMock: false, supported: true, estimateUsd: usd, durationsSec, score: 50, recommended: false });
+  const model = (id: string, label: string, usd: string) => ({ id, label, pairIds: [id], isMock: false, supported: true, estimateUsd: usd, durationsSec, score: 50, recommended: false });
   await page.route(/\/api\/models\?feature=motion_control/, (r) => {
     const seconds = Number(new URL(r.request().url()).searchParams.get('durationSec'));
     return r.fulfill({ json: { models: [model('kling-v3-motion-pro', 'Kling V3 Motion Control Pro', (0.168 * seconds).toFixed(4)), model('kling-v3-motion-standard', 'Kling V3 Motion Control Standard', (0.126 * seconds).toFixed(4))], defaultModelId: 'kling-v3-motion-standard' } });
@@ -439,7 +439,7 @@ test('Motion Control: the image and the reference video, a length check, and a R
 
 test("Motion Control: Dùng lại keeps the job's model even when the remembered model answers later", async ({ page }) => {
   await signIn(page, 'appsa');
-  const model = (id: string, label: string) => ({ id, label, isMock: false, supported: true, estimateUsd: '0.8400', durationsSec: [5], score: 50, recommended: false });
+  const model = (id: string, label: string) => ({ id, label, pairIds: [id], isMock: false, supported: true, estimateUsd: '0.8400', durationsSec: [5], score: 50, recommended: false });
   await page.route(/\/api\/models\?feature=motion_control/, (r) =>
     r.fulfill({ json: { models: [model('kling-v3-motion-pro', 'Kling V3 Motion Control Pro'), model('kling-v3-motion-standard', 'Kling V3 Motion Control Standard')], defaultModelId: 'kling-v3-motion-standard' } }),
   );
