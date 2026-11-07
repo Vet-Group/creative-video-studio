@@ -667,8 +667,8 @@ export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4
                 )}
                 {/* Fash's "Use this template": the page's form filled from this result's inputs (a Library clip's inputs are open to every member). */}
                 {reuseHref(it) && (
-                  <Recreate href={reuseHref(it)!} from={refillFrom({ reuse: it.id })!} className="gallery-use" label={`Dùng mẫu này: ${it.modelLabel}, ${it.ratio}`}>
-                    Dùng mẫu này
+                  <Recreate href={reuseHref(it)!} from={refillFrom({ reuse: it.id })!} className="gallery-use" label={`Dùng ví dụ này: ${it.modelLabel}, ${it.ratio}`}>
+                    Dùng ví dụ này
                   </Recreate>
                 )}
               </li>

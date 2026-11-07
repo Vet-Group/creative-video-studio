@@ -188,7 +188,7 @@ test("another member does not see a private hook; an Admin's company hook shows 
   }
 });
 
-test('Lưu mẫu on a History card saves that job as a template of its page, which Mẫu của tôi lists and refills, on Try On and on Marketing Studio', async ({ page }) => {
+test('Lưu thiết lập on a History card saves that job as a template of its page, which Thiết lập đã lưu lists and refills, on Try On and on Marketing Studio', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   const tag = unique();
   await signIn(page, 'custa');
@@ -199,17 +199,17 @@ test('Lưu mẫu on a History card saves that job as a template of its page, whi
   async function saveFromCard(name: string) {
     await page.getByRole('tab', { name: 'Lịch sử' }).click();
     const card = history(page).locator('.job-card').first();
-    await card.getByRole('button', { name: /^Lưu mẫu từ / }).click();
-    const dialog = page.getByRole('dialog', { name: 'Lưu mẫu' });
-    await expect(dialog.getByLabel('Tên mẫu')).not.toHaveValue(''); // the card's title to start with
-    await dialog.getByLabel('Tên mẫu').fill(name);
+    await card.getByRole('button', { name: /^Lưu thiết lập từ / }).click();
+    const dialog = page.getByRole('dialog', { name: 'Lưu thiết lập' });
+    await expect(dialog.getByLabel('Tên thiết lập')).not.toHaveValue(''); // the card's title to start with
+    await dialog.getByLabel('Tên thiết lập').fill(name);
     await dialog.getByRole('button', { name: 'Lưu', exact: true }).click();
     await expect(dialog).toBeHidden();
-    await expect(card.getByRole('status')).toHaveText('Đã lưu mẫu.');
+    await expect(card.getByRole('status')).toHaveText('Đã lưu thiết lập.');
   }
   async function openTemplate(path: RegExp, name: string) {
     await openTemplates(page);
-    await page.getByRole('dialog', { name: 'Mẫu của tôi' }).getByRole('link', { name }).click();
+    await page.getByRole('dialog', { name: 'Thiết lập đã lưu' }).getByRole('link', { name }).click();
     await expect(page).toHaveURL(path);
   }
 

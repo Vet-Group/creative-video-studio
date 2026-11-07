@@ -312,7 +312,7 @@ test('Create and Marketing Studio: Cài đặt video groups ratio, length, sound
     if (path === '/marketing-studio') order.push(block.getByRole('button', { name: /^Mô hình / }));
     for (let i = 1; i < order.length; i++) expect(await y(order[i]!)).toBeGreaterThan(await y(order[i - 1]!));
     expect(await fits(page)).toBe(true);
-    // Templates: the line of "Mẫu của tôi" says it saves the whole form.
+    // Templates: the line of "Thiết lập đã lưu" says it saves the whole form.
     const mine = await openTemplates(page);
     await expect(mine.getByText('Lưu cả form (ảnh, cài đặt) để dùng lại.')).toBeVisible();
     await page.keyboard.press('Escape');

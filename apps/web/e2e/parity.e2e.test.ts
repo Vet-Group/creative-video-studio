@@ -254,10 +254,10 @@ test('choosing a preset or using an example fills the form and creates no job', 
   // An example: a click shows the details with a "use this sample" button, which fills preset, ratio and duration.
   await page.getByRole('tab', { name: 'Ví dụ' }).click();
   await openTile(page, 'Xoay chậm tại chỗ');
-  const detail = page.getByRole('dialog', { name: 'Chi tiết mẫu' });
-  await expect(detail).toContainText('Mẫu minh họa');
+  const detail = page.getByRole('dialog', { name: 'Chi tiết ví dụ' });
+  await expect(detail).toContainText('Ví dụ minh họa');
   await expect(presetSelect).toHaveAttribute('data-value', 'light-sweep');
-  await detail.getByRole('button', { name: 'Dùng mẫu này' }).click();
+  await detail.getByRole('button', { name: 'Dùng ví dụ này' }).click();
   await expect(detail).toBeHidden();
   await expect(presetSelect).toHaveAttribute('data-value', 'slow-orbit');
   await expect(ratioSelect).toHaveAttribute('data-value', '1:1');
@@ -265,11 +265,11 @@ test('choosing a preset or using an example fills the form and creates no job', 
   // The hover button on a tile does the same without the dialog; a 16:9 sample has no matching form ratio, so the form keeps its own.
   const tile = (title: string) => page.locator('.example').filter({ hasText: title });
   await tile('Cầm trên tay').hover();
-  await tile('Cầm trên tay').getByRole('button', { name: 'Dùng mẫu này: Cầm trên tay' }).click();
+  await tile('Cầm trên tay').getByRole('button', { name: 'Dùng ví dụ này: Cầm trên tay' }).click();
   await expect(presetSelect).toHaveAttribute('data-value', 'handheld-product');
   await expect(ratioSelect).toHaveAttribute('data-value', '9:16');
   await tile('Toàn cảnh trượt ngang').hover();
-  await tile('Toàn cảnh trượt ngang').getByRole('button', { name: 'Dùng mẫu này: Toàn cảnh trượt ngang' }).click();
+  await tile('Toàn cảnh trượt ngang').getByRole('button', { name: 'Dùng ví dụ này: Toàn cảnh trượt ngang' }).click();
   await expect(presetSelect).toHaveAttribute('data-value', 'light-sweep');
   await expect(ratioSelect).toHaveAttribute('data-value', '9:16');
 
@@ -287,11 +287,11 @@ test('V01 Previous and Next step through every sample in order and stop at the e
   await openCreate(page);
   await page.getByRole('tab', { name: 'Ví dụ' }).click();
   await openTile(page, EXAMPLES[0]!.title);
-  const detail = page.getByRole('dialog', { name: 'Chi tiết mẫu' });
+  const detail = page.getByRole('dialog', { name: 'Chi tiết ví dụ' });
   const title = detail.getByRole('heading', { level: 2 });
   const specs = detail.getByRole('list', { name: 'Thông số' });
-  const prev = detail.getByRole('button', { name: 'Mẫu trước' });
-  const next = detail.getByRole('button', { name: 'Mẫu sau' });
+  const prev = detail.getByRole('button', { name: 'Ví dụ trước' });
+  const next = detail.getByRole('button', { name: 'Ví dụ sau' });
   await expect(title).toHaveText(EXAMPLES[0]!.title);
   await expect(specs).toContainText(EXAMPLES[0]!.aspect);
   await expect(prev).toBeHidden(); // the first sample has no Previous, as on live
@@ -305,11 +305,11 @@ test('V01 Previous and Next step through every sample in order and stop at the e
   await prev.click();
   await expect(title).toHaveText(EXAMPLES.at(-2)!.title);
   await expect(prev).toBeFocused(); // the button keeps the focus while the sample changes
-  const download = detail.getByRole('link', { name: 'Tải video mẫu' });
+  const download = detail.getByRole('link', { name: 'Tải video ví dụ' });
   await expect(download).toHaveAttribute('href', EXAMPLES.at(-2)!.src);
   await expect(download).toHaveAttribute('download', '');
   await expect(detail.getByRole('link', { name: 'Mở trong tab mới' })).toHaveAttribute('target', '_blank');
-  await detail.getByRole('button', { name: 'Dùng mẫu này' }).click();
+  await detail.getByRole('button', { name: 'Dùng ví dụ này' }).click();
   await expect(detail).toBeHidden();
   expect(posts).toEqual([]);
 });
@@ -363,9 +363,9 @@ test('as on Fash, a sample with a details file shows its prompt, input photos, s
     await openCreate(page);
     await page.getByRole('tab', { name: 'Ví dụ' }).click();
     // A tile is named from its details file (the preset, or "Tự viết mô tả" for a prompt), not from the fixture it took the place of.
-    await expect(page.getByRole('button', { name: 'Dùng mẫu này: Ngắm trọn bộ đồ' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Dùng ví dụ này: Ngắm trọn bộ đồ' })).toBeVisible();
     await openTile(page, 'Tự viết mô tả');
-    const detail = page.getByRole('dialog', { name: 'Chi tiết mẫu' });
+    const detail = page.getByRole('dialog', { name: 'Chi tiết ví dụ' });
     await expect(detail.locator('.detail-prompt')).toHaveText(details.prompt);
     await expect(detail.getByRole('list', { name: 'Ảnh đầu vào' }).getByRole('img')).toHaveCount(2);
     await expect(detail.getByRole('list', { name: 'Thông số' })).toHaveText('720p8s1:1');
@@ -375,17 +375,17 @@ test('as on Fash, a sample with a details file shows its prompt, input photos, s
     await expect(detail.locator('.detail-chip')).toHaveCount(0);
     await expect(detail.getByRole('heading', { name: 'Tự viết mô tả' })).toHaveClass('sr-only');
     // A sample made from a preset shows the preset's chip, with its name, and no prompt.
-    await detail.getByRole('button', { name: 'Mẫu sau' }).click();
+    await detail.getByRole('button', { name: 'Ví dụ sau' }).click();
     await expect(detail.locator('.detail-chip')).toHaveText('Ngắm trọn bộ đồ');
     await expect(detail.locator('.detail-prompt')).toHaveCount(0);
     await expect(detail.locator('.detail-model')).toHaveCount(0);
     // The next sample has no details file: its own facts and the in-place "use this sample" as before.
-    await detail.getByRole('button', { name: 'Mẫu sau' }).click();
-    await expect(detail).toContainText('Mẫu minh họa');
-    await expect(detail.getByRole('button', { name: 'Dùng mẫu này' })).toBeVisible();
+    await detail.getByRole('button', { name: 'Ví dụ sau' }).click();
+    await expect(detail).toContainText('Ví dụ minh họa');
+    await expect(detail.getByRole('button', { name: 'Dùng ví dụ này' })).toBeVisible();
     await expect(detail.locator('.detail-prompt')).toHaveCount(0);
-    await detail.getByRole('button', { name: 'Mẫu trước' }).click();
-    await detail.getByRole('button', { name: 'Mẫu trước' }).click();
+    await detail.getByRole('button', { name: 'Ví dụ trước' }).click();
+    await detail.getByRole('button', { name: 'Ví dụ trước' }).click();
 
     // As on Fash, a piece goes on the form on its own: a reference image, the words, the ratio.
     const note = (text: string) => page.getByRole('region', { name: 'Thông báo' }).getByText(text);
@@ -405,10 +405,10 @@ test('as on Fash, a sample with a details file shows its prompt, input photos, s
     await expect(select(page, 'Tỉ lệ khung hình')).toHaveAttribute('data-value', '1:1');
     await expect(select(page, 'Thời lượng')).toHaveAttribute('data-value', '8');
 
-    // The tile's own "Dùng mẫu này" refills from the details file too: the preset it names and its photo, not the fixture's preset.
+    // The tile's own "Dùng ví dụ này" refills from the details file too: the preset it names and its photo, not the fixture's preset.
     await page.keyboard.press('Escape');
     await expect(detail).toBeHidden();
-    await page.getByRole('button', { name: 'Dùng mẫu này: Ngắm trọn bộ đồ' }).click();
+    await page.getByRole('button', { name: 'Dùng ví dụ này: Ngắm trọn bộ đồ' }).click();
     await expect(page.locator('.banner-text strong')).toHaveAttribute('data-value', 'outfit-check');
     await expect(page.getByLabel('Ảnh đã chọn').getByRole('img', { name: 'example-2-input.png' })).toBeVisible();
   } finally {
@@ -438,7 +438,7 @@ test("as on Fash's Recreate, a sample's model name and its resolution put that m
     await selectValue(page, 'Thời lượng', '5');
     await page.getByRole('tab', { name: 'Ví dụ' }).click();
     await openTile(page, 'Tự viết mô tả');
-    const detail = page.getByRole('dialog', { name: 'Chi tiết mẫu' });
+    const detail = page.getByRole('dialog', { name: 'Chi tiết ví dụ' });
     const note = (text: string) => page.getByRole('region', { name: 'Thông báo' }).getByText(text);
     await detail.getByRole('button', { name: 'Dùng mô hình Short model' }).click();
     await expect(note('Đã chọn mô hình Short model')).toBeVisible();
@@ -471,16 +471,16 @@ test('a dialog closes on its backdrop, not on a click inside it', async ({ page 
   await openCreate(page);
   await page.getByRole('tab', { name: 'Ví dụ' }).click();
   await openTile(page, 'Xoay chậm tại chỗ');
-  const detail = page.getByRole('dialog', { name: 'Chi tiết mẫu' });
+  const detail = page.getByRole('dialog', { name: 'Chi tiết ví dụ' });
   await expect(detail).toBeVisible();
 
   // The padding beside the video and the text under it are inside the dialog.
   await detail.locator('.modal-body').click({ position: { x: 20, y: 200 } });
-  await detail.getByText('Mẫu minh họa').click();
+  await detail.getByText('Ví dụ minh họa').click();
   await expect(detail).toBeVisible();
 
   // A drag that starts inside (selecting text) and ends on the backdrop keeps it open.
-  const text = (await detail.getByText('Mẫu minh họa').boundingBox())!;
+  const text = (await detail.getByText('Ví dụ minh họa').boundingBox())!;
   await page.mouse.move(text.x + 2, text.y + text.height / 2);
   await page.mouse.down();
   await page.mouse.move(5, 5, { steps: 5 });

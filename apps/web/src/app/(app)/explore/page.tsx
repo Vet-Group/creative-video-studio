@@ -23,7 +23,7 @@ const FEATURES: { href: string; sample: string; title: string; icon: IconName; p
   { href: '/try-on', sample: 'feature-try-on', title: 'Thử đồ', icon: 'tryon', poster: EXAMPLES[2]!.poster },
   { href: '/image-generation', sample: 'feature-image-generation', title: 'Tạo ảnh', icon: 'image', poster: EXAMPLES[3]!.poster },
   { href: '/create', sample: 'feature-create-videos', title: 'Tạo video', icon: 'create', poster: EXAMPLES[0]!.poster },
-  { href: '/marketing-studio', sample: 'feature-marketing-studio', title: 'Marketing Studio', icon: 'megaphone', poster: EXAMPLES[0]!.poster },
+  { href: '/marketing-studio', sample: 'feature-marketing-studio', title: 'Marketing Studio', icon: 'megaphone', poster: EXAMPLES[1]!.poster },
   { href: '/apps', sample: 'feature-apps', title: 'Ứng dụng', icon: 'apps', poster: '/artwork/explore-apps.svg' },
   { href: '/library', sample: 'feature-library', title: 'Thư viện', icon: 'library', poster: '/artwork/explore-library.svg' },
 ];
@@ -143,7 +143,7 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
               const picture = jobPicture(j);
               return (
                 <li key={j.id}>
-                  <Link href={pageOf(j.feature) ?? '/library'} className="explore-job" data-status={isRunning(j) ? 'running' : j.status}>
+                  <Link href={j.status === 'succeeded' ? `/library?item=${j.id}` : (pageOf(j.feature) ?? '/library')} className="explore-job" data-status={isRunning(j) ? 'running' : j.status}>
                     <span className="explore-job-media">{picture ? <img src={picture} alt="" /> : <span className="banner-empty" aria-hidden="true" />}</span>
                     <strong>{featureLabel(j.feature)}</strong>
                     <span className="muted">{jobNote(j)}</span>

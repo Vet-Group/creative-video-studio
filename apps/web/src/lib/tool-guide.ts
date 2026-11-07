@@ -113,7 +113,7 @@ export const TOOL_GUIDE: ToolGuide[] = [
     icon: 'apps',
     oneLine: 'Công cụ một việc: xoá hay đổi nền, đổi khung hình, làm nét, đổi người mẫu hay khuôn mặt, thử trang sức, đồ lót, chép chuyển động, nén ảnh.',
     useIf: 'Bạn đã có ảnh gần đúng và chỉ cần làm một việc cụ thể với nó.',
-    have: 'Ảnh cần sửa (với Điều khiển chuyển động: một ảnh nhân vật và một video có chuyển động mẫu).',
+    have: 'Ảnh cần sửa (với Điều khiển chuyển động: một ảnh nhân vật và một video chuyển động).',
     get: 'Kết quả của đúng việc bạn chọn: thường là cùng ảnh đã sửa một chỗ; Điều khiển chuyển động trả về video.',
     useWhen: [
       'Chuẩn bị ảnh đăng sàn: xoá nền, đổi tỉ lệ 1:1, nén nhẹ (Tối ưu media miễn phí).',

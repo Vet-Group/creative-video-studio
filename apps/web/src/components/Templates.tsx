@@ -40,21 +40,21 @@ export function SaveTemplateDialog({ open, onClose, onSave, canShare, store, nam
     try {
       await onSave(name.trim(), scope);
     } catch (e) {
-      setError(errorText(e, 'Không lưu được mẫu, hãy thử lại.'));
+      setError(errorText(e, 'Không lưu được thiết lập, hãy thử lại.'));
     } finally {
       setBusy(false);
     }
   }
   return (
-    <Modal open={open} onClose={onClose} label="Lưu mẫu" className="choice-dialog">
-      <h2>Lưu mẫu</h2>
+    <Modal open={open} onClose={onClose} label="Lưu thiết lập" className="choice-dialog">
+      <h2>Lưu thiết lập</h2>
       <label className="field-label" htmlFor={nameId}>
-        Tên mẫu
+        Tên thiết lập
       </label>
       <input id={nameId} value={name} maxLength={MAX_TEMPLATE_NAME} onChange={(e) => setName(e.target.value)} />
       {(canShare || store !== undefined) && (
         <fieldset>
-          <legend>Ai được dùng mẫu này</legend>
+          <legend>Ai được dùng thiết lập này</legend>
           <label className="template-share">
             <input type="radio" name={scopeId} checked={scope === 'mine'} onChange={() => setScope('mine')} /> Cá nhân
           </label>
@@ -63,7 +63,7 @@ export function SaveTemplateDialog({ open, onClose, onSave, canShare, store, nam
               <input type="radio" name={scopeId} checked={scope === 'store'} disabled={!store} onChange={() => setScope('store')} /> {store ? `Cửa hàng ${store.name}` : 'Cửa hàng'}
             </label>
           )}
-          {store === null && <p className="help">Chọn cửa hàng trên form để chia sẻ mẫu với cửa hàng đó.</p>}
+          {store === null && <p className="help">Chọn cửa hàng trên form để chia sẻ thiết lập với cửa hàng đó.</p>}
           {canShare && (
             <label className="template-share">
               <input type="radio" name={scopeId} checked={scope === 'company'} onChange={() => setScope('company')} /> Công ty
@@ -110,16 +110,16 @@ export function Templates({ feature, data, store }: { feature: string; data: () 
     const shared = scope === 'company' ? { isCompany: true } : scope === 'store' && store ? { storeId: store.id } : {};
     await api('/api/templates', sendJson('POST', { feature, name, data: Object.fromEntries(Object.entries(data()).filter(([, v]) => v !== '' && v !== undefined)), ...shared }));
     setOpen(null);
-    setNotice('Đã lưu mẫu.');
+    setNotice('Đã lưu thiết lập.');
   }
 
   async function remove(t: Template) {
-    if (!(await confirmDialog({ title: `Xoá mẫu "${t.name}"?`, confirmLabel: 'Xoá', danger: true }))) return;
+    if (!(await confirmDialog({ title: `Xoá thiết lập "${t.name}"?`, confirmLabel: 'Xoá', danger: true }))) return;
     try {
       await api(`/api/templates/${encodeURIComponent(t.id)}`, { method: 'DELETE' });
       void load();
     } catch (e) {
-      setError(errorText(e, 'Không xoá được mẫu.'));
+      setError(errorText(e, 'Không xoá được thiết lập.'));
     }
   }
 
@@ -127,18 +127,18 @@ export function Templates({ feature, data, store }: { feature: string; data: () 
     <div className="templates">
       {notice && <p role="status">{notice}</p>}
       <button type="button" className="link-button" onClick={() => show('list')}>
-        Mẫu của tôi
+        Thiết lập đã lưu
       </button>
       <button type="button" className="link-button" onClick={() => show('save')}>
-        Lưu mẫu
+        Lưu thiết lập
       </button>
-      <Modal open={open === 'list'} onClose={() => setOpen(null)} label="Mẫu của tôi" className="choice-dialog">
-        <h2>Mẫu của tôi</h2>
+      <Modal open={open === 'list'} onClose={() => setOpen(null)} label="Thiết lập đã lưu" className="choice-dialog">
+        <h2>Thiết lập đã lưu</h2>
         <p className="modal-sub">Lưu cả form (ảnh, cài đặt) để dùng lại.</p>
         {list === null ? (
           !failed && <p>Đang tải...</p>
         ) : list.templates.length === 0 ? (
-          <p>Chưa có mẫu nào. Điền form rồi bấm &quot;Lưu mẫu&quot; để dùng lại sau.</p>
+          <p>Chưa có thiết lập nào. Điền form rồi bấm &quot;Lưu thiết lập&quot; để dùng lại sau.</p>
         ) : (
           <ul className="template-list">
             {list.templates.map((t) => (
@@ -149,7 +149,7 @@ export function Templates({ feature, data, store }: { feature: string; data: () 
                 {t.isCompany && <span className="tag">Công ty</span>}
                 {t.storeName && <span className="tag">Cửa hàng: {t.storeName}</span>}
                 {(t.mine || ((t.isCompany || t.storeId) && list.canShare)) && (
-                  <button type="button" className="link-button" aria-label={`Xoá mẫu ${t.name}`} onClick={() => void remove(t)}>
+                  <button type="button" className="link-button" aria-label={`Xoá thiết lập ${t.name}`} onClick={() => void remove(t)}>
                     Xoá
                   </button>
                 )}
@@ -157,7 +157,7 @@ export function Templates({ feature, data, store }: { feature: string; data: () 
             ))}
           </ul>
         )}
-        {failed && <LoadError text="Không tải được danh sách mẫu." onRetry={load} />}
+        {failed && <LoadError text="Không tải được danh sách thiết lập." onRetry={load} />}
         {error && (
           <p className="error" role="alert">
             {error}

@@ -55,6 +55,7 @@ export function PresetForm({ draft, feature = 'video', onClose, onSaved, onWritt
   const [preset, setPreset] = useState<PresetRow | null>(null);
   const propose = draft?.propose === true;
   const style = feature === 'image';
+  const noun = style ? 'phong cách' : 'mẫu'; // an image preset is a style (owner decision 2026-11-07)
   // The prompt-from-video button: a vision LLM reads the preset's saved clip and its answer fills the prompt field; nothing is saved before Save.
   const have = useSamples();
   const fromVideo = useSuggest();
@@ -80,7 +81,7 @@ export function PresetForm({ draft, feature = 'video', onClose, onSaved, onWritt
   }, [draft]);
 
   const editing = draft?.preset != null; // the title and hints follow the draft, not a preset the form has just added
-  const title = propose ? (editing ? 'Đề xuất sửa mẫu' : 'Đề xuất mẫu mới') : editing ? 'Sửa mẫu' : 'Thêm mẫu';
+  const title = propose ? (editing ? `Đề xuất sửa ${noun}` : `Đề xuất ${noun} mới`) : editing ? `Sửa ${noun}` : `Thêm ${noun}`;
   const orderOk = order.trim() === '' ? !(preset && !propose) : Number.isInteger(Number(order));
   const changed = preset ? label.trim() !== preset.label || prompt.trim() !== '' : true;
   const next = { label: label.trim(), prompt: prompt.trim(), enabled, ...(order.trim() !== '' && { sortOrder: Number(order) }) };
@@ -112,12 +113,12 @@ export function PresetForm({ draft, feature = 'video', onClose, onSaved, onWritt
       } catch {
         reloadSamples();
         onWritten();
-        return setError(style ? 'Đã lưu mẫu nhưng chưa tải lên được ảnh ví dụ. Bấm Lưu để thử lại.' : 'Đã lưu mẫu nhưng chưa tải lên được video mẫu hoặc ảnh bìa. Bấm Lưu để thử lại.');
+        return setError(style ? 'Đã lưu phong cách nhưng chưa tải lên được ảnh ví dụ. Bấm Lưu để thử lại.' : 'Đã lưu mẫu nhưng chưa tải lên được video mẫu hoặc ảnh bìa. Bấm Lưu để thử lại.');
       }
       if (video || poster) reloadSamples();
-      onSaved(editing ? 'Đã lưu mẫu.' : 'Đã thêm mẫu.');
+      onSaved(editing ? `Đã lưu ${noun}.` : `Đã thêm ${noun}.`);
     } catch (e) {
-      setError(errorText(e, propose ? 'Không gửi được đề xuất, hãy thử lại.' : 'Không lưu được mẫu, hãy thử lại.'));
+      setError(errorText(e, propose ? 'Không gửi được đề xuất, hãy thử lại.' : `Không lưu được ${noun}, hãy thử lại.`));
     } finally {
       setBusy(false);
     }
@@ -128,7 +129,7 @@ export function PresetForm({ draft, feature = 'video', onClose, onSaved, onWritt
       <h2>{title}</h2>
       {propose && <p className="help">Người có quyền biên tập mẫu sẽ duyệt hoặc từ chối đề xuất của bạn.</p>}
       <label className="field-label" htmlFor={`${id}-label`}>
-        Tên mẫu
+        Tên {noun}
       </label>
       <input id={`${id}-label`} value={label} maxLength={100} onChange={(e) => setLabel(e.target.value)} />
       <div className="field-head">
@@ -232,7 +233,7 @@ export function PendingProposals({ open, proposals, feature = 'video', onClose, 
   }
   const rows = (p: Proposal) =>
     [
-      ['Tên mẫu', p.current?.label, p.label],
+      [feature === 'image' ? 'Tên phong cách' : 'Tên mẫu', p.current?.label, p.label],
       [feature === 'image' ? 'Mô tả phong cách' : 'Mô tả chuyển động', p.current?.prompt, p.prompt],
       ['Thứ tự', p.current?.sortOrder, p.sortOrder],
       ['Trạng thái', p.current && (p.current.enabled ? 'Đang bật' : 'Đang tắt'), p.enabled === null ? null : p.enabled ? 'Đang bật' : 'Đang tắt'],
@@ -249,7 +250,7 @@ export function PendingProposals({ open, proposals, feature = 'video', onClose, 
           {proposals.map((p) => (
             <li key={p.id} aria-label={`Đề xuất của ${p.proposedBy}`}>
               <p>
-                <strong>{p.presetId ? `Sửa mẫu "${p.current?.label}"` : 'Mẫu mới'}</strong> · {p.proposedBy}
+                <strong>{p.presetId ? `Sửa ${feature === 'image' ? 'phong cách' : 'mẫu'} "${p.current?.label}"` : feature === 'image' ? 'Phong cách mới' : 'Mẫu mới'}</strong> · {p.proposedBy}
               </p>
               <dl>
                 {rows(p).map(([name, now, next]) => (

@@ -13,7 +13,6 @@ export interface Example {
   durationSec: number;
   width: number;
   height: number;
-  fixture: boolean;
   src: string;
   poster: string;
 }
@@ -27,7 +26,6 @@ const clip = (n: number, title: string, presetId: string, aspect: Aspect, width:
   durationSec: 5,
   width,
   height,
-  fixture: true,
   src: `/fixtures/examples/example-${n}.mp4`,
   poster: `/fixtures/examples/example-${n}.jpg`,
 });
@@ -49,14 +47,13 @@ export const EXAMPLES: Example[] = [
 /** The reference site's other example clips (owner, 2026-10-26: show all of them). They exist only as uploaded samples, with no fixture behind them. */
 const more = (n: number, aspect: Aspect, width: number, height: number, durationSec: number): Example => ({
   id: `example-${n}`,
-  title: `Video mẫu ${n}`,
+  title: `Video ví dụ ${n}`,
   presetId: '',
   aspect,
   ...(aspect === '9:16' || aspect === '1:1' ? { ratio: aspect } : {}),
   durationSec,
   width,
   height,
-  fixture: false,
   src: `/api/samples/example-${n}.mp4`,
   poster: `/api/samples/example-${n}.jpg`,
 });
@@ -108,7 +105,7 @@ function uploaded(e: Example, have: ReadonlySet<string>): Example {
   if (!have.has(`${e.id}.mp4`)) return e;
   const { ratio: _fixtureRatio, ...rest } = e;
   const [aspect, width, height] = UPLOADED_SIZE[e.id] ?? [e.aspect, e.width, e.height];
-  return { ...rest, title: `Video mẫu ${e.id.slice('example-'.length)}`, presetId: '', fixture: false, aspect, width, height, ...(aspect === '9:16' || aspect === '1:1' ? { ratio: aspect } : {}) };
+  return { ...rest, title: `Video ví dụ ${e.id.slice('example-'.length)}`, presetId: '', aspect, width, height, ...(aspect === '9:16' || aspect === '1:1' ? { ratio: aspect } : {}) };
 }
 
 /** A tile's name: the preset its details file names, "Tự viết mô tả" for a free prompt, else (no details yet) the clip's own title. */

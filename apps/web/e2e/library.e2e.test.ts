@@ -21,7 +21,7 @@ test('Library tools: favourites only, oldest first, the size slider and the empt
   // Favourites only: empty at first, with the way back to every item.
   const favoritesOnly = page.getByLabel('Chỉ mục yêu thích');
   await favoritesOnly.check();
-  await expect(page.getByText('Chưa có clip nào khớp bộ lọc.')).toBeVisible();
+  await expect(page.getByText('Chưa có kết quả nào khớp bộ lọc.')).toBeVisible();
   await expect(page.locator('.library-empty').getByRole('button', { name: 'Xoá lọc' })).toBeVisible();
   await favoritesOnly.uncheck();
 
@@ -45,7 +45,7 @@ test('Library tools: favourites only, oldest first, the size slider and the empt
   // Unmarking under Favourites only takes the card out of the list.
   await favoritesOnly.check();
   await card(second).getByRole('button', { name: 'Yêu thích' }).click();
-  await expect(page.getByText('Chưa có clip nào khớp bộ lọc.')).toBeVisible();
+  await expect(page.getByText('Chưa có kết quả nào khớp bộ lọc.')).toBeVisible();
   await favoritesOnly.uncheck();
 
   // The slider starts in the middle, changes the card width and is remembered.
@@ -95,7 +95,7 @@ test('Library views: grid or list remembered, a selection bar with the zip, sear
   await item(second).getByRole('button', { name: 'Xem chi tiết' }).click();
   const detail = page.getByRole('dialog');
   await detail.getByRole('button', { name: 'Nổi bật', exact: true }).click();
-  await expect(page.getByText('Chưa có clip nào khớp bộ lọc.')).toBeVisible();
+  await expect(page.getByText('Chưa có kết quả nào khớp bộ lọc.')).toBeVisible();
   await expect(detail).toHaveCount(0); // the last unmarked item left, so the detail view closed
   await verdict.selectOption('featured');
   await expect(page.locator('.lib-row')).toHaveCount(1);
@@ -140,7 +140,7 @@ test('Library views: grid or list remembered, a selection bar with the zip, sear
   await expect(page.getByText('2 bộ lọc', { exact: true })).toBeVisible();
   await expect(page.locator('.lib-row')).toHaveCount(2);
   await search.fill('no such words anywhere');
-  await expect(page.getByText('Chưa có clip nào khớp bộ lọc.')).toBeVisible();
+  await expect(page.getByText('Chưa có kết quả nào khớp bộ lọc.')).toBeVisible();
   await page.locator('.library-empty').getByRole('button', { name: 'Xoá lọc' }).click();
   await expect(search).toHaveValue('');
   await expect(page.getByLabel('Người tạo')).toHaveValue('');

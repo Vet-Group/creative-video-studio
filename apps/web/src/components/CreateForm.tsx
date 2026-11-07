@@ -798,20 +798,17 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
           {!narrow && shown === 'examples' && <SizeSlider size={gallerySize} onChange={resizeGallery} />}
           {!narrow && shown === 'history' && <SizeSlider size={historySize} last={1} onChange={resizeHistory} />}
           {shown === 'examples' ? (
-            <div className="masonry" role="group" aria-label="Video mẫu">
+            <div className="masonry" role="group" aria-label="Video ví dụ">
               {splitColumns(examples, narrow ? 2 : Math.max(1, (wide ? 4 : 3) + 1 - gallerySize)).map((column, c) => (
                 <ul key={c} className="masonry-col">
                   {column.map((ex) => (
                     <li key={ex.id} className="example">
                       <Preview src={media(ex.src)} poster={media(ex.poster)} width={ex.width} height={ex.height} title={titleOf(ex)} paused={picking || detail !== null} />
-                      <span className="chips">
-                        {ex.fixture && media(ex.src) === ex.src && <span className="chip">fixture</span>}
-                      </span>
                       <button type="button" className="example-open" onClick={() => setDetail(ex)}>
                         <span className="example-caption">{titleOf(ex)}</span>
                       </button>
-                      <button type="button" className="example-use" aria-label={`Dùng mẫu này: ${titleOf(ex)}`} onClick={() => (have.has(`${ex.id}.json`) ? recreate(exampleFrom({ example: ex.id })!) : fillFromExample(ex))}>
-                        Dùng mẫu này
+                      <button type="button" className="example-use" aria-label={`Dùng ví dụ này: ${titleOf(ex)}`} onClick={() => (have.has(`${ex.id}.json`) ? recreate(exampleFrom({ example: ex.id })!) : fillFromExample(ex))}>
+                        Dùng ví dụ này
                       </button>
                     </li>
                   ))}
@@ -914,7 +911,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
 
       {/* The live Example dialog (REA-video V01, measured 2026-10-23): the clip on black with Close at its top-left, the details column,
           and Previous/Next as round buttons at the viewport edges that stop at the first and last sample. Nothing here submits a job. */}
-      <Modal open={detail !== null} onClose={() => setDetail(null)} label="Chi tiết mẫu" className="example-detail">
+      <Modal open={detail !== null} onClose={() => setDetail(null)} label="Chi tiết ví dụ" className="example-detail">
         {detail && (
           <>
             <div className="detail-media">
@@ -925,7 +922,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
               ref={prevStep}
               type="button"
               className="detail-step prev"
-              aria-label="Mẫu trước"
+              aria-label="Ví dụ trước"
               hidden={detailAt <= 0}
               onClick={() => {
                 setDetail(examples[detailAt - 1]!);
@@ -938,7 +935,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
               ref={nextStep}
               type="button"
               className="detail-step next"
-              aria-label="Mẫu sau"
+              aria-label="Ví dụ sau"
               hidden={detailAt >= examples.length - 1}
               onClick={() => {
                 setDetail(examples[detailAt + 1]!);
@@ -984,7 +981,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
                   ))}
                 </ul>
               ) : (
-                <img className="detail-input" src={media(detail.poster)} alt="Khung hình mẫu" width={48} height={48} />
+                <img className="detail-input" src={media(detail.poster)} alt="Khung hình ví dụ" width={48} height={48} />
               )}
               <ul className="detail-pills" aria-label="Thông số">
                 {details?.resolution && (
@@ -1000,9 +997,9 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
                 </li>
               </ul>
               <div className="detail-foot">
-                <p className="detail-date">{details ? fmtDate(details.date) : `Mẫu minh họa${detail.fixture && media(detail.src) === detail.src ? ' (fixture)' : ''}`}</p>
+                <p className="detail-date">{details ? fmtDate(details.date) : 'Ví dụ minh họa'}</p>
                 <div className="detail-tools">
-                  <a href={media(detail.src)} download aria-label="Tải video mẫu" title="Tải video mẫu">
+                  <a href={media(detail.src)} download aria-label="Tải video ví dụ" title="Tải video ví dụ">
                     <Icon name="download" />
                   </a>
                   <a href={media(detail.src)} target="_blank" rel="noreferrer" aria-label="Mở trong tab mới" title="Mở trong tab mới">
@@ -1017,7 +1014,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
                 ) : (
                   <button type="button" className="detail-use" onClick={() => fillFromExample(detail)}>
                     <Icon name="copy" />
-                    Dùng mẫu này
+                    Dùng ví dụ này
                   </button>
                 )}
               </div>

@@ -29,8 +29,8 @@ const STATUS_LABEL: Record<JobStatus, string> = {
   submitting: 'Đang gửi',
   running: 'Đang tạo',
   succeeded: 'Hoàn tất',
-  failed: 'Thất bại',
-  failed_unknown: 'Thất bại (không rõ kết quả)',
+  failed: 'Không thành công',
+  failed_unknown: 'Không thành công (không rõ kết quả)',
   timed_out: 'Quá thời gian',
 };
 
@@ -145,7 +145,7 @@ function HistoryCard({ job, isAdmin, select }: { job: TrayJob; isAdmin: boolean;
     act(async () => {
       setSaved(false);
       setSaving({ canShare: (await api<{ canShare: boolean }>(`/api/templates?feature=${job.feature}`)).canShare });
-    }, 'Không mở được Lưu mẫu.');
+    }, 'Không mở được Lưu thiết lập.');
   async function saveTemplate(name: string, scope: Scope) {
     await api('/api/templates', sendJson('POST', { name, fromJob: job.id, ...(scope === 'company' && { isCompany: true }) }));
     setSaving(null);
@@ -236,7 +236,7 @@ function HistoryCard({ job, isAdmin, select }: { job: TrayJob; isAdmin: boolean;
         <JobFailureNote job={job} isAdmin={isAdmin} />
         {job.retried && <p className="muted">Đã thử lại</p>}
         {problem && <p className="error">{problem}</p>}
-        {saved && <p role="status">Đã lưu mẫu.</p>}
+        {saved && <p role="status">Đã lưu thiết lập.</p>}
         <div className="job-main">
           {canRetry(job) && (
             <button type="button" className="job-reuse job-primary" disabled={sending} onClick={() => void retry()}>
@@ -278,7 +278,7 @@ function HistoryCard({ job, isAdmin, select }: { job: TrayJob; isAdmin: boolean;
               </button>
             )}
             {savable && (
-              <button type="button" className="icon-button" onClick={() => void openSave()} aria-label={`Lưu mẫu từ lượt tạo lúc ${fmtTime(job.createdAt)}`} title="Lưu thành mẫu">
+              <button type="button" className="icon-button" onClick={() => void openSave()} aria-label={`Lưu thiết lập từ lượt tạo lúc ${fmtTime(job.createdAt)}`} title="Lưu thành thiết lập">
                 <Icon name="plus" />
               </button>
             )}
@@ -371,7 +371,7 @@ function Toasts() {
 }
 
 /**
- * A thin bar along the top while any link of the app opens another page (Explore cards, Dùng lại, Dùng mẫu này, the sidebar too), shown after 150 ms.
+ * A thin bar along the top while any link of the app opens another page (Explore cards, Dùng lại, Dùng ví dụ này, the sidebar too), shown after 150 ms.
  * The App Router has no navigation events: a plain click on a same-site link to another address starts it, the new page showing (Next then sets the
  * address and a new history.state, also when a redirect lands back on the current address) or Back ends it, and it gives up after 15 s in case a link handled the click without navigating.
  */

@@ -22,7 +22,7 @@ test('the Library date presets: today, the last 7 or 30 days, or one day picked 
   await day.selectOption({ label: 'Chọn một ngày…' });
   const calendar = page.getByLabel('Ngày cụ thể');
   await calendar.fill('2026-01-01');
-  await expect(page.getByText('Chưa có clip nào khớp bộ lọc.')).toBeVisible();
+  await expect(page.getByText('Chưa có kết quả nào khớp bộ lọc.')).toBeVisible();
   await expect(day.locator('option:checked')).toHaveText('01/01/2026'); // the picked day shows in the preset field itself
   await page.locator('.library-empty').getByRole('button', { name: 'Xoá lọc' }).click();
   await expect(day).toHaveValue('');

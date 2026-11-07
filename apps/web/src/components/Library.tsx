@@ -45,6 +45,8 @@ const KINDS = [
 /** The size slider: card widths from small to large, remembered per browser. */
 const SIZES = ['12rem', '16rem', '22rem'];
 const SIZE_KEY = 'cvs.library.size';
+/** What the empty Library calls its items under a kind filter: photos, clips, or both. */
+export const emptyNoun = (kind: string) => (['images', 'try_on', 'image'].includes(kind) ? 'ảnh' : kind === 'videos' || kind === 'video' || kind.startsWith('marketing') ? 'clip' : 'kết quả');
 const faultLabel = (id: string | null) => FAULTS.find((f) => f.id === id)?.label ?? id ?? '';
 
 interface StoreOption {
@@ -335,11 +337,11 @@ interface ClipInputs {
 const NO_INPUTS: ClipInputs = { prompt: null, presetId: null, enhance: null, enhancedPrompt: null, audio: null, brief: null, script: null, hookText: null, ending: null, endText: null, format: null, hook: null, location: null, images: [] };
 
 /** The preset and image style names, read once per page load for the detail view's template row; a failed read is tried again next time. */
-let presetNames: Promise<Map<string, string>> | null = null;
+let presetNames: Promise<Map<string, string> | null> | null = null;
 const loadPresetNames = () =>
   (presetNames ??= Promise.all(['video', 'image'].map((f) => api<{ presets: { id: string; label: string }[] }>(`/api/presets?feature=${f}`))).then(
     (r) => new Map(r.flatMap((l) => l.presets).map((p) => [p.id, p.label])),
-    () => ((presetNames = null), new Map<string, string>()),
+    () => ((presetNames = null), null),
   ));
 /** A Marketing choice's name; a member's own hook or location shows as their own. */
 const choiceName = (list: { id: string; name: string }[], id: string | null) => id && (list.find((c) => c.id === id)?.name ?? 'Tự tạo');
@@ -354,7 +356,7 @@ function ClipDetail({ clips, index, stores, onIndex, onChange }: { clips: Clip[]
   const clip = clips[index]!;
   const image = clip.mediaType === 'image';
   const [job, setJob] = useState<ClipInputs | null>(null);
-  const [presets, setPresets] = useState<Map<string, string>>(new Map());
+  const [presets, setPresets] = useState<Map<string, string> | null>(null); // null until read, or when the read failed
   const [note, setNote] = useState('');
   const media = useRef<HTMLVideoElement & HTMLImageElement>(null);
   const content = (id: string) => `/api/assets/${id}/content`;
@@ -464,7 +466,7 @@ function ClipDetail({ clips, index, stores, onIndex, onChange }: { clips: Clip[]
         )}
         <dl className="recipe" aria-label="Cách tạo">
           {row('Mô hình', clip.modelLabel)}
-          {row('Mẫu', job?.presetId && (presets.get(job.presetId) ?? job.presetId))}
+          {row('Mẫu', job?.presetId && presets && (presets.get(job.presetId) ?? 'Đã xoá'))}
           {row('Hook', choiceName(HOOKS, job?.hook ?? null))}
           {row('Bối cảnh', choiceName(LOCATIONS, job?.location ?? null))}
           {row('Tỉ lệ', clip.ratio)}
@@ -693,7 +695,7 @@ export function Library() {
         if (ticket !== latest.current) return undefined;
         setIsAdmin(r.isAdmin);
         setUnmarked(r.unmarked);
-        setClips((cur) => (offset > 0 ? [...cur, ...r.clips] : r.clips));
+        setClips((cur) => (offset > 0 ? [...cur, ...r.clips.filter((c) => !cur.some((o) => o.id === c.id))] : r.clips)); // an item that arrived since page 1 shifts the offset
         setCreators(r.creators);
         setHasMore(r.hasMore);
         setState('ready');
@@ -706,6 +708,15 @@ export function Library() {
     },
     [filters],
   );
+
+  // Explore's Tiếp tục opens a finished item by `?item=<job id>`. shortcut: found only among the loaded items (newest first), else the list just shows; add an id filter to GET /api/library if members miss it.
+  const wanted = useRef(typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('item'));
+  useEffect(() => {
+    if (state !== 'ready' || !wanted.current) return;
+    const i = clips.findIndex((c) => c.id === wanted.current);
+    wanted.current = null;
+    if (i >= 0) setDetail(i);
+  }, [state, clips]);
 
   // Coming back to the Library with the same filters loads as many items as were shown and scrolls back to the same place.
   const restoring = useRef(true);
@@ -935,7 +946,7 @@ export function Library() {
           <EmptyArt search={active > 0} />
           {active > 0 ? (
             <>
-              <p className="library-empty-title">Chưa có clip nào khớp bộ lọc.</p>
+              <p className="library-empty-title">Chưa có {emptyNoun(filters.kind)} nào khớp bộ lọc.</p>
               <p className="muted">Bỏ bớt bộ lọc hoặc thử từ khoá khác.</p>
               <button type="button" onClick={clearFilters}>
                 Xoá lọc

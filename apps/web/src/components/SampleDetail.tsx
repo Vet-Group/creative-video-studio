@@ -78,7 +78,7 @@ export function SampleDetail({ names, index, onIndex }: { names: string[]; index
       {details.images.map((i, n) => (
         <li key={i.sample}>
           <Tap on={form?.photo && (() => form.photo!(i, roleOf(feature, n, { garments: details.garments, format: details.format })))}>
-            <img src={`/api/samples/${i.sample}`} alt={i.sample} />
+            <img src={`/api/samples/${i.sample}`} alt={`Ảnh đầu vào ${n + 1}`} />
           </Tap>
         </li>
       ))}

@@ -221,9 +221,9 @@ export function motionReason(d: MotionDraft): string | null {
   if (d.failed) return 'Không tải được danh sách mô hình.';
   if (!d.model) return 'Ứng dụng này chưa được Admin bật';
   if (!d.image) return 'Tải lên ảnh: Nhân vật.';
-  if (d.videoMs === null) return 'Tải lên video mẫu.';
+  if (d.videoMs === null) return 'Tải lên video chuyển động.';
   const allowed = d.model.durationsSec;
-  if (!allowed.includes(Math.ceil(d.videoMs / 1000))) return `Video mẫu phải dài từ ${allowed[0]} đến ${allowed.at(-1)} giây.`;
+  if (!allowed.includes(Math.ceil(d.videoMs / 1000))) return `Video chuyển động phải dài từ ${allowed[0]} đến ${allowed.at(-1)} giây.`;
   return null;
 }
 

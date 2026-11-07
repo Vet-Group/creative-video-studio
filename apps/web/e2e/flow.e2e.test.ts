@@ -51,12 +51,12 @@ test('a Member runs a mock job and works through the Library', async ({ page }) 
   await page.getByLabel('Người tạo').selectOption({ label: 'E2E Member 1' });
   await expect(card).toHaveCount(1);
   await page.getByLabel('Tỉ lệ').selectOption('9:16');
-  await expect(page.getByText('Chưa có clip nào khớp bộ lọc.')).toBeVisible();
+  await expect(page.getByText('Chưa có kết quả nào khớp bộ lọc.')).toBeVisible();
   await page.getByLabel('Tỉ lệ').selectOption('1:1');
   await expect(card).toHaveCount(1);
   await page.getByRole('combobox', { name: 'Ngày', exact: true }).selectOption({ label: 'Chọn một ngày…' });
   await page.getByLabel('Ngày cụ thể').fill('2000-01-01');
-  await expect(page.getByText('Chưa có clip nào khớp bộ lọc.')).toBeVisible();
+  await expect(page.getByText('Chưa có kết quả nào khớp bộ lọc.')).toBeVisible();
   await page.getByLabel('Ngày cụ thể').fill('');
   await expect(card).toHaveCount(1);
 

@@ -234,7 +234,7 @@ test('the compact tray beside a page without its own History gives a failed job 
   await expect.poll(async () => (await mine()).map((j) => j.status).sort(), { timeout: 60_000 }).toEqual(['failed', 'succeeded']);
   await page.goto('/account/sign-in-methods');
   const tray = page.getByRole('complementary', { name: 'Lượt tạo của tôi' });
-  const failed = tray.getByRole('listitem').filter({ hasText: 'Thất bại' });
+  const failed = tray.getByRole('listitem').filter({ hasText: 'Không thành công' });
   const done = tray.getByRole('listitem').filter({ hasText: 'Hoàn tất' });
   await expect(failed.getByRole('button', { name: 'Thử lại' })).toHaveClass('job-reuse job-primary');
   await expect(failed.getByRole('link', { name: 'Dùng lại' })).toHaveClass('job-reuse');
@@ -259,7 +259,7 @@ test('on a phone a Member reads the real-person sentence on the failed card, wit
   await answerWithRefusal(page);
   await page.goto('/create');
   await page.getByRole('tab', { name: 'Lịch sử' }).click();
-  const card = page.getByRole('complementary', { name: 'Lượt tạo của tôi' }).getByRole('listitem').filter({ hasText: 'Thất bại' });
+  const card = page.getByRole('complementary', { name: 'Lượt tạo của tôi' }).getByRole('listitem').filter({ hasText: 'Không thành công' });
   await expect(card.getByText(REAL_PERSON)).toBeVisible();
   await expect(card.getByRole('button', { name: 'Thử lại' })).toHaveCount(0);
   await expect(card.getByRole('button', { name: 'Dùng lại' })).toBeVisible(); // beside the form it refills in place
@@ -273,7 +273,7 @@ test('on a phone an Admin sees the provider code on the failed card and opens th
   await answerWithRefusal(page);
   await page.goto('/create');
   await page.getByRole('tab', { name: 'Lịch sử' }).click();
-  const card = page.getByRole('complementary', { name: 'Lượt tạo của tôi' }).getByRole('listitem').filter({ hasText: 'Thất bại' });
+  const card = page.getByRole('complementary', { name: 'Lượt tạo của tôi' }).getByRole('listitem').filter({ hasText: 'Không thành công' });
   await expect(card.getByText(REAL_PERSON)).toBeVisible();
   await expect(card.getByText('byteplus · InputImageSensitiveContentDetected.PrivacyInformation')).toBeVisible();
   await expect(card.locator('details')).not.toHaveAttribute('open', ''); // the raw error is folded
@@ -290,7 +290,7 @@ test('the compact tray gives the refused job the same sentence and no Thử lạ
   await signIn(page, 'loada');
   await answerWithRefusal(page);
   await page.goto('/account/sign-in-methods');
-  const failed = page.getByRole('complementary', { name: 'Lượt tạo của tôi' }).getByRole('listitem').filter({ hasText: 'Thất bại' });
+  const failed = page.getByRole('complementary', { name: 'Lượt tạo của tôi' }).getByRole('listitem').filter({ hasText: 'Không thành công' });
   await expect(failed.getByText(REAL_PERSON)).toBeVisible();
   await expect(failed.getByRole('button', { name: 'Thử lại' })).toHaveCount(0);
   await expect(failed.getByRole('link', { name: 'Dùng lại' })).toBeVisible();

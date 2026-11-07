@@ -57,11 +57,11 @@ test('an uploaded clip that replaces a fixture keeps its own size, and "use this
 test('an uploaded clip drops the fixture title and preset, and is named from its details file', () => {
   const presets = [{ id: 'head-to-toe-shot', label: 'Quét từ chân lên đầu' }];
   const ninth = examplesFor(new Set(['example-9.mp4']))[8]!;
-  expect(ninth).toMatchObject({ id: 'example-9', title: 'Video mẫu 9', presetId: '', fixture: false });
+  expect(ninth).toMatchObject({ id: 'example-9', title: 'Video ví dụ 9', presetId: '' });
   expect(exampleTitle(ninth, { presetId: 'head-to-toe-shot' }, presets)).toBe('Quét từ chân lên đầu');
   expect(exampleTitle(ninth, { presetId: null }, presets)).toBe('Tự viết mô tả');
   expect(exampleTitle(ninth, { presetId: 'gone' }, presets)).toBe('Tự viết mô tả');
-  expect(exampleTitle(ninth, undefined, presets)).toBe('Video mẫu 9');
+  expect(exampleTitle(ninth, undefined, presets)).toBe('Video ví dụ 9');
   expect(exampleTitle(EXAMPLES[8]!, undefined, null)).toBe('Bàn làm việc ngang'); // the fixture still stands for its preset
 });
 
