@@ -13,6 +13,7 @@ import { currentUser } from '@/lib/current-user';
 import { cardSample, EXAMPLES, exampleForPreset, sampleSrc } from '@/lib/examples';
 import { continueJobs, greeting, isRunning } from '@/lib/explore';
 import { featureLabel } from '@/lib/features';
+import { MIN_MARKS } from '@/lib/model-marks';
 import { modelStats, rank, scoreOf } from '@/lib/model-scores';
 import { onePerPair } from '@/lib/model-twins';
 import { pageOf } from '@/lib/reuse';
@@ -216,7 +217,7 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
                 </strong>
                 {/* A short description like the live cards, clamped to three lines; a model without one keeps its spec line, scored only once marked. */}
                 <span className="muted explore-card-text">
-                  {cardText(m.id) ?? [m.ratios.join(', '), range(m.durations_sec), m.marks > 0 && `Điểm ${m.score}/100 · ${m.marks} lượt đánh giá`].filter(Boolean).join(' · ')}
+                  {cardText(m.id) ?? [m.ratios.join(', '), range(m.durations_sec), m.marks >= MIN_MARKS && `Điểm ${m.score}/100 · ${m.marks} lượt đánh giá`].filter(Boolean).join(' · ')}
                 </span>
               </Link>
             </li>

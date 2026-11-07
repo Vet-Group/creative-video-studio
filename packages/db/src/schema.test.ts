@@ -461,12 +461,12 @@ describe('migration 0036 Minimax H3 Max resolutions', () => {
       `select id, endpoint, label, output_resolution as res, usd_per_second::text as usd, enabled, features, ratios, durations_sec, max_images from model_configs where id like 'minimax-h3-max%' order by id`,
     );
     expect(rows.map((r) => [r.id, r.endpoint, r.label, r.res, r.usd])).toEqual([
-      ['minimax-h3-max', 'minimax/h3-max/image-to-video', 'Minimax H3 Max', '768p', '0.0800'],
-      ['minimax-h3-max-1080p', 'minimax/h3-max/image-to-video', 'Minimax H3 Max 1080P', '1080p', '0.1600'],
-      ['minimax-h3-max-480p', 'minimax/h3-max/image-to-video', 'Minimax H3 Max 480P', '480p', '0.0500'],
-      ['minimax-h3-max-reference', 'minimax/h3-max/reference-to-video', 'Minimax H3 Max Reference', '768p', '0.0800'],
-      ['minimax-h3-max-reference-1080p', 'minimax/h3-max/reference-to-video', 'Minimax H3 Max Reference 1080P', '1080p', '0.1600'],
-      ['minimax-h3-max-reference-480p', 'minimax/h3-max/reference-to-video', 'Minimax H3 Max Reference 480P', '480p', '0.0500'],
+      ['minimax-h3-max', 'minimax/h3-max/image-to-video', 'MiniMax H3 Max', '768p', '0.0800'],
+      ['minimax-h3-max-1080p', 'minimax/h3-max/image-to-video', 'MiniMax H3 Max 1080p', '1080p', '0.1600'],
+      ['minimax-h3-max-480p', 'minimax/h3-max/image-to-video', 'MiniMax H3 Max 480p', '480p', '0.0500'],
+      ['minimax-h3-max-reference', 'minimax/h3-max/reference-to-video', 'MiniMax H3 Max Reference', '768p', '0.0800'],
+      ['minimax-h3-max-reference-1080p', 'minimax/h3-max/reference-to-video', 'MiniMax H3 Max Reference 1080p', '1080p', '0.1600'],
+      ['minimax-h3-max-reference-480p', 'minimax/h3-max/reference-to-video', 'MiniMax H3 Max Reference 480p', '480p', '0.0500'],
     ]);
     const twin = (id: string) => rows.find((r) => r.id === id)!;
     for (const r of rows.filter((r) => r.res !== '768p')) {
@@ -543,7 +543,7 @@ describe('migration 0042 Veo 3.1 on Vertex', () => {
     expect(row).toEqual(twin);
     expect(row).toMatchObject({ ratios: ['9:16', '16:9'], durations_sec: [8], max_images: 1, output_resolution: '720p' });
     const [facts] = (await pool.query(`select provider, endpoint, label, enabled, usd_per_second::text as usd, sources from model_configs where id = 'veo-3.1-vertex'`)).rows;
-    expect(facts).toMatchObject({ provider: 'vertex', endpoint: 'veo-3.1-generate-001', label: 'Google VEO 3.1', enabled: true, usd: '0.2000' }); // 0075 switches it on as the fallback of the fal row
+    expect(facts).toMatchObject({ provider: 'vertex', endpoint: 'veo-3.1-generate-001', label: 'Veo 3.1', enabled: true, usd: '0.2000' }); // 0075 switches it on as the fallback of the fal row
     expect(facts.sources.usdPerSecond).toMatchObject({ url: 'https://cloud.google.com/vertex-ai/generative-ai/pricing', readAt: '2026-11-01' });
     expect(facts.sources.usdPerSecond.note).toMatch(/^estimate:/);
     expect(AUDIO_USD_PER_SECOND['veo-3.1-generate-001']).toBe(0.4);
@@ -883,7 +883,7 @@ describe('migration 0078 one model per duplicate pair', () => {
     expect(names).toEqual([
       { id: 'nano-banana-pro-vertex', label: 'Nano Banana Pro' },
       { id: 'seedance-2.5-byteplus', label: 'Seedance 2.5' },
-      { id: 'veo-3.1-vertex', label: 'Google VEO 3.1' },
+      { id: 'veo-3.1-vertex', label: 'Veo 3.1' },
     ]);
   });
 
@@ -911,5 +911,19 @@ describe('migration 0078 one model per duplicate pair', () => {
       const [r] = (await pool.query(`select endpoint, usd_per_second::float as usd from model_configs where id = $1`, [id])).rows;
       expect(AUDIO_USD_PER_SECOND[r.endpoint], id).toBe(r.usd);
     }
+  });
+});
+
+describe('migration 0079 model name case', () => {
+  test('writes every model name as its maker does', async () => {
+    const { rows } = await pool.query(`select label from model_configs where label ~ '^(Minimax|WAN) ' or label ~ ' \\d+P$' or label in ('Kling o1', 'Google VEO 3.1')`);
+    expect(rows).toEqual([]);
+    const names = (await pool.query(`select id, label from model_configs where id in ('kling-o1', 'veo-3.1', 'wan-2.7', 'minimax-h3-max-1080p') order by id`)).rows;
+    expect(names).toEqual([
+      { id: 'kling-o1', label: 'Kling O1' },
+      { id: 'minimax-h3-max-1080p', label: 'MiniMax H3 Max 1080p' },
+      { id: 'veo-3.1', label: 'Veo 3.1' },
+      { id: 'wan-2.7', label: 'Wan 2.7' },
+    ]);
   });
 });

@@ -48,10 +48,10 @@ function specLine(name: string, ms: SpecModel[], short: (m: SpecModel) => string
   return `${name}: ${rest.map(([v, who]) => `${v} (${levels(who, names).join(', ')})`).join(' · ')}`;
 }
 
-/** Variants that differ only by a resolution suffix ("H3 Max Reference", "... 1080P", "... 480P") read as one name with their level count in parentheses:
+/** Variants that differ only by a resolution suffix ("H3 Max Reference", "... 1080p", "... 480p") read as one name with their level count in parentheses:
  * the name drops a leading sibling model's name ("H3 Max"), the owner's wording (2026-11-02). */
 function levels(who: readonly string[], names: string[]): string[] {
-  const base = (w: string) => w.replace(/ \d+P$/, '');
+  const base = (w: string) => w.replace(/ \d+p$/i, '');
   return [...new Set(who.map((w) => {
     const b = base(w);
     const n = who.filter((x) => base(x) === b).length;
@@ -215,8 +215,8 @@ const create: AboutPage = {
               title: 'Kling',
               media: 'model-kling-o3-pro',
               family: 'kling-',
-              text: 'Chuyển động chân thực theo vật lý. Kling O3 Pro dựng cảnh từ tối đa 7 ảnh tham chiếu và Kling o1 từ tối đa 4. Kling O3 Pro và 3.0 Pro cho clip 3–15 giây, còn Kling 2.6, 2.5 Turbo và o1 chạy nhanh các clip 5 hoặc 10 giây.',
-              specs: ['Thời lượng: 3–15 giây (O3 Pro, 3.0 Pro) · 5 hoặc 10 giây (2.6, 2.5 Turbo, o1)', 'Độ phân giải: 1080p', 'Tỉ lệ: 9:16, 1:1 · thêm 16:9 (O3 Pro, o1)', 'Ảnh tham chiếu: tối đa 7 (O3 Pro) · 4 (o1)'],
+              text: 'Chuyển động chân thực theo vật lý. Kling O3 Pro dựng cảnh từ tối đa 7 ảnh tham chiếu và Kling O1 từ tối đa 4. Kling O3 Pro và 3.0 Pro cho clip 3–15 giây, còn Kling 2.6, 2.5 Turbo và O1 chạy nhanh các clip 5 hoặc 10 giây.',
+              specs: ['Thời lượng: 3–15 giây (O3 Pro, 3.0 Pro) · 5 hoặc 10 giây (2.6, 2.5 Turbo, O1)', 'Độ phân giải: 1080p', 'Tỉ lệ: 9:16, 1:1 · thêm 16:9 (O3 Pro, O1)', 'Ảnh tham chiếu: tối đa 7 (O3 Pro) · 4 (O1)'],
             },
             {
               tag: '6 mô hình',
@@ -236,7 +236,7 @@ const create: AboutPage = {
             },
             {
               tag: 'Thời lượng cố định',
-              title: 'Google VEO 3.1',
+              title: 'Veo 3.1',
               media: 'model-veo-3-1',
               family: 'veo-',
               text: 'Mô hình điện ảnh của Google. Mỗi lần chạy trả về một clip 8 giây trau chuốt, dựng từ ảnh của bạn.',
@@ -263,15 +263,15 @@ const create: AboutPage = {
               title: 'WAN',
               media: 'model-wan-2-7',
               family: 'wan-',
-              text: 'Mô hình mã nguồn mở của Alibaba. WAN 2.7 cho clip 2–15 giây, WAN 2.7 Reference dựng cảnh từ tối đa 4 ảnh.',
+              text: 'Mô hình mã nguồn mở của Alibaba. Wan 2.7 cho clip 2–15 giây, Wan 2.7 Reference dựng cảnh từ tối đa 4 ảnh.',
               specs: ['Thời lượng: 2–15 giây (2.7) · 2–10 giây (Reference)', 'Độ phân giải: 720p', 'Tỉ lệ: 9:16, 1:1 · đủ 9:16, 1:1, 16:9, 4:3, 3:4 (Reference)', 'Ảnh tham chiếu: tối đa 4 (Reference)'],
             },
             {
               tag: '7 mô hình',
-              title: 'Minimax',
+              title: 'MiniMax',
               media: 'model-minimax-h3-max',
               family: 'minimax-',
-              text: 'Minimax H3 Max là bản chủ lực, clip 5–15 giây ở 768p, kèm bản 480p rẻ để thử nhanh và bản 1080p sắc nét hơn; H3 Max Reference dựng cảnh từ tối đa 9 ảnh, cũng ở ba độ phân giải đó. Hailuo 2.3 Pro là đường nhanh nhất tới một clip 1080p sắc nét: một ảnh vào, video 6 giây ra.',
+              text: 'MiniMax H3 Max là bản chủ lực, clip 5–15 giây ở 768p, kèm bản 480p rẻ để thử nhanh và bản 1080p sắc nét hơn; H3 Max Reference dựng cảnh từ tối đa 9 ảnh, cũng ở ba độ phân giải đó. Hailuo 2.3 Pro là đường nhanh nhất tới một clip 1080p sắc nét: một ảnh vào, video 6 giây ra.',
               specs: ['Thời lượng: 5–15 giây (H3 Max) · 6 giây cố định (Hailuo 2.3 Pro)', 'Độ phân giải: 480p, 768p, 1080p (H3 Max) · 1080p (Hailuo)', 'Tỉ lệ: 9:16, 1:1 · đủ 9:16, 1:1, 16:9, 4:3, 3:4 (H3 Max Reference)', 'Ảnh tham chiếu: tối đa 9 (H3 Max Reference)'],
             },
           ],
@@ -298,10 +298,10 @@ const create: AboutPage = {
           cards: [
             { tag: 'Vòng lặp ngắn', title: '2–5 giây', text: 'Sản phẩm xoay, vải lay nhẹ và vòng lặp cho trang sản phẩm hay ảnh đại diện. Đủ rẻ để thử thoải mái.' },
             { tag: 'Điểm cân bằng', title: '6–10 giây', text: 'Độ dài chuẩn cho quảng cáo, Reels và video trang sản phẩm. Đủ cho một chuyển động rõ ràng và một nhịp dừng.' },
-            { tag: 'Kể chuyện', title: '10–30 giây', text: 'Đi một vòng, chuyển máy, clip chiến dịch ngắn. Kling O3 Pro, Kling 3.0 Pro, Seedance 2.0, WAN 2.7, Grok Imagine 1.5 và Minimax H3 Max tới 15 giây, FLUX 3 tới 20 và Seedance 2.5 Reference tới 30.' },
+            { tag: 'Kể chuyện', title: '10–30 giây', text: 'Đi một vòng, chuyển máy, clip chiến dịch ngắn. Kling O3 Pro, Kling 3.0 Pro, Seedance 2.0, Wan 2.7, Grok Imagine 1.5 và MiniMax H3 Max tới 15 giây, FLUX 3 tới 20 và Seedance 2.5 Reference tới 30.' },
           ],
         },
-        'Mọi mô hình tính tiền theo giây, nên mỗi giây thêm đều tốn thêm. Hai mô hình có thời lượng cố định: Google VEO 3.1 luôn tạo 8 giây và Minimax Hailuo 2.3 Pro luôn tạo 6 giây. Mô hình không có thời lượng đang chọn nằm cuối menu và không chọn được.',
+        'Mọi mô hình tính tiền theo giây, nên mỗi giây thêm đều tốn thêm. Hai mô hình có thời lượng cố định: Veo 3.1 luôn tạo 8 giây và MiniMax Hailuo 2.3 Pro luôn tạo 6 giây. Mô hình không có thời lượng đang chọn nằm cuối menu và không chọn được.',
       ],
     },
     {
@@ -318,7 +318,7 @@ const create: AboutPage = {
             ['4:3', 'Ô ngang trên trang web và slide'],
           ],
         },
-        'Mọi mô hình video đều có 9:16. Google VEO 3.1 và Gemini Omni Flash có thêm 16:9 nhưng không có 1:1; các mô hình còn lại đều có 1:1. Kling O3 Pro, Kling o1 và Seedance 2.0 có thêm 16:9, còn FLUX 3, Seedance 1.0 Pro, 1.5 Pro và các bản Reference có đủ năm tỉ lệ. Với mô hình ảnh-thành-video, ảnh mở đầu được cắt theo tỉ lệ đã chọn, nên hãy để sản phẩm gần giữa ảnh.',
+        'Mọi mô hình video đều có 9:16. Veo 3.1 và Gemini Omni Flash có thêm 16:9 nhưng không có 1:1; các mô hình còn lại đều có 1:1. Kling O3 Pro, Kling O1 và Seedance 2.0 có thêm 16:9, còn FLUX 3, Seedance 1.0 Pro, 1.5 Pro và các bản Reference có đủ năm tỉ lệ. Với mô hình ảnh-thành-video, ảnh mở đầu được cắt theo tỉ lệ đã chọn, nên hãy để sản phẩm gần giữa ảnh.',
       ],
     },
     {
@@ -364,9 +364,9 @@ const create: AboutPage = {
         {
           cols: 3,
           cards: [
-            { tag: 'HD', title: '720p', text: 'Bảng tin mạng xã hội và nội dung cần nhanh, đủ nét cho phần lớn vị trí xem trên điện thoại. Seedance (trừ 1.0 Pro), VEO 3.1, Gemini Omni Flash, Grok Imagine và WAN xuất ở 720p.' },
-            { tag: 'HD+', title: '768p', text: 'Mức mặc định của Minimax H3 Max và H3 Max Reference, nét hơn 720p một chút. Hai họ này còn có bản 480p rẻ hơn để thử nhanh.' },
-            { tag: 'Full HD', title: '1080p', text: 'Trang sản phẩm, quảng cáo trả phí và chiến dịch. Kling, FLUX 3, Seedance 1.0 Pro, Hailuo 2.3 Pro và các bản 1080P của Minimax H3 Max xuất ở 1080p.' },
+            { tag: 'HD', title: '720p', text: 'Bảng tin mạng xã hội và nội dung cần nhanh, đủ nét cho phần lớn vị trí xem trên điện thoại. Seedance (trừ 1.0 Pro), Veo 3.1, Gemini Omni Flash, Grok Imagine và WAN xuất ở 720p.' },
+            { tag: 'HD+', title: '768p', text: 'Mức mặc định của MiniMax H3 Max và H3 Max Reference, nét hơn 720p một chút. Hai họ này còn có bản 480p rẻ hơn để thử nhanh.' },
+            { tag: 'Full HD', title: '1080p', text: 'Trang sản phẩm, quảng cáo trả phí và chiến dịch. Kling, FLUX 3, Seedance 1.0 Pro, Hailuo 2.3 Pro và các bản 1080p của MiniMax H3 Max xuất ở 1080p.' },
           ],
         },
         'Muốn clip sắc hơn, hãy chọn một mô hình 1080p thay vì phóng to sau. Kích thước thực tế còn tuỳ tỉ lệ: một clip 9:16 ở 1080p rộng 1080 điểm ảnh và cao 1920.',
@@ -466,12 +466,12 @@ const create: AboutPage = {
             ['AI biến ảnh thành video được không?', 'Được. Tải bất kỳ ảnh nào, ảnh sản phẩm, ảnh người mẫu hay một kết quả trước đó, làm khung mở đầu và tả chuyển động bạn muốn. AI làm động thành một video bắt đầu đúng từ ảnh đó. Mô hình tham chiếu cũng nhận ảnh của bạn nhưng dựng một cảnh mới từ chúng thay vì làm động một khung cố định.'],
             ['Xuất được cho nền tảng và định dạng nào?', 'Mọi mô hình có 9:16 cho Reels, TikTok và Stories, đa số có thêm 1:1 cho bảng tin và ô sản phẩm, và nhiều mô hình có 16:9, 4:3 hoặc 3:4. Bạn chọn tỉ lệ trước khi chạy, vì không có gì tự đổi cỡ sau đó.'],
             ['Có lồng tiếng bằng giọng thương hiệu được không?', 'Chưa: ứng dụng không có tải giọng hay nhân bản giọng. Khi Tạo âm thanh bật, clip có tiếng gốc của mô hình; muốn giọng riêng thì tắt âm thanh, tải clip xuống và lồng tiếng hoặc ghép nhạc trong phần mềm dựng.'],
-            ['Ứng dụng dùng những mô hình nào?', 'Danh mục có hơn 20 mô hình video thuộc các họ Kling, Seedance, FLUX 3, Google VEO, Gemini Omni Flash, Grok Imagine, WAN và Minimax. Admin bật mô hình nào thì menu có mô hình đó, và bạn chọn trước mỗi lần chạy. Đổi mô hình cũng đổi chi phí ghi trên nút Tạo video.'],
-            ['Video dài tối đa bao lâu?', 'Từ 1 đến 30 giây tuỳ mô hình. Grok Imagine 1.5 từ 1 đến 15 giây, Kling O3 Pro và 3.0 Pro từ 3 đến 15, Seedance 2.0, WAN 2.7 và Minimax H3 Max tới 15, FLUX 3 từ 5 đến 20 và Seedance 2.5 Reference tới 30. Google VEO 3.1 luôn 8 giây, Hailuo 2.3 Pro luôn 6 giây.'],
-            ['Nên chọn mô hình nào?', 'Kling mạnh về chuyển động chân thực và vật lý, ở 1080p. Seedance có dải thời lượng dài nhất. Google VEO 3.1 cho clip 8 giây trau chuốt. Grok Imagine hợp với clip dài mà tiết kiệm, FLUX 3 cho chuyển động điện ảnh tới 20 giây ở 1080p, và Hailuo 2.3 Pro là đường nhanh nhất tới clip 1080p. Khi phân vân, chọn mô hình có nhãn Đề xuất: đó là mô hình công ty chấm điểm cao nhất.'],
+            ['Ứng dụng dùng những mô hình nào?', 'Danh mục có hơn 20 mô hình video thuộc các họ Kling, Seedance, FLUX 3, Veo, Gemini Omni Flash, Grok Imagine, Wan và MiniMax. Admin bật mô hình nào thì menu có mô hình đó, và bạn chọn trước mỗi lần chạy. Đổi mô hình cũng đổi chi phí ghi trên nút Tạo video.'],
+            ['Video dài tối đa bao lâu?', 'Từ 1 đến 30 giây tuỳ mô hình. Grok Imagine 1.5 từ 1 đến 15 giây, Kling O3 Pro và 3.0 Pro từ 3 đến 15, Seedance 2.0, Wan 2.7 và MiniMax H3 Max tới 15, FLUX 3 từ 5 đến 20 và Seedance 2.5 Reference tới 30. Veo 3.1 luôn 8 giây, Hailuo 2.3 Pro luôn 6 giây.'],
+            ['Nên chọn mô hình nào?', 'Kling mạnh về chuyển động chân thực và vật lý, ở 1080p. Seedance có dải thời lượng dài nhất. Veo 3.1 cho clip 8 giây trau chuốt. Grok Imagine hợp với clip dài mà tiết kiệm, FLUX 3 cho chuyển động điện ảnh tới 20 giây ở 1080p, và Hailuo 2.3 Pro là đường nhanh nhất tới clip 1080p. Khi phân vân, chọn mô hình có nhãn Đề xuất: đó là mô hình công ty chấm điểm cao nhất.'],
             ['Nút Cải thiện làm gì?', 'Khi Cải thiện bật (mặc định), AI viết lại mô tả ngắn của bạn thành một bản tả chi tiết bằng tiếng Anh trước khi chạy, và dịch nếu bạn viết tiếng Việt. Nó không nhìn thấy ảnh, nên chỉ thêm chi tiết về chuyển động, máy quay và nhịp độ, không bịa màu sắc, chữ hay logo. Tắt Cải thiện khi bạn muốn gửi đúng câu của mình.'],
             ['Tạo video chỉ từ chữ, không cần ảnh được không?', 'Chưa. Mỗi lần chạy cần ít nhất một ảnh. Nếu ảnh hiện có chưa phù hợp, hãy chỉnh nó ở trang Tạo ảnh trước rồi đưa vào đây.'],
-            ['Video tham chiếu là gì?', 'Thay vì làm động một khung cố định, bạn tải lên vài ảnh tham chiếu, như người mẫu, trang phục và bối cảnh, và AI dựng một video mới có các yếu tố đó. Ở đây các bản Reference (trừ FLUX 3 Reference, chỉ nhận một ảnh), Kling O3 Pro, Kling o1, Seedance 2.0 và 2.5 nhận từ 4 đến 9 ảnh, tuỳ mô hình.'],
+            ['Video tham chiếu là gì?', 'Thay vì làm động một khung cố định, bạn tải lên vài ảnh tham chiếu, như người mẫu, trang phục và bối cảnh, và AI dựng một video mới có các yếu tố đó. Ở đây các bản Reference (trừ FLUX 3 Reference, chỉ nhận một ảnh), Kling O3 Pro, Kling O1, Seedance 2.0 và 2.5 nhận từ 4 đến 9 ảnh, tuỳ mô hình.'],
             ['Video thuộc về ai?', `Video là tài sản của công ty, dùng cho trang sản phẩm, mạng xã hội và quảng cáo của công ty. ${RIGHTS}`],
             PRIVACY,
           ],
@@ -1169,7 +1169,7 @@ const marketing: AboutPage = {
       kicker: 'Âm thanh',
       title: 'Video có tiếng không?',
       blocks: [
-        'Có. Như trên Fash, Tạo âm thanh bật sẵn: clip có tiếng như quay bằng điện thoại, gồm âm thanh căn phòng và vài câu phản ứng ngắn, tự nhiên của người mẫu về sản phẩm, không có nhạc nền. Với Kling O3 Pro và hai bản Seedance, tắt công tắc để có clip im lặng; Gemini Omni Flash, Grok Imagine, WAN 2.7 và Minimax H3 Max luôn tạo tiếng nên công tắc khoá ở Bật. Muốn viết đúng từng chữ người mẫu nói, hãy dùng định dạng Editorial.',
+        'Có. Như trên Fash, Tạo âm thanh bật sẵn: clip có tiếng như quay bằng điện thoại, gồm âm thanh căn phòng và vài câu phản ứng ngắn, tự nhiên của người mẫu về sản phẩm, không có nhạc nền. Với Kling O3 Pro và hai bản Seedance, tắt công tắc để có clip im lặng; Gemini Omni Flash, Grok Imagine, Wan 2.7 và MiniMax H3 Max luôn tạo tiếng nên công tắc khoá ở Bật. Muốn viết đúng từng chữ người mẫu nói, hãy dùng định dạng Editorial.',
         {
           cols: 3,
           cards: [
@@ -1220,11 +1220,11 @@ const marketing: AboutPage = {
             ['Seedance 2.5 Reference', '720p', '4–30 giây', 'Bật hoặc tắt'],
             ['Gemini Omni Flash Reference', '720p', '3–15 giây', 'Luôn có'],
             ['Grok Imagine Reference', '720p', '1–10 giây', 'Luôn có'],
-            ['WAN 2.7 Reference', '720p', '2–10 giây', 'Luôn có'],
-            ['Minimax H3 Max Reference (3 mức)', '480p, 768p hoặc 1080p', '5–15 giây', 'Luôn có'],
+            ['Wan 2.7 Reference', '720p', '2–10 giây', 'Luôn có'],
+            ['MiniMax H3 Max Reference (3 mức)', '480p, 768p hoặc 1080p', '5–15 giây', 'Luôn có'],
           ],
         },
-        'Minimax H3 Max Reference có ba bản theo độ phân giải: 480p rẻ để thử nhanh, 768p là bản chính và 1080p sắc nét hơn. Ở Kling O3 Pro, bật âm thanh làm giá cao hơn; giá trên nút Tạo video luôn đã tính nó.',
+        'MiniMax H3 Max Reference có ba bản theo độ phân giải: 480p rẻ để thử nhanh, 768p là bản chính và 1080p sắc nét hơn. Ở Kling O3 Pro, bật âm thanh làm giá cao hơn; giá trên nút Tạo video luôn đã tính nó.',
       ],
     },
     {
@@ -1255,7 +1255,7 @@ const marketing: AboutPage = {
             { tag: 'Kể chuyện', title: '9–10 giây', text: 'Thêm một hai cảnh quay, cho clip kể trọn câu chuyện hơn.' },
           ],
         },
-        'Video dài hơn tốn hơn, và chi phí ước tính luôn ghi trên nút Tạo video trước khi chạy. Kling O3 Pro xuất video ở 1080p, Minimax H3 Max Reference ở 480p, 768p hoặc 1080p, các mô hình còn lại ở 720p.',
+        'Video dài hơn tốn hơn, và chi phí ước tính luôn ghi trên nút Tạo video trước khi chạy. Kling O3 Pro xuất video ở 1080p, MiniMax H3 Max Reference ở 480p, 768p hoặc 1080p, các mô hình còn lại ở 720p.',
       ],
     },
     {
@@ -1268,7 +1268,7 @@ const marketing: AboutPage = {
             ['Thử đồ', '/try-on', 'mặc trang phục lên người mẫu trước, để ảnh bạn đưa vào đã có bộ đồ bạn muốn.'],
             ['Đổi nhân vật', '/apps/character-swap', 'thay người trong một ảnh bạn đã có, một cách khác để đổi người trong video giữa các thị trường.'],
             ['Tạo ảnh', '/image-generation', 'chỉnh ảnh người mẫu hay ảnh sản phẩm để đưa vào đây.'],
-            ['Tạo video', '/create', 'làm video đa dụng với các họ mô hình Kling, Seedance, VEO và nhiều họ khác.'],
+            ['Tạo video', '/create', 'làm video đa dụng với các họ mô hình Kling, Seedance, Veo và nhiều họ khác.'],
           ],
         },
       ],
@@ -1362,7 +1362,7 @@ const advanced: AboutPage = {
             'Lời bạn viết thành lời nói khớp khẩu hình của người trong video. Mô hình được dặn không nói thêm chữ nào ngoài lời thoại.',
             'Khoảng hai từ mỗi giây: video 10 giây nên có khoảng hai mươi từ.',
             'Không có lời thoại: chỉ có lời nói khi brief yêu cầu; còn lại là âm thanh nền hoặc nhạc.',
-            'Tắt Tạo âm thanh để có video im lặng, rồi thêm giọng đọc hoặc nhạc của riêng bạn khi dựng. Chỉ Kling O3 Pro và Seedance tắt được âm thanh; Gemini Omni Flash, Grok Imagine, WAN 2.7 và Minimax H3 Max luôn tạo tiếng nên công tắc khoá ở Bật. Ở Kling O3 Pro, âm thanh làm giá cao hơn.',
+            'Tắt Tạo âm thanh để có video im lặng, rồi thêm giọng đọc hoặc nhạc của riêng bạn khi dựng. Chỉ Kling O3 Pro và Seedance tắt được âm thanh; Gemini Omni Flash, Grok Imagine, Wan 2.7 và MiniMax H3 Max luôn tạo tiếng nên công tắc khoá ở Bật. Ở Kling O3 Pro, âm thanh làm giá cao hơn.',
           ],
         },
       ],
@@ -1421,7 +1421,7 @@ const advanced: AboutPage = {
             ['UGC Thử đồ', '/marketing-studio', 'là định dạng gọn: một người mẫu và một sản phẩm vào, một clip kiểu người sáng tạo nội dung ra.'],
             ['Tạo ảnh', '/image-generation', 'chỉnh ảnh người mẫu hay ảnh sản phẩm để đưa vào đây.'],
             ['Thử đồ', '/try-on', 'mặc trang phục lên người mẫu trước khi biến ảnh thành quảng cáo.'],
-            ['Tạo video', '/create', 'làm video đa dụng với các họ mô hình Kling, Seedance, VEO và nhiều họ khác.'],
+            ['Tạo video', '/create', 'làm video đa dụng với các họ mô hình Kling, Seedance, Veo và nhiều họ khác.'],
           ],
         },
       ],
@@ -1434,7 +1434,7 @@ const advanced: AboutPage = {
           faq: [
             ['Video marketing Editorial là gì?', 'Là định dạng marketing toàn quyền kiểm soát: bạn tải tối đa 7 ảnh tham chiếu của mình, viết một bản brief sáng tạo, và thêm hook, bối cảnh và lời thoại nếu muốn. AI dựng tất cả thành một video marketing riêng.'],
             ['Editorial khác UGC Thử đồ thế nào?', 'UGC Thử đồ là định dạng gọn: hai ảnh vào, một video thử đồ kiểu người sáng tạo nội dung ra, theo chỉ dẫn cố định. Editorial trao bạn ghế đạo diễn: bản brief là nguồn sự thật, bạn đưa tối đa 7 ảnh và viết lời thoại.'],
-            ['Dùng được bao nhiêu ảnh tham chiếu?', 'Tối đa 7, hoặc ít hơn nếu mô hình đã chọn nhận ít ảnh hơn: WAN 2.7 Reference nhận tối đa 4. Mỗi ảnh có thể là người, sản phẩm, bối cảnh hay ảnh phong cách. AI giữ chi tiết nhìn thấy được của chúng và dựng video quanh chúng.'],
+            ['Dùng được bao nhiêu ảnh tham chiếu?', 'Tối đa 7, hoặc ít hơn nếu mô hình đã chọn nhận ít ảnh hơn: Wan 2.7 Reference nhận tối đa 4. Mỗi ảnh có thể là người, sản phẩm, bối cảnh hay ảnh phong cách. AI giữ chi tiết nhìn thấy được của chúng và dựng video quanh chúng.'],
             ['Có bắt buộc chọn hook hay bối cảnh không?', 'Không, cả hai đều tuỳ chọn. Có hook, video mở bằng khoảnh khắc đó trước khi vào ý tưởng của bạn; có bối cảnh, cảnh được đặt ở đó. Không có, AI theo bản brief.'],
             ['Video có lời thoại không?', 'Có. Tạo âm thanh bật sẵn; lời bạn viết trong ô Lời thoại được đọc đúng từng chữ, khớp khẩu hình. Không viết lời thoại thì chỉ có lời nói khi brief yêu cầu. Với Kling O3 Pro và Seedance, tắt công tắc để có clip im lặng; các mô hình còn lại luôn có tiếng.'],
             ['Một video Editorial tốn bao nhiêu?', 'Chi phí tuỳ mô hình và thời lượng, vì chi phí tính theo giây. Âm thanh làm giá cao hơn ở một số mô hình. Chi phí ước tính, đã tính âm thanh, luôn ghi trên nút chạy trước khi bạn tạo, và video dùng chung ngân sách với Tạo video.'],
@@ -2719,10 +2719,10 @@ export const MODEL_CARD_TEXT: Record<string, string> = {
   'grok-imagine-reference': 'Dựng cảnh từ tối đa 7 ảnh tham chiếu, clip 1–10 giây.',
   'wan-2.7': 'Mô hình mã nguồn mở của Alibaba, clip 2–15 giây.',
   'wan-2.7-reference': 'WAN dựng cảnh từ tối đa 4 ảnh tham chiếu, clip 2–10 giây.',
-  'minimax-h3-max': 'Bản chủ lực của Minimax: clip 5–15 giây ở 768p.',
-  'minimax-h3-max-1080p': 'Minimax H3 Max tinh chỉnh lên 1080p, clip 5–15 giây sắc nét hơn bản 768p.',
-  'minimax-h3-max-480p': 'Minimax H3 Max ở 480p: rẻ nhất trong họ H3, hợp để thử ý tưởng nhanh.',
-  'minimax-h3-max-reference': 'Minimax H3 Max dựng cảnh từ tối đa 9 ảnh tham chiếu.',
+  'minimax-h3-max': 'Bản chủ lực của MiniMax: clip 5–15 giây ở 768p.',
+  'minimax-h3-max-1080p': 'MiniMax H3 Max tinh chỉnh lên 1080p, clip 5–15 giây sắc nét hơn bản 768p.',
+  'minimax-h3-max-480p': 'MiniMax H3 Max ở 480p: rẻ nhất trong họ H3, hợp để thử ý tưởng nhanh.',
+  'minimax-h3-max-reference': 'MiniMax H3 Max dựng cảnh từ tối đa 9 ảnh tham chiếu.',
   'minimax-h3-max-reference-1080p': 'Dựng cảnh từ tối đa 9 ảnh tham chiếu, tinh chỉnh lên 1080p.',
   'minimax-h3-max-reference-480p': 'Dựng cảnh từ tối đa 9 ảnh tham chiếu ở 480p, chi phí thấp nhất.',
   'minimax-hailuo-2.3-pro': 'Đường nhanh nhất tới một clip 1080p sắc nét: một ảnh vào, video 6 giây ra.',

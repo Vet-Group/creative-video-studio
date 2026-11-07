@@ -6,6 +6,7 @@
 import { type CSSProperties, type KeyboardEvent, useEffect, useId, useRef, useState } from 'react';
 import { firstEnabled, moveActive } from '@/lib/listbox';
 import { byFamily, FEATURED, type Family, featured } from '@/lib/model-families';
+import { MIN_MARKS } from '@/lib/model-marks';
 import { Icon } from './Icon';
 
 export interface ModelOption {
@@ -229,8 +230,14 @@ export function ModelPicker({ models: given, value, onChange }: { models: ModelO
           {m.resolution && <span>{m.resolution}</span>}
           {lengths(m.durationsSec) && <span>{lengths(m.durationsSec)}</span>}
           <span>${m.estimateUsd}</span>
-          {m.score !== undefined && m.marks !== 0 && <span>Điểm {m.score}</span>}
-          {m.rate !== undefined && <span>Đạt {m.rate}</span>}
+          {m.marks !== undefined && m.marks > 0 && m.marks < MIN_MARKS ? (
+            <span>Chưa đủ đánh giá</span>
+          ) : (
+            <>
+              {m.score !== undefined && m.marks !== 0 && <span>Điểm {m.score}</span>}
+              {m.rate !== undefined && <span>Đạt {m.rate}</span>}
+            </>
+          )}
           {m.locked ? <span>{lockedText(m)}</span> : !m.supported && <span>Không hỗ trợ lựa chọn này</span>}
         </span>
       </div>
