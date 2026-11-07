@@ -38,11 +38,11 @@ async function open(page: Page, width: number): Promise<{ panel: Locator; list: 
 
 test('the picker opens on the featured models and the families; a family opens beside the panel by pointer and by keyboard', async ({ page }, testInfo) => {
   const { panel, list } = await open(page, 1440);
-  const featured = list.getByRole('group', { name: 'Model nổi bật' }).getByRole('option');
+  const featured = list.getByRole('group', { name: 'Mô hình nổi bật' }).getByRole('option');
   await expect(featured).toHaveText([/^Seedance 2\.0Có âm thanhĐề xuất/, /^Seedance 2\.0 \(BytePlus\)/, /^Kling 3\.0 ProMỚI/, /^Google VEO 3\.1Có âm thanh/, /^Gemini Omni Flash/]);
   await expect(featured.first()).toContainText('1080p4–15 giây$1.5000Điểm 80'); // the audio estimate, as the form starts with audio on
   await expect(featured.first()).toHaveAttribute('aria-selected', 'true');
-  const families = list.getByRole('group', { name: 'Tất cả model' }).getByRole('option');
+  const families = list.getByRole('group', { name: 'Tất cả mô hình' }).getByRole('option');
   await expect(families).toHaveText([/^Seedance/, /^Kling/, /^Google/, /^xAI/, /^Alibaba/, /^MiniMax/, /^Khác/]);
   await page.screenshot({ path: testInfo.outputPath('picker-desktop-initial.png') });
 
@@ -108,8 +108,8 @@ test('the picker opens on the featured models and the families; a family opens b
 test('a search shows a flat list with no sections, and the e2e helper picks a model that is only in a family', async ({ page }) => {
   const { panel, list } = await open(page, 1440);
   await panel.getByRole('combobox', { name: 'Tìm mô hình' }).fill('kling');
-  await expect(list.getByRole('group', { name: 'Model nổi bật' })).toHaveCount(0);
-  await expect(list.getByRole('group', { name: 'Tất cả model' })).toHaveCount(0);
+  await expect(list.getByRole('group', { name: 'Mô hình nổi bật' })).toHaveCount(0);
+  await expect(list.getByRole('group', { name: 'Tất cả mô hình' })).toHaveCount(0);
   await expect(list.getByRole('option')).toHaveText([/^Kling 3\.0 Pro/, /^Kling 2\.6/]);
   await page.keyboard.press('Escape');
   await pickModel(page, /Minimax H3 Max/);
@@ -118,13 +118,13 @@ test('a search shows a flat list with no sections, and the e2e helper picks a mo
 
 test('at 390 px a family opens under its row, inside the screen', async ({ page }, testInfo) => {
   const { panel, list } = await open(page, 390);
-  await expect(list.getByRole('group', { name: 'Model nổi bật' }).getByRole('option').first().getByText('Điểm 80')).toBeVisible();
+  await expect(list.getByRole('group', { name: 'Mô hình nổi bật' }).getByRole('option').first().getByText('Điểm 80')).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('picker-390-initial.png') });
   const p = (await panel.boundingBox())!;
   expect(p.x).toBeGreaterThanOrEqual(0);
   expect(p.x + p.width).toBeLessThanOrEqual(390);
   const kling = list.getByRole('group', { name: 'Kling' });
-  await list.getByRole('group', { name: 'Tất cả model' }).getByRole('option', { name: /^Kling/ }).click();
+  await list.getByRole('group', { name: 'Tất cả mô hình' }).getByRole('option', { name: /^Kling/ }).click();
   await expect(kling.getByRole('option')).toHaveCount(2);
   for (const option of await kling.getByRole('option').all()) {
     const o = (await option.boundingBox())!;

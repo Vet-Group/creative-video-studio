@@ -118,6 +118,14 @@ test('the hero greets the member by given name for the time of day in Vietnam, w
   expect(html).toContain('Bạn chưa tạo clip hay ảnh nào');
 });
 
+test('a clip cap from 100,000 up is no cap, so the hero counts the clips made today instead of the clips left', async () => {
+  const { dailyClips } = await import('@cvs/core/limits');
+  vi.mocked(dailyClips).mockResolvedValueOnce({ today: 2, cap: 100_000 } as never);
+  const html = await withJobs([]);
+  expect(html).toContain('Hôm nay bạn đã tạo 2 clip video');
+  expect(html).not.toContain('100000');
+});
+
 test('Continue shows running jobs first, then the latest finished, at most four; a finished one opens in the Library, the others on their page', async () => {
   const html = await withJobs([
     job('done-1', 'succeeded', { poster_asset_id: 'p1', output_asset_id: 'o1' }),

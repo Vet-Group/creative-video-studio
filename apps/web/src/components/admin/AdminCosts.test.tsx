@@ -86,7 +86,7 @@ test('the model table names the provider, counts jobs or LLM calls, and is left 
 
 test('a budget of $100,000 or more reads as no cap, without a bar; a real cap keeps its bar', () => {
   const none = renderToStaticMarkup(<Budget title="Ngân sách video" used="12.93" cap="100000.0000" />);
-  expect(none).toContain('Chưa đặt hạn mức');
+  expect(none).toContain('Không giới hạn');
   expect(none).not.toContain('meter');
   const real = renderToStaticMarkup(<Budget title="Ngân sách video" used="50" cap="200" />);
   expect(real).toContain('meter');
