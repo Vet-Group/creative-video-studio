@@ -46,14 +46,18 @@ export async function gotoPastSignOut(page: Page, path: string): Promise<void> {
   });
 }
 
-// A production build (CVS_E2E_BUILD=1) turns on better-auth's per-address limiter, which allows 3 sign-ins in 10 s. Each signIn gets its own
+// A production build (CVS_E2E_BUILD=1) turns on better-auth's per-address limiter, which allows 3 sign-ins in 10 s. Each sign-in gets its own
 // address through the header the app reads it from (lib/auth.ts), so the specs' quick sign-ins are not refused. Cloudflare sets it in production.
 let address = Math.floor(Math.random() * 0xffffff);
+/** Sends this page's next requests from a new client address (see above). */
+export async function newAddress(page: Page): Promise<void> {
+  address = (address + 1) & 0xffffff;
+  await page.context().setExtraHTTPHeaders({ 'cf-connecting-ip': `10.${address >> 16}.${(address >> 8) & 255}.${address & 255}` });
+}
 
 /** Signs in through the form; the first-visit card on Explore counts as already closed unless `welcome` asks for it. */
 export async function signIn(page: Page, who: UserKey, { welcome = false } = {}): Promise<void> {
-  address = (address + 1) & 0xffffff;
-  await page.context().setExtraHTTPHeaders({ 'cf-connecting-ip': `10.${address >> 16}.${(address >> 8) & 255}.${address & 255}` });
+  await newAddress(page);
   if (!welcome) await page.addInitScript(() => localStorage.setItem('cvs.welcome.done', '1'));
   await gotoPastSignOut(page, '/login');
   await loginReady(page);
