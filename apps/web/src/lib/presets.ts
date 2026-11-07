@@ -76,9 +76,9 @@ export async function createPreset(tx: Queryable, actorId: string, fields: Prese
   return preset;
 }
 
-/** PATCH of one preset, for an Admin (/api/admin/presets/[id]) or a template editor (/api/presets/[id]): the same checks, change and audit. */
-export async function patchPreset(request: Request, id: string, role: 'admin' | 'editor'): Promise<Response> {
-  const g = await guard(request, role);
+/** PATCH of one preset by a template editor (/api/presets/[id]). */
+export async function patchPreset(request: Request, id: string): Promise<Response> {
+  const g = await guard(request, 'editor');
   if (g.error) return g.error;
   const fields = presetFields((await readBody(request)) ?? {});
   if (typeof fields === 'string') return bad(fields);

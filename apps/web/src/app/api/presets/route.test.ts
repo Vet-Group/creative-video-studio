@@ -10,7 +10,7 @@ process.env.APP_URL = 'http://localhost';
 
 const { auth, pool } = await import('@/lib/auth');
 const { GET } = await import('./route');
-const { PATCH } = await import('../admin/presets/[id]/route');
+const { PATCH } = await import('./[id]/route');
 
 const PASSWORD = 'correct-horse-battery';
 
@@ -37,7 +37,7 @@ afterAll(async () => {
 });
 
 const list = async (cookie = memberCookie) => ((await (await GET(call(cookie, '/api/presets'))).json()) as { presets: { id: string; label: string }[] }).presets;
-const patch = (id: string, body: unknown) => PATCH(call(adminCookie, `/api/admin/presets/${id}`, 'PATCH', body), { params: Promise.resolve({ id }) });
+const patch = (id: string, body: unknown) => PATCH(call(adminCookie, `/api/presets/${id}`, 'PATCH', body), { params: Promise.resolve({ id }) });
 
 describe('GET /api/presets', () => {
   test('answers 401 without a session', async () => {

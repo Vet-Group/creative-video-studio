@@ -1,7 +1,7 @@
 import { type RouteContext } from '@/lib/assets';
 import { patchPreset } from '@/lib/presets';
 
-/** Template editor: edit one preset as an Admin does at /admin/presets, with the same checks and preset.update audit. */
+/** Template editor (an Admin is one): edit a preset's `label`, `prompt` and `sortOrder`, or switch it on or off with `enabled`. The old and new values of what changed are audited as preset.update. */
 export async function PATCH(request: Request, { params }: RouteContext) {
-  return patchPreset(request, (await params).id, 'editor');
+  return patchPreset(request, (await params).id);
 }

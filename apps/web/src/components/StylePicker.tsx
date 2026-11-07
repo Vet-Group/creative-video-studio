@@ -72,7 +72,9 @@ export function StylePicker({ value, onChange }: { value: string; onChange: (id:
         <p className="modal-sub">Mỗi phong cách được thêm vào mô tả của bạn khi tạo ảnh. Chọn một phong cách hoặc không dùng phong cách nào.</p>
         <ul className="preset-grid" aria-label="Danh sách phong cách">
           <li className="preset-card">
-            <div className="banner-empty" />
+            <div className="banner-empty style-none">
+              <Icon name="x" size={28} />
+            </div>
             <button type="button" data-value="" aria-pressed={value === ''} onClick={() => pick('')}>
               Không dùng phong cách
             </button>
