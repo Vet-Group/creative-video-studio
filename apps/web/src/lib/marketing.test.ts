@@ -274,6 +274,7 @@ describe('reviewPrompt', () => {
   it('leaves the talking-points sentence out until a highlight is written, so the preview never reads "about: ."', () => {
     expect(reviewPrompt({ highlights: ['', '  '], ratio: '9:16' })).toBe(`${head}${tail}`);
     expect(reviewPrompt({ highlights: [''], ratio: '9:16', audio: false })).toBe(`${head}${tail} The video is completely silent: no speech, no music and no sound.`);
+    expect(reviewPrompt({ highlights: [''], ratio: '9:16', audio: true })).toBe(`${head}${tail} The creator speaks to the camera in a casual, honest tone, recorded on the phone, with no background music.`);
   });
 
   it('speaks about the points when sound is on, says the script exactly when there is one, and is silent when off', () => {

@@ -176,8 +176,8 @@ export function unboxingPrompt({ model, packaging, ...parts }: Parts & { model: 
   return compose(head, parts, custom, parts.audio === undefined ? null : parts.audio ? UNBOXING_SOUND : SILENT, model ? null : POV_HANDS);
 }
 
-/** Sound of a review clip with audio on and no script: the creator talks about the highlights, as recorded on the phone. */
-const REVIEW_SOUND = 'The creator speaks to the camera in a casual, honest tone about these points, recorded on the phone, with no background music.';
+/** Sound of a review clip with audio on and no script: the creator talks about the highlights (once one is written), as recorded on the phone. */
+const reviewSound = (points: boolean) => `The creator speaks to the camera in a casual, honest tone${points ? ' about these points' : ''}, recorded on the phone, with no background music.`;
 
 /**
  * The one English prompt a Review run sends: the model in [Image1] reviews the product in [Image2] and talks about the member's `highlights` (1 to 3
@@ -192,7 +192,7 @@ export function reviewPrompt({ highlights, script, ...parts }: Parts & { highlig
     // With sound off nobody speaks, so the points are shown rather than talked about.
     (points.length ? `${parts.audio === false ? 'The creator shows each of these points' : 'The creator talks to the camera about'}: ${points.join('; ')}. ` : '') +
     `Show the product up close and a natural move that shows how it fits or works. Soft natural light, honest energy. ${NO_TEXT}`;
-  const sound = parts.audio === undefined ? null : !parts.audio ? SILENT : lines ? `The creator says exactly: "${lines}", lip-synced, and no other spoken words.` : REVIEW_SOUND;
+  const sound = parts.audio === undefined ? null : !parts.audio ? SILENT : lines ? `The creator says exactly: "${lines}", lip-synced, and no other spoken words.` : reviewSound(points.length > 0);
   return compose(head, parts, custom, sound);
 }
 

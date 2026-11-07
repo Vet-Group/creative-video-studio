@@ -132,6 +132,7 @@ test('Đánh giá sản phẩm: Run asks for the model, the product and a highli
   const [tiles, points] = await Promise.all([page.locator('.marketing-slots').boundingBox(), page.locator('.highlights').boundingBox()]);
   expect(points!.y - (tiles!.y + tiles!.height)).toBeGreaterThanOrEqual(16);
   await expect(preview(page)).not.toContainText('talks to the camera about');
+  await expect(preview(page)).toContainText('in a casual, honest tone, recorded on the phone');
   await expect(audio(page)).toHaveAttribute('aria-checked', 'true');
   await expect(script(page)).toBeVisible();
   await expect(runButton(page)).toBeDisabled();
