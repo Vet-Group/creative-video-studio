@@ -59,7 +59,7 @@ test('the picker opens on the featured models and the families; a family opens b
   await families.filter({ hasText: /^Alibaba/ }).scrollIntoViewIfNeeded();
   await page.mouse.move(0, 0);
   await families.filter({ hasText: /^Alibaba/ }).hover();
-  await expect(list.getByRole('group', { name: 'Alibaba' }).getByRole('option', { name: /WAN 2\.7/ })).toHaveAttribute('aria-disabled', 'true');
+  await expect(list.getByRole('group', { name: 'Alibaba' }).getByRole('option', { name: /Wan 2\.7/ })).toHaveAttribute('aria-disabled', 'true');
   await expect(kling).toHaveCount(0);
   // Include contrast: section labels must remain readable, not just match the reference.
   const axe = await new AxeBuilder({ page }).include('.model-pop').analyze();

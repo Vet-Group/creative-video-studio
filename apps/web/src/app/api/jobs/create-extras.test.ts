@@ -56,7 +56,7 @@ afterAll(async () => {
 describe('the end frame', () => {
   test('the Create picker says which models take one', async () => {
     const r = (await (await GET_MODELS(call('/api/models?feature=video&ratio=9:16&durationSec=5'))).json()) as { models: { id: string; endFrame: boolean }[] };
-    expect(r.models.map((m) => [m.id, m.endFrame])).toEqual([['kling-o3-pro', true], ['kling-o1', false]]);
+    expect(r.models.map((m) => [m.id, m.endFrame])).toEqual([['kling-o1', false], ['kling-o3-pro', true]]);
   });
 
   test('a Run keeps the caller’s own image as params.endAssetId, at the same estimate', async () => {
@@ -104,7 +104,7 @@ describe('the end frame', () => {
 describe('a Run from the prompt alone', () => {
   test('the Create picker says which models take one', async () => {
     const r = (await (await GET_MODELS(call('/api/models?feature=video&ratio=9:16&durationSec=5'))).json()) as { models: { id: string; textOnly: boolean }[] };
-    expect(r.models.map((m) => [m.id, m.textOnly])).toEqual([['kling-o3-pro', true], ['kling-o1', false]]);
+    expect(r.models.map((m) => [m.id, m.textOnly])).toEqual([['kling-o1', false], ['kling-o3-pro', true]]);
   });
 
   test('queues a job with no input on a model with a text twin, at the row’s own estimate', async () => {
