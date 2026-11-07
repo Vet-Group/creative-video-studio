@@ -225,10 +225,10 @@ describe('fal', () => {
     expect(s).toMatchObject({ costUsd: 0.896, costSource: 'estimate' });
   });
 
-  test('COMPLETED but a 4xx on the result is a failed job, not a thrown poll error', async () => {
-    const { fn } = fakeFetch([200, { status: 'COMPLETED' }], [422, { detail: 'bad output' }]);
+  test('COMPLETED but a 4xx on the result is a failed job that fal did not bill (cost 0), not a thrown poll error', async () => {
+    const { fn } = fakeFetch([200, { status: 'COMPLETED' }], [422, { detail: [{ msg: 'Tail image without first image is not supported', type: 'input_value_error' }] }]);
     const s = await createFalProvider({ apiKey: 'k', fetch: fn }).status(job);
-    expect(s).toMatchObject({ state: 'failed', costUsd: 0.56, costSource: 'estimate' });
+    expect(s).toMatchObject({ state: 'failed', costUsd: 0, costSource: 'estimate' });
     expect((s as { error: string }).error).toContain('422');
   });
 
