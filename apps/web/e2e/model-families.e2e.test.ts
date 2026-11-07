@@ -15,11 +15,11 @@ const MODELS = [
   model('seedance-2.0-byteplus', 'Seedance 2.0 (BytePlus)', 75),
   model('kling-3.0-pro', 'Kling 3.0 Pro', 70, { isNew: true }),
   model('kling-2.6', 'Kling 2.6', 40, { resolution: '720p', durationsSec: [5, 10] }),
-  model('veo-3.1', 'Google VEO 3.1', 65, { audioEstimateUsd: '2.0000' }),
+  model('veo-3.1', 'Veo 3.1', 65, { audioEstimateUsd: '2.0000' }),
   model('gemini-omni-flash', 'Gemini Omni Flash', 60),
   model('grok-imagine-1.5', 'Grok Imagine 1.5', 30),
-  model('wan-2.7', 'WAN 2.7', 90, { supported: false }), // the best score, but ruled out: not featured, still listed and marked
-  model('minimax-h3-max', 'Minimax H3 Max', 20),
+  model('wan-2.7', 'Wan 2.7', 90, { supported: false }), // the best score, but ruled out: not featured, still listed and marked
+  model('minimax-h3-max', 'MiniMax H3 Max', 20),
   model('mock-e2e', 'Mock E2E', 50, { provider: 'mock', isMock: true, estimateUsd: '0.0000' }),
 ];
 
@@ -39,7 +39,7 @@ async function open(page: Page, width: number): Promise<{ panel: Locator; list: 
 test('the picker opens on the featured models and the families; a family opens beside the panel by pointer and by keyboard', async ({ page }, testInfo) => {
   const { panel, list } = await open(page, 1440);
   const featured = list.getByRole('group', { name: 'Mô hình nổi bật' }).getByRole('option');
-  await expect(featured).toHaveText([/^Seedance 2\.0Có âm thanhĐề xuất/, /^Seedance 2\.0 \(BytePlus\)/, /^Kling 3\.0 ProMỚI/, /^Google VEO 3\.1Có âm thanh/, /^Gemini Omni Flash/]);
+  await expect(featured).toHaveText([/^Seedance 2\.0Có âm thanhĐề xuất/, /^Seedance 2\.0 \(BytePlus\)/, /^Kling 3\.0 ProMỚI/, /^Veo 3\.1Có âm thanh/, /^Gemini Omni Flash/]);
   await expect(featured.first()).toContainText('1080p4–15 giây$1.5000Điểm 80'); // the audio estimate, as the form starts with audio on
   await expect(featured.first()).toHaveAttribute('aria-selected', 'true');
   const families = list.getByRole('group', { name: 'Tất cả mô hình' }).getByRole('option');
@@ -59,7 +59,7 @@ test('the picker opens on the featured models and the families; a family opens b
   await families.filter({ hasText: /^Alibaba/ }).scrollIntoViewIfNeeded();
   await page.mouse.move(0, 0);
   await families.filter({ hasText: /^Alibaba/ }).hover();
-  await expect(list.getByRole('group', { name: 'Alibaba' }).getByRole('option', { name: /WAN 2\.7/ })).toHaveAttribute('aria-disabled', 'true');
+  await expect(list.getByRole('group', { name: 'Alibaba' }).getByRole('option', { name: /Wan 2\.7/ })).toHaveAttribute('aria-disabled', 'true');
   await expect(kling).toHaveCount(0);
   // Include contrast: section labels must remain readable, not just match the reference.
   const axe = await new AxeBuilder({ page }).include('.model-pop').analyze();
@@ -93,7 +93,7 @@ test('the picker opens on the featured models and the families; a family opens b
   await activeIs(families.filter({ hasText: /^Google/ }));
   await page.keyboard.press('Enter'); // Enter opens a family too
   const google = list.getByRole('group', { name: 'Google' });
-  await activeIs(google.getByRole('option', { name: /Google VEO 3\.1/ }));
+  await activeIs(google.getByRole('option', { name: /Veo 3\.1/ }));
   await page.keyboard.press('ArrowDown');
   await page.keyboard.press('Escape'); // closes the flyout only
   await expect(google).toHaveCount(0);
@@ -112,8 +112,8 @@ test('a search shows a flat list with no sections, and the e2e helper picks a mo
   await expect(list.getByRole('group', { name: 'Tất cả mô hình' })).toHaveCount(0);
   await expect(list.getByRole('option')).toHaveText([/^Kling 3\.0 Pro/, /^Kling 2\.6/]);
   await page.keyboard.press('Escape');
-  await pickModel(page, /Minimax H3 Max/);
-  await expect(modelButton(page)).toContainText('Minimax H3 Max');
+  await pickModel(page, /MiniMax H3 Max/);
+  await expect(modelButton(page)).toContainText('MiniMax H3 Max');
 });
 
 test('at 390 px a family opens under its row, inside the screen', async ({ page }, testInfo) => {

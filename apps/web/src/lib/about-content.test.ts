@@ -83,11 +83,11 @@ describe('withLiveSpecs', () => {
   const range = (a: number, b: number) => Array.from({ length: b - a + 1 }, (_, i) => a + i);
   const models = [
     m('kling-o3-pro', 'Kling O3 Pro', range(3, 15), '1080p', ['9:16', '1:1', '16:9'], 7),
-    m('kling-o1', 'Kling o1', [5, 10], '1080p', ['9:16', '1:1', '16:9'], 4),
+    m('kling-o1', 'Kling O1', [5, 10], '1080p', ['9:16', '1:1', '16:9'], 4),
     m('kling-2.6', 'Kling 2.6', [5, 10], '1080p', ['9:16', '1:1'], 1),
     m('kling-2.5-turbo', 'Kling 2.5 Turbo', [5, 10], '1080p', ['9:16', '1:1'], 1),
     m('kling-3.0-pro', 'Kling 3.0 Pro', range(3, 15), '1080p', ['9:16', '1:1'], 1),
-    m('veo-3.1', 'Google VEO 3.1', [8], '720p', ['9:16', '16:9'], 1),
+    m('veo-3.1', 'Veo 3.1', [8], '720p', ['9:16', '16:9'], 1),
   ];
 
   it("builds a family card's spec lines and model count from the loaded models", () => {
@@ -96,8 +96,8 @@ describe('withLiveSpecs', () => {
     expect(card.specs).toEqual([
       'Thời lượng: 3–15 giây (O3 Pro, 3.0 Pro) · 5 hoặc 10 giây (các bản khác)',
       'Độ phân giải: 1080p',
-      'Tỉ lệ: 9:16, 1:1, 16:9 (O3 Pro, o1) · 9:16, 1:1 (các bản khác)',
-      'Ảnh: tối đa 7 (O3 Pro) · tối đa 4 (o1) · 1 (các bản khác)',
+      'Tỉ lệ: 9:16, 1:1, 16:9 (O3 Pro, O1) · 9:16, 1:1 (các bản khác)',
+      'Ảnh: tối đa 7 (O3 Pro) · tối đa 4 (O1) · 1 (các bản khác)',
     ]);
   });
 
@@ -108,20 +108,20 @@ describe('withLiveSpecs', () => {
   });
 
   it('names variants that differ only by resolution once, with their level count', () => {
-    const minimax = ABOUT.create.sections.flatMap((s) => s.blocks ?? []).flatMap((b) => (typeof b === 'object' && 'cards' in b ? b.cards : [])).find((c) => c.title === 'Minimax')!;
+    const minimax = ABOUT.create.sections.flatMap((s) => s.blocks ?? []).flatMap((b) => (typeof b === 'object' && 'cards' in b ? b.cards : [])).find((c) => c.title === 'MiniMax')!;
     const r5 = ['9:16', '1:1', '16:9', '4:3', '3:4'];
     const card = withLiveSpecs(minimax, [
-      m('minimax-h3-max', 'Minimax H3 Max', range(5, 15), '768p', ['9:16', '1:1'], 1),
-      m('minimax-h3-max-1080p', 'Minimax H3 Max 1080P', range(5, 15), '1080p', ['9:16', '1:1'], 1),
-      m('minimax-h3-max-480p', 'Minimax H3 Max 480P', range(5, 15), '480p', ['9:16', '1:1'], 1),
-      m('minimax-h3-max-reference', 'Minimax H3 Max Reference', range(5, 15), '768p', r5, 9),
-      m('minimax-h3-max-reference-1080p', 'Minimax H3 Max Reference 1080P', range(5, 15), '1080p', r5, 9),
-      m('minimax-h3-max-reference-480p', 'Minimax H3 Max Reference 480P', range(5, 15), '480p', r5, 9),
-      m('minimax-hailuo-2.3-pro', 'Minimax Hailuo 2.3 Pro', [6], '1080p', ['9:16', '1:1'], 1),
+      m('minimax-h3-max', 'MiniMax H3 Max', range(5, 15), '768p', ['9:16', '1:1'], 1),
+      m('minimax-h3-max-1080p', 'MiniMax H3 Max 1080p', range(5, 15), '1080p', ['9:16', '1:1'], 1),
+      m('minimax-h3-max-480p', 'MiniMax H3 Max 480p', range(5, 15), '480p', ['9:16', '1:1'], 1),
+      m('minimax-h3-max-reference', 'MiniMax H3 Max Reference', range(5, 15), '768p', r5, 9),
+      m('minimax-h3-max-reference-1080p', 'MiniMax H3 Max Reference 1080p', range(5, 15), '1080p', r5, 9),
+      m('minimax-h3-max-reference-480p', 'MiniMax H3 Max Reference 480p', range(5, 15), '480p', r5, 9),
+      m('minimax-hailuo-2.3-pro', 'MiniMax Hailuo 2.3 Pro', [6], '1080p', ['9:16', '1:1'], 1),
     ]);
     expect(card.specs).toEqual([
       'Thời lượng: 6 giây (Hailuo 2.3 Pro) · 5–15 giây (các bản khác)',
-      'Độ phân giải: 768p (H3 Max, H3 Max Reference) · 480p (H3 Max 480P, H3 Max Reference 480P) · 1080p (các bản khác)',
+      'Độ phân giải: 768p (H3 Max, H3 Max Reference) · 480p (H3 Max 480p, H3 Max Reference 480p) · 1080p (các bản khác)',
       'Tỉ lệ: 9:16, 1:1, 16:9, 4:3, 3:4 (Reference (3 mức)) · 9:16, 1:1 (các bản khác)',
       'Ảnh: tối đa 9 (Reference (3 mức)) · 1 (các bản khác)',
     ]);

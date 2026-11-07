@@ -171,6 +171,17 @@ test('the models row shows 7 video and 3 image models with a link to all of them
   expect(all).toContain('Chỉ xem nổi bật');
 });
 
+test('a model card shows its score only once it rests on at least three marks', async () => {
+  const { modelStats } = await import('@/lib/model-scores');
+  const rows = modelRows(2, 'video').map((r, i) => ({ ...r, id: `plain-${i}`, label: `Plain ${i}` }));
+  const stats = new Map([['plain-0', { passes: 2, total: 2, ok: 0, bad: 0 }], ['plain-1', { passes: 3, total: 3, ok: 0, bad: 0 }]]);
+  vi.mocked(modelStats).mockResolvedValueOnce(stats).mockResolvedValueOnce(new Map());
+  vi.mocked(pool.query).mockResolvedValueOnce({ rows } as never);
+  const html = renderToStaticMarkup(await ExplorePage(props('all')));
+  expect(html).not.toContain('2 lượt đánh giá');
+  expect(html).toContain('Điểm 0/100 · 3 lượt đánh giá');
+});
+
 test('a -vertex or -byteplus twin shows its model written description, not the spec line', async () => {
   const rows = ['gemini-omni-flash-vertex', 'seedream-5-pro-byteplus'].map((id) => ({ ...modelRows(1, id.startsWith('seedream') ? 'image' : 'video')[0]!, id }));
   vi.mocked(pool.query).mockResolvedValueOnce({ rows } as never);
