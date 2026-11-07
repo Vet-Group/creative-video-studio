@@ -110,7 +110,7 @@ test('the sessions list shows both devices and signs the other one out', async (
   const rows = settings.getByRole('list', { name: 'Phiên đăng nhập' }).getByRole('listitem');
   await expect(rows).toHaveCount(2);
   await expect(rows.filter({ hasText: 'Thiết bị này' })).toHaveCount(1);
-  await expect(rows.first()).toContainText(/(Edge|Chrome) trên Windows/);
+  await expect(rows.first()).toContainText(/(Edge|Chrome) trên (Windows|Linux)/); // this machine, or GitHub's Linux runner
   // One device's sign-out asks first; Huỷ keeps it signed in.
   await rows.filter({ hasNotText: 'Thiết bị này' }).getByRole('button', { name: /^Đăng xuất / }).click();
   const one = page.getByRole('dialog', { name: /^Đăng xuất .+\?$/ });
