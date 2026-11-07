@@ -2130,7 +2130,7 @@ dialog.modal.template-sheet { width: 100%; max-width: none; margin: auto 0 0; bo
 .lib-row:hover { background: var(--surface-1); }
 .lib-row:has(.zip-check :checked) { background: var(--surface-2); }
 .lib-row .zip-check { top: 14px; left: 16px; width: 24px; height: 24px; } /* on the thumbnail corner, as on the grid card, so no gutter is kept for it */
-@media (max-width: 599.98px) { .library .zip-check::after { content: ''; position: absolute; inset: calc((44px - 100%) / -2); } } /* a 44 px hit area around the 18 px box */
+@media (max-width: 599.98px) { .library .zip-check::after { content: ''; position: absolute; inset: calc((44px - 100%) / -2); } .library .zip-check input { position: relative; z-index: 1; } } /* a 44 px hit area around the 18 px box; the box itself stays on top of it */
 .lib-thumb { flex: none; width: 56px; height: 56px; overflow: hidden; border-radius: 8px; background: var(--fill); }
 .lib-thumb :is(img, video) { display: block; width: 100%; height: 100%; object-fit: cover; }
 .lib-row-main { flex: 1 1 0; min-width: 0; }
