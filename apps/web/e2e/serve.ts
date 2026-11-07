@@ -1,7 +1,8 @@
 // The e2e server, started by playwright.config.ts: a fresh database (migrated, with one mock video model, one mock image model and the test accounts),
 // the worker on the mock provider and the web app, all on this checkout's .env. It runs until Playwright stops it.
 // Run it with: node --import tsx e2e/serve.ts   (from apps/web)
-import { type ChildProcess, spawn } from 'node:child_process';
+import { type ChildProcess, spawn, spawnSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { createTestDatabase } from '@cvs/db/testing';
 import { PASSWORD, USERS } from './users';
@@ -81,9 +82,15 @@ for (const u of Object.values(USERS)) await auth.api.createUser({ body: { email:
 await pool.query('update users set can_edit_templates = true where email = any($1)', [[USERS.tpled.email, USERS.branded.email, USERS.chsed.email]]);
 await pool.end();
 
+// CVS_E2E_BUILD=1 serves a production build instead of `next dev`, so no route compiles while a spec waits on it.
+const built = process.env.CVS_E2E_BUILD === '1';
+if (built) {
+  const b = spawnSync(process.execPath, [createRequire(import.meta.url).resolve('next/dist/bin/next'), 'build'], { cwd: fileURLToPath(new URL('..', import.meta.url)), stdio: 'inherit' });
+  if (b.status !== 0) process.exit(b.status ?? 1);
+}
 const children: ChildProcess[] = [
   spawn(process.execPath, ['--import', 'tsx', 'src/index.ts'], { cwd: fileURLToPath(new URL('../../worker', import.meta.url)), stdio: 'inherit' }),
-  spawn(process.execPath, ['scripts/next.ts', 'dev'], {
+  spawn(process.execPath, ['scripts/next.ts', built ? 'start' : 'dev'], {
     cwd: fileURLToPath(new URL('..', import.meta.url)),
     stdio: 'inherit',
     env: { ...process.env, NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --require ${fileURLToPath(new URL('keep-alive.cjs', import.meta.url)).replaceAll('\\', '/')}`.trim() },

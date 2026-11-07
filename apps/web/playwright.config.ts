@@ -30,8 +30,10 @@ export default defineConfig({
   timeout: 180_000,
   expect: { timeout: 20_000 },
   // Screenshot baselines live in a `fixtures` folder, which .gitignore lets through for images. They are machine-bound: they were taken with the system Chrome on Windows
-  // (font and anti-aliasing included), so a different OS or browser needs its own baselines. CI does not run these specs.
+  // (font and anti-aliasing included), so a different OS or browser needs its own baselines.
   snapshotPathTemplate: '{testDir}/fixtures/screenshots/{testFileName}/{arg}{ext}',
+  // GitHub's Linux runners render fonts differently, so the screenshot comparisons run only on this machine (the rest of each spec still runs there).
+  ignoreSnapshots: !!process.env.CI,
   reporter: [['list']],
   use: {
     baseURL,
@@ -41,7 +43,7 @@ export default defineConfig({
   webServer: {
     command: 'node --import tsx e2e/serve.ts',
     url: `${baseURL}/login`,
-    timeout: 240_000,
+    timeout: process.env.CVS_E2E_BUILD === '1' ? 600_000 : 240_000, // a production build first takes a few minutes
     reuseExistingServer: false,
   },
 });
