@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { type CSSProperties, type FormEvent, useEffect, useRef, useState } from 'react';
 import { api, sendJson, startSignOut } from '@/lib/api';
+import { NO_CAP } from '@/lib/caps';
 import { AVATAR_COLORS, NAME_LENGTH, nameProblem, protection, userAvatarColor } from '@/lib/profile';
 import type { SignInMethod } from '@/lib/sign-in-methods';
 import { useMediaQuery } from '@/lib/use-media-query';
@@ -78,9 +79,19 @@ const usd = (v: string | number) => `$${Number(v).toLocaleString('en-US', { mini
 export const shareOf = (used: number, cap: number) => (cap > 0 ? Math.min(used / cap, 1) : 1);
 export const levelOf = (share: number) => (share >= 1 ? 'full' : share >= 0.8 ? 'warn' : 'ok');
 
-/** One cap as a labelled bar. */
-function Meter({ label, used, cap, text, left }: { label: string; used: number; cap: number; text: string; left: string }) {
+/** One cap as a labelled bar; a cap from NO_CAP up is no limit, so it shows the use alone (`alone`) without a bar. */
+function Meter({ label, used, cap, text, left, alone }: { label: string; used: number; cap: number; text: string; left: string; alone: string }) {
   const share = shareOf(used, cap);
+  if (cap >= NO_CAP)
+    return (
+      <div className="meter">
+        <div className="meter-head">
+          <span>{label}</span>
+          <strong>{alone}</strong>
+        </div>
+        <p className="meter-left">Không giới hạn</p>
+      </div>
+    );
   return (
     <div className="meter" data-level={levelOf(share)}>
       <div className="meter-head">
@@ -108,13 +119,14 @@ function Limits({ usage }: { usage: Usage | null | 'failed' }) {
   return (
     <>
       <div className="settings-card meters">
-        <Meter label="Clip video hôm nay" used={clips.used} cap={clips.cap} text={`${clips.used} / ${clips.cap} clip`} left={`Còn ${clips.cap - clips.used} clip`} />
+        <Meter label="Clip video hôm nay" used={clips.used} cap={clips.cap} text={`${clips.used} / ${clips.cap} clip`} left={`Còn ${clips.cap - clips.used} clip`} alone={`${clips.used} clip`} />
         <Meter
           label="Ảnh và ứng dụng hôm nay"
           used={Number(dayUsd.used)}
           cap={Number(dayUsd.cap)}
           text={`${usd(dayUsd.used)} / ${usd(dayUsd.cap)}`}
           left={`Còn ${usd(Number(dayUsd.cap) - Number(dayUsd.used))}`}
+          alone={usd(dayUsd.used)}
         />
         <Meter
           label="Ảnh và ứng dụng tháng này"
@@ -122,9 +134,10 @@ function Limits({ usage }: { usage: Usage | null | 'failed' }) {
           cap={Number(monthUsd.cap)}
           text={`${usd(monthUsd.used)} / ${usd(monthUsd.cap)}`}
           left={`Còn ${usd(Number(monthUsd.cap) - Number(monthUsd.used))}`}
+          alone={usd(monthUsd.used)}
         />
       </div>
-      <p className="settings-note">Hạn mức ngày đặt lại lúc 0:00 giờ Việt Nam, hạn mức tháng vào ngày 1. Admin đặt các hạn mức này. Khi ngân sách chung của công ty đã hết, Run cũng tạm dừng dù thanh của bạn còn trống.</p>
+      <p className="settings-note">Hạn mức ngày đặt lại lúc 0:00 giờ Việt Nam, hạn mức tháng vào ngày 1. Admin đặt các hạn mức này. Khi ngân sách chung của công ty đã hết, việc tạo cũng tạm dừng dù thanh của bạn còn trống.</p>
     </>
   );
 }
@@ -209,7 +222,10 @@ function ProfileCard({ name, color, email, isAdmin, onSaved }: { name: string; c
         </span>
         <div className="profile-who">
           <p className="profile-name">{name}</p>
-          <p className="profile-email">{email}</p>
+          {/* A narrow screen breaks a long address after the @ rather than inside the domain. */}
+          <p className="profile-email">
+            {email.split('@').map((part, i) => (i === 0 ? part : [<wbr key={i} />, `@${part}`]))}
+          </p>
         </div>
         <span className="role-badge" data-role={isAdmin ? 'admin' : 'member'}>
           {isAdmin ? 'Admin' : 'Thành viên'}

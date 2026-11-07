@@ -1284,7 +1284,7 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .today-more { min-height: 32px; font-size: 13px; white-space: nowrap; }
 .profile-who { flex: 1; min-width: 0; }
 .profile-name { margin: 0; font-size: 18px; line-height: 26px; font-weight: 600; overflow-wrap: anywhere; }
-.profile-email { margin: 0; color: var(--text-muted); font-size: 14px; line-height: 20px; overflow-wrap: anywhere; }
+.profile-email { margin: 0; color: var(--text-muted); font-size: 14px; line-height: 20px; overflow-wrap: break-word; }
 .role-badge { flex: none; padding: 2px 10px; border-radius: 999px; background: var(--fill); color: var(--text-2); font-size: 12px; line-height: 18px; font-weight: 600; }
 .role-badge[data-role='admin'] { background: var(--danger-soft); color: var(--danger); }
 /* Limits: one bar per cap, dark while there is room, amber from 80 %, red at the cap. */
@@ -1894,7 +1894,7 @@ dialog.modal.template-sheet { width: 100%; max-width: none; margin: auto 0 0; bo
 .choice-box[data-filled] .slot-icon, .choice-box[data-filled] .choice-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 .marketing-slots .slot-wide { grid-column: 1 / -1; } /* Advanced: the reference slot spans the row above the hook and location boxes */
 .choice-box:hover { border-color: var(--ink); background: var(--surface-1); }
-.choice-optional { padding: 1px 8px; border-radius: 999px; background: rgb(var(--tint) / .06); color: var(--text-muted); font-size: 11px; font-weight: 500; line-height: 16px; }
+.choice-optional { white-space: nowrap; padding: 1px 8px; border-radius: 999px; background: rgb(var(--tint) / .06); color: var(--text-muted); font-size: 11px; font-weight: 500; line-height: 16px; }
 /* Hovered or dragged over, a tile's round icon fills, so the whole tile reads as one button. */
 :is(.choice-box:hover, .slot-add:hover, .slot[data-over='true']) .slot-icon { background: var(--ink); color: var(--on-ink); transition: background-color .15s, color .15s; }
 .choice-value { color: var(--ink); font-size: 13px; line-height: 18px; font-weight: 600; overflow-wrap: anywhere; }
@@ -2048,9 +2048,9 @@ dialog.modal.template-sheet { width: 100%; max-width: none; margin: auto 0 0; bo
   .imagebar .prompt-tools .icon-button { width: 28px; height: 28px; }
   .bar-run { flex: 1 0 100%; margin-left: 0; }
 }
-/* Phones: no chevrons, so the three chips fit one row; the model chip may shorten its name before the row could push the page sideways. */
+/* Phones: no chevrons; the chips wrap onto a second row rather than clip, and a long model name may still shorten so it never pushes the page sideways. */
 @media (max-width: 599.98px) {
-  .imagebar .pills { flex-wrap: nowrap; gap: 4px; }
+  .imagebar .pills { flex-wrap: wrap; gap: 4px; }
   .imagebar .pills > * { min-width: 0; }
   .imagebar .select-trigger > .icon:last-child { display: none; }
   .imagebar .select-value-row .badge { margin-left: 4px; }

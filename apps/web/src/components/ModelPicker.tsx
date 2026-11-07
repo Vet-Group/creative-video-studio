@@ -263,14 +263,14 @@ export function ModelPicker({ models: given, value, onChange }: { models: ModelO
         {first > 0 && (
           <div role="group" aria-labelledby={`${uid}-group-featured`}>
             <div className="model-group" id={`${uid}-group-featured`}>
-              <Icon name="star" size={10} /> Model nổi bật
+              <Icon name="star" size={10} /> Mô hình nổi bật
             </div>
             {indexes(0, first).map(topRow)}
           </div>
         )}
         <div role="group" aria-labelledby={allId}>
           <div className="model-group" id={allId}>
-            Tất cả model
+            Tất cả mô hình
           </div>
           {indexes(first, split).map(topRow)}
         </div>
