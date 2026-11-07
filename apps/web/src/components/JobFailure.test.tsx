@@ -59,5 +59,5 @@ test('a job refused for a real person can go once to its fal twin, with the twin
   expect(canRetryOnTwin({ ...refused(RAW), twin, status: 'succeeded' })).toBe(false);
   expect(canRetryOnTwin({ ...refused(RAW.replace('.PrivacyInformation', '.Other')), twin })).toBe(false); // another refusal is not a real person
   expect(canRetryOnTwin(job({ error: 'boom', twin }))).toBe(false);
-  expect(twinRetryText({ ...refused(RAW), twin })).toEqual({ button: 'Chạy lại bằng Seedance 1.0 Pro', ask: 'Chạy lại lượt tạo này bằng Seedance 1.0 Pro với giá khoảng $0.6200?' });
+  expect(twinRetryText({ ...refused(RAW), twin })).toEqual({ button: 'Chạy lại trên fal.ai', ask: 'Chạy lại lượt tạo này bằng Seedance 1.0 Pro trên fal.ai (nhận ảnh có người thật) với giá khoảng $0.6200?' });
 });

@@ -10,8 +10,9 @@ export const canRetry = (job: TrayJob): boolean => RETRYABLE.includes(job.status
 /** A job BytePlus refused for a real person can be sent once to its fal twin, which takes such a photo (POST /api/jobs `onTwin`). */
 export const canRetryOnTwin = (job: TrayJob): boolean => RETRYABLE.includes(job.status) && !job.retried && !job.retryOf && job.failureReason === 'real_person' && !!job.twin;
 
-/** The retry button's label and the confirmation's question for a twin run, with its price as the twin would book it. */
-export const twinRetryText = (job: TrayJob) => ({ button: `Chạy lại bằng ${job.twin!.label}`, ask: `Chạy lại lượt tạo này bằng ${job.twin!.label} với giá khoảng $${job.twin!.estimateUsd}?` });
+/** The retry button's label and the confirmation's question for a twin run, with its price as the twin would book it. The twin of a BytePlus row is its fal row, and the
+ * two may share a name (0078 dropped the provider suffix), so the text names fal. */
+export const twinRetryText = (job: TrayJob) => ({ button: `Chạy lại trên fal.ai`, ask: `Chạy lại lượt tạo này bằng ${job.twin!.label} trên fal.ai (nhận ảnh có người thật) với giá khoảng $${job.twin!.estimateUsd}?` });
 
 // What a Member reads about a job that did not finish; the raw error is for Admins.
 const FAILURE_TEXT = (noun: string): Partial<Record<JobStatus, string>> => ({

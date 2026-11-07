@@ -10,7 +10,7 @@ import { mp4VideoInfo } from '@/lib/assets';
 import { boss } from '@/lib/queue';
 import { findChoice } from '@/lib/choices';
 import { inputRefusal } from '@/lib/job-failure';
-import { offeredNow, twinEstimate } from '@/lib/model-twins';
+import { offeredNow, servingRow, twinEstimate } from '@/lib/model-twins';
 import { BRAND_FEATURES, withBrand } from '@/lib/brand';
 import { ADVANCED_MAX_SCRIPT, END_TEXT_POSITIONS, isParamFormat, MAX_END_TEXT, MAX_ENDING, MAX_HIGHLIGHT, MAX_HIGHLIGHTS, MAX_HOOK, PARAM_FORMATS, UNBOXING_ROLES } from '@/lib/marketing';
 import { falBalance, falCreditUsd, overCredit } from '@/lib/provider-credit';
@@ -81,7 +81,7 @@ export async function GET(request: Request) {
   if (refused.length > 0) {
     const { rows } = await pool.query(
       `select j.id as job, h.label, h.endpoint, h.usd_per_second, h.image_prices, h.thinking_levels, h.thinking_prices
-         from jobs j join model_configs h on h.twin_of = j.model and h.enabled where j.id = any($1::text[]) order by h.id desc`,
+         from jobs j join model_configs h on h.twin_of = j.model and h.enabled and j.feature = any(h.features) where j.id = any($1::text[]) order by h.id desc`,
       [refused.map((r) => r.id)],
     );
     // `order by h.id desc` with a later row replacing an earlier one leaves the first id, the twin a retry takes.
@@ -301,17 +301,30 @@ export async function POST(request: Request) {
       let modelId: string = o.model;
       if (onTwin) {
         if (inputRefusal(o.error)?.reason !== 'real_person') return Response.json({ error: 'only a job refused for a real person can be retried on its twin' }, { status: 409 });
-        const twin = (await tx.query('select id from model_configs where twin_of = $1 and enabled order by id limit 1', [o.model])).rows[0];
+        const twin = (await tx.query('select id from model_configs where twin_of = $1 and enabled and $2 = any(features) order by id limit 1', [o.model, o.feature])).rows[0];
         if (!twin) return Response.json({ error: 'the job has no enabled twin model' }, { status: 409 });
         modelId = twin.id;
       }
       s = { assetIds: o.input_asset_ids, modelId, presetId: o.preset_id, prompt: o.prompt, ratio: o.aspect, durationSec: o.duration_s, storeId: o.store_id, feature: o.feature, params: o.params, enhance: o.enhance, useBrand: false };
       original = o;
     }
-    const { assetIds, modelId, presetId, prompt: freePrompt, ratio, durationSec, storeId, feature, enhance, useBrand } = s!;
+    const { assetIds, modelId: named, presetId, prompt: freePrompt, ratio, durationSec, storeId, feature, enhance, useBrand } = s!;
     // A retry's prompt already carries the brand block it was sent with, so the brand is added to a new Run only.
     let params = s!.params;
     const isImage = !VIDEO_FEATURES.includes(feature);
+    // A new video Run on one model of a duplicate pair runs on the row of the pair that can make it (migration 0078); a retry keeps the row it names.
+    const modelId =
+      original || isImage
+        ? named
+        : await servingRow(tx, named, feature, {
+            durationSec,
+            ratio,
+            images: assetIds.length,
+            video: params.videoAssetId !== undefined,
+            audioClips: params.audioAssetIds?.split(',').length ?? 0,
+            endFrame: params.endAssetId !== undefined,
+            audio: params.audio === 'on',
+          });
     // A new Run was checked before the lock and a retry never was, so both look again: an image deleted meanwhile is refused.
     const clips = params.audioAssetIds?.split(',') ?? [];
     // A Set: the end frame may be the first image again, for a clip that loops.
@@ -384,7 +397,7 @@ export async function POST(request: Request) {
     // Under the same lock, so two Runs cannot both spend fal's last dollars.
     const credit = await falCreditUsd(tx, fal);
     // A new Run takes the row the pickers offer of a pair of duplicate models; a retry copies a Run that was offered. The fal lock is read on video only (the one fal row with a twin is Veo).
-    if (!original && !(await offeredNow(tx, modelId, (v) => v.kind === 'video' && v.usd_per_second !== null && overCredit(v.provider, estimateUsd(v.usd_per_second, durationSec), credit)))) {
+    if (!original && !(await offeredNow(tx, named, (v) => v.kind === 'video' && v.usd_per_second !== null && overCredit(v.provider, estimateUsd(v.usd_per_second, durationSec), credit)))) {
       return bad('the model is not offered now: its duplicate twin serves in its place');
     }
     // A mock job books 0 USD (see the ledger), so it adds nothing to the monthly cap.

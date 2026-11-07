@@ -3,7 +3,7 @@ import { videoInputs } from '@cvs/core/providers/fal';
 import { ASPECTS } from '@cvs/db';
 import { pool } from '@/lib/auth';
 import { modelStats, rank, scoreOf } from '@/lib/model-scores';
-import { onePerPair } from '@/lib/model-twins';
+import { canServe, onePerPair } from '@/lib/model-twins';
 import { falBalance, falCreditUsd, overCredit } from '@/lib/provider-credit';
 import { guard } from '@/lib/session';
 
@@ -71,28 +71,41 @@ export async function GET(request: Request) {
   const offered = await onePerPair(pool, models.rows, (v) => overCredit(v.provider, estimateUsd(v.usd_per_second, durationSec), falCredit));
   const list = offered.map((r) => {
     const st = stats.get(r.id) ?? { passes: 0, total: 0, ok: 0, bad: 0 };
+    // A pair acts as one model (migration 0078): the listed row takes on what its enabled twins add, and is priced as the row the job would run on (servingRow).
+    const pair = [r, ...models.rows.filter((t) => t.twin_of === r.id)];
+    const need = { durationSec, ratio: ratio!, images: 0, video: videoSec > 0, audioClips: 0, endFrame: false };
+    const serving = pair.find((p) => canServe(p, { ...need, audio: false })) ?? r;
+    const voiced = pair.find((p) => canServe(p, { ...need, audio: true })) ?? serving;
+    const takes = pair.map((p) => videoInputs(p.endpoint));
+    const ratios = [...new Set(pair.flatMap((p) => p.ratios as string[]))];
+    const durations = [...new Set(pair.flatMap((p) => p.durations_sec as number[]))].sort((a, b) => a - b);
     return {
       id: r.id as string,
       label: r.label as string,
-      provider: r.provider as string,
+      provider: serving.provider as string,
       isMock: r.provider === 'mock',
-      ratios: r.ratios as string[],
-      durationsSec: r.durations_sec as number[],
-      maxImages: r.max_images as number,
+      ratios,
+      durationsSec: durations,
+      maxImages: Math.max(...pair.map((p) => p.max_images as number)),
       maxPromptChars: promptLimit(r.max_prompt_chars),
       resolution: r.output_resolution as string | null,
       isNew: r.is_new as boolean,
       // A mock job books 0 USD, so that is what the picker shows for it.
-      estimateUsd: r.provider === 'mock' ? '0.0000' : estimateUsd(videoSec > 0 ? usdPerSecondWithVideo(r.endpoint, r.usd_per_second, durationSec, videoSec) : r.usd_per_second, durationSec),
+      estimateUsd: r.provider === 'mock' ? '0.0000' : estimateUsd(videoSec > 0 ? usdPerSecondWithVideo(serving.endpoint, serving.usd_per_second, durationSec, videoSec) : serving.usd_per_second, durationSec),
       // With native audio on (Marketing Studio Advanced); null when the endpoint cannot make audio.
-      audioEstimateUsd: audioEstimate(r, durationSec, videoSec),
-      alwaysAudio: ALWAYS_AUDIO.has(r.endpoint),
-      ...videoInputs(r.endpoint),
+      audioEstimateUsd: audioEstimate(voiced, durationSec, videoSec),
+      alwaysAudio: ALWAYS_AUDIO.has(serving.endpoint) && ALWAYS_AUDIO.has(voiced.endpoint),
+      ...takes[0],
+      endFrame: takes.some((t) => t.endFrame),
+      endMaxSec: takes.find((t) => t.endFrame)?.endMaxSec ?? null,
+      textOnly: takes.some((t) => t.textOnly),
+      audioClips: takes.find((t) => t.audioClips !== null)?.audioClips ?? null,
+      videoRefs: takes.find((t) => t.videoRefs !== null)?.videoRefs ?? null,
       ...scoreOf(st),
       passes: st.passes,
       total: st.total,
-      supported: r.ratios.includes(ratio) && r.durations_sec.includes(durationSec),
-      creditUsd: r.provider === 'fal' ? falCredit : null,
+      supported: ratios.includes(ratio!) && durations.includes(durationSec),
+      creditUsd: serving.provider === 'fal' ? falCredit : null,
       creditShown: g.session.user.role === 'admin', // members see that a model is out of budget, not the provider's balance
     };
   });
