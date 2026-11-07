@@ -1,7 +1,7 @@
 'use client';
 import { type DragEvent, type KeyboardEvent, useEffect, useId, useRef, useState } from 'react';
 import { api, errorText, sendJson } from '@/lib/api';
-import { cardSample, type Example, exampleForPreset, examplesFor, exampleTitle, sampleSrc, splitColumns } from '@/lib/examples';
+import { cardSample, type Example, exampleForPreset, exampleModel, examplesFor, exampleTitle, sampleSrc, splitColumns } from '@/lib/examples';
 import { briefRoom, sectionBody, sectionPrompt } from '@/lib/marketing';
 import { PROMPT_TEMPLATES } from '@/lib/prompt-starters';
 import { promptTooLong } from '@/lib/prompt-limit';
@@ -805,7 +805,12 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
                     <li key={ex.id} className="example">
                       <Preview src={media(ex.src)} poster={media(ex.poster)} width={ex.width} height={ex.height} title={titleOf(ex)} paused={picking || detail !== null} />
                       <button type="button" className="example-open" onClick={() => setDetail(ex)}>
-                        <span className="example-caption">{titleOf(ex)}</span>
+                        <span className="example-caption">
+                          {titleOf(ex)}
+                          <span className="example-model" aria-hidden="true">
+                            {exampleModel(tileDetails[ex.id], models?.models)}
+                          </span>
+                        </span>
                       </button>
                       <button type="button" className="example-use" aria-label={`Dùng ví dụ này: ${titleOf(ex)}`} onClick={() => (have.has(`${ex.id}.json`) ? recreate(exampleFrom({ example: ex.id })!) : fillFromExample(ex))}>
                         Dùng ví dụ này

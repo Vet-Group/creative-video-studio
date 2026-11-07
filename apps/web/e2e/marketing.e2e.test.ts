@@ -26,13 +26,13 @@ test('a mock marketing job runs from two photos, a hook and a location, and show
   // The format picker, as on the live page: all four formats are built (marketing-advanced and marketing-formats specs), none is marked as coming.
   await page.getByRole('button', { name: 'Đổi định dạng' }).click();
   const formats = page.getByRole('dialog', { name: 'Chọn định dạng' });
-  await expect(formats.getByRole('button', { name: /^(UGC Thử đồ|Nâng cao|Mở hộp|Đánh giá sản phẩm)/ })).toHaveCount(4);
+  await expect(formats.getByRole('button', { name: /^(UGC Thử đồ|Editorial|Mở hộp|Đánh giá sản phẩm)/ })).toHaveCount(4);
   await expect(formats.getByRole('button', { name: 'UGC Thử đồ' })).toHaveAttribute('aria-pressed', 'true');
   await expect(formats.getByRole('button', { disabled: true })).toHaveCount(0);
   await expect(formats.getByText('Sắp có')).toHaveCount(0);
   await expect(formats.getByText(/sẽ có sau/)).toHaveCount(0);
   // Without sample clips (as here), each card's name still sits inside its card, under a short placeholder.
-  for (const card of await formats.getByRole('button', { name: /^(UGC Thử đồ|Nâng cao|Mở hộp|Đánh giá sản phẩm)/ }).all()) {
+  for (const card of await formats.getByRole('button', { name: /^(UGC Thử đồ|Editorial|Mở hộp|Đánh giá sản phẩm)/ }).all()) {
     expect(await card.evaluate((b) => b.querySelector('.choice-name')!.getBoundingClientRect().bottom <= b.getBoundingClientRect().bottom)).toBe(true);
   }
   await formats.getByRole('button', { name: 'UGC Thử đồ' }).click();
@@ -508,7 +508,7 @@ test('as on Fash, a sample in Ví dụ with a details file opens in place with i
     await expect(detail.getByRole('list', { name: 'Ảnh đầu vào' }).getByRole('img')).toHaveCount(2);
     await expect(detail.locator('video')).toHaveAttribute('src', '/api/samples/marketing-example-1.mp4');
     await detail.getByRole('button', { name: 'Mục tiếp theo' }).click();
-    detail = page.getByRole('dialog', { name: 'Chi tiết: Nâng cao' });
+    detail = page.getByRole('dialog', { name: 'Chi tiết: Editorial' });
     await expect(detail.locator('.job-text')).toHaveText(adv.brief);
     await expect(detail.getByRole('button', { name: 'Dùng lại' })).toBeVisible();
     await detail.getByRole('button', { name: 'Mục trước' }).click();

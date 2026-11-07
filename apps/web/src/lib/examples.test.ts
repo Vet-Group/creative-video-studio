@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { cardSample, EXAMPLES, exampleForPreset, examplesFor, exampleTitle, numberedSamples, splitColumns } from './examples';
+import { cardSample, EXAMPLES, exampleForPreset, exampleModel, examplesFor, exampleTitle, numberedSamples, splitColumns } from './examples';
 
 test('the samples cover four aspects and never set a ratio the job form lacks', () => {
   expect(new Set(EXAMPLES.map((e) => e.aspect))).toEqual(new Set(['16:9', '1:1', '3:4', '9:16']));
@@ -69,4 +69,13 @@ test('a preset borrows its fixture clip only while no uploaded clip has taken th
   expect(exampleForPreset('lifestyle-table', new Set())?.id).toBe('example-3');
   expect(exampleForPreset('lifestyle-table', new Set(['example-3.mp4']))?.id).toBe('example-9');
   expect(exampleForPreset('lifestyle-table', new Set(['example-3.mp4', 'example-9.mp4']))).toBeUndefined();
+});
+
+test('a tile shows the label of the model its details file names, else nothing', () => {
+  const models = [{ id: 'kling-3-pro', label: 'Kling 3.0 Pro' }];
+  expect(exampleModel({ modelId: 'kling-3-pro' }, models)).toBe('Kling 3.0 Pro');
+  expect(exampleModel({ modelId: 'gone' }, models)).toBeNull();
+  expect(exampleModel({ modelId: null }, models)).toBeNull();
+  expect(exampleModel(undefined, models)).toBeNull();
+  expect(exampleModel({ modelId: 'kling-3-pro' }, null)).toBeNull();
 });

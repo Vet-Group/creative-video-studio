@@ -71,8 +71,8 @@ export const FORMAT_HREF: Record<MarketingFormat, string> = { ugc: '/marketing-s
 const formatOf = (format: string | null | undefined): MarketingFormat => (isParamFormat(format) ? format : 'ugc');
 export const hrefOfFormat = (format: string | null | undefined): string => FORMAT_HREF[formatOf(format)];
 /** The format's name on the picker and the header, and the longer title of a History or Library card. */
-export const FORMAT_NAME: Record<MarketingFormat, string> = { ugc: 'UGC Thử đồ', advanced: 'Nâng cao', unboxing: 'Mở hộp', review: 'Đánh giá sản phẩm' };
-const CARD_TITLE: Record<MarketingFormat, string> = { ugc: 'UGC Thử đồ', advanced: 'Marketing nâng cao', unboxing: 'Marketing mở hộp', review: 'Marketing đánh giá sản phẩm' };
+export const FORMAT_NAME: Record<MarketingFormat, string> = { ugc: 'UGC Thử đồ', advanced: 'Editorial', unboxing: 'Mở hộp', review: 'Đánh giá sản phẩm' };
+const CARD_TITLE: Record<MarketingFormat, string> = { ugc: 'UGC Thử đồ', advanced: 'Marketing Editorial', unboxing: 'Marketing mở hộp', review: 'Marketing đánh giá sản phẩm' };
 export const cardTitleOfFormat = (format: string | null | undefined): string => CARD_TITLE[formatOf(format)];
 
 /** Unboxing's photos in the order they are sent: the model (none = POV, hands only), the product, the packaging (none = not shown); `params.roles` names them. */

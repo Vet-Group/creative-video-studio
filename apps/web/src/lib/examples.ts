@@ -114,6 +114,10 @@ export function exampleTitle(ex: Example, details: { presetId: string | null } |
   return (details.presetId && presets?.find((p) => p.id === details.presetId)?.label) || 'Tự viết mô tả';
 }
 
+/** The label of the model a tile's details file names, so tiles that share a name still differ; null when the file names none or the model is not offered. */
+export const exampleModel = (details: { modelId?: string | null } | undefined, models: readonly { id: string; label: string }[] | null | undefined): string | null =>
+  (details?.modelId && models?.find((m) => m.id === details.modelId)?.label) || null;
+
 /** The Examples tab: the ten fixture-backed clips, then each further sample clip that is uploaded. */
 export const examplesFor = (have: ReadonlySet<string>): Example[] => [...EXAMPLES.map((e) => uploaded(e, have)), ...MORE_EXAMPLES.filter((e) => have.has(`${e.id}.mp4`))];
 

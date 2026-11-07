@@ -1115,7 +1115,7 @@ const marketing: AboutPage = {
             { title: 'Không chữ trên hình', text: 'Không chữ, không logo, không watermark được dựng lên hình. Bạn tự thêm phụ đề trong phần mềm dựng theo ý mình.' },
           ],
         },
-        'Marketing Studio có bốn định dạng: UGC Thử đồ, Nâng cao, Mở hộp và Đánh giá sản phẩm. Đổi định dạng ở bảng chọn định dạng ngay trên đầu trang.',
+        'Marketing Studio có bốn định dạng: UGC Thử đồ, Editorial, Mở hộp và Đánh giá sản phẩm. Đổi định dạng ở bảng chọn định dạng ngay trên đầu trang.',
       ],
     },
     {
@@ -1169,7 +1169,7 @@ const marketing: AboutPage = {
       kicker: 'Âm thanh',
       title: 'Video có tiếng không?',
       blocks: [
-        'Có. Như trên Fash, Tạo âm thanh bật sẵn: clip có tiếng như quay bằng điện thoại, gồm âm thanh căn phòng và vài câu phản ứng ngắn, tự nhiên của người mẫu về sản phẩm, không có nhạc nền. Với Kling O3 Pro và hai bản Seedance, tắt công tắc để có clip im lặng; Gemini Omni Flash, Grok Imagine, WAN 2.7 và Minimax H3 Max luôn tạo tiếng nên công tắc khoá ở Bật. Muốn viết đúng từng chữ người mẫu nói, hãy dùng định dạng Nâng cao.',
+        'Có. Như trên Fash, Tạo âm thanh bật sẵn: clip có tiếng như quay bằng điện thoại, gồm âm thanh căn phòng và vài câu phản ứng ngắn, tự nhiên của người mẫu về sản phẩm, không có nhạc nền. Với Kling O3 Pro và hai bản Seedance, tắt công tắc để có clip im lặng; Gemini Omni Flash, Grok Imagine, WAN 2.7 và Minimax H3 Max luôn tạo tiếng nên công tắc khoá ở Bật. Muốn viết đúng từng chữ người mẫu nói, hãy dùng định dạng Editorial.',
         {
           cols: 3,
           cards: [
@@ -1287,7 +1287,7 @@ const marketing: AboutPage = {
             ['Hook trong video UGC là gì?', `Hook là khoảnh khắc mở đầu gây chú ý, vài giây đầu quyết định người xem ở lại hay lướt qua. Chọn một trong ${HOOKS.length} hook có sẵn: ${hookNames}. AI mở video bằng hook đó rồi chuyển sang phần thử đồ.`],
             ['Cần gì để tạo một video UGC Thử đồ?', 'Hai ảnh: một người mẫu và một sản phẩm. Hook, bối cảnh và một ghi chú ngắn là tuỳ chọn.'],
             ['Một video UGC Thử đồ tốn bao nhiêu?', 'Chi phí tuỳ mô hình và thời lượng, vì chi phí tính theo giây. Nút Tạo video ghi chi phí ước tính bằng USD trước khi bạn chạy. Âm thanh làm giá cao hơn ở một số mô hình, và giá trên nút đã tính nó. Video dùng chung ngân sách với Tạo video: hạn mức số clip theo ngày của bạn và ngân sách video theo tháng của công ty.'],
-            ['Video có giọng nói không?', 'Có, khi Tạo âm thanh bật (mặc định): người mẫu nói vài câu phản ứng ngắn, kèm âm thanh căn phòng, không nhạc nền. Với Kling O3 Pro và Seedance, tắt công tắc để có clip im lặng; bốn mô hình còn lại luôn có tiếng. Muốn viết lời thoại chính xác thì dùng định dạng Nâng cao.'],
+            ['Video có giọng nói không?', 'Có, khi Tạo âm thanh bật (mặc định): người mẫu nói vài câu phản ứng ngắn, kèm âm thanh căn phòng, không nhạc nền. Với Kling O3 Pro và Seedance, tắt công tắc để có clip im lặng; bốn mô hình còn lại luôn có tiếng. Muốn viết lời thoại chính xác thì dùng định dạng Editorial.'],
             ['Kiểm soát được nội dung video không?', 'Ô Mô tả (tuỳ chọn) lái video. Nhắc chi tiết sản phẩm, không khí hay khoảnh khắc bạn muốn; ghi chú được ghép vào cuối chỉ dẫn cố định. Hook và bối cảnh cho bạn thêm hai cách kiểm soát nữa.'],
             ['Dùng cho nhiều ngôn ngữ và thị trường được không?', 'Được. Tắt Tạo âm thanh để có clip không lời, dùng được ở mọi ngôn ngữ; thêm phụ đề hay lồng tiếng theo từng thị trường khi dựng. Đổi ảnh người mẫu và bối cảnh để mỗi thị trường có gương mặt và khung cảnh của riêng mình.'],
             ['Video đặt được ở những bối cảnh nào?', `${LOCATIONS.length} bối cảnh có sẵn: ${locationNames}. Mỗi bối cảnh đặt người trong video vào một khung cảnh đáng tin với ánh sáng và không khí phù hợp, và bảng chọn có video xem trước cho từng lựa chọn.`],
@@ -1307,25 +1307,25 @@ const marketing: AboutPage = {
  * hook and location from lib/marketing.ts, an optional script spoken word for word, the ratio and duration of the chosen model, and native audio on by default.
  */
 const advanced: AboutPage = {
-  title: 'Video marketing nâng cao, giải thích rõ',
+  title: 'Video marketing Editorial, giải thích rõ',
   lead: 'Mang ảnh của bạn và một bản brief sáng tạo, rồi tự chỉ đạo quảng cáo. Một hook, một bối cảnh, lời thoại chính xác và tối đa 7 ảnh tham chiếu được dựng thành một video marketing riêng. Hướng dẫn này giải thích công cụ hoạt động ra sao và cách viết brief cho tốt.',
   sections: [
     {
       kicker: 'Chọn công cụ',
-      title: 'UGC Thử đồ hay Nâng cao?',
-      lead: 'Marketing Studio có bốn định dạng trên cùng một nền tảng. UGC Thử đồ và Nâng cao khác nhau ở mức kiểm soát bạn muốn: chọn theo đó.',
+      title: 'UGC Thử đồ hay Editorial?',
+      lead: 'Marketing Studio có bốn định dạng trên cùng một nền tảng. UGC Thử đồ và Editorial khác nhau ở mức kiểm soát bạn muốn: chọn theo đó.',
       blocks: [
         {
           cards: [
             { title: 'UGC Thử đồ', text: 'Định dạng gọn: một ảnh người mẫu và một ảnh sản phẩm vào, một video thử đồ kiểu người sáng tạo nội dung ra. Công cụ tự chỉ đạo mọi thứ.', link: ['Mở UGC Thử đồ', '/marketing-studio'] },
-            { title: 'Nâng cao', text: 'Ghế đạo diễn: bản brief của bạn là nguồn sự thật, bạn đưa tối đa 7 ảnh của mình, viết đúng lời nhân vật nói, và tự chọn hook và bối cảnh.' },
+            { title: 'Editorial', text: 'Ghế đạo diễn: bản brief của bạn là nguồn sự thật, bạn đưa tối đa 7 ảnh của mình, viết đúng lời nhân vật nói, và tự chọn hook và bối cảnh.' },
           ],
         },
       ],
     },
     {
       kicker: 'Từng bước',
-      title: 'Video marketing nâng cao hoạt động thế nào?',
+      title: 'Video marketing Editorial hoạt động thế nào?',
       lead: 'Mỗi video bắt đầu từ ảnh và bản brief của bạn. AI biến chúng thành một clip với hook và bối cảnh bạn đã chọn.',
       blocks: [
         {
@@ -1432,12 +1432,12 @@ const advanced: AboutPage = {
       blocks: [
         {
           faq: [
-            ['Video marketing nâng cao là gì?', 'Là định dạng marketing toàn quyền kiểm soát: bạn tải tối đa 7 ảnh tham chiếu của mình, viết một bản brief sáng tạo, và thêm hook, bối cảnh và lời thoại nếu muốn. AI dựng tất cả thành một video marketing riêng.'],
-            ['Nâng cao khác UGC Thử đồ thế nào?', 'UGC Thử đồ là định dạng gọn: hai ảnh vào, một video thử đồ kiểu người sáng tạo nội dung ra, theo chỉ dẫn cố định. Nâng cao trao bạn ghế đạo diễn: bản brief là nguồn sự thật, bạn đưa tối đa 7 ảnh và viết lời thoại.'],
+            ['Video marketing Editorial là gì?', 'Là định dạng marketing toàn quyền kiểm soát: bạn tải tối đa 7 ảnh tham chiếu của mình, viết một bản brief sáng tạo, và thêm hook, bối cảnh và lời thoại nếu muốn. AI dựng tất cả thành một video marketing riêng.'],
+            ['Editorial khác UGC Thử đồ thế nào?', 'UGC Thử đồ là định dạng gọn: hai ảnh vào, một video thử đồ kiểu người sáng tạo nội dung ra, theo chỉ dẫn cố định. Editorial trao bạn ghế đạo diễn: bản brief là nguồn sự thật, bạn đưa tối đa 7 ảnh và viết lời thoại.'],
             ['Dùng được bao nhiêu ảnh tham chiếu?', 'Tối đa 7, hoặc ít hơn nếu mô hình đã chọn nhận ít ảnh hơn: WAN 2.7 Reference nhận tối đa 4. Mỗi ảnh có thể là người, sản phẩm, bối cảnh hay ảnh phong cách. AI giữ chi tiết nhìn thấy được của chúng và dựng video quanh chúng.'],
             ['Có bắt buộc chọn hook hay bối cảnh không?', 'Không, cả hai đều tuỳ chọn. Có hook, video mở bằng khoảnh khắc đó trước khi vào ý tưởng của bạn; có bối cảnh, cảnh được đặt ở đó. Không có, AI theo bản brief.'],
             ['Video có lời thoại không?', 'Có. Tạo âm thanh bật sẵn; lời bạn viết trong ô Lời thoại được đọc đúng từng chữ, khớp khẩu hình. Không viết lời thoại thì chỉ có lời nói khi brief yêu cầu. Với Kling O3 Pro và Seedance, tắt công tắc để có clip im lặng; các mô hình còn lại luôn có tiếng.'],
-            ['Một video nâng cao tốn bao nhiêu?', 'Chi phí tuỳ mô hình và thời lượng, vì chi phí tính theo giây. Âm thanh làm giá cao hơn ở một số mô hình. Chi phí ước tính, đã tính âm thanh, luôn ghi trên nút chạy trước khi bạn tạo, và video dùng chung ngân sách với Tạo video.'],
+            ['Một video Editorial tốn bao nhiêu?', 'Chi phí tuỳ mô hình và thời lượng, vì chi phí tính theo giây. Âm thanh làm giá cao hơn ở một số mô hình. Chi phí ước tính, đã tính âm thanh, luôn ghi trên nút chạy trước khi bạn tạo, và video dùng chung ngân sách với Tạo video.'],
             ['Video có chữ hay phụ đề trên hình không?', 'Nên dặn rõ trong brief là không có chữ, logo hay watermark. Thêm phụ đề sau trong phần mềm dựng, nơi bạn kiểm soát phông chữ và vị trí.'],
             ['Video thuộc về ai?', `Video là tài sản của công ty, dùng cho trang sản phẩm, mạng xã hội và quảng cáo của công ty. ${RIGHTS}`],
             PRIVACY,
@@ -1504,7 +1504,7 @@ const unboxing: AboutPage = {
           links: [
             ['Đánh giá sản phẩm', '/marketing-studio/review', 'cho người mẫu nói về những điểm nổi bật của sản phẩm.'],
             ['UGC Thử đồ', '/marketing-studio', 'cho người mẫu mặc hoặc cầm sản phẩm.'],
-            ['Nâng cao', '/marketing-studio/advanced', 'khi bạn muốn tự viết brief và lời thoại với tối đa 7 ảnh.'],
+            ['Editorial', '/marketing-studio/advanced', 'khi bạn muốn tự viết brief và lời thoại với tối đa 7 ảnh.'],
           ],
         },
       ],
@@ -1583,7 +1583,7 @@ const review: AboutPage = {
           links: [
             ['Mở hộp', '/marketing-studio/unboxing', 'cho video bóc hộp, có thể chỉ thấy đôi tay.'],
             ['UGC Thử đồ', '/marketing-studio', 'cho người mẫu mặc hoặc cầm sản phẩm, không có điểm nổi bật.'],
-            ['Nâng cao', '/marketing-studio/advanced', 'khi bạn muốn tự viết brief với tối đa 7 ảnh.'],
+            ['Editorial', '/marketing-studio/advanced', 'khi bạn muốn tự viết brief với tối đa 7 ảnh.'],
           ],
         },
       ],

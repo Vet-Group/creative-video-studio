@@ -79,7 +79,7 @@ async function openExample(page: Page, n: number) {
   const gallery = page.getByRole('group', { name: 'Video Marketing Studio của công ty' });
   await expect(gallery.getByRole('link', { name: 'Xem chi tiết video mẫu' })).toHaveCount(3);
   await gallery.getByRole('link', { name: 'Xem chi tiết video mẫu' }).nth(n - 1).click();
-  const dialog = page.getByRole('dialog', { name: 'Chi tiết: Nâng cao' });
+  const dialog = page.getByRole('dialog', { name: 'Chi tiết: Editorial' });
   await expect(dialog).toBeVisible();
   return dialog;
 }
@@ -177,9 +177,9 @@ test('Example detail: Dùng hook này fills ① and ③ only, Lưu thành hook c
     detail = await openExample(page, 2);
     await detail.getByRole('button', { name: 'Lưu thành hook của tôi' }).click();
     await page.keyboard.press('Escape');
-    await expect(hookPart(page).getByRole('button', { name: /^Hook/ })).toContainText('Nâng cao - ví dụ 2');
+    await expect(hookPart(page).getByRole('button', { name: /^Hook/ })).toContainText('Editorial - ví dụ 2');
     const mine = (await (await page.request.get('/api/choices?kind=hook')).json()) as { hooks: { name: string; phrase: string; mine: boolean; imageAssetId: string | null }[] };
-    expect(mine.hooks.find((h) => h.mine)).toMatchObject({ name: 'Nâng cao - ví dụ 2', phrase: OWN_HOOK, imageAssetId: expect.any(String) }); // the poster, copied as the member's asset
+    expect(mine.hooks.find((h) => h.mine)).toMatchObject({ name: 'Editorial - ví dụ 2', phrase: OWN_HOOK, imageAssetId: expect.any(String) }); // the poster, copied as the member's asset
 
     // An example with no hook: nothing to save, and nothing to fill.
     detail = await openExample(page, 3);

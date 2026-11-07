@@ -37,7 +37,7 @@ const KINDS = [
   { id: 'video', label: 'Tạo video' },
   { id: 'marketing', label: 'Marketing Studio' },
   { id: 'marketing_ugc', label: 'UGC Thử đồ' },
-  { id: 'marketing_advanced', label: 'Nâng cao' },
+  { id: 'marketing_advanced', label: 'Editorial' },
   { id: 'marketing_unboxing', label: 'Mở hộp' },
   { id: 'marketing_review', label: 'Đánh giá sản phẩm' },
   { id: 'apps', label: 'Ứng dụng' },

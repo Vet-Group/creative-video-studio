@@ -40,6 +40,26 @@ export const AUDIT_ACTIONS: Record<string, string> = {
 };
 export const auditLabel = (action: string): string => AUDIT_ACTIONS[action] ?? action;
 
+/** An entry's target as an Admin reads it in the Overview: a sample's file name without the `sample:` prefix and the extension. */
+export const auditTarget = (target: string): string => (target.startsWith('sample:') ? target.slice('sample:'.length).replace(/\.[a-z0-9]+$/i, '') : target);
+
+/**
+ * Collapses a run of consecutive entries (newest first) with the same action by the same actor, each within `gapMs` of the one before it, into the
+ * run's newest entry with a `count`. shortcut: the actor is told apart by name only, an Overview of a few people; use the id if names can repeat.
+ */
+export function groupRecent<T extends { actorName: string; action: string; createdAt: string }>(entries: T[], gapMs = 5 * 60_000): (T & { count: number })[] {
+  const out: (T & { count: number })[] = [];
+  let last = 0;
+  for (const e of entries) {
+    const at = new Date(e.createdAt).getTime();
+    const run = out[out.length - 1];
+    if (run && run.actorName === e.actorName && run.action === e.action && last - at <= gapMs) run.count++;
+    else out.push({ ...e, count: 1 });
+    last = at;
+  }
+  return out;
+}
+
 /** The Vietnamese text for a failed Admin call, followed by the server's reason, which Admins may read. */
 export const failText = (e: unknown, fallback: string): string => (e instanceof ApiError ? `${fallback} (${e.message})` : fallback);
 

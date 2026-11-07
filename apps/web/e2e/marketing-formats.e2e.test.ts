@@ -40,7 +40,7 @@ test('the format picker has four live formats, none marked as coming, and each o
   await nav(page).getByRole('link', { name: 'Marketing Studio' }).click();
   await page.getByRole('button', { name: 'Đổi định dạng' }).click();
   const formats = page.getByRole('dialog', { name: 'Chọn định dạng' });
-  await expect(formats.getByRole('button', { name: /^(UGC Thử đồ|Nâng cao|Mở hộp|Đánh giá sản phẩm)/ })).toHaveCount(4);
+  await expect(formats.getByRole('button', { name: /^(UGC Thử đồ|Editorial|Mở hộp|Đánh giá sản phẩm)/ })).toHaveCount(4);
   await expect(formats.getByRole('button', { disabled: true })).toHaveCount(0);
   await expect(formats.getByText('Sắp có')).toHaveCount(0);
   await expect(formats.getByText(/sẽ có sau/)).toHaveCount(0);
