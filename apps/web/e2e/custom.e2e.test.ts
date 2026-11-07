@@ -210,14 +210,14 @@ test('Lưu thiết lập on a History card saves that job as a template of its p
   async function openTemplate(path: RegExp, name: string) {
     await openTemplates(page);
     await page.getByRole('dialog', { name: 'Thiết lập đã lưu' }).getByRole('link', { name }).click();
-    await expect(page).toHaveURL(path);
+    await expect(page).toHaveURL(path); // the page, not ?template=: the app drops that once it has refilled the form (lib/reuse.ts)
   }
 
   await page.goto('/try-on');
   await saveFromCard(`Áo xanh ${tag}`);
   await page.goto('/try-on');
   await expect(page.getByRole('textbox', { name: 'Mô tả (tuỳ chọn)' })).toHaveValue('');
-  await openTemplate(/\/try-on\?template=/, `Áo xanh ${tag}`);
+  await openTemplate(/\/try-on$/, `Áo xanh ${tag}`);
   await expect(page.getByLabel('Người mẫu: ảnh đã chọn').getByRole('img')).toHaveAttribute('alt', 'cust-person.png');
   await expect(page.getByLabel('Trang phục: ảnh đã chọn').getByRole('img')).toHaveAttribute('alt', 'cust-garment.png');
   await expect(page.getByRole('textbox', { name: 'Mô tả (tuỳ chọn)' })).toHaveValue('blue coat');
@@ -225,7 +225,7 @@ test('Lưu thiết lập on a History card saves that job as a template of its p
   await page.goto('/marketing-studio');
   await saveFromCard(`Bão ${tag}`);
   await page.goto('/marketing-studio');
-  await openTemplate(/\/marketing-studio\?template=/, `Bão ${tag}`);
+  await openTemplate(/\/marketing-studio$/, `Bão ${tag}`);
   await expect(page.getByRole('textbox', { name: 'Mô tả (tuỳ chọn)' })).toHaveValue('tpl brief');
   await expect(hookBox(page)).toContainText(HOOKS[0]!.name);
   await expect(page.getByRole('img', { name: 'cust-person.png' })).toBeVisible();
