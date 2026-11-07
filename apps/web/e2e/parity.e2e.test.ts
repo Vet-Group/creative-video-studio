@@ -316,7 +316,7 @@ test('V01 Previous and Next step through every sample in order and stop at the e
 
 test('V02 the upload limit and its hint follow the chosen model', async ({ page }) => {
   await page.route(/\/api\/models\?/, (r) => {
-    const base = { provider: 'mock', isMock: true, estimateUsd: '0.1000', passRate: null, passes: 0, total: 0, ratios: ['9:16', '1:1'], durationsSec: [5, 8], supported: true };
+    const base = { provider: 'mock', isMock: true, pairIds: [], estimateUsd: '0.1000', passRate: null, passes: 0, total: 0, ratios: ['9:16', '1:1'], durationsSec: [5, 8], supported: true };
     const models = [
       { ...base, id: 'two', label: 'Two image model', maxImages: 2 },
       { ...base, id: 'one', label: 'One image model', maxImages: 1 },
@@ -420,7 +420,7 @@ test("as on Fash's Recreate, a sample's model name and its resolution put that m
   // Short requires a different ratio and duration from the current Wide settings.
   await page.route(/\/api\/models\?/, (r) => {
     const query = new URL(r.request().url()).searchParams;
-    const base = { provider: 'mock', isMock: true, maxImages: 4, estimateUsd: '0.1000', passRate: null, passes: 0, total: 0, maxPromptChars: 2500, supported: true, ratios: ['9:16', '1:1'], durationsSec: [5, 8] };
+    const base = { provider: 'mock', isMock: true, pairIds: [], maxImages: 4, estimateUsd: '0.1000', passRate: null, passes: 0, total: 0, maxPromptChars: 2500, supported: true, ratios: ['9:16', '1:1'], durationsSec: [5, 8] };
     return r.fulfill({ json: { models: [{ ...base, id: 'wide', label: 'Wide model' }, { ...base, id: 'short', label: 'Short model', resolution: '720p', ratios: ['1:1'], durationsSec: [8], supported: query.get('ratio') === '1:1' && query.get('durationSec') === '8' }], defaultModelId: 'wide', monthToDate: { usd: '0.0000', provisional: false } } });
   });
   const details = { prompt: 'A slow orbit.', images: [], presetId: null, enhance: false, audio: 'off', ratio: '1:1', aspect: '1:1', resolution: '720p', durationSec: 8, modelId: 'short', storeId: null, date: '2026-08-18' };
@@ -519,7 +519,7 @@ test('the drawer closes on any link, even the current page, and on its close but
 test('changing the model changes the ratio and duration options to the ones it supports', async ({ page }) => {
   await page.route(/\/api\/models\?/, (r) => {
     const q = new URL(r.request().url()).searchParams;
-    const base = { provider: 'mock', isMock: true, maxImages: 4, estimateUsd: '0.1000', passRate: null, passes: 0, total: 0 };
+    const base = { provider: 'mock', isMock: true, pairIds: [], maxImages: 4, estimateUsd: '0.1000', passRate: null, passes: 0, total: 0 };
     const models = [
       { ...base, id: 'wide', label: 'Wide model', ratios: ['9:16', '1:1'], durationsSec: [5, 8, 10] },
       { ...base, id: 'short', label: 'Short model', ratios: ['9:16'], durationsSec: [5] },

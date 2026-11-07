@@ -189,12 +189,16 @@ describe('migrations 0023 and 0060 in Marketing Studio', () => {
       ['minimax-h3-max-reference', ['9:16', '1:1', '16:9', '4:3', '3:4'], 9],
       ['minimax-h3-max-reference-1080p', ['9:16', '1:1', '16:9', '4:3', '3:4'], 9],
       ['minimax-h3-max-reference-480p', ['9:16', '1:1', '16:9', '4:3', '3:4'], 9],
+      ['seedance-2.0-byteplus', ['9:16', '1:1', '16:9', '4:3', '3:4'], 9], // 0078, the cheaper twin of the fal reference row
       ['seedance-2.0-reference', ['9:16', '1:1', '16:9', '4:3', '3:4'], 9], // 0037 widens both Seedance rows and gives 2.0 its 9 references
+      ['seedance-2.5-byteplus', ['9:16', '1:1', '16:9', '4:3', '3:4'], 9], // 0078
       ['seedance-2.5-reference', ['9:16', '1:1', '16:9', '4:3', '3:4'], 7],
       ['wan-2.7-reference', ['9:16', '1:1', '16:9', '4:3', '3:4'], 4], // the app caps Advanced at the row's 4
     ]);
     // An audio switch with its own price (0023), or always sound at the stored price with the paid test's note (0060; the Vertex Omni row has Google's statement of 2026-11-06 instead, 0074).
-    for (const r of rows) expect(r.endpoint in AUDIO_USD_PER_SECOND || (ALWAYS_AUDIO.has(r.endpoint) && r.audio_read === (r.id === 'gemini-omni-flash-reference-vertex' ? '2026-11-06' : '2026-11-04')), r.id).toBe(true);
+    // A BytePlus row is priced for the silent clip: a job with sound runs on its fal twin (0078, lib/model-twins.ts servingRow), which has the audio price.
+    const twinOf = new Map((await pool.query(`select twin_of, endpoint from model_configs where twin_of is not null and 'marketing' = any(features)`)).rows.map((t) => [t.twin_of, t.endpoint]));
+    for (const r of rows) expect(r.endpoint in AUDIO_USD_PER_SECOND || (twinOf.get(r.id) ?? '') in AUDIO_USD_PER_SECOND || (ALWAYS_AUDIO.has(r.endpoint) && r.audio_read === (r.id === 'gemini-omni-flash-reference-vertex' ? '2026-11-06' : '2026-11-04')), r.id).toBe(true);
     for (const e of ALWAYS_AUDIO) expect(e in AUDIO_USD_PER_SECOND, e).toBe(false);
   });
 });
@@ -254,7 +258,7 @@ describe('migration 0031 Vertex models', () => {
     ]);
     for (const r of rows) {
       expect([r.kind, r.enabled, r.read_at], r.id).toEqual(['image', false, '2026-10-29']);
-      expect(r.label, r.id).toMatch(/ \(Vertex\)$/);
+      expect(r.label, r.id).not.toMatch(/Vertex/); // 0078 drops the provider suffix the rows were added with
     }
     const [recontext, tryOn] = rows.slice(4);
     expect([recontext.features, recontext.ratios, recontext.max_images]).toEqual([['image'], ['auto'], 3]);
@@ -539,7 +543,7 @@ describe('migration 0042 Veo 3.1 on Vertex', () => {
     expect(row).toEqual(twin);
     expect(row).toMatchObject({ ratios: ['9:16', '16:9'], durations_sec: [8], max_images: 1, output_resolution: '720p' });
     const [facts] = (await pool.query(`select provider, endpoint, label, enabled, usd_per_second::text as usd, sources from model_configs where id = 'veo-3.1-vertex'`)).rows;
-    expect(facts).toMatchObject({ provider: 'vertex', endpoint: 'veo-3.1-generate-001', label: 'Google VEO 3.1 (Vertex)', enabled: true, usd: '0.2000' }); // 0075 switches it on as the fallback of the fal row
+    expect(facts).toMatchObject({ provider: 'vertex', endpoint: 'veo-3.1-generate-001', label: 'Google VEO 3.1', enabled: true, usd: '0.2000' }); // 0075 switches it on as the fallback of the fal row
     expect(facts.sources.usdPerSecond).toMatchObject({ url: 'https://cloud.google.com/vertex-ai/generative-ai/pricing', readAt: '2026-11-01' });
     expect(facts.sources.usdPerSecond.note).toMatch(/^estimate:/);
     expect(AUDIO_USD_PER_SECOND['veo-3.1-generate-001']).toBe(0.4);
@@ -591,10 +595,10 @@ describe('migration 0056 BytePlus', () => {
     expect(rows).toEqual([
       row('seedance-1.0-pro-byteplus', 'seedance-1-0-pro-250528', range(2, 12), 1, '1080p', per(2.5, 48_960)),
       row('seedance-1.0-pro-fast-byteplus', 'seedance-1-0-pro-fast-251015', range(2, 12), 1, '1080p', per(1, 48_960)),
-      row('seedance-2.0-byteplus', 'dreamina-seedance-2-0-260128', range(4, 15), 9, '720p', per(7, 21_600)),
+      { ...row('seedance-2.0-byteplus', 'dreamina-seedance-2-0-260128', range(4, 15), 9, '720p', per(7, 21_600)), features: ['video', 'marketing'] }, // 0078
       row('seedance-2.0-fast-byteplus', 'dreamina-seedance-2-0-fast-260128', range(4, 15), 9, '720p', per(5.6, 21_600)),
       row('seedance-2.0-mini-byteplus', 'dreamina-seedance-2-0-mini-260615', range(4, 15), 9, '720p', per(3.5, 21_600)),
-      row('seedance-2.5-byteplus', 'dreamina-seedance-2-5-260628', range(4, 15), 9, '720p', per(10.7, 21_600)), // 4 to 30 s on the API; 15 s until a canary measures the latency (the docs' own 11 s example took 581 s)
+      { ...row('seedance-2.5-byteplus', 'dreamina-seedance-2-5-260628', range(4, 15), 9, '720p', per(10.7, 21_600)), features: ['video', 'marketing'], durations_sec: range(4, 30) }, // 4 to 30 s on the API; 0056 held it at 15 s, 0078 opens 30 s after the canary made 30 s in 266 s
     ]);
     // 5 s at 720p on Seedance 2.5: 108,000 tokens at $10.70 per million.
     expect(rows.find((r) => r.id === 'seedance-2.5-byteplus')!.usd).toBe('0.2312');
@@ -773,10 +777,9 @@ describe('migration 0075 hide the pricier duplicate models', () => {
   ] as const;
 
   test('points exactly ten dearer rows at the row that replaces each, and leaves the rows that have no like-for-like twin visible', async () => {
-    const { rows } = await pool.query(`select id, twin_of from model_configs where twin_of is not null order by id`);
+    const { rows } = await pool.query(`select id, twin_of from model_configs where twin_of is not null and id not in ('seedance-2.0-reference', 'seedance-2.5-reference', 'seedance-2.5-image') order by id`); // 0078 pairs those
     expect(rows.map((r) => [r.id, r.twin_of])).toEqual([...PAIRS].sort((a, b) => a[0].localeCompare(b[0])));
-    // Marketing Studio lists the fal reference rows and the BytePlus rows are not for it; the 2.5 rows allow 30 s clips against 15 s.
-    const { rows: kept } = await pool.query(`select id, twin_of from model_configs where id in ('seedance-2.0-reference', 'seedance-2.5-reference', 'seedance-2.5-image', 'seedance-1.5-pro', 'nano-banana-pro-face-swap')`);
+    const { rows: kept } = await pool.query(`select id, twin_of from model_configs where id in ('seedance-1.5-pro', 'nano-banana-pro-face-swap')`);
     expect(kept.every((r) => r.twin_of === null)).toBe(true);
   });
 
@@ -785,7 +788,8 @@ describe('migration 0075 hide the pricier duplicate models', () => {
     for (const [dear, cheap] of PAIRS) {
       const [d] = (await pool.query(price, [dear])).rows;
       const [c] = (await pool.query(price, [cheap])).rows;
-      expect([c.kind, c.features], dear).toEqual([d.kind, d.features]);
+      expect(c.kind, dear).toBe(d.kind);
+      expect(c.features, dear).toEqual(expect.arrayContaining(d.features)); // 0078 adds Marketing Studio to the BytePlus Seedance rows
       expect(c.usd ?? c.image, dear).toBeLessThanOrEqual(d.usd ?? d.image);
     }
   });
@@ -806,8 +810,8 @@ describe('migration 0074 Gemini Omni 1.2 Flash on Vertex', () => {
   test('adds two disabled Vertex rows that copy their fal twins within what the adapter sends, at $0.0695 a second, with Google sources', async () => {
     const pick = `select kind, features, ratios, durations_sec, max_images, max_prompt_chars, pass_seed_passes, pass_seed_total from model_configs where id = $1`;
     for (const [id, twin, label, images] of [
-      ['gemini-omni-flash-vertex', 'gemini-omni-flash', 'Gemini Omni Flash (Vertex)', 1],
-      ['gemini-omni-flash-reference-vertex', 'gemini-omni-flash-reference', 'Gemini Omni Flash Reference (Vertex)', 9],
+      ['gemini-omni-flash-vertex', 'gemini-omni-flash', 'Gemini Omni Flash', 1],
+      ['gemini-omni-flash-reference-vertex', 'gemini-omni-flash-reference', 'Gemini Omni Flash Reference', 9],
     ] as const) {
       expect((await pool.query(pick, [id])).rows[0], id).toEqual((await pool.query(pick, [twin])).rows[0]);
       const [row] = (await pool.query(`select provider, endpoint, label, enabled, ratios, durations_sec, max_images, output_resolution, usd_per_second::text as usd, sources from model_configs where id = $1`, [id])).rows;
@@ -868,5 +872,44 @@ describe('migration 0071 choices by store', () => {
     await pool.query(`delete from assets where id = 'ca1'`);
     await pool.query(`delete from stores where id = 'cs1'`);
     expect((await pool.query(`select store_id, image_asset_id, niche from user_choices where id = 'c1'`)).rows).toEqual([{ store_id: null, image_asset_id: null, niche: 'Áo dài' }]);
+  });
+});
+
+describe('migration 0078 one model per duplicate pair', () => {
+  test('drops the provider suffix from every model name', async () => {
+    const { rows } = await pool.query(`select id from model_configs where label ~ '\((BytePlus|Vertex)\)'`);
+    expect(rows).toEqual([]);
+    const names = (await pool.query(`select id, label from model_configs where id in ('seedance-2.5-byteplus', 'nano-banana-pro-vertex', 'veo-3.1-vertex') order by id`)).rows;
+    expect(names).toEqual([
+      { id: 'nano-banana-pro-vertex', label: 'Nano Banana Pro' },
+      { id: 'seedance-2.5-byteplus', label: 'Seedance 2.5' },
+      { id: 'veo-3.1-vertex', label: 'Google VEO 3.1' },
+    ]);
+  });
+
+  test('offers BytePlus Seedance 2.0 and 2.5 in Marketing Studio, with the dearer fal rows as their twins for what BytePlus does not take', async () => {
+    const pairs = [
+      ['seedance-2.0-reference', 'seedance-2.0-byteplus'],
+      ['seedance-2.5-image', 'seedance-2.5-byteplus'],
+      ['seedance-2.5-reference', 'seedance-2.5-byteplus'],
+    ];
+    const { rows } = await pool.query(`select id, twin_of from model_configs where id = any($1::text[]) order by id`, [pairs.map((p) => p[0])]);
+    expect(rows.map((r) => [r.id, r.twin_of])).toEqual(pairs);
+    const pick = `select features, usd_per_second::float as usd, durations_sec, endpoint from model_configs where id = $1`;
+    for (const [dear, cheap] of pairs) {
+      const [d] = (await pool.query(pick, [dear])).rows;
+      const [c] = (await pool.query(pick, [cheap])).rows;
+      expect(c.features, dear).toEqual(expect.arrayContaining(d.features));
+      expect(c.usd, dear).toBeLessThan(d.usd);
+      // What only the fal row makes is what a request runs on it for (servingRow): a reference video or audio clips.
+      expect(videoInputs(c.endpoint)).toMatchObject({ videoRefs: null, audioClips: null });
+    }
+    expect((await pool.query(pick, ['seedance-2.5-reference'])).rows[0].durations_sec.at(-1)).toBe(30);
+    expect((await pool.query(pick, ['seedance-2.5-byteplus'])).rows[0].durations_sec).toEqual(Array.from({ length: 27 }, (_, i) => i + 4)); // the 30 s canary
+    // Sound at the row's own price (the canary of 2026-11-08): a BytePlus job with sound stays on BytePlus.
+    for (const id of ['seedance-2.0-byteplus', 'seedance-2.5-byteplus']) {
+      const [r] = (await pool.query(`select endpoint, usd_per_second::float as usd from model_configs where id = $1`, [id])).rows;
+      expect(AUDIO_USD_PER_SECOND[r.endpoint], id).toBe(r.usd);
+    }
   });
 });

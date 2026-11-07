@@ -1,5 +1,5 @@
 // The model picker's sections, as Fash groups its models: the featured models, then one row per family.
-// A family is found from the model id, so a provider twin ("Seedance 2.0 (BytePlus)", "Nano Banana 2 (Vertex)") joins its model's family.
+// A family is found from the model id, so a provider twin (seedance-2.0-byteplus, nano-banana-2-vertex) joins its model's family.
 
 export interface Family {
   key: string;

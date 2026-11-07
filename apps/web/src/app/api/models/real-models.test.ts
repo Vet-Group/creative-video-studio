@@ -55,8 +55,8 @@ describe('the model picker', () => {
     expect(both.models.map((m) => [m.id, m.passes, m.total, m.estimateUsd])).toEqual([['kling-o3-pro', 7, 10, '0.8960'], ['seedance-2.5-byteplus', 7, 12, '1.8496']]); // 6/9 (0013) + 1/3 (0057)
     expect(both.models.map((m) => m.resolution)).toEqual(['1080p', '720p']); // what the Create form shows as the fixed resolution
     expect(both.models.map((m) => m.maxPromptChars)).toEqual([2500, 2000]); // Kling O3 Pro's fal schema (migration 0041); Replicate's own 2000 (0029)
-    // Kling's audio price is $0.14/s (Marketing Studio Advanced); Replicate Seedance has no audio switch.
-    expect(both.models.map((m) => m.audioEstimateUsd)).toEqual(['1.1200', null]);
+    // Kling's audio price is $0.14/s (Marketing Studio Advanced); BytePlus Seedance makes sound at its own price (the canary of 2026-11-08).
+    expect(both.models.map((m) => m.audioEstimateUsd)).toEqual(['1.1200', '1.8496']);
     expect(both.models[1]!.passRate).toBeCloseTo(7 / 12);
     expect(both.defaultModelId).toBe('kling-o3-pro'); // 70% against 58%
     expect(both.models.map((m) => [m.id, m.score, m.recommended])).toEqual([['kling-o3-pro', 64, true], ['seedance-2.5-byteplus', 56, false]]);

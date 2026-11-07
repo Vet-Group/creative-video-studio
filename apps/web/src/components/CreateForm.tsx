@@ -38,6 +38,8 @@ interface Model {
   isMock: boolean;
   ratios: string[];
   durationsSec: number[];
+  /** The rows of its duplicate pair (one entry, migration 0078). */
+  pairIds: string[];
   maxImages: number;
   /** The model's prompt limit (the API caps it at PROMPT_CEILING). */
   maxPromptChars: number;
@@ -304,22 +306,28 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
     };
   }, [source, presets === null]); // once the presets are known: a reload after an edit in the picker must not refill the form again
 
+  // What the job sends besides the images (endAssetId and audioAssetIds below send them only with an image).
+  const withEnd = endFrame !== null && images.length > 0;
+  const clipCount = images.length > 0 ? clips.length : 0;
   // The picker follows the ratio and duration; the chosen model stays while it supports them, else the server's default takes over.
   useEffect(() => {
     if (!ready || !recall.answered) return;
     let stale = false;
-    api<ModelsResponse>(`/api/models?feature=video&ratio=${encodeURIComponent(ratio)}&durationSec=${durationSec}`).then(
+    // An end frame or audio clips may move a duplicate pair onto its fal row (servingRow), so the list is priced with them.
+    const adds = `${withEnd ? '&endFrame=1' : ''}${clipCount > 0 ? `&audioClips=${clipCount}` : ''}`;
+    api<ModelsResponse>(`/api/models?feature=video&ratio=${encodeURIComponent(ratio)}&durationSec=${durationSec}${adds}`).then(
       (r) => {
         if (stale) return;
         setModels(r);
-        const want = r.models.find((m) => m.id === wanted.current);
+        // A job made on a pair's twin reuses the pair's entry.
+        const want = r.models.find((m) => m.id === wanted.current || (wanted.current !== undefined && m.pairIds.includes(wanted.current)));
         wanted.current = undefined;
         if (want && !want.supported && want.ratios.length > 0 && want.durationsSec.length > 0) {
           if (!want.ratios.includes(ratio)) setRatio(want.ratios[0]!);
           if (!want.durationsSec.includes(durationSec)) setDurationSec(want.durationsSec[0]!);
           return; // the next fetch, for the new ratio and duration, keeps the model
         }
-        setModelId((cur) => (r.models.some((m) => m.id === cur && m.supported) ? cur : (r.defaultModelId ?? '')));
+        setModelId((cur) => r.models.find((m) => (m.id === cur || m.pairIds.includes(cur)) && m.supported)?.id ?? r.defaultModelId ?? '');
         const options = r.models.flatMap((m) => m.durationsSec);
         if (options.length > 0 && !options.includes(durationSec)) setDurationSec(Math.min(...options));
       },
@@ -328,7 +336,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
     return () => {
       stale = true;
     };
-  }, [ready, recall.answered, ratio, durationSec, refetch]);
+  }, [ready, recall.answered, ratio, durationSec, refetch, withEnd, clipCount]);
 
   const chosen = models?.models.find((m) => m.id === modelId);
   const audioOn = (audio || chosen?.alwaysAudio === true) && chosen?.audioEstimateUsd != null;

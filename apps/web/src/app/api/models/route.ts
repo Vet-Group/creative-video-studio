@@ -3,7 +3,7 @@ import { videoInputs } from '@cvs/core/providers/fal';
 import { ASPECTS } from '@cvs/db';
 import { pool } from '@/lib/auth';
 import { modelStats, rank, scoreOf } from '@/lib/model-scores';
-import { onePerPair } from '@/lib/model-twins';
+import { canServe, onePerPair } from '@/lib/model-twins';
 import { falBalance, falCreditUsd, overCredit } from '@/lib/provider-credit';
 import { guard } from '@/lib/session';
 
@@ -24,6 +24,8 @@ const MONTH = `to_char(now() at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM')`;
  * `audioEstimateUsd` is the estimate with native audio on, null for a model that cannot make audio; `alwaysAudio` is true for one that cannot be silent (ALWAYS_AUDIO). `endFrame` is true for a model that takes an end frame, `textOnly` for one that runs from the prompt alone, and `audioClips` the reference audio it takes ({ max, seconds }, or null; videoInputs).
  * `videoRefs` is the reference video it takes ({ max, minSec, maxSec, maxMb, maxImages }, or null; videoInputs), and `?videoSec=` the length of the one chosen, which the estimates of the models that bill it then include.
  * `isNew` is true for a model added in the last 14 days (the picker's badge).
+ * A duplicate pair is listed as one entry (migration 0078): its ratios, lengths and inputs are those of the pair, `pairIds` its rows, and its provider, estimate and
+ * `supported` those of the row the job would run on (servingRow), for which `?endFrame=1` and `?audioClips=` say what the form adds.
  * Of a pair of duplicate models (`twin_of`, migration 0075) one is listed: the cheaper, or the dearer in its place while the cheaper cannot serve (lib/model-twins.ts).
  * `creditUsd` is what the model's provider can still spend (lib/provider-credit.ts; fal only, null otherwise): the picker locks a model whose estimate is over it, and the
  * model to pre-select is never one of those.
@@ -44,6 +46,10 @@ export async function GET(request: Request) {
   }
   const videoSec = q.get('videoSec') === null ? 0 : Math.ceil(Number(q.get('videoSec')));
   if (!Number.isInteger(videoSec) || videoSec < 0 || videoSec > 60) return Response.json({ error: 'videoSec must be a number of seconds from 0 to 60' }, { status: 400 });
+  // What the form adds that one row of a duplicate pair may not take, so the entry is priced as the row the job would run on (servingRow).
+  const endFrame = q.get('endFrame') === '1';
+  const audioClips = q.get('audioClips') === null ? 0 : Number(q.get('audioClips'));
+  if (!Number.isInteger(audioClips) || audioClips < 0 || audioClips > 20) return Response.json({ error: 'audioClips must be a whole number from 0 to 20' }, { status: 400 });
   const userId = g.session.user.id;
 
   const fal = await falBalance();
@@ -71,28 +77,48 @@ export async function GET(request: Request) {
   const offered = await onePerPair(pool, models.rows, (v) => overCredit(v.provider, estimateUsd(v.usd_per_second, durationSec), falCredit));
   const list = offered.map((r) => {
     const st = stats.get(r.id) ?? { passes: 0, total: 0, ok: 0, bad: 0 };
+    // A pair acts as one model (migration 0078): the listed row takes on what its enabled twins add, and is priced as the row the job would run on (servingRow).
+    // The twins taking the most images first, as servingRow orders them.
+    const pair = [r, ...models.rows.filter((t) => t.twin_of === r.id).sort((a, b) => b.max_images - a.max_images || a.id.localeCompare(b.id))];
+    const need = { durationSec, ratio: ratio!, images: 0, video: videoSec > 0, audioClips, endFrame };
+    // Whether the entry makes this ratio and length at all; what the form adds only picks the row (the form leaves out what the chosen model does not take).
+    const plain = { ...need, video: false, audioClips: 0, endFrame: false, audio: false };
+    const serving = pair.find((p) => canServe(p, { ...need, audio: false })) ?? pair.find((p) => canServe(p, plain)) ?? r;
+    const voiced = pair.find((p) => canServe(p, { ...need, audio: true })) ?? serving;
+    // What the form may add (an end frame, audio clips, a reference video) comes from the rows that make this ratio and length.
+    const fit = pair.filter((p) => p.ratios.includes(ratio) && p.durations_sec.includes(durationSec));
+    const takes = (fit.length > 0 ? fit : [r]).map((p) => videoInputs(p.endpoint));
+    const ratios = [...new Set(pair.flatMap((p) => p.ratios as string[]))];
+    const durations = [...new Set(pair.flatMap((p) => p.durations_sec as number[]))].sort((a, b) => a - b);
     return {
       id: r.id as string,
       label: r.label as string,
-      provider: r.provider as string,
+      provider: serving.provider as string,
       isMock: r.provider === 'mock',
-      ratios: r.ratios as string[],
-      durationsSec: r.durations_sec as number[],
-      maxImages: r.max_images as number,
+      ratios,
+      durationsSec: durations,
+      maxImages: Math.max(...pair.map((p) => p.max_images as number)),
       maxPromptChars: promptLimit(r.max_prompt_chars),
       resolution: r.output_resolution as string | null,
       isNew: r.is_new as boolean,
       // A mock job books 0 USD, so that is what the picker shows for it.
-      estimateUsd: r.provider === 'mock' ? '0.0000' : estimateUsd(videoSec > 0 ? usdPerSecondWithVideo(r.endpoint, r.usd_per_second, durationSec, videoSec) : r.usd_per_second, durationSec),
+      estimateUsd: r.provider === 'mock' ? '0.0000' : estimateUsd(videoSec > 0 ? usdPerSecondWithVideo(serving.endpoint, serving.usd_per_second, durationSec, videoSec) : serving.usd_per_second, durationSec),
       // With native audio on (Marketing Studio Advanced); null when the endpoint cannot make audio.
-      audioEstimateUsd: audioEstimate(r, durationSec, videoSec),
-      alwaysAudio: ALWAYS_AUDIO.has(r.endpoint),
-      ...videoInputs(r.endpoint),
+      audioEstimateUsd: audioEstimate(voiced, durationSec, videoSec),
+      alwaysAudio: ALWAYS_AUDIO.has(serving.endpoint) && ALWAYS_AUDIO.has(voiced.endpoint),
+      ...takes[0],
+      endFrame: takes.some((t) => t.endFrame),
+      endMaxSec: takes.find((t) => t.endFrame)?.endMaxSec ?? null,
+      textOnly: takes.some((t) => t.textOnly),
+      audioClips: takes.find((t) => t.audioClips !== null)?.audioClips ?? null,
+      videoRefs: takes.find((t) => t.videoRefs !== null)?.videoRefs ?? null,
       ...scoreOf(st),
       passes: st.passes,
       total: st.total,
-      supported: r.ratios.includes(ratio) && r.durations_sec.includes(durationSec),
-      creditUsd: r.provider === 'fal' ? falCredit : null,
+      supported: pair.some((p) => canServe(p, plain)),
+      // The rows of its pair, so a form reusing a job made on a twin keeps this entry.
+      pairIds: pair.map((p) => p.id as string),
+      creditUsd: serving.provider === 'fal' ? falCredit : null,
       creditShown: g.session.user.role === 'admin', // members see that a model is out of budget, not the provider's balance
     };
   });
