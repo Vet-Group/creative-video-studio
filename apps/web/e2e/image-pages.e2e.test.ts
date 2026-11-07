@@ -155,7 +155,7 @@ test('Try On, as on Fash: a sample picture with a details file opens in place wi
 
     // As on Fash, each piece goes on the form on its own, with a note: a garment, the background, the words, a chip, the result as the model photo.
     const note = (text: string) => page.getByRole('region', { name: 'Thông báo' }).getByText(text);
-    await detail.getByRole('button', { name: 'try-on-example-1-garment-1.png' }).click();
+    await detail.getByRole('button', { name: 'Ảnh đầu vào 2' }).click();
     await expect(note('Đã thêm trang phục')).toBeVisible();
     await expect(page.getByLabel('Trang phục: ảnh đã chọn').getByRole('img', { name: 'try-on-example-1-garment-1.png' })).toBeVisible();
     await detail.getByRole('button', { name: 'Seamless White' }).click();
@@ -211,7 +211,7 @@ test('Image Generation, as on Fash: a sample picture with a details file opens i
     await expect(detail.locator('.job-text')).toHaveText(details.prompt);
     await expect(detail.locator('.job-chips')).toHaveText('2K3:4');
     const chosen = page.getByRole('list', { name: 'Ảnh đã chọn' });
-    await detail.getByRole('button', { name: 'image-example-1-input-1.png' }).click();
+    await detail.getByRole('button', { name: 'Ảnh đầu vào 1' }).click();
     await expect(chosen.getByRole('img', { name: 'image-example-1-input-1.png' })).toBeVisible();
     await detail.getByRole('button', { name: 'Dùng kết quả' }).click(); // the result as one more input
     await expect(chosen.getByRole('img')).toHaveCount(2);

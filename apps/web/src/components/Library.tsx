@@ -710,11 +710,13 @@ export function Library() {
   );
 
   // Explore's Tiếp tục opens a finished item by `?item=<job id>`. shortcut: found only among the loaded items (newest first), else the list just shows; add an id filter to GET /api/library if members miss it.
-  const wanted = useRef(typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('item'));
+  // Read once the first list is in: on a client navigation the address may not have changed yet when the page first renders.
+  const looked = useRef(false);
   useEffect(() => {
-    if (state !== 'ready' || !wanted.current) return;
-    const i = clips.findIndex((c) => c.id === wanted.current);
-    wanted.current = null;
+    if (state !== 'ready' || looked.current) return;
+    looked.current = true;
+    const wanted = new URLSearchParams(window.location.search).get('item');
+    const i = wanted ? clips.findIndex((c) => c.id === wanted) : -1;
     if (i >= 0) setDetail(i);
   }, [state, clips]);
 
