@@ -53,6 +53,9 @@ test('the picker opens on the featured models and the families; a family opens b
   const p = (await panel.boundingBox())!;
   const f = (await kling.boundingBox())!;
   expect(Math.abs(f.x - (p.x + p.width + 8))).toBeLessThanOrEqual(2);
+  // A member's own scroll of the list still closes the flyout, which would otherwise sit beside the wrong row (#338 ignores only the list's own scroll).
+  await list.evaluate((el) => el.scrollBy(0, 40));
+  await expect(kling).toHaveCount(0);
   await families.filter({ hasText: /^Alibaba/ }).scrollIntoViewIfNeeded();
   await page.mouse.move(0, 0);
   await families.filter({ hasText: /^Alibaba/ }).hover();
@@ -75,8 +78,6 @@ test('the picker opens on the featured models and the families; a family opens b
   await expect(panel).toBeHidden();
   await expect(modelButton(page)).toContainText('Kling 2.6');
 
-  // On GitHub's runner the flyout ArrowRight opens closes again before the next step (issue #338), so the keyboard part runs on this machine only.
-  if (process.env.CI) return;
   // By keyboard: the panel opens on the family that holds the chosen model; ArrowRight enters it on that model, ArrowLeft leaves it.
   await page.mouse.move(0, 0); // clear of the panel, so no hover moves the active option
   await page.keyboard.press('Enter');
