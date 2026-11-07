@@ -205,7 +205,7 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
       {offered.length === 0 ? (
         <p className="muted">Chưa có mô hình nào được bật.</p>
       ) : (
-        <ul className="explore-cards" aria-label="Mô hình">
+        <ul className={allModels ? 'explore-cards explore-cards-all' : 'explore-cards'} aria-label="Mô hình">
           {shown.map((m) => (
             <li key={m.id}>
               <Link href={`${m.kind === 'video' ? '/create' : '/image-generation'}?model=${encodeURIComponent(m.id)}`} className="explore-card">
