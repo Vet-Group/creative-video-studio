@@ -128,7 +128,7 @@ describe('fal', () => {
     const provider = createFalProvider({ apiKey: 'k', fetch: fn });
     for (const endpoint of endpoints) await provider.submit({ ...req, audio: true, model: { ...kling, endpoint } });
     const sent = calls.map((c) => (c.body as { generate_audio?: boolean }).generate_audio);
-    expect(endpoints.filter((_e, i) => sent[i] === true).sort()).toEqual(Object.keys(AUDIO_USD_PER_SECOND).filter((e) => e !== 'mock' && e !== 'veo-3.1-generate-001').sort());
+    expect(endpoints.filter((_e, i) => sent[i] === true).sort()).toEqual(Object.keys(AUDIO_USD_PER_SECOND).filter((e) => e !== 'mock' && e !== 'veo-3.1-generate-001' && !e.startsWith('dreamina-')).sort());
     expect(sent).not.toContain(false);
     await provider.submit({ ...req, model: { ...kling, endpoint: 'bytedance/seedance-2.5/us/reference-to-video' } });
     expect(calls.at(-1)!.body).toMatchObject({ generate_audio: false }); // audio off unless the job asks

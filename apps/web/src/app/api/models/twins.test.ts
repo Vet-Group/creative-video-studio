@@ -174,28 +174,34 @@ describe('a pair that acts as one model (migration 0078)', () => {
     return (await pool.query(`select j.model, j.provider, c.usd::text as usd from jobs j join cost_entries c on c.job_id = j.id and c.kind = 'estimate' where j.id = $1`, [id])).rows[0];
   };
 
-  test('lists Seedance 2.5 once, with the fal row’s longer clips, reference video and audio, priced as the row that would run', async () => {
+  test('lists Seedance 2.5 once, with the fal row’s reference video and audio clips, priced as the row that would run', async () => {
     await only(['seedance-2.5-byteplus', 'seedance-2.5-reference']);
     const [short] = await listed('ratio=9:16&durationSec=8');
     expect(short).toMatchObject({ id: 'seedance-2.5-byteplus', provider: 'byteplus', estimateUsd: '1.8496', supported: true }); // 8 s at $0.2312
     expect(short!.durationsSec.at(-1)).toBe(30);
     expect(short!.videoRefs).not.toBeNull();
     expect(short!.audioClips).not.toBeNull();
-    const long = await listed('ratio=9:16&durationSec=20');
-    expect(long).toEqual([expect.objectContaining({ id: 'seedance-2.5-byteplus', provider: 'fal', estimateUsd: '9.4600', supported: true })]); // 20 s at $0.473
+    // The canaries of 2026-11-08: BytePlus makes 30 s, and sound at the row's price.
+    expect(await listed('ratio=9:16&durationSec=20')).toEqual([expect.objectContaining({ id: 'seedance-2.5-byteplus', provider: 'byteplus', estimateUsd: '4.6240', audioEstimateUsd: '4.6240', supported: true })]);
     expect((await listed('feature=marketing&ratio=9:16&durationSec=8')).map((m) => m.id)).toEqual(['seedance-2.5-byteplus']);
   });
 
-  test('runs a clip of up to 15 s on BytePlus and a longer one on the fal twin, and refuses the longer one while the twin is off', async () => {
+  test('runs what BytePlus makes on BytePlus, sound included, and a length it does not make on the fal twin, refused while the twin is off', async () => {
     await only(['seedance-2.5-byteplus', 'seedance-2.5-reference']);
     expect(await booked(await run(8))).toEqual({ model: 'seedance-2.5-byteplus', provider: 'byteplus', usd: '1.8496' });
-    expect(await booked(await run(20))).toEqual({ model: 'seedance-2.5-reference', provider: 'fal', usd: '9.4600' });
-    // BytePlus is priced for the silent clip, so a clip with sound runs on fal, and the picker's audio price is fal's.
-    expect((await listed('ratio=9:16&durationSec=8'))[0]).toMatchObject({ estimateUsd: '1.8496', audioEstimateUsd: '3.7840' });
-    expect(await booked(await create({ assetIds: ['img'], modelId: 'seedance-2.5-byteplus', presetId: 'gentle-push-in', ratio: '9:16', durationSec: 8, params: { audio: 'on' } }))).toEqual({ model: 'seedance-2.5-reference', provider: 'fal', usd: '3.7840' });
-    await only(['seedance-2.5-byteplus']);
-    expect((await listed('ratio=9:16&durationSec=8'))[0]!.durationsSec.at(-1)).toBe(15);
-    expect((await run(20)).status).toBe(400);
+    expect(await booked(await run(20))).toEqual({ model: 'seedance-2.5-byteplus', provider: 'byteplus', usd: '4.6240' });
+    expect(await booked(await create({ assetIds: ['img'], modelId: 'seedance-2.5-byteplus', presetId: 'gentle-push-in', ratio: '9:16', durationSec: 8, params: { audio: 'on' } }))).toEqual({ model: 'seedance-2.5-byteplus', provider: 'byteplus', usd: '1.8496' });
+    // A BytePlus row that stopped at 15 s (as 0056 had it): a longer clip runs on fal, priced so in the picker.
+    await pool.query(`update model_configs set durations_sec = array(select generate_series(4, 15)) where id = 'seedance-2.5-byteplus'`);
+    try {
+      expect((await listed('ratio=9:16&durationSec=20'))[0]).toMatchObject({ provider: 'fal', estimateUsd: '9.4600' }); // 20 s at $0.473
+      expect(await booked(await run(20))).toEqual({ model: 'seedance-2.5-reference', provider: 'fal', usd: '9.4600' });
+      await only(['seedance-2.5-byteplus']);
+      expect((await listed('ratio=9:16&durationSec=8'))[0]!.durationsSec.at(-1)).toBe(15);
+      expect((await run(20)).status).toBe(400);
+    } finally {
+      await pool.query(`update model_configs set durations_sec = array(select generate_series(4, 30)) where id = 'seedance-2.5-byteplus'`);
+    }
   });
 
   test('offers the twin of the job’s own feature to a job BytePlus refused for a real person', async () => {
@@ -219,7 +225,7 @@ describe('a pair priced for what the form adds (review of #342)', () => {
     expect(await first('ratio=9:16&durationSec=8&audioClips=1')).toMatchObject({ provider: 'fal', estimateUsd: '3.7840', supported: true }); // the reference row takes audio
     expect(await first('ratio=16:9&durationSec=8')).toMatchObject({ endFrame: false }); // the image row makes 9:16 and 1:1 only
     await only(['seedance-2.5-byteplus', 'seedance-2.5-image']);
-    expect(await first('ratio=16:9&durationSec=20')).toMatchObject({ supported: false }); // BytePlus stops at 15 s, the image row has no 16:9
+    expect(await first('ratio=16:9&durationSec=8&endFrame=1')).toMatchObject({ supported: false }); // BytePlus takes no end frame, the image row has no 16:9
     expect((await videoModels(as('/api/models?ratio=9:16&durationSec=8&audioClips=x'))).status).toBe(400);
   });
 

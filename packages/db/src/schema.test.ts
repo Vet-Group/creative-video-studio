@@ -598,7 +598,7 @@ describe('migration 0056 BytePlus', () => {
       { ...row('seedance-2.0-byteplus', 'dreamina-seedance-2-0-260128', range(4, 15), 9, '720p', per(7, 21_600)), features: ['video', 'marketing'] }, // 0078
       row('seedance-2.0-fast-byteplus', 'dreamina-seedance-2-0-fast-260128', range(4, 15), 9, '720p', per(5.6, 21_600)),
       row('seedance-2.0-mini-byteplus', 'dreamina-seedance-2-0-mini-260615', range(4, 15), 9, '720p', per(3.5, 21_600)),
-      { ...row('seedance-2.5-byteplus', 'dreamina-seedance-2-5-260628', range(4, 15), 9, '720p', per(10.7, 21_600)), features: ['video', 'marketing'] }, // 0078; 4 to 30 s on the API; 15 s until a canary measures the latency (the docs' own 11 s example took 581 s)
+      { ...row('seedance-2.5-byteplus', 'dreamina-seedance-2-5-260628', range(4, 15), 9, '720p', per(10.7, 21_600)), features: ['video', 'marketing'], durations_sec: range(4, 30) }, // 4 to 30 s on the API; 0056 held it at 15 s, 0078 opens 30 s after the canary made 30 s in 266 s
     ]);
     // 5 s at 720p on Seedance 2.5: 108,000 tokens at $10.70 per million.
     expect(rows.find((r) => r.id === 'seedance-2.5-byteplus')!.usd).toBe('0.2312');
@@ -887,7 +887,7 @@ describe('migration 0078 one model per duplicate pair', () => {
     ]);
   });
 
-  test('offers BytePlus Seedance 2.0 and 2.5 in Marketing Studio, with the dearer fal rows as their twins, which reach further', async () => {
+  test('offers BytePlus Seedance 2.0 and 2.5 in Marketing Studio, with the dearer fal rows as their twins for what BytePlus does not take', async () => {
     const pairs = [
       ['seedance-2.0-reference', 'seedance-2.0-byteplus'],
       ['seedance-2.5-image', 'seedance-2.5-byteplus'],
@@ -901,10 +901,15 @@ describe('migration 0078 one model per duplicate pair', () => {
       const [c] = (await pool.query(pick, [cheap])).rows;
       expect(c.features, dear).toEqual(expect.arrayContaining(d.features));
       expect(c.usd, dear).toBeLessThan(d.usd);
-      // What only the fal row makes is what a request runs on it for (servingRow): a longer clip, or a reference video or audio.
+      // What only the fal row makes is what a request runs on it for (servingRow): a reference video or audio clips.
       expect(videoInputs(c.endpoint)).toMatchObject({ videoRefs: null, audioClips: null });
     }
     expect((await pool.query(pick, ['seedance-2.5-reference'])).rows[0].durations_sec.at(-1)).toBe(30);
-    expect((await pool.query(pick, ['seedance-2.5-byteplus'])).rows[0].durations_sec.at(-1)).toBe(15);
+    expect((await pool.query(pick, ['seedance-2.5-byteplus'])).rows[0].durations_sec).toEqual(Array.from({ length: 27 }, (_, i) => i + 4)); // the 30 s canary
+    // Sound at the row's own price (the canary of 2026-11-08): a BytePlus job with sound stays on BytePlus.
+    for (const id of ['seedance-2.0-byteplus', 'seedance-2.5-byteplus']) {
+      const [r] = (await pool.query(`select endpoint, usd_per_second::float as usd from model_configs where id = $1`, [id])).rows;
+      expect(AUDIO_USD_PER_SECOND[r.endpoint], id).toBe(r.usd);
+    }
   });
 });

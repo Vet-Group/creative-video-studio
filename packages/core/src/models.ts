@@ -140,7 +140,9 @@ export const validateRequest = (model: ModelConfig, req: { ratio: string; durati
  * page states (read 2026-10-26, https://fal.ai/models/<endpoint>), for the resolution the builder asks for. Kling O3 Pro $0.112 -> $0.14, Kling 3.0 Pro
  * $0.112 -> $0.168, Kling 2.6 Pro $0.07 -> $0.14, Veo 3.1 $0.20 -> $0.40 (720p/1080p), Seedance 1.5 Pro $1.20 -> $2.40 per million tokens (so twice the
  * stored $0.0259). Seedance 2.0 and 2.5 and FLUX 3 price by resolution and tokens only, so audio costs nothing more. Veo 3.1 on Vertex (vertex-video.ts) lists $0.20 -> $0.40 per 1 count at
- * 720p, an estimate that takes one count as one second (migration 0042). The mock endpoint takes the switch so the specs can drive it; a mock
+ * 720p, an estimate that takes one count as one second (migration 0042). Seedance 2.x on BytePlus (byteplus.ts sends generate_audio) bills the clip's
+ * tokens with or without sound: the paid canary of 2026-11-08 (scripts/byteplus-canary.ts) billed 21,780 tokens a second for 5 s of Seedance 2.0 with sound
+ * against the 21,600 of the silent row, so sound is the row's own price (migration 0056). The mock endpoint takes the switch so the specs can drive it; a mock
  * job books 0 regardless.
  */
 export const AUDIO_USD_PER_SECOND: Record<string, number> = {
@@ -156,6 +158,8 @@ export const AUDIO_USD_PER_SECOND: Record<string, number> = {
   'blackforestlabs/flux-3/image-to-video': 0.29,
   'blackforestlabs/flux-3/keyframes-to-video': 0.29,
   'veo-3.1-generate-001': 0.4,
+  'dreamina-seedance-2-0-260128': 0.1512,
+  'dreamina-seedance-2-5-260628': 0.2312,
   mock: 0,
 };
 
