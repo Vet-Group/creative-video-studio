@@ -566,7 +566,7 @@ export function Settings({ open, onClose, userName, account, start = 'profile' }
               <Preferences />
             </section>
           )}
-          {section === 'methods' && <SignInMethods methods={account.methods} googleEnabled={account.googleEnabled} larkEnabled={account.larkEnabled} />}
+          {section === 'methods' && <SignInMethods methods={account.methods} googleEnabled={account.googleEnabled} larkEnabled={account.larkEnabled} embedded />}
           {section === 'support' && (
             <section aria-labelledby="settings-heading">
               <ul className="acct-rows">
