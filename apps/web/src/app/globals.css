@@ -882,6 +882,7 @@ dialog.admin-modal { width: min(36rem, calc(100vw - 2rem)); }
 .tabs button { flex: 1; height: 30px; padding: 6px 4px; border: 0; border-radius: 8px; background: transparent; color: var(--text-muted); font-size: 12px; line-height: 18px; font-weight: 600; text-align: center; }
 .tabs button:hover { background: var(--fill); }
 .tabs button[aria-selected='true'] { background: var(--ink-strong); color: var(--on-ink); }
+@media (max-width: 599.98px) { .tabs button { position: relative; } .tabs button::after { content: ''; position: absolute; inset: -7px 0; } } /* the 30 px pill keeps its look; its hit area is 44 px */
 /* z-index: the card is a stacking context (sticky), so its menus must sit above the Examples pane painted after it. */
 .form-card { position: relative; z-index: 2; display: flex; flex-direction: column; height: calc(100dvh - 131px); min-height: 440px; padding: 24px; overflow: hidden; border: 0; border-radius: 8px; box-shadow: 0 12px 40px rgb(var(--shade) / .12); }
 .form-scroll { flex: 1; min-height: 0; overflow-y: auto; margin: 0 -2px; padding: 0 4px 14px; }
@@ -1463,6 +1464,9 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .explore-cards { display: flex; align-items: stretch; gap: 16px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: thin; }
 .explore-cards > li { flex: 0 0 178px; scroll-snap-align: start; }
 @media (min-width: 1024px) { .explore-cards > li { flex-basis: 218px; } }
+/* The all-models view wraps into rows of the same card widths instead of one long sideways row. */
+.explore .explore-cards-all { display: grid; grid-template-columns: repeat(auto-fill, minmax(178px, 1fr)); margin-right: 0; padding-right: 0; overflow: visible; }
+@media (min-width: 1024px) { .explore .explore-cards-all { grid-template-columns: repeat(auto-fill, minmax(218px, 1fr)); } }
 .explore-tool:hover, .explore-card:hover { background: var(--fill); }
 .explore-card { display: grid; align-content: start; gap: 6px; height: 100%; padding: 16px; overflow: hidden; border: 1px solid rgb(var(--tint) / .1); border-radius: 12px; color: inherit; text-decoration: none; font-size: 14px; line-height: 21px; }
 .explore-card img, .explore-card video, .explore-card .banner-empty { width: calc(100% + 32px); margin: -16px -16px 6px; aspect-ratio: 1; object-fit: cover; }
@@ -2126,6 +2130,7 @@ dialog.modal.template-sheet { width: 100%; max-width: none; margin: auto 0 0; bo
 .lib-row:hover { background: var(--surface-1); }
 .lib-row:has(.zip-check :checked) { background: var(--surface-2); }
 .lib-row .zip-check { top: 14px; left: 16px; width: 24px; height: 24px; } /* on the thumbnail corner, as on the grid card, so no gutter is kept for it */
+@media (max-width: 599.98px) { .library .zip-check::after { content: ''; position: absolute; inset: calc((44px - 100%) / -2); } .library .zip-check input { position: relative; z-index: 1; } } /* a 44 px hit area around the 18 px box; the box itself stays on top of it */
 .lib-thumb { flex: none; width: 56px; height: 56px; overflow: hidden; border-radius: 8px; background: var(--fill); }
 .lib-thumb :is(img, video) { display: block; width: 100%; height: 100%; object-fit: cover; }
 .lib-row-main { flex: 1 1 0; min-width: 0; }
@@ -2172,7 +2177,7 @@ dialog.modal.template-sheet { width: 100%; max-width: none; margin: auto 0 0; bo
 @media (max-width: 639.98px) {
   .library-search { flex-basis: 100%; }
   .library-tools .library-size { display: none; } /* a phone shows one column at every size */
-  .library-filters { flex-wrap: nowrap; margin: 0 -16px 4px; padding: 3px 16px; overflow-x: auto; scrollbar-width: none; } /* scrolls inside itself, edge to edge */
+  .library-filters { padding: 3px 0; } /* wraps onto more rows (the base rule), room kept for the focus ring */
   .library-active { order: -1; margin: 0 4px 0 0; }
   .lib-row .actions { flex-basis: 100%; padding-left: 68px; }
   .zip-float { bottom: 12px; }
@@ -2225,8 +2230,8 @@ dialog.modal.verdict-guide { width: min(40rem, calc(100vw - 2rem)); }
 .lib-info p { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lib-title { color: var(--ink-strong); font-size: 13px; line-height: 18px; font-weight: 600; }
 /* A long name gives way, never the cost. */
-.lib-info .lib-meta { display: flex; gap: 4px; color: var(--text-muted); font-size: 12px; line-height: 17px; }
-.lib-who { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.lib-info .lib-meta { display: flex; flex-wrap: wrap; column-gap: 4px; white-space: normal; color: var(--text-muted); font-size: 12px; line-height: 17px; }
+.lib-who { min-width: 0; overflow-wrap: anywhere; }
 .lib-meta > span:last-child { flex: none; }
 .lib-mark.featured { background: var(--favorite); color: var(--on-ink); }
 

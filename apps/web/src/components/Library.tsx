@@ -26,6 +26,7 @@ function readPlace(): { query: string; count: number; y: number } | null {
 }
 /** Today in Vietnam as YYYY-MM-DD, the latest day the calendar offers. */
 const today = () => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date());
+const fmtShort = (iso: string) => new Intl.DateTimeFormat('vi-VN', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'numeric', timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date(iso));
 const fmtTime = (iso: string) => new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date(iso));
 /** The Library filters in the reference order; the id is the `kind` the API takes. */
 const KINDS = [
@@ -302,7 +303,7 @@ function ClipCard({ clip, view, select, onChange, onDeleted, onOpen }: { clip: C
         <p className="lib-title">{clip.modelLabel}</p>
         <p className="lib-meta">
           <span className="lib-who">
-            {clip.creator.name} · {fmtTime(clip.createdAt)} ·
+            {clip.creator.name} · {fmtShort(clip.createdAt)} ·
           </span>
           <span title={clip.costFinal ? 'Chi phí thật' : 'Chi phí thật, tạm tính'}>
             ${clip.costUsd}
@@ -657,7 +658,7 @@ export function Library() {
   const calendar = useRef<HTMLInputElement>(null);
   const openCalendar = useRef(false);
   useEffect(() => {
-    // Opened right after "Chọn một ngày…", and scrolled into the filter row, which scrolls sideways on a phone.
+    // Opened right after "Chọn một ngày…", and scrolled into view.
     const el = calendar.current;
     if (!pickDay || !el || !openCalendar.current) return;
     openCalendar.current = false;

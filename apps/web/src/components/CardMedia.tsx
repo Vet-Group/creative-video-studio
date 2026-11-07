@@ -17,7 +17,7 @@ export function LoopVideo({ src, poster }: { src: string; poster: string | null 
     const watch = new IntersectionObserver(([e]) => {
       seen = e?.isIntersecting ?? false;
       sync();
-    });
+    }, { rootMargin: '200px' }); // starts a card just before it scrolls in, and nothing is fetched before that
     watch.observe(v);
     document.addEventListener('visibilitychange', sync);
     return () => {

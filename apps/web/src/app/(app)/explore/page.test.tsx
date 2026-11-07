@@ -161,11 +161,13 @@ test('the models row shows 7 video and 3 image models with a link to all of them
   expect(featured).toContain('Mô hình nổi bật');
   expect(featured).toContain('href="/explore?models=all#models"');
   expect(featured).toContain('Xem tất cả 14 mô hình');
+  expect(featured).not.toContain('explore-cards-all');
 
   vi.mocked(pool.query).mockResolvedValueOnce({ rows } as never);
   const all = renderToStaticMarkup(await ExplorePage(props('all')));
   expect(modelLinks(all)).toHaveLength(14);
   expect(all).toContain('Tất cả mô hình');
+  expect(all).toContain('explore-cards explore-cards-all');
   expect(all).toContain('Chỉ xem nổi bật');
 });
 
