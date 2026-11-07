@@ -49,9 +49,12 @@ async function pollFal(
   // The docs do not say what a failed result answers; a 4xx here is a failed job, not a poll error. Rate limits and auth errors say
   // nothing about the job, so they throw and the key is polled again.
   const out = (await sendJson(f, 'fal result', base, { headers, signal: timeout() }).catch((e) => {
-    if (e instanceof ProviderHttpError && e.status >= 400 && e.status < 500 && ![401, 403, 429].includes(e.status)) return { error: e.message };
+    if (e instanceof ProviderHttpError && e.status >= 400 && e.status < 500 && ![401, 403, 429].includes(e.status)) return { error: e.message, rejected: true };
     throw e;
-  })) as Record<string, unknown> & { error?: string };
+  })) as Record<string, unknown> & { error?: string; rejected?: boolean };
+  // A 4xx result is fal refusing the input (e.g. 422 input_value_error), which it does not bill as a rule, so the job costs 0 and the
+  // ledger releases its estimate. shortcut: fal may still bill a 422 that used GPU time; the monthly fal invoice line (invoice_diff) books that.
+  if (out.rejected) return { state: 'failed', error: out.error!, costUsd: 0, costSource: 'estimate' };
   if (out.error) return { state: 'failed', error: out.error, ...cost };
   const outputUrl = pick(out);
   if (!outputUrl) return { state: 'failed', error: `fal result has no ${field}`, ...cost };

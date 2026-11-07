@@ -317,12 +317,12 @@ describe('fal image status', () => {
     expect(await provider([200, { status: 'COMPLETED' }], [200, out]).p.status(job)).toMatchObject({ state: 'succeeded', outputUrl: 'https://v3.fal.media/b.png' });
   });
 
-  test('COMPLETED with an error, an empty result or a 4xx result is failed and still carries the price', async () => {
+  test('COMPLETED with an error or an empty result is failed and still carries the price; a 4xx result is failed at no cost', async () => {
     expect(await provider([200, { status: 'COMPLETED', error: 'content policy', error_type: 'content_policy_violation' }]).p.status(job)).toEqual({
       state: 'failed', error: 'content policy', costUsd: 0.3, costSource: 'estimate',
     });
     expect(await provider([200, { status: 'COMPLETED' }], [200, { images: [] }]).p.status(job)).toMatchObject({ state: 'failed', error: 'fal result has no images[0].url or image.url' });
-    expect(await provider([200, { status: 'COMPLETED' }], [422, { detail: 'image_too_large' }]).p.status(job)).toMatchObject({ state: 'failed', error: expect.stringContaining('422') });
+    expect(await provider([200, { status: 'COMPLETED' }], [422, { detail: 'image_too_large' }]).p.status(job)).toMatchObject({ state: 'failed', error: expect.stringContaining('422'), costUsd: 0 });
   });
 
   test.each([401, 403, 429, 500])('a %i on the result throws so the poll is retried', async (code) => {
