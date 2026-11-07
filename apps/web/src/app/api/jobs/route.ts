@@ -10,7 +10,7 @@ import { mp4VideoInfo } from '@/lib/assets';
 import { boss } from '@/lib/queue';
 import { findChoice } from '@/lib/choices';
 import { inputRefusal } from '@/lib/job-failure';
-import { offeredNow, servingRow, twinEstimate } from '@/lib/model-twins';
+import { jobNeed, offeredNow, retryTwin, servingRow, twinEstimate } from '@/lib/model-twins';
 import { BRAND_FEATURES, withBrand } from '@/lib/brand';
 import { ADVANCED_MAX_SCRIPT, END_TEXT_POSITIONS, isParamFormat, MAX_END_TEXT, MAX_ENDING, MAX_HIGHLIGHT, MAX_HIGHLIGHTS, MAX_HOOK, PARAM_FORMATS, UNBOXING_ROLES } from '@/lib/marketing';
 import { falBalance, falCreditUsd, overCredit } from '@/lib/provider-credit';
@@ -79,15 +79,10 @@ export async function GET(request: Request) {
   const refused = jobs.rows.filter((r) => !r.retried && !r.retry_of && ['failed', 'failed_unknown', 'timed_out'].includes(r.status) && inputRefusal(r.error)?.reason === 'real_person');
   const twins = new Map<string, { label: string; estimateUsd: string | null }>();
   if (refused.length > 0) {
-    const { rows } = await pool.query(
-      `select j.id as job, h.label, h.endpoint, h.usd_per_second, h.image_prices, h.thinking_levels, h.thinking_prices
-         from jobs j join model_configs h on h.twin_of = j.model and h.enabled and j.feature = any(h.features) where j.id = any($1::text[]) order by h.id desc`,
-      [refused.map((r) => r.id)],
-    );
-    // `order by h.id desc` with a later row replacing an earlier one leaves the first id, the twin a retry takes.
-    for (const t of rows) {
-      const j = refused.find((r) => r.id === t.job)!;
-      twins.set(t.job, { label: t.label, estimateUsd: twinEstimate(t, { params: j.params, duration_s: j.duration_s, inputs: j.input_asset_ids.length }) });
+    // The twin a retry would take (retryTwin), with that run's price; a refused job is rare, so one query each.
+    for (const j of refused) {
+      const t = await retryTwin(pool, j);
+      if (t) twins.set(j.id, { label: t.label, estimateUsd: twinEstimate(t, { params: j.params, duration_s: j.duration_s, inputs: j.input_asset_ids.length }) });
     }
   }
   return Response.json({
@@ -258,7 +253,9 @@ export async function POST(request: Request) {
       if (!clip.rows[0]?.mime.startsWith('video/')) return bad('params.videoAssetId must be one of your own videos');
       // Its picture size and frame rate against the model's limits (videoRefProblem), read from the file's header here, outside the lock. A file or a header that cannot
       // be read passes (as does a frame rate the header does not give): fal then decides.
-      const endpoint = (await pool.query('select endpoint from model_configs where id = $1', [modelId])).rows[0]?.endpoint as string | undefined;
+      // On the row of a duplicate pair the job will run on (servingRow), which takes the video where the named row may not.
+      const runsOn = await servingRow(pool, modelId, feature, jobNeed({ aspect: ratio as string, duration_s: durationSec as number, input_asset_ids: assetIds as string[], params: given }));
+      const endpoint = (await pool.query('select endpoint from model_configs where id = $1', [runsOn])).rows[0]?.endpoint as string | undefined;
       if (endpoint && videoInputs(endpoint).videoRefs) {
         const info = await (async () => {
           try {
@@ -301,7 +298,7 @@ export async function POST(request: Request) {
       let modelId: string = o.model;
       if (onTwin) {
         if (inputRefusal(o.error)?.reason !== 'real_person') return Response.json({ error: 'only a job refused for a real person can be retried on its twin' }, { status: 409 });
-        const twin = (await tx.query('select id from model_configs where twin_of = $1 and enabled and $2 = any(features) order by id limit 1', [o.model, o.feature])).rows[0];
+        const twin = await retryTwin(tx, o);
         if (!twin) return Response.json({ error: 'the job has no enabled twin model' }, { status: 409 });
         modelId = twin.id;
       }
@@ -316,15 +313,7 @@ export async function POST(request: Request) {
     const modelId =
       original || isImage
         ? named
-        : await servingRow(tx, named, feature, {
-            durationSec,
-            ratio,
-            images: assetIds.length,
-            video: params.videoAssetId !== undefined,
-            audioClips: params.audioAssetIds?.split(',').length ?? 0,
-            endFrame: params.endAssetId !== undefined,
-            audio: params.audio === 'on',
-          });
+        : await servingRow(tx, named, feature, jobNeed({ aspect: ratio, duration_s: durationSec, input_asset_ids: assetIds, params }));
     // A new Run was checked before the lock and a retry never was, so both look again: an image deleted meanwhile is refused.
     const clips = params.audioAssetIds?.split(',') ?? [];
     // A Set: the end frame may be the first image again, for a clip that loops.

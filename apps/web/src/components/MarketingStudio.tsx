@@ -46,6 +46,8 @@ interface VideoModel {
   isMock: boolean;
   ratios: string[];
   durationsSec: number[];
+  /** The rows of its duplicate pair (one entry, migration 0078). */
+  pairIds: string[];
   estimateUsd: string;
   /** The estimate with native audio on; null when the model cannot make audio. */
   audioEstimateUsd: string | null;
@@ -360,7 +362,8 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
   // It waits for the remembered model: a list that lands just before it would otherwise pick the default after it.
   useEffect(() => {
     if (!list || !recall.answered || list.models.some((m) => m.id === modelId)) return;
-    const first = list.models.find((m) => m.id === list.defaultId) ?? list.models[0];
+    // A job made on a duplicate pair's twin keeps the pair's entry.
+    const first = list.models.find((m) => m.pairIds.includes(modelId)) ?? list.models.find((m) => m.id === list.defaultId) ?? list.models[0];
     if (first) pickModel(first);
   }, [list, recall.answered]);
 

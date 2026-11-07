@@ -208,3 +208,31 @@ describe('a pair that acts as one model (migration 0078)', () => {
     expect(jobs.find((j) => j.id === 'rp-m')!.twin).toMatchObject({ label: 'Seedance 2.0 Reference' });
   });
 });
+
+describe('a pair priced for what the form adds (review of #342)', () => {
+  const first = async (query: string) => ((await (await videoModels(as(`/api/models?${query}`))).json()) as { models: { id: string; provider: string; estimateUsd: string; supported: boolean; endFrame: boolean; pairIds: string[] }[] }).models[0]!;
+
+  test('prices an end frame or audio clips at the fal row they move the job to, and says when no row of the pair makes the request', async () => {
+    await only(['seedance-2.5-byteplus', 'seedance-2.5-image', 'seedance-2.5-reference']);
+    expect(await first('ratio=9:16&durationSec=8')).toMatchObject({ provider: 'byteplus', estimateUsd: '1.8496', endFrame: true, pairIds: ['seedance-2.5-byteplus', 'seedance-2.5-reference', 'seedance-2.5-image'] });
+    expect(await first('ratio=9:16&durationSec=8&endFrame=1')).toMatchObject({ provider: 'fal', estimateUsd: '3.7840', supported: true }); // the image row takes the end frame
+    expect(await first('ratio=9:16&durationSec=8&audioClips=1')).toMatchObject({ provider: 'fal', estimateUsd: '3.7840', supported: true }); // the reference row takes audio
+    expect(await first('ratio=16:9&durationSec=8')).toMatchObject({ endFrame: false }); // the image row makes 9:16 and 1:1 only
+    await only(['seedance-2.5-byteplus', 'seedance-2.5-image']);
+    expect(await first('ratio=16:9&durationSec=20')).toMatchObject({ supported: false }); // BytePlus stops at 15 s, the image row has no 16:9
+    expect((await videoModels(as('/api/models?ratio=9:16&durationSec=8&audioClips=x'))).status).toBe(400);
+  });
+
+  test('re-runs a refused job on the twin that can make it, the reference row before the image row', async () => {
+    await only(['seedance-2.5-byteplus', 'seedance-2.5-image', 'seedance-2.5-reference']);
+    await pool.query(
+      `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, status, error) values ('rp-16', $1, 'team-unassigned', 'seedance-2.5-byteplus', 'byteplus', 'p', '16:9', 8, '{img}', 'failed', $2)`,
+      [userId, REAL_PERSON],
+    );
+    const jobs = ((await (await listJobs(as('/api/jobs?mine'))).json()) as { jobs: { id: string; twin: { label: string; estimateUsd: string } | null }[] }).jobs;
+    expect(jobs.find((j) => j.id === 'rp-16')!.twin).toEqual({ label: 'Seedance 2.5 Reference', estimateUsd: '3.7840' });
+    const res = await create({ retryOf: 'rp-16', onTwin: true });
+    expect(res.status).toBe(201);
+    expect((await pool.query(`select model from jobs where retry_of = 'rp-16'`)).rows[0].model).toBe('seedance-2.5-reference');
+  });
+});

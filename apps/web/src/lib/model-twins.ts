@@ -80,16 +80,55 @@ export function canServe(row: VideoRow, need: VideoNeed): boolean {
 /**
  * The row a new video job runs on, so a pair of duplicates acts as one model (migration 0078): the named row, or, for a request it cannot make (a longer clip, a
  * reference video or audio clips, an end frame, sound), the first of its enabled twins offering the feature that can. Named rows without twins come back as they are.
+ * The twins taking the most images come first: a reference row keeps the photos references, as the BytePlus rows send them, where an image-to-video row would crop
+ * the first into the opening frame.
  */
 export async function servingRow(q: Queryable, id: string, feature: string, need: VideoNeed): Promise<string> {
   const { rows } = await q.query(
     `select id, endpoint, ratios, durations_sec, max_images, usd_per_second from model_configs
-      where id = $1 or (twin_of = $1 and enabled and $2 = any(features)) order by id = $1 desc, id`,
+      where id = $1 or (twin_of = $1 and enabled and $2 = any(features)) order by id = $1 desc, max_images desc, id`,
     [id, feature],
   );
   const [named, ...twins] = rows as (VideoRow & { id: string })[];
   if (named?.id !== id || canServe(named, need)) return id;
   return twins.find((t) => canServe(t, need))?.id ?? id;
+}
+
+/** What a job already made needs of a row that runs it again (a twin run, api/jobs `onTwin`). */
+export const jobNeed = (job: { aspect: string; duration_s: number; input_asset_ids: string[]; params: Record<string, string> }): VideoNeed => ({
+  durationSec: job.duration_s,
+  ratio: job.aspect,
+  images: job.input_asset_ids.length,
+  video: job.params.videoAssetId !== undefined,
+  audioClips: job.params.audioAssetIds?.split(',').length ?? 0,
+  endFrame: job.params.endAssetId !== undefined,
+  audio: job.params.audio === 'on',
+});
+
+export interface RetryTwin {
+  id: string;
+  label: string;
+  endpoint: string;
+  usd_per_second: string | null;
+  image_prices: Record<string, string> | null;
+  thinking_levels: string[];
+  thinking_prices: Record<string, Record<string, string>> | null;
+}
+
+/**
+ * The twin a job BytePlus refused for a real person runs on again (api/jobs `onTwin`, and the price its button shows): the first enabled twin offering the job's feature
+ * that can make the job, the most images first as in servingRow; an image job takes the first. Undefined when none can.
+ */
+export async function retryTwin(
+  q: Queryable,
+  job: { model: string; feature: string; aspect: string; duration_s: number; input_asset_ids: string[]; params: Record<string, string> },
+): Promise<RetryTwin | undefined> {
+  const { rows } = await q.query(
+    `select id, label, kind, endpoint, ratios, durations_sec, max_images, usd_per_second, image_prices, thinking_levels, thinking_prices from model_configs
+      where twin_of = $1 and enabled and $2 = any(features) order by max_images desc, id`,
+    [job.model, job.feature],
+  );
+  return rows.find((t) => t.kind === 'image' || canServe(t, jobNeed(job)));
 }
 
 /** The price of re-running a failed job on a twin, as the new job's estimate is made (api/jobs); null when the twin does not price the job's settings. */
