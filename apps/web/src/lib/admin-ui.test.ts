@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { auditChanges, auditTarget, groupRecent } from './admin-ui';
+import { auditChanges, auditLabel, auditTarget, groupRecent } from './admin-ui';
 
 test('auditChanges shows a changed field as old → new and an unchanged or new field as its value', () => {
   expect(auditChanges({ enabled: false }, { enabled: true })).toEqual([{ key: 'enabled', text: 'false → true' }]);
@@ -27,4 +27,9 @@ test('groupRecent collapses a run of the same action by the same actor within mi
 test('auditTarget drops the sample prefix and the extension and leaves other targets alone', () => {
   expect(auditTarget('sample:preset-style-flat-lay.jpg')).toBe('preset-style-flat-lay');
   expect(auditTarget('team:t1')).toBe('team:t1');
+});
+
+test('auditLabel words the cap, Vertex and sample events and keeps the code of an unknown one', () => {
+  expect(['feature_cap.update', 'vertex.switch_account', 'vertex_account.update', 'sample.put'].map(auditLabel)).toEqual(['Sửa hạn mức công cụ', 'Chuyển tài khoản Vertex', 'Sửa tài khoản Vertex', 'Tải ảnh mẫu']);
+  expect(auditLabel('cost.release')).toBe('cost.release');
 });

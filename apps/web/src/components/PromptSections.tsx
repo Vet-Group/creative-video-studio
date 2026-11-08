@@ -176,7 +176,7 @@ export function PromptSections({ feature, format, mode, onMode, hook, ending, en
             {children}
           </Section>
           <Section title="③ Kết · cảnh cuối" rule={`Một cảnh dừng rõ ràng: giơ sản phẩm, mỉm cười, cận chi tiết. ${endText ? 'Cần chữ thì dùng ô Chữ trên khung cuối.' : 'Không chữ trên hình.'}`} after={ending.extra}>
-            {part(endingId, 'Cảnh kết', ending, MAX_ENDING, 'Gợi ý cảnh kết', 'Ví dụ: The clip ends with the model smiling at the camera')}
+            {part(endingId, 'Cảnh kết', ending, MAX_ENDING, 'Gợi ý cảnh kết', 'Ví dụ: The clip ends with the model smiling at the camera (nên viết bằng tiếng Anh)')}
           </Section>
         </>
       )}

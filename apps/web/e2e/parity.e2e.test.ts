@@ -364,6 +364,9 @@ test('as on Fash, a sample with a details file shows its prompt, input photos, s
     await page.getByRole('tab', { name: 'Ví dụ' }).click();
     // A tile is named from its details file (the preset, or "Tự viết mô tả" for a prompt), not from the fixture it took the place of.
     await expect(page.getByRole('button', { name: 'Dùng ví dụ này: Ngắm trọn bộ đồ' })).toBeVisible();
+    // The model its details file names is part of the name, so tiles that share a title can be told apart; a file naming none adds nothing.
+    await expect(page.getByRole('button', { name: 'Dùng ví dụ này: Tự viết mô tả, Mock E2E', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Dùng ví dụ này: Ngắm trọn bộ đồ', exact: true })).toBeVisible();
     await openTile(page, 'Tự viết mô tả');
     const detail = page.getByRole('dialog', { name: 'Chi tiết ví dụ' });
     await expect(detail.locator('.detail-prompt')).toHaveText(details.prompt);

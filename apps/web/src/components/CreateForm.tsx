@@ -543,7 +543,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
       maxLength={room}
       onRun={() => canRun && void run()}
       disabled={presetId !== ''}
-      placeholder={presetId === '' ? 'Ví dụ: camera xoay chậm quanh sản phẩm, ánh sáng mềm (nên viết bằng tiếng Anh)' : 'Đang dùng mẫu. Chọn "Tự viết mô tả" trong danh sách mẫu để tự nhập'}
+      placeholder={presetId === '' ? 'Ví dụ: The camera orbits slowly around the product in soft light (nên viết bằng tiếng Anh)' : 'Đang dùng mẫu. Chọn "Tự viết mô tả" trong danh sách mẫu để tự nhập'}
       ask={chosen ? () => ({ field: 'prompt', feature: 'video', text: sec ? prompt : freeText, seconds: durationSec, audio, room: room!, model: chosen.id }) : null}
       enhance={<EnhanceToggle on={enhance} onChange={setEnhance} />}
     />
@@ -820,7 +820,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
                           </span>
                         </span>
                       </button>
-                      <button type="button" className="example-use" aria-label={`Dùng ví dụ này: ${titleOf(ex)}`} onClick={() => (have.has(`${ex.id}.json`) ? recreate(exampleFrom({ example: ex.id })!) : fillFromExample(ex))}>
+                      <button type="button" className="example-use" aria-label={`Dùng ví dụ này: ${[titleOf(ex), exampleModel(tileDetails[ex.id], models?.models)].filter(Boolean).join(', ')}`} onClick={() => (have.has(`${ex.id}.json`) ? recreate(exampleFrom({ example: ex.id })!) : fillFromExample(ex))}>
                         Dùng ví dụ này
                       </button>
                     </li>

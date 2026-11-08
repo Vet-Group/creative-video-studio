@@ -2212,8 +2212,8 @@ dialog.modal.verdict-guide { width: min(40rem, calc(100vw - 2rem)); }
 .library .lib-media > :is(img, video) { display: block; width: 100%; height: 100%; max-height: none; object-fit: contain; border-radius: 0; background: none; }
 .lib-open { position: absolute; inset: 0; width: 100%; height: 100%; padding: 0; border: 0; border-radius: 0; background: none; cursor: zoom-in; }
 .lib-open:focus-visible { outline: 2px solid var(--ink-strong); outline-offset: -2px; }
-.lib-chips { position: absolute; bottom: 8px; left: 8px; display: flex; gap: 4px; max-width: calc(100% - 124px); pointer-events: none; }
-.lib-chip { overflow: hidden; padding: 0 8px; border-radius: 999px; background: rgb(var(--shade) / .6); color: var(--on-dark); font-size: 11px; line-height: 20px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.lib-chips { position: absolute; bottom: 8px; left: 8px; display: flex; flex-wrap: wrap; gap: 4px; max-width: calc(100% - 124px); pointer-events: none; }
+.lib-chip { flex: none; max-width: 100%; overflow: hidden; padding: 0 8px; border-radius: 999px; background: rgb(var(--shade) / .6); color: var(--on-dark); font-size: 11px; line-height: 20px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
 .lib-chips .badge { flex: none; }
 .lib-verdict { position: absolute; top: 8px; right: 8px; max-width: calc(100% - 52px); overflow: hidden; padding: 0 8px; border-radius: 999px; background: var(--cat-utility-solid); color: var(--on-dark); font-size: 11px; line-height: 20px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; pointer-events: none; }
 .lib-verdict.featured { background: var(--favorite); color: var(--on-ink); }
@@ -2367,3 +2367,13 @@ dialog.modal.tool-guide { width: min(52rem, calc(100vw - 2rem)); }
 .preset-card > img { display: block; width: 100%; aspect-ratio: 3 / 4; object-fit: cover; }
 /* A touch screen has no hover: Explore's preset tiles show their name and Create button at once, over a lighter shade. */
 @media (hover: none) { .explore-prompt-hover { opacity: 1; background: rgb(var(--shade) / .2); } }
+/* Phones: a 44 px hit area around the controls that draw smaller, which keep their look. Each control's own ::after is its hit area, so none reaches under another control:
+   the image tile's actions get the gap that makes room for it, and the Library's two view buttons split the gap between them and use the free side. */
+@media (max-width: 480px) {
+  .uploads-link, .explore-start-head .link-button, .library .segmented button, .card-actions > * { position: relative; }
+  .uploads-link { z-index: 1; } /* above the slot's whole-slot button, which spans the label line */
+  :is(.tool-hint-close, .modal-close, .banner-chip, .uploads-link, .explore-start-head .link-button, .library .segmented button, .card-actions > *)::after { content: ''; position: absolute; inset: min(0px, calc((44px - 100%) / -2)); }
+  .card-actions { gap: 14px; }
+  .library .segmented button:first-child::after { right: -1px; left: -12px; }
+  .library .segmented button:last-child::after { right: -12px; left: -1px; }
+}
