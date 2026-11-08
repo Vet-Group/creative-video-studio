@@ -2,7 +2,7 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, test } from 'vitest';
 import type { TrayJob } from '@/lib/api';
-import { inputRefusal } from '@/lib/job-failure';
+import { providerRefusal } from '@/lib/job-failure';
 import { canRetry, canRetryOnTwin, JobFailureNote, twinRetryText } from './JobFailure';
 
 const RAW =
@@ -12,7 +12,7 @@ const GENERIC = 'Không tạo được clip. Hãy thử lại, hoặc đổi ả
 
 const job = (over: Partial<TrayJob>): TrayJob =>
   ({ id: 'j1', status: 'failed', error: null, failureReason: null, resolution: null, retryOf: null, retried: false, ...over }) as TrayJob;
-const refused = (error: string) => job({ error, failureReason: inputRefusal(error)?.reason ?? null });
+const refused = (error: string) => job({ error, failureReason: providerRefusal(error)?.reason ?? null });
 
 test('a Member sees the real-person sentence and not the raw error', () => {
   const html = renderToStaticMarkup(<JobFailureNote job={refused(RAW)} isAdmin={false} />);
@@ -60,4 +60,15 @@ test('a job refused for a real person can go once to its fal twin, with the twin
   expect(canRetryOnTwin({ ...refused(RAW.replace('.PrivacyInformation', '.Other')), twin })).toBe(false); // another refusal is not a real person
   expect(canRetryOnTwin(job({ error: 'boom', twin }))).toBe(false);
   expect(twinRetryText({ ...refused(RAW), twin })).toEqual({ button: 'Chạy lại trên fal.ai', ask: 'Chạy lại lượt tạo này bằng Seedance 1.0 Pro trên fal.ai (nhận ảnh có người thật) với giá khoảng $0.6200?' });
+});
+
+test('a clip whose sound BytePlus blocked says so, and can go once to its fal twin without the real-person note', () => {
+  const audio = refused('byteplus status: OutputAudioSensitiveContentDetected.PolicyViolation: The request failed because the output audio may be related to copyright restrictions. Request id: 0217');
+  const html = renderToStaticMarkup(<JobFailureNote job={audio} isAdmin={false} />);
+  expect(html).toContain('Âm thanh tạo ra bị nhà cung cấp chặn vì có thể vi phạm bản quyền. Hãy tắt âm thanh hoặc bỏ yêu cầu về nhạc trong mô tả rồi chạy lại.');
+  expect(html).not.toContain('OutputAudioSensitiveContentDetected');
+  const twin = { label: 'Seedance 2.0 Reference', estimateUsd: '1.8500' };
+  expect(canRetry(audio)).toBe(false);
+  expect(canRetryOnTwin({ ...audio, twin })).toBe(true);
+  expect(twinRetryText({ ...audio, twin })).toEqual({ button: 'Chạy lại trên fal.ai', ask: 'Chạy lại lượt tạo này bằng Seedance 2.0 Reference trên fal.ai với giá khoảng $1.8500?' });
 });

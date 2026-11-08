@@ -9,7 +9,7 @@ import { pool } from '@/lib/auth';
 import { mp4VideoInfo } from '@/lib/assets';
 import { boss } from '@/lib/queue';
 import { findChoice } from '@/lib/choices';
-import { inputRefusal } from '@/lib/job-failure';
+import { providerRefusal, TWIN_REASONS } from '@/lib/job-failure';
 import { jobNeed, offeredNow, retryTwin, servingRow, twinEstimate } from '@/lib/model-twins';
 import { BRAND_FEATURES, withBrand } from '@/lib/brand';
 import { ADVANCED_MAX_SCRIPT, END_TEXT_POSITIONS, isParamFormat, MAX_END_TEXT, MAX_ENDING, MAX_HIGHLIGHT, MAX_HIGHLIGHTS, MAX_HOOK, PARAM_FORMATS, UNBOXING_ROLES } from '@/lib/marketing';
@@ -56,8 +56,8 @@ const CAP_MESSAGES: Record<CapRefusal, string> = {
 /**
  * `?mine`: the "My jobs" tray. The caller's 20 latest jobs that are not deleted, newest first, whether the worker is offline
  * (no heartbeat for 60 s), and `clips`: the video clips made today against the daily clip cap. `retried` is true once the job has its one manual retry.
- * `failureReason` is `real_person` or `sensitive_input` when the provider refused the job's input image (read from `error`), else null.
- * `twin` is `{ label, estimateUsd }` of the enabled twin model (migration 0075) a job refused for a real person can be retried on (POST `onTwin`), else null.
+ * `failureReason` is `real_person` or `sensitive_input` when the provider refused the job's input image, `output_audio` when it refused the sound it made (read from `error`), else null.
+ * `twin` is `{ label, estimateUsd }` of the enabled twin model (migration 0075) a job refused for a real person or its sound can be retried on (POST `onTwin`), else null.
  */
 export async function GET(request: Request) {
   const g = await guard(request, 'member');
@@ -76,7 +76,7 @@ export async function GET(request: Request) {
     dailyClips(pool, g.session.user.id),
   ]);
   // Only a job that BytePlus refused for a real person and has not been retried has a twin to offer; its price is what the new job's estimate would be.
-  const refused = jobs.rows.filter((r) => !r.retried && !r.retry_of && ['failed', 'failed_unknown', 'timed_out'].includes(r.status) && inputRefusal(r.error)?.reason === 'real_person');
+  const refused = jobs.rows.filter((r) => !r.retried && !r.retry_of && ['failed', 'failed_unknown', 'timed_out'].includes(r.status) && TWIN_REASONS.includes(providerRefusal(r.error)?.reason as string));
   const twins = new Map<string, { label: string; estimateUsd: string | null }>();
   if (refused.length > 0) {
     // The twin a retry would take (retryTwin), with that run's price; a refused job is rare, so one query each.
@@ -89,7 +89,7 @@ export async function GET(request: Request) {
     workerOffline: worker.rows[0].offline,
     clips,
     jobs: jobs.rows.map((r) => ({
-      id: r.id, status: r.status, error: r.error, failureReason: inputRefusal(r.error)?.reason ?? null, isMock: r.is_mock, feature: r.feature, ratio: r.aspect, durationSec: r.duration_s, resolution: r.params.resolution ?? null, modelId: r.model, retryOf: r.retry_of,
+      id: r.id, status: r.status, error: r.error, failureReason: providerRefusal(r.error)?.reason ?? null, isMock: r.is_mock, feature: r.feature, ratio: r.aspect, durationSec: r.duration_s, resolution: r.params.resolution ?? null, modelId: r.model, retryOf: r.retry_of,
       retried: r.retried, twin: twins.get(r.id) ?? null, outputAssetId: r.output_asset_id, posterAssetId: r.poster_asset_id, createdAt: r.created_at, finishedAt: r.finished_at,
       // For the History card: the member's own words (a free prompt on Create video and Image Generation; elsewhere the prompt is composed, so the kept brief),
       // the inputs, the format and the caller's favourite.
@@ -120,7 +120,7 @@ export async function GET(request: Request) {
  * Every other feature takes images only. `useBrand` (Marketing Studio and Image Generation) adds the chosen store's brand kit to the prompt (lib/brand.ts).
  * `retryOf` retries the caller's own failed job once: the inputs, model, preset, prompt, ratio, duration, team and store all come from the
  * original (the body may carry just `retryOf`), the estimate from the model's current price. `onTwin: true` with `retryOf` runs it on the original model's enabled twin instead (migration 0075),
- * only for a job whose input photo BytePlus refused as a real person (`failureReason` real_person), which the dearer fal twin accepts.
+ * only for a job BytePlus refused for a real person in its photo or for the sound it made (`failureReason` real_person or output_audio), which the dearer fal twin may make.
  * A new Run may not name the dearer row of a pair of duplicate models while its twin can serve, nor the twin that cannot while the dearer one can (lib/model-twins.ts).
  */
 export async function POST(request: Request) {
@@ -297,7 +297,7 @@ export async function POST(request: Request) {
       }
       let modelId: string = o.model;
       if (onTwin) {
-        if (inputRefusal(o.error)?.reason !== 'real_person') return Response.json({ error: 'only a job refused for a real person can be retried on its twin' }, { status: 409 });
+        if (!TWIN_REASONS.includes(providerRefusal(o.error)?.reason as string)) return Response.json({ error: 'only a job refused for a real person or its sound can be retried on its twin' }, { status: 409 });
         const twin = await retryTwin(tx, o);
         if (!twin) return Response.json({ error: 'the job has no enabled twin model' }, { status: 409 });
         modelId = twin.id;
