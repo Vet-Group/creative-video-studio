@@ -1,12 +1,12 @@
 // The end text the worker burns into a Marketing Studio clip, with the pinned ffmpeg on a small clip made here.
 import { execFile } from 'node:child_process';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import ffprobe from 'ffprobe-static';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
-import { burnEndText, endTextLayout, requireFfmpeg, wrapText } from './media';
+import { burnEndText, endTextLayout, probeSeconds, probeVideoSeconds, requireFfmpeg, wrapText } from './media';
 
 const run = promisify(execFile);
 let dir = '';
@@ -58,5 +58,23 @@ describe('the end text', () => {
       expect(meanDiff(await frame(source, 1), await frame(out, 1))).toBeLessThan(1.5); // early frames are untouched, bar re-encoding
       expect(meanDiff(await frame(source, 3.5), await frame(out, 3.5))).toBeGreaterThan(4); // the band and the text in the last 2 s
     }
+  });
+});
+
+describe("a video's real length", () => {
+  test('comes from its packets, not the MP4 header the uploader writes, and a trimmed copy reads as trimmed', async () => {
+    expect(await probeVideoSeconds(source)).toBeCloseTo(4, 1);
+    // The same clip with its movie header (mvhd) claiming 1 s, as the upload's length reader would see it.
+    const bytes = await readFile(source);
+    const at = bytes.indexOf('mvhd');
+    bytes.writeUInt32BE(bytes.readUInt32BE(at + 16), at + 20); // version 0: timescale at +16, duration at +20
+    const lying = join(dir, 'lying.mp4');
+    await writeFile(lying, bytes);
+    expect(await probeSeconds(lying)).toBeCloseTo(1, 1);
+    expect(await probeVideoSeconds(lying)).toBeCloseTo(4, 1);
+    // A stream copy cut to 2 s keeps the cut frames behind an edit list; the length played is still 2 s.
+    const trimmed = join(dir, 'trimmed.mp4');
+    await run(requireFfmpeg(), ['-y', '-v', 'error', '-ss', '1', '-t', '2', '-i', source, '-c', 'copy', trimmed]);
+    expect(await probeVideoSeconds(trimmed)).toBeCloseTo(2, 0);
   });
 });

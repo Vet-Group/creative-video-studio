@@ -1,7 +1,7 @@
 // The worker against a disposable database and bucket on the compose Postgres and MinIO (`pnpm services:up`), with the mock provider.
 import { randomBytes, randomUUID } from 'node:crypto';
 import { execFile } from 'node:child_process';
-import { mkdir, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -325,8 +325,18 @@ describe('Create video extras', () => {
   });
 });
 
+/** Stores a real `seconds`-long clip as the input asset `id`, whose length at upload (duration_ms, read from the MP4 header) was `durationMs`. */
+async function storeClip(id: string, seconds: number, durationMs: number): Promise<void> {
+  const file = join(mockDir, `${randomUUID()}-ref.mp4`);
+  await mkdir(mockDir, { recursive: true });
+  await run(requireFfmpeg(), ['-y', '-v', 'error', '-f', 'lavfi', '-i', 'testsrc2=size=320x240:rate=24', '-t', String(seconds), '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', file]);
+  await putObject(`assets/${id}`, await readFile(file), 'video/mp4');
+  await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, duration_ms) values ($1, 'u1', 'input', $2, 'r.mp4', 'video/mp4', 1, $3)`, [id, `assets/${id}`, durationMs]);
+}
+
 describe('Marketing Studio reference video', () => {
   test("a job's params.videoAssetId reaches the adapter as the one clip's asset URL; without it the request has none", async () => {
+    await storeClip('motion', 3, 3000);
     const requests: SubmitRequest[] = [];
     await start(counting(300, (inner) => ({ ...inner, submit: async (req) => (requests.push(req), inner.submit(req)) })));
     const guided = await newJob('u1', { prompt: 'guided' });
@@ -350,7 +360,7 @@ describe('Marketing Studio reference video price', () => {
       `insert into model_configs (id, provider, endpoint, label, ratios, durations_sec, max_images, output_resolution, usd_per_second, sources, enabled)
        values ('mock-seedance-ref', 'mock', 'bytedance/seedance-2.0/us/reference-to-video', 'Mock Seedance', '{9:16}', '{5}', 4, '720p', 0.37, '{}', true)`,
     );
-    await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, duration_ms) values ('ref-clip', 'u1', 'input', 'assets/ref-clip', 'r.mp4', 'video/mp4', 1, 4200)`);
+    await storeClip('ref-clip', 4.2, 4200);
     const guided = await newJob('u1', { prompt: 'priced', model: 'mock-seedance-ref' });
     await pool.query(`update jobs set input_asset_ids = '{start}', params = '{"format":"advanced","audio":"off","videoAssetId":"ref-clip"}' where id = $1`, [guided]);
     await send(guided, 'u1');
@@ -358,6 +368,23 @@ describe('Marketing Studio reference video price', () => {
     expect(rates.length).toBeGreaterThanOrEqual(2);
     for (const [, rate] of rates) expect(rate).toBeCloseTo((0.222 * (5 + 5)) / 5, 6); // 4.2 s counts as 5
     expect(new Set(rates.map(([at]) => at))).toEqual(new Set(['submit', 'status']));
+  });
+
+  test('a reference video that plays more than 1 s longer than its header said is refused before submit, and its estimate released (#349)', async () => {
+    const prompts: string[] = [];
+    await start(counting(300, (inner) => ({ ...inner, submit: async (req) => (prompts.push(req.prompt), inner.submit(req)) })));
+    await storeClip('ref-short-header', 6, 2000); // a 6 s clip whose header claims 2 s
+    await storeClip('ref-close', 3, 2500); // within 1 s of its header: still sent
+    const lying = await newJob('u1', { prompt: 'lying' });
+    const close = await newJob('u2', { prompt: 'close' });
+    await pool.query(`update jobs set input_asset_ids = '{start}', params = '{"format":"advanced","audio":"off","videoAssetId":"ref-short-header"}' where id = $1`, [lying]);
+    await pool.query(`update jobs set input_asset_ids = '{start}', params = '{"format":"advanced","audio":"off","videoAssetId":"ref-close"}' where id = $1`, [close]);
+    await send(lying, 'u1');
+    await send(close, 'u2');
+    await waitFor('the lying job to fail and the close one to succeed', async () => (await status(lying)) === 'failed' && (await status(close)) === 'succeeded');
+    expect((await job(lying)).error).toMatch(/^the reference video plays 6\.0 s, but its file header says 2\.0 s/);
+    expect(await total(lying)).toEqual({ usd: '0.0000', is_final: true });
+    expect(prompts).toEqual(['close']);
   });
 });
 

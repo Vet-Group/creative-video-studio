@@ -53,6 +53,23 @@ export async function probeSeconds(file: string): Promise<number> {
   return Number(stdout.trim());
 }
 
+/**
+ * How long a video's first video stream plays, from its packets' timestamps (edit lists applied), in seconds; 0 without video packets. The MP4 header
+ * (`mvhd`), which `probeSeconds` and the upload read, is written by whoever made the file and can claim any length.
+ */
+export async function probeVideoSeconds(file: string): Promise<number> {
+  const { stdout } = await run(ffprobe.path, ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'packet=pts_time,duration_time', '-of', 'csv=p=0', file], { maxBuffer: 64 * 1024 * 1024 });
+  let first = Number.POSITIVE_INFINITY;
+  let end = 0;
+  for (const line of stdout.split('\n')) {
+    const [pts, duration] = line.split(',').map(Number);
+    if (!Number.isFinite(pts)) continue;
+    first = Math.min(first, pts!);
+    end = Math.max(end, pts! + (duration || 0));
+  }
+  return end > 0 ? end - Math.max(0, first) : 0;
+}
+
 /** `n` evenly spaced stills of an MP4 as small JPEGs (512 px on the long side at most), in time order, and the clip's length in seconds. */
 export async function extractFrames(video: Uint8Array, n: number): Promise<{ seconds: number; stills: Uint8Array[] }> {
   const dir = await mkdtemp(join(tmpdir(), 'cvs-frames-'));
