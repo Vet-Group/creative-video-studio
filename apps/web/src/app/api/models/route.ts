@@ -50,6 +50,8 @@ export async function GET(request: Request) {
   const endFrame = q.get('endFrame') === '1';
   const audioClips = q.get('audioClips') === null ? 0 : Number(q.get('audioClips'));
   if (!Number.isInteger(audioClips) || audioClips < 0 || audioClips > 20) return Response.json({ error: 'audioClips must be a whole number from 0 to 20' }, { status: 400 });
+  const images = q.get('images') === null ? 0 : Number(q.get('images'));
+  if (!Number.isInteger(images) || images < 0 || images > 20) return Response.json({ error: 'images must be a whole number from 0 to 20' }, { status: 400 });
   const userId = g.session.user.id;
 
   const fal = await falBalance();
@@ -80,13 +82,14 @@ export async function GET(request: Request) {
     // A pair acts as one model (migration 0078): the listed row takes on what its enabled twins add, and is priced as the row the job would run on (servingRow).
     // The twins taking the most images first, as servingRow orders them.
     const pair = [r, ...models.rows.filter((t) => t.twin_of === r.id).sort((a, b) => b.max_images - a.max_images || a.id.localeCompare(b.id))];
-    const need = { durationSec, ratio: ratio!, images: 0, video: videoSec > 0, audioClips, endFrame };
+    const need = { durationSec, ratio: ratio!, images, video: videoSec > 0, audioClips, endFrame };
     // Whether the entry makes this ratio and length at all; what the form adds only picks the row (the form leaves out what the chosen model does not take).
-    const plain = { ...need, video: false, audioClips: 0, endFrame: false, audio: false };
+    const plain = { ...need, images: 0, video: false, audioClips: 0, endFrame: false, audio: false };
     const serving = pair.find((p) => canServe(p, { ...need, audio: false })) ?? pair.find((p) => canServe(p, plain)) ?? r;
     const voiced = pair.find((p) => canServe(p, { ...need, audio: true })) ?? serving;
     // What the form may add (an end frame, audio clips, a reference video) comes from the rows that make this ratio and length.
-    const fit = pair.filter((p) => p.ratios.includes(ratio) && p.durations_sec.includes(durationSec));
+    // With the form's images too: a twin that takes an end frame but fewer images cannot run this job (servingRow), so it offers nothing.
+    const fit = pair.filter((p) => p.ratios.includes(ratio) && p.durations_sec.includes(durationSec) && images <= p.max_images);
     const takes = (fit.length > 0 ? fit : [r]).map((p) => videoInputs(p.endpoint));
     const ratios = [...new Set(pair.flatMap((p) => p.ratios as string[]))];
     const durations = [...new Set(pair.flatMap((p) => p.durations_sec as number[]))].sort((a, b) => a - b);

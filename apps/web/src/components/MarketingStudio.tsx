@@ -7,6 +7,7 @@
 import { useRouter } from 'next/navigation';
 import { type CSSProperties, useEffect, useId, useState } from 'react';
 import { ABOUT } from '@/lib/about-content';
+import { NO_CAP } from '@/lib/caps';
 import { api, errorText, sendJson } from '@/lib/api';
 import { ADVANCED_MAX_IMAGES, ADVANCED_MAX_SCRIPT, advancedPrompt, briefRoom, END_TEXT_POSITIONS, type EndTextPosition, FORMAT_HREF, FORMAT_NAME, highlightLines, hrefOfFormat, marketingPrompt, type MarketingFormat, reviewPrompt, sectionPrompt, unboxingPrompt, unboxingRoles } from '@/lib/marketing';
 import { PROMPT_TEMPLATES } from '@/lib/prompt-starters';
@@ -365,7 +366,8 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
     // A job made on a duplicate pair's twin keeps the pair's entry.
     const first = list.models.find((m) => m.pairIds.includes(modelId)) ?? list.models.find((m) => m.id === list.defaultId) ?? list.models[0];
     if (first) pickModel(first);
-  }, [list, recall.answered]);
+    // modelId too: a reused job's twin id can land after the list, and must still map to its pair's entry.
+  }, [list, recall.answered, modelId]);
 
   /** The photo the format still needs: Advanced one reference, Unboxing the product (its model and packaging are optional), the others the model and the product. */
   const photoReason = advanced
@@ -732,7 +734,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
             )}
             {n > 1 && clips && (
               <p className="help variants-usage">
-                {n} biến thể, tổng ${total}: dùng {n} trong {clips.cap} clip mỗi ngày của bạn (hôm nay đã dùng {clips.today}).
+                {n} biến thể, tổng ${total}: {clips.cap >= NO_CAP ? `dùng ${n} clip (hôm nay đã dùng ${clips.today})` : `dùng ${n} trong ${clips.cap} clip mỗi ngày của bạn (hôm nay đã dùng ${clips.today})`}.
               </p>
             )}
             {notice && <p role="status">{notice}</p>}

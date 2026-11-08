@@ -146,8 +146,8 @@ function Limits({ usage }: { usage: Usage | null | 'failed' }) {
 function Today({ usage, onMore }: { usage: Usage | null | 'failed'; onMore: () => void }) {
   if (usage === 'failed') return LIMITS_FAILED;
   const cells = usage && [
-    ['Clip video', usage.clips.used, usage.clips.cap, `${usage.clips.used} / ${usage.clips.cap}`],
-    ['Ảnh và ứng dụng', Number(usage.dayUsd.used), Number(usage.dayUsd.cap), `${usd(usage.dayUsd.used)} / ${usd(usage.dayUsd.cap)}`],
+    ['Clip video', usage.clips.used, usage.clips.cap, usage.clips.cap >= NO_CAP ? `${usage.clips.used}` : `${usage.clips.used} / ${usage.clips.cap}`],
+    ['Ảnh và ứng dụng', Number(usage.dayUsd.used), Number(usage.dayUsd.cap), Number(usage.dayUsd.cap) >= NO_CAP ? usd(usage.dayUsd.used) : `${usd(usage.dayUsd.used)} / ${usd(usage.dayUsd.cap)}`],
   ] as const;
   return (
     <div className="today">
@@ -162,9 +162,11 @@ function Today({ usage, onMore }: { usage: Usage | null | 'failed'; onMore: () =
           <div key={label} className="today-cell" data-level={levelOf(shareOf(used, cap))}>
             <span>{label}</span>
             <strong>{text}</strong>
-            <span className="today-bar" aria-hidden="true">
-              <span style={{ width: `${shareOf(used, cap) * 100}%` }} />
-            </span>
+            {cap < NO_CAP && (
+              <span className="today-bar" aria-hidden="true">
+                <span style={{ width: `${shareOf(used, cap) * 100}%` }} />
+              </span>
+            )}
           </div>
         ))
       ) : (

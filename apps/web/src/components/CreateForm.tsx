@@ -313,8 +313,8 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
   useEffect(() => {
     if (!ready || !recall.answered) return;
     let stale = false;
-    // An end frame or audio clips may move a duplicate pair onto its fal row (servingRow), so the list is priced with them.
-    const adds = `${withEnd ? '&endFrame=1' : ''}${clipCount > 0 ? `&audioClips=${clipCount}` : ''}`;
+    // The images, an end frame or audio clips may move a duplicate pair onto its fal row (servingRow), so the list is priced with them.
+    const adds = `${images.length > 0 ? `&images=${images.length}` : ''}${withEnd ? '&endFrame=1' : ''}${clipCount > 0 ? `&audioClips=${clipCount}` : ''}`;
     api<ModelsResponse>(`/api/models?feature=video&ratio=${encodeURIComponent(ratio)}&durationSec=${durationSec}${adds}`).then(
       (r) => {
         if (stale) return;
@@ -336,7 +336,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
     return () => {
       stale = true;
     };
-  }, [ready, recall.answered, ratio, durationSec, refetch, withEnd, clipCount]);
+  }, [ready, recall.answered, ratio, durationSec, refetch, withEnd, clipCount, images.length]);
 
   const chosen = models?.models.find((m) => m.id === modelId);
   const audioOn = (audio || chosen?.alwaysAudio === true) && chosen?.audioEstimateUsd != null;

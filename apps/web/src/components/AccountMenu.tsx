@@ -3,6 +3,7 @@
 import { type CSSProperties, type KeyboardEvent, useId, useRef, useState } from 'react';
 import { api } from '@/lib/api';
 import { isMac } from '@/lib/sidebar';
+import { NO_CAP } from '@/lib/caps';
 import { Icon, type IconName } from './Icon';
 import { initials, levelOf, type Section, shareOf, signOut, type Usage } from './Settings';
 
@@ -105,10 +106,14 @@ export function AccountMenu({ name, email, color, variant, onSettings }: { name:
                 <span className="account-meter" data-level={clips && clips !== 'failed' ? levelOf(share) : undefined}>
                   <span>{text}</span>
                   <span className="account-meter-row">
-                    <span className="today-bar" aria-hidden="true">
-                      <span style={{ width: `${share * 100}%` }} />
+                    {!(clips && clips !== 'failed' && clips.cap >= NO_CAP) && (
+                      <span className="today-bar" aria-hidden="true">
+                        <span style={{ width: `${share * 100}%` }} />
+                      </span>
+                    )}
+                    <span className="account-meter-value">
+                      {clips === 'failed' ? 'Không tải được' : clips ? (clips.cap >= NO_CAP ? `${clips.used} clip, không giới hạn` : `${clips.used} / ${clips.cap} clip`) : '...'}
                     </span>
-                    <span className="account-meter-value">{clips === 'failed' ? 'Không tải được' : clips ? `${clips.used} / ${clips.cap} clip` : '...'}</span>
                   </span>
                 </span>
               ) : (
