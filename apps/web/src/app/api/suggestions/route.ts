@@ -8,6 +8,7 @@ import { ADVANCED_MAX_SCRIPT, isParamFormat, MAX_CHOICE_DESC, MAX_CHOICE_NAME, M
 import { boss } from '@/lib/queue';
 import { headSample } from '@/lib/samples';
 import { guard, isEditor } from '@/lib/session';
+import { readJson } from '@/lib/assets';
 
 const bad = (error: string, status = 400) => Response.json({ error }, { status });
 
@@ -24,7 +25,7 @@ const bad = (error: string, status = 400) => Response.json({ error }, { status }
 export async function POST(request: Request) {
   const g = await guard(request, 'member');
   if (g.error) return g.error;
-  const b = (await request.json().catch(() => null)) as {
+  const b = (await readJson(request)) as {
     field?: unknown; format?: unknown; feature?: unknown; text?: unknown; hook?: unknown; location?: unknown; room?: unknown; model?: unknown; audio?: unknown; seconds?: unknown; preset?: unknown; rest?: unknown;
   } | null;
   if (b?.field !== 'brief' && b?.field !== 'script' && b?.field !== 'hook' && b?.field !== 'location' && b?.field !== 'ending' && b?.field !== 'prompt' && b?.field !== 'translate' && b?.field !== 'video') {

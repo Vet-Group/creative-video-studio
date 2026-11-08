@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { insertAssets, keptInputs } from '@cvs/db/assets';
-import { db, MAX_BYTES, MAX_FILES, mp4DurationMs, sniffImage, sniffVideo } from '@/lib/assets';
+import { db, MAX_BYTES, MAX_FILES, mp4DurationMs, readJson, sniffImage, sniffVideo } from '@/lib/assets';
 import { pool } from '@/lib/auth';
 import { headSample, MAX_SAMPLE_BYTES, SAMPLE_PREFIX, sampleType } from '@/lib/samples';
 import { guard } from '@/lib/session';
@@ -21,7 +21,7 @@ export const COPY_HOURLY_LIMIT = 200;
 export async function POST(request: Request) {
   const g = await guard(request, 'member');
   if (g.error) return g.error;
-  const body = (await request.json().catch(() => null)) as { names?: unknown; slot?: unknown } | null;
+  const body = (await readJson(request)) as { names?: unknown; slot?: unknown } | null;
   const names = body?.names;
   if (!Array.isArray(names) || names.length === 0 || names.length > MAX_FILES || !names.every((n) => typeof n === 'string' && (sampleType(n)?.startsWith('image/') || sampleType(n) === 'video/mp4')) || names.filter((n) => sampleType(n as string) === 'video/mp4').length > 1) {
     return Response.json({ error: `send 1 to ${MAX_FILES} sample picture names in "names", or one sample clip` }, { status: 400 });

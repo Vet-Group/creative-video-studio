@@ -1,6 +1,6 @@
 import { audit } from '@cvs/core/audit';
 import { withTransaction } from '@cvs/core/ledger';
-import { type RouteContext } from '@/lib/assets';
+import { readJson, type RouteContext } from '@/lib/assets';
 import { pool } from '@/lib/auth';
 import { LIVE_CLIP } from '@/lib/clips';
 import { isFault } from '@/lib/faults';
@@ -17,7 +17,7 @@ export async function PUT(request: Request, { params }: RouteContext) {
   const g = await guard(request, 'member');
   if (g.error) return g.error;
   const { id } = await params;
-  const body = (await request.json().catch(() => null)) as { verdict?: unknown; fault?: unknown; featured?: unknown } | null;
+  const body = (await readJson(request)) as { verdict?: unknown; fault?: unknown; featured?: unknown } | null;
   const verdict = body?.verdict;
   if (verdict !== 'pass' && verdict !== 'fail') return bad("verdict must be 'pass' or 'fail'");
   if (verdict === 'fail' && !isFault(body?.fault)) return bad('a Fail needs one of the faults, or other');

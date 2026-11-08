@@ -20,7 +20,7 @@ import type { Suggester } from '@cvs/core/suggest';
 import { insertAssets } from '@cvs/db/assets';
 import { createDb, type createPool } from '@cvs/db/client';
 import { type Job, PgBoss } from 'pg-boss';
-import { burnEndText, closestRatio, extractPoster, probeSize, sniffImage } from './media';
+import { burnEndText, closestRatio, extractPoster, probeSeconds, probeSize, sniffImage } from './media';
 import { purgeDeletedClips } from './purge';
 import { deleteObject, getObject, putObject } from './storage';
 import { runSuggestion } from './suggest';
@@ -297,7 +297,12 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
    * Copies the output into MinIO, checks it is at least 720p (or the row's own resolution when that is lower, as on a 480p draft row), cuts the poster
    * and settles the job. A failure that may pass leaves the job running for the next pass.
    */
-  async function deliver(job: { id: string; user_id: string; provider: string; kind: string; output_resolution?: string | null; params?: Record<string, string> }, outputUrl: string, costUsd: number, tokens?: number): Promise<void> {
+  async function deliver(
+    job: { id: string; user_id: string; provider: string; kind: string; output_resolution?: string | null; params?: Record<string, string>; feature?: string; duration_s?: number },
+    outputUrl: string,
+    costUsd: number,
+    tokens?: number,
+  ): Promise<void> {
     if (job.kind === 'image') return deliverImage(job, outputUrl, costUsd);
     const dir = await mkdtemp(join(tmpdir(), 'cvs-deliver-'));
     const outputId = randomUUID();
@@ -308,6 +313,12 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
       let video = join(dir, 'output.mp4');
       await download(outputUrl, video, job.provider);
       const { width, height } = await probeSize(video);
+      // The member's own video sets the length here (Motion Control, a reference video), and its header can understate it, so a clip that came back
+      // longer is billed for its own length. shortcut: scales the whole estimate by the length, not each price part; bill per part if one ever differs.
+      if ((job.feature === 'motion_control' || job.params?.videoAssetId) && job.duration_s) {
+        const seconds = await probeSeconds(video);
+        if (seconds > job.duration_s + 1) costUsd = (costUsd * Math.ceil(seconds)) / job.duration_s;
+      }
       const floor = Math.min(720, Number.parseInt(job.output_resolution ?? '', 10) || 720);
       if (Math.min(width, height) < floor) {
         await settle(pool, job.id, { status: 'failed', costUsd, billed: true, tokens, error: `the output is ${width}x${height}, below ${floor}p` });
@@ -406,7 +417,7 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
 
   async function pollRunning(): Promise<void> {
     const { rows } = await pool.query(
-      `select j.id, j.user_id, j.provider, j.provider_job_id, j.model, j.params, j.duration_s, m.kind, m.output_resolution, (now() - j.started_at > ($1::float8 * interval '1 millisecond')) as expired
+      `select j.id, j.user_id, j.provider, j.provider_job_id, j.model, j.feature, j.params, j.duration_s, m.kind, m.output_resolution, (now() - j.started_at > ($1::float8 * interval '1 millisecond')) as expired
          from jobs j join model_configs m on m.id = j.model where j.status = 'running'`,
       [o.runTimeoutMs],
     );

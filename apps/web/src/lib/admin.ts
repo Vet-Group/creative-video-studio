@@ -1,11 +1,12 @@
 // Small helpers shared by the /api/admin routes.
 import { isAPIError } from 'better-auth/api';
+import { readJson } from '@/lib/assets';
 
 export const bad = (error: string, status = 400) => Response.json({ error }, { status });
 
 /** The JSON object of a request body, or null when it is missing or not an object. */
 export async function readBody(request: Request): Promise<Record<string, unknown> | null> {
-  const body: unknown = await request.json().catch(() => null);
+  const body: unknown = await readJson(request);
   return body && typeof body === 'object' && !Array.isArray(body) ? (body as Record<string, unknown>) : null;
 }
 

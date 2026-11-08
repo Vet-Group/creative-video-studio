@@ -5,6 +5,7 @@ import { CHOICE_SQL, choiceFields, listedChoice, type ListedChoice } from '@/lib
 import { LIVE_CLIP } from '@/lib/clips';
 import { BUILT_IN_CHOICES, isParamFormat, MAX_CHOICES, PARAM_FORMATS } from '@/lib/marketing';
 import { guard, isEditor } from '@/lib/session';
+import { readJson } from '@/lib/assets';
 
 const bad = (error: string, status = 400) => Response.json({ error }, { status });
 /** The most ids one often-used list holds. */
@@ -78,7 +79,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const g = await guard(request, 'member');
   if (g.error) return g.error;
-  const b = (await request.json().catch(() => null)) as Record<string, unknown> | null;
+  const b = (await readJson(request)) as Record<string, unknown> | null;
   const kind = b?.kind as ChoiceKind;
   if (!b || !CHOICE_KINDS.includes(kind)) return bad('kind must be hook, location or ending');
   const f = await choiceFields(b, g.session.user);

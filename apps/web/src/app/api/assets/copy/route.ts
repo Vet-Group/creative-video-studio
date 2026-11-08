@@ -1,5 +1,5 @@
 import { insertAssets } from '@cvs/db/assets';
-import { db, mp4DurationMs, sniffVideo } from '@/lib/assets';
+import { db, mp4DurationMs, readJson, sniffVideo } from '@/lib/assets';
 import { pool } from '@/lib/auth';
 import { MAX_SAMPLE_BYTES } from '@/lib/samples';
 import { guard } from '@/lib/session';
@@ -14,7 +14,7 @@ import { COPY_HOURLY_LIMIT } from '../samples/route';
 export async function POST(request: Request) {
   const g = await guard(request, 'member');
   if (g.error) return g.error;
-  const body = (await request.json().catch(() => null)) as { assetId?: unknown } | null;
+  const body = (await readJson(request)) as { assetId?: unknown } | null;
   if (typeof body?.assetId !== 'string') return Response.json({ error: 'send the clip\'s asset id in "assetId"' }, { status: 400 });
   const userId = g.session.user.id;
   const found = (

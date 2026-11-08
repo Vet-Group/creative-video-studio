@@ -11,10 +11,10 @@ process.env.APP_URL = 'http://localhost';
 process.env.S3_BUCKET = `cvs-test-${randomBytes(6).toString('hex')}`;
 
 const { auth, pool } = await import('@/lib/auth');
-const { MAX_BODY } = await import('@/lib/assets');
+const { MAX_BODY, MAX_JSON_BYTES, readJson } = await import('@/lib/assets');
 const { signDownloadToken } = await import('@/lib/download-token');
 const { bucketName, ensureBucket, s3 } = await import('@/lib/storage');
-const { POST, UPLOADS_LIMIT } = await import('./route');
+const { POST, UPLOAD_HOURLY_LIMIT, UPLOADS_LIMIT } = await import('./route');
 const { GET: GET_DETAILS } = await import('./[id]/route');
 const { GET: GET_CONTENT } = await import('./[id]/content/route');
 const { GET: GET_DOWNLOAD } = await import('./[id]/download/route');
@@ -203,6 +203,36 @@ describe('POST /api/assets', () => {
     expect(res.status).toBe(415);
     expect(await assetCount()).toBe(rows);
     expect((await objectKeys()).sort()).toEqual(keys.sort());
+  });
+
+  test('stops a member who added the hourly limit of new files, counting older ones out', async () => {
+    const busyId = (await auth.api.createUser({ body: { email: 'hourly@example.test', name: 'Hourly', password: PASSWORD, role: 'member' } })).user.id;
+    const busy = await signIn('hourly@example.test');
+    const add = (count: number, age: string) =>
+      pool.query(
+        `insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, created_at) select 'up-' || g || '-' || replace($2, ' ', ''), $3::text, 'input', 'up/' || g || '-' || $2, 'x.jpg', 'image/jpeg', 1, now() - $2::interval from generate_series(1, $1) g`,
+        [count, age, busyId],
+      );
+    await add(UPLOAD_HOURLY_LIMIT, '2 hours'); // older than the hour: not counted
+    await add(UPLOAD_HOURLY_LIMIT - 1, '1 minute');
+    expect((await upload(busy, { name: 'a.png', bytes: png(64) })).status).toBe(201); // the 100th
+    const res = await upload(busy, { name: 'b.png', bytes: png(64) });
+    expect(res.status).toBe(429);
+    expect(((await res.json()) as { error: string }).error).toMatch(/giờ/);
+  });
+
+  test('reads a JSON body up to MAX_JSON_BYTES and nothing past it, even without content-length', async () => {
+    const post = (body: BodyInit, headers: Record<string, string> = {}) => new Request(BASE, { method: 'POST', body, headers, duplex: 'half' } as RequestInit);
+    expect(await readJson(post(JSON.stringify({ a: 1 })))).toEqual({ a: 1 });
+    expect(await readJson(post('not json'))).toBeNull();
+    expect(await readJson(post('{}', { 'content-length': String(MAX_JSON_BYTES + 1) }))).toBeNull();
+    const chunked = new ReadableStream<Uint8Array>({
+      start(c) {
+        c.enqueue(new TextEncoder().encode(`{"a":"${'x'.repeat(MAX_JSON_BYTES)}"}`));
+        c.close();
+      },
+    });
+    expect(await readJson(post(chunked))).toBeNull();
   });
 
   test('rejects a 5th file and an empty request', async () => {
