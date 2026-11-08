@@ -1,7 +1,7 @@
 // Canary for BytePlus Seedance 2.x (docs/ops/adding-a-model.md): one real clip through the production adapter, then the clip's length, picture and sound, the
 // time it took, and the tokens BytePlus billed, set against the row's price for the silent clip. Two questions it answers: what sound costs (generate_audio
 // on), and how long a clip longer than the row's 15 s takes to make.
-//   tsx scripts/byteplus-canary.ts --model seedance-2.0|seedance-2.5 --image <product.jpg> [--seconds 5] [--ratio 9:16] [--audio] [--out dir]
+//   tsx scripts/byteplus-canary.ts --model seedance-2.0|seedance-2.0-fast|seedance-2.0-mini|seedance-2.5 --image <product.jpg> [--seconds 5] [--ratio 9:16] [--audio] [--out dir]
 // Without --yes it only prints the plan and the worst-case cost: no call. With --yes it makes ONE paid submit; --max-usd (default 1, never above 12) refuses a
 // dearer plan, where sound counts at twice the silent price. Needs BYTEPLUS_ARK_API_KEY. Prints no secret.
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -15,6 +15,8 @@ import { ffmpeg, isMain } from './bakeoff/common.ts';
 const MODELS: Record<string, { endpoint: string; usdPerSecond: number }> = {
   'seedance-2.0': { endpoint: 'dreamina-seedance-2-0-260128', usdPerSecond: 0.1512 },
   'seedance-2.5': { endpoint: 'dreamina-seedance-2-5-260628', usdPerSecond: 0.2312 },
+  'seedance-2.0-fast': { endpoint: 'dreamina-seedance-2-0-fast-260128', usdPerSecond: 0.121 },
+  'seedance-2.0-mini': { endpoint: 'dreamina-seedance-2-0-mini-260615', usdPerSecond: 0.0756 },
 };
 const TOKENS_PER_SECOND = 21_600;
 const TYPES: Record<string, string> = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp' };

@@ -907,7 +907,7 @@ describe('migration 0078 one model per duplicate pair', () => {
     expect((await pool.query(pick, ['seedance-2.5-reference'])).rows[0].durations_sec.at(-1)).toBe(30);
     expect((await pool.query(pick, ['seedance-2.5-byteplus'])).rows[0].durations_sec).toEqual(Array.from({ length: 27 }, (_, i) => i + 4)); // the 30 s canary
     // Sound at the row's own price (the canary of 2026-11-08): a BytePlus job with sound stays on BytePlus.
-    for (const id of ['seedance-2.0-byteplus', 'seedance-2.5-byteplus']) {
+    for (const id of ['seedance-2.0-byteplus', 'seedance-2.0-fast-byteplus', 'seedance-2.0-mini-byteplus', 'seedance-2.5-byteplus']) {
       const [r] = (await pool.query(`select endpoint, usd_per_second::float as usd from model_configs where id = $1`, [id])).rows;
       expect(AUDIO_USD_PER_SECOND[r.endpoint], id).toBe(r.usd);
     }

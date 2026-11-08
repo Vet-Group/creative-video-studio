@@ -213,6 +213,18 @@ describe('a pair that acts as one model (migration 0078)', () => {
     const jobs = ((await (await listJobs(as('/api/jobs?mine'))).json()) as { jobs: { id: string; twin: { label: string } | null }[] }).jobs;
     expect(jobs.find((j) => j.id === 'rp-m')!.twin).toMatchObject({ label: 'Seedance 2.0 Reference' });
   });
+
+  test('re-runs on the fal twin a clip whose sound BytePlus blocked, with the sound still on', async () => {
+    await only(['seedance-2.0-byteplus', 'seedance-2.0-reference']);
+    await pool.query(
+      `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, status, error, params) values ('oa-1', $1, 'team-unassigned', 'seedance-2.0-byteplus', 'byteplus', 'p', '9:16', 5, '{img}', 'failed', $2, '{"audio":"on"}')`,
+      [userId, 'byteplus status: OutputAudioSensitiveContentDetected.PolicyViolation: The request failed because the output audio may be related to copyright restrictions. Request id: 0217'],
+    );
+    const jobs = ((await (await listJobs(as('/api/jobs?mine'))).json()) as { jobs: { id: string; failureReason: string | null; twin: { label: string; estimateUsd: string } | null }[] }).jobs;
+    expect(jobs.find((j) => j.id === 'oa-1')).toMatchObject({ failureReason: 'output_audio', twin: { label: 'Seedance 2.0 Reference', estimateUsd: '1.8500' } }); // 5 s at fal's $0.37 with sound
+    expect((await create({ retryOf: 'oa-1', onTwin: true })).status).toBe(201);
+    expect((await pool.query(`select model, params->>'audio' as audio from jobs where retry_of = 'oa-1'`)).rows[0]).toEqual({ model: 'seedance-2.0-reference', audio: 'on' });
+  });
 });
 
 describe('a pair priced for what the form adds (review of #342)', () => {
