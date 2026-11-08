@@ -3,7 +3,7 @@
 // The jobs table is the source of truth: rows survive restarts, pg-boss state does not.
 import { randomUUID } from 'node:crypto';
 import { createWriteStream } from 'node:fs';
-import { copyFile, mkdtemp, readFile, rm } from 'node:fs/promises';
+import { copyFile, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Readable } from 'node:stream';
@@ -20,7 +20,7 @@ import type { Suggester } from '@cvs/core/suggest';
 import { insertAssets } from '@cvs/db/assets';
 import { createDb, type createPool } from '@cvs/db/client';
 import { type Job, PgBoss } from 'pg-boss';
-import { burnEndText, closestRatio, extractPoster, probeSeconds, probeSize, sniffImage } from './media';
+import { burnEndText, closestRatio, extractPoster, probeSeconds, probeSize, probeVideoSeconds, sniffImage } from './media';
 import { purgeDeletedClips } from './purge';
 import { deleteObject, getObject, putObject } from './storage';
 import { runSuggestion } from './suggest';
@@ -147,6 +147,26 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
     return getObject(rows[0].s3_key);
   }
 
+  /**
+   * Refuses a reference video (params.videoAssetId) that plays more than 1 s longer than the length stored at upload (assets.duration_ms, read from the
+   * MP4 header, which the uploader writes). That length priced the job, and models that bill input seconds charge for the real ones (issue #349).
+   */
+  async function checkReferenceLength(id: string): Promise<void> {
+    const stored: number | null = (await pool.query('select duration_ms from assets where id = $1', [id])).rows[0]?.duration_ms ?? null;
+    const dir = await mkdtemp(join(tmpdir(), 'cvs-ref-'));
+    try {
+      const file = join(dir, 'reference.mp4');
+      await writeFile(file, await readAsset(id));
+      const seconds = await probeVideoSeconds(file);
+      if (!(seconds > 0)) throw new Error('the reference video has no video frames');
+      if (stored == null || seconds > stored / 1000 + 1) {
+        throw new Error(`the reference video plays ${seconds.toFixed(1)} s, but its file header says ${stored == null ? 'nothing' : `${(stored / 1000).toFixed(1)} s`}`);
+      }
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  }
+
   /** The model as a job at `thinking` sees it: its prices are that level's, so the booked cost follows the level the jobs API estimated. */
   async function loadImageModel(modelId: string, thinking: string | undefined): Promise<ImageModelConfig> {
     const { rows } = await pool.query('select * from model_configs where id = $1', [modelId]);
@@ -235,6 +255,7 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
         }
         const provider = providers[job.provider];
         if (!provider) throw new Error(`no adapter for provider ${job.provider}`);
+        if (job.params.videoAssetId) await checkReferenceLength(job.params.videoAssetId);
         const request: SubmitRequest = {
           model: await loadModel(job.model, job.params.audio, { videoAssetId: job.params.videoAssetId, durationSec: job.duration_s }), prompt: job.prompt, imageUrls, ratio: job.aspect, durationSec: job.duration_s, audio: job.params.audio === 'on',
           ...(job.params.endAssetId && { endImageUrl: `asset://${job.params.endAssetId}` }),
@@ -314,7 +335,7 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
       await download(outputUrl, video, job.provider);
       const { width, height } = await probeSize(video);
       // Motion Control's clip is as long as the member's own video, whose header can understate it, so a clip that came back longer is billed for its own length.
-      // shortcut: a reference video's input seconds (billsInput rows) still come from its header, and a late bill (lateBill) is not scaled; measure both if they matter.
+      // shortcut: a late bill (lateBill) is not scaled; measure it if it matters. A reference video's input seconds are checked before submit (checkReferenceLength).
       if (job.feature === 'motion_control' && job.duration_s) {
         const seconds = await probeSeconds(video);
         if (seconds > job.duration_s + 1) costUsd = (costUsd * Math.ceil(seconds)) / job.duration_s;
