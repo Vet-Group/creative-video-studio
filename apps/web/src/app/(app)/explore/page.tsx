@@ -58,6 +58,7 @@ const SHOWN = { video: 7, image: 3 };
 
 /** A provider twin (-vertex, -byteplus) shares its model's written description. */
 const cardText = (id: string) => MODEL_CARD_TEXT[id] ?? MODEL_CARD_TEXT[id.replace(/-(vertex|byteplus)$/, '')];
+const toolText = (href: string) => toolGuide(href)?.oneLine ?? 'Mọi clip và ảnh công ty đã tạo, để xem, tải xuống và chấm điểm.';
 
 /** Explore: the member's start page: a greeting with their day and recent work, then the tools, the enabled models and the company presets, each linking into Create.
  * `?models=all` lists every enabled model instead of the featured few. */
@@ -123,6 +124,7 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
     return [...of.filter((m) => recommended.has(m.id)), ...of.filter((m) => !recommended.has(m.id))].slice(0, SHOWN[kind]);
   };
   const shown = allModels ? scored : [...lead('video'), ...lead('image')];
+  const modelText = (m: (typeof scored)[number]) => cardText(m.id) ?? [m.ratios.join(', '), range(m.durations_sec), m.marks >= MIN_MARKS && `Điểm ${m.score}/100 · ${m.marks} lượt đánh giá`].filter(Boolean).join(' · ');
   return (
     <div className="explore">
       <header className="explore-hero">
@@ -188,7 +190,9 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
                 <Icon name={f.icon} size={16} />
                 <strong>{f.title}</strong>
               </span>
-              <span className="muted explore-tool-text">{toolGuide(f.href)?.oneLine ?? 'Mọi clip và ảnh công ty đã tạo, để xem, tải xuống và chấm điểm.'}</span>
+              <span className="muted explore-tool-text" title={toolText(f.href)}>
+                {toolText(f.href)}
+              </span>
             </Link>
           </li>
         ))}
@@ -216,8 +220,8 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
                   {recommended.has(m.id) && <span className="badge badge-recommended">Đề xuất</span>}
                 </strong>
                 {/* A short description like the live cards, clamped to three lines; a model without one keeps its spec line, scored only once marked. */}
-                <span className="muted explore-card-text">
-                  {cardText(m.id) ?? [m.ratios.join(', '), range(m.durations_sec), m.marks >= MIN_MARKS && `Điểm ${m.score}/100 · ${m.marks} lượt đánh giá`].filter(Boolean).join(' · ')}
+                <span className="muted explore-card-text" title={modelText(m)}>
+                  {modelText(m)}
                 </span>
               </Link>
             </li>

@@ -147,6 +147,15 @@ test('Library views: grid or list remembered, a selection bar with the zip, sear
   await expect(page.getByText(/^\d bộ lọc$/)).toHaveCount(0);
   await expect(item(second)).toBeVisible();
 
+  // The chips on a card's picture show their whole words beside the length: a type chip such as Marketing Studio is added to this video card to read it, at 1440 and on a phone.
+  const clippedChips = () =>
+    item(first).locator('.lib-chips').evaluate((row) => {
+      row.insertAdjacentHTML('afterbegin', '<span class="lib-chip">Marketing Studio</span>');
+      return [...row.children].filter((c) => c.scrollWidth > c.clientWidth).map((c) => c.textContent);
+    });
+  await page.getByRole('button', { name: 'Lưới', exact: true }).click();
+  expect(await clippedChips()).toEqual([]);
+
   // A phone: neither view pushes the page sideways, and Chọn brings the checkboxes and the bar.
   await page.setViewportSize({ width: 390, height: 844 });
   const fits = () => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
@@ -155,6 +164,7 @@ test('Library views: grid or list remembered, a selection bar with the zip, sear
     await expect(page.getByRole('button', { name: view, exact: true })).toHaveAttribute('aria-pressed', 'true');
     expect(await fits()).toBe(true);
     // Out of selection mode a row keeps no gutter for its checkbox: the thumbnail starts at the row's padding.
+    if (view === 'Lưới') expect(await clippedChips()).toEqual([]);
     if (view === 'Danh sách') expect((await item(first).locator('.lib-thumb').boundingBox())!.x - (await item(first).boundingBox())!.x).toBeLessThanOrEqual(13);
   }
   await page.getByRole('button', { name: 'Chọn', exact: true }).click();
