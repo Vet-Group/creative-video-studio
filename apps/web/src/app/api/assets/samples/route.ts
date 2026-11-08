@@ -14,7 +14,7 @@ import { deleteObject, getObject, putObject } from '@/lib/storage';
  * same way, as an MP4 of at most 50 MB whose header gives its length (`durationMs`), for Marketing Studio Advanced's reference video; at most one clip a request, as the
  * server holds every file in memory.
  * An optional `slot` records the form slot they went into, as on an upload; a sample the caller already copied comes back as that copy, not a new one.
- * 429 once the caller has added COPY_HOURLY_LIMIT pictures (uploads included) in the last hour: here a tiny request makes the server copy up to 4 files of 10 MB, so a loop is held back (uploads themselves are not capped).
+ * 429 once the caller has added COPY_HOURLY_LIMIT pictures (uploads included) in the last hour: here a tiny request makes the server copy up to 4 files of 10 MB, so a loop is held back (uploads have their own UPLOAD_HOURLY_LIMIT).
  */
 export const COPY_HOURLY_LIMIT = 200;
 

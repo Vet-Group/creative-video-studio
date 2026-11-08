@@ -313,9 +313,9 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
       let video = join(dir, 'output.mp4');
       await download(outputUrl, video, job.provider);
       const { width, height } = await probeSize(video);
-      // The member's own video sets the length here (Motion Control, a reference video), and its header can understate it, so a clip that came back
-      // longer is billed for its own length. shortcut: scales the whole estimate by the length, not each price part; bill per part if one ever differs.
-      if ((job.feature === 'motion_control' || job.params?.videoAssetId) && job.duration_s) {
+      // Motion Control's clip is as long as the member's own video, whose header can understate it, so a clip that came back longer is billed for its own length.
+      // shortcut: a reference video's input seconds (billsInput rows) still come from its header, and a late bill (lateBill) is not scaled; measure both if they matter.
+      if (job.feature === 'motion_control' && job.duration_s) {
         const seconds = await probeSeconds(video);
         if (seconds > job.duration_s + 1) costUsd = (costUsd * Math.ceil(seconds)) / job.duration_s;
       }

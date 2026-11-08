@@ -23,20 +23,20 @@ export async function readJson(request: Request): Promise<unknown> {
   const reader = request.body.getReader();
   const chunks: Uint8Array[] = [];
   let seen = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    seen += value.length;
-    if (seen > MAX_JSON_BYTES) {
-      await reader.cancel();
-      return null;
-    }
-    chunks.push(value);
-  }
   try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      seen += value.length;
+      if (seen > MAX_JSON_BYTES) {
+        await reader.cancel();
+        return null;
+      }
+      chunks.push(value);
+    }
     return JSON.parse(Buffer.concat(chunks).toString('utf8'));
   } catch {
-    return null;
+    return null; // not JSON, or the client dropped the body midway
   }
 }
 
