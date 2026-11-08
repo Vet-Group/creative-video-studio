@@ -4,6 +4,7 @@ import { signDownloadToken, verifyDownloadToken } from '@/lib/download-token';
 import { guard } from '@/lib/session';
 import { getObject } from '@/lib/storage';
 import { ZIP32_LIMIT, zipStream } from '@/lib/zip';
+import { readJson } from '@/lib/assets';
 
 const MAX_IDS = 50;
 // An entry's headers (local, data descriptor, central) with a name of up to ~180 characters; 22 is the end record.
@@ -30,7 +31,7 @@ async function items(ids: string[]) {
 export async function POST(request: Request) {
   const g = await guard(request, 'member');
   if (g.error) return g.error;
-  const body = (await request.json().catch(() => null)) as { ids?: unknown } | null;
+  const body = (await readJson(request)) as { ids?: unknown } | null;
   const ids = body?.ids;
   if (!Array.isArray(ids) || ids.length < 1 || ids.length > MAX_IDS) return bad(`ids must list 1 to ${MAX_IDS} items`);
   if (!ids.every((id) => typeof id === 'string' && /^[\w-]{1,64}$/.test(id))) return bad('each id must be a job id');

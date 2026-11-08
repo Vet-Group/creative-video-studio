@@ -14,6 +14,32 @@ export const db = createDb(pool);
 
 export type RouteContext = { params: Promise<{ id: string }> };
 
+/** The most a JSON request body may hold; the forms send a few KB. */
+export const MAX_JSON_BYTES = 1_000_000;
+
+/** The JSON body, or null when it is missing, not JSON, or over MAX_JSON_BYTES (counted while streaming, so a huge body never fills the web process's memory). */
+export async function readJson(request: Request): Promise<unknown> {
+  if (Number(request.headers.get('content-length')) > MAX_JSON_BYTES || !request.body) return null;
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let seen = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      seen += value.length;
+      if (seen > MAX_JSON_BYTES) {
+        await reader.cancel();
+        return null;
+      }
+      chunks.push(value);
+    }
+    return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+  } catch {
+    return null; // not JSON, or the client dropped the body midway
+  }
+}
+
 /** The multipart body as FormData, 'too-large' once it passes MAX_BODY (counted while streaming, so it is never fully buffered), or null when it is not multipart. */
 export async function readUploadForm(request: Request): Promise<FormData | 'too-large' | null> {
   if (Number(request.headers.get('content-length')) > MAX_BODY) return 'too-large';

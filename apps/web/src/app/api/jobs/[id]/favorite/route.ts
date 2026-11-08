@@ -1,4 +1,4 @@
-import { type RouteContext } from '@/lib/assets';
+import { readJson, type RouteContext } from '@/lib/assets';
 import { pool } from '@/lib/auth';
 import { LIVE_CLIP } from '@/lib/clips';
 import { guard } from '@/lib/session';
@@ -11,7 +11,7 @@ export async function PUT(request: Request, { params }: RouteContext) {
   const g = await guard(request, 'member');
   if (g.error) return g.error;
   const { id } = await params;
-  const body = (await request.json().catch(() => null)) as { favorite?: unknown } | null;
+  const body = (await readJson(request)) as { favorite?: unknown } | null;
   if (typeof body?.favorite !== 'boolean') return Response.json({ error: 'favorite must be true or false' }, { status: 400 });
   const userId = g.session.user.id;
   if ((await pool.query(`select 1 from jobs j where j.id = $1 and ${LIVE_CLIP}`, [id])).rowCount === 0) return Response.json({ error: 'not found' }, { status: 404 });

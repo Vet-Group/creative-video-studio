@@ -4,6 +4,7 @@ import { findChoice } from '@/lib/choices';
 import { canReuse } from '@/lib/reuse';
 import { guard, isEditor } from '@/lib/session';
 import { MAX_TEMPLATE_NAME, MAX_TEMPLATES, templateData } from '@/lib/templates';
+import { readJson } from '@/lib/assets';
 
 const bad = (error: string, status = 400) => Response.json({ error }, { status });
 
@@ -72,7 +73,7 @@ async function jobData(jobId: string, userId: string): Promise<{ feature: string
 export async function POST(request: Request) {
   const g = await guard(request, 'member');
   if (g.error) return g.error;
-  const body = (await request.json().catch(() => null)) as { feature?: unknown; name?: unknown; data?: unknown; isCompany?: unknown; storeId?: unknown; fromJob?: unknown } | null;
+  const body = (await readJson(request)) as { feature?: unknown; name?: unknown; data?: unknown; isCompany?: unknown; storeId?: unknown; fromJob?: unknown } | null;
   const fromJob = body?.fromJob;
   if (fromJob !== undefined && (typeof fromJob !== 'string' || body?.feature !== undefined || body?.data !== undefined)) return bad('fromJob is a job id, given without feature and data');
   if (fromJob === undefined && !canReuse(typeof body?.feature === 'string' ? body.feature : '')) return bad('feature must be a page that takes templates');

@@ -235,12 +235,16 @@ describe('a pair priced for what the form adds (review of #342)', () => {
     expect(await first('ratio=9:16&durationSec=8')).toMatchObject({ provider: 'byteplus', estimateUsd: '1.8496', endFrame: true, pairIds: ['seedance-2.5-byteplus', 'seedance-2.5-reference', 'seedance-2.5-image'] });
     expect(await first('ratio=9:16&durationSec=8&endFrame=1')).toMatchObject({ provider: 'fal', estimateUsd: '3.7840', supported: true }); // the image row takes the end frame
     expect(await first('ratio=9:16&durationSec=8&audioClips=1')).toMatchObject({ provider: 'fal', estimateUsd: '3.7840', supported: true }); // the reference row takes audio
+    // The image row takes one image: with three, no row takes the end frame (servingRow would refuse it), so no slot is offered and BytePlus prices the job.
+    expect(await first('ratio=9:16&durationSec=8&images=3&endFrame=1')).toMatchObject({ provider: 'byteplus', estimateUsd: '1.8496', endFrame: false, supported: true });
+    expect(await first('ratio=9:16&durationSec=8&images=1&endFrame=1')).toMatchObject({ provider: 'fal', endFrame: true });
     expect(await first('ratio=16:9&durationSec=8')).toMatchObject({ endFrame: false }); // the image row makes 9:16 and 1:1 only
     await only(['seedance-2.5-byteplus', 'seedance-2.5-image']);
     // No row takes an end frame at 16:9 (the image row has none), so the entry stays on BytePlus, offers no end frame slot, and still makes the clip.
     expect(await first('ratio=16:9&durationSec=8&endFrame=1')).toMatchObject({ provider: 'byteplus', endFrame: false, supported: true });
     expect(await first('ratio=16:9&durationSec=40')).toMatchObject({ supported: false }); // no row makes 40 s
     expect((await videoModels(as('/api/models?ratio=9:16&durationSec=8&audioClips=x'))).status).toBe(400);
+    expect((await videoModels(as('/api/models?ratio=9:16&durationSec=8&images=-1'))).status).toBe(400);
   });
 
   test('re-runs a refused job on the twin that can make it, the reference row before the image row', async () => {

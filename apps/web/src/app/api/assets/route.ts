@@ -30,6 +30,8 @@ const RECENT: Record<string, { feature: string; at: number }> = {
 
 /** How many photos `?recent=uploads` lists. */
 export const UPLOADS_LIMIT = 60;
+/** New pictures and clips a member may add an hour (uploads and copies, as COPY_HOURLY_LIMIT counts them), so a loop cannot fill the file store. */
+export const UPLOAD_HOURLY_LIMIT = 100;
 /** SQL for every image a job (alias `j`) ran from: its inputs and Create video's end frame, as the worker's purge counts them. */
 const imagesOf = (j: string) => `${j}.input_asset_ids || coalesce(string_to_array(${j}.params->>'endAssetId', ','), '{}')`;
 
@@ -84,6 +86,9 @@ export async function POST(request: Request) {
   if (files.length === 0 || files.length > MAX_FILES) {
     return Response.json({ error: `send 1 to ${MAX_FILES} files in the "file" field` }, { status: 400 });
   }
+  // shortcut: counted before the files are stored, so parallel requests can each pass; lock per member around count and insert if that is ever abused.
+  const { n } = (await pool.query(`select count(*)::int as n from assets where owner_id = $1 and kind = 'input' and created_at > now() - interval '1 hour'`, [g.session.user.id])).rows[0];
+  if (n + files.length > UPLOAD_HOURLY_LIMIT) return Response.json({ error: `Mỗi giờ chỉ tải lên được tối đa ${UPLOAD_HOURLY_LIMIT} tệp; hãy thử lại sau.` }, { status: 429 });
   const storeId = form?.get('storeId') || null;
   if (storeId !== null && (typeof storeId !== 'string' || (await pool.query('select 1 from stores where id = $1 and not hidden', [storeId])).rowCount === 0)) {
     return Response.json({ error: 'the store does not exist or is hidden' }, { status: 400 });

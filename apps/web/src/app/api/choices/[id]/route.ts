@@ -1,4 +1,4 @@
-import { type RouteContext } from '@/lib/assets';
+import { readJson, type RouteContext } from '@/lib/assets';
 import { pool } from '@/lib/auth';
 import { CHOICE_SQL, choiceFields, listedChoice } from '@/lib/choices';
 import { MAX_CHOICES } from '@/lib/marketing';
@@ -14,7 +14,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
   const g = await guard(request, 'member');
   if (g.error) return g.error;
   const { id } = await params;
-  const b = (await request.json().catch(() => null)) as Record<string, unknown> | null;
+  const b = (await readJson(request)) as Record<string, unknown> | null;
   if (!b || typeof b !== 'object' || Array.isArray(b)) return Response.json({ error: 'the body must be an object' }, { status: 400 });
   const userId = g.session.user.id;
   const r = (

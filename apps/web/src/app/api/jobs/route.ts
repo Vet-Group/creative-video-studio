@@ -6,7 +6,7 @@ import { VIDEO_QUEUE, videoSendOptions } from '@cvs/core/queue';
 import { FEATURES } from '@cvs/db';
 import { fillInputSlots } from '@cvs/db/assets';
 import { pool } from '@/lib/auth';
-import { mp4VideoInfo } from '@/lib/assets';
+import { mp4VideoInfo, readJson } from '@/lib/assets';
 import { boss } from '@/lib/queue';
 import { findChoice } from '@/lib/choices';
 import { providerRefusal, TWIN_REASONS } from '@/lib/job-failure';
@@ -126,7 +126,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const g = await guard(request, 'member');
   if (g.error) return g.error;
-  const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
+  const body = (await readJson(request)) as Record<string, unknown> | null;
   const { retryOf = null, onTwin = false } = body ?? {};
   if (retryOf !== null && typeof retryOf !== 'string') return bad('retryOf must be a job id');
   if (typeof onTwin !== 'boolean' || (onTwin && retryOf === null)) return bad('onTwin must be true or false, and only retries a job');

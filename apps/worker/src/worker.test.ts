@@ -389,6 +389,26 @@ describe('Marketing Studio end text', () => {
   });
 });
 
+describe("a clip whose length the member's own video set", () => {
+  test('is billed for the length that came back when it is longer than the job asked, and other clips keep their estimate', async () => {
+    const long = join(mockDir, `${randomUUID()}-long.mp4`);
+    await mkdir(mockDir, { recursive: true });
+    await run(requireFfmpeg(), ['-y', '-v', 'error', '-f', 'lavfi', '-i', 'testsrc2=size=720x1280:rate=24', '-t', '9', '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', long]);
+    await start(counting(300, (inner) => ({ ...inner, status: async (pj) => {
+      const s = await inner.status(pj);
+      return s.state === 'succeeded' ? { ...s, outputUrl: pathToFileURL(long).href, costUsd: 0.84 } : s;
+    } })));
+    const motion = await newJob('u1', { prompt: 'motion', estimate: '0.8400' });
+    const plain = await newJob('u2', { prompt: 'plain', estimate: '0.8400' });
+    await pool.query(`update jobs set feature = 'motion_control' where id = $1`, [motion]);
+    await send(motion, 'u1');
+    await send(plain, 'u2');
+    await waitFor('both jobs to succeed', async () => (await status(motion)) === 'succeeded' && (await status(plain)) === 'succeeded');
+    expect(Number((await total(motion)).usd)).toBeCloseTo((0.84 * 9) / 5, 4); // a 5 s job whose clip came back 9 s long
+    expect(Number((await total(plain)).usd)).toBeCloseTo(0.84, 4);
+  });
+});
+
 describe('a submit that pg-boss expiry or an error would orphan', () => {
   test('is not aborted by the pg-boss expiry of the handler', async () => {
     counting.submits = 0;

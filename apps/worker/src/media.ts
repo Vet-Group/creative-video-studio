@@ -47,14 +47,19 @@ export async function extractPoster(video: string, jpeg: string): Promise<void> 
   await run(requireFfmpeg(), ['-y', '-v', 'error', '-i', video, '-frames:v', '1', '-vf', "scale='min(480,iw)':-2", '-q:v', '3', jpeg]);
 }
 
+/** A clip's length in seconds, as ffprobe reads it. */
+export async function probeSeconds(file: string): Promise<number> {
+  const { stdout } = await run(ffprobe.path, ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', file]);
+  return Number(stdout.trim());
+}
+
 /** `n` evenly spaced stills of an MP4 as small JPEGs (512 px on the long side at most), in time order, and the clip's length in seconds. */
 export async function extractFrames(video: Uint8Array, n: number): Promise<{ seconds: number; stills: Uint8Array[] }> {
   const dir = await mkdtemp(join(tmpdir(), 'cvs-frames-'));
   try {
     const file = join(dir, 'clip.mp4');
     await writeFile(file, video);
-    const { stdout } = await run(ffprobe.path, ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', file]);
-    const seconds = Number(stdout.trim());
+    const seconds = await probeSeconds(file);
     if (!(seconds > 0)) throw new Error('the clip has no duration');
     const stills = await Promise.all(
       frameTimes(seconds, n).map(async (t, i) => {
