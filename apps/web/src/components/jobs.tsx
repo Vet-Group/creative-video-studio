@@ -220,11 +220,6 @@ export function useJobs(): JobsState {
   return v;
 }
 
-/** As on Fash (checked 2026-10-29): beside the form, a page opens on History once its feature has a job, else on Examples. */
-export function useHasHistory(feature: string): boolean {
-  return useJobs().jobs.some((j) => j.feature === feature);
-}
-
 /** Runs `run` when one of the user's jobs finishes (after the first poll, so what had already finished does not count) or the tab comes back to the front. */
 export function useFreshResults(run: () => void): void {
   const { lastFinished, loaded } = useJobs();

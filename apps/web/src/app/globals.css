@@ -2263,6 +2263,15 @@ dialog.modal.verdict-guide { width: min(40rem, calc(100vw - 2rem)); }
 .recipe-store { display: grid; gap: 4px; margin: 0; color: var(--text-muted); font-size: 12px; font-weight: 500; }
 .recipe-store select { height: 32px; font-size: 13px; }
 .recipe-keys { margin: 0; color: var(--text-subtle); font-size: 11px; line-height: 16px; }
+.example-control { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.example-control .lib-mark { margin-left: 0; }
+.example-control button.primary { margin-top: 0; }
+.example-check { display: grid; gap: 8px; }
+.example-check h3 { margin: 0; font-size: 13px; }
+.example-check li { display: grid; gap: 2px; justify-items: center; }
+.example-check .job-inputs img { width: 72px; height: 96px; }
+.example-strip { max-height: 13rem; overflow-y: auto; }
+.example-match { color: var(--text-subtle); font-size: 11px; line-height: 16px; }
 @media (hover: none) { .recipe-keys { display: none; } }
 @media (max-width: 760px) { .lightbox .modal-body { grid-template-columns: 1fr; } }
 

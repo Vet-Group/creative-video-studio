@@ -609,7 +609,8 @@ export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4
     if (loading.current) return;
     loading.current = true;
     try {
-      const r = await api<{ hasMore: boolean; clips: Clip[] }>(`/api/library?kind=${kind}${offset > 0 ? `&offset=${offset}` : ''}`);
+      // Only the results an Admin put here (owner, 2026-11-09): a member's other results stay in History and the Library.
+      const r = await api<{ hasMore: boolean; clips: Clip[] }>(`/api/library?kind=${kind}&example=1${offset > 0 ? `&offset=${offset}` : ''}`);
       // A result finished between two pages shifts the offset, so the next page can repeat a tile: keep each id once.
       setItems((cur) => (offset > 0 ? [...cur, ...r.clips.filter((c) => !cur.some((o) => o.id === c.id))] : r.clips));
       setHasMore(r.hasMore);

@@ -18,6 +18,7 @@ const { GET: GET_MINE } = await import('./jobs/route');
 const { GET: GET_JOB, DELETE: DELETE_JOB } = await import('./jobs/[id]/route');
 const { PUT: PUT_VERDICT } = await import('./jobs/[id]/verdict/route');
 const { PUT: PUT_FAVORITE } = await import('./jobs/[id]/favorite/route');
+const { GET: GET_EXAMPLE, PUT: PUT_EXAMPLE, DELETE: DELETE_EXAMPLE } = await import('./jobs/[id]/example/route');
 const { GET: GET_LIBRARY } = await import('./library/route');
 const { GET: GET_MODELS } = await import('./models/route');
 const { GET: GET_ASSET } = await import('./assets/[id]/route');
@@ -187,7 +188,7 @@ describe('GET /api/library', () => {
     expect(body.clips.find((c) => c.id === a)).toEqual({
       id: a, creator: { id: alice.id, name: 'Nguyễn Văn Đạt' }, createdAt: '2026-10-22T17:30:00.000Z', modelId: 'fal-test', modelLabel: 'Fal test', ratio: '1:1', durationSec: 8,
       feature: 'video', mediaType: 'video', resolution: null, isMock: false, videoAssetId: 'lib-a-video', posterAssetId: 'lib-a-poster', storeId: null, costUsd: '1.6000', costFinal: true, verdict: { verdict: 'fail', fault: 'flicker', featured: false, markedBy: alice.id },
-      favorite: false, prompt: null, canEdit: false, downloadName: expect.stringMatching(/^20261023-nguyen-van-dat-lib-a\.mp4$/),
+      favorite: false, example: false, prompt: null, canEdit: false, downloadName: expect.stringMatching(/^20261023-nguyen-van-dat-lib-a\.mp4$/),
     });
     expect(body.clips.find((c) => c.id === b)).toMatchObject({ isMock: true, costFinal: false, verdict: null, canEdit: true }); // bob is the creator
     expect(body.creators).toEqual(expect.arrayContaining([{ id: alice.id, name: 'Nguyễn Văn Đạt' }, { id: bob.id, name: 'Bob' }]));
@@ -507,6 +508,70 @@ describe('PUT /api/jobs/:id/verdict', () => {
     expect((await mark(alice.cookie, id, { verdict: 'fail', fault: 'flicker' })).status).toBe(200);
     expect((await pool.query(`select verdict, featured from verdicts where job_id = $1`, [id])).rows[0]).toEqual({ verdict: 'fail', featured: false });
     await expect(pool.query(`update verdicts set featured = true where job_id = $1`, [id])).rejects.toThrow(/verdicts_featured_check/); // the database refuses a featured Fail too
+  });
+});
+
+describe('/api/jobs/:id/example', () => {
+  const call = (handler: typeof PUT_EXAMPLE, method: string, cookie: string | undefined, id: string) => handler(req(`/api/jobs/${id}/example`, cookie, { method }), ctx(id));
+  // A model of its own, off, so the model scores of the later tests do not move.
+  beforeAll(() => pool.query(`insert into model_configs (id, provider, endpoint, label, ratios, durations_sec, max_images, output_resolution, usd_per_second, sources, enabled) values ('example-test', 'fal', 'x', 'Example test', '{9:16}', '{8}', 2, '720p', 0.2, '{}', false)`));
+  const tryOn = async (userId: string, inputs: string[] = []) => {
+    const id = await clip(userId, { inputs, model: 'example-test' });
+    await pool.query(`update jobs set feature = 'try_on', preset_id = null where id = $1`, [id]);
+    return id;
+  };
+
+  test('only an Admin may check, add or remove one; a member, even the creator, gets 403 and nothing changes', async () => {
+    const id = await tryOn(alice.id);
+    expect((await call(GET_EXAMPLE, 'GET', undefined, id)).status).toBe(401);
+    for (const [handler, method] of [[GET_EXAMPLE, 'GET'], [PUT_EXAMPLE, 'PUT'], [DELETE_EXAMPLE, 'DELETE']] as const) expect((await call(handler, method, alice.cookie, id)).status, method).toBe(403);
+    expect((await call(PUT_EXAMPLE, 'PUT', admin.cookie, 'nope')).status).toBe(404);
+    expect((await pool.query('select count(*)::int as n from examples where job_id = $1', [id])).rows[0].n).toBe(0);
+  });
+
+  test('a featured mark alone keeps a result off the Examples tab; an Admin puts it there and takes it off, each change audited once', async () => {
+    const id = await tryOn(alice.id);
+    expect((await PUT_VERDICT(req(`/api/jobs/${id}/verdict`, alice.cookie, { method: 'PUT', body: JSON.stringify({ verdict: 'pass', featured: true }) }), ctx(id))).status).toBe(200);
+    expect(await libraryIds(bob.cookie, '?kind=try_on&example=1')).not.toContain(id);
+
+    for (let i = 0; i < 2; i++) expect(await (await call(PUT_EXAMPLE, 'PUT', admin.cookie, id)).json()).toEqual({ example: true });
+    expect(await libraryIds(bob.cookie, '?kind=try_on&example=1')).toContain(id);
+    const listed = ((await (await GET_LIBRARY(req('/api/library?kind=try_on', bob.cookie))).json()) as { clips: { id: string; example: boolean }[] }).clips.find((c) => c.id === id);
+    expect(listed?.example).toBe(true);
+
+    expect(await (await call(DELETE_EXAMPLE, 'DELETE', admin.cookie, id)).json()).toEqual({ example: false });
+    expect(await libraryIds(bob.cookie, '?kind=try_on&example=1')).not.toContain(id);
+    expect((await audits(`job:${id}`)).filter((a) => a.action.startsWith('example.'))).toEqual([
+      { actor_id: admin.id, action: 'example.add', old_value: { example: false }, new_value: { example: true } },
+      { actor_id: admin.id, action: 'example.remove', old_value: { example: true }, new_value: { example: false } },
+    ]);
+    expect((await GET_LIBRARY(req('/api/library?example=yes', bob.cookie))).status).toBe(400);
+  });
+
+  test('refuses a result of a page without such a tab', async () => {
+    const id = await clip(alice.id, { model: 'example-test' }); // a Create video clip: its Examples tab shows only the fixed samples
+    expect((await call(PUT_EXAMPLE, 'PUT', admin.cookie, id)).status).toBe(400);
+  });
+
+  test('the check lists the examples of the same feature, those sharing an input photo (same asset or same bytes) first', async () => {
+    for (const [a, sha] of [['ex-in-1', 'aaa'], ['ex-in-2', 'bbb'], ['ex-in-3', 'aaa'], ['ex-in-4', 'ccc']] as const) {
+      await input(a, alice.id);
+      await pool.query('update assets set sha256 = $2 where id = $1', [a, sha]);
+    }
+    const sameAsset = await tryOn(bob.id, ['ex-in-2']);
+    const sameBytes = await tryOn(bob.id, ['ex-in-3']);
+    const other = await tryOn(bob.id, ['ex-in-4']);
+    const video = await clip(bob.id, { inputs: ['ex-in-2'], model: 'example-test' });
+    for (const id of [other, sameAsset, sameBytes]) await call(PUT_EXAMPLE, 'PUT', admin.cookie, id);
+    await pool.query('insert into examples (job_id, added_by) values ($1, $2)', [video, admin.id]); // another feature never shows
+
+    const candidate = await tryOn(alice.id, ['ex-in-1', 'ex-in-2']);
+    const res = await call(GET_EXAMPLE, 'GET', admin.cookie, candidate);
+    expect(res.status).toBe(200);
+    const rows = ((await res.json()) as { examples: { id: string; match: string | null }[] }).examples.filter((e) => [sameAsset, sameBytes, other, video].includes(e.id));
+    expect(rows.slice(0, 2).map((e) => e.match)).toEqual(['inputs', 'inputs']);
+    expect(rows.slice(0, 2).map((e) => e.id).sort()).toEqual([sameAsset, sameBytes].sort());
+    expect(rows.slice(2)).toEqual([{ id: other, match: null }].map((e) => expect.objectContaining(e)));
   });
 });
 

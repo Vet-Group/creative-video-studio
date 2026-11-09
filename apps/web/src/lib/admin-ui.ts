@@ -31,7 +31,7 @@ export function useFetch<T>(path: string, { onTabReturn = false } = {}) {
 
 /** Each event the audit log records, by its code, with the words an Admin reads; the code stays as the filter's value and the label's title. */
 export const AUDIT_ACTIONS: Record<string, string> = {
-  'account.link': 'Liên kết đăng nhập', 'account.unlink': 'Huỷ liên kết đăng nhập', 'clip.delete': 'Xoá clip', 'cost.manual_adjustment': 'Điều chỉnh chi phí', 'feature_cap.update': 'Sửa hạn mức công cụ', 'invoice.enter': 'Nhập hóa đơn',
+  'account.link': 'Liên kết đăng nhập', 'account.unlink': 'Huỷ liên kết đăng nhập', 'clip.delete': 'Xoá clip', 'cost.manual_adjustment': 'Điều chỉnh chi phí', 'example.add': 'Đưa lên Ví dụ', 'example.remove': 'Gỡ khỏi Ví dụ', 'feature_cap.update': 'Sửa hạn mức công cụ', 'invoice.enter': 'Nhập hóa đơn',
   'model.set_enabled': 'Bật/tắt mô hình', 'preset.create': 'Thêm mẫu', 'preset.update': 'Sửa mẫu', 'preset_proposal.approve': 'Duyệt đề xuất mẫu', 'preset_proposal.reject': 'Từ chối đề xuất mẫu', 'rate.update': 'Sửa tỉ giá', 'sample.delete': 'Xoá ảnh mẫu', 'sample.put': 'Tải ảnh mẫu', 'settings.update': 'Sửa cài đặt',
   'store.create': 'Tạo cửa hàng', 'store.hide': 'Ẩn cửa hàng', 'store.reassign': 'Đổi cửa hàng của clip', 'store.update': 'Sửa cửa hàng', 'store.brand': 'Sửa bộ nhận diện cửa hàng', 'team.create': 'Tạo nhóm', 'team.hide': 'Ẩn nhóm', 'team.rename': 'Đổi tên nhóm',
   'user.ban': 'Khoá tài khoản', 'user.delete': 'Xoá tài khoản', 'user.password_change': 'Đổi mật khẩu', 'user.password_set': 'Đặt mật khẩu', 'user.profile_update': 'Sửa hồ sơ', 'user.role_change': 'Đổi vai trò',
