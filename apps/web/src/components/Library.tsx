@@ -304,11 +304,12 @@ function ClipCard({ clip, view, select, onChange, onDeleted, onOpen }: { clip: C
       <div className="lib-info">
         <p className="lib-title">{clip.modelLabel}</p>
         <p className="lib-meta">
-          {/* One line on every card size: a long name is cut, never the time or the cost, so the marks below line up across a row. */}
+          {/* One line on a wide card: a long name is cut, never the time or the cost, so the marks below line up across a row.
+              The phone's two columns put the name on its own line (globals.css), so its leading dot is drawn by CSS. */}
           <span className="lib-who" title={clip.creator.name}>
             {clip.creator.name}
           </span>
-          <span>· {fmtShort(clip.createdAt)} ·</span>
+          <span className="lib-when">{fmtShort(clip.createdAt)} ·</span>
           <span title={clip.costFinal ? 'Chi phí thật' : 'Chi phí thật, tạm tính'}>
             ${clip.costUsd}
             {!clip.costFinal && '*'}

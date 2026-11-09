@@ -595,7 +595,7 @@ function SamePoint({ data }: { data: Costs }) {
       <p className="kpi-label">Cùng kỳ tháng {prevMonth}</p>
       <p className="kpi-value">{c ? dollars(c.prev.toFixed(2)) : '—'}</p>
       <p className="kpi-sub">
-        {!c ? 'Đang tải...' : c.pct === null ? 'Tháng trước chưa có chi phí' : `${c.pct > 0 ? 'Tăng' : c.pct < 0 ? 'Giảm' : 'Không đổi'} ${Math.abs(Math.round(c.pct))}% (${dollars(c.cur.toFixed(2))} đến ngày ${elapsed})`}
+        {!c ? 'Đang tải...' : c.pct === null ? `Cùng kỳ chưa có chi phí job; tháng này ${dollars(c.cur.toFixed(2))} đến ngày ${elapsed}` : `${c.pct > 0 ? 'Tăng' : c.pct < 0 ? 'Giảm' : 'Không đổi'} ${Math.abs(Math.round(c.pct))}% (${dollars(c.cur.toFixed(2))} đến ngày ${elapsed})`}
       </p>
     </div>
   );
