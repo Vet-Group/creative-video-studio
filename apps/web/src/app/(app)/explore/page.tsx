@@ -80,9 +80,10 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
     modelStats('image'),
     bestClips(),
     // shortcut: a running job older than the latest 20 is left out, as the jobs tray leaves it; widen if members queue that many.
-    pool.query<{ id: string; status: string; feature: string; poster_asset_id: string | null; output_asset_id: string | null; input_id: string | null; resolution: string | null; finished_at: Date | null; created_at: Date }>(
-      `select id, status, feature, poster_asset_id, output_asset_id, input_asset_ids[1] as input_id, params->>'resolution' as resolution, finished_at, created_at
-         from jobs where user_id = $1 and deleted_at is null and purged_at is null order by created_at desc, id desc limit 20`,
+    pool.query<{ id: string; status: string; feature: string; poster_asset_id: string | null; output_asset_id: string | null; input_id: string | null; resolution: string | null; finished_at: Date | null; created_at: Date; prompt: string | null; model_label: string | null }>(
+      `select j.id, j.status, j.feature, j.poster_asset_id, j.output_asset_id, j.input_asset_ids[1] as input_id, j.params->>'resolution' as resolution, j.finished_at, j.created_at, case when j.feature in ('image', 'video') and j.preset_id is null then j.prompt when j.feature = 'image' then j.params->>'brief' end as prompt, m.label as model_label
+         from jobs j left join model_configs m on m.id = j.model
+        where j.user_id = $1 and j.deleted_at is null and j.purged_at is null order by j.created_at desc, j.id desc limit 20`,
       [user?.id],
     ),
     dailyClips(pool, user?.id ?? ''),
@@ -150,6 +151,9 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
                   <Link href={j.status === 'succeeded' ? `/library?item=${j.id}` : (pageOf(j.feature) ?? '/library')} className="explore-job" data-status={isRunning(j) ? 'running' : j.status}>
                     <span className="explore-job-media">{picture ? <img src={picture} alt="" /> : <span className="banner-empty" aria-hidden="true" />}</span>
                     <strong>{featureLabel(j.feature)}</strong>
+                    {/* What tells two jobs of one tool apart: the model, and the member's own words, as the Library's OWN_PROMPT picks them (a composed prompt is left out). */}
+                    {j.model_label && <span className="explore-job-model">{j.model_label}</span>}
+                    {j.prompt && <span className="explore-job-prompt" title={j.prompt}>{j.prompt}</span>}
                     <span className="muted">{jobNote(j)}</span>
                   </Link>
                 </li>

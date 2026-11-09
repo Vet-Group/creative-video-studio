@@ -116,17 +116,24 @@ function hiddenHints(): string[] {
   }
 }
 
-/** The strip at the top of a tool page: when to use it, where to go instead, the guide; hidden per page once the member closes it. */
+/** The strip at the top of a tool page: when to use it, where to go instead, the guide. Closed, it folds per page into a one-line chip that opens it again. */
 export function PageHint({ href }: { href: ToolHref }) {
   const t = toolGuide(href)!;
   const [hidden, setHidden] = useState(false);
   useEffect(() => setHidden(hiddenHints().includes(href)), [href]);
-  if (hidden) return null;
-  function hide() {
-    setHidden(true);
+  function remember(hide: boolean) {
+    setHidden(hide);
     try {
-      localStorage.setItem(HIDDEN_KEY, JSON.stringify([...new Set([...hiddenHints(), href])]));
-    } catch {} // storage blocked: hidden for this visit only
+      localStorage.setItem(HIDDEN_KEY, JSON.stringify(hide ? [...new Set([...hiddenHints(), href])] : hiddenHints().filter((h) => h !== href)));
+    } catch {} // storage blocked: for this visit only
+  }
+  if (hidden) {
+    return (
+      <button type="button" className="tool-hint-chip" onClick={() => remember(false)}>
+        <Icon name="help" size={14} />
+        Khi nào dùng {t.title}?
+      </button>
+    );
   }
   return (
     <aside className="tool-hint" aria-label={`Khi nào dùng ${t.title}`}>
@@ -146,7 +153,7 @@ export function PageHint({ href }: { href: ToolHref }) {
         {' · '}
         <ToolGuideButton className="link-button">So sánh các công cụ</ToolGuideButton>
       </p>
-      <button type="button" className="icon-button tool-hint-close" aria-label="Ẩn gợi ý này" title="Ẩn gợi ý này" onClick={hide}>
+      <button type="button" className="icon-button tool-hint-close" aria-label="Ẩn gợi ý này" title="Ẩn gợi ý này" onClick={() => remember(true)}>
         <Icon name="x" size={14} />
       </button>
     </aside>
