@@ -19,7 +19,7 @@ import { PhraseChoice, useChoiceLists } from './Choices';
 import { EnhanceToggle } from './EnhanceToggle';
 import { Icon } from './Icon';
 import { copyError, copySamples, GALLERY_SIZE_KEY, HISTORY_SIZE_KEY, photoImg, RunSummary, SizeSlider, Slot, UploadedPhotos, uploadError, uploadImages, useSize } from './image-tools';
-import { FormContext, type Photo, Tap, useApplier, useHasHistory, useJobs, useRecreated } from './jobs';
+import { FormContext, type Photo, Tap, useApplier, useJobs, useRecreated } from './jobs';
 import { Modal } from './Modal';
 import { ModelPicker } from './ModelPicker';
 import { loadPending, PendingProposals, type PresetDraft, PresetForm, type PresetRow, type Proposal } from './PresetEditing';
@@ -174,8 +174,8 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
   const clipsId = useId();
   const clipInput = useRef<HTMLInputElement>(null);
   const [clips, setClips] = useState<Clip[]>([]); // reference audio, sent only on a model that takes it
-  const [tab, setTab] = useState<Tab | null>(null); // null: the default for the width (Create below 1024 px, else History or Examples, as on the live page)
-  const opening: Tab = useHasHistory('video') ? 'history' : 'examples';
+  const [tab, setTab] = useState<Tab | null>(null); // null: the default for the width (Create below 1024 px, else Examples)
+  const opening: Tab = 'examples'; // owner, 2026-11-09: beside the form a page opens on Examples, History is one click away
   const [picking, setPicking] = useState(false);
   const [detail, setDetail] = useState<Example | null>(null);
   const [details, setDetails] = useState<SampleDetails | null>(null);

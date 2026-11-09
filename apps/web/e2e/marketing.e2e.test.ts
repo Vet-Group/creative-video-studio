@@ -18,7 +18,7 @@ async function openPage(page: Page): Promise<void> {
   await expect(runButton(page)).toBeVisible();
 }
 
-test('a mock marketing job runs from two photos, a hook and a location, and shows in Lịch sử, Ví dụ and the Library under Marketing Studio', async ({ page }) => {
+test('a mock marketing job runs from two photos, a hook and a location, and shows in Lịch sử, in Ví dụ once an Admin puts it there from the Library, and in the Library under Marketing Studio', async ({ page, browser }) => {
   await signIn(page, 'mkta');
   await openPage(page);
   await expect(nav(page).getByRole('link', { name: 'Marketing Studio' })).toHaveAttribute('aria-current', 'page');
@@ -123,13 +123,35 @@ test('a mock marketing job runs from two photos, a hook and a location, and show
   // The form's own inputs are kept for Dùng lại.
   expect(await (await page.request.get(`/api/jobs/${jobs.jobs[0]!.id}`)).json()).toMatchObject({ hook: hook.id, location: spot.id, brief: 'soft morning light', format: null });
 
-  // As on Fash, with a Marketing job the page now opens on Lịch sử (a member without one opens on Ví dụ, below).
+  // Beside the form the page opens on Ví dụ, even with a Marketing job (owner, 2026-11-09); History is one click away.
+  const id = jobs.jobs[0]!.id;
+  const loaded = page.waitForResponse((r) => r.url().includes('/api/library?kind=marketing&example=1'));
   await page.reload();
-  await expect(page.getByRole('tab', { name: 'Lịch sử' })).toHaveAttribute('aria-selected', 'true');
-
-  // Ví dụ lists the company's marketing clips as videos.
-  await page.getByRole('tab', { name: 'Ví dụ' }).click();
+  await loaded;
+  await expect(page.getByRole('tab', { name: 'Ví dụ' })).toHaveAttribute('aria-selected', 'true');
+  // Ví dụ lists only what an Admin put there: the member's own new clip is not in it yet.
   const gallery = page.getByRole('group', { name: 'Video Marketing Studio của công ty' });
+  const tile = page.locator(`.gallery-use[data-from="/api/jobs/${id}"]`);
+  await expect(gallery.or(page.getByText('Chưa có video Marketing Studio nào trong công ty.'))).toBeVisible();
+  await expect(tile).toHaveCount(0);
+
+  // An Admin puts it there from the Library's detail view, after the check of what Ví dụ already holds.
+  const context = await browser.newContext();
+  const admin = await context.newPage();
+  await signIn(admin, 'admin');
+  await admin.goto(`/library?item=${id}`);
+  const lightbox = admin.getByRole('dialog', { name: /^Chi tiết/ });
+  await lightbox.getByRole('button', { name: 'Đưa lên Ví dụ...' }).click();
+  const check = lightbox.getByRole('region', { name: 'Kiểm tra trước khi đưa lên Ví dụ' });
+  await expect(check.getByRole('heading', { name: 'Có thể trùng' })).toBeVisible();
+  await check.getByRole('button', { name: 'Đưa lên Ví dụ', exact: true }).click();
+  await expect(lightbox.getByText('Đang ở tab Ví dụ')).toBeVisible();
+  await expect(lightbox.getByRole('button', { name: 'Gỡ khỏi Ví dụ' })).toBeVisible();
+  await context.close();
+
+  // Now Ví dụ lists it, as a video.
+  await page.reload();
+  await expect(tile).toHaveCount(1);
   await expect(gallery.locator('video').first()).toBeVisible();
   await expect.poll(() => gallery.locator('video').first().evaluate((v: HTMLVideoElement) => v.readyState >= 1)).toBe(true);
 
@@ -140,6 +162,11 @@ test('a mock marketing job runs from two photos, a hook and a location, and show
   const mine = page.getByRole('article').filter({ hasText: 'E2E Mkt A' });
   await expect(mine).toHaveCount(1);
   await expect(mine.getByText('Marketing Studio', { exact: true })).toBeVisible();
+  // Only an Admin puts a result on Ví dụ: a member's detail view has no such button.
+  await mine.getByRole('button', { name: 'Xem chi tiết' }).click();
+  const own = page.getByRole('dialog', { name: /^Chi tiết/ });
+  await expect(own.getByRole('link', { name: 'Dùng lại' })).toBeVisible();
+  await expect(own.getByRole('button', { name: /Ví dụ/ })).toHaveCount(0);
 });
 
 test('the model, ratio and duration come from the marketing model, the About tab says what is missing, and a refused Run shows its message', async ({ page }) => {

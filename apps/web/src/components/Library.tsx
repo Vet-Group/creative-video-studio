@@ -4,9 +4,11 @@ import { type CSSProperties, type ReactNode, useCallback, useEffect, useRef, use
 import { api, type Clip, errorText, sendJson } from '@/lib/api';
 import { FAULTS } from '@/lib/faults';
 import { featureLabel } from '@/lib/features';
+import { GALLERY_SAMPLES, numberedSamples } from '@/lib/examples';
 import { cardTitleOfFormat, HOOKS, LOCATIONS } from '@/lib/marketing';
 import { activeFilters, type LibraryFilters, type LibraryView, libraryQuery, matchesVerdict, NO_FILTERS, readView, saveView, type VerdictFilter } from '@/lib/library-view';
 import { reuseHref } from '@/lib/reuse';
+import { useSamples } from '@/lib/use-samples';
 import { Icon } from './Icon';
 import { useFreshResults } from './jobs';
 import { LoadError } from './LoadError';
@@ -355,7 +357,7 @@ const choiceName = (list: { id: string; name: string }[], id: string | null) => 
  * settings, who made it, when and for how much, the store for an Admin, download / fullscreen / open in a new tab / copy, the marks and Reuse.
  * Arrows and ←/→ step through the loaded items; 1, 2 and 3 mark.
  */
-function ClipDetail({ clips, index, stores, onIndex, onChange }: { clips: Clip[]; index: number; stores?: StoreOption[]; onIndex: (i: number | null) => void; onChange: (c: Clip) => void }) {
+function ClipDetail({ clips, index, stores, admin, onIndex, onChange }: { clips: Clip[]; index: number; stores?: StoreOption[]; admin: boolean; onIndex: (i: number | null) => void; onChange: (c: Clip) => void }) {
   const clip = clips[index]!;
   const image = clip.mediaType === 'image';
   const [job, setJob] = useState<ClipInputs | null>(null);
@@ -516,6 +518,7 @@ function ClipDetail({ clips, index, stores, onIndex, onChange }: { clips: Clip[]
           )}
         </div>
         {clip.canEdit && <VerdictMarks key={clip.id} clip={clip} onChange={onChange} keys />}
+        {admin && <ExampleControl key={`example-${clip.id}`} clip={clip} onChange={onChange} />}
         {clip.canEdit && <p className="recipe-keys">Phím tắt: 1 Đạt · 2 Nổi bật · 3 Không đạt · ←/→ mục trước, sau</p>}
         {reuseHref(clip) && (
           <Link href={reuseHref(clip)!} className="lightbox-reuse">
@@ -534,6 +537,108 @@ function ClipDetail({ clips, index, stores, onIndex, onChange }: { clips: Clip[]
         </button>
       )}
     </Modal>
+  );
+}
+
+/** A result already on an Examples tab, as GET /api/jobs/[id]/example lists it: `match` says why it may repeat the one being checked. */
+interface ExampleRow {
+  id: string;
+  videoAssetId: string;
+  posterAssetId: string | null;
+  ratio: string;
+  modelLabel: string;
+  match: 'inputs' | 'prompt' | null;
+}
+const MATCH_TEXT = { inputs: 'Cùng ảnh đầu vào', prompt: 'Cùng mô tả' } as const;
+
+/**
+ * An Admin's "Đưa lên Ví dụ" on a result of a page whose Examples tab shows company results (owner, 2026-11-09: a featured mark only suggests one).
+ * It first shows what that tab already has, the results that may repeat this one on top and then the fixed samples, so a near copy is seen before it goes up.
+ */
+function ExampleControl({ clip, onChange }: { clip: Clip; onChange: (c: Clip) => void }) {
+  const have = useSamples();
+  const [check, setCheck] = useState<ExampleRow[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState('');
+  const prefix = GALLERY_SAMPLES[clip.feature];
+  if (!prefix) return null;
+
+  async function run(what: () => Promise<void>, fail: string) {
+    setBusy(true);
+    setNote('');
+    try {
+      await what();
+    } catch (e) {
+      setNote(errorText(e, fail));
+    } finally {
+      setBusy(false);
+    }
+  }
+  const open = () => run(async () => setCheck((await api<{ examples: ExampleRow[] }>(`/api/jobs/${clip.id}/example`)).examples), 'Không tải được các ví dụ hiện có.');
+  const save = (on: boolean) =>
+    run(
+      async () => {
+        await api(`/api/jobs/${clip.id}/example`, { method: on ? 'PUT' : 'DELETE' });
+        setCheck(null);
+        onChange({ ...clip, example: on });
+      },
+      on ? 'Không đưa lên Ví dụ được.' : 'Không gỡ khỏi Ví dụ được.',
+    );
+  const status = note && (
+    <p className="muted" role="status">
+      {note}
+    </p>
+  );
+  if (clip.example)
+    return (
+      <div className="example-control">
+        <span className="lib-mark featured">Đang ở tab Ví dụ</span>
+        <button type="button" disabled={busy} onClick={() => void save(false)}>
+          Gỡ khỏi Ví dụ
+        </button>
+        {status}
+      </div>
+    );
+  if (!check)
+    return (
+      <div className="example-control">
+        <button type="button" disabled={busy} onClick={() => void open()}>
+          Đưa lên Ví dụ...
+        </button>
+        {status}
+      </div>
+    );
+  const samples = numberedSamples(have, prefix, clip.feature === 'marketing' ? 'mp4' : 'jpg'); // as the tab counts them; a clip shows its still of the same number
+  const similar = check.filter((e) => e.match);
+  const tile = (e: ExampleRow) => (
+    <li key={e.id}>
+      <img src={`/api/assets/${e.posterAssetId ?? e.videoAssetId}/content`} alt={`${e.modelLabel}, ${e.ratio}`} loading="lazy" />
+      {e.match && <span className="example-match">{MATCH_TEXT[e.match]}</span>}
+    </li>
+  );
+  return (
+    <section className="example-check" aria-label="Kiểm tra trước khi đưa lên Ví dụ">
+      <h3>Có thể trùng</h3>
+      {similar.length > 0 ? <ul className="job-inputs">{similar.map(tile)}</ul> : <p className="muted">Không có ví dụ nào cùng ảnh đầu vào hoặc cùng mô tả.</p>}
+      <h3>Ví dụ hiện có ({samples.length + check.length})</h3>
+      <ul className="job-inputs example-strip" aria-label="Ví dụ hiện có">
+        {check.filter((e) => !e.match).map(tile)}
+        {samples.map((n) => (
+          <li key={n}>
+            <img src={`/api/samples/${n.replace(/\.mp4$/, '.jpg')}`} alt="Ảnh mẫu" loading="lazy" />
+          </li>
+        ))}
+      </ul>
+      <div className="example-control">
+        <button type="button" className="primary" disabled={busy} onClick={() => void save(true)}>
+          Đưa lên Ví dụ
+        </button>
+        <button type="button" disabled={busy} onClick={() => setCheck(null)}>
+          Huỷ
+        </button>
+      </div>
+      {status}
+    </section>
   );
 }
 
@@ -989,7 +1094,7 @@ export function Library() {
           />
         ))}
       </div>
-      {detail !== null && clips[detail] && <ClipDetail clips={clips} index={detail} stores={isAdmin ? stores : undefined} onIndex={setDetail} onChange={update} />}
+      {detail !== null && clips[detail] && <ClipDetail clips={clips} index={detail} stores={isAdmin ? stores : undefined} admin={isAdmin} onIndex={setDetail} onChange={update} />}
       {hasMore && (
         <button ref={moreButton} type="button" className="library-more" onClick={() => void loadMore()}>
           Tải thêm

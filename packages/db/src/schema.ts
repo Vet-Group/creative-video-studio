@@ -544,6 +544,17 @@ export const favorites = pgTable(
   (t) => [primaryKey({ columns: [t.userId, t.jobId] })],
 );
 
+/** A Library result an Admin put on its page's Examples tab, beside the fixed samples. A featured mark only suggests one; it never puts it there. */
+export const examples = pgTable('examples', {
+  jobId: text('job_id')
+    .primaryKey()
+    .references(() => jobs.id, { onDelete: 'cascade' }),
+  addedBy: text('added_by')
+    .notNull()
+    .references(() => users.id, { onDelete: 'restrict' }),
+  createdAt: tstz('created_at').notNull().defaultNow(),
+});
+
 // A member's saved form (Save template): the inputs of one page, in the shape the reuse link reads from a job, so applying it refills the form the same way.
 // `is_company` (set by an Admin or a template editor) shares it with everyone, `store_id` with every member who picks that store on the form;
 // others never see the author's own photos in it.

@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { type Browser, expect, type Page, test } from '@playwright/test';
 import { HOOKS } from '../src/lib/marketing';
-import { openTemplates, optionsOf, png, select, signIn } from './support.test';
+import { openTab, openTemplates, optionsOf, png, select, signIn } from './support.test';
 
 // A member's own hooks and locations on Marketing Studio, Save template from a History card, and the often-used group. Runs use the mock models only.
 // Every company hook made here is deleted in `finally`: marketing.e2e.test.ts counts HOOKS.length cards.
@@ -155,6 +155,7 @@ test('Thêm hook and Thêm bối cảnh save the member’s own, choose them at 
   // A fresh page refilled from History has the same choices and the same prompt.
   await page.goto('/marketing-studio');
   await expect(hookBox(page)).toContainText('Chưa chọn');
+  await openTab(page, 'Lịch sử'); // beside the form the page opens on Examples
   await history(page).getByRole('button', { name: 'Dùng lại' }).first().click();
   await expect(hookBox(page)).toContainText(hook.name);
   await expect(locationBox(page)).toContainText(spot.name);

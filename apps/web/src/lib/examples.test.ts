@@ -79,3 +79,12 @@ test('a tile shows the label of the model its details file names, else nothing',
   expect(exampleModel(undefined, models)).toBeNull();
   expect(exampleModel({ modelId: 'kling-3-pro' }, null)).toBeNull();
 });
+
+test("Explore's model loops show as model demos once uploaded, named by the model their details file names, a pair's twin included", () => {
+  const demo = examplesFor(new Set(['example-45.mp4'])).find((e) => e.id === 'example-45')!;
+  expect(demo).toMatchObject({ title: 'Demo mô hình', aspect: '16:9', src: '/api/samples/example-45.mp4' });
+  expect(examplesFor(new Set()).some((e) => e.id === 'example-45')).toBe(false);
+  expect(exampleTitle(demo, { presetId: null, prompt: null }, [])).toBe('Demo mô hình');
+  expect(exampleTitle(demo, { presetId: null, prompt: 'A walk' }, [])).toBe('Tự viết mô tả');
+  expect(exampleModel({ modelId: 'gemini-omni-flash' }, [{ id: 'gemini-omni-flash-vertex', label: 'Gemini Omni Flash', pairIds: ['gemini-omni-flash-vertex', 'gemini-omni-flash'] }])).toBe('Gemini Omni Flash');
+});

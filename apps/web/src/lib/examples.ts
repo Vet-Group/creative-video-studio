@@ -1,6 +1,6 @@
 // The sample clips behind the Examples tab and the preset cards. They are fixtures (see public/fixtures/examples/README.md)
 // until bake-off clips exist; each stands for one preset. Nothing here is a job, a price or a model option.
-export type Aspect = '16:9' | '1:1' | '3:4' | '9:16';
+export type Aspect = '16:9' | '1:1' | '3:4' | '4:3' | '9:16';
 
 export interface Example {
   id: string;
@@ -58,6 +58,9 @@ const more = (n: number, aspect: Aspect, width: number, height: number, duration
   poster: `/api/samples/example-${n}.jpg`,
 });
 
+/** Explore's model loops, shown here too (owner, 2026-11-09). No prompt is behind them, so the tile keeps this title and its details file names the model. */
+const demo = (n: number, aspect: Aspect, width: number, height: number, durationSec: number): Example => ({ ...more(n, aspect, width, height, durationSec), title: 'Demo mô hình' });
+
 export const MORE_EXAMPLES: Example[] = [
   more(11, '9:16', 408, 720, 6),
   more(12, '9:16', 408, 720, 8),
@@ -84,6 +87,36 @@ export const MORE_EXAMPLES: Example[] = [
   more(33, '1:1', 720, 720, 6),
   more(34, '9:16', 406, 720, 6),
   more(35, '9:16', 406, 720, 6),
+  demo(36, '16:9', 720, 396, 6),
+  demo(37, '16:9', 720, 408, 6),
+  demo(38, '16:9', 720, 406, 6),
+  demo(39, '1:1', 720, 720, 8),
+  demo(40, '16:9', 720, 396, 6),
+  demo(41, '16:9', 720, 406, 6),
+  demo(42, '16:9', 720, 406, 5),
+  demo(43, '16:9', 720, 406, 5),
+  demo(44, '1:1', 720, 720, 5),
+  demo(45, '16:9', 720, 400, 6),
+  demo(46, '1:1', 720, 720, 6),
+  demo(47, '16:9', 720, 406, 5),
+  demo(48, '16:9', 720, 412, 5),
+  demo(49, '16:9', 720, 406, 6),
+  demo(50, '16:9', 720, 406, 6),
+  demo(51, '16:9', 720, 412, 5),
+  demo(52, '16:9', 720, 412, 5),
+  demo(53, '1:1', 720, 720, 6),
+  demo(54, '9:16', 720, 1270, 5),
+  demo(55, '1:1', 720, 720, 5),
+  demo(56, '16:9', 720, 406, 5),
+  demo(57, '9:16', 720, 1280, 5),
+  demo(58, '9:16', 720, 1280, 5),
+  demo(59, '4:3', 720, 540, 6),
+  demo(60, '1:1', 720, 720, 4),
+  demo(61, '16:9', 720, 406, 4),
+  demo(62, '1:1', 720, 720, 6),
+  demo(63, '16:9', 720, 406, 6),
+  demo(64, '16:9', 720, 406, 6),
+  demo(65, '16:9', 720, 402, 5),
 ];
 
 /** The reference site's clips uploaded over the fixtures, in their own sizes (measured on the live samples 2026-10-27), so each tile keeps its clip's shape. */
@@ -108,15 +141,15 @@ function uploaded(e: Example, have: ReadonlySet<string>): Example {
   return { ...rest, title: `Video ví dụ ${e.id.slice('example-'.length)}`, presetId: '', aspect, width, height, ...(aspect === '9:16' || aspect === '1:1' ? { ratio: aspect } : {}) };
 }
 
-/** A tile's name: the preset its details file names, "Tự viết mô tả" for a free prompt, else (no details yet) the clip's own title. */
-export function exampleTitle(ex: Example, details: { presetId: string | null } | undefined, presets: readonly { id: string; label: string }[] | null): string {
-  if (!details) return ex.title;
+/** A tile's name: the preset its details file names, "Tự viết mô tả" for a free prompt, else (no details yet, or neither a preset nor a prompt) the clip's own title. */
+export function exampleTitle(ex: Example, details: { presetId: string | null; prompt?: string | null } | undefined, presets: readonly { id: string; label: string }[] | null): string {
+  if (!details || (!details.presetId && details.prompt === null)) return ex.title;
   return (details.presetId && presets?.find((p) => p.id === details.presetId)?.label) || 'Tự viết mô tả';
 }
 
 /** The label of the model a tile's details file names, so tiles that share a name still differ; null when the file names none or the model is not offered. */
-export const exampleModel = (details: { modelId?: string | null } | undefined, models: readonly { id: string; label: string }[] | null | undefined): string | null =>
-  (details?.modelId && models?.find((m) => m.id === details.modelId)?.label) || null;
+export const exampleModel = (details: { modelId?: string | null } | undefined, models: readonly { id: string; label: string; pairIds?: string[] }[] | null | undefined): string | null =>
+  (details?.modelId && models?.find((m) => m.id === details.modelId || m.pairIds?.includes(details.modelId!))?.label) || null; // a pair is listed by one of its rows
 
 /** The Examples tab: the ten fixture-backed clips, then each further sample clip that is uploaded. */
 export const examplesFor = (have: ReadonlySet<string>): Example[] => [...EXAMPLES.map((e) => uploaded(e, have)), ...MORE_EXAMPLES.filter((e) => have.has(`${e.id}.mp4`))];
@@ -130,6 +163,9 @@ export function sampleSrc(have: ReadonlySet<string>, fallback: string, name = fa
 export function cardSample(have: ReadonlySet<string>, base: string, fallback: string | null = null): { video: string | null; poster: string | null } {
   return { video: have.has(`${base}.mp4`) ? `/api/samples/${base}.mp4` : null, poster: have.has(`${base}.jpg`) ? `/api/samples/${base}.jpg` : fallback };
 }
+
+/** Each Examples tab's fixed samples (components/image-tools.tsx Gallery), by the feature whose results an Admin may put beside them. */
+export const GALLERY_SAMPLES: Record<string, string> = { image: 'image-example-', try_on: 'try-on-example-', marketing: 'marketing-example-' };
 
 /** The uploaded samples named `<prefix><n>.<ext>` (n = 1, 2, ...), in number order: the fixed sample tiles of a gallery. */
 export function numberedSamples(have: ReadonlySet<string>, prefix: string, ext: 'jpg' | 'mp4'): string[] {

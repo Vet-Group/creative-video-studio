@@ -14,7 +14,7 @@ import { ABOUT } from '@/lib/about-content';
 import { About } from './About';
 import { copyError, copySamples, Gallery, type Img, LockedFields, PhotoDialog, photoImg, RATIO_LABEL, Slot, THINKING_LABEL, uploadError, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
 import type { UploadSlot } from '@/lib/upload-slots';
-import { FormContext, type Photo, type PhotoRole, useApplier, useHasHistory, useJobs } from './jobs';
+import { FormContext, type Photo, type PhotoRole, useApplier, useJobs } from './jobs';
 import { ModelPicker } from './ModelPicker';
 import { PromptComposer } from './PromptComposer';
 import { Select } from './Select';
@@ -49,8 +49,8 @@ export function TryOn({ reuse }: { reuse?: string }) {
   const [person, setPerson] = useState<Img[]>([]);
   const [background, setBackground] = useState<Img[]>([]);
   const [prompt, setPrompt] = useState('');
-  const [tab, setTab] = useState<Tab | null>(null); // null: the default for the width (Create below 1024 px, else History or Examples)
-  const opening: Tab = useHasHistory('try_on') ? 'history' : 'examples';
+  const [tab, setTab] = useState<Tab | null>(null); // null: the default for the width (Create below 1024 px, else Examples)
+  const opening: Tab = 'examples'; // owner, 2026-11-09: beside the form a page opens on Examples, History is one click away
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
