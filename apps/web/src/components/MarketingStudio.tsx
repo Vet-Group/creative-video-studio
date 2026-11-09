@@ -11,6 +11,7 @@ import { NO_CAP } from '@/lib/caps';
 import { api, errorText, sendJson, thumbUrl } from '@/lib/api';
 import { ADVANCED_MAX_IMAGES, ADVANCED_MAX_SCRIPT, advancedPrompt, briefRoom, END_TEXT_POSITIONS, type EndTextPosition, FORMAT_HREF, FORMAT_NAME, highlightLines, hrefOfFormat, marketingPrompt, type MarketingFormat, reviewPrompt, sectionPrompt, unboxingPrompt, unboxingRoles } from '@/lib/marketing';
 import { PROMPT_TEMPLATES } from '@/lib/prompt-starters';
+import { type BrandKit, withBrand } from '@/lib/brand';
 import { promptTooLong } from '@/lib/prompt-limit';
 import { confirmRun } from '@/lib/run-guard';
 import { confirmDialog } from './Confirm';
@@ -166,6 +167,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
   const [durationSec, setDurationSec] = useState(10);
   const [storeId, setStoreId] = useState('');
   const [useBrand, setUseBrand] = useState(false); // the chosen store's brand kit, added to the prompt on the server
+  const [kit, setKit] = useState<BrandKit | null>(null);
   /** The stores that are not hidden: the pickers' store filter and the store templates and choices are shared with. */
   const [stores, setStores] = useState<{ id: string; name: string }[]>([]);
   // The member's last model and settings on this format, unless a refill opens the page; the list then follows the ratio and duration.
@@ -237,13 +239,15 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
           ? reviewPrompt({ ...shared, highlights, script }, own)
           : marketingPrompt(shared, own);
   };
+  /** A sent prompt as the provider gets it: the server adds the brand kit after it, so the preview and the limit count it too. */
+  const branded = (text: string) => (kit ? withBrand(text, kit, 'marketing') : text);
   const compose = (hook: string) => composeFor(hook, brief);
   const line = (text: string) => text.replace(/\s+/g, ' ').trim();
   // The request a Run with a video makes may take no end frame (Kling O3): the slot is replaced by a note and the frame is not sent.
   const endAllowed = chosen?.endFrame === true && !(advanced && video !== null && chosen.videoRefs !== null && !chosen.videoRefs.endFrame);
   const endAssetId = endAllowed ? endFrame?.id : undefined;
   /** What the brief may take: the chosen model's limit less what the page adds around it, for the longest variant. */
-  const room = chosen && Math.min(...variants.map((h) => briefRoom((b) => composeFor(h, b), chosen.maxPromptChars)));
+  const room = chosen && Math.min(...variants.map((h) => briefRoom((b) => branded(composeFor(h, b)), chosen.maxPromptChars)));
   /** What a Run sends for each variant, in order. */
   const sent = variants.map(compose);
   const n = variants.length;
@@ -401,7 +405,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
                       : review && highlightLines(highlights).length === 0
                         ? 'Nhập ít nhất 1 điểm nổi bật.'
                         : null);
-  const reason = formReason ?? promptTooLong(chosen, Math.max(...sent.map((s) => s.length)));
+  const reason = formReason ?? promptTooLong(chosen, Math.max(...sent.map((s) => branded(s).length)));
   /** Hook variants beyond the clips left today are refused before anything is sent. */
   const short = n > 1 && clips !== null && clips.today + n > clips.cap ? `Hôm nay bạn chỉ còn ${Math.max(0, clips.cap - clips.today)} clip; bỏ bớt biến thể hook.` : null;
   const canRun = reason === null && short === null && !busy;
@@ -685,10 +689,10 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
               {models && models.length > 0 && <ModelPicker models={models.map((m) => ({ id: m.id, label: m.label, isMock: m.isMock, supported: !pf || (m.maxImages >= images.length && (!advanced || videoReason(video, m.videoRefs, refs.length) === null)), estimateUsd: audio && m.audioEstimateUsd != null ? m.audioEstimateUsd : m.estimateUsd, score: m.score, recommended: m.recommended, resolution: m.resolution, durationsSec: m.durationsSec, audio: m.audioEstimateUsd != null, isNew: m.isNew, creditUsd: m.creditUsd, creditShown: m.creditShown, marks: m.total }))} value={chosen?.id ?? ''} onChange={(id) => pickModel(models.find((m) => m.id === id)!)} />}
             </VideoSettings>
             {/* Under the model, so in free writing the ratio row sits right under the prompt box as on Fash. */}
-            <PromptPreview feature="marketing" prompts={sent} labels={n > 1 ? variants.map((h, i) => `Biến thể ${i + 1} (${hookName(h)})`) : undefined} limit={chosen?.maxPromptChars} />
+            <PromptPreview feature="marketing" prompts={sent.map(branded)} labels={n > 1 ? variants.map((h, i) => `Biến thể ${i + 1} (${hookName(h)})`) : undefined} limit={chosen?.maxPromptChars} />
             {/* In the sections they sit in ③ Ending; in free writing, under the prompt preview. */}
             {!sec && endExtras}
-            <BrandPicker storeId={storeId} onStore={setStoreId} on={useBrand} onToggle={setUseBrand} />
+            <BrandPicker storeId={storeId} onStore={setStoreId} on={useBrand} onToggle={setUseBrand} onKit={setKit} />
             <Templates
               feature="marketing"
               data={() => ({

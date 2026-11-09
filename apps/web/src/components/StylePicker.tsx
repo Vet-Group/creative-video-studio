@@ -12,7 +12,8 @@ import { Modal } from './Modal';
 import { loadPending, PendingProposals, type PresetDraft, PresetForm, type PresetRow, type Proposal } from './PresetEditing';
 
 /** `value` is the chosen style's id, '' for none; a style switched off (or unknown, as from an old reuse link) falls back to none. */
-export function StylePicker({ value, onChange }: { value: string; onChange: (id: string) => void }) {
+/** `onStyle` hears the chosen style (its prompt only for a template editor), for the page's prompt preview (PromptPreview). */
+export function StylePicker({ value, onChange, onStyle }: { value: string; onChange: (id: string) => void; onStyle?: (style: PresetRow | null) => void }) {
   const { notify } = useJobs();
   const [styles, setStyles] = useState<PresetRow[] | null>(null); // the enabled styles, which a Run may use
   const [editable, setEditable] = useState<PresetRow[] | null>(null); // a template editor's view: switched-off styles too
@@ -51,6 +52,7 @@ export function StylePicker({ value, onChange }: { value: string; onChange: (id:
 
   const picture = (id: string) => (have.has(`preset-${id}.jpg`) ? versionedSample(`/api/samples/preset-${id}.jpg`) : null);
   const current = styles?.find((p) => p.id === value);
+  useEffect(() => onStyle?.(current ?? null), [current]);
   const shown = current && picture(current.id);
   const pick = (id: string) => {
     onChange(id);

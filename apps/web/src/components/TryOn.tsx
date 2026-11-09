@@ -3,7 +3,7 @@
 // laid out like Create. Run posts a try_on job; the inputs go in the order the API expects: the person first, then the garments, then the background.
 import { useEffect, useId, useState } from 'react';
 import { api, errorText, sendJson, thumbUrl } from '@/lib/api';
-import { promptTooLong } from '@/lib/prompt-limit';
+import { basePrompt, promptTooLong } from '@/lib/prompt-limit';
 import { confirmRun } from '@/lib/run-guard';
 import { tryOnPrompt } from '@/lib/try-on-prompt';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
@@ -17,6 +17,7 @@ import type { UploadSlot } from '@/lib/upload-slots';
 import { FormContext, type Photo, type PhotoRole, useApplier, useJobs } from './jobs';
 import { ModelPicker } from './ModelPicker';
 import { PromptComposer } from './PromptComposer';
+import { PromptPreview } from './PromptSections';
 import { Select } from './Select';
 import { Tray } from './Shell';
 import { Templates } from './Templates';
@@ -222,6 +223,7 @@ export function TryOn({ reuse }: { reuse?: string }) {
               placeholder="Ví dụ: người mẫu đứng trong studio sáng, toàn thân"
               ask={chosen ? () => ({ field: 'prompt', feature: 'try_on', text: prompt, ...(room !== undefined && { room }), model: chosen.id }) : null}
             />
+            <PromptPreview feature="try_on" prompts={[basePrompt('try_on', tryOnPrompt(Math.max(1, garments.length), background.length > 0, prompt))!]} limit={chosen?.maxPromptChars} />
 
             {models !== null && !failed && !chosen && <LockedFields />}
             {chosen && (

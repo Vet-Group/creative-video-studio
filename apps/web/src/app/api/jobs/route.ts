@@ -12,6 +12,7 @@ import { findChoice } from '@/lib/choices';
 import { providerRefusal, TWIN_REASONS } from '@/lib/job-failure';
 import { jobNeed, offeredNow, retryTwin, servingRow, twinEstimate } from '@/lib/model-twins';
 import { BRAND_FEATURES, withBrand } from '@/lib/brand';
+import { basePrompt } from '@/lib/prompt-limit';
 import { ADVANCED_MAX_SCRIPT, END_TEXT_POSITIONS, isParamFormat, MAX_END_TEXT, MAX_ENDING, MAX_HIGHLIGHT, MAX_HIGHLIGHTS, MAX_HOOK, PARAM_FORMATS, UNBOXING_ROLES } from '@/lib/marketing';
 import { falBalance, falCreditUsd, overCredit } from '@/lib/provider-credit';
 import { guard } from '@/lib/session';
@@ -31,8 +32,6 @@ const QUALITIES = ['auto', 'low', 'medium', 'high'];
 /** The shortest reference audio clip, as on Fash. */
 const MIN_AUDIO_MS = 2000;
 /** The apps that need more than one input image; the model's own max_images is the upper limit. Try On has its own message below. */
-/** The apps whose fixed instruction a member's own prompt is added to, not replaced by. */
-const APPEND_TO_INSTRUCTION = ['character_swap', 'model_swap', 'lingerie_try_on'];
 const MIN_INPUTS: Record<string, number> = { character_swap: 2, model_swap: 2, face_swap: 2, jewelry_try_on: 2, lingerie_try_on: 2 };
 /** `presetId` is null for a free prompt, and `prompt` is null when a preset supplies it (or, in a retry, when the original's is copied). An image job has `durationSec` 0, and no preset but Image Generation's style. */
 type Spec = {
@@ -223,7 +222,7 @@ export async function POST(request: Request) {
     if (typeof useBrand !== 'boolean') return bad('useBrand must be true or false');
     if (useBrand && !BRAND_FEATURES.includes(feature)) return bad('the brand kit is for Marketing Studio and Image Generation only');
     const written = freePrompt?.trim();
-    const prompt = written && APPEND_TO_INSTRUCTION.includes(feature) ? `${FEATURE_PROMPTS[feature]}. ${written}` : (written ?? FEATURE_PROMPTS[feature] ?? (motion ? '' : null));
+    const prompt = basePrompt(feature, written) ?? (motion ? '' : null);
     if (prompt !== null && ((prompt === '' && !motion) || prompt.length > PROMPT_CEILING)) return bad(`the prompt must have 1 to ${PROMPT_CEILING} characters`);
     const usable = await pool.query(
       `select a.id, a.mime, a.duration_ms from assets a

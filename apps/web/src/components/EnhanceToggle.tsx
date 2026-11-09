@@ -4,6 +4,8 @@
 import { Icon } from './Icon';
 
 export const ENHANCE_HINT = 'Dùng AI viết lại mô tả của bạn chi tiết hơn để có kết quả tốt hơn';
+/** Under the prompt preview (PromptPreview) while Enhance is on: the model gets the rewrite, not the text shown. */
+export const ENHANCE_NOTE = 'Cải thiện đang bật: AI viết lại prompt này chi tiết hơn trước khi gửi cho mô hình.';
 
 export function EnhanceToggle({ on, disabled = false, onChange }: { on: boolean; disabled?: boolean; onChange: (on: boolean) => void }) {
   return (

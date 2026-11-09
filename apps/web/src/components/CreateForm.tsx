@@ -16,7 +16,7 @@ import { About } from './About';
 import { AudioSwitch } from './AudioSwitch';
 import { CardMedia } from './CardMedia';
 import { PhraseChoice, useChoiceLists } from './Choices';
-import { EnhanceToggle } from './EnhanceToggle';
+import { ENHANCE_NOTE, EnhanceToggle } from './EnhanceToggle';
 import { Icon } from './Icon';
 import { copyError, copySamples, GALLERY_SIZE_KEY, HISTORY_SIZE_KEY, photoImg, RunSummary, SizeSlider, Slot, UploadedPhotos, uploadError, uploadImages, useSize } from './image-tools';
 import { FormContext, type Photo, Tap, useApplier, useJobs, useRecreated } from './jobs';
@@ -728,7 +728,8 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
                 {body}
               </PromptSections>
             )}
-            {presetId === '' && sec && <PromptPreview feature="video" prompts={[composed]} limit={chosen?.maxPromptChars} />}
+            {/* A preset's own prompt goes as it is (Enhance is off with a preset); only a template editor can read it, so a member's preview stays hidden. */}
+            {presetId === '' ? (sec || composed.trim()) && <PromptPreview feature="video" prompts={[composed]} limit={chosen?.maxPromptChars} note={enhance ? ENHANCE_NOTE : undefined} /> : current?.prompt && <PromptPreview feature="video" prompts={[current.prompt]} limit={chosen?.maxPromptChars} />}
 
             <VideoSettings>
               {models && models.models.length > 0 && (
