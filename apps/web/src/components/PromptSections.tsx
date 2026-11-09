@@ -220,12 +220,18 @@ export function PromptPreview({ feature, prompts, labels, limit, note }: { featu
           {limit !== undefined && `/${limit}`} ký tự
         </span>
       </summary>
-      {prompts.map((p, i) => (
-        <p key={labels?.[i] ?? i} lang="en">
-          {labels?.[i] && <strong lang="vi">{labels[i]}: </strong>}
-          {p}
-        </p>
-      ))}
+      {/* Set apart from the page's own words, so the text the model gets is never mistaken for help or the member's draft. */}
+      <div className="prompt-final" role="group" aria-label="Bản cuối gửi cho mô hình">
+        <span className="prompt-final-label" aria-hidden="true">
+          Bản cuối gửi cho mô hình
+        </span>
+        {prompts.map((p, i) => (
+          <p key={labels?.[i] ?? i} lang="en">
+            {labels?.[i] && <strong lang="vi">{labels[i]}: </strong>}
+            {p}
+          </p>
+        ))}
+      </div>
       {note && <div className="help">{note}</div>}
       {/* Only while open: the closed fold keeps the page to one Translate button, the prompt box's. */}
       {open && (

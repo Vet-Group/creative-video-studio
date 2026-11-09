@@ -62,6 +62,7 @@ test('Create: the sections show by default, Khung prompt fills all three, the pr
 
   const composed = `${t.hook} ${t.body} ${ENDINGS[2]!.phrase}`;
   await expect(page.locator('.prompt-preview')).toHaveAttribute('open', ''); // open by default on a computer
+  await expect(page.locator('.prompt-preview .prompt-final-label')).toHaveText('Bản cuối gửi cho mô hình'); // the sent text sits apart, under its own label
   await expect(preview(page)).toHaveText([composed]);
   await expect(page.locator('.prompt-preview-count')).toHaveText(`${composed.length}/2000 ký tự`);
   await runButton(page).click();
