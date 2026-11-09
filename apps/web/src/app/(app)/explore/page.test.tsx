@@ -199,3 +199,16 @@ test('a -vertex or -byteplus twin shows its model written description, not the s
   expect(html).toContain('Mô hình của ByteDance cho người và khung cảnh chân thực');
   expect(html).not.toContain('Điểm 0/100');
 });
+
+test('a Continue card names its model and, when the member wrote it, their prompt, so two jobs of one tool tell apart', async () => {
+  const html = await withJobs([
+    job('vid-1', 'succeeded', { model_label: 'Kling O3 Pro', prompt: 'a slow turn of the red mug' }),
+    job('mkt-1', 'succeeded', { feature: 'marketing', model_label: 'Seedance 2.0', prompt: null }),
+  ]);
+  const list = html.match(/<ul class="explore-jobs"[^>]*>([\s\S]*?)<\/ul>/)![1]!;
+  const cards = [...list.matchAll(/<a [^>]*>([\s\S]*?)<\/a>/g)].map(([, inner]) => inner!);
+  expect(cards[0]).toContain('<span class="explore-job-model">Kling O3 Pro</span>');
+  expect(cards[0]).toMatch(/<span class="explore-job-prompt" title="a slow turn of the red mug">a slow turn of the red mug<\/span>/);
+  expect(cards[1]).toContain('<span class="explore-job-model">Seedance 2.0</span>');
+  expect(cards[1]).not.toContain('explore-job-prompt'); // a composed prompt is not shown
+});

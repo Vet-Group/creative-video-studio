@@ -574,6 +574,33 @@ function VertexCosts({ month, data, failed, reload }: { month: string; data: Ver
   );
 }
 
+/** Job spend through day `elapsed` of this month against the same days of the previous one; `pct` is null when the previous month had none. */
+export function sameDayChange(days: { usd: string }[], prevDays: { usd: string }[], elapsed: number) {
+  const sum = (d: { usd: string }[]) => d.slice(0, elapsed).reduce((t, x) => t + Number(x.usd), 0);
+  const cur = sum(days);
+  const prev = sum(prevDays);
+  return { cur, prev, pct: prev > 0 ? ((cur - prev) / prev) * 100 : null };
+}
+
+/** The KPI card that sets this month's spend so far beside the same days of the previous month, fetched alongside the current one. */
+function SamePoint({ data }: { data: Costs }) {
+  const [y, m] = data.month.split('-').map(Number) as [number, number];
+  const prevMonth = m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`;
+  const { data: prev } = useFetch<Costs>(`/api/admin/costs?month=${prevMonth}`);
+  const today = new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 10);
+  const elapsed = data.month === today.slice(0, 7) ? Number(today.slice(8)) : data.byDay.length;
+  const c = prev && sameDayChange(data.byDay, prev.byDay, elapsed);
+  return (
+    <div className="kpi" role="group" aria-label="So với tháng trước">
+      <p className="kpi-label">Cùng kỳ tháng {prevMonth}</p>
+      <p className="kpi-value">{c ? dollars(c.prev.toFixed(2)) : '—'}</p>
+      <p className="kpi-sub">
+        {!c ? 'Đang tải...' : c.pct === null ? 'Tháng trước chưa có chi phí' : `${c.pct > 0 ? 'Tăng' : c.pct < 0 ? 'Giảm' : 'Không đổi'} ${Math.abs(Math.round(c.pct))}% (${dollars(c.cur.toFixed(2))} đến ngày ${elapsed})`}
+      </p>
+    </div>
+  );
+}
+
 function CostsBody({ data, reload }: { data: Costs; reload: () => void }) {
   const { problem, pending, run } = useAction(reload);
   const [rate, setRate] = useState(data.rateVndPerUsd ?? '');
@@ -596,6 +623,7 @@ function CostsBody({ data, reload }: { data: Costs; reload: () => void }) {
     ['Theo mục', 'feature', data.byFeature, (g) => g.name ?? g.id],
   ];
   const withVnd = data.rateVndPerUsd !== null;
+  const top = data.byModel.find((l) => l.model !== null);
 
   return (
     <>
@@ -615,8 +643,19 @@ function CostsBody({ data, reload }: { data: Costs; reload: () => void }) {
           </p>
           <p className="kpi-sub">Tháng trước: {dollars(data.previousMonth.usdDisplay)}</p>
         </div>
+        <SamePoint data={data} />
         <Budget title="Ngân sách video" used={data.capUsage.usd} cap={data.capUsage.monthlyCapUsd} />
         <Budget title="Ngân sách ảnh và ứng dụng" used={data.featuresCapUsage.usd} cap={data.featuresCapUsage.monthlyCapUsd} />
+        {top && (
+          <div className="kpi" role="group" aria-label="Mô hình chi nhiều nhất">
+            <p className="kpi-label">Mô hình chi nhiều nhất</p>
+            <p className="kpi-value small">{top.label}</p>
+            <p className="kpi-sub">
+              {top.provider ? `${PROVIDER[top.provider] ?? top.provider} · ` : ''}
+              {dollars(top.usdDisplay)}
+            </p>
+          </div>
+        )}
       </div>
       <p className="muted">Số liệu tính đến dòng sổ cái #{data.asOf}; rê chuột lên một số tiền để xem số lẻ 4 chữ số.</p>
       {data.featureCaps.some((c) => c.level !== null) && (

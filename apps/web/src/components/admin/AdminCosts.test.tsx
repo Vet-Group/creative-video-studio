@@ -1,7 +1,7 @@
 // The provider balances panel's top-up link and the Vertex read error: a neutral button, and one short sentence without Google's raw answer.
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, test } from 'vitest';
-import { ByModel, DailySpend, dollars, packText, TopUp, Usd, VertexError } from './AdminCosts';
+import { ByModel, DailySpend, dollars, packText, sameDayChange, TopUp, Usd, VertexError } from './AdminCosts';
 import { Budget } from './AdminOverview';
 
 test('the top-up link is a neutral button that opens the provider billing page in a new tab', () => {
@@ -100,4 +100,19 @@ test('the Seedance 2.0 pack line shows tokens left of the total, the percent, ab
   expect(packText({ ...pack, tokensLeft: 1_000_000, percentLeft: 14.29, usdLeft: 7, low: true })).toBe(`Còn ${n(1_000_000)} / ${n(7_000_000)} token (14.3%) · ≈ $7.00 theo giá lẻ · hết hạn 2027-02-01 (dưới 20%)`);
   expect(packText({ ...pack, daysLeft: 9.2, low: true })).toContain('(còn 10 ngày)');
   expect(packText({ ...pack, daysLeft: -1, expired: true, low: true })).toContain('(đã hết hạn)');
+});
+
+test('the same-day comparison sums only the days elapsed, gives the percent change, and has no percent when last month was empty', () => {
+  const d = (...v: number[]) => v.map((n) => ({ usd: n.toFixed(4) }));
+  expect(sameDayChange(d(1, 2, 9), d(2, 2, 100), 2)).toEqual({ cur: 3, prev: 4, pct: -25 });
+  expect(sameDayChange(d(3, 3), d(1, 1), 2).pct).toBe(200);
+  expect(sameDayChange(d(1, 2), d(0, 0), 2)).toEqual({ cur: 3, prev: 0, pct: null });
+});
+
+test('a budget bar turns amber from 80%, red at the cap, and a zero cap reads as locked; the no-limit sentinel starts at exactly $100,000', () => {
+  const level = (used: string, cap: string) => renderToStaticMarkup(<Budget title="T" used={used} cap={cap} />).match(/data-level="(\w+)"/)?.[1];
+  expect([level('50', '100'), level('80', '100'), level('100', '100'), level('1', '0')]).toEqual(['ok', 'high', 'full', 'full']);
+  expect(renderToStaticMarkup(<Budget title="T" used="1" cap="0" />)).toContain('Đang khoá');
+  expect(renderToStaticMarkup(<Budget title="T" used="1" cap="99999" />)).toContain('meter');
+  expect(renderToStaticMarkup(<Budget title="T" used="1" cap="100000" />)).toContain('Không giới hạn');
 });

@@ -734,11 +734,11 @@ td code { white-space: pre-wrap; overflow-wrap: anywhere; }
   .admin table.jobs td.model::before { content: '\b7'; position: absolute; left: -9px; }
 }
 /* Costs: one bar per day, thin, rounded at the data end, with a 2px gap; day numbers every five days. */
-.admin .day-bars { display: grid; grid-template-columns: repeat(var(--days, 31), minmax(0, 1fr)); gap: 2px; align-items: end; height: 140px; margin: 0 0 24px; padding: 0; list-style: none; border-bottom: 1px solid var(--hairline); }
+.admin .day-bars { display: grid; grid-template-columns: repeat(var(--days, 31), minmax(0, 1fr)); gap: 2px; align-items: end; height: 140px; max-width: 720px; margin: 0 0 24px; padding: 0; list-style: none; border-bottom: 1px solid var(--hairline); }
 .admin .day-bars li { position: relative; display: flex; height: 100%; align-items: flex-end; }
 .admin .day-bars li span { display: block; width: 100%; border-radius: 4px 4px 0 0; background: var(--ink-2); }
 .admin .day-bars li:hover span { background: var(--brand); }
-.admin .day-bars small { position: absolute; top: calc(100% + 4px); left: 50%; color: var(--muted); font-size: 11px; line-height: 14px; transform: translateX(-50%); }
+.admin .day-bars small { position: absolute; top: calc(100% + 4px); left: 50%; color: var(--text-muted); font-size: 12px; line-height: 16px; transform: translateX(-50%); }
 .admin details:not(.raw, .help) summary { width: fit-content; color: var(--link); font-size: 13px; font-weight: 600; cursor: pointer; }
 .admin h2 { margin: 32px 0 12px; font-size: 16px; line-height: 24px; }
 .admin p.muted { max-width: 80ch; }
@@ -1454,6 +1454,8 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .explore-job[data-status='running'] .explore-job-media img { filter: saturate(.4); }
 .explore-job[data-status='running'] .explore-job-media::after { content: ''; position: absolute; top: 10px; left: 10px; width: 8px; height: 8px; border-radius: 50%; background: var(--brand); box-shadow: 0 0 0 3px rgb(var(--light) / .85); }
 .explore-job .muted { font-size: 13px; line-height: 18px; }
+.explore-job-model { overflow: hidden; color: var(--text-muted); font-size: 13px; line-height: 18px; text-overflow: ellipsis; white-space: nowrap; }
+.explore-job-prompt { display: -webkit-box; overflow: hidden; color: var(--ink-3); font-size: 12px; line-height: 17px; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .explore-job:is([data-status='failed'], [data-status='failed_unknown'], [data-status='timed_out']) .muted { color: var(--danger); }
 /* The tools: compact tiles, a loop or still above the icon and name; 2 columns on a phone, 3 on a tablet, one row of 6 on a desktop. */
 .explore-tools { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
@@ -2181,7 +2183,11 @@ dialog.modal.template-sheet { width: 100%; max-width: none; margin: auto 0 0; bo
 }
 @media (max-width: 639.98px) {
   .library-search { flex-basis: 100%; }
-  .library-tools .library-size { display: none; } /* a phone shows one column at every size */
+  .library-tools .library-size { display: none; } /* a phone shows two columns at every size */
+  .library .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 8px; } /* more than one result per screen; the card keeps every action */
+  /* Two columns leave the bottom edge to the 44 px tools: the type and length go on a second line at the top, under the mark and the
+     picking checkbox, with the card's whole width so no chip is cut; the mark keeps room for the checkbox (its base rule). */
+  .library .lib-media .lib-chips { top: 36px; bottom: auto; max-width: calc(100% - 16px); }
   .library-filters { padding: 3px 0; } /* wraps onto more rows (the base rule), room kept for the focus ring */
   .library-active { order: -1; margin: 0 4px 0 0; }
   .lib-row .actions { flex-basis: 100%; padding-left: 68px; }
@@ -2335,6 +2341,8 @@ dialog.modal.tool-guide { width: min(52rem, calc(100vw - 2rem)); }
 .tool-hint .link-button .icon { display: none; }
 .tool-hint-close { position: absolute; top: 6px; right: 6px; display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 8px; background: none; color: var(--text-muted); }
 .tool-hint-close:hover { background: var(--surface); color: var(--ink); }
+.tool-hint-chip { display: inline-flex; align-items: center; gap: 6px; height: 28px; margin: 0 0 12px; padding: 0 10px; border: 1px solid var(--border); border-radius: 999px; background: none; color: var(--text-muted); font-size: 12px; line-height: 18px; font-weight: 500; }
+.tool-hint-chip:hover { border-color: var(--border-strong); color: var(--ink); }
 @media (pointer: coarse) { .tool-hint { padding-right: 52px; } .tool-hint-close { width: 44px; height: 44px; top: 0; right: 0; } }
 .imagegen > .tool-hint, .apps > .tool-hint { margin-top: 12px; }
 .form-scroll > .tool-hint + .field { margin-top: 0; } /* the first field keeps its place under the hint */

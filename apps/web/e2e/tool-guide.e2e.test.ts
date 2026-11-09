@@ -52,6 +52,13 @@ test('a tool page opens with when to use it, links to the others and the guide, 
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Tạo video', level: 1 })).toBeAttached();
   await expect(page.getByRole('complementary', { name: 'Khi nào dùng Tạo video' })).toHaveCount(0);
+  // Folded into a chip that opens it again, and stays open after a reload.
+  await page.getByRole('button', { name: 'Khi nào dùng Tạo video?' }).click();
+  await expect(hint).toBeVisible();
+  await page.reload();
+  await expect(hint).toBeVisible();
+  await hint.getByRole('button', { name: 'Ẩn gợi ý này' }).click();
+  await expect(hint).toHaveCount(0);
   // Hidden on this page only.
   for (const [path, name] of [['/try-on', 'Thử đồ'], ['/image-generation', 'Tạo ảnh'], ['/marketing-studio', 'Marketing Studio'], ['/apps', 'Ứng dụng']]) {
     await page.goto(path!);
