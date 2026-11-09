@@ -108,7 +108,6 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
   const canRun = reason === null && !busy;
   // With no image and a model that needs one, the best model that makes pictures from words is one click away (not switched to silently: its price differs).
   const wordsModel = chosen && images.length === 0 && !chosen.textToImage ? models?.filter((m) => m.textToImage).sort((a, b) => b.score - a.score)[0] : undefined;
-  // Over Run too once the text nears the model's limit (or is over it after a switch).
 
   async function upload(files: File[]) {
     if (files.length === 0) return;
