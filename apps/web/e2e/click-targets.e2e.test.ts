@@ -109,19 +109,24 @@ test('an image result opens full screen from the picture in History, and an imag
     const { id } = (await res.json()) as { id: string };
     try {
       await expect.poll(async () => ((await (await page.request.get(`/api/jobs/${id}`)).json()) as { status: string }).status, { timeout: 60_000 }).toBe('succeeded');
-      const out = ((await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { id: string; outputAssetId: string }[] }).jobs.find((j) => j.id === id)!.outputAssetId;
+      const done = ((await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { id: string; outputAssetId: string; posterAssetId: string | null }[] }).jobs.find((j) => j.id === id)!;
+      const [out, preview] = [done.outputAssetId, done.posterAssetId];
+      expect(preview).not.toBeNull();
       await page.goto('/image-generation');
       await openTab(page, 'Lịch sử');
-      const picture = page.locator(`.job-media img[src="/api/assets/${out}/content"]`);
+      // The card shows the small preview; full screen shows the original.
+      const picture = page.locator(`.job-media img[src="/api/assets/${preview}/content"]`);
       await expect(picture).toBeVisible();
       await page.mouse.click(...(await at(picture)));
       await expect.poll(() => page.evaluate(() => document.fullscreenElement?.tagName ?? null)).toBe('IMG');
+      expect(await page.evaluate(() => document.fullscreenElement?.getAttribute('src'))).toBe(`/api/assets/${out}/content`);
       await page.evaluate(() => document.exitFullscreen());
 
       await page.getByRole('tab', { name: 'Ví dụ' }).click();
       const gallery = page.getByRole('group', { name: 'Ảnh của công ty' });
-      for (const src of ['/api/samples/image-example-1.jpg', `/api/assets/${out}/content`]) {
-        const tile = gallery.locator(`.gallery-item:has(img[src="${src}"])`);
+      // A result's tile shows its preview and opens the original.
+      for (const [shown, src] of [['/api/samples/image-example-1.jpg', '/api/samples/image-example-1.jpg'], [`/api/assets/${preview}/content`, `/api/assets/${out}/content`]]) {
+        const tile = gallery.locator(`.gallery-item:has(img[src="${shown}"])`);
         await expect(tile).toBeVisible();
         const opened = page.context().waitForEvent('page', { timeout: 5_000 });
         await page.mouse.click(...(await at(tile, undefined, 12))); // near the top, clear of the Use this template pill

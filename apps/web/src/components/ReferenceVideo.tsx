@@ -49,7 +49,7 @@ export function ReferenceVideoSlot({ video, busy, onFile, onHistory, onRemove }:
   const [picking, setPicking] = useState(false);
   const { jobs } = useJobs();
   // The member's recent finished clips (the tray's 20 latest jobs), each one's poster as its tile.
-  const clips = jobs.filter((j) => j.status === 'succeeded' && j.outputAssetId && j.posterAssetId && j.feature !== 'motion_control' && j.feature !== 'image');
+  const clips = jobs.filter((j) => j.status === 'succeeded' && j.outputAssetId && j.posterAssetId && j.feature !== 'motion_control' && j.resolution === null); // an image job's poster is its preview
   return (
     <div className="field">
       <div className="field-head">

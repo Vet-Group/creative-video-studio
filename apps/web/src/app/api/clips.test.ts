@@ -785,7 +785,9 @@ describe('bestClips', () => {
     await mark(image, 'pass');
     await clip(alice.id, { model: 'best-none' });
     const best = await bestClips();
-    expect(best.get('best-image')).toEqual({ video: null, poster: `/api/assets/${image}-video/content` });
+    expect(best.get('best-image')).toEqual({ video: null, poster: `/api/assets/${image}-poster/content` }); // an image's preview
     expect(best.has('best-none')).toBe(false);
+    await pool.query('update jobs set poster_asset_id = null where id = $1', [image]); // an image from before previews shows itself
+    expect((await bestClips()).get('best-image')).toEqual({ video: null, poster: `/api/assets/${image}-video/content` });
   });
 });

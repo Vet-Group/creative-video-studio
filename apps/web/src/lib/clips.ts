@@ -5,7 +5,7 @@ import { pool } from './auth';
 export const LIVE_CLIP = `j.status = 'succeeded' and j.deleted_at is null and j.purged_at is null and j.output_asset_id is not null`;
 
 /** Per model, the company's best Library clip as card media: a real (not mock) Create Videos or Image Generation clip marked Pass, a featured one first, then the most favourited, then the newest.
- * A video clip gives its loop and poster, an image its still; any member may read both (`readableAsset`).
+ * A video clip gives its loop and poster, an image its preview (else the image itself); any member may read both (`readableAsset`).
  * Other features (Try On, Face Swap and the apps) run on the same models but show staff photos, so they never qualify. */
 export async function bestClips(): Promise<Map<string, { video: string | null; poster: string | null }>> {
   const { rows } = await pool.query<{ model: string; output_asset_id: string; poster_asset_id: string | null; mime: string }>(
@@ -18,7 +18,7 @@ export async function bestClips(): Promise<Map<string, { video: string | null; p
   );
   const content = (id: string | null) => (id ? `/api/assets/${id}/content` : null);
   return new Map(
-    rows.map((r) => [r.model, r.mime.startsWith('video/') ? { video: content(r.output_asset_id), poster: content(r.poster_asset_id) } : { video: null, poster: content(r.output_asset_id) }]),
+    rows.map((r) => [r.model, r.mime.startsWith('video/') ? { video: content(r.output_asset_id), poster: content(r.poster_asset_id) } : { video: null, poster: content(r.poster_asset_id ?? r.output_asset_id) }]),
   );
 }
 

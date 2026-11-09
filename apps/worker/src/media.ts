@@ -42,6 +42,12 @@ export async function closestRatio(bytes: Uint8Array, ratios: string[]): Promise
   return fixed.reduce((best, r) => (off(r) < off(best) ? r : best));
 }
 
+/** An image output's tile preview: a JPEG of the upright image, its longest side at most 1024 px (never enlarged), transparency on white. */
+export async function imagePreview(bytes: Uint8Array): Promise<{ data: Buffer; width: number; height: number }> {
+  const { data, info } = await sharp(bytes).rotate().resize(1024, 1024, { fit: 'inside', withoutEnlargement: true }).flatten({ background: '#fff' }).jpeg({ quality: 80 }).toBuffer({ resolveWithObject: true });
+  return { data, width: info.width, height: info.height };
+}
+
 /** Writes the first frame as a JPEG no wider than 480 px. */
 export async function extractPoster(video: string, jpeg: string): Promise<void> {
   await run(requireFfmpeg(), ['-y', '-v', 'error', '-i', video, '-frames:v', '1', '-vf', "scale='min(480,iw)':-2", '-q:v', '3', jpeg]);
