@@ -8,7 +8,7 @@ import { useRouter } from 'next/navigation';
 import { type CSSProperties, useEffect, useId, useState } from 'react';
 import { ABOUT } from '@/lib/about-content';
 import { NO_CAP } from '@/lib/caps';
-import { api, errorText, sendJson } from '@/lib/api';
+import { api, errorText, sendJson, thumbUrl } from '@/lib/api';
 import { ADVANCED_MAX_IMAGES, ADVANCED_MAX_SCRIPT, advancedPrompt, briefRoom, END_TEXT_POSITIONS, type EndTextPosition, FORMAT_HREF, FORMAT_NAME, highlightLines, hrefOfFormat, marketingPrompt, type MarketingFormat, reviewPrompt, sectionPrompt, unboxingPrompt, unboxingRoles } from '@/lib/marketing';
 import { PROMPT_TEMPLATES } from '@/lib/prompt-starters';
 import { promptTooLong } from '@/lib/prompt-limit';
@@ -789,7 +789,7 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
         open={picker === 'product'}
         title="Chọn sản phẩm"
         sub="Sản phẩm của tôi: các ảnh sản phẩm bạn đã dùng, hoặc tải lên ảnh mới."
-        tiles={myProducts.map((a) => ({ key: a.id, src: `/api/assets/${a.id}/content`, label: `Dùng lại ${a.filename}`, pick: () => setProduct([a]) }))}
+        tiles={myProducts.map((a) => ({ key: a.id, src: thumbUrl(a.id), label: `Dùng lại ${a.filename}`, pick: () => setProduct([a]) }))}
         busy={busy}
         onFile={(files) => void add(setProduct, 'product')(files)}
         onClose={() => setPicker(null)}

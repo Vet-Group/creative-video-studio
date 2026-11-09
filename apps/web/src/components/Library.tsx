@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { type CSSProperties, type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
-import { api, type Clip, errorText, sendJson } from '@/lib/api';
+import { api, type Clip, errorText, sendJson, thumbUrl } from '@/lib/api';
 import { FAULTS } from '@/lib/faults';
 import { featureLabel } from '@/lib/features';
 import { GALLERY_SAMPLES, numberedSamples } from '@/lib/examples';
@@ -226,6 +226,7 @@ function ClipCard({ clip, view, select, onChange, onDeleted, onOpen }: { clip: C
             {clip.modelLabel}
             {clip.feature !== 'video' && clip.prompt && <span className="tag feature-tag">{featureLabel(clip.feature)}</span>}
             {clip.isMock && <span className="badge">MOCK</span>}
+            {clip.example && <span className="tag">Ví dụ</span>}
             {mark && <span className={`lib-mark${verdictClass(clip.verdict!)}`}>{mark}</span>}
           </p>
           <p className={clip.prompt ? 'lib-row-prompt' : 'lib-row-prompt none'} title={clip.prompt ?? undefined}>
@@ -293,6 +294,7 @@ function ClipCard({ clip, view, select, onChange, onDeleted, onOpen }: { clip: C
           {clip.feature !== 'video' && <span className="lib-chip">{featureLabel(clip.feature)}</span>}
           {!image && <span className="lib-chip">{clip.durationSec}s</span>}
           {clip.isMock && <span className="badge">MOCK</span>}
+          {clip.example && <span className="lib-chip">Ví dụ</span>}
         </span>
         {mark && (
           <span className={`lib-verdict${verdictClass(clip.verdict!)}`} title={`Kết quả: ${mark}`}>
@@ -463,7 +465,7 @@ function ClipDetail({ clips, index, stores, admin, onIndex, onChange }: { clips:
               {job.images.map((i) => (
                 <li key={i.id}>
                   <a href={content(i.id)} target="_blank" rel="noreferrer" title="Mở ảnh trong tab mới">
-                    <img src={content(i.id)} alt={i.filename} />
+                    <img src={thumbUrl(i.id)} alt={i.filename} />
                   </a>
                 </li>
               ))}
@@ -787,7 +789,7 @@ export function Library() {
   };
   const update = (next: Clip) => {
     if (next.verdict) uncount(clips.find((x) => x.id === next.id)); // a first mark
-    setClips((cur) => ((filters.favoritesOnly && !next.favorite) || !matchesVerdict(filters.verdict, next.verdict) ? cur.filter((x) => x.id !== next.id) : cur.map((x) => (x.id === next.id ? next : x))));
+    setClips((cur) => ((filters.favoritesOnly && !next.favorite) || (filters.examplesOnly && !next.example) || !matchesVerdict(filters.verdict, next.verdict) ? cur.filter((x) => x.id !== next.id) : cur.map((x) => (x.id === next.id ? next : x))));
   };
   // Declared after `update`: the bar renders the bulk actions while this hook runs.
   const zip = useZipDownload({ hover: true, actions: (ids) => <BulkActions ids={ids} clips={clips} stores={isAdmin ? stores : undefined} onChange={update} /> });
@@ -1033,6 +1035,12 @@ export function Library() {
           <Icon name="star" />
           Yêu thích
         </label>
+        {isAdmin && (
+          <label className="library-toggle">
+            <input type="checkbox" checked={filters.examplesOnly} onChange={(e) => set({ examplesOnly: e.target.checked })} />
+            Đang ở Ví dụ
+          </label>
+        )}
         {active > 0 && (
           <span className="library-active">
             <span>{active} bộ lọc</span>

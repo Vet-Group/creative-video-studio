@@ -1,6 +1,6 @@
 'use client';
 import { type DragEvent, type KeyboardEvent, useEffect, useId, useRef, useState } from 'react';
-import { api, errorText, sendJson } from '@/lib/api';
+import { api, errorText, sendJson, thumbUrl } from '@/lib/api';
 import { cardSample, type Example, exampleForPreset, exampleModel, examplesFor, exampleTitle, sampleSrc, splitColumns } from '@/lib/examples';
 import { briefRoom, sectionBody, sectionPrompt } from '@/lib/marketing';
 import { PROMPT_TEMPLATES } from '@/lib/prompt-starters';
@@ -635,7 +635,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
                 <ul className="thumbs" aria-label="Ảnh đã chọn">
                   {images.map((i) => (
                     <li key={i.id}>
-                      <img src={`/api/assets/${i.id}/content`} alt={i.filename} />
+                      <img src={thumbUrl(i.id)} alt={i.filename} />
                       <button type="button" aria-label={`Bỏ ảnh ${i.filename}`} onClick={() => setImages((cur) => cur.filter((x) => x.id !== i.id))}>
                         <Icon name="x" size={12} />
                       </button>
@@ -811,7 +811,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
                 <ul key={c} className="masonry-col">
                   {column.map((ex) => (
                     <li key={ex.id} className="example">
-                      <Preview src={media(ex.src)} poster={media(ex.poster)} width={ex.width} height={ex.height} title={titleOf(ex)} paused={picking || detail !== null} />
+                      <Preview src={media(ex.src)} poster={media(ex.poster)} width={ex.width} height={ex.height} title={titleOf(ex)} paused={picking || detail !== null} onHover />
                       <button type="button" className="example-open" onClick={() => setDetail(ex)}>
                         <span className="example-caption">
                           {titleOf(ex)}

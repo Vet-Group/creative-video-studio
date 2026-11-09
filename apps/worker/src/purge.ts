@@ -25,10 +25,11 @@ export async function purgeDeletedClips(pool: LedgerPool, removeObject: (key: st
         const { rows } = await tx.query(
           `delete from assets a where a.id = any($1::text[])
               or (a.id = any($2::text[]) and a.kind = 'input' and not exists (select 1 from jobs o where o.id <> $3 and o.deleted_at is null and a.id = any(${inputsOf('o')})))
-            returning a.s3_key`,
+            returning a.id, a.s3_key`,
           [outputs, job.inputs, id],
         );
-        return rows.map((r) => r.s3_key as string);
+        // Each image may also have a tile thumbnail (the web's thumbKey); removing a missing one is a no-op.
+        return rows.flatMap((r) => [r.s3_key as string, `thumbs/${r.id}`]);
       });
       purged++;
       for (const key of keys) await removeObject(key).catch((e) => log(`remove object ${key}`, e));

@@ -553,6 +553,8 @@ export const examples = pgTable('examples', {
     .notNull()
     .references(() => users.id, { onDelete: 'restrict' }),
   createdAt: tstz('created_at').notNull().defaultNow(),
+  /** Its place on the tab once an Admin has ordered the tab (from 1); null for one put there since, which shows first, newest first. */
+  position: integer('position'),
 });
 
 // A member's saved form (Save template): the inputs of one page, in the shape the reuse link reads from a job, so applying it refills the form the same way.

@@ -153,6 +153,7 @@ test('a mock marketing job runs from two photos, a hook and a location, and show
   await page.reload();
   await expect(tile).toHaveCount(1);
   await expect(gallery.locator('video').first()).toBeVisible();
+  await gallery.locator('video').first().hover(); // with a mouse a tile loads its clip only under it
   await expect.poll(() => gallery.locator('video').first().evaluate((v: HTMLVideoElement) => v.readyState >= 1)).toBe(true);
 
   await nav(page).getByRole('link', { name: 'Thư viện' }).click();

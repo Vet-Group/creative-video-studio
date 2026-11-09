@@ -1,5 +1,6 @@
 // Motion parity (docs/UI-MOTION-PARITY.md, acceptance 3): the Examples clips really play from real video files, and the playback rules hold.
 // A poster is never evidence of motion, so these specs read currentTime and decoded frames from the video elements.
+// With a mouse the Examples tiles wait for it (owner, 2026-11-09); the autoplay rules below run on a phone, where every visible clip still plays.
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { expect, type Locator, type Page, test } from '@playwright/test';
@@ -18,6 +19,7 @@ async function openExamples(page: Page, size = { width: 1440, height: 1400 }): P
   return videos;
 }
 
+const tile = (page: Page, n: number) => page.locator('.masonry li.example').nth(n);
 const playing = (videos: Locator) => videos.evaluateAll((vs) => vs.filter((v) => !(v as HTMLVideoElement).paused).length);
 /** The clips at least a quarter on screen, the share Preview waits for before it plays. */
 const inView = (videos: Locator) =>
@@ -35,6 +37,7 @@ test('C1: example clips load from valid sources and move: readyState, currentTim
   page.on('response', (r) => r.url().includes('/fixtures/examples/') && r.url().endsWith('.mp4') && sources.push({ url: new URL(r.url()).pathname, status: r.status() }));
   const videos = await openExamples(page);
   const first = videos.first();
+  await tile(page, 0).hover(); // the tile: its caption button lies over the clip
 
   await expect.poll(() => first.evaluate((v: HTMLVideoElement) => v.readyState)).toBeGreaterThanOrEqual(2);
   expect(await first.evaluate((v: HTMLVideoElement) => v.error)).toBeNull();
@@ -49,83 +52,105 @@ test('C1: example clips load from valid sources and move: readyState, currentTim
   expect(sources.every((s) => s.status === 200 || s.status === 206)).toBe(true);
 });
 
-test('every example on screen plays at once, as on the reference site', async ({ page }) => {
+test('with a mouse no example loads its clip until the mouse rests on it, and it pauses when the mouse leaves', async ({ page }) => {
+  const clips: string[] = [];
+  page.on('request', (r) => r.url().includes('/fixtures/examples/') && r.url().endsWith('.mp4') && clips.push(new URL(r.url()).pathname));
   const videos = await openExamples(page);
-  const shown = await inView(videos);
-  expect(shown).toBeGreaterThan(4); // more than the old cap of 4
-  await expect.poll(() => playing(videos)).toBe(shown);
-  evidence('all visible play', { clips: CLIPS, shown });
-});
-
-test('a clip scrolled out of view pauses and plays again when it returns', async ({ page }) => {
-  const videos = await openExamples(page, { width: 1440, height: 400 });
-  const first = videos.first();
-  await expect.poll(() => first.evaluate((v: HTMLVideoElement) => v.paused)).toBe(false);
-
-  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-  const box = (await first.boundingBox())!;
-  expect(box.y + box.height).toBeLessThan(0); // the clip is fully off screen
-  await expect.poll(() => first.evaluate((v: HTMLVideoElement) => v.paused)).toBe(true);
-  evidence('off-screen pause', { bottom: Math.round(box.y + box.height), paused: true });
-
-  await page.evaluate(() => window.scrollTo(0, 0));
-  await expect.poll(() => first.evaluate((v: HTMLVideoElement) => v.paused)).toBe(false);
-});
-
-test('a hidden tab pauses every clip and a shown tab resumes them', async ({ page }) => {
-  const videos = await openExamples(page);
-  const shown = await inView(videos);
-  await expect.poll(() => playing(videos)).toBe(shown);
-  const setVisibility = (state: 'hidden' | 'visible') =>
-    page.evaluate((s) => {
-      Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => s });
-      document.dispatchEvent(new Event('visibilitychange'));
-    }, state);
-
-  await setVisibility('hidden');
-  await expect.poll(() => playing(videos)).toBe(0);
-  await setVisibility('visible');
-  await expect.poll(() => playing(videos)).toBe(shown);
-});
-
-test('C2: a broken source keeps a poster-sized placeholder, not a gap', async ({ page }) => {
-  // The first tile is on screen at once, so its broken source is hit at once.
-  await page.route('**/fixtures/examples/example-1.mp4', (r) => r.fulfill({ status: 404, body: 'gone' }));
-  const videos = await openExamples(page);
-  const placeholder = page.getByRole('img', { name: /Cận cảnh lấp lánh: không tải được video/ });
-  await expect(placeholder).toBeVisible();
-  const box = (await placeholder.boundingBox())!;
-  expect(box.width).toBeGreaterThan(50);
-  expect(Math.abs(box.width / box.height - 180 / 320)).toBeLessThan(0.02); // the clip's own aspect ratio
-  // The others still play.
-  await expect.poll(() => playing(videos)).toBeGreaterThan(0);
-  evidence('broken source', { width: box.width, height: box.height });
-});
-
-test('with reduced motion the examples still autoplay, as on the reference site, with no play buttons', async ({ page }) => {
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  const videos = await openExamples(page);
-  await expect.poll(() => videos.first().evaluate((v: HTMLVideoElement) => v.currentTime)).toBeGreaterThan(0);
-  expect(await playing(videos)).toBe(await inView(videos));
-  await expect(page.getByRole('button', { name: /^Phát / })).toHaveCount(0);
-});
-
-test('C2: when the browser blocks autoplay each clip shows a play button, and pressing it plays', async ({ page }) => {
-  await page.addInitScript(() => {
-    const play = HTMLMediaElement.prototype.play;
-    let allowed = false;
-    document.addEventListener('click', (e) => e.target instanceof Element && e.target.closest('.preview-play') && (allowed = true), true);
-    HTMLMediaElement.prototype.play = function (this: HTMLMediaElement) {
-      return allowed ? play.call(this) : Promise.reject(new DOMException('blocked', 'NotAllowedError'));
-    };
-  });
-  const videos = await openExamples(page);
-  const buttons = page.getByRole('button', { name: /^Phát / });
-  await expect(buttons).toHaveCount(CLIPS);
+  await expect.poll(() => videos.evaluateAll((vs) => vs.every((v) => (v as HTMLVideoElement).poster !== ''))).toBe(true);
+  await page.waitForTimeout(500); // long enough for an autoplay to have started
   expect(await playing(videos)).toBe(0);
+  expect(clips).toEqual([]);
 
-  await buttons.first().click();
-  await expect.poll(() => videos.first().evaluate((v: HTMLVideoElement) => v.currentTime)).toBeGreaterThan(0);
+  const second = videos.nth(1);
+  await tile(page, 1).hover();
+  await expect.poll(() => second.evaluate((v: HTMLVideoElement) => !v.paused && v.currentTime > 0)).toBe(true);
+  expect(await playing(videos)).toBe(1);
+  await page.mouse.move(0, 0);
+  await expect.poll(() => playing(videos)).toBe(0);
+  evidence('hover plays one', { clips: CLIPS, requested: new Set(clips).size });
+});
+
+test.describe('on a phone', () => {
+  test.use({ isMobile: true, hasTouch: true });
+
+  test('every example on screen plays at once, as on the reference site', async ({ page }) => {
+    const videos = await openExamples(page);
+    const shown = await inView(videos);
+    expect(shown).toBeGreaterThan(4); // more than the old cap of 4
+    await expect.poll(() => playing(videos)).toBe(shown);
+    evidence('all visible play', { clips: CLIPS, shown });
+  });
+
+  test('a clip scrolled out of view pauses and plays again when it returns', async ({ page }) => {
+    const videos = await openExamples(page, { width: 1440, height: 400 });
+    const first = videos.first();
+    await expect.poll(() => first.evaluate((v: HTMLVideoElement) => v.paused)).toBe(false);
+
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    const box = (await first.boundingBox())!;
+    expect(box.y + box.height).toBeLessThan(0); // the clip is fully off screen
+    await expect.poll(() => first.evaluate((v: HTMLVideoElement) => v.paused)).toBe(true);
+    evidence('off-screen pause', { bottom: Math.round(box.y + box.height), paused: true });
+
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await expect.poll(() => first.evaluate((v: HTMLVideoElement) => v.paused)).toBe(false);
+  });
+
+  test('a hidden tab pauses every clip and a shown tab resumes them', async ({ page }) => {
+    const videos = await openExamples(page);
+    const shown = await inView(videos);
+    await expect.poll(() => playing(videos)).toBe(shown);
+    const setVisibility = (state: 'hidden' | 'visible') =>
+      page.evaluate((s) => {
+        Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => s });
+        document.dispatchEvent(new Event('visibilitychange'));
+      }, state);
+
+    await setVisibility('hidden');
+    await expect.poll(() => playing(videos)).toBe(0);
+    await setVisibility('visible');
+    await expect.poll(() => playing(videos)).toBe(shown);
+  });
+
+  test('C2: a broken source keeps a poster-sized placeholder, not a gap', async ({ page }) => {
+    // The first tile is on screen at once, so its broken source is hit at once.
+    await page.route('**/fixtures/examples/example-1.mp4', (r) => r.fulfill({ status: 404, body: 'gone' }));
+    const videos = await openExamples(page);
+    const placeholder = page.getByRole('img', { name: /Cận cảnh lấp lánh: không tải được video/ });
+    await expect(placeholder).toBeVisible();
+    const box = (await placeholder.boundingBox())!;
+    expect(box.width).toBeGreaterThan(50);
+    expect(Math.abs(box.width / box.height - 180 / 320)).toBeLessThan(0.02); // the clip's own aspect ratio
+    // The others still play.
+    await expect.poll(() => playing(videos)).toBeGreaterThan(0);
+    evidence('broken source', { width: box.width, height: box.height });
+  });
+
+  test('with reduced motion the examples still autoplay, as on the reference site, with no play buttons', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    const videos = await openExamples(page);
+    await expect.poll(() => videos.first().evaluate((v: HTMLVideoElement) => v.currentTime)).toBeGreaterThan(0);
+    expect(await playing(videos)).toBe(await inView(videos));
+    await expect(page.getByRole('button', { name: /^Phát / })).toHaveCount(0);
+  });
+
+  test('C2: when the browser blocks autoplay each clip shows a play button, and pressing it plays', async ({ page }) => {
+    await page.addInitScript(() => {
+      const play = HTMLMediaElement.prototype.play;
+      let allowed = false;
+      document.addEventListener('click', (e) => e.target instanceof Element && e.target.closest('.preview-play') && (allowed = true), true);
+      HTMLMediaElement.prototype.play = function (this: HTMLMediaElement) {
+        return allowed ? play.call(this) : Promise.reject(new DOMException('blocked', 'NotAllowedError'));
+      };
+    });
+    const videos = await openExamples(page);
+    const buttons = page.getByRole('button', { name: /^Phát / });
+    await expect(buttons).toHaveCount(CLIPS);
+    expect(await playing(videos)).toBe(0);
+
+    await buttons.first().click();
+    await expect.poll(() => videos.first().evaluate((v: HTMLVideoElement) => v.currentTime)).toBeGreaterThan(0);
+  });
 });
 
 test('the preset banner keeps looping when another preset swaps its clip in place', async ({ page }) => {

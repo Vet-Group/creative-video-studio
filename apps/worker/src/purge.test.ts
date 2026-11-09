@@ -65,6 +65,8 @@ describe('purgeDeletedClips', () => {
     await asset('in-own', 'input');
     await asset('in-solo', 'input');
     await asset('in-other-live', 'input');
+    // Tile thumbnails the web made: one of the input that goes, one of the input a live clip keeps.
+    for (const id of ['in-solo', 'in-shared']) await putObject(`thumbs/${id}`, new Uint8Array(1), 'image/jpeg');
     await clip('old', ['in-shared', 'in-own', 'in-solo'], 31);
     await clip('live', ['in-shared'], null);
     await clip('recent', ['in-other-live'], 29);
@@ -91,7 +93,7 @@ describe('purgeDeletedClips', () => {
       { id: 'v-old', output_asset_id: null },
       { id: 'v-recent', output_asset_id: 'recent-video' },
     ]);
-    expect(await keys()).toEqual(['assets/in-other-live', 'assets/in-own', 'assets/in-shared', 'assets/live-poster', 'assets/live-video', 'assets/recent-poster', 'assets/recent-video']);
+    expect(await keys()).toEqual(['assets/in-other-live', 'assets/in-own', 'assets/in-shared', 'assets/live-poster', 'assets/live-video', 'assets/recent-poster', 'assets/recent-video', 'thumbs/in-shared']);
     expect((await pool.query(`select count(*)::int as n from jobs where purged_at is not null`)).rows[0].n).toBe(1);
     expect(logged).toEqual([]);
   });
@@ -110,7 +112,7 @@ describe('purgeDeletedClips', () => {
       throw new Error('minio is down');
     };
     expect(await purgeDeletedClips(pool, failing, log)).toBe(1);
-    expect(logged.sort()).toEqual(['remove object assets/broken-poster', 'remove object assets/broken-video']);
+    expect(logged.sort()).toEqual(['remove object assets/broken-poster', 'remove object assets/broken-video', 'remove object thumbs/broken-poster', 'remove object thumbs/broken-video']);
     expect((await pool.query(`select purged_at is not null as purged from jobs where id = 'broken'`)).rows[0].purged).toBe(true);
   });
 

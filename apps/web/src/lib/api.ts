@@ -50,6 +50,9 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
 /** A readable message for a failed call; the server's text is shown only for the cap refusals, which are written for Members. */
 export const errorText = (e: unknown, fallback: string): string => (e instanceof ApiError && e.status === 429 ? e.message : fallback);
 
+/** An image asset's small JPEG for tiles; open or download the original through `/content`. */
+export const thumbUrl = (id: string) => `/api/assets/${id}/thumb`;
+
 export const sendJson = (method: string, body: unknown): RequestInit => ({ method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
 
 export type JobStatus = 'queued' | 'submitting' | 'running' | 'succeeded' | 'failed' | 'failed_unknown' | 'timed_out';

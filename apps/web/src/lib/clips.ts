@@ -7,6 +7,9 @@ export const LIVE_CLIP = `j.status = 'succeeded' and j.deleted_at is null and j.
 /** The creator's own words, as the detail view shows them: a free prompt on Create video and Image Generation (kept as the brief beside a style); the other features compose theirs. */
 export const OWN_PROMPT = `case when j.feature in ('image', 'video') and j.preset_id is null then j.prompt when j.feature = 'image' then j.params->>'brief' end`;
 
+/** An Examples tab's order over its `examples e` rows: the Admin's order, any added since first, newest first. */
+export const EXAMPLE_ORDER = 'e.position asc nulls first, e.created_at desc, e.job_id';
+
 /** Per model, the company's best Library clip as card media: a real (not mock) Create Videos or Image Generation clip marked Pass, a featured one first, then the most favourited, then the newest.
  * A video clip gives its loop and poster, an image its preview (else the image itself); any member may read both (`readableAsset`).
  * Other features (Try On, Face Swap and the apps) run on the same models but show staff photos, so they never qualify. */

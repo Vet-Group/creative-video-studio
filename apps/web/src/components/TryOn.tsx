@@ -2,7 +2,7 @@
 // Try On: a settings card (garments, the model photo, an optional background, model, prompt, resolution, ratio) beside the History, Examples and About tabs,
 // laid out like Create. Run posts a try_on job; the inputs go in the order the API expects: the person first, then the garments, then the background.
 import { useEffect, useId, useState } from 'react';
-import { api, errorText, sendJson } from '@/lib/api';
+import { api, errorText, sendJson, thumbUrl } from '@/lib/api';
 import { promptTooLong } from '@/lib/prompt-limit';
 import { confirmRun } from '@/lib/run-guard';
 import { tryOnPrompt } from '@/lib/try-on-prompt';
@@ -205,7 +205,7 @@ export function TryOn({ reuse }: { reuse?: string }) {
               onFile={(files) => void (picker?.role === 'model' ? add(setPerson, 'model') : picker?.role === 'background' ? add(setBackground, 'background') : add(setGarments, 'garment'))(files)}
               onClose={() => setPicker(null)}
               onBack={picker?.of ? () => setPicker({ role: picker.role }) : undefined}
-              mine={picker?.role === 'model' && !picker.of ? { title: 'Người mẫu của tôi', tiles: myModels.map((a) => ({ key: a.id, src: `/api/assets/${a.id}/content`, label: `Dùng lại ${a.filename}`, pick: () => setPerson([a]) })) } : undefined}
+              mine={picker?.role === 'model' && !picker.of ? { title: 'Người mẫu của tôi', tiles: myModels.map((a) => ({ key: a.id, src: thumbUrl(a.id), label: `Dùng lại ${a.filename}`, pick: () => setPerson([a]) })) } : undefined}
             />
 
             {models && models.length > 0 && <ModelPicker models={pick.options} value={pick.modelId} onChange={pick.setModelId} />}
