@@ -901,9 +901,7 @@ dialog.admin-modal { width: min(36rem, calc(100vw - 2rem)); }
 .runbar { margin: 0 -24px -24px; }
 .run-summary { margin: 0; padding: 6px 24px 8px; overflow: hidden; color: var(--text-muted); font-size: 12px; line-height: 18px; text-overflow: ellipsis; white-space: nowrap; }
 .runbar button.primary.run { display: flex; align-items: center; justify-content: center; gap: 12px; width: 100%; height: 60px; margin: 0; padding: 12px 16px; border: 0; border-radius: 8px; background: var(--brand); color: var(--on-dark); font-size: 16px; line-height: 24px; font-weight: 500; }
-/* A disabled Run keeps the live look: solid brand red on the video pages, light grey with dark text on Try On; the reason line says why. */
-.runbar button.primary.run:disabled { opacity: 1; }
-[aria-labelledby='tryon-title'] .runbar button.primary.run:disabled { background: var(--fill-strong); color: var(--ink); }
+/* A disabled Run looks the same on every tool, the brand red at half strength (the base disabled rule); the reason line says why. */
 .field { display: grid; gap: 6px; margin-top: 16px; }
 /* Saved forms: two quiet links above Run, and their dialogs. */
 .templates { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 16px; margin: 16px 0 12px; font-size: 14px; line-height: 21px; }
@@ -941,7 +939,7 @@ dialog.admin-modal { width: min(36rem, calc(100vw - 2rem)); }
 .dropzone-pick { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 0 12px; border: 0; border-radius: 18px; background: transparent; color: var(--text-muted); font-size: 14px; line-height: 18.2px; text-align: center; }
 .dropzone-pick:disabled { opacity: 1; cursor: default; }
 .dropzone[data-filled='true'] .dropzone-pick { justify-content: flex-end; padding-bottom: 14px; }
-.dropzone-plus { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: rgb(var(--tint) / .06); color: var(--text-muted); }
+.dropzone-plus { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: var(--divider); color: var(--text-icon); } /* the same circle as the slots and Marketing Studio's tiles */
 /* Up to 9 images (a fal reference model's limit) shrink to share the row. */
 .thumbs { position: absolute; top: 16px; left: 0; right: 0; display: flex; justify-content: center; gap: 8px; margin: 0; padding: 0 12px; list-style: none; pointer-events: none; }
 .thumbs li { position: relative; flex: 0 1 56px; min-width: 0; aspect-ratio: 1; } /* a click on a picture adds more, as the rest of the drop zone does */
@@ -1189,6 +1187,11 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
   .runbar { margin: 0; padding-top: 16px; border-top: 1px solid var(--border-strong); }
   .run-summary { padding: 0 2px 8px; } /* lined up with the Run button, which spans the card's content here */
   .runbar button.primary.run { height: 56px; }
+}
+/* A wide screen gives every tool's form 360 px: at 320 the hints and the prompt wrapped every few words beside a mostly empty gallery. */
+@media (min-width: 1280px) {
+  .create-grid { grid-template-columns: 360px minmax(0, 1fr); }
+  .form-card { width: 360px; }
 }
 @media (max-width: 1023.98px) {
   .toasts { bottom: 5rem; }
@@ -1725,12 +1728,10 @@ dialog.modal.template-sheet { width: 100%; max-width: none; margin: auto 0 0; bo
 .slot-samples li:only-child img { width: 100%; }
 .slot:has(.slot-samples) .slot-add { flex: none; width: 76px; height: 79px; border: 1px dashed var(--border-strong); border-radius: 12px; background: var(--fill); }
 .slot:has(.slot-samples) .slot-icon { display: flex; flex-direction: column; align-items: center; gap: 2px; width: auto; height: auto; background: none; font-size: 11px; line-height: 14px; }
-/* An empty slot is one button. Full width (Try On): the hint on the left and a 76x79 grey upload tile on the right, in a 105 px box. Half width: a grey circle over the hint. */
-.slot-add:has(.slot-hint) { flex: 1 1 100%; flex-direction: row-reverse; justify-content: space-between; gap: 12px; width: auto; height: auto; min-height: 79px; border: 0; background: transparent; text-align: left; }
+/* An empty slot is one button: a grey circle over the hint, as Create video's drop zone and Marketing Studio's tiles, at any width. */
+.slot-add:has(.slot-hint) { flex: 1 1 100%; flex-direction: column; justify-content: center; align-self: stretch; gap: 6px; width: auto; height: auto; min-height: 79px; border: 0; background: transparent; text-align: center; }
 .slot:has(.slot-hint) { min-height: 105px; }
-.slot-add:has(.slot-hint) .slot-icon { flex: none; width: 76px; height: 79px; border-radius: 12px; background: var(--fill); color: var(--text-icon); }
-.app-slots[data-two='true'] .slot-add:has(.slot-hint) .slot-icon { width: 40px; height: 40px; border-radius: 50%; background: var(--divider); }
-.app-slots[data-two='true'] .slot-add:has(.slot-hint) { flex-direction: column; justify-content: center; align-self: stretch; text-align: center; }
+.slot-add:has(.slot-hint) .slot-icon { flex: none; width: 40px; height: 40px; border-radius: 50%; background: var(--divider); color: var(--text-icon); }
 .run-cost { font-weight: 400; }
 
 .imagegen { display: flex; flex-direction: column; min-height: calc(100dvh - 105px); }
