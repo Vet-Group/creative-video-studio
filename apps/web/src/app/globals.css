@@ -2249,7 +2249,7 @@ dialog.modal.verdict-guide { width: min(40rem, calc(100vw - 2rem)); }
 .lib-info .lib-meta { display: flex; column-gap: 4px; color: var(--text-muted); font-size: 12px; line-height: 17px; }
 .lib-who { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .lib-meta > span:not(.lib-who) { flex: none; }
-.lib-when::before { content: '· '; }
+.lib-when::before { content: 'b70'; } /* a dot and a no-break space, so the dot stays with the time */
 .lib-mark.featured { background: var(--favorite); color: var(--on-ink); }
 
 /* The detail view's recipe: a wider side column with the words, the inputs and a label/value list of how the result was made. */
