@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
-import { openTemplates, png, select, selectText, signIn } from './support.test';
+import { addExamples, openTemplates, png, select, selectText, signIn } from './support.test';
 
 // Saved forms: Save template keeps the page's inputs under a name, My templates reopens the page filled from one. Only the store template is run, on the mock model.
 const file = (name: string) => ({ name, mimeType: 'image/png', buffer: png() });
@@ -163,6 +163,7 @@ test('Dùng ví dụ này on a company result in Ví dụ fills Try On, Image Ge
   };
   const done = async () => ((await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { id: string; status: string }[] }).jobs.filter((j) => Object.values(ids).includes(j.id) && j.status === 'succeeded').length;
   await expect.poll(done, { timeout: 60_000 }).toBe(3);
+  await addExamples(browser, Object.values(ids)); // the Examples tab lists a result only once an Admin put it there
 
   // Another member uses them: the inputs of a Library result are open to every member.
   const other = await (await browser.newContext()).newPage();

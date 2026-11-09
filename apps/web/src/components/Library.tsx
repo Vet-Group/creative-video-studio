@@ -518,7 +518,7 @@ function ClipDetail({ clips, index, stores, admin, onIndex, onChange }: { clips:
           )}
         </div>
         {clip.canEdit && <VerdictMarks key={clip.id} clip={clip} onChange={onChange} keys />}
-        {admin && <ExampleControl key={clip.id} clip={clip} onChange={onChange} />}
+        {admin && <ExampleControl key={`example-${clip.id}`} clip={clip} onChange={onChange} />}
         {clip.canEdit && <p className="recipe-keys">Phím tắt: 1 Đạt · 2 Nổi bật · 3 Không đạt · ←/→ mục trước, sau</p>}
         {reuseHref(clip) && (
           <Link href={reuseHref(clip)!} className="lightbox-reuse">

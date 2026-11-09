@@ -1,5 +1,5 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
-import { gotoTryOn, jpg, modelButton, optionsOf, png, select, settled, signIn } from './support.test';
+import { addExamples, gotoTryOn, jpg, modelButton, optionsOf, png, select, settled, signIn } from './support.test';
 
 const nav = (page: Page) => page.getByRole('navigation', { name: 'Điều hướng chính' });
 const file = (name: string) => ({ name, mimeType: 'image/png', buffer: png() });
@@ -35,7 +35,7 @@ test('Try On takes 5 garments, as Fash does with Nano Banana Pro, when the model
   await expect(page.locator('.form-message').getByRole('status')).toHaveCount(0);
 });
 
-test('Try On: a missing slot keeps Run disabled with a reason, a mock run reaches History and the Thử đồ chip, and the inputs go person, garment, background', async ({ page }) => {
+test('Try On: a missing slot keeps Run disabled with a reason, a mock run reaches History and the Thử đồ chip, and the inputs go person, garment, background', async ({ page, browser }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await signIn(page, 'member9');
   await nav(page).getByRole('link', { name: 'Thử đồ' }).click();
@@ -96,7 +96,8 @@ test('Try On: a missing slot keeps Run disabled with a reason, a mock run reache
   await page.getByRole('group', { name: 'Loại' }).getByRole('button', { name: 'Tất cả video', exact: true }).click();
   await expect(mine).toHaveCount(0);
 
-  // Ví dụ shows the company's try-on outputs.
+  // Ví dụ shows the company's try-on outputs once an Admin put them there.
+  await addExamples(browser, jobs.jobs.map((j) => j.id));
   await nav(page).getByRole('link', { name: 'Thử đồ' }).click();
   await page.getByRole('tab', { name: 'Ví dụ' }).click();
   const gallery = page.getByRole('group', { name: 'Ảnh thử đồ của công ty' });
@@ -265,7 +266,7 @@ test('Image Generation: the bar counts the prompt near the model limit, and a sw
   await expect(bar.getByRole('status')).toHaveText('Mô hình Mock image Solo nhận tối đa 1000 ký tự, hãy rút gọn hoặc chọn mô hình khác.');
 });
 
-test('Image Generation: the bar needs a prompt (and an image only on a model with no text-to-image), every pill works by keyboard, and a mock run reaches History and the Tạo ảnh chip', async ({ page }) => {
+test('Image Generation: the bar needs a prompt (and an image only on a model with no text-to-image), every pill works by keyboard, and a mock run reaches History and the Tạo ảnh chip', async ({ page, browser }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await signIn(page, 'member10');
   await nav(page).getByRole('link', { name: 'Tạo ảnh' }).click();
@@ -355,7 +356,8 @@ test('Image Generation: the bar needs a prompt (and an image only on a model wit
   await expect(tray.getByText('Hoàn tất')).toHaveCount(1);
   await expect(tray.locator('.job-chips').first().locator('button')).toHaveText(['2K', '1:1']);
 
-  // Ví dụ now holds the image, and the Library files it under Tạo ảnh and Tất cả ảnh, not under Thử đồ or the videos.
+  // Once an Admin put it there, Ví dụ holds the image, and the Library files it under Tạo ảnh and Tất cả ảnh, not under Thử đồ or the videos.
+  await addExamples(browser, [sent.id]);
   await page.getByRole('tab', { name: 'Ví dụ' }).click();
   const gallery = page.getByRole('group', { name: 'Ảnh của công ty' });
   await expect(gallery.getByRole('img').first()).toBeVisible();
@@ -423,15 +425,17 @@ test('Image Generation: a cap refusal shows its message in Vietnamese', async ({
   await expect(bar.getByRole('alert')).toHaveText('Bạn đã dùng hết hạn mức chi phí hôm nay');
 });
 
-test('geometry at 1440: the Try On card is 320 wide at x=288 and the image bar is 818 wide, centred, 24 px above the bottom, and never covers the last row', async ({ page }) => {
+test('geometry at 1440: the Try On card is 320 wide at x=288 and the image bar is 818 wide, centred, 24 px above the bottom, and never covers the last row', async ({ page, browser }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await signIn(page, 'member11');
-  // Ten images from the mock model, so the gallery is taller than the screen.
+  // Ten images from the mock model, put on Ví dụ below, so the gallery is taller than the screen.
   const up = await page.request.post('/api/assets', { multipart: { file: file('ref.png') } });
   const assetId = ((await up.json()) as { assets: { id: string }[] }).assets[0]!.id;
+  const ids: string[] = [];
   for (let i = 0; i < 10; i++) {
     const job = await page.request.post('/api/jobs', { data: { feature: 'image', modelId: 'mock-image-e2e', assetIds: [assetId], prompt: `scene ${i}`, ratio: 'auto', params: { resolution: '1K' } } });
     expect(job.status()).toBe(201);
+    ids.push(((await job.json()) as { id: string }).id);
   }
 
   await page.goto('/try-on');
@@ -461,6 +465,7 @@ test('geometry at 1440: the Try On card is 320 wide at x=288 and the image bar i
   near((await box(page.locator('.prompt-box'))).height, 161, 'prompt box height', 1); // the 76 px text, one row of starter chips and the toolbar
 
   await expect.poll(async () => ((await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { status: string }[] }).jobs.filter((j) => j.status === 'succeeded').length, { timeout: 120_000 }).toBe(10);
+  await addExamples(browser, ids);
   await page.goto('/image-generation');
   const gallery = page.getByRole('group', { name: 'Ảnh của công ty' });
   await expect(gallery.getByRole('img').first()).toBeVisible();

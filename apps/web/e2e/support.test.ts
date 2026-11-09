@@ -1,7 +1,7 @@
 // Helpers shared by the specs. The name ends in .test.ts, like the specs, so the UI strings below pass the English check;
 // Playwright runs only *.e2e.test.ts (see playwright.config.ts) and Vitest skips this folder.
 import { crc32, deflateSync } from 'node:zlib';
-import { expect, type Locator, type Page } from '@playwright/test';
+import { type Browser, expect, type Locator, type Page } from '@playwright/test';
 import { PASSWORD, USERS, type UserKey } from './users';
 
 /** Numbers each fixture file, so no two are the same bytes: an upload of a file the member already has returns that photo instead of a new one. */
@@ -77,6 +77,18 @@ export async function signIn(page: Page, who: UserKey, { welcome = false } = {})
  */
 export const settled = (send: () => Promise<{ ok(): boolean }>, name: string): Promise<void> =>
   expect(async () => expect((await send()).ok(), name).toBe(true)).toPass({ timeout: 30_000 });
+
+/** Puts finished jobs on their page's Examples tab, as an Admin does from the Library, signed in as the Admin in a context of its own so the caller's session stays. */
+export async function addExamples(browser: Browser, ids: string[]): Promise<void> {
+  const context = await browser.newContext();
+  try {
+    const admin = await context.newPage();
+    await signIn(admin, 'admin');
+    for (const id of ids) await settled(() => admin.request.put(`/api/jobs/${id}/example`), `example ${id}`);
+  } finally {
+    await context.close();
+  }
+}
 
 /** Opens Try On and waits until its form has hydrated (as signIn waits for Create's), opening it again if another page answered the first time. */
 export async function gotoTryOn(page: Page): Promise<void> {

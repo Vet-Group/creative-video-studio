@@ -1,5 +1,5 @@
 import { type Browser, expect, type Page, test } from '@playwright/test';
-import { png, runViaApi, signIn } from './support.test';
+import { addExamples, png, runViaApi, signIn } from './support.test';
 
 /** What the browser fires when the user switches back to this tab. */
 const tabReturn = (page: Page) => page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
@@ -35,7 +35,7 @@ test("the Library shows the user's own clip once the tray hears it finished, and
   await expect(card(page, theirs)).toBeVisible();
 });
 
-test("Tạo ảnh's Ví dụ shows another member's new image when the tab comes back", async ({ page, browser }) => {
+test("Tạo ảnh's Ví dụ shows another member's new image, once an Admin put it there, when the tab comes back", async ({ page, browser }) => {
   await signIn(page, 'fresha');
   await page.goto('/image-generation');
   await page.getByRole('tab', { name: 'Ví dụ' }).click();
@@ -51,7 +51,9 @@ test("Tạo ảnh's Ví dụ shows another member's new image when the tab comes
   const { assets } = (await up.json()) as { assets: { id: string }[] };
   const job = await b.request.post('/api/jobs', { data: { feature: 'image', modelId: 'mock-image-e2e', assetIds: [assets[0]!.id], prompt: 'a mug on a desk', ratio: '1:1', params: { resolution: '1K' } } });
   expect(job.status()).toBe(201);
-  await finished(b, ((await job.json()) as { id: string }).id);
+  const id = ((await job.json()) as { id: string }).id;
+  await finished(b, id);
+  await addExamples(browser, [id]);
   await expect(items).toHaveCount(before);
   await tabReturn(page);
   await expect(newest).not.toHaveAttribute('href', was ?? '');

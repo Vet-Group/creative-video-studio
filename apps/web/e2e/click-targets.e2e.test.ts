@@ -1,5 +1,5 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
-import { jpg, openTab, png, signIn } from './support.test';
+import { addExamples, jpg, openTab, png, signIn } from './support.test';
 
 // Members click a card where they see it, not where its button happens to sit: these specs click with the mouse at the spot a member aims for
 // (a corner of a dashed slot, the middle of a banner, a picture, the edge of a pill or a row), whatever lies on top, as preset-pick.e2e does.
@@ -102,7 +102,7 @@ test('a switch a model cannot use says why on hover', async ({ page }) => {
   await page.unrouteAll({ behavior: 'ignoreErrors' }); // a models request still in flight must not fail the test as the page closes
 });
 
-test('an image result opens full screen from the picture in History, and an image tile in Examples opens like a video tile', async ({ page }) => {
+test('an image result opens full screen from the picture in History, and an image tile in Examples opens like a video tile', async ({ page, browser }) => {
   await withSamples(page, [['image-example-1.jpg', jpg(), 'image/jpeg']], 'clickc', async () => {
     const res = await page.request.post('/api/jobs', { data: { feature: 'image', modelId: 'mock-image-e2e', assetIds: [], ratio: '1:1', prompt: 'a picture to click', enhance: false, params: { resolution: '1K' } } });
     expect(res.status()).toBe(201);
@@ -112,6 +112,7 @@ test('an image result opens full screen from the picture in History, and an imag
       const done = ((await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { id: string; outputAssetId: string; posterAssetId: string | null }[] }).jobs.find((j) => j.id === id)!;
       const [out, preview] = [done.outputAssetId, done.posterAssetId];
       expect(preview).not.toBeNull();
+      await addExamples(browser, [id]); // Examples lists a result only once an Admin put it there
       await page.goto('/image-generation');
       await openTab(page, 'Lịch sử');
       // The card shows the small preview; full screen shows the original.
