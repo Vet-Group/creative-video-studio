@@ -425,7 +425,7 @@ test('Image Generation: a cap refusal shows its message in Vietnamese', async ({
   await expect(form.getByRole('alert')).toHaveText('Bạn đã dùng hết hạn mức chi phí hôm nay');
 });
 
-test('geometry at 1440: the Try On card is 320 wide at x=288, and Image Generation has the same card, pinned while its gallery scrolls beside it', async ({ page, browser }) => {
+test('geometry at 1440: the Try On card is 360 wide at x=288, and Image Generation has the same card, pinned while its gallery scrolls beside it', async ({ page, browser }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await signIn(page, 'member11');
   // Ten images from the mock model, put on Ví dụ below, so the gallery is taller than the screen.
@@ -443,7 +443,7 @@ test('geometry at 1440: the Try On card is 320 wide at x=288, and Image Generati
   const c = await box(card);
   near(c.x, 288, 'card x');
   near(c.y, 16, 'card y');
-  near(c.width, 320, 'card width');
+  near(c.width, 360, 'card width');
   near(c.height, 976, 'card height');
   expect(await card.evaluate((el) => getComputedStyle(el).borderTopLeftRadius)).toBe('24px');
   const tabs = await box(page.getByRole('tablist'));
@@ -452,7 +452,7 @@ test('geometry at 1440: the Try On card is 320 wide at x=288, and Image Generati
   near((await box(page.locator('.runbar'))).height, 73, 'run wrapper height');
   // Three slots, then the model picker, the prompt, the resolution and the ratio, in the order of the reference.
   await expect(page.locator('.form-scroll .field-label')).toHaveText(['Trang phục', 'Người mẫu', 'Bối cảnh (tuỳ chọn)', 'Mô hình', 'Mô tả (tuỳ chọn)', 'Độ phân giải', 'Tỉ lệ']);
-  for (const slot of await page.locator('.slot').all()) near((await box(slot)).width, 268, 'slot width');
+  for (const slot of await page.locator('.slot').all()) near((await box(slot)).width, 308, 'slot width');
   // The live rhythm: the when-to-use hint at the top of the form, the first label 12 px under it, 32 px between one picture tray and the next label.
   const labels = page.locator('.form-scroll .field-label'), slots = page.locator('.slot');
   const hint = await box(page.getByRole('complementary', { name: 'Khi nào dùng Thử đồ' }));

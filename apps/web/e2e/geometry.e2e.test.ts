@@ -163,9 +163,9 @@ test.describe('1440x1000', () => {
     expect(loaded, 'an Inter Variable face is loaded from our own files').toBe(true);
   });
 
-  test('C1 card: 320 px wide, radius 24, no border, shadow 0 12px 40px rgba(0,0,0,.12), padding 24', async ({ page }) => {
+  test('C1 card: 360 px wide, radius 24, no border, shadow 0 12px 40px rgba(0,0,0,.12), padding 24', async ({ page }) => {
     const card = page.locator('.form-card');
-    near((await box(card)).width, 320, 'card width');
+    near((await box(card)).width, 360, 'card width');
     expect(await css(card, 'border-top-left-radius', 'border-top-width', 'box-shadow', 'padding-top', 'padding-right', 'padding-bottom', 'padding-left')).toEqual(['24px', '0px', SHADOW, '24px', '24px', '24px', '24px']);
   });
 
@@ -184,9 +184,9 @@ test.describe('1440x1000', () => {
     expect(await page.evaluate(() => document.documentElement.scrollHeight <= window.innerHeight)).toBe(true);
   });
 
-  test('C3 preset banner: 268x130, radius 18, centred 24px/600 white title, chip 26 tall with radius 16 and 12px/18px white text', async ({ page }) => {
+  test('C3 preset banner: 308x130, radius 18, centred 24px/600 white title, chip 26 tall with radius 16 and 12px/18px white text', async ({ page }) => {
     const banner = page.locator('.banner');
-    sized(await box(banner), 268, 130, 'banner');
+    sized(await box(banner), 308, 130, 'banner');
     expect((await css(banner, 'border-top-left-radius'))[0]).toBe('18px');
     const title = page.locator('.banner-text strong');
     expect(await css(title, 'font-size', 'font-weight', 'color', 'text-align')).toEqual(['24px', '600', 'rgb(255, 255, 255)', 'center']);
@@ -235,21 +235,21 @@ test.describe('1440x1000', () => {
     await expect(zone).toHaveAttribute('data-over', 'false');
   });
 
-  test('U2 dropzone: 268x130, 1px dashed rgb(153,153,153), radius 18, centred column with a 6px gap', async ({ page }) => {
+  test('U2 dropzone: 308x130, 1px dashed rgb(153,153,153), radius 18, centred column with a 6px gap', async ({ page }) => {
     const zone = page.locator('.dropzone');
-    sized(await box(zone), 268, 130, 'dropzone');
+    sized(await box(zone), 308, 130, 'dropzone');
     expect(await css(zone, 'border-top-width', 'border-top-style', 'border-top-color', 'border-top-left-radius')).toEqual(['1px', 'dashed', 'rgb(153, 153, 153)', '18px']);
     expect(await css(page.locator('.dropzone-pick'), 'flex-direction', 'align-items', 'justify-content', 'row-gap')).toEqual(['column', 'center', 'center', '6px']);
     expect((await css(zone, 'transition-property'))[0]).toContain('border-color');
   });
 
-  test('U3 plus button: a 36 px circle rgba(0,0,0,.06) with an rgb(102,102,102) glyph above a 14px grey hint', async ({ page }) => {
+  test('U3 plus button: a 40 px circle rgb(229,229,229) with an rgb(82,82,82) glyph, as the empty slot tiles, above a 14px grey hint', async ({ page }) => {
     const plus = page.locator('.dropzone-plus');
-    sized(await box(plus), 36, 36, 'plus');
-    expect(await css(plus, 'border-top-left-radius', 'background-color', 'color')).toEqual(['50%', 'rgba(0, 0, 0, 0.06)', 'rgb(102, 102, 102)']);
+    sized(await box(plus), 40, 40, 'plus');
+    expect(await css(plus, 'border-top-left-radius', 'background-color', 'color')).toEqual(['50%', 'rgb(229, 229, 229)', 'rgb(82, 82, 82)']);
     const hint = page.locator('.dropzone-hint');
     expect(await css(hint, 'font-size', 'color')).toEqual(['14px', 'rgb(102, 102, 102)']);
-    expect((await box(hint)).y).toBeGreaterThan((await box(plus)).y + 36 - 1);
+    expect((await box(hint)).y).toBeGreaterThan((await box(plus)).y + 40 - 1);
   });
 
   test('U4 thumbnails: two uploads show two thumbs inside the zone, radius 12, remove button top right', async ({ page }) => {
@@ -286,7 +286,7 @@ test.describe('1440x1000', () => {
     for (const label of ['Độ phân giải', 'Thời lượng', 'Tỉ lệ khung hình', 'Cửa hàng/Thương hiệu']) {
       const trigger = select(page, label);
       const b = await box(trigger);
-      sized(b, 268, 39, label);
+      sized(b, 308, 39, label);
       expect(await css(trigger, 'background-color', 'border-top-left-radius', 'border-top-width', 'border-top-color', 'padding-top', 'padding-right', 'font-size', 'line-height')).toEqual(['rgb(242, 242, 242)', '8px', '1px', 'rgba(0, 0, 0, 0)', '8px', '10px', '14px', '21px']);
       expect(await trigger.locator('svg').count(), `${label} has a leading icon and a chevron`).toBe(2);
     }
@@ -319,7 +319,7 @@ test.describe('1440x1000', () => {
 
   test('K3 model picker: a 39 px select-style button and a floating panel 8px to its right (334 wide, radius 8, search 292x29, 56px rows, selected rgba(0,0,0,.06) with a check)', async ({ page }) => {
     const trigger = modelButton(page);
-    sized(await box(trigger), 268, 39, 'model button');
+    sized(await box(trigger), 308, 39, 'model button');
     expect((await css(trigger, 'background-color'))[0]).toBe('rgb(242, 242, 242)');
     await trigger.click();
     const panel = page.getByRole('dialog', { name: 'Chọn mô hình' });
@@ -348,10 +348,10 @@ test.describe('1440x1000', () => {
   test('K4 prompt box (Viết tự do, the one box): as wide as the form, radius 12 with a 1px border; textarea 76 tall, 14px/21px, transparent; no starter chips (Khung prompt replaced them)', async ({ page }) => {
     await page.getByRole('radiogroup', { name: 'Cách viết prompt' }).getByText('Viết tự do').click();
     const wrapper = page.locator('.prompt-box');
-    near((await box(wrapper)).width, 268, 'prompt box width');
+    near((await box(wrapper)).width, 308, 'prompt box width');
     expect(await css(wrapper, 'border-top-width', 'border-top-left-radius')).toEqual(['1px', '12px']);
     const area = page.getByLabel('Mô tả chuyển động');
-    near((await box(area)).width, 266, 'textarea width');
+    near((await box(area)).width, 306, 'textarea width');
     expect(await css(area, 'min-height', 'font-size', 'line-height', 'background-color')).toEqual(['76px', '14px', '21px', 'rgba(0, 0, 0, 0)']); // it grows with the text (the placeholder's lines too)
     await expect(wrapper.getByRole('group', { name: 'Gợi ý nhanh' })).toHaveCount(0);
   });
@@ -373,24 +373,24 @@ test.describe('1440x1000', () => {
     near(tabs.x + tabs.width / 2, side.x + side.width / 2, 'tabs centre', 4);
   });
 
-  test('G1 G2 G3 G4 examples grid: 3 columns of 245 with 8 px gaps, four tile heights, radius 14, no caption row, grid top at y=81 and a 48 px right edge', async ({ page }) => {
+  test('G1 G2 G3 G4 examples grid: 3 columns of 232 with 8 px gaps, four tile heights, radius 14, no caption row, grid top at y=81 and a 48 px right edge', async ({ page }) => {
     await tab(page, 'Ví dụ').click();
     const grid = page.locator('.masonry');
     await expect(page.locator('.masonry video')).not.toHaveCount(0);
     const g = await box(grid);
     near(g.y, 81, 'grid top', 6);
-    near(g.width, 752, 'grid width');
+    near(g.width, 712, 'grid width');
     near(g.x + g.width, await page.evaluate(() => document.documentElement.clientWidth - 48), 'grid right edge');
 
     const cols = await page.locator('.masonry-col').evaluateAll((els) => els.map((c) => [...c.children].map((li) => li.getBoundingClientRect()).map((r) => ({ x: r.x, y: r.y, width: r.width, height: r.height }))));
     expect(cols).toHaveLength(3);
     for (const [i, col] of cols.entries()) {
-      near(col[0]!.width, 245, `column ${i} width`);
+      near(col[0]!.width, 232, `column ${i} width`);
       if (i > 0) near(col[0]!.x - (cols[i - 1]![0]!.x + cols[i - 1]![0]!.width), 8, 'column gap');
       for (const [j, tile] of col.entries()) if (j > 0) near(tile.y - (col[j - 1]!.y + col[j - 1]!.height), 8, 'row gap', 1);
     }
     const heights = cols.flat().map((t) => Math.round(t.height));
-    for (const want of [138, 245, 327, 436]) expect(heights.some((h) => Math.abs(h - want) <= 3), `a tile of ${want} px in ${heights}`).toBe(true);
+    for (const want of [131, 232, 309, 412]) expect(heights.some((h) => Math.abs(h - want) <= 3), `a tile of ${want} px in ${heights}`).toBe(true);
     // The first nine tiles in reading order (row by row across the columns) already differ in height.
     const firstNine = cols.flat().sort((a, b) => a.y - b.y || a.x - b.x).slice(0, 9).map((t) => Math.round(t.height / 4));
     expect(new Set(firstNine).size).toBeGreaterThanOrEqual(3);
@@ -420,11 +420,11 @@ test.describe('1440x1000', () => {
     near(t.y + t.height - (b.y + b.height), 15, 'button from the bottom');
   });
 
-  test('R1 R2 Run button: 272x56 at y=912, black, white 16px/500, radius 8, padding 12px 16px, cost inside', async ({ page }) => {
+  test('R1 R2 Run button: 312x56 at y=912, black, white 16px/500, radius 8, padding 12px 16px, cost inside', async ({ page }) => {
     const run = page.getByRole('button', { name: 'Tạo video' });
     await expect(run).toBeInViewport();
     const b = await box(run);
-    sized(b, 272, 56, 'run');
+    sized(b, 312, 56, 'run');
     near(b.y, 912, 'run y');
     expect(await css(run, 'background-color', 'color', 'font-size', 'font-weight', 'border-top-left-radius', 'padding-top', 'padding-right', 'column-gap', 'justify-content')).toEqual(['rgb(220, 38, 38)', 'rgb(255, 255, 255)', '16px', '500', '8px', '12px', '16px', '12px', 'center']);
     await expect(run).toContainText('$0.8000');
