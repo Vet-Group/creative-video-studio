@@ -2277,6 +2277,12 @@ dialog.modal.verdict-guide { width: min(40rem, calc(100vw - 2rem)); }
 .example-check .job-inputs img { width: 72px; height: 96px; }
 .example-strip { max-height: 13rem; overflow-y: auto; }
 .example-match { color: var(--text-subtle); font-size: 11px; line-height: 16px; }
+.example-order-open { justify-self: start; margin-bottom: 8px; font-size: 13px; }
+.example-order { display: grid; gap: 6px; max-height: 60vh; margin: 12px 0; padding: 0; overflow-y: auto; list-style: none; }
+.example-order li { display: grid; grid-template-columns: 40px 1fr auto auto; align-items: center; gap: 8px; padding: 4px 6px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); cursor: grab; }
+.example-order li[data-dragging] { opacity: 0.5; }
+.example-order img { width: 40px; height: 40px; border-radius: 4px; object-fit: cover; }
+.example-order span { overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
 @media (hover: none) { .recipe-keys { display: none; } }
 @media (max-width: 760px) { .lightbox .modal-body { grid-template-columns: 1fr; } }
 

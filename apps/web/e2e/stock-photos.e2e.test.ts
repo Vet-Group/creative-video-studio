@@ -40,7 +40,7 @@ test('the stock models of Lingerie Try-On and the templates of Jewelry Try-On fi
     expect(copies).toEqual([JSON.stringify({ names: ['lingerie-model-m11.jpg'] })]);
     const model = page.getByRole('group', { name: 'Người mẫu' }).locator('img');
     await expect(model).toHaveCount(1);
-    await expect(model).toHaveAttribute('src', /^\/api\/assets\/[^/]+\/content$/); // the member's own copy, not the sample
+    await expect(model).toHaveAttribute('src', /^\/api\/assets\/[^/]+\/thumb$/); // the member's own copy (its thumbnail), not the sample
     await expect(reasonOf(page)).toHaveText('Tải lên ảnh: Đồ lót.');
 
     // Jewelry Try-On: the groups that have photos, each under its own heading; a group with none does not show.

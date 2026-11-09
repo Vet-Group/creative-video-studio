@@ -1,6 +1,7 @@
 import { ASPECTS, FEATURES } from '@cvs/db';
 import { pool } from '@/lib/auth';
-import { downloadName, extensionOf, ICT_DAY, LIVE_CLIP, OWN_PROMPT } from '@/lib/clips';
+import { downloadName, EXAMPLE_ORDER, extensionOf, ICT_DAY, LIVE_CLIP, OWN_PROMPT } from '@/lib/clips';
+import { GALLERY_SAMPLES } from '@/lib/examples';
 import { guard } from '@/lib/session';
 
 const PAGE = 24;
@@ -34,7 +35,7 @@ const VERDICTS: Record<string, string> = {
 /**
  * The Library: every user's live clips and images, newest first. Filters: `creator` (a user id), `date` (YYYY-MM-DD, Asia/Ho_Chi_Minh), `ratio` and
  * `kind` (`all` by default, `images`, `videos`, one feature of `try_on`, `image`, `video`, `marketing` (or one of its formats, `marketing_ugc`, `marketing_advanced`, `marketing_unboxing` and `marketing_review`), or `apps` for every app feature),
- * `verdict` (`none` for unmarked items, `pass`, `featured` or `fail`), `favorites=1` (only the caller's favourites), `example=1` (only the results an Admin put on an Examples tab), `q` (words in the model name or the creator's own `prompt`, case-insensitive, up to 200 characters) and `sort` (`newest`, the default, or `oldest`); `offset` pages by 24. `favorite` says whether the caller marked an item, `example` whether it is on its page's Examples tab. Each item has its `feature` and `mediaType` (`video` or `image`, from the output asset); `videoAssetId` is the output asset
+ * `verdict` (`none` for unmarked items, `pass`, `featured` or `fail`), `favorites=1` (only the caller's favourites), `example=1` (only the results an Admin put on an Examples tab; with the `kind` of one such tab, in its order unless `sort=oldest`), `q` (words in the model name or the creator's own `prompt`, case-insensitive, up to 200 characters) and `sort` (`newest`, the default, or `oldest`); `offset` pages by 24. `favorite` says whether the caller marked an item, `example` whether it is on its page's Examples tab. Each item has its `feature` and `mediaType` (`video` or `image`, from the output asset); `videoAssetId` is the output asset
  * either way, and an image item has `durationSec` 0 and its `resolution`. `creators` fills the creator filter. `unmarked` counts the live items the caller may mark (their own, or all for an Admin) that have no mark yet. `costUsd` is the job's ledger total, provisional while `costFinal` is false.
  */
 export async function GET(request: Request) {
@@ -70,13 +71,14 @@ export async function GET(request: Request) {
       `select j.id, j.user_id, u.name as creator_name, j.created_at, ${ICT_DAY} as day, j.model, m.label as model_label, j.aspect, j.duration_s, j.is_mock, j.feature, j.params, o.mime as output_mime, o.filename as output_filename,
               j.output_asset_id, j.poster_asset_id, j.store_id, coalesce(c.usd, 0)::numeric(12, 4)::text as cost_usd, coalesce(c.is_final, false) as cost_final, v.verdict, v.fault, v.featured, v.marked_by, ${OWN_PROMPT} as prompt,
               exists (select 1 from favorites f where f.job_id = j.id and f.user_id = $6) as favorite,
-              exists (select 1 from examples e where e.job_id = j.id) as example
+              e.job_id is not null as example
          from jobs j
          join users u on u.id = j.user_id
          join model_configs m on m.id = j.model
          join assets o on o.id = j.output_asset_id
          left join job_costs c on c.job_id = j.id
          left join verdicts v on v.job_id = j.id
+         left join examples e on e.job_id = j.id
         where ${LIVE_CLIP}
           and ($1::text is null or j.user_id = $1)
           and ($2::date is null or (j.created_at at time zone 'Asia/Ho_Chi_Minh')::date = $2::date)
@@ -85,9 +87,9 @@ export async function GET(request: Request) {
           and ${KINDS[kind]}
           and ${verdict === null ? 'true' : VERDICTS[verdict]}
           and ($7::boolean is not true or exists (select 1 from favorites f where f.job_id = j.id and f.user_id = $6))
-          and ($10::boolean is not true or exists (select 1 from examples e where e.job_id = j.id))
+          and ($10::boolean is not true or e.job_id is not null)
           and ($8::text is null or m.label ilike $8 or ${OWN_PROMPT} ilike $8)
-        order by j.created_at ${sort === 'oldest' ? 'asc' : 'desc'}, j.id ${sort === 'oldest' ? 'asc' : 'desc'} limit $4 offset $5`,
+        order by ${example === '1' && sort === 'newest' && Object.hasOwn(GALLERY_SAMPLES, kind) ? EXAMPLE_ORDER : `j.created_at ${sort === 'oldest' ? 'asc' : 'desc'}, j.id ${sort === 'oldest' ? 'asc' : 'desc'}`} limit $4 offset $5`,
       // The words match literally: LIKE's own wildcards and escape are escaped.
       [creator, date, ratio, PAGE + 1, offset, me.id, favorites === '1', text === null ? null : `%${text.replace(/[\\%_]/g, '\\$&')}%`, days === null ? null : Number(days), example === '1'],
     ),

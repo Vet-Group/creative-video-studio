@@ -2,17 +2,42 @@
 // A looping sample clip: the poster first, then a muted loop while it is on screen. See docs/UI-MOTION-PARITY.md ("Parity matrix").
 // It plays only while visible and the tab is shown, every visible clip at once as on the reference site, reduced motion included (owner, 2026-11-02);
 // blocked autoplay keeps the poster with a play button; a broken source keeps a poster-sized placeholder.
+// A gallery tile (`onHover`) on a device with a mouse waits for the mouse instead, so a grid of dozens loads only posters (owner, 2026-11-09); a phone still plays what is visible.
 import { useEffect, useRef, useState } from 'react';
 
 type State = 'idle' | 'playing' | 'blocked' | 'error';
 
-export function Preview({ src, poster, width, height, title, paused = false }: { src: string; poster: string; width: number; height: number; title: string; paused?: boolean }) {
+export function Preview({ src, poster, width, height, title, paused = false, onHover = false }: { src: string; poster: string; width: number; height: number; title: string; paused?: boolean; onHover?: boolean }) {
   const box = useRef<HTMLDivElement>(null);
   const video = useRef<HTMLVideoElement>(null);
   const [visible, setVisible] = useState(false);
   const [tabHidden, setTabHidden] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [state, setState] = useState<State>('idle');
+  const [mouse, setMouse] = useState(false);
+  const [hovered, setHovered] = useState(false);
+
+  // The tile around the clip takes the mouse, since its caption and buttons lie over the clip.
+  useEffect(() => {
+    const tile = box.current?.closest('li') ?? box.current?.parentElement;
+    if (!onHover || !tile || !window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
+    setMouse(true);
+    const enter = (e: PointerEvent) => e.pointerType === 'mouse' && setHovered(true);
+    // A keyboard user plays the tile they reach (a visible focus ring), and it keeps playing while either the mouse or that focus is on it.
+    const leave = () => setHovered(tile.querySelector(':focus-visible') !== null);
+    const focus = (e: FocusEvent) => e.target instanceof Element && e.target.matches(':focus-visible') && setHovered(true);
+    const blur = (e: FocusEvent) => setHovered((e.relatedTarget instanceof Node && tile.contains(e.relatedTarget)) || tile.matches(':hover'));
+    tile.addEventListener('pointerenter', enter);
+    tile.addEventListener('pointerleave', leave);
+    tile.addEventListener('focusin', focus);
+    tile.addEventListener('focusout', blur);
+    return () => {
+      tile.removeEventListener('pointerenter', enter);
+      tile.removeEventListener('pointerleave', leave);
+      tile.removeEventListener('focusin', focus);
+      tile.removeEventListener('focusout', blur);
+    };
+  }, [onHover]);
 
   useEffect(() => {
     if (!box.current) return;
@@ -28,7 +53,7 @@ export function Preview({ src, poster, width, height, title, paused = false }: {
     return () => document.removeEventListener('visibilitychange', sync);
   }, []);
 
-  const want = visible && !tabHidden && !paused && state !== 'error';
+  const want = visible && !tabHidden && !paused && state !== 'error' && (!mouse || hovered);
   useEffect(() => {
     const v = video.current;
     if (!v || !want) return;

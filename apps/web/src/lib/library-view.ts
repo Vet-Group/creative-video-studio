@@ -13,10 +13,12 @@ export interface LibraryFilters {
   kind: string;
   verdict: VerdictFilter;
   favoritesOnly: boolean;
+  /** Only the results an Admin put on an Examples tab. */
+  examplesOnly: boolean;
   sort: 'newest' | 'oldest';
 }
 
-export const NO_FILTERS: LibraryFilters = { q: '', creator: '', date: '', days: '', ratio: '', kind: 'all', verdict: '', favoritesOnly: false, sort: 'newest' };
+export const NO_FILTERS: LibraryFilters = { q: '', creator: '', date: '', days: '', ratio: '', kind: 'all', verdict: '', favoritesOnly: false, examplesOnly: false, sort: 'newest' };
 
 /** Whether an item with this mark belongs under the verdict filter, so a fresh mark can take it out of the list. */
 export function matchesVerdict(filter: VerdictFilter, mark: { verdict: 'pass' | 'fail'; featured: boolean } | null): boolean {
@@ -37,13 +39,14 @@ export function libraryQuery(f: LibraryFilters, offset: number): string {
   if (f.kind !== 'all') q.set('kind', f.kind);
   if (f.verdict) q.set('verdict', f.verdict);
   if (f.favoritesOnly) q.set('favorites', '1');
+  if (f.examplesOnly) q.set('example', '1');
   if (f.sort !== 'newest') q.set('sort', f.sort);
   if (offset > 0) q.set('offset', String(offset));
   return q.toString();
 }
 
 /** How many filters narrow the list; the sort only orders it, so it is not one. */
-export const activeFilters = (f: LibraryFilters): number => [f.q.trim(), f.creator, f.date, f.days, f.ratio, f.kind !== 'all', f.verdict, f.favoritesOnly].filter(Boolean).length;
+export const activeFilters = (f: LibraryFilters): number => [f.q.trim(), f.creator, f.date, f.days, f.ratio, f.kind !== 'all', f.verdict, f.favoritesOnly, f.examplesOnly].filter(Boolean).length;
 
 export type LibraryView = 'grid' | 'list';
 export const VIEW_KEY = 'cvs.library.view';

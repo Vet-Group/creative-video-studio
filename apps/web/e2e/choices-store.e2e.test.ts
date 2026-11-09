@@ -139,7 +139,7 @@ test('Sửa in the library: a member edits their own hook from the prefilled for
     await expect(form.getByLabel('Mô tả ngắn (tuỳ chọn)')).toHaveValue(own.desc);
     await expect(form.getByLabel('Cảnh cho AI (tiếng Anh)')).toHaveValue(own.phrase);
     await expect(form.getByLabel('Ngách (tuỳ chọn)')).toHaveValue(own.niche);
-    await expect(form.getByRole('img', { name: mine })).toHaveAttribute('src', `/api/assets/${own.imageAssetId}/content`);
+    await expect(form.getByRole('img', { name: mine })).toHaveAttribute('src', `/api/assets/${own.imageAssetId}/thumb`); // the slot shows the photo's thumbnail
     await expect(select(member, 'Chia sẻ')).toHaveText('Chỉ mình tôi');
     await expect(form.getByRole('group', { name: 'Điền thử một ví dụ' })).toHaveCount(0);
     await form.getByLabel('Tên', { exact: true }).fill(renamed);

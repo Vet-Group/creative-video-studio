@@ -3,7 +3,7 @@
 // the tab strip and the gallery of the company's outputs.
 import { type DragEvent, type KeyboardEvent, type ReactNode, useEffect, useId, useRef, useState } from 'react';
 import Link from 'next/link';
-import { api, ApiError, type Clip, sendJson } from '@/lib/api';
+import { api, ApiError, type Clip, sendJson, thumbUrl } from '@/lib/api';
 import { dropRefillQuery, exampleFrom, refillFrom, reuseHref } from '@/lib/reuse';
 import { NARROW, useMediaQuery, WIDE } from '@/lib/use-media-query';
 import { numberedSamples } from '@/lib/examples';
@@ -308,7 +308,7 @@ export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRem
           <ul className="slot-thumbs" aria-label={`${label}: ảnh đã chọn`}>
             {images.map((i) => (
               <li key={i.id}>
-                <img src={i.url ?? `/api/assets/${i.id}/content`} alt={i.filename} />
+                <img src={i.url ?? thumbUrl(i.id)} alt={i.filename} />
                 {max === 1 && (
                   <span className="slot-chip" aria-hidden="true">
                     {label}
@@ -549,7 +549,7 @@ export function UploadedPhotos({ name, taken, disabled, onPick, storeId = '', sl
         open={open}
         title="Ảnh đã tải"
         sub={sub}
-        tiles={shown.map((a) => ({ key: a.id, src: `/api/assets/${a.id}/content`, label: `Dùng ${a.filename}`, pick: () => onPick(a) }))}
+        tiles={shown.map((a) => ({ key: a.id, src: thumbUrl(a.id), label: `Dùng ${a.filename}`, pick: () => onPick(a) }))}
         busy={false}
         onClose={() => setOpen(false)}
         filter={
@@ -590,6 +590,123 @@ function SampleActions({ name }: { name: string }) {
   );
 }
 
+/** A result on an Examples tab, as GET /api/examples lists it. */
+interface OrderRow {
+  id: string;
+  videoAssetId: string;
+  posterAssetId: string | null;
+  ratio: string;
+  modelLabel: string;
+}
+
+/** An Admin's order for the results on a page's Examples tab: drag a row or move it with its buttons, then save. The fixed samples always come first. */
+function ExampleOrder({ feature, onSaved }: { feature: string; onSaved: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [rows, setRows] = useState<OrderRow[] | null>(null);
+  const [dragged, setDragged] = useState<number | null>(null);
+  const [moved, setMoved] = useState('');
+  const [problem, setProblem] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  async function show() {
+    setOpen(true);
+    setRows(null);
+    setMoved('');
+    setProblem('');
+    try {
+      setRows((await api<{ examples: OrderRow[] }>(`/api/examples?feature=${feature}`)).examples);
+    } catch {
+      setProblem('Không tải được các ví dụ.');
+    }
+  }
+  function move(from: number, to: number) {
+    if (!rows || to < 0 || to >= rows.length || from === to) return;
+    const row = rows[from]!;
+    setRows((cur) => {
+      const next = [...cur!];
+      next.splice(to, 0, ...next.splice(from, 1));
+      return next;
+    });
+    setMoved(`${row.modelLabel}: vị trí ${to + 1}`);
+  }
+  async function save() {
+    setBusy(true);
+    setProblem('');
+    try {
+      await api('/api/examples', sendJson('PUT', { feature, ids: rows!.map((r) => r.id) }));
+      setOpen(false);
+      onSaved();
+    } catch (e) {
+      setProblem(e instanceof ApiError && e.status === 409 ? 'Tab Ví dụ vừa thay đổi. Đóng rồi mở lại để sắp xếp.' : 'Không lưu được thứ tự.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      <button type="button" className="link-button example-order-open" onClick={() => void show()}>
+        Sắp xếp ví dụ
+      </button>
+      <Modal open={open} onClose={() => setOpen(false)} label="Sắp xếp ví dụ" className="choice-dialog">
+        <h2>Sắp xếp ví dụ</h2>
+        <p className="muted">Kéo một dòng, hoặc dùng nút lên, xuống. Mẫu cố định luôn đứng trước.</p>
+        {rows === null ? (
+          !problem && (
+            <p role="status" className="muted">
+              Đang tải...
+            </p>
+          )
+        ) : (
+          <ol className="example-order" aria-label="Thứ tự ví dụ">
+            {rows.map((r, i) => (
+              <li
+                key={r.id}
+                draggable
+                data-dragging={dragged === i || undefined}
+                onDragStart={(e) => {
+                  e.dataTransfer.setData('text/plain', r.id); // Firefox starts a drag only with data
+                  e.dataTransfer.effectAllowed = 'move';
+                  setDragged(i);
+                }}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  if (dragged !== null && dragged !== i) (move(dragged, i), setDragged(i));
+                }}
+                onDrop={(e) => e.preventDefault()}
+                onDragEnd={() => setDragged(null)}
+              >
+                <img src={thumbUrl(r.posterAssetId ?? r.videoAssetId)} alt="" draggable={false} />
+                <span>
+                  {i + 1}. {r.modelLabel}, {r.ratio}
+                </span>
+                <button type="button" className="icon-button" aria-label={`Lên trước: ${i + 1}. ${r.modelLabel}`} disabled={i === 0} onClick={() => move(i, i - 1)}>
+                  ↑
+                </button>
+                <button type="button" className="icon-button" aria-label={`Ra sau: ${i + 1}. ${r.modelLabel}`} disabled={i === rows.length - 1} onClick={() => move(i, i + 1)}>
+                  ↓
+                </button>
+              </li>
+            ))}
+          </ol>
+        )}
+        <p className="sr-only" role="status">
+          {moved}
+        </p>
+        {problem && <p className="error">{problem}</p>}
+        <div className="actions">
+          <button type="button" disabled={busy || rows === null} onClick={() => void save()}>
+            Lưu thứ tự
+          </button>
+          <button type="button" onClick={() => setOpen(false)}>
+            Huỷ
+          </button>
+        </div>
+      </Modal>
+    </>
+  );
+}
+
 export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4], samples }: { kind: string; label: string; emptyText: string; video?: boolean; cols?: [number, number, number]; samples?: string }) {
   const have = useSamples();
   const sampleTiles = samples ? numberedSamples(have, samples, video ? 'mp4' : 'jpg') : [];
@@ -598,6 +715,7 @@ export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4
   const [open, setOpen] = useState<number | null>(null);
   const [items, setItems] = useState<Clip[]>([]);
   const [hasMore, setHasMore] = useState(false);
+  const [admin, setAdmin] = useState(false);
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [size, resize] = useSize(GALLERY_SIZE_KEY); // 0 small tiles, 1 default, 2 large tiles
   const narrow = useMediaQuery(NARROW);
@@ -610,10 +728,11 @@ export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4
     loading.current = true;
     try {
       // Only the results an Admin put here (owner, 2026-11-09): a member's other results stay in History and the Library.
-      const r = await api<{ hasMore: boolean; clips: Clip[] }>(`/api/library?kind=${kind}&example=1${offset > 0 ? `&offset=${offset}` : ''}`);
+      const r = await api<{ hasMore: boolean; isAdmin: boolean; clips: Clip[] }>(`/api/library?kind=${kind}&example=1${offset > 0 ? `&offset=${offset}` : ''}`);
       // A result finished between two pages shifts the offset, so the next page can repeat a tile: keep each id once.
       setItems((cur) => (offset > 0 ? [...cur, ...r.clips.filter((c) => !cur.some((o) => o.id === c.id))] : r.clips));
       setHasMore(r.hasMore);
+      setAdmin(r.isAdmin);
       setState('ready');
     } catch {
       setState('error');
@@ -637,6 +756,7 @@ export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4
   return (
     <>
       {!narrow && <SizeSlider size={size} onChange={resize} />}
+      {admin && items.length > 1 && <ExampleOrder feature={kind} onSaved={() => void load(0)} />}
       <div className="masonry" role="group" aria-label={label}>
         {Array.from({ length: columns }, (_, c) => (
           <ul key={c} className="masonry-col">
@@ -645,7 +765,7 @@ export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4
                 <li key={it} className="gallery-item">
                   {video ? (
                     <a href={`/api/samples/${it}`} target="_blank" rel="noreferrer" aria-label={detailed.includes(it) ? 'Xem chi tiết video mẫu' : 'Mở video mẫu trong tab mới'} onClick={detailed.includes(it) ? (e) => (e.preventDefault(), setOpen(detailed.indexOf(it))) : undefined}>
-                      <Preview src={`/api/samples/${it}`} poster={`/api/samples/${it.replace(/\.mp4$/, '.jpg')}`} width={9} height={16} title="Video mẫu" />
+                      <Preview src={`/api/samples/${it}`} poster={`/api/samples/${it.replace(/\.mp4$/, '.jpg')}`} width={9} height={16} title="Video mẫu" onHover />
                     </a>
                   ) : (
                     // A picture opens as a clip does: its details in place, else a new tab.
@@ -659,7 +779,7 @@ export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4
               <li key={it.id} className="gallery-item" style={{ aspectRatio: aspectOf(it.ratio) }}>
                 {video ? (
                   <a href={`/api/assets/${it.videoAssetId}/content`} target="_blank" rel="noreferrer" aria-label={`Mở video ${it.modelLabel}, ${it.ratio} trong tab mới`}>
-                    <Preview src={`/api/assets/${it.videoAssetId}/content`} poster={it.posterAssetId ? `/api/assets/${it.posterAssetId}/content` : ''} width={Number(it.ratio.split(':')[0]) || 9} height={Number(it.ratio.split(':')[1]) || 16} title={`${it.modelLabel}, ${it.ratio}`} />
+                    <Preview src={`/api/assets/${it.videoAssetId}/content`} poster={it.posterAssetId ? `/api/assets/${it.posterAssetId}/content` : ''} width={Number(it.ratio.split(':')[0]) || 9} height={Number(it.ratio.split(':')[1]) || 16} title={`${it.modelLabel}, ${it.ratio}`} onHover />
                   </a>
                 ) : (
                   <a href={`/api/assets/${it.videoAssetId}/content`} target="_blank" rel="noreferrer" aria-label={`Mở ảnh ${it.modelLabel}, ${it.ratio} trong tab mới`}>

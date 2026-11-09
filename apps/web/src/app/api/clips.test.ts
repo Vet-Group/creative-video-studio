@@ -20,6 +20,7 @@ const { PUT: PUT_VERDICT } = await import('./jobs/[id]/verdict/route');
 const { PUT: PUT_FAVORITE } = await import('./jobs/[id]/favorite/route');
 const { GET: GET_EXAMPLE, PUT: PUT_EXAMPLE, DELETE: DELETE_EXAMPLE } = await import('./jobs/[id]/example/route');
 const { GET: GET_LIBRARY } = await import('./library/route');
+const { GET: GET_EXAMPLES, PUT: PUT_EXAMPLES } = await import('./examples/route');
 const { GET: GET_MODELS } = await import('./models/route');
 const { GET: GET_ASSET } = await import('./assets/[id]/route');
 const { GET: GET_CONTENT } = await import('./assets/[id]/content/route');
@@ -588,6 +589,39 @@ describe('/api/jobs/:id/example', () => {
     expect(await libraryIds(alice.cookie, '?kind=image&example=1')).toContain(shown);
     await pool.query('update jobs set deleted_at = now() where id = $1', [shown]);
     expect(await libraryIds(alice.cookie, '?kind=image&example=1')).not.toContain(shown);
+  });
+
+  test('an Admin orders a tab: the whole list once, audited; the tab and the Library show that order, one added since first; a stale list gets 409', async () => {
+    const marketing = async () => {
+      const id = await clip(bob.id, { model: 'example-test' });
+      await pool.query(`update jobs set feature = 'marketing', preset_id = null where id = $1`, [id]);
+      await call(PUT_EXAMPLE, 'PUT', admin.cookie, id);
+      return id;
+    };
+    const [a, b, c] = [await marketing(), await marketing(), await marketing()];
+    const list = async (cookie = admin.cookie) => {
+      const res = await GET_EXAMPLES(req('/api/examples?feature=marketing', cookie));
+      return res.status === 200 ? ((await res.json()) as { examples: { id: string }[] }).examples.map((e) => e.id) : res.status;
+    };
+    const order = (ids: unknown, cookie = admin.cookie, feature: unknown = 'marketing') => PUT_EXAMPLES(req('/api/examples', cookie, { method: 'PUT', body: JSON.stringify({ feature, ids }) }));
+    expect(await list()).toEqual([c, b, a]); // never ordered: newest first
+    expect(await list(alice.cookie)).toBe(403);
+    expect((await order([a, b, c], alice.cookie)).status).toBe(403);
+    expect((await order([a, b, c], admin.cookie, 'video')).status).toBe(400);
+    expect((await order([a, a, b])).status).toBe(400);
+
+    expect(await (await order([b, a, c])).json()).toEqual({ ids: [b, a, c] });
+    expect(await list()).toEqual([b, a, c]);
+    expect(await libraryIds(alice.cookie, '?kind=marketing&example=1')).toEqual([b, a, c]);
+    expect((await order([b, a, c])).status).toBe(200); // the same order: no second audit
+    expect((await audits('feature:marketing')).filter((r) => r.action === 'example.order')).toEqual([
+      { actor_id: admin.id, action: 'example.order', old_value: { ids: [c, b, a] }, new_value: { ids: [b, a, c] } },
+    ]);
+
+    const d = await marketing();
+    expect(await list()).toEqual([d, b, a, c]);
+    expect((await order([b, a, c])).status).toBe(409); // read before d came
+    expect(await list()).toEqual([d, b, a, c]);
   });
 });
 

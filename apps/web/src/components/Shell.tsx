@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { api, errorText, sendJson, type JobStatus, type TrayJob } from '@/lib/api';
+import { api, errorText, type JobStatus, sendJson, thumbUrl, type TrayJob } from '@/lib/api';
 import { appBySlug } from '@/lib/apps';
 import { featureLabel } from '@/lib/features';
 import { cardTitleOfFormat } from '@/lib/marketing';
@@ -208,7 +208,7 @@ function HistoryCard({ job, isAdmin, select }: { job: TrayJob; isAdmin: boolean;
             {job.inputAssetIds.map((id, n) => (
               <li key={id}>
                 <Tap on={form?.photo && (() => form.photo!({ asset: id }, roleOf(job.feature, n, { garments: job.garments, format: job.format, roles: job.roles })))} label={`Dùng ảnh đầu vào ${n + 1}`}>
-                  <img src={content(id)} alt="" loading="lazy" />
+                  <img src={thumbUrl(id)} alt="" loading="lazy" />
                 </Tap>
               </li>
             ))}

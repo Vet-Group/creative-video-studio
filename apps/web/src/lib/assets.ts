@@ -14,6 +14,11 @@ export const db = createDb(pool);
 
 export type RouteContext = { params: Promise<{ id: string }> };
 
+/** Where an image asset's tile thumbnail is kept (GET /api/assets/[id]/thumb); the worker's purge removes it with the asset. */
+export const thumbKey = (id: string) => `thumbs/${id}`;
+/** The thumbnail's longest side: sharp on a large tile at twice the pixel density, a few dozen KB instead of the original's megabytes. */
+export const THUMB_SIDE = 512;
+
 /** The most a JSON request body may hold; the forms send a few KB. */
 export const MAX_JSON_BYTES = 1_000_000;
 

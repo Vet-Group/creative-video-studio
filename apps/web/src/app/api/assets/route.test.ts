@@ -18,6 +18,8 @@ const { POST, UPLOAD_HOURLY_LIMIT, UPLOADS_LIMIT } = await import('./route');
 const { GET: GET_DETAILS } = await import('./[id]/route');
 const { GET: GET_CONTENT } = await import('./[id]/content/route');
 const { GET: GET_DOWNLOAD } = await import('./[id]/download/route');
+const { GET: GET_THUMB } = await import('./[id]/thumb/route');
+const { default: sharp } = await import('sharp');
 
 const PASSWORD = 'correct-horse-battery';
 const BASE = 'http://localhost/api/assets';
@@ -363,6 +365,47 @@ describe('GET /api/assets/:id/content', () => {
 
   test('answers 404 for an unknown asset', async () => {
     expect((await GET_CONTENT(get('/api/assets/nope/content', ownerCookie), ctx('nope'))).status).toBe(404);
+  });
+});
+
+describe('GET /api/assets/:id/thumb', () => {
+  let id = '';
+  beforeAll(async () => {
+    const big = await sharp({ create: { width: 1600, height: 800, channels: 4, background: { r: 200, g: 0, b: 0, alpha: 0.5 } } }).png().toBuffer();
+    id = await uploadOne(ownerCookie, new Uint8Array(big), 'wide.png');
+  });
+
+  test('makes an upright JPEG no larger than 512 px on first use, keeps it, then serves the kept one', async () => {
+    const res = await GET_THUMB(get(`/api/assets/${id}/thumb`, ownerCookie), ctx(id));
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toBe('image/jpeg');
+    expect(res.headers.get('cache-control')).toBe('private, max-age=86400');
+    expect(res.headers.get('etag')).toBe(`"${id}-thumb"`);
+    const body = new Uint8Array(await res.arrayBuffer());
+    expect(await sharp(body).metadata()).toMatchObject({ format: 'jpeg', width: 512, height: 256 });
+    expect(await objectKeys()).toContain(`thumbs/${id}`);
+    const again = await GET_THUMB(get(`/api/assets/${id}/thumb`, ownerCookie), ctx(id));
+    expect(new Uint8Array(await again.arrayBuffer())).toEqual(body);
+    expect((await GET_THUMB(get(`/api/assets/${id}/thumb`, ownerCookie, { 'if-none-match': `"${id}-thumb"` }), ctx(id))).status).toBe(304);
+  });
+
+  test('has the access of the content: no session, another Member, an unknown id', async () => {
+    expect((await GET_THUMB(get(`/api/assets/${id}/thumb`), ctx(id))).status).toBe(401);
+    expect((await GET_THUMB(get(`/api/assets/${id}/thumb`, otherCookie), ctx(id))).status).toBe(403);
+    expect((await GET_THUMB(get(`/api/assets/${id}/thumb`, adminCookie), ctx(id))).status).toBe(200);
+    expect((await GET_THUMB(get('/api/assets/nope/thumb', ownerCookie), ctx('nope'))).status).toBe(404);
+  });
+
+  test('never enlarges a small picture, sends a picture sharp cannot read as it is, and refuses a video', async () => {
+    const small = await uploadOne(ownerCookie, new Uint8Array(await sharp({ create: { width: 40, height: 30, channels: 3, background: '#00f' } }).png().toBuffer()), 'small.png');
+    expect(await sharp(new Uint8Array(await (await GET_THUMB(get(`/api/assets/${small}/thumb`, ownerCookie), ctx(small))).arrayBuffer())).metadata()).toMatchObject({ width: 40, height: 30 });
+    const bytes = png(1000); // a PNG signature over noise
+    const broken = await uploadOne(ownerCookie, bytes, 'broken.png');
+    const res = await GET_THUMB(get(`/api/assets/${broken}/thumb`, ownerCookie), ctx(broken));
+    expect(res.status).toBe(200);
+    expect(new Uint8Array(await res.arrayBuffer())).toEqual(bytes);
+    const clip = await uploadOne(ownerCookie, mp4(2000), 'clip.mp4');
+    expect((await GET_THUMB(get(`/api/assets/${clip}/thumb`, ownerCookie), ctx(clip))).status).toBe(400);
   });
 });
 
