@@ -243,8 +243,9 @@ export async function uploadImages(files: File[], kind: UploadKind = 'image', st
  * `samples` (sample names, lib/samples.ts) show while the slot is empty, as on the live Try On; a click hands the name to `onSample`, which copies it on the server.
  * `icon` is the empty slot's icon: a picture by default, a plus on Advanced's wide slot, as on the live page.
  * `onPick` adds the "Ảnh đã tải" link to the label's line while the slot has room (a one-photo slot always: a pick replaces its photo); `storeId` is the page's store, its first filter.
+ * `slot` is the picker's first category, for a slot whose label names another page's category (Image Generation's reference photos); by default the label's.
  */
-export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRemove, samples = [], onSample, icon = 'image', onBrowse, onPick, storeId, optional }: { label: string; empty: string; inputLabel: string; images: Img[]; max: number; busy: boolean; onAdd: (files: File[]) => void; onRemove: (id: string) => void; samples?: string[]; onSample?: (name: string) => void; icon?: IconName; onBrowse?: () => void; onPick?: (img: Img) => void; storeId?: string; optional?: boolean }) {
+export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRemove, samples = [], onSample, icon = 'image', onBrowse, onPick, storeId, optional, slot }: { label: string; empty: string; inputLabel: string; images: Img[]; max: number; busy: boolean; onAdd: (files: File[]) => void; onRemove: (id: string) => void; samples?: string[]; onSample?: (name: string) => void; icon?: IconName; onBrowse?: () => void; onPick?: (img: Img) => void; storeId?: string; optional?: boolean; slot?: UploadSlot }) {
   const hydrated = useHydrated();
   const input = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
@@ -284,7 +285,7 @@ export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRem
       {onPick ? (
         <div className="field-head">
           {name}
-          {(!full || max === 1) && <UploadedPhotos name={`Ảnh đã tải cho ${label}`} taken={images} disabled={!hydrated || busy} storeId={storeId} slot={slotOfLabel(label)} onPick={(img) => (setCut(0), onPick(img))} />}
+          {(!full || max === 1) && <UploadedPhotos name={`Ảnh đã tải cho ${label}`} taken={images} disabled={!hydrated || busy} storeId={storeId} slot={slot ?? slotOfLabel(label)} onPick={(img) => (setCut(0), onPick(img))} />}
         </div>
       ) : (
         name

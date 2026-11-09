@@ -83,7 +83,7 @@ export function PromptTools({ feature, format, value, onChange, maxLength, onRun
     if (text !== value) setUndo({ before: value, after: text });
     onChange(text);
     setOpen(null);
-    root.current?.closest('.prompt-box, .imagebar')?.querySelector('textarea')?.focus();
+    root.current?.closest('.prompt-box')?.querySelector('textarea')?.focus();
   };
   const suggest = () => ask && void ai.run(ask());
   const toggleAi = () => {

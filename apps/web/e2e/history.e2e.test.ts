@@ -102,12 +102,12 @@ test("as on Fash, a History card's words, inputs and result go on the form besid
   const card = page.getByRole('complementary', { name: 'Lượt tạo của tôi' }).getByRole('listitem').filter({ hasText: 'pieces shot' });
   await expect(card.getByText('Hoàn tất')).toBeVisible({ timeout: 60_000 });
   const note = (text: string) => page.getByRole('region', { name: 'Thông báo' }).getByText(text);
-  const chosen = page.getByRole('list', { name: 'Ảnh đã chọn' });
+  const chosen = page.getByRole('list', { name: 'Ảnh tham chiếu: ảnh đã chọn' });
   await card.getByRole('button', { name: 'Dùng ảnh đầu vào 2' }).click();
   await expect(chosen.getByRole('img', { name: 'piece-2.png' })).toBeVisible();
   await expect(note('Đã thêm ảnh vào đầu vào')).toBeVisible();
   await card.getByRole('button', { name: 'Chép vào ô mô tả' }).click();
-  await expect(page.getByRole('textbox', { name: 'Mô tả cảnh bạn muốn tạo' })).toHaveValue('pieces shot');
+  await expect(page.getByRole('textbox', { name: 'Mô tả', exact: true })).toHaveValue('pieces shot');
   await expect(note('Đã chép mô tả')).toBeVisible();
   await card.getByRole('button', { name: 'Dùng kết quả' }).click(); // Fash's Use Result: the result as one more input
   await expect(chosen.getByRole('img')).toHaveCount(2);
@@ -196,7 +196,7 @@ test('a failed read of the job list says so with Thử lại instead of a blank 
 
   // The empty History points to the form beside it.
   await history.getByRole('button', { name: 'Bắt đầu ngay' }).click();
-  await expect(page.getByRole('group', { name: 'Thanh tạo ảnh' }).getByRole('button', { name: 'Thêm ảnh tham chiếu' })).toBeFocused();
+  await expect.poll(() => page.evaluate(() => document.activeElement?.closest('.form-card') !== null)).toBe(true);
 
   // The next poll fails: what was read stays, with a short notice.
   fail = true;

@@ -51,9 +51,9 @@ test('an Advanced job runs from reference images, a brief, a script and audio on
   await expect(brief(page)).toHaveAttribute('placeholder', 'Ví dụ: người mẫu mở hộp, cầm sản phẩm lên và nói cảm nhận đầu tiên…');
   await expect(script(page)).toBeVisible();
   // Empty, each box is its text and the toolbar, with no row of starter chips (the templates menu replaced them): the script's 76 px text, and the
-  // brief's placeholder, which takes a third line in the narrower Body section.
+  // brief's placeholder, which fits in two lines like the script's text since the column is 360 px wide.
   expect((await script(page).locator('..').boundingBox())!.height).toBeCloseTo(123, 0);
-  expect((await brief(page).locator('..').boundingBox())!.height).toBeCloseTo(126, 0);
+  expect((await brief(page).locator('..').boundingBox())!.height).toBeCloseTo(123, 0);
   await expect(page.getByRole('group', { name: 'Gợi ý nhanh' })).toHaveCount(0);
   await expect(audio(page)).toHaveAttribute('aria-checked', 'true');
   await expect(modelButton(page)).toContainText('Mock E2E');

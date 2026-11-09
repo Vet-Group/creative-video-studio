@@ -31,11 +31,11 @@ test('an editor fills a store brand kit, and a member run with the switch on sto
   await expect(page.getByRole('button', { name: 'Bộ nhận diện', exact: true })).toHaveCount(0); // only an editor or an Admin edits a kit
   await brand.click();
   await expect(brand).toHaveAttribute('aria-pressed', 'true');
-  const bar = page.getByRole('group', { name: 'Thanh tạo ảnh' });
-  await bar.getByRole('textbox', { name: 'Mô tả cảnh bạn muốn tạo' }).fill('a linen shirt on a chair');
+  const card = page.locator('.form-card');
+  await card.getByRole('textbox', { name: 'Mô tả', exact: true }).fill('a linen shirt on a chair');
   const [sent] = await Promise.all([
     page.waitForResponse((r) => r.url().endsWith('/api/jobs') && r.request().method() === 'POST'),
-    bar.getByRole('button', { name: /^Tạo ảnh/ }).click(),
+    card.getByRole('button', { name: /^Tạo ảnh/ }).click(),
   ]);
   expect(sent.status()).toBe(201);
   const { id } = (await sent.json()) as { id: string };

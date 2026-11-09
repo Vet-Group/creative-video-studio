@@ -54,13 +54,14 @@ test('a photo uploaded on Image Generation is offered by "Ảnh đã tải" on C
   await expect(page.getByLabel('Sản phẩm: ảnh đã chọn').getByRole('img', { name })).toBeVisible();
   await expect(product).toBeVisible(); // still over the filled photo, to swap it
 
-  // Image Generation: the bar's tile beside the upload one.
+  // Image Generation: the reference slot's own link opens on the photos uploaded on Image Generation, where this one went.
   await page.goto('/image-generation');
-  const bar = page.getByRole('button', { name: 'Ảnh đã tải', exact: true });
-  await expect(bar).toBeEnabled();
-  await bar.click();
+  const refs = page.getByRole('button', { name: 'Ảnh đã tải cho Ảnh tham chiếu' });
+  await expect(refs).toBeEnabled();
+  await refs.click();
+  await expect(page.getByRole('dialog', { name: 'Ảnh đã tải' })).toContainText('Ảnh bạn đã tải cho mục Ảnh tạo ảnh');
   await page.getByRole('dialog', { name: 'Ảnh đã tải' }).getByRole('button', { name: `Dùng ${name}` }).click();
-  await expect(page.getByLabel('Ảnh đã chọn').getByRole('img', { name })).toBeVisible();
+  await expect(page.getByLabel('Ảnh tham chiếu: ảnh đã chọn').getByRole('img', { name })).toBeVisible();
 });
 
 test('an upload carries the store chosen on its page, and the picker opens on the page store with every store one pick away', async ({ page }) => {
@@ -78,7 +79,7 @@ test('an upload carries the store chosen on its page, and the picker opens on th
   await expect(page.getByLabel('Ảnh tham chiếu', { exact: true })).toBeEnabled();
   await selectText(page, store, 'E2E Brand Shop');
   await page.getByLabel('Ảnh tham chiếu', { exact: true }).setInputFiles({ name: onB, mimeType: 'image/png', buffer: png() });
-  await expect(page.getByLabel('Ảnh đã chọn').getByRole('img', { name: onB })).toBeVisible();
+  await expect(page.getByLabel('Ảnh tham chiếu: ảnh đã chọn').getByRole('img', { name: onB })).toBeVisible();
 
   // Back on Create with store A: the picker shows A's photo only, and "Tất cả cửa hàng" shows both.
   await page.goto('/create');

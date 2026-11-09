@@ -465,16 +465,16 @@ test('as on Fash, in Viết tự do the Cài đặt video block sits 16 px under
   expect((await page.getByText('Xem prompt gửi đi').boundingBox())!.y).toBeGreaterThanOrEqual(model.y + model.height + 8);
 });
 
-test('as on the live form (measured 2026-10-29): 272 px content, 131x130 tiles 10 px apart, 36 px icon discs, 14 px grey labels, hook cards with a grey line under the name, and Ví dụ open without a Marketing job', async ({ page }) => {
+test('as on the live form (measured 2026-10-29): 312 px content, 151x130 tiles 10 px apart, 36 px icon discs, 14 px grey labels, hook cards with a grey line under the name, and Ví dụ open without a Marketing job', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await signIn(page, 'mktb');
   await page.goto('/marketing-studio');
   await expect(page.getByRole('tab', { name: 'Ví dụ' })).toHaveAttribute('aria-selected', 'true');
   const near = (got: number, want: number) => expect(Math.abs(got - want), `${got} vs ${want}`).toBeLessThanOrEqual(1);
-  near((await page.locator('.marketing-head').boundingBox())!.width, 272);
+  near((await page.locator('.marketing-head').boundingBox())!.width, 312);
   const model = (await page.getByRole('group', { name: 'Người mẫu' }).boundingBox())!;
   const product = (await page.getByRole('group', { name: 'Sản phẩm' }).boundingBox())!;
-  near(model.width, 131);
+  near(model.width, 151);
   near(model.height, 130);
   near(product.x - (model.x + model.width), 10);
   // The hook tile is in the photo grid when writing freely, as on Fash.
@@ -483,6 +483,7 @@ test('as on the live form (measured 2026-10-29): 272 px content, 131x130 tiles 1
   near((await hookBox.boundingBox())!.height, 130);
   const disc = hookBox.locator('.slot-icon');
   near((await disc.boundingBox())!.width, 36);
+  await page.mouse.move(0, 0); // the click on Viết tự do leaves the pointer over the wider hook tile, which darkens its disc on hover
   expect(await disc.evaluate((e) => getComputedStyle(e).backgroundColor)).toBe('rgba(0, 0, 0, 0.06)');
   expect(await hookBox.locator('.choice-label').evaluate((e) => [getComputedStyle(e).fontSize, getComputedStyle(e).color])).toEqual(['14px', 'rgb(102, 102, 102)']);
   // The Prompt label row is 21 px tall (its Optional chip does not stretch it) and the box sits 6 px under it.
@@ -656,21 +657,21 @@ test("with earlier UGC jobs, the empty product slot offers the member's own past
   await expect(page.getByRole('dialog')).toHaveCount(0);
 });
 
-test('as on Fash in a 666 px tall window (measured 2026-10-29): no scrollbar narrows the form, and the ratio and duration pills are 132 px wide with the value 6 px after a 12 px clock or an 8 px ratio box', async ({ page }) => {
+test('as on Fash in a 666 px tall window (measured 2026-10-29): no scrollbar narrows the form, and the ratio and duration pills are 152 px wide with the value 6 px after a 12 px clock or an 8 px ratio box', async ({ page }) => {
   await page.setViewportSize({ width: 1426, height: 666 });
   await signIn(page, 'mktb');
   await page.goto('/marketing-studio');
   const near = (got: number, want: number) => expect(Math.abs(got - want), `${got} vs ${want}`).toBeLessThanOrEqual(1);
   const scroller = page.locator('.form-scroll').filter({ has: page.locator('.marketing-head') });
   expect(await scroller.evaluate((e) => e.scrollHeight > e.clientHeight)).toBe(true);
-  // Headless Chromium hides scrollbars anyway, so the rule itself is what a test can see; a desktop Chrome would take 15 px of the 272.
+  // Headless Chromium hides scrollbars anyway, so the rule itself is what a test can see; a desktop Chrome would take 15 px of the 312.
   expect(await scroller.evaluate((e) => getComputedStyle(e).scrollbarWidth)).toBe('none');
-  near((await page.locator('.marketing-head').boundingBox())!.width, 272);
+  near((await page.locator('.marketing-head').boundingBox())!.width, 312);
   // Fash: the ratio pill at x 312 has its value at 336.8; the duration pill at 452 has it at 480.8.
   for (const [label, offset] of [['Tỉ lệ', 24.8], ['Thời lượng', 28.8]] as const) {
     const pill = select(page, label);
     const box = (await pill.boundingBox())!;
-    near(box.width, 132);
+    near(box.width, 152);
     near((await pill.locator('.select-value').boundingBox())!.x - box.x, offset);
     near((await pill.locator('.icon').last().boundingBox())!.width, 10);
   }

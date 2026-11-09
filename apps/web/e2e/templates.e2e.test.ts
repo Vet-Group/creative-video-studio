@@ -15,7 +15,7 @@ async function saveAs(page: Page, name: string) {
 test('on every form the template links scroll with the fields, and the fixed bar below holds only Run, as on the live page', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await signIn(page, 'tplpos');
-  for (const path of ['/create', '/try-on', '/marketing-studio', '/apps/character-swap']) {
+  for (const path of ['/create', '/try-on', '/image-generation', '/marketing-studio', '/apps/character-swap']) {
     await page.goto(path);
     await expect(page.getByRole('button', { name: 'Lưu thiết lập', exact: true })).toBeVisible();
     await expect(page.locator('.form-scroll > .templates'), path).toHaveCount(1);
@@ -119,7 +119,7 @@ test("Create: a template saved to the store chosen on the form is listed, tagged
 test('Image Generation: a saved template refills the prompt and Enhance', async ({ page }) => {
   await signIn(page, 'tpla');
   await page.goto('/image-generation');
-  const prompt = page.getByRole('textbox', { name: 'Mô tả cảnh bạn muốn tạo' });
+  const prompt = page.getByRole('textbox', { name: 'Mô tả', exact: true });
   await prompt.fill('a studio shot');
   await saveAs(page, 'Studio');
   await page.goto('/image-generation');
@@ -180,7 +180,7 @@ test('Dùng ví dụ này on a company result in Ví dụ fills Try On, Image Ge
 
   await other.goto('/image-generation');
   await use(ids.image).click();
-  await expect(other.getByRole('textbox', { name: 'Mô tả cảnh bạn muốn tạo' })).toHaveValue('a flat lay');
+  await expect(other.getByRole('textbox', { name: 'Mô tả', exact: true })).toHaveValue('a flat lay');
   await expect(other.getByRole('img', { name: 'use-garment.png' })).toBeVisible();
 
   await other.goto('/marketing-studio');
