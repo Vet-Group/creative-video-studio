@@ -3,10 +3,8 @@ import { withTransaction } from '@cvs/core/ledger';
 import type { RouteContext } from '@/lib/assets';
 import { pool } from '@/lib/auth';
 import { LIVE_CLIP, OWN_PROMPT } from '@/lib/clips';
+import { GALLERY_SAMPLES } from '@/lib/examples';
 import { guard } from '@/lib/session';
-
-/** The features whose page has an Examples tab that shows company results (components/image-tools.tsx Gallery). */
-const GALLERY_FEATURES = ['image', 'try_on', 'marketing'];
 
 /**
  * What an Admin checks before putting a result on its page's Examples tab: the results already there for the same feature, those that may repeat it
@@ -54,7 +52,7 @@ async function set(request: Request, { params }: RouteContext, on: boolean): Pro
   return withTransaction(pool, async (tx): Promise<Response> => {
     const job = (await tx.query(`select j.feature from jobs j where j.id = $1 and ${LIVE_CLIP} for update of j`, [id])).rows[0];
     if (!job) return Response.json({ error: 'not found' }, { status: 404 });
-    if (on && !GALLERY_FEATURES.includes(job.feature)) return Response.json({ error: 'only an Image Generation, Try On or Marketing Studio result can be an example' }, { status: 400 });
+    if (on && !Object.hasOwn(GALLERY_SAMPLES, job.feature)) return Response.json({ error: 'only an Image Generation, Try On or Marketing Studio result can be an example' }, { status: 400 });
     const changed = on
       ? (await tx.query('insert into examples (job_id, added_by) values ($1, $2) on conflict do nothing', [id, userId])).rowCount
       : (await tx.query('delete from examples where job_id = $1', [id])).rowCount;

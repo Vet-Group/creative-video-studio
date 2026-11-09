@@ -608,7 +608,7 @@ function ExampleControl({ clip, onChange }: { clip: Clip; onChange: (c: Clip) =>
         {status}
       </div>
     );
-  const samples = numberedSamples(have, prefix, 'jpg'); // a sample clip has its still under the same number
+  const samples = numberedSamples(have, prefix, clip.feature === 'marketing' ? 'mp4' : 'jpg'); // as the tab counts them; a clip shows its still of the same number
   const similar = check.filter((e) => e.match);
   const tile = (e: ExampleRow) => (
     <li key={e.id}>
@@ -625,7 +625,7 @@ function ExampleControl({ clip, onChange }: { clip: Clip; onChange: (c: Clip) =>
         {check.filter((e) => !e.match).map(tile)}
         {samples.map((n) => (
           <li key={n}>
-            <img src={`/api/samples/${n}`} alt="Ảnh mẫu" loading="lazy" />
+            <img src={`/api/samples/${n.replace(/\.mp4$/, '.jpg')}`} alt="Ảnh mẫu" loading="lazy" />
           </li>
         ))}
       </ul>

@@ -573,6 +573,22 @@ describe('/api/jobs/:id/example', () => {
     expect(rows.slice(0, 2).map((e) => e.id).sort()).toEqual([sameAsset, sameBytes].sort());
     expect(rows.slice(2)).toEqual([{ id: other, match: null }].map((e) => expect.objectContaining(e)));
   });
+
+  test('the check flags an example with the same own prompt, and a deleted example leaves the tab', async () => {
+    const image = async (userId: string) => {
+      const id = await clip(userId, { model: 'example-test' });
+      await pool.query(`update jobs set feature = 'image', preset_id = null, prompt = 'a red shirt on a hanger' where id = $1`, [id]);
+      return id;
+    };
+    const shown = await image(bob.id);
+    await call(PUT_EXAMPLE, 'PUT', admin.cookie, shown);
+    const rows = ((await (await call(GET_EXAMPLE, 'GET', admin.cookie, await image(alice.id))).json()) as { examples: { id: string; match: string | null }[] }).examples;
+    expect(rows.find((e) => e.id === shown)?.match).toBe('prompt');
+
+    expect(await libraryIds(alice.cookie, '?kind=image&example=1')).toContain(shown);
+    await pool.query('update jobs set deleted_at = now() where id = $1', [shown]);
+    expect(await libraryIds(alice.cookie, '?kind=image&example=1')).not.toContain(shown);
+  });
 });
 
 describe('DELETE /api/jobs/:id', () => {
