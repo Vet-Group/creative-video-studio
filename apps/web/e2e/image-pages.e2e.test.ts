@@ -78,6 +78,9 @@ test('Try On: a missing slot keeps Run disabled with a reason, a mock run reache
   // A second run with a background: the garment is still second and the background last, and the prompt names each image's role.
   await page.getByLabel('Ảnh bối cảnh').setInputFiles(file('background.png'));
   await page.getByLabel('Mô tả (tuỳ chọn)').fill('soft studio light');
+  await expect(page.locator('.prompt-preview p')).toContainText('Image 3 is the background scene.'); // once the background is in
+  await expect(page.locator('.prompt-preview p')).toContainText(/soft studio light$/);
+  const preview = await page.locator('.prompt-preview p').innerText();
   await run.click();
   await expect(tray.getByText('Hoàn tất')).toHaveCount(2, { timeout: 60_000 });
   const jobs = (await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { id: string; feature: string }[] };
@@ -86,6 +89,7 @@ test('Try On: a missing slot keeps Run disabled with a reason, a mock run reache
   expect(detail.images.map((i) => i.filename)).toEqual(['person.png', 'garment.png', 'background.png']);
   expect(detail.prompt).toContain('Image 3 is the background scene.');
   expect(detail.prompt).toMatch(/soft studio light$/);
+  expect(detail.prompt).toBe(preview); // the prompt preview showed what the server stored
 
   await libraryChip(page, 'Thử đồ');
   const mine = page.getByRole('article').filter({ hasText: 'E2E Member 9' });

@@ -4,6 +4,7 @@
 import { useId, useState } from 'react';
 import { api, errorText, sendJson } from '@/lib/api';
 import { ABOUT } from '@/lib/about-content';
+import { type BrandKit, withBrand } from '@/lib/brand';
 import { promptTooLong } from '@/lib/prompt-limit';
 import { confirmRun } from '@/lib/run-guard';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
@@ -11,10 +12,12 @@ import { useRecall } from '@/lib/use-recall';
 import { About } from './About';
 import { BrandPicker } from './BrandKit';
 import { copyError, Gallery, type Img, LockedFields, photoImg, RATIO_LABEL, Slot, THINKING_LABEL, uploadError, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
-import { EnhanceToggle } from './EnhanceToggle';
+import { ENHANCE_NOTE, EnhanceToggle } from './EnhanceToggle';
 import { FormContext, type Photo, useApplier, useJobs } from './jobs';
 import { ModelPicker } from './ModelPicker';
 import { PromptComposer } from './PromptComposer';
+import type { PresetRow } from './PresetEditing';
+import { PromptPreview } from './PromptSections';
 import { Select } from './Select';
 import { Tray } from './Shell';
 import { StylePicker } from './StylePicker';
@@ -33,6 +36,8 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
   const [enhance, setEnhance] = useState(true); // on by default, as on Fash
   const [storeId, setStoreId] = useState('');
   const [useBrand, setUseBrand] = useState(false); // the chosen store's brand kit, added to the prompt on the server
+  const [style, setStyle] = useState<PresetRow | null>(null);
+  const [kit, setKit] = useState<BrandKit | null>(null);
   const [tab, setTab] = useState<Tab | null>(null); // null: the default for the width (Create below 1024 px, else Examples)
   const opening: Tab = 'examples';
   const [busy, setBusy] = useState(false);
@@ -88,6 +93,18 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
     (e) => setError(copyError(e, 'Không tìm thấy ảnh để dùng lại.')),
   );
 
+  // What Run sends, composed as POST /api/jobs does: the words, the style's prompt (which only a template editor can read), then the brand kit.
+  const styled = style?.prompt ? `${prompt.trim()}
+
+${style.prompt}` : prompt.trim();
+  const sent = kit ? withBrand(styled, kit, 'image') : styled;
+  const previewNote = [
+    style && !style.prompt && `Mô tả của phong cách "${style.label}" do quản trị giữ, máy chủ thêm vào sau phần của bạn khi tạo.`,
+    enhance && ENHANCE_NOTE,
+  ]
+    .filter(Boolean)
+    .join(' ');
+
   // The first thing that stops Run; null when it can go.
   const reason =
     !recall.answered
@@ -104,7 +121,7 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
                 ? `Mô hình này nhận tối đa ${chosen.maxImages} ảnh.`
                 : prompt.trim() === ''
                   ? 'Nhập mô tả cảnh bạn muốn tạo.'
-                  : promptTooLong(chosen, prompt.trim().length);
+                  : promptTooLong(chosen, sent.length);
   const canRun = reason === null && !busy;
   // With no image and a model that needs one, the best model that makes pictures from words is one click away (not switched to silently: its price differs).
   const wordsModel = chosen && images.length === 0 && !chosen.textToImage ? models?.filter((m) => m.textToImage).sort((a, b) => b.score - a.score)[0] : undefined;
@@ -162,7 +179,7 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
             <Slot label="Ảnh tham chiếu" optional empty={`Tối đa ${max} ảnh tham chiếu`} inputLabel="Ảnh tham chiếu" images={images} max={max} busy={busy} onAdd={(files) => void upload(files)} onRemove={(id) => setImages((cur) => cur.filter((x) => x.id !== id))} onPick={(img) => setImages((cur) => (cur.length < max ? [...cur, img] : cur))} storeId={storeId} slot="image" />
             {/* In a field for the form's spacing; the chip names itself, so it has no label above it. */}
             <div className="field">
-              <StylePicker value={styleId} onChange={setStyleId} />
+              <StylePicker value={styleId} onChange={setStyleId} onStyle={setStyle} />
             </div>
             {models && models.length > 0 && <ModelPicker models={pick.options} value={pick.modelId} onChange={pick.setModelId} />}
 
@@ -177,6 +194,7 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
               placeholder="Mô tả cảnh bạn muốn tạo…"
               ask={chosen ? () => ({ field: 'prompt', feature: 'image', text: prompt, room: chosen.maxPromptChars, model: chosen.id }) : null}
             />
+            {prompt.trim() && <PromptPreview feature="image" prompts={[sent]} limit={chosen?.maxPromptChars} note={previewNote || undefined} />}
 
             {models !== null && !failed && !chosen && <LockedFields />}
             {chosen && (
@@ -187,7 +205,7 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
               </>
             )}
             <EnhanceToggle on={enhance} onChange={setEnhance} />
-            <BrandPicker storeId={storeId} onStore={(v) => (recall.touch(), setStoreId(v))} on={useBrand} onToggle={(v) => (recall.touch(), setUseBrand(v))} />
+            <BrandPicker storeId={storeId} onStore={(v) => (recall.touch(), setStoreId(v))} on={useBrand} onToggle={(v) => (recall.touch(), setUseBrand(v))} onKit={setKit} />
             <Templates feature="image" data={() => ({ images: images.map((i) => i.id), prompt: prompt.trim(), presetId: styleId, enhance, ratio: pick.ratio, resolution: pick.resolution, modelId: pick.modelId })} />
           </div>
 

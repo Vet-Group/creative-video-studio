@@ -81,7 +81,8 @@ export function BrandKitForm({ store, onClose, onSaved }: { store: BrandStore | 
  * The store picker with the "Dùng bộ nhận diện" switch, which works once the chosen store has a kit (the server adds nothing otherwise), and for a
  * template editor a "Bộ nhận diện" button that edits the chosen store's kit.
  */
-export function BrandPicker({ storeId, onStore, on, onToggle }: { storeId: string; onStore: (id: string) => void; on: boolean; onToggle: (on: boolean) => void }) {
+/** `onKit` hears the kit Run adds (null when none), for the page's prompt preview (PromptPreview). */
+export function BrandPicker({ storeId, onStore, on, onToggle, onKit }: { storeId: string; onStore: (id: string) => void; on: boolean; onToggle: (on: boolean) => void; onKit?: (kit: BrandKit | null) => void }) {
   const [stores, setStores] = useState<BrandStore[]>([]);
   const [canEdit, setCanEdit] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -94,6 +95,7 @@ export function BrandPicker({ storeId, onStore, on, onToggle }: { storeId: strin
   }, []);
   const store = stores.find((s) => s.id === storeId);
   const usable = store !== undefined && hasBrand(store);
+  useEffect(() => onKit?.(on && usable ? store : null), [on, usable, store]);
   return (
     <div className="brand-picker">
       <Select label="Cửa hàng/Thương hiệu" icon="store" heading="Chọn cửa hàng hoặc thương hiệu" value={storeId} options={[{ value: '', label: 'Không chọn' }, ...stores.map((s) => ({ value: s.id, label: s.name }))]} onChange={onStore} />

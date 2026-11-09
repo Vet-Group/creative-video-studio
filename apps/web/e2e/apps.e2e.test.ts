@@ -311,12 +311,15 @@ test('the swaps take an optional prompt that is added to their fixed instruction
   await page.locator('input[type=file][aria-label="Ảnh nhân vật mới"]').setInputFiles(file('new.png'));
   await page.locator('input[type=file][aria-label="Ảnh đích"]').setInputFiles(file('target.png'));
   await expect(runButton(page)).toBeEnabled(); // the prompt is not required
+  const preview = page.locator('.prompt-preview p');
+  await expect(preview).toHaveText('replace the whole person in the second image with the person from the first image, keep the background'); // the instruction alone
   await prompt.fill('keep the red hat');
+  await expect(preview).toHaveText('replace the whole person in the second image with the person from the first image, keep the background. keep the red hat');
   await runButton(page).click();
   await expect(page.getByText('Đã gửi lượt tạo')).toBeVisible();
   const mine = (await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { id: string; feature: string }[] };
   const detail = (await (await page.request.get(`/api/jobs/${mine.jobs.find((j) => j.feature === 'character_swap')!.id}`)).json()) as { prompt: string };
-  expect(detail.prompt).toBe('replace the whole person in the second image with the person from the first image, keep the background. keep the red hat');
+  expect(detail.prompt).toBe(await preview.innerText()); // the prompt preview shows what the server stored
   await openApp(page, 'Đổi người mẫu', 'model-swap');
   await expect(page.getByRole('textbox', { name: 'Mô tả (tuỳ chọn)' })).toBeVisible();
   await openApp(page, 'Đổi khuôn mặt', 'face-swap');

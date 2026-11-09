@@ -7,7 +7,7 @@ import { type CSSProperties, useEffect, useId, useRef, useState } from 'react';
 import { APP_ABOUT } from '@/lib/about-content';
 import { api, errorText, sendJson } from '@/lib/api';
 import { APPS, type AppConfig, appInputs, appReason, type AppCategory, motionReason, slotMax, splitImages, stockGroups } from '@/lib/apps';
-import { promptTooLong } from '@/lib/prompt-limit';
+import { basePrompt, promptTooLong } from '@/lib/prompt-limit';
 import { confirmRun } from '@/lib/run-guard';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { useHydrated } from '@/lib/use-hydrated';
@@ -21,6 +21,7 @@ import { copyError, copySamples, type Img, PhotoDialog, RATIO_LABEL, Slot, uploa
 import { FormContext, useJobs } from './jobs';
 import { type ModelOption, ModelPicker } from './ModelPicker';
 import { PromptComposer } from './PromptComposer';
+import { PromptPreview } from './PromptSections';
 import { Select } from './Select';
 import { Tray } from './Shell';
 import { Templates } from './Templates';
@@ -140,6 +141,8 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
   const room = chosen && chosen.maxPromptChars - fixed;
   const reason = (recall.answered ? null : 'Đang tải cài đặt đã dùng...') ?? appReason(app, { images, prompt, models: chosen ? [chosen] : models === null ? null : [], failed }) ?? promptTooLong(chosen, prompt.trim() ? prompt.trim().length + fixed : 0);
   const canRun = reason === null && !busy;
+  /** What Run sends: the app's fixed instruction, with or replaced by the member's words as POST /api/jobs composes it. */
+  const sent = basePrompt(app.feature, appInputs(app, { images, prompt }).prompt);
 
   function add(slot: number) {
     return async (files: File[]) => {
@@ -255,6 +258,7 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
                 ask={chosen ? () => ({ field: 'prompt', feature: app.feature, text: prompt, ...(room !== undefined && { room }), model: chosen.id }) : null}
               />
             )}
+            {sent && <PromptPreview feature={app.feature} prompts={[sent]} limit={chosen?.maxPromptChars} />}
 
             {chosen && app.ratio && <Select label="Tỉ lệ" icon="ratio" heading="Chọn tỉ lệ" value={pick.ratio} options={chosen.ratios.map((r) => ({ value: r, label: RATIO_LABEL[r] ?? r }))} onChange={pick.setRatio} />}
             {chosen && app.resolution && <Select label="Độ phân giải" icon="preset" heading="Chọn độ phân giải" value={pick.resolution} options={chosen.resolutions.map((r) => ({ value: r, label: r }))} onChange={pick.setResolution} />}

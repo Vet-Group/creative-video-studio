@@ -33,6 +33,11 @@ test('an editor fills a store brand kit, and a member run with the switch on sto
   await expect(brand).toHaveAttribute('aria-pressed', 'true');
   const card = page.locator('.form-card');
   await card.getByRole('textbox', { name: 'Mô tả', exact: true }).fill('a linen shirt on a chair');
+  // the prompt preview shows the brand block the server adds, and that Enhance (on by default) rewrites it before the model gets it.
+  const preview = card.locator('.prompt-preview');
+  await expect(preview.locator('p')).toContainText('a linen shirt on a chair Brand style: Minimal, warm, natural light.');
+  await expect(preview).toContainText('Cải thiện đang bật');
+  const shown = await preview.locator('p').innerText();
   const [sent] = await Promise.all([
     page.waitForResponse((r) => r.url().endsWith('/api/jobs') && r.request().method() === 'POST'),
     card.getByRole('button', { name: /^Tạo ảnh/ }).click(),
@@ -40,6 +45,7 @@ test('an editor fills a store brand kit, and a member run with the switch on sto
   expect(sent.status()).toBe(201);
   const { id } = (await sent.json()) as { id: string };
   const job = (await (await page.request.get(`/api/jobs/${id}`)).json()) as { prompt: string; brief: string; storeId: string; brand: boolean };
+  expect(job.prompt).toBe(shown);
   expect(job.prompt).toBe(
     "a linen shirt on a chair Brand style: Minimal, warm, natural light. Brand colours: #C8102E, #FFFFFF, as accents in the setting and styling only; keep the product's own colours exactly as in the photos. If the prompt asks for on-screen text, use the brand tagline \"Mặc là đẹp\"; otherwise add no text.",
   );

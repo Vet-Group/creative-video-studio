@@ -203,8 +203,9 @@ function Section({ title, rule, after, children }: { title: string; rule: string
  * The exact English prompt Run sends, one per hook variant (`labels` names them): open on a computer, folded on a phone. The summary keeps the longest
  * one's length against the model's `limit`, red past it (Run then waits with the reason on the page); open, Translate gives a Vietnamese reading of the first.
  * The server renders it open, and until hydration CSS (data-ssr) shows it folded on a phone, so neither screen flashes the other's state on load.
+ * `note` says what still changes after Run (Enhance's rewrite, a preset's text the member may not read).
  */
-export function PromptPreview({ feature, prompts, labels, limit }: { feature: string; prompts: string[]; labels?: (string | null)[]; limit?: number }) {
+export function PromptPreview({ feature, prompts, labels, limit, note }: { feature: string; prompts: string[]; labels?: (string | null)[]; limit?: number; note?: string }) {
   const narrow = useMediaQuery(NARROW);
   const hydrated = useHydrated();
   const [toggled, setToggled] = useState<boolean | null>(null); // the person's own choice beats the screen's default
@@ -225,6 +226,7 @@ export function PromptPreview({ feature, prompts, labels, limit }: { feature: st
           {p}
         </p>
       ))}
+      {note && <div className="help">{note}</div>}
       {/* Only while open: the closed fold keeps the page to one Translate button, the prompt box's. */}
       {open && (
         <div className="prompt-preview-foot">
