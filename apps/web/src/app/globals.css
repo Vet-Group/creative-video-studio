@@ -246,6 +246,8 @@ button.primary { background: var(--brand); border-color: var(--brand); color: va
 button.primary:hover:not(:disabled), .runbar button.primary.run:hover:not(:disabled), .detail-use:hover, .library-empty-actions .button:first-child:hover, .bar-run:hover:not(:disabled) { border-color: var(--brand-hover); background: var(--brand-hover); }
 :focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 select { border: 1px solid transparent; border-radius: 8px; background: var(--fill); }
+/* A select with a see-through background opens its list on the system's white: the options keep the theme's own colours instead. */
+option { background-color: var(--surface); color: var(--ink); }
 label { display: block; margin: .75rem 0; font-weight: 600; }
 label input, label select { display: block; margin-top: .25rem; font: inherit; font-weight: 400; padding: .4rem .5rem; min-width: 14rem; max-width: 100%; }
 label small { display: block; margin-top: .25rem; font-weight: 400; max-width: 30rem; line-height: 1.4; }
@@ -645,6 +647,8 @@ td code { white-space: pre-wrap; overflow-wrap: anywhere; }
 .admin-nav a:hover { background: var(--fill); color: var(--ink); }
 .admin-nav a:focus-visible { outline-offset: -2px; }
 .admin-nav a[aria-current='page'] { background: var(--ink-strong); color: var(--on-ink); }
+/* On a phone half the tabs are past the edge: the faded end says the bar scrolls, and the padding lets the last tab clear the fade. */
+@media (max-width: 639.98px) { .admin-nav { padding-right: 28px; mask-image: linear-gradient(to right, rgb(var(--shade)) calc(100% - 28px), transparent); } }
 /* Icons only while the whole bar still fits on one row. */
 @container (max-width: 900px) { .admin-nav .icon { display: none; } }
 /* The page head ends on a dashed rule, like the perforation of a film strip. */
@@ -829,7 +833,7 @@ td code { white-space: pre-wrap; overflow-wrap: anywhere; }
 .admin .who-text strong { font-weight: 600; }
 .admin .who-text .muted { font-size: 12px; line-height: 18px; }
 .admin .role { display: inline-block; padding: 0 8px; border: 1px solid var(--border); border-radius: 6px; color: var(--text-sub); font-size: 12px; line-height: 20px; font-weight: 600; }
-.admin .role.admin { border-color: var(--danger-soft-border); background: var(--danger-soft); color: var(--danger); }
+.admin .role[data-role='admin'] { border-color: var(--danger-soft-border); background: var(--danger-soft); color: var(--danger); } /* not a class: `.admin` is the page's own container (container-type), which collapsed the badge */
 .admin .sign-ins { display: flex; flex-wrap: wrap; gap: 4px; margin: 0; padding: 0; list-style: none; }
 .admin .sign-ins li { padding: 0 8px; border-radius: 999px; background: var(--fill); color: var(--text-2); font-size: 12px; line-height: 22px; white-space: nowrap; }
 .admin .sign-ins .sign-in-2fa { background: var(--cat-utility-bg); color: var(--cat-utility-fg); font-weight: 600; }
@@ -1631,7 +1635,7 @@ dialog.modal.template-sheet { width: 100%; max-width: none; margin: auto 0 0; bo
 .library-search:focus-within { border-color: var(--ink); box-shadow: 0 0 0 1px var(--ink); }
 .library-field { display: flex; align-items: center; height: 36px; margin: 0; border: 1px solid rgb(var(--tint) / .1); border-radius: 8px; background: var(--surface); color: var(--text-subtle); font-size: 13px; line-height: 18px; font-weight: 500; white-space: nowrap; }
 .library-field > span:not(.sr-only) { padding: 0 0 0 10px; color: var(--text-muted); } /* the label reads at AA on white; --text-subtle was 3.9:1 */
-.library-field :is(select, input) { width: auto; height: 34px; min-width: 0; margin: 0; padding: 0 8px; border: 0; border-radius: 8px; outline: 0; background: none; color: var(--ink); font: inherit; font-weight: 500; }
+.library-field :is(select, input) { field-sizing: content; width: auto; height: 34px; min-width: 0; margin: 0; padding: 0 8px; border: 0; border-radius: 8px; outline: 0; background: none; color: var(--ink); font: inherit; font-weight: 500; }
 .library-field:has(:focus-visible), .library-toggle:has(:focus-visible) { outline: 2px solid var(--ink); outline-offset: 2px; }
 .library-toggle { position: relative; display: flex; align-items: center; gap: 6px; height: 36px; margin: 0; padding: 0 12px; border: 1px solid rgb(var(--tint) / .1); border-radius: 8px; background: var(--surface); color: var(--text-muted); font-size: 13px; line-height: 18px; font-weight: 500; white-space: nowrap; cursor: pointer; }
 .library-toggle input { position: absolute; inset: 0; width: 100%; min-width: 0; height: 100%; margin: 0; padding: 0; opacity: 0; cursor: pointer; } /* the whole pill is the checkbox */
@@ -2112,8 +2116,9 @@ dialog.modal.template-sheet { width: 100%; max-width: none; margin: auto 0 0; bo
 .job-body a { color: var(--ink-link); font-size: 13px; text-decoration-color: rgb(var(--tint) / .3); text-underline-offset: 2px; }
 /* Library card actions: the clip actions on one row with Delete at its end; the verdict buttons sit together in their own block below. */
 .library .card .actions .danger { order: 1; margin-left: auto; }
-.library .card .actions .verdict-buttons { display: flex; flex-basis: 100%; gap: 6px; }
-.library .card .actions .verdict-buttons button { flex: 1; min-width: 0; padding: 0 4px; white-space: nowrap; } /* three marks fit the smallest card */
+.library .card .actions .verdict-buttons { display: flex; flex-basis: 100%; gap: 4px; }
+.library .card .actions .verdict-buttons button { flex: auto; min-width: 0; padding: 0 4px; white-space: nowrap; } /* sized by their words, so the Fail label fits the smallest card */
+.library .lib-card > .verdict-marks { margin-top: auto; padding-top: 8px; } /* at the card's foot, so the marks line up across a row */
 
 /* Library results: hover border, the hover checkbox and floating selection bar, the list rows, the loading skeleton, and the phone layout. */
 .library .card { transition: border-color .15s, box-shadow .15s; }
@@ -2204,6 +2209,7 @@ dialog.modal.verdict-guide { width: min(40rem, calc(100vw - 2rem)); }
 .verdict-guide .verdict-guide-marks { grid-template-columns: max-content 1fr; column-gap: 16px; }
 .verdict-guide .muted { margin: 8px 0 0; }
 .library-sub .link-button { margin-left: 6px; }
+@media (max-width: 599.98px) { .library-sub .link-button { display: block; margin: 4px 0 0; } } /* on its own line, flush with the subtitle, rather than wrapped with an indent */
 
 /* The Library grid card, media first: a fixed 4:5 frame so rows line up, the result contained in it, its type and length bottom left, the mark top
    right, the actions bottom right on hover (always on touch), two short lines below and the marks for whoever may edit. */
@@ -2230,9 +2236,9 @@ dialog.modal.verdict-guide { width: min(40rem, calc(100vw - 2rem)); }
 .lib-info p { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lib-title { color: var(--ink-strong); font-size: 13px; line-height: 18px; font-weight: 600; }
 /* A long name gives way, never the cost. */
-.lib-info .lib-meta { display: flex; flex-wrap: wrap; column-gap: 4px; white-space: normal; color: var(--text-muted); font-size: 12px; line-height: 17px; }
-.lib-who { min-width: 0; overflow-wrap: anywhere; }
-.lib-meta > span:last-child { flex: none; }
+.lib-info .lib-meta { display: flex; column-gap: 4px; color: var(--text-muted); font-size: 12px; line-height: 17px; }
+.lib-who { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.lib-meta > span:not(.lib-who) { flex: none; }
 .lib-mark.featured { background: var(--favorite); color: var(--on-ink); }
 
 /* The detail view's recipe: a wider side column with the words, the inputs and a label/value list of how the result was made. */

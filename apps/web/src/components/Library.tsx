@@ -302,9 +302,11 @@ function ClipCard({ clip, view, select, onChange, onDeleted, onOpen }: { clip: C
       <div className="lib-info">
         <p className="lib-title">{clip.modelLabel}</p>
         <p className="lib-meta">
-          <span className="lib-who">
-            {clip.creator.name} · {fmtShort(clip.createdAt)} ·
+          {/* One line on every card size: a long name is cut, never the time or the cost, so the marks below line up across a row. */}
+          <span className="lib-who" title={clip.creator.name}>
+            {clip.creator.name}
           </span>
+          <span>· {fmtShort(clip.createdAt)} ·</span>
           <span title={clip.costFinal ? 'Chi phí thật' : 'Chi phí thật, tạm tính'}>
             ${clip.costUsd}
             {!clip.costFinal && '*'}

@@ -209,7 +209,7 @@ function UserRow({ user, team, onEdit }: { user: User; team: string; onEdit: () 
         </div>
       </td>
       <td data-label="Vai trò">
-        <span className={user.role === 'admin' ? 'role admin' : 'role'}>{user.role === 'admin' ? 'Admin' : 'Thành viên'}</span>
+        <span className="role" data-role={user.role}>{user.role === 'admin' ? 'Admin' : 'Thành viên'}</span>
         {user.role !== 'admin' && user.canEditTemplates && <span className="tag">Biên tập mẫu</span>}
       </td>
       <td data-label="Nhóm">{team}</td>
