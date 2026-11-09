@@ -59,14 +59,17 @@ function Field({ label, unit, hint, value, onChange, numeric = false }: { label:
   );
 }
 
+/** A stored amount as a person types it ("100000.0000" shows as 100000); the server pads it again on save. */
+const plain = (usd: string) => String(Number(usd));
+
 function SettingsForm({ settings, reload }: { settings: Settings; reload: () => void }) {
   const { problem, pending, run } = useAction(reload);
-  const [monthly, setMonthly] = useState(settings.monthlyCapUsd);
+  const [monthly, setMonthly] = useState(plain(settings.monthlyCapUsd));
   const [daily, setDaily] = useState(String(settings.memberDailyClipCap));
-  const [features, setFeatures] = useState(settings.featuresMonthlyCapUsd);
-  const [memberDay, setMemberDay] = useState(settings.memberDailyUsdCap);
-  const [memberMonth, setMemberMonth] = useState(settings.memberMonthlyUsdCap);
-  const [warning, setWarning] = useState(settings.balanceWarningUsd);
+  const [features, setFeatures] = useState(plain(settings.featuresMonthlyCapUsd));
+  const [memberDay, setMemberDay] = useState(plain(settings.memberDailyUsdCap));
+  const [memberMonth, setMemberMonth] = useState(plain(settings.memberMonthlyUsdCap));
+  const [warning, setWarning] = useState(plain(settings.balanceWarningUsd));
   const softOf = (s: Settings) => Object.fromEntries(s.featureCaps.map((c) => [c.feature, c.monthlyUsd]));
   const enabledOf = (s: Settings) => Object.fromEntries(s.models.map((m) => [m.id, m.enabled]));
   const [soft, setSoft] = useState(() => softOf(settings));
@@ -97,12 +100,12 @@ function SettingsForm({ settings, reload }: { settings: Settings; reload: () => 
     });
 
   function undo() {
-    setMonthly(settings.monthlyCapUsd);
+    setMonthly(plain(settings.monthlyCapUsd));
     setDaily(String(settings.memberDailyClipCap));
-    setFeatures(settings.featuresMonthlyCapUsd);
-    setMemberDay(settings.memberDailyUsdCap);
-    setMemberMonth(settings.memberMonthlyUsdCap);
-    setWarning(settings.balanceWarningUsd);
+    setFeatures(plain(settings.featuresMonthlyCapUsd));
+    setMemberDay(plain(settings.memberDailyUsdCap));
+    setMemberMonth(plain(settings.memberMonthlyUsdCap));
+    setWarning(plain(settings.balanceWarningUsd));
     setSoft(softOf(settings));
     setEnabled(enabledOf(settings));
     setVertex(vertexOf(settings));
@@ -152,7 +155,7 @@ function SettingsForm({ settings, reload }: { settings: Settings; reload: () => 
             onChange={setMonthly}
             hint="Trần chung của cả công ty. Chạm mức (tính cả tiền đang tạm giữ) thì không ai bấm Tạo video được tới ngày 1 tháng sau. 200 USD ≈ 350 clip Kling 5 giây."
           />
-          <Field label="Số clip tối đa mỗi Member mỗi ngày" unit="clip" numeric value={daily} onChange={setDaily} hint="Clip lỗi không mất tiền thì không tính." />
+          <Field label="Số clip tối đa mỗi thành viên mỗi ngày" unit="clip" numeric value={daily} onChange={setDaily} hint="Clip lỗi không mất tiền thì không tính." />
         </div>
       </fieldset>
       <fieldset>
@@ -160,8 +163,8 @@ function SettingsForm({ settings, reload }: { settings: Settings; reload: () => 
         <p className="muted">Thử đồ, Tạo ảnh và các Ứng dụng ảnh; tách riêng khỏi ngân sách video, không tính video.</p>
         <div className="fields">
           <Field label="Ngân sách tháng cho ảnh và ứng dụng" unit="USD" value={features} onChange={setFeatures} hint="Trần chung của cả công ty. Chạm mức thì các trang này không bấm Tạo được tới ngày 1 tháng sau." />
-          <Field label="Hạn mức mỗi Member mỗi ngày" unit="USD" value={memberDay} onChange={setMemberDay} />
-          <Field label="Hạn mức mỗi Member mỗi tháng" unit="USD" value={memberMonth} onChange={setMemberMonth} />
+          <Field label="Hạn mức mỗi thành viên mỗi ngày" unit="USD" value={memberDay} onChange={setMemberDay} />
+          <Field label="Hạn mức mỗi thành viên mỗi tháng" unit="USD" value={memberMonth} onChange={setMemberMonth} />
         </div>
       </fieldset>
       <fieldset>

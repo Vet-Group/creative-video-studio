@@ -253,6 +253,7 @@ test('a saved Settings change clears the save bar and says it was saved', async 
   await page.goto('/admin/settings');
   const budget = page.getByLabel('Ngân sách tháng cho video (USD)');
   const before = await budget.inputValue();
+  expect(before).toMatch(/^\d+(\.\d{1,3})?$/); // shown as typed, not the stored "250.0000"
   const bar = page.getByRole('region', { name: 'Lưu cài đặt' });
   await expect(bar).toHaveCount(0);
   try {
