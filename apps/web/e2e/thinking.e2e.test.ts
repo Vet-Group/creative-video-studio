@@ -18,13 +18,13 @@ test('Image Generation offers the thinking level only on a model that lists one,
     await route.fulfill({ response: res, json: body });
   });
   await page.goto('/image-generation');
-  const bar = page.getByRole('group', { name: 'Thanh tạo ảnh' });
+  const form = page.locator('.form-card');
   const thinking = select(page, 'Mức suy luận');
   await expect(modelButton(page)).toContainText('Mock image E2E');
   await expect(thinking).toHaveCount(0);
 
   await pickModel(page, /Mock image Solo/);
-  const cost = bar.getByRole('button', { name: /^Tạo ảnh/ }).locator('.run-cost');
+  const cost = form.getByRole('button', { name: /^Tạo ảnh/ }).locator('.run-cost');
   await expect(thinking).toHaveAttribute('data-value', 'minimal');
   await expect(cost).toHaveText('· $0.0400');
   await thinking.click();
@@ -36,9 +36,9 @@ test('Image Generation offers the thinking level only on a model that lists one,
   await expect(thinking).toHaveAttribute('data-value', 'high');
   await expect(cost).toHaveText('· $0.0618');
 
-  await bar.getByRole('textbox', { name: 'Mô tả cảnh bạn muốn tạo' }).fill('a linen dress on a hanger');
+  await form.getByRole('textbox', { name: 'Mô tả', exact: true }).fill('a linen dress on a hanger');
   const sent = page.waitForResponse((r) => r.url().endsWith('/api/jobs') && r.request().method() === 'POST');
-  await bar.getByRole('button', { name: /^Tạo ảnh/ }).click();
+  await form.getByRole('button', { name: /^Tạo ảnh/ }).click();
   const res = await sent;
   expect(res.status()).toBe(201);
   expect(res.request().postDataJSON()).toMatchObject({ modelId: 'mock-image-solo', params: { resolution: '1K', thinking: 'high' } });

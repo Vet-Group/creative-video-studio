@@ -1,45 +1,44 @@
 'use client';
-// Image Generation: tabs over the gallery of the company's images (or History, or About), and a floating prompt bar pinned to the bottom of the content area
-// with an upload tile, the prompt, the model, ratio and resolution pills, and Run. Every pill is a Select or the model picker, so each works by keyboard.
-import { useRef, useState } from 'react';
+// Image Generation: a settings card (reference images, style, model, prompt, ratio, resolution, Enhance, the brand kit) beside the History, Examples and
+// About tabs, laid out like Try On and Create. Run posts an image job.
+import { useId, useState } from 'react';
 import { api, errorText, sendJson } from '@/lib/api';
 import { ABOUT } from '@/lib/about-content';
 import { promptTooLong } from '@/lib/prompt-limit';
-import { confirmRun, runKey } from '@/lib/run-guard';
-import { useHydrated } from '@/lib/use-hydrated';
+import { confirmRun } from '@/lib/run-guard';
+import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { useRecall } from '@/lib/use-recall';
 import { About } from './About';
 import { BrandPicker } from './BrandKit';
-import { copyError, Gallery, type Img, photoImg, RATIO_LABEL, THINKING_LABEL, UploadedPhotos, uploadError, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
+import { copyError, Gallery, type Img, LockedFields, photoImg, RATIO_LABEL, Slot, THINKING_LABEL, uploadError, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
 import { EnhanceToggle } from './EnhanceToggle';
-import { Icon } from './Icon';
 import { FormContext, type Photo, useApplier, useJobs } from './jobs';
 import { ModelPicker } from './ModelPicker';
-import { PromptTools } from './PromptTools';
+import { PromptComposer } from './PromptComposer';
 import { Select } from './Select';
 import { Tray } from './Shell';
 import { StylePicker } from './StylePicker';
 import { Templates } from './Templates';
 import { PageHint } from './ToolGuide';
 
-type Tab = 'history' | 'examples' | 'about';
-const TAB_LABEL: Record<Tab, string> = { history: 'Lịch sử', examples: 'Ví dụ', about: 'Giới thiệu' };
-const TABS: Tab[] = ['history', 'examples', 'about'];
+type Tab = 'create' | 'history' | 'examples' | 'about';
+const TAB_LABEL: Record<Tab, string> = { create: 'Tạo', history: 'Lịch sử', examples: 'Ví dụ', about: 'Giới thiệu' };
 
 export function ImageGeneration({ reuse, model }: { reuse?: string; model?: string }) {
   const { refresh, notify, loading } = useJobs();
-  const hydrated = useHydrated();
+  const narrow = useMediaQuery(NARROW);
   const [images, setImages] = useState<Img[]>([]);
   const [prompt, setPrompt] = useState('');
   const [styleId, setStyleId] = useState(''); // '' for no style
   const [enhance, setEnhance] = useState(true); // on by default, as on Fash
   const [storeId, setStoreId] = useState('');
   const [useBrand, setUseBrand] = useState(false); // the chosen store's brand kit, added to the prompt on the server
-  const [tab, setTab] = useState<Tab>('examples');
+  const [tab, setTab] = useState<Tab | null>(null); // null: the default for the width (Create below 1024 px, else Examples)
+  const opening: Tab = 'examples';
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const input = useRef<HTMLInputElement>(null);
+  const promptId = useId();
   const { models, failed } = useImageModels('image');
   const pick = useImageChoice(models, Math.max(1, images.length), model); // Explore's model card picks the model
   // The member's last model and settings, unless a refill or Explore's model card opens the page.
@@ -109,7 +108,7 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
   const canRun = reason === null && !busy;
   // With no image and a model that needs one, the best model that makes pictures from words is one click away (not switched to silently: its price differs).
   const wordsModel = chosen && images.length === 0 && !chosen.textToImage ? models?.filter((m) => m.textToImage).sort((a, b) => b.score - a.score)[0] : undefined;
-  // The bar has no counter, as on the live page, until the text nears the model's limit (or is over it after a switch).
+  // Over Run too once the text nears the model's limit (or is over it after a switch).
   const count = chosen && prompt.length >= chosen.maxPromptChars * 0.8 ? `${prompt.length}/${chosen.maxPromptChars} ký tự` : null;
 
   async function upload(files: File[]) {
@@ -138,7 +137,7 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
       const body = { feature: 'image', modelId: pick.modelId, assetIds: images.map((i) => i.id), prompt: prompt.trim(), ...(styleId && { presetId: styleId }), enhance, ratio: pick.ratio, storeId: storeId || null, useBrand, params: { resolution: pick.resolution, ...(pick.thinking && { thinking: pick.thinking }) } };
       await api('/api/jobs', sendJson('POST', body));
       setNotice('Đã gửi lượt tạo. Theo dõi trong tab "Lịch sử".');
-      setTab('history');
+      if (!narrow) setTab('history');
       await refresh();
     } catch (e) {
       setError(errorText(e, 'Không gửi được lượt tạo, hãy thử lại.'));
@@ -147,71 +146,55 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
     }
   }
 
+  const tabs: Tab[] = narrow ? ['create', 'history', 'examples', 'about'] : ['history', 'examples', 'about'];
+  const shown: Tab = narrow ? (tab ?? 'create') : tab === null || tab === 'create' ? opening : tab;
+  const panel = shown === 'create' ? 'history' : shown;
+
   return (
-    <section aria-labelledby="imagegen-title" className="imagegen">
+    <section aria-labelledby="imagegen-title" className="create">
       <h1 id="imagegen-title" className="sr-only">
         Tạo ảnh
       </h1>
-      <PageHint href="/image-generation" />
-      {/* Above the tabs: the gallery's size slider is pulled up into the tabs row, over whatever sits between the tabs and the gallery. */}
-      <BrandPicker storeId={storeId} onStore={(v) => (recall.touch(), setStoreId(v))} on={useBrand} onToggle={(v) => (recall.touch(), setUseBrand(v))} />
-      <WorkTabs prefix="imagegen" tabs={TABS} labels={TAB_LABEL} shown={tab} onSelect={setTab} />
-      {/* Above the gallery, not in the prompt bar, which keeps Fash's one-row height. */}
-      <Templates feature="image" data={() => ({ images: images.map((i) => i.id), prompt: prompt.trim(), presetId: styleId, enhance, ratio: pick.ratio, resolution: pick.resolution, modelId: pick.modelId })} />
-      <div className="imagegen-side" id={`imagegen-panel-${tab}`} role="tabpanel" aria-labelledby={`imagegen-tab-${tab}`}>
-        <FormContext.Provider value={{ recreate: (from) => (recall.touch(), recreate(from)), apply, photo: (p) => void take(p), prompt: (text) => (setPrompt(text), notify('Đã chép mô tả')), result: (p) => void take(p) }}>
-          {tab === 'examples' ? <Gallery kind="image" samples="image-example-" label="Ảnh của công ty" emptyText="Chưa có ảnh nào trong công ty. Hãy tạo ảnh đầu tiên bên dưới." /> : tab === 'about' ? <About page={ABOUT.image} /> : <Tray feature="image" />}
-        </FormContext.Provider>
-      </div>
+      <div className="create-grid">
+        <WorkTabs prefix="imagegen" tabs={tabs} labels={TAB_LABEL} shown={shown} onSelect={setTab} />
 
-      <div className="imagebar" role="group" aria-label="Thanh tạo ảnh" onPointerDownCapture={recall.touch} onKeyDownCapture={recall.touch}>
-        <div className="imagebar-top">
-          <input
-            ref={input}
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            multiple
-            hidden
-            aria-label="Ảnh tham chiếu"
-            disabled={!hydrated}
-            onChange={(e) => {
-              const files = [...(e.target.files ?? [])];
-              e.target.value = '';
-              void upload(files);
-            }}
-          />
-          <ul className="bar-thumbs" aria-label="Ảnh đã chọn">
-            {images.map((i) => (
-              <li key={i.id}>
-                <img src={`/api/assets/${i.id}/content`} alt={i.filename} />
-                <button type="button" aria-label={`Bỏ ảnh ${i.filename}`} onClick={() => setImages((cur) => cur.filter((x) => x.id !== i.id))}>
-                  <Icon name="x" size={12} />
-                </button>
-              </li>
-            ))}
-            {images.length < max && (
-              <li>
-                <button type="button" className="bar-add" aria-label="Thêm ảnh tham chiếu" disabled={!hydrated || busy} onClick={() => input.current?.click()}>
-                  <Icon name="plus" size={16} />
-                </button>
-              </li>
+        <div className="card form-card" id="imagegen-panel-create" role={narrow ? 'tabpanel' : undefined} aria-labelledby={narrow ? 'imagegen-tab-create' : undefined} hidden={narrow && shown !== 'create'} onPointerDownCapture={recall.touch} onKeyDownCapture={recall.touch}>
+          <div className="form-scroll">
+            <PageHint href="/image-generation" />
+            <Slot label="Ảnh tham chiếu" optional empty={`Tối đa ${max} ảnh tham chiếu`} inputLabel="Ảnh tham chiếu" images={images} max={max} busy={busy} onAdd={(files) => void upload(files)} onRemove={(id) => setImages((cur) => cur.filter((x) => x.id !== id))} onPick={(img) => setImages((cur) => (cur.length < max ? [...cur, img] : cur))} storeId={storeId} />
+            {/* In a field for the form's spacing; the chip names itself, so it has no label above it. */}
+            <div className="field">
+              <StylePicker value={styleId} onChange={setStyleId} />
+            </div>
+            {models && models.length > 0 && <ModelPicker models={pick.options} value={pick.modelId} onChange={pick.setModelId} />}
+
+            <PromptComposer
+              id={promptId}
+              label="Mô tả"
+              feature="image"
+              value={prompt}
+              onChange={setPrompt}
+              maxLength={chosen?.maxPromptChars}
+              onRun={() => canRun && void run()}
+              placeholder="Mô tả cảnh bạn muốn tạo…"
+              ask={chosen ? () => ({ field: 'prompt', feature: 'image', text: prompt, room: chosen.maxPromptChars, model: chosen.id }) : null}
+            />
+
+            {models !== null && !failed && !chosen && <LockedFields />}
+            {chosen && (
+              <>
+                <Select label="Tỉ lệ" icon="ratio" heading="Chọn tỉ lệ" value={pick.ratio} options={chosen.ratios.map((r) => ({ value: r, label: RATIO_LABEL[r] ?? r }))} onChange={pick.setRatio} />
+                <Select label="Độ phân giải" icon="preset" heading="Chọn độ phân giải" value={pick.resolution} options={chosen.resolutions.map((r) => ({ value: r, label: r }))} onChange={pick.setResolution} />
+                {pick.thinking && <Select label="Mức suy luận" icon="sliders" heading="Chọn mức suy luận" value={pick.thinking} options={chosen.thinking.map((t) => ({ value: t, label: THINKING_LABEL[t] ?? t }))} onChange={pick.setThinking} />}
+              </>
             )}
-            {images.length < max && (
-              <li>
-                <UploadedPhotos className="bar-add" name="Ảnh đã tải" taken={images} disabled={!hydrated || busy} storeId={storeId} onPick={(img) => setImages((cur) => (cur.length < max ? [...cur, img] : cur))}>
-                  <Icon name="library" size={16} />
-                </UploadedPhotos>
-              </li>
-            )}
-          </ul>
-          {/* In the top row, beside the inputs: the bottom row has no room left for another pill. */}
-          <StylePicker value={styleId} onChange={setStyleId} />
-          <textarea aria-label="Mô tả cảnh bạn muốn tạo" placeholder="Mô tả cảnh bạn muốn tạo…" value={prompt} maxLength={chosen?.maxPromptChars} rows={2} onChange={(e) => setPrompt(e.target.value)} onKeyDown={runKey(() => canRun && void run())} />
-          <PromptTools compact feature="image" value={prompt} onChange={setPrompt} maxLength={chosen?.maxPromptChars} onRun={() => canRun && void run()} ask={chosen ? () => ({ field: 'prompt', feature: 'image', text: prompt, room: chosen.maxPromptChars, model: chosen.id }) : null} />
-        </div>
-        {(reason || error || notice || count || pick.note) && (
-          <div className="bar-message">
-            {count && <p className="help bar-count">{count}</p>}
+            <EnhanceToggle on={enhance} onChange={setEnhance} />
+            <BrandPicker storeId={storeId} onStore={(v) => (recall.touch(), setStoreId(v))} on={useBrand} onToggle={(v) => (recall.touch(), setUseBrand(v))} />
+            <Templates feature="image" data={() => ({ images: images.map((i) => i.id), prompt: prompt.trim(), presetId: styleId, enhance, ratio: pick.ratio, resolution: pick.resolution, modelId: pick.modelId })} />
+          </div>
+
+          <div className="form-message">
+            {count && <p className="help">{count}</p>}
             {reason && (
               <p className="help" id="imagegen-reason" role="status">
                 {reason}
@@ -230,33 +213,18 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
             {pick.note && <p className="help" role="status">{pick.note}</p>}
             {notice && <p role="status">{notice}</p>}
           </div>
-        )}
-        <div className="imagebar-bottom">
-          <div className="pills">
-            {models && models.length > 0 && <ModelPicker models={pick.options} value={pick.modelId} onChange={pick.setModelId} />}
-            {models !== null && !failed && !chosen && (
-              <span className="locked-pills" aria-hidden="true">
-                {([['Chưa bật mô hình', 'image'], ['Tỉ lệ', 'ratio'], ['Độ phân giải', 'preset']] as const).map(([label, icon]) => (
-                  <span key={label} className="select-trigger locked">
-                    <Icon name={icon} />
-                    {label}
-                  </span>
-                ))}
-              </span>
-            )}
-            {chosen && (
-              <>
-                <Select label="Tỉ lệ" icon="ratio" heading="Chọn tỉ lệ" value={pick.ratio} options={chosen.ratios.map((r) => ({ value: r, label: RATIO_LABEL[r] ?? r }))} onChange={pick.setRatio} />
-                <Select label="Độ phân giải" icon="preset" heading="Chọn độ phân giải" value={pick.resolution} options={chosen.resolutions.map((r) => ({ value: r, label: r }))} onChange={pick.setResolution} />
-                {pick.thinking && <Select label="Mức suy luận" icon="sliders" heading="Chọn mức suy luận" value={pick.thinking} options={chosen.thinking.map((t) => ({ value: t, label: THINKING_LABEL[t] ?? t }))} onChange={pick.setThinking} />}
-              </>
-            )}
+          <div className="runbar">
+            <button type="button" className="primary run" disabled={!canRun} aria-describedby={reason ? 'imagegen-reason' : undefined} onClick={() => void run()}>
+              Tạo ảnh
+              {pick.estimate !== undefined && <span className="run-cost">· ${pick.estimate}</span>}
+            </button>
           </div>
-          <EnhanceToggle on={enhance} onChange={setEnhance} />
-          <button type="button" className="primary bar-run" disabled={!canRun} aria-describedby={reason ? 'imagegen-reason' : undefined} onClick={() => void run()}>
-            Tạo ảnh
-            {pick.estimate !== undefined && <span className="run-cost">· ${pick.estimate}</span>}
-          </button>
+        </div>
+
+        <div className="side" id={`imagegen-panel-${panel}`} role="tabpanel" aria-labelledby={`imagegen-tab-${panel}`} hidden={narrow && shown === 'create'}>
+          <FormContext.Provider value={{ recreate: (from) => (recall.touch(), recreate(from), narrow && setTab('create')), apply, photo: (p) => void take(p), prompt: (text) => (setPrompt(text), notify('Đã chép mô tả')), result: (p) => void take(p) }}>
+            {shown === 'examples' ? <Gallery kind="image" samples="image-example-" label="Ảnh của công ty" emptyText="Chưa có ảnh nào trong công ty. Hãy tạo ảnh đầu tiên." /> : shown === 'about' ? <About page={ABOUT.image} /> : <Tray feature="image" />}
+          </FormContext.Provider>
         </div>
       </div>
     </section>

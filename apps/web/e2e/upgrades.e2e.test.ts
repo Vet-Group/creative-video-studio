@@ -30,9 +30,9 @@ async function answer(page: Page, question: string, yes: boolean) {
   await expect(confirm).toBeHidden();
 }
 
-const bar = (page: Page) => page.getByRole('group', { name: 'Thanh tạo ảnh' });
-const barPrompt = (page: Page) => bar(page).getByRole('textbox', { name: 'Mô tả cảnh bạn muốn tạo' });
-const barRun = (page: Page) => bar(page).getByRole('button', { name: /^Tạo ảnh/ });
+const form = (page: Page) => page.locator('.form-card');
+const formPrompt = (page: Page) => form(page).getByRole('textbox', { name: 'Mô tả', exact: true });
+const formRun = (page: Page) => form(page).getByRole('button', { name: /^Tạo ảnh/ });
 
 test('AC 11: Image Generation asks before a Run of 1 USD or more; No sends nothing, Yes sends one job, and a cheaper Run does not ask', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
@@ -41,24 +41,24 @@ test('AC 11: Image Generation asks before a Run of 1 USD or more; No sends nothi
   await priceImages(page, '1.2000');
   await page.goto('/image-generation');
   await expect(modelButton(page)).toContainText('Mock image E2E');
-  await barPrompt(page).fill('a guarded picture');
-  await expect(barRun(page)).toContainText('$1.2000');
+  await formPrompt(page).fill('a guarded picture');
+  await expect(formRun(page)).toContainText('$1.2000');
 
-  await barRun(page).click();
+  await formRun(page).click();
   await answer(page, 'Tạo lượt này với giá $1.2000?', false);
-  await expect(barRun(page)).toBeEnabled();
+  await expect(formRun(page)).toBeEnabled();
   expect(posts()).toBe(0);
 
-  await barRun(page).click();
+  await formRun(page).click();
   await answer(page, 'Tạo lượt này với giá $1.2000?', true);
   await expect(page.getByText('Đã gửi lượt tạo')).toBeVisible();
   expect(posts()).toBe(1);
 
   await priceImages(page, '0.5000');
   await page.reload();
-  await barPrompt(page).fill('a cheap picture');
-  await expect(barRun(page)).toContainText('$0.5000');
-  await barRun(page).click();
+  await formPrompt(page).fill('a cheap picture');
+  await expect(formRun(page)).toContainText('$0.5000');
+  await formRun(page).click();
   await expect(page.getByText('Đã gửi lượt tạo')).toBeVisible();
   expect(posts()).toBe(2);
   await expect(page.locator('dialog.confirm[open]'), 'no question under 1 USD').toHaveCount(0);
@@ -146,23 +146,23 @@ test('AC 12: Ctrl+Enter in the prompt runs once, Enter alone does not, and at 1.
   await signIn(page, 'upgb');
   await page.goto('/image-generation');
   await expect(modelButton(page)).toContainText('Mock image E2E');
-  await barPrompt(page).fill('keyboard picture');
-  await barPrompt(page).press('Enter');
-  await expect(barPrompt(page)).toHaveValue('keyboard picture\n');
+  await formPrompt(page).fill('keyboard picture');
+  await formPrompt(page).press('Enter');
+  await expect(formPrompt(page)).toHaveValue('keyboard picture\n');
   expect(posts()).toBe(0);
   // Run waits for hydration and for the remembered settings to load, which a loaded machine makes slow.
-  await expect(barRun(page)).toBeEnabled();
-  await barPrompt(page).press('Control+Enter');
+  await expect(formRun(page)).toBeEnabled();
+  await formPrompt(page).press('Control+Enter');
   await expect(page.getByText('Đã gửi lượt tạo')).toBeVisible();
   expect(posts()).toBe(1);
 
   await priceImages(page, '1.2000');
   await page.reload();
-  await barPrompt(page).fill('keyboard costly picture');
-  await expect(barRun(page)).toContainText('$1.2000');
+  await formPrompt(page).fill('keyboard costly picture');
+  await expect(formRun(page)).toContainText('$1.2000');
   // The same wait as above: after the reload Run is locked again until the remembered settings load, and Ctrl+Enter on a locked Run does nothing.
-  await expect(barRun(page)).toBeEnabled();
-  await barPrompt(page).press('Control+Enter');
+  await expect(formRun(page)).toBeEnabled();
+  await formPrompt(page).press('Control+Enter');
   await answer(page, 'Tạo lượt này với giá $1.2000?', false);
   expect(posts()).toBe(1);
   await page.unrouteAll({ behavior: 'ignoreErrors' });
@@ -174,19 +174,19 @@ test('AC 13: Mô tả gần đây lists the last own words of the page, newest f
   await signIn(page, 'upgc');
   await page.goto('/image-generation');
   await expect(modelButton(page)).toContainText('Mock image E2E');
-  await expect(bar(page).getByRole('button', { name: 'Mô tả gần đây' })).toHaveCount(0); // nothing run yet
+  await expect(form(page).getByRole('button', { name: 'Mô tả gần đây' })).toHaveCount(0); // nothing run yet
   for (const [i, words] of ['first picture words', 'second picture words'].entries()) {
-    await barPrompt(page).fill(words);
-    await barRun(page).click();
+    await formPrompt(page).fill(words);
+    await formRun(page).click();
     await expect.poll(posts).toBe(i + 1);
-    await expect(barRun(page)).toBeEnabled(); // the job is in
+    await expect(formRun(page)).toBeEnabled(); // the job is in
   }
-  await barPrompt(page).fill('');
-  await bar(page).getByRole('button', { name: 'Mô tả gần đây' }).click();
+  await formPrompt(page).fill('');
+  await form(page).getByRole('button', { name: 'Mô tả gần đây' }).click();
   const list = page.getByRole('group', { name: 'Mô tả gần đây' }).getByRole('button');
   await expect(list).toHaveText(['second picture words', 'first picture words']);
   await list.filter({ hasText: 'first picture words' }).click();
-  await expect(barPrompt(page)).toHaveValue('first picture words');
+  await expect(formPrompt(page)).toHaveValue('first picture words');
   await expect(page.getByRole('group', { name: 'Mô tả gần đây' })).toHaveCount(0);
 
   await page.goto('/try-on');
@@ -214,23 +214,23 @@ test('AC 14: the prompt box grows with the text up to a cap and then scrolls, an
   await page.setViewportSize({ width: 1440, height: 1000 });
   await signIn(page, 'upgb');
   const text = Array.from({ length: 40 }, (_, i) => `line ${i + 1}`).join('\n');
-  const size = () => barPrompt(page).evaluate((t: HTMLTextAreaElement) => ({ h: t.clientHeight, sh: t.scrollHeight, offset: t.offsetHeight }));
+  const size = () => formPrompt(page).evaluate((t: HTMLTextAreaElement) => ({ h: t.clientHeight, sh: t.scrollHeight, offset: t.offsetHeight }));
 
   await page.goto('/image-generation');
   const short = await size();
-  expect(short.offset).toBe(56); // empty, the bar keeps its one-row height
-  await barPrompt(page).fill(text);
+  expect(short.offset).toBe(76); // the composer's start, under four lines
+  await formPrompt(page).fill(text);
   const tall = await size();
-  expect(tall.offset).toBeGreaterThan(56);
-  expect(tall.offset).toBeLessThanOrEqual(400); // 40% of the 1000 px viewport
+  expect(tall.offset).toBeGreaterThan(76);
+  expect(tall.offset).toBeLessThanOrEqual(500); // 50% of the viewport
   expect(tall.sh).toBeGreaterThan(tall.h);
-  await bar(page).getByRole('button', { name: 'Mở rộng' }).click();
+  await form(page).getByRole('button', { name: 'Mở rộng' }).click();
   const editor = page.getByRole('dialog', { name: 'Sửa mô tả' });
   await expect(editor.getByRole('textbox', { name: 'Mô tả mở rộng' })).toHaveValue(text);
   await editor.getByRole('textbox', { name: 'Mô tả mở rộng' }).fill('edited in the big box');
   await expect(editor.locator('.help')).toHaveText('21/2000');
   await editor.getByRole('button', { name: 'Đóng' }).click();
-  await expect(barPrompt(page)).toHaveValue('edited in the big box');
+  await expect(formPrompt(page)).toHaveValue('edited in the big box');
 
   await page.goto('/try-on');
   await expect(modelButton(page)).toContainText('Mock image E2E');
@@ -256,10 +256,10 @@ test('AC 15: the Library downloads two picked results as one zip, and refuses a 
   await page.goto('/image-generation');
   await expect(modelButton(page)).toContainText('Mock image E2E');
   for (const [i, words] of ['zip picture one', 'zip picture two', 'zip picture three'].entries()) {
-    await barPrompt(page).fill(words);
-    await barRun(page).click();
+    await formPrompt(page).fill(words);
+    await formRun(page).click();
     await expect.poll(posts).toBe(i + 1);
-    await expect(barRun(page)).toBeEnabled();
+    await expect(formRun(page)).toBeEnabled();
   }
   const mine = async () => ((await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { id: string; status: string }[] }).jobs;
   await expect.poll(async () => (await mine()).filter((j) => j.status === 'succeeded').length, { timeout: 120_000 }).toBe(3);

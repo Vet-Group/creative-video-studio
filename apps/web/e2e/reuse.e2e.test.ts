@@ -76,7 +76,7 @@ test('the reuse link refills Try On (person, garments, background, text, model, 
   // Image Generation: the images, the member's prompt and Enhance off.
   const image = await post({ feature: 'image', modelId: 'mock-image-e2e', assetIds: [g1], ratio: '1:1', prompt: 'a studio shot', enhance: false, params: { resolution: '1K' } });
   await page.goto(`/image-generation?reuse=${image}`);
-  await expect(page.getByRole('textbox', { name: 'Mô tả cảnh bạn muốn tạo' })).toHaveValue('a studio shot');
+  await expect(page.getByRole('textbox', { name: 'Mô tả', exact: true })).toHaveValue('a studio shot');
   await expect(page.getByRole('img', { name: 'g1.png' })).toBeVisible();
   await expect(select(page, 'Tỉ lệ')).toHaveAttribute('data-value', '1:1');
 

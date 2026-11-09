@@ -211,13 +211,13 @@ test('Image Generation, as on Fash: a sample picture with a details file opens i
     await expect(detail.getByRole('heading', { name: 'Mock image E2E' })).toBeVisible();
     await expect(detail.locator('.job-text')).toHaveText(details.prompt);
     await expect(detail.locator('.job-chips')).toHaveText('2K3:4');
-    const chosen = page.getByRole('list', { name: 'Ảnh đã chọn' });
+    const chosen = page.getByRole('list', { name: 'Ảnh tham chiếu: ảnh đã chọn' });
     await detail.getByRole('button', { name: 'Ảnh đầu vào 1' }).click();
     await expect(chosen.getByRole('img', { name: 'image-example-1-input-1.png' })).toBeVisible();
     await detail.getByRole('button', { name: 'Dùng kết quả' }).click(); // the result as one more input
     await expect(chosen.getByRole('img')).toHaveCount(2);
     await detail.getByRole('button', { name: 'Dùng lại' }).click();
-    await expect(page.getByRole('textbox', { name: 'Mô tả cảnh bạn muốn tạo' })).toHaveValue(details.prompt);
+    await expect(page.getByRole('textbox', { name: 'Mô tả', exact: true })).toHaveValue(details.prompt);
     await expect(chosen.getByRole('img')).toHaveCount(1); // Recreate refills: the sample's own input only
     await expect(page).toHaveURL(/\/image-generation$/);
 
@@ -229,29 +229,29 @@ test('Image Generation, as on Fash: a sample picture with a details file opens i
     await expect(tile.getByRole('link', { name: 'Tải xuống' })).toHaveAttribute('href', '/api/samples/image-example-1.jpg');
     await tile.getByRole('button', { name: 'Dùng kết quả' }).click();
     await expect(chosen.getByRole('img')).toHaveCount(2);
-    await page.getByRole('textbox', { name: 'Mô tả cảnh bạn muốn tạo' }).fill('');
+    await page.getByRole('textbox', { name: 'Mô tả', exact: true }).fill('');
     await tile.hover();
     await tile.getByRole('button', { name: 'Dùng lại' }).click();
-    await expect(page.getByRole('textbox', { name: 'Mô tả cảnh bạn muốn tạo' })).toHaveValue(details.prompt);
+    await expect(page.getByRole('textbox', { name: 'Mô tả', exact: true })).toHaveValue(details.prompt);
     await expect(chosen.getByRole('img')).toHaveCount(1);
   } finally {
     await asAdmin((name) => page.request.delete(`/api/admin/samples/${name}`));
   }
 });
 
-test('Image Generation: the bar counts the prompt near the model limit, and a switch to a smaller limit keeps the text while Run waits', async ({ page }) => {
+test('Image Generation: the form counts the prompt near the model limit, and a switch to a smaller limit keeps the text while Run waits', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await signIn(page, 'imgp');
   await page.goto('/image-generation');
-  const bar = page.getByRole('group', { name: 'Thanh tạo ảnh' });
-  const run = bar.getByRole('button', { name: /^Tạo ảnh/ });
-  const prompt = bar.getByRole('textbox', { name: 'Mô tả cảnh bạn muốn tạo' });
-  const count = bar.locator('.bar-count');
-  await bar.getByLabel('Ảnh tham chiếu', { exact: true }).setInputFiles(file('reference.png'));
-  await expect(bar.getByRole('img', { name: 'reference.png' })).toBeVisible();
+  const form = page.locator('.form-card');
+  const run = form.getByRole('button', { name: /^Tạo ảnh/ });
+  const prompt = form.getByRole('textbox', { name: 'Mô tả', exact: true });
+  const count = form.locator('.form-message').getByText(/^\d+\/\d+ ký tự$/);
+  await form.getByLabel('Ảnh tham chiếu', { exact: true }).setInputFiles(file('reference.png'));
+  await expect(form.getByRole('img', { name: 'reference.png' })).toBeVisible();
   await expect(modelButton(page)).toContainText('Mock image E2E');
   await prompt.fill('x'.repeat(1500));
-  await expect(count).toHaveCount(0); // under 80% of 2000: the bar stays as on the live page
+  await expect(count).toHaveCount(0); // under 80% of 2000: nothing over Run, as on the live page
   const text = 'x'.repeat(1700);
   await prompt.fill(text);
   await expect(count).toHaveText('1700/2000 ký tự');
@@ -263,27 +263,27 @@ test('Image Generation: the bar counts the prompt near the model limit, and a sw
   await expect(prompt).toHaveValue(text);
   await expect(count).toHaveText('1700/1000 ký tự');
   await expect(run).toBeDisabled();
-  await expect(bar.getByRole('status')).toHaveText('Mô hình Mock image Solo nhận tối đa 1000 ký tự, hãy rút gọn hoặc chọn mô hình khác.');
+  await expect(form.locator('.form-message').getByRole('status')).toHaveText('Mô hình Mock image Solo nhận tối đa 1000 ký tự, hãy rút gọn hoặc chọn mô hình khác.');
 });
 
-test('Image Generation: the bar needs a prompt (and an image only on a model with no text-to-image), every pill works by keyboard, and a mock run reaches History and the Tạo ảnh chip', async ({ page, browser }) => {
+test('Image Generation: the form needs a prompt (and an image only on a model with no text-to-image), every pill works by keyboard, and a mock run reaches History and the Tạo ảnh chip', async ({ page, browser }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await signIn(page, 'member10');
   await nav(page).getByRole('link', { name: 'Tạo ảnh' }).click();
   await expect(page).toHaveURL(/\/image-generation$/);
   await expect(page.getByRole('tab', { name: 'Ví dụ' })).toHaveAttribute('aria-selected', 'true');
 
-  const bar = page.getByRole('group', { name: 'Thanh tạo ảnh' });
-  const run = bar.getByRole('button', { name: /^Tạo ảnh/ });
-  const reason = bar.getByRole('status');
+  const form = page.locator('.form-card');
+  const run = form.getByRole('button', { name: /^Tạo ảnh/ });
+  const reason = form.locator('.form-message').getByRole('status');
   await expect(modelButton(page)).toContainText('Mock image E2E');
   await expect(run).toBeDisabled();
   await expect(reason).toHaveText('Nhập mô tả cảnh bạn muốn tạo.'); // the mock model makes a picture from words alone, as Fash's text-to-image examples
-  await bar.getByRole('textbox', { name: 'Mô tả cảnh bạn muốn tạo' }).fill('a red shirt on a hanger');
+  await form.getByRole('textbox', { name: 'Mô tả', exact: true }).fill('a red shirt on a hanger');
   await expect(run).toBeEnabled();
   await expect(reason).toHaveCount(0);
-  await bar.getByLabel('Ảnh tham chiếu', { exact: true }).setInputFiles(file('reference.png'));
-  await expect(bar.getByRole('img', { name: 'reference.png' })).toBeVisible();
+  await form.getByLabel('Ảnh tham chiếu', { exact: true }).setInputFiles(file('reference.png'));
+  await expect(form.getByRole('img', { name: 'reference.png' })).toBeVisible();
   await expect(run).toBeEnabled();
 
   // Ratio: Enter opens, arrows move, Enter chooses; Escape closes without changing; Space opens too.
@@ -333,15 +333,15 @@ test('Image Generation: the bar needs a prompt (and an image only on a model wit
   await page.keyboard.press('Enter');
   await expect(modelButton(page)).toContainText('Mock image Solo');
   await expect(ratio).toHaveAttribute('data-value', 'auto'); // 1:1 is not a ratio of this model
-  await expect(bar.getByRole('button', { name: 'Thêm ảnh tham chiếu' })).toHaveCount(0); // one image, and it is there
+  await expect(form.getByRole('button', { name: 'Tải lên Ảnh tham chiếu' })).toHaveCount(0); // one image, and it is there
   await page.keyboard.press('Enter');
   await page.keyboard.press('ArrowUp');
   await page.keyboard.press('Enter');
   await expect(modelButton(page)).toContainText('Mock image E2E');
   await expect(ratio).toHaveAttribute('data-value', '1:1'); // back on the roomy model, the earlier choice returns
 
-  // Enhance sits in the bar, on by default; the job stores the member's choice (a mock job is never rewritten).
-  const enhance = bar.getByRole('button', { name: 'Cải thiện mô tả bằng AI' });
+  // Enhance sits in the form, on by default; the job stores the member's choice (a mock job is never rewritten).
+  const enhance = form.getByRole('button', { name: 'Cải thiện mô tả bằng AI' });
   await expect(enhance).toHaveAttribute('aria-pressed', 'true');
   await enhance.click();
   await expect(enhance).toHaveText('Cải thiện: tắt');
@@ -378,9 +378,9 @@ test('Image Generation, as Fash text-to-image: words alone make a picture on a m
   await page.setViewportSize({ width: 1440, height: 1000 });
   await signIn(page, 'member10');
   await page.goto('/image-generation');
-  const bar = page.getByRole('group', { name: 'Thanh tạo ảnh' });
-  await bar.getByRole('textbox', { name: 'Mô tả cảnh bạn muốn tạo' }).fill('a linen dress on a sunny balcony');
-  await bar.getByRole('button', { name: /^Tạo ảnh/ }).click();
+  const form = page.locator('.form-card');
+  await form.getByRole('textbox', { name: 'Mô tả', exact: true }).fill('a linen dress on a sunny balcony');
+  await form.getByRole('button', { name: /^Tạo ảnh/ }).click();
   await page.getByRole('tab', { name: 'Lịch sử' }).click();
   const card = page.getByRole('complementary', { name: 'Lượt tạo của tôi' }).getByRole('listitem').filter({ hasText: 'a linen dress on a sunny balcony' });
   await expect(card.getByText('Hoàn tất')).toBeVisible({ timeout: 60_000 });
@@ -390,9 +390,9 @@ test('Image Generation, as Fash text-to-image: words alone make a picture on a m
     await r.fulfill({ json: { models: body.models.map((m) => ({ ...m, textToImage: false })) } });
   });
   await page.reload();
-  await bar.getByRole('textbox', { name: 'Mô tả cảnh bạn muốn tạo' }).fill('a linen dress');
-  await expect(bar.getByRole('status')).toHaveText('Mô hình này cần ít nhất 1 ảnh tham chiếu.');
-  await expect(bar.getByRole('button', { name: /^Tạo ảnh/ })).toBeDisabled();
+  await form.getByRole('textbox', { name: 'Mô tả', exact: true }).fill('a linen dress');
+  await expect(form.locator('.form-message').getByRole('status')).toHaveText('Mô hình này cần ít nhất 1 ảnh tham chiếu.');
+  await expect(form.getByRole('button', { name: /^Tạo ảnh/ })).toBeDisabled();
 });
 
 test('Image Generation: with words alone on a model that needs an image, one click picks the best model that makes pictures from words', async ({ page }) => {
@@ -403,29 +403,29 @@ test('Image Generation: with words alone on a model that needs an image, one cli
   });
   await signIn(page, 'member10');
   await page.goto('/image-generation');
-  const bar = page.getByRole('group', { name: 'Thanh tạo ảnh' });
+  const form = page.locator('.form-card');
   await expect(modelButton(page)).toContainText('Mock image E2E');
-  await expect(bar.getByRole('status')).toHaveText('Mô hình này cần ít nhất 1 ảnh tham chiếu.');
-  await bar.getByRole('button', { name: 'Dùng Mock image Solo' }).click(); // not switched silently: the member picks it
+  await expect(form.locator('.form-message').getByRole('status')).toHaveText('Mô hình này cần ít nhất 1 ảnh tham chiếu.');
+  await form.getByRole('button', { name: 'Dùng Mock image Solo' }).click(); // not switched silently: the member picks it
   await expect(modelButton(page)).toContainText('Mock image Solo');
-  await expect(bar.getByRole('button', { name: /^Dùng Mock/ })).toHaveCount(0);
-  await bar.getByRole('textbox', { name: 'Mô tả cảnh bạn muốn tạo' }).fill('a linen dress on a sunny balcony');
-  await expect(bar.getByRole('button', { name: /^Tạo ảnh/ })).toBeEnabled();
+  await expect(form.getByRole('button', { name: /^Dùng Mock/ })).toHaveCount(0);
+  await form.getByRole('textbox', { name: 'Mô tả', exact: true }).fill('a linen dress on a sunny balcony');
+  await expect(form.getByRole('button', { name: /^Tạo ảnh/ })).toBeEnabled();
 });
 
 test('Image Generation: a cap refusal shows its message in Vietnamese', async ({ page }) => {
   await signIn(page, 'member10');
   await page.route(/\/api\/jobs$/, (r) => (r.request().method() === 'POST' ? r.fulfill({ status: 429, json: { error: 'Bạn đã dùng hết hạn mức chi phí hôm nay' } }) : r.fallback()));
   await page.goto('/image-generation');
-  const bar = page.getByRole('group', { name: 'Thanh tạo ảnh' });
-  await expect(bar.getByLabel('Ảnh tham chiếu', { exact: true })).toBeEnabled(); // a fresh load: the input is disabled until hydration
-  await bar.getByLabel('Ảnh tham chiếu', { exact: true }).setInputFiles(file('reference.png'));
-  await bar.getByRole('textbox', { name: 'Mô tả cảnh bạn muốn tạo' }).fill('a bottle');
-  await bar.getByRole('button', { name: /^Tạo ảnh/ }).click();
-  await expect(bar.getByRole('alert')).toHaveText('Bạn đã dùng hết hạn mức chi phí hôm nay');
+  const form = page.locator('.form-card');
+  await expect(form.getByLabel('Ảnh tham chiếu', { exact: true })).toBeEnabled(); // a fresh load: the input is disabled until hydration
+  await form.getByLabel('Ảnh tham chiếu', { exact: true }).setInputFiles(file('reference.png'));
+  await form.getByRole('textbox', { name: 'Mô tả', exact: true }).fill('a bottle');
+  await form.getByRole('button', { name: /^Tạo ảnh/ }).click();
+  await expect(form.getByRole('alert')).toHaveText('Bạn đã dùng hết hạn mức chi phí hôm nay');
 });
 
-test('geometry at 1440: the Try On card is 320 wide at x=288 and the image bar is 818 wide, centred, 24 px above the bottom, and never covers the last row', async ({ page, browser }) => {
+test('geometry at 1440: the Try On card is 320 wide at x=288, and Image Generation has the same card, pinned while its gallery scrolls beside it', async ({ page, browser }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await signIn(page, 'member11');
   // Ten images from the mock model, put on Ví dụ below, so the gallery is taller than the screen.
@@ -470,21 +470,22 @@ test('geometry at 1440: the Try On card is 320 wide at x=288 and the image bar i
   const gallery = page.getByRole('group', { name: 'Ảnh của công ty' });
   await expect(gallery.getByRole('img').first()).toBeVisible();
   await expect.poll(() => gallery.getByRole('img').first().evaluate((i: HTMLImageElement) => i.complete && i.naturalWidth > 0)).toBe(true); // decoded, not just in the DOM
-  const bar = page.locator('.imagebar');
-  const b = await box(bar);
-  const content = await box(page.locator('.content'));
-  near(b.width, 818, 'bar width');
-  near(b.x + b.width / 2, content.x + content.width / 2, 'bar centre', 10); // the scrollbar takes part of the content width
-  near(1000 - (b.y + b.height), 24, 'bar bottom gap');
-  expect(b.height).toBeGreaterThan(120);
-  expect(b.height).toBeLessThan(200);
-  expect(await bar.evaluate((el) => getComputedStyle(el).borderTopLeftRadius)).toBe('24px');
-  // The bar is pinned while the gallery scrolls under it, and at the end of the page the last row sits above it.
+  // The left-column card of Try On, at the same place and size.
+  const form = page.locator('.form-card');
+  const f = await box(form);
+  near(f.x, c.x, 'image card x');
+  near(f.y, c.y, 'image card y');
+  near(f.width, c.width, 'image card width');
+  near(f.height, c.height, 'image card height');
+  expect(await form.evaluate((el) => getComputedStyle(el).borderTopLeftRadius)).toBe('24px');
+  near((await box(page.locator('.runbar'))).height, 73, 'image run wrapper height');
+  // The card is pinned while the gallery scrolls, and no tile ever sits under it; at the end of the page the last row is on screen.
   await page.evaluate(() => window.scrollTo(0, 400));
-  near(1000 - ((await box(bar)).y + (await box(bar)).height), 24, 'pinned bar bottom gap');
+  near((await box(form)).y, c.y, 'pinned card y');
   await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
-  const last = await page.locator('.gallery-item').evaluateAll((els) => Math.max(...els.map((e) => e.getBoundingClientRect().bottom)));
-  expect(last).toBeLessThanOrEqual((await box(bar)).y);
+  const tiles = await page.locator('.gallery-item').evaluateAll((els) => els.map((e) => e.getBoundingClientRect()).map((r) => ({ left: r.left, bottom: r.bottom })));
+  expect(Math.min(...tiles.map((t) => t.left))).toBeGreaterThanOrEqual(f.x + f.width);
+  expect(Math.max(...tiles.map((t) => t.bottom))).toBeLessThanOrEqual(1000);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
@@ -503,24 +504,21 @@ for (const [width, height] of [[390, 844], [1024, 768], [1440, 1000]] as const) 
     }
 
     if (width === 390) {
-      // Try On stacks into the Create-style tabs with its Run button inside the screen; the bar spans the width with 16 px gutters.
-      await page.goto('/try-on');
-      await expect(page.getByRole('tab')).toHaveText(['Tạo', 'Lịch sử', 'Ví dụ', 'Giới thiệu']);
-      const run = await box(page.getByRole('button', { name: /^Thử đồ/ }));
-      expect(run.y + run.height).toBeLessThanOrEqual(height);
-      near(run.width, 358, 'run width', 1); // the card, which has 16 px gutters
-      await page.goto('/image-generation');
-      const b = await box(page.locator('.imagebar'));
-      near(b.x, 16, 'bar left gutter');
-      near(390 - (b.x + b.width), 16, 'bar right gutter');
-      expect(b.y + b.height).toBeLessThanOrEqual(height);
-      // The pills open inside the screen: the model panel and a select popover.
+      // Both pages stack into the Create-style tabs with their Run button inside the screen, across the card, which has 16 px gutters.
+      for (const [path, name] of [['/try-on', /^Thử đồ/], ['/image-generation', /^Tạo ảnh/]] as const) {
+        await page.goto(path);
+        await expect(page.getByRole('tab')).toHaveText(['Tạo', 'Lịch sử', 'Ví dụ', 'Giới thiệu']);
+        const run = await box(page.getByRole('button', { name }));
+        expect(run.y + run.height, path).toBeLessThanOrEqual(height);
+        near(run.width, 358, `${path} run width`, 1);
+      }
+      // The model panel opens inside the screen.
       await modelButton(page).click();
       const panel = await box(page.getByRole('dialog', { name: 'Chọn mô hình' }));
       expect(panel.x).toBeGreaterThanOrEqual(0);
       expect(panel.x + panel.width).toBeLessThanOrEqual(390);
       expect(panel.y).toBeGreaterThanOrEqual(0);
-      expect(panel.y + panel.height).toBeLessThanOrEqual((await box(modelButton(page))).y); // above the pill, which is at the bottom of the screen
+      expect(panel.y + panel.height).toBeLessThanOrEqual(height);
     }
   });
 }
@@ -637,21 +635,21 @@ test('an upload says why it failed: a wrong format or a file over 10 MB before a
   const posts: string[] = [];
   page.on('request', (r) => void (r.method() === 'POST' && new URL(r.url()).pathname === '/api/assets' && posts.push(r.url())));
   await page.goto('/image-generation');
-  const bar = page.getByRole('group', { name: 'Thanh tạo ảnh' });
-  const input = bar.getByLabel('Ảnh tham chiếu', { exact: true });
+  const form = page.locator('.form-card');
+  const input = form.getByLabel('Ảnh tham chiếu', { exact: true });
   await expect(modelButton(page)).toContainText('Mock image E2E');
   await input.setInputFiles({ name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('hello') });
-  await expect(bar.getByRole('alert')).toHaveText('Ảnh "notes.txt" không đúng định dạng: chỉ nhận JPEG, PNG hoặc WebP.');
+  await expect(form.getByRole('alert')).toHaveText('Ảnh "notes.txt" không đúng định dạng: chỉ nhận JPEG, PNG hoặc WebP.');
   await input.setInputFiles({ name: 'big.png', mimeType: 'image/png', buffer: Buffer.alloc(10 * 1024 * 1024 + 1) });
-  await expect(bar.getByRole('alert')).toHaveText('Ảnh "big.png" quá lớn: tối đa 10 MB.');
+  await expect(form.getByRole('alert')).toHaveText('Ảnh "big.png" quá lớn: tối đa 10 MB.');
   expect(posts).toEqual([]); // both refused in the browser
 
   await input.setInputFiles({ name: 'fake.png', mimeType: 'image/png', buffer: Buffer.from('not a picture') });
-  await expect(bar.getByRole('alert')).toHaveText('Ảnh không đúng định dạng: chỉ nhận JPEG, PNG hoặc WebP.'); // the server's 415
+  await expect(form.getByRole('alert')).toHaveText('Ảnh không đúng định dạng: chỉ nhận JPEG, PNG hoặc WebP.'); // the server's 415
   expect(posts).toHaveLength(1);
 
   await page.route('**/api/assets', (r) => r.abort());
   await input.setInputFiles(file('ok.png'));
-  await expect(bar.getByRole('alert')).toHaveText('Không tải ảnh lên được do lỗi mạng hoặc máy chủ. Hãy thử lại.');
-  await expect(bar.getByRole('img', { name: 'ok.png' })).toHaveCount(0);
+  await expect(form.getByRole('alert')).toHaveText('Không tải ảnh lên được do lỗi mạng hoặc máy chủ. Hãy thử lại.');
+  await expect(form.getByRole('img', { name: 'ok.png' })).toHaveCount(0);
 });

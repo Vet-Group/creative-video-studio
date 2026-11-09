@@ -54,13 +54,13 @@ test("each page opens with the model and settings of the member's last Run, afte
   await clearMyJobs(page); // a retry opens on the defaults again, not on the first attempt's Runs
 
   await page.goto('/image-generation');
-  const bar = page.getByRole('group', { name: 'Thanh tạo ảnh' });
-  await bar.getByRole('textbox', { name: 'Mô tả cảnh bạn muốn tạo' }).fill('a red shirt on a hanger');
+  const form = page.locator('.form-card');
+  await form.getByRole('textbox', { name: 'Mô tả', exact: true }).fill('a red shirt on a hanger');
   await pickModel(page, /Mock image E2E/);
   await selectValue(page, 'Tỉ lệ', '3:4');
   await selectValue(page, 'Độ phân giải', '2K');
   await enhance(page).click();
-  await bar.getByRole('button', { name: /^Tạo ảnh/ }).click();
+  await form.getByRole('button', { name: /^Tạo ảnh/ }).click();
   await sent(page);
 
   await page.goto('/create');
@@ -147,7 +147,7 @@ test("a refill wins over the memory: Dùng lại shows the job's settings, and a
   expect((await page.request.post('/api/jobs', { data: { assetIds: [assets[0]!.id], modelId: 'mock-e2e', prompt: 'Slow turn.', ratio: '1:1', durationSec: 5, params: { audio: 'off' } } })).status()).toBe(201);
 
   await page.goto(`/image-generation?reuse=${earlier.id}`);
-  await expect(page.getByRole('group', { name: 'Thanh tạo ảnh' }).getByRole('textbox', { name: 'Mô tả cảnh bạn muốn tạo' })).toHaveValue('a linen dress');
+  await expect(page.locator('.form-card').getByRole('textbox', { name: 'Mô tả', exact: true })).toHaveValue('a linen dress');
   await expect(select(page, 'Tỉ lệ')).toHaveAttribute('data-value', '1:1');
   await expect(select(page, 'Độ phân giải')).toHaveAttribute('data-value', '1K');
 
@@ -172,8 +172,8 @@ test("a refill wins over the memory: Dùng lại shows the job's settings, and a
   await expect(modelButton(page)).toContainText('Mock image E2E');
   await expect(select(page, 'Tỉ lệ')).toHaveAttribute('data-value', 'auto');
   await expect(select(page, 'Độ phân giải')).toHaveAttribute('data-value', '1K');
-  await expect(page.getByRole('group', { name: 'Thanh tạo ảnh' }).getByRole('status')).toHaveText('Nhập mô tả cảnh bạn muốn tạo.');
-  await expect(page.getByRole('group', { name: 'Thanh tạo ảnh' }).getByRole('alert')).toHaveCount(0);
+  await expect(page.locator('.form-card .form-message').getByRole('status')).toHaveText('Nhập mô tả cảnh bạn muốn tạo.');
+  await expect(page.locator('.form-card').getByRole('alert')).toHaveCount(0);
 });
 
 test('a memory that hangs holds Run only for a while: then the page goes on its defaults, and a late answer leaves the form alone', async ({ page }) => {
@@ -182,7 +182,7 @@ test('a memory that hangs holds Run only for a while: then the page goes on its 
   let answer: (() => void) | undefined;
   await page.route(/\/api\/recall\?feature=image/, (r) => new Promise<void>((done) => (answer = done)).then(() => r.fulfill({ json: { settings: { modelId: 'mock-image-e2e', ratio: '16:9', durationSec: null, resolution: '2K', audio: null, enhance: null, storeId: null } } })));
   await page.goto('/image-generation');
-  const status = page.getByRole('group', { name: 'Thanh tạo ảnh' }).getByRole('status');
+  const status = page.locator('.form-card .form-message').getByRole('status');
   await expect(status).toHaveText('Đang tải cài đặt đã dùng...');
   await expect(status).toHaveText('Nhập mô tả cảnh bạn muốn tạo.', { timeout: 15_000 });
   answer?.();
@@ -210,7 +210,7 @@ test('Dùng lại clicked before the memory answers wins: a field the job leaves
   await page.goto('/image-generation');
   await page.getByRole('tab', { name: 'Lịch sử' }).click();
   await page.getByRole('complementary', { name: 'Lượt tạo của tôi' }).getByRole('listitem').filter({ hasText: 'recreate race' }).getByRole('button', { name: 'Dùng lại' }).click();
-  await expect(page.getByRole('group', { name: 'Thanh tạo ảnh' }).getByRole('textbox', { name: 'Mô tả cảnh bạn muốn tạo' })).toHaveValue('recreate race', { timeout: 20_000 });
+  await expect(page.locator('.form-card').getByRole('textbox', { name: 'Mô tả', exact: true })).toHaveValue('recreate race', { timeout: 20_000 });
   await expect(select(page, 'Tỉ lệ')).toHaveAttribute('data-value', 'auto');
   await expect(select(page, 'Độ phân giải')).toHaveAttribute('data-value', '1K');
   await page.unrouteAll({ behavior: 'ignoreErrors' });

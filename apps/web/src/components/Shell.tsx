@@ -305,7 +305,7 @@ const AdminContext = createContext(false);
 /** The History of a page with no job yet, in the Library's empty style: one line and a way to the form. On a phone the form is its own tab, which this opens first. */
 function HistoryEmpty() {
   const toForm = () => {
-    const form = document.querySelector<HTMLElement>('.form-card, .imagebar');
+    const form = document.querySelector<HTMLElement>('.form-card');
     if (!form) return;
     if (form.hidden) document.getElementById(form.getAttribute('aria-labelledby') ?? '')?.click();
     // After the tab has rendered the form.
