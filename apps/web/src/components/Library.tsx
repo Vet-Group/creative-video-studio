@@ -212,7 +212,7 @@ function ClipCard({ clip, view, select, onChange, onDeleted, onOpen }: { clip: C
   );
 
   if (view === 'list') {
-    const thumb = image ? clip.videoAssetId : clip.posterAssetId;
+    const thumb = clip.posterAssetId ?? (image ? clip.videoAssetId : null); // an image's preview, else the image itself
     return (
       <article className="lib-row" aria-label={name}>
         {select}
@@ -281,7 +281,7 @@ function ClipCard({ clip, view, select, onChange, onDeleted, onOpen }: { clip: C
       {select}
       <div className="lib-media" onPointerEnter={(e) => e.pointerType === 'mouse' && play(true)} onPointerLeave={() => play(false)}>
         {image ? (
-          <img className="output" src={`/api/assets/${clip.videoAssetId}/content`} alt={clip.downloadName} loading="lazy" />
+          <img className="output" src={`/api/assets/${clip.posterAssetId ?? clip.videoAssetId}/content`} alt={clip.downloadName} loading="lazy" />
         ) : (
           <video ref={video} muted loop playsInline preload="metadata" poster={clip.posterAssetId ? `/api/assets/${clip.posterAssetId}/content` : undefined} src={`/api/assets/${clip.videoAssetId}/content`} />
         )}

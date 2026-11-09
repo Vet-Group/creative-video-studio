@@ -22,6 +22,7 @@ import { createDb, type createPool } from '@cvs/db/client';
 import { type Job, PgBoss } from 'pg-boss';
 import { burnEndText, closestRatio, extractPoster, probeSeconds, probeSize, probeVideoSeconds, sniffImage } from './media';
 import { purgeDeletedClips } from './purge';
+import { dropPreview, storePreview } from './preview';
 import { deleteObject, getObject, putObject } from './storage';
 import { runSuggestion } from './suggest';
 
@@ -383,11 +384,12 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
     }
   }
 
-  /** An image is stored as it came (its type read from its bytes) and needs no poster: the Library shows the image itself. */
+  /** An image is stored as it came (its type read from its bytes); its poster is a small JPEG preview for tiles, and a failed preview only leaves it without one. */
   async function deliverImage(job: { id: string; user_id: string; provider: string }, outputUrl: string, costUsd: number): Promise<void> {
     const dir = await mkdtemp(join(tmpdir(), 'cvs-deliver-'));
     const outputId = randomUUID();
     const key = `assets/${outputId}`;
+    let previewId: string | null = null;
     try {
       const file = join(dir, 'output');
       await download(outputUrl, file, job.provider);
@@ -400,11 +402,13 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
       const { width, height } = await probeSize(file);
       await putObject(key, bytes, type.mime);
       await insertAssets(db, [{ id: outputId, ownerId: job.user_id, kind: 'output', s3Key: key, filename: `image-${job.id.slice(0, 8)}.${type.ext}`, mime: type.mime, bytes: bytes.length, width, height }]);
-      if (await settle(pool, job.id, { status: 'succeeded', costUsd, outputAssetId: outputId, posterAssetId: null })) return;
+      previewId = await storePreview(db, job.user_id, job.id, bytes).catch((err) => (log(`preview ${job.id}`, err), null));
+      if (await settle(pool, job.id, { status: 'succeeded', costUsd, outputAssetId: outputId, posterAssetId: previewId })) return;
       throw new Error('the job was settled by someone else');
     } catch (e) {
       await pool.query('delete from assets where id = $1', [outputId]).catch((err) => log('cleanup', err));
       await deleteObject(key).catch((err) => log('cleanup', err));
+      if (previewId) await dropPreview(pool, previewId).catch((err) => log('cleanup', err));
       throw e;
     } finally {
       await rm(dir, { recursive: true, force: true });

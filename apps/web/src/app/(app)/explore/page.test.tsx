@@ -149,6 +149,15 @@ test('Continue shows running jobs first, then the latest finished, at most four;
   expect(list).toContain('Không thành công');
 });
 
+test("Continue shows a finished image job's preview when it has one, else the image itself", async () => {
+  const html = await withJobs([
+    job('img-new', 'succeeded', { feature: 'image', resolution: '2K', output_asset_id: 'big', poster_asset_id: 'small' }),
+    job('img-old', 'succeeded', { feature: 'try_on', resolution: '1K', output_asset_id: 'old' }),
+  ]);
+  const list = html.match(/<ul class="explore-jobs"[^>]*>([\s\S]*?)<\/ul>/)![1]!;
+  expect([...list.matchAll(/ src="([^"]+)"/g)].map((m) => m[1])).toEqual(['/api/assets/small/content', '/api/assets/old/content']);
+});
+
 const modelRows = (n: number, kind: 'video' | 'image') =>
   Array.from({ length: n }, (_, i) => ({ id: `${kind}-${i}`, label: `${kind} ${i}`, provider: 'fal', kind, ratios: ['9:16'], durations_sec: [5], usd_per_second: '0.1', image_prices: kind === 'image' ? { '1K': '0.03' } : null }));
 const modelLinks = (html: string) => [...html.matchAll(/href="\/(?:create|image-generation)\?model=([^"]+)"/g)].map((m) => m[1]);

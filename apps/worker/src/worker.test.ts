@@ -12,14 +12,15 @@ import { reserve, withTransaction } from '@cvs/core/ledger';
 import { ImageReadError } from '@cvs/core/providers/http';
 import type { ImageProvider, ImageSubmitRequest, SubmitRequest, VideoProvider } from '@cvs/core/providers';
 import { VIDEO_QUEUE, VIDEO_QUEUE_OPTIONS, videoSendOptions } from '@cvs/core/queue';
-import { createPool } from '@cvs/db/client';
+import { createDb, createPool } from '@cvs/db/client';
 import { createTestDatabase } from '@cvs/db/testing';
 import { PgBoss } from 'pg-boss';
 import sharp from 'sharp';
 import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
 import { closestRatio, requireFfmpeg } from './media';
 import { createMockImageProvider, createMockProvider, MOCK_FAIL } from './mock-provider';
-import { bucketName, ensureBucket, putObject, s3 } from './storage';
+import { backfillPreviews } from './preview';
+import { bucketName, ensureBucket, getObject, putObject, s3 } from './storage';
 import { DEFAULT_OPTIONS, type RunningWorker, startWorker, type WorkerOptions } from './worker';
 
 vi.setConfig({ testTimeout: 90_000, hookTimeout: 90_000 });
@@ -656,19 +657,20 @@ describe('image jobs', () => {
     };
   }
 
-  test('runs a mock image job: a PNG output in MinIO, no poster, nothing billed', async () => {
+  test('runs a mock image job: a PNG output in MinIO, a JPEG preview of the same size as its poster, nothing billed', async () => {
     const id = await newImageJob('u1', { isMock: true, ratio: '3:4' });
     await startImages(createMockImageProvider({ runMs: 300, dir: mockDir }));
     await send(id, 'u1');
     await waitFor('the job to succeed', async () => (await status(id)) === 'succeeded');
 
     const j = await job(id);
-    expect(j.poster_asset_id).toBeNull();
     const a = (await pool.query(`select kind, mime, filename, bytes, width, height, s3_key, owner_id from assets where id = $1`, [j.output_asset_id])).rows[0];
     expect(a).toMatchObject({ kind: 'output', mime: 'image/png', owner_id: 'u1', width: 192, height: 256 });
     expect(a.filename).toBe(`image-${id.slice(0, 8)}.png`);
     const head = await s3().send(new HeadObjectCommand({ Bucket: bucketName(), Key: a.s3_key }));
     expect([head.ContentLength, head.ContentType]).toEqual([a.bytes, 'image/png']);
+    const p = (await pool.query(`select kind, mime, filename, width, height, owner_id from assets where id = $1`, [j.poster_asset_id])).rows[0];
+    expect(p).toEqual({ kind: 'output', mime: 'image/jpeg', filename: `preview-${id.slice(0, 8)}.jpg`, width: 192, height: 256, owner_id: 'u1' }); // never enlarged
     expect((await costs(id)).map((c) => [c.kind, c.usd])).toEqual([['estimate', '0.0000'], ['actual_adjustment', '0.0000']]);
   });
 
@@ -743,6 +745,77 @@ describe('image jobs', () => {
     await waitFor('the job to succeed', async () => (await status(id)) === 'succeeded');
     const a = (await pool.query(`select mime, filename, width, height from assets where id = (select output_asset_id from jobs where id = $1)`, [id])).rows[0];
     expect(a).toEqual({ mime: 'image/jpeg', filename: `image-${id.slice(0, 8)}.jpg`, width: 64, height: 48 });
+  });
+
+  /** A half-transparent PNG of this size, as a file URL for the mock image provider to hand back. */
+  async function bigPng(width: number, height: number): Promise<{ url: string; bytes: Buffer }> {
+    const file = join(mockDir, `${randomUUID()}.png`);
+    await mkdir(mockDir, { recursive: true });
+    const bytes = await sharp({ create: { width, height, channels: 4, background: { r: 200, g: 50, b: 50, alpha: 0.5 } } }).png().toBuffer();
+    await writeFile(file, bytes);
+    return { url: pathToFileURL(file).href, bytes };
+  }
+
+  test('a large image gets a JPEG preview no longer than 1024 px as its poster, and the original stays as it came', async () => {
+    const png = await bigPng(1296, 1728);
+    const id = await newImageJob('u2');
+    await startImages(recording([], async () => png.url));
+    await send(id, 'u2');
+    await waitFor('the job to succeed', async () => (await status(id)) === 'succeeded');
+    const j = await job(id);
+    const out = (await pool.query(`select mime, bytes, width, height, s3_key from assets where id = $1`, [j.output_asset_id])).rows[0];
+    expect(out).toMatchObject({ mime: 'image/png', bytes: png.bytes.length, width: 1296, height: 1728 });
+    expect(Buffer.from(await getObject(out.s3_key)).equals(png.bytes)).toBe(true);
+    const p = (await pool.query(`select kind, mime, bytes, width, height, s3_key, owner_id from assets where id = $1`, [j.poster_asset_id])).rows[0];
+    expect(p).toMatchObject({ kind: 'output', mime: 'image/jpeg', width: 768, height: 1024, owner_id: 'u2' });
+    const meta = await sharp(await getObject(p.s3_key)).metadata();
+    expect([meta.format, meta.width, meta.height, meta.hasAlpha]).toEqual(['jpeg', 768, 1024, false]);
+    expect(p.bytes).toBeLessThan(out.bytes);
+  });
+
+  test('a preview that fails leaves the poster empty and the job still succeeds', async () => {
+    const png = await bigPng(1600, 1200);
+    const cut = join(mockDir, `${randomUUID()}.png`);
+    await writeFile(cut, png.bytes.subarray(0, 60)); // a PNG header ffprobe reads but sharp refuses
+    const id = await newImageJob('u2');
+    await startImages(recording([], async () => pathToFileURL(cut).href));
+    await send(id, 'u2');
+    await waitFor('the job to succeed', async () => (await status(id)) === 'succeeded');
+    const j = await job(id);
+    expect(j.output_asset_id).not.toBeNull();
+    expect(j.poster_asset_id).toBeNull();
+    expect((await pool.query(`select count(*)::int as n from assets where filename = $1`, [`preview-${id.slice(0, 8)}.jpg`])).rows[0].n).toBe(0);
+  });
+
+  test('the backfill counts image jobs without a preview on a dry run, makes them with apply, and finds none it can make the second time', async () => {
+    const png = await bigPng(1200, 1600);
+    const id = await newImageJob('u3');
+    await startImages(recording([], async () => png.url));
+    await send(id, 'u3');
+    await waitFor('the job to succeed', async () => (await status(id)) === 'succeeded');
+    // An image job from before previews: no poster.
+    const made = (await job(id)).poster_asset_id;
+    await pool.query('update jobs set poster_asset_id = null where id = $1', [id]);
+    await pool.query('delete from assets where id = $1', [made]);
+    const db = createDb(pool);
+    const lines: string[] = [];
+    const dry = await backfillPreviews(pool, db, false, (l) => lines.push(l));
+    expect(dry.found).toBeGreaterThanOrEqual(1);
+    expect(dry.made).toBe(0);
+    expect((await job(id)).poster_asset_id).toBeNull();
+    expect(lines.at(-1)).toMatch(/dry run/);
+
+    const applied = await backfillPreviews(pool, db, true, (l) => lines.push(l));
+    const poster = (await job(id)).poster_asset_id;
+    expect(poster).not.toBeNull();
+    const p = (await pool.query(`select kind, mime, width, height, owner_id, s3_key from assets where id = $1`, [poster])).rows[0];
+    expect(p).toMatchObject({ kind: 'output', mime: 'image/jpeg', width: 768, height: 1024, owner_id: 'u3' });
+    expect((await sharp(await getObject(p.s3_key)).metadata()).format).toBe('jpeg');
+    // The cut PNG of the test above can never have a preview, so it stays a failure on every run; a video job is never found.
+    expect(applied).toEqual({ found: dry.found, made: dry.found - applied.failed, failed: applied.failed });
+    const again = await backfillPreviews(pool, db, true, (l) => lines.push(l));
+    expect(again).toEqual({ found: applied.failed, made: 0, failed: applied.failed });
+    expect((await job(id)).poster_asset_id).toBe(poster);
   });
 
   test('fails an output that is not an image but keeps the estimate, because the provider billed it', async () => {

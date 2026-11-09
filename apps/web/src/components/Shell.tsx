@@ -119,6 +119,11 @@ function HistoryCard({ job, isAdmin, select }: { job: TrayJob; isAdmin: boolean;
   const image = job.resolution !== null;
   const out = job.status === 'succeeded' ? job.outputAssetId : null;
   const content = (id: string) => `/api/assets/${id}/content`;
+  // An image card shows its preview; full screen (or its new-tab fallback) loads the original first.
+  const enlarge = () => {
+    if (image && out && media.current) media.current.src = content(out);
+    toggleFullscreen(media.current);
+  };
 
   async function act(what: () => Promise<unknown>, fail: string) {
     setProblem('');
@@ -167,7 +172,7 @@ function HistoryCard({ job, isAdmin, select }: { job: TrayJob; isAdmin: boolean;
         {out ? (
           image ? (
             // A click on the picture is the eye's full screen; the eye stays the keyboard and screen-reader way in.
-            <img ref={media} src={content(out)} alt={cardTitle(job)} loading="lazy" onClick={() => toggleFullscreen(media.current)} />
+            <img ref={media} src={content(job.posterAssetId ?? out)} alt={cardTitle(job)} loading="lazy" onClick={enlarge} />
           ) : (
             // F opens full screen, as in most players; Space and the arrows are the video's own keys.
             <video ref={media} controls playsInline preload="metadata" poster={job.posterAssetId ? content(job.posterAssetId) : undefined} src={content(out)} onKeyDown={(e) => e.key.toLowerCase() === 'f' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && (e.preventDefault(), toggleFullscreen(media.current))} />
@@ -178,7 +183,7 @@ function HistoryCard({ job, isAdmin, select }: { job: TrayJob; isAdmin: boolean;
         {/* On the picture, where the eye already is: full screen and a new tab; they show on hover or focus. */}
         {out && (
           <div className="job-media-tools">
-            <button type="button" className="icon-button" onClick={() => toggleFullscreen(media.current)} aria-label="Toàn màn hình" title="Toàn màn hình (F)">
+            <button type="button" className="icon-button" onClick={enlarge} aria-label="Toàn màn hình" title="Toàn màn hình (F)">
               <Icon name="eye" />
             </button>
             <a className="icon-button" href={content(out)} target="_blank" rel="noreferrer" aria-label="Mở trong tab mới" title="Mở trong tab mới">

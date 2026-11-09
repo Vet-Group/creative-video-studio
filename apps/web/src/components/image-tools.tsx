@@ -662,7 +662,7 @@ export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4
                   </a>
                 ) : (
                   <a href={`/api/assets/${it.videoAssetId}/content`} target="_blank" rel="noreferrer" aria-label={`Mở ảnh ${it.modelLabel}, ${it.ratio} trong tab mới`}>
-                    <img src={`/api/assets/${it.videoAssetId}/content`} alt={`${it.modelLabel}, ${it.ratio}`} loading="lazy" />
+                    <img src={`/api/assets/${it.posterAssetId ?? it.videoAssetId}/content`} alt={`${it.modelLabel}, ${it.ratio}`} loading="lazy" />
                   </a>
                 )}
                 {/* Fash's "Use this template": the page's form filled from this result's inputs (a Library clip's inputs are open to every member). */}
