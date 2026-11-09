@@ -109,7 +109,6 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
   // With no image and a model that needs one, the best model that makes pictures from words is one click away (not switched to silently: its price differs).
   const wordsModel = chosen && images.length === 0 && !chosen.textToImage ? models?.filter((m) => m.textToImage).sort((a, b) => b.score - a.score)[0] : undefined;
   // Over Run too once the text nears the model's limit (or is over it after a switch).
-  const count = chosen && prompt.length >= chosen.maxPromptChars * 0.8 ? `${prompt.length}/${chosen.maxPromptChars} ký tự` : null;
 
   async function upload(files: File[]) {
     if (files.length === 0) return;
@@ -161,7 +160,7 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
         <div className="card form-card" id="imagegen-panel-create" role={narrow ? 'tabpanel' : undefined} aria-labelledby={narrow ? 'imagegen-tab-create' : undefined} hidden={narrow && shown !== 'create'} onPointerDownCapture={recall.touch} onKeyDownCapture={recall.touch}>
           <div className="form-scroll">
             <PageHint href="/image-generation" />
-            <Slot label="Ảnh tham chiếu" optional empty={`Tối đa ${max} ảnh tham chiếu`} inputLabel="Ảnh tham chiếu" images={images} max={max} busy={busy} onAdd={(files) => void upload(files)} onRemove={(id) => setImages((cur) => cur.filter((x) => x.id !== id))} onPick={(img) => setImages((cur) => (cur.length < max ? [...cur, img] : cur))} storeId={storeId} />
+            <Slot label="Ảnh tham chiếu" optional empty={`Tối đa ${max} ảnh tham chiếu`} inputLabel="Ảnh tham chiếu" images={images} max={max} busy={busy} onAdd={(files) => void upload(files)} onRemove={(id) => setImages((cur) => cur.filter((x) => x.id !== id))} onPick={(img) => setImages((cur) => (cur.length < max ? [...cur, img] : cur))} storeId={storeId} slot="image" />
             {/* In a field for the form's spacing; the chip names itself, so it has no label above it. */}
             <div className="field">
               <StylePicker value={styleId} onChange={setStyleId} />
@@ -194,7 +193,6 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
           </div>
 
           <div className="form-message">
-            {count && <p className="help">{count}</p>}
             {reason && (
               <p className="help" id="imagegen-reason" role="status">
                 {reason}

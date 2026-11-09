@@ -54,12 +54,12 @@ test('a photo uploaded on Image Generation is offered by "Ảnh đã tải" on C
   await expect(page.getByLabel('Sản phẩm: ảnh đã chọn').getByRole('img', { name })).toBeVisible();
   await expect(product).toBeVisible(); // still over the filled photo, to swap it
 
-  // Image Generation: the reference slot's own link; it opens on Marketing's reference photos (the slot of its label), every photo one pick away.
+  // Image Generation: the reference slot's own link opens on the photos uploaded on Image Generation, where this one went.
   await page.goto('/image-generation');
   const refs = page.getByRole('button', { name: 'Ảnh đã tải cho Ảnh tham chiếu' });
   await expect(refs).toBeEnabled();
   await refs.click();
-  await selectText(page, 'Lọc theo mục', 'Tất cả mục');
+  await expect(page.getByRole('dialog', { name: 'Ảnh đã tải' })).toContainText('Ảnh bạn đã tải cho mục Ảnh tạo ảnh');
   await page.getByRole('dialog', { name: 'Ảnh đã tải' }).getByRole('button', { name: `Dùng ${name}` }).click();
   await expect(page.getByLabel('Ảnh tham chiếu: ảnh đã chọn').getByRole('img', { name })).toBeVisible();
 });

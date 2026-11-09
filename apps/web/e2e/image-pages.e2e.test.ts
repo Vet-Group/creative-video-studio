@@ -246,22 +246,26 @@ test('Image Generation: the form counts the prompt near the model limit, and a s
   const form = page.locator('.form-card');
   const run = form.getByRole('button', { name: /^Tạo ảnh/ });
   const prompt = form.getByRole('textbox', { name: 'Mô tả', exact: true });
-  const count = form.locator('.form-message').getByText(/^\d+\/\d+ ký tự$/);
+  const count = form.locator('.prompt-count'); // the prompt box's own count, as on Try On and Create video; nothing repeats it over Run
   await form.getByLabel('Ảnh tham chiếu', { exact: true }).setInputFiles(file('reference.png'));
   await expect(form.getByRole('img', { name: 'reference.png' })).toBeVisible();
   await expect(modelButton(page)).toContainText('Mock image E2E');
   await prompt.fill('x'.repeat(1500));
-  await expect(count).toHaveCount(0); // under 80% of 2000: nothing over Run, as on the live page
+  await expect(count).toHaveText('1500/2000');
+  await expect(count).not.toHaveAttribute('data-near'); // 75% of 2000
+  await expect(form.locator('.form-message').getByText(/ký tự$/)).toHaveCount(0);
   const text = 'x'.repeat(1700);
   await prompt.fill(text);
-  await expect(count).toHaveText('1700/2000 ký tự');
+  await expect(count).toHaveText('1700/2000');
+  await expect(count).not.toHaveAttribute('data-near'); // 85%: the box marks the count from 90%
   await expect(run).toBeEnabled();
 
   await modelButton(page).click();
   await page.getByRole('option', { name: /Mock image Solo/ }).click();
   await expect(modelButton(page)).toContainText('Mock image Solo');
   await expect(prompt).toHaveValue(text);
-  await expect(count).toHaveText('1700/1000 ký tự');
+  await expect(count).toHaveText('1700/1000');
+  await expect(count).toHaveAttribute('data-near');
   await expect(run).toBeDisabled();
   await expect(form.locator('.form-message').getByRole('status')).toHaveText('Mô hình Mock image Solo nhận tối đa 1000 ký tự, hãy rút gọn hoặc chọn mô hình khác.');
 });
