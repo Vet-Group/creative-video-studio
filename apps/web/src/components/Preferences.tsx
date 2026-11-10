@@ -1,5 +1,6 @@
 // Settings > Preferences: the colour theme, what happens on this device when a job finishes, and the keyboard shortcuts. Each block is one subsection.
 import { type ReactNode, useId, useState } from 'react';
+import { resetOnboarding } from '@/lib/onboarding';
 import { chime, notificationState, readPref, writePref } from '@/lib/preferences';
 import { readTheme, saveTheme, type Theme } from '@/lib/theme';
 import { Icon, type IconName } from './Icon';
@@ -44,6 +45,7 @@ export function Preferences() {
   const [notify, setNotify] = useState(() => readPref('notify') && notificationState() === 'granted');
   const [sound, setSound] = useState(() => readPref('chime'));
   const [theme, setTheme] = useState(readTheme);
+  const [guideReset, setGuideReset] = useState(false);
 
   async function toggleNotify() {
     if (notify) {
@@ -111,6 +113,31 @@ export function Preferences() {
             <span className="acct-text">{text}</span>
           </li>
         ))}
+      </ul>
+      <p className="settings-kicker settings-sub" id="settings-guide">
+        Hướng dẫn
+      </p>
+      <ul className="acct-rows" aria-labelledby="settings-guide">
+        <li className="acct-row">
+          <span className="acct-mark" aria-hidden="true">
+            <Icon name="help" size={16} />
+          </span>
+          <span className="acct-text">
+            <strong>Xem lại hướng dẫn sử dụng</strong>
+            <span>
+              {guideReset ? 'Đã bật lại — hướng dẫn hiện lại khi bạn mở các trang.' : 'Hiện lại thẻ chào, gợi ý từng trang và chế độ hướng dẫn Marketing Studio nếu bạn đã ẩn.'}
+            </span>
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              resetOnboarding();
+              setGuideReset(true);
+            }}
+          >
+            {guideReset ? 'Đã bật lại' : 'Xem lại'}
+          </button>
+        </li>
       </ul>
     </>
   );

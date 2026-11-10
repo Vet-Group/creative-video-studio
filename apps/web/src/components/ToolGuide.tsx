@@ -2,6 +2,7 @@
 // "Which tool?": the five creative tools side by side, opened from the sidebar, each tool page's hint strip and Explore.
 import Link from 'next/link';
 import { createContext, type ReactNode, useContext, useEffect, useState } from 'react';
+import { HINTS_KEY as HIDDEN_KEY } from '@/lib/onboarding';
 import { TOOL_GOALS, TOOL_GUIDE, type ToolHref, toolGuide } from '@/lib/tool-guide';
 import { Icon } from './Icon';
 import { Modal } from './Modal';
@@ -107,7 +108,6 @@ export function ToolGuide({ open, onClose }: { open: boolean; onClose: () => voi
   );
 }
 
-const HIDDEN_KEY = 'cvs_tool_hint_hidden';
 function hiddenHints(): string[] {
   try {
     return JSON.parse(localStorage.getItem(HIDDEN_KEY) ?? '[]') as string[];
