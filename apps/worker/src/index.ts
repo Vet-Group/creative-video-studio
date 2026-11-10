@@ -1,8 +1,10 @@
 // The worker process: `pnpm --filter @cvs/worker start`. The mock provider always runs; fal and BytePlus run when FAL_KEY and BYTEPLUS_ARK_API_KEY are set (M.6).
+import { readFalBalance } from '@cvs/core/providers/balances';
 import { serviceAccountToken } from '@cvs/core/providers/vertex';
 import { readVertexBilling } from '@cvs/core/providers/vertex-billing';
 import { createPool, databaseUrl } from '@cvs/db/client';
 import { DEDUPE_TICK_MS, dedupeTick } from './asset-dedupe';
+import { FAL_ALERT_TICK_MS, falAlertTick, larkSender } from './fal-alert';
 import { createMockImageProvider, createMockProvider } from './mock-provider';
 import { realProviders } from './real-providers';
 import { fakeSuggester } from './suggest';
@@ -48,6 +50,20 @@ const dedupe = () =>
     .catch((e) => console.error('worker: dedupe:', e instanceof Error ? e.message : e));
 void dedupe();
 setInterval(dedupe, DEDUPE_TICK_MS).unref();
+
+// The hourly fal low-balance alert to the Admins on Lark (fal-alert.ts); only with a fal key and the Lark app, unref'd like the others.
+if (process.env.FAL_KEY && process.env.LARK_APP_ID && process.env.LARK_APP_SECRET) {
+  const send = larkSender({ appId: process.env.LARK_APP_ID, appSecret: process.env.LARK_APP_SECRET });
+  const alert = () =>
+    falAlertTick(pool, () => readFalBalance({ key: process.env.FAL_KEY }), send)
+      .then((r) => {
+        if (r === 'cleared') console.log('worker: fal alert: the balance is back over the threshold');
+        else if (r !== 'none') console.log(`worker: fal alert: sent to ${r.sent} Admins${r.failed.length ? `; failed: ${r.failed.join('; ')}` : ''}`);
+      })
+      .catch((e) => console.error('worker: fal alert:', e instanceof Error ? e.message : e));
+  void alert();
+  setInterval(alert, FAL_ALERT_TICK_MS).unref();
+}
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.once(signal, async () => {

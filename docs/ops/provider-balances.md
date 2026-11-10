@@ -53,6 +53,23 @@ A good balance read is kept a minute, so a top-up unlocks the models within a mi
 locked and fal itself refuses a job it cannot pay for. Other providers are not locked: BytePlus bills the card, and a Vertex account stops through its
 own credits guard.
 
+## fal low-balance alert (2026-11-10)
+
+Owner decision of 2026-11-10: tell the Admins when fal's balance goes under the warning threshold, in the app and on Lark, so it is topped up before
+models lock. There is still no top-up in the app: fal has no API to buy credit.
+
+- **In the app.** Every page an Admin opens shows a notice under the top bar with the balance, the threshold and a link to fal's billing page
+  (`apps/web/src/components/FalLowNotice.tsx`). It reads the panel's answer (`GET /api/admin/costs/balances`) once when the app loads; a failed read shows
+  nothing. Members never see it.
+- **On Lark.** The worker checks once an hour (`apps/worker/src/fal-alert.ts`), only when `FAL_KEY`, `LARK_APP_ID` and `LARK_APP_SECRET` are set. The
+  first check under the threshold claims `settings.fal_low_alerted_at` (migration 0083) and sends one text message from the CVS Lark app's bot to every
+  Admin who is not banned and has a linked Lark account (`accounts.account_id` is the Lark open_id for this app). Later checks while it stays low send
+  nothing; a check at or over the threshold clears the claim, so the next drop alerts again. When every message fails the claim is released and the next
+  hour tries again; the worker log has Lark's error code. A balance that cannot be read, or is not in USD, changes nothing.
+- **Lark setup (owner, once).** In the Lark Developer Console, the CVS app (the one in `LARK_APP_ID`) needs the Bot feature and the scope
+  `im:message:send_as_bot`, published in a new version that the tenant Admin approves, with the Admins inside the app's availability. Without the bot
+  Lark answers code 11205 ("app do not have bot", checked 2026-11-10). An Admin who has never signed in with Lark gets no message.
+
 ## Replicate (removed 2026-11-04)
 
 Replicate has no adapter any more: no code path submits to it, `REPLICATE_API_TOKEN` is no longer read, and the hourly Replicate guard and its fal twin

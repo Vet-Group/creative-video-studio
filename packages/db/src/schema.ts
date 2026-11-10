@@ -359,6 +359,8 @@ export const settings = pgTable(
     vertexActiveProject: text('vertex_active_project'),
     /** Admin Costs shows a provider balance under this many USD in red. */
     balanceWarningUsd: numeric('balance_warning_usd', { precision: 12, scale: 4 }).notNull().default('10'),
+    /** When the worker messaged the Admins on Lark that fal's balance went under balance_warning_usd; null again once it is back over (apps/worker/src/fal-alert.ts). */
+    falLowAlertedAt: tstz('fal_low_alerted_at'),
     /**
      * The BytePlus Seedance 2.0 prepaid resource pack (docs/ops/provider-balances.md). BytePlus has no API for a pack's balance, so the Admin enters the tokens
      * left at a moment and the app subtracts the tokens of the jobs finished after it. All four are set together or all null.

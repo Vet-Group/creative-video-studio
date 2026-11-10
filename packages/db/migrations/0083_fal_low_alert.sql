@@ -1,0 +1,1 @@
+ALTER TABLE "settings" ADD COLUMN "fal_low_alerted_at" timestamp with time zone;

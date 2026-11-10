@@ -575,6 +575,13 @@
 			"when": 1794395639039,
 			"tag": "0082_team_default_tool",
 			"breakpoints": true
+		},
+		{
+			"idx": 82,
+			"version": "7",
+			"when": 1794395639040,
+			"tag": "0083_fal_low_alert",
+			"breakpoints": true
 		}
 	]
 }
