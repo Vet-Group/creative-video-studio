@@ -10,7 +10,7 @@ export async function GET(request: Request) {
   if (g.error) return g.error;
   const all = new URL(request.url).searchParams.get('includeHidden') === '1';
   const { rows } = await pool.query(
-    'select id, name, cost_centre_code as "costCentreCode", hidden from teams where $1 or not hidden order by name, id',
+    'select id, name, cost_centre_code as "costCentreCode", hidden, default_tool as "defaultTool" from teams where $1 or not hidden order by name, id',
     [all],
   );
   return Response.json({ teams: rows });

@@ -47,13 +47,21 @@ export const DEFAULT_TEAM_ID = 'team-unassigned';
 
 const tstz = (name: string) => timestamp(name, { withTimezone: true });
 
-export const teams = pgTable('teams', {
-  id: text('id').primaryKey(),
-  name: text('name').notNull(),
-  costCentreCode: text('cost_centre_code'),
-  hidden: boolean('hidden').notNull().default(false),
-  createdAt: tstz('created_at').notNull().defaultNow(),
-});
+export const teams = pgTable(
+  'teams',
+  {
+    id: text('id').primaryKey(),
+    name: text('name').notNull(),
+    costCentreCode: text('cost_centre_code'),
+    hidden: boolean('hidden').notNull().default(false),
+    /** The page a member of this team lands on after login (apps/web lib/landing.ts); null lands on Create, as everyone did before. */
+    defaultTool: text('default_tool'),
+    createdAt: tstz('created_at').notNull().defaultNow(),
+  },
+  (t) => [
+    check('teams_default_tool_check', sql`${t.defaultTool} is null or ${t.defaultTool} in ('/explore', '/try-on', '/image-generation', '/create', '/marketing-studio', '/apps')`),
+  ],
+);
 
 // The code equals POD Studio's store_id.
 export const stores = pgTable('stores', {

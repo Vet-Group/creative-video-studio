@@ -1,0 +1,2 @@
+ALTER TABLE "teams" ADD COLUMN "default_tool" text;--> statement-breakpoint
+ALTER TABLE "teams" ADD CONSTRAINT "teams_default_tool_check" CHECK ("teams"."default_tool" is null or "teams"."default_tool" in ('/explore', '/try-on', '/image-generation', '/create', '/marketing-studio', '/apps'));
