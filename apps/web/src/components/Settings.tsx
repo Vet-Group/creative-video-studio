@@ -43,6 +43,7 @@ export interface Usage {
   clips: { used: number; cap: number };
   dayUsd: { used: string; cap: string };
   monthUsd: { used: string; cap: string };
+  monthToDate: { usd: string; provisional: boolean };
 }
 
 export type Section = 'profile' | 'limits' | 'security' | 'preferences' | 'methods' | 'support';
@@ -115,10 +116,20 @@ const LIMITS_FAILED = (
 function Limits({ usage }: { usage: Usage | null | 'failed' }) {
   if (usage === 'failed') return LIMITS_FAILED;
   if (!usage) return <p className="muted">Đang tải hạn mức...</p>;
-  const { clips, dayUsd, monthUsd } = usage;
+  const { clips, dayUsd, monthUsd, monthToDate } = usage;
   return (
     <>
       <div className="settings-card meters">
+        <div className="meter">
+          <div className="meter-head">
+            <span>Tổng chi phí tháng này của bạn</span>
+            <strong>
+              {usd(monthToDate.usd)}
+              {monthToDate.provisional && <span className="tag">Tạm tính</span>}
+            </strong>
+          </div>
+          <p className="meter-left">Gồm video, ảnh, ứng dụng và cải thiện prompt, kể cả phần không tính vào hạn mức</p>
+        </div>
         <Meter label="Clip video hôm nay" used={clips.used} cap={clips.cap} text={`${clips.used} / ${clips.cap} clip`} left={`Còn ${clips.cap - clips.used} clip`} alone={`${clips.used} clip`} />
         <Meter
           label="Ảnh và ứng dụng hôm nay"

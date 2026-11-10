@@ -27,7 +27,8 @@ export async function dailyClips(q: Queryable, userId: string): Promise<{ today:
 }
 
 /** What `userId` has used of the caps checkCaps applies to them, counted the same way: the video clips of the ICT day, and the image and apps
- * spend (USD as numeric text) of the ICT day and month, each beside its cap. `at` is the clock (default now()). */
+ * spend (USD as numeric text) of the ICT day and month, each beside its cap. `monthToDate` is everything the ledger holds for them that ICT month
+ * (video, image, apps and LLM rows, under a cap or not), provisional while a job of it has no closing row. `at` is the clock (default now()). */
 export async function memberUsage(q: Queryable, userId: string, at?: Date) {
   const { rows } = await q.query(
     `with t as (select coalesce($2::timestamptz, now()) as at),
@@ -36,7 +37,10 @@ export async function memberUsage(q: Queryable, userId: string, at?: Date) {
        (select coalesce(sum(usd), 0.0000) from cost_entries, m where cost_entries.user_id = $1 and cost_entries.day = m.day and ${capRow} and ${budgetRow('$3')})::text as day_usd,
        s.member_daily_usd_cap::text as day_cap_usd,
        (select coalesce(sum(usd), 0.0000) from cost_entries, m where cost_entries.user_id = $1 and cost_entries.month = m.month and ${capRow} and ${budgetRow('$3')})::text as month_usd,
-       s.member_monthly_usd_cap::text as month_cap_usd
+       s.member_monthly_usd_cap::text as month_cap_usd,
+       (select coalesce(sum(usd), 0.0000) from cost_entries, m where cost_entries.user_id = $1 and cost_entries.month = m.month)::text as total_usd,
+       (select coalesce(bool_or(not c.is_final), false) from job_costs c
+         where c.job_id in (select job_id from cost_entries, m where cost_entries.user_id = $1 and cost_entries.month = m.month)) as total_provisional
      from t, settings s where s.id = 1`,
     [userId, at?.toISOString() ?? null, VIDEO_FEATURES],
   );
@@ -45,6 +49,7 @@ export async function memberUsage(q: Queryable, userId: string, at?: Date) {
     clips: { used: r.clips as number, cap: r.clip_cap as number },
     dayUsd: { used: r.day_usd as string, cap: r.day_cap_usd as string },
     monthUsd: { used: r.month_usd as string, cap: r.month_cap_usd as string },
+    monthToDate: { usd: r.total_usd as string, provisional: r.total_provisional as boolean },
   };
 }
 

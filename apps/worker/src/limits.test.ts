@@ -223,6 +223,7 @@ describe('image and apps features', () => {
       clips: { used: 1, cap: 2 },
       dayUsd: { used: '6.5000', cap: '10.0000' },
       monthUsd: { used: '46.5000', cap: '50.0000' },
+      monthToDate: { usd: '47.5000', provisional: true }, // the video clip too, which no member cap counts
     });
     expect(await checkCaps(pool, u, '1.0000', noon)).toBeNull();
     expect(await checkCaps(pool, u, '3.5000', noon, 'image')).toBeNull(); // 6.5 + 3.5 = 10 of the day
@@ -233,6 +234,7 @@ describe('image and apps features', () => {
       clips: { used: 2, cap: 2 },
       dayUsd: { used: '10.0000', cap: '10.0000' },
       monthUsd: { used: '50.0000', cap: '50.0000' },
+      monthToDate: { usd: '52.0000', provisional: true },
     });
     expect(await checkCaps(pool, u, '1.0000', noon)).toBe('daily_clips');
     expect(await checkCaps(pool, u, '0.0001', noon, 'image')).toBe('member_daily_usd');
@@ -251,7 +253,7 @@ describe('image and apps features', () => {
     await newJob(a, '2031-11-03T03:00:00Z', { estimate: '1.0000' });
     await featureJob(a, 'image', '2031-11-03T03:00:00Z', '10.0000');
     const t = at('2031-11-03T04:00:00Z');
-    expect(await memberUsage(pool, a, t)).toEqual({ clips: { used: 1, cap: 1 }, dayUsd: { used: '10.0000', cap: '10.0000' }, monthUsd: { used: '10.0000', cap: '50.0000' } });
+    expect(await memberUsage(pool, a, t)).toEqual({ clips: { used: 1, cap: 1 }, dayUsd: { used: '10.0000', cap: '10.0000' }, monthUsd: { used: '10.0000', cap: '50.0000' }, monthToDate: { usd: '11.0000', provisional: true } });
     expect(await checkCaps(pool, a, '1.0000', t)).toBe('daily_clips');
     expect(await checkCaps(pool, a, '0.0001', t, 'image')).toBe('member_daily_usd');
     await setCaps('200');
@@ -296,6 +298,7 @@ describe('LLM calls', () => {
     expect(await checkCaps(pool, u, '9.0001', when, 'image')).toBe('member_daily_usd');
     const usage = await memberUsage(pool, u, when);
     expect([usage.clips.used, usage.dayUsd.used, usage.monthUsd.used]).toEqual([1, '1.0000', '1.0000']);
+    expect(usage.monthToDate).toEqual({ usd: '1502.0000', provisional: true }); // the member's own total still shows every LLM call
     await setCaps('200');
     await pool.query('update settings set features_monthly_cap_usd = 260, member_daily_usd_cap = 10, member_monthly_usd_cap = 50');
   });

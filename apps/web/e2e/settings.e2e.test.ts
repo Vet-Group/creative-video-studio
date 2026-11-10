@@ -53,6 +53,7 @@ test('the protection card scores the account and jumps to the missing check; the
   await settings.getByRole('button', { name: 'Xem hạn mức' }).click();
   await expect(settings.getByRole('button', { name: 'Hạn mức', exact: true })).toHaveAttribute('aria-current', 'true');
   await expect(settings.getByRole('meter', { name: 'Clip video hôm nay' })).toHaveAttribute('aria-valuemax', '1000');
+  await expect(settings.locator('.meter-head', { hasText: 'Tổng chi phí tháng này của bạn' })).toContainText('$0.00'); // a new user has no ledger rows
 });
 
 test('on a phone Settings is a list of sections; a section opens as a page with a back button, and Esc still closes', async ({ page }) => {
