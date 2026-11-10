@@ -1,573 +1,580 @@
 {
-  "version": "7",
-  "dialect": "postgresql",
-  "entries": [
-    {
-      "idx": 0,
-      "version": "7",
-      "when": 1792666932036,
-      "tag": "0000_init",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1792753332036,
-      "tag": "0001_assets",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1792839732036,
-      "tag": "0002_jobs_ledger",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1792926132036,
-      "tag": "0003_audit_entries",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1793012532036,
-      "tag": "0004_round_half_even",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1793098932036,
-      "tag": "0005_backfill_email_verified",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "7",
-      "when": 1793185332036,
-      "tag": "0006_features_and_member_usd_caps",
-      "breakpoints": true
-    },
-    {
-      "idx": 7,
-      "version": "7",
-      "when": 1793271732036,
-      "tag": "0007_image_models",
-      "breakpoints": true
-    },
-    {
-      "idx": 8,
-      "version": "7",
-      "when": 1793358132036,
-      "tag": "0008_library_favorites",
-      "breakpoints": true
-    },
-    {
-      "idx": 9,
-      "version": "7",
-      "when": 1793444532036,
-      "tag": "0009_image_app_models",
-      "breakpoints": true
-    },
-    {
-      "idx": 10,
-      "version": "7",
-      "when": 1793530932036,
-      "tag": "0010_marketing_model",
-      "breakpoints": true
-    },
-    {
-      "idx": 11,
-      "version": "7",
-      "when": 1793617332036,
-      "tag": "0011_face_swap_nano_banana_pro",
-      "breakpoints": true
-    },
-    {
-      "idx": 12,
-      "version": "7",
-      "when": 1793703732036,
-      "tag": "0012_bakeoff_spend",
-      "breakpoints": true
-    },
-    {
-      "idx": 13,
-      "version": "7",
-      "when": 1793790132036,
-      "tag": "0013_real_video_models",
-      "breakpoints": true
-    },
-    {
-      "idx": 14,
-      "version": "7",
-      "when": 1793790133036,
-      "tag": "0014_model_score_priors",
-      "breakpoints": true
-    },
-    {
-      "idx": 15,
-      "version": "7",
-      "when": 1793790134036,
-      "tag": "0015_fash_video_models",
-      "breakpoints": true
-    },
-    {
-      "idx": 16,
-      "version": "7",
-      "when": 1793790135036,
-      "tag": "0016_video_models_1080p",
-      "breakpoints": true
-    },
-    {
-      "idx": 17,
-      "version": "7",
-      "when": 1793790136036,
-      "tag": "0017_gpt_image_2_5",
-      "breakpoints": true
-    },
-    {
-      "idx": 18,
-      "version": "7",
-      "when": 1793790137036,
-      "tag": "0018_asset_duration",
-      "breakpoints": true
-    },
-    {
-      "idx": 19,
-      "version": "7",
-      "when": 1793790138036,
-      "tag": "0019_kling_v3_motion_control",
-      "breakpoints": true
-    },
-    {
-      "idx": 20,
-      "version": "7",
-      "when": 1793790139036,
-      "tag": "0020_fash_templates",
-      "breakpoints": true
-    },
-    {
-      "idx": 21,
-      "version": "7",
-      "when": 1793790140036,
-      "tag": "0021_prompt_enhance",
-      "breakpoints": true
-    },
-    {
-      "idx": 22,
-      "version": "7",
-      "when": 1793790141036,
-      "tag": "0022_kling_seven_references",
-      "breakpoints": true
-    },
-    {
-      "idx": 23,
-      "version": "7",
-      "when": 1793790142036,
-      "tag": "0023_marketing_seedance_audio",
-      "breakpoints": true
-    },
-    {
-      "idx": 24,
-      "version": "7",
-      "when": 1793790143036,
-      "tag": "0024_motion_template_labels",
-      "breakpoints": true
-    },
-    {
-      "idx": 25,
-      "version": "7",
-      "when": 1793876543036,
-      "tag": "0025_user_templates",
-      "breakpoints": true
-    },
-    {
-      "idx": 26,
-      "version": "7",
-      "when": 1793962943036,
-      "tag": "0026_suggestion_runs",
-      "breakpoints": true
-    },
-    {
-      "idx": 27,
-      "version": "7",
-      "when": 1794049343036,
-      "tag": "0027_jewelry_try_on",
-      "breakpoints": true
-    },
-    {
-      "idx": 28,
-      "version": "7",
-      "when": 1794135743036,
-      "tag": "0028_model_prompt_limits",
-      "breakpoints": true
-    },
-    {
-      "idx": 29,
-      "version": "7",
-      "when": 1794222143036,
-      "tag": "0029_seedance_prompt_source",
-      "breakpoints": true
-    },
-    {
-      "idx": 30,
-      "version": "7",
-      "when": 1794308543036,
-      "tag": "0030_nano_banana_inputs",
-      "breakpoints": true
-    },
-    {
-      "idx": 31,
-      "version": "7",
-      "when": 1794394943036,
-      "tag": "0031_vertex_models",
-      "breakpoints": true
-    },
-    {
-      "idx": 32,
-      "version": "7",
-      "when": 1794394944036,
-      "tag": "0032_try_on_bake_off_seed",
-      "breakpoints": true
-    },
-    {
-      "idx": 33,
-      "version": "7",
-      "when": 1794394945036,
-      "tag": "0033_seedance_2_0_replicate",
-      "breakpoints": true
-    },
-    {
-      "idx": 34,
-      "version": "7",
-      "when": 1794394946036,
-      "tag": "0034_vertex_try_on_prior",
-      "breakpoints": true
-    },
-    {
-      "idx": 35,
-      "version": "7",
-      "when": 1794394947036,
-      "tag": "0035_user_choices",
-      "breakpoints": true
-    },
-    {
-      "idx": 36,
-      "version": "7",
-      "when": 1794394948036,
-      "tag": "0036_minimax_h3_resolutions",
-      "breakpoints": true
-    },
-    {
-      "idx": 37,
-      "version": "7",
-      "when": 1794394949036,
-      "tag": "0037_more_references_and_ratios",
-      "breakpoints": true
-    },
-    {
-      "idx": 38,
-      "version": "7",
-      "when": 1794394950036,
-      "tag": "0038_image_ratios_thinking",
-      "breakpoints": true
-    },
-    {
-      "idx": 39,
-      "version": "7",
-      "when": 1794394951036,
-      "tag": "0039_thinking_prices",
-      "breakpoints": true
-    },
-    {
-      "idx": 40,
-      "version": "7",
-      "when": 1794394952036,
-      "tag": "0040_veo_3_1_replicate",
-      "breakpoints": true
-    },
-    {
-      "idx": 41,
-      "version": "7",
-      "when": 1794394953036,
-      "tag": "0041_kling_prompt_2500",
-      "breakpoints": true
-    },
-    {
-      "idx": 42,
-      "version": "7",
-      "when": 1794394954036,
-      "tag": "0042_veo_3_1_vertex",
-      "breakpoints": true
-    },
-    {
-      "idx": 43,
-      "version": "7",
-      "when": 1794394955036,
-      "tag": "0043_seedance_2_0_replicate_label",
-      "breakpoints": true
-    },
-    {
-      "idx": 44,
-      "version": "7",
-      "when": 1794394956036,
-      "tag": "0044_passkeys",
-      "breakpoints": true
-    },
-    {
-      "idx": 45,
-      "version": "7",
-      "when": 1794394957036,
-      "tag": "0045_verdict_featured",
-      "breakpoints": true
-    },
-    {
-      "idx": 46,
-      "version": "7",
-      "when": 1794394958036,
-      "tag": "0046_must_change_password",
-      "breakpoints": true
-    },
-    {
-      "idx": 47,
-      "version": "7",
-      "when": 1794394959036,
-      "tag": "0047_lingerie_try_on",
-      "breakpoints": true
-    },
-    {
-      "idx": 48,
-      "version": "7",
-      "when": 1794394960036,
-      "tag": "0048_two_factor",
-      "breakpoints": true
-    },
-    {
-      "idx": 49,
-      "version": "7",
-      "when": 1794394961036,
-      "tag": "0049_user_avatar_color",
-      "breakpoints": true
-    },
-    {
-      "idx": 50,
-      "version": "7",
-      "when": 1794394962036,
-      "tag": "0050_vertex_accounts",
-      "breakpoints": true
-    },
-    {
-      "idx": 51,
-      "version": "7",
-      "when": 1794394963036,
-      "tag": "0051_provider_balances",
-      "breakpoints": true
-    },
-    {
-      "idx": 52,
-      "version": "7",
-      "when": 1794394964036,
-      "tag": "0052_gpt_image_2_2k_4k",
-      "breakpoints": true
-    },
-    {
-      "idx": 53,
-      "version": "7",
-      "when": 1794394965036,
-      "tag": "0053_gpt_image_2_1k_price",
-      "breakpoints": true
-    },
-    {
-      "idx": 54,
-      "version": "7",
-      "when": 1794394966036,
-      "tag": "0054_gpt_image_2_measured_price",
-      "breakpoints": true
-    },
-    {
-      "idx": 55,
-      "version": "7",
-      "when": 1794394967036,
-      "tag": "0055_llm_costs_in_ledger",
-      "breakpoints": true
-    },
-    {
-      "idx": 56,
-      "version": "7",
-      "when": 1794394968036,
-      "tag": "0056_byteplus_provider",
-      "breakpoints": true
-    },
-    {
-      "idx": 57,
-      "version": "7",
-      "when": 1794394969036,
-      "tag": "0057_replicate_round_scores",
-      "breakpoints": true
-    },
-    {
-      "idx": 58,
-      "version": "7",
-      "when": 1794394970036,
-      "tag": "0059_seedream_4_byteplus",
-      "breakpoints": true
-    },
-    {
-      "idx": 59,
-      "version": "7",
-      "when": 1794394971036,
-      "tag": "0060_marketing_more_models",
-      "breakpoints": true
-    },
-    {
-      "idx": 60,
-      "version": "7",
-      "when": 1794394972036,
-      "tag": "0061_replicate_round2_scores",
-      "breakpoints": true
-    },
-    {
-      "idx": 61,
-      "version": "7",
-      "when": 1794394973036,
-      "tag": "0062_remove_replicate",
-      "breakpoints": true
-    },
-    {
-      "idx": 62,
-      "version": "7",
-      "when": 1794394974036,
-      "tag": "0063_template_editors",
-      "breakpoints": true
-    },
-    {
-      "idx": 63,
-      "version": "7",
-      "when": 1794394975036,
-      "tag": "0064_store_templates",
-      "breakpoints": true
-    },
-    {
-      "idx": 64,
-      "version": "7",
-      "when": 1794394976036,
-      "tag": "0065_prompt_review",
-      "breakpoints": true
-    },
-    {
-      "idx": 65,
-      "version": "7",
-      "when": 1794394977036,
-      "tag": "0066_image_styles",
-      "breakpoints": true
-    },
-    {
-      "idx": 66,
-      "version": "7",
-      "when": 1794394978036,
-      "tag": "0067_store_brand_kit",
-      "breakpoints": true
-    },
-    {
-      "idx": 67,
-      "version": "7",
-      "when": 1794394979036,
-      "tag": "0068_upload_store",
-      "breakpoints": true
-    },
-    {
-      "idx": 68,
-      "version": "7",
-      "when": 1794395039036,
-      "tag": "0069_floating_reveal_prompt",
-      "breakpoints": true
-    },
-    {
-      "idx": 69,
-      "version": "7",
-      "when": 1794395099036,
-      "tag": "0070_replicate_round3_scores",
-      "breakpoints": true
-    },
-    {
-      "idx": 70,
-      "version": "7",
-      "when": 1794395159036,
-      "tag": "0071_choice_scope",
-      "breakpoints": true
-    },
-    {
-      "idx": 71,
-      "version": "7",
-      "when": 1794395219036,
-      "tag": "0072_drop_replicate",
-      "breakpoints": true
-    },
-    {
-      "idx": 72,
-      "version": "7",
-      "when": 1794395279036,
-      "tag": "0073_omni_flash_1_2",
-      "breakpoints": true
-    },
-    {
-      "idx": 73,
-      "version": "7",
-      "when": 1794395339036,
-      "tag": "0074_vertex_omni_1_2",
-      "breakpoints": true
-    },
-    {
-      "idx": 74,
-      "version": "7",
-      "when": 1794395399036,
-      "tag": "0075_hide_pricier_twins",
-      "breakpoints": true
-    },
-    {
-      "idx": 75,
-      "version": "7",
-      "when": 1794395459036,
-      "tag": "0076_byteplus_pack_balance",
-      "breakpoints": true
-    },
-    {
-      "idx": 76,
-      "version": "7",
-      "when": 1794395519036,
-      "tag": "0077_upload_dedupe",
-      "breakpoints": true
-    },
-    {
-      "idx": 77,
-      "version": "7",
-      "when": 1794395579036,
-      "tag": "0078_one_model_per_pair",
-      "breakpoints": true
-    },
-    {
-      "idx": 78,
-      "version": "7",
-      "when": 1794395639036,
-      "tag": "0079_model_name_case",
-      "breakpoints": true
-    },
-    {
-      "idx": 79,
-      "version": "7",
-      "when": 1794395639037,
-      "tag": "0080_curated_examples",
-      "breakpoints": true
-    },
-    {
-      "idx": 80,
-      "version": "7",
-      "when": 1794395639038,
-      "tag": "0081_example_order",
-      "breakpoints": true
-    }
-  ]
+	"version": "7",
+	"dialect": "postgresql",
+	"entries": [
+		{
+			"idx": 0,
+			"version": "7",
+			"when": 1792666932036,
+			"tag": "0000_init",
+			"breakpoints": true
+		},
+		{
+			"idx": 1,
+			"version": "7",
+			"when": 1792753332036,
+			"tag": "0001_assets",
+			"breakpoints": true
+		},
+		{
+			"idx": 2,
+			"version": "7",
+			"when": 1792839732036,
+			"tag": "0002_jobs_ledger",
+			"breakpoints": true
+		},
+		{
+			"idx": 3,
+			"version": "7",
+			"when": 1792926132036,
+			"tag": "0003_audit_entries",
+			"breakpoints": true
+		},
+		{
+			"idx": 4,
+			"version": "7",
+			"when": 1793012532036,
+			"tag": "0004_round_half_even",
+			"breakpoints": true
+		},
+		{
+			"idx": 5,
+			"version": "7",
+			"when": 1793098932036,
+			"tag": "0005_backfill_email_verified",
+			"breakpoints": true
+		},
+		{
+			"idx": 6,
+			"version": "7",
+			"when": 1793185332036,
+			"tag": "0006_features_and_member_usd_caps",
+			"breakpoints": true
+		},
+		{
+			"idx": 7,
+			"version": "7",
+			"when": 1793271732036,
+			"tag": "0007_image_models",
+			"breakpoints": true
+		},
+		{
+			"idx": 8,
+			"version": "7",
+			"when": 1793358132036,
+			"tag": "0008_library_favorites",
+			"breakpoints": true
+		},
+		{
+			"idx": 9,
+			"version": "7",
+			"when": 1793444532036,
+			"tag": "0009_image_app_models",
+			"breakpoints": true
+		},
+		{
+			"idx": 10,
+			"version": "7",
+			"when": 1793530932036,
+			"tag": "0010_marketing_model",
+			"breakpoints": true
+		},
+		{
+			"idx": 11,
+			"version": "7",
+			"when": 1793617332036,
+			"tag": "0011_face_swap_nano_banana_pro",
+			"breakpoints": true
+		},
+		{
+			"idx": 12,
+			"version": "7",
+			"when": 1793703732036,
+			"tag": "0012_bakeoff_spend",
+			"breakpoints": true
+		},
+		{
+			"idx": 13,
+			"version": "7",
+			"when": 1793790132036,
+			"tag": "0013_real_video_models",
+			"breakpoints": true
+		},
+		{
+			"idx": 14,
+			"version": "7",
+			"when": 1793790133036,
+			"tag": "0014_model_score_priors",
+			"breakpoints": true
+		},
+		{
+			"idx": 15,
+			"version": "7",
+			"when": 1793790134036,
+			"tag": "0015_fash_video_models",
+			"breakpoints": true
+		},
+		{
+			"idx": 16,
+			"version": "7",
+			"when": 1793790135036,
+			"tag": "0016_video_models_1080p",
+			"breakpoints": true
+		},
+		{
+			"idx": 17,
+			"version": "7",
+			"when": 1793790136036,
+			"tag": "0017_gpt_image_2_5",
+			"breakpoints": true
+		},
+		{
+			"idx": 18,
+			"version": "7",
+			"when": 1793790137036,
+			"tag": "0018_asset_duration",
+			"breakpoints": true
+		},
+		{
+			"idx": 19,
+			"version": "7",
+			"when": 1793790138036,
+			"tag": "0019_kling_v3_motion_control",
+			"breakpoints": true
+		},
+		{
+			"idx": 20,
+			"version": "7",
+			"when": 1793790139036,
+			"tag": "0020_fash_templates",
+			"breakpoints": true
+		},
+		{
+			"idx": 21,
+			"version": "7",
+			"when": 1793790140036,
+			"tag": "0021_prompt_enhance",
+			"breakpoints": true
+		},
+		{
+			"idx": 22,
+			"version": "7",
+			"when": 1793790141036,
+			"tag": "0022_kling_seven_references",
+			"breakpoints": true
+		},
+		{
+			"idx": 23,
+			"version": "7",
+			"when": 1793790142036,
+			"tag": "0023_marketing_seedance_audio",
+			"breakpoints": true
+		},
+		{
+			"idx": 24,
+			"version": "7",
+			"when": 1793790143036,
+			"tag": "0024_motion_template_labels",
+			"breakpoints": true
+		},
+		{
+			"idx": 25,
+			"version": "7",
+			"when": 1793876543036,
+			"tag": "0025_user_templates",
+			"breakpoints": true
+		},
+		{
+			"idx": 26,
+			"version": "7",
+			"when": 1793962943036,
+			"tag": "0026_suggestion_runs",
+			"breakpoints": true
+		},
+		{
+			"idx": 27,
+			"version": "7",
+			"when": 1794049343036,
+			"tag": "0027_jewelry_try_on",
+			"breakpoints": true
+		},
+		{
+			"idx": 28,
+			"version": "7",
+			"when": 1794135743036,
+			"tag": "0028_model_prompt_limits",
+			"breakpoints": true
+		},
+		{
+			"idx": 29,
+			"version": "7",
+			"when": 1794222143036,
+			"tag": "0029_seedance_prompt_source",
+			"breakpoints": true
+		},
+		{
+			"idx": 30,
+			"version": "7",
+			"when": 1794308543036,
+			"tag": "0030_nano_banana_inputs",
+			"breakpoints": true
+		},
+		{
+			"idx": 31,
+			"version": "7",
+			"when": 1794394943036,
+			"tag": "0031_vertex_models",
+			"breakpoints": true
+		},
+		{
+			"idx": 32,
+			"version": "7",
+			"when": 1794394944036,
+			"tag": "0032_try_on_bake_off_seed",
+			"breakpoints": true
+		},
+		{
+			"idx": 33,
+			"version": "7",
+			"when": 1794394945036,
+			"tag": "0033_seedance_2_0_replicate",
+			"breakpoints": true
+		},
+		{
+			"idx": 34,
+			"version": "7",
+			"when": 1794394946036,
+			"tag": "0034_vertex_try_on_prior",
+			"breakpoints": true
+		},
+		{
+			"idx": 35,
+			"version": "7",
+			"when": 1794394947036,
+			"tag": "0035_user_choices",
+			"breakpoints": true
+		},
+		{
+			"idx": 36,
+			"version": "7",
+			"when": 1794394948036,
+			"tag": "0036_minimax_h3_resolutions",
+			"breakpoints": true
+		},
+		{
+			"idx": 37,
+			"version": "7",
+			"when": 1794394949036,
+			"tag": "0037_more_references_and_ratios",
+			"breakpoints": true
+		},
+		{
+			"idx": 38,
+			"version": "7",
+			"when": 1794394950036,
+			"tag": "0038_image_ratios_thinking",
+			"breakpoints": true
+		},
+		{
+			"idx": 39,
+			"version": "7",
+			"when": 1794394951036,
+			"tag": "0039_thinking_prices",
+			"breakpoints": true
+		},
+		{
+			"idx": 40,
+			"version": "7",
+			"when": 1794394952036,
+			"tag": "0040_veo_3_1_replicate",
+			"breakpoints": true
+		},
+		{
+			"idx": 41,
+			"version": "7",
+			"when": 1794394953036,
+			"tag": "0041_kling_prompt_2500",
+			"breakpoints": true
+		},
+		{
+			"idx": 42,
+			"version": "7",
+			"when": 1794394954036,
+			"tag": "0042_veo_3_1_vertex",
+			"breakpoints": true
+		},
+		{
+			"idx": 43,
+			"version": "7",
+			"when": 1794394955036,
+			"tag": "0043_seedance_2_0_replicate_label",
+			"breakpoints": true
+		},
+		{
+			"idx": 44,
+			"version": "7",
+			"when": 1794394956036,
+			"tag": "0044_passkeys",
+			"breakpoints": true
+		},
+		{
+			"idx": 45,
+			"version": "7",
+			"when": 1794394957036,
+			"tag": "0045_verdict_featured",
+			"breakpoints": true
+		},
+		{
+			"idx": 46,
+			"version": "7",
+			"when": 1794394958036,
+			"tag": "0046_must_change_password",
+			"breakpoints": true
+		},
+		{
+			"idx": 47,
+			"version": "7",
+			"when": 1794394959036,
+			"tag": "0047_lingerie_try_on",
+			"breakpoints": true
+		},
+		{
+			"idx": 48,
+			"version": "7",
+			"when": 1794394960036,
+			"tag": "0048_two_factor",
+			"breakpoints": true
+		},
+		{
+			"idx": 49,
+			"version": "7",
+			"when": 1794394961036,
+			"tag": "0049_user_avatar_color",
+			"breakpoints": true
+		},
+		{
+			"idx": 50,
+			"version": "7",
+			"when": 1794394962036,
+			"tag": "0050_vertex_accounts",
+			"breakpoints": true
+		},
+		{
+			"idx": 51,
+			"version": "7",
+			"when": 1794394963036,
+			"tag": "0051_provider_balances",
+			"breakpoints": true
+		},
+		{
+			"idx": 52,
+			"version": "7",
+			"when": 1794394964036,
+			"tag": "0052_gpt_image_2_2k_4k",
+			"breakpoints": true
+		},
+		{
+			"idx": 53,
+			"version": "7",
+			"when": 1794394965036,
+			"tag": "0053_gpt_image_2_1k_price",
+			"breakpoints": true
+		},
+		{
+			"idx": 54,
+			"version": "7",
+			"when": 1794394966036,
+			"tag": "0054_gpt_image_2_measured_price",
+			"breakpoints": true
+		},
+		{
+			"idx": 55,
+			"version": "7",
+			"when": 1794394967036,
+			"tag": "0055_llm_costs_in_ledger",
+			"breakpoints": true
+		},
+		{
+			"idx": 56,
+			"version": "7",
+			"when": 1794394968036,
+			"tag": "0056_byteplus_provider",
+			"breakpoints": true
+		},
+		{
+			"idx": 57,
+			"version": "7",
+			"when": 1794394969036,
+			"tag": "0057_replicate_round_scores",
+			"breakpoints": true
+		},
+		{
+			"idx": 58,
+			"version": "7",
+			"when": 1794394970036,
+			"tag": "0059_seedream_4_byteplus",
+			"breakpoints": true
+		},
+		{
+			"idx": 59,
+			"version": "7",
+			"when": 1794394971036,
+			"tag": "0060_marketing_more_models",
+			"breakpoints": true
+		},
+		{
+			"idx": 60,
+			"version": "7",
+			"when": 1794394972036,
+			"tag": "0061_replicate_round2_scores",
+			"breakpoints": true
+		},
+		{
+			"idx": 61,
+			"version": "7",
+			"when": 1794394973036,
+			"tag": "0062_remove_replicate",
+			"breakpoints": true
+		},
+		{
+			"idx": 62,
+			"version": "7",
+			"when": 1794394974036,
+			"tag": "0063_template_editors",
+			"breakpoints": true
+		},
+		{
+			"idx": 63,
+			"version": "7",
+			"when": 1794394975036,
+			"tag": "0064_store_templates",
+			"breakpoints": true
+		},
+		{
+			"idx": 64,
+			"version": "7",
+			"when": 1794394976036,
+			"tag": "0065_prompt_review",
+			"breakpoints": true
+		},
+		{
+			"idx": 65,
+			"version": "7",
+			"when": 1794394977036,
+			"tag": "0066_image_styles",
+			"breakpoints": true
+		},
+		{
+			"idx": 66,
+			"version": "7",
+			"when": 1794394978036,
+			"tag": "0067_store_brand_kit",
+			"breakpoints": true
+		},
+		{
+			"idx": 67,
+			"version": "7",
+			"when": 1794394979036,
+			"tag": "0068_upload_store",
+			"breakpoints": true
+		},
+		{
+			"idx": 68,
+			"version": "7",
+			"when": 1794395039036,
+			"tag": "0069_floating_reveal_prompt",
+			"breakpoints": true
+		},
+		{
+			"idx": 69,
+			"version": "7",
+			"when": 1794395099036,
+			"tag": "0070_replicate_round3_scores",
+			"breakpoints": true
+		},
+		{
+			"idx": 70,
+			"version": "7",
+			"when": 1794395159036,
+			"tag": "0071_choice_scope",
+			"breakpoints": true
+		},
+		{
+			"idx": 71,
+			"version": "7",
+			"when": 1794395219036,
+			"tag": "0072_drop_replicate",
+			"breakpoints": true
+		},
+		{
+			"idx": 72,
+			"version": "7",
+			"when": 1794395279036,
+			"tag": "0073_omni_flash_1_2",
+			"breakpoints": true
+		},
+		{
+			"idx": 73,
+			"version": "7",
+			"when": 1794395339036,
+			"tag": "0074_vertex_omni_1_2",
+			"breakpoints": true
+		},
+		{
+			"idx": 74,
+			"version": "7",
+			"when": 1794395399036,
+			"tag": "0075_hide_pricier_twins",
+			"breakpoints": true
+		},
+		{
+			"idx": 75,
+			"version": "7",
+			"when": 1794395459036,
+			"tag": "0076_byteplus_pack_balance",
+			"breakpoints": true
+		},
+		{
+			"idx": 76,
+			"version": "7",
+			"when": 1794395519036,
+			"tag": "0077_upload_dedupe",
+			"breakpoints": true
+		},
+		{
+			"idx": 77,
+			"version": "7",
+			"when": 1794395579036,
+			"tag": "0078_one_model_per_pair",
+			"breakpoints": true
+		},
+		{
+			"idx": 78,
+			"version": "7",
+			"when": 1794395639036,
+			"tag": "0079_model_name_case",
+			"breakpoints": true
+		},
+		{
+			"idx": 79,
+			"version": "7",
+			"when": 1794395639037,
+			"tag": "0080_curated_examples",
+			"breakpoints": true
+		},
+		{
+			"idx": 80,
+			"version": "7",
+			"when": 1794395639038,
+			"tag": "0081_example_order",
+			"breakpoints": true
+		},
+		{
+			"idx": 81,
+			"version": "7",
+			"when": 1794395639039,
+			"tag": "0082_team_default_tool",
+			"breakpoints": true
+		}
+	]
 }

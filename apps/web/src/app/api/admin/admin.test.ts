@@ -76,7 +76,8 @@ describe('every /api/admin route', () => {
 });
 
 describe('teams', () => {
-  const list = async (query = '') => ((await (await teamsRoute.GET(call(admin.cookie, `/api/admin/teams${query}`))).json()) as { teams: { id: string; name: string; costCentreCode: string | null; hidden: boolean }[] }).teams;
+  const list = async (query = '') =>
+    ((await (await teamsRoute.GET(call(admin.cookie, `/api/admin/teams${query}`))).json()) as { teams: { id: string; name: string; costCentreCode: string | null; hidden: boolean; defaultTool: string | null }[] }).teams;
   const patch = (id: string, body: unknown) => teamRoute.PATCH(call(admin.cookie, `/api/admin/teams/${id}`, 'PATCH', body), ctx(id));
 
   test('creates a team with a name and an optional cost-centre code, audited once', async () => {
@@ -100,10 +101,23 @@ describe('teams', () => {
     expect((await patch(id, { name: 'Operations', costCentreCode: 'CC-2' })).status).toBe(200);
     expect((await patch(id, { name: 'Operations' })).status).toBe(200); // unchanged: no entry
     expect((await audits(`team:${id}`)).slice(1)).toEqual([
-      { actor_id: admin.id, action: 'team.rename', old_value: { name: 'Ops', costCentreCode: 'CC-1' }, new_value: { name: 'Operations', costCentreCode: 'CC-2' } },
+      { actor_id: admin.id, action: 'team.rename', old_value: { name: 'Ops', costCentreCode: 'CC-1', defaultTool: null }, new_value: { name: 'Operations', costCentreCode: 'CC-2', defaultTool: null } },
     ]);
     expect((await patch(id, { costCentreCode: null })).status).toBe(200);
     expect((await list()).find((t) => t.id === id)).toMatchObject({ name: 'Operations', costCentreCode: null });
+  });
+
+  test('sets and clears a team default landing tool, audited; rejects an unknown route', async () => {
+    const { id } = (await (await teamsRoute.POST(call(admin.cookie, '/api/admin/teams', 'POST', { name: 'Seller' }))).json()) as { id: string };
+    expect((await patch(id, { defaultTool: '/marketing-studio' })).status).toBe(200);
+    expect((await list()).find((t) => t.id === id)).toMatchObject({ defaultTool: '/marketing-studio' });
+    expect((await patch(id, { defaultTool: '/nope' })).status).toBe(400); // not a known landing route
+    expect((await patch(id, { defaultTool: null })).status).toBe(200);
+    expect((await list()).find((t) => t.id === id)).toMatchObject({ defaultTool: null });
+    expect((await audits(`team:${id}`)).slice(1)).toEqual([
+      { actor_id: admin.id, action: 'team.rename', old_value: { name: 'Seller', costCentreCode: null, defaultTool: null }, new_value: { name: 'Seller', costCentreCode: null, defaultTool: '/marketing-studio' } },
+      { actor_id: admin.id, action: 'team.rename', old_value: { name: 'Seller', costCentreCode: null, defaultTool: '/marketing-studio' }, new_value: { name: 'Seller', costCentreCode: null, defaultTool: null } },
+    ]);
   });
 
   test('hides a team, audited once; a hidden team is not listed for the new-user form but stays listed for the Admin page', async () => {

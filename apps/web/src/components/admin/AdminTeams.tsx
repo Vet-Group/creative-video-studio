@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { LoadError } from '@/components/LoadError';
 import { api, sendJson } from '@/lib/api';
 import { useAction, useFetch } from '@/lib/admin-ui';
+import { LANDINGS } from '@/lib/landing';
 import { Empty, PageHead } from './PageHead';
 
 interface Team {
@@ -10,11 +11,13 @@ interface Team {
   name: string;
   costCentreCode: string | null;
   hidden: boolean;
+  defaultTool: string | null;
 }
 
 function TeamRow({ team, run, pending }: { team: Team; run: ReturnType<typeof useAction>['run']; pending: boolean }) {
   const [name, setName] = useState(team.name);
   const [code, setCode] = useState(team.costCentreCode ?? '');
+  const [tool, setTool] = useState(team.defaultTool ?? '');
   const patch = (body: Record<string, unknown>, fallback: string) => run(() => api(`/api/admin/teams/${team.id}`, sendJson('PATCH', body)), fallback);
   return (
     <tr>
@@ -25,9 +28,19 @@ function TeamRow({ team, run, pending }: { team: Team; run: ReturnType<typeof us
       <td data-label="Mã trung tâm chi phí">
         <input aria-label={`Mã trung tâm chi phí của ${team.name}`} value={code} onChange={(e) => setCode(e.target.value)} />
       </td>
+      <td data-label="Trang mặc định">
+        <select aria-label={`Trang mặc định của ${team.name}`} value={tool} onChange={(e) => setTool(e.target.value)}>
+          <option value="">Tạo video (mặc định)</option>
+          {Object.entries(LANDINGS).map(([href, label]) => (
+            <option key={href} value={href}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </td>
       <td data-label="Thao tác">
         <div className="actions">
-          <button type="button" disabled={pending || !name.trim()} onClick={() => void patch({ name, costCentreCode: code.trim() || null }, 'Không lưu được nhóm.')}>
+          <button type="button" disabled={pending || !name.trim()} onClick={() => void patch({ name, costCentreCode: code.trim() || null, defaultTool: tool || null }, 'Không lưu được nhóm.')}>
             Lưu
           </button>
           <button type="button" disabled={pending} onClick={() => void patch({ hidden: !team.hidden }, 'Không đổi được trạng thái ẩn.')}>
@@ -96,6 +109,7 @@ export function AdminTeams() {
               <tr>
                 <th scope="col">Tên nhóm</th>
                 <th scope="col">Mã trung tâm chi phí</th>
+                <th scope="col">Trang mặc định</th>
                 <th scope="col">Thao tác</th>
               </tr>
             </thead>
