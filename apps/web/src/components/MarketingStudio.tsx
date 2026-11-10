@@ -123,7 +123,9 @@ interface MarketingJob {
   modelId: string | null;
 }
 
-export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingFormat; reuse?: string }) {
+const WIZARD_KEY = 'cvs.marketing.wizard';
+
+export function MarketingStudio({ format = 'ugc', reuse, wizardDefault = false }: { format?: MarketingFormat; reuse?: string; wizardDefault?: boolean }) {
   const advanced = format === 'advanced';
   const unboxing = format === 'unboxing';
   const review = format === 'review';
@@ -200,6 +202,22 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
   const promptId = useId();
   const scriptId = useId();
   const reasonId = useId();
+  // The guided wizard walks a Seller through format → photos → content → settings, one step at a time; off is the full form below, unchanged. Default from the team (wizardDefault), then the member's own remembered choice.
+  const [wizard, setWizard] = useState(wizardDefault);
+  const [step, setStep] = useState(0);
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(WIZARD_KEY);
+      if (saved !== null) setWizard(saved === '1');
+    } catch {}
+  }, []);
+  const setWizardMode = (on: boolean) => {
+    setWizard(on);
+    setStep(0);
+    try {
+      localStorage.setItem(WIZARD_KEY, on ? '1' : '0');
+    } catch {}
+  };
 
   // The ratio and duration menus offer what any marketing model offers, so a model whose options differ from the chosen one's can still be picked;
   // switching to a model moves the ratio and the duration to that model's own when it lacks them.
@@ -409,6 +427,11 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
   /** Hook variants beyond the clips left today are refused before anything is sent. */
   const short = n > 1 && clips !== null && clips.today + n > clips.cap ? `Hôm nay bạn chỉ còn ${Math.max(0, clips.cap - clips.today)} clip; bỏ bớt biến thể hook.` : null;
   const canRun = reason === null && short === null && !busy;
+  // The wizard's four steps and whether each may be left: photos present, then the words the format needs, then the Run gate. Off, every block shows at once (atStep).
+  const STEPS = ['Định dạng', 'Ảnh', 'Nội dung', 'Cài đặt'];
+  const lastStep = STEPS.length - 1;
+  const stepReady = [true, photoReason === null, review ? highlightLines(highlights).length > 0 : advanced ? brief.trim() !== '' : true, canRun];
+  const atStep = (k: number) => !wizard || step === k;
 
   /** A stock model is copied on the server as the member's own picture, so the job only ever holds the member's own assets. */
   async function pickStock(name: string) {
@@ -580,20 +603,38 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
         <div className="card form-card" id="marketing-panel-create" role={narrow ? 'tabpanel' : undefined} aria-labelledby={narrow ? 'marketing-tab-create' : undefined} hidden={narrow && shown !== 'create'} onPointerDownCapture={recall.touch} onKeyDownCapture={recall.touch}>
           <div className="form-scroll">
             <PageHint href="/marketing-studio" />
+            {wizard && (
+              <ol className="wizard-steps" aria-label="Các bước làm video">
+                {STEPS.map((s, i) => (
+                  <li key={s} aria-current={i === step ? 'step' : undefined} data-done={i < step || undefined} data-active={i === step || undefined}>
+                    <span className="wizard-step-n" aria-hidden="true">
+                      {i + 1}
+                    </span>
+                    {s}
+                  </li>
+                ))}
+              </ol>
+            )}
+            <button type="button" className="link-button wizard-toggle" onClick={() => setWizardMode(!wizard)}>
+              {wizard ? 'Chuyển sang chế độ đầy đủ' : 'Chuyển sang chế độ hướng dẫn'}
+            </button>
             {/* A click anywhere on the banner opens the format picker, as Create's banner opens its presets; the chip stays the keyboard and screen-reader way in. */}
-            <div className="app-head marketing-head" data-category="video" data-photo={have.has(photo) || undefined} style={have.has(photo) ? ({ '--photo': `url(/api/samples/${photo})` } as CSSProperties) : undefined} onClick={() => setPicker('format')}>
-              {have.has(loop) && (
-                <span className="head-loop">
-                  <LoopVideo src={`/api/samples/${loop}`} poster={have.has(photo) ? `/api/samples/${photo}` : null} />
-                </span>
-              )}
-              <strong>{name}</strong>
-              <button type="button" className="banner-chip" onClick={() => setPicker('format')}>
-                <Icon name="edit" size={12} />
-                Đổi định dạng
-              </button>
-            </div>
-            <div className="app-slots marketing-slots" data-two="true">
+            {atStep(0) && (
+              <div className="app-head marketing-head" data-category="video" data-photo={have.has(photo) || undefined} style={have.has(photo) ? ({ '--photo': `url(/api/samples/${photo})` } as CSSProperties) : undefined} onClick={() => setPicker('format')}>
+                {have.has(loop) && (
+                  <span className="head-loop">
+                    <LoopVideo src={`/api/samples/${loop}`} poster={have.has(photo) ? `/api/samples/${photo}` : null} />
+                  </span>
+                )}
+                <strong>{name}</strong>
+                <button type="button" className="banner-chip" onClick={() => setPicker('format')}>
+                  <Icon name="edit" size={12} />
+                  Đổi định dạng
+                </button>
+              </div>
+            )}
+            {atStep(1) && (
+              <div className="app-slots marketing-slots" data-two="true">
               {advanced ? (
                 <div className="slot-wide">
                   <Slot label="Ảnh tham chiếu" empty={`Tối đa ${maxRefs} ảnh tham chiếu`} inputLabel="Ảnh tham chiếu" images={refs} max={maxRefs} busy={busy} onAdd={add(setRefs, 'reference', maxRefs)} onRemove={(id) => setRefs((cur) => cur.filter((r) => r.id !== id))} icon="plus" onPick={(a) => setRefs((cur) => [...cur, a].slice(0, maxRefs))} storeId={storeId} />
@@ -607,12 +648,14 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
               )}
               {!sec && hookBox}
               {!sec && locationBox}
-            </div>
-            {unboxing && person.length === 0 && <p className="help">Không có ảnh người mẫu: video quay theo góc nhìn thứ nhất, chỉ thấy đôi tay mở hộp.</p>}
-            {review && <Highlights lines={highlights} onChange={setHighlights} />}
+              </div>
+            )}
+            {atStep(1) && unboxing && person.length === 0 && <p className="help">Không có ảnh người mẫu: video quay theo góc nhìn thứ nhất, chỉ thấy đôi tay mở hộp.</p>}
+            {atStep(2) && review && <Highlights lines={highlights} onChange={setHighlights} />}
 
-            {advanced && <ReferenceVideoSlot video={video} busy={busy} onFile={(f) => void takeVideo(() => uploadImages([f], 'video', storeId) as Promise<RefVideo[]>, (e) => uploadError(e, 'video'))} onHistory={(id) => void takeVideo(() => api<{ assets: RefVideo[] }>('/api/assets/copy', sendJson('POST', { assetId: id })).then((r) => r.assets), (e) => copyError(e, VIDEO_ERROR))} onRemove={() => setVideo(null)} />}
+            {atStep(1) && advanced && <ReferenceVideoSlot video={video} busy={busy} onFile={(f) => void takeVideo(() => uploadImages([f], 'video', storeId) as Promise<RefVideo[]>, (e) => uploadError(e, 'video'))} onHistory={(id) => void takeVideo(() => api<{ assets: RefVideo[] }>('/api/assets/copy', sendJson('POST', { assetId: id })).then((r) => r.assets), (e) => copyError(e, VIDEO_ERROR))} onRemove={() => setVideo(null)} />}
 
+            {atStep(2) && (
             <PromptSections
               feature="marketing"
               format={pf}
@@ -656,7 +699,8 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
                 ask={chosen ? () => ({ field: 'brief', ...(pf && { format: pf }), text: brief, hook: hooks[0], location: location || undefined, seconds: durationSec, audio, ...(room !== undefined && { room }), model: chosen.id }) : null}
               />
             </PromptSections>
-            {(advanced || review) && (
+            )}
+            {atStep(2) && (advanced || review) && (
               <PromptComposer
                 id={scriptId}
                 label="Lời thoại"
@@ -676,6 +720,8 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
               />
             )}
 
+            {atStep(3) && (
+            <>
             <VideoSettings>
               <div className="field-row">
                 {models && ratios.length > 0 && (
@@ -717,6 +763,8 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
               })}
               store={stores.find((s) => s.id === storeId) ?? null}
             />
+            </>
+            )}
           </div>
 
           <div className="form-message">
@@ -745,11 +793,22 @@ export function MarketingStudio({ format = 'ugc', reuse }: { format?: MarketingF
           </div>
           <div className="runbar">
             <RunSummary items={[chosen?.label, ratio, `${durationSec} giây`, audioOn && 'có âm thanh']} />
-            <button type="button" className="primary run" disabled={!canRun} aria-describedby={(reason ?? short) ? reasonId : undefined} onClick={() => void run()}>
-              Tạo video
-              {n > 1 && ` ${n} clip`}
-              {chosen && <span className="run-cost">· {fresh ? `$${total}` : '…'}</span>} {/* the estimate is for the duration of the last list */}
-            </button>
+            {wizard && step > 0 && (
+              <button type="button" onClick={() => setStep((s) => s - 1)}>
+                Quay lại
+              </button>
+            )}
+            {wizard && step < lastStep ? (
+              <button type="button" className="primary" disabled={!stepReady[step]} aria-describedby={(reason ?? short) ? reasonId : undefined} onClick={() => stepReady[step] && setStep((s) => s + 1)}>
+                Tiếp tục
+              </button>
+            ) : (
+              <button type="button" className="primary run" disabled={!canRun} aria-describedby={(reason ?? short) ? reasonId : undefined} onClick={() => void run()}>
+                Tạo video
+                {n > 1 && ` ${n} clip`}
+                {chosen && <span className="run-cost">· {fresh ? `$${total}` : '…'}</span>} {/* the estimate is for the duration of the last list */}
+              </button>
+            )}
           </div>
         </div>
 

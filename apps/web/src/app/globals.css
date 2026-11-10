@@ -2335,3 +2335,50 @@ dialog.modal.tool-guide { width: min(52rem, calc(100vw - 2rem)); }
   .library .segmented button:first-child::after { right: -1px; left: -12px; }
   .library .segmented button:last-child::after { right: -12px; left: -1px; }
 }
+
+/* The Marketing Studio guided wizard: the step list, the step toggle and the step circles. */
+.wizard-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin: 0 0 4px;
+  padding: 0;
+  list-style: none;
+}
+.wizard-steps li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--muted);
+}
+.wizard-steps li[data-active] {
+  color: var(--ink);
+  font-weight: 600;
+}
+.wizard-step-n {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  font-size: 11px;
+  line-height: 1;
+}
+.wizard-steps li[data-active] .wizard-step-n {
+  border-color: var(--brand);
+  background: var(--brand);
+  color: var(--on-dark);
+}
+.wizard-steps li[data-done] .wizard-step-n {
+  border-color: var(--brand);
+  background: var(--fill);
+  color: var(--brand);
+}
+.wizard-toggle {
+  align-self: flex-start;
+  font-size: 12px;
+}
