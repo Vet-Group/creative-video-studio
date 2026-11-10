@@ -14,6 +14,7 @@ import { confirmRun } from '@/lib/run-guard';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { AccountMenu } from './AccountMenu';
 import { ConfirmHost, confirmDialog } from './Confirm';
+import { FalLowNotice } from './FalLowNotice';
 import { Icon, type IconName } from './Icon';
 import { JobFailureNote, canRetry, canRetryOnTwin, twinRetryText } from './JobFailure';
 import { JobPrompt, JobsProvider, Recreate, roleOf, Tap, toggleFullscreen, useForm, useJobs } from './jobs';
@@ -570,6 +571,7 @@ export function Shell({ userId, userName, isAdmin, account, initialCollapsed, ch
                 <strong>{title}</strong>
                 {accountMenu('avatar')}
               </header>
+              {isAdmin && <FalLowNotice />}
               <div className="frame">
                 <main>{children}</main>
                 {!hasOwnHistory(pathname) && <Tray />}
