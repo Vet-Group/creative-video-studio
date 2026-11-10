@@ -62,7 +62,7 @@ models lock. There is still no top-up in the app: fal has no API to buy credit.
   (`apps/web/src/components/FalLowNotice.tsx`). It reads the panel's answer (`GET /api/admin/costs/balances`) once when the app loads; a failed read shows
   nothing. Members never see it.
 - **On Lark.** The worker checks once an hour (`apps/worker/src/fal-alert.ts`), only when `FAL_KEY`, `LARK_APP_ID` and `LARK_APP_SECRET` are set. The
-  first check under the threshold claims `settings.fal_low_alerted_at` (migration 0082) and sends one text message from the CVS Lark app's bot to every
+  first check under the threshold claims `settings.fal_low_alerted_at` (migration 0083) and sends one text message from the CVS Lark app's bot to every
   Admin who is not banned and has a linked Lark account (`accounts.account_id` is the Lark open_id for this app). Later checks while it stays low send
   nothing; a check at or over the threshold clears the claim, so the next drop alerts again. When every message fails the claim is released and the next
   hour tries again; the worker log has Lark's error code. A balance that cannot be read, or is not in USD, changes nothing.
