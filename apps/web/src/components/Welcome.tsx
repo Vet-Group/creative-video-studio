@@ -2,10 +2,9 @@
 // A first-visit card on Explore: three steps from picking a tool to marking the result, gone for good once closed.
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { WELCOME_KEY } from '@/lib/onboarding';
 import { Icon } from './Icon';
 import { ToolGuideButton } from './ToolGuide';
-
-export const WELCOME_KEY = 'cvs.welcome.done';
 
 export function Welcome() {
   // Hidden until storage is read, so a member who closed it never sees it flash.

@@ -11,6 +11,7 @@ import { NO_CAP } from '@/lib/caps';
 import { api, errorText, sendJson, thumbUrl } from '@/lib/api';
 import { ADVANCED_MAX_IMAGES, ADVANCED_MAX_SCRIPT, advancedPrompt, briefRoom, END_TEXT_POSITIONS, type EndTextPosition, FORMAT_HREF, FORMAT_NAME, highlightLines, hrefOfFormat, marketingPrompt, type MarketingFormat, reviewPrompt, sectionPrompt, unboxingPrompt, unboxingRoles } from '@/lib/marketing';
 import { PROMPT_TEMPLATES } from '@/lib/prompt-starters';
+import { WIZARD_KEY } from '@/lib/onboarding';
 import { type BrandKit, withBrand } from '@/lib/brand';
 import { promptTooLong } from '@/lib/prompt-limit';
 import { confirmRun } from '@/lib/run-guard';
@@ -122,8 +123,6 @@ interface MarketingJob {
   durationSec: number | null;
   modelId: string | null;
 }
-
-const WIZARD_KEY = 'cvs.marketing.wizard';
 
 export function MarketingStudio({ format = 'ugc', reuse, wizardDefault = false }: { format?: MarketingFormat; reuse?: string; wizardDefault?: boolean }) {
   const advanced = format === 'advanced';
