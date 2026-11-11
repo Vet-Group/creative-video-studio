@@ -81,9 +81,9 @@ test('a failed personal submit under the warning threshold switches once: audite
   expect(sent[0]![1]).toContain('tài khoản fal cá nhân đã hết tiền (còn $0.42)');
 });
 
-test('a failed personal submit with money left, or an unreadable balance, is the job own failure: no switch, nothing sent to the team', async () => {
+test('a failed personal submit with money left, credit under the threshold but not refused for credit, or an unreadable balance, is the job own failure: no switch, nothing sent to the team', async () => {
   const boom = new Error('fal submit: HTTP 422 content policy');
-  for (const readPersonal of [usd(15), async (): Promise<FalBalance> => ({ ok: false, reason: 'failed', error: 'down' })]) {
+  for (const readPersonal of [usd(15), usd(4), async (): Promise<FalBalance> => ({ ok: false, reason: 'failed', error: 'down' })]) {
     const team = account('t');
     const fal = falNext(account('p', boom).provider, team.provider, { pool, readPersonal });
     await expect(fal.submit('req')).rejects.toBe(boom);
@@ -91,6 +91,13 @@ test('a failed personal submit with money left, or an unreadable balance, is the
     expect(await falActive(pool)).toBe('personal');
   }
   expect((await pool.query(`select count(*)::int as n from audit_entries where action = 'fal.switch'`)).rows[0].n).toBe(0);
+});
+
+test('a personal balance at 0 switches whatever fal says', async () => {
+  const team = account('t');
+  const fal = falNext(account('p', new Error('fal submit: HTTP 401 {"error":"unexpected wording"}')).provider, team.provider, { pool, readPersonal: usd(0) });
+  expect(await fal.submit('req')).toEqual({ providerJobId: 'acct:team|t-1' });
+  expect(await falActive(pool)).toBe('team');
 });
 
 test('after the switch a failed team submit is thrown as it is', async () => {

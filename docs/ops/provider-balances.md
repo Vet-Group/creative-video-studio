@@ -76,10 +76,11 @@ Owner decision of 2026-11-11: the fal personal account is used up first, then CV
 accountant top up without the owner's GitHub login). fal cannot move credit between accounts, so the team is topped up and given its own key ahead.
 
 - **Setup.** Put the team key in `FAL_KEY_NEXT` next to `FAL_KEY` in the server `.env` and restart the web app and the worker. Without it nothing changes.
-- **Switch.** New fal jobs keep going to `FAL_KEY` until a submit there fails while its balance is under the Admin warning threshold. The first worker
-  to see that sets `settings.fal_next_at`, writes a `fal.switch` audit row (no actor) and messages the Admins on Lark; the job is sent again to the team,
-  and every later one goes there (`apps/worker/src/fal-next.ts`). A failure with money left, or with an unreadable balance, is the job's own and does not
-  switch. A job keeps the account it was sent to (ids are prefixed `acct:personal|` or `acct:team|`), so jobs sent before the switch finish on the personal
+- **Switch.** The personal credit is used up first (owner, 2026-11-11). New fal jobs keep going to `FAL_KEY` until fal refuses a submit there for
+  credit ("account is locked", "User is locked. Reason: Exhausted balance.", "Insufficient credits", or any refusal once the balance is at or under 0)
+  while the balance is under the Admin warning threshold. The first worker to see that sets `settings.fal_next_at`, writes a `fal.switch` audit row (no actor) and messages the Admins on Lark; the job is sent again to the team,
+  and every later one goes there (`apps/worker/src/fal-next.ts`). A failure with money left, a failure that is not a credit refusal, or one with an unreadable balance,
+  is the job's own and does not switch. A job keeps the account it was sent to (ids are prefixed `acct:personal|` or `acct:team|`), so jobs sent before the switch finish on the personal
   account; an id without the prefix is the personal one.
 - **Balance.** Until the switch, the cost panel, the fal credit lock and the low-balance alert use both balances summed, so models do not lock while the
   team still has money; after it, the team's alone (`readFalBalances` in `packages/core/src/providers/balances.ts`).
