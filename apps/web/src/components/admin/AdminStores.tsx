@@ -10,7 +10,9 @@ import { Empty, PageHead } from './PageHead';
 interface Store extends BrandStore {
   code: string;
   hidden: boolean;
+  paused: boolean;
   hasCost: boolean;
+  inUse: boolean;
 }
 
 function StoreRow({ store, run, pending, onBrand }: { store: Store; run: ReturnType<typeof useAction>['run']; pending: boolean; onBrand: () => void }) {
@@ -22,11 +24,19 @@ function StoreRow({ store, run, pending, onBrand }: { store: Store; run: ReturnT
     if (store.hasCost && code.trim() !== store.code && !(await confirmDialog({ title: 'Đổi mã cửa hàng?', body: 'Cửa hàng này đã có chi phí. Báo cáo và CSV từ giờ dùng mã mới; file đã xuất trước đó vẫn mang mã cũ.', confirmLabel: 'Đổi mã' }))) return;
     void patch({ name, code }, 'Không lưu được cửa hàng.');
   }
+  async function close() {
+    if (!(await confirmDialog({ title: `Đóng cửa hàng ${store.name}?`, body: 'Cửa hàng không còn trong danh sách chọn khi tạo clip. Clip và chi phí cũ vẫn giữ trong báo cáo; mở lại được bất cứ lúc nào.', confirmLabel: 'Đóng cửa hàng' }))) return;
+    void patch({ hidden: true }, 'Không đóng được cửa hàng.');
+  }
+  async function remove() {
+    if (!(await confirmDialog({ title: `Xoá cửa hàng ${store.name}?`, body: 'Cửa hàng chưa có clip, chi phí hay mẫu nào nên xoá hẳn được. Không hoàn tác được.', confirmLabel: 'Xoá', danger: true }))) return;
+    void run(() => api(`/api/admin/stores/${store.id}`, { method: 'DELETE' }), 'Không xoá được cửa hàng.');
+  }
   return (
     <tr>
       <td data-label="Tên cửa hàng">
         <input aria-label={`Tên cửa hàng ${store.name}`} value={name} onChange={(e) => setName(e.target.value)} />
-        {store.hidden && <span className="tag">Đã ẩn</span>}
+        {store.hidden ? <span className="tag">Đã đóng</span> : store.paused && <span className="tag">Tạm dừng</span>}
       </td>
       <td data-label="Mã cửa hàng">
         <input aria-label={`Mã cửa hàng của ${store.name}`} value={code} onChange={(e) => setCode(e.target.value)} />
@@ -36,8 +46,28 @@ function StoreRow({ store, run, pending, onBrand }: { store: Store; run: ReturnT
           <button type="button" disabled={pending || !name.trim() || !code.trim()} onClick={() => void save()}>
             Lưu
           </button>
-          <button type="button" disabled={pending} onClick={() => void patch({ hidden: !store.hidden }, 'Không đổi được trạng thái ẩn.')}>
-            {store.hidden ? 'Hiện lại' : 'Ẩn'}
+          {store.hidden ? (
+            <button type="button" disabled={pending} onClick={() => void patch({ hidden: false, paused: false }, 'Không mở lại được cửa hàng.')}>
+              Mở lại
+            </button>
+          ) : (
+            <>
+              <button type="button" disabled={pending} onClick={() => void patch({ paused: !store.paused }, 'Không đổi được trạng thái cửa hàng.')}>
+                {store.paused ? 'Hoạt động lại' : 'Tạm dừng'}
+              </button>
+              <button type="button" disabled={pending} onClick={() => void close()}>
+                Đóng
+              </button>
+            </>
+          )}
+          <button
+            type="button"
+            className="danger"
+            disabled={pending || store.inUse}
+            title={store.inUse ? 'Cửa hàng đã có clip, chi phí hoặc mẫu: hãy Đóng thay vì xoá.' : undefined}
+            onClick={() => void remove()}
+          >
+            Xoá
           </button>
           <button type="button" aria-label={`Bộ nhận diện của ${store.name}`} onClick={onBrand}>
             Bộ nhận diện
@@ -90,7 +120,10 @@ export function AdminStores() {
             Tạo cửa hàng
           </button>
         </div>
-        <p className="muted">Cửa hàng không bao giờ bị xoá và mã là duy nhất. Đổi mã thì chi phí cũ vẫn thuộc cửa hàng này; báo cáo và CSV từ giờ dùng mã mới.</p>
+        <p className="muted">
+          Mã là duy nhất. Đổi mã thì chi phí cũ vẫn thuộc cửa hàng này; báo cáo và CSV từ giờ dùng mã mới. Tạm dừng: vẫn chọn được, xếp cuối và có nhãn “tạm dừng”. Đóng: không
+          còn trong danh sách chọn, lịch sử vẫn giữ, mở lại được. Chỉ xoá được cửa hàng chưa có clip, chi phí hay mẫu nào.
+        </p>
       </fieldset>
       {problem && (
         <p className="error" role="alert">

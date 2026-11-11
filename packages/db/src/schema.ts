@@ -68,7 +68,10 @@ export const stores = pgTable('stores', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
   code: text('code').notNull().unique(),
+  /** Closed (owner decision, 2026-11-11): out of every picker, its history kept; an Admin may reopen it. */
   hidden: boolean('hidden').notNull().default(false),
+  /** Paused (owner decision, 2026-11-11): still in the pickers, after the open stores and marked as paused; an Admin resumes it with one click. */
+  paused: boolean('paused').notNull().default(false),
   /** The store's brand kit (owner decision, 2026-11-04), added to Marketing Studio and Image Generation prompts on request; validated by the API (lib/brand.ts). */
   brandVoice: text('brand_voice'),
   brandColors: text('brand_colors').array().notNull().default(sql`'{}'`),

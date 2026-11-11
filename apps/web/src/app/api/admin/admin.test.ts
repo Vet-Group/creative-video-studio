@@ -70,8 +70,9 @@ describe('every /api/admin route', () => {
     expect(handlers).toBeGreaterThanOrEqual(23);
   });
 
-  test('nothing is ever deleted: no route offers DELETE', () => {
-    for (const mod of [teamsRoute, teamRoute, storesRoute, storeRoute, presetRoute]) expect(mod).not.toHaveProperty('DELETE');
+  test('nothing else is deleted: only a store nothing points at may be (owner decision, 2026-11-11; tested under stores)', () => {
+    for (const mod of [teamsRoute, teamRoute, storesRoute, presetRoute]) expect(mod).not.toHaveProperty('DELETE');
+    expect(storeRoute).toHaveProperty('DELETE');
   });
 });
 
@@ -194,6 +195,43 @@ describe('stores', () => {
   test('refuses an empty change and an unknown store', async () => {
     expect((await patch('no-such-store', { name: 'X' })).status).toBe(404);
     expect((await patch('no-such-store', {})).status).toBe(400);
+    expect((await patch('no-such-store', { paused: 'yes' })).status).toBe(400);
+  });
+
+  test('pauses a store, audited once: the picker keeps it after the open stores, marked, and resuming brings it back', async () => {
+    const { id } = (await (await create('Aaa Paused Shop', 'POD-P')).json()) as { id: string };
+    const picker = async () => ((await (await GET_PUBLIC_STORES(call(member.cookie, '/api/stores'))).json()) as { stores: { id: string; name: string; paused: boolean }[] }).stores;
+    expect((await picker())[0]).toMatchObject({ id, name: 'Aaa Paused Shop', paused: false }); // first by name while open
+    expect((await patch(id, { paused: true })).status).toBe(200);
+    const paused = await picker();
+    expect(paused.at(-1)).toEqual(expect.objectContaining({ id, name: 'Aaa Paused Shop (tạm dừng)', paused: true }));
+    expect((await list()).find((s) => s.id === id)).toMatchObject({ paused: true, hidden: false });
+    expect((await pool.query('select name from stores where id = $1', [id])).rows[0].name).toBe('Aaa Paused Shop'); // the mark is the picker's, not the name
+    expect((await patch(id, { paused: false })).status).toBe(200);
+    expect((await picker())[0]).toMatchObject({ id, name: 'Aaa Paused Shop', paused: false });
+    expect((await audits(`store:${id}`)).slice(1)).toEqual([
+      { actor_id: admin.id, action: 'store.pause', old_value: { paused: false }, new_value: { paused: true } },
+      { actor_id: admin.id, action: 'store.pause', old_value: { paused: true }, new_value: { paused: false } },
+    ]);
+  });
+
+  test('deletes a store nothing points at, audited; refuses one with a clip (409, nothing changed) and an unknown one (404)', async () => {
+    const remove = (id: string) => storeRoute.DELETE(call(admin.cookie, `/api/admin/stores/${id}`, 'DELETE'), ctx(id));
+    const { id: unused } = (await (await create('Shop Unused', 'POD-U')).json()) as { id: string };
+    const { id: used } = (await (await create('Shop Used', 'POD-V')).json()) as { id: string };
+    await seedJob('delete-guard-job', used);
+    expect((await list()).filter((s) => [unused, used].includes(s.id)).map((s) => [s.code, (s as { inUse?: boolean }).inUse])).toEqual([['POD-U', false], ['POD-V', true]]);
+
+    const before = await auditCount();
+    expect((await remove(used)).status).toBe(409);
+    expect(await auditCount()).toBe(before);
+    expect((await pool.query('select 1 from stores where id = $1', [used])).rowCount).toBe(1);
+
+    expect((await remove(unused)).status).toBe(200);
+    expect((await pool.query('select 1 from stores where id = $1', [unused])).rowCount).toBe(0);
+    expect(await audits(`store:${unused}`)).toContainEqual({ actor_id: admin.id, action: 'store.delete', old_value: { name: 'Shop Unused', code: 'POD-U' }, new_value: null });
+    expect((await remove(unused)).status).toBe(404);
+    expect((await create('Shop Unused again', 'POD-U')).status).toBe(201); // the code is free again
   });
 });
 
