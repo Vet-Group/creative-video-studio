@@ -72,3 +72,16 @@ test('the store picker finds a store typed without diacritics, and Enter picks t
   await search.press('Enter');
   await expect(select(page, label)).toHaveText('Mỹ Phẩm Hàn Quốc');
 });
+
+// The quick search matches a store's code too, not only its name.
+test('the store picker search also matches a store code', async ({ page }) => {
+  await signIn(page, 'admin');
+  const code = `ZX${Date.now() % 100000}`;
+  expect((await page.request.post('/api/admin/stores', { data: { name: 'Ngẫu Nhiên Shop', code } })).ok()).toBe(true);
+  await page.reload();
+  await expect(page.getByLabel('Ảnh sản phẩm')).toBeEnabled();
+  const label = 'Cửa hàng/Thương hiệu';
+  await select(page, label).click();
+  await page.getByRole('searchbox', { name: 'Chọn cửa hàng hoặc thương hiệu' }).fill(code.toLowerCase());
+  await expect(optionsOf(page, label).filter({ hasText: 'Ngẫu Nhiên Shop' })).toHaveCount(1);
+});

@@ -2449,7 +2449,7 @@ dialog.modal.tool-guide { width: min(52rem, calc(100vw - 2rem)); }
 .store-pop li[data-active='true'] { background: rgb(var(--tint) / .04); }
 .store-pop li[aria-selected='true'] { background: rgb(var(--tint) / .06); }
 .store-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.store-star { flex: none; width: 26px; height: 26px; padding: 0; border: none; background: none; color: var(--text-muted); font-size: 15px; line-height: 1; border-radius: 6px; cursor: pointer; }
+.store-star { flex: none; display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; margin-block: -7px; padding: 0; border: none; background: none; color: var(--text-muted); font-size: 15px; line-height: 1; border-radius: 6px; cursor: pointer; }
 .store-star.on { color: var(--tint); }
 .store-star:hover { background: rgb(var(--shade) / .06); }
 .store-empty { margin: 0; padding: 12px; color: var(--text-muted); font-size: 14px; }

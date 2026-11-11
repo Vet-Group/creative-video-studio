@@ -10,6 +10,7 @@ import { Icon, type IconName } from './Icon';
 export interface StoreOption {
   id: string;
   name: string;
+  code?: string;
   mine?: boolean;
   pinned?: boolean;
   assigned?: boolean;
@@ -53,7 +54,7 @@ export function StorePicker({
   // Fold away Vietnamese diacritics and đ so a quick "my pham" matches "Mỹ Phẩm".
   const fold = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd');
   const q = fold(query.trim());
-  const matched = q ? stores.filter((s) => fold(s.name).includes(q)) : stores;
+  const matched = q ? stores.filter((s) => fold(s.name).includes(q) || (!!s.code && fold(s.code).includes(q))) : stores;
   const mine = matched.filter((s) => s.mine);
   const rest = matched.filter((s) => !s.mine);
   const rows: Row[] = [];
@@ -140,7 +141,7 @@ export function StorePicker({
         </button>
         {open && (
           <div className="store-pop" onMouseDown={(e) => e.preventDefault()}>
-            <input ref={searchRef} type="search" className="store-search" placeholder="Tìm cửa hàng…" aria-label={heading} value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={onKeyDown} onBlur={closeOnBlur} />
+            <input ref={searchRef} type="search" className="store-search" placeholder="Tìm theo tên hoặc mã…" aria-label={heading} value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={onKeyDown} onBlur={closeOnBlur} />
             {firstStore < 0 && (q !== '' || noneLabel === undefined) ? (
               <p className="store-empty">Không có cửa hàng khớp.</p>
             ) : (
