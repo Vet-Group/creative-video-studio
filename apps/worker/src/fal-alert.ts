@@ -1,5 +1,5 @@
 // The fal low-balance alert (docs/ops/provider-balances.md): once an hour the worker reads fal's balance and, the first time it is under the Admin
-// warning threshold, sends a direct message from the CVS Lark app's bot to the people in FAL_ALERT_LARK_EMAILS (the owner and the accountants who
+// warning threshold, sends a direct message from the CVS Lark app's bot to the people in FAL_ALERT_LARK_TO (the owner and the accountants who
 // top up), or, without that list, to every Admin with a linked Lark account. Admins also see a notice in the app.
 import type { Queryable } from '@cvs/core/ledger';
 import { BILLING_URLS, isLow, type FalBalance } from '@cvs/core/providers/balances';

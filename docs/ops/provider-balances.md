@@ -66,7 +66,7 @@ models lock. There is still no top-up in the app: fal has no API to buy credit.
   Admin who is not banned and has a linked Lark account (`accounts.account_id` is the Lark open_id for this app). Later checks while it stays low send
   nothing; a check at or over the threshold clears the claim, so the next drop alerts again. When every message fails the claim is released and the next
   hour tries again; the worker log has Lark's error code. A balance that cannot be read, or is not in USD, changes nothing.
-- **Who gets it.** With `FAL_ALERT_LARK_EMAILS` (comma-separated Lark emails) set in the server `.env`, the alert goes to those people instead of
+- **Who gets it.** With `FAL_ALERT_LARK_TO` (comma-separated Lark emails, or open_ids of the CVS app) set in the server `.env`, the alert goes to those people instead of
   the Admins (owner, 2026-11-11: the owner and the two accountants who top up the fal team). Each must be inside the CVS Lark app's availability;
   a refusal is logged with the address. Without it, every Admin with a linked Lark account gets it.
 - **Lark setup (owner, once).** In the Lark Developer Console, the CVS app (the one in `LARK_APP_ID`) needs the Bot feature and the scope
