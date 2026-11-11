@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { select, selectText, signIn } from './support.test';
+import { optionsOf, select, selectText, signIn } from './support.test';
 
 // The store brand kit: a template editor fills a store's kit from the store picker on Image Generation, and a member who picks that store and turns on
 // the brand kit switch runs on the mock model; the server adds the kit to the stored prompt, and the page remembers the store and the switch.
@@ -55,4 +55,20 @@ test('an editor fills a store brand kit, and a member run with the switch on sto
   await page.reload();
   await expect(select(page, store)).toHaveText('E2E Brand Shop');
   await expect(brand).toHaveAttribute('aria-pressed', 'true');
+});
+
+// The picker's quick search folds Vietnamese diacritics, and typing then pressing Enter picks the first matching store, not the leading empty choice.
+test('the store picker finds a store typed without diacritics, and Enter picks that store not the empty choice', async ({ page }) => {
+  await signIn(page, 'admin');
+  const code = `MP${Date.now() % 100000}`;
+  expect((await page.request.post('/api/admin/stores', { data: { name: 'Mỹ Phẩm Hàn Quốc', code } })).ok()).toBe(true);
+  await page.reload();
+  await expect(page.getByLabel('Ảnh sản phẩm')).toBeEnabled(); // wait for hydration so the picker opens on click
+  const label = 'Cửa hàng/Thương hiệu';
+  await select(page, label).click();
+  const search = page.getByRole('searchbox', { name: 'Chọn cửa hàng hoặc thương hiệu' });
+  await search.fill('my pham'); // no diacritics
+  await expect(optionsOf(page, label).filter({ hasText: 'Mỹ Phẩm Hàn Quốc' })).toHaveCount(1);
+  await search.press('Enter');
+  await expect(select(page, label)).toHaveText('Mỹ Phẩm Hàn Quốc');
 });
