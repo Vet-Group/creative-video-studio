@@ -84,7 +84,7 @@ export function creditState(row: CreditRow | undefined, billing: VertexBilling |
 /** The first usable account in order, or null when none is. */
 export const activeAccount = (accounts: { project: string; state: CreditState }[]): string | null => accounts.find((a) => a.state.usable)?.project ?? null;
 
-interface Pinnable<R, J extends { providerJobId: string }, S> {
+export interface Pinnable<R, J extends { providerJobId: string }, S> {
   submit(req: R): Promise<{ providerJobId: string }>;
   status(job: J): Promise<S>;
   cancel(job: J): Promise<{ supported: boolean }>;

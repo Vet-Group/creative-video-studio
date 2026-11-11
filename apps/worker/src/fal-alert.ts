@@ -26,14 +26,19 @@ export async function falAlertTick(pool: Queryable, readBalance: () => Promise<F
   }
   const claim = await pool.query('update settings set fal_low_alerted_at = now() where id = 1 and fal_low_alerted_at is null');
   if (!claim.rowCount) return 'none';
+  const r = await messageAdmins(pool, send, `Creative Video Studio: số dư fal còn $${fal.balance.toFixed(2)}, dưới ngưỡng cảnh báo $${warningUsd}. Nạp tiền tại ${BILLING_URLS.fal}`);
+  if (r.sent === 0 && r.failed.length > 0) await pool.query('update settings set fal_low_alerted_at = null where id = 1');
+  return r;
+}
+
+/** Messages every Admin with a linked Lark account (not banned); a failed message is listed, never thrown. */
+export async function messageAdmins(pool: Queryable, send: SendLark, text: string): Promise<{ sent: number; failed: string[] }> {
   const { rows } = await pool.query(
     `select distinct a.account_id as open_id from users u join accounts a on a.user_id = u.id and a.provider_id = 'lark'
       where u.role = 'admin' and not u.banned order by 1`,
   );
-  const text = `Creative Video Studio: số dư fal còn $${fal.balance.toFixed(2)}, dưới ngưỡng cảnh báo $${warningUsd}. Nạp tiền tại ${BILLING_URLS.fal}`;
   const failed: string[] = [];
   for (const { open_id } of rows as { open_id: string }[]) await send(open_id, text).catch((e) => failed.push(e instanceof Error ? e.message : String(e)));
-  if (rows.length > 0 && failed.length === rows.length) await pool.query('update settings set fal_low_alerted_at = null where id = 1');
   return { sent: rows.length - failed.length, failed };
 }
 

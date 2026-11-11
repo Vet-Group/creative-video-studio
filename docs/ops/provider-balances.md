@@ -70,6 +70,23 @@ models lock. There is still no top-up in the app: fal has no API to buy credit.
   `im:message:send_as_bot`, published in a new version that the tenant Admin approves, with the Admins inside the app's availability. Without the bot
   Lark answers code 11205 ("app do not have bot", checked 2026-11-10). An Admin who has never signed in with Lark gets no message.
 
+## fal team account switch (2026-11-11)
+
+Owner decision of 2026-11-11: the fal personal account is used up first, then CVS moves to the fal team "VET Group" (its Billing role lets the
+accountant top up without the owner's GitHub login). fal cannot move credit between accounts, so the team is topped up and given its own key ahead.
+
+- **Setup.** Put the team key in `FAL_KEY_NEXT` next to `FAL_KEY` in the server `.env` and restart the web app and the worker. Without it nothing changes.
+- **Switch.** New fal jobs keep going to `FAL_KEY` until a submit there fails while its balance is under the Admin warning threshold. The first worker
+  to see that sets `settings.fal_next_at`, writes a `fal.switch` audit row (no actor) and messages the Admins on Lark; the job is sent again to the team,
+  and every later one goes there (`apps/worker/src/fal-next.ts`). A failure with money left, or with an unreadable balance, is the job's own and does not
+  switch. A job keeps the account it was sent to (ids are prefixed `acct:personal|` or `acct:team|`), so jobs sent before the switch finish on the personal
+  account; an id without the prefix is the personal one.
+- **Balance.** Until the switch, the cost panel, the fal credit lock and the low-balance alert use both balances summed, so models do not lock while the
+  team still has money; after it, the team's alone (`readFalBalances` in `packages/core/src/providers/balances.ts`).
+- **After.** Once the switch has happened, and while no fal job is running (a running job's id still carries the `acct:` prefix, which a plain fal
+  provider does not read), move the team key into `FAL_KEY`, remove `FAL_KEY_NEXT` and restart. `settings.fal_next_at` can stay set: it is
+  read only while `FAL_KEY_NEXT` is set.
+
 ## Replicate (removed 2026-11-04)
 
 Replicate has no adapter any more: no code path submits to it, `REPLICATE_API_TOKEN` is no longer read, and the hourly Replicate guard and its fal twin

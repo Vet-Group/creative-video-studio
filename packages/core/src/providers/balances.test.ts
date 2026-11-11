@@ -1,6 +1,6 @@
 // fal's balance reader against fixtures shaped like its billing answer, and the warning rule. No network, no key.
 import { describe, expect, test } from 'vitest';
-import { bytePlusPack, isLow, readFalBalance } from './balances';
+import { bytePlusPack, isLow, readFalBalance, readFalBalances } from './balances';
 
 function fakeFetch(answer: Response | Error) {
   const calls: { url: string; auth: string | null; signal: boolean }[] = [];
@@ -59,5 +59,25 @@ describe('bytePlusPack', () => {
     expect(bytePlusPack(pack, new Date('2027-01-18T16:00:00Z')).low).toBe(true);
     expect(bytePlusPack(pack, new Date('2027-02-02T00:00:00Z'))).toMatchObject({ expired: true, low: true });
     expect(bytePlusPack({ ...pack, usedSince: 9_000_000 }, now)).toMatchObject({ tokensLeft: 0, percentLeft: 0, usdLeft: 0, low: true });
+  });
+});
+
+describe('readFalBalances (a second, team key)', () => {
+  const byKey = (answers: Record<string, Response>) =>
+    (async (_url: string, init: RequestInit = {}) => answers[new Headers(init.headers).get('authorization')!.slice(4)]!.clone()) as unknown as typeof fetch;
+  const usd = (n: number, currency = 'USD') => Response.json({ credits: { current_balance: n, currency } });
+
+  test('without a second key it is the first balance; with one, both summed until the switch, then the second alone', async () => {
+    const fetch = byKey({ first: usd(3.214), next: usd(100) });
+    expect(await readFalBalances({ key: 'first', nextKey: undefined, switched: false, fetch })).toEqual({ ok: true, balance: 3.214, currency: 'USD' });
+    expect(await readFalBalances({ key: 'first', nextKey: 'next', switched: false, fetch })).toEqual({ ok: true, balance: 103.21, currency: 'USD' });
+    expect(await readFalBalances({ key: 'first', nextKey: 'next', switched: true, fetch })).toEqual({ ok: true, balance: 100, currency: 'USD' });
+  });
+
+  test('a failed read on either account, or two currencies, is a failed read', async () => {
+    const bad = Response.json({ detail: 'Unauthorized' }, { status: 401 });
+    expect(await readFalBalances({ key: 'first', nextKey: 'next', switched: false, fetch: byKey({ first: usd(5), next: bad }) })).toMatchObject({ ok: false, error: expect.stringMatching(/^FAL_KEY_NEXT: fal billing: HTTP 401/) });
+    expect(await readFalBalances({ key: 'first', nextKey: 'next', switched: false, fetch: byKey({ first: bad, next: usd(5) }) })).toMatchObject({ ok: false, error: expect.stringMatching(/^fal billing: HTTP 401/) });
+    expect(await readFalBalances({ key: 'first', nextKey: 'next', switched: false, fetch: byKey({ first: usd(5), next: usd(5, 'EUR') }) })).toEqual({ ok: false, reason: 'failed', error: 'the two fal accounts are in USD and EUR' });
   });
 });
