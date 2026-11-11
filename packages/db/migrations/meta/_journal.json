@@ -624,6 +624,13 @@
 			"when": 1794395639046,
 			"tag": "0089_user_stores",
 			"breakpoints": true
+		},
+		{
+			"idx": 89,
+			"version": "7",
+			"when": 1794416852838,
+			"tag": "0090_analyses",
+			"breakpoints": true
 		}
 	]
 }

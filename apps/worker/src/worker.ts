@@ -15,7 +15,7 @@ import { bookLlm, close24h, lateBill, type LedgerPool, release, settle, withTran
 import { type ImageModelConfig, imagePricesFor, type ModelConfig, promptLimit, usdPerSecondFor, usdPerSecondWithVideo } from '@cvs/core/models';
 import { ImageReadError } from '@cvs/core/providers/http';
 import type { ImageProvider, ImageProviderJob, ImageSubmitRequest, ProviderJob, ProviderStatus, SubmitRequest, VideoProvider } from '@cvs/core/providers';
-import { PURGE_CRON, PURGE_QUEUE, SUGGEST_QUEUE, SUGGEST_QUEUE_OPTIONS, type SuggestJobData, VIDEO_QUEUE, VIDEO_QUEUE_OPTIONS, type VideoJobData, videoSendOptions } from '@cvs/core/queue';
+import { ANALYZE_QUEUE, ANALYZE_QUEUE_OPTIONS, type AnalyzeJobData, PURGE_CRON, PURGE_QUEUE, SUGGEST_QUEUE, SUGGEST_QUEUE_OPTIONS, type SuggestJobData, VIDEO_QUEUE, VIDEO_QUEUE_OPTIONS, type VideoJobData, videoSendOptions } from '@cvs/core/queue';
 import type { Suggester } from '@cvs/core/suggest';
 import { insertAssets } from '@cvs/db/assets';
 import { createDb, type createPool } from '@cvs/db/client';
@@ -24,6 +24,7 @@ import { burnEndText, closestRatio, extractPoster, probeSeconds, probeSize, prob
 import { purgeDeletedClips } from './purge';
 import { dropPreview, storePreview } from './preview';
 import { deleteObject, getObject, putObject } from './storage';
+import { reaAnalyzeEnabled, runReaAnalyze } from './analyze';
 import { runSuggestion } from './suggest';
 
 export interface WorkerOptions {
@@ -516,6 +517,13 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
   await boss.work<SuggestJobData>(SUGGEST_QUEUE, { pollingIntervalSeconds: o.pollingIntervalSeconds }, async (jobs) => {
     await Promise.all(jobs.map((job) => runSuggestion(pool, deps.suggest, job.data.runId).catch((e) => log(`suggestion ${job.data.runId}`, e))));
   });
+  // Reference-video analysis runs only where the rea-video binary is installed and the flag is set; off by default.
+  if (reaAnalyzeEnabled()) {
+    await boss.createQueue(ANALYZE_QUEUE, ANALYZE_QUEUE_OPTIONS);
+    await boss.work<AnalyzeJobData>(ANALYZE_QUEUE, { localConcurrency: 1, pollingIntervalSeconds: o.pollingIntervalSeconds }, async (jobs) => {
+      await Promise.all(jobs.map((job) => runReaAnalyze(pool, job.data.analysisId).catch((e) => log(`analyze ${job.data.analysisId}`, e))));
+    });
+  }
   await beat();
   await boss.work<VideoJobData>(VIDEO_QUEUE, { localConcurrency: 5, groupConcurrency: 2, pollingIntervalSeconds: o.pollingIntervalSeconds }, async (jobs) => {
     await Promise.all(jobs.map((job) => handle(job).catch((e) => log(`job ${job.data.jobId}`, e))));
