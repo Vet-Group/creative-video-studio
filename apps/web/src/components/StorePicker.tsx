@@ -48,9 +48,12 @@ export function StorePicker({
   const [active, setActive] = useState(0);
   const searchRef = useRef<HTMLInputElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const [dropUp, setDropUp] = useState(false);
 
-  const q = query.trim().toLowerCase();
-  const matched = q ? stores.filter((s) => s.name.toLowerCase().includes(q)) : stores;
+  // Fold away Vietnamese diacritics and đ so a quick "my pham" matches "Mỹ Phẩm".
+  const fold = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd');
+  const q = fold(query.trim());
+  const matched = q ? stores.filter((s) => fold(s.name).includes(q)) : stores;
   const mine = matched.filter((s) => s.mine);
   const rest = matched.filter((s) => !s.mine);
   const rows: Row[] = [];
@@ -65,6 +68,7 @@ export function StorePicker({
   }
   const flags = rows.map((r) => r.kind === 'head');
   const selected = rows.findIndex((r) => r.kind !== 'head' && r.id === value);
+  const firstStore = rows.findIndex((r) => r.kind === 'store');
   const current = stores.find((s) => s.id === value);
 
   useEffect(() => {
@@ -75,8 +79,15 @@ export function StorePicker({
     const list = li?.parentElement;
     if (li && list) list.scrollTop = Math.min(li.offsetTop, Math.max(list.scrollTop, li.offsetTop + li.offsetHeight - list.clientHeight));
   }, [open, active, uid]);
+  // While searching, highlight the first matching store (not the leading "none" row) so Enter picks a store.
+  useEffect(() => {
+    if (open && q) setActive(firstStore >= 0 ? firstStore : 0);
+  }, [open, q, firstStore]);
 
   function openList() {
+    const r = triggerRef.current?.getBoundingClientRect();
+    const below = r ? window.innerHeight - r.bottom : Infinity;
+    setDropUp(!!r && below < 300 && r.top > below); // open upward when there isn't room below (the picker is the last field on Create)
     setQuery('');
     setActive(selected >= 0 ? selected : Math.max(0, firstEnabled(flags)));
     setOpen(true);
@@ -121,7 +132,7 @@ export function StorePicker({
       <label htmlFor={triggerId} className="field-label">
         {label}
       </label>
-      <div className="store-picker" data-open={open}>
+      <div className="store-picker" data-open={open} data-drop={dropUp ? 'up' : 'down'}>
         <button ref={triggerRef} type="button" id={triggerId} className="select-trigger" data-value={value} role="combobox" aria-haspopup="listbox" aria-expanded={open} aria-controls={open ? listId : undefined} onClick={() => (open ? setOpen(false) : openList())} onKeyDown={onKeyDown} onBlur={closeOnBlur}>
           <Icon name={icon} />
           <span className="select-value">{current?.name ?? noneLabel ?? ''}</span>
@@ -129,8 +140,8 @@ export function StorePicker({
         </button>
         {open && (
           <div className="store-pop" onMouseDown={(e) => e.preventDefault()}>
-            <input ref={searchRef} type="search" className="store-search" placeholder="Tìm cửa hàng…" aria-label={heading} value={query} onChange={(e) => (setQuery(e.target.value), setActive(0))} onKeyDown={onKeyDown} onBlur={closeOnBlur} />
-            {rows.length === 0 ? (
+            <input ref={searchRef} type="search" className="store-search" placeholder="Tìm cửa hàng…" aria-label={heading} value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={onKeyDown} onBlur={closeOnBlur} />
+            {firstStore < 0 && (q !== '' || noneLabel === undefined) ? (
               <p className="store-empty">Không có cửa hàng khớp.</p>
             ) : (
               <ul role="listbox" id={listId} aria-label={label}>
