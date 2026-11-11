@@ -5,7 +5,7 @@ test('a user renames themselves and picks an avatar colour; both stay after a re
   await page.setViewportSize({ width: 1440, height: 900 });
   await signIn(page, 'seta');
   let settings = await openSettings(page);
-  await settings.getByRole('button', { name: 'Sửa tên và màu' }).click();
+  await settings.getByRole('button', { name: 'Sửa tên, màu và email' }).click();
   const name = settings.getByLabel('Tên hiển thị');
   await expect(name).toBeFocused();
   await expect(name).toHaveValue('E2E Settings A');
@@ -23,7 +23,7 @@ test('a user renames themselves and picks an avatar colour; both stay after a re
   await expect(settings.getByText('E2E Đổi Tên', { exact: true })).toBeVisible();
   await expect(settings.locator('.profile-card .avatar')).toHaveCSS('background-color', 'rgb(67, 56, 202)');
   await expect(settings.locator('.profile-card .avatar')).toHaveText('ET');
-  await expect(settings.getByRole('button', { name: 'Sửa tên và màu' })).toBeFocused();
+  await expect(settings.getByRole('button', { name: 'Sửa tên, màu và email' })).toBeFocused();
 
   await page.keyboard.press('Escape');
   await expect(accountButton(page)).toHaveAccessibleName('Tài khoản: E2E Đổi Tên'); // router.refresh() reran the layout
@@ -33,8 +33,22 @@ test('a user renames themselves and picks an avatar colour; both stay after a re
   settings = await openSettings(page);
   await expect(settings.getByText('E2E Đổi Tên', { exact: true })).toBeVisible();
   await expect(settings.locator('.profile-card .avatar')).toHaveCSS('background-color', 'rgb(67, 56, 202)');
-  await settings.getByRole('button', { name: 'Sửa tên và màu' }).click();
+  await settings.getByRole('button', { name: 'Sửa tên, màu và email' }).click();
   await expect(settings.getByRole('radio', { name: 'Chàm' })).toBeChecked();
+
+  // The user changes their own sign-in email; a bad address is refused on the spot, the saved one shows at once, then it goes back.
+  const email = settings.getByLabel('Email đăng nhập');
+  const original = await email.inputValue();
+  await email.fill('not an email');
+  await settings.getByRole('button', { name: 'Lưu' }).click();
+  await expect(settings.getByRole('alert')).toHaveText('Email không hợp lệ.');
+  await email.fill('  E2E.Seta.New@Example.test ');
+  await settings.getByRole('button', { name: 'Lưu' }).click();
+  await expect(settings.locator('.profile-email')).toHaveText('e2e.seta.new@example.test');
+  await settings.getByRole('button', { name: 'Sửa tên, màu và email' }).click();
+  await settings.getByLabel('Email đăng nhập').fill(original);
+  await settings.getByRole('button', { name: 'Lưu' }).click();
+  await expect(settings.locator('.profile-email')).toHaveText(original);
 });
 
 test('the protection card scores the account and jumps to the missing check; the usage strip leads to Limits', async ({ page }) => {

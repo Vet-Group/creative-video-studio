@@ -1,4 +1,4 @@
-// The caller's own name and avatar colour against a disposable database on the compose Postgres (`pnpm services:up`).
+// The caller's own name, avatar colour and email against a disposable database on the compose Postgres (`pnpm services:up`).
 import { randomBytes } from 'node:crypto';
 import { createTestDatabase } from '@cvs/db/testing';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
@@ -48,6 +48,9 @@ describe('PATCH /api/me/profile', () => {
     [{ avatarColor: 'red' }],
     [{ avatarColor: '#B91C1C' }],
     [{ name: 'Ok', avatarColor: 7 }],
+    [{ email: 'not-an-email' }],
+    [{ email: 'two words@example.test' }],
+    [{ email: 42 }],
   ])('refuses %j with 400 and changes nothing', async (body) => {
     expect((await patch(body)).status).toBe(400);
     expect(await row()).toEqual({ name: 'Nguyễn An', avatar_color: null });
@@ -57,7 +60,7 @@ describe('PATCH /api/me/profile', () => {
   test('saves a trimmed name and a palette colour, audited with the old and new values; null goes back to the automatic colour', async () => {
     const res = await patch({ name: '  Nguyễn Văn Ánh  ', avatarColor: '#0369a1' });
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ name: 'Nguyễn Văn Ánh', avatarColor: '#0369a1' });
+    expect(await res.json()).toEqual({ name: 'Nguyễn Văn Ánh', avatarColor: '#0369a1', email: 'me@example.test' });
     expect(await row()).toEqual({ name: 'Nguyễn Văn Ánh', avatar_color: '#0369a1' });
     expect(await audits()).toEqual([
       { actor_id: id, action: 'user.profile_update', old_value: { name: 'Nguyễn An', avatarColor: null }, new_value: { name: 'Nguyễn Văn Ánh', avatarColor: '#0369a1' } },
@@ -66,9 +69,27 @@ describe('PATCH /api/me/profile', () => {
     expect((await patch({ name: 'Nguyễn Văn Ánh' })).status).toBe(200); // no change, no audit row
     expect(await audits()).toHaveLength(1);
 
-    expect(await (await patch({ avatarColor: null })).json()).toEqual({ name: 'Nguyễn Văn Ánh', avatarColor: null });
+    expect(await (await patch({ avatarColor: null })).json()).toEqual({ name: 'Nguyễn Văn Ánh', avatarColor: null, email: 'me@example.test' });
     expect((await audits()).at(-1)).toMatchObject({ old_value: { avatarColor: '#0369a1' }, new_value: { name: 'Nguyễn Văn Ánh', avatarColor: null } });
     expect((await auth.api.getSession({ headers: new Headers({ cookie }) }))?.user.name).toBe('Nguyễn Văn Ánh'); // the layout reads it from here
+  });
+
+  test('changes the sign-in email at once, lower-cased and unverified, audited; a taken address is a 409; the password still signs in with the new one', async () => {
+    await auth.api.createUser({ body: { email: 'taken@example.test', name: 'Other', password, role: 'member' } });
+    const before = (await audits()).length;
+    const taken = await patch({ email: 'Taken@Example.test' });
+    expect(taken.status).toBe(409);
+    expect((await pool.query('select email from users where id = $1', [id])).rows[0].email).toBe('me@example.test');
+
+    const res = await patch({ email: '  Me.New@Gmail.com ' });
+    expect(res.status).toBe(200);
+    expect((await res.json()).email).toBe('me.new@gmail.com');
+    expect((await pool.query('select email, email_verified from users where id = $1', [id])).rows[0]).toEqual({ email: 'me.new@gmail.com', email_verified: false });
+    expect((await audits()).slice(before)).toEqual([
+      { actor_id: id, action: 'user.profile_update', old_value: { name: 'Nguyễn Văn Ánh', avatarColor: null, email: 'me@example.test' }, new_value: { name: 'Nguyễn Văn Ánh', avatarColor: null, email: 'me.new@gmail.com' } },
+    ]);
+    expect((await auth.api.signInEmail({ body: { email: 'me.new@gmail.com', password }, asResponse: true })).status).toBe(200);
+    await pool.query("update users set email = 'me@example.test', email_verified = true where id = $1", [id]);
   });
 
   test('403 while the user must replace a temporary password', async () => {

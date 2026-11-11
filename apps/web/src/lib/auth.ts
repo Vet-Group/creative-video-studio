@@ -86,12 +86,13 @@ export const auth = betterAuth({
   databaseHooks: { account: accountAuditHooks(pool) },
   // The team is changed only by an Admin, so input: false keeps /api/auth/update-user from setting it. The column default is the seeded team.
   // mustChangePassword is set with an Admin's temporary password and cleared by /change-password (account-audit.ts); no client sets it.
-  // canEditTemplates (template editor, lib/session.ts) is set by an Admin only (PATCH /api/admin/users/[id]).
+  // canEditTemplates (template editor, lib/session.ts) and system (an automation account) are set by an Admin only (PATCH /api/admin/users/[id]).
   user: {
     additionalFields: {
       teamId: { type: 'string', required: false, input: false },
       mustChangePassword: { type: 'boolean', required: false, defaultValue: false, input: false },
       canEditTemplates: { type: 'boolean', required: false, defaultValue: false, input: false },
+      system: { type: 'boolean', required: false, defaultValue: false, input: false },
     },
   },
   plugins: [

@@ -4,9 +4,9 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { type CSSProperties, type FormEvent, useEffect, useRef, useState } from 'react';
-import { api, sendJson, startSignOut } from '@/lib/api';
+import { ApiError, api, sendJson, startSignOut } from '@/lib/api';
 import { NO_CAP } from '@/lib/caps';
-import { AVATAR_COLORS, NAME_LENGTH, nameProblem, protection, userAvatarColor } from '@/lib/profile';
+import { AVATAR_COLORS, NAME_LENGTH, isEmail, nameProblem, protection, userAvatarColor } from '@/lib/profile';
 import type { SignInMethod } from '@/lib/sign-in-methods';
 import { useMediaQuery } from '@/lib/use-media-query';
 import { PasswordChange, Sessions, TwoFactor } from './AccountSecurity';
@@ -187,10 +187,11 @@ function Today({ usage, onMore }: { usage: Usage | null | 'failed'; onMore: () =
   );
 }
 
-/** The display name and avatar colour, edited in place on the profile card; saved through PATCH /api/me/profile. */
+/** The display name, avatar colour and sign-in email, edited in place on the profile card; saved through PATCH /api/me/profile. */
 function ProfileCard({ name, color, email, isAdmin, onSaved }: { name: string; color: string; email: string; isAdmin: boolean; onSaved: (p: { name: string; color: string }) => void }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(name);
+  const [mail, setMail] = useState(email);
   const [pick, setPick] = useState(color);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -199,6 +200,7 @@ function ProfileCard({ name, color, email, isAdmin, onSaved }: { name: string; c
 
   function start() {
     setDraft(name);
+    setMail(email);
     setPick(color);
     setError('');
     setEditing(true);
@@ -212,15 +214,17 @@ function ProfileCard({ name, color, email, isAdmin, onSaved }: { name: string; c
     e.preventDefault();
     const problem = nameProblem(draft);
     if (problem) return setError(problem);
-    const body = { ...(draft.trim() !== name ? { name: draft } : {}), ...(pick !== color ? { avatarColor: pick } : {}) };
+    const newMail = mail.trim().toLowerCase();
+    if (!isEmail(newMail)) return setError('Email không hợp lệ.');
+    const body = { ...(draft.trim() !== name ? { name: draft } : {}), ...(pick !== color ? { avatarColor: pick } : {}), ...(newMail !== email ? { email: newMail } : {}) };
     if (Object.keys(body).length === 0) return stop();
     setBusy(true);
     try {
       const saved = await api<{ name: string; avatarColor: string | null }>('/api/me/profile', sendJson('PATCH', body));
       onSaved({ name: saved.name, color: userAvatarColor(saved.name, saved.avatarColor) });
       stop();
-    } catch {
-      setError('Không lưu được hồ sơ. Hãy thử lại.');
+    } catch (err) {
+      setError(err instanceof ApiError && err.status === 409 ? 'Email này đã có người khác dùng.' : 'Không lưu được hồ sơ. Hãy thử lại.');
     } finally {
       setBusy(false);
     }
@@ -244,7 +248,7 @@ function ProfileCard({ name, color, email, isAdmin, onSaved }: { name: string; c
           {isAdmin ? 'Admin' : 'Thành viên'}
         </span>
         {!editing && (
-          <button ref={edit} type="button" className="profile-edit-button" aria-label="Sửa tên và màu" onClick={start}>
+          <button ref={edit} type="button" className="profile-edit-button" aria-label="Sửa tên, màu và email" onClick={start}>
             <Icon name="edit" size={14} />
             Sửa
           </button>
@@ -265,6 +269,19 @@ function ProfileCard({ name, color, email, isAdmin, onSaved }: { name: string; c
           />
           <p className="pw-hint" id="profile-name-hint">
             Tên này hiện ở thanh bên và trong nhật ký của Admin. Tối đa {NAME_LENGTH.max} ký tự.
+          </p>
+          <label htmlFor="profile-email">Email đăng nhập</label>
+          <input
+            id="profile-email"
+            type="email"
+            autoComplete="email"
+            aria-describedby="profile-email-hint"
+            value={mail}
+            onChange={(e) => setMail(e.target.value)}
+            onKeyDown={(e) => e.key === 'Escape' && (e.preventDefault(), stop())}
+          />
+          <p className="pw-hint" id="profile-email-hint">
+            Email dùng khi đăng nhập bằng mật khẩu. Đăng nhập bằng Lark, Google hay passkey vẫn như cũ. Muốn vào bằng Google của địa chỉ mới, hãy liên kết Google ở mục Phương thức đăng nhập.
           </p>
           <fieldset className="swatches">
             <legend>Màu ảnh đại diện</legend>

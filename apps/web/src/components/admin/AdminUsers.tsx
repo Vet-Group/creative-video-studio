@@ -20,6 +20,8 @@ interface User {
   twoFactor: boolean;
   /** A template editor: edits the motion presets on Create and decides the members' proposals, as an Admin does. */
   canEditTemplates: boolean;
+  /** An automation account (deploy Admin, test, demo): listed apart from the staff, never deleted for that. */
+  system: boolean;
   methods: SignInMethod[];
 }
 interface Team {
@@ -102,7 +104,11 @@ function UserEditor({ user, teams, reload }: { user: User; teams: Team[]; reload
           />
           Biên tập mẫu
         </label>
-        <small className="muted">Vai trò, nhóm và quyền biên tập mẫu lưu ngay khi chọn. Đổi nhóm chỉ áp dụng cho các job mới. Người biên tập mẫu sửa, thêm mẫu chuyển động và duyệt đề xuất ở trang Tạo video; Admin luôn có quyền này.</small>
+        <label className="check">
+          <input type="checkbox" aria-label={`Tài khoản hệ thống: ${user.email}`} checked={user.system} disabled={pending} onChange={(e) => void patch({ system: e.target.checked }, 'Không đổi được nhóm hệ thống.')} />
+          Tài khoản hệ thống
+        </label>
+        <small className="muted">Vai trò, nhóm và quyền biên tập mẫu lưu ngay khi chọn. Đổi nhóm chỉ áp dụng cho các job mới. Người biên tập mẫu sửa, thêm mẫu chuyển động và duyệt đề xuất ở trang Tạo video; Admin luôn có quyền này. Tài khoản hệ thống (dùng cho deploy, kiểm thử, demo) được xếp riêng ở cuối danh sách.</small>
       </div>
       <div className="editor-section">
         <h3>Phương thức đăng nhập</h3>
@@ -251,6 +257,32 @@ function UserRow({ user, team, onEdit }: { user: User; team: string; onEdit: () 
   );
 }
 
+function UserTable({ users, teamName, onEdit }: { users: User[]; teamName: (id: string) => string; onEdit: (id: string) => void }) {
+  return (
+    <div className="table-wrap">
+      <table className="mobile-records users">
+        <thead>
+          <tr>
+            <th scope="col">Người dùng</th>
+            <th scope="col">Vai trò</th>
+            <th scope="col">Nhóm</th>
+            <th scope="col">Đăng nhập</th>
+            <th scope="col">Trạng thái</th>
+            <th scope="col">
+              <span className="sr-only">Thao tác</span>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {users.map((u) => (
+            <UserRow key={u.id} user={u} team={teamName(u.teamId)} onEdit={() => onEdit(u.id)} />
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export function AdminUsers() {
   const users = useFetch<{ users: User[] }>('/api/admin/users');
   const teams = useFetch<{ teams: Team[] }>('/api/admin/teams?includeHidden=1');
@@ -275,6 +307,9 @@ export function AdminUsers() {
   const visible = allTeams.filter((t) => !t.hidden);
   const teamName = (id: string) => allTeams.find((t) => t.id === id)?.name ?? '—';
   const shown = users.data.users.filter((u) => fold(`${u.name} ${u.email}`).includes(fold(query.trim())));
+  const staff = shown.filter((u) => !u.system);
+  const system = shown.filter((u) => u.system);
+  const staffTotal = users.data.users.filter((u) => !u.system).length;
   const editUser = users.data.users.find((u) => u.id === editing);
 
   async function add() {
@@ -346,33 +381,22 @@ export function AdminUsers() {
           <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} />
         </label>
         <p className="muted" role="status">
-          {query.trim() ? `${shown.length} trên ${users.data.users.length} người dùng` : `${users.data.users.length} người dùng`}
+          {query.trim() ? `${staff.length} trên ${staffTotal} người dùng` : `${staffTotal} người dùng`}
         </p>
       </div>
       {shown.length === 0 ? (
         <Empty title={`Không có người dùng nào khớp “${query.trim()}”.`} />
       ) : (
-        <div className="table-wrap">
-          <table className="mobile-records users">
-            <thead>
-              <tr>
-                <th scope="col">Người dùng</th>
-                <th scope="col">Vai trò</th>
-                <th scope="col">Nhóm</th>
-                <th scope="col">Đăng nhập</th>
-                <th scope="col">Trạng thái</th>
-                <th scope="col">
-                  <span className="sr-only">Thao tác</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {shown.map((u) => (
-                <UserRow key={u.id} user={u} team={teamName(u.teamId)} onEdit={() => setEditing(u.id)} />
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <>
+          {staff.length > 0 && <UserTable users={staff} teamName={teamName} onEdit={setEditing} />}
+          {system.length > 0 && (
+            <details className="help system-users" open={query.trim() !== ''}>
+              <summary>Tài khoản hệ thống ({system.length})</summary>
+              <p className="muted">Dùng cho deploy, kiểm thử và demo. Không phải nhân viên; giữ lại để chạy tự động.</p>
+              <UserTable users={system} teamName={teamName} onEdit={setEditing} />
+            </details>
+          )}
+        </>
       )}
       <Modal open={editUser !== undefined} onClose={() => setEditing(null)} label={editUser ? `Sửa người dùng ${editUser.email}` : 'Sửa người dùng'} className="admin-modal">
         {editUser && <UserEditor key={editUser.id} user={editUser} teams={allTeams} reload={users.reload} />}

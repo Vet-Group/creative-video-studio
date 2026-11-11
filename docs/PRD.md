@@ -43,7 +43,7 @@ Company staff turn existing product images into short product videos without lea
 
 - The screens: Sign-in, Create Videos (with the job status panel and the "My jobs" tray), Library, Admin.
 - The Admin area has Users, Teams, Stores, Settings, Presets, Report, Costs and an audit log:
-  - **Users:** add a user (a team is required; the password is optional), ban and unban, set a temporary password, change role, change team. A team change affects only jobs created afterwards.
+  - **Users:** add a user (a team is required; the password is optional), ban and unban, set a temporary password, change role, change team. A team change affects only jobs created afterwards. An Admin can mark an account as a system account (the deploy Admin, test and demo accounts): it is listed apart from the staff, kept for automation and never deleted for that. Every user can change their own display name, avatar colour and sign-in email in Settings; a new email is saved at once if no other user has it (owner decision, 2026-11-11).
   - **Settings:** the two caps, and enabling or disabling each model.
   - **Presets:** edit the label and the prompt text, and enable or disable each preset.
   - **Report:** the 3 weekly KPIs per user (accepted clips, provider cost per accepted clip, median time from Run to clip), the job failure rate and spend against the cap, with a CSV export.
