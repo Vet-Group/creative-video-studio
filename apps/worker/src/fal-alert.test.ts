@@ -3,7 +3,7 @@ import type { FalBalance } from '@cvs/core/providers/balances';
 import { createPool } from '@cvs/db/client';
 import { createTestDatabase } from '@cvs/db/testing';
 import { afterAll, beforeAll, expect, test } from 'vitest';
-import { falAlertTick, larkSender } from './fal-alert';
+import { falAlertTick, larkSender, type SendLark } from './fal-alert';
 
 const testDb = await createTestDatabase();
 const pool = createPool(testDb.url);
@@ -66,6 +66,17 @@ test('an unread or non-USD balance changes nothing; when every message fails the
   await falAlertTick(pool, usd(50), never);
 });
 
+test('with a list of Lark emails, the alert goes to each of them instead of the Admins; a failure names its receiver', async () => {
+  const to: string[] = [];
+  const send: SendLark = async (id) => {
+    if (id === 'b@vet.test') throw new Error('lark /im/v1/messages: HTTP 400 code 230013 no availability');
+    to.push(id);
+  };
+  expect(await falAlertTick(pool, usd(2), send, ['a@vet.test', 'b@vet.test'])).toEqual({ sent: 1, failed: ['b@vet.test: lark /im/v1/messages: HTTP 400 code 230013 no availability'] });
+  expect(to).toEqual(['a@vet.test']);
+  await falAlertTick(pool, usd(50), send);
+});
+
 test('larkSender gets a tenant token, then sends a text message to the open_id as the bot; a Lark error code throws', async () => {
   const calls: { url: string; body: unknown; auth?: string }[] = [];
   const answer = (code: number, extra = {}) => new Response(JSON.stringify({ code, msg: code ? 'app do not have bot' : 'ok', ...extra }));
@@ -80,5 +91,9 @@ test('larkSender gets a tenant token, then sends a text message to the open_id a
     { url: 'https://open.larksuite.com/open-apis/auth/v3/tenant_access_token/internal', body: { app_id: 'cli_x', app_secret: 's' }, auth: undefined },
     { url: 'https://open.larksuite.com/open-apis/im/v1/messages?receive_id_type=open_id', body: { receive_id: 'ou_a', msg_type: 'text', content: '{"text":"hello"}' }, auth: 'Bearer t-1' },
   ]);
+  calls.length = 0;
+  await larkSender({ appId: 'cli_x', appSecret: 's' }, fakeFetch(false))('mi@vet.test', 'hello');
+  expect(calls[1]!.url).toBe('https://open.larksuite.com/open-apis/im/v1/messages?receive_id_type=email');
+  expect(calls[1]!.body).toEqual({ receive_id: 'mi@vet.test', msg_type: 'text', content: '{"text":"hello"}' });
   await expect(larkSender({ appId: 'cli_x', appSecret: 's' }, fakeFetch(true))('ou_a', 'hello')).rejects.toThrow('lark /im/v1/messages: HTTP 200 code 11205 app do not have bot');
 });
