@@ -70,10 +70,10 @@ export const auth = betterAuth({
     }),
     after: authAuditHook(pool),
   },
-  // No public sign-up: an Admin creates every account (Q4).
+  // No public email/password sign-up: an Admin creates every password account (Q4).
   emailAndPassword: { enabled: true, disableSignUp: true },
-  // disableSignUp, not disableImplicitSignUp: a client bypasses the latter with requestSignUp: true. A social sign-in only ever
-  // enters an existing, unbanned user, whose email the provider reports; it never creates one.
+  // Google keeps disableSignUp: it is not tenant-gated, so it only ever enters an existing, unbanned user and never creates one.
+  // Lark is different: it auto-provisions internal staff (lib/lark.ts), safe because getUserInfo gates on the company tenant.
   socialProviders: googleLoginEnabled
     ? { google: { clientId: GOOGLE_CLIENT_ID!, clientSecret: GOOGLE_CLIENT_SECRET!, disableDefaultScope: true, scope: ['openid', 'email', 'profile'], disableSignUp: true, disableIdTokenSignIn: true } }
     : {},

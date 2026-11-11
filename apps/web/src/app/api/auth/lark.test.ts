@@ -75,22 +75,28 @@ describe('Lark sign-in', () => {
     expect(providers.larkTokenRequests.at(-1)?.code_verifier).toEqual(expect.any(String));
   });
 
-  test('refuses an unknown email and creates no user', async () => {
-    await user('known@example.test');
-    const [users, accounts] = [await count('users'), await count('accounts')];
-    const flow = await oauth(route, { provider: 'lark', code: lark({ enterprise_email: 'stranger@example.test' }) });
-    expect(flow.error).toBe('signup_disabled');
-    expect(flow.location.pathname).toBe('/login');
-    expect(flow.cookie).toBe('');
-    expect([await count('users'), await count('accounts')]).toEqual([users, accounts]);
+  test('auto-provisions a new member in the seeded team for an unknown enterprise email', async () => {
+    const ref = await user('ref@example.test');
+    const refTeam = (await pool.query('select team_id from users where id = $1', [ref])).rows[0].team_id;
+    const users = await count('users');
+    const flow = await oauth(route, { provider: 'lark', code: lark({ enterprise_email: 'newbie@example.test' }) });
+    expect(flow.error).toBeNull();
+    expect(await count('users')).toBe(users + 1);
+    const newId = await sessionUser(flow.cookie);
+    const row = (await pool.query('select email, role, team_id, email_verified from users where id = $1', [newId])).rows[0];
+    expect(row).toEqual({ email: 'newbie@example.test', role: 'member', team_id: refTeam, email_verified: true });
+    // Lark-only: an auto-provisioned account has no password credential.
+    expect((await pool.query(`select provider_id from accounts where user_id = $1`, [newId])).rows).toEqual([{ provider_id: 'lark' }]);
   });
 
-  test('refuses requestSignUp: true with an unknown email and creates no user', async () => {
+  test('a repeat Lark sign-in reuses the provisioned user and creates no duplicate', async () => {
+    const first = await oauth(route, { provider: 'lark', code: lark({ enterprise_email: 'repeat@example.test' }) });
+    const id = await sessionUser(first.cookie);
     const users = await count('users');
-    const flow = await oauth(route, { provider: 'lark', code: lark({ enterprise_email: 'newcomer@example.test' }), body: { requestSignUp: true } });
-    expect(flow.error).toBe('signup_disabled');
+    const second = await oauth(route, { provider: 'lark', code: lark({ enterprise_email: 'repeat@example.test' }) });
+    expect(second.error).toBeNull();
+    expect(await sessionUser(second.cookie)).toBe(id);
     expect(await count('users')).toBe(users);
-    expect((await pool.query(`select 1 from users where email = 'newcomer@example.test'`)).rowCount).toBe(0);
   });
 
   test('refuses a banned user and starts no session', async () => {
@@ -106,14 +112,16 @@ describe('Lark sign-in', () => {
     expect(await auditsOf(id)).toEqual(auditsBefore);
   });
 
-  test('refuses a tenant_key other than LARK_TENANT_KEY, or none, and links nothing', async () => {
+  test('refuses a tenant_key other than LARK_TENANT_KEY, or none: links nothing and provisions no one', async () => {
     const id = await user('tenant@example.test');
+    const users = await count('users');
     for (const tenant_key of ['tenant-other', null]) {
-      const flow = await oauth(route, { provider: 'lark', code: lark({ enterprise_email: 'tenant@example.test', tenant_key }) });
+      const flow = await oauth(route, { provider: 'lark', code: lark({ enterprise_email: 'outsider@example.test', tenant_key }) });
       expect(flow.error, String(tenant_key)).toBe('unable_to_get_user_info');
       expect(flow.cookie).toBe('');
     }
     expect(await accountsOf(id)).toEqual([]);
+    expect(await count('users')).toBe(users);
   });
 
   test('uses only enterprise_email: a personal email alone is refused, even when it matches a user', async () => {
@@ -123,9 +131,10 @@ describe('Lark sign-in', () => {
     expect(flow.cookie).toBe('');
     expect(await accountsOf(id)).toEqual([]);
 
-    // With both, the enterprise address decides, whatever the personal one is.
+    // With both, the enterprise address decides, whatever the personal one is: the new user's email is the enterprise one.
     const both = await oauth(route, { provider: 'lark', code: lark({ email: 'personal@example.test', enterprise_email: 'work@example.test' }) });
-    expect(both.error).toBe('signup_disabled');
+    expect(both.error).toBeNull();
+    expect((await pool.query('select email from users where id = $1', [await sessionUser(both.cookie)])).rows[0].email).toBe('work@example.test');
   });
 
   test('keeps the local email verification gate: an unverified user is not linked', async () => {

@@ -9,9 +9,10 @@ const TOKEN = 'https://open.larksuite.com/open-apis/authen/v2/oauth/token';
 const USER_INFO = 'https://open.larksuite.com/open-apis/authen/v1/user_info';
 
 /**
- * Sign-in is for existing users only, so nothing is created here. The token request is JSON, not the form body better-auth sends by
- * default, hence `getToken`. A profile from another tenant, or one without a company email, is refused (null): the personal `email`
- * is never read, because it is not under the company's control.
+ * Sign-up is on: a first Lark sign-in auto-provisions the account (role member, the seeded team), so internal staff need no manual
+ * Admin creation. The tenant gate in getUserInfo is what keeps this safe -- only `app.tenantKey` with a company email gets through,
+ * everyone else is refused (null). The token request is JSON, not the form body better-auth sends by default, hence `getToken`. The
+ * personal `email` is never read, because it is not under the company's control.
  */
 export function larkOAuth(app: { appId: string; appSecret: string; tenantKey: string }): GenericOAuthConfig {
   return {
@@ -23,7 +24,6 @@ export function larkOAuth(app: { appId: string; appSecret: string; tenantKey: st
     // user_info's enterprise_email needs contact:user.employee:readonly (Lark Suite reference for authen/v1/user_info, read 2026-10-25);
     // contact:user.enterprise_email:readonly does not exist on Lark Suite and fails the authorize page with error 20043 (D.5-lark).
     scopes: ['contact:user.employee:readonly'],
-    disableSignUp: true,
     async getToken({ code, redirectURI, codeVerifier }) {
       const res = await fetch(TOKEN, {
         method: 'POST',
