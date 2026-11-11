@@ -123,3 +123,33 @@ export async function PATCH(request: Request, { params }: RouteContext) {
   const now = (await pool.query('select id, email, name, role, banned, team_id, can_edit_templates from users where id = $1', [id])).rows[0];
   return Response.json({ id: now.id, email: now.email, name: now.name, role: now.role, banned: now.banned, teamId: now.team_id, canEditTemplates: now.can_edit_templates });
 }
+
+/**
+ * Admin: remove a user for good. better-auth's accounts, sessions, passkeys and 2FA rows fall with it (those foreign keys cascade), so the
+ * sign-in ends at once. A user that has created content — a clip, an uploaded asset, a decided proposal, or an audit row as its actor — is
+ * held back by a restrict foreign key: the delete is refused with 409 so cost and audit history is never orphaned, and the Admin locks the
+ * account instead. You cannot delete yourself, so the acting Admin always remains and the last admin can never be removed. The audit row
+ * shares the transaction and rolls back with a refused delete.
+ */
+export async function DELETE(request: Request, { params }: RouteContext) {
+  const g = await guard(request, 'admin');
+  if (g.error) return g.error;
+  const { id } = await params;
+  const actorId = g.session.user.id;
+  if (id === actorId) return bad('you cannot delete yourself');
+  const target = `user:${id}`;
+  try {
+    const refusal = await withTransaction(pool, async (tx) => {
+      await tx.query('select pg_advisory_xact_lock(hashtext($1))', [target]);
+      const user = (await tx.query('select role, email from users where id = $1', [id])).rows[0];
+      if (!user) return bad('not found', 404);
+      await audit(tx, { actorId, action: 'user.delete', target, oldValue: { email: user.email, role: user.role } });
+      await tx.query('delete from users where id = $1', [id]);
+    });
+    return refusal ?? Response.json({ ok: true });
+  } catch (e) {
+    // A restrict foreign key (assets, jobs, proposals, audit_entries) blocks the delete: the user has content, so lock the account instead.
+    if (e && typeof e === 'object' && (e as { code?: string }).code === '23503') return bad('this user has created content (a clip, an upload or a record); lock the account instead of deleting it', 409);
+    throw e;
+  }
+}

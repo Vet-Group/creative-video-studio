@@ -188,6 +188,17 @@ function UserEditor({ user, teams, reload }: { user: User; teams: Team[]; reload
           >
             {user.banned ? 'Mở khoá' : 'Khoá'}
           </button>
+          <button
+            type="button"
+            className="danger"
+            disabled={pending}
+            onClick={async () => {
+              if (!(await confirmDialog({ title: `Xoá tài khoản ${user.email}?`, body: 'Xoá hẳn người dùng này, không khôi phục được. Nếu họ đã tạo clip hoặc tải ảnh thì không xoá được — hãy dùng Khoá.', confirmLabel: 'Xoá', danger: true }))) return;
+              void run(() => api(`/api/admin/users/${user.id}`, { method: 'DELETE' }), 'Không xoá được. Nếu người này đã tạo clip hoặc tải ảnh, hãy dùng Khoá.');
+            }}
+          >
+            Xoá người dùng
+          </button>
         </div>
       </div>
     </>
