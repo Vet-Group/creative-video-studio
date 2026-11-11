@@ -4,7 +4,7 @@ import type { FeedbackKind, FeedbackStatus } from '@cvs/db';
 export const KIND_LABEL: Record<FeedbackKind, string> = { feedback: 'Góp ý', bug: 'Báo lỗi', feature: 'Yêu cầu tính năng' };
 export const STATUS_LABEL: Record<FeedbackStatus, string> = { new: 'Mới', reviewing: 'Đang xem', done: 'Đã xử lý', rejected: 'Từ chối' };
 
-export const MAX_IMAGES = 4;
+export const MAX_IMAGES = 20;
 export const TITLE_MAX = 120;
 export const BODY_MAX = 4000;
 export const COMMENT_MAX = 2000;

@@ -733,7 +733,7 @@ export const feedback = pgTable(
     check('feedback_status_check', sql`${t.status} in ('new', 'reviewing', 'done', 'rejected')`),
     check('feedback_title_check', sql`char_length(${t.title}) between 1 and 120`),
     check('feedback_body_check', sql`char_length(${t.body}) between 1 and 4000`),
-    check('feedback_images_check', sql`array_length(${t.imageAssetIds}, 1) is null or array_length(${t.imageAssetIds}, 1) <= 4`),
+    check('feedback_images_check', sql`array_length(${t.imageAssetIds}, 1) is null or array_length(${t.imageAssetIds}, 1) <= 20`),
     check('feedback_note_check', sql`${t.adminNote} is null or char_length(${t.adminNote}) <= 4000`),
   ],
 );
