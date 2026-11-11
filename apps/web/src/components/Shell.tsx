@@ -16,6 +16,7 @@ import { AccountMenu } from './AccountMenu';
 import { ConfirmHost, confirmDialog } from './Confirm';
 import { FalLowNotice } from './FalLowNotice';
 import { Icon, type IconName } from './Icon';
+import { LarkLinkPrompt } from './LarkLinkPrompt';
 import { JobFailureNote, canRetry, canRetryOnTwin, twinRetryText } from './JobFailure';
 import { JobPrompt, JobsProvider, Recreate, roleOf, Tap, toggleFullscreen, useForm, useJobs } from './jobs';
 import { LoadError } from './LoadError';
@@ -444,7 +445,7 @@ const PAGE_TITLES: [prefix: string, title: string][] = [
   ['/account', 'Phương thức đăng nhập'],
 ];
 
-export function Shell({ userId, userName, isAdmin, feedbackNew = 0, account, initialCollapsed, children }: { userId: string; userName: string; isAdmin: boolean; feedbackNew?: number; account: Account; initialCollapsed: boolean; children: ReactNode }) {
+export function Shell({ userId, userName, isAdmin, feedbackNew = 0, account, larkPrompt = false, initialCollapsed, children }: { userId: string; userName: string; isAdmin: boolean; feedbackNew?: number; account: Account; /** Show the once-a-day reminder to link Lark (lib/lark-prompt.ts). */ larkPrompt?: boolean; initialCollapsed: boolean; children: ReactNode }) {
   const pathname = usePathname();
   const narrow = useMediaQuery(NARROW);
   const [open, setOpen] = useState(false); // the drawer, below 1024 px
@@ -572,6 +573,7 @@ export function Shell({ userId, userName, isAdmin, feedbackNew = 0, account, ini
                 {accountMenu('avatar')}
               </header>
               {isAdmin && <FalLowNotice />}
+              {larkPrompt && <LarkLinkPrompt />}
               <div className="frame">
                 <main>{children}</main>
                 {!hasOwnHistory(pathname) && <Tray />}
