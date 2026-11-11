@@ -505,8 +505,7 @@ label.model input { display: inline; margin: 0; min-width: 0; width: auto; }
 }
 .login-brand { display: flex; align-items: center; gap: 12px; margin-bottom: 28px; font-size: 15px; line-height: 20px; font-weight: 600; }
 .login-brand .vet-logo { display: block; flex: none; }
-.vet-logo-tile { fill: var(--brand); }
-.vet-logo-mark { fill: var(--on-dark); }
+.vet-logo { object-fit: contain; }
 .login h1 { margin: 0 0 6px; font-size: 28px; line-height: 36px; letter-spacing: -.02em; }
 .login-form > .muted { margin: 0 0 8px; font-size: 14px; line-height: 21px; }
 .login label { margin: 16px 0 6px; font-size: 14px; line-height: 20px; }

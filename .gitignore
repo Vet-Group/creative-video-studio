@@ -37,6 +37,8 @@ cvs-bakeoff/
 !**/fixtures/**
 !apps/web/src/app/icon[12].png
 !apps/web/src/app/apple-icon.png
+!apps/web/src/components/vet-logo.png
+!apps/web/public/icons/*.png
 
 # Agent launch kit: local only, hashed through scripts/run/local-guards.txt.
 scripts/run/local-guards.txt
