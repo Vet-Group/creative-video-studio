@@ -25,6 +25,7 @@ test.each([
   ['BANNED_USER', 'Tài khoản này đã bị khoá. Liên hệ Admin.'],
   ['account_already_linked_to_different_user', 'đã được liên kết với một người dùng khác'],
   ['email_does_not_match', 'không khớp với tài khoản đang đăng nhập'],
+  ['lark_account_not_linked', 'liên kết Lark tại'],
   ['unable_to_get_user_info', 'Không lấy được thông tin tài khoản'],
   ['state_mismatch', 'Không đăng nhập được, hãy thử lại sau.'],
 ])('shows the message for ?error=%s', (code, text) => {

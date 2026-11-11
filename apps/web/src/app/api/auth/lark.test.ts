@@ -38,7 +38,7 @@ async function cookieOf(email: string) {
   return res.headers.getSetCookie().map((c) => c.split(';')[0]).join('; ');
 }
 const auditsOf = async (userId: string) => (await pool.query('select action, old_value, new_value from audit_entries where target = $1 order by id', [`user:${userId}`])).rows;
-const lark = ({ tenant_key = 'tenant-vet', ...p }: { enterprise_email?: string; email?: string; tenant_key?: string | null }) =>
+const lark = ({ tenant_key = 'tenant-vet', ...p }: { enterprise_email?: string; email?: string; name?: string; tenant_key?: string | null }) =>
   providers.larkCode({ open_id: `ou_${++seq}`, ...p, ...(tenant_key === null ? {} : { tenant_key }) });
 const count = async (table: 'users' | 'accounts') => (await pool.query(`select count(*)::int as n from ${table}`)).rows[0].n as number;
 const accountsOf = async (userId: string) => (await pool.query('select provider_id, account_id from accounts where user_id = $1', [userId])).rows;
@@ -97,6 +97,27 @@ describe('Lark sign-in', () => {
     expect(second.error).toBeNull();
     expect(await sessionUser(second.cookie)).toBe(id);
     expect(await count('users')).toBe(users);
+  });
+
+  test('refuses to auto-provision a second account for a user of the same name under another email, and tells them to link Lark', async () => {
+    const id = await user('khanh.gmail@example.test');
+    await pool.query(`update users set name = 'Nguyễn Danh Khánh' where id = $1`, [id]);
+    const users = await count('users');
+    const flow = await oauth(route, { provider: 'lark', code: lark({ enterprise_email: 'khanh@example.test', name: 'Nguyễn  Danh Khánh - Seller' }) });
+    expect(flow.error).toBe('lark_account_not_linked');
+    expect(flow.location.pathname).toBe('/login');
+    expect(flow.cookie).toBe('');
+    expect(await count('users')).toBe(users);
+    expect(await accountsOf(id)).toEqual([]);
+  });
+
+  test('a user of the same name with the equal email still links, and an Admin can still create a namesake', async () => {
+    const id = await user('dung@example.test');
+    await pool.query(`update users set name = 'Võ Thị Dung' where id = $1`, [id]);
+    const flow = await oauth(route, { provider: 'lark', code: lark({ enterprise_email: 'dung@example.test', name: 'Võ Thị Dung - Ban quản lý' }) });
+    expect(flow.error).toBeNull();
+    expect(await sessionUser(flow.cookie)).toBe(id);
+    await auth.api.createUser({ body: { email: 'dung2@example.test', name: 'Võ Thị Dung', role: 'member', data: { emailVerified: true } } });
   });
 
   test('refuses a banned user and starts no session', async () => {

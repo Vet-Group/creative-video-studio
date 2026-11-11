@@ -8,7 +8,7 @@ import { admin, lastLoginMethod, twoFactor } from 'better-auth/plugins';
 import { adminAc, userAc } from 'better-auth/plugins/admin/access';
 import { genericOAuth } from 'better-auth/plugins/generic-oauth';
 import { accountAuditHooks, authAuditHook } from './account-audit';
-import { larkOAuth } from './lark';
+import { larkOAuth, refuseLikelyDuplicate } from './lark';
 
 // One pool per server process; dev reloads keep it on globalThis.
 const g = globalThis as unknown as { cvsPool?: ReturnType<typeof createPool> };
@@ -83,7 +83,8 @@ export const auth = betterAuth({
     // sign-in always links by equal email. The default requireLocalEmailVerified stays on, which is why an Admin-created user is verified.
     accountLinking: { enabled: true, trustedProviders: ['lark'], allowDifferentEmails: true, allowUnlinkingAll: false },
   },
-  databaseHooks: { account: accountAuditHooks(pool) },
+  // user.create.before refuses a Lark auto-provision that would duplicate a staff member who has an account under another email (lib/lark.ts).
+  databaseHooks: { account: accountAuditHooks(pool), user: { create: { before: refuseLikelyDuplicate(pool) } } },
   // The team is changed only by an Admin, so input: false keeps /api/auth/update-user from setting it. The column default is the seeded team.
   // mustChangePassword is set with an Admin's temporary password and cleared by /change-password (account-audit.ts); no client sets it.
   // canEditTemplates (template editor, lib/session.ts) and system (an automation account) are set by an Admin only (PATCH /api/admin/users/[id]).
