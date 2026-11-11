@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { Shell } from '@/components/Shell';
 import { googleLoginEnabled, larkLoginEnabled, pool } from '@/lib/auth';
 import { currentUser } from '@/lib/current-user';
+import { needsLarkPrompt } from '@/lib/lark-prompt';
 import { loginFor } from '@/lib/return-to';
 import { COLLAPSED_COOKIE } from '@/lib/sidebar';
 import { userMethods } from '@/lib/user-methods';
@@ -35,8 +36,9 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     larkEnabled: larkLoginEnabled,
     supportEmail: process.env.CVS_SUPPORT_EMAIL || null,
   };
+  const larkPrompt = needsLarkPrompt({ larkEnabled: larkLoginEnabled, system: user.system === true, providers: account.methods.map((m) => m.provider) });
   return (
-    <Shell userId={user.id} userName={user.name} isAdmin={isAdmin} feedbackNew={feedbackNew} account={account} initialCollapsed={(await cookies()).get(COLLAPSED_COOKIE)?.value === '1'}>
+    <Shell userId={user.id} userName={user.name} isAdmin={isAdmin} feedbackNew={feedbackNew} account={account} larkPrompt={larkPrompt} initialCollapsed={(await cookies()).get(COLLAPSED_COOKIE)?.value === '1'}>
       {children}
     </Shell>
   );
