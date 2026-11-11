@@ -28,6 +28,7 @@ export const methodText = (m: SignInMethod) =>
 /** What a user reads for each `?error=` code better-auth puts in the URL after a failed social sign-in or link. */
 const AUTH_ERROR_TEXT: Record<string, string> = {
   signup_disabled: 'Email này chưa được cấp quyền. Liên hệ Admin.',
+  lark_account_not_linked: 'Bạn đã có tài khoản với email khác. Hãy đăng nhập bằng cách cũ rồi liên kết Lark tại "Phương thức đăng nhập", hoặc liên hệ Admin.',
   account_not_linked: 'Email này đã có tài khoản nhưng chưa liên kết với cách đăng nhập vừa dùng. Hãy đăng nhập bằng cách khác rồi liên kết tại "Phương thức đăng nhập", hoặc liên hệ Admin.',
   BANNED_USER: 'Tài khoản này đã bị khoá. Liên hệ Admin.',
   account_already_linked_to_different_user: 'Tài khoản này đã được liên kết với một người dùng khác.',

@@ -1,6 +1,8 @@
 // The Lark Suite (international tenant) OAuth provider for better-auth's genericOAuth.
 // UNVERIFIED against a live tenant: the endpoints, the JSON token request, the PKCE parameters, the scope name and the user_info fields
 // (`tenant_key`, `enterprise_email`, `open_id`) follow Lark's published docs only. The D.5-lark live check is what verifies them.
+import type { Queryable } from '@cvs/core/ledger';
+import { APIError } from 'better-auth/api';
 import type { GenericOAuthConfig } from 'better-auth/plugins/generic-oauth';
 import { rememberLarkEmail } from './account-audit';
 
@@ -50,5 +52,26 @@ export function larkOAuth(app: { appId: string; appSecret: string; tenantKey: st
       // The tenant gate and the company email make this address trustworthy, which is why 'lark' is a trusted provider in lib/auth.ts.
       return { id: u.open_id, email, emailVerified: true, name: u.name, image: u.avatar_url || undefined };
     },
+  };
+}
+
+/** A name as two sign-ins compare it: Lark display names carry a role suffix ("Nguyễn Danh Khánh - Seller") that a CVS name lacks. */
+export const personName = (name: string) =>
+  name.normalize('NFC').replace(/\s+-\s+.*$/, '').replace(/\s+/g, ' ').trim().toLowerCase();
+
+/**
+ * databaseHooks.user.create.before. A first Lark sign-in links by equal email, so a staff member whose CVS account has another address (a
+ * Gmail one) would get a second, auto-provisioned account. When an existing user has the same name, the sign-in is refused instead with
+ * lark_account_not_linked: the login page tells them to sign in the old way and link Lark under "Phương thức đăng nhập". Only an OAuth
+ * callback creates users this way (Google has disableSignUp), so Admin-created users are never checked.
+ */
+export function refuseLikelyDuplicate(q: Queryable) {
+  return async (user: { name?: string | null }, ctx?: { path?: string } | null) => {
+    const name = personName(user.name ?? '');
+    if (!ctx?.path?.startsWith('/callback/') || !name) return;
+    const { rows } = await q.query('select name from users');
+    if ((rows as { name: string }[]).some((r) => personName(r.name) === name)) {
+      throw new APIError('FORBIDDEN', { code: 'lark_account_not_linked', message: 'A user with this name already exists; link Lark from their account' });
+    }
   };
 }
