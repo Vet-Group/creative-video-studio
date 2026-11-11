@@ -13,6 +13,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   if (!user) redirect(loginFor((await headers()).get('x-cvs-path'))); // set by src/proxy.ts
   if (user.mustChangePassword) redirect('/account/password'); // an Admin's temporary password opens nothing else
   const isAdmin = user.role === 'admin';
+  const feedbackNew = isAdmin ? (await pool.query(`select count(*)::int as n from feedback where status = 'new'`)).rows[0].n : 0;
   const [methods, profile] = await Promise.all([
     userMethods(pool, user.id),
     // Read here, not from the session, which may be cached from before an Admin moved the user to another team.
@@ -35,7 +36,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     supportEmail: process.env.CVS_SUPPORT_EMAIL || null,
   };
   return (
-    <Shell userId={user.id} userName={user.name} isAdmin={isAdmin} account={account} initialCollapsed={(await cookies()).get(COLLAPSED_COOKIE)?.value === '1'}>
+    <Shell userId={user.id} userName={user.name} isAdmin={isAdmin} feedbackNew={feedbackNew} account={account} initialCollapsed={(await cookies()).get(COLLAPSED_COOKIE)?.value === '1'}>
       {children}
     </Shell>
   );

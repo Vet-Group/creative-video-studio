@@ -697,3 +697,74 @@ export const providerInvoices = pgTable(
   },
   (t) => [primaryKey({ columns: [t.month, t.provider] })],
 );
+
+// Staff feedback board: suggestions, bug reports and feature requests, public to every member, with upvotes and comments; an Admin sets the status and a reply.
+export const FEEDBACK_KINDS = ['feedback', 'bug', 'feature'] as const;
+export type FeedbackKind = (typeof FEEDBACK_KINDS)[number];
+export const FEEDBACK_STATUSES = ['new', 'reviewing', 'done', 'rejected'] as const;
+export type FeedbackStatus = (typeof FEEDBACK_STATUSES)[number];
+
+export const feedback = pgTable(
+  'feedback',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'restrict' }),
+    teamId: text('team_id')
+      .notNull()
+      .references(() => teams.id, { onDelete: 'restrict' }),
+    kind: text('kind', { enum: FEEDBACK_KINDS }).notNull(),
+    title: text('title').notNull(),
+    body: text('body').notNull(),
+    // Images the author attached, owned by the author; validated on insert, not foreign-keyed (the shape of jobs.input_asset_ids).
+    imageAssetIds: text('image_asset_ids').array().notNull(),
+    status: text('status', { enum: FEEDBACK_STATUSES }).notNull().default('new'),
+    adminNote: text('admin_note'),
+    createdAt: tstz('created_at').notNull().defaultNow(),
+    updatedAt: tstz('updated_at').notNull().defaultNow(),
+  },
+  (t) => [
+    index('feedback_created_idx').on(t.createdAt),
+    index('feedback_status_idx').on(t.status),
+    check('feedback_kind_check', sql`${t.kind} in ('feedback', 'bug', 'feature')`),
+    check('feedback_status_check', sql`${t.status} in ('new', 'reviewing', 'done', 'rejected')`),
+    check('feedback_title_check', sql`char_length(${t.title}) between 1 and 120`),
+    check('feedback_body_check', sql`char_length(${t.body}) between 1 and 4000`),
+    check('feedback_images_check', sql`array_length(${t.imageAssetIds}, 1) is null or array_length(${t.imageAssetIds}, 1) <= 4`),
+    check('feedback_note_check', sql`${t.adminNote} is null or char_length(${t.adminNote}) <= 4000`),
+  ],
+);
+
+export const feedbackVotes = pgTable(
+  'feedback_votes',
+  {
+    feedbackId: text('feedback_id')
+      .notNull()
+      .references(() => feedback.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    createdAt: tstz('created_at').notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.feedbackId, t.userId] })],
+);
+
+export const feedbackComments = pgTable(
+  'feedback_comments',
+  {
+    id: text('id').primaryKey(),
+    feedbackId: text('feedback_id')
+      .notNull()
+      .references(() => feedback.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'restrict' }),
+    body: text('body').notNull(),
+    createdAt: tstz('created_at').notNull().defaultNow(),
+  },
+  (t) => [
+    index('feedback_comments_feedback_idx').on(t.feedbackId, t.createdAt),
+    check('feedback_comments_body_check', sql`char_length(${t.body}) between 1 and 2000`),
+  ],
+);
