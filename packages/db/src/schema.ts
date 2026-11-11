@@ -100,6 +100,8 @@ export const users = pgTable(
     avatarColor: text('avatar_color'),
     // Set by an Admin: the user edits the motion presets and decides the members' proposals, as an Admin does (lib/session.ts).
     canEditTemplates: boolean('can_edit_templates').notNull().default(false),
+    // Set by an Admin: an account for automation (the deploy Admin, test and demo accounts), listed apart from the staff on Admin Users.
+    system: boolean('system').notNull().default(false),
     teamId: text('team_id')
       .notNull()
       .default(DEFAULT_TEAM_ID)

@@ -172,6 +172,22 @@ describe('PATCH /api/admin/users/:id', () => {
     ]);
   });
 
+  test('moves a user into and out of the system accounts, listed with the flag, audited once per change; a non-boolean is a 400', async () => {
+    const m = await member();
+    expect((await patch(adminCookie, m.id, { system: 'yes' })).status).toBe(400);
+    expect((await patch(adminCookie, m.id, { system: true })).status).toBe(200);
+    expect((await patch(adminCookie, m.id, { system: true })).status).toBe(200); // already a system account: nothing to audit
+    const listed = async () => ((await (await GET(req(adminCookie))).json()) as { users: { id: string; system: boolean }[] }).users.find((u) => u.id === m.id)?.system;
+    expect(await listed()).toBe(true);
+    expect((await patch(adminCookie, m.id, { system: false })).status).toBe(200);
+    expect(await listed()).toBe(false);
+    const admin = await adminId();
+    expect(await audits(m.id)).toEqual([
+      { actor_id: admin, action: 'user.system', old_value: { system: false }, new_value: { system: true } },
+      { actor_id: admin, action: 'user.system', old_value: { system: true }, new_value: { system: false } },
+    ]);
+  });
+
   test('refuses to ban yourself or change your own role', async () => {
     const admin = await adminId();
     expect((await patch(adminCookie, admin, { banned: true })).status).toBe(400);

@@ -16,6 +16,9 @@ export const userAvatarColor = (name: string, chosen: string | null | undefined)
 
 export const isAvatarColor = (v: unknown): v is string => typeof v === 'string' && (AVATAR_COLORS as readonly string[]).includes(v);
 
+/** An email address as Admin Users accepts one: up to 254 characters, something@domain.tld, no spaces. */
+export const isEmail = (v: string): boolean => v.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+
 export const NAME_LENGTH = { min: 1, max: 60 };
 
 /** Why a display name cannot be saved (checked after trimming), or null. */

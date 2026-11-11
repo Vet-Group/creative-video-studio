@@ -83,6 +83,25 @@ test('an Admin sets up a team, a store and a user, then reconciles the month cos
   await editor.getByRole('button', { name: 'Đóng' }).click();
   await expect(editor).toBeHidden();
   await expect(newRow).toContainText('Renamed E2E User');
+  // A system account leaves the staff count and lists under its own section; unticking brings it back.
+  const count = page.getByRole('status').filter({ hasText: /người dùng$/ });
+  const staff = await count.textContent();
+  await newRow.getByRole('button', { name: 'Sửa new.user@e2e.test' }).click();
+  // The box follows the saved state, so it changes once the PATCH answers and the list reloads.
+  const systemBox = editor.getByLabel('Tài khoản hệ thống: new.user@e2e.test');
+  await Promise.all([page.waitForResponse((r) => r.url().includes('/api/admin/users/') && r.ok()), systemBox.click()]);
+  await expect(systemBox).toBeChecked();
+  await editor.getByRole('button', { name: 'Đóng' }).click();
+  const systemSection = page.locator('details.system-users');
+  await expect(systemSection.locator('summary')).toHaveText(/^Tài khoản hệ thống \(\d+\)$/);
+  await expect(count).not.toHaveText(staff!);
+  await systemSection.locator('summary').click();
+  await expect(systemSection.getByRole('row', { name: /new\.user@e2e\.test/ })).toBeVisible();
+  await systemSection.getByRole('button', { name: 'Sửa new.user@e2e.test' }).click();
+  await Promise.all([page.waitForResponse((r) => r.url().includes('/api/admin/users/') && r.ok()), systemBox.click()]);
+  await expect(systemBox).not.toBeChecked();
+  await editor.getByRole('button', { name: 'Đóng' }).click();
+  await expect(count).toHaveText(staff!);
 
   // Costs: the VND rate, an invoice and its difference, a manual adjustment.
   await nav(page, 'Chi phí').click();
