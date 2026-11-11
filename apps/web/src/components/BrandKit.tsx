@@ -6,9 +6,9 @@ import { api, sendJson } from '@/lib/api';
 import { type BrandKit, hasBrand, MAX_BRAND_COLORS, MAX_BRAND_TAGLINE, MAX_BRAND_VOICE } from '@/lib/brand';
 import { Icon } from './Icon';
 import { Modal } from './Modal';
-import { Select } from './Select';
+import { StorePicker, type StoreOption } from './StorePicker';
 
-export type BrandStore = BrandKit & { id: string; name: string };
+export type BrandStore = BrandKit & StoreOption;
 
 const HEX = /^#[0-9a-f]{6}$/i;
 
@@ -96,9 +96,17 @@ export function BrandPicker({ storeId, onStore, on, onToggle, onKit }: { storeId
   const store = stores.find((s) => s.id === storeId);
   const usable = store !== undefined && hasBrand(store);
   useEffect(() => onKit?.(on && usable ? store : null), [on, usable, store]);
+  async function togglePin(id: string) {
+    try {
+      const r = await api<{ pinned: boolean }>(`/api/stores/${id}/pin`, { method: 'PUT' });
+      setStores((cur) => cur.map((s) => (s.id === id ? { ...s, pinned: r.pinned, mine: r.pinned || !!s.assigned } : s)));
+    } catch {
+      /* a failed pin leaves the list as it was */
+    }
+  }
   return (
     <div className="brand-picker">
-      <Select label="Cửa hàng/Thương hiệu" icon="store" heading="Chọn cửa hàng hoặc thương hiệu" value={storeId} options={[{ value: '', label: 'Không chọn' }, ...stores.map((s) => ({ value: s.id, label: s.name }))]} onChange={onStore} />
+      <StorePicker label="Cửa hàng/Thương hiệu" heading="Chọn cửa hàng hoặc thương hiệu" value={storeId} stores={stores} noneLabel="Không chọn" onChange={onStore} onPin={togglePin} />
       <button
         type="button"
         className="enhance"

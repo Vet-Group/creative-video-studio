@@ -582,11 +582,11 @@ test('the custom selects work by keyboard: arrows, Home, End, Enter, Space and E
   await expect(duration).toHaveAttribute('data-value', '5');
   await expect(duration).toBeFocused();
 
-  // Home and End jump to the ends; Space picks. The last store is the last option, "Không chọn" the first.
+  // The store picker opens into its search box; Home and End jump to the ends and Enter picks. The last store is the last option, "Không chọn" the first.
   await store.focus();
   await page.keyboard.press('Enter');
   await page.keyboard.press('End');
-  await page.keyboard.press('Space');
+  await page.keyboard.press('Enter');
   await expect(store).not.toHaveAttribute('data-value', '');
   await page.keyboard.press('Enter');
   await page.keyboard.press('Home');

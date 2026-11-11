@@ -27,6 +27,7 @@ import { PromptComposer } from './PromptComposer';
 import { PromptPreview, PromptSections, usePromptMode } from './PromptSections';
 import { Preview } from './Preview';
 import { Select } from './Select';
+import { StorePicker, type StoreOption } from './StorePicker';
 import { Tray } from './Shell';
 import { Templates } from './Templates';
 import { PageHint } from './ToolGuide';
@@ -155,7 +156,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
   const [modelId, setModelId] = useState(model ?? '');
   const wanted = useRef(model); // the Explore choice, honoured once: the form takes its ratio and duration rather than dropping it
   const [storeId, setStoreId] = useState('');
-  const [stores, setStores] = useState<{ id: string; name: string }[]>([]);
+  const [stores, setStores] = useState<StoreOption[]>([]);
   const [models, setModels] = useState<ModelsResponse | null>(null);
   const [ready, setReady] = useState(!reuse);
   const [source, setSource] = useState(reuse ? { from: reuse } : null); // what the form refills from; Recreate sets a new one in place
@@ -197,8 +198,17 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
   );
 
   useEffect(() => {
-    api<{ stores: { id: string; name: string }[] }>('/api/stores').then((r) => setStores(r.stores), () => setError('Không tải được danh sách cửa hàng.'));
+    api<{ stores: StoreOption[] }>('/api/stores').then((r) => setStores(r.stores), () => setError('Không tải được danh sách cửa hàng.'));
   }, []);
+
+  async function togglePin(id: string) {
+    try {
+      const r = await api<{ pinned: boolean }>(`/api/stores/${id}/pin`, { method: 'PUT' });
+      setStores((xs) => xs.map((s) => (s.id === id ? { ...s, pinned: r.pinned, mine: r.pinned || !!s.assigned } : s)));
+    } catch {
+      /* a failed pin leaves the list as it was */
+    }
+  }
 
   /** Takes a GET /api/presets answer: the enabled presets to pick from and, for a template editor, all of them. */
   const takePresets = (r: { presets: PresetRow[]; canEdit: boolean }) => {
@@ -761,14 +771,7 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
               />
               <AudioSwitch on={audio} available={chosen?.audioEstimateUsd != null} always={chosen?.alwaysAudio} onChange={setAudio} />
             </VideoSettings>
-            <Select
-              label="Cửa hàng/Thương hiệu"
-              icon="store"
-              heading="Chọn cửa hàng hoặc thương hiệu"
-              value={storeId}
-              options={[{ value: '', label: 'Không chọn' }, ...stores.map((s) => ({ value: s.id, label: s.name }))]}
-              onChange={setStoreId}
-            />
+            <StorePicker label="Cửa hàng/Thương hiệu" heading="Chọn cửa hàng hoặc thương hiệu" value={storeId} stores={stores} noneLabel="Không chọn" onChange={setStoreId} onPin={togglePin} />
 
             {models && (
               <p className="help">

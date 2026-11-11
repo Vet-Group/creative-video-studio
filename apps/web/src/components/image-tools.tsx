@@ -17,6 +17,7 @@ import { LoadError } from './LoadError';
 import { Modal } from './Modal';
 import { Preview } from './Preview';
 import { Select } from './Select';
+import { StorePicker, type StoreOption } from './StorePicker';
 import { SampleDetail } from './SampleDetail';
 import type { ModelOption } from './ModelPicker';
 
@@ -519,7 +520,7 @@ export function UploadedPhotos({ name, taken, disabled, onPick, storeId = '', sl
   const [open, setOpen] = useState(false);
   const [store, setStore] = useState('');
   const [kind, setKind] = useState<UploadSlot | ''>('');
-  const [stores, setStores] = useState<{ id: string; name: string }[]>([]);
+  const [stores, setStores] = useState<StoreOption[]>([]);
   const [list, setList] = useState<Img[] | 'failed' | null>(null);
   useEffect(() => {
     if (!open) return;
@@ -535,7 +536,7 @@ export function UploadedPhotos({ name, taken, disabled, onPick, storeId = '', sl
     setOpen(true);
     setStore(storeId);
     setKind(slot ?? '');
-    if (stores.length === 0) api<{ stores: { id: string; name: string }[] }>('/api/stores').then((r) => setStores(r.stores), () => undefined); // without the list the filter offers every store only
+    if (stores.length === 0) api<{ stores: StoreOption[] }>('/api/stores').then((r) => setStores(r.stores), () => undefined); // without the list the filter offers every store only
   }
   const shown = Array.isArray(list) ? list.filter((a) => !taken.some((t) => t.id === a.id)) : [];
   const sub =
@@ -556,7 +557,7 @@ export function UploadedPhotos({ name, taken, disabled, onPick, storeId = '', sl
         filter={
           <div className="uploads-filter">
             <Select label="Lọc theo mục" icon="image" heading="Lọc theo mục" value={kind} options={[{ value: '', label: 'Tất cả mục' }, ...(Object.keys(UPLOAD_SLOTS) as UploadSlot[]).map((k) => ({ value: k, label: UPLOAD_SLOTS[k] }))]} onChange={(v) => setKind(v as UploadSlot | '')} />
-            <Select label="Lọc theo cửa hàng" icon="store" heading="Lọc theo cửa hàng" value={store} options={[{ value: '', label: 'Tất cả cửa hàng' }, ...stores.map((s) => ({ value: s.id, label: s.name }))]} onChange={setStore} />
+            <StorePicker label="Lọc theo cửa hàng" heading="Lọc theo cửa hàng" value={store} stores={stores} noneLabel="Tất cả cửa hàng" onChange={setStore} />
           </div>
         }
       />

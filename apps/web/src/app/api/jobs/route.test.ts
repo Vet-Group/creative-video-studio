@@ -1095,7 +1095,8 @@ describe('GET /api/stores', () => {
   test('lists the visible stores and leaves out a hidden one', async () => {
     const res = await GET(new Request('http://localhost/api/stores', { headers: { cookie: ownerCookie } }));
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ stores: [{ id: 'store-ok', name: 'Store', code: 'S1', paused: false, brandVoice: null, brandColors: [], brandTagline: null }], canEdit: false });
+    // The owner ran a job for store-ok above, so it is now their most recently used store (lastUsedAt set); pin/assign are still untouched.
+    expect(await res.json()).toEqual({ stores: [{ id: 'store-ok', name: 'Store', code: 'S1', paused: false, brandVoice: null, brandColors: [], brandTagline: null, mine: false, pinned: false, assigned: false, lastUsedAt: expect.any(String) }], canEdit: false });
   });
 });
 
