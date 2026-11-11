@@ -400,6 +400,9 @@ export async function POST(request: Request) {
        values ($1, $2, coalesce($3, (select team_id from users where id = $2)), $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb, $14, $15, $16, $17)`,
       [id, userId, original?.team_id ?? null, storeId, retryOf, feature, modelId, provider, presetId, prompt, ratio, durationSec, JSON.stringify(params), assetIds, provider === 'mock', enhance, original?.enhanced_prompt ?? null],
     );
+    // Remember this as the caller's most recently used store, so it leads their picker next time and is the default choice.
+    if (storeId !== null)
+      await tx.query(`insert into user_stores (user_id, store_id, last_used_at) values ($1, $2, now()) on conflict (user_id, store_id) do update set last_used_at = now()`, [userId, storeId]);
     await reserve(tx, id, estimate);
     await fillInputSlots(tx, id); // the uploaded-photos picker files each photo under the slot it was first run from
     return null;

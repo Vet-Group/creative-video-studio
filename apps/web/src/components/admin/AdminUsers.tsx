@@ -39,6 +39,57 @@ const initials = (name: string) => {
 };
 
 /** Everything an Admin changes on one user: name and email, role, team, sign-in methods, a temporary password, lock. */
+/** Admin: the stores assigned to a user. An assigned store leads that user's store pickers (the "theirs" group), as one they pinned does. */
+function StoreAssign({ user }: { user: User }) {
+  const stores = useFetch<{ stores: { id: string; name: string }[] }>('/api/stores');
+  const assigned = useFetch<{ storeIds: string[] }>(`/api/admin/users/${user.id}/stores`);
+  const { problem, pending, run } = useAction(assigned.reload);
+  if (stores.failed || assigned.failed)
+    return (
+      <div className="editor-section">
+        <h3>Cửa hàng phụ trách</h3>
+        <LoadError text="Không tải được cửa hàng." onRetry={() => (stores.reload(), assigned.reload())} />
+      </div>
+    );
+  if (!stores.data || !assigned.data)
+    return (
+      <div className="editor-section">
+        <h3>Cửa hàng phụ trách</h3>
+        <p role="status">Đang tải...</p>
+      </div>
+    );
+  const have = new Set(assigned.data.storeIds);
+  const toggle = (id: string) => {
+    const next = have.has(id) ? assigned.data!.storeIds.filter((x) => x !== id) : [...assigned.data!.storeIds, id];
+    void run(() => api(`/api/admin/users/${user.id}/stores`, sendJson('PUT', { storeIds: next })), 'Không lưu được cửa hàng phụ trách.');
+  };
+  return (
+    <div className="editor-section">
+      <h3>Cửa hàng phụ trách</h3>
+      {problem && (
+        <p className="error" role="alert">
+          {problem}
+        </p>
+      )}
+      {stores.data.stores.length === 0 ? (
+        <p className="muted">Chưa có cửa hàng nào.</p>
+      ) : (
+        <ul className="store-assign">
+          {stores.data.stores.map((s) => (
+            <li key={s.id}>
+              <label className="check">
+                <input type="checkbox" aria-label={`Gán ${s.name} cho ${user.email}`} checked={have.has(s.id)} disabled={pending} onChange={() => toggle(s.id)} />
+                {s.name}
+              </label>
+            </li>
+          ))}
+        </ul>
+      )}
+      <small className="muted">Cửa hàng được gán hiện trong nhóm “Của bạn” ở đầu danh sách khi người này chọn cửa hàng; họ cũng tự ghim thêm được.</small>
+    </div>
+  );
+}
+
 function UserEditor({ user, teams, reload }: { user: User; teams: Team[]; reload: () => void }) {
   // Its own action state, so a failure here and one in the add form never show in each other's place.
   const { problem, pending, run } = useAction(reload);
@@ -110,6 +161,7 @@ function UserEditor({ user, teams, reload }: { user: User; teams: Team[]; reload
         </label>
         <small className="muted">Vai trò, nhóm và quyền biên tập mẫu lưu ngay khi chọn. Đổi nhóm chỉ áp dụng cho các job mới. Người biên tập mẫu sửa, thêm mẫu chuyển động và duyệt đề xuất ở trang Tạo video; Admin luôn có quyền này. Tài khoản hệ thống (dùng cho deploy, kiểm thử, demo) được xếp riêng ở cuối danh sách.</small>
       </div>
+      <StoreAssign user={user} />
       <div className="editor-section">
         <h3>Phương thức đăng nhập</h3>
         <ul className="methods">

@@ -770,3 +770,27 @@ export const feedbackComments = pgTable(
     check('feedback_comments_body_check', sql`char_length(${t.body}) between 1 and 2000`),
   ],
 );
+
+// A member's relationship to a store (owner decision, 2026-11-11): one user may be responsible for many stores. `pinned` is set by the
+// member; `assigned` by an Admin. Either flag makes the store one of "theirs", listed first in the store pickers. `lastUsedAt`, set when
+// they run a job for that store, orders the rest by recency and seeds the default choice. A row is kept only while it still carries a flag
+// or a last-used time.
+export const userStores = pgTable(
+  'user_stores',
+  {
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    storeId: text('store_id')
+      .notNull()
+      .references(() => stores.id, { onDelete: 'cascade' }),
+    pinned: boolean('pinned').notNull().default(false),
+    assigned: boolean('assigned').notNull().default(false),
+    lastUsedAt: tstz('last_used_at'),
+    createdAt: tstz('created_at').notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.storeId] }),
+    index('user_stores_store_id_idx').on(t.storeId),
+  ],
+);
