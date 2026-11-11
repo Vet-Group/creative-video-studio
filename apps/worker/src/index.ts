@@ -54,15 +54,17 @@ const dedupe = () =>
 void dedupe();
 setInterval(dedupe, DEDUPE_TICK_MS).unref();
 
-// The hourly fal low-balance alert to the Admins on Lark (fal-alert.ts); only with a fal key and the Lark app, unref'd like the others.
+// The hourly fal low-balance alert on Lark (fal-alert.ts), to FAL_ALERT_LARK_EMAILS or else the Admins; only with a fal key and the Lark app, unref'd like the others.
 // With a second key it watches what both accounts can still spend (readFalBalances), as Admin Costs shows it.
 if (process.env.FAL_KEY && lark) {
   const read = async () => readFalBalances({ key: process.env.FAL_KEY, nextKey: process.env.FAL_KEY_NEXT, switched: (await falActive(pool)) === 'team' });
+  // FAL_ALERT_LARK_EMAILS: comma-separated Lark emails (the owner and the accountants who top up) that get the alert instead of the Admins.
+  const to = (process.env.FAL_ALERT_LARK_EMAILS ?? '').split(',').map((s) => s.trim()).filter(Boolean);
   const alert = () =>
-    falAlertTick(pool, read, lark)
+    falAlertTick(pool, read, lark, to)
       .then((r) => {
         if (r === 'cleared') console.log('worker: fal alert: the balance is back over the threshold');
-        else if (r !== 'none') console.log(`worker: fal alert: sent to ${r.sent} Admins${r.failed.length ? `; failed: ${r.failed.join('; ')}` : ''}`);
+        else if (r !== 'none') console.log(`worker: fal alert: sent to ${r.sent} ${to.length ? 'listed people' : 'Admins'}${r.failed.length ? `; failed: ${r.failed.join('; ')}` : ''}`);
       })
       .catch((e) => console.error('worker: fal alert:', e instanceof Error ? e.message : e));
   void alert();
