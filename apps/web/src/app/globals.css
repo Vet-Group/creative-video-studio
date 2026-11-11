@@ -804,6 +804,7 @@ td code { white-space: pre-wrap; overflow-wrap: anywhere; }
   .admin .mobile-records td::before { display: block; margin-bottom: 6px; color: var(--text-subtle); font-size: 12px; content: attr(data-label); }
   .admin .mobile-records input:not([type='checkbox']) { width: 100%; }
   .admin .mobile-records .changes { min-width: 0; }
+  .admin .mobile-records td .actions { flex-wrap: wrap; } /* a record's buttons wrap inside the card instead of running off the screen */
 }
 .admin .tag { display: inline-block; margin-left: 8px; padding: 0 8px; border-radius: 999px; background: var(--fill); color: var(--text-sub); font-size: 12px; line-height: 20px; font-weight: 500; }
 .admin .status { display: inline-block; padding: 0 10px; border-radius: 999px; background: var(--cat-utility-bg); color: var(--cat-utility-fg); font-size: 12px; line-height: 24px; font-weight: 600; white-space: nowrap; }

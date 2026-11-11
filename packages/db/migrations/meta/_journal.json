@@ -582,6 +582,13 @@
 			"when": 1794395639040,
 			"tag": "0083_fal_low_alert",
 			"breakpoints": true
+		},
+		{
+			"idx": 83,
+			"version": "7",
+			"when": 1794395639041,
+			"tag": "0084_store_paused",
+			"breakpoints": true
 		}
 	]
 }

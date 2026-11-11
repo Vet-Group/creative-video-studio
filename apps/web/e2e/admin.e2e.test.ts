@@ -381,3 +381,44 @@ test('on a 320 px phone the Costs header buttons wrap their label instead of wid
   expect(box.height).toBeGreaterThanOrEqual(36);
   expect(await page.evaluate(() => document.scrollingElement!.scrollWidth <= innerWidth)).toBe(true);
 });
+
+test('an Admin pauses, resumes, closes, reopens and deletes an unused store; the picker marks a paused one; a store with a clip cannot be deleted', async ({ page }) => {
+  await signIn(page, 'admin');
+  const code = `LS${Date.now() % 100000}`;
+  const name = `Lifecycle store ${code}`;
+  expect((await page.request.post('/api/admin/stores', { data: { name, code } })).status()).toBe(201);
+  await page.goto('/admin/stores');
+  const row = page.getByRole('row').filter({ has: page.getByLabel(`Mã cửa hàng của ${name}`) });
+  const done = () => page.waitForResponse((r) => r.url().includes('/api/admin/stores?') && r.ok());
+
+  await Promise.all([done(), row.getByRole('button', { name: 'Tạm dừng', exact: true }).click()]);
+  await expect(row.locator('.tag')).toHaveText('Tạm dừng');
+  const picker = async () => ((await (await page.request.get('/api/stores')).json()) as { stores: { name: string }[] }).stores.map((s) => s.name);
+  expect(await picker()).toContain(`${name} (tạm dừng)`);
+  await Promise.all([done(), row.getByRole('button', { name: 'Hoạt động lại', exact: true }).click()]);
+  await expect(row.locator('.tag')).toHaveCount(0);
+
+  await row.getByRole('button', { name: 'Đóng', exact: true }).click();
+  await Promise.all([done(), page.getByRole('dialog', { name: `Đóng cửa hàng ${name}?` }).getByRole('button', { name: 'Đóng cửa hàng', exact: true }).click()]);
+  await expect(row.locator('.tag')).toHaveText('Đã đóng');
+  expect((await picker()).filter((n) => n.startsWith(name))).toEqual([]);
+  await Promise.all([done(), row.getByRole('button', { name: 'Mở lại', exact: true }).click()]);
+  await expect(row.locator('.tag')).toHaveCount(0);
+
+  await row.getByRole('button', { name: 'Xoá', exact: true }).click();
+  await Promise.all([done(), page.getByRole('dialog', { name: `Xoá cửa hàng ${name}?` }).getByRole('button', { name: 'Xoá', exact: true }).click()]);
+  await expect(row).toHaveCount(0);
+
+  // A store a clip points at keeps its history: Xoá is disabled and says to close it.
+  const usedCode = `LU${Date.now() % 100000}`;
+  const used = await page.request.post('/api/admin/stores', { data: { name: `Used store ${usedCode}`, code: usedCode } });
+  const storeId = ((await used.json()) as { id: string }).id;
+  const up = await page.request.post('/api/assets', { multipart: { file: { name: 'shirt.png', mimeType: 'image/png', buffer: png() } } });
+  const { assets } = (await up.json()) as { assets: { id: string }[] };
+  expect((await page.request.post('/api/jobs', { data: { assetIds: [assets[0]!.id], modelId: 'mock-e2e', presetId: 'gentle-push-in', ratio: '9:16', durationSec: 5, storeId } })).status()).toBe(201);
+  await page.reload();
+  const usedDelete = page.getByRole('row').filter({ has: page.getByLabel(`Mã cửa hàng của Used store ${usedCode}`) }).getByRole('button', { name: 'Xoá', exact: true });
+  await expect(usedDelete).toBeDisabled();
+  await expect(usedDelete).toHaveAttribute('title', /hãy Đóng thay vì xoá/);
+  expect((await page.request.delete(`/api/admin/stores/${storeId}`)).status()).toBe(409);
+});

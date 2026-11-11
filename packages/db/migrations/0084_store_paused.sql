@@ -1,0 +1,1 @@
+ALTER TABLE "stores" ADD COLUMN "paused" boolean DEFAULT false NOT NULL;
