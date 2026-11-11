@@ -17,7 +17,7 @@ export async function GET(request: Request) {
        from stores s
        left join user_stores us on us.store_id = s.id and us.user_id = $1
       where not s.hidden
-      order by (coalesce(us.pinned, false) or coalesce(us.assigned, false)) desc, us.last_used_at desc nulls last, s.paused, s.name, s.id`,
+      order by coalesce(us.pinned, false) desc, coalesce(us.assigned, false) desc, us.last_used_at desc nulls last, s.paused, s.name, s.id`,
     [g.session.user.id],
   );
   return Response.json({ stores: rows, canEdit: isEditor(g.session.user) });

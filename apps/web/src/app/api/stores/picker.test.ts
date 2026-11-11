@@ -64,6 +64,12 @@ describe('GET /api/stores order and flags', () => {
     const other = await newUser();
     expect((await list(other)).map((s) => s.id)).toEqual(['s-a', 's-b', 's-c', 's-d']);
   });
+
+  test('a pinned store leads an Admin-assigned one even when its name sorts later', async () => {
+    const u = await newUser();
+    await pool.query(`insert into user_stores (user_id, store_id, pinned, assigned) values ($1, 's-d', true, false), ($1, 's-c', false, true)`, [u.id]);
+    expect((await list(u)).map((s) => s.id).slice(0, 2)).toEqual(['s-d', 's-c']); // pinned s-d before assigned s-c, despite C < D by name
+  });
 });
 
 describe('PUT /api/stores/:id/pin', () => {
