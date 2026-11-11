@@ -34,6 +34,21 @@ export async function readFalBalance(o: { key: string | undefined; fetch?: Fetch
   }
 }
 
+/**
+ * What fal can spend for CVS when a second key is set (FAL_KEY_NEXT, the team account that takes over once FAL_KEY's account runs out):
+ * both balances summed until the worker switched (`switched`), then the second alone, since the first can no longer take jobs. Without a
+ * second key it is FAL_KEY's balance, as before. Either read failing, or two currencies, is a failed read.
+ */
+export async function readFalBalances(o: { key: string | undefined; nextKey: string | undefined; switched: boolean; fetch?: Fetch }): Promise<FalBalance> {
+  if (!o.nextKey) return readFalBalance({ key: o.key, fetch: o.fetch });
+  if (o.switched) return readFalBalance({ key: o.nextKey, fetch: o.fetch });
+  const [first, next] = await Promise.all([readFalBalance({ key: o.key, fetch: o.fetch }), readFalBalance({ key: o.nextKey, fetch: o.fetch })]);
+  if (!first.ok) return first;
+  if (!next.ok) return { ...next, error: `FAL_KEY_NEXT: ${next.error}` };
+  if (first.currency !== next.currency) return { ok: false, reason: 'failed', error: `the two fal accounts are in ${first.currency} and ${next.currency}` };
+  return { ok: true, balance: Math.round((first.balance + next.balance) * 100) / 100, currency: first.currency };
+}
+
 /** The one model the BytePlus Seedance 2.0 resource pack covers (2.0 fast, 2.0 mini and 2.5 are pay-as-you-go), and the pack's price per million tokens. */
 export const BYTEPLUS_PACK_MODEL = 'seedance-2.0-byteplus';
 const PACK_USD_PER_MTOKENS = 7;

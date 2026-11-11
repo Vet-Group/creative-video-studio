@@ -1,0 +1,1 @@
+ALTER TABLE "settings" ADD COLUMN "fal_next_at" timestamp with time zone;

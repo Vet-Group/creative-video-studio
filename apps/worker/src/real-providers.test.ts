@@ -49,6 +49,8 @@ describe('realProviders', () => {
     expect([Object.keys(fal.providers), Object.keys(fal.imageProviders!)]).toEqual([['fal'], ['fal']]);
     const stale = realProviders(pool([]), { FAL_KEY: 'k', REPLICATE_API_TOKEN: 't' }); // a leftover token on a server enables nothing
     expect([Object.keys(stale.providers), Object.keys(stale.imageProviders!)]).toEqual([['fal'], ['fal']]);
+    const alone = realProviders(pool([]), { FAL_KEY_NEXT: 'n' }); // the team key alone wires nothing: it only takes over from FAL_KEY
+    expect([Object.keys(alone.providers), Object.keys(alone.imageProviders!)]).toEqual([[], []]);
     const byteplus = realProviders(pool([]), { BYTEPLUS_ARK_API_KEY: 'k' });
     expect([Object.keys(byteplus.providers), Object.keys(byteplus.imageProviders!)]).toEqual([['byteplus'], ['byteplus']]);
   });

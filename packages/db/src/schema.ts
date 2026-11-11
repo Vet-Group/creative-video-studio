@@ -365,6 +365,11 @@ export const settings = pgTable(
     /** When the worker messaged the Admins on Lark that fal's balance went under balance_warning_usd; null again once it is back over (apps/worker/src/fal-alert.ts). */
     falLowAlertedAt: tstz('fal_low_alerted_at'),
     /**
+     * When the worker moved new fal jobs from FAL_KEY (the personal account) to FAL_KEY_NEXT (the "VET Group" team) because the first ran out
+     * (owner request, 2026-11-11; apps/worker/src/fal-next.ts). Null while FAL_KEY takes them.
+     */
+    falNextAt: tstz('fal_next_at'),
+    /**
      * The BytePlus Seedance 2.0 prepaid resource pack (docs/ops/provider-balances.md). BytePlus has no API for a pack's balance, so the Admin enters the tokens
      * left at a moment and the app subtracts the tokens of the jobs finished after it. All four are set together or all null.
      */

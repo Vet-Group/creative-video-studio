@@ -1,14 +1,19 @@
 // The fal credit lock: a fal model whose Run would cost more than fal can still spend is locked until the balance is topped up (owner request, 2026-11-05).
 import type { Queryable } from '@cvs/core/ledger';
-import { type FalBalance, readFalBalance } from '@cvs/core/providers/balances';
+import { type FalBalance, readFalBalances } from '@cvs/core/providers/balances';
+import { pool } from '@/lib/auth';
 
 const CACHE_MS = 60_000;
 let falCache: { at: number; fal: Extract<FalBalance, { ok: true }> } | undefined;
 
-/** fal's balance from its API; a good read is kept a minute, so a top-up unlocks the models within a minute. Admin Costs shows the same read. */
+/**
+ * fal's balance from its API; a good read is kept a minute, so a top-up unlocks the models within a minute. Admin Costs shows the same read. With a
+ * second key (FAL_KEY_NEXT) it is both accounts until the worker switched to the second (settings.fal_next_at), then the second (readFalBalances).
+ */
 export async function falBalance(): Promise<FalBalance> {
   if (falCache && Date.now() - falCache.at < CACHE_MS) return falCache.fal;
-  const fal = await readFalBalance({ key: process.env.FAL_KEY });
+  const switched = process.env.FAL_KEY_NEXT ? (await pool.query('select fal_next_at is not null as s from settings where id = 1')).rows[0]?.s === true : false;
+  const fal = await readFalBalances({ key: process.env.FAL_KEY, nextKey: process.env.FAL_KEY_NEXT, switched });
   falCache = fal.ok ? { at: Date.now(), fal } : undefined;
   return fal;
 }
