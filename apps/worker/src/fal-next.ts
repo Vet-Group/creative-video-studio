@@ -6,15 +6,19 @@ import type { FalBalance } from '@cvs/core/providers/balances';
 import { type Pinnable, pinToAccounts } from '@cvs/core/providers/vertex-accounts';
 import { messageAdmins, type SendLark } from './fal-alert';
 
+/** fal's answers when an account is out of credit (fal docs, Errors and Billing, checked 2026-11-11). */
+const CREDIT_REFUSAL = /account is locked|user is locked|exhausted balance|insufficient credits/i;
+
 /** The account new fal jobs go to: the team once settings.fal_next_at is set, else the personal one. */
 export const falActive = async (pool: Queryable): Promise<'personal' | 'team'> =>
   (await pool.query('select fal_next_at is not null as s from settings where id = 1')).rows[0]?.s === true ? 'team' : 'personal';
 
 /**
  * One fal provider over the two accounts (pinToAccounts: a job keeps the account it was sent to, so one sent to the personal account is still
- * polled there after the switch; an id from before this existed belongs to the personal account). A submit to the personal account that fails
- * while its balance is under the Admin warning threshold switches: the first worker to set settings.fal_next_at audits it (`fal.switch`, no
- * actor) and messages the Admins on Lark, and the job is sent again, to the team. Any other failure is the job's own and is thrown as it was.
+ * polled there after the switch; an id from before this existed belongs to the personal account). The personal credit is used up first
+ * (owner, 2026-11-11): a submit to the personal account switches only when fal refused it for credit (CREDIT_REFUSAL, or a balance at or under
+ * 0) while the balance is under the Admin warning threshold. The first worker to set settings.fal_next_at audits it (`fal.switch`, no actor)
+ * and messages the Admins on Lark, and the job is sent again, to the team. Any other failure is the job's own and is thrown as it was.
  */
 export function falNext<R, J extends { providerJobId: string }, S>(
   personal: Pinnable<R, J, S>,
@@ -32,6 +36,7 @@ export function falNext<R, J extends { providerJobId: string }, S>(
         const fal = await o.readPersonal();
         const warningUsd = Number((await o.pool.query('select balance_warning_usd::text as usd from settings where id = 1')).rows[0].usd);
         if (!fal.ok || fal.balance >= warningUsd) throw e;
+        if (fal.balance > 0 && !CREDIT_REFUSAL.test(e instanceof Error ? e.message : String(e))) throw e;
         await switchToTeam(o.pool, fal.balance, e, o.send);
         return pinned.submit(req);
       }
