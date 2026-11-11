@@ -444,7 +444,7 @@ const PAGE_TITLES: [prefix: string, title: string][] = [
   ['/account', 'Phương thức đăng nhập'],
 ];
 
-export function Shell({ userId, userName, isAdmin, account, initialCollapsed, children }: { userId: string; userName: string; isAdmin: boolean; account: Account; initialCollapsed: boolean; children: ReactNode }) {
+export function Shell({ userId, userName, isAdmin, feedbackNew = 0, account, initialCollapsed, children }: { userId: string; userName: string; isAdmin: boolean; feedbackNew?: number; account: Account; initialCollapsed: boolean; children: ReactNode }) {
   const pathname = usePathname();
   const narrow = useMediaQuery(NARROW);
   const [open, setOpen] = useState(false); // the drawer, below 1024 px
@@ -546,7 +546,7 @@ export function Shell({ userId, userName, isAdmin, account, initialCollapsed, ch
                 </button>
               </div>
               <nav aria-label="Điều hướng chính" data-hint-off={hintOff || undefined} onKeyDown={(e) => e.key === 'Escape' && setHintOff(true)} onFocus={() => setHintOff(false)} onPointerOver={() => hintOff && setHintOff(false)}>
-                {navGroups(isAdmin).map((g, i) => (
+                {navGroups(isAdmin, feedbackNew).map((g, i) => (
                   <div key={g.label ?? 'home'} className="nav-group" role={g.label ? 'group' : undefined} aria-labelledby={g.label ? `nav-group-${i}` : undefined}>
                     {g.label && (
                       <div className="nav-group-head">

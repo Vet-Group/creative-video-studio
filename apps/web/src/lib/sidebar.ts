@@ -31,13 +31,24 @@ const GROUPS: NavGroup[] = [
       { href: '/apps', text: 'Ứng dụng', icon: 'apps' },
     ],
   },
-  { label: 'Của bạn', items: [{ href: '/library', text: 'Thư viện', icon: 'library' }] },
+  {
+    label: 'Của bạn',
+    items: [
+      { href: '/library', text: 'Thư viện', icon: 'library' },
+      { href: '/feedback', text: 'Góp ý', icon: 'help', hint: 'Gửi góp ý, báo lỗi, đề xuất tính năng' },
+    ],
+  },
 ];
 const ADMIN: NavGroup = { label: 'Quản lý', items: [{ href: '/admin/overview', text: 'Quản trị', icon: 'admin' }] };
 
 for (const item of GROUPS[1]!.items) item.hint = toolGuide(item.href)!.oneLine;
 
-export const navGroups = (isAdmin: boolean): NavGroup[] => (isAdmin ? [...GROUPS, ADMIN] : GROUPS);
+/** `feedbackNew`, shown to an Admin as a badge on the feedback item, is the count of items still at status `new` to triage. */
+export const navGroups = (isAdmin: boolean, feedbackNew = 0): NavGroup[] => {
+  const base = isAdmin ? [...GROUPS, ADMIN] : [...GROUPS];
+  if (!isAdmin || feedbackNew <= 0) return base;
+  return base.map((g) => ({ ...g, items: g.items.map((it) => (it.href === '/feedback' ? { ...it, badge: String(feedbackNew) } : it)) }));
+};
 
 /** Ctrl+, (Cmd+, on a Mac) opens Settings from anywhere, even while typing: Windows and Linux browsers leave it free. */
 export const isSettingsShortcut = (e: Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'metaKey' | 'altKey' | 'shiftKey'>, mac: boolean): boolean =>
