@@ -2,6 +2,7 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import { createTestDatabase } from '@cvs/db/testing';
 import { afterAll, describe, expect, test } from 'vitest';
+import { MAX_IMAGES } from '@/lib/feedback';
 
 const testDb = await createTestDatabase();
 process.env.DATABASE_URL = testDb.url;
@@ -71,7 +72,7 @@ describe('POST /api/feedback', () => {
     expect((await post(m.cookie, { ...valid, kind: 'nope' })).status).toBe(400);
     expect((await post(m.cookie, { ...valid, title: '' })).status).toBe(400);
     expect((await post(m.cookie, { ...valid, body: ' ' })).status).toBe(400);
-    expect((await post(m.cookie, { ...valid, assetIds: ['a', 'b', 'c', 'd', 'e'] })).status).toBe(400);
+    expect((await post(m.cookie, { ...valid, assetIds: Array.from({ length: MAX_IMAGES + 1 }, (_, i) => String(i)) })).status).toBe(400);
   });
 
   test('accepts the author’s own images and refuses an image they do not own', async () => {

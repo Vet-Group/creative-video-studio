@@ -19,7 +19,11 @@ export function Feedback() {
   const [kindFilter, setKindFilter] = useState<FeedbackKind | ''>('');
   const [statusFilter, setStatusFilter] = useState('');
   const [sort, setSort] = useState<Sort>('new');
+  const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
+
+  const needle = query.trim().toLowerCase();
+  const shown = needle ? items.filter((it) => `${it.title} ${it.authorName}`.toLowerCase().includes(needle)) : items;
 
   useEffect(() => {
     let live = true;
@@ -64,6 +68,10 @@ export function Feedback() {
       {open && <SubmitForm onDone={(created) => { setItems((xs) => [created, ...xs]); setOpen(false); }} />}
 
       <div className="fb-filters">
+        <label className="fb-search">
+          <span>Tìm</span>
+          <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Tìm theo tiêu đề hoặc người gửi…" />
+        </label>
         <label>
           Loại
           <select value={kindFilter} onChange={(e) => setKindFilter(e.target.value as FeedbackKind | '')}>
@@ -101,9 +109,11 @@ export function Feedback() {
         <p className="muted">Không tải được danh sách. Hãy thử lại.</p>
       ) : items.length === 0 ? (
         <p className="muted">Chưa có góp ý nào. Hãy là người đầu tiên!</p>
+      ) : shown.length === 0 ? (
+        <p className="muted">Không có góp ý nào khớp “{query.trim()}”.</p>
       ) : (
         <ul className="fb-list">
-          {items.map((it) => (
+          {shown.map((it) => (
             <li key={it.id} className="fb-item">
               <button type="button" className={`fb-vote${it.voted ? ' on' : ''}`} onClick={() => void toggleVote(it)} aria-pressed={it.voted} aria-label={`Bình chọn (${it.votes})`}>
                 <span aria-hidden="true">▲</span>
