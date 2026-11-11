@@ -16,8 +16,15 @@ test('Ctrl+, opens Settings on Windows and Linux, Cmd+, on a Mac, and nothing el
 
 test('the groups keep the order users know, and only an Admin gets the admin group, last', () => {
   const flat = (admin: boolean) => navGroups(admin).flatMap((g) => g.items.map((i) => i.text));
-  expect(flat(false)).toEqual(['Khám phá', 'Thử đồ', 'Tạo ảnh', 'Tạo video', 'Marketing Studio', 'Ứng dụng', 'Thư viện']);
+  expect(flat(false)).toEqual(['Khám phá', 'Thử đồ', 'Tạo ảnh', 'Tạo video', 'Marketing Studio', 'Ứng dụng', 'Thư viện', 'Góp ý']);
   expect(flat(true)).toEqual([...flat(false), 'Quản trị']);
   expect(navGroups(false).map((g) => g.label)).toEqual([null, 'Sáng tạo', 'Của bạn']);
   expect(navGroups(true).at(-1)!.label).toBe('Quản lý');
+});
+
+test('an Admin sees the count of new feedback as a badge on the feedback item; a member never does', () => {
+  const feedback = (admin: boolean, count: number) => navGroups(admin, count).flatMap((g) => g.items).find((i) => i.href === '/feedback');
+  expect(feedback(true, 3)?.badge).toBe('3');
+  expect(feedback(true, 0)?.badge).toBeUndefined();
+  expect(feedback(false, 3)?.badge).toBeUndefined();
 });

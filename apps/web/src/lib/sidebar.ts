@@ -35,7 +35,7 @@ const GROUPS: NavGroup[] = [
     label: 'Của bạn',
     items: [
       { href: '/library', text: 'Thư viện', icon: 'library' },
-      { href: '/feedback', text: 'Góp ý', icon: 'help', hint: 'Gửi góp ý, báo lỗi, đề xuất tính năng' },
+      { href: '/feedback', text: 'Góp ý', icon: 'help' },
     ],
   },
 ];
