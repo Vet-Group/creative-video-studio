@@ -11,7 +11,7 @@ process.env.APP_URL = 'http://localhost:3400';
 
 const { auth, pool } = await import('@/lib/auth');
 const { GET, POST } = await import('./route');
-const { PATCH } = await import('./[id]/route');
+const { PATCH, DELETE } = await import('./[id]/route');
 
 const URL_USERS = 'http://localhost:3400/api/admin/users';
 const PASSWORD = 'correct-horse-battery';
@@ -303,6 +303,51 @@ describe('PATCH /api/admin/users/:id', () => {
     ]);
     expect((await patch(adminCookie, m.id, { teamId: 'team-unassigned' })).status).toBe(200); // same team: no second entry
     expect(await audits(m.id)).toHaveLength(1);
+  });
+});
+
+describe('DELETE /api/admin/users/:id', () => {
+  const del = (cookie: string | undefined, id: string) => DELETE(req(cookie, { method: 'DELETE' }), { params: Promise.resolve({ id }) });
+  const audits = async (id: string) => (await pool.query('select actor_id, action, old_value, new_value from audit_entries where target = $1 order by id', [`user:${id}`])).rows;
+  let seq = 0;
+  async function member() {
+    const email = `del-${++seq}@example.test`;
+    const { user } = await auth.api.createUser({ body: { email, name: email, password: PASSWORD, role: 'member', data: { teamId: 'team-unassigned' } } });
+    return { id: user.id, email };
+  }
+  const adminId = async () => (await pool.query(`select id from users where email = 'admin@example.test'`)).rows[0].id as string;
+
+  test('refuses a Member and a request without a session, and deletes nothing', async () => {
+    const m = await member();
+    expect((await del(memberCookie, m.id)).status).toBe(403);
+    expect((await del(undefined, m.id)).status).toBe(401);
+    expect((await pool.query('select 1 from users where id = $1', [m.id])).rowCount).toBe(1);
+    expect(await audits(m.id)).toEqual([]);
+  });
+
+  test('refuses an unknown user and refuses deleting yourself', async () => {
+    const admin = await adminId();
+    expect((await del(adminCookie, 'no-such-user')).status).toBe(404);
+    expect((await del(adminCookie, admin)).status).toBe(400);
+    expect((await pool.query('select 1 from users where id = $1', [admin])).rowCount).toBe(1);
+  });
+
+  test('deletes a member with no content, who can no longer sign in, audited once', async () => {
+    const m = await member();
+    const admin = await adminId();
+    expect((await del(adminCookie, m.id)).status).toBe(200);
+    expect((await pool.query('select 1 from users where id = $1', [m.id])).rowCount).toBe(0);
+    expect((await pool.query('select 1 from accounts where user_id = $1', [m.id])).rowCount).toBe(0);
+    expect((await auth.api.signInEmail({ body: { email: m.email, password: PASSWORD }, asResponse: true })).status).toBe(401);
+    expect(await audits(m.id)).toEqual([{ actor_id: admin, action: 'user.delete', old_value: { email: m.email, role: 'member' }, new_value: null }]);
+  });
+
+  test('refuses to delete a user who owns content, leaving the user and the log untouched', async () => {
+    const m = await member();
+    await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) values ($1, $2, 'input', $3, 'p.jpg', 'image/jpeg', 10)`, [`asset-${m.id}`, m.id, `key-${m.id}`]);
+    expect((await del(adminCookie, m.id)).status).toBe(409);
+    expect((await pool.query('select 1 from users where id = $1', [m.id])).rowCount).toBe(1);
+    expect(await audits(m.id)).toEqual([]);
   });
 });
 
