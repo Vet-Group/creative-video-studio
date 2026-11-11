@@ -14,6 +14,14 @@ export const SUGGEST_QUEUE_OPTIONS = { retryLimit: 0, expireInSeconds: 60 } as c
 /** How long a page waits for a suggestion run before it is marked failed: a short option takes a second call after the first (about 35 s at worst, 2026-11-04). */
 export const SUGGEST_EXPIRY_SECONDS = 90;
 
+/** Reference-video analysis (rea-video decompose): one decompose plus a few VLM calls per run, never retried. A long expiry covers the ffmpeg frame work and the per-shot VLM calls. */
+export const ANALYZE_QUEUE = 'analyze';
+export const ANALYZE_QUEUE_OPTIONS = { retryLimit: 0, expireInSeconds: 1800 } as const;
+
+export interface AnalyzeJobData {
+  analysisId: string;
+}
+
 export interface SuggestJobData {
   runId: string;
 }

@@ -549,6 +549,35 @@ export const verdicts = pgTable(
   ],
 );
 
+export const ANALYSIS_STATUSES = ['queued', 'running', 'succeeded', 'failed'] as const;
+export type AnalysisStatus = (typeof ANALYSIS_STATUSES)[number];
+
+// A reference-video analysis produced by rea-video. It is its own entity, not a generation job, so it
+// stays off the jobs pipeline's invariants. `result` holds the derived Analysis the UI shows; `rawKey`
+// points at the stored raw breakdown.json so the later Smart Remake stage can re-parse richer fields
+// without re-running an expensive decompose.
+export const analyses = pgTable('analyses', {
+  id: text('id').primaryKey(),
+  userId: text('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'restrict' }),
+  teamId: text('team_id')
+    .notNull()
+    .references(() => teams.id, { onDelete: 'restrict' }),
+  storeId: text('store_id').references(() => stores.id, { onDelete: 'set null' }),
+  sourceKey: text('source_key').notNull(),
+  status: text('status', { enum: ANALYSIS_STATUSES }).notNull().default('queued'),
+  provider: text('provider'),
+  model: text('model'),
+  result: jsonb('result'),
+  rawKey: text('raw_key'),
+  costUsd: numeric('cost_usd'),
+  error: text('error'),
+  createdAt: tstz('created_at').notNull().defaultNow(),
+  startedAt: tstz('started_at'),
+  finishedAt: tstz('finished_at'),
+});
+
 // Each user's own favourites in the Library. They mark nothing on the job itself and go with the user or the job.
 export const favorites = pgTable(
   'favorites',

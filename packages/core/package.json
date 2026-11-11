@@ -16,6 +16,8 @@
     "./providers/balances": "./src/providers/balances.ts",
     "./providers/mock": "./src/providers/mock.ts",
     "./providers/http": "./src/providers/http.ts",
+    "./providers/rea-vlm": "./src/providers/rea-vlm.ts",
+    "./analysis/breakdown": "./src/analysis/breakdown.ts",
     "./presets": "./src/presets.ts",
     "./enhance": "./src/enhance.ts",
     "./ledger": "./src/ledger.ts",
