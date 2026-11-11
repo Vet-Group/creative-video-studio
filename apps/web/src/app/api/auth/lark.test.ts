@@ -79,12 +79,13 @@ describe('Lark sign-in', () => {
     const ref = await user('ref@example.test');
     const refTeam = (await pool.query('select team_id from users where id = $1', [ref])).rows[0].team_id;
     const users = await count('users');
-    const flow = await oauth(route, { provider: 'lark', code: lark({ enterprise_email: 'newbie@example.test' }) });
+    const flow = await oauth(route, { provider: 'lark', code: lark({ enterprise_email: 'newbie@example.test', name: 'Trần  Minh Nhật - Seller' }) });
     expect(flow.error).toBeNull();
     expect(await count('users')).toBe(users + 1);
     const newId = await sessionUser(flow.cookie);
-    const row = (await pool.query('select email, role, team_id, email_verified from users where id = $1', [newId])).rows[0];
-    expect(row).toEqual({ email: 'newbie@example.test', role: 'member', team_id: refTeam, email_verified: true });
+    const row = (await pool.query('select email, name, role, team_id, email_verified from users where id = $1', [newId])).rows[0];
+    // The Lark role suffix is dropped from the new account's name.
+    expect(row).toEqual({ email: 'newbie@example.test', name: 'Trần Minh Nhật', role: 'member', team_id: refTeam, email_verified: true });
     // Lark-only: an auto-provisioned account has no password credential.
     expect((await pool.query(`select provider_id from accounts where user_id = $1`, [newId])).rows).toEqual([{ provider_id: 'lark' }]);
   });

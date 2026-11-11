@@ -50,14 +50,17 @@ export function larkOAuth(app: { appId: string; appSecret: string; tenantKey: st
       const email = u.enterprise_email.trim().toLowerCase();
       rememberLarkEmail(u.open_id, email);
       // The tenant gate and the company email make this address trustworthy, which is why 'lark' is a trusted provider in lib/auth.ts.
-      return { id: u.open_id, email, emailVerified: true, name: u.name, image: u.avatar_url || undefined };
+      // A new account is named without the Lark role suffix; better-auth does not overwrite an existing user's name on a later sign-in.
+      return { id: u.open_id, email, emailVerified: true, name: u.name && withoutRole(u.name), image: u.avatar_url || undefined };
     },
   };
 }
 
-/** A name as two sign-ins compare it: Lark display names carry a role suffix ("Nguyễn Danh Khánh - Seller") that a CVS name lacks. */
-export const personName = (name: string) =>
-  name.normalize('NFC').replace(/\s+-\s+.*$/, '').replace(/\s+/g, ' ').trim().toLowerCase();
+/** A Lark display name without its role suffix: "Nguyễn Danh Khánh - Seller" is "Nguyễn Danh Khánh". */
+export const withoutRole = (name: string) => name.normalize('NFC').replace(/\s+-\s+.*$/, '').replace(/\s+/g, ' ').trim();
+
+/** A name as two sign-ins compare it: without the Lark role suffix, and in lower case. */
+export const personName = (name: string) => withoutRole(name).toLowerCase();
 
 /**
  * databaseHooks.user.create.before. A first Lark sign-in links by equal email, so a staff member whose CVS account has another address (a
