@@ -165,6 +165,60 @@ describe('vertex failures and inputs', () => {
   });
 });
 
+describe('vertex 429 retry', () => {
+  const limited = (retryAfter?: string) => [429, { error: { status: 'RESOURCE_EXHAUSTED' } }, retryAfter] as const;
+  function scripted(...answers: (readonly [number, unknown, string?])[]) {
+    const calls: { signal?: AbortSignal | null }[] = [];
+    const fn = (async (_url: string, init: RequestInit = {}) => {
+      calls.push({ signal: init.signal });
+      const [status, body, retryAfter] = answers.shift() ?? [500, {}];
+      return new Response(JSON.stringify(body), { status, headers: retryAfter ? { 'retry-after': retryAfter } : {} });
+    }) as unknown as typeof fetch;
+    return { fn, calls };
+  }
+  const waits: number[] = [];
+  const retrying = (f: typeof fetch) => createVertexImageProvider({ key: KEY, project: 'proj', fetch: f, readImage, token: async () => 'tok', sleep: async (ms) => void waits.push(ms), random: () => 0.5 });
+  const statusOf = (p: ReturnType<typeof provider>, providerJobId: string) => p.status({ providerJobId, model: PRO, resolution: '1K' });
+
+  test('a 429 waits 20 s plus jitter and tries again, with a fresh call bound each time; the image is billed once', async () => {
+    waits.length = 0;
+    const { fn, calls } = scripted(limited(), limited(), [200, geminiAnswer]);
+    const p = retrying(fn);
+    const { providerJobId } = await p.submit(req(PRO));
+    expect(calls).toHaveLength(3);
+    expect(waits).toEqual([30_000, 30_000]);
+    expect(new Set(calls.map((c) => c.signal)).size).toBe(3);
+    expect(await statusOf(p, providerJobId)).toMatchObject({ state: 'succeeded', costUsd: 0.134 });
+  });
+
+  test('Retry-After raises the wait, and neither it nor the jitter pushes it past 60 s', async () => {
+    waits.length = 0;
+    const { fn } = scripted(limited('45'), limited('600'), limited('3'), [200, geminiAnswer]);
+    await retrying(fn).submit(req(PRO));
+    expect(waits).toEqual([55_000, 60_000, 30_000]);
+  });
+
+  test('after 3 retries the 429 fails as before, at no cost', async () => {
+    waits.length = 0;
+    const { fn, calls } = scripted(limited(), limited(), limited(), limited());
+    const p = retrying(fn);
+    const { providerJobId } = await p.submit(req(PRO));
+    expect(calls).toHaveLength(4);
+    expect(waits).toHaveLength(3);
+    expect(await statusOf(p, providerJobId)).toMatchObject({ state: 'failed', error: expect.stringMatching(/^vertex: HTTP 429 .*RESOURCE_EXHAUSTED/), costUsd: 0, costSource: 'reported' });
+  });
+
+  test('other statuses are not retried', async () => {
+    waits.length = 0;
+    const { fn, calls } = scripted([503, { error: 'unavailable' }], [200, geminiAnswer]);
+    const p = retrying(fn);
+    const { providerJobId } = await p.submit(req(PRO));
+    expect(calls).toHaveLength(1);
+    expect(waits).toEqual([]);
+    expect(await statusOf(p, providerJobId)).toMatchObject({ state: 'failed', error: expect.stringMatching(/^vertex: HTTP 503/) });
+  });
+});
+
 describe('serviceAccountToken', () => {
   const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048, privateKeyEncoding: { type: 'pkcs8', format: 'pem' }, publicKeyEncoding: { type: 'spki', format: 'pem' } });
   const key = { client_email: 'sa@p.iam.gserviceaccount.com', private_key: privateKey };
