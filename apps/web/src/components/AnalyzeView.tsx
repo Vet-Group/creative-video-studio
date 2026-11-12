@@ -2,13 +2,15 @@
 // The reference-video analysis page (Feature A): the member picks one of their own videos (an upload, or a clip from
 // their History), rea-video decomposes it on the worker, and the result is shown in Vietnamese with each shot's English
 // prompt ready to push into Create (/create). Reachable only when REA_ANALYZE_ENABLED is on (the route 404s otherwise).
+// /analyze?analysis=<id> opens one analysis; the URL follows the one on view.
 import Link from 'next/link';
 import type { Analysis } from '@cvs/core/analysis/breakdown';
 import { useEffect, useRef, useState } from 'react';
 import { ABOUT } from '@/lib/about-content';
-import { formatLabel } from '@/lib/analyze';
+import { analysisFormat, mergeShots, roleLabel, scriptPrompt, timeRange } from '@/lib/analyze';
 import { ANALYZE_EXAMPLES } from '@/lib/analyze-examples';
 import { api, errorText, sendJson } from '@/lib/api';
+import { MAX_VIDEO_BYTES } from '@/lib/upload-limits';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { About } from './About';
 import { Icon } from './Icon';
@@ -18,8 +20,8 @@ import { copyError, uploadError, uploadVideoDirect, WorkTabs } from './image-too
 import { ReferenceVideoSlot, type RefVideo } from './ReferenceVideo';
 import { RemakePanel } from './RemakePanel';
 
-type Tab = 'create' | 'history' | 'examples' | 'about';
-const TAB_LABEL: Record<Tab, string> = { create: 'Phân tích', history: 'Lịch sử', examples: 'Ví dụ', about: 'Giới thiệu' };
+type Tab = 'result' | 'create' | 'history' | 'examples' | 'about';
+const TAB_LABEL: Record<Tab, string> = { result: 'Kết quả', create: 'Phân tích', history: 'Lịch sử', examples: 'Ví dụ', about: 'Giới thiệu' };
 
 export interface AnalysisRow {
   id: string;
@@ -32,15 +34,18 @@ export interface AnalysisRow {
 
 const terminal = (s: string): boolean => s === 'succeeded' || s === 'failed';
 
-/** The analysis result, Vietnamese display with each shot's English prompt. Pure, so it render-tests without the page. */
-export function AnalysisResult({ analysis }: { analysis: Analysis }) {
+/** The analysis result, Vietnamese display with each shot's English prompt. Pure, so it render-tests without the page.
+ * With `seek` (a source video is beside it) each scene's time is a button that plays the video from there; `activeShot` marks the scene being played. */
+export function AnalysisResult({ analysis, seek, activeShot }: { analysis: Analysis; seek?: (sec: number) => void; activeShot?: number | null }) {
   // Vietnamese for reading when the worker translated it; the English prompt is still what the "use this prompt" button sends to Create.
   const vi = analysis.vi;
+  const scenes = mergeShots(analysis);
+  const script = scriptPrompt(scenes.shots);
   return (
     <div className="analysis-result">
       <p className="muted">
-        {vi?.format || formatLabel(analysis.format) || 'Video'}
-        {analysis.durationS ? ` · ${analysis.durationS.toFixed(1)} giây` : ''} · {analysis.shotCount} cảnh
+        {analysisFormat(analysis)}
+        {analysis.durationS ? ` · ${analysis.durationS.toFixed(1)} giây` : ''} · {scenes.shots.length} cảnh
       </p>
       {(vi?.hook || analysis.hook) && (
         <p>
@@ -48,21 +53,32 @@ export function AnalysisResult({ analysis }: { analysis: Analysis }) {
         </p>
       )}
       {(vi?.summary || analysis.summary) && <p className="muted">{vi?.summary || analysis.summary}</p>}
+      {script && (
+        <p>
+          <Link className="button" href={`/create?prompt=${encodeURIComponent(script)}`}>
+            Dùng cả kịch bản
+          </Link>
+        </p>
+      )}
+      {seek && <p className="help">Bấm giờ của một cảnh để tua video tới đó.</p>}
       <ol className="analysis-shots">
-        {analysis.shots.map((s, i) => (
-          <li key={s.index} className="field">
-            <p>
+        {scenes.shots.map((s, i) => (
+          <li key={s.index} className="field" data-active={activeShot === s.index ? true : undefined}>
+            <p className="analysis-shot-head">
               <strong>Cảnh {s.index}</strong>
-              {s.role && <span className="tag">{s.role}</span>}
-              <span className="muted">
-                {' '}
-                {s.start.toFixed(1)}–{s.end.toFixed(1)}s
-              </span>
+              {s.role && <span className="analysis-role">{roleLabel(s.role)}</span>}
+              {seek ? (
+                <button type="button" className="analysis-time" title="Bấm cảnh để tua video" aria-label={`Tua video tới cảnh ${s.index}, ${timeRange(s.start, s.end)}`} onClick={() => seek(s.start)}>
+                  {timeRange(s.start, s.end)}
+                </button>
+              ) : (
+                <span className="muted">{timeRange(s.start, s.end)}</span>
+              )}
             </p>
             {/* The English prompt with copy, as on History cards; under a Vietnamese reading it opens on a tap (no hover on a phone). */}
-            {vi?.shots[i] ? (
+            {scenes.vi?.[i] ? (
               <>
-                <p className="analysis-prompt">{vi.shots[i]}</p>
+                <p className="analysis-prompt">{scenes.vi[i]}</p>
                 {s.prompt && (
                   <details className="analysis-en">
                     <summary>Prompt tiếng Anh</summary>
@@ -85,39 +101,104 @@ export function AnalysisResult({ analysis }: { analysis: Analysis }) {
   );
 }
 
-/** A finished analysis with its input video beside the result. preload="metadata" shows the first frame as a poster with
- * no transcode, and only the one open result mounts a player, so the History list stays light. */
-export function AnalysisWithSource({ row }: { row: AnalysisRow }) {
-  if (!row.result) return null;
+/** A finished analysis with its video beside the result. The layout follows the width of the box it sits in, not the viewport (the result
+ * shows in the 320 px form column and in the wide side panel). preload="metadata" shows the first frame as a poster with no transcode,
+ * and only the one open result mounts a player, so the History list stays light. */
+export function AnalysisWithSource({ analysis, src, poster, preload = 'metadata' }: { analysis: Analysis; src?: string; poster?: string; preload?: 'none' | 'metadata' }) {
+  const video = useRef<HTMLVideoElement>(null);
+  const [at, setAt] = useState<number | null>(null);
+  const active = at === null ? null : (mergeShots(analysis).shots.find((s) => at >= s.start && at < s.end)?.index ?? null);
+  const seek = (sec: number) => {
+    const v = video.current;
+    if (!v) return;
+    v.currentTime = sec;
+    v.scrollIntoView({ block: 'nearest' }); // stacked in a narrow box, the player may be off screen
+    void v.play().catch(() => undefined); // a refused autoplay still leaves the video at the scene
+  };
   return (
-    <div className="analysis-with-source">
-      {row.sourceAssetId && (
-        <video className="analysis-source" src={`/api/assets/${row.sourceAssetId}/content`} controls muted playsInline preload="metadata" aria-label="Video gốc đã phân tích" />
-      )}
-      <AnalysisResult analysis={row.result} />
+    <div className="analysis-box">
+      <div className="analysis-with-source">
+        {src && (
+          <div className="analysis-source-col">
+            <video ref={video} className="analysis-source" src={src} poster={poster} controls muted playsInline preload={preload} onTimeUpdate={(e) => setAt(e.currentTarget.currentTime)} aria-label="Video gốc đã phân tích" />
+          </div>
+        )}
+        <AnalysisResult analysis={analysis} seek={src ? seek : undefined} activeShot={active} />
+      </div>
     </div>
   );
 }
 
-/** The read-only sample analyses (lib/analyze-examples.ts): what a breakdown looks like, without spending a real run. */
-function Examples() {
+/** One analysis, its status and result: the Kết quả tab on a wide screen and the Phân tích panel on a phone. */
+export function AnalysisPanel({ row, onRetry, onClose, remakeEnabled = false }: { row: AnalysisRow; onRetry?: () => void; onClose: () => void; remakeEnabled?: boolean }) {
+  const waiting = !terminal(row.status);
+  const elapsed = waiting ? elapsedLabel(row) : null;
+  return (
+    <div className="analysis-panel">
+      <div className="analysis-panel-head">
+        <h2>Kết quả phân tích</h2>
+        <button type="button" className="link-button" onClick={onClose}>
+          Đóng kết quả
+        </button>
+      </div>
+      {waiting && (
+        <div className="analysis-wait" role="status">
+          <strong>Đang phân tích video…</strong>
+          <span className="muted">
+            Thường mất khoảng 1–2 phút{elapsed && ` · ${elapsed}`}. Bạn có thể xem tab khác, kết quả cũng sẽ có ở Lịch sử.
+          </span>
+        </div>
+      )}
+      {row.status === 'failed' && (
+        <>
+          <p className="error" role="alert">
+            Phân tích không thành công. Hãy thử lại với video khác.
+          </p>
+          {onRetry && (
+            <button type="button" className="link-button" onClick={onRetry}>
+              Thử lại
+            </button>
+          )}
+        </>
+      )}
+      {row.status === 'succeeded' && row.result && (
+        <>
+          <AnalysisWithSource analysis={row.result} src={row.sourceAssetId ? `/api/assets/${row.sourceAssetId}/content` : undefined} />
+          {/* key: another analysis opened resets the product and shot pick */}
+          {remakeEnabled && <RemakePanel key={row.id} row={row} />}
+        </>
+      )}
+    </div>
+  );
+}
+
+/** The read-only sample analyses (lib/analyze-examples.ts): a real sample clip with its breakdown, and a button that loads the clip as the reference video. */
+function Examples({ busy, onUse }: { busy: boolean; onUse: (video: string) => void }) {
   return (
     <div className="analysis-examples">
-      <p className="help">Phân tích mẫu — xem một video tham chiếu được rã thành cảnh, định dạng, câu mở đầu và prompt tiếng Anh cho từng cảnh.</p>
+      <p className="help">Video mẫu kèm kết quả phân tích: xem một video được rã thành cảnh, định dạng, câu mở đầu và prompt tiếng Anh cho từng cảnh. Bấm "Dùng video này" để nạp video vào ô Video tham chiếu rồi tự phân tích.</p>
       {ANALYZE_EXAMPLES.map((ex) => (
-        <section key={ex.title} className="card analysis-example">
-          <h3>{ex.title}</h3>
-          <AnalysisResult analysis={ex.analysis} />
+        <section key={ex.video} className="card analysis-example">
+          <div className="analysis-example-head">
+            <h3>{ex.title}</h3>
+            <button type="button" disabled={busy} onClick={() => onUse(ex.video)}>
+              Dùng video này
+            </button>
+          </div>
+          <AnalysisWithSource analysis={ex.analysis} src={`/api/samples/${ex.video}`} poster={`/api/samples/${ex.video.replace(/\.mp4$/, '.jpg')}`} preload="none" />
         </section>
       ))}
     </div>
   );
 }
 
+/** The address follows the analysis on view, without a navigation or a scroll. */
+const syncUrl = (id: string | null) => window.history.replaceState(null, '', id ? `/analyze?analysis=${id}` : '/analyze');
+
 /** `remakeEnabled`: REA_REMAKE_ENABLED, which adds Smart Remake under a finished analysis. */
-export function AnalyzeView({ remakeEnabled = false }: { remakeEnabled?: boolean }) {
+export function AnalyzeView({ initialId, remakeEnabled = false }: { initialId?: string; remakeEnabled?: boolean }) {
   const narrow = useMediaQuery(NARROW);
-  const [tab, setTab] = useState<Tab | null>(null); // null: the default for the width (the form below 1024 px, else Examples)
+  const [tab, setTab] = useState<Tab | null>(null); // null: the default for the width (the form below 1024 px, else the result when there is one, else Examples)
   const [video, setVideo] = useState<RefVideo | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -141,8 +222,31 @@ export function AnalyzeView({ remakeEnabled = false }: { remakeEnabled?: boolean
       .then((r) => setHistory(r.analyses), () => setHistoryError(true))
       .finally(() => setHistoryLoading(false));
   };
+  // Put an analysis on view: the Kết quả tab on a wide screen, the Phân tích panel (where the result sits) on a phone.
+  const show = (row: AnalysisRow) => {
+    setCurrent(row);
+    syncUrl(row.id);
+    setTab(narrow ? 'create' : 'result');
+  };
+  const close = () => {
+    stopPoll();
+    setCurrent(null);
+    syncUrl(null);
+    setTab(null);
+  };
   useEffect(() => {
     void loadHistory();
+    if (initialId)
+      api<AnalysisRow>(`/api/analyses/${initialId}`).then(
+        (row) => {
+          show(row);
+          if (!terminal(row.status)) pollOne(row.id);
+        },
+        () => {
+          syncUrl(null);
+          setError('Không mở được phân tích này. Liên kết có thể đã cũ, hoặc phân tích không phải của bạn.');
+        },
+      );
     return stopPoll;
   }, []);
 
@@ -151,12 +255,20 @@ export function AnalyzeView({ remakeEnabled = false }: { remakeEnabled?: boolean
     setBusy(true);
     try {
       setVideo((await get())[0]!);
+      stopPoll();
       setCurrent(null);
+      syncUrl(null);
     } catch (e) {
       setError(failed(e));
     } finally {
       setBusy(false);
     }
+  }
+
+  // A sample clip from the Examples tab becomes the member's own reference video (copied on the server, one clip per request).
+  async function takeSample(name: string) {
+    await takeVideo(() => api<{ assets: RefVideo[] }>('/api/assets/samples', sendJson('POST', { names: [name] })).then((r) => r.assets), (e) => copyError(e, 'Không dùng được video mẫu này.'));
+    if (narrow) setTab('create');
   }
 
   function pollOne(id: string) {
@@ -183,7 +295,7 @@ export function AnalyzeView({ remakeEnabled = false }: { remakeEnabled?: boolean
     setBusy(true);
     try {
       const { id } = await api<{ id: string }>('/api/analyses', sendJson('POST', { sourceAssetId: video.id }));
-      setCurrent({ id, status: 'queued', result: null, error: null, createdAt: new Date().toISOString(), sourceAssetId: video.id });
+      show({ id, status: 'queued', result: null, error: null, createdAt: new Date().toISOString(), sourceAssetId: video.id });
       pollOne(id);
     } catch (e) {
       setError(errorText(e, 'Không bắt đầu phân tích được.'));
@@ -193,17 +305,16 @@ export function AnalyzeView({ remakeEnabled = false }: { remakeEnabled?: boolean
   }
 
   const running = current !== null && !terminal(current.status);
-  const elapsed = running && current ? elapsedLabel({ status: current.status, createdAt: current.createdAt }) : null;
-  // Pick a History row to view: stop any live poll, show it, and on a phone switch to the Phân tích panel where the result sits.
+  // Pick a History row to view: stop any live poll and show it.
   const pick = (a: AnalysisRow) => {
     stopPoll();
-    setCurrent(a);
-    if (narrow) setTab('create');
+    show(a);
   };
 
-  const tabs: Tab[] = narrow ? ['create', 'history', 'examples', 'about'] : ['history', 'examples', 'about'];
-  const shown: Tab = narrow ? (tab ?? 'create') : tab === null || tab === 'create' ? 'examples' : tab;
+  const tabs: Tab[] = narrow ? ['create', 'history', 'examples', 'about'] : [...(current ? (['result'] as const) : []), 'history', 'examples', 'about'];
+  const shown: Tab = narrow ? (tab === null || tab === 'result' ? 'create' : tab) : tab === null || tab === 'create' || (tab === 'result' && !current) ? (current ? 'result' : 'examples') : tab;
   const panel = shown === 'create' ? 'examples' : shown;
+  const retry = video && current?.status === 'failed' && current.sourceAssetId === video.id && !busy ? () => void analyse() : undefined;
 
   return (
     <section aria-labelledby="analyze-title" className="create analyze-page">
@@ -215,17 +326,17 @@ export function AnalyzeView({ remakeEnabled = false }: { remakeEnabled?: boolean
 
         <div className="card form-card" id="analyze-panel-create" role={narrow ? 'tabpanel' : undefined} aria-labelledby={narrow ? 'analyze-tab-create' : undefined} hidden={narrow && shown !== 'create'}>
           <div className="form-scroll">
-            <p className="help">Tải lên một video (hoặc chọn từ Lịch sử) để rã thành danh sách cảnh, định dạng, câu mở đầu và prompt tiếng Anh cho từng cảnh. Bấm một prompt để tạo video từ đó.</p>
+            <p className="help">Tải lên một video (hoặc chọn từ Lịch sử) rồi bấm Phân tích để rã thành danh sách cảnh, định dạng, câu mở đầu và prompt tiếng Anh cho từng cảnh. Bấm "Dùng prompt này" ở một cảnh, hoặc "Dùng cả kịch bản", để mở Tạo video với prompt đó.</p>
 
             <ReferenceVideoSlot
               video={video}
               busy={busy}
+              hint={`Video MP4 hoặc MOV (tối đa ${MAX_VIDEO_BYTES / 1024 / 1024} MB). Hoặc bấm "Dùng video này" ở tab Ví dụ.`}
               onFile={(f) => void takeVideo(() => uploadVideoDirect(f).then((v) => [v]), (e) => uploadError(e, 'video'))}
               onHistory={(id) => void takeVideo(() => api<{ assets: RefVideo[] }>('/api/assets/copy', sendJson('POST', { assetId: id })).then((r) => r.assets), (e) => copyError(e, 'Không dùng được video này.'))}
               onRemove={() => {
-                stopPoll();
+                close();
                 setVideo(null);
-                setCurrent(null);
               }}
             />
 
@@ -240,37 +351,20 @@ export function AnalyzeView({ remakeEnabled = false }: { remakeEnabled?: boolean
               </p>
             )}
 
-            {running && (
-              <p className="muted" role="status">
-                Đang phân tích video… việc này mất một lát.
-                {elapsed && ` · ${elapsed}`}
-              </p>
-            )}
-            {current?.status === 'failed' && (
-              <>
-                <p className="error" role="alert">
-                  Phân tích không thành công. Hãy thử lại với video khác.
-                </p>
-                {video && current.sourceAssetId === video.id && (
-                  <button type="button" className="link-button" disabled={busy || running} onClick={() => void analyse()}>
-                    Thử lại
-                  </button>
-                )}
-              </>
-            )}
-            {current?.status === 'succeeded' && current.result && <AnalysisWithSource row={current} />}
-            {remakeEnabled && current?.status === 'succeeded' && current.result && <RemakePanel key={current.id} row={current} />}
+            {narrow && current && <AnalysisPanel row={current} onRetry={retry} onClose={close} remakeEnabled={remakeEnabled} />}
           </div>
         </div>
 
         <div className="side" id={`analyze-panel-${panel}`} role="tabpanel" aria-labelledby={`analyze-tab-${panel}`} hidden={narrow && shown === 'create'}>
-          {shown === 'history' ? (
+          {shown === 'result' && current ? (
+            <AnalysisPanel row={current} onRetry={retry} onClose={close} remakeEnabled={remakeEnabled} />
+          ) : shown === 'history' ? (
             <section className="analysis-history">
               <h2>Gần đây</h2>
-              <AnalysisHistory loading={historyLoading} error={historyError} items={history} onRetry={() => void loadHistory()} onPick={pick} />
+              <AnalysisHistory loading={historyLoading} error={historyError} items={history} currentId={current?.id} onRetry={() => void loadHistory()} onPick={pick} />
             </section>
           ) : shown === 'examples' ? (
-            <Examples />
+            <Examples busy={busy} onUse={(name) => void takeSample(name)} />
           ) : (
             <About page={ABOUT.analyze} />
           )}

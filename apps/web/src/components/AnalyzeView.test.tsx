@@ -2,7 +2,7 @@ import type { Analysis } from '@cvs/core/analysis/breakdown';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, test } from 'vitest';
 import { ANALYZE_EXAMPLES } from '@/lib/analyze-examples';
-import { AnalysisResult, AnalysisWithSource } from './AnalyzeView';
+import { AnalysisPanel, AnalysisResult, AnalysisWithSource, type AnalysisRow } from './AnalyzeView';
 
 const analysis: Analysis = {
   durationS: 11.4,
@@ -23,11 +23,15 @@ test('shows the mapped format, the hook, each shot English prompt and a link tha
   expect(html).toContain('Model poses to showcase a plain white t-shirt.');
   expect(html).toContain(`href="/create?prompt=${encodeURIComponent('Close-up of the fabric & stitching.')}"`);
   expect(html.match(/aria-label="Chép mô tả"/g)).toHaveLength(2); // each shot's prompt can be copied, as on History cards
+  expect(html).toContain('Chi tiết'); // the role tag reads in Vietnamese ('detail')
+  expect(html).toContain('5.2–11.4s'); // scene times in tenths of a second
+  expect(html).toContain(`href="/create?prompt=${encodeURIComponent('Shot 1 (0.0–5.2s): Model poses to showcase a plain white t-shirt.\nShot 2 (5.2–11.4s): Close-up of the fabric & stitching.')}"`); // the whole script
+  expect(html).not.toContain('analysis-time'); // no video beside it: the times are plain text
 });
 
 test('falls back to the model’s own format text when it is not one we label', () => {
   const html = renderToStaticMarkup(<AnalysisResult analysis={{ ...analysis, format: 'surprise party' }} />);
-  expect(html).toContain('surprise party');
+  expect(html).toContain('Surprise party'); // capitalised as a line start
 });
 
 test('a shot with no prompt shows no push-to-Create link, and a blank format falls back to a label', () => {
@@ -36,26 +40,41 @@ test('a shot with no prompt shows no push-to-Create link, and a blank format fal
   expect(html).toContain('Video'); // formatLabel('') has no label, so the line shows the fallback
 });
 
-test('every read-only Example is well-formed and renders its Vietnamese display with English prompts to push into Create', () => {
+test('every read-only Example is a sample clip with a well-formed analysis that renders its Vietnamese display and English prompts', () => {
   expect(ANALYZE_EXAMPLES.length).toBeGreaterThan(0);
   for (const ex of ANALYZE_EXAMPLES) {
     const a = ex.analysis;
+    expect(ex.video).toMatch(/^[\w-]+\.mp4$/); // the poster name is derived from it
     expect(a.shots.length).toBe(a.shotCount); // the count matches the shots listed
     expect(a.vi?.shots.length).toBe(a.shots.length); // one Vietnamese line per shot, or the display would fall out of step
-    const html = renderToStaticMarkup(<AnalysisResult analysis={a} />);
+    const html = renderToStaticMarkup(<AnalysisWithSource analysis={a} src={`/api/samples/${ex.video}`} preload="none" />);
+    expect(html).toContain(`src="/api/samples/${ex.video}"`);
     expect(html).toContain(a.vi!.hook); // Vietnamese for reading
     expect(html).toContain(`href="/create?prompt=${encodeURIComponent(a.shots[0]!.prompt)}"`); // English prompt pushed to Create
+    expect(html).toContain('Tua video tới cảnh 1'); // each scene time seeks the video
   }
 });
 
+const base: AnalysisRow = { id: 'a1', status: 'succeeded', result: analysis, error: null, createdAt: '2026-11-12T00:00:00Z', sourceAssetId: 'vid-1' };
+
 test('a finished analysis shows its input video beside the result, and omits the player when the source asset is gone', () => {
-  const base = { id: 'a1', status: 'succeeded' as const, result: analysis, error: null, createdAt: '2026-11-12T00:00:00Z' };
-  const withVideo = renderToStaticMarkup(<AnalysisWithSource row={{ ...base, sourceAssetId: 'vid-1' }} />);
+  const withVideo = renderToStaticMarkup(<AnalysisPanel row={base} onClose={() => undefined} />);
   expect(withVideo).toContain('src="/api/assets/vid-1/content"'); // the input video streams from its asset
   expect(withVideo).toContain('preload="metadata"'); // first-frame poster, no transcode, light history list
   expect(withVideo).toContain('Clean apparel presentation.'); // the result still renders beside it
 
-  const noVideo = renderToStaticMarkup(<AnalysisWithSource row={{ ...base, sourceAssetId: null }} />);
+  const noVideo = renderToStaticMarkup(<AnalysisPanel row={{ ...base, sourceAssetId: null }} onClose={() => undefined} />);
   expect(noVideo).not.toContain('<video');
   expect(noVideo).toContain('Clean apparel presentation.');
+});
+
+test('a running analysis shows a status block with the usual wait, and a failed one an alert with retry only when it can be retried', () => {
+  const running = renderToStaticMarkup(<AnalysisPanel row={{ ...base, status: 'running', result: null }} onClose={() => undefined} />);
+  expect(running).toContain('role="status"');
+  expect(running).toContain('1–2 phút');
+  const failed = { ...base, status: 'failed' as const, result: null };
+  expect(renderToStaticMarkup(<AnalysisPanel row={failed} onClose={() => undefined} />)).not.toContain('Thử lại');
+  const retry = renderToStaticMarkup(<AnalysisPanel row={failed} onRetry={() => undefined} onClose={() => undefined} />);
+  expect(retry).toContain('role="alert"');
+  expect(retry).toContain('Thử lại');
 });

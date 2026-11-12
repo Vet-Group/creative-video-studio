@@ -2111,7 +2111,7 @@ dialog.modal.template-sheet { width: 100%; max-width: none; margin: auto 0 0; bo
 .library-skeleton .skeleton { display: block; aspect-ratio: 3 / 4; border-radius: 14px; background: var(--surface-2); animation: skeleton-pulse 1.4s ease-in-out infinite; }
 .library-list.library-skeleton .skeleton { aspect-ratio: auto; height: 77px; border-radius: 0; border-top: 1px solid var(--hairline); }
 @keyframes skeleton-pulse { 50% { opacity: .5; } }
-@media (prefers-reduced-motion: reduce) { .library-skeleton .skeleton, .job-media-wait { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .library-skeleton .skeleton, .job-media-wait, .analysis-wait { animation: none; } }
 .library-more { display: block; height: 36px; margin: 0 auto; padding: 0 20px; border-color: rgb(var(--tint) / .15); font-size: 14px; font-weight: 500; }
 .zip-float { position: sticky; bottom: 16px; z-index: 5; width: fit-content; max-width: 100%; margin: 16px auto 0; padding: 6px 6px 6px 16px; gap: 8px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); box-shadow: 0 8px 24px rgb(var(--shade) / .12); }
 .zip-float > span { font-weight: 600; font-variant-numeric: tabular-nums; }
@@ -2468,17 +2468,48 @@ dialog.modal.tool-guide { width: min(52rem, calc(100vw - 2rem)); }
 .store-assign { list-style: none; margin: 4px 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 4px 12px; max-height: 220px; overflow: auto; }
 .store-assign .check { margin: 0; }
 
-/* Reference-video analysis (/analyze): the result and its shot list. */
-.analysis-result { margin-top: 16px; display: grid; gap: 8px; }
-.analysis-shots { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 12px; }
+/* Reference-video analysis (/analyze): the result and its shot list. The result sits in a 320 px form column on a phone and in the wide side
+   panel on a desktop, so its columns follow the width of its own box (a container query), never the viewport. */
+.analysis-panel { display: grid; gap: 12px; min-width: 0; }
+.analysis-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.analysis-panel-head h2 { margin: 0; font-size: 16px; line-height: 24px; }
+.analysis-wait { display: grid; gap: 4px; padding: 16px; border-radius: 12px; background: var(--surface-2); animation: skeleton-pulse 1.4s ease-in-out infinite; }
+.analysis-box { container-type: inline-size; min-width: 0; }
+.analysis-result { margin-top: 16px; display: grid; gap: 8px; min-width: 0; }
+.analysis-shots { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 8px; }
 .analysis-shots > li { margin-top: 0; border: 1px solid var(--border); border-radius: 12px; padding: 12px; }
-.analysis-prompt { margin: 6px 0; font-size: 14px; line-height: 21px; }
+.analysis-shots > li[data-active] { border-color: var(--ink-strong); box-shadow: 0 0 0 1px var(--ink-strong); }
+.analysis-shot-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; }
+.analysis-role { padding: 1px 8px; border-radius: 999px; background: var(--fill); color: var(--text-muted); font-size: 12px; line-height: 18px; }
+.analysis-time { margin-left: auto; padding: 1px 8px; border: 0; background: transparent; color: var(--link); font-size: 13px; font-variant-numeric: tabular-nums; text-decoration: underline; text-underline-offset: 3px; }
+.analysis-prompt { margin: 6px 0; font-size: 14px; line-height: 21px; overflow-wrap: anywhere; }
 .analysis-with-source { margin-top: 16px; display: grid; gap: 16px; align-items: start; }
 .analysis-with-source .analysis-result { margin-top: 0; }
-.analysis-source { max-width: 100%; max-height: 320px; border-radius: 12px; background: var(--media-bg); }
-@media (min-width: 720px) { .analysis-with-source { grid-template-columns: minmax(0, 300px) minmax(0, 1fr); } }
+.analysis-source-col { min-width: 0; }
+.analysis-with-source .analysis-source { display: block; width: 100%; max-height: 360px; border-radius: 12px; background: var(--media-bg); object-fit: contain; }
+@container (min-width: 640px) {
+  .analysis-with-source:has(> .analysis-source-col) { grid-template-columns: 280px minmax(0, 1fr); } /* one column when the source video is gone */
+  .analysis-source-col { position: sticky; top: 16px; }
+  .analysis-with-source .analysis-source { max-height: min(560px, calc(100dvh - 48px)); }
+}
+.analysis-example-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.analysis-example-head h3 { margin: 0; }
+.analysis-examples { display: grid; gap: 16px; }
 .analysis-history { margin-top: 24px; }
-.analysis-history ul { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 4px; }
+.analysis-list { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+.analysis-card { display: flex; gap: 12px; width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: inherit; font: inherit; text-align: left; }
+button.analysis-card { cursor: pointer; }
+button.analysis-card:hover { background: var(--fill); }
+.analysis-card[aria-current='true'] { border-color: var(--ink-strong); box-shadow: 0 0 0 1px var(--ink-strong); }
+div.analysis-card { opacity: .85; }
+.analysis-poster { display: grid; place-items: center; flex: none; width: 64px; height: 96px; overflow: hidden; border-radius: 8px; background: var(--fill); color: var(--text-muted); }
+.analysis-poster video { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+.analysis-card-body { display: grid; gap: 2px; align-content: start; min-width: 0; font-size: 14px; line-height: 21px; }
+.analysis-card-body .muted { font-size: 13px; line-height: 19px; }
+.analysis-hook { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.analysis-chip { justify-self: start; padding: 0 8px; border-radius: 999px; font-size: 12px; line-height: 20px; font-weight: 600; }
+.analysis-chip[data-tone='wait'] { background: var(--warn-bg); border: 1px solid var(--warn-border); }
+.analysis-chip[data-tone='fail'] { background: var(--danger-soft); border: 1px solid var(--danger-border); color: var(--danger); }
 
 /* The changelog: the page, the sidebar dot, the Explore card and the popup list. */
 .nav-dot { position: absolute; top: -3px; right: -4px; width: 8px; height: 8px; border-radius: 50%; background: var(--badge-new); box-shadow: 0 0 0 2px var(--surface-1); }
