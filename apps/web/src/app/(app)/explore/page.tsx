@@ -15,7 +15,7 @@ import { visibleEntries } from '@/lib/changelog-seen';
 import { bestClips } from '@/lib/clips';
 import { currentUser } from '@/lib/current-user';
 import { cardSample, EXAMPLES, exampleForPreset, sampleSrc } from '@/lib/examples';
-import { continueJobs, greeting, isRunning } from '@/lib/explore';
+import { continueJobs, greeting, isRunning, jobNote } from '@/lib/explore';
 import { featureLabel } from '@/lib/features';
 import { MIN_MARKS } from '@/lib/model-marks';
 import { modelStats, rank, scoreOf } from '@/lib/model-scores';
@@ -104,6 +104,12 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
     const id = done ?? j.input_id;
     return id ? content(id) : null;
   };
+  /** The recent-job note props: the finish label and the server-rendered note (shown until the leaf mounts and ticks the elapsed time). */
+  const noteProps = (j: (typeof recent)[number]) => {
+    const job = { status: j.status, error: j.error, created_at: j.created_at, finished_at: j.finished_at };
+    const done = `${fmtTime.format(j.finished_at ?? j.created_at)} · ${fmtDate.format(j.finished_at ?? j.created_at)}`;
+    return { job, done, initial: jobNote(job, () => done) };
+  };
   const have = new Set(samples.map((s) => s.name));
   /** A model's card picture: the company's best Library clip of it, else its uploaded sample; a clip without a poster keeps the sample's still. */
   const media = (id: string) => {
@@ -159,7 +165,7 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
                     {j.model_label && <span className="explore-job-model">{j.model_label}</span>}
                     {j.prompt && <span className="explore-job-prompt" title={j.prompt}>{j.prompt}</span>}
                     <span className="muted">
-                      <ExploreJobNote job={{ status: j.status, error: j.error, created_at: j.created_at, finished_at: j.finished_at }} done={`${fmtTime.format(j.finished_at ?? j.created_at)} · ${fmtDate.format(j.finished_at ?? j.created_at)}`} />
+                      <ExploreJobNote {...noteProps(j)} />
                     </span>
                   </Link>
                 </li>
