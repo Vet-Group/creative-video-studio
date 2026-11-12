@@ -4,8 +4,8 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createPool } from '@cvs/db/client';
 import { createTestDatabase } from '@cvs/db/testing';
-import { afterAll, beforeAll, expect, test } from 'vitest';
-import { type AnalyzeSeams, reaAnalyzeEnabled, runReaAnalyze } from './analyze';
+import { afterAll, beforeAll, expect, test, vi } from 'vitest';
+import { type AnalyzeSeams, defaultVlmEnv, reaAnalyzeEnabled, runReaAnalyze } from './analyze';
 
 const testDb = await createTestDatabase();
 const pool = createPool(testDb.url, 2);
@@ -93,4 +93,25 @@ test('records a failure when decompose throws, without leaving the row running',
 test('the feature flag is off unless explicitly set', () => {
   expect(reaAnalyzeEnabled({} as NodeJS.ProcessEnv)).toBe(false);
   expect(reaAnalyzeEnabled({ REA_ANALYZE_ENABLED: '1' } as NodeJS.ProcessEnv)).toBe(true);
+});
+
+test('defaultVlmEnv uses BytePlus from the key and never probes when the Vertex fallback is off', async () => {
+  const fetchSpy = vi.fn();
+  vi.stubGlobal('fetch', fetchSpy);
+  const prev = { key: process.env.BYTEPLUS_ARK_API_KEY, fb: process.env.REA_VLM_VERTEX_FALLBACK };
+  process.env.BYTEPLUS_ARK_API_KEY = 'ark-test';
+  delete process.env.REA_VLM_VERTEX_FALLBACK;
+  try {
+    const r = await defaultVlmEnv();
+    expect(r.provider).toBe('byteplus');
+    expect(r.env.REA_VLM_API_KEY).toBe('ark-test');
+    expect(r.model).toBe('seed-2-0-lite-260428');
+    expect(fetchSpy).not.toHaveBeenCalled(); // BytePlus is the default; no reachability probe when the fallback is off
+  } finally {
+    if (prev.key === undefined) delete process.env.BYTEPLUS_ARK_API_KEY;
+    else process.env.BYTEPLUS_ARK_API_KEY = prev.key;
+    if (prev.fb === undefined) delete process.env.REA_VLM_VERTEX_FALLBACK;
+    else process.env.REA_VLM_VERTEX_FALLBACK = prev.fb;
+    vi.unstubAllGlobals();
+  }
 });

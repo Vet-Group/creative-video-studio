@@ -2455,3 +2455,11 @@ dialog.modal.tool-guide { width: min(52rem, calc(100vw - 2rem)); }
 .store-empty { margin: 0; padding: 12px; color: var(--text-muted); font-size: 14px; }
 .store-assign { list-style: none; margin: 4px 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 4px 12px; max-height: 220px; overflow: auto; }
 .store-assign .check { margin: 0; }
+
+/* Reference-video analysis (/analyze): the result and its shot list. */
+.analysis-result { margin-top: 16px; display: grid; gap: 8px; }
+.analysis-shots { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 12px; }
+.analysis-shots > li { margin-top: 0; border: 1px solid var(--border); border-radius: 12px; padding: 12px; }
+.analysis-prompt { margin: 6px 0; font-size: 14px; line-height: 21px; }
+.analysis-history { margin-top: 24px; }
+.analysis-history ul { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 4px; }
