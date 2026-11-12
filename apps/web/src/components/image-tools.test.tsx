@@ -1,8 +1,11 @@
 // Upload batching, the empty slot's icon, the audio switch's closed state and the refill fallback with its note.
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, expect, test, vi } from 'vitest';
+import { decodeOptimizerImage, optimizeImage } from '@/lib/media-optimizer';
 import { AudioSwitch } from './AudioSwitch';
-import { nearestOption, pastedImages, refillNote, Slot, uploadImages } from './image-tools';
+import { nearestOption, pastedImages, refillNote, shrinkImage, Slot, uploadImages } from './image-tools';
+
+vi.mock('@/lib/media-optimizer', () => ({ decodeOptimizerImage: vi.fn(), optimizeImage: vi.fn() }));
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -71,4 +74,31 @@ test('a paste hands a slot its image files, but not when words go into a text bo
   expect(pastedImages(box, { files: [png], types: ['Files', 'text/plain'] })).toEqual([]); // words with a picture, into a box: the words win
   expect(pastedImages(page, { files: [txt], types: ['Files'] })).toEqual([]);
   expect(pastedImages(page, null)).toEqual([]);
+});
+
+test('a photo over 10 MB is shrunk (scaled down until it fits) and uploaded, and one the browser cannot shrink keeps the refusal', async () => {
+  const MB = 1024 * 1024;
+  vi.mocked(decodeOptimizerImage).mockResolvedValue({ width: 4000, height: 3000 } as ImageBitmap);
+  // Size follows the area: 12 MB at full size, so it fits from the second step (scale 0.7).
+  vi.mocked(optimizeImage).mockImplementation(async (_i, w, h, type) => new Blob([new Uint8Array(Math.round(12 * MB * ((w * h) / 12_000_000)))], { type }));
+  const big = new File([new Uint8Array(11 * MB)], 'big.png', { type: 'image/png' });
+  const small = await shrinkImage(big, 10 * MB);
+  expect(small?.name).toBe('big.webp');
+  expect(small?.type).toBe('image/webp');
+  expect(small!.size).toBeLessThanOrEqual(10 * MB);
+  expect((await shrinkImage(new File([new Uint8Array(11 * MB)], 'a.photo.jpg', { type: 'image/jpeg' }), 10 * MB))?.name).toBe('a.photo.jpg');
+
+  let sent: File[] = [];
+  vi.stubGlobal('fetch', async (_path: string, init: RequestInit) => {
+    sent = (init.body as FormData).getAll('file') as File[];
+    return new Response(JSON.stringify({ assets: sent.map((f) => ({ id: f.name, filename: f.name })) }), { status: 201 });
+  });
+  expect((await uploadImages([big])).map((a) => a.id)).toEqual(['big.webp']);
+  expect(sent[0]!.size).toBeLessThanOrEqual(10 * MB);
+
+  vi.mocked(decodeOptimizerImage).mockRejectedValue(new Error('cannot decode'));
+  await expect(uploadImages([big])).rejects.toThrow('Ảnh "big.png" quá lớn: tối đa 10 MB.');
+  vi.mocked(decodeOptimizerImage).mockResolvedValue({ width: 4000, height: 3000 } as ImageBitmap);
+  vi.mocked(optimizeImage).mockImplementation(async (_i, _w, _h, type) => new Blob([new Uint8Array(11 * MB)], { type }));
+  await expect(uploadImages([big])).rejects.toThrow('quá lớn');
 });

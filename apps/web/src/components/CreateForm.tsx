@@ -2,6 +2,7 @@
 import { type DragEvent, type KeyboardEvent, useEffect, useId, useRef, useState } from 'react';
 import { api, errorText, sendJson, thumbUrl } from '@/lib/api';
 import { cardSample, type Example, exampleForPreset, exampleModel, examplesFor, exampleTitle, sampleSrc, splitColumns } from '@/lib/examples';
+import { adjustNote } from '@/lib/video-adjust';
 import { briefRoom, sectionBody, sectionPrompt } from '@/lib/marketing';
 import { PROMPT_TEMPLATES } from '@/lib/prompt-starters';
 import { promptTooLong } from '@/lib/prompt-limit';
@@ -9,6 +10,7 @@ import { confirmRun } from '@/lib/run-guard';
 import { NARROW, useMediaQuery, WIDE } from '@/lib/use-media-query';
 import { useHydrated } from '@/lib/use-hydrated';
 import { useRecall } from '@/lib/use-recall';
+import { useDraftState } from '@/lib/use-draft';
 import { useSamples, versionedSample } from '@/lib/use-samples';
 import { ABOUT } from '@/lib/about-content';
 import { dropRefillQuery, exampleFrom } from '@/lib/reuse';
@@ -143,17 +145,23 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
   const [presetId, setPresetId] = useState(''); // '' means a free prompt
   const [enhance, setEnhance] = useState(true); // on by default, as on Fash; it rewrites a free prompt only
   const [audio, setAudio] = useState(true); // native audio, on by default as on Fash, on a model that can make it
-  const [prompt, setPrompt] = useState(''); // ② Body of a sectioned prompt
+  // The words survive a reload, unless a link or template fills the form (the hook and the ending are not kept).
+  const refilled = reuse !== undefined || seedPrompt !== undefined || image !== undefined;
+  const [prompt, setPrompt, clearBodyDraft] = useDraftState('video.body', refilled); // ② Body of a sectioned prompt
   // The other sections and the free writing box, which keeps its own words: switching back to the sections finds them as they were.
   const [hookText, setHookText] = useState('');
   const [ending, setEnding] = useState('');
-  const [freeText, setFreeText] = useState(seedPrompt ?? '');
+  const [freeText, setFreeText, clearFreeDraft] = useDraftState('video.free', refilled, seedPrompt ?? '');
   const [mode, setMode] = usePromptMode('video', seedPrompt ? 'free' : undefined);
   const sec = mode === 'sections';
   const choices = useChoiceLists();
   const [ratio, setRatio] = useState('9:16');
   const [durationSec, setDurationSec] = useState(8);
   const [modelId, setModelId] = useState(model ?? '');
+  const modelRef = useRef(modelId); // the latest choice, for the models fetch that outlives the render it started in
+  modelRef.current = modelId;
+  /** Said when the form changed a setting itself; it shows only while the form still has the values it set. */
+  const [adjusted, setAdjusted] = useState<{ text: string; ratio: string; durationSec: number; modelId?: string } | null>(null);
   const wanted = useRef(model); // the Explore choice, honoured once: the form takes its ratio and duration rather than dropping it
   const [storeId, setStoreId] = useState('');
   const [stores, setStores] = useState<StoreOption[]>([]);
@@ -333,13 +341,23 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
         const want = r.models.find((m) => m.id === wanted.current || (wanted.current !== undefined && m.pairIds.includes(wanted.current)));
         wanted.current = undefined;
         if (want && !want.supported && want.ratios.length > 0 && want.durationsSec.length > 0) {
-          if (!want.ratios.includes(ratio)) setRatio(want.ratios[0]!);
-          if (!want.durationsSec.includes(durationSec)) setDurationSec(want.durationsSec[0]!);
+          const to = { ratio: want.ratios.includes(ratio) ? ratio : want.ratios[0]!, durationSec: want.durationsSec.includes(durationSec) ? durationSec : want.durationsSec[0]! };
+          if (to.ratio !== ratio) setRatio(to.ratio);
+          if (to.durationSec !== durationSec) setDurationSec(to.durationSec);
+          const text = adjustNote({ ...(to.ratio !== ratio && { ratio: { from: ratio, to: to.ratio } }), ...(to.durationSec !== durationSec && { durationSec: { from: durationSec, to: to.durationSec } }) });
+          if (text) setAdjusted({ ...to, text });
           return; // the next fetch, for the new ratio and duration, keeps the model
         }
-        setModelId((cur) => r.models.find((m) => (m.id === cur || m.pairIds.includes(cur)) && m.supported)?.id ?? r.defaultModelId ?? '');
+        const cur = modelRef.current;
+        const kept = r.models.find((m) => (m.id === cur || m.pairIds.includes(cur)) && m.supported);
+        const next = kept?.id ?? r.defaultModelId ?? '';
+        setModelId(next);
         const options = r.models.flatMap((m) => m.durationsSec);
-        if (options.length > 0 && !options.includes(durationSec)) setDurationSec(Math.min(...options));
+        const toDuration = options.length > 0 && !options.includes(durationSec) ? Math.min(...options) : durationSec;
+        if (toDuration !== durationSec) setDurationSec(toDuration);
+        const nextLabel = r.models.find((m) => m.id === next)?.label;
+        const note = adjustNote({ ...(toDuration !== durationSec && { durationSec: { from: durationSec, to: toDuration } }), ...(cur !== '' && !kept && nextLabel && { model: { label: nextLabel, ratio, durationSec } }) });
+        if (note) setAdjusted({ ratio, durationSec: toDuration, modelId: next, text: note });
       },
       () => !stale && setError('Không tải được danh sách mô hình.'),
     );
@@ -412,6 +430,8 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
     setNotice('');
     try {
       await api('/api/jobs', sendJson('POST', { assetIds: images.map((i) => i.id), modelId, ...(presetId ? { presetId } : { prompt: composed, enhance }), ratio, durationSec, storeId: storeId || null, params: { audio: audioOn ? 'on' : 'off', ...(endAssetId && { endAssetId }), ...(audioAssetIds && { audioAssetIds }), ...(!presetId && sections) } }));
+      clearBodyDraft();
+      clearFreeDraft();
       setNotice('Đã gửi lượt tạo. Theo dõi trong tab "Lịch sử".');
       setRefetch((n) => n + 1);
       if (!narrow) setTab('history'); // beside the form, the new job shows in History
@@ -771,6 +791,11 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
               />
               <AudioSwitch on={audio} available={chosen?.audioEstimateUsd != null} always={chosen?.alwaysAudio} onChange={setAudio} />
             </VideoSettings>
+            {adjusted && adjusted.ratio === ratio && adjusted.durationSec === durationSec && (adjusted.modelId === undefined || adjusted.modelId === modelId) && (
+              <p className="help" role="status">
+                {adjusted.text}
+              </p>
+            )}
             <StorePicker label="Cửa hàng/Thương hiệu" heading="Chọn cửa hàng hoặc thương hiệu" value={storeId} stores={stores} noneLabel="Không chọn" onChange={setStoreId} onPin={togglePin} />
 
             {models && (

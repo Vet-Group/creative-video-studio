@@ -1,6 +1,6 @@
 import { CANCELED_ERROR } from '@cvs/core/ledger';
 import { expect, test } from 'vitest';
-import { continueJobs, givenName, greeting, jobNote } from './explore';
+import { continueJobs, givenName, greeting, jobNote, typicalLabel } from './explore';
 
 test('the given name is the last word of a Vietnamese full name', () => {
   expect(givenName('Nguyễn Văn An')).toBe('An');
@@ -48,4 +48,19 @@ test('the recent-job note shows elapsed while running, the finish time when done
   expect(jobNote({ ...base, status: 'succeeded', created_at: fin, finished_at: fin }, done, now)).toBe(fin.toISOString());
   expect(jobNote({ status: 'failed', error: CANCELED_ERROR, created_at: fin, finished_at: fin }, done, now)).toBe('Đã huỷ');
   expect(jobNote({ status: 'failed', error: 'boom', created_at: fin, finished_at: fin }, done, now)).toBe('Không thành công');
+});
+
+test('the typical finish time is the median to the 75th percentile of the same model\'s recent successes', () => {
+  const done = (modelId: string, secs: number, status = 'succeeded') => ({ status, modelId, createdAt: '2026-11-12T10:00:00Z', finishedAt: new Date(Date.parse('2026-11-12T10:00:00Z') + secs * 1000).toISOString() });
+  const running = { status: 'running', modelId: 'm' };
+  const four = [60, 120, 180, 240].map((s) => done('m', s));
+  expect(typicalLabel(running, four)).toBe('thường xong sau ~3–4 phút');
+  expect(typicalLabel({ status: 'submitting', modelId: 'm' }, four)).toBe('thường xong sau ~3–4 phút');
+  // Other models, failures and unfinished jobs are no samples; fewer than three samples show nothing.
+  expect(typicalLabel(running, [...four.slice(0, 2), done('other', 100), done('m', 100, 'failed'), { status: 'running', modelId: 'm', createdAt: '2026-11-12T10:00:00Z', finishedAt: null }])).toBeNull();
+  expect(typicalLabel({ status: 'queued', modelId: 'm' }, four)).toBeNull();
+  expect(typicalLabel({ status: 'succeeded', modelId: 'm' }, four)).toBeNull();
+  expect(typicalLabel(running, [20, 30, 40].map((s) => done('m', s)))).toBe('thường xong sau dưới 1 phút');
+  expect(typicalLabel(running, [150, 150, 150].map((s) => done('m', s)))).toBe('thường xong sau ~2–3 phút');
+  expect(typicalLabel(running, [180, 180, 180].map((s) => done('m', s)))).toBe('thường xong sau ~3 phút');
 });

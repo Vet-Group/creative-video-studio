@@ -13,6 +13,28 @@ export function elapsedLabel(job: { status: string; createdAt: string }, now = D
   return `${job.status === 'queued' ? 'đã chờ' : 'đã chạy'} ${min < 60 ? `${min} phút` : `${Math.floor(min / 60)} giờ ${min % 60} phút`}`;
 }
 
+const TYPICAL_SAMPLES = 10;
+const TYPICAL_MIN_SAMPLES = 3;
+
+/**
+ * What a submitting or running job usually takes, as a range of minutes: the median to the 75th percentile of the member's own
+ * latest succeeded jobs on the same model (`jobs` newest first). Nothing for another status or with fewer than three samples.
+ */
+export function typicalLabel(job: { status: string; modelId: string }, jobs: readonly { status: string; modelId: string; createdAt: string; finishedAt: string | null }[]): string | null {
+  if (job.status !== 'submitting' && job.status !== 'running') return null;
+  const secs = jobs
+    .filter((j) => j.status === 'succeeded' && j.modelId === job.modelId && j.finishedAt)
+    .slice(0, TYPICAL_SAMPLES)
+    .map((j) => (Date.parse(j.finishedAt!) - Date.parse(j.createdAt)) / 1000)
+    .filter((s) => s > 0)
+    .sort((a, b) => a - b);
+  if (secs.length < TYPICAL_MIN_SAMPLES) return null;
+  const at = (q: number) => secs[Math.min(secs.length - 1, Math.floor(q * secs.length))]! / 60;
+  const lo = Math.max(1, Math.floor(at(0.5)));
+  const hi = Math.max(lo, Math.ceil(at(0.75)));
+  return `thường xong sau ${at(0.75) < 1 ? 'dưới 1 phút' : `~${lo === hi ? lo : `${lo}–${hi}`} phút`}`;
+}
+
 /** The given name of a full name: Vietnamese names put it last; '' for an empty name. */
 export const givenName = (name: string | null | undefined): string => (name ?? '').trim().split(/\s+/).at(-1) ?? '';
 

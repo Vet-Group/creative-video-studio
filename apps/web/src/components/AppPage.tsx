@@ -11,6 +11,7 @@ import { basePrompt, promptTooLong } from '@/lib/prompt-limit';
 import { confirmRun } from '@/lib/run-guard';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { useRecall } from '@/lib/use-recall';
+import { useDraftState } from '@/lib/use-draft';
 import { cardSample } from '@/lib/examples';
 import { useSamples } from '@/lib/use-samples';
 import { About } from './About';
@@ -100,7 +101,7 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
   const { refresh, loading, notify } = useJobs();
   const narrow = useMediaQuery(NARROW);
   const [images, setImages] = useState<Img[][]>(() => app.slots.map(() => []));
-  const [prompt, setPrompt] = useState('');
+  const [prompt, setPrompt, clearDraft] = useDraftState(`app.${app.slug}`, reuse !== undefined);
   const [picker, setPicker] = useState<number | null>(null); // the slot whose stock-photo dialog is open
   const have = useSamples();
   const [tab, setTab] = useState<Tab | null>(null); // null: the default for the width (the form below 1024 px, else About)
@@ -196,6 +197,7 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
         params: { resolution: pick.resolution, ...(app.prompt && prompt.trim() && { brief: prompt.trim() }) }, // the member's own text, kept for reuse
       };
       await api('/api/jobs', sendJson('POST', body));
+      clearDraft();
       setNotice('Đã gửi lượt tạo. Theo dõi trong tab "Lịch sử".');
       if (!narrow) setTab('history');
       await refresh();
@@ -353,7 +355,7 @@ function MotionForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
   const narrow = useMediaQuery(NARROW);
   const [image, setImage] = useState<Img[]>([]);
   const [video, setVideo] = useState<RefVideo | null>(null);
-  const [prompt, setPrompt] = useState('');
+  const [prompt, setPrompt, clearDraft] = useDraftState(`app.${app.slug}`, reuse !== undefined);
   const [tab, setTab] = useState<Tab | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -426,6 +428,7 @@ function MotionForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
       const written = prompt.trim();
       const body = { feature: app.feature, modelId: chosen!.id, assetIds: [image[0]!.id, video!.id], ratio: 'auto', ...(written && { prompt: written }) };
       await api('/api/jobs', sendJson('POST', body));
+      clearDraft();
       setNotice('Đã gửi lượt tạo. Theo dõi trong tab "Lịch sử".');
       if (!narrow) setTab('history');
       await refresh();

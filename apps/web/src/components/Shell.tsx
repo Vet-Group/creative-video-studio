@@ -7,6 +7,7 @@ import { api, errorText, type JobStatus, sendJson, thumbUrl, type TrayJob } from
 import { appBySlug } from '@/lib/apps';
 import type { ChangeEntry } from '@/lib/changelog';
 import { CHANGELOG_SEEN_EVENT, loadSeen, unseenEntries } from '@/lib/changelog-seen';
+import { typicalLabel } from '@/lib/explore';
 import { featureLabel } from '@/lib/features';
 import { cardTitleOfFormat } from '@/lib/marketing';
 import { canReuse, refillFrom, reuseHref } from '@/lib/reuse';
@@ -47,7 +48,8 @@ const statusText = (job: TrayJob) => (isCanceled(job) ? 'Đã huỷ' : STATUS_LA
 const fmtTime = (iso: string) => new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date(iso));
 
 function TrayItem({ job, isAdmin }: { job: TrayJob; isAdmin: boolean }) {
-  const { refresh } = useJobs();
+  const { refresh, jobs } = useJobs();
+  const typical = typicalLabel(job, jobs);
   const [problem, setProblem] = useState('');
   const [sending, setSending] = useState(false);
   const thumb = job.posterAssetId ?? (job.resolution ? job.outputAssetId : null); // an image job's output is its own picture
@@ -76,6 +78,7 @@ function TrayItem({ job, isAdmin }: { job: TrayJob; isAdmin: boolean }) {
         <p className="muted">
           {job.ratio} · {job.resolution ?? `${job.durationSec}s`} · {fmtTime(job.createdAt)}
           {elapsedLabel(job) && ` · ${elapsedLabel(job)}`}
+          {typical && ` · ${typical}`}
         </p>
         <JobFailureNote job={job} isAdmin={isAdmin} />
         <CancelButton job={job} />
@@ -128,7 +131,8 @@ function HistoryCard({ job, isAdmin, select }: { job: TrayJob; isAdmin: boolean;
   const form = useForm();
   const apply = form?.apply;
   const takes = (k: 'durationSec' | 'ratio' | 'resolution') => !!apply && (!form?.settings || form.settings.includes(k));
-  const { refresh } = useJobs();
+  const { refresh, jobs } = useJobs();
+  const typical = typicalLabel(job, jobs);
   const [problem, setProblem] = useState('');
   const [sending, setSending] = useState(false);
   const [favorite, setFavorite] = useState(job.favorite);
@@ -243,6 +247,7 @@ function HistoryCard({ job, isAdmin, select }: { job: TrayJob; isAdmin: boolean;
         <p className="job-when" data-status={isCanceled(job) ? 'canceled' : job.status}>
           <strong>{statusText(job)}</strong> · {fmtTime(job.createdAt)}
           {elapsedLabel(job) && ` · ${elapsedLabel(job)}`}
+          {typical && ` · ${typical}`}
         </p>
         {/* As on Fash, the words, each input and the result can go on the form beside the History. */}
         {job.text && <JobPrompt text={job.text} onUse={form?.prompt && (() => form.prompt!(job.text!))} />}
@@ -395,7 +400,7 @@ export function Tray({ feature }: { feature?: string }) {
         </p>
       )}
       {workerOffline && <p className="warn">Máy xử lý đang tạm ngừng: chưa nhận được tín hiệu, lượt tạo sẽ chạy khi máy hoạt động lại.</p>}
-      {failed && <LoadError text={loaded ? 'Không cập nhật được danh sách lượt tạo.' : 'Không tải được danh sách lượt tạo.'} onRetry={refresh} />}
+      {failed && <LoadError text={!navigator.onLine ? 'Mất kết nối mạng. Sẽ cập nhật lại khi có mạng.' : loaded ? 'Không cập nhật được danh sách lượt tạo.' : 'Không tải được danh sách lượt tạo.'} onRetry={refresh} />}
       {loaded && jobs.length === 0 && (feature ? <HistoryEmpty /> : <p className="muted">Chưa có lượt tạo nào.</p>)}
       <ul>
         {jobs.map((j) => (feature ? <HistoryCard key={j.id} job={j} isAdmin={isAdmin} select={zip.check(j.id, `${cardTitle(j)} ${fmtTime(j.createdAt)}`)} /> : <TrayItem key={j.id} job={j} isAdmin={isAdmin} />))}
@@ -588,6 +593,9 @@ export function Shell({ userId, userName, isAdmin, feedbackNew = 0, analyzeEnabl
       <AdminContext value={isAdmin}>
         <OpenToolGuide value={openGuide}>
           <div className="app" data-collapsed={collapsed}>
+            <a className="skip-link" href="#main" inert={narrow && open}>
+              Bỏ qua đến nội dung
+            </a>
             <NavProgress />
             <div className="scrim" data-open={open} onClick={() => setOpen(false)} aria-hidden="true" />
             <div
@@ -644,7 +652,7 @@ export function Shell({ userId, userName, isAdmin, feedbackNew = 0, analyzeEnabl
               <ChangelogPopup entries={changelog} larkPrompt={larkPrompt} />
               {larkPrompt && <LarkLinkPrompt />}
               <div className="frame">
-                <main>{children}</main>
+                <main id="main" tabIndex={-1}>{children}</main>
                 {!hasOwnHistory(pathname) && <Tray />}
               </div>
             </div>

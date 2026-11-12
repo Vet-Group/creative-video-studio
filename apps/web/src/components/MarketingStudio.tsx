@@ -18,6 +18,7 @@ import { confirmRun } from '@/lib/run-guard';
 import { confirmDialog } from './Confirm';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { useRecall } from '@/lib/use-recall';
+import { useDraftState } from '@/lib/use-draft';
 import { useSamples } from '@/lib/use-samples';
 import { cardSample } from '@/lib/examples';
 import { dropRefillQuery, queryOf } from '@/lib/reuse';
@@ -146,7 +147,7 @@ export function MarketingStudio({ format = 'ugc', reuse, wizardDefault = false }
   const [video, setVideo] = useState<RefVideo | null>(null); // Advanced's reference video, sent only on a model that takes one (the Run says so otherwise)
   const [ending, setEnding] = useState(''); // ③ Ending of the sections, with the own hook of ①; the brief is ② Body
   const [hookText, setHookText] = useState('');
-  const [freeText, setFreeText] = useState(''); // the free writing box, which keeps its own words
+  const [freeText, setFreeText, clearFreeDraft] = useDraftState(`${pf ? `marketing-${pf}` : 'marketing'}.free`, reuse !== undefined); // the free writing box, which keeps its own words
   const [mode, setMode] = usePromptMode(pf ? `marketing-${pf}` : 'marketing');
   const sec = mode === 'sections';
   const [endText, setEndText] = useState('');
@@ -162,7 +163,7 @@ export function MarketingStudio({ format = 'ugc', reuse, wizardDefault = false }
   const [picker, setPicker] = useState<'hook' | 'location' | 'format' | 'model' | 'product' | null>(null);
   /** The member's past UGC product photos (Fash's My Products), offered by the product slot. */
   const [myProducts, setMyProducts] = useState<Img[]>([]);
-  const [prompt, setPrompt] = useState('');
+  const [prompt, setPrompt, clearBodyDraft] = useDraftState(`${pf ? `marketing-${pf}` : 'marketing'}.body`, reuse !== undefined);
   const [modelId, setModelId] = useState('');
   const [ratio, setRatio] = useState('9:16');
   const [durationSec, setDurationSec] = useState(10);
@@ -557,6 +558,8 @@ export function MarketingStudio({ format = 'ugc', reuse, wizardDefault = false }
       }
     }
     if (sentOk.length > 0) {
+      clearFreeDraft();
+      clearBodyDraft();
       setNotice(n > 1 ? `Đã gửi ${sentOk.length}/${n} biến thể: ${sentOk.join(', ')}. Theo dõi trong tab "Lịch sử".` : 'Đã gửi lượt tạo. Theo dõi trong tab "Lịch sử".');
       if (!narrow) setTab('history');
     }

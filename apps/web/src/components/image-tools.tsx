@@ -7,6 +7,7 @@ import { api, ApiError, type Clip, sendJson, thumbUrl } from '@/lib/api';
 import { dropRefillQuery, exampleFrom, refillFrom, reuseHref } from '@/lib/reuse';
 import { NARROW, useMediaQuery, WIDE } from '@/lib/use-media-query';
 import { numberedSamples } from '@/lib/examples';
+import { decodeOptimizerImage, optimizeImage } from '@/lib/media-optimizer';
 import { useFashionModels } from '@/lib/use-fashion-models';
 import { useHydrated } from '@/lib/use-hydrated';
 import { useSamples } from '@/lib/use-samples';
@@ -222,19 +223,38 @@ export function uploadError(e: unknown, kind: UploadKind = 'image'): string {
   return kind === 'image' ? UPLOAD_ERROR : `Không tải ${KINDS[kind].what.toLowerCase()} lên được do lỗi mạng hoặc máy chủ. Hãy thử lại.`;
 }
 
+/** A photo re-encoded, and scaled down if need be, until it is at most `max` bytes; null when the browser cannot read or encode it. */
+export async function shrinkImage(f: File, max: number): Promise<File | null> {
+  try {
+    const bitmap = await decodeOptimizerImage(f);
+    const format = f.type === 'image/jpeg' ? 'image/jpeg' : 'image/webp'; // WebP keeps a PNG's transparency
+    for (let scale = 1; scale > 0.3; scale *= 0.7) {
+      const blob = await optimizeImage(bitmap, Math.round(bitmap.width * scale), Math.round(bitmap.height * scale), format);
+      if (blob.size <= max) return new File([blob], `${f.name.replace(/\.[^.]+$/, '')}.${format === 'image/jpeg' ? 'jpg' : 'webp'}`, { type: format });
+    }
+  } catch {
+    // undecodable, too large to decode, or a format the browser cannot encode: the caller refuses the file
+  }
+  return null;
+}
+
 /**
- * Uploads files of one kind; a file of another type or over the size is refused before anything is sent (a file the browser gives no type is left to the server).
+ * Uploads files of one kind; a file of another type is refused, and one over the size is shrunk if it is a photo (else refused), before anything is sent (a file the browser gives no type is left to the server).
  * `storeId` tags them with the store chosen on the page and `slot` with the form slot they went into, for the uploaded-photos picker's filters.
  */
 export async function uploadImages(files: File[], kind: UploadKind = 'image', storeId = '', slot?: UploadSlot): Promise<Img[]> {
+  const ready: File[] = [];
   for (const f of files) {
     if (f.type && !KINDS[kind].types.includes(f.type)) throw new Refused(wrongType(kind, f.name));
-    if (f.size > KINDS[kind].max) throw new Refused(tooLarge(kind, f.name));
+    // A photo over the limit is shrunk here instead of refused; one the browser cannot shrink keeps the refusal.
+    const fit = f.size <= KINDS[kind].max ? f : kind === 'image' ? await shrinkImage(f, KINDS[kind].max) : null;
+    if (!fit) throw new Refused(tooLarge(kind, f.name));
+    ready.push(fit);
   }
   const out: Img[] = [];
-  for (let i = 0; i < files.length; i += PER_UPLOAD) {
+  for (let i = 0; i < ready.length; i += PER_UPLOAD) {
     const form = new FormData();
-    for (const f of files.slice(i, i + PER_UPLOAD)) form.append('file', f);
+    for (const f of ready.slice(i, i + PER_UPLOAD)) form.append('file', f);
     if (storeId) form.append('storeId', storeId);
     if (slot) form.append('slot', slot);
     out.push(...(await api<{ assets: Img[] }>('/api/assets', { method: 'POST', body: form })).assets);
