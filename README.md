@@ -29,6 +29,8 @@ pnpm typecheck && pnpm test
 node scripts/check-english.mjs
 ```
 
+Every pull request with a change a member or an Admin can notice adds an entry to `apps/web/src/lib/changelog.ts` (the "What's new" page), in plain Vietnamese.
+
 ## Autonomous run
 
 The delivery plan runs end to end after one owner preflight and one pre-approval sentence. Owner steps are in

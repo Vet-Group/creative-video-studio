@@ -3,11 +3,14 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { CardMedia } from '@/components/CardMedia';
 import { Icon, type IconName } from '@/components/Icon';
+import { KindChip } from '@/components/KindChip';
 import { ToolGuideButton } from '@/components/ToolGuide';
 import { Welcome } from '@/components/Welcome';
 import { MODEL_CARD_TEXT } from '@/lib/about-content';
 import { pool } from '@/lib/auth';
 import { NO_CAP } from '@/lib/caps';
+import { CHANGELOG } from '@/lib/changelog';
+import { visibleEntries } from '@/lib/changelog-seen';
 import { bestClips } from '@/lib/clips';
 import { currentUser } from '@/lib/current-user';
 import { cardSample, EXAMPLES, exampleForPreset, sampleSrc } from '@/lib/examples';
@@ -90,6 +93,7 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
   ]);
   // One model of each duplicate pair (lib/model-twins.ts); fal's balance lock is not read here, as the cards name no price to lock.
   const offered = await onePerPair(pool, models.rows);
+  const news = visibleEntries(CHANGELOG, user?.role === 'admin').slice(0, 3);
   const running = jobs.rows.filter(isRunning).length;
   const recent = continueJobs(jobs.rows);
   const status = [running > 0 && `${running} lượt tạo đang chạy`, today.cap >= NO_CAP ? `Hôm nay bạn đã tạo ${today.today} clip video` : `Hôm nay bạn còn ${Math.max(0, today.cap - today.today)}/${today.cap} clip video`].filter(Boolean).join(' · ');
@@ -159,6 +163,29 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
                 </li>
               );
             })}
+          </ul>
+        </section>
+      )}
+
+      {news.length > 0 && (
+        <section aria-labelledby="explore-news" className="explore-news">
+          <div className="explore-start-head">
+            <h2 id="explore-news">Có gì mới</h2>
+            <Link href="/changelog" className="link-button">
+              Xem tất cả
+              <Icon name="right" size={14} />
+            </Link>
+          </div>
+          <ul className="explore-news-list" aria-label="Thay đổi mới nhất">
+            {news.map((n) => (
+              <li key={n.at}>
+                <Link href="/changelog" className="explore-news-item">
+                  <KindChip kind={n.kind} />
+                  <strong>{n.title}</strong>
+                  <span className="muted">{fmtDate.format(new Date(n.at))}</span>
+                </Link>
+              </li>
+            ))}
           </ul>
         </section>
       )}
