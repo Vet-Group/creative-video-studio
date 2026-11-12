@@ -160,7 +160,8 @@ describe.skipIf(!hasBash)('deploy kit (needs bash only)', { timeout: 30_000 }, (
       expect(next, `missing or out of order: ${step}`).toBeGreaterThan(at);
       at = next;
     }
-    expect(r.out.match(/^MemoryMax=768M$/gm)).toHaveLength(2);
+    expect(r.out.match(/^MemoryMax=768M$/gm)).toHaveLength(1); // web
+    expect(r.out.match(/^MemoryMax=2G$/gm)).toHaveLength(1); // worker: rea-video analysis headroom
     expect(r.out.match(/^Restart=on-failure$/gm)).toHaveLength(2);
     expect(readFileSync(join(root, 'deploy/linux/cvs-drill.timer'), 'utf8')).toContain('OnCalendar=*-*-01');
     // The R2 copy runs daily (at most 1 day lost off-host), after the 03:30 nightly backup.
