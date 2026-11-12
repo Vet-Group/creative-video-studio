@@ -22,14 +22,17 @@ const MODES: [PromptMode, string][] = [
 ];
 
 /** How the member writes the prompt on `page`, remembered per browser; the sections by default, and when storage is blocked. */
-export function usePromptMode(page: string): [PromptMode, (m: PromptMode) => void] {
+// `initial` forces the starting mode for this mount without reading or writing the stored preference: a page handed a
+// ready free prompt (the analysis page's push-prompt) shows free mode for that visit only, leaving the remembered mode untouched.
+export function usePromptMode(page: string, initial?: PromptMode): [PromptMode, (m: PromptMode) => void] {
   const key = `cvs.prompt-mode.${page}`;
-  const [mode, setMode] = useState<PromptMode>('sections');
+  const [mode, setMode] = useState<PromptMode>(initial ?? 'sections');
   useEffect(() => {
+    if (initial) return;
     try {
       if (localStorage.getItem(key) === 'free') setMode('free');
     } catch {}
-  }, [key]);
+  }, [key, initial]);
   function choose(m: PromptMode) {
     setMode(m);
     try {

@@ -43,9 +43,16 @@ const ADMIN: NavGroup = { label: 'Quản lý', items: [{ href: '/admin/overview'
 
 for (const item of GROUPS[1]!.items) item.hint = toolGuide(item.href)!.oneLine;
 
+// The reference-video analysis page (rea-video), shown in the creative group only when REA_ANALYZE_ENABLED is on. Its hint
+// is inline rather than a tool-guide entry so the static group above (which asserts a tool-guide per item) stays untouched.
+const ANALYZE_ITEM: NavItem = { href: '/analyze', text: 'Phân tích', icon: 'chart', hint: 'Phân tích video tham chiếu thành danh sách cảnh và prompt tiếng Anh để dựng lại.' };
+
 /** `feedbackNew`, shown to an Admin as a badge on the feedback item, is the count of items still at status `new` to triage. */
-export const navGroups = (isAdmin: boolean, feedbackNew = 0): NavGroup[] => {
-  const base = isAdmin ? [...GROUPS, ADMIN] : [...GROUPS];
+export const navGroups = (isAdmin: boolean, feedbackNew = 0, analyzeEnabled = false): NavGroup[] => {
+  const groups = GROUPS.map((g) =>
+    analyzeEnabled && g.label === 'Sáng tạo' ? { ...g, items: g.items.flatMap((it) => (it.href === '/create' ? [it, ANALYZE_ITEM] : [it])) } : g,
+  );
+  const base = isAdmin ? [...groups, ADMIN] : groups;
   if (!isAdmin || feedbackNew <= 0) return base;
   return base.map((g) => ({ ...g, items: g.items.map((it) => (it.href === '/feedback' ? { ...it, badge: String(feedbackNew) } : it)) }));
 };

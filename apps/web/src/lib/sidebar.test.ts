@@ -22,6 +22,14 @@ test('the groups keep the order users know, and only an Admin gets the admin gro
   expect(navGroups(true).at(-1)!.label).toBe('Quản lý');
 });
 
+test('the Phân tích item appears right after Tạo video only when the analysis feature is on', () => {
+  const texts = (on: boolean) => navGroups(false, 0, on).flatMap((g) => g.items.map((i) => i.text));
+  expect(texts(false)).not.toContain('Phân tích');
+  const on = texts(true);
+  expect(on).toContain('Phân tích');
+  expect(on.indexOf('Phân tích')).toBe(on.indexOf('Tạo video') + 1);
+});
+
 test('an Admin sees the count of new feedback as a badge on the feedback item; a member never does', () => {
   const feedback = (admin: boolean, count: number) => navGroups(admin, count).flatMap((g) => g.items).find((i) => i.href === '/feedback');
   expect(feedback(true, 3)?.badge).toBe('3');

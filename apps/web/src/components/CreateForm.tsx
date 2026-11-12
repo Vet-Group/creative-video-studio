@@ -127,7 +127,7 @@ const MAX_IMAGES = 9;
 const ratePct = (m: Model) => (m.passRate === null ? undefined : `${Math.round(m.passRate * 100)}% (${m.passes}/${m.total})`);
 
 /** `preset` and `model` pre-select the choices Explore links to; an unknown or switched-off one falls back to the default. */
-export function CreateForm({ reuse, preset, model, image }: { reuse?: string; preset?: string; model?: string; image?: string }) {
+export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?: string; preset?: string; model?: string; image?: string; seedPrompt?: string }) {
   const { refresh, notify, loading } = useJobs();
   const recreated = useRecreated();
   const hydrated = useHydrated();
@@ -147,8 +147,8 @@ export function CreateForm({ reuse, preset, model, image }: { reuse?: string; pr
   // The other sections and the free writing box, which keeps its own words: switching back to the sections finds them as they were.
   const [hookText, setHookText] = useState('');
   const [ending, setEnding] = useState('');
-  const [freeText, setFreeText] = useState('');
-  const [mode, setMode] = usePromptMode('video');
+  const [freeText, setFreeText] = useState(seedPrompt ?? '');
+  const [mode, setMode] = usePromptMode('video', seedPrompt ? 'free' : undefined);
   const sec = mode === 'sections';
   const choices = useChoiceLists();
   const [ratio, setRatio] = useState('9:16');
