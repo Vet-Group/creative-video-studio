@@ -94,7 +94,7 @@ test('"Xem tất cả" in the popup opens the page and marks everything seen; an
     await expect(admin.getByRole('heading', { level: 3, name: 'Xoá người dùng' })).toBeVisible();
     await expect(admin.getByText('Chỉ quản trị viên').first()).toBeVisible();
     await expect(admin.getByRole('button', { name: 'Vận hành' })).toBeVisible();
-    await expect(admin.locator('.changelog-entry a[href$="/pull/395"]')).toBeVisible();
+    await expect(admin.locator('.changelog-entry a[href$="/pull/396"]')).toBeVisible();
   } finally {
     await context.close();
   }
