@@ -2,7 +2,7 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, expect, test, vi } from 'vitest';
 import { AudioSwitch } from './AudioSwitch';
-import { nearestOption, refillNote, Slot, uploadImages } from './image-tools';
+import { nearestOption, pastedImages, refillNote, Slot, uploadImages } from './image-tools';
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -59,4 +59,16 @@ test('a refill says which setting the model lacks and what it chose instead, and
   expect(refillNote({ ratio: 'auto', resolution: null }, '1:1', '1K')).toBe('Mẫu dùng tỉ lệ Tự động; mô hình này không có nên đã chọn 1:1.');
   expect(refillNote({ ratio: '16:9', resolution: '2K' }, '16:9', '2K')).toBe('');
   expect(refillNote({ ratio: null, resolution: null }, 'auto', '1K')).toBe('');
+});
+
+test('a paste hands a slot its image files, but not when words go into a text box', () => {
+  const png = new File(['x'], 'shot.png', { type: 'image/png' });
+  const txt = new File(['x'], 'notes.txt', { type: 'text/plain' });
+  const page = { closest: () => null };
+  const box = { closest: (sel: string) => (sel.includes('textarea') ? {} : null) };
+  expect(pastedImages(page, { files: [png, txt], types: ['Files'] })).toEqual([png]);
+  expect(pastedImages(box, { files: [png], types: ['Files'] })).toEqual([png]); // a screenshot pasted while the prompt box has focus
+  expect(pastedImages(box, { files: [png], types: ['Files', 'text/plain'] })).toEqual([]); // words with a picture, into a box: the words win
+  expect(pastedImages(page, { files: [txt], types: ['Files'] })).toEqual([]);
+  expect(pastedImages(page, null)).toEqual([]);
 });

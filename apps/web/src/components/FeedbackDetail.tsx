@@ -39,7 +39,7 @@ export function FeedbackDetail({ id, isAdmin }: { id: string; isAdmin: boolean }
     }
   }
 
-  if (state === 'loading') return <p className="muted">Đang tải…</p>;
+  if (state === 'loading') return <p className="muted" role="status">Đang tải…</p>;
   if (state === 'missing' || !item)
     return (
       <p className="muted">
@@ -146,7 +146,7 @@ function AdminControls({ item, onSaved }: { item: ListedFeedback; onSaved: (next
         Phản hồi cho người gửi
         <textarea value={note} onChange={(e) => setNote(e.target.value)} maxLength={NOTE_MAX} rows={3} placeholder="Để trống nếu chưa phản hồi" />
       </label>
-      {error && <p className="fb-error">{error}</p>}
+      {error && <p className="fb-error" role="alert">{error}</p>}
       <button type="button" onClick={() => void save()} disabled={busy}>
         {busy ? 'Đang lưu…' : 'Lưu'}
       </button>
@@ -177,7 +177,7 @@ function CommentForm({ id, onAdded }: { id: string; onAdded: (c: FeedbackComment
   return (
     <form className="fb-comment-form" onSubmit={(e) => { e.preventDefault(); void submit(); }}>
       <textarea value={body} onChange={(e) => setBody(e.target.value)} maxLength={COMMENT_MAX} rows={2} placeholder="Viết bình luận…" aria-label="Bình luận" />
-      {error && <p className="fb-error">{error}</p>}
+      {error && <p className="fb-error" role="alert">{error}</p>}
       <button type="submit" disabled={busy || body.trim().length < 1}>
         {busy ? 'Đang gửi…' : 'Gửi bình luận'}
       </button>

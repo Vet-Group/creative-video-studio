@@ -21,7 +21,7 @@ import { FalLowNotice } from './FalLowNotice';
 import { Icon, type IconName } from './Icon';
 import { LarkLinkPrompt } from './LarkLinkPrompt';
 import { JobFailureNote, canRetry, canRetryOnTwin, twinRetryText } from './JobFailure';
-import { JobPrompt, JobsProvider, Recreate, roleOf, Tap, toggleFullscreen, useForm, useJobs } from './jobs';
+import { elapsedLabel, JobPrompt, JobsProvider, Recreate, roleOf, Tap, toggleFullscreen, useForm, useJobs } from './jobs';
 import { LoadError } from './LoadError';
 import { type Account, type Section, Settings } from './Settings';
 import { SaveTemplateDialog, type Scope } from './Templates';
@@ -70,6 +70,7 @@ function TrayItem({ job, isAdmin }: { job: TrayJob; isAdmin: boolean }) {
         </p>
         <p className="muted">
           {job.ratio} · {job.resolution ?? `${job.durationSec}s`} · {fmtTime(job.createdAt)}
+          {elapsedLabel(job) && ` · ${elapsedLabel(job)}`}
         </p>
         <JobFailureNote job={job} isAdmin={isAdmin} />
         {job.status === 'succeeded' && (
@@ -205,6 +206,7 @@ function HistoryCard({ job, isAdmin, select }: { job: TrayJob; isAdmin: boolean;
         </h3>
         <p className="job-when" data-status={job.status}>
           <strong>{STATUS_LABEL[job.status]}</strong> · {fmtTime(job.createdAt)}
+          {elapsedLabel(job) && ` · ${elapsedLabel(job)}`}
         </p>
         {/* As on Fash, the words, each input and the result can go on the form beside the History. */}
         {job.text && <JobPrompt text={job.text} onUse={form?.prompt && (() => form.prompt!(job.text!))} />}

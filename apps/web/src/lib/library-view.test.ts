@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { activeFilters, libraryQuery, matchesVerdict, NO_FILTERS, readView, saveView, VIEW_KEY } from './library-view';
+import { activeFilters, dayHeadings, libraryQuery, matchesVerdict, NO_FILTERS, readView, saveView, VIEW_KEY } from './library-view';
 
 describe('libraryQuery', () => {
   it('leaves the defaults out', () => {
@@ -75,5 +75,26 @@ describe('the remembered view', () => {
     });
     expect(readView()).toBe('grid');
     expect(() => saveView('list')).not.toThrow();
+  });
+});
+
+describe('dayHeadings', () => {
+  const now = new Date('2026-11-12T16:00:00+07:00');
+  const at = (iso: string) => ({ createdAt: iso });
+  it('puts a heading before the first item of each Vietnam day, newest first or oldest first', () => {
+    const items = [at('2026-11-12T09:00:00+07:00'), at('2026-11-12T00:30:00+07:00'), at('2026-11-11T23:59:00+07:00'), at('2026-11-09T10:00:00+07:00')];
+    expect([...dayHeadings(items, now)]).toEqual([
+      [0, 'Hôm nay'],
+      [2, 'Hôm qua'],
+      [3, new Intl.DateTimeFormat('vi-VN', { weekday: 'long', day: 'numeric', month: 'numeric', year: 'numeric', timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date('2026-11-09T10:00:00+07:00')).replace(/^./, (c) => c.toUpperCase())],
+    ]);
+    expect([...dayHeadings([...items].reverse(), now).keys()]).toEqual([0, 1, 2]);
+  });
+  it('counts a UTC evening as the next Vietnam day', () => {
+    expect([...dayHeadings([at('2026-11-11T18:00:00Z'), at('2026-11-11T16:00:00Z')], now)]).toEqual([[0, 'Hôm nay'], [1, 'Hôm qua']]);
+  });
+  it('adds no heading when every item is from one day, or there is none', () => {
+    expect(dayHeadings([at('2026-11-12T09:00:00+07:00'), at('2026-11-12T08:00:00+07:00')], now).size).toBe(0);
+    expect(dayHeadings([], now).size).toBe(0);
   });
 });

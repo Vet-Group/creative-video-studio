@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { roleOf } from './jobs';
+import { elapsedLabel, roleOf } from './jobs';
 
 describe('roleOf', () => {
   it('sends UGC and Review photos to the model, then the product', () => {
@@ -22,5 +22,19 @@ describe('roleOf', () => {
 
   it('keeps Try On photos as before', () => {
     expect([0, 1, 2, 3].map((n) => roleOf('try_on', n, { garments: 2 }))).toEqual(['model', 'garment', 'garment', 'background']);
+  });
+});
+
+describe('elapsedLabel', () => {
+  const at = '2026-11-12T10:00:00+07:00';
+  const now = (min: number) => Date.parse(at) + min * 60_000;
+  it('says how long an unfinished job has waited or run', () => {
+    expect(elapsedLabel({ status: 'queued', createdAt: at }, now(0.5))).toBe('vừa gửi');
+    expect(elapsedLabel({ status: 'queued', createdAt: at }, now(3))).toBe('đã chờ 3 phút');
+    expect(elapsedLabel({ status: 'running', createdAt: at }, now(12))).toBe('đã chạy 12 phút');
+    expect(elapsedLabel({ status: 'submitting', createdAt: at }, now(75))).toBe('đã chạy 1 giờ 15 phút');
+  });
+  it('says nothing once the job finished', () => {
+    for (const status of ['succeeded', 'failed', 'failed_unknown', 'timed_out']) expect(elapsedLabel({ status, createdAt: at }, now(5))).toBeNull();
   });
 });

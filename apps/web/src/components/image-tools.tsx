@@ -266,6 +266,17 @@ export async function uploadVideoDirect(file: File, storeId = ''): Promise<RefVi
 }
 
 /**
+ * The images a paste (Ctrl+V) hands an upload slot: the clipboard's image files, unless the paste is words going into a text box.
+ * Pasting a screenshot with focus in a prompt box still fills the slot, since a box takes no picture.
+ */
+export function pastedImages(target: { closest?: (sel: string) => unknown } | null, data: { files: ArrayLike<File>; types: readonly string[] } | null): File[] {
+  if (!data) return [];
+  const images = Array.from(data.files).filter((f) => f.type.startsWith('image/'));
+  if (images.length > 0 && data.types.includes('text/plain') && target?.closest?.('input, textarea, [contenteditable="true"]')) return [];
+  return images;
+}
+
+/**
  * One labelled upload slot: its thumbnails with a remove button each, and a tile that opens the file picker until the slot is full.
  * `samples` (sample names, lib/samples.ts) show while the slot is empty, as on the live Try On; a click hands the name to `onSample`, which copies it on the server.
  * `icon` is the empty slot's icon: a picture by default, a plus on Advanced's wide slot, as on the live page.
@@ -280,6 +291,21 @@ export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRem
   const labelId = useId();
   const full = images.length >= max;
   const offer = images.length === 0 ? samples : [];
+  const box = useRef<HTMLDivElement>(null);
+  const room = hydrated && !full && !busy;
+  // A pasted image (a screenshot of a garment or a model) goes to the first slot on the page with room, as InvokeAI's paste does.
+  useEffect(() => {
+    if (!room) return;
+    const onPaste = (e: ClipboardEvent) => {
+      if (document.querySelector('.slot[data-room]') !== box.current) return;
+      const files = pastedImages(e.target as Element | null, e.clipboardData);
+      if (files.length === 0) return;
+      e.preventDefault();
+      add(files);
+    };
+    document.addEventListener('paste', onPaste);
+    return () => document.removeEventListener('paste', onPaste);
+  });
   function add(files: File[]) {
     const room = max - images.length;
     setCut(files.length > room ? room : 0);
@@ -317,7 +343,7 @@ export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRem
       ) : (
         name
       )}
-      <div className="slot" role="group" aria-labelledby={labelId} data-over={over} data-one={(max === 1 && images.length === 1) || undefined} onDragOver={(e) => (e.preventDefault(), setOver(true))} onDragLeave={() => setOver(false)} onDrop={onDrop}>
+      <div ref={box} className="slot" role="group" aria-labelledby={labelId} data-room={room || undefined} data-over={over} data-one={(max === 1 && images.length === 1) || undefined} onDragOver={(e) => (e.preventDefault(), setOver(true))} onDragLeave={() => setOver(false)} onDrop={onDrop}>
         <input
           ref={input}
           type="file"

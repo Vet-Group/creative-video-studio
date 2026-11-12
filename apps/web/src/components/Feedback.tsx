@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { FEEDBACK_KINDS, FEEDBACK_STATUSES, type FeedbackKind } from '@cvs/db';
 import { ApiError, api, errorText, sendJson, thumbUrl } from '@/lib/api';
+import { LoadError } from './LoadError';
 import { BODY_MAX, feedbackTime, KIND_LABEL, type ListedFeedback, MAX_IMAGES, STATUS_LABEL, TITLE_MAX } from '@/lib/feedback';
 
 type Sort = 'new' | 'top';
@@ -16,6 +17,8 @@ export function Feedback() {
   const [items, setItems] = useState<ListedFeedback[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  const [reload, setReload] = useState(0);
+  const [voteError, setVoteError] = useState(false);
   const [kindFilter, setKindFilter] = useState<FeedbackKind | ''>('');
   const [statusFilter, setStatusFilter] = useState('');
   const [sort, setSort] = useState<Sort>('new');
@@ -40,16 +43,18 @@ export function Feedback() {
     return () => {
       live = false;
     };
-  }, [kindFilter, statusFilter, sort]);
+  }, [kindFilter, statusFilter, sort, reload]);
 
   async function toggleVote(it: ListedFeedback) {
     const prev = items;
+    setVoteError(false);
     setItems((xs) => xs.map((x) => (x.id === it.id ? { ...x, voted: !x.voted, votes: x.votes + (x.voted ? -1 : 1) } : x)));
     try {
       const r = await api<{ voted: boolean; votes: number }>(`/api/feedback/${it.id}/vote`, { method: 'PUT' });
       setItems((xs) => xs.map((x) => (x.id === it.id ? { ...x, voted: r.voted, votes: r.votes } : x)));
     } catch {
       setItems(prev);
+      setVoteError(true);
     }
   }
 
@@ -104,14 +109,16 @@ export function Feedback() {
       </div>
 
       {loading ? (
-        <p className="muted">Đang tải…</p>
+        <p className="muted" role="status">Đang tải…</p>
       ) : loadError ? (
-        <p className="muted">Không tải được danh sách. Hãy thử lại.</p>
+        <LoadError text="Không tải được danh sách góp ý." onRetry={() => setReload((n) => n + 1)} />
       ) : items.length === 0 ? (
         <p className="muted">Chưa có góp ý nào. Hãy là người đầu tiên!</p>
       ) : shown.length === 0 ? (
         <p className="muted">Không có góp ý nào khớp “{query.trim()}”.</p>
       ) : (
+        <>
+        {voteError && <p className="error" role="alert">Chưa bình chọn được. Hãy thử lại.</p>}
         <ul className="fb-list">
           {shown.map((it) => (
             <li key={it.id} className="fb-item">
@@ -134,6 +141,7 @@ export function Feedback() {
             </li>
           ))}
         </ul>
+        </>
       )}
     </div>
   );
@@ -226,7 +234,7 @@ function SubmitForm({ onDone }: { onDone: (created: ListedFeedback) => void }) {
           </ul>
         )}
       </div>
-      {error && <p className="fb-error">{error}</p>}
+      {error && <p className="fb-error" role="alert">{error}</p>}
       <div className="fb-actions">
         <button type="submit" className="fb-new" disabled={busy || uploading}>
           {busy ? 'Đang gửi…' : 'Gửi'}
