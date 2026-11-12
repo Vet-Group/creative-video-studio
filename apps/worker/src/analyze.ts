@@ -84,7 +84,9 @@ export const defaultVlmEnv = async (): Promise<{ env: Record<string, string>; pr
 };
 
 // gpt-6-luna when OPENAI_API_KEY is set, else fal on FAL_KEY; undefined (no translation) when neither is configured.
-const defaultTranslate = createAnalysisTranslator({ openAiKey: process.env.OPENAI_API_KEY, falKey: process.env.FAL_KEY });
+// Built per run, not at import: the worker loads .env lazily (databaseUrl()), after this module is evaluated, so an import-time
+// read saw no key and every analysis stayed English-only.
+const defaultTranslate = () => createAnalysisTranslator({ openAiKey: process.env.OPENAI_API_KEY, falKey: process.env.FAL_KEY });
 
 /** Claims a queued analysis row, runs rea-video over its source video, and stores the result. Safe to
  * call more than once for the same id: only a `queued` row is claimed. */
@@ -93,7 +95,7 @@ export async function runReaAnalyze(pool: Pool, analysisId: string, seams: Analy
   const read = seams.read ?? getObject;
   const write = seams.write ?? putObject;
   const vlmEnv = seams.vlmEnv ?? defaultVlmEnv;
-  const translate = seams.translate ?? defaultTranslate;
+  const translate = seams.translate ?? defaultTranslate();
 
   const row = (await pool.query('select id, source_key, status from analyses where id = $1', [analysisId])).rows[0];
   if (!row || row.status !== 'queued') return;
