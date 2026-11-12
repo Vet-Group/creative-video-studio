@@ -46,6 +46,24 @@ export function libraryQuery(f: LibraryFilters, offset: number): string {
   return q.toString();
 }
 
+/** The filters carried in the Library URL, read back from its query so a shared or bookmarked link reopens the same view; offset and item are ignored. The inverse of libraryQuery. */
+export function filtersFromParams(p: URLSearchParams): LibraryFilters {
+  const days = p.get('days');
+  const verdict = p.get('verdict');
+  return {
+    q: p.get('q') ?? '',
+    creator: p.get('creator') ?? '',
+    date: p.get('date') ?? '',
+    days: days === '1' || days === '7' || days === '30' ? days : '',
+    ratio: p.get('ratio') ?? '',
+    kind: p.get('kind') ?? 'all',
+    verdict: verdict === 'none' || verdict === 'pass' || verdict === 'featured' || verdict === 'fail' ? verdict : '',
+    favoritesOnly: p.get('favorites') === '1',
+    examplesOnly: p.get('example') === '1',
+    sort: p.get('sort') === 'oldest' ? 'oldest' : 'newest',
+  };
+}
+
 /** How many filters narrow the list; the sort only orders it, so it is not one. */
 export const activeFilters = (f: LibraryFilters): number => [f.q.trim(), f.creator, f.date, f.days, f.ratio, f.kind !== 'all', f.verdict, f.favoritesOnly, f.examplesOnly].filter(Boolean).length;
 
