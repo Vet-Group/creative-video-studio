@@ -29,7 +29,7 @@ import { builtInChoices, type Choice, ChoiceBox, ChoiceDialog, PhraseChoice, use
 import { EndScene } from './EndScene';
 import { Highlights } from './Highlights';
 import { Icon } from './Icon';
-import { copyError, copySamples, Gallery, HISTORY_SIZE_KEY, type Img, PhotoDialog, photoImg, RunSummary, SizeSlider, Slot, uploadError, uploadImages, UPLOAD_ERROR, useSize, WorkTabs } from './image-tools';
+import { copyError, copySamples, FormNotice, Gallery, HISTORY_SIZE_KEY, type Img, PhotoDialog, photoImg, RunSummary, SizeSlider, Slot, uploadError, uploadImages, UPLOAD_ERROR, useSize, WorkTabs } from './image-tools';
 import type { UploadSlot } from '@/lib/upload-slots';
 import { FormContext, type FormActions, type Photo, type PhotoRole, useApplier, useJobs, useRecreated } from './jobs';
 import { Modal } from './Modal';
@@ -788,7 +788,7 @@ export function MarketingStudio({ format = 'ugc', reuse, wizardDefault = false }
                 {n} biến thể, tổng ${total}: {clips.cap >= NO_CAP ? `dùng ${n} clip (hôm nay đã dùng ${clips.today})` : `dùng ${n} trong ${clips.cap} clip mỗi ngày của bạn (hôm nay đã dùng ${clips.today})`}.
               </p>
             )}
-            {notice && <p role="status">{notice}</p>}
+            <FormNotice text={notice} onHistory={narrow ? () => setTab('history') : undefined} />
           </div>
           <div className="runbar">
             <RunSummary items={[chosen?.label, ratio, `${durationSec} giây`, audioOn && 'có âm thanh']} />

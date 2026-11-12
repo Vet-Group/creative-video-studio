@@ -22,6 +22,7 @@ test('shows the mapped format, the hook, each shot English prompt and a link tha
   expect(html).toContain('Clean apparel presentation.');
   expect(html).toContain('Model poses to showcase a plain white t-shirt.');
   expect(html).toContain(`href="/create?prompt=${encodeURIComponent('Close-up of the fabric & stitching.')}"`);
+  expect(html.match(/aria-label="Chép mô tả"/g)).toHaveLength(2); // each shot's prompt can be copied, as on History cards
 });
 
 test('falls back to the model’s own format text when it is not one we label', () => {

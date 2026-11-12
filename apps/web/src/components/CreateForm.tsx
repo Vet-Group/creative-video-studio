@@ -18,7 +18,7 @@ import { CardMedia } from './CardMedia';
 import { PhraseChoice, useChoiceLists } from './Choices';
 import { ENHANCE_NOTE, EnhanceToggle } from './EnhanceToggle';
 import { Icon } from './Icon';
-import { copyError, copySamples, GALLERY_SIZE_KEY, HISTORY_SIZE_KEY, photoImg, RunSummary, SizeSlider, Slot, UploadedPhotos, uploadError, uploadImages, useSize } from './image-tools';
+import { copyError, copySamples, FormNotice, GALLERY_SIZE_KEY, HISTORY_SIZE_KEY, photoImg, RunSummary, SizeSlider, Slot, UploadedPhotos, uploadError, uploadImages, useSize } from './image-tools';
 import { FormContext, type Photo, Tap, useApplier, useJobs, useRecreated } from './jobs';
 import { Modal } from './Modal';
 import { ModelPicker } from './ModelPicker';
@@ -794,7 +794,7 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
                   {error}
                 </p>
               )}
-              {notice && <p role="status">{notice}</p>}
+              <FormNotice text={notice} onHistory={narrow ? () => setTab('history') : undefined} />
             </div>
           )}
           <div className="runbar">

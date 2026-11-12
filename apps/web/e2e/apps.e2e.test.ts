@@ -239,7 +239,11 @@ test('Reframe (a field): the ratio field comes from the model, and the chosen ra
   await expect(select(page, 'Tỉ lệ')).toHaveAttribute('data-value', '1:1');
   await runButton(page).click();
   await expect(toast(page, 'Ảnh đã xong')).toBeVisible({ timeout: 60_000 });
-  await expect(page.getByRole('complementary', { name: 'Lượt tạo của tôi' }).locator('.job-chips').first().locator('span')).toHaveText(['1K', '1:1']); // resolution and ratio chips
+  // The ratio chip sets the form's ratio, as on Try On; Reframe takes no resolution, so that chip stays text.
+  const chips = page.getByRole('complementary', { name: 'Lượt tạo của tôi' }).locator('.job-chips').first();
+  await expect(chips.locator('span')).toHaveText(['1K']);
+  await chips.getByRole('button', { name: '1:1' }).click();
+  await expect(toast(page, 'Đã chọn tỉ lệ 1:1')).toBeVisible();
   const jobs = (await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { feature: string; ratio: string }[] };
   expect(jobs.jobs.map((j) => [j.feature, j.ratio])).toEqual([['reframe', '1:1']]);
 });

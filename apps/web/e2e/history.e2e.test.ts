@@ -239,7 +239,7 @@ test('the compact tray beside a page without its own History gives a failed job 
   await expect(failed.getByRole('button', { name: 'Thử lại' })).toHaveClass('job-reuse job-primary');
   await expect(failed.getByRole('link', { name: 'Dùng lại' })).toHaveClass('job-reuse');
   await expect(done.getByRole('link', { name: 'Dùng lại' })).toHaveClass('job-reuse');
-  await expect(done.getByRole('link', { name: 'Xem trong Thư viện' })).toHaveAttribute('href', '/library');
+  await expect(done.getByRole('link', { name: 'Xem trong Thư viện' })).toHaveAttribute('href', /^\/library\?item=[0-9a-f-]+$/);
   for (const j of ((await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { id: string }[] }).jobs) await page.request.delete(`/api/jobs/${j.id}`); // the Library is shared by every spec
 });
 

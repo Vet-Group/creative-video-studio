@@ -22,7 +22,7 @@ import { FalLowNotice } from './FalLowNotice';
 import { Icon, type IconName } from './Icon';
 import { LarkLinkPrompt } from './LarkLinkPrompt';
 import { JobFailureNote, canRetry, isCanceled, canRetryOnTwin, twinRetryText } from './JobFailure';
-import { CancelButton, elapsedLabel, JobPrompt, JobsProvider, Recreate, roleOf, Tap, toggleFullscreen, useForm, useJobs } from './jobs';
+import { CancelButton, elapsedLabel, JobPrompt, JobsProvider, Recreate, resultHref, roleOf, Tap, toggleFullscreen, useForm, useJobs } from './jobs';
 import { LoadError } from './LoadError';
 import { Modal } from './Modal';
 import { type Account, type Section, Settings } from './Settings';
@@ -81,7 +81,7 @@ function TrayItem({ job, isAdmin }: { job: TrayJob; isAdmin: boolean }) {
         <CancelButton job={job} />
         {job.status === 'succeeded' && (
           <p className="job-links">
-            <Link href="/library">Xem trong Thư viện</Link>
+            <Link href={resultHref(job)}>Xem trong Thư viện</Link>
           </p>
         )}
         {(canRetry(job) || canRetryOnTwin(job) || reuseHref(job)) && (
@@ -110,6 +110,13 @@ function TrayItem({ job, isAdmin }: { job: TrayJob; isAdmin: boolean }) {
   );
 }
 
+const WAITING: JobStatus[] = ['queued', 'submitting', 'running'];
+/** A job's ratio ('9:16') as a CSS aspect-ratio; 'auto' and anything else as portrait 3 / 4, the usual shape of a result. */
+const ratioBox =(ratio: string): string => {
+  const m = ratio.match(/^(\d+(?:\.\d+)?):(\d+(?:\.\d+)?)$/);
+  return m ? `${m[1]} / ${m[2]}` : '3 / 4';
+};
+
 /** The History card's title: the page's own name for what made it, as Fash titles its cards ("UGC Try On"). */
 const cardTitle = (job: TrayJob): string => (job.feature === 'marketing' ? cardTitleOfFormat(job.format) : featureLabel(job.feature));
 
@@ -120,6 +127,7 @@ const cardTitle = (job: TrayJob): string => (job.feature === 'marketing' ? cardT
 function HistoryCard({ job, isAdmin, select }: { job: TrayJob; isAdmin: boolean; select?: ReactNode }) {
   const form = useForm();
   const apply = form?.apply;
+  const takes = (k: 'durationSec' | 'ratio' | 'resolution') => !!apply && (!form?.settings || form.settings.includes(k));
   const { refresh } = useJobs();
   const [problem, setProblem] = useState('');
   const [sending, setSending] = useState(false);
@@ -171,14 +179,19 @@ function HistoryCard({ job, isAdmin, select }: { job: TrayJob; isAdmin: boolean;
     setSaving(null);
     setSaved(true);
   }
-  const download = () =>
-    act(async () => {
+  // The server names the file as the Library does (YYYYMMDD-creator-id); the button waits for the link so a second click starts no second download.
+  const [downloading, setDownloading] = useState(false);
+  const download = async () => {
+    setDownloading(true);
+    await act(async () => {
       const a = document.createElement('a');
       a.href = (await api<{ downloadUrl: string }>(`/api/assets/${out}`)).downloadUrl;
       document.body.append(a);
       a.click();
       a.remove();
     }, 'Không tải xuống được.');
+    setDownloading(false);
+  };
 
   return (
     <li className={`job job-card job-${isCanceled(job) ? 'canceled' : job.status}`}>
@@ -192,6 +205,10 @@ function HistoryCard({ job, isAdmin, select }: { job: TrayJob; isAdmin: boolean;
             // F opens full screen, as in most players; Space and the arrows are the video's own keys.
             <video ref={media} controls playsInline preload="metadata" poster={job.posterAssetId ? content(job.posterAssetId) : undefined} src={content(out)} onKeyDown={(e) => e.key.toLowerCase() === 'f' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && (e.preventDefault(), toggleFullscreen(media.current))} />
           )
+        ) : WAITING.includes(job.status) ? (
+          <span className="job-media-empty job-media-wait" style={{ aspectRatio: ratioBox(job.ratio) }}>
+            {statusText(job)}
+          </span>
         ) : (
           <span className="job-media-empty">{statusText(job)}</span>
         )}
@@ -240,30 +257,33 @@ function HistoryCard({ job, isAdmin, select }: { job: TrayJob; isAdmin: boolean;
             ))}
           </ul>
         )}
-        {apply ? (
-          // As on Fash, a chip sets its value on the form beside the History.
-          <p className="job-chips">
-            {image ? (
+        {/* As on Fash, a chip sets its value on the form beside the History; a setting the form does not take stays plain text. */}
+        <p className="job-chips">
+          {image ? (
+            takes('resolution') ? (
               job.resolution && (
-                <button type="button" onClick={() => apply({ resolution: job.resolution! })} title="Dùng độ phân giải này">
+                <button type="button" onClick={() => apply!({ resolution: job.resolution! })} title="Dùng độ phân giải này">
                   {job.resolution}
                 </button>
               )
             ) : (
-              <button type="button" onClick={() => apply({ durationSec: job.durationSec })} title="Dùng thời lượng này">
-                {job.durationSec}s
-              </button>
-            )}
-            <button type="button" onClick={() => apply({ ratio: job.ratio })} title="Dùng tỉ lệ này">
+              <span>{job.resolution}</span>
+            )
+          ) : takes('durationSec') ? (
+            <button type="button" onClick={() => apply!({ durationSec: job.durationSec })} title="Dùng thời lượng này">
+              {job.durationSec}s
+            </button>
+          ) : (
+            <span>{job.durationSec}s</span>
+          )}
+          {takes('ratio') ? (
+            <button type="button" onClick={() => apply!({ ratio: job.ratio })} title="Dùng tỉ lệ này">
               {job.ratio}
             </button>
-          </p>
-        ) : (
-          <p className="job-chips">
-            <span>{image ? job.resolution : `${job.durationSec}s`}</span>
+          ) : (
             <span>{job.ratio}</span>
-          </p>
-        )}
+          )}
+        </p>
         <JobFailureNote job={job} isAdmin={isAdmin} />
         <CancelButton job={job} />
         {job.retried && <p className="muted">Đã thử lại</p>}
@@ -286,7 +306,7 @@ function HistoryCard({ job, isAdmin, select }: { job: TrayJob; isAdmin: boolean;
             </Recreate>
           )}
           {out && (
-            <button type="button" className="job-reuse" onClick={() => void download()}>
+            <button type="button" className="job-reuse" disabled={downloading} aria-busy={downloading} onClick={() => void download()}>
               <Icon name="download" /> Tải xuống
             </button>
           )}
@@ -397,7 +417,7 @@ function Toasts() {
       {toasts.map((t) => (
         <div key={t.id} className={t.ok ? 'toast' : 'toast toast-bad'}>
           <span>{t.text}</span>
-          {t.ok && !t.note && <Link href="/library">Xem</Link>}
+          {t.href && !t.note && <Link href={t.href}>Xem</Link>}
           <button type="button" onClick={() => dismiss(t.id)} aria-label="Đóng thông báo">
             ×
           </button>

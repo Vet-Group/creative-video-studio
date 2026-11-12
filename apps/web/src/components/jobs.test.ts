@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { elapsedLabel, roleOf } from './jobs';
+import { elapsedLabel, resultHref, roleOf } from './jobs';
+
+describe('resultHref', () => {
+  it('opens a result in the Library and a failure on the page that made it', () => {
+    expect(resultHref({ id: 'j1', status: 'succeeded', feature: 'try_on' })).toBe('/library?item=j1');
+    expect(resultHref({ id: 'j2', status: 'failed', feature: 'try_on' })).toBe('/try-on');
+    expect(resultHref({ id: 'j3', status: 'timed_out', feature: 'no_such_tool' })).toBe('/library');
+  });
+});
 
 describe('roleOf', () => {
   it('sends UGC and Review photos to the model, then the product', () => {
