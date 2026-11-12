@@ -1,8 +1,9 @@
 // The pg-boss client the route handlers use to enqueue; the worker is the only consumer.
-import { ANALYZE_QUEUE, ANALYZE_QUEUE_OPTIONS, SUGGEST_QUEUE, SUGGEST_QUEUE_OPTIONS, VIDEO_QUEUE, VIDEO_QUEUE_OPTIONS } from '@cvs/core/queue';
+import { ANALYZE_QUEUE, ANALYZE_QUEUE_OPTIONS, REMAKE_QUEUE, REMAKE_QUEUE_OPTIONS, SUGGEST_QUEUE, SUGGEST_QUEUE_OPTIONS, VIDEO_QUEUE, VIDEO_QUEUE_OPTIONS } from '@cvs/core/queue';
 import { databaseUrl } from '@cvs/db/client';
 import { PgBoss } from 'pg-boss';
 import { reaAnalyzeEnabled } from './analyze';
+import { reaRemakeEnabled } from './remake';
 
 // One client per server process; dev reloads keep it on globalThis.
 const g = globalThis as unknown as { cvsBoss?: Promise<PgBoss> };
@@ -14,6 +15,7 @@ async function start(): Promise<PgBoss> {
   await b.createQueue(VIDEO_QUEUE, VIDEO_QUEUE_OPTIONS);
   await b.createQueue(SUGGEST_QUEUE, SUGGEST_QUEUE_OPTIONS);
   if (reaAnalyzeEnabled()) await b.createQueue(ANALYZE_QUEUE, ANALYZE_QUEUE_OPTIONS);
+  if (reaRemakeEnabled()) await b.createQueue(REMAKE_QUEUE, REMAKE_QUEUE_OPTIONS);
   return b;
 }
 

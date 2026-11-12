@@ -15,7 +15,7 @@ import { bookLlm, close24h, lateBill, type LedgerPool, release, settle, withTran
 import { type ImageModelConfig, imagePricesFor, type ModelConfig, promptLimit, usdPerSecondFor, usdPerSecondWithVideo } from '@cvs/core/models';
 import { ImageReadError } from '@cvs/core/providers/http';
 import type { ImageProvider, ImageProviderJob, ImageSubmitRequest, ProviderJob, ProviderStatus, SubmitRequest, VideoProvider } from '@cvs/core/providers';
-import { ANALYZE_QUEUE, ANALYZE_QUEUE_OPTIONS, type AnalyzeJobData, PURGE_CRON, PURGE_QUEUE, SUGGEST_QUEUE, SUGGEST_QUEUE_OPTIONS, type SuggestJobData, VIDEO_QUEUE, VIDEO_QUEUE_OPTIONS, type VideoJobData, videoSendOptions } from '@cvs/core/queue';
+import { ANALYZE_QUEUE, ANALYZE_QUEUE_OPTIONS, type AnalyzeJobData, PURGE_CRON, PURGE_QUEUE, REMAKE_QUEUE, REMAKE_QUEUE_OPTIONS, type RemakeJobData, SUGGEST_QUEUE, SUGGEST_QUEUE_OPTIONS, type SuggestJobData, VIDEO_QUEUE, VIDEO_QUEUE_OPTIONS, type VideoJobData, videoSendOptions } from '@cvs/core/queue';
 import type { Suggester } from '@cvs/core/suggest';
 import { insertAssets } from '@cvs/db/assets';
 import { createDb, type createPool } from '@cvs/db/client';
@@ -25,6 +25,7 @@ import { purgeDeletedClips } from './purge';
 import { dropPreview, storePreview } from './preview';
 import { deleteObject, getObject, putObject } from './storage';
 import { reaAnalyzeEnabled, runReaAnalyze } from './analyze';
+import { closeStaleRemakes, reaRemakeEnabled, runRemake } from './remake';
 import { runSuggestion } from './suggest';
 
 export interface WorkerOptions {
@@ -492,10 +493,14 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
     }
   }
 
+  const closeRemakes = async () => {
+    if (reaRemakeEnabled()) await closeStaleRemakes(pool);
+  };
+
   let reconciling: Promise<void> | undefined;
   const reconcile = () =>
     (reconciling ??= (async () => {
-      for (const [what, step] of [['resend queued jobs', resendQueued], ['fail lost submits', failLostSubmits], ['poll running jobs', pollRunning], ['poll unresolved jobs', pollUnresolved]] as const) {
+      for (const [what, step] of [['resend queued jobs', resendQueued], ['fail lost submits', failLostSubmits], ['poll running jobs', pollRunning], ['poll unresolved jobs', pollUnresolved], ['close stale remakes', closeRemakes]] as const) {
         await step().catch((e) => log(what, e));
       }
     })().finally(() => {
@@ -522,6 +527,13 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
     await boss.createQueue(ANALYZE_QUEUE, ANALYZE_QUEUE_OPTIONS);
     await boss.work<AnalyzeJobData>(ANALYZE_QUEUE, { localConcurrency: 1, pollingIntervalSeconds: o.pollingIntervalSeconds }, async (jobs) => {
       await Promise.all(jobs.map((job) => runReaAnalyze(pool, job.data.analysisId).catch((e) => log(`analyze ${job.data.analysisId}`, e))));
+    });
+  }
+  // Smart Remake makes paid fal calls; off by default, and one remake at a time per worker.
+  if (reaRemakeEnabled()) {
+    await boss.createQueue(REMAKE_QUEUE, REMAKE_QUEUE_OPTIONS);
+    await boss.work<RemakeJobData>(REMAKE_QUEUE, { localConcurrency: 1, pollingIntervalSeconds: o.pollingIntervalSeconds }, async (jobs) => {
+      await Promise.all(jobs.map((job) => runRemake(pool, job.data.remakeId).catch((e) => log(`remake ${job.data.remakeId}`, e))));
     });
   }
   await beat();

@@ -53,6 +53,19 @@ export async function extractPoster(video: string, jpeg: string): Promise<void> 
   await run(requireFfmpeg(), ['-y', '-v', 'error', '-i', video, '-frames:v', '1', '-vf', "scale='min(480,iw)':-2", '-q:v', '3', jpeg]);
 }
 
+/** The frame `seconds` into a video, as a full-size JPEG: the start image of a Smart Remake shot. */
+export async function extractFrameAt(video: string, seconds: number, jpeg: string): Promise<void> {
+  await run(requireFfmpeg(), ['-y', '-v', 'error', '-ss', seconds.toFixed(3), '-i', video, '-frames:v', '1', '-q:v', '2', jpeg]);
+}
+
+/** Clips joined end to end into one silent H.264 MP4 at the first clip's size, each fitted inside it, so clips of another size or rate still join. */
+export async function concatClips(clips: string[], out: string): Promise<void> {
+  const { width, height } = await probeSize(clips[0]!);
+  const fit = clips.map((_, i) => `[${i}:v:0]scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=24[v${i}]`);
+  const join = `${clips.map((_, i) => `[v${i}]`).join('')}concat=n=${clips.length}:v=1:a=0[out]`;
+  await run(requireFfmpeg(), ['-y', '-v', 'error', ...clips.flatMap((c) => ['-i', c]), '-filter_complex', [...fit, join].join(';'), '-map', '[out]', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '18', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', out]);
+}
+
 /** A clip's length in seconds, as ffprobe reads it. */
 export async function probeSeconds(file: string): Promise<number> {
   const { stdout } = await run(ffprobe.path, ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', file]);

@@ -638,6 +638,13 @@
 			"when": 1794446349642,
 			"tag": "0091_fashion_model",
 			"breakpoints": true
+		},
+		{
+			"idx": 91,
+			"version": "7",
+			"when": 1794511713921,
+			"tag": "0092_remakes",
+			"breakpoints": true
 		}
 	]
 }
