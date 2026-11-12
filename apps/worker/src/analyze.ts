@@ -9,7 +9,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { parseBreakdown } from '@cvs/core/analysis/breakdown';
-import { byteplusReaVlm, pickReaVlm, reaVlmEnv } from '@cvs/core/providers/rea-vlm';
+import { byteplusReaVlm, pickReaVlm, reaVlmEnv, vertexReaVlm } from '@cvs/core/providers/rea-vlm';
+import { serviceAccountToken } from '@cvs/core/providers/vertex';
+import { vertexAccounts } from '@cvs/core/providers/vertex-accounts';
 import { getObject, putObject } from './storage';
 import type { WorkerDeps } from './worker';
 
@@ -37,11 +39,32 @@ const realDecompose = async (video: string, outDir: string, env: Record<string, 
   await run(process.env.REA_VIDEO_BIN || 'rea-video', ['decompose', video, '-o', outDir], { env: { ...process.env, ...env }, maxBuffer: 16 * 1024 * 1024 });
 };
 
-const defaultVlmEnv = async (): Promise<{ env: Record<string, string>; provider: string; model: string }> => {
+// A liveness probe: any HTTP answer (even 401) means Ark is reachable; only a network error or timeout reads as down.
+const byteplusReachable = async (baseUrl: string): Promise<boolean> => {
+  try {
+    await fetch(`${baseUrl}/models`, { method: 'GET', signal: AbortSignal.timeout(4000) });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+// BytePlus Ark is the VLM by default. The Vertex fallback is wired but off unless REA_VLM_VERTEX_FALLBACK=1 and a Vertex
+// service account is configured; even then it is used only when BytePlus is unreachable. So the common path makes no probe.
+export const defaultVlmEnv = async (): Promise<{ env: Record<string, string>; provider: string; model: string }> => {
   const key = process.env.BYTEPLUS_ARK_API_KEY;
-  if (!key) throw new Error('rea-analyze: no VLM key (BYTEPLUS_ARK_API_KEY)');
-  const vlm = pickReaVlm({ byteplus: byteplusReaVlm(key), byteplusReachable: true });
-  return { env: reaVlmEnv(vlm), provider: 'byteplus', model: vlm.model };
+  const byteplus = key ? byteplusReaVlm(key) : undefined;
+  const account = process.env.REA_VLM_VERTEX_FALLBACK === '1' ? vertexAccounts(process.env)[0] : undefined;
+
+  const reachable = byteplus && account ? await byteplusReachable(byteplus.baseUrl) : true;
+  // Mint a Vertex token only when the fallback may actually be used (BytePlus absent or unreachable).
+  const token = account && (!byteplus || !reachable) ? await serviceAccountToken(account.key)() : undefined;
+  const vlm = pickReaVlm({
+    byteplus,
+    vertex: account && token ? () => vertexReaVlm({ project: account.project, location: process.env.GOOGLE_CLOUD_LOCATION || 'global', token }) : undefined,
+    byteplusReachable: reachable,
+  });
+  return { env: reaVlmEnv(vlm), provider: byteplus && vlm.baseUrl === byteplus.baseUrl ? 'byteplus' : 'vertex', model: vlm.model };
 };
 
 /** Claims a queued analysis row, runs rea-video over its source video, and stores the result. Safe to
