@@ -74,6 +74,16 @@ test('Try On: a missing slot keeps Run disabled with a reason, a mock run reache
   const tray = page.getByRole('complementary', { name: 'Lượt tạo của tôi' });
   await expect(tray.getByText('Hoàn tất')).toHaveCount(1);
   await expect(tray.locator('.job-chips').first().locator('button')).toHaveText(['1K', 'auto']); // the History card's resolution and ratio chips
+  // The before/after slider: the card's compare button opens it over the original model photo; the arrow keys move the handle and Escape closes it.
+  await tray.getByRole('button', { name: 'So sánh trước/sau' }).first().click();
+  const compare = page.getByRole('dialog', { name: /^So sánh trước\/sau/ });
+  const slider = compare.getByRole('slider', { name: 'So sánh trước và sau' });
+  await expect(slider).toHaveAttribute('aria-valuetext', 'Ảnh gốc 50%, kết quả 50%');
+  await expect(compare.getByRole('img', { name: 'Ảnh người mẫu gốc' })).toBeVisible();
+  await slider.press('ArrowRight');
+  await expect(slider).toHaveAttribute('aria-valuetext', 'Ảnh gốc 51%, kết quả 49%');
+  await page.keyboard.press('Escape');
+  await expect(compare).toHaveCount(0);
 
   // A second run with a background: the garment is still second and the background last, and the prompt names each image's role.
   await page.getByLabel('Ảnh bối cảnh').setInputFiles(file('background.png'));
@@ -95,6 +105,18 @@ test('Try On: a missing slot keeps Run disabled with a reason, a mock run reache
   const mine = page.getByRole('article').filter({ hasText: 'E2E Member 9' });
   await expect(mine).toHaveCount(2);
   await expect(mine.first().locator('img.output')).toBeVisible();
+  // The Library detail of a Try On image switches between the result and the before/after slider.
+  await mine.first().getByRole('button', { name: 'Xem chi tiết' }).click();
+  const lightbox = page.getByRole('dialog', { name: /^Chi tiết: / });
+  const compareToggle = lightbox.getByRole('button', { name: 'So sánh trước/sau' });
+  await expect(compareToggle).toHaveAttribute('aria-pressed', 'false');
+  await compareToggle.click();
+  await expect(lightbox.getByRole('slider', { name: 'So sánh trước và sau' })).toBeVisible();
+  await expect(lightbox.getByRole('img', { name: /^Ảnh gốc person\.png$/ })).toBeVisible();
+  await compareToggle.click();
+  await expect(lightbox.getByRole('slider')).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await expect(lightbox).toHaveCount(0);
   await page.getByRole('group', { name: 'Loại' }).getByRole('button', { name: 'Tạo ảnh', exact: true }).click();
   await expect(mine).toHaveCount(0);
   await page.getByRole('group', { name: 'Loại' }).getByRole('button', { name: 'Tất cả video', exact: true }).click();

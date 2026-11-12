@@ -9,6 +9,7 @@ import { cardTitleOfFormat, HOOKS, LOCATIONS } from '@/lib/marketing';
 import { activeFilters, dayHeadings, filtersFromParams, type LibraryFilters, type LibraryView, libraryQuery, matchesVerdict, NO_FILTERS, readView, saveView, type VerdictFilter } from '@/lib/library-view';
 import { reuseHref } from '@/lib/reuse';
 import { useSamples } from '@/lib/use-samples';
+import { CompareSlider } from './CompareSlider';
 import { Icon } from './Icon';
 import { useFreshResults } from './jobs';
 import { LoadError } from './LoadError';
@@ -366,11 +367,13 @@ function ClipDetail({ clips, index, stores, admin, onIndex, onChange }: { clips:
   const [job, setJob] = useState<ClipInputs | null>(null);
   const [presets, setPresets] = useState<Map<string, string> | null>(null); // null until read, or when the read failed
   const [note, setNote] = useState('');
+  const [comparing, setComparing] = useState(false);
   const media = useRef<HTMLVideoElement & HTMLImageElement>(null);
   const content = (id: string) => `/api/assets/${id}/content`;
   useEffect(() => {
     setJob(null);
     setNote('');
+    setComparing(false);
     api<ClipInputs>(`/api/jobs/${clip.id}`).then(setJob, () => setJob(NO_INPUTS));
   }, [clip.id]);
   useEffect(() => void loadPresetNames().then(setPresets), []);
@@ -392,6 +395,8 @@ function ClipDetail({ clips, index, stores, admin, onIndex, onChange }: { clips:
   const title = clip.feature === 'marketing' ? cardTitleOfFormat(job?.format) : featureLabel(clip.feature);
   const copyText = own ?? job?.brief ?? job?.prompt ?? null;
   const mark = verdictText(clip.verdict);
+  // Try On's first input is the person: the original the result is compared with.
+  const original = clip.feature === 'try_on' && image ? job?.images[0] : undefined;
 
   async function act(what: () => Promise<unknown>, fail: string) {
     setNote('');
@@ -435,7 +440,9 @@ function ClipDetail({ clips, index, stores, admin, onIndex, onChange }: { clips:
   return (
     <Modal open onClose={() => onIndex(null)} label={`Chi tiết: ${title}`} className="lightbox">
       <div className="lightbox-media">
-        {image ? (
+        {comparing && original ? (
+          <CompareSlider before={content(original.id)} after={content(clip.videoAssetId)} beforeAlt={`Ảnh gốc ${original.filename}`} afterAlt={clip.downloadName} />
+        ) : image ? (
           <img ref={media} src={content(clip.videoAssetId)} alt={clip.downloadName} />
         ) : (
           <video key={clip.id} ref={media} controls autoPlay muted playsInline poster={clip.posterAssetId ? content(clip.posterAssetId) : undefined} src={content(clip.videoAssetId)} />
@@ -517,6 +524,11 @@ function ClipDetail({ clips, index, stores, admin, onIndex, onChange }: { clips:
           {copyText && (
             <button type="button" className="icon-button" onClick={() => void copy()} aria-label="Sao chép mô tả" title="Sao chép mô tả">
               <Icon name="copy" />
+            </button>
+          )}
+          {original && (
+            <button type="button" className="icon-button" aria-pressed={comparing} onClick={() => setComparing(!comparing)} aria-label="So sánh trước/sau" title="So sánh trước/sau">
+              <Icon name="panel" />
             </button>
           )}
         </div>
