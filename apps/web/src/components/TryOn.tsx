@@ -10,6 +10,7 @@ import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { usable } from '@/lib/fashion-models';
 import { useFashionModels } from '@/lib/use-fashion-models';
 import { useRecall } from '@/lib/use-recall';
+import { useDraftState } from '@/lib/use-draft';
 import { useSamples } from '@/lib/use-samples';
 import { backgroundsIn, GARMENT_CATEGORIES, garmentsOf, posesOf, stockModels } from '@/lib/try-on-stock';
 import { ABOUT } from '@/lib/about-content';
@@ -52,7 +53,7 @@ export function TryOn({ reuse }: { reuse?: string }) {
   const aiModels = usable(useFashionModels().models ?? []);
   const [person, setPerson] = useState<Img[]>([]);
   const [background, setBackground] = useState<Img[]>([]);
-  const [prompt, setPrompt] = useState('');
+  const [prompt, setPrompt, clearDraft] = useDraftState('try-on', reuse !== undefined);
   const [tab, setTab] = useState<Tab | null>(null); // null: the default for the width (Create below 1024 px, else Examples)
   const opening: Tab = 'examples'; // owner, 2026-11-09: beside the form a page opens on Examples, History is one click away
   const [busy, setBusy] = useState(false);
@@ -166,6 +167,7 @@ export function TryOn({ reuse }: { reuse?: string }) {
         ...(sent ? { prompt: sent } : {}),
       };
       await api('/api/jobs', sendJson('POST', body));
+      clearDraft();
       setNotice('Đã gửi lượt tạo. Theo dõi trong tab "Lịch sử".');
       if (!narrow) setTab('history');
       await refresh();

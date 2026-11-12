@@ -9,6 +9,7 @@ import { promptTooLong } from '@/lib/prompt-limit';
 import { confirmRun } from '@/lib/run-guard';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { useRecall } from '@/lib/use-recall';
+import { useDraftState } from '@/lib/use-draft';
 import { About } from './About';
 import { BrandPicker } from './BrandKit';
 import { copyError, FormNotice, Gallery, type Img, LockedFields, photoImg, RATIO_LABEL, Slot, THINKING_LABEL, uploadError, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
@@ -31,7 +32,7 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
   const { refresh, notify, loading } = useJobs();
   const narrow = useMediaQuery(NARROW);
   const [images, setImages] = useState<Img[]>([]);
-  const [prompt, setPrompt] = useState('');
+  const [prompt, setPrompt, clearDraft] = useDraftState('image', reuse !== undefined);
   const [styleId, setStyleId] = useState(''); // '' for no style
   const [enhance, setEnhance] = useState(true); // on by default, as on Fash
   const [storeId, setStoreId] = useState('');
@@ -151,6 +152,7 @@ ${style.prompt}` : prompt.trim();
     try {
       const body = { feature: 'image', modelId: pick.modelId, assetIds: images.map((i) => i.id), prompt: prompt.trim(), ...(styleId && { presetId: styleId }), enhance, ratio: pick.ratio, storeId: storeId || null, useBrand, params: { resolution: pick.resolution, ...(pick.thinking && { thinking: pick.thinking }) } };
       await api('/api/jobs', sendJson('POST', body));
+      clearDraft();
       setNotice('Đã gửi lượt tạo. Theo dõi trong tab "Lịch sử".');
       if (!narrow) setTab('history');
       await refresh();

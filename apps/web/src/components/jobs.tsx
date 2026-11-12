@@ -319,7 +319,12 @@ export function JobsProvider({ userId, children }: { userId: string; children: R
   useEffect(() => {
     void refresh();
     const t = setInterval(() => void refresh(), POLL_MS);
-    return () => clearInterval(t);
+    const back = () => void refresh(); // the network is back: do not wait for the next poll
+    window.addEventListener('online', back);
+    return () => {
+      clearInterval(t);
+      window.removeEventListener('online', back);
+    };
   }, [refresh]);
 
   // A tab brought back to the front has delivered its news.
