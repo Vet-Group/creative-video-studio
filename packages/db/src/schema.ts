@@ -845,7 +845,7 @@ export const fashionModels = pgTable(
   },
   (t) => [
     index('fashion_models_user_id_idx').on(t.userId),
-    index('fashion_models_shared_idx').on(t.shared).where(sql`${t.deletedAt} is null`),
+    index('fashion_models_asset_id_idx').on(t.assetId),
     check('fashion_models_name_check', sql`char_length(${t.name}) between 1 and 60`),
   ],
 );

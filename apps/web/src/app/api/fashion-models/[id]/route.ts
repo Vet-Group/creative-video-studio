@@ -44,7 +44,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
   });
 }
 
-/** Delete a saved model (soft: the row stays with `deleted_at`, and the picture stays an input). The owner or an Admin; audited `fashion_model.delete`. */
+/** Delete a saved model (soft: the row stays with `deleted_at`, and the picture stays an input). The owner or an Admin, but only an Admin while an Admin's decision shares it (403); audited `fashion_model.delete`. */
 export async function DELETE(request: Request, { params }: RouteContext) {
   const g = await guard(request, 'member');
   if (g.error) return g.error;
@@ -54,6 +54,8 @@ export async function DELETE(request: Request, { params }: RouteContext) {
     const old = (await tx.query(LOAD, [id])).rows[0] as Row | undefined;
     if (!old || (user.role !== 'admin' && old.user_id !== user.id && !old.shared)) return bad('not found', 404);
     if (user.role !== 'admin' && old.user_id !== user.id) return bad('only the owner or an Admin deletes a model', 403);
+    // An Admin's decision to share a model is final, so the owner cannot delete it out from under the company until an Admin releases or deletes it.
+    if (user.role !== 'admin' && old.shared && old.shared_locked) return bad('an Admin decided to share this model, so only an Admin deletes it', 403);
     await tx.query('update fashion_models set deleted_at = now() where id = $1', [id]);
     await audit(tx, { actorId: user.id, action: 'fashion_model.delete', target: `fashion_model:${id}`, oldValue: { name: old.name, shared: old.shared } });
     return new Response(null, { status: 204 });

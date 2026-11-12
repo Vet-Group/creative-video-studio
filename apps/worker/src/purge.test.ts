@@ -131,4 +131,15 @@ describe('purgeDeletedClips', () => {
     for (const id of ['clip-shared', 'end-shared', 'img-as-end']) expect(await keys()).toContain(`assets/${id}`);
     for (const id of gone) expect(await keys()).not.toContain(`assets/${id}`);
   });
+  test('keeps the picture of a saved AI model, and lets go of the picture of a deleted one so it can be purged', async () => {
+    for (const id of ['fm-live', 'fm-gone']) await asset(id, 'input');
+    await pool.query(`insert into fashion_models (id, user_id, name, asset_id, deleted_at) values ('fmx-live', 'u1', 'Live', 'fm-live', null), ('fmx-gone', 'u1', 'Gone', 'fm-gone', now())`);
+    await clip('fm-clip', ['fm-live', 'fm-gone'], 31);
+    expect(await purgeDeletedClips(pool, deleteObject, log)).toBe(1);
+    const ids = (await pool.query(`select id from assets where id like 'fm-%'`)).rows.map((r) => r.id);
+    expect(ids).toEqual(['fm-live']);
+    expect((await pool.query(`select id from fashion_models order by id`)).rows.map((r) => r.id)).toEqual(['fmx-live']);
+    expect(await keys()).toContain('assets/fm-live');
+    expect(await keys()).not.toContain('assets/fm-gone');
+  });
 });

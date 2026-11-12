@@ -6,6 +6,9 @@ export type FashionModelItem = { id: string; name: string; assetId: string; trai
 /** A saved model's name: 1 to 60 characters (the table's check). */
 export const MAX_NAME = 60;
 
+/** The models a picker offers: the caller can run a job with their own and the shared ones only (an Admin's list also holds every private model, for the management tab). */
+export const usable = <T extends { mine: boolean; shared: boolean }>(models: T[]): T[] => models.filter((m) => m.mine || m.shared);
+
 /**
  * The live models the caller may see, newest first: their own and the shared ones (an Admin sees all); `id` narrows it to one. A model whose picture was
  * deleted is not listed.

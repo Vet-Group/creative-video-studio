@@ -12,7 +12,7 @@ import { findChoice } from '@/lib/choices';
 import { providerRefusal, TWIN_REASONS } from '@/lib/job-failure';
 import { jobNeed, offeredNow, retryTwin, servingRow, twinEstimate } from '@/lib/model-twins';
 import { BRAND_FEATURES, withBrand } from '@/lib/brand';
-import { fashionModelPrompt, parseFashionTraits } from '@/lib/fashion-model';
+import { fashionModelPrompt, mentionsMinor, parseFashionTraits } from '@/lib/fashion-model';
 import { basePrompt } from '@/lib/prompt-limit';
 import { ADVANCED_MAX_SCRIPT, END_TEXT_POSITIONS, isParamFormat, MAX_END_TEXT, MAX_ENDING, MAX_HIGHLIGHT, MAX_HIGHLIGHTS, MAX_HOOK, PARAM_FORMATS, UNBOXING_ROLES } from '@/lib/marketing';
 import { falBalance, falCreditUsd, overCredit } from '@/lib/provider-credit';
@@ -92,9 +92,9 @@ export async function GET(request: Request) {
       id: r.id, status: r.status, error: r.error, failureReason: providerRefusal(r.error)?.reason ?? null, isMock: r.is_mock, feature: r.feature, ratio: r.aspect, durationSec: r.duration_s, resolution: r.params.resolution ?? null, modelId: r.model, retryOf: r.retry_of,
       retried: r.retried, twin: twins.get(r.id) ?? null, outputAssetId: r.output_asset_id, posterAssetId: r.poster_asset_id, createdAt: r.created_at, finishedAt: r.finished_at,
       // For the History card: the member's own words (a free prompt on Create video and Image Generation; elsewhere the prompt is composed, so the kept brief),
-      // the inputs, the format and the caller's favourite.
+      // the inputs, the format and the caller's favourite; `traits` is a Fashion Model Generator job's own traits (JSON), which its save dialog starts from.
       text: r.params.brief ?? ((r.feature === 'video' && !r.preset_id) || r.feature === 'image' ? r.prompt : null), inputAssetIds: r.input_asset_ids,
-      garments: r.params.garments ? Number(r.params.garments) : null, format: r.params.format ?? null, roles: r.params.roles ?? null, favorite: r.favorite, estimateUsd: r.estimate_usd,
+      traits: r.feature === 'fashion_model' ? (r.params.traits ?? null) : null, garments: r.params.garments ? Number(r.params.garments) : null, format: r.params.format ?? null, roles: r.params.roles ?? null, favorite: r.favorite, estimateUsd: r.estimate_usd,
     })),
   });
 }
@@ -180,6 +180,7 @@ export async function POST(request: Request) {
         // not JSON: refused below
       }
       if (!traits) return bad('params.traits must be the traits of the model, as JSON');
+      if (mentionsMinor(traits.extra)) return bad('the extra details may not mention a minor or an age under 18: the model is always an adult');
       if (typeof freePrompt !== 'string' || freePrompt.trim() !== fashionModelPrompt(traits)) return bad('the prompt must be the one the traits make');
       given.traits = JSON.stringify(traits);
     }

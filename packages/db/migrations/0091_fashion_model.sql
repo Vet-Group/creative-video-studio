@@ -15,7 +15,7 @@ ALTER TABLE "jobs" DROP CONSTRAINT "jobs_feature_check";--> statement-breakpoint
 ALTER TABLE "fashion_models" ADD CONSTRAINT "fashion_models_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "fashion_models" ADD CONSTRAINT "fashion_models_asset_id_assets_id_fk" FOREIGN KEY ("asset_id") REFERENCES "public"."assets"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "fashion_models_user_id_idx" ON "fashion_models" USING btree ("user_id");--> statement-breakpoint
-CREATE INDEX "fashion_models_shared_idx" ON "fashion_models" USING btree ("shared") WHERE "fashion_models"."deleted_at" is null;--> statement-breakpoint
+CREATE INDEX "fashion_models_asset_id_idx" ON "fashion_models" USING btree ("asset_id");--> statement-breakpoint
 ALTER TABLE "jobs" ADD CONSTRAINT "jobs_feature_check" CHECK ("jobs"."feature" in ('video', 'marketing', 'try_on', 'image', 'character_swap', 'model_swap', 'background_changer', 'reframe', 'image_upscale', 'face_swap', 'background_remover', 'motion_control', 'media_optimizer', 'jewelry_try_on', 'lingerie_try_on', 'fashion_model'));--> statement-breakpoint
 -- Fashion Model Generator makes a person from words alone, on Nano Banana 2: the fal row and the Vertex row that serves in its place (twin_of, 0075). Its soft cap matches Jewelry Try-On.
 INSERT INTO "feature_caps" ("feature", "monthly_usd") VALUES ('fashion_model', 10) ON CONFLICT DO NOTHING;--> statement-breakpoint

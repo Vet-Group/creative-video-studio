@@ -134,3 +134,23 @@ export function parseFashionTraits(value: unknown): FashionTraits | null {
 export function fashionModelName(t: FashionTraits): string {
   return (['gender', 'age', 'ethnicity'] as const).map((k) => optionOf(k, t[k]).label).join(' · ').slice(0, 60);
 }
+
+/** Lower case without accents or stroked d, so Vietnamese typed with or without diacritics matches. */
+const plain = (s: string) => s.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '').replace(/đ/g, 'd');
+/** Words (English and Vietnamese, folded) that name a minor. shortcut: a keyword match, so "kid" in a surname or "teenage-style font" also blocks; use a classifier if that costs real Runs. */
+const MINOR_WORDS = /\b(?:child|children|kid|kids|teen|teens|teenage|teenager|teenagers|minor|minors|underage|under-age|schoolgirl|schoolboy|school girl|school boy|student uniform|loli\w*|toddler|infant|tre em|tre con|thieu nien|thieu nu|nhi dong|hoc sinh|be gai|be trai)\b/;
+/** An age below 18: "15 years", "15-year-old", "15 tuoi", "age 15", "aged 15" and "under 18" (or below, younger than, duoi). */
+const MINOR_AGE = [/\b(\d{1,2})\s*-?\s*(?:years?|yrs?|yo|y\/o|tuoi)\b/g, /\b(?:age|aged|tuoi)\s*:?\s*(\d{1,2})\b/g];
+const UNDER_AGE = /\b(?:under|below|younger than|duoi|nho hon)\s*(?:age\s*)?(\d{1,2})\b/g;
+
+/** Whether the free text names a minor or an age under 18; the model is always a clearly adult, fictional person, so POST /api/jobs refuses it and the page says so before Run. */
+export function mentionsMinor(text: string): boolean {
+  const t = plain(text);
+  if (MINOR_WORDS.test(t)) return true;
+  if (MINOR_AGE.some((re) => [...t.matchAll(re)].some((m) => Number(m[1]) < 18))) return true;
+  return [...t.matchAll(UNDER_AGE)].some((m) => Number(m[1]) <= 18);
+}
+
+/** Why the free text is refused, in the member's words. */
+export const MINOR_REASON = 'Chi tiết thêm không được nhắc đến trẻ em hoặc người dưới 18 tuổi. Người mẫu luôn là người lớn.';
+

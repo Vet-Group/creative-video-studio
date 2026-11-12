@@ -5,7 +5,7 @@
 import { useId, useState } from 'react';
 import { api, errorText, sendJson } from '@/lib/api';
 import type { AppConfig } from '@/lib/apps';
-import { DEFAULT_FASHION_TRAITS, FASHION_OPTIONS, type FashionTraits, fashionModelName, fashionModelPrompt, MAX_EXTRA, withNiche } from '@/lib/fashion-model';
+import { DEFAULT_FASHION_TRAITS, FASHION_OPTIONS, type FashionTraits, fashionModelName, fashionModelPrompt, MAX_EXTRA, mentionsMinor, MINOR_REASON, parseFashionTraits, withNiche } from '@/lib/fashion-model';
 import { MAX_NAME } from '@/lib/fashion-models';
 import { promptTooLong } from '@/lib/prompt-limit';
 import { confirmRun } from '@/lib/run-guard';
@@ -22,7 +22,7 @@ import { Select } from './Select';
 import { Tray } from './Shell';
 
 type FashionTab = Tab | 'models';
-const LABEL: Record<FashionTab, string> = { ...TAB_LABEL, models: 'Người mẫu của tôi' };
+const LABEL: Record<FashionTab, string> = { ...TAB_LABEL, models: 'Đã lưu' };
 const MAX_IMAGES = 4;
 /** A price without trailing zeros: 0.0670 is $0.067. */
 const usd = (n: number) => String(Number(n.toFixed(4)));
@@ -60,13 +60,25 @@ function Choice({ label, options, value, onChange }: { label: string; options: {
   );
 }
 
+/** The name a save starts with: from the job's own traits, else a plain default. */
+function savedName(json: string | null): string {
+  try {
+    const traits = parseFashionTraits(JSON.parse(json ?? 'null'));
+    if (traits) return fashionModelName(traits);
+  } catch {
+    // unreadable traits: the default below
+  }
+  return 'Người mẫu AI';
+}
+
 export function FashionModelApp({ app, isAdmin }: { app: AppConfig; isAdmin: boolean }) {
   const { refresh } = useJobs();
   const narrow = useMediaQuery(NARROW);
   const [traits, setTraits] = useState<FashionTraits>(DEFAULT_FASHION_TRAITS);
   const [count, setCount] = useState(2);
   const [tab, setTab] = useState<FashionTab | null>(null); // null: the default for the width (the form below 1024 px, else About)
-  const [busy, setBusy] = useState(false);
+  const [running, setRunning] = useState(false);
+  const [saveBusy, setSaveBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   /** The save dialog: the result's asset, and the name and sharing it starts with. */
@@ -87,12 +99,13 @@ export function FashionModelApp({ app, isAdmin }: { app: AppConfig; isAdmin: boo
   const price = Number(pick.estimate ?? 0);
   const total = price * count;
   const reason = offered === null ? 'Đang tải danh sách mô hình...' : failed ? 'Không tải được danh sách mô hình.' : !chosen ? 'Ứng dụng này chưa được Admin bật' : promptTooLong(chosen, prompt.length);
-  const canRun = reason === null && !busy;
+  const minor = mentionsMinor(traits.extra);
+  const canRun = reason === null && !minor && !running;
   const set = (key: Key) => (id: string) => setTraits((t) => ({ ...t, [key]: id }));
 
   async function run() {
     if (!(await confirmRun(total))) return;
-    setBusy(true);
+    setRunning(true);
     setError('');
     setNotice('');
     let sent = 0;
@@ -104,24 +117,24 @@ export function FashionModelApp({ app, isAdmin }: { app: AppConfig; isAdmin: boo
     } catch (e) {
       setError(`${errorText(e, 'Không gửi được lượt tạo, hãy thử lại.')}${sent > 0 ? ` Đã gửi ${sent}/${count} ảnh.` : ''}`);
     } finally {
-      setBusy(false);
+      setRunning(false);
       await refresh();
     }
   }
 
   async function save() {
     if (!saving) return;
-    setBusy(true);
+    setSaveBusy(true);
     setSaveError('');
     try {
       await api('/api/fashion-models', sendJson('POST', { assetId: saving.assetId, name: saving.name.trim(), shared: saving.shared }));
       setSaving(null);
       setVersion((v) => v + 1);
-      setNotice('Đã lưu người mẫu. Xem trong tab "Người mẫu của tôi".');
+      setNotice('Đã lưu người mẫu. Xem trong tab "Đã lưu".');
     } catch (e) {
       setSaveError(errorText(e, 'Không lưu được người mẫu, hãy thử lại.'));
     } finally {
-      setBusy(false);
+      setSaveBusy(false);
     }
   }
 
@@ -198,9 +211,9 @@ export function FashionModelApp({ app, isAdmin }: { app: AppConfig; isAdmin: boo
           </div>
 
           <div className="form-message">
-            {reason && (
-              <p id={reasonId} className="help" role="status">
-                {reason}
+            {(minor || reason) && (
+              <p id={reasonId} className={minor ? 'error' : 'help'} role="status">
+                {minor ? MINOR_REASON : reason}
               </p>
             )}
             {error && (
@@ -212,7 +225,7 @@ export function FashionModelApp({ app, isAdmin }: { app: AppConfig; isAdmin: boo
             {notice && <p role="status">{notice}</p>}
           </div>
           <div className="runbar">
-            <button type="button" className="primary run" disabled={!canRun} aria-describedby={reason ? reasonId : undefined} onClick={() => void run()}>
+            <button type="button" className="primary run" disabled={!canRun} aria-describedby={minor || reason ? reasonId : undefined} onClick={() => void run()}>
               Chạy
               {chosen && <span className="run-cost">· ${usd(total)}</span>}
             </button>
@@ -221,7 +234,7 @@ export function FashionModelApp({ app, isAdmin }: { app: AppConfig; isAdmin: boo
 
         <div className="side" id={`app-panel-${panel}`} role="tabpanel" aria-labelledby={`app-tab-${panel}`} hidden={narrow && shown === 'create'}>
           {shown === 'history' && (
-            <FormContext.Provider value={{ recreate: () => undefined, saveModel: (assetId) => (setSaveError(''), setSaving({ assetId, name: fashionModelName(traits), shared: false })) }}>
+            <FormContext.Provider value={{ recreate: () => undefined, saveModel: (assetId, jobTraits) => (setSaveError(''), setSaving({ assetId, name: savedName(jobTraits), shared: false })) }}>
               <Tray feature={app.feature} />
             </FormContext.Provider>
           )}
@@ -244,7 +257,7 @@ export function FashionModelApp({ app, isAdmin }: { app: AppConfig; isAdmin: boo
             {saveError}
           </p>
         )}
-        <button type="button" className="primary" disabled={busy || !saving?.name.trim()} onClick={() => void save()}>
+        <button type="button" className="primary" disabled={saveBusy || !saving?.name.trim()} onClick={() => void save()}>
           Lưu
         </button>
       </Modal>

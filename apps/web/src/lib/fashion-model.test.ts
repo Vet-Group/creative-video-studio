@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_FASHION_TRAITS, FASHION_AVOID, FASHION_OPTIONS, fashionModelName, fashionModelPrompt, MAX_EXTRA, parseFashionTraits, withNiche } from './fashion-model';
+import { DEFAULT_FASHION_TRAITS, FASHION_AVOID, FASHION_OPTIONS, fashionModelName, fashionModelPrompt, MAX_EXTRA, mentionsMinor, parseFashionTraits, withNiche } from './fashion-model';
 
 describe('fashionModelPrompt', () => {
   it('puts the fragment of every option into the prompt', () => {
@@ -69,5 +69,20 @@ describe('parseFashionTraits', () => {
 describe('fashionModelName', () => {
   it('names a model from its gender, age and heritage', () => {
     expect(fashionModelName(DEFAULT_FASHION_TRAITS)).toBe('Nữ · 26-40 tuổi · Việt Nam / Đông Nam Á');
+  });
+});
+
+describe('mentionsMinor', () => {
+  it.each(['a child', 'Kids style', 'teenager look', 'a TEEN', 'minor', 'underage', 'under 18', 'under-age', 'below 18', 'younger than 18', 'schoolgirl', 'school boy', 'student uniform', 'loli', 'a toddler', 'trẻ em', 'TRE CON', 'thiếu niên', 'học sinh', 'bé gái', 'be trai', 'dưới 18 tuổi', '15 years', '15 years old', '15-year-old', '17 yo', '15 tuổi', 'age 12', 'aged 9', 'tuổi 16'])('refuses %s', (text) => {
+    expect(mentionsMinor(text)).toBe(true);
+  });
+
+  it.each(['', 'freckles and a small mole', 'silver studs', '18 years old', '25 years', '35 tuổi', 'age 30', 'under 40', 'dưới 40 tuổi', 'warm light, college style', 'a kind smile', 'student', 'baby hair edges'])('allows %s', (text) => {
+    expect(mentionsMinor(text)).toBe(false);
+  });
+
+  it('is a keyword match, so a surname or a font that contains a word is refused too', () => {
+    expect(mentionsMinor('Kidd')).toBe(false); // not the word kid
+    expect(mentionsMinor('teenage-style font')).toBe(true);
   });
 });

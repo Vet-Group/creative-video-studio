@@ -17,6 +17,7 @@ function ModelCard({ model, isAdmin, change }: { model: FashionModelItem; isAdmi
   const [busy, setBusy] = useState(false);
   const locked = model.sharedLocked && !isAdmin; // an Admin decided: only an Admin changes it
   const canEdit = model.mine || isAdmin;
+  const keptByAdmin = !isAdmin && model.shared && model.sharedLocked; // only an Admin deletes a model an Admin decided to share
 
   async function act(what: () => Promise<unknown>, fail: string) {
     setBusy(true);
@@ -100,7 +101,7 @@ function ModelCard({ model, isAdmin, change }: { model: FashionModelItem; isAdmi
           </button>
         )}
         {canEdit && (
-          <button type="button" className="danger" aria-label={`Xoá ${model.name}`} disabled={busy} onClick={() => void remove()}>
+          <button type="button" className="danger" aria-label={`Xoá ${model.name}`} title={keptByAdmin ? 'Admin đã quyết định' : undefined} disabled={busy || keptByAdmin} onClick={() => void remove()}>
             Xoá
           </button>
         )}

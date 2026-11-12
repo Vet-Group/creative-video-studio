@@ -271,7 +271,7 @@ function HistoryCard({ job, isAdmin, select }: { job: TrayJob; isAdmin: boolean;
             </button>
           )}
           {out && image && form?.saveModel && (
-            <button type="button" className="job-reuse job-primary" onClick={() => form.saveModel!(out)}>
+            <button type="button" className="job-reuse job-primary" onClick={() => form.saveModel!(out, job.traits)}>
               <Icon name="plus" /> Lưu làm người mẫu
             </button>
           )}

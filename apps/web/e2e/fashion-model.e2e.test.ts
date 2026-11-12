@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { gotoTryOn, openTab, select, selectValue, signIn } from './support.test';
 
-// The AI model generator: traits and a number of images in, results in History, one saved as a model, which the my-models tab and Try On's person picker then list.
+// The AI model generator: traits and a number of images in, results in History, one saved as a model, which the saved tab and Try On's person picker then list.
 test('picks traits and two images, runs, saves a result as a model and finds it in the list and in the Try On picker', async ({ page }) => {
   await signIn(page, 'fashiona');
   await page.goto('/apps/ai-fashion-model');
@@ -33,7 +33,7 @@ test('picks traits and two images, runs, saves a result as a model and finds it 
   await dialog.getByRole('button', { name: 'Lưu', exact: true }).click();
   await expect(dialog).toBeHidden();
 
-  await openTab(page, 'Người mẫu của tôi');
+  await openTab(page, 'Đã lưu');
   const card = page.getByRole('listitem').filter({ has: page.getByRole('heading', { name: 'Nam Melanin' }) });
   await expect(card).toHaveCount(1);
   await expect(card.getByText('Của bạn · Riêng tư')).toBeVisible();

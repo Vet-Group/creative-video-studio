@@ -53,8 +53,8 @@ export interface FormActions {
   prompt?: (text: string) => void;
   /** Fash's Use Result: the result on the form (Try On's model photo, Image Generation's inputs). */
   result?: (p: Photo) => void;
-  /** The Fashion Model Generator's save-as-model button on a finished image: its asset id, for the save dialog. */
-  saveModel?: (assetId: string) => void;
+  /** The Fashion Model Generator's save-as-model button on a finished image: its asset id and the job's own traits (JSON), for the save dialog. */
+  saveModel?: (assetId: string, traits: string | null) => void;
   /** Marketing Studio's use-this-hook button: an example's hook (a library hook id, else its own words) and its ending on the form; the photos and the rest stay. */
   hook?: (h: ExampleHook) => void;
   /** Marketing Studio's save-as-my-hook button: the example's hook saved as the member's own and chosen, with the example's poster (a sample name) as its photo. */

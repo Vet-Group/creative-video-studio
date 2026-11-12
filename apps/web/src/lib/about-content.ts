@@ -2414,7 +2414,7 @@ export const APP_ABOUT: Record<string, AboutPage> = {
               { title: 'Chọn đặc điểm', text: 'Chọn từng đặc điểm, hoặc chọn một phong cách có sẵn để điền sẵn vài lựa chọn phù hợp, rồi chỉnh lại nếu muốn. Phần chi tiết thêm dành cho nốt ruồi, tàn nhang hay kiểu tóc cụ thể.' },
               { title: 'Chọn số ảnh', text: 'Chọn 1 đến 4 ảnh. Dòng chi phí cho biết tổng tiền trước khi bạn bấm Chạy.' },
               { title: 'Chạy', text: 'Bấm Chạy. Mỗi ảnh là một lượt tạo riêng và nằm trong tab Lịch sử khi xong.' },
-              { title: 'Lưu làm người mẫu', text: 'Ở ảnh vừa ý, bấm Lưu làm người mẫu, đặt tên và chọn có dùng chung cho cả công ty hay không. Người mẫu đã lưu nằm trong tab Người mẫu của tôi.' },
+              { title: 'Lưu làm người mẫu', text: 'Ở ảnh vừa ý, bấm Lưu làm người mẫu, đặt tên và chọn có dùng chung cho cả công ty hay không. Người mẫu đã lưu nằm trong tab Đã lưu.' },
             ],
           },
         ],
@@ -2449,6 +2449,8 @@ export const APP_ABOUT: Record<string, AboutPage> = {
           {
             faq: [
               ['Ai nhìn thấy người mẫu của tôi?', 'Chỉ bạn và Admin, trừ khi bạn bật Dùng chung cho cả công ty.'],
+              ['Nếu tôi tắt Dùng chung thì sao?', 'Người mẫu biến khỏi bảng chọn của đồng nghiệp; ảnh mà họ đã tạo từ người mẫu đó vẫn giữ nguyên kết quả.'],
+              ['Người mẫu đã dùng chung có xoá được không?', 'Nếu Admin đã quyết định dùng chung thì chỉ Admin xoá hoặc thả quyết định được; còn lại bạn xoá bất cứ lúc nào.'],
               ['Một lần chạy tốn bao nhiêu?', `${APP_COST} Dòng chi phí trên trang cho biết tổng tiền cho số ảnh bạn chọn.`],
             ],
           },

@@ -722,6 +722,11 @@ describe('POST /api/jobs for an image feature', () => {
       expect((await fashion({}, { resolution: '1K' })).status).toBe(400);
       expect((await fashion({}, { resolution: '1K', traits: JSON.stringify({ gender: 'robot' }) })).status).toBe(400);
       expect((await fashion({}, { resolution: '1K', traits: 'not json' })).status).toBe(400);
+      for (const extra of ['a teenage girl', 'Trẻ em', '15 years old', 'dưới 18 tuổi', 'student uniform']) {
+        const minor = { ...traits, extra };
+        const refused = await fashion({ prompt: fashionModelPrompt(minor) }, { resolution: '1K', traits: JSON.stringify(minor) });
+        expect([extra, refused.status, ((await refused.json()) as { error: string }).error]).toEqual([extra, 400, expect.stringMatching(/minor or an age under 18/)]);
+      }
       expect((await run(m.cookie, { assetIds: [], modelId: 'app-fashion', feature: 'image', ratio: '3:4', prompt, params: { resolution: '1K', traits: '{}' } })).status).toBe(400); // traits are this feature's
       expect(await jobCount()).toBe(before);
       const res = await fashion();
@@ -730,6 +735,9 @@ describe('POST /api/jobs for an image feature', () => {
       expect((await pool.query('select feature, prompt, aspect, input_asset_ids, params from jobs where id = $1', [id])).rows[0]).toEqual({
         feature: 'fashion_model', prompt, aspect: '3:4', input_asset_ids: [], params: { resolution: '1K', traits: JSON.stringify({ ...traits, extra: 'freckles' }) },
       });
+      // The History card's save dialog starts from the job's own traits.
+      const mine = (await (await listJobs(new Request('http://localhost/api/jobs?mine', { headers: { cookie: m.cookie } }))).json()) as { jobs: { id: string; traits: string | null }[] };
+      expect(mine.jobs.find((j) => j.id === id)!.traits).toBe(JSON.stringify({ ...traits, extra: 'freckles' }));
     });
 
     test('Reframe takes one of its ratios and a default prompt', async () => {

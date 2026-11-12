@@ -1,5 +1,5 @@
 {
-  "id": "2d6e59dc-4f29-4229-8a20-276827d3234c",
+  "id": "b2fdfde8-4ff3-4391-a913-ddf41bfbeb4f",
   "prevId": "fad4ba20-8206-4686-ac4e-0d635f726110",
   "version": "7",
   "dialect": "postgresql",
@@ -994,18 +994,17 @@
           "method": "btree",
           "with": {}
         },
-        "fashion_models_shared_idx": {
-          "name": "fashion_models_shared_idx",
+        "fashion_models_asset_id_idx": {
+          "name": "fashion_models_asset_id_idx",
           "columns": [
             {
-              "expression": "shared",
+              "expression": "asset_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
             }
           ],
           "isUnique": false,
-          "where": "\"fashion_models\".\"deleted_at\" is null",
           "concurrently": false,
           "method": "btree",
           "with": {}

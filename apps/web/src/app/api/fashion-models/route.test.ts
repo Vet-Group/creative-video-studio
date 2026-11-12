@@ -21,6 +21,7 @@ const { GET, POST } = await import('./route');
 const { DELETE, PATCH } = await import('./[id]/route');
 const { POST: runJob } = await import('../jobs/route');
 const { GET: thumb } = await import('../assets/[id]/thumb/route');
+const { GET: recentAssets } = await import('../assets/route');
 
 const PASSWORD = 'correct-horse-battery';
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0]);
@@ -173,7 +174,34 @@ describe('PATCH /api/fashion-models/[id]', () => {
   });
 });
 
+describe('the uploaded photos', () => {
+  test('leave out the picture of a saved model, and list it again once the model is deleted', async () => {
+    const id = await saved('bob', 'u-model', 'Bob upload');
+    const asset = (await pool.query('select asset_id from fashion_models where id = $1', [id])).rows[0].asset_id as string;
+    const uploads = async () => ((await (await recentAssets(call(cookies.bob, 'GET', '/api/assets?recent=uploads'))).json()) as { assets: { id: string }[] }).assets.map((a) => a.id);
+    expect(await uploads()).not.toContain(asset);
+    await remove('bob', id);
+    expect(await uploads()).toContain(asset);
+  });
+});
+
 describe('DELETE /api/fashion-models/[id]', () => {
+  test('while an Admin’s decision shares a model only an Admin deletes it', async () => {
+    const id = await saved('ann', 'd-locked', 'Decided');
+    await patch('root', id, { shared: true }); // shared and locked
+    const refused = await remove('ann', id);
+    expect([refused.status, ((await refused.json()) as { error: string }).error]).toEqual([403, expect.stringMatching(/only an Admin deletes it/)]);
+    expect((await list('bob')).some((m) => m.id === id)).toBe(true);
+    await patch('root', id, { sharedLocked: false });
+    expect((await remove('ann', id)).status).toBe(204); // released: the owner may again
+    const again = await saved('ann', 'd-locked-2', 'Decided and unshared');
+    await patch('root', again, { shared: false }); // locked but private: the owner may delete
+    expect((await remove('ann', again)).status).toBe(204);
+    const kept = await saved('ann', 'd-locked-3', 'Decided again');
+    await patch('root', kept, { shared: true });
+    expect((await remove('root', kept)).status).toBe(204);
+  });
+
   test('the owner or an Admin deletes it, softly; others cannot', async () => {
     const mine = await saved('ann', 'd-mine', 'Delete me', true);
     expect((await remove('bob', mine)).status).toBe(403);
@@ -184,6 +212,6 @@ describe('DELETE /api/fashion-models/[id]', () => {
     const other = await saved('bob', 'd-other', 'Bob private');
     expect((await remove('ann', other)).status).toBe(404);
     expect((await remove('root', other)).status).toBe(204);
-    expect((await pool.query(`select action from audit_entries where action = 'fashion_model.delete'`)).rowCount).toBe(3);
+    expect((await pool.query(`select action from audit_entries where action = 'fashion_model.delete'`)).rowCount).toBe(7);
   });
 });

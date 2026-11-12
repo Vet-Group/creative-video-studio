@@ -7,6 +7,7 @@ import { basePrompt, promptTooLong } from '@/lib/prompt-limit';
 import { confirmRun } from '@/lib/run-guard';
 import { tryOnPrompt } from '@/lib/try-on-prompt';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
+import { usable } from '@/lib/fashion-models';
 import { useFashionModels } from '@/lib/use-fashion-models';
 import { useRecall } from '@/lib/use-recall';
 import { useSamples } from '@/lib/use-samples';
@@ -48,7 +49,7 @@ export function TryOn({ reuse }: { reuse?: string }) {
       () => {},
     );
   }, []);
-  const aiModels = useFashionModels().models ?? [];
+  const aiModels = usable(useFashionModels().models ?? []);
   const [person, setPerson] = useState<Img[]>([]);
   const [background, setBackground] = useState<Img[]>([]);
   const [prompt, setPrompt] = useState('');
