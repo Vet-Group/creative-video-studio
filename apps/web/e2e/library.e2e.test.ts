@@ -32,7 +32,10 @@ test('Library tools: favourites only, oldest first, the size slider and the empt
   await expect(page.getByRole('article')).toHaveCount(1);
   await expect(card(second)).toBeVisible();
   await page.reload();
+  // The favourites-only view lives in the address, so the reload keeps it: the second clip alone stays, still marked.
+  await expect(page.getByRole('article')).toHaveCount(1);
   await expect(card(second).getByRole('button', { name: 'Yêu thích' })).toHaveAttribute('aria-pressed', 'true');
+  await favoritesOnly.uncheck();
   await expect(card(first).getByRole('button', { name: 'Yêu thích' })).toHaveAttribute('aria-pressed', 'false');
 
   // Newest first by default; Oldest first swaps the two. Only this member's clips, so the other tests' clips never push these two off the oldest 24.
