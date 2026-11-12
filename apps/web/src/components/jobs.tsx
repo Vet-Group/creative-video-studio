@@ -245,6 +245,8 @@ interface JobsState {
   workerOffline: boolean;
   /** The video clips made today against the daily clip cap; null until the first load. */
   clips: { today: number; cap: number } | null;
+  /** The whole app's queued and running jobs (counts only); null until the first load. */
+  queue: { queued: number; running: number } | null;
   loaded: boolean;
   /** The last read of the list failed (the list, if one was read before, stays as it was); the next poll or refresh tries again. */
   failed: boolean;
@@ -281,18 +283,18 @@ export function useFreshResults(run: () => void): void {
 }
 
 export function JobsProvider({ userId, children }: { userId: string; children: ReactNode }) {
-  const [data, setData] = useState({ jobs: [] as TrayJob[], workerOffline: false, clips: null as JobsState['clips'], loaded: false, failed: false, lastFinished: 0 });
+  const [data, setData] = useState({ jobs: [] as TrayJob[], workerOffline: false, clips: null as JobsState['clips'], queue: null as JobsState['queue'], loaded: false, failed: false, lastFinished: 0 });
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [news, setNews] = useState(false);
   const nextId = useRef(0);
   const pathname = usePathname();
 
   const refresh = useCallback(async () => {
-    const r = await api<{ jobs: TrayJob[]; workerOffline: boolean; clips: { today: number; cap: number } }>('/api/jobs?mine').catch(() => null);
+    const r = await api<{ jobs: TrayJob[]; workerOffline: boolean; clips: { today: number; cap: number }; queue?: JobsState['queue'] }>('/api/jobs?mine').catch(() => null);
     if (!r) return setData((cur) => (cur.failed ? cur : { ...cur, failed: true }));
     const finished = r.jobs.filter((j) => FINISHED.includes(j.status) && j.finishedAt);
     const times = finished.map((j) => Date.parse(j.finishedAt!));
-    setData({ jobs: r.jobs, workerOffline: r.workerOffline, clips: r.clips, loaded: true, failed: false, lastFinished: Math.max(0, ...times) });
+    setData({ jobs: r.jobs, workerOffline: r.workerOffline, clips: r.clips, queue: r.queue ?? null, loaded: true, failed: false, lastFinished: Math.max(0, ...times) });
     const seenKey = `${SEEN_KEY}.${userId}`; // per user, so two accounts in one browser do not hide each other's news
     let fresh: TrayJob[];
     try {

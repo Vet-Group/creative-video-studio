@@ -638,9 +638,9 @@ function ExampleControl({ clip, onChange }: { clip: Clip; onChange: (c: Clip) =>
       <h3>Ví dụ hiện có ({samples.length + check.length})</h3>
       <ul className="job-inputs example-strip" aria-label="Ví dụ hiện có">
         {check.filter((e) => !e.match).map(tile)}
-        {samples.map((n) => (
+        {samples.map((n, i) => (
           <li key={n}>
-            <img src={`/api/samples/${n.replace(/\.mp4$/, '.jpg')}`} alt="Ảnh mẫu" loading="lazy" />
+            <img src={`/api/samples/${n.replace(/\.mp4$/, '.jpg')}`} alt={`Ví dụ mẫu ${i + 1}`} loading="lazy" />
           </li>
         ))}
       </ul>

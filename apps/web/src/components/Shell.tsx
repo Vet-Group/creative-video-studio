@@ -380,12 +380,20 @@ function HistoryEmpty() {
 export function Tray({ feature }: { feature?: string }) {
   const isAdmin = useContext(AdminContext);
   const all = useJobs();
-  const { workerOffline, loaded, failed, refresh } = all;
+  const { workerOffline, loaded, failed, refresh, queue } = all;
   const jobs = feature ? all.jobs.filter((j) => j.feature === feature) : all.jobs;
   const zip = useZipDownload();
+  // InvokeAI's queue count badge: the member's own jobs against the whole app's, so a wait reads as a busy queue rather than a stuck job.
+  const mineQueued = all.jobs.filter((j) => j.status === 'queued').length;
+  const mineRunning = all.jobs.filter((j) => j.status === 'submitting' || j.status === 'running').length;
   return (
     <aside className={feature ? 'tray history' : 'tray'} aria-label="Lượt tạo của tôi">
       <h2>Lượt tạo của tôi</h2>
+      {queue && (mineQueued + mineRunning > 0 || queue.queued > 0) && (
+        <p className="muted tray-queue">
+          Của bạn: {mineRunning} đang chạy, {mineQueued} đang chờ · Cả hệ thống: {queue.running} đang chạy, {queue.queued} đang chờ
+        </p>
+      )}
       {workerOffline && <p className="warn">Máy xử lý đang tạm ngừng: chưa nhận được tín hiệu, lượt tạo sẽ chạy khi máy hoạt động lại.</p>}
       {failed && <LoadError text={loaded ? 'Không cập nhật được danh sách lượt tạo.' : 'Không tải được danh sách lượt tạo.'} onRetry={refresh} />}
       {loaded && jobs.length === 0 && (feature ? <HistoryEmpty /> : <p className="muted">Chưa có lượt tạo nào.</p>)}

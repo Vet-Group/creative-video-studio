@@ -851,7 +851,7 @@ export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4
                   ) : (
                     // A picture opens as a clip does: its details in place, else a new tab.
                     <a href={`/api/samples/${it}`} target="_blank" rel="noreferrer" aria-label={detailed.includes(it) ? 'Xem chi tiết ảnh mẫu' : 'Mở ảnh mẫu trong tab mới'} onClick={detailed.includes(it) ? (e) => (e.preventDefault(), setOpen(detailed.indexOf(it))) : undefined}>
-                      <img src={`/api/samples/${it}`} alt="Ảnh mẫu" loading="lazy" />
+                      <img src={`/api/samples/${it}`} alt={`Ảnh mẫu ${sampleTiles.indexOf(it) + 1}`} loading="lazy" />
                     </a>
                   )}
                   {detailed.includes(it) && <SampleActions name={it} />}

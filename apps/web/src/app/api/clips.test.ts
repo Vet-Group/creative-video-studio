@@ -157,6 +157,14 @@ describe('GET /api/jobs?mine', () => {
     await pool.query('update jobs set deleted_at = now() where id = any($1)', [[refused, other]]);
   });
 
+  test("counts the whole app's queued and running jobs, other members' too", async () => {
+    const queue = async () => ((await (await GET_MINE(req('/api/jobs?mine', alice.cookie))).json()) as { queue: { queued: number; running: number } }).queue;
+    const before = await queue();
+    const ids = [await clip(bob.id, { status: 'queued' }), await clip(bob.id, { status: 'running' }), await clip(alice.id, { status: 'queued' })];
+    expect(await queue()).toEqual({ queued: before.queued + 2, running: before.running + 1 });
+    await pool.query('update jobs set deleted_at = now() where id = any($1)', [ids]);
+  });
+
   test('reports the worker offline until a heartbeat is under 60 s old', async () => {
     const offline = async () => ((await (await GET_MINE(req('/api/jobs?mine', alice.cookie))).json()) as { workerOffline: boolean }).workerOffline;
     expect(await offline()).toBe(true);

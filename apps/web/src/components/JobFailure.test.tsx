@@ -41,6 +41,11 @@ test('any other failure keeps the generic sentence, and an Admin the raw error a
   expect(renderToStaticMarkup(<JobFailureNote job={job({ error: 'boom' })} isAdmin={false} />)).not.toContain('boom');
 });
 
+test('a failed card offers to copy what a report needs, and a canceled one does not', () => {
+  expect(renderToStaticMarkup(<JobFailureNote job={job({ error: 'boom' })} isAdmin={false} />)).toContain('>Chép thông tin lỗi</button>');
+  expect(renderToStaticMarkup(<JobFailureNote job={job({ error: CANCELED_ERROR })} isAdmin={false} />)).toBe('');
+});
+
 test('Thử lại is offered for a failed job once, and never for a refused input image', () => {
   expect(canRetry(job({ error: 'boom' }))).toBe(true);
   expect(canRetry(job({ status: 'timed_out' }))).toBe(true);
