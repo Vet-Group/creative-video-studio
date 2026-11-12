@@ -38,8 +38,17 @@ export const reaAnalyzeEnabled = (env: NodeJS.ProcessEnv = process.env): boolean
 // --vlm: per-shot VLM judgement (prompts the UI shows); --lang en: English report/summary/prompts (the UI
 // localizes only the format label, and the provider prompts must be English). Not relying on host rea-video
 // prefs keeps the invocation self-contained.
+// --workers 5: run the per-shot VLM calls 5 at a time (rea-video's default is 3). Measured on a 57s/720p clip:
+//   3 workers = 847 MB / 6:16, 8 workers = 2.0 GB / 3:50; 5 is the balance that halves nothing but shaves the
+//   wall time to ~4.5 min while staying ~1.3 GB, under the worker's 2G MemoryMax (deploy/linux/cvs-worker.service).
+// --max-vlm-shots 40: bound the VLM spend and time on a pathologically long video (default 60); the busiest real
+//   clip measured was 27 shots, and rea-video spends the budget on the least-certain shots first.
 const realDecompose = async (video: string, outDir: string, env: Record<string, string>): Promise<void> => {
-  await run(process.env.REA_VIDEO_BIN || 'rea-video', ['decompose', video, '-o', outDir, '--vlm', '--lang', 'en'], { env: { ...process.env, ...env }, maxBuffer: 16 * 1024 * 1024 });
+  await run(
+    process.env.REA_VIDEO_BIN || 'rea-video',
+    ['decompose', video, '-o', outDir, '--vlm', '--lang', 'en', '--workers', '5', '--max-vlm-shots', '40'],
+    { env: { ...process.env, ...env }, maxBuffer: 16 * 1024 * 1024 },
+  );
 };
 
 // A liveness probe: any HTTP answer (even 401) means Ark is reachable; only a network error or timeout reads as down.

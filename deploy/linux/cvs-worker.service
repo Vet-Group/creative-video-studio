@@ -12,8 +12,10 @@ ExecStart=@APP@/node/bin/node @APP@/apps/worker/node_modules/tsx/dist/cli.mjs @A
 Restart=on-failure
 RestartSec=5
 TimeoutStopSec=30
-# Set by plan step D.3 from the measured VET headroom (docs/ops/production.md).
-MemoryMax=768M
+# The reference-video analysis (rea-video) peaks around 850 MB (opencv + onnxruntime + 720p frame buffers)
+# on top of the Node worker, so this is 2G, not the 768M the rest of the worker needs. The box has 31 GB and
+# runs only CVS (docs/ops/production.md).
+MemoryMax=2G
 
 [Install]
 WantedBy=default.target
