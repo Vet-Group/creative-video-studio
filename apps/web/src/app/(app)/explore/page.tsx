@@ -14,7 +14,7 @@ import { visibleEntries } from '@/lib/changelog-seen';
 import { bestClips } from '@/lib/clips';
 import { currentUser } from '@/lib/current-user';
 import { cardSample, EXAMPLES, exampleForPreset, sampleSrc } from '@/lib/examples';
-import { continueJobs, greeting, isRunning } from '@/lib/explore';
+import { continueJobs, greeting, isRunning, jobNote } from '@/lib/explore';
 import { featureLabel } from '@/lib/features';
 import { MIN_MARKS } from '@/lib/model-marks';
 import { modelStats, rank, scoreOf } from '@/lib/model-scores';
@@ -83,8 +83,8 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
     modelStats('image'),
     bestClips(),
     // shortcut: a running job older than the latest 20 is left out, as the jobs tray leaves it; widen if members queue that many.
-    pool.query<{ id: string; status: string; feature: string; poster_asset_id: string | null; output_asset_id: string | null; input_id: string | null; resolution: string | null; finished_at: Date | null; created_at: Date; prompt: string | null; model_label: string | null }>(
-      `select j.id, j.status, j.feature, j.poster_asset_id, j.output_asset_id, j.input_asset_ids[1] as input_id, j.params->>'resolution' as resolution, j.finished_at, j.created_at, case when j.feature in ('image', 'video') and j.preset_id is null then j.prompt when j.feature = 'image' then j.params->>'brief' end as prompt, m.label as model_label
+    pool.query<{ id: string; status: string; error: string | null; feature: string; poster_asset_id: string | null; output_asset_id: string | null; input_id: string | null; resolution: string | null; finished_at: Date | null; created_at: Date; prompt: string | null; model_label: string | null }>(
+      `select j.id, j.status, j.error, j.feature, j.poster_asset_id, j.output_asset_id, j.input_asset_ids[1] as input_id, j.params->>'resolution' as resolution, j.finished_at, j.created_at, case when j.feature in ('image', 'video') and j.preset_id is null then j.prompt when j.feature = 'image' then j.params->>'brief' end as prompt, m.label as model_label
          from jobs j left join model_configs m on m.id = j.model
         where j.user_id = $1 and j.deleted_at is null and j.purged_at is null order by j.created_at desc, j.id desc limit 20`,
       [user?.id],
@@ -103,7 +103,7 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
     const id = done ?? j.input_id;
     return id ? content(id) : null;
   };
-  const jobNote = (j: (typeof recent)[number]) => (isRunning(j) ? 'Đang tạo' : j.status === 'succeeded' ? `${fmtTime.format(j.finished_at ?? j.created_at)} · ${fmtDate.format(j.finished_at ?? j.created_at)}` : 'Không thành công');
+  const note = (j: (typeof recent)[number]) => jobNote(j, (d) => `${fmtTime.format(d)} · ${fmtDate.format(d)}`);
   const have = new Set(samples.map((s) => s.name));
   /** A model's card picture: the company's best Library clip of it, else its uploaded sample; a clip without a poster keeps the sample's still. */
   const media = (id: string) => {
@@ -158,7 +158,7 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
                     {/* What tells two jobs of one tool apart: the model, and the member's own words, as the Library's OWN_PROMPT picks them (a composed prompt is left out). */}
                     {j.model_label && <span className="explore-job-model">{j.model_label}</span>}
                     {j.prompt && <span className="explore-job-prompt" title={j.prompt}>{j.prompt}</span>}
-                    <span className="muted">{jobNote(j)}</span>
+                    <span className="muted">{note(j)}</span>
                   </Link>
                 </li>
               );

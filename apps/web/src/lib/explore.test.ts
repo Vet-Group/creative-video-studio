@@ -1,5 +1,6 @@
+import { CANCELED_ERROR } from '@cvs/core/ledger';
 import { expect, test } from 'vitest';
-import { continueJobs, givenName, greeting } from './explore';
+import { continueJobs, givenName, greeting, jobNote } from './explore';
 
 test('the given name is the last word of a Vietnamese full name', () => {
   expect(givenName('Nguyễn Văn An')).toBe('An');
@@ -35,4 +36,16 @@ test('Continue puts running jobs first, then the latest finished, and keeps at m
   expect(continueJobs(jobs, 3).map((j) => j.id)).toEqual(['b', 'd', 'f']);
   expect(continueJobs(jobs.filter((j) => j.status === 'succeeded')).map((j) => j.id)).toEqual(['a', 'e']);
   expect(continueJobs([])).toEqual([]);
+});
+
+test('the recent-job note shows elapsed while running, the finish time when done, a cancel, else a failure', () => {
+  const now = Date.parse('2026-11-12T10:00:00Z');
+  const fin = new Date('2026-11-12T09:30:00Z');
+  const done = (d: Date) => d.toISOString();
+  const base = { error: null, finished_at: null };
+  expect(jobNote({ ...base, status: 'running', created_at: new Date(now - 3 * 60_000) }, done, now)).toBe('Đang tạo · đã chạy 3 phút');
+  expect(jobNote({ ...base, status: 'queued', created_at: new Date(now - 30_000) }, done, now)).toBe('Đang tạo · vừa gửi');
+  expect(jobNote({ ...base, status: 'succeeded', created_at: fin, finished_at: fin }, done, now)).toBe(fin.toISOString());
+  expect(jobNote({ status: 'failed', error: CANCELED_ERROR, created_at: fin, finished_at: fin }, done, now)).toBe('Đã huỷ');
+  expect(jobNote({ status: 'failed', error: 'boom', created_at: fin, finished_at: fin }, done, now)).toBe('Không thành công');
 });
