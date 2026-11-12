@@ -87,6 +87,25 @@ test('adds the translation cost to the stored cost, and stays English-only when 
   expect(rn.cost_usd).toBe('0.02');
 });
 
+test('the default translator reads its key when an analysis runs, not when the module was imported', async () => {
+  // The worker loads .env lazily (databaseUrl()), after this module is evaluated: a key that appears later must still be used.
+  const saved = { openAi: process.env.OPENAI_API_KEY, fal: process.env.FAL_KEY };
+  delete process.env.OPENAI_API_KEY;
+  process.env.FAL_KEY = 'test-fal-key';
+  vi.stubGlobal('fetch', async () => new Response(JSON.stringify({ output: JSON.stringify({ format: 'f', hook: 'mở đầu', summary: 's', shots: ['c1'] }) }), { status: 200 }));
+  try {
+    const id = await queued();
+    await runReaAnalyze(pool, id, { ...seams(), translate: undefined });
+    expect((await row(id)).result.vi.hook).toBe('mở đầu');
+  } finally {
+    vi.unstubAllGlobals();
+    if (saved.openAi === undefined) delete process.env.OPENAI_API_KEY;
+    else process.env.OPENAI_API_KEY = saved.openAi;
+    if (saved.fal === undefined) delete process.env.FAL_KEY;
+    else process.env.FAL_KEY = saved.fal;
+  }
+});
+
 test('does nothing on a repeated run once the analysis is no longer queued', async () => {
   const id = await queued();
   let calls = 0;
