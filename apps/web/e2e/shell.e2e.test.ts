@@ -97,7 +97,7 @@ test('at 1440 the sidebar keeps the live rhythm: the first item at 81 px, one ev
   for (let i = 2; i < 6; i++) expect(ys[i]! - ys[i - 1]!).toBe(41); // the create group: Try On to Apps
   // The groups the nav reads as, each named by its label (Explore, the home page, has none).
   await expect(nav(page).getByRole('group', { name: 'Sáng tạo' }).getByRole('link')).toHaveCount(5);
-  await expect(nav(page).getByRole('group', { name: 'Của bạn' }).getByRole('link')).toHaveText(['Thư viện', 'Góp ý', 'Có gì mới']);
+  await expect(nav(page).getByRole('group', { name: 'Của bạn' }).getByRole('link')).toHaveText(['Thư viện', 'Góp ý', 'Có gì mới (có mục mới)']); // a first visit: the newest day is unseen
   await expect(nav(page).locator('.nav-group-label')).toHaveText(['Sáng tạo', 'Của bạn']);
   await expect(page.locator('.brand strong')).toHaveText('Video Studio'); // the app, not the user, heads the sidebar
   const icon = links.first().locator('svg');

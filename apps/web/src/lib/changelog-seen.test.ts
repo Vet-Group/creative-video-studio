@@ -21,7 +21,7 @@ test('unseen are the entries newer than the seen mark, whatever the offset they 
   expect(unseenEntries(all, null)).toEqual([]);
 });
 
-test('a first visit starts at the newest entry's Vietnam day, so only that day is unseen', () => {
+test("a first visit starts at the newest entry's Vietnam day, so only that day is unseen", () => {
   const day = [e('2026-11-11T18:30:00Z'), e('2026-11-12T10:00:00+07:00'), e('2026-11-11T23:59:00+07:00')];
   expect(firstVisitMark(day)).toBe('2026-11-12T00:00:00+07:00'); // 18:30Z on the 11th is 01:30 on the 12th in Vietnam
   expect(unseenEntries(day, firstVisitMark(day)).map((x) => x.at)).toEqual(['2026-11-12T10:00:00+07:00', '2026-11-11T18:30:00Z']);

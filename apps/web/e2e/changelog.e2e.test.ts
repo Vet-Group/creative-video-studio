@@ -18,10 +18,10 @@ test('a first visit shows the dot for the newest day but no popup; the page list
   await page.goto('/explore');
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
   await expect(popup(page)).toHaveCount(0);
-  await expect(page.getByRole('link', { name: 'Có gì mới', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: /^Có gì mới/ })).toBeVisible();
   await expect(dot(page)).toHaveCount(1);
 
-  await page.getByRole('link', { name: 'Có gì mới', exact: true }).click();
+  await page.getByRole('link', { name: /^Có gì mới/ }).click();
   await expect(page).toHaveURL(/\/changelog$/);
   await expect(dot(page)).toHaveCount(0);
   await expect(page.getByRole('heading', { level: 1, name: 'Có gì mới' })).toBeVisible();

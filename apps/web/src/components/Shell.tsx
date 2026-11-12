@@ -480,7 +480,7 @@ export function Shell({ userId, userName, isAdmin, feedbackNew = 0, analyzeEnabl
           {dot && <span className="nav-dot" aria-hidden="true" />}
         </span>
         <span className="nav-label">{text}</span>
-        {dot && <span className="sr-only">(có mục mới)</span>}
+        {dot && <span className="sr-only"> (có mục mới)</span>}
         {badge && <span className="nav-badge" aria-hidden="true">{badge}</span>}
       </Link>
     );
