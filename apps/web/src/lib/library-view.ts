@@ -67,6 +67,27 @@ export function filtersFromParams(p: URLSearchParams): LibraryFilters {
 /** How many filters narrow the list; the sort only orders it, so it is not one. */
 export const activeFilters = (f: LibraryFilters): number => [f.q.trim(), f.creator, f.date, f.days, f.ratio, f.kind !== 'all', f.verdict, f.favoritesOnly, f.examplesOnly].filter(Boolean).length;
 
+/** Which filter a chip removes; date and days share one chip since the UI never sets both. */
+export type ChipKey = 'q' | 'creator' | 'date' | 'days' | 'ratio' | 'kind' | 'verdict' | 'favoritesOnly' | 'examplesOnly';
+
+const DAYS_LABEL: Record<string, string> = { '1': 'Hôm nay', '7': '7 ngày qua', '30': '30 ngày qua' };
+const VERDICT_LABEL: Record<Exclude<VerdictFilter, ''>, string> = { none: 'Chưa chấm', pass: 'Đạt', featured: 'Nổi bật', fail: 'Không đạt' };
+
+/** The active filters as removable chips, in the order of the filter bar. creator and kind read as labels, not raw values, so the page passes the names it already shows. */
+export function activeFilterChips(f: LibraryFilters, names: { creator?: string; kind?: string } = {}): { key: ChipKey; label: string }[] {
+  const chips: { key: ChipKey; label: string }[] = [];
+  if (f.q.trim()) chips.push({ key: 'q', label: `Tìm: ${f.q.trim()}` });
+  if (f.creator) chips.push({ key: 'creator', label: `Người tạo: ${names.creator ?? f.creator}` });
+  if (f.date) chips.push({ key: 'date', label: `Ngày: ${f.date.split('-').reverse().join('/')}` });
+  else if (f.days) chips.push({ key: 'days', label: DAYS_LABEL[f.days] ?? f.days });
+  if (f.ratio) chips.push({ key: 'ratio', label: `Tỉ lệ: ${f.ratio}` });
+  if (f.kind !== 'all') chips.push({ key: 'kind', label: names.kind ?? f.kind });
+  if (f.verdict) chips.push({ key: 'verdict', label: `Kết quả: ${VERDICT_LABEL[f.verdict]}` });
+  if (f.favoritesOnly) chips.push({ key: 'favoritesOnly', label: 'Yêu thích' });
+  if (f.examplesOnly) chips.push({ key: 'examplesOnly', label: 'Đang ở Ví dụ' });
+  return chips;
+}
+
 export type LibraryView = 'grid' | 'list';
 export const VIEW_KEY = 'cvs.library.view';
 

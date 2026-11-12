@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { activeFilters, dayHeadings, filtersFromParams, libraryQuery, matchesVerdict, NO_FILTERS, readView, saveView, VIEW_KEY } from './library-view';
+import { activeFilterChips, activeFilters, dayHeadings, filtersFromParams, libraryQuery, matchesVerdict, NO_FILTERS, readView, saveView, VIEW_KEY } from './library-view';
 
 describe('libraryQuery', () => {
   it('leaves the defaults out', () => {
@@ -91,6 +91,37 @@ describe('the remembered view', () => {
     });
     expect(readView()).toBe('grid');
     expect(() => saveView('list')).not.toThrow();
+  });
+});
+
+describe('activeFilterChips', () => {
+  it('has no chip when nothing is filtered', () => {
+    expect(activeFilterChips(NO_FILTERS)).toEqual([]);
+  });
+  it('one chip per active filter, in bar order, with the passed creator and kind names', () => {
+    const chips = activeFilterChips(
+      { ...NO_FILTERS, q: ' áo ', creator: 'u1', days: '7', ratio: '9:16', kind: 'video', verdict: 'featured', favoritesOnly: true, examplesOnly: true },
+      { creator: 'An', kind: 'Tạo video' },
+    );
+    expect(chips).toEqual([
+      { key: 'q', label: 'Tìm: áo' },
+      { key: 'creator', label: 'Người tạo: An' },
+      { key: 'days', label: '7 ngày qua' },
+      { key: 'ratio', label: 'Tỉ lệ: 9:16' },
+      { key: 'kind', label: 'Tạo video' },
+      { key: 'verdict', label: 'Kết quả: Nổi bật' },
+      { key: 'favoritesOnly', label: 'Yêu thích' },
+      { key: 'examplesOnly', label: 'Đang ở Ví dụ' },
+    ]);
+  });
+  it('a picked date wins over days and reads day/month/year', () => {
+    expect(activeFilterChips({ ...NO_FILTERS, date: '2026-11-09', days: '30' })).toEqual([{ key: 'date', label: 'Ngày: 09/11/2026' }]);
+  });
+  it('falls back to the raw value when no name is passed', () => {
+    expect(activeFilterChips({ ...NO_FILTERS, creator: 'u1', kind: 'video' })).toEqual([
+      { key: 'creator', label: 'Người tạo: u1' },
+      { key: 'kind', label: 'video' },
+    ]);
   });
 });
 
