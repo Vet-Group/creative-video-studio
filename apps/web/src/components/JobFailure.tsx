@@ -1,5 +1,6 @@
 // What a job that did not finish says, in the tray and in a History card.
 import { CANCELED_ERROR } from '@cvs/core/ledger';
+import { useState } from 'react';
 import { isBillingDisabled } from '@cvs/core/providers/vertex-billing-disabled';
 import type { JobStatus, TrayJob } from '@/lib/api';
 import { type FailureReason, providerRefusal, TWIN_REASONS } from '@/lib/job-failure';
@@ -37,6 +38,28 @@ const REFUSAL_TEXT: Record<FailureReason, string> = {
 // Google closed the billing account behind Vertex; the worker has already moved new jobs off it (docs/ops/vertex-accounts.md).
 const VERTEX_BILLING_TEXT = 'Vertex tạm ngưng do thanh toán Google Cloud. Hãy chọn lại mô hình (ứng dụng đã chuyển sang bản fal) rồi chạy lại.';
 
+/** What a report of a failed job needs, on the clipboard (lobehub's error card copy): the job id and status for everyone, the raw error for an Admin only. */
+function CopyFailure({ job, isAdmin }: { job: TrayJob; isAdmin: boolean }) {
+  const [note, setNote] = useState('');
+  const copy = () => {
+    const text = [`Lượt tạo ${job.id} · ${job.status}`, isAdmin && job.error].filter(Boolean).join('\n');
+    // No clipboard outside a secure context (the LAN address over http): say so rather than do nothing.
+    if (!navigator.clipboard) return setNote('Không chép được.');
+    void navigator.clipboard.writeText(text).then(
+      () => setNote('Đã chép.'),
+      () => setNote('Không chép được.'),
+    );
+  };
+  return (
+    <p className="job-failure-copy">
+      <button type="button" className="notice-link" onClick={copy}>
+        Chép thông tin lỗi
+      </button>{' '}
+      <span aria-live="polite">{note}</span>
+    </p>
+  );
+}
+
 /** The failure sentence for everyone; for an Admin the raw error too, folded under the provider's code when the input image was refused. */
 export function JobFailureNote({ job, isAdmin }: { job: TrayJob; isAdmin: boolean }) {
   if (isCanceled(job)) return null;
@@ -45,6 +68,7 @@ export function JobFailureNote({ job, isAdmin }: { job: TrayJob; isAdmin: boolea
   return (
     <>
       {text && <p className="error">{text}</p>}
+      {text && <CopyFailure job={job} isAdmin={isAdmin} />}
       {isAdmin &&
         job.error &&
         (refusal ? (

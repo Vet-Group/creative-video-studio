@@ -55,7 +55,7 @@ const CAP_MESSAGES: Record<CapRefusal, string> = {
 
 /**
  * `?mine`: the "My jobs" tray. The caller's 20 latest jobs that are not deleted, newest first, whether the worker is offline
- * (no heartbeat for 60 s), and `clips`: the video clips made today against the daily clip cap. `retried` is true once the job has its one manual retry.
+ * (no heartbeat for 60 s), `clips`: the video clips made today against the daily clip cap, and `queue`: how many jobs of the whole app are queued and how many submitting or running (counts only). `retried` is true once the job has its one manual retry.
  * `failureReason` is `real_person` or `sensitive_input` when the provider refused the job's input image, `output_audio` when it refused the sound it made (read from `error`), else null.
  * `twin` is `{ label, estimateUsd }` of the enabled twin model (migration 0075) a job refused for a real person or its sound can be retried on (POST `onTwin`), else null.
  */
@@ -63,7 +63,7 @@ export async function GET(request: Request) {
   const g = await guard(request, 'member');
   if (g.error) return g.error;
   if (!new URL(request.url).searchParams.has('mine')) return bad('only ?mine is supported');
-  const [jobs, worker, clips] = await Promise.all([
+  const [jobs, worker, clips, queue] = await Promise.all([
     pool.query(
       `select j.id, j.status, j.error, j.is_mock, j.feature, j.aspect, j.duration_s, j.params, j.model, j.retry_of, j.output_asset_id, j.poster_asset_id, j.created_at, j.finished_at,
               j.prompt, j.preset_id, j.input_asset_ids, exists (select 1 from jobs r where r.retry_of = j.id) as retried,
@@ -74,6 +74,8 @@ export async function GET(request: Request) {
     ),
     pool.query(`select not exists (select 1 from worker_heartbeat where beat_at > now() - interval '60 seconds') as offline`),
     dailyClips(pool, g.session.user.id),
+    // The whole app's queue (counts only), so a member can tell how busy the worker is (InvokeAI's queue count badge).
+    pool.query(`select count(*) filter (where status = 'queued')::int as queued, count(*) filter (where status in ('submitting', 'running'))::int as running from jobs where status in ('queued', 'submitting', 'running') and deleted_at is null`),
   ]);
   // Only a job that BytePlus refused for a real person and has not been retried has a twin to offer; its price is what the new job's estimate would be.
   const refused = jobs.rows.filter((r) => !r.retried && !r.retry_of && ['failed', 'failed_unknown', 'timed_out'].includes(r.status) && TWIN_REASONS.includes(providerRefusal(r.error)?.reason as string));
@@ -88,6 +90,7 @@ export async function GET(request: Request) {
   return Response.json({
     workerOffline: worker.rows[0].offline,
     clips,
+    queue: queue.rows[0] as { queued: number; running: number },
     jobs: jobs.rows.map((r) => ({
       id: r.id, status: r.status, error: r.error, failureReason: providerRefusal(r.error)?.reason ?? null, isMock: r.is_mock, feature: r.feature, ratio: r.aspect, durationSec: r.duration_s, resolution: r.params.resolution ?? null, modelId: r.model, retryOf: r.retry_of,
       retried: r.retried, twin: twins.get(r.id) ?? null, outputAssetId: r.output_asset_id, posterAssetId: r.poster_asset_id, createdAt: r.created_at, finishedAt: r.finished_at,

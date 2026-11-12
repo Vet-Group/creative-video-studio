@@ -2530,3 +2530,4 @@ dialog.modal.compare-modal { width: min(760px, calc(100vw - 32px)); max-width: n
 .notice-link { padding: 0; border: 0; background: none; color: var(--link); font: inherit; font-weight: 600; text-decoration: underline; cursor: pointer; }
 .analysis-en { margin: 6px 0; font-size: 13px; }
 .analysis-en summary { color: var(--text-muted); cursor: pointer; }
+.job-failure-copy { margin: 4px 0 0; font-size: 13px; }

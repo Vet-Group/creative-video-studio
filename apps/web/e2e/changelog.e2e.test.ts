@@ -1,9 +1,12 @@
 import { expect, type Page, test } from '@playwright/test';
+import { CHANGELOG } from '../src/lib/changelog';
 import { signIn } from './support.test';
 
 const SEEN = 'cvs.changelog.seen';
 const POPUP = 'cvs.changelog.popup';
 const longAgo = '2026-11-11T12:00:00+07:00'; // older than the newest three entries a member may read
+// The newest entry's Vietnam day, so a new entry on a later day does not break the spec.
+const NEWEST_DAY = CHANGELOG[0]!.at.slice(0, 10);
 
 const dot = (page: Page) => page.locator('.sidebar nav a[href="/changelog"] .nav-dot');
 const popup = (page: Page) => page.getByRole('dialog', { name: 'Có gì mới' });
@@ -29,7 +32,7 @@ test('a first visit shows the dot for the newest day but no popup; the page list
   // Grouped by day, newest first.
   const days = page.locator('.changelog-day');
   expect(await days.count()).toBeGreaterThan(5);
-  await expect(days.first()).toContainText('12');
+  await expect(days.first()).toContainText(String(Number(NEWEST_DAY.slice(8))));
   // A member sees no admin entry, no operations chip and no PR numbers.
   await expect(page.getByText('Chỉ quản trị viên')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Vận hành' })).toHaveCount(0);
@@ -85,7 +88,7 @@ test('"Xem tất cả" in the popup opens the page and marks everything seen; an
   await popup(page).getByRole('button', { name: 'Xem tất cả' }).click();
   await expect(page).toHaveURL(/\/changelog$/);
   await expect(dot(page)).toHaveCount(0);
-  expect(await page.evaluate((key) => localStorage.getItem(key), SEEN)).toMatch(/^2026-11-12T/);
+  expect(await page.evaluate((key) => localStorage.getItem(key), SEEN)).toMatch(new RegExp(`^${NEWEST_DAY}T`));
 
   const context = await browser.newContext();
   try {
