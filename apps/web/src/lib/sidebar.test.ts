@@ -30,6 +30,12 @@ test('the Phân tích item appears right after Tạo video only when the analysi
   expect(on.indexOf('Phân tích')).toBe(on.indexOf('Tạo video') + 1);
 });
 
+test('the newest tool Phân tích carries the "Mới" badge, and Marketing Studio no longer does', () => {
+  const items = navGroups(false, 0, true).flatMap((g) => g.items);
+  expect(items.find((i) => i.href === '/analyze')?.badge).toBe('Mới');
+  expect(items.find((i) => i.href === '/marketing-studio')?.badge).toBeUndefined();
+});
+
 test('an Admin sees the count of new feedback as a badge on the feedback item; a member never does', () => {
   const feedback = (admin: boolean, count: number) => navGroups(admin, count).flatMap((g) => g.items).find((i) => i.href === '/feedback');
   expect(feedback(true, 3)?.badge).toBe('3');

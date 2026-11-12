@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { createContext, type ReactNode, useContext, useEffect, useState } from 'react';
 import { HINTS_KEY as HIDDEN_KEY } from '@/lib/onboarding';
-import { TOOL_GOALS, TOOL_GUIDE, type ToolHref, toolGuide } from '@/lib/tool-guide';
+import { type ToolHref, toolGoals, toolGuide, toolGuides } from '@/lib/tool-guide';
 import { Icon } from './Icon';
 import { Modal } from './Modal';
 
@@ -20,15 +20,15 @@ export function ToolGuideButton({ className, children = 'Chọn công cụ nào?
   );
 }
 
-export function ToolGuide({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function ToolGuide({ open, onClose, analyzeEnabled = false }: { open: boolean; onClose: () => void; analyzeEnabled?: boolean }) {
   return (
     <Modal open={open} onClose={onClose} label="Chọn công cụ nào?" className="tool-guide">
       <h2>Chọn công cụ nào?</h2>
-      <p className="modal-sub">Năm công cụ trong nhóm Sáng tạo làm năm việc khác nhau. Bắt đầu từ thứ bạn đang có và thứ bạn cần.</p>
+      <p className="modal-sub">Các công cụ trong nhóm Sáng tạo mỗi cái làm một việc. Bắt đầu từ thứ bạn đang có và thứ bạn cần.</p>
 
       <h3>Bạn cần gì?</h3>
       <ul className="tool-goals">
-        {TOOL_GOALS.map((g) => (
+        {toolGoals(analyzeEnabled).map((g) => (
           <li key={g.need}>
             <Link href={g.href} onClick={onClose}>
               <span>{g.need}</span>
@@ -53,7 +53,7 @@ export function ToolGuide({ open, onClose }: { open: boolean; onClose: () => voi
             </tr>
           </thead>
           <tbody>
-            {TOOL_GUIDE.map((t) => (
+            {toolGuides(analyzeEnabled).map((t) => (
               <tr key={t.href}>
                 <th scope="row">{t.title}</th>
                 <td data-label="Bạn đưa vào">{t.have}</td>
@@ -66,7 +66,7 @@ export function ToolGuide({ open, onClose }: { open: boolean; onClose: () => voi
       </div>
       <p className="muted">Chi phí ước tính bằng USD hiện trên nút chạy của từng trang trước khi bạn bấm. Ảnh thường rẻ hơn video; Tối ưu media miễn phí.</p>
 
-      {TOOL_GUIDE.map((t) => (
+      {toolGuides(analyzeEnabled).map((t) => (
         <section key={t.href} className="tool-entry" aria-labelledby={`tool-entry-${t.icon}`}>
           <h3 id={`tool-entry-${t.icon}`}>
             <Icon name={t.icon} size={16} />

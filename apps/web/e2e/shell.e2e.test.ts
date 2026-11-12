@@ -88,7 +88,7 @@ test('Explore links into Create with the chosen preset or model already picked',
   await expect(presetOf(page)).toHaveAttribute('data-value', ''); // the default free prompt
 });
 
-test('at 1440 the sidebar keeps the live rhythm: the first item at 81 px, one every 41 px within a group, quiet group labels, solid 16 px icons and a red "Mới" pill on Marketing Studio', async ({ page }) => {
+test('at 1440 the sidebar keeps the live rhythm: the first item at 81 px, one every 41 px within a group, quiet group labels and solid 16 px icons', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await signIn(page, 'member1');
   const links = nav(page).getByRole('link');
@@ -103,12 +103,8 @@ test('at 1440 the sidebar keeps the live rhythm: the first item at 81 px, one ev
   const icon = links.first().locator('svg');
   await expect(icon).toHaveAttribute('fill', 'currentColor');
   expect((await icon.boundingBox())!.width).toBe(16);
-  const badge = links.nth(4).locator('.nav-badge');
-  await expect(badge).toHaveText('Mới');
-  await expect(badge).toHaveCSS('background-color', 'rgb(217, 45, 32)');
-  expect((await links.nth(4).locator('.nav-label').boundingBox())!.height).toBe(21); // one line, the pill beside it
-  const pill = (await badge.boundingBox())!, row = (await links.nth(4).boundingBox())!;
-  expect(pill.x + pill.width).toBeLessThanOrEqual(row.x + row.width);
+  // The new-tool pill now belongs to the newest tool (the analysis tool), which is flag-gated off here, so no visible item carries it.
+  await expect(links.nth(4).locator('.nav-badge')).toHaveCount(0); // Marketing Studio no longer pinned as new
 });
 
 test('the sidebar collapses to a 64 px icon rail that keeps its labels for screen readers and is remembered', async ({ page }) => {

@@ -2,7 +2,7 @@
 // Facts follow the About pages (about-content.ts) and the app list (apps.ts); prices are left to the Run buttons, which show the estimate.
 import type { IconName } from '@/components/Icon';
 
-export type ToolHref = '/try-on' | '/image-generation' | '/create' | '/marketing-studio' | '/apps';
+export type ToolHref = '/try-on' | '/image-generation' | '/create' | '/analyze' | '/marketing-studio' | '/apps';
 
 export interface ToolGuide {
   href: ToolHref;
@@ -140,4 +140,35 @@ export const TOOL_GOALS: { need: string; href: string; go: string }[] = [
   { need: 'Thử trang sức lên người mẫu', href: '/apps/jewelry-try-on', go: 'Thử trang sức' },
 ];
 
-export const toolGuide = (href: string): ToolGuide | undefined => TOOL_GUIDE.find((t) => href === t.href || href.startsWith(`${t.href}/`));
+// The reference-video analysis tool (rea-video), shown in the guide only when REA_ANALYZE_ENABLED is on. Kept out of the
+// static TOOL_GUIDE/TOOL_GOALS above so the sidebar-mirror test stays exact for the flag-off default (tool-guide.test.ts).
+export const ANALYZE_TOOL: ToolGuide = {
+  href: '/analyze',
+  title: 'Phân tích',
+  icon: 'chart',
+  oneLine: 'Rã một video tham chiếu thành cảnh, định dạng, câu mở đầu và prompt tiếng Anh cho từng cảnh để dựng lại.',
+  useIf: 'Bạn có một video mẫu và muốn hiểu cách nó được dựng để làm một clip tương tự.',
+  have: '1 video MP4 hoặc MOV (tải lên hoặc chọn từ Lịch sử).',
+  get: 'Danh sách cảnh kèm thời lượng, định dạng và câu mở đầu, mỗi cảnh một prompt tiếng Anh; bấm một prompt để dựng ở Tạo video.',
+  useWhen: [
+    'Thấy một quảng cáo hay clip đối thủ đẹp và muốn biết nó gồm những cảnh nào.',
+    'Cần ý tưởng kịch bản và prompt sẵn để bắt đầu dựng một video tương tự.',
+    'Muốn tách một video dài thành từng cảnh để tái sử dụng.',
+  ],
+  notWhen: [
+    { text: 'Muốn chép đúng một chuyển động từ video có sẵn', href: '/apps/motion-control', go: 'Điều khiển chuyển động' },
+    { text: 'Đã biết muốn gì, chỉ cần dựng clip', href: '/create', go: 'Tạo video' },
+    { text: 'Cần video quảng cáo kiểu người thật giới thiệu', href: '/marketing-studio', go: 'Marketing Studio' },
+  ],
+  example: { have: 'Một clip quảng cáo áo thun 10 giây.', get: 'Ba cảnh: cận chất vải, người mẫu xoay, câu mở đầu — mỗi cảnh một prompt tiếng Anh để dựng lại.' },
+  wait: 'Thường một, hai phút.',
+};
+const ANALYZE_GOAL = { need: 'Có video mẫu, cần hiểu cách dựng và prompt để làm lại', href: '/analyze', go: 'Phân tích' };
+
+/** The guide's tools in sidebar order, with the analysis tool right after the video tool only when the feature is on. */
+export const toolGuides = (analyzeEnabled: boolean): ToolGuide[] =>
+  analyzeEnabled ? TOOL_GUIDE.flatMap((t) => (t.href === '/create' ? [t, ANALYZE_TOOL] : [t])) : TOOL_GUIDE;
+/** The goals list, with the analysis goal after the video goal only when the feature is on. */
+export const toolGoals = (analyzeEnabled: boolean): typeof TOOL_GOALS => (analyzeEnabled ? [...TOOL_GOALS.slice(0, 3), ANALYZE_GOAL, ...TOOL_GOALS.slice(3)] : TOOL_GOALS);
+
+export const toolGuide = (href: string): ToolGuide | undefined => [...TOOL_GUIDE, ANALYZE_TOOL].find((t) => href === t.href || href.startsWith(`${t.href}/`));

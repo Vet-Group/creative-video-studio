@@ -27,7 +27,7 @@ const GROUPS: NavGroup[] = [
       { href: '/try-on', text: 'Thử đồ', icon: 'tryon' },
       { href: '/image-generation', text: 'Tạo ảnh', icon: 'image' },
       { href: '/create', text: 'Tạo video', icon: 'create' },
-      { href: '/marketing-studio', text: 'Marketing Studio', icon: 'megaphone', badge: 'Mới' },
+      { href: '/marketing-studio', text: 'Marketing Studio', icon: 'megaphone' },
       { href: '/apps', text: 'Ứng dụng', icon: 'apps' },
     ],
   },
@@ -44,9 +44,10 @@ const ADMIN: NavGroup = { label: 'Quản lý', items: [{ href: '/admin/overview'
 
 for (const item of GROUPS[1]!.items) item.hint = toolGuide(item.href)!.oneLine;
 
-// The reference-video analysis page (rea-video), shown in the creative group only when REA_ANALYZE_ENABLED is on. Its hint
-// is inline rather than a tool-guide entry so the static group above (which asserts a tool-guide per item) stays untouched.
-const ANALYZE_ITEM: NavItem = { href: '/analyze', text: 'Phân tích', icon: 'chart', hint: 'Phân tích video tham chiếu thành danh sách cảnh và prompt tiếng Anh để dựng lại.' };
+// The reference-video analysis page (rea-video), shown in the creative group only when REA_ANALYZE_ENABLED is on, as the
+// newest tool so it carries the "new" badge. Its line comes from the guide's ANALYZE_TOOL (kept out of the static
+// TOOL_GUIDE above so the sidebar-mirror test stays exact for the flag-off default).
+const ANALYZE_ITEM: NavItem = { href: '/analyze', text: 'Phân tích', icon: 'chart', badge: 'Mới', hint: toolGuide('/analyze')!.oneLine };
 
 /** `feedbackNew`, shown to an Admin as a badge on the feedback item, is the count of items still at status `new` to triage. */
 export const navGroups = (isAdmin: boolean, feedbackNew = 0, analyzeEnabled = false): NavGroup[] => {
