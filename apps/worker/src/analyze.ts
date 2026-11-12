@@ -8,7 +8,8 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
-import { parseBreakdown } from '@cvs/core/analysis/breakdown';
+import { type Analysis, type AnalysisVi, parseBreakdown } from '@cvs/core/analysis/breakdown';
+import { createAnalysisTranslator } from '@cvs/core/analysis/translate';
 import { byteplusReaVlm, pickReaVlm, reaVlmEnv, vertexReaVlm } from '@cvs/core/providers/rea-vlm';
 import { serviceAccountToken } from '@cvs/core/providers/vertex';
 import { vertexAccounts } from '@cvs/core/providers/vertex-accounts';
@@ -30,6 +31,8 @@ export interface AnalyzeSeams {
   write?: (key: string, body: Uint8Array, contentType: string) => Promise<void>;
   /** Resolves the REA_VLM_* environment; defaults to BytePlus from BYTEPLUS_ARK_API_KEY. */
   vlmEnv?: () => Promise<{ env: Record<string, string>; provider: string; model: string }>;
+  /** Translates the parsed analysis to Vietnamese for display; defaults to gpt-6-luna/fal, best-effort. */
+  translate?: (a: Analysis) => Promise<{ vi: AnalysisVi; costUsd: number | null }>;
 }
 
 /** The feature switch for this worker. Default OFF: the queue is not even subscribed when unset. */
@@ -79,6 +82,9 @@ export const defaultVlmEnv = async (): Promise<{ env: Record<string, string>; pr
   return { env: reaVlmEnv(vlm), provider: byteplus && vlm.baseUrl === byteplus.baseUrl ? 'byteplus' : 'vertex', model: vlm.model };
 };
 
+// gpt-6-luna when OPENAI_API_KEY is set, else fal on FAL_KEY; undefined (no translation) when neither is configured.
+const defaultTranslate = createAnalysisTranslator({ openAiKey: process.env.OPENAI_API_KEY, falKey: process.env.FAL_KEY });
+
 /** Claims a queued analysis row, runs rea-video over its source video, and stores the result. Safe to
  * call more than once for the same id: only a `queued` row is claimed. */
 export async function runReaAnalyze(pool: Pool, analysisId: string, seams: AnalyzeSeams = {}): Promise<void> {
@@ -86,6 +92,7 @@ export async function runReaAnalyze(pool: Pool, analysisId: string, seams: Analy
   const read = seams.read ?? getObject;
   const write = seams.write ?? putObject;
   const vlmEnv = seams.vlmEnv ?? defaultVlmEnv;
+  const translate = seams.translate ?? defaultTranslate;
 
   const row = (await pool.query('select id, source_key, status from analyses where id = $1', [analysisId])).rows[0];
   if (!row || row.status !== 'queued') return;
@@ -101,11 +108,22 @@ export async function runReaAnalyze(pool: Pool, analysisId: string, seams: Analy
     await decompose(video, out, env);
     const rawBytes = await readFile(join(out, 'breakdown.json'));
     const analysis = parseBreakdown(JSON.parse(rawBytes.toString('utf8')));
+    let cost = ANALYZE_COST_USD;
+    // Best-effort Vietnamese display: a failed or missing translator leaves the analysis English-only, still succeeded.
+    if (translate) {
+      try {
+        const t = await translate(analysis);
+        analysis.vi = t.vi;
+        if (t.costUsd) cost += t.costUsd;
+      } catch {
+        /* keep the English-only analysis */
+      }
+    }
     const rawKey = `analyses/${analysisId}/breakdown.json`;
     await write(rawKey, rawBytes, 'application/json');
     await pool.query(
       `update analyses set status = 'succeeded', result = $2, raw_key = $3, provider = $4, model = $5, cost_usd = $6, finished_at = now() where id = $1`,
-      [analysisId, JSON.stringify(analysis), rawKey, provider, model, String(ANALYZE_COST_USD)],
+      [analysisId, JSON.stringify(analysis), rawKey, provider, model, String(Number(cost.toFixed(6)))],
     );
   } catch (e) {
     const msg = (e instanceof Error ? e.message : String(e)).slice(0, 2000);

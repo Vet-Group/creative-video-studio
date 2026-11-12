@@ -25,6 +25,7 @@ const seams = (over: Partial<AnalyzeSeams> = {}): AnalyzeSeams => ({
   read: async () => new Uint8Array([0, 0, 0]),
   write: async (key, body) => void (stored[key] = body),
   vlmEnv: async () => ({ env: { REA_VLM_MODEL: 'seed-2-0-lite-260428' }, provider: 'byteplus', model: 'seed-2-0-lite-260428' }),
+  translate: async (a) => ({ vi: { format: 'giới thiệu sản phẩm', hook: 'câu mở đầu', summary: 'tóm tắt', shots: a.shots.map((_, i) => `cảnh ${i + 1}`) }, costUsd: null }),
   ...over,
 });
 
@@ -56,6 +57,32 @@ test('decomposes a queued analysis, storing the parsed result, the raw breakdown
   expect(r.provider).toBe('byteplus');
   expect(r.model).toBe('seed-2-0-lite-260428');
   expect(r.cost_usd).toBe('0.02');
+  expect(r.result.vi.hook).toBe('câu mở đầu'); // Vietnamese for display
+  expect(r.result.vi.shots).toEqual(['cảnh 1']);
+  expect(r.result.shots[0].prompt).toContain('white t-shirt'); // English prompt kept for Create
+});
+
+test('adds the translation cost to the stored cost, and stays English-only when the translator fails', async () => {
+  const paid = await queued();
+  await runReaAnalyze(pool, paid, seams({ translate: async () => ({ vi: { format: 'f', hook: 'h', summary: 's', shots: ['c1'] }, costUsd: 0.03 }) }));
+  const rp = await row(paid);
+  expect(rp.cost_usd).toBe('0.05'); // 0.02 analyze + 0.03 translate, no float dust
+  expect(rp.result.vi.summary).toBe('s');
+
+  const noVi = await queued();
+  await runReaAnalyze(
+    pool,
+    noVi,
+    seams({
+      translate: async () => {
+        throw new Error('translate boom');
+      },
+    }),
+  );
+  const rn = await row(noVi);
+  expect(rn.status).toBe('succeeded');
+  expect(rn.result.vi).toBeUndefined();
+  expect(rn.cost_usd).toBe('0.02');
 });
 
 test('does nothing on a repeated run once the analysis is no longer queued', async () => {

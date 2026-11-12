@@ -23,20 +23,22 @@ const terminal = (s: string): boolean => s === 'succeeded' || s === 'failed';
 
 /** The analysis result, Vietnamese display with each shot's English prompt. Pure, so it render-tests without the page. */
 export function AnalysisResult({ analysis }: { analysis: Analysis }) {
+  // Vietnamese for reading when the worker translated it; the English prompt is still what the "use this prompt" button sends to Create.
+  const vi = analysis.vi;
   return (
     <div className="analysis-result">
       <p className="muted">
-        {formatLabel(analysis.format) || 'Video'}
+        {vi?.format || formatLabel(analysis.format) || 'Video'}
         {analysis.durationS ? ` · ${analysis.durationS.toFixed(1)} giây` : ''} · {analysis.shotCount} cảnh
       </p>
-      {analysis.hook && (
+      {(vi?.hook || analysis.hook) && (
         <p>
-          <strong>Mở đầu:</strong> {analysis.hook}
+          <strong>Mở đầu:</strong> {vi?.hook || analysis.hook}
         </p>
       )}
-      {analysis.summary && <p className="muted">{analysis.summary}</p>}
+      {(vi?.summary || analysis.summary) && <p className="muted">{vi?.summary || analysis.summary}</p>}
       <ol className="analysis-shots">
-        {analysis.shots.map((s) => (
+        {analysis.shots.map((s, i) => (
           <li key={s.index} className="field">
             <p>
               <strong>Cảnh {s.index}</strong>
@@ -46,9 +48,9 @@ export function AnalysisResult({ analysis }: { analysis: Analysis }) {
                 {s.start.toFixed(1)}–{s.end.toFixed(1)}s
               </span>
             </p>
-            <p className="analysis-prompt">{s.prompt}</p>
+            <p className="analysis-prompt">{vi?.shots[i] || s.prompt}</p>
             {s.prompt && (
-              <Link className="link-button" href={`/create?prompt=${encodeURIComponent(s.prompt)}`}>
+              <Link className="link-button" href={`/create?prompt=${encodeURIComponent(s.prompt)}`} title={s.prompt}>
                 Dùng prompt này
               </Link>
             )}
