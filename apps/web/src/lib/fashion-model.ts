@@ -3,7 +3,7 @@
 
 /** `label` is what the member reads, `prompt` the English fragment that goes into the prompt. */
 export type FashionOption = { id: string; label: string; prompt: string };
-/** A niche also names the traits the page pre-selects when it is chosen (the member may still change them). */
+/** A niche also names the traits the page pre-selects when it is chosen (the member may still change them); its ethnicity may be VARIED_ETHNICITY. */
 export type FashionNiche = FashionOption & { defaults?: Partial<Omit<FashionTraits, 'extra' | 'niche'>> };
 
 export type FashionTraits = {
@@ -12,6 +12,10 @@ export type FashionTraits = {
   extra: string;
 };
 export const MAX_EXTRA = 300;
+
+/** A client-only ethnicity pick: not an option id, so the server never sees it. Image i of a run takes the pool's entry i (see traitsForImage). */
+export const VARIED_ETHNICITY = 'varied';
+export const VARIED_POOL = ['white', 'mixed', 'vietnamese_sea'];
 
 export const FASHION_OPTIONS = {
   gender: [
@@ -71,11 +75,12 @@ export const FASHION_OPTIONS = {
     { id: 'black_natural_hair', label: 'Gốc Phi, tóc tự nhiên', prompt: 'natural hair as a defined afro, twist-out, locs or neat box braids, small gold hoops, confident warm smile, lighting that renders the skin tone accurately', defaults: { ethnicity: 'black' } },
     { id: 'melanin', label: 'Melanin', prompt: 'luminous evenly lit deep skin, minimal makeup, short natural coils or a sleek bun, simple gold jewelry, radiant self-assured expression', defaults: { ethnicity: 'black', skinTone: 'deep' } },
     { id: 'heritage', label: 'Di sản / Black History', prompt: 'salt-and-pepper natural hair or gray locs, a groomed beard or a plain solid-color headwrap, proud thoughtful expression, timeless portrait light', defaults: { ethnicity: 'black', age: 'mature' } },
-    { id: 'faith', label: 'Đức tin / Phúc âm', prompt: 'neat conservative grooming, soft natural makeup, an optional small plain cross pendant, gentle hopeful smile, bright airy light' },
-    { id: 'americana', label: 'Yêu nước / Americana', prompt: 'friendly open face, classic haircut or relaxed waves, everyday heartland casual vibe' },
-    { id: 'veteran', label: 'Cựu chiến binh', prompt: 'short neat haircut, trimmed gray beard or clean-shaven, kind weathered face, steady proud expression', defaults: { age: 'mature' } },
-    { id: 'game_day', label: 'Fan thể thao', prompt: 'sporty ponytail or short fade, natural grin, casual game-day energy' },
-    { id: 'southern', label: 'Miền Nam / đồng quê', prompt: 'sun-kissed skin, loose waves or a side braid, easy friendly smile' },
+    { id: 'faith', label: 'Đức tin / Phúc âm', prompt: 'neat conservative grooming, soft natural makeup, an optional small plain cross pendant, gentle hopeful smile, bright airy light', defaults: { ethnicity: VARIED_ETHNICITY } },
+    { id: 'americana', label: 'Yêu nước / Americana', prompt: 'friendly open face, classic all-American look with natural freckles or a light tan, classic haircut or relaxed waves, small simple stud earrings, everyday heartland casual vibe', defaults: { ethnicity: VARIED_ETHNICITY } },
+    { id: 'veteran', label: 'Cựu chiến binh', prompt: 'short neat haircut, kind weathered face with fine laugh lines, upright confident posture, steady proud expression; if a man, a trimmed gray beard or clean-shaven', defaults: { gender: 'male', age: 'mature', ethnicity: VARIED_ETHNICITY } },
+    { id: 'game_day', label: 'Fan thể thao', prompt: 'sporty ponytail or short fade, athletic build, excited natural grin, light sun-kissed glow, casual game-day energy', defaults: { ethnicity: VARIED_ETHNICITY } },
+    { id: 'southern', label: 'Miền Nam / đồng quê', prompt: 'relaxed modern-western casual look, sun-kissed skin, easy waves or a side braid, a simple leather-band watch, friendly warm smile', defaults: { ethnicity: VARIED_ETHNICITY } },
+    { id: 'family_milestone', label: 'Gia đình / mẹ trẻ', prompt: 'warm approachable young parent, natural soft makeup or clean grooming, hair in an easy low ponytail or loose waves, small stud earrings, relaxed genuine smile, cozy weekend-family vibe', defaults: { gender: 'female', age: 'adult', ethnicity: VARIED_ETHNICITY } },
   ] as FashionNiche[],
 } satisfies Record<Exclude<keyof FashionTraits, 'extra'>, FashionOption[]>;
 
@@ -96,6 +101,11 @@ const cleanExtra = (extra: string) => extra.replace(/\s+/g, ' ').trim();
 /** The traits a niche pre-selects once it is chosen; the member may still change them. */
 export function withNiche(traits: FashionTraits, niche: string): FashionTraits {
   return { ...traits, ...(FASHION_OPTIONS.niche.find((n) => n.id === niche)?.defaults ?? {}), niche };
+}
+
+/** The traits of image `index` in a run: a varied ethnicity becomes a concrete one from the pool, so every job (and saved model) records a valid trait. */
+export function traitsForImage(t: FashionTraits, index: number): FashionTraits {
+  return t.ethnicity === VARIED_ETHNICITY ? { ...t, ethnicity: VARIED_POOL[index % VARIED_POOL.length]! } : t;
 }
 
 /** The one English prompt for these traits (valid ones: see parseFashionTraits). */

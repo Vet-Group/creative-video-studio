@@ -2411,7 +2411,7 @@ export const APP_ABOUT: Record<string, AboutPage> = {
         blocks: [
           {
             steps: [
-              { title: 'Chọn đặc điểm', text: 'Chọn từng đặc điểm, hoặc chọn một phong cách có sẵn để điền sẵn vài lựa chọn phù hợp, rồi chỉnh lại nếu muốn. Phần chi tiết thêm dành cho nốt ruồi, tàn nhang hay kiểu tóc cụ thể.' },
+              { title: 'Chọn đặc điểm', text: 'Chọn từng đặc điểm, hoặc chọn một phong cách có sẵn để điền sẵn vài lựa chọn phù hợp, rồi chỉnh lại nếu muốn. Nguồn gốc có lựa chọn Đa dạng: mỗi ảnh trong một lần chạy nhận một nguồn gốc khác nhau, và mỗi người mẫu đã lưu ghi lại nguồn gốc cụ thể của ảnh đó. Phần chi tiết thêm dành cho nốt ruồi, tàn nhang hay kiểu tóc cụ thể.' },
               { title: 'Chọn số ảnh', text: 'Chọn 1 đến 4 ảnh. Dòng chi phí cho biết tổng tiền trước khi bạn bấm Chạy.' },
               { title: 'Chạy', text: 'Bấm Chạy. Mỗi ảnh là một lượt tạo riêng và nằm trong tab Lịch sử khi xong.' },
               { title: 'Lưu làm người mẫu', text: 'Ở ảnh vừa ý, bấm Lưu làm người mẫu, đặt tên và chọn có dùng chung cho cả công ty hay không. Người mẫu đã lưu nằm trong tab Đã lưu.' },

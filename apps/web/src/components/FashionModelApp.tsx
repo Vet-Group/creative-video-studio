@@ -5,7 +5,7 @@
 import { useId, useState } from 'react';
 import { api, errorText, sendJson } from '@/lib/api';
 import type { AppConfig } from '@/lib/apps';
-import { DEFAULT_FASHION_TRAITS, FASHION_OPTIONS, type FashionTraits, fashionModelName, fashionModelPrompt, MAX_EXTRA, mentionsMinor, MINOR_REASON, parseFashionTraits, withNiche } from '@/lib/fashion-model';
+import { DEFAULT_FASHION_TRAITS, FASHION_OPTIONS, type FashionTraits, fashionModelName, fashionModelPrompt, MAX_EXTRA, mentionsMinor, MINOR_REASON, parseFashionTraits, traitsForImage, VARIED_ETHNICITY, withNiche } from '@/lib/fashion-model';
 import { MAX_NAME } from '@/lib/fashion-models';
 import { promptTooLong } from '@/lib/prompt-limit';
 import { confirmRun } from '@/lib/run-guard';
@@ -93,7 +93,7 @@ export function FashionModelApp({ app, isAdmin }: { app: AppConfig; isAdmin: boo
   const offered = models?.filter((m) => m.textToImage) ?? (models === null ? null : []);
   const pick = useImageChoice(offered, 0);
   const { chosen } = pick;
-  const prompt = fashionModelPrompt(traits);
+  const prompt = fashionModelPrompt(traitsForImage(traits, 0)); // the preview and the length check use the first image's ethnicity
   const portrait = chosen?.ratios.filter((r) => r !== 'auto') ?? [];
   const ratio = portrait.length > 0 ? nearestOption(portrait, '3:4') : 'auto';
   const price = Number(pick.estimate ?? 0);
@@ -110,8 +110,10 @@ export function FashionModelApp({ app, isAdmin }: { app: AppConfig; isAdmin: boo
     setNotice('');
     let sent = 0;
     try {
-      const body = { feature: app.feature, modelId: pick.modelId, assetIds: [], ratio, prompt, params: { resolution: pick.resolution, traits: JSON.stringify(traits) } };
-      for (; sent < count; sent++) await api('/api/jobs', sendJson('POST', body));
+      for (; sent < count; sent++) {
+        const own = traitsForImage(traits, sent);
+        await api('/api/jobs', sendJson('POST', { feature: app.feature, modelId: pick.modelId, assetIds: [], ratio, prompt: fashionModelPrompt(own), params: { resolution: pick.resolution, traits: JSON.stringify(own) } }));
+      }
       setNotice('Đã gửi lượt tạo. Theo dõi trong tab "Lịch sử".');
       if (!narrow) setTab('history');
     } catch (e) {
@@ -164,7 +166,7 @@ export function FashionModelApp({ app, isAdmin }: { app: AppConfig; isAdmin: boo
             {FIELDS.slice(0, 2).map((f) => (
               <Choice key={f.key} label={f.label} options={FASHION_OPTIONS[f.key]} value={traits[f.key]} onChange={set(f.key)} />
             ))}
-            <Select label="Nguồn gốc" icon="image" heading="Chọn nguồn gốc" value={traits.ethnicity} options={FASHION_OPTIONS.ethnicity.map((o) => ({ value: o.id, label: o.label }))} onChange={set('ethnicity')} />
+            <Select label="Nguồn gốc" icon="image" heading="Chọn nguồn gốc" value={traits.ethnicity} options={[{ value: VARIED_ETHNICITY, label: 'Đa dạng (mỗi ảnh một kiểu: Da trắng, Lai, Việt Nam/ĐNÁ)' }, ...FASHION_OPTIONS.ethnicity.map((o) => ({ value: o.id, label: o.label }))]} onChange={set('ethnicity')} />
             {FIELDS.slice(2).map((f) => (
               <Choice key={f.key} label={f.label} options={FASHION_OPTIONS[f.key]} value={traits[f.key]} onChange={set(f.key)} />
             ))}

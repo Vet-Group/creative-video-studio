@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_FASHION_TRAITS, FASHION_AVOID, FASHION_OPTIONS, fashionModelName, fashionModelPrompt, MAX_EXTRA, mentionsMinor, parseFashionTraits, withNiche } from './fashion-model';
+import { DEFAULT_FASHION_TRAITS, FASHION_AVOID, FASHION_OPTIONS, fashionModelName, fashionModelPrompt, MAX_EXTRA, mentionsMinor, parseFashionTraits, traitsForImage, VARIED_ETHNICITY, VARIED_POOL, withNiche } from './fashion-model';
 
 describe('fashionModelPrompt', () => {
   it('puts the fragment of every option into the prompt', () => {
@@ -43,7 +43,36 @@ describe('defaults and niches', () => {
   it('pre-selects the traits a niche names and leaves the rest', () => {
     expect(withNiche(DEFAULT_FASHION_TRAITS, 'melanin')).toMatchObject({ niche: 'melanin', ethnicity: 'black', skinTone: 'deep', age: 'adult' });
     expect(withNiche(DEFAULT_FASHION_TRAITS, 'heritage')).toMatchObject({ ethnicity: 'black', age: 'mature' });
-    expect(withNiche({ ...DEFAULT_FASHION_TRAITS, ethnicity: 'white' }, 'faith')).toMatchObject({ niche: 'faith', ethnicity: 'white' });
+    expect(withNiche({ ...DEFAULT_FASHION_TRAITS, ethnicity: 'white' }, 'faith')).toMatchObject({ niche: 'faith', ethnicity: VARIED_ETHNICITY, gender: 'female' });
+  });
+
+  it('defaults the US-market niches to a varied ethnicity, with the veteran a mature man and the family niche a woman', () => {
+    for (const id of ['faith', 'americana', 'veteran', 'game_day', 'southern', 'family_milestone']) expect(withNiche(DEFAULT_FASHION_TRAITS, id).ethnicity, id).toBe(VARIED_ETHNICITY);
+    expect(withNiche(DEFAULT_FASHION_TRAITS, 'veteran')).toMatchObject({ gender: 'male', age: 'mature' });
+    expect(withNiche({ ...DEFAULT_FASHION_TRAITS, gender: 'male' }, 'family_milestone')).toMatchObject({ gender: 'female', age: 'adult' });
+  });
+
+  it('only names valid option ids as niche defaults, apart from the varied ethnicity', () => {
+    for (const niche of FASHION_OPTIONS.niche) {
+      for (const [key, id] of Object.entries(niche.defaults ?? {})) {
+        if (id !== VARIED_ETHNICITY) expect(FASHION_OPTIONS[key as keyof typeof FASHION_OPTIONS].some((o) => o.id === id), `${niche.id}.${key}`).toBe(true);
+      }
+    }
+  });
+});
+
+describe('traitsForImage', () => {
+  const varied = { ...DEFAULT_FASHION_TRAITS, ethnicity: VARIED_ETHNICITY };
+
+  it('gives image i the pool entry i, wrapping around, as a trait the server parses', () => {
+    expect([0, 1, 2, 3].map((i) => traitsForImage(varied, i).ethnicity)).toEqual(['white', 'mixed', 'vietnamese_sea', 'white']);
+    for (let i = 0; i < 4; i++) expect(parseFashionTraits(JSON.parse(JSON.stringify(traitsForImage(varied, i))))).toEqual(traitsForImage(varied, i));
+    expect(VARIED_POOL.every((id) => FASHION_OPTIONS.ethnicity.some((o) => o.id === id))).toBe(true);
+  });
+
+  it('leaves a concrete ethnicity alone, and the server refuses the varied one', () => {
+    expect(traitsForImage({ ...DEFAULT_FASHION_TRAITS, ethnicity: 'black' }, 2).ethnicity).toBe('black');
+    expect(parseFashionTraits({ ethnicity: VARIED_ETHNICITY })).toBeNull();
   });
 });
 
