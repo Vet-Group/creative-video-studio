@@ -24,6 +24,12 @@ const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const SCOPE = 'https://www.googleapis.com/auth/cloud-platform';
 /** Image calls answer in seconds; this bounds a stuck one well inside the worker's 10-minute job limit. */
 const CALL_MS = 300_000;
+/** A 429 RESOURCE_EXHAUSTED (many concurrent jobs on one project) is retried up to RETRIES times, 20 to 60 s apart; Google does not bill a refused call. */
+const RETRIES = 3;
+const RETRY_MIN_MS = 20_000;
+const RETRY_MAX_MS = 60_000;
+const RETRY_JITTER_MS = 20_000;
+const unrefSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms).unref());
 
 const b64url = (s: string | Buffer): string => Buffer.from(s).toString('base64url');
 
@@ -126,12 +132,27 @@ export function createVertexImageProvider(opts: {
   readImage?: ReadImage;
   /** Tests pass a fixed token; otherwise one is minted from the key. */
   token?: () => Promise<string>;
+  /** Tests pass fakes for the 429 retry wait and its jitter. */
+  sleep?: (ms: number) => Promise<void>;
+  random?: () => number;
   /** Where outcomes outlive the process: the worker passes its object storage. */
   store?: { put(key: string, body: Uint8Array, contentType: string): Promise<void>; get(key: string): Promise<Uint8Array>; delete(key: string): Promise<void> };
 }): ImageProvider {
   const f = opts.fetch ?? fetch;
   const token = opts.token ?? serviceAccountToken(opts.key, f);
   const region = opts.region ?? 'us-central1';
+  const sleep = opts.sleep ?? unrefSleep;
+  const random = opts.random ?? Math.random;
+  // Each attempt gets its own CALL_MS bound, so the waits between 429s do not eat it. shortcut: a Retry-After HTTP date is ignored (the 20 s floor applies).
+  const retry429: Fetch = async (url, init) => {
+    for (let n = 0; ; n++) {
+      const res = await f(url, { ...init, signal: AbortSignal.timeout(CALL_MS) });
+      if (res.status !== 429 || n === RETRIES) return res;
+      await res.body?.cancel();
+      const asked = Number(res.headers.get('retry-after')) * 1000;
+      await sleep(Math.min(RETRY_MAX_MS, Math.max(RETRY_MIN_MS, asked || 0) + random() * RETRY_JITTER_MS));
+    }
+  };
   const outcomes = new Map<string, ProviderStatus>();
   const keyOf = (id: string) => `vertex-outcomes/${id}.json`;
   return {
@@ -141,7 +162,7 @@ export function createVertexImageProvider(opts: {
       const billed = imageEstimate(req);
       try {
         const headers = { Authorization: `Bearer ${await token()}`, 'Content-Type': 'application/json' };
-        const answer = await sendJson(f, 'vertex', call.path, { method: 'POST', headers, body: JSON.stringify(call.body), signal: AbortSignal.timeout(CALL_MS) });
+        const answer = await sendJson(retry429, 'vertex', call.path, { method: 'POST', headers, body: JSON.stringify(call.body) });
         const out = call.pick(answer);
         // A 200 without an image (a safety block, for example) is still billed for its tokens; the estimate stands for that small amount.
         outcomes.set(id, out ? { state: 'succeeded', outputUrl: `data:${out.mimeType};base64,${out.data}`, ...billed } : { state: 'failed', error: `vertex returned no image: ${JSON.stringify(answer).slice(0, 300)}`, ...billed });
