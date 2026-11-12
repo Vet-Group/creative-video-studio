@@ -143,6 +143,23 @@ export async function release(pool: LedgerPool, jobId: string, error: string): P
   });
 }
 
+/** The `jobs.error` of a job its member canceled while it was still queued; the UI shows it as canceled and the failure counts leave it out. */
+export const CANCELED_ERROR = 'canceled by the member';
+
+/** The member cancels their own job before the worker has claimed it: the estimate is released to 0 and the job becomes failed with CANCELED_ERROR. The row lock makes it race the worker's
+ * queued -> submitting claim (an update that also checks the status), so exactly one wins. `started` when the job is no longer queued, `not_found` when it is missing or not the member's. */
+export async function cancelQueued(pool: LedgerPool, jobId: string, userId: string): Promise<'canceled' | 'started' | 'not_found'> {
+  return withTransaction(pool, async (tx) => {
+    if ((await tx.query('select 1 from jobs where id = $1 and user_id = $2', [jobId, userId])).rowCount === 0) return 'not_found';
+    const job = await lockJob(tx, jobId);
+    if (job.status !== 'queued') return 'started';
+    const bal = await balance(tx, jobId);
+    if (bal.rows > 0 && !bal.final) await bookTo(tx, job, 'release', 0, bal.total);
+    await tx.query(`update jobs set status = 'failed', error = $2, finished_at = now() where id = $1`, [jobId, CANCELED_ERROR]);
+    return 'canceled';
+  });
+}
+
 /** The provider reported a final cost for a job we had given up on (timed_out or failed_unknown). A cost of 0 on a failed or canceled job means unbilled and releases the estimate; a late success keeps the larger of the cost and the estimate, as `settle` does. */
 export async function lateBill(pool: LedgerPool, jobId: string, costUsd: string | number, succeeded = false, tokens?: number): Promise<boolean> {
   return withTransaction(pool, async (tx) => {

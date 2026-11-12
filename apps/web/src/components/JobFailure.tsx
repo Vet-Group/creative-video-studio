@@ -1,7 +1,11 @@
 // What a job that did not finish says, in the tray and in a History card.
+import { CANCELED_ERROR } from '@cvs/core/ledger';
 import { isBillingDisabled } from '@cvs/core/providers/vertex-billing-disabled';
 import type { JobStatus, TrayJob } from '@/lib/api';
 import { type FailureReason, providerRefusal, TWIN_REASONS } from '@/lib/job-failure';
+
+/** A job its member canceled while it was queued: stored as failed with a marker, shown as canceled and never as an error. */
+export const isCanceled = (job: TrayJob): boolean => job.status === 'failed' && job.error === CANCELED_ERROR;
 
 const RETRYABLE: JobStatus[] = ['failed', 'failed_unknown', 'timed_out'];
 
@@ -35,6 +39,7 @@ const VERTEX_BILLING_TEXT = 'Vertex tạm ngưng do thanh toán Google Cloud. H�
 
 /** The failure sentence for everyone; for an Admin the raw error too, folded under the provider's code when the input image was refused. */
 export function JobFailureNote({ job, isAdmin }: { job: TrayJob; isAdmin: boolean }) {
+  if (isCanceled(job)) return null;
   const text = job.failureReason ? REFUSAL_TEXT[job.failureReason] : isBillingDisabled(job.error) ? VERTEX_BILLING_TEXT : FAILURE_TEXT(job.resolution ? 'ảnh' : 'clip')[job.status];
   const refusal = job.failureReason ? providerRefusal(job.error) : null;
   return (

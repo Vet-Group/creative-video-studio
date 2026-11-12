@@ -8,7 +8,7 @@ import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import { DeleteBucketCommand, DeleteObjectsCommand, HeadObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import type { Enhancer } from '@cvs/core/enhance';
-import { reserve, withTransaction } from '@cvs/core/ledger';
+import { cancelQueued, reserve, withTransaction } from '@cvs/core/ledger';
 import { ImageReadError } from '@cvs/core/providers/http';
 import type { ImageProvider, ImageSubmitRequest, SubmitRequest, VideoProvider } from '@cvs/core/providers';
 import { VIDEO_QUEUE, VIDEO_QUEUE_OPTIONS, videoSendOptions } from '@cvs/core/queue';
@@ -605,6 +605,19 @@ describe('restarts', () => {
     await start(counting(300));
     await waitFor('the job to succeed', async () => (await status(id)) === 'succeeded');
     expect(counting.submits).toBe(1);
+  });
+
+  test('never submits a job its member canceled while it was queued, though its pg-boss job is still waiting', async () => {
+    counting.submits = 0;
+    const id = await newJob('u1');
+    await send(id, 'u1');
+    expect(await cancelQueued(pool, id, 'u1')).toBe('canceled');
+    await start(counting(300));
+    await new Promise((r) => setTimeout(r, 1_500)); // the claim is `update ... where status = 'queued'`, so the canceled row is gone for it
+    expect(counting.submits).toBe(0);
+    expect((await job(id)).status).toBe('failed');
+    expect((await costs(id)).map((c) => c.kind)).toEqual(['estimate', 'release']);
+    expect((await total(id)).usd).toBe('0.0000');
   });
 
   test('runs a job once even when pg-boss holds two jobs for it', async () => {

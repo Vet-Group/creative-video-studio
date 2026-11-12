@@ -1,4 +1,5 @@
 // The Admin Overview: this month's two budgets (the same figures as the Costs page), today's jobs, accounts, models and the latest audit entries.
+import { CANCELED_ERROR } from '@cvs/core/ledger';
 import { pool } from '@/lib/auth';
 import { costsPage, snapshot } from '@/lib/costs';
 
@@ -9,7 +10,7 @@ export async function adminOverview() {
   const [today, running, users, models, audit] = await Promise.all([
     pool.query(
       `select count(*)::int as today, count(*) filter (where status = 'succeeded')::int as succeeded,
-              count(*) filter (where status in ('failed', 'failed_unknown', 'timed_out'))::int as failed
+              count(*) filter (where status in ('failed', 'failed_unknown', 'timed_out') and error is distinct from '${CANCELED_ERROR}')::int as failed
          from jobs where created_at >= ${ICT_TODAY}`,
     ),
     pool.query(`select count(*)::int as running from jobs where status in ('queued', 'submitting', 'running')`),

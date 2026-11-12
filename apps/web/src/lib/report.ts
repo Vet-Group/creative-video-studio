@@ -1,4 +1,5 @@
 // The weekly report of the Admin area (plan M.5), shared by GET /api/admin/report and its CSV.
+import { CANCELED_ERROR } from '@cvs/core/ledger';
 import { pool } from '@/lib/auth';
 
 const ICT = `'Asia/Ho_Chi_Minh'`;
@@ -18,8 +19,8 @@ export async function weeklyReport(week: string | null) {
                      where (j.feature in ('video', 'marketing') or (ce.job_id is null and ce.kind = 'llm')) and ce.day >= w.start and ce.day < w.start + 7 group by ce.user_id),
           per_user as (
             select j.user_id, count(*)::int as jobs, (count(*) filter (where v.verdict = 'pass'))::int as accepted,
-                   (count(*) filter (where j.status in ('failed', 'timed_out', 'failed_unknown')))::int as failed,
-                   (count(*) filter (where j.status in ('succeeded', 'failed', 'timed_out', 'failed_unknown')))::int as finished,
+                   (count(*) filter (where j.status in ('failed', 'timed_out', 'failed_unknown') and j.error is distinct from '${CANCELED_ERROR}'))::int as failed,
+                   (count(*) filter (where j.status in ('succeeded', 'failed', 'timed_out', 'failed_unknown') and j.error is distinct from '${CANCELED_ERROR}'))::int as finished,
                    percentile_cont(0.5) within group (order by extract(epoch from j.finished_at - j.created_at)) filter (where j.status = 'succeeded') as median_s
               from wj j left join verdicts v on v.job_id = j.id group by j.user_id),
           who as (select user_id from per_user union select user_id from spend)

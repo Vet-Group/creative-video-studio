@@ -65,7 +65,7 @@ export const dollars = (v: string | number, digits = 2) => {
   const s = typeof v === 'number' ? v.toFixed(digits) : v;
   return s.startsWith('-') ? `-$${s.slice(1)}` : `$${s}`;
 };
-const STATUS: Record<string, string> = { queued: 'Đang chờ', submitting: 'Đang gửi', running: 'Đang tạo', succeeded: 'Xong', failed: 'Lỗi', timed_out: 'Quá giờ', failed_unknown: 'Lỗi' };
+const STATUS: Record<string, string> = { queued: 'Đang chờ', submitting: 'Đang gửi', running: 'Đang tạo', succeeded: 'Xong', failed: 'Lỗi', timed_out: 'Quá giờ', failed_unknown: 'Lỗi', canceled: 'Đã huỷ' };
 const PROVIDER: Record<string, string> = { fal: 'fal.ai', vertex: 'Vertex', byteplus: 'BytePlus', openai: 'OpenAI', replicate: 'Replicate', mock: 'Mock' };
 
 /**
