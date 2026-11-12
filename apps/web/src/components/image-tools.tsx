@@ -446,6 +446,26 @@ export function WorkTabs<T extends string>({ prefix, tabs, labels, shown, onSele
   );
 }
 
+/** A form's status line. On a phone Run leaves the form on screen, so a sent job's line also opens the History tab it names. */
+export function FormNotice({ text, onHistory }: { text: string; onHistory?: () => void }) {
+  if (!text) return null;
+  // shortcut: keyed on the line's own ending (tab "Lịch sử".), true of every sent line today; pass a flag instead if one is ever worded otherwise.
+  const toHistory = onHistory && /tab "Lịch sử"\.$/.test(text);
+  return (
+    <p role="status">
+      {text}
+      {toHistory && (
+        <>
+          {' '}
+          <button type="button" className="notice-link" onClick={onHistory}>
+            Xem Lịch sử
+          </button>
+        </>
+      )}
+    </p>
+  );
+}
+
 /** The model, resolution and ratio fields, shown locked while no model is enabled, so the form keeps its shape; the run button's notice says why. */
 export function LockedFields() {
   return (

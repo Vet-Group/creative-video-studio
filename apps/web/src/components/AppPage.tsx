@@ -16,8 +16,8 @@ import { useSamples } from '@/lib/use-samples';
 import { About } from './About';
 import { CardMedia, LoopVideo } from './CardMedia';
 import { Icon, type IconName } from './Icon';
-import { copyError, copySamples, type Img, PhotoDialog, RATIO_LABEL, Slot, uploadError, uploadImages, UPLOAD_ERROR, type UploadKind, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
-import { FormContext, useJobs } from './jobs';
+import { copyError, copySamples, FormNotice, type Img, PhotoDialog, RATIO_LABEL, Slot, uploadError, uploadImages, UPLOAD_ERROR, type UploadKind, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
+import { FormContext, useApplier, useJobs } from './jobs';
 import { type ModelOption, ModelPicker } from './ModelPicker';
 import { PromptComposer } from './PromptComposer';
 import { PromptPreview } from './PromptSections';
@@ -97,7 +97,7 @@ export function AppHeader({ app }: { app: AppConfig }) {
 }
 
 function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
-  const { refresh, loading } = useJobs();
+  const { refresh, loading, notify } = useJobs();
   const narrow = useMediaQuery(NARROW);
   const [images, setImages] = useState<Img[][]>(() => app.slots.map(() => []));
   const [prompt, setPrompt] = useState('');
@@ -123,6 +123,12 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
     },
     { skip: reuse !== undefined },
   );
+  const settings = [...(app.ratio ? (['ratio'] as const) : []), ...(app.resolution ? (['resolution'] as const) : [])];
+  const apply = useApplier((s) => {
+    recall.touch();
+    if (s.ratio) pick.setRatio(s.ratio);
+    if (s.resolution) pick.setResolution(s.resolution);
+  });
 
   // Reuse: the images back in their slots, in the order they were sent, and the member's own text.
   const recreate = useReuse(
@@ -281,7 +287,7 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
               </p>
             )}
             {pick.note && <p className="help" role="status">{pick.note}</p>}
-            {notice && <p role="status">{notice}</p>}
+            <FormNotice text={notice} onHistory={narrow ? () => setTab('history') : undefined} />
           </div>
           <div className="runbar">
             <button type="button" className="primary run" disabled={!canRun} aria-describedby={reason ? reasonId : undefined} onClick={() => void run()}>
@@ -292,7 +298,14 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
         </div>
 
         <div className="side" id={`app-panel-${panel}`} role="tabpanel" aria-labelledby={`app-tab-${panel}`} hidden={narrow && shown === 'create'}>
-          <FormContext.Provider value={{ recreate: (from) => (recall.touch(), recreate(from), narrow && setTab('create')) }}>
+          <FormContext.Provider
+            value={{
+              recreate: (from) => (recall.touch(), recreate(from), narrow && setTab('create')),
+              // As on Try On, a card's chips and words go on the form; only the settings this app has.
+              ...(settings.length > 0 && { apply, settings }),
+              ...(app.prompt && { prompt: (text: string) => (setPrompt(text), notify('Đã chép mô tả')) }),
+            }}
+          >
             {shown === 'history' ? <Tray feature={app.feature} /> : <AppAbout app={app} />}
           </FormContext.Provider>
         </div>
@@ -491,7 +504,7 @@ function MotionForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
                 {error}
               </p>
             )}
-            {notice && <p role="status">{notice}</p>}
+            <FormNotice text={notice} onHistory={narrow ? () => setTab('history') : undefined} />
           </div>
           <div className="runbar">
             <button type="button" className="primary run" disabled={!canRun} aria-describedby={reason ? reasonId : undefined} onClick={() => void run()}>

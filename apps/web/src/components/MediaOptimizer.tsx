@@ -8,7 +8,7 @@ import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { addHistory } from '@/lib/optimizer-history';
 import { IMAGE_FORMATS, decodeOptimizerImage, imageFileReason, imageSizeReason, optimizeImage, outputSizeText, resizedDimensions, type ImageFormat } from '@/lib/media-optimizer';
 import { AppAbout, AppHeader, TAB_LABEL, type Tab } from './AppPage';
-import { Slot, WorkTabs } from './image-tools';
+import { FormNotice, Slot, WorkTabs } from './image-tools';
 import styles from './MediaOptimizer.module.css';
 import { Select } from './Select';
 
@@ -247,7 +247,7 @@ export function MediaOptimizer({ app }: { app: AppConfig }) {
                 {error}
               </p>
             )}
-            {notice && <p role="status">{notice}</p>}
+            <FormNotice text={notice} onHistory={narrow ? () => setTab('history') : undefined} />
           </div>
           <div className="runbar">
             <button type="button" className="primary run" disabled={!canRun} aria-describedby={reason ? reasonId : undefined} onClick={() => void run()}>

@@ -12,7 +12,7 @@ import { api, errorText, sendJson } from '@/lib/api';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { About } from './About';
 import { Icon } from './Icon';
-import { elapsedLabel } from './jobs';
+import { elapsedLabel, JobPrompt } from './jobs';
 import { AnalysisHistory } from './AnalysisHistory';
 import { copyError, uploadError, uploadVideoDirect, WorkTabs } from './image-tools';
 import { ReferenceVideoSlot, type RefVideo } from './ReferenceVideo';
@@ -58,9 +58,22 @@ export function AnalysisResult({ analysis }: { analysis: Analysis }) {
                 {s.start.toFixed(1)}–{s.end.toFixed(1)}s
               </span>
             </p>
-            <p className="analysis-prompt">{vi?.shots[i] || s.prompt}</p>
+            {/* The English prompt with copy, as on History cards; under a Vietnamese reading it opens on a tap (no hover on a phone). */}
+            {vi?.shots[i] ? (
+              <>
+                <p className="analysis-prompt">{vi.shots[i]}</p>
+                {s.prompt && (
+                  <details className="analysis-en">
+                    <summary>Prompt tiếng Anh</summary>
+                    <JobPrompt text={s.prompt} />
+                  </details>
+                )}
+              </>
+            ) : (
+              s.prompt && <JobPrompt text={s.prompt} />
+            )}
             {s.prompt && (
-              <Link className="link-button" href={`/create?prompt=${encodeURIComponent(s.prompt)}`} title={s.prompt}>
+              <Link className="link-button" href={`/create?prompt=${encodeURIComponent(s.prompt)}`}>
                 Dùng prompt này
               </Link>
             )}

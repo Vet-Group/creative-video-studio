@@ -13,7 +13,7 @@ import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { AppAbout, AppHeader, TAB_LABEL, type Tab } from './AppPage';
 import s from './FashionModelApp.module.css';
 import { FashionModelList } from './FashionModelList';
-import { nearestOption, useImageChoice, useImageModels, WorkTabs } from './image-tools';
+import { FormNotice, nearestOption, useImageChoice, useImageModels, WorkTabs } from './image-tools';
 import { FormContext, useJobs } from './jobs';
 import { Modal } from './Modal';
 import { ModelPicker } from './ModelPicker';
@@ -224,7 +224,7 @@ export function FashionModelApp({ app, isAdmin }: { app: AppConfig; isAdmin: boo
               </p>
             )}
             {pick.note && <p className="help" role="status">{pick.note}</p>}
-            {notice && <p role="status">{notice}</p>}
+            <FormNotice text={notice} onHistory={narrow ? () => setTab('history') : undefined} />
           </div>
           <div className="runbar">
             <button type="button" className="primary run" disabled={!canRun} aria-describedby={minor || reason ? reasonId : undefined} onClick={() => void run()}>

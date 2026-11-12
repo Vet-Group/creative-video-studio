@@ -11,7 +11,7 @@ import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { useRecall } from '@/lib/use-recall';
 import { About } from './About';
 import { BrandPicker } from './BrandKit';
-import { copyError, Gallery, type Img, LockedFields, photoImg, RATIO_LABEL, Slot, THINKING_LABEL, uploadError, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
+import { copyError, FormNotice, Gallery, type Img, LockedFields, photoImg, RATIO_LABEL, Slot, THINKING_LABEL, uploadError, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
 import { ENHANCE_NOTE, EnhanceToggle } from './EnhanceToggle';
 import { FormContext, type Photo, useApplier, useJobs } from './jobs';
 import { ModelPicker } from './ModelPicker';
@@ -226,7 +226,7 @@ ${style.prompt}` : prompt.trim();
               </p>
             )}
             {pick.note && <p className="help" role="status">{pick.note}</p>}
-            {notice && <p role="status">{notice}</p>}
+            <FormNotice text={notice} onHistory={narrow ? () => setTab('history') : undefined} />
           </div>
           <div className="runbar">
             <button type="button" className="primary run" disabled={!canRun} aria-describedby={reason ? 'imagegen-reason' : undefined} onClick={() => void run()}>

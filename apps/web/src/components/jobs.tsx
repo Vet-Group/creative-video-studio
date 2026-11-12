@@ -7,7 +7,9 @@ import { usePathname } from 'next/navigation';
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { CANCELED_ERROR } from '@cvs/core/ledger';
 import { api, ApiError, sendJson, type TrayJob } from '@/lib/api';
+import { featureLabel } from '@/lib/features';
 import { announce } from '@/lib/preferences';
+import { pageOf } from '@/lib/reuse';
 import { useTabReturn } from '@/lib/use-tab-return';
 import { confirmDialog } from './Confirm';
 import { Icon } from './Icon';
@@ -59,7 +61,12 @@ export interface Toast {
   text: string;
   /** A short note (a History chip applied) rather than a finished job: no Library link, and it goes by itself. */
   note?: boolean;
+  /** A finished job's link: its result in the Library, or for a failure the page that made it. */
+  href?: string;
 }
+
+/** Where a finished job's toast and tray link go: a result opens itself in the Library (as Explore's cards do), a failure its page's History. */
+export const resultHref = (job: { id: string; status: string; feature: string }): string => (job.status === 'succeeded' ? `/library?item=${encodeURIComponent(job.id)}` : (pageOf(job.feature) ?? '/library'));
 
 const NOTE_MS = 3_000;
 
@@ -82,6 +89,8 @@ export function useRecreated(): (from: string) => void {
 export interface FormActions {
   recreate: (from: string) => void;
   apply?: (s: Setting) => void;
+  /** The settings `apply` takes, where the form has only some (an app with a ratio but no resolution); absent, it takes them all. */
+  settings?: (keyof Setting)[];
   /** A photo of a detail put on the form in its role, as a click on one of Fash's inputs does. */
   photo?: (p: Photo, role: PhotoRole) => void;
   /** A detail's words put in the form's prompt (Fash's "Prompt copied"). */
@@ -300,7 +309,7 @@ export function JobsProvider({ userId, children }: { userId: string; children: R
       return; // storage blocked (a privacy setting, a full quota): no news toasts, but the tray still updates
     }
     setNews(true);
-    const done = fresh.map((j) => ({ ok: j.status === 'succeeded', text: j.status === 'succeeded' ? (j.resolution ? 'Ảnh đã xong' : 'Clip đã xong') : 'Một lượt tạo không thành công' }));
+    const done = fresh.map((j) => ({ ok: j.status === 'succeeded', href: resultHref(j), text: j.status === 'succeeded' ? (j.resolution ? 'Ảnh đã xong' : 'Clip đã xong') : `${featureLabel(j.feature)}: một lượt tạo không thành công` }));
     setToasts((cur) => [...cur, ...done.map((n) => ({ id: nextId.current++, ...n }))]);
     announce(done.map((n) => n.text));
   }, [userId]);
