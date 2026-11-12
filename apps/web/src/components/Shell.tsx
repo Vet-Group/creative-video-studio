@@ -484,7 +484,7 @@ function NavProgress() {
 }
 
 /** The pages that show their own History tab instead of the tray beside them. */
-const OWN_HISTORY = ['/create', '/try-on', '/image-generation', '/marketing-studio'];
+const OWN_HISTORY = ['/create', '/try-on', '/image-generation', '/marketing-studio', '/analyze']; // an analysis is not a job: its page lists its own History
 
 /** Explore, the Apps index and the Library give the full width to their grids (the Library already lists every result), and the Admin pages to their tables; the jobs show in Library and in the History tabs. */
 const NO_TRAY = ['/explore', '/apps', '/library'];

@@ -1,5 +1,5 @@
 // The analyze History list states: loading, a load error with retry (not the empty message), the empty invitation, and
-// the rows where only a succeeded analysis opens.
+// the cards where only a succeeded analysis opens.
 import type { Analysis } from '@cvs/core/analysis/breakdown';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, test } from 'vitest';
@@ -8,7 +8,7 @@ import type { AnalysisRow } from './AnalyzeView';
 
 const result: Analysis = {
   durationS: 11.4,
-  shotCount: 2,
+  shotCount: 1,
   format: '商品展示',
   hook: 'Clean apparel presentation.',
   summary: 'A model wears a plain white t-shirt in a studio.',
@@ -39,8 +39,22 @@ test('no rows and no error shows the empty invitation', () => {
   expect(render()).toContain('Chưa có phân tích nào');
 });
 
-test('a succeeded row opens; a failed one is disabled and labelled Không thành công', () => {
-  const html = render({ items: [row(), row({ id: 'a2', status: 'failed', result: null, error: 'boom' })] });
+test('a succeeded row is a card button with its format, length, shots and hook; the one on view is marked current', () => {
+  const html = render({ items: [row(), row({ id: 'a2' })], currentId: 'a2' });
+  expect(html).toContain('Giới thiệu sản phẩm');
+  expect(html).toContain('11.4 giây · 1 cảnh');
+  expect(html).toContain('Clean apparel presentation.');
+  expect(html).toContain('/api/assets/v1/content#t=0.1'); // the source video's first frame is the poster
+  expect(html.match(/<button/g)).toHaveLength(2);
+  expect(html.match(/aria-current="true"/g)).toHaveLength(1);
+});
+
+test('a failed or running row is not a button and says why it cannot be opened', () => {
+  const html = render({ items: [row({ id: 'a2', status: 'failed', result: null, error: 'boom' }), row({ id: 'a3', status: 'running', result: null, sourceAssetId: null })] });
   expect(html).toContain('Không thành công');
-  expect((html.match(/<button[^>]*\sdisabled/g) ?? []).length).toBe(1); // only the failed row is disabled
+  expect(html).toContain('không có gì để mở');
+  expect(html).toContain('Đang phân tích…');
+  expect(html).toContain('Chưa mở được');
+  expect(html).not.toContain('<button');
+  expect(html.match(/<video/g)).toHaveLength(1); // the running row's source asset is gone: a placeholder icon, not a player
 });
