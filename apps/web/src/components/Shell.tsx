@@ -16,6 +16,7 @@ import { confirmRun } from '@/lib/run-guard';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { AccountMenu } from './AccountMenu';
 import { ChangelogPopup } from './ChangelogPopup';
+import { CompareSlider } from './CompareSlider';
 import { ConfirmHost, confirmDialog } from './Confirm';
 import { FalLowNotice } from './FalLowNotice';
 import { Icon, type IconName } from './Icon';
@@ -23,6 +24,7 @@ import { LarkLinkPrompt } from './LarkLinkPrompt';
 import { JobFailureNote, canRetry, isCanceled, canRetryOnTwin, twinRetryText } from './JobFailure';
 import { CancelButton, elapsedLabel, JobPrompt, JobsProvider, Recreate, roleOf, Tap, toggleFullscreen, useForm, useJobs } from './jobs';
 import { LoadError } from './LoadError';
+import { Modal } from './Modal';
 import { type Account, type Section, Settings } from './Settings';
 import { SaveTemplateDialog, type Scope } from './Templates';
 import { OpenToolGuide, ToolGuide, ToolGuideButton } from './ToolGuide';
@@ -125,9 +127,12 @@ function HistoryCard({ job, isAdmin, select }: { job: TrayJob; isAdmin: boolean;
   /** Save template: null while closed, else whether the member may share it with the company (asked when the dialog opens). */
   const [saving, setSaving] = useState<{ canShare: boolean } | null>(null);
   const [saved, setSaved] = useState(false);
+  const [comparing, setComparing] = useState(false);
   const media = useRef<HTMLVideoElement & HTMLImageElement>(null);
   const image = job.resolution !== null;
   const out = job.status === 'succeeded' ? job.outputAssetId : null;
+  // Try On's first input is the person: the original its result is compared with.
+  const original = job.feature === 'try_on' && image ? job.inputAssetIds[0] : undefined;
   const content = (id: string) => `/api/assets/${id}/content`;
   // An image card shows its preview; full screen (or its new-tab fallback) loads the original first.
   const enlarge = () => {
@@ -199,7 +204,17 @@ function HistoryCard({ job, isAdmin, select }: { job: TrayJob; isAdmin: boolean;
             <a className="icon-button" href={content(out)} target="_blank" rel="noreferrer" aria-label="Mở trong tab mới" title="Mở trong tab mới">
               <Icon name="external" />
             </a>
+            {original && (
+              <button type="button" className="icon-button" aria-haspopup="dialog" onClick={() => setComparing(true)} aria-label="So sánh trước/sau" title="So sánh trước/sau">
+                <Icon name="panel" />
+              </button>
+            )}
           </div>
+        )}
+        {out && original && (
+          <Modal open={comparing} onClose={() => setComparing(false)} label={`So sánh trước/sau: ${cardTitle(job)}`} className="compare-modal">
+            <CompareSlider before={content(original)} after={content(out)} beforeAlt="Ảnh người mẫu gốc" afterAlt={cardTitle(job)} />
+          </Modal>
         )}
       </div>
       <div className="job-body">
