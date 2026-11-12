@@ -7,8 +7,11 @@ export type CapRefusal = 'daily_clips' | 'monthly_usd' | 'features_monthly_usd' 
 const VIDEO_FEATURES = ['video', 'marketing'];
 /** Ledger rows of the image and apps features; shared rows (no job) belong to the video budget. */
 const budgetRow = (features: string) => `exists (select 1 from jobs bj where bj.id = cost_entries.job_id and bj.feature <> all(${features}::text[]))`;
-/** LLM calls (Enhance, suggestions, translations) never count toward a cap (owner decision, 2026-11-04); the Costs page still shows them. */
-const capRow = `cost_entries.kind <> 'llm'`;
+/**
+ * LLM calls (Enhance, suggestions, translations, analyses) never count toward a cap (owner decision, 2026-11-04); the Costs page still shows them.
+ * A Smart Remake's fal calls are booked as llm rows too (bookLlm) but are video generation, so they count, like any row with no job, in the video month.
+ */
+const capRow = `(cost_entries.kind <> 'llm' or cost_entries.ref like 'llm:remake:%')`;
 
 /** The video clips (features in parameter `features`) the user in parameter `user` made on the ICT day of `t.at`, as the daily clip cap counts them:
  * `failed` jobs with no provider cost booked (an Enhance llm row aside) do not count. */
@@ -60,7 +63,7 @@ export async function memberUsage(q: Queryable, userId: string, at?: Date) {
  *   timed_out and failed_unknown count), then the company month: every ledger row of the ICT month outside the image and apps features plus the estimate.
  * - Image and apps features: the member's ICT day and month, then the month for everyone, each over those features' ledger rows plus the estimate.
  *   The per-feature caps (feature_caps) never refuse; the Costs page shows them.
- * - llm rows count toward none of these.
+ * - llm rows count toward none of these, except a Smart Remake's (capRow).
  */
 export async function checkCaps(tx: Queryable, userId: string, estimateUsd: string, at?: Date, feature = 'video'): Promise<CapRefusal | null> {
   const values = [userId, estimateUsd, at?.toISOString() ?? null, VIDEO_FEATURES];

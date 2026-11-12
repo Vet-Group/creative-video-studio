@@ -892,3 +892,23 @@ describe('the purge schedule', () => {
     expect(purge[0]).toMatchObject({ cron: '0 3 * * *', timezone: 'Asia/Ho_Chi_Minh' });
   });
 });
+
+describe('Smart Remake', () => {
+  test('the reconcile pass leaves remakes alone while REA_REMAKE_ENABLED is unset, and closes a stale one once it is set', async () => {
+    // No remake is queued here, so a subscribed worker runs none; the key is dropped anyway so none could reach fal.
+    delete process.env.FAL_KEY;
+    delete process.env.FAL_KEY_NEXT;
+    await pool.query(`insert into analyses (id, user_id, team_id, source_key, status) values ('an-sweep', 'u1', 'team-unassigned', 's', 'succeeded')`);
+    await pool.query(`insert into remakes (id, user_id, team_id, analysis_id, shots, status, started_at) values ('rm-sweep', 'u1', 'team-unassigned', 'an-sweep', '[1]', 'running', now() - interval '1 day')`);
+    const remake = async () => (await pool.query(`select status from remakes where id = 'rm-sweep'`)).rows[0].status;
+    await (await start(counting(300))).reconcile();
+    expect(await remake()).toBe('running');
+    process.env.REA_REMAKE_ENABLED = '1';
+    try {
+      await (await start(counting(300))).reconcile();
+      expect(await remake()).toBe('failed');
+    } finally {
+      delete process.env.REA_REMAKE_ENABLED;
+    }
+  });
+});

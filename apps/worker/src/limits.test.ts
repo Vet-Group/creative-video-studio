@@ -302,4 +302,19 @@ describe('LLM calls', () => {
     await setCaps('200');
     await pool.query('update settings set features_monthly_cap_usd = 260, member_daily_usd_cap = 10, member_monthly_usd_cap = 50');
   });
+
+  test('a Smart Remake’s fal calls, booked as llm rows, are video spend: they count toward the company month, not the image and apps caps', async () => {
+    await setCaps('10', 5);
+    await pool.query('update settings set features_monthly_cap_usd = 10, member_daily_usd_cap = 10, member_monthly_usd_cap = 10');
+    const u = await member();
+    await pool.query(`insert into analyses (id, user_id, team_id, source_key, status, created_at) values ('limits-an', $1, 'team-b', 's', 'succeeded', '2032-06-10T03:00:00Z')`, [u]);
+    await pool.query(`insert into remakes (id, user_id, team_id, analysis_id, shots, created_at) values ('limits-rm', $1, 'team-b', 'limits-an', '[1]', '2032-06-10T03:00:00Z')`, [u]);
+    await bookLlm(pool, { remake: 'limits-rm', step: '1:video' }, { costUsd: 4, provider: 'fal', model: 'm' });
+    const when = at('2032-06-10T04:00:00Z');
+    expect(await checkCaps(pool, u, '6.0000', when)).toBeNull(); // video month: 4 + 6 = 10
+    expect(await checkCaps(pool, u, '6.0001', when)).toBe('monthly_usd');
+    expect(await checkCaps(pool, u, '10.0000', when, 'image')).toBeNull(); // not image and apps spend
+    await setCaps('200');
+    await pool.query('update settings set features_monthly_cap_usd = 260, member_daily_usd_cap = 10, member_monthly_usd_cap = 50');
+  });
 });

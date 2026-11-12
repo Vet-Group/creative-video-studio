@@ -5,14 +5,20 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
+import type { ProviderStatus } from '@cvs/core/providers';
 import { createPool } from '@cvs/db/client';
 import { createTestDatabase } from '@cvs/db/testing';
-import { afterAll, beforeAll, expect, test } from 'vitest';
+import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import { requireFfmpeg } from './media';
-import { closeStaleRemakes, PaidCallError, type RemakeSeams, reaRemakeEnabled, runRemake } from './remake';
+import { closeStaleRemakes, PaidCallError, type RemakeSeams, reaRemakeEnabled, runRemake, settleFal } from './remake';
+
+vi.setConfig({ testTimeout: 90_000, hookTimeout: 90_000 });
 
 const run = promisify(execFile);
 const testDb = await createTestDatabase();
+// createTestDatabase loads the checkout's .env, which may hold a real fal key: a test that forgot a seam must fail, never pay.
+delete process.env.FAL_KEY;
+delete process.env.FAL_KEY_NEXT;
 const pool = createPool(testDb.url, 2);
 let dir = '';
 let sourceVideo = new Uint8Array();
@@ -175,7 +181,44 @@ test('the feature flag is off unless explicitly set', () => {
   expect(reaRemakeEnabled({ REA_REMAKE_ENABLED: '1' } as NodeJS.ProcessEnv)).toBe(true);
 });
 
-// Every test above injects both fal calls; CI also carries no fal key, so a test that forgot one fails instead of paying.
-test.runIf(!!process.env.CI)('CI has no FAL_KEY', () => {
-  expect(process.env.FAL_KEY).toBeUndefined();
+test('without a fal key the real calls refuse before any request, so nothing is booked', async () => {
+  const fetchSpy = vi.fn();
+  vi.stubGlobal('fetch', fetchSpy);
+  try {
+    const id = await queued([1]);
+    await runRemake(pool, id, { read: seams().read, write: seams().write });
+    expect(await row(id)).toMatchObject({ status: 'failed', error: 'FAL_KEY is not set', cost_usd: '0.000000' });
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(await ledger(id)).toEqual([]);
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
+describe('settleFal: every outcome after fal took the request carries its cost', () => {
+  const ok = (body = new Uint8Array([1, 2])) => (async () => new Response(body)) as unknown as typeof fetch;
+  const statuses = (...s: (ProviderStatus | Error)[]) => {
+    let i = 0;
+    return async () => {
+      const v = s[Math.min(i++, s.length - 1)]!;
+      if (v instanceof Error) throw v;
+      return v;
+    };
+  };
+  const fast = { pollMs: 1 };
+  const won = { state: 'succeeded' as const, outputUrl: 'https://cdn/out', costUsd: 0.108, costSource: 'estimate' as const };
+  const paidError = async (p: Promise<unknown>) => p.then(() => null, (e: unknown) => (e instanceof PaidCallError ? [e.message, e.costUsd] : ['not paid', (e as Error).message]));
+
+  test('a success downloads the output at its cost, after polling past a queue wait and a failed poll', async () => {
+    const out = await settleFal(statuses({ state: 'queued' }, new Error('HTTP 429'), { state: 'running' }, won), 0.5, { ...fast, fetch: ok() });
+    expect(out).toEqual({ bytes: new Uint8Array([1, 2]), costUsd: 0.108 });
+  });
+
+  test('a failed request, a lost download and a request past the deadline each carry a cost', async () => {
+    expect(await paidError(settleFal(statuses({ state: 'failed', error: 'content policy', costUsd: 0.108, costSource: 'estimate' }), 0.5, fast))).toEqual(['content policy', 0.108]);
+    expect(await paidError(settleFal(statuses({ state: 'failed', error: 'input rejected', costUsd: 0, costSource: 'estimate' }), 0.5, fast))).toEqual(['input rejected', 0]); // a 4xx fal refused: not billed
+    const lost = (async () => new Response('gone', { status: 404 })) as unknown as typeof fetch;
+    expect(await paidError(settleFal(statuses(won), 0.5, { ...fast, fetch: lost }))).toEqual(['could not download the fal output: HTTP 404', 0.108]);
+    expect(await paidError(settleFal(statuses({ state: 'running' }), 0.5, { ...fast, deadlineMs: 0 }))).toEqual(['fal did not finish within 0 minutes', 0.5]); // booked at the estimate
+  });
 });

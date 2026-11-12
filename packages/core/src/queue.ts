@@ -22,9 +22,13 @@ export interface AnalyzeJobData {
   analysisId: string;
 }
 
-/** Smart Remake (apps/worker/src/remake.ts): two paid fal calls per chosen shot, never retried, since a retry would bill the shots again. */
+/**
+ * Smart Remake (apps/worker/src/remake.ts): two paid fal calls per chosen shot, never retried, since a retry would bill the shots again. The expiry
+ * covers the longest remake (6 shots x 2 calls x the 10-minute call deadline, plus the frame and join work), so pg-boss never frees the worker's
+ * one remake slot while that remake still runs.
+ */
 export const REMAKE_QUEUE = 'remake';
-export const REMAKE_QUEUE_OPTIONS = { retryLimit: 0, expireInSeconds: 1800 } as const;
+export const REMAKE_QUEUE_OPTIONS = { retryLimit: 0, expireInSeconds: 7800 } as const;
 
 export interface RemakeJobData {
   remakeId: string;

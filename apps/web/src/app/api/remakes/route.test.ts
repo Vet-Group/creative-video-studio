@@ -98,6 +98,22 @@ test('polls one of the caller’s remakes and hides another member’s', async (
   expect((await ONE(call('/api/remakes/rm-theirs'), { params: Promise.resolve({ id: 'rm-theirs' }) })).status).toBe(404);
 });
 
+test('counts the open remakes against the company month and refuses one that would pass it, queuing nothing', async () => {
+  const prev = (await pool.query('select monthly_cap_usd::text as cap from settings where id = 1')).rows[0].cap as string;
+  const open = (await pool.query(`select coalesce(sum(jsonb_array_length(shots)), 0)::int as n from remakes where status in ('queued', 'running')`)).rows[0].n as number;
+  const count = async () => (await pool.query('select count(*)::int as n from remakes')).rows[0].n as number;
+  await pool.query('update settings set monthly_cap_usd = $1 where id = 1', [((open + 2) * 0.1478).toFixed(4)]); // room for 2 more shots at 0.1478 each
+  try {
+    const before = await count();
+    const over = await post({ ...ok, shots: [1, 2, 3] });
+    expect([over.status, await over.json()]).toEqual([429, { error: 'a spending cap is reached', cap: 'monthly_usd' }]);
+    expect(await count()).toBe(before);
+    expect((await post({ ...ok, shots: [1, 2] })).status).toBe(201); // exactly the cap
+  } finally {
+    await pool.query('update settings set monthly_cap_usd = $1 where id = 1', [prev]);
+  }
+});
+
 test('lists the caller’s remakes newest first', async () => {
   const list = (await (await LIST(call('/api/remakes'))).json()) as { remakes: { id: string; createdAt: string }[] };
   expect(list.remakes.length).toBeGreaterThanOrEqual(2);

@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import type { Analysis } from '@cvs/core/analysis/breakdown';
-import { remakeShotsProblem } from '@cvs/core/analysis/remake';
+import { REMAKE_SHOT_USD, remakeShotsProblem } from '@cvs/core/analysis/remake';
+import { withTransaction } from '@cvs/core/ledger';
+import { checkCaps } from '@cvs/core/limits';
 import { REMAKE_QUEUE } from '@cvs/core/queue';
 import { readableAsset, readJson } from '@/lib/assets';
 import { pool } from '@/lib/auth';
@@ -46,11 +48,27 @@ export async function POST(request: Request) {
   const id = randomUUID();
   // The clips are joined in shot order, whatever order they were picked in.
   const shots = [...(b!.shots as number[])].sort((x, y) => x - y);
-  await pool.query(
-    `insert into remakes (id, user_id, team_id, store_id, analysis_id, product_asset_id, shots)
-       values ($1, $2, (select team_id from users where id = $2), $3, $4, $5, $6)`,
-    [id, userId, analysis.store_id, analysisId, productAssetId, JSON.stringify(shots)],
-  );
+  const cap = await withTransaction(pool, async (tx) => {
+    // One writer at a time, as for a Run, so two remakes cannot both take the last dollars of the month.
+    await tx.query(`select pg_advisory_xact_lock(hashtext('caps'))`);
+    // A remake is video spend (limits.ts capRow). Open remakes have booked only the calls made so far, so the rest of their estimate counts too.
+    const estimate = (
+      await tx.query(
+        `select (coalesce(sum(greatest(jsonb_array_length(shots) * $1::numeric - coalesce(cost_usd, 0), 0)), 0) + $2::numeric)::text as usd
+           from remakes where status in ('queued', 'running')`,
+        [REMAKE_SHOT_USD.toFixed(6), (shots.length * REMAKE_SHOT_USD).toFixed(6)],
+      )
+    ).rows[0].usd as string;
+    const refused = await checkCaps(tx, userId, estimate, undefined, 'video');
+    if (refused) return refused;
+    await tx.query(
+      `insert into remakes (id, user_id, team_id, store_id, analysis_id, product_asset_id, shots)
+         values ($1, $2, (select team_id from users where id = $2), $3, $4, $5, $6)`,
+      [id, userId, analysis.store_id, analysisId, productAssetId, JSON.stringify(shots)],
+    );
+    return null;
+  });
+  if (cap) return Response.json({ error: 'a spending cap is reached', cap }, { status: 429 });
   try {
     await (await boss()).send(REMAKE_QUEUE, { remakeId: id });
   } catch (e) {

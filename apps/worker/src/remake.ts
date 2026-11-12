@@ -13,6 +13,10 @@ import { bookLlm } from '@cvs/core/ledger';
 import type { ImageModelConfig, ModelConfig } from '@cvs/core/models';
 import type { ProviderStatus } from '@cvs/core/providers';
 import { createFalImageProvider, createFalProvider } from '@cvs/core/providers/fal';
+import { REMAKE_QUEUE_OPTIONS } from '@cvs/core/queue';
+import { insertAssets } from '@cvs/db/assets';
+import { createDb } from '@cvs/db/client';
+import { falActive } from './fal-next';
 import { concatClips, extractFrameAt, probeSize, sniffImage } from './media';
 import { fitForInline } from './real-providers';
 import { getObject, putObject } from './storage';
@@ -58,8 +62,12 @@ const VIDEO_MODEL: ModelConfig = {
   maxImages: 1, outputResolution: '720p', usdPerSecond: REMAKE_VIDEO_USD_PER_SECOND, billedAmountField: null, sources: {},
 };
 
-const falKey = (): string => {
-  const key = process.env.FAL_KEY;
+/**
+ * The fal account new calls go to (fal-next.ts): the team's key once the personal account ran out, else the personal one. shortcut: a credit refusal
+ * here fails the shot without switching accounts; the next video job's refusal switches them (falNext), and later remakes follow.
+ */
+const falKey = async (pool: Pool): Promise<string> => {
+  const key = (await falActive(pool)) === 'team' && process.env.FAL_KEY_NEXT ? process.env.FAL_KEY_NEXT : process.env.FAL_KEY;
   if (!key) throw new Error('FAL_KEY is not set');
   return key;
 };
@@ -71,19 +79,25 @@ const memReader = (images: Image[]) => async (url: string) => {
   return fitForInline(img.bytes, img.contentType);
 };
 
-const POLL_MS = 3_000;
-/** fal's queue answers within a few minutes; past this the call is given up and booked at its estimate, as fal may still run it. */
+/** fal's queue answers within a few minutes; past this a call is given up and booked at its estimate, as fal may still run it. */
 const CALL_DEADLINE_MS = 10 * 60_000;
 
-/** Polls one submitted fal request to its end and downloads the output. Every failure from here on carries the call's cost: fal took the request. */
-async function settleFal(status: () => Promise<ProviderStatus>, estimateUsd: number): Promise<{ bytes: Uint8Array; costUsd: number }> {
-  const deadline = Date.now() + CALL_DEADLINE_MS;
+/**
+ * Polls one submitted fal request to its end and downloads the output. Every failure from here on carries the call's cost, since fal took the
+ * request: its failed status's cost, the success's cost when the download fails, or the estimate past the deadline.
+ */
+export async function settleFal(
+  status: () => Promise<ProviderStatus>,
+  estimateUsd: number,
+  o: { pollMs?: number; deadlineMs?: number; fetch?: typeof fetch } = {},
+): Promise<{ bytes: Uint8Array; costUsd: number }> {
+  const deadline = Date.now() + (o.deadlineMs ?? CALL_DEADLINE_MS);
   for (;;) {
     // A failed poll (network, 429) says nothing about the request, so it is polled again.
     const s = await status().catch(() => undefined);
     if (s?.state === 'succeeded') {
       try {
-        const res = await fetch(s.outputUrl);
+        const res = await (o.fetch ?? fetch)(s.outputUrl, { signal: AbortSignal.timeout(2 * 60_000) });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return { bytes: new Uint8Array(await res.arrayBuffer()), costUsd: s.costUsd };
       } catch (e) {
@@ -91,26 +105,30 @@ async function settleFal(status: () => Promise<ProviderStatus>, estimateUsd: num
       }
     }
     if (s?.state === 'failed' || s?.state === 'canceled') throw new PaidCallError(s.error, s.costUsd);
-    if (Date.now() > deadline) throw new PaidCallError(`fal did not finish within ${CALL_DEADLINE_MS / 60_000} minutes`, estimateUsd);
-    await new Promise((r) => setTimeout(r, POLL_MS));
+    if (Date.now() >= deadline) throw new PaidCallError(`fal did not finish within ${Math.round((o.deadlineMs ?? CALL_DEADLINE_MS) / 60_000)} minutes`, estimateUsd);
+    await new Promise((r) => setTimeout(r, o.pollMs ?? 3_000));
   }
 }
 
-const defaultEdit: NonNullable<RemakeSeams['edit']> = async (frame, product, prompt) => {
-  const fal = createFalImageProvider({ apiKey: falKey(), readImage: memReader([frame, product]) });
-  const { providerJobId } = await fal.submit({ model: EDIT_MODEL, prompt, imageUrls: ['mem:0', 'mem:1'], ratio: 'auto', resolution: '1K' });
-  const out = await settleFal(() => fal.status({ providerJobId, model: EDIT_MODEL, resolution: '1K' }), REMAKE_EDIT_USD);
-  const type = sniffImage(out.bytes);
-  if (!type) throw new PaidCallError('the edited frame is not a PNG, JPEG or WebP image', out.costUsd);
-  return { image: { bytes: out.bytes, contentType: type.mime }, costUsd: out.costUsd };
-};
+const realEdit =
+  (pool: Pool): NonNullable<RemakeSeams['edit']> =>
+  async (frame, product, prompt) => {
+    const fal = createFalImageProvider({ apiKey: await falKey(pool), readImage: memReader([frame, product]) });
+    const { providerJobId } = await fal.submit({ model: EDIT_MODEL, prompt, imageUrls: ['mem:0', 'mem:1'], ratio: 'auto', resolution: '1K' });
+    const out = await settleFal(() => fal.status({ providerJobId, model: EDIT_MODEL, resolution: '1K' }), REMAKE_EDIT_USD);
+    const type = sniffImage(out.bytes);
+    if (!type) throw new PaidCallError('the edited frame is not a PNG, JPEG or WebP image', out.costUsd);
+    return { image: { bytes: out.bytes, contentType: type.mime }, costUsd: out.costUsd };
+  };
 
-const defaultAnimate: NonNullable<RemakeSeams['animate']> = async (image, prompt, seconds) => {
-  const fal = createFalProvider({ apiKey: falKey(), readImage: memReader([image]) });
-  const { providerJobId } = await fal.submit({ model: VIDEO_MODEL, prompt, imageUrls: ['mem:0'], ratio: 'auto', durationSec: seconds });
-  const out = await settleFal(() => fal.status({ providerJobId, model: VIDEO_MODEL }), REMAKE_VIDEO_USD_PER_SECOND * seconds);
-  return { video: out.bytes, costUsd: out.costUsd };
-};
+const realAnimate =
+  (pool: Pool): NonNullable<RemakeSeams['animate']> =>
+  async (image, prompt, seconds) => {
+    const fal = createFalProvider({ apiKey: await falKey(pool), readImage: memReader([image]) });
+    const { providerJobId } = await fal.submit({ model: VIDEO_MODEL, prompt, imageUrls: ['mem:0'], ratio: 'auto', durationSec: seconds });
+    const out = await settleFal(() => fal.status({ providerJobId, model: VIDEO_MODEL }), REMAKE_VIDEO_USD_PER_SECOND * seconds);
+    return { video: out.bytes, costUsd: out.costUsd };
+  };
 
 const message = (e: unknown): string => (e instanceof Error ? e.message : String(e)).slice(0, 2000);
 const usd = (n: number): string => String(Number(n.toFixed(6)));
@@ -129,9 +147,7 @@ async function storeVideo(pool: Pool, write: Write, ownerId: string, file: strin
   const { width, height } = await probeSize(file);
   const id = randomUUID();
   await write(`assets/${id}`, bytes, 'video/mp4');
-  await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, width, height) values ($1, $2, 'output', $3, $4, 'video/mp4', $5, $6, $7)`, [
-    id, ownerId, `assets/${id}`, filename, bytes.length, width, height,
-  ]);
+  await insertAssets(createDb(pool), [{ id, ownerId, kind: 'output', s3Key: `assets/${id}`, filename, mime: 'video/mp4', bytes: bytes.length, width, height }]);
   return id;
 }
 
@@ -142,8 +158,8 @@ async function storeVideo(pool: Pool, write: Write, ownerId: string, file: strin
 export async function runRemake(pool: Pool, remakeId: string, seams: RemakeSeams = {}): Promise<void> {
   const read = seams.read ?? getObject;
   const write = seams.write ?? putObject;
-  const edit = seams.edit ?? defaultEdit;
-  const animate = seams.animate ?? defaultAnimate;
+  const edit = seams.edit ?? realEdit(pool);
+  const animate = seams.animate ?? realAnimate(pool);
 
   const claimed = (await pool.query(`update remakes set status = 'running', started_at = now() where id = $1 and status = 'queued'`, [remakeId])).rowCount;
   if (!claimed) return; // another worker claimed it, or it already ran
@@ -158,7 +174,11 @@ export async function runRemake(pool: Pool, remakeId: string, seams: RemakeSeams
   // Books one paid call as soon as it returns or fails, so a stopped worker leaves at most the call in flight unbooked.
   const paid = async <T extends { costUsd: number }>(entry: ShotResult, step: 'edit' | 'video', model: string, call: () => Promise<T>): Promise<T> => {
     const book = async (costUsd: number) => {
-      await bookLlm(pool, { remake: remakeId, step: `${entry.index}:${step}` }, { costUsd, provider: 'fal', model });
+      const ref = `${entry.index}:${step}`;
+      await bookLlm(pool, { remake: remakeId, step: ref }, { costUsd, provider: 'fal', model }).catch((e) => {
+        console.error(`worker: remake ${remakeId}: could not book ${costUsd} USD for ${ref}; the monthly fal invoice (invoice_diff) will carry it:`, e);
+        throw e;
+      });
       entry.costUsd += costUsd;
     };
     try {
@@ -171,8 +191,9 @@ export async function runRemake(pool: Pool, remakeId: string, seams: RemakeSeams
     }
   };
 
-  const dir = await mkdtemp(join(tmpdir(), 'cvs-remake-'));
+  let dir: string | undefined;
   try {
+    dir = await mkdtemp(join(tmpdir(), 'cvs-remake-'));
     const r = (
       await pool.query(
         `select r.user_id, r.shots, a.source_key, a.result, p.s3_key as product_key, p.mime as product_mime
@@ -182,8 +203,9 @@ export async function runRemake(pool: Pool, remakeId: string, seams: RemakeSeams
       )
     ).rows[0];
     const chosen = r.shots as number[];
-    // The API checks this too; it is checked again before the first paid call, as the cap is what bounds a remake's spend.
+    // The API checks these too; they are checked again before the first paid call, as the cap bounds a remake's spend and a repeated shot would reuse a ledger ref.
     if (chosen.length > REMAKE_MAX_SHOTS) throw new Error(`at most ${REMAKE_MAX_SHOTS} shots per remake`);
+    if (new Set(chosen).size !== chosen.length) throw new Error('each shot may be chosen once');
     if (!r.product_key) throw new Error('the product image is no longer available');
     const video = join(dir, 'source.mp4');
     await writeFile(video, await read(r.source_key));
@@ -211,7 +233,8 @@ export async function runRemake(pool: Pool, remakeId: string, seams: RemakeSeams
         entry.error = message(e);
       }
       shots.push(entry);
-      await pool.query('update remakes set result = $2, cost_usd = $3 where id = $1', [remakeId, JSON.stringify({ shots }), spent()]);
+      const open = (await pool.query(`update remakes set result = $2, cost_usd = $3 where id = $1 and status = 'running'`, [remakeId, JSON.stringify({ shots }), spent()])).rowCount;
+      if (!open) return; // the stale sweep closed it: stop before another paid call
     }
 
     let outputAssetId: string | null = null;
@@ -230,12 +253,12 @@ export async function runRemake(pool: Pool, remakeId: string, seams: RemakeSeams
   } catch (e) {
     await finish(shots.some((s) => s.status === 'succeeded') ? 'partial' : 'failed', null, message(e));
   } finally {
-    await rm(dir, { recursive: true, force: true });
+    if (dir) await rm(dir, { recursive: true, force: true });
   }
 }
 
-/** Longer than any remake can run: every shot's two calls at their deadline, plus the frame, join and upload work. */
-const STALE_AFTER_MS = REMAKE_MAX_SHOTS * 2 * CALL_DEADLINE_MS + 10 * 60_000;
+/** Longer than any remake can run: the queue's expiry, which covers the longest one, and a margin. */
+const STALE_AFTER_MS = REMAKE_QUEUE_OPTIONS.expireInSeconds * 1000 + 10 * 60_000;
 
 /**
  * Closes the remakes a stopped worker left open (no queue retries them): 'partial' when some shots made clips, which stay booked and viewable, else 'failed'.

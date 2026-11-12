@@ -20,6 +20,9 @@ export const REMAKE_EDIT_USD = 0.0398;
 export const REMAKE_VIDEO_ENDPOINT = 'fal-ai/bytedance/seedance/v1/pro/fast/image-to-video';
 export const REMAKE_VIDEO_USD_PER_SECOND = 0.0216;
 
+/** What one shot is estimated to cost: its edit and its clip. The API counts it against the spending caps before a remake is queued. */
+export const REMAKE_SHOT_USD = REMAKE_EDIT_USD + REMAKE_VIDEO_USD_PER_SECOND * REMAKE_SHOT_SECONDS;
+
 /** Why these chosen shot indices cannot be remade from an analysis whose shots have the `available` indices, or null: 1 to REMAKE_MAX_SHOTS distinct shots of the analysis. */
 export function remakeShotsProblem(chosen: unknown, available: number[]): string | null {
   if (!Array.isArray(chosen) || chosen.length === 0 || !chosen.every((n) => Number.isInteger(n))) return 'shots must be a non-empty list of shot numbers';
