@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 import ffprobe from 'ffprobe-static';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
-import { burnEndText, endTextLayout, probeSeconds, probeVideoSeconds, requireFfmpeg, wrapText } from './media';
+import { burnEndText, concatClips, endTextLayout, extractFrameAt, probeSeconds, probeSize, probeVideoSeconds, requireFfmpeg, wrapText } from './media';
 
 const run = promisify(execFile);
 let dir = '';
@@ -32,6 +32,23 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await rm(dir, { recursive: true, force: true });
+});
+
+describe('Smart Remake frames and joins', () => {
+  test('takes a full-size frame at a time, and joins clips of other sizes into one silent clip at the first clip’s size', async () => {
+    const still = join(dir, 'still.jpg');
+    await extractFrameAt(source, 1.04, still);
+    expect(await probeSize(still)).toEqual({ width: 360, height: 640 });
+
+    const wide = join(dir, 'wide.mp4');
+    await run(requireFfmpeg(), ['-y', '-v', 'error', '-f', 'lavfi', '-i', 'color=c=red:size=640x360:rate=30', '-t', '1', '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', wide]);
+    const joined = join(dir, 'joined.mp4');
+    await concatClips([source, wide], joined);
+    expect(await probeSize(joined)).toEqual({ width: 360, height: 640 });
+    const p = await probe(joined);
+    expect(Math.abs(Number(p.format.duration) - 5)).toBeLessThanOrEqual(0.2); // 4 s + 1 s
+    expect(p.streams.map((s) => s.codec_type)).toEqual(['video']); // the source's tone is dropped
+  });
 });
 
 describe('the end text', () => {

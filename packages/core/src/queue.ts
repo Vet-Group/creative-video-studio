@@ -22,6 +22,14 @@ export interface AnalyzeJobData {
   analysisId: string;
 }
 
+/** Smart Remake (apps/worker/src/remake.ts): two paid fal calls per chosen shot, never retried, since a retry would bill the shots again. */
+export const REMAKE_QUEUE = 'remake';
+export const REMAKE_QUEUE_OPTIONS = { retryLimit: 0, expireInSeconds: 1800 } as const;
+
+export interface RemakeJobData {
+  remakeId: string;
+}
+
 export interface SuggestJobData {
   runId: string;
 }

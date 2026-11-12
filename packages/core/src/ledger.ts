@@ -215,12 +215,13 @@ export async function bookShared(
 
 /**
  * The cost of one LLM call, with the provider and model that answered it, once per source: a job's Enhance (on the job, its user, team, store and Run day; not final, as it never closes the
- * job), a suggestion or translation run (no job; the run's user, that user's team now and the run's ICT day; final), or a reference-video analysis (no job; the analysis' user, team, store and
- * ICT day; final). False when the cost is null or rounds to 0 USD, or the source was booked before.
+ * job), a suggestion or translation run (no job; the run's user, that user's team now and the run's ICT day; final), a reference-video analysis (no job; the analysis' user, team, store and
+ * ICT day; final), or one paid call of a Smart Remake (`step` names it, e.g. '3:edit'; like an analysis, on the remake's own row, booked as the call returns so a stopped worker
+ * leaves at most one call unbooked). False when the cost is null or rounds to 0 USD, or the source was booked before.
  */
 export async function bookLlm(
   db: Queryable,
-  source: { enhance: string } | { suggestion: string } | { analysis: string },
+  source: { enhance: string } | { suggestion: string } | { analysis: string } | { remake: string; step: string },
   call: { costUsd: number | null; provider: string; model: string },
 ): Promise<boolean> {
   const usd = call.costUsd === null ? 0 : units(call.costUsd);
@@ -230,7 +231,9 @@ export async function bookLlm(
     : 'suggestion' in source
       ? [`select r.created_at, r.user_id, u.team_id, null::text as store_id, null::text as job_id, true as is_final
             from suggestion_runs r join users u on u.id = r.user_id where r.id = $4`, source.suggestion, `llm:suggestion:${source.suggestion}`]
-      : [`select created_at, user_id, team_id, store_id, null::text as job_id, true as is_final from analyses where id = $4`, source.analysis, `llm:analysis:${source.analysis}`];
+      : 'analysis' in source
+        ? [`select created_at, user_id, team_id, store_id, null::text as job_id, true as is_final from analyses where id = $4`, source.analysis, `llm:analysis:${source.analysis}`]
+        : [`select created_at, user_id, team_id, store_id, null::text as job_id, true as is_final from remakes where id = $4`, source.remake, `llm:remake:${source.remake}:${source.step}`];
   const { rowCount } = await db.query(
     `insert into cost_entries (kind, usd, month, day, user_id, team_id, store_id, job_id, provider, model, is_final, ref)
      select 'llm', $1, to_char(s.created_at at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM'), (s.created_at at time zone 'Asia/Ho_Chi_Minh')::date,

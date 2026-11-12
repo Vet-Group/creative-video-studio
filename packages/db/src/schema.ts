@@ -578,6 +578,41 @@ export const analyses = pgTable('analyses', {
   finishedAt: tstz('finished_at'),
 });
 
+export const REMAKE_STATUSES = ['queued', 'running', 'succeeded', 'partial', 'failed'] as const;
+export type RemakeStatus = (typeof REMAKE_STATUSES)[number];
+
+// A Smart Remake: a member's product image put into chosen shots of one of their analyses (@cvs/core/analysis/remake). Like an analysis it is its
+// own entity off the jobs pipeline. `shots` are the chosen shot indices in order; `result` records each shot (its clip asset, cost or error) as the
+// worker goes, so a remake whose worker stopped still shows the clips it made. 'partial': some shots made clips. The product image and the output
+// may be purged with a deleted job's files, so those links are dropped rather than blocking the purge.
+export const remakes = pgTable(
+  'remakes',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'restrict' }),
+    teamId: text('team_id')
+      .notNull()
+      .references(() => teams.id, { onDelete: 'restrict' }),
+    storeId: text('store_id').references(() => stores.id, { onDelete: 'set null' }),
+    analysisId: text('analysis_id')
+      .notNull()
+      .references(() => analyses.id, { onDelete: 'restrict' }),
+    productAssetId: text('product_asset_id').references(() => assets.id, { onDelete: 'set null' }),
+    shots: jsonb('shots').notNull(),
+    status: text('status', { enum: REMAKE_STATUSES }).notNull().default('queued'),
+    result: jsonb('result'),
+    outputAssetId: text('output_asset_id').references(() => assets.id, { onDelete: 'set null' }),
+    costUsd: numeric('cost_usd', { precision: 12, scale: 6 }),
+    error: text('error'),
+    createdAt: tstz('created_at').notNull().defaultNow(),
+    startedAt: tstz('started_at'),
+    finishedAt: tstz('finished_at'),
+  },
+  (t) => [index('remakes_user_id_created_at_idx').on(t.userId, t.createdAt)],
+);
+
 // Each user's own favourites in the Library. They mark nothing on the job itself and go with the user or the job.
 export const favorites = pgTable(
   'favorites',

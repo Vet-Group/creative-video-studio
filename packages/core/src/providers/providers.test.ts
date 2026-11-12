@@ -298,6 +298,20 @@ function falFake(put = 200) {
   return { fn, calls };
 }
 
+describe('fal Smart Remake animate step', () => {
+  test('Seedance 1.0 Pro Fast gets the image, prompt, ratio and duration as its schema names them, at 720p, and is polled under its app', async () => {
+    const endpoint = 'fal-ai/bytedance/seedance/v1/pro/fast/image-to-video';
+    const { fn, calls } = fakeFetch([200, { request_id: 'r1' }], [200, { status: 'COMPLETED' }], [200, { video: { url: 'https://cdn/out.mp4' } }]);
+    const provider = createFalProvider({ apiKey: 'k', fetch: fn });
+    const model = { ...kling, endpoint, usdPerSecond: 0.0216 };
+    const { providerJobId } = await provider.submit({ ...base, imageUrls: ['https://img/1.jpg'], ratio: 'auto', model });
+    expect(calls[0]!.url).toBe(`https://queue.fal.run/${endpoint}`);
+    expect(calls[0]!.body).toEqual({ prompt: 'a bottle on a table', image_url: 'https://img/1.jpg', aspect_ratio: 'auto', duration: '5', resolution: '720p' });
+    expect(await provider.status({ providerJobId, model })).toEqual({ state: 'succeeded', outputUrl: 'https://cdn/out.mp4', costUsd: 0.108, costSource: 'estimate' });
+    expect(calls[1]!.url).toBe('https://queue.fal.run/fal-ai/bytedance/requests/r1/status');
+  });
+});
+
 describe('fal reference audio', () => {
   const read = async (url: string) => (url.includes('clip') ? { bytes: new Uint8Array([0x49, 0x44, 0x33]), contentType: url.endsWith('wav') ? 'audio/wav' : 'audio/mpeg' } : readImage(url));
 
