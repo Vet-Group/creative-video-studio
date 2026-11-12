@@ -27,6 +27,24 @@ export function s3(): S3Client {
 
 export const bucketName = () => env('S3_BUCKET');
 
+// Cloudflare R2 holds the direct browser uploads that the web app presigns (large videos). The asset's s3_key carries an
+// `r2:` prefix, so the worker reads such a source from R2 by the key alone — see apps/web/src/lib/storage.ts.
+const R2 = 'r2:';
+let r2Client: S3Client | undefined;
+function r2(): S3Client {
+  return (r2Client ??= new S3Client({
+    endpoint: env('R2_ENDPOINT'),
+    region: 'auto',
+    forcePathStyle: true,
+    credentials: { accessKeyId: env('R2_ACCESS_KEY_ID'), secretAccessKey: env('R2_SECRET_ACCESS_KEY') },
+  }));
+}
+
+/** The client, bucket and real object key for a stored key, reading the `r2:` prefix that marks an R2 object. */
+function loc(key: string): { client: S3Client; Bucket: string; Key: string } {
+  return key.startsWith(R2) ? { client: r2(), Bucket: env('R2_BUCKET'), Key: key.slice(R2.length) } : { client: s3(), Bucket: bucketName(), Key: key };
+}
+
 /** Creates the bucket when it is missing. */
 export async function ensureBucket(): Promise<void> {
   const Bucket = bucketName();
@@ -39,14 +57,17 @@ export async function ensureBucket(): Promise<void> {
 }
 
 export async function putObject(key: string, body: Uint8Array, contentType: string): Promise<void> {
-  await s3().send(new PutObjectCommand({ Bucket: bucketName(), Key: key, Body: body, ContentType: contentType }));
+  const { client, Bucket, Key } = loc(key);
+  await client.send(new PutObjectCommand({ Bucket, Key, Body: body, ContentType: contentType }));
 }
 
 export async function getObject(key: string): Promise<Uint8Array> {
-  const res = await s3().send(new GetObjectCommand({ Bucket: bucketName(), Key: key }));
+  const { client, Bucket, Key } = loc(key);
+  const res = await client.send(new GetObjectCommand({ Bucket, Key }));
   return res.Body!.transformToByteArray();
 }
 
 export async function deleteObject(key: string): Promise<void> {
-  await s3().send(new DeleteObjectCommand({ Bucket: bucketName(), Key: key }));
+  const { client, Bucket, Key } = loc(key);
+  await client.send(new DeleteObjectCommand({ Bucket, Key }));
 }
