@@ -13,6 +13,7 @@ import { readFalBalance } from '@cvs/core/providers/balances';
 import sharp from 'sharp';
 import type { SendLark } from './fal-alert';
 import { falNext } from './fal-next';
+import { failoverOnBilling } from './vertex-accounts';
 import type { WorkerDeps } from './worker';
 import { deleteObject, getObject, putObject } from './storage';
 
@@ -65,6 +66,8 @@ export const assetReader =
  */
 export function realProviders(
   pool: WorkerDeps['pool'], env: NodeJS.ProcessEnv = process.env, read?: (key: string) => Promise<Uint8Array>, send?: SendLark,
+  /** Runs the Vertex credits guard; called when Google refuses an account's calls because its billing is disabled (vertex-accounts.ts). */
+  rerunVertexGuard: () => Promise<unknown> = async () => undefined,
 ): Pick<WorkerDeps, 'providers' | 'imageProviders' | 'enhance' | 'suggest'> & { vertexAccounts: VertexAccount[] } {
   const readImage = assetReader(pool, read);
   const providers: WorkerDeps['providers'] = {};
@@ -107,9 +110,9 @@ export function realProviders(
       const by = (model: { endpoint: string }) => (model.endpoint === VERTEX_OMNI_MODEL ? omni : veo);
       return { submit: (req) => by(req.model).submit(req), status: (job) => by(job.model).status(job), cancel: (job) => by(job.model).cancel(job) };
     };
-    providers.vertex = pinToAccounts(accounts.map(({ project, key }) => [project, vertexVideo(project, key)]), active);
+    providers.vertex = pinToAccounts(accounts.map(({ project, key }) => [project, failoverOnBilling(project, vertexVideo(project, key), rerunVertexGuard)]), active);
     imageProviders.vertex = pinToAccounts(
-      accounts.map(({ project, key }) => [project, createVertexImageProvider({ key, project, region: env.GOOGLE_CLOUD_LOCATION || undefined, readImage, store: { put: putObject, get: getObject, delete: deleteObject } })]),
+      accounts.map(({ project, key }) => [project, failoverOnBilling(project, createVertexImageProvider({ key, project, region: env.GOOGLE_CLOUD_LOCATION || undefined, readImage, store: { put: putObject, get: getObject, delete: deleteObject } }), rerunVertexGuard)]),
       active,
     );
   }

@@ -10,7 +10,7 @@ import { createMockImageProvider, createMockProvider } from './mock-provider';
 import { realProviders } from './real-providers';
 import { fakeSuggester } from './suggest';
 import { ensureBucket } from './storage';
-import { VERTEX_TICK_MS, vertexTicker } from './vertex-accounts';
+import { VERTEX_TICK_MS, vertexTick, vertexTicker } from './vertex-accounts';
 import { startWorker } from './worker';
 
 const connectionString = databaseUrl();
@@ -20,7 +20,9 @@ if (process.env.NODE_ENV !== 'production') {
 }
 // The CVS Lark app's bot, for the fal alerts to the Admins (fal-alert.ts, fal-next.ts); only when the app is configured.
 const lark = process.env.LARK_APP_ID && process.env.LARK_APP_SECRET ? larkSender({ appId: process.env.LARK_APP_ID, appSecret: process.env.LARK_APP_SECRET }) : undefined;
-const real = realProviders(pool, process.env, undefined, lark);
+// Set below with the Vertex guard, which needs the providers' accounts; a Vertex billing refusal runs it at once instead of waiting for the hour.
+let vertexGuard: () => Promise<unknown> = async () => undefined;
+const real = realProviders(pool, process.env, undefined, lark, () => vertexGuard());
 const worker = await startWorker({
   pool,
   connectionString,
@@ -34,13 +36,12 @@ console.log(`worker ${worker.id} is running`);
 
 // The hourly Vertex credits guard and the daily invoice booking (docs/ops/vertex-accounts.md); unref'd so it never keeps the process alive.
 if (real.vertexAccounts.length) {
-  const ticker = vertexTicker(
-    pool,
-    real.vertexAccounts.map(({ project, key }) => {
-      const token = serviceAccountToken(key);
-      return { project, read: () => readVertexBilling({ project, token }) };
-    }),
-  );
+  const accounts = real.vertexAccounts.map(({ project, key }) => {
+    const token = serviceAccountToken(key);
+    return { project, read: () => readVertexBilling({ project, token }) };
+  });
+  const ticker = vertexTicker(pool, accounts);
+  vertexGuard = () => vertexTick(pool, accounts, new Date(), { book: false });
   const tick = () => ticker().catch((e) => console.error('worker: vertex tick:', e instanceof Error ? e.message : e));
   void tick();
   setInterval(tick, VERTEX_TICK_MS).unref();
