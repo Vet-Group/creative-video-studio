@@ -9,6 +9,8 @@ test('picks traits and two images, runs, saves a result as a model and finds it 
   await expect(run).toBeEnabled();
 
   // A niche pre-selects its traits, which stay editable; the cost line follows the number of images.
+  await selectValue(page, 'Phong cách (tuỳ chọn)', 'faith');
+  await expect(select(page, 'Nguồn gốc')).toContainText('Đa dạng');
   await selectValue(page, 'Phong cách (tuỳ chọn)', 'melanin');
   await expect(select(page, 'Nguồn gốc')).toContainText('Da đen / gốc Phi');
   await page.getByRole('radio', { name: 'Nam', exact: true }).check();
