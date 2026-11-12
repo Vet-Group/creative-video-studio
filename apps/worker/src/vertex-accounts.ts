@@ -2,7 +2,8 @@
 // and book Google's monthly Vertex total into the ledger once a UTC day. It runs in the worker process; no unit of its own.
 import { audit } from '@cvs/core/audit';
 import { bookInvoice, type LedgerPool, withTransaction } from '@cvs/core/ledger';
-import { activeAccount, creditState } from '@cvs/core/providers/vertex-accounts';
+import { type Pinnable, activeAccount, creditState } from '@cvs/core/providers/vertex-accounts';
+import { isBillingDisabled } from '@cvs/core/providers/vertex-billing-disabled';
 import type { VertexBilling } from '@cvs/core/providers/vertex-billing';
 
 /** The guard runs hourly, so a change in Admin Settings takes effect within the hour. */
@@ -11,6 +12,45 @@ export const VERTEX_TICK_MS = 60 * 60 * 1000;
 const log = (what: string, e: unknown) => console.error(`worker: vertex ${what}:`, e instanceof Error ? e.message : e);
 
 type Account = { project: string; read: () => Promise<VertexBilling> };
+
+/** A project whose billing account Google closed is skipped by the guard for this long, then tried again (the first job after it either works or is refused again). */
+export const BILLING_RETRY_MS = 30 * 60 * 1000;
+// In memory: a restarted worker forgets it and the first job after the start finds the block again. shortcut: one worker process, so no shared state.
+const blockedAt = new Map<string, number>();
+const billingBlocked = (project: string, now: number) => now - (blockedAt.get(project) ?? -Infinity) < BILLING_RETRY_MS;
+
+/**
+ * Watches one account's provider for Google's billing-disabled 403 (thrown by a submit or status, or carried by a failed status: the image provider
+ * keeps its HTTP error as the job's result). The first one marks the project blocked and runs `rerun` (the guard), which moves new jobs to the next
+ * account or, with none left, to none, so the pickers offer the fal twins. The job itself fails as it did.
+ */
+export function failoverOnBilling<R, J extends { providerJobId: string }, S>(project: string, inner: Pinnable<R, J, S>, rerun: () => Promise<unknown>): Pinnable<R, J, S> {
+  const seen = (message: unknown) => {
+    if (!isBillingDisabled(typeof message === 'string' ? message : undefined)) return;
+    const first = !billingBlocked(project, Date.now());
+    blockedAt.set(project, Date.now());
+    if (!first) return;
+    console.error(`worker: vertex: billing is disabled on ${project}; skipping it for ${BILLING_RETRY_MS / 60_000} minutes`);
+    void rerun().catch((e) => log('guard after billing block', e));
+  };
+  const watch = async <T>(call: () => Promise<T>): Promise<T> => {
+    try {
+      return await call();
+    } catch (e) {
+      seen(e instanceof Error ? e.message : e);
+      throw e;
+    }
+  };
+  return {
+    ...inner,
+    submit: (req) => watch(() => inner.submit(req)),
+    async status(job) {
+      const status = await watch(() => inner.status(job));
+      seen((status as { state?: string; error?: unknown }).state === 'failed' ? (status as { error?: unknown }).error : undefined);
+      return status;
+    },
+  };
+}
 
 /** One pass: the guard always, the booking when `book` is set. True when every account was read (so the booking, if asked, ran). `read` may throw, which counts as unreadable. */
 export async function vertexTick(pool: LedgerPool, accounts: Account[], now = new Date(), { book = true } = {}): Promise<boolean> {
@@ -30,7 +70,10 @@ export async function vertexTick(pool: LedgerPool, accounts: Account[], now = ne
             stop_when_credits_end as "stopWhenCreditsEnd" from vertex_accounts`,
   );
   const today = now.toISOString().slice(0, 10);
-  const states = accounts.map((a, i) => ({ project: a.project, state: creditState(rows.find((r) => r.project_id === a.project), results[i], today) }));
+  const states = accounts.map((a, i) => {
+    const state = creditState(rows.find((r) => r.project_id === a.project), results[i], today);
+    return { project: a.project, state: billingBlocked(a.project, now.getTime()) ? { ...state, usable: false } : state };
+  });
   const active = activeAccount(states);
   await withTransaction(pool, async (tx) => {
     const old = (await tx.query('select vertex_active_project as p from settings where id = 1 for update')).rows[0]?.p ?? null;

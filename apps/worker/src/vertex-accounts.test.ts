@@ -3,8 +3,8 @@ import { bookShared } from '@cvs/core/ledger';
 import type { SkuMonth, VertexBilling } from '@cvs/core/providers/vertex-billing';
 import { createPool } from '@cvs/db/client';
 import { createTestDatabase } from '@cvs/db/testing';
-import { afterAll, beforeEach, describe, expect, test } from 'vitest';
-import { vertexTick, vertexTicker } from './vertex-accounts';
+import { afterAll, beforeEach, describe, expect, test, vi } from 'vitest';
+import { BILLING_RETRY_MS, failoverOnBilling, vertexTick, vertexTicker } from './vertex-accounts';
 
 const testDb = await createTestDatabase();
 const pool = createPool(testDb.url);
@@ -52,6 +52,66 @@ describe('the credits guard', () => {
     expect((await switches()).at(-1)).toMatchObject({ old_value: { project: 'cvs-vertex', unverified: true } });
     await vertexTick(pool, [account('cvs-vertex', new Error('timeout'))], new Date('2026-11-10T02:00:00Z'));
     expect(await active()).toBeNull();
+  });
+});
+
+const BILLING_403 = 'vertex: HTTP 403 {"error":{"code":403,"message":"This API method requires billing to be enabled. Please enable billing on project #cvs-vertex by visiting https://console.developers.google.com/billing/enable?project=cvs-vertex then retry.","status":"PERMISSION_DENIED"}}';
+
+describe('a Vertex billing refusal', () => {
+  // The failures a provider can show: thrown by a submit (Veo), or kept as the failed result of a status (the image provider). `project` is unique per test: blocks live in memory.
+  const refused = (project: string, how: 'submit' | 'status' | 'failed-status', error: string, rerun = vi.fn(async () => undefined)) => {
+    const inner = {
+      submit: async () => {
+        if (how === 'submit') throw new Error(`submit failed: ${error}`);
+        return { providerJobId: 'p' };
+      },
+      status: async () => {
+        if (how === 'status') throw new Error(error);
+        return how === 'failed-status' ? { state: 'failed' as const, error, costUsd: 0, costSource: 'reported' as const } : { state: 'running' as const };
+      },
+      cancel: async () => ({ supported: false }),
+    };
+    return { provider: failoverOnBilling(project, inner, rerun), rerun };
+  };
+  const use = async (p: ReturnType<typeof refused>['provider'], how: 'submit' | 'status' | 'failed-status') => {
+    if (how === 'submit') await p.submit({} as never).catch(() => undefined);
+    else await p.status({ providerJobId: 'p' } as never).catch(() => undefined);
+  };
+
+  test.each(['submit', 'status', 'failed-status'] as const)('runs the guard once and still fails the job as before (%s)', async (how) => {
+    const { provider, rerun } = refused(`blocked-${how}`, how, BILLING_403);
+    await use(provider, how);
+    await use(provider, how);
+    expect(rerun).toHaveBeenCalledTimes(1);
+    if (how === 'submit') await expect(provider.submit({} as never)).rejects.toThrow('requires billing to be enabled');
+    if (how === 'failed-status') expect(await provider.status({ providerJobId: 'p' } as never)).toMatchObject({ state: 'failed', error: BILLING_403 });
+  });
+
+  test('does not run the guard for another 403', async () => {
+    const { provider, rerun } = refused('other-403', 'failed-status', 'vertex: HTTP 403 {"error":{"message":"Permission denied on resource project"}}');
+    await use(provider, 'failed-status');
+    expect(rerun).not.toHaveBeenCalled();
+  });
+
+  test('moves new jobs to the next account, or to none, and the guard takes the account back after the cool-down', async () => {
+    await pool.query(`insert into vertex_accounts (project_id) values ('next-billing')`);
+    const both = [account('first-billing', ok([])), account('next-billing', ok([]))];
+    const t0 = new Date(Date.now() - 60_000);
+    await vertexTick(pool, both, t0, { book: false });
+    expect(await active()).toBe('first-billing');
+
+    const { provider } = refused('first-billing', 'failed-status', BILLING_403, vi.fn(async () => void (await vertexTick(pool, both, new Date(), { book: false }))));
+    await use(provider, 'failed-status');
+    await vi.waitFor(async () => expect(await active()).toBe('next-billing'));
+    // The hourly tick keeps skipping it while the block lasts, and with the next one blocked too no account is left.
+    await vertexTick(pool, both, new Date(Date.now() + 1000), { book: false });
+    expect(await active()).toBe('next-billing');
+    await use(refused('next-billing', 'failed-status', BILLING_403).provider, 'failed-status');
+    await vertexTick(pool, both, new Date(), { book: false });
+    expect(await active()).toBeNull();
+    // Billing fixed: after the cool-down the first account is tried again.
+    await vertexTick(pool, both, new Date(Date.now() + BILLING_RETRY_MS + 1000), { book: false });
+    expect(await active()).toBe('first-billing');
   });
 });
 

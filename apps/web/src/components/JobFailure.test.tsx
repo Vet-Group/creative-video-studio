@@ -72,3 +72,13 @@ test('a clip whose sound BytePlus blocked says so, and can go once to its fal tw
   expect(canRetryOnTwin({ ...audio, twin })).toBe(true);
   expect(twinRetryText({ ...audio, twin })).toEqual({ button: 'Chạy lại trên fal.ai', ask: 'Chạy lại lượt tạo này bằng Seedance 2.0 Reference trên fal.ai với giá khoảng $1.8500?' });
 });
+
+test('a Vertex billing refusal tells a Member to pick the model again, and an Admin sees the raw error too', () => {
+  const error = 'vertex: HTTP 403 {"error":{"code":403,"message":"This API method requires billing to be enabled. Please enable billing on project #cvs-vertex"}}';
+  const member = renderToStaticMarkup(<JobFailureNote job={job({ error })} isAdmin={false} />);
+  expect(member).toContain('Vertex tạm ngưng do thanh toán Google Cloud');
+  expect(member).not.toContain(GENERIC);
+  expect(member).not.toContain('requires billing');
+  expect(renderToStaticMarkup(<JobFailureNote job={job({ error })} isAdmin />)).toContain('requires billing to be enabled');
+  expect(canRetry(job({ error }))).toBe(true);
+});

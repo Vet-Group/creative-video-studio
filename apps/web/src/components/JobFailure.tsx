@@ -1,4 +1,5 @@
 // What a job that did not finish says, in the tray and in a History card.
+import { isBillingDisabled } from '@cvs/core/providers/vertex-billing-disabled';
 import type { JobStatus, TrayJob } from '@/lib/api';
 import { type FailureReason, providerRefusal, TWIN_REASONS } from '@/lib/job-failure';
 
@@ -29,9 +30,12 @@ const REFUSAL_TEXT: Record<FailureReason, string> = {
   output_audio: 'Âm thanh tạo ra bị nhà cung cấp chặn vì có thể vi phạm bản quyền. Hãy tắt âm thanh hoặc bỏ yêu cầu về nhạc trong mô tả rồi chạy lại.',
 };
 
+// Google closed the billing account behind Vertex; the worker has already moved new jobs off it (docs/ops/vertex-accounts.md).
+const VERTEX_BILLING_TEXT = 'Vertex tạm ngưng do thanh toán Google Cloud. Hãy chọn lại mô hình (ứng dụng đã chuyển sang bản fal) rồi chạy lại.';
+
 /** The failure sentence for everyone; for an Admin the raw error too, folded under the provider's code when the input image was refused. */
 export function JobFailureNote({ job, isAdmin }: { job: TrayJob; isAdmin: boolean }) {
-  const text = job.failureReason ? REFUSAL_TEXT[job.failureReason] : FAILURE_TEXT(job.resolution ? 'ảnh' : 'clip')[job.status];
+  const text = job.failureReason ? REFUSAL_TEXT[job.failureReason] : isBillingDisabled(job.error) ? VERTEX_BILLING_TEXT : FAILURE_TEXT(job.resolution ? 'ảnh' : 'clip')[job.status];
   const refusal = job.failureReason ? providerRefusal(job.error) : null;
   return (
     <>

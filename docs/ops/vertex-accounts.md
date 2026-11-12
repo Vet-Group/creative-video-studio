@@ -51,6 +51,22 @@ released.
 A job keeps the account that took it: the provider job id starts with `acct:<project>|`, and status and cancel go to that account. An id without
 the prefix was sent before accounts existed and belongs to account 1, so jobs in flight survive a deploy.
 
+## Billing closed on a project
+
+The credits guard reads only the billing export, so it cannot see that Google closed a project's billing account (2026-11-11: every `cvs-vertex` job failed with
+HTTP 403 `This API method requires billing to be enabled`, status `PERMISSION_DENIED`, reason `BILLING_DISABLED`). The worker therefore also watches the
+calls themselves: a Vertex submit or status that fails with that refusal (`isBillingDisabled`, matched on "requires billing to be enabled",
+`BILLING_DISABLED` or "billing account ... closed/disabled"; any other 403 or a 429 does not count) marks that project billing-blocked and runs the guard at
+once. The guard skips a blocked project, so `settings.vertex_active_project` moves to the next usable account or, with none left, to null, and the
+pickers then offer the fal twins (`vertex.switch_account` is audited as usual, and the worker logs one line per block).
+
+The block is kept in the worker's memory, so there is no migration. It lasts 30 minutes and is renewed by every further refusal; the first hourly tick after it
+ends tries the project again, so the first job sent there either works (the project stays active, no action needed once billing is fixed) or is refused
+again (blocked again for another 30 minutes). While billing stays closed, expect about one failed job an hour on that project. A worker restart forgets the
+block: the start-up tick re-activates the project and its first job finds the block again. The failed job is not requeued; it fails and is settled as before,
+and a Member sees a line saying Vertex is paused over Google Cloud billing and to pick the model again. An Admin fixes the cause in the Google Cloud console (Billing >
+link a billing account to the project); nothing else needs to change.
+
 ## Daily ledger booking
 
 Once a UTC day (the first hourly tick of the day whose reads all succeed; a failed read retries the next hour), the tick books Google's Vertex
