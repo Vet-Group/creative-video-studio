@@ -8,7 +8,7 @@ import { useEffect, useRef, useState } from 'react';
 import { formatLabel } from '@/lib/analyze';
 import { api, errorText, sendJson } from '@/lib/api';
 import { Icon } from './Icon';
-import { copyError, uploadError, uploadImages } from './image-tools';
+import { copyError, uploadError, uploadVideoDirect } from './image-tools';
 import { ReferenceVideoSlot, type RefVideo } from './ReferenceVideo';
 
 interface AnalysisRow {
@@ -139,7 +139,7 @@ export function AnalyzeView() {
       <ReferenceVideoSlot
         video={video}
         busy={busy}
-        onFile={(f) => void takeVideo(() => uploadImages([f], 'video') as Promise<RefVideo[]>, (e) => uploadError(e, 'video'))}
+        onFile={(f) => void takeVideo(() => uploadVideoDirect(f).then((v) => [v]), (e) => uploadError(e, 'video'))}
         onHistory={(id) => void takeVideo(() => api<{ assets: RefVideo[] }>('/api/assets/copy', sendJson('POST', { assetId: id })).then((r) => r.assets), (e) => copyError(e, 'Không dùng được video này.'))}
         onRemove={() => {
           stopPoll();

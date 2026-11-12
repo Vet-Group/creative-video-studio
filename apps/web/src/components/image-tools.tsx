@@ -10,7 +10,8 @@ import { numberedSamples } from '@/lib/examples';
 import { useFashionModels } from '@/lib/use-fashion-models';
 import { useHydrated } from '@/lib/use-hydrated';
 import { useSamples } from '@/lib/use-samples';
-import { MAX_AUDIO_BYTES, MAX_BYTES, MAX_VIDEO_BYTES } from '@/lib/upload-limits';
+import { MAX_AUDIO_BYTES, MAX_BYTES, MAX_VIDEO_BYTES, MAX_VIDEO_BYTES_R2 } from '@/lib/upload-limits';
+import type { RefVideo } from './ReferenceVideo';
 import { AI_MODEL_SLOTS, slotOfLabel, UPLOAD_SLOTS, type UploadSlot } from '@/lib/upload-slots';
 import { type FashionModelItem, usable } from '@/lib/fashion-models';
 import { type Photo, Recreate, useForm, useFreshResults, useJobs, useRecreated } from './jobs';
@@ -239,6 +240,29 @@ export async function uploadImages(files: File[], kind: UploadKind = 'image', st
     out.push(...(await api<{ assets: Img[] }>('/api/assets', { method: 'POST', body: form })).assets);
   }
   return out;
+}
+
+/**
+ * Uploads one reference video straight to R2 for the /analyze page, past the request-body and tunnel caps: presign, PUT the
+ * file to storage, then record the input asset. A wrong type or an over-size file is refused before anything is sent.
+ */
+export async function uploadVideoDirect(file: File, storeId = ''): Promise<RefVideo> {
+  if (file.type && !KINDS.video.types.includes(file.type)) throw new Refused(wrongType('video', file.name));
+  if (file.size > MAX_VIDEO_BYTES_R2) throw new Refused(`Video${file.name && ` "${file.name}"`} quá lớn: tối đa ${MAX_VIDEO_BYTES_R2 / 1024 / 1024} MB.`);
+  const contentType = file.type || 'video/mp4';
+  const pre = await api<{ assetId: string; url: string } | { fallback: true }>('/api/assets/presign-video', sendJson('POST', { contentType, size: file.size }));
+  if ('fallback' in pre) {
+    const [img] = await uploadImages([file], 'video', storeId);
+    return { id: img!.id, filename: img!.filename, durationMs: 0, bytes: file.size };
+  }
+  const { assetId, url } = pre;
+  const put = await fetch(url, { method: 'PUT', headers: { 'content-type': contentType }, body: file });
+  if (!put.ok) throw new Error(`R2 PUT ${put.status}`);
+  const { asset } = await api<{ asset: { id: string; filename: string; durationMs: number | null; bytes: number } }>(
+    '/api/assets/finalize-video',
+    sendJson('POST', { assetId, filename: file.name, storeId: storeId || undefined }),
+  );
+  return { id: asset.id, filename: asset.filename, durationMs: asset.durationMs ?? 0, bytes: asset.bytes };
 }
 
 /**
