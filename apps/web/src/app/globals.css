@@ -2505,13 +2505,13 @@ dialog.modal.tool-guide { width: min(52rem, calc(100vw - 2rem)); }
 .library-list .lib-day { margin: 0; padding: 10px 16px 6px; border-top: 1px solid var(--hairline); }
 .library-list .lib-day:first-child { border-top: 0; }
 
-/* Try On before/after slider (CompareSlider): the result fills the frame, the original is clipped to the left of the handle. */
+/* Try On before/after slider (CompareSlider): the result fills the frame, the original is clipped to the left of the handle. The Before/After tags sit at the bottom, clear of the dialog close button. */
 .compare { position: relative; display: grid; width: 100%; height: 100%; min-height: 0; overflow: hidden; user-select: none; }
 .compare img { grid-area: 1 / 1; display: block; width: 100%; height: 100%; min-height: 0; object-fit: contain; }
 .compare-before { clip-path: inset(0 calc(100% - var(--at)) 0 0); }
 .compare-handle { position: absolute; top: 0; bottom: 0; left: var(--at); width: 2px; margin-left: -1px; background: var(--on-dark); box-shadow: 0 0 0 1px rgb(var(--shade) / .35); pointer-events: none; }
 .compare-handle::after { content: ''; position: absolute; top: 50%; left: 50%; width: 28px; height: 28px; border: 2px solid var(--on-dark); border-radius: 50%; background: rgb(var(--shade) / .45); transform: translate(-50%, -50%); }
-.compare-tag { position: absolute; top: 12px; padding: 2px 8px; border-radius: 999px; background: rgb(var(--shade) / .6); color: var(--on-dark); font-size: 12px; line-height: 18px; pointer-events: none; }
+.compare-tag { position: absolute; bottom: 12px; padding: 2px 8px; border-radius: 999px; background: rgb(var(--shade) / .6); color: var(--on-dark); font-size: 12px; line-height: 18px; pointer-events: none; }
 .compare-tag-before { left: 12px; }
 .compare-tag-after { right: 12px; }
 .compare input[type='range'] { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: ew-resize; }
