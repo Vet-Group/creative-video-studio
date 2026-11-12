@@ -2,7 +2,7 @@ import type { Analysis } from '@cvs/core/analysis/breakdown';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, test } from 'vitest';
 import { ANALYZE_EXAMPLES } from '@/lib/analyze-examples';
-import { AnalysisResult } from './AnalyzeView';
+import { AnalysisResult, AnalysisWithSource } from './AnalyzeView';
 
 const analysis: Analysis = {
   durationS: 11.4,
@@ -45,4 +45,16 @@ test('every read-only Example is well-formed and renders its Vietnamese display 
     expect(html).toContain(a.vi!.hook); // Vietnamese for reading
     expect(html).toContain(`href="/create?prompt=${encodeURIComponent(a.shots[0]!.prompt)}"`); // English prompt pushed to Create
   }
+});
+
+test('a finished analysis shows its input video beside the result, and omits the player when the source asset is gone', () => {
+  const base = { id: 'a1', status: 'succeeded' as const, result: analysis, error: null, createdAt: '2026-11-12T00:00:00Z' };
+  const withVideo = renderToStaticMarkup(<AnalysisWithSource row={{ ...base, sourceAssetId: 'vid-1' }} />);
+  expect(withVideo).toContain('src="/api/assets/vid-1/content"'); // the input video streams from its asset
+  expect(withVideo).toContain('preload="metadata"'); // first-frame poster, no transcode, light history list
+  expect(withVideo).toContain('Clean apparel presentation.'); // the result still renders beside it
+
+  const noVideo = renderToStaticMarkup(<AnalysisWithSource row={{ ...base, sourceAssetId: null }} />);
+  expect(noVideo).not.toContain('<video');
+  expect(noVideo).toContain('Clean apparel presentation.');
 });

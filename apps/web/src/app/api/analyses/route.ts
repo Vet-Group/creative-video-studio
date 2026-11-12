@@ -16,7 +16,8 @@ export async function GET(request: Request) {
   if (g.error) return g.error;
   const rows = (
     await pool.query(
-      `select id, status, provider, model, result, cost_usd as "costUsd", error, created_at as "createdAt", finished_at as "finishedAt"
+      `select id, status, provider, model, result, cost_usd as "costUsd", error, created_at as "createdAt", finished_at as "finishedAt",
+              (select a.id from assets a where a.s3_key = analyses.source_key) as "sourceAssetId"
          from analyses where user_id = $1 order by created_at desc limit 50`,
       [g.session.user.id],
     )
