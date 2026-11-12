@@ -68,6 +68,7 @@ export const USERS = {
   thinka: { email: 'thinka@e2e.test', name: 'E2E Thinking A', role: 'member' }, // thinking.e2e
   // create-extras.e2e: the end frame, a Run from the prompt alone and reference audio on Create video.
   cvxa: { email: 'cvxa@e2e.test', name: 'E2E Create Extras A', role: 'member' },
+  cvpr: { email: 'cvpr@e2e.test', name: 'E2E Create Prompt', role: 'member' }, // create-prompt.e2e: the ?prompt= prefill
   cvxr: { email: 'cvxr@e2e.test', name: 'E2E Create Extras Reuse', role: 'member' }, // its end frame and audio refilled from a template and from History
   famsa: { email: 'famsa@e2e.test', name: 'E2E Families A', role: 'member' }, // model-families.e2e
   passa: { email: 'passa@e2e.test', name: 'E2E Passkey A', role: 'member' }, // passkey.e2e
