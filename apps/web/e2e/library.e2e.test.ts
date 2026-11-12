@@ -42,6 +42,16 @@ test('Library tools: favourites only, oldest first, the size slider and the empt
   await page.getByLabel('Người tạo').selectOption({ label: 'E2E Member 4' });
   const position = async (id: string) => (await mine.evaluateAll((cards) => cards.map((c) => c.getAttribute('aria-label') ?? ''))).findIndex((l) => l.endsWith(`${id.slice(0, 8)}.mp4`));
   expect(await position(second)).toBeLessThan(await position(first));
+
+  // The copy-link button is always there; the creator filter shows as a removable chip, and clicking it clears just that filter.
+  await expect(page.getByRole('button', { name: 'Sao chép liên kết khung xem' })).toBeVisible();
+  const creatorChip = page.locator('.library-active').getByRole('button', { name: /Người tạo:/ });
+  await expect(creatorChip).toBeVisible();
+  await creatorChip.click();
+  await expect(page.getByLabel('Người tạo')).toHaveValue('');
+  await expect(page.locator('.library-active').getByRole('button', { name: /Người tạo:/ })).toHaveCount(0);
+  await page.getByLabel('Người tạo').selectOption({ label: 'E2E Member 4' }); // restore for the rest of the test
+
   await page.getByLabel('Sắp xếp').selectOption('oldest');
   await expect.poll(async () => (await position(first)) < (await position(second))).toBe(true);
 
@@ -75,7 +85,7 @@ test('Library views: grid or list remembered, a selection bar with the zip, sear
   const mineOnly = () => page.getByLabel('Người tạo').selectOption({ label: 'E2E Library View' });
   await mineOnly();
   await expect(page.getByRole('article')).toHaveCount(2);
-  await expect(page.getByText('1 bộ lọc', { exact: true })).toBeVisible();
+  await expect(page.locator('.library-active .library-chip')).toHaveCount(1); // the creator filter, as a removable chip
 
   // List rows keep the item names and actions; the card size belongs to the grid; the choice outlives a reload.
   const listView = page.getByRole('button', { name: 'Danh sách', exact: true });
@@ -140,7 +150,7 @@ test('Library views: grid or list remembered, a selection bar with the zip, sear
   // Search reads the model name; words that match nothing show the filtered-empty state, whose Xoá lọc clears every filter.
   const search = page.getByLabel('Tìm kiếm');
   await search.fill('mock e2e');
-  await expect(page.getByText('2 bộ lọc', { exact: true })).toBeVisible();
+  await expect(page.locator('.library-active .library-chip')).toHaveCount(2); // the creator filter and the search term, each a removable chip
   await expect(page.locator('.lib-row')).toHaveCount(2);
   await search.fill('no such words anywhere');
   await expect(page.getByText('Chưa có kết quả nào khớp bộ lọc.')).toBeVisible();

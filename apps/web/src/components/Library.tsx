@@ -6,7 +6,7 @@ import { FAULTS } from '@/lib/faults';
 import { featureLabel } from '@/lib/features';
 import { GALLERY_SAMPLES, numberedSamples } from '@/lib/examples';
 import { cardTitleOfFormat, HOOKS, LOCATIONS } from '@/lib/marketing';
-import { activeFilters, dayHeadings, filtersFromParams, type LibraryFilters, type LibraryView, libraryQuery, matchesVerdict, NO_FILTERS, readView, saveView, type VerdictFilter } from '@/lib/library-view';
+import { activeFilterChips, activeFilters, type ChipKey, dayHeadings, filtersFromParams, type LibraryFilters, type LibraryView, libraryQuery, matchesVerdict, NO_FILTERS, readView, saveView, type VerdictFilter } from '@/lib/library-view';
 import { reuseHref } from '@/lib/reuse';
 import { useSamples } from '@/lib/use-samples';
 import { CompareSlider } from './CompareSlider';
@@ -775,6 +775,7 @@ export function Library() {
   const [stores, setStores] = useState<StoreOption[]>([]);
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [guide, setGuide] = useState(false);
+  const [copied, setCopied] = useState(false); // the "copy link" button's brief confirmation
   const [unmarked, setUnmarked] = useState(0); // the items the viewer may mark that have no mark yet, for the verdict filter
   const latest = useRef(0);
   const set = (patch: Partial<LibraryFilters>) => setFilters((cur) => ({ ...cur, ...patch }));
@@ -794,6 +795,7 @@ export function Library() {
     }
   }, [pickDay]);
   const active = activeFilters(filters);
+  const chips = activeFilterChips(filters, { creator: creators.find((c) => c.id === filters.creator)?.name, kind: KINDS.find((k) => k.id === filters.kind)?.label });
   // An item that no longer matches Favourites only or the verdict filter leaves the list, so the next page's offset stays right; the detail view then shows the next one.
   const counted = useRef(new Set<string>()); // first marks already taken off the count: two quick marks on one item see the same unmarked render
   const uncount = (c: Clip | undefined) => {
@@ -962,6 +964,21 @@ export function Library() {
     setPickDay(false);
     setFilters((cur) => ({ ...NO_FILTERS, sort: cur.sort }));
   }
+  function clearOne(key: ChipKey) {
+    if (key === 'q') setSearch('');
+    else if (key === 'days' || key === 'date') (setPickDay(false), set({ days: '', date: '' }));
+    else if (key === 'kind') set({ kind: 'all' });
+    else if (key === 'favoritesOnly') set({ favoritesOnly: false });
+    else if (key === 'examplesOnly') set({ examplesOnly: false });
+    else set({ [key]: '' } as Partial<LibraryFilters>);
+  }
+  // Copy the address as it stands, so the current filters and any open item travel to whoever gets the link.
+  function copyLink() {
+    void navigator.clipboard.writeText(window.location.href).then(
+      () => (setCopied(true), void setTimeout(() => setCopied(false), 1500)),
+      () => {},
+    );
+  }
 
   useEffect(() => {
     if (isAdmin) api<{ stores: StoreOption[] }>('/api/admin/stores?includeHidden=1').then((r) => setStores(r.stores), () => null);
@@ -1007,6 +1024,10 @@ export function Library() {
           </label>
         )}
         {zip.toggle}
+        <button type="button" className="icon-button library-share" onClick={copyLink} aria-label="Sao chép liên kết khung xem" title="Sao chép liên kết khung xem">
+          <Icon name={copied ? 'check' : 'link'} />
+          {copied && <span className="sr-only">Đã sao chép liên kết.</span>}
+        </button>
       </div>
       <div className="kinds" role="group" aria-label="Loại">
         {KINDS.map((k) => (
@@ -1082,7 +1103,13 @@ export function Library() {
         )}
         {active > 0 && (
           <span className="library-active">
-            <span>{active} bộ lọc</span>
+            {chips.map((c) => (
+              <button key={c.key} type="button" className="library-chip" onClick={() => clearOne(c.key)} title={`Bỏ lọc: ${c.label}`}>
+                <span>{c.label}</span>
+                <span aria-hidden="true">×</span>
+                <span className="sr-only">— bỏ lọc</span>
+              </button>
+            ))}
             <button type="button" className="link-button" onClick={clearFilters}>
               Xoá lọc
             </button>
