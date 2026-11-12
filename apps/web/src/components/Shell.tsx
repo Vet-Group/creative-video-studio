@@ -5,6 +5,8 @@ import { usePathname } from 'next/navigation';
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { api, errorText, type JobStatus, sendJson, thumbUrl, type TrayJob } from '@/lib/api';
 import { appBySlug } from '@/lib/apps';
+import type { ChangeEntry } from '@/lib/changelog';
+import { CHANGELOG_SEEN_EVENT, loadSeen, unseenEntries } from '@/lib/changelog-seen';
 import { featureLabel } from '@/lib/features';
 import { cardTitleOfFormat } from '@/lib/marketing';
 import { canReuse, refillFrom, reuseHref } from '@/lib/reuse';
@@ -13,6 +15,7 @@ import { COLLAPSED_COOKIE, isMac, isSettingsShortcut, navGroups } from '@/lib/si
 import { confirmRun } from '@/lib/run-guard';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { AccountMenu } from './AccountMenu';
+import { ChangelogPopup } from './ChangelogPopup';
 import { ConfirmHost, confirmDialog } from './Confirm';
 import { FalLowNotice } from './FalLowNotice';
 import { Icon, type IconName } from './Icon';
@@ -446,11 +449,12 @@ const PAGE_TITLES: [prefix: string, title: string][] = [
   ['/marketing-studio', 'Marketing Studio'],
   ['/apps', 'Ứng dụng'],
   ['/library', 'Thư viện'],
+  ['/changelog', 'Có gì mới'],
   ['/admin', 'Quản trị'],
   ['/account', 'Phương thức đăng nhập'],
 ];
 
-export function Shell({ userId, userName, isAdmin, feedbackNew = 0, analyzeEnabled = false, account, larkPrompt = false, initialCollapsed, children }: { userId: string; userName: string; isAdmin: boolean; feedbackNew?: number; analyzeEnabled?: boolean; account: Account; /** Show the once-a-day reminder to link Lark (lib/lark-prompt.ts). */ larkPrompt?: boolean; initialCollapsed: boolean; children: ReactNode }) {
+export function Shell({ userId, userName, isAdmin, feedbackNew = 0, analyzeEnabled = false, account, larkPrompt = false, changelog = [], initialCollapsed, children }: { userId: string; userName: string; isAdmin: boolean; feedbackNew?: number; analyzeEnabled?: boolean; account: Account; /** Show the once-a-day reminder to link Lark (lib/lark-prompt.ts). */ larkPrompt?: boolean; /** The newest entries this user may read (lib/changelog-seen.ts), for the sidebar dot and the once-a-day popup. */ changelog?: ChangeEntry[]; initialCollapsed: boolean; children: ReactNode }) {
   const pathname = usePathname();
   const narrow = useMediaQuery(NARROW);
   const [open, setOpen] = useState(false); // the drawer, below 1024 px
@@ -460,14 +464,23 @@ export function Shell({ userId, userName, isAdmin, feedbackNew = 0, analyzeEnabl
   const [settings, setSettings] = useState<Section | null>(null); // the open Settings dialog's first section
   const [guide, setGuide] = useState(false); // the "Chọn công cụ nào?" dialog
   const openGuide = useCallback(() => (setOpen(false), setGuide(true)), []);
+  const [changelogDot, setChangelogDot] = useState(false); // entries the member has not seen: the red dot on the changelog item
+  useEffect(() => {
+    const sync = () => setChangelogDot(unseenEntries(changelog, loadSeen(changelog)).length > 0);
+    sync();
+    window.addEventListener(CHANGELOG_SEEN_EVENT, sync);
+    return () => window.removeEventListener(CHANGELOG_SEEN_EVENT, sync);
+  }, [changelog]);
   const [hintOff, setHintOff] = useState(false); // Esc hides a sidebar line until focus or the pointer moves on
-  const link = (href: string, text: string, icon: IconName, current = pathname === href, badge?: string, hint?: string) => {
+  const link = (href: string, text: string, icon: IconName, current = pathname === href, badge?: string, hint?: string, dot = false) => {
     const a = (
       <Link key={href} href={href} aria-current={current ? 'page' : undefined} aria-describedby={hint ? `nav-hint-${icon}` : undefined} title={collapsed && !hint ? text : undefined}>
         <span className="nav-icon">
           <Icon name={icon} size={16} filled />
+          {dot && <span className="nav-dot" aria-hidden="true" />}
         </span>
         <span className="nav-label">{text}</span>
+        {dot && <span className="sr-only"> (có mục mới)</span>}
         {badge && <span className="nav-badge" aria-hidden="true">{badge}</span>}
       </Link>
     );
@@ -562,7 +575,7 @@ export function Shell({ userId, userName, isAdmin, feedbackNew = 0, analyzeEnabl
                         {g.items.some((n) => n.hint) && <ToolGuideButton className="nav-guide">Chọn công cụ nào?</ToolGuideButton>}
                       </div>
                     )}
-                    {g.items.map((n) => link(n.href, n.text, n.icon, current(n.href), n.badge, n.hint))}
+                    {g.items.map((n) => link(n.href, n.text, n.icon, current(n.href), n.badge, n.hint, n.href === '/changelog' && changelogDot))}
                   </div>
                 ))}
               </nav>
@@ -578,6 +591,7 @@ export function Shell({ userId, userName, isAdmin, feedbackNew = 0, analyzeEnabl
                 {accountMenu('avatar')}
               </header>
               {isAdmin && <FalLowNotice />}
+              <ChangelogPopup entries={changelog} larkPrompt={larkPrompt} />
               {larkPrompt && <LarkLinkPrompt />}
               <div className="frame">
                 <main>{children}</main>

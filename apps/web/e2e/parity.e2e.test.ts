@@ -649,7 +649,7 @@ for (const width of [1440, 1280, 390]) {
       });
     // The account chip closes the sidebar (the top bar's avatar below 1024 px); the open tab takes the tab stop.
     const account = 'Tài khoản: E2E Member 5';
-    const order = wideScreen ? ['Thu gọn thanh bên', 'Khám phá', 'Chọn công cụ nào?', 'Thử đồ', 'Tạo ảnh', 'Tạo video', 'Marketing Studio', 'Ứng dụng', 'Thư viện', 'Góp ý', account, 'Ví dụ'] : ['Mở menu', account, 'Tạo'];
+    const order = wideScreen ? ['Thu gọn thanh bên', 'Khám phá', 'Chọn công cụ nào?', 'Thử đồ', 'Tạo ảnh', 'Tạo video', 'Marketing Studio', 'Ứng dụng', 'Thư viện', 'Góp ý', 'Có gì mới (có mục mới)', account, 'Ví dụ'] : ['Mở menu', account, 'Tạo'];
 
     for (const name of order) {
       await page.keyboard.press('Tab');

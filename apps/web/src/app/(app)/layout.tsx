@@ -3,6 +3,8 @@ import { redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { Shell } from '@/components/Shell';
 import { reaAnalyzeEnabled } from '@/lib/analyze';
+import { CHANGELOG } from '@/lib/changelog';
+import { visibleEntries } from '@/lib/changelog-seen';
 import { googleLoginEnabled, larkLoginEnabled, pool } from '@/lib/auth';
 import { currentUser } from '@/lib/current-user';
 import { needsLarkPrompt } from '@/lib/lark-prompt';
@@ -39,7 +41,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   };
   const larkPrompt = needsLarkPrompt({ larkEnabled: larkLoginEnabled, system: user.system === true, providers: account.methods.map((m) => m.provider) });
   return (
-    <Shell userId={user.id} userName={user.name} isAdmin={isAdmin} feedbackNew={feedbackNew} analyzeEnabled={reaAnalyzeEnabled()} account={account} larkPrompt={larkPrompt} initialCollapsed={(await cookies()).get(COLLAPSED_COOKIE)?.value === '1'}>
+    <Shell userId={user.id} userName={user.name} isAdmin={isAdmin} feedbackNew={feedbackNew} analyzeEnabled={reaAnalyzeEnabled()} account={account} larkPrompt={larkPrompt} changelog={visibleEntries(CHANGELOG, isAdmin).slice(0, 10)} initialCollapsed={(await cookies()).get(COLLAPSED_COOKIE)?.value === '1'}>
       {children}
     </Shell>
   );
