@@ -12,13 +12,14 @@ import { api, errorText, sendJson } from '@/lib/api';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { About } from './About';
 import { Icon } from './Icon';
+import { AnalysisHistory } from './AnalysisHistory';
 import { copyError, uploadError, uploadVideoDirect, WorkTabs } from './image-tools';
 import { ReferenceVideoSlot, type RefVideo } from './ReferenceVideo';
 
 type Tab = 'create' | 'history' | 'examples' | 'about';
 const TAB_LABEL: Record<Tab, string> = { create: 'Phân tích', history: 'Lịch sử', examples: 'Ví dụ', about: 'Giới thiệu' };
 
-interface AnalysisRow {
+export interface AnalysisRow {
   id: string;
   status: 'queued' | 'running' | 'succeeded' | 'failed';
   result: Analysis | null;
@@ -107,6 +108,7 @@ export function AnalyzeView() {
   const [current, setCurrent] = useState<AnalysisRow | null>(null);
   const [history, setHistory] = useState<AnalysisRow[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
+  const [historyError, setHistoryError] = useState(false);
   const poll = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   // The id the poll chain is following; cleared on unmount, remove or a History pick so an in-flight fetch does not
   // reschedule itself or write its row over a newer selection after the chain was meant to stop.
@@ -118,8 +120,9 @@ export function AnalyzeView() {
 
   const loadHistory = () => {
     setHistoryLoading(true);
+    setHistoryError(false);
     return api<{ analyses: AnalysisRow[] }>('/api/analyses')
-      .then((r) => setHistory(r.analyses), () => {})
+      .then((r) => setHistory(r.analyses), () => setHistoryError(true))
       .finally(() => setHistoryLoading(false));
   };
   useEffect(() => {
@@ -226,9 +229,16 @@ export function AnalyzeView() {
               </p>
             )}
             {current?.status === 'failed' && (
-              <p className="error" role="alert">
-                Phân tích không thành công. Hãy thử lại với video khác.
-              </p>
+              <>
+                <p className="error" role="alert">
+                  Phân tích không thành công. Hãy thử lại với video khác.
+                </p>
+                {video && current.sourceAssetId === video.id && (
+                  <button type="button" className="link-button" disabled={busy || running} onClick={() => void analyse()}>
+                    Thử lại
+                  </button>
+                )}
+              </>
             )}
             {current?.status === 'succeeded' && current.result && <AnalysisWithSource row={current} />}
           </div>
@@ -238,23 +248,7 @@ export function AnalyzeView() {
           {shown === 'history' ? (
             <section className="analysis-history">
               <h2>Gần đây</h2>
-              {historyLoading && history.length === 0 ? (
-                <p className="muted" role="status">
-                  Đang tải…
-                </p>
-              ) : history.length === 0 ? (
-                <p className="muted">Chưa có phân tích nào. Chọn một video rồi bấm Phân tích để bắt đầu.</p>
-              ) : (
-                <ul>
-                  {history.map((a) => (
-                    <li key={a.id}>
-                      <button type="button" className="link-button" disabled={a.status !== 'succeeded' || !a.result} onClick={() => pick(a)}>
-                        {a.result ? formatLabel(a.result.format) || 'Video' : a.status === 'failed' ? 'Không thành công' : 'Đang xử lý'} · {new Date(a.createdAt).toLocaleString('vi-VN')}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
+              <AnalysisHistory loading={historyLoading} error={historyError} items={history} onRetry={() => void loadHistory()} onPick={pick} />
             </section>
           ) : shown === 'examples' ? (
             <Examples />

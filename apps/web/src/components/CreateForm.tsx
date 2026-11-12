@@ -800,8 +800,14 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
           <div className="runbar">
             <RunSummary items={[chosen?.label, ratio, `${durationSec} giây`, audioOn && 'có âm thanh']} />
             <button type="button" className="primary run" disabled={!canRun} aria-describedby={tooLong ? tooLongId : undefined} onClick={() => void run()}>
-              Tạo video
-              {chosen && <span className="run-cost">· ${audioOn ? chosen.audioEstimateUsd : chosen.estimateUsd}</span>}
+              {busy ? (
+                'Đang gửi…'
+              ) : (
+                <>
+                  Tạo video
+                  {chosen && <span className="run-cost">· ${audioOn ? chosen.audioEstimateUsd : chosen.estimateUsd}</span>}
+                </>
+              )}
             </button>
           </div>
         </div>

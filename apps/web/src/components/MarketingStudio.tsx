@@ -803,9 +803,15 @@ export function MarketingStudio({ format = 'ugc', reuse, wizardDefault = false }
               </button>
             ) : (
               <button type="button" className="primary run" disabled={!canRun} aria-describedby={(reason ?? short) ? reasonId : undefined} onClick={() => void run()}>
-                Tạo video
-                {n > 1 && ` ${n} clip`}
-                {chosen && <span className="run-cost">· {fresh ? `$${total}` : '…'}</span>} {/* the estimate is for the duration of the last list */}
+                {busy ? (
+                  'Đang gửi…'
+                ) : (
+                  <>
+                    Tạo video
+                    {n > 1 && ` ${n} clip`}
+                    {chosen && <span className="run-cost">· {fresh ? `$${total}` : '…'}</span>} {/* the estimate is for the duration of the last list */}
+                  </>
+                )}
               </button>
             )}
           </div>
