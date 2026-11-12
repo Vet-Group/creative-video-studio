@@ -10,7 +10,6 @@ import { APPS, type AppConfig, appInputs, appReason, type AppCategory, motionRea
 import { basePrompt, promptTooLong } from '@/lib/prompt-limit';
 import { confirmRun } from '@/lib/run-guard';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
-import { useHydrated } from '@/lib/use-hydrated';
 import { useRecall } from '@/lib/use-recall';
 import { cardSample } from '@/lib/examples';
 import { useSamples } from '@/lib/use-samples';
@@ -22,6 +21,7 @@ import { FormContext, useJobs } from './jobs';
 import { type ModelOption, ModelPicker } from './ModelPicker';
 import { PromptComposer } from './PromptComposer';
 import { PromptPreview } from './PromptSections';
+import { ReferenceVideoSlot } from './ReferenceVideo';
 import { Select } from './Select';
 import { Tray } from './Shell';
 import { Templates } from './Templates';
@@ -286,7 +286,7 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
           <div className="runbar">
             <button type="button" className="primary run" disabled={!canRun} aria-describedby={reason ? reasonId : undefined} onClick={() => void run()}>
               Chạy
-              {pick.estimate !== undefined && <span className="run-cost">· ${pick.estimate}</span>}
+              {busy ? <span className="run-cost">· Đang gửi…</span> : pick.estimate !== undefined && <span className="run-cost">· ${pick.estimate}</span>}
             </button>
           </div>
         </div>
@@ -333,51 +333,6 @@ interface RefVideo {
 }
 type MotionModel = ModelOption & { durationsSec: number[]; maxPromptChars: number };
 type Uploaded = Img & { durationMs: number | null };
-
-/** Motion Control's video slot: one MP4 or MOV, shown with its length. */
-function VideoSlot({ video, busy, onAdd, onRemove }: { video: RefVideo | null; busy: boolean; onAdd: (file: File) => void; onRemove: () => void }) {
-  const hydrated = useHydrated();
-  const input = useRef<HTMLInputElement>(null);
-  const labelId = useId();
-  return (
-    <div className="field">
-      <span id={labelId} className="field-label">
-        Video chuyển động
-      </span>
-      <div className="slot" role="group" aria-labelledby={labelId}>
-        <input
-          ref={input}
-          type="file"
-          accept="video/mp4,video/quicktime"
-          hidden
-          aria-label="Tệp video chuyển động"
-          disabled={!hydrated}
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            e.target.value = '';
-            if (file) onAdd(file);
-          }}
-        />
-        {video ? (
-          <ul className="slot-thumbs" aria-label="Video chuyển động: video đã chọn">
-            <li>
-              <video src={`/api/assets/${video.id}/content`} muted playsInline preload="metadata" aria-label={video.filename} />
-              <button type="button" aria-label={`Bỏ video ${video.filename}`} onClick={onRemove}>
-                <Icon name="x" size={12} />
-              </button>
-            </li>
-          </ul>
-        ) : (
-          <button type="button" className="slot-add" aria-label="Tải lên Video chuyển động" disabled={!hydrated || busy} onClick={() => input.current?.click()}>
-            <Icon name="plus" size={16} />
-            <span>Tải lên</span>
-          </button>
-        )}
-        <span className="slot-hint">{video ? `${video.filename} · ${(video.durationMs / 1000).toFixed(1)} giây` : 'Thêm 1 video MP4 hoặc MOV, 3 đến 30 giây, tối đa 20 MB'}</span>
-      </div>
-    </div>
-  );
-}
 
 /** Motion Control: a character image and a reference video, a model of the feature, an optional prompt. The cost follows the video's length. */
 function MotionForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
@@ -435,6 +390,20 @@ function MotionForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
     }
   }
 
+  // A History clip is copied as the member's own input, as Marketing Advanced's reference video is.
+  async function copyVideo(assetId: string) {
+    setError('');
+    setBusy(true);
+    try {
+      const [v] = (await api<{ assets: RefVideo[] }>('/api/assets/copy', sendJson('POST', { assetId }))).assets;
+      if (v) setVideo({ id: v.id, filename: v.filename, durationMs: v.durationMs });
+    } catch (e) {
+      setError(copyError(e, 'Không dùng được video này.'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function run() {
     if (!(await confirmRun(chosen?.estimateUsd))) return;
     setBusy(true);
@@ -480,10 +449,15 @@ function MotionForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
                 onAdd={(files) => void upload(files, setImage, 'image')}
                 onRemove={() => setImage([])}
               />
-              <VideoSlot
+              <ReferenceVideoSlot
+                label="Video chuyển động"
+                optional={false}
+                fileLabel="Tệp video chuyển động"
+                hint="Thêm 1 video MP4 hoặc MOV, 3 đến 30 giây, tối đa 20 MB"
                 video={video}
                 busy={busy}
-                onAdd={(file) => void upload([file], ([v]) => v && setVideo({ id: v.id, filename: v.filename, durationMs: v.durationMs ?? 0 }), 'video')}
+                onFile={(file) => void upload([file], ([v]) => v && setVideo({ id: v.id, filename: v.filename, durationMs: v.durationMs ?? 0 }), 'video')}
+                onHistory={(id) => void copyVideo(id)}
                 onRemove={() => setVideo(null)}
               />
             </div>
@@ -522,7 +496,7 @@ function MotionForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
           <div className="runbar">
             <button type="button" className="primary run" disabled={!canRun} aria-describedby={reason ? reasonId : undefined} onClick={() => void run()}>
               Chạy
-              {video && chosen && <span className="run-cost">· ${chosen.estimateUsd}</span>}
+              {busy ? <span className="run-cost">· Đang gửi…</span> : video && chosen && <span className="run-cost">· ${chosen.estimateUsd}</span>}
             </button>
           </div>
         </div>

@@ -1,12 +1,12 @@
 'use client';
 import Link from 'next/link';
-import { type CSSProperties, type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
+import { type CSSProperties, Fragment, type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { api, type Clip, errorText, sendJson, thumbUrl } from '@/lib/api';
 import { FAULTS } from '@/lib/faults';
 import { featureLabel } from '@/lib/features';
 import { GALLERY_SAMPLES, numberedSamples } from '@/lib/examples';
 import { cardTitleOfFormat, HOOKS, LOCATIONS } from '@/lib/marketing';
-import { activeFilters, type LibraryFilters, type LibraryView, libraryQuery, matchesVerdict, NO_FILTERS, readView, saveView, type VerdictFilter } from '@/lib/library-view';
+import { activeFilters, dayHeadings, type LibraryFilters, type LibraryView, libraryQuery, matchesVerdict, NO_FILTERS, readView, saveView, type VerdictFilter } from '@/lib/library-view';
 import { reuseHref } from '@/lib/reuse';
 import { useSamples } from '@/lib/use-samples';
 import { Icon } from './Icon';
@@ -755,6 +755,7 @@ export function Library() {
   const [view, setView] = useState<LibraryView>('grid');
   const [size, setSize] = useState(1);
   const [clips, setClips] = useState<Clip[]>([]);
+  const headings = dayHeadings(clips);
   const [creators, setCreators] = useState<{ id: string; name: string }[]>([]);
   const [hasMore, setHasMore] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -1089,8 +1090,9 @@ export function Library() {
       )}
       <div className={view === 'list' ? 'library-list' : 'grid'} style={{ '--card-min': SIZES[size] } as CSSProperties} aria-busy={state === 'loading'} hidden={clips.length === 0}>
         {clips.map((c, i) => (
+          <Fragment key={c.id}>
+          {headings.has(i) && <h2 className="lib-day">{headings.get(i)}</h2>}
           <ClipCard
-            key={c.id}
             clip={c}
             view={view}
             select={zip.check(c.id, c.downloadName)}
@@ -1101,6 +1103,7 @@ export function Library() {
             }}
             onOpen={() => setDetail(i)}
           />
+          </Fragment>
         ))}
       </div>
       {detail !== null && clips[detail] && <ClipDetail clips={clips} index={detail} stores={isAdmin ? stores : undefined} admin={isAdmin} onIndex={setDetail} onChange={update} />}

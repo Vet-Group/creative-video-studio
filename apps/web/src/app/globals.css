@@ -2498,3 +2498,9 @@ dialog.modal.tool-guide { width: min(52rem, calc(100vw - 2rem)); }
 .explore-news .explore-start-head h2 { margin-bottom: 12px; }
 .changelog-popup { display: grid; gap: 8px; margin: 12px 0 0; padding: 0; list-style: none; }
 .changelog-popup li { display: flex; align-items: center; gap: 8px; font-size: 14px; line-height: 20px; color: var(--ink); }
+
+/* polish: uploads + job progress (Library day headings; added by the uploads/progress batch, the other batch has its own section) */
+.lib-day { grid-column: 1 / -1; margin: 8px 0 -4px; font-size: 13px; line-height: 20px; font-weight: 600; color: var(--muted); }
+.lib-day:first-child { margin-top: 0; }
+.library-list .lib-day { margin: 0; padding: 10px 16px 6px; border-top: 1px solid var(--hairline); }
+.library-list .lib-day:first-child { border-top: 0; }

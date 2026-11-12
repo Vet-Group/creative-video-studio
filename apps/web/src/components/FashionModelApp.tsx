@@ -229,7 +229,7 @@ export function FashionModelApp({ app, isAdmin }: { app: AppConfig; isAdmin: boo
           <div className="runbar">
             <button type="button" className="primary run" disabled={!canRun} aria-describedby={minor || reason ? reasonId : undefined} onClick={() => void run()}>
               Chạy
-              {chosen && <span className="run-cost">· ${usd(total)}</span>}
+              {running ? <span className="run-cost">· Đang gửi…</span> : chosen && <span className="run-cost">· ${usd(total)}</span>}
             </button>
           </div>
         </div>

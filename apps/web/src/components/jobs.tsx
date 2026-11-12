@@ -18,6 +18,14 @@ const TITLE_NEWS_MS = 8_000;
 const BASE_TITLE = 'Creative Video Studio';
 const FINISHED = ['succeeded', 'failed', 'failed_unknown', 'timed_out'];
 
+/** How long an unfinished job has waited or run, so a slow job does not look stuck; nothing once it finished. The 5 s poll re-renders it. */
+export function elapsedLabel(job: { status: string; createdAt: string }, now = Date.now()): string | null {
+  if (FINISHED.includes(job.status)) return null;
+  const min = Math.floor((now - Date.parse(job.createdAt)) / 60_000);
+  if (min < 1) return 'vừa gửi';
+  return `${job.status === 'queued' ? 'đã chờ' : 'đã chạy'} ${min < 60 ? `${min} phút` : `${Math.floor(min / 60)} giờ ${min % 60} phút`}`;
+}
+
 export interface Toast {
   id: number;
   ok: boolean;

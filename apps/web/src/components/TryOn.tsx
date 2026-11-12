@@ -267,7 +267,7 @@ export function TryOn({ reuse }: { reuse?: string }) {
           <div className="runbar">
             <button type="button" className="primary run" disabled={!canRun} aria-describedby={reason ? reasonId : undefined} onClick={() => void run()}>
               Thử đồ
-              {pick.estimate !== undefined && <span className="run-cost">· ${pick.estimate}</span>}
+              {busy ? <span className="run-cost">· Đang gửi…</span> : pick.estimate !== undefined && <span className="run-cost">· ${pick.estimate}</span>}
             </button>
           </div>
         </div>

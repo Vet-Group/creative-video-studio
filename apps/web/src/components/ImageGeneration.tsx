@@ -231,7 +231,7 @@ ${style.prompt}` : prompt.trim();
           <div className="runbar">
             <button type="button" className="primary run" disabled={!canRun} aria-describedby={reason ? 'imagegen-reason' : undefined} onClick={() => void run()}>
               Tạo ảnh
-              {pick.estimate !== undefined && <span className="run-cost">· ${pick.estimate}</span>}
+              {busy ? <span className="run-cost">· Đang gửi…</span> : pick.estimate !== undefined && <span className="run-cost">· ${pick.estimate}</span>}
             </button>
           </div>
         </div>

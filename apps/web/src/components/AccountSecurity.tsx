@@ -121,7 +121,7 @@ export function Sessions() {
     setBusy(false);
   }
 
-  if (!sessions) return error ? <LoadError text={error} onRetry={() => (setError(''), load())} /> : <p className="muted">Đang tải phiên đăng nhập...</p>;
+  if (!sessions) return error ? <LoadError text={error} onRetry={() => (setError(''), load())} /> : <p className="muted" role="status">Đang tải phiên đăng nhập...</p>;
   const others = sessions.filter((s) => !s.current).length;
   const hidden = sessions.length - SESSIONS_SHOWN;
   return (

@@ -1,4 +1,5 @@
-// The Library page's filters as the /api/library query, how many of them narrow the list, and the grid or list view remembered per browser.
+// The Library page's filters as the /api/library query, how many of them narrow the list, the day headings, and the grid or list view remembered per browser.
+import { vnDay } from './lark-prompt';
 
 /** The verdict filter: every item (''), the unmarked ones, any Pass (a featured one too), only featured, or Fail. */
 export type VerdictFilter = '' | 'none' | 'pass' | 'featured' | 'fail';
@@ -64,4 +65,23 @@ export function saveView(view: LibraryView): void {
   try {
     localStorage.setItem(VIEW_KEY, view);
   } catch {} // blocked storage: the view lasts for this visit
+}
+
+/**
+ * The day heading before each item that starts a new Vietnam day, keyed by the item's index (today, yesterday, else the weekday and date), as ComfyUI's job list groups by day.
+ * A list that is all one day gets none: a single heading would add nothing.
+ */
+export function dayHeadings(items: { createdAt: string }[], now = new Date()): Map<number, string> {
+  const days = items.map((it) => vnDay(new Date(it.createdAt)));
+  const out = new Map<number, string>();
+  if (new Set(days).size < 2) return out;
+  const today = vnDay(now);
+  const yesterday = vnDay(new Date(now.getTime() - 86_400_000));
+  const long = new Intl.DateTimeFormat('vi-VN', { weekday: 'long', day: 'numeric', month: 'numeric', year: 'numeric', timeZone: 'Asia/Ho_Chi_Minh' });
+  days.forEach((d, i) => {
+    if (i > 0 && d === days[i - 1]) return;
+    const label = d === today ? 'Hôm nay' : d === yesterday ? 'Hôm qua' : long.format(new Date(items[i]!.createdAt));
+    out.set(i, label[0]!.toUpperCase() + label.slice(1));
+  });
+  return out;
 }
