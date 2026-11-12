@@ -1,5 +1,6 @@
 // The recommendation score of a model, computed on every request from what the app has harvested: the prior quality (a bake-off record or a public
 // leaderboard, model_configs.pass_seed_*), staff Pass/Fail marks, and how often its real jobs end well. The best-scoring model of a picker gets the badge.
+import { CANCELED_ERROR } from '@cvs/core/ledger';
 import { pool } from '@/lib/auth';
 
 export interface ModelStats {
@@ -44,7 +45,7 @@ export async function modelStats(feature: string | null): Promise<Map<string, Mo
        left join (select j.model, (count(*) filter (where v.verdict = 'pass'))::int as passes, count(*)::int as total
                     from verdicts v join jobs j on j.id = v.job_id where $1::text is null or j.feature = $1 group by j.model) v on v.model = m.id
        left join (select model, (count(*) filter (where status = 'succeeded'))::int as ok,
-                         (count(*) filter (where status in ('failed', 'failed_unknown', 'timed_out')))::int as bad
+                         (count(*) filter (where status in ('failed', 'failed_unknown', 'timed_out') and error is distinct from '${CANCELED_ERROR}'))::int as bad
                     from jobs where not is_mock and ($1::text is null or feature = $1) group by model) o on o.model = m.id
       where m.enabled`,
     [feature],

@@ -1,9 +1,10 @@
 // What a failed job says to a Member and to an Admin, and when its retry button is offered.
+import { CANCELED_ERROR } from '@cvs/core/ledger';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, test } from 'vitest';
 import type { TrayJob } from '@/lib/api';
 import { providerRefusal } from '@/lib/job-failure';
-import { canRetry, canRetryOnTwin, JobFailureNote, twinRetryText } from './JobFailure';
+import { canRetry, canRetryOnTwin, isCanceled, JobFailureNote, twinRetryText } from './JobFailure';
 
 const RAW =
   'byteplus submit: HTTP 400 {"error":{"code":"InputImageSensitiveContentDetected.PrivacyInformation","message":"The request failed because the input image \'content[1]\' may contain real person.","param":"content[1]","type":"BadRequest"}}';
@@ -81,4 +82,13 @@ test('a Vertex billing refusal tells a Member to pick the model again, and an Ad
   expect(member).not.toContain('requires billing');
   expect(renderToStaticMarkup(<JobFailureNote job={job({ error })} isAdmin />)).toContain('requires billing to be enabled');
   expect(canRetry(job({ error }))).toBe(true);
+});
+
+test('a job canceled while queued is not an error: no failure sentence for a Member, none for an Admin either', () => {
+  const canceled = job({ error: CANCELED_ERROR });
+  expect(isCanceled(canceled)).toBe(true);
+  expect(isCanceled(job({ error: 'boom' }))).toBe(false);
+  expect(isCanceled(job({ status: 'timed_out', error: CANCELED_ERROR }))).toBe(false);
+  expect(renderToStaticMarkup(<JobFailureNote job={canceled} isAdmin={false} />)).toBe('');
+  expect(renderToStaticMarkup(<JobFailureNote job={canceled} isAdmin />)).toBe('');
 });

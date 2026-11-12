@@ -1,7 +1,7 @@
 // The Admin Costs page and its two CSVs (plan M.5). Each is read inside one REPEATABLE READ transaction, so what they show is one set of
 // ledger rows. VND is rounded per row in SQL by round_half_even; every total here is a sum of those row values, kept in whole 1/10000 USD
 // and whole VND as BigInt, so nothing passes through a float.
-import { type Queryable, withTransaction } from '@cvs/core/ledger';
+import { CANCELED_ERROR, type Queryable, withTransaction } from '@cvs/core/ledger';
 import { pool } from '@/lib/auth';
 import { csvResponse, text } from '@/lib/csv';
 import { featureLabel } from '@/lib/features';
@@ -101,7 +101,7 @@ const readRows = async (tx: Queryable, month: string, asOf: number): Promise<Row
   (
     await tx.query(
       `select ce.id::int as id, ce.kind, ce.usd::text as usd, round_half_even(ce.usd * r.vnd_per_usd)::text as vnd, ce.month, ce.day::text as day,
-              ce.job_id, j.feature, ce.provider, ce.model, mc.label as model_label, j.status as job_status, to_char(j.created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as job_created_at, ce.user_id, u.name as user_name, u.email, ce.team_id, t.name as team_name, t.cost_centre_code,
+              ce.job_id, j.feature, ce.provider, ce.model, mc.label as model_label, case when j.status = 'failed' and j.error = '${CANCELED_ERROR}' then 'canceled' else j.status end as job_status, to_char(j.created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as job_created_at, ce.user_id, u.name as user_name, u.email, ce.team_id, t.name as team_name, t.cost_centre_code,
               ce.store_id, s.name as store_name, s.code as store_code, j.user_id as job_user, j.team_id as job_team, j.store_id as job_store,
               coalesce(jc.is_final, true) as final, v.verdict,
               coalesce(j.status in ('failed', 'timed_out') and v.verdict is distinct from 'fail'

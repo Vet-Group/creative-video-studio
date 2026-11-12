@@ -20,8 +20,8 @@ import { ConfirmHost, confirmDialog } from './Confirm';
 import { FalLowNotice } from './FalLowNotice';
 import { Icon, type IconName } from './Icon';
 import { LarkLinkPrompt } from './LarkLinkPrompt';
-import { JobFailureNote, canRetry, canRetryOnTwin, twinRetryText } from './JobFailure';
-import { elapsedLabel, JobPrompt, JobsProvider, Recreate, roleOf, Tap, toggleFullscreen, useForm, useJobs } from './jobs';
+import { JobFailureNote, canRetry, isCanceled, canRetryOnTwin, twinRetryText } from './JobFailure';
+import { CancelButton, elapsedLabel, JobPrompt, JobsProvider, Recreate, roleOf, Tap, toggleFullscreen, useForm, useJobs } from './jobs';
 import { LoadError } from './LoadError';
 import { type Account, type Section, Settings } from './Settings';
 import { SaveTemplateDialog, type Scope } from './Templates';
@@ -38,6 +38,9 @@ const STATUS_LABEL: Record<JobStatus, string> = {
   failed_unknown: 'Không thành công (không rõ kết quả)',
   timed_out: 'Quá thời gian',
 };
+
+/** The status as a member reads it: a job canceled while queued reads as canceled, not as a failure. */
+const statusText = (job: TrayJob) => (isCanceled(job) ? 'Đã huỷ' : STATUS_LABEL[job.status]);
 
 const fmtTime = (iso: string) => new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date(iso));
 
@@ -60,11 +63,11 @@ function TrayItem({ job, isAdmin }: { job: TrayJob; isAdmin: boolean }) {
     setSending(false);
   }
   return (
-    <li className={`job job-${job.status}`}>
+    <li className={`job job-${isCanceled(job) ? 'canceled' : job.status}`}>
       {thumb && <img className="job-poster" src={`/api/assets/${thumb}/content`} alt="" />}
       <div className="job-body">
         <p>
-          <strong>{STATUS_LABEL[job.status]}</strong>
+          <strong>{statusText(job)}</strong>
           {job.isMock && <span className="badge">MOCK</span>}
           {job.retryOf && <span className="tag">Thử lại</span>}
         </p>
@@ -73,6 +76,7 @@ function TrayItem({ job, isAdmin }: { job: TrayJob; isAdmin: boolean }) {
           {elapsedLabel(job) && ` · ${elapsedLabel(job)}`}
         </p>
         <JobFailureNote job={job} isAdmin={isAdmin} />
+        <CancelButton job={job} />
         {job.status === 'succeeded' && (
           <p className="job-links">
             <Link href="/library">Xem trong Thư viện</Link>
@@ -172,7 +176,7 @@ function HistoryCard({ job, isAdmin, select }: { job: TrayJob; isAdmin: boolean;
     }, 'Không tải xuống được.');
 
   return (
-    <li className={`job job-card job-${job.status}`}>
+    <li className={`job job-card job-${isCanceled(job) ? 'canceled' : job.status}`}>
       {out && select}
       <div className="job-media">
         {out ? (
@@ -184,7 +188,7 @@ function HistoryCard({ job, isAdmin, select }: { job: TrayJob; isAdmin: boolean;
             <video ref={media} controls playsInline preload="metadata" poster={job.posterAssetId ? content(job.posterAssetId) : undefined} src={content(out)} onKeyDown={(e) => e.key.toLowerCase() === 'f' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && (e.preventDefault(), toggleFullscreen(media.current))} />
           )
         ) : (
-          <span className="job-media-empty">{STATUS_LABEL[job.status]}</span>
+          <span className="job-media-empty">{statusText(job)}</span>
         )}
         {/* On the picture, where the eye already is: full screen and a new tab; they show on hover or focus. */}
         {out && (
@@ -204,8 +208,8 @@ function HistoryCard({ job, isAdmin, select }: { job: TrayJob; isAdmin: boolean;
           {job.isMock && <span className="badge">MOCK</span>}
           {job.retryOf && <span className="tag">Thử lại</span>}
         </h3>
-        <p className="job-when" data-status={job.status}>
-          <strong>{STATUS_LABEL[job.status]}</strong> · {fmtTime(job.createdAt)}
+        <p className="job-when" data-status={isCanceled(job) ? 'canceled' : job.status}>
+          <strong>{statusText(job)}</strong> · {fmtTime(job.createdAt)}
           {elapsedLabel(job) && ` · ${elapsedLabel(job)}`}
         </p>
         {/* As on Fash, the words, each input and the result can go on the form beside the History. */}
@@ -246,6 +250,7 @@ function HistoryCard({ job, isAdmin, select }: { job: TrayJob; isAdmin: boolean;
           </p>
         )}
         <JobFailureNote job={job} isAdmin={isAdmin} />
+        <CancelButton job={job} />
         {job.retried && <p className="muted">Đã thử lại</p>}
         {problem && <p className="error">{problem}</p>}
         {saved && <p role="status">Đã lưu thiết lập.</p>}

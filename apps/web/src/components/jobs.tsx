@@ -5,9 +5,11 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { api, type TrayJob } from '@/lib/api';
+import { CANCELED_ERROR } from '@cvs/core/ledger';
+import { api, ApiError, sendJson, type TrayJob } from '@/lib/api';
 import { announce } from '@/lib/preferences';
 import { useTabReturn } from '@/lib/use-tab-return';
+import { confirmDialog } from './Confirm';
 import { Icon } from './Icon';
 import { isVietnamese, useTranslate } from './Suggestions';
 
@@ -24,6 +26,36 @@ export function elapsedLabel(job: { status: string; createdAt: string }, now = D
   const min = Math.floor((now - Date.parse(job.createdAt)) / 60_000);
   if (min < 1) return 'vừa gửi';
   return `${job.status === 'queued' ? 'đã chờ' : 'đã chạy'} ${min < 60 ? `${min} phút` : `${Math.floor(min / 60)} giờ ${min % 60} phút`}`;
+}
+
+/** Cancel on a queued job, which no provider has been sent yet, so it costs nothing; the tray refreshes after, and a job that started meanwhile says so. */
+export function CancelButton({ job }: { job: TrayJob }) {
+  const { refresh } = useJobs();
+  const [sending, setSending] = useState(false);
+  const [problem, setProblem] = useState('');
+  if (job.status !== 'queued') return null;
+  const cancel = async () => {
+    if (!(await confirmDialog({ title: 'Huỷ lượt tạo này?', body: 'Lượt tạo chưa chạy nên không mất chi phí.', confirmLabel: 'Huỷ lượt tạo', danger: true }))) return;
+    setSending(true);
+    setProblem('');
+    try {
+      await api(`/api/jobs/${job.id}/cancel`, sendJson('POST', {}));
+    } catch (e) {
+      setProblem(e instanceof ApiError && e.status === 409 ? e.message : 'Không huỷ được.');
+    }
+    await refresh();
+    setSending(false);
+  };
+  return (
+    <>
+      <div className="job-main">
+        <button type="button" className="job-reuse" disabled={sending} onClick={() => void cancel()}>
+          <Icon name="x" /> Huỷ
+        </button>
+      </div>
+      {problem && <p className="error">{problem}</p>}
+    </>
+  );
 }
 
 export interface Toast {
@@ -266,7 +298,7 @@ export function JobsProvider({ userId, children }: { userId: string; children: R
         localStorage.setItem(seenKey, String(Math.max(0, ...times)));
         return;
       }
-      fresh = finished.filter((j) => Date.parse(j.finishedAt!) > Number(stored));
+      fresh = finished.filter((j) => Date.parse(j.finishedAt!) > Number(stored) && j.error !== CANCELED_ERROR); // a cancel the member made is no news
       if (fresh.length === 0) return;
       localStorage.setItem(seenKey, String(Math.max(...times)));
     } catch {
