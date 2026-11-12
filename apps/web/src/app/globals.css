@@ -2471,6 +2471,7 @@ dialog.modal.tool-guide { width: min(52rem, calc(100vw - 2rem)); }
 /* Reference-video analysis (/analyze): the result and its shot list. The result sits in a 320 px form column on a phone and in the wide side
    panel on a desktop, so its columns follow the width of its own box (a container query), never the viewport. */
 .analysis-panel { display: grid; gap: 12px; min-width: 0; }
+.form-scroll > .analysis-panel { margin-top: 16px; } /* on a phone the result follows the video slot in the form */
 .analysis-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .analysis-panel-head h2 { margin: 0; font-size: 16px; line-height: 24px; }
 .analysis-wait { display: grid; gap: 4px; padding: 16px; border-radius: 12px; background: var(--surface-2); animation: skeleton-pulse 1.4s ease-in-out infinite; }
@@ -2494,6 +2495,7 @@ dialog.modal.tool-guide { width: min(52rem, calc(100vw - 2rem)); }
 }
 .analysis-example-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .analysis-example-head h3 { margin: 0; }
+.analysis-example-head button { flex-shrink: 0; white-space: nowrap; }
 .analysis-examples { display: grid; gap: 16px; }
 .analysis-history { margin-top: 24px; }
 .analysis-list { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 8px; }
