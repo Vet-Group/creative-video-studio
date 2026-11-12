@@ -1,11 +1,12 @@
 import { reserve, withTransaction } from '@cvs/core/ledger';
-import { type CapRefusal, checkCaps, dailyClips } from '@cvs/core/limits';
+import { checkCaps, dailyClips } from '@cvs/core/limits';
 import { estimateUsd, extraInputUsd, FEATURE_PROMPTS, imagePricesFor, PROMPT_CEILING, promptLimit, textToImage, usdPerSecondFor, usdPerSecondWithVideo } from '@cvs/core/models';
 import { videoInputs, videoRefProblem } from '@cvs/core/providers/fal';
 import { VIDEO_QUEUE, videoSendOptions } from '@cvs/core/queue';
 import { FEATURES } from '@cvs/db';
 import { fillInputSlots } from '@cvs/db/assets';
 import { pool } from '@/lib/auth';
+import { CAP_MESSAGES } from '@/lib/caps';
 import { mp4VideoInfo, readJson } from '@/lib/assets';
 import { boss } from '@/lib/queue';
 import { findChoice } from '@/lib/choices';
@@ -44,14 +45,6 @@ type Spec = {
   useBrand: boolean;
 };
 const bad = (error: string) => Response.json({ error }, { status: 400 });
-/** Member-facing text for a Run a cap refused. */
-const CAP_MESSAGES: Record<CapRefusal, string> = {
-  daily_clips: 'Bạn đã dùng hết số clip trong ngày hôm nay',
-  monthly_usd: 'Đã hết ngân sách tháng của công ty',
-  features_monthly_usd: 'Đã hết ngân sách tháng cho ảnh và ứng dụng',
-  member_daily_usd: 'Bạn đã dùng hết hạn mức chi phí hôm nay',
-  member_monthly_usd: 'Bạn đã dùng hết hạn mức chi phí tháng này',
-};
 
 /**
  * `?mine`: the "My jobs" tray. The caller's 20 latest jobs that are not deleted, newest first, whether the worker is offline

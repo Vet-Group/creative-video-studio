@@ -16,6 +16,7 @@ import { elapsedLabel, JobPrompt } from './jobs';
 import { AnalysisHistory } from './AnalysisHistory';
 import { copyError, uploadError, uploadVideoDirect, WorkTabs } from './image-tools';
 import { ReferenceVideoSlot, type RefVideo } from './ReferenceVideo';
+import { RemakePanel } from './RemakePanel';
 
 type Tab = 'create' | 'history' | 'examples' | 'about';
 const TAB_LABEL: Record<Tab, string> = { create: 'Phân tích', history: 'Lịch sử', examples: 'Ví dụ', about: 'Giới thiệu' };
@@ -113,7 +114,8 @@ function Examples() {
   );
 }
 
-export function AnalyzeView() {
+/** `remakeEnabled`: REA_REMAKE_ENABLED, which adds Smart Remake under a finished analysis. */
+export function AnalyzeView({ remakeEnabled = false }: { remakeEnabled?: boolean }) {
   const narrow = useMediaQuery(NARROW);
   const [tab, setTab] = useState<Tab | null>(null); // null: the default for the width (the form below 1024 px, else Examples)
   const [video, setVideo] = useState<RefVideo | null>(null);
@@ -257,6 +259,7 @@ export function AnalyzeView() {
               </>
             )}
             {current?.status === 'succeeded' && current.result && <AnalysisWithSource row={current} />}
+            {remakeEnabled && current?.status === 'succeeded' && current.result && <RemakePanel key={current.id} row={current} />}
           </div>
         </div>
 

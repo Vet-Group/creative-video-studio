@@ -106,7 +106,7 @@ test('counts the open remakes against the company month and refuses one that wou
   try {
     const before = await count();
     const over = await post({ ...ok, shots: [1, 2, 3] });
-    expect([over.status, await over.json()]).toEqual([429, { error: 'a spending cap is reached', cap: 'monthly_usd' }]);
+    expect([over.status, await over.json()]).toEqual([429, { error: 'Đã hết ngân sách tháng của công ty' }]); // shown to the member as is (errorText)
     expect(await count()).toBe(before);
     expect((await post({ ...ok, shots: [1, 2] })).status).toBe(201); // exactly the cap
   } finally {

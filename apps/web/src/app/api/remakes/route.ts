@@ -6,6 +6,7 @@ import { checkCaps } from '@cvs/core/limits';
 import { REMAKE_QUEUE } from '@cvs/core/queue';
 import { readableAsset, readJson } from '@/lib/assets';
 import { pool } from '@/lib/auth';
+import { CAP_MESSAGES } from '@/lib/caps';
 import { boss } from '@/lib/queue';
 import { REMAKE_COLUMNS, reaRemakeEnabled } from '@/lib/remake';
 import { guard } from '@/lib/session';
@@ -68,7 +69,7 @@ export async function POST(request: Request) {
     );
     return null;
   });
-  if (cap) return Response.json({ error: 'a spending cap is reached', cap }, { status: 429 });
+  if (cap) return Response.json({ error: CAP_MESSAGES[cap] }, { status: 429 });
   try {
     await (await boss()).send(REMAKE_QUEUE, { remakeId: id });
   } catch (e) {

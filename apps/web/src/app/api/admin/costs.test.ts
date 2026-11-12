@@ -658,7 +658,7 @@ describe('LLM calls on the Costs page', () => {
     expect(p.byUser.map((u) => [u.id, u.usd])).toEqual([['alice', '2.0004'], ['bob', '0.0006']]);
     expect(p.byTeam.map((t) => [t.id, t.name, t.usd])).toEqual([['t3', 'Gamma', '2.0004'], ['t2', 'Beta', '0.0006']]);
     expect(p.byStore.map((s) => [s.id, s.name, s.usd])).toEqual([['s1', 'Shop A', '2.0004'], ['', 'Không gắn cửa hàng', '0.0006']]);
-    expect(p.byFeature.map((f) => [f.id, f.name, f.usd])).toEqual([['video', 'Tạo video', '2.0000'], ['llm', 'LLM (Dịch/Gợi ý/Cải thiện)', '0.0010']]);
+    expect(p.byFeature.map((f) => [f.id, f.name, f.usd])).toEqual([['video', 'Tạo video', '2.0000'], ['llm', 'LLM (Dịch/Gợi ý/Cải thiện) và Smart Remake', '0.0010']]);
     expect(p.capUsage.usd).toBe('2.0000'); // LLM calls count toward no cap
 
     const d = await detail(LM);
@@ -682,6 +682,18 @@ describe('LLM calls on the Costs page', () => {
     const p = await page(FM);
     expect(p.byUser.map((u) => [u.id, u.usd, u.failedByStatus.usd])).toEqual([['bob', '0.0004', '0.0000']]);
     expect(p.capUsage.usd).toBe('0.0000');
+  });
+
+  test('a Smart Remake’s fal calls show on the LLM line but count in the video budget, as the caps count them', async () => {
+    const { bookLlm } = await import('@cvs/core/ledger');
+    await pool.query(`insert into analyses (id, user_id, team_id, store_id, source_key, status, created_at) values ('ra1', 'alice', 't3', 's1', 's', 'succeeded', '2031-11-10T03:00:00Z')`);
+    await pool.query(`insert into remakes (id, user_id, team_id, store_id, analysis_id, shots, created_at) values ('rm1', 'alice', 't3', 's1', 'ra1', '[1]', '2031-11-10T03:00:00Z')`);
+    expect(await bookLlm(pool, { remake: 'rm1', step: '1:edit' }, { costUsd: 0.0398, provider: 'fal', model: 'fal-ai/nano-banana/edit' })).toBe(true);
+    expect(await bookLlm(pool, { remake: 'rm1', step: '1:video' }, { costUsd: 0.108, provider: 'fal', model: 'fal-ai/bytedance/seedance/v1/pro/fast/image-to-video' })).toBe(true);
+    const p = (await page('2031-11')) as Page & { byFeature: { id: string; name: string; usd: string }[] };
+    expect(p.byFeature.map((f) => [f.id, f.usd])).toEqual([['llm', '0.1478']]);
+    expect(p.byStore.map((s) => [s.id, s.usd])).toEqual([['s1', '0.1478']]); // the member's store, not shared cost
+    expect(p.capUsage.usd).toBe('0.1478');
   });
 });
 

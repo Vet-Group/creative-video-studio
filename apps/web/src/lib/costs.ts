@@ -8,7 +8,8 @@ import { featureLabel } from '@/lib/features';
 
 const NO_STORE = 'Không gắn cửa hàng';
 const SHARED = 'Chi phí chung';
-const LLM = 'LLM (Dịch/Gợi ý/Cải thiện)';
+// shortcut: a Smart Remake's fal calls are llm rows (bookLlm), so they share this line; give them their own line if their spend needs reading apart.
+const LLM = 'LLM (Dịch/Gợi ý/Cải thiện) và Smart Remake';
 
 interface Row {
   id: number;
@@ -66,7 +67,7 @@ export interface Snapshot {
   asOf: number;
   rate: string | null;
   rows: Row[];
-  /** The video budget: every ledger row of the month outside the image and apps features (shared rows included, LLM calls left out), and its cap. */
+  /** The video budget: every ledger row of the month outside the image and apps features (shared rows and Smart Remakes included, other LLM calls left out), and its cap. */
   capUsageUsd: string;
   monthlyCapUsd: string;
   /** The image and apps budget and its hard cap. */
@@ -146,9 +147,9 @@ export function snapshot(requestedMonth: string | null, upTo: number | null = nu
     const { asOf, month } = await cutOff(tx, requestedMonth, upTo);
     const rate = await tx.query('select vnd_per_usd::text as rate from monthly_rates where month = $1', [month]);
     const cap = await tx.query(
-      // LLM calls never count toward a cap (owner decision, 2026-11-04).
+      // LLM calls never count toward a cap (owner decision, 2026-11-04), except a Smart Remake's, which is video spend (limits.ts capRow).
       `with b as (select ce.usd, exists (select 1 from jobs j where j.id = ce.job_id and j.feature not in ('video', 'marketing')) as budget
-                    from cost_entries ce where ce.month = $1 and ce.kind <> 'llm')
+                    from cost_entries ce where ce.month = $1 and (ce.kind <> 'llm' or ce.ref like 'llm:remake:%'))
        select coalesce((select sum(usd) from b where not budget), 0)::numeric(12, 4)::text as used,
               coalesce((select sum(usd) from b where budget), 0)::numeric(12, 4)::text as features_used,
               s.monthly_cap_usd::text as cap, s.features_monthly_cap_usd::text as features_cap
