@@ -600,7 +600,7 @@ export function Shell({ userId, userName, isAdmin, feedbackNew = 0, analyzeEnabl
             </div>
             <Toasts />
           </div>
-          <ToolGuide open={guide} onClose={() => setGuide(false)} />
+          <ToolGuide open={guide} onClose={() => setGuide(false)} analyzeEnabled={analyzeEnabled} />
           <ConfirmHost />
         </OpenToolGuide>
       </AdminContext>

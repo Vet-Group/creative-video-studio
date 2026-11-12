@@ -276,7 +276,7 @@ legend { font-weight: 600; padding: 0 .25rem; }
 .rail-toggle { display: none; }
 .drawer-close { margin-left: auto; display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 8px; background: transparent; }
 .logo { display: grid; place-items: center; width: 28px; height: 28px; }
-.sidebar nav { display: grid; gap: 12px; }
+.sidebar nav { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; } /* pin the single column to the rail width so an oversized child (a guide pill) can never stretch the nav items */
 .nav-group { display: grid; gap: 2px; }
 .nav-group-label { margin: 0; padding: 0 12px 2px; color: var(--text-muted); font-size: 12px; line-height: 16px; font-weight: 500; }
 .sidebar nav a { display: flex; align-items: center; height: 37px; padding: 8px 12px; border-radius: 10px; color: var(--text-2); font-size: 14px; line-height: 21px; font-weight: 500; text-decoration: none; transition: background-color .15s; }
@@ -285,7 +285,7 @@ legend { font-weight: 600; padding: 0 .25rem; }
 .nav-progress[data-on='true'] { opacity: 1; transition: opacity 0s .15s; animation: nav-progress 8s linear .15s forwards; }
 @keyframes nav-progress { 0% { transform: scaleX(.3); } 12.5% { transform: scaleX(.55); } 25% { transform: scaleX(.7); } 100% { transform: scaleX(.9); } } /* 30% at once, 70% by 2 s, then slower; linear so the stops set the curve */
 /* The live sidebar's red "New" pill beside Marketing Studio. */
-.nav-badge { flex: none; margin-left: 6px; padding: 0 7px; border-radius: 999px; background: var(--badge-new); color: var(--on-dark); font-size: 11px; line-height: 16px; font-weight: 600; }
+.nav-badge { flex: none; margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: var(--badge-new); color: var(--on-dark); font-size: 10px; line-height: 15px; font-weight: 700; letter-spacing: .01em; }
 .sidebar nav a:hover, .sidebar nav a[aria-current='page'] { background: var(--fill); }
 .sidebar nav a[aria-current='page'] { color: var(--ink); }
 .sidebar nav a[aria-current='page'] .nav-icon { color: var(--ink); }
@@ -2230,9 +2230,9 @@ dialog.modal.verdict-guide { width: min(40rem, calc(100vw - 2rem)); }
 /* Which tool when: the sidebar's line per creative tool, the guide dialog, each tool page's hint strip and Explore's "start here" list. */
 .nav-group-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding-right: 4px; }
 .nav-group-head > * { white-space: nowrap; } /* one line each, or the label and the button wrap in the narrow sidebar */
-.nav-guide .icon { display: none; } /* no room beside the label; the words say it */
-.nav-guide { display: inline-flex; align-items: center; gap: 4px; padding: 0; border: 0; background: none; color: var(--text-muted); font-size: 12px; line-height: 16px; cursor: pointer; }
-.nav-guide:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+.nav-guide { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 2px; padding: 5px 10px; border: 1px solid var(--border); border-radius: 999px; background: none; color: var(--text-muted); font-size: 12px; line-height: 16px; font-weight: 500; cursor: pointer; transition: background-color .15s, color .15s, border-color .15s; }
+.nav-guide .icon { display: none; } /* no room beside the label in the 240 px rail; the words say it */
+.nav-guide:hover { background: var(--fill); border-color: var(--ink-subtle, var(--border)); color: var(--ink); }
 .nav-hint { display: block; padding: 0 12px 6px 40px; color: var(--text-muted); font-size: 12px; line-height: 16px; }
 .nav-hint strong { display: none; }
 @media (min-width: 1024px) {
