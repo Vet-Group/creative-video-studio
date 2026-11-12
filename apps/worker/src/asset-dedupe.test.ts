@@ -32,6 +32,19 @@ async function input(id: string, content: string | null, minutes: number, owner 
 }
 const live = async () => (await pool.query(`select id from assets where deleted_at is null order by id`)).rows.map((r: { id: string }) => r.id);
 
+test('keeps the picture of a saved AI model, deleted or not, even when a newer copy of the same file exists', async () => {
+  await input('m-live', 'face', 10, 'u2');
+  await input('m-live-newer', 'face', 1, 'u2'); // a later upload of the same file
+  await input('m-gone', 'hat', 10, 'u2');
+  await input('m-gone-newer', 'hat', 1, 'u2');
+  await pool.query(`insert into fashion_models (id, user_id, name, asset_id) values ('fm1', 'u2', 'Live', 'm-live'), ('fm2', 'u2', 'Gone', 'm-gone')`);
+  await pool.query(`update fashion_models set deleted_at = now() where id = 'fm2'`);
+  await dedupeTick(pool, read);
+  expect(await live()).toEqual(expect.arrayContaining(['m-live', 'm-live-newer', 'm-gone', 'm-gone-newer']));
+  await pool.query(`delete from fashion_models`);
+  await pool.query(`delete from assets where id like 'm-%'`);
+});
+
 test('hashes old inputs, keeps the newest copy of a file the purge will not take and every copy something uses, and removes the rest', async () => {
   await input('a-new', 'shirt', 1);
   await input('a-mid', 'shirt', 2);

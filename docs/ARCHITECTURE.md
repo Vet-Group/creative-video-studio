@@ -42,6 +42,7 @@ Layout [proposed]: a pnpm workspace with `apps/web`, `apps/worker` and `packages
   - Result and timing: `output_asset_id`, `created_at`, `started_at`, `finished_at`, `deleted_at`, `purged_at`.
 - **`cost_entries`, `monthly_rates`, `provider_invoices`**: the cost ledger and its inputs. See "Cost ledger".
 - **`model_configs`**: per model, the limits, price per second (or per image and resolution for an image model), whether it is enabled, and the pass-rate seed.
+- **`fashion_models`**: an AI model a member saved from a Fashion Model Generator result (app `ai-fashion-model`, feature `fashion_model`): `user_id`, `name`, `asset_id` (a copy of the picture as an input asset, so the person pickers and jobs can use it), the `traits` it was made from, `shared` with every member, `shared_locked` once an Admin decided (only an Admin changes it again) and a soft `deleted_at`.
 - **`presets`**: a Vietnamese label, an English prompt, `enabled` and `is_bakeoff_safe`. Six are seeded.
 - **`verdicts`**: Pass or Fail per clip (unique per job, so a purge that removes the output asset keeps the verdict), the fault for a Fail, and who marked it.
 - **`audit_entries`**: who, when, what, and the old and new values.

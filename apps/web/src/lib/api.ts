@@ -83,6 +83,8 @@ export interface TrayJob {
   inputAssetIds: string[];
   /** How many of a Try On job's inputs are garments (after the person, before the background). */
   garments: number | null;
+  /** A Fashion Model Generator job's traits as JSON; null for any other job. */
+  traits: string | null;
   format: string | null;
   /** Unboxing's photo roles in the order of `inputAssetIds`. */
   roles: string | null;

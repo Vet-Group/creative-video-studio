@@ -12,6 +12,7 @@ import { findChoice } from '@/lib/choices';
 import { providerRefusal, TWIN_REASONS } from '@/lib/job-failure';
 import { jobNeed, offeredNow, retryTwin, servingRow, twinEstimate } from '@/lib/model-twins';
 import { BRAND_FEATURES, withBrand } from '@/lib/brand';
+import { fashionModelPrompt, mentionsMinor, parseFashionTraits } from '@/lib/fashion-model';
 import { basePrompt } from '@/lib/prompt-limit';
 import { ADVANCED_MAX_SCRIPT, END_TEXT_POSITIONS, isParamFormat, MAX_END_TEXT, MAX_ENDING, MAX_HIGHLIGHT, MAX_HIGHLIGHTS, MAX_HOOK, PARAM_FORMATS, UNBOXING_ROLES } from '@/lib/marketing';
 import { falBalance, falCreditUsd, overCredit } from '@/lib/provider-credit';
@@ -91,9 +92,9 @@ export async function GET(request: Request) {
       id: r.id, status: r.status, error: r.error, failureReason: providerRefusal(r.error)?.reason ?? null, isMock: r.is_mock, feature: r.feature, ratio: r.aspect, durationSec: r.duration_s, resolution: r.params.resolution ?? null, modelId: r.model, retryOf: r.retry_of,
       retried: r.retried, twin: twins.get(r.id) ?? null, outputAssetId: r.output_asset_id, posterAssetId: r.poster_asset_id, createdAt: r.created_at, finishedAt: r.finished_at,
       // For the History card: the member's own words (a free prompt on Create video and Image Generation; elsewhere the prompt is composed, so the kept brief),
-      // the inputs, the format and the caller's favourite.
+      // the inputs, the format and the caller's favourite; `traits` is a Fashion Model Generator job's own traits (JSON), which its save dialog starts from.
       text: r.params.brief ?? ((r.feature === 'video' && !r.preset_id) || r.feature === 'image' ? r.prompt : null), inputAssetIds: r.input_asset_ids,
-      garments: r.params.garments ? Number(r.params.garments) : null, format: r.params.format ?? null, roles: r.params.roles ?? null, favorite: r.favorite, estimateUsd: r.estimate_usd,
+      traits: r.feature === 'fashion_model' ? (r.params.traits ?? null) : null, garments: r.params.garments ? Number(r.params.garments) : null, format: r.params.format ?? null, roles: r.params.roles ?? null, favorite: r.favorite, estimateUsd: r.estimate_usd,
     })),
   });
 }
@@ -116,6 +117,7 @@ export async function GET(request: Request) {
  * estimate), an optional `params.quality` and an optional `params.thinking` (one of the model's `thinking_levels`; its `thinking_prices` set the estimate, the first level's when none is named). `durationSec` is not read and the job stores 0.
  * `motion_control` takes a video model that lists it, exactly 2 inputs (the character image, then an MP4/MOV reference video), ratio `auto`, no preset and
  * an optional prompt; its duration is the reference video's length rounded up (the body's `durationSec` is not read), which the model must allow.
+ * `fashion_model` (the AI model generator) takes no input image, a text-to-image model that lists it, and `params.traits` (JSON, parseFashionTraits) with the prompt those traits make.
  * Every other feature takes images only. `useBrand` (Marketing Studio and Image Generation) adds the chosen store's brand kit to the prompt (lib/brand.ts).
  * `retryOf` retries the caller's own failed job once: the inputs, model, preset, prompt, ratio, duration, team and store all come from the
  * original (the body may carry just `retryOf`), the estimate from the model's current price. `onTwin: true` with `retryOf` runs it on the original model's enabled twin instead (migration 0075),
@@ -146,11 +148,12 @@ export async function POST(request: Request) {
     const review = feature === 'marketing' && given.format === 'review';
     const unboxing = feature === 'marketing' && given.format === 'unboxing';
     const maxInputs = isImage ? MAX_IMAGE_INPUTS : advanced ? MAX_ADVANCED_IMAGES : MAX_IMAGES;
-    // Image Generation and Create video may have no image (text to image or video, on a model that offers it: checked with the model below).
-    const fewest = feature === 'image' || feature === 'video' ? 0 : 1;
+    // Image Generation, Create video and the Fashion Model Generator may have no image (text to image or video, on a model that offers it: checked with the model below).
+    const fewest = feature === 'image' || feature === 'video' || feature === 'fashion_model' ? 0 : 1;
     if (!Array.isArray(assetIds) || assetIds.length < fewest || assetIds.length > maxInputs || !assetIds.every((a) => typeof a === 'string') || new Set(assetIds).size !== assetIds.length) {
       return bad(`assetIds must list ${fewest} to ${maxInputs} different asset ids`);
     }
+    if (feature === 'fashion_model' && assetIds.length !== 0) return bad('the Fashion Model Generator takes no input images');
     if (feature === 'try_on' && assetIds.length < 2) return bad('Try On needs the person image and at least one garment image');
     if (feature === 'marketing' && !advanced && !unboxing && assetIds.length !== 2) return bad('Marketing Studio needs exactly 2 images: the model photo first, then the product photo');
     if (feature === 'marketing' && (presetId !== null || typeof freePrompt !== 'string' || freePrompt.trim() === '')) return bad('Marketing Studio takes a prompt and no preset');
@@ -163,11 +166,24 @@ export async function POST(request: Request) {
     // Images take resolution, quality and thinking, plus the member's own text (and Try On its garment count) kept for reuse; Marketing Studio takes format ('advanced', 'unboxing' or 'review'),
     // audio ('on' or 'off'), an end frame, the end text the worker burns in (endText, endTextPos) and the form's own inputs. The kept inputs are never read by the
     // worker. Create video takes audio, an end frame, reference audio and its prompt's sections (hookText, ending); the others none.
-    const keys = isImage ? ['resolution', 'quality', 'thinking', 'brief', ...(feature === 'try_on' ? ['garments'] : [])] : feature === 'marketing' ? ['format', 'audio', 'endAssetId', 'videoAssetId', 'hook', 'hookText', 'location', 'brief', 'script', 'ending', 'endText', 'endTextPos', 'roles', 'highlights'] : feature === 'video' ? ['audio', 'endAssetId', 'audioAssetIds', 'hookText', 'ending'] : [];
+    const keys = isImage ? ['resolution', 'quality', 'thinking', 'brief', ...(feature === 'try_on' ? ['garments'] : feature === 'fashion_model' ? ['traits'] : [])] : feature === 'marketing' ? ['format', 'audio', 'endAssetId', 'videoAssetId', 'hook', 'hookText', 'location', 'brief', 'script', 'ending', 'endText', 'endTextPos', 'roles', 'highlights'] : feature === 'video' ? ['audio', 'endAssetId', 'audioAssetIds', 'hookText', 'ending'] : [];
     if (!entries || entries.some(([k, v]) => !keys.includes(k) || typeof v !== 'string')) {
       return bad(keys.length > 0 ? `params may hold only ${keys.length > 1 ? `${keys.slice(0, -1).join(', ')} and ${keys.at(-1)}` : keys[0]}, as text` : 'params are for image features, Create video and Marketing Studio only');
     }
     if (isImage && given.resolution === undefined) return bad('params.resolution is required');
+    // The Fashion Model Generator's prompt is built from its traits (lib/fashion-model.ts), which are kept as the canonical JSON; the page's prompt must be that one.
+    if (feature === 'fashion_model') {
+      let traits: ReturnType<typeof parseFashionTraits> = null;
+      try {
+        traits = parseFashionTraits(JSON.parse(given.traits ?? 'null'));
+      } catch {
+        // not JSON: refused below
+      }
+      if (!traits) return bad('params.traits must be the traits of the model, as JSON');
+      if (mentionsMinor(traits.extra)) return bad('the extra details may not mention a minor or an age under 18: the model is always an adult');
+      if (typeof freePrompt !== 'string' || freePrompt.trim() !== fashionModelPrompt(traits)) return bad('the prompt must be the one the traits make');
+      given.traits = JSON.stringify(traits);
+    }
     if (given.format !== undefined && !isParamFormat(given.format)) return bad(`params.format must be one of ${PARAM_FORMATS.join(', ')}`);
     // Unboxing names its photos in the order sent (the model when there is one, the product, the packaging when there is one); Review lists 1 to 3 highlight lines, one per line.
     if (given.roles !== undefined || unboxing) {
@@ -227,7 +243,8 @@ export async function POST(request: Request) {
     const usable = await pool.query(
       `select a.id, a.mime, a.duration_ms from assets a
         where a.id = any($1::text[]) and a.deleted_at is null and a.kind = 'input'
-          and (a.owner_id = $2 or exists (select 1 from jobs j where a.id = any(j.input_asset_ids) and j.status = 'succeeded' and j.deleted_at is null and j.purged_at is null))`,
+          and (a.owner_id = $2 or exists (select 1 from jobs j where a.id = any(j.input_asset_ids) and j.status = 'succeeded' and j.deleted_at is null and j.purged_at is null)
+               or exists (select 1 from fashion_models f where f.asset_id = a.id and f.deleted_at is null and (f.user_id = $2 or f.shared)))`,
       [assetIds, userId],
     );
     if (usable.rowCount !== assetIds.length) return bad('one or more assets do not exist or cannot be used');
@@ -322,7 +339,7 @@ export async function POST(request: Request) {
     const model = (await tx.query('select enabled, provider, endpoint, kind, features, ratios, thinking_levels, durations_sec, max_images, max_prompt_chars, usd_per_second, image_prices, thinking_prices from model_configs where id = $1', [modelId])).rows[0];
     if (!model?.enabled) return bad('the model does not exist or is not enabled');
     if (model.kind !== (isImage ? 'image' : 'video') || !model.features.includes(feature)) return bad('the model does not offer this feature');
-    if (feature === 'image' && assetIds.length === 0 && !textToImage(model)) return bad('the model needs at least one input image');
+    if ((feature === 'image' || feature === 'fashion_model') && assetIds.length === 0 && !textToImage(model)) return bad('the model needs at least one input image');
     // A retry copies a Run this check already passed.
     if (!original && feature === 'video' && assetIds.length === 0 && !videoInputs(model.endpoint).textOnly) return bad('the model needs at least one input image');
     // What the model takes is read for the request the worker will make: with a reference video that is the video-to-video sibling where the row has one (Kling O3 Pro).

@@ -9,13 +9,17 @@ const draft = (images: string[][], prompt = '', maxImages = 2): AppDraft => ({ i
 const reason = (slug: string, images: string[][], prompt?: string, maxImages?: number) => appReason(appBySlug(slug)!, draft(images, prompt, maxImages));
 
 describe('the app list', () => {
-  it('has eleven apps with unique slugs, known features and (for the built image apps) a default prompt', () => {
-    expect(APPS).toHaveLength(11);
-    expect(new Set(APPS.map((a) => a.slug)).size).toBe(11);
+  it('has twelve apps with unique slugs, known features and (for the built image apps) a default prompt', () => {
+    expect(APPS).toHaveLength(12);
+    expect(new Set(APPS.map((a) => a.slug)).size).toBe(12);
     for (const a of APPS) {
       expect(FEATURES as readonly string[]).toContain(a.feature);
-      if (!a.soon && a.feature !== 'motion_control' && a.feature !== 'media_optimizer') expect(FEATURE_PROMPTS).toHaveProperty(a.feature);
+      if (!a.soon && a.feature !== 'motion_control' && a.feature !== 'media_optimizer' && a.feature !== 'fashion_model') expect(FEATURE_PROMPTS).toHaveProperty(a.feature);
     }
+  });
+
+  it('opens the AI model generator as an app with its own page and no upload slot', () => {
+    expect(appBySlug('ai-fashion-model')).toMatchObject({ slots: [], feature: 'fashion_model', category: 'fashion' });
   });
 
   it('opens Media Optimizer as a local image tool without a coming-soon badge', () => {
@@ -89,9 +93,9 @@ describe('the app About tabs', () => {
 
 describe('filterApps', () => {
   it('filters by category and by name or description, ignoring accents and case', () => {
-    expect(filterApps('all', '')).toHaveLength(11);
-    expect(filterApps('all', '').at(-1)!.slug).toBe('lingerie-try-on'); // ours comes after the live apps, which keep their order
-    expect(filterApps('fashion', '').map((a) => a.slug)).toEqual(['character-swap', 'model-swap', 'face-swap', 'jewelry-try-on', 'lingerie-try-on']);
+    expect(filterApps('all', '')).toHaveLength(12);
+    expect(filterApps('all', '').at(-1)!.slug).toBe('ai-fashion-model'); // ours comes after the live apps, which keep their order
+    expect(filterApps('fashion', '').map((a) => a.slug)).toEqual(['character-swap', 'model-swap', 'face-swap', 'jewelry-try-on', 'lingerie-try-on', 'ai-fashion-model']);
     expect(filterApps('video', '').map((a) => a.slug)).toEqual(['motion-control']);
     expect(filterApps('all', 'DOI NEN').map((a) => a.slug)).toEqual(['background-changer']);
     expect(filterApps('all', 'xoá nền').map((a) => a.slug)).toContain('background-remover');

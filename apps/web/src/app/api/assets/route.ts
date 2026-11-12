@@ -42,7 +42,7 @@ const imagesOf = (j: string) => `${j}.input_asset_ids || coalesce(string_to_arra
  * `?recent=uploads`: every photo the caller uploaded on any page, for the shared uploaded-photos picker; newest upload first, at most UPLOADS_LIMIT.
  * Deleted files, videos and audio are left out, and so is a photo that only deleted jobs ran from: the purge removes it once those are purged.
  * `&storeId=` keeps the photos uploaded with that store chosen; without it, every store and none. `&slot=` keeps the photos of that form slot (lib/upload-slots.ts).
- * A file kept in several copies (uploaded before uploads were hashed, or used by a job) shows once, as its newest copy.
+ * A file kept in several copies (uploaded before uploads were hashed, or used by a job) shows once, as its newest copy. The picture of a saved AI model is left out: the pickers list it as a model.
  */
 export async function GET(request: Request) {
   const g = await guard(request, 'member');
@@ -55,6 +55,7 @@ export async function GET(request: Request) {
          select distinct on (coalesce(nullif(a.sha256, 'unreadable'), a.id)) a.id, a.filename, a.created_at from assets a
           where a.owner_id = $1 and a.kind = 'input' and a.deleted_at is null and a.mime like 'image/%'
             and ($3::text is null or a.store_id = $3) and ($4::text is null or a.slot = $4)
+            and not exists (select 1 from fashion_models f where f.asset_id = a.id and f.deleted_at is null)
             and (exists (select 1 from jobs j where a.id = any(${imagesOf('j')}) and j.deleted_at is null)
               or not exists (select 1 from jobs j where a.id = any(${imagesOf('j')})))
           order by coalesce(nullif(a.sha256, 'unreadable'), a.id), a.created_at desc, a.id) u

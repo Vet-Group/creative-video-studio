@@ -19,6 +19,9 @@ export type UploadSlot = keyof typeof UPLOAD_SLOTS;
 
 export const isUploadSlot = (s: unknown): s is UploadSlot => typeof s === 'string' && Object.hasOwn(UPLOAD_SLOTS, s);
 
+/** The slots whose picker also offers the saved AI models: a person (model) or a general picture (reference, video, image), and a box of no slot at all (Create's). Not a garment, background, product, packaging, end frame or illustration. */
+export const AI_MODEL_SLOTS: readonly (UploadSlot | undefined)[] = [undefined, 'model', 'reference', 'video', 'image'];
+
 /** The slot of a form's upload box by its label, which may end in the optional suffix; undefined for a label of no slot. */
 export function slotOfLabel(label: string): UploadSlot | undefined {
   const name = label.replace(/ \(tuỳ chọn\)$/, '');

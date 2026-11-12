@@ -2395,6 +2395,69 @@ export const APP_ABOUT: Record<string, AboutPage> = {
       },
     ],
   },
+  'ai-fashion-model': {
+    title: 'Tạo người mẫu AI từ vài lựa chọn',
+    sections: [
+      {
+        title: 'Tạo người mẫu AI là gì?',
+        blocks: [
+          'Tạo người mẫu AI là ứng dụng dựng một người mẫu hư cấu từ các lựa chọn của bạn: giới tính, độ tuổi, nguồn gốc, màu da, dáng người, tóc, khung hình, nền và biểu cảm. Bạn không cần ảnh đầu vào, ứng dụng tự viết mô tả cố định bằng tiếng Anh và tạo từ 1 đến 4 ảnh để bạn chọn.',
+          `Ảnh vừa ý có thể lưu thành một người mẫu AI của bạn, rồi chọn lại ở Thử đồ, Tạo ảnh và Tạo video mà không phải dựng lại từ đầu. ${APP_COST}`,
+        ],
+      },
+      {
+        title: 'Từ lựa chọn đến người mẫu trong 4 bước',
+        lead: 'Chọn đặc điểm, chọn số ảnh, bấm Chạy, rồi lưu ảnh bạn thích.',
+        blocks: [
+          {
+            steps: [
+              { title: 'Chọn đặc điểm', text: 'Chọn từng đặc điểm, hoặc chọn một phong cách có sẵn để điền sẵn vài lựa chọn phù hợp, rồi chỉnh lại nếu muốn. Phần chi tiết thêm dành cho nốt ruồi, tàn nhang hay kiểu tóc cụ thể.' },
+              { title: 'Chọn số ảnh', text: 'Chọn 1 đến 4 ảnh. Dòng chi phí cho biết tổng tiền trước khi bạn bấm Chạy.' },
+              { title: 'Chạy', text: 'Bấm Chạy. Mỗi ảnh là một lượt tạo riêng và nằm trong tab Lịch sử khi xong.' },
+              { title: 'Lưu làm người mẫu', text: 'Ở ảnh vừa ý, bấm Lưu làm người mẫu, đặt tên và chọn có dùng chung cho cả công ty hay không. Người mẫu đã lưu nằm trong tab Đã lưu.' },
+            ],
+          },
+        ],
+      },
+      {
+        title: 'Người mẫu đã lưu dùng ở đâu?',
+        blocks: [
+          {
+            cards: [
+              { title: 'Thử đồ', text: 'Có trong nhóm Người mẫu AI của bảng chọn người mẫu.' },
+              { title: 'Tạo ảnh', text: 'Mở Ảnh đã tải ở ô ảnh tham chiếu và chọn trong nhóm Người mẫu AI.' },
+              { title: 'Tạo video', text: 'Mở Ảnh đã tải ở ô ảnh và chọn trong nhóm Người mẫu AI.' },
+            ],
+          },
+        ],
+      },
+      {
+        title: 'Riêng tư và dùng chung',
+        blocks: [
+          'Người mẫu bạn lưu là của riêng bạn. Bạn có thể bật Dùng chung cho cả công ty để đồng nghiệp chọn được, và tắt lại bất cứ lúc nào. Nếu Admin đã quyết định cho một người mẫu, quyết định đó được giữ cho đến khi Admin thả ra.',
+        ],
+      },
+      {
+        title: 'Giới hạn',
+        blocks: [
+          'Người mẫu luôn là người hư cấu, trên 18 tuổi, mặc áo thun trắng trơn và không có chữ, logo, cờ, đồng phục hay đạo cụ. AI có thể vẽ sai một chi tiết nhỏ, nên hãy xem kỹ ảnh trước khi lưu.',
+        ],
+      },
+      {
+        title: 'Câu hỏi thường gặp',
+        blocks: [
+          {
+            faq: [
+              ['Ai nhìn thấy người mẫu của tôi?', 'Chỉ bạn và Admin, trừ khi bạn bật Dùng chung cho cả công ty.'],
+              ['Nếu tôi tắt Dùng chung thì sao?', 'Người mẫu biến khỏi bảng chọn của đồng nghiệp; ảnh mà họ đã tạo từ người mẫu đó vẫn giữ nguyên kết quả.'],
+              ['Người mẫu đã dùng chung có xoá được không?', 'Nếu Admin đã quyết định dùng chung thì chỉ Admin xoá hoặc thả quyết định được; còn lại bạn xoá bất cứ lúc nào.'],
+              ['Một lần chạy tốn bao nhiêu?', `${APP_COST} Dòng chi phí trên trang cho biết tổng tiền cho số ảnh bạn chọn.`],
+            ],
+          },
+        ],
+      },
+    ],
+  },
   'face-swap': {
     title: 'Đổi khuôn mặt chỉ với một lần chạy',
     sections: [

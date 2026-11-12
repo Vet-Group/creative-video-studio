@@ -129,6 +129,8 @@ export const USERS = {
   fmtd: { email: 'fmtd@e2e.test', name: 'E2E Formats D', role: 'member' },
   fmte: { email: 'fmte@e2e.test', name: 'E2E Formats E', role: 'member' },
   fmtf: { email: 'fmtf@e2e.test', name: 'E2E Formats F', role: 'member' },
+  // fashion-model.e2e: the AI model generator, a saved model in the Try On person picker.
+  fashiona: { email: 'fashiona@e2e.test', name: 'E2E Fashion A', role: 'member' },
   admin: { email: 'admin@e2e.test', name: 'E2E Admin', role: 'admin' },
 } as const;
 

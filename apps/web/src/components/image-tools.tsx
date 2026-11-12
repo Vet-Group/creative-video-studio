@@ -7,10 +7,12 @@ import { api, ApiError, type Clip, sendJson, thumbUrl } from '@/lib/api';
 import { dropRefillQuery, exampleFrom, refillFrom, reuseHref } from '@/lib/reuse';
 import { NARROW, useMediaQuery, WIDE } from '@/lib/use-media-query';
 import { numberedSamples } from '@/lib/examples';
+import { useFashionModels } from '@/lib/use-fashion-models';
 import { useHydrated } from '@/lib/use-hydrated';
 import { useSamples } from '@/lib/use-samples';
 import { MAX_AUDIO_BYTES, MAX_BYTES, MAX_VIDEO_BYTES } from '@/lib/upload-limits';
-import { slotOfLabel, UPLOAD_SLOTS, type UploadSlot } from '@/lib/upload-slots';
+import { AI_MODEL_SLOTS, slotOfLabel, UPLOAD_SLOTS, type UploadSlot } from '@/lib/upload-slots';
+import { type FashionModelItem, usable } from '@/lib/fashion-models';
 import { type Photo, Recreate, useForm, useFreshResults, useJobs, useRecreated } from './jobs';
 import { Icon, type IconName } from './Icon';
 import { LoadError } from './LoadError';
@@ -510,6 +512,10 @@ export function PhotoDialog({ open, title, sub, tiles, busy, onFile, onClose, on
   );
 }
 
+/** The tiles of the "Người mẫu AI" group of a photo dialog: each saved model's picture (an input asset), picked as an uploaded photo is. */
+export const fashionTiles = (models: FashionModelItem[], onPick: (img: Img) => void): PhotoTile[] =>
+  models.map((m) => ({ key: m.id, src: thumbUrl(m.assetId), label: `Dùng người mẫu AI ${m.name}`, pick: () => onPick({ id: m.assetId, filename: m.name }) }));
+
 /**
  * "Ảnh đã tải": a button that opens the member's own photos uploaded on any page (GET /api/assets?recent=uploads, newest first), shared by Create, Try On,
  * Image Generation and Marketing Studio. A pick hands the asset to `onPick` as an upload would (the same id, nothing sent again); photos already in the
@@ -539,8 +545,10 @@ export function UploadedPhotos({ name, taken, disabled, onPick, storeId = '', sl
     if (stores.length === 0) api<{ stores: StoreOption[] }>('/api/stores').then((r) => setStores(r.stores), () => undefined); // without the list the filter offers every store only
   }
   const shown = Array.isArray(list) ? list.filter((a) => !taken.some((t) => t.id === a.id)) : [];
+  const offersModels = AI_MODEL_SLOTS.includes(slot);
+  const ai = usable(useFashionModels(open && offersModels).models ?? []).filter((m) => !taken.some((t) => t.id === m.assetId));
   const sub =
-    list === null ? 'Đang tải ảnh...' : list === 'failed' ? 'Không tải được ảnh đã tải. Hãy đóng và mở lại.' : shown.length === 0 ? (kind ? `Chưa có ảnh ${UPLOAD_SLOTS[kind].toLowerCase()} nào khác. Chọn "Tất cả mục" để xem mọi ảnh.` : store ? 'Chưa có ảnh nào khác của cửa hàng này. Chọn "Tất cả cửa hàng" để xem mọi ảnh.' : 'Chưa có ảnh nào khác. Ảnh bạn tải lên ở mọi trang sẽ hiện ở đây.') : kind ? `Ảnh bạn đã tải cho mục ${UPLOAD_SLOTS[kind]}, mỗi ảnh một lần, mới nhất trước.` : 'Ảnh bạn đã tải lên ở mọi trang, mỗi ảnh một lần, mới nhất trước.';
+    list === null ? 'Đang tải ảnh...' : list === 'failed' ? 'Không tải được ảnh đã tải. Hãy đóng và mở lại.' : shown.length === 0 ? (ai.length > 0 ? 'Chưa có ảnh đã tải nào khác. Bạn có thể chọn một người mẫu AI bên dưới.' : kind ? `Chưa có ảnh ${UPLOAD_SLOTS[kind].toLowerCase()} nào khác. Chọn "Tất cả mục" để xem mọi ảnh.` : store ? 'Chưa có ảnh nào khác của cửa hàng này. Chọn "Tất cả cửa hàng" để xem mọi ảnh.' : 'Chưa có ảnh nào khác. Ảnh bạn tải lên ở mọi trang sẽ hiện ở đây.') : kind ? `Ảnh bạn đã tải cho mục ${UPLOAD_SLOTS[kind]}, mỗi ảnh một lần, mới nhất trước.` : 'Ảnh bạn đã tải lên ở mọi trang, mỗi ảnh một lần, mới nhất trước.';
   return (
     <>
       {/* An icon-only button (Image Generation's bar) takes its name as a tooltip too. */}
@@ -552,6 +560,7 @@ export function UploadedPhotos({ name, taken, disabled, onPick, storeId = '', sl
         title="Ảnh đã tải"
         sub={sub}
         tiles={shown.map((a) => ({ key: a.id, src: thumbUrl(a.id), label: `Dùng ${a.filename}`, pick: () => onPick(a) }))}
+        groups={offersModels ? [{ title: 'Người mẫu AI', tiles: fashionTiles(ai, onPick) }] : []}
         busy={false}
         onClose={() => setOpen(false)}
         filter={
