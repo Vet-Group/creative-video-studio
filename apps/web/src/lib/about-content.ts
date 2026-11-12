@@ -2752,8 +2752,52 @@ export const APP_ABOUT: Record<string, AboutPage> = {
   },
 };
 
+const analyze: AboutPage = {
+  title: 'Phân tích video tham chiếu',
+  lead: 'Đưa vào một video tham chiếu, trang này rã nó thành danh sách cảnh: định dạng, câu mở đầu, tóm tắt và một prompt tiếng Anh cho từng cảnh. Dùng để học cách một clip đang chạy tốt được dựng, rồi tạo lại ý tưởng đó cho sản phẩm của bạn chỉ bằng một cú bấm.',
+  sections: [
+    {
+      kicker: 'Vì sao quan trọng',
+      title: 'Vì sao nên phân tích một video tham chiếu?',
+      lead: 'Một clip đối thủ hay một mẫu bạn thích chứa sẵn công thức: mở đầu thế nào, cắt cảnh ra sao, mỗi cảnh làm gì. Phân tích rút công thức đó ra thành chữ để bạn tái dùng, thay vì xem đi xem lại và đoán.',
+      blocks: [
+        {
+          cards: [
+            { title: 'Rã thành từng cảnh', text: 'Mỗi cảnh có mốc thời gian, vai trò (mở đầu, chi tiết, kết) và một prompt mô tả chuyển động. Bạn thấy rõ clip được dựng ra sao, không phải tua lại.' },
+            { title: 'Hiển thị tiếng Việt, prompt tiếng Anh', text: 'Phần đọc hiểu là tiếng Việt cho nhanh; prompt gửi sang Tạo video vẫn là tiếng Anh vì mô hình chạy ổn định hơn với tiếng Anh.' },
+            { title: 'Một bấm sang Tạo video', text: 'Mỗi cảnh có nút "Dùng prompt này" nạp thẳng prompt đó vào trang Tạo video, để bạn dựng lại ý tưởng cho ảnh sản phẩm của mình.' },
+            { title: 'Video của bạn, trên máy công ty', text: 'Phân tích chạy trên máy chủ của công ty bằng khoá nhà cung cấp của công ty; chi phí ghi lại, không tính phí người dùng.' },
+          ],
+        },
+      ],
+    },
+    {
+      kicker: 'Từng bước',
+      title: 'Phân tích hoạt động thế nào?',
+      lead: 'Chọn một video của bạn (tải lên hoặc lấy từ Lịch sử), chờ máy chủ rã cảnh, rồi đọc kết quả và đẩy một cảnh sang Tạo video.',
+      blocks: [
+        {
+          steps: [
+            { title: 'Chọn video tham chiếu', text: 'Tải lên một clip MP4 hoặc MOV, hoặc chọn một video từ Lịch sử của bạn. Video tải thẳng lên kho nên không còn vướng trần dung lượng như trước.' },
+            { title: 'Chờ rã cảnh', text: 'Máy chủ chạy công cụ phân tích trên clip: tách cảnh, đọc hiểu từng cảnh và viết prompt. Việc này mất một lát; lượt phân tích nằm trong tab Lịch sử tới khi xong.' },
+            { title: 'Đọc và tái dùng', text: 'Xem định dạng, câu mở đầu và prompt từng cảnh bằng tiếng Việt. Bấm "Dùng prompt này" ở một cảnh để mở Tạo video với prompt tiếng Anh đã điền sẵn.' },
+          ],
+        },
+      ],
+    },
+    {
+      kicker: 'Trả lời nhanh',
+      title: 'Phân tích có tạo ra video không?',
+      blocks: [
+        'Không. Phân tích chỉ đọc một video có sẵn và mô tả cách nó được dựng — danh sách cảnh, định dạng, câu mở đầu và prompt. Để ra video, bạn mang một prompt sang trang Tạo video.',
+        'Hãy xem nó như bước nghiên cứu trước khi làm: hiểu một clip hiệu quả, rồi dựng lại ý tưởng đó cho sản phẩm của bạn thay vì bắt đầu từ trang trắng.',
+      ],
+    },
+  ],
+};
+
 /** The long About tabs of the tools; `advanced` is for the Advanced marketing page. */
-export const ABOUT = { create, tryOn, image, marketing, advanced, unboxing, review };
+export const ABOUT = { create, tryOn, image, marketing, advanced, unboxing, review, analyze };
 
 /** The short description of a model on the Explore "Featured models" cards, by model id. */
 export const MODEL_CARD_TEXT: Record<string, string> = {

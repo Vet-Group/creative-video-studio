@@ -1,6 +1,7 @@
 import type { Analysis } from '@cvs/core/analysis/breakdown';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, test } from 'vitest';
+import { ANALYZE_EXAMPLES } from '@/lib/analyze-examples';
 import { AnalysisResult } from './AnalyzeView';
 
 const analysis: Analysis = {
@@ -32,4 +33,16 @@ test('a shot with no prompt shows no push-to-Create link, and a blank format fal
   const html = renderToStaticMarkup(<AnalysisResult analysis={{ ...analysis, format: '', shots: [{ index: 1, start: 0, end: 2, role: '', prompt: '' }] }} />);
   expect(html).not.toContain('/create?prompt=');
   expect(html).toContain('Video'); // formatLabel('') has no label, so the line shows the fallback
+});
+
+test('every read-only Example is well-formed and renders its Vietnamese display with English prompts to push into Create', () => {
+  expect(ANALYZE_EXAMPLES.length).toBeGreaterThan(0);
+  for (const ex of ANALYZE_EXAMPLES) {
+    const a = ex.analysis;
+    expect(a.shots.length).toBe(a.shotCount); // the count matches the shots listed
+    expect(a.vi?.shots.length).toBe(a.shots.length); // one Vietnamese line per shot, or the display would fall out of step
+    const html = renderToStaticMarkup(<AnalysisResult analysis={a} />);
+    expect(html).toContain(a.vi!.hook); // Vietnamese for reading
+    expect(html).toContain(`href="/create?prompt=${encodeURIComponent(a.shots[0]!.prompt)}"`); // English prompt pushed to Create
+  }
 });

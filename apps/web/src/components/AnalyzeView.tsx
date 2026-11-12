@@ -5,11 +5,18 @@
 import Link from 'next/link';
 import type { Analysis } from '@cvs/core/analysis/breakdown';
 import { useEffect, useRef, useState } from 'react';
+import { ABOUT } from '@/lib/about-content';
 import { formatLabel } from '@/lib/analyze';
+import { ANALYZE_EXAMPLES } from '@/lib/analyze-examples';
 import { api, errorText, sendJson } from '@/lib/api';
+import { NARROW, useMediaQuery } from '@/lib/use-media-query';
+import { About } from './About';
 import { Icon } from './Icon';
-import { copyError, uploadError, uploadVideoDirect } from './image-tools';
+import { copyError, uploadError, uploadVideoDirect, WorkTabs } from './image-tools';
 import { ReferenceVideoSlot, type RefVideo } from './ReferenceVideo';
+
+type Tab = 'create' | 'history' | 'examples' | 'about';
+const TAB_LABEL: Record<Tab, string> = { create: 'Phân tích', history: 'Lịch sử', examples: 'Ví dụ', about: 'Giới thiệu' };
 
 interface AnalysisRow {
   id: string;
@@ -61,12 +68,30 @@ export function AnalysisResult({ analysis }: { analysis: Analysis }) {
   );
 }
 
+/** The read-only sample analyses (lib/analyze-examples.ts): what a breakdown looks like, without spending a real run. */
+function Examples() {
+  return (
+    <div className="analysis-examples">
+      <p className="help">Phân tích mẫu — xem một video tham chiếu được rã thành cảnh, định dạng, câu mở đầu và prompt tiếng Anh cho từng cảnh.</p>
+      {ANALYZE_EXAMPLES.map((ex) => (
+        <section key={ex.title} className="card analysis-example">
+          <h3>{ex.title}</h3>
+          <AnalysisResult analysis={ex.analysis} />
+        </section>
+      ))}
+    </div>
+  );
+}
+
 export function AnalyzeView() {
+  const narrow = useMediaQuery(NARROW);
+  const [tab, setTab] = useState<Tab | null>(null); // null: the default for the width (the form below 1024 px, else Examples)
   const [video, setVideo] = useState<RefVideo | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [current, setCurrent] = useState<AnalysisRow | null>(null);
   const [history, setHistory] = useState<AnalysisRow[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(true);
   const poll = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   // The id the poll chain is following; cleared on unmount, remove or a History pick so an in-flight fetch does not
   // reschedule itself or write its row over a newer selection after the chain was meant to stop.
@@ -76,7 +101,12 @@ export function AnalyzeView() {
     clearTimeout(poll.current);
   };
 
-  const loadHistory = () => api<{ analyses: AnalysisRow[] }>('/api/analyses').then((r) => setHistory(r.analyses), () => {});
+  const loadHistory = () => {
+    setHistoryLoading(true);
+    return api<{ analyses: AnalysisRow[] }>('/api/analyses')
+      .then((r) => setHistory(r.analyses), () => {})
+      .finally(() => setHistoryLoading(false));
+  };
   useEffect(() => {
     void loadHistory();
     return stopPoll;
@@ -129,70 +159,95 @@ export function AnalyzeView() {
   }
 
   const running = current !== null && !terminal(current.status);
+  // Pick a History row to view: stop any live poll, show it, and on a phone switch to the Phân tích panel where the result sits.
+  const pick = (a: AnalysisRow) => {
+    stopPoll();
+    setCurrent(a);
+    if (narrow) setTab('create');
+  };
+
+  const tabs: Tab[] = narrow ? ['create', 'history', 'examples', 'about'] : ['history', 'examples', 'about'];
+  const shown: Tab = narrow ? (tab ?? 'create') : tab === null || tab === 'create' ? 'examples' : tab;
+  const panel = shown === 'create' ? 'examples' : shown;
+
   return (
-    <section aria-labelledby="analyze-title" className="create">
-      <h1 id="analyze-title">Phân tích video tham chiếu</h1>
-      <p className="help">
-        Tải lên một video (hoặc chọn từ Lịch sử) để rã thành danh sách cảnh, định dạng, câu mở đầu và prompt tiếng Anh cho từng cảnh. Bấm một prompt để tạo video từ đó.
-      </p>
+    <section aria-labelledby="analyze-title" className="create analyze-page">
+      <h1 id="analyze-title" className="sr-only">
+        Phân tích video tham chiếu
+      </h1>
+      <div className="create-grid">
+        <WorkTabs prefix="analyze" tabs={tabs} labels={TAB_LABEL} shown={shown} onSelect={setTab} />
 
-      <ReferenceVideoSlot
-        video={video}
-        busy={busy}
-        onFile={(f) => void takeVideo(() => uploadVideoDirect(f).then((v) => [v]), (e) => uploadError(e, 'video'))}
-        onHistory={(id) => void takeVideo(() => api<{ assets: RefVideo[] }>('/api/assets/copy', sendJson('POST', { assetId: id })).then((r) => r.assets), (e) => copyError(e, 'Không dùng được video này.'))}
-        onRemove={() => {
-          stopPoll();
-          setVideo(null);
-          setCurrent(null);
-        }}
-      />
+        <div className="card form-card" id="analyze-panel-create" role={narrow ? 'tabpanel' : undefined} aria-labelledby={narrow ? 'analyze-tab-create' : undefined} hidden={narrow && shown !== 'create'}>
+          <div className="form-scroll">
+            <p className="help">Tải lên một video (hoặc chọn từ Lịch sử) để rã thành danh sách cảnh, định dạng, câu mở đầu và prompt tiếng Anh cho từng cảnh. Bấm một prompt để tạo video từ đó.</p>
 
-      {video && (
-        <button type="button" className="primary" disabled={busy || running} onClick={() => void analyse()}>
-          <Icon name="chart" /> Phân tích
-        </button>
-      )}
-      {error && (
-        <p className="error" role="alert">
-          {error}
-        </p>
-      )}
+            <ReferenceVideoSlot
+              video={video}
+              busy={busy}
+              onFile={(f) => void takeVideo(() => uploadVideoDirect(f).then((v) => [v]), (e) => uploadError(e, 'video'))}
+              onHistory={(id) => void takeVideo(() => api<{ assets: RefVideo[] }>('/api/assets/copy', sendJson('POST', { assetId: id })).then((r) => r.assets), (e) => copyError(e, 'Không dùng được video này.'))}
+              onRemove={() => {
+                stopPoll();
+                setVideo(null);
+                setCurrent(null);
+              }}
+            />
 
-      {running && (
-        <p className="muted" role="status">
-          Đang phân tích video… việc này mất một lát.
-        </p>
-      )}
-      {current?.status === 'failed' && (
-        <p className="error" role="alert">
-          Phân tích không thành công. Hãy thử lại với video khác.
-        </p>
-      )}
-      {current?.status === 'succeeded' && current.result && <AnalysisResult analysis={current.result} />}
+            {video && (
+              <button type="button" className="primary" disabled={busy || running} onClick={() => void analyse()}>
+                <Icon name="chart" /> Phân tích
+              </button>
+            )}
+            {error && (
+              <p className="error" role="alert">
+                {error}
+              </p>
+            )}
 
-      {history.length > 0 && (
-        <section className="analysis-history">
-          <h2>Gần đây</h2>
-          <ul>
-            {history.map((a) => (
-              <li key={a.id}>
-                <button
-                  type="button"
-                  className="link-button"
-                  disabled={a.status !== 'succeeded' || !a.result}
-                  onClick={() => {
-                    stopPoll();
-                    setCurrent(a);
-                  }}
-                >
-                  {a.result ? formatLabel(a.result.format) || 'Video' : a.status === 'failed' ? 'Không thành công' : 'Đang xử lý'} · {new Date(a.createdAt).toLocaleString('vi-VN')}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+            {running && (
+              <p className="muted" role="status">
+                Đang phân tích video… việc này mất một lát.
+              </p>
+            )}
+            {current?.status === 'failed' && (
+              <p className="error" role="alert">
+                Phân tích không thành công. Hãy thử lại với video khác.
+              </p>
+            )}
+            {current?.status === 'succeeded' && current.result && <AnalysisResult analysis={current.result} />}
+          </div>
+        </div>
+
+        <div className="side" id={`analyze-panel-${panel}`} role="tabpanel" aria-labelledby={`analyze-tab-${panel}`} hidden={narrow && shown === 'create'}>
+          {shown === 'history' ? (
+            <section className="analysis-history">
+              <h2>Gần đây</h2>
+              {historyLoading && history.length === 0 ? (
+                <p className="muted" role="status">
+                  Đang tải…
+                </p>
+              ) : history.length === 0 ? (
+                <p className="muted">Chưa có phân tích nào. Chọn một video rồi bấm Phân tích để bắt đầu.</p>
+              ) : (
+                <ul>
+                  {history.map((a) => (
+                    <li key={a.id}>
+                      <button type="button" className="link-button" disabled={a.status !== 'succeeded' || !a.result} onClick={() => pick(a)}>
+                        {a.result ? formatLabel(a.result.format) || 'Video' : a.status === 'failed' ? 'Không thành công' : 'Đang xử lý'} · {new Date(a.createdAt).toLocaleString('vi-VN')}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          ) : shown === 'examples' ? (
+            <Examples />
+          ) : (
+            <About page={ABOUT.analyze} />
+          )}
+        </div>
+      </div>
     </section>
   );
 }
