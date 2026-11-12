@@ -57,6 +57,8 @@ test('decomposes a queued analysis, storing the parsed result, the raw breakdown
   expect(r.provider).toBe('byteplus');
   expect(r.model).toBe('seed-2-0-lite-260428');
   expect(r.cost_usd).toBe('0.02');
+  const led = (await pool.query(`select kind, usd::text as usd, user_id, team_id, store_id, job_id, provider, model, is_final from cost_entries where ref = $1`, [`llm:analysis:${id}`])).rows;
+  expect(led).toEqual([{ kind: 'llm', usd: '0.0200', user_id: 'u1', team_id: 'team-unassigned', store_id: null, job_id: null, provider: 'byteplus', model: 'seed-2-0-lite-260428', is_final: true }]); // recorded in the Admin Costs ledger
   expect(r.result.vi.hook).toBe('câu mở đầu'); // Vietnamese for display
   expect(r.result.vi.shots).toEqual(['cảnh 1']);
   expect(r.result.shots[0].prompt).toContain('white t-shirt'); // English prompt kept for Create

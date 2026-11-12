@@ -10,6 +10,7 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { type Analysis, type AnalysisVi, parseBreakdown } from '@cvs/core/analysis/breakdown';
 import { createAnalysisTranslator } from '@cvs/core/analysis/translate';
+import { bookLlm, withTransaction } from '@cvs/core/ledger';
 import { byteplusReaVlm, pickReaVlm, reaVlmEnv, vertexReaVlm } from '@cvs/core/providers/rea-vlm';
 import { serviceAccountToken } from '@cvs/core/providers/vertex';
 import { vertexAccounts } from '@cvs/core/providers/vertex-accounts';
@@ -121,10 +122,15 @@ export async function runReaAnalyze(pool: Pool, analysisId: string, seams: Analy
     }
     const rawKey = `analyses/${analysisId}/breakdown.json`;
     await write(rawKey, rawBytes, 'application/json');
-    await pool.query(
-      `update analyses set status = 'succeeded', result = $2, raw_key = $3, provider = $4, model = $5, cost_usd = $6, finished_at = now() where id = $1`,
-      [analysisId, JSON.stringify(analysis), rawKey, provider, model, String(Number(cost.toFixed(6)))],
-    );
+    // Close the row and book its cost to the member's team and store in one transaction, so the Admin Costs ledger always
+    // matches a succeeded analysis. bookLlm is idempotent (ref llm:analysis:<id>); staff are not charged, the cost is only recorded.
+    await withTransaction(pool, async (tx) => {
+      await tx.query(
+        `update analyses set status = 'succeeded', result = $2, raw_key = $3, provider = $4, model = $5, cost_usd = $6, finished_at = now() where id = $1`,
+        [analysisId, JSON.stringify(analysis), rawKey, provider, model, String(Number(cost.toFixed(6)))],
+      );
+      await bookLlm(tx, { analysis: analysisId }, { costUsd: cost, provider, model });
+    });
   } catch (e) {
     const msg = (e instanceof Error ? e.message : String(e)).slice(0, 2000);
     await pool.query(`update analyses set status = 'failed', error = $2, finished_at = now() where id = $1`, [analysisId, msg]);

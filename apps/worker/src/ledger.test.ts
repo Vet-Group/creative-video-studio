@@ -303,6 +303,15 @@ describe('bookLlm', () => {
     ]);
   });
 
+  test("books a reference-video analysis without a job, on the member, team and store, final", async () => {
+    await pool.query(`insert into analyses (id, user_id, team_id, store_id, source_key, created_at) values ('an-1', 'u1', 'team-b', 'store-a', 'inputs/x.mp4', '2026-10-28T09:00:00Z')`);
+    expect(await bookLlm(pool, { analysis: 'an-1' }, { costUsd: 0.02, provider: 'byteplus', model: 'seed-2-0-lite-260428' })).toBe(true);
+    expect(await bookLlm(pool, { analysis: 'an-1' }, { costUsd: 0.02, provider: 'byteplus', model: 'seed-2-0-lite-260428' })).toBe(false);
+    expect(await llmRows('llm:analysis:an-1')).toEqual([
+      { usd: '0.0200', month: '2026-10', day: '2026-10-28', user_id: 'u1', team_id: 'team-b', store_id: 'store-a', job_id: null, provider: 'byteplus', model: 'seed-2-0-lite-260428', is_final: true },
+    ]);
+  });
+
   test('books nothing for a null cost, a 0 cost or one that rounds to 0 USD', async () => {
     const id = await reservedJob('1.0000', { status: 'running' });
     for (const cost of [null, 0, 0.00004]) expect(await bookLlm(pool, { enhance: id }, { costUsd: cost, provider: 'fal', model: 'm' })).toBe(false);
