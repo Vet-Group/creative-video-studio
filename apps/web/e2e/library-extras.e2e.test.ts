@@ -16,7 +16,7 @@ test('the Library date presets: today, the last 7 or 30 days, or one day picked 
     await day.selectOption({ label: preset });
     await expect(mine).toHaveCount(1);
   }
-  await expect(page.getByText('2 bộ lọc', { exact: true })).toBeVisible();
+  await expect(page.locator('.library-active .library-chip')).toHaveCount(2); // creator and the date preset, each a removable chip
   // One day: the calendar field shows, and a day before the item leaves the list empty.
   await expect(page.getByLabel('Ngày cụ thể')).toHaveCount(0);
   await day.selectOption({ label: 'Chọn một ngày…' });
