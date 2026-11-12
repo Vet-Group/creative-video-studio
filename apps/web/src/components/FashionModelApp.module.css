@@ -1,0 +1,18 @@
+.wrap { flex-wrap: wrap; justify-self: start; max-width: 100%; }
+.count { display: flex; align-items: center; gap: 8px; }
+.count button { width: 36px; height: 36px; padding: 0; font-size: 18px; line-height: 1; }
+.count output { min-width: 2ch; text-align: center; font-variant-numeric: tabular-nums; }
+.cost { margin: 0; color: var(--ink); font-size: 14px; line-height: 21px; font-variant-numeric: tabular-nums; }
+.prompt summary { cursor: pointer; color: var(--text-subtle); font-size: 13px; }
+.prompt p { margin: 6px 0 0; color: var(--text-subtle); font-size: 12px; line-height: 18px; overflow-wrap: anywhere; }
+.list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr)); gap: 16px; }
+.card { display: grid; gap: 8px; align-content: start; padding: 12px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); }
+.card img { display: block; width: 100%; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 10px; background: var(--fill); }
+.card h3 { margin: 0; color: var(--ink-strong); font-size: 14px; line-height: 21px; font-weight: 600; overflow-wrap: anywhere; }
+.card p { margin: 0; }
+.actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.actions :is(button, a) { min-height: 32px; padding: 0 10px; font-size: 13px; }
+.share { display: flex; align-items: center; gap: 8px; font-size: 13px; line-height: 18px; }
+.share input { flex: none; width: 16px; min-width: 0; height: 16px; margin: 0; padding: 0; accent-color: var(--ink-strong); }
+.rename { display: grid; gap: 6px; }
+.rename input { min-width: 0; }

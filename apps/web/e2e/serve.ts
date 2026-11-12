@@ -48,7 +48,7 @@ await pool.query(`update model_configs set max_prompt_chars = 1000 where id = 'm
 // one-image model for the image page, so the model pill has a second choice.
 await pool.query(
   `insert into model_configs (id, provider, endpoint, label, kind, features, ratios, durations_sec, max_images, image_prices, sources, enabled) values
-     ('mock-image-e2e', 'mock', 'mock', 'Mock image E2E', 'image', '{image,try_on}', '{auto,1:1,3:4}', '{}', 4, '{"1K": "0.1500", "2K": "0.3000"}', '{}', true),
+     ('mock-image-e2e', 'mock', 'mock', 'Mock image E2E', 'image', '{image,try_on,fashion_model}', '{auto,1:1,3:4}', '{}', 4, '{"1K": "0.1500", "2K": "0.3000"}', '{}', true),
      ('mock-image-solo', 'mock', 'mock', 'Mock image Solo', 'image', '{image}', '{auto}', '{}', 1, '{"1K": "0.1000"}', '{}', true)`,
 );
 await pool.query(`update model_configs set max_prompt_chars = 1000 where id = 'mock-image-solo'`); // a smaller limit for the image bar spec

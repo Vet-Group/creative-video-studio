@@ -270,6 +270,11 @@ function HistoryCard({ job, isAdmin, select }: { job: TrayJob; isAdmin: boolean;
               <Icon name="right" /> Dùng kết quả
             </button>
           )}
+          {out && image && form?.saveModel && (
+            <button type="button" className="job-reuse job-primary" onClick={() => form.saveModel!(out)}>
+              <Icon name="plus" /> Lưu làm người mẫu
+            </button>
+          )}
           {/* Fash's Generate Video on an image: Create video opens with the picture as its first image. */}
           {out && image && (
             <Link href={`/create?image=${out}`} className="job-reuse">

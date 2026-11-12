@@ -1,0 +1,73 @@
+import { describe, expect, it } from 'vitest';
+import { DEFAULT_FASHION_TRAITS, FASHION_AVOID, FASHION_OPTIONS, fashionModelName, fashionModelPrompt, MAX_EXTRA, parseFashionTraits, withNiche } from './fashion-model';
+
+describe('fashionModelPrompt', () => {
+  it('puts the fragment of every option into the prompt', () => {
+    for (const key of Object.keys(FASHION_OPTIONS) as (keyof typeof FASHION_OPTIONS)[]) {
+      for (const option of FASHION_OPTIONS[key]) {
+        const prompt = fashionModelPrompt({ ...DEFAULT_FASHION_TRAITS, [key]: option.id });
+        expect(prompt.toLowerCase(), `${key}.${option.id}`).toContain(option.prompt.toLowerCase());
+      }
+    }
+  });
+
+  it('keeps the plus-size body true, the avoid list and the base look in every prompt', () => {
+    expect(fashionModelPrompt({ ...DEFAULT_FASHION_TRAITS, body: 'plus' })).toContain('keep true plus-size proportions, do not slim or reshape the body');
+    for (const niche of FASHION_OPTIONS.niche) {
+      const prompt = fashionModelPrompt({ ...DEFAULT_FASHION_TRAITS, niche: niche.id });
+      expect(prompt.endsWith(FASHION_AVOID)).toBe(true);
+      expect(prompt).toContain('fictional adult (clearly 18+) fashion model');
+      expect(prompt).toContain('plain white crew-neck t-shirt with no print');
+      expect(prompt).toContain('3:4 portrait');
+    }
+    expect(fashionModelPrompt({ ...DEFAULT_FASHION_TRAITS, framing: 'full' })).toContain('plain light-blue jeans and plain white sneakers');
+  });
+
+  it('adds extra details as one trimmed line before the avoid list, and nothing for a blank one', () => {
+    expect(fashionModelPrompt({ ...DEFAULT_FASHION_TRAITS, extra: '  freckles\n and a mole ' })).toContain(`Additional details: freckles and a mole ${FASHION_AVOID}`);
+    expect(fashionModelPrompt({ ...DEFAULT_FASHION_TRAITS, extra: '   ' })).not.toContain('Additional details');
+  });
+
+  it('is the same prompt for the traits the server parses back', () => {
+    const traits = { ...DEFAULT_FASHION_TRAITS, niche: 'melanin', extra: ' a  b ' };
+    expect(fashionModelPrompt(parseFashionTraits(JSON.parse(JSON.stringify(traits)))!)).toBe(fashionModelPrompt(traits));
+  });
+});
+
+describe('defaults and niches', () => {
+  it('defaults to a Vietnamese or Southeast Asian woman of 26 to 40, half body on white, with no niche', () => {
+    expect(DEFAULT_FASHION_TRAITS).toMatchObject({ gender: 'female', age: 'adult', ethnicity: 'vietnamese_sea', skinTone: 'auto', framing: 'half', background: 'white', niche: 'none' });
+    for (const [key, id] of Object.entries(DEFAULT_FASHION_TRAITS)) if (key !== 'extra') expect(FASHION_OPTIONS[key as keyof typeof FASHION_OPTIONS].some((o) => o.id === id)).toBe(true);
+  });
+
+  it('pre-selects the traits a niche names and leaves the rest', () => {
+    expect(withNiche(DEFAULT_FASHION_TRAITS, 'melanin')).toMatchObject({ niche: 'melanin', ethnicity: 'black', skinTone: 'deep', age: 'adult' });
+    expect(withNiche(DEFAULT_FASHION_TRAITS, 'heritage')).toMatchObject({ ethnicity: 'black', age: 'mature' });
+    expect(withNiche({ ...DEFAULT_FASHION_TRAITS, ethnicity: 'white' }, 'faith')).toMatchObject({ niche: 'faith', ethnicity: 'white' });
+  });
+});
+
+describe('parseFashionTraits', () => {
+  it('fills the defaults for what is missing', () => {
+    expect(parseFashionTraits({})).toEqual(DEFAULT_FASHION_TRAITS);
+    expect(parseFashionTraits({ gender: 'male' })).toEqual({ ...DEFAULT_FASHION_TRAITS, gender: 'male' });
+  });
+
+  it('refuses an unknown id, a wrong type, and extra text that is too long or has control characters', () => {
+    expect(parseFashionTraits({ gender: 'robot' })).toBeNull();
+    expect(parseFashionTraits({ niche: 'constructor' })).toBeNull();
+    expect(parseFashionTraits({ age: 3 })).toBeNull();
+    expect(parseFashionTraits(null)).toBeNull();
+    expect(parseFashionTraits([])).toBeNull();
+    expect(parseFashionTraits({ extra: 'a'.repeat(MAX_EXTRA) })).not.toBeNull();
+    expect(parseFashionTraits({ extra: 'a'.repeat(MAX_EXTRA + 1) })).toBeNull();
+    expect(parseFashionTraits({ extra: 'a\u0000b' })).toBeNull();
+    expect(parseFashionTraits({ extra: 5 })).toBeNull();
+  });
+});
+
+describe('fashionModelName', () => {
+  it('names a model from its gender, age and heritage', () => {
+    expect(fashionModelName(DEFAULT_FASHION_TRAITS)).toBe('Nữ · 26-40 tuổi · Việt Nam / Đông Nam Á');
+  });
+});

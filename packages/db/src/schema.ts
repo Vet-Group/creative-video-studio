@@ -34,7 +34,7 @@ export const PROVIDERS = ['fal', 'vertex', 'byteplus', 'mock'] as const;
 /** What a job is for. `video` and `marketing` spend the company video budget; the rest share the image and apps budget (FEATURE_BUDGET). */
 export const FEATURES = [
   'video', 'marketing', 'try_on', 'image', 'character_swap', 'model_swap', 'background_changer', 'reframe', 'image_upscale', 'face_swap',
-  'background_remover', 'motion_control', 'media_optimizer', 'jewelry_try_on', 'lingerie_try_on',
+  'background_remover', 'motion_control', 'media_optimizer', 'jewelry_try_on', 'lingerie_try_on', 'fashion_model',
 ] as const;
 /** The features under settings.features_monthly_cap_usd and the per-member USD caps. */
 export const FEATURE_BUDGET = FEATURES.filter((f) => f !== 'video' && f !== 'marketing');
@@ -459,7 +459,7 @@ export const jobs = pgTable(
     check('jobs_status_check', sql`${t.status} in ('queued', 'submitting', 'running', 'succeeded', 'failed', 'failed_unknown', 'timed_out')`),
     check('jobs_aspect_check', sql`${t.aspect} in ('auto', '1:1', '9:16', '16:9', '3:4', '4:3', '2:3', '3:2', '4:5', '5:4', '21:9', '4:1', '1:4', '8:1', '1:8')`),
     check('jobs_provider_check', sql`${t.provider} in ('fal', 'vertex', 'byteplus', 'mock')`),
-    check('jobs_feature_check', sql`${t.feature} in ('video', 'marketing', 'try_on', 'image', 'character_swap', 'model_swap', 'background_changer', 'reframe', 'image_upscale', 'face_swap', 'background_remover', 'motion_control', 'media_optimizer', 'jewelry_try_on', 'lingerie_try_on')`),
+    check('jobs_feature_check', sql`${t.feature} in ('video', 'marketing', 'try_on', 'image', 'character_swap', 'model_swap', 'background_changer', 'reframe', 'image_upscale', 'face_swap', 'background_remover', 'motion_control', 'media_optimizer', 'jewelry_try_on', 'lingerie_try_on', 'fashion_model')`),
   ],
 );
 
@@ -821,5 +821,31 @@ export const userStores = pgTable(
   (t) => [
     primaryKey({ columns: [t.userId, t.storeId] }),
     index('user_stores_store_id_idx').on(t.storeId),
+  ],
+);
+
+// An AI model a member saved from a Fashion Model Generator result: a private input asset the person pickers offer, shared with every member only
+// when `shared`. `shared_locked`: an Admin decided, and only an Admin changes it again.
+export const fashionModels = pgTable(
+  'fashion_models',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    assetId: text('asset_id')
+      .notNull()
+      .references(() => assets.id),
+    traits: jsonb('traits').notNull().default({}),
+    shared: boolean('shared').notNull().default(false),
+    sharedLocked: boolean('shared_locked').notNull().default(false),
+    createdAt: tstz('created_at').notNull().defaultNow(),
+    deletedAt: tstz('deleted_at'),
+  },
+  (t) => [
+    index('fashion_models_user_id_idx').on(t.userId),
+    index('fashion_models_shared_idx').on(t.shared).where(sql`${t.deletedAt} is null`),
+    check('fashion_models_name_check', sql`char_length(${t.name}) between 1 and 60`),
   ],
 );

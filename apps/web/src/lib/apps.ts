@@ -164,6 +164,15 @@ export const APPS: AppConfig[] = [
     ratio: true,
     resolution: true,
   },
+  {
+    // Ours too, and the only app with its own page (components/FashionModelApp.tsx): the traits are its form, so it has no upload slot.
+    slug: 'ai-fashion-model',
+    feature: 'fashion_model',
+    name: 'Tạo người mẫu AI',
+    description: 'Chọn đặc điểm để tạo người mẫu hư cấu, lưu lại và dùng trong Thử đồ, Tạo ảnh và Tạo video.',
+    category: 'fashion',
+    slots: [],
+  },
 ];
 
 export const appBySlug = (slug: string): AppConfig | undefined => APPS.find((a) => a.slug === slug);

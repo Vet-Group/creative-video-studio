@@ -315,7 +315,7 @@ describe('migration 0007 image models', () => {
       ['fashn-v1.6', 'fal-ai/fashn/tryon/v1.6', ['try_on'], { '1K': '0.075' }],
       ['gpt-image-2', 'openai/gpt-image-2/edit', ['image'], { '1K': '0.281', '2K': '0.301', '4K': '0.530' }],
       ['nano-banana', 'fal-ai/nano-banana/edit', ['image', 'try_on', 'jewelry_try_on'], { '1K': '0.0398' }],
-      ['nano-banana-2', 'fal-ai/nano-banana-2/edit', ['image'], { '1K': '0.08' }],
+      ['nano-banana-2', 'fal-ai/nano-banana-2/edit', ['image', 'fashion_model'], { '1K': '0.08' }],
       ['nano-banana-2.1', 'google/nano-banana-2.1/edit', ['image', 'try_on', 'jewelry_try_on'], { '1K': '0.04', '2K': '0.059' }],
       ['nano-banana-pro', 'fal-ai/nano-banana-pro/edit', ['image', 'try_on', 'jewelry_try_on', 'lingerie_try_on'], { '1K': '0.15', '2K': '0.15', '4K': '0.30' }],
       ['seedream-5-pro', 'bytedance/seedream/v5/pro/edit', ['image', 'lingerie_try_on'], { '1K': '0.0675', '2K': '0.135' }],

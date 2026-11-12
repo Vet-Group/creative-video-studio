@@ -9,6 +9,7 @@ process.env.BETTER_AUTH_SECRET = randomBytes(32).toString('hex');
 process.env.APP_URL = 'http://localhost';
 
 const { auth, pool } = await import('@/lib/auth');
+const { DEFAULT_FASHION_TRAITS, fashionModelPrompt } = await import('@/lib/fashion-model');
 const { stopBoss } = await import('@/lib/queue');
 const { GET: listJobs, POST } = await import('./route');
 const { GET } = await import('../stores/route');
@@ -648,7 +649,7 @@ describe('POST /api/jobs for an image feature', () => {
   describe('the image apps', () => {
     const appModels: [string, string, number, string][] = [
       ['app-char', 'character_swap', 2, 'auto'], ['app-model', 'model_swap', 2, 'auto'], ['app-bg', 'background_changer', 2, 'auto'], ['app-reframe', 'reframe', 1, '1:1,16:9'],
-      ['app-up', 'image_upscale', 1, 'auto'], ['app-face', 'face_swap', 2, 'auto'], ['app-rm', 'background_remover', 1, 'auto'], ['app-jewel', 'jewelry_try_on', 4, 'auto'], ['app-lingerie', 'lingerie_try_on', 4, 'auto'],
+      ['app-up', 'image_upscale', 1, 'auto'], ['app-face', 'face_swap', 2, 'auto'], ['app-rm', 'background_remover', 1, 'auto'], ['app-jewel', 'jewelry_try_on', 4, 'auto'], ['app-lingerie', 'lingerie_try_on', 4, 'auto'], ['app-fashion', 'fashion_model', 1, '3:4,auto'],
     ];
     beforeAll(async () => {
       for (const [id, feature, max, ratios] of appModels) {
@@ -706,6 +707,29 @@ describe('POST /api/jobs for an image feature', () => {
       expect(await app('lingerie_try_on', 3)).toMatchObject({ status: 201, job: { feature: 'lingerie_try_on', prompt: expect.stringMatching(/^Dress the person in the last image in the lingerie pieces[^.]*.[^]*watermarks$/) } });
       const own = await app('lingerie_try_on', 2, { prompt: 'black lace set', params: { resolution: '2K' } });
       expect(own).toMatchObject({ status: 201, job: { prompt: expect.stringMatching(/watermarks. black lace set$/), params: { resolution: '2K' } } });
+    });
+
+    test('the Fashion Model Generator takes no image, its traits as JSON and exactly the prompt they make, and keeps the traits as canonical JSON', async () => {
+      const m = await newMember();
+      const traits = { ...DEFAULT_FASHION_TRAITS, niche: 'melanin', extra: ' freckles ' };
+      const prompt = fashionModelPrompt(traits);
+      const fashion = (extra: Record<string, unknown> = {}, params: Record<string, string> = { resolution: '1K', traits: JSON.stringify(traits) }) =>
+        run(m.cookie, { assetIds: [], modelId: 'app-fashion', feature: 'fashion_model', ratio: '3:4', prompt, params, ...extra });
+      const before = await jobCount();
+      expect((await fashion({ assetIds: [m.asset] })).status).toBe(400); // no input image
+      expect((await fashion({ prompt: undefined })).status).toBe(400);
+      expect((await fashion({ prompt: `${prompt} and a hat` })).status).toBe(400); // the prompt must be the traits'
+      expect((await fashion({}, { resolution: '1K' })).status).toBe(400);
+      expect((await fashion({}, { resolution: '1K', traits: JSON.stringify({ gender: 'robot' }) })).status).toBe(400);
+      expect((await fashion({}, { resolution: '1K', traits: 'not json' })).status).toBe(400);
+      expect((await run(m.cookie, { assetIds: [], modelId: 'app-fashion', feature: 'image', ratio: '3:4', prompt, params: { resolution: '1K', traits: '{}' } })).status).toBe(400); // traits are this feature's
+      expect(await jobCount()).toBe(before);
+      const res = await fashion();
+      expect(res.status).toBe(201);
+      const { id } = (await res.json()) as { id: string };
+      expect((await pool.query('select feature, prompt, aspect, input_asset_ids, params from jobs where id = $1', [id])).rows[0]).toEqual({
+        feature: 'fashion_model', prompt, aspect: '3:4', input_asset_ids: [], params: { resolution: '1K', traits: JSON.stringify({ ...traits, extra: 'freckles' }) },
+      });
     });
 
     test('Reframe takes one of its ratios and a default prompt', async () => {

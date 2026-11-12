@@ -21,10 +21,11 @@ export async function purgeDeletedClips(pool: LedgerPool, removeObject: (key: st
         // The job and the verdict reference the output assets, so both let go of them first; the verdict itself survives (it still counts in the pass rate).
         await tx.query('update jobs set purged_at = now(), output_asset_id = null, poster_asset_id = null where id = $1', [id]);
         await tx.query('update verdicts set output_asset_id = null where job_id = $1', [id]);
-        // An input stays while any other undeleted job (a Reuse, a retry, a failed Run) still names it.
+        // An input stays while any other undeleted job (a Reuse, a retry, a failed Run) still names it, or a saved AI model does.
         const { rows } = await tx.query(
           `delete from assets a where a.id = any($1::text[])
-              or (a.id = any($2::text[]) and a.kind = 'input' and not exists (select 1 from jobs o where o.id <> $3 and o.deleted_at is null and a.id = any(${inputsOf('o')})))
+              or (a.id = any($2::text[]) and a.kind = 'input' and not exists (select 1 from jobs o where o.id <> $3 and o.deleted_at is null and a.id = any(${inputsOf('o')}))
+                  and not exists (select 1 from fashion_models f where f.asset_id = a.id))
             returning a.id, a.s3_key`,
           [outputs, job.inputs, id],
         );

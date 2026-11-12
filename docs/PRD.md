@@ -81,6 +81,7 @@ Company staff turn existing product images into short product videos without lea
 
 - Pricing, credits, billing, landing pages.
 - Image generation, Try-On, image tools, Apps.
+  - Later addition: the Apps include the AI Fashion Model Generator. A member picks traits and 1 to 4 images, sees the cost before Run, and saves a result as an AI model for the person pickers; a model is private unless its creator or an Admin shares it, and an Admin's choice is final until an Admin releases it.
 - UGC, voice and audio.
 - Prompt-only video as a separate mode. It still works when no image is attached, but it is not tuned.
 - Lark, Drive, Etsy or TikTok delivery.
