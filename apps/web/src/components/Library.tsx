@@ -6,7 +6,7 @@ import { FAULTS } from '@/lib/faults';
 import { featureLabel } from '@/lib/features';
 import { GALLERY_SAMPLES, numberedSamples } from '@/lib/examples';
 import { cardTitleOfFormat, HOOKS, LOCATIONS } from '@/lib/marketing';
-import { activeFilters, dayHeadings, type LibraryFilters, type LibraryView, libraryQuery, matchesVerdict, NO_FILTERS, readView, saveView, type VerdictFilter } from '@/lib/library-view';
+import { activeFilters, dayHeadings, filtersFromParams, type LibraryFilters, type LibraryView, libraryQuery, matchesVerdict, NO_FILTERS, readView, saveView, type VerdictFilter } from '@/lib/library-view';
 import { reuseHref } from '@/lib/reuse';
 import { useSamples } from '@/lib/use-samples';
 import { Icon } from './Icon';
@@ -750,8 +750,9 @@ function EmptyArt({ search }: { search?: boolean }) {
 
 export function Library() {
   const [detail, setDetail] = useState<number | null>(null); // the item open in the detail view, by its place in the list
-  const [filters, setFilters] = useState<LibraryFilters>(NO_FILTERS);
-  const [search, setSearch] = useState(''); // the search box; its words reach the filters once typing pauses
+  // The filters and search box start from the address, so a shared or bookmarked /library?… link opens the same view.
+  const [filters, setFilters] = useState<LibraryFilters>(() => (typeof window === 'undefined' ? NO_FILTERS : filtersFromParams(new URLSearchParams(window.location.search))));
+  const [search, setSearch] = useState(() => (typeof window === 'undefined' ? '' : (new URLSearchParams(window.location.search).get('q') ?? ''))); // the search box; its words reach the filters once typing pauses
   const [view, setView] = useState<LibraryView>('grid');
   const [size, setSize] = useState(1);
   const [clips, setClips] = useState<Clip[]>([]);
@@ -901,6 +902,31 @@ export function Library() {
     const t = setTimeout(() => setFilters((cur) => (cur.q === words ? cur : { ...cur, q: words })), 300);
     return () => clearTimeout(t);
   }, [search]);
+
+  // Mirror the filters into the address so a view is shareable and Back returns to the previous one; keep any ?item= deep link.
+  // The first run only normalises the address (no history entry); the target===current test also absorbs the popstate echo below.
+  const firstUrlSync = useRef(true);
+  useEffect(() => {
+    const here = new URLSearchParams(window.location.search);
+    const item = here.get('item');
+    const qs = libraryQuery(filters, 0);
+    const query = item ? `${qs ? `${qs}&` : ''}item=${encodeURIComponent(item)}` : qs;
+    const target = query ? `${window.location.pathname}?${query}` : window.location.pathname;
+    if (target !== window.location.pathname + window.location.search) {
+      if (firstUrlSync.current) window.history.replaceState(null, '', target);
+      else window.history.pushState(null, '', target);
+    }
+    firstUrlSync.current = false;
+  }, [filters]);
+  useEffect(() => {
+    const onPop = () => {
+      const p = new URLSearchParams(window.location.search);
+      setFilters(filtersFromParams(p));
+      setSearch(p.get('q') ?? '');
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
 
   useEffect(() => {
     setView(readView());

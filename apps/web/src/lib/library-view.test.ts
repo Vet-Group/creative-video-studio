@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { activeFilters, dayHeadings, libraryQuery, matchesVerdict, NO_FILTERS, readView, saveView, VIEW_KEY } from './library-view';
+import { activeFilters, dayHeadings, filtersFromParams, libraryQuery, matchesVerdict, NO_FILTERS, readView, saveView, VIEW_KEY } from './library-view';
 
 describe('libraryQuery', () => {
   it('leaves the defaults out', () => {
@@ -13,6 +13,22 @@ describe('libraryQuery', () => {
 
   it('drops blank words', () => {
     expect(libraryQuery({ ...NO_FILTERS, q: '   ' }, 0)).toBe('');
+  });
+});
+
+describe('filtersFromParams', () => {
+  it('reads nothing back as the defaults', () => {
+    expect(filtersFromParams(new URLSearchParams(''))).toEqual(NO_FILTERS);
+  });
+
+  it('round-trips every filter through libraryQuery', () => {
+    const f = { q: 'áo khoác', creator: 'u1', date: '2026-10-23', days: '7' as const, ratio: '1:1', kind: 'images', verdict: 'none' as const, favoritesOnly: true, examplesOnly: true, sort: 'oldest' as const };
+    expect(filtersFromParams(new URLSearchParams(libraryQuery(f, 0)))).toEqual(f);
+  });
+
+  it('ignores offset and the item deep link, and falls back on unknown values', () => {
+    const p = new URLSearchParams('q=hoa&offset=48&item=abc&days=weird&verdict=bogus&sort=weird');
+    expect(filtersFromParams(p)).toEqual({ ...NO_FILTERS, q: 'hoa' });
   });
 });
 
