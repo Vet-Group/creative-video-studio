@@ -12,6 +12,7 @@ import { api, errorText, sendJson } from '@/lib/api';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { About } from './About';
 import { Icon } from './Icon';
+import { elapsedLabel } from './jobs';
 import { AnalysisHistory } from './AnalysisHistory';
 import { copyError, uploadError, uploadVideoDirect, WorkTabs } from './image-tools';
 import { ReferenceVideoSlot, type RefVideo } from './ReferenceVideo';
@@ -177,6 +178,7 @@ export function AnalyzeView() {
   }
 
   const running = current !== null && !terminal(current.status);
+  const elapsed = running && current ? elapsedLabel({ status: current.status, createdAt: current.createdAt }) : null;
   // Pick a History row to view: stop any live poll, show it, and on a phone switch to the Phân tích panel where the result sits.
   const pick = (a: AnalysisRow) => {
     stopPoll();
@@ -226,6 +228,7 @@ export function AnalyzeView() {
             {running && (
               <p className="muted" role="status">
                 Đang phân tích video… việc này mất một lát.
+                {elapsed && ` · ${elapsed}`}
               </p>
             )}
             {current?.status === 'failed' && (
