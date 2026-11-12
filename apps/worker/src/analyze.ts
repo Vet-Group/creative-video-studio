@@ -35,8 +35,11 @@ export interface AnalyzeSeams {
 /** The feature switch for this worker. Default OFF: the queue is not even subscribed when unset. */
 export const reaAnalyzeEnabled = (env: NodeJS.ProcessEnv = process.env): boolean => env.REA_ANALYZE_ENABLED === '1';
 
+// --vlm: per-shot VLM judgement (prompts the UI shows); --lang en: English report/summary/prompts (the UI
+// localizes only the format label, and the provider prompts must be English). Not relying on host rea-video
+// prefs keeps the invocation self-contained.
 const realDecompose = async (video: string, outDir: string, env: Record<string, string>): Promise<void> => {
-  await run(process.env.REA_VIDEO_BIN || 'rea-video', ['decompose', video, '-o', outDir], { env: { ...process.env, ...env }, maxBuffer: 16 * 1024 * 1024 });
+  await run(process.env.REA_VIDEO_BIN || 'rea-video', ['decompose', video, '-o', outDir, '--vlm', '--lang', 'en'], { env: { ...process.env, ...env }, maxBuffer: 16 * 1024 * 1024 });
 };
 
 // A liveness probe: any HTTP answer (even 401) means Ark is reachable; only a network error or timeout reads as down.
