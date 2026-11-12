@@ -1,5 +1,6 @@
 // What a member has not seen yet in the changelog, and when the once-a-day popup is due (components/ChangelogPopup.tsx, the sidebar dot).
 import type { ChangeEntry } from './changelog';
+import { vnDay } from './lark-prompt';
 
 /** The localStorage key that holds the `at` of the newest entry the member has seen. */
 export const CHANGELOG_SEEN_KEY = 'cvs.changelog.seen';
@@ -24,13 +25,17 @@ export const unseenEntries = (entries: readonly ChangeEntry[], seen: string | nu
 /** Whether the popup shows: something is unseen, it was not shown yet on `today` (a Vietnam day), and the Lark reminder is not taking this visit. */
 export const changelogPopupDue = (o: { unseen: number; lastShown: string | null; today: string; larkDue: boolean }) => o.unseen > 0 && o.lastShown !== o.today && !o.larkDue;
 
-/** The seen mark, set to the newest entry when there is none yet. A blocked storage reads as null each time, so nothing is ever unseen there. */
+/** The mark a first visit starts from: the start of the newest entry's Vietnam day, so that day's entries count as unseen (the dot announces them) and older history does not. */
+export const firstVisitMark = (entries: readonly ChangeEntry[]): string => `${vnDay(new Date([...entries].sort(byNewest)[0]!.at))}T00:00:00+07:00`;
+
+/** The seen mark, set by firstVisitMark when there is none yet; a first visit also counts as today's popup, so it shows the dot but never opens a dialog. A blocked storage reads as null each time, so nothing is ever unseen there. */
 export function loadSeen(entries: readonly ChangeEntry[]): string | null {
   try {
     const seen = localStorage.getItem(CHANGELOG_SEEN_KEY);
     if (seen !== null || entries.length === 0) return seen;
-    const first = [...entries].sort(byNewest)[0]!.at;
+    const first = firstVisitMark(entries);
     localStorage.setItem(CHANGELOG_SEEN_KEY, first);
+    if (localStorage.getItem(CHANGELOG_POPUP_KEY) === null) localStorage.setItem(CHANGELOG_POPUP_KEY, vnDay(new Date()));
     return first;
   } catch {
     return null;

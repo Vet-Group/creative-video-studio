@@ -13,16 +13,17 @@ async function unseen(page: Page) {
   await page.evaluate(([seen, popupKey, value]) => (localStorage.setItem(seen!, value!), localStorage.removeItem(popupKey!)), [SEEN, POPUP, longAgo]);
 }
 
-test('a first visit marks the history seen: no dot and no popup; the page lists entries for members only, and a kind chip filters them', async ({ page }) => {
+test('a first visit shows the dot for the newest day but no popup; the page lists entries for members only, and a kind chip filters them', async ({ page }) => {
   await signIn(page, 'chga');
   await page.goto('/explore');
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
   await expect(popup(page)).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'Có gì mới', exact: true })).toBeVisible();
-  await expect(dot(page)).toHaveCount(0);
+  await expect(dot(page)).toHaveCount(1);
 
   await page.getByRole('link', { name: 'Có gì mới', exact: true }).click();
   await expect(page).toHaveURL(/\/changelog$/);
+  await expect(dot(page)).toHaveCount(0);
   await expect(page.getByRole('heading', { level: 1, name: 'Có gì mới' })).toBeVisible();
   await expect(page.getByRole('heading', { level: 3, name: 'Trang Có gì mới' })).toBeVisible();
   // Grouped by day, newest first.

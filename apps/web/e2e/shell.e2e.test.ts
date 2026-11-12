@@ -6,14 +6,14 @@ const nav = (page: Page) => page.getByRole('navigation', { name: 'Điều hướ
 
 test('the sidebar lists Explore, Try On, Image Generation, Create, Marketing Studio, Apps and Library in the live order, and Admin only for an Admin', async ({ page }) => {
   await signIn(page, 'member1');
-  await expect(nav(page).getByRole('link')).toHaveCount(8);
-  await expect(nav(page).locator('.nav-label')).toHaveText(['Khám phá', 'Thử đồ', 'Tạo ảnh', 'Tạo video', 'Marketing Studio', 'Ứng dụng', 'Thư viện', 'Góp ý']);
+  await expect(nav(page).getByRole('link')).toHaveCount(9);
+  await expect(nav(page).locator('.nav-label')).toHaveText(['Khám phá', 'Thử đồ', 'Tạo ảnh', 'Tạo video', 'Marketing Studio', 'Ứng dụng', 'Thư viện', 'Góp ý', 'Có gì mới']);
   await expect(nav(page).getByRole('link', { name: 'Marketing Studio', exact: true })).toBeVisible(); // the badge is not part of the name
   await (await openSettings(page)).getByRole('button', { name: 'Đăng xuất' }).click();
   await expect(page).toHaveURL(/\/login$/);
   await signIn(page, 'admin');
-  await expect(nav(page).getByRole('link')).toHaveCount(9);
-  await expect(nav(page).locator('.nav-label')).toHaveText(['Khám phá', 'Thử đồ', 'Tạo ảnh', 'Tạo video', 'Marketing Studio', 'Ứng dụng', 'Thư viện', 'Góp ý', 'Quản trị']);
+  await expect(nav(page).getByRole('link')).toHaveCount(10);
+  await expect(nav(page).locator('.nav-label')).toHaveText(['Khám phá', 'Thử đồ', 'Tạo ảnh', 'Tạo video', 'Marketing Studio', 'Ứng dụng', 'Thư viện', 'Góp ý', 'Có gì mới', 'Quản trị']);
 });
 
 test('a link anywhere in the app, not only the sidebar, shows the top progress bar until the next page is up', async ({ page }) => {
@@ -97,7 +97,7 @@ test('at 1440 the sidebar keeps the live rhythm: the first item at 81 px, one ev
   for (let i = 2; i < 6; i++) expect(ys[i]! - ys[i - 1]!).toBe(41); // the create group: Try On to Apps
   // The groups the nav reads as, each named by its label (Explore, the home page, has none).
   await expect(nav(page).getByRole('group', { name: 'Sáng tạo' }).getByRole('link')).toHaveCount(5);
-  await expect(nav(page).getByRole('group', { name: 'Của bạn' }).getByRole('link')).toHaveText(['Thư viện', 'Góp ý']);
+  await expect(nav(page).getByRole('group', { name: 'Của bạn' }).getByRole('link')).toHaveText(['Thư viện', 'Góp ý', 'Có gì mới']);
   await expect(nav(page).locator('.nav-group-label')).toHaveText(['Sáng tạo', 'Của bạn']);
   await expect(page.locator('.brand strong')).toHaveText('Video Studio'); // the app, not the user, heads the sidebar
   const icon = links.first().locator('svg');

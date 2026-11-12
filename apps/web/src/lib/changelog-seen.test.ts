@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import { CHANGELOG } from './changelog';
-import { changelogPopupDue, unseenEntries, visibleEntries } from './changelog-seen';
+import { changelogPopupDue, firstVisitMark, unseenEntries, visibleEntries } from './changelog-seen';
 import { type ChangeEntry } from './changelog';
 
 const e = (at: string, audience: ChangeEntry['audience'] = 'all', prs: number[] = [1]): ChangeEntry => ({ at, kind: 'new', title: at, details: ['x'], prs, audience });
@@ -19,6 +19,12 @@ test('unseen are the entries newer than the seen mark, whatever the offset they 
   expect(unseenEntries(all, '2026-11-12T02:00:00Z')).toEqual([]); // the same moment as the newest entry
   expect(unseenEntries(all, '2026-11-12T09:00:00+07:00')).toEqual([]);
   expect(unseenEntries(all, null)).toEqual([]);
+});
+
+test('a first visit starts at the newest entry's Vietnam day, so only that day is unseen', () => {
+  const day = [e('2026-11-11T18:30:00Z'), e('2026-11-12T10:00:00+07:00'), e('2026-11-11T23:59:00+07:00')];
+  expect(firstVisitMark(day)).toBe('2026-11-12T00:00:00+07:00'); // 18:30Z on the 11th is 01:30 on the 12th in Vietnam
+  expect(unseenEntries(day, firstVisitMark(day)).map((x) => x.at)).toEqual(['2026-11-12T10:00:00+07:00', '2026-11-11T18:30:00Z']);
 });
 
 test('the popup is due once a Vietnam day when something is unseen, and never on the visit the Lark reminder takes', () => {
