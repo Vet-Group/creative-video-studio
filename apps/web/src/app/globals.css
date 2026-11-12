@@ -2461,5 +2461,9 @@ dialog.modal.tool-guide { width: min(52rem, calc(100vw - 2rem)); }
 .analysis-shots { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 12px; }
 .analysis-shots > li { margin-top: 0; border: 1px solid var(--border); border-radius: 12px; padding: 12px; }
 .analysis-prompt { margin: 6px 0; font-size: 14px; line-height: 21px; }
+.analysis-with-source { margin-top: 16px; display: grid; gap: 16px; align-items: start; }
+.analysis-with-source .analysis-result { margin-top: 0; }
+.analysis-source { max-width: 100%; max-height: 320px; border-radius: 12px; background: var(--media-bg); }
+@media (min-width: 720px) { .analysis-with-source { grid-template-columns: minmax(0, 300px) minmax(0, 1fr); } }
 .analysis-history { margin-top: 24px; }
 .analysis-history ul { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 4px; }

@@ -24,6 +24,7 @@ interface AnalysisRow {
   result: Analysis | null;
   error: string | null;
   createdAt: string;
+  sourceAssetId: string | null; // the input video, recovered from the analysis' source_key; null if that asset was deleted
 }
 
 const terminal = (s: string): boolean => s === 'succeeded' || s === 'failed';
@@ -64,6 +65,20 @@ export function AnalysisResult({ analysis }: { analysis: Analysis }) {
           </li>
         ))}
       </ol>
+    </div>
+  );
+}
+
+/** A finished analysis with its input video beside the result. preload="metadata" shows the first frame as a poster with
+ * no transcode, and only the one open result mounts a player, so the History list stays light. */
+export function AnalysisWithSource({ row }: { row: AnalysisRow }) {
+  if (!row.result) return null;
+  return (
+    <div className="analysis-with-source">
+      {row.sourceAssetId && (
+        <video className="analysis-source" src={`/api/assets/${row.sourceAssetId}/content`} controls muted playsInline preload="metadata" aria-label="Video gốc đã phân tích" />
+      )}
+      <AnalysisResult analysis={row.result} />
     </div>
   );
 }
@@ -149,7 +164,7 @@ export function AnalyzeView() {
     setBusy(true);
     try {
       const { id } = await api<{ id: string }>('/api/analyses', sendJson('POST', { sourceAssetId: video.id }));
-      setCurrent({ id, status: 'queued', result: null, error: null, createdAt: new Date().toISOString() });
+      setCurrent({ id, status: 'queued', result: null, error: null, createdAt: new Date().toISOString(), sourceAssetId: video.id });
       pollOne(id);
     } catch (e) {
       setError(errorText(e, 'Không bắt đầu phân tích được.'));
@@ -215,7 +230,7 @@ export function AnalyzeView() {
                 Phân tích không thành công. Hãy thử lại với video khác.
               </p>
             )}
-            {current?.status === 'succeeded' && current.result && <AnalysisResult analysis={current.result} />}
+            {current?.status === 'succeeded' && current.result && <AnalysisWithSource row={current} />}
           </div>
         </div>
 

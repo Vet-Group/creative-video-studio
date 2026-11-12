@@ -11,7 +11,8 @@ export async function GET(request: Request, { params }: RouteContext) {
   const { id } = await params;
   const row = (
     await pool.query(
-      `select id, status, provider, model, result, cost_usd as "costUsd", error, created_at as "createdAt", finished_at as "finishedAt"
+      `select id, status, provider, model, result, cost_usd as "costUsd", error, created_at as "createdAt", finished_at as "finishedAt",
+              (select a.id from assets a where a.s3_key = analyses.source_key) as "sourceAssetId"
          from analyses where id = $1 and user_id = $2`,
       [id, g.session.user.id],
     )
