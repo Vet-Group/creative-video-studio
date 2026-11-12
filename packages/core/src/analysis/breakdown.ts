@@ -15,6 +15,14 @@ export interface AnalysisShot {
   prompt: string;
 }
 
+/** A Vietnamese reading of an analysis for display; the English fields above stay what Create receives. */
+export interface AnalysisVi {
+  format: string;
+  hook: string;
+  summary: string;
+  shots: string[]; // one per shot, same order as Analysis.shots
+}
+
 export interface Analysis {
   durationS: number;
   shotCount: number;
@@ -22,6 +30,7 @@ export interface Analysis {
   hook: string;
   summary: string;
   shots: AnalysisShot[];
+  vi?: AnalysisVi;
 }
 
 type Raw = Record<string, unknown>;
