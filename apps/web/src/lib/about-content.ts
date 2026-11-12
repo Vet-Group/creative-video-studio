@@ -2786,11 +2786,18 @@ const analyze: AboutPage = {
       ],
     },
     {
-      kicker: 'Trả lời nhanh',
-      title: 'Phân tích có tạo ra video không?',
+      kicker: 'Hỏi đáp',
+      title: 'Câu hỏi thường gặp',
       blocks: [
-        'Không. Phân tích chỉ đọc một video có sẵn và mô tả cách nó được dựng — danh sách cảnh, định dạng, câu mở đầu và prompt. Để ra video, bạn mang một prompt sang trang Tạo video.',
-        'Hãy xem nó như bước nghiên cứu trước khi làm: hiểu một clip hiệu quả, rồi dựng lại ý tưởng đó cho sản phẩm của bạn thay vì bắt đầu từ trang trắng.',
+        {
+          faq: [
+            ['Phân tích có tạo ra video không?', 'Không. Phân tích chỉ đọc một video có sẵn và mô tả cách nó được dựng — danh sách cảnh, định dạng, câu mở đầu và một prompt cho mỗi cảnh. Để ra video, bạn mang một prompt sang trang Tạo video. Hãy xem đây là bước nghiên cứu: hiểu một clip hiệu quả rồi dựng lại ý tưởng đó cho sản phẩm của bạn thay vì bắt đầu từ trang trắng.'],
+            ['Dùng được video nào làm video tham chiếu?', 'Một clip MP4 hoặc MOV của bạn: tải lên, hoặc chọn một video từ Lịch sử của bạn. Video tải thẳng lên kho nên không còn vướng trần dung lượng nhỏ như trước. Chỉ phân tích được video của chính bạn trong ứng dụng.'],
+            ['Vì sao hiển thị tiếng Việt nhưng prompt lại tiếng Anh?', 'Phần đọc hiểu — định dạng, câu mở đầu, tóm tắt và mô tả từng cảnh — được dịch sang tiếng Việt cho nhanh. Prompt gửi sang trang Tạo video vẫn giữ tiếng Anh vì các mô hình chạy ổn định hơn với tiếng Anh.'],
+            ['Phân tích mất bao lâu và tốn bao nhiêu?', 'Mỗi lần mất một lát vì máy chủ rã cảnh và đọc hiểu từng cảnh; lượt phân tích nằm trong tab Lịch sử cho tới khi xong. Chi phí được ghi lại cho công ty theo dõi, không tính phí người dùng.'],
+            ['Kết quả phân tích có luôn đúng không?', 'Đây là bản đọc hiểu tự động, dùng để tham khảo nhanh chứ không phải mô tả tuyệt đối. Định dạng, câu mở đầu và prompt từng cảnh giúp bạn nắm cách clip được dựng; cứ chỉnh lại prompt khi mang sang Tạo video cho hợp sản phẩm của bạn.'],
+          ],
+        },
       ],
     },
   ],
