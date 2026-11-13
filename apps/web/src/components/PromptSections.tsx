@@ -3,14 +3,17 @@
 // last shot. Each section has its rule (in line with the suggestions' PRINCIPLES, core/suggest.ts) and its own AI suggestions; the templates dialog fills all
 // three (and lists the member's recent hooks and endings, which fill one section), and free writing keeps the page's one box. The page composes the prompt (lib/marketing.ts); PromptPreview shows the English it sends.
 import { type ReactNode, useEffect, useId, useState } from 'react';
-import { api } from '@/lib/api';
+import { api, errorText } from '@/lib/api';
+import { cardSample } from '@/lib/examples';
 import { MAX_ENDING, MAX_HOOK, type ParamFormat } from '@/lib/marketing';
 import type { PromptTemplate } from '@/lib/prompt-starters';
 import { useHydrated } from '@/lib/use-hydrated';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
+import { reloadSamples, useSamples, versionedSample } from '@/lib/use-samples';
 import { confirmDialog } from './Confirm';
 import { Icon } from './Icon';
 import { Modal } from './Modal';
+import { Preview } from './Preview';
 import { PromptComposer } from './PromptComposer';
 import s from './PromptComposer.module.css';
 import { PromptTools } from './PromptTools';
@@ -84,6 +87,13 @@ export function PromptSections({ feature, format, mode, onMode, hook, ending, en
   /** The member's own last hooks and endings (GET /api/recent-prompts?field=), fetched each time the dialog opens; empty when there are none or the fetch fails. */
   const [recent, setRecent] = useState<{ hook: string[]; ending: string[] }>({ hook: [], ending: [] });
   const narrow = useMediaQuery(NARROW);
+  const have = useSamples();
+  /** A template editor (GET /api/presets says so) sees the clip upload on each card; a member never does. */
+  const [canEdit, setCanEdit] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    void api<{ canEdit: boolean }>('/api/presets').then((r) => setCanEdit(r.canEdit), () => undefined);
+  }, [open]);
   useEffect(() => {
     if (!open) return;
     setRecent({ hook: [], ending: [] });
@@ -114,23 +124,31 @@ export function PromptSections({ feature, format, mode, onMode, hook, ending, en
       <h2>Khung prompt</h2>
       <p className="modal-sub">Điền sẵn Hook · Diễn biến · Kết để bạn sửa tiếp.</p>
       <div className="choice-grid prompt-template-grid" role="group" aria-label="Khung prompt">
-        {templates.map((t) => (
-          <button key={t.name} type="button" onClick={() => void pick(t)}>
-            <span className="choice-name">{t.name}</span>
-            <span className="choice-desc">{t.desc}</span>
-            {/* Create's dialog has room for what the template opens and ends on; Marketing Studio's, taller, keeps the one line. */}
-            {feature === 'video' && (
-              <>
-                <span className="prompt-template-line">
-                  Hook: <span lang="en">{t.hook}</span>
-                </span>
-                <span className="prompt-template-line">
-                  Kết: <span lang="en">{t.ending}</span>
-                </span>
-              </>
-            )}
-          </button>
-        ))}
+        {templates.map((t) => {
+          const clip = cardSample(have, `template-${t.id}`);
+          return (
+            <div key={t.id} className="prompt-template">
+              {clip.video && <Preview src={versionedSample(clip.video)} poster={clip.poster ? versionedSample(clip.poster) : ''} width={3} height={4} title={`Clip mẫu ${t.name}`} onHover />}
+              <button type="button" onClick={() => void pick(t)}>
+                <span className="choice-name">{t.name}</span>
+                <span className="choice-desc">{t.desc}</span>
+                {t.needs && <span className="prompt-template-needs">{t.needs}</span>}
+                {/* Create's dialog has room for what the template opens and ends on; Marketing Studio's, taller, keeps the one line. */}
+                {feature === 'video' && (
+                  <>
+                    <span className="prompt-template-line">
+                      Hook: <span lang="en">{t.hook}</span>
+                    </span>
+                    <span className="prompt-template-line">
+                      Kết: <span lang="en">{t.ending}</span>
+                    </span>
+                  </>
+                )}
+              </button>
+              {canEdit && <TemplateClip id={t.id} has={clip.video !== null} />}
+            </div>
+          );
+        })}
       </div>
       {recents.length > 0 && (
         <section className="prompt-recent" aria-label="Gần đây">
@@ -183,6 +201,40 @@ export function PromptSections({ feature, format, mode, onMode, hook, ending, en
             {part(endingId, 'Cảnh kết', ending, MAX_ENDING, 'Gợi ý cảnh kết', 'Ví dụ: The clip ends with the model smiling at the camera (nên viết bằng tiếng Anh)')}
           </Section>
         </>
+      )}
+    </div>
+  );
+}
+
+/** A template editor's upload of the card's clip, `template-<id>.mp4`, the way PresetEditing uploads a preset's; the cards show it once the sample list is read again. */
+function TemplateClip({ id, has }: { id: string; has: boolean }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  async function upload(input: HTMLInputElement) {
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) return;
+    setBusy(true);
+    setError('');
+    try {
+      await api(`/api/admin/samples/template-${id}.mp4`, { method: 'PUT', body: file });
+      reloadSamples();
+    } catch (e) {
+      setError(errorText(e, 'Không tải lên được clip mẫu, hãy thử lại.'));
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <div className="prompt-template-edit">
+      <label className="link-button">
+        <input type="file" accept="video/mp4" className="sr-only" disabled={busy} onChange={(e) => void upload(e.target)} />
+        {busy ? 'Đang tải lên…' : has ? 'Thay clip mẫu' : 'Tải clip mẫu'}
+      </label>
+      {error && (
+        <p className="error" role="alert">
+          {error}
+        </p>
       )}
     </div>
   );

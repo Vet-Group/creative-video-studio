@@ -1,7 +1,9 @@
-import { expect, type Page, test } from '@playwright/test';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { expect, type Locator, type Page, test } from '@playwright/test';
 import { ENDINGS, HOOKS } from '../src/lib/marketing';
 import { PROMPT_TEMPLATES } from '../src/lib/prompt-starters';
-import { modelButton, openPromptTemplates, openTemplates, png, signIn } from './support.test';
+import { jpg, modelButton, openPromptTemplates, openTemplates, png, signIn } from './support.test';
 
 // The sectioned prompt (owner 2026-11-05) on Create and Marketing Studio: ① Hook, ② Body (the page's own prompt box) and ③ Ending,
 // a templates menu that fills all three, the English preview of what Run sends, Reuse, and free writing. Suggestions come from the e2e worker's
@@ -322,4 +324,54 @@ test('Create and Marketing Studio: Cài đặt video groups ratio, length, sound
   await page.goto('/create');
   await page.getByRole('button', { name: 'Chọn mẫu khác' }).click();
   await expect(page.getByRole('dialog', { name: 'Bộ sưu tập mẫu' }).getByText('chọn mẫu sẽ thay cả prompt', { exact: false })).toBeVisible();
+});
+
+const sampleMp4 = readFileSync(fileURLToPath(new URL('../public/fixtures/examples/example-1.mp4', import.meta.url)));
+const card = (dialog: Locator, name: string) => dialog.locator('.prompt-template').filter({ has: dialog.page().getByRole('button', { name: new RegExp(`^${name}`) }) });
+
+test('Khung prompt: a seeded template clip shows on its card, a needs note shows, only a template editor sees the clip upload, and the phone sheet still fits', async ({ page, browser }) => {
+  const admin = await browser.newPage();
+  await signIn(admin, 'admin');
+  const put = (name: string, data: Buffer, type: string) => admin.request.put(`/api/admin/samples/${name}`, { data, headers: { 'content-type': type } });
+  const names = ['template-xoay-360.mp4', 'template-xoay-360.jpg', 'template-zoom-cham.mp4'];
+  try {
+    expect((await put('template-xoay-360.mp4', sampleMp4, 'video/mp4')).ok()).toBe(true);
+    expect((await put('template-xoay-360.jpg', jpg(), 'image/jpeg')).ok()).toBe(true);
+
+    // A member: the clip with its poster on the one card that has it, the card as before on the rest, the needs note, and no upload.
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await signIn(page, 'secta');
+    await page.goto('/create');
+    let dialog = await openPromptTemplates(page);
+    await expect(card(dialog, 'Xoay 360°').locator('video')).toHaveAttribute('src', /^\/api\/samples\/template-xoay-360\.mp4/);
+    await expect(card(dialog, 'Xoay 360°').locator('video')).toHaveAttribute('poster', /^\/api\/samples\/template-xoay-360\.jpg/);
+    await expect(card(dialog, 'Zoom chậm').locator('video')).toHaveCount(0);
+    await expect(card(dialog, 'Selfie gương')).toContainText('Cần ảnh người mẫu mặc đồ');
+    await expect(card(dialog, 'Zoom chậm')).not.toContainText('Cần ảnh');
+    await expect(dialog.locator('input[type=file]')).toHaveCount(0);
+    await expect(dialog.getByText(/clip mẫu/)).toHaveCount(0);
+    await page.keyboard.press('Escape');
+
+    // A template editor: Thay on the card that has a clip, Tải on one without, and an upload shows on the card at once.
+    await page.context().clearCookies();
+    await signIn(page, 'tpled');
+    await page.goto('/create');
+    dialog = await openPromptTemplates(page);
+    await expect(card(dialog, 'Xoay 360°').getByText('Thay clip mẫu')).toBeVisible();
+    await expect(card(dialog, 'Zoom chậm').getByText('Tải clip mẫu')).toBeVisible();
+    await card(dialog, 'Zoom chậm').locator('input[type=file]').setInputFiles({ name: 'clip.mp4', mimeType: 'video/mp4', buffer: sampleMp4 });
+    await expect(card(dialog, 'Zoom chậm').locator('video')).toHaveAttribute('src', /template-zoom-cham\.mp4/);
+    await expect(card(dialog, 'Zoom chậm').getByText('Thay clip mẫu')).toBeVisible();
+
+    // The phone sheet: the card with a clip is whole on the screen and nothing overflows sideways.
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/create');
+    const sheet = await openPromptTemplates(page);
+    await expect(sheet).toHaveClass(/template-sheet/);
+    await expect(card(sheet, 'Xoay 360°').locator('video')).toBeVisible();
+    expect(await fits(page)).toBe(true);
+  } finally {
+    for (const name of names) await admin.request.delete(`/api/admin/samples/${name}`);
+    await admin.close();
+  }
 });

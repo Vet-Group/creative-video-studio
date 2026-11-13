@@ -7,8 +7,12 @@ export interface Starter {
 
 /** A template of a sectioned prompt: a Vietnamese name and one-line description, and the English hook, body and last shot it fills the three sections with. */
 export interface PromptTemplate {
+  /** A stable lower-case kebab slug, unique across every list: the name of the template's sample clip, `template-<id>.mp4`. */
+  id: string;
   name: string;
   desc: string;
+  /** Set when the template only works with a particular input photo: one short Vietnamese line, at most 60 characters. */
+  needs?: string;
   hook: string;
   body: string;
   ending: string;
@@ -18,6 +22,7 @@ export interface PromptTemplate {
 export const PROMPT_TEMPLATES: Record<'video' | 'marketing' | 'advanced' | 'unboxing' | 'review', PromptTemplate[]> = {
   video: [
     {
+      id: 'xoay-360',
       name: 'Xoay 360°',
       desc: 'Máy quay xoay quanh sản phẩm trên nền studio sạch',
       hook: 'The clip opens with a quick push-in that lands on the product in the centre of the frame.',
@@ -25,6 +30,7 @@ export const PROMPT_TEMPLATES: Record<'video' | 'marketing' | 'advanced' | 'unbo
       ending: 'The clip ends with the camera settling on a still front view of the product.',
     },
     {
+      id: 'zoom-cham',
       name: 'Zoom chậm',
       desc: 'Từ toàn cảnh đẩy chậm vào chi tiết sản phẩm',
       hook: 'The clip opens on a wide shot as a soft beam of light sweeps across the product.',
@@ -32,6 +38,7 @@ export const PROMPT_TEMPLATES: Record<'video' | 'marketing' | 'advanced' | 'unbo
       ending: "The clip ends on a still close-up of the product's finest detail.",
     },
     {
+      id: 'cam-tren-tay',
       name: 'Cầm trên tay',
       desc: 'Bàn tay cầm sản phẩm, xoay nhẹ về phía máy quay',
       hook: 'The clip opens as a hand reaches into the frame and takes hold of the product.',
@@ -39,6 +46,7 @@ export const PROMPT_TEMPLATES: Record<'video' | 'marketing' | 'advanced' | 'unbo
       ending: 'The clip ends with the hand holding the product still, facing the camera.',
     },
     {
+      id: 'gio-nhe',
       name: 'Gió nhẹ',
       desc: 'Gió nhẹ lay vải, máy quay đứng yên',
       hook: 'The clip opens as a sudden gust of wind lifts the fabric.',
@@ -46,27 +54,34 @@ export const PROMPT_TEMPLATES: Record<'video' | 'marketing' | 'advanced' | 'unbo
       ending: 'The clip ends as the fabric settles and the frame holds still.',
     },
     {
+      id: 'nguoi-mau-buoc-di',
       name: 'Người mẫu bước đi',
       desc: 'Người mẫu mặc đồ bước về phía máy quay',
+      needs: 'Cần ảnh người mẫu mặc đồ',
       hook: 'The clip opens with the model stepping into the frame in one confident stride.',
       body: 'The model walks toward the camera wearing the outfit, smooth tracking shot, golden-hour light.',
       ending: 'The clip ends with the model stopping, turning to the camera and smiling.',
     },
     {
+      id: 'treo-moc',
       name: 'Treo móc',
       desc: 'Áo treo trên móc, xoay nhẹ khoe mặt trước và sau',
+      needs: 'Cần ảnh quần áo, không có người',
       hook: 'The clip opens as the garment on its hanger swings gently into view.',
       body: 'The garment hangs on a wooden hanger against a plain wall and turns slowly to show the front and then the back, soft diffused light, static camera.',
       ending: 'The clip ends with the garment settling still, its front facing the camera.',
     },
     {
+      id: 'ma-nanh-canh-vo-hinh',
       name: 'Ma-nơ-canh vô hình',
       desc: 'Bộ đồ đứng phom như có người mặc, nền xám nhạt',
+      needs: 'Cần ảnh quần áo, không có người',
       hook: 'The clip opens on the outfit standing on its own, shaped as if worn by an invisible body.',
       body: 'The camera circles slowly around the hollow, perfectly shaped outfit on a seamless light grey background, crisp studio light that shows the fabric and the print.',
       ending: 'The clip ends on a still front view of the outfit, centred in the frame.',
     },
     {
+      id: 'mo-gap-tren-ban',
       name: 'Mở gấp trên bàn',
       desc: 'Hai tay mở sản phẩm đang gấp rồi giơ lên máy quay',
       hook: 'The clip opens on the product neatly folded on a wooden table as two hands reach in.',
@@ -74,13 +89,16 @@ export const PROMPT_TEMPLATES: Record<'video' | 'marketing' | 'advanced' | 'unbo
       ending: 'The clip ends with the product laid flat and still, filling the frame.',
     },
     {
+      id: 'selfie-guong',
       name: 'Selfie gương',
       desc: 'Người mẫu chụp gương, xoay người khoe dáng đồ',
+      needs: 'Cần ảnh người mẫu mặc đồ',
       hook: 'The clip opens on a mirror reflection of the model raising a phone for a selfie.',
       body: 'The model, wearing the outfit, turns from side to side in front of a full-length mirror to show the fit, bright natural light, the phone held at chest height.',
       ending: 'The clip ends with the model holding one last mirror pose, the whole outfit in view.',
     },
     {
+      id: 'can-hinh-in',
       name: 'Cận hình in',
       desc: 'Máy quay lướt sát hình in rồi lùi ra toàn sản phẩm',
       hook: 'The clip opens on an extreme close-up of the printed design as the camera slides across it.',
@@ -90,6 +108,7 @@ export const PROMPT_TEMPLATES: Record<'video' | 'marketing' | 'advanced' | 'unbo
   ],
   marketing: [
     {
+      id: 'truoc-sau',
       name: 'Trước / sau',
       desc: 'Từ bộ đồ cũ sang sản phẩm mới trong một cú chuyển cảnh',
       hook: 'The clip opens with the creator in a plain, dull outfit, then a quick snap transition reveals them wearing the product.',
@@ -97,6 +116,7 @@ export const PROMPT_TEMPLATES: Record<'video' | 'marketing' | 'advanced' | 'unbo
       ending: 'The clip ends with the creator stepping back and striking a pose that shows the whole outfit.',
     },
     {
+      id: 'can-chat-lieu',
       name: 'Cận chất liệu',
       desc: 'Cận cảnh đường may, chất vải và chi tiết nhỏ',
       hook: 'The clip opens on an extreme close-up of the fabric as a hand brushes across it.',
@@ -104,6 +124,7 @@ export const PROMPT_TEMPLATES: Record<'video' | 'marketing' | 'advanced' | 'unbo
       ending: 'The clip ends as the camera pulls back to a still close-up of the whole product.',
     },
     {
+      id: 'phoi-do',
       name: 'Phối đồ',
       desc: 'Ba cách phối sản phẩm: đi làm, đi chơi, dự tiệc',
       hook: 'The clip opens with the creator spinning once in the first look, the product in the centre of the frame.',
@@ -111,6 +132,7 @@ export const PROMPT_TEMPLATES: Record<'video' | 'marketing' | 'advanced' | 'unbo
       ending: 'The clip ends with the creator in the favourite look, waving goodbye to the camera.',
     },
     {
+      id: 'quay-bang-dien-thoai',
       name: 'Quay bằng điện thoại',
       desc: 'Như clip tự quay thật: cầm máy một tay, rung nhẹ',
       hook: 'The clip opens on a selfie-style phone shot as the creator holds up the product and grins at the lens.',
@@ -118,6 +140,7 @@ export const PROMPT_TEMPLATES: Record<'video' | 'marketing' | 'advanced' | 'unbo
       ending: 'The clip ends with the creator bringing the product close to the lens, then lowering the phone.',
     },
     {
+      id: 'dung-luot',
       name: 'Dừng lướt',
       desc: 'Chỉ thẳng vào máy quay, búng tay là sản phẩm hiện ra',
       hook: 'The clip opens with the creator pointing straight at the camera, then snapping their fingers as the product appears in their hand.',
@@ -125,6 +148,7 @@ export const PROMPT_TEMPLATES: Record<'video' | 'marketing' | 'advanced' | 'unbo
       ending: 'The clip ends with the creator giving a quick wink at the camera, the product in view.',
     },
     {
+      id: 'phan-ung-bat-ngo',
       name: 'Phản ứng bất ngờ',
       desc: 'Lấy sản phẩm ra khỏi túi và ngạc nhiên thích thú',
       hook: "The clip opens on the creator's surprised face as they pull the product out of a shopping bag.",
@@ -134,6 +158,7 @@ export const PROMPT_TEMPLATES: Record<'video' | 'marketing' | 'advanced' | 'unbo
   ],
   advanced: [
     {
+      id: 'gioi-thieu-nhanh',
       name: 'Giới thiệu nhanh',
       desc: 'Khoe sản phẩm từ ba góc trên nền sạch',
       hook: 'The clip opens with the product snapping into frame on a clean background.',
@@ -141,6 +166,7 @@ export const PROMPT_TEMPLATES: Record<'video' | 'marketing' | 'advanced' | 'unbo
       ending: 'The clip ends on a still hero shot of the product.',
     },
     {
+      id: 'mot-ngay-cung-san-pham',
       name: 'Một ngày cùng sản phẩm',
       desc: 'Sản phẩm đi cùng một người từ sáng tới tối',
       hook: 'The clip opens with a person reaching for the product first thing in the morning.',
@@ -148,6 +174,7 @@ export const PROMPT_TEMPLATES: Record<'video' | 'marketing' | 'advanced' | 'unbo
       ending: 'The clip ends with the person smiling at the camera, the product in hand.',
     },
     {
+      id: 'van-de-va-giai-phap',
       name: 'Vấn đề và giải pháp',
       desc: 'Một rắc rối nhỏ, rồi sản phẩm giải quyết gọn',
       hook: 'The clip opens on a small everyday problem the product solves, shown in one quick moment.',
@@ -155,6 +182,7 @@ export const PROMPT_TEMPLATES: Record<'video' | 'marketing' | 'advanced' | 'unbo
       ending: 'The clip ends on a close-up of the product with the person giving a satisfied nod.',
     },
     {
+      id: 'phim-quang-cao-ngan',
       name: 'Phim quảng cáo ngắn',
       desc: 'Chuỗi cảnh ngắn: cận chi tiết, đang dùng, toàn cảnh',
       hook: 'The clip opens with a fast push-in on the product under a striking hero light.',
@@ -162,6 +190,7 @@ export const PROMPT_TEMPLATES: Record<'video' | 'marketing' | 'advanced' | 'unbo
       ending: 'The clip ends on a clean hero shot of the product as the light softens.',
     },
     {
+      id: 'mon-qua',
       name: 'Món quà',
       desc: 'Một người tặng quà, người kia mở ra và thử ngay',
       hook: 'The clip opens as one person hands a wrapped gift to a friend.',
@@ -169,6 +198,7 @@ export const PROMPT_TEMPLATES: Record<'video' | 'marketing' | 'advanced' | 'unbo
       ending: 'The clip ends with the two friends laughing together, the product in the centre of the frame.',
     },
     {
+      id: 'dao-pho',
       name: 'Dạo phố',
       desc: 'Lookbook đường phố: đi, cận chi tiết, cười tự nhiên',
       hook: 'The clip opens with the model stepping out of a doorway onto a sunny street.',
@@ -178,6 +208,7 @@ export const PROMPT_TEMPLATES: Record<'video' | 'marketing' | 'advanced' | 'unbo
   ],
   unboxing: [
     {
+      id: 'hop-qua',
       name: 'Hộp quà',
       desc: 'Gỡ nơ hộp quà và bất ngờ với sản phẩm',
       hook: 'The clip opens on a gift box tied with a ribbon as hands pull the ribbon loose.',
@@ -185,6 +216,7 @@ export const PROMPT_TEMPLATES: Record<'video' | 'marketing' | 'advanced' | 'unbo
       ending: 'The clip ends with the product held up next to its open box.',
     },
     {
+      id: 'pov-tay',
       name: 'POV tay',
       desc: 'Góc nhìn thứ nhất, chỉ thấy tay mở hộp',
       hook: 'The clip opens from a first-person view as two hands slide a sealed package onto the table.',
@@ -192,6 +224,7 @@ export const PROMPT_TEMPLATES: Record<'video' | 'marketing' | 'advanced' | 'unbo
       ending: 'The clip ends with the hands placing the product neatly on top of its box.',
     },
     {
+      id: 'mo-nhanh-asmr',
       name: 'Mở nhanh ASMR',
       desc: 'Mở nhanh, cận cảnh tiếng giấy và băng keo',
       hook: 'The clip opens on an extreme close-up of tape being peeled off a box with a crisp sound.',
@@ -199,6 +232,7 @@ export const PROMPT_TEMPLATES: Record<'video' | 'marketing' | 'advanced' | 'unbo
       ending: 'The clip ends on a still close-up of the product resting in its open box.',
     },
     {
+      id: 'hang-vua-giao',
       name: 'Hàng vừa giao',
       desc: 'Gói hàng tới cửa, mang vào bàn mở ngay',
       hook: 'The clip opens on a package landing on a doorstep as hands quickly pick it up.',
@@ -206,6 +240,7 @@ export const PROMPT_TEMPLATES: Record<'video' | 'marketing' | 'advanced' | 'unbo
       ending: 'The clip ends with the product held up in front of the open package.',
     },
     {
+      id: 'nhieu-don-mot-lan',
       name: 'Nhiều đơn một lần',
       desc: 'Mở liền mấy gói, để sản phẩm của bạn tới cuối',
       hook: 'The clip opens on a pile of parcels as the creator rubs their hands in excitement.',
@@ -213,6 +248,7 @@ export const PROMPT_TEMPLATES: Record<'video' | 'marketing' | 'advanced' | 'unbo
       ending: 'The clip ends with the creator holding the product up beside the empty parcels.',
     },
     {
+      id: 'toi-gian',
       name: 'Tối giản',
       desc: 'Mở chậm, gọn gàng trên bàn trắng, ánh sáng dịu',
       hook: 'The clip opens on a plain box on a clean white table in soft morning light.',
@@ -222,6 +258,7 @@ export const PROMPT_TEMPLATES: Record<'video' | 'marketing' | 'advanced' | 'unbo
   ],
   review: [
     {
+      id: 'review-that',
       name: 'Review thật',
       desc: 'Mặc thử, đi vài bước và nhận xét thật lòng',
       hook: 'The clip opens on a close-up of the creator wearing the product, looking straight into the camera.',
@@ -229,6 +266,7 @@ export const PROMPT_TEMPLATES: Record<'video' | 'marketing' | 'advanced' | 'unbo
       ending: 'The clip ends with the creator nodding and giving a thumbs up next to the product.',
     },
     {
+      id: 'uu-va-nhuoc',
       name: 'Ưu và nhược',
       desc: 'Hai điểm thích và một điểm cần lưu ý',
       hook: 'The clip opens with the creator holding the product up to the camera and saying they have used it for a week.',
@@ -236,6 +274,7 @@ export const PROMPT_TEMPLATES: Record<'video' | 'marketing' | 'advanced' | 'unbo
       ending: 'The clip ends with the creator giving the product a confident nod.',
     },
     {
+      id: 'mac-ca-ngay',
       name: 'Mặc cả ngày',
       desc: 'Từ sáng tới tối, sản phẩm vẫn chỉn chu',
       hook: 'The clip opens with the creator checking the time on a phone in the morning, wearing the product.',
@@ -243,6 +282,7 @@ export const PROMPT_TEMPLATES: Record<'video' | 'marketing' | 'advanced' | 'unbo
       ending: 'The clip ends with the creator back home at night, smiling and pointing at the product.',
     },
     {
+      id: 'tra-loi-binh-luan',
       name: 'Trả lời bình luận',
       desc: 'Đọc một câu hỏi của khách rồi trả lời bằng sản phẩm',
       hook: 'The clip opens with the creator reading a comment on their phone, then turning to the camera.',
@@ -250,6 +290,7 @@ export const PROMPT_TEMPLATES: Record<'video' | 'marketing' | 'advanced' | 'unbo
       ending: 'The clip ends with the creator holding the product up and nodding, as if to say it is worth it.',
     },
     {
+      id: 'so-voi-do-cu',
       name: 'So với đồ cũ',
       desc: 'Đặt cạnh món cũ đã sờn, chỉ ra chỗ hơn',
       hook: 'The clip opens with the creator holding an old, worn item next to the product.',
@@ -257,6 +298,7 @@ export const PROMPT_TEMPLATES: Record<'video' | 'marketing' | 'advanced' | 'unbo
       ending: 'The clip ends with the creator keeping the product and setting the old one aside with a smile.',
     },
     {
+      id: 'thu-size',
       name: 'Thử size',
       desc: 'Mặc thử, chỉ độ vừa ở vai, eo, độ dài',
       hook: 'The clip opens with the creator holding the product against their body in front of a mirror.',
