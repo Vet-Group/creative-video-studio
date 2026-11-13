@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { type Analysis, mergeShots } from '@cvs/core/analysis/breakdown';
-import { REMAKE_MAX_SECONDS, REMAKE_USD_PER_SECOND, remakeScene, remakeShotsProblem, remakeShotUsd } from '@cvs/core/analysis/remake';
+import { REMAKE_MAX_SECONDS, remakeScene, remakeShotsProblem, remakeShotUsd } from '@cvs/core/analysis/remake';
 import { withTransaction } from '@cvs/core/ledger';
 import { checkCaps } from '@cvs/core/limits';
 import { REMAKE_QUEUE } from '@cvs/core/queue';
@@ -62,7 +62,7 @@ export async function POST(request: Request) {
       await tx.query(
         `select (coalesce(sum(greatest(jsonb_array_length(shots) * $1::numeric - coalesce(cost_usd, 0), 0)), 0) + $2::numeric)::text as usd
            from remakes where status in ('queued', 'running')`,
-        [(REMAKE_MAX_SECONDS * REMAKE_USD_PER_SECOND).toFixed(6), thisOne.toFixed(6)],
+        [remakeShotUsd({ start: 0, end: REMAKE_MAX_SECONDS }).toFixed(6), thisOne.toFixed(6)],
       )
     ).rows[0].usd as string;
     const refused = await checkCaps(tx, userId, estimate, undefined, 'video');

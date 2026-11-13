@@ -6,8 +6,8 @@ import { RemakePanel, RemakeResult, type RemakeRow, remakeEstimate } from './Rem
 const base: RemakeRow = { id: 'r1', analysisId: 'a1', status: 'succeeded', result: null, outputAssetId: null, costUsd: null, createdAt: '2026-11-13T00:00:00Z' };
 
 test('the estimate is each shot billed at its length in whole seconds (2 to 10) at $0.10, as the API counts it against the caps', () => {
-  expect(remakeEstimate([{ start: 0, end: 1 }])).toBe('0.20');
-  expect(remakeEstimate([{ start: 0, end: 2.1 }, { start: 2.1, end: 30 }])).toBe('1.30'); // 3 s + 10 s
+  expect(remakeEstimate([{ start: 0, end: 1 }])).toBe('0.40'); // 2 s sent + 2 s made
+  expect(remakeEstimate([{ start: 0, end: 2.1 }, { start: 2.1, end: 30 }])).toBe('2.60'); // (3 s + 10 s) twice
 });
 
 test('a finished remake shows the joined video with a download, each shot clip, and its cost', () => {
