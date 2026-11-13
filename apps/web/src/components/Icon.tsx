@@ -68,6 +68,8 @@ const FILLED: Partial<Record<keyof typeof PATHS, string>> = {
   megaphone: 'M1 5.8v4.4h2.8L10 14V2L3.8 5.8z M11.5 5a3.2 3.2 0 0 1 0 6z M3.5 11l1.3 3.8h2.4L6.1 11z',
   apps: 'M1.5 3.5h3.5v3.5H1.5z M6.25 3.5h3.5v3.5h-3.5z M11 3.5h3.5v3.5H11z M1.5 9h3.5v3.5H1.5z M6.25 9h3.5v3.5h-3.5z M11 9h3.5v3.5H11z',
   library: 'M3.5 1.5h11v9h-11z M5 9h8L10.6 6l-1.8 2-1.3-1.2z M1.5 4v10.5H12V13H3V4z',
+  chart: 'M1.5 13h13v1.5h-13z M2.5 8h3v4h-3z M6.5 3.5h3v8.5h-3z M10.5 6h3v6h-3z',
+  help: 'M8 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13z M5.6 6.3a2.4 2.4 0 1 1 4.8 0c0 1.5-1.6 1.9-1.6 3.2H7.2c0-2 1.6-2.3 1.6-3.2a.8.8 0 0 0-1.6 0z M7.2 10.8h1.6v1.6H7.2z',
 };
 
 export type IconName = keyof typeof PATHS;
