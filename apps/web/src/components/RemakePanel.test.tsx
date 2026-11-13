@@ -139,6 +139,14 @@ test('a finished remake shows the before/after video inline, with the link to op
   expect(renderToStaticMarkup(<RemakeResult row={{ ...base, outputAssetId: 'out-1', result: { shots: [] } }} />).match(/<video/g)).toHaveLength(1); // no comparison made
 });
 
+test('a finished remake offers the full-length cut with the source sound beside the scenes-only video, when it was made', () => {
+  const html = renderToStaticMarkup(<RemakeResult row={{ ...base, outputAssetId: 'out-1', result: { shots: [], fullAssetId: 'full-1' } }} />);
+  expect(html).toContain('href="/api/assets/out-1/download"');
+  expect(html).toContain('href="/api/assets/full-1/download"');
+  expect(html).toContain('Tải bản đủ dài (có âm thanh gốc)');
+  expect(renderToStaticMarkup(<RemakeResult row={{ ...base, outputAssetId: 'out-1', result: { shots: [] } }} />)).not.toContain('bản đủ dài'); // a remake made before it, or whose cut failed
+});
+
 test('with a source video each scene gets a decorative thumbnail slot beside its label; without one the picker is text only', () => {
   const analysis: Analysis = { durationS: 12, shotCount: 2, format: '', hook: '', summary: '', shots: [{ index: 1, start: 0, end: 5.2, role: '', prompt: 'p1' }, { index: 2, start: 5.2, end: 12, role: '', prompt: 'p2' }] };
   const panel = (sourceAssetId: string | null) => renderToStaticMarkup(<RemakePanel row={{ id: 'a-thumb', status: 'succeeded', result: analysis, error: null, createdAt: '2026-11-13T00:00:00Z', sourceAssetId }} />);

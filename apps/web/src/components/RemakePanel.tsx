@@ -20,7 +20,7 @@ export interface RemakeRow {
   productAssetId: string | null; // null once the image is purged
   shots: number[]; // the first stored shot of each scene asked for
   status: 'queued' | 'running' | 'succeeded' | 'partial' | 'failed';
-  result: { shots: { index: number; status: 'succeeded' | 'failed'; clipAssetId?: string }[]; compareAssetId?: string } | null;
+  result: { shots: { index: number; status: 'succeeded' | 'failed'; clipAssetId?: string }[]; compareAssetId?: string; fullAssetId?: string } | null;
   outputAssetId: string | null;
   costUsd: string | null;
   createdAt: string;
@@ -68,6 +68,12 @@ export function RemakeResult({ row, scene = (index) => index, analysis, onDelete
           <a className="link-button" href={`/api/assets/${row.outputAssetId}/download`}>
             Tải video
           </a>
+          {row.result?.fullAssetId && (
+            // The whole reference video with the remade scenes in their places and its own sound.
+            <a className="link-button" href={`/api/assets/${row.result.fullAssetId}/download`}>
+              Tải bản đủ dài (có âm thanh gốc)
+            </a>
+          )}
           {row.result?.compareAssetId && (
             <>
               <video className="remake-video" src={`/api/assets/${row.result.compareAssetId}/content`} controls playsInline preload="metadata" aria-label="So sánh trước/sau" />

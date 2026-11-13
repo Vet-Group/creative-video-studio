@@ -134,10 +134,10 @@ test('deletes a finished remake with its output assets, keeps the product image 
   await pool.query(`insert into analyses (id, user_id, team_id, source_key, status, result) select 'an-del', u.id, u.team_id, 's3/vid', 'succeeded', $2::jsonb from users u where u.id = $1`, [userId, shots]);
   await pool.query(
     `insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) values
-       ('rm-out', $1, 'output', 'assets/rm-out', 'out.mp4', 'video/mp4', 1), ('rm-cmp', $1, 'output', 'assets/rm-cmp', 'cmp.mp4', 'video/mp4', 1), ('rm-clip', $1, 'output', 'assets/rm-clip', 'clip.mp4', 'video/mp4', 1)`,
+       ('rm-out', $1, 'output', 'assets/rm-out', 'out.mp4', 'video/mp4', 1), ('rm-cmp', $1, 'output', 'assets/rm-cmp', 'cmp.mp4', 'video/mp4', 1), ('rm-full', $1, 'output', 'assets/rm-full', 'full.mp4', 'video/mp4', 1), ('rm-clip', $1, 'output', 'assets/rm-clip', 'clip.mp4', 'video/mp4', 1)`,
     [userId],
   );
-  const result = JSON.stringify({ shots: [{ index: 1, status: 'succeeded', clipAssetId: 'rm-clip', costUsd: 0.2 }], compareAssetId: 'rm-cmp' });
+  const result = JSON.stringify({ shots: [{ index: 1, status: 'succeeded', clipAssetId: 'rm-clip', costUsd: 0.2 }], compareAssetId: 'rm-cmp', fullAssetId: 'rm-full' });
   await pool.query(
     `insert into remakes (id, user_id, team_id, analysis_id, product_asset_id, shots, status, result, output_asset_id)
        select 'rm-done', u.id, u.team_id, 'an-del', 'img', '[1]'::jsonb, 'succeeded', $2::jsonb, 'rm-out' from users u where u.id = $1
@@ -160,7 +160,7 @@ test('deletes a finished remake with its output assets, keeps the product image 
 
   expect((await remove('rm-done')).status).toBe(200);
   expect(await exists('remakes', 'rm-done')).toBe(false);
-  for (const id of ['rm-out', 'rm-cmp', 'rm-clip']) expect(await exists('assets', id)).toBe(false);
+  for (const id of ['rm-out', 'rm-cmp', 'rm-full', 'rm-clip']) expect(await exists('assets', id)).toBe(false);
   expect(await exists('assets', 'img')).toBe(true);
   expect((await pool.query(`select count(*)::int as n from cost_entries where ref = 'llm:remake:rm-done:1:video'`)).rows[0].n).toBe(1);
   expect((await remove('rm-done')).status).toBe(404);

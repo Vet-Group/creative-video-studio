@@ -29,7 +29,7 @@ export async function DELETE(request: Request, { params }: RouteContext) {
     const row = (await tx.query('select status, result, output_asset_id as "outputAssetId" from remakes where id = $1 and user_id = $2 for update', [id, g.session.user.id])).rows[0];
     if (!row) return Response.json({ error: 'not found' }, { status: 404 });
     if (row.status === 'queued' || row.status === 'running') return Response.json({ error: 'Video đang được tạo nên chưa xoá được. Hãy đợi nó xong.' }, { status: 409 });
-    const assetIds = [row.outputAssetId, row.result?.compareAssetId, ...(row.result?.shots ?? []).map((s: { clipAssetId?: string }) => s.clipAssetId)].filter((a): a is string => !!a);
+    const assetIds = [row.outputAssetId, row.result?.compareAssetId, row.result?.fullAssetId, ...(row.result?.shots ?? []).map((s: { clipAssetId?: string }) => s.clipAssetId)].filter((a): a is string => !!a);
     await tx.query('delete from remakes where id = $1', [id]);
     const { rows } = await tx.query(`delete from assets where id = any($1::text[]) and kind = 'output' returning id, s3_key`, [assetIds]);
     // Each asset may also have a tile thumbnail; removing a missing one is a no-op.

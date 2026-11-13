@@ -100,12 +100,15 @@ test('remakes every chosen shot from its own clip, joins the clips with a before
   expect((Number(frames) - 1) / (num! / den!)).toBeGreaterThanOrEqual(2);
   expect(await probeSeconds(sent)).toBeLessThanOrEqual(2.2);
   // The joined video, each shot's clip (cut back to the shot's 1 s) and the before/after are the member's output assets, under their own keys.
-  const ids = [r.output_asset_id, ...r.result.shots.map((s: { clipAssetId: string }) => s.clipAssetId), r.result.compareAssetId];
+  const ids = [r.output_asset_id, ...r.result.shots.map((s: { clipAssetId: string }) => s.clipAssetId), r.result.compareAssetId, r.result.fullAssetId];
   const assets = (await pool.query(`select id, owner_id, kind, mime, s3_key, width, height from assets where id = any($1::text[])`, [ids])).rows;
-  expect(assets).toHaveLength(4);
+  expect(assets).toHaveLength(5);
   for (const a of assets) expect([a.owner_id, a.kind, a.mime, a.s3_key, a.height]).toEqual(['u1', 'output', 'video/mp4', `assets/${a.id}`, 224]);
   for (const a of assets) expect(stored[a.s3_key]).toBeDefined();
   expect(assets.find((a) => a.id === r.result.compareAssetId)!.width).toBe(256); // the source's shots beside their remakes
+  const full = join(dir, 'stored-full.mp4');
+  await writeFile(full, stored[`assets/${r.result.fullAssetId}`]!);
+  expect(Math.abs((await probeSeconds(full)) - 2)).toBeLessThanOrEqual(0.15); // the whole 2 s source, both scenes remade in place
   const clip = join(dir, 'stored-clip.mp4');
   await writeFile(clip, stored[`assets/${r.result.shots[0].clipAssetId}`]!);
   expect(Math.abs((await probeSeconds(clip)) - 1)).toBeLessThanOrEqual(0.1);

@@ -85,6 +85,43 @@ export async function concatClips(clips: string[], out: string): Promise<void> {
   await run(requireFfmpeg(), ['-y', '-v', 'error', ...clips.flatMap((c) => ['-i', c]), '-filter_complex', [...fit, join].join(';'), '-map', '[out]', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '18', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', out]);
 }
 
+/**
+ * The source video with each remade part laid over its own span and the rest as it was, at the source's length and sound: a remake's full-length
+ * cut. It takes the first part's size, as the parts were made from the source as it is shown (a phone clip's rotation applied, which its stream
+ * size leaves out). A part is cut or held on its last frame to exactly its span, so the source's sound stays in step; parts come in time order.
+ */
+export async function spliceClips(video: string, parts: { start: number; seconds: number; clip: string }[], out: string): Promise<void> {
+  const [{ width, height }, total] = await Promise.all([probeSize(parts[0]!.clip), probeVideoSeconds(video)]);
+  const fit = `scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=24`;
+  const gaps: [number, number][] = [];
+  let at = 0;
+  for (const p of parts) {
+    if (p.start - at > 0.04) gaps.push([at, p.start]);
+    at = p.start + p.seconds;
+  }
+  if (total - at > 0.04) gaps.push([at, total]);
+  const graph = [`[0:v:0]split=${Math.max(1, gaps.length)}${gaps.map((_, g) => `[s${g}]`).join('') || '[s0]'}`];
+  const seq: string[] = [];
+  let g = 0;
+  const gap = (from: number, to: number) => {
+    graph.push(`[s${g}]trim=start=${from.toFixed(3)}:end=${to.toFixed(3)},setpts=PTS-STARTPTS,${fit}[g${g}]`);
+    seq.push(`[g${g++}]`);
+  };
+  at = 0;
+  parts.forEach((p, i) => {
+    if (p.start - at > 0.04) gap(at, p.start);
+    const s = p.seconds.toFixed(3);
+    graph.push(`[${i + 1}:v:0]setpts=PTS-STARTPTS,tpad=stop_mode=clone:stop_duration=${s},trim=duration=${s},${fit}[c${i}]`);
+    seq.push(`[c${i}]`);
+    at = p.start + p.seconds;
+  });
+  if (total - at > 0.04) gap(at, total);
+  if (gaps.length === 0) graph.push('[s0]nullsink');
+  graph.push(`${seq.join('')}concat=n=${seq.length}:v=1:a=0[out]`);
+  const sound = ['-map', '0:a:0?', '-c:a', 'aac'];
+  await run(requireFfmpeg(), ['-y', '-v', 'error', '-i', video, ...parts.flatMap((p) => ['-i', p.clip]), '-filter_complex', graph.join(';'), '-map', '[out]', ...sound, '-t', total.toFixed(3), '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '18', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', out]);
+}
+
 /** A clip's length in seconds, as ffprobe reads it. */
 export async function probeSeconds(file: string): Promise<number> {
   const { stdout } = await run(ffprobe.path, ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', file]);

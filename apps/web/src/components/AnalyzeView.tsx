@@ -187,7 +187,7 @@ export function AnalysisPanel({ row, onRetry, onClose, remakeEnabled = false }: 
         <div className="analysis-wait" role="status">
           <strong>Đang phân tích video…</strong>
           <span className="muted">
-            Thường mất khoảng 1–2 phút{elapsed && ` · ${elapsed}`}. Bạn có thể xem tab khác, kết quả cũng sẽ có ở Lịch sử.
+            Thường mất khoảng 2–4 phút{elapsed && ` · ${elapsed}`}. Bạn có thể xem tab khác, kết quả cũng sẽ có ở Lịch sử.
           </span>
         </div>
       )}

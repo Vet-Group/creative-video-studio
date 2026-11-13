@@ -17,7 +17,7 @@ import { REMAKE_QUEUE_OPTIONS } from '@cvs/core/queue';
 import { insertAssets } from '@cvs/db/assets';
 import { createDb } from '@cvs/db/client';
 import { falActive } from './fal-next';
-import { concatClips, cutShot, probeSize, probeVideoSeconds, sideBySide, trimClip } from './media';
+import { concatClips, cutShot, probeSize, probeVideoSeconds, sideBySide, spliceClips, trimClip } from './media';
 import { fitForInline } from './real-providers';
 import { getObject, putObject } from './storage';
 import type { WorkerDeps } from './worker';
@@ -192,10 +192,10 @@ export async function runRemake(pool: Pool, remakeId: string, seams: RemakeSeams
 
   const shots: ShotResult[] = [];
   const spent = () => usd(shots.reduce((sum, s) => sum + s.costUsd, 0));
-  const finish = (status: 'succeeded' | 'partial' | 'failed', outputAssetId: string | null, error: string | null, compareAssetId?: string) =>
+  const finish = (status: 'succeeded' | 'partial' | 'failed', outputAssetId: string | null, error: string | null, compareAssetId?: string, fullAssetId?: string) =>
     pool.query(
       `update remakes set status = $2, result = $3, output_asset_id = $4, cost_usd = $5, error = $6, finished_at = now() where id = $1 and status = 'running' and result->>'worker' = $7`,
-      [remakeId, status, JSON.stringify({ shots, compareAssetId }), outputAssetId, spent(), error, workerId],
+      [remakeId, status, JSON.stringify({ shots, compareAssetId, fullAssetId }), outputAssetId, spent(), error, workerId],
     );
   // Books the shot's paid call as soon as it returns or fails, so a stopped worker leaves at most the call in flight unbooked.
   const paid = async <T extends { costUsd: number }>(entry: ShotResult, call: () => Promise<T>): Promise<T> => {
@@ -238,7 +238,7 @@ export async function runRemake(pool: Pool, remakeId: string, seams: RemakeSeams
     const product = { bytes: await read(r.product_key), contentType: r.product_mime as string };
     const analysis = r.result as Analysis | null;
     // Each made shot's clip, and the cut it was made from, for the before/after.
-    const made: { clip: string; sent: string }[] = [];
+    const made: { clip: string; sent: string; start: number; seconds: number }[] = [];
 
     const unsure = resume && chosen.find((i) => !resume.shots?.some((s) => s.index === i));
     for (const index of chosen) {
@@ -283,7 +283,7 @@ export async function runRemake(pool: Pool, remakeId: string, seams: RemakeSeams
           entry.clipAssetId = await storeVideo(pool, write, r.user_id, clip, `remake-${remakeId.slice(0, 8)}-shot-${index}.mp4`);
           entry.status = 'succeeded';
         }
-        made.push({ clip, sent });
+        made.push({ clip, sent, start: shot.start, seconds: keep });
       } catch (e) {
         // One shot's failure never stops the others; what it spent is already booked.
         entry.status = 'failed';
@@ -296,6 +296,7 @@ export async function runRemake(pool: Pool, remakeId: string, seams: RemakeSeams
 
     let outputAssetId: string | null = null;
     let compareAssetId: string | undefined;
+    let fullAssetId: string | undefined;
     let error = shots.find((s) => s.error)?.error ?? null;
     if (made.length > 0) {
       try {
@@ -318,11 +319,19 @@ export async function runRemake(pool: Pool, remakeId: string, seams: RemakeSeams
         } catch (e) {
           console.error(`worker: remake ${remakeId}: no before/after video:`, e);
         }
+        // The full-length cut: the whole source with each remade scene over its own span and the source's sound, also free and optional.
+        try {
+          const full = join(dir, 'full.mp4');
+          await spliceClips(video, made.map(({ start, seconds, clip }) => ({ start, seconds, clip })).sort((a, b) => a.start - b.start), full);
+          fullAssetId = await storeVideo(pool, write, r.user_id, full, `remake-${remakeId.slice(0, 8)}-full.mp4`);
+        } catch (e) {
+          console.error(`worker: remake ${remakeId}: no full-length video:`, e);
+        }
       } catch (e) {
         error = `the clips could not be joined: ${message(e)}`;
       }
     }
-    await finish(made.length === 0 ? 'failed' : made.length === chosen.length && outputAssetId ? 'succeeded' : 'partial', outputAssetId, error, compareAssetId);
+    await finish(made.length === 0 ? 'failed' : made.length === chosen.length && outputAssetId ? 'succeeded' : 'partial', outputAssetId, error, compareAssetId, fullAssetId);
   } catch (e) {
     await finish(shots.some((s) => s.status === 'succeeded') ? 'partial' : 'failed', null, message(e));
   } finally {
