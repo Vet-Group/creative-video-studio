@@ -70,11 +70,11 @@ export async function getObject(key: string): Promise<Uint8Array> {
   return res.Body!.transformToByteArray();
 }
 
-/** Streams a stored object into `file`, so a large video never sits in memory. */
-export async function downloadObject(key: string, file: string): Promise<void> {
+/** Streams a stored object into `file`, so a large video never sits in memory; `signal` gives up on a read that stalls. */
+export async function downloadObject(key: string, file: string, signal?: AbortSignal): Promise<void> {
   const { client, Bucket, Key } = loc(key);
-  const res = await client.send(new GetObjectCommand({ Bucket, Key }));
-  await pipeline(res.Body as Readable, createWriteStream(file));
+  const res = await client.send(new GetObjectCommand({ Bucket, Key }), { abortSignal: signal });
+  await pipeline(res.Body as Readable, createWriteStream(file), { signal });
 }
 
 export async function deleteObject(key: string): Promise<void> {
