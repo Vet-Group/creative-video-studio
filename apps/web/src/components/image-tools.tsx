@@ -25,6 +25,7 @@ import { Select } from './Select';
 import { StorePicker, type StoreOption } from './StorePicker';
 import { SampleDetail } from './SampleDetail';
 import type { ModelOption } from './ModelPicker';
+import { fillBlanks } from './TemplateBlanks';
 
 export interface ImageModel {
   id: string;
@@ -165,9 +166,12 @@ export function useReuse(reuse: string | undefined, feature: string, fill: (j: O
     const reuse = source.from;
     let stale = false; // a refill superseded (another link, or a re-run effect) must not fill or upload
     api<ReuseJob>(reuse)
-      .then(async (j) => {
+      .then(async (loaded) => {
         if (stale) return;
-        if (j.feature !== feature) return fail();
+        if (loaded.feature !== feature) return fail();
+        const j = await fillBlanks(reuse, loaded);
+        if (stale) return; // superseded while the member filled the blanks
+        if (!j) return dropRefillQuery(); // cancelled: the form stays as it is
         // A sample's photos become this member's inputs first, copied on the server.
         const samples = j.images.flatMap((i) => ('sample' in i ? [i.sample] : []));
         const images = samples.length > 0 ? await copySamples(samples) : (j.images as Img[]);

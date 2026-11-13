@@ -39,6 +39,7 @@ import { ReferenceVideoSlot, type RefVideo, videoReason, type VideoRefs } from '
 import { PromptPreview, PromptSections, usePromptMode } from './PromptSections';
 import { Select } from './Select';
 import { Tray } from './Shell';
+import { fillBlanks } from './TemplateBlanks';
 import { Templates } from './Templates';
 import { PageHint } from './ToolGuide';
 import { VideoSettings } from './VideoSettings';
@@ -307,10 +308,13 @@ export function MarketingStudio({ format = 'ugc', reuse, wizardDefault = false }
     const reuse = source.from;
     let stale = false; // a refill superseded (another link, or a re-run effect) must not fill or upload
     api<MarketingJob>(reuse)
-      .then(async (j) => {
+      .then(async (loaded) => {
         if (stale) return;
-        if (j.feature !== 'marketing') return setError('Không tìm thấy clip để dùng lại.');
-        if (hrefOfFormat(j.format) !== FORMAT_HREF[format]) return router.replace(`${hrefOfFormat(j.format)}?${queryOf(reuse)}`);
+        if (loaded.feature !== 'marketing') return setError('Không tìm thấy clip để dùng lại.');
+        if (hrefOfFormat(loaded.format) !== FORMAT_HREF[format]) return router.replace(`${hrefOfFormat(loaded.format)}?${queryOf(reuse)}`);
+        const j = await fillBlanks(reuse, loaded);
+        if (stale) return; // superseded while the member filled the blanks
+        if (!j) return dropRefillQuery(); // cancelled: the form stays as it is
         // A sample's photos become this member's inputs first, copied on the server.
         const samples = j.images.map((i) => ('sample' in i ? i.sample : null)).filter((s) => s !== null);
         const inputs = samples.length > 0 ? await copySamples(samples) : (j.images as Img[]);

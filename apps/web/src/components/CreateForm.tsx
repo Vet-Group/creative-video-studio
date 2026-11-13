@@ -30,6 +30,7 @@ import { Preview } from './Preview';
 import { Select } from './Select';
 import { StorePicker, type StoreOption } from './StorePicker';
 import { Tray } from './Shell';
+import { fillBlanks } from './TemplateBlanks';
 import { Templates } from './Templates';
 import { PageHint } from './ToolGuide';
 import { VideoSettings } from './VideoSettings';
@@ -285,8 +286,11 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
     const reuse = source.from;
     let stale = false; // a refill superseded (another link, or a re-run effect) must not fill or upload
     api<JobDetail>(reuse)
-      .then(async (j) => {
+      .then(async (loaded) => {
         if (stale) return;
+        const j = await fillBlanks(reuse, loaded);
+        if (stale) return; // superseded while the member filled the blanks
+        if (!j) return dropRefillQuery(); // cancelled: the form stays as it is
         const preset = presets.some((p) => p.id === j.presetId) ? j.presetId : null;
         // A sample's photos become this member's inputs first, copied on the server.
         const samples = j.images.flatMap((i) => ('sample' in i ? [i.sample] : []));

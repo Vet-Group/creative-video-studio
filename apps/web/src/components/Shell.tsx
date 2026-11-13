@@ -28,6 +28,7 @@ import { CancelButton, elapsedLabel, JobPrompt, JobsProvider, Recreate, resultHr
 import { LoadError } from './LoadError';
 import { Modal } from './Modal';
 import { type Account, type Section, Settings } from './Settings';
+import { TemplateBlanksHost } from './TemplateBlanks';
 import { SaveTemplateDialog, type Scope } from './Templates';
 import { OpenToolGuide, ToolGuide, ToolGuideButton } from './ToolGuide';
 import { VetLogo } from './VetLogo';
@@ -678,6 +679,7 @@ export function Shell({ userId, userName, isAdmin, feedbackNew = 0, analyzeEnabl
           </div>
           <ToolGuide open={guide} onClose={() => setGuide(false)} analyzeEnabled={analyzeEnabled} />
           <ConfirmHost />
+          <TemplateBlanksHost />
         </OpenToolGuide>
       </AdminContext>
     </JobsProvider>
