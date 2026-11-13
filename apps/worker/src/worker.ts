@@ -25,7 +25,7 @@ import { purgeDeletedClips } from './purge';
 import { dropPreview, storePreview } from './preview';
 import { deleteObject, getObject, putObject } from './storage';
 import { reaAnalyzeEnabled, runReaAnalyze } from './analyze';
-import { closeStaleRemakes, reaRemakeEnabled, runRemake } from './remake';
+import { closeStaleRemakes, reaRemakeEnabled, runRemake, takeOverRemakes } from './remake';
 import { runSuggestion } from './suggest';
 
 export interface WorkerOptions {
@@ -493,14 +493,17 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
     }
   }
 
+  // A remake whose worker stopped is resumed from its saved fal request ids (never submitted again); closing it is the last resort.
   const closeRemakes = async () => {
-    if (reaRemakeEnabled()) await closeStaleRemakes(pool);
+    if (!reaRemakeEnabled()) return;
+    for (const t of await takeOverRemakes(pool, id, o.heartbeatStaleMs)) void runRemake(pool, t.id, { workerId: id }, t.resume).catch((e) => log(`resume remake ${t.id}`, e));
+    await closeStaleRemakes(pool);
   };
 
   let reconciling: Promise<void> | undefined;
   const reconcile = () =>
     (reconciling ??= (async () => {
-      for (const [what, step] of [['resend queued jobs', resendQueued], ['fail lost submits', failLostSubmits], ['poll running jobs', pollRunning], ['poll unresolved jobs', pollUnresolved], ['close stale remakes', closeRemakes]] as const) {
+      for (const [what, step] of [['resend queued jobs', resendQueued], ['fail lost submits', failLostSubmits], ['poll running jobs', pollRunning], ['poll unresolved jobs', pollUnresolved], ['resume or close stale remakes', closeRemakes]] as const) {
         await step().catch((e) => log(what, e));
       }
     })().finally(() => {
@@ -534,7 +537,7 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
   if (reaRemakeEnabled()) {
     await boss.createQueue(REMAKE_QUEUE, REMAKE_QUEUE_OPTIONS);
     await boss.work<RemakeJobData>(REMAKE_QUEUE, { localConcurrency: 1, pollingIntervalSeconds: o.pollingIntervalSeconds }, async (jobs) => {
-      await Promise.all(jobs.map((job) => runRemake(pool, job.data.remakeId).catch((e) => log(`remake ${job.data.remakeId}`, e))));
+      await Promise.all(jobs.map((job) => runRemake(pool, job.data.remakeId, { workerId: id }).catch((e) => log(`remake ${job.data.remakeId}`, e))));
     });
   }
   await beat();
