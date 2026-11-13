@@ -1,6 +1,6 @@
 // Duplicate uploads (owner decision 2026-11-06: the uploaded-photos picker shows each photo once, and copies nothing uses are removed). An upload hashes its bytes at once
 // (assets.sha256); this sweep hashes the inputs uploaded before that, then soft-deletes every extra copy of the same file of one owner that no job, template
-// or choice refers to (nor a saved AI model, deleted or not: its row points at the asset), keeping the newest. A copy something refers to stays (the picker shows its file once anyway). The purge's usual rules then apply.
+// or choice refers to (nor a saved AI model, deleted or not: its row points at the asset; nor an analysis' reference video or a remake's product), keeping the newest. A copy something refers to stays (the picker shows its file once anyway). The purge's usual rules then apply.
 import { createHash } from 'node:crypto';
 import type { LedgerPool as Pool } from '@cvs/core/ledger';
 import { getObject } from './storage';
@@ -47,6 +47,8 @@ export async function removeDuplicateInputs(pool: Pool): Promise<string[]> {
         and not exists (select 1 from user_templates t where strpos(t.data::text, a.id) > 0)
         and not exists (select 1 from user_choices u where u.image_asset_id = a.id)
         and not exists (select 1 from fashion_models f where f.asset_id = a.id)
+        and not exists (select 1 from analyses x where x.source_key = a.s3_key)
+        and not exists (select 1 from remakes r where r.product_asset_id = a.id)
      returning a.id`,
   );
   return rows.map((r: { id: string }) => r.id);
