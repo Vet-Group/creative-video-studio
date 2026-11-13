@@ -2,6 +2,7 @@
 import { bookLlm, withTransaction } from '@cvs/core/ledger';
 import { SUGGEST_EXPIRY_SECONDS } from '@cvs/core/queue';
 import { type SuggestInput, type Suggester, VIDEO_FRAMES, videoPrompt } from '@cvs/core/suggest';
+import sharp from 'sharp';
 import { extractFrames } from './media';
 import { getObject } from './storage';
 import type { WorkerDeps } from './worker';
@@ -18,8 +19,12 @@ export async function runSuggestion(pool: WorkerDeps['pool'], suggest: Suggester
     if (!suggest) throw new Error('no suggester: FAL_KEY is not set');
     const input = run.input as SuggestInput;
     const clip = input.clip ? await extractFrames(await read(`samples/${input.clip}`), VIDEO_FRAMES) : undefined;
+    // A scenes run sends the member's product (upright, a cut-out on white), then one still per scene of the reference video.
+    const product = input.field === 'scenes' ? await sharp(await read(input.productKey!)).rotate().resize(512, 512, { fit: 'inside', withoutEnlargement: true }).flatten({ background: '#fff' }).jpeg().toBuffer() : undefined;
+    const scenes = product ? await extractFrames(await read(input.sourceKey!), input.times!) : undefined;
+    const still = (b: Uint8Array) => `data:image/jpeg;base64,${Buffer.from(b).toString('base64')}`;
     // The clip's length goes with its stills so the call can say when each was taken.
-    const call = await suggest(clip ? { ...input, seconds: clip.seconds } : input, clip?.stills.map((b) => `data:image/jpeg;base64,${Buffer.from(b).toString('base64')}`));
+    const call = await suggest(clip ? { ...input, seconds: clip.seconds } : input, clip ? clip.stills.map(still) : scenes && product ? [product, ...scenes.stills].map(still) : undefined);
     const { options, meanings, costUsd } = call;
     // An option with a Vietnamese reading is stored as { text, vi }, one without as its text (as every run before the readings).
     const output = options.map((text, i) => (meanings?.[i] ? { text, vi: meanings[i] } : text));
@@ -41,6 +46,8 @@ export async function runSuggestion(pool: WorkerDeps['pool'], suggest: Suggester
 export const fakeSuggester: Suggester = async (i, frames) =>
   i.field === 'translate'
     ? { options: [`Translation: ${i.text}`], costUsd: 0, provider: 'mock', model: 'fake' }
-    : i.field === 'video'
-      ? { options: [videoPrompt({ motion: `Mock motion read from ${frames?.length ?? 0} stills: the camera pushes in slowly on the model.`, person: true, stable: true }, i.max)], costUsd: 0, provider: 'mock', model: 'fake' }
-      : { options: [1, 2, 3].map((n) => `Option ${n}: ${i.text || i.field}`.slice(0, i.max)), meanings: [1, 2, 3].map((n) => `Reading ${n}: ${i.text || i.field}`), costUsd: 0, provider: 'mock', model: 'fake' };
+    : i.field === 'scenes'
+      ? { options: (i.times ?? []).slice(0, 2).map((_, k) => String(k + 1)), costUsd: 0, provider: 'mock', model: 'fake' } // the first two scenes
+      : i.field === 'video'
+        ? { options: [videoPrompt({ motion: `Mock motion read from ${frames?.length ?? 0} stills: the camera pushes in slowly on the model.`, person: true, stable: true }, i.max)], costUsd: 0, provider: 'mock', model: 'fake' }
+        : { options: [1, 2, 3].map((n) => `Option ${n}: ${i.text || i.field}`.slice(0, i.max)), meanings: [1, 2, 3].map((n) => `Reading ${n}: ${i.text || i.field}`), costUsd: 0, provider: 'mock', model: 'fake' };

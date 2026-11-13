@@ -173,7 +173,20 @@ export const APPS: AppConfig[] = [
     category: 'fashion',
     slots: [],
   },
+  {
+    // Ours too, with its own page (components/SmartRemakeApp.tsx) and off unless both REA flags are on (visibleApps). It spends no job: a remake is video spend
+    // of its own (api/remakes), so it borrows the `video` feature rather than add one whose per-feature cap would never apply.
+    slug: 'smart-remake',
+    feature: 'video',
+    name: 'Smart Remake',
+    description: 'Giữ mạch truyện của một video mẫu và đặt sản phẩm của bạn vào các cảnh. Chỉ cần một video và một ảnh sản phẩm.',
+    category: 'video',
+    slots: [],
+  },
 ];
+
+/** The apps the member is offered: Smart Remake only when its flags are on (the server reads them), as every list of apps shows it. */
+export const visibleApps = (smartRemake: boolean): AppConfig[] => APPS.filter((a) => smartRemake || a.slug !== 'smart-remake');
 
 export const appBySlug = (slug: string): AppConfig | undefined => APPS.find((a) => a.slug === slug);
 
@@ -181,9 +194,9 @@ export const appBySlug = (slug: string): AppConfig | undefined => APPS.find((a) 
 export const fold = (s: string): string => s.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '').replace(/đ/g, 'd');
 
 /** The apps of one category (or all) whose name or description contains the search text. */
-export function filterApps(category: AppCategory | 'all', search: string): AppConfig[] {
+export function filterApps(category: AppCategory | 'all', search: string, smartRemake = false): AppConfig[] {
   const q = fold(search.trim());
-  return APPS.filter((a) => (category === 'all' || a.category === category) && fold(`${a.name} ${a.description}`).includes(q));
+  return visibleApps(smartRemake).filter((a) => (category === 'all' || a.category === category) && fold(`${a.name} ${a.description}`).includes(q));
 }
 
 /** What a page has chosen, as the Run needs it: the images of each slot (in the order of `slots`), the prompt text and the model. */

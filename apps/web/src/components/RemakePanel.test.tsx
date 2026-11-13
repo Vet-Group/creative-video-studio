@@ -86,6 +86,23 @@ test('a panel mounted again for the same analysis starts with the draft it saved
   remakeDrafts.clear();
 });
 
+test('initial props pre-tick scenes and fill the product, show the price for them and the note; a saved draft wins over them', () => {
+  const analysis: Analysis = { durationS: 12, shotCount: 2, format: '', hook: '', summary: '', shots: [{ index: 1, start: 0, end: 5.2, role: '', prompt: 'p1' }, { index: 2, start: 5.2, end: 12, role: '', prompt: 'p2' }] };
+  const panel = (id: string) =>
+    renderToStaticMarkup(<RemakePanel row={{ id, status: 'succeeded', result: analysis, error: null, createdAt: '2026-11-13T00:00:00Z', sourceAssetId: null }} initialProduct={[{ id: 'img-2', filename: 'dress.png' }]} initialChosen={[2]} note="AI đã chọn sẵn 1 cảnh." />);
+  const html = panel('a-initial');
+  expect(html).toContain('dress.png');
+  expect(html.match(/checked=""/g)).toHaveLength(1);
+  expect(html).toContain(`<span class="run-cost"> · $${remakeEstimate([{ start: 5.2, end: 12 }])}</span>`); // scene 2 only, priced as the API prices it
+  expect(html).toContain('AI đã chọn sẵn 1 cảnh.');
+  const fixed = renderToStaticMarkup(<RemakePanel row={{ id: 'a-fixed', status: 'succeeded', result: analysis, error: null, createdAt: '2026-11-13T00:00:00Z', sourceAssetId: null }} initialProduct={[{ id: 'img-2', filename: 'dress.png' }]} initialChosen={[2]} productFixed />);
+  expect(fixed).not.toContain('dress.png'); // the app's own form holds the product
+  expect(fixed).not.toMatch(/<button type="button" class="primary" disabled="">/); // but it still counts: ready to run
+  remakeDrafts.set('a-saved', { product: [], chosen: [] });
+  expect(panel('a-saved')).not.toContain('dress.png');
+  remakeDrafts.clear();
+});
+
 test('only a remake that is no longer open offers a delete', () => {
   expect(renderToStaticMarkup(<RemakeResult row={base} onDelete={() => {}} />)).toContain('>Xoá</button>');
   expect(renderToStaticMarkup(<RemakeResult row={{ ...base, status: 'queued' }} onDelete={() => {}} />)).not.toContain('Xoá');

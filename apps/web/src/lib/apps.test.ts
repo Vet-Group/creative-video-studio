@@ -2,20 +2,36 @@ import { FEATURE_PROMPTS } from '@cvs/core/models';
 import { FEATURES } from '@cvs/db';
 import { describe, expect, it } from 'vitest';
 import { APP_ABOUT } from './about-content';
-import { APPS, appBySlug, appInputs, appReason, type AppDraft, filterApps, motionReason, slotMax, splitImages, stockGroups } from './apps';
+import { APPS, appBySlug, appInputs, appReason, type AppDraft, filterApps, motionReason, slotMax, splitImages, stockGroups, visibleApps } from './apps';
 
 const img = (id: string) => ({ id });
 const draft = (images: string[][], prompt = '', maxImages = 2): AppDraft => ({ images: images.map((l) => l.map(img)), prompt, models: [{ maxImages }], failed: false });
 const reason = (slug: string, images: string[][], prompt?: string, maxImages?: number) => appReason(appBySlug(slug)!, draft(images, prompt, maxImages));
 
 describe('the app list', () => {
-  it('has twelve apps with unique slugs, known features and (for the built image apps) a default prompt', () => {
-    expect(APPS).toHaveLength(12);
-    expect(new Set(APPS.map((a) => a.slug)).size).toBe(12);
+  it('has thirteen apps with unique slugs, known features and (for the built image apps) a default prompt', () => {
+    expect(APPS).toHaveLength(13);
+    expect(new Set(APPS.map((a) => a.slug)).size).toBe(13);
     for (const a of APPS) {
       expect(FEATURES as readonly string[]).toContain(a.feature);
-      if (!a.soon && a.feature !== 'motion_control' && a.feature !== 'media_optimizer' && a.feature !== 'fashion_model') expect(FEATURE_PROMPTS).toHaveProperty(a.feature);
+      if (!a.soon && a.feature !== 'motion_control' && a.feature !== 'media_optimizer' && a.feature !== 'fashion_model' && a.slug !== 'smart-remake') expect(FEATURE_PROMPTS).toHaveProperty(a.feature);
     }
+  });
+
+  it('opens Smart Remake as a video app with its own page, no upload slot and the video feature (a remake is not a job)', () => {
+    expect(appBySlug('smart-remake')).toMatchObject({ slots: [], feature: 'video', category: 'video' });
+  });
+
+  it('offers Smart Remake only when its flags are on: the first twelve apps keep their places and it comes last', () => {
+    expect(visibleApps(false)).toHaveLength(12);
+    expect(visibleApps(false).map((a) => a.slug)).not.toContain('smart-remake');
+    expect(visibleApps(true).at(-1)!.slug).toBe('smart-remake');
+    expect(filterApps('all', '')).toHaveLength(12); // off unless asked for
+    expect(filterApps('video', '').map((a) => a.slug)).toEqual(['motion-control']);
+    expect(filterApps('all', '', true)).toHaveLength(13);
+    expect(filterApps('video', '', true).map((a) => a.slug)).toEqual(['motion-control', 'smart-remake']);
+    expect(filterApps('all', 'remake', true).map((a) => a.slug)).toEqual(['smart-remake']);
+    expect(filterApps('all', 'remake')).toEqual([]);
   });
 
   it('opens the AI model generator as an app with its own page and no upload slot', () => {

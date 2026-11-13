@@ -24,10 +24,16 @@ export interface SuggestInput {
    * `ending`: the English scene of a new hook, location or ending (the phrase the prompt takes), from the member's Vietnamese name and description
    * in `text`, or a sectioned prompt's hook or ending from the member's own words so far, with the prompt's other sections in `context`;
    * `prompt`: the English prompt of the tool in `task`; `translate`: one Vietnamese reading of the English `text`, for the member only;
-   * `video`: one motion preset prompt from stills of the clip in `clip`, for a template editor. */
-  field: 'brief' | 'script' | 'hook' | 'location' | 'ending' | 'prompt' | 'translate' | 'video';
+   * `video`: one motion preset prompt from stills of the clip in `clip`, for a template editor;
+   * `scenes`: which of a reference video's scenes show a product like the member's (Smart Remake's pre-ticked scenes). */
+  field: 'brief' | 'script' | 'hook' | 'location' | 'ending' | 'prompt' | 'translate' | 'video' | 'scenes';
   /** For `video`: the sample clip's name under samples/ (`preset-<id>.mp4`), whose stills the worker sends. */
   clip?: string;
+  /** For `scenes`: the bucket keys of the reference video and of the member's product image (both chosen by the server), and the time in seconds of each
+   * scene's still. The answer's options are the 1-based numbers of the scenes that show the product. */
+  sourceKey?: string;
+  productKey?: string;
+  times?: number[];
   /** For a prompt: what the tool does and what its prompt should say (PROMPT_TASKS, picked by the server, never the member's words). */
   task?: string;
   /** The member's own text so far (may be empty). */
@@ -139,6 +145,26 @@ export function parseVideoAnswer(answer: string, max: number): string {
   return videoPrompt({ motion, person: v!.person === true, stable: v!.stable !== false }, max);
 }
 
+/** Smart Remake's scene pick: the first image is the member's product, the others are one still per scene of a reference video, numbered from 1. */
+export const SCENES_SYSTEM =
+  'You match a seller\'s product to the scenes of a reference video. The first image is the seller\'s product. The other images are one still per scene of the video, ' +
+  'numbered from 1 in the order you get them. List the scenes that clearly show a product of the same kind as the first image (worn, held or displayed), ' +
+  'for example a dress where the product is a dress. Ignore scenes without such a product, and scenes that show only a different kind of product. ' +
+  'Reply with a JSON object and nothing else: {"scenes": [the scene numbers, ascending]}. Use an empty list when no scene matches.';
+
+/** The scene numbers of a `{ scenes: [...] }` answer (possibly in a code fence), ascending and without repeats; numbers outside 1 to `count` are dropped. */
+export function parseScenes(answer: string, count: number): number[] {
+  let v: unknown;
+  try {
+    v = JSON.parse(unfence(answer));
+  } catch {
+    throw new Error('suggest: the answer is not JSON');
+  }
+  const list = Array.isArray(v) ? v : (v as { scenes?: unknown } | null)?.scenes;
+  if (!Array.isArray(list)) throw new Error('suggest: no scenes in the answer');
+  return [...new Set(list.filter((n): n is number => Number.isInteger(n) && n >= 1 && n <= count))].sort((a, b) => a - b);
+}
+
 /** What each tool's prompt should say, by feature (the Create, Image Generation, Try On and app pages that take a prompt). */
 export const PROMPT_TASKS = {
   video: "an image-to-video model that animates the seller's product photos into a short clip. Describe the motion, the camera move and the light",
@@ -208,6 +234,7 @@ function lengthLine(i: SuggestInput): string {
 /** The user turn of the call for direction `d` (0 to 2): the task, the direction, the model, the pace, the hook and location, the notes and the length. */
 export function suggestPrompt(i: SuggestInput, d = 0): string {
   if (i.field === 'translate') return `The prompt:\n${i.text}`;
+  if (i.field === 'scenes') return `The first image is the product; the other ${i.times?.length ?? 0} images are scenes 1 to ${i.times?.length ?? 0}.`;
   if (i.field === 'video') {
     // Each still's number and time, so the model can read their order.
     const at = i.seconds ? frameTimes(i.seconds, VIDEO_FRAMES).map((t, k) => `still ${k + 1} of ${VIDEO_FRAMES} at ${t.toFixed(1)} s`) : [];
@@ -278,7 +305,7 @@ export function parseOption(answer: string, max: number): { text: string; vi: st
 type Chat = (system: string, user: string, temperature: number, maxTokens: number, images?: string[]) => Promise<{ text: string; costUsd: number | null }>;
 
 const SYSTEMS: Record<SuggestInput['field'], string> = {
-  brief: SUGGEST_SYSTEM, script: SUGGEST_SYSTEM, hook: SCENE_SYSTEM, location: SCENE_SYSTEM, ending: SCENE_SYSTEM, prompt: PROMPT_SYSTEM, translate: TRANSLATE_SYSTEM, video: VIDEO_SYSTEM,
+  brief: SUGGEST_SYSTEM, script: SUGGEST_SYSTEM, hook: SCENE_SYSTEM, location: SCENE_SYSTEM, ending: SCENE_SYSTEM, prompt: PROMPT_SYSTEM, translate: TRANSLATE_SYSTEM, video: VIDEO_SYSTEM, scenes: SCENES_SYSTEM,
 };
 
 const sum = (costs: (number | null)[]): number | null => (costs.every((c) => c === null) ? null : costs.reduce<number>((a, c) => a + (c ?? 0), 0));
@@ -293,6 +320,12 @@ async function suggestWith(chat: Chat, input: SuggestInput, frames: string[] = [
     if (!frames.length) throw new Error('suggest: no stills of the clip');
     const { text, costUsd } = await chat(system, suggestPrompt(input), 0.4, 800, frames);
     return { options: [parseVideoAnswer(text, input.max)], costUsd };
+  }
+  if (input.field === 'scenes') {
+    const count = input.times?.length ?? 0;
+    if (!count || frames.length !== count + 1) throw new Error('suggest: the product and one still per scene are needed');
+    const { text, costUsd } = await chat(system, suggestPrompt(input), 0, 800, frames);
+    return { options: parseScenes(text, count).map(String), costUsd };
   }
   if (input.field === 'translate') {
     const { text, costUsd } = await chat(system, suggestPrompt(input), 0.2, maxTokens(input));
