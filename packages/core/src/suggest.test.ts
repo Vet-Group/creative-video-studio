@@ -278,3 +278,9 @@ test('fal: a scene pick is one vision call with the product, then a still per sc
   await expect(suggest(scenes, frames.slice(0, 3))).rejects.toThrow('one still per scene'); // a still is missing: no call is made
   expect(calls).toHaveLength(1);
 });
+
+test('the scene pick matches by product type, not look: a black long-sleeve top in the video still counts for a white T-shirt', () => {
+  // gpt-6-luna on prod (2026-11-13) left out all three scenes of a black long-sleeve top for a white T-shirt under "the same kind".
+  expect(SCENES_SYSTEM).toMatch(/same general type/);
+  expect(SCENES_SYSTEM).toMatch(/Colour, pattern, sleeve length, fit, brand and style do not matter/);
+});

@@ -147,9 +147,11 @@ export function parseVideoAnswer(answer: string, max: number): string {
 
 /** Smart Remake's scene pick: the first image is the member's product, the others are one still per scene of a reference video, numbered from 1. */
 export const SCENES_SYSTEM =
-  'You match a seller\'s product to the scenes of a reference video. The first image is the seller\'s product. The other images are one still per scene of the video, ' +
-  'numbered from 1 in the order you get them. List the scenes that clearly show a product of the same kind as the first image (worn, held or displayed), ' +
-  'for example a dress where the product is a dress. Ignore scenes without such a product, and scenes that show only a different kind of product. ' +
+  'You pick the scenes of a reference video whose product will be replaced by a seller\'s product. The first image is the seller\'s product. The other images are one ' +
+  'still per scene of the video, numbered from 1 in the order you get them. List every scene that shows a product of the same general type as the first image, ' +
+  'worn, held or displayed: any top (T-shirt, shirt, blouse, sweater) for a top, any dress for a dress, any bag for a bag, and so on. Colour, pattern, sleeve ' +
+  'length, fit, brand and style do not matter, because that product is about to be replaced. Leave out scenes with no such product, and scenes that show only ' +
+  'a product of another type, such as shoes when the product is a top. ' +
   'Reply with a JSON object and nothing else: {"scenes": [the scene numbers, ascending]}. Use an empty list when no scene matches.';
 
 /** The scene numbers of a `{ scenes: [...] }` answer (possibly in a code fence), ascending and without repeats; numbers outside 1 to `count` are dropped. */
