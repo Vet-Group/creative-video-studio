@@ -9,6 +9,7 @@ import { mergeShots, timeRange } from '@/lib/analyze';
 import { api, errorText, sendJson } from '@/lib/api';
 import { confirmRun } from '@/lib/run-guard';
 import type { AnalysisRow } from './AnalyzeView';
+import { confirmDialog } from './Confirm';
 import { type Img, Slot, uploadError, uploadImages } from './image-tools';
 
 export interface RemakeRow {
@@ -28,7 +29,7 @@ const isOpen = (r: RemakeRow) => r.status === 'queued' || r.status === 'running'
 export const remakeEstimate = (shots: { start: number; end: number }[]): string => shots.reduce((sum, s) => sum + remakeShotUsd(s), 0).toFixed(2);
 
 /** One remake: its state, the joined video, then each shot's clip or that it failed. Pure, so it render-tests without the page. `scene` numbers a stored shot as the result list does. */
-export function RemakeResult({ row, scene = (index) => index }: { row: RemakeRow; scene?: (index: number) => number }) {
+export function RemakeResult({ row, scene = (index) => index, onDelete }: { row: RemakeRow; scene?: (index: number) => number; onDelete?: () => void }) {
   const shots = row.result?.shots ?? [];
   return (
     <li className="remake-item">
@@ -65,17 +66,25 @@ export function RemakeResult({ row, scene = (index) => index }: { row: RemakeRow
         </ul>
       )}
       {row.status === 'failed' && shots.length === 0 && <p className="error">Không tạo được video. Hãy thử lại.</p>}
+      {onDelete && !isOpen(row) && (
+        <button type="button" className="link-button" onClick={onDelete}>
+          Xoá
+        </button>
+      )}
     </li>
   );
 }
+
+// The unsent form per analysis id, so a remount (AnalyzeView moves the panel across its 1024 px breakpoint) keeps the pick; cleared once a remake is sent.
+export const remakeDrafts = new Map<string, { product: Img[]; chosen: number[] }>();
 
 /** The Smart Remake form and this analysis' remakes, newest first. Mount it with `key` set to the analysis id, so a pick starts over. */
 export function RemakePanel({ row }: { row: AnalysisRow }) {
   // The scenes as the result list numbers them; a scene is sent as its first stored shot, which the API and the worker take.
   const scenes = row.result ? mergeShots(row.result) : { shots: [], first: [] };
   const scene = (index: number) => scenes.first.filter((f) => f <= index).length;
-  const [product, setProduct] = useState<Img[]>([]);
-  const [chosen, setChosen] = useState<number[]>([]);
+  const [product, setProduct] = useState<Img[]>(remakeDrafts.get(row.id)?.product ?? []);
+  const [chosen, setChosen] = useState<number[]>(remakeDrafts.get(row.id)?.chosen ?? []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [remakes, setRemakes] = useState<RemakeRow[]>([]);
@@ -106,6 +115,10 @@ export function RemakePanel({ row }: { row: AnalysisRow }) {
     };
   }, [row.id, sent]);
 
+  useEffect(() => {
+    remakeDrafts.set(row.id, { product, chosen });
+  }, [row.id, product, chosen]);
+
   async function upload(files: File[]) {
     setBusy(true);
     setError('');
@@ -125,11 +138,23 @@ export function RemakePanel({ row }: { row: AnalysisRow }) {
     setError('');
     try {
       await api('/api/remakes', sendJson('POST', { analysisId: row.id, productAssetId: product[0].id, shots: chosen }));
+      remakeDrafts.delete(row.id);
       setSent((n) => n + 1);
     } catch (e) {
       setError(errorText(e, 'Không bắt đầu được Smart Remake. Hãy thử lại.'));
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function remove(r: RemakeRow) {
+    if (!(await confirmDialog({ title: 'Xoá video này?', body: 'Video và các clip của lượt làm lại này sẽ mất. Ảnh sản phẩm của bạn vẫn còn.', confirmLabel: 'Xoá', danger: true }))) return;
+    setError('');
+    try {
+      await api(`/api/remakes/${encodeURIComponent(r.id)}`, { method: 'DELETE' });
+      setRemakes((list) => list.filter((m) => m.id !== r.id));
+    } catch (e) {
+      setError(errorText(e, 'Không xoá được video này. Hãy thử lại.'));
     }
   }
 
@@ -170,7 +195,7 @@ export function RemakePanel({ row }: { row: AnalysisRow }) {
       {remakes.length > 0 && (
         <ul className="remake-list">
           {remakes.map((r) => (
-            <RemakeResult key={r.id} row={r} scene={scene} />
+            <RemakeResult key={r.id} row={r} scene={scene} onDelete={() => void remove(r)} />
           ))}
         </ul>
       )}

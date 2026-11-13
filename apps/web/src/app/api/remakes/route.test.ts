@@ -10,11 +10,13 @@ process.env.BETTER_AUTH_SECRET = randomBytes(32).toString('hex');
 process.env.APP_URL = 'http://localhost';
 process.env.S3_BUCKET = `cvs-test-${randomBytes(6).toString('hex')}`;
 process.env.REA_REMAKE_ENABLED = '1';
+process.env.REA_ANALYZE_ENABLED = '1';
 
 const { auth, pool } = await import('@/lib/auth');
 const { stopBoss } = await import('@/lib/queue');
 const { GET: LIST, POST } = await import('./route');
-const { GET: ONE } = await import('./[id]/route');
+const { GET: ONE, DELETE: REMOVE } = await import('./[id]/route');
+const { DELETE: REMOVE_ANALYSIS } = await import('../analyses/[id]/route');
 
 const PASSWORD = 'correct-horse-battery';
 let cookie = '';
@@ -125,4 +127,46 @@ test('lists the caller’s remakes newest first', async () => {
   expect(list.remakes.some((r) => r.id === 'rm-theirs')).toBe(false);
   const times = list.remakes.map((r) => Date.parse(r.createdAt));
   expect(times).toEqual([...times].sort((a, b) => b - a));
+});
+
+test('deletes a finished remake with its output assets, keeps the product image and the ledger, then lets the analysis go; refuses an open or another member’s one', async () => {
+  const shots = JSON.stringify({ shots: [{ index: 1, start: 0, end: 1, role: 'r', prompt: 'p' }] });
+  await pool.query(`insert into analyses (id, user_id, team_id, source_key, status, result) select 'an-del', u.id, u.team_id, 's3/vid', 'succeeded', $2::jsonb from users u where u.id = $1`, [userId, shots]);
+  await pool.query(
+    `insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) values
+       ('rm-out', $1, 'output', 'assets/rm-out', 'out.mp4', 'video/mp4', 1), ('rm-cmp', $1, 'output', 'assets/rm-cmp', 'cmp.mp4', 'video/mp4', 1), ('rm-clip', $1, 'output', 'assets/rm-clip', 'clip.mp4', 'video/mp4', 1)`,
+    [userId],
+  );
+  const result = JSON.stringify({ shots: [{ index: 1, status: 'succeeded', clipAssetId: 'rm-clip', costUsd: 0.2 }], compareAssetId: 'rm-cmp' });
+  await pool.query(
+    `insert into remakes (id, user_id, team_id, analysis_id, product_asset_id, shots, status, result, output_asset_id)
+       select 'rm-done', u.id, u.team_id, 'an-del', 'img', '[1]'::jsonb, 'succeeded', $2::jsonb, 'rm-out' from users u where u.id = $1
+       union all select 'rm-open', u.id, u.team_id, 'an-del', 'img', '[1]'::jsonb, 'running', null::jsonb, null from users u where u.id = $1`,
+    [userId, result],
+  );
+  await pool.query(
+    `insert into cost_entries (kind, usd, month, day, user_id, team_id, provider, is_final, ref) select 'llm', 0.2, '2026-11', '2026-11-13', u.id, u.team_id, 'fal', true, 'llm:remake:rm-done:1:video' from users u where u.id = $1`,
+    [userId],
+  );
+  const remove = (id: string) => REMOVE(call(`/api/remakes/${id}`, 'DELETE'), { params: Promise.resolve({ id }) });
+  const exists = async (table: string, id: string) => (await pool.query(`select 1 from ${table} where id = $1`, [id])).rowCount === 1;
+
+  expect((await remove('rm-theirs')).status).toBe(404);
+  const open = await remove('rm-open');
+  expect([open.status, await errorOf(open)]).toEqual([409, 'Video đang được tạo nên chưa xoá được. Hãy đợi nó xong.']);
+  expect(await exists('remakes', 'rm-open')).toBe(true);
+  const analysis = (id: string) => REMOVE_ANALYSIS(call(`/api/analyses/${id}`, 'DELETE'), { params: Promise.resolve({ id }) });
+  expect((await analysis('an-del')).status).toBe(409); // its remakes still hold it
+
+  expect((await remove('rm-done')).status).toBe(200);
+  expect(await exists('remakes', 'rm-done')).toBe(false);
+  for (const id of ['rm-out', 'rm-cmp', 'rm-clip']) expect(await exists('assets', id)).toBe(false);
+  expect(await exists('assets', 'img')).toBe(true);
+  expect((await pool.query(`select count(*)::int as n from cost_entries where ref = 'llm:remake:rm-done:1:video'`)).rows[0].n).toBe(1);
+  expect((await remove('rm-done')).status).toBe(404);
+
+  await pool.query(`update remakes set status = 'failed' where id = 'rm-open'`);
+  expect((await remove('rm-open')).status).toBe(200);
+  expect((await analysis('an-del')).status).toBe(204);
+  expect(await exists('analyses', 'an-del')).toBe(false);
 });

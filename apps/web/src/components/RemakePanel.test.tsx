@@ -1,7 +1,7 @@
 import type { Analysis } from '@cvs/core/analysis/breakdown';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, test } from 'vitest';
-import { RemakePanel, RemakeResult, type RemakeRow, remakeEstimate } from './RemakePanel';
+import { RemakePanel, RemakeResult, type RemakeRow, remakeDrafts, remakeEstimate } from './RemakePanel';
 
 const base: RemakeRow = { id: 'r1', analysisId: 'a1', status: 'succeeded', result: null, outputAssetId: null, costUsd: null, createdAt: '2026-11-13T00:00:00Z' };
 
@@ -72,4 +72,22 @@ test('the form offers the scenes the result list shows, sending each as its firs
   const done = renderToStaticMarkup(<RemakeResult row={{ ...base, status: 'partial', result: { shots: [{ index: 1, status: 'failed' }, { index: 3, status: 'succeeded', clipAssetId: 'c3' }] } }} scene={scene} />);
   expect(done).toContain('Cảnh 1 không tạo được');
   expect(done).toContain('Clip cảnh 2');
+});
+
+test('a panel mounted again for the same analysis starts with the draft it saved, and one for another analysis starts empty', () => {
+  const analysis: Analysis = { durationS: 12, shotCount: 2, format: '', hook: '', summary: '', shots: [{ index: 1, start: 0, end: 5.2, role: '', prompt: 'p1' }, { index: 2, start: 5.2, end: 12, role: '', prompt: 'p2' }] };
+  const panel = (id: string) => renderToStaticMarkup(<RemakePanel row={{ id, status: 'succeeded', result: analysis, error: null, createdAt: '2026-11-13T00:00:00Z', sourceAssetId: null }} />);
+  remakeDrafts.set('a-draft', { product: [{ id: 'img-1', filename: 'shirt.png' }], chosen: [2] });
+  const again = panel('a-draft');
+  expect(again).toContain('shirt.png');
+  expect(again.match(/checked=""/g)).toHaveLength(1);
+  expect(again).not.toMatch(/<button type="button" class="primary" disabled="">/); // a product and a shot: ready to run
+  expect(panel('a-other')).not.toContain('shirt.png');
+  remakeDrafts.clear();
+});
+
+test('only a remake that is no longer open offers a delete', () => {
+  expect(renderToStaticMarkup(<RemakeResult row={base} onDelete={() => {}} />)).toContain('>Xoá</button>');
+  expect(renderToStaticMarkup(<RemakeResult row={{ ...base, status: 'queued' }} onDelete={() => {}} />)).not.toContain('Xoá');
+  expect(renderToStaticMarkup(<RemakeResult row={base} />)).not.toContain('Xoá');
 });
