@@ -102,7 +102,7 @@ test('a switch a model cannot use says why on hover', async ({ page }) => {
   await page.unrouteAll({ behavior: 'ignoreErrors' }); // a models request still in flight must not fail the test as the page closes
 });
 
-test('an image result opens full screen from the picture in History, and an image tile in Examples opens like a video tile', async ({ page, browser }) => {
+test('an image result opens full screen from the picture in History, and an image tile in Examples opens its details from anywhere on the tile', async ({ page, browser }) => {
   await withSamples(page, [['image-example-1.jpg', jpg(), 'image/jpeg']], 'clickc', async () => {
     const res = await page.request.post('/api/jobs', { data: { feature: 'image', modelId: 'mock-image-e2e', assetIds: [], ratio: '1:1', prompt: 'a picture to click', enhance: false, params: { resolution: '1K' } } });
     expect(res.status()).toBe(201);
@@ -125,16 +125,18 @@ test('an image result opens full screen from the picture in History, and an imag
 
       await page.getByRole('tab', { name: 'Ví dụ' }).click();
       const gallery = page.getByRole('group', { name: 'Ảnh của công ty' });
-      // A result's tile shows its preview and opens the original.
-      for (const [shown, src] of [['/api/samples/image-example-1.jpg', '/api/samples/image-example-1.jpg'], [`/api/assets/${preview}/content`, `/api/assets/${out}/content`]]) {
-        const tile = gallery.locator(`.gallery-item:has(img[src="${shown}"])`);
-        await expect(tile).toBeVisible();
-        const opened = page.context().waitForEvent('page', { timeout: 5_000 });
-        await page.mouse.click(...(await at(tile, undefined, 12))); // near the top, clear of the Use this template pill
-        const tab = await opened;
-        await tab.waitForURL((u) => u.pathname === src); // a new tab reports an empty URL until its first navigation commits
-        await tab.close();
-      }
+      // A sample without a details file opens its picture in a new tab.
+      const sample = gallery.locator('.gallery-item:has(img[src="/api/samples/image-example-1.jpg"])');
+      await expect(sample).toBeVisible();
+      const opened = page.context().waitForEvent('page', { timeout: 5_000 });
+      await page.mouse.click(...(await at(sample, undefined, 12))); // near the top, clear of the Use this template pill
+      const tab = await opened;
+      await tab.waitForURL((u) => u.pathname === '/api/samples/image-example-1.jpg'); // a new tab reports an empty URL until its first navigation commits
+      await tab.close();
+      // A result's tile shows its preview and opens its details in place, as in the Library, with the original.
+      const result = gallery.locator(`.gallery-item:has(img[src="/api/assets/${preview}/content"])`);
+      await page.mouse.click(...(await at(result, undefined, 12)));
+      await expect(page.getByRole('dialog', { name: /^Chi tiết: / }).locator(`img[src="/api/assets/${out}/content"]`)).toBeVisible();
     } finally {
       await page.request.delete(`/api/jobs/${id}`);
     }
