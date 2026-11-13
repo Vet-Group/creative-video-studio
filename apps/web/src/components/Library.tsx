@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { type CSSProperties, Fragment, type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { JOB_APPS } from '@/lib/apps';
 import { api, type Clip, errorText, sendJson, thumbUrl } from '@/lib/api';
+import { downloadCompressed } from '@/lib/compress-download';
 import { FAULTS } from '@/lib/faults';
 import { featureLabel } from '@/lib/features';
 import { GALLERY_SAMPLES, numberedSamples } from '@/lib/examples';
@@ -428,6 +429,14 @@ export function ClipDetail({ clips, index, stores, admin, onIndex, onChange }: {
       a.click();
       a.remove();
     }, 'Không tải xuống được.');
+  const [compressing, setCompressing] = useState(false);
+  const compress = async () => {
+    setCompressing(true);
+    await act(async () => {
+      if (!(await downloadCompressed(clip.videoAssetId, clip.downloadName))) setNote('Bản nén không nhẹ hơn nên đã tải ảnh gốc.');
+    }, 'Không nén và tải xuống được.');
+    setCompressing(false);
+  };
   const copy = () => act(async () => (await navigator.clipboard.writeText(copyText ?? ''), setNote('Đã sao chép.')), 'Không sao chép được.');
   const reassign = (storeId: string) =>
     act(async () => {
@@ -565,6 +574,11 @@ export function ClipDetail({ clips, index, stores, admin, onIndex, onChange }: {
           <button type="button" className="icon-button" onClick={() => void download()} aria-label="Tải xuống" title="Tải xuống">
             <Icon name="download" />
           </button>
+          {image && (
+            <button type="button" className="icon-button" disabled={compressing} aria-busy={compressing} onClick={() => void compress()} aria-label="Nén & tải về" title="Nén & tải về">
+              <Icon name="compress" />
+            </button>
+          )}
           <button type="button" className="icon-button" onClick={() => void media.current?.requestFullscreen?.()} aria-label="Toàn màn hình" title="Toàn màn hình">
             <Icon name="eye" />
           </button>

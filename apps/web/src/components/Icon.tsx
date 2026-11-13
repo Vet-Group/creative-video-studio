@@ -19,6 +19,7 @@ const PATHS = {
   preset: 'M8 1.5l1.4 3.6 3.6 1.4-3.6 1.4L8 11.5 6.6 7.9 3 6.5l3.6-1.4z',
   ratio: 'M2.5 4h11v8h-11z',
   expand: 'M9.5 2.5h4v4 M13.5 2.5L9 7 M6.5 13.5h-4v-4 M2.5 13.5L7 9',
+  compress: 'M13.5 6.5h-4v-4 M9.5 6.5L14 2 M2.5 9.5h4v4 M6.5 9.5L2 14',
   'ratio-tall': 'M4.5 2h7v12h-7z',
   'ratio-square': 'M3 3h10v10H3z',
   film: 'M2.5 3h11v10h-11z M5 3v10 M11 3v10 M2.5 6h2.5 M2.5 10h2.5 M11 6h2.5 M11 10h2.5',

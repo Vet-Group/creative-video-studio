@@ -48,6 +48,9 @@ test('a mock image job made through the API is an image card under "Tất cả �
   await expect(recipe.filter({ hasText: /^3:4$/ })).toHaveCount(1);
   await expect(recipe.filter({ hasText: /^1K$/ })).toHaveCount(1);
   await expect(page.getByRole('dialog').getByRole('link', { name: 'Dùng lại' })).toHaveAttribute('href', /^\/image-generation\?reuse=/);
+  // Nén & tải về saves a lighter WebP named after the image; when the tiny mock PNG does not shrink, the original is saved instead.
+  const [compressed] = await Promise.all([page.waitForEvent('download'), page.getByRole('dialog').getByRole('button', { name: 'Nén & tải về' }).click()]);
+  expect(compressed.suggestedFilename()).toMatch(new RegExp(`^${today()}-e2e-member-8-[0-9a-f]{8}(-nen\\.webp|\\.png)$`));
   await page.keyboard.press('Escape');
 
   // The Library is company-wide, so other specs' clips may be listed; this member's image must be in none of the other kinds.

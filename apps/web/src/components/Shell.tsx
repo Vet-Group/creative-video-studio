@@ -7,6 +7,7 @@ import { api, errorText, type JobStatus, sendJson, thumbUrl, type TrayJob } from
 import { appBySlug } from '@/lib/apps';
 import type { ChangeEntry } from '@/lib/changelog';
 import { CHANGELOG_SEEN_EVENT, loadSeen, unseenEntries } from '@/lib/changelog-seen';
+import { downloadCompressed } from '@/lib/compress-download';
 import { typicalLabel } from '@/lib/explore';
 import { featureLabel } from '@/lib/features';
 import { cardTitleOfFormat } from '@/lib/marketing';
@@ -196,6 +197,17 @@ function HistoryCard({ job, isAdmin, select }: { job: TrayJob; isAdmin: boolean;
     }, 'Không tải xuống được.');
     setDownloading(false);
   };
+  // Fash's Compress & download on an image: a lighter file at once, for chat or a marketplace.
+  const [compressing, setCompressing] = useState(false);
+  const [note, setNote] = useState('');
+  const compress = async () => {
+    setCompressing(true);
+    setNote('');
+    await act(async () => {
+      if (!(await downloadCompressed(out!))) setNote('Bản nén không nhẹ hơn nên đã tải ảnh gốc.');
+    }, 'Không nén và tải xuống được.');
+    setCompressing(false);
+  };
 
   return (
     <li className={`job job-card job-${isCanceled(job) ? 'canceled' : job.status}`}>
@@ -225,6 +237,11 @@ function HistoryCard({ job, isAdmin, select }: { job: TrayJob; isAdmin: boolean;
             <a className="icon-button" href={content(out)} target="_blank" rel="noreferrer" aria-label="Mở trong tab mới" title="Mở trong tab mới">
               <Icon name="external" />
             </a>
+            {image && (
+              <button type="button" className="icon-button" disabled={compressing} aria-busy={compressing} onClick={() => void compress()} aria-label="Nén & tải về" title="Nén & tải về">
+                <Icon name="compress" />
+              </button>
+            )}
             {original && (
               <button type="button" className="icon-button" aria-haspopup="dialog" onClick={() => setComparing(true)} aria-label="So sánh trước/sau" title="So sánh trước/sau">
                 <Icon name="panel" />
@@ -294,6 +311,7 @@ function HistoryCard({ job, isAdmin, select }: { job: TrayJob; isAdmin: boolean;
         {job.retried && <p className="muted">Đã thử lại</p>}
         {problem && <p className="error">{problem}</p>}
         {saved && <p role="status">Đã lưu thiết lập.</p>}
+        {note && <p role="status">{note}</p>}
         <div className="job-main">
           {canRetry(job) && (
             <button type="button" className="job-reuse job-primary" disabled={sending} onClick={() => void retry()}>
