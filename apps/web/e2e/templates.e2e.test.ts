@@ -182,6 +182,15 @@ test('Dùng ví dụ này on a company result in Ví dụ fills Try On, Image Ge
   await use(ids.image).click();
   await expect(other.getByRole('textbox', { name: 'Mô tả', exact: true })).toHaveValue('a flat lay');
   await expect(other.getByRole('img', { name: 'use-garment.png' })).toBeVisible();
+  // A click on the result itself opens its details in place, as in the Library (Fash's example dialog), not a new tab.
+  await other.goto('/image-generation');
+  await other.locator('li.gallery-item', { has: use(ids.image) }).getByRole('link', { name: /^Xem chi tiết ảnh / }).click();
+  const detail = other.getByRole('dialog', { name: /^Chi tiết: / });
+  await expect(detail.getByText('a flat lay')).toBeVisible();
+  await expect(detail.getByRole('link', { name: 'Dùng lại' })).toBeVisible();
+  await other.keyboard.press('Escape');
+  await expect(detail).toBeHidden();
+  expect(other.context().pages()).toHaveLength(1);
 
   await other.goto('/marketing-studio');
   await use(ids.marketing).click();

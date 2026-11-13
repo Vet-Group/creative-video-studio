@@ -1,7 +1,8 @@
 'use client';
 // What the Try On and Image Generation pages share: the image-model picker data, the choice of model, ratio and resolution, the upload slot,
 // the tab strip and the gallery of the company's outputs.
-import { type DragEvent, type KeyboardEvent, type ReactNode, useEffect, useId, useRef, useState } from 'react';
+import { type CSSProperties, type DragEvent, type KeyboardEvent, type ReactNode, useEffect, useId, useRef, useState } from 'react';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { api, ApiError, type Clip, sendJson, thumbUrl } from '@/lib/api';
 import { dropRefillQuery, exampleFrom, refillFrom, reuseHref } from '@/lib/reuse';
@@ -808,12 +809,16 @@ function ExampleOrder({ feature, onSaved }: { feature: string; onSaved: () => vo
   );
 }
 
+/** The Library's item detail, loaded when a company result is first opened, so these pages do not carry the Library in their bundle. */
+const ClipDetail = dynamic(() => import('./Library').then((m) => m.ClipDetail), { ssr: false });
+
 export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4], samples }: { kind: string; label: string; emptyText: string; video?: boolean; cols?: [number, number, number]; samples?: string }) {
   const have = useSamples();
   const sampleTiles = samples ? numberedSamples(have, samples, video ? 'mp4' : 'jpg') : [];
   /** The samples with a details file open in place (SampleDetail); other clips still open in a new tab. */
   const detailed = sampleTiles.filter((n) => have.has(n.replace(/\.(mp4|jpg)$/, '.json')));
   const [open, setOpen] = useState<number | null>(null);
+  const [detail, setDetail] = useState<number | null>(null); // a company result open in place, as in the Library
   const [items, setItems] = useState<Clip[]>([]);
   const [hasMore, setHasMore] = useState(false);
   const [admin, setAdmin] = useState(false);
@@ -823,6 +828,7 @@ export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4
   const wide = useMediaQuery(WIDE);
   const columns = narrow ? cols[0] : Math.max(1, (wide ? cols[2] : cols[1]) + 1 - size);
   const loading = useRef(false); // a second click while a page loads would append it twice
+  const more = useRef<HTMLButtonElement>(null);
 
   async function load(offset: number) {
     if (loading.current) return;
@@ -846,10 +852,26 @@ export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4
   }, [kind]);
   useFreshResults(() => void load(0));
   const retry = () => (setState('loading'), load(0));
+  // The next page loads as the end comes near, as the Library's does; the button stays for the keyboard and when the observer does not fire.
+  useEffect(() => {
+    const el = more.current;
+    if (!el || !hasMore || state !== 'ready') return;
+    const io = new IntersectionObserver((seen) => seen[0]?.isIntersecting && void load(items.length), { rootMargin: '800px 0px' });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [hasMore, state, items.length]);
 
   // The fixed samples show at once; only the company's own outputs wait for the request.
   if (sampleTiles.length === 0) {
-    if (state === 'loading') return <p role="status" className="muted">Đang tải...</p>;
+    if (state === 'loading')
+      return (
+        <div className="grid library-skeleton" style={{ '--card-min': '10rem' } as CSSProperties} role="status">
+          <span className="sr-only">Đang tải...</span>
+          {Array.from({ length: 6 }, (_, i) => (
+            <span key={i} className="skeleton" />
+          ))}
+        </div>
+      );
     if (state === 'error') return <LoadError text="Không tải được kết quả của công ty." onRetry={retry} />;
     if (items.length === 0) return <p className="muted">{emptyText}</p>;
   }
@@ -879,11 +901,11 @@ export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4
               ) : (
               <li key={it.id} className="gallery-item" style={{ aspectRatio: aspectOf(it.ratio) }}>
                 {video ? (
-                  <a href={`/api/assets/${it.videoAssetId}/content`} target="_blank" rel="noreferrer" aria-label={`Mở video ${it.modelLabel}, ${it.ratio} trong tab mới`}>
+                  <a href={`/api/assets/${it.videoAssetId}/content`} target="_blank" rel="noreferrer" aria-label={`Xem chi tiết video ${it.modelLabel}, ${it.ratio}`} onClick={(e) => (e.preventDefault(), setDetail(items.indexOf(it)))}>
                     <Preview src={`/api/assets/${it.videoAssetId}/content`} poster={it.posterAssetId ? `/api/assets/${it.posterAssetId}/content` : ''} width={Number(it.ratio.split(':')[0]) || 9} height={Number(it.ratio.split(':')[1]) || 16} title={`${it.modelLabel}, ${it.ratio}`} onHover />
                   </a>
                 ) : (
-                  <a href={`/api/assets/${it.videoAssetId}/content`} target="_blank" rel="noreferrer" aria-label={`Mở ảnh ${it.modelLabel}, ${it.ratio} trong tab mới`}>
+                  <a href={`/api/assets/${it.videoAssetId}/content`} target="_blank" rel="noreferrer" aria-label={`Xem chi tiết ảnh ${it.modelLabel}, ${it.ratio}`} onClick={(e) => (e.preventDefault(), setDetail(items.indexOf(it)))}>
                     <img src={`/api/assets/${it.posterAssetId ?? it.videoAssetId}/content`} alt={`${it.modelLabel}, ${it.ratio}`} loading="lazy" />
                   </a>
                 )}
@@ -900,9 +922,10 @@ export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4
         ))}
       </div>
       {open !== null && <SampleDetail names={detailed} index={open} onIndex={setOpen} />}
+      {detail !== null && items[detail] && <ClipDetail clips={items} index={detail} admin={admin} onIndex={setDetail} onChange={(c) => setItems((cur) => cur.map((o) => (o.id === c.id ? c : o)))} />}
       {state === 'error' && sampleTiles.length > 0 && <LoadError text="Không tải được kết quả của công ty." onRetry={retry} />}
       {hasMore && (
-        <button type="button" className="gallery-more" onClick={() => void load(items.length)}>
+        <button ref={more} type="button" className="gallery-more" onClick={() => void load(items.length)}>
           Tải thêm
         </button>
       )}
