@@ -45,6 +45,21 @@ test('keeps the picture of a saved AI model, deleted or not, even when a newer c
   await pool.query(`delete from assets where id like 'm-%'`);
 });
 
+test("keeps an analysis' reference video and a remake's product image even when a newer copy of the same file exists", async () => {
+  // Seen on prod 2026-11-13: uploading a reference video again hid the older copy an analysis plays (its /analyze video answered 404).
+  await input('v-used', 'clip', 10, 'u2');
+  await input('v-newer', 'clip', 1, 'u2');
+  await input('p-used', 'top', 10, 'u2');
+  await input('p-newer', 'top', 1, 'u2');
+  await pool.query(`insert into analyses (id, user_id, team_id, source_key, status) values ('an1', 'u2', 'team-unassigned', 'assets/v-used', 'succeeded')`);
+  await pool.query(`insert into remakes (id, user_id, team_id, analysis_id, product_asset_id, shots, status) values ('rm1', 'u2', 'team-unassigned', 'an1', 'p-used', '[0]', 'succeeded')`);
+  await dedupeTick(pool, read);
+  expect(await live()).toEqual(expect.arrayContaining(['v-used', 'v-newer', 'p-used', 'p-newer']));
+  await pool.query(`delete from remakes`);
+  await pool.query(`delete from analyses`);
+  await pool.query(`delete from assets where id like 'v-%' or id like 'p-%'`);
+});
+
 test('hashes old inputs, keeps the newest copy of a file the purge will not take and every copy something uses, and removes the rest', async () => {
   await input('a-new', 'shirt', 1);
   await input('a-mid', 'shirt', 2);
