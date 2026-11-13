@@ -48,6 +48,8 @@ jobs:
       CVS_WEB_PORT: '3400'
       # Serve a production build: a 4-core runner keeps up with it, where `next dev` compiles routes while specs wait.
       CVS_E2E_BUILD: '1'
+      # The CI workflow typechecks the same commit, so the shards' builds skip it.
+      CVS_SKIP_BUILD_TYPECHECK: '1'
       # A throwaway value for the tests only. The specs run on mock models, so no provider key is set.
       BETTER_AUTH_SECRET: ci-only-not-a-secret-0123456789abcdef
     steps:

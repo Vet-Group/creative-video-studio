@@ -91,3 +91,6 @@ jobs:
 
       - name: Build
         run: pnpm --filter @cvs/web build
+        env:
+          # The Typecheck step above already ran tsc.
+          CVS_SKIP_BUILD_TYPECHECK: '1'
