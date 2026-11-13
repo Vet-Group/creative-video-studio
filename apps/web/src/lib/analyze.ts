@@ -76,10 +76,12 @@ export const timeRange = (start: number, end: number): string => (end < 60 ? `${
 /**
  * The scenes to read: adjacent shots the model gave the same role and prompt become one (rea-video cuts per camera shot but describes per beat,
  * so a beat filmed in three cuts came back as three identical scenes), renumbered, with their Vietnamese readings kept in step.
+ * `first` is each scene's first stored shot index, the shot Smart Remake sends for that scene.
  */
-export function mergeShots(a: Analysis): { shots: Analysis['shots']; vi: string[] | undefined } {
+export function mergeShots(a: Analysis): { shots: Analysis['shots']; vi: string[] | undefined; first: number[] } {
   const shots: Analysis['shots'] = [];
   const vi: string[] = [];
+  const first: number[] = [];
   a.shots.forEach((s, i) => {
     const last = shots.at(-1);
     if (last && last.prompt === s.prompt && last.role === s.role) {
@@ -88,8 +90,9 @@ export function mergeShots(a: Analysis): { shots: Analysis['shots']; vi: string[
     }
     shots.push({ ...s, index: shots.length + 1 });
     vi.push(a.vi?.shots[i] ?? '');
+    first.push(s.index);
   });
-  return { shots, vi: a.vi ? vi : undefined };
+  return { shots, vi: a.vi ? vi : undefined, first };
 }
 
 /** Create's free prompt takes at most this many characters from ?prompt= (the create page slices to it). */

@@ -56,3 +56,17 @@ test('the form offers every shot of the analysis, caps the pick at 6, and cannot
   expect(html).toContain('5.2–12.0s');
   expect(html).toMatch(/<button type="button" class="primary" disabled="">Tạo video với sản phẩm<\/button>/);
 });
+
+test('the form offers the scenes the result list shows, sending each as its first stored shot, and a clip is named by its scene', () => {
+  const s = (index: number, start: number, end: number, prompt: string) => ({ index, start, end, role: 'proof', prompt });
+  const analysis: Analysis = { durationS: 8, shotCount: 4, format: '', hook: '', summary: '', shots: [s(1, 0, 1.2, 'Pan.'), s(2, 1.2, 2.3, 'Pan.'), s(3, 2.3, 4, 'Spin.'), s(4, 4, 8, 'Spin.')] };
+  const html = renderToStaticMarkup(<RemakePanel row={{ id: 'a1', status: 'succeeded', result: analysis, error: null, createdAt: '2026-11-13T00:00:00Z', sourceAssetId: null }} />);
+  expect(html.match(/type="checkbox"/g)).toHaveLength(2);
+  expect(html).toContain('Cảnh 2<span class="muted">2.3–8.0s</span>');
+  expect(html).not.toContain('Cảnh 3');
+
+  const scene = (index: number) => [1, 3].filter((f) => f <= index).length;
+  const done = renderToStaticMarkup(<RemakeResult row={{ ...base, status: 'partial', result: { shots: [{ index: 1, status: 'failed' }, { index: 3, status: 'succeeded', clipAssetId: 'c3' }] } }} scene={scene} />);
+  expect(done).toContain('Cảnh 1 không tạo được');
+  expect(done).toContain('Clip cảnh 2');
+});
