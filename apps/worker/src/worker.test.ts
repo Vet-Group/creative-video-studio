@@ -236,6 +236,33 @@ describe('the mock lifecycle', () => {
     expect((await job(thin)).error).toMatch(/1470x540, below 720p/);
   });
 
+  test('sizes a provider rounds to a multiple of 16 still pass for 21:9, but a 480p clip returned for a 720p job fails', async () => {
+    await pool.query(
+      `insert into model_configs (id, provider, endpoint, label, ratios, durations_sec, max_images, output_resolution, usd_per_second, sources, enabled)
+       values ('mock-480p', 'mock', 'mock', 'Mock 480p', '{9:16,1:1}', '{5,10}', 4, '480p', 0.05, '{}', true) on conflict do nothing`,
+    );
+    const clip = async (size: string) => {
+      const file = join(mockDir, `${randomUUID()}-small.mp4`);
+      await mkdir(mockDir, { recursive: true });
+      await run(requireFfmpeg(), ['-y', '-v', 'error', '-f', 'lavfi', '-i', `testsrc2=size=${size}:rate=24`, '-t', '1', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', file]);
+      return pathToFileURL(file).href;
+    };
+    let output = await clip('1456x624'); // 21:9 at 720p, rounded down to multiples of 16
+    await start(counting(300, (inner) => ({ ...inner, status: async (pj) => ((await inner.status(pj)).state === 'running' ? { state: 'running' } : { state: 'succeeded', outputUrl: output, costUsd: 0, costSource: 'estimate' }) })));
+    const rounded = await newJob('u1');
+    await send(rounded, 'u1');
+    await waitFor('the rounded 21:9 job to succeed', async () => (await status(rounded)) === 'succeeded');
+    output = await clip('976x416'); // 21:9 at 480p, rounded down
+    const small = await newJob('u2', { model: 'mock-480p' });
+    await send(small, 'u2');
+    await waitFor('the 480p 21:9 job to succeed', async () => (await status(small)) === 'succeeded');
+    output = await clip('992x432'); // a 480p 21:9 clip for a 720p job
+    const wrong = await newJob('u1');
+    await send(wrong, 'u1');
+    await waitFor('the 480p clip to fail on a 720p job', async () => (await status(wrong)) === 'failed');
+    expect((await job(wrong)).error).toMatch(/992x432, below 720p/);
+  });
+
   test('times out a job whose delivery keeps failing, frees its slot and settles it from timed_out', async () => {
     const id = await newJob('u2');
     const broken = counting(300, (inner) => ({ ...inner, status: async () => ({ state: 'succeeded', outputUrl: 'http://127.0.0.1:9/gone.mp4', costUsd: 0, costSource: 'estimate' }) }));

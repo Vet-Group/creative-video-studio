@@ -343,8 +343,10 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
         const seconds = await probeSeconds(video);
         if (seconds > job.duration_s + 1) costUsd = (costUsd * Math.ceil(seconds)) / job.duration_s;
       }
-      // A tier keeps one pixel area for every ratio, so a shape wider than 16:9 has a shorter short side (21:9 at 720p is 1470x630); the floor shrinks with it.
-      const wide = Math.min(1, Math.sqrt(16 / 9 / (Math.max(width, height) / Math.min(width, height))));
+      // A tier keeps one pixel area for every ratio, so a shape much wider than 16:9 has a shorter short side (21:9 at 720p is 1470x630); its floor shrinks with it, 3% less for
+      // sizes rounded to a multiple of 16 (1456x624). Shapes up to 2:1 keep the exact floor, which is what catches 704 px where 720 was asked.
+      const aspect = Math.max(width, height) / Math.min(width, height);
+      const wide = aspect > 2 ? Math.sqrt(16 / 9 / aspect) * 0.97 : 1;
       const tier = Math.min(720, Number.parseInt(job.output_resolution ?? '', 10) || 720);
       if (Math.min(width, height) < Math.floor(tier * wide)) {
         await settle(pool, job.id, { status: 'failed', costUsd, billed: true, tokens, error: `the output is ${width}x${height}, below ${tier}p` });

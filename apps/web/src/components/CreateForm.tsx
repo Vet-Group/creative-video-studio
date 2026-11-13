@@ -1,5 +1,6 @@
 'use client';
 import { type DragEvent, type KeyboardEvent, useEffect, useId, useRef, useState } from 'react';
+import { resolutionVariants } from '@/lib/resolution-variants';
 import { api, errorText, sendJson, thumbUrl } from '@/lib/api';
 import { cardSample, type Example, exampleForPreset, exampleModel, examplesFor, exampleTitle, sampleSrc, splitColumns } from '@/lib/examples';
 import { adjustNote } from '@/lib/video-adjust';
@@ -385,9 +386,8 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
   const durations = [...new Set(chosen ? chosen.durationsSec : (models?.models.flatMap((m) => m.durationsSec) ?? [durationSec]))].sort((a, b) => a - b);
   const ratios = chosen ? chosen.ratios : (models?.models.flatMap((m) => m.ratios) ?? [ratio]);
   const tooMany = chosen !== undefined && images.length > chosen.maxImages;
-  // The resolutions of one model are rows of their own (id, id-480p, id-1080p, as the models API lists them), so the Resolution box switches between those that serve this ratio and length.
-  const baseId = (id: string) => id.replace(/-(1080p|480p)$/, '');
-  const resolutions = chosen ? (models?.models ?? []).filter((m) => m.resolution && baseId(m.id) === baseId(chosen.id) && (m.supported || m.id === chosen.id)).sort((a, b) => parseInt(a.resolution!) - parseInt(b.resolution!)) : [];
+  // The resolutions of one model are rows of their own (id, id-480p, id-1080p, as the models API lists them; lib/resolution-variants.ts), so the Resolution box switches between those that serve this ratio and length.
+  const resolutions = chosen ? resolutionVariants(models?.models ?? [], chosen) : [];
   const endOver = endAssetId !== undefined && chosen?.endMaxSec != null && durationSec > chosen.endMaxSec;
   // The upload limit follows the chosen model (REA-video V02); the server caps every model at MAX_IMAGES.
   const maxImages = Math.min(MAX_IMAGES, chosen?.maxImages ?? MAX_IMAGES);

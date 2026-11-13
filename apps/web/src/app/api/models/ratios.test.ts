@@ -11,6 +11,7 @@ process.env.APP_URL = 'http://localhost';
 const { auth, pool } = await import('@/lib/auth');
 const { stopBoss } = await import('@/lib/queue');
 const { GET: videoModels } = await import('./route');
+const { resolutionVariants } = await import('@/lib/resolution-variants');
 const { GET: listJobs, POST: postJob } = await import('../jobs/route');
 
 const PASSWORD = 'correct-horse-battery';
@@ -35,7 +36,7 @@ afterAll(async () => {
   await testDb.drop();
 });
 
-type Listed = { id: string; ratios: string[]; resolution: string; estimateUsd: string; audioEstimateUsd: string | null; supported: boolean };
+type Listed = { id: string; pairIds: string[]; ratios: string[]; resolution: string; estimateUsd: string; audioEstimateUsd: string | null; supported: boolean };
 const listed = async (ratio: string, images: number) => {
   const res = await videoModels(as(`/api/models?feature=video&ratio=${ratio}&durationSec=5&images=${images}`));
   return { status: res.status, models: ((await res.json()) as { models?: Listed[] }).models ?? [] };
@@ -83,5 +84,31 @@ describe('a Run asking for auto', () => {
 
   test('is refused by a row that does not list it', async () => {
     expect((await run(['img'], 'auto', 'kling-o3-pro')).status).toBe(400);
+  });
+});
+
+describe('the Resolution box on prod’s real setup', () => {
+  test('with the BytePlus twin on, the listed entry is BytePlus’s and still offers the fal 1080p row beside it', async () => {
+    await only([...ON, 'seedance-2.5-byteplus']);
+    const { models } = await listed('9:16', 1);
+    expect(models.map((m) => m.id)).toContain('seedance-2.5-byteplus');
+    expect(models.map((m) => m.id)).not.toContain('seedance-2.5-image'); // the dearer twin is hidden (migration 0078)
+    const entry = models.find((m) => m.id === 'seedance-2.5-byteplus')!;
+    expect(entry.pairIds).toContain('seedance-2.5-image');
+    expect(resolutionVariants(models, entry).map((m) => [m.id, m.resolution])).toEqual([['seedance-2.5-byteplus', '720p'], ['seedance-2.5-image-1080p', '1080p']]);
+    // From the 1080p entry the box lists the same two.
+    expect(resolutionVariants(models, models.find((m) => m.id === 'seedance-2.5-image-1080p')!).map((m) => m.id)).toEqual(['seedance-2.5-byteplus', 'seedance-2.5-image-1080p']);
+    // An unrelated model has no variants but itself.
+    expect(resolutionVariants(models, models.find((m) => m.id === 'seedance-2.0')!).map((m) => m.id)).toEqual(['seedance-2.0']);
+  });
+});
+
+describe('Marketing Studio keeps its three ratios', () => {
+  test('a hand-made marketing job with 21:9 is refused although the row lists it', async () => {
+    await only(['seedance-2.5-reference']);
+    await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) values ('img2', $1, 'input', 'img2', 'b.png', 'image/png', 1)`, [userId]);
+    const res = await create({ assetIds: ['img', 'img2'], modelId: 'seedance-2.5-reference', feature: 'marketing', prompt: 'a bottle', ratio: '21:9', durationSec: 5 });
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { error: string }).error).toMatch(/Marketing Studio takes the ratios/);
   });
 });
