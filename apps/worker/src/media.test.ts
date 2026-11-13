@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 import ffprobe from 'ffprobe-static';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
-import { burnEndText, concatClips, endTextLayout, extractFrameAt, probeSeconds, probeSize, probeVideoSeconds, requireFfmpeg, wrapText } from './media';
+import { burnEndText, concatClips, cutShot, endTextLayout, probeSeconds, probeSize, probeVideoSeconds, requireFfmpeg, sideBySide, trimClip, wrapText } from './media';
 
 const run = promisify(execFile);
 let dir = '';
@@ -34,12 +34,26 @@ afterAll(async () => {
   await rm(dir, { recursive: true, force: true });
 });
 
-describe('Smart Remake frames and joins', () => {
-  test('takes a full-size frame at a time, and joins clips of other sizes into one silent clip at the first clip’s size', async () => {
-    const still = join(dir, 'still.jpg');
-    await extractFrameAt(source, 1.04, still);
-    expect(await probeSize(still)).toEqual({ width: 360, height: 640 });
+describe('Smart Remake cuts and joins', () => {
+  test('cuts a shot silent and holds its last frame up to the length sent, trims it back, and puts two clips side by side', async () => {
+    const shot = join(dir, 'shot.mp4');
+    await cutShot(source, 2.5, 1.2, 2, shot); // a 1.2 s shot, sent as 2 s
+    const s = await probe(shot);
+    expect(Math.abs(Number(s.format.duration) - 2)).toBeLessThanOrEqual(0.1);
+    expect(s.streams.map((x) => x.codec_type)).toEqual(['video']);
+    expect(await probeSize(shot)).toEqual({ width: 360, height: 640 });
 
+    const back = join(dir, 'back.mp4');
+    await trimClip(shot, 1.2, back);
+    expect(Math.abs(Number((await probe(back)).format.duration) - 1.2)).toBeLessThanOrEqual(0.1);
+
+    const both = join(dir, 'both.mp4');
+    await sideBySide(source, back, both);
+    expect(await probeSize(both)).toEqual({ width: 720, height: 640 });
+    expect(Math.abs(Number((await probe(both)).format.duration) - 1.2)).toBeLessThanOrEqual(0.1); // as long as the shorter
+  });
+
+  test('joins clips of other sizes into one silent clip at the first clip’s size', async () => {
     const wide = join(dir, 'wide.mp4');
     await run(requireFfmpeg(), ['-y', '-v', 'error', '-f', 'lavfi', '-i', 'color=c=red:size=640x360:rate=30', '-t', '1', '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', wide]);
     const joined = join(dir, 'joined.mp4');

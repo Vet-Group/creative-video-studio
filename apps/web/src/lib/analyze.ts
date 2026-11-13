@@ -1,4 +1,4 @@
-import type { Analysis } from '@cvs/core/analysis/breakdown';
+import { type Analysis, mergeShots } from '@cvs/core/analysis/breakdown';
 // The reference-video analysis feature (rea-video). Off by default: the /api/analyses routes 404 and the worker
 // queue is not created until a deploy sets REA_ANALYZE_ENABLED=1 (Stage 3, once rea-video is installed on the
 // worker). Mirrors the worker's reaAnalyzeEnabled (apps/worker/src/analyze.ts); the two tiers read the same env.
@@ -73,27 +73,8 @@ export const clock = (sec: number): string => {
 /** A scene's span: seconds with one decimal under a minute (a short clip cuts every second or so, and m:ss would round two scenes to the same second), m:ss beyond. */
 export const timeRange = (start: number, end: number): string => (end < 60 ? `${start.toFixed(1)}–${end.toFixed(1)}s` : `${clock(start)}–${clock(end)}`);
 
-/**
- * The scenes to read: adjacent shots the model gave the same role and prompt become one (rea-video cuts per camera shot but describes per beat,
- * so a beat filmed in three cuts came back as three identical scenes), renumbered, with their Vietnamese readings kept in step.
- * `first` is each scene's first stored shot index, the shot Smart Remake sends for that scene.
- */
-export function mergeShots(a: Analysis): { shots: Analysis['shots']; vi: string[] | undefined; first: number[] } {
-  const shots: Analysis['shots'] = [];
-  const vi: string[] = [];
-  const first: number[] = [];
-  a.shots.forEach((s, i) => {
-    const last = shots.at(-1);
-    if (last && last.prompt === s.prompt && last.role === s.role) {
-      last.end = s.end;
-      return;
-    }
-    shots.push({ ...s, index: shots.length + 1 });
-    vi.push(a.vi?.shots[i] ?? '');
-    first.push(s.index);
-  });
-  return { shots, vi: a.vi ? vi : undefined, first };
-}
+// The scene merge lives in core, as Smart Remake's API and worker remake a whole scene too.
+export { mergeShots };
 
 /** Create's free prompt takes at most this many characters from ?prompt= (the create page slices to it). */
 const SCRIPT_LIMIT = 2000;

@@ -2,7 +2,7 @@
 import { describe, expect, test } from 'vitest';
 import { AUDIO_USD_PER_SECOND, BAKEOFF_MODELS } from '../models';
 import { createFalProvider, VIDEO_BODIES, videoInputs, videoRefProblem } from './fal';
-import { ImageReadError, isFundingRefusal, MAX_INLINE_CHARS, ProviderHttpError, resolveImages, unpackJobId } from './http';
+import { estimate, ImageReadError, isFundingRefusal, MAX_INLINE_CHARS, ProviderHttpError, resolveImages, unpackJobId } from './http';
 import { createMockVideoProvider, MOCK_FAIL } from './mock';
 import type { ProviderJob, SubmitRequest } from './types';
 
@@ -298,17 +298,21 @@ function falFake(put = 200) {
   return { fn, calls };
 }
 
-describe('fal Smart Remake animate step', () => {
-  test('Seedance 1.0 Pro Fast gets the image, prompt, ratio and duration as its schema names them, at 720p, and is polled under its app', async () => {
-    const endpoint = 'fal-ai/bytedance/seedance/v1/pro/fast/image-to-video';
-    const { fn, calls } = fakeFetch([200, { request_id: 'r1' }], [200, { status: 'COMPLETED' }], [200, { video: { url: 'https://cdn/out.mp4' } }]);
-    const provider = createFalProvider({ apiKey: 'k', fetch: fn });
-    const model = { ...kling, endpoint, usdPerSecond: 0.0216 };
-    const { providerJobId } = await provider.submit({ ...base, imageUrls: ['https://img/1.jpg'], ratio: 'auto', model });
-    expect(calls[0]!.url).toBe(`https://queue.fal.run/${endpoint}`);
-    expect(calls[0]!.body).toEqual({ prompt: 'a bottle on a table', image_url: 'https://img/1.jpg', aspect_ratio: 'auto', duration: '5', resolution: '720p' });
-    expect(await provider.status({ providerJobId, model })).toEqual({ state: 'succeeded', outputUrl: 'https://cdn/out.mp4', costUsd: 0.108, costSource: 'estimate' });
-    expect(calls[1]!.url).toBe('https://queue.fal.run/fal-ai/bytedance/requests/r1/status');
+describe('fal Smart Remake edit', () => {
+  test('Wan 2.7 video edit gets the product and the shot clip through fal storage, keeps the clip length and sound, and costs its billed seconds', async () => {
+    const endpoint = 'fal-ai/wan/v2.7/edit-video';
+    const { fn, calls } = falFake();
+    const read = async (url: string) => (url === 'mem:clip' ? { bytes: new Uint8Array([0, 0, 0, 0x18]), contentType: 'video/mp4' } : readImage(url));
+    const provider = createFalProvider({ apiKey: 'k', fetch: fn, readImage: read });
+    const model = { ...kling, endpoint, usdPerSecond: 0.1 };
+    const { providerJobId } = await provider.submit({ ...base, prompt: 'Replace the shirt.', imageUrls: ['data:image/png;base64,iVBORw0KGgo=', 'mem:clip'], ratio: 'auto', durationSec: 3, model });
+    expect(calls.at(-1)!.url).toBe(`https://queue.fal.run/${endpoint}`);
+    expect(calls.at(-1)!.body).toEqual({
+      prompt: 'Replace the shirt.', video_url: 'https://v3b.fal.media/files/video-mp4', reference_image_url: 'https://v3b.fal.media/files/image-png', duration: 0, resolution: '720p', audio_setting: 'origin',
+    });
+    expect(estimate({ model }, 3).costUsd).toBeCloseTo(0.3); // what status() books: 3 s at $0.10
+    expect(providerJobId).toBe('3:m1');
+    await expect(provider.submit({ ...base, imageUrls: ['data:image/png;base64,iVBORw0KGgo='], ratio: 'auto', model })).rejects.toThrow('the remake edit needs the product image and the shot clip');
   });
 });
 
