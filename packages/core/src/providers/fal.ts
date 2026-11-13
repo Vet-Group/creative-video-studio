@@ -29,8 +29,23 @@ const falHeaders = (apiKey: string) => ({
   'X-Fal-Object-Lifecycle-Preference': LIFECYCLE,
 });
 
-/** The queue status, then the result, of one request; `cost` is the final cost to report and `pick` finds the output URL in the result. */
-async function pollFal(
+/**
+ * The queue status, then the result, of one request; `cost` is the final cost to report and `pick` finds the output URL in the result. A request fal
+ * dropped because its X-Fal-Request-Start-Timeout passed before any runner started it ends as 504 with X-Fal-Request-Timeout-Type: user (docs read
+ * 2026-11-14: common-parameters and queue; they do not say which of the two calls answers it, so both are checked). It was never processed, so it costs 0.
+ */
+async function pollFal(...p: Parameters<typeof pollRequest>): Promise<ProviderStatus> {
+  try {
+    return await pollRequest(...p);
+  } catch (e) {
+    if (e instanceof ProviderHttpError && e.status === 504 && e.headers?.get('X-Fal-Request-Timeout-Type') === 'user') {
+      return { state: 'failed', error: 'fal dropped the request: no runner started it before the start timeout', costUsd: 0, costSource: 'estimate' };
+    }
+    throw e;
+  }
+}
+
+async function pollRequest(
   f: Fetch,
   headers: Record<string, string>,
   endpoint: string,
@@ -270,9 +285,11 @@ async function uploadInputs(f: Fetch, apiKey: string, urls: string[], readImage?
 /** The worker shrinks each inlined input to 600 KB so that 4 fit the inline limit; more (up to 9 references) go through fal storage instead. */
 const MAX_INLINE_INPUTS = 4;
 
-export function createFalProvider(opts: { apiKey: string; fetch?: Fetch; readImage?: ReadImage }): VideoProvider {
+export function createFalProvider(opts: { apiKey: string; fetch?: Fetch; readImage?: ReadImage; startTimeoutSec?: number }): VideoProvider {
   const f = opts.fetch ?? fetch;
   const headers = falHeaders(opts.apiKey);
+  // With `startTimeoutSec`, fal drops a request that has not started by then, so it is neither run nor billed after the caller gave up on it.
+  const submitHeaders = opts.startTimeoutSec ? { ...headers, 'X-Fal-Request-Start-Timeout': String(opts.startTimeoutSec) } : headers;
   return {
     async submit(req) {
       const own = VIDEO_BODIES[req.model.endpoint];
@@ -295,7 +312,7 @@ export function createFalProvider(opts: { apiKey: string; fetch?: Fetch; readIma
         body[spec.video!.field] = spec.video!.single ? url : [url];
         body.prompt = videoTokens(body.prompt as string, spec.video!.name);
       }
-      const res = (await sendJson(f, 'fal submit', `${QUEUE}/${endpoint}`, { method: 'POST', headers, body: JSON.stringify(body) })) as { request_id?: string };
+      const res = (await sendJson(f, 'fal submit', `${QUEUE}/${endpoint}`, { method: 'POST', headers: submitHeaders, body: JSON.stringify(body) })) as { request_id?: string };
       if (!res.request_id) throw new Error('fal submit: no request_id in the response');
       return { providerJobId: packJobId(req.durationSec, res.request_id) };
     },
