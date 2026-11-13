@@ -106,3 +106,28 @@ export const scenePicks = (first: number[], options: string[], max: number): num
 
 /** Where a scene's thumbnail is taken: just inside its start (the first frame can still be the previous cut), and never past its middle. */
 export const frameTime = (start: number, end: number): number => start + Math.min(0.3, Math.max(0, end - start) / 2);
+
+/** The times a scene's thumbnail is chosen from: just inside its start, its middle and just inside its end, without repeats (a short scene has fewer). */
+export const frameTimes = (start: number, end: number): number[] => {
+  const len = Math.max(0, end - start);
+  return [...new Set([frameTime(start, end), start + len / 2, end - Math.min(0.3, len / 2)].map((t) => Math.round(t * 100) / 100))];
+};
+
+/** How sharp a still is: the variance of its grey Laplacian, so a blurred, moving or mid-cut frame scores lower. `px` is RGBA, as a canvas gives it. */
+export function sharpness(px: Uint8ClampedArray, width: number, height: number): number {
+  const grey = (x: number, y: number) => {
+    const i = (y * width + x) * 4;
+    return 0.299 * px[i]! + 0.587 * px[i + 1]! + 0.114 * px[i + 2]!;
+  };
+  let sum = 0;
+  let sq = 0;
+  let n = 0;
+  for (let y = 1; y < height - 1; y++)
+    for (let x = 1; x < width - 1; x++) {
+      const l = grey(x - 1, y) + grey(x + 1, y) + grey(x, y - 1) + grey(x, y + 1) - 4 * grey(x, y);
+      sum += l;
+      sq += l * l;
+      n++;
+    }
+  return n ? sq / n - (sum / n) ** 2 : 0;
+}
