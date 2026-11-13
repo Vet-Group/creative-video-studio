@@ -118,20 +118,22 @@ export async function GET(request: Request) {
  * `retryOf` retries the caller's own failed job once: the inputs, model, preset, prompt, ratio, duration, team and store all come from the
  * original (the body may carry just `retryOf`), the estimate from the model's current price. `onTwin: true` with `retryOf` runs it on the original model's enabled twin instead (migration 0075),
  * only for a job BytePlus refused for a real person in its photo or for the sound it made (`failureReason` real_person or output_audio), which the dearer fal twin may make.
- * A new Run may not name the dearer row of a pair of duplicate models while its twin can serve, nor the twin that cannot while the dearer one can (lib/model-twins.ts).
+ * `rerunOf` runs the caller's own succeeded job again as a NEW job (404 for anyone else's): the same inputs, model, prompt, ratio, duration, params and store, through this same path, so the caps, the estimate at the model's current price, the ledger and the daily clip count apply as to any Run (no retry semantics: it can be rerun again, and the job has no `retry_of`).
+ * It is refused with 409 when an input asset was deleted or purged, and as a Run is when its model is no longer enabled. A new Run may not name the dearer row of a pair of duplicate models while its twin can serve, nor the twin that cannot while the dearer one can (lib/model-twins.ts).
  */
 export async function POST(request: Request) {
   const g = await guard(request, 'member');
   if (g.error) return g.error;
   const body = (await readJson(request)) as Record<string, unknown> | null;
-  const { retryOf = null, onTwin = false } = body ?? {};
+  const { retryOf = null, onTwin = false, rerunOf = null } = body ?? {};
   if (retryOf !== null && typeof retryOf !== 'string') return bad('retryOf must be a job id');
+  if (rerunOf !== null && (typeof rerunOf !== 'string' || retryOf !== null)) return bad('rerunOf must be a job id, and does not go with retryOf');
   if (typeof onTwin !== 'boolean' || (onTwin && retryOf === null)) return bad('onTwin must be true or false, and only retries a job');
   const userId = g.session.user.id;
 
-  // A retry takes everything from the original job, so only a new Run is validated against the body.
+  // A retry or a rerun takes everything from the original job, so only a new Run is validated against the body.
   let spec: Spec | null = null;
-  if (retryOf === null) {
+  if (retryOf === null && rerunOf === null) {
     const { assetIds, modelId, presetId = null, prompt: rawPrompt = null, ratio, durationSec, storeId = null, feature = 'video', params: rawParams, enhance = false, useBrand = false } = body ?? {};
     const params = rawParams ?? {}; // null as well as absent: video clients may send it
     if (typeof feature !== 'string' || !(FEATURES as readonly string[]).includes(feature)) return bad(`feature must be one of ${FEATURES.join(', ')}`);
@@ -301,13 +303,19 @@ export async function POST(request: Request) {
     // The model, preset, store and assets are read under the lock, so one disabled or hidden meanwhile is refused.
     let s = spec;
     let original: { team_id: string; provider: string; prompt: string; enhanced_prompt: string | null } | undefined;
-    if (retryOf !== null) {
-      const o = (await tx.query('select user_id, team_id, store_id, status, error, retry_of, input_asset_ids, model, provider, preset_id, prompt, enhance, enhanced_prompt, aspect, duration_s, feature, params from jobs where id = $1', [retryOf])).rows[0];
-      if (!o) return Response.json({ error: 'the job to retry does not exist' }, { status: 404 });
-      if (o.user_id !== userId) return Response.json({ error: 'only the owner of a job may retry it' }, { status: 403 });
-      if (!['failed', 'timed_out', 'failed_unknown'].includes(o.status)) return Response.json({ error: 'only a failed job can be retried' }, { status: 409 });
-      if (o.retry_of !== null || (await tx.query('select 1 from jobs where retry_of = $1', [retryOf])).rowCount) {
-        return Response.json({ error: 'a job can be retried only once, and a retry cannot be retried' }, { status: 409 });
+    if (retryOf !== null || rerunOf !== null) {
+      const o = (await tx.query('select user_id, team_id, store_id, status, error, retry_of, input_asset_ids, model, provider, preset_id, prompt, enhance, enhanced_prompt, aspect, duration_s, feature, params, deleted_at from jobs where id = $1', [retryOf ?? rerunOf])).rows[0];
+      if (rerunOf !== null) {
+        // Someone else's job, or one in the trash, is not found; the rest is a new Run like any other, so the caps, the estimate and the ledger below apply in full.
+        if (!o || o.user_id !== userId || o.deleted_at !== null) return Response.json({ error: 'the job to rerun does not exist' }, { status: 404 });
+        if (o.status !== 'succeeded') return Response.json({ error: 'only a succeeded job can be rerun' }, { status: 409 });
+      } else {
+        if (!o) return Response.json({ error: 'the job to retry does not exist' }, { status: 404 });
+        if (o.user_id !== userId) return Response.json({ error: 'only the owner of a job may retry it' }, { status: 403 });
+        if (!['failed', 'timed_out', 'failed_unknown'].includes(o.status)) return Response.json({ error: 'only a failed job can be retried' }, { status: 409 });
+        if (o.retry_of !== null || (await tx.query('select 1 from jobs where retry_of = $1', [retryOf])).rowCount) {
+          return Response.json({ error: 'a job can be retried only once, and a retry cannot be retried' }, { status: 409 });
+        }
       }
       let modelId: string = o.model;
       if (onTwin) {
@@ -333,7 +341,9 @@ export async function POST(request: Request) {
     // A Set: the end frame may be the first image again, for a clip that loops.
     const inputs = [...new Set([...assetIds, ...(params.endAssetId ? [params.endAssetId] : []), ...(params.videoAssetId ? [params.videoAssetId] : []), ...clips])];
     const live = await tx.query('select 1 from assets where id = any($1::text[]) and deleted_at is null', [inputs]);
-    if (live.rowCount !== inputs.length) return bad('one or more assets were deleted');
+    if (live.rowCount !== inputs.length) {
+      return rerunOf !== null ? Response.json({ error: 'Không chạy lại được: ảnh hoặc video đầu vào của lượt này đã bị xoá.' }, { status: 409 }) : bad('one or more assets were deleted');
+    }
     const model = (await tx.query('select enabled, provider, endpoint, kind, features, ratios, thinking_levels, durations_sec, max_images, max_prompt_chars, usd_per_second, image_prices, thinking_prices from model_configs where id = $1', [modelId])).rows[0];
     if (!model?.enabled) return bad('the model does not exist or is not enabled');
     if (model.kind !== (isImage ? 'image' : 'video') || !model.features.includes(feature)) return bad('the model does not offer this feature');
@@ -396,7 +406,7 @@ export async function POST(request: Request) {
       if (prompt && prompt.length > limit) return bad(`the prompt may be at most ${limit} characters on this model`);
     }
     // A retry on the twin goes to the twin's provider, not the failed job's.
-    const provider = onTwin ? model.provider : (original?.provider ?? model.provider);
+    const provider = onTwin || rerunOf !== null ? model.provider : (original?.provider ?? model.provider);
     const perSecond = isImage ? null : usdPerSecondFor({ endpoint: model.endpoint, usdPerSecond: model.usd_per_second }, params.audio);
     if (!isImage && perSecond === undefined) return bad('the model cannot generate audio');
     const estimate = isImage ? (Number(imagePrice) + extraInputUsd(model.endpoint, assetIds.length)).toFixed(4) : estimateUsd(refSec > 0 ? usdPerSecondWithVideo(model.endpoint, perSecond!, durationSec, refSec) : perSecond!, durationSec);
@@ -416,7 +426,7 @@ export async function POST(request: Request) {
       // A retry keeps the original's brief, so it is not rewritten (and paid for) again.
       `insert into jobs (id, user_id, team_id, store_id, retry_of, feature, model, provider, preset_id, prompt, aspect, duration_s, params, input_asset_ids, is_mock, enhance, enhanced_prompt)
        values ($1, $2, coalesce($3, (select team_id from users where id = $2)), $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb, $14, $15, $16, $17)`,
-      [id, userId, original?.team_id ?? null, storeId, retryOf, feature, modelId, provider, presetId, prompt, ratio, durationSec, JSON.stringify(params), assetIds, provider === 'mock', enhance, original?.enhanced_prompt ?? null],
+      [id, userId, (rerunOf === null && original?.team_id) || null, storeId, retryOf, feature, modelId, provider, presetId, prompt, ratio, durationSec, JSON.stringify(params), assetIds, provider === 'mock', enhance, original?.enhanced_prompt ?? null],
     );
     // Remember this as the caller's most recently used store, so it leads their picker next time and is the default choice.
     if (storeId !== null)

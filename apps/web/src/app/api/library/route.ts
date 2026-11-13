@@ -126,6 +126,7 @@ export async function GET(request: Request) {
       example: r.example,
       prompt: r.prompt,
       canEdit: r.user_id === me.id || me.role === 'admin',
+      mine: r.user_id === me.id,
       downloadName: downloadName(r.day, r.creator_name, r.id, r.output_mime.startsWith('image/') ? extensionOf(r.output_filename) : 'mp4'),
     })),
   });

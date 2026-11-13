@@ -120,5 +120,7 @@ export interface Clip {
   /** The creator's own words (a free prompt on Create video or Image Generation), else null. */
   prompt: string | null;
   canEdit: boolean;
+  /** The caller made it (`canEdit` is also true for an Admin): only then can it be run again. */
+  mine: boolean;
   downloadName: string;
 }
