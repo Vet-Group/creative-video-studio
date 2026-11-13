@@ -19,9 +19,9 @@ export async function runSuggestion(pool: WorkerDeps['pool'], suggest: Suggester
     if (!suggest) throw new Error('no suggester: FAL_KEY is not set');
     const input = run.input as SuggestInput;
     const clip = input.clip ? await extractFrames(await read(`samples/${input.clip}`), VIDEO_FRAMES) : undefined;
-    // A scenes run sends the member's product, then one still per scene of the reference video.
-    const scenes = input.field === 'scenes' ? await extractFrames(await read(input.sourceKey!), input.times!) : undefined;
-    const product = scenes ? await sharp(await read(input.productKey!)).resize(512, 512, { fit: 'inside' }).jpeg().toBuffer() : undefined;
+    // A scenes run sends the member's product (upright, a cut-out on white), then one still per scene of the reference video.
+    const product = input.field === 'scenes' ? await sharp(await read(input.productKey!)).rotate().resize(512, 512, { fit: 'inside', withoutEnlargement: true }).flatten({ background: '#fff' }).jpeg().toBuffer() : undefined;
+    const scenes = product ? await extractFrames(await read(input.sourceKey!), input.times!) : undefined;
     const still = (b: Uint8Array) => `data:image/jpeg;base64,${Buffer.from(b).toString('base64')}`;
     // The clip's length goes with its stills so the call can say when each was taken.
     const call = await suggest(clip ? { ...input, seconds: clip.seconds } : input, clip ? clip.stills.map(still) : scenes && product ? [product, ...scenes.stills].map(still) : undefined);

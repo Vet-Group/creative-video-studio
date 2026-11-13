@@ -116,14 +116,21 @@ export async function extractFrames(video: Uint8Array, n: number | number[]): Pr
     await writeFile(file, video);
     const seconds = await probeSeconds(file);
     if (!(seconds > 0)) throw new Error('the clip has no duration');
-    const stills = await Promise.all(
-      (typeof n === 'number' ? frameTimes(seconds, n) : n.map((t) => Math.min(Math.max(t, 0), Math.max(seconds - 0.1, 0)))).map(async (t, i) => {
-        const jpeg = join(dir, `${i}.jpg`);
-        const scale = 'scale=512:512:force_original_aspect_ratio=decrease:force_divisible_by=2';
-        await run(requireFfmpeg(), ['-y', '-v', 'error', '-ss', t.toFixed(3), '-i', file, '-frames:v', '1', '-vf', scale, '-q:v', '4', jpeg]);
-        return new Uint8Array(await readFile(jpeg));
-      }),
-    );
+    const times = typeof n === 'number' ? frameTimes(seconds, n) : n.map((t) => Math.min(Math.max(t, 0), Math.max(seconds - 0.1, 0)));
+    const stills: Uint8Array[] = [];
+    // Four ffmpeg at a time: a scene pick asks for up to 30 stills on the shared worker.
+    for (let k = 0; k < times.length; k += 4) {
+      stills.push(
+        ...(await Promise.all(
+          times.slice(k, k + 4).map(async (t, j) => {
+            const jpeg = join(dir, `${k + j}.jpg`);
+            const scale = 'scale=512:512:force_original_aspect_ratio=decrease:force_divisible_by=2';
+            await run(requireFfmpeg(), ['-y', '-v', 'error', '-ss', t.toFixed(3), '-i', file, '-frames:v', '1', '-vf', scale, '-q:v', '4', jpeg]);
+            return new Uint8Array(await readFile(jpeg));
+          }),
+        )),
+      );
+    }
     return { seconds, stills };
   } finally {
     await rm(dir, { recursive: true, force: true });

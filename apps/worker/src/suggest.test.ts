@@ -126,7 +126,8 @@ test('a clip that cannot be read fails the run without calling the suggester', a
 });
 
 const scenesInput = { field: 'scenes', text: '', context: '', max: 0, sourceKey: 'r2:analyses/v.mp4', productKey: 'assets/p.png', times: [0.2, 1.1, 999] };
-const png = () => sharp({ create: { width: 900, height: 600, channels: 3, background: '#c33' } }).png().toBuffer();
+// A cut-out product: a transparent PNG, which must reach the vision call on white, not black.
+const png = () => sharp({ create: { width: 900, height: 600, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).png().toBuffer();
 
 test("a scenes run reads the video and the product, sends the product then one still per scene (a time past the end is kept inside it), and stores and books the scene numbers", async () => {
   const keys: string[] = [];
@@ -138,8 +139,10 @@ test("a scenes run reads the video and the product, sends the product then one s
   expect(seen[0]!.input).toEqual(scenesInput);
   expect(seen[0]!.frames).toHaveLength(4);
   for (const f of seen[0]!.frames!) expect(f).toMatch(/^data:image\/jpeg;base64,\/9j\//);
-  const { width = 0, height = 0 } = await sharp(Buffer.from(seen[0]!.frames![0]!.split(',')[1]!, 'base64')).metadata();
+  const product = sharp(Buffer.from(seen[0]!.frames![0]!.split(',')[1]!, 'base64'));
+  const { width = 0, height = 0 } = await product.metadata();
   expect(Math.max(width, height)).toBe(512); // the 900 px product is shrunk like the stills
+  expect((await product.stats()).channels[0]!.mean).toBeGreaterThan(250); // its transparency is white
   expect(await row(id)).toEqual({ status: 'succeeded', output: ['1', '3'], cost_usd: '0.000900' });
   expect(await ledger(id)).toEqual([{ kind: 'llm', usd: '0.0009', user_id: 'u1', team_id: 'team-unassigned', job_id: null, model: 'google/gemini-2.5-flash', is_final: true }]);
 });

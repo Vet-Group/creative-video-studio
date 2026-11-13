@@ -47,23 +47,29 @@ export function useSuggest() {
     return () => void (alive.current = false);
   }, []);
 
+  const seq = useRef(0);
+
   async function run(ask: Ask) {
+    // Only the latest run speaks: an earlier one that ends late (for another product or video) changes nothing.
+    const my = ++seq.current;
+    const latest = () => alive.current && seq.current === my;
     setBusy(true);
     setError('');
     setOptions([]);
     try {
       const { id } = await api<{ id: string }>('/api/suggestions', sendJson('POST', ask));
-      for (const until = Date.now() + GIVE_UP_MS; alive.current && Date.now() < until; ) {
+      for (const until = Date.now() + GIVE_UP_MS; latest() && Date.now() < until; ) {
         await new Promise((r) => setTimeout(r, POLL_MS));
         const state = await api<{ status: string; options: string[]; meanings?: (string | null)[] }>(`/api/suggestions/${encodeURIComponent(id)}`);
+        if (!latest()) return;
         if (state.status === 'succeeded') return (setMeanings(state.meanings ?? []), setOptions(state.options));
         if (state.status === 'failed') break;
       }
-      setError(UNAVAILABLE);
+      if (latest()) setError(UNAVAILABLE);
     } catch (e) {
-      setError(errorText(e, UNAVAILABLE));
+      if (latest()) setError(errorText(e, UNAVAILABLE));
     } finally {
-      if (alive.current) setBusy(false);
+      if (latest()) setBusy(false);
     }
   }
   return { busy, options, meanings, error, run, clear: () => (setOptions([]), setError('')) };

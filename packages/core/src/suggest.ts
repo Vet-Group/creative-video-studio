@@ -324,7 +324,7 @@ async function suggestWith(chat: Chat, input: SuggestInput, frames: string[] = [
   if (input.field === 'scenes') {
     const count = input.times?.length ?? 0;
     if (!count || frames.length !== count + 1) throw new Error('suggest: the product and one still per scene are needed');
-    const { text, costUsd } = await chat(system, suggestPrompt(input), 0, 300, frames);
+    const { text, costUsd } = await chat(system, suggestPrompt(input), 0, 800, frames);
     return { options: parseScenes(text, count).map(String), costUsd };
   }
   if (input.field === 'translate') {

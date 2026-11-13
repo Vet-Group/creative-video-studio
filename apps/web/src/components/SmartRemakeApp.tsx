@@ -3,7 +3,7 @@
 // (the analysis API, as on /analyze); once it has succeeded and a product is set, an AI pass marks the scenes that show a product like theirs (the `scenes`
 // suggestion) and those are pre-ticked in the same RemakePanel /analyze uses, which shows the price and makes the video. If the pick fails, nothing is ticked.
 import { REMAKE_MAX_SHOTS } from '@cvs/core/analysis/remake';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api, errorText, sendJson } from '@/lib/api';
 import type { AppConfig } from '@/lib/apps';
 import { mergeShots, scenePicks } from '@/lib/analyze';
@@ -32,6 +32,7 @@ export function SmartRemakeApp({ app }: { app: AppConfig }) {
   const [busy, setBusy] = useState(false); // an upload or the start of the analysis
   const [error, setError] = useState('');
   const [asked, setAsked] = useState(''); // `analysis:product` the pick was last asked for
+  const wanted = useRef(''); // the video whose analysis is being started
   const pick = useSuggest();
 
   // Follows the analysis until it ends.
@@ -72,12 +73,14 @@ export function SmartRemakeApp({ app }: { app: AppConfig }) {
   }
 
   async function analyse(v: RefVideo) {
+    wanted.current = v.id;
     setAnalysis(null);
     try {
       const { id } = await api<{ id: string }>('/api/analyses', sendJson('POST', { sourceAssetId: v.id }));
-      setAnalysis({ id, status: 'queued', result: null, error: null, createdAt: new Date().toISOString(), sourceAssetId: v.id });
+      // The member may have removed or replaced the video meanwhile.
+      if (wanted.current === v.id) setAnalysis({ id, status: 'queued', result: null, error: null, createdAt: new Date().toISOString(), sourceAssetId: v.id });
     } catch (e) {
-      setError(errorText(e, 'Không bắt đầu phân tích được.'));
+      if (wanted.current === v.id) setError(errorText(e, 'Không bắt đầu phân tích được.'));
     }
   }
 
@@ -146,6 +149,7 @@ export function SmartRemakeApp({ app }: { app: AppConfig }) {
               onFile={(f) => void take(() => uploadVideoDirect(f).then((v) => [v]), (e) => uploadError(e, 'video'))}
               onHistory={(id) => void take(() => api<{ assets: RefVideo[] }>('/api/assets/copy', sendJson('POST', { assetId: id })).then((r) => r.assets), (e) => copyError(e, 'Không dùng được video này.'))}
               onRemove={() => {
+                wanted.current = '';
                 setVideo(null);
                 setAnalysis(null);
                 setAsked('');
