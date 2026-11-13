@@ -32,7 +32,8 @@ test('Create: two camera angles start two clips with different prompts, and with
   await angles(page).getByText(first!.label, { exact: true }).click();
   await angles(page).getByText(third!.label, { exact: true }).click();
   await expect(page.getByRole('status').filter({ hasText: /^2 clip × \$[\d.]+ = \$[\d.]+$/ })).toBeVisible();
-  await expect(page.locator('.prompt-preview p')).toHaveText([anglePrompt(BODY, first!), anglePrompt(BODY, third!)]);
+  // The preview names each clip's prompt by its angle.
+  await expect(page.locator('.prompt-preview p')).toHaveText([`${first!.label}: ${anglePrompt(BODY, first!)}`, `${third!.label}: ${anglePrompt(BODY, third!)}`]);
 
   const posted: { prompt: string }[] = [];
   page.on('request', (r) => r.url().endsWith('/api/jobs') && r.method() === 'POST' && posted.push(r.postDataJSON()));
