@@ -20,13 +20,14 @@ test('only an Admin sees the remaining company budget', async ({ page }) => {
 });
 
 test('a signed-out visit to the Library goes to the login page and back to the Library after the sign-in', async ({ page }) => {
-  await page.goto('/library?tab=video');
-  await expect(page).toHaveURL(/\/login\?next=%2Flibrary%3Ftab%3Dvideo$/);
+  // A filter the Library keeps in its address: it rewrites an unknown one (such as ?tab=) away as it loads, racing this check.
+  await page.goto('/library?kind=videos');
+  await expect(page).toHaveURL(/\/login\?next=%2Flibrary%3Fkind%3Dvideos$/);
   await loginReady(page);
   await page.getByLabel('Email').fill(USERS.member1.email);
   await page.getByLabel('Mật khẩu').fill(PASSWORD);
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
-  await expect(page).toHaveURL(/\/library\?tab=video$/);
+  await expect(page).toHaveURL(/\/library\?kind=videos$/);
 });
 
 test('a login link that points at another site still lands on Create', async ({ page }) => {
