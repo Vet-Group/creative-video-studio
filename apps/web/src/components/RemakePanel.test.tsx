@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, test } from 'vitest';
 import { RemakePanel, RemakeResult, type RemakeRow, remakeDrafts, remakeEstimate, remakeMinutesLeft } from './RemakePanel';
 
-const base: RemakeRow = { id: 'r1', analysisId: 'a1', shots: [], status: 'succeeded', result: null, outputAssetId: null, costUsd: null, createdAt: '2026-11-13T00:00:00Z' };
+const base: RemakeRow = { id: 'r1', analysisId: 'a1', productAssetId: 'p1', shots: [], status: 'succeeded', result: null, outputAssetId: null, costUsd: null, createdAt: '2026-11-13T00:00:00Z' };
 
 test('the estimate is each shot billed at its length in whole seconds (2 to 10) at $0.10, as the API counts it against the caps', () => {
   expect(remakeEstimate([{ start: 0, end: 1 }])).toBe('0.40'); // 2 s sent + 2 s made

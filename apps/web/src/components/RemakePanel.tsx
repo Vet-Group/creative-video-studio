@@ -17,6 +17,7 @@ import { type Img, Slot, uploadError, uploadImages } from './image-tools';
 export interface RemakeRow {
   id: string;
   analysisId: string;
+  productAssetId: string;
   shots: number[]; // the first stored shot of each scene asked for
   status: 'queued' | 'running' | 'succeeded' | 'partial' | 'failed';
   result: { shots: { index: number; status: 'succeeded' | 'failed'; clipAssetId?: string }[]; compareAssetId?: string } | null;

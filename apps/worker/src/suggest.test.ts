@@ -1,5 +1,5 @@
 // The suggestion run against a disposable database on the compose Postgres (`pnpm services:up`). The suggester is a fake: no call reaches fal.
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { createPool } from '@cvs/db/client';
 import { createTestDatabase } from '@cvs/db/testing';
 import { frameTimes, type Suggester, VIDEO_FRAMES } from '@cvs/core/suggest';
@@ -129,13 +129,18 @@ const scenesInput = { field: 'scenes', text: '', context: '', max: 0, sourceKey:
 // A cut-out product: a transparent PNG, which must reach the vision call on white, not black.
 const png = () => sharp({ create: { width: 900, height: 600, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).png().toBuffer();
 
-test("a scenes run reads the video and the product, sends the product then one still per scene (a time past the end is kept inside it), and stores and books the scene numbers", async () => {
-  const keys: string[] = [];
+// The reference video as the bucket would stream it to disk.
+const saveClip = async (_key: string, file: string) => writeFile(file, await clip());
+
+test("a scenes run reads the product and saves the video to disk, sends the product then one still per scene (a time past the end is kept inside it), and stores and books the scene numbers", async () => {
+  const read: string[] = [];
+  const saved: string[] = [];
   const seen: { input: unknown; frames?: string[] }[] = [];
   const suggest: Suggester = async (i, frames) => (seen.push({ input: i, frames }), { options: ['1', '3'], costUsd: 0.0009, provider: 'fal', model: 'google/gemini-2.5-flash' });
   const id = await queued(0, scenesInput);
-  await runSuggestion(pool, suggest, id, async (key) => (keys.push(key), key.endsWith('.png') ? new Uint8Array(await png()) : new Uint8Array(await clip())));
-  expect(keys.sort()).toEqual(['assets/p.png', 'r2:analyses/v.mp4']);
+  await runSuggestion(pool, suggest, id, async (key) => (read.push(key), new Uint8Array(await png())), async (key, file) => (saved.push(key), saveClip(key, file)));
+  expect(read).toEqual(['assets/p.png']); // the video never comes into memory
+  expect(saved).toEqual(['r2:analyses/v.mp4']);
   expect(seen[0]!.input).toEqual(scenesInput);
   expect(seen[0]!.frames).toHaveLength(4);
   for (const f of seen[0]!.frames!) expect(f).toMatch(/^data:image\/jpeg;base64,\/9j\//);
@@ -149,12 +154,12 @@ test("a scenes run reads the video and the product, sends the product then one s
 
 test('a scenes run whose answer cannot be read fails with nothing booked; one whose product is missing never calls the suggester', async () => {
   const bad = await queued(0, scenesInput);
-  await expect(runSuggestion(pool, async () => Promise.reject(new Error('suggest: the answer is not JSON')), bad, async (key) => new Uint8Array(key.endsWith('.png') ? await png() : await clip()))).rejects.toThrow('not JSON');
+  await expect(runSuggestion(pool, async () => Promise.reject(new Error('suggest: the answer is not JSON')), bad, async () => new Uint8Array(await png()), saveClip)).rejects.toThrow('not JSON');
   expect((await row(bad)).status).toBe('failed');
   expect(await ledger(bad)).toEqual([]);
   let called = false;
   const gone = await queued(0, scenesInput);
-  await expect(runSuggestion(pool, async () => ((called = true), { options: [], costUsd: null, provider: 'fal', model: 'm' }), gone, async (key) => (key.endsWith('.png') ? Promise.reject(new Error('NoSuchKey')) : new Uint8Array(await clip())))).rejects.toThrow('NoSuchKey');
+  await expect(runSuggestion(pool, async () => ((called = true), { options: [], costUsd: null, provider: 'fal', model: 'm' }), gone, () => Promise.reject(new Error('NoSuchKey')), saveClip)).rejects.toThrow('NoSuchKey');
   expect(called).toBe(false);
   expect((await row(gone)).status).toBe('failed');
 });

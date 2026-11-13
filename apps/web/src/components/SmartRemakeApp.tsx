@@ -24,11 +24,15 @@ const POLL_MS = 2500;
 export const pickNote = (picked: number | null): string =>
   picked === null ? 'Chưa tự chọn được cảnh nào. Bạn hãy tự chọn các cảnh cần thay sản phẩm.' : picked === 0 ? 'AI chưa thấy cảnh nào có sản phẩm giống của bạn. Bạn hãy tự chọn các cảnh cần thay.' : `AI đã chọn sẵn ${picked} cảnh có sản phẩm của bạn; bỏ chọn cảnh nào không cần.`;
 
-/** The address follows the analysis on view (as /analyze's does), without a navigation or a scroll, so a reload or a shared link comes back to it. */
-const syncUrl = (slug: string, id: string | null) => window.history.replaceState(null, '', id ? `/apps/${slug}?analysis=${id}` : `/apps/${slug}`);
+/** The address follows the analysis and the product on view (as /analyze's does), without a navigation or a scroll, so a reload or a shared link comes back to them. */
+const syncUrl = (slug: string, id: string | null, product?: string) =>
+  window.history.replaceState(null, '', id ? `/apps/${slug}?analysis=${id}${product ? `&product=${product}` : ''}` : `/apps/${slug}`);
 
-/** `initialId`: an analysis to open again (?analysis=); its reference video is shown as chosen, and the product is added again. */
-export function SmartRemakeApp({ app, initialId }: { app: AppConfig; initialId?: string }) {
+/**
+ * `initialId`: an analysis to open again (?analysis=); its reference video is shown as chosen. `initialProductId` (?product=): the product image to set again
+ * with it, while it is still there; otherwise the member adds one again.
+ */
+export function SmartRemakeApp({ app, initialId, initialProductId }: { app: AppConfig; initialId?: string; initialProductId?: string }) {
   const narrow = useMediaQuery(NARROW);
   const [tab, setTab] = useState<Tab>('create');
   const [video, setVideo] = useState<RefVideo | null>(null);
@@ -40,15 +44,22 @@ export function SmartRemakeApp({ app, initialId }: { app: AppConfig; initialId?:
   const wanted = useRef(''); // the video whose analysis is being started
   const pick = useSuggest();
 
-  // Opens the analysis the address names; the API only gives the member's own.
+  // Opens the analysis the address names, with its product image when it still opens; the APIs only give the member's own.
   useEffect(() => {
     if (!initialId) return;
     let live = true;
     void api<AnalysisRow>(`/api/analyses/${initialId}`).then(
-      (row) => {
+      async (row) => {
+        const img = initialProductId
+          ? await api<{ id: string; filename: string; mime: string }>(`/api/assets/${initialProductId}`).then(
+              (a) => (a.mime.startsWith('image/') ? { id: a.id, filename: a.filename } : null),
+              () => null, // gone or not theirs: the member adds a product again
+            )
+          : null;
         if (!live || wanted.current) return; // the member already chose a video
         setAnalysis(row);
         if (row.sourceAssetId) setVideo({ id: row.sourceAssetId, filename: 'Video mẫu', durationMs: Math.round((row.result?.durationS ?? 0) * 1000) });
+        if (img) setProduct((p) => (p.length ? p : [img])); // one the member added meanwhile stays
       },
       () => {
         if (!live) return;
@@ -61,8 +72,14 @@ export function SmartRemakeApp({ app, initialId }: { app: AppConfig; initialId?:
     };
   }, []);
 
-  // Follows the analysis until it ends.
+  // The address names the analysis on view and its product (a removed video clears it in onRemove).
   const analysisId = analysis?.id;
+  const productId = product[0]?.id;
+  useEffect(() => {
+    if (analysisId) syncUrl(app.slug, analysisId, productId);
+  }, [analysisId, productId]);
+
+  // Follows the analysis until it ends.
   const open = analysis !== null && (analysis.status === 'queued' || analysis.status === 'running');
   useEffect(() => {
     if (!analysisId || !open) return;
@@ -104,10 +121,7 @@ export function SmartRemakeApp({ app, initialId }: { app: AppConfig; initialId?:
     try {
       const { id } = await api<{ id: string }>('/api/analyses', sendJson('POST', { sourceAssetId: v.id }));
       // The member may have removed or replaced the video meanwhile.
-      if (wanted.current === v.id) {
-        setAnalysis({ id, status: 'queued', result: null, error: null, createdAt: new Date().toISOString(), sourceAssetId: v.id });
-        syncUrl(app.slug, id);
-      }
+      if (wanted.current === v.id) setAnalysis({ id, status: 'queued', result: null, error: null, createdAt: new Date().toISOString(), sourceAssetId: v.id });
     } catch (e) {
       if (wanted.current === v.id) setError(errorText(e, 'Không bắt đầu phân tích được.'));
     }

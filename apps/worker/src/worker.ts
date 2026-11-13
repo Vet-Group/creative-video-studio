@@ -519,7 +519,8 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
     await purgeDeletedClips(pool, deleteObject, log);
   });
   await boss.createQueue(SUGGEST_QUEUE, SUGGEST_QUEUE_OPTIONS);
-  await boss.work<SuggestJobData>(SUGGEST_QUEUE, { pollingIntervalSeconds: o.pollingIntervalSeconds }, async (jobs) => {
+  // Four at a time, so a slow scene pick on a large video never holds up the quick text suggestions behind it.
+  await boss.work<SuggestJobData>(SUGGEST_QUEUE, { localConcurrency: 4, pollingIntervalSeconds: o.pollingIntervalSeconds }, async (jobs) => {
     await Promise.all(jobs.map((job) => runSuggestion(pool, deps.suggest, job.data.runId).catch((e) => log(`suggestion ${job.data.runId}`, e))));
   });
   // Reference-video analysis runs only where the rea-video binary is installed and the flag is set; off by default.
