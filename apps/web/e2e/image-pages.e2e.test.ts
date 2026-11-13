@@ -458,14 +458,23 @@ test('Image Generation: a cap refusal shows its message in Vietnamese', async ({
 test('geometry at 1440: the Try On card is 360 wide at x=288, and Image Generation has the same card, pinned while its gallery scrolls beside it', async ({ page, browser }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await signIn(page, 'member11');
-  // Ten images from the mock model, put on Ví dụ below, so the gallery is taller than the screen.
-  const up = await page.request.post('/api/assets', { multipart: { file: file('ref.png') } });
-  const assetId = ((await up.json()) as { assets: { id: string }[] }).assets[0]!.id;
+  // Ten images from the mock model, put on Ví dụ below, so the gallery is taller than the screen. Two each from five members: the queue runs two
+  // per member at a time, so one member's ten queued in five rounds and took over a minute.
+  const makers = [page];
+  for (const who of ['geoa', 'geob', 'geoc', 'geod'] as const) {
+    const maker = await (await browser.newContext()).newPage();
+    await signIn(maker, who);
+    makers.push(maker);
+  }
   const ids: string[] = [];
-  for (let i = 0; i < 10; i++) {
-    const job = await page.request.post('/api/jobs', { data: { feature: 'image', modelId: 'mock-image-e2e', assetIds: [assetId], prompt: `scene ${i}`, ratio: 'auto', params: { resolution: '1K' } } });
-    expect(job.status()).toBe(201);
-    ids.push(((await job.json()) as { id: string }).id);
+  for (const [k, maker] of makers.entries()) {
+    const up = await maker.request.post('/api/assets', { multipart: { file: file('ref.png') } });
+    const assetId = ((await up.json()) as { assets: { id: string }[] }).assets[0]!.id;
+    for (let i = 0; i < 2; i++) {
+      const job = await maker.request.post('/api/jobs', { data: { feature: 'image', modelId: 'mock-image-e2e', assetIds: [assetId], prompt: `scene ${k * 2 + i}`, ratio: 'auto', params: { resolution: '1K' } } });
+      expect(job.status()).toBe(201);
+      ids.push(((await job.json()) as { id: string }).id);
+    }
   }
 
   await page.goto('/try-on');
@@ -494,7 +503,9 @@ test('geometry at 1440: the Try On card is 360 wide at x=288, and Image Generati
   }
   near((await box(page.locator('.prompt-box'))).height, 161, 'prompt box height', 1); // the 76 px text, one row of starter chips and the toolbar
 
-  await expect.poll(async () => ((await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { status: string }[] }).jobs.filter((j) => j.status === 'succeeded').length, { timeout: 120_000 }).toBe(10);
+  const succeeded = async (maker: Page) => ((await (await maker.request.get('/api/jobs?mine')).json()) as { jobs: { id: string; status: string }[] }).jobs.filter((j) => ids.includes(j.id) && j.status === 'succeeded').length;
+  await expect.poll(async () => (await Promise.all(makers.map(succeeded))).reduce((a, b) => a + b, 0), { timeout: 120_000 }).toBe(10);
+  for (const maker of makers.slice(1)) await maker.context().close();
   await addExamples(browser, ids);
   await page.goto('/image-generation');
   const gallery = page.getByRole('group', { name: 'Ảnh của công ty' });

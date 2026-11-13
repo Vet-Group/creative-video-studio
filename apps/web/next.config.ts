@@ -5,6 +5,8 @@ const config: NextConfig = {
   transpilePackages: ['@cvs/core', '@cvs/db'],
   serverExternalPackages: ['pg-boss'],
   poweredByHeader: false,
+  // CI typechecks in its own step first, so its builds skip the second pass (~12 s each); a deploy build still typechecks.
+  typescript: { ignoreBuildErrors: process.env.CVS_SKIP_BUILD_TYPECHECK === '1' },
   devIndicators: { position: 'bottom-right' }, // the account chip has the bottom-left corner
   // No page is ever framed (stops clickjacking of the login and the Create buttons), and responses keep their declared types.
   async headers() {

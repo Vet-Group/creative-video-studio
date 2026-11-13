@@ -15,6 +15,11 @@ export const USERS = {
   imgp: { email: 'imgp@e2e.test', name: 'E2E Img P', role: 'member' },
   tplpos: { email: 'tplpos@e2e.test', name: 'E2E Tpl Pos', role: 'member' },
   member11: { email: 'member11@e2e.test', name: 'E2E Member 11', role: 'member' },
+  // image-pages.e2e geometry at 1440: two gallery images each beside member11's, so the queue runs them side by side.
+  geoa: { email: 'geoa@e2e.test', name: 'E2E Geo A', role: 'member' },
+  geob: { email: 'geob@e2e.test', name: 'E2E Geo B', role: 'member' },
+  geoc: { email: 'geoc@e2e.test', name: 'E2E Geo C', role: 'member' },
+  geod: { email: 'geod@e2e.test', name: 'E2E Geo D', role: 'member' },
   // Named so that no earlier spec's "E2E Member 1" text match picks them up.
   appsa: { email: 'appsa@e2e.test', name: 'E2E Apps A', role: 'member' },
   appsb: { email: 'appsb@e2e.test', name: 'E2E Apps B', role: 'member' },
