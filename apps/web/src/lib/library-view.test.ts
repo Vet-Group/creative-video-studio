@@ -26,6 +26,13 @@ describe('filtersFromParams', () => {
     expect(filtersFromParams(new URLSearchParams(libraryQuery(f, 0)))).toEqual(f);
   });
 
+  it('keeps the kind of one app through the address', () => {
+    const f = { ...NO_FILTERS, kind: 'background_changer', sort: 'oldest' as const };
+    const query = libraryQuery(f, 0);
+    expect(query).toBe('kind=background_changer&sort=oldest');
+    expect(filtersFromParams(new URLSearchParams(query))).toEqual(f);
+  });
+
   it('ignores offset and the item deep link, and falls back on unknown values', () => {
     const p = new URLSearchParams('q=hoa&offset=48&item=abc&days=weird&verdict=bogus&sort=weird');
     expect(filtersFromParams(p)).toEqual({ ...NO_FILTERS, q: 'hoa' });
@@ -116,6 +123,9 @@ describe('activeFilterChips', () => {
   });
   it('a picked date wins over days and reads day/month/year', () => {
     expect(activeFilterChips({ ...NO_FILTERS, date: '2026-11-09', days: '30' })).toEqual([{ key: 'date', label: 'Ngày: 09/11/2026' }]);
+  });
+  it('shows the name of one app for its kind', () => {
+    expect(activeFilterChips({ ...NO_FILTERS, kind: 'background_changer' }, { kind: 'Đổi nền' })).toEqual([{ key: 'kind', label: 'Đổi nền' }]);
   });
   it('falls back to the raw value when no name is passed', () => {
     expect(activeFilterChips({ ...NO_FILTERS, creator: 'u1', kind: 'video' })).toEqual([

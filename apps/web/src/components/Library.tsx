@@ -1,6 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { type CSSProperties, Fragment, type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
+import { JOB_APPS } from '@/lib/apps';
 import { api, type Clip, errorText, sendJson, thumbUrl } from '@/lib/api';
 import { FAULTS } from '@/lib/faults';
 import { featureLabel } from '@/lib/features';
@@ -8,6 +9,7 @@ import { GALLERY_SAMPLES, numberedSamples } from '@/lib/examples';
 import { cardTitleOfFormat, HOOKS, LOCATIONS } from '@/lib/marketing';
 import { activeFilterChips, activeFilters, type ChipKey, dayHeadings, filtersFromParams, type LibraryFilters, type LibraryView, libraryQuery, matchesVerdict, NO_FILTERS, readView, saveView, type VerdictFilter } from '@/lib/library-view';
 import { reuseHref } from '@/lib/reuse';
+import { SWIPE_START_PX, swipeStep } from '@/lib/swipe';
 import { useSamples } from '@/lib/use-samples';
 import { CompareSlider } from './CompareSlider';
 import { Icon } from './Icon';
@@ -46,6 +48,8 @@ const KINDS = [
   { id: 'marketing_review', label: 'Đánh giá sản phẩm' },
   { id: 'apps', label: 'Ứng dụng' },
 ];
+/** The kind of each app, for the second row of pills under the Apps pill: the id is the app's feature, the `kind` the API takes. */
+const APP_KINDS = JOB_APPS.map((a) => ({ id: a.feature, label: a.name }));
 /** The size slider: card widths from small to large, remembered per browser. */
 const SIZES = ['12rem', '16rem', '22rem'];
 const SIZE_KEY = 'cvs.library.size';
@@ -369,6 +373,15 @@ export function ClipDetail({ clips, index, stores, admin, onIndex, onChange }: {
   const [note, setNote] = useState('');
   const [comparing, setComparing] = useState(false);
   const media = useRef<HTMLVideoElement & HTMLImageElement>(null);
+  // A swipe on a touch screen steps to the neighbour like the arrows: the media follows the finger, then opens it or snaps back.
+  const box = useRef<HTMLDivElement>(null);
+  const fingers = useRef(new Set<number>());
+  const swipe = useRef<{ x: number; y: number; t: number } | null>(null);
+  const slide = (dx: number, animate = false) => {
+    if (!box.current) return;
+    box.current.style.transition = animate && !matchMedia('(prefers-reduced-motion: reduce)').matches ? 'transform .15s' : 'none';
+    box.current.style.transform = dx ? `translateX(${dx}px)` : '';
+  };
   const content = (id: string) => `/api/assets/${id}/content`;
   useEffect(() => {
     setJob(null);
@@ -439,7 +452,44 @@ export function ClipDetail({ clips, index, stores, admin, onIndex, onChange }: {
 
   return (
     <Modal open onClose={() => onIndex(null)} label={`Chi tiết: ${title}`} className="lightbox">
-      <div className="lightbox-media">
+      <div
+        ref={box}
+        className="lightbox-media"
+        onPointerDown={(e) => {
+          fingers.current.add(e.pointerId);
+          swipe.current = null;
+          if (fingers.current.size > 1) return slide(0); // a second finger is a pinch, not a swipe
+          // The native video controls sit in the bottom strip and keep their own drags.
+          const over = e.target instanceof HTMLVideoElement && e.clientY > e.target.getBoundingClientRect().bottom - 56;
+          if (e.pointerType !== 'mouse' && !comparing && !over) swipe.current = { x: e.clientX, y: e.clientY, t: e.timeStamp };
+        }}
+        onPointerMove={(e) => {
+          const s = swipe.current;
+          if (!s) return;
+          const dx = e.clientX - s.x;
+          if (Math.abs(e.clientY - s.y) > Math.abs(dx) && Math.abs(e.clientY - s.y) >= SWIPE_START_PX) {
+            swipe.current = null; // a vertical scroll
+            slide(0, true);
+          } else if (Math.abs(dx) >= SWIPE_START_PX) slide(dx);
+        }}
+        onPointerUp={(e) => {
+          fingers.current.delete(e.pointerId);
+          const s = swipe.current;
+          swipe.current = null;
+          if (!s) return;
+          const dx = e.clientX - s.x;
+          const step = Math.abs(e.clientY - s.y) > Math.abs(dx) ? 0 : swipeStep(dx, e.timeStamp - s.t, e.currentTarget.clientWidth);
+          if (step && index + step >= 0 && index + step < clips.length) {
+            slide(0);
+            onIndex(index + step);
+          } else slide(0, true);
+        }}
+        onPointerCancel={(e) => {
+          fingers.current.delete(e.pointerId);
+          swipe.current = null;
+          slide(0, true);
+        }}
+      >
         {comparing && original ? (
           <CompareSlider before={content(original.id)} after={content(clip.videoAssetId)} beforeAlt={`Ảnh gốc ${original.filename}`} afterAlt={clip.downloadName} />
         ) : image ? (
@@ -795,7 +845,8 @@ export function Library() {
     }
   }, [pickDay]);
   const active = activeFilters(filters);
-  const chips = activeFilterChips(filters, { creator: creators.find((c) => c.id === filters.creator)?.name, kind: KINDS.find((k) => k.id === filters.kind)?.label });
+  const inApps = filters.kind === 'apps' || APP_KINDS.some((k) => k.id === filters.kind);
+  const chips = activeFilterChips(filters, { creator: creators.find((c) => c.id === filters.creator)?.name, kind: [...KINDS, ...APP_KINDS].find((k) => k.id === filters.kind)?.label });
   // An item that no longer matches Favourites only or the verdict filter leaves the list, so the next page's offset stays right; the detail view then shows the next one.
   const counted = useRef(new Set<string>()); // first marks already taken off the count: two quick marks on one item see the same unmarked render
   const uncount = (c: Clip | undefined) => {
@@ -1031,11 +1082,20 @@ export function Library() {
       </div>
       <div className="kinds" role="group" aria-label="Loại">
         {KINDS.map((k) => (
-          <button key={k.id} type="button" aria-pressed={filters.kind === k.id} onClick={() => set({ kind: k.id })}>
+          <button key={k.id} type="button" aria-pressed={filters.kind === k.id || (k.id === 'apps' && inApps)} onClick={() => set({ kind: k.id })}>
             {k.label}
           </button>
         ))}
       </div>
+      {inApps && (
+        <div className="kinds" role="group" aria-label="Theo ứng dụng">
+          {[{ id: 'apps', label: 'Tất cả ứng dụng' }, ...APP_KINDS].map((k) => (
+            <button key={k.id} type="button" aria-pressed={filters.kind === k.id} onClick={() => set({ kind: k.id })}>
+              {k.label}
+            </button>
+          ))}
+        </div>
+      )}
       <div className="library-filters" role="search" aria-label="Bộ lọc">
         <label className="library-field">
           <span>Người tạo</span>
