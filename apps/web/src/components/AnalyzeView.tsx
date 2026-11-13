@@ -6,7 +6,6 @@
 import Link from 'next/link';
 import type { Analysis } from '@cvs/core/analysis/breakdown';
 import { useEffect, useRef, useState } from 'react';
-import { ABOUT } from '@/lib/about-content';
 import { analysisFormat, mergeShots, roleLabel, scriptPrompt, scriptText, timeRange } from '@/lib/analyze';
 import { ANALYZE_EXAMPLES } from '@/lib/analyze-examples';
 import { api, ApiError, errorText, sendJson } from '@/lib/api';
@@ -433,7 +432,7 @@ export function AnalyzeView({ initialId, remakeEnabled = false }: { initialId?: 
           ) : shown === 'examples' ? (
             <Examples busy={busy} onUse={(name) => void takeSample(name)} />
           ) : (
-            <About page={ABOUT.analyze} />
+            <About page="analyze" />
           )}
         </div>
       </div>

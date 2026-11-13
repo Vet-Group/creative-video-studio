@@ -140,9 +140,9 @@ test('Continue shows running jobs first, then the latest finished, at most four;
   const attr = (tag: string, name: string) => tag.match(new RegExp(` ${name}="([^"]+)"`))?.[1] ?? null;
   const cards = [...list.matchAll(/(<a [^>]*>)([\s\S]*?)<\/a>/g)].map(([, tag, inner]) => [attr(tag!, 'href'), attr(tag!, 'data-status'), attr(inner!, 'src')]);
   expect(cards).toEqual([
-    ['/try-on', 'running', '/api/assets/in1/content'], // a running job shows the photo it was given
-    ['/library?item=done-1', 'succeeded', '/api/assets/p1/content'], // a clip shows its poster
-    ['/library?item=img-1', 'succeeded', '/api/assets/i1/content'], // an image shows itself
+    ['/try-on', 'running', '/api/assets/in1/thumb'], // a running job shows the photo it was given
+    ['/library?item=done-1', 'succeeded', '/api/assets/p1/thumb'], // a clip shows its poster
+    ['/library?item=img-1', 'succeeded', '/api/assets/i1/thumb'], // an image shows itself
     ['/marketing-studio', 'failed', null],
   ]);
   expect(list).toContain('Đang tạo');
@@ -155,7 +155,7 @@ test("Continue shows a finished image job's preview when it has one, else the im
     job('img-old', 'succeeded', { feature: 'try_on', resolution: '1K', output_asset_id: 'old' }),
   ]);
   const list = html.match(/<ul class="explore-jobs"[^>]*>([\s\S]*?)<\/ul>/)![1]!;
-  expect([...list.matchAll(/ src="([^"]+)"/g)].map((m) => m[1])).toEqual(['/api/assets/small/content', '/api/assets/old/content']);
+  expect([...list.matchAll(/ src="([^"]+)"/g)].map((m) => m[1])).toEqual(['/api/assets/small/thumb', '/api/assets/old/thumb']);
 });
 
 const modelRows = (n: number, kind: 'video' | 'image') =>

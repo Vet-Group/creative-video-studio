@@ -2,7 +2,7 @@
 // The choices library's pickers (GET /api/choices): a box on the form that opens a dialog of hook, location or ending cards, grouped by who shares them and
 // filtered by store and niche, with a form that adds one (private, for the chosen store or, for a template editor, for the company) with an optional photo.
 import { type KeyboardEvent, type ReactNode, useEffect, useId, useRef, useState } from 'react';
-import { api, errorText, sendJson } from '@/lib/api';
+import { api, errorText, sendJson, thumbUrl } from '@/lib/api';
 import { cardSample } from '@/lib/examples';
 import { BUILT_IN_CHOICES, MAX_CHOICE_DESC, MAX_CHOICE_NAME, MAX_CHOICE_NICHE, MAX_CHOICE_PHRASE, type MarketingChoice, type ParamFormat } from '@/lib/marketing';
 import { useSamples } from '@/lib/use-samples';
@@ -347,7 +347,7 @@ export function ChoiceDialog({ open, title, sub, kind, choices, often, posters, 
   const first = top[0] ?? groups[0]?.list[0];
   const card = (c: Choice) => (
     <button key={c.id} type="button" role="option" aria-selected={selected.includes(c.id)} tabIndex={(selected.length > 0 ? selected[0] === c.id : c === first) ? 0 : -1} aria-label={c.name} aria-describedby={`${kind}-${c.id}-desc`} onClick={() => onPick(c.id)}>
-      {open && <CardMedia {...cardSample(have, `marketing-${kind}-${c.id}`, c.imageAssetId ? `/api/assets/${c.imageAssetId}/content` : posters[c.id] && !have.has(`marketing-${kind}-${c.id}.mp4`) ? `/api/assets/${posters[c.id]}/content` : null)} />}
+      {open && <CardMedia {...cardSample(have, `marketing-${kind}-${c.id}`, c.imageAssetId ? thumbUrl(c.imageAssetId) : posters[c.id] && !have.has(`marketing-${kind}-${c.id}.mp4`) ? thumbUrl(posters[c.id]!) : null)} />}
       <span className="choice-name">{c.name}</span>
       <span id={`${kind}-${c.id}-desc`} className="choice-desc">
         {c.desc}

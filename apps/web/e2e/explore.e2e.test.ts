@@ -21,7 +21,7 @@ test('Explore greets the member by given name and lists a job they start under C
 
   // The mock clip takes a few seconds; once done the card shows its poster and the day's count includes it.
   await expect.poll(async () => (await page.reload(), await recent.getAttribute('data-status')), { timeout: 60_000 }).toBe('succeeded');
-  await expect(recent.locator('img')).toHaveAttribute('src', /^\/api\/assets\/[^/]+\/content$/);
+  await expect(recent.locator('img')).toHaveAttribute('src', /^\/api\/assets\/[^/]+\/thumb$/);
   await expect(status).toHaveText(`Hôm nay bạn còn ${Number(left) - 1}/${cap} clip video`);
 
   // Finished, the card opens the result in the Library's detail view.

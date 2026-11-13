@@ -224,7 +224,7 @@ function ClipCard({ clip, view, select, onChange, onDeleted, onOpen }: { clip: C
       <article className="lib-row" aria-label={name}>
         {select}
         <span className="lib-thumb">
-          {thumb ? <img src={`/api/assets/${thumb}/content`} alt="" loading="lazy" /> : <video preload="metadata" muted playsInline src={`/api/assets/${clip.videoAssetId}/content`} />}
+          {thumb ? <img src={thumbUrl(thumb)} alt="" loading="lazy" decoding="async" /> : <video preload="metadata" muted playsInline src={`/api/assets/${clip.videoAssetId}/content`} />}
         </span>
         <div className="lib-row-main">
           <p className="lib-row-title">
@@ -289,9 +289,9 @@ function ClipCard({ clip, view, select, onChange, onDeleted, onOpen }: { clip: C
       {select}
       <div className="lib-media" onPointerEnter={(e) => e.pointerType === 'mouse' && play(true)} onPointerLeave={() => play(false)}>
         {image ? (
-          <img className="output" src={`/api/assets/${clip.posterAssetId ?? clip.videoAssetId}/content`} alt={clip.downloadName} loading="lazy" />
+          <img className="output" src={thumbUrl(clip.posterAssetId ?? clip.videoAssetId)} alt={clip.downloadName} loading="lazy" decoding="async" />
         ) : (
-          <video ref={video} muted loop playsInline preload="metadata" poster={clip.posterAssetId ? `/api/assets/${clip.posterAssetId}/content` : undefined} src={`/api/assets/${clip.videoAssetId}/content`} />
+          <video ref={video} muted loop playsInline preload="metadata" poster={clip.posterAssetId ? thumbUrl(clip.posterAssetId) : undefined} src={`/api/assets/${clip.videoAssetId}/content`} />
         )}
         {/* Over the media rather than around it, so the picture keeps its own name for screen readers. */}
         <button type="button" className="lib-open" onClick={onOpen} aria-label="Xem chi tiết" title="Xem chi tiết" />
@@ -677,7 +677,7 @@ function ExampleControl({ clip, onChange }: { clip: Clip; onChange: (c: Clip) =>
   const similar = check.filter((e) => e.match);
   const tile = (e: ExampleRow) => (
     <li key={e.id}>
-      <img src={`/api/assets/${e.posterAssetId ?? e.videoAssetId}/content`} alt={`${e.modelLabel}, ${e.ratio}`} loading="lazy" />
+      <img src={thumbUrl(e.posterAssetId ?? e.videoAssetId)} alt={`${e.modelLabel}, ${e.ratio}`} loading="lazy" decoding="async" />
       {e.match && <span className="example-match">{MATCH_TEXT[e.match]}</span>}
     </li>
   );

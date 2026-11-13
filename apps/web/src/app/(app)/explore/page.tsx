@@ -8,6 +8,7 @@ import { KindChip } from '@/components/KindChip';
 import { ToolGuideButton } from '@/components/ToolGuide';
 import { Welcome } from '@/components/Welcome';
 import { MODEL_CARD_TEXT } from '@/lib/about-content';
+import { thumbUrl } from '@/lib/api';
 import { pool } from '@/lib/auth';
 import { NO_CAP } from '@/lib/caps';
 import { CHANGELOG } from '@/lib/changelog';
@@ -38,7 +39,6 @@ const TZ = 'Asia/Ho_Chi_Minh';
 const fmtDay = new Intl.DateTimeFormat('vi-VN', { weekday: 'long', day: 'numeric', month: 'numeric', timeZone: TZ });
 const fmtTime = new Intl.DateTimeFormat('vi-VN', { hour: '2-digit', minute: '2-digit', timeZone: TZ });
 const fmtDate = new Intl.DateTimeFormat('vi-VN', { day: 'numeric', month: 'numeric', timeZone: TZ });
-const content = (id: string) => `/api/assets/${id}/content`;
 
 /** The sample name of a model card; ids such as seedance-2.5 keep only letters, digits and dashes in sample names.
  * A variant without its own sample (a -vertex, -reference, -byteplus, -1080p or -480p id) shows the sample of the model it varies. */
@@ -102,7 +102,7 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
   const jobPicture = (j: (typeof recent)[number]) => {
     const done = j.status === 'succeeded' ? (j.poster_asset_id ?? (j.resolution ? j.output_asset_id : null)) : null;
     const id = done ?? j.input_id;
-    return id ? content(id) : null;
+    return id ? thumbUrl(id) : null;
   };
   /** The recent-job note props: the finish label and the server-rendered note (shown until the leaf mounts and ticks the elapsed time). */
   const noteProps = (j: (typeof recent)[number]) => {
@@ -159,7 +159,7 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
               return (
                 <li key={j.id}>
                   <Link href={j.status === 'succeeded' ? `/library?item=${j.id}` : (pageOf(j.feature) ?? '/library')} className="explore-job" data-status={isRunning(j) ? 'running' : j.status}>
-                    <span className="explore-job-media">{picture ? <img src={picture} alt="" /> : <span className="banner-empty" aria-hidden="true" />}</span>
+                    <span className="explore-job-media">{picture ? <img src={picture} alt="" loading="lazy" decoding="async" /> : <span className="banner-empty" aria-hidden="true" />}</span>
                     <strong>{featureLabel(j.feature)}</strong>
                     {/* What tells two jobs of one tool apart: the model, and the member's own words, as the Library's OWN_PROMPT picks them (a composed prompt is left out). */}
                     {j.model_label && <span className="explore-job-model">{j.model_label}</span>}

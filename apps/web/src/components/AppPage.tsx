@@ -4,7 +4,6 @@
 import { FEATURE_PROMPTS } from '@cvs/core/models';
 import Link from 'next/link';
 import { type CSSProperties, useEffect, useId, useRef, useState } from 'react';
-import { APP_ABOUT } from '@/lib/about-content';
 import { api, errorText, sendJson } from '@/lib/api';
 import { type AppConfig, appInputs, appReason, type AppCategory, motionReason, slotMax, splitImages, stockGroups, visibleApps } from '@/lib/apps';
 import { basePrompt, promptTooLong } from '@/lib/prompt-limit';
@@ -530,6 +529,5 @@ function MotionForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
 }
 
 export function AppAbout({ app }: { app: AppConfig }) {
-  const page = APP_ABOUT[app.slug];
-  return page ? <About page={page} long /> : null;
+  return <About app={app.slug} long />;
 }

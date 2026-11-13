@@ -3,7 +3,6 @@
 // About tabs, laid out like Try On and Create. Run posts an image job.
 import { useId, useState } from 'react';
 import { api, errorText, sendJson } from '@/lib/api';
-import { ABOUT } from '@/lib/about-content';
 import { type BrandKit, withBrand } from '@/lib/brand';
 import { promptTooLong } from '@/lib/prompt-limit';
 import { confirmRun } from '@/lib/run-guard';
@@ -240,7 +239,7 @@ ${style.prompt}` : prompt.trim();
 
         <div className="side" id={`imagegen-panel-${panel}`} role="tabpanel" aria-labelledby={`imagegen-tab-${panel}`} hidden={narrow && shown === 'create'}>
           <FormContext.Provider value={{ recreate: (from) => (recall.touch(), recreate(from), narrow && setTab('create')), apply, photo: (p) => void take(p), prompt: (text) => (setPrompt(text), notify('Đã chép mô tả')), result: (p) => void take(p) }}>
-            {shown === 'examples' ? <Gallery kind="image" samples="image-example-" label="Ảnh của công ty" emptyText="Chưa có ảnh nào trong công ty. Hãy tạo ảnh đầu tiên." /> : shown === 'about' ? <About page={ABOUT.image} /> : <Tray feature="image" />}
+            {shown === 'examples' ? <Gallery kind="image" samples="image-example-" label="Ảnh của công ty" emptyText="Chưa có ảnh nào trong công ty. Hãy tạo ảnh đầu tiên." /> : shown === 'about' ? <About page="image" /> : <Tray feature="image" />}
           </FormContext.Provider>
         </div>
       </div>

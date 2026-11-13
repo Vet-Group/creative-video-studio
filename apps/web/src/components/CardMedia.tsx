@@ -32,5 +32,5 @@ export function LoopVideo({ src, poster }: { src: string; poster: string | null 
 /** A card's loop, else its still, else the empty stripes. `cardSample` (lib/examples.ts) picks the sources. */
 export function CardMedia({ video, poster }: { video: string | null; poster: string | null }) {
   if (video) return <LoopVideo src={video} poster={poster} />;
-  return poster ? <img src={poster} alt="" /> : <span className="banner-empty" aria-hidden="true" />;
+  return poster ? <img src={poster} alt="" loading="lazy" decoding="async" /> : <span className="banner-empty" aria-hidden="true" />;
 }

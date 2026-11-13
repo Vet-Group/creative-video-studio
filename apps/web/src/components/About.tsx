@@ -3,7 +3,9 @@
 // then sections of eyebrow, heading and lead with cards, steps, before-and-after pairs, tables, ratio tiles, example prompts and a FAQ).
 // `long` is the app pages' article style: plain headings, numbered steps and points without boxes.
 import Link from 'next/link';
-import { type AboutBlock, type AboutCard, type AboutPage, type SpecModel, withLiveSpecs } from '@/lib/about-content';
+import { useEffect, useState } from 'react';
+import type { ABOUT } from '@/lib/about-content';
+import { type AboutBlock, type AboutCard, type SpecModel, withLiveSpecs } from '@/lib/about-specs';
 import { cardSample } from '@/lib/examples';
 import { useSamples } from '@/lib/use-samples';
 import { CardMedia } from './CardMedia';
@@ -168,8 +170,15 @@ function Block({ block, models }: { block: AboutBlock; models?: SpecModel[] }) {
   );
 }
 
-/** `models`: the Create form's loaded model list, which family cards build their spec lines from. */
-export function About({ page, long = false, models }: { page: AboutPage; long?: boolean; models?: SpecModel[] }) {
+/** `page` names a tool's page (ABOUT) and `app` an app's slug (APP_ABOUT); the page data (a large module) loads when the tab first opens.
+ * `models`: the Create form's loaded model list, which family cards build their spec lines from. */
+export function About({ page: key, app, long = false, models }: { page?: keyof typeof ABOUT; app?: string; long?: boolean; models?: SpecModel[] }) {
+  const [content, setContent] = useState<typeof import('@/lib/about-content')>();
+  useEffect(() => {
+    void import('@/lib/about-content').then(setContent);
+  }, []);
+  const page = key ? content?.ABOUT[key] : app ? content?.APP_ABOUT[app] : undefined;
+  if (!page) return null;
   return (
     <article className={long ? 'about about-long' : 'about'}>
       <h2>{page.title}</h2>

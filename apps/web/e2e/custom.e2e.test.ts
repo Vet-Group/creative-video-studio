@@ -273,7 +273,7 @@ test("a Hay dùng card with no sample shows the poster of the member's latest cl
   await hookBox(page).click();
   const hooks = page.getByRole('dialog', { name: 'Chọn hook' });
   const card = hooks.getByRole('group', { name: 'Hay dùng' }).getByRole('option', { name, exact: true });
-  await expect(card.locator('img')).toHaveAttribute('src', `/api/assets/${poster}/content`);
+  await expect(card.locator('img')).toHaveAttribute('src', `/api/assets/${poster}/thumb`);
   await expect.poll(() => card.locator('img').evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true);
   await expect(hooks.getByRole('option', { name: quiet, exact: true }).locator('img')).toHaveCount(0); // never used: no picture
 

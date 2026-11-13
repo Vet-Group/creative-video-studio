@@ -55,7 +55,7 @@ test("a hook shared with the page's store shows for another member under that st
     const hooks = other.getByRole('dialog', { name: 'Chọn hook' });
     await expect(select(other, 'Cửa hàng')).toHaveText('E2E Shop');
     await expect(hooks.getByRole('group', { name: 'Của cửa hàng E2E Shop' }).getByRole('option', { name, exact: true })).toBeVisible();
-    await expect(hooks.getByRole('option', { name, exact: true }).locator('img')).toHaveAttribute('src', /^\/api\/assets\/.+\/content$/); // its photo, readable by another member
+    await expect(hooks.getByRole('option', { name, exact: true }).locator('img')).toHaveAttribute('src', /^\/api\/assets\/.+\/thumb$/); // its photo, readable by another member
     await expect(hooks.getByRole('group', { name: 'Có sẵn' }).getByRole('option').first()).toBeVisible();
     const niches = hooks.getByRole('group', { name: 'Ngách' });
     await niches.getByRole('button', { name: niche, exact: true }).click();
