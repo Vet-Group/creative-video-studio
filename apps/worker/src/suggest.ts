@@ -49,13 +49,15 @@ export async function runSuggestion(
 
 /**
  * The e2e worker's stand-in (CVS_FAKE_SUGGEST=1, never with a fal key): three numbered options built from the input with their readings, one
- * translation, or one preset prompt that counts the stills it got; no network.
+ * translation, or one preset prompt that counts the stills it got, or one issue with its fix for a prompt to check (none when the prompt says "fine"); no network.
  */
 export const fakeSuggester: Suggester = async (i, frames) =>
   i.field === 'translate'
     ? { options: [`Translation: ${i.text}`], costUsd: 0, provider: 'mock', model: 'fake' }
-    : i.field === 'scenes'
-      ? { options: (i.times ?? []).slice(0, 2).map((_, k) => String(k + 1)), costUsd: 0, provider: 'mock', model: 'fake' } // the first two scenes
-      : i.field === 'video'
-        ? { options: [videoPrompt({ motion: `Mock motion read from ${frames?.length ?? 0} stills: the camera pushes in slowly on the model.`, person: true, stable: true }, i.max)], costUsd: 0, provider: 'mock', model: 'fake' }
-        : { options: [1, 2, 3].map((n) => `Option ${n}: ${i.text || i.field}`.slice(0, i.max)), meanings: [1, 2, 3].map((n) => `Reading ${n}: ${i.text || i.field}`), costUsd: 0, provider: 'mock', model: 'fake' };
+    : i.field === 'check'
+      ? { options: /fine/i.test(i.text) ? [] : [`Issue: ${i.text}`], meanings: /fine/i.test(i.text) ? [] : [`Fix: ${i.text}`], costUsd: 0, provider: 'mock', model: 'fake' }
+      : i.field === 'scenes'
+        ? { options: (i.times ?? []).slice(0, 2).map((_, k) => String(k + 1)), costUsd: 0, provider: 'mock', model: 'fake' } // the first two scenes
+        : i.field === 'video'
+          ? { options: [videoPrompt({ motion: `Mock motion read from ${frames?.length ?? 0} stills: the camera pushes in slowly on the model.`, person: true, stable: true }, i.max)], costUsd: 0, provider: 'mock', model: 'fake' }
+          : { options: [1, 2, 3].map((n) => `Option ${n}: ${i.text || i.field}`.slice(0, i.max)), meanings: [1, 2, 3].map((n) => `Reading ${n}: ${i.text || i.field}`), costUsd: 0, provider: 'mock', model: 'fake' };

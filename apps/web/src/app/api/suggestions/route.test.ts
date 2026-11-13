@@ -100,7 +100,7 @@ describe('/api/suggestions', () => {
   test('refuses a bad field, a script outside Advanced, over-long text and unknown choices, and queues nothing', async () => {
     const u = await newUser();
     const before = sent.length;
-    expect(await error(await ask(u, { field: 'title' }))).toBe('field must be brief, script, hook, location, ending, prompt, translate, video or scenes');
+    expect(await error(await ask(u, { field: 'title' }))).toBe('field must be brief, script, hook, location, ending, prompt, translate, video, scenes or check');
     expect(await error(await ask(u, { field: 'script' }))).toBe('a script is for Advanced and Review only');
     expect((await ask(u, { field: 'script', format: 'advanced', text: 'x'.repeat(ADVANCED_MAX_SCRIPT + 1) })).status).toBe(202); // the brief as notes for lines
     expect(await error(await ask(u, { field: 'script', format: 'advanced', text: 'x'.repeat(5001) }))).toBe('text may be at most 5000 characters');
@@ -121,6 +121,31 @@ describe('/api/suggestions', () => {
     expect(await error(await ask(u, { field: 'translate', text: '  ' }))).toBe('text must be 1 to 5000 characters');
     expect(await error(await ask(u, { field: 'translate', text: 'x'.repeat(5001) }))).toBe('text must be 1 to 5000 characters');
     expect(await runs(u.id)).toBe(1);
+  });
+
+  test("a check queues the composed English prompt with the page's model, pace and clip format, counted like any run, and refuses bad text or values", async () => {
+    const u = await newUser();
+    await pool.query(
+      `insert into model_configs (id, provider, endpoint, label, kind, features, ratios, durations_sec, max_images, output_resolution, usd_per_second, sources, enabled)
+       values ('kling-c', 'fal', 'fal-ai/kling-video/v2.6/pro/image-to-video', 'Kling C', 'video', '{video}', '{9:16}', '{5}', 4, '1080p', 0.07, '{}', true),
+              ('kling-c-off', 'fal', 'x', 'Kling C Off', 'video', '{video}', '{9:16}', '{5}', 4, '1080p', 0.07, '{}', false)`,
+    );
+    const { modelNote } = await import('@cvs/core/suggest');
+    const res = await ask(u, { field: 'check', text: ' The clip opens on a spin. ', model: 'kling-c', audio: false, seconds: 5, format: 'review', feature: 'ignored', room: 100 });
+    expect(res.status).toBe(202);
+    const { id } = (await res.json()) as { id: string };
+    expect((await pool.query('select input from suggestion_runs where id = $1', [id])).rows[0].input).toEqual({
+      field: 'check', text: 'The clip opens on a spin.', context: '', max: 5000, seconds: 5, format: 'review',
+      model: modelNote({ id: 'kling-c', label: 'Kling C', endpoint: 'fal-ai/kling-video/v2.6/pro/image-to-video' }, false),
+    });
+    expect((await ask(u, { field: 'check', text: 'A spin.' })).status).toBe(202);
+    expect(await error(await ask(u, { field: 'check', text: '  ' }))).toBe('text must be 1 to 5000 characters');
+    expect(await error(await ask(u, { field: 'check' }))).toBe('text must be 1 to 5000 characters');
+    expect(await error(await ask(u, { field: 'check', text: 'x'.repeat(5001) }))).toBe('text must be 1 to 5000 characters');
+    expect(await error(await ask(u, { field: 'check', text: 'A spin.', model: 'kling-c-off' }))).toBe('model is not an enabled model');
+    expect(await error(await ask(u, { field: 'check', text: 'A spin.', seconds: 61 }))).toBe('seconds must be a whole number from 1 to 60');
+    expect(await error(await ask(u, { field: 'check', text: 'A spin.', audio: 'on' }))).toBe('audio must be true or false');
+    expect(await runs(u.id)).toBe(2);
   });
 
   test("a prompt asks for the tool's own task by feature, with the member's notes and room, and refuses an unknown feature", async () => {

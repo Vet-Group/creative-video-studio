@@ -12,8 +12,9 @@ import { confirmDialog } from './Confirm';
 import { Icon } from './Icon';
 import { Modal } from './Modal';
 import { PromptComposer } from './PromptComposer';
+import s from './PromptComposer.module.css';
 import { PromptTools } from './PromptTools';
-import type { Ask } from './Suggestions';
+import { type Ask, useSuggest } from './Suggestions';
 
 export type PromptMode = 'sections' | 'free';
 const MODES: [PromptMode, string][] = [
@@ -206,9 +207,10 @@ function Section({ title, rule, after, children }: { title: string; rule: string
  * The exact English prompt Run sends, one per hook variant (`labels` names them): open on a computer, folded on a phone. The summary keeps the longest
  * one's length against the model's `limit`, red past it (Run then waits with the reason on the page); open, Translate gives a Vietnamese reading of the first.
  * The server renders it open, and until hydration CSS (data-ssr) shows it folded on a phone, so neither screen flashes the other's state on load.
- * `note` says what still changes after Run (Enhance's rewrite, a preset's text the member may not read).
+ * `note` says what still changes after Run (Enhance's rewrite, a preset's text the member may not read). `check` (the page's model, audio, seconds and
+ * format) adds the Check button, which reviews the first prompt; only a page whose prompt is the member's own passes it.
  */
-export function PromptPreview({ feature, prompts, labels, limit, note }: { feature: string; prompts: string[]; labels?: (string | null)[]; limit?: number; note?: string }) {
+export function PromptPreview({ feature, prompts, labels, limit, note, check }: { feature: string; prompts: string[]; labels?: (string | null)[]; limit?: number; note?: string; check?: Pick<Ask, 'model' | 'audio' | 'seconds' | 'format'> }) {
   const narrow = useMediaQuery(NARROW);
   const hydrated = useHydrated();
   const [toggled, setToggled] = useState<boolean | null>(null); // the person's own choice beats the screen's default
@@ -240,8 +242,40 @@ export function PromptPreview({ feature, prompts, labels, limit, note }: { featu
       {open && (
         <div className="prompt-preview-foot">
           <PromptTools feature={feature} value={prompts[0] ?? ''} onChange={() => undefined} onRun={() => false} parts={['translate']} />
+          {check && prompts[0]?.trim() && <PromptCheck key={prompts[0]} text={prompts[0]} ask={check} />}
         </div>
       )}
     </details>
+  );
+}
+
+/** The Check button: an AI review of the composed prompt before the member pays for the clip, as issues with fixes. It never blocks Run, and keyed by the prompt, new words clear it. */
+function PromptCheck({ text, ask }: { text: string; ask: Pick<Ask, 'model' | 'audio' | 'seconds' | 'format'> }) {
+  const { busy, options, meanings, error, done, run } = useSuggest();
+  return (
+    <>
+      <button type="button" className={s.tool} disabled={busy} onClick={() => void run({ ...ask, field: 'check', text })}>
+        <Icon name="check" size={13} />
+        {busy ? 'Đang kiểm tra…' : error ? 'Thử lại' : 'Kiểm tra'}
+      </button>
+      <div className="prompt-check" role="group" aria-label="Kết quả kiểm tra prompt" aria-live="polite" hidden={!(busy || done || error)}>
+        {done && options.length === 0 && <p className="help">Prompt ổn, có thể chạy.</p>}
+        {options.length > 0 && (
+          <ul>
+            {options.map((o, i) => (
+              <li key={o}>
+                <strong>{o}</strong>
+                {meanings[i] && <span>Cách sửa: {meanings[i]}</span>}
+              </li>
+            ))}
+          </ul>
+        )}
+        {error && (
+          <p className={s.error} role="alert">
+            {error}
+          </p>
+        )}
+      </div>
+    </>
   );
 }

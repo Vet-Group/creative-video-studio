@@ -759,7 +759,7 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
               </PromptSections>
             )}
             {/* A preset's own prompt goes as it is (Enhance is off with a preset); only a template editor can read it, so a member's preview stays hidden. */}
-            {presetId === '' ? (sec || composed.trim()) && <PromptPreview feature="video" prompts={[composed]} limit={chosen?.maxPromptChars} note={enhance ? ENHANCE_NOTE : undefined} /> : current?.prompt && <PromptPreview feature="video" prompts={[current.prompt]} limit={chosen?.maxPromptChars} />}
+            {presetId === '' ? (sec || composed.trim()) && <PromptPreview feature="video" prompts={[composed]} limit={chosen?.maxPromptChars} note={enhance ? ENHANCE_NOTE : undefined} check={chosen ? { model: chosen.id, audio, seconds: durationSec } : undefined} /> : current?.prompt && <PromptPreview feature="video" prompts={[current.prompt]} limit={chosen?.maxPromptChars} />}
 
             <VideoSettings>
               {models && models.models.length > 0 && (

@@ -1569,6 +1569,9 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .prompt-preview { margin: 12px 0 0; font-size: 12px; line-height: 18px; }
 .prompt-preview summary { color: var(--text-subtle); cursor: pointer; }
 .prompt-preview-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 6px; }
+.prompt-check { flex: 1 0 100%; font-size: 13px; line-height: 19px; }
+.prompt-check ul { display: grid; gap: 8px; margin: 4px 0 0; padding-left: 18px; }
+.prompt-check li span { display: block; color: var(--text-sub); }
 .prompt-preview-count { color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .prompt-preview-count[data-over] { color: var(--danger-text); font-weight: 600; }
 .prompt-preview summary .prompt-preview-count { margin-left: 8px; }

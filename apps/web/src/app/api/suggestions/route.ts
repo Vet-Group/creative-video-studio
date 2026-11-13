@@ -21,7 +21,7 @@ const bad = (error: string, status = 400) => Response.json({ error }, { status }
  * Asks the worker for three Marketing Studio suggestions: `field` (`brief`, `script` on Advanced, or `hook`, `location` or `ending` for the English scene of
  * a new one from its Vietnamese name and description in `text`; with `rest`, the prompt's other sections, `hook` or `ending` is a sectioned prompt's
  * hook or last shot, from the member's own words in `text` (which may be empty) and written for the page's model and pace; `prompt` for the English prompt of the tool `feature`, a PROMPT_TASKS key, or `translate`
- * for one Vietnamese reading of the English prompt in `text`), `format` ('advanced', 'unboxing', 'review' or absent; the last two tell the model what the clip is), the
+ * for one Vietnamese reading of the English prompt in `text`, or `check` for a review of that composed prompt, as issues with fixes, before the member runs it), `format` ('advanced', 'unboxing', 'review' or absent; the last two tell the model what the clip is), the
  * member's `text` so far, the chosen `hook` and `location`, and for a brief the `room` the chosen model leaves for it (the page computes it); for a
  * brief, a script or a prompt, the page's chosen `model` (an enabled model's id), its `audio` switch and the clip's `seconds`, when it has them;
  * `scenes` for Smart Remake's pick of the scenes of the member's own finished analysis `analysisId` that show a product like their image `productAssetId` (404 unless both REA flags are on);
@@ -34,8 +34,8 @@ export async function POST(request: Request) {
   const b = (await readJson(request)) as {
     field?: unknown; format?: unknown; feature?: unknown; text?: unknown; hook?: unknown; location?: unknown; room?: unknown; model?: unknown; audio?: unknown; seconds?: unknown; preset?: unknown; rest?: unknown; analysisId?: unknown; productAssetId?: unknown;
   } | null;
-  if (b?.field !== 'brief' && b?.field !== 'script' && b?.field !== 'hook' && b?.field !== 'location' && b?.field !== 'ending' && b?.field !== 'prompt' && b?.field !== 'translate' && b?.field !== 'video' && b?.field !== 'scenes') {
-    return bad('field must be brief, script, hook, location, ending, prompt, translate, video or scenes');
+  if (b?.field !== 'brief' && b?.field !== 'script' && b?.field !== 'hook' && b?.field !== 'location' && b?.field !== 'ending' && b?.field !== 'prompt' && b?.field !== 'translate' && b?.field !== 'video' && b?.field !== 'scenes' && b?.field !== 'check') {
+    return bad('field must be brief, script, hook, location, ending, prompt, translate, video, scenes or check');
   }
   if (b.field === 'scenes') return scenes(g.session, b);
   if (b.field === 'video') {
@@ -66,6 +66,14 @@ export async function POST(request: Request) {
   }
   // Unboxing and Review tell the model what their clip is, so the options fit it.
   const note = b.format === 'unboxing' || b.format === 'review' ? { format: b.format as 'unboxing' | 'review' } : {};
+  if (b.field === 'check') {
+    // The Check button under the prompt preview: the composed English prompt, reviewed for the page's model and pace; it counts as a run like any other.
+    const text = typeof b.text === 'string' ? b.text.trim() : '';
+    if (!text || text.length > PROMPT_CEILING) return bad(`text must be 1 to ${PROMPT_CEILING} characters`);
+    const extra = await modelAndPace(b);
+    if (typeof extra === 'string') return bad(extra);
+    return queue(g.session.user.id, { field: 'check', text, context: '', max: PROMPT_CEILING, ...extra, ...note });
+  }
   if ((b.field === 'hook' || b.field === 'ending') && b.rest !== undefined) {
     // A sectioned prompt's Hook or Ending section: the member's words so far, as long as the section takes, and the other sections as the context.
     const max = b.field === 'hook' ? MAX_HOOK : MAX_ENDING;

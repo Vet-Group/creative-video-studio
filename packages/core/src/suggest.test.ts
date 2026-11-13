@@ -1,8 +1,8 @@
 import { expect, test } from 'vitest';
 import { ENHANCE_MODEL, ENHANCE_URL, OPENAI_URL } from './enhance';
 import {
-  createFalSuggester, createOpenAiSuggester, cutTo, DIRECTIONS, lengthenPrompt, modelNote, parseOption, PROMPT_SYSTEM, PROMPT_TASKS, SCENE_SYSTEM, SUGGEST_SYSTEM,
-  frameTimes, parseScenes, parseVideoAnswer, PERSON_KEEP, SCENES_SYSTEM, PRODUCT_KEEP, suggestPrompt, targetRange, TRANSLATE_SYSTEM, VIDEO_FRAMES, VIDEO_SYSTEM, videoPrompt,
+  CHECK_SYSTEM, createFalSuggester, FORMAT_NOTES, createOpenAiSuggester, cutTo, DIRECTIONS, lengthenPrompt, modelNote, parseOption, PROMPT_SYSTEM, PROMPT_TASKS, SCENE_SYSTEM, SUGGEST_SYSTEM,
+  frameTimes, parseCheck, parseScenes, parseVideoAnswer, PERSON_KEEP, SCENES_SYSTEM, PRODUCT_KEEP, suggestPrompt, targetRange, TRANSLATE_SYSTEM, VIDEO_FRAMES, VIDEO_SYSTEM, videoPrompt,
 } from './suggest';
 
 const answer = (body: unknown, status = 200) => Promise.resolve(new Response(JSON.stringify(body), { status }));
@@ -144,6 +144,25 @@ test('a translation is one call under its own system prompt, cool and long enoug
   expect(bodies).toHaveLength(1);
   expect(bodies[0]).toMatchObject({ system_prompt: TRANSLATE_SYSTEM, prompt: 'The prompt:\nThe model turns slowly in window light', temperature: 0.2, max_tokens: 6000 });
   expect(TRANSLATE_SYSTEM).toMatch(/natural, plain Vietnamese/);
+});
+
+test('a check is one cool call under its own system prompt with the model, format, pace and prompt, and answers each issue with its fix', async () => {
+  const bodies: FalBody[] = [];
+  const reply = JSON.stringify({ issues: [{ issue: 'Mở đầu chưa gây chú ý', fix: 'Bắt đầu bằng một chuyển động rõ.' }, { issue: 'Có thể thêm chữ lên video', fix: 'Bỏ cụm "caption".' }] });
+  const suggest = createFalSuggester({ apiKey: 'k', fetch: (_url, init) => (bodies.push(JSON.parse(String(init!.body))), answer({ output: reply, usage: { cost: 0.0002 } })) });
+  const ask = { field: 'check' as const, text: 'The model turns, a caption appears.', context: '', max: 5000, model: 'The model: Kling T.', seconds: 5, format: 'unboxing' as const };
+  expect(await suggest(ask)).toEqual({ options: ['Mở đầu chưa gây chú ý', 'Có thể thêm chữ lên video'], meanings: ['Bắt đầu bằng một chuyển động rõ.', 'Bỏ cụm "caption".'], costUsd: 0.0002, provider: 'fal', model: ENHANCE_MODEL });
+  expect(bodies).toHaveLength(1);
+  expect(bodies[0]).toMatchObject({ system_prompt: CHECK_SYSTEM, temperature: 0.2 });
+  expect(bodies[0]!.prompt).toBe(['The model: Kling T.', FORMAT_NOTES.unboxing, 'The clip lasts 5 seconds.', 'The prompt to review:', 'The model turns, a caption appears.'].join('\n'));
+  expect(CHECK_SYSTEM).toMatch(/first 2 seconds/);
+  expect(CHECK_SYSTEM).toMatch(/never inventing details/);
+});
+
+test('a check answer is read strictly: no issues is fine, more than four are cut, and anything malformed is an error and never an OK', () => {
+  expect(parseCheck('```json\n{"issues": []}\n```')).toEqual([]);
+  expect(parseCheck(JSON.stringify({ issues: Array.from({ length: 6 }, (_, i) => ({ issue: `i${i}`, fix: `f${i}` })) }))).toHaveLength(4);
+  for (const bad of ['', 'ổn', '[]', '{}', '{"issues": "none"}', '{"issues": [null]}', '{"issues": [{"issue": "x"}]}', '{"issues": [{"issue": " ", "fix": "y"}]}']) expect(() => parseCheck(bad), bad).toThrow(/suggest:/);
 });
 
 const chat = (content: unknown, usage?: unknown) => answer({ choices: [{ message: { role: 'assistant', content } }], usage });
