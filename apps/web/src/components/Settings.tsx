@@ -188,7 +188,7 @@ function Today({ usage, onMore }: { usage: Usage | null | 'failed'; onMore: () =
 }
 
 /** The display name, avatar colour and sign-in email, edited in place on the profile card; saved through PATCH /api/me/profile. */
-function ProfileCard({ name, color, email, isAdmin, onSaved }: { name: string; color: string; email: string; isAdmin: boolean; onSaved: (p: { name: string; color: string }) => void }) {
+function ProfileCard({ name, color, email, isAdmin, onSaved }: { name: string; color: string; email: string; isAdmin: boolean; onSaved: (p: { name: string; color: string; email: string }) => void }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(name);
   const [mail, setMail] = useState(email);
@@ -197,18 +197,26 @@ function ProfileCard({ name, color, email, isAdmin, onSaved }: { name: string; c
   const [busy, setBusy] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const edit = useRef<HTMLButtonElement>(null);
+  const moved = useRef(false);
+
+  // Focus follows the swap between the button and the form only once React has committed it; a frame callback can run before that.
+  useEffect(() => {
+    if (!moved.current) return;
+    moved.current = false;
+    (editing ? input : edit).current?.focus();
+  }, [editing]);
 
   function start() {
     setDraft(name);
     setMail(email);
     setPick(color);
     setError('');
+    moved.current = true;
     setEditing(true);
-    requestAnimationFrame(() => input.current?.focus());
   }
   function stop() {
+    moved.current = true;
     setEditing(false);
-    requestAnimationFrame(() => edit.current?.focus());
   }
   async function save(e: FormEvent) {
     e.preventDefault();
@@ -220,8 +228,8 @@ function ProfileCard({ name, color, email, isAdmin, onSaved }: { name: string; c
     if (Object.keys(body).length === 0) return stop();
     setBusy(true);
     try {
-      const saved = await api<{ name: string; avatarColor: string | null }>('/api/me/profile', sendJson('PATCH', body));
-      onSaved({ name: saved.name, color: userAvatarColor(saved.name, saved.avatarColor) });
+      const saved = await api<{ name: string; avatarColor: string | null; email: string }>('/api/me/profile', sendJson('PATCH', body));
+      onSaved({ name: saved.name, color: userAvatarColor(saved.name, saved.avatarColor), email: saved.email });
       stop();
     } catch (err) {
       setError(err instanceof ApiError && err.status === 409 ? 'Email này đã có người khác dùng.' : 'Không lưu được hồ sơ. Hãy thử lại.');
@@ -382,7 +390,7 @@ export function Settings({ open, onClose, userName, account, start = 'profile' }
   const [changes, setChanges] = useState(0); // a password change signs the other devices out, so the sessions list reloads
   const [twoFactor, setTwoFactor] = useState(account.twoFactor);
   const [usage, setUsage] = useState<Usage | null | 'failed'>(null);
-  const [saved, setSaved] = useState<{ name: string; color: string } | null>(null);
+  const [saved, setSaved] = useState<{ name: string; color: string; email: string } | null>(null);
   const [pwOpen, setPwOpen] = useState(false);
   const [pwDone, setPwDone] = useState(false);
   const heading = useRef<HTMLHeadingElement>(null);
@@ -487,7 +495,7 @@ export function Settings({ open, onClose, userName, account, start = 'profile' }
               <ProfileCard
                 name={name}
                 color={color}
-                email={account.email}
+                email={saved?.email ?? account.email}
                 isAdmin={account.isAdmin}
                 onSaved={(p) => {
                   setSaved(p);
