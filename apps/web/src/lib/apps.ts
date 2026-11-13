@@ -188,6 +188,9 @@ export const APPS: AppConfig[] = [
 /** The apps the member is offered: Smart Remake only when its flags are on (the server reads them), as every list of apps shows it. */
 export const visibleApps = (smartRemake: boolean): AppConfig[] => APPS.filter((a) => smartRemake || a.slug !== 'smart-remake');
 
+/** The apps whose results are jobs of their own feature, so the Library can filter by one (Smart Remake borrows `video`, and has none). */
+export const JOB_APPS: AppConfig[] = APPS.filter((a) => a.feature !== 'video');
+
 export const appBySlug = (slug: string): AppConfig | undefined => APPS.find((a) => a.slug === slug);
 
 /** Lower case without accents or stroked d, so a search typed without diacritics still matches. */

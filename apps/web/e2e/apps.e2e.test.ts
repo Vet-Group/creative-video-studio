@@ -168,6 +168,13 @@ test('Background Remover (one slot): Run needs the image, a mock job reaches His
   await expect(mine).toHaveCount(1);
   await expect(mine.getByText('Xoá nền', { exact: true })).toBeVisible();
   await expect(mine.locator('img.output')).toBeVisible();
+
+  const perApp = page.getByRole('group', { name: 'Theo ứng dụng' });
+  await perApp.getByRole('button', { name: 'Xoá nền', exact: true }).click();
+  await expect(page).toHaveURL(/kind=background_remover/);
+  await expect(mine).toHaveCount(1);
+  await perApp.getByRole('button', { name: 'Đổi nền', exact: true }).click();
+  await expect(mine).toHaveCount(0);
 });
 
 test('Jewelry Try-On takes several pieces and then the person; a mock job sends them in that order with the fixed instruction', async ({ page }) => {

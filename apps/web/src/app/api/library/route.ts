@@ -1,4 +1,5 @@
 import { ASPECTS, FEATURES } from '@cvs/db';
+import { JOB_APPS } from '@/lib/apps';
 import { pool } from '@/lib/auth';
 import { downloadName, EXAMPLE_ORDER, extensionOf, ICT_DAY, LIVE_CLIP, OWN_PROMPT } from '@/lib/clips';
 import { GALLERY_SAMPLES } from '@/lib/examples';
@@ -23,6 +24,8 @@ const KINDS: Record<string, string> = {
   marketing_unboxing: `j.feature = 'marketing' and j.params->>'format' = 'unboxing'`,
   marketing_review: `j.feature = 'marketing' and j.params->>'format' = 'review'`,
   apps: `j.feature in (${APP_FEATURES})`,
+  // One app: its feature is the kind.
+  ...Object.fromEntries(JOB_APPS.map((a) => [a.feature, `j.feature = '${a.feature}'`])),
 };
 /** The `verdict` filters, as SQL over the item's mark `v`: unmarked, any Pass (a featured one too), featured only, or Fail. */
 const VERDICTS: Record<string, string> = {
@@ -34,7 +37,7 @@ const VERDICTS: Record<string, string> = {
 
 /**
  * The Library: every user's live clips and images, newest first. Filters: `creator` (a user id), `date` (YYYY-MM-DD, Asia/Ho_Chi_Minh), `ratio` and
- * `kind` (`all` by default, `images`, `videos`, one feature of `try_on`, `image`, `video`, `marketing` (or one of its formats, `marketing_ugc`, `marketing_advanced`, `marketing_unboxing` and `marketing_review`), or `apps` for every app feature),
+ * `kind` (`all` by default, `images`, `videos`, one feature of `try_on`, `image`, `video`, `marketing` (or one of its formats, `marketing_ugc`, `marketing_advanced`, `marketing_unboxing` and `marketing_review`), or `apps` for every app feature, or the feature of one app such as `background_changer`),
  * `verdict` (`none` for unmarked items, `pass`, `featured` or `fail`), `favorites=1` (only the caller's favourites), `example=1` (only the results an Admin put on an Examples tab; with the `kind` of one such tab, in its order unless `sort=oldest`), `q` (words in the model name or the creator's own `prompt`, case-insensitive, up to 200 characters) and `sort` (`newest`, the default, or `oldest`); `offset` pages by 24. `favorite` says whether the caller marked an item, `example` whether it is on its page's Examples tab. Each item has its `feature` and `mediaType` (`video` or `image`, from the output asset); `videoAssetId` is the output asset
  * either way, and an image item has `durationSec` 0 and its `resolution`. `creators` fills the creator filter. `unmarked` counts the live items the caller may mark (their own, or all for an Admin) that have no mark yet. `costUsd` is the job's ledger total, provisional while `costFinal` is false.
  */

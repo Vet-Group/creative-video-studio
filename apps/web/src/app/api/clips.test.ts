@@ -3,6 +3,7 @@
 import { randomBytes } from 'node:crypto';
 import { DeleteBucketCommand, DeleteObjectsCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { createTestDatabase } from '@cvs/db/testing';
+import { JOB_APPS } from '@/lib/apps';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
 const testDb = await createTestDatabase();
@@ -394,6 +395,11 @@ describe('images in the Library', () => {
     expect(await kind('marketing_unboxing')).toEqual([mu]);
     expect(await kind('marketing_review')).toEqual([mr]);
     expect(await kind('apps')).toEqual([mc, rf].sort());
+    expect(await kind('reframe')).toEqual([rf]); // one app: just its feature
+    expect(await kind('motion_control')).toEqual([mc]);
+    expect(await kind('face_swap')).toEqual([]);
+    for (const a of JOB_APPS) expect((await GET_LIBRARY(req(`/api/library?kind=${a.feature}`, bob.cookie))).status).toBe(200); // every app the picker offers is a kind
+    expect((await GET_LIBRARY(req('/api/library?kind=smart-remake', bob.cookie))).status).toBe(400); // an app with no job of its own is not
     expect((await items(bob.cookie)).map((c) => c.id)).toEqual(expect.arrayContaining([v, im])); // no kind is all
     expect((await GET_LIBRARY(req('/api/library?kind=cats', bob.cookie))).status).toBe(400);
     expect((await GET_LIBRARY(req('/api/library?kind=toString', bob.cookie))).status).toBe(400);
