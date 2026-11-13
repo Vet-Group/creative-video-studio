@@ -75,6 +75,8 @@ test('the e2e stand-in answers three options from the text, within the limit', a
     model: 'fake',
   });
   expect(await fakeSuggester({ field: 'translate', text: 'slow turn', context: '', max: 100 })).toEqual({ options: ['Translation: slow turn'], costUsd: 0, provider: 'mock', model: 'fake' });
+  expect(await fakeSuggester({ field: 'check', text: 'slow turn', context: '', max: 100 })).toEqual({ options: ['Issue: slow turn'], meanings: ['Fix: slow turn'], costUsd: 0, provider: 'mock', model: 'fake' });
+  expect((await fakeSuggester({ field: 'check', text: 'All fine here', context: '', max: 100 })).options).toEqual([]);
 });
 
 test('an option with a Vietnamese reading is stored as text and vi, one without as its text', async () => {

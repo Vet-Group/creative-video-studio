@@ -737,7 +737,7 @@ export function MarketingStudio({ format = 'ugc', reuse, wizardDefault = false }
               {models && models.length > 0 && <ModelPicker models={models.map((m) => ({ id: m.id, label: m.label, isMock: m.isMock, supported: !pf || (m.maxImages >= images.length && (!advanced || videoReason(video, m.videoRefs, refs.length) === null)), estimateUsd: audio && m.audioEstimateUsd != null ? m.audioEstimateUsd : m.estimateUsd, score: m.score, recommended: m.recommended, resolution: m.resolution, durationsSec: m.durationsSec, audio: m.audioEstimateUsd != null, isNew: m.isNew, creditUsd: m.creditUsd, creditShown: m.creditShown, marks: m.total }))} value={chosen?.id ?? ''} onChange={(id) => pickModel(models.find((m) => m.id === id)!)} />}
             </VideoSettings>
             {/* Under the model, so in free writing the ratio row sits right under the prompt box as on Fash. */}
-            <PromptPreview feature="marketing" prompts={sent.map(branded)} labels={n > 1 ? variants.map((h, i) => `Biến thể ${i + 1} (${hookName(h)})`) : undefined} limit={chosen?.maxPromptChars} />
+            <PromptPreview feature="marketing" prompts={sent.map(branded)} labels={n > 1 ? variants.map((h, i) => `Biến thể ${i + 1} (${hookName(h)})`) : undefined} limit={chosen?.maxPromptChars} check={chosen ? { model: chosen.id, audio, seconds: durationSec, ...(pf && { format: pf }) } : undefined} />
             {/* In the sections they sit in ③ Ending; in free writing, under the prompt preview. */}
             {!sec && endExtras}
             <BrandPicker storeId={storeId} onStore={setStoreId} on={useBrand} onToggle={setUseBrand} onKit={setKit} />

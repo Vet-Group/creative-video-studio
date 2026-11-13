@@ -11,7 +11,7 @@ const GIVE_UP_MS = 95_000;
 const UNAVAILABLE = 'Chưa lấy được gợi ý lúc này, hãy thử lại sau.';
 
 export interface Ask {
-  field: 'brief' | 'script' | 'hook' | 'location' | 'ending' | 'prompt' | 'translate' | 'video' | 'scenes';
+  field: 'brief' | 'script' | 'hook' | 'location' | 'ending' | 'prompt' | 'translate' | 'video' | 'scenes' | 'check';
   /** For `video` (a template editor): the motion preset whose saved clip is read. */
   preset?: string;
   /** For `scenes` (Smart Remake): the member's finished analysis and their product image; the options are the numbers of the scenes that show a product like it. */
@@ -34,12 +34,13 @@ export interface Ask {
   seconds?: number;
 }
 
-/** One suggestion request at a time: `run` asks and polls; `options` (with their Vietnamese `meanings`, null where none) or `error` hold the answer until `clear`. */
+/** One suggestion request at a time: `run` asks and polls; `options` (with their Vietnamese `meanings`, null where none) or `error` hold the answer until `clear`; `done` tells an empty answer from none yet. */
 export function useSuggest() {
   const [busy, setBusy] = useState(false);
   const [options, setOptions] = useState<string[]>([]);
   const [meanings, setMeanings] = useState<(string | null)[]>([]);
   const [error, setError] = useState('');
+  const [done, setDone] = useState(false);
   const alive = useRef(true);
   // Set on every mount: Strict Mode mounts twice, and the first cleanup would otherwise leave the page looking unmounted.
   useEffect(() => {
@@ -56,13 +57,14 @@ export function useSuggest() {
     setBusy(true);
     setError('');
     setOptions([]);
+    setDone(false);
     try {
       const { id } = await api<{ id: string }>('/api/suggestions', sendJson('POST', ask));
       for (const until = Date.now() + GIVE_UP_MS; latest() && Date.now() < until; ) {
         await new Promise((r) => setTimeout(r, POLL_MS));
         const state = await api<{ status: string; options: string[]; meanings?: (string | null)[] }>(`/api/suggestions/${encodeURIComponent(id)}`);
         if (!latest()) return;
-        if (state.status === 'succeeded') return (setMeanings(state.meanings ?? []), setOptions(state.options));
+        if (state.status === 'succeeded') return (setMeanings(state.meanings ?? []), setOptions(state.options), setDone(true));
         if (state.status === 'failed') break;
       }
       if (latest()) setError(UNAVAILABLE);
@@ -72,7 +74,7 @@ export function useSuggest() {
       if (latest()) setBusy(false);
     }
   }
-  return { busy, options, meanings, error, run, clear: () => (setOptions([]), setError('')) };
+  return { busy, options, meanings, error, done, run, clear: () => (setOptions([]), setError(''), setDone(false)) };
 }
 
 /** Text that already reads as Vietnamese (any of its tone or vowel marks) needs no translation. */

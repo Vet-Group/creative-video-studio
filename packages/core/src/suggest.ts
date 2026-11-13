@@ -25,8 +25,9 @@ export interface SuggestInput {
    * in `text`, or a sectioned prompt's hook or ending from the member's own words so far, with the prompt's other sections in `context`;
    * `prompt`: the English prompt of the tool in `task`; `translate`: one Vietnamese reading of the English `text`, for the member only;
    * `video`: one motion preset prompt from stills of the clip in `clip`, for a template editor;
-   * `scenes`: which of a reference video's scenes show a product like the member's (Smart Remake's pre-ticked scenes). */
-  field: 'brief' | 'script' | 'hook' | 'location' | 'ending' | 'prompt' | 'translate' | 'video' | 'scenes';
+   * `scenes`: which of a reference video's scenes show a product like the member's (Smart Remake's pre-ticked scenes);
+   * `check`: a review of the composed English prompt in `text` before the member pays for the clip (the answer's options are its issues, the meanings their fixes). */
+  field: 'brief' | 'script' | 'hook' | 'location' | 'ending' | 'prompt' | 'translate' | 'video' | 'scenes' | 'check';
   /** For `video`: the sample clip's name under samples/ (`preset-<id>.mp4`), whose stills the worker sends. */
   clip?: string;
   /** For `scenes`: the bucket keys of the reference video and of the member's product image (both chosen by the server), and the time in seconds of each
@@ -57,7 +58,7 @@ export const FORMAT_NOTES = {
   review: 'The clip is a product review: the creator talks to the camera about what they like in the product and shows it up close.',
 } as const;
 
-/** `meanings[i]` is option i in Vietnamese for the member to read (null when the model gave none); only `options` ever fill a field. */
+/** `meanings[i]` is option i in Vietnamese (for `check`, the fix of issue i) for the member to read (null when the model gave none); only `options` ever fill a field. */
 /** `provider` and `model`: who answered and with what, for the call's ledger row. `frames`: a `video` run's stills, as JPEG data URLs in time order. */
 export type Suggester = (input: SuggestInput, frames?: string[]) => Promise<{ options: string[]; meanings?: (string | null)[]; costUsd: number | null; provider: string; model: string }>;
 
@@ -92,6 +93,16 @@ export const SCENE_SYSTEM =
 export const PROMPT_SYSTEM =
   'You write prompts for an AI tool a fashion seller uses on their own photos. ' + UNSEEN + ' Keep every concrete detail the seller gave, translated ' +
   'to English when needed. ' + PRINCIPLES + ' Write the text in plain, concrete English with no Vietnamese. ' + REPLY;
+
+/** The Check button: a review of the prompt a member is about to pay to send, in Vietnamese, as issues with fixes and never a rewrite. */
+export const MAX_CHECK_ISSUES = 4;
+export const CHECK_SYSTEM =
+  'You review the English prompt a fashion seller is about to send to an AI video model, before they pay for the clip. ' + UNSEEN + ' Judge it by these principles: ' + PRINCIPLES +
+  ' Look for: a hook that does not grab attention in the first 2 seconds; anything that could change the product (its shape, colours or printed text) or add ' +
+  'on-screen text, logos or watermarks; an action too big or too small for the clip length; anything vague or contradictory; anything the chosen model ' +
+  `handles badly, using the model note. Report at most ${MAX_CHECK_ISSUES} real problems, the most important first, each as a short issue and a one-line fix, ` +
+  'both in plain Vietnamese and never inventing details of the product or person. Do not praise or nitpick; a prompt with no real problem gets an empty list. ' +
+  'Reply with a JSON object and nothing else: {"issues": [{"issue": the problem, "fix": the one-line fix}]}.';
 
 /** The Translate button: a Vietnamese reading of an English prompt, shown beside it and never sent to a model. */
 export const TRANSLATE_SYSTEM =
@@ -237,6 +248,7 @@ function lengthLine(i: SuggestInput): string {
 export function suggestPrompt(i: SuggestInput, d = 0): string {
   if (i.field === 'translate') return `The prompt:\n${i.text}`;
   if (i.field === 'scenes') return `The first image is the product; the other ${i.times?.length ?? 0} images are scenes 1 to ${i.times?.length ?? 0}.`;
+  if (i.field === 'check') return [i.model, i.format && FORMAT_NOTES[i.format], i.seconds && `The clip lasts ${i.seconds} seconds.`, `The prompt to review:\n${i.text}`].filter(Boolean).join('\n');
   if (i.field === 'video') {
     // Each still's number and time, so the model can read their order.
     const at = i.seconds ? frameTimes(i.seconds, VIDEO_FRAMES).map((t, k) => `still ${k + 1} of ${VIDEO_FRAMES} at ${t.toFixed(1)} s`) : [];
@@ -303,11 +315,29 @@ export function parseOption(answer: string, max: number): { text: string; vi: st
   return { text, vi: typeof o?.vi === 'string' && o.vi.trim() ? cutTo(o.vi.trim(), MAX_SUMMARY) : null };
 }
 
+/** The issues of a `{ issues: [{ issue, fix }] }` answer (possibly in a code fence), at most MAX_CHECK_ISSUES; an empty list means the prompt is fine, any other shape is an error. */
+export function parseCheck(answer: string): { issue: string; fix: string }[] {
+  let v: unknown;
+  try {
+    v = JSON.parse(unfence(answer));
+  } catch {
+    throw new Error('suggest: the answer is not JSON');
+  }
+  const list = (v as { issues?: unknown } | null)?.issues;
+  if (!Array.isArray(list)) throw new Error('suggest: no issues list in the answer');
+  return list.slice(0, MAX_CHECK_ISSUES).map((o: { issue?: unknown; fix?: unknown } | null) => {
+    const issue = typeof o?.issue === 'string' ? o.issue.trim() : '';
+    const fix = typeof o?.fix === 'string' ? o.fix.trim() : '';
+    if (!issue || !fix) throw new Error('suggest: an issue needs its text and its fix');
+    return { issue: cutTo(issue, MAX_SUMMARY), fix: cutTo(fix, MAX_SUMMARY) };
+  });
+}
+
 /** One LLM call: a system prompt, a user turn, a temperature, a token budget and any images (data URLs) in; the answer's text and its cost out. */
 type Chat = (system: string, user: string, temperature: number, maxTokens: number, images?: string[]) => Promise<{ text: string; costUsd: number | null }>;
 
 const SYSTEMS: Record<SuggestInput['field'], string> = {
-  brief: SUGGEST_SYSTEM, script: SUGGEST_SYSTEM, hook: SCENE_SYSTEM, location: SCENE_SYSTEM, ending: SCENE_SYSTEM, prompt: PROMPT_SYSTEM, translate: TRANSLATE_SYSTEM, video: VIDEO_SYSTEM, scenes: SCENES_SYSTEM,
+  brief: SUGGEST_SYSTEM, script: SUGGEST_SYSTEM, hook: SCENE_SYSTEM, location: SCENE_SYSTEM, ending: SCENE_SYSTEM, prompt: PROMPT_SYSTEM, translate: TRANSLATE_SYSTEM, video: VIDEO_SYSTEM, scenes: SCENES_SYSTEM, check: CHECK_SYSTEM,
 };
 
 const sum = (costs: (number | null)[]): number | null => (costs.every((c) => c === null) ? null : costs.reduce<number>((a, c) => a + (c ?? 0), 0));
@@ -328,6 +358,11 @@ async function suggestWith(chat: Chat, input: SuggestInput, frames: string[] = [
     if (!count || frames.length !== count + 1) throw new Error('suggest: the product and one still per scene are needed');
     const { text, costUsd } = await chat(system, suggestPrompt(input), 0, 800, frames);
     return { options: parseScenes(text, count).map(String), costUsd };
+  }
+  if (input.field === 'check') {
+    const { text, costUsd } = await chat(system, suggestPrompt(input), 0.2, 1200);
+    const issues = parseCheck(text);
+    return { options: issues.map((x) => x.issue), meanings: issues.map((x) => x.fix), costUsd };
   }
   if (input.field === 'translate') {
     const { text, costUsd } = await chat(system, suggestPrompt(input), 0.2, maxTokens(input));

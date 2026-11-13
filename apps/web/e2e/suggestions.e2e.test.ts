@@ -212,3 +212,33 @@ test('a refused or failed run says so in Vietnamese', async ({ page }) => {
   await page.getByRole('button', { name: 'Gợi ý khác' }).click();
   await expect(page.getByRole('alert').filter({ hasText: 'Chưa lấy được gợi ý lúc này, hãy thử lại sau.' })).toBeVisible();
 });
+
+// The Check button under Create's prompt preview reviews the composed English prompt; the stand-in answers one issue "Issue: <prompt>" with its fix
+// "Fix: <prompt>", or none when the prompt says "fine". A failed check says so, can be retried.
+test('Kiểm tra on Create lists the issues with their fixes, says when the prompt is fine, and can be retried after an error', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await signIn(page, 'sugga');
+  await page.goto('/create');
+  let sent: unknown;
+  page.on('request', (r) => r.url().endsWith('/api/suggestions') && r.method() === 'POST' && (sent = r.postDataJSON()));
+  await page.getByLabel('Mô tả chuyển động').fill('slow turn');
+  const check = page.getByRole('button', { name: 'Kiểm tra', exact: true });
+  const result = page.getByRole('group', { name: 'Kết quả kiểm tra prompt' });
+  await check.click();
+  await expect(result).toContainText(/Issue: .*slow turn/, { timeout: 20_000 });
+  await expect(result).toContainText(/Cách sửa: Fix: .*slow turn/);
+  expect(sent).toMatchObject({ field: 'check', text: expect.stringContaining('slow turn'), model: expect.any(String), seconds: expect.any(Number) });
+  // New words clear the review, and a prompt without problems gets the all-clear.
+  await page.getByLabel('Mô tả chuyển động').fill('all fine');
+  await expect(result).toBeHidden();
+  await check.click();
+  await expect(result).toHaveText('Prompt ổn, có thể chạy.', { timeout: 20_000 });
+  // A refused run shows the reason and offers a retry.
+  await page.getByLabel('Mô tả chuyển động').fill('all fine again');
+  await page.route('/api/suggestions', (r) => r.fulfill({ status: 503, json: { error: 'suggestions are unavailable right now' } }));
+  await check.click();
+  await expect(result.getByRole('alert')).toBeVisible();
+  await page.unroute('/api/suggestions');
+  await page.getByRole('button', { name: 'Thử lại' }).click();
+  await expect(result).toHaveText('Prompt ổn, có thể chạy.', { timeout: 20_000 });
+});
