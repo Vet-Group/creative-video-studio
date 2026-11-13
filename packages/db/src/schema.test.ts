@@ -163,14 +163,14 @@ describe('migration 0028 prompt limits', () => {
 describe('migration 0015 Fash video models', () => {
   test('adds 22 fal video models, disabled and complete, each with a request builder and its sources', async () => {
     const { rows } = await pool.query(
-      `select id, endpoint, ratios, durations_sec, max_images, output_resolution, usd_per_second::float as usd, sources from model_configs where kind = 'video' and provider = 'fal' and id <> 'kling-o3-pro' and not 'motion_control' = any(features) and (not enabled or id = 'veo-3.1') and id !~ '^minimax-h3-max.*-(480|1080)p$' order by id`, // 0036's resolution rows have their own test; 0075 switches Veo 3.1 on
+      `select id, endpoint, ratios, durations_sec, max_images, output_resolution, usd_per_second::float as usd, sources from model_configs where kind = 'video' and provider = 'fal' and id <> 'kling-o3-pro' and not 'motion_control' = any(features) and (not enabled or id = 'veo-3.1') and id !~ '^minimax-h3-max.*-(480|1080)p$' and id <> 'seedance-2.5-image-1080p' order by id`, // 0036's and 0094's resolution rows have their own tests; 0075 switches Veo 3.1 on
     );
     expect(rows).toHaveLength(22);
     for (const r of rows) {
       expect(VIDEO_BODIES[r.endpoint], r.id).toBeDefined();
       expect(r.ratios.length * r.durations_sec.length * r.max_images * r.usd, r.id).toBeGreaterThan(0);
       expect(['720p', '768p', '1080p'], r.id).toContain(r.output_resolution);
-      expect(Object.keys(r.sources).filter((k) => k !== 'maxPromptChars' && k !== 'passSeed' && k !== 'nativeAudio').sort(), r.id).toEqual(['durationsSec', 'maxImages', 'outputResolution', 'ratios', 'usdPerSecond']); // 0028 adds the prompt limit's source, 0057 the bake-off prior's, 0060 the audio test's
+      expect(Object.keys(r.sources).filter((k) => k !== 'maxPromptChars' && k !== 'passSeed' && k !== 'nativeAudio' && k !== 'ratiosUltrawide' && k !== 'ratiosAuto').sort(), r.id).toEqual(['durationsSec', 'maxImages', 'outputResolution', 'ratios', 'usdPerSecond']); // 0028 adds the prompt limit's source, 0057 the bake-off prior's, 0060 the audio test's, 0094 the ratios'
     }
     expect(rows.find((r) => r.id === 'veo-3.1')).toMatchObject({ ratios: ['9:16', '16:9'], durations_sec: [8] }); // no 1:1, and Fash's 8 s only; 0037 adds 16:9
     await pool.query(`update model_configs set enabled = true where id = 'kling-3.0-pro'`); // complete enough for the enable check
@@ -186,13 +186,13 @@ describe('migrations 0023 and 0060 in Marketing Studio', () => {
       ['gemini-omni-flash-reference-vertex', ['9:16', '16:9'], 9], // 0074, the Vertex twin: Google's ratios are the same two
       ['grok-imagine-reference', ['9:16', '1:1', '16:9', '4:3', '3:4'], 7],
       ['kling-o3-pro', ['9:16', '1:1', '16:9'], 7],
-      ['minimax-h3-max-reference', ['9:16', '1:1', '16:9', '4:3', '3:4'], 9],
-      ['minimax-h3-max-reference-1080p', ['9:16', '1:1', '16:9', '4:3', '3:4'], 9],
-      ['minimax-h3-max-reference-480p', ['9:16', '1:1', '16:9', '4:3', '3:4'], 9],
-      ['seedance-2.0-byteplus', ['9:16', '1:1', '16:9', '4:3', '3:4'], 9], // 0078, the cheaper twin of the fal reference row
-      ['seedance-2.0-reference', ['9:16', '1:1', '16:9', '4:3', '3:4'], 9], // 0037 widens both Seedance rows and gives 2.0 its 9 references
-      ['seedance-2.5-byteplus', ['9:16', '1:1', '16:9', '4:3', '3:4'], 9], // 0078
-      ['seedance-2.5-reference', ['9:16', '1:1', '16:9', '4:3', '3:4'], 7],
+      ['minimax-h3-max-reference', ['9:16', '1:1', '16:9', '4:3', '3:4', '21:9'], 9],
+      ['minimax-h3-max-reference-1080p', ['9:16', '1:1', '16:9', '4:3', '3:4', '21:9'], 9],
+      ['minimax-h3-max-reference-480p', ['9:16', '1:1', '16:9', '4:3', '3:4', '21:9'], 9],
+      ['seedance-2.0-byteplus', ['9:16', '1:1', '16:9', '4:3', '3:4', '21:9'], 9], // 0078, the cheaper twin of the fal reference row
+      ['seedance-2.0-reference', ['9:16', '1:1', '16:9', '4:3', '3:4', '21:9'], 9], // 0037 widens both Seedance rows and gives 2.0 its 9 references
+      ['seedance-2.5-byteplus', ['9:16', '1:1', '16:9', '4:3', '3:4', '21:9'], 9], // 0078
+      ['seedance-2.5-reference', ['9:16', '1:1', '16:9', '4:3', '3:4', '21:9'], 7],
       ['wan-2.7-reference', ['9:16', '1:1', '16:9', '4:3', '3:4'], 4], // the app caps Advanced at the row's 4
     ]);
     // An audio switch with its own price (0023), or always sound at the stored price with the paid test's note (0060; the Vertex Omni row has Google's statement of 2026-11-06 instead, 0074).
@@ -211,6 +211,27 @@ describe('migration 0016 video models at 1080p', () => {
       { id: 'flux-3-reference', output_resolution: '1080p', usd: 0.29 },
       { id: 'seedance-1.0-pro', output_resolution: '1080p', usd: 0.124 },
     ]);
+  });
+});
+
+describe('migration 0094 1080p Seedance and the ratios 21:9 and auto', () => {
+  test('gives 21:9 to the rows whose provider schema takes it and auto only to the image-to-video rows that follow the input image, and no other row', async () => {
+    const { rows } = await pool.query(`select id, ratios from model_configs where kind = 'video' and ('21:9' = any(ratios) or 'auto' = any(ratios)) and not 'motion_control' = any(features) order by id`);
+    const ultrawide = ['flux-3', 'flux-3-reference', 'minimax-h3-max-reference', 'minimax-h3-max-reference-1080p', 'minimax-h3-max-reference-480p', 'seedance-1.0-pro', 'seedance-1.0-pro-byteplus', 'seedance-1.0-pro-fast-byteplus', 'seedance-1.5-pro', 'seedance-2.0', 'seedance-2.0-byteplus', 'seedance-2.0-fast-byteplus', 'seedance-2.0-mini-byteplus', 'seedance-2.0-reference', 'seedance-2.5-byteplus', 'seedance-2.5-reference'];
+    const auto = ['flux-3', 'flux-3-reference', 'seedance-1.0-pro', 'seedance-1.5-pro', 'seedance-2.0', 'seedance-2.5-image', 'seedance-2.5-image-1080p'];
+    expect(rows.filter((r) => r.ratios.includes('21:9')).map((r) => r.id)).toEqual(ultrawide.sort());
+    expect(rows.filter((r) => r.ratios.includes('auto')).map((r) => r.id)).toEqual(auto.sort());
+  });
+
+  test('adds Seedance 2.5 at 1080p beside the 720p row: the same endpoint and limits, fal’s $1.164 a second, disabled, no twin, with its sources', async () => {
+    const { rows } = await pool.query(`select id, provider, endpoint, label, features, ratios, durations_sec, max_images, output_resolution, usd_per_second::float as usd, enabled, twin_of, sources from model_configs where id in ('seedance-2.5-image', 'seedance-2.5-image-1080p') order by id`);
+    const [p720, p1080] = rows;
+    expect(p1080).toMatchObject({ id: 'seedance-2.5-image-1080p', provider: 'fal', label: 'Seedance 2.5 1080p', output_resolution: '1080p', usd: 1.164, enabled: false, twin_of: null });
+    expect(p720).toMatchObject({ output_resolution: '720p', usd: 0.473 });
+    expect(p1080).toMatchObject({ endpoint: p720.endpoint, features: p720.features, ratios: p720.ratios, durations_sec: p720.durations_sec, max_images: p720.max_images });
+    expect(p1080.sources.usdPerSecond).toEqual({ url: 'https://fal.ai/models/bytedance/seedance-2.5/us/image-to-video', readAt: '2026-11-14' });
+    await pool.query(`update model_configs set enabled = true where id = 'seedance-2.5-image-1080p'`); // complete enough for the enable check
+    await pool.query(`update model_configs set enabled = false where id = 'seedance-2.5-image-1080p'`);
   });
 });
 
@@ -489,12 +510,12 @@ describe('migration 0037 references and ratios', () => {
       ['gemini-omni-flash-reference', 9],
       ['grok-imagine-reference', 7],
     ]);
-    expect(of('minimax-h3-max-reference').ratios).toEqual(['9:16', '1:1', '16:9', '4:3', '3:4']);
+    expect(of('minimax-h3-max-reference').ratios).toEqual(['9:16', '1:1', '16:9', '4:3', '3:4', '21:9']); // 0094 adds 21:9
     expect(of('gemini-omni-flash-reference').ratios).toEqual(['9:16', '16:9']); // its enum has no 4:3 or 3:4
     expect(of('kling-o3-pro').sources.ratios.readAt).not.toBe('2026-10-29'); // it already had 16:9, so it is left as it was
     expect(of('minimax-h3-max').ratios).toEqual(['9:16', '1:1']); // its endpoint has no aspect_ratio: the first image is cropped
-    for (const r of rows) expect(r.ratios.every((x: string) => ['9:16', '1:1', '16:9', '4:3', '3:4', 'auto'].includes(x)), r.id).toBe(true);
-    const motion = rows.filter((r) => r.ratios.includes('auto'));
+    for (const r of rows) expect(r.ratios.every((x: string) => ['9:16', '1:1', '16:9', '4:3', '3:4', '21:9', 'auto'].includes(x)), r.id).toBe(true); // 0094 adds 21:9 and auto to some
+    const motion = rows.filter((r) => r.ratios.includes('auto') && r.ratios.length === 1); // Motion Control's rows have no other ratio
     expect(motion.length).toBeGreaterThan(0);
     for (const r of motion) expect(r.ratios, r.id).toEqual(['auto']);
   });
@@ -588,7 +609,7 @@ describe('migration 0056 BytePlus', () => {
     // tokens per second: 21,600 at 720p (1280x720), 48,960 at Seedance 1.0's 1080p (1920x1088); USD per million tokens from the pricing page, read 2026-11-03.
     const per = (usdPerMillion: number, tokensPerSecond: number) => (Math.ceil((usdPerMillion * tokensPerSecond) / 100) / 10_000).toFixed(4);
     const range = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => from + i);
-    const ratios = ['9:16', '1:1', '16:9', '4:3', '3:4'];
+    const ratios = ['9:16', '1:1', '16:9', '4:3', '3:4', '21:9']; // 0094 adds 21:9
     const row = (id: string, endpoint: string, durations: number[], maxImages: number, resolution: string, usd: string) => ({
       id, provider: 'byteplus', endpoint, enabled: false, kind: 'video', features: ['video'], ratios, durations_sec: durations, max_images: maxImages, output_resolution: resolution, usd, billed_amount_field: 'usage.completion_tokens',
     });

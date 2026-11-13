@@ -217,6 +217,25 @@ describe('the mock lifecycle', () => {
     expect((await job(tiny)).error).toMatch(/320x240, below 480p/);
   });
 
+  test('a 21:9 output keeps the 720p tier pixel area and passes the floor, while a thin one still fails', async () => {
+    const clip = async (size: string) => {
+      const file = join(mockDir, `${randomUUID()}-small.mp4`);
+      await mkdir(mockDir, { recursive: true });
+      await run(requireFfmpeg(), ['-y', '-v', 'error', '-f', 'lavfi', '-i', `testsrc2=size=${size}:rate=24`, '-t', '1', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', file]);
+      return pathToFileURL(file).href;
+    };
+    let output = await clip('1470x630'); // Seedance 21:9 at 720p
+    await start(counting(300, (inner) => ({ ...inner, status: async (pj) => ((await inner.status(pj)).state === 'running' ? { state: 'running' } : { state: 'succeeded', outputUrl: output, costUsd: 0, costSource: 'estimate' }) })));
+    const wide = await newJob('u1');
+    await send(wide, 'u1');
+    await waitFor('the 21:9 job to succeed', async () => (await status(wide)) === 'succeeded');
+    output = await clip('1470x540');
+    const thin = await newJob('u2');
+    await send(thin, 'u2');
+    await waitFor('the thin job to fail', async () => (await status(thin)) === 'failed');
+    expect((await job(thin)).error).toMatch(/1470x540, below 720p/);
+  });
+
   test('times out a job whose delivery keeps failing, frees its slot and settles it from timed_out', async () => {
     const id = await newJob('u2');
     const broken = counting(300, (inner) => ({ ...inner, status: async () => ({ state: 'succeeded', outputUrl: 'http://127.0.0.1:9/gone.mp4', costUsd: 0, costSource: 'estimate' }) }));

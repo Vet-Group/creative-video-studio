@@ -338,6 +338,7 @@ export async function POST(request: Request) {
     if ((feature === 'image' || feature === 'fashion_model') && assetIds.length === 0 && !textToImage(model)) return bad('the model needs at least one input image');
     // A retry copies a Run this check already passed.
     if (!original && feature === 'video' && assetIds.length === 0 && !videoInputs(model.endpoint).textOnly) return bad('the model needs at least one input image');
+    if (feature === 'video' && ratio === 'auto' && assetIds.length === 0) return bad('ratio auto follows the input image, so it needs an image');
     // What the model takes is read for the request the worker will make: with a reference video that is the video-to-video sibling where the row has one (Kling O3 Pro).
     const takesNow = videoInputs(model.endpoint, params.videoAssetId !== undefined);
     if (params.endAssetId !== undefined && !takesNow.endFrame) return bad(takesNow.endFrame !== videoInputs(model.endpoint).endFrame ? 'the model takes no end frame together with a reference video' : 'the model does not take an end frame');

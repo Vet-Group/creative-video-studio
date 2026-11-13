@@ -39,8 +39,8 @@ export async function GET(request: Request) {
   const durationSec = q.get('durationSec') ? Number(q.get('durationSec')) : NaN;
   const feature = q.get('feature');
   if (feature !== null && !['video', 'marketing', 'motion_control'].includes(feature)) return Response.json({ error: 'feature must be video, marketing or motion_control' }, { status: 400 });
-  // Motion Control's output follows the reference video, so its only ratio is 'auto'. Create Video offers each ratio some fal schema takes (0037).
-  const ratios: readonly (string | null)[] = feature === 'marketing' ? [...ASPECTS, '16:9'] : feature === 'motion_control' ? ['auto'] : [...ASPECTS, '16:9', '4:3', '3:4'];
+  // Motion Control's output follows the reference video, so its only ratio is 'auto'. Create Video offers each ratio some video schema takes (0037, 0094); `auto` follows the input image, so a model serves it only for a Run with an image.
+  const ratios: readonly (string | null)[] = feature === 'marketing' ? [...ASPECTS, '16:9'] : feature === 'motion_control' ? ['auto'] : [...ASPECTS, '16:9', '4:3', '3:4', '21:9', 'auto'];
   if (!ratios.includes(ratio) || !Number.isInteger(durationSec)) {
     return Response.json({ error: 'ratio and durationSec (a whole number) are required' }, { status: 400 });
   }
@@ -53,6 +53,8 @@ export async function GET(request: Request) {
   const images = q.get('images') === null ? 0 : Number(q.get('images'));
   if (!Number.isInteger(images) || images < 0 || images > 20) return Response.json({ error: 'images must be a whole number from 0 to 20' }, { status: 400 });
   const userId = g.session.user.id;
+  // `auto` follows the input image, so a Run with none cannot ask for it (Motion Control's own `auto` follows its reference video).
+  const followsImage = ratio !== 'auto' || feature === 'motion_control' || images > 0;
 
   const fal = await falBalance();
   const [models, mine, budget, stats, falCredit] = await Promise.all([
@@ -118,7 +120,7 @@ export async function GET(request: Request) {
       ...scoreOf(st),
       passes: st.passes,
       total: st.total,
-      supported: pair.some((p) => canServe(p, plain)),
+      supported: followsImage && pair.some((p) => canServe(p, plain)),
       // The rows of its pair, so a form reusing a job made on a twin keeps this entry.
       pairIds: pair.map((p) => p.id as string),
       creditUsd: serving.provider === 'fal' ? falCredit : null,

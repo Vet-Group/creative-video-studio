@@ -343,9 +343,11 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
         const seconds = await probeSeconds(video);
         if (seconds > job.duration_s + 1) costUsd = (costUsd * Math.ceil(seconds)) / job.duration_s;
       }
-      const floor = Math.min(720, Number.parseInt(job.output_resolution ?? '', 10) || 720);
-      if (Math.min(width, height) < floor) {
-        await settle(pool, job.id, { status: 'failed', costUsd, billed: true, tokens, error: `the output is ${width}x${height}, below ${floor}p` });
+      // A tier keeps one pixel area for every ratio, so a shape wider than 16:9 has a shorter short side (21:9 at 720p is 1470x630); the floor shrinks with it.
+      const wide = Math.min(1, Math.sqrt(16 / 9 / (Math.max(width, height) / Math.min(width, height))));
+      const tier = Math.min(720, Number.parseInt(job.output_resolution ?? '', 10) || 720);
+      if (Math.min(width, height) < Math.floor(tier * wide)) {
+        await settle(pool, job.id, { status: 'failed', costUsd, billed: true, tokens, error: `the output is ${width}x${height}, below ${tier}p` });
         return;
       }
       // Marketing Studio's end text (params.endText), burned in here rather than asked of the model. The provider already billed the clip, so a failed

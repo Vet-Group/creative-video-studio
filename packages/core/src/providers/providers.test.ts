@@ -46,7 +46,7 @@ describe('fal', () => {
       expect(calls[0]!.url).toBe(`https://queue.fal.run/${endpoint}`);
       return calls[0]!.body;
     };
-    expect(await body('bytedance/seedance-2.5/us/reference-to-video')).toEqual({ prompt: 'put @Image1 on @Image2', image_urls: ['https://img/1.jpg', 'https://img/2.jpg'], aspect_ratio: '9:16', duration: '5', resolution: '720p', generate_audio: false });
+    expect(await body('bytedance/seedance-2.5/us/reference-to-video', undefined, '720p')).toEqual({ prompt: 'put @Image1 on @Image2', image_urls: ['https://img/1.jpg', 'https://img/2.jpg'], aspect_ratio: '9:16', duration: '5', resolution: '720p', generate_audio: false });
     expect(await body('fal-ai/kling-video/v3/pro/image-to-video')).toEqual({ prompt: 'put image 1 on image 2', start_image_url: 'https://img/1.jpg', duration: '5', generate_audio: false });
     expect(await body('google/gemini-omni-flash/v1.2/image-to-video')).toEqual({ prompt: 'put image 1 on image 2', image_url: 'https://img/1.jpg', aspect_ratio: '9:16', duration: 5, resolution: '720p' });
     expect(await body('fal-ai/veo3.1/image-to-video')).toMatchObject({ duration: '5s', generate_audio: false });
@@ -84,6 +84,40 @@ describe('fal', () => {
     expect(calls).toHaveLength(withEnd.length);
     await expect(createFalProvider({ apiKey: 'k', fetch: fn }).submit({ ...req, endImageUrl: 'https://img/end.jpg', model: { ...kling, endpoint: 'fal-ai/kling-video/o1/reference-to-video' } })).rejects.toThrow(ImageReadError);
     expect(calls).toHaveLength(withEnd.length);
+  });
+
+  test('21:9 and auto reach the schema as the ratio, auto crops nothing, and the Seedance 2.5 rows each send their own resolution', async () => {
+    const submit = async (endpoint: string, ratio: string, over: Partial<SubmitRequest> = {}, outputResolution: string | null = '1080p') => {
+      const { fn, calls } = fakeFetch([200, { request_id: 'r' }]);
+      const crops: (string | undefined)[] = [];
+      const read = async (url: string, opts?: { ratio?: string }) => (crops.push(opts?.ratio), readImage(url));
+      await createFalProvider({ apiKey: 'k', fetch: fn, readImage: read }).submit({ ...base, ratio: ratio as SubmitRequest['ratio'], ...over, model: { ...kling, endpoint, outputResolution } });
+      return { url: calls[0]!.url, body: calls[0]!.body as Record<string, unknown>, crops };
+    };
+    // The endpoints a migration 0094 row sends the ratio to (schemas read 2026-11-14): the value goes through as it is.
+    for (const endpoint of ['bytedance/seedance-2.0/us/image-to-video', 'fal-ai/bytedance/seedance/v1.5/pro/image-to-video', 'fal-ai/bytedance/seedance/v1/pro/image-to-video', 'blackforestlabs/flux-3/image-to-video']) {
+      expect((await submit(endpoint, '21:9')).body.aspect_ratio).toBe('21:9');
+      expect((await submit(endpoint, 'auto')).body.aspect_ratio).toBe('auto');
+    }
+    expect((await submit('bytedance/seedance-2.5/us/reference-to-video', '21:9')).body.aspect_ratio).toBe('21:9');
+    expect((await submit('minimax/h3-max/reference-to-video', '21:9')).body.aspect_ratio).toBe('21:9');
+    // The text-to-video twin of a Run with no image takes 21:9 too.
+    const text = await submit('fal-ai/bytedance/seedance/v1.5/pro/image-to-video', '21:9', { imageUrls: [] });
+    expect(text.url).toBe('https://queue.fal.run/fal-ai/bytedance/seedance/v1.5/pro/text-to-video');
+    expect(text.body.aspect_ratio).toBe('21:9');
+    // An endpoint with no ratio field follows its input image: a ratio crops the image to it, auto leaves it as it is.
+    const own = { imageUrls: ['asset://start'], endImageUrl: 'asset://end' };
+    expect((await submit('bytedance/seedance-2.5/us/image-to-video', '1:1', own)).crops).toEqual(['1:1', '1:1']);
+    const auto = await submit('bytedance/seedance-2.5/us/image-to-video', 'auto', own);
+    expect(auto.crops).toEqual([undefined, undefined]);
+    expect(auto.body).not.toHaveProperty('aspect_ratio');
+    // The 1080p row of Seedance 2.5 rides the 720p row's endpoint and its text twin.
+    expect((await submit('bytedance/seedance-2.5/us/image-to-video', '9:16', {}, '1080p')).body.resolution).toBe('1080p');
+    expect((await submit('bytedance/seedance-2.5/us/image-to-video', '9:16', {}, '720p')).body.resolution).toBe('720p');
+    expect((await submit('bytedance/seedance-2.5/us/image-to-video', '9:16', {}, null)).body.resolution).toBe('720p');
+    const twin = await submit('bytedance/seedance-2.5/us/image-to-video', '9:16', { imageUrls: [] }, '1080p');
+    expect(twin.url).toBe('https://queue.fal.run/bytedance/seedance-2.5/us/text-to-video');
+    expect(twin.body.resolution).toBe('1080p');
   });
 
   test("a Marketing Studio end frame on the reference endpoints that take one rides beside the model and product photos, not among them", async () => {

@@ -49,6 +49,14 @@ test('audio on takes the endpoint audio price, audio off or absent the stored pr
   expect(usdPerSecondFor({ endpoint: 'constructor', usdPerSecond: 0.1 }, 'on')).toBeUndefined();
 });
 
+test('the Seedance 2.5 1080p row keeps its own price with sound on (free on that endpoint), as the 720p row keeps its, and 5 s of it reserves $5.82', () => {
+  const endpoint = 'bytedance/seedance-2.5/us/image-to-video';
+  expect(usdPerSecondFor({ endpoint, usdPerSecond: 0.473 }, 'on')).toBe(0.473);
+  expect(usdPerSecondFor({ endpoint, usdPerSecond: '1.1640' }, 'on')).toBe(1.164);
+  expect(usdPerSecondFor({ endpoint, usdPerSecond: '1.1640' }, 'off')).toBe('1.1640');
+  expect(estimateUsd(usdPerSecondFor({ endpoint, usdPerSecond: '1.1640' }, 'on')!, 5)).toBe('5.8200');
+});
+
 test('a model’s prompt limit is its own, never past the ceiling', () => {
   expect([promptLimit(2000), promptLimit(4096), promptLimit(50000)]).toEqual([2000, 4096, PROMPT_CEILING]);
   expect(PROMPT_CEILING).toBe(5000);

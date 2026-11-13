@@ -172,9 +172,13 @@ export const AUDIO_USD_PER_SECOND: Record<string, number> = {
  */
 export const ALWAYS_AUDIO: ReadonlySet<string> = new Set(['google/gemini-omni-flash/v1.2/reference-to-video', 'gemini-omni-1.2-flash', 'minimax/h3-max/reference-to-video', 'xai/grok-imagine-video/reference-to-video', 'fal-ai/wan/v2.7/reference-to-video']);
 
-/** The model's price per second for a job, with audio on when `audio` is 'on' (a job's params.audio); undefined when the endpoint cannot make audio. */
+/**
+ * The model's price per second for a job, with audio on when `audio` is 'on' (a job's params.audio); undefined when the endpoint cannot make audio.
+ * The audio prices above are for the resolution the endpoint's first row stores, so a row of the same endpoint at a dearer resolution (Seedance 2.5 at 1080p, where sound
+ * is free too) keeps its own price: sound never costs less than the silent clip (the mock endpoint's 0 aside).
+ */
 export const usdPerSecondFor = (model: { endpoint: string; usdPerSecond: number | string }, audio: string | undefined): number | string | undefined =>
-  audio !== 'on' || ALWAYS_AUDIO.has(model.endpoint) ? model.usdPerSecond : Object.hasOwn(AUDIO_USD_PER_SECOND, model.endpoint) ? AUDIO_USD_PER_SECOND[model.endpoint] : undefined;
+  audio !== 'on' || ALWAYS_AUDIO.has(model.endpoint) ? model.usdPerSecond : Object.hasOwn(AUDIO_USD_PER_SECOND, model.endpoint) ? (AUDIO_USD_PER_SECOND[model.endpoint] === 0 ? 0 : Math.max(Number(model.usdPerSecond), AUDIO_USD_PER_SECOND[model.endpoint]!)) : undefined;
 
 /**
  * What a reference video (params.videoAssetId) does to a Run's price, by endpoint, from the fal model pages (read 2026-11-06, https://fal.ai/models/<endpoint>):
