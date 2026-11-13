@@ -349,7 +349,8 @@ describe('settings', () => {
   test('does not list the dearer row of a duplicate pair, refuses to switch it, and leaves it out of the Overview count', async () => {
     const listed = (await get()).models.map((m) => m.id);
     expect(listed).toContain('nano-banana-pro-vertex');
-    for (const id of ['nano-banana-pro', 'seedream-5-pro', 'veo-3.1-vertex']) expect(listed, id).not.toContain(id);
+    expect(listed).toContain('veo-3.1-vertex'); // 0093
+    for (const id of ['nano-banana-pro', 'seedream-5-pro', 'veo-3.1']) expect(listed, id).not.toContain(id);
     const hidden = (await pool.query('select count(*)::int as n from model_configs where twin_of is not null')).rows[0].n;
     const total = (await pool.query('select count(*)::int as n from model_configs')).rows[0].n;
     expect(listed).toHaveLength(total - hidden);

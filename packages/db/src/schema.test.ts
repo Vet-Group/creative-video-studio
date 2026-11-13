@@ -543,7 +543,7 @@ describe('migration 0042 Veo 3.1 on Vertex', () => {
     expect(row).toEqual(twin);
     expect(row).toMatchObject({ ratios: ['9:16', '16:9'], durations_sec: [8], max_images: 1, output_resolution: '720p' });
     const [facts] = (await pool.query(`select provider, endpoint, label, enabled, usd_per_second::text as usd, sources from model_configs where id = 'veo-3.1-vertex'`)).rows;
-    expect(facts).toMatchObject({ provider: 'vertex', endpoint: 'veo-3.1-generate-001', label: 'Veo 3.1', enabled: true, usd: '0.2000' }); // 0075 switches it on as the fallback of the fal row
+    expect(facts).toMatchObject({ provider: 'vertex', endpoint: 'veo-3.1-generate-001', label: 'Veo 3.1', enabled: true, usd: '0.2000' }); // 0075 switches it on; 0093 offers it ahead of the fal row
     expect(facts.sources.usdPerSecond).toMatchObject({ url: 'https://cloud.google.com/vertex-ai/generative-ai/pricing', readAt: '2026-11-01' });
     expect(facts.sources.usdPerSecond.note).toMatch(/^estimate:/);
     expect(AUDIO_USD_PER_SECOND['veo-3.1-generate-001']).toBe(0.4);
@@ -773,7 +773,7 @@ describe('migration 0075 hide the pricier duplicate models', () => {
     ['seedance-2.0', 'seedance-2.0-byteplus'],
     ['gemini-omni-flash', 'gemini-omni-flash-vertex'],
     ['gemini-omni-flash-reference', 'gemini-omni-flash-reference-vertex'],
-    ['veo-3.1-vertex', 'veo-3.1'],
+    ['veo-3.1', 'veo-3.1-vertex'], // 0075 hid the Vertex row; 0093 swaps the pair
   ] as const;
 
   test('points exactly ten dearer rows at the row that replaces each, and leaves the rows that have no like-for-like twin visible', async () => {
@@ -802,7 +802,17 @@ describe('migration 0075 hide the pricier duplicate models', () => {
   test('refuses a row that is its own twin or a twin that does not exist, and a twin cannot be deleted while another row points at it', async () => {
     await expect(pool.query(`update model_configs set twin_of = id where id = 'kling-2.6'`)).rejects.toThrow(/model_configs_twin_of_check/);
     await expect(pool.query(`update model_configs set twin_of = 'nope' where id = 'kling-2.6'`)).rejects.toThrow(/model_configs_twin_of_model_configs_id_fk/);
-    await expect(pool.query(`delete from model_configs where id = 'veo-3.1'`)).rejects.toThrow(/model_configs_twin_of_model_configs_id_fk/);
+    await expect(pool.query(`delete from model_configs where id = 'veo-3.1-vertex'`)).rejects.toThrow(/model_configs_twin_of_model_configs_id_fk/);
+  });
+});
+
+describe('migration 0093 Veo 3.1 on Vertex first', () => {
+  test('offers the Vertex row and makes the fal row its twin, with both still enabled', async () => {
+    const { rows } = await pool.query(`select id, twin_of, enabled from model_configs where id in ('veo-3.1', 'veo-3.1-vertex') order by id`);
+    expect(rows).toEqual([
+      { id: 'veo-3.1', twin_of: 'veo-3.1-vertex', enabled: true },
+      { id: 'veo-3.1-vertex', twin_of: null, enabled: true },
+    ]);
   });
 });
 
