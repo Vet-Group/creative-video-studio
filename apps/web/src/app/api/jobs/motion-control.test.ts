@@ -12,6 +12,7 @@ const { auth, pool } = await import('@/lib/auth');
 const { stopBoss } = await import('@/lib/queue');
 const { POST } = await import('./route');
 const { GET: GET_MODELS } = await import('../models/route');
+const { GET: GET_JOB } = await import('./[id]/route');
 
 const PASSWORD = 'correct-horse-battery';
 let cookie = '';
@@ -19,6 +20,7 @@ let cookie = '';
 const call = (path: string, method = 'GET', body?: unknown) =>
   new Request(`http://localhost${path}`, { method, headers: { cookie, 'content-type': 'application/json' }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
 const run = (body: Record<string, unknown>) => POST(call('/api/jobs', 'POST', { feature: 'motion_control', modelId: 'kling-v3-motion-pro', ratio: 'auto', ...body }));
+const orientationOf = async (job: string) => ((await (await GET_JOB(call(`/api/jobs/${job}`), { params: Promise.resolve({ id: job }) })).json()) as { orientation: string | null }).orientation; // what Reuse refills
 const errorOf = async (res: Response) => ((await res.json()) as { error: string }).error;
 
 beforeAll(async () => {
@@ -68,6 +70,7 @@ describe('POST /api/jobs for Motion Control', () => {
     expect(res.status).toBe(201);
     const { id } = (await res.json()) as { id: string };
     expect((await pool.query('select prompt from jobs where id = $1', [id])).rows[0].prompt).toBe('a dancer on a stage');
+    expect(await orientationOf(id)).toBeNull(); // a job made without the option reuses with none: the form's default, video
   });
 
   test('refuses the wrong inputs: a video first, two images, one input, a preset, or a video longer than the model allows', async () => {
@@ -88,6 +91,7 @@ describe('POST /api/jobs for Motion Control', () => {
     const usd = async (job: string) => (await pool.query(`select usd::text from cost_entries where job_id = $1 and kind = 'estimate'`, [job])).rows[0].usd;
     expect(await usd(id)).toBe('1.0080'); // 6 s, as the video orientation
     expect(await usd(video.id)).toBe('1.0080');
+    expect([await orientationOf(id), await orientationOf(video.id)]).toEqual(['image', 'video']); // Reuse brings the choice back
   });
 
   test('refuses the orientation of the image on a reference over 10 s, while the video orientation takes it', async () => {

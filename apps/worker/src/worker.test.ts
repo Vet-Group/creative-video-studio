@@ -416,6 +416,37 @@ describe('Motion Control orientation', () => {
   });
 });
 
+describe('Motion Control reference length', () => {
+  /** A Motion Control job on a model that takes up to 30 s, whose reference plays `seconds` and whose header says the same. */
+  async function motionJob(user: string, prompt: string, ref: string, seconds: number, orientation: string): Promise<string> {
+    await storeClip(ref, seconds, seconds * 1000);
+    const id = await newJob(user, { prompt, model: 'mock-motion' });
+    await pool.query(`update jobs set feature = 'motion_control', input_asset_ids = $2, params = $3 where id = $1`, [id, ['start', ref], JSON.stringify({ orientation })]);
+    return id;
+  }
+
+  test("a reference over 10 s is refused before submit on the image orientation, and sent on the video orientation; over the model's longest it is refused on both; the estimate is released", async () => {
+    await pool.query(
+      `insert into model_configs (id, provider, endpoint, label, ratios, durations_sec, max_images, output_resolution, usd_per_second, sources, enabled)
+       values ('mock-motion', 'mock', 'mock', 'Mock motion', '{9:16,1:1}', '{5,10,30}', 4, '720p', 0.1, '{}', true)`,
+    );
+    const prompts: string[] = [];
+    await start(counting(300, (inner) => ({ ...inner, submit: async (req) => (prompts.push(req.prompt), inner.submit(req)) })));
+    const image = await motionJob('u1', 'image-12', 'mref-12a', 12, 'image');
+    const video = await motionJob('u2', 'video-12', 'mref-12b', 12, 'video');
+    const tooLong = await motionJob('u1', 'video-35', 'mref-35', 35, 'video');
+    await send(image, 'u1');
+    await send(video, 'u2');
+    await send(tooLong, 'u1');
+    await waitFor('the three jobs to finish', async () => (await status(image)) === 'failed' && (await status(video)) === 'succeeded' && (await status(tooLong)) === 'failed');
+    expect((await job(image)).error).toMatch(/^the reference video plays 12\.0 s, but this job takes at most 10 s/);
+    expect((await job(tooLong)).error).toMatch(/^the reference video plays 35\.0 s, but this job takes at most 30 s/);
+    expect(await total(image)).toEqual({ usd: '0.0000', is_final: true });
+    expect(await total(tooLong)).toEqual({ usd: '0.0000', is_final: true });
+    expect(prompts).toEqual(['video-12']);
+  });
+});
+
 describe('Marketing Studio reference video price', () => {
   test('the submit and the status that settles the job both see the rate that includes the clip: $0.222 x (5 s out + 5 s reference) / 5 s on Seedance 2.0 Reference', async () => {
     const rates: [string, number][] = [];
@@ -491,7 +522,8 @@ describe("a clip whose length the member's own video set", () => {
     } })));
     const motion = await newJob('u1', { prompt: 'motion', estimate: '0.8400' });
     const plain = await newJob('u2', { prompt: 'plain', estimate: '0.8400' });
-    await pool.query(`update jobs set feature = 'motion_control' where id = $1`, [motion]);
+    await storeClip('motion-ref', 5, 5000);
+    await pool.query(`update jobs set feature = 'motion_control', input_asset_ids = '{start,motion-ref}' where id = $1`, [motion]);
     await send(motion, 'u1');
     await send(plain, 'u2');
     await waitFor('both jobs to succeed', async () => (await status(motion)) === 'succeeded' && (await status(plain)) === 'succeeded');

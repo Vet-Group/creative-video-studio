@@ -56,6 +56,7 @@ async function jobData(jobId: string, userId: string): Promise<{ feature: string
     prompt: ownPrompt ? j.prompt : undefined,
     brief: p.brief, script: p.script, hookText: p.hookText, ending: p.ending, endText: p.endText, endTextPos: p.endTextPos, hook: p.hook, location: p.location, format: p.format, roles: p.roles?.split(',').length === (j.images?.length ?? 0) ? p.roles : undefined, highlights: p.highlights?.split('\n'), audio: p.audio,
     garments: p.garments ? Number(p.garments) : undefined,
+    orientation: p.orientation,
     enhance: ['video', 'image'].includes(j.feature) ? j.enhance : undefined,
     ratio: j.aspect, resolution: p.resolution, modelId: j.model, presetId: j.preset_id, storeId: j.store_id,
     durationSec: ['video', 'marketing'].includes(j.feature) ? j.duration_s : undefined,

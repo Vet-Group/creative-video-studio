@@ -497,7 +497,7 @@ function MotionForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
                   </label>
                 ))}
               </div>
-              {orientation === 'image' && <p className="help">Nhân vật giữ nguyên tư thế trong ảnh.</p>}
+              {orientation === 'image' && <p className="help">Giữ hướng nhân vật như trong ảnh; chuyển động vẫn theo video.</p>}
             </div>
 
             {list && list.models.length > 1 && <ModelPicker models={list.models} value={chosen?.id ?? ''} onChange={setModelId} />}
@@ -514,7 +514,7 @@ function MotionForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
               placeholder="Ví dụ: sân khấu ánh đèn ấm, nhân vật mặc nguyên bộ đồ trong ảnh"
               ask={chosen ? () => ({ field: 'prompt', feature: app.feature, text: prompt, room: chosen.maxPromptChars, model: chosen.id }) : null}
             />
-            <Templates feature={app.feature} data={() => ({ images: [...image, ...(video ? [video] : [])].map((i) => i.id), prompt: prompt.trim(), modelId: chosen?.id })} />
+            <Templates feature={app.feature} data={() => ({ images: [...image, ...(video ? [video] : [])].map((i) => i.id), prompt: prompt.trim(), modelId: chosen?.id, orientation })} />
           </div>
 
           <div className="form-message">

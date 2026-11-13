@@ -33,6 +33,8 @@ export type TemplateData = {
   roles?: string;
   highlights?: string[];
   audio?: string;
+  /** Motion Control's character orientation ('video' when left out). */
+  orientation?: string;
   enhance?: boolean;
   garments?: number;
   durationSec?: number;
@@ -45,7 +47,7 @@ export type TemplateData = {
 
 const TEXT = ['prompt', 'brief', 'script'] as const;
 const SHORT = ['ratio', 'resolution', 'modelId', 'presetId', 'storeId', 'endFrame', 'videoRef'] as const;
-const FIELDS = new Set<string>(['images', 'clips', ...TEXT, ...SHORT, 'hookText', 'ending', 'promptMode', 'endText', 'endTextPos', 'hook', 'location', 'format', 'roles', 'highlights', 'audio', 'enhance', 'garments', 'durationSec']);
+const FIELDS = new Set<string>(['images', 'clips', ...TEXT, ...SHORT, 'hookText', 'ending', 'promptMode', 'endText', 'endTextPos', 'hook', 'location', 'format', 'roles', 'highlights', 'audio', 'orientation', 'enhance', 'garments', 'durationSec']);
 const whole = (v: unknown, min: number, max: number) => Number.isInteger(v) && (v as number) >= min && (v as number) <= max;
 
 /** The checked data of a template, or the reason it is refused. Unknown keys, wrong types and over-long text are refused; the route checks the hook and the location. */
@@ -83,6 +85,7 @@ export function templateData(raw: unknown): TemplateData | string {
   }
   if (d.promptMode !== undefined && d.promptMode !== 'sections' && d.promptMode !== 'free') return 'data.promptMode must be sections or free';
   if (d.audio !== undefined && d.audio !== 'on' && d.audio !== 'off') return 'data.audio must be on or off';
+  if (d.orientation !== undefined && d.orientation !== 'video' && d.orientation !== 'image') return 'data.orientation must be video or image';
   if (d.enhance !== undefined && typeof d.enhance !== 'boolean') return 'data.enhance must be true or false';
   if (d.garments !== undefined && !whole(d.garments, 1, 6)) return 'data.garments must be 1 to 6';
   if (d.durationSec !== undefined && !whole(d.durationSec, 1, 60)) return 'data.durationSec must be 1 to 60';
