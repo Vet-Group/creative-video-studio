@@ -2458,6 +2458,62 @@ export const APP_ABOUT: Record<string, AboutPage> = {
       },
     ],
   },
+  'smart-remake': {
+    title: 'Làm lại video mẫu với sản phẩm của bạn',
+    sections: [
+      {
+        title: 'Smart Remake là gì?',
+        blocks: [
+          'Smart Remake giữ mạch truyện của một video mẫu và đặt sản phẩm của bạn vào các cảnh có sản phẩm tương tự. Bạn chỉ cần đưa một video mẫu và một ảnh sản phẩm; AI tự phân tích video, tự chọn sẵn các cảnh có sản phẩm giống của bạn, và bạn bấm một nút để tạo video.',
+          'Mỗi cảnh được làm lại riêng, giữ nguyên chuyển động và độ dài của cảnh gốc, không tiếng. Các cảnh được ghép lại thành một video, kèm bản so sánh trước/sau.',
+        ],
+      },
+      {
+        title: 'Từ video mẫu đến video của bạn trong 3 bước',
+        lead: 'Thêm video mẫu, thêm ảnh sản phẩm, kiểm tra các cảnh đã chọn rồi bấm Tạo.',
+        blocks: [
+          {
+            steps: [
+              { title: 'Thêm video mẫu', text: 'Tải video lên hoặc chọn từ Lịch sử. Video được phân tích ngay khi bạn thêm, mất khoảng một phút, và phân tích tốn khoảng $0.02.' },
+              { title: 'Thêm ảnh sản phẩm', text: 'Chọn một ảnh rõ nét của sản phẩm, tốt nhất trên nền trơn và cùng loại sản phẩm với video mẫu. AI xem từng cảnh và tick sẵn các cảnh có sản phẩm giống của bạn.' },
+              { title: 'Tạo video', text: 'Bỏ chọn cảnh không cần hoặc chọn thêm cảnh, xem giá ngay trên nút Tạo, rồi bấm. Bạn xác nhận giá trước khi tiền được tính.' },
+            ],
+          },
+        ],
+      },
+      {
+        title: 'Giá bao nhiêu?',
+        blocks: [
+          'Mỗi cảnh tính theo độ dài của cảnh, làm tròn lên số giây nguyên (từ 2 đến 10 giây), với $0.10 mỗi giây. Một video làm lại tối đa 6 cảnh. Tiền tính vào ngân sách video; nút Tạo ghi tổng giá ước tính trước khi bạn bấm.',
+        ],
+      },
+      {
+        title: 'Mẹo để có kết quả đẹp',
+        blocks: [
+          {
+            list: [
+              'Dùng ảnh sản phẩm rõ nét, đủ sáng, trên nền trơn.',
+              'Chọn sản phẩm cùng loại với sản phẩm trong video mẫu, ví dụ áo thay cho áo.',
+              'Chỉ chọn các cảnh có sản phẩm; cảnh không có sản phẩm sẽ không thay đổi gì đáng kể mà vẫn tốn tiền.',
+            ],
+          },
+        ],
+      },
+      {
+        title: 'Câu hỏi thường gặp',
+        blocks: [
+          {
+            faq: [
+              ['Nếu AI không chọn được cảnh nào thì sao?', 'Trang sẽ báo và bạn tự tick các cảnh cần thay sản phẩm.'],
+              ['Tôi có đổi được cảnh AI đã chọn không?', 'Có. Các cảnh chỉ được tick sẵn; bạn bỏ hoặc thêm cảnh trước khi bấm Tạo.'],
+              ['Video làm xong nằm ở đâu?', 'Ngay dưới nút Tạo trên trang này, kèm bản so sánh trước/sau. Bạn cũng xem lại được ở mục Phân tích.'],
+              ['Có xoá được video đã làm không?', 'Có, bấm Xoá ở video đó. Ảnh sản phẩm của bạn vẫn còn.'],
+            ],
+          },
+        ],
+      },
+    ],
+  },
   'face-swap': {
     title: 'Đổi khuôn mặt chỉ với một lần chạy',
     sections: [

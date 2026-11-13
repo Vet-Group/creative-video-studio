@@ -101,5 +101,8 @@ export function scriptText(a: Analysis): string {
   return [[`Định dạng: ${analysisFormat(a)}`, hook && `Mở đầu: ${hook}`].filter(Boolean).join('\n'), ...blocks].join('\n\n');
 }
 
+/** The stored shots (as Smart Remake takes them) of the scenes a scene pick answered with, as 1-based scene numbers in `options`: unknown numbers are dropped, and at most `max` are kept. */
+export const scenePicks = (first: number[], options: string[], max: number): number[] => options.map(Number).filter((n) => Number.isInteger(n) && first[n - 1] !== undefined).map((n) => first[n - 1]!).slice(0, max);
+
 /** Where a scene's thumbnail is taken: just inside its start (the first frame can still be the previous cut), and never past its middle. */
 export const frameTime = (start: number, end: number): number => start + Math.min(0.3, Math.max(0, end - start) / 2);

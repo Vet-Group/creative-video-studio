@@ -108,8 +108,8 @@ export async function probeVideoSeconds(file: string): Promise<number> {
   return end > 0 ? end - Math.max(0, first) : 0;
 }
 
-/** `n` evenly spaced stills of an MP4 as small JPEGs (512 px on the long side at most), in time order, and the clip's length in seconds. */
-export async function extractFrames(video: Uint8Array, n: number): Promise<{ seconds: number; stills: Uint8Array[] }> {
+/** `n` evenly spaced stills of an MP4 (or one at each of the given times in seconds, kept inside the clip) as small JPEGs (512 px on the long side at most), in time order, and the clip's length in seconds. */
+export async function extractFrames(video: Uint8Array, n: number | number[]): Promise<{ seconds: number; stills: Uint8Array[] }> {
   const dir = await mkdtemp(join(tmpdir(), 'cvs-frames-'));
   try {
     const file = join(dir, 'clip.mp4');
@@ -117,7 +117,7 @@ export async function extractFrames(video: Uint8Array, n: number): Promise<{ sec
     const seconds = await probeSeconds(file);
     if (!(seconds > 0)) throw new Error('the clip has no duration');
     const stills = await Promise.all(
-      frameTimes(seconds, n).map(async (t, i) => {
+      (typeof n === 'number' ? frameTimes(seconds, n) : n.map((t) => Math.min(Math.max(t, 0), Math.max(seconds - 0.1, 0)))).map(async (t, i) => {
         const jpeg = join(dir, `${i}.jpg`);
         const scale = 'scale=512:512:force_original_aspect_ratio=decrease:force_divisible_by=2';
         await run(requireFfmpeg(), ['-y', '-v', 'error', '-ss', t.toFixed(3), '-i', file, '-frames:v', '1', '-vf', scale, '-q:v', '4', jpeg]);

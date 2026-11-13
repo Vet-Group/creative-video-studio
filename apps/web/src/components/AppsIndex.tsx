@@ -5,13 +5,14 @@ import { useId, useState } from 'react';
 import { type AppCategory, CATEGORIES, filterApps } from '@/lib/apps';
 import { AppArt } from './AppPage';
 import { Icon } from './Icon';
+import { useSmartRemakeEnabled } from './SmartRemakeGate';
 import { PageHint } from './ToolGuide';
 
 export function AppsIndex() {
   const [category, setCategory] = useState<AppCategory | 'all'>('all');
   const [search, setSearch] = useState('');
   const searchId = useId();
-  const apps = filterApps(category, search);
+  const apps = filterApps(category, search, useSmartRemakeEnabled());
   return (
     <section aria-labelledby="apps-title" className="apps">
       <h1 id="apps-title">Ứng dụng</h1>

@@ -78,13 +78,17 @@ export function RemakeResult({ row, scene = (index) => index, onDelete }: { row:
 // The unsent form per analysis id, so a remount (AnalyzeView moves the panel across its 1024 px breakpoint) keeps the pick; cleared once a remake is sent.
 export const remakeDrafts = new Map<string, { product: Img[]; chosen: number[] }>();
 
-/** The Smart Remake form and this analysis' remakes, newest first. Mount it with `key` set to the analysis id, so a pick starts over. */
-export function RemakePanel({ row }: { row: AnalysisRow }) {
+/**
+ * The Smart Remake form and this analysis' remakes, newest first. Mount it with `key` set to the analysis id, so a pick starts over. The Smart Remake app
+ * (SmartRemakeApp) asks for the product and the scenes itself: it passes them as `initialProduct` and `initialChosen` (a saved draft wins), a `note` on how
+ * they were chosen, and `productFixed` to leave the product slot to its own form.
+ */
+export function RemakePanel({ row, initialProduct, initialChosen, note, productFixed = false }: { row: AnalysisRow; initialProduct?: Img[]; initialChosen?: number[]; note?: string; productFixed?: boolean }) {
   // The scenes as the result list numbers them; a scene is sent as its first stored shot, which the API and the worker take.
   const scenes = row.result ? mergeShots(row.result) : { shots: [], first: [] };
   const scene = (index: number) => scenes.first.filter((f) => f <= index).length;
-  const [product, setProduct] = useState<Img[]>(remakeDrafts.get(row.id)?.product ?? []);
-  const [chosen, setChosen] = useState<number[]>(remakeDrafts.get(row.id)?.chosen ?? []);
+  const [product, setProduct] = useState<Img[]>(remakeDrafts.get(row.id)?.product ?? initialProduct ?? []);
+  const [chosen, setChosen] = useState<number[]>(remakeDrafts.get(row.id)?.chosen ?? initialChosen ?? []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [remakes, setRemakes] = useState<RemakeRow[]>([]);
@@ -168,7 +172,8 @@ export function RemakePanel({ row }: { row: AnalysisRow }) {
       <p className="help">
         Giữ mạch truyện của video này, thay sản phẩm trong các cảnh bạn chọn bằng ảnh sản phẩm của bạn. Mỗi cảnh giữ nguyên chuyển động và độ dài (tính tiền từ {REMAKE_MIN_SECONDS} đến {REMAKE_MAX_SECONDS} giây một cảnh), không tiếng, rồi được ghép lại thành một video kèm bản so sánh trước/sau.
       </p>
-      <Slot label="Ảnh sản phẩm" empty="Thêm 1 ảnh sản phẩm" inputLabel="Ảnh sản phẩm" images={product} max={1} busy={busy} onAdd={(files) => void upload(files)} onRemove={() => setProduct([])} onPick={(a) => setProduct([a])} slot="product" />
+      {note && <p className="help" role="status">{note}</p>}
+      {!productFixed && <Slot label="Ảnh sản phẩm" empty="Thêm 1 ảnh sản phẩm" inputLabel="Ảnh sản phẩm" images={product} max={1} busy={busy} onAdd={(files) => void upload(files)} onRemove={() => setProduct([])} onPick={(a) => setProduct([a])} slot="product" />}
       <fieldset className="remake-pick">
         <legend>Cảnh cần thay sản phẩm (tối đa {REMAKE_MAX_SHOTS})</legend>
         {scenes.shots.map((s, i) => {

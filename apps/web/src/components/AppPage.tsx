@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { type CSSProperties, useEffect, useId, useRef, useState } from 'react';
 import { APP_ABOUT } from '@/lib/about-content';
 import { api, errorText, sendJson } from '@/lib/api';
-import { APPS, type AppConfig, appInputs, appReason, type AppCategory, motionReason, slotMax, splitImages, stockGroups } from '@/lib/apps';
+import { type AppConfig, appInputs, appReason, type AppCategory, motionReason, slotMax, splitImages, stockGroups, visibleApps } from '@/lib/apps';
 import { basePrompt, promptTooLong } from '@/lib/prompt-limit';
 import { confirmRun } from '@/lib/run-guard';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
@@ -25,6 +25,7 @@ import { PromptPreview } from './PromptSections';
 import { ReferenceVideoSlot } from './ReferenceVideo';
 import { Select } from './Select';
 import { Tray } from './Shell';
+import { useSmartRemakeEnabled } from './SmartRemakeGate';
 import { Templates } from './Templates';
 
 export type Tab = 'create' | 'history' | 'about';
@@ -47,6 +48,7 @@ function ChangeMenu({ current }: { current: string }) {
   const root = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const listId = useId();
+  const smartRemake = useSmartRemakeEnabled();
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => !root.current?.contains(e.target as Node) && setOpen(false);
@@ -67,7 +69,7 @@ function ChangeMenu({ current }: { current: string }) {
       </button>
       {open && (
         <ul id={listId} className="app-change-list" aria-label="Ứng dụng">
-          {APPS.map((a) => (
+          {visibleApps(smartRemake).map((a) => (
             <li key={a.slug}>
               <Link href={`/apps/${a.slug}`} aria-current={a.slug === current ? 'page' : undefined} onClick={() => setOpen(false)}>
                 {a.name}

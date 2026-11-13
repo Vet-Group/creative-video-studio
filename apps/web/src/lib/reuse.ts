@@ -6,8 +6,8 @@ const PAGES: Partial<Record<string, string>> = {
   marketing: '/marketing-studio',
   try_on: '/try-on',
   image: '/image-generation',
-  // The apps, Motion Control too.
-  ...Object.fromEntries(APPS.filter((a) => !a.soon && a.feature !== 'media_optimizer').map((a) => [a.feature, `/apps/${a.slug}`])),
+  // The apps, Motion Control too. Smart Remake has no jobs, and its `video` feature must keep pointing at Create.
+  ...Object.fromEntries(APPS.filter((a) => !a.soon && a.feature !== 'media_optimizer' && a.slug !== 'smart-remake').map((a) => [a.feature, `/apps/${a.slug}`])),
 };
 
 /** The page that made a job of the feature; it opens on its History once the feature has a job. */

@@ -1,15 +1,20 @@
 import { randomUUID } from 'node:crypto';
 import { SUGGEST_QUEUE } from '@cvs/core/queue';
 import { PROMPT_CEILING } from '@cvs/core/models';
+import { type Analysis, mergeShots } from '@cvs/core/analysis/breakdown';
 import { modelNote, PROMPT_TASKS, type SuggestInput } from '@cvs/core/suggest';
-import { pool } from '@/lib/auth';
+import { frameTime } from '@/lib/analyze';
+import { pool, type Session } from '@/lib/auth';
 import { findChoice } from '@/lib/choices';
 import { ADVANCED_MAX_SCRIPT, isParamFormat, MAX_CHOICE_DESC, MAX_CHOICE_NAME, MAX_CHOICE_PHRASE, MAX_ENDING, MAX_HOOK, SUGGEST_DAILY_LIMIT } from '@/lib/marketing';
 import { boss } from '@/lib/queue';
+import { smartRemakeAppEnabled } from '@/lib/remake';
 import { headSample } from '@/lib/samples';
 import { guard, isEditor } from '@/lib/session';
-import { readJson } from '@/lib/assets';
+import { readableAsset, readJson } from '@/lib/assets';
 
+/** The most scenes one pick looks at: one still each, all in one vision call. */
+const MAX_PICK_SCENES = 30;
 const bad = (error: string, status = 400) => Response.json({ error }, { status });
 
 /**
@@ -19,6 +24,7 @@ const bad = (error: string, status = 400) => Response.json({ error }, { status }
  * for one Vietnamese reading of the English prompt in `text`), `format` ('advanced', 'unboxing', 'review' or absent; the last two tell the model what the clip is), the
  * member's `text` so far, the chosen `hook` and `location`, and for a brief the `room` the chosen model leaves for it (the page computes it); for a
  * brief, a script or a prompt, the page's chosen `model` (an enabled model's id), its `audio` switch and the clip's `seconds`, when it has them;
+ * `scenes` for Smart Remake's pick of the scenes of the member's own finished analysis `analysisId` that show a product like their image `productAssetId` (404 unless both REA flags are on);
  * or `video` for a template editor only: the English prompt of the motion preset `preset`, from stills of its saved clip. Answers 202 with the run's id for the page to poll (GET /api/suggestions/:id),
  * 429 past the daily limit, 503 when the queue cannot take it (the run is not counted then).
  */
@@ -26,11 +32,12 @@ export async function POST(request: Request) {
   const g = await guard(request, 'member');
   if (g.error) return g.error;
   const b = (await readJson(request)) as {
-    field?: unknown; format?: unknown; feature?: unknown; text?: unknown; hook?: unknown; location?: unknown; room?: unknown; model?: unknown; audio?: unknown; seconds?: unknown; preset?: unknown; rest?: unknown;
+    field?: unknown; format?: unknown; feature?: unknown; text?: unknown; hook?: unknown; location?: unknown; room?: unknown; model?: unknown; audio?: unknown; seconds?: unknown; preset?: unknown; rest?: unknown; analysisId?: unknown; productAssetId?: unknown;
   } | null;
-  if (b?.field !== 'brief' && b?.field !== 'script' && b?.field !== 'hook' && b?.field !== 'location' && b?.field !== 'ending' && b?.field !== 'prompt' && b?.field !== 'translate' && b?.field !== 'video') {
-    return bad('field must be brief, script, hook, location, ending, prompt, translate or video');
+  if (b?.field !== 'brief' && b?.field !== 'script' && b?.field !== 'hook' && b?.field !== 'location' && b?.field !== 'ending' && b?.field !== 'prompt' && b?.field !== 'translate' && b?.field !== 'video' && b?.field !== 'scenes') {
+    return bad('field must be brief, script, hook, location, ending, prompt, translate, video or scenes');
   }
+  if (b.field === 'scenes') return scenes(g.session, b);
   if (b.field === 'video') {
     // The prompt-from-video button in the preset edit form: a vision call on the preset's saved clip, for the people who edit presets.
     if (!isEditor(g.session.user)) return bad('forbidden', 403);
@@ -93,6 +100,22 @@ export async function POST(request: Request) {
   const input: SuggestInput = { field: b.field, text, context: [hook?.phrase, location && `Set in ${location.phrase}.`].filter(Boolean).join(' '), max, ...extra, ...note };
 
   return queue(userId, input);
+}
+
+/** Smart Remake's scene pick: a vision call on one still per scene of the member's finished analysis, with their product image. The server chooses every key it sends. */
+async function scenes(session: Session, b: { analysisId?: unknown; productAssetId?: unknown }): Promise<Response> {
+  if (!smartRemakeAppEnabled()) return bad('not found', 404);
+  if (typeof b.analysisId !== 'string' || typeof b.productAssetId !== 'string') return bad('analysisId and productAssetId are required');
+  const analysis = (await pool.query('select status, result, source_key from analyses where id = $1 and user_id = $2', [b.analysisId, session.user.id])).rows[0];
+  if (!analysis) return bad('the analysis does not exist', 404);
+  if (analysis.status !== 'succeeded') return bad('the analysis has not finished');
+  const found = await readableAsset(session, b.productAssetId);
+  if (found.error) return found.error;
+  if (found.asset.ownerId !== session.user.id) return bad('productAssetId must be one of your own images', 403);
+  if (!found.asset.mime.startsWith('image/')) return bad('productAssetId must be an image');
+  const times = mergeShots(analysis.result as Analysis).shots.map((s) => frameTime(s.start, s.end));
+  if (times.length === 0 || times.length > MAX_PICK_SCENES) return bad(`the analysis must have 1 to ${MAX_PICK_SCENES} scenes`);
+  return queue(session.user.id, { field: 'scenes', text: '', context: '', max: 0, sourceKey: analysis.source_key, productKey: found.asset.s3Key, times });
 }
 
 /**

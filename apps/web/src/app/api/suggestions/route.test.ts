@@ -100,7 +100,7 @@ describe('/api/suggestions', () => {
   test('refuses a bad field, a script outside Advanced, over-long text and unknown choices, and queues nothing', async () => {
     const u = await newUser();
     const before = sent.length;
-    expect(await error(await ask(u, { field: 'title' }))).toBe('field must be brief, script, hook, location, ending, prompt, translate or video');
+    expect(await error(await ask(u, { field: 'title' }))).toBe('field must be brief, script, hook, location, ending, prompt, translate, video or scenes');
     expect(await error(await ask(u, { field: 'script' }))).toBe('a script is for Advanced and Review only');
     expect((await ask(u, { field: 'script', format: 'advanced', text: 'x'.repeat(ADVANCED_MAX_SCRIPT + 1) })).status).toBe(202); // the brief as notes for lines
     expect(await error(await ask(u, { field: 'script', format: 'advanced', text: 'x'.repeat(5001) }))).toBe('text may be at most 5000 characters');
@@ -268,5 +268,67 @@ describe('/api/suggestions for a preset prompt from its clip', () => {
     expect(await error(await ask(u, { field: 'video' }))).toBe('preset is not a preset');
     expect(await error(await ask(u, { field: 'video', preset: 'walk-right' }))).toBe('the preset has no clip');
     expect([await runs(u.id), sent.length]).toEqual([0, before]);
+  });
+});
+
+describe('/api/suggestions scenes (Smart Remake)', () => {
+  const shots = (n: number) => JSON.stringify({ shots: Array.from({ length: n }, (_, i) => ({ index: i + 1, start: i * 2, end: i * 2 + 2, role: 'r', prompt: `p${i}` })) });
+  async function setup() {
+    const [u, other] = [await newUser(), await newUser()];
+    const team = (await pool.query('select team_id from users where id = $1', [u.id])).rows[0].team_id;
+    await pool.query(
+      `insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) values
+         ($1, $3, 'input', 'k/' || $1 || '-product.png', 'p.png', 'image/png', 1), ($2, $3, 'input', 'k/' || $2 || '-clip.mp4', 'c.mp4', 'video/mp4', 1), ($4, $5, 'input', 'k/' || $4 || '-theirs.png', 't.png', 'image/png', 1)`,
+      [`${u.id}-img`, `${u.id}-vid`, u.id, `${other.id}-img`, other.id],
+    );
+    const add = (id: string, owner: string, status: string, result: string | null) =>
+      pool.query(`insert into analyses (id, user_id, team_id, source_key, status, result) values ($1, $2, $3, 'r2:analyses/clip.mp4', $4, $5::jsonb)`, [id, owner, team, status, result]);
+    await add(`${u.id}-ok`, u.id, 'succeeded', shots(3));
+    await add(`${u.id}-running`, u.id, 'running', null);
+    await add(`${u.id}-many`, u.id, 'succeeded', JSON.stringify({ shots: Array.from({ length: 31 }, (_, i) => ({ index: i + 1, start: i, end: i + 1, role: 'r', prompt: `p${i}` })) }));
+    await add(`${other.id}-ok`, other.id, 'succeeded', shots(3));
+    return { u, other, ok: `${u.id}-ok`, img: `${u.id}-img` };
+  }
+  const flags = (on: boolean) => {
+    for (const k of ['REA_ANALYZE_ENABLED', 'REA_REMAKE_ENABLED']) on ? (process.env[k] = '1') : delete process.env[k];
+  };
+
+  test("queues a pick of the member's own finished analysis with their own image: keys from the server and one still time per scene", async () => {
+    flags(true);
+    try {
+      const { u, ok, img } = await setup();
+      const res = await ask(u, { field: 'scenes', analysisId: ok, productAssetId: img });
+      expect(res.status).toBe(202);
+      const { id } = (await res.json()) as { id: string };
+      expect(sent.at(-1)).toEqual({ name: 'suggest', data: { runId: id } });
+      const input = (await pool.query('select input from suggestion_runs where id = $1', [id])).rows[0].input;
+      expect(input).toEqual({ field: 'scenes', text: '', context: '', max: 0, sourceKey: 'r2:analyses/clip.mp4', productKey: `k/${img}-product.png`, times: [0.3, 2.3, 4.3] }); // just inside each scene's start
+    } finally {
+      flags(false);
+    }
+  });
+
+  test('is a 404 unless both flags are on, and refuses an analysis or image that is not the caller’s, not finished, or not usable, queuing nothing', async () => {
+    const { u, other, ok, img } = await setup();
+    for (const [analyze, remake] of [[false, false], [true, false], [false, true]]) {
+      flags(false);
+      if (analyze) process.env.REA_ANALYZE_ENABLED = '1';
+      if (remake) process.env.REA_REMAKE_ENABLED = '1';
+      expect((await ask(u, { field: 'scenes', analysisId: ok, productAssetId: img })).status).toBe(404);
+    }
+    flags(true);
+    try {
+      const before = sent.length;
+      expect((await ask(u, { field: 'scenes', analysisId: `${other.id}-ok`, productAssetId: img })).status).toBe(404); // another member's analysis
+      expect((await ask(u, { field: 'scenes', analysisId: `${u.id}-running`, productAssetId: img })).status).toBe(400);
+      expect((await ask(u, { field: 'scenes', analysisId: ok, productAssetId: `${other.id}-img` })).status).toBe(403); // another member's image
+      expect((await ask(u, { field: 'scenes', analysisId: ok, productAssetId: `${u.id}-vid` })).status).toBe(400); // a video is not a product image
+      expect((await ask(u, { field: 'scenes', analysisId: ok, productAssetId: 'nope' })).status).toBe(404);
+      expect((await ask(u, { field: 'scenes', analysisId: ok })).status).toBe(400);
+      expect((await ask(u, { field: 'scenes', analysisId: `${u.id}-many`, productAssetId: img })).status).toBe(400); // too many stills for one call
+      expect([await runs(u.id), sent.length]).toEqual([0, before]);
+    } finally {
+      flags(false);
+    }
   });
 });

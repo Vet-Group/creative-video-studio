@@ -11,9 +11,12 @@ const GIVE_UP_MS = 95_000;
 const UNAVAILABLE = 'Chưa lấy được gợi ý lúc này, hãy thử lại sau.';
 
 export interface Ask {
-  field: 'brief' | 'script' | 'hook' | 'location' | 'ending' | 'prompt' | 'translate' | 'video';
+  field: 'brief' | 'script' | 'hook' | 'location' | 'ending' | 'prompt' | 'translate' | 'video' | 'scenes';
   /** For `video` (a template editor): the motion preset whose saved clip is read. */
   preset?: string;
+  /** For `scenes` (Smart Remake): the member's finished analysis and their product image; the options are the numbers of the scenes that show a product like it. */
+  analysisId?: string;
+  productAssetId?: string;
   /** For a prompt: the page's feature, which the server maps to the tool's task. */
   feature?: string;
   format?: ParamFormat;

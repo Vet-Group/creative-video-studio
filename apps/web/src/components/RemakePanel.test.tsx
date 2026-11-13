@@ -86,6 +86,20 @@ test('a panel mounted again for the same analysis starts with the draft it saved
   remakeDrafts.clear();
 });
 
+test('initial props pre-tick scenes and fill the product, show the price for them and the note; a saved draft wins over them', () => {
+  const analysis: Analysis = { durationS: 12, shotCount: 2, format: '', hook: '', summary: '', shots: [{ index: 1, start: 0, end: 5.2, role: '', prompt: 'p1' }, { index: 2, start: 5.2, end: 12, role: '', prompt: 'p2' }] };
+  const panel = (id: string) =>
+    renderToStaticMarkup(<RemakePanel row={{ id, status: 'succeeded', result: analysis, error: null, createdAt: '2026-11-13T00:00:00Z', sourceAssetId: null }} initialProduct={[{ id: 'img-2', filename: 'dress.png' }]} initialChosen={[2]} note="AI đã chọn sẵn 1 cảnh." />);
+  const html = panel('a-initial');
+  expect(html).toContain('dress.png');
+  expect(html.match(/checked=""/g)).toHaveLength(1);
+  expect(html).toContain('<span class="run-cost"> · $0.70</span>'); // scene 2: 6.8 s billed as 7 s
+  expect(html).toContain('AI đã chọn sẵn 1 cảnh.');
+  remakeDrafts.set('a-saved', { product: [], chosen: [] });
+  expect(panel('a-saved')).not.toContain('dress.png');
+  remakeDrafts.clear();
+});
+
 test('only a remake that is no longer open offers a delete', () => {
   expect(renderToStaticMarkup(<RemakeResult row={base} onDelete={() => {}} />)).toContain('>Xoá</button>');
   expect(renderToStaticMarkup(<RemakeResult row={{ ...base, status: 'queued' }} onDelete={() => {}} />)).not.toContain('Xoá');

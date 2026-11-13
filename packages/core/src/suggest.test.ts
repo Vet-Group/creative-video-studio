@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 import { ENHANCE_MODEL, ENHANCE_URL, OPENAI_URL } from './enhance';
 import {
   createFalSuggester, createOpenAiSuggester, cutTo, DIRECTIONS, lengthenPrompt, modelNote, parseOption, PROMPT_SYSTEM, PROMPT_TASKS, SCENE_SYSTEM, SUGGEST_SYSTEM,
-  frameTimes, parseVideoAnswer, PERSON_KEEP, PRODUCT_KEEP, suggestPrompt, targetRange, TRANSLATE_SYSTEM, VIDEO_FRAMES, VIDEO_SYSTEM, videoPrompt,
+  frameTimes, parseScenes, parseVideoAnswer, PERSON_KEEP, SCENES_SYSTEM, PRODUCT_KEEP, suggestPrompt, targetRange, TRANSLATE_SYSTEM, VIDEO_FRAMES, VIDEO_SYSTEM, videoPrompt,
 } from './suggest';
 
 const answer = (body: unknown, status = 200) => Promise.resolve(new Response(JSON.stringify(body), { status }));
@@ -252,4 +252,29 @@ test('OpenAI: a preset prompt sends the stills as image parts after the text', a
     { role: 'developer', content: VIDEO_SYSTEM },
     { role: 'user', content: [{ type: 'text', text: suggestPrompt(video) }, ...stills.map((url) => ({ type: 'image_url', image_url: { url } }))] },
   ]);
+});
+
+const scenes = { field: 'scenes' as const, text: '', context: '', max: 0, sourceKey: 'v.mp4', productKey: 'p.png', times: [0.3, 4.3, 9] };
+
+test('the scene answer keeps whole scene numbers inside the video, ascending and once each; no JSON or no list throws', () => {
+  expect(parseScenes('{"scenes": [3, 1, 1, 2.5, 0, 4, "2"]}', 3)).toEqual([1, 3]);
+  expect(parseScenes('```json\n{"scenes": []}\n```', 3)).toEqual([]);
+  expect(parseScenes('[2]', 3)).toEqual([2]);
+  expect(() => parseScenes('Scenes 1 and 2.', 3)).toThrow('not JSON');
+  expect(() => parseScenes('{"scene": [1]}', 3)).toThrow('no scenes');
+});
+
+test('fal: a scene pick is one vision call with the product, then a still per scene, and answers the scene numbers as options', async () => {
+  const calls: { url: string; body: FalBody & { image_urls?: string[] } }[] = [];
+  const suggest = createFalSuggester({
+    apiKey: 'k',
+    fetch: (url, init) => (calls.push({ url: String(url), body: JSON.parse(String(init!.body)) }), answer({ output: '{"scenes": [2, 3]}', usage: { cost: 0.0009 } })),
+  });
+  const frames = ['data:image/jpeg;base64,P', 'data:image/jpeg;base64,A', 'data:image/jpeg;base64,B', 'data:image/jpeg;base64,C'];
+  expect(await suggest(scenes, frames)).toEqual({ options: ['2', '3'], costUsd: 0.0009, provider: 'fal', model: ENHANCE_MODEL });
+  expect(calls).toHaveLength(1);
+  expect(calls[0]!.url).toBe(`${ENHANCE_URL}/vision`);
+  expect(calls[0]!.body).toMatchObject({ system_prompt: SCENES_SYSTEM, prompt: 'The first image is the product; the other 3 images are scenes 1 to 3.', image_urls: frames });
+  await expect(suggest(scenes, frames.slice(0, 3))).rejects.toThrow('one still per scene'); // a still is missing: no call is made
+  expect(calls).toHaveLength(1);
 });

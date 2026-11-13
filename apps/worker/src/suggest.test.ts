@@ -125,6 +125,42 @@ test('a clip that cannot be read fails the run without calling the suggester', a
   expect((await row(id)).status).toBe('failed');
 });
 
+const scenesInput = { field: 'scenes', text: '', context: '', max: 0, sourceKey: 'r2:analyses/v.mp4', productKey: 'assets/p.png', times: [0.2, 1.1, 999] };
+const png = () => sharp({ create: { width: 900, height: 600, channels: 3, background: '#c33' } }).png().toBuffer();
+
+test("a scenes run reads the video and the product, sends the product then one still per scene (a time past the end is kept inside it), and stores and books the scene numbers", async () => {
+  const keys: string[] = [];
+  const seen: { input: unknown; frames?: string[] }[] = [];
+  const suggest: Suggester = async (i, frames) => (seen.push({ input: i, frames }), { options: ['1', '3'], costUsd: 0.0009, provider: 'fal', model: 'google/gemini-2.5-flash' });
+  const id = await queued(0, scenesInput);
+  await runSuggestion(pool, suggest, id, async (key) => (keys.push(key), key.endsWith('.png') ? new Uint8Array(await png()) : new Uint8Array(await clip())));
+  expect(keys.sort()).toEqual(['assets/p.png', 'r2:analyses/v.mp4']);
+  expect(seen[0]!.input).toEqual(scenesInput);
+  expect(seen[0]!.frames).toHaveLength(4);
+  for (const f of seen[0]!.frames!) expect(f).toMatch(/^data:image\/jpeg;base64,\/9j\//);
+  const { width = 0, height = 0 } = await sharp(Buffer.from(seen[0]!.frames![0]!.split(',')[1]!, 'base64')).metadata();
+  expect(Math.max(width, height)).toBe(512); // the 900 px product is shrunk like the stills
+  expect(await row(id)).toEqual({ status: 'succeeded', output: ['1', '3'], cost_usd: '0.000900' });
+  expect(await ledger(id)).toEqual([{ kind: 'llm', usd: '0.0009', user_id: 'u1', team_id: 'team-unassigned', job_id: null, model: 'google/gemini-2.5-flash', is_final: true }]);
+});
+
+test('a scenes run whose answer cannot be read fails with nothing booked; one whose product is missing never calls the suggester', async () => {
+  const bad = await queued(0, scenesInput);
+  await expect(runSuggestion(pool, async () => Promise.reject(new Error('suggest: the answer is not JSON')), bad, async (key) => new Uint8Array(key.endsWith('.png') ? await png() : await clip()))).rejects.toThrow('not JSON');
+  expect((await row(bad)).status).toBe('failed');
+  expect(await ledger(bad)).toEqual([]);
+  let called = false;
+  const gone = await queued(0, scenesInput);
+  await expect(runSuggestion(pool, async () => ((called = true), { options: [], costUsd: null, provider: 'fal', model: 'm' }), gone, async (key) => (key.endsWith('.png') ? Promise.reject(new Error('NoSuchKey')) : new Uint8Array(await clip())))).rejects.toThrow('NoSuchKey');
+  expect(called).toBe(false);
+  expect((await row(gone)).status).toBe('failed');
+});
+
+test('the e2e stand-in picks the first two scenes of a scenes run, at no cost and without a network call', async () => {
+  expect(await fakeSuggester({ ...scenesInput, field: 'scenes' })).toEqual({ options: ['1', '2'], costUsd: 0, provider: 'mock', model: 'fake' });
+  expect((await fakeSuggester({ ...scenesInput, field: 'scenes', times: [0.5] })).options).toEqual(['1']);
+});
+
 test('the e2e stand-in writes a house-style preset prompt from the stills without any network call', async () => {
   const fetchSpy = vi.spyOn(globalThis, 'fetch');
   try {
