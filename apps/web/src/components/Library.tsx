@@ -48,7 +48,7 @@ const KINDS = [
   { id: 'marketing_review', label: 'Đánh giá sản phẩm' },
   { id: 'apps', label: 'Ứng dụng' },
 ];
-/** The kind of each app, for the second row of pills under Ứng dụng: the id is the app's feature, the `kind` the API takes. */
+/** The kind of each app, for the second row of pills under the Apps pill: the id is the app's feature, the `kind` the API takes. */
 const APP_KINDS = JOB_APPS.map((a) => ({ id: a.feature, label: a.name }));
 /** The size slider: card widths from small to large, remembered per browser. */
 const SIZES = ['12rem', '16rem', '22rem'];
