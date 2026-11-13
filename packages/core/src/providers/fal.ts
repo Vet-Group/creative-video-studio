@@ -148,9 +148,11 @@ export const VIDEO_BODIES: Record<string, VideoBody> = {
   'fal-ai/kling-video/v3/pro/image-to-video': { crop: true, end: 'end_image_url', text: 'fal-ai/kling-video/v3/pro/text-to-video', build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), start_image_url: images[0], duration: seconds(req), generate_audio: req.audio === true }) },
   'fal-ai/kling-video/v2.6/pro/image-to-video': { crop: true, end: 'end_image_url', text: 'fal-ai/kling-video/v2.6/pro/text-to-video', build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), start_image_url: images[0], duration: seconds(req), generate_audio: req.audio === true }) },
   'fal-ai/kling-video/v2.5-turbo/pro/image-to-video': { crop: true, end: 'tail_image_url', text: 'fal-ai/kling-video/v2.5-turbo/pro/text-to-video', build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), duration: seconds(req) }) },
+  // The Seedance 2.5 rows (720p and 1080p) share these endpoints and their text twin; each sends its own output resolution, as Minimax does.
   // "Up to 10 files", each 1.8 to 30.2 s and 30.2 s in all (the schema's description; it states no maxItems).
-  'bytedance/seedance-2.5/us/reference-to-video': { text: 'bytedance/seedance-2.5/us/text-to-video', audio: { field: 'audio_urls', max: 10, seconds: 30 }, video: { field: 'video_urls', minSec: 1.8, maxSec: 30.2, maxMb: 200, dims: { minSide: 300, maxSide: 6000, minAspect: 0.4, maxAspect: 2.5 }, fps: [24, 60], name: atVideo }, build: (req, images) => ({ prompt: imageTokens(req.prompt, atImage), ...ref(images), aspect_ratio: req.ratio, duration: seconds(req), resolution: '720p', generate_audio: req.audio === true }) },
-  'bytedance/seedance-2.5/us/image-to-video': { crop: true, end: 'end_image_url', text: 'bytedance/seedance-2.5/us/text-to-video', build: (req, images) => ({ prompt: oneShot(imageTokens(req.prompt, plainImage)), ...first(images), duration: seconds(req), resolution: '720p', generate_audio: req.audio === true }) },
+  'bytedance/seedance-2.5/us/reference-to-video': { text: 'bytedance/seedance-2.5/us/text-to-video', audio: { field: 'audio_urls', max: 10, seconds: 30 }, video: { field: 'video_urls', minSec: 1.8, maxSec: 30.2, maxMb: 200, dims: { minSide: 300, maxSide: 6000, minAspect: 0.4, maxAspect: 2.5 }, fps: [24, 60], name: atVideo }, build: (req, images) => ({ prompt: imageTokens(req.prompt, atImage), ...ref(images), aspect_ratio: req.ratio, duration: seconds(req), resolution: req.model.outputResolution ?? '720p', generate_audio: req.audio === true }) },
+  // The image-to-video schema's aspect_ratio is always "auto", so the crop is the only ratio control.
+  'bytedance/seedance-2.5/us/image-to-video': { crop: true, end: 'end_image_url', text: 'bytedance/seedance-2.5/us/text-to-video', build: (req, images) => ({ prompt: oneShot(imageTokens(req.prompt, plainImage)), ...first(images), duration: seconds(req), resolution: req.model.outputResolution ?? '720p', generate_audio: req.audio === true }) },
   'bytedance/seedance-2.0/us/reference-to-video': { text: 'bytedance/seedance-2.0/us/text-to-video', audio: { field: 'audio_urls', max: 3, seconds: 15 }, video: { field: 'video_urls', minSec: 2, maxSec: 15, maxMb: 50, dims: { minPixels: 640 * 640, maxPixels: 834 * 1112 }, name: atVideo }, build: (req, images) => ({ prompt: imageTokens(req.prompt, atImage), ...ref(images), aspect_ratio: req.ratio, duration: seconds(req), resolution: '720p', generate_audio: req.audio === true }) },
   'bytedance/seedance-2.0/us/image-to-video': { end: 'end_image_url', build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), aspect_ratio: req.ratio, duration: seconds(req), resolution: '720p', generate_audio: req.audio === true }) },
   'fal-ai/bytedance/seedance/v1.5/pro/image-to-video': { end: 'end_image_url', text: 'fal-ai/bytedance/seedance/v1.5/pro/text-to-video', build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), aspect_ratio: req.ratio, duration: seconds(req), resolution: '720p', generate_audio: req.audio === true }) },
@@ -182,7 +184,7 @@ export const VIDEO_BODIES: Record<string, VideoBody> = {
   'fal-ai/kling-video/v3/pro/text-to-video': { build: (req) => words(req, seconds(req), { generate_audio: req.audio === true }) },
   'fal-ai/kling-video/v2.6/pro/text-to-video': { build: (req) => words(req, seconds(req), { generate_audio: req.audio === true }) },
   'fal-ai/kling-video/v2.5-turbo/pro/text-to-video': { build: (req) => words(req, seconds(req)) },
-  'bytedance/seedance-2.5/us/text-to-video': { build: (req) => words(req, seconds(req), { resolution: '720p', generate_audio: req.audio === true }) },
+  'bytedance/seedance-2.5/us/text-to-video': { build: (req) => words(req, seconds(req), { resolution: req.model.outputResolution ?? '720p', generate_audio: req.audio === true }) },
   'bytedance/seedance-2.0/us/text-to-video': { build: (req) => words(req, seconds(req), { resolution: '720p', generate_audio: req.audio === true }) },
   'fal-ai/bytedance/seedance/v1.5/pro/text-to-video': { build: (req) => words(req, seconds(req), { resolution: '720p', generate_audio: req.audio === true }) },
   'fal-ai/bytedance/seedance/v1/pro/text-to-video': { build: (req) => words(req, seconds(req), { resolution: '1080p' }) },
@@ -302,10 +304,12 @@ export function createFalProvider(opts: { apiKey: string; fetch?: Fetch; readIma
       if (req.endImageUrl && !spec.end) throw new ImageReadError(`fal video: ${req.model.endpoint} takes no end frame`);
       if (req.audioUrls?.length && !spec.audio) throw new ImageReadError(`fal video: ${req.model.endpoint} takes no reference audio`);
       if (req.videoUrls?.length && (!spec.video || req.videoUrls.length > 1)) throw new ImageReadError(`fal video: ${req.model.endpoint} takes ${spec.video ? 'one' : 'no'} reference video`);
-      const inputs = spec.upload || req.imageUrls.length > MAX_INLINE_INPUTS ? await uploadInputs(f, opts.apiKey, req.imageUrls, opts.readImage) : await resolveImages(req.imageUrls, opts.readImage, spec.crop ? { ratio: req.ratio } : undefined);
+      // 'auto' follows the input image, so there is no shape to crop to.
+      const crop = spec.crop && req.ratio !== 'auto' ? { ratio: req.ratio } : undefined;
+      const inputs = spec.upload || req.imageUrls.length > MAX_INLINE_INPUTS ? await uploadInputs(f, opts.apiKey, req.imageUrls, opts.readImage) : await resolveImages(req.imageUrls, opts.readImage, crop);
       const body = spec.build(req, inputs);
       // The end frame is read like the inputs, cropped to the ratio where they are, so both frames have one shape.
-      if (req.endImageUrl) [body[spec.end!]] = await resolveImages([req.endImageUrl], opts.readImage, spec.crop ? { ratio: req.ratio } : undefined);
+      if (req.endImageUrl) [body[spec.end!]] = await resolveImages([req.endImageUrl], opts.readImage, crop);
       if (req.audioUrls?.length) body[spec.audio!.field] = await uploadInputs(f, opts.apiKey, req.audioUrls, opts.readImage);
       if (req.videoUrls?.length) {
         const [url] = await uploadInputs(f, opts.apiKey, req.videoUrls, opts.readImage);

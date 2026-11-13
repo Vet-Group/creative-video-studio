@@ -652,6 +652,13 @@
 			"when": 1794561570511,
 			"tag": "0093_veo_vertex_first",
 			"breakpoints": true
+		},
+		{
+			"idx": 93,
+			"version": "7",
+			"when": 1794620000000,
+			"tag": "0094_video_1080p_ultrawide_auto",
+			"breakpoints": true
 		}
 	]
 }

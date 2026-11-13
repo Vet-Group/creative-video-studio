@@ -1,5 +1,6 @@
 'use client';
 import { type DragEvent, type KeyboardEvent, useEffect, useId, useRef, useState } from 'react';
+import { resolutionVariants } from '@/lib/resolution-variants';
 import { api, errorText, sendJson, thumbUrl } from '@/lib/api';
 import { cardSample, type Example, exampleForPreset, exampleModel, examplesFor, exampleTitle, sampleSrc, splitColumns } from '@/lib/examples';
 import { adjustNote } from '@/lib/video-adjust';
@@ -124,7 +125,7 @@ const fmtDate = (day: string) => new Intl.DateTimeFormat('vi-VN', { dateStyle: '
 
 type Tab = 'create' | 'history' | 'examples' | 'about';
 const TAB_LABEL: Record<Tab, string> = { create: 'Tạo', history: 'Lịch sử', examples: 'Ví dụ', about: 'Giới thiệu' };
-const RATIO_LABEL: Record<string, string> = { '9:16': '9:16 (dọc)', '1:1': '1:1 (vuông)', '16:9': '16:9 (ngang)', '4:3': '4:3 (ngang)', '3:4': '3:4 (dọc)' };
+const RATIO_LABEL: Record<string, string> = { '9:16': '9:16 (dọc)', '1:1': '1:1 (vuông)', '16:9': '16:9 (ngang)', '4:3': '4:3 (ngang)', '3:4': '3:4 (dọc)', '21:9': '21:9 (siêu ngang)', auto: 'Tự động (theo ảnh)' };
 const MAX_IMAGES = 9;
 const ratePct = (m: Model) => (m.passRate === null ? undefined : `${Math.round(m.passRate * 100)}% (${m.passes}/${m.total})`);
 
@@ -330,6 +331,10 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
   // What the job sends besides the images (endAssetId and audioAssetIds below send them only with an image).
   const withEnd = endFrame !== null && images.length > 0;
   const clipCount = images.length > 0 ? clips.length : 0;
+  // Auto follows the input image, so it is offered only with one (the models API and the jobs API refuse it otherwise).
+  useEffect(() => {
+    if (ratio === 'auto' && images.length === 0) setRatio('9:16');
+  }, [ratio, images.length]);
   // The picker follows the ratio and duration; the chosen model stays while it supports them, else the server's default takes over.
   useEffect(() => {
     if (!ready || !recall.answered) return;
@@ -381,6 +386,8 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
   const durations = [...new Set(chosen ? chosen.durationsSec : (models?.models.flatMap((m) => m.durationsSec) ?? [durationSec]))].sort((a, b) => a - b);
   const ratios = chosen ? chosen.ratios : (models?.models.flatMap((m) => m.ratios) ?? [ratio]);
   const tooMany = chosen !== undefined && images.length > chosen.maxImages;
+  // The resolutions of one model are rows of their own (id, id-480p, id-1080p, as the models API lists them; lib/resolution-variants.ts), so the Resolution box switches between those that serve this ratio and length.
+  const resolutions = chosen ? resolutionVariants(models?.models ?? [], chosen) : [];
   const endOver = endAssetId !== undefined && chosen?.endMaxSec != null && durationSec > chosen.endMaxSec;
   // The upload limit follows the chosen model (REA-video V02); the server caps every model at MAX_IMAGES.
   const maxImages = Math.min(MAX_IMAGES, chosen?.maxImages ?? MAX_IMAGES);
@@ -775,7 +782,7 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
               {models && models.models.length === 0 && <p className="help">Chưa bật mô hình video nào. Admin bật trong Quản trị → Cài đặt → Mô hình.</p>}
               {tooMany && chosen && <p className="error">Mô hình này nhận tối đa {chosen.maxImages} ảnh.</p>}
               {endOver && <p className="error">Mô hình này chỉ nhận khung hình cuối cho clip tối đa {chosen!.endMaxSec} giây.</p>}
-              <Select label="Độ phân giải" icon="preset" heading="Độ phân giải" value={chosen?.resolution ?? ''} options={[{ value: chosen?.resolution ?? '', label: chosen?.resolution ?? 'Theo mô hình' }]} onChange={() => undefined} />
+              <Select label="Độ phân giải" icon="preset" heading="Độ phân giải" value={resolutions.length > 1 ? chosen!.id : (chosen?.resolution ?? '')} options={resolutions.length > 1 ? resolutions.map((m) => ({ value: m.id, label: m.resolution! })) : [{ value: chosen?.resolution ?? '', label: chosen?.resolution ?? 'Theo mô hình' }]} onChange={resolutions.length > 1 ? setModelId : () => undefined} />
               <Select
                 label="Thời lượng"
                 icon="clock"
@@ -789,7 +796,7 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
                 icon="ratio"
                 heading="Chọn tỉ lệ khung hình"
                 value={ratio}
-                options={[...new Set(ratios)].map((r) => ({ value: r, label: RATIO_LABEL[r] ?? r }))}
+                options={[...new Set(ratios)].filter((r) => r !== 'auto' || images.length > 0).map((r) => ({ value: r, label: RATIO_LABEL[r] ?? r }))}
                 onChange={setRatio}
               />
               <AudioSwitch on={audio} available={chosen?.audioEstimateUsd != null} always={chosen?.alwaysAudio} onChange={setAudio} />

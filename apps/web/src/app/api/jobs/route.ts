@@ -3,7 +3,7 @@ import { checkCaps, dailyClips } from '@cvs/core/limits';
 import { estimateUsd, extraInputUsd, FEATURE_PROMPTS, imagePricesFor, PROMPT_CEILING, promptLimit, textToImage, usdPerSecondFor, usdPerSecondWithVideo } from '@cvs/core/models';
 import { videoInputs, videoRefProblem } from '@cvs/core/providers/fal';
 import { VIDEO_QUEUE, videoSendOptions } from '@cvs/core/queue';
-import { FEATURES } from '@cvs/db';
+import { ASPECTS, FEATURES } from '@cvs/db';
 import { fillInputSlots } from '@cvs/db/assets';
 import { pool } from '@/lib/auth';
 import { CAP_MESSAGES } from '@/lib/caps';
@@ -338,6 +338,7 @@ export async function POST(request: Request) {
     if ((feature === 'image' || feature === 'fashion_model') && assetIds.length === 0 && !textToImage(model)) return bad('the model needs at least one input image');
     // A retry copies a Run this check already passed.
     if (!original && feature === 'video' && assetIds.length === 0 && !videoInputs(model.endpoint).textOnly) return bad('the model needs at least one input image');
+    if (feature === 'video' && ratio === 'auto' && assetIds.length === 0) return bad('ratio auto follows the input image, so it needs an image');
     // What the model takes is read for the request the worker will make: with a reference video that is the video-to-video sibling where the row has one (Kling O3 Pro).
     const takesNow = videoInputs(model.endpoint, params.videoAssetId !== undefined);
     if (params.endAssetId !== undefined && !takesNow.endFrame) return bad(takesNow.endFrame !== videoInputs(model.endpoint).endFrame ? 'the model takes no end frame together with a reference video' : 'the model does not take an end frame');
@@ -363,6 +364,8 @@ export async function POST(request: Request) {
     // Own keys only, with a plain decimal price: `in` would also accept "constructor" and friends.
     const prices = isImage ? imagePricesFor(model, params.thinking) : {};
     const imagePrice = isImage && Object.hasOwn(prices, params.resolution!) ? String(prices[params.resolution!]) : null;
+    // Marketing Studio offers 9:16, 1:1 and 16:9 only (api/models), though its rows list more.
+    if (feature === 'marketing' && ![...ASPECTS, '16:9'].includes(ratio as never)) return bad('Marketing Studio takes the ratios 9:16, 1:1 and 16:9');
     if (!model.ratios.includes(ratio) || !(isImage ? imagePrice !== null && /^\d+(\.\d+)?$/.test(imagePrice) : model.durations_sec.includes(durationSec)) || assetIds.length > model.max_images) {
       return bad(isImage ? 'the model does not allow this ratio, resolution or number of images' : 'the model does not allow this ratio, duration or number of images');
     }
