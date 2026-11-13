@@ -399,6 +399,23 @@ describe('Marketing Studio reference video', () => {
   });
 });
 
+describe('Motion Control orientation', () => {
+  test("a job's params.orientation 'image' reaches the adapter; a job without it (every job made before the option) sends none, which fal's builder reads as video", async () => {
+    const requests: SubmitRequest[] = [];
+    await start(counting(300, (inner) => ({ ...inner, submit: async (req) => (requests.push(req), inner.submit(req)) })));
+    const kept = await newJob('u1', { prompt: 'kept' });
+    await pool.query(`update jobs set params = '{"orientation":"image"}' where id = $1`, [kept]);
+    const old = await newJob('u2', { prompt: 'old' });
+    await send(kept, 'u1');
+    await send(old, 'u2');
+    await waitFor('both submits', async () => requests.length === 2);
+    const by = Object.fromEntries(requests.map((r) => [r.prompt, r]));
+    expect(by.kept!.orientation).toBe('image');
+    expect(by.old!.orientation).toBeUndefined();
+    await waitFor('both jobs to finish', async () => (await status(kept)) === 'succeeded' && (await status(old)) === 'succeeded');
+  });
+});
+
 describe('Marketing Studio reference video price', () => {
   test('the submit and the status that settles the job both see the rate that includes the clip: $0.222 x (5 s out + 5 s reference) / 5 s on Seedance 2.0 Reference', async () => {
     const rates: [string, number][] = [];

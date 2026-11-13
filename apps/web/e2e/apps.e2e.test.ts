@@ -444,9 +444,11 @@ test('Motion Control: the image and the reference video, a length check, and a R
   const picker = (await page.locator('.select-trigger').boundingBox())!;
   const form = (await page.locator('.form-scroll').boundingBox())!;
   expect(picker.x + picker.width).toBeLessThanOrEqual(form.x + form.width);
+  await expect(page.getByRole('radio', { name: 'Theo video (tối đa 30 giây)' })).toBeChecked();
+  await page.getByText('Theo ảnh (tối đa 10 giây)').click();
   await runButton(page).click();
   await expect(page.getByText('Đã gửi lượt tạo. Theo dõi trong tab "Lịch sử".')).toBeVisible();
-  expect(sent).toMatchObject({ feature: 'motion_control', modelId: 'kling-v3-motion-standard', ratio: 'auto' });
+  expect(sent).toMatchObject({ feature: 'motion_control', modelId: 'kling-v3-motion-standard', ratio: 'auto', params: { orientation: 'image' } });
   expect((sent as unknown as { assetIds: string[] }).assetIds).toHaveLength(2);
   expect(sent).not.toHaveProperty('prompt');
 });

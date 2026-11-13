@@ -247,12 +247,12 @@ function remakeEdit(req: SubmitRequest, [reference_image_url, video_url, ...rest
 }
 
 /**
- * Motion Control: the character image (1st input) moves like the reference video (2nd input). Orientation 'video' lets the reference run up to 30 s
- * ('image' allows 10 s); the reference's sound is dropped, as audio is everywhere. The prompt is optional and sent only when the member wrote one.
+ * Motion Control: the character image (1st input) moves like the reference video (2nd input). Orientation 'video' (the default) lets the reference run up to 30 s
+ * ('image' allows 10 s and keeps the pose of the image); the reference's sound is dropped, as audio is everywhere. The prompt is optional and sent only when the member wrote one.
  */
 function motion(req: SubmitRequest, [image_url, video_url, ...rest]: string[]): Record<string, unknown> {
   if (!image_url || !video_url || rest.length > 0) throw new ImageReadError('motion control needs the character image and the reference video');
-  return { image_url, video_url, character_orientation: 'video', keep_original_sound: false, ...(req.prompt.trim() && { prompt: req.prompt }) };
+  return { image_url, video_url, character_orientation: req.orientation ?? 'video', keep_original_sound: false, ...(req.prompt.trim() && { prompt: req.prompt }) };
 }
 
 /**

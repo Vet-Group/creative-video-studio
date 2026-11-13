@@ -264,6 +264,7 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
           ...(job.params.endAssetId && { endImageUrl: `asset://${job.params.endAssetId}` }),
           ...(job.params.audioAssetIds && { audioUrls: (job.params.audioAssetIds as string).split(',').map((a) => `asset://${a}`) }),
           ...(job.params.videoAssetId && { videoUrls: [`asset://${job.params.videoAssetId}`] }),
+          ...(job.params.orientation === 'image' && { orientation: 'image' as const }),
         };
         return { send: () => provider.submit(request) };
       })().catch(async (e) => {
