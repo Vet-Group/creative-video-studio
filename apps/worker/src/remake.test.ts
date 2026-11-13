@@ -155,6 +155,22 @@ test('a shot missing from the analysis fails alone; more shots than the cap fail
   expect(calls).toEqual([]);
 });
 
+test('a shot that starts a merged scene is remade over the whole scene, and its clip is cut back to the scene’s length', async () => {
+  const s = (index: number, start: number, end: number, prompt: string) => ({ index, start, end, role: 'proof', prompt });
+  await pool.query(`insert into analyses (id, user_id, team_id, source_key, status, result) values ('an-merged', 'u1', 'team-unassigned', 'sources/ref.mp4', 'succeeded', $1)`, [
+    JSON.stringify({ ...analysis, shots: [s(1, 0, 0.6, 'Pan.'), s(2, 0.6, 1.7, 'Pan.'), s(3, 1.7, 2, 'Spin.')] }),
+  ]);
+  await pool.query(`insert into remakes (id, user_id, team_id, analysis_id, product_asset_id, shots) values ('rm-merged', 'u1', 'team-unassigned', 'an-merged', 'prod', '[1]')`);
+  calls = [];
+  // The edit answers with the clip it was sent (2 s: the 1.7 s scene held on its last frame), so the stored clip shows what was cut.
+  await runRemake(pool, 'rm-merged', seams({ edit: async (clip, _product, _prompt, seconds) => (calls.push(`edit ${seconds}s`), { video: clip, costUsd: 0.2 }) }));
+  const r = await row('rm-merged');
+  expect([r.status, calls]).toEqual(['succeeded', ['edit 2s']]);
+  const clip = join(dir, 'merged-clip.mp4');
+  await writeFile(clip, stored[`assets/${r.result.shots[0].clipAssetId}`]!);
+  expect(Math.abs((await probeSeconds(clip)) - 1.7)).toBeLessThanOrEqual(0.1); // the scene, not shot 1's 0.6 s
+});
+
 test('does nothing on a repeated run once the remake is no longer queued', async () => {
   const id = await queued([1]);
   calls = [];

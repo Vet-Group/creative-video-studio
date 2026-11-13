@@ -1,6 +1,7 @@
 // Smart Remake (Feature B): the settings shared by the API, which validates a request, and the worker, which runs it.
 // A remake puts a member's product image into chosen shots of one of their analysed reference videos: per shot, the
 // shot's own clip is edited with the product, keeping its motion, framing and length, and the clips are joined in shot order.
+import { type Analysis, type AnalysisShot, mergeShots } from './breakdown';
 
 /** The most shots one remake may take: each is one paid fal call, so this bounds a remake's spend (owner decision, 2026-11-13). */
 export const REMAKE_MAX_SHOTS = 6;
@@ -24,6 +25,18 @@ export const remakeShotSeconds = (shot: { start: number; end: number }): number 
 
 /** What a shot is estimated to cost; the API counts the chosen shots' sum against the spending caps before a remake is queued. */
 export const remakeShotUsd = (shot: { start: number; end: number }): number => remakeShotSeconds(shot) * REMAKE_USD_PER_SECOND;
+
+/**
+ * What a remake takes for a chosen stored shot index: the scene it starts (mergeShots), from the shot's start to the scene's end, as the picker
+ * offers it; a shot inside a scene stands for itself. Undefined when the analysis has no such shot.
+ */
+export function remakeScene(a: Analysis, index: number): AnalysisShot | undefined {
+  const shot = a.shots.find((s) => s.index === index);
+  if (!shot) return undefined;
+  const { shots, first } = mergeShots(a);
+  const k = first.indexOf(index);
+  return k < 0 ? shot : { ...shot, end: shots[k]!.end };
+}
 
 /** Why these chosen shot indices cannot be remade from an analysis whose shots have the `available` indices, or null: 1 to REMAKE_MAX_SHOTS distinct shots of the analysis. */
 export function remakeShotsProblem(chosen: unknown, available: number[]): string | null {

@@ -1,5 +1,16 @@
 import { expect, test } from 'vitest';
-import { REMAKE_MAX_SHOTS, remakeShotSeconds, remakeShotsProblem, remakeShotUsd } from './remake';
+import type { Analysis } from './breakdown';
+import { REMAKE_MAX_SHOTS, remakeScene, remakeShotSeconds, remakeShotsProblem, remakeShotUsd } from './remake';
+
+test('a chosen shot that starts a merged scene stands for the whole scene; a shot inside one stands for itself', () => {
+  const s = (index: number, start: number, end: number, prompt: string) => ({ index, start, end, role: 'proof', prompt });
+  const a: Analysis = { durationS: 8, shotCount: 4, format: '', hook: '', summary: '', shots: [s(1, 0, 1.2, 'Pan.'), s(2, 1.2, 2.3, 'Pan.'), s(3, 2.3, 4, 'Spin.'), s(4, 4, 8, 'Spin.')] };
+  expect(remakeScene(a, 1)).toEqual(s(1, 0, 2.3, 'Pan.'));
+  expect(remakeScene(a, 3)).toEqual(s(3, 2.3, 8, 'Spin.'));
+  expect(remakeScene(a, 4)).toEqual(s(4, 4, 8, 'Spin.'));
+  expect(remakeScene(a, 9)).toBeUndefined();
+  expect(a.shots[0]!.end).toBe(1.2); // the analysis is left as it was
+});
 
 test('a shot is sent and billed as its length in whole seconds, 2 to 10', () => {
   const secs = (start: number, end: number) => remakeShotSeconds({ start, end });

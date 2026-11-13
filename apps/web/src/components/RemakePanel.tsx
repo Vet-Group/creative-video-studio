@@ -135,7 +135,7 @@ export function RemakePanel({ row }: { row: AnalysisRow }) {
 
   const running = remakes.some(isOpen); // one at a time per analysis, so a double click cannot pay twice
   const toggle = (index: number) => setChosen((c) => (c.includes(index) ? c.filter((n) => n !== index) : [...c, index]));
-  const picked = shots.filter((s) => chosen.includes(s.index));
+  const picked = scenes.shots.filter((_, i) => chosen.includes(scenes.first[i]!)); // whole scenes, as the API prices them
 
   return (
     <section className="remake-panel" aria-labelledby={`remake-${row.id}`}>

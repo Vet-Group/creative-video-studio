@@ -39,7 +39,7 @@ beforeAll(async () => {
     [userId, other.user.id],
   );
   await pool.query(`insert into stores (id, name, code) values ('store-ok', 'Shop', 'SOK')`);
-  const shots = JSON.stringify({ shots: [1, 2, 3].map((index) => ({ index, start: index - 1, end: index, role: 'r', prompt: 'p' })) });
+  const shots = JSON.stringify({ shots: [1, 2, 3].map((index) => ({ index, start: index - 1, end: index, role: 'r', prompt: `p${index}` })) });
   await pool.query(
     `insert into analyses (id, user_id, team_id, store_id, source_key, status, result)
        select 'an-ok', u.id, u.team_id, 'store-ok', 's3/vid', 'succeeded', $3::jsonb from users u where u.id = $1
@@ -47,6 +47,9 @@ beforeAll(async () => {
        union all select 'an-theirs', u.id, u.team_id, null, 's3/theirs', 'succeeded', $3::jsonb from users u where u.id = $2`,
     [userId, other.user.id, shots],
   );
+  // Shots 1 and 2 share a prompt and a role, so they are one scene (mergeShots).
+  const merged = JSON.stringify({ shots: [1, 2, 3].map((index) => ({ index, start: index - 1, end: index, role: 'r', prompt: index < 3 ? 'same' : 'other' })) });
+  await pool.query(`insert into analyses (id, user_id, team_id, source_key, status, result) select 'an-merged', u.id, u.team_id, 's3/vid', 'succeeded', $2::jsonb from users u where u.id = $1`, [userId, merged]);
 });
 
 afterAll(async () => {
@@ -81,6 +84,7 @@ test('refuses another member’s or an unfinished analysis, shots it does not ha
   expect([theirs.status, await errorOf(theirs)]).toEqual([404, 'the analysis does not exist']);
   expect(await errorOf(await post({ ...ok, analysisId: 'an-running' }))).toBe('the analysis has not finished');
   expect(await errorOf(await post({ ...ok, shots: [1, 9] }))).toBe('shot 9 is not in the analysis');
+  expect(await errorOf(await post({ ...ok, analysisId: 'an-merged', shots: [2] }))).toBe('shot 2 is not in the analysis'); // inside scene 1, not a scene of its own
   expect(await errorOf(await post({ ...ok, shots: [1, 2, 3, 4, 5, 6, 7] }))).toBe('at most 6 shots per remake');
   expect(await errorOf(await post({ ...ok, productAssetId: 'vid' }))).toBe('productAssetId must be an image');
   expect((await post({ ...ok, productAssetId: 'img-theirs' })).status).toBe(403);

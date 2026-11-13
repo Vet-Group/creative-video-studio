@@ -8,7 +8,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Analysis, AnalysisShot } from '@cvs/core/analysis/breakdown';
-import { REMAKE_ENDPOINT, REMAKE_MAX_SECONDS, REMAKE_MAX_SHOTS, REMAKE_USD_PER_SECOND, remakeShotSeconds } from '@cvs/core/analysis/remake';
+import { REMAKE_ENDPOINT, REMAKE_MAX_SECONDS, REMAKE_MAX_SHOTS, REMAKE_USD_PER_SECOND, remakeScene, remakeShotSeconds } from '@cvs/core/analysis/remake';
 import { bookLlm } from '@cvs/core/ledger';
 import type { ModelConfig } from '@cvs/core/models';
 import type { ProviderStatus } from '@cvs/core/providers';
@@ -190,14 +190,15 @@ export async function runRemake(pool: Pool, remakeId: string, seams: RemakeSeams
     const video = join(dir, 'source.mp4');
     await writeFile(video, await read(r.source_key));
     const product = { bytes: await read(r.product_key), contentType: r.product_mime as string };
-    const analysisShots = (r.result as Analysis | null)?.shots ?? [];
+    const analysis = r.result as Analysis | null;
     // Each made shot's clip, and the source's same seconds for the before/after.
     const made: { clip: string; before: string }[] = [];
 
     for (const index of chosen) {
       const entry: ShotResult = { index, status: 'failed', costUsd: 0 };
       try {
-        const shot = analysisShots.find((s) => s.index === index);
+        // The whole scene the picker offered for this shot (shots joined by mergeShots), not just its first cut.
+        const shot = analysis ? remakeScene(analysis, index) : undefined;
         if (!shot) throw new Error(`shot ${index} is not in the analysis`);
         // Sent as whole seconds (2 to 10, padded with its last frame), then cut back to the shot's own length, at most 10 s.
         const seconds = remakeShotSeconds(shot);
