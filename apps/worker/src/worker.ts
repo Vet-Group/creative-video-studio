@@ -519,7 +519,7 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
     await purgeDeletedClips(pool, deleteObject, log);
   });
   await boss.createQueue(SUGGEST_QUEUE, SUGGEST_QUEUE_OPTIONS);
-  // Four at a time, so a slow scene pick on a large video never holds up the quick text suggestions behind it.
+  // Four at a time, so one slow scene pick on a large video does not hold up the quick text suggestions queued behind it.
   await boss.work<SuggestJobData>(SUGGEST_QUEUE, { localConcurrency: 4, pollingIntervalSeconds: o.pollingIntervalSeconds }, async (jobs) => {
     await Promise.all(jobs.map((job) => runSuggestion(pool, deps.suggest, job.data.runId).catch((e) => log(`suggestion ${job.data.runId}`, e))));
   });

@@ -48,14 +48,15 @@ export function SmartRemakeApp({ app, initialId, initialProductId }: { app: AppC
   useEffect(() => {
     if (!initialId) return;
     let live = true;
+    const image = initialProductId
+      ? api<{ id: string; filename: string; mime: string }>(`/api/assets/${initialProductId}`).then(
+          (a) => (a.mime.startsWith('image/') ? { id: a.id, filename: a.filename } : null),
+          () => null, // gone or not theirs: the member adds a product again
+        )
+      : Promise.resolve(null);
     void api<AnalysisRow>(`/api/analyses/${initialId}`).then(
       async (row) => {
-        const img = initialProductId
-          ? await api<{ id: string; filename: string; mime: string }>(`/api/assets/${initialProductId}`).then(
-              (a) => (a.mime.startsWith('image/') ? { id: a.id, filename: a.filename } : null),
-              () => null, // gone or not theirs: the member adds a product again
-            )
-          : null;
+        const img = await image;
         if (!live || wanted.current) return; // the member already chose a video
         setAnalysis(row);
         if (row.sourceAssetId) setVideo({ id: row.sourceAssetId, filename: 'Video mẫu', durationMs: Math.round((row.result?.durationS ?? 0) * 1000) });

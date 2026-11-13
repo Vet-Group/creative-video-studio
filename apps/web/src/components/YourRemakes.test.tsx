@@ -10,6 +10,8 @@ test('lists the remakes of other analyses, each with a link back to its analysis
   expect(html).toContain('Video của bạn');
   expect(html).toContain('href="/apps/smart-remake?analysis=a-2&amp;product=p-a-2"'); // the product comes back with its video
   expect(html).toContain('href="/apps/smart-remake?analysis=a-3&amp;product=p-a-3"');
+  const purged = renderToStaticMarkup(<YourRemakes slug="smart-remake" initial={[{ ...row('r-9', 'a-9'), productAssetId: null }]} />);
+  expect(purged).toContain('href="/apps/smart-remake?analysis=a-9"'); // a purged image leaves no product in the link
   expect(html).not.toContain('analysis=a-open'); // the open analysis' panel lists its own
   expect(html.match(/class="remake-item"/g)).toHaveLength(2);
   expect(html.match(/>Xoá<\/button>/g)).toHaveLength(1); // the running one has none

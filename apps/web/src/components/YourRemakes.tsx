@@ -55,7 +55,7 @@ export function YourRemakes({ slug, exclude, initial = [] }: { slug: string; exc
       <ul className="remake-list">
         {shown.map((r) => (
           <RemakeResult key={r.id} row={r} onDelete={() => void remove(r)}>
-            <Link className="link-button" href={`/apps/${slug}?analysis=${encodeURIComponent(r.analysisId)}&product=${encodeURIComponent(r.productAssetId)}`}>
+            <Link className="link-button" href={`/apps/${slug}?analysis=${encodeURIComponent(r.analysisId)}${r.productAssetId ? `&product=${encodeURIComponent(r.productAssetId)}` : ''}`}>
               Mở lại video mẫu này
             </Link>
           </RemakeResult>
