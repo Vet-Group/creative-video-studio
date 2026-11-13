@@ -3,6 +3,7 @@
 # owner's vet-linux profile, so the owner runs it (or tells the coordinating session to). Plan D.5: the VET .env holds only
 # the names in .env.example, copied value by value from this checkout's .env, so FAL_ADMIN_KEY never reaches VET.
 # APP_URL becomes the public hostname; BETTER_AUTH_SECRET is kept from the VET .env when there is one, else a new one is made.
+# An empty (or missing) local value keeps the value already on VET, so a name can only be blanked by editing VET's .env by hand.
 # It also prepares the app directory as a git checkout with the right origin, so the gate's `deploy` fetches instead of
 # cloning into a non-empty directory. Values are never printed; only the names are.
 #   bash scripts/run/provision-vet-env.sh             write the file on VET
@@ -49,6 +50,13 @@ ENVFILE
 if [ -f $APP/.env ] && old="\$(grep -m1 '^BETTER_AUTH_SECRET=.' $APP/.env)"; then
   awk -v old="\$old" '/^BETTER_AUTH_SECRET=/ { print old; next } { print }' $APP/.env.new > $APP/.env.tmp && mv $APP/.env.tmp $APP/.env.new
   echo "kept the BETTER_AUTH_SECRET already on VET"
+fi
+if [ -f $APP/.env ]; then
+  cat > $APP/.keep.awk <<'KEEPAWK'
+$(cat "$ROOT/scripts/run/keep-vet-values.awk")
+KEEPAWK
+  awk -f $APP/.keep.awk $APP/.env $APP/.env.new > $APP/.env.tmp && mv $APP/.env.tmp $APP/.env.new
+  rm -f $APP/.keep.awk
 fi
 chmod 600 $APP/.env.new
 mv $APP/.env.new $APP/.env

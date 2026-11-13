@@ -122,6 +122,21 @@ describe('provision-vet-env.sh (D.5 owner step)', () => {
     expect(r.stdout).not.toMatch(/FAL_ADMIN_KEY|NOT_IN_EXAMPLE|secret-value|localhost/);
     expect(r.stdout).toContain('dry run: nothing was sent');
   });
+
+  test('an empty value keeps the one on VET, a set value wins, and only names are printed', () => {
+    const dir = tmp();
+    const [old, built] = [join(dir, 'old.env'), join(dir, 'new.env')];
+    writeFileSync(old, 'KEEP_ME=vet-secret\nEMPTY_ON_VET=\nSET_LOCALLY=vet-old\nONLY_ON_VET=x\n');
+    writeFileSync(built, 'KEEP_ME=\nEMPTY_ON_VET=\nSET_LOCALLY=local-new\nNEW_EMPTY=\n');
+    const r = spawnSync('awk', ['-f', join(ROOT, 'scripts/run/keep-vet-values.awk'), old, built], { encoding: 'utf8' });
+    expect(r.status, r.stderr).toBe(0);
+    expect(r.stdout).toBe('KEEP_ME=vet-secret\nEMPTY_ON_VET=\nSET_LOCALLY=local-new\nNEW_EMPTY=\n');
+    expect(r.stderr.trim()).toBe('kept from VET: KEEP_ME');
+  });
+
+  test('the remote step runs the same awk file', () => {
+    expect(readFileSync(join(ROOT, 'scripts/run/provision-vet-env.sh'), 'utf8')).toContain('keep-vet-values.awk');
+  });
 });
 
 const pwsh = spawnSync('pwsh', ['-NoProfile', '-Command', 'exit 0']).status === 0;
