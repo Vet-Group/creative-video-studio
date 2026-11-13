@@ -93,12 +93,12 @@ describe('signing in with a passkey', () => {
     const { key } = await seedPasskey(id);
     const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
     const res = await ceremony('authenticate', (c) => key.authenticate(c, false));
-    expect(res.status).toBe(401);
-    expect(((await res.json()) as { code: string }).code).toBe('USER_NOT_VERIFIED');
+    // Since 1.7.18 the plugin refuses it itself (requireUserVerification), before the afterVerification check in lib/auth.ts.
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { code: string }).code).toBe('AUTHENTICATION_FAILED');
     expect(await count('sessions where user_id = $1', [id])).toBe(0);
-    // The refusal is in the server log, with the credential that was used.
-    expect(logged.mock.calls.flat().join(' ')).toContain('USER_NOT_VERIFIED');
-    expect(JSON.stringify(logged.mock.calls)).toContain(key.id);
+    // The refusal is in the server log.
+    expect(logged.mock.calls.flat().join(' ')).toContain('Failed to verify authentication');
     logged.mockRestore();
   });
 

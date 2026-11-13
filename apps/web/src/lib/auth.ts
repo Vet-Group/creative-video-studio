@@ -109,7 +109,7 @@ export const auth = betterAuth({
       rpName: 'Creative Video Studio',
       origin: process.env.APP_URL,
       authenticatorSelection: { residentKey: 'required', userVerification: 'required' },
-      // The plugin verifies with requireUserVerification false; demand the PIN or biometric here, so a found security key alone signs no one in.
+      // Since 1.7.18 the plugin demands the PIN or biometric itself (userVerification 'required' above); this is a second check, so a found security key alone signs no one in.
       authentication: {
         afterVerification: ({ ctx, verification, clientData }) => {
           if (verification.authenticationInfo.userVerified) return;
