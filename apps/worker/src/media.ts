@@ -108,6 +108,23 @@ export async function probeVideoSeconds(file: string): Promise<number> {
   return end > 0 ? end - Math.max(0, first) : 0;
 }
 
+/** Free still-cutting ffmpeg slots, and the cuts waiting for one. */
+let freeStills = 4;
+const stillQueue: (() => void)[] = [];
+
+/** Runs `cut` when one of four ffmpeg slots is free, shared by every extractFrames in this worker: a scene pick asks for up to 30 stills, and four picks run at once. */
+export async function stillSlot<T>(cut: () => Promise<T>): Promise<T> {
+  if (freeStills > 0) freeStills--;
+  else await new Promise<void>((go) => stillQueue.push(go));
+  try {
+    return await cut();
+  } finally {
+    const next = stillQueue.shift();
+    if (next) next(); // the slot passes straight to the next cut
+    else freeStills++;
+  }
+}
+
 /**
  * `n` evenly spaced stills of an MP4 (or one at each of the given times in seconds, kept inside the clip) as small JPEGs (512 px on the long side at most), in
  * time order, and the clip's length in seconds. `video` is the clip's bytes, or a function that saves it to the given file (a large one then stays on disk).
@@ -120,20 +137,22 @@ export async function extractFrames(video: Uint8Array | ((file: string) => Promi
     const seconds = await probeSeconds(file);
     if (!(seconds > 0)) throw new Error('the clip has no duration');
     const times = typeof n === 'number' ? frameTimes(seconds, n) : n.map((t) => Math.min(Math.max(t, 0), Math.max(seconds - 0.1, 0)));
-    const stills: Uint8Array[] = [];
-    // Four ffmpeg at a time: a scene pick asks for up to 30 stills on the shared worker.
-    for (let k = 0; k < times.length; k += 4) {
-      stills.push(
-        ...(await Promise.all(
-          times.slice(k, k + 4).map(async (t, j) => {
-            const jpeg = join(dir, `${k + j}.jpg`);
-            const scale = 'scale=512:512:force_original_aspect_ratio=decrease:force_divisible_by=2';
-            await run(requireFfmpeg(), ['-y', '-v', 'error', '-ss', t.toFixed(3), '-i', file, '-frames:v', '1', '-vf', scale, '-q:v', '4', jpeg]);
-            return new Uint8Array(await readFile(jpeg));
-          }),
-        )),
-      );
-    }
+    const scale = 'scale=512:512:force_original_aspect_ratio=decrease:force_divisible_by=2';
+    let failed = false; // the cuts still waiting for a slot are skipped, so none starts in a folder being removed
+    const stills = await Promise.all(
+      times.map((t, k) =>
+        stillSlot(async () => {
+          if (failed) throw new Error('an earlier still failed');
+          const jpeg = join(dir, `${k}.jpg`);
+          // A hung ffmpeg would hold one of the four shared slots for good; one still takes well under a second.
+          await run(requireFfmpeg(), ['-y', '-v', 'error', '-ss', t.toFixed(3), '-i', file, '-frames:v', '1', '-vf', scale, '-q:v', '4', jpeg], { timeout: 30_000 }).catch((e) => {
+            failed = true;
+            throw e;
+          });
+          return new Uint8Array(await readFile(jpeg));
+        }),
+      ),
+    );
     return { seconds, stills };
   } finally {
     await rm(dir, { recursive: true, force: true });

@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 import ffprobe from 'ffprobe-static';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
-import { burnEndText, concatClips, cutShot, endTextLayout, probeSeconds, probeSize, probeVideoSeconds, requireFfmpeg, sideBySide, trimClip, wrapText } from './media';
+import { burnEndText, concatClips, cutShot, endTextLayout, probeSeconds, probeSize, probeVideoSeconds, requireFfmpeg, sideBySide, stillSlot, trimClip, wrapText } from './media';
 
 const run = promisify(execFile);
 let dir = '';
@@ -108,4 +108,25 @@ describe("a video's real length", () => {
     await run(requireFfmpeg(), ['-y', '-v', 'error', '-ss', '1', '-t', '2', '-i', source, '-c', 'copy', trimmed]);
     expect(await probeVideoSeconds(trimmed)).toBeCloseTo(2, 0);
   });
+});
+
+test('still cuts share four ffmpeg slots across calls, keep their order, and free a slot when a cut fails', async () => {
+  let active = 0;
+  let most = 0;
+  const cut = (v: number, fail = false) => async () => {
+    most = Math.max(most, ++active);
+    await new Promise((done) => setTimeout(done, 10));
+    active--;
+    if (fail) throw new Error(`cut ${v}`);
+    return v;
+  };
+  // Two scene picks at once, ten stills each, one of which fails.
+  const a = Promise.all(Array.from({ length: 10 }, (_, i) => stillSlot(cut(i))));
+  const b = Promise.allSettled(Array.from({ length: 10 }, (_, i) => stillSlot(cut(10 + i, i === 3))));
+  expect(await a).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+  expect((await b).filter((r) => r.status === 'rejected')).toHaveLength(1);
+  expect(most).toBe(4);
+  most = 0;
+  expect(await Promise.all([1, 2, 3, 4, 5].map((v) => stillSlot(cut(v))))).toEqual([1, 2, 3, 4, 5]); // all four slots came back
+  expect(most).toBe(4);
 });

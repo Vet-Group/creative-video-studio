@@ -24,9 +24,21 @@ const POLL_MS = 2500;
 export const pickNote = (picked: number | null): string =>
   picked === null ? 'Chưa tự chọn được cảnh nào. Bạn hãy tự chọn các cảnh cần thay sản phẩm.' : picked === 0 ? 'AI chưa thấy cảnh nào có sản phẩm giống của bạn. Bạn hãy tự chọn các cảnh cần thay.' : `AI đã chọn sẵn ${picked} cảnh có sản phẩm của bạn; bỏ chọn cảnh nào không cần.`;
 
+/** The app's address for an analysis and the product on view, or the bare app without an analysis. */
+export const remakeHref = (slug: string, id: string | null, product?: string): string =>
+  id ? `/apps/${slug}?analysis=${id}${product ? `&product=${product}` : ''}` : `/apps/${slug}`;
+
 /** The address follows the analysis and the product on view (as /analyze's does), without a navigation or a scroll, so a reload or a shared link comes back to them. */
-const syncUrl = (slug: string, id: string | null, product?: string) =>
-  window.history.replaceState(null, '', id ? `/apps/${slug}?analysis=${id}${product ? `&product=${product}` : ''}` : `/apps/${slug}`);
+const syncUrl = (slug: string, id: string | null, product?: string) => window.history.replaceState(null, '', remakeHref(slug, id, product));
+
+/** The product image an address names, while it is still one of the member's images; null when there is none, or it is gone, not theirs or not an image. */
+export const savedProduct = (id: string | undefined): Promise<Img | null> =>
+  id
+    ? api<{ id: string; filename: string; mime: string }>(`/api/assets/${id}`).then(
+        (a) => (a.mime.startsWith('image/') ? { id: a.id, filename: a.filename } : null),
+        () => null, // the member adds a product again
+      )
+    : Promise.resolve(null);
 
 /**
  * `initialId`: an analysis to open again (?analysis=); its reference video is shown as chosen. `initialProductId` (?product=): the product image to set again
@@ -48,12 +60,7 @@ export function SmartRemakeApp({ app, initialId, initialProductId }: { app: AppC
   useEffect(() => {
     if (!initialId) return;
     let live = true;
-    const image = initialProductId
-      ? api<{ id: string; filename: string; mime: string }>(`/api/assets/${initialProductId}`).then(
-          (a) => (a.mime.startsWith('image/') ? { id: a.id, filename: a.filename } : null),
-          () => null, // gone or not theirs: the member adds a product again
-        )
-      : Promise.resolve(null);
+    const image = savedProduct(initialProductId);
     void api<AnalysisRow>(`/api/analyses/${initialId}`).then(
       async (row) => {
         const img = await image;

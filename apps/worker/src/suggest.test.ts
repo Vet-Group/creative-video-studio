@@ -164,6 +164,22 @@ test('a scenes run whose answer cannot be read fails with nothing booked; one wh
   expect((await row(gone)).status).toBe('failed');
 });
 
+test('a scenes run whose download stalls stops when the queue gives up on the job, and fails without calling the suggester', async () => {
+  const id = await queued(0, scenesInput);
+  const queue = new AbortController();
+  let saving!: () => void;
+  const started = new Promise<void>((go) => (saving = go));
+  // A download that never ends on its own, as a stalled bucket read: only the signal stops it.
+  const stalled = (_key: string, _file: string, signal?: AbortSignal) => new Promise<void>((_, fail) => (signal!.addEventListener('abort', () => fail(signal!.reason)), saving()));
+  let called = false;
+  const run = runSuggestion(pool, async () => ((called = true), { options: [], costUsd: null, provider: 'fal', model: 'm' }), id, async () => new Uint8Array(await png()), stalled, queue.signal);
+  await started;
+  queue.abort(new Error('handler execution exceeded 60s'));
+  await expect(run).rejects.toThrow('exceeded 60s');
+  expect(called).toBe(false);
+  expect((await row(id)).status).toBe('failed');
+});
+
 test('the e2e stand-in picks the first two scenes of a scenes run, at no cost and without a network call', async () => {
   expect(await fakeSuggester({ ...scenesInput, field: 'scenes' })).toEqual({ options: ['1', '2'], costUsd: 0, provider: 'mock', model: 'fake' });
   expect((await fakeSuggester({ ...scenesInput, field: 'scenes', times: [0.5] })).options).toEqual(['1']);
