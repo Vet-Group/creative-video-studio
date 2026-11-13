@@ -4,6 +4,7 @@ import { resolutionVariants } from '@/lib/resolution-variants';
 import { api, errorText, sendJson, thumbUrl } from '@/lib/api';
 import { cardSample, type Example, exampleForPreset, exampleModel, examplesFor, exampleTitle, sampleSrc, splitColumns } from '@/lib/examples';
 import { adjustNote } from '@/lib/video-adjust';
+import { anglePrompt, CAMERA_ANGLES, MAX_ANGLES } from '@/lib/camera-angles';
 import { briefRoom, sectionBody, sectionPrompt } from '@/lib/marketing';
 import { PROMPT_TEMPLATES } from '@/lib/prompt-starters';
 import { promptTooLong } from '@/lib/prompt-limit';
@@ -18,6 +19,7 @@ import { About } from './About';
 import { AudioSwitch } from './AudioSwitch';
 import { CardMedia } from './CardMedia';
 import { PhraseChoice, useChoiceLists } from './Choices';
+import { confirmDialog } from './Confirm';
 import { ENHANCE_NOTE, EnhanceToggle } from './EnhanceToggle';
 import { Icon } from './Icon';
 import { copyError, copySamples, FormNotice, GALLERY_SIZE_KEY, HISTORY_SIZE_KEY, photoImg, RunSummary, SizeSlider, Slot, UploadedPhotos, uploadError, uploadImages, useSize } from './image-tools';
@@ -144,6 +146,7 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
   const [pending, setPending] = useState<{ list: Proposal[]; count: number } | null>(null); // the proposals waiting for an editor
   const [reviewing, setReviewing] = useState(false);
   const [presetId, setPresetId] = useState(''); // '' means a free prompt
+  const [angles, setAngles] = useState<string[]>([]); // Nhiều góc máy: the picked angle ids, one clip each; own-prompt mode only
   const [enhance, setEnhance] = useState(true); // on by default, as on Fash; it rewrites a free prompt only
   const [audio, setAudio] = useState(true); // native audio, on by default as on Fash, on a model that can make it
   // The words survive a reload, unless a link or template fills the form (the hook and the ending are not kept).
@@ -182,6 +185,7 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
   const promptId = useId();
   const tooLongId = useId();
   const clipsId = useId();
+  const anglesId = useId();
   const clipInput = useRef<HTMLInputElement>(null);
   const [clips, setClips] = useState<Clip[]>([]); // reference audio, sent only on a model that takes it
   const [tab, setTab] = useState<Tab | null>(null); // null: the default for the width (Create below 1024 px, else Examples)
@@ -397,7 +401,17 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
   const room = chosen && (sec ? briefRoom((b) => sectionPrompt({ hook: hookText, body: b, ending }), chosen.maxPromptChars) : chosen.maxPromptChars);
   const line = (text: string) => text.replace(/\s+/g, ' ').trim();
   const sections = { ...(sec && line(hookText) && { hookText: line(hookText) }), ...(sec && line(ending) && { ending: line(ending) }) };
-  const tooLong = presetId === '' ? promptTooLong(chosen, composed.trim().length) : null;
+  /** The angles Run makes a clip for, in the list's order; a preset has none. */
+  const picked = presetId === '' ? CAMERA_ANGLES.filter((a) => angles.includes(a.id)) : [];
+  /** What Run sends: the composed prompt, or one prompt per picked angle. */
+  const sent = picked.length > 0 ? picked.map((a) => anglePrompt(composed, a)) : [composed];
+  const n = sent.length;
+  const unit = chosen && (audioOn ? chosen.audioEstimateUsd : chosen.estimateUsd);
+  const total = unit == null ? undefined : (Number(unit) * n).toFixed(unit.split('.')[1]?.length ?? 2);
+  /** Why an angle cannot be added: the cap, or the model's prompt limit once its sentence is on. A picked angle stays open so it can be taken off. */
+  const lockedWhy = (a: (typeof CAMERA_ANGLES)[number]) => (angles.includes(a.id) ? null : angles.length >= MAX_ANGLES ? `Tối đa ${MAX_ANGLES} góc máy.` : chosen && composed.trim() && anglePrompt(composed, a).trim().length > chosen.maxPromptChars ? `Mô tả đã dài, thêm góc này sẽ vượt giới hạn ${chosen.maxPromptChars} ký tự của mô hình.` : null);
+  const lockedNotes = [...new Set(CAMERA_ANGLES.map(lockedWhy).filter((w) => w !== null))];
+  const tooLong = presetId === '' ? promptTooLong(chosen, Math.max(...sent.map((p) => p.trim().length))) : null;
   const promptOk = presetId !== '' || (composed.trim() !== '' && tooLong === null);
   const canRun = ready && recall.answered && !busy && (images.length > 0 || (wordsOnly && presetId === '')) && chosen?.supported === true && !tooMany && !clipsOver && !endOver && promptOk;
 
@@ -433,21 +447,29 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
     }
   }
 
+  /** One job per picked angle, sent one after another (the API takes one job per POST); the first refusal stops the rest and says how many went. */
   async function run() {
-    if (!(await confirmRun(chosen && (audioOn ? chosen.audioEstimateUsd : chosen.estimateUsd)))) return;
+    if (!(await (n > 1 ? confirmDialog({ title: `Tạo ${n} clip, mỗi góc máy một clip, tổng $${total}?`, confirmLabel: 'Tiếp tục' }) : confirmRun(unit)))) return;
     setBusy(true);
     setError('');
     setNotice('');
+    let started = 0;
     try {
-      await api('/api/jobs', sendJson('POST', { assetIds: images.map((i) => i.id), modelId, ...(presetId ? { presetId } : { prompt: composed, enhance }), ratio, durationSec, storeId: storeId || null, params: { audio: audioOn ? 'on' : 'off', ...(endAssetId && { endAssetId }), ...(audioAssetIds && { audioAssetIds }), ...(!presetId && sections) } }));
+      for (; started < n; started++) {
+        await api('/api/jobs', sendJson('POST', { assetIds: images.map((i) => i.id), modelId, ...(presetId ? { presetId } : { prompt: sent[started], enhance }), ratio, durationSec, storeId: storeId || null, params: { audio: audioOn ? 'on' : 'off', ...(endAssetId && { endAssetId }), ...(audioAssetIds && { audioAssetIds }), ...(!presetId && sections) } }));
+      }
       clearBodyDraft();
       clearFreeDraft();
-      setNotice('Đã gửi lượt tạo. Theo dõi trong tab "Lịch sử".');
+      setNotice(n > 1 ? `Đã gửi ${n} clip, mỗi góc máy một clip. Theo dõi trong tab "Lịch sử".` : 'Đã gửi lượt tạo. Theo dõi trong tab "Lịch sử".');
       setRefetch((n) => n + 1);
       if (!narrow) setTab('history'); // beside the form, the new job shows in History
       await refresh();
     } catch (e) {
-      setError(errorText(e, 'Không gửi được lượt tạo, hãy thử lại.'));
+      setError(`${errorText(e, 'Không gửi được lượt tạo, hãy thử lại.')}${started > 0 ? ` Đã gửi ${started}/${n} clip.` : ''}`);
+      if (started > 0) {
+        setRefetch((c) => c + 1);
+        await refresh();
+      }
     } finally {
       setBusy(false);
     }
@@ -769,7 +791,34 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
               </PromptSections>
             )}
             {/* A preset's own prompt goes as it is (Enhance is off with a preset); only a template editor can read it, so a member's preview stays hidden. */}
-            {presetId === '' ? (sec || composed.trim()) && <PromptPreview feature="video" prompts={[composed]} limit={chosen?.maxPromptChars} note={enhance ? ENHANCE_NOTE : undefined} check={chosen ? { model: chosen.id, audio, seconds: durationSec } : undefined} /> : current?.prompt && <PromptPreview feature="video" prompts={[current.prompt]} limit={chosen?.maxPromptChars} />}
+            {presetId === '' ? (sec || composed.trim()) && <PromptPreview feature="video" prompts={sent} labels={picked.length > 0 ? picked.map((a) => a.label) : undefined} limit={chosen?.maxPromptChars} note={enhance ? ENHANCE_NOTE : undefined} check={chosen ? { model: chosen.id, audio, seconds: durationSec } : undefined} /> : current?.prompt && <PromptPreview feature="video" prompts={[current.prompt]} limit={chosen?.maxPromptChars} />}
+
+            {presetId === '' && (
+              <div className="field">
+                <span id={anglesId} className="field-label">
+                  Nhiều góc máy (tuỳ chọn)
+                </span>
+                <div className="segmented theme-choice angle-choice" role="group" aria-labelledby={anglesId}>
+                  {CAMERA_ANGLES.map((a) => (
+                    <label key={a.id} title={lockedWhy(a) ?? undefined}>
+                      <input type="checkbox" checked={angles.includes(a.id)} disabled={lockedWhy(a) !== null} onChange={() => setAngles((cur) => (cur.includes(a.id) ? cur.filter((x) => x !== a.id) : [...cur, a.id]))} />
+                      {a.label}
+                    </label>
+                  ))}
+                </div>
+                <p className="help">Chọn 1 đến {MAX_ANGLES} góc máy: mỗi góc tạo một clip riêng và tính tiền riêng. Không chọn thì tạo một clip như bình thường.</p>
+                {lockedNotes.map((w) => (
+                  <p key={w} className="help">
+                    {w}
+                  </p>
+                ))}
+                {picked.length > 0 && chosen && unit != null && (
+                  <p className="help" role="status">
+                    {n} clip × ${unit} = ${total}
+                  </p>
+                )}
+              </div>
+            )}
 
             <VideoSettings>
               {models && models.models.length > 0 && (
@@ -839,8 +888,8 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
                 'Đang gửi…'
               ) : (
                 <>
-                  Tạo video
-                  {chosen && <span className="run-cost">· ${audioOn ? chosen.audioEstimateUsd : chosen.estimateUsd}</span>}
+                  {picked.length > 0 ? `Tạo ${n} clip` : 'Tạo video'}
+                  {chosen && <span className="run-cost">· ${picked.length > 0 ? total : unit}</span>}
                 </>
               )}
             </button>
