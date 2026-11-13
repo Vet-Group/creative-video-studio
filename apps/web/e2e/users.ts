@@ -125,6 +125,9 @@ export const USERS = {
   // prompt-sections.e2e: the sectioned prompt on Create (secta) and Marketing Studio (sectb).
   secta: { email: 'secta@e2e.test', name: 'E2E Sections A', role: 'member' },
   sectb: { email: 'sectb@e2e.test', name: 'E2E Sections B', role: 'member' },
+  // camera-angles.e2e: several camera angles on Create, one member per test.
+  angla: { email: 'angla@e2e.test', name: 'E2E Angles A', role: 'member' },
+  anglb: { email: 'anglb@e2e.test', name: 'E2E Angles B', role: 'member' },
   // prompt-sections.e2e: the prompt templates dialog's recent group (sectc), whose jobs must be the only ones the member has.
   sectc: { email: 'sectc@e2e.test', name: 'E2E Sections C', role: 'member' },
   // marketing-formats.e2e: the Unboxing and Review formats, one member per test.

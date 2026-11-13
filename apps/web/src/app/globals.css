@@ -1349,6 +1349,9 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .theme-choice label:has(:checked) { background: var(--surface-raised); color: var(--ink); box-shadow: 0 1px 2px rgb(var(--shade) / .08), 0 0 0 1px rgb(var(--tint) / .06); }
 .theme-choice label:has(:focus-visible) { outline: 2px solid var(--ink); outline-offset: 2px; }
 .theme-choice input { position: absolute; inset: 0; width: 100%; min-width: 0; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.theme-choice label:has(:disabled) { opacity: .5; }
+.theme-choice input:disabled { cursor: not-allowed; }
+.angle-choice { flex-wrap: wrap; justify-self: start; max-width: 100%; } /* Create's camera angles: chips that wrap on a phone */
 .settings-panel .acct-rows + .actions { margin-top: 12px; }
 .settings-panel .actions button { height: 36px; padding: 0 14px; font-size: 14px; }
 .settings-panel .actions button:hover:not(:disabled) { background: var(--fill); }
