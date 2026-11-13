@@ -1,6 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { endingLine, hookLine, MAX_ENDING, MAX_HOOK } from './marketing';
-import { PROMPT_TEMPLATES } from './prompt-starters';
+import { PROMPT_TEMPLATES, STARTERS } from './prompt-starters';
+
+describe('STARTERS', () => {
+  it.each(Object.entries(STARTERS))('%s: uniquely labelled chips with a Vietnamese label and English text', (_, list) => {
+    expect(new Set(list.map((s) => s.label)).size).toBe(list.length);
+    expect(new Set(list.map((s) => s.text)).size).toBe(list.length);
+    for (const s of list) {
+      expect(s.label.length).toBeLessThanOrEqual(20); // one chip in the scrolling row
+      expect(s.text).not.toMatch(/[À-ỹ]/); // the image models read English best
+    }
+  });
+});
 
 describe('PROMPT_TEMPLATES', () => {
   it.each(Object.entries(PROMPT_TEMPLATES))('%s: uniquely named templates with a short Vietnamese line, whose English hook and ending fit their sections and read as written', (_, list) => {
@@ -20,11 +31,11 @@ describe('PROMPT_TEMPLATES', () => {
 });
 
 describe('PROMPT_TEMPLATES across pages', () => {
-  it('names the three templates of each Marketing Studio format and never offers one template on two pages', () => {
-    expect(PROMPT_TEMPLATES.marketing.map((t) => t.name)).toEqual(['Trước / sau', 'Cận chất liệu', 'Phối đồ']);
-    expect(PROMPT_TEMPLATES.advanced.map((t) => t.name)).toEqual(['Giới thiệu nhanh', 'Một ngày cùng sản phẩm', 'Vấn đề và giải pháp']);
-    expect(PROMPT_TEMPLATES.unboxing.map((t) => t.name)).toEqual(['Hộp quà', 'POV tay', 'Mở nhanh ASMR']);
-    expect(PROMPT_TEMPLATES.review.map((t) => t.name)).toEqual(['Review thật', 'Ưu và nhược', 'Mặc cả ngày']);
+  it('names the templates of each Marketing Studio format and never offers one template on two pages', () => {
+    expect(PROMPT_TEMPLATES.marketing.map((t) => t.name)).toEqual(['Trước / sau', 'Cận chất liệu', 'Phối đồ', 'Quay bằng điện thoại', 'Dừng lướt', 'Phản ứng bất ngờ']);
+    expect(PROMPT_TEMPLATES.advanced.map((t) => t.name)).toEqual(['Giới thiệu nhanh', 'Một ngày cùng sản phẩm', 'Vấn đề và giải pháp', 'Phim quảng cáo ngắn', 'Món quà', 'Dạo phố']);
+    expect(PROMPT_TEMPLATES.unboxing.map((t) => t.name)).toEqual(['Hộp quà', 'POV tay', 'Mở nhanh ASMR', 'Hàng vừa giao', 'Nhiều đơn một lần', 'Tối giản']);
+    expect(PROMPT_TEMPLATES.review.map((t) => t.name)).toEqual(['Review thật', 'Ưu và nhược', 'Mặc cả ngày', 'Trả lời bình luận', 'So với đồ cũ', 'Thử size']);
     const all = Object.values(PROMPT_TEMPLATES).flat();
     for (const key of ['name', 'hook', 'body', 'ending'] as const) expect(new Set(all.map((t) => t[key])).size).toBe(all.length);
   });

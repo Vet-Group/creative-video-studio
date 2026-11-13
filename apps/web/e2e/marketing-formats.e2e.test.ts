@@ -206,7 +206,7 @@ test('each of the four formats lists its own Khung prompt templates, none of the
     await pick(page, format);
     const dialog = await openPromptTemplates(page);
     const group = dialog.getByRole('group', { name: 'Khung prompt' });
-    await expect(group.getByRole('button')).toHaveCount(3);
+    await expect(group.getByRole('button')).toHaveCount(lists[format].length);
     for (const t of lists[format]) await expect(group.getByRole('button', { name: new RegExp(`^${t.name}`) })).toContainText(t.desc);
     for (const other of Object.values(lists).filter((l) => l !== lists[format])) for (const t of other) await expect(group.getByRole('button', { name: new RegExp(`^${t.name}`) })).toHaveCount(0);
     // A template fills the three sections, and the sent prompt carries them after the format's fixed instruction.

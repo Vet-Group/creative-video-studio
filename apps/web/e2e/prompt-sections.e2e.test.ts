@@ -197,7 +197,8 @@ test('at 390 px the templates open as a sheet over the Run bar with the last one
       await expect(last).toContainText(`Kết: ${t.ending}`);
       for (const line of await sheet.locator('.prompt-template-line').all()) expect((await line.boundingBox())!.height).toBe(18);
     } else await expect(sheet.locator('.prompt-template-line')).toHaveCount(0);
-    // Whole on the screen and on top, with no scrolling first: nothing (the sticky Run bar) covers its middle.
+    // Ten templates outgrow a phone, so the sheet scrolls; scrolled to, the last is whole on the screen and on top: nothing (the sticky Run bar) covers its middle.
+    await last.scrollIntoViewIfNeeded();
     await expect(last).toBeInViewport({ ratio: 1 });
     expect(await last.evaluate((el) => { const r = el.getBoundingClientRect(); return el.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)); })).toBe(true);
     expect(await fits(page)).toBe(true);
