@@ -391,10 +391,10 @@ describe('Marketing Studio reference video price', () => {
 
 describe('Marketing Studio end text', () => {
   test("burns params.endText into the delivered clip; when the overlay fails, the provider's clip is kept and the job says why", async () => {
-    // A clip with PCM sound (in Matroska), which cannot be copied into an MP4, so the overlay fails after the provider has billed.
+    // A clip with 8-bit PCM sound (in Matroska), which cannot be copied into an MP4 (FFmpeg 6.1 accepts 16-bit PCM there), so the overlay fails after the provider has billed.
     const odd = join(mockDir, `${randomUUID()}-pcm.mp4`);
     await mkdir(mockDir, { recursive: true });
-    await run(requireFfmpeg(), ['-y', '-v', 'error', '-f', 'lavfi', '-i', 'testsrc2=size=720x1280:rate=24', '-f', 'lavfi', '-i', 'sine', '-t', '1', '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', '-c:a', 'pcm_s16le', '-f', 'matroska', odd]);
+    await run(requireFfmpeg(), ['-y', '-v', 'error', '-f', 'lavfi', '-i', 'testsrc2=size=720x1280:rate=24', '-f', 'lavfi', '-i', 'sine', '-t', '1', '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', '-c:a', 'pcm_u8', '-f', 'matroska', odd]);
     await start(counting(300, (inner) => ({ ...inner, status: async (pj) => {
       const s = await inner.status(pj);
       return s.state === 'succeeded' && (await pool.query(`select 1 from jobs where provider_job_id = $1 and prompt = 'odd'`, [pj.providerJobId])).rowCount ? { ...s, outputUrl: pathToFileURL(odd).href } : s;
