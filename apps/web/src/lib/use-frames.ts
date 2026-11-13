@@ -2,7 +2,7 @@
 // A still of a video at each scene, cut in the browser, for the analysis result (AnalyzeView) and RemakePanel's scene picker.
 import type { Analysis } from '@cvs/core/analysis/breakdown';
 import { type RefObject, useEffect, useState } from 'react';
-import { frameTime } from './analyze';
+import { frameTimes, sharpness } from './analyze';
 
 const FRAME_WIDTH = 128; // twice the 64 px it shows at, for a sharp still on a dense screen
 const FRAME_WAIT_MS = 10_000;
@@ -17,7 +17,8 @@ const videoEvent = (v: HTMLVideoElement, done: 'loadeddata' | 'seeked', go: () =
   });
 
 /**
- * A still of the video at each scene: a detached same-origin video seeks to the scene and draws to a canvas, one scene at a time, once `box` scrolls into view.
+ * A still of the video at each scene, the sharpest of up to three: a detached same-origin video seeks to each and draws to a canvas, one scene at a time,
+ * once `box` scrolls into view.
  * An entry is undefined until its still is ready; null (no thumbnails at all) with no source or after any failure, so the page shows none.
  */
 export function useFrames(src: string | undefined, shots: Analysis['shots'], box: RefObject<HTMLElement | null>): (string | undefined)[] | null {
@@ -37,12 +38,18 @@ export function useFrames(src: string | undefined, shots: Analysis['shots'], box
         const canvas = document.createElement('canvas');
         canvas.width = FRAME_WIDTH;
         canvas.height = Math.round((FRAME_WIDTH * v.videoHeight) / v.videoWidth);
+        const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
         const out: string[] = [];
         for (const s of shots) {
-          await videoEvent(v, 'seeked', () => (v.currentTime = frameTime(s.start, s.end)));
-          if (stopped) return;
-          canvas.getContext('2d')!.drawImage(v, 0, 0, canvas.width, canvas.height);
-          out.push(canvas.toDataURL('image/jpeg', 0.7));
+          let best = { score: -1, url: '' };
+          for (const t of frameTimes(s.start, s.end)) {
+            await videoEvent(v, 'seeked', () => (v.currentTime = t));
+            if (stopped) return;
+            ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
+            const score = sharpness(ctx.getImageData(0, 0, canvas.width, canvas.height).data, canvas.width, canvas.height);
+            if (score > best.score) best = { score, url: canvas.toDataURL('image/jpeg', 0.7) };
+          }
+          out.push(best.url);
           setFrames([...out]);
         }
       } catch {

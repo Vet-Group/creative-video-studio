@@ -1,6 +1,6 @@
 import type { Analysis } from '@cvs/core/analysis/breakdown';
 import { expect, test } from 'vitest';
-import { analysisFormat, clock, frameTime, mergeShots, roleLabel, scriptPrompt, scriptText, timeRange } from './analyze';
+import { analysisFormat, clock, frameTime, frameTimes, mergeShots, roleLabel, scriptPrompt, scriptText, sharpness, timeRange } from './analyze';
 
 test('shot roles read in Vietnamese, in any case, and an unknown role stays as the model wrote it', () => {
   expect(roleLabel('hook')).toBe('Mở đầu');
@@ -80,4 +80,23 @@ test('the thumbnail is taken just inside the scene and never past its middle', (
   expect(frameTime(4, 8)).toBeCloseTo(4.3);
   expect(frameTime(4, 4.2)).toBeCloseTo(4.1);
   expect(frameTime(4, 4)).toBe(4);
+});
+
+test('a scene thumbnail is picked from just inside its start, its middle and just inside its end, fewer on a short scene', () => {
+  expect(frameTimes(4, 8)).toEqual([4.3, 6, 7.7]);
+  expect(frameTimes(4, 4.2)).toEqual([4.1]);
+  expect(frameTimes(4, 4)).toEqual([4]);
+});
+
+test('a still with edges scores sharper than the same still blurred, and a flat one scores nothing', () => {
+  const still = (at: (x: number, y: number) => number, w = 16, h = 16) => {
+    const px = new Uint8ClampedArray(w * h * 4);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) px.fill(at(x, y), (y * w + x) * 4, (y * w + x) * 4 + 3);
+    return sharpness(px, w, h);
+  };
+  const edges = still((x, y) => ((x >> 1) + (y >> 1)) % 2 ? 255 : 0); // a checkerboard
+  const blurred = still((x, y) => 128 + 40 * Math.sin(x / 3) * Math.cos(y / 3));
+  expect(edges).toBeGreaterThan(blurred);
+  expect(blurred).toBeGreaterThan(0);
+  expect(still(() => 90)).toBe(0);
 });
