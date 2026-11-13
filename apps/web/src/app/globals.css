@@ -1588,7 +1588,16 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .prompt-sections-head .link-button { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; font-size: 13px; }
 /* The Khung prompt dialog's cards, in the choice grid: text only, so wider than a sample card and left-aligned. min-width 0: a one-line, cut template line must not widen its card. */
 .choice-grid.prompt-template-grid { grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); }
-.choice-grid.prompt-template-grid button { display: grid; align-content: start; gap: 2px; min-width: 0; text-align: left; }
+/* A card is a div that carries the card's border, so its button (the text) can sit beside a sample clip and above the editor's upload. */
+.prompt-template-grid .prompt-template { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; min-width: 0; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+.prompt-template-grid .prompt-template:hover { border-color: var(--text-disabled); }
+.choice-grid.prompt-template-grid .prompt-template > button { display: grid; align-content: start; gap: 2px; min-width: 0; border: 0; border-radius: inherit; background: transparent; text-align: left; }
+/* A template with a sample clip: a small thumbnail (3:4) beside the text, no taller than the text itself, with the upload below the text. */
+.prompt-template-grid .prompt-template:has(> .preview) { grid-template-columns: 2.5rem minmax(0, 1fr); column-gap: 10px; }
+.prompt-template-grid .prompt-template > .preview { grid-row: 1 / span 2; width: 2.5rem; margin: 8px 0 8px 8px; border-radius: 6px; }
+.prompt-template-needs { display: block; color: var(--text-muted); font-size: 12px; line-height: 18px; }
+.prompt-template-edit { grid-column: -2 / -1; padding: 0 12px 8px; font-size: 12px; line-height: 18px; }
+.prompt-template-edit label:has(:focus-visible) { outline: 2px solid var(--ink); outline-offset: 2px; }
 .prompt-template-grid .choice-name { font-weight: 600; }
 /* The recent group: the member's last hooks and endings under the cards, each a full-width button of its own words (two lines at most). */
 .prompt-recent h3 { margin: 20px 0 4px; font-size: 14px; line-height: 20px; font-weight: 600; }

@@ -152,6 +152,21 @@ describe('editing presets on Create', () => {
     expect((await del(editor.cookie, 'preset-slow-orbit.jpg')).status).toBe(204);
     expect((await pool.query(`select actor_id, action from audit_entries where target = 'sample:preset-slow-orbit.mp4'`)).rows).toEqual([{ actor_id: editor.id, action: 'sample.put' }]);
   });
+
+  test("an editor uploads and removes the clip and poster of a known prompt template only, and a member never does", async () => {
+    const put = (cookie: string, name: string, body: Uint8Array<ArrayBuffer>) => samplesRoute.PUT(new Request(`http://localhost/api/admin/samples/${name}`, { method: 'PUT', headers: { cookie }, body }), ctx('name', name));
+    const del = (cookie: string, name: string) => samplesRoute.DELETE(new Request(`http://localhost/api/admin/samples/${name}`, { method: 'DELETE', headers: { cookie } }), ctx('name', name));
+    const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4]);
+    expect((await put(member.cookie, 'template-xoay-360.mp4', mp4())).status).toBe(403);
+    expect((await put(editor.cookie, 'template-no-such.mp4', mp4())).status).toBe(403);
+    expect((await put(editor.cookie, 'template-xoay-360.png', jpeg)).status).toBe(403);
+    expect((await put(editor.cookie, 'template-xoay-360.mp4', jpeg)).status).toBe(400); // the byte check still applies
+    expect((await put(editor.cookie, 'template-xoay-360.mp4', mp4())).status).toBe(201);
+    expect((await put(editor.cookie, 'template-xoay-360.jpg', jpeg)).status).toBe(201);
+    expect((await del(member.cookie, 'template-xoay-360.jpg')).status).toBe(403);
+    expect((await del(editor.cookie, 'template-xoay-360.jpg')).status).toBe(204);
+    expect((await del(editor.cookie, 'template-xoay-360.mp4')).status).toBe(204);
+  });
 });
 
 describe('proposals', () => {

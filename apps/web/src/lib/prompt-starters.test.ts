@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { endingLine, hookLine, MAX_ENDING, MAX_HOOK } from './marketing';
 import { PROMPT_TEMPLATES, STARTERS } from './prompt-starters';
+import { sampleType } from './samples';
 
 describe('STARTERS', () => {
   it.each(Object.entries(STARTERS))('%s: uniquely labelled chips with a Vietnamese label and English text', (_, list) => {
@@ -26,6 +27,21 @@ describe('PROMPT_TEMPLATES', () => {
       expect(t.hook).toMatch(/^The clip opens /);
       expect(hookLine(t.hook)).toBe(t.hook);
       expect(endingLine(t.ending)).toBe(t.ending); // no "It ends with: The clip ends…"
+    }
+  });
+});
+
+describe('PROMPT_TEMPLATES ids', () => {
+  it('gives every template a unique kebab slug that is a valid sample name, and a short Vietnamese needs note only where set', () => {
+    const all = Object.values(PROMPT_TEMPLATES).flat();
+    expect(new Set(all.map((t) => t.id)).size).toBe(all.length);
+    for (const t of all) {
+      expect(t.id).toMatch(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
+      for (const ext of ['mp4', 'jpg']) expect(sampleType(`template-${t.id}.${ext}`)).not.toBeNull();
+      if (t.needs !== undefined) {
+        expect(t.needs).toMatch(/[À-ỹ]/);
+        expect(t.needs.length).toBeLessThanOrEqual(60);
+      }
     }
   });
 });

@@ -2,21 +2,25 @@ import { audit } from '@cvs/core/audit';
 import { withTransaction } from '@cvs/core/ledger';
 import { bad } from '@/lib/admin';
 import { pool } from '@/lib/auth';
+import { PROMPT_TEMPLATES } from '@/lib/prompt-starters';
 import { headSample, MAX_SAMPLE_BYTES, SAMPLE_PREFIX, sampleBytesMatch, sampleType } from '@/lib/samples';
 import { guard } from '@/lib/session';
 import { deleteObject, putObject } from '@/lib/storage';
 
 type Ctx = { params: Promise<{ name: string }> };
 
-/** An Admin writes any sample; a template editor only the clip or poster of an existing preset, `preset-<id>.mp4` or `preset-<id>.jpg`. Null when allowed. */
+const TEMPLATE_IDS = new Set(Object.values(PROMPT_TEMPLATES).flat().map((t) => t.id));
+
+/** An Admin writes any sample; a template editor only the clip or poster of an existing preset, `preset-<id>.mp4` or `preset-<id>.jpg`, or of a prompt template, `template-<id>.mp4` or `.jpg`. Null when allowed. */
 async function refusal(user: { role?: string | null }, name: string): Promise<Response | null> {
   if (user.role === 'admin') return null;
+  if (TEMPLATE_IDS.has(/^template-(.+)\.(?:mp4|jpg)$/.exec(name)?.[1] ?? '')) return null;
   const id = /^preset-(.+)\.(?:mp4|jpg)$/.exec(name)?.[1];
   if (id && sampleType(name) && (await pool.query('select 1 from presets where id = $1', [id])).rowCount) return null;
   return bad('forbidden', 403);
 }
 
-/** Admin, or a template editor for a preset's clip or poster: upload or replace one sample; the raw body is the file and its bytes must match the name's type. Audited as sample.put. */
+/** Admin, or a template editor for a preset's or prompt template's clip or poster: upload or replace one sample; the raw body is the file and its bytes must match the name's type. Audited as sample.put. */
 export async function PUT(request: Request, { params }: Ctx) {
   const g = await guard(request, 'editor');
   if (g.error) return g.error;
@@ -38,7 +42,7 @@ export async function PUT(request: Request, { params }: Ctx) {
   return Response.json({ name, bytes: body.byteLength }, { status: old ? 200 : 201 });
 }
 
-/** Admin, or a template editor for a preset's clip or poster: remove one sample, so its slot shows the built-in fallback again. Audited as sample.delete. */
+/** Admin, or a template editor for a preset's or prompt template's clip or poster: remove one sample, so its slot shows the built-in fallback again. Audited as sample.delete. */
 export async function DELETE(request: Request, { params }: Ctx) {
   const g = await guard(request, 'editor');
   if (g.error) return g.error;
