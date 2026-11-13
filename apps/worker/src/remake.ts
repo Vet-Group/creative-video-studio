@@ -53,10 +53,11 @@ export const reaRemakeEnabled = (env: NodeJS.ProcessEnv = process.env): boolean 
 const editPrompt = (shot: AnalysisShot): string =>
   `Replace the product shown in this video with the product in the reference image, reproducing its shape, colours, print and text faithfully. Take only the product from the reference image, not its model, jewellery, accessories or background. Keep everything else exactly as in the video: the people, faces, hair, hands, poses and every movement, the background, lighting and camera framing. The shot, for context: ${shot.prompt.slice(0, 1000)}`;
 
-// The model, priced as @cvs/core/analysis/remake estimates. It is not a model_configs row, so it does not show in Create.
+// The model, priced as @cvs/core/analysis/remake estimates: fal bills the clip sent as well as the clip made, so each billed second counts twice.
+// It is not a model_configs row, so it does not show in Create.
 const EDIT_MODEL: ModelConfig = {
   id: 'smart-remake-edit', provider: 'fal', endpoint: REMAKE_ENDPOINT, label: 'Wan 2.7 Edit', ratios: [], durationsSec: [],
-  maxImages: 1, outputResolution: '720p', usdPerSecond: REMAKE_USD_PER_SECOND, billedAmountField: null, sources: {},
+  maxImages: 1, outputResolution: '720p', usdPerSecond: 2 * REMAKE_USD_PER_SECOND, billedAmountField: null, sources: {},
 };
 
 /**
@@ -107,7 +108,7 @@ const realEdit =
     const readImage = async (url: string) => (url === 'mem:clip' ? { bytes: clip, contentType: 'video/mp4' } : fitForInline(product.bytes, product.contentType));
     const fal = createFalProvider({ apiKey: await falKey(pool), readImage });
     const { providerJobId } = await fal.submit({ model: EDIT_MODEL, prompt, imageUrls: ['mem:product', 'mem:clip'], ratio: 'auto', durationSec: seconds });
-    const out = await settleFal(() => fal.status({ providerJobId, model: EDIT_MODEL }), REMAKE_USD_PER_SECOND * seconds);
+    const out = await settleFal(() => fal.status({ providerJobId, model: EDIT_MODEL }), EDIT_MODEL.usdPerSecond * seconds);
     return { video: out.bytes, costUsd: out.costUsd };
   };
 

@@ -106,8 +106,8 @@ test('counts the open remakes against the company month and refuses one that wou
   const prev = (await pool.query('select monthly_cap_usd::text as cap from settings where id = 1')).rows[0].cap as string;
   const open = (await pool.query(`select coalesce(sum(jsonb_array_length(shots)), 0)::int as n from remakes where status in ('queued', 'running')`)).rows[0].n as number;
   const count = async () => (await pool.query('select count(*)::int as n from remakes')).rows[0].n as number;
-  // An open remake's shots hold $1.00 each (10 s at $0.10); these 1 s shots cost $0.20 each (sent as 2 s), so there is room for 2 more.
-  await pool.query('update settings set monthly_cap_usd = $1 where id = 1', [(open * 1 + 2 * 0.2).toFixed(4)]);
+  // An open remake's shots hold $2.00 each (10 s sent + 10 s made at $0.10); these 1 s shots cost $0.40 each (2 s sent + 2 s made), so there is room for 2 more.
+  await pool.query('update settings set monthly_cap_usd = $1 where id = 1', [(open * 2 + 2 * 0.4).toFixed(4)]);
   try {
     const before = await count();
     const over = await post({ ...ok, shots: [1, 2, 3] });

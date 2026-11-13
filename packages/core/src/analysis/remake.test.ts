@@ -15,8 +15,8 @@ test('a chosen shot that starts a merged scene stands for the whole scene; a sho
 test('a shot is sent and billed as its length in whole seconds, 2 to 10', () => {
   const secs = (start: number, end: number) => remakeShotSeconds({ start, end });
   expect([secs(0, 2), secs(0, 2.0000001), secs(0, 2.1), secs(2.1, 4.3), secs(4.3, 7), secs(0, 0.4), secs(3, 25)]).toEqual([2, 2, 3, 3, 3, 2, 10]);
-  expect(remakeShotUsd({ start: 2.1, end: 4.3 })).toBeCloseTo(0.3);
-  expect(remakeShotUsd({ start: 0, end: 25 })).toBeCloseTo(1);
+  expect(remakeShotUsd({ start: 2.1, end: 4.3 })).toBeCloseTo(0.6); // 3 s sent + 3 s made at $0.10
+  expect(remakeShotUsd({ start: 0, end: 25 })).toBeCloseTo(2);
 });
 
 test('takes 1 to REMAKE_MAX_SHOTS distinct shots of the analysis, and says why anything else is refused', () => {
