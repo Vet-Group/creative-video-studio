@@ -203,3 +203,41 @@ test('Dùng ví dụ này on a company result in Ví dụ fills Try On, Image Ge
   await expect(other.getByRole('button', { name: /^Mô hình / })).toContainText('Mock image Solo');
   await other.close();
 });
+
+test('Image Generation: a company template with ${blanks} asks for them in Điền chỗ trống before filling the prompt, and Huỷ fills nothing', async ({ page, browser }) => {
+  const editor = await (await browser.newContext()).newPage();
+  await signIn(editor, 'tpled');
+  await editor.goto('/image-generation');
+  await editor.getByRole('button', { name: 'Lưu thiết lập', exact: true }).click();
+  await expect(editor.getByRole('dialog', { name: 'Lưu thiết lập' })).toContainText('Mẹo: viết ${tên:mặc định} trong prompt'); // only a template editor may share company-wide
+  const saved = await editor.request.post('/api/templates', { data: { feature: 'image', name: 'Blanks', isCompany: true, data: { images: [], prompt: 'a ${product:shoe} on ${place}, again ${product}' } } });
+  expect(saved.status()).toBe(201);
+  const { id } = (await saved.json()) as { id: string };
+  try {
+    await signIn(page, 'tplpos');
+    await page.goto('/image-generation');
+    const prompt = page.getByRole('textbox', { name: 'Mô tả', exact: true });
+    const blanks = page.getByRole('dialog', { name: 'Điền chỗ trống' });
+    await openTemplates(page);
+    await page.getByRole('dialog', { name: 'Thiết lập đã lưu' }).getByRole('link', { name: 'Blanks' }).click();
+    await expect(blanks.getByLabel('product')).toHaveValue('shoe');
+    await expect(blanks.getByLabel('place')).toHaveValue('');
+    await expect(blanks.getByRole('button', { name: 'Dùng thiết lập', exact: true })).toBeDisabled(); // a blank without a default is required
+    await blanks.getByRole('button', { name: 'Huỷ', exact: true }).click();
+    await expect(blanks).toBeHidden();
+    await expect(page).toHaveURL((u) => u.pathname === '/image-generation' && u.search === ''); // dropped, as after a refill
+    await expect(prompt).toHaveValue(''); // nothing was filled
+
+    await page.goto('/image-generation'); // the same link again is no refill on the page that already opened it
+    await openTemplates(page);
+    await page.getByRole('dialog', { name: 'Thiết lập đã lưu' }).getByRole('link', { name: 'Blanks' }).click();
+    await blanks.getByLabel('place').fill('a beach');
+    await blanks.getByLabel('product').fill('');
+    await blanks.getByRole('button', { name: 'Dùng thiết lập', exact: true }).click();
+    await expect(prompt).toHaveValue('a shoe on a beach, again shoe'); // an empty value takes the default
+    await expect(page).toHaveURL((u) => u.pathname === '/image-generation' && u.search === '');
+  } finally {
+    await editor.request.delete(`/api/templates/${id}`);
+    await editor.close();
+  }
+});

@@ -71,6 +71,7 @@ export function SaveTemplateDialog({ open, onClose, onSave, canShare, store, nam
           )}
         </fieldset>
       )}
+      {canShare && <p className="help">Mẹo: viết {'${tên:mặc định}'} trong prompt để người dùng điền khi mở thiết lập.</p>}
       {error && (
         <p className="error" role="alert">
           {error}

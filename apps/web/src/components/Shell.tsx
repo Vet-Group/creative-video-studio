@@ -20,6 +20,7 @@ import { AccountMenu } from './AccountMenu';
 import { ChangelogPopup } from './ChangelogPopup';
 import { CompareSlider } from './CompareSlider';
 import { ConfirmHost, confirmDialog } from './Confirm';
+import { TemplateBlanksHost } from './TemplateBlanks';
 import { FalLowNotice } from './FalLowNotice';
 import { Icon, type IconName } from './Icon';
 import { LarkLinkPrompt } from './LarkLinkPrompt';
@@ -678,6 +679,7 @@ export function Shell({ userId, userName, isAdmin, feedbackNew = 0, analyzeEnabl
           </div>
           <ToolGuide open={guide} onClose={() => setGuide(false)} analyzeEnabled={analyzeEnabled} />
           <ConfirmHost />
+          <TemplateBlanksHost />
         </OpenToolGuide>
       </AdminContext>
     </JobsProvider>

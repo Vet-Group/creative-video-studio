@@ -22,6 +22,7 @@ import { Icon } from './Icon';
 import { copyError, copySamples, FormNotice, GALLERY_SIZE_KEY, HISTORY_SIZE_KEY, photoImg, RunSummary, SizeSlider, Slot, UploadedPhotos, uploadError, uploadImages, useSize } from './image-tools';
 import { FormContext, type Photo, Tap, useApplier, useJobs, useRecreated } from './jobs';
 import { Modal } from './Modal';
+import { fillBlanks } from './TemplateBlanks';
 import { ModelPicker } from './ModelPicker';
 import { loadPending, PendingProposals, type PresetDraft, PresetForm, type PresetRow, type Proposal } from './PresetEditing';
 import { PromptComposer } from './PromptComposer';
@@ -285,8 +286,11 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
     const reuse = source.from;
     let stale = false; // a refill superseded (another link, or a re-run effect) must not fill or upload
     api<JobDetail>(reuse)
-      .then(async (j) => {
+      .then(async (loaded) => {
         if (stale) return;
+        const j = await fillBlanks(reuse, loaded);
+        if (stale) return; // superseded while the member filled the blanks
+        if (!j) return dropRefillQuery(); // cancelled: the form stays as it is
         const preset = presets.some((p) => p.id === j.presetId) ? j.presetId : null;
         // A sample's photos become this member's inputs first, copied on the server.
         const samples = j.images.flatMap((i) => ('sample' in i ? [i.sample] : []));
