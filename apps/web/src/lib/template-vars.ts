@@ -28,7 +28,7 @@ export function templateVars(t: TemplateTexts): TemplateVar[] {
 /** The template with every blank replaced by its value, or when the value is empty by the first default its name was given (so a bare `${name}` takes it too). */
 export function fillTemplate<T extends TemplateTexts>(t: T, values: Record<string, string>): T {
   const defaults = new Map(templateVars(t).map((v) => [v.name, v.default]));
-  const fill = (s: string) => s.replace(BLANK, (_, name: string) => values[name] || defaults.get(name) || '');
+  const fill = (s: string) => s.replace(BLANK, (_, name: string) => values[name]?.trim() || defaults.get(name) || '');
   const out: TemplateTexts = { ...t };
   for (const k of KEYS) if (typeof t[k] === 'string') out[k] = fill(t[k]);
   if (t.highlights) out.highlights = t.highlights.map(fill);

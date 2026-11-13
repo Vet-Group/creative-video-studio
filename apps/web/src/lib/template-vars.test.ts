@@ -25,4 +25,5 @@ test('fill replaces every occurrence with the value, or the default when the val
   expect(fillTemplate(t, { a: 'X', b: '', c: '' })).toEqual({ ...t, prompt: 'X X z', brief: 'X', hookText: 'z', ending: 'end e', endText: 'X', highlights: ['X', 'plain'] });
   expect(fillTemplate({ prompt: '${a:one} ${a:two} ${a}' }, {})).toEqual({ prompt: 'one one one' }); // the first default belongs to the name
   expect(fillTemplate({ prompt: '${a}' }, { a: '$& $1' })).toEqual({ prompt: '$& $1' }); // the value is text, not a replacement pattern
+  expect(fillTemplate({ prompt: 'on ${place:a beach}' }, { place: '  ' })).toEqual({ prompt: 'on a beach' }); // spaces alone count as empty
 });

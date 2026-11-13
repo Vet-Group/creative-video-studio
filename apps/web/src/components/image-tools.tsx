@@ -20,12 +20,12 @@ import { type Photo, Recreate, useForm, useFreshResults, useJobs, useRecreated }
 import { Icon, type IconName } from './Icon';
 import { LoadError } from './LoadError';
 import { Modal } from './Modal';
-import { fillBlanks } from './TemplateBlanks';
 import { Preview } from './Preview';
 import { Select } from './Select';
 import { StorePicker, type StoreOption } from './StorePicker';
 import { SampleDetail } from './SampleDetail';
 import type { ModelOption } from './ModelPicker';
+import { fillBlanks } from './TemplateBlanks';
 
 export interface ImageModel {
   id: string;

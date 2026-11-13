@@ -33,13 +33,13 @@ import { copyError, copySamples, FormNotice, Gallery, HISTORY_SIZE_KEY, type Img
 import type { UploadSlot } from '@/lib/upload-slots';
 import { FormContext, type FormActions, type Photo, type PhotoRole, useApplier, useJobs, useRecreated } from './jobs';
 import { Modal } from './Modal';
-import { fillBlanks } from './TemplateBlanks';
 import { ModelPicker } from './ModelPicker';
 import { PromptComposer } from './PromptComposer';
 import { ReferenceVideoSlot, type RefVideo, videoReason, type VideoRefs } from './ReferenceVideo';
 import { PromptPreview, PromptSections, usePromptMode } from './PromptSections';
 import { Select } from './Select';
 import { Tray } from './Shell';
+import { fillBlanks } from './TemplateBlanks';
 import { Templates } from './Templates';
 import { PageHint } from './ToolGuide';
 import { VideoSettings } from './VideoSettings';
