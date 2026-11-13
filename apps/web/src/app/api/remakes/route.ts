@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { Analysis } from '@cvs/core/analysis/breakdown';
-import { REMAKE_SHOT_USD, remakeShotsProblem } from '@cvs/core/analysis/remake';
+import { REMAKE_MAX_SECONDS, REMAKE_USD_PER_SECOND, remakeShotsProblem, remakeShotUsd } from '@cvs/core/analysis/remake';
 import { withTransaction } from '@cvs/core/ledger';
 import { checkCaps } from '@cvs/core/limits';
 import { REMAKE_QUEUE } from '@cvs/core/queue';
@@ -38,7 +38,8 @@ export async function POST(request: Request) {
   const analysis = (await pool.query('select status, result, store_id from analyses where id = $1 and user_id = $2', [analysisId, userId])).rows[0];
   if (!analysis) return bad('the analysis does not exist', 404);
   if (analysis.status !== 'succeeded') return bad('the analysis has not finished');
-  const problem = remakeShotsProblem(b?.shots, ((analysis.result as Analysis).shots ?? []).map((s) => s.index));
+  const analysisShots = (analysis.result as Analysis).shots ?? [];
+  const problem = remakeShotsProblem(b?.shots, analysisShots.map((s) => s.index));
   if (problem) return bad(problem);
 
   const found = await readableAsset(g.session, productAssetId);
@@ -53,11 +54,14 @@ export async function POST(request: Request) {
     // One writer at a time, as for a Run, so two remakes cannot both take the last dollars of the month.
     await tx.query(`select pg_advisory_xact_lock(hashtext('caps'))`);
     // A remake is video spend (limits.ts capRow). Open remakes have booked only the calls made so far, so the rest of their estimate counts too.
+    // shortcut: an open remake's shots count at the longest a shot is billed (REMAKE_MAX_SECONDS), which only holds back a little more for the few
+    // minutes it runs; store each remake's estimate if that ever refuses a remake near the month's cap.
+    const thisOne = analysisShots.filter((s) => shots.includes(s.index)).reduce((sum, s) => sum + remakeShotUsd(s), 0);
     const estimate = (
       await tx.query(
         `select (coalesce(sum(greatest(jsonb_array_length(shots) * $1::numeric - coalesce(cost_usd, 0), 0)), 0) + $2::numeric)::text as usd
            from remakes where status in ('queued', 'running')`,
-        [REMAKE_SHOT_USD.toFixed(6), (shots.length * REMAKE_SHOT_USD).toFixed(6)],
+        [(REMAKE_MAX_SECONDS * REMAKE_USD_PER_SECOND).toFixed(6), thisOne.toFixed(6)],
       )
     ).rows[0].usd as string;
     const refused = await checkCaps(tx, userId, estimate, undefined, 'video');

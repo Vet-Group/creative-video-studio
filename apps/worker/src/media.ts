@@ -53,9 +53,27 @@ export async function extractPoster(video: string, jpeg: string): Promise<void> 
   await run(requireFfmpeg(), ['-y', '-v', 'error', '-i', video, '-frames:v', '1', '-vf', "scale='min(480,iw)':-2", '-q:v', '3', jpeg]);
 }
 
-/** The frame `seconds` into a video, as a full-size JPEG: the start image of a Smart Remake shot. */
-export async function extractFrameAt(video: string, seconds: number, jpeg: string): Promise<void> {
-  await run(requireFfmpeg(), ['-y', '-v', 'error', '-ss', seconds.toFixed(3), '-i', video, '-frames:v', '1', '-q:v', '2', jpeg]);
+const H264 = ['-c:v', 'libx264', '-preset', 'veryfast', '-crf', '18', '-pix_fmt', 'yuv420p', '-movflags', '+faststart'];
+
+/**
+ * A Smart Remake shot as the edit is sent it: `keep` seconds of the video from `start`, silent, at most 1280 px tall, then held on its last frame up
+ * to `seconds` (the edit takes at least 2 s).
+ */
+export async function cutShot(video: string, start: number, keep: number, seconds: number, out: string): Promise<void> {
+  const vf = `scale=-2:'trunc(min(1280,ih)/2)*2',tpad=stop_mode=clone:stop_duration=${Math.max(0, seconds - keep).toFixed(3)}`;
+  await run(requireFfmpeg(), ['-y', '-v', 'error', '-ss', start.toFixed(3), '-t', keep.toFixed(3), '-i', video, '-an', '-vf', vf, '-t', String(seconds), ...H264, out]);
+}
+
+/** The first `seconds` of a clip, silent: a remake shot's edit cut back to the shot's own length. */
+export async function trimClip(clip: string, seconds: number, out: string): Promise<void> {
+  await run(requireFfmpeg(), ['-y', '-v', 'error', '-i', clip, '-t', seconds.toFixed(3), '-an', ...H264, out]);
+}
+
+/** Two clips side by side at the right one's height, silent, as long as the shorter: a remake's before and after. */
+export async function sideBySide(left: string, right: string, out: string): Promise<void> {
+  const { height } = await probeSize(right);
+  const fit = (i: number) => `[${i}:v:0]scale=-2:${height},setsar=1,fps=24[v${i}]`;
+  await run(requireFfmpeg(), ['-y', '-v', 'error', '-i', left, '-i', right, '-filter_complex', `${fit(0)};${fit(1)};[v0][v1]hstack=inputs=2:shortest=1[out]`, '-map', '[out]', ...H264, out]);
 }
 
 /** Clips joined end to end into one silent H.264 MP4 at the first clip's size, each fitted inside it, so clips of another size or rate still join. */

@@ -5,16 +5,19 @@ import { RemakePanel, RemakeResult, type RemakeRow, remakeEstimate } from './Rem
 
 const base: RemakeRow = { id: 'r1', analysisId: 'a1', status: 'succeeded', result: null, outputAssetId: null, costUsd: null, createdAt: '2026-11-13T00:00:00Z' };
 
-test('the estimate is two paid calls per shot, as the API counts it against the caps', () => {
-  expect([remakeEstimate(1), remakeEstimate(6)]).toEqual(['0.15', '0.89']);
+test('the estimate is each shot billed at its length in whole seconds (2 to 10) at $0.10, as the API counts it against the caps', () => {
+  expect(remakeEstimate([{ start: 0, end: 1 }])).toBe('0.20');
+  expect(remakeEstimate([{ start: 0, end: 2.1 }, { start: 2.1, end: 30 }])).toBe('1.30'); // 3 s + 10 s
 });
 
 test('a finished remake shows the joined video with a download, each shot clip, and its cost', () => {
   const html = renderToStaticMarkup(
-    <RemakeResult row={{ ...base, outputAssetId: 'out-1', costUsd: '0.295600', result: { shots: [{ index: 1, status: 'succeeded', clipAssetId: 'c1' }, { index: 3, status: 'succeeded', clipAssetId: 'c3' }] } }} />,
+    <RemakeResult row={{ ...base, outputAssetId: 'out-1', costUsd: '0.295600', result: { shots: [{ index: 1, status: 'succeeded', clipAssetId: 'c1' }, { index: 3, status: 'succeeded', clipAssetId: 'c3' }], compareAssetId: 'cmp' } }} />,
   );
   expect(html).toContain('src="/api/assets/out-1/content"');
   expect(html).toContain('href="/api/assets/out-1/download"');
+  expect(html).toContain('href="/api/assets/cmp/content"');
+  expect(html).toContain('Xem so sánh trước/sau');
   expect(html).toContain('href="/api/assets/c3/content"');
   expect(html).toContain('Clip cảnh 3');
   expect(html).toContain('$0.30');

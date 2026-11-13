@@ -141,8 +141,9 @@ export const VIDEO_BODIES: Record<string, VideoBody> = {
   'fal-ai/bytedance/seedance/v1.5/pro/image-to-video': { end: 'end_image_url', text: 'fal-ai/bytedance/seedance/v1.5/pro/text-to-video', build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), aspect_ratio: req.ratio, duration: seconds(req), resolution: '720p', generate_audio: req.audio === true }) },
   // Seedance 1.0 Pro and FLUX 3 render "720p" 9:16 as 704 px wide, under the worker's 720p floor (smoke run 2026-10-25), so they ask for 1080p.
   'fal-ai/bytedance/seedance/v1/pro/image-to-video': { end: 'end_image_url', text: 'fal-ai/bytedance/seedance/v1/pro/text-to-video', build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), aspect_ratio: req.ratio, duration: seconds(req), resolution: '1080p' }) },
-  // Smart Remake's animate step only, never a model row (schema read 2026-11-13: no end frame, no audio switch, 'auto' ratio follows the image); 720p is the resolution its estimate is for.
-  'fal-ai/bytedance/seedance/v1/pro/fast/image-to-video': { build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), aspect_ratio: req.ratio, duration: seconds(req), resolution: '720p' }) },
+  // Smart Remake's one call, never a model row (apps/worker/src/remake.ts): the product image (1st input) put into the shot's clip (2nd input). The clip
+  // is too large to inline, so both go to fal storage, as for Motion Control.
+  'fal-ai/wan/v2.7/edit-video': { upload: true, build: remakeEdit },
   // fal has no FLUX 3 reference endpoint; keyframes pins the product image as the first frame, the closest match to Fash's "FLUX 3 Reference".
   'blackforestlabs/flux-3/keyframes-to-video': { text: 'blackforestlabs/flux-3/text-to-video', build: (req, images) => ({ prompt: oneShot(imageTokens(req.prompt, plainImage)), keyframes: [{ image_url: images[0], frame_index: 0 }], aspect_ratio: req.ratio, duration: req.durationSec, resolution: '1080p', generate_audio: req.audio === true }) },
   'blackforestlabs/flux-3/image-to-video': { text: 'blackforestlabs/flux-3/text-to-video', build: (req, images) => ({ prompt: imageTokens(req.prompt, plainImage), ...first(images), aspect_ratio: req.ratio, duration: req.durationSec, resolution: '1080p', generate_audio: req.audio === true }) },
@@ -216,6 +217,15 @@ export function videoRefProblem(endpoint: string, info: { width: number; height:
   }
   if (video?.fps && fps !== null && (fps < video.fps[0] - 0.5 || fps > video.fps[1] + 0.5)) return `the reference video runs at ${Math.round(fps)} fps, outside the ${video.fps[0]} to ${video.fps[1]} this model takes`;
   return null;
+}
+
+/**
+ * Smart Remake's edit (schema read 2026-11-13): the clip keeps its length (`duration` 0, so the job's duration is only what it is billed for) and its
+ * own sound ('origin'; the worker sends it silent, so no sound is made or billed); 720p is the resolution its price is for.
+ */
+function remakeEdit(req: SubmitRequest, [reference_image_url, video_url, ...rest]: string[]): Record<string, unknown> {
+  if (!reference_image_url || !video_url || rest.length > 0) throw new ImageReadError('the remake edit needs the product image and the shot clip');
+  return { prompt: req.prompt, video_url, reference_image_url, duration: 0, resolution: '720p', audio_setting: 'origin' };
 }
 
 /**

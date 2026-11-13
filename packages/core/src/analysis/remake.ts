@@ -1,27 +1,29 @@
 // Smart Remake (Feature B): the settings shared by the API, which validates a request, and the worker, which runs it.
 // A remake puts a member's product image into chosen shots of one of their analysed reference videos: per shot, the
-// frame at the shot's start is edited with the product, then animated, and the clips are joined in shot order.
+// shot's own clip is edited with the product, keeping its motion, framing and length, and the clips are joined in shot order.
 
-/** The most shots one remake may take: each costs two paid fal calls, so this bounds a remake's spend (owner decision, 2026-11-13). */
+/** The most shots one remake may take: each is one paid fal call, so this bounds a remake's spend (owner decision, 2026-11-13). */
 export const REMAKE_MAX_SHOTS = 6;
-/** Each shot's clip length in seconds, the Seedance default. */
-export const REMAKE_SHOT_SECONDS = 5;
-
-/** The edit step: Nano Banana's multi-image edit puts the product (second image) into the shot's frame (first image), as validated in the 2026-11-11 spike. */
-export const REMAKE_EDIT_ENDPOINT = 'fal-ai/nano-banana/edit';
-/** Its price per 1K image, as its model_configs row stores it (migration 0007). */
-export const REMAKE_EDIT_USD = 0.0398;
 
 /**
- * The animate step: Seedance 1.0 Pro Fast at 720p; fal redirects the spike's v1/lite endpoint here (its schema, read 2026-11-13). It is priced by output
- * tokens at $1 per million (fal pricing, read 2026-11-13), tokens = width x height x 24 fps x seconds / 1024, so about $0.0216 a second at 1280x720.
- * shortcut: an estimate from the listed price; the first real remake (the enablement PR's price check) and the monthly fal invoice (invoice_diff) confirm it.
+ * The one paid call per shot: Wan 2.7 video edit puts the reference image's product into the shot's clip, keeping the clip's motion, framing and
+ * length (owner's pick after the 2026-11-13 A/B against Nano Banana edit + Seedance, which lost the motion and came out square). Schema read
+ * 2026-11-13: the clip is 2 to 10 s; priced at $0.10 per output second at 720p (fal pricing, read 2026-11-13).
  */
-export const REMAKE_VIDEO_ENDPOINT = 'fal-ai/bytedance/seedance/v1/pro/fast/image-to-video';
-export const REMAKE_VIDEO_USD_PER_SECOND = 0.0216;
+export const REMAKE_ENDPOINT = 'fal-ai/wan/v2.7/edit-video';
+export const REMAKE_USD_PER_SECOND = 0.1;
+export const REMAKE_MIN_SECONDS = 2;
+export const REMAKE_MAX_SECONDS = 10;
 
-/** What one shot is estimated to cost: its edit and its clip. The API counts it against the spending caps before a remake is queued. */
-export const REMAKE_SHOT_USD = REMAKE_EDIT_USD + REMAKE_VIDEO_USD_PER_SECOND * REMAKE_SHOT_SECONDS;
+/**
+ * How many seconds of clip a shot is sent and billed as: its length in whole seconds, at least REMAKE_MIN_SECONDS (a shorter shot is padded with its
+ * last frame) and at most REMAKE_MAX_SECONDS (a longer one keeps only its start). Rounded to 0.01 s first, so 2.1 - 0 is 3 but 2.0000001 is 2.
+ */
+export const remakeShotSeconds = (shot: { start: number; end: number }): number =>
+  Math.min(REMAKE_MAX_SECONDS, Math.max(REMAKE_MIN_SECONDS, Math.ceil(Number((shot.end - shot.start).toFixed(2)))));
+
+/** What a shot is estimated to cost; the API counts the chosen shots' sum against the spending caps before a remake is queued. */
+export const remakeShotUsd = (shot: { start: number; end: number }): number => remakeShotSeconds(shot) * REMAKE_USD_PER_SECOND;
 
 /** Why these chosen shot indices cannot be remade from an analysis whose shots have the `available` indices, or null: 1 to REMAKE_MAX_SHOTS distinct shots of the analysis. */
 export function remakeShotsProblem(chosen: unknown, available: number[]): string | null {

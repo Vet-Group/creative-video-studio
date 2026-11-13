@@ -1,7 +1,7 @@
 // Runs against a disposable database on the compose Postgres (`pnpm services:up`). No network, S3 or paid call: both fal
 // calls and the object store are injected; ffmpeg runs for real on tiny clips made here.
 import { execFile } from 'node:child_process';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
@@ -9,7 +9,7 @@ import type { ProviderStatus } from '@cvs/core/providers';
 import { createPool } from '@cvs/db/client';
 import { createTestDatabase } from '@cvs/db/testing';
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
-import { requireFfmpeg } from './media';
+import { probeSeconds, requireFfmpeg } from './media';
 import { closeStaleRemakes, PaidCallError, type RemakeSeams, reaRemakeEnabled, runRemake, settleFal } from './remake';
 
 vi.setConfig({ testTimeout: 90_000, hookTimeout: 90_000 });
@@ -35,16 +35,14 @@ const analysis = {
 
 const stored: Record<string, Uint8Array> = {};
 let calls: string[] = [];
+let sentClips: Uint8Array[] = [];
 const seams = (over: Partial<RemakeSeams> = {}): RemakeSeams => ({
   read: async (key) => (key === 'sources/ref.mp4' ? sourceVideo : PRODUCT),
   write: async (key, body) => void (stored[key] = body),
-  edit: async (frame, product, prompt) => {
-    calls.push(`edit ${product.contentType} ${prompt.slice(0, 19)}`);
-    return { image: frame, costUsd: 0.0398 };
-  },
-  animate: async (_image, prompt, seconds) => {
-    calls.push(`animate ${seconds}s ${prompt}`);
-    return { video: clipVideo, costUsd: 0.108 };
+  edit: async (clip, product, prompt, seconds) => {
+    sentClips.push(clip);
+    calls.push(`edit ${seconds}s ${product.contentType} ${prompt.split('for context: ')[1]}`);
+    return { video: clipVideo, costUsd: 0.2 };
   },
   ...over,
 });
@@ -78,28 +76,34 @@ afterAll(async () => {
   await rm(dir, { recursive: true, force: true });
 });
 
-test('remakes every chosen shot, joins the clips and books each paid call to the ledger', async () => {
+test('remakes every chosen shot from its own clip, joins the clips with a before/after, and books each paid call to the ledger', async () => {
   calls = [];
+  sentClips = [];
   const id = await queued([1, 2]);
   await runRemake(pool, id, seams());
   const r = await row(id);
   expect(r.status).toBe('succeeded');
   expect(r.error).toBeNull();
-  expect(r.cost_usd).toBe('0.295600'); // 2 x (0.0398 + 0.108)
+  expect(r.cost_usd).toBe('0.400000'); // 2 shots x 2 s x $0.10
   expect(r.result.shots.map((s: { index: number; status: string }) => [s.index, s.status])).toEqual([[1, 'succeeded'], [2, 'succeeded']]);
-  // The product image goes to the edit, the shot's own English prompt to the animate step, 5 s each.
-  expect(calls).toEqual(['edit image/png Replace the product', 'animate 5s A model turns to the camera. Keep the product exactly as it appears in the image.', 'edit image/png Replace the product', 'animate 5s A close-up of the shirt. Keep the product exactly as it appears in the image.']);
-  // The joined video and each shot's clip are the member's output assets, stored under their own keys.
-  const ids = [r.output_asset_id, ...r.result.shots.map((s: { clipAssetId: string }) => s.clipAssetId)];
+  // The product image and the shot's own English description go to the edit; each 1 s shot is sent as the 2 s the edit takes at least.
+  expect(calls).toEqual(['edit 2s image/png A model turns to the camera.', 'edit 2s image/png A close-up of the shirt.']);
+  const sent = join(dir, 'sent.mp4');
+  await writeFile(sent, sentClips[0]!);
+  expect(Math.abs((await probeSeconds(sent)) - 2)).toBeLessThanOrEqual(0.1);
+  // The joined video, each shot's clip (cut back to the shot's 1 s) and the before/after are the member's output assets, under their own keys.
+  const ids = [r.output_asset_id, ...r.result.shots.map((s: { clipAssetId: string }) => s.clipAssetId), r.result.compareAssetId];
   const assets = (await pool.query(`select id, owner_id, kind, mime, s3_key, width, height from assets where id = any($1::text[])`, [ids])).rows;
-  expect(assets).toHaveLength(3);
-  for (const a of assets) expect([a.owner_id, a.kind, a.mime, a.s3_key, a.width, a.height]).toEqual(['u1', 'output', 'video/mp4', `assets/${a.id}`, 128, 224]);
+  expect(assets).toHaveLength(4);
+  for (const a of assets) expect([a.owner_id, a.kind, a.mime, a.s3_key, a.height]).toEqual(['u1', 'output', 'video/mp4', `assets/${a.id}`, 224]);
   for (const a of assets) expect(stored[a.s3_key]).toBeDefined();
+  expect(assets.find((a) => a.id === r.result.compareAssetId)!.width).toBe(256); // the source's shots beside their remakes
+  const clip = join(dir, 'stored-clip.mp4');
+  await writeFile(clip, stored[`assets/${r.result.shots[0].clipAssetId}`]!);
+  expect(Math.abs((await probeSeconds(clip)) - 1)).toBeLessThanOrEqual(0.1);
   expect(await ledger(id)).toEqual([
-    { ref: `llm:remake:${id}:1:edit`, kind: 'llm', usd: '0.0398', user_id: 'u1', team_id: 'team-unassigned', provider: 'fal', model: 'fal-ai/nano-banana/edit', is_final: true },
-    { ref: `llm:remake:${id}:1:video`, kind: 'llm', usd: '0.1080', user_id: 'u1', team_id: 'team-unassigned', provider: 'fal', model: 'fal-ai/bytedance/seedance/v1/pro/fast/image-to-video', is_final: true },
-    { ref: `llm:remake:${id}:2:edit`, kind: 'llm', usd: '0.0398', user_id: 'u1', team_id: 'team-unassigned', provider: 'fal', model: 'fal-ai/nano-banana/edit', is_final: true },
-    { ref: `llm:remake:${id}:2:video`, kind: 'llm', usd: '0.1080', user_id: 'u1', team_id: 'team-unassigned', provider: 'fal', model: 'fal-ai/bytedance/seedance/v1/pro/fast/image-to-video', is_final: true },
+    { ref: `llm:remake:${id}:1:video`, kind: 'llm', usd: '0.2000', user_id: 'u1', team_id: 'team-unassigned', provider: 'fal', model: 'fal-ai/wan/v2.7/edit-video', is_final: true },
+    { ref: `llm:remake:${id}:2:video`, kind: 'llm', usd: '0.2000', user_id: 'u1', team_id: 'team-unassigned', provider: 'fal', model: 'fal-ai/wan/v2.7/edit-video', is_final: true },
   ]);
 });
 
@@ -109,9 +113,9 @@ test('a shot whose paid call fails still books what fal billed, and the remake d
     pool,
     id,
     seams({
-      animate: async (_image, prompt) => {
-        if (prompt.startsWith('A close-up')) throw new PaidCallError('content policy', 0.108);
-        return { video: clipVideo, costUsd: 0.108 };
+      edit: async (_clip, _product, prompt) => {
+        if (prompt.endsWith('A close-up of the shirt.')) throw new PaidCallError('content policy', 0.2);
+        return { video: clipVideo, costUsd: 0.2 };
       },
     }),
   );
@@ -119,9 +123,9 @@ test('a shot whose paid call fails still books what fal billed, and the remake d
   expect(r.status).toBe('partial');
   expect(r.output_asset_id).not.toBeNull(); // the one clip, joined on its own
   expect(r.error).toBe('content policy');
-  expect(r.result.shots[1]).toMatchObject({ index: 2, status: 'failed', costUsd: 0.1478, error: 'content policy' });
-  expect(r.cost_usd).toBe('0.295600');
-  expect((await ledger(id)).map((l: { ref: string }) => l.ref)).toEqual([`llm:remake:${id}:1:edit`, `llm:remake:${id}:1:video`, `llm:remake:${id}:2:edit`, `llm:remake:${id}:2:video`]);
+  expect(r.result.shots[1]).toMatchObject({ index: 2, status: 'failed', costUsd: 0.2, error: 'content policy' });
+  expect(r.cost_usd).toBe('0.400000');
+  expect((await ledger(id)).map((l: { ref: string }) => l.ref)).toEqual([`llm:remake:${id}:1:video`, `llm:remake:${id}:2:video`]);
 });
 
 test('fails without a paid call when nothing could be made, and books nothing for a call fal never took', async () => {
@@ -157,7 +161,7 @@ test('does nothing on a repeated run once the remake is no longer queued', async
   await runRemake(pool, id, seams());
   await runRemake(pool, id, seams());
   expect(calls.filter((c) => c.startsWith('edit'))).toHaveLength(1);
-  expect(await ledger(id)).toHaveLength(2);
+  expect(await ledger(id)).toHaveLength(1);
 });
 
 test('closes remakes a stopped worker left open: partial when a shot made a clip, failed otherwise; recent ones stay', async () => {

@@ -1,23 +1,23 @@
 // Smart Remake (Feature B): puts a member's product image into chosen shots of one of their analysed reference videos
-// (@cvs/core/analysis/remake). Per shot, the frame at the shot's start is edited with the product (Nano Banana edit), then
-// animated (Seedance); each paid call is booked to the ledger as it returns, and the clips are joined into one silent MP4.
-// Gated by REA_REMAKE_ENABLED at the worker subscription and inert when off. The two fal calls and the object store are
-// injected, so the path is unit-tested with no network, S3 or paid call; ffmpeg runs for real on tiny clips.
+// (@cvs/core/analysis/remake). Per shot, the shot's own clip is edited with the product (Wan 2.7 video edit), keeping its motion,
+// framing and length; each paid call is booked to the ledger as it returns, and the clips are joined into one silent MP4, with a
+// before/after video beside it. Gated by REA_REMAKE_ENABLED at the worker subscription and inert when off. The fal call and the
+// object store are injected, so the path is unit-tested with no network, S3 or paid call; ffmpeg runs for real on tiny clips.
 import { randomUUID } from 'node:crypto';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Analysis, AnalysisShot } from '@cvs/core/analysis/breakdown';
-import { REMAKE_EDIT_ENDPOINT, REMAKE_EDIT_USD, REMAKE_MAX_SHOTS, REMAKE_SHOT_SECONDS, REMAKE_VIDEO_ENDPOINT, REMAKE_VIDEO_USD_PER_SECOND } from '@cvs/core/analysis/remake';
+import { REMAKE_ENDPOINT, REMAKE_MAX_SECONDS, REMAKE_MAX_SHOTS, REMAKE_USD_PER_SECOND, remakeShotSeconds } from '@cvs/core/analysis/remake';
 import { bookLlm } from '@cvs/core/ledger';
-import type { ImageModelConfig, ModelConfig } from '@cvs/core/models';
+import type { ModelConfig } from '@cvs/core/models';
 import type { ProviderStatus } from '@cvs/core/providers';
-import { createFalImageProvider, createFalProvider } from '@cvs/core/providers/fal';
+import { createFalProvider } from '@cvs/core/providers/fal';
 import { REMAKE_QUEUE_OPTIONS } from '@cvs/core/queue';
 import { insertAssets } from '@cvs/db/assets';
 import { createDb } from '@cvs/db/client';
 import { falActive } from './fal-next';
-import { concatClips, extractFrameAt, probeSize, sniffImage } from './media';
+import { concatClips, cutShot, probeSize, sideBySide, trimClip } from './media';
 import { fitForInline } from './real-providers';
 import { getObject, putObject } from './storage';
 import type { WorkerDeps } from './worker';
@@ -39,27 +39,24 @@ export class PaidCallError extends Error {
 export interface RemakeSeams {
   read?: (key: string) => Promise<Uint8Array>;
   write?: Write;
-  /** The shot's frame (first image) with the product (second image) put into it, and the call's cost. Throws PaidCallError when fal billed a failure. */
-  edit?: (frame: Image, product: Image, prompt: string) => Promise<{ image: Image; costUsd: number }>;
-  /** An MP4 of `seconds` animated from the image, and the call's cost. Throws PaidCallError when fal billed a failure. */
-  animate?: (image: Image, prompt: string, seconds: number) => Promise<{ video: Uint8Array; costUsd: number }>;
+  /** The shot's clip (an MP4 of `seconds`) with the product put into it, and the call's cost. Throws PaidCallError when fal billed a failure. */
+  edit?: (clip: Uint8Array, product: Image, prompt: string, seconds: number) => Promise<{ video: Uint8Array; costUsd: number }>;
 }
 
 /** The feature switch for this worker. Default OFF: the queue is not subscribed and no remake is swept when unset. */
 export const reaRemakeEnabled = (env: NodeJS.ProcessEnv = process.env): boolean => env.REA_REMAKE_ENABLED === '1';
 
-const EDIT_PROMPT =
-  'Replace the product in the first image with the product shown in the second image. Keep everything else in the first image exactly the same: the person, face, pose, hair, hands, background, lighting and camera framing. Reproduce the product faithfully, with its shape, colours, print and text.';
-/** The shot's own English prompt from the analysis, told to keep the product the edit put in. */
-const animatePrompt = (shot: AnalysisShot): string => `${shot.prompt} Keep the product exactly as it appears in the image.`;
-/** A frame (at 24 fps) past the shot's cut, so the previous shot's last frame is never the one taken. */
-const FRAME_OFFSET_S = 0.04;
+/**
+ * The edit's instruction, with the shot's own English description from the analysis for context. It takes nothing but the product from the photo: in the
+ * 2026-11-13 A/B Wan also put the photo's model's necklace on the woman in the clip.
+ */
+const editPrompt = (shot: AnalysisShot): string =>
+  `Replace the product shown in this video with the product in the reference image, reproducing its shape, colours, print and text faithfully. Take only the product from the reference image, not its model, jewellery, accessories or background. Keep everything else exactly as in the video: the people, faces, hair, hands, poses and every movement, the background, lighting and camera framing. The shot, for context: ${shot.prompt}`;
 
-// The two models, priced as @cvs/core/analysis/remake estimates. Neither is a model_configs row, so neither shows in Create.
-const EDIT_MODEL: ImageModelConfig = { id: 'smart-remake-edit', provider: 'fal', endpoint: REMAKE_EDIT_ENDPOINT, label: 'Nano Banana', ratios: ['auto'], maxImages: 2, imagePrices: { '1K': String(REMAKE_EDIT_USD) }, features: [] };
-const VIDEO_MODEL: ModelConfig = {
-  id: 'smart-remake-video', provider: 'fal', endpoint: REMAKE_VIDEO_ENDPOINT, label: 'Seedance 1.0 Pro Fast', ratios: [], durationsSec: [REMAKE_SHOT_SECONDS],
-  maxImages: 1, outputResolution: '720p', usdPerSecond: REMAKE_VIDEO_USD_PER_SECOND, billedAmountField: null, sources: {},
+// The model, priced as @cvs/core/analysis/remake estimates. It is not a model_configs row, so it does not show in Create.
+const EDIT_MODEL: ModelConfig = {
+  id: 'smart-remake-edit', provider: 'fal', endpoint: REMAKE_ENDPOINT, label: 'Wan 2.7 Edit', ratios: [], durationsSec: [],
+  maxImages: 1, outputResolution: '720p', usdPerSecond: REMAKE_USD_PER_SECOND, billedAmountField: null, sources: {},
 };
 
 /**
@@ -70,13 +67,6 @@ const falKey = async (pool: Pool): Promise<string> => {
   const key = (await falActive(pool)) === 'team' && process.env.FAL_KEY_NEXT ? process.env.FAL_KEY_NEXT : process.env.FAL_KEY;
   if (!key) throw new Error('FAL_KEY is not set');
   return key;
-};
-
-/** The inputs go as `mem:<n>` and are inlined from memory, shrunk as a job's inputs are. */
-const memReader = (images: Image[]) => async (url: string) => {
-  const img = images[Number(url.slice('mem:'.length))];
-  if (!img) throw new Error(`no input ${url}`);
-  return fitForInline(img.bytes, img.contentType);
 };
 
 /** fal's queue answers within a few minutes; past this a call is given up and booked at its estimate, as fal may still run it. */
@@ -110,23 +100,14 @@ export async function settleFal(
   }
 }
 
+/** Both inputs go to fal storage from memory (fal.ts uploads them): the product shrunk as a job's inputs are, the clip as cut. */
 const realEdit =
   (pool: Pool): NonNullable<RemakeSeams['edit']> =>
-  async (frame, product, prompt) => {
-    const fal = createFalImageProvider({ apiKey: await falKey(pool), readImage: memReader([frame, product]) });
-    const { providerJobId } = await fal.submit({ model: EDIT_MODEL, prompt, imageUrls: ['mem:0', 'mem:1'], ratio: 'auto', resolution: '1K' });
-    const out = await settleFal(() => fal.status({ providerJobId, model: EDIT_MODEL, resolution: '1K' }), REMAKE_EDIT_USD);
-    const type = sniffImage(out.bytes);
-    if (!type) throw new PaidCallError('the edited frame is not a PNG, JPEG or WebP image', out.costUsd);
-    return { image: { bytes: out.bytes, contentType: type.mime }, costUsd: out.costUsd };
-  };
-
-const realAnimate =
-  (pool: Pool): NonNullable<RemakeSeams['animate']> =>
-  async (image, prompt, seconds) => {
-    const fal = createFalProvider({ apiKey: await falKey(pool), readImage: memReader([image]) });
-    const { providerJobId } = await fal.submit({ model: VIDEO_MODEL, prompt, imageUrls: ['mem:0'], ratio: 'auto', durationSec: seconds });
-    const out = await settleFal(() => fal.status({ providerJobId, model: VIDEO_MODEL }), REMAKE_VIDEO_USD_PER_SECOND * seconds);
+  async (clip, product, prompt, seconds) => {
+    const readImage = async (url: string) => (url === 'mem:clip' ? { bytes: clip, contentType: 'video/mp4' } : fitForInline(product.bytes, product.contentType));
+    const fal = createFalProvider({ apiKey: await falKey(pool), readImage });
+    const { providerJobId } = await fal.submit({ model: EDIT_MODEL, prompt, imageUrls: ['mem:product', 'mem:clip'], ratio: 'auto', durationSec: seconds });
+    const out = await settleFal(() => fal.status({ providerJobId, model: EDIT_MODEL }), REMAKE_USD_PER_SECOND * seconds);
     return { video: out.bytes, costUsd: out.costUsd };
   };
 
@@ -159,23 +140,22 @@ export async function runRemake(pool: Pool, remakeId: string, seams: RemakeSeams
   const read = seams.read ?? getObject;
   const write = seams.write ?? putObject;
   const edit = seams.edit ?? realEdit(pool);
-  const animate = seams.animate ?? realAnimate(pool);
 
   const claimed = (await pool.query(`update remakes set status = 'running', started_at = now() where id = $1 and status = 'queued'`, [remakeId])).rowCount;
   if (!claimed) return; // another worker claimed it, or it already ran
 
   const shots: ShotResult[] = [];
   const spent = () => usd(shots.reduce((sum, s) => sum + s.costUsd, 0));
-  const finish = (status: 'succeeded' | 'partial' | 'failed', outputAssetId: string | null, error: string | null) =>
+  const finish = (status: 'succeeded' | 'partial' | 'failed', outputAssetId: string | null, error: string | null, compareAssetId?: string) =>
     pool.query(
       `update remakes set status = $2, result = $3, output_asset_id = $4, cost_usd = $5, error = $6, finished_at = now() where id = $1 and status = 'running'`,
-      [remakeId, status, JSON.stringify({ shots }), outputAssetId, spent(), error],
+      [remakeId, status, JSON.stringify({ shots, compareAssetId }), outputAssetId, spent(), error],
     );
-  // Books one paid call as soon as it returns or fails, so a stopped worker leaves at most the call in flight unbooked.
-  const paid = async <T extends { costUsd: number }>(entry: ShotResult, step: 'edit' | 'video', model: string, call: () => Promise<T>): Promise<T> => {
+  // Books the shot's paid call as soon as it returns or fails, so a stopped worker leaves at most the call in flight unbooked.
+  const paid = async <T extends { costUsd: number }>(entry: ShotResult, call: () => Promise<T>): Promise<T> => {
     const book = async (costUsd: number) => {
-      const ref = `${entry.index}:${step}`;
-      await bookLlm(pool, { remake: remakeId, step: ref }, { costUsd, provider: 'fal', model }).catch((e) => {
+      const ref = `${entry.index}:video`;
+      await bookLlm(pool, { remake: remakeId, step: ref }, { costUsd, provider: 'fal', model: REMAKE_ENDPOINT }).catch((e) => {
         console.error(`worker: remake ${remakeId}: could not book ${costUsd} USD for ${ref}; the monthly fal invoice (invoice_diff) will carry it:`, e);
         throw e;
       });
@@ -211,23 +191,30 @@ export async function runRemake(pool: Pool, remakeId: string, seams: RemakeSeams
     await writeFile(video, await read(r.source_key));
     const product = { bytes: await read(r.product_key), contentType: r.product_mime as string };
     const analysisShots = (r.result as Analysis | null)?.shots ?? [];
-    const clips: string[] = [];
+    // Each made shot's clip, and the source's same seconds for the before/after.
+    const made: { clip: string; before: string }[] = [];
 
     for (const index of chosen) {
       const entry: ShotResult = { index, status: 'failed', costUsd: 0 };
       try {
         const shot = analysisShots.find((s) => s.index === index);
         if (!shot) throw new Error(`shot ${index} is not in the analysis`);
-        const frameFile = join(dir, `frame-${index}.jpg`);
-        await extractFrameAt(video, Math.min(shot.start + FRAME_OFFSET_S, shot.end), frameFile);
-        const frame = { bytes: new Uint8Array(await readFile(frameFile)), contentType: 'image/jpeg' };
-        const edited = await paid(entry, 'edit', REMAKE_EDIT_ENDPOINT, () => edit(frame, product, EDIT_PROMPT));
-        const clip = await paid(entry, 'video', REMAKE_VIDEO_ENDPOINT, () => animate(edited.image, animatePrompt(shot), REMAKE_SHOT_SECONDS));
-        const clipFile = join(dir, `clip-${index}.mp4`);
-        await writeFile(clipFile, clip.video);
-        entry.clipAssetId = await storeVideo(pool, write, r.user_id, clipFile, `remake-${remakeId.slice(0, 8)}-shot-${index}.mp4`);
+        // Sent as whole seconds (2 to 10, padded with its last frame), then cut back to the shot's own length, at most 10 s.
+        const seconds = remakeShotSeconds(shot);
+        const keep = Math.min(shot.end - shot.start, REMAKE_MAX_SECONDS);
+        const sent = join(dir, `shot-${index}.mp4`);
+        await cutShot(video, shot.start, keep, seconds, sent);
+        const clipBytes = new Uint8Array(await readFile(sent));
+        const edited = await paid(entry, () => edit(clipBytes, product, editPrompt(shot), seconds));
+        const raw = join(dir, `edited-${index}.mp4`);
+        await writeFile(raw, edited.video);
+        const clip = join(dir, `clip-${index}.mp4`);
+        await trimClip(raw, keep, clip);
+        entry.clipAssetId = await storeVideo(pool, write, r.user_id, clip, `remake-${remakeId.slice(0, 8)}-shot-${index}.mp4`);
         entry.status = 'succeeded';
-        clips.push(clipFile);
+        const before = join(dir, `before-${index}.mp4`);
+        await trimClip(sent, keep, before);
+        made.push({ clip, before });
       } catch (e) {
         // One shot's failure never stops the others; what it spent is already booked.
         entry.error = message(e);
@@ -238,18 +225,28 @@ export async function runRemake(pool: Pool, remakeId: string, seams: RemakeSeams
     }
 
     let outputAssetId: string | null = null;
+    let compareAssetId: string | undefined;
     let error = shots.find((s) => s.error)?.error ?? null;
-    if (clips.length > 0) {
+    if (made.length > 0) {
       try {
         const joined = join(dir, 'remake.mp4');
-        await concatClips(clips, joined);
+        await concatClips(made.map((m) => m.clip), joined);
         outputAssetId = await storeVideo(pool, write, r.user_id, joined, `remake-${remakeId.slice(0, 8)}.mp4`);
+        // The before/after costs nothing more, so a failure here leaves the remake as it is.
+        try {
+          const before = join(dir, 'before.mp4');
+          const compare = join(dir, 'compare.mp4');
+          await concatClips(made.map((m) => m.before), before);
+          await sideBySide(before, joined, compare);
+          compareAssetId = await storeVideo(pool, write, r.user_id, compare, `remake-${remakeId.slice(0, 8)}-before-after.mp4`);
+        } catch (e) {
+          console.error(`worker: remake ${remakeId}: no before/after video:`, e);
+        }
       } catch (e) {
         error = `the clips could not be joined: ${message(e)}`;
       }
     }
-    const made = clips.length;
-    await finish(made === 0 ? 'failed' : made === chosen.length && outputAssetId ? 'succeeded' : 'partial', outputAssetId, error);
+    await finish(made.length === 0 ? 'failed' : made.length === chosen.length && outputAssetId ? 'succeeded' : 'partial', outputAssetId, error, compareAssetId);
   } catch (e) {
     await finish(shots.some((s) => s.status === 'succeeded') ? 'partial' : 'failed', null, message(e));
   } finally {
