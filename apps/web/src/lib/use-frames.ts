@@ -1,5 +1,5 @@
 'use client';
-// A still of a video at each scene, cut in the browser. This is a copy of AnalyzeView's own `useFrames` (which that file keeps private), for RemakePanel's scene picker.
+// A still of a video at each scene, cut in the browser, for the analysis result (AnalyzeView) and RemakePanel's scene picker.
 import type { Analysis } from '@cvs/core/analysis/breakdown';
 import { type RefObject, useEffect, useState } from 'react';
 import { frameTime } from './analyze';
