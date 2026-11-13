@@ -31,3 +31,10 @@ test('the note says how many scenes were ticked, that none matched, or that the 
   expect(pickNote(0)).toContain('chưa thấy cảnh nào');
   expect(pickNote(null)).toContain('tự chọn');
 });
+
+test('opened with an analysis id it still shows the form, with no remake list until the member has some', () => {
+  const html = renderToStaticMarkup(<SmartRemakeApp app={appBySlug('smart-remake')!} initialId="an-1" />);
+  expect(html).toContain('Ảnh sản phẩm');
+  expect(html).not.toContain('Tạo video với sản phẩm'); // the panel needs the analysis fetched and a product added again
+  expect(html).not.toContain('Video của bạn');
+});

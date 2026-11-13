@@ -2584,6 +2584,7 @@ dialog.modal.compare-modal { width: min(760px, calc(100vw - 32px)); max-width: n
 .remake-pick legend { margin-bottom: 4px; padding: 0; font-weight: 600; }
 .remake-pick label { display: flex; gap: 8px; align-items: center; min-height: 32px; margin: 0; font-weight: 400; cursor: pointer; }
 .remake-pick input[type='checkbox'] { width: 16px; min-width: 0; height: 16px; margin: 0; padding: 0; } /* the generic label-input min width must not push the box away from its text */
+.remake-pick .analysis-frame { flex: none; object-fit: cover; width: 40px; height: 60px; border-radius: 6px; } /* the 64 px still of the analysis result, smaller in a pick row */
 .remake-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 12px; }
 .remake-item { border: 1px solid var(--border); border-radius: 12px; padding: 12px; display: grid; gap: 8px; justify-items: start; }
 .remake-item p { margin: 0; }
