@@ -340,7 +340,9 @@ export function AnalyzeView({ initialId, remakeEnabled = false }: { initialId?: 
     if (initialId)
       api<AnalysisRow>(`/api/analyses/${initialId}`).then(
         (row) => {
-          show(row);
+          // No setTab: the default tab already shows it, and a tab the member picked while this loaded stays picked.
+          setCurrent(row);
+          syncUrl(row.id);
           if (!terminal(row.status)) pollOne(row.id);
         },
         () => {

@@ -35,6 +35,7 @@ test('adjacent shots with the same role and prompt read as one scene, renumbered
     [3, 4, 8, 'Pan.'], // not adjacent to the first, so its own scene
   ]);
   expect(m.vi).toEqual(['Lia.', 'Xoay.', 'Lia lại.']);
+  expect(m.first).toEqual([1, 3, 4]);
   expect(a.shots[0]!.end).toBe(1.2); // the stored analysis is left as it was
   expect(mergeShots({ ...a, vi: undefined }).vi).toBeUndefined();
 });

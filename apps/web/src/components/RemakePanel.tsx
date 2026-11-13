@@ -4,6 +4,7 @@
 // one silent video. Rendered only when REA_REMAKE_ENABLED is on (AnalyzeView's remakeEnabled); the API 404s otherwise.
 import { REMAKE_MAX_SHOTS, REMAKE_SHOT_USD } from '@cvs/core/analysis/remake';
 import { useEffect, useState } from 'react';
+import { mergeShots, timeRange } from '@/lib/analyze';
 import { api, errorText, sendJson } from '@/lib/api';
 import { confirmRun } from '@/lib/run-guard';
 import type { AnalysisRow } from './AnalyzeView';
@@ -25,8 +26,8 @@ const isOpen = (r: RemakeRow) => r.status === 'queued' || r.status === 'running'
 /** What `shots` shots are estimated to cost, as the API counts it against the spending caps. */
 export const remakeEstimate = (shots: number): string => (shots * REMAKE_SHOT_USD).toFixed(2);
 
-/** One remake: its state, the joined video, then each shot's clip or that it failed. Pure, so it render-tests without the page. */
-export function RemakeResult({ row }: { row: RemakeRow }) {
+/** One remake: its state, the joined video, then each shot's clip or that it failed. Pure, so it render-tests without the page. `scene` numbers a stored shot as the result list does. */
+export function RemakeResult({ row, scene = (index) => index }: { row: RemakeRow; scene?: (index: number) => number }) {
   const shots = row.result?.shots ?? [];
   return (
     <li className="remake-item">
@@ -48,10 +49,10 @@ export function RemakeResult({ row }: { row: RemakeRow }) {
             <li key={s.index}>
               {s.clipAssetId ? (
                 <a href={`/api/assets/${s.clipAssetId}/content`} target="_blank" rel="noreferrer">
-                  Clip cảnh {s.index}
+                  Clip cảnh {scene(s.index)}
                 </a>
               ) : (
-                <span className="error">Cảnh {s.index} không tạo được</span>
+                <span className="error">Cảnh {scene(s.index)} không tạo được</span>
               )}
             </li>
           ))}
@@ -64,7 +65,9 @@ export function RemakeResult({ row }: { row: RemakeRow }) {
 
 /** The Smart Remake form and this analysis' remakes, newest first. Mount it with `key` set to the analysis id, so a pick starts over. */
 export function RemakePanel({ row }: { row: AnalysisRow }) {
-  const shots = row.result?.shots ?? [];
+  // The scenes as the result list numbers them; a scene is sent as its first stored shot, which the API and the worker take.
+  const scenes = row.result ? mergeShots(row.result) : { shots: [], first: [] };
+  const scene = (index: number) => scenes.first.filter((f) => f <= index).length;
   const [product, setProduct] = useState<Img[]>([]);
   const [chosen, setChosen] = useState<number[]>([]);
   const [busy, setBusy] = useState(false);
@@ -134,15 +137,14 @@ export function RemakePanel({ row }: { row: AnalysisRow }) {
       <Slot label="Ảnh sản phẩm" empty="Thêm 1 ảnh sản phẩm" inputLabel="Ảnh sản phẩm" images={product} max={1} busy={busy} onAdd={(files) => void upload(files)} onRemove={() => setProduct([])} onPick={(a) => setProduct([a])} slot="product" />
       <fieldset className="remake-pick">
         <legend>Cảnh cần thay sản phẩm (tối đa {REMAKE_MAX_SHOTS})</legend>
-        {shots.map((s) => {
-          const on = chosen.includes(s.index);
+        {scenes.shots.map((s, i) => {
+          const index = scenes.first[i]!;
+          const on = chosen.includes(index);
           return (
-            <label key={s.index}>
-              <input type="checkbox" checked={on} disabled={busy || (!on && chosen.length >= REMAKE_MAX_SHOTS)} onChange={() => toggle(s.index)} />
+            <label key={index}>
+              <input type="checkbox" checked={on} disabled={busy || (!on && chosen.length >= REMAKE_MAX_SHOTS)} onChange={() => toggle(index)} />
               Cảnh {s.index}
-              <span className="muted">
-                {s.start.toFixed(1)}–{s.end.toFixed(1)}s
-              </span>
+              <span className="muted">{timeRange(s.start, s.end)}</span>
             </label>
           );
         })}
@@ -159,7 +161,7 @@ export function RemakePanel({ row }: { row: AnalysisRow }) {
       {remakes.length > 0 && (
         <ul className="remake-list">
           {remakes.map((r) => (
-            <RemakeResult key={r.id} row={r} />
+            <RemakeResult key={r.id} row={r} scene={scene} />
           ))}
         </ul>
       )}
