@@ -17,7 +17,7 @@ import { REMAKE_QUEUE_OPTIONS } from '@cvs/core/queue';
 import { insertAssets } from '@cvs/db/assets';
 import { createDb } from '@cvs/db/client';
 import { falActive } from './fal-next';
-import { concatClips, cutShot, probeSize, sideBySide, trimClip } from './media';
+import { concatClips, cutShot, probeSize, probeVideoSeconds, sideBySide, trimClip } from './media';
 import { fitForInline } from './real-providers';
 import { getObject, putObject } from './storage';
 import type { WorkerDeps } from './worker';
@@ -51,7 +51,7 @@ export const reaRemakeEnabled = (env: NodeJS.ProcessEnv = process.env): boolean 
  * 2026-11-13 A/B Wan also put the photo's model's necklace on the woman in the clip.
  */
 const editPrompt = (shot: AnalysisShot): string =>
-  `Replace the product shown in this video with the product in the reference image, reproducing its shape, colours, print and text faithfully. Take only the product from the reference image, not its model, jewellery, accessories or background. Keep everything else exactly as in the video: the people, faces, hair, hands, poses and every movement, the background, lighting and camera framing. The shot, for context: ${shot.prompt}`;
+  `Replace the product shown in this video with the product in the reference image, reproducing its shape, colours, print and text faithfully. Take only the product from the reference image, not its model, jewellery, accessories or background. Keep everything else exactly as in the video: the people, faces, hair, hands, poses and every movement, the background, lighting and camera framing. The shot, for context: ${shot.prompt.slice(0, 1000)}`;
 
 // The model, priced as @cvs/core/analysis/remake estimates. It is not a model_configs row, so it does not show in Create.
 const EDIT_MODEL: ModelConfig = {
@@ -191,8 +191,8 @@ export async function runRemake(pool: Pool, remakeId: string, seams: RemakeSeams
     await writeFile(video, await read(r.source_key));
     const product = { bytes: await read(r.product_key), contentType: r.product_mime as string };
     const analysis = r.result as Analysis | null;
-    // Each made shot's clip, and the source's same seconds for the before/after.
-    const made: { clip: string; before: string }[] = [];
+    // Each made shot's clip, and the cut it was made from, for the before/after.
+    const made: { clip: string; sent: string }[] = [];
 
     for (const index of chosen) {
       const entry: ShotResult = { index, status: 'failed', costUsd: 0 };
@@ -205,6 +205,8 @@ export async function runRemake(pool: Pool, remakeId: string, seams: RemakeSeams
         const keep = Math.min(shot.end - shot.start, REMAKE_MAX_SECONDS);
         const sent = join(dir, `shot-${index}.mp4`);
         await cutShot(video, shot.start, keep, seconds, sent);
+        // A shot past the source's end cuts to nothing; nothing is paid for it.
+        if ((await probeVideoSeconds(sent)) < seconds - 0.1) throw new Error(`shot ${index} is not in the video`);
         const clipBytes = new Uint8Array(await readFile(sent));
         const edited = await paid(entry, () => edit(clipBytes, product, editPrompt(shot), seconds));
         const raw = join(dir, `edited-${index}.mp4`);
@@ -213,9 +215,7 @@ export async function runRemake(pool: Pool, remakeId: string, seams: RemakeSeams
         await trimClip(raw, keep, clip);
         entry.clipAssetId = await storeVideo(pool, write, r.user_id, clip, `remake-${remakeId.slice(0, 8)}-shot-${index}.mp4`);
         entry.status = 'succeeded';
-        const before = join(dir, `before-${index}.mp4`);
-        await trimClip(sent, keep, before);
-        made.push({ clip, before });
+        made.push({ clip, sent });
       } catch (e) {
         // One shot's failure never stops the others; what it spent is already booked.
         entry.error = message(e);
@@ -235,9 +235,15 @@ export async function runRemake(pool: Pool, remakeId: string, seams: RemakeSeams
         outputAssetId = await storeVideo(pool, write, r.user_id, joined, `remake-${remakeId.slice(0, 8)}.mp4`);
         // The before/after costs nothing more, so a failure here leaves the remake as it is.
         try {
+          // Each source cut is trimmed to its remade clip's own length, so the two sides stay in step shot after shot.
+          const befores: string[] = [];
+          for (const [i, m] of made.entries()) {
+            befores.push(join(dir, `before-${i}.mp4`));
+            await trimClip(m.sent, await probeVideoSeconds(m.clip), befores[i]!);
+          }
           const before = join(dir, 'before.mp4');
           const compare = join(dir, 'compare.mp4');
-          await concatClips(made.map((m) => m.before), before);
+          await concatClips(befores, before);
           await sideBySide(before, joined, compare);
           compareAssetId = await storeVideo(pool, write, r.user_id, compare, `remake-${remakeId.slice(0, 8)}-before-after.mp4`);
         } catch (e) {

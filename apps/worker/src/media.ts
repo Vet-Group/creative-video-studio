@@ -56,11 +56,12 @@ export async function extractPoster(video: string, jpeg: string): Promise<void> 
 const H264 = ['-c:v', 'libx264', '-preset', 'veryfast', '-crf', '18', '-pix_fmt', 'yuv420p', '-movflags', '+faststart'];
 
 /**
- * A Smart Remake shot as the edit is sent it: `keep` seconds of the video from `start`, silent, at most 1280 px tall, then held on its last frame up
- * to `seconds` (the edit takes at least 2 s).
+ * A Smart Remake shot as the edit is sent it: `keep` seconds of the video from `start`, silent, fitted inside 1280x1280 (the edit makes 720p), then
+ * held on its last frame up to `seconds` (the edit takes at least 2 s). The hold is as long as `seconds` and the output is cut to `seconds`, so a
+ * shot the source ends early in still comes out whole; one with no frame at all comes out empty, which the caller checks before paying.
  */
 export async function cutShot(video: string, start: number, keep: number, seconds: number, out: string): Promise<void> {
-  const vf = `scale=-2:'trunc(min(1280,ih)/2)*2',tpad=stop_mode=clone:stop_duration=${Math.max(0, seconds - keep).toFixed(3)}`;
+  const vf = `scale='min(1280,iw)':'min(1280,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2,tpad=stop_mode=clone:stop_duration=${seconds}`;
   await run(requireFfmpeg(), ['-y', '-v', 'error', '-ss', start.toFixed(3), '-t', keep.toFixed(3), '-i', video, '-an', '-vf', vf, '-t', String(seconds), ...H264, out]);
 }
 

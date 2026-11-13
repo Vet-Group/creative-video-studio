@@ -64,7 +64,7 @@ beforeAll(async () => {
     return new Uint8Array(await readFile(file));
   };
   sourceVideo = await make(join(dir, 'source.mp4'), 2, 'blue');
-  clipVideo = await make(join(dir, 'clip.mp4'), 1, 'green');
+  clipVideo = await make(join(dir, 'clip.mp4'), 2, 'green'); // what the edit answers for a 1 s shot sent as 2 s
   await pool.query(`insert into users (id, email, name) values ('u1', 'u1@example.test', 'u1')`);
   await pool.query(`insert into analyses (id, user_id, team_id, source_key, status, result) values ('an1', 'u1', 'team-unassigned', 'sources/ref.mp4', 'succeeded', $1)`, [JSON.stringify(analysis)]);
   await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) values ('prod', 'u1', 'input', 's3/prod', 'shirt.png', 'image/png', 4), ('gone', 'u1', 'input', 's3/gone', 'old.png', 'image/png', 4)`);
@@ -169,6 +169,18 @@ test('a shot that starts a merged scene is remade over the whole scene, and its 
   const clip = join(dir, 'merged-clip.mp4');
   await writeFile(clip, stored[`assets/${r.result.shots[0].clipAssetId}`]!);
   expect(Math.abs((await probeSeconds(clip)) - 1.7)).toBeLessThanOrEqual(0.1); // the scene, not shot 1's 0.6 s
+});
+
+test('a shot past the end of the source fails before any paid call', async () => {
+  await pool.query(`insert into analyses (id, user_id, team_id, source_key, status, result) values ('an-late', 'u1', 'team-unassigned', 'sources/ref.mp4', 'succeeded', $1)`, [
+    JSON.stringify({ ...analysis, shots: [{ index: 1, start: 10, end: 11, role: 'hook', prompt: 'Late.' }] }),
+  ]);
+  await pool.query(`insert into remakes (id, user_id, team_id, analysis_id, product_asset_id, shots) values ('rm-late', 'u1', 'team-unassigned', 'an-late', 'prod', '[1]')`);
+  calls = [];
+  await runRemake(pool, 'rm-late', seams());
+  expect(await row('rm-late')).toMatchObject({ status: 'failed', output_asset_id: null, error: 'shot 1 is not in the video', cost_usd: '0.000000' });
+  expect(calls).toEqual([]);
+  expect(await ledger('rm-late')).toEqual([]);
 });
 
 test('does nothing on a repeated run once the remake is no longer queued', async () => {
