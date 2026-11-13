@@ -93,8 +93,11 @@ test('initial props pre-tick scenes and fill the product, show the price for the
   const html = panel('a-initial');
   expect(html).toContain('dress.png');
   expect(html.match(/checked=""/g)).toHaveLength(1);
-  expect(html).toContain('<span class="run-cost"> · $0.70</span>'); // scene 2: 6.8 s billed as 7 s
+  expect(html).toContain(`<span class="run-cost"> · $${remakeEstimate([{ start: 5.2, end: 12 }])}</span>`); // scene 2 only, priced as the API prices it
   expect(html).toContain('AI đã chọn sẵn 1 cảnh.');
+  const fixed = renderToStaticMarkup(<RemakePanel row={{ id: 'a-fixed', status: 'succeeded', result: analysis, error: null, createdAt: '2026-11-13T00:00:00Z', sourceAssetId: null }} initialProduct={[{ id: 'img-2', filename: 'dress.png' }]} initialChosen={[2]} productFixed />);
+  expect(fixed).not.toContain('dress.png'); // the app's own form holds the product
+  expect(fixed).not.toMatch(/<button type="button" class="primary" disabled="">/); // but it still counts: ready to run
   remakeDrafts.set('a-saved', { product: [], chosen: [] });
   expect(panel('a-saved')).not.toContain('dress.png');
   remakeDrafts.clear();

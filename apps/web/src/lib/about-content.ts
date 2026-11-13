@@ -2484,7 +2484,7 @@ export const APP_ABOUT: Record<string, AboutPage> = {
       {
         title: 'Giá bao nhiêu?',
         blocks: [
-          'Mỗi cảnh tính theo độ dài của cảnh, làm tròn lên số giây nguyên (từ 2 đến 10 giây), với $0.10 mỗi giây. Một video làm lại tối đa 6 cảnh. Tiền tính vào ngân sách video; nút Tạo ghi tổng giá ước tính trước khi bạn bấm.',
+          'Mỗi cảnh tính theo độ dài của cảnh, làm tròn lên số giây nguyên (từ 2 đến 10 giây). Một video làm lại tối đa 6 cảnh. Tiền tính vào ngân sách video; nút Tạo ghi tổng giá ước tính trước khi bạn bấm.',
         ],
       },
       {
