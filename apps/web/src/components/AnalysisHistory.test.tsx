@@ -16,7 +16,7 @@ const result: Analysis = {
 };
 const row = (o: Partial<AnalysisRow> = {}): AnalysisRow => ({ id: 'a1', status: 'succeeded', result, error: null, createdAt: '2026-11-12T10:00:00.000Z', sourceAssetId: 'v1', ...o });
 const render = (p: Partial<Parameters<typeof AnalysisHistory>[0]> = {}) =>
-  renderToStaticMarkup(<AnalysisHistory loading={false} error={false} items={[]} onRetry={() => undefined} onPick={() => undefined} {...p} />);
+  renderToStaticMarkup(<AnalysisHistory loading={false} error={false} items={[]} onRetry={() => undefined} onPick={() => undefined} onDelete={() => undefined} {...p} />);
 
 test('while the first load is in flight it says it is loading', () => {
   expect(render({ loading: true })).toContain('Đang tải…');
@@ -45,7 +45,7 @@ test('a succeeded row is a card button with its format, length, shots and hook; 
   expect(html).toContain('11.4 giây · 1 cảnh');
   expect(html).toContain('Clean apparel presentation.');
   expect(html).toContain('/api/assets/v1/content#t=0.1'); // the source video's first frame is the poster
-  expect(html.match(/<button/g)).toHaveLength(2);
+  expect(html.match(/<button type="button" class="analysis-card"/g)).toHaveLength(2); // a card per row, each a button to open it
   expect(html.match(/aria-current="true"/g)).toHaveLength(1);
 });
 
@@ -55,6 +55,13 @@ test('a failed or running row is not a button and says why it cannot be opened',
   expect(html).toContain('không có gì để mở');
   expect(html).toContain('Đang phân tích…');
   expect(html).toContain('Chưa mở được');
-  expect(html).not.toContain('<button');
+  expect(html).not.toContain('<button type="button" class="analysis-card"'); // no card is a button
   expect(html.match(/<video/g)).toHaveLength(1); // the running row's source asset is gone: a placeholder icon, not a player
+});
+
+test('a finished row, succeeded or failed, has a delete button, and a queued or running one does not', () => {
+  const html = render({
+    items: [row(), row({ id: 'a2', status: 'failed', result: null }), row({ id: 'a3', status: 'queued', result: null }), row({ id: 'a4', status: 'running', result: null })],
+  });
+  expect(html.match(/aria-label="Xoá phân tích"/g)).toHaveLength(2);
 });

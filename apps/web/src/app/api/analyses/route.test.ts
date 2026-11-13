@@ -14,7 +14,7 @@ process.env.REA_ANALYZE_ENABLED = '1';
 const { auth, pool } = await import('@/lib/auth');
 const { stopBoss } = await import('@/lib/queue');
 const { GET: LIST, POST } = await import('./route');
-const { GET: ONE } = await import('./[id]/route');
+const { GET: ONE, DELETE: REMOVE } = await import('./[id]/route');
 
 const PASSWORD = 'correct-horse-battery';
 let cookie = '';
@@ -96,4 +96,47 @@ test('lists the caller’s analyses newest first', async () => {
   const list = (await (await LIST(call('/api/analyses'))).json()) as { analyses: { id: string; status: string }[] };
   expect(list.analyses.length).toBeGreaterThanOrEqual(2);
   expect(list.analyses.every((a) => a.status === 'queued')).toBe(true);
+});
+
+const remove = (id: string) => REMOVE(call(`/api/analyses/${id}`, 'DELETE'), { params: Promise.resolve({ id }) });
+const addAnalysis = (id: string, status: string, user = 'member@example.test') =>
+  pool.query(`insert into analyses (id, user_id, team_id, store_id, source_key, status) select $1, u.id, u.team_id, null, 's3/x', $2 from users u where u.email = $3`, [id, status, user]);
+
+test('deletes one of the caller’s finished analyses and nothing else', async () => {
+  await addAnalysis('del-ok', 'succeeded');
+  await addAnalysis('del-failed', 'failed');
+  expect((await remove('del-ok')).status).toBe(204);
+  expect((await remove('del-failed')).status).toBe(204);
+  expect((await pool.query(`select id from analyses where id in ('del-ok', 'del-failed')`)).rowCount).toBe(0);
+  expect((await remove('del-ok')).status).toBe(404); // already gone
+});
+
+test('hides another user’s analysis: 404, and the row stays', async () => {
+  await addAnalysis('del-theirs', 'succeeded', 'other@example.test');
+  expect((await remove('del-theirs')).status).toBe(404);
+  expect((await pool.query(`select id from analyses where id = 'del-theirs'`)).rowCount).toBe(1);
+});
+
+test('refuses a queued or running analysis with 409', async () => {
+  await addAnalysis('del-queued', 'queued');
+  await addAnalysis('del-running', 'running');
+  for (const id of ['del-queued', 'del-running']) {
+    const res = await remove(id);
+    expect(res.status).toBe(409);
+    expect(await errorOf(res)).toContain('đang chạy');
+  }
+  expect((await pool.query(`select id from analyses where id in ('del-queued', 'del-running')`)).rowCount).toBe(2);
+});
+
+test('refuses an analysis a remake was made from with 409, not a database error', async () => {
+  await addAnalysis('del-remade', 'succeeded');
+  await pool.query(`insert into remakes (id, user_id, team_id, analysis_id, shots) select 'rm-del', u.id, u.team_id, 'del-remade', '[1]' from users u where u.email = 'member@example.test'`);
+  const res = await remove('del-remade');
+  expect(res.status).toBe(409);
+  expect(await errorOf(res)).toContain('lượt làm lại');
+  expect((await pool.query(`select id from analyses where id = 'del-remade'`)).rowCount).toBe(1);
+});
+
+test('delete 404s while the feature is off', async () => {
+  await withFlag(undefined, async () => expect((await remove('x')).status).toBe(404));
 });

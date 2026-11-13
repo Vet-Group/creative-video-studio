@@ -1,6 +1,6 @@
 import type { Analysis } from '@cvs/core/analysis/breakdown';
 import { expect, test } from 'vitest';
-import { analysisFormat, clock, mergeShots, roleLabel, scriptPrompt, timeRange } from './analyze';
+import { analysisFormat, clock, frameTime, mergeShots, roleLabel, scriptPrompt, scriptText, timeRange } from './analyze';
 
 test('shot roles read in Vietnamese, in any case, and an unknown role stays as the model wrote it', () => {
   expect(roleLabel('hook')).toBe('Mở đầu');
@@ -57,4 +57,26 @@ test('the script stops before the shot that would pass the limit that Create tak
   expect(text.length).toBeLessThanOrEqual(2000);
   expect(text.split('\n')).toHaveLength(2);
   expect(scriptPrompt([shot(1, 'y'.repeat(2500))]).length).toBeGreaterThan(2000); // a single shot is never dropped; Create's own cap applies
+});
+
+test('the copied script has the format and hook, then a block per merged scene with its reading and English prompt', () => {
+  const s = (index: number, start: number, end: number, role: string, prompt: string) => ({ index, start, end, role, prompt });
+  const a: Analysis = {
+    durationS: 8,
+    shotCount: 3,
+    format: 'product showcase',
+    hook: 'Clean look.',
+    summary: 's',
+    shots: [s(1, 0, 1.2, 'hook', 'Pan.'), s(2, 1.2, 4, 'hook', 'Pan.'), s(3, 4, 8, 'proof', 'Spin.')],
+    vi: { format: 'Trưng bày', hook: 'Gọn gàng.', summary: 's', shots: ['Lia.', 'Lia.', 'Xoay.'] },
+  };
+  expect(scriptText(a)).toBe('Định dạng: Trưng bày\nMở đầu: Gọn gàng.\n\nCảnh 1 (0.0–4.0s) · Mở đầu\nLia.\nPrompt: Pan.\n\nCảnh 2 (4.0–8.0s) · Minh chứng\nXoay.\nPrompt: Spin.');
+  // No translation, no hook and a shot without a role or prompt: only what exists is written.
+  expect(scriptText({ ...a, vi: undefined, hook: '', shots: [s(1, 0, 2, '', 'Pan.'), s(2, 2, 3, '', '')] })).toBe('Định dạng: Giới thiệu sản phẩm\n\nCảnh 1 (0.0–2.0s)\nPrompt: Pan.\n\nCảnh 2 (2.0–3.0s)');
+});
+
+test('the thumbnail is taken just inside the scene and never past its middle', () => {
+  expect(frameTime(4, 8)).toBeCloseTo(4.3);
+  expect(frameTime(4, 4.2)).toBeCloseTo(4.1);
+  expect(frameTime(4, 4)).toBe(4);
 });
