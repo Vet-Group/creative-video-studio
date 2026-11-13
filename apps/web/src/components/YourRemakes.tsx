@@ -1,6 +1,6 @@
 'use client';
 // The "your videos" list on the Smart Remake app page: the member's latest remakes of OTHER videos than the one open (the open analysis' RemakePanel lists its own),
-// so a result is found again after a reload or after moving on. Each one links back to its analysis (?analysis=<id>). Followed every 4 s while one is open.
+// so a result is found again after a reload or after moving on. Each one links back to its analysis and product (?analysis=<id>&product=<id>). Followed every 4 s while one is open.
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { api, errorText } from '@/lib/api';
@@ -55,7 +55,7 @@ export function YourRemakes({ slug, exclude, initial = [] }: { slug: string; exc
       <ul className="remake-list">
         {shown.map((r) => (
           <RemakeResult key={r.id} row={r} onDelete={() => void remove(r)}>
-            <Link className="link-button" href={`/apps/${slug}?analysis=${encodeURIComponent(r.analysisId)}`}>
+            <Link className="link-button" href={`/apps/${slug}?analysis=${encodeURIComponent(r.analysisId)}${r.productAssetId ? `&product=${encodeURIComponent(r.productAssetId)}` : ''}`}>
               Mở lại video mẫu này
             </Link>
           </RemakeResult>

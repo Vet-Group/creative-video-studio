@@ -1,4 +1,7 @@
 // The worker's S3 client for the app's own MinIO (the same bucket the web app streams from).
+import { createWriteStream } from 'node:fs';
+import type { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 import { CreateBucketCommand, DeleteObjectCommand, GetObjectCommand, HeadBucketCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 
 /** A setting from the environment, else from the repo's .env (local runs; variables already set win). */
@@ -65,6 +68,13 @@ export async function getObject(key: string): Promise<Uint8Array> {
   const { client, Bucket, Key } = loc(key);
   const res = await client.send(new GetObjectCommand({ Bucket, Key }));
   return res.Body!.transformToByteArray();
+}
+
+/** Streams a stored object into `file`, so a large video never sits in memory. */
+export async function downloadObject(key: string, file: string): Promise<void> {
+  const { client, Bucket, Key } = loc(key);
+  const res = await client.send(new GetObjectCommand({ Bucket, Key }));
+  await pipeline(res.Body as Readable, createWriteStream(file));
 }
 
 export async function deleteObject(key: string): Promise<void> {

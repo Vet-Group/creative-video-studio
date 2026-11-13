@@ -108,12 +108,15 @@ export async function probeVideoSeconds(file: string): Promise<number> {
   return end > 0 ? end - Math.max(0, first) : 0;
 }
 
-/** `n` evenly spaced stills of an MP4 (or one at each of the given times in seconds, kept inside the clip) as small JPEGs (512 px on the long side at most), in time order, and the clip's length in seconds. */
-export async function extractFrames(video: Uint8Array, n: number | number[]): Promise<{ seconds: number; stills: Uint8Array[] }> {
+/**
+ * `n` evenly spaced stills of an MP4 (or one at each of the given times in seconds, kept inside the clip) as small JPEGs (512 px on the long side at most), in
+ * time order, and the clip's length in seconds. `video` is the clip's bytes, or a function that saves it to the given file (a large one then stays on disk).
+ */
+export async function extractFrames(video: Uint8Array | ((file: string) => Promise<void>), n: number | number[]): Promise<{ seconds: number; stills: Uint8Array[] }> {
   const dir = await mkdtemp(join(tmpdir(), 'cvs-frames-'));
   try {
     const file = join(dir, 'clip.mp4');
-    await writeFile(file, video);
+    await (typeof video === 'function' ? video(file) : writeFile(file, video));
     const seconds = await probeSeconds(file);
     if (!(seconds > 0)) throw new Error('the clip has no duration');
     const times = typeof n === 'number' ? frameTimes(seconds, n) : n.map((t) => Math.min(Math.max(t, 0), Math.max(seconds - 0.1, 0)));
