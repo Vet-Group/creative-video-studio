@@ -621,15 +621,15 @@ test("Try On, as Fash's pickers: a stock model then its pose, a garment category
     const poses = page.getByRole('dialog', { name: 'Chọn tư thế' });
     await poses.getByRole('button', { name: 'Quay lại' }).click(); // back to the models, as Fash's arrow
     await models.getByRole('button', { name: 'Người mẫu có sẵn 1' }).click();
-    // The photo goes up as the member's own input; a note says so until it is in, so a slow upload never looks like nothing happened.
+    // The photo is copied on the server as the member's own input; a note says so until it is in, so a slow copy never looks like nothing happened.
     const loadingNote = page.getByRole('region', { name: 'Thông báo' }).getByText('Đang tải ảnh...');
-    await page.route('**/api/assets', async (r) => (r.request().method() === 'POST' ? (await new Promise((done) => setTimeout(done, 1500)), r.continue()) : r.continue()));
+    await page.route('**/api/assets/samples', async (r) => (r.request().method() === 'POST' ? (await new Promise((done) => setTimeout(done, 1500)), r.continue()) : r.continue()));
     await poses.getByRole('button', { name: 'Tư thế 1' }).click();
     await expect(poses).toBeHidden();
     await expect(loadingNote).toBeVisible();
     await expect(chosen('Người mẫu')).toHaveCount(1);
     await expect(loadingNote).toBeHidden();
-    await page.unroute('**/api/assets');
+    await page.unroute('**/api/assets/samples');
 
     await page.getByRole('button', { name: 'Tải lên Trang phục' }).click();
     await page.getByRole('dialog', { name: 'Chọn trang phục' }).getByRole('button', { name: 'Áo' }).click();
