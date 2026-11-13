@@ -493,11 +493,18 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
     }
   }
 
+  // One remake at a time per worker, as the queue's localConcurrency of 1 says: a resumed remake waits for the one running, and a queued one for it.
+  let remakeSlot: Promise<unknown> = Promise.resolve();
+  const oneRemake = (run: () => Promise<void>): Promise<void> => {
+    const next = remakeSlot.then(run);
+    remakeSlot = next.catch(() => undefined);
+    return next;
+  };
   // A remake whose worker stopped is resumed from its saved fal request ids (never submitted again); closing it is the last resort.
   const closeRemakes = async () => {
     if (!reaRemakeEnabled()) return;
-    for (const t of await takeOverRemakes(pool, id, o.heartbeatStaleMs)) void runRemake(pool, t.id, { workerId: id }, t.resume).catch((e) => log(`resume remake ${t.id}`, e));
-    await closeStaleRemakes(pool);
+    for (const t of await takeOverRemakes(pool, id, o.heartbeatStaleMs)) void oneRemake(() => runRemake(pool, t.id, { workerId: id }, t.resume)).catch((e) => log(`resume remake ${t.id}`, e));
+    await closeStaleRemakes(pool, undefined, o.heartbeatStaleMs);
   };
 
   let reconciling: Promise<void> | undefined;
@@ -537,7 +544,7 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
   if (reaRemakeEnabled()) {
     await boss.createQueue(REMAKE_QUEUE, REMAKE_QUEUE_OPTIONS);
     await boss.work<RemakeJobData>(REMAKE_QUEUE, { localConcurrency: 1, pollingIntervalSeconds: o.pollingIntervalSeconds }, async (jobs) => {
-      await Promise.all(jobs.map((job) => runRemake(pool, job.data.remakeId, { workerId: id }).catch((e) => log(`remake ${job.data.remakeId}`, e))));
+      await Promise.all(jobs.map((job) => oneRemake(() => runRemake(pool, job.data.remakeId, { workerId: id })).catch((e) => log(`remake ${job.data.remakeId}`, e))));
     });
   }
   await beat();

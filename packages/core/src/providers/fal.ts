@@ -29,8 +29,23 @@ const falHeaders = (apiKey: string) => ({
   'X-Fal-Object-Lifecycle-Preference': LIFECYCLE,
 });
 
-/** The queue status, then the result, of one request; `cost` is the final cost to report and `pick` finds the output URL in the result. */
-async function pollFal(
+/**
+ * The queue status, then the result, of one request; `cost` is the final cost to report and `pick` finds the output URL in the result. A request fal
+ * dropped because its X-Fal-Request-Start-Timeout passed before any runner started it ends as 504 with X-Fal-Request-Timeout-Type: user (docs read
+ * 2026-11-14: common-parameters and queue; they do not say which of the two calls answers it, so both are checked). It was never processed, so it costs 0.
+ */
+async function pollFal(...p: Parameters<typeof pollRequest>): Promise<ProviderStatus> {
+  try {
+    return await pollRequest(...p);
+  } catch (e) {
+    if (e instanceof ProviderHttpError && e.status === 504 && e.headers?.get('X-Fal-Request-Timeout-Type') === 'user') {
+      return { state: 'failed', error: 'fal dropped the request: no runner started it before the start timeout', costUsd: 0, costSource: 'estimate' };
+    }
+    throw e;
+  }
+}
+
+async function pollRequest(
   f: Fetch,
   headers: Record<string, string>,
   endpoint: string,

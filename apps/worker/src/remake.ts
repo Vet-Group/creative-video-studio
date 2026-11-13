@@ -39,17 +39,24 @@ export class PaidCallError extends Error {
 /** The fal account a request was sent to; its key must also poll it (fal-next.ts). */
 type FalAccount = 'personal' | 'team';
 
+/** A submitted fal request: its id, the account whose key submitted it (and must poll it), and when, as the start timeout counts from the submit. */
+export interface FalRef {
+  providerJobId: string;
+  account: FalAccount;
+  submittedAt: number;
+}
+
 /** What `result` holds besides the finished shots while a remake runs: the worker that owns it and, per shot index, the fal request it submitted. */
 export interface RemakeState {
   worker?: string;
-  fal?: Record<string, { providerJobId: string; account: FalAccount }>;
+  fal?: Record<string, FalRef>;
   shots?: ShotResult[];
 }
 
 /** The edit's hand-over to the remake: `saved` records fal's request id as soon as the submit returns, `resume` is a request a stopped worker submitted, polled instead of submitting again. */
 export interface FalCall {
-  resume?: { providerJobId: string; account: FalAccount };
-  saved: (providerJobId: string, account: FalAccount) => Promise<void>;
+  resume?: FalRef;
+  saved: (ref: FalRef) => Promise<void>;
 }
 
 export interface RemakeSeams {
@@ -82,10 +89,12 @@ const EDIT_MODEL: ModelConfig = {
  * The fal account new calls go to (fal-next.ts): the team's key once the personal account ran out, else the personal one. shortcut: a credit refusal
  * here fails the shot without switching accounts; the next video job's refusal switches them (falNext), and later remakes follow.
  */
-const falKey = (account: FalAccount): string => {
-  const key = account === 'team' && process.env.FAL_KEY_NEXT ? process.env.FAL_KEY_NEXT : process.env.FAL_KEY;
+const falKey = (account: FalAccount): { key: string; account: FalAccount } => {
+  // The account is the one whose key is really used: a team label with no FAL_KEY_NEXT goes out with FAL_KEY, and is saved as the personal account.
+  const used = account === 'team' && process.env.FAL_KEY_NEXT ? 'team' : 'personal';
+  const key = used === 'team' ? process.env.FAL_KEY_NEXT : process.env.FAL_KEY;
   if (!key) throw new Error('FAL_KEY is not set');
-  return key;
+  return { key, account: used };
 };
 
 /** fal's queue answers within a few minutes; past this a call is given up and booked at its estimate, as fal may still run it. */
@@ -124,16 +133,21 @@ const realEdit =
   (pool: Pool): NonNullable<RemakeSeams['edit']> =>
   async (clip, product, prompt, seconds, call) => {
     const readImage = async (url: string) => (url === 'mem:clip' ? { bytes: clip, contentType: 'video/mp4' } : fitForInline(product.bytes, product.contentType));
-    const account = call.resume?.account ?? (await falActive(pool));
+    // A request is polled with the key that submitted it: one sent with FAL_KEY_NEXT cannot be polled once that is gone.
+    if (call.resume?.account === 'team' && !process.env.FAL_KEY_NEXT) throw new Error('FAL_KEY_NEXT is not set, so the fal request sent with it cannot be polled');
+    const { key, account } = falKey(call.resume?.account ?? (await falActive(pool)));
     // The start timeout is the poll deadline (settleFal): a request still queued when it is given up is dropped by fal, not run and billed unseen.
-    const fal = createFalProvider({ apiKey: falKey(account), readImage, startTimeoutSec: CALL_DEADLINE_MS / 1000 });
-    let providerJobId = call.resume?.providerJobId;
-    if (!providerJobId) {
-      ({ providerJobId } = await fal.submit({ model: EDIT_MODEL, prompt, imageUrls: ['mem:product', 'mem:clip'], ratio: 'auto', durationSec: seconds }));
-      await call.saved(providerJobId, account);
+    const fal = createFalProvider({ apiKey: key, readImage, startTimeoutSec: CALL_DEADLINE_MS / 1000 });
+    let ref = call.resume;
+    if (!ref) {
+      const { providerJobId } = await fal.submit({ model: EDIT_MODEL, prompt, imageUrls: ['mem:product', 'mem:clip'], ratio: 'auto', durationSec: seconds });
+      ref = { providerJobId, account, submittedAt: Date.now() };
+      await call.saved(ref);
     }
-    const job = { providerJobId, model: EDIT_MODEL };
-    const out = await settleFal(() => fal.status(job), EDIT_MODEL.usdPerSecond * seconds);
+    const job = { providerJobId: ref.providerJobId, model: EDIT_MODEL };
+    // fal's start timeout counts from the submit, so a resumed poll gets what is left of it, not a fresh 10 minutes.
+    const left = call.resume ? { deadlineMs: Math.max(0, ref.submittedAt + CALL_DEADLINE_MS - Date.now()) } : {};
+    const out = await settleFal(() => fal.status(job), EDIT_MODEL.usdPerSecond * seconds, left);
     return { video: out.bytes, costUsd: out.costUsd };
   };
 
@@ -162,7 +176,8 @@ async function storeVideo(pool: Pool, write: Write, ownerId: string, file: strin
  * Claims a queued remake, makes one clip per chosen shot, joins them and stores the outcome: 'succeeded' when every shot made a clip and they joined,
  * 'partial' when only some did (their clips stay viewable), 'failed' when none did. Safe to call more than once for the same id: only a `queued` row is claimed.
  * With `resume` (the state takeOverRemakes returns for a remake whose worker stopped) the row is already this worker's: finished shots are kept, a shot
- * with a saved fal request id is polled to its end and booked, and a shot with none fails instead of being submitted, as fal may have started it.
+ * with a saved fal request id is polled to its end and booked. Shots run one at a time, so only the first shot not yet recorded can have been submitted without its
+ * id being saved: it fails instead of being submitted again, as fal may have started it; the shots after it were never reached and are submitted as usual.
  */
 export async function runRemake(pool: Pool, remakeId: string, seams: RemakeSeams = {}, resume?: RemakeState): Promise<void> {
   const read = seams.read ?? getObject;
@@ -225,6 +240,7 @@ export async function runRemake(pool: Pool, remakeId: string, seams: RemakeSeams
     // Each made shot's clip, and the cut it was made from, for the before/after.
     const made: { clip: string; sent: string }[] = [];
 
+    const unsure = resume && chosen.find((i) => !resume.shots?.some((s) => s.index === i));
     for (const index of chosen) {
       const was = resume?.shots?.find((s) => s.index === index);
       if (was?.status === 'failed') {
@@ -237,7 +253,7 @@ export async function runRemake(pool: Pool, remakeId: string, seams: RemakeSeams
         const shot = analysis ? remakeScene(analysis, index) : undefined;
         if (!shot) throw new Error(`shot ${index} is not in the analysis`);
         const submitted = resume?.fal?.[String(index)];
-        if (resume && !was && !submitted) throw new Error(`shot ${index} has no saved fal request id (the worker stopped before it was submitted or saved); it was not submitted again`);
+        if (index === unsure && !submitted) throw new Error(`shot ${index} has no saved fal request id (the worker stopped before it was submitted or saved); it was not submitted again`);
         // Billed and made as whole seconds (2 to 10, padded with its last frame), then cut back to the shot's own length, at most 10 s. The cut sent
         // runs 0.1 s over (up to the 10 s the edit takes): fal measures a clip without its last frame, so an exact 2 s cut reads 1.96 s and is refused.
         const seconds = remakeShotSeconds(shot);
@@ -255,10 +271,10 @@ export async function runRemake(pool: Pool, remakeId: string, seams: RemakeSeams
           // The request id is saved before the first poll, so a stopped worker's successor finds it; a save that fails is logged and the shot goes on, as it always did.
           const call: FalCall = {
             resume: submitted,
-            saved: (providerJobId, account) =>
+            saved: (ref) =>
               pool
-                .query(`update remakes set result = jsonb_set(result, '{fal}', coalesce(result->'fal', '{}'::jsonb) || jsonb_build_object($2::text, $3::jsonb)) where id = $1 and status = 'running' and result->>'worker' = $4`, [remakeId, String(index), JSON.stringify({ providerJobId, account }), workerId])
-                .then(() => undefined, (e) => console.error(`worker: remake ${remakeId}: could not save the fal request ${providerJobId} for shot ${index}:`, e)),
+                .query(`update remakes set result = jsonb_set(result, '{fal}', coalesce(result->'fal', '{}'::jsonb) || jsonb_build_object($2::text, $3::jsonb)) where id = $1 and status = 'running' and result->>'worker' = $4`, [remakeId, String(index), JSON.stringify(ref), workerId])
+                .then(() => undefined, (e) => console.error(`worker: remake ${remakeId}: could not save the fal request ${ref.providerJobId} for shot ${index}:`, e)),
           };
           const edited = await paid(entry, () => edit(clipBytes, product, editPrompt(shot), seconds, call));
           const raw = join(dir, `edited-${index}.mp4`);
@@ -334,15 +350,16 @@ const STALE_AFTER_MS = REMAKE_QUEUE_OPTIONS.expireInSeconds * 1000 + 10 * 60_000
 
 /**
  * Closes the remakes a stopped worker left open (no queue retries them): 'partial' when some shots made clips, which stay booked and viewable, else 'failed'.
- * A queued remake whose queue message was lost is closed the same way. Returns how many it closed.
+ * A queued remake whose queue message was lost is closed the same way; one whose worker still has a heartbeat (a resume in progress) is left. Returns how many it closed.
  */
-export async function closeStaleRemakes(pool: Pool, staleAfterMs = STALE_AFTER_MS): Promise<number> {
+export async function closeStaleRemakes(pool: Pool, staleAfterMs = STALE_AFTER_MS, heartbeatStaleMs = 60_000): Promise<number> {
   const { rowCount } = await pool.query(
     `update remakes
         set status = case when exists (select 1 from jsonb_array_elements(coalesce(result->'shots', '[]'::jsonb)) s where s->>'status' = 'succeeded') then 'partial' else 'failed' end,
             error = coalesce(error, 'the worker stopped before the remake finished'), finished_at = now()
-      where status in ('queued', 'running') and coalesce(started_at, created_at) < now() - ($1::float8 * interval '1 millisecond')`,
-    [staleAfterMs],
+      where status in ('queued', 'running') and coalesce(started_at, created_at) < now() - ($1::float8 * interval '1 millisecond')
+        and not exists (select 1 from worker_heartbeat h where h.worker_id = remakes.result->>'worker' and h.beat_at > now() - ($2::float8 * interval '1 millisecond'))`,
+    [staleAfterMs, heartbeatStaleMs],
   );
   return rowCount ?? 0;
 }

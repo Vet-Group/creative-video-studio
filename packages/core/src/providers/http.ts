@@ -5,11 +5,14 @@ import type { ImageProviderJob, ProviderJob, SubmitRequest } from './types';
 export class ProviderHttpError extends Error {
   readonly status: number;
   readonly body: string;
+  /** The response headers, where a caller needs one (fal's X-Fal-Request-Timeout-Type). */
+  readonly headers?: Headers;
   // Fields are declared out here, not as constructor parameter properties, so the scripts can run this file under Node's type stripping.
-  constructor(status: number, body: string, message: string) {
+  constructor(status: number, body: string, message: string, headers?: Headers) {
     super(message);
     this.status = status;
     this.body = body;
+    this.headers = headers;
   }
 }
 
@@ -55,7 +58,7 @@ export async function boundedText(res: Response, what: string, max: number): Pro
 export async function sendJson(f: Fetch, what: string, url: string, init: RequestInit): Promise<unknown> {
   const res = await f(url, init);
   const text = await res.text();
-  if (!res.ok) throw new ProviderHttpError(res.status, text, `${what}: HTTP ${res.status} ${text.slice(0, 500)}`);
+  if (!res.ok) throw new ProviderHttpError(res.status, text, `${what}: HTTP ${res.status} ${text.slice(0, 500)}`, res.headers);
   return text ? JSON.parse(text) : {};
 }
 

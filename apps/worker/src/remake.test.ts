@@ -247,8 +247,12 @@ describe('a remake survives a worker restart: its fal requests are saved, polled
     async (key) =>
       key === 'sources/ref.mp4' ? sourceVideo : clipKeys.includes(key) ? clipVideo : png;
 
-  /** fal as far as the remake sees it: `finish` is what a status poll answers; every request id has the same output. `onStatus` runs on every status poll. */
-  function fakeFal(o: { onStatus?: () => Promise<void> } = {}) {
+  /**
+   * fal as far as the remake sees it: every request id has the same output; `status` is what a poll answers; `onStatus` runs on every status poll;
+   * `dropped` makes the status or the result call answer what fal answers for a request its start timeout dropped (504, X-Fal-Request-Timeout-Type: user).
+   */
+  function fakeFal(o: { onStatus?: () => Promise<void>; status?: string; dropped?: 'status' | 'result' } = {}) {
+    const timedOut = () => new Response('', { status: 504, headers: { 'X-Fal-Request-Timeout-Type': 'user' } });
     const seen: { method: string; url: string; headers: Record<string, string> }[] = [];
     let n = 0;
     const fetchStub = vi.fn(async (url: string, init: RequestInit = {}) => {
@@ -259,15 +263,15 @@ describe('a remake survives a worker restart: its fal requests are saved, polled
       if (method === 'POST' && url === QUEUE_SUBMIT) return Response.json({ request_id: `req-${++n}` });
       if (url.endsWith('/status')) {
         await o.onStatus?.();
-        return Response.json({ status: 'COMPLETED' });
+        return o.dropped === 'status' ? timedOut() : Response.json({ status: o.status ?? 'COMPLETED' });
       }
-      if (url.startsWith('https://queue.fal.run/fal-ai/wan/requests/')) return Response.json({ video: { url: 'https://cdn.test/out.mp4' } });
+      if (url.startsWith('https://queue.fal.run/fal-ai/wan/requests/')) return o.dropped === 'result' ? timedOut() : Response.json({ video: { url: 'https://cdn.test/out.mp4' } });
       if (url === 'https://cdn.test/out.mp4') return new Response(clipVideo);
       throw new Error(`unexpected fetch ${method} ${url}`);
     });
     vi.stubGlobal('fetch', fetchStub);
     process.env.FAL_KEY = 'test-key';
-    return { seen, submits: () => seen.filter((c) => c.method === 'POST' && c.url === QUEUE_SUBMIT), uploads: () => seen.filter((c) => c.url.includes('/storage/upload/initiate')) };
+    return { seen, polls: () => seen.filter((c) => c.url.endsWith('/status')).length, submits: () => seen.filter((c) => c.method === 'POST' && c.url === QUEUE_SUBMIT), uploads: () => seen.filter((c) => c.url.includes('/storage/upload/initiate')) };
   }
   const restore = () => {
     vi.unstubAllGlobals();
@@ -280,7 +284,7 @@ describe('a remake survives a worker restart: its fal requests are saved, polled
     await pool.query(`update remakes set status = 'running', started_at = now(), result = $2 where id = $1`, [id, JSON.stringify({ worker: from, ...state })]);
     return id;
   }
-  const saved = (req: string) => ({ providerJobId: `2:${req}`, account: 'personal' as const });
+  const saved = (req: string, o: { account?: 'personal' | 'team'; ago?: number } = {}) => ({ providerJobId: `2:${req}`, account: o.account ?? ('personal' as const), submittedAt: Date.now() - (o.ago ?? 0) });
   /** What a started worker does: takes over the remakes of the workers that stopped and resumes each; returns their ids. */
   const resumeAll = async (worker: string, seam: Partial<RemakeSeams>): Promise<string[]> => {
     const taken = await takeOverRemakes(pool, worker, 60_000);
@@ -300,7 +304,7 @@ describe('a remake survives a worker restart: its fal requests are saved, polled
     expect((await row(id)).status).toBe('succeeded');
     expect(fal.submits()).toHaveLength(1);
     // The first poll already finds the request id (packed with its billed seconds) and the account it went to, under the shot's index.
-    expect(polled[0]).toMatchObject({ worker: 'worker-a', fal: { 1: { providerJobId: '2:req-3', account: 'personal' } } });
+    expect(polled[0]).toMatchObject({ worker: 'worker-a', fal: { 1: { providerJobId: '2:req-3', account: 'personal', submittedAt: expect.any(Number) } } });
     // 600 s is the poll deadline (CALL_DEADLINE_MS), so a request still queued then is dropped by fal instead of run and billed unseen.
     expect(fal.submits()[0]!.headers['X-Fal-Request-Start-Timeout']).toBe('600');
     expect(fal.submits()[0]!.headers.Authorization).toBe('Key test-key');
@@ -353,7 +357,26 @@ describe('a remake survives a worker restart: its fal requests are saved, polled
     expect(await ledger(id)).toHaveLength(2);
   });
 
-  test('a shot with no saved request id fails the remake clearly and is never submitted, whatever the other shots do', async () => {
+  test('only the first shot not yet recorded can have been submitted unsaved: it fails and is never submitted, the shots after it are submitted as usual', async () => {
+    const lost = await orphan([1, 2], { shots: [] }); // shot 1 may have been submitted before its id was saved; shot 2 was never reached
+    const fal = fakeFal();
+    try {
+      expect(await resumeAll('worker-new', { read: realRead(), write: seams().write })).toEqual([lost]);
+    } finally {
+      restore();
+    }
+    const l = await row(lost);
+    expect(l.status).toBe('partial'); // shot 2 was made
+    expect(l.error).toMatch(/^shot 1 has no saved fal request id .* it was not submitted again$/);
+    expect(l.result.shots.map((s: { index: number; status: string }) => [s.index, s.status])).toEqual([[1, 'failed'], [2, 'succeeded']]);
+    expect(fal.submits()).toHaveLength(1); // shot 2's, once
+    expect((await ledger(lost)).map((x: { ref: string; usd: string }) => [x.ref, x.usd])).toEqual([[`llm:remake:${lost}:2:video`, '0.4000']]);
+    expect(l.cost_usd).toBe('0.400000');
+    // Its own request id was saved as it was submitted, so a second restart would poll it.
+    await pool.query(`update remakes set status = 'failed' where id = $1`, [lost]);
+  });
+
+  test('a shot in flight with its id saved is polled, and the next shot, never reached, is submitted; a lone unrecorded shot fails with nothing paid', async () => {
     const half = await orphan([1, 2], { fal: { 1: saved('req-1') }, shots: [] });
     const none = await orphan([1], { shots: [] });
     const fal = fakeFal();
@@ -362,16 +385,82 @@ describe('a remake survives a worker restart: its fal requests are saved, polled
     } finally {
       restore();
     }
-    const h = await row(half);
-    expect(h.status).toBe('partial'); // shot 1 was polled and delivered
-    expect(h.error).toMatch(/^shot 2 has no saved fal request id .* it was not submitted again$/);
-    expect(h.result.shots.map((s: { index: number; status: string }) => [s.index, s.status])).toEqual([[1, 'succeeded'], [2, 'failed']]);
+    expect(await row(half)).toMatchObject({ status: 'succeeded', error: null, cost_usd: '0.800000' });
     expect(await row(none)).toMatchObject({ status: 'failed', output_asset_id: null, cost_usd: '0.000000' });
     expect((await row(none)).error).toMatch(/^shot 1 has no saved fal request id/);
-    expect(fal.submits()).toEqual([]);
-    expect(fal.uploads()).toEqual([]);
+    expect(fal.submits()).toHaveLength(1); // half's shot 2 only
     expect(await ledger(none)).toEqual([]);
-    expect((await ledger(half)).map((l: { ref: string }) => l.ref)).toEqual([`llm:remake:${half}:1:video`]);
+    expect((await ledger(half)).map((x: { ref: string }) => x.ref)).toEqual([`llm:remake:${half}:1:video`, `llm:remake:${half}:2:video`]);
+  });
+
+  test('a request fal dropped on its start timeout (504, type user) is booked at $0 and fails the shot at once, on the status or the result call', async () => {
+    for (const dropped of ['status', 'result'] as const) {
+      const id = await orphan([1], { fal: { 1: saved('req-1') }, shots: [] });
+      const fal = fakeFal({ dropped });
+      const t0 = Date.now();
+      try {
+        expect(await resumeAll('worker-new', { read: realRead(), write: seams().write })).toEqual([id]);
+      } finally {
+        restore();
+      }
+      expect(await row(id)).toMatchObject({ status: 'failed', cost_usd: '0.000000', output_asset_id: null });
+      expect((await row(id)).error).toMatch(/no runner started it before the start timeout/);
+      expect(fal.polls()).toBe(1);
+      expect(Date.now() - t0).toBeLessThan(10_000); // not polled until a deadline
+      expect(await ledger(id)).toEqual([]);
+    }
+  });
+
+  test('a resumed poll is capped at 10 minutes from the submit, not from the restart', async () => {
+    const id = await orphan([1], { fal: { 1: saved('req-1', { ago: 11 * 60_000 }) }, shots: [] });
+    const fal = fakeFal({ status: 'IN_PROGRESS' });
+    try {
+      await resumeAll('worker-new', { read: realRead(), write: seams().write });
+    } finally {
+      restore();
+    }
+    expect(fal.polls()).toBe(1); // one look, then given up at the estimate as past the deadline, with no 10 more minutes
+    expect(await row(id)).toMatchObject({ status: 'failed', cost_usd: '0.400000' });
+    expect((await ledger(id)).map((x: { usd: string }) => x.usd)).toEqual(['0.4000']);
+  });
+
+  test('the account saved is the one whose key submitted: a team label without FAL_KEY_NEXT is the personal account; a team request cannot be polled without the key', async () => {
+    await pool.query(`update settings set fal_next_at = now() where id = 1`);
+    try {
+      // The settings say team, FAL_KEY_NEXT is unset: the request goes out with FAL_KEY. A row closed during the first poll keeps the saved ref to read back.
+      const stopped = await queued([1]);
+      const fal = fakeFal({ onStatus: async () => void (await pool.query(`update remakes set status = 'failed' where id = $1`, [stopped])) });
+      try {
+        await runRemake(pool, stopped, { read: realRead(), write: seams().write, workerId: 'worker-a' });
+      } finally {
+        restore();
+      }
+      expect(fal.submits()).toHaveLength(1);
+      expect(fal.submits()[0]!.headers.Authorization).toBe('Key test-key');
+      expect((await row(stopped)).result.fal[1].account).toBe('personal');
+    } finally {
+      await pool.query(`update settings set fal_next_at = null where id = 1`);
+    }
+    const id = await orphan([1], { fal: { 1: saved('req-1', { account: 'team' }) }, shots: [] });
+    const fal = fakeFal();
+    try {
+      await resumeAll('worker-new', { read: realRead(), write: seams().write });
+    } finally {
+      restore();
+    }
+    expect(await row(id)).toMatchObject({ status: 'failed', cost_usd: '0.000000' });
+    expect((await row(id)).error).toMatch(/FAL_KEY_NEXT is not set/);
+    expect(fal.seen).toEqual([]);
+  });
+
+  test('the stale sweep leaves a remake whose worker is alive (a resume in progress)', async () => {
+    const id = await orphan([1], { fal: { 1: saved('req-1') } }, 'worker-resuming');
+    await pool.query(`update remakes set started_at = now() - interval '3 hours' where id = $1`, [id]);
+    await pool.query(`insert into worker_heartbeat (worker_id) values ('worker-resuming') on conflict (worker_id) do update set beat_at = now()`);
+    expect(await closeStaleRemakes(pool)).toBe(0);
+    await pool.query(`delete from worker_heartbeat where worker_id = 'worker-resuming'`);
+    expect(await closeStaleRemakes(pool)).toBe(1);
+    expect((await row(id)).status).toBe('failed');
   });
 
   test('only a worker whose heartbeat stopped loses its remakes, to one taker; a superseded worker cannot write the remake any more', async () => {
