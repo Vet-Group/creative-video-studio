@@ -1,4 +1,5 @@
 // What the Library routes share: which jobs are Library clips and what a clip's download is called.
+import { thumbUrl } from './api';
 import { pool } from './auth';
 
 /** SQL for a job (alias `j`) that is a clip in the Library: succeeded, not deleted, not purged. */
@@ -23,8 +24,9 @@ export async function bestClips(): Promise<Map<string, { video: string | null; p
       order by j.model, v.featured desc, (select count(*) from favorites f where f.job_id = j.id) desc, j.created_at desc, j.id desc`,
   );
   const content = (id: string | null) => (id ? `/api/assets/${id}/content` : null);
+  const thumb = (id: string | null) => (id ? thumbUrl(id) : null); // the card's picture is a tile, not the original
   return new Map(
-    rows.map((r) => [r.model, r.mime.startsWith('video/') ? { video: content(r.output_asset_id), poster: content(r.poster_asset_id) } : { video: null, poster: content(r.poster_asset_id ?? r.output_asset_id) }]),
+    rows.map((r) => [r.model, r.mime.startsWith('video/') ? { video: content(r.output_asset_id), poster: thumb(r.poster_asset_id) } : { video: null, poster: thumb(r.poster_asset_id ?? r.output_asset_id) }]),
   );
 }
 

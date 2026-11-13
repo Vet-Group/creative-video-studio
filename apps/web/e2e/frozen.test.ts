@@ -80,7 +80,7 @@ export async function freezeData(page: Page): Promise<void> {
     }),
   );
   await page.route(/\/api\/jobs\?mine/, (r) => r.fulfill({ json: { jobs: [job], workerOffline: false } }));
-  await page.route(/\/api\/assets\/frozen-(poster|video)-(\d)\/content/, (r) => {
+  await page.route(/\/api\/assets\/frozen-(poster|video)-(\d)\/(content|thumb)/, (r) => {
     const [, kind, n] = /frozen-(poster|video)-(\d)/.exec(r.request().url())!;
     return kind === 'poster'
       ? r.fulfill({ body: fixture(`example-${n}.jpg`), contentType: 'image/jpeg' })

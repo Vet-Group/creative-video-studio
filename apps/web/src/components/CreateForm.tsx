@@ -12,7 +12,6 @@ import { useHydrated } from '@/lib/use-hydrated';
 import { useRecall } from '@/lib/use-recall';
 import { useDraftState } from '@/lib/use-draft';
 import { useSamples, versionedSample } from '@/lib/use-samples';
-import { ABOUT } from '@/lib/about-content';
 import { dropRefillQuery, exampleFrom } from '@/lib/reuse';
 import { About } from './About';
 import { AudioSwitch } from './AudioSwitch';
@@ -864,7 +863,7 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
               ))}
             </div>
           ) : shown === 'about' ? (
-            <About page={ABOUT.create} models={models?.models} />
+            <About page="create" models={models?.models} />
           ) : (
             <FormContext.Provider value={{ recreate, apply, photo: (p) => void take(p), prompt: copyPrompt }}>
               <Tray feature="video" />

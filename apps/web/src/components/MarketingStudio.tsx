@@ -6,7 +6,6 @@
 // (lib/marketing.ts) and posts a `marketing` video job on a video model that lists the feature; the other formats add params format and audio.
 import { useRouter } from 'next/navigation';
 import { type CSSProperties, useEffect, useId, useState } from 'react';
-import { ABOUT } from '@/lib/about-content';
 import { NO_CAP } from '@/lib/caps';
 import { api, errorText, sendJson, thumbUrl } from '@/lib/api';
 import { ADVANCED_MAX_IMAGES, ADVANCED_MAX_SCRIPT, advancedPrompt, briefRoom, END_TEXT_POSITIONS, type EndTextPosition, FORMAT_HREF, FORMAT_NAME, highlightLines, hrefOfFormat, marketingPrompt, type MarketingFormat, reviewPrompt, sectionPrompt, unboxingPrompt, unboxingRoles } from '@/lib/marketing';
@@ -826,7 +825,7 @@ export function MarketingStudio({ format = 'ugc', reuse, wizardDefault = false }
               <Gallery kind="marketing" video samples="marketing-example-" label="Video Marketing Studio của công ty" emptyText="Chưa có video Marketing Studio nào trong công ty." />
             </FormContext.Provider>
           ) : shown === 'about' ? (
-            <About page={ABOUT[advanced ? 'advanced' : unboxing ? 'unboxing' : review ? 'review' : 'marketing']} />
+            <About page={advanced ? 'advanced' : unboxing ? 'unboxing' : review ? 'review' : 'marketing'} />
           ) : (
             <FormContext.Provider value={actions}>
               {!narrow && <SizeSlider size={historySize} last={1} onChange={resizeHistory} />}

@@ -13,7 +13,6 @@ import { useRecall } from '@/lib/use-recall';
 import { useDraftState } from '@/lib/use-draft';
 import { useSamples } from '@/lib/use-samples';
 import { backgroundsIn, GARMENT_CATEGORIES, garmentsOf, posesOf, stockModels } from '@/lib/try-on-stock';
-import { ABOUT } from '@/lib/about-content';
 import { About } from './About';
 import { copyError, copySamples, fashionTiles, FormNotice, Gallery, type Img, LockedFields, PhotoDialog, photoImg, RATIO_LABEL, Slot, THINKING_LABEL, uploadError, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
 import type { UploadSlot } from '@/lib/upload-slots';
@@ -284,7 +283,7 @@ export function TryOn({ reuse }: { reuse?: string }) {
               result: (p) => void take(p, 'model', 'Đã dùng kết quả làm ảnh người mẫu'),
             }}
           >
-            {shown === 'examples' ? <Gallery kind="try_on" samples="try-on-example-" cols={[2, 2, 3]} label="Ảnh thử đồ của công ty" emptyText="Chưa có ảnh thử đồ nào trong công ty." /> : shown === 'about' ? <About page={ABOUT.tryOn} /> : <Tray feature="try_on" />}
+            {shown === 'examples' ? <Gallery kind="try_on" samples="try-on-example-" cols={[2, 2, 3]} label="Ảnh thử đồ của công ty" emptyText="Chưa có ảnh thử đồ nào trong công ty." /> : shown === 'about' ? <About page="tryOn" /> : <Tray feature="try_on" />}
           </FormContext.Provider>
         </div>
       </div>
