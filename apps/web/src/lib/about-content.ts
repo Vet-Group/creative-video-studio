@@ -2466,6 +2466,7 @@ export const APP_ABOUT: Record<string, AboutPage> = {
         blocks: [
           'Smart Remake giữ mạch truyện của một video mẫu và đặt sản phẩm của bạn vào các cảnh có sản phẩm tương tự. Bạn chỉ cần đưa một video mẫu và một ảnh sản phẩm; AI tự phân tích video, tự chọn sẵn các cảnh có sản phẩm giống của bạn, và bạn bấm một nút để tạo video.',
           'Mỗi cảnh được làm lại riêng, giữ nguyên chuyển động và độ dài của cảnh gốc, không tiếng. Các cảnh được ghép lại thành một video, kèm bản so sánh trước/sau.',
+          { loop: 'about-smart-remake-loop' },
         ],
       },
       {

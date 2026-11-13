@@ -3,11 +3,13 @@
 // the worker puts the product into each shot's own clip, keeping its motion and length (apps/worker/src/remake.ts), and the clips are
 // joined into one silent video, with a before/after beside it. Rendered only when REA_REMAKE_ENABLED is on (AnalyzeView's remakeEnabled);
 // the API 404s otherwise.
-import { REMAKE_MAX_SECONDS, REMAKE_MAX_SHOTS, REMAKE_MIN_SECONDS, remakeShotUsd } from '@cvs/core/analysis/remake';
-import { useEffect, useState } from 'react';
+import type { Analysis } from '@cvs/core/analysis/breakdown';
+import { REMAKE_MAX_SECONDS, REMAKE_MAX_SHOTS, REMAKE_MIN_SECONDS, remakeScene, remakeShotSeconds, remakeShotUsd } from '@cvs/core/analysis/remake';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { mergeShots, timeRange } from '@/lib/analyze';
 import { api, errorText, sendJson } from '@/lib/api';
 import { confirmRun } from '@/lib/run-guard';
+import { useFrames } from '@/lib/use-frames';
 import type { AnalysisRow } from './AnalyzeView';
 import { confirmDialog } from './Confirm';
 import { type Img, Slot, uploadError, uploadImages } from './image-tools';
@@ -15,6 +17,7 @@ import { type Img, Slot, uploadError, uploadImages } from './image-tools';
 export interface RemakeRow {
   id: string;
   analysisId: string;
+  shots: number[]; // the first stored shot of each scene asked for
   status: 'queued' | 'running' | 'succeeded' | 'partial' | 'failed';
   result: { shots: { index: number; status: 'succeeded' | 'failed'; clipAssetId?: string }[]; compareAssetId?: string } | null;
   outputAssetId: string | null;
@@ -28,14 +31,35 @@ const isOpen = (r: RemakeRow) => r.status === 'queued' || r.status === 'running'
 /** What these shots are estimated to cost, as the API counts it against the spending caps. */
 export const remakeEstimate = (shots: { start: number; end: number }[]): string => shots.reduce((sum, s) => sum + remakeShotUsd(s), 0).toFixed(2);
 
-/** One remake: its state, the joined video, then each shot's clip or that it failed. Pure, so it render-tests without the page. `scene` numbers a stored shot as the result list does. */
-export function RemakeResult({ row, scene = (index) => index, onDelete }: { row: RemakeRow; scene?: (index: number) => number; onDelete?: () => void }) {
+// A rough run time, from the first real run: about a minute per billed second of a scene plus about a minute of overhead, one scene after another.
+const SCENE_OVERHEAD_MIN = 1;
+const UNKNOWN_SCENE_MIN = 4; // a scene whose length is not known here (no analysis at hand)
+
+/** About how many minutes an open remake still has to run: its scenes not yet in the result, each by its billed seconds when the `analysis` is at hand. At least 1. */
+export function remakeMinutesLeft(row: RemakeRow, analysis?: Analysis | null): number {
+  const done = new Set((row.result?.shots ?? []).map((s) => s.index));
+  const left = row.shots.filter((index) => !done.has(index));
+  const minutes = left.reduce((sum, index) => {
+    const scene = analysis ? remakeScene(analysis, index) : undefined;
+    return sum + (scene ? remakeShotSeconds(scene) + SCENE_OVERHEAD_MIN : UNKNOWN_SCENE_MIN);
+  }, 0);
+  return Math.max(1, minutes);
+}
+
+/** One remake: its state, the joined video, then each shot's clip or that it failed. Pure, so it render-tests without the page. `scene` numbers a stored shot as the result list does;
+ * `analysis`, when the page has it, makes the time left more exact; `children` end the item (a link back to the analysis). */
+export function RemakeResult({ row, scene = (index) => index, analysis, onDelete, children }: { row: RemakeRow; scene?: (index: number) => number; analysis?: Analysis | null; onDelete?: () => void; children?: ReactNode }) {
   const shots = row.result?.shots ?? [];
   return (
     <li className="remake-item">
       <p role={isOpen(row) ? 'status' : undefined}>
         <strong>{STATUS[row.status]}</strong>
-        {isOpen(row) ? <span className="muted"> · việc này mất vài phút</span> : row.costUsd !== null && <span className="muted"> · ${Number(row.costUsd).toFixed(2)}</span>}
+        {isOpen(row) ? (
+          <span className="muted">
+            {' '}
+            · Đã xong {shots.length}/{row.shots.length} cảnh · còn khoảng {remakeMinutesLeft(row, analysis)} phút
+          </span>
+        ) : row.costUsd !== null && <span className="muted"> · ${Number(row.costUsd).toFixed(2)}</span>}
       </p>
       {row.outputAssetId && (
         <>
@@ -44,9 +68,12 @@ export function RemakeResult({ row, scene = (index) => index, onDelete }: { row:
             Tải video
           </a>
           {row.result?.compareAssetId && (
-            <a className="link-button" href={`/api/assets/${row.result.compareAssetId}/content`} target="_blank" rel="noreferrer">
-              Xem so sánh trước/sau
-            </a>
+            <>
+              <video className="remake-video" src={`/api/assets/${row.result.compareAssetId}/content`} controls playsInline preload="metadata" aria-label="So sánh trước/sau" />
+              <a className="link-button" href={`/api/assets/${row.result.compareAssetId}/content`} target="_blank" rel="noreferrer">
+                Xem so sánh trước/sau
+              </a>
+            </>
           )}
         </>
       )}
@@ -71,6 +98,7 @@ export function RemakeResult({ row, scene = (index) => index, onDelete }: { row:
           Xoá
         </button>
       )}
+      {children}
     </li>
   );
 }
@@ -92,6 +120,7 @@ export function RemakePanel({ row, initialProduct, initialChosen, note, productF
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [remakes, setRemakes] = useState<RemakeRow[]>([]);
+  const pickBox = useRef<HTMLFieldSetElement>(null);
   const [sent, setSent] = useState(0); // bumped by each new remake, to load the list again and follow it
 
   // Loads this analysis' remakes, then again every 4 s while one is still open; a failed load retries only while one is followed.
@@ -165,6 +194,7 @@ export function RemakePanel({ row, initialProduct, initialChosen, note, productF
   const running = remakes.some(isOpen); // one at a time per analysis, so a double click cannot pay twice
   const toggle = (index: number) => setChosen((c) => (c.includes(index) ? c.filter((n) => n !== index) : [...c, index]));
   const picked = scenes.shots.filter((_, i) => chosen.includes(scenes.first[i]!)); // whole scenes, as the API prices them
+  const frames = useFrames(row.sourceAssetId ? `/api/assets/${row.sourceAssetId}/content` : undefined, scenes.shots, pickBox); // null when there is no video or it will not decode
 
   return (
     <section className="remake-panel" aria-labelledby={`remake-${row.id}`}>
@@ -174,7 +204,7 @@ export function RemakePanel({ row, initialProduct, initialChosen, note, productF
       </p>
       {note && <p className="help" role="status">{note}</p>}
       {!productFixed && <Slot label="Ảnh sản phẩm" empty="Thêm 1 ảnh sản phẩm" inputLabel="Ảnh sản phẩm" images={product} max={1} busy={busy} onAdd={(files) => void upload(files)} onRemove={() => setProduct([])} onPick={(a) => setProduct([a])} slot="product" />}
-      <fieldset className="remake-pick">
+      <fieldset className="remake-pick" ref={pickBox}>
         <legend>Cảnh cần thay sản phẩm (tối đa {REMAKE_MAX_SHOTS})</legend>
         {scenes.shots.map((s, i) => {
           const index = scenes.first[i]!;
@@ -182,6 +212,7 @@ export function RemakePanel({ row, initialProduct, initialChosen, note, productF
           return (
             <label key={index}>
               <input type="checkbox" checked={on} disabled={busy || (!on && chosen.length >= REMAKE_MAX_SHOTS)} onChange={() => toggle(index)} />
+              {frames && (frames[i] ? <img className="analysis-frame" src={frames[i]} alt="" /> : <span className="analysis-frame" aria-hidden="true" />)}
               Cảnh {s.index}
               <span className="muted">{timeRange(s.start, s.end)}</span>
             </label>
@@ -200,7 +231,7 @@ export function RemakePanel({ row, initialProduct, initialChosen, note, productF
       {remakes.length > 0 && (
         <ul className="remake-list">
           {remakes.map((r) => (
-            <RemakeResult key={r.id} row={r} scene={scene} onDelete={() => void remove(r)} />
+            <RemakeResult key={r.id} row={r} scene={scene} analysis={row.result} onDelete={() => void remove(r)} />
           ))}
         </ul>
       )}

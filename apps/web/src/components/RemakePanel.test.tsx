@@ -1,9 +1,9 @@
 import type { Analysis } from '@cvs/core/analysis/breakdown';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, test } from 'vitest';
-import { RemakePanel, RemakeResult, type RemakeRow, remakeDrafts, remakeEstimate } from './RemakePanel';
+import { RemakePanel, RemakeResult, type RemakeRow, remakeDrafts, remakeEstimate, remakeMinutesLeft } from './RemakePanel';
 
-const base: RemakeRow = { id: 'r1', analysisId: 'a1', status: 'succeeded', result: null, outputAssetId: null, costUsd: null, createdAt: '2026-11-13T00:00:00Z' };
+const base: RemakeRow = { id: 'r1', analysisId: 'a1', shots: [], status: 'succeeded', result: null, outputAssetId: null, costUsd: null, createdAt: '2026-11-13T00:00:00Z' };
 
 test('the estimate is each shot billed at its length in whole seconds (2 to 10) at $0.10, as the API counts it against the caps', () => {
   expect(remakeEstimate([{ start: 0, end: 1 }])).toBe('0.40'); // 2 s sent + 2 s made
@@ -107,4 +107,43 @@ test('only a remake that is no longer open offers a delete', () => {
   expect(renderToStaticMarkup(<RemakeResult row={base} onDelete={() => {}} />)).toContain('>Xoá</button>');
   expect(renderToStaticMarkup(<RemakeResult row={{ ...base, status: 'queued' }} onDelete={() => {}} />)).not.toContain('Xoá');
   expect(renderToStaticMarkup(<RemakeResult row={base} />)).not.toContain('Xoá');
+});
+
+test('the minutes left count each scene still to make: its billed seconds plus a minute, or 4 when its length is not known, and at least 1', () => {
+  const s = (index: number, start: number, end: number) => ({ index, start, end, role: '', prompt: `p${index}` }); // distinct prompts keep them as separate scenes
+  const analysis: Analysis = { durationS: 10, shotCount: 3, format: '', hook: '', summary: '', shots: [s(1, 0, 3), s(2, 3, 8), s(3, 8, 10)] }; // billed 3 s, 5 s, 2 s
+  const open: RemakeRow = { ...base, status: 'running', shots: [1, 2, 3] };
+  expect(remakeMinutesLeft(open, analysis)).toBe(4 + 6 + 3);
+  expect(remakeMinutesLeft(open)).toBe(12);
+  const first = { ...open, result: { shots: [{ index: 1, status: 'succeeded' as const, clipAssetId: 'c1' }] } };
+  expect(remakeMinutesLeft(first, analysis)).toBe(6 + 3);
+  expect(remakeMinutesLeft(first)).toBe(8);
+  expect(remakeMinutesLeft({ ...open, result: { shots: [1, 2, 3].map((index) => ({ index, status: 'failed' as const })) } }, analysis)).toBe(1);
+});
+
+test('an open remake says how many scenes are done of those asked for and about how long is left', () => {
+  const open: RemakeRow = { ...base, status: 'running', shots: [1, 3, 5], result: { shots: [{ index: 1, status: 'succeeded', clipAssetId: 'c1' }] } };
+  const html = renderToStaticMarkup(<RemakeResult row={open} />);
+  expect(html).toContain('Đã xong 1/3 cảnh');
+  expect(html).toContain('còn khoảng 8 phút');
+  expect(html).not.toContain('việc này mất vài phút');
+  expect(renderToStaticMarkup(<RemakeResult row={{ ...base, status: 'queued', shots: [2] }} />)).toContain('Đã xong 0/1 cảnh');
+});
+
+test('a finished remake shows the before/after video inline, with the link to open it full size', () => {
+  const html = renderToStaticMarkup(<RemakeResult row={{ ...base, outputAssetId: 'out-1', result: { shots: [], compareAssetId: 'cmp' } }} />);
+  expect(html).toContain('src="/api/assets/cmp/content"');
+  expect(html.match(/<video/g)).toHaveLength(2); // the joined video and the comparison
+  expect(html).toContain('preload="metadata"');
+  expect(html).toContain('href="/api/assets/cmp/content"');
+  expect(renderToStaticMarkup(<RemakeResult row={{ ...base, outputAssetId: 'out-1', result: { shots: [] } }} />).match(/<video/g)).toHaveLength(1); // no comparison made
+});
+
+test('with a source video each scene gets a decorative thumbnail slot beside its label; without one the picker is text only', () => {
+  const analysis: Analysis = { durationS: 12, shotCount: 2, format: '', hook: '', summary: '', shots: [{ index: 1, start: 0, end: 5.2, role: '', prompt: 'p1' }, { index: 2, start: 5.2, end: 12, role: '', prompt: 'p2' }] };
+  const panel = (sourceAssetId: string | null) => renderToStaticMarkup(<RemakePanel row={{ id: 'a-thumb', status: 'succeeded', result: analysis, error: null, createdAt: '2026-11-13T00:00:00Z', sourceAssetId }} />);
+  const withVideo = panel('src-1');
+  expect(withVideo.match(/<span class="analysis-frame" aria-hidden="true">/g)).toHaveLength(2); // still being cut: an empty slot per scene
+  expect(withVideo).toContain('type="checkbox"'); // the checkbox and its text label stay
+  expect(panel(null)).not.toContain('analysis-frame');
 });
