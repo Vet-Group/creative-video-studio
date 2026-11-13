@@ -65,22 +65,26 @@ describe('the image picker', () => {
 });
 
 describe('the video picker', () => {
-  test('offers Veo 3.1 on fal, with its Vertex twin only in place of it when fal is off or its balance cannot pay', async () => {
+  test('offers Veo 3.1 on Vertex (0093), with its fal twin only in place of it when the Vertex row is off or no Vertex account can serve', async () => {
     await only(['veo-3.1', 'veo-3.1-vertex']);
     await vertex('project-one');
+    expect(await video()).toEqual(['veo-3.1-vertex']);
+
+    await vertex(null); // the credits ended, or the day before they expire
     expect(await video()).toEqual(['veo-3.1']);
 
-    await only(['veo-3.1-vertex']); // fal's row switched off
-    expect(await video()).toEqual(['veo-3.1-vertex']);
+    await vertex('project-one');
+    await only(['veo-3.1']); // the Vertex row switched off
+    expect(await video()).toEqual(['veo-3.1']);
 
     await only(['veo-3.1', 'veo-3.1-vertex']);
     vi.stubGlobal('fetch', async (url: string) => (url.startsWith('https://api.fal.ai/v1/account/billing') ? Response.json({ credits: { current_balance: 0.5, currency: 'USD' } }) : new Response('unexpected', { status: 500 })));
     process.env.FAL_KEY = 'fal-fixture-value'; // a made-up value, never a real key
     forgetFalBalance();
     try {
-      expect(await video()).toEqual(['veo-3.1-vertex']); // 8 s at $0.20 is 1.60, over fal's 0.50
+      expect(await video()).toEqual(['veo-3.1-vertex']); // fal's 0.50 does not matter while Vertex serves
       await vertex(null);
-      expect(await video()).toEqual(['veo-3.1']); // Vertex cannot serve either: the fal row stays, locked by the picker
+      expect(await video()).toEqual(['veo-3.1']); // neither can serve: the fal row stays, locked by the picker
     } finally {
       vi.unstubAllGlobals();
       process.env.FAL_KEY = ''; // vitest.setup.ts
