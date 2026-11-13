@@ -8,6 +8,7 @@ import { promisify } from 'node:util';
 import type { ProviderStatus } from '@cvs/core/providers';
 import { createPool } from '@cvs/db/client';
 import { createTestDatabase } from '@cvs/db/testing';
+import ffprobe from 'ffprobe-static';
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import { probeSeconds, requireFfmpeg } from './media';
 import { closeStaleRemakes, PaidCallError, type RemakeSeams, reaRemakeEnabled, runRemake, settleFal } from './remake';
@@ -90,7 +91,12 @@ test('remakes every chosen shot from its own clip, joins the clips with a before
   expect(calls).toEqual(['edit 2s image/png A model turns to the camera.', 'edit 2s image/png A close-up of the shirt.']);
   const sent = join(dir, 'sent.mp4');
   await writeFile(sent, sentClips[0]!);
-  expect(Math.abs((await probeSeconds(sent)) - 2)).toBeLessThanOrEqual(0.1);
+  // Past 2 s even without its last frame, as fal measures it (it refused an exact 2 s cut as 1.958 s on prod).
+  const probe = await run(ffprobe.path, ['-v', 'error', '-select_streams', 'v:0', '-count_frames', '-show_entries', 'stream=r_frame_rate,nb_read_frames', '-of', 'csv=p=0', sent]);
+  const [fps, frames] = probe.stdout.trim().split(',');
+  const [num, den] = fps!.split('/').map(Number);
+  expect((Number(frames) - 1) / (num! / den!)).toBeGreaterThanOrEqual(2);
+  expect(await probeSeconds(sent)).toBeLessThanOrEqual(2.2);
   // The joined video, each shot's clip (cut back to the shot's 1 s) and the before/after are the member's output assets, under their own keys.
   const ids = [r.output_asset_id, ...r.result.shots.map((s: { clipAssetId: string }) => s.clipAssetId), r.result.compareAssetId];
   const assets = (await pool.query(`select id, owner_id, kind, mime, s3_key, width, height from assets where id = any($1::text[])`, [ids])).rows;

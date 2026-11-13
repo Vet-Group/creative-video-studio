@@ -39,7 +39,7 @@ export class PaidCallError extends Error {
 export interface RemakeSeams {
   read?: (key: string) => Promise<Uint8Array>;
   write?: Write;
-  /** The shot's clip (an MP4 of `seconds`) with the product put into it, and the call's cost. Throws PaidCallError when fal billed a failure. */
+  /** The shot's clip (an MP4 a little over `seconds`) with the product put into it, `seconds` long, and the call's cost. Throws PaidCallError when fal billed a failure. */
   edit?: (clip: Uint8Array, product: Image, prompt: string, seconds: number) => Promise<{ video: Uint8Array; costUsd: number }>;
 }
 
@@ -200,13 +200,15 @@ export async function runRemake(pool: Pool, remakeId: string, seams: RemakeSeams
         // The whole scene the picker offered for this shot (shots joined by mergeShots), not just its first cut.
         const shot = analysis ? remakeScene(analysis, index) : undefined;
         if (!shot) throw new Error(`shot ${index} is not in the analysis`);
-        // Sent as whole seconds (2 to 10, padded with its last frame), then cut back to the shot's own length, at most 10 s.
+        // Billed and made as whole seconds (2 to 10, padded with its last frame), then cut back to the shot's own length, at most 10 s. The cut sent
+        // runs 0.1 s over (up to the 10 s the edit takes): fal measures a clip without its last frame, so an exact 2 s cut reads 1.96 s and is refused.
         const seconds = remakeShotSeconds(shot);
         const keep = Math.min(shot.end - shot.start, REMAKE_MAX_SECONDS);
+        const send = Math.min(REMAKE_MAX_SECONDS, seconds + 0.1);
         const sent = join(dir, `shot-${index}.mp4`);
-        await cutShot(video, shot.start, keep, seconds, sent);
+        await cutShot(video, shot.start, keep, send, sent);
         // A shot past the source's end cuts to nothing; nothing is paid for it.
-        if ((await probeVideoSeconds(sent)) < seconds - 0.1) throw new Error(`shot ${index} is not in the video`);
+        if ((await probeVideoSeconds(sent)) < send - 0.01) throw new Error(`shot ${index} is not in the video`);
         const clipBytes = new Uint8Array(await readFile(sent));
         const edited = await paid(entry, () => edit(clipBytes, product, editPrompt(shot), seconds));
         const raw = join(dir, `edited-${index}.mp4`);

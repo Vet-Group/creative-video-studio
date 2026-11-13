@@ -220,12 +220,13 @@ export function videoRefProblem(endpoint: string, info: { width: number; height:
 }
 
 /**
- * Smart Remake's edit (schema read 2026-11-13): the clip keeps its length (`duration` 0, so the job's duration is only what it is billed for) and its
- * own sound ('origin'; the worker sends it silent, so no sound is made or billed); 720p is the resolution its price is for.
+ * Smart Remake's edit (schema read 2026-11-13): the output is cut to the job's whole seconds (`duration` 2-10, kept from the start), which is what
+ * it is billed for, while the clip sent is a little longer (fal measures a clip without its last frame and refuses one under 2 s). It keeps the
+ * clip's own sound ('origin'; the worker sends it silent, so no sound is made or billed); 720p is the resolution its price is for.
  */
 function remakeEdit(req: SubmitRequest, [reference_image_url, video_url, ...rest]: string[]): Record<string, unknown> {
   if (!reference_image_url || !video_url || rest.length > 0) throw new ImageReadError('the remake edit needs the product image and the shot clip');
-  return { prompt: req.prompt, video_url, reference_image_url, duration: 0, resolution: '720p', audio_setting: 'origin' };
+  return { prompt: req.prompt, video_url, reference_image_url, duration: req.durationSec, resolution: '720p', audio_setting: 'origin' };
 }
 
 /**
