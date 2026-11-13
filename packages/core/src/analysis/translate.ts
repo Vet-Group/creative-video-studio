@@ -8,10 +8,16 @@ import { type Fetch, sendJson, timeout } from '../providers/http';
 import type { Analysis, AnalysisVi } from './breakdown';
 
 export const ANALYSIS_TRANSLATE_SYSTEM =
-  'You translate a short-video analysis from English into natural, plain Vietnamese so a seller can read it quickly. ' +
+  'You translate a short-video analysis into natural, plain Vietnamese so a seller can read it quickly. ' +
+  'The fields are mostly English, but some (often "format") may be Chinese or another language: translate those to Vietnamese too. ' +
+  'Every value you return must be written in Vietnamese; never answer in Chinese. ' +
   'Keep the meaning and every concrete detail; add and drop nothing. Keep product names, brand names and any on-screen or quoted text as they are. ' +
   'You get a JSON object {"format","hook","summary","shots":[...]}. Reply with only a JSON object of the same shape, each value translated to ' +
   'Vietnamese, the "shots" array the same length and in the same order.';
+
+// Chinese or Japanese script in an answer means the model answered in the wrong language (seen in production when the
+// analysis' format came back as 商品展示): such a reading is dropped rather than shown as Vietnamese.
+const CJK = /[぀-ヿ㐀-鿿豈-﫿]/;
 
 /** One chat call: the answer text and its cost. */
 type Chat = (system: string, user: string, maxTokens: number) => Promise<{ text: string; costUsd: number | null }>;
@@ -51,7 +57,9 @@ export async function translateAnalysisVi(a: Analysis, chat: Chat): Promise<{ vi
   }
   const shots = Array.isArray(v.shots) ? v.shots.map(str) : [];
   if (shots.length !== a.shots.length) throw new Error('analyze translate: shot count mismatch');
-  return { vi: { format: str(v.format), hook: str(v.hook), summary: str(v.summary), shots }, costUsd };
+  const vi = { format: str(v.format), hook: str(v.hook), summary: str(v.summary), shots };
+  if (CJK.test([vi.format, vi.hook, vi.summary, ...shots].join('\n'))) throw new Error('analyze translate: the answer is not Vietnamese');
+  return { vi, costUsd };
 }
 
 /** The worker's default translator: gpt-6-luna (OPENAI_API_KEY) if set, else fal (FAL_KEY); undefined when neither is. */

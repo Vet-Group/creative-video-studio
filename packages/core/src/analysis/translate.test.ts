@@ -29,6 +29,13 @@ test('throws on a shot-count mismatch so the caller keeps the analysis English-o
   await expect(translateAnalysisVi(a, chat)).rejects.toThrow('shot count');
 });
 
+test('throws when any value of the answer is in Chinese, so a wrong-language reading is never shown', async () => {
+  const allChinese = async () => ({ text: '{"format":"商品展示","hook":"视频从动作中途开始","summary":"s","shots":["c1","c2"]}', costUsd: null });
+  await expect(translateAnalysisVi(a, allChinese)).rejects.toThrow('not Vietnamese');
+  const formatKept = async () => ({ text: '{"format":"剧情","hook":"Mở đầu","summary":"Tóm tắt","shots":["Cảnh 1","Cảnh 2"]}', costUsd: null });
+  await expect(translateAnalysisVi(a, formatKept)).rejects.toThrow('not Vietnamese');
+});
+
 test('throws when the answer is not JSON', async () => {
   const chat = async () => ({ text: 'sorry, not json', costUsd: null });
   await expect(translateAnalysisVi(a, chat)).rejects.toThrow('not JSON');
