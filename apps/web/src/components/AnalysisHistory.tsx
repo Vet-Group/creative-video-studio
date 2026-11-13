@@ -48,6 +48,7 @@ export function AnalysisHistory({
   currentId,
   onRetry,
   onPick,
+  onDelete,
 }: {
   loading: boolean;
   error: boolean;
@@ -56,6 +57,8 @@ export function AnalysisHistory({
   currentId?: string | null;
   onRetry: () => void;
   onPick: (a: AnalysisRow) => void;
+  /** Delete a finished (succeeded or failed) analysis; the caller confirms. */
+  onDelete: (a: AnalysisRow) => void;
 }) {
   if (loading && items.length === 0)
     return (
@@ -68,7 +71,7 @@ export function AnalysisHistory({
   return (
     <ul className="analysis-list">
       {items.map((a) => (
-        <li key={a.id}>
+        <li key={a.id} className="analysis-item">
           {a.status === 'succeeded' && a.result ? (
             <button type="button" className="analysis-card" aria-current={a.id === currentId ? 'true' : undefined} onClick={() => onPick(a)}>
               <Card a={a} />
@@ -77,6 +80,11 @@ export function AnalysisHistory({
             <div className="analysis-card" data-status={a.status}>
               <Card a={a} />
             </div>
+          )}
+          {(a.status === 'succeeded' || a.status === 'failed') && (
+            <button type="button" className="analysis-delete" aria-label="Xoá phân tích" title="Xoá phân tích" onClick={() => onDelete(a)}>
+              <Icon name="x" size={14} />
+            </button>
           )}
         </li>
       ))}

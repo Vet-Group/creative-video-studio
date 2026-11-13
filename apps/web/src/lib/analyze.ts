@@ -108,3 +108,14 @@ export const scriptPrompt = (shots: Analysis['shots']): string => {
   }
   return lines.join('\n');
 };
+
+/** The whole breakdown as plain text to paste elsewhere: the format and hook, then a block per scene with its Vietnamese reading (when the worker made one) and English prompt. */
+export function scriptText(a: Analysis): string {
+  const { shots, vi } = mergeShots(a);
+  const hook = a.vi?.hook || a.hook;
+  const blocks = shots.map((s, i) => [`Cảnh ${s.index} (${timeRange(s.start, s.end)})${s.role ? ` · ${roleLabel(s.role)}` : ''}`, vi?.[i], s.prompt && `Prompt: ${s.prompt}`].filter(Boolean).join('\n'));
+  return [[`Định dạng: ${analysisFormat(a)}`, hook && `Mở đầu: ${hook}`].filter(Boolean).join('\n'), ...blocks].join('\n\n');
+}
+
+/** Where a scene's thumbnail is taken: just inside its start (the first frame can still be the previous cut), and never past its middle. */
+export const frameTime = (start: number, end: number): number => start + Math.min(0.3, Math.max(0, end - start) / 2);

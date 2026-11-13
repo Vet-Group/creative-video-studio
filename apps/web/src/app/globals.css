@@ -2481,6 +2481,12 @@ dialog.modal.tool-guide { width: min(52rem, calc(100vw - 2rem)); }
 .analysis-shots > li { margin-top: 0; border: 1px solid var(--border); border-radius: 12px; padding: 12px; }
 .analysis-shots > li[data-active] { border-color: var(--ink-strong); box-shadow: 0 0 0 1px var(--ink-strong); }
 .analysis-shot-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; }
+.analysis-script-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; }
+.analysis-shots > li[data-frame] { grid-template-columns: 64px minmax(0, 1fr); gap: 12px; align-items: start; }
+.analysis-shot-main { display: grid; gap: 6px; min-width: 0; }
+.analysis-frame { display: block; width: 64px; height: 96px; padding: 0; overflow: hidden; border: 0; border-radius: 8px; background: var(--fill); }
+button.analysis-frame { cursor: pointer; }
+.analysis-frame img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .analysis-role { padding: 1px 8px; border-radius: 999px; background: var(--fill); color: var(--text-muted); font-size: 12px; line-height: 18px; }
 .analysis-time { margin-left: auto; padding: 1px 8px; border: 0; background: transparent; color: var(--link); font-size: 13px; font-variant-numeric: tabular-nums; text-decoration: underline; text-underline-offset: 3px; }
 .analysis-prompt { margin: 6px 0; font-size: 14px; line-height: 21px; overflow-wrap: anywhere; }
@@ -2499,6 +2505,10 @@ dialog.modal.tool-guide { width: min(52rem, calc(100vw - 2rem)); }
 .analysis-examples { display: grid; gap: 16px; }
 .analysis-history { margin-top: 24px; }
 .analysis-list { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+.analysis-item { position: relative; }
+.analysis-delete { position: absolute; top: 6px; right: 6px; display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 8px; background: none; color: var(--text-muted); }
+.analysis-delete:hover { background: var(--fill); color: var(--danger); }
+.analysis-item:has(.analysis-delete) .analysis-card-body { padding-right: 32px; }
 .analysis-card { display: flex; gap: 12px; width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: inherit; font: inherit; text-align: left; }
 button.analysis-card { cursor: pointer; }
 button.analysis-card:hover { background: var(--fill); }

@@ -5,14 +5,15 @@
 // /analyze?analysis=<id> opens one analysis; the URL follows the one on view.
 import Link from 'next/link';
 import type { Analysis } from '@cvs/core/analysis/breakdown';
-import { useEffect, useRef, useState } from 'react';
+import { type RefObject, useEffect, useRef, useState } from 'react';
 import { ABOUT } from '@/lib/about-content';
-import { analysisFormat, mergeShots, roleLabel, scriptPrompt, timeRange } from '@/lib/analyze';
+import { analysisFormat, frameTime, mergeShots, roleLabel, scriptPrompt, scriptText, timeRange } from '@/lib/analyze';
 import { ANALYZE_EXAMPLES } from '@/lib/analyze-examples';
-import { api, errorText, sendJson } from '@/lib/api';
+import { api, ApiError, errorText, sendJson } from '@/lib/api';
 import { MAX_VIDEO_BYTES } from '@/lib/upload-limits';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { About } from './About';
+import { confirmDialog } from './Confirm';
 import { Icon } from './Icon';
 import { elapsedLabel, JobPrompt } from './jobs';
 import { AnalysisHistory } from './AnalysisHistory';
@@ -34,9 +35,91 @@ export interface AnalysisRow {
 
 const terminal = (s: string): boolean => s === 'succeeded' || s === 'failed';
 
+/** The whole breakdown on the clipboard as text, with a short note on how it went. */
+function CopyScript({ text }: { text: string }) {
+  const [note, setNote] = useState('');
+  const copy = () => {
+    // No clipboard outside a secure context (the LAN address over http): say so rather than do nothing.
+    if (!navigator.clipboard) return setNote('Không chép được.');
+    void navigator.clipboard.writeText(text).then(
+      () => setNote('Đã chép.'),
+      () => setNote('Không chép được.'),
+    );
+  };
+  return (
+    <>
+      <button type="button" onClick={copy}>
+        Chép kịch bản
+      </button>
+      <span className="muted" aria-live="polite">
+        {note}
+      </span>
+    </>
+  );
+}
+
+const FRAME_WIDTH = 128; // twice the 64 px it shows at, for a sharp still on a dense screen
+const FRAME_WAIT_MS = 10_000;
+
+/** Resolves on the video's `done` event, rejects on its error or after FRAME_WAIT_MS; `go` starts the load or the seek. */
+const videoEvent = (v: HTMLVideoElement, done: 'loadeddata' | 'seeked', go: () => void) =>
+  new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('video timeout')), FRAME_WAIT_MS);
+    v.addEventListener(done, () => (clearTimeout(timer), resolve()), { once: true });
+    v.addEventListener('error', () => (clearTimeout(timer), reject(new Error('video error'))), { once: true });
+    go();
+  });
+
+/**
+ * A still of the video at each scene, cut in the browser: a detached same-origin video seeks to the scene and draws to a canvas, one scene at a time, once `box`
+ * scrolls into view. An entry is undefined until its still is ready; null (no thumbnails at all) with no source or after any failure, so the page shows none.
+ */
+function useFrames(src: string | undefined, shots: Analysis['shots'], box: RefObject<HTMLElement | null>): (string | undefined)[] | null {
+  const [frames, setFrames] = useState<(string | undefined)[] | null>(src ? [] : null);
+  const scenes = shots.map((s) => `${s.start}-${s.end}`).join();
+  useEffect(() => {
+    if (!src) return setFrames(null);
+    setFrames([]);
+    let stopped = false;
+    const v = document.createElement('video');
+    v.muted = true;
+    v.playsInline = true;
+    v.preload = 'auto';
+    const run = async () => {
+      try {
+        await videoEvent(v, 'loadeddata', () => (v.src = src));
+        const canvas = document.createElement('canvas');
+        canvas.width = FRAME_WIDTH;
+        canvas.height = Math.round((FRAME_WIDTH * v.videoHeight) / v.videoWidth);
+        const out: string[] = [];
+        for (const s of shots) {
+          await videoEvent(v, 'seeked', () => (v.currentTime = frameTime(s.start, s.end)));
+          if (stopped) return;
+          canvas.getContext('2d')!.drawImage(v, 0, 0, canvas.width, canvas.height);
+          out.push(canvas.toDataURL('image/jpeg', 0.7));
+          setFrames([...out]);
+        }
+      } catch {
+        if (!stopped) setFrames(null); // a clip that will not decode, or a canvas the browser refuses to read: no thumbnails, quietly
+      }
+    };
+    const watch = box.current && typeof IntersectionObserver !== 'undefined' ? new IntersectionObserver((e) => e[0]?.isIntersecting && (watch?.disconnect(), void run())) : null;
+    if (watch) watch.observe(box.current!);
+    else void run();
+    return () => {
+      stopped = true;
+      watch?.disconnect();
+      v.removeAttribute('src'); // lets the browser drop the connection
+      v.load();
+    };
+  }, [src, scenes]);
+  return frames;
+}
+
 /** The analysis result, Vietnamese display with each shot's English prompt. Pure, so it render-tests without the page.
- * With `seek` (a source video is beside it) each scene's time is a button that plays the video from there; `activeShot` marks the scene being played. */
-export function AnalysisResult({ analysis, seek, activeShot }: { analysis: Analysis; seek?: (sec: number) => void; activeShot?: number | null }) {
+ * With `seek` (a source video is beside it) each scene's time is a button that plays the video from there; `activeShot` marks the scene being played.
+ * `frames` (one per scene, undefined while still being cut) adds a thumbnail that seeks the same way. */
+export function AnalysisResult({ analysis, seek, activeShot, frames }: { analysis: Analysis; seek?: (sec: number) => void; activeShot?: number | null; frames?: (string | undefined)[] | null }) {
   // Vietnamese for reading when the worker translated it; the English prompt is still what the "use this prompt" button sends to Create.
   const vi = analysis.vi;
   const scenes = mergeShots(analysis);
@@ -53,47 +136,61 @@ export function AnalysisResult({ analysis, seek, activeShot }: { analysis: Analy
         </p>
       )}
       {(vi?.summary || analysis.summary) && <p className="muted">{vi?.summary || analysis.summary}</p>}
-      {script && (
-        <p>
-          <Link className="button" href={`/create?prompt=${encodeURIComponent(script)}`}>
-            Dùng cả kịch bản
-          </Link>
+      {scenes.shots.length > 0 && (
+        <p className="analysis-script-actions">
+          {script && (
+            <Link className="button" href={`/create?prompt=${encodeURIComponent(script)}`}>
+              Dùng cả kịch bản
+            </Link>
+          )}
+          <CopyScript text={scriptText(analysis)} />
         </p>
       )}
       {seek && <p className="help">Bấm giờ của một cảnh để tua video tới đó.</p>}
       <ol className="analysis-shots">
         {scenes.shots.map((s, i) => (
-          <li key={s.index} className="field" data-active={activeShot === s.index ? true : undefined}>
-            <p className="analysis-shot-head">
-              <strong>Cảnh {s.index}</strong>
-              {s.role && <span className="analysis-role">{roleLabel(s.role)}</span>}
-              {seek ? (
-                <button type="button" className="analysis-time" title="Bấm cảnh để tua video" aria-label={`Tua video tới cảnh ${s.index}, ${timeRange(s.start, s.end)}`} onClick={() => seek(s.start)}>
-                  {timeRange(s.start, s.end)}
+          <li key={s.index} className="field" data-active={activeShot === s.index ? true : undefined} data-frame={seek && frames ? true : undefined}>
+            {seek &&
+              frames &&
+              (frames[i] ? (
+                <button type="button" className="analysis-frame" title="Bấm để tua video tới cảnh này" onClick={() => seek(s.start)}>
+                  <img src={frames[i]} alt={`Khung hình cảnh ${s.index}`} />
                 </button>
               ) : (
-                <span className="muted">{timeRange(s.start, s.end)}</span>
-              )}
-            </p>
-            {/* The English prompt with copy, as on History cards; under a Vietnamese reading it opens on a tap (no hover on a phone). */}
-            {scenes.vi?.[i] ? (
-              <>
-                <p className="analysis-prompt">{scenes.vi[i]}</p>
-                {s.prompt && (
-                  <details className="analysis-en">
-                    <summary>Prompt tiếng Anh</summary>
-                    <JobPrompt text={s.prompt} />
-                  </details>
+                <span className="analysis-frame" aria-hidden="true" />
+              ))}
+            <div className="analysis-shot-main">
+              <p className="analysis-shot-head">
+                <strong>Cảnh {s.index}</strong>
+                {s.role && <span className="analysis-role">{roleLabel(s.role)}</span>}
+                {seek ? (
+                  <button type="button" className="analysis-time" title="Bấm cảnh để tua video" aria-label={`Tua video tới cảnh ${s.index}, ${timeRange(s.start, s.end)}`} onClick={() => seek(s.start)}>
+                    {timeRange(s.start, s.end)}
+                  </button>
+                ) : (
+                  <span className="muted">{timeRange(s.start, s.end)}</span>
                 )}
-              </>
-            ) : (
-              s.prompt && <JobPrompt text={s.prompt} />
-            )}
-            {s.prompt && (
-              <Link className="link-button" href={`/create?prompt=${encodeURIComponent(s.prompt)}`}>
-                Dùng prompt này
-              </Link>
-            )}
+              </p>
+              {/* The English prompt with copy, as on History cards; under a Vietnamese reading it opens on a tap (no hover on a phone). */}
+              {scenes.vi?.[i] ? (
+                <>
+                  <p className="analysis-prompt">{scenes.vi[i]}</p>
+                  {s.prompt && (
+                    <details className="analysis-en">
+                      <summary>Prompt tiếng Anh</summary>
+                      <JobPrompt text={s.prompt} />
+                    </details>
+                  )}
+                </>
+              ) : (
+                s.prompt && <JobPrompt text={s.prompt} />
+              )}
+              {s.prompt && (
+                <Link className="link-button" href={`/create?prompt=${encodeURIComponent(s.prompt)}`}>
+                  Dùng prompt này
+                </Link>
+              )}
+            </div>
           </li>
         ))}
       </ol>
@@ -106,8 +203,11 @@ export function AnalysisResult({ analysis, seek, activeShot }: { analysis: Analy
  * and only the one open result mounts a player, so the History list stays light. */
 export function AnalysisWithSource({ analysis, src, poster, preload = 'metadata' }: { analysis: Analysis; src?: string; poster?: string; preload?: 'none' | 'metadata' }) {
   const video = useRef<HTMLVideoElement>(null);
+  const box = useRef<HTMLDivElement>(null);
   const [at, setAt] = useState<number | null>(null);
-  const active = at === null ? null : (mergeShots(analysis).shots.find((s) => at >= s.start && at < s.end)?.index ?? null);
+  const shots = mergeShots(analysis).shots;
+  const frames = useFrames(src, shots, box);
+  const active = at === null ? null : (shots.find((s) => at >= s.start && at < s.end)?.index ?? null);
   const seek = (sec: number) => {
     const v = video.current;
     if (!v) return;
@@ -116,14 +216,14 @@ export function AnalysisWithSource({ analysis, src, poster, preload = 'metadata'
     void v.play().catch(() => undefined); // a refused autoplay still leaves the video at the scene
   };
   return (
-    <div className="analysis-box">
+    <div ref={box} className="analysis-box">
       <div className="analysis-with-source">
         {src && (
           <div className="analysis-source-col">
             <video ref={video} className="analysis-source" src={src} poster={poster} controls muted playsInline preload={preload} onTimeUpdate={(e) => setAt(e.currentTarget.currentTime)} aria-label="Video gốc đã phân tích" />
           </div>
         )}
-        <AnalysisResult analysis={analysis} seek={src ? seek : undefined} activeShot={active} />
+        <AnalysisResult analysis={analysis} seek={src ? seek : undefined} activeShot={active} frames={frames} />
       </div>
     </div>
   );
@@ -206,6 +306,7 @@ export function AnalyzeView({ initialId, remakeEnabled = false }: { initialId?: 
   const [history, setHistory] = useState<AnalysisRow[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [historyError, setHistoryError] = useState(false);
+  const [removeError, setRemoveError] = useState('');
   const poll = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   // The id the poll chain is following; cleared on unmount, remove or a History pick so an in-flight fetch does not
   // reschedule itself or write its row over a newer selection after the chain was meant to stop.
@@ -304,6 +405,22 @@ export function AnalyzeView({ initialId, remakeEnabled = false }: { initialId?: 
     }
   }
 
+  // Delete a finished analysis from History: the one on view closes with it. The server's 409 texts (a remake exists) are written for members.
+  async function remove(a: AnalysisRow) {
+    if (!(await confirmDialog({ title: 'Xoá phân tích này?', body: 'Video gốc vẫn còn trong Thư viện của bạn.', confirmLabel: 'Xoá', danger: true }))) return;
+    setRemoveError('');
+    try {
+      await api(`/api/analyses/${encodeURIComponent(a.id)}`, { method: 'DELETE' });
+      setHistory((h) => h.filter((x) => x.id !== a.id));
+      if (current?.id === a.id) {
+        close();
+        setTab('history'); // stay on the list the member is working in
+      }
+    } catch (e) {
+      setRemoveError(e instanceof ApiError && e.status === 409 ? e.message : 'Không xoá được phân tích này. Hãy thử lại.');
+    }
+  }
+
   const running = current !== null && !terminal(current.status);
   // Pick a History row to view: stop any live poll and show it.
   const pick = (a: AnalysisRow) => {
@@ -361,7 +478,12 @@ export function AnalyzeView({ initialId, remakeEnabled = false }: { initialId?: 
           ) : shown === 'history' ? (
             <section className="analysis-history">
               <h2>Gần đây</h2>
-              <AnalysisHistory loading={historyLoading} error={historyError} items={history} currentId={current?.id} onRetry={() => void loadHistory()} onPick={pick} />
+              <AnalysisHistory loading={historyLoading} error={historyError} items={history} currentId={current?.id} onRetry={() => void loadHistory()} onPick={pick} onDelete={(a) => void remove(a)} />
+              {removeError && (
+                <p className="error" role="alert">
+                  {removeError}
+                </p>
+              )}
             </section>
           ) : shown === 'examples' ? (
             <Examples busy={busy} onUse={(name) => void takeSample(name)} />

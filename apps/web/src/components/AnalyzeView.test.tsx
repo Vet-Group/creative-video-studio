@@ -78,3 +78,25 @@ test('a running analysis shows a status block with the usual wait, and a failed 
   expect(retry).toContain('role="alert"');
   expect(retry).toContain('Thử lại');
 });
+
+test('with a source video each scene has a thumbnail slot that seeks like the time button, and the whole script can be copied', () => {
+  const html = renderToStaticMarkup(<AnalysisPanel row={base} onClose={() => undefined} />);
+  expect(html.match(/class="analysis-frame"/g)).toHaveLength(2); // a placeholder per scene until its still is cut in the browser
+  expect(html).toContain('data-frame="true"');
+  expect(html).toContain('Chép kịch bản');
+  expect(html).toContain('aria-live="polite"');
+  const plain = renderToStaticMarkup(<AnalysisResult analysis={analysis} />);
+  expect(plain).not.toContain('analysis-frame'); // no video beside it: no thumbnails
+  expect(plain).toContain('Chép kịch bản'); // but the script still copies
+  const noVideo = renderToStaticMarkup(<AnalysisPanel row={{ ...base, sourceAssetId: null }} onClose={() => undefined} />);
+  expect(noVideo).not.toContain('analysis-frame');
+});
+
+test('a thumbnail that is ready is an image button labelled with its scene; one still being cut is a hidden placeholder', () => {
+  const html = renderToStaticMarkup(<AnalysisResult analysis={analysis} seek={() => undefined} frames={['data:image/jpeg;base64,AAAA', undefined]} />);
+  expect(html).toContain('alt="Khung hình cảnh 1"');
+  expect(html).toContain('src="data:image/jpeg;base64,AAAA"');
+  expect(html).not.toContain('alt="Khung hình cảnh 2"');
+  expect(html.match(/class="analysis-frame"/g)).toHaveLength(2);
+  expect(renderToStaticMarkup(<AnalysisResult analysis={analysis} seek={() => undefined} frames={null} />)).not.toContain('analysis-frame'); // a failed cut shows none
+});
