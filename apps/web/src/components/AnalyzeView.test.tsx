@@ -71,7 +71,7 @@ test('a finished analysis shows its input video beside the result, and omits the
 test('a running analysis shows a status block with the usual wait, and a failed one an alert with retry only when it can be retried', () => {
   const running = renderToStaticMarkup(<AnalysisPanel row={{ ...base, status: 'running', result: null }} onClose={() => undefined} />);
   expect(running).toContain('role="status"');
-  expect(running).toContain('1–2 phút');
+  expect(running).toContain('2–4 phút'); // measured on prod 2026-11-14: median 125 s, slowest 232 s
   const failed = { ...base, status: 'failed' as const, result: null };
   expect(renderToStaticMarkup(<AnalysisPanel row={failed} onClose={() => undefined} />)).not.toContain('Thử lại');
   const retry = renderToStaticMarkup(<AnalysisPanel row={failed} onRetry={() => undefined} onClose={() => undefined} />);

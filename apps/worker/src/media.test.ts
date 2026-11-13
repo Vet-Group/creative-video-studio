@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 import ffprobe from 'ffprobe-static';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
-import { burnEndText, concatClips, cutShot, endTextLayout, probeSeconds, probeSize, probeVideoSeconds, requireFfmpeg, sideBySide, stillSlot, trimClip, wrapText } from './media';
+import { burnEndText, concatClips, cutShot, endTextLayout, probeSeconds, probeSize, probeVideoSeconds, requireFfmpeg, sideBySide, spliceClips, stillSlot, trimClip, wrapText } from './media';
 
 const run = promisify(execFile);
 let dir = '';
@@ -63,6 +63,25 @@ describe('Smart Remake cuts and joins', () => {
     expect(Math.abs(Number(p.format.duration) - 5)).toBeLessThanOrEqual(0.2); // 4 s + 1 s
     expect(p.streams.map((s) => s.codec_type)).toEqual(['video']); // the source's tone is dropped
   });
+
+  test('lays remade parts over their spans of the source, at its size and length, and keeps its sound', async () => {
+    const red = join(dir, 'red.mp4'); // a remade part: silent, at another rate and shorter than its span; its size is the cut's
+    await run(requireFfmpeg(), ['-y', '-v', 'error', '-f', 'lavfi', '-i', 'color=c=red:size=360x640:rate=30', '-t', '0.8', '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', red]);
+    const green = join(dir, 'green.mp4'); // smaller, longer than its span, and the last part reaches the end
+    await run(requireFfmpeg(), ['-y', '-v', 'error', '-f', 'lavfi', '-i', 'color=c=green:size=180x320:rate=24', '-t', '2', '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', green]);
+    const full = join(dir, 'full.mp4');
+    await spliceClips(source, [{ start: 1, seconds: 1, clip: red }, { start: 3, seconds: 1, clip: green }], full);
+    expect(await probeSize(full)).toEqual({ width: 360, height: 640 });
+    const p = await probe(full);
+    expect(Math.abs(Number(p.format.duration) - 4)).toBeLessThanOrEqual(0.15);
+    expect(p.streams.map((s) => s.codec_type).sort()).toEqual(['audio', 'video']);
+    const [before, inRed, between, inGreen] = await Promise.all([0.5, 1.5, 2.5, 3.5].map((t) => frame(full, t)));
+    const src = await frame(source, 0.5);
+    expect(meanDiff(before!, src)).toBeLessThan(4); // untouched spans are the source
+    expect(meanDiff(between!, src)).toBeLessThan(4);
+    expect(meanDiff(inRed!, src)).toBeGreaterThan(10); // a remade span is the part, held over its whole second
+    expect(meanDiff(inGreen!, src)).toBeGreaterThan(10);
+  }, 30_000); // four ffmpeg runs and four frame reads
 });
 
 describe('the end text', () => {
