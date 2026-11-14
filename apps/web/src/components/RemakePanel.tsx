@@ -11,6 +11,7 @@ import { api, errorText, sendJson } from '@/lib/api';
 import { confirmRun } from '@/lib/run-guard';
 import { useFrames } from '@/lib/use-frames';
 import type { AnalysisRow } from './AnalyzeView';
+import { CompareVideo } from './CompareVideo';
 import { confirmDialog } from './Confirm';
 import { type Img, Slot, uploadError, uploadImages } from './image-tools';
 
@@ -48,8 +49,8 @@ export function remakeMinutesLeft(row: RemakeRow, analysis?: Analysis | null): n
 }
 
 /** One remake: its state, the joined video, then each shot's clip or that it failed. Pure, so it render-tests without the page. `scene` numbers a stored shot as the result list does;
- * `analysis`, when the page has it, makes the time left more exact; `children` end the item (a link back to the analysis). */
-export function RemakeResult({ row, scene = (index) => index, analysis, onDelete, children }: { row: RemakeRow; scene?: (index: number) => number; analysis?: Analysis | null; onDelete?: () => void; children?: ReactNode }) {
+ * `analysis`, when the page has it, makes the time left more exact, and with `sourceAssetId` (the reference video) gives each clip a before/after slider; `children` end the item (a link back to the analysis). */
+export function RemakeResult({ row, scene = (index) => index, analysis, sourceAssetId, onDelete, children }: { row: RemakeRow; scene?: (index: number) => number; analysis?: Analysis | null; sourceAssetId?: string | null; onDelete?: () => void; children?: ReactNode }) {
   const shots = row.result?.shots ?? [];
   return (
     <li className="remake-item">
@@ -89,9 +90,14 @@ export function RemakeResult({ row, scene = (index) => index, analysis, onDelete
           {shots.map((s) => (
             <li key={s.index}>
               {s.clipAssetId ? (
-                <a href={`/api/assets/${s.clipAssetId}/content`} target="_blank" rel="noreferrer">
-                  Clip cảnh {scene(s.index)}
-                </a>
+                <>
+                  <a href={`/api/assets/${s.clipAssetId}/content`} target="_blank" rel="noreferrer">
+                    Clip cảnh {scene(s.index)}
+                  </a>
+                  {sourceAssetId && analysis && remakeScene(analysis, s.index) && (
+                    <CompareVideo before={`/api/assets/${sourceAssetId}/content`} after={`/api/assets/${s.clipAssetId}/content`} start={remakeScene(analysis, s.index)!.start} />
+                  )}
+                </>
               ) : (
                 <span className="error">Cảnh {scene(s.index)} không tạo được</span>
               )}
@@ -238,7 +244,7 @@ export function RemakePanel({ row, initialProduct, initialChosen, note, productF
       {remakes.length > 0 && (
         <ul className="remake-list">
           {remakes.map((r) => (
-            <RemakeResult key={r.id} row={r} scene={scene} analysis={row.result} onDelete={() => void remove(r)} />
+            <RemakeResult key={r.id} row={r} scene={scene} analysis={row.result} sourceAssetId={row.sourceAssetId} onDelete={() => void remove(r)} />
           ))}
         </ul>
       )}

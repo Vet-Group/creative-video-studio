@@ -155,3 +155,17 @@ test('with a source video each scene gets a decorative thumbnail slot beside its
   expect(withVideo).toContain('type="checkbox"'); // the checkbox and its text label stay
   expect(panel(null)).not.toContain('analysis-frame');
 });
+
+test('a clip with its analysis and reference video gets a before/after slider seeked to its scene, beside the existing links', () => {
+  const analysis: Analysis = { durationS: 12, shotCount: 2, format: '', hook: '', summary: '', shots: [{ index: 1, start: 0, end: 5.2, role: '', prompt: 'p1' }, { index: 2, start: 5.2, end: 12, role: '', prompt: 'p2' }] };
+  const row: RemakeRow = { ...base, outputAssetId: 'out-1', result: { shots: [{ index: 2, status: 'succeeded', clipAssetId: 'c2' }, { index: 1, status: 'failed' }], compareAssetId: 'cmp' } };
+  const html = renderToStaticMarkup(<RemakeResult row={row} analysis={analysis} sourceAssetId="src-1" />);
+  expect(html).toContain('src="/api/assets/src-1/content#t=5.2"');
+  expect(html).toContain('src="/api/assets/c2/content"');
+  expect(html).toContain('<input type="range" min="0" max="100" aria-label="So sánh trước và sau"');
+  expect(html).toContain('href="/api/assets/c2/content"'); // the clip link stays
+  expect(html).toContain('href="/api/assets/cmp/content"'); // so does the side-by-side
+  expect(html.match(/type="range"/g)).toHaveLength(1); // the failed shot has none
+  expect(renderToStaticMarkup(<RemakeResult row={row} analysis={analysis} />)).not.toContain('type="range"'); // no reference video
+  expect(renderToStaticMarkup(<RemakeResult row={row} sourceAssetId="src-1" />)).not.toContain('type="range"'); // no scene timing
+});
