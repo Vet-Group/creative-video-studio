@@ -70,7 +70,7 @@ export async function POST(request: Request) {
     // The Check button under the prompt preview: the composed English prompt, reviewed for the page's model and pace; it counts as a run like any other.
     const text = typeof b.text === 'string' ? b.text.trim() : '';
     if (!text || text.length > PROMPT_CEILING) return bad(`text must be 1 to ${PROMPT_CEILING} characters`);
-    const extra = await modelAndPace(b);
+    const extra = await modelAndPace(b, false);
     if (typeof extra === 'string') return bad(extra);
     return queue(g.session.user.id, { field: 'check', text, context: '', max: PROMPT_CEILING, ...extra, ...note });
   }
@@ -130,13 +130,13 @@ async function scenes(session: Session, b: { analysisId?: unknown; productAssetI
  * The chosen model's note (its name, how to write for it and whether the clip has sound) and the clip's length, or the error. Only an enabled
  * model is named to the LLM, so the member's request never reaches it as words.
  */
-async function modelAndPace(b: { model?: unknown; audio?: unknown; seconds?: unknown }): Promise<Pick<SuggestInput, 'model' | 'seconds'> | string> {
+async function modelAndPace(b: { model?: unknown; audio?: unknown; seconds?: unknown }, writing = true): Promise<Pick<SuggestInput, 'model' | 'seconds'> | string> {
   if (b.audio !== undefined && typeof b.audio !== 'boolean') return 'audio must be true or false';
   if (b.seconds !== undefined && !(Number.isInteger(b.seconds) && (b.seconds as number) >= 1 && (b.seconds as number) <= 60)) return 'seconds must be a whole number from 1 to 60';
   if (b.model === undefined) return { ...(b.seconds !== undefined && { seconds: b.seconds as number }) };
   const model = typeof b.model === 'string' ? (await pool.query('select id, label, endpoint from model_configs where id = $1 and enabled', [b.model])).rows[0] : undefined;
   if (!model) return 'model is not an enabled model';
-  return { model: modelNote(model, b.audio === true), ...(b.seconds !== undefined && { seconds: b.seconds as number }) };
+  return { model: modelNote(model, b.audio === true, writing), ...(b.seconds !== undefined && { seconds: b.seconds as number }) };
 }
 
 /** Counts the run against the member's daily limit, stores it and hands it to the worker. */

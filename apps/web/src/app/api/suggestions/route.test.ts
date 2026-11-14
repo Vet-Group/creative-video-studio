@@ -136,7 +136,7 @@ describe('/api/suggestions', () => {
     const { id } = (await res.json()) as { id: string };
     expect((await pool.query('select input from suggestion_runs where id = $1', [id])).rows[0].input).toEqual({
       field: 'check', text: 'The clip opens on a spin.', context: '', max: 5000, seconds: 5, format: 'review',
-      model: modelNote({ id: 'kling-c', label: 'Kling C', endpoint: 'fal-ai/kling-video/v2.6/pro/image-to-video' }, false),
+      model: modelNote({ id: 'kling-c', label: 'Kling C', endpoint: 'fal-ai/kling-video/v2.6/pro/image-to-video' }, false, false),
     });
     expect((await ask(u, { field: 'check', text: 'A spin.' })).status).toBe(202);
     expect(await error(await ask(u, { field: 'check', text: '  ' }))).toBe('text must be 1 to 5000 characters');
