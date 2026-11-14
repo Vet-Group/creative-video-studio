@@ -187,7 +187,7 @@ test('Library views: grid or list remembered, a selection bar with the zip, sear
   expect(await fits()).toBe(true);
 
   // No items at all: the first-use state leads to Create video and Image Generation.
-  await page.route(/\/api\/library(\?|$)/, (r) => r.fulfill({ json: { hasMore: false, isAdmin: false, unmarked: 0, creators: [], clips: [] } }));
+  await page.route(/\/api\/library(\?|$)/, (r) => r.fulfill({ json: { hasMore: false, isAdmin: false, unmarked: 0, creators: [], ratios: [], clips: [] } }));
   await page.reload();
   await expect(page.getByText('Thư viện còn trống')).toBeVisible();
   await expect(page.locator('.library-empty').getByRole('link', { name: 'Tạo video' })).toHaveAttribute('href', '/create');

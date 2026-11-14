@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { activeFilterChips, activeFilters, dayHeadings, filtersFromParams, libraryQuery, matchesVerdict, NO_FILTERS, readView, saveView, VIEW_KEY } from './library-view';
+import { activeFilterChips, activeFilters, dayHeadings, filtersFromParams, libraryQuery, matchesVerdict, mergeFresh, NO_FILTERS, readView, saveView, VIEW_KEY } from './library-view';
 
 describe('libraryQuery', () => {
   it('leaves the defaults out', () => {
@@ -153,5 +153,25 @@ describe('dayHeadings', () => {
   it('adds no heading when every item is from one day, or there is none', () => {
     expect(dayHeadings([at('2026-11-12T09:00:00+07:00'), at('2026-11-12T08:00:00+07:00')], now).size).toBe(0);
     expect(dayHeadings([], now).size).toBe(0);
+  });
+});
+
+describe('mergeFresh', () => {
+  const item = (id: string) => ({ id });
+  it('puts the items not yet shown on top and keeps the pages already loaded', () => {
+    const cur = [item('c'), item('b'), item('a')];
+    expect(mergeFresh(cur, [item('e'), item('d'), item('c')])).toEqual([item('e'), item('d'), item('c'), item('b'), item('a')]);
+  });
+
+  it('adds nothing when the first page has nothing new, and takes the fresh copy of an item shown', () => {
+    const cur = [item('c'), item('b')];
+    expect(mergeFresh(cur, [item('c'), item('b')])).toEqual(cur);
+    const marked = [{ id: 'c', verdict: null as string | null }, { id: 'b', verdict: null as string | null }];
+    expect(mergeFresh(marked, [{ id: 'c', verdict: 'pass' }])).toEqual([{ id: 'c', verdict: 'pass' }, { id: 'b', verdict: null }]);
+    expect(mergeFresh(cur, [])).toEqual(cur);
+  });
+
+  it('fills an empty list', () => {
+    expect(mergeFresh([], [item('b'), item('a')])).toEqual([item('b'), item('a')]);
   });
 });
