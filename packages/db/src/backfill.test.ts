@@ -1,12 +1,12 @@
 // The one-off migration that marks every existing user's email as verified (D.1), run against a database that already has users.
 import { readFileSync } from 'node:fs';
-import pg from 'pg';
 import { afterAll, expect, test } from 'vitest';
 import { fillInputSlots } from './assets';
+import { createPool } from './client';
 import { createTestDatabase } from './testing';
 
 const testDb = await createTestDatabase();
-const pool = new pg.Pool({ connectionString: testDb.url, max: 1 });
+const pool = createPool(testDb.url, 1);
 
 afterAll(async () => {
   await pool.end();

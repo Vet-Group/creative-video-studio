@@ -1,16 +1,16 @@
 // Integration test of migration 0002 on a disposable database (needs the compose Postgres: `pnpm services:up`).
 import { readFileSync } from 'node:fs';
-import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { ALWAYS_AUDIO, AUDIO_USD_PER_SECOND, BAKEOFF_MODELS } from '../../core/src/models';
 import { tokenCost } from '../../core/src/providers/byteplus';
 import { VIDEO_BODIES, videoInputs } from '../../core/src/providers/fal';
 import { VERTEX_OMNI_MODEL } from '../../core/src/providers/vertex-omni';
 import { PRESETS } from '../../core/src/presets';
+import { createPool } from './client';
 import { createTestDatabase } from './testing';
 
 const testDb = await createTestDatabase();
-const pool = new pg.Pool({ connectionString: testDb.url, max: 2 });
+const pool = createPool(testDb.url, 2);
 
 afterAll(async () => {
   await pool.end();
