@@ -265,7 +265,7 @@ export function ClipCard({ clip, view, select, onChange, onDeleted, onOpen }: { 
             {clip.prompt ?? featureLabel(clip.feature)}
           </p>
           <p className="lib-row-meta">
-            {clip.creator.name} · {fmtTime(clip.createdAt)} · {clip.ratio} · {image ? clip.resolution : `${clip.durationSec} giây`}
+            {clip.creator.name} · {fmtTime(clip.createdAt)} · {clip.ratio} · {image ? clip.resolution : `${clip.lengthSec ?? clip.durationSec} giây`}
           </p>
         </div>
         <div className="actions">
@@ -325,7 +325,7 @@ export function ClipCard({ clip, view, select, onChange, onDeleted, onOpen }: { 
         <button type="button" className="lib-open" onClick={onOpen} aria-label="Xem chi tiết" title="Xem chi tiết" {...about} />
         <span className="lib-chips">
           {clip.feature !== 'video' && <span className="lib-chip">{featureLabel(clip.feature)}</span>}
-          {!image && <span className="lib-chip">{clip.durationSec}s</span>}
+          {!image && <span className="lib-chip">{clip.lengthSec ?? clip.durationSec}s</span>}
           {clip.isMock && <span className="badge">MOCK</span>}
           {clip.example && <span className="lib-chip">Ví dụ</span>}
         </span>
