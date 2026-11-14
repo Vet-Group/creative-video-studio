@@ -42,16 +42,17 @@ const VERDICTS: Record<string, string> = {
 };
 
 /**
- * The Library: every user's live clips and images, newest first. Filters: `creator` (a user id), `date` (YYYY-MM-DD, Asia/Ho_Chi_Minh), `ratio` (the real shape of the output, one of the `ratios` listed; an unknown value is ignored) and
+ * The Library: every user's live clips and images, newest first. Filters: `creator` (a user id), `date` (YYYY-MM-DD, Asia/Ho_Chi_Minh), `ratio` (the real shape of the output, one of the `ratios` listed; an unknown value is ignored), `store` (a store id from the `stores` listed, or `none` for items with no store; the id of a closed store matches nothing unless the caller is an Admin) and
  * `kind` (`all` by default, `images`, `videos`, one feature of `try_on`, `image`, `video`, `marketing` (or one of its formats, `marketing_ugc`, `marketing_advanced`, `marketing_unboxing` and `marketing_review`), or `apps` for every app feature, or the feature of one app such as `background_changer`),
  * `verdict` (`none` for unmarked items, `pass`, `featured` or `fail`), `favorites=1` (only the caller's favourites), `example=1` (only the results an Admin put on an Examples tab; with the `kind` of one such tab, in its order unless `sort=oldest`), `q` (words in the model name, the creator's own prompt or the brief, or the store name, ignoring case and diacritics, up to 200 characters) and `sort` (`newest`, the default, or `oldest`); `offset` pages by 24. `favorite` says whether the caller marked an item, `example` whether it is on its page's Examples tab. Each item has its `feature` and `mediaType` (`video` or `image`, from the output asset); `videoAssetId` is the output asset
- * either way, and an image item has `durationSec` 0 and its `resolution`; `lengthSec` is a video's own length once recorded (else null), `durationSec` the length asked. `creators` fills the creator filter and `ratios` the ratio filter. `ratio` is the output's real shape. `unmarked` counts the live items the caller may mark (their own, or all for an Admin) that have no mark yet. `costUsd` is the job's ledger total, provisional while `costFinal` is false.
+ * either way, and an image item has `durationSec` 0 and its `resolution`; `lengthSec` is a video's own length once recorded (else null), `durationSec` the length asked. `creators`, `stores` (the stores that have a live item) and `ratios` fill the creator, store and ratio filters; `storeName` is the item's store (null for none, or a closed store the caller may not see). `ratio` is the output's real shape. `unmarked` counts the live items the caller may mark (their own, or all for an Admin) that have no mark yet. `costUsd` is the job's ledger total, provisional while `costFinal` is false.
  */
 export async function GET(request: Request) {
   const g = await guard(request, 'member');
   if (g.error) return g.error;
   const q = new URL(request.url).searchParams;
   const creator = q.get('creator');
+  const store = q.get('store') || null;
   const date = q.get('date');
   const days = q.get('days');
   const ratioParam = q.get('ratio');
@@ -75,10 +76,10 @@ export async function GET(request: Request) {
   if (text !== null && text.length > 200) return bad('q must be at most 200 characters');
   const me = g.session.user;
 
-  const [clips, creators, shapes, unmarked] = await Promise.all([
+  const [clips, creators, stores, shapes, unmarked] = await Promise.all([
     pool.query(
       `select j.id, j.user_id, u.name as creator_name, j.created_at, ${ICT_DAY} as day, j.model, m.label as model_label, ${SHAPE} as shape, j.duration_s, o.duration_ms as output_ms, j.is_mock, j.feature, j.params, o.mime as output_mime, o.filename as output_filename,
-              j.output_asset_id, j.poster_asset_id, j.store_id, coalesce(c.usd, 0)::numeric(12, 4)::text as cost_usd, coalesce(c.is_final, false) as cost_final, v.verdict, v.fault, v.featured, v.marked_by, ${OWN_PROMPT} as prompt,
+              j.output_asset_id, j.poster_asset_id, j.store_id, case when not s.hidden or $12::boolean then s.name end as store_name, coalesce(c.usd, 0)::numeric(12, 4)::text as cost_usd, coalesce(c.is_final, false) as cost_final, v.verdict, v.fault, v.featured, v.marked_by, ${OWN_PROMPT} as prompt,
               exists (select 1 from favorites f where f.job_id = j.id and f.user_id = $6) as favorite,
               e.job_id is not null as example
          from jobs j
@@ -92,6 +93,7 @@ export async function GET(request: Request) {
          left join examples e on e.job_id = j.id
         where ${LIVE_CLIP}
           and ($1::text is null or j.user_id = $1)
+          and ($11::text is null or case when $11 = 'none' then j.store_id is null else j.store_id = $11 and (not s.hidden or $12::boolean) end)
           and ($2::date is null or (j.created_at at time zone 'Asia/Ho_Chi_Minh')::date = $2::date)
           and ($9::int is null or (j.created_at at time zone 'Asia/Ho_Chi_Minh')::date > (now() at time zone 'Asia/Ho_Chi_Minh')::date - $9::int)
           and ($3::text is null or ${SHAPE} = $3)
@@ -102,9 +104,11 @@ export async function GET(request: Request) {
           and ($8::text is null or ${SEARCHED.map((c) => `unaccent(${c}) ilike unaccent($8)`).join(' or ')})
         order by ${example === '1' && sort === 'newest' && Object.hasOwn(GALLERY_SAMPLES, kind) ? EXAMPLE_ORDER : `j.created_at ${sort === 'oldest' ? 'asc' : 'desc'}, j.id ${sort === 'oldest' ? 'asc' : 'desc'}`} limit $4 offset $5`,
       // The words match literally: LIKE's own wildcards and escape are escaped.
-      [creator, date, ratio, PAGE + 1, offset, me.id, favorites === '1', text === null ? null : `%${text.replace(/[\\%_]/g, '\\$&')}%`, days === null ? null : Number(days), example === '1'],
+      [creator, date, ratio, PAGE + 1, offset, me.id, favorites === '1', text === null ? null : `%${text.replace(/[\\%_]/g, '\\$&')}%`, days === null ? null : Number(days), example === '1', store, me.role === 'admin'],
     ),
     pool.query(`select distinct u.id, u.name from jobs j join users u on u.id = j.user_id where ${LIVE_CLIP} order by u.name, u.id`),
+    // A closed store is the Admin's to see, as in the store picker.
+    pool.query(`select s.id, s.name from stores s where (not s.hidden or $1::boolean) and exists (select 1 from jobs j where j.store_id = s.id and ${LIVE_CLIP}) order by s.name, s.id`, [me.role === 'admin']),
     pool.query(`select distinct ${SHAPE} as shape from jobs j join assets o on o.id = j.output_asset_id ${SHAPE_JOIN} where ${LIVE_CLIP}`),
     pool.query(`select count(*)::int as n from jobs j where ${LIVE_CLIP} and ($1::boolean or j.user_id = $2) and not exists (select 1 from verdicts v where v.job_id = j.id)`, [me.role === 'admin', me.id]),
   ]);
@@ -112,6 +116,7 @@ export async function GET(request: Request) {
     hasMore: clips.rows.length > PAGE,
     isAdmin: me.role === 'admin',
     creators: creators.rows,
+    stores: stores.rows,
     ratios: (IMAGE_RATIOS as readonly string[]).filter((r) => shapes.rows.some((x) => x.shape === r)),
     unmarked: unmarked.rows[0].n,
     clips: clips.rows.slice(0, PAGE).map((r) => ({
@@ -130,6 +135,7 @@ export async function GET(request: Request) {
       videoAssetId: r.output_asset_id,
       posterAssetId: r.poster_asset_id,
       storeId: r.store_id,
+      storeName: r.store_name,
       costUsd: r.cost_usd,
       costFinal: r.cost_final,
       verdict: r.verdict ? { verdict: r.verdict, fault: r.fault, featured: r.featured, markedBy: r.marked_by } : null,

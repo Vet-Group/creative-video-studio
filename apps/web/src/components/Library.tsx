@@ -9,7 +9,7 @@ import { FAULTS } from '@/lib/faults';
 import { featureLabel } from '@/lib/features';
 import { GALLERY_SAMPLES, numberedSamples } from '@/lib/examples';
 import { cardTitleOfFormat, HOOKS, LOCATIONS } from '@/lib/marketing';
-import { activeFilterChips, activeFilters, type ChipKey, dayHeadings, filtersFromParams, type LibraryFilters, type LibraryView, libraryQuery, matchesVerdict, mergeFresh, NO_FILTERS, readView, saveView, type VerdictFilter } from '@/lib/library-view';
+import { activeFilterChips, activeFilters, type ChipKey, dayHeadings, filtersFromParams, type LibraryFilters, type LibraryView, libraryQuery, matchesVerdict, mergeFresh, NO_FILTERS, NO_STORE, readView, saveView, type VerdictFilter } from '@/lib/library-view';
 import { reuseHref } from '@/lib/reuse';
 import { SWIPE_START_PX, swipeStep } from '@/lib/swipe';
 import { useSamples } from '@/lib/use-samples';
@@ -265,7 +265,7 @@ export function ClipCard({ clip, view, select, onChange, onDeleted, onOpen }: { 
             {clip.prompt ?? featureLabel(clip.feature)}
           </p>
           <p className="lib-row-meta">
-            {clip.creator.name} · {fmtTime(clip.createdAt)} · {clip.ratio} · {image ? clip.resolution : `${clip.lengthSec ?? clip.durationSec} giây`}
+            {clip.creator.name} · {clip.storeName && `${clip.storeName} · `}{fmtTime(clip.createdAt)} · {clip.ratio} · {image ? clip.resolution : `${clip.lengthSec ?? clip.durationSec} giây`}
           </p>
         </div>
         <div className="actions">
@@ -341,8 +341,9 @@ export function ClipCard({ clip, view, select, onChange, onDeleted, onOpen }: { 
         <p className="lib-meta">
           {/* One line on a wide card: a long name is cut, never the time or the cost, so the marks below line up across a row.
               The phone's two columns put the name on its own line (globals.css), so its leading dot is drawn by CSS. */}
-          <span className="lib-who" title={clip.creator.name}>
+          <span className="lib-who" title={clip.storeName ? `${clip.creator.name} · ${clip.storeName}` : clip.creator.name}>
             {clip.creator.name}
+            {clip.storeName && ` · ${clip.storeName}`}
           </span>
           <span className="lib-when">{fmtShort(clip.createdAt)} ·</span>
           <span title={clip.costFinal ? 'Chi phí thật' : 'Chi phí thật, tạm tính'}>
@@ -589,6 +590,7 @@ export function ClipDetail({ clips, index, stores, admin, onIndex, onChange }: {
           {row('Âm thanh', job?.audio === 'on' ? 'Có' : job?.audio === 'off' ? 'Không' : null)}
           {row('AI cải thiện', job?.enhance ? 'Có' : null)}
           {row('Người tạo', `${clip.creator.name} · ${fmtTime(clip.createdAt)}`)}
+          {!stores && row('Cửa hàng', clip.storeName)}
           {row('Chi phí thật', `$${clip.costUsd}${clip.costFinal ? '' : ' (tạm tính)'}`)}
         </dl>
         {stores && (
@@ -878,6 +880,7 @@ export function Library() {
   const [clips, setClips] = useState<Clip[]>([]);
   const headings = dayHeadings(clips);
   const [creators, setCreators] = useState<{ id: string; name: string }[]>([]);
+  const [storeNames, setStoreNames] = useState<{ id: string; name: string }[]>([]); // the stores with a live item, for the store filter
   const [ratios, setRatios] = useState<string[]>([]);
   const [hasMore, setHasMore] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -906,7 +909,7 @@ export function Library() {
   }, [pickDay]);
   const active = activeFilters(filters);
   const inApps = filters.kind === 'apps' || APP_KINDS.some((k) => k.id === filters.kind);
-  const chips = activeFilterChips(filters, { creator: creators.find((c) => c.id === filters.creator)?.name, kind: [...KINDS, ...APP_KINDS].find((k) => k.id === filters.kind)?.label });
+  const chips = activeFilterChips(filters, { creator: creators.find((c) => c.id === filters.creator)?.name, store: storeNames.find((s) => s.id === filters.store)?.name, kind: [...KINDS, ...APP_KINDS].find((k) => k.id === filters.kind)?.label });
   // An item that no longer matches Favourites only or the verdict filter leaves the list, so the next page's offset stays right; the detail view then shows the next one.
   const listed = useRef(clips); // the list as last rendered, for a refresh to count what it adds
   listed.current = clips;
@@ -931,7 +934,7 @@ export function Library() {
     async (offset: number, refresh = false): Promise<number | null | undefined> => {
       const ticket = ++latest.current;
       try {
-        const r = await api<{ hasMore: boolean; isAdmin: boolean; unmarked: number; creators: { id: string; name: string }[]; ratios: string[]; clips: Clip[] }>(`/api/library?${libraryQuery(filters, offset)}`);
+        const r = await api<{ hasMore: boolean; isAdmin: boolean; unmarked: number; creators: { id: string; name: string }[]; stores: { id: string; name: string }[]; ratios: string[]; clips: Clip[] }>(`/api/library?${libraryQuery(filters, offset)}`);
         if (ticket !== latest.current) return undefined;
         setIsAdmin(r.isAdmin);
         setUnmarked(r.unmarked);
@@ -945,6 +948,7 @@ export function Library() {
           setHasMore(r.hasMore);
         }
         setCreators(r.creators);
+        setStoreNames(r.stores);
         setRatios(r.ratios);
         setState('ready');
         return r.hasMore ? r.clips.length : null;
@@ -1173,6 +1177,18 @@ export function Library() {
             {creators.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="library-field">
+          <span>Cửa hàng</span>
+          <select value={filters.store} onChange={(e) => set({ store: e.target.value })}>
+            <option value="">Tất cả</option>
+            <option value="none">{NO_STORE}</option>
+            {storeNames.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
               </option>
             ))}
           </select>

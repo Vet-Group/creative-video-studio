@@ -7,8 +7,8 @@ describe('libraryQuery', () => {
   });
 
   it('sends every filter, the trimmed words, the sort and the offset', () => {
-    const q = new URLSearchParams(libraryQuery({ q: '  áo  khoác ', creator: 'u1', date: '2026-10-23', days: '7', ratio: '1:1', kind: 'images', verdict: 'none', favoritesOnly: true, examplesOnly: true, sort: 'oldest' }, 24));
-    expect(Object.fromEntries(q)).toEqual({ q: 'áo  khoác', creator: 'u1', date: '2026-10-23', days: '7', ratio: '1:1', kind: 'images', verdict: 'none', favorites: '1', example: '1', sort: 'oldest', offset: '24' });
+    const q = new URLSearchParams(libraryQuery({ q: '  áo  khoác ', creator: 'u1', store: 's1', date: '2026-10-23', days: '7', ratio: '1:1', kind: 'images', verdict: 'none', favoritesOnly: true, examplesOnly: true, sort: 'oldest' }, 24));
+    expect(Object.fromEntries(q)).toEqual({ q: 'áo  khoác', creator: 'u1', store: 's1', date: '2026-10-23', days: '7', ratio: '1:1', kind: 'images', verdict: 'none', favorites: '1', example: '1', sort: 'oldest', offset: '24' });
   });
 
   it('drops blank words', () => {
@@ -22,7 +22,7 @@ describe('filtersFromParams', () => {
   });
 
   it('round-trips every filter through libraryQuery', () => {
-    const f = { q: 'áo khoác', creator: 'u1', date: '2026-10-23', days: '7' as const, ratio: '1:1', kind: 'images', verdict: 'none' as const, favoritesOnly: true, examplesOnly: true, sort: 'oldest' as const };
+    const f = { q: 'áo khoác', creator: 'u1', store: 'none', date: '2026-10-23', days: '7' as const, ratio: '1:1', kind: 'images', verdict: 'none' as const, favoritesOnly: true, examplesOnly: true, sort: 'oldest' as const };
     expect(filtersFromParams(new URLSearchParams(libraryQuery(f, 0)))).toEqual(f);
   });
 
@@ -45,7 +45,8 @@ describe('activeFilters', () => {
     expect(activeFilters({ ...NO_FILTERS, sort: 'oldest', q: ' ' })).toBe(0);
     expect(activeFilters({ ...NO_FILTERS, kind: 'videos' })).toBe(1);
     expect(activeFilters({ ...NO_FILTERS, verdict: 'fail' })).toBe(1);
-    expect(activeFilters({ q: 'x', creator: 'u1', date: '2026-10-23', days: '30', ratio: '9:16', kind: 'apps', verdict: 'pass', favoritesOnly: true, examplesOnly: true, sort: 'newest' })).toBe(9);
+    expect(activeFilters({ q: 'x', creator: 'u1', store: 's1', date: '2026-10-23', days: '30', ratio: '9:16', kind: 'apps', verdict: 'pass', favoritesOnly: true, examplesOnly: true, sort: 'newest' })).toBe(10);
+    expect(activeFilters({ ...NO_FILTERS, store: 'none' })).toBe(1);
   });
 });
 
@@ -105,14 +106,15 @@ describe('activeFilterChips', () => {
   it('has no chip when nothing is filtered', () => {
     expect(activeFilterChips(NO_FILTERS)).toEqual([]);
   });
-  it('one chip per active filter, in bar order, with the passed creator and kind names', () => {
+  it('one chip per active filter, in bar order, with the passed creator, store and kind names', () => {
     const chips = activeFilterChips(
-      { ...NO_FILTERS, q: ' áo ', creator: 'u1', days: '7', ratio: '9:16', kind: 'video', verdict: 'featured', favoritesOnly: true, examplesOnly: true },
-      { creator: 'An', kind: 'Tạo video' },
+      { ...NO_FILTERS, q: ' áo ', creator: 'u1', store: 's1', days: '7', ratio: '9:16', kind: 'video', verdict: 'featured', favoritesOnly: true, examplesOnly: true },
+      { creator: 'An', store: 'Cửa hàng A', kind: 'Tạo video' },
     );
     expect(chips).toEqual([
       { key: 'q', label: 'Tìm: áo' },
       { key: 'creator', label: 'Người tạo: An' },
+      { key: 'store', label: 'Cửa hàng: Cửa hàng A' },
       { key: 'days', label: '7 ngày qua' },
       { key: 'ratio', label: 'Tỉ lệ: 9:16' },
       { key: 'kind', label: 'Tạo video' },
@@ -121,6 +123,9 @@ describe('activeFilterChips', () => {
       { key: 'examplesOnly', label: 'Đang ở Ví dụ' },
     ]);
   });
+  it('the store filter for items with no store reads as its option, whatever name is passed', () => {
+    expect(activeFilterChips({ ...NO_FILTERS, store: 'none' }, { store: 'x' })).toEqual([{ key: 'store', label: 'Cửa hàng: Không gắn cửa hàng' }]);
+  });
   it('a picked date wins over days and reads day/month/year', () => {
     expect(activeFilterChips({ ...NO_FILTERS, date: '2026-11-09', days: '30' })).toEqual([{ key: 'date', label: 'Ngày: 09/11/2026' }]);
   });
@@ -128,8 +133,9 @@ describe('activeFilterChips', () => {
     expect(activeFilterChips({ ...NO_FILTERS, kind: 'background_changer' }, { kind: 'Đổi nền' })).toEqual([{ key: 'kind', label: 'Đổi nền' }]);
   });
   it('falls back to the raw value when no name is passed', () => {
-    expect(activeFilterChips({ ...NO_FILTERS, creator: 'u1', kind: 'video' })).toEqual([
+    expect(activeFilterChips({ ...NO_FILTERS, creator: 'u1', store: 's1', kind: 'video' })).toEqual([
       { key: 'creator', label: 'Người tạo: u1' },
+      { key: 'store', label: 'Cửa hàng: s1' },
       { key: 'kind', label: 'video' },
     ]);
   });
