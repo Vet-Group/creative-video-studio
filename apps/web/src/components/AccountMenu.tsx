@@ -1,11 +1,12 @@
 'use client';
 // The account button (the sidebar's bottom chip, or the avatar in the phone top bar) and its menu: Settings, today's clip cap, security, help, sign out.
 import { type CSSProperties, type KeyboardEvent, useId, useRef, useState } from 'react';
-import { api } from '@/lib/api';
+import { api, signOut } from '@/lib/api';
 import { isMac } from '@/lib/sidebar';
 import { NO_CAP } from '@/lib/caps';
+import { initials, levelOf, shareOf } from '@/lib/profile';
 import { Icon, type IconName } from './Icon';
-import { initials, levelOf, type Section, shareOf, signOut, type Usage } from './Settings';
+import type { Section, Usage } from './Settings';
 
 const ITEMS: readonly (readonly [Section, string, IconName])[] = [
   ['profile', 'Cài đặt', 'sliders'],
@@ -25,6 +26,7 @@ export function AccountMenu({ name, email, color, variant, onSettings }: { name:
   function show(at: 'first' | 'last') {
     setOpen(true);
     setClips(null);
+    void import('./Settings'); // so a slow network does not leave the click on a Settings item looking dead
     api<Usage>('/api/me/limits')
       .then((u) => setClips(u.clips))
       .catch(() => setClips('failed'));

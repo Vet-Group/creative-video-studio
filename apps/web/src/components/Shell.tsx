@@ -1,8 +1,9 @@
 'use client';
 // The frame of every signed-in page: navigation, the "My jobs" tray and the toasts.
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { createContext, type ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { type ComponentProps, createContext, type ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { api, errorText, type JobStatus, sendJson, thumbUrl, type TrayJob } from '@/lib/api';
 import { appBySlug } from '@/lib/apps';
 import type { ChangeEntry } from '@/lib/changelog';
@@ -27,12 +28,26 @@ import { JobFailureNote, canRetry, isCanceled, canRetryOnTwin, twinRetryText } f
 import { CancelButton, elapsedLabel, JobPrompt, JobsProvider, Recreate, resultHref, roleOf, Tap, toggleFullscreen, useForm, useJobs } from './jobs';
 import { LoadError } from './LoadError';
 import { Modal } from './Modal';
-import { type Account, type Section, Settings } from './Settings';
+import type { Account, Section } from './Settings';
 import { TemplateBlanksHost } from './TemplateBlanks';
 import { SaveTemplateDialog, type Scope } from './Templates';
 import { OpenToolGuide, ToolGuide, ToolGuideButton } from './ToolGuide';
 import { VetLogo } from './VetLogo';
+import { SettingsBoundary } from './SettingsBoundary';
 import { useZipDownload } from './ZipDownload';
+
+// The Settings dialog and the account security panels load the first time it opens, so no page loads them up front.
+const Settings = dynamic(() => import('./Settings').then((m) => m.Settings), { ssr: false });
+
+/** The lazy Settings dialog; if its chunk cannot load, closes it and says to reload, as the page keeps its typed form state. */
+function SettingsDialog(props: ComponentProps<typeof Settings>) {
+  const { notify } = useJobs();
+  return (
+    <SettingsBoundary open={props.open} onFail={() => (props.onClose(), notify('Không mở được Cài đặt. Hãy tải lại trang.'))}>
+      <Settings {...props} />
+    </SettingsBoundary>
+  );
+}
 
 const STATUS_LABEL: Record<JobStatus, string> = {
   queued: 'Đang chờ',
@@ -549,6 +564,8 @@ export function Shell({ userId, userName, isAdmin, feedbackNew = 0, analyzeEnabl
   const sidebar = useRef<HTMLDivElement>(null);
   const [collapsed, setCollapsed] = useState(initialCollapsed); // the icon rail, from 1024 px
   const [settings, setSettings] = useState<Section | null>(null); // the open Settings dialog's first section
+  const [settingsUsed, setSettingsUsed] = useState(false); // once opened it stays mounted, so closing returns focus as before
+  if (settings !== null && !settingsUsed) setSettingsUsed(true);
   const [guide, setGuide] = useState(false); // the "Chọn công cụ nào?" dialog
   const openGuide = useCallback(() => (setOpen(false), setGuide(true)), []);
   const [changelogDot, setChangelogDot] = useState(false); // entries the member has not seen: the red dot on the changelog item
@@ -671,7 +688,7 @@ export function Shell({ userId, userName, isAdmin, feedbackNew = 0, analyzeEnabl
               </nav>
               {accountMenu('chip')}
             </div>
-            <Settings open={settings !== null} onClose={() => setSettings(null)} userName={userName} account={account} start={settings ?? 'profile'} />
+            {settingsUsed && <SettingsDialog open={settings !== null} onClose={() => setSettings(null)} userName={userName} account={account} start={settings ?? 'profile'} />}
             <div className="content" inert={narrow && open}>
               <header className="topbar">
                 <button ref={menuButton} type="button" className="menu-button" aria-label="Mở menu" aria-expanded={open} aria-controls="sidebar" onClick={() => setOpen(true)}>

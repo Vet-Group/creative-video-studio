@@ -57,6 +57,12 @@ export const thumbUrl = (id: string) => `/api/assets/${id}/thumb`;
 
 export const sendJson = (method: string, body: unknown): RequestInit => ({ method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
 
+export async function signOut() {
+  startSignOut();
+  await api('/api/auth/sign-out', sendJson('POST', {})).catch(() => null);
+  window.location.assign('/login');
+}
+
 export type JobStatus = 'queued' | 'submitting' | 'running' | 'succeeded' | 'failed' | 'failed_unknown' | 'timed_out';
 
 export interface TrayJob {

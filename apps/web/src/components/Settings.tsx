@@ -4,9 +4,9 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { type CSSProperties, type FormEvent, useEffect, useRef, useState } from 'react';
-import { ApiError, api, sendJson, startSignOut } from '@/lib/api';
+import { ApiError, api, sendJson, signOut } from '@/lib/api';
 import { NO_CAP } from '@/lib/caps';
-import { AVATAR_COLORS, NAME_LENGTH, isEmail, nameProblem, protection, userAvatarColor } from '@/lib/profile';
+import { AVATAR_COLORS, NAME_LENGTH, initials, isEmail, levelOf, nameProblem, protection, shareOf, userAvatarColor } from '@/lib/profile';
 import type { SignInMethod } from '@/lib/sign-in-methods';
 import { useMediaQuery } from '@/lib/use-media-query';
 import { PasswordChange, Sessions, TwoFactor } from './AccountSecurity';
@@ -62,23 +62,11 @@ const PHONE = '(max-width: 767.98px)';
 
 const COLOR_NAMES = ['Đỏ', 'Hồng đậm', 'Hổ phách', 'Xanh lục', 'Xanh mòng két', 'Xanh dương', 'Chàm', 'Xám'];
 
-/** The first letters of the first and last word of a name, or the first two of a single word. */
-export function initials(name: string): string {
-  const words = name.normalize('NFC').trim().split(/\s+/).filter(Boolean);
-  if (words.length === 0) return '?';
-  const first = [...words[0]!];
-  const text = words.length > 1 ? first[0]! + [...words.at(-1)!][0]! : first.slice(0, 2).join('');
-  return text.toLocaleUpperCase('vi');
-}
-
 const monthYear = (iso: string) => {
   const parts = new Intl.DateTimeFormat('vi-VN', { month: '2-digit', year: 'numeric', timeZone: 'Asia/Ho_Chi_Minh' }).formatToParts(new Date(iso));
   return `tháng ${parts.find((p) => p.type === 'month')?.value}/${parts.find((p) => p.type === 'year')?.value}`;
 };
 const usd = (v: string | number) => `$${Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`;
-/** A cap's fill: at or over the cap is full, as checkCaps refuses there (a cap of 0 is always full). */
-export const shareOf = (used: number, cap: number) => (cap > 0 ? Math.min(used / cap, 1) : 1);
-export const levelOf = (share: number) => (share >= 1 ? 'full' : share >= 0.8 ? 'warn' : 'ok');
 
 /** One cap as a labelled bar; a cap from NO_CAP up is no limit, so it shows the use alone (`alone`) without a bar. */
 function Meter({ label, used, cap, text, left, alone }: { label: string; used: number; cap: number; text: string; left: string; alone: string }) {
@@ -372,12 +360,6 @@ function Protection({ account, twoFactor, onFix }: { account: Account; twoFactor
 }
 
 const PASSWORD_DONE = 'Đã đổi mật khẩu. Các thiết bị khác đã được đăng xuất.';
-
-export async function signOut() {
-  startSignOut();
-  await api('/api/auth/sign-out', sendJson('POST', {})).catch(() => null);
-  window.location.assign('/login');
-}
 
 /** `start`: the section it opens on (the account menu's items); on phones any other than the profile opens as its page. */
 export function Settings({ open, onClose, userName, account, start = 'profile' }: { open: boolean; onClose: () => void; userName: string; account: Account; start?: Section }) {

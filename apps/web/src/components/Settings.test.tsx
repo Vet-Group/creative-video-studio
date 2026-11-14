@@ -1,8 +1,8 @@
 // The Settings dialog: the avatar initials and colour, the sections in order, and the profile card.
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, test, vi } from 'vitest';
-import { avatarColor } from '@/lib/profile';
-import { type Account, initials, Settings, supportMail } from './Settings';
+import { avatarColor, initials } from '@/lib/profile';
+import { type Account, Settings, supportMail } from './Settings';
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: () => undefined }) }));
 
