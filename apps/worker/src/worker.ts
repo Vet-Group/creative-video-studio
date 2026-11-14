@@ -547,7 +547,7 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
   // Compress & download: two ffmpeg encodes at a time per worker (and within the shared ffmpeg slots); a failure is left to pg-boss to record, which the web reads as failed.
   await boss.createQueue(COMPRESS_QUEUE, COMPRESS_QUEUE_OPTIONS);
   await boss.work<CompressJobData>(COMPRESS_QUEUE, { localConcurrency: 2, pollingIntervalSeconds: o.pollingIntervalSeconds }, async ([job]) => {
-    await compressVideoAsset(pool, job!.data.assetId).catch((e) => {
+    await compressVideoAsset(pool, job!.data.assetId, job!.signal).catch((e) => {
       log(`compress ${job!.data.assetId}`, e);
       throw e;
     });

@@ -1,7 +1,7 @@
 // The Compress & download button API against a disposable database and bucket on the compose Postgres and MinIO (`pnpm services:up`). No worker runs: the test plays its part on the queue.
 import { randomBytes } from 'node:crypto';
 import { DeleteBucketCommand, DeleteObjectsCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
-import { COMPRESS_QUEUE, compressedKey } from '@cvs/core/queue';
+import { COMPRESS_MAX_BYTES, COMPRESS_QUEUE, compressedKey } from '@cvs/core/queue';
 import { createTestDatabase } from '@cvs/db/testing';
 import { afterAll, beforeAll, expect, test } from 'vitest';
 
@@ -34,8 +34,8 @@ beforeAll(async () => {
     const res = await auth.api.signInEmail({ body: { email: `${name}@example.test`, password: PASSWORD }, asResponse: true });
     cookies[name] = res.headers.getSetCookie().map((c) => c.split(';')[0]).join('; ');
   }
-  for (const [id, mime] of [['clip', 'video/mp4'], ['clip2', 'video/mp4'], ['clip3', 'video/mp4'], ['pic', 'image/png']]) {
-    await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) values ($1, $2, 'input', $3, $1, $4, 1)`, [id, ids.owner, `assets/${id}`, mime]);
+  for (const [id, kind, mime, bytes] of [['clip', 'output', 'video/mp4', 1], ['clip2', 'output', 'video/mp4', 1], ['clip3', 'output', 'video/mp4', 1], ['pic', 'output', 'image/png', 1], ['upload', 'input', 'video/mp4', 1], ['huge', 'output', 'video/mp4', COMPRESS_MAX_BYTES + 1]]) {
+    await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) values ($1, $2, $3, concat('assets/', $1::text), $1, $4, $5)`, [id, ids.owner, kind, mime, bytes]);
   }
 });
 
@@ -57,11 +57,14 @@ test('asks for a sign-in, and gives another member the answers the original down
   expect(await jobsOf('clip')).toEqual([]);
 });
 
-test('refuses an image', async () => {
-  const res = await call('POST', 'pic', 'owner');
-  expect(res.status).toBe(400);
-  expect(((await res.json()) as { error: string }).error).toBe('only a video can be compressed');
-  expect(await jobsOf('pic')).toEqual([]);
+test('refuses an image, an input video and a video over the size cap, in Vietnamese', async () => {
+  for (const [id, text] of [['pic', 'Chỉ nén được video kết quả.'], ['upload', 'Chỉ nén được video kết quả.'], ['huge', 'Video nặng hơn 200 MB nên không nén được.']] as const) {
+    const res = await call('POST', id, 'owner');
+    expect(res.status, id).toBe(400);
+    expect(((await res.json()) as { error: string }).error).toBe(text);
+    expect((await call('GET', id, 'owner')).status, id).toBe(400);
+    expect(await jobsOf(id)).toEqual([]);
+  }
 });
 
 test('queues one compression per asset however many times it is asked', async () => {

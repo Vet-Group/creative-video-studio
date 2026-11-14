@@ -37,6 +37,9 @@ export const REMAKE_QUEUE_OPTIONS = { retryLimit: 0, expireInSeconds: 7800 } as 
 export const COMPRESS_QUEUE = 'compress';
 export const COMPRESS_QUEUE_OPTIONS = { policy: 'exclusive', retryLimit: 0, expireInSeconds: 600 } as const;
 
+/** The most a video may weigh to be compressed (provider outputs are tens of MB); the encode and the copy in memory stay bounded by it. */
+export const COMPRESS_MAX_BYTES = 200 * 1024 * 1024;
+
 export interface CompressJobData {
   assetId: string;
 }

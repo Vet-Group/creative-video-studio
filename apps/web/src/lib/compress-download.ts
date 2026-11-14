@@ -36,7 +36,7 @@ export async function downloadCompressed(assetId: string, name?: string): Promis
 }
 
 const POLL_MS = 2_000;
-const GIVE_UP_MS = 10 * 60_000; // the worker's own expiry for one compression
+const GIVE_UP_MS = 20 * 60_000; // the wait in the queue plus the worker's own 10-minute expiry for one compression
 
 function open(url: string, name?: string) {
   const a = document.createElement('a');

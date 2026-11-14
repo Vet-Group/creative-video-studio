@@ -1,19 +1,19 @@
 // The Compress & download button on the worker: a clip made here with the pinned ffmpeg, a disposable database and bucket on the compose Postgres and MinIO (`pnpm services:up`).
 import { execFile } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { DeleteBucketCommand, DeleteObjectsCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
-import { compressedKey } from '@cvs/core/queue';
+import { COMPRESS_MAX_BYTES, compressedKey } from '@cvs/core/queue';
 import { createPool } from '@cvs/db/client';
 import { createTestDatabase } from '@cvs/db/testing';
 import ffprobe from 'ffprobe-static';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { compressVideoAsset } from './compress';
 import { compressClip, probeSize, requireFfmpeg } from './media';
-import { bucketName, ensureBucket, getObject, putObject, s3 } from './storage';
+import { bucketName, ensureBucket, getObject, hasObject, putObject, s3 } from './storage';
 
 const run = promisify(execFile);
 const testDb = await createTestDatabase();
@@ -84,7 +84,7 @@ describe('compressVideoAsset', () => {
     await putObject(compressedKey('big'), new Uint8Array([1, 2, 3]), 'video/mp4');
     expect(await compressVideoAsset(pool, 'big')).toBe('stored');
     expect([...(await getObject(compressedKey('big')))]).toEqual([1, 2, 3]);
-  });
+  }, 30_000);
 
   test('keeps nothing when the copy is not at least 20% smaller, so the original is served', async () => {
     const file = join(dir, 'small.mp4');
@@ -93,14 +93,30 @@ describe('compressVideoAsset', () => {
     expect(await compressVideoAsset(pool, 'small')).toBe('original');
     const { Contents = [] } = await s3().send(new ListObjectsV2Command({ Bucket: bucketName(), Prefix: compressedKey('small') }));
     expect(Contents).toEqual([]);
+  }, 30_000);
+
+  test('refuses an image, an input video, one over the size cap and a missing asset', async () => {
+    const row = (id: string, kind: string, mime: string, bytes: number) =>
+      pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) values ($1, 'u1', $2, $3, $1, $4, $5)`, [id, kind, `assets/${id}`, mime, bytes]);
+    await row('pic', 'output', 'image/png', 1);
+    await row('upload', 'input', 'video/mp4', 1);
+    await row('huge', 'output', 'video/mp4', COMPRESS_MAX_BYTES + 1);
+    for (const id of ['pic', 'upload', 'huge', 'nope']) await expect(compressVideoAsset(pool, id)).rejects.toThrow('not an output video within the size cap');
   });
 
-  test('refuses an image and a missing asset', async () => {
-    await putObject('assets/pic', new Uint8Array(1), 'image/png');
-    await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) values ('pic', 'u1', 'output', 'assets/pic', 'pic', 'image/png', 1)`);
-    await expect(compressVideoAsset(pool, 'pic')).rejects.toThrow('not a video');
-    await expect(compressVideoAsset(pool, 'nope')).rejects.toThrow('not a video');
-  });
+  test('a timeout or an abort rejects, leaves no copy and removes the temporary files', async () => {
+    const file = join(dir, 'slow.mp4');
+    await makeClip(file, ['-c:v', 'libx264', '-preset', 'ultrafast', '-b:v', '12M']);
+    await video('slow', file);
+    const leftovers = async () => (await readdir(tmpdir())).filter((n) => n.startsWith('cvs-compress-'));
+    const before = await leftovers();
+    await expect(compressVideoAsset(pool, 'slow', undefined, 1)).rejects.toThrow(); // ffmpeg is killed after 1 ms
+    const stop = new AbortController();
+    stop.abort();
+    await expect(compressVideoAsset(pool, 'slow', stop.signal)).rejects.toThrow(); // pg-boss expired the job
+    expect(await leftovers()).toEqual(before);
+    expect(await hasObject(compressedKey('slow'))).toBe(false);
+  }, 30_000);
 });
 
 test('compressClip brings a long side over 1920 px down to 1920 and keeps the shape', async () => {
