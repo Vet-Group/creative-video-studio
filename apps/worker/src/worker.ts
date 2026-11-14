@@ -391,10 +391,9 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
         { id: outputId, ownerId: job.user_id, kind: 'output', s3Key: keys[0]!, filename: `video-${name}.mp4`, mime: 'video/mp4', bytes: videoBytes.length, width, height, durationMs: seconds > 0 ? Math.round(seconds * 1000) : null },
         { id: posterId, ownerId: job.user_id, kind: 'output', s3Key: keys[1]!, filename: `poster-${name}.jpg`, mime: 'image/jpeg', bytes: posterBytes.length },
       ]);
-      if (await settle(pool, job.id, { status: 'succeeded', costUsd, outputAssetId: outputId, posterAssetId: posterId, tokens })) {
-        if (warnings.length) await pool.query('update jobs set error = $2 where id = $1', [job.id, warnings.join('; ').slice(0, 1000)]).catch((err) => log(`warning ${job.id}`, err));
-        return;
-      }
+      // Before settle, so the warning is there the moment the job reads succeeded (settle leaves error alone).
+      if (warnings.length) await pool.query(`update jobs set error = $2 where id = $1 and status = 'running'`, [job.id, warnings.join('; ').slice(0, 1000)]).catch((err) => log(`warning ${job.id}`, err));
+      if (await settle(pool, job.id, { status: 'succeeded', costUsd, outputAssetId: outputId, posterAssetId: posterId, tokens })) return;
       throw new Error('the job was settled by someone else');
     } catch (e) {
       await pool.query('delete from assets where id = any($1::text[])', [[outputId, posterId]]).catch((err) => log('cleanup', err));
