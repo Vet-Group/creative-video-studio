@@ -30,6 +30,20 @@ export interface AnalyzeJobData {
 export const REMAKE_QUEUE = 'remake';
 export const REMAKE_QUEUE_OPTIONS = { retryLimit: 0, expireInSeconds: 7800 } as const;
 
+/**
+ * Compress & download on a video: one ffmpeg re-encode on the worker, never retried. The `exclusive` policy keeps one queued or active job per singletonKey
+ * (the asset id), so a double click or two members never run two compressions of one asset. No provider is called.
+ */
+export const COMPRESS_QUEUE = 'compress';
+export const COMPRESS_QUEUE_OPTIONS = { policy: 'exclusive', retryLimit: 0, expireInSeconds: 600 } as const;
+
+export interface CompressJobData {
+  assetId: string;
+}
+
+/** Where the compressed copy of a video asset is kept (the web streams it, the worker writes it and the purge removes it with the asset). */
+export const compressedKey = (assetId: string) => `compressed/${assetId}.mp4`;
+
 export interface RemakeJobData {
   remakeId: string;
 }

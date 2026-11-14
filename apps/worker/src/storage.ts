@@ -2,7 +2,7 @@
 import { createWriteStream } from 'node:fs';
 import type { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
-import { CreateBucketCommand, DeleteObjectCommand, GetObjectCommand, HeadBucketCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { CreateBucketCommand, DeleteObjectCommand, GetObjectCommand, HeadBucketCommand, HeadObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 
 /** A setting from the environment, else from the repo's .env (local runs; variables already set win). */
 function env(name: string): string {
@@ -75,6 +75,17 @@ export async function downloadObject(key: string, file: string, signal?: AbortSi
   const { client, Bucket, Key } = loc(key);
   const res = await client.send(new GetObjectCommand({ Bucket, Key }), { abortSignal: signal });
   await pipeline(res.Body as Readable, createWriteStream(file), { signal });
+}
+
+export async function hasObject(key: string): Promise<boolean> {
+  const { client, Bucket, Key } = loc(key);
+  try {
+    await client.send(new HeadObjectCommand({ Bucket, Key }));
+    return true;
+  } catch (e) {
+    if ((e as { name?: string }).name === 'NotFound') return false;
+    throw e;
+  }
 }
 
 export async function deleteObject(key: string): Promise<void> {

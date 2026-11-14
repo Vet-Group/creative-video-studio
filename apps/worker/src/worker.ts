@@ -15,12 +15,13 @@ import { bookLlm, close24h, lateBill, type LedgerPool, release, settle, withTran
 import { type ImageModelConfig, imagePricesFor, type ModelConfig, MOTION_IMAGE_MAX_SEC, promptLimit, usdPerSecondFor, usdPerSecondWithVideo } from '@cvs/core/models';
 import { ImageReadError } from '@cvs/core/providers/http';
 import type { ImageProvider, ImageProviderJob, ImageSubmitRequest, ProviderJob, ProviderStatus, SubmitRequest, VideoProvider } from '@cvs/core/providers';
-import { ANALYZE_QUEUE, ANALYZE_QUEUE_OPTIONS, type AnalyzeJobData, PURGE_CRON, PURGE_QUEUE, REMAKE_QUEUE, REMAKE_QUEUE_OPTIONS, type RemakeJobData, SUGGEST_QUEUE, SUGGEST_QUEUE_OPTIONS, type SuggestJobData, VIDEO_QUEUE, VIDEO_QUEUE_OPTIONS, type VideoJobData, videoSendOptions } from '@cvs/core/queue';
+import { ANALYZE_QUEUE, ANALYZE_QUEUE_OPTIONS, type AnalyzeJobData, COMPRESS_QUEUE, COMPRESS_QUEUE_OPTIONS, type CompressJobData, PURGE_CRON, PURGE_QUEUE, REMAKE_QUEUE, REMAKE_QUEUE_OPTIONS, type RemakeJobData, SUGGEST_QUEUE, SUGGEST_QUEUE_OPTIONS, type SuggestJobData, VIDEO_QUEUE, VIDEO_QUEUE_OPTIONS, type VideoJobData, videoSendOptions } from '@cvs/core/queue';
 import type { Suggester } from '@cvs/core/suggest';
 import { insertAssets } from '@cvs/db/assets';
 import { createDb, type createPool } from '@cvs/db/client';
 import { type Job, PgBoss } from 'pg-boss';
 import { burnEndText, closestRatio, extractPoster, probeSeconds, probeSize, probeVideoSeconds, sniffImage } from './media';
+import { compressVideoAsset } from './compress';
 import { purgeDeletedClips } from './purge';
 import { dropPreview, storePreview } from './preview';
 import { deleteObject, getObject, putObject } from './storage';
@@ -542,6 +543,14 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
   // Four at a time, so one slow scene pick on a large video does not hold up the quick text suggestions queued behind it.
   await boss.work<SuggestJobData>(SUGGEST_QUEUE, { localConcurrency: 4, pollingIntervalSeconds: o.pollingIntervalSeconds }, async (jobs) => {
     await Promise.all(jobs.map((job) => runSuggestion(pool, deps.suggest, job.data.runId, undefined, undefined, job.signal).catch((e) => log(`suggestion ${job.data.runId}`, e))));
+  });
+  // Compress & download: two ffmpeg encodes at a time per worker (and within the shared ffmpeg slots); a failure is left to pg-boss to record, which the web reads as failed.
+  await boss.createQueue(COMPRESS_QUEUE, COMPRESS_QUEUE_OPTIONS);
+  await boss.work<CompressJobData>(COMPRESS_QUEUE, { localConcurrency: 2, pollingIntervalSeconds: o.pollingIntervalSeconds }, async ([job]) => {
+    await compressVideoAsset(pool, job!.data.assetId).catch((e) => {
+      log(`compress ${job!.data.assetId}`, e);
+      throw e;
+    });
   });
   // Reference-video analysis runs only where the rea-video binary is installed and the flag is set; off by default.
   if (reaAnalyzeEnabled()) {

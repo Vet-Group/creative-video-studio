@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { type CSSProperties, Fragment, type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { JOB_APPS } from '@/lib/apps';
 import { api, type Clip, errorText, sendJson, thumbUrl } from '@/lib/api';
-import { downloadCompressed } from '@/lib/compress-download';
+import { downloadCompressed, downloadCompressedVideo } from '@/lib/compress-download';
 import { confirmRerun } from '@/lib/run-guard';
 import { FAULTS } from '@/lib/faults';
 import { featureLabel } from '@/lib/features';
@@ -435,7 +435,12 @@ export function ClipDetail({ clips, index, stores, admin, onIndex, onChange }: {
   const compress = async () => {
     setCompressing(true);
     await act(async () => {
-      if (!(await downloadCompressed(clip.videoAssetId, clip.downloadName))) setNote('Bản nén không nhẹ hơn nên đã tải ảnh gốc.');
+      if (image) {
+        if (!(await downloadCompressed(clip.videoAssetId, clip.downloadName))) setNote('Bản nén không nhẹ hơn nên đã tải ảnh gốc.');
+        return;
+      }
+      setNote('Đang nén video, vui lòng chờ…');
+      setNote((await downloadCompressedVideo(clip.videoAssetId, clip.downloadName)) ? '' : 'Bản nén không nhẹ hơn nên đã tải video gốc.');
     }, 'Không nén và tải xuống được.');
     setCompressing(false);
   };
@@ -584,11 +589,9 @@ export function ClipDetail({ clips, index, stores, admin, onIndex, onChange }: {
           <button type="button" className="icon-button" onClick={() => void download()} aria-label="Tải xuống" title="Tải xuống">
             <Icon name="download" />
           </button>
-          {image && (
-            <button type="button" className="icon-button" disabled={compressing} aria-busy={compressing} onClick={() => void compress()} aria-label="Nén & tải về" title="Nén & tải về">
-              <Icon name="compress" />
-            </button>
-          )}
+          <button type="button" className="icon-button" disabled={compressing} aria-busy={compressing} onClick={() => void compress()} aria-label="Nén & tải về" title="Nén & tải về">
+            <Icon name="compress" />
+          </button>
           <button type="button" className="icon-button" onClick={() => void media.current?.requestFullscreen?.()} aria-label="Toàn màn hình" title="Toàn màn hình">
             <Icon name="eye" />
           </button>
