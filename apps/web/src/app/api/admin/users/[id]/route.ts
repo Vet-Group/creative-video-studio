@@ -9,7 +9,7 @@ import { guard } from '@/lib/session';
 /**
  * Admin: change one user. Any of `name`, `email` (unique; a first Google or Lark sign-in links by this address), `role` (member|admin),
  * `teamId` (a visible team), `banned` (boolean, with an optional `banReason`), `temporaryPassword`, `twoFactor: false` (turns the
- * user's 2FA off, for a lost phone, and ends the user's sessions), `canEditTemplates` (boolean: a template editor, lib/session.ts) `system` (boolean: an
+ * user's 2FA off, for a lost phone, and ends the user's sessions), `canEditTemplates` (boolean: a template editor, lib/session.ts), `system` (boolean: an
  * automation account, listed apart from the staff) and `outsideLark` (boolean: not in the company's Lark organisation, never asked to link Lark) in one body. Every field is checked before anything is written. Each change that differs from the current state is
  * audited with its old and new value, in the transaction of the change itself: the audit row commits only if the change was made. The
  * password itself is never stored. A team change touches only users.team_id: jobs keep the team they were run under.
