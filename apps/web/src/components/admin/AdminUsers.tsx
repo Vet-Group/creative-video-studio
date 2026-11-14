@@ -419,16 +419,18 @@ export function AdminUsers() {
             Mật khẩu (không bắt buộc)
             <input type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} />
           </label>
-          <label className="check">
-            <input type="checkbox" checked={outsideLark} onChange={(e) => setOutsideLark(e.target.checked)} />
-            Ngoài tổ chức Lark
-          </label>
+          <div className="check-field">
+            <label className="check">
+              <input type="checkbox" checked={outsideLark} onChange={(e) => setOutsideLark(e.target.checked)} />
+              Ngoài tổ chức Lark
+            </label>
+            <small>Không nhắc liên kết Lark; đăng nhập bằng email, Google hoặc passkey.</small>
+          </div>
           <button type="button" className="primary" disabled={pending || !email.trim() || !name.trim() || !teamId} onClick={() => void add()}>
             Thêm người dùng
           </button>
         </div>
         <p className="muted">Dùng Gmail hoặc email công ty trên Lark của người đó. Không đặt mật khẩu thì chỉ đăng nhập được bằng Lark hoặc Google.</p>
-        <p className="muted">Không nhắc liên kết Lark; đăng nhập bằng email, Google hoặc passkey.</p>
         <details className="help">
           <summary>Đăng nhập bằng Google, Lark hoạt động thế nào?</summary>
           <p>
