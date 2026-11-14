@@ -1167,7 +1167,7 @@ export function Library() {
             <option value="yesterday">Hôm qua</option>
             <option value="d7">7 ngày qua</option>
             <option value="d30">30 ngày qua</option>
-            <option value="pick">{filters.date ? filters.date.split('-').reverse().join('/') : 'Chọn một ngày…'}</option>
+            <option value="pick">{filters.date && !yesterdayOnly ? filters.date.split('-').reverse().join('/') : 'Chọn một ngày…'}</option>
           </select>
         </label>
         {(pickDay || (filters.date && !yesterdayOnly)) && (
