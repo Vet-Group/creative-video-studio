@@ -789,3 +789,32 @@ describe('the analysis on the Costs page: cost per accepted clip, by model, by d
     expect((await jobs(query)).status).toBe(400);
   });
 });
+
+describe('shared rows that name a model on the Costs page', () => {
+  // March 2032. Alice's clip cf1 (2.0, fal-test); a fal-test correction of -0.5 folds into that line; a fal correction with no model (-0.25) keeps its own line;
+  // a correction on vtx-test (0.3) has no job, and one on a model the table no longer holds (0.1) gets a line under that model.
+  const FM = '2032-03';
+
+  beforeAll(async () => {
+    await open('cf1', 'alice', 't3', null, 'fal', '2032-03-03T03:00:00Z', '2.0000');
+    await running('cf1');
+    await succeed('cf1', '2.0000');
+    await bookShared(pool, { kind: 'manual_adjustment', usd: '-0.5000', month: FM, provider: 'fal', model: 'fal-test', ref: 'adj-fold-1', note: 'match the invoice' });
+    await bookShared(pool, { kind: 'manual_adjustment', usd: '-0.2500', month: FM, provider: 'fal', ref: 'adj-fold-2', note: 'no model' });
+    await bookShared(pool, { kind: 'manual_adjustment', usd: '0.3000', month: FM, provider: 'vertex', model: 'vtx-test', ref: 'adj-fold-3', note: 'no job' });
+    await bookShared(pool, { kind: 'manual_adjustment', usd: '0.1000', month: FM, provider: 'openai', model: 'gone-model', ref: 'adj-fold-4', note: 'unknown model' });
+  });
+
+  test('folds them into the (provider, model) line without counting a job, keeps modelless shared lines, and leaves the month totals alone', async () => {
+    const p = (await page(FM)) as Page & { byModel: { provider: string | null; model: string | null; label: string; jobs: number; calls: number; usd: string; usdDisplay: string }[] };
+    expect(p.byModel).toEqual([
+      { provider: 'fal', model: 'fal-test', label: 'Fal test', jobs: 1, calls: 0, usd: '1.5000', usdDisplay: '1.50' },
+      { provider: 'vertex', model: 'vtx-test', label: 'Vertex test', jobs: 0, calls: 0, usd: '0.3000', usdDisplay: '0.30' },
+      { provider: 'openai', model: 'gone-model', label: 'gone-model', jobs: 0, calls: 0, usd: '0.1000', usdDisplay: '0.10' },
+      { provider: 'fal', model: null, label: 'Điều chỉnh tay', jobs: 0, calls: 0, usd: '-0.2500', usdDisplay: '-0.25' },
+    ]);
+    expect(p.total.usd).toBe('1.6500');
+    expect(sumUsd(p.byModel.map((l) => l.usd))).toBe(p.total.usd);
+    expect(p.shared.usd).toBe('-0.3500');
+  });
+});

@@ -269,11 +269,11 @@ export type GroupBy = keyof typeof GROUP_KEYS;
 
 const SHARED_KIND: Record<string, string> = { bakeoff: 'Thử nghiệm mô hình', manual_adjustment: 'Điều chỉnh tay', invoice_diff: 'Chênh lệch hóa đơn' };
 
-/** Every row of the month (shared rows too) by provider and model, largest first, with how many jobs each holds. */
+/** Every row of the month (shared rows too) by provider and model, largest first, with how many jobs each holds. A shared row that names a model is folded into that model's line (no job, so the counts stay); one without a model keeps a line of its kind. */
 function byModel(s: Snapshot) {
   const out = new Map<string, { provider: string | null; model: string | null; label: string; usd: bigint; jobs: Set<string>; calls: number }>();
   for (const r of s.rows) {
-    const shared = SHARED_KIND[r.kind];
+    const shared = r.model ? undefined : SHARED_KIND[r.kind];
     const key = `${r.provider ?? ''}	${shared ?? r.model ?? ''}`;
     const g = out.get(key) ?? out.set(key, { provider: r.provider, model: shared ? null : r.model, label: shared ?? r.model_label ?? r.model ?? 'Không rõ', usd: 0n, jobs: new Set(), calls: 0 }).get(key)!;
     g.usd += units(r.usd);
