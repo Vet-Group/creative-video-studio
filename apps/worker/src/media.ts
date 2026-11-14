@@ -77,6 +77,31 @@ export async function compressClip(video: string, out: string, { signal, timeout
   await run(requireFfmpeg(), ['-y', '-v', 'error', '-i', video, '-map', '0:v:0', '-map', '0:a:0?', '-vf', fit, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '28', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '96k', '-movflags', '+faststart', out], { timeout: timeoutMs, signal });
 }
 
+/** Bounds each ffprobe and ffmpeg call of ensureH264. Delivery runs in the reconcile loop (no queue expiry covers it), so a hung process would stall every job polled after it. */
+export const H264_TIMEOUT_MS = 480_000;
+
+/**
+ * `video` as it will be stored: when its video is not 8-bit 4:2:0 H.264 (fal's Seedance 2.5 can return HEVC, and 10-bit or 4:2:2 H.264 does not play in
+ * browsers either) a copy at `out` encoded with the H264 settings in the same size and rate, the sound copied when it is AAC and encoded as AAC otherwise;
+ * a playable clip comes back untouched. A clip that cannot be probed or converted (error or timeout) is returned as it came and `onFail` told: a paid
+ * output is better kept as it is than lost. When `signal` aborts (the worker is stopping) it throws instead, so the clip is delivered again by the next worker.
+ */
+export async function ensureH264(video: string, out: string, { signal, timeoutMs = H264_TIMEOUT_MS, onFail }: { signal?: AbortSignal; timeoutMs?: number; onFail?: (e: unknown) => void } = {}): Promise<string> {
+  try {
+    const { stdout } = await run(ffprobe.path, ['-v', 'error', '-show_entries', 'stream=codec_type,codec_name,pix_fmt', '-of', 'json', video], { timeout: timeoutMs, signal });
+    const streams = (JSON.parse(stdout) as { streams?: { codec_type: string; codec_name: string; pix_fmt?: string }[] }).streams ?? [];
+    const v = streams.find((s) => s.codec_type === 'video');
+    if (!v || (v.codec_name === 'h264' && (v.pix_fmt === 'yuv420p' || v.pix_fmt === 'yuvj420p'))) return video;
+    const audio = streams.find((s) => s.codec_type === 'audio')?.codec_name === 'aac' ? 'copy' : 'aac';
+    await stillSlot(() => run(requireFfmpeg(), ['-y', '-v', 'error', '-i', video, '-map', '0:v:0', '-map', '0:a:0?', ...H264, '-c:a', audio, out], { timeout: timeoutMs, signal }));
+    return out;
+  } catch (e) {
+    if (signal?.aborted) throw e;
+    onFail?.(e);
+    return video;
+  }
+}
+
 /** The first `seconds` of a clip, silent: a remake shot's edit cut back to the shot's own length. */
 export async function trimClip(clip: string, seconds: number, out: string): Promise<void> {
   await run(requireFfmpeg(), ['-y', '-v', 'error', '-i', clip, '-t', seconds.toFixed(3), '-an', ...H264, out]);

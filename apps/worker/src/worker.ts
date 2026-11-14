@@ -20,7 +20,7 @@ import type { Suggester } from '@cvs/core/suggest';
 import { insertAssets } from '@cvs/db/assets';
 import { createDb, type createPool } from '@cvs/db/client';
 import { type Job, PgBoss } from 'pg-boss';
-import { burnEndText, closestRatio, extractPoster, probeSeconds, probeSize, probeVideoSeconds, sniffImage } from './media';
+import { burnEndText, closestRatio, ensureH264, extractPoster, probeSeconds, probeSize, probeVideoSeconds, sniffImage } from './media';
 import { compressVideoAsset } from './compress';
 import { purgeDeletedClips } from './purge';
 import { dropPreview, storePreview } from './preview';
@@ -339,10 +339,19 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
     const outputId = randomUUID();
     const posterId = randomUUID();
     const keys: string[] = [];
-    let warning: string | null = null;
+    const warnings: string[] = [];
     try {
       let video = join(dir, 'output.mp4');
       await download(outputUrl, video, job.provider);
+      // Whichever model made it, the stored clip is 8-bit H.264 (a browser without an HEVC decoder cannot play fal's Seedance 2.5 1080p); the size, length, poster and compress below read that file.
+      // A shutdown throws here: the job stays running and the next worker delivers it again (pollRunning). A real failure keeps the clip as it came, with a warning for the Admin.
+      video = await ensureH264(video, join(dir, 'h264.mp4'), {
+        signal: stopping.signal,
+        onFail: (e) => {
+          warnings.push(`the clip was not converted to H.264 and may not play in every browser: ${e instanceof Error ? e.message : e}`.slice(0, 500));
+          log(`h264 conversion ${job.id}`, e);
+        },
+      });
       const { width, height } = await probeSize(video);
       const seconds = await probeSeconds(video);
       // Motion Control's clip is as long as the member's own video, whose header can understate it, so a clip that came back longer is billed for its own length. A shorter one is not
@@ -367,7 +376,7 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
           await burnEndText(video, marked, endText, (['top', 'middle'] as const).find((p) => p === job.params?.endTextPos) ?? 'bottom');
           video = marked;
         } catch (e) {
-          warning = `the end text was not added: ${e instanceof Error ? e.message : e}`.slice(0, 500);
+          warnings.push(`the end text was not added: ${e instanceof Error ? e.message : e}`.slice(0, 500));
           log(`end text ${job.id}`, e);
         }
       }
@@ -382,10 +391,9 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
         { id: outputId, ownerId: job.user_id, kind: 'output', s3Key: keys[0]!, filename: `video-${name}.mp4`, mime: 'video/mp4', bytes: videoBytes.length, width, height, durationMs: seconds > 0 ? Math.round(seconds * 1000) : null },
         { id: posterId, ownerId: job.user_id, kind: 'output', s3Key: keys[1]!, filename: `poster-${name}.jpg`, mime: 'image/jpeg', bytes: posterBytes.length },
       ]);
-      if (await settle(pool, job.id, { status: 'succeeded', costUsd, outputAssetId: outputId, posterAssetId: posterId, tokens })) {
-        if (warning) await pool.query('update jobs set error = $2 where id = $1', [job.id, warning]).catch((err) => log(`end text warning ${job.id}`, err));
-        return;
-      }
+      // Before settle, so the warning is there the moment the job reads succeeded (settle leaves error alone).
+      if (warnings.length) await pool.query(`update jobs set error = $2 where id = $1 and status = 'running'`, [job.id, warnings.join('; ').slice(0, 1000)]).catch((err) => log(`warning ${job.id}`, err));
+      if (await settle(pool, job.id, { status: 'succeeded', costUsd, outputAssetId: outputId, posterAssetId: posterId, tokens })) return;
       throw new Error('the job was settled by someone else');
     } catch (e) {
       await pool.query('delete from assets where id = any($1::text[])', [[outputId, posterId]]).catch((err) => log('cleanup', err));
@@ -468,8 +476,8 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
         else if (row.expired && (await timeOut(row.id)) && adapter) await adapter.cancel().catch((e) => log(`cancel ${row.id}`, e));
       } catch (e) {
         log(`running job ${row.id}`, e);
-        // A delivery or status call that keeps failing must not keep the job running past its limit; lateBill or close24h finalize it from timed_out.
-        if (row.expired) await timeOut(row.id).catch((err) => log(`time out ${row.id}`, err));
+        // A delivery or status call that keeps failing must not keep the job running past its limit; lateBill or close24h finalize it from timed_out. Not on a shutdown, though: a delivery cut short by it stays running for the next worker.
+        if (row.expired && !stopping.signal.aborted) await timeOut(row.id).catch((err) => log(`time out ${row.id}`, err));
       }
     }
   }

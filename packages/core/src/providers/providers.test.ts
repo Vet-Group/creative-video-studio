@@ -46,7 +46,7 @@ describe('fal', () => {
       expect(calls[0]!.url).toBe(`https://queue.fal.run/${endpoint}`);
       return calls[0]!.body;
     };
-    expect(await body('bytedance/seedance-2.5/us/reference-to-video', undefined, '720p')).toEqual({ prompt: 'put @Image1 on @Image2', image_urls: ['https://img/1.jpg', 'https://img/2.jpg'], aspect_ratio: '9:16', duration: '5', resolution: '720p', generate_audio: false });
+    expect(await body('bytedance/seedance-2.5/us/reference-to-video', undefined, '720p')).toEqual({ prompt: 'put @Image1 on @Image2', image_urls: ['https://img/1.jpg', 'https://img/2.jpg'], aspect_ratio: '9:16', duration: '5', resolution: '720p', generate_audio: false, codec: 'H264' });
     expect(await body('fal-ai/kling-video/v3/pro/image-to-video')).toEqual({ prompt: 'put image 1 on image 2', start_image_url: 'https://img/1.jpg', duration: '5', generate_audio: false });
     expect(await body('google/gemini-omni-flash/v1.2/image-to-video')).toEqual({ prompt: 'put image 1 on image 2', image_url: 'https://img/1.jpg', aspect_ratio: '9:16', duration: 5, resolution: '720p' });
     expect(await body('fal-ai/veo3.1/image-to-video')).toMatchObject({ duration: '5s', generate_audio: false });
@@ -62,6 +62,19 @@ describe('fal', () => {
     expect(await body('minimax/h3-max/reference-to-video', undefined, '1080p')).toMatchObject({ resolution: '1080P' });
     expect(await body('minimax/h3-max/image-to-video', undefined, '480p')).toMatchObject({ resolution: '480P' });
     expect(await body('fal-ai/minimax/hailuo-2.3/pro/image-to-video')).toEqual({ prompt: 'put image 1 on image 2', image_url: 'https://img/1.jpg' });
+  });
+
+  test('every Seedance 2.5 endpoint asks fal for H.264 (its schemas take codec; auto returned HEVC Main 10), and the others do not send the field', async () => {
+    const submit = async (endpoint: string, over: Partial<SubmitRequest> = {}) => {
+      const { fn, calls } = fakeFetch([200, { request_id: 'r' }]);
+      await createFalProvider({ apiKey: 'k', fetch: fn }).submit({ ...req, ...over, model: { ...kling, endpoint, outputResolution: '1080p' } });
+      return { url: calls[0]!.url, body: calls[0]!.body as Record<string, unknown> };
+    };
+    for (const endpoint of ['bytedance/seedance-2.5/us/image-to-video', 'bytedance/seedance-2.5/us/reference-to-video']) expect((await submit(endpoint)).body.codec).toBe('H264');
+    const text = await submit('bytedance/seedance-2.5/us/image-to-video', { imageUrls: [] }); // the text-to-video twin
+    expect(text.url).toBe('https://queue.fal.run/bytedance/seedance-2.5/us/text-to-video');
+    expect(text.body.codec).toBe('H264');
+    for (const endpoint of ['bytedance/seedance-2.0/us/image-to-video', 'bytedance/seedance-2.0/us/reference-to-video', 'fal-ai/bytedance/seedance/v1.5/pro/image-to-video']) expect((await submit(endpoint)).body).not.toHaveProperty('codec');
   });
 
   test('an end frame goes in each end-frame endpoint’s own field, read like the inputs (cropped where they are); elsewhere it is refused before any call', async () => {
@@ -440,7 +453,7 @@ describe('fal reference video', () => {
       const submit = calls.at(-1)!;
       expect(submit.url).toBe(`https://queue.fal.run/${endpoint}`);
       expect(submit.body).toEqual({
-        prompt: 'Follow the motion, camera framing and pace of @Video1; a woman in @Image1.', image_urls: [DATA_URL], aspect_ratio: base.ratio, duration: String(base.durationSec), resolution: '720p', generate_audio: false,
+        prompt: 'Follow the motion, camera framing and pace of @Video1; a woman in @Image1.', image_urls: [DATA_URL], aspect_ratio: base.ratio, duration: String(base.durationSec), resolution: '720p', generate_audio: false, ...(name === 'mov' ? { codec: 'H264' } : {}),
         video_urls: [name === 'mov' ? 'https://v3b.fal.media/files/video-quicktime' : 'https://v3b.fal.media/files/video-mp4'],
       });
     }
