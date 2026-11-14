@@ -104,6 +104,13 @@ describe('Vertex Veo', () => {
     const job = await provider.submit(request());
     expect(await provider.status({ ...job, model })).toMatchObject({ state: 'failed', costUsd: 1.6, costSource: 'estimate' });
   });
+  test("a failed operation keeps Google's code and message, one line, without the project path", async () => {
+    const { provider } = setup({ name }, { done: true, error: { code: 3, message: 'The input image violates\nusage guidelines for projects/123/locations/us-central1/x.' } });
+    const job = await provider.submit(request());
+    expect(await provider.status({ ...job, model })).toEqual({
+      state: 'failed', error: 'Vertex Veo generation failed (code 3: The input image violates usage guidelines for projects/…)', costUsd: 1.6, costSource: 'estimate',
+    });
+  });
   test('rejects wrong operation identity without HTTP', async () => {
     const { provider, calls } = setup({ name: name.replace('projects/test', 'projects/other') });
     await expect(provider.submit(request())).rejects.toThrow('operation');

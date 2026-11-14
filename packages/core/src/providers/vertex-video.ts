@@ -58,6 +58,12 @@ export function createVertexVideoProvider(opts: {
     if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Malformed Vertex Veo response');
     return data;
   }
+  /** The failed operation's gRPC code and message for the job's error (an Admin reads it), on one line, project paths cut, at most 200 characters. */
+  const operationError = (e: { code?: unknown; message?: unknown }): string => {
+    const message = typeof e.message === 'string' ? e.message.replace(/projects\/\S+/g, 'projects/…').replace(/\s+/g, ' ').trim().slice(0, 200) : '';
+    const detail = [typeof e.code === 'number' ? `code ${e.code}` : '', message].filter(Boolean).join(': ');
+    return detail ? ` (${detail})` : '';
+  };
   return {
     async submit(req) {
       if (req.model.endpoint !== MODEL || req.model.outputResolution !== '720p' || !['16:9', '9:16'].includes(req.ratio) || ![4, 6, 8].includes(req.durationSec) || req.imageUrls.length > 1 || req.endImageUrl !== undefined || (req.audioUrls?.length ?? 0) > 0 || (req.videoUrls?.length ?? 0) > 0 || (req.audio !== undefined && typeof req.audio !== 'boolean')) throw new ImageReadError('Unsupported Vertex Veo input');
@@ -83,7 +89,7 @@ export function createVertexVideoProvider(opts: {
       const data = await post('fetchPredictOperation', { operationName: saved.name });
       if (data.name !== undefined && data.name !== saved.name) throw new Error('Invalid Vertex Veo operation');
       const failed = (error: string): ProviderStatus => ({ state: 'failed', error, costUsd: saved.costUsd, costSource: 'estimate' });
-      if (data.error) return failed('Vertex Veo generation failed');
+      if (data.error) return failed(`Vertex Veo generation failed${operationError(data.error)}`);
       if (data.done === false || (data.done === undefined && data.name === saved.name)) return { state: 'running' };
       if (data.done !== true) return failed('Malformed Vertex Veo operation');
       const response = data.response;
