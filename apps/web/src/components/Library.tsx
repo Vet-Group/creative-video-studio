@@ -1206,7 +1206,8 @@ export function Library() {
           <span>Tỉ lệ</span>
           <select value={filters.ratio} onChange={(e) => set({ ratio: e.target.value })}>
             <option value="">Tất cả</option>
-            {(ratios.includes(filters.ratio) || !filters.ratio ? ratios : [...ratios, filters.ratio]).map((r) => (
+            {/* A linked ratio no item has yet joins the list only once the list is loaded: before that the server and the first render both have none. */}
+            {(ratios.length === 0 || ratios.includes(filters.ratio) || !filters.ratio ? ratios : [...ratios, filters.ratio]).map((r) => (
               <option key={r} value={r}>
                 {r}
               </option>
