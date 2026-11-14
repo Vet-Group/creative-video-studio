@@ -309,7 +309,7 @@ export const STARTERS: Record<string, Starter[]> = {
     { label: 'Đường phố', text: "Set the scene on a sunny city street in natural daylight with a softly blurred background, the model's pose unchanged." },
     { label: 'Quán cà phê', text: "Set the scene by the window of a cozy cafe in warm natural light with a softly blurred interior, the model's pose unchanged." },
     { label: 'Công viên', text: "A green park on a sunny day with soft natural light, the model's pose unchanged." },
-    { label: 'Nền màu', text: 'The model poses against a bold solid-colour studio backdrop, crisp even light, full body.' },
+    { label: 'Nền màu', text: "A bold solid-colour studio backdrop with crisp even light, the model's pose unchanged." },
   ],
   lingerie_try_on: [
     { label: 'Nắng sớm dịu', text: 'Soft, bright, airy morning light from the side, gentle shadows and clean natural skin tones.' },
