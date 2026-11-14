@@ -2,7 +2,7 @@ import { imagePricesFor, promptLimit, textToImage } from '@cvs/core/models';
 import { FEATURES } from '@cvs/db';
 import { pool } from '@/lib/auth';
 import { modelStats, rank, scoreOf } from '@/lib/model-scores';
-import { onePerPair } from '@/lib/model-twins';
+import { onePerPair, vertexOnCredits } from '@/lib/model-twins';
 import { falBalance, falCreditUsd } from '@/lib/provider-credit';
 import { guard } from '@/lib/session';
 
@@ -10,7 +10,8 @@ import { guard } from '@/lib/session';
  * The model picker of an image page (`?feature=try_on` or `?feature=image`, or any feature other than video and marketing): the enabled image models that
  * list the feature, with their ratios, resolutions (the keys of `image_prices`), the price of one image per resolution as a 4-decimal string, and
  * `maxImages`, `maxPromptChars` (the model's prompt limit under the ceiling), `textToImage` (it takes a job with no input image), `thinking` (its thinking levels, the first the default; empty for none), `thinkingPrices` (level to the prices at that level, as `prices` is at the default level; empty for none) and `isNew` (added in the last 14 days). A mock model prices every resolution at 0, as its jobs book 0 USD. Each model carries its recommendation score for this feature
- * (lib/model-scores.ts), and the best (the cheaper on a tie) is flagged `recommended` unless all score the same. `creditUsd` is what the model's provider can still
+ * (lib/model-scores.ts), and the best (the cheaper on a tie) is flagged `recommended` unless all score the same; for `?feature=image` (Create Image) while the active Vertex
+ * account runs on credits alone (vertexOnCredits), the best Vertex model is flagged instead, whatever the others score. `creditUsd` is what the model's provider can still
  * spend (lib/provider-credit.ts; fal only, null otherwise): the picker locks a model whose price at the chosen resolution is over it. Of a pair of duplicate models (`twin_of`, migration 0075) one is listed:
  * the cheaper, or the dearer in its place while the cheaper cannot serve (lib/model-twins.ts). Members and Admins.
  */
@@ -56,6 +57,11 @@ export async function GET(request: Request) {
       total: st.total,
     };
   });
-  const { recommended } = rank(models.map((m) => ({ id: m.id, score: m.score, usd: Math.min(...Object.values(m.prices).map(Number)) })));
+  const ranking = models.map((m) => ({ id: m.id, score: m.score, usd: Math.min(...Object.values(m.prices).map(Number)), vertex: m.provider === 'vertex' }));
+  // Create Image only (`?feature=image`): while the active Vertex account runs on credits alone, its models are ranked among themselves and the best is the pre-selection.
+  const onVertex = ranking.filter((m) => m.vertex);
+  const onCredits = feature === 'image' && onVertex.length > 0 && (await vertexOnCredits(pool));
+  const ranked = rank(onCredits ? onVertex : ranking);
+  const recommended = onCredits ? ranked.best : ranked.recommended;
   return Response.json({ models: models.map((m) => ({ ...m, recommended: m.id === recommended })) });
 }

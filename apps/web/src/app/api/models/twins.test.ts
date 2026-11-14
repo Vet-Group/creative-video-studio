@@ -92,6 +92,29 @@ describe('the video picker', () => {
     }
   });
 
+  test('pre-selects the best Vertex model in Create Video while the active Vertex account runs on credits alone, whatever a fal model scores, and ranks as before otherwise', async () => {
+    const before = (await pool.query(`select id, features, pass_seed_passes, pass_seed_total from model_configs where id in ('kling-o3-pro', 'veo-3.1-vertex')`)).rows;
+    await pool.query(`update model_configs set pass_seed_passes = 9, pass_seed_total = 10 where id = 'kling-o3-pro'`);
+    await pool.query(`update model_configs set features = array_append(features, 'marketing') where id = 'veo-3.1-vertex' and 'marketing' <> all(features)`);
+    await pool.query(`insert into vertex_accounts (project_id, stop_when_credits_end) values ('t-paid', false)`);
+    await only(['kling-o3-pro', 'veo-3.1', 'veo-3.1-vertex']);
+    const pick = async (project: string | null, feature = 'video') => {
+      await vertex(project);
+      const res = (await (await videoModels(as(`/api/models?feature=${feature}&ratio=9:16&durationSec=8`))).json()) as { models: { id: string; recommended: boolean }[]; defaultModelId: string | null };
+      return [res.defaultModelId, res.models.find((m) => m.recommended)?.id];
+    };
+    try {
+      expect(await pick(null)).toEqual(['kling-o3-pro', 'kling-o3-pro']);
+      expect(await pick('t-paid')).toEqual(['kling-o3-pro', 'kling-o3-pro']); // an account that may bill money
+      expect(await pick('cvs-vertex')).toEqual(['veo-3.1-vertex', 'veo-3.1-vertex']); // credits only, though it scores less
+      expect(await pick('cvs-vertex', 'marketing')).toEqual(['kling-o3-pro', 'kling-o3-pro']); // Create Video only
+    } finally {
+      await vertex(null);
+      await pool.query(`delete from vertex_accounts where project_id = 't-paid'`);
+      for (const r of before) await pool.query('update model_configs set features = $2, pass_seed_passes = $3, pass_seed_total = $4 where id = $1', [r.id, r.features, r.pass_seed_passes, r.pass_seed_total]);
+    }
+  });
+
   test('keeps the fal Omni row while the Vertex Omni row is off, and swaps to the Vertex row once it is on and an account can serve', async () => {
     await only(['gemini-omni-flash']);
     await vertex('project-one');

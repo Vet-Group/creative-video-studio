@@ -15,6 +15,15 @@ async function vertexUsable(q: Queryable): Promise<boolean> {
   return (await q.query('select vertex_active_project is not null as on from settings where id = 1')).rows[0]?.on === true;
 }
 
+/** Whether the active Vertex account runs on credits only (`stop_when_credits_end` with a credit total): a job there costs no money while the guard keeps it active. */
+export async function vertexOnCredits(q: Queryable): Promise<boolean> {
+  return (
+    (await q.query(
+      `select exists (select 1 from settings s join vertex_accounts a on a.project_id = s.vertex_active_project where s.id = 1 and a.stop_when_credits_end and a.credit_total is not null) as on`,
+    )).rows[0]?.on === true
+  );
+}
+
 /**
  * One row of each pair, from the enabled rows of a listing: the cheaper row, or the dearer one in its place when the cheaper cannot serve, which is when
  * `locked(row)` says so (fal's balance lock; the caller knows the estimate) or it is a Vertex row while no Vertex account is usable. A disabled twin is absent from

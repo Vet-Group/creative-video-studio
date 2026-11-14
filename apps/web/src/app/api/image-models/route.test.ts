@@ -98,6 +98,30 @@ describe('GET /api/image-models', () => {
     }
   });
 
+  test('recommends the best Vertex model of Create Image while the active Vertex account runs on credits alone, and nothing changes otherwise', async () => {
+    await pool.query(`update model_configs set pass_seed_passes = 8, pass_seed_total = 10 where id = 't-both'`);
+    await pool.query(
+      `insert into model_configs (id, provider, endpoint, label, kind, features, ratios, durations_sec, max_images, image_prices, sources, enabled, max_prompt_chars)
+       values ('t-vertex', 'vertex', 'x', 'G vertex', 'image', '{image,try_on}', '{auto}', '{}', 2, '{"1K": "0.1000"}', '{}', true, 2000)`,
+    );
+    await pool.query(`insert into vertex_accounts (project_id, stop_when_credits_end) values ('t-paid', false)`);
+    const recommended = async (project: string | null, feature = 'image') => {
+      await pool.query('update settings set vertex_active_project = $1 where id = 1', [project]);
+      return (await list(feature)).find((m) => m.recommended)?.id;
+    };
+    try {
+      expect(await recommended(null)).toBe('t-both'); // 67 against the 50 of t-vertex
+      expect(await recommended('t-paid')).toBe('t-both'); // an account that may bill money
+      expect(await recommended('cvs-vertex')).toBe('t-vertex'); // credits only, though it scores less
+      expect(await recommended('cvs-vertex', 'try_on')).toBe('t-both'); // Create Image only
+    } finally {
+      await pool.query('update settings set vertex_active_project = null where id = 1');
+      await pool.query(`delete from vertex_accounts where project_id = 't-paid'`);
+      await pool.query(`delete from model_configs where id = 't-vertex'`);
+      await pool.query(`update model_configs set pass_seed_passes = null, pass_seed_total = null where id = 't-both'`);
+    }
+  });
+
   test('marks a model as new for 14 days after it was added', async () => {
     await pool.query(`update model_configs set created_at = now() - interval '15 days' where id = 't-image'`);
     try {
