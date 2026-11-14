@@ -1,5 +1,6 @@
 // The weekly report of the Admin area (plan M.5), shared by GET /api/admin/report and its CSV.
 import { CANCELED_ERROR } from '@cvs/core/ledger';
+import { capRowOf } from '@cvs/core/limits';
 import { pool } from '@/lib/auth';
 
 const ICT = `'Asia/Ho_Chi_Minh'`;
@@ -15,7 +16,7 @@ export async function weeklyReport(week: string | null) {
     `with w as (select date_trunc('week', coalesce($1::date, (now() at time zone ${ICT})::date)::timestamp)::date as start),
           wj as (select j.* from jobs j, w where j.feature in ('video', 'marketing') and (j.created_at at time zone ${ICT})::date >= w.start and (j.created_at at time zone ${ICT})::date < w.start + 7),
           -- The video jobs' rows, and the member's suggestion and translation runs (llm rows without a job).
-          spend as (select ce.user_id, sum(ce.usd) as usd, sum(ce.usd) filter (where ce.kind <> 'llm') as usd_cap from cost_entries ce left join jobs j on j.id = ce.job_id cross join w
+          spend as (select ce.user_id, sum(ce.usd) as usd, sum(ce.usd) filter (where ${capRowOf('ce')}) as usd_cap from cost_entries ce left join jobs j on j.id = ce.job_id cross join w
                      where (j.feature in ('video', 'marketing') or (ce.job_id is null and ce.kind = 'llm')) and ce.day >= w.start and ce.day < w.start + 7 group by ce.user_id),
           per_user as (
             select j.user_id, count(*)::int as jobs, (count(*) filter (where v.verdict = 'pass'))::int as accepted,
@@ -26,7 +27,7 @@ export async function weeklyReport(week: string | null) {
           who as (select user_id from per_user union select user_id from spend)
      select w.start::text as start, (w.start + 6)::text as "end",
             to_char(w.start::timestamp, 'YYYY-MM') as cap_month, s.monthly_cap_usd::text as monthly_cap, s.member_daily_clip_cap as daily_cap,
-            coalesce((select sum(usd) from cost_entries ce where month = to_char(w.start::timestamp, 'YYYY-MM') and ce.kind <> 'llm' and not exists (select 1 from jobs j where j.id = ce.job_id and j.feature not in ('video', 'marketing'))), 0)::numeric(12, 4)::text as cap_used,
+            coalesce((select sum(usd) from cost_entries ce where month = to_char(w.start::timestamp, 'YYYY-MM') and ${capRowOf('ce')} and not exists (select 1 from jobs j where j.id = ce.job_id and j.feature not in ('video', 'marketing'))), 0)::numeric(12, 4)::text as cap_used,
             u.id as user_id, u.name, u.email, t.name as team, coalesce(p.jobs, 0) as jobs, coalesce(p.accepted, 0) as accepted,
             coalesce(p.failed, 0) as failed, coalesce(p.finished, 0) as finished, p.median_s,
             coalesce(sp.usd, 0)::numeric(12, 4)::text as spend, round(sp.usd / nullif(p.accepted, 0), 4)::text as per_accepted,

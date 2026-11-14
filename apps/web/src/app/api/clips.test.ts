@@ -14,6 +14,8 @@ process.env.S3_BUCKET = `cvs-test-${randomBytes(6).toString('hex')}`;
 
 const { auth, pool } = await import('@/lib/auth');
 const { bestClips, downloadName } = await import('@/lib/clips');
+const { bookLlm } = await import('@cvs/core/ledger');
+const { checkCaps } = await import('@cvs/core/limits');
 const { bucketName, ensureBucket, putObject, s3 } = await import('@/lib/storage');
 const { GET: GET_MINE } = await import('./jobs/route');
 const { GET: GET_JOB, DELETE: DELETE_JOB } = await import('./jobs/[id]/route');
@@ -881,6 +883,22 @@ describe('GET /api/models', () => {
     expect(member).not.toHaveProperty('remainingBudgetUsd');
     const adminBody = await models(admin.cookie);
     expect(Number(adminBody.remainingBudgetUsd)).toBeCloseTo(200 - Number(used), 4);
+  });
+
+  test('takes a Smart Remake llm row off the remaining budget as the caps count it, and an Enhance llm row not', async () => {
+    const erin = await newUser('erin@example.test', 'Erin'); // no jobs, so only the company month can refuse
+    const enhanced = await clip(alice.id);
+    const remaining = async () => (await models(admin.cookie)).remainingBudgetUsd!;
+    const before = await remaining();
+    await bookLlm(pool, { enhance: enhanced }, { costUsd: 0.5, provider: 'fal', model: 'm' });
+    expect(await remaining()).toBe(before);
+    await pool.query(`insert into analyses (id, user_id, team_id, source_key, status) values ('budget-an', $1, 'team-unassigned', 's', 'succeeded')`, [alice.id]);
+    await pool.query(`insert into remakes (id, user_id, team_id, analysis_id, shots) values ('budget-rm', $1, 'team-unassigned', 'budget-an', '[1]')`, [alice.id]);
+    await bookLlm(pool, { remake: 'budget-rm', step: '1:video' }, { costUsd: 3, provider: 'fal', model: 'm' });
+    const after = await remaining();
+    expect(Number(after)).toBeCloseTo(Number(before) - 3, 4);
+    expect(await checkCaps(pool, erin.id, after)).toBeNull(); // what the display says is left still fits
+    expect(await checkCaps(pool, erin.id, (Number(after) + 0.0001).toFixed(4))).toBe('monthly_usd');
   });
 
   test('gives a Member their own month-to-date total, provisional while a job has no closing row', async () => {

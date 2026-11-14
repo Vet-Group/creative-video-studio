@@ -11,6 +11,7 @@ process.env.APP_URL = 'http://localhost';
 
 const { auth, pool } = await import('@/lib/auth');
 const { bookLlm, reserve } = await import('@cvs/core/ledger');
+const { checkCaps } = await import('@cvs/core/limits');
 const { GET } = await import('./report/route');
 const { GET: GET_CSV } = await import('./report/csv/route');
 
@@ -165,6 +166,27 @@ describe('GET /api/admin/report', () => {
     try {
       const r = await report('?week=2026-11-12');
       expect(r.users.map((u) => [u.userId, u.spendUsd, u.spendOfCap])).toEqual([['rep1', '2.0004', '4.0000'], ['rep2', '0.0006', '0.0000']]);
+    } finally {
+      await pool.query(`update settings set monthly_cap_usd = $1 where id = 1`, [rows[0].cap]);
+    }
+  });
+
+  test("counts a Smart Remake's llm calls in the cap column and the month's usage like the cap does", async () => {
+    await pool.query(`insert into analyses (id, user_id, team_id, source_key, status) values ('rpt-an', 'rep2', 'rt', 's', 'succeeded')`);
+    await pool.query(`insert into remakes (id, user_id, team_id, analysis_id, shots, created_at) values ('rpt-rm', 'rep2', 'rt', 'rpt-an', '[1]', '2026-11-11 10:00:00+07')`);
+    const before = (await report('?week=2026-11-12')).cap.usedUsd;
+    await bookLlm(pool, { remake: 'rpt-rm', step: '1:video' }, { costUsd: 0.25, provider: 'fal', model: 'm' });
+    const { rows } = await pool.query(`select monthly_cap_usd::text as cap from settings where id = 1`);
+    await pool.query(`update settings set monthly_cap_usd = 1 where id = 1`);
+    try {
+      const r = await report('?week=2026-11-12');
+      expect(Number(r.cap.usedUsd)).toBeCloseTo(Number(before) + 0.25, 4);
+      // The 0.0006 suggestion run still counts for nothing, so Rep Two's share of the cap is the remake alone.
+      expect(r.users.map((u) => [u.userId, u.spendOfCap])).toEqual([['rep1', '2.0000'], ['rep2', '0.2500']]);
+      await pool.query(`update settings set monthly_cap_usd = $1 where id = 1`, [r.cap.usedUsd]);
+      const at = new Date('2026-11-12T00:00:00+07:00');
+      expect(await checkCaps(pool, 'rep1', '0.0000', at)).toBeNull(); // the usage shown is exactly what is enforced
+      expect(await checkCaps(pool, 'rep1', '0.0001', at)).toBe('monthly_usd');
     } finally {
       await pool.query(`update settings set monthly_cap_usd = $1 where id = 1`, [rows[0].cap]);
     }
