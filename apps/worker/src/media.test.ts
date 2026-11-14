@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 import ffprobe from 'ffprobe-static';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
-import { burnEndText, concatClips, cutShot, endTextLayout, probeSeconds, probeSize, probeVideoSeconds, requireFfmpeg, sideBySide, spliceClips, stillSlot, trimClip, wrapText } from './media';
+import { burnEndText, concatClips, cutShot, endTextLayout, ensureH264, probeSeconds, probeSize, probeVideoSeconds, requireFfmpeg, sideBySide, spliceClips, stillSlot, trimClip, wrapText } from './media';
 
 const run = promisify(execFile);
 let dir = '';
@@ -148,4 +148,45 @@ test('still cuts share four ffmpeg slots across calls, keep their order, and fre
   most = 0;
   expect(await Promise.all([1, 2, 3, 4, 5].map((v) => stillSlot(cut(v))))).toEqual([1, 2, 3, 4, 5]); // all four slots came back
   expect(most).toBe(4);
+});
+
+describe('H.264 for every stored clip', () => {
+  const codecs = async (file: string) => (JSON.parse((await run(ffprobe.path, ['-v', 'error', '-show_entries', 'stream=codec_type,codec_name', '-of', 'json', file])).stdout) as { streams: { codec_type: string; codec_name: string }[] }).streams.map((s) => `${s.codec_type}:${s.codec_name}`);
+  /** A 2 s 320x240 clip with a tone, 10-bit HEVC as fal returns it, or any other encoder given. */
+  const make = async (name: string, video: string[]) => {
+    const file = join(dir, name);
+    await run(requireFfmpeg(), ['-y', '-v', 'error', '-f', 'lavfi', '-i', 'testsrc2=size=320x240:rate=24', '-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=44100', '-t', '2', ...video, '-c:a', 'aac', '-shortest', file]);
+    return file;
+  };
+
+  test('converts an HEVC clip to H.264 at the same size and length, keeping its AAC sound', async () => {
+    const hevc = await make('hevc.mp4', ['-c:v', 'libx265', '-pix_fmt', 'yuv420p10le', '-x265-params', 'log-level=error']);
+    expect(await codecs(hevc)).toContain('video:hevc');
+    const out = join(dir, 'hevc-h264.mp4');
+    const failures: unknown[] = [];
+    expect(await ensureH264(hevc, out, { onFail: (e) => failures.push(e) })).toBe(out);
+    expect(failures).toEqual([]);
+    expect(await codecs(out)).toEqual(['video:h264', 'audio:aac']);
+    expect(await probeSize(out)).toEqual(await probeSize(hevc));
+    expect(Math.abs((await probeSeconds(out)) - (await probeSeconds(hevc)))).toBeLessThan(0.1);
+  });
+
+  test('leaves an H.264 clip as it is, byte for byte', async () => {
+    const h264 = await make('plain.mp4', ['-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p']);
+    const out = join(dir, 'plain-copy.mp4');
+    expect(await ensureH264(h264, out)).toBe(h264);
+    await expect(readFile(out)).rejects.toThrow();
+  });
+
+  test('keeps the original, and says why, when the conversion fails or the clip cannot be read', async () => {
+    const hevc = await make('hevc2.mp4', ['-c:v', 'libx265', '-pix_fmt', 'yuv420p', '-x265-params', 'log-level=error']);
+    const failures: unknown[] = [];
+    expect(await ensureH264(hevc, join(dir, 'late.mp4'), { timeoutMs: 1, onFail: (e) => failures.push(e) })).toBe(hevc); // ffmpeg is killed at the timeout
+    const aborted = AbortSignal.abort();
+    expect(await ensureH264(hevc, join(dir, 'aborted.mp4'), { signal: aborted, onFail: (e) => failures.push(e) })).toBe(hevc);
+    const junk = join(dir, 'junk.mp4');
+    await writeFile(junk, 'not a video');
+    expect(await ensureH264(junk, join(dir, 'junk-out.mp4'), { onFail: (e) => failures.push(e) })).toBe(junk);
+    expect(failures).toHaveLength(3);
+  });
 });

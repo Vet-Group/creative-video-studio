@@ -20,7 +20,7 @@ import type { Suggester } from '@cvs/core/suggest';
 import { insertAssets } from '@cvs/db/assets';
 import { createDb, type createPool } from '@cvs/db/client';
 import { type Job, PgBoss } from 'pg-boss';
-import { burnEndText, closestRatio, extractPoster, probeSeconds, probeSize, probeVideoSeconds, sniffImage } from './media';
+import { burnEndText, closestRatio, ensureH264, extractPoster, probeSeconds, probeSize, probeVideoSeconds, sniffImage } from './media';
 import { compressVideoAsset } from './compress';
 import { purgeDeletedClips } from './purge';
 import { dropPreview, storePreview } from './preview';
@@ -343,6 +343,8 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
     try {
       let video = join(dir, 'output.mp4');
       await download(outputUrl, video, job.provider);
+      // Whichever model made it, the stored clip is H.264 (a browser without an HEVC decoder cannot play fal's Seedance 2.5 1080p); the size, length, poster and compress below read that file.
+      video = await ensureH264(video, join(dir, 'h264.mp4'), { signal: stopping.signal, onFail: (e) => log(`h264 conversion ${job.id}`, e) });
       const { width, height } = await probeSize(video);
       const seconds = await probeSeconds(video);
       // Motion Control's clip is as long as the member's own video, whose header can understate it, so a clip that came back longer is billed for its own length. A shorter one is not

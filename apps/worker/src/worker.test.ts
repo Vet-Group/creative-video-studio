@@ -14,6 +14,7 @@ import type { ImageProvider, ImageSubmitRequest, SubmitRequest, VideoProvider } 
 import { VIDEO_QUEUE, VIDEO_QUEUE_OPTIONS, videoSendOptions } from '@cvs/core/queue';
 import { createDb, createPool } from '@cvs/db/client';
 import { createTestDatabase } from '@cvs/db/testing';
+import ffprobe from 'ffprobe-static';
 import { PgBoss } from 'pg-boss';
 import sharp from 'sharp';
 import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
@@ -193,6 +194,33 @@ describe('the mock lifecycle', () => {
     expect((await job(id)).output_asset_id).toBeNull();
     expect((await costs(id)).map((c) => [c.kind, c.usd])).toEqual([['estimate', '1.5000'], ['actual_adjustment', '0.0000']]); // not a release of -1.5000
     expect(await total(id)).toEqual({ usd: '1.5000', is_final: true });
+  });
+
+  test('stores an HEVC output as H.264 with its size and length, and an H.264 output as it came', async () => {
+    await mkdir(mockDir, { recursive: true });
+    const clip = async (encoder: string[]) => {
+      const file = join(mockDir, `${randomUUID()}-${encoder[0]}.mp4`);
+      await run(requireFfmpeg(), ['-y', '-v', 'error', '-f', 'lavfi', '-i', 'testsrc2=size=720x1280:rate=24', '-t', '1', '-c:v', ...encoder, '-pix_fmt', 'yuv420p', file]);
+      return file;
+    };
+    const hevc = await clip(['libx265', '-x265-params', 'log-level=error']);
+    const plain = await clip(['libx264', '-preset', 'ultrafast']);
+    let output = hevc;
+    await start(counting(300, (inner) => ({ ...inner, status: async (pj) => ((await inner.status(pj)).state === 'running' ? { state: 'running' } : { state: 'succeeded', outputUrl: pathToFileURL(output).href, costUsd: 0, costSource: 'estimate' }) })));
+    const stored = async (id: string) => {
+      await send(id, 'u1');
+      await waitFor('the job to succeed', async () => (await status(id)) === 'succeeded');
+      const a = (await pool.query('select s3_key, bytes, width, height, duration_ms from assets where id = $1', [(await job(id)).output_asset_id])).rows[0];
+      return { ...a, data: Buffer.from(await getObject(a.s3_key)) };
+    };
+    const converted = await stored(await newJob('u1'));
+    const file = join(mockDir, `${randomUUID()}-stored.mp4`);
+    await writeFile(file, converted.data);
+    const codec = (await run(ffprobe.path, ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=codec_name', '-of', 'csv=p=0', file])).stdout.trim();
+    expect([codec, converted.width, converted.height, converted.bytes, converted.duration_ms]).toEqual(['h264', 720, 1280, converted.data.length, 1000]);
+    output = plain;
+    const untouched = await stored(await newJob('u2'));
+    expect(untouched.data.equals(await readFile(plain))).toBe(true);
   });
 
   test("a 480p row's output passes at its own 480p floor and still fails below it", async () => {
