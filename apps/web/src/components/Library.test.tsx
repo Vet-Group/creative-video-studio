@@ -33,6 +33,11 @@ test('a card is named by what was made, the model and the Vietnam time, not by i
   expect(card(sample)).not.toContain('Clip 20261114');
 });
 
+test("a video card shows the clip's own length once recorded, else the length asked", () => {
+  expect(card({ ...sample, lengthSec: 3.7 })).toContain('>3.7s<');
+  expect(card({ ...sample, lengthSec: null })).toContain('>5s<');
+});
+
 test('a grid video loads nothing until hover or focus: preload none with its poster, and metadata only when it has no poster', () => {
   const html = card(sample);
   expect(html).toContain('preload="none"');

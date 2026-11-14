@@ -45,7 +45,7 @@ const VERDICTS: Record<string, string> = {
  * The Library: every user's live clips and images, newest first. Filters: `creator` (a user id), `date` (YYYY-MM-DD, Asia/Ho_Chi_Minh), `ratio` (the real shape of the output, one of the `ratios` listed; an unknown value is ignored) and
  * `kind` (`all` by default, `images`, `videos`, one feature of `try_on`, `image`, `video`, `marketing` (or one of its formats, `marketing_ugc`, `marketing_advanced`, `marketing_unboxing` and `marketing_review`), or `apps` for every app feature, or the feature of one app such as `background_changer`),
  * `verdict` (`none` for unmarked items, `pass`, `featured` or `fail`), `favorites=1` (only the caller's favourites), `example=1` (only the results an Admin put on an Examples tab; with the `kind` of one such tab, in its order unless `sort=oldest`), `q` (words in the model name, the creator's own prompt or the brief, or the store name, ignoring case and diacritics, up to 200 characters) and `sort` (`newest`, the default, or `oldest`); `offset` pages by 24. `favorite` says whether the caller marked an item, `example` whether it is on its page's Examples tab. Each item has its `feature` and `mediaType` (`video` or `image`, from the output asset); `videoAssetId` is the output asset
- * either way, and an image item has `durationSec` 0 and its `resolution`. `creators` fills the creator filter and `ratios` the ratio filter. `ratio` is the output's real shape. `unmarked` counts the live items the caller may mark (their own, or all for an Admin) that have no mark yet. `costUsd` is the job's ledger total, provisional while `costFinal` is false.
+ * either way, and an image item has `durationSec` 0 and its `resolution`; `lengthSec` is a video's own length once recorded (else null), `durationSec` the length asked. `creators` fills the creator filter and `ratios` the ratio filter. `ratio` is the output's real shape. `unmarked` counts the live items the caller may mark (their own, or all for an Admin) that have no mark yet. `costUsd` is the job's ledger total, provisional while `costFinal` is false.
  */
 export async function GET(request: Request) {
   const g = await guard(request, 'member');
@@ -121,7 +121,8 @@ export async function GET(request: Request) {
       modelId: r.model,
       modelLabel: r.model_label,
       ratio: r.shape,
-      durationSec: r.output_ms === null ? r.duration_s : Math.round(r.output_ms / 100) / 10, // the clip's own length (to 0.1 s) once it is known, else the length asked
+      durationSec: r.duration_s, // the length asked: the detail's how-it-was-made row
+      lengthSec: r.output_ms === null ? null : Math.round(r.output_ms / 100) / 10, // the clip's own length (to 0.1 s) once the worker recorded it, for the card
       feature: r.feature,
       mediaType: r.output_mime.startsWith('image/') ? 'image' : 'video',
       resolution: r.params.resolution ?? null,

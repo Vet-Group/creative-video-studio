@@ -196,7 +196,7 @@ describe('GET /api/library', () => {
     expect(ids).not.toContain(deleted);
     expect(ids.indexOf(a)).toBeLessThan(ids.indexOf(b)); // newest first
     expect(body.clips.find((c) => c.id === a)).toEqual({
-      id: a, creator: { id: alice.id, name: 'Nguyễn Văn Đạt' }, createdAt: '2026-10-22T17:30:00.000Z', modelId: 'fal-test', modelLabel: 'Fal test', ratio: '1:1', durationSec: 8,
+      id: a, creator: { id: alice.id, name: 'Nguyễn Văn Đạt' }, createdAt: '2026-10-22T17:30:00.000Z', modelId: 'fal-test', modelLabel: 'Fal test', ratio: '1:1', durationSec: 8, lengthSec: null,
       feature: 'video', mediaType: 'video', resolution: null, isMock: false, videoAssetId: 'lib-a-video', posterAssetId: 'lib-a-poster', storeId: null, costUsd: '1.6000', costFinal: true, verdict: { verdict: 'fail', fault: 'flicker', featured: false, markedBy: alice.id },
       favorite: false, example: false, prompt: null, canEdit: false, mine: false, downloadName: expect.stringMatching(/^20261023-nguyen-van-dat-lib-a\.mp4$/),
     });
@@ -207,13 +207,13 @@ describe('GET /api/library', () => {
     expect(await (await GET_LIBRARY(req('/api/library', admin.cookie))).json()).toMatchObject({ isAdmin: true });
   });
 
-  test("durationSec is the output clip's own length to 0.1 s when it is recorded, and the length the job asked for when it is not", async () => {
+  test("lengthSec is the output clip's own length to 0.1 s once recorded (null before), while durationSec stays the length asked", async () => {
     const known = await clip(alice.id, { id: 'dur-known' });
     const unknown = await clip(alice.id, { id: 'dur-unknown' });
     await pool.query(`update assets set duration_ms = 3749 where id = 'dur-known-video'`); // a job that asked for 8 s whose clip plays 3.7 s
     await pool.query(`update jobs set is_mock = true where id = any($1)`, [[known, unknown]]); // keeps them out of the model scores of the later tests
-    const body = (await (await GET_LIBRARY(req('/api/library', alice.cookie))).json()) as { clips: { id: string; durationSec: number }[] };
-    expect(body.clips.filter((c) => [known, unknown].includes(c.id)).map((c) => [c.id, c.durationSec]).sort()).toEqual([['dur-known', 3.7], ['dur-unknown', 8]]);
+    const body = (await (await GET_LIBRARY(req('/api/library', alice.cookie))).json()) as { clips: { id: string; durationSec: number; lengthSec: number | null }[] };
+    expect(body.clips.filter((c) => [known, unknown].includes(c.id)).map((c) => [c.id, c.lengthSec, c.durationSec]).sort()).toEqual([['dur-known', 3.7, 8], ['dur-unknown', null, 8]]);
     await pool.query(`update jobs set deleted_at = now() where id = any($1)`, [[known, unknown]]); // the later tests count the live clips
   });
 

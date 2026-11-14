@@ -109,6 +109,8 @@ export interface Clip {
   modelLabel: string;
   ratio: string;
   durationSec: number;
+  /** The clip's own length to 0.1 s once the worker recorded it (null before); durationSec is the length asked. */
+  lengthSec?: number | null;
   feature: string;
   mediaType: 'video' | 'image';
   resolution: string | null;
