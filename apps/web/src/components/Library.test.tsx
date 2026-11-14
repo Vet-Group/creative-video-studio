@@ -25,7 +25,7 @@ const sample: Clip = {
   feature: 'video', mediaType: 'video', resolution: null, isMock: false, videoAssetId: 'vid-1', posterAssetId: 'poster-1', storeId: null, costUsd: '0.1000', costFinal: true,
   verdict: null, favorite: false, example: false, prompt: null, canEdit: true, mine: true, downloadName: '20261114-mai-job-1.mp4',
 };
-const card = (c: Clip, view: 'grid' | 'list' = 'grid') => renderToStaticMarkup(<ClipCard sample={c} view={view} onChange={() => undefined} onDeleted={() => undefined} onOpen={() => undefined} />);
+const card = (c: Clip, view: 'grid' | 'list' = 'grid') => renderToStaticMarkup(<ClipCard clip={c} view={view} onChange={() => undefined} onDeleted={() => undefined} onOpen={() => undefined} />);
 
 test('a card is named by what was made, the model and the Vietnam time, not by its file name', () => {
   expect(clipLabel(sample)).toBe('Tạo video · Seedance 1.5 Pro · 08:04 14/11');
