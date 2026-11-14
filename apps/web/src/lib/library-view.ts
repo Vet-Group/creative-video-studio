@@ -21,11 +21,12 @@ export interface LibraryFilters {
 
 export const NO_FILTERS: LibraryFilters = { q: '', creator: '', date: '', days: '', ratio: '', kind: 'all', verdict: '', favoritesOnly: false, examplesOnly: false, sort: 'newest' };
 
-/** A refresh of the first page onto the list shown: the items not yet there go on top (newest first), so pages loaded since and the scroll position stay. */
+/** A refresh of the first page onto the list shown: the items not yet there go on top (newest first), so pages loaded since and the scroll position stay;
+ * an item shown that is on the fresh page takes its fresh copy (a mark or a final cost set meanwhile). */
 export function mergeFresh<T extends { id: string }>(cur: T[], fresh: T[]): T[] {
+  const byId = new Map(fresh.map((c) => [c.id, c]));
   const have = new Set(cur.map((c) => c.id));
-  const added = fresh.filter((c) => !have.has(c.id));
-  return added.length === 0 ? cur : [...added, ...cur];
+  return [...fresh.filter((c) => !have.has(c.id)), ...cur.map((c) => byId.get(c.id) ?? c)];
 }
 
 /** Whether an item with this mark belongs under the verdict filter, so a fresh mark can take it out of the list. */

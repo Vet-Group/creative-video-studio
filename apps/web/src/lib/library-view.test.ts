@@ -163,10 +163,12 @@ describe('mergeFresh', () => {
     expect(mergeFresh(cur, [item('e'), item('d'), item('c')])).toEqual([item('e'), item('d'), item('c'), item('b'), item('a')]);
   });
 
-  it('returns the same list when the first page has nothing new', () => {
+  it('adds nothing when the first page has nothing new, and takes the fresh copy of an item shown', () => {
     const cur = [item('c'), item('b')];
-    expect(mergeFresh(cur, [item('c'), item('b')])).toBe(cur);
-    expect(mergeFresh(cur, [])).toBe(cur);
+    expect(mergeFresh(cur, [item('c'), item('b')])).toEqual(cur);
+    const marked = [{ id: 'c', verdict: null as string | null }, { id: 'b', verdict: null as string | null }];
+    expect(mergeFresh(marked, [{ id: 'c', verdict: 'pass' }])).toEqual([{ id: 'c', verdict: 'pass' }, { id: 'b', verdict: null }]);
+    expect(mergeFresh(cur, [])).toEqual(cur);
   });
 
   it('fills an empty list', () => {
