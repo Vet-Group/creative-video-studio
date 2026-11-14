@@ -119,6 +119,8 @@ export interface Clip {
   videoAssetId: string;
   posterAssetId: string | null;
   storeId: string | null;
+  /** The store's name when there is one the viewer may see. */
+  storeName: string | null;
   costUsd: string;
   costFinal: boolean;
   /** `featured`: a Pass shown first on Explore. */

@@ -197,7 +197,7 @@ describe('GET /api/library', () => {
     expect(ids.indexOf(a)).toBeLessThan(ids.indexOf(b)); // newest first
     expect(body.clips.find((c) => c.id === a)).toEqual({
       id: a, creator: { id: alice.id, name: 'Nguyễn Văn Đạt' }, createdAt: '2026-10-22T17:30:00.000Z', modelId: 'fal-test', modelLabel: 'Fal test', ratio: '1:1', durationSec: 8, lengthSec: null,
-      feature: 'video', mediaType: 'video', resolution: null, isMock: false, videoAssetId: 'lib-a-video', posterAssetId: 'lib-a-poster', storeId: null, costUsd: '1.6000', costFinal: true, verdict: { verdict: 'fail', fault: 'flicker', featured: false, markedBy: alice.id },
+      feature: 'video', mediaType: 'video', resolution: null, isMock: false, videoAssetId: 'lib-a-video', posterAssetId: 'lib-a-poster', storeId: null, storeName: null, costUsd: '1.6000', costFinal: true, verdict: { verdict: 'fail', fault: 'flicker', featured: false, markedBy: alice.id },
       favorite: false, example: false, prompt: null, canEdit: false, mine: false, downloadName: expect.stringMatching(/^20261023-nguyen-van-dat-lib-a\.mp4$/),
     });
     expect(body.clips.find((c) => c.id === b)).toMatchObject({ isMock: true, costFinal: false, verdict: null, canEdit: true }); // bob is the creator
@@ -352,6 +352,30 @@ describe('GET /api/library', () => {
     expect(await found('empower')).toEqual([stored]);
     expect(await found('cua hang')).toEqual([stored]);
     expect(await found('khong co')).toEqual([]);
+  });
+
+  test('filters by store (an id, or none), names the store of each item, and keeps a closed store from members', async () => {
+    await pool.query(`insert into model_configs (id, provider, endpoint, label, ratios, durations_sec, max_images, output_resolution, usd_per_second, sources, enabled) values ('stf-model', 'fal', 'x', 'Store filter', '{9:16}', '{8}', 2, '720p', 0.1, '{}', false)`);
+    await pool.query(`insert into stores (id, name, code) values ('stf-a', 'Cửa hàng Lọc', 'SF1')`);
+    const open = await clip(alice.id, { id: 'stf-open', model: 'stf-model', storeId: 'stf-a' });
+    const closed = await clip(alice.id, { id: 'stf-closed', model: 'stf-model', storeId: 'store-hidden' });
+    const none = await clip(alice.id, { id: 'stf-none', model: 'stf-model' });
+    const lib = async (cookie: string, query: string) => (await libraryIds(cookie, query)).filter((id) => id.startsWith('stf-')).sort();
+    expect(await lib(bob.cookie, '?store=stf-a')).toEqual([open]);
+    expect(await lib(bob.cookie, '?store=none')).toEqual([none]);
+    expect(await lib(bob.cookie, '?store=no-such-store')).toEqual([]); // a stale link: no error, nothing matches
+    expect(await lib(bob.cookie, '?store=store-hidden')).toEqual([]);
+    expect(await lib(bob.cookie, '?store=')).toEqual([closed, none, open].sort()); // blank is no filter
+    expect(await lib(admin.cookie, '?store=store-hidden')).toEqual([closed]);
+    const body = async (cookie: string) => (await (await GET_LIBRARY(req('/api/library', cookie))).json()) as { clips: { id: string; storeName: string | null }[]; stores: { id: string; name: string }[] };
+    const member = await body(bob.cookie);
+    expect(Object.fromEntries(member.clips.filter((c) => c.id.startsWith('stf-')).map((c) => [c.id, c.storeName]))).toEqual({ [open]: 'Cửa hàng Lọc', [closed]: null, [none]: null });
+    expect(member.stores).toEqual(expect.arrayContaining([{ id: 'stf-a', name: 'Cửa hàng Lọc' }]));
+    expect(member.stores.map((s) => s.id)).not.toContain('store-hidden'); // as in the store picker
+    const boss = await body(admin.cookie);
+    expect(boss.clips.find((c) => c.id === closed)?.storeName).toBe('Hidden');
+    expect(boss.stores.map((s) => s.id)).toContain('store-hidden');
+    expect(member.stores.map((s) => s.id)).not.toContain('store-ok'); // no live item: not offered
   });
 
   test('shows and filters the real shape of the output, and ignores a ratio it does not know', async () => {

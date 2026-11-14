@@ -7,6 +7,8 @@ export type VerdictFilter = '' | 'none' | 'pass' | 'featured' | 'fail';
 export interface LibraryFilters {
   q: string;
   creator: string;
+  /** A store id, or 'none' for items with no store; '' for any. */
+  store: string;
   date: string;
   /** '1' (today), '7' or '30': the last days in Vietnam time; '' for any day. */
   days: '' | '1' | '7' | '30';
@@ -19,7 +21,7 @@ export interface LibraryFilters {
   sort: 'newest' | 'oldest';
 }
 
-export const NO_FILTERS: LibraryFilters = { q: '', creator: '', date: '', days: '', ratio: '', kind: 'all', verdict: '', favoritesOnly: false, examplesOnly: false, sort: 'newest' };
+export const NO_FILTERS: LibraryFilters = { q: '', creator: '', store: '', date: '', days: '', ratio: '', kind: 'all', verdict: '', favoritesOnly: false, examplesOnly: false, sort: 'newest' };
 
 /** A refresh of the first page onto the list shown: the items not yet there go on top (newest first), so pages loaded since and the scroll position stay;
  * an item shown that is on the fresh page takes its fresh copy (a mark or a final cost set meanwhile). */
@@ -42,6 +44,7 @@ export function libraryQuery(f: LibraryFilters, offset: number): string {
   const q = new URLSearchParams();
   if (f.q.trim()) q.set('q', f.q.trim());
   if (f.creator) q.set('creator', f.creator);
+  if (f.store) q.set('store', f.store);
   if (f.date) q.set('date', f.date);
   if (f.days) q.set('days', f.days);
   if (f.ratio) q.set('ratio', f.ratio);
@@ -61,6 +64,7 @@ export function filtersFromParams(p: URLSearchParams): LibraryFilters {
   return {
     q: p.get('q') ?? '',
     creator: p.get('creator') ?? '',
+    store: p.get('store') ?? '',
     date: p.get('date') ?? '',
     days: days === '1' || days === '7' || days === '30' ? days : '',
     ratio: p.get('ratio') ?? '',
@@ -72,20 +76,30 @@ export function filtersFromParams(p: URLSearchParams): LibraryFilters {
   };
 }
 
+/** The same read from what a server page gets as `searchParams` (a repeated key counts once, first wins), so the server and the first client render start from the same filters. */
+export function filtersFromSearch(search: Record<string, string | string[] | undefined>): LibraryFilters {
+  const p = new URLSearchParams();
+  for (const [k, v] of Object.entries(search)) for (const x of [v ?? []].flat()) p.append(k, x);
+  return filtersFromParams(p);
+}
+
 /** How many filters narrow the list; the sort only orders it, so it is not one. */
-export const activeFilters = (f: LibraryFilters): number => [f.q.trim(), f.creator, f.date, f.days, f.ratio, f.kind !== 'all', f.verdict, f.favoritesOnly, f.examplesOnly].filter(Boolean).length;
+export const activeFilters = (f: LibraryFilters): number => [f.q.trim(), f.creator, f.store, f.date, f.days, f.ratio, f.kind !== 'all', f.verdict, f.favoritesOnly, f.examplesOnly].filter(Boolean).length;
 
 /** Which filter a chip removes; date and days share one chip since the UI never sets both. */
-export type ChipKey = 'q' | 'creator' | 'date' | 'days' | 'ratio' | 'kind' | 'verdict' | 'favoritesOnly' | 'examplesOnly';
+export type ChipKey = 'q' | 'creator' | 'store' | 'date' | 'days' | 'ratio' | 'kind' | 'verdict' | 'favoritesOnly' | 'examplesOnly';
 
+/** The store filter's option, and its chip, for items with no store. */
+export const NO_STORE = 'Không gắn cửa hàng';
 const DAYS_LABEL: Record<string, string> = { '1': 'Hôm nay', '7': '7 ngày qua', '30': '30 ngày qua' };
 const VERDICT_LABEL: Record<Exclude<VerdictFilter, ''>, string> = { none: 'Chưa chấm', pass: 'Đạt', featured: 'Nổi bật', fail: 'Không đạt' };
 
-/** The active filters as removable chips, in the order of the filter bar. creator and kind read as labels, not raw values, so the page passes the names it already shows. */
-export function activeFilterChips(f: LibraryFilters, names: { creator?: string; kind?: string } = {}): { key: ChipKey; label: string }[] {
+/** The active filters as removable chips, in the order of the filter bar. creator, store and kind read as labels, not raw values, so the page passes the names it already shows. */
+export function activeFilterChips(f: LibraryFilters, names: { creator?: string; store?: string; kind?: string } = {}): { key: ChipKey; label: string }[] {
   const chips: { key: ChipKey; label: string }[] = [];
   if (f.q.trim()) chips.push({ key: 'q', label: `Tìm: ${f.q.trim()}` });
   if (f.creator) chips.push({ key: 'creator', label: `Người tạo: ${names.creator ?? f.creator}` });
+  if (f.store) chips.push({ key: 'store', label: `Cửa hàng: ${f.store === 'none' ? NO_STORE : (names.store ?? f.store)}` });
   if (f.date) chips.push({ key: 'date', label: `Ngày: ${f.date.split('-').reverse().join('/')}` });
   else if (f.days) chips.push({ key: 'days', label: DAYS_LABEL[f.days] ?? f.days });
   if (f.ratio) chips.push({ key: 'ratio', label: `Tỉ lệ: ${f.ratio}` });

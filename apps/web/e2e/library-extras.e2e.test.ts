@@ -46,7 +46,7 @@ test('the Library loads more as the end comes near, and coming back keeps the it
   await page.route(/\/api\/library(\?|$)/, async (r) => {
     const offset = Number(new URL(r.request().url()).searchParams.get('offset') ?? 0);
     const items = Array.from({ length: 50 }, (_, i) => clip(i)).slice(offset, offset + 24);
-    await r.fulfill({ json: { hasMore: offset + 24 < 50, isAdmin: false, unmarked: 0, creators: [], ratios: ['9:16'], clips: items } });
+    await r.fulfill({ json: { hasMore: offset + 24 < 50, isAdmin: false, unmarked: 0, creators: [], stores: [], ratios: ['9:16'], clips: items } });
   });
   await page.goto('/library');
   const cards = page.getByRole('article');
