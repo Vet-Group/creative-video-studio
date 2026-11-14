@@ -250,9 +250,9 @@ export async function streamAsset(request: Request, asset: Pick<Asset, 's3Key' |
     'x-content-type-options': 'nosniff',
   };
   if (!range) {
-    return new Response(await getObject(asset.s3Key), { headers: { ...headers, 'content-length': String(asset.bytes) } });
+    return new Response(await getObject(asset.s3Key, undefined, request.signal), { headers: { ...headers, 'content-length': String(asset.bytes) } });
   }
   headers['content-length'] = String(range.end - range.start + 1);
   headers['content-range'] = `bytes ${range.start}-${range.end}/${asset.bytes}`;
-  return new Response(await getObject(asset.s3Key, `bytes=${range.start}-${range.end}`), { status: 206, headers });
+  return new Response(await getObject(asset.s3Key, `bytes=${range.start}-${range.end}`, request.signal), { status: 206, headers });
 }

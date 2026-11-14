@@ -24,12 +24,17 @@ function env(name: string): string {
 // One client per server process; dev reloads keep it on globalThis.
 const g = globalThis as unknown as { cvsS3?: S3Client };
 
+/** The client's 50 sockets are shared by every media request: a body nobody reads (a browser that dropped a video range) frees its
+ * socket after a minute of silence instead of holding it until restart, which on 2026-11-14 queued every thumbnail and sample behind it. */
+export const REQUEST_HANDLER = { connectionTimeout: 5_000, requestTimeout: 60_000 };
+
 export function s3(): S3Client {
   return (g.cvsS3 ??= new S3Client({
     endpoint: env('S3_ENDPOINT'),
     region: 'us-east-1',
     forcePathStyle: true,
     credentials: { accessKeyId: env('S3_ACCESS_KEY_ID'), secretAccessKey: env('S3_SECRET_ACCESS_KEY') },
+    requestHandler: REQUEST_HANDLER,
   }));
 }
 
@@ -47,6 +52,7 @@ function r2(): S3Client {
     region: 'auto',
     forcePathStyle: true,
     credentials: { accessKeyId: env('R2_ACCESS_KEY_ID'), secretAccessKey: env('R2_SECRET_ACCESS_KEY') },
+    requestHandler: REQUEST_HANDLER,
   }));
 }
 
@@ -99,10 +105,11 @@ export async function deleteObject(key: string): Promise<void> {
   await client.send(new DeleteObjectCommand({ Bucket, Key }));
 }
 
-/** The object as a web stream; `range` is an HTTP byte range such as `bytes=0-99`. */
-export async function getObject(key: string, range?: string): Promise<ReadableStream<Uint8Array>> {
+/** The object as a web stream; `range` is an HTTP byte range such as `bytes=0-99`. `signal` (the browser's request) ends the read and
+ * frees its socket when the browser goes away mid-stream. */
+export async function getObject(key: string, range?: string, signal?: AbortSignal): Promise<ReadableStream<Uint8Array>> {
   const { client, Bucket, Key } = loc(key);
-  const res = await client.send(new GetObjectCommand({ Bucket, Key, Range: range }));
+  const res = await client.send(new GetObjectCommand({ Bucket, Key, Range: range }), { abortSignal: signal });
   if (!res.Body) throw new Error(`Empty body for ${key}`);
   return res.Body.transformToWebStream();
 }

@@ -58,8 +58,11 @@ const more = (n: number, aspect: Aspect, width: number, height: number, duration
   poster: `/api/samples/example-${n}.jpg`,
 });
 
+/** The title of a model loop's tile; the tile shows its model's name instead when the details file names one (CreateForm). */
+export const DEMO_TITLE = 'Video mẫu của mô hình';
+
 /** Explore's model loops, shown here too (owner, 2026-11-09). No prompt is behind them, so the tile keeps this title and its details file names the model. */
-const demo = (n: number, aspect: Aspect, width: number, height: number, durationSec: number): Example => ({ ...more(n, aspect, width, height, durationSec), title: 'Demo mô hình' });
+const demo = (n: number, aspect: Aspect, width: number, height: number, durationSec: number): Example => ({ ...more(n, aspect, width, height, durationSec), title: DEMO_TITLE });
 
 export const MORE_EXAMPLES: Example[] = [
   more(11, '9:16', 408, 720, 6),

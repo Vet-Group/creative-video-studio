@@ -2,7 +2,7 @@
 import { type DragEvent, type KeyboardEvent, useEffect, useId, useRef, useState } from 'react';
 import { resolutionVariants } from '@/lib/resolution-variants';
 import { api, errorText, sendJson, thumbUrl } from '@/lib/api';
-import { cardSample, type Example, exampleForPreset, exampleModel, examplesFor, exampleTitle, sampleSrc, splitColumns } from '@/lib/examples';
+import { cardSample, DEMO_TITLE, type Example, exampleForPreset, exampleModel, examplesFor, exampleTitle, sampleSrc, splitColumns } from '@/lib/examples';
 import { adjustNote } from '@/lib/video-adjust';
 import { anglePrompt, CAMERA_ANGLES, MAX_ANGLES } from '@/lib/camera-angles';
 import { briefRoom, sectionBody, sectionPrompt } from '@/lib/marketing';
@@ -903,22 +903,27 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
             <div className="masonry" role="group" aria-label="Video ví dụ">
               {splitColumns(examples, narrow ? 2 : Math.max(1, (wide ? 4 : 3) + 1 - gallerySize)).map((column, c) => (
                 <ul key={c} className="masonry-col">
-                  {column.map((ex) => (
-                    <li key={ex.id} className="example">
-                      <Preview src={media(ex.src)} poster={media(ex.poster)} width={ex.width} height={ex.height} title={titleOf(ex)} paused={picking || detail !== null} onHover />
-                      <button type="button" className="example-open" onClick={() => setDetail(ex)}>
-                        <span className="example-caption">
-                          {titleOf(ex)}
-                          <span className="example-model" aria-hidden="true">
-                            {exampleModel(tileDetails[ex.id], models?.models)}
+                  {column.map((ex) => {
+                    const model = exampleModel(tileDetails[ex.id], models?.models);
+                    // A model loop is named by its model (thirty tiles all titled "model demo" told nothing apart), with what it is under it.
+                    const [title, sub] = titleOf(ex) === DEMO_TITLE && model ? [model, 'Video mẫu của mô hình'] : [titleOf(ex), model];
+                    return (
+                      <li key={ex.id} className="example">
+                        <Preview src={media(ex.src)} poster={media(ex.poster)} width={ex.width} height={ex.height} title={title} paused={picking || detail !== null} onHover />
+                        <button type="button" className="example-open" onClick={() => setDetail(ex)}>
+                          <span className="example-caption">
+                            {title}
+                            <span className="example-model" aria-hidden="true">
+                              {sub}
+                            </span>
                           </span>
-                        </span>
-                      </button>
-                      <button type="button" className="example-use" aria-label={`Dùng ví dụ này: ${[titleOf(ex), exampleModel(tileDetails[ex.id], models?.models)].filter(Boolean).join(', ')}`} onClick={() => (have.has(`${ex.id}.json`) ? recreate(exampleFrom({ example: ex.id })!) : fillFromExample(ex))}>
-                        Dùng ví dụ này
-                      </button>
-                    </li>
-                  ))}
+                        </button>
+                        <button type="button" className="example-use" aria-label={`Dùng ví dụ này: ${[title, sub].filter(Boolean).join(', ')}`} onClick={() => (have.has(`${ex.id}.json`) ? recreate(exampleFrom({ example: ex.id })!) : fillFromExample(ex))}>
+                          Dùng ví dụ này
+                        </button>
+                      </li>
+                    );
+                  })}
                 </ul>
               ))}
             </div>
