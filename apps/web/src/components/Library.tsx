@@ -870,11 +870,11 @@ function EmptyArt({ search }: { search?: boolean }) {
   );
 }
 
-export function Library() {
+export function Library({ initialFilters = NO_FILTERS }: { initialFilters?: LibraryFilters }) {
   const [detail, setDetail] = useState<number | null>(null); // the item open in the detail view, by its place in the list
-  // The filters and search box start from the address, so a shared or bookmarked /library?… link opens the same view.
-  const [filters, setFilters] = useState<LibraryFilters>(() => (typeof window === 'undefined' ? NO_FILTERS : filtersFromParams(new URLSearchParams(window.location.search))));
-  const [search, setSearch] = useState(() => (typeof window === 'undefined' ? '' : (new URLSearchParams(window.location.search).get('q') ?? ''))); // the search box; its words reach the filters once typing pauses
+  // The filters and search box start from the address (read by the page on the server), so a shared or bookmarked /library?… link opens the same view and the first render matches the server's.
+  const [filters, setFilters] = useState<LibraryFilters>(initialFilters);
+  const [search, setSearch] = useState(initialFilters.q); // the search box; its words reach the filters once typing pauses
   const [view, setView] = useState<LibraryView>('grid');
   const [size, setSize] = useState(1);
   const [clips, setClips] = useState<Clip[]>([]);

@@ -1,13 +1,18 @@
 import { renderToStaticMarkup } from 'react-dom/server';
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import type { Clip } from '@/lib/api';
-import { ClipCard, ClipDetail, clipLabel, emptyNoun } from './Library';
+import LibraryPage from '@/app/(app)/library/page';
+import { filtersFromSearch } from '@/lib/library-view';
+import { ClipCard, ClipDetail, clipLabel, emptyNoun, Library } from './Library';
 
 test('the empty Library names photos under a photo filter, clips under a video one, and results under a mixed one', () => {
   expect(['images', 'try_on', 'image'].map(emptyNoun)).toEqual(['ảnh', 'ảnh', 'ảnh']);
   expect(['videos', 'video', 'marketing', 'marketing_review'].map(emptyNoun)).toEqual(['clip', 'clip', 'clip', 'clip']);
   expect(['all', 'apps'].map(emptyNoun)).toEqual(['kết quả', 'kết quả']);
 });
+
+// The page's refresh-on-news hook needs the app shell's provider, which a static render of the Library alone does not have.
+vi.mock('./jobs', async (orig) => ({ ...(await orig<typeof import('./jobs')>()), useFreshResults: () => undefined }));
 
 const clip = (mediaType: Clip['mediaType']): Clip => ({
   id: 'c1', creator: { id: 'u1', name: 'An' }, createdAt: '2026-11-14T00:00:00Z', modelId: 'm', modelLabel: 'Model', ratio: '9:16', durationSec: 5, feature: 'video', mediaType, resolution: null, isMock: false,
@@ -66,4 +71,23 @@ test('a card and the detail name the store of an item that has one, and show not
   }
   expect(detail(stored)).toContain('<dt>Cửa hàng</dt><dd>Cửa hàng Đỏ</dd>');
   expect(detail(sample)).not.toContain('<dt>Cửa hàng</dt>');
+});
+
+test('the filters of the address are what the server renders and the first client render starts from', async () => {
+  const query = { q: 'áo dài', creator: 'u1', store: 'none', days: '7', ratio: '1:1', kind: 'videos', verdict: 'fail', favorites: '1', sort: 'oldest' };
+  const html = renderToStaticMarkup(await LibraryPage({ searchParams: Promise.resolve(query) }));
+  expect(html).toBe(renderToStaticMarkup(<Library initialFilters={filtersFromSearch(query)} />));
+  expect(html).toContain('value="áo dài"'); // the search box
+  expect(html).toContain('<option value="oldest" selected="">'); // sort
+  expect(html).toContain('<option value="none" selected="">Không gắn cửa hàng</option>'); // store
+  expect(html).toContain('<option value="d7" selected="">'); // days
+  expect(html).toContain('<option value="fail" selected="">'); // verdict
+  expect(html).toMatch(/<button[^>]*aria-pressed="true"[^>]*>Tất cả video</); // kind
+  expect(html).toContain('aria-label="Chỉ mục yêu thích" checked=""'); // favourites
+  for (const chip of ['Tìm: áo dài', 'Người tạo: u1', 'Cửa hàng: Không gắn cửa hàng', 'Tỉ lệ: 1:1']) expect(html, chip).toContain(chip);
+});
+
+test('without a query the Library renders no filter and a repeated key counts once', async () => {
+  expect(renderToStaticMarkup(await LibraryPage({ searchParams: Promise.resolve({}) }))).toBe(renderToStaticMarkup(<Library />));
+  expect(filtersFromSearch({ kind: ['video', 'images'], days: undefined })).toMatchObject({ kind: 'video', days: '' });
 });

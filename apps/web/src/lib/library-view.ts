@@ -76,6 +76,13 @@ export function filtersFromParams(p: URLSearchParams): LibraryFilters {
   };
 }
 
+/** The same read from what a server page gets as `searchParams` (a repeated key counts once, first wins), so the server and the first client render start from the same filters. */
+export function filtersFromSearch(search: Record<string, string | string[] | undefined>): LibraryFilters {
+  const p = new URLSearchParams();
+  for (const [k, v] of Object.entries(search)) for (const x of [v ?? []].flat()) p.append(k, x);
+  return filtersFromParams(p);
+}
+
 /** How many filters narrow the list; the sort only orders it, so it is not one. */
 export const activeFilters = (f: LibraryFilters): number => [f.q.trim(), f.creator, f.store, f.date, f.days, f.ratio, f.kind !== 'all', f.verdict, f.favoritesOnly, f.examplesOnly].filter(Boolean).length;
 
