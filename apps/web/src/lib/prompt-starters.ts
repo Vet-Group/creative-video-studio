@@ -312,8 +312,8 @@ export const STARTERS: Record<string, Starter[]> = {
     { label: 'Nền màu', text: 'The model poses against a bold solid-colour studio backdrop, crisp even light, full body.' },
   ],
   lingerie_try_on: [
-    { label: 'Phòng ngủ sáng', text: 'Soft, bright, airy morning light from the side, gentle shadows and clean natural skin tones.' },
-    { label: 'Studio', text: 'Soft, even studio-style light with gentle shadows and a clean, neutral look.' },
+    { label: 'Nắng sớm dịu', text: 'Soft, bright, airy morning light from the side, gentle shadows and clean natural skin tones.' },
+    { label: 'Ánh sáng studio', text: 'Soft, even studio-style light with gentle shadows and a clean, neutral look.' },
   ],
   background_changer: [
     { label: 'Bàn đá cẩm thạch', text: 'a white marble table in a bright minimalist kitchen' },
