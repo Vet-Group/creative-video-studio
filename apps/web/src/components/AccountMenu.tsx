@@ -26,6 +26,7 @@ export function AccountMenu({ name, email, color, variant, onSettings }: { name:
   function show(at: 'first' | 'last') {
     setOpen(true);
     setClips(null);
+    void import('./Settings'); // so a slow network does not leave the click on a Settings item looking dead
     api<Usage>('/api/me/limits')
       .then((u) => setClips(u.clips))
       .catch(() => setClips('failed'));
