@@ -171,6 +171,17 @@ describe('H.264 for every stored clip', () => {
     expect(Math.abs((await probeSeconds(out)) - (await probeSeconds(hevc)))).toBeLessThan(0.1);
   });
 
+  test('converts a 10-bit or 4:2:2 H.264 clip, which browsers cannot play either, and leaves yuvj420p alone', async () => {
+    for (const pix of ['yuv420p10le', 'yuv422p']) {
+      const odd = await make(`odd-${pix}.mp4`, ['-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', pix]);
+      const out = join(dir, `odd-${pix}-out.mp4`);
+      expect(await ensureH264(odd, out)).toBe(out);
+      expect((await run(ffprobe.path, ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=codec_name,pix_fmt', '-of', 'csv=p=0', out])).stdout.trim()).toBe('h264,yuv420p');
+    }
+    const full = await make('full-range.mp4', ['-c:v', 'libx264', '-preset', 'ultrafast', '-vf', 'scale=in_range=tv:out_range=pc,format=yuvj420p']);
+    expect(await ensureH264(full, join(dir, 'full-out.mp4'))).toBe(full);
+  });
+
   test('leaves an H.264 clip as it is, byte for byte', async () => {
     const h264 = await make('plain.mp4', ['-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p']);
     const out = join(dir, 'plain-copy.mp4');
@@ -178,15 +189,22 @@ describe('H.264 for every stored clip', () => {
     await expect(readFile(out)).rejects.toThrow();
   });
 
-  test('keeps the original, and says why, when the conversion fails or the clip cannot be read', async () => {
+  test('keeps the original, and says why, when the conversion times out or the clip cannot be read', async () => {
     const hevc = await make('hevc2.mp4', ['-c:v', 'libx265', '-pix_fmt', 'yuv420p', '-x265-params', 'log-level=error']);
     const failures: unknown[] = [];
     expect(await ensureH264(hevc, join(dir, 'late.mp4'), { timeoutMs: 1, onFail: (e) => failures.push(e) })).toBe(hevc); // ffmpeg is killed at the timeout
-    const aborted = AbortSignal.abort();
-    expect(await ensureH264(hevc, join(dir, 'aborted.mp4'), { signal: aborted, onFail: (e) => failures.push(e) })).toBe(hevc);
     const junk = join(dir, 'junk.mp4');
     await writeFile(junk, 'not a video');
     expect(await ensureH264(junk, join(dir, 'junk-out.mp4'), { onFail: (e) => failures.push(e) })).toBe(junk);
-    expect(failures).toHaveLength(3);
+    expect(failures).toHaveLength(2);
+  });
+
+  test('throws, and writes nothing, when the worker is stopping, so the clip is not kept as HEVC for good', async () => {
+    const hevc = await make('hevc3.mp4', ['-c:v', 'libx265', '-pix_fmt', 'yuv420p', '-x265-params', 'log-level=error']);
+    const out = join(dir, 'stopped.mp4');
+    const failures: unknown[] = [];
+    await expect(ensureH264(hevc, out, { signal: AbortSignal.abort(), onFail: (e) => failures.push(e) })).rejects.toThrow();
+    expect(failures).toEqual([]);
+    await expect(readFile(out)).rejects.toThrow();
   });
 });
