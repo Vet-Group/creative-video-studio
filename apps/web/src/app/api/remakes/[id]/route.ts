@@ -1,4 +1,5 @@
 import { withTransaction } from '@cvs/core/ledger';
+import { compressedKey } from '@cvs/core/queue';
 import type { RouteContext } from '@/lib/assets';
 import { pool } from '@/lib/auth';
 import { REMAKE_COLUMNS, reaRemakeEnabled } from '@/lib/remake';
@@ -32,8 +33,8 @@ export async function DELETE(request: Request, { params }: RouteContext) {
     const assetIds = [row.outputAssetId, row.result?.compareAssetId, row.result?.fullAssetId, ...(row.result?.shots ?? []).map((s: { clipAssetId?: string }) => s.clipAssetId)].filter((a): a is string => !!a);
     await tx.query('delete from remakes where id = $1', [id]);
     const { rows } = await tx.query(`delete from assets where id = any($1::text[]) and kind = 'output' returning id, s3_key`, [assetIds]);
-    // Each asset may also have a tile thumbnail; removing a missing one is a no-op.
-    return { keys: rows.flatMap((r) => [r.s3_key as string, `thumbs/${r.id}`]) };
+    // Each asset may also have a tile thumbnail or a compressed copy; removing a missing one is a no-op.
+    return { keys: rows.flatMap((r) => [r.s3_key as string, `thumbs/${r.id}`, compressedKey(r.id as string)]) };
   });
   if (result instanceof Response) return result;
   // After the commit, as the purge does: a failure here only leaves an orphan object.

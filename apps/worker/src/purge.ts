@@ -1,6 +1,7 @@
 // The daily purge (plan M.4): clips soft-deleted more than 30 days ago lose their objects and asset rows. The job row stays as a
 // tombstone (purged_at), because the cost ledger points at it; ledger rows are never touched.
 import { type LedgerPool, withTransaction } from '@cvs/core/ledger';
+import { compressedKey } from '@cvs/core/queue';
 
 export const PURGE_AFTER = '30 days';
 
@@ -31,8 +32,8 @@ export async function purgeDeletedClips(pool: LedgerPool, removeObject: (key: st
             returning a.id, a.s3_key`,
           [outputs, job.inputs, id],
         );
-        // Each image may also have a tile thumbnail (the web's thumbKey); removing a missing one is a no-op.
-        return rows.flatMap((r) => [r.s3_key as string, `thumbs/${r.id}`]);
+        // Each image may also have a tile thumbnail (the web's thumbKey) and each video a compressed copy (compressedKey); removing a missing one is a no-op.
+        return rows.flatMap((r) => [r.s3_key as string, `thumbs/${r.id}`, compressedKey(r.id as string)]);
       });
       purged++;
       for (const key of keys) await removeObject(key).catch((e) => log(`remove object ${key}`, e));
