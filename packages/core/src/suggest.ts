@@ -101,8 +101,8 @@ export const CHECK_SYSTEM =
   ' Look for, most important first: camera or action directions that contradict each other (such as a top-down or static camera while the product is held ' +
   'up to the camera, a close-up while the whole body must show, or a fixed frame while the camera moves); a hook that does not grab attention in the first ' +
   '2 seconds; anything that could change the product (its shape, colours or printed text) or add on-screen text, logos or watermarks; an action too big or ' +
-  'too small for the clip length; anything vague; anything the chosen model handles badly, using the model note. The model note is advice for writing, ' +
-  'not a checklist: a missing shot size, lens or sound sentence is not a problem on its own. ' +
+  'too small for the clip length; anything vague; anything the chosen model is known to handle badly. Judge only what the prompt says: a missing ' +
+  'shot size, lens, camera move or sound sentence is never a problem on its own. ' +
   `Report at most ${MAX_CHECK_ISSUES} real problems, the most important first, each as a short issue and a one-line fix, both in plain Vietnamese and ` +
   "never inventing details of the product or person. Make each fix concrete: quote the prompt's exact English words to change in single quotes and give " +
   'the English words to put in their place, or name the exact beat to cut; never a general tip such as "make it clearer" or "split the beats". ' +
@@ -212,12 +212,14 @@ const FAMILY_TIPS: [RegExp, string][] = [
 
 /**
  * The model line of the user turn: the model's name, its family's tip and, for a clip with sound (an endpoint that always makes it, or one that
- * can with the page's audio switch on), a sentence on the sound.
+ * can with the page's audio switch on), a sentence on the sound. `writing` false (the Check) keeps only the facts: the tips read as orders, and the
+ * reviewer then reported a prompt for not following them.
  */
-export function modelNote(model: { id: string; label: string; endpoint: string }, audio: boolean): string {
-  const tip = FAMILY_TIPS.find(([re]) => re.test(model.id))?.[1];
+export function modelNote(model: { id: string; label: string; endpoint: string }, audio: boolean, writing = true): string {
+  const tip = writing && FAMILY_TIPS.find(([re]) => re.test(model.id))?.[1];
   const sound = ALWAYS_AUDIO.has(model.endpoint) || (audio && Object.hasOwn(AUDIO_USD_PER_SECOND, model.endpoint));
-  return [`The model: ${model.label}.`, tip, sound && 'The clip has sound: add one sentence on the ambient sound, with any spoken line in double quotes.'].filter(Boolean).join(' ');
+  const soundLine = writing ? 'The clip has sound: add one sentence on the ambient sound, with any spoken line in double quotes.' : 'The clip has sound.';
+  return [`The model: ${model.label}.`, tip, sound && soundLine].filter(Boolean).join(' ');
 }
 
 const ASK = {

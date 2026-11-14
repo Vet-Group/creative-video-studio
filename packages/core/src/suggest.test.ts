@@ -62,6 +62,9 @@ test('the model note names the model, its family tip and the sound only when the
   // An endpoint that always makes sound has it with the switch off; a family with no tip is only named.
   expect(modelNote({ id: 'wan-2.7-reference', label: 'WAN', endpoint: 'fal-ai/wan/v2.7/reference-to-video' }, false)).toMatch(/^The model: WAN\. WAN rewards detail: .* The clip has sound/);
   expect(modelNote({ id: 'fashn-v1.6', label: 'FASHN', endpoint: 'x' }, true)).toBe('The model: FASHN.');
+  // The Check gets the facts only: no writing tip and no order to add a sound sentence, which it reported as missing on a clean Veo prompt.
+  expect(modelNote(kling, true, false)).toBe('The model: Kling 2.6 Pro. The clip has sound.');
+  expect(modelNote({ id: 'veo-3.1', label: 'Veo 3.1', endpoint: 'fal-ai/veo3.1/image-to-video' }, false, false)).toBe('The model: Veo 3.1.');
   expect(suggestPrompt({ field: 'prompt', task: PROMPT_TASKS.video, text: '', context: '', max: 500, model: modelNote(kling, false) })).toContain('\nThe model: Kling 2.6 Pro.');
 });
 
@@ -159,7 +162,7 @@ test('a check is one cool call under its own system prompt with the model, forma
   expect(CHECK_SYSTEM).toMatch(/never inventing details/);
   expect(CHECK_SYSTEM).toMatch(/directions that contradict each other/); // checked first: the top-down camera and the product held up to it
   expect(CHECK_SYSTEM).toMatch(/quote the prompt's exact English words to change/); // a fix names the words, never a general tip
-  expect(CHECK_SYSTEM).toMatch(/not a checklist/); // the model's writing tips are no issues on their own
+  expect(CHECK_SYSTEM).toMatch(/shot size, lens, camera move or sound sentence is never a problem on its own/); // missing style direction is no issue
 });
 
 test('a check answer is read strictly: no issues is fine, more than four are cut, and anything malformed is an error and never an OK', () => {
