@@ -157,6 +157,9 @@ test('a check is one cool call under its own system prompt with the model, forma
   expect(bodies[0]!.prompt).toBe(['The model: Kling T.', FORMAT_NOTES.unboxing, 'The clip lasts 5 seconds.', 'The prompt to review:', 'The model turns, a caption appears.'].join('\n'));
   expect(CHECK_SYSTEM).toMatch(/first 2 seconds/);
   expect(CHECK_SYSTEM).toMatch(/never inventing details/);
+  expect(CHECK_SYSTEM).toMatch(/directions that contradict each other/); // checked first: the top-down camera and the product held up to it
+  expect(CHECK_SYSTEM).toMatch(/quote the prompt's exact English words to change/); // a fix names the words, never a general tip
+  expect(CHECK_SYSTEM).toMatch(/not a checklist/); // the model's writing tips are no issues on their own
 });
 
 test('a check answer is read strictly: no issues is fine, more than four are cut, and anything malformed is an error and never an OK', () => {
