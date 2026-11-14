@@ -10,8 +10,10 @@ const budgetRow = (features: string) => `exists (select 1 from jobs bj where bj.
 /**
  * LLM calls (Enhance, suggestions, translations, analyses) never count toward a cap (owner decision, 2026-11-04); the Costs page still shows them.
  * A Smart Remake's fal calls are booked as llm rows too (bookLlm) but are video generation, so they count, like any row with no job, in the video month.
+ * `capRowOf(alias)` is the predicate for a query that names the ledger by an alias; the Admin budget displays use it so they count what the caps do.
  */
-const capRow = `(cost_entries.kind <> 'llm' or cost_entries.ref like 'llm:remake:%')`;
+export const capRowOf = (alias: string) => `(${alias}.kind <> 'llm' or ${alias}.ref like 'llm:remake:%')`;
+const capRow = capRowOf('cost_entries');
 
 /** The video clips (features in parameter `features`) the user in parameter `user` made on the ICT day of `t.at`, as the daily clip cap counts them:
  * `failed` jobs with no provider cost booked (an Enhance llm row aside) do not count. */
