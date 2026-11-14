@@ -1,6 +1,8 @@
 // The ten apps of the Apps index: what each page shows (upload slots, extra fields) and the rules a Run must meet before it is sent.
 // The rules mirror POST /api/jobs: the swaps and Face Swap take exactly 2 images, Jewelry Try-On 2 or more (the pieces, then the person); Background Changer takes a prompt with 1 image, or a reference image as the 2nd, not both and not neither.
 
+import { MOTION_IMAGE_MAX_SEC } from '@cvs/core/models';
+
 export type AppCategory = 'fashion' | 'photo' | 'video' | 'utility';
 export const CATEGORIES: { id: AppCategory | 'all'; label: string }[] = [
   { id: 'all', label: 'Tất cả' },
@@ -238,6 +240,8 @@ export interface MotionDraft {
   /** null while the model list loads; `failed` when it could not be loaded. */
   model: { durationsSec: number[] } | null | undefined;
   failed: boolean;
+  /** Whose orientation the character keeps; 'image' caps the reference video at MOTION_IMAGE_MAX_SEC. Default 'video'. */
+  orientation?: 'video' | 'image';
 }
 
 /** The first thing that stops a Motion Control Run, in the order the form is filled; null when it can go. */
@@ -249,6 +253,7 @@ export function motionReason(d: MotionDraft): string | null {
   if (d.videoMs === null) return 'Tải lên video chuyển động.';
   const allowed = d.model.durationsSec;
   if (!allowed.includes(Math.ceil(d.videoMs / 1000))) return `Video chuyển động phải dài từ ${allowed[0]} đến ${allowed.at(-1)} giây.`;
+  if (d.orientation === 'image' && Math.ceil(d.videoMs / 1000) > MOTION_IMAGE_MAX_SEC) return `Khi nhân vật giữ hướng của ảnh, video chuyển động chỉ dài tối đa ${MOTION_IMAGE_MAX_SEC} giây. Hãy cắt ngắn video hoặc chọn "Theo video".`;
   return null;
 }
 

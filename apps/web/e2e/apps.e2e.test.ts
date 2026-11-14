@@ -444,9 +444,11 @@ test('Motion Control: the image and the reference video, a length check, and a R
   const picker = (await page.locator('.select-trigger').boundingBox())!;
   const form = (await page.locator('.form-scroll').boundingBox())!;
   expect(picker.x + picker.width).toBeLessThanOrEqual(form.x + form.width);
+  await expect(page.getByRole('radio', { name: 'Theo video (tối đa 30 giây)' })).toBeChecked();
+  await page.getByText('Theo ảnh (tối đa 10 giây)').click();
   await runButton(page).click();
   await expect(page.getByText('Đã gửi lượt tạo. Theo dõi trong tab "Lịch sử".')).toBeVisible();
-  expect(sent).toMatchObject({ feature: 'motion_control', modelId: 'kling-v3-motion-standard', ratio: 'auto' });
+  expect(sent).toMatchObject({ feature: 'motion_control', modelId: 'kling-v3-motion-standard', ratio: 'auto', params: { orientation: 'image' } });
   expect((sent as unknown as { assetIds: string[] }).assetIds).toHaveLength(2);
   expect(sent).not.toHaveProperty('prompt');
 });
@@ -458,7 +460,7 @@ test("Motion Control: Dùng lại keeps the job's model even when the remembered
     r.fulfill({ json: { models: [model('kling-v3-motion-pro', 'Kling V3 Motion Control Pro'), model('kling-v3-motion-standard', 'Kling V3 Motion Control Standard')], defaultModelId: 'kling-v3-motion-standard' } }),
   );
   await page.route('**/api/jobs/motion-old', (r) =>
-    r.fulfill({ json: { feature: 'motion_control', images: [], prompt: 'stage light', brief: null, garments: null, enhance: null, ratio: 'auto', resolution: null, modelId: 'kling-v3-motion-pro' } }),
+    r.fulfill({ json: { feature: 'motion_control', images: [], prompt: 'stage light', brief: null, garments: null, enhance: null, ratio: 'auto', resolution: null, modelId: 'kling-v3-motion-pro', orientation: 'image' } }),
   );
   let recalled = false;
   await page.route(/\/api\/recall\?feature=motion_control/, async (r) => {
@@ -471,6 +473,7 @@ test("Motion Control: Dùng lại keeps the job's model even when the remembered
   await page.waitForTimeout(2500);
   await expect(page.locator('.select-trigger')).toContainText('Kling V3 Motion Control Pro');
   expect(recalled).toBe(false); // a refill skips the memory
+  await expect(page.getByRole('radio', { name: 'Theo ảnh (tối đa 10 giây)' })).toBeChecked(); // the job's orientation comes back
 });
 
 test('Run is disabled with a reason when the app has no enabled model, and "Đổi ứng dụng" switches app with a fresh form', async ({ page }) => {

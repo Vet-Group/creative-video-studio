@@ -498,6 +498,17 @@ describe('fal Motion Control', () => {
     expect(submit.body).toEqual({ image_url: 'https://v3b.fal.media/files/image-png', video_url: 'https://v3b.fal.media/files/video-mp4', character_orientation: 'video', keep_original_sound: false });
   });
 
+  test("Motion Control sends character_orientation 'image' when asked, 'video' when the request names it or none", async () => {
+    const bodyFor = async (orientation?: 'video' | 'image') => {
+      const { fn, calls } = falFake();
+      await createFalProvider({ apiKey: 'k', fetch: fn, readImage: read }).submit({ ...base, model: motionModel, prompt: '', imageUrls: inputs, ratio: 'auto', durationSec: 7, ...(orientation && { orientation }) });
+      return (calls.at(-1)!.body as { character_orientation: string }).character_orientation;
+    };
+    expect(await bodyFor('image')).toBe('image');
+    expect(await bodyFor('video')).toBe('video');
+    expect(await bodyFor()).toBe('video');
+  });
+
   test('more than 4 images go through fal storage on any endpoint, since 9 shrunk inputs inlined would pass the inline limit; 4 stay inlined', async () => {
     const ref = { ...kling, id: 'minimax-h3-max-reference', endpoint: 'minimax/h3-max/reference-to-video', outputResolution: '768p' };
     const nine = Array.from({ length: 9 }, (_, i) => `asset://img${i}`);

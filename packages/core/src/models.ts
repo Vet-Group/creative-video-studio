@@ -36,6 +36,8 @@ export interface ImageModelConfig {
 
 /** No prompt longer than this is sent, whatever a model takes: past it the extra words rarely change the result, and a typo cannot send a novel. */
 export const PROMPT_CEILING = 5000;
+/** Motion Control with the character keeping the orientation of its image (`params.orientation` 'image') takes a reference video of at most this many seconds; 'video' takes the model's own 30. */
+export const MOTION_IMAGE_MAX_SEC = 10;
 /** A model's prompt limit as the app applies it: its own `max_prompt_chars` under the ceiling. */
 export const promptLimit = (maxPromptChars: number): number => Math.min(maxPromptChars, PROMPT_CEILING);
 

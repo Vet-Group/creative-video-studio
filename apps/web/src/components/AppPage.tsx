@@ -347,6 +347,10 @@ interface RefVideo {
   filename: string;
   durationMs: number;
 }
+const ORIENTATIONS = [
+  { id: 'video', label: 'Theo video (tối đa 30 giây)' },
+  { id: 'image', label: 'Theo ảnh (tối đa 10 giây)' },
+] as const;
 type MotionModel = ModelOption & { durationsSec: number[]; maxPromptChars: number };
 type Uploaded = Img & { durationMs: number | null };
 
@@ -363,9 +367,11 @@ function MotionForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
   const [notice, setNotice] = useState('');
   const [list, setList] = useState<{ models: MotionModel[]; best: string | null; failed: boolean } | null>(null);
   const [modelId, setModelId] = useState('');
+  const [orientation, setOrientation] = useState<'video' | 'image'>('video');
   const recall = useRecall(app.feature, (s) => setModelId(s.modelId), { skip: reuse !== undefined }); // the member's last model, unless a refill comes
   const promptId = useId();
   const reasonId = useId();
+  const orientationName = useId();
   // The estimate is per second of the video, so the list is asked again for its length (5 s until a video is chosen).
   const seconds = video ? Math.ceil(video.durationMs / 1000) : 5;
   useEffect(() => {
@@ -386,11 +392,12 @@ function MotionForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
       setVideo(ref ? { id: ref.id, filename: ref.filename, durationMs: ref.durationMs ?? 0 } : null);
       setPrompt(j.prompt ?? '');
       if (j.modelId) setModelId(j.modelId);
+      setOrientation(j.orientation === 'image' ? 'image' : 'video');
     },
     (e) => setError(copyError(e, 'Không tìm thấy video để dùng lại.')),
   );
   const chosen = list?.models.find((m) => m.id === modelId) ?? list?.models.find((m) => m.id === list.best) ?? list?.models[0];
-  const reason = (recall.answered ? null : 'Đang tải cài đặt đã dùng...') ?? motionReason({ image: image.length > 0, videoMs: video?.durationMs ?? null, model: list === null ? null : chosen, failed: list?.failed ?? false }) ?? promptTooLong(chosen, prompt.trim().length);
+  const reason = (recall.answered ? null : 'Đang tải cài đặt đã dùng...') ?? motionReason({ image: image.length > 0, videoMs: video?.durationMs ?? null, model: list === null ? null : chosen, failed: list?.failed ?? false, orientation }) ?? promptTooLong(chosen, prompt.trim().length);
   const canRun = reason === null && !busy;
 
   async function upload(files: File[], then: (assets: Uploaded[]) => void, kind: UploadKind) {
@@ -427,7 +434,7 @@ function MotionForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
     setNotice('');
     try {
       const written = prompt.trim();
-      const body = { feature: app.feature, modelId: chosen!.id, assetIds: [image[0]!.id, video!.id], ratio: 'auto', ...(written && { prompt: written }) };
+      const body = { feature: app.feature, modelId: chosen!.id, assetIds: [image[0]!.id, video!.id], ratio: 'auto', params: { orientation }, ...(written && { prompt: written }) };
       await api('/api/jobs', sendJson('POST', body));
       clearDraft();
       setNotice('Đã gửi lượt tạo. Theo dõi trong tab "Lịch sử".');
@@ -480,6 +487,19 @@ function MotionForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
             </div>
             <p className="help">Ảnh JPEG, PNG hoặc WebP; video MP4 hoặc MOV. Chỉ tải lên ảnh và video mà công ty có quyền sử dụng.</p>
 
+            <div className="field">
+              <span className="field-label" id={`${orientationName}-label`}>Hướng nhân vật</span>
+              <div className="segmented theme-choice orientation-choice" role="radiogroup" aria-labelledby={`${orientationName}-label`}>
+                {ORIENTATIONS.map((o) => (
+                  <label key={o.id}>
+                    <input type="radio" name={orientationName} value={o.id} checked={orientation === o.id} onChange={() => setOrientation(o.id)} />
+                    {o.label}
+                  </label>
+                ))}
+              </div>
+              {orientation === 'image' && <p className="help">Giữ hướng nhân vật như trong ảnh; chuyển động vẫn theo video.</p>}
+            </div>
+
             {list && list.models.length > 1 && <ModelPicker models={list.models} value={chosen?.id ?? ''} onChange={setModelId} />}
 
             <PromptComposer
@@ -494,7 +514,7 @@ function MotionForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
               placeholder="Ví dụ: sân khấu ánh đèn ấm, nhân vật mặc nguyên bộ đồ trong ảnh"
               ask={chosen ? () => ({ field: 'prompt', feature: app.feature, text: prompt, room: chosen.maxPromptChars, model: chosen.id }) : null}
             />
-            <Templates feature={app.feature} data={() => ({ images: [...image, ...(video ? [video] : [])].map((i) => i.id), prompt: prompt.trim(), modelId: chosen?.id })} />
+            <Templates feature={app.feature} data={() => ({ images: [...image, ...(video ? [video] : [])].map((i) => i.id), prompt: prompt.trim(), modelId: chosen?.id, orientation })} />
           </div>
 
           <div className="form-message">

@@ -184,4 +184,11 @@ describe('motionReason', () => {
     expect(motionReason(base)).toBeNull();
     expect(motionReason({ ...base, videoMs: 30_000 })).toBeNull();
   });
+  it('holds the orientation of the image to 10 s, and the orientation of the video to the model', () => {
+    expect(motionReason({ ...base, videoMs: 12_000, orientation: 'image' })).toBe('Khi nhân vật giữ hướng của ảnh, video chuyển động chỉ dài tối đa 10 giây. Hãy cắt ngắn video hoặc chọn "Theo video".');
+    expect(motionReason({ ...base, videoMs: 10_100, orientation: 'image' })).not.toBeNull(); // rounds up to 11 s
+    expect(motionReason({ ...base, videoMs: 10_000, orientation: 'image' })).toBeNull();
+    expect(motionReason({ ...base, videoMs: 12_000, orientation: 'video' })).toBeNull();
+    expect(motionReason({ ...base, videoMs: 12_000 })).toBeNull();
+  });
 });

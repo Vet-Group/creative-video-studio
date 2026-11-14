@@ -16,6 +16,8 @@ export interface SubmitRequest {
   audioUrls?: string[];
   /** The reference video (MP4 or MOV, one clip), on a model that takes one (fal's VIDEO_BODIES `video`). */
   videoUrls?: string[];
+  /** Motion Control only: whose orientation the character keeps. 'video' (default) allows a 30 s reference, 'image' 10 s. */
+  orientation?: 'video' | 'image';
 }
 
 /** fal's queue URLs include the model endpoint, so polling needs the model as well as the id. */

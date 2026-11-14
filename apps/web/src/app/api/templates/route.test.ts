@@ -265,6 +265,17 @@ describe('/api/templates', () => {
       ]);
     });
 
+    test("keeps a Motion Control job's character orientation, returns it on GET, and refuses an unknown one", async () => {
+      const u = await newUser();
+      await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, duration_ms) values ($1, $2, 'input', $1, 'ref2.mp4', 'video/mp4', 1, 5300)`, [`${u.id}-v2`, u.id]);
+      const motion = await job(u, { feature: 'motion_control', model: 'kling-v3-motion-pro', aspect: 'auto', duration: 6, params: { orientation: 'image' }, inputs: [u.asset, `${u.id}-v2`] });
+      const { id } = (await (await fromJob(u, motion)).json()) as { id: string };
+      expect((await pool.query('select data from user_templates where id = $1', [id])).rows[0].data).toMatchObject({ orientation: 'image' });
+      expect(await (await one(req(u, `/api/templates/${id}`), ctx(id))).json()).toMatchObject({ orientation: 'image' });
+      const refused = await save(u, { feature: 'motion_control', name: 'Bad', data: { images: [u.asset, `${u.id}-v2`], orientation: 'left' } });
+      expect([refused.status, await error(refused)]).toEqual([400, 'data.orientation must be video or image']);
+    });
+
     test("keeps a video job's own live end frame and audio clips, and leaves out another member's and deleted ones", async () => {
       const [u, other] = [await newUser(), await newUser()];
       for (const [id, owner, gone] of [[`${u.id}-c1`, u, false], [`${u.id}-c2`, u, false], [`${u.id}-cx`, u, true], [`${other.id}-c`, other, false]] as const) {

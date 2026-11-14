@@ -1975,6 +1975,7 @@ dialog.modal.template-sheet { width: 100%; max-width: none; margin: auto 0 0; bo
 .end-scene input[type='text'] { display: block; width: 100%; min-width: 0; margin: 0; padding: 8px 12px; border: 1px solid var(--field-border); border-radius: 8px; background: var(--fill); color: inherit; font: inherit; font-size: 14px; line-height: 21px; }
 .end-scene .help { margin-top: 0; }
 .end-scene .theme-choice { justify-self: start; margin: 0; }
+.orientation-choice { flex-wrap: wrap; justify-self: start; margin: 4px 0 0; } /* two long labels wrap on a phone */
 /* Review's highlight lines: one input per line, styled like the end text box. */
 .highlights { display: grid; gap: 8px; margin-top: 16px; }
 .highlight-row { display: flex; align-items: center; gap: 8px; }

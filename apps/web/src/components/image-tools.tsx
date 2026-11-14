@@ -153,6 +153,8 @@ export interface ReuseJob {
   ratio: string | null;
   resolution: string | null;
   modelId: string | null;
+  /** Motion Control's character orientation. */
+  orientation?: string | null;
 }
 
 /** Refill (`reuse` is a job's or a saved template's API path, lib/reuse.ts): reads it and hands it to `fill` when it is of `feature`; `fail` otherwise. Everything stays editable.
