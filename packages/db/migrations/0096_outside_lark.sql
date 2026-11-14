@@ -1,0 +1,1 @@
+ALTER TABLE "users" ADD COLUMN "outside_lark" boolean DEFAULT false NOT NULL;

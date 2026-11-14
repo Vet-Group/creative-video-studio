@@ -9,5 +9,5 @@ export const vnDay = (at: Date) => new Intl.DateTimeFormat('en-CA', { year: 'num
 /** Whether the reminder is due: it was not shown yet on `today` (a Vietnam day from vnDay). */
 export const larkPromptDue = (lastShown: string | null, today: string) => lastShown !== today;
 
-/** Who gets the reminder: Lark sign-in is on, the user is a person (not a system account) and has no linked Lark account yet. */
-export const needsLarkPrompt = (o: { larkEnabled: boolean; system: boolean; providers: string[] }) => o.larkEnabled && !o.system && !o.providers.includes('lark');
+/** Who gets the reminder: Lark sign-in is on, the user is a person (not a system account), is not outside the Lark organisation and has no linked Lark account yet. */
+export const needsLarkPrompt = (o: { larkEnabled: boolean; system: boolean; outsideLark: boolean; providers: string[] }) => o.larkEnabled && !o.system && !o.outsideLark && !o.providers.includes('lark');
