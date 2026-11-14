@@ -533,6 +533,17 @@ function NavProgress() {
   return <div className="nav-progress" data-on={on} aria-hidden="true" />;
 }
 
+/** Centres a nav item's hint on its link. The hint sits against the sidebar so the scrolling nav cannot clip it, so its top follows the link only when the pointer or focus arrives (after the focus scroll). */
+function placeHint(target: EventTarget) {
+  const item = target instanceof Element ? target.closest<HTMLElement>('.nav-item') : null;
+  const side = item?.closest('.sidebar');
+  if (!item || !side) return;
+  requestAnimationFrame(() => {
+    const link = item.getBoundingClientRect();
+    item.style.setProperty('--hint-top', `${link.top + link.height / 2 - side.getBoundingClientRect().top}px`); // the item is as tall as its link: the hint is out of flow
+  });
+}
+
 /** The pages that show their own History tab instead of the tray beside them. */
 const OWN_HISTORY = ['/create', '/try-on', '/image-generation', '/marketing-studio', '/analyze']; // an analysis is not a job: its page lists its own History
 
@@ -674,7 +685,7 @@ export function Shell({ userId, userName, isAdmin, feedbackNew = 0, analyzeEnabl
                   <Icon name="x" size={16} />
                 </button>
               </div>
-              <nav aria-label="Điều hướng chính" data-hint-off={hintOff || undefined} onKeyDown={(e) => e.key === 'Escape' && setHintOff(true)} onFocus={() => setHintOff(false)} onPointerOver={() => hintOff && setHintOff(false)}>
+              <nav aria-label="Điều hướng chính" data-hint-off={hintOff || undefined} onKeyDown={(e) => e.key === 'Escape' && setHintOff(true)} onFocus={(e) => (setHintOff(false), placeHint(e.target))} onPointerOver={(e) => (hintOff && setHintOff(false), placeHint(e.target))}>
                 {navGroups(isAdmin, feedbackNew, analyzeEnabled).map((g, i) => (
                   <div key={g.label ?? 'home'} className="nav-group" role={g.label ? 'group' : undefined} aria-labelledby={g.label ? `nav-group-${i}` : undefined}>
                     {g.label && (
