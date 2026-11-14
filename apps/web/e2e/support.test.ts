@@ -63,7 +63,13 @@ export async function signIn(page: Page, who: UserKey, { welcome = false } = {})
   await loginReady(page);
   await page.getByLabel('Email').fill(USERS[who].email);
   await page.getByLabel('Mật khẩu').fill(PASSWORD);
+  // A redirect the previous page had already started can land after the goto, as /login?next=…; the sign-in then goes to that page, so go on to Create from there.
+  const next = new URL(page.url()).searchParams.get('next');
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
+  if (next) {
+    await expect.poll(() => { const u = new URL(page.url()); return u.pathname + u.search; }).toBe(next);
+    await page.goto('/create');
+  }
   await expect(page).toHaveURL(/\/create$/);
   // Wait for hydration, so the next link click navigates client-side and the next page's file inputs are already enabled.
   await expect(page.getByLabel('Ảnh sản phẩm')).toBeEnabled();
