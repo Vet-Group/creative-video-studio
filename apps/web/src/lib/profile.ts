@@ -43,3 +43,16 @@ export function protection(a: { hasPassword: boolean; linked: boolean; passkeys:
     ...(a.hasPassword ? [{ id: 'twoFactor', label: 'Xác thực 2 lớp', done: a.twoFactor } as const] : []),
   ];
 }
+
+/** The first letters of the first and last word of a name, or the first two of a single word. */
+export function initials(name: string): string {
+  const words = name.normalize('NFC').trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return '?';
+  const first = [...words[0]!];
+  const text = words.length > 1 ? first[0]! + [...words.at(-1)!][0]! : first.slice(0, 2).join('');
+  return text.toLocaleUpperCase('vi');
+}
+
+/** A cap's fill: at or over the cap is full, as checkCaps refuses there (a cap of 0 is always full). */
+export const shareOf = (used: number, cap: number) => (cap > 0 ? Math.min(used / cap, 1) : 1);
+export const levelOf = (share: number) => (share >= 1 ? 'full' : share >= 0.8 ? 'warn' : 'ok');
