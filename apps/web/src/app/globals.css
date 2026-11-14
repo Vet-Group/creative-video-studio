@@ -781,6 +781,12 @@ td code { white-space: pre-wrap; overflow-wrap: anywhere; }
 .admin .row { gap: 0 16px; margin: 0; }
 .admin .row > label { flex: 1 1 13rem; }
 .admin .row > :is(button, .button) { margin-bottom: 12px; }
+/* A checkbox field in a row of labelled inputs: the box lines up with the inputs (caption 18px + 6px gap) and its hint sits right under it. */
+.admin .row:has(> .check-field) { align-items: start; }
+.admin .row:has(> .check-field) > :is(button, .button) { margin-top: 24px; }
+.admin .row > .check-field { display: grid; flex: 1 1 13rem; max-width: 22rem; margin: 0 0 12px; padding-top: 24px; }
+.admin .check-field label.check { height: 36px; }
+.admin .check-field small { color: var(--muted); font-size: 12px; line-height: 18px; }
 .admin .filters { gap: 0 16px; }
 .admin .filters > label { flex: 0 1 22rem; }
 .admin .filters > p { margin: 0 0 20px; }
@@ -806,6 +812,7 @@ td code { white-space: pre-wrap; overflow-wrap: anywhere; }
 .admin .nowrap { white-space: nowrap; }
 @media (max-width: 640px) {
   .admin .mobile-records { display: block; min-width: 0; }
+  .admin .row > .check-field, .admin .row:has(> .check-field) > :is(button, .button) { margin-top: 0; padding-top: 0; } /* stacked fields: no caption line to match */
   .admin .mobile-records thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
   .admin .mobile-records tbody { display: block; }
   .admin .mobile-records tr { display: grid; padding: 12px 0; border-bottom: 1px solid var(--border); }
