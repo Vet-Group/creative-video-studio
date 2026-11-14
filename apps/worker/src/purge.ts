@@ -32,8 +32,8 @@ export async function purgeDeletedClips(pool: LedgerPool, removeObject: (key: st
             returning a.id, a.s3_key`,
           [outputs, job.inputs, id],
         );
-        // Each image may also have a tile thumbnail (the web's thumbKey) and each video a compressed copy (compressedKey); removing a missing one is a no-op.
-        return rows.flatMap((r) => [r.s3_key as string, `thumbs/${r.id}`, compressedKey(r.id as string)]);
+        // Each image may also have a tile thumbnail and a 1600 px preview (the web's thumbKey) and each video a compressed copy (compressedKey); removing a missing one is a no-op.
+        return rows.flatMap((r) => [r.s3_key as string, `thumbs/${r.id}`, `thumbs/${r.id}-1600`, compressedKey(r.id as string)]);
       });
       purged++;
       for (const key of keys) await removeObject(key).catch((e) => log(`remove object ${key}`, e));

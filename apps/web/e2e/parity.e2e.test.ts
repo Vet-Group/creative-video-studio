@@ -71,7 +71,10 @@ for (const size of SIZES) {
     await page.goto('/library');
     await expect(page.getByRole('article')).toHaveCount(3);
     await expect(page.getByTitle('Chi phí thật', { exact: true })).toHaveText(['$0.0000', '$0.0000', '$0.0000']);
-    await expect.poll(() => page.locator('.card video').evaluateAll((vs) => vs.every((v) => (v as HTMLVideoElement).readyState >= 1))).toBe(true);
+    // A grid video loads nothing until hover (preload none), so what shows is its poster: wait for every poster to load so the screenshot is stable.
+    const posters = await page.locator('.card video').evaluateAll((vs) => vs.map((v) => (v as HTMLVideoElement).poster));
+    expect(posters.every(Boolean)).toBe(true);
+    await page.evaluate((srcs) => Promise.all(srcs.map((src) => new Promise((done) => Object.assign(new Image(), { onload: done, onerror: done, src })))), posters);
     await expect(page).toHaveScreenshot(`library-${at}.png`, SHOT);
 
     // Below 1024 px the drawer is part of the baseline.

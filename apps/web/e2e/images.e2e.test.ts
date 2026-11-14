@@ -35,7 +35,7 @@ test('a mock image job made through the API is an image card under "Tất cả �
   await expect(chips.getByRole('button', { name: 'Tất cả ảnh' })).toHaveAttribute('aria-pressed', 'true');
   const card = cards.filter({ hasText: 'E2E Member 8' });
   await expect(card).toHaveCount(1);
-  await expect(card).toHaveAccessibleName(/^Ảnh /);
+  await expect(card).toHaveAccessibleName(/^Tạo ảnh · Mock image E2E · /); // named by what made it, the model and the time
   await expect(card.getByText('Mock image E2E', { exact: true })).toBeVisible();
   const image = card.getByRole('img');
   await expect(image).toBeVisible();

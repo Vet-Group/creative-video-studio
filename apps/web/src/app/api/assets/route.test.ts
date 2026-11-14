@@ -389,6 +389,31 @@ describe('GET /api/assets/:id/thumb', () => {
     expect((await GET_THUMB(get(`/api/assets/${id}/thumb`, ownerCookie, { 'if-none-match': `"${id}-thumb"` }), ctx(id))).status).toBe(304);
   });
 
+  test('?w=1600 makes a separate WebP preview kept under its own key, keeps the alpha, never enlarges, and leaves the default thumbnail alone', async () => {
+    const res = await GET_THUMB(get(`/api/assets/${id}/thumb?w=1600`, ownerCookie), ctx(id));
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toBe('image/webp');
+    expect(res.headers.get('etag')).toBe(`"${id}-thumb-1600"`);
+    const body = new Uint8Array(await res.arrayBuffer());
+    expect(await sharp(body).metadata()).toMatchObject({ format: 'webp', width: 1600, height: 800, hasAlpha: true });
+    expect(await objectKeys()).toEqual(expect.arrayContaining([`thumbs/${id}-1600`]));
+    expect(new Uint8Array(await (await GET_THUMB(get(`/api/assets/${id}/thumb?w=1600`, ownerCookie), ctx(id))).arrayBuffer())).toEqual(body);
+    expect((await GET_THUMB(get(`/api/assets/${id}/thumb?w=1600`, ownerCookie, { 'if-none-match': `"${id}-thumb"` }), ctx(id))).status).toBe(200); // the tile's tag is not the preview's
+    expect((await GET_THUMB(get(`/api/assets/${id}/thumb?w=1600`, ownerCookie, { 'if-none-match': `"${id}-thumb-1600"` }), ctx(id))).status).toBe(304);
+    const tile = await GET_THUMB(get(`/api/assets/${id}/thumb`, ownerCookie), ctx(id));
+    expect(tile.headers.get('content-type')).toBe('image/jpeg');
+    expect(await sharp(new Uint8Array(await tile.arrayBuffer())).metadata()).toMatchObject({ format: 'jpeg', width: 512 });
+    const small = await uploadOne(ownerCookie, new Uint8Array(await sharp({ create: { width: 40, height: 30, channels: 3, background: '#00f' } }).png().toBuffer()), 'small-preview.png');
+    expect(await sharp(new Uint8Array(await (await GET_THUMB(get(`/api/assets/${small}/thumb?w=1600`, ownerCookie), ctx(small))).arrayBuffer())).metadata()).toMatchObject({ width: 40, height: 30 });
+  });
+
+  test('refuses any other size, and the preview has the same access as the tile', async () => {
+    for (const w of ['512', '100', '1601', '0', '-1', 'abc', '']) expect((await GET_THUMB(get(`/api/assets/${id}/thumb?w=${w}`, ownerCookie), ctx(id))).status, `w=${w}`).toBe(400);
+    expect((await GET_THUMB(get(`/api/assets/${id}/thumb?w=1600`), ctx(id))).status).toBe(401);
+    expect((await GET_THUMB(get(`/api/assets/${id}/thumb?w=1600`, otherCookie), ctx(id))).status).toBe(403);
+    expect((await GET_THUMB(get('/api/assets/nope/thumb?w=1600', ownerCookie), ctx('nope'))).status).toBe(404);
+  });
+
   test('has the access of the content: no session, another Member, an unknown id', async () => {
     expect((await GET_THUMB(get(`/api/assets/${id}/thumb`), ctx(id))).status).toBe(401);
     expect((await GET_THUMB(get(`/api/assets/${id}/thumb`, otherCookie), ctx(id))).status).toBe(403);

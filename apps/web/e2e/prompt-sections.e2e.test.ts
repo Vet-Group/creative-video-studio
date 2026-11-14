@@ -142,7 +142,7 @@ test('Marketing Studio: the own hook counts only with no hook chosen, the job ke
   expect(job).toMatchObject({ prompt: shown, hookText: t.hook, brief: t.body, ending: t.ending, hook: null });
   // The Library detail shows the member's own hook beside the brief and the ending.
   await page.goto('/library');
-  await page.getByRole('article', { name: new RegExp(`${String(job.id).slice(0, 8)}\\.[a-z0-9]+$`) }).getByRole('button', { name: 'Xem chi tiết' }).click();
+  await page.locator(`article[data-clip-id="${String(job.id)}"]`).getByRole('button', { name: 'Xem chi tiết' }).click();
   const recipe = page.getByRole('dialog').locator('.recipe-text');
   await expect(recipe.filter({ has: page.getByRole('heading', { name: 'Hook tự viết' }) })).toContainText(t.hook);
   await expect(recipe.filter({ has: page.getByRole('heading', { name: 'Cảnh kết' }) })).toContainText(t.ending);
