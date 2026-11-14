@@ -24,9 +24,9 @@ export const PROMPT_TEMPLATES: Record<'video' | 'marketing' | 'advanced' | 'unbo
     {
       id: 'xoay-360',
       name: 'Xoay 360°',
-      desc: 'Máy quay xoay quanh sản phẩm trên nền studio sạch',
-      hook: 'The clip opens with a quick push-in that lands on the product in the centre of the frame.',
-      body: 'The camera slowly orbits 360 degrees around the product on a clean studio set, soft even light.',
+      desc: 'Máy quay lướt vòng nhẹ quanh sản phẩm, luôn thấy mặt trước',
+      hook: 'The clip opens on the product exactly as in the photo, as the camera begins to drift slowly to one side.',
+      body: 'The camera arcs slowly a little to one side around the product and then back, its front always toward the camera. Soft, even light, smooth steady motion.',
       ending: 'The clip ends with the camera settling on a still front view of the product.',
     },
     {
@@ -110,10 +110,10 @@ export const PROMPT_TEMPLATES: Record<'video' | 'marketing' | 'advanced' | 'unbo
     {
       id: 'phoi-do',
       name: 'Phối đồ',
-      desc: 'Ba cách phối sản phẩm: đi làm, đi chơi, dự tiệc',
-      hook: 'The clip opens with the creator spinning once in the first look, the product in the centre of the frame.',
-      body: 'The creator shows three ways to style the product, for work, for a day out and for a party, switching looks with quick cuts and a short pose in each. Bright, even light, a steady phone camera that frames the full body.',
-      ending: 'The clip ends with the creator in the favourite look, waving goodbye to the camera.',
+      desc: 'Một cách phối với sản phẩm, xoay nhẹ khoe cả bộ',
+      hook: 'The clip opens with the creator in a full-body shot, wearing the product as the centre of the outfit.',
+      body: 'The creator shows one outfit built around the product: a gentle turn a little to each side to show the whole look, then a point to how the product pairs with the other pieces. Bright, even light, a steady phone camera that frames the full body.',
+      ending: 'The clip ends with the creator facing the camera in the finished look, the front of the product in full view.',
     },
     {
       id: 'quay-bang-dien-thoai',
@@ -252,10 +252,10 @@ export const PROMPT_TEMPLATES: Record<'video' | 'marketing' | 'advanced' | 'unbo
     {
       id: 'uu-va-nhuoc',
       name: 'Ưu và nhược',
-      desc: 'Hai điểm thích và một điểm cần lưu ý',
-      hook: 'The clip opens with the creator holding the product up to the camera and saying they have used it for a week.',
-      body: 'The creator counts on their fingers two things they love about the product and one thing to know before buying, showing each point on the product. Bright daylight, a handheld phone camera at eye level.',
-      ending: 'The clip ends with the creator giving the product a confident nod.',
+      desc: 'Một điểm thích và một điểm cần lưu ý',
+      hook: 'The clip opens with the creator holding the product up to the camera, its front in view, ready to share an honest take.',
+      body: 'The creator points to one thing they love about the product, then to one thing to know before buying, showing each on the product with its front kept toward the camera. Bright daylight, a handheld phone camera at eye level.',
+      ending: 'The clip ends with the creator giving the product a confident nod, its front in view.',
     },
     {
       id: 'mac-ca-ngay',
@@ -306,14 +306,14 @@ export const STARTERS: Record<string, Starter[]> = {
   ],
   try_on: [
     { label: 'Studio', text: 'The model stands in a clean studio with soft even light, full body, facing the camera.' },
-    { label: 'Đường phố', text: 'The model walks on a sunny city street, natural light, full-body shot.' },
-    { label: 'Quán cà phê', text: 'The model sits by the window of a cozy cafe, warm natural light, three-quarter shot.' },
+    { label: 'Đường phố', text: "Set the scene on a sunny city street in natural daylight with a softly blurred background, the model's pose unchanged." },
+    { label: 'Quán cà phê', text: "Set the scene by the window of a cozy cafe in warm natural light with a softly blurred interior, the model's pose unchanged." },
     { label: 'Công viên', text: 'The model stands in a green park on a sunny day, soft natural light, full-body shot.' },
     { label: 'Nền màu', text: 'The model poses against a bold solid-colour studio backdrop, crisp even light, full body.' },
   ],
   lingerie_try_on: [
-    { label: 'Phòng ngủ sáng', text: 'The model stands in a bright, airy bedroom with soft morning light, a tasteful three-quarter pose.' },
-    { label: 'Studio', text: 'A clean studio with soft even light, the model in a relaxed, tasteful pose.' },
+    { label: 'Nắng sớm dịu', text: 'Soft, bright, airy morning light from the side, gentle shadows and clean natural skin tones.' },
+    { label: 'Ánh sáng studio', text: 'Soft, even studio-style light with gentle shadows and a clean, neutral look.' },
   ],
   background_changer: [
     { label: 'Bàn đá cẩm thạch', text: 'a white marble table in a bright minimalist kitchen' },
