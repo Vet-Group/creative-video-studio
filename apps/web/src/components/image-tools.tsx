@@ -11,7 +11,7 @@ import { numberedSamples } from '@/lib/examples';
 import { decodeOptimizerImage, optimizeImage } from '@/lib/media-optimizer';
 import { useFashionModels } from '@/lib/use-fashion-models';
 import { useHydrated } from '@/lib/use-hydrated';
-import { useSamples } from '@/lib/use-samples';
+import { reloadSamples, samplesFailed, useSamples } from '@/lib/use-samples';
 import { MAX_AUDIO_BYTES, MAX_BYTES, MAX_VIDEO_BYTES, MAX_VIDEO_BYTES_R2 } from '@/lib/upload-limits';
 import type { RefVideo } from './ReferenceVideo';
 import { AI_MODEL_SLOTS, slotOfLabel, UPLOAD_SLOTS, type UploadSlot } from '@/lib/upload-slots';
@@ -857,7 +857,7 @@ export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4
     void load(0);
   }, [kind]);
   useFreshResults(() => void load(0));
-  const retry = () => (setState('loading'), load(0));
+  const retry = () => (setState('loading'), reloadSamples(), load(0));
   // The next page loads as the end comes near, as the Library's does; the button stays for the keyboard and when the observer does not fire.
   useEffect(() => {
     const el = more.current;
@@ -879,6 +879,8 @@ export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4
         </div>
       );
     if (state === 'error') return <LoadError text="Không tải được kết quả của công ty." onRetry={retry} />;
+    // A sample list that failed is not an empty company: say so, with a retry (the list also retries by itself).
+    if (items.length === 0 && samples && samplesFailed()) return <LoadError text="Không tải được ví dụ." onRetry={retry} />;
     if (items.length === 0) return <p className="muted">{emptyText}</p>;
   }
   const tiles: (Clip | string)[] = [...sampleTiles, ...items];
