@@ -102,6 +102,8 @@ export const users = pgTable(
     canEditTemplates: boolean('can_edit_templates').notNull().default(false),
     // Set by an Admin: an account for automation (the deploy Admin, test and demo accounts), listed apart from the staff on Admin Users.
     system: boolean('system').notNull().default(false),
+    // Set by an Admin: a collaborator outside the company's Lark organisation, who can never link Lark and so gets no reminder to.
+    outsideLark: boolean('outside_lark').notNull().default(false),
     teamId: text('team_id')
       .notNull()
       .default(DEFAULT_TEAM_ID)

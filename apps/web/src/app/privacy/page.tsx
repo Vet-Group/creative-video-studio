@@ -19,7 +19,11 @@ export default async function PrivacyPage() {
       </ul>
 
       <h2>Mục đích sử dụng</h2>
-      <p>Chỉ để đăng nhập vào tài khoản mà Admin đã tạo sẵn cho bạn. Địa chỉ email không có trong danh sách của Admin sẽ bị từ chối và không tạo tài khoản nào.</p>
+      <p>
+        Chỉ để đăng nhập. Nhân viên thuộc tổ chức Lark của công ty được tạo tài khoản tự động ở lần đầu đăng nhập bằng Lark, là thành viên trong nhóm “Chưa phân team”. Mọi người khác dùng tài khoản do Admin tạo và đăng nhập
+        bằng email và mật khẩu, Google hoặc passkey. Địa chỉ email Google không có trong danh sách của Admin, hoặc tài khoản Lark ngoài tổ chức của công ty, sẽ bị từ chối và không tạo tài khoản nào.
+      </p>
+      <p>Người ngoài tổ chức Lark đăng nhập bằng tài khoản do Admin tạo và không bị nhắc liên kết Lark.</p>
 
       <h2>Chia sẻ và lưu trữ</h2>
       <p>Chúng tôi không chia sẻ hay bán dữ liệu này cho bên thứ ba. Dữ liệu nằm trên máy chủ của VET và trong các bản sao lưu đã mã hóa của máy chủ đó.</p>
@@ -39,7 +43,8 @@ export default async function PrivacyPage() {
       <h2>English summary</h2>
       <p>
         Creative Video Studio is an internal tool run by VET. When you sign in with Google (scopes openid, email, profile) we read your name, email and profile picture; with Lark, your name and company email. We use
-        them only to sign in an account an Admin has already created. Nothing is shared or sold. The data stays on VET&apos;s server and its encrypted backups. You can ask for its removal at any time.
+        them only to sign you in. Staff in the company&apos;s Lark organisation get an account automatically at their first Lark sign-in, as a member of the team &quot;Chưa phân team&quot;. Everyone else uses an account an Admin
+        creates, with email and password, Google or a passkey; people outside the Lark organisation sign in this way and are not asked to link Lark. Nothing is shared or sold. The data stays on VET&apos;s server and its encrypted backups. You can ask for its removal at any time.
       </p>
     </main>
   );

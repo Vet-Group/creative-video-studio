@@ -41,7 +41,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     larkEnabled: larkLoginEnabled,
     supportEmail: process.env.CVS_SUPPORT_EMAIL || null,
   };
-  const larkPrompt = needsLarkPrompt({ larkEnabled: larkLoginEnabled, system: user.system === true, providers: account.methods.map((m) => m.provider) });
+  const larkPrompt = needsLarkPrompt({ larkEnabled: larkLoginEnabled, system: user.system === true, outsideLark: user.outsideLark === true, providers: account.methods.map((m) => m.provider) });
   return (
     <SmartRemakeGate enabled={smartRemakeAppEnabled()}>
       <Shell userId={user.id} userName={user.name} isAdmin={isAdmin} feedbackNew={feedbackNew} analyzeEnabled={reaAnalyzeEnabled()} account={account} larkPrompt={larkPrompt} changelog={visibleEntries(CHANGELOG, isAdmin).slice(0, 10)} initialCollapsed={(await cookies()).get(COLLAPSED_COOKIE)?.value === '1'}>

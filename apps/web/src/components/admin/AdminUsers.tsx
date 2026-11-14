@@ -22,6 +22,8 @@ interface User {
   canEditTemplates: boolean;
   /** An automation account (deploy Admin, test, demo): listed apart from the staff, never deleted for that. */
   system: boolean;
+  /** Not in the company's Lark organisation: never asked to link Lark. */
+  outsideLark: boolean;
   methods: SignInMethod[];
 }
 interface Team {
@@ -159,6 +161,11 @@ function UserEditor({ user, teams, reload }: { user: User; teams: Team[]; reload
           <input type="checkbox" aria-label={`Tài khoản hệ thống: ${user.email}`} checked={user.system} disabled={pending} onChange={(e) => void patch({ system: e.target.checked }, 'Không đổi được nhóm hệ thống.')} />
           Tài khoản hệ thống
         </label>
+        <label className="check">
+          <input type="checkbox" aria-label={`Ngoài tổ chức Lark: ${user.email}`} checked={user.outsideLark} disabled={pending} onChange={(e) => void patch({ outsideLark: e.target.checked }, 'Không đổi được dấu ngoài tổ chức Lark.')} />
+          Ngoài tổ chức Lark
+        </label>
+        <small className="muted">Không nhắc liên kết Lark; đăng nhập bằng email, Google hoặc passkey.</small>
         <small className="muted">Vai trò, nhóm và quyền biên tập mẫu lưu ngay khi chọn. Đổi nhóm chỉ áp dụng cho các job mới. Người biên tập mẫu sửa, thêm mẫu chuyển động và duyệt đề xuất ở trang Tạo video; Admin luôn có quyền này. Tài khoản hệ thống (dùng cho deploy, kiểm thử, demo) được xếp riêng ở cuối danh sách.</small>
       </div>
       <StoreAssign user={user} />
@@ -280,6 +287,7 @@ function UserRow({ user, team, onEdit }: { user: User; team: string; onEdit: () 
       <td data-label="Vai trò">
         <span className="role" data-role={user.role}>{user.role === 'admin' ? 'Admin' : 'Thành viên'}</span>
         {user.role !== 'admin' && user.canEditTemplates && <span className="tag">Biên tập mẫu</span>}
+        {user.outsideLark && <span className="tag">Ngoài Lark</span>}
       </td>
       <td data-label="Nhóm">{team}</td>
       <td data-label="Đăng nhập">
@@ -344,6 +352,7 @@ export function AdminUsers() {
   const [password, setPassword] = useState('');
   const [teamId, setTeamId] = useState('');
   const [role, setRole] = useState('member');
+  const [outsideLark, setOutsideLark] = useState(false);
   const [query, setQuery] = useState('');
   const [editing, setEditing] = useState<string | null>(null);
 
@@ -365,11 +374,12 @@ export function AdminUsers() {
   const editUser = users.data.users.find((u) => u.id === editing);
 
   async function add() {
-    const ok = await run(() => api('/api/admin/users', sendJson('POST', { email, name, teamId, role, ...(password ? { password } : {}) })), 'Không thêm được người dùng.');
+    const ok = await run(() => api('/api/admin/users', sendJson('POST', { email, name, teamId, role, outsideLark, ...(password ? { password } : {}) })), 'Không thêm được người dùng.');
     if (ok) {
       setEmail('');
       setName('');
       setPassword('');
+      setOutsideLark(false);
     }
   }
 
@@ -409,11 +419,16 @@ export function AdminUsers() {
             Mật khẩu (không bắt buộc)
             <input type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} />
           </label>
+          <label className="check">
+            <input type="checkbox" checked={outsideLark} onChange={(e) => setOutsideLark(e.target.checked)} />
+            Ngoài tổ chức Lark
+          </label>
           <button type="button" className="primary" disabled={pending || !email.trim() || !name.trim() || !teamId} onClick={() => void add()}>
             Thêm người dùng
           </button>
         </div>
         <p className="muted">Dùng Gmail hoặc email công ty trên Lark của người đó. Không đặt mật khẩu thì chỉ đăng nhập được bằng Lark hoặc Google.</p>
+        <p className="muted">Không nhắc liên kết Lark; đăng nhập bằng email, Google hoặc passkey.</p>
         <details className="help">
           <summary>Đăng nhập bằng Google, Lark hoạt động thế nào?</summary>
           <p>

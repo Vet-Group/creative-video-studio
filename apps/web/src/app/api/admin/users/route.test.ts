@@ -119,6 +119,19 @@ describe('/api/admin/users', () => {
     const { users } = (await (await GET(req(adminCookie))).json()) as { users: { email: string; teamId: string }[] };
     expect(users.find((u) => u.email === 'teamed@example.test')?.teamId).toBe('team-b');
   });
+
+  test('creates a user outside the Lark organisation when asked, lists the flag, and defaults to false; a non-boolean is a 400', async () => {
+    const create = (extra: object) => POST(req(adminCookie, { method: 'POST', body: JSON.stringify({ name: 'Outside', teamId: 'team-unassigned', ...extra }) }));
+    expect((await create({ email: 'outside-bad@example.test', outsideLark: 'yes' })).status).toBe(400);
+    expect((await pool.query(`select 1 from users where email = 'outside-bad@example.test'`)).rowCount).toBe(0);
+    expect((await create({ email: 'outside@example.test', outsideLark: true })).status).toBe(201);
+    expect((await create({ email: 'inside@example.test' })).status).toBe(201);
+    const { users } = (await (await GET(req(adminCookie))).json()) as { users: { email: string; outsideLark: boolean }[] };
+    expect(users.filter((u) => /^(outside|inside)@/.test(u.email)).map((u) => [u.email, u.outsideLark]).sort()).toEqual([
+      ['inside@example.test', false],
+      ['outside@example.test', true],
+    ]);
+  });
 });
 
 describe('PATCH /api/admin/users/:id', () => {
@@ -185,6 +198,22 @@ describe('PATCH /api/admin/users/:id', () => {
     expect(await audits(m.id)).toEqual([
       { actor_id: admin, action: 'user.system', old_value: { system: false }, new_value: { system: true } },
       { actor_id: admin, action: 'user.system', old_value: { system: true }, new_value: { system: false } },
+    ]);
+  });
+
+  test('flags a user as outside the Lark organisation and back, listed with the flag, audited once per change; a non-boolean is a 400', async () => {
+    const m = await member();
+    expect((await patch(adminCookie, m.id, { outsideLark: 'yes' })).status).toBe(400);
+    expect((await patch(adminCookie, m.id, { outsideLark: true })).status).toBe(200);
+    expect((await patch(adminCookie, m.id, { outsideLark: true })).status).toBe(200); // already flagged: nothing to audit
+    const listed = async () => ((await (await GET(req(adminCookie))).json()) as { users: { id: string; outsideLark: boolean }[] }).users.find((u) => u.id === m.id)?.outsideLark;
+    expect(await listed()).toBe(true);
+    expect((await patch(adminCookie, m.id, { outsideLark: false })).status).toBe(200);
+    expect(await listed()).toBe(false);
+    const admin = await adminId();
+    expect(await audits(m.id)).toEqual([
+      { actor_id: admin, action: 'user.outside_lark', old_value: { outsideLark: false }, new_value: { outsideLark: true } },
+      { actor_id: admin, action: 'user.outside_lark', old_value: { outsideLark: true }, new_value: { outsideLark: false } },
     ]);
   });
 

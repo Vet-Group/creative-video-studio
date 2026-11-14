@@ -9,8 +9,8 @@ import { guard } from '@/lib/session';
 /**
  * Admin: change one user. Any of `name`, `email` (unique; a first Google or Lark sign-in links by this address), `role` (member|admin),
  * `teamId` (a visible team), `banned` (boolean, with an optional `banReason`), `temporaryPassword`, `twoFactor: false` (turns the
- * user's 2FA off, for a lost phone, and ends the user's sessions), `canEditTemplates` (boolean: a template editor, lib/session.ts) and `system` (boolean: an
- * automation account, listed apart from the staff) in one body. Every field is checked before anything is written. Each change that differs from the current state is
+ * user's 2FA off, for a lost phone, and ends the user's sessions), `canEditTemplates` (boolean: a template editor, lib/session.ts), `system` (boolean: an
+ * automation account, listed apart from the staff) and `outsideLark` (boolean: not in the company's Lark organisation, never asked to link Lark) in one body. Every field is checked before anything is written. Each change that differs from the current state is
  * audited with its old and new value, in the transaction of the change itself: the audit row commits only if the change was made. The
  * password itself is never stored. A team change touches only users.team_id: jobs keep the team they were run under.
  */
@@ -19,9 +19,9 @@ export async function PATCH(request: Request, { params }: RouteContext) {
   if (g.error) return g.error;
   const { id } = await params;
   const actorId = g.session.user.id;
-  const { name, email, role, teamId, banned, banReason, temporaryPassword, twoFactor, canEditTemplates, system } = (await readBody(request)) ?? {};
-  if ([name, email, role, teamId, banned, temporaryPassword, twoFactor, canEditTemplates, system].every((v) => v === undefined)) {
-    return bad('give at least one of name, email, role, teamId, banned, temporaryPassword, twoFactor, canEditTemplates, system');
+  const { name, email, role, teamId, banned, banReason, temporaryPassword, twoFactor, canEditTemplates, system, outsideLark } = (await readBody(request)) ?? {};
+  if ([name, email, role, teamId, banned, temporaryPassword, twoFactor, canEditTemplates, system, outsideLark].every((v) => v === undefined)) {
+    return bad('give at least one of name, email, role, teamId, banned, temporaryPassword, twoFactor, canEditTemplates, system, outsideLark');
   }
   const newName = typeof name === 'string' ? name.trim() : name;
   const newEmail = typeof email === 'string' ? email.trim().toLowerCase() : email;
@@ -37,6 +37,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
   if (twoFactor !== undefined && twoFactor !== false) return bad('twoFactor can only be turned off (false); the user turns it on');
   if (canEditTemplates !== undefined && typeof canEditTemplates !== 'boolean') return bad('canEditTemplates must be true or false');
   if (system !== undefined && typeof system !== 'boolean') return bad('system must be true or false');
+  if (outsideLark !== undefined && typeof outsideLark !== 'boolean') return bad('outsideLark must be true or false');
   if (id === actorId && ((role !== undefined && role !== g.session.user.role) || banned === true)) return bad('you cannot change your own role or ban yourself');
 
   if (!(await pool.query('select 1 from users where id = $1', [id])).rowCount) return bad('not found', 404);
@@ -91,6 +92,12 @@ export async function PATCH(request: Request, { params }: RouteContext) {
       await withTransaction(pool, async (tx) => {
         if (!(await tx.query('update users set system = $2, updated_at = now() where id = $1 and system <> $2', [id, system])).rowCount) return;
         await audit(tx, { actorId, action: 'user.system', target, oldValue: { system: !system }, newValue: { system } });
+      });
+    }
+    if (typeof outsideLark === 'boolean') {
+      await withTransaction(pool, async (tx) => {
+        if (!(await tx.query('update users set outside_lark = $2, updated_at = now() where id = $1 and outside_lark <> $2', [id, outsideLark])).rowCount) return;
+        await audit(tx, { actorId, action: 'user.outside_lark', target, oldValue: { outsideLark: !outsideLark }, newValue: { outsideLark } });
       });
     }
     if (banned === true) {

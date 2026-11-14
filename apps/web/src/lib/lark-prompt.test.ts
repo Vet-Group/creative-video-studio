@@ -12,9 +12,10 @@ test('the reminder is due once a Vietnam day: never shown, or last shown on anot
   expect(larkPromptDue('2026-11-11', '2026-11-11')).toBe(false);
 });
 
-test('only a person without a linked Lark account gets the reminder, and only while Lark sign-in is on', () => {
-  expect(needsLarkPrompt({ larkEnabled: true, system: false, providers: ['credential'] })).toBe(true);
-  expect(needsLarkPrompt({ larkEnabled: true, system: false, providers: ['credential', 'lark'] })).toBe(false);
-  expect(needsLarkPrompt({ larkEnabled: true, system: true, providers: ['credential'] })).toBe(false);
-  expect(needsLarkPrompt({ larkEnabled: false, system: false, providers: ['credential'] })).toBe(false);
+test('only a person inside the Lark organisation without a linked Lark account gets the reminder, and only while Lark sign-in is on', () => {
+  expect(needsLarkPrompt({ larkEnabled: true, system: false, outsideLark: false, providers: ['credential'] })).toBe(true);
+  expect(needsLarkPrompt({ larkEnabled: true, system: false, outsideLark: false, providers: ['credential', 'lark'] })).toBe(false);
+  expect(needsLarkPrompt({ larkEnabled: true, system: true, outsideLark: false, providers: ['credential'] })).toBe(false);
+  expect(needsLarkPrompt({ larkEnabled: false, system: false, outsideLark: false, providers: ['credential'] })).toBe(false);
+  expect(needsLarkPrompt({ larkEnabled: true, system: false, outsideLark: true, providers: ['credential'] })).toBe(false);
 });
