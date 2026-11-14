@@ -160,6 +160,62 @@ test('the Apps pages widen the sidebar to 280 px as Fash does, and the icon rail
   expect((await sidebar(page).boundingBox())!.width).toBe(240);
 });
 
+test('on a short desktop window the nav scrolls, the account button stays in view and its menu and the nav hints show whole, expanded and as an icon rail', async ({ page }) => {
+  const vw = 1280;
+  const vh = 620; // a laptop browser window: the sidebar's content is taller than this
+  await page.setViewportSize({ width: vw, height: vh });
+  await signIn(page, 'admin'); // the longest nav: the Admin items come on top of the member's
+  const inside = (b: { x: number; y: number; width: number; height: number }) => {
+    expect(b.x).toBeGreaterThanOrEqual(0);
+    expect(b.y).toBeGreaterThanOrEqual(0);
+    expect(b.x + b.width).toBeLessThanOrEqual(vw);
+    expect(b.y + b.height).toBeLessThanOrEqual(vh);
+  };
+  const navBox = nav(page);
+  for (const rail of [false, true]) {
+    if (rail) {
+      await page.getByRole('button', { name: 'Thu gọn thanh bên' }).click();
+      await expect.poll(async () => (await sidebar(page).boundingBox())!.width).toBe(64);
+    }
+    const chip = accountButton(page);
+    inside((await chip.boundingBox())!);
+    inside((await page.getByRole('button', { name: 'Thu gọn thanh bên' }).boundingBox())!);
+    expect(await navBox.evaluate((n) => n.scrollWidth <= n.clientWidth)).toBe(true); // the nav scrolls down only: the guide pill and the focus rings fit its gutters
+    // The last nav item is reachable by scrolling the nav and stays above the account button.
+    const last = navBox.getByRole('link').last();
+    await last.scrollIntoViewIfNeeded();
+    expect((await last.boundingBox())!.y + (await last.boundingBox())!.height).toBeLessThanOrEqual((await chip.boundingBox())!.y);
+    // A nav hint is not clipped by the scrolling nav: it sits beside its link, centred on it, in view.
+    const apps = navBox.getByRole('link', { name: 'Ứng dụng', exact: true });
+    const hint = page.locator('.nav-item').filter({ has: page.getByRole('link', { name: 'Ứng dụng', exact: true }) }).locator('.nav-hint');
+    await apps.scrollIntoViewIfNeeded();
+    await apps.hover();
+    await expect(hint).toBeVisible();
+    const h = (await hint.boundingBox())!;
+    const a = (await apps.boundingBox())!;
+    inside(h);
+    expect(Math.abs(h.x - ((await sidebar(page).boundingBox())!.width + 12))).toBeLessThanOrEqual(1); // 12 px past the sidebar's edge
+    expect(Math.abs(h.y + h.height / 2 - (a.y + a.height / 2))).toBeLessThanOrEqual(2);
+    await page.mouse.move(vw - 100, vh / 2);
+    await expect(hint).toBeHidden();
+    // The account menu opens whole: every item in view, in the rail too, where it is wider than the sidebar.
+    const menu = page.getByRole('menu', { name: /^Tài khoản: / });
+    await expect(async () => {
+      if (!(await menu.isVisible())) await chip.click();
+      await expect(menu).toBeVisible({ timeout: 2_000 });
+    }).toPass();
+    inside((await menu.boundingBox())!);
+    const items = menu.getByRole('menuitem');
+    await expect(items).toHaveText([/^Cài đặt/, /^Hạn mức hôm nay/, /^Bảo mật/, /^Hỗ trợ/, /^Đăng xuất/]);
+    for (const item of await items.all()) {
+      await expect(item).toBeVisible();
+      inside((await item.boundingBox())!);
+    }
+    await page.keyboard.press('Escape');
+    await expect(menu).toBeHidden();
+  }
+});
+
 test('Settings shows the profile, the own caps, the sign-in summary, the support contact and no billing', async ({ page }) => {
   await signIn(page, 'member1');
   const settings = await openSettings(page);
