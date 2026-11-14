@@ -9,7 +9,7 @@ import { FAULTS } from '@/lib/faults';
 import { featureLabel } from '@/lib/features';
 import { GALLERY_SAMPLES, numberedSamples } from '@/lib/examples';
 import { cardTitleOfFormat, HOOKS, LOCATIONS } from '@/lib/marketing';
-import { activeFilterChips, activeFilters, type ChipKey, dayHeadings, filtersFromParams, type LibraryFilters, type LibraryView, libraryQuery, matchesVerdict, NO_FILTERS, readView, saveView, type VerdictFilter } from '@/lib/library-view';
+import { activeFilterChips, activeFilters, type ChipKey, dayHeadings, filtersFromParams, type LibraryFilters, type LibraryView, libraryQuery, matchesVerdict, mergeFresh, NO_FILTERS, readView, saveView, type VerdictFilter } from '@/lib/library-view';
 import { reuseHref } from '@/lib/reuse';
 import { SWIPE_START_PX, swipeStep } from '@/lib/swipe';
 import { useSamples } from '@/lib/use-samples';
@@ -31,8 +31,8 @@ function readPlace(): { query: string; count: number; y: number } | null {
     return null;
   }
 }
-/** Today in Vietnam as YYYY-MM-DD, the latest day the calendar offers. */
-const today = () => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date());
+/** Today in Vietnam as YYYY-MM-DD (or that many days back), the latest day the calendar offers. */
+const today = (daysBack = 0) => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date(Date.now() - daysBack * 86_400_000));
 const fmtShort = (iso: string) => new Intl.DateTimeFormat('vi-VN', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'numeric', timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date(iso));
 const fmtTime = (iso: string) => new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date(iso));
 /** The Library filters in the reference order; the id is the `kind` the API takes. */
@@ -852,6 +852,7 @@ export function Library() {
   const [clips, setClips] = useState<Clip[]>([]);
   const headings = dayHeadings(clips);
   const [creators, setCreators] = useState<{ id: string; name: string }[]>([]);
+  const [ratios, setRatios] = useState<string[]>([]);
   const [hasMore, setHasMore] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [stores, setStores] = useState<StoreOption[]>([]);
@@ -862,6 +863,7 @@ export function Library() {
   const latest = useRef(0);
   const set = (patch: Partial<LibraryFilters>) => setFilters((cur) => ({ ...cur, ...patch }));
   const [pickDay, setPickDay] = useState(false); // "Chọn một ngày…" shows the calendar field
+  const yesterdayOnly = !pickDay && !filters.days && filters.date === today(1); // the "Hôm qua" option, not a day picked on the calendar
   const calendar = useRef<HTMLInputElement>(null);
   const openCalendar = useRef(false);
   useEffect(() => {
@@ -880,6 +882,8 @@ export function Library() {
   const inApps = filters.kind === 'apps' || APP_KINDS.some((k) => k.id === filters.kind);
   const chips = activeFilterChips(filters, { creator: creators.find((c) => c.id === filters.creator)?.name, kind: [...KINDS, ...APP_KINDS].find((k) => k.id === filters.kind)?.label });
   // An item that no longer matches Favourites only or the verdict filter leaves the list, so the next page's offset stays right; the detail view then shows the next one.
+  const listed = useRef(clips); // the list as last rendered, for a refresh to count what it adds
+  listed.current = clips;
   const counted = useRef(new Set<string>()); // first marks already taken off the count: two quick marks on one item see the same unmarked render
   const uncount = (c: Clip | undefined) => {
     if (!c || c.verdict || !c.canEdit || counted.current.has(c.id)) return;
@@ -897,17 +901,25 @@ export function Library() {
   }, [clips, detail]);
 
   const load = useCallback(
-    // How many came while more wait, null at the end or on an error, undefined when a newer load took over.
-    async (offset: number): Promise<number | null | undefined> => {
+    // How many came while more wait, null at the end or on an error, undefined when a newer load took over. `refresh` puts the new items of page 1 on top of the list shown instead of replacing it.
+    async (offset: number, refresh = false): Promise<number | null | undefined> => {
       const ticket = ++latest.current;
       try {
-        const r = await api<{ hasMore: boolean; isAdmin: boolean; unmarked: number; creators: { id: string; name: string }[]; clips: Clip[] }>(`/api/library?${libraryQuery(filters, offset)}`);
+        const r = await api<{ hasMore: boolean; isAdmin: boolean; unmarked: number; creators: { id: string; name: string }[]; ratios: string[]; clips: Clip[] }>(`/api/library?${libraryQuery(filters, offset)}`);
         if (ticket !== latest.current) return undefined;
         setIsAdmin(r.isAdmin);
         setUnmarked(r.unmarked);
-        setClips((cur) => (offset > 0 ? [...cur, ...r.clips.filter((c) => !cur.some((o) => o.id === c.id))] : r.clips)); // an item that arrived since page 1 shifts the offset
+        // Only the newest-first order puts a new item on top; the pages loaded so far still count for the next offset.
+        if (refresh && filters.sort === 'newest' && !filters.examplesOnly) {
+          const added = mergeFresh(listed.current, r.clips).length - listed.current.length;
+          setClips((cur) => mergeFresh(cur, r.clips));
+          setDetail((d) => (d === null ? d : d + added)); // the open item moves down with the list
+        } else {
+          setClips((cur) => (offset > 0 ? [...cur, ...r.clips.filter((c) => !cur.some((o) => o.id === c.id))] : r.clips)); // an item that arrived since page 1 shifts the offset
+          setHasMore(r.hasMore);
+        }
         setCreators(r.creators);
-        setHasMore(r.hasMore);
+        setRatios(r.ratios);
         setState('ready');
         return r.hasMore ? r.clips.length : null;
       } catch {
@@ -991,8 +1003,7 @@ export function Library() {
     io.observe(el);
     return () => io.disconnect();
   }, [hasMore, state, loadMore]);
-  // shortcut: a fresh result reloads the first page, so pages added with "Xem thêm" close; merge them if that bothers anyone.
-  useFreshResults(() => void load(0));
+  useFreshResults(() => void load(0, true));
 
   useEffect(() => {
     const words = search.trim();
@@ -1143,22 +1154,23 @@ export function Library() {
         <label className="library-field">
           <span>Ngày</span>
           <select
-            value={filters.days ? `d${filters.days}` : filters.date || pickDay ? 'pick' : ''}
+            value={filters.days ? `d${filters.days}` : yesterdayOnly ? 'yesterday' : filters.date || pickDay ? 'pick' : ''}
             onChange={(e) => {
               const v = e.target.value;
               openCalendar.current = v === 'pick';
               setPickDay(v === 'pick');
-              set(v === 'pick' ? { days: '' } : { days: v.slice(1) as LibraryFilters['days'], date: '' });
+              set(v === 'pick' ? { days: '' } : v === 'yesterday' ? { days: '', date: today(1) } : { days: v.slice(1) as LibraryFilters['days'], date: '' });
             }}
           >
             <option value="">Mọi ngày</option>
             <option value="d1">Hôm nay</option>
+            <option value="yesterday">Hôm qua</option>
             <option value="d7">7 ngày qua</option>
             <option value="d30">30 ngày qua</option>
             <option value="pick">{filters.date ? filters.date.split('-').reverse().join('/') : 'Chọn một ngày…'}</option>
           </select>
         </label>
-        {(pickDay || filters.date) && (
+        {(pickDay || (filters.date && !yesterdayOnly)) && (
           <label className="library-field">
             <span className="sr-only">Ngày cụ thể</span>
             <input ref={calendar} type="date" value={filters.date} max={today()} onChange={(e) => set({ date: e.target.value })} />
@@ -1168,8 +1180,11 @@ export function Library() {
           <span>Tỉ lệ</span>
           <select value={filters.ratio} onChange={(e) => set({ ratio: e.target.value })}>
             <option value="">Tất cả</option>
-            <option value="9:16">9:16</option>
-            <option value="1:1">1:1</option>
+            {(ratios.includes(filters.ratio) || !filters.ratio ? ratios : [...ratios, filters.ratio]).map((r) => (
+              <option key={r} value={r}>
+                {r}
+              </option>
+            ))}
           </select>
         </label>
         <label className="library-field">

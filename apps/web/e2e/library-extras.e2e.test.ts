@@ -11,12 +11,17 @@ test('the Library date presets: today, the last 7 or 30 days, or one day picked 
   const mine = page.getByRole('article');
   await expect(mine).toHaveCount(1);
   const day = page.getByRole('combobox', { name: 'Ngày', exact: true });
-  expect(await day.locator('option').allTextContents()).toEqual(['Mọi ngày', 'Hôm nay', '7 ngày qua', '30 ngày qua', 'Chọn một ngày…']);
+  expect(await day.locator('option').allTextContents()).toEqual(['Mọi ngày', 'Hôm nay', 'Hôm qua', '7 ngày qua', '30 ngày qua', 'Chọn một ngày…']);
   for (const preset of ['Hôm nay', '7 ngày qua', '30 ngày qua']) {
     await day.selectOption({ label: preset });
     await expect(mine).toHaveCount(1);
   }
   await expect(page.locator('.library-active .library-chip')).toHaveCount(2); // creator and the date preset, each a removable chip
+  // Yesterday is one fixed day without the calendar field, and the item made today is not in it.
+  await day.selectOption({ label: 'Hôm qua' });
+  await expect(page.getByText('Chưa có kết quả nào khớp bộ lọc.')).toBeVisible();
+  await expect(page.getByLabel('Ngày cụ thể')).toHaveCount(0);
+  await expect(day.locator('option:checked')).toHaveText('Hôm qua');
   // One day: the calendar field shows, and a day before the item leaves the list empty.
   await expect(page.getByLabel('Ngày cụ thể')).toHaveCount(0);
   await day.selectOption({ label: 'Chọn một ngày…' });
@@ -41,7 +46,7 @@ test('the Library loads more as the end comes near, and coming back keeps the it
   await page.route(/\/api\/library(\?|$)/, async (r) => {
     const offset = Number(new URL(r.request().url()).searchParams.get('offset') ?? 0);
     const items = Array.from({ length: 50 }, (_, i) => clip(i)).slice(offset, offset + 24);
-    await r.fulfill({ json: { hasMore: offset + 24 < 50, isAdmin: false, unmarked: 0, creators: [], clips: items } });
+    await r.fulfill({ json: { hasMore: offset + 24 < 50, isAdmin: false, unmarked: 0, creators: [], ratios: ['9:16'], clips: items } });
   });
   await page.goto('/library');
   const cards = page.getByRole('article');

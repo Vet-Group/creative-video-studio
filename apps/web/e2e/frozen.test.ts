@@ -53,7 +53,7 @@ const job = {
 export async function freezeData(page: Page): Promise<void> {
   await page.clock.setFixedTime(new Date('2026-10-23T05:00:00.000Z'));
   await page.route(/\/api\/library(\?|$)/, (r) =>
-    r.fulfill({ json: { hasMore: false, isAdmin: false, creators: [{ id: 'frozen-user', name: 'E2E Member 5' }], clips: [clip(1, '9:16', true), clip(2, '1:1', false), clip(3, '9:16', false)] } }),
+    r.fulfill({ json: { hasMore: false, isAdmin: false, creators: [{ id: 'frozen-user', name: 'E2E Member 5' }], ratios: ['9:16', '1:1'], clips: [clip(1, '9:16', true), clip(2, '1:1', false), clip(3, '9:16', false)] } }),
   );
   // Other specs rename and switch presets, so the picker is answered from the seed labels.
   await page.route(/\/api\/presets$/, (r) =>

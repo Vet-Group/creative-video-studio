@@ -21,6 +21,13 @@ export interface LibraryFilters {
 
 export const NO_FILTERS: LibraryFilters = { q: '', creator: '', date: '', days: '', ratio: '', kind: 'all', verdict: '', favoritesOnly: false, examplesOnly: false, sort: 'newest' };
 
+/** A refresh of the first page onto the list shown: the items not yet there go on top (newest first), so pages loaded since and the scroll position stay. */
+export function mergeFresh<T extends { id: string }>(cur: T[], fresh: T[]): T[] {
+  const have = new Set(cur.map((c) => c.id));
+  const added = fresh.filter((c) => !have.has(c.id));
+  return added.length === 0 ? cur : [...added, ...cur];
+}
+
 /** Whether an item with this mark belongs under the verdict filter, so a fresh mark can take it out of the list. */
 export function matchesVerdict(filter: VerdictFilter, mark: { verdict: 'pass' | 'fail'; featured: boolean } | null): boolean {
   if (filter === '') return true;

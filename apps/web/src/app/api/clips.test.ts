@@ -268,7 +268,7 @@ describe('GET /api/library', () => {
     expect(await unmarked(admin.cookie)).toBe(before.admin + 1);
   });
 
-  test.each(['?date=2026-13-45', '?date=yesterday', '?days=2', '?days=', '?ratio=16:9', '?offset=-1', '?offset=x', '?favorites=0', '?sort=random', '?verdict=good', '?verdict=', '?verdict=toString'])('answers 400 for %s', async (query) => {
+  test.each(['?date=2026-13-45', '?date=yesterday', '?days=2', '?days=', '?offset=-1', '?offset=x', '?favorites=0', '?sort=random', '?verdict=good', '?verdict=', '?verdict=toString'])('answers 400 for %s', async (query) => {
     expect((await GET_LIBRARY(req(`/api/library${query}`, bob.cookie))).status).toBe(400);
   });
 
@@ -326,6 +326,50 @@ describe('GET /api/library', () => {
     expect((await GET_LIBRARY(req(`/api/library?q=${'x'.repeat(200)}`, bob.cookie))).status).toBe(200);
   });
 
+  test('searches a brief and the store name, ignoring case and Vietnamese diacritics', async () => {
+    await pool.query(
+      `insert into model_configs (id, provider, endpoint, label, ratios, durations_sec, max_images, output_resolution, usd_per_second, sources, enabled) values ('diac-model', 'fal', 'x', 'Diacritics', '{9:16}', '{8}', 2, '720p', 0.1, '{}', false)`,
+    );
+    await pool.query(`insert into stores (id, name, code) values ('store-diac', 'Cửa hàng Đỏ Empower', 'S9')`);
+    const brief = await clip(alice.id, { id: 'diac-brief', model: 'diac-model' });
+    await pool.query(`update jobs set feature = 'marketing', preset_id = null, params = '{"brief":"Người mẫu mặc áo ĐỎ"}' where id = $1`, [brief]);
+    const stored = await clip(alice.id, { id: 'diac-store', model: 'diac-model', storeId: 'store-diac' });
+    const found = async (q: string) => (await libraryIds(bob.cookie, `?q=${encodeURIComponent(q)}`)).filter((id) => id.startsWith('diac-')).sort();
+    expect(await found('nguoi mau')).toEqual([brief]);
+    expect(await found('NGƯỜI MẪU')).toEqual([brief]);
+    expect(await found('do')).toEqual([brief, stored].sort()); // đỏ in the brief, Đỏ in the store name
+    expect(await found('đỏ')).toEqual([brief, stored].sort());
+    expect(await found('empower')).toEqual([stored]);
+    expect(await found('cua hang')).toEqual([stored]);
+    expect(await found('khong co')).toEqual([]);
+  });
+
+  test('shows and filters the real shape of the output, and ignores a ratio it does not know', async () => {
+    await pool.query(
+      `insert into model_configs (id, provider, endpoint, label, ratios, durations_sec, max_images, output_resolution, usd_per_second, sources, enabled) values ('shape-model', 'fal', 'x', 'Shape', '{9:16}', '{8}', 2, '720p', 0.1, '{}', false)`,
+    );
+    // Saved as 9:16 but 768x768; saved as auto but 896x1200; saved as 9:16 with no size known.
+    const square = await clip(alice.id, { id: 'shape-square', model: 'shape-model' });
+    const auto = await clip(alice.id, { id: 'shape-auto', model: 'shape-model' });
+    const unknown = await clip(alice.id, { id: 'shape-unknown', model: 'shape-model' });
+    await pool.query(`update assets set width = 768, height = 768 where id = 'shape-square-video'`);
+    await pool.query(`update assets set width = 896, height = 1200 where id = 'shape-auto-video'`);
+    await pool.query(`update jobs set aspect = 'auto' where id = $1`, [auto]);
+    const lib = async (query: string) => (await libraryIds(bob.cookie, query)).filter((id) => id.startsWith('shape-')).sort();
+    expect(await lib('?ratio=1:1')).toEqual([square]);
+    expect(await lib('?ratio=3:4')).toEqual([auto]);
+    expect(await lib('?ratio=9:16')).toEqual([unknown]);
+    expect(await lib('?ratio=auto')).toEqual([]);
+    expect(await lib('?ratio=16:9')).toEqual([]); // a ratio the list has no output of
+    const res = await GET_LIBRARY(req('/api/library?ratio=7:3', bob.cookie)); // a link the page can produce: no error, no filter
+    expect(res.status).toBe(200);
+    expect(await lib('?ratio=7:3')).toEqual([auto, square, unknown].sort());
+    const body = (await (await GET_LIBRARY(req('/api/library', bob.cookie))).json()) as { clips: { id: string; ratio: string }[]; ratios: string[] };
+    expect(Object.fromEntries(body.clips.filter((c) => c.id.startsWith('shape-')).map((c) => [c.id, c.ratio]))).toEqual({ [square]: '1:1', [auto]: '3:4', [unknown]: '9:16' });
+    expect(body.ratios).toEqual(expect.arrayContaining(['9:16', '1:1', '3:4']));
+    expect(body.ratios.indexOf('1:1')).toBeLessThan(body.ratios.indexOf('9:16')); // the order of IMAGE_RATIOS
+  });
+
   test('pages by 24', async () => {
     const carol = await newUser('carol@example.test', 'Carol');
     for (let i = 0; i < 25; i++) await clip(carol.id);
@@ -341,7 +385,8 @@ describe('images in the Library', () => {
   /** A succeeded image job of the user, with its output image (no poster) and a 0.15 USD ledger total. */
   async function imageClip(userId: string, o: { id?: string; feature?: string; resolution?: string; ratio?: string; filename?: string; createdAt?: string } = {}): Promise<string> {
     const id = o.id ?? `img-${++seqImage}-${randomBytes(4).toString('hex')}`;
-    await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, width, height) values ($1, $2, 'output', $3, $4, 'image/png', 10, 64, 64)`, [`${id}-out`, userId, `assets/${id}-out`, o.filename ?? `image-${id.slice(0, 8)}.png`]);
+    const [w, h] = (o.ratio ?? '1:1').split(':').map((n) => Number(n) * 16); // a picture of the ratio it was asked for
+    await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, width, height) values ($1, $2, 'output', $3, $4, 'image/png', 10, $5, $6)`, [`${id}-out`, userId, `assets/${id}-out`, o.filename ?? `image-${id.slice(0, 8)}.png`, w, h]);
     await pool.query(
       `insert into jobs (id, user_id, team_id, feature, model, provider, prompt, aspect, duration_s, params, input_asset_ids, status, output_asset_id, created_at)
        values ($1, $2, 'team-unassigned', $3, 'nano-banana-pro', 'fal', 'a prompt', $4, 0, $5, '{}', 'succeeded', $6, coalesce($7::timestamptz, now()))`,
