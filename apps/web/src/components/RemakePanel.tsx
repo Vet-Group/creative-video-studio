@@ -95,7 +95,7 @@ export function RemakeResult({ row, scene = (index) => index, analysis, sourceAs
                     Clip cảnh {scene(s.index)}
                   </a>
                   {sourceAssetId && analysis && remakeScene(analysis, s.index) && (
-                    <CompareVideo before={`/api/assets/${sourceAssetId}/content`} after={`/api/assets/${s.clipAssetId}/content`} start={remakeScene(analysis, s.index)!.start} />
+                    <CompareVideo before={`/api/assets/${sourceAssetId}/content`} after={`/api/assets/${s.clipAssetId}/content`} start={remakeScene(analysis, s.index)!.start} end={remakeScene(analysis, s.index)!.end} />
                   )}
                 </>
               ) : (

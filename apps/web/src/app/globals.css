@@ -2611,5 +2611,6 @@ dialog.modal.compare-modal { width: min(760px, calc(100vw - 32px)); max-width: n
 .remake-compare { display: grid; gap: 4px; justify-items: start; width: min(100%, 480px); }
 .remake-compare .compare { height: auto; border-radius: 12px; background: var(--media-bg); }
 .remake-compare video { max-height: 360px; }
+.remake-compare input[type='range'] { touch-action: pan-y; } /* a vertical swipe scrolls the list instead of dragging the handle */
 .remake-shots { margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 13px; }
 .job-failure-copy { margin: 4px 0 0; font-size: 13px; }
