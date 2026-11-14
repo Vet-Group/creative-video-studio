@@ -163,6 +163,10 @@ test('a check is one cool call under its own system prompt with the model, forma
   expect(CHECK_SYSTEM).toMatch(/directions that contradict each other/); // checked first: the top-down camera and the product held up to it
   expect(CHECK_SYSTEM).toMatch(/quote the prompt's exact English words to change/); // a fix names the words, never a general tip
   expect(CHECK_SYSTEM).toMatch(/shot size, lens, camera move or sound sentence is never a problem on its own/); // missing style direction is no issue
+  expect(CHECK_SYSTEM).toMatch(/a steady or fixed camera filming an action done in front of it is fine/); // a product lifted to a steady camera is no contradiction
+  expect(CHECK_SYSTEM).not.toMatch(/static camera while/);
+  expect(CHECK_SYSTEM).toMatch(/only when you are sure it will spoil the clip/); // the owner chose certain problems only
+  expect(CHECK_SYSTEM).toMatch(/one or two beats fit a 5 to 10 second clip/);
 });
 
 test('a check answer is read strictly: no issues is fine, more than four are cut, and anything malformed is an error and never an OK', () => {
