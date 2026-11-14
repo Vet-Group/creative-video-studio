@@ -133,10 +133,10 @@ test('an image result opens full screen from the picture in History, and an imag
       const tab = await opened;
       await tab.waitForURL((u) => u.pathname === '/api/samples/image-example-1.jpg'); // a new tab reports an empty URL until its first navigation commits
       await tab.close();
-      // A result's tile shows its preview and opens its details in place, as in the Library, with the original.
+      // A result's tile shows its preview and opens its details in place, as in the Library, with a 1600 px preview of the original.
       const result = gallery.locator(`.gallery-item:has(img[src="/api/assets/${preview}/content"])`);
       await page.mouse.click(...(await at(result, undefined, 12)));
-      await expect(page.getByRole('dialog', { name: /^Chi tiết: / }).locator(`img[src="/api/assets/${out}/content"]`)).toBeVisible();
+      await expect(page.getByRole('dialog', { name: /^Chi tiết: / }).locator(`img[src="/api/assets/${out}/thumb?w=1600"]`)).toBeVisible();
     } finally {
       await page.request.delete(`/api/jobs/${id}`);
     }
