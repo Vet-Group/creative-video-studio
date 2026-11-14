@@ -77,7 +77,7 @@ export async function GET(request: Request) {
 
   const [clips, creators, shapes, unmarked] = await Promise.all([
     pool.query(
-      `select j.id, j.user_id, u.name as creator_name, j.created_at, ${ICT_DAY} as day, j.model, m.label as model_label, ${SHAPE} as shape, j.duration_s, j.is_mock, j.feature, j.params, o.mime as output_mime, o.filename as output_filename,
+      `select j.id, j.user_id, u.name as creator_name, j.created_at, ${ICT_DAY} as day, j.model, m.label as model_label, ${SHAPE} as shape, j.duration_s, o.duration_ms as output_ms, j.is_mock, j.feature, j.params, o.mime as output_mime, o.filename as output_filename,
               j.output_asset_id, j.poster_asset_id, j.store_id, coalesce(c.usd, 0)::numeric(12, 4)::text as cost_usd, coalesce(c.is_final, false) as cost_final, v.verdict, v.fault, v.featured, v.marked_by, ${OWN_PROMPT} as prompt,
               exists (select 1 from favorites f where f.job_id = j.id and f.user_id = $6) as favorite,
               e.job_id is not null as example
@@ -121,7 +121,7 @@ export async function GET(request: Request) {
       modelId: r.model,
       modelLabel: r.model_label,
       ratio: r.shape,
-      durationSec: r.duration_s,
+      durationSec: r.output_ms === null ? r.duration_s : Math.round(r.output_ms / 100) / 10, // the clip's own length (to 0.1 s) once it is known, else the length asked
       feature: r.feature,
       mediaType: r.output_mime.startsWith('image/') ? 'image' : 'video',
       resolution: r.params.resolution ?? null,

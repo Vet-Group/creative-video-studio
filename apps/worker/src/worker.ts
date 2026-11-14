@@ -344,12 +344,11 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
       let video = join(dir, 'output.mp4');
       await download(outputUrl, video, job.provider);
       const { width, height } = await probeSize(video);
-      // Motion Control's clip is as long as the member's own video, whose header can understate it, so a clip that came back longer is billed for its own length.
+      const seconds = await probeSeconds(video);
+      // Motion Control's clip is as long as the member's own video, whose header can understate it, so a clip that came back longer is billed for its own length. A shorter one is not
+      // scaled down here: settle() never books less than the estimate, so a lower cost would change nothing (backfill-durations.ts books the difference for the clips already made).
       // shortcut: a late bill (lateBill) is not scaled; measure it if it matters. A reference video's input seconds are checked before submit (checkReferenceLength).
-      if (job.feature === 'motion_control' && job.duration_s) {
-        const seconds = await probeSeconds(video);
-        if (seconds > job.duration_s + 1) costUsd = (costUsd * Math.ceil(seconds)) / job.duration_s;
-      }
+      if (job.feature === 'motion_control' && job.duration_s && seconds > job.duration_s + 1) costUsd = (costUsd * Math.ceil(seconds)) / job.duration_s;
       // A tier keeps one pixel area for every ratio, so a shape much wider than 16:9 has a shorter short side (21:9 at 720p is 1470x630); its floor shrinks with it, 3% less for
       // sizes rounded to a multiple of 16 (1456x624). Shapes up to 2:1 keep the exact floor, which is what catches 704 px where 720 was asked.
       const aspect = Math.max(width, height) / Math.min(width, height);
@@ -380,7 +379,7 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
       await putObject(keys[1]!, posterBytes, 'image/jpeg');
       const name = job.id.slice(0, 8);
       await insertAssets(db, [
-        { id: outputId, ownerId: job.user_id, kind: 'output', s3Key: keys[0]!, filename: `video-${name}.mp4`, mime: 'video/mp4', bytes: videoBytes.length, width, height },
+        { id: outputId, ownerId: job.user_id, kind: 'output', s3Key: keys[0]!, filename: `video-${name}.mp4`, mime: 'video/mp4', bytes: videoBytes.length, width, height, durationMs: seconds > 0 ? Math.round(seconds * 1000) : null },
         { id: posterId, ownerId: job.user_id, kind: 'output', s3Key: keys[1]!, filename: `poster-${name}.jpg`, mime: 'image/jpeg', bytes: posterBytes.length },
       ]);
       if (await settle(pool, job.id, { status: 'succeeded', costUsd, outputAssetId: outputId, posterAssetId: posterId, tokens })) {

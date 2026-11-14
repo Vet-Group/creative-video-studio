@@ -207,6 +207,16 @@ describe('GET /api/library', () => {
     expect(await (await GET_LIBRARY(req('/api/library', admin.cookie))).json()).toMatchObject({ isAdmin: true });
   });
 
+  test("durationSec is the output clip's own length to 0.1 s when it is recorded, and the length the job asked for when it is not", async () => {
+    const known = await clip(alice.id, { id: 'dur-known' });
+    const unknown = await clip(alice.id, { id: 'dur-unknown' });
+    await pool.query(`update assets set duration_ms = 3749 where id = 'dur-known-video'`); // a job that asked for 8 s whose clip plays 3.7 s
+    await pool.query(`update jobs set is_mock = true where id = any($1)`, [[known, unknown]]); // keeps them out of the model scores of the later tests
+    const body = (await (await GET_LIBRARY(req('/api/library', alice.cookie))).json()) as { clips: { id: string; durationSec: number }[] };
+    expect(body.clips.filter((c) => [known, unknown].includes(c.id)).map((c) => [c.id, c.durationSec]).sort()).toEqual([['dur-known', 3.7], ['dur-unknown', 8]]);
+    await pool.query(`update jobs set deleted_at = now() where id = any($1)`, [[known, unknown]]); // the later tests count the live clips
+  });
+
   test('filters by creator, by ICT date and by ratio', async () => {
     const lib = async (query: string) => (await libraryIds(bob.cookie, query)).filter((id) => id.startsWith('lib-'));
     expect(await lib(`?creator=${alice.id}`)).toEqual(['lib-a']);

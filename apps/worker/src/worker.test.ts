@@ -17,6 +17,7 @@ import { createTestDatabase } from '@cvs/db/testing';
 import { PgBoss } from 'pg-boss';
 import sharp from 'sharp';
 import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
+import { backfillDurations } from './durations';
 import { closestRatio, requireFfmpeg } from './media';
 import { createMockImageProvider, createMockProvider, MOCK_FAIL } from './mock-provider';
 import { backfillPreviews } from './preview';
@@ -529,6 +530,29 @@ describe("a clip whose length the member's own video set", () => {
     await waitFor('both jobs to succeed', async () => (await status(motion)) === 'succeeded' && (await status(plain)) === 'succeeded');
     expect(Number((await total(motion)).usd)).toBeCloseTo((0.84 * 9) / 5, 4); // a 5 s job whose clip came back 9 s long
     expect(Number((await total(plain)).usd)).toBeCloseTo(0.84, 4);
+    // Every video output records the length that came back, whatever the feature.
+    for (const id of [motion, plain]) expect((await pool.query('select duration_ms from assets where id = $1', [(await job(id)).output_asset_id])).rows[0].duration_ms).toBeCloseTo(9000, -2);
+  });
+
+  test('keeps its estimate when it is shorter than the job asked (settle never books less), and still records the length that came back', async () => {
+    const short = join(mockDir, `${randomUUID()}-short.mp4`);
+    await mkdir(mockDir, { recursive: true });
+    await run(requireFfmpeg(), ['-y', '-v', 'error', '-f', 'lavfi', '-i', 'testsrc2=size=720x1280:rate=24', '-t', '3.7', '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', short]);
+    await start(counting(300, (inner) => ({ ...inner, status: async (pj) => {
+      const s = await inner.status(pj);
+      return s.state === 'succeeded' ? { ...s, outputUrl: pathToFileURL(short).href, costUsd: 0.756 } : s;
+    } })));
+    const motion = await newJob('u1', { prompt: 'motion-short', estimate: '0.7560' });
+    const plain = await newJob('u2', { prompt: 'plain-short', estimate: '0.7560' });
+    await storeClip('motion-ref-short', 6, 6000);
+    await pool.query(`update jobs set feature = 'motion_control', duration_s = 6, input_asset_ids = '{start,motion-ref-short}' where id = $1`, [motion]);
+    await pool.query(`update jobs set duration_s = 6 where id = $1`, [plain]);
+    await send(motion, 'u1');
+    await send(plain, 'u2');
+    await waitFor('both jobs to succeed', async () => (await status(motion)) === 'succeeded' && (await status(plain)) === 'succeeded');
+    expect(Number((await total(motion)).usd)).toBeCloseTo(0.756, 4); // a 6 s job whose clip plays 3.7 s
+    expect(Number((await total(plain)).usd)).toBeCloseTo(0.756, 4);
+    expect((await pool.query('select duration_ms from assets where id = $1', [(await job(motion)).output_asset_id])).rows[0].duration_ms).toBeCloseTo(3700, -2);
   });
 });
 
@@ -1005,5 +1029,43 @@ describe('Smart Remake', () => {
     } finally {
       delete process.env.REA_REMAKE_ENABLED;
     }
+  });
+});
+
+describe('the duration backfill', () => {
+  test('a dry run writes nothing; --apply sets the length of a clip that has none; --apply-cost books a Motion Control clip that plays less than asked once, as a manual_adjustment', async () => {
+    const file = join(mockDir, `${randomUUID()}-backfill.mp4`);
+    await mkdir(mockDir, { recursive: true });
+    await run(requireFfmpeg(), ['-y', '-v', 'error', '-f', 'lavfi', '-i', 'testsrc2=size=720x1280:rate=24', '-t', '3.7', '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', file]);
+    await putObject('assets/bf-video', await readFile(file), 'video/mp4');
+    await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) values ('bf-video', 'u1', 'output', 'assets/bf-video', 'bf.mp4', 'video/mp4', 10)`);
+    await pool.query(
+      `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, feature, status, output_asset_id)
+       values ('bf-job', 'u1', 'team-unassigned', 'mock-sample', 'fal', 'p', '9:16', 6, '{}', 'motion_control', 'succeeded', 'bf-video')`,
+    );
+    for (const [kind, usd, final] of [['estimate', '0.7560', false], ['actual_adjustment', '0.0000', true]] as const) {
+      await pool.query(
+        `insert into cost_entries (kind, usd, month, day, user_id, team_id, job_id, is_final)
+         select $2, $3, to_char(created_at at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM'), (created_at at time zone 'Asia/Ho_Chi_Minh')::date, user_id, team_id, id, $4 from jobs where id = $1`,
+        ['bf-job', kind, usd, final],
+      );
+    }
+    const lines: string[] = [];
+    const length = async () => (await pool.query(`select duration_ms from assets where id = 'bf-video'`)).rows[0].duration_ms;
+    const adjustments = async () => (await pool.query(`select usd::text as usd, note from cost_entries where ref = 'motion-output-seconds:bf-job'`)).rows;
+
+    await backfillDurations(pool, { apply: false, applyCost: false }, (l) => lines.push(l));
+    expect(await length()).toBeNull();
+    expect(await adjustments()).toEqual([]);
+    expect(lines.find((l) => l.startsWith('bf-job'))).toMatch(/^bf-job \| motion_control \| 6 \| 3\.7\d \| 0\.7560 \| 0\.5040$/);
+
+    await backfillDurations(pool, { apply: true, applyCost: false }, () => undefined);
+    expect(await length()).toBeCloseTo(3700, -2);
+    expect(await adjustments()).toEqual([]);
+
+    // The length is recorded now, yet the cost is still pending, so a later run with --apply-cost finds the job.
+    for (let run = 0; run < 2; run++) await backfillDurations(pool, { apply: true, applyCost: true }, () => undefined);
+    expect(await adjustments()).toEqual([{ usd: '-0.2520', note: expect.stringContaining('bf-job'.slice(0, 8)) }]);
+    expect((await pool.query(`select usd::text from job_costs where job_id = 'bf-job'`)).rows[0].usd).toBe('0.7560'); // the job's own rows are untouched
   });
 });
