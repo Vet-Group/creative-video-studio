@@ -13,7 +13,7 @@ import { NARROW, useMediaQuery, WIDE } from '@/lib/use-media-query';
 import { useHydrated } from '@/lib/use-hydrated';
 import { useRecall } from '@/lib/use-recall';
 import { useDraftState } from '@/lib/use-draft';
-import { useSamples, versionedSample } from '@/lib/use-samples';
+import { reloadSamples, samplesFailed, useSamples, versionedSample } from '@/lib/use-samples';
 import { dropRefillQuery, exampleFrom } from '@/lib/reuse';
 import { About } from './About';
 import { AudioSwitch } from './AudioSwitch';
@@ -22,6 +22,7 @@ import { PhraseChoice, useChoiceLists } from './Choices';
 import { confirmDialog } from './Confirm';
 import { ENHANCE_NOTE, EnhanceToggle } from './EnhanceToggle';
 import { Icon } from './Icon';
+import { LoadError } from './LoadError';
 import { copyError, copySamples, FormNotice, GALLERY_SIZE_KEY, HISTORY_SIZE_KEY, photoImg, RunSummary, SizeSlider, Slot, UploadedPhotos, uploadError, uploadImages, useSize } from './image-tools';
 import { FormContext, type Photo, Tap, useApplier, useJobs, useRecreated } from './jobs';
 import { Modal } from './Modal';
@@ -899,7 +900,10 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
         <div className={!narrow && historySize === 0 ? 'side history-small' : 'side'} id={`create-panel-${shown === 'create' ? 'history' : shown}`} role="tabpanel" aria-labelledby={`create-tab-${shown === 'create' ? 'history' : shown}`} hidden={narrow && shown === 'create'}>
           {!narrow && shown === 'examples' && <SizeSlider size={gallerySize} onChange={resizeGallery} />}
           {!narrow && shown === 'history' && <SizeSlider size={historySize} last={1} onChange={resizeHistory} />}
-          {shown === 'examples' ? (
+          {shown === 'examples' && samplesFailed() ? (
+            // Without the sample list only the built-in test patterns would show (colour bars, 2026-11-14): say it failed instead.
+            <LoadError text="Không tải được ví dụ." onRetry={reloadSamples} />
+          ) : shown === 'examples' ? (
             <div className="masonry" role="group" aria-label="Video ví dụ">
               {splitColumns(examples, narrow ? 2 : Math.max(1, (wide ? 4 : 3) + 1 - gallerySize)).map((column, c) => (
                 <ul key={c} className="masonry-col">
