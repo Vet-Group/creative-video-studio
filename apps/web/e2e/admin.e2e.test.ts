@@ -201,7 +201,7 @@ test('an Admin re-assigns a clip store from the Library and Reuse follows it', a
 
   // The Library is shared by every spec, which filter it by ratio and date: leave no clip of this spec behind.
   await page.getByRole('link', { name: 'Thư viện' }).first().click();
-  const mine = page.getByRole('article', { name: (await page.getByRole('article').first().getAttribute('aria-label'))!, exact: true });
+  const mine = page.locator(`article[data-clip-id="${await page.getByRole('article').first().getAttribute('data-clip-id')}"]`);
   await mine.getByRole('button', { name: 'Xoá', exact: true }).click();
   await mine.getByRole('button', { name: 'Xác nhận xoá' }).click();
   await expect(mine).toHaveCount(0);

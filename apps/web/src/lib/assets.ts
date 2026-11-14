@@ -14,10 +14,12 @@ export const db = createDb(pool);
 
 export type RouteContext = { params: Promise<{ id: string }> };
 
-/** Where an image asset's tile thumbnail is kept (GET /api/assets/[id]/thumb); the worker's purge removes it with the asset. */
-export const thumbKey = (id: string) => `thumbs/${id}`;
+/** Where an image asset's tile thumbnail, or with `side` its larger preview, is kept (GET /api/assets/[id]/thumb); the worker's purge removes both with the asset. */
+export const thumbKey = (id: string, side?: number) => (side ? `thumbs/${id}-${side}` : `thumbs/${id}`);
 /** The thumbnail's longest side: sharp on a large tile at twice the pixel density, a few dozen KB instead of the original's megabytes. */
 export const THUMB_SIDE = 512;
+/** The one larger size `?w=` may ask for: the detail view's picture, a fraction of the original's megabytes. */
+export const PREVIEW_SIDE = 1600;
 
 /** The most a JSON request body may hold; the forms send a few KB. */
 export const MAX_JSON_BYTES = 1_000_000;

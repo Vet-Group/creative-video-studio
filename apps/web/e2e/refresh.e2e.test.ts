@@ -15,7 +15,7 @@ async function finished(page: Page, id: string): Promise<void> {
   await expect.poll(async () => ((await (await page.request.get(`/api/jobs/${id}`)).json()) as { status: string }).status, { timeout: 60_000 }).toBe('succeeded');
 }
 
-const card = (page: Page, id: string) => page.getByRole('article', { name: new RegExp(`${id.slice(0, 8)}\\.mp4$`) });
+const card = (page: Page, id: string) => page.locator(`article[data-clip-id="${id}"]`);
 
 test("the Library shows the user's own clip once the tray hears it finished, and another member's when the tab comes back", async ({ page, browser }) => {
   await signIn(page, 'fresha');

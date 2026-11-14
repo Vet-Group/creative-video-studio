@@ -69,6 +69,7 @@ describe('purgeDeletedClips', () => {
     for (const id of ['in-solo', 'in-shared']) await putObject(`thumbs/${id}`, new Uint8Array(1), 'image/jpeg');
     // The compressed copies the worker made of the old clip's video and of a live clip's.
     for (const id of ['old-video', 'live-video']) await putObject(`compressed/${id}.mp4`, new Uint8Array(1), 'video/mp4');
+    await putObject('thumbs/in-solo-1600', new Uint8Array(1), 'image/webp'); // and the 1600 px preview of the one that goes
     await clip('old', ['in-shared', 'in-own', 'in-solo'], 31);
     await clip('live', ['in-shared'], null);
     await clip('recent', ['in-other-live'], 29);
@@ -114,7 +115,7 @@ describe('purgeDeletedClips', () => {
       throw new Error('minio is down');
     };
     expect(await purgeDeletedClips(pool, failing, log)).toBe(1);
-    expect(logged.sort()).toEqual(['remove object assets/broken-poster', 'remove object assets/broken-video', 'remove object compressed/broken-poster.mp4', 'remove object compressed/broken-video.mp4', 'remove object thumbs/broken-poster', 'remove object thumbs/broken-video']);
+    expect(logged.sort()).toEqual(['remove object assets/broken-poster', 'remove object assets/broken-video', 'remove object compressed/broken-poster.mp4', 'remove object compressed/broken-video.mp4', 'remove object thumbs/broken-poster', 'remove object thumbs/broken-poster-1600', 'remove object thumbs/broken-video', 'remove object thumbs/broken-video-1600']);
     expect((await pool.query(`select purged_at is not null as purged from jobs where id = 'broken'`)).rows[0].purged).toBe(true);
   });
 

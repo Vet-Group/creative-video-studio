@@ -56,7 +56,7 @@ test('the Library loads more as the end comes near, and coming back keeps the it
   await page.getByRole('button', { name: 'Tải thêm' }).scrollIntoViewIfNeeded();
   await expect(cards).toHaveCount(50);
   await expect(page.getByRole('button', { name: 'Tải thêm' })).toHaveCount(0);
-  await page.getByRole('article', { name: /fake-30\.png$/ }).scrollIntoViewIfNeeded();
+  await page.locator('article[data-clip-id="fake-30"]').scrollIntoViewIfNeeded();
   const y = await page.evaluate(() => window.scrollY);
   expect(y).toBeGreaterThan(1000);
 

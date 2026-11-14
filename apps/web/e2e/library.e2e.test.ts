@@ -11,8 +11,8 @@ test('Library tools: favourites only, oldest first, the size slider and the empt
   const second = await runViaApi(page);
   await page.goto('/library');
   const mine = page.getByRole('article').filter({ hasText: 'E2E Member 4' });
-  // A card's name holds its download name, which ends in the first 8 characters of the job id.
-  const card = (id: string) => page.getByRole('article', { name: new RegExp(`${id.slice(0, 8)}\\.mp4$`) });
+  // A card's name is its feature, model and time, so cards are found by the job id they carry.
+  const card = (id: string) => page.locator(`article[data-clip-id="${id}"]`);
   await expect(page.getByText('Clip đã xong')).toHaveCount(2, { timeout: 60_000 });
   await expect(card(first)).toBeVisible(); // the Library reloads itself when the tray hears a job finished
   await expect(card(second)).toBeVisible();
@@ -40,7 +40,7 @@ test('Library tools: favourites only, oldest first, the size slider and the empt
 
   // Newest first by default; Oldest first swaps the two. Only this member's clips, so the other tests' clips never push these two off the oldest 24.
   await page.getByLabel('Người tạo').selectOption({ label: 'E2E Member 4' });
-  const position = async (id: string) => (await mine.evaluateAll((cards) => cards.map((c) => c.getAttribute('aria-label') ?? ''))).findIndex((l) => l.endsWith(`${id.slice(0, 8)}.mp4`));
+  const position = async (id: string) => (await mine.evaluateAll((cards) => cards.map((c) => c.getAttribute('data-clip-id') ?? ''))).indexOf(id);
   expect(await position(second)).toBeLessThan(await position(first));
 
   // The copy-link button is always there; the creator filter shows as a removable chip, and clicking it clears just that filter.
@@ -81,7 +81,7 @@ test('Library views: grid or list remembered, a selection bar with the zip, sear
   const done = async () => ((await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { status: string }[] }).jobs.filter((j) => j.status === 'succeeded').length;
   await expect.poll(done, { timeout: 60_000 }).toBe(2);
   await page.goto('/library');
-  const item = (id: string) => page.getByRole('article', { name: new RegExp(`${id.slice(0, 8)}\\.mp4$`) });
+  const item = (id: string) => page.locator(`article[data-clip-id="${id}"]`);
   const mineOnly = () => page.getByLabel('Người tạo').selectOption({ label: 'E2E Library View' });
   await mineOnly();
   await expect(page.getByRole('article')).toHaveCount(2);
@@ -216,7 +216,7 @@ test('Library detail: how an item was made for anyone, marks by keyboard, ←/�
 
   await page.goto('/library');
   await expect(page.getByRole('complementary', { name: 'Lượt tạo của tôi' })).toHaveCount(0); // the Library already lists every result
-  const item = (id: string) => page.getByRole('article', { name: new RegExp(`${id.slice(0, 8)}\\.[a-z0-9]+$`) });
+  const item = (id: string) => page.locator(`article[data-clip-id="${id}"]`);
   const detail = page.getByRole('dialog');
   const recipe = detail.getByRole('definition');
   // The label carries no count at 0 (and before the first page arrives, so the first read waits for 2 or more).

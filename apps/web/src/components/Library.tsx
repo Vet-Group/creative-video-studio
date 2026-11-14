@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { type CSSProperties, Fragment, type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
+import { type CSSProperties, Fragment, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, useCallback, useEffect, useId, useRef, useState } from 'react';
 import { JOB_APPS } from '@/lib/apps';
 import { api, type Clip, errorText, sendJson, thumbUrl } from '@/lib/api';
 import { downloadCompressed, downloadCompressedVideo } from '@/lib/compress-download';
@@ -57,6 +57,10 @@ const SIZES = ['12rem', '16rem', '22rem'];
 const SIZE_KEY = 'cvs.library.size';
 /** What the empty Library calls its items under a kind filter: photos, clips, or both. */
 export const emptyNoun = (kind: string) => (['images', 'try_on', 'image'].includes(kind) ? 'ảnh' : kind === 'videos' || kind === 'video' || kind.startsWith('marketing') ? 'clip' : 'kết quả');
+/** The size of the picture the detail view loads instead of the original: the one `w` GET /api/assets/:id/thumb serves besides the tile. */
+const PREVIEW_W = 1600;
+/** What a screen reader calls a card: what was made, with which model, and when (feature · model · local time). */
+export const clipLabel = (c: Pick<Clip, 'feature' | 'modelLabel' | 'createdAt'>) => `${featureLabel(c.feature)} · ${c.modelLabel} · ${fmtShort(c.createdAt)}`;
 const faultLabel = (id: string | null) => FAULTS.find((f) => f.id === id)?.label ?? id ?? '';
 
 interface StoreOption {
@@ -73,7 +77,8 @@ const typing = (t: EventTarget | null) => t instanceof HTMLElement && (t.isConte
  * The Pass, featured Pass and Fail marks (Fail asks for the fault) on an item its viewer may edit: the grid card, the list row and the detail view.
  * With `keys` (the detail view) 1, 2 and 3 press Pass, featured Pass and Fail, which then focuses the fault list.
  */
-function VerdictMarks({ clip, onChange, keys = false }: { clip: Clip; onChange: (c: Clip) => void; keys?: boolean }) {
+function VerdictMarks({ clip, onChange, keys = false, describedBy }: { clip: Clip; onChange: (c: Clip) => void; keys?: boolean; describedBy?: string }) {
+  const [stop, setStop] = useState(0); // the one button of the group that Tab reaches
   const [failing, setFailing] = useState(false);
   const [fault, setFault] = useState('');
   const [problem, setProblem] = useState('');
@@ -98,6 +103,17 @@ function VerdictMarks({ clip, onChange, keys = false }: { clip: Clip; onChange: 
     if (failing && keys) faultList.current?.focus();
   }, [failing, keys]);
 
+  // Roving tabindex: Tab enters the group once, the arrow keys move inside it (and do not also step the detail view to the next item).
+  const roving = (i: number) => ({ tabIndex: stop === i ? 0 : -1, onFocus: () => setStop(i), 'aria-describedby': describedBy });
+  const arrows = (e: ReactKeyboardEvent<HTMLElement>) => {
+    const step = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0;
+    if (!step) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const buttons = [...e.currentTarget.querySelectorAll('button')];
+    buttons[(buttons.indexOf(e.target as HTMLButtonElement) + step + buttons.length) % buttons.length]?.focus();
+  };
+
   async function mark(body: { verdict: 'pass'; featured?: boolean } | { verdict: 'fail'; fault: string }) {
     const { clip: now, onChange: changed, saving: busy } = latest.current; // a shortcut's listener outlives the render that added it
     if (busy) return; // a key pressed again before the answer
@@ -117,15 +133,15 @@ function VerdictMarks({ clip, onChange, keys = false }: { clip: Clip; onChange: 
 
   return (
     <div className="actions verdict-marks">
-      <span className="verdict-buttons">
-        <button type="button" aria-pressed={clip.verdict?.verdict === 'pass' && !clip.verdict.featured} disabled={saving} onClick={() => void mark({ verdict: 'pass' })}>
+      <span className="verdict-buttons" role="group" aria-label="Chấm điểm" onKeyDown={arrows}>
+        <button type="button" {...roving(0)} aria-pressed={clip.verdict?.verdict === 'pass' && !clip.verdict.featured} disabled={saving} onClick={() => void mark({ verdict: 'pass' })}>
           Đạt
         </button>
         {/* A Pass worth showing the whole company: Explore model cards show these first. */}
-        <button type="button" aria-pressed={clip.verdict?.featured === true} disabled={saving} title={`Đạt và đẹp, nên làm mẫu: ${noun} nổi bật hiện trước trên thẻ mô hình ở Khám phá`} onClick={() => void mark({ verdict: 'pass', featured: true })}>
+        <button type="button" {...roving(1)} aria-pressed={clip.verdict?.featured === true} disabled={saving} title={`Đạt và đẹp, nên làm mẫu: ${noun} nổi bật hiện trước trên thẻ mô hình ở Khám phá`} onClick={() => void mark({ verdict: 'pass', featured: true })}>
           Nổi bật
         </button>
-        <button type="button" aria-pressed={failing || clip.verdict?.verdict === 'fail'} disabled={saving} onClick={() => setFailing((f) => !f)}>
+        <button type="button" {...roving(2)} aria-pressed={failing || clip.verdict?.verdict === 'fail'} disabled={saving} onClick={() => setFailing((f) => !f)}>
           Không đạt
         </button>
       </span>
@@ -157,7 +173,7 @@ const verdictText = (v: Clip['verdict']) => v && (v.verdict === 'fail' ? `Không
 const verdictClass = (v: NonNullable<Clip['verdict']>) => (v.verdict === 'fail' ? ' fail' : v.featured ? ' featured' : '');
 
 /** A grid card puts the result first: its type and length on the media, the mark in its corner, the actions over it on hover (always on touch), two short lines under it and the marks for whoever may edit; Reuse and the store live in the detail view. A `list` row keeps the clip actions and the marks. */
-function ClipCard({ clip, view, select, onChange, onDeleted, onOpen }: { clip: Clip; view: LibraryView; select?: ReactNode; onChange: (c: Clip) => void; onDeleted: (id: string) => void; onOpen: () => void }) {
+export function ClipCard({ clip, view, select, onChange, onDeleted, onOpen }: { clip: Clip; view: LibraryView; select?: ReactNode; onChange: (c: Clip) => void; onDeleted: (id: string) => void; onOpen: () => void }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [problem, setProblem] = useState('');
   const [saving, setSaving] = useState(false);
@@ -165,6 +181,8 @@ function ClipCard({ clip, view, select, onChange, onDeleted, onOpen }: { clip: C
   const noun = image ? 'ảnh' : 'clip';
   const mark = verdictText(clip.verdict);
   const video = useRef<HTMLVideoElement>(null);
+  const labelId = useId();
+  const about = { 'aria-describedby': labelId }; // each action says which item it acts on
 
   async function remove() {
     setProblem('');
@@ -207,7 +225,13 @@ function ClipCard({ clip, view, select, onChange, onDeleted, onOpen }: { clip: C
     }
   }
 
-  const name = `${image ? 'Ảnh' : 'Clip'} ${clip.downloadName}`;
+  const name = clipLabel(clip);
+  // Hidden but still readable as a description, so a screen reader reads each action with its item once, not as card text too.
+  const labelled = (
+    <span id={labelId} hidden>
+      {name}
+    </span>
+  );
   const confirm = confirmDelete && (
     <div className="actions" role="alertdialog" aria-label="Xác nhận xoá">
       <span>Xoá {noun} này?</span>
@@ -223,7 +247,8 @@ function ClipCard({ clip, view, select, onChange, onDeleted, onOpen }: { clip: C
   if (view === 'list') {
     const thumb = clip.posterAssetId ?? (image ? clip.videoAssetId : null); // an image's preview, else the image itself
     return (
-      <article className="lib-row" aria-label={name}>
+      <article className="lib-row" aria-label={name} data-clip-id={clip.id}>
+        {labelled}
         {select}
         <span className="lib-thumb">
           {thumb ? <img src={thumbUrl(thumb)} alt="" loading="lazy" decoding="async" /> : <video preload="metadata" muted playsInline src={`/api/assets/${clip.videoAssetId}/content`} />}
@@ -244,22 +269,22 @@ function ClipCard({ clip, view, select, onChange, onDeleted, onOpen }: { clip: C
           </p>
         </div>
         <div className="actions">
-          <button type="button" className="favorite icon-button" aria-pressed={clip.favorite} disabled={saving} onClick={() => void toggleFavorite()} aria-label="Yêu thích" title="Yêu thích">
+          <button type="button" className="favorite icon-button" aria-pressed={clip.favorite} disabled={saving} onClick={() => void toggleFavorite()} aria-label="Yêu thích" title="Yêu thích" {...about}>
             <Icon name="star" />
           </button>
-          <button type="button" className="icon-button" onClick={() => void download()} aria-label="Tải xuống" title="Tải xuống">
+          <button type="button" className="icon-button" onClick={() => void download()} aria-label="Tải xuống" title="Tải xuống" {...about}>
             <Icon name="download" />
           </button>
-          <button type="button" className="icon-button" onClick={onOpen} aria-label="Xem chi tiết" title="Xem chi tiết">
+          <button type="button" className="icon-button" onClick={onOpen} aria-label="Xem chi tiết" title="Xem chi tiết" {...about}>
             <Icon name="eye" />
           </button>
           {clip.canEdit && (
-            <button type="button" className="danger icon-button" onClick={() => setConfirmDelete(true)} aria-label="Xoá" title="Xoá">
+            <button type="button" className="danger icon-button" onClick={() => setConfirmDelete(true)} aria-label="Xoá" title="Xoá" {...about}>
               <Icon name="x" />
             </button>
           )}
         </div>
-        {clip.canEdit && <VerdictMarks clip={clip} onChange={onChange} />}
+        {clip.canEdit && <VerdictMarks clip={clip} onChange={onChange} describedBy={labelId} />}
         {confirm}
         {problem && <p className="error">{problem}</p>}
       </article>
@@ -268,35 +293,36 @@ function ClipCard({ clip, view, select, onChange, onDeleted, onOpen }: { clip: C
 
   const tools = (
     <div className="lib-tools">
-      <button type="button" className="favorite icon-button" aria-pressed={clip.favorite} disabled={saving} onClick={() => void toggleFavorite()} aria-label="Yêu thích" title="Yêu thích">
+      <button type="button" className="favorite icon-button" aria-pressed={clip.favorite} disabled={saving} onClick={() => void toggleFavorite()} aria-label="Yêu thích" title="Yêu thích" {...about}>
         <Icon name="star" />
       </button>
-      <button type="button" className="icon-button" onClick={() => void download()} aria-label="Tải xuống" title="Tải xuống">
+      <button type="button" className="icon-button" onClick={() => void download()} aria-label="Tải xuống" title="Tải xuống" {...about}>
         <Icon name="download" />
       </button>
       {clip.canEdit && (
-        <button type="button" className="danger icon-button" onClick={() => setConfirmDelete(true)} aria-label="Xoá" title="Xoá">
+        <button type="button" className="danger icon-button" onClick={() => setConfirmDelete(true)} aria-label="Xoá" title="Xoá" {...about}>
           <Icon name="x" />
         </button>
       )}
     </div>
   );
-  // A video plays muted while a mouse rests on it, so the grid can be skimmed without opening each item.
+  // A video loads nothing (its poster stands in) until a mouse rests on it or it takes focus, then plays muted, so the grid can be skimmed without opening each item.
   const play = (on: boolean) => {
     const v = video.current;
     if (v) on ? void v.play().catch(() => undefined) : v.pause();
   };
   return (
-    <article className="card lib-card" aria-label={name}>
+    <article className="card lib-card" aria-label={name} data-clip-id={clip.id}>
+      {labelled}
       {select}
-      <div className="lib-media" onPointerEnter={(e) => e.pointerType === 'mouse' && play(true)} onPointerLeave={() => play(false)}>
+      <div className="lib-media" onPointerEnter={(e) => e.pointerType === 'mouse' && play(true)} onPointerLeave={() => play(false)} onFocus={() => play(true)} onBlur={() => play(false)}>
         {image ? (
           <img className="output" src={thumbUrl(clip.posterAssetId ?? clip.videoAssetId)} alt={clip.downloadName} loading="lazy" decoding="async" />
         ) : (
-          <video ref={video} muted loop playsInline preload="metadata" poster={clip.posterAssetId ? thumbUrl(clip.posterAssetId) : undefined} src={`/api/assets/${clip.videoAssetId}/content`} />
+          <video ref={video} muted loop playsInline preload={clip.posterAssetId ? 'none' : 'metadata'} poster={clip.posterAssetId ? thumbUrl(clip.posterAssetId) : undefined} src={`/api/assets/${clip.videoAssetId}/content`} />
         )}
         {/* Over the media rather than around it, so the picture keeps its own name for screen readers. */}
-        <button type="button" className="lib-open" onClick={onOpen} aria-label="Xem chi tiết" title="Xem chi tiết" />
+        <button type="button" className="lib-open" onClick={onOpen} aria-label="Xem chi tiết" title="Xem chi tiết" {...about} />
         <span className="lib-chips">
           {clip.feature !== 'video' && <span className="lib-chip">{featureLabel(clip.feature)}</span>}
           {!image && <span className="lib-chip">{clip.durationSec}s</span>}
@@ -325,7 +351,7 @@ function ClipCard({ clip, view, select, onChange, onDeleted, onOpen }: { clip: C
           </span>
         </p>
       </div>
-      {clip.canEdit && <VerdictMarks clip={clip} onChange={onChange} />}
+      {clip.canEdit && <VerdictMarks clip={clip} onChange={onChange} describedBy={labelId} />}
       {confirm}
       {problem && <p className="error">{problem}</p>}
     </article>
@@ -517,9 +543,9 @@ export function ClipDetail({ clips, index, stores, admin, onIndex, onChange }: {
         {comparing && original ? (
           <CompareSlider before={content(original.id)} after={content(clip.videoAssetId)} beforeAlt={`Ảnh gốc ${original.filename}`} afterAlt={clip.downloadName} />
         ) : image ? (
-          <img ref={media} src={content(clip.videoAssetId)} alt={clip.downloadName} />
+          <img ref={media} src={thumbUrl(clip.videoAssetId, PREVIEW_W)} alt={clip.downloadName} />
         ) : (
-          <video key={clip.id} ref={media} controls autoPlay muted playsInline poster={clip.posterAssetId ? content(clip.posterAssetId) : undefined} src={content(clip.videoAssetId)} />
+          <video key={clip.id} ref={media} controls autoPlay muted playsInline poster={clip.posterAssetId ? thumbUrl(clip.posterAssetId) : undefined} src={content(clip.videoAssetId)} />
         )}
       </div>
       <div className="lightbox-side">
@@ -593,7 +619,7 @@ export function ClipDetail({ clips, index, stores, admin, onIndex, onChange }: {
             <Icon name="compress" />
           </button>
           <button type="button" className="icon-button" onClick={() => void media.current?.requestFullscreen?.()} aria-label="Toàn màn hình" title="Toàn màn hình">
-            <Icon name="eye" />
+            <Icon name="expand" />
           </button>
           <a className="icon-button" href={content(clip.videoAssetId)} target="_blank" rel="noreferrer" aria-label="Mở trong tab mới" title="Mở trong tab mới">
             <Icon name="external" />
