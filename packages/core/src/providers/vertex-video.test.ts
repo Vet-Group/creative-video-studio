@@ -92,7 +92,6 @@ describe('Vertex Veo', () => {
     expect(calls).toHaveLength(0);
   });
   test.each([
-    { done: true, error: { message: 'private detail' } },
     { done: true, response: { raiMediaFilteredCount: 1 } },
     { done: true, response: { videos: [] } },
     { done: true, response: { videos: [{}, {}] } },
@@ -104,11 +103,11 @@ describe('Vertex Veo', () => {
     const job = await provider.submit(request());
     expect(await provider.status({ ...job, model })).toMatchObject({ state: 'failed', costUsd: 1.6, costSource: 'estimate' });
   });
-  test("a failed operation keeps Google's code and message, one line, without the project path", async () => {
+  test("a failed operation keeps Google's code and message, one line, without the project path, and costs nothing", async () => {
     const { provider } = setup({ name }, { done: true, error: { code: 3, message: 'The input image violates\nusage guidelines for projects/123/locations/us-central1/x.' } });
     const job = await provider.submit(request());
     expect(await provider.status({ ...job, model })).toEqual({
-      state: 'failed', error: 'Vertex Veo generation failed (code 3: The input image violates usage guidelines for projects/…)', costUsd: 1.6, costSource: 'estimate',
+      state: 'failed', error: 'Vertex Veo generation failed (code 3: The input image violates usage guidelines for projects/…)', costUsd: 0, costSource: 'estimate',
     });
   });
   test('rejects wrong operation identity without HTTP', async () => {

@@ -88,8 +88,9 @@ export function createVertexVideoProvider(opts: {
       if (!saved || !validOperation(saved.name) || !Number.isFinite(saved.costUsd) || saved.costUsd < 0) throw new Error('Invalid Vertex Veo job');
       const data = await post('fetchPredictOperation', { operationName: saved.name });
       if (data.name !== undefined && data.name !== saved.name) throw new Error('Invalid Vertex Veo operation');
-      const failed = (error: string): ProviderStatus => ({ state: 'failed', error, costUsd: saved.costUsd, costSource: 'estimate' });
-      if (data.error) return failed(`Vertex Veo generation failed${operationError(data.error)}`);
+      const failed = (error: string, costUsd = saved.costUsd): ProviderStatus => ({ state: 'failed', error, costUsd, costSource: 'estimate' });
+      // Google does not bill an operation that ends in an error (the cvs-vertex billing export of 2026-11-14 had no Veo seconds for two such jobs), so it releases to $0.
+      if (data.error) return failed(`Vertex Veo generation failed${operationError(data.error)}`, 0);
       if (data.done === false || (data.done === undefined && data.name === saved.name)) return { state: 'running' };
       if (data.done !== true) return failed('Malformed Vertex Veo operation');
       const response = data.response;
