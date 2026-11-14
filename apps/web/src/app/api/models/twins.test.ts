@@ -208,6 +208,27 @@ describe('a pair that acts as one model (migration 0078)', () => {
     }
   });
 
+  test('reruns a succeeded job as a new Run would: on the row of the pair that makes it today, whichever row it ran on, and a twin retry keeps its row', async () => {
+    await only(['seedance-2.5-byteplus', 'seedance-2.5-reference']);
+    const succeeded = (id: string, model: string, retryOf: string | null = null) =>
+      pool.query(
+        `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, status, retry_of) values ($1, $2, 'team-unassigned', $3, 'fal', 'p', '9:16', 20, '{img}', 'succeeded', $4)`,
+        [id, userId, model, retryOf],
+      );
+    const rerun = (id: string) => create({ rerunOf: id, maxUsd: 1000 });
+    await succeeded('rr-1', 'seedance-2.5-reference'); // it ran on fal while BytePlus stopped at 15 s
+    await pool.query(`insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, status) values ('rr-f', $1, 'team-unassigned', 'seedance-2.5-byteplus', 'byteplus', 'p', '9:16', 20, '{img}', 'failed')`, [userId]);
+    await succeeded('rr-2', 'seedance-2.5-reference', 'rr-f');
+    expect(await booked(await rerun('rr-1'))).toEqual({ model: 'seedance-2.5-byteplus', provider: 'byteplus', usd: '4.6240' }); // 20 s at BytePlus's $0.2312, as a new Run costs
+    expect(await booked(await rerun('rr-2'))).toEqual({ model: 'seedance-2.5-reference', provider: 'fal', usd: '9.4600' }); // a twin retry is copied, not chosen again
+    await pool.query(`update model_configs set durations_sec = array(select generate_series(4, 15)) where id = 'seedance-2.5-byteplus'`);
+    try {
+      expect(await booked(await rerun('rr-1'))).toEqual({ model: 'seedance-2.5-reference', provider: 'fal', usd: '9.4600' });
+    } finally {
+      await pool.query(`update model_configs set durations_sec = array(select generate_series(4, 30)) where id = 'seedance-2.5-byteplus'`);
+    }
+  });
+
   test('offers the twin of the job’s own feature to a job BytePlus refused for a real person', async () => {
     await only(['seedance-2.0-byteplus', 'seedance-2.0', 'seedance-2.0-reference']); // seedance-2.0 (fal) is a twin for Create Video only
     await pool.query(

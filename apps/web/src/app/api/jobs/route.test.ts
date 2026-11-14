@@ -1171,7 +1171,7 @@ describe('the fal credit lock', () => {
 });
 
 describe('POST /api/jobs with rerunOf', () => {
-  const rerun = (m: Member, job: string, extra: Record<string, unknown> = {}) => run(m.cookie, { rerunOf: job, ...extra });
+  const rerun = (m: Member, job: string, extra: Record<string, unknown> = {}) => run(m.cookie, { rerunOf: job, maxUsd: 1000, ...extra });
   const estimate = async (id: string) => (await pool.query(`select usd::text from cost_entries where job_id = $1 and kind = 'estimate'`, [id])).rows[0]?.usd as string | undefined;
 
   test('runs the own succeeded job again as a new queued job with the same inputs, an estimate of its own and no retry link, as often as wanted', async () => {
@@ -1230,6 +1230,45 @@ describe('POST /api/jobs with rerunOf', () => {
       expect(await res.json()).toEqual({ error: 'the model does not exist or is not enabled' });
     } finally {
       await pool.query(`update model_configs set enabled = true where id = 'fal-test'`);
+    }
+  });
+
+  test('answers 409 with the current price when it is above the price shown, and reserves nothing; the price shown is required', async () => {
+    const m = await newMember();
+    const [original] = await seedJobs(m.id, 1, 'succeeded', { assets: [m.asset] });
+    const before = await jobCount();
+    const low = await rerun(m, original!, { maxUsd: 0.8 }); // the model's estimate for 5 s is 1.0000
+    expect(low.status).toBe(409);
+    expect(await low.json()).toEqual({ error: 'Giá đã thay đổi: lượt chạy lại này bây giờ khoảng $1.00. Hãy kiểm tra lại giá.', estimateUsd: '1.0000' });
+    expect(await jobCount()).toBe(before);
+    expect((await pool.query(`select count(*)::int as n from cost_entries where job_id in (select id from jobs where user_id = $1 and id <> $2)`, [m.id, original])).rows[0].n).toBe(0);
+    expect((await rerun(m, original!, { maxUsd: 1 })).status).toBe(201); // the price shown is enough
+    for (const maxUsd of [undefined, '1', -1, null]) expect((await run(m.cookie, { rerunOf: original, maxUsd })).status).toBe(400);
+  });
+
+  test('drops a store that is hidden now, as Reuse does, and holds the prompt to the model’s limit now', async () => {
+    const m = await newMember();
+    const [original] = await seedJobs(m.id, 1, 'succeeded', { assets: [m.asset], storeId: 'store-ok' });
+    await pool.query(`update jobs set prompt = $2 where id = $1`, [original, 'x'.repeat(100)]);
+    await pool.query(`update stores set hidden = true where id = 'store-ok'`);
+    try {
+      const res = await rerun(m, original!);
+      expect(res.status).toBe(201);
+      const { id } = (await res.json()) as { id: string };
+      expect((await pool.query('select store_id from jobs where id = $1', [id])).rows[0].store_id).toBeNull();
+      expect((await pool.query(`select count(*)::int as n from user_stores where user_id = $1`, [m.id])).rows[0].n).toBe(0);
+    } finally {
+      await pool.query(`update stores set hidden = false where id = 'store-ok'`);
+    }
+    await pool.query(`update model_configs set max_prompt_chars = 50 where id = 'fal-test'`);
+    try {
+      const before = await jobCount();
+      const res = await rerun(m, original!);
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: 'the prompt may be at most 50 characters on this model' });
+      expect(await jobCount()).toBe(before);
+    } finally {
+      await pool.query(`update model_configs set max_prompt_chars = 2000 where id = 'fal-test'`);
     }
   });
 

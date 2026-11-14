@@ -14,7 +14,7 @@ import { cardTitleOfFormat } from '@/lib/marketing';
 import { canReuse, refillFrom, reuseHref } from '@/lib/reuse';
 import { userAvatarColor } from '@/lib/profile';
 import { COLLAPSED_COOKIE, isMac, isSettingsShortcut, navGroups } from '@/lib/sidebar';
-import { confirmRun } from '@/lib/run-guard';
+import { confirmRerun, confirmRun } from '@/lib/run-guard';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { AccountMenu } from './AccountMenu';
 import { ChangelogPopup } from './ChangelogPopup';
@@ -170,7 +170,9 @@ function HistoryCard({ job, isAdmin, select }: { job: TrayJob; isAdmin: boolean;
   // A new paid job with the same inputs: the same confirm as a Run, and the server applies the caps and the ledger as for any other.
   const rerun = async () => {
     setSending(true); // from the click on, so a double click cannot send two paid jobs
-    if (await confirmRun(job.estimateUsd, `Chạy lại lượt tạo này với giá khoảng $${job.estimateUsd}?`)) await act(async () => (await api('/api/jobs', sendJson('POST', { rerunOf: job.id })), await refresh()), 'Không chạy lại được.');
+    await act(async () => {
+      if (await confirmRerun(job.estimateUsd, (usd) => `Chạy lại lượt tạo này với giá khoảng $${usd}?`, (maxUsd) => api('/api/jobs', sendJson('POST', { rerunOf: job.id, maxUsd })))) await refresh();
+    }, 'Không chạy lại được.');
     setSending(false);
   };
   const toggleFavorite = () => act(async () => setFavorite((await api<{ favorite: boolean }>(`/api/jobs/${job.id}/favorite`, sendJson('PUT', { favorite: !favorite }))).favorite), 'Không lưu được mục yêu thích.');

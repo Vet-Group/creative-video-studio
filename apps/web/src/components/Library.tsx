@@ -4,7 +4,7 @@ import { type CSSProperties, Fragment, type ReactNode, useCallback, useEffect, u
 import { JOB_APPS } from '@/lib/apps';
 import { api, type Clip, errorText, sendJson, thumbUrl } from '@/lib/api';
 import { downloadCompressed } from '@/lib/compress-download';
-import { confirmRun } from '@/lib/run-guard';
+import { confirmRerun } from '@/lib/run-guard';
 import { FAULTS } from '@/lib/faults';
 import { featureLabel } from '@/lib/features';
 import { GALLERY_SAMPLES, numberedSamples } from '@/lib/examples';
@@ -442,7 +442,9 @@ export function ClipDetail({ clips, index, stores, admin, onIndex, onChange }: {
   // A new paid job with the same inputs, after the same confirm as a Run; the server applies the caps and the ledger as for any other.
   const rerun = async () => {
     setRerunning(true); // from the click on, so a double click cannot send two paid jobs
-    if (await confirmRun(clip.costUsd, `Chạy lại với giá khoảng $${clip.costUsd}?`)) await act(async () => (await api('/api/jobs', sendJson('POST', { rerunOf: clip.id })), setNote('Đã gửi lượt chạy lại. Theo dõi trong Lịch sử của ứng dụng.')), 'Không chạy lại được.');
+    await act(async () => {
+      if (await confirmRerun(clip.costUsd, (usd) => `Chạy lại với giá khoảng $${usd}?`, (maxUsd) => api('/api/jobs', sendJson('POST', { rerunOf: clip.id, maxUsd })))) setNote('Đã gửi lượt chạy lại. Theo dõi trong Lịch sử của ứng dụng.');
+    }, 'Không chạy lại được.');
     setRerunning(false);
   };
   const copy = () => act(async () => (await navigator.clipboard.writeText(copyText ?? ''), setNote('Đã sao chép.')), 'Không sao chép được.');

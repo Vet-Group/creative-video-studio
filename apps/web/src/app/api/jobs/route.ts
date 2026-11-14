@@ -118,16 +118,17 @@ export async function GET(request: Request) {
  * `retryOf` retries the caller's own failed job once: the inputs, model, preset, prompt, ratio, duration, team and store all come from the
  * original (the body may carry just `retryOf`), the estimate from the model's current price. `onTwin: true` with `retryOf` runs it on the original model's enabled twin instead (migration 0075),
  * only for a job BytePlus refused for a real person in its photo or for the sound it made (`failureReason` real_person or output_audio), which the dearer fal twin may make.
- * `rerunOf` runs the caller's own succeeded job again as a NEW job (404 for anyone else's): the same inputs, model, prompt, ratio, duration, params and store, through this same path, so the caps, the estimate at the model's current price, the ledger and the daily clip count apply as to any Run (no retry semantics: it can be rerun again, and the job has no `retry_of`).
- * It is refused with 409 when an input asset was deleted or purged, and as a Run is when its model is no longer enabled. A new Run may not name the dearer row of a pair of duplicate models while its twin can serve, nor the twin that cannot while the dearer one can (lib/model-twins.ts).
+ * `rerunOf` (with `maxUsd`, the price the member was shown, a number) runs the caller's own succeeded job again as a NEW job (404 for anyone else's): the same inputs, model, prompt, ratio, duration and params, and the store unless it is hidden now, through this same path, so the caps, the estimate at the model's current price, the ledger and the daily clip count apply as to any Run (no retry semantics: it can be rerun again, and the job has no `retry_of`).
+ * It is refused with 409 when an input asset was deleted or purged, or (with the new `estimateUsd`, nothing reserved) when the estimate is above `maxUsd`, and as a Run is when its model is no longer enabled or its prompt is over the limit. A new Run may not name the dearer row of a pair of duplicate models while its twin can serve, nor the twin that cannot while the dearer one can (lib/model-twins.ts).
  */
 export async function POST(request: Request) {
   const g = await guard(request, 'member');
   if (g.error) return g.error;
   const body = (await readJson(request)) as Record<string, unknown> | null;
-  const { retryOf = null, onTwin = false, rerunOf = null } = body ?? {};
+  const { retryOf = null, onTwin = false, rerunOf = null, maxUsd = null } = body ?? {};
   if (retryOf !== null && typeof retryOf !== 'string') return bad('retryOf must be a job id');
   if (rerunOf !== null && (typeof rerunOf !== 'string' || retryOf !== null)) return bad('rerunOf must be a job id, and does not go with retryOf');
+  if (rerunOf !== null && (typeof maxUsd !== 'number' || !Number.isFinite(maxUsd) || maxUsd < 0)) return bad('maxUsd must be the price the member was shown, in USD, with rerunOf');
   if (typeof onTwin !== 'boolean' || (onTwin && retryOf === null)) return bad('onTwin must be true or false, and only retries a job');
   const userId = g.session.user.id;
 
@@ -302,7 +303,7 @@ export async function POST(request: Request) {
     await tx.query(`select pg_advisory_xact_lock(hashtext('caps'))`);
     // The model, preset, store and assets are read under the lock, so one disabled or hidden meanwhile is refused.
     let s = spec;
-    let original: { team_id: string; provider: string; prompt: string; enhanced_prompt: string | null } | undefined;
+    let original: { team_id: string; provider: string; prompt: string; enhanced_prompt: string | null; retry_of: string | null } | undefined;
     if (retryOf !== null || rerunOf !== null) {
       const o = (await tx.query('select user_id, team_id, store_id, status, error, retry_of, input_asset_ids, model, provider, preset_id, prompt, enhance, enhanced_prompt, aspect, duration_s, feature, params, deleted_at from jobs where id = $1', [retryOf ?? rerunOf])).rows[0];
       if (rerunOf !== null) {
@@ -324,16 +325,20 @@ export async function POST(request: Request) {
         if (!twin) return Response.json({ error: 'the job has no enabled twin model' }, { status: 409 });
         modelId = twin.id;
       }
-      s = { assetIds: o.input_asset_ids, modelId, presetId: o.preset_id, prompt: o.prompt, ratio: o.aspect, durationSec: o.duration_s, storeId: o.store_id, feature: o.feature, params: o.params, enhance: o.enhance, useBrand: false };
+      // A rerun is a new Run: it names the cheaper row of a pair (the job may have run on the dearer one), and a store hidden since is dropped, as Reuse does.
+      if (rerunOf !== null && o.retry_of === null) modelId = (await tx.query('select coalesce(twin_of, id) as id from model_configs where id = $1', [o.model])).rows[0]?.id ?? o.model;
+      const storeId = rerunOf !== null && o.store_id !== null && !(await tx.query('select 1 from stores where id = $1 and not hidden', [o.store_id])).rowCount ? null : o.store_id;
+      s = { assetIds: o.input_asset_ids, modelId, presetId: o.preset_id, prompt: o.prompt, ratio: o.aspect, durationSec: o.duration_s, storeId, feature: o.feature, params: o.params, enhance: o.enhance, useBrand: false };
       original = o;
     }
     const { assetIds, modelId: named, presetId, prompt: freePrompt, ratio, durationSec, storeId, feature, enhance, useBrand } = s!;
     // A retry's prompt already carries the brand block it was sent with, so the brand is added to a new Run only.
     let params = s!.params;
     const isImage = !VIDEO_FEATURES.includes(feature);
-    // A new video Run on one model of a duplicate pair runs on the row of the pair that can make it (migration 0078); a retry keeps the row it names.
+    // A new video Run on one model of a duplicate pair runs on the row of the pair that can make it (migration 0078), and so does a rerun of a job that was not a twin retry; a retry keeps the row it names.
+    const asNewRun = !original || (rerunOf !== null && original.retry_of === null);
     const modelId =
-      original || isImage
+      !asNewRun || isImage
         ? named
         : await servingRow(tx, named, feature, jobNeed({ aspect: ratio, duration_s: durationSec, input_asset_ids: assetIds, params }));
     // A new Run was checked before the lock and a retry never was, so both look again: an image deleted meanwhile is refused.
@@ -401,7 +406,9 @@ export async function POST(request: Request) {
         params = { ...params, brand: 'on', ...(feature === 'image' && params.brief === undefined && { brief: freePrompt! }) };
         prompt = branded;
       }
-      // Checked here, before anything is reserved, rather than refused by the provider after the money is held. A retry sends the prompt it was checked with.
+    }
+    // Checked here, before anything is reserved, rather than refused by the provider after the money is held. A retry sends the prompt it was checked with; a rerun, a Run, checks it against today's limit.
+    if (retryOf === null) {
       const limit = promptLimit(model.max_prompt_chars);
       if (prompt && prompt.length > limit) return bad(`the prompt may be at most ${limit} characters on this model`);
     }
@@ -413,8 +420,12 @@ export async function POST(request: Request) {
     // Under the same lock, so two Runs cannot both spend fal's last dollars.
     const credit = await falCreditUsd(tx, fal);
     // A new Run takes the row the pickers offer of a pair of duplicate models; a retry copies a Run that was offered. The fal lock is read on video only (the one fal row with a twin is Veo).
-    if (!original && !(await offeredNow(tx, named, (v) => v.kind === 'video' && v.usd_per_second !== null && overCredit(v.provider, estimateUsd(v.usd_per_second, durationSec), credit)))) {
+    if (asNewRun && !(await offeredNow(tx, named, (v) => v.kind === 'video' && v.usd_per_second !== null && overCredit(v.provider, estimateUsd(v.usd_per_second, durationSec), credit)))) {
       return bad('the model is not offered now: its duplicate twin serves in its place');
+    }
+    // The price the member was shown is what they agreed to: a higher one now is refused with the new price, before the caps and with nothing reserved.
+    if (rerunOf !== null && Number(estimate) > (maxUsd as number)) {
+      return Response.json({ error: `Giá đã thay đổi: lượt chạy lại này bây giờ khoảng $${Number(estimate).toFixed(2)}. Hãy kiểm tra lại giá.`, estimateUsd: estimate }, { status: 409 });
     }
     // A mock job books 0 USD (see the ledger), so it adds nothing to the monthly cap.
     const cap = await checkCaps(tx, userId, provider === 'mock' ? '0' : estimate, undefined, feature);
