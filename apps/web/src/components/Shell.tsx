@@ -14,7 +14,7 @@ import { cardTitleOfFormat } from '@/lib/marketing';
 import { canReuse, refillFrom, reuseHref } from '@/lib/reuse';
 import { userAvatarColor } from '@/lib/profile';
 import { COLLAPSED_COOKIE, isMac, isSettingsShortcut, navGroups } from '@/lib/sidebar';
-import { confirmRun } from '@/lib/run-guard';
+import { confirmRerun, confirmRun } from '@/lib/run-guard';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { AccountMenu } from './AccountMenu';
 import { ChangelogPopup } from './ChangelogPopup';
@@ -165,6 +165,14 @@ function HistoryCard({ job, isAdmin, select }: { job: TrayJob; isAdmin: boolean;
   const retry = async (onTwin = false) => {
     setSending(true); // from the click on, so a double click cannot send two paid jobs
     if (await confirmRun(onTwin ? job.twin!.estimateUsd : job.estimateUsd, onTwin ? twinRetryText(job).ask : `Thử lại lượt tạo này với giá khoảng $${job.estimateUsd}?`)) await act(async () => (await api('/api/jobs', sendJson('POST', { retryOf: job.id, ...(onTwin && { onTwin }) })), await refresh()), 'Không thử lại được');
+    setSending(false);
+  };
+  // A new paid job with the same inputs: the same confirm as a Run, and the server applies the caps and the ledger as for any other.
+  const rerun = async () => {
+    setSending(true); // from the click on, so a double click cannot send two paid jobs
+    await act(async () => {
+      if (await confirmRerun(job.estimateUsd, (usd) => `Chạy lại lượt tạo này với giá khoảng $${usd}?`, (maxUsd) => api('/api/jobs', sendJson('POST', { rerunOf: job.id, maxUsd })))) await refresh();
+    }, 'Không chạy lại được.');
     setSending(false);
   };
   const toggleFavorite = () => act(async () => setFavorite((await api<{ favorite: boolean }>(`/api/jobs/${job.id}/favorite`, sendJson('PUT', { favorite: !favorite }))).favorite), 'Không lưu được mục yêu thích.');
@@ -322,6 +330,11 @@ function HistoryCard({ job, isAdmin, select }: { job: TrayJob; isAdmin: boolean;
           {canRetryOnTwin(job) && (
             <button type="button" className="job-reuse job-primary" disabled={sending} onClick={() => void retry(true)}>
               <Icon name="arrow" /> {twinRetryText(job).button}
+            </button>
+          )}
+          {job.status === 'succeeded' && reuseHref(job) && (
+            <button type="button" className="job-reuse" disabled={sending} onClick={() => void rerun()}>
+              <Icon name="arrow" /> Chạy lại
             </button>
           )}
           {reuseHref(job) && (

@@ -1169,3 +1169,116 @@ describe('the fal credit lock', () => {
     }
   });
 });
+
+describe('POST /api/jobs with rerunOf', () => {
+  const rerun = (m: Member, job: string, extra: Record<string, unknown> = {}) => run(m.cookie, { rerunOf: job, maxUsd: 1000, ...extra });
+  const estimate = async (id: string) => (await pool.query(`select usd::text from cost_entries where job_id = $1 and kind = 'estimate'`, [id])).rows[0]?.usd as string | undefined;
+
+  test('runs the own succeeded job again as a new queued job with the same inputs, an estimate of its own and no retry link, as often as wanted', async () => {
+    const m = await newMember('team-b');
+    const [original] = await seedJobs(m.id, 1, 'succeeded', { assets: [m.asset], storeId: 'store-ok' });
+    await pool.query(`update jobs set params = '{"audio":"off"}', prompt = 'My own prompt.' where id = $1`, [original]);
+    const sentBefore = await sentCount(m.id);
+    // The body's own fields are ignored: a rerun takes everything from the original.
+    const res = await rerun(m, original!, { assetIds: ['theirs-1'], modelId: 'mock-sample', ratio: '1:1', durationSec: 10 });
+    expect(res.status).toBe(201);
+    const { id } = (await res.json()) as { id: string };
+    expect(id).not.toBe(original);
+    expect((await pool.query('select status, retry_of, model, provider, prompt, aspect, duration_s, input_asset_ids, params, store_id from jobs where id = $1', [id])).rows[0]).toEqual({
+      status: 'queued', retry_of: null, model: 'fal-test', provider: 'fal', prompt: 'My own prompt.', aspect: '9:16', duration_s: 5, input_asset_ids: [m.asset], params: { audio: 'off' }, store_id: 'store-ok',
+    });
+    expect(await estimate(id)).toBe('1.0000');
+    expect(await sentCount(m.id)).toBe(sentBefore + 1);
+    expect((await rerun(m, original!)).status).toBe(201); // not once only, as a retry is
+    expect((await pool.query('select count(*)::int as n from jobs where retry_of is not null and user_id = $1', [m.id])).rows[0].n).toBe(0);
+  });
+
+  test("answers 404 for another member's job, a job in the trash and an unknown one, and 409 for the caller's job that has not succeeded", async () => {
+    const m = await newMember();
+    const other = await newMember();
+    const [theirs] = await seedJobs(other.id, 1);
+    const [trashed] = await seedJobs(m.id, 1, 'succeeded', { assets: [m.asset] });
+    await pool.query('update jobs set deleted_at = now() where id = $1', [trashed]);
+    const [failed] = await seedJobs(m.id, 1, 'failed', { assets: [m.asset] });
+    const before = (await pool.query('select count(*)::int as n from jobs')).rows[0].n;
+    expect((await rerun(m, theirs!)).status).toBe(404);
+    expect((await rerun(m, trashed!)).status).toBe(404);
+    expect((await rerun(m, 'nope')).status).toBe(404);
+    expect((await rerun(m, failed!)).status).toBe(409);
+    expect((await rerun(m, 5 as unknown as string)).status).toBe(400);
+    expect((await run(m.cookie, { rerunOf: failed, retryOf: failed })).status).toBe(400);
+    expect((await pool.query('select count(*)::int as n from jobs')).rows[0].n).toBe(before);
+  });
+
+  test('answers 409 in Vietnamese when an input asset was deleted, and creates nothing', async () => {
+    const m = await newMember();
+    const [original] = await seedJobs(m.id, 1, 'succeeded', { assets: [m.asset] });
+    await pool.query('update assets set deleted_at = now() where id = $1', [m.asset]);
+    const res = await rerun(m, original!);
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: 'Không chạy lại được: ảnh hoặc video đầu vào của lượt này đã bị xoá.' });
+    expect((await pool.query(`select count(*)::int as n from jobs where user_id = $1 and id <> $2`, [m.id, original])).rows[0].n).toBe(0);
+  });
+
+  test('refuses a model that is disabled now', async () => {
+    const m = await newMember();
+    const [original] = await seedJobs(m.id, 1, 'succeeded', { assets: [m.asset] });
+    await pool.query(`update model_configs set enabled = false where id = 'fal-test'`);
+    try {
+      const res = await rerun(m, original!);
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: 'the model does not exist or is not enabled' });
+    } finally {
+      await pool.query(`update model_configs set enabled = true where id = 'fal-test'`);
+    }
+  });
+
+  test('answers 409 with the current price when it is above the price shown, and reserves nothing; the price shown is required', async () => {
+    const m = await newMember();
+    const [original] = await seedJobs(m.id, 1, 'succeeded', { assets: [m.asset] });
+    const before = await jobCount();
+    const low = await rerun(m, original!, { maxUsd: 0.8 }); // the model's estimate for 5 s is 1.0000
+    expect(low.status).toBe(409);
+    expect(await low.json()).toEqual({ error: 'Giá đã thay đổi: lượt chạy lại này bây giờ khoảng $1.00. Hãy kiểm tra lại giá.', estimateUsd: '1.0000' });
+    expect(await jobCount()).toBe(before);
+    expect((await pool.query(`select count(*)::int as n from cost_entries where job_id in (select id from jobs where user_id = $1 and id <> $2)`, [m.id, original])).rows[0].n).toBe(0);
+    expect((await rerun(m, original!, { maxUsd: 1 })).status).toBe(201); // the price shown is enough
+    for (const maxUsd of [undefined, '1', -1, null]) expect((await run(m.cookie, { rerunOf: original, maxUsd })).status).toBe(400);
+  });
+
+  test('drops a store that is hidden now, as Reuse does, and holds the prompt to the model’s limit now', async () => {
+    const m = await newMember();
+    const [original] = await seedJobs(m.id, 1, 'succeeded', { assets: [m.asset], storeId: 'store-ok' });
+    await pool.query(`update jobs set prompt = $2 where id = $1`, [original, 'x'.repeat(100)]);
+    await pool.query(`update stores set hidden = true where id = 'store-ok'`);
+    try {
+      const res = await rerun(m, original!);
+      expect(res.status).toBe(201);
+      const { id } = (await res.json()) as { id: string };
+      expect((await pool.query('select store_id from jobs where id = $1', [id])).rows[0].store_id).toBeNull();
+      expect((await pool.query(`select count(*)::int as n from user_stores where user_id = $1`, [m.id])).rows[0].n).toBe(0);
+    } finally {
+      await pool.query(`update stores set hidden = false where id = 'store-ok'`);
+    }
+    await pool.query(`update model_configs set max_prompt_chars = 50 where id = 'fal-test'`);
+    try {
+      const before = await jobCount();
+      const res = await rerun(m, original!);
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: 'the prompt may be at most 50 characters on this model' });
+      expect(await jobCount()).toBe(before);
+    } finally {
+      await pool.query(`update model_configs set max_prompt_chars = 2000 where id = 'fal-test'`);
+    }
+  });
+
+  test('is a Run like any other: the daily clip cap refuses it and nothing is sent', async () => {
+    const m = await newMember();
+    const [original] = await seedJobs(m.id, 5, 'succeeded', { assets: [m.asset] });
+    const sentBefore = await sentCount(m.id);
+    const res = await rerun(m, original!);
+    expect(res.status).toBe(429);
+    expect(await res.json()).toEqual({ error: dayFull });
+    expect(await sentCount(m.id)).toBe(sentBefore);
+  });
+});

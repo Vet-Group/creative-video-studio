@@ -11,6 +11,8 @@ export class ApiError extends Error {
     readonly retryAfter: number | null = null,
     /** The machine-readable code of a better-auth refusal, such as USER_NOT_VERIFIED, else null. */
     readonly code: string | null = null,
+    /** The server's current price, in USD, on a refusal because the price shown was too low (a rerun), else null. */
+    readonly estimateUsd: string | null = null,
   ) {
     super(message);
   }
@@ -40,10 +42,10 @@ export async function rotatingSession<T>(run: () => Promise<T>): Promise<T> {
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const sentAt = rotations;
   const res = await fetch(path, init);
-  const body = (await res.json().catch(() => null)) as (T & { error?: string; code?: string }) | null;
+  const body = (await res.json().catch(() => null)) as (T & { error?: string; code?: string; estimateUsd?: string }) | null;
   const stale = rotating > 0 || sentAt !== rotations;
   if (res.status === 401 && !signingOut && !stale && window.location.pathname !== '/login') window.location.assign(loginFor(window.location.pathname + window.location.search));
-  if (!res.ok) throw new ApiError(res.status, body?.error ?? `HTTP ${res.status}`, Number(res.headers.get('x-retry-after')) || null, body?.code ?? null);
+  if (!res.ok) throw new ApiError(res.status, body?.error ?? `HTTP ${res.status}`, Number(res.headers.get('x-retry-after')) || null, body?.code ?? null, body?.estimateUsd ?? null);
   return body as T;
 }
 
@@ -120,5 +122,7 @@ export interface Clip {
   /** The creator's own words (a free prompt on Create video or Image Generation), else null. */
   prompt: string | null;
   canEdit: boolean;
+  /** The caller made it (`canEdit` is also true for an Admin): only then can it be run again. */
+  mine: boolean;
   downloadName: string;
 }

@@ -300,3 +300,19 @@ test('the compact tray gives the refused job the same sentence and no Thử lạ
   await expect(failed.getByRole('button', { name: 'Thử lại' })).toHaveCount(0);
   await expect(failed.getByRole('link', { name: 'Dùng lại' })).toBeVisible();
 });
+
+test('Chạy lại on a succeeded History card sends a new job with the same inputs', async ({ page }) => {
+  await signIn(page, 'hista');
+  const up = async (name: string) => ((await (await page.request.post('/api/assets', { multipart: { file: { name, mimeType: 'image/png', buffer: png() } } })).json()) as { assets: { id: string }[] }).assets[0]!.id;
+  const [a, b] = [await up('rr-1.png'), await up('rr-2.png')];
+  const res = await page.request.post('/api/jobs', { data: { feature: 'image', modelId: 'mock-image-e2e', assetIds: [a, b], ratio: '1:1', prompt: 'a rerunnable studio shot', enhance: false, params: { resolution: '2K' } } });
+  expect(res.status()).toBe(201);
+
+  await page.goto('/image-generation');
+  await openTab(page, 'Lịch sử');
+  const cards = page.getByRole('complementary', { name: 'Lượt tạo của tôi' }).getByRole('listitem').filter({ hasText: 'a rerunnable studio shot' });
+  await expect(cards.getByText('Hoàn tất')).toBeVisible({ timeout: 60_000 });
+  await cards.getByRole('button', { name: 'Chạy lại' }).click();
+  await expect(cards).toHaveCount(2);
+  await expect(cards.first().getByRole('list', { name: 'Ảnh đầu vào' }).locator('img')).toHaveCount(2);
+});

@@ -36,7 +36,7 @@ test('the Library loads more as the end comes near, and coming back keeps the it
   const clip = (i: number) => ({
     id: `fake-${i}`, creator: { id: 'u', name: 'E2E Fake' }, createdAt: '2026-11-03T03:00:00.000Z', modelId: 'mock-e2e', modelLabel: `Fake ${i}`, ratio: '9:16', durationSec: 5,
     feature: 'video', mediaType: 'image', resolution: '1K', isMock: true, videoAssetId: 'none', posterAssetId: null, storeId: null, costUsd: '0.0000', costFinal: true, verdict: null,
-    favorite: false, prompt: null, canEdit: false, downloadName: `fake-${i}.png`,
+    favorite: false, prompt: null, canEdit: false, mine: false, downloadName: `fake-${i}.png`,
   });
   await page.route(/\/api\/library(\?|$)/, async (r) => {
     const offset = Number(new URL(r.request().url()).searchParams.get('offset') ?? 0);
