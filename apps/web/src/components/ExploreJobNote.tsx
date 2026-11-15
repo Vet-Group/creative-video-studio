@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react';
 import { isRunning, jobNote } from '@/lib/explore';
 
-type NoteJob = { status: string; error: string | null; created_at: Date; finished_at: Date | null };
+type NoteJob = { status: string; error: string | null; created_at: Date; started_at: Date | null; finished_at: Date | null };
 
 /**
  * `initial` is the note the server already rendered; the leaf shows it until mounted (so hydration matches), then, only

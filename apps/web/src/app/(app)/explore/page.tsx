@@ -84,8 +84,8 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
     modelStats('image'),
     bestClips(),
     // shortcut: a running job older than the latest 20 is left out, as the jobs tray leaves it; widen if members queue that many.
-    pool.query<{ id: string; status: string; error: string | null; feature: string; poster_asset_id: string | null; output_asset_id: string | null; input_id: string | null; resolution: string | null; finished_at: Date | null; created_at: Date; prompt: string | null; model_label: string | null }>(
-      `select j.id, j.status, j.error, j.feature, j.poster_asset_id, j.output_asset_id, j.input_asset_ids[1] as input_id, j.params->>'resolution' as resolution, j.finished_at, j.created_at, case when j.feature in ('image', 'video') and j.preset_id is null then j.prompt when j.feature = 'image' then j.params->>'brief' end as prompt, m.label as model_label
+    pool.query<{ id: string; status: string; error: string | null; feature: string; poster_asset_id: string | null; output_asset_id: string | null; input_id: string | null; resolution: string | null; finished_at: Date | null; started_at: Date | null; created_at: Date; prompt: string | null; model_label: string | null }>(
+      `select j.id, j.status, j.error, j.feature, j.poster_asset_id, j.output_asset_id, j.input_asset_ids[1] as input_id, j.params->>'resolution' as resolution, j.finished_at, j.started_at, j.created_at, case when j.feature in ('image', 'video') and j.preset_id is null then j.prompt when j.feature = 'image' then j.params->>'brief' end as prompt, m.label as model_label
          from jobs j left join model_configs m on m.id = j.model
         where j.user_id = $1 and j.deleted_at is null and j.purged_at is null order by j.created_at desc, j.id desc limit 20`,
       [user?.id],
@@ -106,7 +106,7 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
   };
   /** The recent-job note props: the finish label and the server-rendered note (shown until the leaf mounts and ticks the elapsed time). */
   const noteProps = (j: (typeof recent)[number]) => {
-    const job = { status: j.status, error: j.error, created_at: j.created_at, finished_at: j.finished_at };
+    const job = { status: j.status, error: j.error, created_at: j.created_at, started_at: j.started_at, finished_at: j.finished_at };
     const done = `${fmtTime.format(j.finished_at ?? j.created_at)} · ${fmtDate.format(j.finished_at ?? j.created_at)}`;
     return { job, done, initial: jobNote(job, () => done) };
   };

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { elapsedLabel, resultHref, roleOf } from './jobs';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { ApiError, type TrayJob } from '@/lib/api';
+import { CancelAllQueued, cancelEach, elapsedLabel, resultHref, roleOf } from './jobs';
 
 describe('resultHref', () => {
   it('opens a result in the Library and a failure on the page that made it', () => {
@@ -42,7 +44,32 @@ describe('elapsedLabel', () => {
     expect(elapsedLabel({ status: 'running', createdAt: at }, now(12))).toBe('đã chạy 12 phút');
     expect(elapsedLabel({ status: 'submitting', createdAt: at }, now(75))).toBe('đã chạy 1 giờ 15 phút');
   });
+  it('counts a running job from its start, not from when it was queued, and a queued one from when it was sent', () => {
+    const started = new Date(now(10)).toISOString();
+    expect(elapsedLabel({ status: 'running', createdAt: at, startedAt: started }, now(12))).toBe('đã chạy 2 phút');
+    expect(elapsedLabel({ status: 'running', createdAt: at, startedAt: null }, now(12))).toBe('đã chạy 12 phút');
+    expect(elapsedLabel({ status: 'queued', createdAt: at, startedAt: null }, now(12))).toBe('đã chờ 12 phút');
+  });
   it('says nothing once the job finished', () => {
     for (const status of ['succeeded', 'failed', 'failed_unknown', 'timed_out']) expect(elapsedLabel({ status, createdAt: at }, now(5))).toBeNull();
+  });
+});
+
+describe('cancel all queued', () => {
+  const job = (id: string, status: string) => ({ id, status }) as TrayJob;
+  const refresh = async () => undefined;
+  it('offers one button from two queued jobs of the member, naming how many', () => {
+    expect(renderToStaticMarkup(<CancelAllQueued jobs={[job('a', 'queued'), job('b', 'running'), job('c', 'queued')]} refresh={refresh} />)).toContain('Huỷ cả 2 lượt đang chờ');
+    expect(renderToStaticMarkup(<CancelAllQueued jobs={[job('a', 'queued'), job('b', 'running')]} refresh={refresh} />)).toBe('');
+  });
+  it('cancels each in turn and counts a job that started meanwhile (409) apart from one that could not be canceled', async () => {
+    const seen: string[] = [];
+    const cancel = async (id: string) => {
+      seen.push(id);
+      if (id === 'b') throw new ApiError(409, 'started');
+      if (id === 'c') throw new Error('offline');
+    };
+    expect(await cancelEach(['a', 'b', 'c', 'd'], cancel)).toEqual({ started: 1, failed: 1 });
+    expect(seen).toEqual(['a', 'b', 'c', 'd']);
   });
 });

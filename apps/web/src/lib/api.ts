@@ -85,6 +85,8 @@ export interface TrayJob {
   outputAssetId: string | null;
   posterAssetId: string | null;
   createdAt: string;
+  /** When the provider took the job (it ran from then on); null while it is queued or being sent. */
+  startedAt: string | null;
   finishedAt: string | null;
   /** The member's own words, when kept. */
   text: string | null;

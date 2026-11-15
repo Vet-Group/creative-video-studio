@@ -25,7 +25,7 @@ import { FalLowNotice } from './FalLowNotice';
 import { Icon, type IconName } from './Icon';
 import { LarkLinkPrompt } from './LarkLinkPrompt';
 import { JobFailureNote, canRetry, isCanceled, canRetryOnTwin, twinRetryText } from './JobFailure';
-import { CancelButton, elapsedLabel, JobPrompt, JobsProvider, Recreate, resultHref, roleOf, Tap, toggleFullscreen, useForm, useJobs } from './jobs';
+import { CancelAllQueued, CancelButton, elapsedLabel, JobPrompt, JobsProvider, Recreate, resultHref, roleOf, Tap, toggleFullscreen, useForm, useJobs } from './jobs';
 import { LoadError } from './LoadError';
 import { Modal } from './Modal';
 import type { Account, Section } from './Settings';
@@ -449,6 +449,7 @@ export function Tray({ feature }: { feature?: string }) {
           Của bạn: {mineRunning} đang chạy, {mineQueued} đang chờ · Cả hệ thống: {queue.running} đang chạy, {queue.queued} đang chờ
         </p>
       )}
+      <CancelAllQueued jobs={all.jobs} refresh={refresh} />
       {workerOffline && <p className="warn">Máy xử lý đang tạm ngừng: chưa nhận được tín hiệu, lượt tạo sẽ chạy khi máy hoạt động lại.</p>}
       {failed && <LoadError text={!navigator.onLine ? 'Mất kết nối mạng. Sẽ cập nhật lại khi có mạng.' : loaded ? 'Không cập nhật được danh sách lượt tạo.' : 'Không tải được danh sách lượt tạo.'} onRetry={refresh} />}
       {loaded && jobs.length === 0 && (feature ? <HistoryEmpty /> : <p className="muted">Chưa có lượt tạo nào.</p>)}
