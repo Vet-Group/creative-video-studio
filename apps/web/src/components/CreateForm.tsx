@@ -15,7 +15,7 @@ import { useHydrated } from '@/lib/use-hydrated';
 import { useRecall } from '@/lib/use-recall';
 import { useDraftState } from '@/lib/use-draft';
 import { reloadSamples, samplesFailed, useSamples, versionedSample } from '@/lib/use-samples';
-import { dropRefillQuery, exampleFrom, refillFrom } from '@/lib/reuse';
+import { dropRefillQuery, exampleFrom, recipeOf, refillFrom } from '@/lib/reuse';
 import { About } from './About';
 import { AudioSwitch } from './AudioSwitch';
 import { CardMedia } from './CardMedia';
@@ -206,7 +206,7 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
   const [stores, setStores] = useState<StoreOption[]>([]);
   const [models, setModels] = useState<ModelsResponse | null>(null);
   const [ready, setReady] = useState(!reuse);
-  const [source, setSource] = useState(reuse ? { from: reuse } : null); // what the form refills from; Recreate sets a new one in place
+  const [source, setSource] = useState<{ from: string; recipe?: boolean } | null>(reuse ? { from: reuse } : null); // what the form refills from; Recreate sets a new one in place. `recipe`: a company example, which gives its settings but not its photos or store
   const [refetch, setRefetch] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -334,18 +334,22 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
     api<JobDetail>(reuse)
       .then(async (loaded) => {
         if (stale) return;
-        const j = await fillBlanks(reuse, loaded);
+        const full = await fillBlanks(reuse, loaded);
         if (stale) return; // superseded while the member filled the blanks
-        if (!j) return dropRefillQuery(); // cancelled: the form stays as it is
+        if (!full) return dropRefillQuery(); // cancelled: the form stays as it is
+        const j = source.recipe ? recipeOf(full) : full;
+        const own = source.recipe ? null : full; // the photos and the store: a company example's are not the member's
         const preset = presets.some((p) => p.id === j.presetId) ? j.presetId : null;
-        // A sample's photos become this member's inputs first, copied on the server.
-        const samples = j.images.flatMap((i) => ('sample' in i ? [i.sample] : []));
-        const images = samples.length > 0 ? await copySamples(samples) : (j.images as Image[]);
-        if (stale) return; // superseded while the photos were copied
-        setImages(images);
-        // Sent only on a model that takes them, as when picked by hand.
-        setEndFrame(j.endFrame ?? null);
-        setClips(j.clips ?? []);
+        if (own) {
+          // A sample's photos become this member's inputs first, copied on the server.
+          const samples = own.images.flatMap((i) => ('sample' in i ? [i.sample] : []));
+          const images = samples.length > 0 ? await copySamples(samples) : (own.images as Image[]);
+          if (stale) return; // superseded while the photos were copied
+          setImages(images);
+          // Sent only on a model that takes them, as when picked by hand.
+          setEndFrame(own.endFrame ?? null);
+          setClips(own.clips ?? []);
+        }
         setPresetId(preset ?? '');
         if (!preset) {
           // A prompt made of sections refills them; a template keeps the way it was written; else the words go where the member writes now.
@@ -361,8 +365,9 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
         if (j.ratio) setRatio(j.ratio);
         if (j.durationSec) setDurationSec(j.durationSec);
         if (j.modelId) setModelId(j.modelId);
-        setStoreId(j.storeId ?? '');
-        recreated(reuse);
+        if (own) setStoreId(own.storeId ?? '');
+        if (source.recipe) notify('Đã dùng mẫu của ví dụ. Thêm ảnh sản phẩm của bạn rồi bấm Tạo video.');
+        else recreated(reuse);
         dropRefillQuery();
       })
       .catch((e) => setError(copyError(e, 'Không tìm thấy clip để dùng lại.')))
@@ -652,6 +657,14 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
   function recreate(from: string) {
     recall.touch();
     setSource({ from });
+    if (narrow) setTab('create');
+  }
+
+  /** A company example's recipe on the form; its photos and store are not the member's, so they stay as the member has them. */
+  function useRecipe(id: string) {
+    recall.touch();
+    setSource({ from: refillFrom({ reuse: id })!, recipe: true });
+    setCuratedId(null);
     if (narrow) setTab('create');
   }
 
@@ -999,7 +1012,7 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
                               </span>
                             </span>
                           </button>
-                          <button type="button" className="example-use" aria-label={`Dùng ví dụ này: ${name}`} onClick={() => recreate(refillFrom({ reuse: clip.id })!)}>
+                          <button type="button" className="example-use" aria-label={`Dùng ví dụ này: ${name}`} onClick={() => useRecipe(clip.id)}>
                             Dùng ví dụ này
                           </button>
                         </li>
@@ -1125,7 +1138,7 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
         }}
       />
 
-      {curatedAt >= 0 && <ClipDetail clips={shownCurated} index={curatedAt} admin={curated.admin} onIndex={(i) => setCuratedId(i === null ? null : (shownCurated[i]?.id ?? null))} onChange={(c) => setCurated((cur) => ({ ...cur, clips: cur.clips.map((o) => (o.id === c.id ? c : o)) }))} />}
+      {curatedAt >= 0 && <ClipDetail clips={shownCurated} index={curatedAt} admin={curated.admin} onUse={(c) => useRecipe(c.id)} onIndex={(i) => setCuratedId(i === null ? null : (shownCurated[i]?.id ?? null))} onChange={(c) => setCurated((cur) => ({ ...cur, clips: cur.clips.map((o) => (o.id === c.id ? c : o)) }))} />}
       {/* The live Example dialog (REA-video V01, measured 2026-10-23): the clip on black with Close at its top-left, the details column,
           and Previous/Next as round buttons at the viewport edges that stop at the first and last sample. Nothing here submits a job. */}
       <Modal open={detail !== null} onClose={() => setDetail(null)} label="Chi tiết ví dụ" className="example-detail">

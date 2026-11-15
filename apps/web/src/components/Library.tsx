@@ -427,7 +427,7 @@ const choiceName = (list: { id: string; name: string }[], id: string | null) => 
  * settings, who made it, when and for how much, the store for an Admin, download / fullscreen / open in a new tab / copy, the marks and Reuse.
  * Arrows and ←/→ step through the loaded items; 1, 2 and 3 mark.
  */
-export function ClipDetail({ clips, index, stores, admin, onIndex, onChange }: { clips: Clip[]; index: number; stores?: StoreOption[]; admin: boolean; onIndex: (i: number | null) => void; onChange: (c: Clip) => void }) {
+export function ClipDetail({ clips, index, stores, admin, onIndex, onChange, onUse }: { clips: Clip[]; index: number; stores?: StoreOption[]; admin: boolean; onIndex: (i: number | null) => void; onChange: (c: Clip) => void; onUse?: (c: Clip) => void }) {
   const clip = clips[index]!;
   const image = clip.mediaType === 'image';
   const [job, setJob] = useState<ClipInputs | null>(null);
@@ -678,11 +678,16 @@ export function ClipDetail({ clips, index, stores, admin, onIndex, onChange }: {
             Chạy lại
           </button>
         )}
-        {reuseHref(clip) && (
-          <Link href={reuseHref(clip)!} className="lightbox-reuse">
-            Dùng lại
-          </Link>
-        )}
+        {reuseHref(clip) &&
+          (onUse ? (
+            <button type="button" className="lightbox-reuse" onClick={() => onUse(clip)}>
+              Dùng lại
+            </button>
+          ) : (
+            <Link href={reuseHref(clip)!} className="lightbox-reuse">
+              Dùng lại
+            </Link>
+          ))}
       </div>
       {index > 0 && (
         <button type="button" className="lightbox-step lightbox-prev" onClick={() => onIndex(index - 1)} aria-label="Mục trước">

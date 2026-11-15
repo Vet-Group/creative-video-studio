@@ -56,6 +56,8 @@ export function SmartRemakeApp({ app, initialId, initialProductId }: { app: AppC
   const [error, setError] = useState('');
   const [asked, setAsked] = useState(''); // `analysis:product` the pick was last asked for
   const wanted = useRef(''); // the video whose analysis is being started
+  const addProductButton = useRef<HTMLButtonElement>(null);
+  const [taken, setTaken] = useState(0); // counts the shelf's picks, so the product field is brought into view once the pick's layout has rendered
   const pick = useSuggest();
 
   // Opens the analysis the address names, with its product image when it still opens; the APIs give only the member's own analyses and images, or a shared analysis.
@@ -87,6 +89,14 @@ export function SmartRemakeApp({ app, initialId, initialProductId }: { app: AppC
   useEffect(() => {
     if (analysisId) syncUrl(app.slug, analysisId, productId);
   }, [analysisId, productId]);
+
+  // After a shelf pick the next step, the product image, sits below the whole shelf: bring it into view and focus its add button (a set product needs no step).
+  useEffect(() => {
+    const add = addProductButton.current;
+    if (!taken || !add) return;
+    add.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    add.focus({ preventScroll: true });
+  }, [taken]);
 
   // Follows the analysis until it ends.
   const open = analysis !== null && (analysis.status === 'queued' || analysis.status === 'running');
@@ -122,7 +132,7 @@ export function SmartRemakeApp({ app, initialId, initialProductId }: { app: AppC
     wanted.current = id; // an upload still being analysed, or the address' analysis still loading, no longer takes over
     setError('');
     const row = await api<AnalysisRow>(`/api/analyses/${encodeURIComponent(id)}`);
-    if (wanted.current === id) showAnalysis(row);
+    if (wanted.current === id) (showAnalysis(row), setTaken((n) => n + 1));
   }
 
   async function take(get: () => Promise<RefVideo[]>, failed: (e: unknown) => string) {
@@ -223,7 +233,7 @@ export function SmartRemakeApp({ app, initialId, initialProductId }: { app: AppC
               }}
             />
             <SharedVideos busy={locked} currentId={analysis?.id} onPick={takeShared} />
-            <Slot label="Ảnh sản phẩm" empty="Thêm 1 ảnh sản phẩm" inputLabel="Ảnh sản phẩm" images={product} max={1} busy={locked} onAdd={(files) => void addProduct(files)} onRemove={() => setProduct([])} onPick={(a) => setProduct([a])} slot="product" />
+            <Slot label="Ảnh sản phẩm" empty="Thêm 1 ảnh sản phẩm" inputLabel="Ảnh sản phẩm" images={product} max={1} busy={locked} onAdd={(files) => void addProduct(files)} onRemove={() => setProduct([])} onPick={(a) => setProduct([a])} slot="product" addRef={addProductButton} />
             <p className="help">Mẹo: dùng ảnh sản phẩm rõ nét trên nền trơn, cùng loại sản phẩm với trong video mẫu (áo thay cho áo).</p>
             {status && (
               <p className="help" role="status">

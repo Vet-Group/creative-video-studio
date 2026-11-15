@@ -42,6 +42,13 @@ export function queryOf(from: string): string {
   return m ? `${{ jobs: 'reuse', templates: 'template', samples: 'example' }[m[1] as 'jobs' | 'templates' | 'samples']}=${m[2]}` : '';
 }
 
+/** What a company example (a result on the Examples tab, usually another member's) hands the form: the recipe only (preset or prompt, model, ratio, duration, audio),
+ * without the photos, end frame, audio clips or store, which are the maker's product and shop; the member's own stay on the form. */
+export function recipeOf<T extends { images?: unknown; endFrame?: unknown; clips?: unknown; storeId?: unknown }>(job: T): Omit<T, 'images' | 'endFrame' | 'clips' | 'storeId'> {
+  const { images, endFrame, clips, storeId, ...recipe } = job;
+  return recipe;
+}
+
 /** The link for a job's reuse action, or null for a feature whose page cannot refill from a job yet. */
 export function reuseHref(job: { id: string; feature: string }): string | null {
   const page = PAGES[job.feature];
