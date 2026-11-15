@@ -129,6 +129,8 @@ test('Try On: a missing slot keeps Run disabled with a reason, a mock run reache
   const gallery = page.getByRole('group', { name: 'Ảnh thử đồ của công ty' });
   await expect(gallery.getByRole('img').first()).toBeVisible();
   await expect.poll(() => gallery.getByRole('img').first().evaluate((i: HTMLImageElement) => i.complete && i.naturalWidth > 0)).toBe(true); // decoded, not just in the DOM
+  // The company's results lead the fixed samples: the first tile of the first column is one of them.
+  await expect(gallery.locator('.masonry-col').first().locator('.gallery-item a').first()).toHaveAttribute('href', /^\/api\/assets\//);
   await page.getByRole('tab', { name: 'Giới thiệu' }).click();
   await expect(page.getByRole('heading', { name: 'Thử đồ trên người mẫu' })).toBeVisible();
 
