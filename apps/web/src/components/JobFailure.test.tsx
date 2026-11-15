@@ -41,6 +41,34 @@ test('any other failure keeps the generic sentence, and an Admin the raw error a
   expect(renderToStaticMarkup(<JobFailureNote job={job({ error: 'boom' })} isAdmin={false} />)).not.toContain('boom');
 });
 
+// The fal 422s Kling Motion Control returned on prod, as the worker stores them.
+const NO_BODY_IMAGE =
+  'fal result: HTTP 422 {"detail":[{"loc":["body"],"msg":"Image recognition failed. Please make sure your image meets the requirements. Error: No complete upper body detected in the image; ensure the upper body is clearly visible.","type":"value_error"}]}';
+const NO_BODY_VIDEO =
+  'fal result: HTTP 422 {"detail":[{"loc":["body"],"msg":"The input was rejected, No complete upper body detected in the video; ensure the upper body is clearly visible.","type":"value_error"}]}';
+const SHORT_MOTION =
+  'fal result: HTTP 422 {"detail":[{"loc":["body"],"msg":"The input was rejected, The duration of continuous valid motion is too short; it should last at least 3 second.","type":"value_error"}]}';
+
+test('a Motion Control input the model cannot read says what to change, and offers no same-input retry', () => {
+  for (const [error, words] of [
+    [NO_BODY_IMAGE, 'nửa thân trên của người trong ảnh'],
+    [NO_BODY_VIDEO, 'nửa thân trên của người trong video chuyển động'],
+    [SHORT_MOTION, 'ít nhất 3 giây chuyển động liên tục'],
+  ] as const) {
+    const html = renderToStaticMarkup(<JobFailureNote job={refused(error)} isAdmin={false} />);
+    expect(html).toContain(words);
+    expect(html).not.toContain(GENERIC);
+    expect(canRetry(refused(error))).toBe(false);
+    expect(canRetryOnTwin({ ...refused(error), twin: { label: 'x', estimateUsd: '1' } })).toBe(false);
+  }
+});
+
+test('a failure the ledger closed at $0 tells the member it was not charged, and one still holding its estimate does not', () => {
+  expect(renderToStaticMarkup(<JobFailureNote job={job({ error: 'boom', unbilled: true })} isAdmin={false} />)).toContain('Lượt này không bị tính phí.');
+  expect(renderToStaticMarkup(<JobFailureNote job={job({ error: 'boom', unbilled: false })} isAdmin={false} />)).not.toContain('không bị tính phí');
+  expect(renderToStaticMarkup(<JobFailureNote job={job({ error: CANCELED_ERROR, unbilled: true })} isAdmin={false} />)).toBe('');
+});
+
 test('a failed card offers to copy what a report needs, and a canceled one does not', () => {
   expect(renderToStaticMarkup(<JobFailureNote job={job({ error: 'boom' })} isAdmin={false} />)).toContain('>Chép thông tin lỗi</button>');
   expect(renderToStaticMarkup(<JobFailureNote job={job({ error: CANCELED_ERROR })} isAdmin={false} />)).toBe('');

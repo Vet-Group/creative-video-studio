@@ -99,6 +99,8 @@ export interface TrayJob {
   favorite: boolean;
   /** The job's estimate in USD (4 decimals), which a retry costs again; null for a job without one. */
   estimateUsd: string | null;
+  /** True once the ledger closed the job at $0 (a failure the provider did not bill, or a cancel): the member was not charged. */
+  unbilled: boolean;
 }
 
 export interface Clip {
