@@ -134,6 +134,39 @@ const MAX_IMAGES = 9;
 const ratePct = (m: Model) => (m.passRate === null ? undefined : `${Math.round(m.passRate * 100)}% (${m.passes}/${m.total})`);
 
 /** `preset` and `model` pre-select the choices Explore links to; an unknown or switched-off one falls back to the default. */
+/** Where a stop already has its own error, next to its field: Run points to that message instead of repeating it. */
+export type RunStopField = 'images' | 'clips' | 'end' | 'prompt';
+
+/**
+ * The first thing that stops Run on Create Video, in the order the form is filled (as on Try On and Create Image, after InvokeAI's "why it cannot run"), with `near`
+ * set when that message is already shown next to its field; null when it can go.
+ */
+export function runReason(f: {
+  loading: boolean;
+  modelsLoaded: boolean;
+  chosen: { supported: boolean; maxImages: number; endMaxSec?: number | null } | undefined;
+  images: number;
+  wordsOnly: boolean;
+  preset: boolean;
+  tooMany: boolean;
+  clipsOver: boolean;
+  takes: { max: number; seconds: number } | null | undefined;
+  endOver: boolean;
+  promptOk: boolean;
+  tooLong: string | null;
+}): { text: string; near?: RunStopField } | null {
+  const say = (text: string, near?: RunStopField) => ({ text, ...(near && { near }) });
+  if (f.loading) return say('Đang tải cài đặt đã dùng...');
+  if (!f.chosen) return say(f.modelsLoaded ? 'Chọn một mô hình.' : 'Đang tải danh sách mô hình...');
+  if (f.images === 0 && !(f.wordsOnly && !f.preset)) return say(f.wordsOnly ? 'Mẫu cần ít nhất 1 ảnh sản phẩm. Bỏ chọn mẫu để tạo video chỉ từ mô tả.' : 'Tải lên ít nhất 1 ảnh sản phẩm.');
+  if (!f.chosen.supported) return say('Mô hình này không tạo được clip với tỉ lệ, thời lượng hoặc đầu vào đang chọn. Hãy đổi lựa chọn hoặc chọn mô hình khác.');
+  if (f.tooMany) return say(`Mô hình này nhận tối đa ${f.chosen.maxImages} ảnh.`, 'images');
+  if (f.clipsOver && f.takes) return say(`Mô hình này nhận tối đa ${f.takes.max} tệp âm thanh, tổng ${f.takes.seconds} giây.`, 'clips');
+  if (f.endOver) return say(`Mô hình này chỉ nhận khung hình cuối cho clip tối đa ${f.chosen.endMaxSec} giây.`, 'end');
+  if (!f.promptOk) return f.tooLong ? say(f.tooLong, 'prompt') : say('Viết mô tả cho video, hoặc chọn một mẫu.');
+  return null;
+}
+
 export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?: string; preset?: string; model?: string; image?: string; seedPrompt?: string }) {
   const { refresh, notify, loading } = useJobs();
   const recreated = useRecreated();
@@ -185,7 +218,8 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
   const fileInput = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
   const promptId = useId();
-  const tooLongId = useId();
+  const reasonId = useId();
+  const fieldIds: Record<RunStopField, string> = { images: useId(), clips: useId(), end: useId(), prompt: useId() };
   const clipsId = useId();
   const anglesId = useId();
   const clipInput = useRef<HTMLInputElement>(null);
@@ -420,7 +454,8 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
   const lockedNotes = [...new Set(CAMERA_ANGLES.map(lockedWhy).filter((w) => w !== null))];
   const tooLong = presetId === '' ? promptTooLong(chosen, Math.max(...sent.map((p) => p.trim().length))) : null;
   const promptOk = presetId !== '' || (composed.trim() !== '' && tooLong === null);
-  const canRun = ready && recall.answered && !busy && (images.length > 0 || (wordsOnly && presetId === '')) && chosen?.supported === true && !tooMany && !clipsOver && !endOver && promptOk;
+  const reason = runReason({ loading: !ready || !recall.answered, modelsLoaded: models !== null, chosen, images: images.length, wordsOnly, preset: presetId !== '', tooMany, clipsOver, takes, endOver, promptOk, tooLong });
+  const canRun = reason === null && !busy;
 
   async function upload(files: File[]) {
     if (files.length === 0) return;
@@ -788,11 +823,11 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
                 </div>
               </div>
             )}
-            {clipsOver && <p className="error">Mô hình này nhận tối đa {takes!.max} tệp âm thanh, tổng {takes!.seconds} giây.</p>}
+            {clipsOver && <p className="error" id={fieldIds.clips}>Mô hình này nhận tối đa {takes!.max} tệp âm thanh, tổng {takes!.seconds} giây.</p>}
 
             {wordsOnly && presetId !== '' && <p className="help">Mẫu chuyển động cần ảnh sản phẩm. Không có ảnh thì chọn &quot;Tự viết mô tả&quot;.</p>}
             {tooLong && (
-              <p className="error" id={tooLongId}>
+              <p className="error" id={fieldIds.prompt}>
                 {tooLong}
               </p>
             )}
@@ -865,8 +900,8 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
                 />
               )}
               {models && models.models.length === 0 && <p className="help">Chưa bật mô hình video nào. Admin bật trong Quản trị → Cài đặt → Mô hình.</p>}
-              {tooMany && chosen && <p className="error">Mô hình này nhận tối đa {chosen.maxImages} ảnh.</p>}
-              {endOver && <p className="error">Mô hình này chỉ nhận khung hình cuối cho clip tối đa {chosen!.endMaxSec} giây.</p>}
+              {tooMany && chosen && <p className="error" id={fieldIds.images}>Mô hình này nhận tối đa {chosen.maxImages} ảnh.</p>}
+              {endOver && <p className="error" id={fieldIds.end}>Mô hình này chỉ nhận khung hình cuối cho clip tối đa {chosen!.endMaxSec} giây.</p>}
               <Select label="Độ phân giải" icon="preset" heading="Độ phân giải" value={resolutions.length > 1 ? chosen!.id : (chosen?.resolution ?? '')} options={resolutions.length > 1 ? resolutions.map((m) => ({ value: m.id, label: m.resolution! })) : [{ value: chosen?.resolution ?? '', label: chosen?.resolution ?? 'Theo mô hình' }]} onChange={resolutions.length > 1 ? setModelId : () => undefined} />
               <Select
                 label="Thời lượng"
@@ -917,9 +952,14 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
               <FormNotice text={notice} onHistory={narrow ? () => setTab('history') : undefined} />
             </div>
           )}
+          {reason && !reason.near && (
+            <p className="help" id={reasonId} role="status">
+              {reason.text}
+            </p>
+          )}
           <div className="runbar">
             <RunSummary items={[chosen?.label, ratio, `${durationSec} giây`, audioOn && 'có âm thanh']} />
-            <button type="button" className="primary run" disabled={!canRun} aria-describedby={tooLong ? tooLongId : undefined} onClick={() => void run()}>
+            <button type="button" className="primary run" disabled={!canRun} aria-describedby={reason ? (reason.near ? fieldIds[reason.near] : reasonId) : undefined} onClick={() => void run()}>
               {busy ? (
                 'Đang gửi…'
               ) : (
