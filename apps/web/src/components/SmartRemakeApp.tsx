@@ -2,6 +2,7 @@
 // Smart Remake as its own app: the member gives a reference video and one product image, and nothing else. The video is analysed as soon as it is chosen
 // (the analysis API, as on /analyze); once it has succeeded and a product is set, an AI pass marks the scenes that show a product like theirs (the `scenes`
 // suggestion) and those are pre-ticked in the same RemakePanel /analyze uses, which shows the price and makes the video. If the pick fails, nothing is ticked.
+// Or the member picks a reference video an Admin shared (SharedVideos), whose analysis is already done.
 import { REMAKE_MAX_SHOTS } from '@cvs/core/analysis/remake';
 import { useEffect, useRef, useState } from 'react';
 import { api, errorText, sendJson } from '@/lib/api';
@@ -13,6 +14,7 @@ import { AppAbout, AppHeader, TAB_LABEL } from './AppPage';
 import { copyError, type Img, Slot, uploadError, uploadImages, uploadVideoDirect, WorkTabs } from './image-tools';
 import { ReferenceVideoSlot, type RefVideo } from './ReferenceVideo';
 import { RemakePanel, remakeDrafts } from './RemakePanel';
+import { SharedVideos } from './SharedVideos';
 import { useSuggest } from './Suggestions';
 import { YourRemakes } from './YourRemakes';
 
@@ -56,7 +58,7 @@ export function SmartRemakeApp({ app, initialId, initialProductId }: { app: AppC
   const wanted = useRef(''); // the video whose analysis is being started
   const pick = useSuggest();
 
-  // Opens the analysis the address names, with its product image when it still opens; the APIs only give the member's own.
+  // Opens the analysis the address names, with its product image when it still opens; the APIs give only the member's own analyses and images, or a shared analysis.
   useEffect(() => {
     if (!initialId) return;
     let live = true;
@@ -65,8 +67,7 @@ export function SmartRemakeApp({ app, initialId, initialProductId }: { app: AppC
       async (row) => {
         const img = await image;
         if (!live || wanted.current) return; // the member already chose a video
-        setAnalysis(row);
-        if (row.sourceAssetId) setVideo({ id: row.sourceAssetId, filename: 'Video mẫu', durationMs: Math.round((row.result?.durationS ?? 0) * 1000) });
+        showAnalysis(row);
         if (img) setProduct((p) => (p.length ? p : [img])); // one the member added meanwhile stays
       },
       () => {
@@ -108,6 +109,21 @@ export function SmartRemakeApp({ app, initialId, initialProductId }: { app: AppC
       clearTimeout(timer);
     };
   }, [analysisId, open]);
+
+  // An analysis to work from with its reference video shown as chosen: the one the address names, or a shared one picked from the shelf.
+  function showAnalysis(row: AnalysisRow) {
+    setAnalysis(row);
+    setVideo(row.sourceAssetId ? { id: row.sourceAssetId, filename: row.sharedTitle ?? 'Video mẫu', durationMs: Math.round((row.result?.durationS ?? 0) * 1000) } : null);
+  }
+
+  // A shared reference video picked on the shelf: its analysis opens unless the member chose another video meanwhile (as analyse() guards it).
+  // A failed fetch is the shelf's to report.
+  async function takeShared(id: string) {
+    wanted.current = id; // an upload still being analysed, or the address' analysis still loading, no longer takes over
+    setError('');
+    const row = await api<AnalysisRow>(`/api/analyses/${encodeURIComponent(id)}`);
+    if (wanted.current === id) showAnalysis(row);
+  }
 
   async function take(get: () => Promise<RefVideo[]>, failed: (e: unknown) => string) {
     setError('');
@@ -206,6 +222,7 @@ export function SmartRemakeApp({ app, initialId, initialProductId }: { app: AppC
                 setAsked('');
               }}
             />
+            <SharedVideos busy={locked} currentId={analysis?.id} onPick={takeShared} />
             <Slot label="Ảnh sản phẩm" empty="Thêm 1 ảnh sản phẩm" inputLabel="Ảnh sản phẩm" images={product} max={1} busy={locked} onAdd={(files) => void addProduct(files)} onRemove={() => setProduct([])} onPick={(a) => setProduct([a])} slot="product" />
             <p className="help">Mẹo: dùng ảnh sản phẩm rõ nét trên nền trơn, cùng loại sản phẩm với trong video mẫu (áo thay cho áo).</p>
             {status && (

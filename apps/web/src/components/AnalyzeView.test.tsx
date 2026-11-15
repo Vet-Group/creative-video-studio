@@ -100,3 +100,16 @@ test('a thumbnail that is ready is an image button labelled with its scene; one 
   expect(html.match(/class="analysis-frame"/g)).toHaveLength(2);
   expect(renderToStaticMarkup(<AnalysisResult analysis={analysis} seek={() => undefined} frames={null} />)).not.toContain('analysis-frame'); // a failed cut shows none
 });
+
+test('an Admin sees a share action on a finished result, or the shared title with an unshare action; a member sees neither', () => {
+  const share = renderToStaticMarkup(<AnalysisPanel row={base} onClose={() => undefined} onShared={() => undefined} />);
+  expect(share).toContain('Chia sẻ làm video mẫu…');
+  expect(share).not.toContain('Gỡ khỏi video mẫu');
+  const shared = renderToStaticMarkup(<AnalysisPanel row={{ ...base, sharedTitle: 'Áo thun trơn' }} onClose={() => undefined} onShared={() => undefined} />);
+  expect(shared).toContain('Áo thun trơn');
+  expect(shared).toContain('Gỡ khỏi video mẫu');
+  expect(shared).not.toContain('Chia sẻ làm video mẫu…');
+  const member = renderToStaticMarkup(<AnalysisPanel row={{ ...base, sharedTitle: 'Áo thun trơn' }} onClose={() => undefined} />);
+  expect(member).not.toContain('video mẫu');
+  expect(renderToStaticMarkup(<AnalysisPanel row={{ ...base, status: 'running', result: null }} onClose={() => undefined} onShared={() => undefined} />)).not.toContain('video mẫu'); // only a finished one
+});

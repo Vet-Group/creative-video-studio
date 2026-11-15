@@ -982,3 +982,16 @@ describe('migration 0079 model name case', () => {
     ]);
   });
 });
+
+describe('migration 0098 shared analyses', () => {
+  test('sets a shared title and its time together or neither, with a partial index for the shared list', async () => {
+    const analysis = (id: string, title: string | null, at: string | null) =>
+      pool.query(`insert into analyses (id, user_id, team_id, source_key, shared_title, shared_at) values ($1, $2, 'team-unassigned', $1, $3, $4)`, [id, userId, title, at]);
+    await analysis('sa1', null, null);
+    await analysis('sa2', 'Áo thun', '2026-11-15T10:00:00Z');
+    await expect(analysis('sa3', 'Áo thun', null)).rejects.toThrow(/analyses_shared_check/);
+    await expect(analysis('sa4', null, '2026-11-15T10:00:00Z')).rejects.toThrow(/analyses_shared_check/);
+    const index = await pool.query(`select indexdef from pg_indexes where indexname = 'analyses_shared_at_idx'`);
+    expect(index.rows[0].indexdef).toContain('WHERE (shared_at IS NOT NULL)');
+  });
+});

@@ -356,4 +356,18 @@ describe('/api/suggestions scenes (Smart Remake)', () => {
       flags(false);
     }
   });
+
+  test('queues a pick of another member’s analysis while an Admin shares it, still with the caller’s own image, and refuses it once unshared', async () => {
+    flags(true);
+    try {
+      const { u, other, img } = await setup();
+      await pool.query(`update analyses set shared_title = 'Tee', shared_at = now() where id = $1`, [`${other.id}-ok`]);
+      expect((await ask(u, { field: 'scenes', analysisId: `${other.id}-ok`, productAssetId: img })).status).toBe(202);
+      expect((await ask(u, { field: 'scenes', analysisId: `${other.id}-ok`, productAssetId: `${other.id}-img` })).status).toBe(403);
+      await pool.query(`update analyses set shared_title = null, shared_at = null where id = $1`, [`${other.id}-ok`]);
+      expect((await ask(u, { field: 'scenes', analysisId: `${other.id}-ok`, productAssetId: img })).status).toBe(404);
+    } finally {
+      flags(false);
+    }
+  });
 });

@@ -4,6 +4,9 @@ import { type Analysis, mergeShots } from '@cvs/core/analysis/breakdown';
 // worker). Mirrors the worker's reaAnalyzeEnabled (apps/worker/src/analyze.ts); the two tiers read the same env.
 export const reaAnalyzeEnabled = (): boolean => process.env.REA_ANALYZE_ENABLED === '1';
 
+/** The longest title an Admin may give an analysis shared as a Smart Remake reference video (the share route and its dialog). */
+export const MAX_SHARED_TITLE = 80;
+
 // rea-video's `format` is a short label the model may return localized (English or, seen in spikes, Chinese). Map the
 // common ones to Vietnamese; fall back to the model's own text when it is something we have not labelled.
 const FORMAT_LABELS: Record<string, string> = {

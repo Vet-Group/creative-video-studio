@@ -23,8 +23,8 @@ export async function GET(request: Request) {
   return Response.json({ remakes: rows });
 }
 
-/** Queues a Smart Remake: one of the caller's own images put into chosen shots of one of their finished analyses, on the worker.
- * Answers with the new remake id to poll. */
+/** Queues a Smart Remake: one of the caller's own images put into chosen shots of one of their finished analyses, or of one an Admin shared, on the worker.
+ * A remake of their own analysis takes its store; one of a shared analysis has none, as the sharer's store is not the caller's. Answers with the new remake id to poll. */
 export async function POST(request: Request) {
   if (!reaRemakeEnabled()) return notHere();
   const g = await guard(request, 'member');
@@ -35,7 +35,7 @@ export async function POST(request: Request) {
   if (typeof analysisId !== 'string' || typeof productAssetId !== 'string') return bad('analysisId, productAssetId and shots are required');
 
   const userId = g.session.user.id;
-  const analysis = (await pool.query('select status, result, store_id from analyses where id = $1 and user_id = $2', [analysisId, userId])).rows[0];
+  const analysis = (await pool.query('select status, result, store_id, user_id = $2 as own from analyses where id = $1 and (user_id = $2 or shared_at is not null)', [analysisId, userId])).rows[0];
   if (!analysis) return bad('the analysis does not exist', 404);
   if (analysis.status !== 'succeeded') return bad('the analysis has not finished');
   // A remake takes whole scenes, as the result list and the picker show them: each is chosen by its first stored shot (mergeShots).
@@ -70,7 +70,7 @@ export async function POST(request: Request) {
     await tx.query(
       `insert into remakes (id, user_id, team_id, store_id, analysis_id, product_asset_id, shots)
          values ($1, $2, (select team_id from users where id = $2), $3, $4, $5, $6)`,
-      [id, userId, analysis.store_id, analysisId, productAssetId, JSON.stringify(shots)],
+      [id, userId, analysis.own ? analysis.store_id : null, analysisId, productAssetId, JSON.stringify(shots)],
     );
     return null;
   });

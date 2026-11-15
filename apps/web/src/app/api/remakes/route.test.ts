@@ -170,3 +170,19 @@ test('deletes a finished remake with its output assets, keeps the product image 
   expect((await analysis('an-del')).status).toBe(204);
   expect(await exists('analyses', 'an-del')).toBe(false);
 });
+
+test('remakes another member’s analysis while an Admin shares it, with the caller’s own image and no store, and refuses it once unshared', async () => {
+  await pool.query(
+    `insert into analyses (id, user_id, team_id, store_id, source_key, status, result, shared_title, shared_at)
+       select 'an-shared', u.id, u.team_id, 'store-ok', 's3/theirs', 'succeeded', a.result, 'Tee', now() from analyses a, users u where a.id = 'an-theirs' and u.email = 'other@example.test'`,
+  );
+  const shared = { ...ok, analysisId: 'an-shared' };
+  const storeOf = async (res: Response) => (await pool.query('select store_id from remakes where id = $1', [((await res.json()) as { id: string }).id])).rows[0].store_id;
+  expect(await storeOf(await post(shared))).toBeNull(); // the sharer's store is not the caller's
+  expect(await storeOf(await post({ ...shared, storeId: 'store-ok' }))).toBeNull(); // a store sent in the body is ignored
+  expect((await post({ ...shared, productAssetId: 'img-theirs' })).status).toBe(403); // the product must still be the caller's own image
+  expect(await errorOf(await post({ ...shared, shots: [9] }))).toBe('shot 9 is not in the analysis');
+  await pool.query(`update analyses set shared_title = null, shared_at = null where id = 'an-shared'`);
+  const unshared = await post(shared);
+  expect([unshared.status, await errorOf(unshared)]).toEqual([404, 'the analysis does not exist']);
+});

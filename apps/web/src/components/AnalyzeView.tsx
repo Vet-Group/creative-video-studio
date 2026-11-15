@@ -20,6 +20,7 @@ import { AnalysisHistory } from './AnalysisHistory';
 import { copyError, uploadError, uploadVideoDirect, WorkTabs } from './image-tools';
 import { ReferenceVideoSlot, type RefVideo } from './ReferenceVideo';
 import { RemakePanel } from './RemakePanel';
+import { SharedVideos, ShareControl } from './SharedVideos';
 
 type Tab = 'result' | 'create' | 'history' | 'examples' | 'about';
 const TAB_LABEL: Record<Tab, string> = { result: 'Kết quả', create: 'Phân tích', history: 'Lịch sử', examples: 'Ví dụ', about: 'Giới thiệu' };
@@ -31,6 +32,7 @@ export interface AnalysisRow {
   error: string | null;
   createdAt: string;
   sourceAssetId: string | null; // the input video, recovered from the analysis' source_key; null if that asset was deleted
+  sharedTitle?: string | null; // set while an Admin shares it as a Smart Remake reference video
 }
 
 const terminal = (s: string): boolean => s === 'succeeded' || s === 'failed';
@@ -171,8 +173,8 @@ export function AnalysisWithSource({ analysis, src, poster, preload = 'metadata'
   );
 }
 
-/** One analysis, its status and result: the Kết quả tab on a wide screen and the Phân tích panel on a phone. */
-export function AnalysisPanel({ row, onRetry, onClose, remakeEnabled = false }: { row: AnalysisRow; onRetry?: () => void; onClose: () => void; remakeEnabled?: boolean }) {
+/** One analysis, its status and result: the Kết quả tab on a wide screen and the Phân tích panel on a phone. `onShared`, for an Admin, adds the share control. */
+export function AnalysisPanel({ row, onRetry, onClose, remakeEnabled = false, onShared }: { row: AnalysisRow; onRetry?: () => void; onClose: () => void; remakeEnabled?: boolean; onShared?: (id: string, sharedTitle: string | null) => void }) {
   const waiting = !terminal(row.status);
   const elapsed = waiting ? elapsedLabel(row) : null;
   return (
@@ -206,6 +208,7 @@ export function AnalysisPanel({ row, onRetry, onClose, remakeEnabled = false }: 
       {row.status === 'succeeded' && row.result && (
         <>
           <AnalysisWithSource analysis={row.result} src={row.sourceAssetId ? `/api/assets/${row.sourceAssetId}/content` : undefined} />
+          {onShared && <ShareControl key={row.id} row={row} onSaved={onShared} />}
           {/* key: another analysis opened resets the product and shot pick */}
           {remakeEnabled && <RemakePanel key={row.id} row={row} />}
         </>
@@ -237,8 +240,8 @@ function Examples({ busy, onUse }: { busy: boolean; onUse: (video: string) => vo
 /** The address follows the analysis on view, without a navigation or a scroll. */
 const syncUrl = (id: string | null) => window.history.replaceState(null, '', id ? `/analyze?analysis=${id}` : '/analyze');
 
-/** `remakeEnabled`: REA_REMAKE_ENABLED, which adds Smart Remake under a finished analysis. */
-export function AnalyzeView({ initialId, remakeEnabled = false }: { initialId?: string; remakeEnabled?: boolean }) {
+/** `remakeEnabled`: REA_REMAKE_ENABLED, which adds Smart Remake under a finished analysis and the shared reference videos on the Examples tab. `isAdmin` adds the share control. */
+export function AnalyzeView({ initialId, remakeEnabled = false, isAdmin = false }: { initialId?: string; remakeEnabled?: boolean; isAdmin?: boolean }) {
   const narrow = useMediaQuery(NARROW);
   const [tab, setTab] = useState<Tab | null>(null); // null: the default for the width (the form below 1024 px, else the result when there is one, else Examples)
   const [video, setVideo] = useState<RefVideo | null>(null);
@@ -365,6 +368,13 @@ export function AnalyzeView({ initialId, remakeEnabled = false }: { initialId?: 
     }
   }
 
+  // An Admin shared or unshared an analysis: its row on view (while still that one) and in History follow.
+  const shared = (id: string, sharedTitle: string | null) => {
+    setCurrent((c) => (c && c.id === id ? { ...c, sharedTitle } : c));
+    setHistory((h) => h.map((x) => (x.id === id ? { ...x, sharedTitle } : x)));
+  };
+  const onShared = isAdmin ? shared : undefined;
+
   const running = current !== null && !terminal(current.status);
   // Pick a History row to view: stop any live poll and show it.
   const pick = (a: AnalysisRow) => {
@@ -412,13 +422,13 @@ export function AnalyzeView({ initialId, remakeEnabled = false }: { initialId?: 
               </p>
             )}
 
-            {narrow && current && <AnalysisPanel row={current} onRetry={retry} onClose={close} remakeEnabled={remakeEnabled} />}
+            {narrow && current && <AnalysisPanel row={current} onRetry={retry} onClose={close} remakeEnabled={remakeEnabled} onShared={onShared} />}
           </div>
         </div>
 
         <div className="side" id={`analyze-panel-${panel}`} role="tabpanel" aria-labelledby={`analyze-tab-${panel}`} hidden={narrow && shown === 'create'}>
           {shown === 'result' && current ? (
-            <AnalysisPanel row={current} onRetry={retry} onClose={close} remakeEnabled={remakeEnabled} />
+            <AnalysisPanel row={current} onRetry={retry} onClose={close} remakeEnabled={remakeEnabled} onShared={onShared} />
           ) : shown === 'history' ? (
             <section className="analysis-history">
               <h2>Gần đây</h2>
@@ -430,7 +440,10 @@ export function AnalyzeView({ initialId, remakeEnabled = false }: { initialId?: 
               )}
             </section>
           ) : shown === 'examples' ? (
-            <Examples busy={busy} onUse={(name) => void takeSample(name)} />
+            <>
+              {remakeEnabled && <SharedVideos busy={busy} currentId={current?.id} onPick={(id) => api<AnalysisRow>(`/api/analyses/${encodeURIComponent(id)}`).then(pick)} />}
+              <Examples busy={busy} onUse={(name) => void takeSample(name)} />
+            </>
           ) : (
             <About page="analyze" />
           )}
