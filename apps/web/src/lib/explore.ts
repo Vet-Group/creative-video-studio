@@ -17,6 +17,10 @@ export function elapsedLabel(job: { status: string; createdAt: string; startedAt
   return `${job.status === 'queued' ? 'đã chờ' : 'đã chạy'} ${min < 60 ? `${min} phút` : `${Math.floor(min / 60)} giờ ${min % 60} phút`}`;
 }
 
+/** A running job the provider still holds in its own queue (fal's queue_position): how many requests are ahead of it, so a wait there does not look like a stuck job. */
+export const providerQueueLabel = (job: { status: string; providerQueue?: number | null }): string | null =>
+  job.status !== 'running' || job.providerQueue == null ? null : job.providerQueue === 0 ? 'nhà cung cấp sắp chạy' : `nhà cung cấp còn ${job.providerQueue} lượt trước`;
+
 const TYPICAL_SAMPLES = 10;
 const TYPICAL_MIN_SAMPLES = 3;
 

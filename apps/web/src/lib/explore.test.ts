@@ -1,6 +1,6 @@
 import { CANCELED_ERROR } from '@cvs/core/ledger';
 import { expect, test } from 'vitest';
-import { continueJobs, givenName, greeting, jobNote, typicalLabel } from './explore';
+import { continueJobs, givenName, greeting, jobNote, providerQueueLabel, typicalLabel } from './explore';
 
 test('the given name is the last word of a Vietnamese full name', () => {
   expect(givenName('Nguyễn Văn An')).toBe('An');
@@ -82,4 +82,12 @@ test('a running recent job counts its elapsed time from its start', () => {
   const now = Date.parse('2026-11-12T10:00:00Z');
   const job = { status: 'running', error: null, finished_at: null, created_at: new Date(now - 20 * 60_000), started_at: new Date(now - 2 * 60_000) };
   expect(jobNote(job, (d) => d.toISOString(), now)).toBe('Đang tạo · đã chạy 2 phút');
+});
+
+test("providerQueueLabel says how many requests are ahead at the provider, only for a running job it still queues", () => {
+  expect(providerQueueLabel({ status: 'running', providerQueue: 3 })).toBe('nhà cung cấp còn 3 lượt trước');
+  expect(providerQueueLabel({ status: 'running', providerQueue: 0 })).toBe('nhà cung cấp sắp chạy');
+  expect(providerQueueLabel({ status: 'running', providerQueue: null })).toBeNull();
+  expect(providerQueueLabel({ status: 'queued', providerQueue: 2 })).toBeNull();
+  expect(providerQueueLabel({ status: 'succeeded', providerQueue: 1 })).toBeNull();
 });

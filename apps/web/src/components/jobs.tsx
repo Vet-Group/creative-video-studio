@@ -23,7 +23,7 @@ const BASE_TITLE = 'Creative Video Studio';
 const FINISHED = ['succeeded', 'failed', 'failed_unknown', 'timed_out'];
 
 // elapsedLabel lives in lib/explore (server-safe) so the Explore server page can call it; re-exported here for the tray and History.
-export { elapsedLabel } from '@/lib/explore';
+export { elapsedLabel, providerQueueLabel } from '@/lib/explore';
 
 /** Cancel on a queued job, which no provider has been sent yet, so it costs nothing; the tray refreshes after, and a job that started meanwhile says so. */
 export function CancelButton({ job }: { job: TrayJob }) {

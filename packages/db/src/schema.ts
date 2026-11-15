@@ -444,6 +444,8 @@ export const jobs = pgTable(
     inputAssetIds: text('input_asset_ids').array().notNull(),
     status: text('status', { enum: JOB_STATUSES }).notNull().default('queued'),
     providerJobId: text('provider_job_id'),
+    /** While the provider holds a running job in its own queue: how many of its requests are ahead (fal's queue_position, 0 = next); null once it runs or reports none. */
+    providerQueuePosition: integer('provider_queue_position'),
     /** The worker instance that moved the job from queued to submitting. */
     claimedBy: text('claimed_by'),
     error: text('error'),

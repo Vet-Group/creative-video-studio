@@ -29,7 +29,8 @@ export interface ProviderJob {
 export type CostSource = 'reported' | 'estimate';
 
 export type ProviderStatus =
-  | { state: 'queued' | 'running' }
+  /** `queuePosition`: while the provider still queues the job, how many of its requests are ahead (fal's queue_position, 0 = next), when it says. */
+  | { state: 'queued' | 'running'; queuePosition?: number }
   /** `tokens`: the tokens the provider billed, when it reports them (BytePlus Seedance); it feeds the resource pack balance. */
   | { state: 'succeeded'; outputUrl: string; costUsd: number; costSource: CostSource; tokens?: number }
   | { state: 'failed' | 'canceled'; error: string; costUsd: number; costSource: CostSource };
