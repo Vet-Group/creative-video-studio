@@ -169,7 +169,7 @@ test.describe('1440x1000', () => {
     expect(await css(card, 'border-top-left-radius', 'border-top-width', 'box-shadow', 'padding-top', 'padding-right', 'padding-bottom', 'padding-left')).toEqual(['24px', '0px', SHADOW, '24px', '24px', '24px', '24px']);
   });
 
-  test('C2 card height and scroll: sticky at top 16, viewport minus 24 tall, Run pinned under a 1px rgb(204,204,204) divider', async ({ page }) => {
+  test('C2 card height and scroll: sticky at top 16, viewport minus 24 tall, Run pinned under a 1px rgb(204,204,204) divider, the reason Run is off 8 px above it', async ({ page }) => {
     const card = page.locator('.form-card');
     const b = await box(card);
     near(b.y, 16, 'card y');
@@ -180,6 +180,11 @@ test.describe('1440x1000', () => {
     expect(await css(bar, 'border-top-width', 'border-top-style', 'border-top-color', 'padding-top')).toEqual(['1px', 'solid', 'rgb(204, 204, 204)', '16px']);
     near((await box(bar)).height, 99, 'run wrapper height'); // 73 plus the 26 px summary line over Run (model, ratio, length, sound)
     await expect(bar.locator('.run-summary')).toHaveText(/giây/);
+    // With no product photo Run is off, and the line saying so ends 8 px above the divider rather than touching it.
+    const reason = page.locator('.runbar').locator('xpath=preceding-sibling::p[1]');
+    await expect(reason).toHaveText('Tải lên ít nhất 1 ảnh sản phẩm.');
+    const r = await box(reason);
+    near((await box(bar)).y - (r.y + r.height), 8, 'reason line to divider', 1);
     await tab(page, 'Lịch sử').click(); // the Examples pane scrolls the page, as on the live site; an empty History keeps it one screen tall
     expect(await page.evaluate(() => document.documentElement.scrollHeight <= window.innerHeight)).toBe(true);
   });
