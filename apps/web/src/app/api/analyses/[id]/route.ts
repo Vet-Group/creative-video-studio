@@ -3,7 +3,7 @@ import type { RouteContext } from '@/lib/assets';
 import { pool } from '@/lib/auth';
 import { guard } from '@/lib/session';
 
-/** One of the caller's own analyses, polled while it runs. */
+/** One of the caller's own analyses, polled while it runs, or one an Admin shared as a reference video. */
 export async function GET(request: Request, { params }: RouteContext) {
   if (!reaAnalyzeEnabled()) return Response.json({ error: 'not found' }, { status: 404 });
   const g = await guard(request, 'member');
@@ -11,9 +11,9 @@ export async function GET(request: Request, { params }: RouteContext) {
   const { id } = await params;
   const row = (
     await pool.query(
-      `select id, status, provider, model, result, cost_usd as "costUsd", error, created_at as "createdAt", finished_at as "finishedAt",
+      `select id, status, provider, model, result, cost_usd as "costUsd", error, created_at as "createdAt", finished_at as "finishedAt", shared_title as "sharedTitle",
               (select a.id from assets a where a.s3_key = analyses.source_key) as "sourceAssetId"
-         from analyses where id = $1 and user_id = $2`,
+         from analyses where id = $1 and (user_id = $2 or shared_at is not null)`,
       [id, g.session.user.id],
     )
   ).rows[0];

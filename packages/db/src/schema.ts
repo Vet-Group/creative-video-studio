@@ -561,33 +561,45 @@ export type AnalysisStatus = (typeof ANALYSIS_STATUSES)[number];
 // A reference-video analysis produced by rea-video. It is its own entity, not a generation job, so it
 // stays off the jobs pipeline's invariants. `result` holds the derived Analysis the UI shows; `rawKey`
 // points at the stored raw breakdown.json so the later Smart Remake stage can re-parse richer fields
-// without re-running an expensive decompose.
-export const analyses = pgTable('analyses', {
-  id: text('id').primaryKey(),
-  userId: text('user_id')
-    .notNull()
-    .references(() => users.id, { onDelete: 'restrict' }),
-  teamId: text('team_id')
-    .notNull()
-    .references(() => teams.id, { onDelete: 'restrict' }),
-  storeId: text('store_id').references(() => stores.id, { onDelete: 'set null' }),
-  sourceKey: text('source_key').notNull(),
-  status: text('status', { enum: ANALYSIS_STATUSES }).notNull().default('queued'),
-  provider: text('provider'),
-  model: text('model'),
-  result: jsonb('result'),
-  rawKey: text('raw_key'),
-  costUsd: numeric('cost_usd'),
-  error: text('error'),
-  createdAt: tstz('created_at').notNull().defaultNow(),
-  startedAt: tstz('started_at'),
-  finishedAt: tstz('finished_at'),
-});
+// without re-running an expensive decompose. An Admin may share a finished one as a Smart Remake reference video
+// for every member (`sharedTitle` and `sharedAt`, set together); its source video is then readable by all (readableAsset).
+export const analyses = pgTable(
+  'analyses',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'restrict' }),
+    teamId: text('team_id')
+      .notNull()
+      .references(() => teams.id, { onDelete: 'restrict' }),
+    storeId: text('store_id').references(() => stores.id, { onDelete: 'set null' }),
+    sourceKey: text('source_key').notNull(),
+    status: text('status', { enum: ANALYSIS_STATUSES }).notNull().default('queued'),
+    provider: text('provider'),
+    model: text('model'),
+    result: jsonb('result'),
+    rawKey: text('raw_key'),
+    costUsd: numeric('cost_usd'),
+    error: text('error'),
+    createdAt: tstz('created_at').notNull().defaultNow(),
+    startedAt: tstz('started_at'),
+    finishedAt: tstz('finished_at'),
+    sharedTitle: text('shared_title'),
+    sharedAt: tstz('shared_at'),
+  },
+  (t) => [
+    check('analyses_shared_check', sql`(${t.sharedTitle} is null) = (${t.sharedAt} is null)`),
+    index('analyses_shared_at_idx')
+      .on(t.sharedAt)
+      .where(sql`${t.sharedAt} is not null`),
+  ],
+);
 
 export const REMAKE_STATUSES = ['queued', 'running', 'succeeded', 'partial', 'failed'] as const;
 export type RemakeStatus = (typeof REMAKE_STATUSES)[number];
 
-// A Smart Remake: a member's product image put into chosen shots of one of their analyses (@cvs/core/analysis/remake). Like an analysis it is its
+// A Smart Remake: a member's product image put into chosen shots of one of their analyses or a shared one (@cvs/core/analysis/remake). Like an analysis it is its
 // own entity off the jobs pipeline. `shots` are the chosen shot indices in order; `result` records each shot (its clip asset, cost or error) as the
 // worker goes, so a remake whose worker stopped still shows the clips it made. 'partial': some shots made clips. The product image and the output
 // may be purged with a deleted job's files, so those links are dropped rather than blocking the purge.

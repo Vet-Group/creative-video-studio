@@ -356,4 +356,16 @@ describe('/api/suggestions scenes (Smart Remake)', () => {
       flags(false);
     }
   });
+
+  test('queues a pick of another member’s analysis once an Admin shared it, still with the caller’s own image', async () => {
+    flags(true);
+    try {
+      const { u, other, img } = await setup();
+      await pool.query(`update analyses set shared_title = 'Tee', shared_at = now() where id = $1`, [`${other.id}-ok`]);
+      expect((await ask(u, { field: 'scenes', analysisId: `${other.id}-ok`, productAssetId: img })).status).toBe(202);
+      expect((await ask(u, { field: 'scenes', analysisId: `${other.id}-ok`, productAssetId: `${other.id}-img` })).status).toBe(403);
+    } finally {
+      flags(false);
+    }
+  });
 });

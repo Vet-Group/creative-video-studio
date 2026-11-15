@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { type Analysis, mergeShots } from '@cvs/core/analysis/breakdown';
 import { ANALYZE_QUEUE } from '@cvs/core/queue';
 import { reaAnalyzeEnabled } from '@/lib/analyze';
 import { readableAsset, readJson } from '@/lib/assets';
@@ -9,15 +10,22 @@ import { guard } from '@/lib/session';
 const bad = (error: string, status = 400) => Response.json({ error }, { status });
 const notHere = () => Response.json({ error: 'not found' }, { status: 404 });
 
-/** The caller's analyses, newest first, for the analysis page's history. */
+/** The caller's analyses, newest first, for the analysis page's history. `?shared=1`: the analyses an Admin shared as reference videos, from any
+ * owner, newest share first, with only what a card shows (no owner, cost or result). */
 export async function GET(request: Request) {
   if (!reaAnalyzeEnabled()) return notHere();
   const g = await guard(request, 'member');
   if (g.error) return g.error;
+  const source = `(select a.id from assets a where a.s3_key = analyses.source_key) as "sourceAssetId"`;
+  if (new URL(request.url).searchParams.get('shared') === '1') {
+    const { rows } = await pool.query(`select id, shared_title as title, shared_at as "sharedAt", result, ${source} from analyses where shared_at is not null order by shared_at desc limit 50`);
+    return Response.json({
+      analyses: rows.map(({ result, ...r }) => ({ ...r, durationS: (result as Analysis).durationS ?? null, sceneCount: mergeShots(result as Analysis).shots.length })),
+    });
+  }
   const rows = (
     await pool.query(
-      `select id, status, provider, model, result, cost_usd as "costUsd", error, created_at as "createdAt", finished_at as "finishedAt",
-              (select a.id from assets a where a.s3_key = analyses.source_key) as "sourceAssetId"
+      `select id, status, provider, model, result, cost_usd as "costUsd", error, created_at as "createdAt", finished_at as "finishedAt", shared_title as "sharedTitle", ${source}
          from analyses where user_id = $1 order by created_at desc limit 50`,
       [g.session.user.id],
     )

@@ -2,7 +2,7 @@
 // against a disposable database on the compose Postgres. No S3 or rea-video binary: the worker consumes the queue.
 import { randomBytes } from 'node:crypto';
 import { createTestDatabase } from '@cvs/db/testing';
-import { afterAll, beforeAll, expect, test } from 'vitest';
+import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
 const testDb = await createTestDatabase();
 process.env.DATABASE_URL = testDb.url;
@@ -15,13 +15,18 @@ const { auth, pool } = await import('@/lib/auth');
 const { stopBoss } = await import('@/lib/queue');
 const { GET: LIST, POST } = await import('./route');
 const { GET: ONE, DELETE: REMOVE } = await import('./[id]/route');
+const { PUT: SHARE, DELETE: UNSHARE } = await import('./[id]/share/route');
+const { GET: ASSET } = await import('../assets/[id]/route');
+const { GET: CONTENT } = await import('../assets/[id]/content/route');
 
 const PASSWORD = 'correct-horse-battery';
 let cookie = '';
+let adminCookie = '';
 let userId = '';
+let otherId = '';
 
-const call = (path: string, method = 'GET', body?: unknown) =>
-  new Request(`http://localhost${path}`, { method, headers: { cookie, 'content-type': 'application/json' }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
+const call = (path: string, method = 'GET', body?: unknown, as = cookie) =>
+  new Request(`http://localhost${path}`, { method, headers: { cookie: as, 'content-type': 'application/json' }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
 const post = (body: Record<string, unknown>) => POST(call('/api/analyses', 'POST', body));
 const errorOf = async (res: Response) => ((await res.json()) as { error: string }).error;
 const withFlag = async <T>(value: string | undefined, fn: () => Promise<T>): Promise<T> => {
@@ -38,14 +43,22 @@ const withFlag = async <T>(value: string | undefined, fn: () => Promise<T>): Pro
 beforeAll(async () => {
   const { user } = await auth.api.createUser({ body: { email: 'member@example.test', name: 'Member', password: PASSWORD, role: 'member' } });
   const other = await auth.api.createUser({ body: { email: 'other@example.test', name: 'Other', password: PASSWORD, role: 'member' } });
+  await auth.api.createUser({ body: { email: 'admin@example.test', name: 'Admin', password: PASSWORD, role: 'admin' } });
   userId = user.id;
-  const res = await auth.api.signInEmail({ body: { email: 'member@example.test', password: PASSWORD }, asResponse: true });
-  cookie = res.headers.getSetCookie().map((c) => c.split(';')[0]).join('; ');
+  otherId = other.user.id;
+  const signIn = async (email: string) =>
+    (await auth.api.signInEmail({ body: { email, password: PASSWORD }, asResponse: true })).headers
+      .getSetCookie()
+      .map((c) => c.split(';')[0])
+      .join('; ');
+  cookie = await signIn('member@example.test');
+  adminCookie = await signIn('admin@example.test');
   await pool.query(
     `insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, duration_ms) values
        ('v1', $1, 'input', 's3/v1', 'ref.mp4', 'video/mp4', 1000, 5000),
        ('img', $1, 'input', 's3/img', 'a.png', 'image/png', 1, null),
-       ('v-theirs', $2, 'input', 's3/theirs', 't.mp4', 'video/mp4', 1000, 5000)`,
+       ('v-theirs', $2, 'input', 's3/theirs', 't.mp4', 'video/mp4', 1000, 5000),
+       ('v-shared', $2, 'input', 's3/shared', 'tee-front.mp4', 'video/mp4', 1000, 8000)`,
     [userId, other.user.id],
   );
   await pool.query(`insert into stores (id, name, code) values ('store-ok', 'Shop', 'SOK'), ('store-hidden', 'Gone', 'SGONE')`);
@@ -139,4 +152,77 @@ test('refuses an analysis a remake was made from with 409, not a database error'
 
 test('delete 404s while the feature is off', async () => {
   await withFlag(undefined, async () => expect((await remove('x')).status).toBe(404));
+});
+
+describe('shared reference videos', () => {
+  const shots = JSON.stringify({ durationS: 8, shots: [1, 2, 3].map((index) => ({ index, start: index - 1, end: index, role: 'r', prompt: index < 3 ? 'same' : 'other' })) });
+  const share = (id: string, body: unknown, as = adminCookie) => SHARE(call(`/api/analyses/${id}/share`, 'PUT', body, as), { params: Promise.resolve({ id }) });
+  const unshare = (id: string, as = adminCookie) => UNSHARE(call(`/api/analyses/${id}/share`, 'DELETE', undefined, as), { params: Promise.resolve({ id }) });
+  const audits = async (id: string) => (await pool.query(`select action, new_value from audit_entries where target = $1 order by created_at, id`, [`analysis:${id}`])).rows;
+  const shared = async () => ((await (await LIST(call('/api/analyses?shared=1'))).json()) as { analyses: Record<string, unknown>[] }).analyses;
+  const asset = (id: string, route = ASSET) => route(call(`/api/assets/${id}`), { params: Promise.resolve({ id }) });
+
+  beforeAll(async () => {
+    await pool.query(
+      `insert into analyses (id, user_id, team_id, source_key, status, result, cost_usd) select 'an-share', u.id, u.team_id, 's3/shared', 'succeeded', $2::jsonb, 0.5 from users u where u.id = $1
+         union all select 'an-share-running', u.id, u.team_id, 's3/theirs', 'running', null, null from users u where u.id = $1`,
+      [otherId, shots],
+    );
+  });
+
+  test('only an Admin shares, only a finished analysis, under a trimmed title of 1 to 80 characters', async () => {
+    expect((await share('an-share', { title: 'Tee' }, cookie)).status).toBe(403);
+    expect((await unshare('an-share', cookie)).status).toBe(403);
+    expect(await errorOf(await share('an-share-running', { title: 'Tee' }))).toBe('only a finished analysis can be shared');
+    for (const title of ['   ', 'x'.repeat(81), 7, undefined]) expect(await errorOf(await share('an-share', { title }))).toBe('title must be 1 to 80 characters');
+    expect((await share('nope', { title: 'Tee' })).status).toBe(404);
+    expect((await pool.query(`select shared_title from analyses where id = 'an-share'`)).rows[0].shared_title).toBeNull();
+    await withFlag(undefined, async () => expect((await share('an-share', { title: 'Tee' })).status).toBe(404));
+  });
+
+  test('shares, renames in place and unshares, each change audited once', async () => {
+    const first = await share('an-share', { title: '  Áo thun trơn  ' });
+    expect(first.status).toBe(200);
+    const { sharedAt } = (await first.json()) as { sharedTitle: string; sharedAt: string };
+    expect(sharedAt).toBeTruthy();
+    expect(((await (await share('an-share', { title: 'Áo thun trơn' })).json()) as object)).toEqual({ sharedTitle: 'Áo thun trơn', sharedAt }); // a repeat
+    expect(((await (await share('an-share', { title: 'Tee' })).json()) as object)).toEqual({ sharedTitle: 'Tee', sharedAt }); // renamed, same place on the shelf
+    expect(((await (await unshare('an-share')).json()) as object)).toEqual({ sharedTitle: null, sharedAt: null });
+    expect((await unshare('an-share')).status).toBe(200); // a repeat
+    expect(await audits('an-share')).toEqual([
+      { action: 'analysis.share', new_value: { sharedTitle: 'Áo thun trơn' } },
+      { action: 'analysis.share', new_value: { sharedTitle: 'Tee' } },
+      { action: 'analysis.unshare', new_value: { sharedTitle: null } },
+    ]);
+  });
+
+  test('every member lists the shared ones, newest share first, with only what a card shows', async () => {
+    expect(await shared()).toEqual([]);
+    await pool.query(`insert into analyses (id, user_id, team_id, source_key, status, result) select 'an-mine-shared', u.id, u.team_id, 's3/v1', 'succeeded', $2::jsonb from users u where u.id = $1`, [userId, shots]);
+    await share('an-mine-shared', { title: 'Mine' });
+    await share('an-share', { title: 'Tee' });
+    const list = await shared();
+    expect(list.map((a) => a.id)).toEqual(['an-share', 'an-mine-shared']);
+    expect(list[0]).toEqual({ id: 'an-share', title: 'Tee', sharedAt: expect.any(String), sourceAssetId: 'v-shared', durationS: 8, sceneCount: 2 }); // no owner, cost or result
+    const own = ((await (await LIST(call('/api/analyses'))).json()) as { analyses: { id: string; sharedTitle: string | null }[] }).analyses;
+    expect(own.some((a) => a.id === 'an-share')).toBe(false); // the own list stays the caller's
+    expect(own.find((a) => a.id === 'an-mine-shared')?.sharedTitle).toBe('Mine');
+  });
+
+  test('a shared analysis opens for any member, and another member’s unshared one still does not', async () => {
+    const got = await ONE(call('/api/analyses/an-share'), { params: Promise.resolve({ id: 'an-share' }) });
+    expect(got.status).toBe(200);
+    expect((await got.json()) as object).toMatchObject({ id: 'an-share', status: 'succeeded', sharedTitle: 'Tee', sourceAssetId: 'v-shared' });
+    expect((await ONE(call('/api/analyses/an-share-running'), { params: Promise.resolve({ id: 'an-share-running' }) })).status).toBe(404);
+  });
+
+  test('the source video of a shared analysis is readable by any member while it is shared, and nothing else of its owner is', async () => {
+    expect((await asset('v-shared')).status).toBe(200);
+    expect((await asset('v-theirs')).status).toBe(403); // the owner's other video, the source of an unshared analysis
+    expect((await asset('v-theirs', CONTENT)).status).toBe(403);
+    await unshare('an-share');
+    expect((await asset('v-shared')).status).toBe(403);
+    expect((await asset('v-shared', CONTENT)).status).toBe(403);
+    await share('an-share', { title: 'Tee' });
+  });
 });

@@ -170,3 +170,21 @@ test('deletes a finished remake with its output assets, keeps the product image 
   expect((await analysis('an-del')).status).toBe(204);
   expect(await exists('analyses', 'an-del')).toBe(false);
 });
+
+test('remakes another member’s analysis once an Admin shared it, with the caller’s own image and the store they name, or none', async () => {
+  await pool.query(`insert into stores (id, name, code, hidden) values ('store-hidden', 'Gone', 'SGONE', true)`);
+  await pool.query(
+    `insert into analyses (id, user_id, team_id, store_id, source_key, status, result, shared_title, shared_at)
+       select 'an-shared', u.id, u.team_id, null, 's3/theirs', 'succeeded', result, 'Tee', now() from analyses a, users u where a.id = 'an-theirs' and u.email = 'other@example.test'`,
+  );
+  const shared = { ...ok, analysisId: 'an-shared' };
+  const storeOf = async (res: Response) => (await pool.query('select store_id from remakes where id = $1', [((await res.json()) as { id: string }).id])).rows[0].store_id;
+  expect(await storeOf(await post(shared))).toBeNull();
+  expect(await storeOf(await post({ ...shared, storeId: 'store-ok' }))).toBe('store-ok');
+  expect(await errorOf(await post({ ...shared, storeId: 'store-hidden' }))).toBe('the store does not exist or is hidden');
+  expect(await errorOf(await post({ ...shared, storeId: 'nope' }))).toBe('the store does not exist or is hidden');
+  expect(await errorOf(await post({ ...shared, storeId: 7 }))).toBe('storeId must be a string');
+  expect((await post({ ...shared, productAssetId: 'img-theirs' })).status).toBe(403); // the product must still be the caller's own image
+  expect(await errorOf(await post({ ...shared, shots: [9] }))).toBe('shot 9 is not in the analysis');
+  expect(await storeOf(await post({ ...ok, storeId: 'store-hidden' }))).toBe('store-ok'); // the caller's own analysis keeps its store, whatever is sent
+});

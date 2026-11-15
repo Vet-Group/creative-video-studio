@@ -211,7 +211,8 @@ export function audioDurationMs(b: Uint8Array, mime: string): number | undefined
 
 /**
  * The asset for a signed-in user: 404 when it does not exist, 403 unless the user owns it, is an Admin, or it belongs to a Library clip (its video, poster
- * or input images), is the photo of a company or store choice (user_choices) or of a shared AI model (fashion_models), which every member sees.
+ * or input images), is the photo of a company or store choice (user_choices) or of a shared AI model (fashion_models), or is the source video of an
+ * analysis shared as a Smart Remake reference video, which every member sees.
  */
 export async function readableAsset(session: Session, id: string): Promise<{ asset: Asset; error?: never } | { asset?: never; error: Response }> {
   const asset = await findAsset(db, id);
@@ -220,8 +221,9 @@ export async function readableAsset(session: Session, id: string): Promise<{ ass
     const inLibrary = await pool.query(
       `select 1 from jobs j where ${LIVE_CLIP} and ($1 in (j.output_asset_id, j.poster_asset_id) or $1 = any(j.input_asset_ids))
        union all select 1 from user_choices c where c.image_asset_id = $1 and (c.is_company or c.store_id is not null)
-       union all select 1 from fashion_models f where f.asset_id = $1 and f.shared and f.deleted_at is null limit 1`,
-      [id],
+       union all select 1 from fashion_models f where f.asset_id = $1 and f.shared and f.deleted_at is null
+       union all select 1 from analyses an where an.source_key = $2 and an.shared_at is not null limit 1`,
+      [id, asset.s3Key],
     );
     if (!inLibrary.rowCount) return { error: Response.json({ error: 'forbidden' }, { status: 403 }) };
   }

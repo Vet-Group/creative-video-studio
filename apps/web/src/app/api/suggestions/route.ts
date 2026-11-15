@@ -110,11 +110,11 @@ export async function POST(request: Request) {
   return queue(userId, input);
 }
 
-/** Smart Remake's scene pick: a vision call on one still per scene of the member's finished analysis, with their product image. The server chooses every key it sends. */
+/** Smart Remake's scene pick: a vision call on one still per scene of the member's finished analysis (or a shared one), with their product image. The server chooses every key it sends. */
 async function scenes(session: Session, b: { analysisId?: unknown; productAssetId?: unknown }): Promise<Response> {
   if (!smartRemakeAppEnabled()) return bad('not found', 404);
   if (typeof b.analysisId !== 'string' || typeof b.productAssetId !== 'string') return bad('analysisId and productAssetId are required');
-  const analysis = (await pool.query('select status, result, source_key from analyses where id = $1 and user_id = $2', [b.analysisId, session.user.id])).rows[0];
+  const analysis = (await pool.query('select status, result, source_key from analyses where id = $1 and (user_id = $2 or shared_at is not null)', [b.analysisId, session.user.id])).rows[0];
   if (!analysis) return bad('the analysis does not exist', 404);
   if (analysis.status !== 'succeeded') return bad('the analysis has not finished');
   const found = await readableAsset(session, b.productAssetId);
