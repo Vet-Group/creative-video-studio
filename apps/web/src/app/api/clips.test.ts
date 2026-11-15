@@ -200,7 +200,7 @@ describe('GET /api/library', () => {
     expect(body.clips.find((c) => c.id === a)).toEqual({
       id: a, creator: { id: alice.id, name: 'Nguyễn Văn Đạt' }, createdAt: '2026-10-22T17:30:00.000Z', modelId: 'fal-test', modelLabel: 'Fal test', ratio: '1:1', durationSec: 8, lengthSec: null,
       feature: 'video', mediaType: 'video', resolution: null, isMock: false, videoAssetId: 'lib-a-video', posterAssetId: 'lib-a-poster', storeId: null, storeName: null, costUsd: '1.6000', costFinal: true, verdict: { verdict: 'fail', fault: 'flicker', featured: false, markedBy: alice.id },
-      favorite: false, example: false, prompt: null, canEdit: false, mine: false, downloadName: expect.stringMatching(/^20261023-nguyen-van-dat-lib-a\.mp4$/),
+      favorite: false, example: false, productType: null, prompt: null, canEdit: false, mine: false, downloadName: expect.stringMatching(/^20261023-nguyen-van-dat-lib-a\.mp4$/),
     });
     expect(body.clips.find((c) => c.id === b)).toMatchObject({ isMock: true, costFinal: false, verdict: null, canEdit: true }); // bob is the creator
     expect(body.creators).toEqual(expect.arrayContaining([{ id: alice.id, name: 'Nguyễn Văn Đạt' }, { id: bob.id, name: 'Bob' }]));
@@ -644,9 +644,34 @@ describe('/api/jobs/:id/example', () => {
     expect((await GET_LIBRARY(req('/api/library?example=yes', bob.cookie))).status).toBe(400);
   });
 
-  test('refuses a result of a page without such a tab', async () => {
-    const id = await clip(alice.id, { model: 'example-test' }); // a Create video clip: its Examples tab shows only the fixed samples
+  test('refuses a result of a page without such a tab, and takes a Create video', async () => {
+    const id = await clip(alice.id, { model: 'example-test' });
+    await pool.query(`update jobs set feature = 'background_changer' where id = $1`, [id]); // an app: its page has no Examples tab
     expect((await call(PUT_EXAMPLE, 'PUT', admin.cookie, id)).status).toBe(400);
+    const video = await clip(alice.id, { model: 'example-test' }); // Create's tab shows Admin-chosen clips before its fixed samples
+    expect((await call(PUT_EXAMPLE, 'PUT', admin.cookie, video)).status).toBe(200);
+    expect(await libraryIds(bob.cookie, '?kind=video&example=1')).toContain(video);
+  });
+
+  test('an Admin tags an example with a product type, changes and clears it with a later PUT, each change audited; an unknown type is refused', async () => {
+    const id = await tryOn(alice.id);
+    const put = (body: unknown) => PUT_EXAMPLE(req(`/api/jobs/${id}/example`, admin.cookie, { method: 'PUT', body: JSON.stringify(body) }), ctx(id));
+    const typeOf = async () => ((await (await GET_LIBRARY(req('/api/library?kind=try_on&example=1', bob.cookie))).json()) as { clips: { id: string; productType: string | null }[] }).clips.find((c) => c.id === id)?.productType;
+    for (const productType of ['shirt', 'Mug', '', 1, ['mug']]) expect((await put({ productType })).status, JSON.stringify(productType)).toBe(400);
+    expect(await typeOf()).toBeUndefined(); // a refused one never goes up
+    expect(await (await put({ productType: 'mug' })).json()).toEqual({ example: true });
+    expect(await typeOf()).toBe('mug');
+    expect((await put({ productType: 'tumbler' })).status).toBe(200);
+    expect((await put({})).status).toBe(200); // no type given: it stays
+    expect(await typeOf()).toBe('tumbler');
+    expect((await put({ productType: 'shirt' })).status).toBe(400);
+    expect((await put({ productType: null })).status).toBe(200);
+    expect(await typeOf()).toBeNull();
+    expect((await audits(`job:${id}`)).filter((a) => a.action.startsWith('example.'))).toEqual([
+      { actor_id: admin.id, action: 'example.add', old_value: { example: false }, new_value: { example: true, productType: 'mug' } },
+      { actor_id: admin.id, action: 'example.type', old_value: { productType: 'mug' }, new_value: { productType: 'tumbler' } },
+      { actor_id: admin.id, action: 'example.type', old_value: { productType: 'tumbler' }, new_value: { productType: null } },
+    ]);
   });
 
   test('the check lists the examples of the same feature, those sharing an input photo (same asset or same bytes) first', async () => {
@@ -702,7 +727,7 @@ describe('/api/jobs/:id/example', () => {
     expect(await list()).toEqual([c, b, a]); // never ordered: newest first
     expect(await list(alice.cookie)).toBe(403);
     expect((await order([a, b, c], alice.cookie)).status).toBe(403);
-    expect((await order([a, b, c], admin.cookie, 'video')).status).toBe(400);
+    expect((await order([a, b, c], admin.cookie, 'background_changer')).status).toBe(400); // a page without an Examples tab
     expect((await order([a, a, b])).status).toBe(400);
 
     expect(await (await order([b, a, c])).json()).toEqual({ ids: [b, a, c] });

@@ -1,9 +1,10 @@
-// Upload batching, the empty slot's icon, the audio switch's closed state and the refill fallback with its note.
+// Upload batching, the empty slot's icon, the audio switch's closed state, the refill fallback with its note and the Examples filter by product type.
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, expect, test, vi } from 'vitest';
+import type { Clip } from '@/lib/api';
 import { decodeOptimizerImage, optimizeImage } from '@/lib/media-optimizer';
 import { AudioSwitch } from './AudioSwitch';
-import { nearestOption, pastedImages, refillNote, shrinkImage, Slot, uploadImages } from './image-tools';
+import { nearestOption, pastedImages, ProductTypeFilter, refillNote, shownType, shrinkImage, Slot, uploadImages } from './image-tools';
 
 vi.mock('@/lib/media-optimizer', () => ({ decodeOptimizerImage: vi.fn(), optimizeImage: vi.fn() }));
 
@@ -101,4 +102,21 @@ test('a photo over 10 MB is shrunk (scaled down until it fits) and uploaded, and
   vi.mocked(decodeOptimizerImage).mockResolvedValue({ width: 4000, height: 3000 } as ImageBitmap);
   vi.mocked(optimizeImage).mockImplementation(async (_i, _w, _h, type) => new Blob([new Uint8Array(11 * MB)], { type }));
   await expect(uploadImages([big])).rejects.toThrow('quá lớn');
+});
+
+const tagged = (id: string, productType: string | null) => ({ id, productType }) as Clip;
+
+test('the Examples filter lists All and only the product types the tab carries, in their order, the chosen one pressed', () => {
+  const items = [tagged('a', 'mug'), tagged('b', null), tagged('c', 'tshirt'), tagged('d', 'mug')];
+  const html = renderToStaticMarkup(<ProductTypeFilter items={items} value="mug" onChange={() => undefined} />);
+  expect(html).toContain('role="group" aria-label="Lọc theo loại hàng"');
+  expect([...html.matchAll(/aria-pressed="(true|false)">([^<]*)</g)].map((m) => [m[2], m[1]])).toEqual([['Tất cả', 'false'], ['Áo thun', 'false'], ['Cốc', 'true']]);
+  expect(renderToStaticMarkup(<ProductTypeFilter items={[tagged('b', null)]} value="" onChange={() => undefined} />)).toBe(''); // no tagged example: no filter
+});
+
+test('a chosen product type no example carries any more falls back to all', () => {
+  const items = [tagged('a', 'mug')];
+  expect(shownType(items, 'mug')).toBe('mug');
+  expect(shownType(items, 'cap')).toBe('');
+  expect(shownType(items, '')).toBe('');
 });

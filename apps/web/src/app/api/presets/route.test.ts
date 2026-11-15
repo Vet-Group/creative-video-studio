@@ -44,12 +44,12 @@ describe('GET /api/presets', () => {
     expect((await GET(call(undefined, '/api/presets'))).status).toBe(401);
   });
 
-  test('lists the enabled presets in display order with only the id and the label to a member, and every column to an Admin', async () => {
-    const all = (await pool.query(`select id, label from presets where feature = 'video' order by sort_order, id`)).rows;
+  test('lists the enabled presets in display order with only the id, the label and the group to a member, and every column to an Admin', async () => {
+    const all = (await pool.query(`select id, label, "group" from presets where feature = 'video' order by sort_order, id`)).rows;
     expect(all.length).toBeGreaterThan(1);
     const body = await (await GET(call(memberCookie, '/api/presets'))).json();
     expect(body).toEqual({ presets: all, canEdit: false });
-    const full = (await pool.query(`select id, label, prompt, enabled, sort_order as "sortOrder" from presets where feature = 'video' order by sort_order, id`)).rows;
+    const full = (await pool.query(`select id, label, prompt, enabled, sort_order as "sortOrder", "group" from presets where feature = 'video' order by sort_order, id`)).rows;
     expect(await (await GET(call(adminCookie, '/api/presets'))).json()).toEqual({ presets: full, canEdit: true });
   });
 
@@ -58,7 +58,7 @@ describe('GET /api/presets', () => {
     expect((await patch(first!.id, { enabled: false })).status).toBe(200);
     expect((await list()).map((p) => p.id)).not.toContain(first!.id);
     expect((await patch(second!.id, { label: 'Renamed preset' })).status).toBe(200);
-    expect((await list())[0]).toEqual({ id: second!.id, label: 'Renamed preset' });
+    expect((await list())[0]).toEqual({ id: second!.id, label: 'Renamed preset', group: 'pod' });
     expect((await patch(third!.id, { sortOrder: -5 })).status).toBe(200);
     expect((await list())[0]!.id).toBe(third!.id);
   });

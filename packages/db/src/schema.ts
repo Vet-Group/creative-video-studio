@@ -246,6 +246,8 @@ export const assets = pgTable(
 );
 
 export const PRESET_FEATURES = ['video', 'image'] as const;
+/** The picker sections, in display order: print-on-demand products, products in general, fashion models. */
+export const PRESET_GROUPS = ['pod', 'product', 'fashion'] as const;
 
 export const presets = pgTable(
   'presets',
@@ -260,9 +262,11 @@ export const presets = pgTable(
     sortOrder: integer('sort_order').notNull().default(0),
     /** The page it belongs to: a motion preset on Create (`video`) or a style on Image Generation (`image`). */
     feature: text('feature', { enum: PRESET_FEATURES }).notNull().default('video'),
+    /** The picker section it shows under; a preset added later (or an approved proposal) lands in `product` until an editor moves it. */
+    group: text('group', { enum: PRESET_GROUPS }).notNull().default('product'),
     updatedAt: tstz('updated_at').notNull().defaultNow(),
   },
-  (t) => [check('presets_feature_check', sql`${t.feature} in ('video', 'image')`)],
+  (t) => [check('presets_feature_check', sql`${t.feature} in ('video', 'image')`), check('presets_group_check', sql`${t.group} in ('pod', 'product', 'fashion')`)],
 );
 
 export const PROPOSAL_STATUSES = ['pending', 'approved', 'rejected'] as const;
@@ -631,17 +635,25 @@ export const favorites = pgTable(
 );
 
 /** A Library result an Admin put on its page's Examples tab, beside the fixed samples. A featured mark only suggests one; it never puts it there. */
-export const examples = pgTable('examples', {
-  jobId: text('job_id')
-    .primaryKey()
-    .references(() => jobs.id, { onDelete: 'cascade' }),
-  addedBy: text('added_by')
-    .notNull()
-    .references(() => users.id, { onDelete: 'restrict' }),
-  createdAt: tstz('created_at').notNull().defaultNow(),
-  /** Its place on the tab once an Admin has ordered the tab (from 1); null for one put there since, which shows first, newest first. */
-  position: integer('position'),
-});
+export const examples = pgTable(
+  'examples',
+  {
+    jobId: text('job_id')
+      .primaryKey()
+      .references(() => jobs.id, { onDelete: 'cascade' }),
+    addedBy: text('added_by')
+      .notNull()
+      .references(() => users.id, { onDelete: 'restrict' }),
+    createdAt: tstz('created_at').notNull().defaultNow(),
+    /** Its place on the tab once an Admin has ordered the tab (from 1); null for one put there since, which shows first, newest first. */
+    position: integer('position'),
+    /** The kind of product it shows, which the tab filters by; the keys are apps/web/src/lib/product-types.ts. Null when not tagged. */
+    productType: text('product_type'),
+  },
+  (t) => [
+    check('examples_product_type_check', sql`${t.productType} in ('tshirt', 'jersey', 'hoodie', 'hawaiian', 'polo', 'mug', 'tumbler', 'ornament', 'flag', 'decal', 'poster', 'blanket', 'cap', 'jewelry', 'shoes', 'home', 'other')`),
+  ],
+);
 
 // A member's saved form (Save template): the inputs of one page, in the shape the reuse link reads from a job, so applying it refills the form the same way.
 // `is_company` (set by an Admin or a template editor) shares it with everyone, `store_id` with every member who picks that store on the form;

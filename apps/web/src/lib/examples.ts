@@ -167,8 +167,8 @@ export function cardSample(have: ReadonlySet<string>, base: string, fallback: st
   return { video: have.has(`${base}.mp4`) ? `/api/samples/${base}.mp4` : null, poster: have.has(`${base}.jpg`) ? `/api/samples/${base}.jpg` : fallback };
 }
 
-/** Each Examples tab's fixed samples (components/image-tools.tsx Gallery), by the feature whose results an Admin may put beside them. */
-export const GALLERY_SAMPLES: Record<string, string> = { image: 'image-example-', try_on: 'try-on-example-', marketing: 'marketing-example-' };
+/** Each Examples tab's fixed samples (components/image-tools.tsx Gallery, and Create's own clips), by the feature whose results an Admin may put beside them. */
+export const GALLERY_SAMPLES: Record<string, string> = { video: 'example-', image: 'image-example-', try_on: 'try-on-example-', marketing: 'marketing-example-' };
 
 /** The uploaded samples named `<prefix><n>.<ext>` (n = 1, 2, ...), in number order: the fixed sample tiles of a gallery. */
 export function numberedSamples(have: ReadonlySet<string>, prefix: string, ext: 'jpg' | 'mp4'): string[] {
@@ -180,8 +180,8 @@ export function numberedSamples(have: ReadonlySet<string>, prefix: string, ext: 
 export const exampleForPreset = (presetId: string, have: ReadonlySet<string>): Example | undefined => EXAMPLES.find((e) => e.presetId === presetId && !have.has(`${e.id}.mp4`));
 
 /** Deals the tiles into columns, each to the currently shortest one, so the columns end level and every tile keeps its aspect ratio. */
-export function splitColumns(items: Example[], count: number): Example[][] {
-  const columns: Example[][] = Array.from({ length: count }, () => []);
+export function splitColumns<T extends { width: number; height: number }>(items: T[], count: number): T[][] {
+  const columns: T[][] = Array.from({ length: count }, () => []);
   const heights = new Array<number>(count).fill(0);
   for (const item of items) {
     const shortest = heights.indexOf(Math.min(...heights));

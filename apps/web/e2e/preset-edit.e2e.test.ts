@@ -56,7 +56,7 @@ test('an Admin switches a preset off in the picker: a member no longer sees it, 
   const grid = await openPicker(page);
   try {
     await save(false);
-    const off = grid.getByRole('listitem').filter({ hasText: label });
+    const off = grid.locator('.preset-card').filter({ hasText: label }); // the card, not the section around it
     await expect(off).toHaveClass(/(^| )off( |$)/);
     await expect(off.getByText('Đang tắt')).toBeVisible();
     await expect(off.getByRole('button', { name: label, exact: true })).toHaveCount(0); // no pick button for it

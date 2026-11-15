@@ -9,6 +9,7 @@ import { FAULTS } from '@/lib/faults';
 import { featureLabel } from '@/lib/features';
 import { GALLERY_SAMPLES, numberedSamples } from '@/lib/examples';
 import { cardTitleOfFormat, HOOKS, LOCATIONS } from '@/lib/marketing';
+import { PRODUCT_TYPES } from '@/lib/product-types';
 import { activeFilterChips, activeFilters, type ChipKey, dayHeadings, filtersFromParams, type LibraryFilters, type LibraryView, libraryQuery, matchesVerdict, mergeFresh, NO_FILTERS, NO_STORE, readView, saveView, type VerdictFilter } from '@/lib/library-view';
 import { reuseHref } from '@/lib/reuse';
 import { SWIPE_START_PX, swipeStep } from '@/lib/swipe';
@@ -711,12 +712,14 @@ const MATCH_TEXT = { inputs: 'Cùng ảnh đầu vào', prompt: 'Cùng mô tả'
 /**
  * An Admin's "Đưa lên Ví dụ" on a result of a page whose Examples tab shows company results (owner, 2026-11-09: a featured mark only suggests one).
  * It first shows what that tab already has, the results that may repeat this one on top and then the fixed samples, so a near copy is seen before it goes up.
+ * The Admin may tag it with the product it shows, which the tab filters by, and change that tag once it is there.
  */
 function ExampleControl({ clip, onChange }: { clip: Clip; onChange: (c: Clip) => void }) {
   const have = useSamples();
   const [check, setCheck] = useState<ExampleRow[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState('');
+  const [type, setType] = useState(''); // the product type it goes up with
   const prefix = GALLERY_SAMPLES[clip.feature];
   if (!prefix) return null;
 
@@ -732,15 +735,28 @@ function ExampleControl({ clip, onChange }: { clip: Clip; onChange: (c: Clip) =>
     }
   }
   const open = () => run(async () => setCheck((await api<{ examples: ExampleRow[] }>(`/api/jobs/${clip.id}/example`)).examples), 'Không tải được các ví dụ hiện có.');
-  const save = (on: boolean) =>
+  const save = (on: boolean, productType = type) =>
     run(
       async () => {
-        await api(`/api/jobs/${clip.id}/example`, { method: on ? 'PUT' : 'DELETE' });
+        await api(`/api/jobs/${clip.id}/example`, on ? sendJson('PUT', { productType: productType || null }) : { method: 'DELETE' });
         setCheck(null);
-        onChange({ ...clip, example: on });
+        onChange({ ...clip, example: on, productType: on ? productType || null : null });
       },
       on ? 'Không đưa lên Ví dụ được.' : 'Không gỡ khỏi Ví dụ được.',
     );
+  const typeSelect = (value: string, pick: (type: string) => void) => (
+    <label className="example-type">
+      Loại hàng
+      <select value={value} disabled={busy} onChange={(e) => pick(e.target.value)}>
+        <option value="">Chưa chọn</option>
+        {Object.entries(PRODUCT_TYPES).map(([key, label]) => (
+          <option key={key} value={key}>
+            {label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
   const status = note && (
     <p className="muted" role="status">
       {note}
@@ -749,7 +765,12 @@ function ExampleControl({ clip, onChange }: { clip: Clip; onChange: (c: Clip) =>
   if (clip.example)
     return (
       <div className="example-control">
-        <span className="lib-mark featured">Đang ở tab Ví dụ</span>
+        <span className="lib-mark featured">
+          Đang ở tab Ví dụ
+          {clip.productType && ` · ${PRODUCT_TYPES[clip.productType] ?? clip.productType}`}
+        </span>
+        {/* A new tag saves at once, as the store select does; a failed save leaves the select on the saved one. */}
+        {typeSelect(clip.productType ?? '', (t) => void save(true, t))}
         <button type="button" disabled={busy} onClick={() => void save(false)}>
           Gỡ khỏi Ví dụ
         </button>
@@ -765,7 +786,7 @@ function ExampleControl({ clip, onChange }: { clip: Clip; onChange: (c: Clip) =>
         {status}
       </div>
     );
-  const samples = numberedSamples(have, prefix, clip.feature === 'marketing' ? 'mp4' : 'jpg'); // as the tab counts them; a clip shows its still of the same number
+  const samples = numberedSamples(have, prefix, clip.feature === 'marketing' || clip.feature === 'video' ? 'mp4' : 'jpg'); // as the tab counts them; a clip shows its still of the same number
   const similar = check.filter((e) => e.match);
   const tile = (e: ExampleRow) => (
     <li key={e.id}>
@@ -786,6 +807,7 @@ function ExampleControl({ clip, onChange }: { clip: Clip; onChange: (c: Clip) =>
           </li>
         ))}
       </ul>
+      {typeSelect(type, setType)}
       <div className="example-control">
         <button type="button" className="primary" disabled={busy} onClick={() => void save(true)}>
           Đưa lên Ví dụ

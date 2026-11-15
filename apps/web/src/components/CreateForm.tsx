@@ -1,7 +1,7 @@
 'use client';
 import { type DragEvent, type KeyboardEvent, useEffect, useId, useRef, useState } from 'react';
 import { resolutionVariants } from '@/lib/resolution-variants';
-import { api, errorText, sendJson, thumbUrl } from '@/lib/api';
+import { api, type Clip as LibraryClip, errorText, sendJson, thumbUrl } from '@/lib/api';
 import { cardSample, DEMO_TITLE, type Example, exampleForPreset, exampleModel, examplesFor, exampleTitle, sampleSrc, splitColumns } from '@/lib/examples';
 import { adjustNote } from '@/lib/video-adjust';
 import { anglePrompt, CAMERA_ANGLES, MAX_ANGLES } from '@/lib/camera-angles';
@@ -14,7 +14,7 @@ import { useHydrated } from '@/lib/use-hydrated';
 import { useRecall } from '@/lib/use-recall';
 import { useDraftState } from '@/lib/use-draft';
 import { reloadSamples, samplesFailed, useSamples, versionedSample } from '@/lib/use-samples';
-import { dropRefillQuery, exampleFrom } from '@/lib/reuse';
+import { dropRefillQuery, exampleFrom, refillFrom } from '@/lib/reuse';
 import { About } from './About';
 import { AudioSwitch } from './AudioSwitch';
 import { CardMedia } from './CardMedia';
@@ -23,11 +23,11 @@ import { confirmDialog } from './Confirm';
 import { ENHANCE_NOTE, EnhanceToggle } from './EnhanceToggle';
 import { Icon } from './Icon';
 import { LoadError } from './LoadError';
-import { copyError, copySamples, FormNotice, GALLERY_SIZE_KEY, HISTORY_SIZE_KEY, photoImg, RunSummary, SizeSlider, Slot, UploadedPhotos, uploadError, uploadImages, useSize } from './image-tools';
+import { ClipDetail, copyError, copySamples, FormNotice, GALLERY_SIZE_KEY, HISTORY_SIZE_KEY, photoImg, ProductTypeFilter, RunSummary, shownType, SizeSlider, Slot, UploadedPhotos, uploadError, uploadImages, useSize } from './image-tools';
 import { FormContext, type Photo, Tap, useApplier, useJobs, useRecreated } from './jobs';
 import { Modal } from './Modal';
 import { ModelPicker } from './ModelPicker';
-import { loadPending, PendingProposals, type PresetDraft, PresetForm, type PresetRow, type Proposal } from './PresetEditing';
+import { loadPending, PendingProposals, type PresetDraft, PresetForm, type PresetRow, PresetSections, type Proposal } from './PresetEditing';
 import { PromptComposer } from './PromptComposer';
 import { PromptPreview, PromptSections, usePromptMode } from './PromptSections';
 import { Preview } from './Preview';
@@ -196,6 +196,11 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
   const [details, setDetails] = useState<SampleDetails | null>(null);
   const [tileDetails, setTileDetails] = useState<Record<string, SampleDetails>>({});
   const askedDetails = useRef(new Set<string>());
+  // The results an Admin put on the Examples tab (owner, 2026-11-15: POD examples), shown before the fixed samples and filtered by product type.
+  const [curated, setCurated] = useState<{ clips: LibraryClip[]; admin: boolean; failed: boolean }>({ clips: [], admin: false, failed: false });
+  const [curatedAt, setCuratedAt] = useState<number | null>(null); // one open in place, as on the other Examples tabs
+  const [chosenType, setChosenType] = useState(''); // ProductTypeFilter
+  const [curatedTry, setCuratedTry] = useState(0);
   // The member's last model and settings, unless a refill or an Explore link opens the page. The model is honoured once, as Explore's is.
   const recall = useRecall(
     'video',
@@ -505,6 +510,28 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
       );
     }
   }, [shown, have]);
+  useEffect(() => {
+    if (shown !== 'examples') return;
+    let stale = false;
+    (async () => {
+      const clips: LibraryClip[] = [];
+      let admin = false;
+      for (let more = true; more && !stale; ) {
+        const r = await api<{ hasMore: boolean; isAdmin: boolean; clips: LibraryClip[] }>(`/api/library?kind=video&example=1&offset=${clips.length}`);
+        clips.push(...r.clips.filter((c) => !clips.some((o) => o.id === c.id))); // one put there between two pages repeats a tile
+        more = r.hasMore;
+        admin = r.isAdmin;
+      }
+      if (!stale) setCurated({ clips, admin, failed: false });
+    })().catch(() => !stale && setCurated((c) => ({ ...c, failed: true })));
+    return () => {
+      stale = true;
+    };
+  }, [shown, curatedTry]);
+  const type = shownType(curated.clips, chosenType);
+  const shownCurated = type ? curated.clips.filter((c) => c.productType === type) : curated.clips;
+  // A chosen product type shows only the results tagged with it: the fixed samples carry no type.
+  const tiles = [...shownCurated.map((clip) => ({ clip, width: Number(clip.ratio.split(':')[0]) || 9, height: Number(clip.ratio.split(':')[1]) || 16 })), ...(type ? [] : examples)];
   const titleOf = (ex: Example) => exampleTitle(ex, tileDetails[ex.id], presets);
   const detailAt = detail ? examples.findIndex((e) => e.id === detail.id) : -1;
   // As on Fash, a sample with a details file shows its own prompt, input photos, settings and date, and Dùng lại refills the form from it.
@@ -900,14 +927,30 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
         <div className={!narrow && historySize === 0 ? 'side history-small' : 'side'} id={`create-panel-${shown === 'create' ? 'history' : shown}`} role="tabpanel" aria-labelledby={`create-tab-${shown === 'create' ? 'history' : shown}`} hidden={narrow && shown === 'create'}>
           {!narrow && shown === 'examples' && <SizeSlider size={gallerySize} onChange={resizeGallery} />}
           {!narrow && shown === 'history' && <SizeSlider size={historySize} last={1} onChange={resizeHistory} />}
+          {shown === 'examples' && curated.failed && <LoadError text="Không tải được kết quả của công ty." onRetry={() => setCuratedTry((n) => n + 1)} />}
+          {shown === 'examples' && !samplesFailed() && <ProductTypeFilter items={curated.clips} value={type} onChange={setChosenType} />}
           {shown === 'examples' && samplesFailed() ? (
             // Without the sample list only the built-in test patterns would show (colour bars, 2026-11-14): say it failed instead.
             <LoadError text="Không tải được ví dụ." onRetry={reloadSamples} />
           ) : shown === 'examples' ? (
             <div className="masonry" role="group" aria-label="Video ví dụ">
-              {splitColumns(examples, narrow ? 2 : Math.max(1, (wide ? 4 : 3) + 1 - gallerySize)).map((column, c) => (
+              {splitColumns(tiles, narrow ? 2 : Math.max(1, (wide ? 4 : 3) + 1 - gallerySize)).map((column, c) => (
                 <ul key={c} className="masonry-col">
                   {column.map((ex) => {
+                    if ('clip' in ex) {
+                      const { clip } = ex;
+                      return (
+                        <li key={clip.id} className="example">
+                          <Preview src={`/api/assets/${clip.videoAssetId}/content`} poster={clip.posterAssetId ? `/api/assets/${clip.posterAssetId}/content` : ''} width={ex.width} height={ex.height} title={clip.modelLabel} paused={picking || detail !== null} onHover />
+                          <button type="button" className="example-open" onClick={() => setCuratedAt(shownCurated.indexOf(clip))}>
+                            <span className="example-caption">{clip.modelLabel}</span>
+                          </button>
+                          <button type="button" className="example-use" aria-label={`Dùng ví dụ này: ${clip.modelLabel}`} onClick={() => recreate(refillFrom({ reuse: clip.id })!)}>
+                            Dùng ví dụ này
+                          </button>
+                        </li>
+                      );
+                    }
                     const model = exampleModel(tileDetails[ex.id], models?.models);
                     // A model loop is named by its model (thirty tiles all titled "model demo" told nothing apart), with what it is under it.
                     const [title, sub] = titleOf(ex) === DEMO_TITLE && model ? [model, 'Video mẫu của mô hình'] : [titleOf(ex), model];
@@ -960,37 +1003,40 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
               Tự viết mô tả
             </button>
           </li>
-          {(editable ?? presets)?.map((p) => {
-            const m = presetMedia(p.id);
-            const off = p.enabled === false; // shown to an editor only, who can switch it back on
-            return (
-              <li key={p.id} className={off ? 'preset-card off' : 'preset-card'}>
-                {m.video ? <Preview src={m.video} poster={m.poster ?? ''} width={3} height={4} title={p.label} /> : <div className="banner-empty" />}
-                {off ? (
-                  <span className="preset-name">
-                    {p.label}
-                    <span className="tag">Đang tắt</span>
-                  </span>
-                ) : (
-                  <button
-                    type="button"
-                    data-value={p.id}
-                    aria-pressed={p.id === presetId}
-                    onClick={() => {
-                      setPresetId(p.id);
-                      setPicking(false);
-                    }}
-                  >
-                    {p.label}
+          <PresetSections
+            presets={editable ?? presets ?? []}
+            card={(p) => {
+              const m = presetMedia(p.id);
+              const off = p.enabled === false; // shown to an editor only, who can switch it back on
+              return (
+                <li key={p.id} className={off ? 'preset-card off' : 'preset-card'}>
+                  {m.video ? <Preview src={m.video} poster={m.poster ?? ''} width={3} height={4} title={p.label} /> : <div className="banner-empty" />}
+                  {off ? (
+                    <span className="preset-name">
+                      {p.label}
+                      <span className="tag">Đang tắt</span>
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      data-value={p.id}
+                      aria-pressed={p.id === presetId}
+                      onClick={() => {
+                        setPresetId(p.id);
+                        setPicking(false);
+                      }}
+                    >
+                      {p.label}
+                    </button>
+                  )}
+                  {/* After the name, so the picker's buttons still read name first; it sits above the name's card-wide click area. */}
+                  <button type="button" className="preset-edit" aria-label={canEdit ? `Sửa mẫu ${p.label}` : `Đề xuất sửa mẫu ${p.label}`} onClick={() => setDraft({ preset: p, propose: !canEdit })}>
+                    {canEdit ? 'Sửa' : 'Đề xuất sửa'}
                   </button>
-                )}
-                {/* After the name, so the picker's buttons still read name first; it sits above the name's card-wide click area. */}
-                <button type="button" className="preset-edit" aria-label={canEdit ? `Sửa mẫu ${p.label}` : `Đề xuất sửa mẫu ${p.label}`} onClick={() => setDraft({ preset: p, propose: !canEdit })}>
-                  {canEdit ? 'Sửa' : 'Đề xuất sửa'}
-                </button>
-              </li>
-            );
-          })}
+                </li>
+              );
+            }}
+          />
         </ul>
         {/* Below the grid, so the first row keeps its place under the header. */}
         <div className="preset-actions">
@@ -1025,6 +1071,7 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
         }}
       />
 
+      {curatedAt !== null && shownCurated[curatedAt] && <ClipDetail clips={shownCurated} index={curatedAt} admin={curated.admin} onIndex={setCuratedAt} onChange={(c) => setCurated((cur) => ({ ...cur, clips: cur.clips.map((o) => (o.id === c.id ? c : o)) }))} />}
       {/* The live Example dialog (REA-video V01, measured 2026-10-23): the clip on black with Close at its top-left, the details column,
           and Previous/Next as round buttons at the viewport edges that stop at the first and last sample. Nothing here submits a job. */}
       <Modal open={detail !== null} onClose={() => setDetail(null)} label="Chi tiết ví dụ" className="example-detail">

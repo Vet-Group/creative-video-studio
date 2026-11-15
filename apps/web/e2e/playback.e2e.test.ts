@@ -176,7 +176,7 @@ test('with reduced motion the Create banner, the preset picker and the Explore p
   const banner = page.locator('.banner video');
   await expect.poll(() => banner.evaluate((v: HTMLVideoElement) => !v.paused && v.currentTime > 0)).toBe(true);
   await page.getByRole('button', { name: 'Chọn mẫu khác' }).click();
-  const picked = page.getByRole('list', { name: 'Danh sách mẫu' }).locator('li', { hasText: 'Xoay chậm tại chỗ' }).locator('video');
+  const picked = page.getByRole('list', { name: 'Danh sách mẫu' }).locator('.preset-card', { hasText: 'Xoay chậm tại chỗ' }).locator('video');
   await expect.poll(() => picked.evaluate((v: HTMLVideoElement) => !v.paused && v.currentTime > 0)).toBe(true);
   await page.keyboard.press('Escape');
 

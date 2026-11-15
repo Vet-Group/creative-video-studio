@@ -35,7 +35,7 @@ async function newUser(email: string, role: 'member' | 'admin') {
 }
 // Rows by a person: migration 0065 audits its own prompt changes as the system (no actor).
 const audits = async (target: string) => (await pool.query('select actor_id, action, old_value, new_value from audit_entries where target = $1 and actor_id is not null order by id', [target])).rows;
-const preset = async (id: string) => (await pool.query('select id, label, prompt, enabled, sort_order as "sortOrder" from presets where id = $1', [id])).rows[0];
+const preset = async (id: string) => (await pool.query('select id, label, prompt, enabled, sort_order as "sortOrder", "group" from presets where id = $1', [id])).rows[0];
 const list = async (cookie: string) => (await (await presetsRoute.GET(call(cookie))).json()) as { presets: Record<string, unknown>[]; canEdit: boolean };
 const propose = (cookie: string, body: unknown) => proposalsRoute.POST(call(cookie, 'POST', body));
 const decide = (cookie: string, id: string, approve: unknown) => decisionRoute.POST(call(cookie, 'POST', { approve }), ctx('id', id));
@@ -87,16 +87,16 @@ describe('the template editor permission', () => {
 });
 
 describe('GET /api/presets', () => {
-  test('a member reads the enabled presets by id and label only; an editor and an Admin read them all with prompt, order and state', async () => {
+  test('a member reads the enabled presets by id, label and group only; an editor and an Admin read them all with prompt, order and state', async () => {
     await pool.query(`update presets set enabled = false where id = 'slow-orbit'`);
     const m = await list(member.cookie);
     expect(m.canEdit).toBe(false);
-    expect(Object.keys(m.presets[0]!)).toEqual(['id', 'label']);
+    expect(Object.keys(m.presets[0]!)).toEqual(['id', 'label', 'group']);
     expect(m.presets.some((p) => p.id === 'slow-orbit')).toBe(false);
     for (const who of [editor, admin]) {
       const e = await list(who.cookie);
       expect(e.canEdit).toBe(true);
-      expect(Object.keys(e.presets[0]!).sort()).toEqual(['enabled', 'id', 'label', 'prompt', 'sortOrder']);
+      expect(Object.keys(e.presets[0]!).sort()).toEqual(['enabled', 'group', 'id', 'label', 'prompt', 'sortOrder']);
       expect(e.presets.find((p) => p.id === 'slow-orbit')).toMatchObject({ enabled: false });
     }
     await pool.query(`update presets set enabled = true where id = 'slow-orbit'`);
@@ -121,13 +121,32 @@ describe('editing presets on Create', () => {
     expect((await presetsRoute.POST(call(editor.cookie, 'POST', { label: 'Only a label' }))).status).toBe(400);
     const add = async (label: string, extra = {}) => (await presetsRoute.POST(call(editor.cookie, 'POST', { label, prompt: 'Slow pan across the product.', ...extra }))).json();
     const max = (await pool.query(`select max(sort_order) as n from presets where feature = 'video'`)).rows[0].n;
-    expect(await add('Đẩy máy chậm')).toEqual({ id: 'day-may-cham', label: 'Đẩy máy chậm', prompt: 'Slow pan across the product.', sortOrder: max + 1, enabled: true });
+    expect(await add('Đẩy máy chậm')).toEqual({ id: 'day-may-cham', label: 'Đẩy máy chậm', prompt: 'Slow pan across the product.', sortOrder: max + 1, enabled: true, group: 'product' });
     expect((await add('Đẩy  máy, chậm!', { sortOrder: 3, enabled: false })).id).toBe('day-may-cham-2');
     expect((await add('General')).id).toBe('general-2'); // preset-general is the free prompt's sample
     expect(await preset('day-may-cham-2')).toMatchObject({ sortOrder: 3, enabled: false });
     expect(await audits('preset:day-may-cham')).toEqual([
-      { actor_id: editor.id, action: 'preset.create', old_value: null, new_value: { label: 'Đẩy máy chậm', prompt: 'Slow pan across the product.', sortOrder: max + 1, enabled: true, feature: 'video' } },
+      { actor_id: editor.id, action: 'preset.create', old_value: null, new_value: { label: 'Đẩy máy chậm', prompt: 'Slow pan across the product.', sortOrder: max + 1, enabled: true, feature: 'video', group: 'product' } },
     ]);
+  });
+
+  test('an editor puts a preset in a picker group, checked and audited; a new one lands in the group it names', async () => {
+    for (const group of ['', 'other', 1, null]) {
+      expect((await presetRoute.PATCH(call(editor.cookie, 'PATCH', { group }), ctx('id', 'handheld-product'))).status, String(group)).toBe(400);
+      expect((await presetsRoute.POST(call(editor.cookie, 'POST', { label: 'Nhóm sai', prompt: 'Y', group }))).status, String(group)).toBe(400);
+    }
+    expect((await presetRoute.PATCH(call(member.cookie, 'PATCH', { group: 'pod' }), ctx('id', 'handheld-product'))).status).toBe(403);
+    const before = await preset('handheld-product');
+    expect(before.group).toBe('product');
+    const res = await presetRoute.PATCH(call(editor.cookie, 'PATCH', { group: 'pod' }), ctx('id', 'handheld-product'));
+    expect(await res.json()).toEqual({ ...before, group: 'pod' });
+    expect((await list(member.cookie)).presets.find((p) => p.id === 'handheld-product')).toEqual({ id: 'handheld-product', label: before.label, group: 'pod' });
+    expect((await audits('preset:handheld-product')).at(-1)).toEqual({ actor_id: editor.id, action: 'preset.update', old_value: { group: 'product' }, new_value: { group: 'pod' } });
+    expect((await presetRoute.PATCH(call(editor.cookie, 'PATCH', { group: 'product' }), ctx('id', 'handheld-product'))).status).toBe(200);
+
+    const added = await (await presetsRoute.POST(call(editor.cookie, 'POST', { label: 'Cốc trên bàn', prompt: 'A mug on a table.', group: 'pod' }))).json();
+    expect(added).toMatchObject({ id: 'coc-tren-ban', group: 'pod' });
+    expect((await audits('preset:coc-tren-ban'))[0].new_value).toMatchObject({ group: 'pod' });
   });
 
   test('a slug is ASCII lower-case words joined by dashes, never empty', () => {
@@ -274,7 +293,7 @@ describe('Image Generation styles', () => {
 
   test('the picker of ?feature=image lists only the styles, and an unknown feature is refused', async () => {
     const ids = (await styles(member.cookie)).presets.map((p) => p.id);
-    expect(ids).toHaveLength(8);
+    expect(ids).toHaveLength(16); // 8 POD styles (migration 0097), then the 8 of 0066
     expect(ids.every((id) => String(id).startsWith('style-'))).toBe(true);
     expect((await list(member.cookie)).presets.map((p) => p.id)).not.toContain('style-street'); // Create's picker keeps to its presets
     expect((await presetsRoute.GET(new Request('http://localhost/api/presets?feature=audio', { headers: { cookie: member.cookie } }))).status).toBe(400);
@@ -283,7 +302,7 @@ describe('Image Generation styles', () => {
   test('an editor adds a style last in its own picker, and a style proposed by a member lands there on approval, listed with the styles only', async () => {
     const res = await presetsRoute.POST(call(editor.cookie, 'POST', { label: 'Bể bơi', prompt: 'By a sunny pool.', feature: 'image' }));
     expect(res.status).toBe(201);
-    expect(await res.json()).toMatchObject({ id: 'be-boi', sortOrder: 9 });
+    expect(await res.json()).toMatchObject({ id: 'be-boi', sortOrder: 17, group: 'product' });
     expect((await pool.query(`select feature from presets where id = 'be-boi'`)).rows[0].feature).toBe('image');
     expect((await audits('preset:be-boi'))[0].new_value).toMatchObject({ feature: 'image' });
     expect((await presetsRoute.POST(call(editor.cookie, 'POST', { label: 'X', prompt: 'Y', feature: 'audio' }))).status).toBe(400);
@@ -296,7 +315,7 @@ describe('Image Generation styles', () => {
     expect(image.pendingCount).toBe(2);
     expect((await pending('video')).proposals.map((p) => p.id)).not.toContain(asked.id);
     const approved = await (await decide(editor.cookie, asked.id, true)).json();
-    expect(approved.preset).toMatchObject({ id: 'tuyet', sortOrder: 10 });
+    expect(approved.preset).toMatchObject({ id: 'tuyet', sortOrder: 18, group: 'product' }); // a proposal never names a group
     expect((await pool.query(`select feature from presets where id = 'tuyet'`)).rows[0].feature).toBe('image');
     expect((await decide(editor.cookie, change.id, false)).status).toBe(200);
   });

@@ -1079,6 +1079,10 @@ dialog.admin-modal { width: min(36rem, calc(100vw - 2rem)); }
 /* The preset picker, like the live one: a vertically scrolling grid of 3:4 clips (4 columns, 2 on a phone), each name left-aligned under its clip. */
 .preset-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; max-height: min(620px, calc(100vh - 250px)); scrollbar-width: thin; margin: 0; padding: 4px; overflow-y: auto; list-style: none; }
 .preset-card { position: relative; display: grid; align-content: start; gap: 6px; }
+/* A picker section (PresetSections): its heading and its own list span the grid and keep its columns. */
+.preset-grid > .preset-group { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; gap: 8px 16px; }
+.preset-group > h3 { grid-column: 1 / -1; margin: 8px 0 0; color: var(--ink-strong); font-size: 14px; line-height: 21px; font-weight: 600; }
+.preset-group > ul { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; gap: 16px; margin: 0; padding: 0; list-style: none; }
 .preset-card > :first-child { border-radius: 8px; }
 .preset-card > .banner-empty { height: auto; aspect-ratio: 3 / 4; }
 .preset-card > .style-none { display: grid; place-items: center; color: var(--text-muted); }
@@ -1094,6 +1098,7 @@ dialog.admin-modal { width: min(36rem, calc(100vw - 2rem)); }
 .preset-actions { display: flex; flex-wrap: wrap; gap: 16px; padding-top: 16px; font-size: 14px; }
 .preset-form textarea { width: 100%; margin: 6px 0 12px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; font: inherit; }
 .preset-form input[type='file'] { display: block; margin: 6px 0 12px; }
+.preset-form select { display: block; height: 40px; margin: 6px 0 12px; padding: 0 12px; border: 1px solid var(--border); font: inherit; }
 .proposal-list { display: grid; gap: 16px; margin: 0; padding: 0; list-style: none; }
 .proposal-list > li { padding-bottom: 16px; border-bottom: 1px solid var(--hairline); }
 .proposal-list p { margin: 0; }
@@ -2245,6 +2250,8 @@ dialog.modal.verdict-guide { width: min(40rem, calc(100vw - 2rem)); }
 .example-check h3 { margin: 0; font-size: 13px; }
 .example-check li { display: grid; gap: 2px; justify-items: center; }
 .example-check .job-inputs img { width: 72px; height: 96px; }
+.example-type { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.example-type select { height: 32px; padding: 0 8px; font: inherit; }
 .example-strip { max-height: 13rem; overflow-y: auto; }
 .example-match { color: var(--text-subtle); font-size: 11px; line-height: 16px; }
 .example-order-open { justify-self: start; margin-bottom: 8px; font-size: 13px; }
