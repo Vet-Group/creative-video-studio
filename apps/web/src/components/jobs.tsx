@@ -55,6 +55,50 @@ export function CancelButton({ job }: { job: TrayJob }) {
   );
 }
 
+/** Cancels each job in turn through the one-job cancel; a 409 means it started meanwhile (left running), any other error is counted as not canceled. */
+export async function cancelEach(ids: readonly string[], cancel = (id: string) => api(`/api/jobs/${id}/cancel`, sendJson('POST', {}))): Promise<{ started: number; failed: number }> {
+  let started = 0;
+  let failed = 0;
+  for (const id of ids) {
+    try {
+      await cancel(id);
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 409) started++;
+      else failed++;
+    }
+  }
+  return { started, failed };
+}
+
+/** One button for every queued job of the member at once (InvokeAI's clear-queue idea), shown from two up: each goes through the same cancel as CancelButton, one after
+ * another, and a job that started meanwhile is left running and counted in the note. */
+export function CancelAllQueued({ jobs, refresh }: { jobs: readonly TrayJob[]; refresh: () => Promise<unknown> }) {
+  const [sending, setSending] = useState(false);
+  const [note, setNote] = useState('');
+  const queued = jobs.filter((j) => j.status === 'queued');
+  if (queued.length < 2 && !note) return null;
+  const cancelAll = async () => {
+    const n = queued.length;
+    if (!(await confirmDialog({ title: `Huỷ cả ${n} lượt đang chờ?`, body: 'Các lượt này chưa chạy nên không mất chi phí.', confirmLabel: `Huỷ ${n} lượt`, danger: true }))) return;
+    setSending(true);
+    setNote('');
+    const { started, failed } = await cancelEach(queued.map((j) => j.id));
+    await refresh();
+    setSending(false);
+    setNote([started > 0 && `${started} lượt đã bắt đầu chạy nên không huỷ được.`, failed > 0 && `${failed} lượt không huỷ được.`].filter(Boolean).join(' '));
+  };
+  return (
+    <p className="tray-cancel-all">
+      {queued.length >= 2 && (
+        <button type="button" className="notice-link" disabled={sending} onClick={() => void cancelAll()}>
+          Huỷ cả {queued.length} lượt đang chờ
+        </button>
+      )}{' '}
+      <span aria-live="polite">{note}</span>
+    </p>
+  );
+}
+
 export interface Toast {
   id: number;
   ok: boolean;

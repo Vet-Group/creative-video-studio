@@ -5,10 +5,14 @@ const FINISHED = ['succeeded', 'failed', 'failed_unknown', 'timed_out'];
 
 export const isRunning = (job: { status: string }): boolean => !FINISHED.includes(job.status);
 
-/** How long an unfinished job has waited or run, so a slow job does not look stuck; nothing once it finished. A poll re-renders it. */
-export function elapsedLabel(job: { status: string; createdAt: string }, now = Date.now()): string | null {
+/** When a job began to run: its `startedAt` (set once the provider took it), else its `createdAt` (a row without one, or a job still being sent). */
+const runStart = (job: { createdAt: string; startedAt?: string | null }): number => Date.parse(job.startedAt ?? job.createdAt);
+
+/** How long an unfinished job has waited (queued, from `createdAt`) or run (from `startedAt`, so the queue wait is not counted twice), so a slow job does
+ * not look stuck; nothing once it finished. A poll re-renders it. */
+export function elapsedLabel(job: { status: string; createdAt: string; startedAt?: string | null }, now = Date.now()): string | null {
   if (FINISHED.includes(job.status)) return null;
-  const min = Math.floor((now - Date.parse(job.createdAt)) / 60_000);
+  const min = Math.floor((now - (job.status === 'queued' ? Date.parse(job.createdAt) : runStart(job))) / 60_000);
   if (min < 1) return 'vừa gửi';
   return `${job.status === 'queued' ? 'đã chờ' : 'đã chạy'} ${min < 60 ? `${min} phút` : `${Math.floor(min / 60)} giờ ${min % 60} phút`}`;
 }
@@ -17,15 +21,18 @@ const TYPICAL_SAMPLES = 10;
 const TYPICAL_MIN_SAMPLES = 3;
 
 /**
- * What a submitting or running job usually takes, as a range of minutes: the median to the 75th percentile of the member's own
- * latest succeeded jobs on the same model (`jobs` newest first). Nothing for another status or with fewer than three samples.
+ * What a submitting or running job usually takes, as a range of minutes: the median to the 75th percentile of the run time (start to finish, without the
+ * queue wait) of the member's own latest succeeded jobs on the same model (`jobs` newest first). Nothing for another status or with fewer than three samples.
  */
-export function typicalLabel(job: { status: string; modelId: string }, jobs: readonly { status: string; modelId: string; createdAt: string; finishedAt: string | null }[]): string | null {
+export function typicalLabel(
+  job: { status: string; modelId: string },
+  jobs: readonly { status: string; modelId: string; createdAt: string; startedAt?: string | null; finishedAt: string | null }[],
+): string | null {
   if (job.status !== 'submitting' && job.status !== 'running') return null;
   const secs = jobs
     .filter((j) => j.status === 'succeeded' && j.modelId === job.modelId && j.finishedAt)
     .slice(0, TYPICAL_SAMPLES)
-    .map((j) => (Date.parse(j.finishedAt!) - Date.parse(j.createdAt)) / 1000)
+    .map((j) => (Date.parse(j.finishedAt!) - runStart(j)) / 1000)
     .filter((s) => s > 0)
     .sort((a, b) => a - b);
   if (secs.length < TYPICAL_MIN_SAMPLES) return null;
@@ -50,9 +57,9 @@ export function greeting(name: string | null | undefined, at: Date): string {
 export const continueJobs = <T extends { status: string }>(jobs: readonly T[], cap = 4): T[] => [...jobs.filter(isRunning), ...jobs.filter((j) => !isRunning(j))].slice(0, cap);
 
 /** The one-line note under a recent job: elapsed while running, the finish time when done (via `done`), 'Đã huỷ' for a cancel, else a failure note. */
-export function jobNote(j: { status: string; error: string | null; created_at: Date; finished_at: Date | null }, done: (d: Date) => string, now = Date.now()): string {
+export function jobNote(j: { status: string; error: string | null; created_at: Date; started_at?: Date | null; finished_at: Date | null }, done: (d: Date) => string, now = Date.now()): string {
   if (isRunning(j)) {
-    const el = elapsedLabel({ status: j.status, createdAt: j.created_at.toISOString() }, now);
+    const el = elapsedLabel({ status: j.status, createdAt: j.created_at.toISOString(), startedAt: j.started_at?.toISOString() ?? null }, now);
     return el ? `Đang tạo · ${el}` : 'Đang tạo';
   }
   if (j.status === 'succeeded') return done(j.finished_at ?? j.created_at);

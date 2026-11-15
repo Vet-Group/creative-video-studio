@@ -64,3 +64,22 @@ test('the typical finish time is the median to the 75th percentile of the same m
   expect(typicalLabel(running, [150, 150, 150].map((s) => done('m', s)))).toBe('thường xong sau ~2–3 phút');
   expect(typicalLabel(running, [180, 180, 180].map((s) => done('m', s)))).toBe('thường xong sau ~3 phút');
 });
+
+test('the typical finish time counts from when a job started, so a long queue wait does not inflate it', () => {
+  const created = Date.parse('2026-11-12T10:00:00Z');
+  // Each waited 10 minutes in the queue, then ran 1, 2, 3 and 4 minutes.
+  const waited = [60, 120, 180, 240].map((s) => ({
+    status: 'succeeded',
+    modelId: 'm',
+    createdAt: new Date(created).toISOString(),
+    startedAt: new Date(created + 600_000).toISOString(),
+    finishedAt: new Date(created + 600_000 + s * 1000).toISOString(),
+  }));
+  expect(typicalLabel({ status: 'running', modelId: 'm' }, waited)).toBe('thường xong sau ~3–4 phút');
+});
+
+test('a running recent job counts its elapsed time from its start', () => {
+  const now = Date.parse('2026-11-12T10:00:00Z');
+  const job = { status: 'running', error: null, finished_at: null, created_at: new Date(now - 20 * 60_000), started_at: new Date(now - 2 * 60_000) };
+  expect(jobNote(job, (d) => d.toISOString(), now)).toBe('Đang tạo · đã chạy 2 phút');
+});
