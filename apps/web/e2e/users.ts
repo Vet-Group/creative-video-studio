@@ -42,6 +42,9 @@ export const USERS = {
   tplb: { email: 'tplb@e2e.test', name: 'E2E Templates B', role: 'member' },
   usea: { email: 'usea@e2e.test', name: 'E2E Use A', role: 'member' },
   useb: { email: 'useb@e2e.test', name: 'E2E Use B', role: 'member' },
+  // templates.e2e: exmaker makes a company example on Create, exuse uses it and keeps their own photo and store.
+  exmaker: { email: 'exmaker@e2e.test', name: 'E2E Example Maker', role: 'member' },
+  exuse: { email: 'exuse@e2e.test', name: 'E2E Example User', role: 'member' },
   sugga: { email: 'sugga@e2e.test', name: 'E2E Suggest A', role: 'member' },
   hista: { email: 'hista@e2e.test', name: 'E2E History A', role: 'member' },
   auda: { email: 'auda@e2e.test', name: 'E2E Audio A', role: 'member' },

@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
-import { addExamples, openTemplates, png, select, selectText, signIn } from './support.test';
+import { addExamples, openTemplates, png, presetOf, select, selectText, selectValue, signIn } from './support.test';
 
 // Saved forms: Save template keeps the page's inputs under a name, My templates reopens the page filled from one. Only the store template is run, on the mock model.
 const file = (name: string) => ({ name, mimeType: 'image/png', buffer: png() });
@@ -202,6 +202,53 @@ test('Dùng ví dụ này on a company result in Ví dụ fills Try On, Image Ge
   await expect(other).toHaveURL(/\/image-generation\?model=mock-image-solo$/);
   await expect(other.getByRole('button', { name: /^Mô hình / })).toContainText('Mock image Solo');
   await other.close();
+});
+
+test("on Create, using a company example in Ví dụ takes its settings only: not the maker's photo or store, and not the member's own", async ({ page, browser }) => {
+  const maker = await (await browser.newContext()).newPage();
+  await signIn(maker, 'exmaker');
+  const up = await maker.request.post('/api/assets', { multipart: { file: file('maker-shirt.png') } });
+  const { assets } = (await up.json()) as { assets: { id: string }[] };
+  const job = await maker.request.post('/api/jobs', { data: { assetIds: [assets[0]!.id], modelId: 'mock-e2e', presetId: 'gentle-push-in', ratio: '1:1', durationSec: 5, storeId: 'store-e2e' } });
+  expect(job.status()).toBe(201);
+  const { id } = (await job.json()) as { id: string };
+  await expect.poll(async () => ((await (await maker.request.get(`/api/jobs/${id}`)).json()) as { status: string }).status, { timeout: 60_000 }).toBe('succeeded');
+  await addExamples(browser, [id]);
+  await maker.close();
+
+  await signIn(page, 'exuse');
+  await selectText(page, 'Cửa hàng/Thương hiệu', 'E2E Brand Shop');
+  const notice = page.getByRole('region', { name: 'Thông báo' });
+  const made = 'Đã dùng mẫu của ví dụ. Ảnh và cửa hàng của bạn được giữ nguyên.';
+  /** The example's settings are on the form; its photo and store are not, and the member's store stays. */
+  const settingsOnly = async () => {
+    await expect(notice.getByText(made)).toBeVisible();
+    await expect(notice.getByText('Sẵn sàng tạo lại')).toHaveCount(0);
+    await expect(presetOf(page)).toHaveAttribute('data-value', 'gentle-push-in');
+    await expect(select(page, 'Tỉ lệ khung hình')).toHaveAttribute('data-value', '1:1');
+    await expect(select(page, 'Thời lượng')).toHaveAttribute('data-value', '5');
+    await expect(page.getByRole('img', { name: 'maker-shirt.png' })).toHaveCount(0);
+    await expect(select(page, 'Cửa hàng/Thương hiệu')).toContainText('E2E Brand Shop');
+  };
+
+  // The tile on a form without a photo: Run waits for the member's own.
+  await page.getByRole('tab', { name: 'Ví dụ' }).click();
+  await page.getByRole('button', { name: /^Dùng ví dụ này: Mock E2E, 1:1/ }).click();
+  await settingsOnly();
+  await expect(page.getByRole('button', { name: 'Tạo video' })).toBeDisabled();
+  await expect(page.getByText(/^Mẫu cần ít nhất 1 ảnh sản phẩm|^Tải lên ít nhất 1 ảnh sản phẩm/)).toBeVisible();
+
+  // Its details dialog says the same, and the member's own photo stays. The first notice goes and the ratio moves first, so the second refill is what is checked.
+  await expect(notice.getByText(made)).toHaveCount(0);
+  await page.getByLabel('Ảnh sản phẩm').setInputFiles(file('my-shirt.png'));
+  await expect(page.getByRole('img', { name: 'my-shirt.png' })).toBeVisible();
+  await selectValue(page, 'Tỉ lệ khung hình', '9:16');
+  await expect(select(page, 'Tỉ lệ khung hình')).toHaveAttribute('data-value', '9:16');
+  await page.getByRole('button', { name: /^Xem chi tiết video Mock E2E, 1:1/ }).click();
+  await page.getByRole('dialog', { name: /^Chi tiết: / }).getByRole('button', { name: 'Dùng lại' }).click();
+  await expect(page.getByRole('dialog', { name: /^Chi tiết: / })).toBeHidden();
+  await settingsOnly();
+  await expect(page.getByRole('img', { name: 'my-shirt.png' })).toBeVisible();
 });
 
 test('Image Generation: a company template with ${blanks} asks for them in Điền chỗ trống before filling the prompt, and Huỷ fills nothing', async ({ page, browser }) => {
