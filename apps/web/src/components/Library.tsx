@@ -73,6 +73,36 @@ interface StoreOption {
 // A focused player keeps its own keys too: ←/→ seek there.
 const typing = (t: EventTarget | null) => t instanceof HTMLElement && (t.isContentEditable || ['INPUT', 'SELECT', 'TEXTAREA', 'VIDEO', 'AUDIO'].includes(t.tagName));
 
+/** What a delete really does: the item leaves the Library now (and the Examples tab, if an Admin put it there) and the worker's purge removes its files 30 days later (PURGE_AFTER in apps/worker/src/purge.ts). */
+export const deleteConsequence = (example: boolean) => `Nó biến khỏi Thư viện ngay${example ? ' và khỏi mục Ví dụ' : ''}, rồi bị xoá hẳn sau 30 ngày.`;
+
+/**
+ * The card an arrow key moves to from card `from`, given every card's offsetTop in order: Left/Right step one, Home/End jump to the ends, Up/Down keep the column in the row above or below
+ * (a shorter row takes its last card). Rows come from the rendered tops because the grid's column count follows the width. Null when the key does nothing here.
+ */
+export function gridStep(tops: number[], from: number, key: string): number | null {
+  const last = tops.length - 1;
+  if (from < 0 || from > last) return null;
+  if (key === 'Home') return 0;
+  if (key === 'End') return last;
+  if (key === 'ArrowLeft') return Math.max(from - 1, 0);
+  if (key === 'ArrowRight') return Math.min(from + 1, last);
+  if (key !== 'ArrowUp' && key !== 'ArrowDown') return null;
+  const starts = tops.flatMap((t, i) => (i === 0 || t > tops[i - 1]! + 1 ? [i] : []));
+  const row = starts.findLastIndex((s) => s <= from);
+  const target = row + (key === 'ArrowUp' ? -1 : 1);
+  if (target < 0 || target >= starts.length) return null;
+  return Math.min(starts[target]! + (from - starts[row]!), (starts[target + 1] ?? tops.length) - 1);
+}
+
+/** Moves focus to a card's main target (the open button) and scrolls the card just into view, without animation under reduced motion. */
+function focusCard(card: Element | undefined | null) {
+  const open = card?.querySelector<HTMLElement>('button[aria-label="Xem chi tiết"]');
+  if (!card || !open) return;
+  open.focus({ preventScroll: true });
+  card.scrollIntoView({ block: 'nearest', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+}
+
 /**
  * The Pass, featured Pass and Fail marks (Fail asks for the fault) on an item its viewer may edit: the grid card, the list row and the detail view.
  * With `keys` (the detail view) 1, 2 and 3 press Pass, featured Pass and Fail, which then focuses the fault list.
@@ -234,7 +264,9 @@ export function ClipCard({ clip, view, select, onChange, onDeleted, onOpen }: { 
   );
   const confirm = confirmDelete && (
     <div className="actions" role="alertdialog" aria-label="Xác nhận xoá">
-      <span>Xoá {noun} này?</span>
+      <span>
+        Xoá {noun} này? {deleteConsequence(clip.example)}
+      </span>
       <button type="button" disabled={saving} onClick={() => void remove()}>
         Xác nhận xoá
       </button>
@@ -890,6 +922,27 @@ export function Library({ initialFilters = NO_FILTERS }: { initialFilters?: Libr
   const [copied, setCopied] = useState(false); // the "copy link" button's brief confirmation
   const [unmarked, setUnmarked] = useState(0); // the items the viewer may mark that have no mark yet, for the verdict filter
   const latest = useRef(0);
+  const grid = useRef<HTMLDivElement>(null);
+  const viewed = useRef<string | null>(null); // the last item the detail view showed, so closing it can bring that card back into sight
+  useEffect(() => {
+    if (detail !== null) {
+      viewed.current = clips[detail]?.id ?? viewed.current;
+      return;
+    }
+    const id = viewed.current;
+    viewed.current = null;
+    if (id) focusCard([...(grid.current?.querySelectorAll('[data-clip-id]') ?? [])].find((c) => c.getAttribute('data-clip-id') === id));
+  }, [detail, clips]);
+  // Arrow keys on a card's open button move between cards; any other target (a field, the marks, a dialog) keeps its own keys.
+  const gridKeys = (e: ReactKeyboardEvent<HTMLElement>) => {
+    const from = e.target instanceof HTMLElement && e.target.classList.contains('lib-open') ? e.target.closest('.lib-card') : null;
+    if (!from || e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+    const cards = [...e.currentTarget.querySelectorAll<HTMLElement>('.lib-card')];
+    const next = gridStep(cards.map((c) => c.offsetTop), cards.indexOf(from as HTMLElement), e.key);
+    if (next === null) return;
+    e.preventDefault();
+    focusCard(cards[next]);
+  };
   const set = (patch: Partial<LibraryFilters>) => setFilters((cur) => ({ ...cur, ...patch }));
   const [pickDay, setPickDay] = useState(false); // "Chọn một ngày…" shows the calendar field
   const yesterdayOnly = !pickDay && !filters.days && filters.date === today(1); // the "Hôm qua" option, not a day picked on the calendar
@@ -1303,7 +1356,7 @@ export function Library({ initialFilters = NO_FILTERS }: { initialFilters?: Libr
           )}
         </div>
       )}
-      <div className={view === 'list' ? 'library-list' : 'grid'} style={{ '--card-min': SIZES[size] } as CSSProperties} aria-busy={state === 'loading'} hidden={clips.length === 0}>
+      <div ref={grid} className={view === 'list' ? 'library-list' : 'grid'} style={{ '--card-min': SIZES[size] } as CSSProperties} aria-busy={state === 'loading'} hidden={clips.length === 0} onKeyDown={view === 'grid' ? gridKeys : undefined}>
         {clips.map((c, i) => (
           <Fragment key={c.id}>
           {headings.has(i) && <h2 className="lib-day">{headings.get(i)}</h2>}

@@ -3,7 +3,7 @@ import { expect, test, vi } from 'vitest';
 import type { Clip } from '@/lib/api';
 import LibraryPage from '@/app/(app)/library/page';
 import { filtersFromSearch } from '@/lib/library-view';
-import { ClipCard, ClipDetail, clipLabel, emptyNoun, Library } from './Library';
+import { ClipCard, ClipDetail, clipLabel, deleteConsequence, emptyNoun, gridStep, Library } from './Library';
 
 test('the empty Library names photos under a photo filter, clips under a video one, and results under a mixed one', () => {
   expect(['images', 'try_on', 'image'].map(emptyNoun)).toEqual(['ảnh', 'ảnh', 'ảnh']);
@@ -90,4 +90,38 @@ test('the filters of the address are what the server renders and the first clien
 test('without a query the Library renders no filter and a repeated key counts once', async () => {
   expect(renderToStaticMarkup(await LibraryPage({ searchParams: Promise.resolve({}) }))).toBe(renderToStaticMarkup(<Library />));
   expect(filtersFromSearch({ kind: ['video', 'images'], days: undefined })).toMatchObject({ kind: 'video', days: '' });
+});
+
+// Three columns: the first row's tops are 0, the second row's 300, the last row (two cards) 600.
+const tops = [0, 0, 0, 300, 300, 300, 600, 600];
+
+test('arrow keys on the grid step one card, and Up and Down keep the column', () => {
+  expect(gridStep(tops, 1, 'ArrowRight')).toBe(2);
+  expect(gridStep(tops, 3, 'ArrowLeft')).toBe(2); // Left from a row start goes to the end of the row above
+  expect(gridStep(tops, 1, 'ArrowDown')).toBe(4);
+  expect(gridStep(tops, 5, 'ArrowUp')).toBe(2);
+  expect(gridStep(tops, 5, 'ArrowDown')).toBe(7); // the last row is short: its last card
+  expect(gridStep(tops, 6, 'ArrowUp')).toBe(3);
+});
+
+test('Home and End jump to the ends, and a key at an edge or one that is not an arrow does nothing', () => {
+  expect(gridStep(tops, 4, 'Home')).toBe(0);
+  expect(gridStep(tops, 4, 'End')).toBe(7);
+  expect(gridStep(tops, 0, 'ArrowLeft')).toBe(0);
+  expect(gridStep(tops, 7, 'ArrowRight')).toBe(7);
+  expect(gridStep(tops, 1, 'ArrowUp')).toBeNull(); // no row above
+  expect(gridStep(tops, 7, 'ArrowDown')).toBeNull(); // no row below
+  expect(gridStep(tops, 1, 'Enter')).toBeNull();
+  expect(gridStep(tops, -1, 'ArrowRight')).toBeNull();
+});
+
+test('the grid follows the rendered width: one column moves by one, and a day heading that pushes a card down starts a new row', () => {
+  expect(gridStep([0, 100, 200], 1, 'ArrowDown')).toBe(2);
+  expect(gridStep([0, 0, 40, 40], 1, 'ArrowDown')).toBe(3);
+  expect(gridStep([0, 0.4, 0.6], 1, 'ArrowDown')).toBeNull(); // sub-pixel differences are one row
+});
+
+test('the delete confirm says the item leaves the Library now and is gone for good after 30 days, and names the Examples tab only for an example', () => {
+  expect(deleteConsequence(false)).toBe('Nó biến khỏi Thư viện ngay, rồi bị xoá hẳn sau 30 ngày.');
+  expect(deleteConsequence(true)).toBe('Nó biến khỏi Thư viện ngay và khỏi mục Ví dụ, rồi bị xoá hẳn sau 30 ngày.');
 });
