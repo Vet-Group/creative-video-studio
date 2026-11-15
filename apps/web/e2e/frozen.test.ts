@@ -52,8 +52,9 @@ const job = {
 /** Answers /api/library, /api/jobs?mine and the clip media from fixed data. Call before the first navigation. */
 export async function freezeData(page: Page): Promise<void> {
   await page.clock.setFixedTime(new Date('2026-10-23T05:00:00.000Z'));
+  // The frozen clips are on no Examples tab, so a tab's own query (example=1, as Create's Examples tab sends) lists none of them.
   await page.route(/\/api\/library(\?|$)/, (r) =>
-    r.fulfill({ json: { hasMore: false, isAdmin: false, creators: [{ id: 'frozen-user', name: 'E2E Member 5' }], stores: [], ratios: ['9:16', '1:1'], clips: [clip(1, '9:16', true), clip(2, '1:1', false), clip(3, '9:16', false)] } }),
+    r.fulfill({ json: { hasMore: false, isAdmin: false, creators: [{ id: 'frozen-user', name: 'E2E Member 5' }], stores: [], ratios: ['9:16', '1:1'], clips: new URL(r.request().url()).searchParams.has('example') ? [] : [clip(1, '9:16', true), clip(2, '1:1', false), clip(3, '9:16', false)] } }),
   );
   // Other specs rename and switch presets, so the picker is answered from the seed labels.
   await page.route(/\/api\/presets$/, (r) =>

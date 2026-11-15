@@ -201,9 +201,10 @@ test('the preset picker is a vertically scrolling grid like the live one: 4 colu
     await openCreate(page);
     await page.getByRole('button', { name: 'Chọn mẫu khác' }).click();
     const grid = page.getByRole('list', { name: 'Danh sách mẫu' });
-    const cards = grid.getByRole('listitem');
-    await expect(cards).toHaveCount(26); // 6 company presets, the 19 motion templates of migration 0020 and the free prompt
-    const tops = await cards.evaluateAll((li) => li.slice(0, 8).map((e) => Math.round(e.getBoundingClientRect().top)));
+    const cards = grid.locator('.preset-card');
+    await expect(cards).toHaveCount(43); // the free prompt, then the 17 POD presets of migration 0097, 6 company presets and the 19 motion templates of 0020
+    await expect(grid.getByRole('heading', { level: 3 })).toHaveText(['Sản phẩm POD', 'Sản phẩm chung', 'Người mẫu thời trang']); // a section per group
+    const tops = await cards.evaluateAll((li) => li.slice(1, 9).map((e) => Math.round(e.getBoundingClientRect().top))); // the first section's two rows
     expect(tops.filter((t) => t === tops[0]).length).toBe(columns);
     expect(await grid.evaluate((el) => el.scrollHeight > el.clientHeight && el.scrollWidth <= el.clientWidth)).toBe(true);
     const chosen = cards.filter({ has: page.locator('button[aria-pressed="true"]') });

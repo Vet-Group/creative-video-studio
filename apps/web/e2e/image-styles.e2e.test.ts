@@ -16,7 +16,7 @@ async function openStyles(page: Page) {
 test('a member picks a style, and a mock Run sends its id while History and Reuse keep the member’s own words', async ({ page }) => {
   await signIn(page, 'stylea');
   const grid = await openStyles(page);
-  await expect(grid.getByRole('button', { name: /^Đề xuất sửa phong cách / })).toHaveCount(8); // a member proposes and edits nothing directly
+  await expect(grid.getByRole('button', { name: /^Đề xuất sửa phong cách / })).toHaveCount(16); // 8 POD styles and 8 general ones; a member proposes and edits nothing directly
   await expect(grid.getByRole('button', { name: /^Sửa phong cách / })).toHaveCount(0);
   await grid.getByRole('button', { name: 'Đường phố', exact: true }).click();
   await expect(grid).toBeHidden();

@@ -58,16 +58,16 @@ describe('migration 0002 seed data', () => {
   });
 
   test('seeds the six presets from packages/core/src/presets.ts, the safe one flagged once', async () => {
-    const { rows } = await pool.query(`select id, label, prompt, is_bakeoff_safe as "isBakeoffSafe" from presets where feature = 'video' and sort_order < 10 order by sort_order`);
+    const { rows } = await pool.query(`select id, label, prompt, is_bakeoff_safe as "isBakeoffSafe" from presets where feature = 'video' and "group" = 'product' order by sort_order`);
     expect(rows).toEqual(PRESETS.map((p) => ({ id: p.id, label: p.label, prompt: p.prompt, isBakeoffSafe: p.isBakeoffSafe })));
     expect((await pool.query('select id from presets where is_bakeoff_safe')).rows).toHaveLength(1);
   });
 
   test('migration 0020 adds the 19 motion templates after the company presets, enabled, not bake-off safe, with ASCII prompts that keep the person and outfit', async () => {
-    const { rows } = await pool.query(`select id, label, prompt, enabled, is_bakeoff_safe as safe, sort_order as sort from presets where feature = 'video' and sort_order >= 10 order by sort_order`);
+    const { rows } = await pool.query(`select id, label, prompt, enabled, is_bakeoff_safe as safe, sort_order as sort from presets where "group" = 'fashion' order by sort_order`);
     expect(rows).toHaveLength(19);
     expect(rows.slice(0, 2).map((r) => r.id)).toEqual(['shoulder-sequence', 'turn-around']);
-    expect(rows.at(-1)).toMatchObject({ id: 'golden-hour-wall', sort: 28 });
+    expect(rows.at(-1)).toMatchObject({ id: 'golden-hour-wall', sort: 45 }); // 28, moved past the POD presets by 0097
     for (const r of rows) {
       expect(r).toMatchObject({ enabled: true, safe: false });
       expect(r.prompt).toMatch(/^[ -~]+$/);
@@ -76,7 +76,7 @@ describe('migration 0002 seed data', () => {
   });
 
   test('migration 0024 gives the motion templates Vietnamese labels, as the company presets have', async () => {
-    const { rows } = await pool.query(`select id, label from presets where feature = 'video' and sort_order >= 10 order by sort_order`);
+    const { rows } = await pool.query(`select id, label from presets where "group" = 'fashion' order by sort_order`);
     expect(rows.at(0)).toEqual({ id: 'shoulder-sequence', label: 'Cận chi tiết rồi toàn thân' }); // renamed by 0065
     expect(rows.at(-1)).toEqual({ id: 'golden-hour-wall', label: 'Tường nắng hoàng hôn' });
     expect(new Set(rows.map((r) => r.label)).size).toBe(19);
@@ -105,9 +105,9 @@ describe('migration 0002 seed data', () => {
   });
 
   test('migration 0066 makes every earlier preset a Create one and adds eight enabled Image Generation styles with ASCII prompts that keep the subject', async () => {
-    expect((await pool.query(`select count(*)::int as n from presets where feature = 'video'`)).rows[0].n).toBe(25);
-    const { rows } = await pool.query(`select id, label, prompt, enabled, sort_order as sort from presets where feature = 'image' order by sort_order`);
-    expect(rows.map((r) => r.sort)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+    expect((await pool.query(`select count(*)::int as n from presets where feature = 'video' and "group" <> 'pod'`)).rows[0].n).toBe(25);
+    const { rows } = await pool.query(`select id, label, prompt, enabled, sort_order as sort from presets where feature = 'image' and "group" <> 'pod' order by sort_order`);
+    expect(rows.map((r) => r.sort)).toEqual([9, 10, 11, 12, 13, 14, 15, 16]); // 1 to 8, moved past the POD styles by 0097
     expect(rows.at(0)).toMatchObject({ id: 'style-white-studio', label: 'Studio nền trắng' });
     expect(rows.at(-1)).toMatchObject({ id: 'style-flat-lay', label: 'Phẳng nằm' });
     expect(rows.map((r) => r.label)).toContain('Ngoài trời giờ vàng');
@@ -119,6 +119,30 @@ describe('migration 0002 seed data', () => {
       expect(r.prompt).toContain('Do not add any text, logos or watermarks.');
     }
     await expect(pool.query(`update presets set feature = 'audio' where id = 'style-street'`)).rejects.toThrow(/presets_feature_check/);
+  });
+
+  test('migration 0097 puts 17 POD presets and 8 POD styles first in their pickers, the earlier ones after them in their order, each in its group', async () => {
+    const picker = async (feature: string) => (await pool.query(`select id, label, prompt, enabled, "group", sort_order as sort from presets where feature = $1 order by sort_order, id`, [feature])).rows;
+    const video = await picker('video');
+    expect(video.map((r) => r.group)).toEqual([...Array(17).fill('pod'), ...Array(6).fill('product'), ...Array(19).fill('fashion')]);
+    expect(video.slice(0, 18).map((r) => r.sort)).toEqual(Array.from({ length: 18 }, (_, i) => i + 1)); // the first earlier preset right after the POD ones
+    expect(video.slice(17, 23).map((r) => r.id)).toEqual(PRESETS.map((p) => p.id));
+    expect(video[0]).toMatchObject({ id: 'pod-unbox-try-on', label: 'Mở túi rồi mặc thử', enabled: true });
+    expect(video[16]).toMatchObject({ id: 'pod-jewelry-hand', label: 'Trang sức trên tay' });
+    const image = await picker('image');
+    expect(image.map((r) => [r.group, r.sort])).toEqual(Array.from({ length: 16 }, (_, i) => [i < 8 ? 'pod' : 'product', i + 1]));
+    expect(image[0]).toMatchObject({ id: 'style-pod-hanger', label: 'Áo treo móc gỗ', enabled: true });
+    expect(image[8]!.id).toBe('style-white-studio');
+    for (const r of [...video, ...image].filter((p) => p.group === 'pod')) {
+      expect(r.prompt).toMatch(/^[ -~]+$/);
+      expect(r.prompt).toContain('Do not add any text, logos or watermarks.');
+    }
+    await expect(pool.query(`update presets set "group" = 'other' where id = 'style-street'`)).rejects.toThrow(/presets_group_check/);
+
+    const job = await insertJob(userId);
+    await expect(pool.query(`insert into examples (job_id, added_by, product_type) values ($1, $2, 'shirt')`, [job, userId])).rejects.toThrow(/examples_product_type_check/);
+    await pool.query(`insert into examples (job_id, added_by) values ($1, $2)`, [job, userId]); // untagged
+    await pool.query(`update examples set product_type = 'mug' where job_id = $1`, [job]);
   });
 
   test('seeds Kling with price, limits and bake-off record (migration 0013; 0022: Kling takes 7 references; Seedance 2.5 on Replicate was deleted by 0072), and the settings row', async () => {

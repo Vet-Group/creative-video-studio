@@ -2,7 +2,7 @@
 import { audit } from '@cvs/core/audit';
 import { type Queryable, withTransaction } from '@cvs/core/ledger';
 import { PROMPT_CEILING } from '@cvs/core/models';
-import { PRESET_FEATURES } from '@cvs/db';
+import { PRESET_FEATURES, PRESET_GROUPS } from '@cvs/db';
 import { bad, nonEmpty, readBody } from './admin';
 import { pool } from './auth';
 import { guard } from './session';
@@ -13,15 +13,21 @@ export interface Preset {
   prompt: string;
   sortOrder: number;
   enabled: boolean;
+  group: PresetGroup;
 }
 export type PresetFields = Partial<Omit<Preset, 'id'>>;
 export type PresetFeature = (typeof PRESET_FEATURES)[number];
+export type PresetGroup = (typeof PRESET_GROUPS)[number];
 
 /** The page a preset belongs to, from a query or a body: `video` (Create) when left out, `image` (Image Generation), or null when it is neither. */
 export function presetFeature(value: unknown): PresetFeature | null {
   if (value === undefined || value === null) return 'video';
   return (PRESET_FEATURES as readonly unknown[]).includes(value) ? (value as PresetFeature) : null;
 }
+
+/** The picker section a body names, or null when it is none of them. An editor sets it; a proposal never does. */
+export const presetGroup = (value: unknown): PresetGroup | null => ((PRESET_GROUPS as readonly unknown[]).includes(value) ? (value as PresetGroup) : null);
+export const BAD_GROUP = `group must be one of ${PRESET_GROUPS.join(', ')}`;
 
 export const MAX_PRESET_LABEL = 100;
 
@@ -46,12 +52,12 @@ export function presetSlug(label: string): string {
 
 /** Changes what `fields` gives of one preset and audits the old and new values of what changed as preset.update; null when there is no such preset. */
 export async function updatePreset(tx: Queryable, actorId: string, id: string, fields: PresetFields): Promise<Preset | null> {
-  const old = (await tx.query('select label, prompt, sort_order as "sortOrder", enabled from presets where id = $1 for update', [id])).rows[0];
+  const old = (await tx.query('select label, prompt, sort_order as "sortOrder", enabled, "group" from presets where id = $1 for update', [id])).rows[0];
   if (!old) return null;
   const next = { ...old, ...fields };
   const changed = Object.keys(old).filter((k) => next[k] !== old[k]);
   if (changed.length > 0) {
-    await tx.query('update presets set label = $2, prompt = $3, sort_order = $4, enabled = $5, updated_at = now() where id = $1', [id, next.label, next.prompt, next.sortOrder, next.enabled]);
+    await tx.query('update presets set label = $2, prompt = $3, sort_order = $4, enabled = $5, "group" = $6, updated_at = now() where id = $1', [id, next.label, next.prompt, next.sortOrder, next.enabled, next.group]);
     await audit(tx, {
       actorId, action: 'preset.update', target: `preset:${id}`,
       oldValue: Object.fromEntries(changed.map((k) => [k, old[k]])), newValue: Object.fromEntries(changed.map((k) => [k, next[k]])),
@@ -62,7 +68,7 @@ export async function updatePreset(tx: Queryable, actorId: string, id: string, f
 
 /**
  * Adds a preset to `feature`'s picker, audited as preset.create. Its id is the label's slug, with -2, -3... when taken; `general` is kept for the
- * free prompt's sample (preset-general). It is enabled and last in its picker unless `fields` says otherwise.
+ * free prompt's sample (preset-general). It is enabled, in the `product` group and last in its picker unless `fields` says otherwise.
  */
 export async function createPreset(tx: Queryable, actorId: string, fields: PresetFields & Pick<Preset, 'label' | 'prompt'>, feature: PresetFeature = 'video'): Promise<Preset> {
   await tx.query(`select pg_advisory_xact_lock(hashtext('preset.create'))`); // two adds of one label must not pick the same id
@@ -70,9 +76,9 @@ export async function createPreset(tx: Queryable, actorId: string, fields: Prese
   let id = base;
   for (let n = 2; id === 'general' || (await tx.query('select 1 from presets where id = $1', [id])).rowCount; n++) id = `${base}-${n}`;
   const sortOrder = fields.sortOrder ?? (await tx.query('select coalesce(max(sort_order), 0) + 1 as n from presets where feature = $1', [feature])).rows[0].n;
-  const preset = { id, label: fields.label, prompt: fields.prompt, sortOrder, enabled: fields.enabled ?? true };
-  await tx.query('insert into presets (id, label, prompt, sort_order, enabled, feature) values ($1, $2, $3, $4, $5, $6)', [id, preset.label, preset.prompt, sortOrder, preset.enabled, feature]);
-  await audit(tx, { actorId, action: 'preset.create', target: `preset:${id}`, newValue: { label: preset.label, prompt: preset.prompt, sortOrder, enabled: preset.enabled, feature } });
+  const preset = { id, label: fields.label, prompt: fields.prompt, sortOrder, enabled: fields.enabled ?? true, group: fields.group ?? 'product' };
+  await tx.query('insert into presets (id, label, prompt, sort_order, enabled, feature, "group") values ($1, $2, $3, $4, $5, $6, $7)', [id, preset.label, preset.prompt, sortOrder, preset.enabled, feature, preset.group]);
+  await audit(tx, { actorId, action: 'preset.create', target: `preset:${id}`, newValue: { label: preset.label, prompt: preset.prompt, sortOrder, enabled: preset.enabled, feature, group: preset.group } });
   return preset;
 }
 
@@ -80,9 +86,15 @@ export async function createPreset(tx: Queryable, actorId: string, fields: Prese
 export async function patchPreset(request: Request, id: string): Promise<Response> {
   const g = await guard(request, 'editor');
   if (g.error) return g.error;
-  const fields = presetFields((await readBody(request)) ?? {});
+  const body = (await readBody(request)) ?? {};
+  const fields = presetFields(body);
   if (typeof fields === 'string') return bad(fields);
-  if (Object.keys(fields).length === 0) return bad('give at least one of label, prompt, sortOrder, enabled');
+  if (body.group !== undefined) {
+    const group = presetGroup(body.group);
+    if (!group) return bad(BAD_GROUP);
+    fields.group = group;
+  }
+  if (Object.keys(fields).length === 0) return bad('give at least one of label, prompt, sortOrder, enabled, group');
   return withTransaction(pool, async (tx): Promise<Response> => {
     const preset = await updatePreset(tx, g.session.user.id, id, fields);
     return preset ? Response.json(preset) : bad('not found', 404);

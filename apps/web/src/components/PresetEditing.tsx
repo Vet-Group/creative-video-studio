@@ -1,17 +1,18 @@
 'use client';
 // Preset management in Create's preset picker and Image Generation's style picker: a template editor (an Admin, or a user an Admin allowed) edits
 // or adds a preset and decides the members' proposals; any other member proposes a change or a new preset, and one editor's approval applies it.
-import { useEffect, useId, useState } from 'react';
+import { type ReactNode, useEffect, useId, useState } from 'react';
 import { api, ApiError, errorText, sendJson } from '@/lib/api';
 import { reloadSamples, useSamples } from '@/lib/use-samples';
 import { Icon } from './Icon';
 import { Modal } from './Modal';
 import { useSuggest } from './Suggestions';
 
-/** A preset as GET /api/presets gives it: id and label to a member; prompt, enabled and sortOrder too to an editor. */
+/** A preset as GET /api/presets gives it: id, label and group to a member; prompt, enabled and sortOrder too to an editor. */
 export interface PresetRow {
   id: string;
   label: string;
+  group: PresetGroup;
   prompt?: string;
   enabled?: boolean;
   sortOrder?: number;
@@ -36,6 +37,29 @@ export interface Proposal {
 /** The page a preset belongs to (presets.feature): Create's motion presets, or Image Generation's styles, which have an example picture and no clip. */
 export type PresetFeature = 'video' | 'image';
 
+/** The picker section a preset shows under (presets.group), in display order. */
+export type PresetGroup = 'pod' | 'product' | 'fashion';
+const GROUPS: PresetGroup[] = ['pod', 'product', 'fashion'];
+const GROUP_LABEL: Record<PresetGroup, string> = { pod: 'Sản phẩm POD', product: 'Sản phẩm chung', fashion: 'Người mẫu thời trang' };
+/** Image Generation names its general section after its styles (owner, 2026-11-15). */
+const groupLabel = (group: PresetGroup, feature: PresetFeature) => (feature === 'image' && group === 'product' ? 'Phong cách chung' : GROUP_LABEL[group]);
+
+/**
+ * A picker's cards after its free card: one section per group that has presets, each a heading over a list of its own, in GROUPS order.
+ * With a single group the cards stand alone, as before there were groups.
+ */
+export function PresetSections({ presets, feature = 'video', card }: { presets: PresetRow[]; feature?: PresetFeature; card: (preset: PresetRow) => ReactNode }) {
+  const id = useId();
+  const sections = GROUPS.map((group) => [group, presets.filter((p) => p.group === group)] as const).filter(([, list]) => list.length > 0);
+  if (sections.length < 2) return presets.map(card);
+  return sections.map(([group, list]) => (
+    <li key={group} className="preset-group">
+      <h3 id={`${id}-${group}`}>{groupLabel(group, feature)}</h3>
+      <ul aria-labelledby={`${id}-${group}`}>{list.map(card)}</ul>
+    </li>
+  ));
+}
+
 /**
  * Edit or add a preset (an editor), or propose either (a member). `onSaved` gets the notice to show once it is done; `onWritten` runs after
  * a preset was saved but its clip or poster was not, so the form stays open on it.
@@ -46,6 +70,7 @@ export function PresetForm({ draft, feature = 'video', onClose, onSaved, onWritt
   const [prompt, setPrompt] = useState('');
   const [order, setOrder] = useState('');
   const [enabled, setEnabled] = useState(true);
+  const [group, setGroup] = useState<PresetGroup>('product');
   const [note, setNote] = useState('');
   const [video, setVideo] = useState<File | null>(null);
   const [poster, setPoster] = useState<File | null>(null);
@@ -74,6 +99,7 @@ export function PresetForm({ draft, feature = 'video', onClose, onSaved, onWritt
     setPrompt(draft.propose ? '' : (draft.preset?.prompt ?? ''));
     setOrder(draft.preset?.sortOrder === undefined ? '' : String(draft.preset.sortOrder));
     setEnabled(draft.preset?.enabled ?? true);
+    setGroup(draft.preset?.group ?? 'product');
     setNote('');
     setVideo(null);
     setPoster(null);
@@ -84,7 +110,7 @@ export function PresetForm({ draft, feature = 'video', onClose, onSaved, onWritt
   const title = propose ? (editing ? `Đề xuất sửa ${noun}` : `Đề xuất ${noun} mới`) : editing ? `Sửa ${noun}` : `Thêm ${noun}`;
   const orderOk = order.trim() === '' ? !(preset && !propose) : Number.isInteger(Number(order));
   const changed = preset ? label.trim() !== preset.label || prompt.trim() !== '' : true;
-  const next = { label: label.trim(), prompt: prompt.trim(), enabled, ...(order.trim() !== '' && { sortOrder: Number(order) }) };
+  const next = { label: label.trim(), prompt: prompt.trim(), enabled, group, ...(order.trim() !== '' && { sortOrder: Number(order) }) };
   // Only what the editor changed, so an edit another editor made meanwhile to the other fields stays.
   const diff = preset ? Object.fromEntries(Object.entries(next).filter(([k, v]) => v !== preset[k as keyof PresetRow])) : next;
   const dirty = Object.keys(diff).length > 0 || video !== null || poster !== null;
@@ -180,6 +206,16 @@ export function PresetForm({ draft, feature = 'video', onClose, onSaved, onWritt
             Thứ tự
           </label>
           <input id={`${id}-order`} inputMode="numeric" value={order} placeholder={editing ? undefined : 'Để trống: xếp cuối'} onChange={(e) => setOrder(e.target.value)} />
+          <label className="field-label" htmlFor={`${id}-group`}>
+            Nhóm
+          </label>
+          <select id={`${id}-group`} value={group} onChange={(e) => setGroup(e.target.value as PresetGroup)}>
+            {GROUPS.map((g) => (
+              <option key={g} value={g}>
+                {groupLabel(g, feature)}
+              </option>
+            ))}
+          </select>
           <label className="template-share">
             <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} /> Đang bật
           </label>

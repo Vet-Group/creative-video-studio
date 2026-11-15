@@ -16,7 +16,7 @@ vi.mock('./jobs', async (orig) => ({ ...(await orig<typeof import('./jobs')>()),
 
 const clip = (mediaType: Clip['mediaType']): Clip => ({
   id: 'c1', creator: { id: 'u1', name: 'An' }, createdAt: '2026-11-14T00:00:00Z', modelId: 'm', modelLabel: 'Model', ratio: '9:16', durationSec: 5, feature: 'video', mediaType, resolution: null, isMock: false,
-  videoAssetId: 'a1', posterAssetId: null, storeId: null, storeName: null, costUsd: '1.00', costFinal: true, verdict: null, favorite: false, example: false, prompt: null, canEdit: false, mine: false, downloadName: 'out',
+  videoAssetId: 'a1', posterAssetId: null, storeId: null, storeName: null, costUsd: '1.00', costFinal: true, verdict: null, favorite: false, example: false, productType: null, prompt: null, canEdit: false, mine: false, downloadName: 'out',
 });
 const detail = (c: Clip) => renderToStaticMarkup(<ClipDetail clips={[c]} index={0} admin={false} onIndex={() => undefined} onChange={() => undefined} />);
 
@@ -28,7 +28,7 @@ test('the clip detail offers Nén & tải về on a video as well as on an image
 const sample: Clip = {
   id: 'job-1', creator: { id: 'u1', name: 'Mai' }, createdAt: '2026-11-14T01:04:00.000Z', modelId: 'seedance', modelLabel: 'Seedance 1.5 Pro', ratio: '9:16', durationSec: 5,
   feature: 'video', mediaType: 'video', resolution: null, isMock: false, videoAssetId: 'vid-1', posterAssetId: 'poster-1', storeId: null, storeName: null, costUsd: '0.1000', costFinal: true,
-  verdict: null, favorite: false, example: false, prompt: null, canEdit: true, mine: true, downloadName: '20261114-mai-job-1.mp4',
+  verdict: null, favorite: false, example: false, productType: null, prompt: null, canEdit: true, mine: true, downloadName: '20261114-mai-job-1.mp4',
 };
 const card = (c: Clip, view: 'grid' | 'list' = 'grid') => renderToStaticMarkup(<ClipCard clip={c} view={view} onChange={() => undefined} onDeleted={() => undefined} onOpen={() => undefined} />);
 

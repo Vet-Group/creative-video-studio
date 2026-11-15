@@ -9,7 +9,7 @@ import { useSamples, versionedSample } from '@/lib/use-samples';
 import { Icon } from './Icon';
 import { useJobs } from './jobs';
 import { Modal } from './Modal';
-import { loadPending, PendingProposals, type PresetDraft, PresetForm, type PresetRow, type Proposal } from './PresetEditing';
+import { loadPending, PendingProposals, type PresetDraft, PresetForm, type PresetRow, PresetSections, type Proposal } from './PresetEditing';
 
 /** `value` is the chosen style's id, '' for none; a style switched off (or unknown, as from an old reuse link) falls back to none. */
 /** `onStyle` hears the chosen style (its prompt only for a template editor), for the page's prompt preview (PromptPreview). */
@@ -81,28 +81,32 @@ export function StylePicker({ value, onChange, onStyle }: { value: string; onCha
               Không dùng phong cách
             </button>
           </li>
-          {(editable ?? styles)?.map((p) => {
-            const src = picture(p.id);
-            const off = p.enabled === false; // shown to an editor only, who can switch it back on
-            return (
-              <li key={p.id} className={off ? 'preset-card off' : 'preset-card'}>
-                {src ? <img src={src} alt="" /> : <div className="banner-empty" />}
-                {off ? (
-                  <span className="preset-name">
-                    {p.label}
-                    <span className="tag">Đang tắt</span>
-                  </span>
-                ) : (
-                  <button type="button" data-value={p.id} aria-pressed={p.id === value} onClick={() => pick(p.id)}>
-                    {p.label}
+          <PresetSections
+            presets={editable ?? styles ?? []}
+            feature="image"
+            card={(p) => {
+              const src = picture(p.id);
+              const off = p.enabled === false; // shown to an editor only, who can switch it back on
+              return (
+                <li key={p.id} className={off ? 'preset-card off' : 'preset-card'}>
+                  {src ? <img src={src} alt="" /> : <div className="banner-empty" />}
+                  {off ? (
+                    <span className="preset-name">
+                      {p.label}
+                      <span className="tag">Đang tắt</span>
+                    </span>
+                  ) : (
+                    <button type="button" data-value={p.id} aria-pressed={p.id === value} onClick={() => pick(p.id)}>
+                      {p.label}
+                    </button>
+                  )}
+                  <button type="button" className="preset-edit" aria-label={canEdit ? `Sửa phong cách ${p.label}` : `Đề xuất sửa phong cách ${p.label}`} onClick={() => setDraft({ preset: p, propose: !canEdit })}>
+                    {canEdit ? 'Sửa' : 'Đề xuất sửa'}
                   </button>
-                )}
-                <button type="button" className="preset-edit" aria-label={canEdit ? `Sửa phong cách ${p.label}` : `Đề xuất sửa phong cách ${p.label}`} onClick={() => setDraft({ preset: p, propose: !canEdit })}>
-                  {canEdit ? 'Sửa' : 'Đề xuất sửa'}
-                </button>
-              </li>
-            );
-          })}
+                </li>
+              );
+            }}
+          />
         </ul>
         <div className="preset-actions">
           <button type="button" className="link-button" onClick={() => setDraft({ preset: null, propose: !canEdit })}>
