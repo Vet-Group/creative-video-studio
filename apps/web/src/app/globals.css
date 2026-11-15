@@ -1204,6 +1204,8 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
   :is([aria-labelledby='app-title'], [aria-labelledby='tryon-title']) .create-grid { column-gap: 24px; }
   [aria-labelledby='tryon-title'] .about { max-width: none; }
   .runbar { margin: 0; padding-top: 16px; border-top: 1px solid var(--border-strong); }
+  /* Create Video's reason line sits right above the Run bar's rule; 8 px keeps it off the line, as .form-message lines get on the other tools. */
+  .help:has(+ .runbar) { margin-bottom: 8px; }
   .run-summary { padding: 0 2px 8px; } /* lined up with the Run button, which spans the card's content here */
   .runbar button.primary.run { height: 56px; }
 }
