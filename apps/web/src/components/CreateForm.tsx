@@ -134,6 +134,32 @@ const MAX_IMAGES = 9;
 const ratePct = (m: Model) => (m.passRate === null ? undefined : `${Math.round(m.passRate * 100)}% (${m.passes}/${m.total})`);
 
 /** `preset` and `model` pre-select the choices Explore links to; an unknown or switched-off one falls back to the default. */
+/** The first thing that stops Run on Create Video, in the order the form is filled (as on Try On and Create Image, after InvokeAI's "why it cannot run"); null when it can go. */
+export function runReason(f: {
+  loading: boolean;
+  modelsLoaded: boolean;
+  chosen: { supported: boolean; maxImages: number; endMaxSec?: number | null } | undefined;
+  images: number;
+  wordsOnly: boolean;
+  preset: boolean;
+  tooMany: boolean;
+  clipsOver: boolean;
+  takes: { max: number; seconds: number } | null | undefined;
+  endOver: boolean;
+  promptOk: boolean;
+  tooLong: string | null;
+}): string | null {
+  if (f.loading) return 'Đang tải cài đặt đã dùng...';
+  if (!f.chosen) return f.modelsLoaded ? 'Chọn một mô hình.' : 'Đang tải danh sách mô hình...';
+  if (f.images === 0 && !(f.wordsOnly && !f.preset)) return f.wordsOnly ? 'Mẫu cần ít nhất 1 ảnh sản phẩm. Bỏ chọn mẫu để tạo video chỉ từ mô tả.' : 'Tải lên ít nhất 1 ảnh sản phẩm.';
+  if (!f.chosen.supported) return 'Mô hình này không tạo được clip với tỉ lệ, thời lượng hoặc đầu vào đang chọn. Hãy đổi lựa chọn hoặc chọn mô hình khác.';
+  if (f.tooMany) return `Mô hình này nhận tối đa ${f.chosen.maxImages} ảnh.`;
+  if (f.clipsOver && f.takes) return `Mô hình này nhận tối đa ${f.takes.max} tệp âm thanh, tổng ${f.takes.seconds} giây.`;
+  if (f.endOver) return `Mô hình này chỉ nhận khung hình cuối cho clip tối đa ${f.chosen.endMaxSec} giây.`;
+  if (!f.promptOk) return f.tooLong ?? 'Viết mô tả cho video, hoặc chọn một mẫu.';
+  return null;
+}
+
 export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?: string; preset?: string; model?: string; image?: string; seedPrompt?: string }) {
   const { refresh, notify, loading } = useJobs();
   const recreated = useRecreated();
@@ -185,7 +211,7 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
   const fileInput = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
   const promptId = useId();
-  const tooLongId = useId();
+  const reasonId = useId();
   const clipsId = useId();
   const anglesId = useId();
   const clipInput = useRef<HTMLInputElement>(null);
@@ -420,7 +446,8 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
   const lockedNotes = [...new Set(CAMERA_ANGLES.map(lockedWhy).filter((w) => w !== null))];
   const tooLong = presetId === '' ? promptTooLong(chosen, Math.max(...sent.map((p) => p.trim().length))) : null;
   const promptOk = presetId !== '' || (composed.trim() !== '' && tooLong === null);
-  const canRun = ready && recall.answered && !busy && (images.length > 0 || (wordsOnly && presetId === '')) && chosen?.supported === true && !tooMany && !clipsOver && !endOver && promptOk;
+  const reason = runReason({ loading: !ready || !recall.answered, modelsLoaded: models !== null, chosen, images: images.length, wordsOnly, preset: presetId !== '', tooMany, clipsOver, takes, endOver, promptOk, tooLong });
+  const canRun = reason === null && !busy;
 
   async function upload(files: File[]) {
     if (files.length === 0) return;
@@ -792,7 +819,7 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
 
             {wordsOnly && presetId !== '' && <p className="help">Mẫu chuyển động cần ảnh sản phẩm. Không có ảnh thì chọn &quot;Tự viết mô tả&quot;.</p>}
             {tooLong && (
-              <p className="error" id={tooLongId}>
+              <p className="error">
                 {tooLong}
               </p>
             )}
@@ -917,9 +944,14 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
               <FormNotice text={notice} onHistory={narrow ? () => setTab('history') : undefined} />
             </div>
           )}
+          {reason && (
+            <p className="help" id={reasonId} role="status">
+              {reason}
+            </p>
+          )}
           <div className="runbar">
             <RunSummary items={[chosen?.label, ratio, `${durationSec} giây`, audioOn && 'có âm thanh']} />
-            <button type="button" className="primary run" disabled={!canRun} aria-describedby={tooLong ? tooLongId : undefined} onClick={() => void run()}>
+            <button type="button" className="primary run" disabled={!canRun} aria-describedby={reason ? reasonId : undefined} onClick={() => void run()}>
               {busy ? (
                 'Đang gửi…'
               ) : (
