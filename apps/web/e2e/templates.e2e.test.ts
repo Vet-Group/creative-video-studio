@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
-import { addExamples, openTemplates, png, presetOf, select, selectText, signIn } from './support.test';
+import { addExamples, openTemplates, png, presetOf, select, selectText, selectValue, signIn } from './support.test';
 
 // Saved forms: Save template keeps the page's inputs under a name, My templates reopens the page filled from one. Only the store template is run, on the mock model.
 const file = (name: string) => ({ name, mimeType: 'image/png', buffer: png() });
@@ -219,7 +219,7 @@ test("on Create, using a company example in Ví dụ takes its settings only: no
   await signIn(page, 'exuse');
   await selectText(page, 'Cửa hàng/Thương hiệu', 'E2E Brand Shop');
   const notice = page.getByRole('region', { name: 'Thông báo' });
-  const made = 'Đã dùng mẫu của ví dụ. Thêm ảnh sản phẩm của bạn rồi bấm Tạo video.';
+  const made = 'Đã dùng mẫu của ví dụ. Ảnh và cửa hàng của bạn được giữ nguyên.';
   /** The example's settings are on the form; its photo and store are not, and the member's store stays. */
   const settingsOnly = async () => {
     await expect(notice.getByText(made)).toBeVisible();
@@ -236,10 +236,14 @@ test("on Create, using a company example in Ví dụ takes its settings only: no
   await page.getByRole('button', { name: /^Dùng ví dụ này: Mock E2E, 1:1/ }).click();
   await settingsOnly();
   await expect(page.getByRole('button', { name: 'Tạo video' })).toBeDisabled();
+  await expect(page.getByText(/^Mẫu cần ít nhất 1 ảnh sản phẩm|^Tải lên ít nhất 1 ảnh sản phẩm/)).toBeVisible();
 
-  // Its details dialog says the same, and the member's own photo stays.
+  // Its details dialog says the same, and the member's own photo stays. The first notice goes and the ratio moves first, so the second refill is what is checked.
+  await expect(notice.getByText(made)).toHaveCount(0);
   await page.getByLabel('Ảnh sản phẩm').setInputFiles(file('my-shirt.png'));
   await expect(page.getByRole('img', { name: 'my-shirt.png' })).toBeVisible();
+  await selectValue(page, 'Tỉ lệ khung hình', '9:16');
+  await expect(select(page, 'Tỉ lệ khung hình')).toHaveAttribute('data-value', '9:16');
   await page.getByRole('button', { name: /^Xem chi tiết video Mock E2E, 1:1/ }).click();
   await page.getByRole('dialog', { name: /^Chi tiết: / }).getByRole('button', { name: 'Dùng lại' }).click();
   await expect(page.getByRole('dialog', { name: /^Chi tiết: / })).toBeHidden();

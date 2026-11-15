@@ -366,13 +366,15 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
         if (j.durationSec) setDurationSec(j.durationSec);
         if (j.modelId) setModelId(j.modelId);
         if (own) setStoreId(own.storeId ?? '');
-        if (source.recipe) notify('Đã dùng mẫu của ví dụ. Thêm ảnh sản phẩm của bạn rồi bấm Tạo video.');
-        else recreated(reuse);
+        if (source.recipe) {
+          setRefetch((n) => n + 1); // the photos did not change, so the picker reloads to map a pair's twin id onto its entry
+          notify('Đã dùng mẫu của ví dụ. Ảnh và cửa hàng của bạn được giữ nguyên.');
+        } else recreated(reuse);
         dropRefillQuery();
       })
       .catch((e) => setError(copyError(e, 'Không tìm thấy clip để dùng lại.')))
       .finally(() => setReady(true))
-      .finally(loading('Đang tải ảnh...'));
+      .finally(loading(source.recipe ? 'Đang tải mẫu...' : 'Đang tải ảnh...'));
     return () => {
       stale = true;
     };
@@ -661,7 +663,7 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
   }
 
   /** A company example's recipe on the form; its photos and store are not the member's, so they stay as the member has them. */
-  function useRecipe(id: string) {
+  function applyRecipe(id: string) {
     recall.touch();
     setSource({ from: refillFrom({ reuse: id })!, recipe: true });
     setCuratedId(null);
@@ -1012,7 +1014,7 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
                               </span>
                             </span>
                           </button>
-                          <button type="button" className="example-use" aria-label={`Dùng ví dụ này: ${name}`} onClick={() => useRecipe(clip.id)}>
+                          <button type="button" className="example-use" aria-label={`Dùng ví dụ này: ${name}`} onClick={() => applyRecipe(clip.id)}>
                             Dùng ví dụ này
                           </button>
                         </li>
@@ -1138,7 +1140,7 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
         }}
       />
 
-      {curatedAt >= 0 && <ClipDetail clips={shownCurated} index={curatedAt} admin={curated.admin} onUse={(c) => useRecipe(c.id)} onIndex={(i) => setCuratedId(i === null ? null : (shownCurated[i]?.id ?? null))} onChange={(c) => setCurated((cur) => ({ ...cur, clips: cur.clips.map((o) => (o.id === c.id ? c : o)) }))} />}
+      {curatedAt >= 0 && <ClipDetail clips={shownCurated} index={curatedAt} admin={curated.admin} onUse={(c) => applyRecipe(c.id)} onIndex={(i) => setCuratedId(i === null ? null : (shownCurated[i]?.id ?? null))} onChange={(c) => setCurated((cur) => ({ ...cur, clips: cur.clips.map((o) => (o.id === c.id ? c : o)) }))} />}
       {/* The live Example dialog (REA-video V01, measured 2026-10-23): the clip on black with Close at its top-left, the details column,
           and Previous/Next as round buttons at the viewport edges that stop at the first and last sample. Nothing here submits a job. */}
       <Modal open={detail !== null} onClose={() => setDetail(null)} label="Chi tiết ví dụ" className="example-detail">
