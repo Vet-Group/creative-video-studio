@@ -914,7 +914,8 @@ export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4
     if (items.length === 0 && samples && samplesFailed()) return <LoadError text="Không tải được ví dụ." onRetry={retry} />;
     if (items.length === 0) return <p className="muted">{emptyText}</p>;
   }
-  const tiles: (Clip | string)[] = type ? shown : [...sampleTiles, ...items];
+  // The company's own results an Admin chose lead (owner, 2026-11-15: POD examples first), then the fixed samples.
+  const tiles: (Clip | string)[] = type ? shown : [...items, ...sampleTiles];
   return (
     <>
       {!narrow && <SizeSlider size={size} onChange={resize} />}
