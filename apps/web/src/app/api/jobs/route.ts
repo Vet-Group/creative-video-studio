@@ -49,7 +49,8 @@ const bad = (error: string) => Response.json({ error }, { status: 400 });
 /**
  * `?mine`: the "My jobs" tray. The caller's 20 latest jobs that are not deleted, newest first, whether the worker is offline
  * (no heartbeat for 60 s), `clips`: the video clips made today against the daily clip cap, and `queue`: how many jobs of the whole app are queued and how many submitting or running (counts only). `retried` is true once the job has its one manual retry.
- * `failureReason` is `real_person` or `sensitive_input` when the provider refused the job's input image, `output_audio` when it refused the sound it made (read from `error`), else null.
+ * `failureReason` is `real_person` or `sensitive_input` when the provider refused the job's input image, `output_audio` when it refused the sound it made, `upper_body_image`,
+ * `upper_body_video` or `motion_short` when Motion Control could not read its inputs (read from `error`), else null. `unbilled` is true once the ledger closed the job at $0.
  * `twin` is `{ label, estimateUsd }` of the enabled twin model (migration 0075) a job refused for a real person or its sound can be retried on (POST `onTwin`), else null.
  */
 export async function GET(request: Request) {
@@ -61,7 +62,8 @@ export async function GET(request: Request) {
       `select j.id, j.status, j.error, j.is_mock, j.feature, j.aspect, j.duration_s, j.params, j.model, j.retry_of, j.output_asset_id, j.poster_asset_id, j.created_at, j.finished_at,
               j.prompt, j.preset_id, j.input_asset_ids, exists (select 1 from jobs r where r.retry_of = j.id) as retried,
               exists (select 1 from favorites f where f.user_id = $1 and f.job_id = j.id) as favorite,
-              (select c.usd::text from cost_entries c where c.job_id = j.id and c.kind = 'estimate') as estimate_usd
+              (select c.usd::text from cost_entries c where c.job_id = j.id and c.kind = 'estimate') as estimate_usd,
+              coalesce((select bool_or(c.is_final) and sum(c.usd) = 0 from cost_entries c where c.job_id = j.id), false) as unbilled
          from jobs j where j.user_id = $1 and j.deleted_at is null order by j.created_at desc, j.id desc limit 20`,
       [g.session.user.id],
     ),
@@ -90,7 +92,7 @@ export async function GET(request: Request) {
       // For the History card: the member's own words (a free prompt on Create video and Image Generation; elsewhere the prompt is composed, so the kept brief),
       // the inputs, the format and the caller's favourite; `traits` is a Fashion Model Generator job's own traits (JSON), which its save dialog starts from.
       text: r.params.brief ?? ((r.feature === 'video' && !r.preset_id) || r.feature === 'image' ? r.prompt : null), inputAssetIds: r.input_asset_ids,
-      traits: r.feature === 'fashion_model' ? (r.params.traits ?? null) : null, garments: r.params.garments ? Number(r.params.garments) : null, format: r.params.format ?? null, roles: r.params.roles ?? null, favorite: r.favorite, estimateUsd: r.estimate_usd,
+      traits: r.feature === 'fashion_model' ? (r.params.traits ?? null) : null, garments: r.params.garments ? Number(r.params.garments) : null, format: r.params.format ?? null, roles: r.params.roles ?? null, favorite: r.favorite, estimateUsd: r.estimate_usd, unbilled: r.unbilled,
     })),
   });
 }

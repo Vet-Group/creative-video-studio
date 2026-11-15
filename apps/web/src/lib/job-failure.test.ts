@@ -33,6 +33,14 @@ test('a fal content_policy_violation about likenesses of real people is real_per
   expect(providerRefusal(FAL_REAL_PERSON)).toEqual({ reason: 'real_person', detail: 'fal · content_policy_violation' });
 });
 
+test('a Motion Control 422 names what it could not read: the upper body in the image or the video, or too little motion', () => {
+  const msg = (m: string) => `fal result: HTTP 422 {"detail":[{"loc":["body"],"msg":"${m}","type":"value_error"}]}`;
+  expect(providerRefusal(msg('Image recognition failed. Please make sure your image meets the requirements. Error: No complete upper body detected in the image; ensure the upper body is clearly visible.'))).toEqual({ reason: 'upper_body_image', detail: 'fal · no complete upper body in the image' });
+  expect(providerRefusal(msg('The input was rejected, No complete upper body detected in the video; ensure the upper body is clearly visible.'))).toEqual({ reason: 'upper_body_video', detail: 'fal · no complete upper body in the video' });
+  expect(providerRefusal(msg('The input was rejected, The duration of continuous valid motion is too short; it should last at least 3 second.'))).toEqual({ reason: 'motion_short', detail: 'fal · motion too short' });
+  expect(providerRefusal(msg('Tail image without first image is not supported'))).toBeNull();
+});
+
 test('any other fal content_policy_violation is sensitive_input', () => {
   const other = FAL_REAL_PERSON.replace('may contain likenesses of real people or other private information', 'may contain content that cannot be processed');
   expect(providerRefusal(other)).toEqual({ reason: 'sensitive_input', detail: 'fal · content_policy_violation' });

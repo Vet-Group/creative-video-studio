@@ -1,5 +1,6 @@
-/** Why a provider refused a job: a real person or other sensitive content in its input image, or sound it made that may break copyright. */
-export type FailureReason = 'real_person' | 'sensitive_input' | 'output_audio';
+/** Why a provider refused a job: a real person or other sensitive content in its input image, sound it made that may break copyright, or a Motion Control input
+ * the model cannot read (no whole upper body in the image or the video, or too little motion in the video). */
+export type FailureReason = 'real_person' | 'sensitive_input' | 'output_audio' | 'upper_body_image' | 'upper_body_video' | 'motion_short';
 
 // BytePlus answers a refused input photo with `InputImageSensitiveContentDetected.<Kind>`, either as a create 400 or as a failed task.
 const BYTEPLUS_INPUT_REFUSAL = /\bInputImageSensitiveContentDetected(?:\.(\w+))?/;
@@ -10,6 +11,10 @@ const BYTEPLUS_AUDIO_REFUSAL = /\bOutputAudioSensitiveContentDetected(?:\.\w+)?/
 const FAL_POLICY_REFUSAL = /"type":\s*"content_policy_violation"/;
 const FAL_REAL_PERSON = /likenesses? of real people/i;
 
+// fal's Kling Motion Control answers an input it cannot read with an HTTP 422 naming what is missing (11 jobs on prod by 2026-11-15; the one retry failed the same way).
+const FAL_NO_UPPER_BODY = /No complete upper body detected in the (image|video)/;
+const FAL_MOTION_TOO_SHORT = /continuous valid motion is too short/;
+
 /** The refusals a fal twin may get past: it takes a real person's photo, and makes its own sound. */
 export const TWIN_REASONS: readonly string[] = ['real_person', 'output_audio'];
 
@@ -19,5 +24,8 @@ export function providerRefusal(error: string | null): { reason: FailureReason; 
   if (audio) return { reason: 'output_audio', detail: `byteplus · ${audio[0]}` };
   const m = error?.match(BYTEPLUS_INPUT_REFUSAL);
   if (m) return { reason: m[1] === 'PrivacyInformation' ? 'real_person' : 'sensitive_input', detail: `byteplus · ${m[0]}` };
+  const body = error?.match(FAL_NO_UPPER_BODY);
+  if (body) return { reason: body[1] === 'video' ? 'upper_body_video' : 'upper_body_image', detail: `fal · no complete upper body in the ${body[1]}` };
+  if (error && FAL_MOTION_TOO_SHORT.test(error)) return { reason: 'motion_short', detail: 'fal · motion too short' };
   return error && FAL_POLICY_REFUSAL.test(error) ? { reason: FAL_REAL_PERSON.test(error) ? 'real_person' : 'sensitive_input', detail: 'fal · content_policy_violation' } : null;
 }

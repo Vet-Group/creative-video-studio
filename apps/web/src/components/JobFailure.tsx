@@ -33,6 +33,9 @@ const REFUSAL_TEXT: Record<FailureReason, string> = {
   real_person: 'Mô hình này không nhận ảnh có người thật. Hãy dùng ảnh chỉ có sản phẩm, hoặc chọn mô hình khác.',
   sensitive_input: 'Ảnh bị nhà cung cấp từ chối vì nội dung nhạy cảm. Hãy đổi ảnh hoặc chọn mô hình khác.',
   output_audio: 'Âm thanh tạo ra bị nhà cung cấp chặn vì có thể vi phạm bản quyền. Hãy tắt âm thanh hoặc bỏ yêu cầu về nhạc trong mô tả rồi chạy lại.',
+  upper_body_image: 'Mô hình không nhận ra trọn nửa thân trên của người trong ảnh. Hãy dùng ảnh thấy rõ từ đầu tới hông rồi chạy lại.',
+  upper_body_video: 'Mô hình không nhận ra trọn nửa thân trên của người trong video chuyển động. Hãy dùng video thấy rõ từ đầu tới hông suốt clip rồi chạy lại.',
+  motion_short: 'Video chuyển động cần ít nhất 3 giây chuyển động liên tục. Hãy dùng video có đoạn chuyển động dài hơn rồi chạy lại.',
 };
 
 // Google closed the billing account behind Vertex; the worker has already moved new jobs off it (docs/ops/vertex-accounts.md).
@@ -68,6 +71,7 @@ export function JobFailureNote({ job, isAdmin }: { job: TrayJob; isAdmin: boolea
   return (
     <>
       {text && <p className="error">{text}</p>}
+      {text && job.unbilled && <p className="muted">Lượt này không bị tính phí.</p>}
       {text && <CopyFailure job={job} isAdmin={isAdmin} />}
       {isAdmin &&
         job.error &&
