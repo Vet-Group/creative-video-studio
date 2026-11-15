@@ -87,6 +87,8 @@ export interface TrayJob {
   createdAt: string;
   /** When the provider took the job (it ran from then on); null while it is queued or being sent. */
   startedAt: string | null;
+  /** While the provider still queues a running job: how many of its requests are ahead (fal only, migration 0099); else null. */
+  providerQueue: number | null;
   finishedAt: string | null;
   /** The member's own words, when kept. */
   text: string | null;

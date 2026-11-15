@@ -1,0 +1,1 @@
+ALTER TABLE "jobs" ADD COLUMN "provider_queue_position" integer;

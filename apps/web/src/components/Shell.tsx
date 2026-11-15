@@ -25,7 +25,7 @@ import { FalLowNotice } from './FalLowNotice';
 import { Icon, type IconName } from './Icon';
 import { LarkLinkPrompt } from './LarkLinkPrompt';
 import { JobFailureNote, canRetry, isCanceled, canRetryOnTwin, twinRetryText } from './JobFailure';
-import { CancelAllQueued, CancelButton, elapsedLabel, JobPrompt, JobsProvider, Recreate, resultHref, roleOf, Tap, toggleFullscreen, useForm, useJobs } from './jobs';
+import { CancelAllQueued, CancelButton, elapsedLabel, providerQueueLabel, JobPrompt, JobsProvider, Recreate, resultHref, roleOf, Tap, toggleFullscreen, useForm, useJobs } from './jobs';
 import { LoadError } from './LoadError';
 import { Modal } from './Modal';
 import type { Account, Section } from './Settings';
@@ -95,6 +95,7 @@ function TrayItem({ job, isAdmin }: { job: TrayJob; isAdmin: boolean }) {
         <p className="muted">
           {job.ratio} · {job.resolution ?? `${job.durationSec}s`} · {fmtTime(job.createdAt)}
           {elapsedLabel(job) && ` · ${elapsedLabel(job)}`}
+          {providerQueueLabel(job) && ` · ${providerQueueLabel(job)}`}
           {typical && ` · ${typical}`}
         </p>
         <JobFailureNote job={job} isAdmin={isAdmin} />
@@ -291,6 +292,7 @@ function HistoryCard({ job, isAdmin, select }: { job: TrayJob; isAdmin: boolean;
         <p className="job-when" data-status={isCanceled(job) ? 'canceled' : job.status}>
           <strong>{statusText(job)}</strong> · {fmtTime(job.createdAt)}
           {elapsedLabel(job) && ` · ${elapsedLabel(job)}`}
+          {providerQueueLabel(job) && ` · ${providerQueueLabel(job)}`}
           {typical && ` · ${typical}`}
         </p>
         {/* As on Fash, the words, each input and the result can go on the form beside the History. */}

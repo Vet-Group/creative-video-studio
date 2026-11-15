@@ -55,8 +55,8 @@ async function pollRequest(
   field: string,
 ): Promise<ProviderStatus> {
   const base = `${QUEUE}/${appPath(endpoint)}/requests/${id}`;
-  const st = (await sendJson(f, 'fal status', `${base}/status`, { headers, signal: timeout() })) as { status?: string; error?: string; error_type?: string };
-  if (st.status === 'IN_QUEUE') return { state: 'queued' };
+  const st = (await sendJson(f, 'fal status', `${base}/status`, { headers, signal: timeout() })) as { status?: string; error?: string; error_type?: string; queue_position?: number };
+  if (st.status === 'IN_QUEUE') return { state: 'queued', ...(typeof st.queue_position === 'number' && { queuePosition: st.queue_position }) };
   if (st.status === 'IN_PROGRESS') return { state: 'running' };
   if (st.status !== 'COMPLETED') throw new Error(`fal status: unknown status ${String(st.status)}`);
   // A failed request completes with `error` (human-readable) and `error_type` (machine-readable).

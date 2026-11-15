@@ -470,7 +470,11 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
       try {
         const adapter = await adapterFor(row);
         // Without an adapter the job can only time out.
-        const status = adapter ? await adapter.status() : { state: 'running' as const };
+        const status: ProviderStatus = adapter ? await adapter.status() : { state: 'running' };
+        // The provider's own queue place for the tray (migration 0099), written only when it changes; null once the job runs there.
+        if (status.state === 'queued' || status.state === 'running') {
+          await pool.query(`update jobs set provider_queue_position = $2 where id = $1 and status = 'running' and provider_queue_position is distinct from $2`, [row.id, status.state === 'queued' ? (status.queuePosition ?? null) : null]);
+        }
         if (status.state === 'succeeded') await deliver(row, status.outputUrl, status.costUsd, status.tokens);
         else if (status.state === 'failed' || status.state === 'canceled') await settle(pool, row.id, { status: 'failed', costUsd: status.costUsd, error: status.error });
         else if (row.expired && (await timeOut(row.id)) && adapter) await adapter.cancel().catch((e) => log(`cancel ${row.id}`, e));

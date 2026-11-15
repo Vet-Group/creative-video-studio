@@ -59,7 +59,7 @@ export async function GET(request: Request) {
   if (!new URL(request.url).searchParams.has('mine')) return bad('only ?mine is supported');
   const [jobs, worker, clips, queue] = await Promise.all([
     pool.query(
-      `select j.id, j.status, j.error, j.is_mock, j.feature, j.aspect, j.duration_s, j.params, j.model, j.retry_of, j.output_asset_id, j.poster_asset_id, j.created_at, j.started_at, j.finished_at,
+      `select j.id, j.status, j.error, j.is_mock, j.feature, j.aspect, j.duration_s, j.params, j.model, j.retry_of, j.output_asset_id, j.poster_asset_id, j.created_at, j.started_at, j.finished_at, j.provider_queue_position,
               j.prompt, j.preset_id, j.input_asset_ids, exists (select 1 from jobs r where r.retry_of = j.id) as retried,
               exists (select 1 from favorites f where f.user_id = $1 and f.job_id = j.id) as favorite,
               (select c.usd::text from cost_entries c where c.job_id = j.id and c.kind = 'estimate') as estimate_usd,
@@ -88,7 +88,7 @@ export async function GET(request: Request) {
     queue: queue.rows[0] as { queued: number; running: number },
     jobs: jobs.rows.map((r) => ({
       id: r.id, status: r.status, error: r.error, failureReason: providerRefusal(r.error)?.reason ?? null, isMock: r.is_mock, feature: r.feature, ratio: r.aspect, durationSec: r.duration_s, resolution: r.params.resolution ?? null, modelId: r.model, retryOf: r.retry_of,
-      retried: r.retried, twin: twins.get(r.id) ?? null, outputAssetId: r.output_asset_id, posterAssetId: r.poster_asset_id, createdAt: r.created_at, startedAt: r.started_at, finishedAt: r.finished_at,
+      retried: r.retried, twin: twins.get(r.id) ?? null, outputAssetId: r.output_asset_id, posterAssetId: r.poster_asset_id, createdAt: r.created_at, startedAt: r.started_at, finishedAt: r.finished_at, providerQueue: r.provider_queue_position,
       // For the History card: the member's own words (a free prompt on Create video and Image Generation; elsewhere the prompt is composed, so the kept brief),
       // the inputs, the format and the caller's favourite; `traits` is a Fashion Model Generator job's own traits (JSON), which its save dialog starts from.
       text: r.params.brief ?? ((r.feature === 'video' && !r.preset_id) || r.feature === 'image' ? r.prompt : null), inputAssetIds: r.input_asset_ids,

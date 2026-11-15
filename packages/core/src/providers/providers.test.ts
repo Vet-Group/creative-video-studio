@@ -252,6 +252,13 @@ describe('fal', () => {
     expect(calls[0]!.headers.Authorization).toBe('Key k');
   });
 
+  test("IN_QUEUE carries fal's queue_position, the requests ahead, when it gives one", async () => {
+    const { fn } = fakeFetch([200, { status: 'IN_QUEUE', request_id: 'req-1', queue_position: 3 }]);
+    expect(await createFalProvider({ apiKey: 'k', fetch: fn }).status(job)).toEqual({ state: 'queued', queuePosition: 3 });
+    const zero = fakeFetch([200, { status: 'IN_QUEUE', request_id: 'req-1', queue_position: 0 }]);
+    expect(await createFalProvider({ apiKey: 'k', fetch: zero.fn }).status(job)).toEqual({ state: 'queued', queuePosition: 0 });
+  });
+
   test('COMPLETED reads the result and estimates the cost', async () => {
     const { fn, calls } = fakeFetch([200, { status: 'COMPLETED' }], [200, { video: { url: 'https://v3.fal.media/a.mp4' } }]);
     const s = await createFalProvider({ apiKey: 'k', fetch: fn }).status(job);

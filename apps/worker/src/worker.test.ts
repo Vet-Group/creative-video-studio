@@ -10,7 +10,7 @@ import { DeleteBucketCommand, DeleteObjectsCommand, HeadObjectCommand, ListObjec
 import type { Enhancer } from '@cvs/core/enhance';
 import { cancelQueued, reserve, withTransaction } from '@cvs/core/ledger';
 import { ImageReadError } from '@cvs/core/providers/http';
-import type { ImageProvider, ImageSubmitRequest, SubmitRequest, VideoProvider } from '@cvs/core/providers';
+import type { ImageProvider, ImageSubmitRequest, ProviderStatus, SubmitRequest, VideoProvider } from '@cvs/core/providers';
 import { VIDEO_QUEUE, VIDEO_QUEUE_OPTIONS, videoSendOptions } from '@cvs/core/queue';
 import { createDb, createPool } from '@cvs/db/client';
 import { createTestDatabase } from '@cvs/db/testing';
@@ -259,6 +259,22 @@ describe('the mock lifecycle', () => {
     expect((await run(ffprobe.path, ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=codec_name', '-of', 'csv=p=0', file])).stdout.trim()).toBe('h264');
     expect((await costs(id)).map((c) => c.kind)).toEqual(['estimate', 'actual_adjustment']); // one estimate, one settlement
     expect((await job(id)).error).toBeNull();
+  });
+
+  test("the provider's queue place is kept on the running job while it queues there, updated as it moves, and cleared once it runs", async () => {
+    const id = await newJob('u1');
+    let answer: ProviderStatus = { state: 'queued', queuePosition: 2 };
+    await start(counting(300, (inner) => ({ ...inner, status: async () => answer })));
+    await send(id, 'u1');
+    await waitFor('the queue place', async () => (await job(id)).provider_queue_position === 2);
+    answer = { state: 'queued', queuePosition: 0 };
+    await waitFor('the queue place to move', async () => (await job(id)).provider_queue_position === 0);
+    answer = { state: 'running' };
+    await waitFor('the queue place to clear', async () => (await job(id)).provider_queue_position === null);
+    expect(await status(id)).toBe('running');
+    // Finish it, so no later test's worker polls a job of this provider.
+    answer = { state: 'failed', error: 'done', costUsd: 0, costSource: 'estimate' };
+    await waitFor('the job to finish', async () => (await status(id)) === 'failed');
   });
 
   test('an HEVC output that cannot be converted is stored as it came, the job succeeds, and a warning tells the Admin', async () => {
