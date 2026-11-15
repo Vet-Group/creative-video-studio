@@ -709,7 +709,7 @@ interface OrderRow {
 }
 
 /** An Admin's order for the results on a page's Examples tab: drag a row or move it with its buttons, then save. The fixed samples always come first. */
-function ExampleOrder({ feature, onSaved }: { feature: string; onSaved: () => void }) {
+export function ExampleOrder({ feature, onSaved }: { feature: string; onSaved: () => void }) {
   const [open, setOpen] = useState(false);
   const [rows, setRows] = useState<OrderRow[] | null>(null);
   const [dragged, setDragged] = useState<number | null>(null);
@@ -846,7 +846,7 @@ export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4
   /** The samples with a details file open in place (SampleDetail); other clips still open in a new tab. */
   const detailed = sampleTiles.filter((n) => have.has(n.replace(/\.(mp4|jpg)$/, '.json')));
   const [open, setOpen] = useState<number | null>(null);
-  const [detail, setDetail] = useState<number | null>(null); // a company result open in place, as in the Library
+  const [detail, setDetail] = useState<string | null>(null); // the id of a company result open in place, as in the Library
   const [items, setItems] = useState<Clip[]>([]);
   const [chosenType, setChosenType] = useState(''); // ProductTypeFilter
   const [hasMore, setHasMore] = useState(false);
@@ -880,6 +880,14 @@ export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4
     void load(0);
   }, [kind]);
   useFreshResults(() => void load(0));
+  const type = shownType(items, chosenType);
+  // A chosen product type shows only the results tagged with it: the fixed samples carry no type.
+  const shown = type ? items.filter((c) => c.productType === type) : items;
+  const detailAt = detail === null ? -1 : shown.findIndex((c) => c.id === detail);
+  // An open result that leaves the list (its type changed under the filter, or it left the tab) closes, so no other result takes its place.
+  useEffect(() => {
+    if (detail !== null && detailAt < 0) setDetail(null);
+  }, [detail, detailAt]);
   const retry = () => (setState('loading'), reloadSamples(), load(0));
   // The next page loads as the end comes near, as the Library's does; the button stays for the keyboard and when the observer does not fire.
   useEffect(() => {
@@ -906,9 +914,6 @@ export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4
     if (items.length === 0 && samples && samplesFailed()) return <LoadError text="Không tải được ví dụ." onRetry={retry} />;
     if (items.length === 0) return <p className="muted">{emptyText}</p>;
   }
-  const type = shownType(items, chosenType);
-  // A chosen product type shows only the results tagged with it: the fixed samples carry no type.
-  const shown = type ? items.filter((c) => c.productType === type) : items;
   const tiles: (Clip | string)[] = type ? shown : [...sampleTiles, ...items];
   return (
     <>
@@ -936,11 +941,11 @@ export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4
               ) : (
               <li key={it.id} className="gallery-item" style={{ aspectRatio: aspectOf(it.ratio) }}>
                 {video ? (
-                  <a href={`/api/assets/${it.videoAssetId}/content`} target="_blank" rel="noreferrer" aria-label={`Xem chi tiết video ${it.modelLabel}, ${it.ratio}`} onClick={(e) => (e.preventDefault(), setDetail(shown.indexOf(it)))}>
+                  <a href={`/api/assets/${it.videoAssetId}/content`} target="_blank" rel="noreferrer" aria-label={`Xem chi tiết video ${it.modelLabel}, ${it.ratio}`} onClick={(e) => (e.preventDefault(), setDetail(it.id))}>
                     <Preview src={`/api/assets/${it.videoAssetId}/content`} poster={it.posterAssetId ? `/api/assets/${it.posterAssetId}/content` : ''} width={Number(it.ratio.split(':')[0]) || 9} height={Number(it.ratio.split(':')[1]) || 16} title={`${it.modelLabel}, ${it.ratio}`} onHover />
                   </a>
                 ) : (
-                  <a href={`/api/assets/${it.videoAssetId}/content`} target="_blank" rel="noreferrer" aria-label={`Xem chi tiết ảnh ${it.modelLabel}, ${it.ratio}`} onClick={(e) => (e.preventDefault(), setDetail(shown.indexOf(it)))}>
+                  <a href={`/api/assets/${it.videoAssetId}/content`} target="_blank" rel="noreferrer" aria-label={`Xem chi tiết ảnh ${it.modelLabel}, ${it.ratio}`} onClick={(e) => (e.preventDefault(), setDetail(it.id))}>
                     <img src={`/api/assets/${it.posterAssetId ?? it.videoAssetId}/content`} alt={`${it.modelLabel}, ${it.ratio}`} loading="lazy" />
                   </a>
                 )}
@@ -957,7 +962,7 @@ export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4
         ))}
       </div>
       {open !== null && <SampleDetail names={detailed} index={open} onIndex={setOpen} />}
-      {detail !== null && shown[detail] && <ClipDetail clips={shown} index={detail} admin={admin} onIndex={setDetail} onChange={(c) => setItems((cur) => cur.map((o) => (o.id === c.id ? c : o)))} />}
+      {detailAt >= 0 && <ClipDetail clips={shown} index={detailAt} admin={admin} onIndex={(i) => setDetail(i === null ? null : (shown[i]?.id ?? null))} onChange={(c) => setItems((cur) => cur.map((o) => (o.id === c.id ? c : o)))} />}
       {state === 'error' && sampleTiles.length > 0 && <LoadError text="Không tải được kết quả của công ty." onRetry={retry} />}
       {hasMore && (
         <button ref={more} type="button" className="gallery-more" onClick={() => void load(items.length)}>

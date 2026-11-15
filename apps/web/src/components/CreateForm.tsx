@@ -6,6 +6,7 @@ import { cardSample, DEMO_TITLE, type Example, exampleForPreset, exampleModel, e
 import { adjustNote } from '@/lib/video-adjust';
 import { anglePrompt, CAMERA_ANGLES, MAX_ANGLES } from '@/lib/camera-angles';
 import { briefRoom, sectionBody, sectionPrompt } from '@/lib/marketing';
+import { PRODUCT_TYPES } from '@/lib/product-types';
 import { PROMPT_TEMPLATES } from '@/lib/prompt-starters';
 import { promptTooLong } from '@/lib/prompt-limit';
 import { confirmRun } from '@/lib/run-guard';
@@ -23,7 +24,7 @@ import { confirmDialog } from './Confirm';
 import { ENHANCE_NOTE, EnhanceToggle } from './EnhanceToggle';
 import { Icon } from './Icon';
 import { LoadError } from './LoadError';
-import { ClipDetail, copyError, copySamples, FormNotice, GALLERY_SIZE_KEY, HISTORY_SIZE_KEY, photoImg, ProductTypeFilter, RunSummary, shownType, SizeSlider, Slot, UploadedPhotos, uploadError, uploadImages, useSize } from './image-tools';
+import { ClipDetail, copyError, copySamples, ExampleOrder, FormNotice, GALLERY_SIZE_KEY, HISTORY_SIZE_KEY, photoImg, ProductTypeFilter, RunSummary, shownType, SizeSlider, Slot, UploadedPhotos, uploadError, uploadImages, useSize } from './image-tools';
 import { FormContext, type Photo, Tap, useApplier, useJobs, useRecreated } from './jobs';
 import { Modal } from './Modal';
 import { ModelPicker } from './ModelPicker';
@@ -198,7 +199,7 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
   const askedDetails = useRef(new Set<string>());
   // The results an Admin put on the Examples tab (owner, 2026-11-15: POD examples), shown before the fixed samples and filtered by product type.
   const [curated, setCurated] = useState<{ clips: LibraryClip[]; admin: boolean; failed: boolean }>({ clips: [], admin: false, failed: false });
-  const [curatedAt, setCuratedAt] = useState<number | null>(null); // one open in place, as on the other Examples tabs
+  const [curatedId, setCuratedId] = useState<string | null>(null); // the id of one open in place, as on the other Examples tabs
   const [chosenType, setChosenType] = useState(''); // ProductTypeFilter
   const [curatedTry, setCuratedTry] = useState(0);
   // The member's last model and settings, unless a refill or an Explore link opens the page. The model is honoured once, as Explore's is.
@@ -516,10 +517,11 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
     (async () => {
       const clips: LibraryClip[] = [];
       let admin = false;
-      for (let more = true; more && !stale; ) {
-        const r = await api<{ hasMore: boolean; isAdmin: boolean; clips: LibraryClip[] }>(`/api/library?kind=video&example=1&offset=${clips.length}`);
+      for (let offset = 0, more = true; more && !stale; ) {
+        const r = await api<{ hasMore: boolean; isAdmin: boolean; clips: LibraryClip[] }>(`/api/library?kind=video&example=1&offset=${offset}`);
+        offset += r.clips.length;
         clips.push(...r.clips.filter((c) => !clips.some((o) => o.id === c.id))); // one put there between two pages repeats a tile
-        more = r.hasMore;
+        more = r.hasMore && r.clips.length > 0; // an empty page ends the loop whatever hasMore says
         admin = r.isAdmin;
       }
       if (!stale) setCurated({ clips, admin, failed: false });
@@ -530,8 +532,14 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
   }, [shown, curatedTry]);
   const type = shownType(curated.clips, chosenType);
   const shownCurated = type ? curated.clips.filter((c) => c.productType === type) : curated.clips;
-  // A chosen product type shows only the results tagged with it: the fixed samples carry no type.
-  const tiles = [...shownCurated.map((clip) => ({ clip, width: Number(clip.ratio.split(':')[0]) || 9, height: Number(clip.ratio.split(':')[1]) || 16 })), ...(type ? [] : examples)];
+  const curatedAt = curatedId === null ? -1 : shownCurated.findIndex((c) => c.id === curatedId);
+  // An open result that leaves the list (its type changed under the filter, or it left the tab) closes, so no other result takes its place.
+  useEffect(() => {
+    if (curatedId !== null && curatedAt < 0) setCuratedId(null);
+  }, [curatedId, curatedAt]);
+  // A chosen product type shows only the results tagged with it: the fixed samples carry no type. Without the sample list the fixed tiles
+  // would be the built-in test patterns (colour bars, 2026-11-14), so they stay out and the panel says the list failed.
+  const tiles = [...shownCurated.map((clip) => ({ clip, width: Number(clip.ratio.split(':')[0]) || 9, height: Number(clip.ratio.split(':')[1]) || 16 })), ...(type || samplesFailed() ? [] : examples)];
   const titleOf = (ex: Example) => exampleTitle(ex, tileDetails[ex.id], presets);
   const detailAt = detail ? examples.findIndex((e) => e.id === detail.id) : -1;
   // As on Fash, a sample with a details file shows its own prompt, input photos, settings and date, and Dùng lại refills the form from it.
@@ -928,24 +936,30 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
           {!narrow && shown === 'examples' && <SizeSlider size={gallerySize} onChange={resizeGallery} />}
           {!narrow && shown === 'history' && <SizeSlider size={historySize} last={1} onChange={resizeHistory} />}
           {shown === 'examples' && curated.failed && <LoadError text="Không tải được kết quả của công ty." onRetry={() => setCuratedTry((n) => n + 1)} />}
-          {shown === 'examples' && !samplesFailed() && <ProductTypeFilter items={curated.clips} value={type} onChange={setChosenType} />}
-          {shown === 'examples' && samplesFailed() ? (
-            // Without the sample list only the built-in test patterns would show (colour bars, 2026-11-14): say it failed instead.
-            <LoadError text="Không tải được ví dụ." onRetry={reloadSamples} />
-          ) : shown === 'examples' ? (
+          {shown === 'examples' && samplesFailed() && <LoadError text="Không tải được ví dụ." onRetry={reloadSamples} />}
+          {shown === 'examples' && curated.admin && curated.clips.length > 1 && <ExampleOrder feature="video" onSaved={() => setCuratedTry((n) => n + 1)} />}
+          {shown === 'examples' && <ProductTypeFilter items={curated.clips} value={type} onChange={setChosenType} />}
+          {shown === 'examples' ? (
             <div className="masonry" role="group" aria-label="Video ví dụ">
               {splitColumns(tiles, narrow ? 2 : Math.max(1, (wide ? 4 : 3) + 1 - gallerySize)).map((column, c) => (
                 <ul key={c} className="masonry-col">
                   {column.map((ex) => {
                     if ('clip' in ex) {
                       const { clip } = ex;
+                      const kind = clip.productType ? (PRODUCT_TYPES[clip.productType] ?? null) : null;
+                      const name = [clip.modelLabel, clip.ratio, kind].filter(Boolean).join(', '); // as the other Examples tabs name a company result
                       return (
                         <li key={clip.id} className="example">
-                          <Preview src={`/api/assets/${clip.videoAssetId}/content`} poster={clip.posterAssetId ? `/api/assets/${clip.posterAssetId}/content` : ''} width={ex.width} height={ex.height} title={clip.modelLabel} paused={picking || detail !== null} onHover />
-                          <button type="button" className="example-open" onClick={() => setCuratedAt(shownCurated.indexOf(clip))}>
-                            <span className="example-caption">{clip.modelLabel}</span>
+                          <Preview src={`/api/assets/${clip.videoAssetId}/content`} poster={clip.posterAssetId ? `/api/assets/${clip.posterAssetId}/content` : ''} width={ex.width} height={ex.height} title={name} paused={picking || detail !== null || curatedId !== null} onHover />
+                          <button type="button" className="example-open" aria-label={`Xem chi tiết video ${name}`} onClick={() => setCuratedId(clip.id)}>
+                            <span className="example-caption">
+                              {clip.modelLabel}
+                              <span className="example-model" aria-hidden="true">
+                                {kind}
+                              </span>
+                            </span>
                           </button>
-                          <button type="button" className="example-use" aria-label={`Dùng ví dụ này: ${clip.modelLabel}`} onClick={() => recreate(refillFrom({ reuse: clip.id })!)}>
+                          <button type="button" className="example-use" aria-label={`Dùng ví dụ này: ${name}`} onClick={() => recreate(refillFrom({ reuse: clip.id })!)}>
                             Dùng ví dụ này
                           </button>
                         </li>
@@ -956,7 +970,7 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
                     const [title, sub] = titleOf(ex) === DEMO_TITLE && model ? [model, 'Video mẫu của mô hình'] : [titleOf(ex), model];
                     return (
                       <li key={ex.id} className="example">
-                        <Preview src={media(ex.src)} poster={media(ex.poster)} width={ex.width} height={ex.height} title={title} paused={picking || detail !== null} onHover />
+                        <Preview src={media(ex.src)} poster={media(ex.poster)} width={ex.width} height={ex.height} title={title} paused={picking || detail !== null || curatedId !== null} onHover />
                         <button type="button" className="example-open" onClick={() => setDetail(ex)}>
                           <span className="example-caption">
                             {title}
@@ -1071,7 +1085,7 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
         }}
       />
 
-      {curatedAt !== null && shownCurated[curatedAt] && <ClipDetail clips={shownCurated} index={curatedAt} admin={curated.admin} onIndex={setCuratedAt} onChange={(c) => setCurated((cur) => ({ ...cur, clips: cur.clips.map((o) => (o.id === c.id ? c : o)) }))} />}
+      {curatedAt >= 0 && <ClipDetail clips={shownCurated} index={curatedAt} admin={curated.admin} onIndex={(i) => setCuratedId(i === null ? null : (shownCurated[i]?.id ?? null))} onChange={(c) => setCurated((cur) => ({ ...cur, clips: cur.clips.map((o) => (o.id === c.id ? c : o)) }))} />}
       {/* The live Example dialog (REA-video V01, measured 2026-10-23): the clip on black with Close at its top-left, the details column,
           and Previous/Next as round buttons at the viewport edges that stop at the first and last sample. Nothing here submits a job. */}
       <Modal open={detail !== null} onClose={() => setDetail(null)} label="Chi tiết ví dụ" className="example-detail">
