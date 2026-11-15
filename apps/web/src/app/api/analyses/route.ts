@@ -18,7 +18,12 @@ export async function GET(request: Request) {
   if (g.error) return g.error;
   const source = `(select a.id from assets a where a.s3_key = analyses.source_key) as "sourceAssetId"`;
   if (new URL(request.url).searchParams.get('shared') === '1') {
-    const { rows } = await pool.query(`select id, shared_title as title, shared_at as "sharedAt", result, ${source} from analyses where shared_at is not null order by shared_at desc limit 50`);
+    // One whose source video was deleted cannot be remade, so it leaves the shelf.
+    const { rows } = await pool.query(
+      `select id, shared_title as title, shared_at as "sharedAt", result, ${source} from analyses
+        where shared_at is not null and exists (select 1 from assets a where a.s3_key = analyses.source_key and a.deleted_at is null)
+        order by shared_at desc limit 50`,
+    );
     return Response.json({
       analyses: rows.map(({ result, ...r }) => ({ ...r, durationS: (result as Analysis).durationS ?? null, sceneCount: mergeShots(result as Analysis).shots.length })),
     });

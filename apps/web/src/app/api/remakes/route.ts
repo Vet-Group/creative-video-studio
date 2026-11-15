@@ -24,12 +24,12 @@ export async function GET(request: Request) {
 }
 
 /** Queues a Smart Remake: one of the caller's own images put into chosen shots of one of their finished analyses, or of one an Admin shared, on the worker.
- * A remake of their own analysis takes its store; one of a shared analysis takes the optional `storeId` sent. Answers with the new remake id to poll. */
+ * A remake of their own analysis takes its store; one of a shared analysis has none, as the sharer's store is not the caller's. Answers with the new remake id to poll. */
 export async function POST(request: Request) {
   if (!reaRemakeEnabled()) return notHere();
   const g = await guard(request, 'member');
   if (g.error) return g.error;
-  const b = (await readJson(request)) as { analysisId?: unknown; productAssetId?: unknown; shots?: unknown; storeId?: unknown } | null;
+  const b = (await readJson(request)) as { analysisId?: unknown; productAssetId?: unknown; shots?: unknown } | null;
   const analysisId = b?.analysisId;
   const productAssetId = b?.productAssetId;
   if (typeof analysisId !== 'string' || typeof productAssetId !== 'string') return bad('analysisId, productAssetId and shots are required');
@@ -38,12 +38,6 @@ export async function POST(request: Request) {
   const analysis = (await pool.query('select status, result, store_id, user_id = $2 as own from analyses where id = $1 and (user_id = $2 or shared_at is not null)', [analysisId, userId])).rows[0];
   if (!analysis) return bad('the analysis does not exist', 404);
   if (analysis.status !== 'succeeded') return bad('the analysis has not finished');
-  // The sharer's store is not the caller's, so a shared analysis' remake is booked to the store the caller names (checked as POST /api/analyses does), or none.
-  const storeId = analysis.own ? (analysis.store_id as string | null) : (b?.storeId ?? null);
-  if (!analysis.own && storeId !== null) {
-    if (typeof storeId !== 'string') return bad('storeId must be a string');
-    if (!(await pool.query('select 1 from stores where id = $1 and not hidden', [storeId])).rowCount) return bad('the store does not exist or is hidden');
-  }
   // A remake takes whole scenes, as the result list and the picker show them: each is chosen by its first stored shot (mergeShots).
   const result = analysis.result as Analysis;
   const problem = remakeShotsProblem(b?.shots, mergeShots(result).first);
@@ -76,7 +70,7 @@ export async function POST(request: Request) {
     await tx.query(
       `insert into remakes (id, user_id, team_id, store_id, analysis_id, product_asset_id, shots)
          values ($1, $2, (select team_id from users where id = $2), $3, $4, $5, $6)`,
-      [id, userId, storeId, analysisId, productAssetId, JSON.stringify(shots)],
+      [id, userId, analysis.own ? analysis.store_id : null, analysisId, productAssetId, JSON.stringify(shots)],
     );
     return null;
   });

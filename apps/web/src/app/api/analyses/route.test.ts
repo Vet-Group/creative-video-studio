@@ -158,25 +158,40 @@ describe('shared reference videos', () => {
   const shots = JSON.stringify({ durationS: 8, shots: [1, 2, 3].map((index) => ({ index, start: index - 1, end: index, role: 'r', prompt: index < 3 ? 'same' : 'other' })) });
   const share = (id: string, body: unknown, as = adminCookie) => SHARE(call(`/api/analyses/${id}/share`, 'PUT', body, as), { params: Promise.resolve({ id }) });
   const unshare = (id: string, as = adminCookie) => UNSHARE(call(`/api/analyses/${id}/share`, 'DELETE', undefined, as), { params: Promise.resolve({ id }) });
-  const audits = async (id: string) => (await pool.query(`select action, new_value from audit_entries where target = $1 order by created_at, id`, [`analysis:${id}`])).rows;
+  const audits = async (id: string) => (await pool.query(`select action, new_value from audit_entries where target = $1 order by id`, [`analysis:${id}`])).rows;
   const shared = async () => ((await (await LIST(call('/api/analyses?shared=1'))).json()) as { analyses: Record<string, unknown>[] }).analyses;
+  const one = (id: string) => ONE(call(`/api/analyses/${id}`), { params: Promise.resolve({ id }) });
   const asset = (id: string, route = ASSET) => route(call(`/api/assets/${id}`), { params: Promise.resolve({ id }) });
+  // Another member's analysis of `source`, finished unless a status is given.
+  const theirs = (id: string, source: string, status = 'succeeded') =>
+    pool.query(
+      `insert into analyses (id, user_id, team_id, source_key, status, result, provider, model, cost_usd) select $1, u.id, u.team_id, $3, $4, $5::jsonb, 'gemini', 'flash', 0.5 from users u where u.id = $2`,
+      [id, otherId, source, status, status === 'succeeded' ? shots : null],
+    );
 
   beforeAll(async () => {
     await pool.query(
-      `insert into analyses (id, user_id, team_id, source_key, status, result, cost_usd) select 'an-share', u.id, u.team_id, 's3/shared', 'succeeded', $2::jsonb, 0.5 from users u where u.id = $1
-         union all select 'an-share-running', u.id, u.team_id, 's3/theirs', 'running', null, null from users u where u.id = $1`,
-      [otherId, shots],
+      `insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, deleted_at) values
+         ('v-gone', $1, 'input', 's3/gone', 'gone.mp4', 'video/mp4', 1, now()), ('v-later', $1, 'input', 's3/later', 'later.mp4', 'video/mp4', 1, null)`,
+      [otherId],
     );
+    await theirs('an-share', 's3/shared');
+    await theirs('an-unshared', 's3/theirs');
+    await theirs('an-share-running', 's3/theirs', 'running');
+    await theirs('an-no-source', 's3/none');
+    await theirs('an-gone', 's3/gone');
+    await theirs('an-later', 's3/later');
   });
 
-  test('only an Admin shares, only a finished analysis, under a trimmed title of 1 to 80 characters', async () => {
+  test('only an Admin shares, only a finished analysis whose source video is still there, under a trimmed title of 1 to 80 characters', async () => {
     expect((await share('an-share', { title: 'Tee' }, cookie)).status).toBe(403);
     expect((await unshare('an-share', cookie)).status).toBe(403);
     expect(await errorOf(await share('an-share-running', { title: 'Tee' }))).toBe('only a finished analysis can be shared');
+    expect(await errorOf(await share('an-no-source', { title: 'Tee' }))).toBe('the analysis has no source video to share');
+    expect(await errorOf(await share('an-gone', { title: 'Tee' }))).toBe('the analysis has no source video to share'); // soft-deleted
     for (const title of ['   ', 'x'.repeat(81), 7, undefined]) expect(await errorOf(await share('an-share', { title }))).toBe('title must be 1 to 80 characters');
     expect((await share('nope', { title: 'Tee' })).status).toBe(404);
-    expect((await pool.query(`select shared_title from analyses where id = 'an-share'`)).rows[0].shared_title).toBeNull();
+    expect((await pool.query(`select count(*)::int as n from analyses where shared_title is not null`)).rows[0].n).toBe(0);
     await withFlag(undefined, async () => expect((await share('an-share', { title: 'Tee' })).status).toBe(404));
   });
 
@@ -185,9 +200,9 @@ describe('shared reference videos', () => {
     expect(first.status).toBe(200);
     const { sharedAt } = (await first.json()) as { sharedTitle: string; sharedAt: string };
     expect(sharedAt).toBeTruthy();
-    expect(((await (await share('an-share', { title: 'Áo thun trơn' })).json()) as object)).toEqual({ sharedTitle: 'Áo thun trơn', sharedAt }); // a repeat
-    expect(((await (await share('an-share', { title: 'Tee' })).json()) as object)).toEqual({ sharedTitle: 'Tee', sharedAt }); // renamed, same place on the shelf
-    expect(((await (await unshare('an-share')).json()) as object)).toEqual({ sharedTitle: null, sharedAt: null });
+    expect((await (await share('an-share', { title: 'Áo thun trơn' })).json()) as object).toEqual({ sharedTitle: 'Áo thun trơn', sharedAt }); // a repeat
+    expect((await (await share('an-share', { title: 'Tee' })).json()) as object).toEqual({ sharedTitle: 'Tee', sharedAt }); // renamed, same place on the shelf
+    expect((await (await unshare('an-share')).json()) as object).toEqual({ sharedTitle: null, sharedAt: null });
     expect((await unshare('an-share')).status).toBe(200); // a repeat
     expect(await audits('an-share')).toEqual([
       { action: 'analysis.share', new_value: { sharedTitle: 'Áo thun trơn' } },
@@ -196,11 +211,17 @@ describe('shared reference videos', () => {
     ]);
   });
 
-  test('every member lists the shared ones, newest share first, with only what a card shows', async () => {
+  test('every member lists the shared ones, newest share first, with only what a card shows, and none whose source video was deleted', async () => {
     expect(await shared()).toEqual([]);
-    await pool.query(`insert into analyses (id, user_id, team_id, source_key, status, result) select 'an-mine-shared', u.id, u.team_id, 's3/v1', 'succeeded', $2::jsonb from users u where u.id = $1`, [userId, shots]);
+    await pool.query(
+      `insert into analyses (id, user_id, team_id, source_key, status, result, provider) select 'an-mine-shared', u.id, u.team_id, 's3/v1', 'succeeded', $2::jsonb, 'gemini' from users u where u.id = $1`,
+      [userId, shots],
+    );
+    await share('an-later', { title: 'Later' });
     await share('an-mine-shared', { title: 'Mine' });
     await share('an-share', { title: 'Tee' });
+    expect((await shared()).map((a) => a.id)).toEqual(['an-share', 'an-mine-shared', 'an-later']);
+    await pool.query(`update assets set deleted_at = now() where id = 'v-later'`);
     const list = await shared();
     expect(list.map((a) => a.id)).toEqual(['an-share', 'an-mine-shared']);
     expect(list[0]).toEqual({ id: 'an-share', title: 'Tee', sharedAt: expect.any(String), sourceAssetId: 'v-shared', durationS: 8, sceneCount: 2 }); // no owner, cost or result
@@ -209,20 +230,32 @@ describe('shared reference videos', () => {
     expect(own.find((a) => a.id === 'an-mine-shared')?.sharedTitle).toBe('Mine');
   });
 
-  test('a shared analysis opens for any member, and another member’s unshared one still does not', async () => {
-    const got = await ONE(call('/api/analyses/an-share'), { params: Promise.resolve({ id: 'an-share' }) });
+  test('a shared analysis opens for any member without its owner’s cost, provider, model or error; the owner still sees them', async () => {
+    const got = await one('an-share');
     expect(got.status).toBe(200);
-    expect((await got.json()) as object).toMatchObject({ id: 'an-share', status: 'succeeded', sharedTitle: 'Tee', sourceAssetId: 'v-shared' });
-    expect((await ONE(call('/api/analyses/an-share-running'), { params: Promise.resolve({ id: 'an-share-running' }) })).status).toBe(404);
+    expect((await got.json()) as object).toMatchObject({ id: 'an-share', status: 'succeeded', sharedTitle: 'Tee', sourceAssetId: 'v-shared', costUsd: null, provider: null, model: null, error: null });
+    expect((await (await one('an-mine-shared')).json()) as object).toMatchObject({ id: 'an-mine-shared', provider: 'gemini' });
+    expect((await one('an-unshared')).status).toBe(404); // another member's finished analysis that is not shared
   });
 
   test('the source video of a shared analysis is readable by any member while it is shared, and nothing else of its owner is', async () => {
     expect((await asset('v-shared')).status).toBe(200);
-    expect((await asset('v-theirs')).status).toBe(403); // the owner's other video, the source of an unshared analysis
+    expect((await asset('v-theirs')).status).toBe(403); // the owner's other video, the source of a finished analysis that is not shared
     expect((await asset('v-theirs', CONTENT)).status).toBe(403);
     await unshare('an-share');
     expect((await asset('v-shared')).status).toBe(403);
     expect((await asset('v-shared', CONTENT)).status).toBe(403);
+    expect((await one('an-share')).status).toBe(404); // unsharing also closes the analysis itself
     await share('an-share', { title: 'Tee' });
+  });
+
+  test('the owner of a shared analysis that another member remade gets its own refusal; their own remake keeps the usual one', async () => {
+    await pool.query(`insert into remakes (id, user_id, team_id, analysis_id, shots) select 'rm-by-other', u.id, u.team_id, 'an-mine-shared', '[1]' from users u where u.id = $1`, [otherId]);
+    const byOther = await remove('an-mine-shared');
+    expect([byOther.status, await errorOf(byOther)]).toEqual([409, 'Video mẫu này đã có người dùng để làm lại nên không xoá được.']);
+    await pool.query(`insert into remakes (id, user_id, team_id, analysis_id, shots) select 'rm-by-owner', u.id, u.team_id, 'an-mine-shared', '[1]' from users u where u.id = $1`, [userId]);
+    const own = await remove('an-mine-shared');
+    expect([own.status, await errorOf(own)]).toEqual([409, 'Phân tích này đã có lượt làm lại nên không xoá được.']);
+    expect((await pool.query(`select id from analyses where id = 'an-mine-shared'`)).rowCount).toBe(1);
   });
 });

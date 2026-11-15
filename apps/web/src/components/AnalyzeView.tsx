@@ -174,7 +174,7 @@ export function AnalysisWithSource({ analysis, src, poster, preload = 'metadata'
 }
 
 /** One analysis, its status and result: the Kết quả tab on a wide screen and the Phân tích panel on a phone. `onShared`, for an Admin, adds the share control. */
-export function AnalysisPanel({ row, onRetry, onClose, remakeEnabled = false, onShared }: { row: AnalysisRow; onRetry?: () => void; onClose: () => void; remakeEnabled?: boolean; onShared?: (sharedTitle: string | null) => void }) {
+export function AnalysisPanel({ row, onRetry, onClose, remakeEnabled = false, onShared }: { row: AnalysisRow; onRetry?: () => void; onClose: () => void; remakeEnabled?: boolean; onShared?: (id: string, sharedTitle: string | null) => void }) {
   const waiting = !terminal(row.status);
   const elapsed = waiting ? elapsedLabel(row) : null;
   return (
@@ -368,10 +368,9 @@ export function AnalyzeView({ initialId, remakeEnabled = false, isAdmin = false 
     }
   }
 
-  // An Admin shared or unshared the analysis on view: its row here and in History follow.
-  const shared = (sharedTitle: string | null) => {
-    const id = current?.id;
-    setCurrent((c) => c && { ...c, sharedTitle });
+  // An Admin shared or unshared an analysis: its row on view (while still that one) and in History follow.
+  const shared = (id: string, sharedTitle: string | null) => {
+    setCurrent((c) => (c && c.id === id ? { ...c, sharedTitle } : c));
     setHistory((h) => h.map((x) => (x.id === id ? { ...x, sharedTitle } : x)));
   };
   const onShared = isAdmin ? shared : undefined;
@@ -442,7 +441,7 @@ export function AnalyzeView({ initialId, remakeEnabled = false, isAdmin = false 
             </section>
           ) : shown === 'examples' ? (
             <>
-              {remakeEnabled && <SharedVideos busy={busy} currentId={current?.id} onPick={pick} />}
+              {remakeEnabled && <SharedVideos busy={busy} currentId={current?.id} onPick={(id) => api<AnalysisRow>(`/api/analyses/${encodeURIComponent(id)}`).then(pick)} />}
               <Examples busy={busy} onUse={(name) => void takeSample(name)} />
             </>
           ) : (
