@@ -5,7 +5,7 @@ import { type CSSProperties, type DragEvent, type KeyboardEvent, type ReactNode,
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { api, ApiError, type Clip, sendJson, thumbUrl } from '@/lib/api';
-import { dropRefillQuery, exampleFrom, refillFrom, reuseHref } from '@/lib/reuse';
+import { dropRefillQuery, exampleFrom, recipeOf, refillFrom, reuseHref } from '@/lib/reuse';
 import { NARROW, useMediaQuery, WIDE } from '@/lib/use-media-query';
 import { numberedSamples } from '@/lib/examples';
 import { PRODUCT_TYPES } from '@/lib/product-types';
@@ -159,11 +159,12 @@ export interface ReuseJob {
 }
 
 /** Refill (`reuse` is a job's or a saved template's API path, lib/reuse.ts): reads it and hands it to `fill` when it is of `feature`; `fail` otherwise. Everything stays editable.
- * Returns Recreate in place: the same refill from another path, the URL unchanged, as Fash's Recreate. */
-export function useReuse(reuse: string | undefined, feature: string, fill: (j: Omit<ReuseJob, 'images'> & { images: Img[] }) => void, fail: (e?: unknown) => void): (from: string) => void {
+ * Returns Recreate in place: the same refill from another path, the URL unchanged, as Fash's Recreate. `recipe`: a company example, which gives its
+ * words and settings but not its photos (another seller's product), so `fill` gets no `images` and the member's own stay. */
+export function useReuse(reuse: string | undefined, feature: string, fill: (j: Omit<ReuseJob, 'images'> & { images?: Img[] }) => void, fail: (e?: unknown) => void): (from: string, recipe?: boolean) => void {
   const recreated = useRecreated();
-  const { loading } = useJobs();
-  const [source, setSource] = useState(reuse ? { from: reuse } : null); // a new object each time, so the same path refills again
+  const { loading, notify } = useJobs();
+  const [source, setSource] = useState<{ from: string; recipe?: boolean } | null>(reuse ? { from: reuse } : null); // a new object each time, so the same path refills again
   useEffect(() => {
     if (!source) return;
     const reuse = source.from;
@@ -175,21 +176,26 @@ export function useReuse(reuse: string | undefined, feature: string, fill: (j: O
         const j = await fillBlanks(reuse, loaded);
         if (stale) return; // superseded while the member filled the blanks
         if (!j) return dropRefillQuery(); // cancelled: the form stays as it is
-        // A sample's photos become this member's inputs first, copied on the server.
-        const samples = j.images.flatMap((i) => ('sample' in i ? [i.sample] : []));
-        const images = samples.length > 0 ? await copySamples(samples) : (j.images as Img[]);
-        if (stale) return; // superseded while the photos were copied
-        fill({ ...j, images });
-        recreated(reuse);
+        if (source.recipe) {
+          fill(recipeOf(j));
+          notify('Đã dùng mẫu của ví dụ. Ảnh của bạn được giữ nguyên.');
+        } else {
+          // A sample's photos become this member's inputs first, copied on the server.
+          const samples = j.images.flatMap((i) => ('sample' in i ? [i.sample] : []));
+          const images = samples.length > 0 ? await copySamples(samples) : (j.images as Img[]);
+          if (stale) return; // superseded while the photos were copied
+          fill({ ...j, images });
+          recreated(reuse);
+        }
         dropRefillQuery();
       })
       .catch(fail)
-      .finally(loading('Đang tải ảnh...'));
+      .finally(loading(source.recipe ? 'Đang tải mẫu...' : 'Đang tải ảnh...'));
     return () => {
       stale = true;
     };
   }, [source]);
-  return (from) => setSource({ from });
+  return (from, recipe) => setSource({ from, recipe });
 }
 
 /** Uploads files through /api/assets and returns the new assets. */
@@ -848,6 +854,7 @@ export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4
   const detailed = sampleTiles.filter((n) => have.has(n.replace(/\.(mp4|jpg)$/, '.json')));
   const [open, setOpen] = useState<number | null>(null);
   const [detail, setDetail] = useState<string | null>(null); // the id of a company result open in place, as in the Library
+  const form = useForm();
   const [items, setItems] = useState<Clip[]>([]);
   const [chosenType, setChosenType] = useState(''); // ProductTypeFilter
   const [hasMore, setHasMore] = useState(false);
@@ -951,9 +958,9 @@ export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4
                     <img src={`/api/assets/${it.posterAssetId ?? it.videoAssetId}/content`} alt={`${it.modelLabel}, ${it.ratio}`} loading="lazy" />
                   </a>
                 )}
-                {/* Fash's "Use this template": the page's form filled from this result's inputs (a Library clip's inputs are open to every member). */}
+                {/* Fash's "Use this template": the page's form filled from this result's words and settings; its photos are another seller's, so the member's own stay. */}
                 {reuseHref(it) && (
-                  <Recreate href={reuseHref(it)!} from={refillFrom({ reuse: it.id })!} className="gallery-use" label={`Dùng ví dụ này: ${it.modelLabel}, ${it.ratio}`}>
+                  <Recreate href={reuseHref(it)!} from={refillFrom({ reuse: it.id })!} recipe className="gallery-use" label={`Dùng ví dụ này: ${it.modelLabel}, ${it.ratio}`}>
                     Dùng ví dụ này
                   </Recreate>
                 )}
@@ -964,7 +971,7 @@ export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4
         ))}
       </div>
       {open !== null && <SampleDetail names={detailed} index={open} onIndex={setOpen} />}
-      {detailAt >= 0 && <ClipDetail clips={shown} index={detailAt} admin={admin} onIndex={(i) => setDetail(i === null ? null : (shown[i]?.id ?? null))} onChange={(c) => setItems((cur) => cur.map((o) => (o.id === c.id ? c : o)))} />}
+      {detailAt >= 0 && <ClipDetail clips={shown} index={detailAt} admin={admin} onUse={form ? (c) => (form.recreate(refillFrom({ reuse: c.id })!, true), setDetail(null)) : undefined} onIndex={(i) => setDetail(i === null ? null : (shown[i]?.id ?? null))} onChange={(c) => setItems((cur) => cur.map((o) => (o.id === c.id ? c : o)))} />}
       {state === 'error' && sampleTiles.length > 0 && <LoadError text="Không tải được kết quả của công ty." onRetry={retry} />}
       {hasMore && (
         <button ref={more} type="button" className="gallery-more" onClick={() => void load(items.length)}>

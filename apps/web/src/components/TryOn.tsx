@@ -86,10 +86,12 @@ export function TryOn({ reuse }: { reuse?: string }) {
     'try_on',
     (j) => {
       recall.touch();
-      const n = j.garments ?? j.images.length - 1;
-      setPerson(j.images.slice(0, 1));
-      setGarments(j.images.slice(1, 1 + n));
-      setBackground(j.images.slice(1 + n, 2 + n));
+      if (j.images) {
+        const n = j.garments ?? j.images.length - 1;
+        setPerson(j.images.slice(0, 1));
+        setGarments(j.images.slice(1, 1 + n));
+        setBackground(j.images.slice(1 + n, 2 + n));
+      }
       setPrompt(j.brief ?? '');
       pick.refill(j);
     },
@@ -276,7 +278,7 @@ export function TryOn({ reuse }: { reuse?: string }) {
         <div className="side" id={`tryon-panel-${panel}`} role="tabpanel" aria-labelledby={`tryon-tab-${panel}`} hidden={narrow && shown === 'create'}>
           <FormContext.Provider
             value={{
-              recreate: (from) => (recall.touch(), recreate(from), narrow && setTab('create')),
+              recreate: (from, recipe) => (recall.touch(), recreate(from, recipe), narrow && setTab('create')),
               apply,
               photo: (p, role) => void take(p, role),
               prompt: (text) => (setPrompt(text), notify('Đã chép mô tả')),

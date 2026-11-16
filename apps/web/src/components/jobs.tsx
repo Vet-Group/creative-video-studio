@@ -131,7 +131,8 @@ export function useRecreated(): (from: string) => void {
 
 /** What a page's form offers the History, the Examples and their details beside it: Recreate in place (Fash's keeps the URL) and a chip's setting. */
 export interface FormActions {
-  recreate: (from: string) => void;
+  /** `recipe`: a company example, whose words and settings go on the form but not its photos. */
+  recreate: (from: string, recipe?: boolean) => void;
   apply?: (s: Setting) => void;
   /** The settings `apply` takes, where the form has only some (an app with a ratio but no resolution); absent, it takes them all. */
   settings?: (keyof Setting)[];
@@ -259,8 +260,8 @@ export const FormContext = createContext<FormActions | null>(null);
 export const useForm = (): FormActions | null => useContext(FormContext);
 
 /** The reuse action (Fash's Recreate): beside a form it refills that form in place and the URL stays; elsewhere (the Library) it opens the page that made it.
- * `from` is the API path the form refills from (lib/reuse.ts), `href` the page link; `onDone` runs after an in-place refill starts. */
-export function Recreate({ href, from, className, label, onDone, children }: { href: string; from: string; className?: string; label?: string; onDone?: () => void; children: ReactNode }) {
+ * `from` is the API path the form refills from (lib/reuse.ts), `href` the page link; `onDone` runs after an in-place refill starts; `recipe` as FormActions.recreate. */
+export function Recreate({ href, from, className, label, onDone, recipe, children }: { href: string; from: string; className?: string; label?: string; onDone?: () => void; recipe?: boolean; children: ReactNode }) {
   const form = useForm();
   if (!form)
     return (
@@ -269,7 +270,7 @@ export function Recreate({ href, from, className, label, onDone, children }: { h
       </Link>
     );
   return (
-    <button type="button" className={className} aria-label={label} data-from={from} onClick={() => (form.recreate(from), onDone?.())}>
+    <button type="button" className={className} aria-label={label} data-from={from} onClick={() => (form.recreate(from, recipe), onDone?.())}>
       {children}
     </button>
   );

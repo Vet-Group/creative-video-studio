@@ -138,7 +138,7 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
     app.feature,
     (j) => {
       recall.touch();
-      setImages(splitImages(app, j.images));
+      if (j.images) setImages(splitImages(app, j.images));
       setPrompt(j.brief ?? '');
       pick.refill(j);
     },
@@ -386,10 +386,12 @@ function MotionForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
     app.feature,
     (j) => {
       recall.touch();
-      const inputs = j.images as (Img & { mime?: string; durationMs?: number | null })[];
-      const ref = inputs.find((i) => i.mime?.startsWith('video/'));
-      setImage(inputs.filter((i) => i !== ref).slice(0, 1));
-      setVideo(ref ? { id: ref.id, filename: ref.filename, durationMs: ref.durationMs ?? 0 } : null);
+      if (j.images) {
+        const inputs = j.images as (Img & { mime?: string; durationMs?: number | null })[];
+        const ref = inputs.find((i) => i.mime?.startsWith('video/'));
+        setImage(inputs.filter((i) => i !== ref).slice(0, 1));
+        setVideo(ref ? { id: ref.id, filename: ref.filename, durationMs: ref.durationMs ?? 0 } : null);
+      }
       setPrompt(j.prompt ?? '');
       if (j.modelId) setModelId(j.modelId);
       setOrientation(j.orientation === 'image' ? 'image' : 'video');

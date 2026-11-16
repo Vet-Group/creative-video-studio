@@ -32,7 +32,7 @@ export function exampleFrom(q: { example?: unknown }): string | undefined {
  * changes and copy its photos again, while the link itself still opens the refill from anywhere. */
 export function dropRefillQuery(): void {
   const url = new URL(window.location.href);
-  for (const k of ['reuse', 'template', 'example']) url.searchParams.delete(k);
+  for (const k of ['reuse', 'template', 'example', 'recipe']) url.searchParams.delete(k);
   if (url.href !== window.location.href) window.history.replaceState(null, '', url);
 }
 

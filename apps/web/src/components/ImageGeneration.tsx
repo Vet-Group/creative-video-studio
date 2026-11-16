@@ -84,7 +84,7 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
     'image',
     (j) => {
       recall.touch();
-      setImages(j.images);
+      if (j.images) setImages(j.images);
       setPrompt(j.brief ?? j.prompt ?? ''); // with a style or the brand kit, the job's prompt is composed and the member's own words are the brief
       setStyleId(j.presetId ?? '');
       setEnhance(j.enhance ?? true);
@@ -238,7 +238,7 @@ ${style.prompt}` : prompt.trim();
         </div>
 
         <div className="side" id={`imagegen-panel-${panel}`} role="tabpanel" aria-labelledby={`imagegen-tab-${panel}`} hidden={narrow && shown === 'create'}>
-          <FormContext.Provider value={{ recreate: (from) => (recall.touch(), recreate(from), narrow && setTab('create')), apply, photo: (p) => void take(p), prompt: (text) => (setPrompt(text), notify('Đã chép mô tả')), result: (p) => void take(p) }}>
+          <FormContext.Provider value={{ recreate: (from, recipe) => (recall.touch(), recreate(from, recipe), narrow && setTab('create')), apply, photo: (p) => void take(p), prompt: (text) => (setPrompt(text), notify('Đã chép mô tả')), result: (p) => void take(p) }}>
             {shown === 'examples' ? <Gallery kind="image" samples="image-example-" label="Ảnh của công ty" emptyText="Chưa có ảnh nào trong công ty. Hãy tạo ảnh đầu tiên." /> : shown === 'about' ? <About page="image" /> : <Tray feature="image" />}
           </FormContext.Provider>
         </div>
