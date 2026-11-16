@@ -71,12 +71,15 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  const Bucket = bucketName();
-  const { Contents = [] } = await s3().send(new ListObjectsV2Command({ Bucket }));
-  if (Contents.length > 0) await s3().send(new DeleteObjectsCommand({ Bucket, Delete: { Objects: Contents.flatMap(({ Key }) => (Key ? [{ Key }] : [])) } }));
-  await s3().send(new DeleteBucketCommand({ Bucket }));
-  await pool.end();
-  await testDb.drop();
+  try {
+    const Bucket = bucketName();
+    const { Contents = [] } = await s3().send(new ListObjectsV2Command({ Bucket }));
+    if (Contents.length > 0) await s3().send(new DeleteObjectsCommand({ Bucket, Delete: { Objects: Contents.flatMap(({ Key }) => (Key ? [{ Key }] : [])) } }));
+    await s3().send(new DeleteBucketCommand({ Bucket }));
+    await pool.end();
+  } finally {
+    await testDb.drop();
+  }
 });
 
 describe('/api/library/zip', () => {

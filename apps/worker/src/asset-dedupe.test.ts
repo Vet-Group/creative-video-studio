@@ -21,8 +21,11 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await pool.end();
-  await testDb.drop();
+  try {
+    await pool.end();
+  } finally {
+    await testDb.drop();
+  }
 });
 
 /** An input asset `id` of `owner` holding `content`, made `minutes` ago. */

@@ -31,9 +31,12 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await stopBoss();
-  await pool.end();
-  await testDb.drop();
+  try {
+    await stopBoss();
+    await pool.end();
+  } finally {
+    await testDb.drop();
+  }
 });
 
 type Listed = { id: string; pairIds: string[]; ratios: string[]; resolution: string; estimateUsd: string; audioEstimateUsd: string | null; supported: boolean };

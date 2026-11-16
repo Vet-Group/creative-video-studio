@@ -55,9 +55,12 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await stopBoss();
-  await pool.end();
-  await testDb.drop();
+  try {
+    await stopBoss();
+    await pool.end();
+  } finally {
+    await testDb.drop();
+  }
 });
 
 test('every route 404s while the feature is off', async () => {

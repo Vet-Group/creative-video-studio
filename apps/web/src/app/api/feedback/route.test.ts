@@ -20,8 +20,11 @@ const PASSWORD = 'correct-horse-battery';
 let seq = 0;
 
 afterAll(async () => {
-  await pool.end();
-  await testDb.drop();
+  try {
+    await pool.end();
+  } finally {
+    await testDb.drop();
+  }
 });
 
 async function user(role: 'member' | 'admin' = 'member') {

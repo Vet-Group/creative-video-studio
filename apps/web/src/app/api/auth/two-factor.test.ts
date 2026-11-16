@@ -16,8 +16,11 @@ const { PATCH } = await import('../admin/users/[id]/route');
 
 const PASSWORD = 'correct-horse-battery';
 afterAll(async () => {
-  await pool.end();
-  await testDb.drop();
+  try {
+    await pool.end();
+  } finally {
+    await testDb.drop();
+  }
 });
 
 async function user(email: string, role: 'member' | 'admin' = 'member') {

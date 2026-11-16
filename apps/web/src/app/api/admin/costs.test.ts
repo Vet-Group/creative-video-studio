@@ -187,8 +187,11 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await pool.end();
-  await testDb.drop();
+  try {
+    await pool.end();
+  } finally {
+    await testDb.drop();
+  }
 });
 
 // Hand-computed from the fixture, at 25000.5 VND per USD, rounding each ledger row half to even.

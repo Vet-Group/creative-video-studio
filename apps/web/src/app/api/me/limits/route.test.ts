@@ -12,8 +12,11 @@ const { auth, pool } = await import('@/lib/auth');
 const { GET } = await import('./route');
 
 afterAll(async () => {
-  await pool.end();
-  await testDb.drop();
+  try {
+    await pool.end();
+  } finally {
+    await testDb.drop();
+  }
 });
 
 test('401 without a session; a member reads only their own usage beside the Admin caps', async () => {

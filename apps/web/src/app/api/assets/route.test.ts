@@ -127,12 +127,15 @@ async function assetCount(): Promise<number> {
 }
 
 afterAll(async () => {
-  const Bucket = bucketName();
-  const keys = await objectKeys();
-  if (keys.length > 0) await s3().send(new DeleteObjectsCommand({ Bucket, Delete: { Objects: keys.map((Key) => ({ Key })) } }));
-  await s3().send(new DeleteBucketCommand({ Bucket }));
-  await pool.end();
-  await testDb.drop();
+  try {
+    const Bucket = bucketName();
+    const keys = await objectKeys();
+    if (keys.length > 0) await s3().send(new DeleteObjectsCommand({ Bucket, Delete: { Objects: keys.map((Key) => ({ Key })) } }));
+    await s3().send(new DeleteBucketCommand({ Bucket }));
+    await pool.end();
+  } finally {
+    await testDb.drop();
+  }
 });
 
 describe('POST /api/assets', () => {

@@ -9,8 +9,11 @@ const testDb = await createTestDatabase();
 const pool = createPool(testDb.url);
 
 afterAll(async () => {
-  await pool.end();
-  await testDb.drop();
+  try {
+    await pool.end();
+  } finally {
+    await testDb.drop();
+  }
 });
 
 beforeAll(async () => {

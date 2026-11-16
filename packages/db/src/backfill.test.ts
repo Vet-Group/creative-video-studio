@@ -9,8 +9,11 @@ const testDb = await createTestDatabase();
 const pool = createPool(testDb.url, 1);
 
 afterAll(async () => {
-  await pool.end();
-  await testDb.drop();
+  try {
+    await pool.end();
+  } finally {
+    await testDb.drop();
+  }
 });
 
 test('0005 marks every unverified user verified and touches nothing else', async () => {

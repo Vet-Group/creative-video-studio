@@ -39,9 +39,12 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await stopBoss();
-  await pool.end();
-  await testDb.drop();
+  try {
+    await stopBoss();
+    await pool.end();
+  } finally {
+    await testDb.drop();
+  }
 });
 
 describe('the model picker', () => {

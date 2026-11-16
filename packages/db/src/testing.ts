@@ -6,28 +6,53 @@ import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import pg from 'pg';
 import { databaseUrl } from './client';
 
+const STALE_AFTER_MS = 6 * 60 * 60 * 1000;
+// cvs_test_<base36 epoch seconds>_<12 hex>. Older names (cvs_test_<12 hex>, no timestamp) never match, so they are never swept.
+const TIMED_NAME = /^cvs_test_([0-9a-z]+)_[0-9a-f]{12}$/;
+
+/** The databases among `names` that a run killed before its teardown left behind: timestamped test databases more than 6 hours old. */
+export function staleTestDatabases(names: string[], now = Date.now()): string[] {
+  return names.filter((n) => {
+    const seconds = parseInt(TIMED_NAME.exec(n)?.[1] ?? '', 36);
+    return Number.isFinite(seconds) && now - seconds * 1000 > STALE_AFTER_MS;
+  });
+}
+
 /** A random database name, or `fixedName` (replacing any database of that name left behind) when the caller must know the URL up front. */
 export async function createTestDatabase(fixedName?: string): Promise<{ url: string; drop: () => Promise<void> }> {
   const base = new URL(databaseUrl());
-  const name = fixedName ?? `cvs_test_${randomBytes(6).toString('hex')}`;
+  const name = fixedName ?? `cvs_test_${Math.floor(Date.now() / 1000).toString(36)}_${randomBytes(6).toString('hex')}`;
   const run = async (q: string) => {
     const c = new pg.Client({ connectionString: base.toString() });
     await c.connect();
     try {
-      await c.query(q);
+      return (await c.query(q)).rows as pg.QueryResultRow[];
     } finally {
       await c.end();
     }
   };
-  if (fixedName) await run(`drop database if exists ${name} with (force)`);
+  const drop = async () => void (await run(`drop database if exists ${name} with (force)`));
+  if (fixedName) {
+    await drop();
+  } else {
+    // Other worktrees share this server, so only databases that no live run can still own are dropped; a failed drop must not fail this run.
+    const rows = await run(`select datname from pg_database where datname ~ '^cvs_test_'`);
+    for (const stale of staleTestDatabases(rows.map((r) => r.datname as string))) await run(`drop database if exists ${stale} with (force)`).catch(() => {});
+  }
   await run(`create database ${name}`);
   const url = new URL(base);
   url.pathname = `/${name}`;
   const pool = new pg.Pool({ connectionString: url.toString(), max: 1 });
   try {
-    await migrate(drizzle(pool), { migrationsFolder: fileURLToPath(new URL('../migrations', import.meta.url)) });
-  } finally {
-    await pool.end();
+    try {
+      await migrate(drizzle(pool), { migrationsFolder: fileURLToPath(new URL('../migrations', import.meta.url)) });
+    } finally {
+      await pool.end();
+    }
+  } catch (e) {
+    // The caller never gets a handle to drop, so a database that failed to migrate must not outlive the call.
+    await drop().catch(() => {});
+    throw e;
   }
-  return { url: url.toString(), drop: () => run(`drop database if exists ${name} with (force)`) };
+  return { url: url.toString(), drop };
 }

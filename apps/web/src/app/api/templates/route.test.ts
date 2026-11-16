@@ -39,12 +39,15 @@ const tryOn = (u: User) => ({ feature: 'try_on', name: 'Red dress', data: { imag
 beforeAll(() => ensureBucket());
 
 afterAll(async () => {
-  const Bucket = bucketName();
-  const { Contents = [] } = await s3().send(new ListObjectsV2Command({ Bucket }));
-  if (Contents.length) await s3().send(new DeleteObjectsCommand({ Bucket, Delete: { Objects: Contents.map(({ Key }) => ({ Key: Key! })) } }));
-  await s3().send(new DeleteBucketCommand({ Bucket }));
-  await pool.end();
-  await testDb.drop();
+  try {
+    const Bucket = bucketName();
+    const { Contents = [] } = await s3().send(new ListObjectsV2Command({ Bucket }));
+    if (Contents.length) await s3().send(new DeleteObjectsCommand({ Bucket, Delete: { Objects: Contents.map(({ Key }) => ({ Key: Key! })) } }));
+    await s3().send(new DeleteBucketCommand({ Bucket }));
+    await pool.end();
+  } finally {
+    await testDb.drop();
+  }
 });
 
 describe('/api/templates', () => {
