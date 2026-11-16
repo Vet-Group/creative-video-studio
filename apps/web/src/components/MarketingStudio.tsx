@@ -125,7 +125,7 @@ interface MarketingJob {
   modelId: string | null;
 }
 
-export function MarketingStudio({ format = 'ugc', reuse, wizardDefault = false }: { format?: MarketingFormat; reuse?: string; wizardDefault?: boolean }) {
+export function MarketingStudio({ format = 'ugc', reuse, recipe, wizardDefault = false }: { format?: MarketingFormat; reuse?: string; recipe?: boolean; wizardDefault?: boolean }) {
   const advanced = format === 'advanced';
   const unboxing = format === 'unboxing';
   const review = format === 'review';
@@ -190,7 +190,7 @@ export function MarketingStudio({ format = 'ugc', reuse, wizardDefault = false }
     if (s.ratio) setRatio(s.ratio);
     if (s.durationSec) setDurationSec(s.durationSec);
   });
-  const [source, setSource] = useState(reuse ? { from: reuse } : null); // what the form refills from; Recreate sets a new one in place
+  const [source, setSource] = useState<{ from: string; recipe?: boolean } | null>(reuse ? { from: reuse, recipe } : null); // what the form refills from; Recreate sets a new one in place. `recipe`: a company example, which gives its words and settings but not its photos, end frame or video
   const [list, setList] = useState<{ key: string; models: VideoModel[]; defaultId: string | null } | null>(null);
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -311,35 +311,40 @@ export function MarketingStudio({ format = 'ugc', reuse, wizardDefault = false }
       .then(async (loaded) => {
         if (stale) return;
         if (loaded.feature !== 'marketing') return setError('Không tìm thấy clip để dùng lại.');
-        if (hrefOfFormat(loaded.format) !== FORMAT_HREF[format]) return router.replace(`${hrefOfFormat(loaded.format)}?${queryOf(reuse)}`);
+        if (hrefOfFormat(loaded.format) !== FORMAT_HREF[format]) return router.replace(`${hrefOfFormat(loaded.format)}?${queryOf(reuse)}${source.recipe ? '&recipe=1' : ''}`);
         const j = await fillBlanks(reuse, loaded);
         if (stale) return; // superseded while the member filled the blanks
         if (!j) return dropRefillQuery(); // cancelled: the form stays as it is
-        // A sample's photos become this member's inputs first, copied on the server.
-        const samples = j.images.map((i) => ('sample' in i ? i.sample : null)).filter((s) => s !== null);
-        const inputs = samples.length > 0 ? await copySamples(samples) : (j.images as Img[]);
-        if (stale) return; // superseded while the photos were copied
-        if (advanced) setRefs(inputs);
-        else if (unboxing) {
-          // The photos come in the order sent; the roles say which of them the job had.
-          const roles = j.roles?.split(',') ?? (inputs.length === 1 ? ['product'] : ['model', 'product']);
-          const photo = (role: string) => inputs.filter((_, n) => roles[n] === role).slice(0, 1);
-          setPerson(photo('model'));
-          setProduct(photo('product'));
-          setPackaging(photo('packaging'));
-        } else (setPerson(inputs.slice(0, 1)), setProduct(inputs.slice(1, 2)));
+        if (!source.recipe) {
+          // A sample's photos become this member's inputs first, copied on the server.
+          const samples = j.images.map((i) => ('sample' in i ? i.sample : null)).filter((s) => s !== null);
+          const inputs = samples.length > 0 ? await copySamples(samples) : (j.images as Img[]);
+          if (stale) return; // superseded while the photos were copied
+          if (advanced) setRefs(inputs);
+          else if (unboxing) {
+            // The photos come in the order sent; the roles say which of them the job had.
+            const roles = j.roles?.split(',') ?? (inputs.length === 1 ? ['product'] : ['model', 'product']);
+            const photo = (role: string) => inputs.filter((_, n) => roles[n] === role).slice(0, 1);
+            setPerson(photo('model'));
+            setProduct(photo('product'));
+            setPackaging(photo('packaging'));
+          } else (setPerson(inputs.slice(0, 1)), setProduct(inputs.slice(1, 2)));
+          setEndFrame(j.endFrame ?? null);
+          setVideo(advanced ? (j.videoRef ?? null) : null);
+        }
         if (review) setHighlights(j.highlights?.length ? j.highlights : ['']);
         setHooks(j.hook ? [j.hook] : []);
         setLocation(j.location ?? '');
         // A job with an own hook or a last shot was written in sections; a template keeps the way it was written; else the brief goes where the member writes now.
         const next = j.promptMode ?? (j.hookText || j.ending ? 'sections' : mode);
         if (next !== mode) setMode(next);
-        if (next === 'free') setFreeText(j.brief ?? '');
-        else setPrompt(j.brief ?? '');
+        // An example without its words (an older job) leaves the member's own.
+        if (j.brief !== null || !source.recipe) {
+          if (next === 'free') setFreeText(j.brief ?? '');
+          else setPrompt(j.brief ?? '');
+        }
         setHookText(j.hookText ?? '');
         setScript(j.script ?? '');
-        setEndFrame(j.endFrame ?? null);
-        setVideo(advanced ? (j.videoRef ?? null) : null);
         setEnding(j.ending ?? '');
         setEndText(j.endText ?? '');
         setEndTextPos((END_TEXT_POSITIONS as readonly string[]).includes(j.endTextPos ?? '') ? (j.endTextPos as EndTextPosition) : 'bottom');
@@ -348,12 +353,15 @@ export function MarketingStudio({ format = 'ugc', reuse, wizardDefault = false }
         if (j.ratio) setRatio(j.ratio);
         if (j.durationSec) setDurationSec(j.durationSec);
         if (j.modelId) setModelId(j.modelId);
-        if (j.brief === null && advanced) setNotice('Clip này không có mô tả gốc: đã điền lại ảnh và cài đặt, hãy nhập lại mô tả.');
-        recreated(reuse);
+        if (source.recipe) notify('Đã dùng mẫu của ví dụ. Ảnh của bạn được giữ nguyên.');
+        else {
+          if (j.brief === null && advanced) setNotice('Clip này không có mô tả gốc: đã điền lại ảnh và cài đặt, hãy nhập lại mô tả.');
+          recreated(reuse);
+        }
         dropRefillQuery();
       })
       .catch((e) => setError(copyError(e, 'Không tìm thấy clip để dùng lại.')))
-      .finally(loading('Đang tải ảnh...'));
+      .finally(loading(source.recipe ? 'Đang tải mẫu...' : 'Đang tải ảnh...'));
     return () => {
       stale = true;
     };
@@ -479,7 +487,7 @@ export function MarketingStudio({ format = 'ugc', reuse, wizardDefault = false }
     }
   }
   const actions: FormActions = {
-    recreate: (from) => (recall.touch(), setSource({ from }), narrow && setTab('create')),
+    recreate: (from, recipe) => (recall.touch(), setSource({ from, recipe }), narrow && setTab('create')),
     apply,
     photo: (p, role) => void take(p, role),
     prompt: (text) => ((sec ? setPrompt : setFreeText)(text), notify('Đã chép mô tả')),

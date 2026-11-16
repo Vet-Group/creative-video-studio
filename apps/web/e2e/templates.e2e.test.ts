@@ -147,7 +147,7 @@ test('Marketing Studio: an Advanced template chosen on the UGC page opens the Ad
   await expect(page.getByRole('textbox', { name: 'Lời thoại (tuỳ chọn)' })).toHaveValue('my lines');
 });
 
-test('Dùng ví dụ này on a company result in Ví dụ fills Try On, Image Generation and Marketing Studio from its inputs, for another member too; an Explore image model opens Image Generation on that model', async ({ page, browser }) => {
+test("Dùng ví dụ này on a company result in Ví dụ gives Try On, Image Generation and Marketing Studio its words and settings, not the maker's photos, and the member's own photo stays; an Explore image model opens Image Generation on that model", async ({ page, browser }) => {
   await signIn(page, 'usea');
   const up = async (name: string) => ((await (await page.request.post('/api/assets', { multipart: { file: file(name) } })).json()) as { assets: { id: string }[] }).assets[0]!.id;
   const post = async (data: Record<string, unknown>) => {
@@ -160,42 +160,61 @@ test('Dùng ví dụ này on a company result in Ví dụ fills Try On, Image Ge
     try_on: await post({ feature: 'try_on', modelId: 'mock-image-e2e', assetIds: [person, garment], ratio: '3:4', prompt: 'composed', params: { resolution: '1K', garments: '1', brief: 'blue coat' } }),
     image: await post({ feature: 'image', modelId: 'mock-image-e2e', assetIds: [garment], ratio: '1:1', prompt: 'a flat lay', enhance: false, params: { resolution: '1K' } }),
     marketing: await post({ feature: 'marketing', modelId: 'mock-e2e', assetIds: [person, garment], ratio: '1:1', durationSec: 5, prompt: 'composed', params: { audio: 'off' } }),
+    advanced: await post({ feature: 'marketing', modelId: 'mock-e2e', assetIds: [garment], ratio: '1:1', durationSec: 5, prompt: 'composed', params: { format: 'advanced', audio: 'off', brief: 'a surfer at dawn' } }),
   };
   const done = async () => ((await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { id: string; status: string }[] }).jobs.filter((j) => Object.values(ids).includes(j.id) && j.status === 'succeeded').length;
-  await expect.poll(done, { timeout: 60_000 }).toBe(3);
+  await expect.poll(done, { timeout: 60_000 }).toBe(4);
   await addExamples(browser, Object.values(ids)); // the Examples tab lists a result only once an Admin put it there
 
-  // Another member uses them: the inputs of a Library result are open to every member.
+  // Another member uses them: a result's words and settings are open to every member; its photos are another seller's product, so they stay off the form.
   const other = await (await browser.newContext()).newPage();
   await signIn(other, 'useb');
   const use = (id: string) => other.locator(`.gallery-use[data-from="/api/jobs/${id}"]`);
+  const notice = other.getByRole('region', { name: 'Thông báo' });
+  /** The example's template is on the form, the maker's photos are not. */
+  const templateOnly = async () => {
+    await expect(notice.getByText('Đã dùng mẫu của ví dụ. Ảnh của bạn được giữ nguyên.')).toBeVisible();
+    await expect(notice.getByText('Sẵn sàng tạo lại')).toHaveCount(0);
+    await expect(other.getByRole('img', { name: 'use-person.png' })).toHaveCount(0);
+    await expect(other.getByRole('img', { name: 'use-garment.png' })).toHaveCount(0);
+  };
 
   await other.goto('/try-on');
   await other.getByRole('tab', { name: 'Ví dụ' }).click();
   await use(ids.try_on).click();
   await expect(other).toHaveURL((u) => u.pathname === '/try-on' && u.search === ''); // in place, as Fash's Recreate
-  await expect(other.getByLabel('Người mẫu: ảnh đã chọn').getByRole('img')).toHaveAttribute('alt', 'use-person.png');
-  await expect(other.getByLabel('Trang phục: ảnh đã chọn').getByRole('img')).toHaveAttribute('alt', 'use-garment.png');
   await expect(other.getByRole('textbox', { name: 'Mô tả (tuỳ chọn)' })).toHaveValue('blue coat'); // a result's words are open to every member too (owner, 2026-11-03)
+  await templateOnly();
 
   await other.goto('/image-generation');
+  const input = other.getByLabel('Ảnh tham chiếu', { exact: true });
+  await expect(input).toBeEnabled(); // disabled until hydration
+  await input.setInputFiles(file('my-shirt.png'));
+  await expect(other.getByRole('img', { name: 'my-shirt.png' })).toBeVisible();
   await use(ids.image).click();
   await expect(other.getByRole('textbox', { name: 'Mô tả', exact: true })).toHaveValue('a flat lay');
-  await expect(other.getByRole('img', { name: 'use-garment.png' })).toBeVisible();
-  // A click on the result itself opens its details in place, as in the Library (Fash's example dialog), not a new tab.
+  await templateOnly();
+  await expect(other.getByRole('img', { name: 'my-shirt.png' })).toBeVisible();
+  // A click on the result itself opens its details in place, as in the Library (Fash's example dialog), not a new tab; its Dùng lại does the same as the tile.
   await other.goto('/image-generation');
   await other.locator('li.gallery-item', { has: use(ids.image) }).getByRole('link', { name: /^Xem chi tiết ảnh / }).click();
   const detail = other.getByRole('dialog', { name: /^Chi tiết: / });
   await expect(detail.getByText('a flat lay')).toBeVisible();
-  await expect(detail.getByRole('link', { name: 'Dùng lại' })).toBeVisible();
-  await other.keyboard.press('Escape');
+  await detail.getByRole('button', { name: 'Dùng lại' }).click();
   await expect(detail).toBeHidden();
+  await templateOnly();
   expect(other.context().pages()).toHaveLength(1);
 
   await other.goto('/marketing-studio');
   await use(ids.marketing).click();
   await expect(other).toHaveURL((u) => u.pathname === '/marketing-studio' && u.search === '');
-  await expect(other.getByRole('img', { name: 'use-person.png' })).toBeVisible();
+  await templateOnly();
+  // Ví dụ lists every format: an Advanced example used from the UGC page opens the Advanced page, still with its words only.
+  await other.goto('/marketing-studio');
+  await use(ids.advanced).click();
+  await expect(other).toHaveURL((u) => u.pathname === '/marketing-studio/advanced' && u.search === '');
+  await templateOnly();
+  await expect(other.getByRole('textbox', { name: 'Mô tả', exact: true })).toHaveValue('a surfer at dawn');
 
   await other.goto('/explore');
   await other.getByRole('list', { name: 'Mô hình' }).getByRole('link', { name: /Mock image Solo/ }).click();
