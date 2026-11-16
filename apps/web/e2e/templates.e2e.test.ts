@@ -195,7 +195,7 @@ test("Dùng ví dụ này on a company result in Ví dụ gives Try On, Image Ge
   await expect(other.getByRole('textbox', { name: 'Mô tả', exact: true })).toHaveValue('a flat lay');
   await templateOnly();
   await expect(other.getByRole('img', { name: 'my-shirt.png' })).toBeVisible();
-  // A click on the result itself opens its details in place, as in the Library (Fash's example dialog), not a new tab; its Dùng lại does the same as the tile.
+  // A click on the result itself opens its details in place, as in the Library (Fash's example dialog), not a new tab; its reuse button does the same as the tile.
   await other.goto('/image-generation');
   await other.locator('li.gallery-item', { has: use(ids.image) }).getByRole('link', { name: /^Xem chi tiết ảnh / }).click();
   const detail = other.getByRole('dialog', { name: /^Chi tiết: / });
@@ -209,7 +209,7 @@ test("Dùng ví dụ này on a company result in Ví dụ gives Try On, Image Ge
   await use(ids.marketing).click();
   await expect(other).toHaveURL((u) => u.pathname === '/marketing-studio' && u.search === '');
   await templateOnly();
-  // Ví dụ lists every format: an Advanced example used from the UGC page opens the Advanced page, still with its words only.
+  // The Examples tab lists every format: an Advanced example used from the UGC page opens the Advanced page, still with its words only.
   await other.goto('/marketing-studio');
   await use(ids.advanced).click();
   await expect(other).toHaveURL((u) => u.pathname === '/marketing-studio/advanced' && u.search === '');
