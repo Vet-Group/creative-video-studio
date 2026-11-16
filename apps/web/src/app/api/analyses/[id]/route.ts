@@ -3,19 +3,22 @@ import type { RouteContext } from '@/lib/assets';
 import { pool } from '@/lib/auth';
 import { guard } from '@/lib/session';
 
-/** One of the caller's own analyses, polled while it runs, or one an Admin shared as a reference video, without its owner's cost, provider, model and error. */
+/** One of the caller's own analyses, polled while it runs, or one an Admin shared as a reference video, without its owner's cost, provider, model and error.
+ * An Admin reads any member's analysis in full, with its creator's name when it is not their own. */
 export async function GET(request: Request, { params }: RouteContext) {
   if (!reaAnalyzeEnabled()) return Response.json({ error: 'not found' }, { status: 404 });
   const g = await guard(request, 'member');
   if (g.error) return g.error;
   const { id } = await params;
+  const admin = g.session.user.role === 'admin';
   const row = (
     await pool.query(
-      `select id, status, case when user_id = $2 then provider end as provider, case when user_id = $2 then model end as model, result,
-              case when user_id = $2 then cost_usd end as "costUsd", case when user_id = $2 then error end as error, created_at as "createdAt", finished_at as "finishedAt",
-              shared_title as "sharedTitle", (select a.id from assets a where a.s3_key = analyses.source_key) as "sourceAssetId"
-         from analyses where id = $1 and (user_id = $2 or shared_at is not null)`,
-      [id, g.session.user.id],
+      `select id, status, case when user_id = $2 or $3 then provider end as provider, case when user_id = $2 or $3 then model end as model, result,
+              case when user_id = $2 or $3 then cost_usd end as "costUsd", case when user_id = $2 or $3 then error end as error, created_at as "createdAt", finished_at as "finishedAt",
+              shared_title as "sharedTitle", (select a.id from assets a where a.s3_key = analyses.source_key) as "sourceAssetId",
+              case when user_id <> $2 and $3 then (select u.name from users u where u.id = analyses.user_id) end as "creatorName"
+         from analyses where id = $1 and (user_id = $2 or $3 or shared_at is not null)`,
+      [id, g.session.user.id, admin],
     )
   ).rows[0];
   if (!row) return Response.json({ error: 'not found' }, { status: 404 });

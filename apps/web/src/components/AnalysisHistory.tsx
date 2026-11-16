@@ -35,9 +35,20 @@ function Card({ a }: { a: AnalysisRow }) {
             <span className="muted">{waiting ? 'Chưa mở được, kết quả sẽ có ở đây khi phân tích xong.' : 'Phân tích này không ra kết quả nên không có gì để mở. Hãy thử lại với video khác.'}</span>
           </>
         )}
+        {a.creatorName && <span className="muted">Người tạo: {a.creatorName}</span>}
         <span className="muted">{new Date(a.createdAt).toLocaleString('vi-VN', WHEN)}</span>
       </span>
     </>
+  );
+}
+
+/** An Admin's choice to list every member's analyses in History instead of their own. */
+export function EveryoneChoice({ checked, onChange }: { checked: boolean; onChange: (on: boolean) => void }) {
+  return (
+    <label className="analysis-everyone">
+      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+      Mọi người
+    </label>
   );
 }
 
@@ -57,7 +68,7 @@ export function AnalysisHistory({
   currentId?: string | null;
   onRetry: () => void;
   onPick: (a: AnalysisRow) => void;
-  /** Delete a finished (succeeded or failed) analysis; the caller confirms. */
+  /** Delete a finished (succeeded or failed) analysis of the caller's own (none is offered for another member's); the caller confirms. */
   onDelete: (a: AnalysisRow) => void;
 }) {
   if (loading && items.length === 0)
@@ -81,7 +92,7 @@ export function AnalysisHistory({
               <Card a={a} />
             </div>
           )}
-          {(a.status === 'succeeded' || a.status === 'failed') && (
+          {(a.status === 'succeeded' || a.status === 'failed') && !a.creatorName && (
             <button type="button" className="analysis-delete" aria-label="Xoá phân tích" title="Xoá phân tích" onClick={() => onDelete(a)}>
               <Icon name="x" size={14} />
             </button>

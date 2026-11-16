@@ -261,4 +261,36 @@ describe('shared reference videos', () => {
     expect([own.status, await errorOf(own)]).toEqual([409, 'Phân tích này đã có lượt làm lại nên không xoá được.']);
     expect((await pool.query(`select id from analyses where id = 'an-mine-shared'`)).rowCount).toBe(1);
   });
+
+  describe('an Admin viewing every member’s analyses', () => {
+    const oneAs = (id: string, as: string) => ONE(call(`/api/analyses/${id}`, 'GET', undefined, as), { params: Promise.resolve({ id }) });
+    const all = (as: string) => LIST(call('/api/analyses?scope=all', 'GET', undefined, as));
+
+    test('opens any member’s analysis, shared or not, with its cost, provider and creator; a member still gets 404 for an unshared one', async () => {
+      const got = await oneAs('an-unshared', adminCookie);
+      expect(got.status).toBe(200);
+      expect((await got.json()) as object).toMatchObject({ id: 'an-unshared', provider: 'gemini', model: 'flash', costUsd: expect.anything(), creatorName: 'Other' });
+      expect((await (await oneAs('an-mine-shared', adminCookie)).json()) as object).toMatchObject({ provider: 'gemini', creatorName: 'Member' });
+      expect((await oneAs('an-unshared', cookie)).status).toBe(404);
+      expect((await oneAs('an-mine-shared', cookie).then((r) => r.json())) as object).toMatchObject({ creatorName: null }); // a member never learns who made another's
+      expect(((await oneAs('an-share', cookie).then((r) => r.json())) as { creatorName: unknown }).creatorName).toBeNull();
+    });
+
+    test('scope=all lists every member’s analyses with their creators for an Admin only; a plain list stays the caller’s', async () => {
+      expect((await all(cookie)).status).toBe(403);
+      const list = ((await (await all(adminCookie)).json()) as { analyses: { id: string; creatorName: string | null }[] }).analyses;
+      expect(list.find((a) => a.id === 'an-unshared')?.creatorName).toBe('Other');
+      expect(list.find((a) => a.id === 'an-mine-shared')?.creatorName).toBe('Member');
+      const own = ((await (await LIST(call('/api/analyses', 'GET', undefined, adminCookie))).json()) as { analyses: unknown[] }).analyses;
+      expect(own).toEqual([]); // the Admin made none
+      const mine = ((await (await LIST(call('/api/analyses'))).json()) as { analyses: { id: string; creatorName: string | null }[] }).analyses;
+      expect(mine.every((a) => a.creatorName === null)).toBe(true);
+    });
+
+    test('an Admin still cannot delete another member’s analysis', async () => {
+      const res = await REMOVE(call('/api/analyses/an-unshared', 'DELETE', undefined, adminCookie), { params: Promise.resolve({ id: 'an-unshared' }) });
+      expect(res.status).toBe(404);
+      expect((await pool.query(`select id from analyses where id = 'an-unshared'`)).rowCount).toBe(1);
+    });
+  });
 });

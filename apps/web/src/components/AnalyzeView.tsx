@@ -16,7 +16,7 @@ import { About } from './About';
 import { confirmDialog } from './Confirm';
 import { Icon } from './Icon';
 import { elapsedLabel, JobPrompt } from './jobs';
-import { AnalysisHistory } from './AnalysisHistory';
+import { AnalysisHistory, EveryoneChoice } from './AnalysisHistory';
 import { copyError, uploadError, uploadVideoDirect, WorkTabs } from './image-tools';
 import { ReferenceVideoSlot, type RefVideo } from './ReferenceVideo';
 import { RemakePanel } from './RemakePanel';
@@ -33,6 +33,7 @@ export interface AnalysisRow {
   createdAt: string;
   sourceAssetId: string | null; // the input video, recovered from the analysis' source_key; null if that asset was deleted
   sharedTitle?: string | null; // set while an Admin shares it as a Smart Remake reference video
+  creatorName?: string | null; // an Admin viewing another member's analysis: who made it; null for their own (and for every member)
 }
 
 const terminal = (s: string): boolean => s === 'succeeded' || s === 'failed';
@@ -192,6 +193,7 @@ export function AnalysisPanel({ row, onRetry, onClose, remakeEnabled = false, on
           Đóng kết quả
         </button>
       </div>
+      {row.creatorName && <p className="muted">Người tạo: {row.creatorName}</p>}
       {waiting && (
         <div className="analysis-wait" role="status">
           <strong>Đang phân tích video…</strong>
@@ -215,9 +217,9 @@ export function AnalysisPanel({ row, onRetry, onClose, remakeEnabled = false, on
       {row.status === 'succeeded' && row.result && (
         <>
           <AnalysisWithSource analysis={row.result} src={row.sourceAssetId ? `/api/assets/${row.sourceAssetId}/content` : undefined} />
-          {onShared && <ShareControl key={row.id} row={row} onSaved={onShared} />}
-          {/* key: another analysis opened resets the product and shot pick */}
-          {remakeEnabled && <RemakePanel key={row.id} row={row} />}
+          {onShared && !row.creatorName && <ShareControl key={row.id} row={row} onSaved={onShared} />}
+          {/* key: another analysis opened resets the product and shot pick. The remake API takes another member's analysis only while it is shared. */}
+          {remakeEnabled && (!row.creatorName || row.sharedTitle) && <RemakePanel key={row.id} row={row} />}
         </>
       )}
     </div>
@@ -247,7 +249,7 @@ function Examples({ busy, onUse }: { busy: boolean; onUse: (video: string) => vo
 /** The address follows the analysis on view, without a navigation or a scroll. */
 const syncUrl = (id: string | null) => window.history.replaceState(null, '', id ? `/analyze?analysis=${id}` : '/analyze');
 
-/** `remakeEnabled`: REA_REMAKE_ENABLED, which adds Smart Remake under a finished analysis and the shared reference videos on the Examples tab. `isAdmin` adds the share control. */
+/** `remakeEnabled`: REA_REMAKE_ENABLED, which adds Smart Remake under a finished analysis and the shared reference videos on the Examples tab. `isAdmin` adds the share control, and History's choice to list every member's analyses (view only). */
 export function AnalyzeView({ initialId, remakeEnabled = false, isAdmin = false }: { initialId?: string; remakeEnabled?: boolean; isAdmin?: boolean }) {
   const narrow = useMediaQuery(NARROW);
   const [tab, setTab] = useState<Tab | null>(null); // null: the default for the width (the form below 1024 px, else the result when there is one, else Examples)
@@ -258,6 +260,8 @@ export function AnalyzeView({ initialId, remakeEnabled = false, isAdmin = false 
   const [history, setHistory] = useState<AnalysisRow[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [historyError, setHistoryError] = useState(false);
+  const [everyone, setEveryone] = useState(false); // Admin: History lists every member's analyses
+  const everyoneRef = useRef(false); // the poll chain's loadHistory outlives the render that made it
   const [removeError, setRemoveError] = useState('');
   const poll = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   // The id the poll chain is following; cleared on unmount, remove or a History pick so an in-flight fetch does not
@@ -271,7 +275,7 @@ export function AnalyzeView({ initialId, remakeEnabled = false, isAdmin = false 
   const loadHistory = () => {
     setHistoryLoading(true);
     setHistoryError(false);
-    return api<{ analyses: AnalysisRow[] }>('/api/analyses')
+    return api<{ analyses: AnalysisRow[] }>(everyoneRef.current ? '/api/analyses?scope=all' : '/api/analyses')
       .then((r) => setHistory(r.analyses), () => setHistoryError(true))
       .finally(() => setHistoryLoading(false));
   };
@@ -439,6 +443,16 @@ export function AnalyzeView({ initialId, remakeEnabled = false, isAdmin = false 
           ) : shown === 'history' ? (
             <section className="analysis-history">
               <h2>Gần đây</h2>
+              {isAdmin && (
+                <EveryoneChoice
+                  checked={everyone}
+                  onChange={(on) => {
+                    everyoneRef.current = on;
+                    setEveryone(on);
+                    void loadHistory();
+                  }}
+                />
+              )}
               <AnalysisHistory loading={historyLoading} error={historyError} items={history} currentId={current?.id} onRetry={() => void loadHistory()} onPick={pick} onDelete={(a) => void remove(a)} />
               {removeError && (
                 <p className="error" role="alert">
