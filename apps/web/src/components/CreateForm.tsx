@@ -1100,7 +1100,8 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
                   )}
                   {/* After the name, so the picker's buttons still read name first; it sits above the name's card-wide click area. */}
                   <button type="button" className="preset-edit" aria-label={canEdit ? `Sửa mẫu ${p.label}` : `Đề xuất sửa mẫu ${p.label}`} onClick={() => setDraft({ preset: p, propose: !canEdit })}>
-                    {canEdit ? 'Sửa' : 'Đề xuất sửa'}
+                    <Icon name="edit" size={12} />
+                    <span>{canEdit ? 'Sửa' : 'Đề xuất sửa'}</span>
                   </button>
                 </li>
               );

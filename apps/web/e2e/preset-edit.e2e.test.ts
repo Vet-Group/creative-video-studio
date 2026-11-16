@@ -69,6 +69,35 @@ test('an Admin switches a preset off in the picker: a member no longer sees it, 
   }
 });
 
+test("a card's edit chip shows only on the card's hover or keyboard focus with a mouse, and is a pencil on a touch screen", async ({ page, browser }) => {
+  await signIn(page, 'tplprop');
+  const grid = await openPicker(page);
+  const chip = grid.getByRole('button', { name: 'Đề xuất sửa mẫu Lia vòng sang trái', exact: true });
+  const card = grid.locator('.preset-card').filter({ has: page.getByRole('button', { name: 'Đề xuất sửa mẫu Lia vòng sang trái', exact: true }) });
+  await page.mouse.move(0, 0);
+  await expect(chip).toHaveCSS('opacity', '0'); // the cards read as videos, not as statuses
+  await card.hover();
+  await expect(chip).toHaveCSS('opacity', '1');
+  await expect(chip.getByText('Đề xuất sửa', { exact: true })).toBeVisible();
+  await page.mouse.move(0, 0);
+  await expect(chip).toHaveCSS('opacity', '0');
+  await card.getByRole('button', { name: 'Lia vòng sang trái', exact: true }).focus();
+  await page.keyboard.press('Tab'); // from the card's name to its chip, by keyboard
+  await expect(chip).toBeFocused();
+  await expect(chip).toHaveCSS('opacity', '1');
+
+  const touch = await (await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true })).newPage();
+  await signIn(touch, 'tplprop');
+  const cards = await openPicker(touch);
+  const pencil = cards.getByRole('button', { name: 'Đề xuất sửa mẫu Lia vòng sang trái', exact: true });
+  await expect(pencil).toHaveCSS('opacity', '1');
+  await expect(pencil.getByText('Đề xuất sửa', { exact: true })).toBeHidden();
+  await expect(pencil.locator('svg.icon')).toBeVisible();
+  const box = (await pencil.boundingBox())!;
+  expect([Math.round(box.width), Math.round(box.height)]).toEqual([24, 24]);
+  await touch.context().close();
+});
+
 test('a member proposes a new label, an editor approves it from the pending list, and the picker shows it', async ({ page }) => {
   await signIn(page, 'tplprop');
   let grid = await openPicker(page);
