@@ -18,11 +18,17 @@ const { POST: stop } = await import('../../me/stop-impersonating/route');
 const profile = await import('../../me/profile/route');
 const sessionsRoute = await import('../../me/sessions/route');
 const { GET: limits } = await import('../../me/limits/route');
+const { GET: listUsers } = await import('./route');
+const { DELETE: unlink } = await import('./[id]/accounts/[accountId]/route');
+const { readSession } = await import('@/lib/session');
 
 const PASSWORD = 'correct-horse-battery';
 afterAll(async () => {
-  await pool.end();
-  await testDb.drop();
+  try {
+    await pool.end();
+  } finally {
+    await testDb.drop();
+  }
 });
 
 async function user(email: string, role: 'member' | 'admin') {
@@ -43,8 +49,11 @@ function merge(cookie: string, res: Response): string {
   }
   return [...jar.values()].join('; ');
 }
-const startAs = (cookie: string, id: string) => start(new Request(`${ORIGIN}/api/admin/users/${id}/impersonate`, { method: 'POST', headers: { cookie } }), { params: Promise.resolve({ id }) });
-const stopAs = (cookie: string) => stop(new Request(`${ORIGIN}/api/me/stop-impersonating`, { method: 'POST', headers: { cookie } }));
+const startAs = (cookie: string, id: string, origin: string | null = ORIGIN) =>
+  start(new Request(`${ORIGIN}/api/admin/users/${id}/impersonate`, { method: 'POST', headers: { cookie, ...(origin ? { origin } : {}) } }), { params: Promise.resolve({ id }) });
+const stopAs = (cookie: string, origin: string | null = ORIGIN) => stop(new Request(`${ORIGIN}/api/me/stop-impersonating`, { method: 'POST', headers: { cookie, ...(origin ? { origin } : {}) } }));
+const asUser = (cookie: string) => limits(new Request(`${ORIGIN}/api/me/limits`, { headers: { cookie } }));
+const dropDontRemember = (cookie: string) => cookie.split('; ').filter((c) => !c.includes('dont_remember')).join('; ');
 const patch = (cookie: string, id: string, body: unknown) =>
   PATCH(new Request(`${ORIGIN}/api/admin/users/${id}`, { method: 'PATCH', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify(body) }), { params: Promise.resolve({ id }) });
 const authPost = (path: string, cookie: string, body: unknown = {}) =>
@@ -107,7 +116,7 @@ describe('POST /api/admin/users/[id]/impersonate', () => {
     expect((await whoami(cookie)).user.id).toBe(other);
     const nested = await startAs(cookie, member);
     expect(nested.status).toBe(403);
-    expect(((await nested.json()) as { error: string }).error).toMatch(/already signed in/);
+    expect(((await nested.json()) as { error: string }).error).toBe('not_allowed_while_impersonating');
     expect(await audits('user.impersonate_start')).toHaveLength(2);
   });
 });
@@ -212,12 +221,104 @@ describe('while signed in as a user', () => {
   });
 
   test('everything else works as that user, and the temporary-password gate does not hold the Admin up', async () => {
-    const asUser = () => limits(new Request(`${ORIGIN}/api/me/limits`, { headers: { cookie } }));
-    expect((await asUser()).status).toBe(200);
+    expect((await asUser(cookie)).status).toBe(200);
     await pool.query('update users set must_change_password = true where id = $1', [member]);
-    expect((await asUser()).status).toBe(200);
+    expect((await asUser(cookie)).status).toBe(200);
     // The member's own session is still held at the gate.
     expect((await limits(new Request(`${ORIGIN}/api/me/limits`, { headers: { cookie: memberCookie } }))).status).toBe(403);
     await pool.query('update users set must_change_password = false where id = $1', [member]);
+  });
+});
+
+describe('the origin of the two POST routes', () => {
+  test('a missing or foreign Origin is refused before anything happens', async () => {
+    expect((await startAs(devCookie, member, null)).status).toBe(403);
+    expect((await startAs(devCookie, member, 'https://evil.example')).status).toBe(403);
+    const started = merge(devCookie, await startAs(devCookie, member));
+    expect((await stopAs(started, null)).status).toBe(403);
+    expect((await stopAs(started, 'https://evil.example')).status).toBe(403);
+    expect((await whoami(started)).user.id).toBe(member); // still signed in as the member
+    expect((await stopAs(started)).status).toBe(200);
+  });
+});
+
+describe("the one-hour limit and the holder's standing, enforced on every request", () => {
+  const holder = async (email: string) => {
+    const id = await user(email, 'admin');
+    await setFlag(id);
+    return { id, cookie: await signIn(email) };
+  };
+  const impersonating = async (h: { cookie: string }) => merge(h.cookie, await startAs(h.cookie, member));
+
+  test('dropping the dont_remember cookie does not stretch the hour: better-auth renews the session, the app still ends it', async () => {
+    const h = await holder('limit@example.test');
+    const cookie = dropDontRemember(await impersonating(h));
+    const s = await whoami(cookie);
+    expect(new Date(s.session.expiresAt).getTime() - Date.now()).toBeGreaterThan(3600_000 * 24); // renewed to the 7-day default
+    expect((await asUser(cookie)).status).toBe(200); // within the hour
+    await pool.query(`update sessions set created_at = now() - interval '61 minutes' where impersonated_by = $1`, [h.id]);
+    expect((await asUser(cookie)).status).toBe(401);
+    expect(await readSession(new Headers({ cookie }))).toBeNull();
+  });
+
+  test("turning the holder's flag off ends the impersonation", async () => {
+    const h = await holder('flagoff@example.test');
+    const cookie = await impersonating(h);
+    expect((await asUser(cookie)).status).toBe(200);
+    expect((await patch(devCookie, h.id, { canImpersonate: false })).status).toBe(200);
+    expect((await asUser(cookie)).status).toBe(401);
+  });
+
+  test('locking the holder ends the impersonation', async () => {
+    const h = await holder('banned@example.test');
+    const cookie = await impersonating(h);
+    expect((await patch(devCookie, h.id, { banned: true })).status).toBe(200);
+    expect((await asUser(cookie)).status).toBe(401);
+  });
+
+  test('demoting the holder ends the impersonation and clears the flag, audited', async () => {
+    const h = await holder('demoted@example.test');
+    const cookie = await impersonating(h);
+    expect((await patch(devCookie, h.id, { role: 'member' })).status).toBe(200);
+    expect((await asUser(cookie)).status).toBe(401);
+    expect((await pool.query('select can_impersonate from users where id = $1', [h.id])).rows[0].can_impersonate).toBe(false);
+    expect((await audits('user.developer')).at(-1)).toMatchObject({ actor_id: dev, target: `user:${h.id}`, old_value: { canImpersonate: true }, new_value: { canImpersonate: false } });
+    expect((await patch(devCookie, h.id, { role: 'admin' })).status).toBe(200); // promoting again does not bring the flag back
+    expect((await pool.query('select can_impersonate from users where id = $1', [h.id])).rows[0].can_impersonate).toBe(false);
+  });
+});
+
+describe("a developer Admin's account", () => {
+  test('an Admin without the flag cannot change its email, password or 2FA, nor unlink its sign-in methods, but can still lock it', async () => {
+    const id = await user('target-dev@example.test', 'admin');
+    await setFlag(id);
+    for (const body of [{ email: 'taken@example.test' }, { temporaryPassword: 'a-new-temporary-pass' }, { twoFactor: false }]) expect((await patch(plainCookie, id, body)).status).toBe(403);
+    const del = await unlink(new Request(`${ORIGIN}/api/admin/users/${id}/accounts/x`, { method: 'DELETE', headers: { cookie: plainCookie } }), { params: Promise.resolve({ id, accountId: 'x' }) });
+    expect(del.status).toBe(403);
+    expect((await pool.query('select email from users where id = $1', [id])).rows[0].email).toBe('target-dev@example.test');
+    expect((await patch(devCookie, id, { email: 'moved-dev@example.test' })).status).toBe(200); // a developer Admin may
+    expect((await patch(plainCookie, id, { banned: true })).status).toBe(200);
+  });
+});
+
+describe('an impersonated Admin only looks', () => {
+  test('every change through an Admin route is refused, a read is allowed', async () => {
+    const cookie = merge(devCookie, await startAs(devCookie, other));
+    expect((await patch(cookie, member, { name: 'Renamed by mistake' })).status).toBe(403);
+    expect((await pool.query('select name from users where id = $1', [member])).rows[0].name).toBe('member@example.test');
+    const read = await listUsers(new Request(`${ORIGIN}/api/admin/users`, { headers: { cookie } }));
+    expect(read.status).toBe(200);
+  });
+
+  test('signing out of an impersonation is audited as its stop, with the real Admin as actor', async () => {
+    const cookie = merge(devCookie, await startAs(devCookie, member));
+    const before = (await audits('user.impersonate_stop')).length;
+    expect((await authPost('/sign-out', cookie)).status).toBe(200);
+    const rows = await audits('user.impersonate_stop');
+    expect(rows).toHaveLength(before + 1);
+    expect(rows.at(-1)).toMatchObject({ actor_id: dev, target: `user:${member}`, new_value: { signOut: true } });
+    // A plain sign-out of a plain session is not a stop.
+    await authPost('/sign-out', await signIn('plain@example.test'));
+    expect(await audits('user.impersonate_stop')).toHaveLength(before + 1);
   });
 });

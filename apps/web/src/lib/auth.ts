@@ -1,4 +1,5 @@
 import { passkey } from '@better-auth/passkey';
+import { audit } from '@cvs/core/audit';
 import { accounts, passkeys, sessions, twoFactors, users, verifications } from '@cvs/db';
 import { createDb, createPool, databaseUrl } from '@cvs/db/client';
 import { betterAuth } from 'better-auth';
@@ -70,6 +71,11 @@ export const auth = betterAuth({
       }
       // Until the temporary password is replaced, its holder may not add, keep or manage another way in, which would outlive the change.
       // A denylist, so the Google and Lark sign-in callbacks still run. The 2FA step of a sign-in has no session yet, so it is never refused here.
+      // Leaving by signing out ends an impersonation without POST /api/me/stop-impersonating; the stop is audited here, while the session still exists.
+      if (ctx.path === '/sign-out') {
+        const leaving = await getSessionFromCtx(ctx);
+        if (leaving?.session.impersonatedBy) await audit(pool, { actorId: leaving.session.impersonatedBy, action: 'user.impersonate_stop', target: `user:${leaving.user.id}`, newValue: { signOut: true } });
+      }
       const credentialPath = FORCED_CHANGE_CLOSED.has(ctx.path) || ctx.path.startsWith('/two-factor/');
       if (credentialPath || IMPERSONATION_CLOSED.has(ctx.path)) {
         const current = await getSessionFromCtx(ctx);

@@ -3,18 +3,20 @@ import { withTransaction } from '@cvs/core/ledger';
 import { type RouteContext } from '@/lib/assets';
 import { auth, pool } from '@/lib/auth';
 import { authFailure, bad } from '@/lib/admin';
-import { guard, isImpersonated } from '@/lib/session';
+import { guard, isImpersonated, sameOrigin } from '@/lib/session';
 
 /**
  * Admin: sign in as another user (a member or an Admin) to see what they see; every action then counts for that user, runs included.
  * Only an Admin with the `can_impersonate` flag may (PATCH /api/admin/users/[id] sets it). Refused: yourself, a locked account, and
  * starting while already signed in as someone. better-auth keeps the Admin's own session in a signed cookie, and the session it opens for the
- * user lasts one hour (the plugin's default). The audit row shares a transaction with the better-auth call: it commits only if the session
- * was opened. Its Set-Cookie headers are forwarded, so the browser swaps to the user's session. POST /api/me/stop-impersonating ends it.
+ * user lasts one hour, which lib/session.ts enforces itself. The audit insert and the better-auth call run on different connections: the
+ * call is made inside the audit transaction, so a failure rolls the audit row back, and the Set-Cookie headers are forwarded only after that
+ * transaction has committed. POST /api/me/stop-impersonating ends it. Only this app's own origin may call it.
  */
 export async function POST(request: Request, { params }: RouteContext) {
   const g = await guard(request, 'admin');
   if (g.error) return g.error;
+  if (!sameOrigin(request)) return bad('forbidden origin', 403);
   if (isImpersonated(g.session)) return bad('you are already signed in as another user; exit first', 403);
   if (!g.session.user.canImpersonate) return bad('only a developer Admin can sign in as another user', 403);
   const { id } = await params;
