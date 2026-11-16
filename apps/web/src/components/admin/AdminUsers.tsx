@@ -24,6 +24,8 @@ interface User {
   system: boolean;
   /** Not in the company's Lark organisation: never asked to link Lark. */
   outsideLark: boolean;
+  /** A developer Admin: may sign in as another user. Only another developer Admin sets it. */
+  canImpersonate: boolean;
   methods: SignInMethod[];
 }
 interface Team {
@@ -92,7 +94,7 @@ function StoreAssign({ user }: { user: User }) {
   );
 }
 
-function UserEditor({ user, teams, reload }: { user: User; teams: Team[]; reload: () => void }) {
+function UserEditor({ user, teams, reload, canSetDeveloper }: { user: User; teams: Team[]; reload: () => void; canSetDeveloper: boolean }) {
   // Its own action state, so a failure here and one in the add form never show in each other's place.
   const { problem, pending, run } = useAction(reload);
   const [password, setPassword] = useState<string | null>(null);
@@ -166,6 +168,15 @@ function UserEditor({ user, teams, reload }: { user: User; teams: Team[]; reload
           Ngoài tổ chức Lark
         </label>
         <small className="muted">Không nhắc liên kết Lark; đăng nhập bằng email, Google hoặc passkey.</small>
+        {canSetDeveloper && user.role === 'admin' && (
+          <>
+            <label className="check">
+              <input type="checkbox" aria-label={`Nhà phát triển: ${user.email}`} checked={user.canImpersonate} disabled={pending} onChange={(e) => void patch({ canImpersonate: e.target.checked }, 'Không đổi được quyền nhà phát triển.')} />
+              Nhà phát triển
+            </label>
+            <small className="muted">Cho phép Admin này đăng nhập thay người khác để xem đúng những gì họ thấy. Mỗi lần bật, tắt, bắt đầu và thoát đều được ghi vào nhật ký.</small>
+          </>
+        )}
         <small className="muted">Vai trò, nhóm và quyền biên tập mẫu lưu ngay khi chọn. Đổi nhóm chỉ áp dụng cho các job mới. Người biên tập mẫu sửa, thêm mẫu chuyển động và duyệt đề xuất ở trang Tạo video; Admin luôn có quyền này. Tài khoản hệ thống (dùng cho deploy, kiểm thử, demo) được xếp riêng ở cuối danh sách.</small>
       </div>
       <StoreAssign user={user} />
@@ -270,7 +281,7 @@ function UserEditor({ user, teams, reload }: { user: User; teams: Team[]; reload
   );
 }
 
-function UserRow({ user, team, onEdit }: { user: User; team: string; onEdit: () => void }) {
+function UserRow({ user, team, onEdit, onImpersonate }: { user: User; team: string; onEdit: () => void; onImpersonate?: () => void }) {
   return (
     <tr>
       <td data-label="Người dùng">
@@ -312,12 +323,18 @@ function UserRow({ user, team, onEdit }: { user: User; team: string; onEdit: () 
           <Icon name="edit" />
           Sửa
         </button>
+        {onImpersonate && (
+          <button type="button" className="small" aria-label={`Đăng nhập thay ${user.email}`} onClick={onImpersonate}>
+            Đăng nhập thay
+          </button>
+        )}
       </td>
     </tr>
   );
 }
 
-function UserTable({ users, teamName, onEdit }: { users: User[]; teamName: (id: string) => string; onEdit: (id: string) => void }) {
+/** The sign-in-as button is hidden for yourself and for a locked account; the route refuses both again. */
+function UserTable({ users, teamName, onEdit, onImpersonate, meId }: { users: User[]; teamName: (id: string) => string; onEdit: (id: string) => void; onImpersonate?: (user: User) => void; meId: string }) {
   return (
     <div className="table-wrap">
       <table className="mobile-records users">
@@ -335,7 +352,7 @@ function UserTable({ users, teamName, onEdit }: { users: User[]; teamName: (id: 
         </thead>
         <tbody>
           {users.map((u) => (
-            <UserRow key={u.id} user={u} team={teamName(u.teamId)} onEdit={() => onEdit(u.id)} />
+            <UserRow key={u.id} user={u} team={teamName(u.teamId)} onEdit={() => onEdit(u.id)} onImpersonate={onImpersonate && !u.banned && u.id !== meId ? () => onImpersonate(u) : undefined} />
           ))}
         </tbody>
       </table>
@@ -343,7 +360,8 @@ function UserTable({ users, teamName, onEdit }: { users: User[]; teamName: (id: 
   );
 }
 
-export function AdminUsers() {
+/** `meId` is the signed-in Admin; `canImpersonate` is true for a developer Admin, who alone sees the sign-in-as action and the developer switch. */
+export function AdminUsers({ meId = '', canImpersonate = false }: { meId?: string; canImpersonate?: boolean }) {
   const users = useFetch<{ users: User[] }>('/api/admin/users');
   const teams = useFetch<{ teams: Team[] }>('/api/admin/teams?includeHidden=1');
   const { problem, pending, run } = useAction(users.reload);
@@ -373,6 +391,14 @@ export function AdminUsers() {
   const staffTotal = users.data.users.filter((u) => !u.system).length;
   const editUser = users.data.users.find((u) => u.id === editing);
 
+  async function impersonate(u: User) {
+    const yes = await confirmDialog({
+      title: `Đăng nhập thay ${u.name}?`,
+      body: 'Bạn sẽ thấy đúng những gì người này thấy. Mọi thao tác, kể cả lượt tạo video, được tính cho tài khoản của họ. Bạn không đổi được mật khẩu, xác thực 2 lớp, passkey hay email của họ. Việc bắt đầu và thoát được ghi vào nhật ký.',
+      confirmLabel: 'Đăng nhập thay',
+    });
+    if (yes && (await run(() => api(`/api/admin/users/${u.id}/impersonate`, { method: 'POST' }), 'Không đăng nhập thay được.'))) window.location.assign('/');
+  }
   async function add() {
     const ok = await run(() => api('/api/admin/users', sendJson('POST', { email, name, teamId, role, outsideLark, ...(password ? { password } : {}) })), 'Không thêm được người dùng.');
     if (ok) {
@@ -457,18 +483,18 @@ export function AdminUsers() {
         <Empty title={`Không có người dùng nào khớp “${query.trim()}”.`} />
       ) : (
         <>
-          {staff.length > 0 && <UserTable users={staff} teamName={teamName} onEdit={setEditing} />}
+          {staff.length > 0 && <UserTable users={staff} teamName={teamName} onEdit={setEditing} onImpersonate={canImpersonate ? impersonate : undefined} meId={meId} />}
           {system.length > 0 && (
             <details className="help system-users" open={query.trim() !== ''}>
               <summary>Tài khoản hệ thống ({system.length})</summary>
               <p className="muted">Dùng cho deploy, kiểm thử và demo. Không phải nhân viên; giữ lại để chạy tự động.</p>
-              <UserTable users={system} teamName={teamName} onEdit={setEditing} />
+              <UserTable users={system} teamName={teamName} onEdit={setEditing} onImpersonate={canImpersonate ? impersonate : undefined} meId={meId} />
             </details>
           )}
         </>
       )}
       <Modal open={editUser !== undefined} onClose={() => setEditing(null)} label={editUser ? `Sửa người dùng ${editUser.email}` : 'Sửa người dùng'} className="admin-modal">
-        {editUser && <UserEditor key={editUser.id} user={editUser} teams={allTeams} reload={users.reload} />}
+        {editUser && <UserEditor key={editUser.id} user={editUser} teams={allTeams} reload={users.reload} canSetDeveloper={canImpersonate && editUser.id !== meId} />}
       </Modal>
     </section>
   );

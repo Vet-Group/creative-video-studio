@@ -2,7 +2,7 @@ import { audit } from '@cvs/core/audit';
 import { withTransaction } from '@cvs/core/ledger';
 import { bad } from '@/lib/admin';
 import { pool } from '@/lib/auth';
-import { guard } from '@/lib/session';
+import { guard, impersonationRefusal, isImpersonated } from '@/lib/session';
 
 // The app's own routes, not better-auth's /list-sessions and /revoke-session: those hand every session token to the page and refuse a
 // session older than a day (freshAge).
@@ -31,6 +31,7 @@ export async function GET(request: Request) {
 export async function DELETE(request: Request) {
   const g = await guard(request, 'member');
   if (g.error) return g.error;
+  if (isImpersonated(g.session)) return impersonationRefusal();
   const id = new URL(request.url).searchParams.get('id');
   const userId = g.session.user.id;
   const revoked = await withTransaction(pool, async (tx) => {

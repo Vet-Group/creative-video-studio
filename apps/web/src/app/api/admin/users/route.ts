@@ -14,7 +14,7 @@ export async function GET(request: Request) {
     methods.set(p.user_id, [...(methods.get(p.user_id) ?? []), { id: p.id, provider: 'passkey', email: null, createdAt: p.created_at.toISOString() }]);
   }
   return Response.json({
-    users: users.map((u) => ({ id: u.id, email: u.email, name: u.name, role: u.role, banned: u.banned, teamId: (u as typeof u & { teamId: string }).teamId, twoFactor: (u as typeof u & { twoFactorEnabled?: boolean }).twoFactorEnabled === true, canEditTemplates: (u as typeof u & { canEditTemplates?: boolean }).canEditTemplates === true, system: (u as typeof u & { system?: boolean }).system === true, outsideLark: (u as typeof u & { outsideLark?: boolean }).outsideLark === true, methods: methods.get(u.id) ?? [] })),
+    users: users.map((u) => ({ id: u.id, email: u.email, name: u.name, role: u.role, banned: u.banned, teamId: (u as typeof u & { teamId: string }).teamId, twoFactor: (u as typeof u & { twoFactorEnabled?: boolean }).twoFactorEnabled === true, canEditTemplates: (u as typeof u & { canEditTemplates?: boolean }).canEditTemplates === true, system: (u as typeof u & { system?: boolean }).system === true, outsideLark: (u as typeof u & { outsideLark?: boolean }).outsideLark === true, canImpersonate: (u as typeof u & { canImpersonate?: boolean }).canImpersonate === true, methods: methods.get(u.id) ?? [] })),
   });
 }
 

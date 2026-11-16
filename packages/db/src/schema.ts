@@ -104,6 +104,8 @@ export const users = pgTable(
     system: boolean('system').notNull().default(false),
     // Set by an Admin: a collaborator outside the company's Lark organisation, who can never link Lark and so gets no reminder to.
     outsideLark: boolean('outside_lark').notNull().default(false),
+    // Set by an Admin who has it: a developer Admin may sign in as another user to see what they see (POST /api/admin/users/[id]/impersonate). Never granted by a migration.
+    canImpersonate: boolean('can_impersonate').notNull().default(false),
     teamId: text('team_id')
       .notNull()
       .default(DEFAULT_TEAM_ID)

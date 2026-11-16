@@ -22,6 +22,7 @@ import { ChangelogPopup } from './ChangelogPopup';
 import { CompareSlider } from './CompareSlider';
 import { ConfirmHost, confirmDialog } from './Confirm';
 import { FalLowNotice } from './FalLowNotice';
+import { ImpersonationBanner } from './ImpersonationBanner';
 import { Icon, type IconName } from './Icon';
 import { LarkLinkPrompt } from './LarkLinkPrompt';
 import { JobFailureNote, canRetry, isCanceled, canRetryOnTwin, twinRetryText } from './JobFailure';
@@ -594,7 +595,7 @@ const PAGE_TITLES: [prefix: string, title: string][] = [
   ['/account', 'Phương thức đăng nhập'],
 ];
 
-export function Shell({ userId, userName, isAdmin, feedbackNew = 0, analyzeEnabled = false, account, larkPrompt = false, changelog = [], initialCollapsed, children }: { userId: string; userName: string; isAdmin: boolean; feedbackNew?: number; analyzeEnabled?: boolean; account: Account; /** Show the once-a-day reminder to link Lark (lib/lark-prompt.ts). */ larkPrompt?: boolean; /** The newest entries this user may read (lib/changelog-seen.ts), for the sidebar dot and the once-a-day popup. */ changelog?: ChangeEntry[]; initialCollapsed: boolean; children: ReactNode }) {
+export function Shell({ userId, userName, isAdmin, feedbackNew = 0, analyzeEnabled = false, account, larkPrompt = false, impersonating = false, changelog = [], initialCollapsed, children }: { userId: string; userName: string; isAdmin: boolean; feedbackNew?: number; analyzeEnabled?: boolean; account: Account; /** Show the once-a-day reminder to link Lark (lib/lark-prompt.ts). */ larkPrompt?: boolean; /** An Admin is signed in as this user (a session with impersonatedBy): shows the banner with the way out. */ impersonating?: boolean; /** The newest entries this user may read (lib/changelog-seen.ts), for the sidebar dot and the once-a-day popup. */ changelog?: ChangeEntry[]; initialCollapsed: boolean; children: ReactNode }) {
   const pathname = usePathname();
   const narrow = useMediaQuery(NARROW);
   const [open, setOpen] = useState(false); // the drawer, below 1024 px
@@ -735,6 +736,7 @@ export function Shell({ userId, userName, isAdmin, feedbackNew = 0, analyzeEnabl
               </Modal>
             )}
             <div className="content" inert={narrow && open}>
+              {impersonating && <ImpersonationBanner name={userName} />}
               <header className="topbar">
                 <button ref={menuButton} type="button" className="menu-button" aria-label="Mở menu" aria-expanded={open} aria-controls="sidebar" onClick={() => setOpen(true)}>
                   <Icon name="menu" size={20} />

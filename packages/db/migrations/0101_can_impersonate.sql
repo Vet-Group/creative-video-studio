@@ -1,0 +1,1 @@
+ALTER TABLE "users" ADD COLUMN "can_impersonate" boolean DEFAULT false NOT NULL;

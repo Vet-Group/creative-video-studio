@@ -10,7 +10,7 @@ import { guard } from '@/lib/session';
  * Admin: change one user. Any of `name`, `email` (unique; a first Google or Lark sign-in links by this address), `role` (member|admin),
  * `teamId` (a visible team), `banned` (boolean, with an optional `banReason`), `temporaryPassword`, `twoFactor: false` (turns the
  * user's 2FA off, for a lost phone, and ends the user's sessions), `canEditTemplates` (boolean: a template editor, lib/session.ts), `system` (boolean: an
- * automation account, listed apart from the staff) and `outsideLark` (boolean: not in the company's Lark organisation, never asked to link Lark) in one body. Every field is checked before anything is written. Each change that differs from the current state is
+ * automation account, listed apart from the staff) and `outsideLark` (boolean: not in the company's Lark organisation, never asked to link Lark) and `canImpersonate` (boolean: a developer Admin who may sign in as another user; only a holder sets it, never on their own account, and only on an Admin) in one body. Every field is checked before anything is written. Each change that differs from the current state is
  * audited with its old and new value, in the transaction of the change itself: the audit row commits only if the change was made. The
  * password itself is never stored. A team change touches only users.team_id: jobs keep the team they were run under.
  */
@@ -19,9 +19,9 @@ export async function PATCH(request: Request, { params }: RouteContext) {
   if (g.error) return g.error;
   const { id } = await params;
   const actorId = g.session.user.id;
-  const { name, email, role, teamId, banned, banReason, temporaryPassword, twoFactor, canEditTemplates, system, outsideLark } = (await readBody(request)) ?? {};
-  if ([name, email, role, teamId, banned, temporaryPassword, twoFactor, canEditTemplates, system, outsideLark].every((v) => v === undefined)) {
-    return bad('give at least one of name, email, role, teamId, banned, temporaryPassword, twoFactor, canEditTemplates, system, outsideLark');
+  const { name, email, role, teamId, banned, banReason, temporaryPassword, twoFactor, canEditTemplates, system, outsideLark, canImpersonate } = (await readBody(request)) ?? {};
+  if ([name, email, role, teamId, banned, temporaryPassword, twoFactor, canEditTemplates, system, outsideLark, canImpersonate].every((v) => v === undefined)) {
+    return bad('give at least one of name, email, role, teamId, banned, temporaryPassword, twoFactor, canEditTemplates, system, outsideLark, canImpersonate');
   }
   const newName = typeof name === 'string' ? name.trim() : name;
   const newEmail = typeof email === 'string' ? email.trim().toLowerCase() : email;
@@ -38,9 +38,20 @@ export async function PATCH(request: Request, { params }: RouteContext) {
   if (canEditTemplates !== undefined && typeof canEditTemplates !== 'boolean') return bad('canEditTemplates must be true or false');
   if (system !== undefined && typeof system !== 'boolean') return bad('system must be true or false');
   if (outsideLark !== undefined && typeof outsideLark !== 'boolean') return bad('outsideLark must be true or false');
+  if (canImpersonate !== undefined && typeof canImpersonate !== 'boolean') return bad('canImpersonate must be true or false');
+  if (canImpersonate !== undefined) {
+    if (!g.session.user.canImpersonate) return bad('only a developer Admin can change this', 403);
+    if (id === actorId) return bad('you cannot change this on your own account');
+  }
   if (id === actorId && ((role !== undefined && role !== g.session.user.role) || banned === true)) return bad('you cannot change your own role or ban yourself');
 
-  if (!(await pool.query('select 1 from users where id = $1', [id])).rowCount) return bad('not found', 404);
+  const found = (await pool.query('select can_impersonate from users where id = $1', [id])).rows[0];
+  if (!found) return bad('not found', 404);
+  // A developer Admin's email, password and 2FA are for developer Admins: taking the account over would be a way to the flag. Locking stays open to every Admin.
+  if (found.can_impersonate && !g.session.user.canImpersonate && (email !== undefined || temporaryPassword !== undefined || twoFactor !== undefined)) {
+    return bad('only a developer Admin can change the email, password or 2FA of a developer Admin', 403);
+  }
+  if (canImpersonate === true && (await pool.query('select role from users where id = $1', [id])).rows[0].role !== 'admin') return bad('only an Admin can be a developer Admin');
   if (typeof teamId === 'string' && !(await pool.query('select 1 from teams where id = $1 and not hidden', [teamId])).rowCount) return bad('teamId must be the id of a visible team');
   if (typeof newEmail === 'string' && (await pool.query('select 1 from users where lower(email) = $1 and id <> $2', [newEmail, id])).rowCount) return bad('another user has this email', 409);
 
@@ -71,7 +82,13 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     if (role !== undefined) {
       await change(
         (old) => (role === old.role ? null : { action: 'user.role_change', oldValue: { role: old.role }, newValue: { role } }),
-        () => auth.api.setRole({ headers: request.headers, body: { userId: id, role } }),
+        async (tx) => {
+          await auth.api.setRole({ headers: request.headers, body: { userId: id, role } });
+          // The flag goes with the Admin role; after better-auth's write, which would wait on this row lock.
+          if (role !== 'admin' && (await tx.query('update users set can_impersonate = false, updated_at = now() where id = $1 and can_impersonate', [id])).rowCount) {
+            await audit(tx, { actorId, action: 'user.developer', target, oldValue: { canImpersonate: true }, newValue: { canImpersonate: false, because: 'role change' } });
+          }
+        },
       );
     }
     if (typeof teamId === 'string') {
@@ -98,6 +115,12 @@ export async function PATCH(request: Request, { params }: RouteContext) {
       await withTransaction(pool, async (tx) => {
         if (!(await tx.query('update users set outside_lark = $2, updated_at = now() where id = $1 and outside_lark <> $2', [id, outsideLark])).rowCount) return;
         await audit(tx, { actorId, action: 'user.outside_lark', target, oldValue: { outsideLark: !outsideLark }, newValue: { outsideLark } });
+      });
+    }
+    if (typeof canImpersonate === 'boolean') {
+      await withTransaction(pool, async (tx) => {
+        if (!(await tx.query('update users set can_impersonate = $2, updated_at = now() where id = $1 and can_impersonate <> $2', [id, canImpersonate])).rowCount) return;
+        await audit(tx, { actorId, action: 'user.developer', target, oldValue: { canImpersonate: !canImpersonate }, newValue: { canImpersonate } });
       });
     }
     if (banned === true) {

@@ -145,6 +145,10 @@ export const USERS = {
   // changelog.e2e: the changelog page, the sidebar dot and the once-a-day popup, one member per test.
   chga: { email: 'chga@e2e.test', name: 'E2E Changelog A', role: 'member' },
   chgb: { email: 'chgb@e2e.test', name: 'E2E Changelog B', role: 'member' },
+  // impersonation.e2e: a developer Admin (flag seeded in serve.ts), an Admin without it, and the member the developer signs in as.
+  impdev: { email: 'impdev@e2e.test', name: 'E2E Imp Dev', role: 'admin' },
+  impplain: { email: 'impplain@e2e.test', name: 'E2E Imp Plain', role: 'admin' },
+  impmember: { email: 'impmember@e2e.test', name: 'E2E Imp Member', role: 'member' },
   admin: { email: 'admin@e2e.test', name: 'E2E Admin', role: 'admin' },
 } as const;
 
