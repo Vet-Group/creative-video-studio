@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { api } from '@/lib/api';
+import { api, rotatingSession } from '@/lib/api';
 
 /** The Admin users page, where the Admin lands again after leaving. */
 const ADMIN_USERS_PAGE = '/admin/users';
@@ -13,7 +13,8 @@ export function ImpersonationBanner({ name }: { name: string }) {
     setPending(true);
     setProblem('');
     try {
-      await api('/api/me/stop-impersonating', { method: 'POST' });
+      // Stopping deletes the user's session: a page call still in flight on it gets a 401 that must not send the Admin to the login.
+      await rotatingSession(() => api('/api/me/stop-impersonating', { method: 'POST' }));
       window.location.assign(ADMIN_USERS_PAGE);
     } catch {
       setProblem('Không thoát được. Hãy thử lại hoặc đăng xuất.');
