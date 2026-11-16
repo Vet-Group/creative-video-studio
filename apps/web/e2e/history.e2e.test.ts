@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
-import { clearMyJobs, openTab, png, runViaApi, select, selectValue, signIn } from './support.test';
+import { clearMyJobs, openJobs, openTab, png, runViaApi, select, selectValue, signIn } from './support.test';
 
 // A page's History tab lists the member's jobs as Fash's History cards: the result, the member's words, the inputs, chips, and the actions.
 test('a History card shows the text, inputs and chips, and its favourite, new-tab, download, delete and Dùng lại actions work', async ({ page }) => {
@@ -225,7 +225,7 @@ test('on a phone, Bắt đầu ngay in an empty History opens the form tab and p
   await expect.poll(() => page.evaluate(() => document.activeElement?.closest('.form-card') !== null)).toBe(true);
 });
 
-test('the compact tray beside a page without its own History gives a failed job and a finished one the History card buttons', async ({ page }) => {
+test('the jobs drawer of a page without its own History gives a failed job and a finished one the History card buttons', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await signIn(page, 'traya');
   await clearMyJobs(page);
@@ -238,7 +238,7 @@ test('the compact tray beside a page without its own History gives a failed job 
   const mine = async () => ((await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { status: string }[] }).jobs;
   await expect.poll(async () => (await mine()).map((j) => j.status).sort(), { timeout: 60_000 }).toEqual(['failed', 'succeeded']);
   await page.goto('/account/sign-in-methods');
-  const tray = page.getByRole('complementary', { name: 'Lượt tạo của tôi' });
+  const tray = (await openJobs(page)).getByRole('complementary', { name: 'Lượt tạo của tôi' });
   const failed = tray.getByRole('listitem').filter({ hasText: 'Không thành công' });
   const done = tray.getByRole('listitem').filter({ hasText: 'Hoàn tất' });
   await expect(failed.getByRole('button', { name: 'Thử lại' })).toHaveClass('job-reuse job-primary');
@@ -290,15 +290,47 @@ test('on a phone an Admin sees the provider code on the failed card and opens th
   await expect(card.getByRole('button', { name: 'Thử lại' })).toHaveCount(0);
 });
 
-test('the compact tray gives the refused job the same sentence and no Thử lại', async ({ page }) => {
+test('the jobs drawer gives the refused job the same sentence and no Thử lại', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await signIn(page, 'loada');
   await answerWithRefusal(page);
   await page.goto('/account/sign-in-methods');
-  const failed = page.getByRole('complementary', { name: 'Lượt tạo của tôi' }).getByRole('listitem').filter({ hasText: 'Không thành công' });
+  const failed = (await openJobs(page)).getByRole('complementary', { name: 'Lượt tạo của tôi' }).getByRole('listitem').filter({ hasText: 'Không thành công' });
   await expect(failed.getByText(REAL_PERSON)).toBeVisible();
   await expect(failed.getByRole('button', { name: 'Thử lại' })).toHaveCount(0);
   await expect(failed.getByRole('link', { name: 'Dùng lại' })).toBeVisible();
+});
+
+test('a page without its own History keeps the full width and opens the jobs from a Lượt tạo button that counts the active ones', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await signIn(page, 'loada');
+  const active = (id: string, status: string) => ({ ...refusedJob, id, status, error: null, failureReason: null, startedAt: status === 'running' ? refusedJob.createdAt : null, finishedAt: null });
+  await page.route(/\/api\/jobs\?mine/, (r) => r.fulfill({ json: { workerOffline: false, clips: { today: 0, cap: 20 }, jobs: [active('running-job-1', 'running'), active('queued-job-1', 'queued'), refusedJob] } }));
+  await page.goto('/account/sign-in-methods');
+  const button = page.getByRole('button', { name: 'Lượt tạo, 2 đang chạy', exact: true });
+  await expect(button).toBeVisible();
+  await expect(button.locator('.jobs-open-count')).toHaveText('2');
+  // No column beside the page: the page takes the frame's whole width (its 48 px gutters aside).
+  await expect(page.getByRole('complementary', { name: 'Lượt tạo của tôi' })).toHaveCount(0);
+  expect((await page.locator('main').boundingBox())!.width).toBe((await page.locator('.frame').boundingBox())!.width - 96);
+
+  const drawer = await openJobs(page);
+  expect((await drawer.boundingBox())!.width).toBe(380);
+  await expect(drawer.getByRole('complementary', { name: 'Lượt tạo của tôi' }).getByRole('listitem')).toHaveCount(3);
+  await expect(drawer.getByRole('heading', { name: 'Lượt tạo của tôi' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(drawer).toBeHidden();
+  await expect(button).toBeFocused();
+
+  // On a phone the button sits in the top bar, a 44 px target, and the drawer takes the whole width.
+  await page.setViewportSize({ width: 390, height: 844 });
+  const inBar = page.locator('.topbar').getByRole('button', { name: 'Lượt tạo, 2 đang chạy', exact: true });
+  await expect(inBar).toBeVisible();
+  expect((await inBar.boundingBox())!.height).toBe(44);
+  await inBar.click();
+  await expect(drawer).toBeVisible();
+  expect((await drawer.boundingBox())!.width).toBe(await page.evaluate(() => document.documentElement.clientWidth));
+  expect(await fits(page)).toBe(true);
 });
 
 test('Chạy lại on a succeeded History card sends a new job with the same inputs', async ({ page }) => {

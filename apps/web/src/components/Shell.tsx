@@ -432,7 +432,7 @@ function HistoryEmpty() {
   );
 }
 
-/** The "My jobs" list. It sits beside the page, or in the History tab of Create. With `feature`, only the jobs of that feature (the History tab of Try On and Image Generation).
+/** The "My jobs" list. It opens in the drawer of a page without its own History, or sits in the History tab of Create. With `feature`, only the jobs of that feature (the History tab of Try On and Image Generation).
  * Beside a form (FormContext), the cards' chips set their value on it and Dùng lại refills it in place. */
 export function Tray({ feature }: { feature?: string }) {
   const isAdmin = useContext(AdminContext);
@@ -466,6 +466,26 @@ export function Tray({ feature }: { feature?: string }) {
         </div>
       )}
     </aside>
+  );
+}
+
+/** Opens the "My jobs" drawer of a page without its own History: the active jobs as a count, and the sidebar's dot once a job finishes until the drawer is opened.
+ * Shown twice by width (the top bar below 1024 px, the frame from it); both follow `open`, so their dots agree. */
+function JobsButton({ open, onOpen }: { open: boolean; onOpen: () => void }) {
+  const { jobs, lastFinished, loaded } = useJobs();
+  const [seen, setSeen] = useState<number | null>(null); // the newest finish time the member has had the drawer open for
+  if (loaded && (seen === null || open) && seen !== lastFinished) setSeen(lastFinished); // what finished before this page, or while the drawer is open, is no news
+  const active = jobs.filter((j) => j.status === 'queued' || j.status === 'submitting' || j.status === 'running').length;
+  const fresh = seen !== null && lastFinished > seen;
+  return (
+    <button type="button" className="jobs-open" aria-haspopup="dialog" aria-label={['Lượt tạo', active > 0 && `${active} đang chạy`, fresh && 'có kết quả mới'].filter(Boolean).join(', ')} onClick={onOpen}>
+      <span className="jobs-open-icon">
+        <Icon name="clock" size={16} />
+        {fresh && <span className="nav-dot" />}
+      </span>
+      <span className="jobs-open-label">Lượt tạo</span>
+      {active > 0 && <span className="jobs-open-count">{active}</span>}
+    </button>
   );
 }
 
@@ -547,7 +567,7 @@ function placeHint(target: EventTarget) {
   });
 }
 
-/** The pages that show their own History tab instead of the tray beside them. */
+/** The pages that show their own History tab instead of the "Lượt tạo" button and its drawer. */
 const OWN_HISTORY = ['/create', '/try-on', '/image-generation', '/marketing-studio', '/analyze']; // an analysis is not a job: its page lists its own History
 
 /** Explore, the Apps index and the Library give the full width to their grids (the Library already lists every result), and the Admin pages to their tables; the jobs show in Library and in the History tabs. */
@@ -585,6 +605,8 @@ export function Shell({ userId, userName, isAdmin, feedbackNew = 0, analyzeEnabl
   const [settingsUsed, setSettingsUsed] = useState(false); // once opened it stays mounted, so closing returns focus as before
   if (settings !== null && !settingsUsed) setSettingsUsed(true);
   const [guide, setGuide] = useState(false); // the "Chọn công cụ nào?" dialog
+  const [jobsOpen, setJobsOpen] = useState(false); // the "Lượt tạo của tôi" drawer of a page without its own History
+  const trayPage = !hasOwnHistory(pathname);
   const openGuide = useCallback(() => (setOpen(false), setGuide(true)), []);
   const [changelogDot, setChangelogDot] = useState(false); // entries the member has not seen: the red dot on the changelog item
   useEffect(() => {
@@ -632,7 +654,7 @@ export function Shell({ userId, userName, isAdmin, feedbackNew = 0, analyzeEnabl
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, []);
-  useEffect(() => setOpen(false), [pathname]);
+  useEffect(() => (setOpen(false), setJobsOpen(false)), [pathname]); // a link in the jobs drawer (Xem trong Thư viện, Dùng lại) closes it too
   useEffect(() => {
     if (!narrow) setOpen(false); // the drawer is for narrow screens only
   }, [narrow]);
@@ -707,20 +729,26 @@ export function Shell({ userId, userName, isAdmin, feedbackNew = 0, analyzeEnabl
               {accountMenu('chip')}
             </div>
             {settingsUsed && <SettingsDialog open={settings !== null} onClose={() => setSettings(null)} userName={userName} account={account} start={settings ?? 'profile'} />}
+            {trayPage && (
+              <Modal open={jobsOpen} onClose={() => setJobsOpen(false)} label="Lượt tạo của tôi" className="jobs-drawer">
+                <Tray />
+              </Modal>
+            )}
             <div className="content" inert={narrow && open}>
               <header className="topbar">
                 <button ref={menuButton} type="button" className="menu-button" aria-label="Mở menu" aria-expanded={open} aria-controls="sidebar" onClick={() => setOpen(true)}>
                   <Icon name="menu" size={20} />
                 </button>
                 <strong>{title}</strong>
+                {trayPage && <JobsButton open={jobsOpen} onOpen={() => setJobsOpen(true)} />}
                 {accountMenu('avatar')}
               </header>
               {isAdmin && <FalLowNotice />}
               <ChangelogPopup entries={changelog} larkPrompt={larkPrompt} />
               {larkPrompt && <LarkLinkPrompt />}
               <div className="frame">
+                {trayPage && <JobsButton open={jobsOpen} onOpen={() => setJobsOpen(true)} />}
                 <main id="main" tabIndex={-1}>{children}</main>
-                {!hasOwnHistory(pathname) && <Tray />}
               </div>
             </div>
             <Toasts />
