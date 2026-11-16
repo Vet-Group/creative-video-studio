@@ -104,7 +104,7 @@ export const USERS = {
   traya: { email: 'traya@e2e.test', name: 'E2E Tray A', role: 'member' }, // history e2e: the compact tray's buttons beside a page without its own History
   loada: { email: 'loada@e2e.test', name: 'E2E Load A', role: 'member' }, // history, library and image-pages e2e: a failed read and its retry, the upload reasons
   preseta: { email: 'preseta@e2e.test', name: 'E2E Preset A', role: 'member' }, // preset-pick.e2e: a late preset list does not undo a pick
-  // preset-edit.e2e: tpled is a template editor (e2e/serve.ts sets it), tplprop a plain member who proposes.
+  // preset-edit.e2e: tpled is a template editor (e2e/serve.ts sets it), tplprop a plain member who proposes; preset-edit-touch.e2e only reads the picker as tplprop.
   tpled: { email: 'tpled@e2e.test', name: 'E2E Template Editor', role: 'member' },
   tplprop: { email: 'tplprop@e2e.test', name: 'E2E Template Proposer', role: 'member' },
   // templates.e2e: stpla saves a template to a store on Create, stplb picks that store and applies it.
