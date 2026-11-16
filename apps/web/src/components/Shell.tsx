@@ -569,6 +569,7 @@ const PAGE_TITLES: [prefix: string, title: string][] = [
   ['/apps', 'Ứng dụng'],
   ['/library', 'Thư viện'],
   ['/changelog', 'Có gì mới'],
+  ['/feedback', 'Góp ý'],
   ['/admin', 'Quản trị'],
   ['/account', 'Phương thức đăng nhập'],
 ];

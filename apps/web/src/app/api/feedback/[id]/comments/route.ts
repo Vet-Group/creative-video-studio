@@ -18,6 +18,6 @@ export async function POST(request: Request, { params }: RouteContext) {
   if (!(await pool.query('select 1 from feedback where id = $1', [id])).rowCount) return bad('not found', 404);
   const commentId = randomUUID();
   await pool.query('insert into feedback_comments (id, feedback_id, user_id, body) values ($1, $2, $3, $4)', [commentId, id, g.session.user.id, body]);
-  const comment: FeedbackComment = { id: commentId, authorName: g.session.user.name, body, mine: true, createdAt: new Date().toISOString() };
+  const comment: FeedbackComment = { id: commentId, authorName: g.session.user.name, authorAdmin: g.session.user.role === 'admin', body, mine: true, createdAt: new Date().toISOString() };
   return Response.json(comment, { status: 201 });
 }

@@ -27,11 +27,15 @@ export interface ListedFeedback {
   voted: boolean;
   comments: number;
   createdAt: string;
+  /** The last time an Admin changed the status or the reply (the creation time until then). */
+  updatedAt: string;
 }
 
 export interface FeedbackComment {
   id: string;
   authorName: string;
+  /** The author is an Admin, so the thread shows them as the technical team. */
+  authorAdmin: boolean;
   body: string;
   mine: boolean;
   createdAt: string;
@@ -39,7 +43,7 @@ export interface FeedbackComment {
 
 /** The columns, author name and vote/comment counts that toListed reads; `$1` is the caller, for `mine` and `voted`. Shared by the list and detail routes and the board page. */
 export const FEEDBACK_SELECT = `
-  select f.id, f.kind, f.title, f.body, f.status, f.admin_note, f.image_asset_ids, f.created_at,
+  select f.id, f.kind, f.title, f.body, f.status, f.admin_note, f.image_asset_ids, f.created_at, f.updated_at,
     u.name as author_name, (f.user_id = $1) as mine,
     (select count(*)::int from feedback_votes v where v.feedback_id = f.id) as votes,
     exists(select 1 from feedback_votes v where v.feedback_id = f.id and v.user_id = $1) as voted,
@@ -61,6 +65,7 @@ export const toListed = (r: Record<string, unknown>): ListedFeedback => ({
   voted: r.voted === true,
   comments: Number(r.comments ?? 0),
   createdAt: new Date(r.created_at as string).toISOString(),
+  updatedAt: new Date(r.updated_at as string).toISOString(),
 });
 
 /** dd/mm/yyyy HH:mm in Vietnam time, how the board shows when something was posted. */

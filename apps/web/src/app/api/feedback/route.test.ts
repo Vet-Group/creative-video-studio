@@ -133,8 +133,18 @@ describe('comments and detail', () => {
     const got = (await (await detail.GET(new Request('http://localhost/x', { headers: headers(m.cookie) }), ctx(f.id))).json()) as { item: { comments: number }; comments: { body: string; authorName: string; mine: boolean }[] };
     expect(got.item.comments).toBe(1);
     expect(got.comments).toHaveLength(1);
-    expect(got.comments[0]).toMatchObject({ body: 'Me too!', mine: true });
+    expect(got.comments[0]).toMatchObject({ body: 'Me too!', mine: true, authorAdmin: false });
     expect(typeof got.comments[0]!.authorName).toBe('string');
+  });
+
+  test("an Admin's comment is marked as the Admin's, in the reply to the post and in the detail", async () => {
+    const m = await user();
+    const admin = await user('admin');
+    const f = (await (await post(m.cookie, valid)).json()) as { id: string };
+    const res = await comments.POST(new Request('http://localhost/x', { method: 'POST', headers: headers(admin.cookie), body: JSON.stringify({ body: 'On it.' }) }), ctx(f.id));
+    expect(await res.json()).toMatchObject({ body: 'On it.', authorAdmin: true });
+    const got = (await (await detail.GET(new Request('http://localhost/x', { headers: headers(m.cookie) }), ctx(f.id))).json()) as { comments: { authorAdmin: boolean; mine: boolean }[] };
+    expect(got.comments[0]).toMatchObject({ authorAdmin: true, mine: false });
   });
 
   test('detail 404 for an unknown id', async () => {
@@ -164,8 +174,9 @@ describe('PATCH /api/admin/feedback/:id', () => {
     const admin = await user('admin');
     const f = (await (await post(m.cookie, valid)).json()) as { id: string };
     expect((await patch(admin.cookie, f.id, { status: 'done', adminNote: 'Shipped in v2.' })).status).toBe(200);
-    const got = (await (await detail.GET(new Request('http://localhost/x', { headers: headers(m.cookie) }), ctx(f.id))).json()) as { item: { status: string; adminNote: string } };
+    const got = (await (await detail.GET(new Request('http://localhost/x', { headers: headers(m.cookie) }), ctx(f.id))).json()) as { item: { status: string; adminNote: string; createdAt: string; updatedAt: string } };
     expect(got.item).toMatchObject({ status: 'done', adminNote: 'Shipped in v2.' });
+    expect(Date.parse(got.item.updatedAt)).toBeGreaterThanOrEqual(Date.parse(got.item.createdAt));
     const audits = (await pool.query(`select action, new_value from audit_entries where target = $1`, [`feedback:${f.id}`])).rows;
     expect(audits).toHaveLength(1);
     expect(audits[0].action).toBe('feedback.update');
