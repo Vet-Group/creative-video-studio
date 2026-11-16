@@ -3,7 +3,7 @@
 import type { Analysis } from '@cvs/core/analysis/breakdown';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, test } from 'vitest';
-import { AnalysisHistory } from './AnalysisHistory';
+import { AnalysisHistory, EveryoneChoice } from './AnalysisHistory';
 import type { AnalysisRow } from './AnalyzeView';
 
 const result: Analysis = {
@@ -64,4 +64,19 @@ test('a finished row, succeeded or failed, has a delete button, and a queued or 
     items: [row(), row({ id: 'a2', status: 'failed', result: null }), row({ id: 'a3', status: 'queued', result: null }), row({ id: 'a4', status: 'running', result: null })],
   });
   expect(html.match(/aria-label="Xoá phân tích"/g)).toHaveLength(2);
+});
+
+test("another member's analysis names its creator and has no delete button, while the caller's own keeps it", () => {
+  const html = render({ items: [row({ id: 'mine' }), row({ id: 'theirs', creatorName: 'Lan' })] });
+  expect(html.match(/Người tạo: Lan/g)).toHaveLength(1);
+  expect(html.match(/aria-label="Xoá phân tích"/g)).toHaveLength(1);
+  expect(render({ items: [row()] })).not.toContain('Người tạo');
+});
+
+test('the Admin choice is a labelled checkbox that follows its state', () => {
+  const off = renderToStaticMarkup(<EveryoneChoice checked={false} onChange={() => undefined} />);
+  expect(off).toContain('Mọi người');
+  expect(off).toContain('type="checkbox"');
+  expect(off).not.toContain('checked');
+  expect(renderToStaticMarkup(<EveryoneChoice checked onChange={() => undefined} />)).toContain('checked=""');
 });

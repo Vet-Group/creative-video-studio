@@ -124,3 +124,15 @@ test('an Admin sees a share action on a finished result, or the shared title wit
   expect(member).not.toContain('video mẫu');
   expect(renderToStaticMarkup(<AnalysisPanel row={{ ...base, status: 'running', result: null }} onClose={() => undefined} onShared={() => undefined} />)).not.toContain('video mẫu'); // only a finished one
 });
+
+test("an Admin viewing another member's analysis sees who made it, and no share control; Smart Remake only while it is shared", () => {
+  const theirs = { ...base, creatorName: 'Lan' };
+  const html = renderToStaticMarkup(<AnalysisPanel row={theirs} onClose={() => undefined} onShared={() => undefined} remakeEnabled />);
+  expect(html).toContain('Người tạo: Lan');
+  expect(html).not.toContain('Chia sẻ làm video mẫu…');
+  expect(html).not.toContain('Smart Remake'); // the remake API refuses another member's analysis unless it is shared
+  const shared = renderToStaticMarkup(<AnalysisPanel row={{ ...theirs, sharedTitle: 'Áo thun trơn' }} onClose={() => undefined} onShared={() => undefined} remakeEnabled />);
+  expect(shared).toContain('Smart Remake');
+  expect(shared).not.toContain('Gỡ khỏi video mẫu');
+  expect(renderToStaticMarkup(<AnalysisPanel row={base} onClose={() => undefined} onShared={() => undefined} />)).not.toContain('Người tạo');
+});

@@ -2522,7 +2522,8 @@ dialog.modal.tool-guide { width: min(52rem, calc(100vw - 2rem)); }
 .fb-excerpt { display: -webkit-box; overflow: hidden; margin: 4px 0 0; color: var(--text-2); font-size: 14px; line-height: 20px; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .fb-replied { display: inline-flex; align-items: center; gap: 4px; color: var(--ink); font-size: .76rem; font-weight: 600; }
 .fb-filters .fb-mine { display: inline-flex; align-items: center; gap: 6px; padding: 8px 0; color: var(--ink); font-size: 14px; cursor: pointer; }
-.fb-mine input { width: 16px; min-width: 0; height: 16px; margin: 0; padding: 0; } /* the generic label-input min width (full width on phones) must not push the box away from its text */
+.analysis-everyone { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 14px; cursor: pointer; }
+.fb-mine input, .analysis-everyone input { width: 16px; min-width: 0; height: 16px; margin: 0; padding: 0; } /* the generic label-input min width (full width on phones) must not push the box away from its text */
 /* The item page: the post in a card, where it stands, the team's reply under it, the Admin's box, then comments. */
 .fb-back { display: inline-flex; align-items: center; gap: 6px; margin: 4px 0 12px; color: var(--muted); font-size: 14px; text-decoration: none; }
 .fb-back:hover { color: var(--ink); }
