@@ -151,6 +151,32 @@ test.describe('1440x1000', () => {
     }
   });
 
+  test('S7 tool guide button: beside the Sáng tạo label at normal text and under it at 130% text, whole and inside the 208 px column both times', async ({ page }) => {
+    const head = page.locator('.sidebar .nav-group-head').filter({ hasText: 'Sáng tạo' });
+    const label = head.locator('.nav-group-label');
+    const guide = head.getByRole('button', { name: 'Chọn công cụ nào?' });
+    const bottom = (b: Box) => b.y + b.height;
+    const inColumn = async () => {
+      const g = await box(guide);
+      expect(g.x + g.width, 'guide inside the column (240 minus 16 padding)').toBeLessThanOrEqual(224);
+      expect(await guide.evaluate((el) => el.scrollWidth - el.clientWidth), 'guide text not cut').toBe(0);
+      return g;
+    };
+    expect((await inColumn()).y, 'guide beside the label').toBeLessThan(bottom(await box(label)));
+    // Large text as the OS applies it: every computed font size and line height x1.3, px spacing unchanged (read all first, so inherited sizes are not scaled twice).
+    await page.evaluate(() => {
+      const els = [...document.querySelectorAll<HTMLElement>('body, body *')].map((el) => {
+        const cs = getComputedStyle(el);
+        return [el, parseFloat(cs.fontSize), cs.lineHeight] as const;
+      });
+      for (const [el, fs, lh] of els) {
+        el.style.fontSize = `${fs * 1.3}px`;
+        if (lh !== 'normal') el.style.lineHeight = `${parseFloat(lh) * 1.3}px`;
+      }
+    });
+    expect((await inColumn()).y, 'guide under the label').toBeGreaterThanOrEqual(bottom(await box(label)));
+  });
+
   test('S5 page frame: main padding 16px 48px 0, the card starts at x=288', async ({ page }) => {
     near((await box(page.locator('.form-card'))).x, 288, 'card x');
     expect(await css(page.locator('.frame'), 'padding-top', 'padding-right', 'padding-bottom')).toEqual(['16px', '48px', '0px']);
