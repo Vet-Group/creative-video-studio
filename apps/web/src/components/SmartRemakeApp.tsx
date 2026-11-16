@@ -217,6 +217,8 @@ export function SmartRemakeApp({ app, initialId, initialProductId }: { app: AppC
           <div className="form-scroll">
             <AppHeader app={app} />
             <p className="help">Chỉ cần một video mẫu và một ảnh sản phẩm. AI phân tích video, chọn sẵn các cảnh có sản phẩm giống của bạn, rồi bạn bấm một nút để tạo video.</p>
+            {/* The shared shelf first: a seller without a reference video of their own starts there (owner, 2026-11-16). */}
+            <SharedVideos busy={locked} currentId={analysis?.id} onPick={takeShared} />
             <ReferenceVideoSlot
               video={video}
               busy={locked}
@@ -232,7 +234,6 @@ export function SmartRemakeApp({ app, initialId, initialProductId }: { app: AppC
                 setAsked('');
               }}
             />
-            <SharedVideos busy={locked} currentId={analysis?.id} onPick={takeShared} />
             <Slot label="Ảnh sản phẩm" empty="Thêm 1 ảnh sản phẩm" inputLabel="Ảnh sản phẩm" images={product} max={1} busy={locked} onAdd={(files) => void addProduct(files)} onRemove={() => setProduct([])} onPick={(a) => setProduct([a])} slot="product" addRef={addProductButton} />
             <p className="help">Mẹo: dùng ảnh sản phẩm rõ nét trên nền trơn, cùng loại sản phẩm với trong video mẫu (áo thay cho áo).</p>
             {status && (
