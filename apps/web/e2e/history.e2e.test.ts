@@ -329,7 +329,7 @@ test('a page without its own History keeps the full width and opens the jobs fro
   expect((await inBar.boundingBox())!.height).toBe(44);
   await inBar.click();
   await expect(drawer).toBeVisible();
-  expect((await drawer.boundingBox())!.width).toBe(await page.evaluate(() => document.documentElement.clientWidth));
+  expect(Math.round((await drawer.boundingBox())!.width)).toBe(await page.evaluate(() => document.documentElement.clientWidth)); // boxes are sub-pixel
   expect(await fits(page)).toBe(true);
 });
 
