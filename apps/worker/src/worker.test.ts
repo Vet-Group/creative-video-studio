@@ -62,14 +62,17 @@ afterEach(async () => {
 });
 
 afterAll(async () => {
-  const Bucket = bucketName();
-  const { Contents = [] } = await s3().send(new ListObjectsV2Command({ Bucket }));
-  if (Contents.length > 0) await s3().send(new DeleteObjectsCommand({ Bucket, Delete: { Objects: Contents.flatMap(({ Key }) => (Key ? [{ Key }] : [])) } }));
-  await s3().send(new DeleteBucketCommand({ Bucket }));
-  await boss.stop({ graceful: false });
-  await pool.end();
-  await testDb.drop();
-  await rm(mockDir, { recursive: true, force: true });
+  try {
+    const Bucket = bucketName();
+    const { Contents = [] } = await s3().send(new ListObjectsV2Command({ Bucket }));
+    if (Contents.length > 0) await s3().send(new DeleteObjectsCommand({ Bucket, Delete: { Objects: Contents.flatMap(({ Key }) => (Key ? [{ Key }] : [])) } }));
+    await s3().send(new DeleteBucketCommand({ Bucket }));
+    await boss.stop({ graceful: false });
+    await pool.end();
+    await rm(mockDir, { recursive: true, force: true });
+  } finally {
+    await testDb.drop();
+  }
 });
 
 async function waitFor<T>(what: string, fn: () => Promise<T | undefined | false>, ms = 45_000): Promise<T> {

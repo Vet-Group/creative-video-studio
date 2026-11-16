@@ -44,10 +44,13 @@ const error = async (res: Response) => ((await res.json()) as { error: string })
 const runs = async (userId: string) => (await pool.query('select count(*)::int as n from suggestion_runs where user_id = $1', [userId])).rows[0].n as number;
 
 afterAll(async () => {
-  await s3().send(new DeleteObjectCommand({ Bucket: bucketName(), Key: 'samples/preset-walk-left.mp4' }));
-  await s3().send(new DeleteBucketCommand({ Bucket: bucketName() }));
-  await pool.end();
-  await testDb.drop();
+  try {
+    await s3().send(new DeleteObjectCommand({ Bucket: bucketName(), Key: 'samples/preset-walk-left.mp4' }));
+    await s3().send(new DeleteBucketCommand({ Bucket: bucketName() }));
+    await pool.end();
+  } finally {
+    await testDb.drop();
+  }
 });
 
 describe('/api/suggestions', () => {

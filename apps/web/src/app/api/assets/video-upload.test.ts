@@ -57,8 +57,11 @@ beforeEach(() => {
   vi.mocked(storage.deleteObject).mockClear();
 });
 afterAll(async () => {
-  await pool.end();
-  await testDb.drop();
+  try {
+    await pool.end();
+  } finally {
+    await testDb.drop();
+  }
 });
 
 test('both routes 404 while the analyze flag is off', async () => {

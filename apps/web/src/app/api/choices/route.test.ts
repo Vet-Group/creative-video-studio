@@ -66,8 +66,11 @@ async function clip(jobId: string, userId: string, { posterDeleted = false } = {
 }
 
 afterAll(async () => {
-  await pool.end();
-  await testDb.drop();
+  try {
+    await pool.end();
+  } finally {
+    await testDb.drop();
+  }
 });
 
 describe('/api/choices', () => {

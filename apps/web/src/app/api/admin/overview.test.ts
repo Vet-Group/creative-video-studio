@@ -71,8 +71,11 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await pool.end();
-  await testDb.drop();
+  try {
+    await pool.end();
+  } finally {
+    await testDb.drop();
+  }
 });
 
 describe('GET /api/admin/overview', () => {

@@ -74,9 +74,12 @@ beforeAll(async () => {
   await pool.query(`update assets set deleted_at = now() where id = 'gone'`);
 });
 afterAll(async () => {
-  await pool.end();
-  await testDb.drop();
-  await rm(dir, { recursive: true, force: true });
+  try {
+    await pool.end();
+    await rm(dir, { recursive: true, force: true });
+  } finally {
+    await testDb.drop();
+  }
 });
 
 test('remakes every chosen shot from its own clip, joins the clips with a before/after, and books each paid call to the ledger', async () => {

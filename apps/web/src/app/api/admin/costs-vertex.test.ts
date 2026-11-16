@@ -42,9 +42,12 @@ afterEach(() => {
 });
 
 afterAll(async () => {
-  rmSync(dir, { recursive: true });
-  await pool.end();
-  await testDb.drop();
+  try {
+    rmSync(dir, { recursive: true });
+    await pool.end();
+  } finally {
+    await testDb.drop();
+  }
 });
 
 const FIELDS = ['credits_all_time', 'credits_all_time_usd', 'currency', 'rate', 'month', 'sku_id', 'sku', 'usage', 'unit', 'cost', 'cost_usd', 'credits', 'credits_usd'];

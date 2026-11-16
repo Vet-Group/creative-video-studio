@@ -26,8 +26,11 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await pool.end();
-  await testDb.drop();
+  try {
+    await pool.end();
+  } finally {
+    await testDb.drop();
+  }
 });
 
 test('writes the options and the cost of a queued run, calling the suggester once with its input', async () => {

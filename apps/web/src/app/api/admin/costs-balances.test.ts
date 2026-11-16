@@ -27,8 +27,11 @@ afterEach(() => {
 });
 
 afterAll(async () => {
-  await pool.end();
-  await testDb.drop();
+  try {
+    await pool.end();
+  } finally {
+    await testDb.drop();
+  }
 });
 
 function fakeFal(answer: () => Response) {

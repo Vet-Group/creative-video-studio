@@ -32,8 +32,11 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await pool.end();
-  await testDb.drop();
+  try {
+    await pool.end();
+  } finally {
+    await testDb.drop();
+  }
 });
 
 const list = async (cookie = memberCookie) => ((await (await GET(call(cookie, '/api/presets'))).json()) as { presets: { id: string; label: string }[] }).presets;

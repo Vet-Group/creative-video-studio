@@ -23,9 +23,12 @@ const providers = mockProviders();
 let seq = 0;
 
 afterAll(async () => {
-  vi.unstubAllGlobals();
-  await pool.end();
-  await testDb.drop();
+  try {
+    vi.unstubAllGlobals();
+    await pool.end();
+  } finally {
+    await testDb.drop();
+  }
 });
 
 const PASSWORD = 'correct-horse-battery';

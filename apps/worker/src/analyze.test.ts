@@ -44,8 +44,11 @@ beforeAll(async () => {
   await pool.query(`insert into users (id, email, name) values ('u1', 'u1@example.test', 'u1')`);
 });
 afterAll(async () => {
-  await pool.end();
-  await testDb.drop();
+  try {
+    await pool.end();
+  } finally {
+    await testDb.drop();
+  }
 });
 
 test('decomposes a queued analysis, storing the parsed result, the raw breakdown.json and a cost', async () => {

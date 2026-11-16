@@ -70,13 +70,16 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  const Bucket = bucketName();
-  const { Contents = [] } = await s3().send(new ListObjectsV2Command({ Bucket }));
-  if (Contents.length) await s3().send(new DeleteObjectsCommand({ Bucket, Delete: { Objects: Contents.map(({ Key }) => ({ Key: Key! })) } }));
-  await s3().send(new DeleteBucketCommand({ Bucket }));
-  await stopBoss();
-  await pool.end();
-  await testDb.drop();
+  try {
+    const Bucket = bucketName();
+    const { Contents = [] } = await s3().send(new ListObjectsV2Command({ Bucket }));
+    if (Contents.length) await s3().send(new DeleteObjectsCommand({ Bucket, Delete: { Objects: Contents.map(({ Key }) => ({ Key: Key! })) } }));
+    await s3().send(new DeleteBucketCommand({ Bucket }));
+    await stopBoss();
+    await pool.end();
+  } finally {
+    await testDb.drop();
+  }
 });
 
 describe('migration 0091', () => {

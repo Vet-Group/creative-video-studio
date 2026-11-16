@@ -28,12 +28,15 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  const Bucket = bucketName();
-  const Objects = (await keys()).map((Key) => ({ Key }));
-  if (Objects.length > 0) await s3().send(new DeleteObjectsCommand({ Bucket, Delete: { Objects } }));
-  await s3().send(new DeleteBucketCommand({ Bucket }));
-  await pool.end();
-  await testDb.drop();
+  try {
+    const Bucket = bucketName();
+    const Objects = (await keys()).map((Key) => ({ Key }));
+    if (Objects.length > 0) await s3().send(new DeleteObjectsCommand({ Bucket, Delete: { Objects } }));
+    await s3().send(new DeleteBucketCommand({ Bucket }));
+    await pool.end();
+  } finally {
+    await testDb.drop();
+  }
 });
 
 async function asset(id: string, kind: 'input' | 'output') {
