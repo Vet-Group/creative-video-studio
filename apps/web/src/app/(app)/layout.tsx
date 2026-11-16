@@ -8,6 +8,7 @@ import { CHANGELOG } from '@/lib/changelog';
 import { visibleEntries } from '@/lib/changelog-seen';
 import { googleLoginEnabled, larkLoginEnabled, pool } from '@/lib/auth';
 import { currentUser } from '@/lib/current-user';
+import { FEEDBACK_UNREAD_COUNT } from '@/lib/feedback';
 import { needsLarkPrompt } from '@/lib/lark-prompt';
 import { smartRemakeAppEnabled } from '@/lib/remake';
 import { loginFor } from '@/lib/return-to';
@@ -19,7 +20,8 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   if (!user) redirect(loginFor((await headers()).get('x-cvs-path'))); // set by src/proxy.ts
   if (user.mustChangePassword) redirect('/account/password'); // an Admin's temporary password opens nothing else
   const isAdmin = user.role === 'admin';
-  const feedbackNew = isAdmin ? (await pool.query(`select count(*)::int as n from feedback where status = 'new'`)).rows[0].n : 0;
+  // The feedback item's badge: for an Admin the items still to triage, for a member the items of theirs the Admin has changed since they last looked.
+  const feedbackNew = (await (isAdmin ? pool.query(`select count(*)::int as n from feedback where status = 'new'`) : pool.query(FEEDBACK_UNREAD_COUNT, [user.id]))).rows[0].n;
   const [methods, profile] = await Promise.all([
     userMethods(pool, user.id),
     // Read here, not from the session, which may be cached from before an Admin moved the user to another team.

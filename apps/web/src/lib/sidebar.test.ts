@@ -36,9 +36,10 @@ test('the newest tool Phân tích carries the "Mới" badge, and Marketing Studi
   expect(items.find((i) => i.href === '/marketing-studio')?.badge).toBeUndefined();
 });
 
-test('an Admin sees the count of new feedback as a badge on the feedback item; a member never does', () => {
+test('the feedback item shows its count as a badge (new items for an Admin, updated ones for a member) and none at zero', () => {
   const feedback = (admin: boolean, count: number) => navGroups(admin, count).flatMap((g) => g.items).find((i) => i.href === '/feedback');
   expect(feedback(true, 3)?.badge).toBe('3');
   expect(feedback(true, 0)?.badge).toBeUndefined();
-  expect(feedback(false, 3)?.badge).toBeUndefined();
+  expect(feedback(false, 2)?.badge).toBe('2');
+  expect(feedback(false, 0)?.badge).toBeUndefined();
 });

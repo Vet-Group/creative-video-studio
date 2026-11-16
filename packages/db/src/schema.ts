@@ -863,6 +863,22 @@ export const feedbackComments = pgTable(
   ],
 );
 
+// When each member last opened a board item. An item they posted or voted for counts as updated for them while the Admin's
+// last status or reply change (feedback.updated_at) is newer than this, or than their post or vote when they never opened it.
+export const feedbackReads = pgTable(
+  'feedback_reads',
+  {
+    feedbackId: text('feedback_id')
+      .notNull()
+      .references(() => feedback.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    seenAt: tstz('seen_at').notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.feedbackId, t.userId] })],
+);
+
 // A member's relationship to a store (owner decision, 2026-11-11): one user may be responsible for many stores. `pinned` is set by the
 // member; `assigned` by an Admin. Either flag makes the store one of "theirs", listed first in the store pickers. `lastUsedAt`, set when
 // they run a job for that store, orders the rest by recency and seeds the default choice. A row is kept only while it still carries a flag
