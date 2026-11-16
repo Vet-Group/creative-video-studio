@@ -15,7 +15,7 @@ import { useHydrated } from '@/lib/use-hydrated';
 import { useRecall } from '@/lib/use-recall';
 import { useDraftState } from '@/lib/use-draft';
 import { reloadSamples, samplesFailed, useSamples, versionedSample } from '@/lib/use-samples';
-import { dropRefillQuery, exampleFrom, recipeOf, refillFrom } from '@/lib/reuse';
+import { asExample, dropRefillQuery, exampleFrom, refillFrom } from '@/lib/reuse';
 import { About } from './About';
 import { AudioSwitch } from './AudioSwitch';
 import { CardMedia } from './CardMedia';
@@ -24,7 +24,7 @@ import { confirmDialog } from './Confirm';
 import { ENHANCE_NOTE, EnhanceToggle } from './EnhanceToggle';
 import { Icon } from './Icon';
 import { LoadError } from './LoadError';
-import { ClipDetail, copyError, copySamples, ExampleOrder, FormNotice, GALLERY_SIZE_KEY, HISTORY_SIZE_KEY, photoImg, ProductTypeFilter, RunSummary, shownType, SizeSlider, Slot, UploadedPhotos, uploadError, uploadImages, useSize } from './image-tools';
+import { ClipDetail, copyError, copySamples, EXAMPLE_USED, ExampleNote, ExampleOrder, FormNotice, GALLERY_SIZE_KEY, HISTORY_SIZE_KEY, photoImg, ProductTypeFilter, RunSummary, shownType, SizeSlider, Slot, UploadedPhotos, uploadError, uploadImages, useSize } from './image-tools';
 import { FormContext, type Photo, Tap, useApplier, useJobs, useRecreated } from './jobs';
 import { Modal } from './Modal';
 import { ModelPicker } from './ModelPicker';
@@ -86,6 +86,8 @@ interface ModelsResponse {
 interface Image {
   id: string;
   filename: string;
+  /** A company example's photo (asExample). */
+  example?: boolean;
 }
 /** An uploaded reference audio clip and its length. */
 type Clip = Image & { durationMs: number };
@@ -206,7 +208,7 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
   const [stores, setStores] = useState<StoreOption[]>([]);
   const [models, setModels] = useState<ModelsResponse | null>(null);
   const [ready, setReady] = useState(!reuse);
-  const [source, setSource] = useState<{ from: string; recipe?: boolean } | null>(reuse ? { from: reuse } : null); // what the form refills from; Recreate sets a new one in place. `recipe`: a company example, which gives its settings but not its photos or store
+  const [source, setSource] = useState<{ from: string; recipe?: boolean } | null>(reuse ? { from: reuse } : null); // what the form refills from; Recreate sets a new one in place. `recipe`: a company example, which fills everything but the store
   const [refetch, setRefetch] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -334,22 +336,18 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
     api<JobDetail>(reuse)
       .then(async (loaded) => {
         if (stale) return;
-        const full = await fillBlanks(reuse, loaded);
+        const j = await fillBlanks(reuse, loaded);
         if (stale) return; // superseded while the member filled the blanks
-        if (!full) return dropRefillQuery(); // cancelled: the form stays as it is
-        const j = source.recipe ? recipeOf(full) : full;
-        const own = source.recipe ? null : full; // the photos and the store: a company example's are not the member's
+        if (!j) return dropRefillQuery(); // cancelled: the form stays as it is
         const preset = presets.some((p) => p.id === j.presetId) ? j.presetId : null;
-        if (own) {
-          // A sample's photos become this member's inputs first, copied on the server.
-          const samples = own.images.flatMap((i) => ('sample' in i ? [i.sample] : []));
-          const images = samples.length > 0 ? await copySamples(samples) : (own.images as Image[]);
-          if (stale) return; // superseded while the photos were copied
-          setImages(images);
-          // Sent only on a model that takes them, as when picked by hand.
-          setEndFrame(own.endFrame ?? null);
-          setClips(own.clips ?? []);
-        }
+        // A sample's photos become this member's inputs first, copied on the server.
+        const samples = j.images.flatMap((i) => ('sample' in i ? [i.sample] : []));
+        const images = samples.length > 0 ? await copySamples(samples) : (j.images as Image[]);
+        if (stale) return; // superseded while the photos were copied
+        setImages(source.recipe ? asExample(images) : images);
+        // Sent only on a model that takes them, as when picked by hand.
+        setEndFrame(j.endFrame ?? null);
+        setClips(j.clips ?? []);
         setPresetId(preset ?? '');
         if (!preset) {
           // A prompt made of sections refills them; a template keeps the way it was written; else the words go where the member writes now.
@@ -365,11 +363,10 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
         if (j.ratio) setRatio(j.ratio);
         if (j.durationSec) setDurationSec(j.durationSec);
         if (j.modelId) setModelId(j.modelId);
-        if (own) setStoreId(own.storeId ?? '');
         if (source.recipe) {
-          setRefetch((n) => n + 1); // the photos did not change, so the picker reloads to map a pair's twin id onto its entry
-          notify('Đã dùng mẫu của ví dụ. Ảnh và cửa hàng của bạn được giữ nguyên.');
-        } else recreated(reuse);
+          setRefetch((n) => n + 1); // the photo count may not change, so the picker reloads to map a pair's twin id onto its entry
+          notify(`${EXAMPLE_USED} Cửa hàng của bạn được giữ nguyên.`); // a company example's store is not the member's
+        } else (setStoreId(j.storeId ?? ''), recreated(reuse));
         dropRefillQuery();
       })
       .catch((e) => setError(copyError(e, 'Không tìm thấy clip để dùng lại.')))
@@ -662,7 +659,7 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
     if (narrow) setTab('create');
   }
 
-  /** A company example's recipe on the form; its photos and store are not the member's, so they stay as the member has them. */
+  /** A company example on the form, its photos marked as the example's (asExample); its store is not the member's, so the member's stays. */
   function applyRecipe(id: string) {
     recall.touch();
     setSource({ from: refillFrom({ reuse: id })!, recipe: true });
@@ -795,6 +792,7 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
             <div className="dropzone-foot">
               <UploadedPhotos taken={images} disabled={!hydrated || busy || images.length >= maxImages} storeId={storeId} onPick={(img) => (setError(''), setImages((cur) => (cur.length < maxImages ? [...cur, img] : cur)))} />
             </div>
+            <ExampleNote images={images} />
             {(!sec || presetId !== '') && endSlot}
             {takes && (
               <div className="field">

@@ -147,7 +147,7 @@ test('Marketing Studio: an Advanced template chosen on the UGC page opens the Ad
   await expect(page.getByRole('textbox', { name: 'Lời thoại (tuỳ chọn)' })).toHaveValue('my lines');
 });
 
-test("Dùng ví dụ này on a company result in Ví dụ gives Try On, Image Generation and Marketing Studio its words and settings, not the maker's photos, and the member's own photo stays; an Explore image model opens Image Generation on that model", async ({ page, browser }) => {
+test("Dùng ví dụ này on a company result in Ví dụ gives Try On, Image Generation and Marketing Studio its words, settings and photos, marked as the example's; an Explore image model opens Image Generation on that model", async ({ page, browser }) => {
   await signIn(page, 'usea');
   const up = async (name: string) => ((await (await page.request.post('/api/assets', { multipart: { file: file(name) } })).json()) as { assets: { id: string }[] }).assets[0]!.id;
   const post = async (data: Record<string, unknown>) => {
@@ -166,17 +166,17 @@ test("Dùng ví dụ này on a company result in Ví dụ gives Try On, Image Ge
   await expect.poll(done, { timeout: 60_000 }).toBe(4);
   await addExamples(browser, Object.values(ids)); // the Examples tab lists a result only once an Admin put it there
 
-  // Another member uses them: a result's words and settings are open to every member; its photos are another seller's product, so they stay off the form.
+  // Another member uses them: the whole example comes onto the form, its photos too, so it runs as shown; the photos say they are the example's (owner, 2026-11-16).
   const other = await (await browser.newContext()).newPage();
   await signIn(other, 'useb');
   const use = (id: string) => other.locator(`.gallery-use[data-from="/api/jobs/${id}"]`);
   const notice = other.getByRole('region', { name: 'Thông báo' });
-  /** The example's template is on the form, the maker's photos are not. */
-  const templateOnly = async () => {
-    await expect(notice.getByText('Đã dùng mẫu của ví dụ. Ảnh của bạn được giữ nguyên.')).toBeVisible();
+  /** The example is on the form with the maker's photos, each field holding them asks for the member's own product. */
+  const withExamplePhotos = async (...photos: string[]) => {
+    await expect(notice.getByText('Đã dùng ví dụ, kể cả ảnh. Hãy thay ảnh của ví dụ bằng ảnh sản phẩm của bạn.')).toBeVisible();
     await expect(notice.getByText('Sẵn sàng tạo lại')).toHaveCount(0);
-    await expect(other.getByRole('img', { name: 'use-person.png' })).toHaveCount(0);
-    await expect(other.getByRole('img', { name: 'use-garment.png' })).toHaveCount(0);
+    for (const name of photos) await expect(other.getByRole('img', { name })).toBeVisible();
+    await expect(other.getByRole('note').filter({ hasText: 'Đang dùng ảnh của ví dụ. Thay bằng ảnh sản phẩm của bạn.' }).first()).toBeVisible();
   };
 
   await other.goto('/try-on');
@@ -184,7 +184,7 @@ test("Dùng ví dụ này on a company result in Ví dụ gives Try On, Image Ge
   await use(ids.try_on).click();
   await expect(other).toHaveURL((u) => u.pathname === '/try-on' && u.search === ''); // in place, as Fash's Recreate
   await expect(other.getByRole('textbox', { name: 'Mô tả (tuỳ chọn)' })).toHaveValue('blue coat'); // a result's words are open to every member too (owner, 2026-11-03)
-  await templateOnly();
+  await withExamplePhotos('use-person.png', 'use-garment.png');
 
   await other.goto('/image-generation');
   const input = other.getByLabel('Ảnh tham chiếu', { exact: true });
@@ -193,8 +193,11 @@ test("Dùng ví dụ này on a company result in Ví dụ gives Try On, Image Ge
   await expect(other.getByRole('img', { name: 'my-shirt.png' })).toBeVisible();
   await use(ids.image).click();
   await expect(other.getByRole('textbox', { name: 'Mô tả', exact: true })).toHaveValue('a flat lay');
-  await templateOnly();
-  await expect(other.getByRole('img', { name: 'my-shirt.png' })).toBeVisible();
+  await withExamplePhotos('use-garment.png');
+  await expect(other.getByRole('img', { name: 'my-shirt.png' })).toHaveCount(0); // the example's photos replace the form's, as a reuse does
+  // Removing the example's photo removes the reminder.
+  await other.getByRole('button', { name: 'Bỏ ảnh use-garment.png' }).click();
+  await expect(other.getByRole('note').filter({ hasText: 'Đang dùng ảnh của ví dụ' })).toHaveCount(0);
   // A click on the result itself opens its details in place, as in the Library (Fash's example dialog), not a new tab; its reuse button does the same as the tile.
   await other.goto('/image-generation');
   await other.locator('li.gallery-item', { has: use(ids.image) }).getByRole('link', { name: /^Xem chi tiết ảnh / }).click();
@@ -202,18 +205,18 @@ test("Dùng ví dụ này on a company result in Ví dụ gives Try On, Image Ge
   await expect(detail.getByText('a flat lay')).toBeVisible();
   await detail.getByRole('button', { name: 'Dùng lại' }).click();
   await expect(detail).toBeHidden();
-  await templateOnly();
+  await withExamplePhotos('use-garment.png');
   expect(other.context().pages()).toHaveLength(1);
 
   await other.goto('/marketing-studio');
   await use(ids.marketing).click();
   await expect(other).toHaveURL((u) => u.pathname === '/marketing-studio' && u.search === '');
-  await templateOnly();
-  // The Examples tab lists every format: an Advanced example used from the UGC page opens the Advanced page, still with its words only.
+  await withExamplePhotos('use-person.png', 'use-garment.png');
+  // The Examples tab lists every format: an Advanced example used from the UGC page opens the Advanced page, with its words and photos.
   await other.goto('/marketing-studio');
   await use(ids.advanced).click();
   await expect(other).toHaveURL((u) => u.pathname === '/marketing-studio/advanced' && u.search === '');
-  await templateOnly();
+  await withExamplePhotos('use-garment.png');
   await expect(other.getByRole('textbox', { name: 'Mô tả', exact: true })).toHaveValue('a surfer at dawn');
 
   await other.goto('/explore');
@@ -223,7 +226,7 @@ test("Dùng ví dụ này on a company result in Ví dụ gives Try On, Image Ge
   await other.close();
 });
 
-test("on Create, using a company example in Ví dụ takes its settings only: not the maker's photo or store, and not the member's own", async ({ page, browser }) => {
+test("on Create, using a company example in Ví dụ fills its settings and the maker's photo, marked as the example's, and keeps the member's store; the server takes that photo from another member", async ({ page, browser }) => {
   const maker = await (await browser.newContext()).newPage();
   await signIn(maker, 'exmaker');
   const up = await maker.request.post('/api/assets', { multipart: { file: file('maker-shirt.png') } });
@@ -238,27 +241,33 @@ test("on Create, using a company example in Ví dụ takes its settings only: no
   await signIn(page, 'exuse');
   await selectText(page, 'Cửa hàng/Thương hiệu', 'E2E Brand Shop');
   const notice = page.getByRole('region', { name: 'Thông báo' });
-  const made = 'Đã dùng mẫu của ví dụ. Ảnh và cửa hàng của bạn được giữ nguyên.';
-  /** The example's settings are on the form; its photo and store are not, and the member's store stays. */
-  const settingsOnly = async () => {
+  const made = 'Đã dùng ví dụ, kể cả ảnh. Hãy thay ảnh của ví dụ bằng ảnh sản phẩm của bạn. Cửa hàng của bạn được giữ nguyên.';
+  const reminder = page.getByRole('note').filter({ hasText: 'Đang dùng ảnh của ví dụ. Thay bằng ảnh sản phẩm của bạn.' });
+  /** The example's settings and photo are on the form, the photo marked as the example's; its store is not, and the member's stays. */
+  const asShown = async () => {
     await expect(notice.getByText(made)).toBeVisible();
     await expect(notice.getByText('Sẵn sàng tạo lại')).toHaveCount(0);
     await expect(presetOf(page)).toHaveAttribute('data-value', 'gentle-push-in');
     await expect(select(page, 'Tỉ lệ khung hình')).toHaveAttribute('data-value', '1:1');
     await expect(select(page, 'Thời lượng')).toHaveAttribute('data-value', '5');
-    await expect(page.getByRole('img', { name: 'maker-shirt.png' })).toHaveCount(0);
+    await expect(page.getByRole('img', { name: 'maker-shirt.png' })).toBeVisible();
+    await expect(reminder).toBeVisible();
     await expect(select(page, 'Cửa hàng/Thương hiệu')).toContainText('E2E Brand Shop');
   };
 
-  // The tile on a form without a photo: Run waits for the member's own.
+  // The tile on a form without a photo: the example can run as shown.
   await page.getByRole('tab', { name: 'Ví dụ' }).click();
   await page.getByRole('button', { name: /^Dùng ví dụ này: Mock E2E, 1:1/ }).click();
-  await settingsOnly();
-  await expect(page.getByRole('button', { name: 'Tạo video' })).toBeDisabled();
-  await expect(page.getByText(/^Mẫu cần ít nhất 1 ảnh sản phẩm|^Tải lên ít nhất 1 ảnh sản phẩm/)).toBeVisible();
+  await asShown();
+  await expect(page.getByRole('button', { name: 'Tạo video' })).toBeEnabled();
+  // Run sends the maker's photo as this member's input: the jobs API takes an input of a finished job from anyone.
+  const run = await page.request.post('/api/jobs', { data: { assetIds: [assets[0]!.id], modelId: 'mock-e2e', presetId: 'gentle-push-in', ratio: '1:1', durationSec: 5 } });
+  expect(run.status()).toBe(201);
 
-  // Its details dialog says the same, and the member's own photo stays. The first notice goes and the ratio moves first, so the second refill is what is checked.
+  // Its details dialog does the same, over the member's own photo. The first notice goes and the ratio moves first, so the second refill is what is checked.
   await expect(notice.getByText(made)).toHaveCount(0);
+  await page.getByRole('button', { name: 'Bỏ ảnh maker-shirt.png' }).click();
+  await expect(reminder).toHaveCount(0); // without the example's photo, no reminder
   await page.getByLabel('Ảnh sản phẩm').setInputFiles(file('my-shirt.png'));
   await expect(page.getByRole('img', { name: 'my-shirt.png' })).toBeVisible();
   await selectValue(page, 'Tỉ lệ khung hình', '9:16');
@@ -266,8 +275,8 @@ test("on Create, using a company example in Ví dụ takes its settings only: no
   await page.getByRole('button', { name: /^Xem chi tiết video Mock E2E, 1:1/ }).click();
   await page.getByRole('dialog', { name: /^Chi tiết: / }).getByRole('button', { name: 'Dùng lại' }).click();
   await expect(page.getByRole('dialog', { name: /^Chi tiết: / })).toBeHidden();
-  await settingsOnly();
-  await expect(page.getByRole('img', { name: 'my-shirt.png' })).toBeVisible();
+  await asShown();
+  await expect(page.getByRole('img', { name: 'my-shirt.png' })).toHaveCount(0);
 });
 
 test('Image Generation: a company template with ${blanks} asks for them in Điền chỗ trống before filling the prompt, and Huỷ fills nothing', async ({ page, browser }) => {
