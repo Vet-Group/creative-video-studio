@@ -3,7 +3,7 @@ import { withTransaction } from '@cvs/core/ledger';
 import { bad, readBody } from '@/lib/admin';
 import { pool } from '@/lib/auth';
 import { isAvatarColor, isEmail, nameProblem } from '@/lib/profile';
-import { guard } from '@/lib/session';
+import { guard, impersonationRefusal, isImpersonated } from '@/lib/session';
 
 /**
  * The caller changes their own display name (1 to 60 characters after trimming, no control characters), avatar colour (one of the
@@ -16,6 +16,7 @@ import { guard } from '@/lib/session';
 export async function PATCH(request: Request) {
   const g = await guard(request, 'member');
   if (g.error) return g.error;
+  if (isImpersonated(g.session)) return impersonationRefusal();
   const { name, avatarColor, email } = (await readBody(request)) ?? {};
   if (name === undefined && avatarColor === undefined && email === undefined) return bad('give name, avatarColor or email');
   if (name !== undefined && (typeof name !== 'string' || nameProblem(name))) return bad('name must have 1 to 60 characters and no control characters');

@@ -80,6 +80,8 @@ await pool.query('update settings set member_daily_clip_cap = 1000 where id = 1'
 for (const u of Object.values(USERS)) await auth.api.createUser({ body: { email: u.email, name: u.name, password: PASSWORD, role: u.role, data: { emailVerified: true } } });
 // An Admin made these members template editors (Admin > Users), for preset-edit.e2e, store-brand.e2e and choices-store.e2e.
 await pool.query('update users set can_edit_templates = true where email = any($1)', [[USERS.tpled.email, USERS.branded.email, USERS.chsed.email]]);
+// The developer Admin of impersonation.e2e, as an existing developer Admin would have made them (the migration grants the flag to no one).
+await pool.query('update users set can_impersonate = true where email = $1', [USERS.impdev.email]);
 await pool.end();
 
 // CVS_E2E_BUILD=1 serves a production build instead of `next dev`, so no route compiles while a spec waits on it.

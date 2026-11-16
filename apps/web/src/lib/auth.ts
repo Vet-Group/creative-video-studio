@@ -34,6 +34,12 @@ const FORCED_CHANGE_CLOSED = new Set([
   '/passkey/update-passkey',
 ]);
 
+/**
+ * While an Admin is signed in as a user (a session with impersonatedBy), these endpoints stay shut: the password, 2FA, passkeys, email, linked
+ * Lark and Google accounts and the other sessions of the impersonated user are not for the visitor to change. /two-factor/ is closed whole.
+ */
+const IMPERSONATION_CLOSED = new Set([...FORCED_CHANGE_CLOSED, '/change-password', '/set-password', '/change-email', '/delete-user']);
+
 export const auth = betterAuth({
   baseURL: process.env.APP_URL,
   secret: process.env.BETTER_AUTH_SECRET,
@@ -64,8 +70,16 @@ export const auth = betterAuth({
       }
       // Until the temporary password is replaced, its holder may not add, keep or manage another way in, which would outlive the change.
       // A denylist, so the Google and Lark sign-in callbacks still run. The 2FA step of a sign-in has no session yet, so it is never refused here.
-      if ((FORCED_CHANGE_CLOSED.has(ctx.path) || ctx.path.startsWith('/two-factor/')) && (await getSessionFromCtx(ctx))?.user.mustChangePassword) {
-        throw new APIError('FORBIDDEN', { message: 'Change the temporary password first', code: 'PASSWORD_CHANGE_REQUIRED' });
+      const credentialPath = FORCED_CHANGE_CLOSED.has(ctx.path) || ctx.path.startsWith('/two-factor/');
+      if (credentialPath || IMPERSONATION_CLOSED.has(ctx.path)) {
+        const current = await getSessionFromCtx(ctx);
+        // An Admin signed in as the user is not asked for the temporary password: the gate is skipped, and the rule below keeps these paths shut.
+        if (current?.session.impersonatedBy) {
+          throw new APIError('FORBIDDEN', { message: 'Not allowed while signed in as another user', code: 'IMPERSONATING' });
+        }
+        if (credentialPath && current?.user.mustChangePassword) {
+          throw new APIError('FORBIDDEN', { message: 'Change the temporary password first', code: 'PASSWORD_CHANGE_REQUIRED' });
+        }
       }
     }),
     after: authAuditHook(pool),
@@ -87,7 +101,7 @@ export const auth = betterAuth({
   databaseHooks: { account: accountAuditHooks(pool), user: { create: { before: refuseLikelyDuplicate(pool) } } },
   // The team is changed only by an Admin, so input: false keeps /api/auth/update-user from setting it. The column default is the seeded team.
   // mustChangePassword is set with an Admin's temporary password and cleared by /change-password (account-audit.ts); no client sets it.
-  // canEditTemplates (template editor, lib/session.ts), system (an automation account) and outsideLark (not in the company's Lark organisation) are set by an Admin only (PATCH /api/admin/users/[id]).
+  // canEditTemplates (template editor, lib/session.ts), system (an automation account) and outsideLark (not in the company's Lark organisation) and canImpersonate (a developer Admin who may sign in as another user) are set by an Admin only (PATCH /api/admin/users/[id]).
   user: {
     additionalFields: {
       teamId: { type: 'string', required: false, input: false },
@@ -95,6 +109,7 @@ export const auth = betterAuth({
       canEditTemplates: { type: 'boolean', required: false, defaultValue: false, input: false },
       system: { type: 'boolean', required: false, defaultValue: false, input: false },
       outsideLark: { type: 'boolean', required: false, defaultValue: false, input: false },
+      canImpersonate: { type: 'boolean', required: false, defaultValue: false, input: false },
     },
   },
   plugins: [
@@ -103,6 +118,8 @@ export const auth = betterAuth({
       roles: { admin: adminAc, member: userAc },
       defaultRole: 'member',
       adminRoles: ['admin'],
+      // The role check (adminAc has "impersonate", userAc does not) still applies; POST /api/admin/users/[id]/impersonate adds the per-account flag.
+      allowImpersonatingAdmins: true,
     }),
     genericOAuth({ config: larkLoginEnabled ? [larkOAuth({ appId: LARK_APP_ID!, appSecret: LARK_APP_SECRET!, tenantKey: LARK_TENANT_KEY! })] : [] }),
     // Adding a passkey needs a fresh session of an existing user; signing in with one never creates a user. rpID is APP_URL's host.

@@ -3,7 +3,7 @@ import { withTransaction } from '@cvs/core/ledger';
 import { lastLinkedEmail } from '@/lib/account-audit';
 import { pool } from '@/lib/auth';
 import { bad } from '@/lib/admin';
-import { guard } from '@/lib/session';
+import { guard, impersonationRefusal, isImpersonated } from '@/lib/session';
 import { googleEmail } from '@/lib/sign-in-methods';
 
 /**
@@ -18,6 +18,8 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   const g = await guard(request, 'admin');
   if (g.error) return g.error;
   const { id, accountId } = await params;
+  // An Admin signed in as another Admin may not unlink that Admin's own sign-in methods.
+  if (id === g.session.user.id && isImpersonated(g.session)) return impersonationRefusal();
 
   const refusal = await withTransaction(pool, async (tx) => {
     await tx.query('select pg_advisory_xact_lock(hashtext($1))', [`user:${id}`]); // the same lock the user PATCH takes
