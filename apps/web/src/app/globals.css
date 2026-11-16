@@ -2492,7 +2492,7 @@ dialog.modal.tool-guide { width: min(52rem, calc(100vw - 2rem)); }
 .fb-card { padding: 20px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); }
 .fb-detail-title { flex: 1; min-width: 0; }
 .fb-author { display: inline-flex; align-items: center; gap: 6px; }
-.fb-avatar { display: inline-grid; flex: none; place-items: center; width: 24px; height: 24px; border-radius: 50%; color: #fff; font-size: 10px; font-weight: 700; line-height: 1; }
+.fb-avatar { display: inline-grid; flex: none; place-items: center; width: 24px; height: 24px; border-radius: 50%; color: var(--on-dark); font-size: 10px; font-weight: 700; line-height: 1; }
 .fb-comments .fb-avatar { width: 32px; height: 32px; font-size: 12px; }
 .fb-steps { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 16px 0 4px; padding: 0; list-style: none; color: var(--muted); font-size: 12px; font-weight: 500; }
 .fb-steps li { display: inline-flex; align-items: center; gap: 6px; }
