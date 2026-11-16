@@ -1098,7 +1098,8 @@ dialog.admin-modal { width: min(36rem, calc(100vw - 2rem)); }
 .preset-card .preset-edit > .icon { display: none; }
 @media (hover: hover) {
   .preset-card .preset-edit { opacity: 0; transition: opacity .15s; }
-  .preset-card:hover .preset-edit, .preset-card:has(:focus-visible) .preset-edit { opacity: 1; }
+  .preset-card:hover .preset-edit { opacity: 1; }
+  .preset-card:has(:focus-visible) .preset-edit { opacity: 1; } /* its own rule: a browser without :has() still shows the chip on hover */
 }
 @media (hover: none) {
   .preset-card .preset-edit { display: grid; place-items: center; width: 24px; height: 24px; padding: 0; }
