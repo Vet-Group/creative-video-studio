@@ -52,6 +52,7 @@ test('the reply keeps paragraphs, a numbered list, bold and links; the steps and
   await page.goto('/feedback');
   const row = page.locator('.fb-item').filter({ hasText: title });
   await expect(row).toContainText('Đã phản hồi');
+  await expect(row).not.toContainText('Có cập nhật mới'); // opened above, after the reply
   await expect(row.locator('.fb-excerpt')).toHaveText('Cần thêm mẫu cho cốc và chăn.\nDòng thứ hai.');
   await expect(page.locator('.fb-item').filter({ hasText: other })).toBeVisible();
   await page.getByLabel('Chỉ của tôi').check();
@@ -77,13 +78,13 @@ test("the Admin's reply box previews the formatting, saves only a change and con
     await box.getByRole('button', { name: 'Sửa' }).click();
     await box.getByLabel('Trạng thái').selectOption('done');
     await save.click();
-    await expect(box.getByRole('status')).toHaveText('Đã lưu.');
+    await expect(box.getByRole('status', { name: 'Kết quả lưu' })).toHaveText('Đã lưu.');
     await expect(save).toBeDisabled();
     await expect(admin.getByRole('region', { name: 'Phản hồi từ đội kỹ thuật' }).locator('ul > li')).toHaveText(['Nút thẳng hàng', 'Thêm kiểm tra']);
   });
 });
 
-test('at 390 px the top bar says "Góp ý" and the item page does not scroll sideways', async ({ page }) => {
+test('at 390 px the top bar says "Góp ý", the item page does not scroll sideways and the board\'s "Chỉ của tôi" box sits beside its text', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await signIn(page, 'member6');
   const longLink = `https://video.vetgroup.net/${'a'.repeat(120)}`;
@@ -92,4 +93,26 @@ test('at 390 px the top bar says "Góp ý" and the item page does not scroll sid
   await expect(page.locator('.topbar strong')).toHaveText('Góp ý');
   await expect(page.locator('.fb-card h1')).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
+  await page.goto('/feedback');
+  const mine = page.locator('.fb-mine');
+  const [box, label] = await Promise.all([mine.locator('input').boundingBox(), mine.boundingBox()]);
+  expect(box!.width).toBeLessThanOrEqual(20); // the box sits right beside "Chỉ của tôi", not stretched by the generic label-input width
+  expect(label!.height).toBeLessThanOrEqual(44); // one line (24 px text + 16 px padding), not "Chỉ / của / tôi" stacked
+});
+
+test("a member's item the Admin changed shows as updated, with a badge on the sidebar's Góp ý, until the member opens it", async ({ page, browser }) => {
+  await signIn(page, 'member6');
+  const title = `Cập nhật cho người gửi ${Date.now()}`;
+  const id = await postItem(page, title, 'Chờ phản hồi.');
+  await asAdmin(browser, async (admin) => {
+    expect((await admin.request.patch(`/api/admin/feedback/${id}`, { data: { status: 'reviewing', adminNote: 'Đang xem.' } })).ok()).toBe(true);
+  });
+  await page.goto('/feedback');
+  const row = page.locator('.fb-item').filter({ hasText: title });
+  await expect(row).toContainText('Có cập nhật mới');
+  await expect(page.locator('.sidebar nav a[href="/feedback"] .nav-badge')).toBeVisible();
+  await row.getByRole('link', { name: title }).click();
+  await expect(page.getByRole('region', { name: 'Phản hồi từ đội kỹ thuật' })).toContainText('Đang xem.');
+  await page.goto('/feedback');
+  await expect(page.locator('.fb-item').filter({ hasText: title })).not.toContainText('Có cập nhật mới');
 });

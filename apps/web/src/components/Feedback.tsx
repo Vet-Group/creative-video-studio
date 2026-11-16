@@ -140,6 +140,7 @@ export function Feedback() {
                 <div className="fb-meta">
                   <span className={`fb-tag k-${it.kind}`}>{KIND_LABEL[it.kind]}</span>
                   <span className={`fb-tag s-${it.status}`}>{STATUS_LABEL[it.status]}</span>
+                  {it.unread && <span className="fb-tag fresh">Có cập nhật mới</span>}
                   {it.adminNote && (
                     <span className="fb-replied">
                       <Icon name="check" size={12} /> Đã phản hồi

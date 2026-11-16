@@ -2,10 +2,11 @@
 
 // One board item (/feedback/[id]): full content and images, upvote, where it stands, the technical team's reply, comments, and — for an Admin — the status and reply controls.
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { FEEDBACK_STATUSES, type FeedbackStatus } from '@cvs/db';
 import { ApiError, api, errorText, sendJson, thumbUrl } from '@/lib/api';
-import { COMMENT_MAX, type FeedbackComment, feedbackTime, KIND_LABEL, type ListedFeedback, NOTE_MAX, STATUS_LABEL } from '@/lib/feedback';
+import { COMMENT_MAX, type FeedbackComment, feedbackMarkdown, feedbackTime, KIND_LABEL, type ListedFeedback, NOTE_MAX, STATUS_LABEL } from '@/lib/feedback';
 import { avatarColor, initials } from '@/lib/profile';
 import { Icon } from './Icon';
 import { LoadError } from './LoadError';
@@ -14,7 +15,14 @@ import { RichText } from './RichText';
 /** How a reply can be written; the same words sit under the Admin's reply box. */
 const FORMAT_HINT = 'Dòng trống để tách đoạn. Bắt đầu dòng bằng "1." hoặc "-" để thành danh sách. **chữ đậm**. Link tự nhận.';
 
-export function FeedbackDetail({ id, isAdmin }: { id: string; isAdmin: boolean }) {
+/** A changelog entry that answers this item. */
+export interface ShippedIn {
+  at: string;
+  title: string;
+}
+
+export function FeedbackDetail({ id, isAdmin, shipped = [] }: { id: string; isAdmin: boolean; shipped?: ShippedIn[] }) {
+  const router = useRouter();
   const [item, setItem] = useState<ListedFeedback | null>(null);
   const [comments, setComments] = useState<FeedbackComment[]>([]);
   const [state, setState] = useState<'loading' | 'ready' | 'missing' | 'error'>('loading');
@@ -30,12 +38,13 @@ export function FeedbackDetail({ id, isAdmin }: { id: string; isAdmin: boolean }
         setItem(r.item);
         setComments(r.comments);
         setState('ready');
+        if (r.item.unread) router.refresh(); // opening it marked it read: the sidebar badge counts one fewer
       })
       .catch((e) => live && setState(e instanceof ApiError && e.status === 404 ? 'missing' : 'error'));
     return () => {
       live = false;
     };
-  }, [id, reload]);
+  }, [id, reload, router]);
 
   async function toggleVote() {
     if (!item) return;
@@ -134,7 +143,30 @@ export function FeedbackDetail({ id, isAdmin }: { id: string; isAdmin: boolean }
         </section>
       )}
 
-      {isAdmin && <AdminControls item={item} onSaved={(next) => setItem(next)} />}
+      {shipped.length > 0 && (
+        <section className="fb-shipped" aria-labelledby="fb-shipped-title">
+          <h2 id="fb-shipped-title">Đã có trong bản cập nhật</h2>
+          <ul>
+            {shipped.map((e) => (
+              <li key={e.at}>
+                <Link href="/changelog">{e.title}</Link>
+                <span className="muted">{feedbackTime(e.at)}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {isAdmin && (
+        <AdminControls
+          item={item}
+          comments={comments}
+          onSaved={(next) => {
+            setItem(next);
+            router.refresh(); // the Admin's badge of items still to triage
+          }}
+        />
+      )}
 
       <section className="fb-comments" aria-labelledby="fb-comments-title">
         <h2 id="fb-comments-title">Bình luận ({comments.length})</h2>
@@ -176,20 +208,30 @@ function StatusSteps({ status }: { status: FeedbackStatus }) {
     <ol className={`fb-steps s-${status}`} aria-label="Tiến độ xử lý">
       {steps.map((s, i) => (
         <li key={s} className={i < at ? 'past' : i === at ? 'now' : undefined} aria-current={i === at ? 'step' : undefined}>
-          {STATUS_LABEL[s]}
+          <span>{STATUS_LABEL[s]}</span>
         </li>
       ))}
     </ol>
   );
 }
 
-function AdminControls({ item, onSaved }: { item: ListedFeedback; onSaved: (next: ListedFeedback) => void }) {
+function AdminControls({ item, comments, onSaved }: { item: ListedFeedback; comments: FeedbackComment[]; onSaved: (next: ListedFeedback) => void }) {
   const [status, setStatus] = useState<FeedbackStatus>(item.status);
   const [note, setNote] = useState(item.adminNote ?? '');
   const [preview, setPreview] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [copyNote, setCopyNote] = useState('');
+
+  /** The item as Markdown for the technical team, without staff names. No clipboard outside a secure context (the LAN address over http): say so. */
+  function copyMarkdown() {
+    if (!navigator.clipboard) return setCopyNote('Không chép được.');
+    void navigator.clipboard.writeText(feedbackMarkdown(item, comments, window.location.origin)).then(
+      () => setCopyNote('Đã chép Markdown.'),
+      () => setCopyNote('Không chép được.'),
+    );
+  }
   const changed = status !== item.status || (note.trim() || null) !== item.adminNote;
 
   async function save() {
@@ -246,8 +288,14 @@ function AdminControls({ item, onSaved }: { item: ListedFeedback; onSaved: (next
         <button type="button" className="fb-new" onClick={() => void save()} disabled={busy || !changed}>
           {busy ? 'Đang lưu…' : 'Lưu'}
         </button>
-        <span className="muted" role="status">
+        <span className="muted" role="status" aria-label="Kết quả lưu">
           {saved && !changed ? 'Đã lưu.' : ''}
+        </span>
+        <button type="button" className="fb-copy" onClick={copyMarkdown}>
+          <Icon name="copy" size={14} /> Sao chép Markdown
+        </button>
+        <span className="muted" role="status" aria-label="Kết quả sao chép">
+          {copyNote}
         </span>
       </div>
     </fieldset>

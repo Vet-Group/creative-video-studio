@@ -49,13 +49,13 @@ for (const item of GROUPS[1]!.items) item.hint = toolGuide(item.href)!.oneLine;
 // TOOL_GUIDE above so the sidebar-mirror test stays exact for the flag-off default).
 const ANALYZE_ITEM: NavItem = { href: '/analyze', text: 'Phân tích', icon: 'chart', badge: 'Mới', hint: toolGuide('/analyze')!.oneLine };
 
-/** `feedbackNew`, shown to an Admin as a badge on the feedback item, is the count of items still at status `new` to triage. */
+/** `feedbackNew`, shown as a badge on the feedback item: for an Admin the count of items still at status `new` to triage, for a member the count of their items the Admin has changed since they last opened them. */
 export const navGroups = (isAdmin: boolean, feedbackNew = 0, analyzeEnabled = false): NavGroup[] => {
   const groups = GROUPS.map((g) =>
     analyzeEnabled && g.label === 'Sáng tạo' ? { ...g, items: g.items.flatMap((it) => (it.href === '/create' ? [it, ANALYZE_ITEM] : [it])) } : g,
   );
   const base = isAdmin ? [...groups, ADMIN] : groups;
-  if (!isAdmin || feedbackNew <= 0) return base;
+  if (feedbackNew <= 0) return base;
   return base.map((g) => ({ ...g, items: g.items.map((it) => (it.href === '/feedback' ? { ...it, badge: String(feedbackNew) } : it)) }));
 };
 

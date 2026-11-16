@@ -2521,6 +2521,7 @@ dialog.modal.tool-guide { width: min(52rem, calc(100vw - 2rem)); }
 .fb-excerpt { display: -webkit-box; overflow: hidden; margin: 4px 0 0; color: var(--text-2); font-size: 14px; line-height: 20px; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .fb-replied { display: inline-flex; align-items: center; gap: 4px; color: var(--ink); font-size: .76rem; font-weight: 600; }
 .fb-filters .fb-mine { display: inline-flex; align-items: center; gap: 6px; padding: 8px 0; color: var(--ink); font-size: 14px; cursor: pointer; }
+.fb-mine input { width: 16px; min-width: 0; height: 16px; margin: 0; padding: 0; } /* the generic label-input min width (full width on phones) must not push the box away from its text */
 /* The item page: the post in a card, where it stands, the team's reply under it, the Admin's box, then comments. */
 .fb-back { display: inline-flex; align-items: center; gap: 6px; margin: 4px 0 12px; color: var(--muted); font-size: 14px; text-decoration: none; }
 .fb-back:hover { color: var(--ink); }
@@ -2533,8 +2534,8 @@ dialog.modal.tool-guide { width: min(52rem, calc(100vw - 2rem)); }
 .fb-steps li { display: inline-flex; align-items: center; gap: 6px; }
 .fb-steps li + li::before { content: ''; width: 18px; height: 1px; background: var(--border-strong); }
 .fb-steps li.past, .fb-steps li.now { color: var(--ink); }
-.fb-steps li.now { padding: 2px 10px; border: 1px solid var(--border-strong); border-radius: 999px; font-weight: 600; }
-.fb-steps.s-done li.now { border-color: var(--ok-border); background: rgb(var(--shade) / .03); }
+.fb-steps li.now > span { padding: 2px 10px; border: 1px solid var(--border-strong); border-radius: 999px; font-weight: 600; } /* the pill wraps the label only, so the connector stays outside it */
+.fb-steps.s-done li.now > span { border-color: var(--ok-border); background: rgb(var(--shade) / .03); }
 .fb-steps.s-rejected li.now { color: var(--muted); }
 .rich p, .rich ol, .rich ul { margin: 0 0 10px; }
 .rich > :last-child { margin-bottom: 0; }
@@ -2559,11 +2560,19 @@ dialog.modal.tool-guide { width: min(52rem, calc(100vw - 2rem)); }
 .fb-comment-body { flex: 1; min-width: 0; }
 .fb-comment-body .fb-text { margin: 4px 0 0; }
 .fb-tag.team { color: var(--ink); border-color: var(--border-strong); }
+.fb-tag.fresh { color: var(--brand); border-color: var(--brand); background: transparent; }
+.fb-shipped { margin: 16px 0; padding: 14px 20px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); }
+.fb-shipped h2 { margin: 0 0 8px; font-size: .95rem; }
+.fb-shipped ul { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.fb-shipped li { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; font-size: 14px; }
+.fb-shipped a { color: var(--link); }
+.fb-copy { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; font-size: 14px; }
 .fb-comment-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 12px; }
 @media (max-width: 640px) {
   .fb-head { flex-direction: column; }
   .fb-images { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); }
-  .fb-card, .fb-reply, .fb-admin { padding: 14px; }
+  .fb-card, .fb-reply, .fb-admin, .fb-shipped { padding: 14px; }
+  .fb-admin-actions { flex-wrap: wrap; }
   .fb-comment-actions > .muted { display: none; } /* no Ctrl key on a phone */
 }
 

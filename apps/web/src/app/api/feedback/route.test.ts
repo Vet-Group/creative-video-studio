@@ -2,7 +2,7 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import { createTestDatabase } from '@cvs/db/testing';
 import { afterAll, describe, expect, test } from 'vitest';
-import { MAX_IMAGES } from '@/lib/feedback';
+import { FEEDBACK_UNREAD_COUNT, MAX_IMAGES } from '@/lib/feedback';
 
 const testDb = await createTestDatabase();
 process.env.DATABASE_URL = testDb.url;
@@ -189,4 +189,45 @@ describe('PATCH /api/admin/feedback/:id', () => {
     const f = (await (await post(m.cookie, valid)).json()) as { id: string };
     expect((await patch(admin.cookie, f.id, { status: 'nope' })).status).toBe(400);
   });
+});
+
+describe('updated for me', () => {
+  const unreadOf = async (cookie: string, id: string) =>
+    ((await (await getList(cookie)).json()) as { items: { id: string; unread: boolean }[] }).items.find((i) => i.id === id)!.unread;
+  const countFor = async (userId: string) => (await pool.query(FEEDBACK_UNREAD_COUNT, [userId])).rows[0].n as number;
+  const open = (cookie: string, id: string) => detail.GET(new Request('http://localhost/x', { headers: headers(cookie) }), ctx(id));
+  const patch = (cookie: string, id: string, body: unknown) =>
+    adminRoute.PATCH(new Request('http://localhost/x', { method: 'PATCH', headers: headers(cookie), body: JSON.stringify(body) }), ctx(id));
+
+  test("the author's item counts as updated after an Admin change until the author opens it", async () => {
+    const m = await user();
+    const admin = await user('admin');
+    const f = (await (await post(m.cookie, valid)).json()) as { id: string };
+    expect(await unreadOf(m.cookie, f.id)).toBe(false);
+    expect((await patch(admin.cookie, f.id, { status: 'reviewing', adminNote: 'Looking.' })).status).toBe(200);
+    expect(await unreadOf(m.cookie, f.id)).toBe(true);
+    expect(await countFor(m.id)).toBe(1);
+    expect(((await (await open(m.cookie, f.id)).json()) as { item: { unread: boolean } }).item.unread).toBe(true);
+    expect(await unreadOf(m.cookie, f.id)).toBe(false);
+    expect(await countFor(m.id)).toBe(0);
+    expect((await patch(admin.cookie, f.id, { status: 'done', adminNote: 'Shipped.' })).status).toBe(200);
+    expect(await countFor(m.id)).toBe(1);
+  });
+
+  test('a voter sees the change; a member who only read it, or voted after it, does not', async () => {
+    const author = await user();
+    const voter = await user();
+    const reader = await user();
+    const late = await user();
+    const admin = await user('admin');
+    const f = (await (await post(author.cookie, valid)).json()) as { id: string };
+    await vote.PUT(new Request('http://localhost/x', { method: 'PUT', headers: headers(voter.cookie) }), ctx(f.id));
+    await open(reader.cookie, f.id);
+    expect((await patch(admin.cookie, f.id, { status: 'done', adminNote: 'Shipped.' })).status).toBe(200);
+    await vote.PUT(new Request('http://localhost/x', { method: 'PUT', headers: headers(late.cookie) }), ctx(f.id));
+    expect(await unreadOf(voter.cookie, f.id)).toBe(true);
+    expect(await unreadOf(reader.cookie, f.id)).toBe(false);
+    expect(await unreadOf(late.cookie, f.id)).toBe(false);
+    expect(await countFor(reader.id)).toBe(0);
+  }, 20_000); // five sign-ins
 });
