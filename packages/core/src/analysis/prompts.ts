@@ -7,16 +7,16 @@ import { type AnalysisLlmKeys, CJK, type Chat, analysisChat, unfence } from './t
 
 export const ANALYSIS_PROMPTS_SYSTEM =
   'You write prompts for an AI video model from a shot-by-shot analysis of a short product video, so a seller can film the same scenes with their own product. ' +
-  'You get a JSON object {"video":{...},"scenes":[...]}. Each scene has its number "n", its length in "seconds", its story "role" and "beat", and one entry in ' +
+  'You get a JSON object {"count":N,"video":{...},"scenes":[...]} with N scenes. Each scene has its number "n", its length in "seconds", its story "role" and "beat", and one entry in ' +
   '"cuts" per camera cut with what the analysis saw: the action, a description, the shot size, the subject\'s position, the camera and the look. ' +
   'Some values are in Chinese: read them, but write only English. ' +
-  'For each scene write one English prompt of 60 to 120 words as a single plain paragraph, covering in this order: the shot size and camera angle; ' +
+  'For each scene write exactly one English prompt of 60 to 120 words as a single plain paragraph, covering all of its cuts in order (a scene with three cuts still gets one prompt), in this order: the shot size and camera angle; ' +
   'the camera movement; where the subject sits in the frame; the action beats in order, ending with the end state; then the lighting, the setting and the style. ' +
   'Describe the product only generically, as "the product" or by its type, such as "the shirt" or "the hoodie". Never give its colours, prints, patterns, ' +
   'text, logos or brand: the seller\'s own product photo decides how it looks. ' +
   'Describe people generically, such as "a woman" or "the model", without identifying traits such as tattoos, scars, piercings or a distinctive hairstyle. ' +
   'Use positive phrasing only: write what is seen and what happens, never what is absent or to be avoided. Leave out on-screen text, captions and speech. ' +
-  'Reply with only a JSON object {"prompts":[...]}: one prompt per scene, in the same order and the same count as "scenes".';
+  'Reply with only a JSON object {"prompts":[...]} holding exactly N prompts: one per scene, never one per cut, in the order of "scenes".';
 
 type Raw = Record<string, unknown>;
 const obj = (v: unknown): Raw => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Raw) : {});
@@ -55,6 +55,7 @@ export async function writeScenePrompts(a: Analysis, raw: unknown, chat: Chat): 
   const whole = obj(obj(raw).whole_video_vlm);
   const unit = obj((obj(obj(raw).production_plan).units as unknown[] | undefined)?.[0]);
   const input = JSON.stringify({
+    count: scenes.length,
     video: { summary: a.summary || undefined, format: str(whole.format) || undefined, look: str(unit.prompt).split('\n')[0] || undefined },
     scenes: scenes.map((idx, k) => {
       const head = a.shots[idx[0]!]!;
