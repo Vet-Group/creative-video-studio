@@ -378,13 +378,13 @@ main:focus { outline: none; } /* focus lands here from the skip link; it is not 
 .job-body { min-width: 0; overflow-wrap: anywhere; }
 .job-failed, .job-failed_unknown, .job-timed_out { border-color: var(--danger-border); }
 .job-succeeded { border-color: var(--ok-border); }
-/* A page without its own History: "Lượt tạo" opens the jobs in a drawer, from the top bar below 1024 px and from the frame's top-right corner above it. */
+/* A page without its own History: the Jobs button opens the jobs in a drawer, from the top bar below 1024 px and from the frame's top-right corner above it. */
 .jobs-open { position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 6px; flex: none; min-width: 44px; height: 44px; padding: 0 10px; border: 0; border-radius: 10px; background: transparent; color: var(--ink); font-size: 14px; line-height: 20px; font-weight: 500; white-space: nowrap; }
 .jobs-open:hover { background: var(--fill); }
 .jobs-open-icon { position: relative; display: grid; }
 .jobs-open .nav-dot { box-shadow: 0 0 0 2px var(--surface); }
 .jobs-open-count { min-width: 20px; padding: 0 6px; border-radius: 999px; background: var(--ink-strong); color: var(--on-ink); font-size: 12px; line-height: 20px; font-weight: 600; text-align: center; font-variant-numeric: tabular-nums; }
-/* In the top bar an icon with the count on its corner, so the longest title (Phương thức đăng nhập, 207 px) still fits on one line at 390 px. */
+/* In the top bar an icon with the count on its corner, so the longest page title (207 px) still fits on one line at 390 px. */
 .topbar > .jobs-open { width: 44px; padding: 0; margin-left: auto; }
 .topbar > .jobs-open + .account { margin-left: 0; }
 .topbar .jobs-open-count { position: absolute; right: 2px; bottom: 4px; min-width: 16px; padding: 0 4px; font-size: 10px; line-height: 16px; box-shadow: 0 0 0 2px var(--surface); }
