@@ -4,8 +4,9 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createPool } from '@cvs/db/client';
 import { createTestDatabase } from '@cvs/db/testing';
+import { ANALYSIS_PROMPTS_SYSTEM } from '@cvs/core/analysis/prompts';
 import { afterAll, beforeAll, expect, test, vi } from 'vitest';
-import { type AnalyzeSeams, defaultVlmEnv, reaAnalyzeEnabled, runReaAnalyze } from './analyze';
+import { type AnalyzeSeams, backfillScenePrompts, defaultVlmEnv, hasScenePrompts, planScenePrompts, reaAnalyzeEnabled, runReaAnalyze, scenePromptsEstimateUsd } from './analyze';
 
 const testDb = await createTestDatabase();
 const pool = createPool(testDb.url, 2);
@@ -25,6 +26,8 @@ const seams = (over: Partial<AnalyzeSeams> = {}): AnalyzeSeams => ({
   read: async () => new Uint8Array([0, 0, 0]),
   write: async (key, body) => void (stored[key] = body),
   vlmEnv: async () => ({ env: { REA_VLM_MODEL: 'seed-2-0-lite-260428' }, provider: 'byteplus', model: 'seed-2-0-lite-260428' }),
+  // Never the default writer or translator here: the test database loads the repo's .env, keys included.
+  writePrompts: async (a) => ({ prompts: a.shots.map((_, i) => `Medium shot ${i + 1}; the model turns to show the product.`), costUsd: null }),
   translate: async (a) => ({ vi: { format: 'giới thiệu sản phẩm', hook: 'câu mở đầu', summary: 'tóm tắt', shots: a.shots.map((_, i) => `cảnh ${i + 1}`) }, costUsd: null }),
   ...over,
 });
@@ -51,7 +54,6 @@ test('decomposes a queued analysis, storing the parsed result, the raw breakdown
   const r = await row(id);
   expect(r.status).toBe('succeeded');
   expect(r.result.format).toBe('product showcase');
-  expect(r.result.shots[0].prompt).toContain('white t-shirt');
   expect(r.raw_key).toBe(`analyses/${id}/breakdown.json`);
   expect(stored[`analyses/${id}/breakdown.json`]).toBeDefined();
   expect(r.provider).toBe('byteplus');
@@ -61,7 +63,49 @@ test('decomposes a queued analysis, storing the parsed result, the raw breakdown
   expect(led).toEqual([{ kind: 'llm', usd: '0.0200', user_id: 'u1', team_id: 'team-unassigned', store_id: null, job_id: null, provider: 'byteplus', model: 'seed-2-0-lite-260428', is_final: true }]); // recorded in the Admin Costs ledger
   expect(r.result.vi.hook).toBe('câu mở đầu'); // Vietnamese for display
   expect(r.result.vi.shots).toEqual(['cảnh 1']);
-  expect(r.result.shots[0].prompt).toContain('white t-shirt'); // English prompt kept for Create
+  expect(r.result.shots[0].prompt).toBe('Medium shot 1; the model turns to show the product.'); // the detailed English prompt for Create
+  expect(r.result.shots[0].point).toBe('Model posing to showcase a plain white t-shirt.'); // rea-video's beat, kept apart
+});
+
+test('writes the scene prompts from the raw breakdown before the translation reads them, and adds their cost', async () => {
+  const id = await queued();
+  let translated: string[] = [];
+  await runReaAnalyze(
+    pool,
+    id,
+    seams({
+      writePrompts: async (_a, raw) => ({ prompts: [(raw as typeof sample).shots[0]!.narrative.role === 'mood' ? 'Close-up; the product turns.' : 'wrong raw'], costUsd: 0.01 }),
+      translate: async (a) => ((translated = a.shots.map((s) => s.prompt)), { vi: { format: 'f', hook: 'h', summary: 's', shots: ['c1'] }, costUsd: 0.03 }),
+    }),
+  );
+  const r = await row(id);
+  expect(translated).toEqual(['Close-up; the product turns.']);
+  expect(r.result.shots[0].prompt).toBe('Close-up; the product turns.');
+  expect(r.cost_usd).toBe('0.06'); // 0.02 analyze + 0.01 prompts + 0.03 translate
+});
+
+test('keeps the short point as the prompt, logged, when the prompt writer fails, and still translates', async () => {
+  const id = await queued();
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+  try {
+    await runReaAnalyze(
+      pool,
+      id,
+      seams({
+        writePrompts: async () => {
+          throw new Error('analyze prompts: the answer is not English');
+        },
+      }),
+    );
+    expect(warn).toHaveBeenCalledWith(`worker: analysis ${id}: scene prompts failed, keeping the short points: analyze prompts: the answer is not English`);
+  } finally {
+    warn.mockRestore();
+  }
+  const r = await row(id);
+  expect(r.status).toBe('succeeded');
+  expect(r.result.shots[0]).toMatchObject({ point: 'Model posing to showcase a plain white t-shirt.', prompt: 'Model posing to showcase a plain white t-shirt.' });
+  expect(r.result.vi.shots).toEqual(['cảnh 1']);
+  expect(r.cost_usd).toBe('0.02');
 });
 
 test('adds the translation cost to the stored cost, and stays English-only when the translator fails', async () => {
@@ -162,4 +206,67 @@ test('defaultVlmEnv uses BytePlus from the key and never probes when the Vertex 
     else process.env.REA_VLM_VERTEX_FALLBACK = prev.fb;
     vi.unstubAllGlobals();
   }
+});
+
+test('the backfill plan: rows whose shots all keep a point are done unless forced, and the estimate follows their shots and scenes', () => {
+  const old = { result: { shots: [{ prompt: 'Beat A.' }, { prompt: 'Beat A.' }, { prompt: 'Beat B.' }] } };
+  const done = { result: { shots: [{ point: 'Beat A.', prompt: 'Wide shot; the model walks in.' }] } };
+  const empty = { result: { shots: [] } };
+  expect([old, done, empty].map((r) => hasScenePrompts(r.result))).toEqual([false, true, true]);
+  expect(hasScenePrompts(null)).toBe(false);
+  expect(planScenePrompts([old, done, empty], false)).toEqual({ todo: [old], estimateUsd: scenePromptsEstimateUsd(3, 2) });
+  expect(planScenePrompts([old, done, empty], true).todo).toEqual([old, done, empty]);
+  expect(scenePromptsEstimateUsd(10, 8)).toBeGreaterThan(0.001);
+  expect(scenePromptsEstimateUsd(10, 8)).toBeLessThan(0.01); // gpt-6-luna; about $0.003 for a 10-shot clip
+});
+
+test('the backfill rewrites only the result of the old analyses from their stored breakdown.json, books the calls, and skips them next time', async () => {
+  const breakdown = (point: string) => ({ ...sample, shots: [{ ...sample.shots[0]!, narrative: { role: 'mood', point } }] });
+  const objects: Record<string, Uint8Array> = {};
+  const old = async (id: string, point: string, shared = false) => {
+    objects[`analyses/${id}/breakdown.json`] = new TextEncoder().encode(JSON.stringify(breakdown(point)));
+    const result = { durationS: 11.4, shotCount: 1, format: 'product showcase', hook: 'h', summary: 's', shots: [{ index: 1, start: 0, end: 11.4, role: 'mood', prompt: point }], vi: { format: 'f', hook: 'h', summary: 's', shots: ['cũ'] } };
+    await pool.query(
+      `insert into analyses (id, user_id, team_id, source_key, status, result, raw_key, provider, model, cost_usd, finished_at, shared_title, shared_at)
+       values ($1, 'u1', 'team-unassigned', $2, 'succeeded', $3, $4, 'byteplus', 'seed', 0.02, '2026-11-13T00:00:00Z', $5, $6)`,
+      [id, `sources/${id}.mp4`, JSON.stringify(result), `analyses/${id}/breakdown.json`, shared ? 'Áo thun' : null, shared ? '2026-11-14T00:00:00Z' : null],
+    );
+  };
+  await old('bf-old', 'Model posing to showcase a plain white t-shirt.', true); // a shared reference video is backfilled too
+  await old('bf-bad', 'A broken beat.');
+  await pool.query(`insert into analyses (id, user_id, team_id, source_key, status) values ('bf-queued', 'u1', 'team-unassigned', 'sources/q.mp4', 'queued')`);
+
+  const asked: string[] = [];
+  const chat = async (system: string, user: string) => {
+    const body = JSON.parse(user);
+    if (system === ANALYSIS_PROMPTS_SYSTEM) {
+      asked.push(body.scenes[0].beat);
+      return body.scenes[0].beat === 'A broken beat.' ? { text: '{"prompts":["中景"]}', costUsd: 0.001 } : { text: '{"prompts":["Medium shot; the model turns to show the product."]}', costUsd: 0.004 };
+    }
+    return { text: JSON.stringify({ format: 'f', hook: 'h', summary: 's', shots: body.shots.map(() => 'cảnh mới') }), costUsd: 0.002 };
+  };
+  const seams = { read: async (key: string) => objects[key]!, llm: { chat, provider: 'openai', model: 'gpt-6-luna' } };
+  const lines: string[] = [];
+  const log = (line: string) => void lines.push(line);
+  const before = (await pool.query(`select * from analyses where id = 'bf-old'`)).rows[0];
+
+  const dry = await backfillScenePrompts(pool, { apply: false, force: false }, seams, log);
+  expect(dry).toMatchObject({ todo: 2, updated: 0, failed: 0 });
+  expect(asked).toEqual([]); // a dry run calls no model
+  expect(lines.at(-1)).toContain('2 to rewrite, about $');
+
+  const run = await backfillScenePrompts(pool, { apply: true, force: false }, seams, log);
+  expect(run).toMatchObject({ todo: 2, updated: 1, failed: 1 });
+  const after = (await pool.query(`select * from analyses where id = 'bf-old'`)).rows[0];
+  expect(after.result.shots[0]).toEqual({ index: 1, start: 0, end: 11.4, role: 'mood', point: 'Model posing to showcase a plain white t-shirt.', prompt: 'Medium shot; the model turns to show the product.' });
+  expect(after.result.vi.shots).toEqual(['cảnh mới']);
+  expect({ ...after, result: null }).toEqual({ ...before, result: null }); // every other field as it was
+  const led = (await pool.query(`select ref, usd::text as usd, provider, model from cost_entries where ref like 'llm:analysis:bf-old:%'`)).rows;
+  expect(led).toEqual([{ ref: expect.stringMatching(/^llm:analysis:bf-old:prompts-\d+$/), usd: '0.0060', provider: 'openai', model: 'gpt-6-luna' }]);
+  expect((await pool.query(`select result from analyses where id = 'bf-bad'`)).rows[0].result.shots[0]).toEqual({ index: 1, start: 0, end: 11.4, role: 'mood', prompt: 'A broken beat.' }); // left for the next run
+  expect(lines).toContain('bf-bad: left as it was');
+
+  asked.length = 0;
+  expect(await backfillScenePrompts(pool, { apply: true, force: false }, seams, log)).toMatchObject({ todo: 1 });
+  expect(asked).toEqual(['A broken beat.']); // the done analysis is skipped
 });

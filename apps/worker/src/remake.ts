@@ -73,10 +73,11 @@ export const reaRemakeEnabled = (env: NodeJS.ProcessEnv = process.env): boolean 
 
 /**
  * The edit's instruction, with the shot's own English description from the analysis for context. It takes nothing but the product from the photo: in the
- * 2026-11-13 A/B Wan also put the photo's model's necklace on the woman in the clip.
+ * 2026-11-13 A/B Wan also put the photo's model's necklace on the woman in the clip. The context is rea-video's point, which names the source's own product
+ * (what the edit replaces) and is what that A/B ran with, not the product-neutral prompt Create gets; an older result's prompt is its point.
  */
 const editPrompt = (shot: AnalysisShot): string =>
-  `Replace the product shown in this video with the product in the reference image, reproducing its shape, colours, print and text faithfully. Take only the product from the reference image, not its model, jewellery, accessories or background. Keep everything else exactly as in the video: the people, faces, hair, hands, poses and every movement, the background, lighting and camera framing. The shot, for context: ${shot.prompt.slice(0, 1000)}`;
+  `Replace the product shown in this video with the product in the reference image, reproducing its shape, colours, print and text faithfully. Take only the product from the reference image, not its model, jewellery, accessories or background. Keep everything else exactly as in the video: the people, faces, hair, hands, poses and every movement, the background, lighting and camera framing. The shot, for context: ${(shot.point ?? shot.prompt).slice(0, 1000)}`;
 
 // The model, priced as @cvs/core/analysis/remake estimates: fal bills the clip sent as well as the clip made, so each billed second counts twice.
 // It is not a model_configs row, so it does not show in Create.

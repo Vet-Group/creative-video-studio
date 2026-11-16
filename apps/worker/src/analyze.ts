@@ -1,6 +1,7 @@
 // Reference-video analysis: shells out to the rea-video CLI on this worker, parses its breakdown.json
-// into the Analysis the UI shows, and stores both the derived Analysis and the raw breakdown.json (so
-// the later Smart Remake stage can re-parse richer fields without a re-run). Gated by REA_ANALYZE_ENABLED
+// into the Analysis the UI shows (with a detailed prompt per scene and a Vietnamese reading, analysisFromBreakdown), and
+// stores both the derived Analysis and the raw breakdown.json (so later stages, such as Smart Remake and the scene prompts
+// backfill, can re-parse richer fields without a re-run). Gated by REA_ANALYZE_ENABLED
 // at the worker subscription and inert when off; the hard seams (decompose, object store, VLM env) are
 // injected so the path is unit-tested without a real binary, network, or S3.
 import { execFile } from 'node:child_process';
@@ -8,8 +9,10 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
-import { type Analysis, type AnalysisVi, parseBreakdown } from '@cvs/core/analysis/breakdown';
-import { createAnalysisTranslator } from '@cvs/core/analysis/translate';
+import { type Analysis, type AnalysisVi, mergeShots, parseBreakdown } from '@cvs/core/analysis/breakdown';
+import { createAnalysisPromptWriter, writeScenePrompts } from '@cvs/core/analysis/prompts';
+import { analysisChat, type Chat, createAnalysisTranslator, translateAnalysisVi } from '@cvs/core/analysis/translate';
+import { OPENAI_PRICES } from '@cvs/core/enhance';
 import { bookLlm, withTransaction } from '@cvs/core/ledger';
 import { byteplusReaVlm, pickReaVlm, reaVlmEnv, vertexReaVlm } from '@cvs/core/providers/rea-vlm';
 import { serviceAccountToken } from '@cvs/core/providers/vertex';
@@ -32,6 +35,8 @@ export interface AnalyzeSeams {
   write?: (key: string, body: Uint8Array, contentType: string) => Promise<void>;
   /** Resolves the REA_VLM_* environment; defaults to BytePlus from BYTEPLUS_ARK_API_KEY. */
   vlmEnv?: () => Promise<{ env: Record<string, string>; provider: string; model: string }>;
+  /** Rewrites each scene's point into a detailed English prompt, one per stored shot; defaults to gpt-6-luna/fal, best-effort. */
+  writePrompts?: (a: Analysis, raw: unknown) => Promise<{ prompts: string[]; costUsd: number | null }>;
   /** Translates the parsed analysis to Vietnamese for display; defaults to gpt-6-luna/fal, best-effort. */
   translate?: (a: Analysis) => Promise<{ vi: AnalysisVi; costUsd: number | null }>;
 }
@@ -87,6 +92,42 @@ export const defaultVlmEnv = async (): Promise<{ env: Record<string, string>; pr
 // Built per run, not at import: the worker loads .env lazily (databaseUrl()), after this module is evaluated, so an import-time
 // read saw no key and every analysis stayed English-only.
 const defaultTranslate = () => createAnalysisTranslator({ openAiKey: process.env.OPENAI_API_KEY, falKey: process.env.FAL_KEY });
+const defaultWritePrompts = () => createAnalysisPromptWriter({ openAiKey: process.env.OPENAI_API_KEY, falKey: process.env.FAL_KEY });
+
+/**
+ * The stored result of a breakdown.json: parsed, each scene's detailed prompt written over its point, then the Vietnamese reading of those prompts,
+ * with the calls' cost. Both calls are best-effort: a failed writer leaves the points as the prompts, a failed translation leaves the result
+ * English-only; each failure is logged. `prompts` says whether the writer's prompts are in.
+ */
+export async function analysisFromBreakdown(
+  raw: unknown,
+  llm: Pick<AnalyzeSeams, 'writePrompts' | 'translate'>,
+  log: (line: string) => void = console.warn,
+): Promise<{ analysis: Analysis; costUsd: number; prompts: boolean }> {
+  const analysis = parseBreakdown(raw);
+  let costUsd = 0;
+  let prompts = false;
+  if (llm.writePrompts) {
+    try {
+      const w = await llm.writePrompts(analysis, raw);
+      analysis.shots.forEach((s, i) => (s.prompt = w.prompts[i] ?? s.prompt));
+      if (w.costUsd) costUsd += w.costUsd;
+      prompts = true;
+    } catch (e) {
+      log(`scene prompts failed, keeping the short points: ${e instanceof Error ? e.message : e}`);
+    }
+  }
+  if (llm.translate) {
+    try {
+      const t = await llm.translate(analysis);
+      analysis.vi = t.vi;
+      if (t.costUsd) costUsd += t.costUsd;
+    } catch (e) {
+      log(`translation failed, keeping the analysis English-only: ${e instanceof Error ? e.message : e}`);
+    }
+  }
+  return { analysis, costUsd, prompts };
+}
 
 /** Claims a queued analysis row, runs rea-video over its source video, and stores the result. Safe to
  * call more than once for the same id: only a `queued` row is claimed. */
@@ -96,6 +137,7 @@ export async function runReaAnalyze(pool: Pool, analysisId: string, seams: Analy
   const write = seams.write ?? putObject;
   const vlmEnv = seams.vlmEnv ?? defaultVlmEnv;
   const translate = seams.translate ?? defaultTranslate();
+  const writePrompts = seams.writePrompts ?? defaultWritePrompts();
 
   const row = (await pool.query('select id, source_key, status from analyses where id = $1', [analysisId])).rows[0];
   if (!row || row.status !== 'queued') return;
@@ -110,18 +152,9 @@ export async function runReaAnalyze(pool: Pool, analysisId: string, seams: Analy
     const { env, provider, model } = await vlmEnv();
     await decompose(video, out, env);
     const rawBytes = await readFile(join(out, 'breakdown.json'));
-    const analysis = parseBreakdown(JSON.parse(rawBytes.toString('utf8')));
-    let cost = ANALYZE_COST_USD;
-    // Best-effort Vietnamese display: a failed or missing translator leaves the analysis English-only, still succeeded.
-    if (translate) {
-      try {
-        const t = await translate(analysis);
-        analysis.vi = t.vi;
-        if (t.costUsd) cost += t.costUsd;
-      } catch {
-        /* keep the English-only analysis */
-      }
-    }
+    // Best-effort prompts and Vietnamese display: a failed or missing LLM leaves the points and English only, still succeeded.
+    const { analysis, costUsd } = await analysisFromBreakdown(JSON.parse(rawBytes.toString('utf8')), { writePrompts, translate }, (line) => console.warn(`worker: analysis ${analysisId}: ${line}`));
+    const cost = ANALYZE_COST_USD + costUsd;
     const rawKey = `analyses/${analysisId}/breakdown.json`;
     await write(rawKey, rawBytes, 'application/json');
     // Close the row and book its cost to the member's team and store in one transaction, so the Admin Costs ledger always
@@ -139,4 +172,76 @@ export async function runReaAnalyze(pool: Pool, analysisId: string, seams: Analy
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
+}
+
+/**
+ * A rough cost of one analysis' two calls at gpt-6-luna prices (fal's Gemini answers cost about four times more). The sample breakdown.json's one shot
+ * sends the writer about 1,260 characters (250 of them Chinese), some 500 tokens; a 120-word prompt is about 200 tokens with its JSON, and its Vietnamese
+ * reading about 300. The two system prompts and the video's header add some 600 tokens.
+ */
+export const scenePromptsEstimateUsd = (shots: number, scenes: number): number =>
+  ((600 + 500 * shots + 200 * scenes) * OPENAI_PRICES.input + 500 * scenes * OPENAI_PRICES.output) / 1e6;
+
+/** Whether a stored result already has the scene prompts: every shot keeps its point apart (a result from before has only `prompt`, the point). */
+export const hasScenePrompts = (result: unknown): boolean => {
+  const shots = (result as Partial<Analysis> | null)?.shots;
+  return Array.isArray(shots) && shots.every((s) => typeof s?.point === 'string');
+};
+
+/** The backfill's plan: the rows to rewrite (every row with `force`) and their estimated cost. */
+export function planScenePrompts<R extends { result: unknown }>(rows: R[], force: boolean): { todo: R[]; estimateUsd: number } {
+  const todo = rows.filter((r) => force || !hasScenePrompts(r.result));
+  const estimateUsd = todo.reduce((sum, r) => {
+    const a = r.result as Analysis | null;
+    return Array.isArray(a?.shots) ? sum + scenePromptsEstimateUsd(a.shots.length, mergeShots(a).shots.length) : sum;
+  }, 0);
+  return { todo, estimateUsd };
+}
+
+/**
+ * One-off: the detailed scene prompts, and the Vietnamese reading of them, for the analyses that finished before the worker wrote them (the shared
+ * reference videos too), re-parsed from each stored breakdown.json without running rea-video again. A dry run by default; `apply` rewrites `result`
+ * only and books the calls' cost on the analysis as the worker does, under a step of its own so a forced re-run books its own spend. A row whose writer
+ * or translation failed keeps its old result, so the next run retries it; `force` also redoes the rows that already have the prompts.
+ * shortcut: like every analysis cost, the calls are booked on the analysis' own ICT day, so a run in a later month books an older analysis' calls to its
+ * month; fine while the analyses are from the month the backfill runs in, book on the run's day if that ever matters.
+ */
+export async function backfillScenePrompts(
+  pool: Pool,
+  o: { apply: boolean; force: boolean },
+  seams: { read?: AnalyzeSeams['read']; llm?: { chat: Chat; provider: string; model: string } } = {},
+  log: (line: string) => void = console.log,
+): Promise<{ found: number; todo: number; updated: number; failed: number }> {
+  const { rows } = await pool.query(`select id, raw_key, result from analyses where status = 'succeeded' and raw_key is not null order by created_at, id`);
+  const { todo, estimateUsd } = planScenePrompts(rows as { id: string; raw_key: string; result: unknown }[], o.force);
+  log(`${rows.length} analyses, ${todo.length} to rewrite, about $${estimateUsd.toFixed(4)} at gpt-6-luna prices${o.apply ? '' : ' (dry run; pass --apply to write them, plus --force to redo the ones that have the prompts)'}`);
+  if (!o.apply || todo.length === 0) return { found: rows.length, todo: todo.length, updated: 0, failed: 0 };
+  const llm = seams.llm ?? analysisChat({ openAiKey: process.env.OPENAI_API_KEY, falKey: process.env.FAL_KEY }, 'analyze backfill');
+  if (!llm) throw new Error('OPENAI_API_KEY or FAL_KEY must be set to write the prompts');
+  const read = seams.read ?? getObject;
+  const step = `prompts-${Date.now()}`;
+  let updated = 0;
+  let failed = 0;
+  for (const r of todo) {
+    try {
+      const raw = JSON.parse(Buffer.from(await read(r.raw_key)).toString('utf8'));
+      const calls = { writePrompts: (a: Analysis, b: unknown) => writeScenePrompts(a, b, llm.chat), translate: (a: Analysis) => translateAnalysisVi(a, llm.chat) };
+      const { analysis, costUsd, prompts } = await analysisFromBreakdown(raw, calls, (line) => log(`${r.id}: ${line}`));
+      const ok = prompts && analysis.vi !== undefined;
+      await withTransaction(pool, async (tx) => {
+        if (ok) await tx.query(`update analyses set result = $2 where id = $1 and status = 'succeeded'`, [r.id, JSON.stringify(analysis)]);
+        await bookLlm(tx, { analysis: r.id, step }, { costUsd, provider: llm.provider, model: llm.model });
+      });
+      if (ok) updated++;
+      else {
+        failed++;
+        log(`${r.id}: left as it was`);
+      }
+    } catch (e) {
+      failed++;
+      log(`${r.id}: ${e instanceof Error ? e.message : e}`);
+    }
+  }
+  log(`rewrote ${updated} of ${todo.length} analyses, ${failed} failed`);
+  return { found: rows.length, todo: todo.length, updated, failed };
 }

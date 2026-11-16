@@ -74,10 +74,10 @@ export function openAiCost(usage: OpenAiUsage | undefined): number | null {
 /**
  * One Chat Completions call: the answer's text (trimmed, '' when there is none) and its cost. Effort `none`: the tasks are short rewrites and
  * translations that need no planning, it is the fastest and cheapest setting, and it is the only one that keeps our temperatures.
- * `images` (data URLs) follow the user turn's text as image parts.
+ * `images` (data URLs) follow the user turn's text as image parts. `timeoutMs` bounds the wait (a long answer needs more than the default).
  */
 export async function openAiChat(
-  f: Fetch, what: string, apiKey: string, model: string, system: string, user: string, temperature: number, maxTokens: number, images: string[] = [],
+  f: Fetch, what: string, apiKey: string, model: string, system: string, user: string, temperature: number, maxTokens: number, images: string[] = [], timeoutMs?: number,
 ): Promise<{ text: string; costUsd: number | null }> {
   const out = (await sendJson(f, what, OPENAI_URL, {
     method: 'POST',
@@ -92,7 +92,7 @@ export async function openAiChat(
       temperature,
       max_completion_tokens: maxTokens,
     }),
-    signal: timeout(),
+    signal: timeout(timeoutMs),
   })) as { choices?: { message?: { content?: unknown } }[]; usage?: OpenAiUsage };
   const content = out.choices?.[0]?.message?.content;
   return { text: typeof content === 'string' ? content.trim() : '', costUsd: openAiCost(out.usage) };

@@ -68,6 +68,9 @@ export function AnalysisResult({ analysis, seek, activeShot, frames }: { analysi
   const vi = analysis.vi;
   const scenes = mergeShots(analysis);
   const script = scriptPrompt(scenes.shots);
+  // Detailed prompts run long, so Create's 2000-character box may take only the first scenes: then the button says how many.
+  const scripted = script ? script.split('\n').length : 0;
+  const withPrompt = scenes.shots.filter((s) => s.prompt).length;
   return (
     <div className="analysis-result">
       <p className="muted">
@@ -83,8 +86,12 @@ export function AnalysisResult({ analysis, seek, activeShot, frames }: { analysi
       {scenes.shots.length > 0 && (
         <p className="analysis-script-actions">
           {script && (
-            <Link className="button" href={`/create?prompt=${encodeURIComponent(script)}`}>
-              Dùng cả kịch bản
+            <Link
+              className="button"
+              href={`/create?prompt=${encodeURIComponent(script)}`}
+              title={scripted < withPrompt ? `Ô mô tả của Tạo video nhận tối đa 2000 ký tự, đủ cho ${scripted} cảnh đầu` : undefined}
+            >
+              {scripted < withPrompt ? `Dùng ${scripted}/${withPrompt} cảnh đầu` : 'Dùng cả kịch bản'}
             </Link>
           )}
           <CopyScript text={scriptText(analysis)} />

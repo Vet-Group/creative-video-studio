@@ -4,7 +4,7 @@
 // material / has_real_material flags are intentionally ignored: on studio and stock apparel footage
 // they misclassify (a real live-action clip reads as "3D render" with has_real_material=false), while
 // the VLM summary and per-shot narrative stay accurate. rea-video runs with lang=en, so the per-shot
-// `point` and the whole-video `summary` are English prompts; `format`/`hook` are display labels the
+// `point` and the whole-video `summary` are English; `format`/`hook` are display labels the
 // Vietnamese UI maps and may be localized by the model.
 
 export interface AnalysisShot {
@@ -12,6 +12,9 @@ export interface AnalysisShot {
   start: number;
   end: number;
   role: string;
+  /** rea-video's one-sentence story beat, about the source's own product and people. Missing on results stored before it was kept apart, whose `prompt` is this beat. */
+  point?: string;
+  /** The English prompt Create receives: the worker's detailed, product-neutral rewrite of the scene (analysis/prompts.ts), or the point when that failed. */
   prompt: string;
 }
 
@@ -46,7 +49,7 @@ export function parseBreakdown(raw: unknown): Analysis {
   const shots = arr(d.shots).map((s, i): AnalysisShot => {
     const sh = obj(s);
     const narrative = obj(sh.narrative);
-    return { index: num(sh.index, i + 1), start: num(sh.start), end: num(sh.end), role: str(narrative.role), prompt: str(narrative.point) };
+    return { index: num(sh.index, i + 1), start: num(sh.start), end: num(sh.end), role: str(narrative.role), point: str(narrative.point), prompt: str(narrative.point) };
   });
   return {
     durationS: num(summary.duration),
@@ -58,8 +61,11 @@ export function parseBreakdown(raw: unknown): Analysis {
   };
 }
 
+/** Whether two adjacent shots are one scene: the model gave them the same role and point (an older result's `prompt` is its point). */
+export const sameScene = (a: AnalysisShot, b: AnalysisShot): boolean => a.role === b.role && (a.point ?? a.prompt) === (b.point ?? b.prompt);
+
 /**
- * The scenes to read: adjacent shots the model gave the same role and prompt become one (rea-video cuts per camera shot but describes per beat,
+ * The scenes to read: adjacent shots the model gave the same role and point become one (rea-video cuts per camera shot but describes per beat,
  * so a beat filmed in three cuts came back as three identical scenes), renumbered, with their Vietnamese readings kept in step.
  * `first` is each scene's first stored shot index, the shot Smart Remake sends for that scene.
  */
@@ -69,7 +75,7 @@ export function mergeShots(a: Analysis): { shots: Analysis['shots']; vi: string[
   const first: number[] = [];
   a.shots.forEach((s, i) => {
     const last = shots.at(-1);
-    if (last && last.prompt === s.prompt && last.role === s.role) {
+    if (last && sameScene(last, s)) {
       last.end = s.end;
       return;
     }

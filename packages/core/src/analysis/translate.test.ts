@@ -24,6 +24,25 @@ test('sends the English fields and parses a JSON answer, even fenced, keeping th
   expect(costUsd).toBe(0.001);
 });
 
+test('sends a prompt that several shots of one scene share once, and gives its reading back to each of them', async () => {
+  const merged: Analysis = { ...a, shots: [...a.shots, { index: 3, start: 5, end: 7, role: 'info', prompt: 'p2' }] };
+  const chat = async (_system: string, user: string) => {
+    expect(JSON.parse(user).shots).toEqual(['p1', 'p2']);
+    return { text: '{"format":"f","hook":"h","summary":"s","shots":["c1","c2"]}', costUsd: null };
+  };
+  expect((await translateAnalysisVi(merged, chat)).vi.shots).toEqual(['c1', 'c2', 'c2']);
+});
+
+test('raises the answer budget with the length of the prompts it translates', async () => {
+  let budget = 0;
+  const chat = async (_s: string, _u: string, maxTokens: number) => ((budget = maxTokens), { text: '{"format":"f","hook":"h","summary":"s","shots":["c1","c2"]}', costUsd: null });
+  await translateAnalysisVi(a, chat);
+  expect(budget).toBe(2000); // short prompts keep the old budget
+  const long = 'Medium shot at eye level on a static camera. '.repeat(40);
+  await translateAnalysisVi({ ...a, shots: [{ ...a.shots[0]!, prompt: `${long}1` }, { ...a.shots[1]!, prompt: `${long}2` }] }, chat);
+  expect(budget).toBeGreaterThan(2000);
+});
+
 test('throws on a shot-count mismatch so the caller keeps the analysis English-only', async () => {
   const chat = async () => ({ text: '{"format":"f","hook":"h","summary":"s","shots":["only-one"]}', costUsd: null });
   await expect(translateAnalysisVi(a, chat)).rejects.toThrow('shot count');
