@@ -137,6 +137,16 @@ export async function openPromptTemplates(page: Page): Promise<Locator> {
   return dialog;
 }
 
+/** Opens the "Lượt tạo của tôi" drawer of a page without its own History. Retries the click, as a click before hydration does nothing (as openTemplates does). */
+export async function openJobs(page: Page): Promise<Locator> {
+  const drawer = page.getByRole('dialog', { name: 'Lượt tạo của tôi' });
+  await expect(async () => {
+    if (!(await drawer.isVisible())) await page.getByRole('button', { name: /^Lượt tạo/ }).click();
+    await expect(drawer).toBeVisible({ timeout: 2_000 });
+  }).toPass();
+  return drawer;
+}
+
 /** Opens Settings the way a user does: the account menu, then its first item. Retries the menu, as a click before hydration does nothing. */
 export async function openSettings(page: Page): Promise<Locator> {
   const menu = page.getByRole('menu', { name: /^Tài khoản: / });
