@@ -20,7 +20,7 @@ import { useRecall } from '@/lib/use-recall';
 import { useDraftState } from '@/lib/use-draft';
 import { useSamples } from '@/lib/use-samples';
 import { cardSample } from '@/lib/examples';
-import { dropRefillQuery, queryOf } from '@/lib/reuse';
+import { asExample, dropRefillQuery, queryOf } from '@/lib/reuse';
 import { About } from './About';
 import { AudioSwitch } from './AudioSwitch';
 import { BrandPicker } from './BrandKit';
@@ -29,7 +29,7 @@ import { builtInChoices, type Choice, ChoiceBox, ChoiceDialog, PhraseChoice, use
 import { EndScene } from './EndScene';
 import { Highlights } from './Highlights';
 import { Icon } from './Icon';
-import { copyError, copySamples, FormNotice, Gallery, HISTORY_SIZE_KEY, type Img, PhotoDialog, photoImg, RunSummary, SizeSlider, Slot, uploadError, uploadImages, UPLOAD_ERROR, useSize, WorkTabs } from './image-tools';
+import { copyError, copySamples, EXAMPLE_USED, FormNotice, Gallery, HISTORY_SIZE_KEY, type Img, PhotoDialog, photoImg, RunSummary, SizeSlider, Slot, uploadError, uploadImages, UPLOAD_ERROR, useSize, WorkTabs } from './image-tools';
 import type { UploadSlot } from '@/lib/upload-slots';
 import { FormContext, type FormActions, type Photo, type PhotoRole, useApplier, useJobs, useRecreated } from './jobs';
 import { Modal } from './Modal';
@@ -190,7 +190,7 @@ export function MarketingStudio({ format = 'ugc', reuse, recipe, wizardDefault =
     if (s.ratio) setRatio(s.ratio);
     if (s.durationSec) setDurationSec(s.durationSec);
   });
-  const [source, setSource] = useState<{ from: string; recipe?: boolean } | null>(reuse ? { from: reuse, recipe } : null); // what the form refills from; Recreate sets a new one in place. `recipe`: a company example, which gives its words and settings but not its photos, end frame or video
+  const [source, setSource] = useState<{ from: string; recipe?: boolean } | null>(reuse ? { from: reuse, recipe } : null); // what the form refills from; Recreate sets a new one in place. `recipe`: a company example, its photos marked as the example's (asExample)
   const [list, setList] = useState<{ key: string; models: VideoModel[]; defaultId: string | null } | null>(null);
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -315,23 +315,22 @@ export function MarketingStudio({ format = 'ugc', reuse, recipe, wizardDefault =
         const j = await fillBlanks(reuse, loaded);
         if (stale) return; // superseded while the member filled the blanks
         if (!j) return dropRefillQuery(); // cancelled: the form stays as it is
-        if (!source.recipe) {
-          // A sample's photos become this member's inputs first, copied on the server.
-          const samples = j.images.map((i) => ('sample' in i ? i.sample : null)).filter((s) => s !== null);
-          const inputs = samples.length > 0 ? await copySamples(samples) : (j.images as Img[]);
-          if (stale) return; // superseded while the photos were copied
-          if (advanced) setRefs(inputs);
-          else if (unboxing) {
-            // The photos come in the order sent; the roles say which of them the job had.
-            const roles = j.roles?.split(',') ?? (inputs.length === 1 ? ['product'] : ['model', 'product']);
-            const photo = (role: string) => inputs.filter((_, n) => roles[n] === role).slice(0, 1);
-            setPerson(photo('model'));
-            setProduct(photo('product'));
-            setPackaging(photo('packaging'));
-          } else (setPerson(inputs.slice(0, 1)), setProduct(inputs.slice(1, 2)));
-          setEndFrame(j.endFrame ?? null);
-          setVideo(advanced ? (j.videoRef ?? null) : null);
-        }
+        // A sample's photos become this member's inputs first, copied on the server.
+        const samples = j.images.map((i) => ('sample' in i ? i.sample : null)).filter((s) => s !== null);
+        const copied = samples.length > 0 ? await copySamples(samples) : (j.images as Img[]);
+        if (stale) return; // superseded while the photos were copied
+        const inputs = source.recipe ? asExample(copied) : copied;
+        if (advanced) setRefs(inputs);
+        else if (unboxing) {
+          // The photos come in the order sent; the roles say which of them the job had.
+          const roles = j.roles?.split(',') ?? (inputs.length === 1 ? ['product'] : ['model', 'product']);
+          const photo = (role: string) => inputs.filter((_, n) => roles[n] === role).slice(0, 1);
+          setPerson(photo('model'));
+          setProduct(photo('product'));
+          setPackaging(photo('packaging'));
+        } else (setPerson(inputs.slice(0, 1)), setProduct(inputs.slice(1, 2)));
+        setEndFrame(j.endFrame ?? null);
+        setVideo(advanced ? (j.videoRef ?? null) : null);
         if (review) setHighlights(j.highlights?.length ? j.highlights : ['']);
         setHooks(j.hook ? [j.hook] : []);
         setLocation(j.location ?? '');
@@ -353,7 +352,7 @@ export function MarketingStudio({ format = 'ugc', reuse, recipe, wizardDefault =
         if (j.ratio) setRatio(j.ratio);
         if (j.durationSec) setDurationSec(j.durationSec);
         if (j.modelId) setModelId(j.modelId);
-        if (source.recipe) notify('Đã dùng mẫu của ví dụ. Ảnh của bạn được giữ nguyên.');
+        if (source.recipe) notify(EXAMPLE_USED);
         else {
           if (j.brief === null && advanced) setNotice('Clip này không có mô tả gốc: đã điền lại ảnh và cài đặt, hãy nhập lại mô tả.');
           recreated(reuse);

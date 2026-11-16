@@ -5,7 +5,7 @@ import { type CSSProperties, type DragEvent, type KeyboardEvent, type ReactNode,
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { api, ApiError, type Clip, sendJson, thumbUrl } from '@/lib/api';
-import { dropRefillQuery, exampleFrom, recipeOf, refillFrom, reuseHref } from '@/lib/reuse';
+import { asExample, dropRefillQuery, exampleFrom, refillFrom, reuseHref } from '@/lib/reuse';
 import { NARROW, useMediaQuery, WIDE } from '@/lib/use-media-query';
 import { numberedSamples } from '@/lib/examples';
 import { PRODUCT_TYPES } from '@/lib/product-types';
@@ -61,6 +61,20 @@ export interface Img {
   filename: string;
   /** A picture that is not an uploaded asset (an object URL, as in Media Optimizer); else the asset's content. */
   url?: string;
+  /** A company example's photo, put on the form by an Examples tab use button (asExample in lib/reuse.ts). */
+  example?: boolean;
+}
+
+/** What a company example's refill tells the member (Create adds that the store stays theirs). */
+export const EXAMPLE_USED = 'Đã dùng ví dụ, kể cả ảnh. Hãy thay ảnh của ví dụ bằng ảnh sản phẩm của bạn.';
+
+/** Under a photo field while it holds a company example's photos: they show the example's product, to be swapped for the member's own. */
+export function ExampleNote({ images }: { images: { example?: boolean }[] }) {
+  return images.some((i) => i.example) ? (
+    <p className="help" role="note">
+      Đang dùng ảnh của ví dụ. Thay bằng ảnh sản phẩm của bạn.
+    </p>
+  ) : null;
 }
 
 export const RATIO_LABEL: Record<string, string> = { auto: 'Tự động' };
@@ -159,8 +173,8 @@ export interface ReuseJob {
 }
 
 /** Refill (`reuse` is a job's or a saved template's API path, lib/reuse.ts): reads it and hands it to `fill` when it is of `feature`; `fail` otherwise. Everything stays editable.
- * Returns Recreate in place: the same refill from another path, the URL unchanged, as Fash's Recreate. `recipe`: a company example, which gives its
- * words and settings but not its photos (another seller's product), so `fill` gets no `images` and the member's own stay. */
+ * Returns Recreate in place: the same refill from another path, the URL unchanged, as Fash's Recreate. `recipe`: a company example, whose photos come
+ * marked as the example's (asExample). */
 export function useReuse(reuse: string | undefined, feature: string, fill: (j: Omit<ReuseJob, 'images'> & { images?: Img[] }) => void, fail: (e?: unknown) => void): (from: string, recipe?: boolean) => void {
   const recreated = useRecreated();
   const { loading, notify } = useJobs();
@@ -176,14 +190,14 @@ export function useReuse(reuse: string | undefined, feature: string, fill: (j: O
         const j = await fillBlanks(reuse, loaded);
         if (stale) return; // superseded while the member filled the blanks
         if (!j) return dropRefillQuery(); // cancelled: the form stays as it is
+        // A sample's photos become this member's inputs first, copied on the server.
+        const samples = j.images.flatMap((i) => ('sample' in i ? [i.sample] : []));
+        const images = samples.length > 0 ? await copySamples(samples) : (j.images as Img[]);
+        if (stale) return; // superseded while the photos were copied
         if (source.recipe) {
-          fill(recipeOf(j));
-          notify('Đã dùng mẫu của ví dụ. Ảnh của bạn được giữ nguyên.');
+          fill({ ...j, images: asExample(images) });
+          notify(EXAMPLE_USED);
         } else {
-          // A sample's photos become this member's inputs first, copied on the server.
-          const samples = j.images.flatMap((i) => ('sample' in i ? [i.sample] : []));
-          const images = samples.length > 0 ? await copySamples(samples) : (j.images as Img[]);
-          if (stale) return; // superseded while the photos were copied
           fill({ ...j, images });
           recreated(reuse);
         }
@@ -440,6 +454,7 @@ export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRem
           </button>
         )}
       </div>
+      <ExampleNote images={images} />
       {cut > 0 && (
         <p className="help" role="status">
           Chỉ lấy {cut} ảnh đầu.

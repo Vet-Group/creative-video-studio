@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { exampleFrom, queryOf, recipeOf, refillFrom, reuseHref } from './reuse';
+import { asExample, exampleFrom, queryOf, refillFrom, reuseHref } from './reuse';
 
 test('the reuse link opens the page that made the job, with the job to refill from; features without a refill yet get no link', () => {
   expect(reuseHref({ id: 'j1', feature: 'video' })).toBe('/create?reuse=j1');
@@ -37,9 +37,9 @@ test('a refill that has to open on another page carries its source as that page 
   expect(queryOf('/api/other/x')).toBe('');
 });
 
-test("a company example hands the form its recipe, never the maker's photos, end frame, audio clips or store", () => {
-  const job = { presetId: 'p1', prompt: 'orbit', ratio: '9:16', durationSec: 8, modelId: 'm1', audio: 'on', enhance: false, images: [{ id: 'a1' }], endFrame: { id: 'a2' }, clips: [{ id: 'a3' }], storeId: 's1' };
-  expect(recipeOf(job)).toEqual({ presetId: 'p1', prompt: 'orbit', ratio: '9:16', durationSec: 8, modelId: 'm1', audio: 'on', enhance: false });
-  const bare = recipeOf({ images: [], storeId: null, prompt: null });
-  expect('images' in bare || 'storeId' in bare || 'endFrame' in bare || 'clips' in bare).toBe(false);
+test("a company example's photos come along, each marked as the example's, and the originals are untouched", () => {
+  const images = [{ id: 'a1', filename: 'shirt.png' }, { id: 'a2', filename: 'model.png' }];
+  expect(asExample(images)).toEqual([{ id: 'a1', filename: 'shirt.png', example: true }, { id: 'a2', filename: 'model.png', example: true }]);
+  expect(images[0]).not.toHaveProperty('example');
+  expect(asExample([])).toEqual([]);
 });
