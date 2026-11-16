@@ -33,6 +33,8 @@ test('sends one request for the whole analysis: one entry per scene, with what r
   expect(sent!.maxTokens).toBe(200 + 400 * 2);
   const body = JSON.parse(sent!.user);
   expect(body.video).toEqual({ summary: 'A man unboxes a cream jersey in a living room.', format: '开箱', look: 'Vertical 9:16; soft frontal light, neutral (about 5000K).' });
+  // The model is told the count: on a one-scene clip filmed in three cuts it once answered one prompt per cut.
+  expect(body.count).toBe(2);
   expect(body.scenes).toHaveLength(2);
   expect(body.scenes[0]).toMatchObject({ n: 1, seconds: 5.5, role: 'hook', beat: 'A tattooed man pulls a cream jersey out of a bag.' });
   expect(body.scenes[0].cuts).toEqual([
