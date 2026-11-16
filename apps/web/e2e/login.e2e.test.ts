@@ -1,8 +1,9 @@
 import { expect, test } from '@playwright/test';
-import { loginReady, signIn } from './support.test';
+import { loginReady, newAddress, signIn } from './support.test';
 import { PASSWORD, USERS } from './users';
 
 test('the login page refuses a wrong password and has no Lark button while Lark is not configured', async ({ page }) => {
+  await newAddress(page); // its own sign-in limiter bucket, as signIn() takes: the form sign-ins of this file share one otherwise
   await page.goto('/');
   await expect(page).toHaveURL(/\/login$/);
   await expect(page.getByRole('button', { name: /Lark/ })).toHaveCount(0);
@@ -20,6 +21,7 @@ test('only an Admin sees the remaining company budget', async ({ page }) => {
 });
 
 test('a signed-out visit to the Library goes to the login page and back to the Library after the sign-in', async ({ page }) => {
+  await newAddress(page); // its own sign-in limiter bucket, as signIn() takes: the form sign-ins of this file share one otherwise
   // A filter the Library keeps in its address: it rewrites an unknown one (such as ?tab=) away as it loads, racing this check.
   await page.goto('/library?kind=videos');
   await expect(page).toHaveURL(/\/login\?next=%2Flibrary%3Fkind%3Dvideos$/);
@@ -31,6 +33,7 @@ test('a signed-out visit to the Library goes to the login page and back to the L
 });
 
 test('a login link that points at another site still lands on Create', async ({ page }) => {
+  await newAddress(page); // its own sign-in limiter bucket, as signIn() takes: the form sign-ins of this file share one otherwise
   await page.goto('/login?next=%2F%2Fevil.example');
   await loginReady(page);
   await page.getByLabel('Email').fill(USERS.member1.email);
