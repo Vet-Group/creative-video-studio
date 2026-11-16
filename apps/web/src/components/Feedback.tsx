@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { FEEDBACK_KINDS, FEEDBACK_STATUSES, type FeedbackKind } from '@cvs/db';
 import { ApiError, api, errorText, sendJson, thumbUrl } from '@/lib/api';
+import { Icon } from './Icon';
 import { LoadError } from './LoadError';
 import { BODY_MAX, feedbackTime, KIND_LABEL, type ListedFeedback, MAX_IMAGES, STATUS_LABEL, TITLE_MAX } from '@/lib/feedback';
 
@@ -23,10 +24,11 @@ export function Feedback() {
   const [statusFilter, setStatusFilter] = useState('');
   const [sort, setSort] = useState<Sort>('new');
   const [query, setQuery] = useState('');
+  const [mineOnly, setMineOnly] = useState(false);
   const [open, setOpen] = useState(false);
 
   const needle = query.trim().toLowerCase();
-  const shown = needle ? items.filter((it) => `${it.title} ${it.authorName}`.toLowerCase().includes(needle)) : items;
+  const shown = items.filter((it) => (!mineOnly || it.mine) && (!needle || `${it.title} ${it.authorName} ${it.body}`.toLowerCase().includes(needle)));
 
   useEffect(() => {
     let live = true;
@@ -75,7 +77,7 @@ export function Feedback() {
       <div className="fb-filters">
         <label className="fb-search">
           <span>Tìm</span>
-          <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Tìm theo tiêu đề hoặc người gửi…" />
+          <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Tìm theo tiêu đề, nội dung hoặc người gửi…" />
         </label>
         <label>
           Loại
@@ -106,6 +108,10 @@ export function Feedback() {
             <option value="top">Nhiều bình chọn</option>
           </select>
         </label>
+        <label className="fb-mine">
+          <input type="checkbox" checked={mineOnly} onChange={(e) => setMineOnly(e.target.checked)} />
+          Chỉ của tôi
+        </label>
       </div>
 
       {loading ? (
@@ -115,7 +121,7 @@ export function Feedback() {
       ) : items.length === 0 ? (
         <p className="muted">Chưa có góp ý nào. Hãy là người đầu tiên!</p>
       ) : shown.length === 0 ? (
-        <p className="muted">Không có góp ý nào khớp “{query.trim()}”.</p>
+        <p className="muted">{needle ? `Không có góp ý nào khớp “${query.trim()}”.` : 'Bạn chưa gửi góp ý nào.'}</p>
       ) : (
         <>
         {voteError && <p className="error" role="alert">Chưa bình chọn được. Hãy thử lại.</p>}
@@ -130,11 +136,18 @@ export function Feedback() {
                 <Link href={`/feedback/${it.id}`} className="fb-title">
                   {it.title}
                 </Link>
+                <p className="fb-excerpt">{it.body}</p>
                 <div className="fb-meta">
                   <span className={`fb-tag k-${it.kind}`}>{KIND_LABEL[it.kind]}</span>
                   <span className={`fb-tag s-${it.status}`}>{STATUS_LABEL[it.status]}</span>
+                  {it.adminNote && (
+                    <span className="fb-replied">
+                      <Icon name="check" size={12} /> Đã phản hồi
+                    </span>
+                  )}
                   <span className="muted">
                     {it.authorName} · {feedbackTime(it.createdAt)} · {it.comments} bình luận
+                    {it.imageAssetIds.length > 0 && ` · ${it.imageAssetIds.length} ảnh`}
                   </span>
                 </div>
               </div>
