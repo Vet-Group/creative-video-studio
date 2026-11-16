@@ -33,7 +33,7 @@ export type Fetch = typeof fetch;
 export type ReadImage = (url: string, opts?: { ratio?: string }) => Promise<{ bytes: Uint8Array; contentType: string }>;
 
 /** Every request after submit gets a bounded wait, so a stuck provider cannot hang a poll. */
-export const timeout = (): AbortSignal => AbortSignal.timeout(30_000);
+export const timeout = (ms = 30_000): AbortSignal => AbortSignal.timeout(ms);
 
 /** A response body as text, refused past `max` bytes so a misbehaving server cannot fill memory. */
 export async function boundedText(res: Response, what: string, max: number): Promise<string> {

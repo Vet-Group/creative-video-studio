@@ -31,8 +31,8 @@ const PRODUCT = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
 const analysis = {
   durationS: 2, shotCount: 2, format: 'product showcase', hook: 'h', summary: 's',
   shots: [
-    { index: 1, start: 0, end: 1, role: 'hook', prompt: 'A model turns to the camera.' },
-    { index: 2, start: 1, end: 2, role: 'mood', prompt: 'A close-up of the shirt.' },
+    { index: 1, start: 0, end: 1, role: 'hook', prompt: 'A model turns to the camera.' }, // stored before the point was kept apart
+    { index: 2, start: 1, end: 2, role: 'mood', point: 'A close-up of the shirt.', prompt: 'Close-up at eye level on a static camera; the product fills the frame as a hand smooths it flat.' },
   ],
 };
 
@@ -89,7 +89,7 @@ test('remakes every chosen shot from its own clip, joins the clips with a before
   expect(r.error).toBeNull();
   expect(r.cost_usd).toBe('0.400000'); // 2 shots x 2 s x $0.10
   expect(r.result.shots.map((s: { index: number; status: string }) => [s.index, s.status])).toEqual([[1, 'succeeded'], [2, 'succeeded']]);
-  // The product image and the shot's own English description go to the edit; each 1 s shot is sent as the 2 s the edit takes at least.
+  // The product image and the shot's own English point (an older result's prompt) go to the edit; each 1 s shot is sent as the 2 s the edit takes at least.
   expect(calls).toEqual(['edit 2s image/png A model turns to the camera.', 'edit 2s image/png A close-up of the shirt.']);
   const sent = join(dir, 'sent.mp4');
   await writeFile(sent, sentClips[0]!);

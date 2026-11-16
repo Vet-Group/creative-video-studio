@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
-import { parseBreakdown } from './breakdown';
+import { type Analysis, mergeShots, parseBreakdown } from './breakdown';
 
 // A representative slice of a rea-video breakdown.json (apparel reference clip from the spike),
 // carrying the deterministic verdict/material flags so the test can prove they are ignored.
@@ -22,14 +22,15 @@ const sample = {
   ],
 };
 
-test('builds the analysis from the VLM layer (summary, format, hook, per-shot English prompt)', () => {
+test('builds the analysis from the VLM layer (summary, format, hook, per-shot English point, which is the prompt until the worker rewrites it)', () => {
   const a = parseBreakdown(sample);
   expect(a.durationS).toBe(11.433);
   expect(a.shotCount).toBe(1);
   expect(a.format).toBe('product showcase');
   expect(a.hook).toContain('Clean minimalist apparel');
   expect(a.summary).toContain('plain white t-shirt');
-  expect(a.shots).toEqual([{ index: 1, start: 0, end: 11.433, role: 'mood', prompt: 'Model posing and slightly adjusting hair in a clean studio setting to showcase a plain white t-shirt.' }]);
+  const point = 'Model posing and slightly adjusting hair in a clean studio setting to showcase a plain white t-shirt.';
+  expect(a.shots).toEqual([{ index: 1, start: 0, end: 11.433, role: 'mood', point, prompt: point }]);
 });
 
 test('ignores the unreliable deterministic verdict/material flags', () => {
@@ -56,4 +57,31 @@ test('parses a real rea-video breakdown.json fixture into non-empty prompts (gua
   expect(a.shotCount).toBeGreaterThanOrEqual(1);
   expect(a.summary.length).toBeGreaterThan(10);
   expect(a.shots.every((s) => s.prompt.length > 0)).toBe(true);
+});
+
+const scenes = (shots: Analysis['shots']) => mergeShots({ durationS: 0, shotCount: shots.length, format: '', hook: '', summary: '', shots });
+
+test('mergeShots joins adjacent shots on their role and point, so the distinct detailed prompts still merge', () => {
+  const m = scenes([
+    { index: 1, start: 0, end: 2, role: 'hook', point: 'Beat A.', prompt: 'Wide shot; the model walks in.' },
+    { index: 2, start: 2, end: 4, role: 'hook', point: 'Beat A.', prompt: 'Close-up; the model smiles.' },
+    { index: 3, start: 4, end: 6, role: 'proof', point: 'Beat A.', prompt: 'Close-up; the model smiles.' }, // another role: its own scene
+    { index: 4, start: 6, end: 8, role: 'proof', point: 'Beat B.', prompt: 'Close-up; the model smiles.' }, // another point: its own scene
+  ]);
+  expect(m.shots.map((s) => [s.index, s.start, s.end, s.prompt])).toEqual([
+    [1, 0, 4, 'Wide shot; the model walks in.'],
+    [2, 4, 6, 'Close-up; the model smiles.'],
+    [3, 6, 8, 'Close-up; the model smiles.'],
+  ]);
+  expect(m.first).toEqual([1, 3, 4]);
+});
+
+test('mergeShots reads an older result without points on its prompts, which were the points', () => {
+  const m = scenes([
+    { index: 1, start: 0, end: 2, role: 'hook', prompt: 'Beat A.' },
+    { index: 2, start: 2, end: 4, role: 'hook', prompt: 'Beat A.' },
+    { index: 3, start: 4, end: 6, role: 'hook', prompt: 'Beat B.' },
+  ]);
+  expect(m.first).toEqual([1, 3]);
+  expect(m.shots[0]!.end).toBe(4);
 });

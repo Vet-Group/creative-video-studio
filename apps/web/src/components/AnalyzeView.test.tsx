@@ -27,6 +27,17 @@ test('shows the mapped format, the hook, each shot English prompt and a link tha
   expect(html).toContain('5.2–11.4s'); // scene times in tenths of a second
   expect(html).toContain(`href="/create?prompt=${encodeURIComponent('Shot 1 (0.0–5.2s): Model poses to showcase a plain white t-shirt.\nShot 2 (5.2–11.4s): Close-up of the fabric & stitching.')}"`); // the whole script
   expect(html).not.toContain('analysis-time'); // no video beside it: the times are plain text
+  expect(html).toContain('Dùng cả kịch bản'); // every scene fits Create's prompt box
+});
+
+test('with long detailed prompts the script button says how many first scenes fit, and each scene still reads in full', () => {
+  const shots = [1, 2, 3, 4].map((i) => ({ index: i, start: i - 1, end: i, role: 'mood', point: `Beat ${i}.`, prompt: `${'word '.repeat(140)}${i}` }));
+  const vi = { format: '', hook: '', summary: '', shots: shots.map((s) => `Cận cảnh ngang tầm mắt, người mẫu đưa sản phẩm lại gần máy quay. ${'Rồi xoay nhẹ. '.repeat(30)}${s.index}`) };
+  const html = renderToStaticMarkup(<AnalysisResult analysis={{ ...analysis, shots, vi }} />);
+  expect(html).toContain('Dùng 2/4 cảnh đầu'); // each line is about 720 characters, so two fit in 2000
+  expect(html).toContain('đủ cho 2 cảnh đầu');
+  expect(html).toContain(`${'Rồi xoay nhẹ. '.repeat(30)}4`); // the Vietnamese reading is not cut
+  expect(html).toContain(`href="/create?prompt=${encodeURIComponent(shots[3]!.prompt)}"`); // and each scene's whole prompt still goes to Create
 });
 
 test('falls back to the model’s own format text when it is not one we label', () => {
