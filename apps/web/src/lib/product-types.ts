@@ -18,6 +18,9 @@ export const PRODUCT_TYPES: Record<string, string> = {
   cap: 'Mũ',
   jewelry: 'Trang sức',
   shoes: 'Giày, Crocs',
+  garage: 'Gara cover',
+  door: 'Door cover',
+  curtain: 'Door curtain',
   home: 'Đồ trang trí nhà',
   other: 'Khác',
 };
