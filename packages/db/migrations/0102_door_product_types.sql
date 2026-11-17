@@ -1,0 +1,2 @@
+ALTER TABLE "examples" DROP CONSTRAINT "examples_product_type_check";--> statement-breakpoint
+ALTER TABLE "examples" ADD CONSTRAINT "examples_product_type_check" CHECK ("examples"."product_type" in ('tshirt', 'jersey', 'hoodie', 'hawaiian', 'polo', 'mug', 'tumbler', 'ornament', 'flag', 'decal', 'poster', 'blanket', 'cap', 'jewelry', 'shoes', 'garage', 'door', 'curtain', 'home', 'other'));

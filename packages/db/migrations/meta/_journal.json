@@ -708,6 +708,13 @@
 			"when": 1795300000000,
 			"tag": "0101_can_impersonate",
 			"breakpoints": true
+		},
+		{
+			"idx": 101,
+			"version": "7",
+			"when": 1795400000000,
+			"tag": "0102_door_product_types",
+			"breakpoints": true
 		}
 	]
 }
