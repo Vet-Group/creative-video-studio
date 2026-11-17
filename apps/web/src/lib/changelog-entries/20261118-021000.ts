@@ -1,0 +1,3 @@
+import type { ChangeEntry } from '../changelog';
+
+export default { at: '2026-11-18T02:10:00+07:00', kind: 'improved', title: 'Dễ đọc, dễ bấm hơn trên các trang tạo', details: ['Chữ của các lựa chọn chưa chọn (như Nữ/Nam, độ tuổi ở Tạo người mẫu AI, Theo ảnh/Theo video ở Điều khiển chuyển động) đậm hơn để dễ đọc.', 'Các nút chữ nhỏ "Ảnh đã tải", "Thiết lập đã lưu", "Lưu thiết lập" và "Xem prompt gửi đi" có vùng bấm rộng hơn, nhất là trên điện thoại, mà không đổi chỗ.', 'Dòng tóm tắt phía trên nút Tạo (mô hình, tỉ lệ, độ dài, âm thanh) hiện đủ, xuống dòng thay vì bị cắt bằng dấu ba chấm; tên mô hình dài trong ô chọn mô hình và trên thẻ Thư viện hiện đủ khi rê chuột.'], prs: [515], audience: 'all' } satisfies ChangeEntry;
