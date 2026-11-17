@@ -1,0 +1,3 @@
+import type { ChangeEntry } from '../changelog';
+
+export default { at: '2026-11-13T13:00:00+07:00', kind: 'improved', title: 'Smart Remake giữ nguyên chuyển động của video gốc', details: ['Mỗi cảnh được thay sản phẩm ngay trên đoạn video gốc: người trong video vẫn cử động như cũ, giữ đúng khung hình dọc hoặc ngang và đúng độ dài cảnh, thay vì một clip vuông 5 giây gần như đứng yên.', 'Giá tính theo độ dài cảnh, $0.20 mỗi giây (mỗi cảnh từ 2 đến 10 giây); nút tạo hiện giá ước tính. Mỗi lượt có thêm video so sánh trước/sau, đặt cảnh gốc cạnh cảnh đã làm lại.'], href: '/analyze', prs: [422], audience: 'all' } satisfies ChangeEntry;

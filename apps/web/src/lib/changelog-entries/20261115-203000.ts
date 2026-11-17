@@ -1,0 +1,3 @@
+import type { ChangeEntry } from '../changelog';
+
+export default { at: '2026-11-15T20:30:00+07:00', kind: 'new', title: 'Mẫu video và phong cách ảnh cho hàng POD', details: ['Tạo video có thêm 17 mẫu cho hàng POD (áo thun, jersey, áo Hawaii, cốc, tumbler, ornament, cờ, decal, tranh, chăn, mũ, trang sức) và Tạo ảnh có thêm 8 phong cách cho hàng POD, xếp đầu bảng chọn.', 'Bảng chọn mẫu và bảng chọn phong cách giờ chia nhóm: Sản phẩm POD, Sản phẩm chung, Người mẫu thời trang.', 'Tab Ví dụ của Tạo video giờ có cả kết quả do Admin chọn, xếp trước video mẫu. Khi ví dụ được gắn loại hàng, mọi tab Ví dụ có hàng nút để lọc theo loại hàng.'], href: '/create', prs: [485], feedback: ['addee750-3bd7-4c37-ae56-713dee6db866'], audience: 'all' } satisfies ChangeEntry;

@@ -1,0 +1,3 @@
+import type { ChangeEntry } from '../changelog';
+
+export default { at: '2026-11-14T08:40:00+07:00', kind: 'improved', title: 'Nút Kiểm tra bắt lỗi góc máy và gợi ý sửa cụ thể hơn', details: ['Nút Kiểm tra dưới phần prompt gửi đi giờ ưu tiên tìm chỉ dẫn máy quay hoặc hành động mâu thuẫn nhau, ví dụ quay từ trên xuống mà lại giơ sản phẩm lên trước máy.', 'Mỗi cách sửa trích đúng cụm tiếng Anh cần đổi và ghi cụm thay thế, thay vì lời khuyên chung chung. Nút cũng không còn báo thiếu cỡ cảnh, ống kính hay câu âm thanh như một lỗi.'], href: '/create', prs: [456], audience: 'all' } satisfies ChangeEntry;

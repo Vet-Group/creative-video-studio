@@ -1,0 +1,3 @@
+import type { ChangeEntry } from '../changelog';
+
+export default { at: '2026-11-14T03:35:00+07:00', kind: 'new', title: 'Kiểm tra prompt trước khi tạo video', details: ['Ở Tạo video và Marketing Studio, khi bạn tự viết prompt, bấm Kiểm tra dưới phần Xem prompt gửi đi để AI rà lại: mở đầu đã thu hút trong 2 giây đầu chưa, có nguy cơ làm đổi sản phẩm hoặc thêm chữ, logo trên video không, hành động có vừa độ dài clip và hợp với mô hình đã chọn không.', 'Kết quả là tối đa 4 điểm cần sửa bằng tiếng Việt, mỗi điểm kèm một dòng cách sửa, hoặc "Prompt ổn, có thể chạy.". Việc kiểm tra không chặn nút Chạy và tính vào số lượt gợi ý mỗi ngày.'], href: '/create', prs: [442], audience: 'all' } satisfies ChangeEntry;

@@ -1,0 +1,3 @@
+import type { ChangeEntry } from '../changelog';
+
+export default { at: '2026-11-14T10:50:00+07:00', kind: 'improved', title: 'Bảy mẫu prompt cũ được viết lại cho clip ổn định hơn', details: ['Khung Xoay 360° giờ lướt vòng nhẹ rồi quay lại để luôn thấy mặt trước sản phẩm. Khung Phối đồ chỉ còn một bộ, khung Ưu và nhược còn hai ý cho vừa một clip ngắn.', 'Gợi ý Đường phố và Quán cà phê của Thử đồ chỉ đổi nền, giữ nguyên dáng người mẫu.', 'Gợi ý của Thử đồ lót chỉ đổi ánh sáng vì ảnh gốc giữ nguyên dáng và nền, nên đổi tên thành Nắng sớm dịu và Ánh sáng studio.'], prs: [461], audience: 'all' } satisfies ChangeEntry;

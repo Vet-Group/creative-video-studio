@@ -1,0 +1,3 @@
+import type { ChangeEntry } from '../changelog';
+
+export default { at: '2026-11-16T15:05:00+07:00', kind: 'improved', title: 'Admin xem được phân tích video của mọi người', details: ['Ở tab Lịch sử của trang Phân tích, Admin có ô Mọi người để xem phân tích của tất cả thành viên, mỗi phân tích ghi tên người tạo. Mở một liên kết phân tích bất kỳ cũng xem được kết quả, cùng nhà cung cấp, mô hình và chi phí.', 'Admin chỉ xem: không xoá hay chia sẻ phân tích của người khác. Smart Remake từ phân tích của người khác chỉ có khi phân tích đó đang được chia sẻ làm video mẫu.'], href: '/analyze', prs: [504], audience: 'admin' } satisfies ChangeEntry;

@@ -29,7 +29,7 @@ pnpm typecheck && pnpm test
 node scripts/check-english.mjs
 ```
 
-Every pull request with a change a member or an Admin can notice adds an entry to `apps/web/src/lib/changelog.ts` (the "What's new" page), in plain Vietnamese.
+Every pull request with a change a member or an Admin can notice adds one entry file to `apps/web/src/lib/changelog-entries/` (the "What's new" page), in plain Vietnamese. The file is named after the entry's `at` (`20261116-163000.ts` for `2026-11-16T16:30:00+07:00`); the folder's `index.ts` is generated and not committed, so entries from parallel pull requests never conflict. The rules are at the top of `apps/web/src/lib/changelog.ts`.
 
 ## Autonomous run
 

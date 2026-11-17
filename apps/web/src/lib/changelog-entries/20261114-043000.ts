@@ -1,0 +1,3 @@
+import type { ChangeEntry } from '../changelog';
+
+export default { at: '2026-11-14T04:30:00+07:00', kind: 'improved', title: 'Khung prompt có video xem trước', details: ['Mỗi khung prompt có thể có một clip mẫu nhỏ ngay trên thẻ, để bạn thấy khung đó cho ra kiểu video nào trước khi chọn. Trên máy tính, clip chạy khi bạn rê chuột vào thẻ.', 'Khung nào chỉ hợp với một loại ảnh, như Selfie gương cần ảnh người mặc đồ, có ghi chú nhỏ ngay dưới mô tả.', 'Người có quyền biên tập mẫu thấy nút Tải clip mẫu hoặc Thay clip mẫu trên từng thẻ để tải clip MP4 lên.'], href: '/create', prs: [451], audience: 'all' } satisfies ChangeEntry;

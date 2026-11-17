@@ -1,0 +1,3 @@
+import type { ChangeEntry } from '../changelog';
+
+export default { at: '2026-11-12T23:13:44+07:00', kind: 'improved', title: 'Lịch sử và thông báo dẫn thẳng tới kết quả', details: ['Nút Xem trên thông báo "đã xong" và trong mục Việc của tôi mở thẳng ảnh hoặc clip vừa tạo trong Thư viện; thông báo lỗi nói rõ công cụ nào và dẫn tới Lịch sử của nó.', 'Ở các trang Ứng dụng, bấm mô tả hoặc chip tỉ lệ, độ phân giải trên thẻ Lịch sử là điền vào form; lượt đang chạy hiện khung chờ đúng tỉ lệ.', 'Trên điện thoại, sau khi bấm Chạy có nút Xem Lịch sử; ở Phân tích video, mỗi cảnh có nút chép prompt tiếng Anh.'], prs: [408], audience: 'all' } satisfies ChangeEntry;

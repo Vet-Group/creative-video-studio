@@ -1,0 +1,3 @@
+import type { ChangeEntry } from '../changelog';
+
+export default { at: '2026-11-13T15:30:00+07:00', kind: 'new', title: 'Smart Remake thành ứng dụng riêng: chỉ cần một video và một ảnh sản phẩm', details: ['Mở Ứng dụng > Smart Remake, thêm một video mẫu và một ảnh sản phẩm. Video được phân tích ngay, AI tự tick sẵn các cảnh có sản phẩm giống của bạn, và bạn bấm một nút để tạo video.', 'Bạn vẫn xem giá trên nút Tạo, xác nhận trước khi tiền được tính, và bỏ hoặc thêm cảnh được. Nếu AI không chọn được cảnh nào, bạn tự chọn như trước. Smart Remake dưới mỗi bản phân tích ở trang Phân tích vẫn dùng được.'], href: '/apps/smart-remake', prs: [428], audience: 'all' } satisfies ChangeEntry;
