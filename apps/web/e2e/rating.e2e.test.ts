@@ -51,6 +51,13 @@ test('on a 390px phone the card is a full-width bottom sheet and the scores work
   await c.getByRole('radio', { name: '1 điểm', exact: true }).focus();
   await page.keyboard.press('ArrowRight');
   await expect(c.getByRole('radio', { name: '2 điểm', exact: true })).toBeChecked();
+  // Scrolled to the end of a page, its last control (Create's Run button) must clear the sheet, so the member never has to answer first.
+  await page.goto('/create');
+  await expect(card(page)).toBeVisible();
+  const run = page.getByRole('main').getByRole('button', { name: /^Tạo video/ });
+  await expect(run).toBeVisible();
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await expect.poll(async () => (await run.boundingBox())!.y + (await run.boundingBox())!.height).toBeLessThanOrEqual((await card(page).boundingBox())!.y);
 });
 
 test('a member can always rate from the Feedback page', async ({ page }) => {

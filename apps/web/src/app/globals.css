@@ -2753,6 +2753,8 @@ dialog.modal.compare-modal { width: min(760px, calc(100vw - 32px)); max-width: n
 .rating-block h2 { margin: 0; font-size: 1rem; }
 @media (max-width: 639.98px) {
   .rating-card { right: 0; bottom: 0; left: 0; width: auto; padding-bottom: calc(14px + env(safe-area-inset-bottom)); border-bottom: 0; border-radius: 14px 14px 0 0; }
+  /* Room under the page while the sheet is up, so its last control (Create's Run button) scrolls clear of the sheet. */
+  .content:has(> .rating-card) .frame { padding-bottom: calc(260px + env(safe-area-inset-bottom)); }
   .rating-scores { grid-template-columns: repeat(5, 1fr); }
   .rating-score, .rating-actions button { min-height: 44px; }
 }
