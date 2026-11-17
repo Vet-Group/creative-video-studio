@@ -156,6 +156,8 @@ export const USERS = {
   ratec: { email: 'ratec@e2e.test', name: 'E2E Rating C', role: 'member' },
   rated: { email: 'rated@e2e.test', name: 'E2E Rating D', role: 'member' }, // no jobs: only the Feedback page's block rates
   admin: { email: 'admin@e2e.test', name: 'E2E Admin', role: 'admin' },
+  // a11y.e2e: one finished clip, so a Library card shows its marks on a phone.
+  phonea: { email: 'phonea@e2e.test', name: 'E2E Phone A', role: 'member' },
 } as const;
 
 export type UserKey = keyof typeof USERS;
