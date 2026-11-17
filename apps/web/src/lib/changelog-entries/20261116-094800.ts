@@ -1,0 +1,3 @@
+import type { ChangeEntry } from '../changelog';
+
+export default { at: '2026-11-16T09:48:00+07:00', kind: 'improved', title: 'Góp ý báo cho bạn khi đội kỹ thuật cập nhật', details: ['Khi đội kỹ thuật đổi trạng thái hoặc trả lời một góp ý bạn đã gửi, bình chọn hay bình luận, mục Góp ý ở thanh bên hiện số góp ý có cập nhật, và góp ý đó có nhãn “Có cập nhật mới” cho tới khi bạn mở ra xem.', 'Góp ý đã được đưa vào một bản cập nhật có thêm mục “Đã có trong bản cập nhật”, dẫn tới trang Có gì mới.', 'Ô “Chỉ của tôi” giờ nằm sát chữ và gọn một dòng trên điện thoại.'], href: '/feedback', prs: [498], audience: 'all' } satisfies ChangeEntry;

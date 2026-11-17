@@ -1,4 +1,7 @@
 import { type NextConfig } from 'next';
+import { writeChangelogIndex } from './scripts/changelog-index';
+
+writeChangelogIndex();
 
 const config: NextConfig = {
   // The workspace packages ship TypeScript sources.

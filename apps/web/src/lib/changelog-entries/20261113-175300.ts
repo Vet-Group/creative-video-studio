@@ -1,0 +1,3 @@
+import type { ChangeEntry } from '../changelog';
+
+export default { at: '2026-11-13T17:53:00+07:00', kind: 'improved', title: 'Smart Remake: ảnh từng cảnh, mở lại khi tải lại trang, thời gian còn lại và so sánh ngay trong trang', details: ['Mỗi cảnh trong danh sách chọn có một ảnh nhỏ để bạn nhận ra cảnh. Địa chỉ trang giờ nhớ video mẫu đang mở, nên tải lại trang hoặc quay lại sau vẫn tiếp tục được (bạn chỉ cần thêm lại ảnh sản phẩm), và mục Video của bạn liệt kê các video đã làm gần đây.', 'Khi đang làm, trang cho biết đã xong bao nhiêu cảnh và còn khoảng bao lâu. Khi xong, bản so sánh trước/sau phát ngay trong trang.'], href: '/apps/smart-remake', prs: [432], audience: 'all' } satisfies ChangeEntry;

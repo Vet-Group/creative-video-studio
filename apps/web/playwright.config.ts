@@ -1,6 +1,10 @@
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from '@playwright/test';
+import { writeChangelogIndex } from './scripts/changelog-index';
+
+// The specs import the changelog, which reads the generated entry index.
+writeChangelogIndex();
 
 try {
   process.loadEnvFile(fileURLToPath(new URL('../../.env', import.meta.url)));

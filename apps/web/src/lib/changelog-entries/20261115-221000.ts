@@ -1,0 +1,3 @@
+import type { ChangeEntry } from '../changelog';
+
+export default { at: '2026-11-15T22:10:00+07:00', kind: 'fixed', title: 'Dùng ví dụ chỉ lấy mẫu, không lấy ảnh của người khác', details: ['Ở tab Ví dụ của Tạo video, “Dùng ví dụ này” và “Dùng lại” trong chi tiết một kết quả của công ty giờ chỉ áp dụng mẫu (mẫu hoặc mô tả, mô hình, tỉ lệ, thời lượng, âm thanh). Ảnh đầu vào và cửa hàng của người làm ví dụ không còn bị chép sang, ảnh và cửa hàng bạn đã chọn được giữ nguyên.', 'Ở Smart Remake, sau khi chọn một video mẫu, trang tự cuộn tới ô Ảnh sản phẩm để bạn thêm ảnh ngay.'], href: '/create', prs: [490], audience: 'all' } satisfies ChangeEntry;

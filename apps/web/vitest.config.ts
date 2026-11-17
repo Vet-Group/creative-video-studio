@@ -1,5 +1,8 @@
 import { fileURLToPath } from 'node:url';
 import { configDefaults, defineConfig } from 'vitest/config';
+import { writeChangelogIndex } from './scripts/changelog-index';
+
+writeChangelogIndex();
 
 export default defineConfig({
   resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },

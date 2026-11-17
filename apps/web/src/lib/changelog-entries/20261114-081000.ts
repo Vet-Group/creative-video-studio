@@ -1,0 +1,3 @@
+import type { ChangeEntry } from '../changelog';
+
+export default { at: '2026-11-14T08:10:00+07:00', kind: 'improved', title: 'Khung prompt được duyệt lại cho clip đẹp hơn', details: ['Các khung prompt mới được viết lại để khớp với ảnh bạn tải lên, ít cảnh hơn trong một clip ngắn, luôn để mặt trước sản phẩm hướng về máy quay và không có chữ trên màn hình.', 'Bỏ hai khung Mở gấp trên bàn và Cận hình in ở Tạo video, vì chúng dễ làm sai hình in. Bỏ gợi ý Selfie gương ở Thử đồ và Cạnh cửa sổ ở Thử đồ lót, vì hai công cụ này giữ nguyên tư thế và nền của ảnh gốc.', 'Một số khung ghi rõ hơn loại ảnh cần dùng, ví dụ Treo móc cần ảnh áo treo trên móc.'], href: '/create', prs: [455], audience: 'all' } satisfies ChangeEntry;

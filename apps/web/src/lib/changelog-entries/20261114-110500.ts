@@ -1,0 +1,3 @@
+import type { ChangeEntry } from '../changelog';
+
+export default { at: '2026-11-14T11:05:00+07:00', kind: 'improved', title: 'Thư viện: tìm không cần dấu, lọc đúng tỉ lệ và giữ chỗ đang xem', details: ['Ô tìm giờ tìm cả brief và tên cửa hàng, gõ không dấu vẫn ra (nguoi mau tìm được người mẫu). Bộ lọc Ngày có thêm Hôm qua.', 'Tỉ lệ trên thẻ và trong bộ lọc lấy theo kích thước thật của file, nên clip vuông không còn ghi 9:16 và không còn chữ auto. Bộ lọc có đủ các tỉ lệ đang có.', 'Sang tab khác rồi quay lại, danh sách không còn co lại và mục đang xem không bị đóng; kết quả mới chỉ được thêm lên đầu.'], prs: [463], audience: 'all' } satisfies ChangeEntry;

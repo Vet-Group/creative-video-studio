@@ -1,0 +1,3 @@
+import type { ChangeEntry } from '../changelog';
+
+export default { at: '2026-11-13T07:33:00+07:00', kind: 'new', title: 'Smart Remake: đưa sản phẩm của bạn vào video tham chiếu', details: ['Ở trang Phân tích video, dưới một bản phân tích đã xong: chọn ảnh sản phẩm và tối đa 6 cảnh. Mỗi cảnh được thay sản phẩm rồi dựng thành clip 5 giây, sau đó các clip được ghép lại thành một video không tiếng.', 'Nút tạo hiện giá ước tính (khoảng $0.15 mỗi cảnh), khoản này tính vào ngân sách video của công ty. Cảnh nào lỗi thì các clip còn lại vẫn được giữ và tải về được.'], href: '/analyze', prs: [413, 414, 416], audience: 'all' } satisfies ChangeEntry;

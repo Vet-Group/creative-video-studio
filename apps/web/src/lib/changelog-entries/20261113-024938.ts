@@ -1,0 +1,3 @@
+import type { ChangeEntry } from '../changelog';
+
+export default { at: '2026-11-13T02:49:38+07:00', kind: 'improved', title: 'Biểu mẫu và theo dõi lượt tạo bớt bất ngờ', details: ['Lượt đang chạy cho biết thường xong sau bao lâu, dựa trên các lượt gần đây của chính bạn với cùng mô hình. Khi mạng mất, mục Việc của tôi nói rõ và tự cập nhật lại khi có mạng.', 'Khi biểu mẫu tự đổi thời lượng, tỉ lệ hoặc mô hình vì mô hình không hỗ trợ, nó cho bạn biết; mô tả đang gõ dở được giữ lại khi tải lại trang.', 'Ảnh lớn hơn 10 MB được tự thu nhỏ thay vì bị từ chối, và có liên kết "Bỏ qua đến nội dung" cho người dùng bàn phím.'], prs: [411], audience: 'all' } satisfies ChangeEntry;

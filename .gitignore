@@ -18,6 +18,8 @@ evidence/
 next-env.d.ts
 *.tsbuildinfo
 .omc/
+# Generated from the entry files by apps/web/scripts/changelog-index.ts.
+apps/web/src/lib/changelog-entries/index.ts
 
 # Files deploy/linux/install.sh creates inside the app directory on the host.
 /node/

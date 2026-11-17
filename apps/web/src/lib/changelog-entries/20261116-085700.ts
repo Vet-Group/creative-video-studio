@@ -1,0 +1,3 @@
+import type { ChangeEntry } from '../changelog';
+
+export default { at: '2026-11-16T08:57:00+07:00', kind: 'improved', title: 'Trang Góp ý dễ đọc hơn', details: ['Phản hồi của đội kỹ thuật giữ nguyên xuống dòng, danh sách đánh số, chữ đậm và link, kèm ngày cập nhật, thay vì dồn thành một khối chữ dài.', 'Mỗi góp ý có dải tiến độ Mới → Đang xem → Đã xử lý. Bình luận của đội kỹ thuật có nhãn riêng để dễ nhận ra.', 'Danh sách hiện hai dòng đầu của nội dung, dấu “Đã phản hồi” và số ảnh đính kèm. Có ô “Chỉ của tôi”, và ô tìm kiếm tìm được cả trong nội dung.'], href: '/feedback', prs: [495], audience: 'all' } satisfies ChangeEntry;

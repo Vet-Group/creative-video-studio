@@ -1,0 +1,3 @@
+import type { ChangeEntry } from '../changelog';
+
+export default { at: '2026-11-16T11:40:00+07:00', kind: 'improved', title: 'Dùng ví dụ lấy cả ảnh, bấm Tạo được ngay', details: ['Ở tab Ví dụ của Tạo video, Tạo ảnh, Thử đồ và Marketing Studio, “Dùng ví dụ này” và “Dùng lại” trên một kết quả của công ty giờ điền đủ như ví dụ: mẫu hoặc mô tả, cài đặt, và cả ảnh sản phẩm, ảnh trang phục, người mẫu, ảnh tham chiếu. Bạn bấm Tạo được ngay để ra kết quả giống ví dụ.', 'Dưới ô ảnh có dòng “Đang dùng ảnh của ví dụ” để nhắc bạn thay bằng ảnh sản phẩm của mình. Cửa hàng bạn đang chọn được giữ nguyên.'], prs: [500], audience: 'all' } satisfies ChangeEntry;

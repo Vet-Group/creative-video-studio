@@ -1,0 +1,3 @@
+import type { ChangeEntry } from '../changelog';
+
+export default { at: '2026-11-14T11:30:00+07:00', kind: 'improved', title: 'Thư viện tải nhẹ hơn và dễ dùng bằng bàn phím', details: ['Lưới không còn tải trước các video gốc: video chỉ chạy khi rê chuột hoặc chọn tới, nên trang mở nhanh hơn và tốn ít mạng hơn.', 'Mở chi tiết một ảnh sẽ hiện bản xem trước nhẹ trước; Mở trong tab mới và Tải xuống vẫn lấy bản gốc.', 'Mỗi thẻ được đọc theo tính năng, mô hình và giờ tạo. Ba nút chấm Đạt, Nổi bật, Không đạt chỉ còn một lần Tab, dùng phím mũi tên để chọn. Nút Toàn màn hình có biểu tượng riêng.'], prs: [464], audience: 'all' } satisfies ChangeEntry;
