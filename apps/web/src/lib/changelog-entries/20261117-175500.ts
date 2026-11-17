@@ -1,3 +1,0 @@
-import type { ChangeEntry } from '../changelog';
-
-export default { at: '2026-11-17T17:55:00+07:00', kind: 'improved', title: 'Chọn ví dụ mẫu dễ thấy hơn, có bộ lọc Gợi ý làm ví dụ', details: ['Trong khung chi tiết ở Thư viện, nút "Đưa lên Ví dụ..." đổi thành "Chọn làm ví dụ mẫu" và nằm trong khung riêng "Ví dụ cho mọi người", ghi rõ kết quả sẽ hiện ở tab Ví dụ của trang nào.', 'Kết quả được đánh dấu Nổi bật mà chưa ở tab Ví dụ có khung viền màu, dòng "nên cân nhắc làm ví dụ" và nút chính màu nhấn.', 'Bộ lọc mới "Gợi ý làm ví dụ" chỉ hiện các kết quả Nổi bật chưa ở tab Ví dụ; chọn xong, kết quả rời danh sách và khung chi tiết chuyển sang mục kế tiếp.'], href: '/library?suggested=1', prs: [511], audience: 'admin' } satisfies ChangeEntry;

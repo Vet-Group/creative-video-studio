@@ -16,6 +16,16 @@ async function marketingClip(page: Page): Promise<string> {
   return id;
 }
 
+// An image result for the suggestions test: Tạo ảnh has an Examples tab, and no spec counts the mock image model's pass rate (flow and geometry
+// assert Mock E2E's 8/10, which a Pass on a marketing clip would move).
+async function imageClip(page: Page): Promise<string> {
+  const res = await page.request.post('/api/jobs', { data: { feature: 'image', modelId: 'mock-image-e2e', assetIds: [], ratio: '1:1', prompt: 'a suggested example', enhance: false, params: { resolution: '1K' } } });
+  expect(res.status(), await res.text()).toBe(201);
+  const { id } = (await res.json()) as { id: string };
+  await expect.poll(async () => ((await (await page.request.get(`/api/jobs/${id}`)).json()) as { status: string }).status, { timeout: 60_000 }).toBe('succeeded');
+  return id;
+}
+
 const tabOrder = async (page: Page) => ((await (await page.request.get('/api/examples?feature=marketing')).json()) as { examples: { id: string; posterAssetId: string }[] }).examples;
 
 test('an Admin filters the Library to the results on Ví dụ, each with its chip, and orders a tab by moving a row', async ({ page, browser }) => {
@@ -56,8 +66,8 @@ test('an Admin filters the Library to the results on Ví dụ, each with its chi
 
 test('an Admin lists the featured results not yet on Ví dụ and picks one from its panel, which takes it off the list', async ({ page, browser }) => {
   await signIn(page, 'admin');
-  const fresh = await marketingClip(page);
-  const shown = await marketingClip(page);
+  const fresh = await imageClip(page);
+  const shown = await imageClip(page);
   for (const id of [fresh, shown]) expect((await page.request.put(`/api/jobs/${id}/verdict`, { data: { verdict: 'pass', featured: true } })).status()).toBe(200);
   await addExamples(browser, [shown]);
 
@@ -78,6 +88,7 @@ test('an Admin lists the featured results not yet on Ví dụ and picks one from
   const lightbox = page.getByRole('dialog', { name: /^Chi tiết/ });
   const panel = lightbox.getByRole('region', { name: 'Ví dụ cho mọi người' });
   await expect(panel.getByText('Được đánh dấu Nổi bật · nên cân nhắc làm ví dụ')).toBeVisible();
+  await expect(panel.getByText('Hiện ở tab Ví dụ của trang Tạo ảnh, mọi người đều thấy và dùng lại được.')).toBeVisible();
   const pick = panel.getByRole('button', { name: 'Chọn làm ví dụ mẫu' });
   await expect(pick).toHaveClass('primary');
   await pick.click();
@@ -88,7 +99,7 @@ test('an Admin lists the featured results not yet on Ví dụ and picks one from
   // Now on Ví dụ, it leaves the suggestions, in the list shown (the detail view moves on, so nothing there reads "on Ví dụ") and on the server.
   await expect(check).toHaveCount(0);
   await expect(lightbox.getByText('Đang ở tab Ví dụ')).toHaveCount(0);
-  const after = ((await (await page.request.get('/api/library?kind=marketing&suggested=1')).json()) as { clips: { id: string }[] }).clips.map((c) => c.id);
+  const after = ((await (await page.request.get('/api/library?kind=image&suggested=1')).json()) as { clips: { id: string }[] }).clips.map((c) => c.id);
   expect(after).not.toContain(fresh);
 });
 
