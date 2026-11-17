@@ -20,6 +20,8 @@ const sessionsRoute = await import('../../me/sessions/route');
 const { GET: limits } = await import('../../me/limits/route');
 const { GET: listUsers } = await import('./route');
 const { DELETE: unlink } = await import('./[id]/accounts/[accountId]/route');
+const rating = await import('../../rating/route');
+const snooze = await import('../../rating/snooze/route');
 const { readSession } = await import('@/lib/session');
 
 const PASSWORD = 'correct-horse-battery';
@@ -211,6 +213,17 @@ describe('while signed in as a user', () => {
     expect(rename.status).toBe(403);
     expect((await sessionsRoute.DELETE(new Request(`${ORIGIN}/api/me/sessions`, { method: 'DELETE', headers: { cookie } }))).status).toBe(403);
     expect((await pool.query('select name from users where id = $1', [member])).rows[0].name).toBe('member@example.test');
+  });
+
+  test('the satisfaction rating and its snooze are refused, so an Admin never answers for the member', async () => {
+    const sent = await rating.POST(new Request(`${ORIGIN}/api/rating`, { method: 'POST', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify({ score: 9 }) }));
+    const later = await snooze.POST(new Request(`${ORIGIN}/api/rating/snooze`, { method: 'POST', headers: { cookie } }));
+    for (const res of [sent, later]) {
+      expect(res.status).toBe(403);
+      expect(((await res.json()) as { error: string }).error).toBe('not_allowed_while_impersonating');
+    }
+    const row = (await pool.query('select (select count(*)::int from ratings where user_id = $1) as n, rating_snoozed_until from users where id = $1', [member])).rows[0];
+    expect(row).toEqual({ n: 0, rating_snoozed_until: null });
   });
 
   test('an impersonated Admin cannot change their own email, password or 2FA, nor unlink their own sign-in methods', async () => {
