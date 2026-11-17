@@ -173,7 +173,7 @@
   --cat-utility-bg: #0f2e1c;
   --cat-utility-fg: #86efac;
   --garment-blend: normal;
-  --surface-raised: #2c2c31;
+  --surface-raised: #68686e; /* 3:1 on the #1c1c1f track, so the chosen segment shows (WCAG 1.4.11); the text keeps 4.7:1 */
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']):not(:has(.login)) {
@@ -230,7 +230,7 @@
     --cat-utility-bg: #0f2e1c;
     --cat-utility-fg: #86efac;
     --garment-blend: normal;
-    --surface-raised: #2c2c31;
+    --surface-raised: #68686e; /* 3:1 on the #1c1c1f track, so the chosen segment shows (WCAG 1.4.11); the text keeps 4.7:1 */
   }
 }
 * { box-sizing: border-box; }
@@ -290,7 +290,7 @@ main:focus { outline: none; } /* focus lands here from the skip link; it is not 
 .nav-progress[data-on='true'] { opacity: 1; transition: opacity 0s .15s; animation: nav-progress 8s linear .15s forwards; }
 @keyframes nav-progress { 0% { transform: scaleX(.3); } 12.5% { transform: scaleX(.55); } 25% { transform: scaleX(.7); } 100% { transform: scaleX(.9); } } /* 30% at once, 70% by 2 s, then slower; linear so the stops set the curve */
 /* The live sidebar's red "New" pill beside Marketing Studio. */
-.nav-badge { flex: none; margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: var(--badge-new); color: var(--on-dark); font-size: 10px; line-height: 15px; font-weight: 700; letter-spacing: .01em; }
+.nav-badge { flex: none; margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: var(--badge-new); color: var(--on-dark); font-size: 12px; line-height: 16px; font-weight: 700; letter-spacing: .01em; }
 .sidebar nav a:hover, .sidebar nav a[aria-current='page'] { background: var(--fill); }
 .sidebar nav a[aria-current='page'] { color: var(--ink); }
 .sidebar nav a[aria-current='page'] .nav-icon { color: var(--ink); }
@@ -1060,7 +1060,7 @@ dialog.admin-modal { width: min(36rem, calc(100vw - 2rem)); }
 .model-search:has(input:focus-visible) { outline: 2px solid var(--ink); outline-offset: 2px; }
 .model-search input { flex: 1; min-width: 0; padding: 0; border: 0; outline: none; background: transparent; color: var(--ink); font: inherit; font-size: 14px; }
 .model-pop [role='listbox'] { overflow-y: auto; padding-bottom: 8px; }
-.model-group { padding: 8px 12px 4px; color: var(--text-muted); font-size: 10px; line-height: 15px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; }
+.model-group { padding: 8px 12px 4px; color: var(--text-muted); font-size: 12px; line-height: 16px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; }
 .model-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 56px; padding: 6px 12px; cursor: pointer; }
 .model-row[data-active='true'] { background: rgb(var(--tint) / .04); }
 .model-row[aria-selected='true'] { background: rgb(var(--tint) / .06); }
@@ -1222,7 +1222,7 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .detail-date { margin: 0; color: var(--text-subtle); font-size: 12px; line-height: 18px; }
 .detail-tools { display: flex; gap: 6px; margin-top: 12px; padding-top: 11px; border-top: 1px solid var(--divider); }
 .detail-tools a { display: grid; place-items: center; width: calc((100% - 18px) / 4); height: 32px; border-radius: 6px; background: var(--fill); color: var(--text-2); }
-.detail-use { display: flex; align-items: center; justify-content: center; gap: 6px; height: 36px; margin: 6px 0 0; padding: 0 12px; border: 0; border-radius: 8px; background: var(--brand); color: var(--on-dark); font-size: 11px; line-height: 16.5px; font-weight: 600; text-decoration: none; }
+.detail-use { display: flex; align-items: center; justify-content: center; gap: 6px; height: 36px; margin: 6px 0 0; padding: 0 12px; border: 0; border-radius: 8px; background: var(--brand); color: var(--on-dark); font-size: 12px; line-height: 18px; font-weight: 600; text-decoration: none; }
 .detail-step { position: fixed; top: 50%; z-index: 3; display: grid; place-items: center; width: 36px; height: 36px; padding: 0; transform: translateY(-50%); border: 0; border-radius: 50%; background: rgb(var(--shade) / .5); color: var(--on-dark); }
 .detail-step[hidden] { display: none; }
 .detail-step.prev { left: 24px; }
@@ -1693,7 +1693,7 @@ dialog.modal.template-sheet { width: 100%; max-width: none; margin: auto 0 0; bo
 .variants label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
 .variants input[type='checkbox'] { width: 16px; min-width: 0; height: 16px; margin: 0; padding: 0; } /* the generic label-input min width must not push the box away from its text */
 .prompt-final { margin-top: 6px; padding: 8px 10px 10px; border: 1px solid var(--border-strong); border-left: 3px solid var(--brand); border-radius: 8px; background: var(--fill); }
-.prompt-final-label { display: block; color: var(--link); font-size: 11px; line-height: 16px; font-weight: 600; letter-spacing: .02em; }
+.prompt-final-label { display: block; color: var(--link); font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: .02em; }
 .prompt-preview .prompt-final p { margin: 4px 0 0; color: var(--ink); font-family: ui-monospace, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
 .prompt-preview .prompt-final p + p { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--border-strong); }
 .prompt-preview .prompt-final strong { font-family: 'Inter Variable', Inter, Arial, sans-serif; } /* a variant's name stays in the page's type */
@@ -1788,7 +1788,7 @@ dialog.modal.template-sheet { width: 100%; max-width: none; margin: auto 0 0; bo
 .slot-thumbs li { position: relative; width: 56px; height: 56px; }
 .slot-thumbs img, .slot-thumbs video { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: 12px; }
 .slot-thumbs button { position: absolute; top: -6px; right: -6px; display: grid; place-items: center; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%; background: var(--ink); color: var(--on-ink); }
-.slot-add { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; width: 56px; height: 56px; padding: 0; border: 1px dashed var(--border-strong); border-radius: 12px; background: var(--fill); color: var(--text-2); font-size: 11px; line-height: 14px; }
+.slot-add { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; width: 56px; height: 56px; padding: 0; border: 1px dashed var(--border-strong); border-radius: 12px; background: var(--fill); color: var(--text-2); font-size: 12px; line-height: 16px; }
 .slot-hint { color: var(--text-muted); font-size: 13px; line-height: 18px; }
 /* Create video's reference audio: one line per clip, its name and length, then the remove button. */
 .clips { display: flex; flex: 1 1 100%; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; font-size: 13px; line-height: 18px; }
@@ -1814,7 +1814,7 @@ dialog.modal.template-sheet { width: 100%; max-width: none; margin: auto 0 0; bo
 .slot-samples img[src*='try-on-garment'] { mix-blend-mode: var(--garment-blend); } /* the garments' white studio ground takes the tray's grey, as on the live page */
 .slot-samples li:only-child img { width: 100%; }
 .slot:has(.slot-samples) .slot-add { flex: none; width: 76px; height: 79px; border: 1px dashed var(--border-strong); border-radius: 12px; background: var(--fill); }
-.slot:has(.slot-samples) .slot-icon { display: flex; flex-direction: column; align-items: center; gap: 2px; width: auto; height: auto; background: none; font-size: 11px; line-height: 14px; }
+.slot:has(.slot-samples) .slot-icon { display: flex; flex-direction: column; align-items: center; gap: 2px; width: auto; height: auto; background: none; font-size: 12px; line-height: 16px; }
 /* An empty slot is one button: a grey circle over the hint, as Create video's drop zone and Marketing Studio's tiles, at any width. */
 .slot-add:has(.slot-hint) { flex: 1 1 100%; flex-direction: column; justify-content: center; align-self: stretch; gap: 6px; width: auto; height: auto; min-height: 79px; border: 0; background: transparent; text-align: center; }
 .slot:has(.slot-hint) { min-height: 105px; }
@@ -1923,6 +1923,7 @@ dialog.modal.template-sheet { width: 100%; max-width: none; margin: auto 0 0; bo
 .app-slots[data-two='true'] > .field:has(> .field-head) { position: relative; }
 .app-slots[data-two='true'] > .field > .field-head { position: absolute; right: 8px; bottom: 8px; z-index: 2; height: auto; }
 .app-slots[data-two='true'] > .field .uploads-link { padding: 2px 8px; border-radius: 10px; background: var(--surface); }
+.app-slots[data-two='true'] > .field:has(> .field-head .uploads-link) > .slot:has(> .slot-hint) { padding-bottom: 34px; } /* the video slot's hint ends above the corner link */
 /* As on Fash (measured 2026-10-29): the form scrolls without a scrollbar, so a short window keeps the full 272 px; the ratio and duration pills set a 12 px clock or an 8x14 ratio box 6 px before the value and a 10 px chevron. */
 .form-scroll:has(> .marketing-head) { scrollbar-width: none; }
 .form-scroll:has(> .marketing-head) .field-row .select-trigger { gap: 6px; }
@@ -1940,7 +1941,7 @@ dialog.modal.template-sheet { width: 100%; max-width: none; margin: auto 0 0; bo
 .marketing-slots .slot[data-one] .slot-thumbs li { width: 100%; height: 100%; }
 .marketing-slots .slot[data-one] .slot-thumbs img { border-radius: 17px; object-fit: contain; } /* the whole photo, as on Fash */
 /* Filled, the picture fills the tile inside its dashed edge and the name chip sits in the bottom-left corner with the tile's own curve, as on Fash. */
-.marketing-slots .slot-chip, .marketing-slots .choice-box[data-filled] .choice-value { left: 0; bottom: 0; max-width: 100%; padding: 8px; border-radius: 0 8px 0 17px; font-size: 10px; line-height: 15px; font-weight: 600; }
+.marketing-slots .slot-chip, .marketing-slots .choice-box[data-filled] .choice-value { left: 0; bottom: 0; max-width: 100%; padding: 8px; border-radius: 0 8px 0 17px; font-size: 12px; line-height: 16px; font-weight: 600; }
 /* The X mirrors the chip, as on Fash: a dark tab flush in the top-right corner with only its inner corner rounded. */
 .marketing-slots .slot[data-one] .slot-thumbs button, .marketing-slots .choice-clear { top: 0; right: 0; width: 24px; height: 22px; border-radius: 0 17px 0 8px; background: rgb(var(--shade) / .75); color: var(--on-dark); }
 .marketing-slots .choice-clear { top: 1px; right: 1px; } /* outside the box, so inside its 1 px dashed edge by hand */
@@ -1951,7 +1952,7 @@ dialog.modal.template-sheet { width: 100%; max-width: none; margin: auto 0 0; bo
 .marketing-slots .slot-wide .slot-thumbs img { object-fit: contain; border-radius: 6px; }
 .marketing-slots .slot-wide .slot-thumbs button { top: 6px; right: 6px; }
 .marketing-slots .slot-wide .slot:has(.slot-thumbs) .slot-add { width: auto; height: auto; aspect-ratio: 1; border: 1px dashed var(--text-disabled); border-radius: 12px; background: transparent; }
-.slot-chip, .choice-box[data-filled] .choice-value { position: absolute; left: 8px; bottom: 8px; z-index: 1; max-width: calc(100% - 16px); padding: 3px 8px; overflow: hidden; border-radius: 6px; background: rgb(var(--shade) / .75); color: var(--on-dark); font-size: 11px; line-height: 16px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.slot-chip, .choice-box[data-filled] .choice-value { position: absolute; left: 8px; bottom: 8px; z-index: 1; max-width: calc(100% - 16px); padding: 3px 8px; overflow: hidden; border-radius: 6px; background: rgb(var(--shade) / .75); color: var(--on-dark); font-size: 12px; line-height: 16px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 .choice-box[data-filled] { position: relative; padding: 0; overflow: hidden; }
 .marketing-slots .field:has(> .choice-box) { position: relative; }
 .choice-clear { position: absolute; top: 8px; right: 8px; z-index: 2; display: grid; place-items: center; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%; background: var(--ink); color: var(--on-ink); }
@@ -1959,7 +1960,7 @@ dialog.modal.template-sheet { width: 100%; max-width: none; margin: auto 0 0; bo
 .choice-box[data-filled] .slot-icon, .choice-box[data-filled] .choice-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 .marketing-slots .slot-wide { grid-column: 1 / -1; } /* Advanced: the reference slot spans the row above the hook and location boxes */
 .choice-box:hover { border-color: var(--ink); background: var(--surface-1); }
-.choice-optional { white-space: nowrap; padding: 1px 8px; border-radius: 999px; background: rgb(var(--tint) / .06); color: var(--text-muted); font-size: 11px; font-weight: 500; line-height: 16px; }
+.choice-optional { white-space: nowrap; padding: 1px 8px; border-radius: 999px; background: rgb(var(--tint) / .06); color: var(--text-muted); font-size: 12px; font-weight: 500; line-height: 16px; }
 /* Hovered or dragged over, a tile's round icon fills, so the whole tile reads as one button. */
 :is(.choice-box:hover, .slot-add:hover, .slot[data-over='true']) .slot-icon { background: var(--ink); color: var(--on-ink); transition: background-color .15s, color .15s; }
 .choice-value { color: var(--ink); font-size: 13px; line-height: 18px; font-weight: 600; overflow-wrap: anywhere; }
@@ -2166,7 +2167,7 @@ dialog.modal.template-sheet { width: 100%; max-width: none; margin: auto 0 0; bo
 .lib-row-prompt { color: var(--text-2); font-size: 13px; line-height: 20px; }
 .lib-row-prompt.none { color: var(--text-subtle); }
 .lib-row-meta { color: var(--text-subtle); font-size: 12px; line-height: 18px; }
-.lib-mark { margin-left: 8px; padding: 0 8px; border-radius: 999px; background: var(--cat-utility-bg); color: var(--cat-utility-fg); font-size: 11px; line-height: 18px; font-weight: 500; }
+.lib-mark { margin-left: 8px; padding: 0 8px; border-radius: 999px; background: var(--cat-utility-bg); color: var(--cat-utility-fg); font-size: 12px; line-height: 18px; font-weight: 500; }
 .lib-mark.fail { background: var(--danger-soft); color: var(--danger); }
 .lib-row .actions { flex: none; gap: 2px; margin: 0; }
 :is(.lib-row, .lightbox-side) .verdict-marks { gap: 6px; margin: 0; }
@@ -2212,7 +2213,8 @@ dialog.modal.template-sheet { width: 100%; max-width: none; margin: auto 0 0; bo
   .library .grid .lib-meta { flex-wrap: wrap; }
   .library .grid .lib-who { flex-basis: 100%; }
   .library .grid .lib-when::before { content: none; }
-  .library-filters { padding: 3px 0; } /* wraps onto more rows (the base rule), room kept for the focus ring */
+  /* One scrolling row, like the type pills above, instead of three rows that pushed the first result down; the padding keeps the focus ring. */
+  .library-filters { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-inline: -4px; padding: 4px 24px 4px 4px; mask-image: linear-gradient(to right, rgb(var(--shade)) calc(100% - 24px), transparent); }
   .library-active { order: -1; margin: 0 4px 0 0; }
   .lib-row .actions { flex-basis: 100%; padding-left: 68px; }
   .zip-float { bottom: 12px; }
@@ -2249,9 +2251,9 @@ dialog.modal.verdict-guide { width: min(40rem, calc(100vw - 2rem)); }
 .lib-open { position: absolute; inset: 0; width: 100%; height: 100%; padding: 0; border: 0; border-radius: 0; background: none; cursor: zoom-in; }
 .lib-open:focus-visible { outline: 2px solid var(--ink-strong); outline-offset: -2px; }
 .lib-chips { position: absolute; bottom: 8px; left: 8px; display: flex; flex-wrap: wrap; gap: 4px; max-width: calc(100% - 124px); pointer-events: none; }
-.lib-chip { flex: none; max-width: 100%; overflow: hidden; padding: 0 8px; border-radius: 999px; background: rgb(var(--shade) / .6); color: var(--on-dark); font-size: 11px; line-height: 20px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.lib-chip { flex: none; max-width: 100%; overflow: hidden; padding: 0 8px; border-radius: 999px; background: rgb(var(--shade) / .6); color: var(--on-dark); font-size: 12px; line-height: 20px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
 .lib-chips .badge { flex: none; }
-.lib-verdict { position: absolute; top: 8px; right: 8px; max-width: calc(100% - 52px); overflow: hidden; padding: 0 8px; border-radius: 999px; background: var(--cat-utility-solid); color: var(--on-dark); font-size: 11px; line-height: 20px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; pointer-events: none; }
+.lib-verdict { position: absolute; top: 8px; right: 8px; max-width: calc(100% - 52px); overflow: hidden; padding: 0 8px; border-radius: 999px; background: var(--cat-utility-solid); color: var(--on-dark); font-size: 12px; line-height: 20px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; pointer-events: none; }
 .lib-verdict.featured { background: var(--favorite); color: var(--on-ink); }
 .lib-verdict.fail { background: var(--danger); color: var(--on-dark); }
 .lib-tools { position: absolute; right: 8px; bottom: 8px; display: flex; gap: 4px; }
@@ -2287,7 +2289,7 @@ dialog.modal.verdict-guide { width: min(40rem, calc(100vw - 2rem)); }
 .recipe dd { margin: 0; color: var(--ink); font-size: 12px; line-height: 18px; overflow-wrap: anywhere; }
 .recipe-store { display: grid; gap: 4px; margin: 0; color: var(--text-muted); font-size: 12px; font-weight: 500; }
 .recipe-store select { height: 32px; font-size: 13px; }
-.recipe-keys { margin: 0; color: var(--text-subtle); font-size: 11px; line-height: 16px; }
+.recipe-keys { margin: 0; color: var(--text-subtle); font-size: 12px; line-height: 16px; }
 /* An Admin's Examples panel in the detail view: its own box apart from the marks, stronger on a featured result not yet on Examples. */
 .example-panel { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--border-strong); border-radius: 10px; }
 .example-panel.suggested { border-color: var(--favorite); box-shadow: inset 3px 0 0 var(--favorite); }
@@ -2306,7 +2308,7 @@ dialog.modal.verdict-guide { width: min(40rem, calc(100vw - 2rem)); }
 .example-type { display: flex; align-items: center; gap: 8px; font-size: 13px; white-space: nowrap; }
 .example-type select { min-width: 0; height: 32px; padding: 0 8px; font: inherit; }
 .example-strip { max-height: 13rem; overflow-y: auto; }
-.example-match { color: var(--text-subtle); font-size: 11px; line-height: 16px; }
+.example-match { color: var(--text-subtle); font-size: 12px; line-height: 16px; }
 .example-order-open { justify-self: start; margin-bottom: 8px; font-size: 13px; }
 .example-order { display: grid; gap: 6px; max-height: 60vh; margin: 12px 0; padding: 0; overflow-y: auto; list-style: none; }
 .example-order li { display: grid; grid-template-columns: 40px 1fr auto auto; align-items: center; gap: 8px; padding: 4px 6px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); cursor: grab; }
@@ -2403,7 +2405,8 @@ dialog.modal.tool-guide { width: min(52rem, calc(100vw - 2rem)); }
 .explore-start .tool-goals { grid-template-columns: minmax(0, 1fr); }
 @media (min-width: 720px) { .explore-start .tool-goals { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (min-width: 1200px) { .explore-start .tool-goals { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-.explore-tool-text { display: -webkit-box; padding: 0 12px 12px; overflow: hidden; font-size: 12px; line-height: 17px; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
+/* The bottom space is a margin: a padding sits inside the clamped box and showed the top of a fourth line. */
+.explore-tool-text { display: -webkit-box; margin-bottom: 12px; padding: 0 12px; overflow: hidden; font-size: 12px; line-height: 17px; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
 
 /* Explore's first-visit card: three steps, closed for good with its button. */
 .welcome { position: relative; margin: 16px 0 0; padding: 16px 48px 16px 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--fill); }
@@ -2430,11 +2433,21 @@ dialog.modal.tool-guide { width: min(52rem, calc(100vw - 2rem)); }
 /* Phones: a 44 px hit area around the controls that draw smaller, which keep their look. Each control's own ::after is its hit area, so none reaches under another control:
    the image tile's actions get the gap that makes room for it, and the Library's two view buttons split the gap between them and use the free side. */
 @media (max-width: 480px) {
-  .explore-start-head .link-button, .library .segmented button, .card-actions > * { position: relative; }
-  :is(.tool-hint-close, .modal-close, .banner-chip, .uploads-link, .templates .link-button, .prompt-preview summary, .explore-start-head .link-button, .library .segmented button, .card-actions > *)::after { content: ''; position: absolute; inset: min(0px, calc((44px - 100%) / -2)); }
+  .explore-start-head .link-button, .library .segmented button, .card-actions > *, .enhance, .prompt-sections-head .link-button, .library-sub .link-button, .wizard-toggle, .app-change > button, .acct-row > :is(button, a) { position: relative; }
+  :is(.tool-hint-close, .modal-close, .banner-chip, .uploads-link, .templates .link-button, .prompt-preview summary, .explore-start-head .link-button, .library .segmented button, .card-actions > *, .theme-choice label, .enhance, .prompt-sections-head .link-button, .library-sub .link-button, .wizard-toggle, .app-change > button, .acct-row > :is(button, a))::after { content: ''; position: absolute; inset: min(0px, calc((44px - 100%) / -2)); }
+  .switch::before { content: ''; position: absolute; inset: -10px 0; } /* its ::after is the knob */
+  .angle-choice, .orientation-choice { row-gap: 14px; } /* wrapped choices: each row's hit area ends where the next row's begins */
+  .wizard-toggle { margin: 10px 0; } /* room for its hit area: the scrolling form clips above it, and the format card below is drawn over it */
   .card-actions { gap: 14px; }
   .library .segmented button:first-child::after { right: -1px; left: -12px; }
   .library .segmented button:last-child::after { right: -12px; left: -1px; }
+  /* Fields, the pills and the Library's toolbar draw at 44 px instead: they sit in rows and scrolling strips, where a wider hit area would reach under the next control or be clipped. */
+  .select-trigger, .apps-search input, .kinds button, .apps-tools .kinds button, .library-search, .library-field, .library-toggle, .library-tools .zip-toggle { height: 44px; }
+  .library-search input, .library-field :is(select, input) { height: 42px; }
+  .library-tools .zip-toggle { line-height: 42px; }
+  .library-tools .library-share { width: 44px; height: 44px; }
+  :is(.library-active .link-button, .library-empty-actions .button, .acct-rows + .actions button) { display: inline-flex; align-items: center; min-height: 44px; }
+  :is(.end-scene, .highlights) input[type='text'] { min-height: 44px; }
 }
 
 /* The Marketing Studio guided wizard: the step list, the step toggle and the step circles. */
@@ -2466,7 +2479,7 @@ dialog.modal.tool-guide { width: min(52rem, calc(100vw - 2rem)); }
   height: 18px;
   border: 1px solid var(--border-strong);
   border-radius: 50%;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1;
 }
 .wizard-steps li[data-active] .wizard-step-n {
@@ -2602,7 +2615,7 @@ dialog.modal.tool-guide { width: min(52rem, calc(100vw - 2rem)); }
 .store-picker[data-drop='up'] .store-pop { top: auto; bottom: calc(100% + 3px); }
 .store-search { flex: none; margin: 6px; padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--fill); color: var(--ink); font: inherit; font-size: 14px; }
 .store-pop ul { margin: 0; padding: 0 0 4px; overflow: auto; list-style: none; }
-.store-head { padding: 7px 12px 2px; color: var(--text-muted); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
+.store-head { padding: 7px 12px 2px; color: var(--text-muted); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
 .store-pop li[role='option'] { display: flex; align-items: center; gap: 8px; padding: 9px 12px; font-size: 14px; line-height: 21px; cursor: pointer; }
 .store-pop li[data-active='true'] { background: rgb(var(--tint) / .04); }
 .store-pop li[aria-selected='true'] { background: rgb(var(--tint) / .06); }

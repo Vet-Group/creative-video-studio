@@ -2,7 +2,7 @@
 /* minmax(0, 1fr) and min-width 0: the one-row chips scroll inside the box instead of widening the form column. */
 .composer { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; min-width: 0; }
 .head { display: flex; align-items: center; gap: 8px; min-height: 21px; }
-.optional { padding: 1px 8px; border-radius: 999px; background: rgb(var(--tint) / .06); color: var(--text-muted); font-size: 11px; font-weight: 500; line-height: 16px; }
+.optional { padding: 1px 8px; border-radius: 999px; background: rgb(var(--tint) / .06); color: var(--text-muted); font-size: 12px; font-weight: 500; line-height: 16px; }
 
 /* The box: a quiet fill at rest, the surface with a soft ring while typing; the popovers hang from it, full width. */
 .box { position: relative; display: flex; flex-direction: column; border: 1px solid var(--field-border); border-radius: 12px; background: var(--fill); transition: border-color .15s, background-color .15s, box-shadow .15s; }
@@ -43,7 +43,7 @@
 .option:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; }
 /* An option: its number, direction and length, the Vietnamese summary at body size, then the English the field takes, smaller and muted, its
    first six lines only: an option fills most of the model's room (thousands of characters), and a pick puts it whole in the box. */
-.optionLabel { display: block; margin-bottom: 4px; color: var(--text-muted); font-size: 11px; font-weight: 600; line-height: 16px; }
+.optionLabel { display: block; margin-bottom: 4px; color: var(--text-muted); font-size: 12px; font-weight: 600; line-height: 16px; }
 .optionVi { display: block; }
 .optionEn { display: -webkit-box; margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--border); color: var(--text-muted); font-size: 12px; line-height: 18px; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 6; line-clamp: 6; }
 .popNote { margin: -2px 2px 0; color: var(--text-muted); font-size: 12px; line-height: 18px; }
@@ -67,3 +67,12 @@
 .compact { position: static; }
 /* There the list still floats over the bar at the foot of the page, scrolling inside a taller box. */
 .compact .popover { position: absolute; bottom: calc(100% + 6px); left: 0; right: 0; z-index: 40; max-height: min(480px, 60vh); overflow-y: auto; margin: 0; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); box-shadow: 0 12px 32px rgb(var(--shade) / .16); }
+/* Phones: the tools and the starter pills take a 44 px tap through an invisible ::after. The toolbar's padding and the strip's padding hold it,
+   so it neither reaches another control (a wrapped toolbar row keeps 12 px apart) nor is clipped by the scrolling strip. */
+@media (max-width: 480px) {
+  .tool, .starter { position: relative; }
+  .tool::after, .starter::after { content: ''; position: absolute; inset: min(0px, calc((44px - 100%) / -2)); }
+  .iconTool { width: 44px; }
+  .toolbar { row-gap: 12px; }
+  .starters { padding-top: 8px; padding-bottom: 8px; }
+}
