@@ -92,6 +92,7 @@ export const USERS = {
   seta: { email: 'seta@e2e.test', name: 'E2E Settings A', role: 'member' },
   setb: { email: 'setb@e2e.test', name: 'E2E Settings B', role: 'member' },
   explorea: { email: 'explorea@e2e.test', name: 'E2E Explore Lan', role: 'member' }, // explore.e2e: the greeting by given name and the Continue strip
+  exploreb: { email: 'exploreb@e2e.test', name: 'E2E Explore Minh', role: 'member' }, // explore.e2e: a running job's elapsed time keeps counting
   libv: { email: 'libv@e2e.test', name: 'E2E Library View', role: 'member' }, // library.e2e: grid or list, the selection bar, search and the empty states
   // library.e2e: libra marks from the detail view and in bulk, librb owns the item libra may read but not mark.
   libra: { email: 'libra@e2e.test', name: 'E2E Library Recipe A', role: 'member' },
