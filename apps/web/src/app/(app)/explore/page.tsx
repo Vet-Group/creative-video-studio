@@ -162,7 +162,7 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
                     <span className="explore-job-media">{picture ? <img src={picture} alt="" loading="lazy" decoding="async" /> : <span className="banner-empty" aria-hidden="true" />}</span>
                     <strong>{featureLabel(j.feature)}</strong>
                     {/* What tells two jobs of one tool apart: the model, and the member's own words, as the Library's OWN_PROMPT picks them (a composed prompt is left out). */}
-                    {j.model_label && <span className="explore-job-model">{j.model_label}</span>}
+                    {j.model_label && <span className="explore-job-model" title={j.model_label}>{j.model_label}</span>}
                     {j.prompt && <span className="explore-job-prompt" title={j.prompt}>{j.prompt}</span>}
                     <span className="muted">
                       <ExploreJobNote {...noteProps(j)} />

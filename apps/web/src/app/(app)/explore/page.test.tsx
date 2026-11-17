@@ -114,7 +114,7 @@ test('the hero greets the member by given name for the time of day in Vietnam, w
   expect(html).toMatch(/<h1>Chào buổi chiều, Hưng<\/h1>/);
   expect(html).toContain('Hôm nay bạn còn 3/5 clip video');
   expect(html).not.toContain('đang chạy');
-  expect(html).not.toContain('Tiếp tục'); // no jobs: the first-run line instead
+  expect(html).not.toContain('id="explore-continue"'); // no jobs, no Continue section: the first-run line instead (the news list may name it)
   expect(html).toContain('Bạn chưa tạo clip hay ảnh nào');
 });
 
@@ -200,12 +200,12 @@ test('a -vertex or -byteplus twin shows its model written description, not the s
   expect(html).not.toContain('Điểm 0/100');
 });
 
-test('every Explore text the stylesheet clamps carries its whole text as a title, so the cut-off part can still be read', async () => {
+test('every Explore text the stylesheet cuts short (a line clamp or an ellipsis) carries its whole text as a title, so the cut-off part can still be read', async () => {
   const css = readFileSync(new URL('../../globals.css', import.meta.url), 'utf8');
-  const clamped = [...css.matchAll(/\.(explore-[a-z-]+)\s*\{[^}]*-webkit-line-clamp/g)].map((m) => m[1]!);
-  expect(clamped).toEqual(expect.arrayContaining(['explore-job-prompt', 'explore-card-text', 'explore-tool-text']));
+  const clamped = [...css.matchAll(/\.(explore-[a-z-]+)\s*\{[^}]*(?:-webkit-line-clamp|text-overflow:\s*ellipsis)/g)].map((m) => m[1]!);
+  expect(clamped).toEqual(expect.arrayContaining(['explore-job-model', 'explore-job-prompt', 'explore-card-text', 'explore-tool-text']));
   vi.mocked(pool.query).mockImplementation((async (sql: string) => ({
-    rows: sql.includes('from jobs') ? [job('vid-1', 'succeeded', { prompt: 'a slow turn of the red mug' })] : sql.includes('from model_configs') ? modelRows(1, 'video') : [],
+    rows: sql.includes('from jobs') ? [job('vid-1', 'succeeded', { model_label: 'Kling O3 Pro', prompt: 'a slow turn of the red mug' })] : sql.includes('from model_configs') ? modelRows(1, 'video') : [],
   })) as never);
   try {
     const html = renderToStaticMarkup(await ExplorePage(props()));
@@ -226,8 +226,8 @@ test('a Continue card names its model and, when the member wrote it, their promp
   ]);
   const list = html.match(/<ul class="explore-jobs"[^>]*>([\s\S]*?)<\/ul>/)![1]!;
   const cards = [...list.matchAll(/<a [^>]*>([\s\S]*?)<\/a>/g)].map(([, inner]) => inner!);
-  expect(cards[0]).toContain('<span class="explore-job-model">Kling O3 Pro</span>');
+  expect(cards[0]).toContain('<span class="explore-job-model" title="Kling O3 Pro">Kling O3 Pro</span>');
   expect(cards[0]).toMatch(/<span class="explore-job-prompt" title="a slow turn of the red mug">a slow turn of the red mug<\/span>/);
-  expect(cards[1]).toContain('<span class="explore-job-model">Seedance 2.0</span>');
+  expect(cards[1]).toContain('<span class="explore-job-model" title="Seedance 2.0">Seedance 2.0</span>');
   expect(cards[1]).not.toContain('explore-job-prompt'); // a composed prompt is not shown
 });
