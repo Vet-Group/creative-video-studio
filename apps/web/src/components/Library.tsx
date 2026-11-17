@@ -370,7 +370,7 @@ export function ClipCard({ clip, view, select, onChange, onDeleted, onOpen }: { 
         {tools}
       </div>
       <div className="lib-info">
-        <p className="lib-title">{clip.modelLabel}</p>
+        <p className="lib-title" title={clip.modelLabel}>{clip.modelLabel}</p>
         <p className="lib-meta">
           {/* One line on a wide card: a long name is cut, never the time or the cost, so the marks below line up across a row.
               The phone's two columns put the name on its own line (globals.css), so its leading dot is drawn by CSS. */}

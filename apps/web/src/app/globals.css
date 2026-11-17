@@ -297,6 +297,12 @@ main:focus { outline: none; } /* focus lands here from the skip link; it is not 
 .topbar { position: sticky; top: 0; z-index: 99; display: flex; align-items: center; gap: 12px; height: 57px; padding: 8px 0; background: var(--surface); border-bottom: 1px solid rgb(var(--tint) / .1); }
 .fal-low { margin: 12px 16px 0; }
 .impersonation-banner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; margin: 12px 16px 0; border-width: 2px; font-weight: 500; }
+/* A phone keeps the banner to one line, the name and the exit button; the sign-in-as dialog has already said whose account pays. */
+@media (max-width: 640px) {
+  .impersonation-banner { flex-wrap: nowrap; margin: 8px 16px 0; padding: 6px 6px 6px 10px; font-size: 13px; line-height: 18px; }
+  .impersonation-banner > button { flex: none; }
+  .impersonation-note { display: none; }
+}
 .topbar strong { font-size: 18px; line-height: 27px; font-weight: 600; color: var(--ink); }
 .topbar > .account { flex: none; margin-left: auto; margin-right: 6px; }
 /* The account button and its menu: the chip at the bottom of the sidebar, or the avatar in the top bar. */
@@ -927,8 +933,9 @@ dialog.admin-modal { width: min(36rem, calc(100vw - 2rem)); }
 .tabs button:hover { background: var(--fill); }
 .tabs button[aria-selected='true'] { background: var(--ink-strong); color: var(--on-ink); }
 @media (max-width: 599.98px) { .tabs button { position: relative; } .tabs button::after { content: ''; position: absolute; inset: -7px 0; } } /* the 30 px pill keeps its look; its hit area is 44 px */
-/* z-index: the card is a stacking context (sticky), so its menus must sit above the Examples pane painted after it. */
-.form-card { position: relative; z-index: 2; display: flex; flex-direction: column; height: calc(100dvh - 131px); min-height: 440px; padding: 24px; overflow: hidden; border: 0; border-radius: 8px; box-shadow: 0 12px 40px rgb(var(--shade) / .12); }
+/* z-index: the card is a stacking context (sticky), so its menus must sit above the Examples pane painted after it.
+   --impersonation-h: the sign-in-as banner's height (ImpersonationBanner sets it), which the screen-tall card gives up so Run stays in view. */
+.form-card { position: relative; z-index: 2; display: flex; flex-direction: column; height: calc(100dvh - 131px - var(--impersonation-h, 0px)); min-height: 440px; padding: 24px; overflow: hidden; border: 0; border-radius: 8px; box-shadow: 0 12px 40px rgb(var(--shade) / .12); }
 .form-scroll { flex: 1; min-height: 0; overflow-y: auto; margin: 0 -2px; padding: 0 4px 14px; }
 /* While more of the form lies below, its last visible line fades out instead of being cut by the Run bar; the fade follows the scroll and is gone at the end (or when nothing scrolls). Menus (z-index 50) stay above it. */
 .form-scroll::after { content: ''; position: sticky; bottom: -14px; z-index: 1; display: block; height: 32px; margin: -32px -4px -14px; background: linear-gradient(transparent, var(--surface)); opacity: 0; pointer-events: none; }
@@ -939,7 +946,7 @@ dialog.admin-modal { width: min(36rem, calc(100vw - 2rem)); }
 .form-message { padding-top: 8px; font-size: 14px; line-height: 21px; }
 .form-message p { margin: 0; }
 .runbar { margin: 0 -24px -24px; }
-.run-summary { margin: 0; padding: 6px 24px 8px; overflow: hidden; color: var(--text-muted); font-size: 12px; line-height: 18px; text-overflow: ellipsis; white-space: nowrap; }
+.run-summary { margin: 0; padding: 6px 24px 8px; color: var(--text-muted); font-size: 12px; line-height: 18px; } /* wraps rather than cuts: it is the last look at what Run will make */
 .runbar button.primary.run { display: flex; align-items: center; justify-content: center; gap: 12px; width: 100%; height: 60px; margin: 0; padding: 12px 16px; border: 0; border-radius: 8px; background: var(--brand); color: var(--on-dark); font-size: 16px; line-height: 24px; font-weight: 500; }
 /* A disabled Run looks the same on every tool, the brand red at half strength (the base disabled rule); the reason line says why. */
 .field { display: grid; gap: 6px; margin-top: 16px; }
@@ -1233,10 +1240,10 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
   .create-grid { grid-template-columns: 320px minmax(0, 1fr); grid-template-areas: 'form tabs' 'form side'; grid-template-rows: auto 1fr; gap: 0 32px; align-items: start; }
   .tabs { position: static; grid-area: tabs; justify-self: center; gap: 4px; margin: 8px 0 20px; }
   .tabs button { flex: none; height: 37px; padding: 8px 20px; font-size: 14px; line-height: 21px; }
-  .form-card { grid-area: form; position: sticky; top: 16px; width: 320px; height: calc(100dvh - 24px); min-height: 0; border-radius: 24px; }
+  .form-card { grid-area: form; position: sticky; top: 16px; width: 320px; height: calc(100dvh - 24px - var(--impersonation-h, 0px)); min-height: 0; border-radius: 24px; }
   .side { grid-area: side; position: relative; z-index: 1; } /* below the form card, whose menus open over it */
   /* An app's panel is as tall as its inputs, as on the live app pages; Create keeps the full-height card. */
-  [aria-labelledby='app-title'] .form-card { height: auto; max-height: calc(100dvh - 24px); }
+  [aria-labelledby='app-title'] .form-card { height: auto; max-height: calc(100dvh - 24px - var(--impersonation-h, 0px)); }
   /* Try On and the app pages keep 24 px between the form and the tab, and Try On's About fills it, as on the live pages. */
   :is([aria-labelledby='app-title'], [aria-labelledby='tryon-title']) .create-grid { column-gap: 24px; }
   [aria-labelledby='tryon-title'] .about { max-width: none; }
@@ -1396,7 +1403,7 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .keys kbd { display: inline-grid; place-items: center; min-width: 26px; height: 24px; padding: 0 6px; border: 1px solid var(--border-strong); border-bottom-width: 2px; border-radius: 6px; background: var(--surface-1); color: var(--ink); font-family: inherit; font-size: 12px; line-height: 1; font-weight: 600; }
 /* The theme choice: a segmented row of radios, the chosen one raised like the Library's view toggle. */
 .theme-choice { margin: 8px 0 0; }
-.theme-choice label { position: relative; display: inline-flex; align-items: center; gap: 6px; height: 30px; margin: 0; padding: 0 12px; border-radius: 6px; color: var(--text-subtle); font-size: 13px; line-height: 18px; font-weight: 500; cursor: pointer; }
+.theme-choice label { position: relative; display: inline-flex; align-items: center; gap: 6px; height: 30px; margin: 0; padding: 0 12px; border-radius: 6px; color: var(--text-2); font-size: 13px; line-height: 18px; font-weight: 500; cursor: pointer; } /* text-subtle read 3.8:1 on the #fafafa track */
 .theme-choice label:hover { color: var(--ink); }
 .theme-choice label:has(:checked) { background: var(--surface-raised); color: var(--ink); box-shadow: 0 1px 2px rgb(var(--shade) / .08), 0 0 0 1px rgb(var(--tint) / .06); }
 .theme-choice label:has(:focus-visible) { outline: 2px solid var(--ink); outline-offset: 2px; }
@@ -1639,7 +1646,6 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .prompt-sections { min-width: 0; margin-top: 16px; }
 .prompt-sections-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
 .prompt-sections-head .theme-choice { margin: 0; }
-.prompt-sections-head .theme-choice label:not(:has(:checked), :hover) { color: var(--text-2); } /* the form card's grey, where the subtle one is too light to read */
 .prompt-sections-head .link-button { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; font-size: 13px; }
 /* The Khung prompt dialog's cards, in the choice grid: text only, so wider than a sample card and left-aligned. min-width 0: a one-line, cut template line must not widen its card. */
 .choice-grid.prompt-template-grid { grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); }
@@ -2417,12 +2423,15 @@ dialog.modal.tool-guide { width: min(52rem, calc(100vw - 2rem)); }
 .preset-card > img { display: block; width: 100%; aspect-ratio: 3 / 4; object-fit: cover; }
 /* A touch screen has no hover: Explore's preset tiles show their name and Create button at once, over a lighter shade. */
 @media (hover: none) { .explore-prompt-hover { opacity: 1; background: rgb(var(--shade) / .2); } }
+/* Every width: the text buttons that draw under 24 px tall take clicks across 24 px (WCAG 2.5.8) through the same invisible ::after; phones widen it to 44 px below. */
+.uploads-link, .templates .link-button, .prompt-preview summary { position: relative; }
+.uploads-link { z-index: 1; } /* above the slot's whole-slot button, which spans the label line */
+:is(.uploads-link, .templates .link-button, .prompt-preview summary)::after { content: ''; position: absolute; inset: min(0px, calc((24px - 100%) / -2)); }
 /* Phones: a 44 px hit area around the controls that draw smaller, which keep their look. Each control's own ::after is its hit area, so none reaches under another control:
    the image tile's actions get the gap that makes room for it, and the Library's two view buttons split the gap between them and use the free side. */
 @media (max-width: 480px) {
-  .uploads-link, .explore-start-head .link-button, .library .segmented button, .card-actions > * { position: relative; }
-  .uploads-link { z-index: 1; } /* above the slot's whole-slot button, which spans the label line */
-  :is(.tool-hint-close, .modal-close, .banner-chip, .uploads-link, .explore-start-head .link-button, .library .segmented button, .card-actions > *)::after { content: ''; position: absolute; inset: min(0px, calc((44px - 100%) / -2)); }
+  .explore-start-head .link-button, .library .segmented button, .card-actions > * { position: relative; }
+  :is(.tool-hint-close, .modal-close, .banner-chip, .uploads-link, .templates .link-button, .prompt-preview summary, .explore-start-head .link-button, .library .segmented button, .card-actions > *)::after { content: ''; position: absolute; inset: min(0px, calc((44px - 100%) / -2)); }
   .card-actions { gap: 14px; }
   .library .segmented button:first-child::after { right: -1px; left: -12px; }
   .library .segmented button:last-child::after { right: -12px; left: -1px; }

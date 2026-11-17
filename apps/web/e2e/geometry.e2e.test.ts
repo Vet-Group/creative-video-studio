@@ -206,6 +206,10 @@ test.describe('1440x1000', () => {
     expect(await css(bar, 'border-top-width', 'border-top-style', 'border-top-color', 'padding-top')).toEqual(['1px', 'solid', 'rgb(204, 204, 204)', '16px']);
     near((await box(bar)).height, 99, 'run wrapper height'); // 73 plus the 26 px summary line over Run (model, ratio, length, sound)
     await expect(bar.locator('.run-summary')).toHaveText(/giây/);
+    // The summary wraps rather than ending in an ellipsis, and the model menu keeps a cut-off name whole in its title.
+    expect(await css(bar.locator('.run-summary'), 'white-space', 'text-overflow')).toEqual(['normal', 'clip']);
+    const model = page.locator('.form-card .select-value-text').first();
+    await expect(model).toHaveAttribute('title', (await model.textContent())!);
     // With no product photo Run is off, and the line saying so ends 8 px above the divider rather than touching it.
     const reason = page.locator('.runbar').locator('xpath=preceding-sibling::p[1]');
     await expect(reason).toHaveText('Tải lên ít nhất 1 ảnh sản phẩm.');

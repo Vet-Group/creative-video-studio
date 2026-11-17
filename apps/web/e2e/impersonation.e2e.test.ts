@@ -30,10 +30,19 @@ test('a developer Admin signs in as a member, sees the banner on their pages, an
   await expect(page.getByRole('link', { name: 'Quản trị', exact: true })).toHaveCount(0);
   await page.goto('/admin/users');
   await expect(page.getByText('Khu vực quản trị chỉ dành cho Admin.')).toBeVisible();
+  // The screen-tall form card gives up the banner's height, so Run is in view without scrolling, on a laptop and on a phone.
+  const runInView = () => page.locator('.runbar button.run').evaluate((b) => b.getBoundingClientRect().bottom <= window.innerHeight);
+  await page.goto('/create');
+  await expect.poll(runInView).toBe(true);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/create');
   await expect(page.getByRole('button', { name: 'Thoát', exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  // A phone keeps the banner to one row: the name beside the exit button, without the note on whose account pays (it was 152 px tall).
+  await expect(page.locator('.impersonation-note')).toBeHidden();
+  expect((await page.locator('.impersonation-banner').boundingBox())!.height).toBeLessThan(60);
+  await expect.poll(runInView).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollHeight <= window.innerHeight)).toBe(true);
 
   await page.getByRole('button', { name: 'Thoát', exact: true }).click();
   await expect(page).toHaveURL(/\/admin\/users$/);

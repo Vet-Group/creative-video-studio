@@ -36,6 +36,8 @@ test('a card is named by what was made, the model and the Vietnam time, not by i
   expect(clipLabel(sample)).toBe('Tạo video · Seedance 1.5 Pro · 08:04 14/11');
   for (const view of ['grid', 'list'] as const) expect(card(sample, view)).toContain('aria-label="Tạo video · Seedance 1.5 Pro · 08:04 14/11"');
   expect(card(sample)).not.toContain('Clip 20261114');
+  // The model name line ends in an ellipsis when the card is narrow; its title keeps the whole name.
+  expect(card(sample)).toContain('<p class="lib-title" title="Seedance 1.5 Pro">Seedance 1.5 Pro</p>');
 });
 
 test("a video card shows the clip's own length once recorded, else the length asked", () => {

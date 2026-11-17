@@ -340,7 +340,7 @@ export function ModelPicker({ models: given, value, onChange }: { models: ModelO
         >
           <Icon name="model" />
           <span className="select-value select-value-row" id={valueId}>
-            <span className="select-value-text">{chosen ? chosen.label : 'Chưa chọn mô hình'}</span>
+            <span className="select-value-text" title={chosen?.label}>{chosen ? chosen.label : 'Chưa chọn mô hình'}</span>
             {chosen?.isMock && <span className="badge">MOCK</span>}
             {chosen?.recommended && <span className="badge badge-recommended">Đề xuất</span>}
           </span>
