@@ -35,3 +35,16 @@ test('Explore greets the member by given name and lists a job they start under C
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 });
+
+test("a running job's elapsed time under Continue keeps counting without a reload", async ({ page }) => {
+  await signIn(page, 'exploreb');
+  await page.goto('/explore'); // compiled now, so the reload below is quick and finds the 4-second mock job still unfinished
+  await page.clock.install();
+  await runViaApi(page);
+  await page.reload();
+  const note = page.getByRole('list', { name: 'Việc gần đây' }).getByRole('link').first().locator('span.muted');
+  await expect(note).toHaveText('Đang tạo · vừa gửi');
+  // The page never polls: only the note's own one-minute tick can move the label.
+  await page.clock.fastForward('02:00');
+  await expect(note).toHaveText(/^Đang tạo · đã (chờ|chạy) 2 phút$/);
+});

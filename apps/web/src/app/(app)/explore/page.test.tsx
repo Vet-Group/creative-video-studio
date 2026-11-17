@@ -200,6 +200,25 @@ test('a -vertex or -byteplus twin shows its model written description, not the s
   expect(html).not.toContain('Điểm 0/100');
 });
 
+test('every Explore text the stylesheet clamps carries its whole text as a title, so the cut-off part can still be read', async () => {
+  const css = readFileSync(new URL('../../globals.css', import.meta.url), 'utf8');
+  const clamped = [...css.matchAll(/\.(explore-[a-z-]+)\s*\{[^}]*-webkit-line-clamp/g)].map((m) => m[1]!);
+  expect(clamped).toEqual(expect.arrayContaining(['explore-job-prompt', 'explore-card-text', 'explore-tool-text']));
+  vi.mocked(pool.query).mockImplementation((async (sql: string) => ({
+    rows: sql.includes('from jobs') ? [job('vid-1', 'succeeded', { prompt: 'a slow turn of the red mug' })] : sql.includes('from model_configs') ? modelRows(1, 'video') : [],
+  })) as never);
+  try {
+    const html = renderToStaticMarkup(await ExplorePage(props()));
+    for (const name of clamped) {
+      const spans = [...html.matchAll(new RegExp(`<span class="(?:[^"]* )?${name}"([^>]*)>([^<]*)</span>`, 'g'))];
+      expect(spans.length, name).toBeGreaterThan(0);
+      for (const [, attrs, text] of spans) expect(attrs, name).toBe(` title="${text}"`);
+    }
+  } finally {
+    vi.mocked(pool.query).mockImplementation((async () => ({ rows: [] })) as never);
+  }
+});
+
 test('a Continue card names its model and, when the member wrote it, their prompt, so two jobs of one tool tell apart', async () => {
   const html = await withJobs([
     job('vid-1', 'succeeded', { model_label: 'Kling O3 Pro', prompt: 'a slow turn of the red mug' }),
