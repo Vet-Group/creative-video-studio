@@ -4,6 +4,7 @@ import { LoadError } from '@/components/LoadError';
 import { auditLabel, auditTarget, groupRecent, useFetch } from '@/lib/admin-ui';
 import { NO_CAP } from '@/lib/caps';
 import type { AdminOverview as Data } from '@/lib/overview';
+import { AdminRatings } from './AdminRatings';
 import { Empty, PageHead } from './PageHead';
 
 const usd = (v: string) => `$${Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -112,6 +113,7 @@ export function AdminOverview() {
               </ol>
             )}
           </section>
+          <AdminRatings />
           <p className="muted">
             Tổng chi phí tháng: {usd(data.totalUsd)}
             {data.provisional && ' (tạm tính)'} · <Link href="/admin/costs">Xem chi phí</Link>

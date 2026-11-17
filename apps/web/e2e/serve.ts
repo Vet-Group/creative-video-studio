@@ -82,6 +82,14 @@ for (const u of Object.values(USERS)) await auth.api.createUser({ body: { email:
 await pool.query('update users set can_edit_templates = true where email = any($1)', [[USERS.tpled.email, USERS.branded.email, USERS.chsed.email]]);
 // The developer Admin of impersonation.e2e, as an existing developer Admin would have made them (the migration grants the flag to no one).
 await pool.query('update users set can_impersonate = true where email = $1', [USERS.impdev.email]);
+// The satisfaction prompt asks after three succeeded real jobs (mock jobs never count and the specs run on the mock provider), so rating.e2e's members get them
+// seeded here, dated long ago so no page's "today" figure or weekly report moves.
+await pool.query(
+  `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, feature, status, created_at)
+   select 'rating-seed-' || u.id || '-' || n, u.id, u.team_id, 'mock-image-e2e', 'mock', 'seed', '1:1', 5, '{}', 'image', 'succeeded', '2026-01-02T00:00:00Z'
+     from users u cross join generate_series(1, 3) n where u.email = any($1)`,
+  [[USERS.ratea.email, USERS.rateb.email, USERS.ratec.email]],
+);
 await pool.end();
 
 // CVS_E2E_BUILD=1 serves a production build instead of `next dev`, so no route compiles while a spec waits on it.

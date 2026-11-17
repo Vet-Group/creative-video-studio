@@ -12,6 +12,7 @@ import {
   numeric,
   pgTable,
   primaryKey,
+  smallint,
   text,
   timestamp,
   uniqueIndex,
@@ -106,6 +107,8 @@ export const users = pgTable(
     outsideLark: boolean('outside_lark').notNull().default(false),
     // Set by an Admin who has it: a developer Admin may sign in as another user to see what they see (POST /api/admin/users/[id]/impersonate). Never granted by a migration.
     canImpersonate: boolean('can_impersonate').notNull().default(false),
+    // Set when the user snoozes the satisfaction prompt: it stays hidden until then (lib/rating.ts).
+    ratingSnoozedUntil: tstz('rating_snoozed_until'),
     teamId: text('team_id')
       .notNull()
       .default(DEFAULT_TEAM_ID)
@@ -879,6 +882,26 @@ export const feedbackReads = pgTable(
     seenAt: tstz('seen_at').notNull().defaultNow(),
   },
   (t) => [primaryKey({ columns: [t.feedbackId, t.userId] })],
+);
+
+// A member's 1-10 satisfaction score for the app (the stage-1 goal is real users rating it 8 or more), with the team they were in at the time.
+export const ratings = pgTable(
+  'ratings',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'restrict' }),
+    teamId: text('team_id').references(() => teams.id, { onDelete: 'set null' }),
+    score: smallint('score').notNull(),
+    comment: text('comment'),
+    createdAt: tstz('created_at').notNull().defaultNow(),
+  },
+  (t) => [
+    index('ratings_created_idx').on(t.createdAt),
+    check('ratings_score_check', sql`${t.score} between 1 and 10`),
+    check('ratings_comment_check', sql`${t.comment} is null or char_length(${t.comment}) <= 1000`),
+  ],
 );
 
 // A member's relationship to a store (owner decision, 2026-11-11): one user may be responsible for many stores. `pinned` is set by the
