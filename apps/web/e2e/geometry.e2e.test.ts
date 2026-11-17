@@ -102,7 +102,7 @@ async function checkExampleDialog(
   near(u.x, m.use[0], 'use button x');
   near(u.y, m.use[1], 'use button y', 3);
   sized(u, m.use[2], 36, 'use button');
-  expect(await css(use, 'background-color', 'color', 'border-top-left-radius', 'font-size', 'font-weight')).toEqual(['rgb(220, 38, 38)', 'rgb(255, 255, 255)', '8px', '11px', '600']);
+  expect(await css(use, 'background-color', 'color', 'border-top-left-radius', 'font-size', 'font-weight')).toEqual(['rgb(220, 38, 38)', 'rgb(255, 255, 255)', '8px', '12px', '600']);
   const [leftX, rightX, stepY, size] = m.step;
   for (const [name, x] of [['Ví dụ trước', leftX], ['Ví dụ sau', rightX]] as const) {
     const b = page.getByRole('button', { name });
@@ -369,7 +369,7 @@ test.describe('1440x1000', () => {
     sized(await box(search), 292, 29, 'search');
     expect(await css(search, 'background-color', 'border-top-left-radius')).toEqual(['rgb(242, 242, 242)', '8px']);
     expect(await css(panel.locator('input'), 'font-size')).toEqual(['14px']);
-    expect(await css(panel.locator('.model-group').first(), 'font-size', 'font-weight', 'letter-spacing', 'text-transform', 'color')).toEqual(['10px', '700', '0.5px', 'uppercase', 'rgb(102, 102, 102)']);
+    expect(await css(panel.locator('.model-group').first(), 'font-size', 'font-weight', 'letter-spacing', 'text-transform', 'color')).toEqual(['12px', '700', '0.5px', 'uppercase', 'rgb(102, 102, 102)']);
     const row = panel.getByRole('option', { name: /Mock E2E/ });
     near((await box(row)).height, 56, 'row height');
     expect(await css(row, 'padding-top', 'padding-left', 'background-color')).toEqual(['6px', '12px', 'rgba(0, 0, 0, 0.06)']);
