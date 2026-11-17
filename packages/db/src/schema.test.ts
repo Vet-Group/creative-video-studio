@@ -998,3 +998,16 @@ describe('migration 0098 shared analyses', () => {
     expect(index.rows[0].indexdef).toContain('WHERE (shared_at IS NOT NULL)');
   });
 });
+
+describe('migration 0103 ratings', () => {
+  test('keeps a score from 1 to 10 and a comment of at most 1000 characters, and leaves a user unsnoozed by default', async () => {
+    const rate = (id: string, score: number, comment: string | null) =>
+      pool.query(`insert into ratings (id, user_id, team_id, score, comment) values ($1, $2, null, $3, $4)`, [id, userId, score, comment]);
+    await rate('r1', 1, null);
+    await rate('r2', 10, 'x'.repeat(1000));
+    await expect(rate('r3', 0, null)).rejects.toThrow(/ratings_score_check/);
+    await expect(rate('r4', 11, null)).rejects.toThrow(/ratings_score_check/);
+    await expect(rate('r5', 5, 'x'.repeat(1001))).rejects.toThrow(/ratings_comment_check/);
+    expect((await pool.query('select rating_snoozed_until from users where id = $1', [userId])).rows[0].rating_snoozed_until).toBeNull();
+  });
+});

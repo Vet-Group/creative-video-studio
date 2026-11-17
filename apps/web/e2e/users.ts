@@ -150,6 +150,11 @@ export const USERS = {
   impdev: { email: 'impdev@e2e.test', name: 'E2E Imp Dev', role: 'admin' },
   impplain: { email: 'impplain@e2e.test', name: 'E2E Imp Plain', role: 'admin' },
   impmember: { email: 'impmember@e2e.test', name: 'E2E Imp Member', role: 'member' },
+  // rating.e2e: members with three succeeded real jobs (seeded in serve.ts), so the satisfaction prompt is due: one sends a score, one snoozes, one is on a phone.
+  ratea: { email: 'ratea@e2e.test', name: 'E2E Rating A', role: 'member' },
+  rateb: { email: 'rateb@e2e.test', name: 'E2E Rating B', role: 'member' },
+  ratec: { email: 'ratec@e2e.test', name: 'E2E Rating C', role: 'member' },
+  rated: { email: 'rated@e2e.test', name: 'E2E Rating D', role: 'member' }, // no jobs: only the Feedback page's block rates
   admin: { email: 'admin@e2e.test', name: 'E2E Admin', role: 'admin' },
 } as const;
 

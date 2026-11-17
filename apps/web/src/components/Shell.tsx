@@ -25,6 +25,7 @@ import { FalLowNotice } from './FalLowNotice';
 import { ImpersonationBanner } from './ImpersonationBanner';
 import { Icon, type IconName } from './Icon';
 import { LarkLinkPrompt } from './LarkLinkPrompt';
+import { RatingPrompt } from './Rating';
 import { JobFailureNote, canRetry, isCanceled, canRetryOnTwin, twinRetryText } from './JobFailure';
 import { CancelAllQueued, CancelButton, elapsedLabel, providerQueueLabel, JobPrompt, JobsProvider, Recreate, resultHref, roleOf, Tap, toggleFullscreen, useForm, useJobs } from './jobs';
 import { LoadError } from './LoadError';
@@ -748,6 +749,7 @@ export function Shell({ userId, userName, isAdmin, feedbackNew = 0, analyzeEnabl
               {isAdmin && <FalLowNotice />}
               <ChangelogPopup entries={changelog} larkPrompt={larkPrompt} />
               {larkPrompt && <LarkLinkPrompt />}
+              {!impersonating && <RatingPrompt />}
               <div className="frame">
                 {trayPage && <JobsButton open={jobsOpen} onOpen={() => setJobsOpen(true)} />}
                 <main id="main" tabIndex={-1}>{children}</main>

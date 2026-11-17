@@ -7,6 +7,7 @@ import { FEEDBACK_KINDS, FEEDBACK_STATUSES, type FeedbackKind } from '@cvs/db';
 import { ApiError, api, errorText, sendJson, thumbUrl } from '@/lib/api';
 import { Icon } from './Icon';
 import { LoadError } from './LoadError';
+import { RatingBlock } from './Rating';
 import { BODY_MAX, feedbackTime, KIND_LABEL, type ListedFeedback, MAX_IMAGES, STATUS_LABEL, TITLE_MAX } from '@/lib/feedback';
 
 type Sort = 'new' | 'top';
@@ -71,6 +72,8 @@ export function Feedback() {
           {open ? 'Đóng' : 'Gửi góp ý'}
         </button>
       </header>
+
+      <RatingBlock />
 
       {open && <SubmitForm onDone={(created) => { setItems((xs) => [created, ...xs]); setOpen(false); }} />}
 
