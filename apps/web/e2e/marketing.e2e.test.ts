@@ -141,10 +141,14 @@ test('a mock marketing job runs from two photos, a hook and a location, and show
   await signIn(admin, 'admin');
   await admin.goto(`/library?item=${id}`);
   const lightbox = admin.getByRole('dialog', { name: /^Chi tiết/ });
-  await lightbox.getByRole('button', { name: 'Đưa lên Ví dụ...' }).click();
-  const check = lightbox.getByRole('region', { name: 'Kiểm tra trước khi đưa lên Ví dụ' });
+  // Its own panel says where it will show; an unmarked result gets no featured hint.
+  const panel = lightbox.getByRole('region', { name: 'Ví dụ cho mọi người' });
+  await expect(panel.getByText('Hiện ở tab Ví dụ của trang Marketing Studio, mọi người đều thấy và dùng lại được.')).toBeVisible();
+  await expect(panel.getByText('Được đánh dấu Nổi bật · nên cân nhắc làm ví dụ')).toHaveCount(0);
+  await panel.getByRole('button', { name: 'Chọn làm ví dụ mẫu' }).click();
+  const check = lightbox.getByRole('region', { name: 'Kiểm tra trước khi chọn làm ví dụ' });
   await expect(check.getByRole('heading', { name: 'Có thể trùng' })).toBeVisible();
-  await check.getByRole('button', { name: 'Đưa lên Ví dụ', exact: true }).click();
+  await check.getByRole('button', { name: 'Xác nhận làm ví dụ mẫu' }).click();
   await expect(lightbox.getByText('Đang ở tab Ví dụ')).toBeVisible();
   await expect(lightbox.getByRole('button', { name: 'Gỡ khỏi Ví dụ' })).toBeVisible();
   await context.close();
@@ -531,7 +535,8 @@ test('as on Fash, a sample in Ví dụ with a details file opens in place with i
     await expect(gallery.getByRole('link', { name: 'Xem chi tiết video mẫu' })).toHaveCount(2);
     await expect(gallery.getByRole('link', { name: 'Mở video mẫu trong tab mới' })).toHaveCount(1); // no details file: the new tab as before
 
-    await gallery.getByRole('link', { name: 'Xem chi tiết video mẫu' }).first().click();
+    // By its address, not the first link: the masonry deals tiles into columns, so DOM order depends on how many company results lead.
+    await gallery.getByRole('link', { name: 'Xem chi tiết video mẫu' }).and(page.locator('[href="/api/samples/marketing-example-1.mp4"]')).click();
     let detail = page.getByRole('dialog', { name: 'Chi tiết: UGC Thử đồ' });
     await expect(detail.locator('.job-chips')).toHaveText('8s1:1');
     await expect(detail.getByRole('list', { name: 'Ảnh đầu vào' }).getByRole('img')).toHaveCount(2);
