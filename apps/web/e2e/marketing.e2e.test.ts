@@ -596,7 +596,7 @@ test('as on Fash, a filled photo slot and a chosen hook or location show the pic
     await cornerTab(box, slot.getByRole('button', { name: /^Bỏ / }));
     // As on Fash (measured 2026-10-29): the whole photo shows (contain), under a 10 px name chip padded 8 px.
     expect(await photo.evaluate((e) => getComputedStyle(e).objectFit)).toBe('contain');
-    expect(await slot.locator('.slot-chip').evaluate((e) => [getComputedStyle(e).fontSize, getComputedStyle(e).lineHeight, getComputedStyle(e).paddingTop])).toEqual(['10px', '15px', '8px']);
+    expect(await slot.locator('.slot-chip').evaluate((e) => [getComputedStyle(e).fontSize, getComputedStyle(e).lineHeight, getComputedStyle(e).paddingTop])).toEqual(['12px', '16px', '8px']);
     await expect.poll(() => slot.evaluate((e) => getComputedStyle(e).borderTopStyle)).toBe('dashed');
     await expect.poll(() => slot.evaluate((e) => getComputedStyle(e).borderTopColor)).not.toBe('rgba(0, 0, 0, 0)');
 

@@ -32,7 +32,7 @@ async function open(page: Page, width: number): Promise<{ panel: Locator; list: 
   const panel = page.getByRole('dialog', { name: 'Chọn mô hình' });
   const heading = panel.locator('.model-group').first();
   await expect(heading.locator('.icon')).toHaveCSS('display', 'inline-block');
-  expect((await heading.boundingBox())!.height).toBe(27); // one 15px label line plus 8px/4px padding
+  expect((await heading.boundingBox())!.height).toBe(28); // one 16px label line plus 8px/4px padding
   return { panel, list: panel.getByRole('listbox', { name: 'Mô hình' }) };
 }
 

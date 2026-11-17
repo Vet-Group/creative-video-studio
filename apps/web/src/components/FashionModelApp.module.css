@@ -16,3 +16,10 @@
 .share input { flex: none; width: 16px; min-width: 0; height: 16px; margin: 0; padding: 0; accent-color: var(--ink-strong); }
 .rename { display: grid; gap: 6px; }
 .rename input { min-width: 0; }
+/* Phones: 44 px taps. The count buttons and the prompt's summary keep their look and take it through an invisible ::after; the card actions wrap, so they draw at 44 px. */
+@media (max-width: 480px) {
+  .count button, .prompt summary { position: relative; }
+  .count button::after, .prompt summary::after { content: ''; position: absolute; inset: min(0px, calc((44px - 100%) / -2)); }
+  .actions :is(button, a) { display: inline-flex; align-items: center; min-height: 44px; }
+  .wrap { row-gap: 14px; } /* wrapped choices: each row's hit area ends where the next row's begins */
+}

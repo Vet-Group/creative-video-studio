@@ -41,3 +41,30 @@ test('the dark theme and the system dark mode set the same tokens, each one defi
   expect(declarations(system![1]!)).toEqual(darkTokens);
   expect(darkTokens.map((d) => d.split(':')[0]).filter((t) => t !== 'color-scheme' && !light.has(t))).toEqual([]);
 });
+
+// Text reads at 12 px or more (the 2026-11-18 phone pass); only a count, a pair of initials, a chart's SVG label and the login page's own tag draw smaller.
+test('no text rule sets a font size under 12 px, but for the count badge, the initials, the ring label and the login tag', () => {
+  const small: string[] = [];
+  for (const name of ['./globals.css', '../components/MediaOptimizer.module.css', '../components/PromptComposer.module.css', '../components/FashionModelApp.module.css']) {
+    const css = readFileSync(new URL(name, import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+    for (const [, selector, body] of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      const size = body!.match(/font-size:\s*([\d.]+)px/)?.[1];
+      if (size && Number(size) < 12) small.push(selector!.trim());
+    }
+  }
+  expect(small).toEqual(['.topbar .jobs-open-count', '.login-last', '.protect-ring text', '.fb-avatar']);
+});
+
+const luminance = (hex: string) => {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+  return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!;
+};
+const contrast = (a: string, b: string) => { const [x, y] = [luminance(a), luminance(b)].sort((m, n) => n - m); return (x! + 0.05) / (y! + 0.05); };
+
+// The chosen segment of a segmented control drew #2c2c31 on the #1c1c1f track in dark (1.22:1), so the choice barely showed.
+test('in dark, the chosen segment stands 3:1 off its track and its text reads 4.5:1 on it', () => {
+  const { dark } = tokenBlocks(readFileSync(new URL('./globals.css', import.meta.url), 'utf8'));
+  const token = (name: string) => declarations(dark![1]!).find((d) => d.startsWith(`${name}:`))!.split(': ')[1]!.split(' ')[0]!;
+  expect(contrast(token('--surface-raised'), token('--surface-1'))).toBeGreaterThanOrEqual(3);
+  expect(contrast(token('--ink'), token('--surface-raised'))).toBeGreaterThanOrEqual(4.5);
+});
