@@ -715,7 +715,8 @@ interface ExampleRow {
 const MATCH_TEXT = { inputs: 'Cùng ảnh đầu vào', prompt: 'Cùng mô tả' } as const;
 
 /**
- * An Admin's "Đưa lên Ví dụ" on a result of a page whose Examples tab shows company results (owner, 2026-11-09: a featured mark only suggests one).
+ * An Admin's "Chọn làm ví dụ mẫu" on a result of a page whose Examples tab shows company results (owner, 2026-11-09: a featured mark only suggests one).
+ * It sits in its own panel that says where the result will show; a featured result not yet there gets a stronger panel and the primary button.
  * It first shows what that tab already has, the results that may repeat this one on top and then the fixed samples, so a near copy is seen before it goes up.
  * The Admin may tag it with the product it shows, which the tab filters by, and change that tag once it is there.
  */
@@ -747,7 +748,7 @@ function ExampleControl({ clip, onChange }: { clip: Clip; onChange: (c: Clip) =>
         setCheck(null);
         onChange({ ...clip, example: on, productType: on ? productType || null : null });
       },
-      on ? 'Không đưa lên Ví dụ được.' : 'Không gỡ khỏi Ví dụ được.',
+      on ? 'Không chọn làm ví dụ được.' : 'Không gỡ khỏi Ví dụ được.',
     );
   const typeSelect = (value: string, pick: (type: string) => void) => (
     <label className="example-type">
@@ -767,8 +768,20 @@ function ExampleControl({ clip, onChange }: { clip: Clip; onChange: (c: Clip) =>
       {note}
     </p>
   );
+  const suggested = !clip.example && clip.verdict?.featured === true;
+  const panel = (body: ReactNode) => (
+    <section className={`example-panel${suggested ? ' suggested' : ''}`} aria-labelledby={`example-panel-${clip.id}`}>
+      <h3 id={`example-panel-${clip.id}`}>
+        <Icon name="users" />
+        Ví dụ cho mọi người
+      </h3>
+      {body}
+      {status}
+    </section>
+  );
+  const where = <p className="example-where">Hiện ở tab Ví dụ của trang {featureLabel(clip.feature)}, mọi người đều thấy và dùng lại được.</p>;
   if (clip.example)
-    return (
+    return panel(
       <div className="example-control">
         <span className="lib-mark featured">
           Đang ở tab Ví dụ
@@ -779,17 +792,17 @@ function ExampleControl({ clip, onChange }: { clip: Clip; onChange: (c: Clip) =>
         <button type="button" disabled={busy} onClick={() => void save(false)}>
           Gỡ khỏi Ví dụ
         </button>
-        {status}
-      </div>
+      </div>,
     );
   if (!check)
-    return (
-      <div className="example-control">
-        <button type="button" disabled={busy} onClick={() => void open()}>
-          Đưa lên Ví dụ...
+    return panel(
+      <>
+        {suggested && <p className="example-hint">Được đánh dấu Nổi bật · nên cân nhắc làm ví dụ</p>}
+        <button type="button" className={suggested ? 'primary' : 'example-pick'} disabled={busy} onClick={() => void open()}>
+          Chọn làm ví dụ mẫu
         </button>
-        {status}
-      </div>
+        {where}
+      </>,
     );
   const samples = numberedSamples(have, prefix, clip.feature === 'marketing' || clip.feature === 'video' ? 'mp4' : 'jpg'); // as the tab counts them; a clip shows its still of the same number
   const similar = check.filter((e) => e.match);
@@ -799,11 +812,12 @@ function ExampleControl({ clip, onChange }: { clip: Clip; onChange: (c: Clip) =>
       {e.match && <span className="example-match">{MATCH_TEXT[e.match]}</span>}
     </li>
   );
-  return (
-    <section className="example-check" aria-label="Kiểm tra trước khi đưa lên Ví dụ">
-      <h3>Có thể trùng</h3>
+  return panel(
+    <section className="example-check" aria-label="Kiểm tra trước khi chọn làm ví dụ">
+      {where}
+      <h4>Có thể trùng</h4>
       {similar.length > 0 ? <ul className="job-inputs">{similar.map(tile)}</ul> : <p className="muted">Không có ví dụ nào cùng ảnh đầu vào hoặc cùng mô tả.</p>}
-      <h3>Ví dụ hiện có ({samples.length + check.length})</h3>
+      <h4>Ví dụ hiện có ({samples.length + check.length})</h4>
       <ul className="job-inputs example-strip" aria-label="Ví dụ hiện có">
         {check.filter((e) => !e.match).map(tile)}
         {samples.map((n, i) => (
@@ -815,14 +829,13 @@ function ExampleControl({ clip, onChange }: { clip: Clip; onChange: (c: Clip) =>
       {typeSelect(type, setType)}
       <div className="example-control">
         <button type="button" className="primary" disabled={busy} onClick={() => void save(true)}>
-          Đưa lên Ví dụ
+          Xác nhận làm ví dụ mẫu
         </button>
         <button type="button" disabled={busy} onClick={() => setCheck(null)}>
           Huỷ
         </button>
       </div>
-      {status}
-    </section>
+    </section>,
   );
 }
 
@@ -1001,7 +1014,7 @@ export function Library({ initialFilters = NO_FILTERS }: { initialFilters?: Libr
   };
   const update = (next: Clip) => {
     if (next.verdict) uncount(clips.find((x) => x.id === next.id)); // a first mark
-    setClips((cur) => ((filters.favoritesOnly && !next.favorite) || (filters.examplesOnly && !next.example) || !matchesVerdict(filters.verdict, next.verdict) ? cur.filter((x) => x.id !== next.id) : cur.map((x) => (x.id === next.id ? next : x))));
+    setClips((cur) => ((filters.favoritesOnly && !next.favorite) || (filters.examplesOnly && !next.example) || (filters.suggestedOnly && (next.example || !next.verdict?.featured)) || !matchesVerdict(filters.verdict, next.verdict) ? cur.filter((x) => x.id !== next.id) : cur.map((x) => (x.id === next.id ? next : x))));
   };
   // Declared after `update`: the bar renders the bulk actions while this hook runs.
   const zip = useZipDownload({ hover: true, actions: (ids) => <BulkActions ids={ids} clips={clips} stores={isAdmin ? stores : undefined} onChange={update} /> });
@@ -1174,6 +1187,7 @@ export function Library({ initialFilters = NO_FILTERS }: { initialFilters?: Libr
     else if (key === 'kind') set({ kind: 'all' });
     else if (key === 'favoritesOnly') set({ favoritesOnly: false });
     else if (key === 'examplesOnly') set({ examplesOnly: false });
+    else if (key === 'suggestedOnly') set({ suggestedOnly: false });
     else set({ [key]: '' } as Partial<LibraryFilters>);
   }
   // Copy the address as it stands, so the current filters and any open item travel to whoever gets the link.
@@ -1325,10 +1339,17 @@ export function Library({ initialFilters = NO_FILTERS }: { initialFilters?: Libr
           <Icon name="star" />
           Yêu thích
         </label>
+        {/* The two never hold together: one lists what is on Examples, the other what is not yet. */}
         {isAdmin && (
           <label className="library-toggle">
-            <input type="checkbox" checked={filters.examplesOnly} onChange={(e) => set({ examplesOnly: e.target.checked })} />
+            <input type="checkbox" checked={filters.examplesOnly} onChange={(e) => set({ examplesOnly: e.target.checked, suggestedOnly: false })} />
             Đang ở Ví dụ
+          </label>
+        )}
+        {isAdmin && (
+          <label className="library-toggle" title="Các kết quả được đánh dấu Nổi bật mà chưa ở tab Ví dụ">
+            <input type="checkbox" checked={filters.suggestedOnly} onChange={(e) => set({ suggestedOnly: e.target.checked, examplesOnly: false })} />
+            Gợi ý làm ví dụ
           </label>
         )}
         {active > 0 && (

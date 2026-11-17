@@ -18,10 +18,12 @@ export interface LibraryFilters {
   favoritesOnly: boolean;
   /** Only the results an Admin put on an Examples tab. */
   examplesOnly: boolean;
+  /** Only the featured results not yet on an Examples tab, which an Admin may put there. */
+  suggestedOnly: boolean;
   sort: 'newest' | 'oldest';
 }
 
-export const NO_FILTERS: LibraryFilters = { q: '', creator: '', store: '', date: '', days: '', ratio: '', kind: 'all', verdict: '', favoritesOnly: false, examplesOnly: false, sort: 'newest' };
+export const NO_FILTERS: LibraryFilters = { q: '', creator: '', store: '', date: '', days: '', ratio: '', kind: 'all', verdict: '', favoritesOnly: false, examplesOnly: false, suggestedOnly: false, sort: 'newest' };
 
 /** A refresh of the first page onto the list shown: the items not yet there go on top (newest first), so pages loaded since and the scroll position stay;
  * an item shown that is on the fresh page takes its fresh copy (a mark or a final cost set meanwhile). */
@@ -52,6 +54,7 @@ export function libraryQuery(f: LibraryFilters, offset: number): string {
   if (f.verdict) q.set('verdict', f.verdict);
   if (f.favoritesOnly) q.set('favorites', '1');
   if (f.examplesOnly) q.set('example', '1');
+  if (f.suggestedOnly) q.set('suggested', '1');
   if (f.sort !== 'newest') q.set('sort', f.sort);
   if (offset > 0) q.set('offset', String(offset));
   return q.toString();
@@ -72,6 +75,7 @@ export function filtersFromParams(p: URLSearchParams): LibraryFilters {
     verdict: verdict === 'none' || verdict === 'pass' || verdict === 'featured' || verdict === 'fail' ? verdict : '',
     favoritesOnly: p.get('favorites') === '1',
     examplesOnly: p.get('example') === '1',
+    suggestedOnly: p.get('suggested') === '1',
     sort: p.get('sort') === 'oldest' ? 'oldest' : 'newest',
   };
 }
@@ -84,10 +88,10 @@ export function filtersFromSearch(search: Record<string, string | string[] | und
 }
 
 /** How many filters narrow the list; the sort only orders it, so it is not one. */
-export const activeFilters = (f: LibraryFilters): number => [f.q.trim(), f.creator, f.store, f.date, f.days, f.ratio, f.kind !== 'all', f.verdict, f.favoritesOnly, f.examplesOnly].filter(Boolean).length;
+export const activeFilters = (f: LibraryFilters): number => [f.q.trim(), f.creator, f.store, f.date, f.days, f.ratio, f.kind !== 'all', f.verdict, f.favoritesOnly, f.examplesOnly, f.suggestedOnly].filter(Boolean).length;
 
 /** Which filter a chip removes; date and days share one chip since the UI never sets both. */
-export type ChipKey = 'q' | 'creator' | 'store' | 'date' | 'days' | 'ratio' | 'kind' | 'verdict' | 'favoritesOnly' | 'examplesOnly';
+export type ChipKey = 'q' | 'creator' | 'store' | 'date' | 'days' | 'ratio' | 'kind' | 'verdict' | 'favoritesOnly' | 'examplesOnly' | 'suggestedOnly';
 
 /** The store filter's option, and its chip, for items with no store. */
 export const NO_STORE = 'Không gắn cửa hàng';
@@ -107,6 +111,7 @@ export function activeFilterChips(f: LibraryFilters, names: { creator?: string; 
   if (f.verdict) chips.push({ key: 'verdict', label: `Kết quả: ${VERDICT_LABEL[f.verdict]}` });
   if (f.favoritesOnly) chips.push({ key: 'favoritesOnly', label: 'Yêu thích' });
   if (f.examplesOnly) chips.push({ key: 'examplesOnly', label: 'Đang ở Ví dụ' });
+  if (f.suggestedOnly) chips.push({ key: 'suggestedOnly', label: 'Gợi ý làm ví dụ' });
   return chips;
 }
 
