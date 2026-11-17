@@ -1,6 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
-import { signIn } from './support.test';
+import { runViaApi, signIn } from './support.test';
+import { USERS } from './users';
 
 // The main pages, in both themes, carry no serious or critical axe violation (the 2026-11-04 accessibility pass).
 const MEMBER_PAGES = ['/explore', '/create', '/try-on', '/image-generation', '/marketing-studio', '/apps', '/apps/ai-fashion-model', '/apps/motion-control', '/library', '/account/sign-in-methods'];
@@ -115,6 +116,24 @@ test.describe('touch phone', () => {
       });
       expect.soft(misses, path).toEqual([]); // soft: one run lists every page's misses
       if (path === '/library') expect.soft(await page.locator('.library-filters').evaluate((e) => e.getBoundingClientRect().height), 'the Library filters on one row').toBeLessThanOrEqual(52);
+    }
+  });
+
+  // A half-width Library card keeps each of its three marks 44 px wide and tall, its label inside the button (on prod, "Đạt" drew 30 px wide).
+  test("a Library card's marks each take 44 px", async ({ page }) => {
+    await signIn(page, 'phonea');
+    await runViaApi(page);
+    await expect.poll(async () => ((await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { status: string }[] }).jobs[0]?.status, { timeout: 60_000 }).toBe('succeeded');
+    await page.goto('/library');
+    await page.getByLabel('Người tạo').selectOption({ label: USERS.phonea.name });
+    const marks = page.getByRole('article').first().locator('.verdict-buttons button');
+    await expect(marks).toHaveCount(3);
+    for (const mark of await marks.all()) {
+      const [width, height, fits] = await mark.evaluate((b) => [b.getBoundingClientRect().width, b.getBoundingClientRect().height, b.scrollWidth <= b.clientWidth && b.scrollHeight <= b.clientHeight] as const);
+      const label = await mark.textContent();
+      expect(width, `${label} wide`).toBeGreaterThanOrEqual(44);
+      expect(height, `${label} tall`).toBeGreaterThanOrEqual(44);
+      expect(fits, `${label} fits its button`).toBe(true);
     }
   });
 });
