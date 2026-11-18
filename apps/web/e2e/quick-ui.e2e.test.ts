@@ -3,9 +3,10 @@ import { addExamples, clearMyJobs, openTab, signIn } from './support.test';
 
 test("Create's Examples shows the loading skeleton, not the built-in test patterns, until its lists have answered", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
+  await signIn(page, 'quicka');
+  await page.goto('about:blank'); // the page signing in landed on may still be loading its own samples
   const stills: string[] = [];
   page.on('request', (r) => r.url().includes('/fixtures/examples/') && r.url().endsWith('.jpg') && stills.push(new URL(r.url()).pathname));
-  await signIn(page, 'quicka');
   let release!: () => void;
   const gate = new Promise<void>((resolve) => (release = resolve));
   // Neither the sample list nor the company's clips answer until the gate opens.
@@ -46,7 +47,8 @@ test("an image result's Examples tile loads the small preview, fades in, and its
     expect(originals).toEqual([]);
     const picture = tile.locator('img');
     await expect(picture).toHaveClass(/loaded/);
-    expect(await picture.evaluate((img) => [getComputedStyle(img).opacity, getComputedStyle(img).transitionProperty])).toEqual(['1', 'opacity']);
+    await expect.poll(() => picture.evaluate((img) => getComputedStyle(img).opacity)).toBe('1'); // the 200 ms fade may still be running
+    expect(await picture.evaluate((img) => getComputedStyle(img).transitionProperty)).toBe('opacity');
     const [pill, box] = [await tile.locator('.gallery-use').boundingBox(), await tile.boundingBox()];
     expect(pill).not.toBeNull();
     expect(pill!.x).toBeGreaterThanOrEqual(box!.x);
