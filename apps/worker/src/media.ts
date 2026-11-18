@@ -125,34 +125,37 @@ export async function concatClips(clips: string[], out: string): Promise<void> {
 /**
  * The source video with each remade part laid over its own span and the rest as it was, at the source's length and sound: a remake's full-length
  * cut. It takes the first part's size, as the parts were made from the source as it is shown (a phone clip's rotation applied, which its stream
- * size leaves out). A part is cut or held on its last frame to exactly its span, so the source's sound stays in step; parts come in time order.
+ * size leaves out). Every span is cut on one 24 fps frame grid of the source's timeline (a part is cut or held on its last frame to exactly its
+ * frames), so rounding each span on its own cannot add up and slide later parts off the source's sound; parts come in time order.
  */
 export async function spliceClips(video: string, parts: { start: number; seconds: number; clip: string }[], out: string): Promise<void> {
   const [{ width, height }, total] = await Promise.all([probeSize(parts[0]!.clip), probeVideoSeconds(video)]);
-  const fit = `scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=24`;
+  const fit = `scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1`;
+  const frame = (t: number) => Math.round(t * 24); // the frame of the output's 24 fps grid at `t` seconds
+  const last = frame(total);
   const gaps: [number, number][] = [];
   let at = 0;
   for (const p of parts) {
-    if (p.start - at > 0.04) gaps.push([at, p.start]);
-    at = p.start + p.seconds;
+    if (frame(p.start) > at) gaps.push([at, frame(p.start)]);
+    at = frame(p.start + p.seconds);
   }
-  if (total - at > 0.04) gaps.push([at, total]);
+  if (last > at) gaps.push([at, last]);
   const graph = [`[0:v:0]split=${Math.max(1, gaps.length)}${gaps.map((_, g) => `[s${g}]`).join('') || '[s0]'}`];
   const seq: string[] = [];
   let g = 0;
   const gap = (from: number, to: number) => {
-    graph.push(`[s${g}]trim=start=${from.toFixed(3)}:end=${to.toFixed(3)},setpts=PTS-STARTPTS,${fit}[g${g}]`);
+    graph.push(`[s${g}]fps=24,trim=start_frame=${from}:end_frame=${to},setpts=PTS-STARTPTS,${fit}[g${g}]`);
     seq.push(`[g${g++}]`);
   };
   at = 0;
   parts.forEach((p, i) => {
-    if (p.start - at > 0.04) gap(at, p.start);
-    const s = p.seconds.toFixed(3);
-    graph.push(`[${i + 1}:v:0]setpts=PTS-STARTPTS,tpad=stop_mode=clone:stop_duration=${s},trim=duration=${s},${fit}[c${i}]`);
+    if (frame(p.start) > at) gap(at, frame(p.start));
+    const end = frame(p.start + p.seconds);
+    graph.push(`[${i + 1}:v:0]setpts=PTS-STARTPTS,fps=24,tpad=stop_mode=clone:stop_duration=${(p.seconds + 1).toFixed(3)},trim=end_frame=${end - frame(p.start)},${fit}[c${i}]`);
     seq.push(`[c${i}]`);
-    at = p.start + p.seconds;
+    at = end;
   });
-  if (total - at > 0.04) gap(at, total);
+  if (last > at) gap(at, last);
   if (gaps.length === 0) graph.push('[s0]nullsink');
   graph.push(`${seq.join('')}concat=n=${seq.length}:v=1:a=0[out]`);
   const sound = ['-map', '0:a:0?', '-c:a', 'aac'];
