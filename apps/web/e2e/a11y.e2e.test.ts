@@ -71,50 +71,52 @@ test('the small text buttons on a form take a click across 24 px, and 44 px on a
 test.describe('touch phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 
+  const tapMisses = (page: import('@playwright/test').Page) =>
+    page.evaluate(async () => {
+      const CONTROLS = 'a[href], button, summary, select, input:not([type=hidden]), [role=button]';
+      const controls = [...document.querySelectorAll<HTMLElement>(CONTROLS)]
+        .map((el) => (el.matches('input, select') && el.closest('label')) || el)
+        .filter((el, i, all) => all.indexOf(el) === i && !el.matches('.skip-link') && !el.closest('[inert]'))
+        .filter((el) => !el.closest('p')) // a link or button in a sentence
+        .filter((el) => { const r = el.getBoundingClientRect(); return r.width > 1 && r.height > 1 && getComputedStyle(el).visibility !== 'hidden'; });
+      const found: string[] = [];
+      for (const el of controls) {
+        el.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'instant' });
+        await new Promise(requestAnimationFrame);
+        // The part on screen: a scrolling strip or the viewport may cut a card at its end.
+        const r = { left: 0, top: 0, right: innerWidth, bottom: innerHeight };
+        for (let a: Element | null = el; a; a = a.parentElement) {
+          const b = a.getBoundingClientRect(), cs = getComputedStyle(a);
+          if (a !== el && cs.overflowX === 'visible' && cs.overflowY === 'visible') continue;
+          r.left = Math.max(r.left, b.left); r.top = Math.max(r.top, b.top); r.right = Math.min(r.right, b.right); r.bottom = Math.min(r.bottom, b.bottom);
+        }
+        const width = r.right - r.left, height = r.bottom - r.top;
+        const x = r.left + width / 2, y = r.top + height / 2;
+        // A tap is the control's own, or lands on another control drawn over it there (the slot's corner link): an overlay, not a hit area reaching over.
+        const own = (dx: number, dy: number) => {
+          const t = document.elementFromPoint(x + dx, y + dy);
+          if (el.contains(t)) return true;
+          const b = t?.getBoundingClientRect();
+          return !!t && !!b && t.closest(CONTROLS) !== null && x + dx >= b.left && x + dx <= b.right && y + dy >= b.top && y + dy <= b.bottom;
+        };
+        // How far the control answers from its middle in one direction, up to 30 px: two side-by-side buttons may split their gap unevenly.
+        const reach = (sx: number, sy: number) => { let n = 0; while (n < 30 && own(sx * (n + 1), sy * (n + 1))) n++; return n; };
+        const name = `${el.tagName.toLowerCase()}.${[...el.classList].join('.')} "${(el.getAttribute('aria-label') || el.textContent || '').trim().slice(0, 30)}"`;
+        const edgeX = Math.max(width / 2 - 2, 0), edgeY = Math.max(height / 2 - 2, 0);
+        const taken = ([[0, 0], [0, -edgeY], [0, edgeY], [-edgeX, 0], [edgeX, 0]] as const).find(([dx, dy]) => !own(dx, dy));
+        if (taken) { const t = document.elementFromPoint(x + taken[0]!, y + taken[1]!); found.push(`${name}: ${t?.tagName.toLowerCase()}.${[...(t?.classList ?? [])].join('.')} takes a tap at ${taken.join(',')} from its middle`); }
+        else if (reach(0, -1) + reach(0, 1) + 1 < 43 || reach(-1, 0) + reach(1, 0) + 1 < 43) found.push(`${name}: ${Math.round(width)}x${Math.round(height)} takes ${reach(-1, 0) + reach(1, 0) + 1}x${reach(0, -1) + reach(0, 1) + 1}`);
+      }
+      return found;
+    });
+
   test('every control on the member pages takes a 44 px tap and none covers another', async ({ page }) => {
     test.setTimeout(300_000);
     await signIn(page, 'member8');
     for (const path of MEMBER_PAGES) {
       await page.goto(path);
       await page.waitForLoadState('networkidle'); // the sample strips load late and push the form down
-      const misses = await page.evaluate(async () => {
-        const CONTROLS = 'a[href], button, summary, select, input:not([type=hidden]), [role=button]';
-        const controls = [...document.querySelectorAll<HTMLElement>(CONTROLS)]
-          .map((el) => (el.matches('input, select') && el.closest('label')) || el)
-          .filter((el, i, all) => all.indexOf(el) === i && !el.matches('.skip-link') && !el.closest('[inert]'))
-          .filter((el) => !el.closest('p')) // a link or button in a sentence
-          .filter((el) => { const r = el.getBoundingClientRect(); return r.width > 1 && r.height > 1 && getComputedStyle(el).visibility !== 'hidden'; });
-        const found: string[] = [];
-        for (const el of controls) {
-          el.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'instant' });
-          await new Promise(requestAnimationFrame);
-          // The part on screen: a scrolling strip or the viewport may cut a card at its end.
-          const r = { left: 0, top: 0, right: innerWidth, bottom: innerHeight };
-          for (let a: Element | null = el; a; a = a.parentElement) {
-            const b = a.getBoundingClientRect(), cs = getComputedStyle(a);
-            if (a !== el && cs.overflowX === 'visible' && cs.overflowY === 'visible') continue;
-            r.left = Math.max(r.left, b.left); r.top = Math.max(r.top, b.top); r.right = Math.min(r.right, b.right); r.bottom = Math.min(r.bottom, b.bottom);
-          }
-          const width = r.right - r.left, height = r.bottom - r.top;
-          const x = r.left + width / 2, y = r.top + height / 2;
-          // A tap is the control's own, or lands on another control drawn over it there (the slot's corner link): an overlay, not a hit area reaching over.
-          const own = (dx: number, dy: number) => {
-            const t = document.elementFromPoint(x + dx, y + dy);
-            if (el.contains(t)) return true;
-            const b = t?.getBoundingClientRect();
-            return !!t && !!b && t.closest(CONTROLS) !== null && x + dx >= b.left && x + dx <= b.right && y + dy >= b.top && y + dy <= b.bottom;
-          };
-          // How far the control answers from its middle in one direction, up to 30 px: two side-by-side buttons may split their gap unevenly.
-          const reach = (sx: number, sy: number) => { let n = 0; while (n < 30 && own(sx * (n + 1), sy * (n + 1))) n++; return n; };
-          const name = `${el.tagName.toLowerCase()}.${[...el.classList].join('.')} "${(el.getAttribute('aria-label') || el.textContent || '').trim().slice(0, 30)}"`;
-          const edgeX = Math.max(width / 2 - 2, 0), edgeY = Math.max(height / 2 - 2, 0);
-          const taken = ([[0, 0], [0, -edgeY], [0, edgeY], [-edgeX, 0], [edgeX, 0]] as const).find(([dx, dy]) => !own(dx, dy));
-          if (taken) { const t = document.elementFromPoint(x + taken[0]!, y + taken[1]!); found.push(`${name}: ${t?.tagName.toLowerCase()}.${[...(t?.classList ?? [])].join('.')} takes a tap at ${taken.join(',')} from its middle`); }
-          else if (reach(0, -1) + reach(0, 1) + 1 < 43 || reach(-1, 0) + reach(1, 0) + 1 < 43) found.push(`${name}: ${Math.round(width)}x${Math.round(height)} takes ${reach(-1, 0) + reach(1, 0) + 1}x${reach(0, -1) + reach(0, 1) + 1}`);
-        }
-        return found;
-      });
-      expect.soft(misses, path).toEqual([]); // soft: one run lists every page's misses
+      expect.soft(await tapMisses(page), path).toEqual([]); // soft: one run lists every page's misses
       if (path === '/library') expect.soft(await page.locator('.library-filters').evaluate((e) => e.getBoundingClientRect().height), 'the Library filters on one row').toBeLessThanOrEqual(52);
     }
   });
@@ -135,6 +137,23 @@ test.describe('touch phone', () => {
       expect(height, `${label} tall`).toBeGreaterThanOrEqual(44);
       expect(fits, `${label} fits its button`).toBe(true);
     }
+  });
+
+  // The Góp ý board: its header button, filters, a listed post, and the open form with two photos attached. The list and the upload are routed:
+  // other specs post to the shared board, and the photos' remove buttons only need two thumbnails.
+  test('every control on the Góp ý page takes a 44 px tap', async ({ page }) => {
+    await signIn(page, 'member8');
+    const at = new Date().toISOString();
+    const item = { id: 'e2e-taps', kind: 'feature', title: 'Một góp ý', body: 'Nội dung góp ý.', status: 'new', adminNote: null, imageAssetIds: [], authorName: USERS.member8.name, mine: true, votes: 1, voted: false, comments: 0, createdAt: at, updatedAt: at, unread: false };
+    await page.route(/\/api\/feedback\?/, (route) => route.fulfill({ json: { items: [item] } }));
+    await page.route(/\/api\/assets$/, (route) => route.fulfill({ json: { assets: [{ id: 'e2e-taps-a' }, { id: 'e2e-taps-b' }] } }));
+    await page.goto('/feedback');
+    await expect(page.getByRole('link', { name: 'Một góp ý' })).toBeVisible();
+    expect.soft(await tapMisses(page), 'the board').toEqual([]);
+    await page.getByRole('button', { name: 'Gửi góp ý' }).click();
+    await page.locator('.fb-uploads input[type=file]').setInputFiles([1, 2].map((n) => ({ name: `${n}.png`, mimeType: 'image/png', buffer: Buffer.from('png') })));
+    await expect(page.getByRole('button', { name: 'Bỏ ảnh' })).toHaveCount(2);
+    expect.soft(await tapMisses(page), 'the open form').toEqual([]);
   });
 });
 
