@@ -425,6 +425,18 @@ dialog.modal.jobs-drawer[open] { animation: jobs-drawer-in .28s cubic-bezier(.2,
 /* A queued or running job: a pulsing box in the result's ratio, the status inside it (as lobehub's GenerationFeed loading item). */
 .job-media-wait { display: grid; place-items: center; height: 100%; max-width: 100%; border-radius: 12px; background: var(--surface-2); animation: skeleton-pulse 1.4s ease-in-out infinite; }
 .job-media { position: relative; }
+/* The wait shows the job's first input photo, blurred and dimmed; the status, the usual time and a thin bar sit on a solid chip so they read on any photo. */
+.job-media-wait { position: relative; overflow: hidden; }
+.job-media-wait:has(.job-wait-input) { animation: none; }
+.job-media .job-wait-input { position: absolute; inset: 0; width: 100%; height: 100%; max-height: none; object-fit: cover; cursor: default; filter: blur(16px); transform: scale(1.15); opacity: .55; }
+.job-wait-status { position: relative; display: grid; gap: 6px; width: min(80%, 240px); padding: 10px 14px; border-radius: 12px; background: var(--surface); color: var(--ink); font-size: 14px; text-align: center; }
+.job-wait-hint { color: var(--text-muted); font-size: 13px; }
+.job-wait-bar { display: block; height: 4px; overflow: hidden; border-radius: 2px; background: var(--fill-strong); }
+.job-wait-bar > span { display: block; height: 100%; border-radius: 2px; background: var(--ink); transform-origin: left; }
+@media (prefers-reduced-motion: no-preference) { .job-wait-bar > span { transition: transform 2s linear; } }
+/* A result that arrived while the card was open unblurs and fades in once loaded (opacity and filter only); under reduced motion it simply shows. */
+.job-media .job-reveal:not(.is-in) { opacity: 0; filter: blur(16px); }
+@media (prefers-reduced-motion: no-preference) { .job-media .job-reveal { transition: opacity .4s ease-out, filter .4s ease-out; } }
 .job-media-tools { position: absolute; top: 10px; right: 10px; display: flex; gap: 6px; opacity: 0; transition: opacity .15s; }
 .job-media:hover .job-media-tools, .job-media-tools:focus-within { opacity: 1; }
 .job-media-tools .icon-button { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 8px; background: rgb(var(--shade) / .55); color: var(--on-dark); backdrop-filter: blur(6px); }
@@ -489,7 +501,7 @@ button.job-reuse, button.lightbox-reuse, button.gallery-use { border: 0; font-fa
   .job-card { grid-template-columns: 1fr; min-height: 0; }
   .job-media { height: auto; max-height: 70vh; }
   .job-media img, .job-media video { height: auto; max-height: 70vh; }
-  .job-media-wait { height: auto; width: min(100%, 320px); margin: 16px 0; }
+  .job-media-wait { height: auto; width: 100%; max-height: 70vh; }
   .job-card .job-body { border-left: 0; border-top: 1px solid var(--border); }
 }
 .side .tray { padding: 0; border: 0; background: transparent; }

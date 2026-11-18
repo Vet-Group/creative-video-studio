@@ -164,6 +164,8 @@ export const USERS = {
   rated: { email: 'rated@e2e.test', name: 'E2E Rating D', role: 'member' }, // no jobs: only the Feedback page's block rates
   // quick-ui.e2e: Create's Examples while its lists load, and an image result's Examples tile on a phone.
   quicka: { email: 'quicka@e2e.test', name: 'E2E Quick A', role: 'member' },
+  // run-progress.e2e: a running History card (the job list is answered by the spec) with its blurred input, bar and reveal.
+  runprog: { email: 'runprog@e2e.test', name: 'E2E Run Progress', role: 'member' },
   admin: { email: 'admin@e2e.test', name: 'E2E Admin', role: 'admin' },
   // a11y.e2e: one finished clip, so a Library card shows its marks on a phone.
   phonea: { email: 'phonea@e2e.test', name: 'E2E Phone A', role: 'member' },
