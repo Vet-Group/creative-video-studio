@@ -68,3 +68,62 @@ test('in dark, the chosen segment stands 3:1 off its track and its text reads 4.
   expect(contrast(token('--surface-raised'), token('--surface-1'))).toBeGreaterThanOrEqual(3);
   expect(contrast(token('--ink'), token('--surface-raised'))).toBeGreaterThanOrEqual(4.5);
 });
+
+// The 2026-11-18 motion pass: shared timings, entrances and press feedback that stay off for people who ask for less motion.
+const stripComments = (css: string) => css.replace(/\/\*[\s\S]*?\*\//g, '');
+// The text of the block opened by `head`, braces matched.
+const blockOf = (css: string, head: string) => {
+  const start = css.indexOf(head);
+  if (start < 0) return '';
+  let depth = 0;
+  for (let i = css.indexOf('{', start); i < css.length; i++) {
+    if (css[i] === '{') depth++;
+    if (css[i] === '}' && --depth === 0) return css.slice(start, i + 1);
+  }
+  return '';
+};
+
+test('the motion tokens are defined once on :root for every theme to share', () => {
+  const { root, dark } = tokenBlocks(readFileSync(new URL('./globals.css', import.meta.url), 'utf8'));
+  const light = declarations(root![1]!);
+  for (const name of ['--dur-press', '--dur-fast', '--dur-base', '--dur-slow', '--ease-out']) expect(light.filter((d) => d.startsWith(`${name}:`)), name).toHaveLength(1);
+  expect(declarations(dark![1]!).filter((d) => /^--(dur|ease)/.test(d))).toEqual([]);
+  expect(light).toContain('--dur-press: 80ms'); // a press answers inside 100 ms
+});
+
+test('dialog and toast entrances and the press scale play only under no-preference; Run drops its colour fade under reduce', () => {
+  const css = stripComments(readFileSync(new URL('./globals.css', import.meta.url), 'utf8'));
+  const motion = blockOf(css, '@media (prefers-reduced-motion: no-preference) {\n  button, .button');
+  expect(motion).toContain('@starting-style');
+  expect(motion).toMatch(/dialog\.modal:not\(\.jobs-drawer\)\[open\] \{ transition: opacity/);
+  expect(motion).toMatch(/:active[^{]*\{ scale: \.97;/);
+  expect(motion).toMatch(/\.toast \{ animation: toast-in/);
+  // Nothing outside that block starts the entrance, the toast animation or the press scale.
+  const rest = css.replace(motion, '');
+  expect(rest).not.toContain('@starting-style');
+  expect(rest).not.toMatch(/animation: toast-in/);
+  expect(rest).not.toMatch(/:active[^{]*\{[^}]*scale:/);
+  // Only transform and opacity (scale and translate included) move: no size, margin or inset animates.
+  expect(motion).not.toMatch(/transition:[^;}]*\b(width|height|margin|top|left|inset)\b/);
+  expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\) \{ \.runbar button\.primary\.run \{ transition: none; \} \}/);
+});
+
+const toHex = (v: string) => {
+  const rgb = v.match(/^rgb\((\d+), (\d+), (\d+)\)$/);
+  return rgb ? `#${rgb.slice(1).map((n) => Number(n).toString(16).padStart(2, '0')).join('')}` : v;
+};
+
+// The not-ready Run was the brand red at half strength: a muddy red with dim red text in dark.
+test('a not-ready Run is a neutral grey whose label reads 4.5:1 in light and in dark', () => {
+  const css = readFileSync(new URL('./globals.css', import.meta.url), 'utf8');
+  const { root, dark } = tokenBlocks(css);
+  const rule = css.match(/^\.runbar button\.primary\.run:disabled \{([^}]*)\}/m)?.[1] ?? '';
+  expect(rule).toMatch(/opacity: 1;/); // not the base disabled rule's half strength
+  const bg = rule.match(/background: var\((--[\w-]+)\)/)![1]!;
+  const fg = rule.match(/(?<!-)color: var\((--[\w-]+)\)/)![1]!;
+  for (const [theme, block] of [['light', root], ['dark', dark]] as const) {
+    const token = (name: string) => toHex((declarations(block![1]!).find((d) => d.startsWith(`${name}:`)) ?? declarations(root![1]!).find((d) => d.startsWith(`${name}:`)))!.split(': ')[1]!);
+    expect(token(bg), theme).not.toBe(token('--brand'));
+    expect(contrast(token(fg), token(bg)), theme).toBeGreaterThanOrEqual(4.5);
+  }
+});

@@ -117,6 +117,12 @@
   --scene-dust: rgb(232 170 60);
   --scene-chalk: #fafafa;
   --scene-tally-ok: #22c55e;
+  /* Motion: one set of durations and one ease-out for every transition added from here on. */
+  --dur-press: 80ms;
+  --dur-fast: 150ms;
+  --dur-base: 200ms;
+  --dur-slow: 300ms;
+  --ease-out: cubic-bezier(.22, 1, .36, 1);
 }
 /* Dark: chosen in Settings (html[data-theme], set before paint by the root layout), or the system's when nothing is chosen. The login page keeps its own studio look. */
 :root[data-theme='dark']:not(:has(.login)) {
@@ -245,6 +251,21 @@ button[aria-pressed='true'] { background: var(--fill); border-color: var(--ink);
 button.primary { background: var(--brand); border-color: var(--brand); color: var(--on-dark); margin-top: .5rem; }
 button.primary:hover:not(:disabled), .runbar button.primary.run:hover:not(:disabled), .detail-use:hover, .library-empty-actions .button:first-child:hover { border-color: var(--brand-hover); background: var(--brand-hover); }
 :focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+/* Motion that only plays for people who have not asked for less: a press on a control shrinks it a little (the scale property, so it adds to a transform a control already has),
+   a dialog fades in (and scales up unless it holds fixed-position arrows, which a scaled box would carry along), and a toast rises. The jobs drawer has its own slide. */
+@media (prefers-reduced-motion: no-preference) {
+  button, .button { transition: scale var(--dur-fast) var(--ease-out); }
+  :is(button:not(.example-open), .button):not(:disabled, [aria-disabled='true']):active { scale: .97; transition-duration: var(--dur-press); }
+  .example:has(.example-open:active), .gallery-item:has(> a:active) { scale: .98; } /* these two keep their own transition list, so the card snaps */
+  dialog.modal:not(.jobs-drawer)[open] { transition: opacity var(--dur-base) var(--ease-out), scale var(--dur-base) var(--ease-out); }
+  dialog.modal:not(.jobs-drawer)[open]::backdrop { transition: opacity var(--dur-base) var(--ease-out); }
+  @starting-style {
+    dialog.modal:not(.jobs-drawer)[open], dialog.modal:not(.jobs-drawer)[open]::backdrop { opacity: 0; }
+    dialog.modal:not(.jobs-drawer, .lightbox, .example-detail)[open] { scale: .97; }
+  }
+  .toast { animation: toast-in var(--dur-base) var(--ease-out); }
+}
+@keyframes toast-in { from { opacity: 0; translate: 0 12px; } }
 select { border: 1px solid transparent; border-radius: 8px; background: var(--fill); }
 /* A select with a see-through background opens its list on the system's white: the options keep the theme's own colours instead. */
 option { background-color: var(--surface); color: var(--ink); }
@@ -308,13 +329,13 @@ main:focus { outline: none; } /* focus lands here from the skip link; it is not 
 /* The account button and its menu: the chip at the bottom of the sidebar, or the avatar in the top bar. */
 .account { position: relative; margin-top: auto; }
 .account .avatar { width: 32px; height: 32px; font-size: 12px; letter-spacing: 0; }
-.account-chip { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px; border: 0; border-radius: 10px; background: transparent; color: var(--ink); text-align: left; transition: background-color .15s; }
+.account-chip { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px; border: 0; border-radius: 10px; background: transparent; color: var(--ink); text-align: left; transition: background-color var(--dur-fast); }
 .account-chip:hover, .account-chip[aria-expanded='true'] { background: var(--fill); }
 .account-who { display: grid; flex: 1; min-width: 0; }
 .account-name, .account-email { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .account-name { font-size: 14px; line-height: 20px; font-weight: 600; }
 .account-email { color: var(--text-muted); font-size: 12px; line-height: 16px; }
-.account-chevron { display: grid; flex: none; color: var(--text-subtle); transition: transform .15s; }
+.account-chevron { display: grid; flex: none; color: var(--text-subtle); transition: transform var(--dur-fast); }
 .account-chip[aria-expanded='true'] .account-chevron { transform: rotate(180deg); }
 .account-button { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 10px; background: transparent; }
 .account-button:hover, .account-button[aria-expanded='true'] { background: var(--fill); }
@@ -437,7 +458,7 @@ dialog.modal.jobs-drawer[open] { animation: jobs-drawer-in .28s cubic-bezier(.2,
 /* A result that arrived while the card was open unblurs and fades in once loaded (opacity and filter only); under reduced motion it simply shows. */
 .job-media .job-reveal:not(.is-in) { opacity: 0; filter: blur(16px); }
 @media (prefers-reduced-motion: no-preference) { .job-media .job-reveal { transition: opacity .4s ease-out, filter .4s ease-out; } }
-.job-media-tools { position: absolute; top: 10px; right: 10px; display: flex; gap: 6px; opacity: 0; transition: opacity .15s; }
+.job-media-tools { position: absolute; top: 10px; right: 10px; display: flex; gap: 6px; opacity: 0; transition: opacity var(--dur-fast); }
 .job-media:hover .job-media-tools, .job-media-tools:focus-within { opacity: 1; }
 .job-media-tools .icon-button { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 8px; background: rgb(var(--shade) / .55); color: var(--on-dark); backdrop-filter: blur(6px); }
 .job-media-tools .icon-button:hover { background: rgb(var(--shade) / .75); }
@@ -737,7 +758,7 @@ td code { white-space: pre-wrap; overflow-wrap: anywhere; }
 /* Overview and Costs: figure cards, a budget bar that goes amber from 80% and red at the cap, and a red REC dot while jobs run. */
 .admin .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(13rem, 100%), 1fr)); gap: 12px; margin: 0 0 16px; }
 .admin .kpis-wide { grid-template-columns: repeat(auto-fit, minmax(min(20rem, 100%), 1fr)); }
-.admin .kpi { display: flex; flex-direction: column; gap: 6px; min-width: 0; padding: 16px 18px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); color: var(--ink); text-decoration: none; transition: border-color .15s, box-shadow .15s; }
+.admin .kpi { display: flex; flex-direction: column; gap: 6px; min-width: 0; padding: 16px 18px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); color: var(--ink); text-decoration: none; transition: border-color var(--dur-fast), box-shadow var(--dur-fast); }
 .admin a.kpi:hover { border-color: var(--border-strong); box-shadow: 0 4px 16px rgb(var(--shade) / .06); }
 .admin .kpi p { margin: 0; }
 .admin .kpi-label { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; color: var(--text-sub); font-size: 13px; line-height: 20px; font-weight: 600; }
@@ -980,8 +1001,10 @@ dialog.admin-modal { width: min(36rem, calc(100vw - 2rem)); }
 .form-message p { margin: 0; }
 .runbar { margin: 0 -24px -24px; }
 .run-summary { margin: 0; padding: 6px 24px 8px; color: var(--text-muted); font-size: 12px; line-height: 18px; } /* wraps rather than cuts: it is the last look at what Run will make */
-.runbar button.primary.run { display: flex; align-items: center; justify-content: center; gap: 12px; width: 100%; height: 60px; margin: 0; padding: 12px 16px; border: 0; border-radius: 8px; background: var(--brand); color: var(--on-dark); font-size: 16px; line-height: 24px; font-weight: 500; }
-/* A disabled Run looks the same on every tool, the brand red at half strength (the base disabled rule); the reason line says why. */
+.runbar button.primary.run { display: flex; align-items: center; justify-content: center; gap: 12px; width: 100%; height: 60px; margin: 0; padding: 12px 16px; border: 0; border-radius: 8px; background: var(--brand); color: var(--on-dark); font-size: 16px; line-height: 24px; font-weight: 500; transition: background-color var(--dur-base) var(--ease-out), color var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out), scale var(--dur-fast) var(--ease-out); }
+/* Not ready is a neutral grey in both themes (the reason line says why), not the brand red at half strength, which read as an error in dark; it lights up to the brand colour when the form is complete. */
+.runbar button.primary.run:disabled { background: var(--fill); color: var(--text-muted); box-shadow: inset 0 0 0 1px var(--border-strong); opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .runbar button.primary.run { transition: none; } }
 .field { display: grid; gap: 6px; margin-top: 16px; }
 /* Saved forms: two quiet links above Run, and their dialogs. */
 .templates { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 16px; margin: 16px 0 12px; font-size: 14px; line-height: 21px; }
@@ -1014,7 +1037,7 @@ dialog.admin-modal { width: min(36rem, calc(100vw - 2rem)); }
 .marketing-head .banner-chip { top: 4px; right: 4px; font-weight: 400; backdrop-filter: blur(4.5px); }
 .marketing-head .banner-chip .icon { width: 11px; height: 11px; }
 
-.dropzone { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; width: 100%; height: 130px; margin-top: 16px; border: 1px dashed var(--text-disabled); border-radius: 18px; transition: border-color .15s, background-color .15s; }
+.dropzone { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; width: 100%; height: 130px; margin-top: 16px; border: 1px dashed var(--text-disabled); border-radius: 18px; transition: border-color var(--dur-fast), background-color var(--dur-fast); }
 .dropzone:hover, .dropzone[data-over='true'] { border-color: var(--ink); background: var(--surface-1); }
 .dropzone-pick { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 0 12px; border: 0; border-radius: 18px; background: transparent; color: var(--text-muted); font-size: 14px; line-height: 18.2px; text-align: center; }
 .dropzone-pick:disabled { opacity: 1; cursor: default; }
@@ -1063,13 +1086,13 @@ dialog.admin-modal { width: min(36rem, calc(100vw - 2rem)); }
 /* The live Generate Audio switch: a 44x24 pill with a white knob, the state beside it. */
 .switch-row { display: flex; align-items: center; gap: 10px; color: var(--text-2); font-size: 14px; line-height: 21px; }
 .switch { position: relative; flex: none; width: 44px; height: 24px; padding: 0; border: 0; border-radius: 12px; background: var(--fill-strong); }
-.switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: var(--surface); transition: left .15s; }
+.switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: var(--surface); transition: left var(--dur-fast); }
 .switch[aria-checked="true"] { background: var(--ink-strong); }
 .switch[aria-checked="true"]::after { left: 23px; }
 .switch:disabled { opacity: 1; cursor: default; }
 
 .select { position: relative; min-width: 0; } /* a long model name must not widen its grid column */
-.select-trigger { display: flex; align-items: center; gap: 8px; width: 100%; height: 39px; padding: 8px 10px; border: 1px solid transparent; border-radius: 8px; background: var(--fill); color: var(--ink); font-size: 14px; line-height: 21px; text-align: left; transition: border-color .15s; }
+.select-trigger { display: flex; align-items: center; gap: 8px; width: 100%; height: 39px; padding: 8px 10px; border: 1px solid transparent; border-radius: 8px; background: var(--fill); color: var(--ink); font-size: 14px; line-height: 21px; text-align: left; transition: border-color var(--dur-fast); }
 .select-trigger .icon { color: var(--text-muted); }
 .select-trigger:hover, .select[data-open='true'] .select-trigger { border-color: var(--border-strong); }
 .select-value { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1118,7 +1141,7 @@ dialog.admin-modal { width: min(36rem, calc(100vw - 2rem)); }
 
 .masonry { display: flex; align-items: flex-start; gap: 8px; }
 .masonry-col { display: flex; flex: 1; flex-direction: column; gap: 8px; min-width: 0; margin: 0; padding: 0; list-style: none; }
-.example { position: relative; overflow: hidden; border-radius: 14px; background: var(--zinc-900); cursor: pointer; transition: transform .2s, box-shadow .2s; }
+.example { position: relative; overflow: hidden; border-radius: 14px; background: var(--zinc-900); cursor: pointer; transition: transform var(--dur-base), box-shadow var(--dur-base); }
 .example:hover { transform: translateY(-3px); box-shadow: 0 8px 28px rgb(var(--shade) / .13); }
 .example:has(.example-open:focus-visible) { outline: 2px solid var(--ink); outline-offset: 2px; }
 .example .preview { border-radius: 0; }
@@ -1164,7 +1187,7 @@ dialog.admin-modal { width: min(36rem, calc(100vw - 2rem)); }
    statuses; on any screen that can be touched, a touch laptop too, it is a pencil that always shows, its name in the aria-label. */
 .preset-card .preset-edit > .icon { display: none; }
 @media (hover: hover) {
-  .preset-card .preset-edit { opacity: 0; transition: opacity .15s; }
+  .preset-card .preset-edit { opacity: 0; transition: opacity var(--dur-fast); }
   .preset-card:hover .preset-edit { opacity: 1; }
   .preset-card:has(:focus-visible) .preset-edit { opacity: 1; } /* its own rule: a browser without :has() still shows the chip on hover */
 }
@@ -1356,7 +1379,7 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .profile-top .avatar { grid-row: span 2; }
 .profile-top .role-badge { grid-column: 2; grid-row: 2; justify-self: start; margin-top: 6px; }
 .profile-top .profile-edit-button { grid-column: 3; grid-row: 1 / span 2; }
-.avatar { display: grid; flex: none; place-items: center; width: 56px; height: 56px; border-radius: 50%; background: var(--avatar); color: var(--on-dark); font-size: 20px; line-height: 1; font-weight: 600; letter-spacing: .02em; transition: background-color .2s; }
+.avatar { display: grid; flex: none; place-items: center; width: 56px; height: 56px; border-radius: 50%; background: var(--avatar); color: var(--on-dark); font-size: 20px; line-height: 1; font-weight: 600; letter-spacing: .02em; transition: background-color var(--dur-base); }
 .profile-edit-button { display: inline-flex; flex: none; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border: 1px solid var(--border-button); border-radius: 8px; background: var(--surface); color: var(--ink); font-size: 13px; }
 .profile-edit-button:hover { background: var(--fill); }
 .pw-form.profile-edit { max-width: none; padding-top: 20px; border-top: 1px solid var(--border); }
@@ -1365,7 +1388,7 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .swatches legend { margin: 0 0 8px; padding: 0; font-size: 14px; line-height: 21px; font-weight: 500; }
 .swatch { position: relative; display: grid; place-items: center; width: 36px; height: 36px; margin: 0; cursor: pointer; }
 .swatch input { position: absolute; inset: 0; width: 100%; min-width: 0; height: 100%; margin: 0; padding: 0; opacity: 0; cursor: pointer; }
-.swatch span { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--swatch); color: var(--on-dark); pointer-events: none; transition: box-shadow .15s; }
+.swatch span { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--swatch); color: var(--on-dark); pointer-events: none; transition: box-shadow var(--dur-fast); }
 .swatch span .icon { opacity: 0; }
 .swatch input:checked + span { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--swatch); }
 .swatch input:checked + span .icon { opacity: 1; }
@@ -1599,9 +1622,9 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 @media (min-width: 1024px) { .explore-prompts { columns: 4; } }
 .explore-prompts > li { break-inside: avoid; margin-bottom: 12px; }
 .explore-prompt { position: relative; display: block; overflow: hidden; border-radius: 8px; background: var(--border); color: var(--on-dark); text-decoration: none; }
-.explore-prompt img, .explore-prompt video { display: block; width: 100%; height: auto; min-height: 120px; object-fit: cover; transition: filter .2s; }
+.explore-prompt img, .explore-prompt video { display: block; width: 100%; height: auto; min-height: 120px; object-fit: cover; transition: filter var(--dur-base); }
 .explore-prompt .banner-empty { aspect-ratio: 3 / 4; }
-.explore-prompt-hover { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 24px; padding: 16px 16px 92px; background: rgb(var(--shade) / .35); opacity: 0; transition: opacity .2s; text-align: center; }
+.explore-prompt-hover { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 24px; padding: 16px 16px 92px; background: rgb(var(--shade) / .35); opacity: 0; transition: opacity var(--dur-base); text-align: center; }
 .explore-prompt-hover strong { font-size: 24px; line-height: 30px; font-weight: 600; }
 /* The live Generate button: about 70 % of the tile, the icon pinned left and the label centred. */
 .explore-prompt-go { position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; justify-content: center; width: min(180px, calc(100% - 32px)); height: 44px; padding: 0 20px; border: 1px solid rgb(var(--light) / .25); border-radius: 8px; background: rgb(var(--light) / .12); font-size: 16px; font-weight: 600; }
@@ -1670,7 +1693,7 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .about-faq details { border-radius: 12px; background: rgb(var(--tint) / .05); }
 .about-faq summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 20px; color: var(--ink); font-size: 14px; line-height: 21px; font-weight: 600; list-style: none; cursor: pointer; }
 .about-faq summary::-webkit-details-marker { display: none; }
-.about-faq summary::after { content: ''; flex: none; width: 7px; height: 7px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); transition: transform .2s; }
+.about-faq summary::after { content: ''; flex: none; width: 7px; height: 7px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); transition: transform var(--dur-base); }
 .about-faq details[open] summary::after { transform: rotate(-135deg); }
 /* Create and Marketing Studio: the exact English prompt Run sends (folded on a phone), its length against the model's limit in the summary, and Translate. */
 .prompt-preview { margin: 12px 0 0; font-size: 12px; line-height: 18px; }
@@ -1823,7 +1846,7 @@ dialog.modal.template-sheet { width: 100%; max-width: none; margin: auto 0 0; bo
 
 /* Try On and Image Generation (REA, measured 2026-10-24 at 1424 px): Try On reuses the Create card and tabs; its upload slots are dashed boxes of 56 px thumbnails and a 56 px
    upload tile. Image Generation has tabs over a gallery and a floating bar, 818 wide and centred in the content area, with 24 px under it. */
-.slot { position: relative; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-height: 82px; padding: 12px; border: 1px dashed var(--text-disabled); border-radius: 18px; transition: border-color .15s, background-color .15s; }
+.slot { position: relative; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-height: 82px; padding: 12px; border: 1px dashed var(--text-disabled); border-radius: 18px; transition: border-color var(--dur-fast), background-color var(--dur-fast); }
 .slot:hover, .slot[data-over='true'] { border-color: var(--ink); background: var(--surface-1); }
 /* The whole dashed slot is its upload button, as Create's drop zone is; the remove buttons, the samples and the audio clips stay on top. */
 .slot-add::before { content: ''; position: absolute; inset: 0; }
@@ -1855,7 +1878,7 @@ dialog.modal.template-sheet { width: 100%; max-width: none; margin: auto 0 0; bo
 .slot-samples li:only-child { flex: 1; } /* one sample (a background) fills the tray, as on the live page */
 .slot-samples button { display: block; width: 100%; height: 100%; padding: 0; border: 0; background: transparent; }
 .slot-samples button:hover img { transform: scale(1.04); }
-.slot-samples img { display: block; width: 79px; height: 100%; object-fit: cover; transition: transform .15s; }
+.slot-samples img { display: block; width: 79px; height: 100%; object-fit: cover; transition: transform var(--dur-fast); }
 .slot-samples img[src*='try-on-garment'] { mix-blend-mode: var(--garment-blend); } /* the garments' white studio ground takes the tray's grey, as on the live page */
 .slot-samples li:only-child img { width: 100%; }
 .slot:has(.slot-samples) .slot-add { flex: none; width: 76px; height: 79px; border: 1px dashed var(--border-strong); border-radius: 12px; background: var(--fill); }
@@ -1866,10 +1889,10 @@ dialog.modal.template-sheet { width: 100%; max-width: none; margin: auto 0 0; bo
 .slot-add:has(.slot-hint) .slot-icon { flex: none; width: 40px; height: 40px; border-radius: 50%; background: var(--divider); color: var(--text-icon); }
 .run-cost { font-weight: 400; }
 
-.gallery-item { position: relative; overflow: hidden; border-radius: 14px; background: var(--fill); transition: transform .2s, box-shadow .2s; }
+.gallery-item { position: relative; overflow: hidden; border-radius: 14px; background: var(--fill); transition: transform var(--dur-base), box-shadow var(--dur-base); }
 .gallery-item:hover { transform: translateY(-3px); box-shadow: 0 8px 28px rgb(var(--shade) / .13); } /* as Create video's .example, measured on Fash (docs/UI-MOTION-PARITY-M7B-LIVE.md) */
 @media (prefers-reduced-motion: reduce) { .gallery-item { transition: none; } .gallery-item:hover { transform: none; } }
-.gallery-use { position: absolute; left: 8px; bottom: 8px; max-width: calc(100% - 16px); padding: 4px 10px; border-radius: 999px; background: rgb(var(--shade) / 60%); color: var(--on-dark); font-size: 12px; line-height: 18px; font-weight: 500; opacity: 0; transition: opacity .15s; }
+.gallery-use { position: absolute; left: 8px; bottom: 8px; max-width: calc(100% - 16px); padding: 4px 10px; border-radius: 999px; background: rgb(var(--shade) / 60%); color: var(--on-dark); font-size: 12px; line-height: 18px; font-weight: 500; opacity: 0; transition: opacity var(--dur-fast); }
 .gallery-item:hover .gallery-use, .gallery-use:focus-visible { opacity: 1; }
 @media (hover: none) { .gallery-use { opacity: 1; } }
 .gallery-item img { display: block; width: 100%; height: 100%; object-fit: cover; }
@@ -1877,9 +1900,9 @@ dialog.modal.template-sheet { width: 100%; max-width: none; margin: auto 0 0; bo
 .tile-img.loaded { opacity: 1; }
 @media (prefers-reduced-motion: reduce) { .tile-img { opacity: 1; transition: none; } }
 /* Fash's card actions (.grid-card__actions, .card-recreate): on hover, a column of icons at the top right and Recreate at the foot. */
-.card-actions { position: absolute; top: 8px; right: 8px; display: flex; flex-direction: column; gap: 6px; opacity: 0; transition: opacity .15s; }
+.card-actions { position: absolute; top: 8px; right: 8px; display: flex; flex-direction: column; gap: 6px; opacity: 0; transition: opacity var(--dur-fast); }
 .card-actions > * { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 8px; background: rgb(var(--shade) / 55%); color: var(--on-dark); cursor: pointer; }
-.card-recreate { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); padding: 6px 16px; border: 0; border-radius: 999px; background: rgb(var(--shade) / 60%); color: var(--on-dark); font: inherit; font-size: 13px; line-height: 18px; font-weight: 600; opacity: 0; cursor: pointer; transition: opacity .15s; }
+.card-recreate { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); padding: 6px 16px; border: 0; border-radius: 999px; background: rgb(var(--shade) / 60%); color: var(--on-dark); font: inherit; font-size: 13px; line-height: 18px; font-weight: 600; opacity: 0; cursor: pointer; transition: opacity var(--dur-fast); }
 .gallery-item:hover .card-actions, .gallery-item:hover .card-recreate, .card-actions:focus-within, .card-recreate:focus-visible { opacity: 1; }
 @media (hover: none) { .card-actions, .card-recreate { opacity: 1; } }
 .gallery-more { display: block; margin: 16px auto 0; }
@@ -2010,7 +2033,7 @@ dialog.modal.template-sheet { width: 100%; max-width: none; margin: auto 0 0; bo
 .choice-box:hover { border-color: var(--ink); background: var(--surface-1); }
 .choice-optional { white-space: nowrap; padding: 1px 8px; border-radius: 999px; background: rgb(var(--tint) / .06); color: var(--text-muted); font-size: 12px; font-weight: 500; line-height: 16px; }
 /* Hovered or dragged over, a tile's round icon fills, so the whole tile reads as one button. */
-:is(.choice-box:hover, .slot-add:hover, .slot[data-over='true']) .slot-icon { background: var(--ink); color: var(--on-ink); transition: background-color .15s, color .15s; }
+:is(.choice-box:hover, .slot-add:hover, .slot[data-over='true']) .slot-icon { background: var(--ink); color: var(--on-ink); transition: background-color var(--dur-fast), color var(--dur-fast); }
 .choice-value { color: var(--ink); font-size: 13px; line-height: 18px; font-weight: 600; overflow-wrap: anywhere; }
 .choice-dialog .modal-body h2:not(:has(+ .modal-sub)) { margin: 0 0 12px; font-size: 18px; line-height: 26px; }
 /* The model dialog's header, as on the live one: a 16 px medium title over a full-width rule, the photos 16 px below. */
@@ -2025,7 +2048,7 @@ dialog.modal.template-sheet { width: 100%; max-width: none; margin: auto 0 0; bo
 .model-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } /* minmax: a wide photo must not stretch a column and scroll the dialog sideways */
 .model-grid button, .model-upload { position: relative; aspect-ratio: 163 / 217; min-height: 0; padding: 0; overflow: hidden; border-radius: 12px; }
 .model-grid img { display: block; width: 100%; height: 100%; object-fit: cover; }
-.model-upload { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; margin: 0; padding: 12px; border: 1px dashed var(--border-strong); background: var(--fill); color: var(--text-subtle); font-size: 13px; line-height: 18px; text-align: center; cursor: pointer; transition: border-color .15s, background-color .15s, color .15s; }
+.model-upload { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; margin: 0; padding: 12px; border: 1px dashed var(--border-strong); background: var(--fill); color: var(--text-subtle); font-size: 13px; line-height: 18px; text-align: center; cursor: pointer; transition: border-color var(--dur-fast), background-color var(--dur-fast), color var(--dur-fast); }
 .model-upload > * { pointer-events: none; } /* a drag over the words stays a drag over the tile */
 .model-upload .icon { display: grid; place-items: center; width: 40px; height: 40px; padding: 10px; border-radius: 50%; background: var(--surface); color: var(--ink); }
 .model-upload-title { color: var(--ink); font-weight: 600; }
@@ -2063,7 +2086,7 @@ dialog.modal.template-sheet { width: 100%; max-width: none; margin: auto 0 0; bo
 /* The listbox's cards sit in the grid around it, so the add card can close the grid. */
 .choice-options { display: contents; }
 /* The add card: a dashed 3:4 tile after the last choice. */
-.choice-dialog .choice-grid button.choice-add-card { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; align-self: start; aspect-ratio: 3 / 4; min-height: 0; padding: 12px; border: 1px dashed var(--border-strong); border-radius: 10px; background: var(--fill); color: var(--ink); font-size: 13px; line-height: 18px; font-weight: 600; text-align: center; transition: border-color .15s, background-color .15s; }
+.choice-dialog .choice-grid button.choice-add-card { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; align-self: start; aspect-ratio: 3 / 4; min-height: 0; padding: 12px; border: 1px dashed var(--border-strong); border-radius: 10px; background: var(--fill); color: var(--ink); font-size: 13px; line-height: 18px; font-weight: 600; text-align: center; transition: border-color var(--dur-fast), background-color var(--dur-fast); }
 .choice-dialog .choice-grid button.choice-add-card:hover { border-color: var(--ink-strong); background: var(--surface); }
 .choice-add-card .icon { display: grid; place-items: center; width: 40px; height: 40px; padding: 10px; border-radius: 50%; background: var(--surface); }
 /* The add form, in the dialog's place: what the kind is, examples that fill it, a hint under the English scene and the words the prompt will take. */
@@ -2192,14 +2215,14 @@ dialog.modal.template-sheet { width: 100%; max-width: none; margin: auto 0 0; bo
 .library .lib-card > .verdict-marks { margin-top: auto; padding-top: 8px; } /* at the card's foot, so the marks line up across a row */
 
 /* Library results: hover border, the hover checkbox and floating selection bar, the list rows, the loading skeleton, and the phone layout. */
-.library .card { transition: border-color .15s, box-shadow .15s; }
+.library .card { transition: border-color var(--dur-fast), box-shadow var(--dur-fast); }
 .library .card:hover { border-color: var(--border-strong); box-shadow: 0 2px 8px rgb(var(--shade) / .06); }
 .library .card:has(.zip-check :checked) { border-color: var(--ink); box-shadow: 0 0 0 1px var(--ink); }
 .library .zip-check input { min-width: 0; }
-.library .zip-check { top: 14px; left: 14px; border: 1px solid rgb(var(--tint) / .1); box-shadow: 0 1px 2px rgb(var(--shade) / .1); opacity: 0; transition: opacity .15s; }
+.library .zip-check { top: 14px; left: 14px; border: 1px solid rgb(var(--tint) / .1); box-shadow: 0 1px 2px rgb(var(--shade) / .1); opacity: 0; transition: opacity var(--dur-fast); }
 .library :is(.card, .lib-row):is(:hover, :focus-within) .zip-check, .library[data-selecting='true'] .zip-check { opacity: 1; }
 @media (hover: none) { .library:not([data-selecting='true']) .zip-check { display: none; } } /* no hover to reveal it: the select button turns the checkboxes on */
-.library :is(.grid, .library-list)[aria-busy='true'] { opacity: .6; transition: opacity .2s; }
+.library :is(.grid, .library-list)[aria-busy='true'] { opacity: .6; transition: opacity var(--dur-base); }
 .library-list { display: grid; grid-template-columns: minmax(0, 1fr); margin: 16px 0; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
 .lib-row { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 12px; border-top: 1px solid var(--hairline); background: var(--surface); }
 .lib-row:first-child { border-top: 0; }
@@ -2210,7 +2233,7 @@ dialog.modal.template-sheet { width: 100%; max-width: none; margin: auto 0 0; bo
 .lib-row .zip-check input { width: 16px; height: 16px; }
 @media (max-width: 599.98px) { .library .zip-check::after { content: ''; position: absolute; inset: calc((44px - 100%) / -2); } .library .zip-check input { position: relative; z-index: 1; } } /* a 44 px hit area around the 18 px box; the box itself stays on top of it */
 .lib-thumb { position: relative; flex: none; width: 56px; height: 56px; overflow: hidden; border-radius: 8px; background: var(--fill); }
-.lib-thumb :is(img, video) { display: block; width: 100%; height: 100%; object-fit: cover; transition: filter .15s; }
+.lib-thumb :is(img, video) { display: block; width: 100%; height: 100%; object-fit: cover; transition: filter var(--dur-fast); }
 .lib-thumb:hover :is(img, video) { filter: brightness(1.12); }
 .lib-thumb:active :is(img, video) { filter: brightness(.94); }
 .library[data-selecting='true'] .lib-open { cursor: pointer; } /* a click picks, it does not zoom */
@@ -2320,7 +2343,7 @@ dialog.modal.verdict-guide { width: min(40rem, calc(100vw - 2rem)); }
 .lib-verdict.featured { background: var(--favorite); color: var(--on-ink); }
 .lib-verdict.fail { background: var(--danger); color: var(--on-dark); }
 .lib-tools { position: absolute; right: 8px; bottom: 8px; display: flex; gap: 4px; }
-.lib-tools .icon-button { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 8px; background: rgb(var(--shade) / .6); color: var(--on-dark); opacity: 0; transition: opacity .15s; }
+.lib-tools .icon-button { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 8px; background: rgb(var(--shade) / .6); color: var(--on-dark); opacity: 0; transition: opacity var(--dur-fast); }
 .lib-card:is(:hover, :focus-within) .lib-tools .icon-button, .lib-tools .favorite[aria-pressed='true'] { opacity: 1; }
 .lib-tools .favorite[aria-pressed='true'] { color: var(--favorite); }
 .lib-tools .favorite[aria-pressed='true'] svg path { fill: currentColor; }
@@ -2393,7 +2416,7 @@ dialog.modal.verdict-guide { width: min(40rem, calc(100vw - 2rem)); }
 /* Which tool when: the sidebar's line per creative tool, the guide dialog, each tool page's hint strip and Explore's "start here" list. */
 .nav-group-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; } /* no right padding here or on the label, so both fit the 208 px column at normal text; with large text the guide button drops under the label instead of running past the rail */
 .nav-group-head > * { white-space: nowrap; } /* one line each, or the label and the button wrap in the narrow sidebar */
-.nav-guide { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 2px; padding: 5px 10px; border: 1px solid var(--border); border-radius: 999px; background: none; color: var(--text-muted); font-size: 12px; line-height: 16px; font-weight: 500; cursor: pointer; transition: background-color .15s, color .15s, border-color .15s; }
+.nav-guide { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 2px; padding: 5px 10px; border: 1px solid var(--border); border-radius: 999px; background: none; color: var(--text-muted); font-size: 12px; line-height: 16px; font-weight: 500; cursor: pointer; transition: background-color var(--dur-fast), color var(--dur-fast), border-color var(--dur-fast); }
 .nav-guide .icon { display: none; } /* no room beside the label in the 240 px rail; the words say it */
 .nav-guide:hover { background: var(--fill); border-color: var(--ink-subtle, var(--border)); color: var(--ink); }
 .nav-hint { display: block; padding: 0 12px 6px 40px; color: var(--text-muted); font-size: 12px; line-height: 16px; }
@@ -2420,7 +2443,7 @@ dialog.modal.tool-guide { width: min(52rem, calc(100vw - 2rem)); }
 .tool-goals { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .tool-guide .tool-goals { padding: 0; }
 .tool-goals li + li { margin-top: 0; }
-.tool-goals a { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 10px; color: var(--text-2); font-size: 14px; line-height: 20px; text-decoration: none; transition: background-color .15s; }
+.tool-goals a { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 10px; color: var(--text-2); font-size: 14px; line-height: 20px; text-decoration: none; transition: background-color var(--dur-fast); }
 .tool-goals a:hover { background: var(--fill); }
 .tool-goals strong { display: inline-flex; flex: none; align-items: center; gap: 4px; color: var(--ink); font-weight: 600; }
 .tool-compare-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; }
@@ -2569,9 +2592,9 @@ dialog.modal.tool-guide { width: min(52rem, calc(100vw - 2rem)); }
 .fb-search { flex: 1 1 220px; }
 .fb-search input { width: 100%; }
 .fb-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
-.fb-item { display: flex; gap: 14px; padding: 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); transition: border-color .15s ease; }
+.fb-item { display: flex; gap: 14px; padding: 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); transition: border-color var(--dur-fast) ease; }
 .fb-item:hover { border-color: var(--border-strong); }
-.fb-vote { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-width: 54px; align-self: start; padding: 6px 8px; border: 1px solid var(--border-button); border-radius: 10px; background: var(--surface); font-weight: 600; line-height: 1.1; transition: border-color .15s ease, color .15s ease; }
+.fb-vote { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-width: 54px; align-self: start; padding: 6px 8px; border: 1px solid var(--border-button); border-radius: 10px; background: var(--surface); font-weight: 600; line-height: 1.1; transition: border-color var(--dur-fast) ease, color var(--dur-fast) ease; }
 .fb-vote:hover:not(:disabled) { border-color: var(--brand); color: var(--brand); }
 .fb-vote.on { border-color: var(--brand); color: var(--brand); background: rgb(var(--shade) / .03); }
 .fb-vote span { font-size: .8rem; }
