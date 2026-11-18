@@ -720,11 +720,13 @@ test("Try On, as Fash's model catalog: the filters narrow the portraits, a portr
     expect(job.pose).toBe('hand-on-hip');
     expect(job.prompt).toContain('show them in this pose and framing: standing facing the camera with one hand on the hip');
 
-    // Không chọn tư thế keeps the portrait and drops the pose.
+    // Không chọn tư thế keeps the portrait and drops the pose; the full one-photo slot is emptied first, so it opens the picker again.
+    await page.getByRole('button', { name: 'Bỏ ảnh try-on-portrait-woman-isla.jpg' }).click();
     await page.getByRole('button', { name: 'Tải lên Người mẫu' }).click();
     await models.getByRole('button', { name: 'Người mẫu Isla' }).click();
     await poses.getByRole('button', { name: 'Không chọn tư thế' }).click();
     await expect(poses).toBeHidden();
+    await expect(page.getByLabel('Người mẫu: ảnh đã chọn').getByRole('img', { name: 'try-on-portrait-woman-isla.jpg' })).toBeVisible();
     await expect(select(page, 'Tư thế')).toHaveAttribute('data-value', '');
   } finally {
     await asAdmin((name) => page.request.delete(`/api/admin/samples/${name}`));
