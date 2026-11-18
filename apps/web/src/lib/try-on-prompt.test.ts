@@ -29,4 +29,12 @@ describe('tryOnPrompt', () => {
     expect(p).toContain('and place them in the background scene.');
     expect(p.endsWith(' sunset')).toBe(true);
   });
+
+  it('gives a chosen pose its words in place of keeping the pose, even with one garment and no text, and ignores an unknown one', () => {
+    const p = tryOnPrompt(1, false, '', 'hand-on-hip')!;
+    expect(p).toContain("Keep the person's face and identity exactly unchanged, and show them in this pose and framing: standing facing the camera with one hand on the hip");
+    expect(p).not.toContain('pose and body exactly unchanged');
+    expect(tryOnPrompt(1, false, '', 'cartwheel')).toBeUndefined();
+    expect(tryOnPrompt(2, false, 'red', null)).toContain("Keep the person's face, pose and body exactly unchanged.");
+  });
 });

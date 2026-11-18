@@ -12,7 +12,7 @@ import { useFashionModels } from '@/lib/use-fashion-models';
 import { useRecall } from '@/lib/use-recall';
 import { useDraftState } from '@/lib/use-draft';
 import { useSamples } from '@/lib/use-samples';
-import { backgroundsIn, GARMENT_CATEGORIES, garmentsOf, posesOf, stockModels } from '@/lib/try-on-stock';
+import { backgroundsIn, GARMENT_CATEGORIES, garmentsOf, PORTRAIT_FILTERS, portraitGender, portraitName, type PortraitFilter, portraitsIn, POSES, posesOf, stockModels } from '@/lib/try-on-stock';
 import { About } from './About';
 import { copyError, copySamples, fashionTiles, FormNotice, Gallery, type Img, LockedFields, PhotoDialog, photoImg, RATIO_LABEL, Slot, THINKING_LABEL, uploadError, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
 import type { UploadSlot } from '@/lib/upload-slots';
@@ -41,6 +41,16 @@ export function TryOn({ reuse }: { reuse?: string }) {
   const models0 = stockModels(have);
   const backgrounds = backgroundsIn(have);
   const categories = GARMENT_CATEGORIES.filter((c) => garmentsOf(have, c.id).length > 0);
+  /** Fash's model catalog, by its four filters, and the pose a run asks for (null: the photo's own pose). */
+  const [portraitFilter, setPortraitFilter] = useState<PortraitFilter>({});
+  const portraits = portraitsIn(have, portraitFilter);
+  const catalog = portraitsIn(have, {}).length > 0;
+  const [pose, setPose] = useState<string | null>(null);
+  const posesFor = (gender: 'woman' | 'man') => POSES.filter((p) => have.has(`try-on-pose-${gender}-${p.value}.jpg`));
+  const stockTiles = models0.map((name, i) => ({ key: name, src: `/api/samples/${name}`, label: `Người mẫu có sẵn ${i + 1}`, pick: () => (posesOf(have, name).length > 0 ? setPicker({ role: 'model', of: name }) : void take({ sample: name }, 'model')) }));
+  // A catalog model goes on to Fash's pose step, the poses shown on a model of its gender.
+  const portraitTiles = portraits.map((p) => ({ key: portraitName(p), src: `/api/samples/${portraitName(p)}`, label: `Người mẫu ${p.name[0]!.toUpperCase()}${p.name.slice(1)}`, pick: () => (posesFor(p.gender).length > 0 ? setPicker({ role: 'model', of: portraitName(p) }) : void take({ sample: portraitName(p) }, 'model')) }));
+  const portraitOf = picker?.role === 'model' && picker.of ? portraitGender(picker.of) : null;
   /** The member's own model photos from earlier Try On jobs (Fash's My Models); a failure leaves just the stock ones. */
   const [myModels, setMyModels] = useState<Img[]>([]);
   useEffect(() => {
@@ -92,6 +102,7 @@ export function TryOn({ reuse }: { reuse?: string }) {
         setGarments(j.images.slice(1, 1 + n));
         setBackground(j.images.slice(1 + n, 2 + n));
       }
+      setPose(j.pose ?? null);
       setPrompt(j.brief ?? '');
       pick.refill(j);
     },
@@ -114,10 +125,10 @@ export function TryOn({ reuse }: { reuse?: string }) {
                 ? 'Tải lên ảnh người mẫu.'
                 : total > chosen.maxImages
                   ? `Mô hình này nhận tối đa ${chosen.maxImages} ảnh (người mẫu, trang phục và bối cảnh).`
-                  : promptTooLong(chosen, tryOnPrompt(garments.length, background.length > 0, prompt)?.length ?? 0);
+                  : promptTooLong(chosen, tryOnPrompt(garments.length, background.length > 0, prompt, pose)?.length ?? 0);
   const canRun = reason === null && !busy;
   /** What the member may write: the model's limit less the image roles the prompt starts with. */
-  const room = chosen && chosen.maxPromptChars - (tryOnPrompt(Math.max(1, garments.length), background.length > 0, 'x')!.length - 1);
+  const room = chosen && chosen.maxPromptChars - (tryOnPrompt(Math.max(1, garments.length), background.length > 0, 'x', pose)!.length - 1);
 
   /** A detail's photo in its slot, as Fash's clicks on a detail's inputs and its Use Result do. */
   async function take(p: Photo, role: PhotoRole, note?: string) {
@@ -157,14 +168,14 @@ export function TryOn({ reuse }: { reuse?: string }) {
     setNotice('');
     try {
       const text = prompt.trim();
-      const sent = tryOnPrompt(garments.length, background.length > 0, text); // with one garment and no background the server's default prompt says it all
+      const sent = tryOnPrompt(garments.length, background.length > 0, text, pose); // with one garment, no background and no pose the server's default prompt says it all
       const body = {
         feature: 'try_on',
         modelId: pick.modelId,
         assetIds: [...person, ...garments, ...background].map((i) => i.id),
         ratio: pick.ratio,
         // The garment count and the member's own text are kept for reuse.
-        params: { resolution: pick.resolution, ...(pick.thinking && { thinking: pick.thinking }), garments: String(garments.length), ...(text && { brief: text }) },
+        params: { resolution: pick.resolution, ...(pick.thinking && { thinking: pick.thinking }), garments: String(garments.length), ...(pose && { pose }), ...(text && { brief: text }) },
         ...(sent ? { prompt: sent } : {}),
       };
       if (!(await sendRun(body))) return;
@@ -195,14 +206,17 @@ export function TryOn({ reuse }: { reuse?: string }) {
           <div className="form-scroll">
             <PageHint href="/try-on" />
             <Slot label="Trang phục" empty="Thêm 1 đến 5 ảnh trang phục" inputLabel="Ảnh trang phục" images={garments} max={MAX_GARMENTS} busy={busy} onAdd={add(setGarments, 'garment')} onRemove={(id) => setGarments((c) => c.filter((i) => i.id !== id))} samples={categories.length > 0 ? [] : samplesOf('garment')} onSample={addSample(setGarments, 'garment')} onBrowse={categories.length > 0 ? () => setPicker({ role: 'garment' }) : undefined} onPick={(a) => setGarments((c) => (c.length < MAX_GARMENTS ? [...c, a] : c))} />
-            <Slot label="Người mẫu" empty="Thêm 1 ảnh người mẫu" inputLabel="Ảnh người mẫu" images={person} max={1} busy={busy} onAdd={add(setPerson, 'model')} onRemove={(id) => setPerson((c) => c.filter((i) => i.id !== id))} samples={models0.length > 0 ? [] : samplesOf('model')} onSample={addSample(setPerson, 'model')} onBrowse={models0.length + myModels.length + aiModels.length > 0 ? () => setPicker({ role: 'model' }) : undefined} onPick={(a) => setPerson([a])} />
+            <Slot label="Người mẫu" empty="Thêm 1 ảnh người mẫu" inputLabel="Ảnh người mẫu" images={person} max={1} busy={busy} onAdd={add(setPerson, 'model')} onRemove={(id) => setPerson((c) => c.filter((i) => i.id !== id))} samples={models0.length > 0 ? [] : samplesOf('model')} onSample={addSample(setPerson, 'model')} onBrowse={catalog || models0.length + myModels.length + aiModels.length > 0 ? () => setPicker({ role: 'model' }) : undefined} onPick={(a) => setPerson([a])} />
+            {(person.length > 0 || pose) && <Select label="Tư thế" icon="model" heading="Chọn tư thế" value={pose ?? ''} options={[{ value: '', label: 'Giữ tư thế trong ảnh' }, ...POSES.map((p) => ({ value: p.value, label: p.label }))]} onChange={(v) => setPose(v || null)} />}
             <Slot label="Bối cảnh (tuỳ chọn)" empty="Thêm 1 ảnh bối cảnh nếu muốn" inputLabel="Ảnh bối cảnh" images={background} max={1} busy={busy} onAdd={add(setBackground, 'background')} onRemove={(id) => setBackground((c) => c.filter((i) => i.id !== id))} samples={backgrounds.length > 0 ? [] : samplesOf('background')} onSample={addSample(setBackground, 'background')} onBrowse={backgrounds.length > 0 ? () => setPicker({ role: 'background' }) : undefined} onPick={(a) => setBackground([a])} />
             <PhotoDialog
               open={picker !== null}
               title={picker?.of ? (picker.role === 'model' ? 'Chọn tư thế' : GARMENT_CATEGORIES.find((c) => c.id === picker.of)!.label) : picker?.role === 'model' ? 'Chọn người mẫu' : picker?.role === 'garment' ? 'Chọn trang phục' : 'Chọn bối cảnh'}
+              sub={portraitOf ? 'Người mẫu sẽ đứng đúng tư thế bạn chọn. Hoặc bấm Không chọn tư thế, rồi tả tư thế trong ô Mô tả nếu muốn.' : undefined}
               tiles={
                 !picker ? [] :
-                picker.role === 'model' && !picker.of ? models0.map((name, i) => ({ key: name, src: `/api/samples/${name}`, label: `Người mẫu có sẵn ${i + 1}`, pick: () => (posesOf(have, name).length > 0 ? setPicker({ role: 'model', of: name }) : void take({ sample: name }, 'model')) })) :
+                picker.role === 'model' && !picker.of ? (catalog ? portraitTiles : stockTiles) :
+                portraitOf ? posesFor(portraitOf).map((p) => ({ key: p.value, src: `/api/samples/try-on-pose-${portraitOf}-${p.value}.jpg`, label: p.label, pick: () => (setPose(p.value), void take({ sample: picker.of! }, 'model')) })) :
                 picker.role === 'model' ? posesOf(have, picker.of!).map((name, i) => ({ key: name, src: `/api/samples/${name}`, label: `Tư thế ${i + 1}`, pick: () => void take({ sample: name }, 'model') })) :
                 picker.role === 'garment' && !picker.of ? categories.map((c) => ({ key: c.id, src: `/api/samples/${have.has(`try-on-stock-${c.id}.jpg`) ? `try-on-stock-${c.id}.jpg` : garmentsOf(have, c.id)[0]}`, label: c.label, pick: () => setPicker({ role: 'garment', of: c.id }) })) :
                 picker.role === 'garment' ? garmentsOf(have, picker.of!).map((name, i) => ({ key: name, src: `/api/samples/${name}`, label: `${GARMENT_CATEGORIES.find((c) => c.id === picker.of)!.label} ${i + 1}`, pick: () => void take({ sample: name }, 'garment') })) :
@@ -212,7 +226,20 @@ export function TryOn({ reuse }: { reuse?: string }) {
               onFile={(files) => void (picker?.role === 'model' ? add(setPerson, 'model') : picker?.role === 'background' ? add(setBackground, 'background') : add(setGarments, 'garment'))(files)}
               onClose={() => setPicker(null)}
               onBack={picker?.of ? () => setPicker({ role: picker.role }) : undefined}
-              groups={picker?.role === 'model' && !picker.of ? [{ title: 'Người mẫu AI', tiles: fashionTiles(aiModels, (img) => setPerson([img])) }] : []}
+              groups={picker?.role === 'model' && !picker.of ? [...(catalog ? [{ title: 'Người mẫu có sẵn', tiles: stockTiles }] : []), { title: 'Người mẫu AI', tiles: fashionTiles(aiModels, (img) => setPerson([img])) }] : []}
+              filter={
+                picker?.role === 'model' && !picker.of && catalog ? (
+                  <div className="portrait-filter">
+                    {PORTRAIT_FILTERS.map((f) => (
+                      <Select key={f.key} label={f.label} icon="sliders" heading={f.label} value={portraitFilter[f.key] ?? ''} options={[{ value: '', label: f.all }, ...f.options.map(([value, label]) => ({ value, label }))]} onChange={(v) => setPortraitFilter((cur) => ({ ...cur, [f.key]: v || undefined }))} />
+                    ))}
+                  </div>
+                ) : portraitOf ? (
+                  <button type="button" className="link-button portrait-no-pose" onClick={() => (setPicker(null), setPose(null), void take({ sample: picker!.of! }, 'model'))}>
+                    Không chọn tư thế
+                  </button>
+                ) : undefined
+              }
               mine={picker?.role === 'model' && !picker.of ? { title: 'Người mẫu của tôi', tiles: myModels.map((a) => ({ key: a.id, src: thumbUrl(a.id), label: `Dùng lại ${a.filename}`, pick: () => setPerson([a]) })) } : undefined}
             />
 
@@ -230,7 +257,7 @@ export function TryOn({ reuse }: { reuse?: string }) {
               placeholder="Ví dụ: người mẫu đứng trong studio sáng, toàn thân"
               ask={chosen ? () => ({ field: 'prompt', feature: 'try_on', text: prompt, ...(room !== undefined && { room }), model: chosen.id }) : null}
             />
-            <PromptPreview feature="try_on" prompts={[basePrompt('try_on', tryOnPrompt(Math.max(1, garments.length), background.length > 0, prompt))!]} limit={chosen?.maxPromptChars} />
+            <PromptPreview feature="try_on" prompts={[basePrompt('try_on', tryOnPrompt(Math.max(1, garments.length), background.length > 0, prompt, pose))!]} limit={chosen?.maxPromptChars} />
 
             {models !== null && !failed && !chosen && <LockedFields />}
             {chosen && (
@@ -245,6 +272,7 @@ export function TryOn({ reuse }: { reuse?: string }) {
               data={() => ({
                 images: [...person, ...garments, ...background].map((i) => i.id),
                 ...(garments.length > 0 && { garments: garments.length }),
+                ...(pose && { pose }),
                 brief: prompt.trim(),
                 ratio: pick.ratio,
                 resolution: pick.resolution,

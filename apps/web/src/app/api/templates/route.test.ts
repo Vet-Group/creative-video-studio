@@ -250,6 +250,8 @@ describe('/api/templates', () => {
       await pool.query(`insert into user_choices (id, user_id, kind, name, phrase) values ($1, $2, 'hook', 'n', 'p')`, [`${u.id}-hook`, u.id]);
       const tryOn = await job(u, { feature: 'try_on', model: 'nano-banana-pro', aspect: '3:4', params: { resolution: '2K', garments: '1', brief: 'red dress' }, inputs: [u.asset, `${u.id}-g`] });
       expect(await saved(await fromJob(u, tryOn))).toEqual({ feature: 'try_on', data: { images: [u.asset, `${u.id}-g`], brief: 'red dress', garments: 1, ratio: '3:4', resolution: '2K', modelId: 'nano-banana-pro' } });
+      const posed = await job(u, { feature: 'try_on', model: 'nano-banana-pro', aspect: '3:4', params: { resolution: '2K', garments: '1', pose: 'kneel' }, inputs: [u.asset, `${u.id}-g`] });
+      expect((await saved(await fromJob(u, posed))).data).toMatchObject({ garments: 1, pose: 'kneel' }); // Try On's pose is kept with the garment count
       const mkt = await job(u, { feature: 'marketing', model: 'kling-o3-pro', duration: 10, params: { format: 'advanced', audio: 'on', hook: `${u.id}-hook`, location: 'kitchen', brief: 'b', script: 's' }, inputs: [u.asset] });
       expect(await saved(await fromJob(u, mkt))).toEqual({
         feature: 'marketing', data: { images: [u.asset], brief: 'b', script: 's', hook: `${u.id}-hook`, location: 'kitchen', format: 'advanced', audio: 'on', ratio: '9:16', modelId: 'kling-o3-pro', durationSec: 10 },
@@ -277,6 +279,11 @@ describe('/api/templates', () => {
       expect(await (await one(req(u, `/api/templates/${id}`), ctx(id))).json()).toMatchObject({ orientation: 'image' });
       const refused = await save(u, { feature: 'motion_control', name: 'Bad', data: { images: [u.asset, `${u.id}-v2`], orientation: 'left' } });
       expect([refused.status, await error(refused)]).toEqual([400, 'data.orientation must be video or image']);
+      const posed = await save(u, { feature: 'try_on', name: 'Posed', data: { images: [u.asset], garments: 1, pose: 'kneel' } });
+      const posedId = ((await posed.json()) as { id: string }).id;
+      expect(await (await one(req(u, `/api/templates/${posedId}`), ctx(posedId))).json()).toMatchObject({ pose: 'kneel' });
+      const badPose = await save(u, { feature: 'try_on', name: 'Bad pose', data: { images: [u.asset], garments: 1, pose: 'cartwheel' } });
+      expect([badPose.status, await error(badPose)]).toEqual([400, 'data.pose must be one of the Try On poses']);
     });
 
     test("keeps a video job's own live end frame and audio clips, and leaves out another member's and deleted ones", async () => {
