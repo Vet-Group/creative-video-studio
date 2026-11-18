@@ -783,6 +783,17 @@ describe('DELETE /api/jobs/:id', () => {
     expect(await audits(`job:${own}`)).toEqual([]);
   });
 
+  test('soft-deletes only the clip video and poster: the inputs it ran from stay, so a later job that names them still reuses all its photos', async () => {
+    await input('k-in-1', alice.id);
+    await input('k-in-2', alice.id);
+    const a = await clip(alice.id, { inputs: ['k-in-1', 'k-in-2'], model: 'seedance-2.5-byteplus' }); // a seeded model the picker does not list, so its counts stay as they are
+    const b = await clip(alice.id, { inputs: ['k-in-2', 'k-in-1'], model: 'seedance-2.5-byteplus' });
+    expect((await remove(alice.cookie, a)).status).toBe(200);
+    expect((await pool.query(`select id from assets where deleted_at is not null and id in ('k-in-1', 'k-in-2', $1, $2, $3, $4) order by id`, [`${a}-video`, `${a}-poster`, `${b}-video`, `${b}-poster`])).rows.map((r) => r.id)).toEqual([`${a}-poster`, `${a}-video`]);
+    const images = ((await (await GET_JOB(req(`/api/jobs/${b}`, alice.cookie), ctx(b))).json()) as { images: { id: string }[] }).images;
+    expect(images.map((i) => i.id)).toEqual(['k-in-2', 'k-in-1']);
+  });
+
   test('refuses a job that is not a Library clip', async () => {
     expect((await remove(alice.cookie, await clip(alice.id, { status: 'running' }))).status).toBe(404);
     expect((await remove(alice.cookie, 'nope')).status).toBe(404);

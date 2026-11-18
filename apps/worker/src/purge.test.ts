@@ -148,4 +148,17 @@ describe('purgeDeletedClips', () => {
     expect(await keys()).toContain('assets/fm-live');
     expect(await keys()).not.toContain('assets/fm-gone');
   });
+
+  test('keeps an input a saved template, a company hook or location, or a feedback item still shows, and removes the one nothing names', async () => {
+    for (const id of ['keep-template', 'keep-choice', 'keep-feedback', 'keep-solo']) await asset(id, 'input');
+    await pool.query(`insert into user_templates (id, user_id, feature, name, data) values ('tpl', 'u1', 'try_on', 'T', $1)`, [JSON.stringify({ images: ['keep-template'], prompt: 'p' })]);
+    await pool.query(`insert into user_choices (id, user_id, kind, name, phrase, image_asset_id) values ('ch', 'u1', 'location', 'L', 'a phrase', 'keep-choice')`);
+    await pool.query(`insert into feedback (id, user_id, team_id, kind, title, body, image_asset_ids) values ('fb', 'u1', 'team-unassigned', 'bug', 't', 'b', '{keep-feedback}')`);
+    await clip('keep-clip', ['keep-template', 'keep-choice', 'keep-feedback', 'keep-solo'], 31);
+    expect(await purgeDeletedClips(pool, deleteObject, log)).toBe(1);
+    expect((await pool.query(`select id from assets where id like 'keep-%' and id not like 'keep-clip-%' order by id`)).rows.map((r) => r.id)).toEqual(['keep-choice', 'keep-feedback', 'keep-template']);
+    expect((await pool.query(`select image_asset_id from user_choices where id = 'ch'`)).rows[0].image_asset_id).toBe('keep-choice');
+    expect(await keys()).toContain('assets/keep-template');
+    expect(await keys()).not.toContain('assets/keep-solo');
+  });
 });
