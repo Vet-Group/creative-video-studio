@@ -30,13 +30,16 @@ export async function GET(request: Request) {
   });
 }
 
-/** What a job of the caller gives a template (`fromJob`), in the shape GET /api/jobs/:id exposes it; null when it is not the caller's live job. */
+/**
+ * What a job of the caller gives a template (`fromJob`), in the shape GET /api/jobs/:id exposes it; null when it is not the caller's live job. `images` keeps
+ * one entry per input in the order sent, '' (an empty slot) where it is no longer the caller's live upload, so the photos after it keep their roles.
+ */
 async function jobData(jobId: string, userId: string): Promise<{ feature: string; data: Record<string, unknown> } | null> {
   const j = (
     await pool.query(
       `select j.feature, j.params, j.preset_id, j.prompt, j.enhance, j.aspect, j.duration_s, j.model,
-              (select array_agg(a.id order by array_position(j.input_asset_ids, a.id)) from assets a
-                where a.id = any(j.input_asset_ids) and a.owner_id = $2 and a.kind = 'input' and a.deleted_at is null) as images,
+              (select array_agg(coalesce(a.id, '') order by i.n) from unnest(j.input_asset_ids) with ordinality as i(id, n)
+                left join assets a on a.id = i.id and a.owner_id = $2 and a.kind = 'input' and a.deleted_at is null) as images,
               (select a.id from assets a where a.id = j.params->>'endAssetId' and a.owner_id = $2 and a.kind = 'input' and a.deleted_at is null) as end_frame,
               (select a.id from assets a where a.id = j.params->>'videoAssetId' and a.owner_id = $2 and a.kind = 'input' and a.deleted_at is null) as video_ref,
               (select array_agg(a.id order by array_position(string_to_array(j.params->>'audioAssetIds', ','), a.id)) from assets a
@@ -69,8 +72,8 @@ async function jobData(jobId: string, userId: string): Promise<{ feature: string
  * Saves the caller's form as a template: `feature` (a page that refills), `name` (1 to 60 characters), `data` (lib/templates.ts) whose images, end frame and clips must be
  * the caller's own live uploads, and `isCompany` (a template editor only) or `storeId` (any member; a store that is not hidden) to share it. A member keeps at most 50. The hook and the location must be ones the caller
  * may use (lib/choices.ts), and a company or store template may hold only built-in or company ones.
- * `fromJob` (instead of `feature` and `data`) saves what one of the caller's own jobs was made from, as a History card's Save template does: its own live uploads,
- * its words and its settings; a hook or location the caller can no longer use is left out.
+ * `fromJob` (instead of `feature` and `data`) saves what one of the caller's own jobs was made from, as a History card's Save template does: its own live uploads
+ * (any other photo as an empty slot ''), its words and its settings; a hook or location the caller can no longer use is left out.
  */
 export async function POST(request: Request) {
   const g = await guard(request, 'member');
@@ -101,7 +104,7 @@ export async function POST(request: Request) {
     else if (!choice) return bad(`data.${key} is not a ${key}`);
     else if ((isCompany || storeId) && !choice.builtIn && !choice.isCompany) return bad('a company or store template may use only built-in or company hooks and locations');
   }
-  for (const [key, ids] of [['images', data.images], ['endFrame', data.endFrame ? [data.endFrame] : []], ['videoRef', data.videoRef ? [data.videoRef] : []], ['clips', data.clips ?? []]] as const) {
+  for (const [key, ids] of [['images', data.images.filter((i) => i !== '')], ['endFrame', data.endFrame ? [data.endFrame] : []], ['videoRef', data.videoRef ? [data.videoRef] : []], ['clips', data.clips ?? []]] as const) {
     if (ids.length === 0) continue;
     const own = await pool.query(`select count(*)::int as n from assets where id = any($1::text[]) and owner_id = $2 and kind = 'input' and deleted_at is null`, [ids, userId]);
     if (own.rows[0].n !== ids.length) return bad(`data.${key} may hold only your own uploads`);

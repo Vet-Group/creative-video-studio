@@ -12,6 +12,7 @@ const MAX_CLIPS = 10; // the most reference audio clips a model takes (Seedance 
 
 /** A template's stored inputs: asset ids for the images, Create video's end frame and reference audio, and the fields of GET /api/jobs/:id the pages refill from. */
 export type TemplateData = {
+  /** In the order saved; '' is an empty slot (POST /api/templates fromJob), so the photos after it keep their roles. */
   images: string[];
   endFrame?: string;
   /** Marketing Studio Advanced's reference video (an asset id). */
@@ -60,7 +61,9 @@ export function templateData(raw: unknown): TemplateData | string {
   const unknown = Object.keys(d).find((k) => !FIELDS.has(k));
   if (unknown) return `data.${unknown} is not a template field`;
   const images = d.images ?? [];
-  if (!Array.isArray(images) || images.length > MAX_IMAGES || !images.every((i) => typeof i === 'string') || new Set(images).size !== images.length) {
+  // '' is an empty slot (a photo deleted before a save from History), so it may repeat.
+  const ids = Array.isArray(images) ? images.filter((i) => i !== '') : [];
+  if (!Array.isArray(images) || images.length > MAX_IMAGES || !images.every((i) => typeof i === 'string') || new Set(ids).size !== ids.length) {
     return `data.images must list up to ${MAX_IMAGES} different asset ids`;
   }
   const clips = d.clips;
