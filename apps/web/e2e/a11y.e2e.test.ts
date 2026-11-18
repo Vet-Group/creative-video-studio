@@ -36,6 +36,21 @@ for (const scheme of ['light', 'dark'] as const) {
       expect.soft(await blocking(page), path).toEqual([]); // soft: one run lists every page's problems
     }
   });
+
+  // The Góp ý board and an item page, with a bug report so its red tag shows on both.
+  test(`the Góp ý board and an item page have no serious accessibility problem (${scheme})`, async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.emulateMedia({ colorScheme: scheme });
+    await signIn(page, 'member8');
+    const res = await page.request.post('/api/feedback', { data: { kind: 'bug', title: `Một lỗi (${scheme})`, body: 'Nội dung.' } });
+    expect(res.ok()).toBe(true);
+    for (const path of [`/feedback/${((await res.json()) as { id: string }).id}`, '/feedback']) {
+      await page.goto(path);
+      await page.waitForLoadState('networkidle');
+      await expect(page.locator('.fb-tag.k-bug').first()).toBeVisible();
+      expect.soft(await blocking(page), path).toEqual([]);
+    }
+  });
 }
 
 // WCAG 2.5.8: a text button drawn under 24 px tall still takes a click across 24 px, and 44 px on a phone, through its invisible ::after;
@@ -154,6 +169,18 @@ test.describe('touch phone', () => {
     await page.locator('.fb-uploads input[type=file]').setInputFiles([1, 2].map((n) => ({ name: `${n}.png`, mimeType: 'image/png', buffer: Buffer.from('png') })));
     await expect(page.getByRole('button', { name: 'Bỏ ảnh' })).toHaveCount(2);
     expect.soft(await tapMisses(page), 'the open form').toEqual([]);
+  });
+
+  // A Góp ý item page as the Admin, who also gets the triage box: the back link, the vote, the reply box's preview toggle, the copy button and the comment form.
+  test('every control on a Góp ý item page takes a 44 px tap, the Admin box and its preview included', async ({ page }) => {
+    await signIn(page, 'admin');
+    const res = await page.request.post('/api/feedback', { data: { kind: 'bug', title: 'Một lỗi cần xem', body: 'Nội dung.' } });
+    expect(res.ok()).toBe(true);
+    await page.goto(`/feedback/${((await res.json()) as { id: string }).id}`);
+    await expect(page.getByRole('group', { name: 'Xử lý (Admin)' })).toBeVisible();
+    expect.soft(await tapMisses(page), 'the item').toEqual([]);
+    await page.getByRole('button', { name: 'Xem trước' }).click();
+    expect.soft(await tapMisses(page), 'the reply preview').toEqual([]);
   });
 });
 

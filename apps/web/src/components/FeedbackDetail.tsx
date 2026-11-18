@@ -121,7 +121,7 @@ export function FeedbackDetail({ id, isAdmin, shipped = [] }: { id: string; isAd
             {item.imageAssetIds.map((aid, i) => (
               <li key={aid}>
                 <a href={`/api/assets/${aid}/content`} target="_blank" rel="noreferrer" aria-label={`Mở ảnh ${i + 1} ở thẻ mới`}>
-                  <img src={thumbUrl(aid, 480)} alt="" loading="lazy" />
+                  <img src={thumbUrl(aid)} alt="" loading="lazy" />
                 </a>
               </li>
             ))}
