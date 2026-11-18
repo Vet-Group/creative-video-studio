@@ -9,7 +9,7 @@ import { appBySlug, VIEW_LABELS } from '@/lib/apps';
 import type { ChangeEntry } from '@/lib/changelog';
 import { CHANGELOG_SEEN_EVENT, loadSeen, unseenEntries } from '@/lib/changelog-seen';
 import { downloadCompressed, downloadCompressedVideo } from '@/lib/compress-download';
-import { typicalLabel } from '@/lib/explore';
+import { typicalLabel, waitProgress } from '@/lib/explore';
 import { featureLabel } from '@/lib/features';
 import { cardTitleOfFormat } from '@/lib/marketing';
 import { canReuse, refillFrom, reuseHref } from '@/lib/reuse';
@@ -141,6 +141,27 @@ const ratioBox =(ratio: string): string => {
   return m ? `${m[1]} / ${m[2]}` : '3 / 4';
 };
 
+/** The thin bar and caption of a running job's waiting picture: filled from the time since it started against its model's usual run time. Its own 2 s ticker runs only while the card waits. */
+function WaitProgress({ job }: { job: TrayJob }) {
+  const { jobs } = useJobs();
+  const [now, setNow] = useState<number>();
+  useEffect(() => {
+    setNow(Date.now());
+    const t = setInterval(() => setNow(Date.now()), 2000);
+    return () => clearInterval(t);
+  }, []);
+  const progress = now === undefined ? null : waitProgress(job, jobs, now);
+  if (!progress) return null;
+  return (
+    <>
+      <span className="job-wait-hint">{progress.label}</span>
+      <span className="job-wait-bar" aria-hidden="true">
+        <span style={{ transform: `scaleX(${progress.fraction})` }} />
+      </span>
+    </>
+  );
+}
+
 /** The History card's title: the page's own name for what made it, as Fash titles its cards ("UGC Try On"); a multi-angle card adds its view, as each view is its own job. */
 const cardTitle = (job: TrayJob): string => {
   const view = job.view && VIEW_LABELS[job.view];
@@ -165,6 +186,9 @@ function HistoryCard({ job, isAdmin, select }: { job: TrayJob; isAdmin: boolean;
   const [saved, setSaved] = useState(false);
   const [comparing, setComparing] = useState(false);
   const media = useRef<HTMLVideoElement & HTMLImageElement>(null);
+  // A result that arrives while the card is open fades and unblurs in once it has loaded; one already there at the first render just shows.
+  const [revealed, setRevealed] = useState(!WAITING.includes(job.status));
+  const reveal = { className: `job-reveal${revealed ? ' is-in' : ''}`, onError: () => setRevealed(true) };
   const image = job.resolution !== null;
   const out = job.status === 'succeeded' ? job.outputAssetId : null;
   // Try On's first input is the person: the original its result is compared with.
@@ -252,14 +276,19 @@ function HistoryCard({ job, isAdmin, select }: { job: TrayJob; isAdmin: boolean;
         {out ? (
           image ? (
             // A click on the picture is the full screen button's; the button stays the keyboard and screen-reader way in.
-            <img ref={media} src={content(job.posterAssetId ?? out)} alt={cardTitle(job)} loading="lazy" onClick={enlarge} {...photoDrag(form?.result && form.photo ? (to) => form.photo!({ asset: out }, to) : undefined)} />
+            <img ref={media} src={content(job.posterAssetId ?? out)} alt={cardTitle(job)} loading="lazy" onClick={enlarge} onLoad={() => setRevealed(true)} {...reveal} {...photoDrag(form?.result && form.photo ? (to) => form.photo!({ asset: out }, to) : undefined)} />
           ) : (
             // F opens full screen, as in most players; Space and the arrows are the video's own keys.
-            <video ref={media} controls playsInline preload="metadata" poster={job.posterAssetId ? content(job.posterAssetId) : undefined} src={content(out)} onKeyDown={(e) => e.key.toLowerCase() === 'f' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && (e.preventDefault(), toggleFullscreen(media.current))} />
+            <video ref={media} controls playsInline preload="metadata" poster={job.posterAssetId ? content(job.posterAssetId) : undefined} src={content(out)} onLoadedMetadata={() => setRevealed(true)} {...reveal} onKeyDown={(e) => e.key.toLowerCase() === 'f' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && (e.preventDefault(), toggleFullscreen(media.current))} />
           )
         ) : WAITING.includes(job.status) ? (
           <span className="job-media-empty job-media-wait" style={{ aspectRatio: ratioBox(job.ratio) }}>
-            {statusText(job)}
+            {/* The first input photo, blurred, behind the wait; a Motion Control input is a clip, which has no thumbnail. */}
+            {job.inputAssetIds[0] && job.feature !== 'motion_control' && <img className="job-wait-input" src={thumbUrl(job.inputAssetIds[0])} alt="" onError={(e) => (e.currentTarget.hidden = true)} />}
+            <span className="job-wait-status">
+              <span>{statusText(job)}</span>
+              <WaitProgress job={job} />
+            </span>
           </span>
         ) : (
           <span className="job-media-empty">{statusText(job)}</span>

@@ -24,14 +24,12 @@ export const providerQueueLabel = (job: { status: string; providerQueue?: number
 const TYPICAL_SAMPLES = 10;
 const TYPICAL_MIN_SAMPLES = 3;
 
-/**
- * What a submitting or running job usually takes, as a range of minutes: the median to the 75th percentile of the run time (start to finish, without the
- * queue wait) of the member's own latest succeeded jobs on the same model (`jobs` newest first). Nothing for another status or with fewer than three samples.
- */
-export function typicalLabel(
-  job: { status: string; modelId: string },
-  jobs: readonly { status: string; modelId: string; createdAt: string; startedAt?: string | null; finishedAt: string | null }[],
-): string | null {
+type TypicalJob = { status: string; modelId: string };
+type PastJob = { status: string; modelId: string; createdAt: string; startedAt?: string | null; finishedAt: string | null };
+
+/** The median and 75th percentile, in seconds, of the run time (start to finish, without the queue wait) of the member's own latest succeeded jobs on
+ * a submitting or running job's model (`jobs` newest first). Nothing for another status or with fewer than three samples. */
+function typicalRun(job: TypicalJob, jobs: readonly PastJob[]): { p50: number; p75: number } | null {
   if (job.status !== 'submitting' && job.status !== 'running') return null;
   const secs = jobs
     .filter((j) => j.status === 'succeeded' && j.modelId === job.modelId && j.finishedAt)
@@ -40,10 +38,39 @@ export function typicalLabel(
     .filter((s) => s > 0)
     .sort((a, b) => a - b);
   if (secs.length < TYPICAL_MIN_SAMPLES) return null;
-  const at = (q: number) => secs[Math.min(secs.length - 1, Math.floor(q * secs.length))]! / 60;
-  const lo = Math.max(1, Math.floor(at(0.5)));
-  const hi = Math.max(lo, Math.ceil(at(0.75)));
-  return `thường xong sau ${at(0.75) < 1 ? 'dưới 1 phút' : `~${lo === hi ? lo : `${lo}–${hi}`} phút`}`;
+  const at = (q: number) => secs[Math.min(secs.length - 1, Math.floor(q * secs.length))]!;
+  return { p50: at(0.5), p75: at(0.75) };
+}
+
+/** The usual run time as a range of whole minutes ("2–3 phút"); null when the 75th percentile is under a minute. */
+function typicalSpan({ p50, p75 }: { p50: number; p75: number }): string | null {
+  if (p75 < 60) return null;
+  const lo = Math.max(1, Math.floor(p50 / 60));
+  const hi = Math.max(lo, Math.ceil(p75 / 60));
+  return `${lo === hi ? lo : `${lo}–${hi}`} phút`;
+}
+
+/** What a submitting or running job usually takes, as a range of minutes (see `typicalRun`). */
+export function typicalLabel(job: TypicalJob, jobs: readonly PastJob[]): string | null {
+  const t = typicalRun(job, jobs);
+  if (!t) return null;
+  const span = typicalSpan(t);
+  return `thường xong sau ${span ? `~${span}` : 'dưới 1 phút'}`;
+}
+
+/**
+ * The bar and the caption of a running job's waiting picture, from the time since it started against its model's usual run time. The fraction eases toward
+ * 0.9 and never reaches it, so the bar never claims "done"; past the usual range the caption says so. Null without enough history, so no bar is invented.
+ */
+export function waitProgress(job: TypicalJob & { createdAt: string; startedAt?: string | null }, jobs: readonly PastJob[], now = Date.now()): { fraction: number; label: string } | null {
+  const t = typicalRun(job, jobs);
+  if (!t) return null;
+  const elapsed = Math.max(0, (now - runStart(job)) / 1000);
+  const span = typicalSpan(t);
+  return {
+    fraction: 0.9 * (1 - Math.exp((-1.6 * elapsed) / t.p50)),
+    label: elapsed > t.p75 ? 'Lâu hơn thường lệ một chút' : span ? `Thường mất khoảng ${span}` : 'Thường mất dưới 1 phút',
+  };
 }
 
 /** The given name of a full name: Vietnamese names put it last; '' for an empty name. */

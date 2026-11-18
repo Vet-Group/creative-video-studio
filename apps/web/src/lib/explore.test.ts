@@ -1,6 +1,6 @@
 import { CANCELED_ERROR } from '@cvs/core/ledger';
 import { expect, test } from 'vitest';
-import { continueJobs, givenName, greeting, jobNote, providerQueueLabel, typicalLabel } from './explore';
+import { continueJobs, givenName, greeting, jobNote, providerQueueLabel, typicalLabel, waitProgress } from './explore';
 
 test('the given name is the last word of a Vietnamese full name', () => {
   expect(givenName('Nguyễn Văn An')).toBe('An');
@@ -90,4 +90,26 @@ test("providerQueueLabel says how many requests are ahead at the provider, only 
   expect(providerQueueLabel({ status: 'running', providerQueue: null })).toBeNull();
   expect(providerQueueLabel({ status: 'queued', providerQueue: 2 })).toBeNull();
   expect(providerQueueLabel({ status: 'succeeded', providerQueue: 1 })).toBeNull();
+});
+
+test('the waiting bar eases toward 90% of the typical run time and never claims to be done', () => {
+  const start = Date.parse('2026-11-12T10:00:00Z');
+  const done = (secs: number) => ({ status: 'succeeded', modelId: 'm', createdAt: new Date(start).toISOString(), finishedAt: new Date(start + secs * 1000).toISOString() });
+  const past = [120, 120, 180].map(done); // median 2 min, 75th percentile 3 min
+  const job = { status: 'running', modelId: 'm', createdAt: new Date(start).toISOString(), startedAt: new Date(start).toISOString() };
+  const at = (secs: number) => waitProgress(job, past, start + secs * 1000)!;
+  expect(at(0)).toEqual({ fraction: 0, label: 'Thường mất khoảng 2–3 phút' });
+  expect(at(60).fraction).toBeGreaterThan(0.3);
+  expect(at(60).fraction).toBeLessThan(at(120).fraction);
+  expect(at(170).label).toBe('Thường mất khoảng 2–3 phút');
+  // Past the 75th percentile the caption turns honest, and a very long wait still stays under 90%.
+  expect(at(190).label).toBe('Lâu hơn thường lệ một chút');
+  expect(at(100_000).fraction).toBeLessThanOrEqual(0.9);
+  expect(at(100_000).fraction).toBeGreaterThan(0.89);
+  // The queue wait is not counted (startedAt); a clock behind the start gives 0; a quick model says so; no history or no run gives nothing.
+  expect(waitProgress({ ...job, createdAt: new Date(start - 600_000).toISOString() }, past, start)!.fraction).toBe(0);
+  expect(waitProgress(job, past, start - 5000)!.fraction).toBe(0);
+  expect(waitProgress(job, [20, 30, 40].map(done), start)!.label).toBe('Thường mất dưới 1 phút');
+  expect(waitProgress(job, past.slice(0, 2), start)).toBeNull();
+  expect(waitProgress({ ...job, status: 'queued' }, past, start)).toBeNull();
 });
