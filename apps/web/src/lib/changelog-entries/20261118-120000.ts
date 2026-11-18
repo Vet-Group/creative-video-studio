@@ -1,0 +1,3 @@
+import type { ChangeEntry } from '../changelog';
+
+export default { at: '2026-11-18T12:00:00+07:00', kind: 'improved', title: 'Xem kết quả mượt hơn, Smart Remake khớp tiếng hơn và ít lỗi hơn khi fal quá tải', details: ['Trong khung chi tiết của Thư viện, ảnh của mục bên cạnh được tải sẵn nên bấm mũi tên hoặc vuốt sang là thấy ngay; video tự phát lại như ngoài lưới.', 'Bản Smart Remake đủ dài cắt mọi đoạn theo đúng khung hình của video gốc, nên các đoạn làm lại ở cuối video không còn lệch dần so với tiếng.', 'Khi fal báo đang quá tải hoặc giới hạn lượt gửi, lượt tạo được gửi lại tối đa 2 lần thay vì báo lỗi ngay; đoạn Smart Remake đã làm xong được tải lại khi đường truyền chập chờn.'], href: '/library', prs: [522, 523, 524], audience: 'all' } satisfies ChangeEntry;

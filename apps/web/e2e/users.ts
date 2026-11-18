@@ -97,6 +97,7 @@ export const USERS = {
   // library.e2e: libra marks from the detail view and in bulk, librb owns the item libra may read but not mark.
   libra: { email: 'libra@e2e.test', name: 'E2E Library Recipe A', role: 'member' },
   librb: { email: 'librb@e2e.test', name: 'E2E Library Recipe B', role: 'member' },
+  librp: { email: 'librp@e2e.test', name: 'E2E Library Prefetch', role: 'member' }, // library.e2e: the detail fetches its image neighbours' previews ahead
   welc: { email: 'welc@e2e.test', name: 'E2E Welcome', role: 'member' }, // library-extras.e2e: the first-visit card on Explore
   libx: { email: 'libx@e2e.test', name: 'E2E Library Extras', role: 'member' }, // library-extras.e2e: the date presets
   toolg: { email: 'toolg@e2e.test', name: 'E2E Tool Guide', role: 'member' }, // tool-guide.e2e: the sidebar lines, the guide, the page hints and Explore's start list
