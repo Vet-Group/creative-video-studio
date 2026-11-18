@@ -6,6 +6,7 @@ export const PRODUCT_TYPES: Record<string, string> = {
   tshirt: 'Áo thun',
   jersey: 'Jersey',
   hoodie: 'Hoodie, sweatshirt',
+  mask_hoodie: 'Hoodie mặt nạ khoá kéo',
   hawaiian: 'Áo Hawaii',
   polo: 'Polo',
   mug: 'Cốc',

@@ -670,7 +670,7 @@ export const examples = pgTable(
     productType: text('product_type'),
   },
   (t) => [
-    check('examples_product_type_check', sql`${t.productType} in ('tshirt', 'jersey', 'hoodie', 'hawaiian', 'polo', 'mug', 'tumbler', 'ornament', 'flag', 'decal', 'poster', 'blanket', 'cap', 'jewelry', 'shoes', 'garage', 'door', 'curtain', 'home', 'other')`),
+    check('examples_product_type_check', sql`${t.productType} in ('tshirt', 'jersey', 'hoodie', 'mask_hoodie', 'hawaiian', 'polo', 'mug', 'tumbler', 'ornament', 'flag', 'decal', 'poster', 'blanket', 'cap', 'jewelry', 'shoes', 'garage', 'door', 'curtain', 'home', 'other')`),
   ],
 );
 

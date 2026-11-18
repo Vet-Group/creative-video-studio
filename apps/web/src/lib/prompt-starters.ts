@@ -89,6 +89,15 @@ export const PROMPT_TEMPLATES: Record<'video' | 'marketing' | 'advanced' | 'unbo
       body: 'The model, wearing the outfit, turns gently from side to side in front of the mirror to show the fit, the phone held steady where it is in the image. Bright natural light.',
       ending: 'The clip ends with the model holding one last mirror pose, the whole outfit in view.',
     },
+    {
+      id: 'keo-khoa-mat-na',
+      name: 'Kéo khoá thành mặt nạ',
+      desc: 'Trùm mũ rồi kéo khoá lên mặt: hoodie thành mặt nạ',
+      needs: 'Cần ảnh người mẫu mặc hoodie mặt nạ, chưa trùm mũ',
+      hook: 'The clip opens on the model exactly as in the photo, as they reach up and pull the hood over their head.',
+      body: 'With one hand they take the zip pull at the chest and draw it slowly all the way up over the chin and face, so the hood closes into a full mask with only the eye opening left, the print on the hood lining up as it closes. Static camera at chest height, the front of the hoodie toward the camera.',
+      ending: 'The clip ends with the masked model standing still and staring straight into the camera.',
+    },
   ],
   marketing: [
     {
@@ -138,6 +147,15 @@ export const PROMPT_TEMPLATES: Record<'video' | 'marketing' | 'advanced' | 'unbo
       hook: "The clip opens on the creator's surprised face as they pull the product out of a plain paper shopping bag.",
       body: 'The creator holds the product up against their body, looks down at it, then back at the camera and nods, impressed, as if seeing it for the first time. Warm natural light, a handheld phone camera.',
       ending: 'The clip ends with the creator holding the product up to the camera with a delighted smile, its front fully in view.',
+    },
+    {
+      id: 'chi-la-hoodie',
+      name: 'Chỉ là cái hoodie',
+      desc: 'Trend TikTok: thản nhiên kéo khoá, hoodie thành mặt nạ',
+      needs: 'Cần ảnh hoodie mặt nạ khoá kéo',
+      hook: 'The clip opens with the creator in the hoodie, hood down, giving the camera a casual shrug.',
+      body: 'Filmed like a real phone video at night outside a brightly lit stadium: the creator pulls the hood up, then zips the hoodie all the way up over the face so it becomes a full mask with only the eye opening left, the print on the hood lining up. A steady phone camera at eye level.',
+      ending: 'The clip ends with the masked creator tilting their head at the camera, the whole front of the hoodie in view.',
     },
   ],
   advanced: [
@@ -303,6 +321,9 @@ export const STARTERS: Record<string, Starter[]> = {
     { label: 'Treo móc', text: 'The garment on a wooden hanger against a clean plaster wall, soft window light, straight-on view.' },
     { label: 'Selfie gương', text: 'A model taking a mirror selfie in the outfit in a bright bedroom with natural light, full body, the phone held beside the face so the whole front of the outfit shows, its colours and any print exactly as in the photo.' },
     { label: 'Ảnh quảng cáo', text: "A premium commercial product photo on a softly lit gradient background with a gentle reflection below, the product's shape, colours and printed text unchanged." },
+    { label: 'Sân vận động đêm', text: 'The garment on its own, shaped as if worn by an invisible body, standing on a football field at night under bright stadium floodlights, the crowd in the stands softly blurred behind, its colours and print exactly as in the photo.' },
+    // A video model keeps an all-over print better when it has seen the garment from several sides: this sheet is one photo of all of them.
+    { label: 'Ảnh nhiều góc', text: 'A product reference sheet on a plain light grey background: the same garment seen from the front, the back, the left side and the right side, plus a close-up of its main print, each view evenly lit and the same size, its colours and print exactly as in the photo.' },
   ],
   try_on: [
     { label: 'Studio', text: "A clean studio backdrop with soft even light, the model's pose unchanged." },
@@ -310,6 +331,7 @@ export const STARTERS: Record<string, Starter[]> = {
     { label: 'Quán cà phê', text: "Set the scene by the window of a cozy cafe in warm natural light with a softly blurred interior, the model's pose unchanged." },
     { label: 'Công viên', text: "A green park on a sunny day with soft natural light, the model's pose unchanged." },
     { label: 'Nền màu', text: "A bold solid-colour studio backdrop with crisp even light, the model's pose unchanged." },
+    { label: 'Sân vận động', text: "Set the scene on a football field at night under bright stadium floodlights with the stands softly blurred behind, the model's pose unchanged." },
   ],
   lingerie_try_on: [
     { label: 'Nắng sớm dịu', text: 'Soft, bright, airy morning light from the side, gentle shadows and clean natural skin tones.' },
