@@ -102,7 +102,7 @@ interface JobDetail {
   ratio: string | null;
   durationSec: number | null;
   modelId: string | null;
-  /** The model's label, kept once it is switched off; how many input images the job had; whether its store is hidden now (a job's, not a sample's or a template's). */
+  /** The model's label, kept once it is switched off, and whether its store is hidden now (a job's, not a sample's or a template's); how many input images the job had or the template saved (not a sample's). */
   modelLabel?: string | null;
   inputCount?: number;
   storeLost?: boolean;

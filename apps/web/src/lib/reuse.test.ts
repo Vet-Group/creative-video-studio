@@ -65,12 +65,12 @@ test('a refill has nothing to bring back only when every input photo is gone and
   expect(nothingRefilled({ inputCount: 2, images: [], prompt: null, brief: ' ' })).toBe(true);
   expect(nothingRefilled({ inputCount: 2, images: [], prompt: 'a studio shot' })).toBe(false); // the words still come back
   expect(nothingRefilled({ inputCount: 2, images: [{}] })).toBe(false); // a photo still comes back
-  expect(nothingRefilled({ inputCount: 0, images: [] })).toBe(false); // a job without photos, or a sample or a template (no count)
+  expect(nothingRefilled({ inputCount: 0, images: [] })).toBe(false); // a job or a template without photos, or a sample (no count)
   expect(nothingRefilled({ images: [] })).toBe(false);
   expect(nothingNote(2)).toBe('Không dùng lại được: 2 ảnh đầu vào đã bị xoá và lượt này không có mô tả. Biểu mẫu được giữ nguyên.');
 });
 
-test("the photos lost are the job's count less those that still exist, and none for a sample or a template", () => {
+test("the photos lost are the job's or the template's count less those that still exist, and none for a sample", () => {
   expect(lostInputs({ inputCount: 3, images: [{}, {}] })).toBe(1);
   expect(lostInputs({ inputCount: 2, images: [{}, {}] })).toBe(0);
   expect(lostInputs({ images: [{}] })).toBe(0);

@@ -148,6 +148,44 @@ test('a reuse says what it could not bring back and why: a deleted input photo, 
   await expect(page.getByRole('img', { name: 'first.png' })).toHaveCount(0);
 });
 
+test('a saved template says what it could not bring back as a reuse does: a deleted input photo on Image Generation and Marketing Studio, and nothing at all', async ({ page }) => {
+  await signIn(page, 'reusea');
+  const save = async (feature: string, data: Record<string, unknown>) => {
+    const res = await page.request.post('/api/templates', { data: { feature, name: `Lost ${feature}`, data } });
+    expect(res.status()).toBe(201);
+    return ((await res.json()) as { id: string }).id;
+  };
+  const [a, b] = [await upload(page, 'first.png'), await upload(page, 'second.png')];
+  // As for a job above: the template's answer is cut as the server cuts it for a photo deleted since, the images that still exist, `inputCount` still the template's own.
+  const cut = (id: string, change: (j: Record<string, unknown>) => void) =>
+    page.route(`**/api/templates/${id}`, async (route) => {
+      const j = (await (await route.fetch()).json()) as Record<string, unknown>;
+      change(j);
+      await route.fulfill({ json: j });
+    });
+  const note = page.getByRole('status').filter({ hasText: 'Không dùng lại được' });
+
+  const image = await save('image', { images: [a, b], prompt: 'two photos', ratio: '1:1', resolution: '1K', modelId: 'mock-image-e2e', enhance: false });
+  await cut(image, (j) => (j.images = (j.images as unknown[]).slice(1)));
+  await page.goto(`/image-generation?template=${image}`);
+  await expect(page.getByRole('img', { name: 'second.png' })).toBeVisible();
+  await expect(note).toHaveText('Đã điền lại 1 ảnh và phần còn lại. Không dùng lại được: 1 ảnh đầu vào (đã bị xoá).');
+
+  // Marketing Studio refills on its own path: the product stays in its slot, the deleted model photo is counted.
+  const marketing = await save('marketing', { images: [a, b], brief: 'soft light' });
+  await cut(marketing, (j) => (j.images = (j.images as unknown[]).slice(1)));
+  await page.goto(`/marketing-studio?template=${marketing}`);
+  await expect(page.getByLabel('Sản phẩm: ảnh đã chọn').getByRole('img', { name: 'second.png' })).toBeVisible();
+  await expect(note).toHaveText('Đã điền lại 1 ảnh và phần còn lại. Không dùng lại được: 1 ảnh đầu vào (đã bị xoá).');
+
+  // Nothing to bring back: its only photo is gone and it has no words. The form stays as it is, and a toast says so.
+  const bare = await save('image', { images: [a], ratio: '1:1' });
+  await cut(bare, (j) => (j.images = []));
+  await page.goto(`/image-generation?template=${bare}`);
+  await expect(page.getByRole('region', { name: 'Thông báo' }).getByText('Không dùng lại được: 1 ảnh đầu vào đã bị xoá và lượt này không có mô tả. Biểu mẫu được giữ nguyên.')).toBeVisible();
+  await expect(page.getByRole('img', { name: 'first.png' })).toHaveCount(0);
+});
+
 test("a History card shows what it cannot do as a disabled action with its reason: Motion Control's inputs", async ({ page }) => {
   await signIn(page, 'reusea');
   // The tray's answer gets a Motion Control card, as no mock model runs it here.

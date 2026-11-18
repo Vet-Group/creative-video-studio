@@ -102,7 +102,7 @@ interface MarketingJob {
   feature: string;
   format: string | null;
   images: (Img | { sample: string })[];
-  /** How many input images the job had (not a sample's or a template's). */
+  /** How many input images the job had or the template saved (not a sample's). */
   inputCount?: number;
   /** The job's input ids in the order sent, a deleted one's too (alignInputs). */
   inputIds?: string[];

@@ -75,14 +75,14 @@ export function skippedNote(kept: number, s: Skipped): string {
   return list.length === 0 ? '' : `Đã điền lại ${kept > 0 ? `${kept} ảnh và ` : ''}phần còn lại. Không dùng lại được: ${list.join('; ')}.`;
 }
 
-/** Whether a job's refill has nothing to bring back: it had input photos, none exists any more, and it has no words to put in the form. */
+/** Whether a job's or a template's refill has nothing to bring back: it had input photos, none exists any more, and it has no words to put in the form. */
 export const nothingRefilled = (j: { inputCount?: number; images: unknown[]; prompt?: string | null; brief?: string | null }): boolean =>
   (j.inputCount ?? 0) > 0 && j.images.length === 0 && !(j.brief || j.prompt)?.trim();
 
 /** The line for a refill that changed nothing (see nothingRefilled). */
 export const nothingNote = (lost: number): string => `Không dùng lại được: ${lost} ảnh đầu vào đã bị xoá và lượt này không có mô tả. Biểu mẫu được giữ nguyên.`;
 
-/** How many of a job's input photos no longer exist (the jobs API tells how many it had); 0 for a sample or a template, which have no count. */
+/** How many of a job's or a template's input photos no longer exist (GET /api/jobs/:id and /api/templates/:id tell how many it had); 0 for a sample, which has no count. */
 export const lostInputs = (j: { inputCount?: number; images: unknown[] }): number => Math.max(0, (j.inputCount ?? 0) - j.images.length);
 
 /** A job's or a template's input photos in the places they were sent or saved in (`inputIds`, GET /api/jobs/:id and /api/templates/:id), a deleted one as
