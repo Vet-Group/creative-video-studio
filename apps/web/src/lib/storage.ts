@@ -28,8 +28,9 @@ function env(name: string): string {
 const g = globalThis as unknown as { cvsS3?: S3Client };
 
 /** The client's 50 sockets are shared by every media request: a body nobody reads (a browser that dropped a video range) frees its
- * socket after a minute of silence instead of holding it until restart, which on 2026-11-14 queued every thumbnail and sample behind it. */
-export const REQUEST_HANDLER = { connectionTimeout: 5_000, requestTimeout: 60_000 };
+ * socket after a minute of silence instead of holding it until restart, which on 2026-11-14 queued every thumbnail and sample behind it.
+ * socketTimeout is that idle limit, kept through the body (@smithy/node-http-handler 4.14.2+); requestTimeout alone only logs a warning. */
+export const REQUEST_HANDLER = { connectionTimeout: 5_000, requestTimeout: 60_000, socketTimeout: 60_000 };
 
 export function s3(): S3Client {
   return (g.cvsS3 ??= new S3Client({
