@@ -177,7 +177,7 @@ test('Try On, as on Fash: a sample picture with a details file opens in place wi
     await gallery.getByRole('link', { name: 'Xem chi tiết ảnh mẫu' }).click();
     const detail = page.getByRole('dialog', { name: 'Chi tiết: Thử đồ' });
     await expect(detail.getByRole('heading', { name: 'Mock image E2E' })).toBeVisible();
-    await expect(detail.getByRole('list', { name: 'Ảnh đầu vào' }).getByRole('img')).toHaveCount(3);
+    await expect(detail.getByRole('list', { name: 'Ảnh đầu vào' }).getByRole('listitem')).toHaveCount(3);
     await expect(detail.locator('.job-text')).toHaveText(details.brief);
     await expect(detail.locator('.job-chips')).toHaveText(['1K3:4', 'Seamless White']);
     await expect(detail.locator('.lightbox-media img')).toHaveAttribute('src', '/api/samples/try-on-example-1.jpg');

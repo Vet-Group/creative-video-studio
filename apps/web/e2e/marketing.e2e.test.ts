@@ -539,7 +539,7 @@ test('as on Fash, a sample in Ví dụ with a details file opens in place with i
     await gallery.getByRole('link', { name: 'Xem chi tiết video mẫu' }).and(page.locator('[href="/api/samples/marketing-example-1.mp4"]')).click();
     let detail = page.getByRole('dialog', { name: 'Chi tiết: UGC Thử đồ' });
     await expect(detail.locator('.job-chips')).toHaveText('8s1:1');
-    await expect(detail.getByRole('list', { name: 'Ảnh đầu vào' }).getByRole('img')).toHaveCount(2);
+    await expect(detail.getByRole('list', { name: 'Ảnh đầu vào' }).getByRole('listitem')).toHaveCount(2);
     await expect(detail.locator('video')).toHaveAttribute('src', '/api/samples/marketing-example-1.mp4');
     await detail.getByRole('button', { name: 'Mục tiếp theo' }).click();
     detail = page.getByRole('dialog', { name: 'Chi tiết: Editorial' });

@@ -1,0 +1,3 @@
+import type { ChangeEntry } from '../changelog';
+
+export default { at: '2026-11-18T13:45:00+07:00', kind: 'improved', title: 'Ảnh đầu vào ở Lịch sử: rõ bấm để dùng, có nút xem ảnh lớn', details: ['Rê chuột lên ảnh đầu vào ở Lịch sử hoặc trong chi tiết ví dụ sẽ thấy ảnh vào ô nào ("+ Trang phục", "+ Bối cảnh"…); bấm để đưa vào biểu mẫu như trước.', 'Góc ảnh có nút xem ảnh lớn, trong đó có nút "Dùng làm …"; ảnh đã có trong biểu mẫu được đánh dấu ✓ và không bị thêm trùng.', 'Thông báo không còn chồng lên nhau: thông báo mới thay thông báo cũ, cùng nội dung thì đếm ×2, ×3; ảnh vừa vào ô sáng viền một nhịp để dễ thấy.'], prs: [527], audience: 'all' } satisfies ChangeEntry;

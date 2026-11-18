@@ -13,6 +13,7 @@ import { pageOf } from '@/lib/reuse';
 import { useTabReturn } from '@/lib/use-tab-return';
 import { confirmDialog } from './Confirm';
 import { Icon } from './Icon';
+import { Modal } from './Modal';
 import { isVietnamese, useTranslate } from './Suggestions';
 
 const POLL_MS = 5_000;
@@ -105,6 +106,10 @@ export interface Toast {
   text: string;
   /** A short note (a History chip applied) rather than a finished job: no Library link, and it goes by itself. */
   note?: boolean;
+  /** A note said again while still shown (four garments put on the form one by one): how many times, shown as ×N instead of a stack. */
+  count?: number;
+  /** A loading note, which its caller takes away; a new note never replaces it. */
+  wait?: boolean;
   /** A finished job's link: its result in the Library, or for a failure the page that made it. */
   href?: string;
 }
@@ -138,6 +143,8 @@ export interface FormActions {
   settings?: (keyof Setting)[];
   /** A photo of a detail put on the form in its role, as a click on one of Fash's inputs does. */
   photo?: (p: Photo, role: PhotoRole) => void;
+  /** Whether the form already has this asset in a slot: its History input is ticked and not added twice. */
+  has?: (asset: string) => boolean;
   /** A detail's words put in the form's prompt (Fash's "Prompt copied"). */
   prompt?: (text: string) => void;
   /** Fash's Use Result: the result on the form (Try On's model photo, Image Generation's inputs). */
@@ -178,6 +185,56 @@ export function Tap({ on, label, className, children }: { on?: () => void; label
     <button type="button" className={className ? `tap ${className}` : 'tap'} aria-label={label} title={label} onClick={on}>
       {children}
     </button>
+  );
+}
+
+/** Each photo role by the name a History input's hover and its viewer's button give it. */
+const ROLE_NAME: Record<PhotoRole, string> = { model: 'người mẫu', garment: 'trang phục', background: 'bối cảnh', product: 'sản phẩm', packaging: 'bao bì', input: 'đầu vào' };
+
+/**
+ * A History card's or an Example's input photo. Beside a form a click puts it there in its role, which a hover names; a photo the form already has
+ * is ticked and not added twice; the corner button shows it large. With no form beside it, a click shows it large.
+ */
+export function InputThumb({ photo, n, role, thumb, full }: { photo: Photo; n: number; role: PhotoRole; thumb: string; full: string }) {
+  const form = useForm();
+  const { notify } = useJobs();
+  const [viewing, setViewing] = useState(false);
+  const used = 'asset' in photo && !!form?.has?.(photo.asset);
+  const name = ROLE_NAME[role];
+  const put = form?.photo;
+  const use = put && (() => (used ? notify('Ảnh này đã có trong biểu mẫu') : put(photo, role)));
+  return (
+    <li className="input-thumb">
+      <button type="button" className="tap" aria-label={use ? `Ảnh đầu vào ${n + 1}: dùng làm ${name}${used ? ', đã có trong biểu mẫu' : ''}` : `Xem lớn ảnh ${n + 1}`} onClick={use ?? (() => setViewing(true))}>
+        <img src={thumb} alt="" loading="lazy" />
+        {used && (
+          <span className="input-used" aria-hidden="true">
+            <Icon name="check" size={10} />
+          </span>
+        )}
+        {use && (
+          <span className="input-use" aria-hidden="true">
+            {used ? 'Đã có' : `+ ${name[0]!.toUpperCase()}${name.slice(1)}`}
+          </span>
+        )}
+      </button>
+      {use && (
+        <button type="button" className="input-zoom" aria-label={`Xem lớn ảnh ${n + 1}`} title="Xem ảnh lớn" onClick={() => setViewing(true)}>
+          <Icon name="expand" size={12} />
+        </button>
+      )}
+      {viewing && (
+        <Modal open onClose={() => setViewing(false)} label={`Ảnh đầu vào ${n + 1}`} className="input-viewer">
+          {/* The thumbnail, already loaded, stands in while the original comes. */}
+          <img src={full} alt={`Ảnh đầu vào ${n + 1}`} style={{ background: `center / contain no-repeat url("${thumb}")` }} />
+          {use && !used && (
+            <button type="button" className="lightbox-reuse input-viewer-use" onClick={() => (use(), setViewing(false))}>
+              <Icon name="plus" /> Dùng làm {name}
+            </button>
+          )}
+        </Modal>
+      )}
+    </li>
   );
 }
 /** A job's or an example's words: four lines with show more for the rest (no inner scroll bar), copy, and beside a form a click puts them in its prompt box. */
@@ -396,15 +453,20 @@ export function JobsProvider({ userId, children }: { userId: string; children: R
     setNews(false);
   }, []);
 
+  // One note at a time: a new note takes the last one's place, and the same note again counts up (×2) instead of stacking over the page.
   const notify = useCallback((text: string) => {
     const id = nextId.current++;
-    setToasts((cur) => [...cur, { id, ok: true, text, note: true }]);
+    setToasts((cur) => {
+      const last = cur.findLast((t) => t.note && !t.wait);
+      const count = last?.text === text ? (last.count ?? 1) + 1 : 1;
+      return [...cur.filter((t) => !t.note || t.wait), { id, ok: true, text, note: true, count }];
+    });
     setTimeout(() => setToasts((cur) => cur.filter((t) => t.id !== id)), NOTE_MS);
   }, []);
 
   const loading = useCallback((text: string) => {
     const id = nextId.current++;
-    setToasts((cur) => [...cur, { id, ok: true, text, note: true }]);
+    setToasts((cur) => [...cur, { id, ok: true, text, note: true, wait: true }]);
     return () => setToasts((cur) => cur.filter((t) => t.id !== id));
   }, []);
 

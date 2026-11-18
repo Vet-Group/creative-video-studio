@@ -9,7 +9,7 @@ import { BACKGROUNDS } from '@/lib/try-on-stock';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { Icon } from './Icon';
 import { useImageModels } from './image-tools';
-import { JobPrompt, Recreate, roleOf, Tap, useForm } from './jobs';
+import { InputThumb, JobPrompt, Recreate, roleOf, useForm } from './jobs';
 import { Modal } from './Modal';
 
 /** A sample's details file, in the shape its page refills from (`?example=`): Marketing's format and duration, or Try On's model, resolution and background. */
@@ -78,11 +78,7 @@ export function SampleDetail({ names, index, onIndex, hasDetails = () => true }:
   const inputs = details && details.images.length > 0 && (
     <ul className="job-inputs" aria-label="Ảnh đầu vào">
       {details.images.map((i, n) => (
-        <li key={i.sample}>
-          <Tap on={form?.photo && (() => form.photo!(i, roleOf(feature, n, { garments: details.garments, format: details.format })))}>
-            <img src={`/api/samples/${i.sample}`} alt={`Ảnh đầu vào ${n + 1}`} />
-          </Tap>
-        </li>
+        <InputThumb key={i.sample} photo={i} n={n} role={roleOf(feature, n, { garments: details.garments, format: details.format })} thumb={`/api/samples/${i.sample}`} full={`/api/samples/${i.sample}`} />
       ))}
     </ul>
   );
