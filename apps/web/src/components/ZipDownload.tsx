@@ -1,6 +1,7 @@
 'use client';
 // Many results at once: the select toggle shows a checkbox per item with an output, and the bar downloads the picked ones as one .zip (POST for a signed link, then the link).
 // With `hover` (the Library) every item has its checkbox, shown on hover or focus by CSS; picking one starts the selection, and Esc or the clear button ends it.
+// `flip` picks or drops an item from elsewhere than its checkbox (the Library's picture, while a selection is on).
 // `actions` adds the page's own controls for the picked ids to the bar (the Library's marks and store).
 import { type ReactNode, useEffect, useState } from 'react';
 import { api, ApiError, sendJson } from '@/lib/api';
@@ -13,6 +14,7 @@ export function useZipDownload({ hover = false, actions }: { hover?: boolean; ac
   toggle: ReactNode;
   bar: ReactNode;
   check: (id: string, label: string) => ReactNode;
+  flip: (id: string) => void;
 } {
   const [on, setOn] = useState(false);
   const [ids, setIds] = useState<string[]>([]);
@@ -87,5 +89,6 @@ export function useZipDownload({ hover = false, actions }: { hover?: boolean; ac
           <input type="checkbox" checked={ids.includes(id)} onChange={(e) => pick(id, e.target.checked)} aria-label={`Chọn ${label}`} />
         </label>
       ),
+    flip: (id) => pick(id, !ids.includes(id)),
   };
 }

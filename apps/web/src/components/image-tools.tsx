@@ -710,7 +710,7 @@ function SampleActions({ name }: { name: string }) {
         <a href={`/api/samples/${name}`} download={name} aria-label="Tải xuống" title="Tải xuống">
           <Icon name="download" />
         </a>
-        <a href={`/api/samples/${name}`} target="_blank" rel="noreferrer" aria-label="Mở trong tab mới" title="Mở trong tab mới">
+        <a href={`/api/samples/${name}`} target="_blank" rel="noreferrer" aria-label="Mở bản gốc trong tab mới" title="Mở bản gốc trong tab mới">
           <Icon name="external" />
         </a>
       </div>
@@ -865,7 +865,7 @@ export const shownType = (items: Clip[], chosen: string): string => (items.some(
 export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4], samples }: { kind: string; label: string; emptyText: string; video?: boolean; cols?: [number, number, number]; samples?: string }) {
   const have = useSamples();
   const sampleTiles = samples ? numberedSamples(have, samples, video ? 'mp4' : 'jpg') : [];
-  /** The samples with a details file open in place (SampleDetail); other clips still open in a new tab. */
+  /** Every sample opens in place (SampleDetail); the ones with a details file show its prompt and settings too. */
   const detailed = sampleTiles.filter((n) => have.has(n.replace(/\.(mp4|jpg)$/, '.json')));
   const [open, setOpen] = useState<number | null>(null);
   const [detail, setDetail] = useState<string | null>(null); // the id of a company result open in place, as in the Library
@@ -951,12 +951,12 @@ export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4
               typeof it === 'string' ? (
                 <li key={it} className="gallery-item">
                   {video ? (
-                    <a href={`/api/samples/${it}`} target="_blank" rel="noreferrer" aria-label={detailed.includes(it) ? 'Xem chi tiết video mẫu' : 'Mở video mẫu trong tab mới'} onClick={detailed.includes(it) ? (e) => (e.preventDefault(), setOpen(detailed.indexOf(it))) : undefined}>
+                    <a href={`/api/samples/${it}`} aria-label={detailed.includes(it) ? 'Xem chi tiết video mẫu' : 'Xem video mẫu'} onClick={(e) => (e.preventDefault(), setOpen(sampleTiles.indexOf(it)))}>
                       <Preview src={`/api/samples/${it}`} poster={`/api/samples/${it.replace(/\.mp4$/, '.jpg')}`} width={9} height={16} title="Video mẫu" onHover />
                     </a>
                   ) : (
-                    // A picture opens as a clip does: its details in place, else a new tab.
-                    <a href={`/api/samples/${it}`} target="_blank" rel="noreferrer" aria-label={detailed.includes(it) ? 'Xem chi tiết ảnh mẫu' : 'Mở ảnh mẫu trong tab mới'} onClick={detailed.includes(it) ? (e) => (e.preventDefault(), setOpen(detailed.indexOf(it))) : undefined}>
+                    // A picture opens in place as a clip does, with its details when it has a file.
+                    <a href={`/api/samples/${it}`} aria-label={detailed.includes(it) ? 'Xem chi tiết ảnh mẫu' : 'Xem ảnh mẫu'} onClick={(e) => (e.preventDefault(), setOpen(sampleTiles.indexOf(it)))}>
                       <img src={`/api/samples/${it}`} alt={`Ảnh mẫu ${sampleTiles.indexOf(it) + 1}`} loading="lazy" />
                     </a>
                   )}
@@ -985,7 +985,7 @@ export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4
           </ul>
         ))}
       </div>
-      {open !== null && <SampleDetail names={detailed} index={open} onIndex={setOpen} />}
+      {open !== null && <SampleDetail names={sampleTiles} index={open} onIndex={setOpen} hasDetails={(n) => detailed.includes(n)} />}
       {detailAt >= 0 && <ClipDetail clips={shown} index={detailAt} admin={admin} onUse={form ? (c) => (form.recreate(refillFrom({ reuse: c.id })!, true), setDetail(null)) : undefined} onIndex={(i) => setDetail(i === null ? null : (shown[i]?.id ?? null))} onChange={(c) => setItems((cur) => cur.map((o) => (o.id === c.id ? c : o)))} />}
       {state === 'error' && sampleTiles.length > 0 && <LoadError text="Không tải được kết quả của công ty." onRetry={retry} />}
       {hasMore && (

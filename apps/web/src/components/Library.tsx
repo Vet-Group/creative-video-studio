@@ -203,8 +203,11 @@ function VerdictMarks({ clip, onChange, keys = false, describedBy }: { clip: Cli
 const verdictText = (v: Clip['verdict']) => v && (v.verdict === 'fail' ? `Không đạt · ${faultLabel(v.fault)}` : v.featured ? 'Nổi bật' : 'Đạt');
 const verdictClass = (v: NonNullable<Clip['verdict']>) => (v.verdict === 'fail' ? ' fail' : v.featured ? ' featured' : '');
 
-/** A grid card puts the result first: its type and length on the media, the mark in its corner, the actions over it on hover (always on touch), two short lines under it and the marks for whoever may edit; Reuse and the store live in the detail view. A `list` row keeps the clip actions and the marks. */
-export function ClipCard({ clip, view, select, onChange, onDeleted, onOpen }: { clip: Clip; view: LibraryView; select?: ReactNode; onChange: (c: Clip) => void; onDeleted: (id: string) => void; onOpen: () => void }) {
+/**
+ * A grid card puts the result first: its type and length on the media, the mark in its corner, the actions over it on hover (always on touch), two short lines under it and the marks for whoever may edit; Reuse and the store live in the detail view. A `list` row keeps the clip actions and the marks.
+ * On both, the picture opens the detail (`onOpen`); while `selecting`, the page makes that click pick the item instead (owner, 2026-11-18), and the checkbox in the picture's corner stays the control a keyboard or screen reader uses.
+ */
+export function ClipCard({ clip, view, select, selecting = false, onChange, onDeleted, onOpen }: { clip: Clip; view: LibraryView; select?: ReactNode; selecting?: boolean; onChange: (c: Clip) => void; onDeleted: (id: string) => void; onOpen: () => void }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [problem, setProblem] = useState('');
   const [saving, setSaving] = useState(false);
@@ -257,6 +260,7 @@ export function ClipCard({ clip, view, select, onChange, onDeleted, onOpen }: { 
   }
 
   const name = clipLabel(clip);
+  const opener = selecting ? { tabIndex: -1, 'aria-hidden': true } : { 'aria-label': 'Xem chi tiết', title: 'Xem chi tiết', ...about };
   // Hidden but still readable as a description, so a screen reader reads each action with its item once, not as card text too.
   const labelled = (
     <span id={labelId} hidden>
@@ -279,12 +283,16 @@ export function ClipCard({ clip, view, select, onChange, onDeleted, onOpen }: { 
 
   if (view === 'list') {
     const thumb = clip.posterAssetId ?? (image ? clip.videoAssetId : null); // an image's preview, else the image itself
+    const prompt = clip.prompt?.replaceAll('**', ''); // Markdown bold pasted into a prompt reads as plain words here; the detail keeps the prompt as sent
     return (
       <article className="lib-row" aria-label={name} data-clip-id={clip.id}>
         {labelled}
-        {select}
+        {/* The picture opens the detail, as the grid card's does; the checkbox sits in its corner. */}
         <span className="lib-thumb">
           {thumb ? <img src={thumbUrl(thumb)} alt="" loading="lazy" decoding="async" /> : <video preload="metadata" muted playsInline src={`/api/assets/${clip.videoAssetId}/content`} />}
+          <button type="button" className="lib-open" onClick={onOpen} {...opener} />
+          {select}
+          {!image && <span className="lib-thumb-len" aria-hidden="true">{Math.round(clip.lengthSec ?? clip.durationSec)}s</span>}
         </span>
         <div className="lib-row-main">
           <p className="lib-row-title">
@@ -294,8 +302,8 @@ export function ClipCard({ clip, view, select, onChange, onDeleted, onOpen }: { 
             {clip.example && <span className="tag">Ví dụ</span>}
             {mark && <span className={`lib-mark${verdictClass(clip.verdict!)}`}>{mark}</span>}
           </p>
-          <p className={clip.prompt ? 'lib-row-prompt' : 'lib-row-prompt none'} title={clip.prompt ?? undefined}>
-            {clip.prompt ?? featureLabel(clip.feature)}
+          <p className={prompt ? 'lib-row-prompt' : 'lib-row-prompt none'} title={prompt}>
+            {prompt ?? featureLabel(clip.feature)}
           </p>
           <p className="lib-row-meta">
             {clip.creator.name} · {clip.storeName && `${clip.storeName} · `}{fmtTime(clip.createdAt)} · {clip.ratio} · {image ? clip.resolution : `${clip.lengthSec ?? clip.durationSec} giây`}
@@ -307,9 +315,6 @@ export function ClipCard({ clip, view, select, onChange, onDeleted, onOpen }: { 
           </button>
           <button type="button" className="icon-button" onClick={() => void download()} aria-label="Tải xuống" title="Tải xuống" {...about}>
             <Icon name="download" />
-          </button>
-          <button type="button" className="icon-button" onClick={onOpen} aria-label="Xem chi tiết" title="Xem chi tiết" {...about}>
-            <Icon name="eye" />
           </button>
           {clip.canEdit && (
             <button type="button" className="danger icon-button" onClick={() => setConfirmDelete(true)} aria-label="Xoá" title="Xoá" {...about}>
@@ -355,7 +360,7 @@ export function ClipCard({ clip, view, select, onChange, onDeleted, onOpen }: { 
           <video ref={video} muted loop playsInline preload={clip.posterAssetId ? 'none' : 'metadata'} poster={clip.posterAssetId ? thumbUrl(clip.posterAssetId) : undefined} src={`/api/assets/${clip.videoAssetId}/content`} />
         )}
         {/* Over the media rather than around it, so the picture keeps its own name for screen readers. */}
-        <button type="button" className="lib-open" onClick={onOpen} aria-label="Xem chi tiết" title="Xem chi tiết" {...about} />
+        <button type="button" className="lib-open" onClick={onOpen} {...opener} />
         <span className="lib-chips">
           {clip.feature !== 'video' && <span className="lib-chip">{featureLabel(clip.feature)}</span>}
           {!image && <span className="lib-chip">{clip.lengthSec ?? clip.durationSec}s</span>}
@@ -435,6 +440,8 @@ export function ClipDetail({ clips, index, stores, admin, onIndex, onChange, onU
   const [note, setNote] = useState('');
   const [comparing, setComparing] = useState(false);
   const [rerunning, setRerunning] = useState(false);
+  const [shown, setShown] = useState<{ id: string; filename: string } | null>(null); // an input photo shown large in the result's place, instead of a new tab
+  const [full, setFull] = useState<string | null>(null); // the picture full screen loaded at its own size (the box shows a 1600 px preview)
   const media = useRef<HTMLVideoElement & HTMLImageElement>(null);
   // A swipe on a touch screen steps to the neighbour like the arrows: the media follows the finger, then opens it or snaps back.
   const box = useRef<HTMLDivElement>(null);
@@ -450,6 +457,7 @@ export function ClipDetail({ clips, index, stores, admin, onIndex, onChange, onU
     setJob(null);
     setNote('');
     setComparing(false);
+    setShown(null);
     api<ClipInputs>(`/api/jobs/${clip.id}`).then(setJob, () => setJob(NO_INPUTS));
   }, [clip.id]);
   useEffect(() => void loadPresetNames().then(setPresets), []);
@@ -574,10 +582,18 @@ export function ClipDetail({ clips, index, stores, admin, onIndex, onChange, onU
           slide(0, true);
         }}
       >
-        {comparing && original ? (
+        {shown ? (
+          <>
+            <img ref={media} src={full === shown.id ? content(shown.id) : thumbUrl(shown.id, PREVIEW_W)} alt={`Ảnh đầu vào ${shown.filename}`} />
+            <button type="button" className="lightbox-back" onClick={() => setShown(null)}>
+              <Icon name="left" />
+              Về kết quả
+            </button>
+          </>
+        ) : comparing && original ? (
           <CompareSlider before={content(original.id)} after={content(clip.videoAssetId)} beforeAlt={`Ảnh gốc ${original.filename}`} afterAlt={clip.downloadName} />
         ) : image ? (
-          <img ref={media} src={thumbUrl(clip.videoAssetId, PREVIEW_W)} alt={clip.downloadName} />
+          <img ref={media} src={full === clip.videoAssetId ? content(clip.videoAssetId) : thumbUrl(clip.videoAssetId, PREVIEW_W)} alt={clip.downloadName} />
         ) : (
           <video key={clip.id} ref={media} controls autoPlay muted playsInline poster={clip.posterAssetId ? thumbUrl(clip.posterAssetId) : undefined} src={content(clip.videoAssetId)} />
         )}
@@ -605,9 +621,9 @@ export function ClipDetail({ clips, index, stores, admin, onIndex, onChange, onU
             <ul className="job-inputs" aria-label="Ảnh đầu vào">
               {job.images.map((i) => (
                 <li key={i.id}>
-                  <a href={content(i.id)} target="_blank" rel="noreferrer" title="Mở ảnh trong tab mới">
+                  <button type="button" className="tap" aria-pressed={shown?.id === i.id} title="Xem lớn ảnh này" onClick={() => (setComparing(false), setShown(shown?.id === i.id ? null : i))}>
                     <img src={thumbUrl(i.id)} alt={i.filename} />
-                  </a>
+                  </button>
                 </li>
               ))}
             </ul>
@@ -653,10 +669,11 @@ export function ClipDetail({ clips, index, stores, admin, onIndex, onChange, onU
           <button type="button" className="icon-button" disabled={compressing} aria-busy={compressing} onClick={() => void compress()} aria-label="Nén & tải về" title="Nén & tải về">
             <Icon name="compress" />
           </button>
-          <button type="button" className="icon-button" onClick={() => void media.current?.requestFullscreen?.()} aria-label="Toàn màn hình" title="Toàn màn hình">
+          <button type="button" className="icon-button" onClick={() => (setFull(shown?.id ?? clip.videoAssetId), void media.current?.requestFullscreen?.())} aria-label="Toàn màn hình" title="Toàn màn hình">
             <Icon name="expand" />
           </button>
-          <a className="icon-button" href={content(clip.videoAssetId)} target="_blank" rel="noreferrer" aria-label="Mở trong tab mới" title="Mở trong tab mới">
+          {/* The file itself: its own size and a link to copy (Fash keeps it beside download). */}
+          <a className="icon-button" href={content(clip.videoAssetId)} target="_blank" rel="noreferrer" aria-label="Mở bản gốc trong tab mới" title="Mở bản gốc trong tab mới">
             <Icon name="external" />
           </a>
           {copyText && (
@@ -665,7 +682,7 @@ export function ClipDetail({ clips, index, stores, admin, onIndex, onChange, onU
             </button>
           )}
           {original && (
-            <button type="button" className="icon-button" aria-pressed={comparing} onClick={() => setComparing(!comparing)} aria-label="So sánh trước/sau" title="So sánh trước/sau">
+            <button type="button" className="icon-button" aria-pressed={comparing} onClick={() => (setShown(null), setComparing(!comparing))} aria-label="So sánh trước/sau" title="So sánh trước/sau">
               <Icon name="panel" />
             </button>
           )}
@@ -1412,12 +1429,13 @@ export function Library({ initialFilters = NO_FILTERS }: { initialFilters?: Libr
             clip={c}
             view={view}
             select={zip.check(c.id, c.downloadName)}
+            selecting={zip.active}
             onChange={update}
             onDeleted={(id) => {
               uncount(clips.find((x) => x.id === id));
               setClips((cur) => cur.filter((x) => x.id !== id));
             }}
-            onOpen={() => setDetail(i)}
+            onOpen={zip.active ? () => zip.flip(c.id) : () => setDetail(i)}
           />
           </Fragment>
         ))}

@@ -312,7 +312,7 @@ test('V01 Previous and Next step through every sample in order and stop at the e
   const download = detail.getByRole('link', { name: 'Tải video ví dụ' });
   await expect(download).toHaveAttribute('href', EXAMPLES.at(-2)!.src);
   await expect(download).toHaveAttribute('download', '');
-  await expect(detail.getByRole('link', { name: 'Mở trong tab mới' })).toHaveAttribute('target', '_blank');
+  await expect(detail.getByRole('link', { name: 'Mở bản gốc trong tab mới' })).toHaveAttribute('target', '_blank');
   await detail.getByRole('button', { name: 'Dùng ví dụ này' }).click();
   await expect(detail).toBeHidden();
   expect(posts).toEqual([]);

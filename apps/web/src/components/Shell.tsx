@@ -247,7 +247,7 @@ function HistoryCard({ job, isAdmin, select }: { job: TrayJob; isAdmin: boolean;
       <div className="job-media">
         {out ? (
           image ? (
-            // A click on the picture is the eye's full screen; the eye stays the keyboard and screen-reader way in.
+            // A click on the picture is the full screen button's; the button stays the keyboard and screen-reader way in.
             <img ref={media} src={content(job.posterAssetId ?? out)} alt={cardTitle(job)} loading="lazy" onClick={enlarge} />
           ) : (
             // F opens full screen, as in most players; Space and the arrows are the video's own keys.
@@ -260,13 +260,13 @@ function HistoryCard({ job, isAdmin, select }: { job: TrayJob; isAdmin: boolean;
         ) : (
           <span className="job-media-empty">{statusText(job)}</span>
         )}
-        {/* On the picture, where the eye already is: full screen and a new tab; they show on hover or focus. */}
+        {/* On the picture: full screen and the file in a new tab; they show on hover or focus. */}
         {out && (
           <div className="job-media-tools">
             <button type="button" className="icon-button" onClick={enlarge} aria-label="Toàn màn hình" title="Toàn màn hình (F)">
-              <Icon name="eye" />
+              <Icon name="expand" />
             </button>
-            <a className="icon-button" href={content(out)} target="_blank" rel="noreferrer" aria-label="Mở trong tab mới" title="Mở trong tab mới">
+            <a className="icon-button" href={content(out)} target="_blank" rel="noreferrer" aria-label="Mở bản gốc trong tab mới" title="Mở bản gốc trong tab mới">
               <Icon name="external" />
             </a>
             <button type="button" className="icon-button" disabled={compressing} aria-busy={compressing} onClick={() => void compress()} aria-label="Nén & tải về" title="Nén & tải về">

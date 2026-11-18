@@ -52,10 +52,11 @@ const chip = (text: string, on: (() => void) | undefined, label: string) =>
 
 const fmtDate = (day: string) => new Intl.DateTimeFormat('vi-VN', { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(day));
 
-/** `names`: the samples that have a details file (`marketing-example-<n>.mp4`, `try-on-example-<n>.jpg`), in tile order; `index` the open one. */
-export function SampleDetail({ names, index, onIndex }: { names: string[]; index: number; onIndex: (i: number | null) => void }) {
+/** `names`: the samples in tile order (`marketing-example-<n>.mp4`, `try-on-example-<n>.jpg`); `index` the open one. One without a details file (`hasDetails`) shows the sample and its file actions only. */
+export function SampleDetail({ names, index, onIndex, hasDetails = () => true }: { names: string[]; index: number; onIndex: (i: number | null) => void; hasDetails?: (name: string) => boolean }) {
   const name = names[index]!;
   const video = name.endsWith('.mp4');
+  const bare = !hasDetails(name);
   const base = name.replace(/\.(mp4|jpg)$/, '');
   const [details, setDetails] = useState<SampleDetails | null>(null);
   const [note, setNote] = useState('');
@@ -65,13 +66,14 @@ export function SampleDetail({ names, index, onIndex }: { names: string[]; index
   useEffect(() => {
     setDetails(null);
     setNote('');
+    if (bare) return;
     api<SampleDetails>(`/api/samples/${base}.json`).then(setDetails, () => setNote(video ? 'Không tải được chi tiết của video mẫu.' : 'Không tải được chi tiết của ảnh mẫu.'));
-  }, [base, video]);
+  }, [base, video, bare]);
   const picture = !video; // a Try On or an Image Generation sample: the photos before the words, resolution chips, Use Result
   const tryOn = base.startsWith('try-on-');
   const feature = video ? 'marketing' : tryOn ? 'try_on' : 'image';
   const text = details?.brief ?? details?.prompt ?? null;
-  const title = tryOn ? 'Thử đồ' : picture ? 'Tạo ảnh' : FORMAT_NAME[isParamFormat(details?.format) ? details.format : 'ugc'];
+  const title = bare ? (video ? 'Video mẫu' : 'Ảnh mẫu') : tryOn ? 'Thử đồ' : picture ? 'Tạo ảnh' : FORMAT_NAME[isParamFormat(details?.format) ? details.format : 'ugc'];
   // As on Fash, each photo, the words, a chip and the result can go on the form beside the Examples.
   const inputs = details && details.images.length > 0 && (
     <ul className="job-inputs" aria-label="Ảnh đầu vào">
@@ -130,9 +132,9 @@ export function SampleDetail({ names, index, onIndex }: { names: string[]; index
             <Icon name="download" />
           </a>
           <button type="button" className="icon-button" onClick={() => void media.current?.requestFullscreen?.()} aria-label="Toàn màn hình" title="Toàn màn hình">
-            <Icon name="eye" />
+            <Icon name="expand" />
           </button>
-          <a className="icon-button" href={`/api/samples/${name}`} target="_blank" rel="noreferrer" aria-label="Mở trong tab mới" title="Mở trong tab mới">
+          <a className="icon-button" href={`/api/samples/${name}`} target="_blank" rel="noreferrer" aria-label="Mở bản gốc trong tab mới" title="Mở bản gốc trong tab mới">
             <Icon name="external" />
           </a>
         </div>
