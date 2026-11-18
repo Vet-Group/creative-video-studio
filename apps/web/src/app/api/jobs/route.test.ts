@@ -58,6 +58,7 @@ beforeAll(async () => {
   await insertAsset('own-3', ownerId);
   await insertAsset('own-deleted', ownerId, 'deleted');
   await insertAsset('theirs-1', otherId);
+  await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) values ('own-output', $1, 'output', 'own-output', 'a.png', 'image/png', 1)`, [ownerId]);
 });
 
 afterAll(async () => {
@@ -198,6 +199,7 @@ describe('POST /api/jobs', () => {
     ['the same asset twice', { assetIds: ['own-1', 'own-1'] }],
     ['an unknown asset', { assetIds: ['own-1', 'nope'] }],
     ['a deleted asset', { assetIds: ['own-deleted'] }],
+    ['a result (an output), which only an input copy of it may stand for', { assetIds: ['own-output'] }],
     ['more images than the model takes', { assetIds: ['own-1', 'own-2', 'own-3'] }],
     ['an unknown store', { assetIds: ['own-1'], storeId: 'nope' }],
     ['a hidden store', { assetIds: ['own-1'], storeId: 'store-hidden' }],
