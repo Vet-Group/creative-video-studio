@@ -1,5 +1,5 @@
-import { expect, type Page, test } from '@playwright/test';
-import { clearMyJobs, openJobs, openTab, png, runViaApi, select, selectValue, signIn } from './support.test';
+import { expect, type Locator, type Page, test } from '@playwright/test';
+import { clearMyJobs, gotoTryOn, openJobs, openTab, png, runViaApi, select, selectValue, signIn } from './support.test';
 
 // A page's History tab lists the member's jobs as Fash's History cards: the result, the member's words, the inputs, chips, and the actions.
 test('a History card shows the text, inputs and chips, and its favourite, new-tab, download, delete and Dùng lại actions work', async ({ page }) => {
@@ -44,6 +44,59 @@ test('a History card shows the text, inputs and chips, and its favourite, new-ta
   await page.getByRole('dialog', { name: /^Xoá (ảnh|clip) này\?$/ }).getByRole('button', { name: 'Xoá', exact: true }).click();
   await expect(card).toHaveCount(0);
   expect(((await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { id: string }[] }).jobs.some((j) => j.id === id)).toBe(false);
+});
+
+/** Presses Run and returns the new job as the API saw it: the POST's status and the inputs it kept, each with its kind. */
+async function runAndInspect(page: Page, run: Locator): Promise<{ status: number; inputs: { id: string; kind: string }[] }> {
+  const posted = page.waitForResponse((r) => new URL(r.url()).pathname === '/api/jobs' && r.request().method() === 'POST');
+  await run.click();
+  const res = await posted;
+  if (res.status() !== 201) return { status: res.status(), inputs: [] };
+  const { id } = (await res.json()) as { id: string };
+  const job = ((await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { id: string; inputAssetIds: string[] }[] }).jobs.find((j) => j.id === id)!;
+  const inputs = await Promise.all(job.inputAssetIds.map(async (a) => ((await (await page.request.get(`/api/assets/${a}`)).json()) as { id: string; kind: string })));
+  return { status: res.status(), inputs: inputs.map(({ id: i, kind }) => ({ id: i, kind })) };
+}
+
+/** A finished mock image job made through the API, and its result's asset id once the card shows it done. */
+async function finishedResult(page: Page, body: Record<string, unknown>, text: string): Promise<{ card: Locator; result: string }> {
+  expect((await page.request.post('/api/jobs', { data: { modelId: 'mock-image-e2e', ratio: '1:1', enhance: false, ...body } })).status()).toBe(201);
+  const card = page.getByRole('complementary', { name: 'Lượt tạo của tôi' }).getByRole('listitem').filter({ hasText: text });
+  await expect(card.getByText('Hoàn tất')).toBeVisible({ timeout: 60_000 });
+  const result = ((await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { text: string | null; outputAssetId: string | null }[] }).jobs.find((j) => j.text === text)!.outputAssetId!;
+  return { card, result };
+}
+
+test("a History card's Dùng kết quả on Image Generation puts the result in as an input the next Run accepts, as a copy the member owns", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await signIn(page, 'resimga');
+  await page.goto('/image-generation');
+  await openTab(page, 'Lịch sử');
+  const { card, result } = await finishedResult(page, { feature: 'image', assetIds: [], prompt: 'result source shot', params: { resolution: '1K' } }, 'result source shot');
+  await card.getByRole('button', { name: 'Dùng kết quả' }).click();
+  await expect(page.getByRole('list', { name: 'Ảnh tham chiếu: ảnh đã chọn' }).getByRole('img')).toHaveCount(1);
+  await page.getByRole('textbox', { name: 'Mô tả', exact: true }).fill('the result made into a second shot');
+  const sent = await runAndInspect(page, page.getByRole('button', { name: /^Tạo ảnh/ }));
+  expect(sent.status).toBe(201); // before the fix a job could not name the output: 400
+  expect(sent.inputs).toHaveLength(1);
+  expect(sent.inputs[0]!.kind).toBe('input');
+  expect(sent.inputs[0]!.id).not.toBe(result); // a copy, so deleting the first job cannot take this one's input with it
+});
+
+test("a History card's Dùng kết quả on Try On sets the model photo from the result, and the next Run accepts it", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await signIn(page, 'restrya');
+  const up = async (name: string) => ((await (await page.request.post('/api/assets', { multipart: { file: { name, mimeType: 'image/png', buffer: png() } } })).json()) as { assets: { id: string }[] }).assets[0]!.id;
+  await gotoTryOn(page);
+  await openTab(page, 'Lịch sử');
+  const { card, result } = await finishedResult(page, { feature: 'try_on', assetIds: [await up('r-person.png'), await up('r-garment.png')], params: { resolution: '1K', garments: '1', brief: 'result try-on source' } }, 'result try-on source');
+  await card.getByRole('button', { name: 'Dùng kết quả' }).click();
+  await expect(page.getByLabel('Người mẫu: ảnh đã chọn').getByRole('img')).toHaveCount(1);
+  await page.getByLabel('Ảnh trang phục').setInputFiles({ name: 'r-garment-2.png', mimeType: 'image/png', buffer: png() });
+  const sent = await runAndInspect(page, page.getByRole('button', { name: /^Thử đồ/ }));
+  expect(sent.status).toBe(201);
+  expect(sent.inputs.map((i) => i.kind)).toEqual(['input', 'input']);
+  expect(sent.inputs[0]!.id).not.toBe(result); // the model photo is the copy of the result
 });
 
 test('as on Fash, a History chip sets its resolution, ratio or duration on the form beside it and says so', async ({ page }) => {

@@ -1,5 +1,5 @@
 // POST /api/assets/copy against a disposable database and bucket on the compose Postgres and MinIO (`pnpm services:up`): a member's own finished clip becomes
-// a new input asset of theirs, for Marketing Studio Advanced's reference video.
+// a new input asset of theirs, for Marketing Studio Advanced's reference video; and a finished image becomes one for the image pages' "Use result" button.
 import { randomBytes } from 'node:crypto';
 import { DeleteBucketCommand, DeleteObjectsCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { createTestDatabase } from '@cvs/db/testing';
@@ -32,11 +32,13 @@ async function signIn(email: string): Promise<string> {
 const copy = (cookie: string | undefined, body: unknown) =>
   POST(new Request('http://localhost/api/assets/copy', { method: 'POST', body: JSON.stringify(body), headers: { 'content-type': 'application/json', ...(cookie ? { cookie } : {}) } }));
 
-/** A finished clip: an output asset (an MP4 in the store unless `object` is false) and the job that points at it. */
-async function clip(id: string, owner: string, o: { mime?: string; bytes?: number; purged?: boolean; deleted?: boolean; kind?: string; object?: boolean } = {}): Promise<void> {
-  const bytes = mp4Fixture({ ms: 6200, width: 720, height: 1280, fps: 30, size: 1024 });
-  if (o.object !== false) await putObject(`assets/${id}`, bytes, 'video/mp4');
-  await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) values ($1, $2, $3, $4, 'video.mp4', $5, $6)`, [id, owner, o.kind ?? 'output', `assets/${id}`, o.mime ?? 'video/mp4', o.bytes ?? bytes.length]);
+const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0]);
+
+/** A finished clip, or a finished image with `image`: an output asset (in the store unless `object` is false) and the job that points at it. */
+async function clip(id: string, owner: string, o: { mime?: string; bytes?: number; purged?: boolean; deleted?: boolean; kind?: string; object?: boolean; image?: boolean } = {}): Promise<void> {
+  const bytes = o.image ? PNG : mp4Fixture({ ms: 6200, width: 720, height: 1280, fps: 30, size: 1024 });
+  if (o.object !== false) await putObject(`assets/${id}`, bytes, o.image ? 'image/png' : 'video/mp4');
+  await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) values ($1, $2, $3, $4, 'video.mp4', $5, $6)`, [id, owner, o.kind ?? 'output', `assets/${id}`, o.mime ?? (o.image ? 'image/png' : 'video/mp4'), o.bytes ?? bytes.length]);
   await pool.query(
     `insert into jobs (id, user_id, team_id, feature, model, provider, prompt, aspect, duration_s, input_asset_ids, status, output_asset_id, purged_at, deleted_at)
      values ($1, $2, 'team-unassigned', 'marketing', 'mock-model', 'mock', 'p', '9:16', 7, '{}', 'succeeded', $3, $4, $5)`,
@@ -91,6 +93,29 @@ describe('POST /api/assets/copy', () => {
     await clip('deleted', userId, { deleted: true });
     for (const assetId of ['theirs', 'an-input', 'purged', 'deleted', 'nope']) expect((await copy(member, { assetId })).status, assetId).toBe(404);
     expect((await copy(other, { assetId: 'theirs' })).status).toBe(201); // the owner may
+  });
+
+  test('copies the caller’s own finished image as a new input asset of its own, for owner, output, live job and image type only', async () => {
+    await clip('pic', userId, { image: true });
+    await clip('pic-theirs', otherId, { image: true });
+    await clip('pic-input', userId, { image: true, kind: 'input' });
+    await clip('pic-purged', userId, { image: true, purged: true });
+    await clip('pic-deleted', userId, { image: true, deleted: true });
+    await clip('pic-gif', userId, { image: true, mime: 'image/gif' });
+    for (const assetId of ['pic-theirs', 'pic-input', 'pic-purged', 'pic-deleted', 'pic-gif']) expect((await copy(member, { assetId })).status, assetId).toBe(404);
+    const res = await copy(member, { assetId: 'pic' });
+    expect(res.status).toBe(201);
+    const [made] = ((await res.json()) as { assets: { id: string; filename: string; mime: string; bytes: number }[] }).assets;
+    expect(made!.id).not.toBe('pic');
+    expect([made!.mime, made!.bytes, made!.filename]).toEqual(['image/png', PNG.length, `history-${made!.id.slice(0, 8)}.png`]);
+    expect((await pool.query('select owner_id, kind, s3_key, mime, duration_ms from assets where id = $1', [made!.id])).rows[0]).toEqual({ owner_id: userId, kind: 'input', s3_key: `assets/${made!.id}`, mime: 'image/png', duration_ms: null });
+    expect((await pool.query(`select count(*)::int as n from assets where id = 'pic' and kind = 'output'`)).rows[0].n).toBe(1); // the result stays
+  });
+
+  test('is 415 for an image result whose file is not a JPEG, PNG or WebP', async () => {
+    await clip('pic-bad', userId, { image: true, object: false });
+    await putObject('assets/pic-bad', new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]), 'image/png');
+    expect((await copy(member, { assetId: 'pic-bad' })).status).toBe(415);
   });
 
   test('is 400 without an asset id, 413 over 50 MB and 415 for a file that is not an MP4', async () => {

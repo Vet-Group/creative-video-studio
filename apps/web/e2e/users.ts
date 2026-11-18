@@ -47,6 +47,8 @@ export const USERS = {
   exuse: { email: 'exuse@e2e.test', name: 'E2E Example User', role: 'member' },
   sugga: { email: 'sugga@e2e.test', name: 'E2E Suggest A', role: 'member' },
   hista: { email: 'hista@e2e.test', name: 'E2E History A', role: 'member' },
+  resimga: { email: 'resimga@e2e.test', name: 'E2E Result Image A', role: 'member' },
+  restrya: { email: 'restrya@e2e.test', name: 'E2E Result Try On A', role: 'member' },
   auda: { email: 'auda@e2e.test', name: 'E2E Audio A', role: 'member' },
   audb: { email: 'audb@e2e.test', name: 'E2E Audio B', role: 'member' },
   cvexa: { email: 'cvexa@e2e.test', name: 'E2E Create Examples A', role: 'member' },

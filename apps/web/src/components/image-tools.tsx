@@ -223,10 +223,11 @@ export async function copySamples(names: string[], slot?: UploadSlot): Promise<I
   return out;
 }
 
-/** A detail's photo as one of the form's images: a sample is copied as the member's own, an asset is read for its name. */
+/** A detail's photo as one of the form's images: a sample or a job's result is copied as the member's own input (a job cannot name an output), an input is read for its name. */
 export async function photoImg(p: Photo): Promise<Img> {
   if ('sample' in p) return (await copySamples([p.sample]))[0]!;
-  const a = await api<Img>(`/api/assets/${p.asset}`);
+  const a = await api<Img & { kind: string }>(`/api/assets/${p.asset}`);
+  if (a.kind === 'output') return (await api<{ assets: Img[] }>('/api/assets/copy', sendJson('POST', { assetId: a.id }))).assets[0]!;
   return { id: a.id, filename: a.filename };
 }
 
