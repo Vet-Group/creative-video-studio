@@ -15,7 +15,7 @@ import { useHydrated } from '@/lib/use-hydrated';
 import { useRecall } from '@/lib/use-recall';
 import { useDraftState } from '@/lib/use-draft';
 import { reloadSamples, samplesFailed, samplesPending, useSamples, versionedSample } from '@/lib/use-samples';
-import { asExample, dropRefillQuery, exampleFrom, refillFrom } from '@/lib/reuse';
+import { asExample, dropRefillQuery, exampleFrom, lostInputs, nothingNote, nothingRefilled, refillFrom, skippedNote } from '@/lib/reuse';
 import { About } from './About';
 import { AudioSwitch } from './AudioSwitch';
 import { CardMedia } from './CardMedia';
@@ -102,6 +102,10 @@ interface JobDetail {
   ratio: string | null;
   durationSec: number | null;
   modelId: string | null;
+  /** The model's label, kept once it is switched off; how many input images the job had; whether its store is hidden now (a job's, not a sample's or a template's). */
+  modelLabel?: string | null;
+  inputCount?: number;
+  storeLost?: boolean;
   storeId: string | null;
   /** A sample's details file names its photos as samples (`?example=`); a job or a template has uploaded images. */
   images: (Image | { sample: string })[];
@@ -207,6 +211,7 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
   /** Said when the form changed a setting itself; it shows only while the form still has the values it set. */
   const [adjusted, setAdjusted] = useState<{ text: string; ratio: string; durationSec: number; modelId?: string } | null>(null);
   const wanted = useRef(model); // the Explore choice, honoured once: the form takes its ratio and duration rather than dropping it
+  const left = useRef<{ modelLabel: string | null; lost: number; store: boolean } | null>(null); // what a refill left out; the models fetch that follows tells it with the model, once
   const [storeId, setStoreId] = useState('');
   const [stores, setStores] = useState<StoreOption[]>([]);
   const [models, setModels] = useState<ModelsResponse | null>(null);
@@ -342,6 +347,10 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
         const j = await fillBlanks(reuse, loaded);
         if (stale) return; // superseded while the member filled the blanks
         if (!j) return dropRefillQuery(); // cancelled: the form stays as it is
+        if (nothingRefilled({ ...j, prompt: j.prompt ?? j.hookText ?? j.ending })) {
+          notify(nothingNote(lostInputs(j))); // nothing to bring back: the form stays as it is
+          return dropRefillQuery();
+        }
         const preset = presets.some((p) => p.id === j.presetId) ? j.presetId : null;
         // A sample's photos become this member's inputs first, copied on the server.
         const samples = j.images.flatMap((i) => ('sample' in i ? [i.sample] : []));
@@ -369,7 +378,12 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
         if (source.recipe) {
           setRefetch((n) => n + 1); // the photo count may not change, so the picker reloads to map a pair's twin id onto its entry
           notify(`${EXAMPLE_USED} Cửa hàng của bạn được giữ nguyên.`); // a company example's store is not the member's
-        } else (setStoreId(j.storeId ?? ''), recreated(reuse));
+        } else {
+          setStoreId(j.storeId ?? '');
+          recreated(reuse);
+          left.current = { modelLabel: j.modelLabel ?? null, lost: lostInputs(j), store: j.storeLost === true };
+          setRefetch((n) => n + 1); // the counts may not change, so the list is asked again to say what was left out
+        }
         dropRefillQuery();
       })
       .catch((e) => setError(copyError(e, 'Không tìm thấy clip để dùng lại.')))
@@ -411,12 +425,21 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
         const cur = modelRef.current;
         const kept = r.models.find((m) => (m.id === cur || m.pairIds.includes(cur)) && m.supported);
         const next = kept?.id ?? r.defaultModelId ?? '';
+        const out = left.current;
+        left.current = null;
+        // A model the list lacks altogether is switched off or hidden (one that does not take the ratio or duration is in the list, as unsupported).
+        const gone = out !== null && cur !== '' && !r.models.some((m) => m.id === cur || m.pairIds.includes(cur));
         setModelId(next);
         const options = r.models.flatMap((m) => m.durationsSec);
         const toDuration = options.length > 0 && !options.includes(durationSec) ? Math.min(...options) : durationSec;
         if (toDuration !== durationSec) setDurationSec(toDuration);
         const nextLabel = r.models.find((m) => m.id === next)?.label;
-        const note = adjustNote({ ...(toDuration !== durationSec && { durationSec: { from: durationSec, to: toDuration } }), ...(cur !== '' && !kept && nextLabel && { model: { label: nextLabel, ratio, durationSec } }) });
+        const note = [
+          out && skippedNote(images.length, { lost: out.lost, store: out.store, ...(gone && { model: { label: out.modelLabel, instead: nextLabel ?? null } }) }),
+          adjustNote({ ...(toDuration !== durationSec && { durationSec: { from: durationSec, to: toDuration } }), ...(cur !== '' && !kept && !gone && nextLabel && { model: { label: nextLabel, ratio, durationSec } }) }),
+        ]
+          .filter(Boolean)
+          .join(' ');
         if (note) setAdjusted({ ratio, durationSec: toDuration, modelId: next, text: note });
       },
       () => !stale && setError('Không tải được danh sách mô hình.'),

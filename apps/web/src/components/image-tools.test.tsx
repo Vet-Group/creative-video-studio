@@ -65,6 +65,13 @@ test('a refill says which setting the model lacks and what it chose instead, and
   expect(refillNote({ ratio: null, resolution: null }, 'auto', '1K')).toBe('');
 });
 
+test('a refill leaves one note: the setting the model lacks, then what could not come back and why', () => {
+  expect(refillNote({ ratio: '16:9', resolution: '2K' }, '16:9', '2K', { lost: 1 }, 2)).toBe('Đã điền lại 2 ảnh và phần còn lại. Không dùng lại được: 1 ảnh đầu vào (đã bị xoá).');
+  expect(refillNote({ ratio: '4:5', resolution: null }, '3:4', '1K', { lost: 1 }, 1)).toBe(
+    'Mẫu dùng tỉ lệ 4:5; mô hình này không có nên đã chọn 3:4. Đã điền lại 1 ảnh và phần còn lại. Không dùng lại được: 1 ảnh đầu vào (đã bị xoá).',
+  );
+});
+
 test('a paste hands a slot its image files, but not when words go into a text box', () => {
   const png = new File(['x'], 'shot.png', { type: 'image/png' });
   const txt = new File(['x'], 'notes.txt', { type: 'text/plain' });

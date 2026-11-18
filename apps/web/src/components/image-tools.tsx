@@ -5,7 +5,7 @@ import { type CSSProperties, type DragEvent, type ImgHTMLAttributes, type Keyboa
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { api, ApiError, type Clip, sendJson, thumbUrl } from '@/lib/api';
-import { asExample, dropRefillQuery, exampleFrom, refillFrom, reuseHref } from '@/lib/reuse';
+import { asExample, dropRefillQuery, exampleFrom, lostInputs, nothingNote, nothingRefilled, refillFrom, reuseHref, type Skipped, skippedNote } from '@/lib/reuse';
 import { NARROW, useMediaQuery, WIDE } from '@/lib/use-media-query';
 import { numberedSamples } from '@/lib/examples';
 import { PRODUCT_TYPES } from '@/lib/product-types';
@@ -110,13 +110,14 @@ export function nearestOption(options: string[], want: string): string {
   return w === undefined ? options[0]! : options.reduce((a, b) => (off(b) < off(a) ? b : a));
 }
 
-/** The line a refill shows when the model lacks the ratio or resolution it asked for, empty when it has both. */
-export function refillNote(asked: { ratio?: string | null; resolution?: string | null }, ratio: string, resolution: string): string {
+/** The note a refill leaves on the form, one text: what the model lacks of the ratio or resolution it asked for, then what the refill could not bring back and why (skippedNote); empty when both are fine. `kept` is the photos put back. */
+export function refillNote(asked: { ratio?: string | null; resolution?: string | null }, ratio: string, resolution: string, skipped: Skipped = {}, kept = 0): string {
   const missed = [
     ...(asked.ratio && asked.ratio !== ratio ? [[`tỉ lệ ${RATIO_LABEL[asked.ratio] ?? asked.ratio}`, RATIO_LABEL[ratio] ?? ratio]] : []),
     ...(asked.resolution && asked.resolution !== resolution ? [[`độ phân giải ${asked.resolution}`, resolution]] : []),
   ];
-  return missed.length === 0 ? '' : `Mẫu dùng ${missed.map((m) => m[0]).join(', ')}; mô hình này không có nên đã chọn ${missed.map((m) => m[1]).join(', ')}.`;
+  const settings = missed.length === 0 ? '' : `Mẫu dùng ${missed.map((m) => m[0]).join(', ')}; mô hình này không có nên đã chọn ${missed.map((m) => m[1]).join(', ')}.`;
+  return [settings, skippedNote(kept, skipped)].filter(Boolean).join(' ');
 }
 
 /**
@@ -130,7 +131,7 @@ export function useImageChoice(models: ImageModel[] | null, images: number, init
   const [wantRatio, pickRatio] = useState('auto');
   const [wantResolution, pickResolution] = useState('1K');
   const [wantThinking, setThinking] = useState('');
-  const [asked, setAsked] = useState<{ ratio: string | null; resolution: string | null } | null>(null);
+  const [asked, setAsked] = useState<{ ratio: string | null; resolution: string | null; modelId: string | null; modelLabel: string | null; lost: number; extra?: Skipped['extra']; store: boolean; kept: number } | null>(null);
   const fits = (m: ImageModel) => m.maxImages >= images;
   const chosen = models?.find((m) => m.id === modelId) ?? models?.find((m) => m.recommended && fits(m)) ?? models?.find(fits) ?? models?.[0];
   const ratio = chosen ? nearestOption(chosen.ratios, wantRatio) : wantRatio;
@@ -140,15 +141,17 @@ export function useImageChoice(models: ImageModel[] | null, images: number, init
     id: m.id, label: m.label, isMock: m.isMock, supported: fits(m), estimateUsd: m.prices[resolution] ?? Object.values(m.prices)[0] ?? '0.0000', score: m.score, recommended: m.recommended, resolution: m.resolutions.join('/'), isNew: m.isNew, creditUsd: m.creditUsd, creditShown: m.creditShown, marks: m.total,
   }));
   const user = <T,>(set: (v: T) => void) => (v: T) => (setAsked(null), set(v));
-  function refill(j: { modelId: string | null; ratio: string | null; resolution: string | null }) {
+  function refill(j: { modelId: string | null; ratio: string | null; resolution: string | null; modelLabel?: string | null; images?: unknown[]; lost?: number; extra?: Skipped['extra']; store?: boolean }) {
     if (j.modelId) pickModel(j.modelId);
     if (j.ratio) pickRatio(j.ratio);
     if (j.resolution) pickResolution(j.resolution);
-    setAsked({ ratio: j.ratio, resolution: j.resolution });
+    setAsked({ ratio: j.ratio, resolution: j.resolution, modelId: j.modelId, modelLabel: j.modelLabel ?? null, lost: j.lost ?? 0, extra: j.extra, store: j.store === true, kept: (j.images?.length ?? 0) - (j.extra?.count ?? 0) });
   }
+  // The job's model is skipped when the list (known by now) lacks it: it is switched off or hidden, or not for this page.
+  const skipped: Skipped = asked ? { lost: asked.lost, extra: asked.extra, store: asked.store, ...(models && asked.modelId && !models.some((m) => m.id === asked.modelId) && { model: { label: asked.modelLabel, instead: chosen?.label ?? null } }) } : {};
   return {
     chosen, ratio, resolution, thinking, estimate: (thinking && chosen?.thinkingPrices[thinking]?.[resolution]) || chosen?.prices[resolution], options, modelId: chosen?.id ?? '',
-    setModelId: user(pickModel), setRatio: user(pickRatio), setResolution: user(pickResolution), setThinking, refill, note: chosen && asked ? refillNote(asked, ratio, resolution) : '',
+    setModelId: user(pickModel), setRatio: user(pickRatio), setResolution: user(pickResolution), setThinking, refill, note: chosen && asked ? refillNote(asked, ratio, resolution, skipped, asked.kept) : '',
   };
 }
 
@@ -157,6 +160,14 @@ export interface ReuseJob {
   feature: string;
   /** A sample's details file (`?example=`) names its photos as samples; a job or a template has uploaded images. */
   images: (Img | { sample: string })[];
+  /** How many input images the job had (GET /api/jobs/:id; not a sample's or a template's), so the form can say how many no longer exist. */
+  inputCount?: number;
+  /** The label of the job's model, kept even once it is switched off. */
+  modelLabel?: string | null;
+  /** Whether the brand kit was added to the job (a job's, not a template's or a sample's), the job's store and whether that store is hidden since. */
+  brand?: boolean;
+  storeId?: string | null;
+  storeLost?: boolean;
   /** The job's prompt: the member's own text on Image Generation without a style, a composed prompt elsewhere. */
   prompt: string | null;
   /** The member's own text, kept for reuse (Try On, the apps, and Image Generation beside a style). */
@@ -179,7 +190,7 @@ export interface ReuseJob {
 /** Refill (`reuse` is a job's or a saved template's API path, lib/reuse.ts): reads it and hands it to `fill` when it is of `feature`; `fail` otherwise. Everything stays editable.
  * Returns Recreate in place: the same refill from another path, the URL unchanged, as Fash's Recreate. `recipe`: a company example, whose photos come
  * marked as the example's (asExample). */
-export function useReuse(reuse: string | undefined, feature: string, fill: (j: Omit<ReuseJob, 'images'> & { images?: Img[] }) => void, fail: (e?: unknown) => void): (from: string, recipe?: boolean) => void {
+export function useReuse(reuse: string | undefined, feature: string, fill: (j: Omit<ReuseJob, 'images'> & { images?: Img[]; lost?: number; recipe?: boolean }) => void, fail: (e?: unknown) => void): (from: string, recipe?: boolean) => void {
   const recreated = useRecreated();
   const { loading, notify } = useJobs();
   const [source, setSource] = useState<{ from: string; recipe?: boolean } | null>(reuse ? { from: reuse } : null); // a new object each time, so the same path refills again
@@ -194,15 +205,20 @@ export function useReuse(reuse: string | undefined, feature: string, fill: (j: O
         const j = await fillBlanks(reuse, loaded);
         if (stale) return; // superseded while the member filled the blanks
         if (!j) return dropRefillQuery(); // cancelled: the form stays as it is
+        if (nothingRefilled(j)) {
+          notify(nothingNote(lostInputs(j))); // nothing to bring back: the form stays as it is
+          return dropRefillQuery();
+        }
         // A sample's photos become this member's inputs first, copied on the server.
         const samples = j.images.flatMap((i) => ('sample' in i ? [i.sample] : []));
         const images = samples.length > 0 ? await copySamples(samples) : (j.images as Img[]);
         if (stale) return; // superseded while the photos were copied
+        const lost = lostInputs(j);
         if (source.recipe) {
-          fill({ ...j, images: asExample(images) });
+          fill({ ...j, images: asExample(images), lost, recipe: true });
           notify(EXAMPLE_USED);
         } else {
-          fill({ ...j, images });
+          fill({ ...j, images, lost });
           recreated(reuse);
         }
         dropRefillQuery();

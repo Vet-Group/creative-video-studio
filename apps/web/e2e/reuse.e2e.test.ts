@@ -91,3 +91,68 @@ test('the reuse link refills Try On (person, garments, background, text, model, 
   await page.goto(`/try-on?reuse=${image}`);
   await expect(page.getByText('Không tìm thấy ảnh để dùng lại.')).toBeVisible();
 });
+
+test('a reuse says what it could not bring back and why: a deleted input photo, a model that is gone, and nothing at all', async ({ page }) => {
+  await signIn(page, 'reusea');
+  const post = async (data: Record<string, unknown>) => {
+    const res = await page.request.post('/api/jobs', { data });
+    expect(res.status()).toBe(201);
+    return ((await res.json()) as { id: string }).id;
+  };
+  const [a, b] = [await upload(page, 'first.png'), await upload(page, 'second.png')];
+  // No API deletes an input photo, so the job's answer is cut as the server cuts it for one that was deleted or purged: the images that still exist, `inputCount` still the job's own.
+  const cut = (id: string, change: (j: Record<string, unknown>) => void) =>
+    page.route(`**/api/jobs/${id}`, async (route) => {
+      const j = (await (await route.fetch()).json()) as Record<string, unknown>;
+      change(j);
+      await route.fulfill({ json: j });
+    });
+  const note = page.locator('.form-message p.help[role="status"], .form-card p.help[role="status"]').filter({ hasText: 'Không dùng lại được' });
+
+  // A deleted input photo: the one that is left comes back, and the note counts the one that is not.
+  const two = await post({ feature: 'image', modelId: 'mock-image-e2e', assetIds: [a, b], ratio: '1:1', prompt: 'two photos', enhance: false, params: { resolution: '1K' } });
+  await cut(two, (j) => (j.images = (j.images as unknown[]).slice(0, 1)));
+  await page.goto(`/image-generation?reuse=${two}`);
+  await expect(page.getByRole('img', { name: 'first.png' })).toBeVisible();
+  await expect(note).toHaveText('Đã điền lại 1 ảnh và phần còn lại. Không dùng lại được: 1 ảnh đầu vào (đã bị xoá).');
+
+  // A model that is switched off or hidden: the list lacks it, so the form chose another and says which and why.
+  const one = await post({ feature: 'image', modelId: 'mock-image-e2e', assetIds: [a], ratio: 'auto', prompt: 'one photo', enhance: false, params: { resolution: '1K' } });
+  await page.route(/\/api\/image-models\?feature=image\b/, async (route) => {
+    const list = (await (await route.fetch()).json()) as { models: { id: string }[] };
+    await route.fulfill({ json: { ...list, models: list.models.filter((m) => m.id !== 'mock-image-e2e') } });
+  });
+  await page.goto(`/image-generation?reuse=${one}`);
+  await expect(page.getByRole('img', { name: 'first.png' })).toBeVisible();
+  await expect(note).toHaveText('Đã điền lại 1 ảnh và phần còn lại. Không dùng lại được: mô hình Mock image E2E (đã tắt hoặc không còn dùng ở trang này, đã chọn Mock image Solo).');
+  await page.unroute(/\/api\/image-models\?feature=image\b/);
+
+  // Nothing to bring back: every photo is gone and the job has no words. The form stays as it is, and a toast says so.
+  const bare = await post({ feature: 'image', modelId: 'mock-image-e2e', assetIds: [a], ratio: 'auto', prompt: 'words', enhance: false, params: { resolution: '1K' } });
+  await cut(bare, (j) => Object.assign(j, { images: [], prompt: null, brief: null }));
+  await page.goto(`/image-generation?reuse=${bare}`);
+  await expect(page.getByRole('region', { name: 'Thông báo' }).getByText('Không dùng lại được: 1 ảnh đầu vào đã bị xoá và lượt này không có mô tả. Biểu mẫu được giữ nguyên.')).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Thông báo' }).getByText('Sẵn sàng tạo lại')).toHaveCount(0);
+  await expect(page.getByRole('textbox', { name: 'Mô tả', exact: true })).toHaveValue('');
+  await expect(page.getByRole('img', { name: 'first.png' })).toHaveCount(0);
+});
+
+test("a History card shows what it cannot do as a disabled action with its reason: Motion Control's inputs", async ({ page }) => {
+  await signIn(page, 'reusea');
+  // The tray's answer gets a Motion Control card, as no mock model runs it here.
+  await page.route(/\/api\/jobs\?mine/, async (route) => {
+    const body = (await (await route.fetch()).json()) as { jobs: Record<string, unknown>[] };
+    const card = (id: string, inputAssetIds: string[]) => ({
+      id, status: 'failed', error: 'e2e', failureReason: null, twin: null, isMock: true, feature: 'motion_control', ratio: 'auto', durationSec: 5, resolution: null, modelId: 'mock', retryOf: null, retried: false,
+      outputAssetId: null, posterAssetId: null, createdAt: new Date().toISOString(), startedAt: null, providerQueue: null, finishedAt: new Date().toISOString(), text: null, inputAssetIds,
+      garments: null, traits: null, format: null, roles: null, view: null, favorite: false, estimateUsd: null, unbilled: true,
+    });
+    await route.fulfill({ json: { ...body, jobs: [card('card-motion', ['x1', 'x2']), ...body.jobs] } });
+  });
+  await page.goto('/apps/motion-control');
+  await page.getByRole('tab', { name: 'Lịch sử' }).click();
+  const inputs = page.getByRole('button', { name: 'Dùng ảnh đầu vào' });
+  await expect(inputs).toBeDisabled();
+  await expect(inputs).toHaveAccessibleDescription('Ảnh nhân vật và video tham chiếu chỉ dùng lại cùng nhau: bấm Dùng lại.');
+  await expect(page.getByRole('button', { name: 'Dùng lại', exact: true })).toBeEnabled(); // the way that does work stays
+});

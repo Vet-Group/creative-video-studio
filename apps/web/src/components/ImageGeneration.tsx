@@ -88,7 +88,13 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
       setPrompt(j.brief ?? j.prompt ?? ''); // with a style or the brand kit, the job's prompt is composed and the member's own words are the brief
       setStyleId(j.presetId ?? '');
       setEnhance(j.enhance ?? true);
-      pick.refill(j);
+      // The brand kit switch comes back with its store (a company example keeps the member's own, a template has no switch); a store hidden since leaves it off.
+      if (!j.recipe && j.brand !== undefined) {
+        const on = j.brand && !j.storeLost;
+        setUseBrand(on);
+        if (on) setStoreId(j.storeId ?? '');
+      }
+      pick.refill({ ...j, store: !j.recipe && j.brand === true && j.storeLost === true });
     },
     (e) => setError(copyError(e, 'Không tìm thấy ảnh để dùng lại.')),
   );

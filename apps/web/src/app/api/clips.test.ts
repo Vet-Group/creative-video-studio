@@ -794,6 +794,22 @@ describe('DELETE /api/jobs/:id', () => {
     expect(images.map((i) => i.id)).toEqual(['k-in-2', 'k-in-1']);
   });
 
+  test('tells reuse what could not come back: how many inputs the job had, its model label, and a store that is hidden since', async () => {
+    await input('r-in-1', alice.id);
+    await input('r-in-2', alice.id);
+    const id = await clip(alice.id, { inputs: ['r-in-1', 'r-in-2'], model: 'seedance-2.5-byteplus' });
+    await pool.query(`insert into stores (id, name, code) values ('r-store', 'R Shop', 'R-CODE')`);
+    await pool.query('update jobs set store_id = $2 where id = $1', [id, 'r-store']);
+    const label = (await pool.query(`select label from model_configs where id = 'seedance-2.5-byteplus'`)).rows[0].label;
+    const detail = async () => (await (await GET_JOB(req(`/api/jobs/${id}`, alice.cookie), ctx(id))).json()) as { inputCount: number; images: { id: string }[]; modelLabel: string; storeId: string | null; storeLost: boolean };
+    expect(await detail()).toMatchObject({ inputCount: 2, modelLabel: label, storeId: 'r-store', storeLost: false });
+    await pool.query(`update assets set deleted_at = now() where id = 'r-in-1'`); // a deleted or purged input
+    await pool.query(`update stores set hidden = true where id = 'r-store'`);
+    const gone = await detail();
+    expect(gone).toMatchObject({ inputCount: 2, modelLabel: label, storeId: null, storeLost: true });
+    expect(gone.images.map((i) => i.id)).toEqual(['r-in-2']);
+  });
+
   test('refuses a job that is not a Library clip', async () => {
     expect((await remove(alice.cookie, await clip(alice.id, { status: 'running' }))).status).toBe(404);
     expect((await remove(alice.cookie, 'nope')).status).toBe(404);
@@ -814,7 +830,7 @@ describe('GET /api/jobs/:id', () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
       id, userId: alice.id, status: 'succeeded', error: null, isMock: false, feature: 'video', resolution: null, presetId: 'gentle-push-in', prompt: 'a prompt', enhance: false, enhancedPrompt: null, audio: null, orientation: null, view: null, ratio: '1:1', garments: null, pose: null, format: null, hook: null, location: null, brief: null, script: null, roles: null, highlights: null, brand: false, hookText: null, ending: null, endText: null, endTextPos: null, durationSec: 8, modelId: 'fal-test',
-      storeId: 'store-ok', outputAssetId: `${id}-video`, posterAssetId: `${id}-poster`,
+      storeId: 'store-ok', storeLost: false, modelLabel: 'Fal test', inputCount: 3, outputAssetId: `${id}-video`, posterAssetId: `${id}-poster`,
       images: [{ id: 'd-in-2', filename: 'in.png', width: null, height: null, mime: 'image/png', durationMs: null }, { id: 'd-in-1', filename: 'in.png', width: null, height: null, mime: 'image/png', durationMs: null }],
       endFrame: null, videoRef: null, clips: [],
     });

@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { asExample, exampleFrom, queryOf, refillFrom, reuseHref } from './reuse';
+import { asExample, exampleFrom, lostInputs, nothingNote, nothingRefilled, queryOf, refillFrom, reuseHref, skippedNote } from './reuse';
 
 test('the reuse link opens the page that made the job, with the job to refill from; features without a refill yet get no link', () => {
   expect(reuseHref({ id: 'j1', feature: 'video' })).toBe('/create?reuse=j1');
@@ -45,4 +45,32 @@ test("a company example's photos come along, each marked as the example's, and t
   expect(asExample(images)).toEqual([{ id: 'a1', filename: 'shirt.png', example: true }, { id: 'a2', filename: 'model.png', example: true }]);
   expect(images[0]).not.toHaveProperty('example');
   expect(asExample([])).toEqual([]);
+});
+
+test('a refill that left something out names each part with its reason, in one line', () => {
+  expect(skippedNote(2, { lost: 1 })).toBe('Đã điền lại 2 ảnh và phần còn lại. Không dùng lại được: 1 ảnh đầu vào (đã bị xoá).');
+  expect(skippedNote(1, { model: { label: 'Nano Banana', instead: 'Seedream' } })).toBe('Đã điền lại 1 ảnh và phần còn lại. Không dùng lại được: mô hình Nano Banana (đã tắt hoặc không còn dùng ở trang này, đã chọn Seedream).');
+  expect(skippedNote(0, { model: { label: null, instead: null } })).toBe('Đã điền lại phần còn lại. Không dùng lại được: mô hình đã dùng (đã tắt hoặc không còn dùng ở trang này).');
+  expect(skippedNote(1, { extra: { count: 2, max: 1 } })).toBe('Đã điền lại 1 ảnh và phần còn lại. Không dùng lại được: 2 ảnh thừa (chỗ này chỉ nhận 1 ảnh).');
+  expect(skippedNote(3, { store: true })).toBe('Đã điền lại 3 ảnh và phần còn lại. Không dùng lại được: cửa hàng (đã bị ẩn).');
+  expect(skippedNote(1, { lost: 1, extra: { count: 1, max: 2 }, store: true, model: { label: 'X', instead: 'Y' } })).toBe(
+    'Đã điền lại 1 ảnh và phần còn lại. Không dùng lại được: mô hình X (đã tắt hoặc không còn dùng ở trang này, đã chọn Y); 1 ảnh đầu vào (đã bị xoá); 1 ảnh thừa (chỗ này chỉ nhận 2 ảnh); cửa hàng (đã bị ẩn).',
+  );
+  expect(skippedNote(2, {})).toBe(''); // nothing was left out: no note
+  expect(skippedNote(2, { lost: 0 })).toBe('');
+});
+
+test('a refill has nothing to bring back only when every input photo is gone and the job has no words', () => {
+  expect(nothingRefilled({ inputCount: 2, images: [], prompt: null, brief: ' ' })).toBe(true);
+  expect(nothingRefilled({ inputCount: 2, images: [], prompt: 'a studio shot' })).toBe(false); // the words still come back
+  expect(nothingRefilled({ inputCount: 2, images: [{}] })).toBe(false); // a photo still comes back
+  expect(nothingRefilled({ inputCount: 0, images: [] })).toBe(false); // a job without photos, or a sample or a template (no count)
+  expect(nothingRefilled({ images: [] })).toBe(false);
+  expect(nothingNote(2)).toBe('Không dùng lại được: 2 ảnh đầu vào đã bị xoá và lượt này không có mô tả. Biểu mẫu được giữ nguyên.');
+});
+
+test("the photos lost are the job's count less those that still exist, and none for a sample or a template", () => {
+  expect(lostInputs({ inputCount: 3, images: [{}, {}] })).toBe(1);
+  expect(lostInputs({ inputCount: 2, images: [{}, {}] })).toBe(0);
+  expect(lostInputs({ images: [{}] })).toBe(0);
 });
