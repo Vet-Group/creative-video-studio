@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
-import { cardSample, EXAMPLES, exampleForPreset, exampleModel, examplesFor, exampleTitle, numberedSamples, splitColumns } from './examples';
+import { exampleFrom } from './reuse';
+import { cardSample, EXAMPLES, exampleForPreset, exampleModel, examplesFor, exampleTitle, GALLERY_SAMPLES, numberedSamples, splitColumns } from './examples';
 
 test('the samples cover four aspects and never set a ratio the job form lacks', () => {
   expect(new Set(EXAMPLES.map((e) => e.aspect))).toEqual(new Set(['16:9', '1:1', '3:4', '9:16']));
@@ -28,6 +29,16 @@ test('numbered samples keep their prefix and extension and sort by number', () =
   expect(numberedSamples(have, 'image-example-', 'jpg')).toEqual(['image-example-1.jpg', 'image-example-2.jpg', 'image-example-10.jpg']);
   expect(numberedSamples(have, 'image-example-', 'mp4')).toEqual(['image-example-3.mp4']);
   expect(numberedSamples(new Set(), 'image-example-', 'jpg')).toEqual([]);
+});
+
+test('the two Try-On apps have an Examples tab of their own prefix, and every prefix is one Recreate reads', () => {
+  expect(GALLERY_SAMPLES).toMatchObject({ jewelry_try_on: 'jewelry-try-on-example-', lingerie_try_on: 'lingerie-try-on-example-' });
+  for (const prefix of Object.values(GALLERY_SAMPLES)) expect(exampleFrom({ example: `${prefix}3` })).toBe(`/api/samples/${prefix}3.json`);
+  // Each tab lists only its own results: not the photos of an example, the template library, nor another page's samples.
+  const have = new Set(['jewelry-try-on-example-2.jpg', 'jewelry-try-on-example-1.jpg', 'jewelry-try-on-example-1-template.jpg', 'jewelry-template-neck-01.jpg', 'lingerie-try-on-example-1.jpg', 'try-on-example-1.jpg']);
+  expect(numberedSamples(have, GALLERY_SAMPLES.jewelry_try_on!, 'jpg')).toEqual(['jewelry-try-on-example-1.jpg', 'jewelry-try-on-example-2.jpg']);
+  expect(numberedSamples(have, GALLERY_SAMPLES.lingerie_try_on!, 'jpg')).toEqual(['lingerie-try-on-example-1.jpg']);
+  expect(numberedSamples(have, GALLERY_SAMPLES.try_on!, 'jpg')).toEqual(['try-on-example-1.jpg']);
 });
 
 test('a card plays its uploaded loop over its uploaded still, and falls back to the given still or nothing', () => {

@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import AxeBuilder from '@axe-core/playwright';
 import { expect, type Page, test } from '@playwright/test';
-import { expectOptions, modelButton, png, select, selectValue, signIn } from './support.test';
+import { expectOptions, jpg, modelButton, openTab, png, select, selectValue, settled, signIn } from './support.test';
 
 const nav = (page: Page) => page.getByRole('navigation', { name: 'Điều hướng chính' });
 const file = (name: string) => ({ name, mimeType: 'image/png', buffer: png() });
@@ -202,6 +202,54 @@ test('Jewelry Try-On takes several pieces and then the person; a mock job sends 
   await page.goto(`/apps/jewelry-try-on?reuse=${job.id}`);
   await expect(page.getByRole('group', { name: 'Trang sức' }).locator('img')).toHaveCount(2);
   await expect(page.getByRole('group', { name: 'Người đeo' }).getByRole('img', { name: 'wearer.png' })).toBeVisible();
+});
+
+test('Jewelry Try-On: the Ví dụ tab lists the uploaded samples, and Dùng lại refills the pieces and the wearer from the details file', async ({ page }) => {
+  const base = 'jewelry-try-on-example-1';
+  const details = { feature: 'jewelry_try_on', images: [{ sample: `${base}-jewelry-1.jpg` }, { sample: `${base}-jewelry-2.jpg` }, { sample: `${base}-template.jpg` }], resolution: '1K', date: '2026-11-12' };
+  const files: [string, Buffer, string][] = [
+    [`${base}.jpg`, jpg(), 'image/jpeg'], [`${base}.json`, Buffer.from(JSON.stringify(details)), 'application/json'],
+    [`${base}-jewelry-1.jpg`, jpg(), 'image/jpeg'], [`${base}-jewelry-2.jpg`, jpg(), 'image/jpeg'], [`${base}-template.jpg`, jpg(), 'image/jpeg'],
+    ['jewelry-try-on-example-2.jpg', jpg(), 'image/jpeg'], // no details file: a plain picture
+  ];
+  const asAdmin = async (each: (name: string, data: Buffer, type: string) => Promise<{ ok(): boolean }>) => {
+    await page.context().clearCookies();
+    await signIn(page, 'admin');
+    for (const [name, data, type] of files) await settled(() => each(name, data, type), name);
+    await page.context().clearCookies();
+  };
+  await asAdmin((name, data, type) => page.request.put(`/api/admin/samples/${name}`, { data, headers: { 'content-type': type } }));
+  try {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await signIn(page, 'appexa');
+    await page.route(/\/api\/library\?kind=jewelry_try_on/, (r) => r.fulfill({ json: { hasMore: false, isAdmin: false, creators: [], clips: [] } }));
+    await page.goto('/apps/jewelry-try-on');
+    await expect(page.getByRole('tab')).toHaveText(['Lịch sử', 'Ví dụ', 'Giới thiệu']);
+    await openTab(page, 'Ví dụ');
+    const gallery = page.getByRole('group', { name: 'Ảnh thử trang sức của công ty' });
+    await expect(gallery.getByRole('link', { name: 'Xem chi tiết ảnh mẫu' })).toHaveCount(1);
+    await expect(gallery.getByRole('img', { name: 'Ảnh mẫu' })).toHaveCount(2); // the example's photos and the template are not tiles
+
+    await gallery.getByRole('link', { name: 'Xem chi tiết ảnh mẫu' }).click();
+    const detail = page.getByRole('dialog', { name: 'Chi tiết: Thử trang sức' });
+    await expect(detail.getByRole('list', { name: 'Ảnh đầu vào' }).getByRole('listitem')).toHaveCount(3);
+    await expect(detail.locator('.job-chips')).toHaveText('1K'); // the app has no ratio field, so the file names none
+    await detail.getByRole('button', { name: 'Dùng lại' }).click();
+    const pieces = page.getByRole('group', { name: 'Trang sức' });
+    const wearer = page.getByRole('group', { name: 'Người đeo' });
+    await expect(pieces.locator('img')).toHaveCount(2);
+    await expect(pieces.getByRole('img', { name: `${base}-jewelry-1.jpg` })).toBeVisible();
+    await expect(wearer.getByRole('img', { name: `${base}-template.jpg` })).toBeVisible();
+    await expect(page).toHaveURL(/\/apps\/jewelry-try-on$/);
+
+    // The same file opens the page refilled from a link (?example=).
+    await page.goto(`/apps/jewelry-try-on?example=${base}`);
+    await expect(pieces.locator('img')).toHaveCount(2);
+    await expect(wearer.getByRole('img', { name: `${base}-template.jpg` })).toBeVisible();
+    await expect(page).toHaveURL(/\/apps\/jewelry-try-on$/); // the query is dropped once the form is filled
+  } finally {
+    await asAdmin((name) => page.request.delete(`/api/admin/samples/${name}`));
+  }
 });
 
 test('Face Swap (two slots): each required slot has its reason, and a mock job takes the source face, then the target', async ({ page }) => {
