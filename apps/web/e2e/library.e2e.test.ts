@@ -345,6 +345,30 @@ test('the Library detail fetches its image neighbours’ large previews ahead, s
   }
 });
 
+test('Dùng khung hình này in a video’s detail opens Create video with the frame on screen as its first image', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await signIn(page, 'librf');
+  const up = (await (await page.request.post('/api/assets', { multipart: { file: { name: 'frame-in.png', mimeType: 'image/png', buffer: png() } } })).json()) as { assets: { id: string }[] };
+  const res = await page.request.post('/api/jobs', { data: { assetIds: [up.assets[0]!.id], modelId: 'mock-e2e', prompt: 'a clip to take a frame from', enhance: false, ratio: '9:16', durationSec: 5 } });
+  expect(res.status()).toBe(201);
+  const id = ((await res.json()) as { id: string }).id;
+  try {
+    await expect.poll(async () => ((await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { id: string; status: string }[] }).jobs.find((j) => j.id === id)?.status, { timeout: 60_000 }).toBe('succeeded');
+    await page.goto('/library');
+    await page.getByLabel('Người tạo').selectOption({ label: 'E2E Library Frame' });
+    await page.locator(`article[data-clip-id="${id}"]`).getByRole('button', { name: 'Xem chi tiết' }).click();
+    const detail = page.getByRole('dialog');
+    await expect.poll(() => detail.locator('video').evaluate((v: HTMLVideoElement) => v.readyState)).toBeGreaterThanOrEqual(2); // a frame is decoded
+    await detail.getByRole('button', { name: 'Dùng khung hình này' }).click();
+    await expect(page).toHaveURL(/\/create\?image=[\w-]+$/);
+    const picked = page.getByLabel('Ảnh đã chọn').getByRole('img');
+    await expect(picked).toHaveCount(1);
+    await expect(picked).toHaveAccessibleName(/s\.jpg$/); // the frame, named after the clip and its second
+  } finally {
+    expect((await page.request.delete(`/api/jobs/${id}`)).ok()).toBe(true);
+  }
+});
+
 test('a failed Library read says so, and Thử lại loads it without a page reload', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await signIn(page, 'loada');

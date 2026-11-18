@@ -1,5 +1,6 @@
 'use client';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { type CSSProperties, Fragment, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, useCallback, useEffect, useId, useRef, useState } from 'react';
 import { JOB_APPS } from '@/lib/apps';
 import { api, type Clip, errorText, sendJson, thumbUrl } from '@/lib/api';
@@ -16,6 +17,7 @@ import { SWIPE_START_PX, swipeStep } from '@/lib/swipe';
 import { useSamples } from '@/lib/use-samples';
 import { CompareSlider } from './CompareSlider';
 import { Icon } from './Icon';
+import { uploadImages } from './image-tools';
 import { useFreshResults } from './jobs';
 import { LoadError } from './LoadError';
 import { Modal } from './Modal';
@@ -526,6 +528,26 @@ export function ClipDetail({ clips, index, stores, admin, onIndex, onChange, onU
     setRerunning(false);
   };
   const copy = () => act(async () => (await navigator.clipboard.writeText(copyText ?? ''), setNote('Đã sao chép.')), 'Không sao chép được.');
+  // Fash's "Use this frame": the video stops on the frame shown, which goes up as a photo and opens Create video as its first image.
+  const router = useRouter();
+  const [grabbing, setGrabbing] = useState(false);
+  const takeFrame = async () => {
+    const v = media.current;
+    if (!v) return;
+    v.pause();
+    setGrabbing(true);
+    await act(async () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = v.videoWidth;
+      canvas.height = v.videoHeight;
+      canvas.getContext('2d')!.drawImage(v, 0, 0);
+      const blob = await new Promise<Blob | null>((done) => canvas.toBlob(done, 'image/jpeg', 0.92));
+      if (!blob) throw new Error('no frame'); // a video not decoded yet draws nothing
+      const [frame] = await uploadImages([new File([blob], `${clip.downloadName.replace(/\.\w+$/, '')}-${v.currentTime.toFixed(1)}s.jpg`, { type: 'image/jpeg' })]);
+      router.push(`/create?image=${frame!.id}`);
+    }, 'Không lấy được khung hình này.');
+    setGrabbing(false);
+  };
   const reassign = (storeId: string) =>
     act(async () => {
       await api(`/api/admin/jobs/${clip.id}/store`, sendJson('PUT', { storeId: storeId || null }));
@@ -684,6 +706,11 @@ export function ClipDetail({ clips, index, stores, admin, onIndex, onChange, onU
           {copyText && (
             <button type="button" className="icon-button" onClick={() => void copy()} aria-label="Sao chép mô tả" title="Sao chép mô tả">
               <Icon name="copy" />
+            </button>
+          )}
+          {!image && !shown && (
+            <button type="button" className="icon-button" disabled={grabbing} aria-busy={grabbing} onClick={() => void takeFrame()} aria-label="Dùng khung hình này" title="Dùng khung hình này làm ảnh cho Tạo video">
+              <Icon name="image" />
             </button>
           )}
           {original && (

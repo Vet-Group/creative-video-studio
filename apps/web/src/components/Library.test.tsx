@@ -13,6 +13,7 @@ test('the empty Library names photos under a photo filter, clips under a video o
 
 // The page's refresh-on-news hook needs the app shell's provider, which a static render of the Library alone does not have.
 vi.mock('./jobs', async (orig) => ({ ...(await orig<typeof import('./jobs')>()), useFreshResults: () => undefined }));
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) })); // the detail's Use this frame navigates; a static render has no app router
 
 const clip = (mediaType: Clip['mediaType']): Clip => ({
   id: 'c1', creator: { id: 'u1', name: 'An' }, createdAt: '2026-11-14T00:00:00Z', modelId: 'm', modelLabel: 'Model', ratio: '9:16', durationSec: 5, feature: 'video', mediaType, resolution: null, isMock: false,
