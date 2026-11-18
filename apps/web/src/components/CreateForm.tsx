@@ -62,6 +62,7 @@ interface Model {
   endFrame: boolean;
   /** The longest clip in seconds that may carry an end frame; null when there is no limit. */
   endMaxSec: number | null;
+  endMaxImages: number | null;
   /** The model runs from the prompt alone, with no image. */
   textOnly: boolean;
   /** The reference audio the model takes: how many clips and how many seconds in all; null when none. */
@@ -146,7 +147,7 @@ export type RunStopField = 'images' | 'clips' | 'end' | 'prompt';
 export function runReason(f: {
   loading: boolean;
   modelsLoaded: boolean;
-  chosen: { supported: boolean; maxImages: number; endMaxSec?: number | null } | undefined;
+  chosen: { supported: boolean; maxImages: number; endMaxSec?: number | null; endMaxImages?: number | null } | undefined;
   images: number;
   wordsOnly: boolean;
   preset: boolean;
@@ -154,6 +155,7 @@ export function runReason(f: {
   clipsOver: boolean;
   takes: { max: number; seconds: number } | null | undefined;
   endOver: boolean;
+  endImagesOver: boolean;
   promptOk: boolean;
   tooLong: string | null;
 }): { text: string; near?: RunStopField } | null {
@@ -165,6 +167,7 @@ export function runReason(f: {
   if (f.tooMany) return say(`Mô hình này nhận tối đa ${f.chosen.maxImages} ảnh.`, 'images');
   if (f.clipsOver && f.takes) return say(`Mô hình này nhận tối đa ${f.takes.max} tệp âm thanh, tổng ${f.takes.seconds} giây.`, 'clips');
   if (f.endOver) return say(`Mô hình này chỉ nhận khung hình cuối cho clip tối đa ${f.chosen.endMaxSec} giây.`, 'end');
+  if (f.endImagesOver) return say(`Mô hình này chỉ nhận khung hình cuối khi có tối đa ${f.chosen.endMaxImages} ảnh. Bỏ bớt ảnh hoặc bỏ khung hình cuối.`, 'end');
   if (!f.promptOk) return f.tooLong ? say(f.tooLong, 'prompt') : say('Viết mô tả cho video, hoặc chọn một mẫu.');
   return null;
 }
@@ -438,6 +441,7 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
   // The resolutions of one model are rows of their own (id, id-480p, id-1080p, as the models API lists them; lib/resolution-variants.ts), so the Resolution box switches between those that serve this ratio and length.
   const resolutions = chosen ? resolutionVariants(models?.models ?? [], chosen) : [];
   const endOver = endAssetId !== undefined && chosen?.endMaxSec != null && durationSec > chosen.endMaxSec;
+  const endImagesOver = endAssetId !== undefined && chosen?.endMaxImages != null && images.length > chosen.endMaxImages;
   // The upload limit follows the chosen model (REA-video V02); the server caps every model at MAX_IMAGES.
   const maxImages = Math.min(MAX_IMAGES, chosen?.maxImages ?? MAX_IMAGES);
   /** What Run sends as the free prompt: the sections composed (the body as typed while the hook and the ending are empty), or the free writing box. */
@@ -458,7 +462,7 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
   const lockedNotes = [...new Set(CAMERA_ANGLES.map(lockedWhy).filter((w) => w !== null))];
   const tooLong = presetId === '' ? promptTooLong(chosen, Math.max(...sent.map((p) => p.trim().length))) : null;
   const promptOk = presetId !== '' || (composed.trim() !== '' && tooLong === null);
-  const reason = runReason({ loading: !ready || !recall.answered, modelsLoaded: models !== null, chosen, images: images.length, wordsOnly, preset: presetId !== '', tooMany, clipsOver, takes, endOver, promptOk, tooLong });
+  const reason = runReason({ loading: !ready || !recall.answered, modelsLoaded: models !== null, chosen, images: images.length, wordsOnly, preset: presetId !== '', tooMany, clipsOver, takes, endOver, endImagesOver, promptOk, tooLong });
   const canRun = reason === null && !busy;
 
   async function upload(files: File[]) {
@@ -918,6 +922,7 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
               {models && models.models.length === 0 && <p className="help">Chưa bật mô hình video nào. Admin bật trong Quản trị → Cài đặt → Mô hình.</p>}
               {tooMany && chosen && <p className="error" id={fieldIds.images}>Mô hình này nhận tối đa {chosen.maxImages} ảnh.</p>}
               {endOver && <p className="error" id={fieldIds.end}>Mô hình này chỉ nhận khung hình cuối cho clip tối đa {chosen!.endMaxSec} giây.</p>}
+              {!endOver && endImagesOver && <p className="error" id={fieldIds.end}>Mô hình này chỉ nhận khung hình cuối khi có tối đa {chosen!.endMaxImages} ảnh. Bỏ bớt ảnh hoặc bỏ khung hình cuối.</p>}
               <Select label="Độ phân giải" icon="preset" heading="Độ phân giải" value={resolutions.length > 1 ? chosen!.id : (chosen?.resolution ?? '')} options={resolutions.length > 1 ? resolutions.map((m) => ({ value: m.id, label: m.resolution! })) : [{ value: chosen?.resolution ?? '', label: chosen?.resolution ?? 'Theo mô hình' }]} onChange={resolutions.length > 1 ? setModelId : () => undefined} />
               <Select
                 label="Thời lượng"

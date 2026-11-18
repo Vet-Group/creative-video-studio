@@ -116,6 +116,7 @@ export async function GET(request: Request) {
       ...takes[0],
       endFrame: takes.some((t) => t.endFrame),
       endMaxSec: takes.find((t) => t.endFrame)?.endMaxSec ?? null,
+      endMaxImages: takes.find((t) => t.endFrame)?.endMaxImages ?? null,
       textOnly: takes.some((t) => t.textOnly),
       audioClips: takes.find((t) => t.audioClips !== null)?.audioClips ?? null,
       videoRefs: takes.find((t) => t.videoRefs !== null)?.videoRefs ?? null,

@@ -129,6 +129,8 @@ interface VideoBody {
   end?: string;
   /** The longest clip, in seconds, that takes an end frame (Gemini Omni Flash 1.2: "At most 10 seconds when an end image is provided", schema read 2026-11-06). */
   endMaxSec?: number;
+  /** The most images a request with an end frame takes (Kling O3 Pro: fal answered a prod Run of 2026-11-17 with 422 "Setting end image is not supported when there are more than 2 images"; 2 images and an end frame ran). */
+  endMaxImages?: number;
   /**
    * The text-to-video endpoint of the same app, where a Run with no image goes (as on Fash, the model runs from the prompt). Set only where its model
    * page (https://fal.ai/models/<endpoint>, read 2026-10-30) gives the same price as the row's, audio on and off, at the resolution the builders ask
@@ -167,7 +169,7 @@ const first = (images: string[]) => ({ image_url: images[0] });
 const words = (req: SubmitRequest, duration: string | number, rest: Record<string, unknown> = {}) => ({ prompt: req.prompt, aspect_ratio: req.ratio, duration, ...rest });
 export const VIDEO_BODIES: Record<string, VideoBody> = {
   // Audio is on only for a job that asks for it (params.audio 'on'), priced by AUDIO_USD_PER_SECOND.
-  'fal-ai/kling-video/o3/pro/reference-to-video': { end: 'end_image_url', text: 'fal-ai/kling-video/o3/pro/text-to-video', videoTwin: 'fal-ai/kling-video/o3/pro/video-to-video/reference', build: (req, images) => ({ prompt: imageTokens(req.prompt, atImage), ...ref(images), aspect_ratio: req.ratio, duration: seconds(req), generate_audio: req.audio === true }) },
+  'fal-ai/kling-video/o3/pro/reference-to-video': { end: 'end_image_url', endMaxImages: 2, text: 'fal-ai/kling-video/o3/pro/text-to-video', videoTwin: 'fal-ai/kling-video/o3/pro/video-to-video/reference', build: (req, images) => ({ prompt: imageTokens(req.prompt, atImage), ...ref(images), aspect_ratio: req.ratio, duration: seconds(req), generate_audio: req.audio === true }) },
   // Reference video (schema read 2026-11-06): one .mp4/.mov of 3 to 15 s and at most 200 MB, at most 4 images and elements in all, ratios auto, 16:9, 9:16 and 1:1.
   // The schema has no audio switch, only keep_audio for the reference's own sound, which the app drops as it does everywhere (audio is the job's own switch).
   'fal-ai/kling-video/o3/pro/video-to-video/reference': { video: { field: 'video_url', single: true, minSec: 3, maxSec: 15, maxMb: 200, maxImages: 4, dims: { minSide: 720, maxSide: 3840 }, silent: true, name: atVideo }, build: (req, images) => ({ prompt: imageTokens(req.prompt, atImage), ...(images.length > 0 && ref(images)), aspect_ratio: req.ratio, duration: seconds(req), keep_audio: false }) },
@@ -234,12 +236,12 @@ export function videoInputs(endpoint: string, withVideo = false) {
   const twin = plain?.videoTwin ? VIDEO_BODIES[plain.videoTwin] : undefined;
   const spec = withVideo && twin ? twin : plain;
   // BytePlus Seedance runs from the prompt alone and takes neither an end frame nor reference audio (byteplus.ts).
-  if (isByteplusVideo(endpoint)) return { endFrame: false, endMaxSec: null, textOnly: true, audioClips: null, videoRefs: null };
+  if (isByteplusVideo(endpoint)) return { endFrame: false, endMaxSec: null, endMaxImages: null, textOnly: true, audioClips: null, videoRefs: null };
   // Vertex Omni runs from the prompt alone, takes a last frame with one first frame up to 10 s, and no reference audio (vertex-omni.ts).
-  if (endpoint === VERTEX_OMNI_MODEL) return { endFrame: true, endMaxSec: 10, textOnly: true, audioClips: null, videoRefs: null };
+  if (endpoint === VERTEX_OMNI_MODEL) return { endFrame: true, endMaxSec: 10, endMaxImages: null, textOnly: true, audioClips: null, videoRefs: null };
   const video = (twin ?? plain)?.video;
   return {
-    endFrame: spec?.end !== undefined, endMaxSec: spec?.endMaxSec ?? null, textOnly: spec?.text !== undefined, audioClips: spec?.audio ? { max: spec.audio.max, seconds: spec.audio.seconds } : null,
+    endFrame: spec?.end !== undefined, endMaxSec: spec?.endMaxSec ?? null, endMaxImages: spec?.endMaxImages ?? null, textOnly: spec?.text !== undefined, audioClips: spec?.audio ? { max: spec.audio.max, seconds: spec.audio.seconds } : null,
     videoRefs: video ? { max: 1, minSec: video.minSec, maxSec: video.maxSec, maxMb: video.maxMb ?? null, maxImages: video.maxImages ?? null, endFrame: (twin ?? plain)?.end !== undefined, silent: video.silent ?? false } : null,
   };
 }

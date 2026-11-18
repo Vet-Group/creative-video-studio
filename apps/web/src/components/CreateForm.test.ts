@@ -5,7 +5,7 @@ import { runReason } from './CreateForm';
 const ok = {
   loading: false,
   modelsLoaded: true,
-  chosen: { supported: true, maxImages: 4, endMaxSec: 10 },
+  chosen: { supported: true, maxImages: 4, endMaxSec: 10, endMaxImages: 2 },
   images: 1,
   wordsOnly: false,
   preset: false,
@@ -13,6 +13,7 @@ const ok = {
   clipsOver: false,
   takes: null,
   endOver: false,
+  endImagesOver: false,
   promptOk: true,
   tooLong: null,
 };
@@ -38,6 +39,7 @@ test('a stop already shown next to its field is pointed to, not repeated', () =>
   expect(runReason({ ...ok, tooMany: true })).toEqual({ text: 'Mô hình này nhận tối đa 4 ảnh.', near: 'images' });
   expect(runReason({ ...ok, clipsOver: true, takes: { max: 3, seconds: 15 } })).toEqual({ text: 'Mô hình này nhận tối đa 3 tệp âm thanh, tổng 15 giây.', near: 'clips' });
   expect(runReason({ ...ok, endOver: true })).toEqual({ text: 'Mô hình này chỉ nhận khung hình cuối cho clip tối đa 10 giây.', near: 'end' });
+  expect(runReason({ ...ok, endImagesOver: true })).toEqual({ text: 'Mô hình này chỉ nhận khung hình cuối khi có tối đa 2 ảnh. Bỏ bớt ảnh hoặc bỏ khung hình cuối.', near: 'end' });
   expect(runReason({ ...ok, promptOk: false, tooLong: 'Mô tả dài quá.' })).toEqual({ text: 'Mô tả dài quá.', near: 'prompt' });
   // The stops with no message of their own carry no field, so the line above Run shows them.
   expect(runReason({ ...ok, images: 0 })?.near).toBeUndefined();
