@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { signIn } from './support.test';
+import { png, signIn } from './support.test';
 
 // VET identity: the logo in the shell and the red primary and link colours. The parity screenshots keep the Fash colours (e2e/screenshot.css), so these checks hold the brand.
 
@@ -13,6 +13,10 @@ test.describe('wide', () => {
     const b = (await logo.boundingBox())!;
     expect([Math.round(b.width), Math.round(b.height)]).toEqual([28, 28]);
     const run = page.getByRole('button', { name: 'Tạo video' });
+    // A Run that is not ready is grey; with a product photo and a motion line it is ready and VET red.
+    await page.getByLabel('Ảnh sản phẩm').setInputFiles({ name: 'run.png', mimeType: 'image/png', buffer: png() });
+    await page.getByLabel('Mô tả chuyển động').fill('Slow turn of the bottle.');
+    await expect(run).toHaveCSS('background-color', 'rgb(220, 38, 38)');
     expect(await run.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe('rgb(220, 38, 38)');
     const link = await page.evaluate(() => {
       const a = document.body.appendChild(Object.assign(document.createElement('a'), { href: '#x', textContent: 'x' }));

@@ -236,6 +236,7 @@ test.describe('touch', () => {
     await expect(card).toHaveAttribute('data-flashlight', 'off');
 
     const forgot = page.getByRole('button', { name: 'Quên mật khẩu?', exact: true });
+    await expect.poll(() => eye.evaluate((el) => getComputedStyle(el).scale)).toBe('none'); // a tap holds :active a moment, and the press shrink lets go after it
     for (const control of [eye, scene, forgot, submit, pw, page.getByLabel('Email')]) expect((await box(control)).height).toBeGreaterThanOrEqual(44);
     for (const icon of [eye, scene]) expect((await box(icon)).width).toBeGreaterThanOrEqual(44);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
