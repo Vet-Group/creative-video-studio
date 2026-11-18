@@ -365,6 +365,8 @@ export async function POST(request: Request) {
     if (params.endAssetId !== undefined && !takesNow.endFrame) return bad(takesNow.endFrame !== videoInputs(model.endpoint).endFrame ? 'the model takes no end frame together with a reference video' : 'the model does not take an end frame');
     const endMax = takesNow.endMaxSec;
     if (params.endAssetId !== undefined && endMax !== null && durationSec > endMax) return bad(`the model takes an end frame on clips of at most ${endMax} seconds`);
+    const endImages = takesNow.endMaxImages;
+    if (params.endAssetId !== undefined && endImages !== null && assetIds.length > endImages) return bad(`the model takes an end frame with at most ${endImages} images`);
     if (clips.length > 0) {
       const takes = takesNow.audioClips;
       const ms = (await tx.query('select coalesce(sum(duration_ms), 0)::int as ms from assets where id = any($1::text[])', [clips])).rows[0].ms as number;

@@ -380,7 +380,7 @@ describe('fal reference audio', () => {
       ['bytedance/seedance-2.0/us/reference-to-video', { max: 3, seconds: 15 }],
       ['minimax/h3-max/reference-to-video', { max: 3, seconds: 15 }],
     ]);
-    expect(videoInputs('mock')).toEqual({ endFrame: false, endMaxSec: null, textOnly: false, audioClips: null, videoRefs: null });
+    expect(videoInputs('mock')).toEqual({ endFrame: false, endMaxSec: null, endMaxImages: null, textOnly: false, audioClips: null, videoRefs: null });
   });
 
   test('uploads the clips to fal storage as .mp3 or .wav and sends their URLs in the endpoint’s own field; the images stay inline', async () => {

@@ -95,6 +95,15 @@ describe('the end frame', () => {
     }
   });
 
+  test('Kling O3 Pro takes an end frame with at most 2 images (fal refuses more), and more images run without one', async () => {
+    await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) select x, owner_id, 'input', x, 'x.png', 'image/png', 1 from assets, unnest(array['img2', 'img3']) x where id = 'img'`);
+    const r = (await (await GET_MODELS(call('/api/models?feature=video&ratio=9:16&durationSec=5'))).json()) as { models: { id: string; endMaxImages: number | null }[] };
+    expect(Object.fromEntries(r.models.map((m) => [m.id, m.endMaxImages]))).toEqual({ 'kling-o3-pro': 2, 'kling-o1': null });
+    expect((await run({ assetIds: ['img', 'img2'], params: { endAssetId: 'end' } })).status).toBe(201);
+    expect(await errorOf(await run({ assetIds: ['img', 'img2', 'img3'], params: { endAssetId: 'end' } }))).toBe('the model takes an end frame with at most 2 images');
+    expect((await run({ assetIds: ['img', 'img2', 'img3'] })).status).toBe(201);
+  });
+
   test('a retry is refused once its end frame was deleted', async () => {
     await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) select 'end2', owner_id, 'input', 'end2', 'e.png', 'image/png', 1 from assets where id = 'img'`);
     const { id } = (await (await run({ params: { endAssetId: 'end2' } })).json()) as { id: string };
