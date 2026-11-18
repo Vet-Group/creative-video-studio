@@ -1,0 +1,3 @@
+import type { ChangeEntry } from '../changelog';
+
+export default { at: '2026-11-18T15:40:00+07:00', kind: 'new', title: 'Thử đồ: danh mục người mẫu có bộ lọc và bước chọn tư thế', details: ['Chọn người mẫu giờ có danh mục 56 người mẫu, lọc theo giới tính, độ tuổi, sắc tộc và dáng người.', 'Chọn một người mẫu trong danh mục thì app hỏi tiếp tư thế (mặt trước, tay chống hông, ngồi, quay lưng...), hoặc bấm "Không chọn tư thế".', 'Ô "Tư thế" dưới ảnh người mẫu đổi tư thế cho mọi ảnh, kể cả ảnh tự tải lên; "Giữ tư thế trong ảnh" giữ nguyên như trước. Dùng lại và thiết lập đã lưu nhớ cả tư thế.'], prs: [537], audience: 'all' } satisfies ChangeEntry;

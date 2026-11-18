@@ -164,6 +164,8 @@ export interface ReuseJob {
   /** Image Generation's style (a job's or a template's); left out by a sample's details file. */
   presetId?: string | null;
   garments: number | null;
+  /** Try On's pose. */
+  pose?: string | null;
   enhance: boolean | null;
   ratio: string | null;
   resolution: string | null;

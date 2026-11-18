@@ -1,5 +1,5 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
-import { addExamples, gotoTryOn, jpg, modelButton, optionsOf, png, select, settled, signIn } from './support.test';
+import { addExamples, gotoTryOn, jpg, modelButton, optionsOf, png, select, selectValue, settled, signIn } from './support.test';
 
 const nav = (page: Page) => page.getByRole('navigation', { name: 'Điều hướng chính' });
 const file = (name: string) => ({ name, mimeType: 'image/png', buffer: png() });
@@ -674,6 +674,60 @@ test("Try On, as Fash's pickers: a stock model then its pose, a garment category
     const mine = page.getByRole('dialog', { name: 'Chọn người mẫu' }).getByRole('region', { name: 'Người mẫu của tôi' });
     await mine.getByRole('button', { name: 'Dùng lại my-model.png' }).click();
     await expect(page.getByLabel('Người mẫu: ảnh đã chọn').getByRole('img', { name: 'my-model.png' })).toBeVisible();
+  } finally {
+    await asAdmin((name) => page.request.delete(`/api/admin/samples/${name}`));
+  }
+});
+
+test("Try On, as Fash's model catalog: the filters narrow the portraits, a portrait goes on to the pose step, and the pose rides the run's prompt and params", async ({ page }) => {
+  const names = ['try-on-portrait-woman-isla.jpg', 'try-on-portrait-man-kai.jpg', 'try-on-pose-woman-front.jpg', 'try-on-pose-woman-hand-on-hip.jpg'];
+  const asAdmin = async (each: (name: string) => Promise<{ ok(): boolean }>) => {
+    await page.context().clearCookies();
+    await signIn(page, 'admin');
+    for (const name of names) await settled(() => each(name), name);
+    await page.context().clearCookies();
+  };
+  await asAdmin((name) => page.request.put(`/api/admin/samples/${name}`, { data: jpg(), headers: { 'content-type': 'image/jpeg' } }));
+  try {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await signIn(page, 'tryposea');
+    await gotoTryOn(page);
+    await expect(page.getByRole('button', { name: 'Tải lên Người mẫu' })).toHaveAttribute('aria-haspopup', 'dialog');
+    await expect(select(page, 'Tư thế')).toHaveCount(0); // no model photo yet
+
+    await page.getByRole('button', { name: 'Tải lên Người mẫu' }).click();
+    const models = page.getByRole('dialog', { name: 'Chọn người mẫu' });
+    await expect(models.getByRole('button', { name: /^Người mẫu (Isla|Kai)$/ })).toHaveCount(2);
+    await selectValue(page, 'Giới tính', 'man');
+    await expect(models.getByRole('button', { name: 'Người mẫu Isla' })).toHaveCount(0);
+    await expect(models.getByRole('button', { name: 'Người mẫu Kai' })).toHaveCount(1);
+    await selectValue(page, 'Giới tính', '');
+    await models.getByRole('button', { name: 'Người mẫu Isla' }).click();
+
+    // Fash's pose step: only the poses with a preview for her gender, and a way to skip.
+    const poses = page.getByRole('dialog', { name: 'Chọn tư thế' });
+    await expect(poses.getByRole('button', { name: /^(Mặt trước|Tay chống hông)$/ })).toHaveCount(2);
+    await poses.getByRole('button', { name: 'Tay chống hông' }).click();
+    await expect(poses).toBeHidden();
+    await expect(page.getByLabel('Người mẫu: ảnh đã chọn').getByRole('img', { name: 'try-on-portrait-woman-isla.jpg' })).toBeVisible();
+    await expect(select(page, 'Tư thế')).toHaveAttribute('data-value', 'hand-on-hip');
+
+    await page.getByLabel('Ảnh trang phục').setInputFiles({ name: 'pose-garment.png', mimeType: 'image/png', buffer: png() });
+    await page.getByRole('button', { name: /^Thử đồ/ }).click();
+    await expect(page.getByText('Đã gửi lượt tạo')).toBeVisible();
+    const sent = ((await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { id: string }[] }).jobs[0]!;
+    const job = (await (await page.request.get(`/api/jobs/${sent.id}`)).json()) as { prompt: string; pose: string };
+    expect(job.pose).toBe('hand-on-hip');
+    expect(job.prompt).toContain('show them in this pose and framing: standing facing the camera with one hand on the hip');
+
+    // Không chọn tư thế keeps the portrait and drops the pose; the full one-photo slot is emptied first, so it opens the picker again.
+    await page.getByRole('button', { name: 'Bỏ ảnh try-on-portrait-woman-isla.jpg' }).click();
+    await page.getByRole('button', { name: 'Tải lên Người mẫu' }).click();
+    await models.getByRole('button', { name: 'Người mẫu Isla' }).click();
+    await poses.getByRole('button', { name: 'Không chọn tư thế' }).click();
+    await expect(poses).toBeHidden();
+    await expect(page.getByLabel('Người mẫu: ảnh đã chọn').getByRole('img', { name: 'try-on-portrait-woman-isla.jpg' })).toBeVisible();
+    await expect(select(page, 'Tư thế')).toHaveAttribute('data-value', '');
   } finally {
     await asAdmin((name) => page.request.delete(`/api/admin/samples/${name}`));
   }

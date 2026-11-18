@@ -1035,6 +1035,10 @@ dialog.admin-modal { width: min(36rem, calc(100vw - 2rem)); }
 .dropzone[data-filled='true'] .dropzone-pick { padding-right: 84px; } /* the bottom hint keeps clear of the link */
 .uploads-filter { max-width: 280px; margin-bottom: 16px; } /* the picker's store filter, under the dialog's heading */
 .uploads-filter > .field { margin-top: 0; }
+/* Try On's model catalog: Fash's four filters in a row that wraps on a phone, and the pose step's way out. */
+.portrait-filter { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin-bottom: 16px; }
+.portrait-filter > .field { margin-top: 0; }
+.portrait-no-pose { min-height: 32px; margin: 0 0 16px; }
 .prompt-editor textarea { display: block; width: 100%; height: 60vh; padding: 8px; border: 1px solid var(--field-border); border-radius: 8px; background: var(--fill); color: inherit; font: inherit; font-size: 14px; line-height: 21px; resize: vertical; }
 /* Enhance: Fash's pill in the prompt box, filled when on, outlined when off. */
 .enhance { display: inline-flex; align-items: center; gap: 4px; height: 30px; padding: 0 10px; border: 1px solid var(--ink); border-radius: 999px; background: var(--ink); color: var(--on-ink); font: inherit; font-size: 12px; font-weight: 600; line-height: 18px; white-space: nowrap; cursor: pointer; }

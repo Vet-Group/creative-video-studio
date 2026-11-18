@@ -643,7 +643,10 @@ describe('POST /api/jobs for an image feature', () => {
     const { id } = (await res.json()) as { id: string };
     expect((await pool.query('select params from jobs where id = $1', [id])).rows[0].params).toEqual({ resolution: '1K', garments: '1', brief: 'red dress' });
     expect((await runImage(m, { params: { resolution: '1K', brief: 'a studio shot' } })).status).toBe(201); // Image Generation
+    const posed = (await (await runImage(m, { ...tryOn, params: { resolution: '1K', garments: '1', pose: 'kneel' } })).json()) as { id: string };
+    expect((await pool.query('select params from jobs where id = $1', [posed.id])).rows[0].params).toMatchObject({ pose: 'kneel' }); // Try On's pose, kept for reuse
     const before = await jobCount();
+    expect(await error(await runImage(m, { ...tryOn, params: { resolution: '1K', pose: 'cartwheel' } }))).toMatch(/params.pose must be one of the Try On poses/);
     expect(await error(await runImage(m, { ...tryOn, params: { resolution: '1K', garments: '2' } }))).toMatch(/params.garments must count the garment images \(1 to 1\)/); // 2 inputs: the person and 1 garment
     expect(await error(await runImage(m, { ...tryOn, params: { resolution: '1K', garments: 'x' } }))).toMatch(/params.garments must count the garment images/);
     expect(await error(await runImage(m, { params: { resolution: '1K', garments: '1' } }))).toMatch(/params may hold only resolution, quality, thinking and brief/);
