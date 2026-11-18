@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { runViaApi, signIn } from './support.test';
+import { addExamples, runViaApi, signIn } from './support.test';
 
 test('Explore greets the member by given name and lists a job they start under Continue, without pushing a phone page sideways', async ({ page }) => {
   await signIn(page, 'explorea');
@@ -47,4 +47,65 @@ test("a running job's elapsed time under Continue keeps counting without a reloa
   // The page never polls: only the note's own one-minute tick can move the label.
   await page.clock.fastForward('02:00');
   await expect(note).toHaveText(/^Đang tạo · đã (chờ|chạy) 2 phút$/);
+});
+
+test("the day line counts what the member made today across kinds, beside the clips left of their cap", async ({ page }) => {
+  await signIn(page, 'exploremix');
+  await runViaApi(page);
+  const image = await page.request.post('/api/jobs', { data: { feature: 'image', modelId: 'mock-image-e2e', assetIds: [], ratio: '1:1', prompt: 'a picture for the day line', enhance: false, params: { resolution: '1K' } } });
+  expect(image.status(), await image.text()).toBe(201);
+  await page.goto('/explore');
+  await expect(page.locator('.explore-status')).toHaveText(/(^| · )Hôm nay bạn còn \d+\/\d+ clip video · 1 ảnh$/); // a running job's note may come first
+});
+
+test('a first-time member sees three picture cards and a way into Try On with sample photos', async ({ page }) => {
+  await signIn(page, 'explorenew', { welcome: true });
+  await page.goto('/explore');
+  const card = page.getByRole('region', { name: 'Bắt đầu trong 3 bước' });
+  await expect(card.getByRole('listitem')).toHaveCount(3);
+  await expect(card.locator('.welcome-pic')).toHaveCount(3);
+  for (const pic of await card.locator('.welcome-pic img, .welcome-pic video').all()) await expect(pic).toBeVisible();
+  await card.getByRole('link', { name: 'Thử ngay với ảnh mẫu' }).click();
+  await expect(page).toHaveURL(/\/try-on$/);
+  await expect(page.getByLabel('Ảnh trang phục')).toBeEnabled();
+});
+
+test("the hero strip shows only the Examples' thumbnails, and stands still under reduced motion", async ({ page, browser }) => {
+  await signIn(page, 'explorestrip');
+  const made = async (prompt: string) => {
+    const res = await page.request.post('/api/jobs', { data: { feature: 'image', modelId: 'mock-image-e2e', assetIds: [], ratio: '1:1', prompt, enhance: false, params: { resolution: '1K' } } });
+    expect(res.status(), await res.text()).toBe(201);
+    const { id } = (await res.json()) as { id: string };
+    await expect.poll(async () => ((await (await page.request.get(`/api/jobs/${id}`)).json()) as { status: string }).status, { timeout: 60_000 }).toBe('succeeded');
+    const job = (await (await page.request.get(`/api/jobs/${id}`)).json()) as { outputAssetId: string; posterAssetId: string | null };
+    return { id, assets: [job.outputAssetId, job.posterAssetId].filter((a): a is string => a !== null), shown: job.posterAssetId ?? job.outputAssetId };
+  };
+  const shared = await made('a picture on Examples');
+  const own = await made('a picture only I made');
+  await addExamples(browser, [shared.id]);
+  try {
+    await page.goto('/explore');
+    const strip = page.locator('.explore-strip');
+    await expect(strip).toHaveAttribute('aria-hidden', 'true');
+    const srcs = await strip.locator('img').evaluateAll((imgs) => imgs.map((i) => i.getAttribute('src')));
+    expect(srcs).toContain(`/api/assets/${shared.shown}/thumb`);
+    expect(srcs.some((s) => own.assets.some((a) => s?.includes(a)))).toBe(false); // a result nobody put on Examples never shows
+    const track = strip.locator('.explore-strip-track');
+    await expect.poll(() => track.evaluate((e) => getComputedStyle(e).animationName)).toBe('explore-strip');
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await expect.poll(() => track.evaluate((e) => getComputedStyle(e).animationName)).toBe('none');
+    await expect(strip.locator('li[data-copy]').first()).toBeHidden();
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  } finally {
+    const context = await browser.newContext();
+    try {
+      const admin = await context.newPage();
+      await signIn(admin, 'admin');
+      await admin.request.delete(`/api/jobs/${shared.id}/example`);
+    } finally {
+      await context.close();
+    }
+  }
 });

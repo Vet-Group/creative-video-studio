@@ -1,6 +1,6 @@
 import { CANCELED_ERROR } from '@cvs/core/ledger';
 import { expect, test } from 'vitest';
-import { continueJobs, givenName, greeting, jobNote, providerQueueLabel, typicalLabel, waitProgress } from './explore';
+import { continueJobs, givenName, greeting, jobNote, providerQueueLabel, todayStat, typicalLabel, waitProgress } from './explore';
 
 test('the given name is the last word of a Vietnamese full name', () => {
   expect(givenName('Nguyễn Văn An')).toBe('An');
@@ -112,4 +112,15 @@ test('the waiting bar eases toward 90% of the typical run time and never claims 
   expect(waitProgress(job, [20, 30, 40].map(done), start)!.label).toBe('Thường mất dưới 1 phút');
   expect(waitProgress(job, past.slice(0, 2), start)).toBeNull();
   expect(waitProgress({ ...job, status: 'queued' }, past, start)).toBeNull();
+});
+
+test("the hero's day line counts images and clips across kinds, and keeps the clips-left wording for a member with a cap", () => {
+  const free = { today: 2, cap: 100_000 };
+  expect(todayStat({ clips: 0, images: 0 }, free)).toBe('Hôm nay bạn chưa tạo ảnh hay clip nào');
+  expect(todayStat({ clips: 0, images: 3 }, free)).toBe('Hôm nay: 3 ảnh');
+  expect(todayStat({ clips: 2, images: 0 }, free)).toBe('Hôm nay: 2 clip');
+  expect(todayStat({ clips: 1, images: 3 }, free)).toBe('Hôm nay: 3 ảnh · 1 clip');
+  expect(todayStat({ clips: 1, images: 0 }, { today: 2, cap: 5 })).toBe('Hôm nay bạn còn 3/5 clip video');
+  expect(todayStat({ clips: 1, images: 4 }, { today: 2, cap: 5 })).toBe('Hôm nay bạn còn 3/5 clip video · 4 ảnh');
+  expect(todayStat({ clips: 6, images: 0 }, { today: 6, cap: 5 })).toBe('Hôm nay bạn còn 0/5 clip video');
 });

@@ -5,7 +5,7 @@ import { beforeEach, expect, test, vi } from 'vitest';
 vi.mock('@/lib/auth', () => ({ pool: { query: vi.fn(async () => ({ rows: [] })) } }));
 vi.mock('@/lib/model-scores', () => ({ modelStats: vi.fn(async () => new Map()), rank: () => ({}), scoreOf: () => ({ score: 0 }) }));
 vi.mock('@/lib/samples', () => ({ listSamples: vi.fn(async () => []) }));
-vi.mock('@/lib/clips', () => ({ bestClips: vi.fn(async () => new Map()) }));
+vi.mock('@/lib/clips', () => ({ bestClips: vi.fn(async () => new Map()), LIVE_CLIP: 'true', EXAMPLE_ORDER: 'e.job_id' }));
 vi.mock('@/lib/current-user', () => ({ currentUser: vi.fn(async () => ({ mustChangePassword: false })) }));
 vi.mock('@cvs/core/limits', () => ({ dailyClips: vi.fn(async () => ({ today: 2, cap: 5 })) }));
 vi.mock('next/navigation', () => ({ redirect: vi.fn((to: string) => { throw new Error(`redirect ${to}`); }) }));
@@ -94,10 +94,10 @@ test('a user who must change an Admin-set password is sent to the change page, a
 });
 
 /** The page's markup with these recent jobs (newest first) for a signed-in Phạm Quốc Hưng at 14:00 in Vietnam. */
-async function withJobs(jobs: Record<string, unknown>[]) {
+async function withJobs(jobs: Record<string, unknown>[], more: { counts?: Record<string, unknown>[]; strip?: Record<string, unknown>[] } = {}) {
   vi.setSystemTime(new Date('2026-11-02T07:00:00Z'));
   vi.mocked(currentUser).mockResolvedValueOnce({ id: 'u1', name: 'Phạm Quốc Hưng', mustChangePassword: false } as Awaited<ReturnType<typeof currentUser>>);
-  vi.mocked(pool.query).mockImplementation((async (sql: string) => ({ rows: sql.includes('from jobs') ? jobs : [] })) as never);
+  vi.mocked(pool.query).mockImplementation((async (sql: string) => ({ rows: sql.includes('filter (where') ? (more.counts ?? []) : sql.includes('from examples') ? (more.strip ?? []) : sql.includes('from jobs') ? jobs : [] })) as never);
   try {
     return renderToStaticMarkup(await ExplorePage(props()));
   } finally {
@@ -121,9 +121,16 @@ test('the hero greets the member by given name for the time of day in Vietnam, w
 test('a clip cap from 100,000 up is no cap, so the hero counts the clips made today instead of the clips left', async () => {
   const { dailyClips } = await import('@cvs/core/limits');
   vi.mocked(dailyClips).mockResolvedValueOnce({ today: 2, cap: 100_000 } as never);
-  const html = await withJobs([]);
-  expect(html).toContain('Hôm nay bạn đã tạo 2 clip video');
+  const html = await withJobs([], { counts: [{ clips: 1, images: 3 }] });
+  expect(html).toContain('Hôm nay: 3 ảnh · 1 clip');
   expect(html).not.toContain('100000');
+});
+
+test("the hero strip shows the Examples' thumbnails as decorative pictures, and nothing without any", async () => {
+  expect(await withJobs([])).not.toContain('explore-strip');
+  const html = await withJobs([], { strip: [{ id: 'a1' }, { id: 'a2' }] });
+  expect(html).toContain('class="explore-strip" aria-hidden="true"');
+  expect(html).toContain('src="/api/assets/a1/thumb"');
 });
 
 test('Continue shows running jobs first, then the latest finished, at most four; a finished one opens in the Library, the others on their page', async () => {
