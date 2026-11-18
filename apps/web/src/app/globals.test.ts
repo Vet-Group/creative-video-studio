@@ -105,6 +105,13 @@ test('dialog and toast entrances and the press scale play only under no-preferen
   expect(rest).not.toMatch(/:active[^{]*\{[^}]*scale:/);
   // Only transform and opacity (scale and translate included) move: no size, margin or inset animates.
   expect(motion).not.toMatch(/transition:[^;}]*\b(width|height|margin|top|left|inset)\b/);
+  // A dialog only fades in, so its box is its final size and place from the first frame.
+  expect(blockOf(motion, '@starting-style')).not.toMatch(/scale|translate|transform/);
+  // A scaled button is the containing block of its absolute ::before, so a button whose ::before covers a whole card, slot or pill keeps its size on a press.
+  const press = motion.split('\n').find((l) => /:active \{ scale: \.97;/.test(l))!;
+  const stretched = [...css.matchAll(/^([^{}\n]+)::before \{ content: ''; position: absolute; inset: 0; \}/gm)].map((m) => m[1]!.trim()).filter((s) => !/\ba$/.test(s));
+  expect(stretched).toEqual(expect.arrayContaining(['.slot-add', '.preset-card button', '.detail-pills .tap']));
+  for (const host of stretched) expect(press, host).toContain(host);
   expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\) \{ \.runbar button\.primary\.run \{ transition: none; \} \}/);
 });
 

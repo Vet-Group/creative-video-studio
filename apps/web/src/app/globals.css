@@ -252,16 +252,17 @@ button.primary { background: var(--brand); border-color: var(--brand); color: va
 button.primary:hover:not(:disabled), .runbar button.primary.run:hover:not(:disabled), .detail-use:hover, .library-empty-actions .button:first-child:hover { border-color: var(--brand-hover); background: var(--brand-hover); }
 :focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 /* Motion that only plays for people who have not asked for less: a press on a control shrinks it a little (the scale property, so it adds to a transform a control already has),
-   a dialog fades in (and scales up unless it holds fixed-position arrows, which a scaled box would carry along), and a toast rises. The jobs drawer has its own slide. */
+   a dialog and its backdrop fade in (opacity only, so no box changes size or place while it opens), and a toast rises. The jobs drawer has its own slide.
+   A scaled button becomes the containing block of its absolute ::before, so the buttons whose ::before stretches over a whole card, slot or pill do not shrink:
+   mid-press their hit area would collapse to the button and the release would miss it. */
 @media (prefers-reduced-motion: no-preference) {
   button, .button { transition: scale var(--dur-fast) var(--ease-out); }
-  :is(button:not(.example-open), .button):not(:disabled, [aria-disabled='true']):active { scale: .97; transition-duration: var(--dur-press); }
+  :is(button:not(.example-open, :where(.slot-add, .preset-card button, .detail-pills .tap)), .button):not(:disabled, [aria-disabled='true']):active { scale: .97; transition-duration: var(--dur-press); }
   .example:has(.example-open:active), .gallery-item:has(> a:active) { scale: .98; } /* these two keep their own transition list, so the card snaps */
-  dialog.modal:not(.jobs-drawer)[open] { transition: opacity var(--dur-base) var(--ease-out), scale var(--dur-base) var(--ease-out); }
+  dialog.modal:not(.jobs-drawer)[open] { transition: opacity var(--dur-base) var(--ease-out); }
   dialog.modal:not(.jobs-drawer)[open]::backdrop { transition: opacity var(--dur-base) var(--ease-out); }
   @starting-style {
     dialog.modal:not(.jobs-drawer)[open], dialog.modal:not(.jobs-drawer)[open]::backdrop { opacity: 0; }
-    dialog.modal:not(.jobs-drawer, .lightbox, .example-detail)[open] { scale: .97; }
   }
   .toast { animation: toast-in var(--dur-base) var(--ease-out); }
 }

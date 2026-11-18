@@ -1,14 +1,14 @@
 import { expect, type Page, test } from '@playwright/test';
 import { png, signIn } from './support.test';
 
-// The 2026-11-18 motion pass: a dialog fades and scales in to its final box, a not-ready Run is a readable grey, a ready one lights up, and a press shrinks a control.
+// The 2026-11-18 motion pass: a dialog fades in at its final box, a not-ready Run is a readable grey, a ready one lights up, and a press shrinks a control.
 const luminance = ([r, g, b]: number[]) => 0.2126 * lin(r!) + 0.7152 * lin(g!) + 0.0722 * lin(b!);
 const lin = (v: number) => ((v /= 255) <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
 const contrast = (a: number[], b: number[]) => { const [x, y] = [luminance(a), luminance(b)].sort((m, n) => n - m); return (x! + 0.05) / (y! + 0.05); };
 const rgb = (css: string) => css.match(/\d+(\.\d+)?/g)!.slice(0, 3).map(Number);
 
 const openGuide = async (page: Page) => {
-  // The scale and opacity showModal() starts from, read in the same task, before the first frame.
+  // The opacity and scale showModal() starts from, read in the same task, before the first frame.
   await page.evaluate(() => {
     const open = HTMLDialogElement.prototype.showModal;
     HTMLDialogElement.prototype.showModal = function showModal() {
@@ -30,14 +30,14 @@ for (const scheme of ['light', 'dark'] as const) {
       await signIn(page, 'motion');
     });
 
-    test('a dialog fades and scales in from 0.97 and ends at its final centred box', async ({ page }) => {
+    test('a dialog fades in at its final centred box, unscaled from the first frame', async ({ page }) => {
       await page.emulateMedia({ colorScheme: scheme, reducedMotion: 'no-preference' });
       const guide = await openGuide(page);
       await expect(guide).toBeVisible();
       const start = await entered(page);
       expect(start.opacity).toBeLessThan(1);
-      expect(Number(start.scale)).toBeLessThan(1);
-      // Settled: opaque, unscaled, nothing still running, and the box is the CSS width (52rem) centred on the screen.
+      expect(start.scale).toBe('none'); // only the opacity moves, so nothing in the dialog changes size or place while it opens
+      // Settled: opaque, nothing still running, and the box is the CSS width (52rem) centred on the screen.
       await expect.poll(() => guide.evaluate((el) => el.getAnimations().length)).toBe(0);
       expect(await guide.evaluate((el) => [getComputedStyle(el).opacity, getComputedStyle(el).scale])).toEqual(['1', 'none']);
       const box = (await guide.boundingBox())!;
