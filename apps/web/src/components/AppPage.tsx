@@ -467,7 +467,7 @@ function MotionForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
             <div className="app-slots" data-two>
               <Slot
                 label="Nhân vật"
-                empty="Thêm 1 ảnh người sẽ làm động tác"
+                empty="Thêm 1 ảnh thấy rõ từ đầu tới hông của người sẽ làm động tác"
                 inputLabel="Ảnh nhân vật"
                 images={image}
                 max={1}
@@ -479,7 +479,7 @@ function MotionForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
                 label="Video chuyển động"
                 optional={false}
                 fileLabel="Tệp video chuyển động"
-                hint="Thêm 1 video MP4 hoặc MOV, 3 đến 30 giây, tối đa 20 MB"
+                hint="Thêm 1 video MP4 hoặc MOV thấy rõ nửa thân trên, 3 đến 30 giây chuyển động liên tục, tối đa 20 MB"
                 video={video}
                 busy={busy}
                 onFile={(file) => void upload([file], ([v]) => v && setVideo({ id: v.id, filename: v.filename, durationMs: v.durationMs ?? 0 }), 'video')}
