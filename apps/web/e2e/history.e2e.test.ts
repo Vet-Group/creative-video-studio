@@ -20,7 +20,7 @@ test('a History card shows the text, inputs and chips, and its favourite, new-ta
   await expect(card.getByRole('img', { name: 'Tạo ảnh' })).toBeVisible();
   await expect(card.getByRole('button', { name: 'Dùng lại' })).toBeVisible(); // beside the form it refills in place (reuse e2e)
 
-  const out = await card.getByRole('link', { name: 'Mở trong tab mới' }).getAttribute('href');
+  const out = await card.getByRole('link', { name: 'Mở bản gốc trong tab mới' }).getAttribute('href');
   expect(out).toMatch(/^\/api\/assets\/.+\/content$/);
   expect((await page.request.get(out!)).status()).toBe(200);
 
@@ -171,7 +171,7 @@ test('the Library item detail shows the result large with its words, inputs and 
   await expect(detail.getByRole('img', { name: 'detail-in.png' })).toBeVisible();
   await expect(detail.getByRole('definition').filter({ hasText: /^(1K|3:4)$/ })).toHaveText(['3:4', '1K']); // how it was made
   await expect(detail.getByRole('link', { name: 'Dùng lại' })).toHaveAttribute('href', `/image-generation?reuse=${ids[1]}`);
-  await expect(detail.getByRole('link', { name: 'Mở trong tab mới' })).toHaveAttribute('href', /^\/api\/assets\/.+\/content$/);
+  await expect(detail.getByRole('link', { name: 'Mở bản gốc trong tab mới' })).toHaveAttribute('href', /^\/api\/assets\/.+\/content$/);
 
   await detail.getByRole('button', { name: 'Mục tiếp theo' }).click();
   await expect(detail.getByText('first detail shot')).toBeVisible();

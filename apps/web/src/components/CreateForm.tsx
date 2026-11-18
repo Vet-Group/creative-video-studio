@@ -1233,7 +1233,7 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
                   <a href={media(detail.src)} download aria-label="Tải video ví dụ" title="Tải video ví dụ">
                     <Icon name="download" />
                   </a>
-                  <a href={media(detail.src)} target="_blank" rel="noreferrer" aria-label="Mở trong tab mới" title="Mở trong tab mới">
+                  <a href={media(detail.src)} target="_blank" rel="noreferrer" aria-label="Mở bản gốc trong tab mới" title="Mở bản gốc trong tab mới">
                     <Icon name="external" />
                   </a>
                 </div>

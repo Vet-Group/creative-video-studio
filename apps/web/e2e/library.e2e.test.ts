@@ -98,6 +98,13 @@ test('Library views: grid or list remembered, a selection bar with the zip, sear
   await expect(page.getByRole('button', { name: 'Danh sách', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await mineOnly();
   await expect(page.locator('.lib-row')).toHaveCount(2);
+  // The picture is the row's way into the detail (no eye button beside the other actions), its checkbox sits in the picture's top-left corner, and a video shows its length on it.
+  await expect(item(first).getByRole('button', { name: 'Xem chi tiết' })).toHaveCount(1);
+  await expect(item(first).locator('.lib-thumb').getByRole('button', { name: 'Xem chi tiết' })).toHaveCount(1);
+  const thumb = (await item(first).locator('.lib-thumb').boundingBox())!;
+  const corner = (await item(first).locator('.zip-check').boundingBox())!;
+  expect({ x: Math.round(corner.x - thumb.x), y: Math.round(corner.y - thumb.y) }).toEqual({ x: 2, y: 2 });
+  await expect(item(first).locator('.lib-thumb-len')).toHaveText(/^\d+s$/);
 
   // Marks work on a list row and in the detail view; Kết quả finds the unmarked items, and a fresh mark takes one out of that list.
   await item(first).getByRole('button', { name: 'Đạt', exact: true }).click();
@@ -142,6 +149,13 @@ test('Library views: grid or list remembered, a selection bar with the zip, sear
   await page.getByRole('button', { name: 'Chọn', exact: true }).click();
   await expect(bar).toContainText('Đã chọn 0');
   await expect(bar.getByRole('button', { name: 'Tải xuống .zip' })).toBeDisabled();
+  // While picking, a click on the picture picks or drops its item instead of opening it.
+  await item(first).locator('.lib-thumb .lib-open').click();
+  await expect(bar).toContainText('Đã chọn 1');
+  await expect(item(first).getByRole('checkbox')).toBeChecked();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await item(first).locator('.lib-thumb .lib-open').click();
+  await expect(bar).toContainText('Đã chọn 0');
   await checks.nth(1).check();
   await expect(bar).toContainText('Đã chọn 1');
   await bar.getByRole('button', { name: 'Bỏ chọn' }).click();
@@ -231,6 +245,14 @@ test('Library detail: how an item was made for anyone, marks by keyboard, ←/�
   await expect(recipe.filter({ hasText: /^5 giây$/ })).toHaveCount(1);
   await expect(recipe.filter({ hasText: /^E2E Library Recipe B · / })).toHaveCount(1);
   await expect(detail.getByRole('button', { name: 'Đạt', exact: true })).toHaveCount(0);
+  // Its input photo opens large in the result's place, not in a new tab, and Về kết quả brings the result back.
+  const input = detail.getByRole('list', { name: 'Ảnh đầu vào' }).getByRole('button', { name: 'recipe.png' });
+  await input.click();
+  await expect(input).toHaveAttribute('aria-pressed', 'true');
+  await expect(detail.locator('.lightbox-media img')).toHaveAttribute('alt', 'Ảnh đầu vào recipe.png');
+  await detail.getByRole('button', { name: 'Về kết quả' }).click();
+  await expect(input).toHaveAttribute('aria-pressed', 'false');
+  await expect(detail.locator('.lightbox-media video')).toHaveCount(1);
   await page.keyboard.press('Escape');
 
   // Own items, newest first: 2 marks the open one featured, → moves to the older one, 1 passes it, 3 opens the fault list.

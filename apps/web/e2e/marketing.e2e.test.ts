@@ -533,7 +533,7 @@ test('as on Fash, a sample in Ví dụ with a details file opens in place with i
     await page.getByRole('tab', { name: 'Ví dụ' }).click();
     const gallery = page.getByRole('group', { name: 'Video Marketing Studio của công ty' });
     await expect(gallery.getByRole('link', { name: 'Xem chi tiết video mẫu' })).toHaveCount(2);
-    await expect(gallery.getByRole('link', { name: 'Mở video mẫu trong tab mới' })).toHaveCount(1); // no details file: the new tab as before
+    await expect(gallery.getByRole('link', { name: 'Xem video mẫu' })).toHaveCount(1); // no details file: it opens in place too, with the clip and its file actions only
 
     // By its address, not the first link: the masonry deals tiles into columns, so DOM order depends on how many company results lead.
     await gallery.getByRole('link', { name: 'Xem chi tiết video mẫu' }).and(page.locator('[href="/api/samples/marketing-example-1.mp4"]')).click();
@@ -545,6 +545,14 @@ test('as on Fash, a sample in Ví dụ with a details file opens in place with i
     detail = page.getByRole('dialog', { name: 'Chi tiết: Editorial' });
     await expect(detail.locator('.job-text')).toHaveText(adv.brief);
     await expect(detail.getByRole('button', { name: 'Dùng lại' })).toBeVisible();
+    await detail.getByRole('button', { name: 'Mục tiếp theo' }).click();
+    detail = page.getByRole('dialog', { name: 'Chi tiết: Video mẫu' });
+    await expect(detail.locator('video')).toHaveAttribute('src', '/api/samples/marketing-example-3.mp4');
+    await expect(detail.getByRole('link', { name: 'Mở bản gốc trong tab mới' })).toHaveAttribute('target', '_blank');
+    await expect(detail.getByRole('button', { name: 'Dùng lại' })).toHaveCount(0);
+    await expect(detail.getByRole('status')).toHaveCount(0); // no details file is not a failed read
+    await detail.getByRole('button', { name: 'Mục trước' }).click();
+    detail = page.getByRole('dialog', { name: 'Chi tiết: Editorial' });
     await detail.getByRole('button', { name: 'Mục trước' }).click();
     detail = page.getByRole('dialog', { name: 'Chi tiết: UGC Thử đồ' });
 
