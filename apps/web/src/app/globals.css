@@ -1171,6 +1171,7 @@ dialog.modal { position: fixed; width: min(45rem, calc(100vw - 2rem)); max-heigh
 .lightbox-back { position: absolute; top: 12px; left: 12px; display: inline-flex; align-items: center; gap: 4px; height: 32px; padding: 0 12px 0 8px; border: 0; border-radius: 999px; background: rgb(var(--shade) / .7); color: var(--on-dark); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
 .lightbox-back:hover { background: rgb(var(--shade) / .85); }
 @media (pointer: coarse) { .lightbox-back { height: 44px; } }
+.lightbox-back:focus-visible, .lightbox-step:focus-visible { outline-color: var(--on-dark); } /* the default dark ring vanishes on the dark picture (1.04:1 measured) */
 .job-inputs button.tap { border-radius: 6px; cursor: zoom-in; }
 .job-inputs .tap[aria-pressed='true'] img { outline: 2px solid var(--ink-strong); outline-offset: 1px; }
 .lightbox-side { display: flex; flex-direction: column; gap: 12px; min-height: 0; padding: 16px; overflow-y: auto; background: var(--surface); }

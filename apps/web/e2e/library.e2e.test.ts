@@ -221,7 +221,7 @@ test('Library detail: how an item was made for anyone, marks by keyboard, ←/�
     expect.poll(async () => ((await (await p.request.get('/api/jobs?mine')).json()) as { jobs: { id: string; status: string }[] }).jobs.filter((j) => ids.includes(j.id) && j.status === 'succeeded').length, { timeout: 60_000 }).toBe(ids.length);
   const other = await (await browser.newContext()).newPage();
   await signIn(other, 'librb');
-  const theirs = await clip(other, 'words of member B');
+  const theirs = await clip(other, 'words of **member B**');
   await signIn(page, 'libra');
   const older = await clip(page, 'recipe words one');
   const newer = await clip(page, 'recipe words two');
@@ -238,7 +238,7 @@ test('Library detail: how an item was made for anyone, marks by keyboard, ←/�
   await expect.poll(unmarked).toBeGreaterThanOrEqual(2);
   const before = await unmarked();
 
-  // Another member's item: its prompt, model and settings are open to everyone, its marks are not.
+  // Another member's item: its prompt (without Markdown's **), model and settings are open to everyone, its marks are not.
   await item(theirs).getByRole('button', { name: 'Xem chi tiết' }).click();
   await expect(detail.getByText('words of member B', { exact: true })).toBeVisible();
   await expect(recipe.filter({ hasText: /^Mock E2E$/ })).toHaveCount(1);
@@ -253,6 +253,23 @@ test('Library detail: how an item was made for anyone, marks by keyboard, ←/�
   await detail.getByRole('button', { name: 'Về kết quả' }).click();
   await expect(input).toHaveAttribute('aria-pressed', 'false');
   await expect(detail.locator('.lightbox-media video')).toHaveCount(1);
+  // By keyboard: Enter shows the photo, Về kết quả takes focus with a white ring on the dark picture, and Enter puts focus back on the photo.
+  await input.focus();
+  await page.keyboard.press('Enter');
+  await expect(input).toHaveAttribute('aria-pressed', 'true');
+  const back = detail.getByRole('button', { name: 'Về kết quả' });
+  for (let i = 0; i < 12 && !(await back.evaluate((e) => e === document.activeElement)); i++) await page.keyboard.press('Shift+Tab');
+  await expect(back).toBeFocused();
+  await expect(back).toHaveCSS('outline-color', 'rgb(255, 255, 255)');
+  await page.keyboard.press('Enter');
+  await expect(back).toHaveCount(0);
+  await expect(input).toBeFocused();
+  await expect(input).toHaveAttribute('aria-pressed', 'false');
+  // The ←/→ arrows sit on the picture on a phone, so they get the same white ring.
+  const step = detail.locator('.lightbox-step').first();
+  for (let i = 0; i < 30 && !(await step.evaluate((e) => e === document.activeElement)); i++) await page.keyboard.press('Tab');
+  await expect(step).toBeFocused();
+  await expect(step).toHaveCSS('outline-color', 'rgb(255, 255, 255)');
   await page.keyboard.press('Escape');
 
   // Own items, newest first: 2 marks the open one featured, → moves to the older one, 1 passes it, 3 opens the fault list.

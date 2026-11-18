@@ -283,7 +283,7 @@ export function ClipCard({ clip, view, select, selecting = false, onChange, onDe
 
   if (view === 'list') {
     const thumb = clip.posterAssetId ?? (image ? clip.videoAssetId : null); // an image's preview, else the image itself
-    const prompt = clip.prompt?.replaceAll('**', ''); // Markdown bold pasted into a prompt reads as plain words here; the detail keeps the prompt as sent
+    const prompt = clip.prompt?.replaceAll('**', ''); // Markdown bold pasted into a prompt reads as plain words here and in the detail's Mô tả; Copy and the sent prompt keep it
     return (
       <article className="lib-row" aria-label={name} data-clip-id={clip.id}>
         {labelled}
@@ -443,6 +443,7 @@ export function ClipDetail({ clips, index, stores, admin, onIndex, onChange, onU
   const [shown, setShown] = useState<{ id: string; filename: string } | null>(null); // an input photo shown large in the result's place, instead of a new tab
   const [full, setFull] = useState<string | null>(null); // the picture full screen loaded at its own size (the box shows a 1600 px preview)
   const media = useRef<HTMLVideoElement & HTMLImageElement>(null);
+  const inputs = useRef<HTMLUListElement>(null); // Về kết quả puts focus back on the photo it showed, not on the page
   // A swipe on a touch screen steps to the neighbour like the arrows: the media follows the finger, then opens it or snaps back.
   const box = useRef<HTMLDivElement>(null);
   const fingers = useRef(new Set<number>());
@@ -585,7 +586,7 @@ export function ClipDetail({ clips, index, stores, admin, onIndex, onChange, onU
         {shown ? (
           <>
             <img ref={media} src={full === shown.id ? content(shown.id) : thumbUrl(shown.id, PREVIEW_W)} alt={`Ảnh đầu vào ${shown.filename}`} />
-            <button type="button" className="lightbox-back" onClick={() => setShown(null)}>
+            <button type="button" className="lightbox-back" onClick={() => (inputs.current?.querySelector<HTMLButtonElement>('[aria-pressed="true"]')?.focus(), setShown(null))}>
               <Icon name="left" />
               Về kết quả
             </button>
@@ -604,7 +605,7 @@ export function ClipDetail({ clips, index, stores, admin, onIndex, onChange, onU
           {mark && <span className={`lib-mark${verdictClass(clip.verdict!)}`}>{mark}</span>}
         </h2>
         {words('Hook tự viết', job?.hookText)}
-        {words('Mô tả', own ?? job?.brief)}
+        {words('Mô tả', (own ?? job?.brief)?.replaceAll('**', ''))}
         {words('Lời thoại', job?.script)}
         {words('Cảnh kết', job?.ending)}
         {words('Chữ trên khung cuối', job?.endText)}
@@ -618,7 +619,7 @@ export function ClipDetail({ clips, index, stores, admin, onIndex, onChange, onU
         {job && job.images.length > 0 && clip.feature !== 'motion_control' && (
           <div className="recipe-text">
             <h3>Ảnh đầu vào</h3>
-            <ul className="job-inputs" aria-label="Ảnh đầu vào">
+            <ul ref={inputs} className="job-inputs" aria-label="Ảnh đầu vào">
               {job.images.map((i) => (
                 <li key={i.id}>
                   <button type="button" className="tap" aria-pressed={shown?.id === i.id} title="Xem lớn ảnh này" onClick={() => (setComparing(false), setShown(shown?.id === i.id ? null : i))}>
