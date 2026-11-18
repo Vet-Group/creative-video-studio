@@ -2850,7 +2850,7 @@ dialog.modal.compare-modal, dialog.modal.input-viewer { width: min(760px, calc(1
 
 /* Explore's hero strip and first-visit cards (hero media, welcome pictures). */
 .explore-hero:has(~ :is(.welcome, .welcome-pending)) .explore-first { display: none; } /* the card says it already; the line returns once the card is closed */
-.explore-strip { margin: 8px 0 0; overflow: hidden; border-radius: 14px; -webkit-mask-image: linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent); mask-image: linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent); }
+.explore-strip { margin: 8px 0 0; overflow: hidden; border-radius: 14px; -webkit-mask-image: linear-gradient(90deg, transparent, rgb(var(--shade)) 5%, rgb(var(--shade)) 95%, transparent); mask-image: linear-gradient(90deg, transparent, rgb(var(--shade)) 5%, rgb(var(--shade)) 95%, transparent); }
 .explore-strip-track { display: flex; width: max-content; }
 .explore-strip-track > li { flex: none; width: 132px; height: 165px; margin-right: 12px; overflow: hidden; border-radius: 10px; background: var(--fill); }
 .explore-strip-track img { display: block; width: 100%; height: 100%; object-fit: cover; }
