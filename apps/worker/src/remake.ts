@@ -115,12 +115,17 @@ export async function settleFal(
     // A failed poll (network, 429) says nothing about the request, so it is polled again.
     const s = await status().catch(() => undefined);
     if (s?.state === 'succeeded') {
-      try {
-        const res = await (o.fetch ?? fetch)(s.outputUrl, { signal: AbortSignal.timeout(2 * 60_000) });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return { bytes: new Uint8Array(await res.arrayBuffer()), costUsd: s.costUsd };
-      } catch (e) {
-        throw new PaidCallError(`could not download the fal output: ${message(e)}`, s.costUsd);
+      // A GET of a finished output is safe to repeat: a network blip or a 5xx/429 gets 3 tries before the paid shot is given up.
+      for (let n = 1; ; n++) {
+        try {
+          const res = await (o.fetch ?? fetch)(s.outputUrl, { signal: AbortSignal.timeout(2 * 60_000) });
+          if (res.ok) return { bytes: new Uint8Array(await res.arrayBuffer()), costUsd: s.costUsd };
+          await res.body?.cancel();
+          throw Object.assign(new Error(`HTTP ${res.status}`), { final: res.status < 500 && res.status !== 429 });
+        } catch (e) {
+          if (n === 3 || (e as { final?: boolean }).final) throw new PaidCallError(`could not download the fal output: ${message(e)}`, s.costUsd);
+        }
+        await new Promise((r) => setTimeout(r, (o.pollMs ?? 3_000) * n));
       }
     }
     if (s?.state === 'failed' || s?.state === 'canceled') throw new PaidCallError(s.error, s.costUsd);

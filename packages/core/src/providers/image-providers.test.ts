@@ -286,6 +286,35 @@ describe('fal image submit', () => {
     expect(err.status).toBe(402);
     await expect(createFalImageProvider({ apiKey: 'k', fetch: fakeFetch([200, {}]).fn }).submit(req(PRO))).rejects.toThrow(/no request_id/);
   });
+
+  test('a submit fal turned away (429, 503) or never reached is sent again, up to twice; one that may have reached fal is not', async () => {
+    const waits: number[] = [];
+    const pause = async (ms: number) => void waits.push(ms);
+    const submit = (fn: typeof fetch) => createFalImageProvider({ apiKey: 'k', fetch: fn, pause }).submit(req(PRO));
+
+    const busy = fakeFetch([503, {}], [429, {}], [200, { request_id: 'r1' }]);
+    expect((await submit(busy.fn)).providerJobId).toBe('r1');
+    expect(busy.calls).toHaveLength(3);
+    expect(waits).toEqual([2_000, 2_000]); // no Retry-After: the 2 s floor
+
+    const limited = fakeFetch([429, {}], [429, {}], [429, {}], [200, { request_id: 'late' }]);
+    expect((await submit(limited.fn).catch((e: ProviderHttpError) => e.status))).toBe(429); // given up after 3 tries
+    expect(limited.calls).toHaveLength(3);
+
+    for (const status of [500, 502, 504]) {
+      const maybeTaken = fakeFetch([status, {}], [200, { request_id: 'twice' }]);
+      expect(await submit(maybeTaken.fn).catch((e: ProviderHttpError) => e.status)).toBe(status);
+      expect(maybeTaken.calls).toHaveLength(1);
+    }
+
+    const fail = (code: string) => Object.assign(new TypeError('fetch failed'), { cause: Object.assign(new Error(code), { code }) });
+    const flaky = (code: string) => {
+      let n = 0;
+      return (async () => (n++ === 0 ? Promise.reject(fail(code)) : new Response(JSON.stringify({ request_id: 'r2' })))) as unknown as typeof fetch;
+    };
+    expect((await submit(flaky('ECONNREFUSED'))).providerJobId).toBe('r2'); // never connected: sent again
+    await expect(submit(flaky('ECONNRESET'))).rejects.toThrow('fetch failed'); // dropped mid-call: may have reached fal
+  });
 });
 
 describe('fal image status', () => {
