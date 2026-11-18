@@ -1,12 +1,15 @@
 // The S3 client for the app's own MinIO (127.0.0.1 only, so every byte goes through our routes).
 import { CopyObjectCommand, CreateBucketCommand, DeleteObjectCommand, GetObjectCommand, HeadBucketCommand, HeadObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 /** A setting from the environment, else from the repo's .env (local runs; variables already set win), or undefined. */
 function envOpt(name: string): string | undefined {
   if (!process.env[name]) {
     try {
-      process.loadEnvFile(new URL('../../../../.env', import.meta.url));
+      // A path, not new URL('…/.env', import.meta.url): Turbopack copies a file named that way into the build, under the public .next/static/media.
+      process.loadEnvFile(join(dirname(fileURLToPath(import.meta.url)), '../../../../.env'));
     } catch {
       // No .env file.
     }

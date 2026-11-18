@@ -89,8 +89,17 @@ jobs:
       - name: Test
         run: pnpm test
 
+      # Turbopack copies a file named by new URL('…', import.meta.url) into the public .next/static/media; a canary .env shows whether a build carries it.
+      - name: Canary .env
+        run: echo "CVS_ENV_CANARY=ci-canary-$GITHUB_RUN_ID" > .env
+
       - name: Build
         run: pnpm --filter @cvs/web build
         env:
           # The Typecheck step above already ran tsc.
           CVS_SKIP_BUILD_TYPECHECK: '1'
+
+      - name: No .env in the build
+        run: |
+          leaked=$(find apps/web/.next -name '.env*'; grep -rl "ci-canary-$GITHUB_RUN_ID" apps/web/.next || true)
+          if [ -n "$leaked" ]; then echo "The build carries the .env: $leaked"; exit 1; fi
