@@ -12,10 +12,13 @@ test('a member with three succeeded jobs sees the card, sends 9 with a comment, 
   const c = card(page);
   await expect(c.getByText('Bạn chấm Creative Video Studio mấy điểm?')).toBeVisible();
   await expect(c.getByRole('radio')).toHaveCount(10);
-  await expect(c.getByLabel('Điều gì sẽ giúp bạn chấm cao hơn?')).toBeHidden(); // the comment box opens with the first score
+  await expect(c.getByRole('textbox')).toBeHidden(); // the comment box opens with the first score
   await expect(c.getByRole('button', { name: 'Gửi' })).toBeDisabled();
+  // Its question follows the score: what to fix for a low one, what works for a high one.
+  await c.getByRole('radio', { name: '5 điểm', exact: true }).check();
+  await expect(c.getByLabel('Chúng tôi nên cải thiện điều gì?')).toBeVisible();
   await c.getByRole('radio', { name: '9 điểm', exact: true }).check();
-  await c.getByLabel('Điều gì sẽ giúp bạn chấm cao hơn?').fill('  Nhanh hơn tôi nghĩ  ');
+  await c.getByLabel('Bạn thích điều gì nhất?').fill('  Nhanh hơn tôi nghĩ  ');
   await c.getByRole('button', { name: 'Gửi' }).click();
   await expect(c.getByText('Cảm ơn bạn!')).toBeVisible();
   await expect(c).toBeHidden();
