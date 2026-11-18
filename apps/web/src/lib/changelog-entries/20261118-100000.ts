@@ -1,0 +1,3 @@
+import type { ChangeEntry } from '../changelog';
+
+export default { at: '2026-11-18T10:00:00+07:00', kind: 'fixed', title: 'Ảnh đính kèm hiện lại trong trang chi tiết góp ý', details: ['Ảnh gửi kèm một góp ý hiện lại trong trang chi tiết của góp ý đó (trước đây chỉ hiện ô ảnh hỏng); bấm vào ảnh vẫn mở ảnh gốc.', 'Nhãn "Báo lỗi", "Mới" và "Có cập nhật mới" có màu đậm hơn, dễ đọc ở cả giao diện sáng và tối.', 'Trên điện thoại, "Về danh sách", "Gửi bình luận", và với Admin là "Xem trước", "Sao chép Markdown", đều nhận chạm rộng ít nhất 44 px.'], prs: [520], audience: 'all' } satisfies ChangeEntry;
