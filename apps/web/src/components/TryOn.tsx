@@ -4,6 +4,7 @@
 import { useEffect, useId, useState } from 'react';
 import { api, errorText, thumbUrl } from '@/lib/api';
 import { basePrompt, promptTooLong } from '@/lib/prompt-limit';
+import { tryOnSlots } from '@/lib/reuse';
 import { confirmRun, sendRun } from '@/lib/run-guard';
 import { tryOnPrompt } from '@/lib/try-on-prompt';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
@@ -90,17 +91,17 @@ export function TryOn({ reuse }: { reuse?: string }) {
     if (s.resolution) pick.setResolution(s.resolution);
   });
 
-  // Reuse: the person first, then the garments (their count is kept on the job), then the background.
+  // Reuse: the person first, then the garments (their count is kept on the job), then the background; a deleted photo leaves its slot empty.
   const recreate = useReuse(
     reuse,
     'try_on',
     (j) => {
       recall.touch();
       if (j.images) {
-        const n = j.garments ?? j.images.length - 1;
-        setPerson(j.images.slice(0, 1));
-        setGarments(j.images.slice(1, 1 + n));
-        setBackground(j.images.slice(1 + n, 2 + n));
+        const slots = tryOnSlots(j.inputIds, j.images, j.garments);
+        setPerson(slots.person);
+        setGarments(slots.garments);
+        setBackground(slots.background);
       }
       setPose(j.pose ?? null);
       setPrompt(j.brief ?? '');

@@ -45,6 +45,7 @@ const READERS: Record<string, string[]> = {
   storeLost: ['components/CreateForm.tsx', 'components/ImageGeneration.tsx', 'components/MarketingStudio.tsx'], // says the store is hidden
   images: ['components/image-tools.tsx', 'components/CreateForm.tsx', 'components/MarketingStudio.tsx', 'components/TryOn.tsx'],
   inputCount: ['lib/reuse.ts'], // says how many images no longer exist
+  inputIds: ['components/TryOn.tsx', 'components/AppPage.tsx', 'components/MarketingStudio.tsx'], // keeps each image in its own slot when one before it is gone
   endFrame: ['components/CreateForm.tsx', 'components/MarketingStudio.tsx'],
   videoRef: ['components/MarketingStudio.tsx'],
   clips: ['components/CreateForm.tsx'],

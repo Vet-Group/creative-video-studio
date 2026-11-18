@@ -7,7 +7,7 @@ import { type CSSProperties, type ReactNode, useEffect, useId, useRef, useState 
 import { api, errorText, sendJson } from '@/lib/api';
 import { type AppConfig, appInputs, appReason, type AppCategory, DEFAULT_VIEWS, motionReason, runTotal, slotMax, splitImages, stockGroups, VIEW_LABELS, visibleApps } from '@/lib/apps';
 import { basePrompt, promptTooLong } from '@/lib/prompt-limit';
-import { type Skipped, skippedNote } from '@/lib/reuse';
+import { alignInputs, type Skipped, skippedNote } from '@/lib/reuse';
 import { confirmRun, sendRun } from '@/lib/run-guard';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { useRecall } from '@/lib/use-recall';
@@ -149,10 +149,11 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
     app.feature,
     (j) => {
       recall.touch();
-      // Photos beyond the app's slots have no place on the form.
-      const slots = j.images ? splitImages(app, j.images) : null;
-      if (slots) setImages(slots);
-      const extra = j.images && slots ? j.images.length - slots.flat().length : 0;
+      // Photos beyond the app's slots have no place on the form; a deleted one leaves its slot empty.
+      const slots = j.images ? splitImages(app, alignInputs(j.inputIds, j.images)) : null;
+      const placed = slots?.map((s) => s.filter((i) => i !== null));
+      if (placed) setImages(placed);
+      const extra = j.images && placed ? j.images.length - placed.flat().length : 0;
       setPrompt(j.brief ?? '');
       if (j.view) setViews([j.view]);
       pick.refill({ ...j, ...(extra > 0 && { extra: { count: extra, max: slots!.flat().length } }) });

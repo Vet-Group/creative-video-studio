@@ -12,7 +12,7 @@ import { GALLERY_SAMPLES, numberedSamples } from '@/lib/examples';
 import { cardTitleOfFormat, HOOKS, LOCATIONS } from '@/lib/marketing';
 import { PRODUCT_TYPES } from '@/lib/product-types';
 import { activeFilterChips, activeFilters, type ChipKey, dayHeadings, filtersFromParams, type LibraryFilters, type LibraryView, libraryQuery, matchesVerdict, mergeFresh, NO_FILTERS, NO_STORE, readView, saveView, type VerdictFilter } from '@/lib/library-view';
-import { reuseHref } from '@/lib/reuse';
+import { alignInputs, reuseHref } from '@/lib/reuse';
 import { SWIPE_START_PX, swipeStep } from '@/lib/swipe';
 import { useSamples } from '@/lib/use-samples';
 import { CompareSlider } from './CompareSlider';
@@ -416,8 +416,10 @@ interface ClipInputs {
   hook: string | null;
   location: string | null;
   images: { id: string; filename: string }[];
+  /** The job's input ids in the order sent, a deleted one's too (alignInputs). */
+  inputIds: string[];
 }
-const NO_INPUTS: ClipInputs = { prompt: null, presetId: null, enhance: null, enhancedPrompt: null, audio: null, brief: null, script: null, hookText: null, ending: null, endText: null, format: null, hook: null, location: null, images: [] };
+const NO_INPUTS: ClipInputs = { prompt: null, presetId: null, enhance: null, enhancedPrompt: null, audio: null, brief: null, script: null, hookText: null, ending: null, endText: null, format: null, hook: null, location: null, images: [], inputIds: [] };
 
 /** The preset and image style names, read once per page load for the detail view's template row; a failed read is tried again next time. */
 let presetNames: Promise<Map<string, string> | null> | null = null;
@@ -487,8 +489,8 @@ export function ClipDetail({ clips, index, stores, admin, onIndex, onChange, onU
   const title = clip.feature === 'marketing' ? cardTitleOfFormat(job?.format) : featureLabel(clip.feature);
   const copyText = own ?? job?.brief ?? job?.prompt ?? null;
   const mark = verdictText(clip.verdict);
-  // Try On's first input is the person: the original the result is compared with.
-  const original = clip.feature === 'try_on' && image ? job?.images[0] : undefined;
+  // Try On's first input is the person: the original the result is compared with (none once it is deleted).
+  const original = clip.feature === 'try_on' && image && job ? alignInputs(job.inputIds, job.images)[0] : undefined;
 
   async function act(what: () => Promise<unknown>, fail: string) {
     setNote('');

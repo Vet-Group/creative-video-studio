@@ -20,7 +20,7 @@ import { useRecall } from '@/lib/use-recall';
 import { useDraftState } from '@/lib/use-draft';
 import { useSamples } from '@/lib/use-samples';
 import { cardSample } from '@/lib/examples';
-import { asExample, dropRefillQuery, lostInputs, nothingNote, nothingRefilled, queryOf, skippedNote } from '@/lib/reuse';
+import { alignInputs, asExample, dropRefillQuery, lostInputs, nothingNote, nothingRefilled, queryOf, skippedNote } from '@/lib/reuse';
 import { About } from './About';
 import { AudioSwitch } from './AudioSwitch';
 import { BrandPicker } from './BrandKit';
@@ -104,6 +104,8 @@ interface MarketingJob {
   images: (Img | { sample: string })[];
   /** How many input images the job had (not a sample's or a template's). */
   inputCount?: number;
+  /** The job's input ids in the order sent, a deleted one's too (alignInputs). */
+  inputIds?: string[];
   /** Whether the brand kit was added to the job, its store and whether that store is hidden since (a job's, not a template's or a sample's). */
   brand?: boolean;
   storeId?: string | null;
@@ -330,15 +332,17 @@ export function MarketingStudio({ format = 'ugc', reuse, recipe, wizardDefault =
         const copied = samples.length > 0 ? await copySamples(samples) : (j.images as Img[]);
         if (stale) return; // superseded while the photos were copied
         const inputs = source.recipe ? asExample(copied) : copied;
+        // The photos keep the places they were sent in, a deleted one leaving its role empty.
+        const placed = alignInputs(j.inputIds, inputs);
         if (advanced) setRefs(inputs);
         else if (unboxing) {
-          // The photos come in the order sent; the roles say which of them the job had.
-          const roles = j.roles?.split(',') ?? (inputs.length === 1 ? ['product'] : ['model', 'product']);
-          const photo = (role: string) => inputs.filter((_, n) => roles[n] === role).slice(0, 1);
+          // The roles say which of them the job had.
+          const roles = j.roles?.split(',') ?? (placed.length === 1 ? ['product'] : ['model', 'product']);
+          const photo = (role: string) => placed.flatMap((i, n) => (i && roles[n] === role ? [i] : [])).slice(0, 1);
           setPerson(photo('model'));
           setProduct(photo('product'));
           setPackaging(photo('packaging'));
-        } else (setPerson(inputs.slice(0, 1)), setProduct(inputs.slice(1, 2)));
+        } else (setPerson(placed.slice(0, 1).filter((i) => i !== null)), setProduct(placed.slice(1, 2).filter((i) => i !== null)));
         setEndFrame(j.endFrame ?? null);
         setVideo(advanced ? (j.videoRef ?? null) : null);
         if (review) setHighlights(j.highlights?.length ? j.highlights : ['']);
