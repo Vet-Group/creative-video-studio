@@ -48,8 +48,9 @@ test('a user changes their password in Settings: the old one stops working and t
   await expect(form.getByRole('alert')).toHaveText('Mật khẩu hiện tại không đúng.');
   await form.getByLabel('Mật khẩu hiện tại').fill(PASSWORD);
   await form.getByRole('button', { name: 'Đổi mật khẩu' }).click();
-  // After a change the form closes again and the result stays in its place.
-  await expect(settings.getByRole('status')).toHaveText('Đã đổi mật khẩu. Các thiết bị khác đã được đăng xuất.');
+  // After a change the form closes again and the result stays in its place. The sessions list reloads at the same moment and shows its own
+  // loading status, so the check names the password's status rather than taking the only one.
+  await expect(settings.getByRole('status').filter({ hasText: 'Đã đổi mật khẩu' })).toHaveText('Đã đổi mật khẩu. Các thiết bị khác đã được đăng xuất.');
   await expect(form).toBeHidden();
   await expect(disclosure).toHaveAttribute('aria-expanded', 'false');
   await expect(settings.getByRole('list', { name: 'Phiên đăng nhập' }).getByRole('listitem')).toHaveCount(1);
