@@ -25,6 +25,7 @@ export const USERS = {
   appsb: { email: 'appsb@e2e.test', name: 'E2E Apps B', role: 'member' },
   stocka: { email: 'stocka@e2e.test', name: 'E2E Stock A', role: 'member' },
   appsc: { email: 'appsc@e2e.test', name: 'E2E Apps C', role: 'member' },
+  appart: { email: 'appart@e2e.test', name: 'E2E Apps Art', role: 'member' }, // never runs an app: its History stays empty
   mkta: { email: 'mkta@e2e.test', name: 'E2E Mkt A', role: 'member' },
   mktb: { email: 'mktb@e2e.test', name: 'E2E Mkt B', role: 'member' },
   mktc: { email: 'mktc@e2e.test', name: 'E2E Mkt C', role: 'member' },

@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import AxeBuilder from '@axe-core/playwright';
 import { expect, type Page, test } from '@playwright/test';
 import { expectOptions, modelButton, png, select, selectValue, signIn } from './support.test';
 
@@ -351,6 +354,44 @@ test('an app About at 1440 reads like the live article: 24 px from the form, 56 
   expect(Math.round(second.y - (first.y + first.height))).toBe(64);
   expect(await about.locator('h3').first().evaluate((e) => getComputedStyle(e).fontWeight)).toBe('600');
   expect(await about.locator('.about-table td').first().evaluate((e) => getComputedStyle(e).borderLeftWidth)).toBe('0px');
+});
+
+test("an app's card art tops its About and fills its empty History; an app without art keeps the plain pages", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await signIn(page, 'appart');
+  // The e2e bucket holds no samples: one app gets art, as an Admin upload would give it.
+  const art = 'app-background-changer.jpg';
+  await page.route('**/api/samples', async (r) => r.fulfill({ json: { samples: [...((await (await r.fetch()).json()) as { samples: { name: string }[] }).samples, { name: art, bytes: 1 }] } }));
+  await page.route(`**/api/samples/${art}`, (r) => r.fulfill({ body: readFileSync(fileURLToPath(new URL('../public/fixtures/examples/example-1.jpg', import.meta.url))), contentType: 'image/jpeg' }));
+  const side = page.locator('.side');
+
+  await page.goto('/apps/background-changer');
+  const top = side.locator('.app-art[data-page]');
+  await expect(top.locator('img')).toHaveAttribute('src', `/api/samples/${art}`);
+  await expect(top.locator('img')).toHaveAttribute('loading', 'lazy');
+  await expect(top).toHaveAttribute('aria-hidden', 'true');
+  await expect(side.locator('> *').first()).toHaveClass(/app-art/); // the art, then the article
+  await expect(side.getByRole('heading', { level: 2 }).first()).toBeVisible();
+  await page.getByRole('tab', { name: 'Lịch sử' }).click();
+  const empty = side.locator('.library-empty');
+  await expect(empty.locator('.app-art[data-page] img')).toHaveAttribute('src', `/api/samples/${art}`);
+  await expect(empty.locator('.library-art')).toHaveCount(0); // the app's art stands in for the generic picture
+  await expect(empty.getByText('Chưa có lượt tạo nào.')).toBeVisible();
+  await expect(empty.getByRole('button', { name: 'Bắt đầu ngay' })).toBeVisible();
+  for (const scheme of ['light', 'dark'] as const) {
+    await page.emulateMedia({ colorScheme: scheme });
+    expect((await new AxeBuilder({ page }).exclude('nextjs-portal').analyze()).violations.filter((v) => v.impact === 'serious' || v.impact === 'critical').map((v) => v.id)).toEqual([]); // as e2e/a11y
+  }
+
+  // No art (the multi-angle app has only its category tile on the index): no empty box, and the generic picture stays.
+  await page.goto('/apps/multi-angle');
+  await expect(side.getByRole('heading', { level: 2 }).first()).toBeVisible();
+  await expect(page.locator('.app-art[data-page]')).toHaveCount(0);
+  await page.getByRole('tab', { name: 'Lịch sử' }).click();
+  await expect(side.locator('.library-empty .library-art')).toBeVisible();
+  await expect(side.locator('.library-empty').getByRole('button', { name: 'Bắt đầu ngay' })).toBeVisible();
+  await expect(page.locator('.app-art[data-page]')).toHaveCount(0);
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
 });
 
 test('the change-app menu returns focus to its button on Escape, closes when focus leaves it, and shows a focus ring', async ({ page }) => {

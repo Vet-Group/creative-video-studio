@@ -442,8 +442,12 @@ function HistoryCard({ job, isAdmin, select }: { job: TrayJob; isAdmin: boolean;
 
 const AdminContext = createContext(false);
 
+/** A picture an app page puts in its empty History in place of the generic one (AppHistoryArt). */
+export const HistoryArtContext = createContext<ReactNode>(null);
+
 /** The History of a page with no job yet, in the Library's empty style: its picture, what will appear here and a way to the form. On a phone the form is its own tab, which this opens first. */
 function HistoryEmpty({ feature }: { feature: string }) {
+  const art = useContext(HistoryArtContext);
   const toForm = () => {
     const form = document.querySelector<HTMLElement>('.form-card');
     if (!form) return;
@@ -453,7 +457,7 @@ function HistoryEmpty({ feature }: { feature: string }) {
   };
   return (
     <div className="library-empty">
-      <EmptyArt />
+      {art ?? <EmptyArt />}
       <p className="library-empty-title">Chưa có lượt tạo nào.</p>
       <p className="muted">Mỗi lần chạy {featureLabel(feature)}, kết quả sẽ hiện ở đây.</p>
       <p className="library-empty-actions">
