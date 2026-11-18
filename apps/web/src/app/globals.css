@@ -2842,3 +2842,7 @@ dialog.modal.compare-modal, dialog.modal.input-viewer { width: min(760px, calc(1
 .admin .rating-comments li { display: grid; gap: 2px; padding: 10px 0; border-top: 1px solid var(--hairline); }
 .admin .rating-comments li:first-child { border-top: 0; }
 .admin .rating-comments p { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+
+/* An app's card art on its own page: above its About text and in its empty History. The box keeps the card's ratio, so the picture loading moves nothing. */
+.app-art[data-page] { width: 100%; max-width: 440px; margin: 0 auto 24px; aspect-ratio: 331 / 320; border-radius: 14px; }
+.library-empty .app-art[data-page] { max-width: 280px; margin: 0 0 12px; }

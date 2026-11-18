@@ -10,7 +10,7 @@ import { MAX_NAME } from '@/lib/fashion-models';
 import { promptTooLong } from '@/lib/prompt-limit';
 import { confirmRun } from '@/lib/run-guard';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
-import { AppAbout, AppHeader, TAB_LABEL, type Tab } from './AppPage';
+import { AppAbout, AppHeader, AppHistoryArt, TAB_LABEL, type Tab } from './AppPage';
 import s from './FashionModelApp.module.css';
 import { FashionModelList } from './FashionModelList';
 import { FormNotice, nearestOption, useImageChoice, useImageModels, WorkTabs } from './image-tools';
@@ -237,7 +237,9 @@ export function FashionModelApp({ app, isAdmin }: { app: AppConfig; isAdmin: boo
         <div className="side" id={`app-panel-${panel}`} role="tabpanel" aria-labelledby={`app-tab-${panel}`} hidden={narrow && shown === 'create'}>
           {shown === 'history' && (
             <FormContext.Provider value={{ recreate: () => undefined, saveModel: (assetId, jobTraits) => (setSaveError(''), setSaving({ assetId, name: savedName(jobTraits), shared: false })) }}>
-              <Tray feature={app.feature} />
+              <AppHistoryArt app={app}>
+                <Tray feature={app.feature} />
+              </AppHistoryArt>
             </FormContext.Provider>
           )}
           {shown === 'models' && <FashionModelList version={version} isAdmin={isAdmin} change={() => setVersion((v) => v + 1)} />}

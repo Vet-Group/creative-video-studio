@@ -3,7 +3,7 @@
 // (laid out like Try On). An app that is not built yet shows why instead of the form.
 import { FEATURE_PROMPTS, PRODUCT_VIEWS } from '@cvs/core/models';
 import Link from 'next/link';
-import { type CSSProperties, useEffect, useId, useRef, useState } from 'react';
+import { type CSSProperties, type ReactNode, useEffect, useId, useRef, useState } from 'react';
 import { api, errorText, sendJson } from '@/lib/api';
 import { type AppConfig, appInputs, appReason, type AppCategory, DEFAULT_VIEWS, motionReason, runTotal, slotMax, splitImages, stockGroups, VIEW_LABELS, visibleApps } from '@/lib/apps';
 import { basePrompt, promptTooLong } from '@/lib/prompt-limit';
@@ -23,7 +23,7 @@ import { PromptComposer } from './PromptComposer';
 import { PromptPreview } from './PromptSections';
 import { ReferenceVideoSlot } from './ReferenceVideo';
 import { Select } from './Select';
-import { Tray } from './Shell';
+import { HistoryArtContext, Tray } from './Shell';
 import { useSmartRemakeEnabled } from './SmartRemakeGate';
 import { Templates } from './Templates';
 
@@ -32,13 +32,21 @@ export const TAB_LABEL: Record<Tab, string> = { create: 'Tạo', history: 'Lịc
 const CATEGORY_ICON: Record<AppCategory, IconName> = { fashion: 'tryon', photo: 'image', video: 'create', utility: 'library' };
 
 /** The picture of an app on a card and in the page header: its sample loop or still, else a tinted tile with the icon of its category. The loop plays under reduced motion too, as on the reference site's Apps pages. */
-export function AppArt({ app }: { app: AppConfig }) {
+export function AppArt({ app, page }: { app: AppConfig; page?: boolean }) {
   const media = cardSample(useSamples(), `app-${app.slug}`);
+  const has = Boolean(media.video || media.poster);
+  if (page && !has) return null; // on its own page an app with no art shows nothing rather than a bare tile
   return (
-    <span className="app-art" data-category={app.category} aria-hidden="true">
-      {media.video || media.poster ? <CardMedia {...media} /> : <Icon name={CATEGORY_ICON[app.category]} size={36} />}
+    <span className="app-art" data-category={app.category} data-page={page || undefined} aria-hidden="true">
+      {has ? <CardMedia {...media} /> : <Icon name={CATEGORY_ICON[app.category]} size={36} />}
     </span>
   );
+}
+
+/** Puts the app's art in the empty History of the page below it, in place of the generic picture; an app with no art keeps that picture. */
+export function AppHistoryArt({ app, children }: { app: AppConfig; children: ReactNode }) {
+  const media = cardSample(useSamples(), `app-${app.slug}`);
+  return <HistoryArtContext.Provider value={media.video || media.poster ? <AppArt app={app} page /> : null}>{children}</HistoryArtContext.Provider>;
 }
 
 /** The change-app button of the header card and the list of apps it opens. */
@@ -373,7 +381,7 @@ function Soon({ app, text }: { app: AppConfig; text: string }) {
 
 export function AppPage({ app, reuse }: { app: AppConfig; reuse?: string }) {
   if (app.soon) return <Soon app={app} text={app.soon} />;
-  return app.feature === 'motion_control' ? <MotionForm app={app} reuse={reuse} /> : <AppForm app={app} reuse={reuse} />;
+  return <AppHistoryArt app={app}>{app.feature === 'motion_control' ? <MotionForm app={app} reuse={reuse} /> : <AppForm app={app} reuse={reuse} />}</AppHistoryArt>;
 }
 
 /** An uploaded reference video and its length. */
@@ -586,5 +594,10 @@ function MotionForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
 }
 
 export function AppAbout({ app }: { app: AppConfig }) {
-  return <About app={app.slug} long />;
+  return (
+    <>
+      <AppArt app={app} page />
+      <About app={app.slug} long />
+    </>
+  );
 }
