@@ -2468,17 +2468,6 @@ dialog.modal.tool-guide { width: min(52rem, calc(100vw - 2rem)); }
 /* The bottom space is a margin: a padding sits inside the clamped box and showed the top of a fourth line. */
 .explore-tool-text { display: -webkit-box; margin-bottom: 12px; padding: 0 12px; overflow: hidden; font-size: 12px; line-height: 17px; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
 
-/* Explore's first-visit card: three steps, closed for good with its button. */
-.welcome { position: relative; margin: 16px 0 0; padding: 16px 48px 16px 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--fill); }
-:is(.welcome, .welcome-pending) + .explore-first { display: none; } /* the card says it already; the line returns once the card is closed */
-.welcome h2 { margin: 0 0 8px; color: var(--ink-strong); font-size: 15px; line-height: 22px; font-weight: 600; }
-.welcome ol { display: grid; gap: 6px; margin: 0; padding-left: 20px; color: var(--text-2); font-size: 14px; line-height: 21px; }
-.welcome strong { color: var(--ink); font-weight: 600; }
-.welcome a, .welcome .link-button { color: var(--ink-strong); font-weight: 500; text-decoration: underline; text-underline-offset: 3px; }
-.welcome .link-button .icon { display: none; }
-.welcome-close { position: absolute; top: 8px; right: 8px; display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 8px; background: none; color: var(--text-muted); }
-.welcome-close:hover { background: var(--surface); color: var(--ink); }
-@media (pointer: coarse) { .welcome-close { width: 44px; height: 44px; top: 2px; right: 2px; } }
 
 /* Image Generation's style chip (StylePicker.tsx): the chosen style's example picture (or an icon until an editor uploads one) and its name. */
 .style-pill img { flex: none; width: 20px; height: 20px; border-radius: 4px; object-fit: cover; }
@@ -2858,3 +2847,41 @@ dialog.modal.compare-modal, dialog.modal.input-viewer { width: min(760px, calc(1
 /* An app's card art on its own page: above its About text and in its empty History. The box keeps the card's ratio, so the picture loading moves nothing. */
 .app-art[data-page] { width: 100%; max-width: 440px; margin: 0 auto 24px; aspect-ratio: 331 / 320; border-radius: 14px; }
 .library-empty .app-art[data-page] { max-width: 280px; margin: 0 0 12px; }
+
+/* Explore's hero strip and first-visit cards (hero media, welcome pictures). */
+.explore-hero:has(~ :is(.welcome, .welcome-pending)) .explore-first { display: none; } /* the card says it already; the line returns once the card is closed */
+.explore-strip { margin: 8px 0 0; overflow: hidden; border-radius: 14px; -webkit-mask-image: linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent); mask-image: linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent); }
+.explore-strip-track { display: flex; width: max-content; }
+.explore-strip-track > li { flex: none; width: 132px; height: 165px; margin-right: 12px; overflow: hidden; border-radius: 10px; background: var(--fill); }
+.explore-strip-track img { display: block; width: 100%; height: 100%; object-fit: cover; }
+@media (max-width: 480px) { .explore-strip-track > li { width: 96px; height: 120px; } }
+@media (prefers-reduced-motion: no-preference) {
+  .explore-strip-track { animation: explore-strip 90s linear infinite; will-change: transform; }
+  .explore-strip:is(:hover, :focus-within, [data-paused]) .explore-strip-track { animation-play-state: paused; }
+}
+@keyframes explore-strip { to { transform: translateX(-50%); } }
+/* Reduced motion: one still mosaic of two rows, without the looped copy. */
+@media (prefers-reduced-motion: reduce) {
+  .explore-strip { max-height: 342px; }
+  .explore-strip-track { flex-wrap: wrap; width: auto; row-gap: 12px; }
+  .explore-strip-track > li[data-copy] { display: none; }
+}
+@media (prefers-reduced-motion: reduce) and (max-width: 480px) { .explore-strip { max-height: 264px; } }
+.welcome { position: relative; margin: 24px 0 0; padding: 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--fill); }
+.welcome h2 { margin: 0 48px 12px 0; color: var(--ink-strong); font-size: 15px; line-height: 22px; font-weight: 600; }
+.welcome-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; counter-reset: step; }
+.welcome-steps > li { display: grid; grid-template-rows: auto 1fr; overflow: hidden; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); counter-increment: step; }
+.welcome-pic { position: relative; display: block; aspect-ratio: 16 / 10; overflow: hidden; background: var(--fill); }
+.welcome-pic img, .welcome-pic video, .welcome-pic .banner-empty { display: block; width: 100%; height: 100%; object-fit: cover; }
+.welcome-pic::after { content: counter(step); position: absolute; top: 8px; left: 8px; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--brand); color: var(--on-dark); font-size: 13px; line-height: 1; font-weight: 600; }
+.welcome-text { padding: 12px; color: var(--text-2); font-size: 14px; line-height: 21px; }
+.welcome strong { color: var(--ink); font-weight: 600; }
+.welcome-text a, .welcome .link-button { color: var(--ink-strong); font-weight: 500; text-decoration: underline; text-underline-offset: 3px; }
+.welcome .link-button .icon { display: none; }
+.welcome-try { display: inline-flex; align-items: center; min-height: 40px; margin-top: 12px; padding: 0 16px; border-radius: 8px; background: var(--brand); color: var(--on-dark); font-size: 14px; font-weight: 500; text-decoration: none; }
+.welcome-try:hover { background: var(--brand-hover); }
+.welcome-close { position: absolute; top: 8px; right: 8px; display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 8px; background: none; color: var(--text-muted); }
+.welcome-close:hover { background: var(--surface); color: var(--ink); }
+@media (pointer: coarse) { .welcome-close { width: 44px; height: 44px; top: 2px; right: 2px; } .welcome-try { min-height: 44px; } }
+@media (max-width: 800px) { .welcome-steps { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 480px) { .welcome-try { display: flex; justify-content: center; min-height: 44px; } .welcome-text :is(a, .link-button) { display: flex; align-items: center; width: fit-content; min-height: 44px; } }

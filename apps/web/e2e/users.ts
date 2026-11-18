@@ -97,6 +97,10 @@ export const USERS = {
   setb: { email: 'setb@e2e.test', name: 'E2E Settings B', role: 'member' },
   explorea: { email: 'explorea@e2e.test', name: 'E2E Explore Lan', role: 'member' }, // explore.e2e: the greeting by given name and the Continue strip
   exploreb: { email: 'exploreb@e2e.test', name: 'E2E Explore Minh', role: 'member' }, // explore.e2e: a running job's elapsed time keeps counting
+  // explore.e2e: the day line over two kinds of job, the first-visit cards, and the hero strip of Examples.
+  exploremix: { email: 'exploremix@e2e.test', name: 'E2E Explore Mix', role: 'member' },
+  explorenew: { email: 'explorenew@e2e.test', name: 'E2E Explore New', role: 'member' },
+  explorestrip: { email: 'explorestrip@e2e.test', name: 'E2E Explore Strip', role: 'member' },
   libv: { email: 'libv@e2e.test', name: 'E2E Library View', role: 'member' }, // library.e2e: grid or list, the selection bar, search and the empty states
   // library.e2e: libra marks from the detail view and in bulk, librb owns the item libra may read but not mark.
   libra: { email: 'libra@e2e.test', name: 'E2E Library Recipe A', role: 'member' },

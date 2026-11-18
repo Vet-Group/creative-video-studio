@@ -1,0 +1,3 @@
+import type { ChangeEntry } from '../changelog';
+
+export default { at: '2026-11-18T17:30:00+07:00', kind: 'improved', title: 'Trang Khám phá có dải kết quả của công ty, số liệu hôm nay đủ ảnh và clip, và hướng dẫn đầu tiên có hình', details: ['Dưới lời chào có một dải chậm các kết quả đang ở tab Ví dụ của công ty; dải dừng khi bạn rê chuột vào hoặc cuộn ra khỏi màn hình, và đứng yên nếu máy bật giảm chuyển động.', 'Dòng “Hôm nay” giờ đếm cả ảnh lẫn clip bạn đã tạo, ví dụ “Hôm nay: 3 ảnh · 1 clip”.', 'Thẻ hướng dẫn cho người mới có ba bước kèm hình, và nút “Thử ngay với ảnh mẫu” mở Thử đồ.'], prs: [], audience: 'all' } satisfies ChangeEntry;

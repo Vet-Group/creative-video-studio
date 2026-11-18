@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { CardMedia } from '@/components/CardMedia';
 import { ExploreJobNote } from '@/components/ExploreJobNote';
+import { ExploreStrip } from '@/components/ExploreStrip';
 import { Icon, type IconName } from '@/components/Icon';
 import { KindChip } from '@/components/KindChip';
 import { ToolGuideButton } from '@/components/ToolGuide';
@@ -10,13 +11,12 @@ import { Welcome } from '@/components/Welcome';
 import { MODEL_CARD_TEXT } from '@/lib/about-content';
 import { thumbUrl } from '@/lib/api';
 import { pool } from '@/lib/auth';
-import { NO_CAP } from '@/lib/caps';
 import { CHANGELOG } from '@/lib/changelog';
 import { visibleEntries } from '@/lib/changelog-seen';
-import { bestClips } from '@/lib/clips';
+import { bestClips, EXAMPLE_ORDER, LIVE_CLIP } from '@/lib/clips';
 import { currentUser } from '@/lib/current-user';
 import { cardSample, EXAMPLES, exampleForPreset, sampleSrc } from '@/lib/examples';
-import { continueJobs, greeting, isRunning, jobNote } from '@/lib/explore';
+import { continueJobs, greeting, isRunning, jobNote, todayStat } from '@/lib/explore';
 import { featureLabel } from '@/lib/features';
 import { MIN_MARKS } from '@/lib/model-marks';
 import { modelStats, rank, scoreOf } from '@/lib/model-scores';
@@ -72,7 +72,7 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
   const user = await currentUser();
   if (user?.mustChangePassword) redirect('/account/password');
   const now = new Date();
-  const [models, presets, samples, videoStats, imageStats, clips, jobs, today] = await Promise.all([
+  const [models, presets, samples, videoStats, imageStats, clips, jobs, today, made, stripRows] = await Promise.all([
     // Video models open Create Videos and image models open Image Generation, as the live page features both.
     pool.query<{ id: string; label: string; provider: string; kind: string; ratios: string[]; durations_sec: number[]; usd_per_second: string | null; image_prices: Record<string, string> | null; twin_of: string | null }>(
       `select id, label, provider, kind, ratios, durations_sec, usd_per_second, image_prices, twin_of from model_configs where enabled and kind = any(features) and kind in ('video', 'image') order by kind desc, label, id`,
@@ -91,13 +91,25 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
       [user?.id],
     ),
     dailyClips(pool, user?.id ?? ''),
+    // What the member made today, by kind: a video-output feature is a clip, every other one an image (the daily clip cap counts only video and marketing, in dailyClips).
+    pool.query<{ clips: number; images: number }>(
+      `select (count(*) filter (where feature in ('video', 'marketing', 'motion_control')))::int as clips, (count(*) filter (where feature not in ('video', 'marketing', 'motion_control')))::int as images
+         from jobs where user_id = $1 and deleted_at is null and status in ('queued', 'submitting', 'running', 'succeeded')
+          and (created_at at time zone 'Asia/Ho_Chi_Minh')::date = (now() at time zone 'Asia/Ho_Chi_Minh')::date`,
+      [user?.id],
+    ),
+    // The hero strip: only results an Admin put on the Examples tabs, which every member sees there; never a member's other outputs.
+    pool.query<{ id: string }>(
+      `select coalesce(j.poster_asset_id, j.output_asset_id) as id from examples e join jobs j on j.id = e.job_id join assets o on o.id = j.output_asset_id
+        where ${LIVE_CLIP} and (j.poster_asset_id is not null or o.mime like 'image/%') order by ${EXAMPLE_ORDER} limit 12`,
+    ),
   ]);
   // One model of each duplicate pair (lib/model-twins.ts); fal's balance lock is not read here, as the cards name no price to lock.
   const offered = await onePerPair(pool, models.rows);
   const news = visibleEntries(CHANGELOG, user?.role === 'admin').slice(0, 3);
   const running = jobs.rows.filter(isRunning).length;
   const recent = continueJobs(jobs.rows);
-  const status = [running > 0 && `${running} lượt tạo đang chạy`, today.cap >= NO_CAP ? `Hôm nay bạn đã tạo ${today.today} clip video` : `Hôm nay bạn còn ${Math.max(0, today.cap - today.today)}/${today.cap} clip video`].filter(Boolean).join(' · ');
+  const status = [running > 0 && `${running} lượt tạo đang chạy`, todayStat(made.rows[0] ?? { clips: 0, images: 0 }, today)].filter(Boolean).join(' · ');
   /** A recent job's picture: its poster (a clip's first frame, an image's preview), else an image job's result, else the first photo it was given (a running or failed job). */
   const jobPicture = (j: (typeof recent)[number]) => {
     const done = j.status === 'succeeded' ? (j.poster_asset_id ?? (j.resolution ? j.output_asset_id : null)) : null;
@@ -145,9 +157,10 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
         </p>
         <h1>{greeting(user?.name, now)}</h1>
         <p className="explore-status">{status}</p>
-        {recent.length === 0 && <Welcome />}
         {recent.length === 0 && <p className="muted explore-first">Bạn chưa tạo clip hay ảnh nào. Chọn một công cụ bên dưới: tải ảnh sản phẩm lên, chọn mẫu và nhận kết quả sau vài phút.</p>}
       </header>
+      {stripRows.rows.length > 0 && <ExploreStrip ids={stripRows.rows.map((r) => r.id)} />}
+      {recent.length === 0 && <Welcome pictures={[FEATURES[0]!, FEATURES[1]!, FEATURES[5]!].map((f) => cardSample(have, f.sample, f.poster))} />}
 
       {recent.length > 0 && (
         <section aria-labelledby="explore-continue">

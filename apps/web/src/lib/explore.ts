@@ -1,5 +1,6 @@
 // The personal part of Explore: the greeting and the jobs to continue. Times are Vietnam time, as the server renders them.
 import { CANCELED_ERROR } from '@cvs/core/ledger';
+import { NO_CAP } from './caps';
 
 const FINISHED = ['succeeded', 'failed', 'failed_unknown', 'timed_out'];
 
@@ -95,4 +96,12 @@ export function jobNote(j: { status: string; error: string | null; created_at: D
   }
   if (j.status === 'succeeded') return done(j.finished_at ?? j.created_at);
   return j.error === CANCELED_ERROR ? 'Đã huỷ' : 'Không thành công';
+}
+
+/** The hero's day line: what the member made today across kinds ("Hôm nay: 3 ảnh · 1 clip"); a member with a daily clip cap keeps the clips-left wording, then their images. */
+export function todayStat(made: { clips: number; images: number }, cap: { today: number; cap: number }): string {
+  const images = made.images > 0 ? ` · ${made.images} ảnh` : '';
+  if (cap.cap < NO_CAP) return `Hôm nay bạn còn ${Math.max(0, cap.cap - cap.today)}/${cap.cap} clip video${images}`;
+  const parts = [made.images > 0 && `${made.images} ảnh`, made.clips > 0 && `${made.clips} clip`].filter(Boolean);
+  return parts.length > 0 ? `Hôm nay: ${parts.join(' · ')}` : 'Hôm nay bạn chưa tạo ảnh hay clip nào';
 }
