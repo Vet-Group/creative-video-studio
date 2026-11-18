@@ -253,6 +253,7 @@ test('Library detail: how an item was made for anyone, marks by keyboard, ←/�
   await detail.getByRole('button', { name: 'Về kết quả' }).click();
   await expect(input).toHaveAttribute('aria-pressed', 'false');
   await expect(detail.locator('.lightbox-media video')).toHaveCount(1);
+  await expect(detail.locator('.lightbox-media video')).toHaveJSProperty('loop', true); // a short clip plays on, as on the grid
   // By keyboard: Enter shows the photo, Về kết quả takes focus with a white ring on the dark picture, and Enter puts focus back on the photo.
   await input.focus();
   await page.keyboard.press('Enter');
@@ -317,6 +318,31 @@ test('Library detail: how an item was made for anyone, marks by keyboard, ←/�
   // Leave nothing behind for the other specs that read the shared Library.
   for (const id of [newer, older]) expect((await page.request.delete(`/api/jobs/${id}`)).ok()).toBe(true);
   expect((await other.request.delete(`/api/jobs/${theirs}`)).ok()).toBe(true);
+});
+
+test('the Library detail fetches its image neighbours’ large previews ahead, so an arrow shows the next picture at once', async ({ page }) => {
+  await signIn(page, 'librp');
+  const image = async (prompt: string) => {
+    const res = await page.request.post('/api/jobs', { data: { feature: 'image', modelId: 'mock-image-e2e', assetIds: [], ratio: '1:1', prompt, enhance: false, params: { resolution: '1K' } } });
+    expect(res.status()).toBe(201);
+    return ((await res.json()) as { id: string }).id;
+  };
+  const older = await image('a neighbour picture');
+  const newer = await image('the open picture');
+  const mine = async () => ((await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { id: string; status: string; outputAssetId: string }[] }).jobs.filter((j) => j.id === older || j.id === newer);
+  try {
+    await expect.poll(async () => (await mine()).filter((j) => j.status === 'succeeded').length, { timeout: 60_000 }).toBe(2);
+    const neighbour = (await mine()).find((j) => j.id === older)!.outputAssetId;
+    await page.goto('/library');
+    await page.getByLabel('Người tạo').selectOption({ label: 'E2E Library Prefetch' });
+    await expect(page.getByRole('article')).toHaveCount(2);
+    const ahead = page.waitForRequest((r) => r.url().endsWith(`/api/assets/${neighbour}/thumb?w=1600`));
+    await page.locator(`article[data-clip-id="${newer}"]`).getByRole('button', { name: 'Xem chi tiết' }).click();
+    await expect(page.getByRole('dialog').getByText('the open picture', { exact: true })).toBeVisible();
+    await ahead; // asked for while the newer picture is open, before any arrow
+  } finally {
+    for (const id of [older, newer]) expect((await page.request.delete(`/api/jobs/${id}`)).ok()).toBe(true);
+  }
 });
 
 test('a failed Library read says so, and Thử lại loads it without a page reload', async ({ page }) => {

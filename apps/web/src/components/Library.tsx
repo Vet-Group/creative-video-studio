@@ -462,6 +462,10 @@ export function ClipDetail({ clips, index, stores, admin, onIndex, onChange, onU
     api<ClipInputs>(`/api/jobs/${clip.id}`).then(setJob, () => setJob(NO_INPUTS));
   }, [clip.id]);
   useEffect(() => void loadPresetNames().then(setPresets), []);
+  // The grid holds small thumbnails only, so the image neighbours' large previews are fetched ahead and an arrow or a swipe shows them at once.
+  useEffect(() => {
+    for (const n of [clips[index - 1], clips[index + 1]]) if (n?.mediaType === 'image') new Image().src = thumbUrl(n.videoAssetId, PREVIEW_W);
+  }, [clips, index]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey || e.altKey || typing(e.target) || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
@@ -596,7 +600,7 @@ export function ClipDetail({ clips, index, stores, admin, onIndex, onChange, onU
         ) : image ? (
           <img ref={media} src={full === clip.videoAssetId ? content(clip.videoAssetId) : thumbUrl(clip.videoAssetId, PREVIEW_W)} alt={clip.downloadName} />
         ) : (
-          <video key={clip.id} ref={media} controls autoPlay muted playsInline poster={clip.posterAssetId ? thumbUrl(clip.posterAssetId) : undefined} src={content(clip.videoAssetId)} />
+          <video key={clip.id} ref={media} controls autoPlay muted loop playsInline poster={clip.posterAssetId ? thumbUrl(clip.posterAssetId) : undefined} src={content(clip.videoAssetId)} />
         )}
       </div>
       <div className="lightbox-side">
