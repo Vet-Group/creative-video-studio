@@ -48,7 +48,7 @@ describe('PROMPT_TEMPLATES ids', () => {
 
 describe('PROMPT_TEMPLATES across pages', () => {
   it('names the templates of each Marketing Studio format and never offers one template on two pages', () => {
-    expect(PROMPT_TEMPLATES.marketing.map((t) => t.name)).toEqual(['Trước / sau', 'Cận chất liệu', 'Phối đồ', 'Quay bằng điện thoại', 'Dừng lướt', 'Phản ứng bất ngờ']);
+    expect(PROMPT_TEMPLATES.marketing.map((t) => t.name)).toEqual(['Trước / sau', 'Cận chất liệu', 'Phối đồ', 'Quay bằng điện thoại', 'Dừng lướt', 'Phản ứng bất ngờ', 'Chỉ là cái hoodie']);
     expect(PROMPT_TEMPLATES.advanced.map((t) => t.name)).toEqual(['Giới thiệu nhanh', 'Một ngày cùng sản phẩm', 'Vấn đề và giải pháp', 'Phim quảng cáo ngắn', 'Món quà', 'Dạo phố']);
     expect(PROMPT_TEMPLATES.unboxing.map((t) => t.name)).toEqual(['Hộp quà', 'POV tay', 'Mở nhanh ASMR', 'Hàng vừa giao', 'Nhiều đơn một lần', 'Tối giản']);
     expect(PROMPT_TEMPLATES.review.map((t) => t.name)).toEqual(['Review thật', 'Ưu và nhược', 'Mặc cả ngày', 'Trả lời bình luận', 'So với đồ cũ', 'Thử size']);

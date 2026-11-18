@@ -1,0 +1,3 @@
+import type { ChangeEntry } from '../changelog';
+
+export default { at: '2026-11-18T12:10:00+07:00', kind: 'new', title: 'Hoodie mặt nạ khoá kéo: loại sản phẩm mới và mẫu prompt cho nó', details: ['Tab Ví dụ lọc được theo loại sản phẩm mới "Hoodie mặt nạ khoá kéo".', 'Tạo video có mẫu "Kéo khoá thành mặt nạ", Marketing Studio (UGC) có mẫu "Chỉ là cái hoodie" theo trend TikTok: trùm mũ, kéo khoá lên mặt.', 'Tạo ảnh có thêm gợi ý "Sân vận động đêm" và "Ảnh nhiều góc" (một ảnh đủ mặt trước, sau, hai bên, để video giữ hình in tốt hơn); Thử đồ có thêm bối cảnh "Sân vận động".'], prs: [], audience: 'all' } satisfies ChangeEntry;
