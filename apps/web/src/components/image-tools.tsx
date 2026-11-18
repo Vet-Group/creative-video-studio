@@ -17,7 +17,7 @@ import { MAX_AUDIO_BYTES, MAX_BYTES, MAX_VIDEO_BYTES, MAX_VIDEO_BYTES_R2 } from 
 import type { RefVideo } from './ReferenceVideo';
 import { AI_MODEL_SLOTS, slotOfLabel, UPLOAD_SLOTS, type UploadSlot } from '@/lib/upload-slots';
 import { type FashionModelItem, usable } from '@/lib/fashion-models';
-import { type Photo, Recreate, useForm, useFreshResults, useJobs, useRecreated } from './jobs';
+import { dropPhoto, dropRole, isPhotoDrag, type Photo, photoDrag, Recreate, useForm, useFreshResults, useJobs, useRecreated } from './jobs';
 import { Icon, type IconName } from './Icon';
 import { LoadError } from './LoadError';
 import { Modal } from './Modal';
@@ -361,9 +361,17 @@ export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRem
     setCut(files.length > room ? room : 0);
     onAdd(files.slice(0, room));
   }
+  // A photo dragged from History or the Examples goes through the page's own put (a click's), in the role this slot gives; a full slot, or one the History's photos do not go to, is no target.
+  const photoRole = room ? dropRole(slot ?? slotOfLabel(label)) : undefined;
+  function onDragOver(e: DragEvent) {
+    if (isPhotoDrag(e) && !photoRole) return;
+    e.preventDefault();
+    setOver(true);
+  }
   function onDrop(e: DragEvent) {
     e.preventDefault();
     setOver(false);
+    if (isPhotoDrag(e)) return photoRole && dropPhoto(photoRole);
     if (hydrated && !full && !busy) add([...e.dataTransfer.files]);
   }
   const labelText = (
@@ -393,7 +401,7 @@ export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRem
       ) : (
         name
       )}
-      <div ref={box} className="slot" role="group" aria-labelledby={labelId} data-room={room || undefined} data-over={over} data-one={(max === 1 && images.length === 1) || undefined} onDragOver={(e) => (e.preventDefault(), setOver(true))} onDragLeave={() => setOver(false)} onDrop={onDrop}>
+      <div ref={box} className="slot" role="group" aria-labelledby={labelId} data-room={room || undefined} data-over={over} data-one={(max === 1 && images.length === 1) || undefined} onDragOver={onDragOver} onDragLeave={() => setOver(false)} onDrop={onDrop}>
         <input
           ref={input}
           type="file"
@@ -969,7 +977,7 @@ export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4
                   ) : (
                     // A picture opens in place as a clip does, with its details when it has a file.
                     <a href={`/api/samples/${it}`} aria-label={detailed.includes(it) ? 'Xem chi tiết ảnh mẫu' : 'Xem ảnh mẫu'} onClick={(e) => (e.preventDefault(), setOpen(sampleTiles.indexOf(it)))}>
-                      <TileImg src={`/api/samples/${it}`} alt={`Ảnh mẫu ${sampleTiles.indexOf(it) + 1}`} loading="lazy" />
+                      <TileImg src={`/api/samples/${it}`} alt={`Ảnh mẫu ${sampleTiles.indexOf(it) + 1}`} loading="lazy" {...photoDrag(form?.result && form.photo ? (to) => form.photo!({ sample: it }, to) : undefined)} />
                     </a>
                   )}
                   {detailed.includes(it) && <SampleActions name={it} />}

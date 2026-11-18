@@ -25,7 +25,7 @@ import { ENHANCE_NOTE, EnhanceToggle } from './EnhanceToggle';
 import { Icon } from './Icon';
 import { LoadError } from './LoadError';
 import { ClipDetail, copyError, copySamples, EXAMPLE_USED, ExampleNote, ExampleOrder, FormNotice, GALLERY_SIZE_KEY, HISTORY_SIZE_KEY, photoImg, ProductTypeFilter, RunSummary, shownType, SizeSlider, Slot, TileSkeleton, UploadedPhotos, uploadError, uploadImages, useSize } from './image-tools';
-import { FormContext, type Photo, Tap, useApplier, useJobs, useRecreated } from './jobs';
+import { dropPhoto, FormContext, isPhotoDrag, type Photo, Tap, useApplier, useJobs, useRecreated } from './jobs';
 import { Modal } from './Modal';
 import { ModelPicker } from './ModelPicker';
 import { loadPending, PendingProposals, type PresetDraft, PresetForm, type PresetRow, PresetSections, type Proposal } from './PresetEditing';
@@ -612,9 +612,17 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
     setTab(tabs[next]!);
     document.getElementById(`create-tab-${tabs[next]}`)?.focus();
   }
+  // A photo dragged from History goes through the page's own put (a click's); a full box is no target.
+  const photoRoom = hydrated && images.length < maxImages;
+  function onDragOver(e: DragEvent) {
+    if (isPhotoDrag(e) && !photoRoom) return;
+    e.preventDefault();
+    setDragOver(true);
+  }
   function onDrop(e: DragEvent) {
     e.preventDefault();
     setDragOver(false);
+    if (isPhotoDrag(e)) return photoRoom && dropPhoto('input');
     if (hydrated) void upload([...e.dataTransfer.files]);
   }
   /** Fills the form from a sample; nothing is submitted. A sample whose look has no matching form ratio leaves the ratio alone. */
@@ -750,7 +758,7 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
               </button>
             </div>
 
-            <div className="dropzone" data-over={dragOver} data-filled={images.length > 0} onDragOver={(e) => (e.preventDefault(), setDragOver(true))} onDragLeave={() => setDragOver(false)} onDrop={onDrop}>
+            <div className="dropzone" data-over={dragOver} data-filled={images.length > 0} onDragOver={onDragOver} onDragLeave={() => setDragOver(false)} onDrop={onDrop}>
               <input
                 ref={fileInput}
                 type="file"

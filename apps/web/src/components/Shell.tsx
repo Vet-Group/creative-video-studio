@@ -28,7 +28,7 @@ import { Icon, type IconName } from './Icon';
 import { LarkLinkPrompt } from './LarkLinkPrompt';
 import { RatingPrompt } from './Rating';
 import { JobFailureNote, canRetry, isCanceled, canRetryOnTwin, twinRetryText } from './JobFailure';
-import { CancelAllQueued, CancelButton, elapsedLabel, providerQueueLabel, InputThumb, JobPrompt, JobsProvider, Recreate, resultHref, roleOf, toggleFullscreen, useForm, useJobs } from './jobs';
+import { CancelAllQueued, CancelButton, elapsedLabel, providerQueueLabel, InputThumb, JobPrompt, JobsProvider, photoDrag, Recreate, resultHref, roleOf, toggleFullscreen, useForm, useJobs } from './jobs';
 import { LoadError } from './LoadError';
 import { Modal } from './Modal';
 import type { Account, Section } from './Settings';
@@ -249,7 +249,7 @@ function HistoryCard({ job, isAdmin, select }: { job: TrayJob; isAdmin: boolean;
         {out ? (
           image ? (
             // A click on the picture is the full screen button's; the button stays the keyboard and screen-reader way in.
-            <img ref={media} src={content(job.posterAssetId ?? out)} alt={cardTitle(job)} loading="lazy" onClick={enlarge} />
+            <img ref={media} src={content(job.posterAssetId ?? out)} alt={cardTitle(job)} loading="lazy" onClick={enlarge} {...photoDrag(form?.result && form.photo ? (to) => form.photo!({ asset: out }, to) : undefined)} />
           ) : (
             // F opens full screen, as in most players; Space and the arrows are the video's own keys.
             <video ref={media} controls playsInline preload="metadata" poster={job.posterAssetId ? content(job.posterAssetId) : undefined} src={content(out)} onKeyDown={(e) => e.key.toLowerCase() === 'f' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && (e.preventDefault(), toggleFullscreen(media.current))} />

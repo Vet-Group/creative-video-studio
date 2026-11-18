@@ -4,13 +4,14 @@
 // is announced when the user returns, and old results are not announced again.
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { createContext, type ReactNode, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createContext, type DragEvent, type ReactNode,useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { CANCELED_ERROR } from '@cvs/core/ledger';
 import { api, ApiError, sendJson, type TrayJob } from '@/lib/api';
 import { featureLabel } from '@/lib/features';
 import { announce } from '@/lib/preferences';
 import { pageOf } from '@/lib/reuse';
 import { useTabReturn } from '@/lib/use-tab-return';
+import type { UploadSlot } from '@/lib/upload-slots';
 import { confirmDialog } from './Confirm';
 import { Icon } from './Icon';
 import { Modal } from './Modal';
@@ -178,6 +179,33 @@ export function roleOf(feature: string, n: number, opts: { garments?: number | n
   return 'input';
 }
 
+/** What a photo dropped on a form slot becomes, by the slot's key (lib/upload-slots.ts): the slot decides, not where the photo came from. The end frame and a hook's picture take none. */
+const DROP_ROLE: Partial<Record<UploadSlot, PhotoRole>> = { garment: 'garment', model: 'model', background: 'background', product: 'product', packaging: 'packaging', reference: 'input', image: 'input', video: 'input' };
+export const dropRole = (slot: UploadSlot | undefined): PhotoRole | undefined => (slot ? DROP_ROLE[slot] : undefined);
+
+/** Set on a drag that carries a photo from History or the Examples, so a slot can tell it from a dragged file. */
+export const PHOTO_DRAG = 'application/x-cvs-photo';
+export const isPhotoDrag = (e: { dataTransfer: Pick<DataTransfer, 'types'> }) => e.dataTransfer.types.includes(PHOTO_DRAG);
+// The photo being dragged, as the put a click would run: the drop calls it with the slot's role, so the form does what a click does (its limit, its note, no copy twice).
+let dragged: ((role: PhotoRole) => void) | null = null;
+export const dropPhoto = (role: PhotoRole): void => dragged?.(role);
+
+/** Props that make a photo draggable to a form slot (a pointer extra: the click is the keyboard and touch way); none where no form takes photos. */
+export function photoDrag(put: ((role: PhotoRole) => void) | undefined) {
+  if (!put) return {};
+  return {
+    draggable: true,
+    onDragStart: (e: DragEvent) => {
+      dragged = put;
+      e.dataTransfer.setData(PHOTO_DRAG, '1'); // Firefox starts a drag only with data
+      e.dataTransfer.effectAllowed = 'copy';
+    },
+    onDragEnd: () => {
+      dragged = null;
+    },
+  };
+}
+
 /** One of a detail's pieces: a button that puts it on the form beside it, or the plain piece where there is none. */
 export function Tap({ on, label, className, children }: { on?: () => void; label?: string; className?: string; children: ReactNode }) {
   if (!on) return className ? <span className={className}>{children}</span> : <>{children}</>;
@@ -202,11 +230,12 @@ export function InputThumb({ photo, n, role, thumb, full }: { photo: Photo; n: n
   const used = 'asset' in photo && !!form?.has?.(photo.asset);
   const name = ROLE_NAME[role];
   const put = form?.photo;
-  const use = put && (() => (used ? notify('Ảnh này đã có trong biểu mẫu') : put(photo, role)));
+  // A drag to a slot puts the photo in that slot's role; a click, in this photo's own.
+  const use = put && ((to: PhotoRole = role) => (used ? notify('Ảnh này đã có trong biểu mẫu') : put(photo, to)));
   return (
     <li className="input-thumb">
-      <button type="button" className="tap" aria-label={use ? `Ảnh đầu vào ${n + 1}: dùng làm ${name}${used ? ', đã có trong biểu mẫu' : ''}` : `Xem lớn ảnh ${n + 1}`} onClick={use ?? (() => setViewing(true))}>
-        <img src={thumb} alt="" loading="lazy" />
+      <button type="button" className="tap" aria-label={use ? `Ảnh đầu vào ${n + 1}: dùng làm ${name}${used ? ', đã có trong biểu mẫu' : ''}` : `Xem lớn ảnh ${n + 1}`} onClick={use ? () => use() : () => setViewing(true)}>
+        <img src={thumb} alt="" loading="lazy" {...photoDrag(use)} />
         {used && (
           <span className="input-used" aria-hidden="true">
             <Icon name="check" size={10} />
