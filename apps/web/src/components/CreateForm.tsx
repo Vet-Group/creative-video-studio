@@ -9,7 +9,7 @@ import { briefRoom, sectionBody, sectionPrompt } from '@/lib/marketing';
 import { PRODUCT_TYPES } from '@/lib/product-types';
 import { PROMPT_TEMPLATES } from '@/lib/prompt-starters';
 import { promptTooLong } from '@/lib/prompt-limit';
-import { confirmRun } from '@/lib/run-guard';
+import { confirmRun, sendRun } from '@/lib/run-guard';
 import { NARROW, useMediaQuery, WIDE } from '@/lib/use-media-query';
 import { useHydrated } from '@/lib/use-hydrated';
 import { useRecall } from '@/lib/use-recall';
@@ -502,7 +502,10 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
     let started = 0;
     try {
       for (; started < n; started++) {
-        await api('/api/jobs', sendJson('POST', { assetIds: images.map((i) => i.id), modelId, ...(presetId ? { presetId } : { prompt: sent[started], enhance }), ratio, durationSec, storeId: storeId || null, params: { audio: audioOn ? 'on' : 'off', ...(endAssetId && { endAssetId }), ...(audioAssetIds && { audioAssetIds }), ...(!presetId && sections) } }));
+        const body = { assetIds: images.map((i) => i.id), modelId, ...(presetId ? { presetId } : { prompt: sent[started], enhance }), ratio, durationSec, storeId: storeId || null, params: { audio: audioOn ? 'on' : 'off', ...(endAssetId && { endAssetId }), ...(audioAssetIds && { audioAssetIds }), ...(!presetId && sections) } };
+        // The first clip of a batch stands for it: a batch the same as the last one asks before anything is sent.
+        if (started > 0) await api('/api/jobs', sendJson('POST', body));
+        else if (!(await sendRun(body))) return;
       }
       clearBodyDraft();
       clearFreeDraft();

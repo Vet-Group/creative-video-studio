@@ -1,9 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { confirmDialog } from '@/components/Confirm';
-import { ApiError } from '@/lib/api';
-import { confirmRerun, confirmRun, runKey } from './run-guard';
+import { api, ApiError } from '@/lib/api';
+import { confirmRerun, confirmRun, runKey, sendRun } from './run-guard';
 
 vi.mock('@/components/Confirm', () => ({ confirmDialog: vi.fn() }));
+vi.mock('@/lib/api', async (actual) => ({ ...(await actual<typeof import('@/lib/api')>()), api: vi.fn() }));
 
 describe('confirmRun', () => {
   it('asks only from 1 USD, with the price in the question, and returns the answer', async () => {
@@ -17,6 +18,34 @@ describe('confirmRun', () => {
     confirm.mockResolvedValue(true);
     expect(await confirmRun(1.5, 'Tạo 2 clip?')).toBe(true);
     expect(confirm).toHaveBeenLastCalledWith({ title: 'Tạo 2 clip?', confirmLabel: 'Tiếp tục' });
+  });
+});
+
+describe('sendRun', () => {
+  it('sends a Run, and asks before sending the same body again for the same feature; a no sends nothing', async () => {
+    const confirm = vi.mocked(confirmDialog).mockReset().mockResolvedValue(false);
+    const send = vi.mocked(api).mockReset().mockResolvedValue({});
+    const body = { feature: 'image', modelId: 'm', prompt: 'a red shirt' };
+    expect(await sendRun(body)).toBe(true);
+    expect(confirm).not.toHaveBeenCalled();
+    expect(await sendRun({ ...body })).toBe(false); // the same settings again: asked, declined, not sent
+    expect(confirm).toHaveBeenLastCalledWith(expect.objectContaining({ title: 'Chạy lại đúng các cài đặt vừa gửi?', confirmLabel: 'Chạy lại' }));
+    expect(send).toHaveBeenCalledOnce();
+    confirm.mockResolvedValue(true);
+    expect(await sendRun(body)).toBe(true); // said yes: sent
+    expect(send).toHaveBeenCalledTimes(2);
+    confirm.mockClear();
+    expect(await sendRun({ ...body, prompt: 'a blue shirt' })).toBe(true); // other settings, or another feature, are not asked about
+    expect(await sendRun({ modelId: 'm', prompt: 'a blue shirt' })).toBe(true);
+    expect(confirm).not.toHaveBeenCalled();
+  });
+  it('remembers only a Run the server took', async () => {
+    const confirm = vi.mocked(confirmDialog).mockReset().mockResolvedValue(true);
+    vi.mocked(api).mockReset().mockRejectedValueOnce(new ApiError(500, 'down')).mockResolvedValue({});
+    const body = { feature: 'try_on', modelId: 'm' };
+    await expect(sendRun(body)).rejects.toThrow('down');
+    expect(await sendRun(body)).toBe(true); // the failed one does not count as sent
+    expect(confirm).not.toHaveBeenCalled();
   });
 });
 
