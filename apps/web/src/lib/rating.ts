@@ -8,6 +8,9 @@ export const RATING_PAUSE_DAYS = 30;
 /** Days the snooze button keeps the prompt away. */
 export const RATING_SNOOZE_DAYS = 7;
 export const RATING_SCORES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] as const;
+/** The comment's question by score, as Fash asks it: what to fix up to 6, what would make it a 10 at 7-8, what works at 9-10. */
+export const ratingFollowUp = (score: number): string =>
+  score <= 6 ? 'Chúng tôi nên cải thiện điều gì?' : score <= 8 ? 'Điều gì sẽ giúp bạn chấm 10 điểm?' : 'Bạn thích điều gì nhất?';
 /** Fired on window when a rating is sent from the Feedback page, so the prompt of the same page load goes away. */
 export const RATING_SENT_EVENT = 'cvs:rating-sent';
 

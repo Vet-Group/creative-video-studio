@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { isRatingDue, parseRating, RATING_COMMENT_MAX, type RatingState } from './rating';
+import { isRatingDue, parseRating, RATING_COMMENT_MAX, ratingFollowUp, type RatingState } from './rating';
 
 const NOW = new Date('2026-11-17T10:00:00Z');
 const DAY = 24 * 60 * 60 * 1000;
@@ -40,6 +40,17 @@ describe('isRatingDue', () => {
     expect(due({ lastRatedAt: ago(40 * DAY), snoozedUntil: new Date(NOW.getTime() + DAY) })).toBe(false);
     expect(due({ lastRatedAt: ago(40 * DAY), snoozedUntil: ago(DAY), succeededJobs: 2 })).toBe(false);
   });
+});
+
+test('the comment asks what to fix up to 6, what would make it a 10 at 7-8, and what works at 9-10', () => {
+  expect([1, 6, 7, 8, 9, 10].map(ratingFollowUp)).toEqual([
+    'Chúng tôi nên cải thiện điều gì?',
+    'Chúng tôi nên cải thiện điều gì?',
+    'Điều gì sẽ giúp bạn chấm 10 điểm?',
+    'Điều gì sẽ giúp bạn chấm 10 điểm?',
+    'Bạn thích điều gì nhất?',
+    'Bạn thích điều gì nhất?',
+  ]);
 });
 
 describe('parseRating', () => {

@@ -3,7 +3,7 @@
 // The in-app satisfaction rating (lib/rating.ts): the 1-10 control, the prompt card of the app shell and the always-open block on the Feedback page.
 import { useEffect, useId, useState } from 'react';
 import { api, sendJson } from '@/lib/api';
-import { RATING_COMMENT_MAX, RATING_SCORES, RATING_SENT_EVENT } from '@/lib/rating';
+import { RATING_COMMENT_MAX, RATING_SCORES, RATING_SENT_EVENT, ratingFollowUp } from '@/lib/rating';
 
 const QUESTION = 'Bạn chấm Creative Video Studio mấy điểm?';
 
@@ -50,7 +50,7 @@ function RatingForm({ onSent, onLater }: { onSent: () => void; onLater?: () => v
       </p>
       {score > 0 && (
         <label className="rating-comment">
-          <span>Điều gì sẽ giúp bạn chấm cao hơn?</span>
+          <span>{ratingFollowUp(score)}</span>
           <textarea value={comment} maxLength={RATING_COMMENT_MAX} rows={2} onChange={(e) => setComment(e.target.value)} />
         </label>
       )}
