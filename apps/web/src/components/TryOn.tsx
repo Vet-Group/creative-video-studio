@@ -2,9 +2,9 @@
 // Try On: a settings card (garments, the model photo, an optional background, model, prompt, resolution, ratio) beside the History, Examples and About tabs,
 // laid out like Create. Run posts a try_on job; the inputs go in the order the API expects: the person first, then the garments, then the background.
 import { useEffect, useId, useState } from 'react';
-import { api, errorText, sendJson, thumbUrl } from '@/lib/api';
+import { api, errorText, thumbUrl } from '@/lib/api';
 import { basePrompt, promptTooLong } from '@/lib/prompt-limit';
-import { confirmRun } from '@/lib/run-guard';
+import { confirmRun, sendRun } from '@/lib/run-guard';
 import { tryOnPrompt } from '@/lib/try-on-prompt';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { usable } from '@/lib/fashion-models';
@@ -167,7 +167,7 @@ export function TryOn({ reuse }: { reuse?: string }) {
         params: { resolution: pick.resolution, ...(pick.thinking && { thinking: pick.thinking }), garments: String(garments.length), ...(text && { brief: text }) },
         ...(sent ? { prompt: sent } : {}),
       };
-      await api('/api/jobs', sendJson('POST', body));
+      if (!(await sendRun(body))) return;
       clearDraft();
       setNotice('Đã gửi lượt tạo. Theo dõi trong tab "Lịch sử".');
       if (!narrow) setTab('history');

@@ -2,10 +2,10 @@
 // Image Generation: a settings card (reference images, style, model, prompt, ratio, resolution, Enhance, the brand kit) beside the History, Examples and
 // About tabs, laid out like Try On and Create. Run posts an image job.
 import { useId, useState } from 'react';
-import { api, errorText, sendJson } from '@/lib/api';
+import { errorText } from '@/lib/api';
 import { type BrandKit, withBrand } from '@/lib/brand';
 import { promptTooLong } from '@/lib/prompt-limit';
-import { confirmRun } from '@/lib/run-guard';
+import { confirmRun, sendRun } from '@/lib/run-guard';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { useRecall } from '@/lib/use-recall';
 import { useDraftState } from '@/lib/use-draft';
@@ -150,7 +150,7 @@ ${style.prompt}` : prompt.trim();
     setNotice('');
     try {
       const body = { feature: 'image', modelId: pick.modelId, assetIds: images.map((i) => i.id), prompt: prompt.trim(), ...(styleId && { presetId: styleId }), enhance, ratio: pick.ratio, storeId: storeId || null, useBrand, params: { resolution: pick.resolution, ...(pick.thinking && { thinking: pick.thinking }) } };
-      await api('/api/jobs', sendJson('POST', body));
+      if (!(await sendRun(body))) return;
       clearDraft();
       setNotice('Đã gửi lượt tạo. Theo dõi trong tab "Lịch sử".');
       if (!narrow) setTab('history');

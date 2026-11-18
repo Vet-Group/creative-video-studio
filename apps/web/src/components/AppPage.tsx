@@ -7,7 +7,7 @@ import { type CSSProperties, useEffect, useId, useRef, useState } from 'react';
 import { api, errorText, sendJson } from '@/lib/api';
 import { type AppConfig, appInputs, appReason, type AppCategory, motionReason, slotMax, splitImages, stockGroups, visibleApps } from '@/lib/apps';
 import { basePrompt, promptTooLong } from '@/lib/prompt-limit';
-import { confirmRun } from '@/lib/run-guard';
+import { confirmRun, sendRun } from '@/lib/run-guard';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { useRecall } from '@/lib/use-recall';
 import { useDraftState } from '@/lib/use-draft';
@@ -197,7 +197,7 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
         ratio: pick.ratio,
         params: { resolution: pick.resolution, ...(app.prompt && prompt.trim() && { brief: prompt.trim() }) }, // the member's own text, kept for reuse
       };
-      await api('/api/jobs', sendJson('POST', body));
+      if (!(await sendRun(body))) return;
       clearDraft();
       setNotice('Đã gửi lượt tạo. Theo dõi trong tab "Lịch sử".');
       if (!narrow) setTab('history');
@@ -437,7 +437,7 @@ function MotionForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
     try {
       const written = prompt.trim();
       const body = { feature: app.feature, modelId: chosen!.id, assetIds: [image[0]!.id, video!.id], ratio: 'auto', params: { orientation }, ...(written && { prompt: written }) };
-      await api('/api/jobs', sendJson('POST', body));
+      if (!(await sendRun(body))) return;
       clearDraft();
       setNotice('Đã gửi lượt tạo. Theo dõi trong tab "Lịch sử".');
       if (!narrow) setTab('history');

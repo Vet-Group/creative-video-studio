@@ -13,7 +13,7 @@ import { PROMPT_TEMPLATES } from '@/lib/prompt-starters';
 import { WIZARD_KEY } from '@/lib/onboarding';
 import { type BrandKit, withBrand } from '@/lib/brand';
 import { promptTooLong } from '@/lib/prompt-limit';
-import { confirmRun } from '@/lib/run-guard';
+import { confirmRun, sendRun } from '@/lib/run-guard';
 import { confirmDialog } from './Confirm';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { useRecall } from '@/lib/use-recall';
@@ -562,7 +562,9 @@ export function MarketingStudio({ format = 'ugc', reuse, recipe, wizardDefault =
         params: { ...(pf && { format: pf }), audio: audioOn ? 'on' : 'off', ...inputs, ...(script.trim() && (advanced || review) && { script: script.trim() }), ...formInputs, ...(advanced && video && { videoAssetId: video.id }) },
       };
       try {
-        await api('/api/jobs', sendJson('POST', body));
+        // The first variant stands for the batch: a batch the same as the last one asks before anything is sent.
+        if (i > 0) await api('/api/jobs', sendJson('POST', body));
+        else if (!(await sendRun(body))) return setBusy(false);
         sentOk.push(hookName(hook));
       } catch (e) {
         refused.push(n > 1 ? `${hookName(hook)}: ${errorText(e, 'không gửi được')}` : errorText(e, 'Không gửi được lượt tạo, hãy thử lại.'));

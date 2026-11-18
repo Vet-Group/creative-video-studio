@@ -382,6 +382,13 @@ test('Image Generation: the form needs a prompt (and an image only on a model wi
   await expect(page.getByText('Đã gửi lượt tạo')).toBeVisible();
   const sent = ((await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { id: string }[] }).jobs[0]!;
   expect(await (await page.request.get(`/api/jobs/${sent.id}`)).json()).toMatchObject({ prompt: 'a red shirt on a hanger', enhance: false, enhancedPrompt: null });
+  // The same settings again ask first, as Fash's "Run Again?"; Huỷ sends nothing.
+  await run.click();
+  const again = page.getByRole('dialog', { name: 'Chạy lại đúng các cài đặt vừa gửi?' });
+  await expect(again).toBeVisible();
+  await again.getByRole('button', { name: 'Huỷ' }).click();
+  await expect(again).toBeHidden();
+  expect(((await (await page.request.get('/api/jobs?mine')).json()) as { jobs: unknown[] }).jobs).toHaveLength(1);
   await expect(page.getByRole('tab', { name: 'Lịch sử' })).toHaveAttribute('aria-selected', 'true');
   await expect(toast(page, 'Ảnh đã xong')).toBeVisible({ timeout: 60_000 });
   const tray = page.getByRole('complementary', { name: 'Lượt tạo của tôi' });

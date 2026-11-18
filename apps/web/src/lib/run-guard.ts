@@ -1,7 +1,7 @@
 // What every form's Run goes through: a confirm before a costly job, and Ctrl+Enter (Cmd+Enter) in the prompt.
 import type { KeyboardEvent } from 'react';
 import { confirmDialog } from '@/components/Confirm';
-import { ApiError } from '@/lib/api';
+import { api, ApiError, sendJson } from '@/lib/api';
 
 /** A Run whose button shows this many USD or more asks first. */
 export const RUN_CONFIRM_USD = 1;
@@ -10,6 +10,23 @@ export const RUN_CONFIRM_USD = 1;
 export async function confirmRun(usd: string | number | null | undefined, text?: string): Promise<boolean> {
   if (usd === null || usd === undefined || !(Number(usd) >= RUN_CONFIRM_USD)) return true;
   return confirmDialog({ title: text ?? `Tạo lượt này với giá $${usd}?`, confirmLabel: 'Tiếp tục' });
+}
+
+/** Each feature's last Run sent in this page load, as its JSON body. */
+const lastRuns = new Map<string, string>();
+
+/**
+ * Sends a Run's job and returns true. A body identical to the last one this page load sent for the same feature asks first, as Fash's "Run Again?";
+ * when the member says no, nothing is sent and false comes back. A Run counts once the server took it.
+ */
+export async function sendRun(body: Record<string, unknown>): Promise<boolean> {
+  const feature = typeof body.feature === 'string' ? body.feature : 'video';
+  const json = JSON.stringify(body);
+  const again = lastRuns.get(feature) === json;
+  if (again && !(await confirmDialog({ title: 'Chạy lại đúng các cài đặt vừa gửi?', body: 'Bạn vừa gửi một lượt tạo y hệt. Lượt mới tạo thêm một kết quả và tính phí như lượt trước.', confirmLabel: 'Chạy lại' }))) return false;
+  await api('/api/jobs', sendJson('POST', body));
+  lastRuns.set(feature, json);
+  return true;
 }
 
 /**
