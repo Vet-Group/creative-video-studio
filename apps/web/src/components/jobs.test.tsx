@@ -1,13 +1,44 @@
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ApiError, type TrayJob } from '@/lib/api';
-import { CancelAllQueued, cancelEach, elapsedLabel, resultHref, roleOf } from './jobs';
+import { CancelAllQueued, cancelEach, dropPhoto, dropRole, elapsedLabel, isPhotoDrag, PHOTO_DRAG, photoDrag, resultHref, roleOf } from './jobs';
+import type { DragEvent } from 'react';
 
 describe('resultHref', () => {
   it('opens a result in the Library and a failure on the page that made it', () => {
     expect(resultHref({ id: 'j1', status: 'succeeded', feature: 'try_on' })).toBe('/library?item=j1');
     expect(resultHref({ id: 'j2', status: 'failed', feature: 'try_on' })).toBe('/try-on');
     expect(resultHref({ id: 'j3', status: 'timed_out', feature: 'no_such_tool' })).toBe('/library');
+  });
+});
+
+describe('dragging a photo to a slot', () => {
+  const data: Record<string, string> = {};
+  const start = (e: Partial<DragEvent> = {}) => ({ dataTransfer: { setData: (k: string, v: string) => (data[k] = v), effectAllowed: '' }, ...e }) as unknown as DragEvent;
+
+  it('gives a slot the role its key names, and none to the end frame or a hook picture', () => {
+    expect(['garment', 'model', 'background', 'product', 'packaging', 'reference', 'image', 'video'].map((k) => dropRole(k as 'garment'))).toEqual(['garment', 'model', 'background', 'product', 'packaging', 'input', 'input', 'input']);
+    expect([dropRole('end-frame'), dropRole('illustration'), dropRole(undefined)]).toEqual([undefined, undefined, undefined]);
+  });
+
+  it('is not draggable where no form takes photos', () => {
+    expect(photoDrag(undefined)).toEqual({});
+  });
+
+  it('hands the drop to the click path in the slot role until the drag ends, and tells a photo from a file by its type', () => {
+    const put: string[] = [];
+    const props = photoDrag((role) => void put.push(role)) as { draggable: boolean; onDragStart: (e: DragEvent) => void; onDragEnd: () => void };
+    dropPhoto('model');
+    expect(put).toEqual([]); // nothing dragged yet
+    props.onDragStart(start());
+    expect(props.draggable).toBe(true);
+    expect(data[PHOTO_DRAG]).toBeDefined();
+    dropPhoto('garment');
+    props.onDragEnd();
+    dropPhoto('model');
+    expect(put).toEqual(['garment']);
+    expect(isPhotoDrag({ dataTransfer: { types: [PHOTO_DRAG, 'text/plain'] } })).toBe(true);
+    expect(isPhotoDrag({ dataTransfer: { types: ['Files'] } })).toBe(false);
   });
 });
 

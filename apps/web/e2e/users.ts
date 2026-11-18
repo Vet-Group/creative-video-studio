@@ -164,6 +164,10 @@ export const USERS = {
   admin: { email: 'admin@e2e.test', name: 'E2E Admin', role: 'admin' },
   // a11y.e2e: one finished clip, so a Library card shows its marks on a phone.
   phonea: { email: 'phonea@e2e.test', name: 'E2E Phone A', role: 'member' },
+  // drag-photo.e2e: History photos dragged onto a form slot, one member per page.
+  draga: { email: 'draga@e2e.test', name: 'E2E Drag A', role: 'member' },
+  dragb: { email: 'dragb@e2e.test', name: 'E2E Drag B', role: 'member' },
+  dragc: { email: 'dragc@e2e.test', name: 'E2E Drag C', role: 'member' },
 } as const;
 
 export type UserKey = keyof typeof USERS;
