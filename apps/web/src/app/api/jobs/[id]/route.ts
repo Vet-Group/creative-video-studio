@@ -9,7 +9,7 @@ const notFound = () => Response.json({ error: 'not found' }, { status: 404 });
 
 /**
  * A job (an image job carries its `feature` and `resolution`, and `durationSec` 0) with what Reuse needs to prefill Create: the input images that still exist, preset, prompt, ratio, duration, model and store
- * (null when the store is hidden now, since a Run cannot take it, and `storeLost` says so), the model's label and how many input images the job had (`inputCount`, so the form can say how many no longer exist), and to its creator the end frame and reference audio that still exist (a Run takes only the caller's own). Visible to its owner and to Admins, and to everyone once it is a
+ * (null when the store is hidden now, since a Run cannot take it, and `storeLost` says so), the model's label, how many input images the job had (`inputCount`, so the form can say how many no longer exist) and their ids in the job's order (`inputIds`, so each image goes back to its own slot when one before it is gone), and to its creator the end frame and reference audio that still exist (a Run takes only the caller's own). Visible to its owner and to Admins, and to everyone once it is a
  * Library clip. A deleted or purged job is 404.
  */
 export async function GET(request: Request, { params }: RouteContext) {
@@ -45,7 +45,7 @@ export async function GET(request: Request, { params }: RouteContext) {
     // the Library is where staff learn how a result was made, and the composed prompt carries them anyway.
     garments: job.params.garments ? Number(job.params.garments) : null, pose: job.params.pose ?? null, format: job.params.format ?? null, hook: job.params.hook ?? null, location: job.params.location ?? null, brief: job.params.brief ?? null, script: job.params.script ?? null, roles: job.params.roles ?? null, highlights: job.params.highlights?.split('\n') ?? null, brand: job.params.brand === 'on',
     hookText: job.params.hookText ?? null, ending: job.params.ending ?? null, endText: job.params.endText ?? null, endTextPos: job.params.endTextPos ?? null,
-    durationSec: job.duration_s, modelId: job.model, modelLabel: job.model_label, storeId: job.store_id, storeLost: job.job_store_id !== null && job.store_id === null, inputCount: job.input_asset_ids.length, outputAssetId: job.output_asset_id, posterAssetId: job.poster_asset_id, images: images.rows, endFrame: end.rows[0] ?? null, videoRef: video.rows[0] ?? null, clips: clips.rows,
+    durationSec: job.duration_s, modelId: job.model, modelLabel: job.model_label, storeId: job.store_id, storeLost: job.job_store_id !== null && job.store_id === null, inputCount: job.input_asset_ids.length, inputIds: job.input_asset_ids, outputAssetId: job.output_asset_id, posterAssetId: job.poster_asset_id, images: images.rows, endFrame: end.rows[0] ?? null, videoRef: video.rows[0] ?? null, clips: clips.rows,
   });
 }
 

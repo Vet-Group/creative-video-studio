@@ -84,3 +84,15 @@ export const nothingNote = (lost: number): string => `Không dùng lại đượ
 
 /** How many of a job's input photos no longer exist (the jobs API tells how many it had); 0 for a sample or a template, which have no count. */
 export const lostInputs = (j: { inputCount?: number; images: unknown[] }): number => Math.max(0, (j.inputCount ?? 0) - j.images.length);
+
+/** A job's input photos in the places the job sent them (`inputIds`, GET /api/jobs/:id), a deleted one as null, so the photos after it keep their roles;
+ * without ids (a sample or a template) the photos as they come. */
+export const alignInputs = <I extends { id: string }>(ids: string[] | undefined, images: I[]): (I | null)[] => (ids ? ids.map((id) => images.find((i) => i.id === id) ?? null) : images);
+
+/** Try On's photos back in their slots: the person, then `garments` garments (all but the person when the count is unknown), then the background; a deleted one leaves its slot empty. */
+export function tryOnSlots<I extends { id: string }>(ids: string[] | undefined, images: I[], garments: number | null): { person: I[]; garments: I[]; background: I[] } {
+  const sent = alignInputs(ids, images);
+  const n = garments ?? sent.length - 1;
+  const slot = (from: number, to: number) => sent.slice(from, to).filter((i) => i !== null);
+  return { person: slot(0, 1), garments: slot(1, 1 + n), background: slot(1 + n, 2 + n) };
+}

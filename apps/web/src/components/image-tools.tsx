@@ -162,6 +162,8 @@ export interface ReuseJob {
   images: (Img | { sample: string })[];
   /** How many input images the job had (GET /api/jobs/:id; not a sample's or a template's), so the form can say how many no longer exist. */
   inputCount?: number;
+  /** The job's input ids in the order sent, a deleted one's too, so each image goes back to its own slot (alignInputs). */
+  inputIds?: string[];
   /** The label of the job's model, kept even once it is switched off. */
   modelLabel?: string | null;
   /** Whether the brand kit was added to the job (a job's, not a template's or a sample's), the job's store and whether that store is hidden since. */

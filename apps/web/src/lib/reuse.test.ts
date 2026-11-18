@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
-import { asExample, exampleFrom, lostInputs, nothingNote, nothingRefilled, queryOf, refillFrom, reuseHref, skippedNote } from './reuse';
+import { appBySlug, splitImages } from './apps';
+import { alignInputs, asExample, exampleFrom, lostInputs, nothingNote, nothingRefilled, queryOf, refillFrom, reuseHref, skippedNote, tryOnSlots } from './reuse';
 
 test('the reuse link opens the page that made the job, with the job to refill from; features without a refill yet get no link', () => {
   expect(reuseHref({ id: 'j1', feature: 'video' })).toBe('/create?reuse=j1');
@@ -73,4 +74,21 @@ test("the photos lost are the job's count less those that still exist, and none 
   expect(lostInputs({ inputCount: 3, images: [{}, {}] })).toBe(1);
   expect(lostInputs({ inputCount: 2, images: [{}, {}] })).toBe(0);
   expect(lostInputs({ images: [{}] })).toBe(0);
+});
+
+test("a job's photos go back in the places it sent them, a deleted one as an empty place, and a sample's or a template's as they come", () => {
+  const [a, c] = [{ id: 'a' }, { id: 'c' }];
+  expect(alignInputs(['a', 'b', 'c'], [a, c])).toEqual([a, null, c]);
+  expect(alignInputs(['a', 'b'], [])).toEqual([null, null]);
+  expect(alignInputs(undefined, [a, c])).toEqual([a, c]);
+  // An app's slots: the face swap's source deleted leaves the target in its own slot.
+  expect(splitImages(appBySlug('face-swap')!, alignInputs(['s', 't'], [{ id: 't' }]))).toEqual([[null], [{ id: 't' }]]);
+});
+
+test('Try On with the person deleted refills the garments as garments and the background as the background, and leaves the person empty', () => {
+  const [g1, g2, bg] = [{ id: 'g1' }, { id: 'g2' }, { id: 'bg' }];
+  expect(tryOnSlots(['person', 'g1', 'g2', 'bg'], [g1, g2, bg], 2)).toEqual({ person: [], garments: [g1, g2], background: [bg] });
+  expect(tryOnSlots(['p', 'g1', 'g2', 'bg'], [{ id: 'p' }, g1, bg], 2)).toEqual({ person: [{ id: 'p' }], garments: [g1], background: [bg] }); // a deleted garment
+  expect(tryOnSlots(['p', 'g1'], [g1], null)).toEqual({ person: [], garments: [g1], background: [] }); // no garment count: all but the person
+  expect(tryOnSlots(undefined, [{ id: 'p' }, g1, g2], null)).toEqual({ person: [{ id: 'p' }], garments: [g1, g2], background: [] }); // a sample or a template
 });

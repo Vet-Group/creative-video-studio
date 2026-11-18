@@ -116,6 +116,17 @@ test('a reuse says what it could not bring back and why: a deleted input photo, 
   await expect(page.getByRole('img', { name: 'first.png' })).toBeVisible();
   await expect(note).toHaveText('Đã điền lại 1 ảnh và phần còn lại. Không dùng lại được: 1 ảnh đầu vào (đã bị xoá).');
 
+  // Try On with the person photo deleted: the garments and the background stay in their own slots, and the person's is left empty.
+  const [garment, backdrop] = [await upload(page, 'garment.png'), await upload(page, 'backdrop.png')];
+  const tryOn = await post({ feature: 'try_on', modelId: 'mock-image-e2e', assetIds: [a, garment, b, backdrop], ratio: '3:4', prompt: 'composed', params: { resolution: '2K', garments: '2', brief: 'red dress' } });
+  await cut(tryOn, (j) => (j.images = (j.images as unknown[]).slice(1)));
+  await page.goto(`/try-on?reuse=${tryOn}`);
+  await expect(page.getByLabel('Trang phục: ảnh đã chọn').getByRole('img')).toHaveCount(2);
+  await expect(page.getByLabel('Trang phục: ảnh đã chọn').getByRole('img').first()).toHaveAttribute('alt', 'garment.png');
+  await expect(page.getByLabel('Bối cảnh (tuỳ chọn): ảnh đã chọn').getByRole('img')).toHaveAttribute('alt', 'backdrop.png');
+  await expect(page.getByLabel('Người mẫu: ảnh đã chọn')).toHaveCount(0);
+  await expect(note).toHaveText('Đã điền lại 3 ảnh và phần còn lại. Không dùng lại được: 1 ảnh đầu vào (đã bị xoá).');
+
   // A model that is switched off or hidden: the list lacks it, so the form chose another and says which and why.
   const one = await post({ feature: 'image', modelId: 'mock-image-e2e', assetIds: [a], ratio: 'auto', prompt: 'one photo', enhance: false, params: { resolution: '1K' } });
   await page.route(/\/api\/image-models\?feature=image\b/, async (route) => {

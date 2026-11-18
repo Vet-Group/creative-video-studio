@@ -1,0 +1,3 @@
+import type { ChangeEntry } from '../changelog';
+
+export default { at: '2026-11-18T18:40:00+07:00', kind: 'fixed', title: 'Dùng lại giữ đúng ô của từng ảnh', details: ['Khi "Dùng lại" một lượt có ảnh đầu vào đã bị xoá, các ảnh còn lại về đúng ô của mình, còn ô của ảnh đã xoá để trống để bạn thêm ảnh mới. Trước đây ảnh phía sau bị dồn lên, như ảnh trang phục rơi vào ô người mẫu ở Thử đồ.', 'Áp dụng cho Thử đồ, các app nhiều ô ảnh (đổi mặt, đổi nền...) và Marketing Studio.', 'Trong Thư viện, ảnh so sánh trước/sau của Thử đồ không còn lấy nhầm ảnh trang phục khi ảnh người mẫu đã bị xoá.'], prs: [549], audience: 'all' } satisfies ChangeEntry;
