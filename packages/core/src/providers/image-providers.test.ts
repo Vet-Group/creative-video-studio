@@ -1,6 +1,6 @@
 // Image adapters against fixtures shaped like the fal input and output schemas read on 2026-10-24. No network, no key.
 import { describe, expect, test } from 'vitest';
-import { FEATURE_PROMPTS, type ImageModelConfig } from '../models';
+import { FEATURE_PROMPTS, type ImageModelConfig, PRODUCT_VIEWS } from '../models';
 import { createFalImageProvider } from './fal';
 import { ImageReadError, imageEstimate, ProviderHttpError } from './http';
 import { createMockImageProvider, MOCK_FAIL } from './mock';
@@ -164,6 +164,14 @@ describe('fal image submit', () => {
       expect([err instanceof ImageReadError, (err as Error).message]).toEqual([true, expect.stringMatching(message)]);
       expect(calls).toHaveLength(0);
     };
+    /** A png header of the given size, which the adapters measure. */
+    const png = (width: number, height: number) => {
+      const b = new Uint8Array(33);
+      b.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+      new DataView(b.buffer).setUint32(16, width);
+      new DataView(b.buffer).setUint32(20, height);
+      return b;
+    };
 
     test('Character Swap and Model Swap send the images and the fixed prompt through the Nano Banana Pro body', async () => {
       const prompt = FEATURE_PROMPTS.character_swap!;
@@ -199,13 +207,6 @@ describe('fal image submit', () => {
 
     describe('Upscale', () => {
       const topaz = model('fal-ai/topaz/upscale/image', { '2K': '0.08', '4K': '0.08' });
-      const png = (width: number, height: number) => {
-        const b = new Uint8Array(33);
-        b.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-        new DataView(b.buffer).setUint32(16, width);
-        new DataView(b.buffer).setUint32(20, height);
-        return b;
-      };
       const readPng = (width: number, height: number) => async () => ({ bytes: png(width, height), contentType: 'image/png' });
       const upscaleReq = (resolution: string) => req(topaz, { imageUrls: ['asset://a'], resolution, ratio: 'auto' });
       const factor = async (width: number, height: number, resolution: string) =>
@@ -255,6 +256,42 @@ describe('fal image submit', () => {
       expect(prompt).toBe('Swap the face from the first image onto the person in the second image.');
       expect((await bodyFor(req(PRO, { ...two, prompt, ratio: 'auto' }))).body).toEqual({
         prompt, image_urls: ['https://img/1.jpg', 'https://img/2.jpg'], aspect_ratio: 'auto', resolution: '1K', num_images: 1, output_format: 'png',
+      });
+    });
+
+    describe('Multi-angle views', () => {
+      const qwen = app('fal-ai/qwen-image-edit-2511-multiple-angles', '0.035');
+      const view = (id: string | undefined, width = 1000, height = 1000) =>
+        bodyFor(req(qwen, { imageUrls: ['asset://a'], prompt: FEATURE_PROMPTS.multi_angle!, ratio: 'auto', view: id }), async () => ({ bytes: png(width, height), contentType: 'image/png' }));
+
+      test('turns the camera to each view, adds the fixed prompt and asks for one png', async () => {
+        const angles: Record<string, [number, number]> = {};
+        for (const v of PRODUCT_VIEWS) {
+          const { url, body } = await view(v.id);
+          expect(url).toBe('https://queue.fal.run/fal-ai/qwen-image-edit-2511-multiple-angles');
+          expect(body).toMatchObject({ image_urls: [expect.stringMatching(/^data:image\/png;base64,/)], additional_prompt: FEATURE_PROMPTS.multi_angle, num_images: 1, output_format: 'png' });
+          const { horizontal_angle, vertical_angle } = body as { horizontal_angle: number; vertical_angle: number };
+          angles[v.id] = [horizontal_angle, vertical_angle];
+        }
+        // The schema: 0 front, 90 right side, 180 back, 270 left side; vertical 0 eye level, 60 high angle.
+        expect(angles).toEqual({ back: [180, 0], left: [270, 0], right: [90, 0], 'three-quarter-left': [315, 0], 'three-quarter-right': [45, 0], top: [0, 60] });
+      });
+
+      test('keeps the output within one megapixel in the shape of the input, so a view costs its one 1K price', async () => {
+        expect(((await view('back', 1000, 1000)).body as { image_size: unknown }).image_size).toEqual({ width: 992, height: 992 });
+        for (const [w, h] of [[3000, 4000], [1080, 1920], [4000, 3000], [5000, 1000], [600, 600]] as const) {
+          const { width, height } = ((await view('left', w, h)).body as { image_size: { width: number; height: number } }).image_size;
+          expect([width % 16, height % 16]).toEqual([0, 0]);
+          expect(width * height).toBeLessThanOrEqual(1_000_000);
+          expect(width * height).toBeGreaterThan(900_000);
+          expect(Math.abs(Math.log(width / height) - Math.log(w / h))).toBeLessThan(0.05);
+        }
+        expect(imageEstimate({ model: qwen, resolution: '1K' })).toEqual({ costUsd: 0.035, costSource: 'estimate' }); // $0.035 x 1 megapixel
+      });
+
+      test('refuses a job without a known view before any call', async () => {
+        await refuses(req(qwen, { ...one, view: undefined }), /needs a view, not undefined/);
+        await refuses(req(qwen, { ...one, view: 'under' }), /needs a view, not under/);
       });
     });
 

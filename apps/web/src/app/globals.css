@@ -1659,7 +1659,7 @@ dialog.modal.example-detail { width: min(1100px, calc(100vw - 32px)); max-width:
 .about-faq details[open] summary::after { transform: rotate(-135deg); }
 /* Create and Marketing Studio: the exact English prompt Run sends (folded on a phone), its length against the model's limit in the summary, and Translate. */
 .prompt-preview { margin: 12px 0 0; font-size: 12px; line-height: 18px; }
-.prompt-preview summary { color: var(--text-subtle); cursor: pointer; }
+.prompt-preview summary { color: var(--text-muted); cursor: pointer; } /* 12 px text: --text-subtle is under 4.5:1 on white */
 .prompt-preview-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 6px; }
 .prompt-check { flex: 1 0 100%; font-size: 13px; line-height: 19px; }
 .prompt-check ul { display: grid; gap: 8px; margin: 4px 0 0; padding-left: 18px; }
@@ -2489,6 +2489,7 @@ dialog.modal.tool-guide { width: min(52rem, calc(100vw - 2rem)); }
   .brand-picker { row-gap: 12px; } /* the link's hit area stays off the store picker on the row above */
   .switch::before { content: ''; position: absolute; inset: -10px 0; } /* its ::after is the knob */
   .angle-choice, .orientation-choice { row-gap: 14px; } /* wrapped choices: each row's hit area ends where the next row's begins */
+  .prompt-preview + .templates { margin-top: 26px; } /* an app form without a field between them: the summary's hit area ends where the buttons' begins */
   .wizard-toggle { margin: 10px 0; } /* room for its hit area: the scrolling form clips above it, and the format card below is drawn over it */
   .card-actions { gap: 14px; }
   .library .segmented button:first-child::after { right: -1px; left: -12px; }

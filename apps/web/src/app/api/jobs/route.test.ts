@@ -14,6 +14,7 @@ const { stopBoss } = await import('@/lib/queue');
 const { GET: listJobs, POST } = await import('./route');
 const { GET } = await import('../stores/route');
 const { settle } = await import('@cvs/core/ledger');
+const { FEATURE_PROMPTS } = await import('@cvs/core/models');
 const { forgetFalBalance } = await import('@/lib/provider-credit');
 
 const PASSWORD = 'correct-horse-battery';
@@ -658,6 +659,7 @@ describe('POST /api/jobs for an image feature', () => {
     const appModels: [string, string, number, string][] = [
       ['app-char', 'character_swap', 2, 'auto'], ['app-model', 'model_swap', 2, 'auto'], ['app-bg', 'background_changer', 2, 'auto'], ['app-reframe', 'reframe', 1, '1:1,16:9'],
       ['app-up', 'image_upscale', 1, 'auto'], ['app-face', 'face_swap', 2, 'auto'], ['app-rm', 'background_remover', 1, 'auto'], ['app-jewel', 'jewelry_try_on', 4, 'auto'], ['app-lingerie', 'lingerie_try_on', 4, 'auto'], ['app-fashion', 'fashion_model', 1, '3:4,auto'],
+      ['app-angles', 'multi_angle', 1, 'auto'],
     ];
     beforeAll(async () => {
       for (const [id, feature, max, ratios] of appModels) {
@@ -715,6 +717,15 @@ describe('POST /api/jobs for an image feature', () => {
       expect(await app('lingerie_try_on', 3)).toMatchObject({ status: 201, job: { feature: 'lingerie_try_on', prompt: expect.stringMatching(/^Dress the person in the last image in the lingerie pieces[^.]*.[^]*watermarks$/) } });
       const own = await app('lingerie_try_on', 2, { prompt: 'black lace set', params: { resolution: '2K' } });
       expect(own).toMatchObject({ status: 201, job: { prompt: expect.stringMatching(/watermarks. black lace set$/), params: { resolution: '2K' } } });
+    });
+
+    test('the multi-angle app takes one photo and one known view per job, kept with the job beside its fixed instruction', async () => {
+      expect((await app('multi_angle', 1)).error).toBe('params.view must be one of back, left, right, three-quarter-left, three-quarter-right, top');
+      expect((await app('multi_angle', 1, { params: { resolution: '1K', view: 'under' } })).error).toMatch(/^params.view must be one of back,/);
+      expect((await app('multi_angle', 2, { params: { resolution: '1K', view: 'back' } })).error).toMatch(/number of images/);
+      expect((await app('image_upscale', 1, { params: { resolution: '1K', view: 'back' } })).error).toMatch(/^params may hold only/); // no other app takes a view
+      const ok = await app('multi_angle', 1, { params: { resolution: '1K', view: 'back' } });
+      expect([ok.status, ok.job]).toEqual([201, { feature: 'multi_angle', model: 'app-angles', prompt: FEATURE_PROMPTS.multi_angle, aspect: 'auto', params: { resolution: '1K', view: 'back' } }]);
     });
 
     test('the Fashion Model Generator takes no image, its traits as JSON and exactly the prompt they make, and keeps the traits as canonical JSON', async () => {

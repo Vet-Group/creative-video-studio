@@ -1,11 +1,11 @@
 'use client';
 // One app of the Apps index, driven by its entry in lib/apps.ts: a card with the app's header, upload slots, fields and Run, beside the History and About tabs
 // (laid out like Try On). An app that is not built yet shows why instead of the form.
-import { FEATURE_PROMPTS } from '@cvs/core/models';
+import { FEATURE_PROMPTS, PRODUCT_VIEWS } from '@cvs/core/models';
 import Link from 'next/link';
 import { type CSSProperties, useEffect, useId, useRef, useState } from 'react';
 import { api, errorText, sendJson } from '@/lib/api';
-import { type AppConfig, appInputs, appReason, type AppCategory, motionReason, slotMax, splitImages, stockGroups, visibleApps } from '@/lib/apps';
+import { type AppConfig, appInputs, appReason, type AppCategory, DEFAULT_VIEWS, motionReason, runTotal, slotMax, splitImages, stockGroups, VIEW_LABELS, visibleApps } from '@/lib/apps';
 import { basePrompt, promptTooLong } from '@/lib/prompt-limit';
 import { confirmRun, sendRun } from '@/lib/run-guard';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
@@ -109,8 +109,10 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [views, setViews] = useState(DEFAULT_VIEWS); // the multi-angle app: one job per view
   const promptId = useId();
   const reasonId = useId();
+  const viewsId = useId();
   const { models, failed } = useImageModels(app.feature);
   const count = images.reduce((n, list) => n + list.length, 0);
   const pick = useImageChoice(models, Math.max(1, count));
@@ -140,6 +142,7 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
       recall.touch();
       if (j.images) setImages(splitImages(app, j.images));
       setPrompt(j.brief ?? '');
+      if (j.view) setViews([j.view]);
       pick.refill(j);
     },
     (e) => setError(copyError(e, 'Không tìm thấy ảnh để dùng lại.')),
@@ -147,10 +150,13 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
   // The swaps add the member's text to their fixed instruction, so it shares the model's limit with it.
   const fixed = app.prompt === 'optional' ? FEATURE_PROMPTS[app.feature]!.length + 2 : 0;
   const room = chosen && chosen.maxPromptChars - fixed;
-  const reason = (recall.answered ? null : 'Đang tải cài đặt đã dùng...') ?? appReason(app, { images, prompt, models: chosen ? [chosen] : models === null ? null : [], failed }) ?? promptTooLong(chosen, prompt.trim() ? prompt.trim().length + fixed : 0);
+  const reason = (recall.answered ? null : 'Đang tải cài đặt đã dùng...') ?? appReason(app, { images, prompt, models: chosen ? [chosen] : models === null ? null : [], failed, views: views.length }) ?? promptTooLong(chosen, prompt.trim() ? prompt.trim().length + fixed : 0);
   const canRun = reason === null && !busy;
   /** What Run sends: the app's fixed instruction, with or replaced by the member's words as POST /api/jobs composes it. */
   const sent = basePrompt(app.feature, appInputs(app, { images, prompt }).prompt);
+  // The multi-angle app sends one job per view picked, in the order of PRODUCT_VIEWS; every other app one job without a view.
+  const runs: (string | undefined)[] = app.views ? PRODUCT_VIEWS.filter((v) => views.includes(v.id)).map((v) => v.id) : [undefined];
+  const estimate = app.views ? runTotal(pick.estimate, runs.length) : pick.estimate;
 
   function add(slot: number) {
     return async (files: File[]) => {
@@ -185,25 +191,32 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
   const stock = picker === null ? [] : stockGroups(app.slots[picker]!, have);
 
   async function run() {
-    if (!(await confirmRun(pick.estimate))) return;
+    if (!(await confirmRun(estimate))) return;
     setBusy(true);
     setError('');
     setNotice('');
+    let done = 0;
     try {
-      const body = {
-        feature: app.feature,
-        modelId: pick.modelId,
-        ...appInputs(app, { images, prompt }),
-        ratio: pick.ratio,
-        params: { resolution: pick.resolution, ...(app.prompt && prompt.trim() && { brief: prompt.trim() }) }, // the member's own text, kept for reuse
-      };
-      if (!(await sendRun(body))) return;
+      for (const view of runs) {
+        const body = {
+          feature: app.feature,
+          modelId: pick.modelId,
+          ...appInputs(app, { images, prompt }),
+          ratio: pick.ratio,
+          params: { resolution: pick.resolution, ...(app.prompt && prompt.trim() && { brief: prompt.trim() }), ...(view && { view }) }, // the member's own text, kept for reuse
+        };
+        // As on Create's angles, the first job stands for the batch: a batch the same as the last one asks before anything is sent.
+        if (done > 0) await api('/api/jobs', sendJson('POST', body));
+        else if (!(await sendRun(body))) return;
+        done++;
+      }
       clearDraft();
       setNotice('Đã gửi lượt tạo. Theo dõi trong tab "Lịch sử".');
       if (!narrow) setTab('history');
       await refresh();
     } catch (e) {
-      setError(errorText(e, 'Không gửi được lượt tạo, hãy thử lại.'));
+      setError(`${errorText(e, 'Không gửi được lượt tạo, hãy thử lại.')}${done > 0 ? ` Đã gửi ${done}/${runs.length} ảnh.` : ''}`);
+      if (done > 0) await refresh();
     } finally {
       setBusy(false);
     }
@@ -253,6 +266,28 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
 
             {models && models.length > 1 && <ModelPicker models={pick.options} value={pick.modelId} onChange={pick.setModelId} />}
 
+            {app.views && (
+              <div className="field">
+                <span id={viewsId} className="field-label">
+                  Góc cần tạo
+                </span>
+                <div className="segmented theme-choice angle-choice" role="group" aria-labelledby={viewsId}>
+                  {PRODUCT_VIEWS.map((v) => (
+                    <label key={v.id}>
+                      <input type="checkbox" checked={views.includes(v.id)} onChange={() => setViews((cur) => (cur.includes(v.id) ? cur.filter((x) => x !== v.id) : [...cur, v.id]))} />
+                      {VIEW_LABELS[v.id]}
+                    </label>
+                  ))}
+                </div>
+                <p className="help">Mỗi góc tạo một ảnh riêng và tính tiền riêng. Mặt sau và hai bên là AI đoán từ ảnh mặt trước; nếu có ảnh thật thì dùng ảnh thật.</p>
+                {runs.length > 0 && pick.estimate !== undefined && (
+                  <p className="help" role="status">
+                    {runs.length} ảnh × ${pick.estimate} = ${estimate}
+                  </p>
+                )}
+              </div>
+            )}
+
             {app.prompt && (
               <PromptComposer
                 id={promptId}
@@ -295,7 +330,7 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
           <div className="runbar">
             <button type="button" className="primary run" disabled={!canRun} aria-describedby={reason ? reasonId : undefined} onClick={() => void run()}>
               Chạy
-              {busy ? <span className="run-cost">· Đang gửi…</span> : pick.estimate !== undefined && <span className="run-cost">· ${pick.estimate}</span>}
+              {busy ? <span className="run-cost">· Đang gửi…</span> : estimate !== undefined && <span className="run-cost">· ${estimate}</span>}
             </button>
           </div>
         </div>

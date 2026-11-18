@@ -1,6 +1,6 @@
 import { reserve, withTransaction } from '@cvs/core/ledger';
 import { checkCaps, dailyClips } from '@cvs/core/limits';
-import { estimateUsd, extraInputUsd, FEATURE_PROMPTS, imagePricesFor, MOTION_IMAGE_MAX_SEC, PROMPT_CEILING, promptLimit, textToImage, usdPerSecondFor, usdPerSecondWithVideo } from '@cvs/core/models';
+import { estimateUsd, extraInputUsd, FEATURE_PROMPTS, imagePricesFor, MOTION_IMAGE_MAX_SEC, PRODUCT_VIEWS, PROMPT_CEILING, promptLimit, textToImage, usdPerSecondFor, usdPerSecondWithVideo } from '@cvs/core/models';
 import { videoInputs, videoRefProblem } from '@cvs/core/providers/fal';
 import { VIDEO_QUEUE, videoSendOptions } from '@cvs/core/queue';
 import { ASPECTS, FEATURES } from '@cvs/db';
@@ -93,7 +93,7 @@ export async function GET(request: Request) {
       // For the History card: the member's own words (a free prompt on Create video and Image Generation; elsewhere the prompt is composed, so the kept brief),
       // the inputs, the format and the caller's favourite; `traits` is a Fashion Model Generator job's own traits (JSON), which its save dialog starts from.
       text: r.params.brief ?? ((r.feature === 'video' && !r.preset_id) || r.feature === 'image' ? r.prompt : null), inputAssetIds: r.input_asset_ids,
-      traits: r.feature === 'fashion_model' ? (r.params.traits ?? null) : null, garments: r.params.garments ? Number(r.params.garments) : null, format: r.params.format ?? null, roles: r.params.roles ?? null, favorite: r.favorite, estimateUsd: r.estimate_usd, unbilled: r.unbilled,
+      traits: r.feature === 'fashion_model' ? (r.params.traits ?? null) : null, garments: r.params.garments ? Number(r.params.garments) : null, format: r.params.format ?? null, roles: r.params.roles ?? null, view: r.params.view ?? null, favorite: r.favorite, estimateUsd: r.estimate_usd, unbilled: r.unbilled,
     })),
   });
 }
@@ -117,6 +117,7 @@ export async function GET(request: Request) {
  * `motion_control` takes a video model that lists it, exactly 2 inputs (the character image, then an MP4/MOV reference video), ratio `auto`, no preset and
  * an optional prompt; its duration is the reference video's length rounded up (the body's `durationSec` is not read), which the model must allow.
  * `fashion_model` (the AI model generator) takes no input image, a text-to-image model that lists it, and `params.traits` (JSON, parseFashionTraits) with the prompt those traits make.
+ * `multi_angle` (the multi-angle app) takes `params.view`, the id of one of PRODUCT_VIEWS: one job per view, the page sends one per view picked.
  * Every other feature takes images only. `useBrand` (Marketing Studio and Image Generation) adds the chosen store's brand kit to the prompt (lib/brand.ts).
  * `retryOf` retries the caller's own failed job once: the inputs, model, preset, prompt, ratio, duration, team and store all come from the
  * original (the body may carry just `retryOf`), the estimate from the model's current price. `onTwin: true` with `retryOf` runs it on the original model's enabled twin instead (migration 0075),
@@ -168,11 +169,12 @@ export async function POST(request: Request) {
     // Images take resolution, quality and thinking, plus the member's own text (and Try On its garment count) kept for reuse; Marketing Studio takes format ('advanced', 'unboxing' or 'review'),
     // audio ('on' or 'off'), an end frame, the end text the worker burns in (endText, endTextPos) and the form's own inputs. The kept inputs are never read by the
     // worker. Create video takes audio, an end frame, reference audio and its prompt's sections (hookText, ending); the others none.
-    const keys = isImage ? ['resolution', 'quality', 'thinking', 'brief', ...(feature === 'try_on' ? ['garments', 'pose'] : feature === 'fashion_model' ? ['traits'] : [])] : feature === 'marketing' ? ['format', 'audio', 'endAssetId', 'videoAssetId', 'hook', 'hookText', 'location', 'brief', 'script', 'ending', 'endText', 'endTextPos', 'roles', 'highlights'] : feature === 'video' ? ['audio', 'endAssetId', 'audioAssetIds', 'hookText', 'ending'] : motion ? ['orientation'] : [];
+    const keys = isImage ? ['resolution', 'quality', 'thinking', 'brief', ...(feature === 'try_on' ? ['garments', 'pose'] : feature === 'fashion_model' ? ['traits'] : feature === 'multi_angle' ? ['view'] : [])] : feature === 'marketing' ? ['format', 'audio', 'endAssetId', 'videoAssetId', 'hook', 'hookText', 'location', 'brief', 'script', 'ending', 'endText', 'endTextPos', 'roles', 'highlights'] : feature === 'video' ? ['audio', 'endAssetId', 'audioAssetIds', 'hookText', 'ending'] : motion ? ['orientation'] : [];
     if (!entries || entries.some(([k, v]) => !keys.includes(k) || typeof v !== 'string')) {
       return bad(keys.length > 0 ? `params may hold only ${keys.length > 1 ? `${keys.slice(0, -1).join(', ')} and ${keys.at(-1)}` : keys[0]}, as text` : 'params are for image features, Create video and Marketing Studio only');
     }
     if (isImage && given.resolution === undefined) return bad('params.resolution is required');
+    if (feature === 'multi_angle' && !PRODUCT_VIEWS.some((v) => v.id === given.view)) return bad(`params.view must be one of ${PRODUCT_VIEWS.map((v) => v.id).join(', ')}`);
     // The Fashion Model Generator's prompt is built from its traits (lib/fashion-model.ts), which are kept as the canonical JSON; the page's prompt must be that one.
     if (feature === 'fashion_model') {
       let traits: ReturnType<typeof parseFashionTraits> = null;

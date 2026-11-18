@@ -100,6 +100,8 @@ export interface TrayJob {
   format: string | null;
   /** Unboxing's photo roles in the order of `inputAssetIds`. */
   roles: string | null;
+  /** A multi-angle job's view (an id of PRODUCT_VIEWS); null for any other job. */
+  view: string | null;
   favorite: boolean;
   /** The job's estimate in USD (4 decimals), which a retry costs again; null for a job without one. */
   estimateUsd: string | null;

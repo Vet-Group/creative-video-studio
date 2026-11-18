@@ -55,6 +55,8 @@ export interface ImageSubmitRequest {
   quality?: string;
   /** One of the model's thinking levels (lowercase, as fal takes them); absent leaves the provider's default. The worker prices the model at this level (imagePricesFor). */
   thinking?: string;
+  /** The multi-angle app only: the id of one of PRODUCT_VIEWS, the camera the image is turned to. */
+  view?: string;
 }
 
 /** Image prices depend on the resolution, so polling needs it as well as the id. */
