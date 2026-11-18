@@ -2454,10 +2454,11 @@ dialog.modal.tool-guide { width: min(52rem, calc(100vw - 2rem)); }
 /* Phones: a 44 px hit area around the controls that draw smaller, which keep their look. Each control's own ::after is its hit area, so none reaches under another control:
    the image tile's actions get the gap that makes room for it, and the Library's two view buttons split the gap between them and use the free side. */
 @media (max-width: 480px) {
-  .explore-start-head .link-button, .library .segmented button, .card-actions > *, .enhance, .prompt-sections-head .link-button, .library-sub .link-button, .wizard-toggle, .app-change > button, .acct-row > :is(button, a), .brand-picker .link-button, .fb-title { position: relative; }
-  :is(.tool-hint-close, .modal-close, .banner-chip, .uploads-link, .templates .link-button, .prompt-preview summary, .explore-start-head .link-button, .library .segmented button, .card-actions > *, .theme-choice label, .enhance, .prompt-sections-head .link-button, .library-sub .link-button, .wizard-toggle, .app-change > button, .acct-row > :is(button, a), .brand-picker .link-button, .fb-title, .fb-thumbs button)::after { content: ''; position: absolute; inset: min(0px, calc((44px - 100%) / -2)); }
+  .explore-start-head .link-button, .library .segmented button, .card-actions > *, .enhance, .prompt-sections-head .link-button, .library-sub .link-button, .wizard-toggle, .app-change > button, .acct-row > :is(button, a), .brand-picker .link-button, .fb-title, .fb-back, .fb-admin-note-head .link-button { position: relative; }
+  :is(.tool-hint-close, .modal-close, .banner-chip, .uploads-link, .templates .link-button, .prompt-preview summary, .explore-start-head .link-button, .library .segmented button, .card-actions > *, .theme-choice label, .enhance, .prompt-sections-head .link-button, .library-sub .link-button, .wizard-toggle, .app-change > button, .acct-row > :is(button, a), .brand-picker .link-button, .fb-title, .fb-thumbs button, .fb-back, .fb-admin-note-head .link-button)::after { content: ''; position: absolute; inset: min(0px, calc((44px - 100%) / -2)); }
   .fb-thumbs button { z-index: 1; } /* its hit area lies over the next photo, which takes no tap */
   .fb-form .fb-uploads { gap: 18px; } /* a photo's remove hit area ends where the attach button begins */
+  .fb-admin .fb-admin-note { gap: 10px; } /* the preview toggle's hit area ends where the reply box begins */
   .brand-picker { row-gap: 12px; } /* the link's hit area stays off the store picker on the row above */
   .switch::before { content: ''; position: absolute; inset: -10px 0; } /* its ::after is the knob */
   .angle-choice, .orientation-choice { row-gap: 14px; } /* wrapped choices: each row's hit area ends where the next row's begins */
@@ -2472,7 +2473,7 @@ dialog.modal.tool-guide { width: min(52rem, calc(100vw - 2rem)); }
   .library-tools .library-share { width: 44px; height: 44px; }
   :is(.library-active .link-button, .library-empty-actions .button, .acct-rows + .actions button) { display: inline-flex; align-items: center; min-height: 44px; }
   :is(.end-scene, .highlights) input[type='text'] { min-height: 44px; }
-  .fb-new, .fb-uploads > button, .fb-filters .fb-mine { min-height: 44px; }
+  .fb-new, .fb-uploads > button, .fb-filters .fb-mine, .fb-comment-actions button, .fb-copy { min-height: 44px; }
 }
 
 /* The Marketing Studio guided wizard: the step list, the step toggle and the step circles. */
@@ -2547,8 +2548,8 @@ dialog.modal.tool-guide { width: min(52rem, calc(100vw - 2rem)); }
 .fb-title:hover { color: var(--brand); }
 .fb-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; font-size: .85rem; }
 .fb-tag { display: inline-flex; align-items: center; padding: 1px 9px; border-radius: 999px; font-size: .76rem; font-weight: 600; color: var(--muted); border: 1px solid var(--border); background: rgb(var(--shade) / .03); }
-.fb-tag.k-bug { color: var(--danger-text); border-color: var(--danger-border); background: var(--danger-soft); }
-.fb-tag.s-new { color: var(--brand); border-color: var(--brand); background: transparent; }
+.fb-tag.k-bug { color: var(--danger); border-color: var(--danger-border); background: var(--danger-soft); } /* the darker red: --danger-text on --danger-soft reads 4.41:1 in light */
+.fb-tag.s-new { color: var(--link); border-color: var(--brand); background: transparent; } /* the red that reads as text: --brand is 3.74:1 on the dark surface */
 .fb-tag.s-reviewing { color: inherit; border-color: var(--border-strong); background: transparent; }
 .fb-tag.s-done { color: inherit; border-color: var(--ok-border); background: transparent; }
 .fb-tag.s-rejected { color: var(--muted); opacity: .75; }
@@ -2618,7 +2619,7 @@ dialog.modal.tool-guide { width: min(52rem, calc(100vw - 2rem)); }
 .fb-comment-body { flex: 1; min-width: 0; }
 .fb-comment-body .fb-text { margin: 4px 0 0; }
 .fb-tag.team { color: var(--ink); border-color: var(--border-strong); }
-.fb-tag.fresh { color: var(--brand); border-color: var(--brand); background: transparent; }
+.fb-tag.fresh { color: var(--link); border-color: var(--brand); background: transparent; }
 .fb-shipped { margin: 16px 0; padding: 14px 20px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); }
 .fb-shipped h2 { margin: 0 0 8px; font-size: .95rem; }
 .fb-shipped ul { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }

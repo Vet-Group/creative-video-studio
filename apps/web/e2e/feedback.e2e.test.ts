@@ -1,13 +1,13 @@
 // The feedback board and an item page: the team's reply keeps its formatting, the Admin's comments are marked, the board shows replies,
 // excerpts and the mine-only filter, and the Admin's reply box previews and confirms a save.
 import { type Browser, expect, type Page, test } from '@playwright/test';
-import { signIn } from './support.test';
+import { png, signIn } from './support.test';
 
 const REPLY = 'Cảm ơn bạn đã góp ý. Đã xong:\n1. Thêm 17 mẫu cho hàng POD.\n2. Xem thêm tại https://video.vetgroup.net/create.\n\nCách dùng: **chọn mẫu khác** rồi bấm Tạo video.';
 
-/** A board item posted through the API by whoever is signed in on `page`; returns its id. */
-async function postItem(page: Page, title: string, body: string): Promise<string> {
-  const res = await page.request.post('/api/feedback', { data: { kind: 'feature', title, body } });
+/** A board item posted through the API by whoever is signed in on `page` (a feature request unless `extra` says otherwise); returns its id. */
+async function postItem(page: Page, title: string, body: string, extra: { kind?: string; assetIds?: string[] } = {}): Promise<string> {
+  const res = await page.request.post('/api/feedback', { data: { kind: 'feature', title, body, ...extra } });
   expect(res.ok()).toBe(true);
   return ((await res.json()) as { id: string }).id;
 }
@@ -115,4 +115,16 @@ test("a member's item the Admin changed shows as updated, with a badge on the si
   await expect(page.getByRole('region', { name: 'Phản hồi từ đội kỹ thuật' })).toContainText('Đang xem.');
   await page.goto('/feedback');
   await expect(page.locator('.fb-item').filter({ hasText: title })).not.toContainText('Có cập nhật mới');
+});
+
+// An attached photo shows on the item page, decoded. From #495 the page asked the thumbnail route for a size it refuses, and every photo broke.
+test("an item's attached photo shows on its page", async ({ page }) => {
+  await signIn(page, 'member6');
+  const up = await page.request.post('/api/assets', { multipart: { file: { name: 'feedback.png', mimeType: 'image/png', buffer: png() } } });
+  expect(up.ok()).toBe(true);
+  const assetIds = ((await up.json()) as { assets: { id: string }[] }).assets.map((a) => a.id);
+  await page.goto(`/feedback/${await postItem(page, `Ảnh đính kèm ${Date.now()}`, 'Xem ảnh chụp màn hình.', { kind: 'bug', assetIds })}`);
+  const photo = page.getByRole('list', { name: '1 ảnh đính kèm' }).locator('img');
+  await photo.scrollIntoViewIfNeeded();
+  await expect.poll(() => photo.evaluate((i: HTMLImageElement) => i.complete && i.naturalWidth > 0)).toBe(true);
 });
