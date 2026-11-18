@@ -14,7 +14,7 @@ import { NARROW, useMediaQuery, WIDE } from '@/lib/use-media-query';
 import { useHydrated } from '@/lib/use-hydrated';
 import { useRecall } from '@/lib/use-recall';
 import { useDraftState } from '@/lib/use-draft';
-import { reloadSamples, samplesFailed, useSamples, versionedSample } from '@/lib/use-samples';
+import { reloadSamples, samplesFailed, samplesPending, useSamples, versionedSample } from '@/lib/use-samples';
 import { asExample, dropRefillQuery, exampleFrom, refillFrom } from '@/lib/reuse';
 import { About } from './About';
 import { AudioSwitch } from './AudioSwitch';
@@ -24,7 +24,7 @@ import { confirmDialog } from './Confirm';
 import { ENHANCE_NOTE, EnhanceToggle } from './EnhanceToggle';
 import { Icon } from './Icon';
 import { LoadError } from './LoadError';
-import { ClipDetail, copyError, copySamples, EXAMPLE_USED, ExampleNote, ExampleOrder, FormNotice, GALLERY_SIZE_KEY, HISTORY_SIZE_KEY, photoImg, ProductTypeFilter, RunSummary, shownType, SizeSlider, Slot, UploadedPhotos, uploadError, uploadImages, useSize } from './image-tools';
+import { ClipDetail, copyError, copySamples, EXAMPLE_USED, ExampleNote, ExampleOrder, FormNotice, GALLERY_SIZE_KEY, HISTORY_SIZE_KEY, photoImg, ProductTypeFilter, RunSummary, shownType, SizeSlider, Slot, TileSkeleton, UploadedPhotos, uploadError, uploadImages, useSize } from './image-tools';
 import { FormContext, type Photo, Tap, useApplier, useJobs, useRecreated } from './jobs';
 import { Modal } from './Modal';
 import { ModelPicker } from './ModelPicker';
@@ -234,7 +234,7 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
   const [tileDetails, setTileDetails] = useState<Record<string, SampleDetails>>({});
   const askedDetails = useRef(new Set<string>());
   // The results an Admin put on the Examples tab (owner, 2026-11-15: POD examples), shown before the fixed samples and filtered by product type.
-  const [curated, setCurated] = useState<{ clips: LibraryClip[]; admin: boolean; failed: boolean }>({ clips: [], admin: false, failed: false });
+  const [curated, setCurated] = useState<{ clips: LibraryClip[]; admin: boolean; failed: boolean; loaded: boolean }>({ clips: [], admin: false, failed: false, loaded: false });
   const [curatedId, setCuratedId] = useState<string | null>(null); // the id of one open in place, as on the other Examples tabs
   const [chosenType, setChosenType] = useState(''); // ProductTypeFilter
   const [curatedTry, setCuratedTry] = useState(0);
@@ -563,7 +563,7 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
         more = r.hasMore && r.clips.length > 0; // an empty page ends the loop whatever hasMore says
         admin = r.isAdmin;
       }
-      if (!stale) setCurated({ clips, admin, failed: false });
+      if (!stale) setCurated({ clips, admin, failed: false, loaded: true });
     })().catch(() => !stale && setCurated((c) => ({ ...c, failed: true })));
     return () => {
       stale = true;
@@ -992,7 +992,9 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
           {shown === 'examples' && samplesFailed() && <LoadError text="Không tải được ví dụ." onRetry={reloadSamples} />}
           {shown === 'examples' && curated.admin && curated.clips.length > 1 && <ExampleOrder feature="video" onSaved={() => setCuratedTry((n) => n + 1)} />}
           {shown === 'examples' && <ProductTypeFilter items={curated.clips} value={type} onChange={setChosenType} />}
-          {shown === 'examples' ? (
+          {shown === 'examples' && (samplesPending() || !(curated.loaded || curated.failed)) ? (
+            <TileSkeleton />
+          ) : shown === 'examples' ? (
             <div className="masonry" role="group" aria-label="Video ví dụ">
               {splitColumns(tiles, narrow ? 2 : Math.max(1, (wide ? 4 : 3) + 1 - gallerySize)).map((column, c) => (
                 <ul key={c} className="masonry-col">
@@ -1003,7 +1005,7 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
                       const name = [clip.modelLabel, clip.ratio, kind].filter(Boolean).join(', '); // as the other Examples tabs name a company result
                       return (
                         <li key={clip.id} className="example">
-                          <Preview src={`/api/assets/${clip.videoAssetId}/content`} poster={clip.posterAssetId ? `/api/assets/${clip.posterAssetId}/content` : ''} width={ex.width} height={ex.height} title={name} paused={picking || detail !== null || curatedId !== null} onHover />
+                          <Preview src={`/api/assets/${clip.videoAssetId}/content`} poster={clip.posterAssetId ? thumbUrl(clip.posterAssetId) : ''} width={ex.width} height={ex.height} title={name} paused={picking || detail !== null || curatedId !== null} onHover />
                           <button type="button" className="example-open" aria-label={`Xem chi tiết video ${name}`} onClick={() => setCuratedId(clip.id)}>
                             <span className="example-caption">
                               {clip.modelLabel}

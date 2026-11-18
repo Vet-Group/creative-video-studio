@@ -6,6 +6,8 @@ const listeners = new Set<(have: Set<string>) => void>();
 const versions = new Map<string, string>();
 /** Whether the last list request failed: the pages then say so with a retry rather than "no samples yet". */
 let failed = false;
+/** The last list read, so a page mounted later starts on it instead of an empty list. */
+let known: Set<string> | null = null;
 let retries = 0;
 /** The waits before the next tries after a failed list, so a server that recovers fills the pages without a reload. */
 export const RETRY_MS = [3_000, 10_000, 30_000];
@@ -20,7 +22,8 @@ function load(): Promise<Set<string>> {
       failed = false;
       retries = 0;
       for (const s of b.samples) versions.set(s.name, s.version);
-      return new Set(b.samples.map((s) => s.name));
+      known = new Set(b.samples.map((s) => s.name));
+      return known;
     })
     .catch(() => {
       // A failure is never kept: the next mount or the timer below asks again.
@@ -36,6 +39,9 @@ function load(): Promise<Set<string>> {
 /** Whether the sample list failed to load (read on the render after useSamples updates). */
 export const samplesFailed = (): boolean => failed;
 
+/** Whether the list has not answered yet (neither read nor failed): pages show a skeleton rather than the built-in test patterns that stand for an empty list. */
+export const samplesPending = (): boolean => known === null && !failed;
+
 /** A sample's URL with its version, so a replaced file is fetched anew rather than from the browser's hour-long cache. */
 export const versionedSample = (src: string): string => {
   const v = versions.get(src.slice(src.lastIndexOf('/') + 1));
@@ -50,7 +56,7 @@ export function reloadSamples(): void {
 
 /** The names of the uploaded samples (lib/samples.ts), loaded once per page; empty until then, so every slot starts on its fallback. */
 export function useSamples(): Set<string> {
-  const [have, setHave] = useState<Set<string>>(() => new Set());
+  const [have, setHave] = useState<Set<string>>(() => known ?? new Set());
   useEffect(() => {
     let live = true;
     const set = (s: Set<string>) => live && setHave(s);
