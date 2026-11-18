@@ -253,10 +253,17 @@ export async function streamAsset(request: Request, asset: Pick<Asset, 's3Key' |
     ...(etag ? { etag } : {}),
     'x-content-type-options': 'nosniff',
   };
+  // A viewer who leaves (a scroll past a grid, a closed tab) aborts the read: 499 for nobody, instead of an AbortError in the log.
+  const read = (bytes?: string) => getObject(asset.s3Key, bytes, request.signal).catch((e: unknown) => {
+    if (request.signal.aborted) return null;
+    throw e;
+  });
   if (!range) {
-    return new Response(await getObject(asset.s3Key, undefined, request.signal), { headers: { ...headers, 'content-length': String(asset.bytes) } });
+    const body = await read();
+    return body ? new Response(body, { headers: { ...headers, 'content-length': String(asset.bytes) } }) : new Response(null, { status: 499 });
   }
   headers['content-length'] = String(range.end - range.start + 1);
   headers['content-range'] = `bytes ${range.start}-${range.end}/${asset.bytes}`;
-  return new Response(await getObject(asset.s3Key, `bytes=${range.start}-${range.end}`, request.signal), { status: 206, headers });
+  const body = await read(`bytes=${range.start}-${range.end}`);
+  return body ? new Response(body, { status: 206, headers }) : new Response(null, { status: 499 });
 }

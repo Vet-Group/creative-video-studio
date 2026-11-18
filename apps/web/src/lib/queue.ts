@@ -9,7 +9,8 @@ import { reaRemakeEnabled } from './remake';
 const g = globalThis as unknown as { cvsBoss?: Promise<PgBoss> };
 
 async function start(): Promise<PgBoss> {
-  const b = new PgBoss({ connectionString: databaseUrl(), max: 2 });
+  // The worker supervises and schedules; a second supervisor here only scans pg-boss's tables again.
+  const b = new PgBoss({ connectionString: databaseUrl(), max: 2, supervise: false, schedule: false });
   b.on('error', (e) => console.error('pg-boss:', e));
   await b.start();
   await b.createQueue(VIDEO_QUEUE, VIDEO_QUEUE_OPTIONS);
