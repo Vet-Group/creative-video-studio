@@ -39,6 +39,8 @@ export interface AppConfig {
   ratio?: boolean;
   /** Shows the resolution field (Upscale); the options are the keys of the model's prices. */
   resolution?: boolean;
+  /** Shows the views (PRODUCT_VIEWS) to pick (the multi-angle app): Run sends one job per view picked, each with its `params.view`. */
+  views?: boolean;
   /** An app that is not built yet: its page says so, and why. */
   soon?: string;
 }
@@ -176,6 +178,16 @@ export const APPS: AppConfig[] = [
     slots: [],
   },
   {
+    // Ours too: the sides of a product from its front photo, as reference images that help a video model keep an all-over print.
+    slug: 'multi-angle',
+    feature: 'multi_angle',
+    name: 'Ảnh nhiều góc',
+    description: 'Từ một ảnh sản phẩm, tạo ảnh mặt sau, hai bên hoặc góc 3/4, mỗi góc một ảnh riêng.',
+    category: 'photo',
+    slots: [{ label: 'Sản phẩm', inputLabel: 'Ảnh sản phẩm', empty: 'Thêm 1 ảnh mặt trước của sản phẩm' }],
+    views: true,
+  },
+  {
     // Ours too, with its own page (components/SmartRemakeApp.tsx) and off unless both REA flags are on (visibleApps). It spends no job: a remake is video spend
     // of its own (api/remakes), so it borrows the `video` feature rather than add one whose per-feature cap would never apply.
     slug: 'smart-remake',
@@ -211,6 +223,8 @@ export interface AppDraft {
   /** null while the model list loads; `failed` when it could not be loaded. */
   models: { maxImages: number }[] | null;
   failed: boolean;
+  /** How many views are picked, on an app with `views`. */
+  views?: number;
 }
 
 /** The first thing that stops Run, in the order the form is filled; null when it can go. */
@@ -222,6 +236,7 @@ export function appReason(app: AppConfig, d: AppDraft): string | null {
   for (const [i, slot] of app.slots.entries()) {
     if (!slot.optional && d.images[i]!.length === 0) return `Tải lên ảnh: ${slot.label}.`;
   }
+  if (app.views && !d.views) return 'Chọn ít nhất một góc.';
   if (app.prompt === 'background') {
     const reference = d.images[1]!.length > 0;
     const written = d.prompt.trim() !== '';
@@ -288,3 +303,14 @@ export function appInputs(app: AppConfig, d: Pick<AppDraft, 'images' | 'prompt'>
   const written = d.prompt.trim();
   return app.prompt && written ? { assetIds, prompt: written } : { assetIds };
 }
+
+/** What the multi-angle app calls each of PRODUCT_VIEWS. */
+export const VIEW_LABELS: Record<string, string> = {
+  back: 'Mặt sau', left: 'Bên trái', right: 'Bên phải', 'three-quarter-left': 'Góc 3/4 trái', 'three-quarter-right': 'Góc 3/4 phải', top: 'Nhìn từ trên',
+};
+
+/** The views the multi-angle app starts with: the back and both sides, which the front photo shows least. */
+export const DEFAULT_VIEWS = ['back', 'left', 'right'];
+
+/** What a Run of `runs` jobs at `unit` USD each costs, with the 4 decimals of a job's estimate; undefined while the price is unknown. */
+export const runTotal = (unit: string | undefined, runs: number): string | undefined => (unit === undefined ? undefined : (Number(unit) * runs).toFixed(4));

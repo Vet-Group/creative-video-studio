@@ -86,7 +86,22 @@ export const FEATURE_PROMPTS: Record<string, string> = {
   background_remover: 'Remove the background.',
   jewelry_try_on: 'Put the jewelry from every image but the last on the person in the last image, each piece where it is worn and at a realistic scale. Keep its design, metal colour and stones exactly, and match its reflections and shadows to the light of the photo. Keep the person, face, pose, clothing and background exactly unchanged. Do not add any text, logos or watermarks.',
   lingerie_try_on: 'Dress the person in the last image in the lingerie pieces from every image but the last, each piece worn as intended and fitted to the body. Keep the fabric details (lace, mesh, satin, straps, seams) and the colours exactly. Keep the face, body shape, pose, skin tone and background exactly unchanged. Do not add any text, logos or watermarks',
+  multi_angle: "Keep the product exactly as it is: its shape, print, colours and details. Infer the sides the photo does not show from the product's construction, with seams, closures and back details consistent with the front. Do not add any text, logos or watermarks.",
 };
+
+/**
+ * The views of the multi-angle app (feature `multi_angle`), in the app's order: the id a job keeps in `params.view` and the camera fal's Qwen multiple-angles endpoint takes
+ * (schema read 2026-11-18: horizontal_angle 0 front, 90 right side, 180 back, 270 left side; vertical_angle 0 eye level, 60 high angle). Each view is its own job;
+ * the app's labels are VIEW_LABELS in apps/web/src/lib/apps.ts.
+ */
+export const PRODUCT_VIEWS = [
+  { id: 'back', horizontal: 180, vertical: 0 },
+  { id: 'left', horizontal: 270, vertical: 0 },
+  { id: 'right', horizontal: 90, vertical: 0 },
+  { id: 'three-quarter-left', horizontal: 315, vertical: 0 },
+  { id: 'three-quarter-right', horizontal: 45, vertical: 0 },
+  { id: 'top', horizontal: 0, vertical: 60 },
+] as const;
 
 const FAL_KLING_PAGE = 'https://fal.ai/models/fal-ai/kling-video/o3/pro/reference-to-video';
 const FAL_KLING_SCHEMA = 'https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=fal-ai/kling-video/o3/pro/reference-to-video';

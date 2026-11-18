@@ -148,6 +148,8 @@ export const USERS = {
   fmtf: { email: 'fmtf@e2e.test', name: 'E2E Formats F', role: 'member' },
   // fashion-model.e2e: the AI model generator, a saved model in the Try On person picker.
   fashiona: { email: 'fashiona@e2e.test', name: 'E2E Fashion A', role: 'member' },
+  // multi-angle.e2e: the multi-angle app, one job per view.
+  viewsa: { email: 'viewsa@e2e.test', name: 'E2E Views A', role: 'member' },
   // changelog.e2e: the changelog page, the sidebar dot and the once-a-day popup, one member per test.
   chga: { email: 'chga@e2e.test', name: 'E2E Changelog A', role: 'member' },
   chgb: { email: 'chgb@e2e.test', name: 'E2E Changelog B', role: 'member' },

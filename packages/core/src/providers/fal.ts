@@ -11,7 +11,7 @@ import { imageSize } from './image-size';
 import { estimate, ImageReadError, imageEstimate, imageTokens, packJobId, plainImage, ProviderHttpError, resolveImages, sendJson, sizeFor, timeout, unpackJobId, videoTokens, type Fetch, type ReadImage } from './http';
 import { isByteplusVideo } from './byteplus';
 import { VERTEX_OMNI_MODEL } from './vertex-omni';
-import { FAL_TEXT_ENDPOINTS } from '../models';
+import { FAL_TEXT_ENDPOINTS, PRODUCT_VIEWS } from '../models';
 import type { ImageProvider, ImageSubmitRequest, ProviderStatus, SubmitRequest, VideoProvider } from './types';
 
 const QUEUE = 'https://queue.fal.run';
@@ -427,6 +427,17 @@ function upscaleFactor(image: string, target: number): number {
   return Math.max(1, Math.floor(Math.min(4, tier, Math.sqrt(target / pixels)) * 100) / 100);
 }
 
+/**
+ * The multi-angle app: fal bills the Qwen multiple-angles endpoint $0.035 per output megapixel (pricing read 2026-11-18), and without a size the output matches the input.
+ * So the output is pinned to at most a million pixels in the input's shape, edges rounded down to multiples of 16, and every view costs the one megapixel of its 1K price.
+ */
+function megapixelSize(image: string | undefined): Size {
+  const size = image?.startsWith('data:') ? imageSize(Buffer.from(image.slice(image.indexOf(',') + 1), 'base64')) : undefined;
+  const shape = size ? size.width / size.height : 1;
+  const edge = (n: number) => Math.floor(n / 16) * 16;
+  return { width: edge(Math.sqrt(1_000_000 * shape)), height: edge(Math.sqrt(1_000_000 / shape)) };
+}
+
 /** The request body of each image endpoint, built from its input schema (read 2026-10-24). Output is png wherever the schema offers a format; Topaz is left at its jpeg default, and the other endpoints have no choice. */
 const IMAGE_BODIES: Record<string, ImageBody> = {
   'fal-ai/nano-banana-pro/edit': nano(true),
@@ -464,6 +475,12 @@ const IMAGE_BODIES: Record<string, ImageBody> = {
   },
   // A prompt would be billed extra and change the cutout, so none is sent.
   'fal-ai/bria/background/remove': (_req, [image_url]) => ({ image_url }),
+  // One view per job; the endpoint writes its own camera prompt from the angles and appends the fixed prompt to it (additional_prompt). Zoom stays at its medium-shot default.
+  'fal-ai/qwen-image-edit-2511-multiple-angles': (req, [image]) => {
+    const view = PRODUCT_VIEWS.find((v) => v.id === req.view);
+    if (!view) throw new ImageReadError(`qwen multiple angles needs a view, not ${req.view}`);
+    return { image_urls: [image], horizontal_angle: view.horizontal, vertical_angle: view.vertical, additional_prompt: req.prompt, image_size: megapixelSize(image), num_images: 1, output_format: 'png' };
+  },
 };
 
 export function createFalImageProvider(opts: { apiKey: string; fetch?: Fetch; readImage?: ReadImage; pause?: (ms: number) => Promise<void> }): ImageProvider {

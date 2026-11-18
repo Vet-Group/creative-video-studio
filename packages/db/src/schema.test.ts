@@ -358,7 +358,7 @@ describe('migration 0035 user choices', () => {
 
 describe('migration 0007 image models', () => {
   test('seeds the seven fal image models disabled, each with its prices, ratios and features', async () => {
-    const { rows } = await pool.query(`select id, endpoint, features, ratios, durations_sec, max_images, image_prices, usd_per_second, enabled, sources from model_configs where kind = 'image' and cardinality(features) > 0 and not features && ARRAY['character_swap', 'model_swap', 'background_changer', 'reframe', 'image_upscale', 'face_swap', 'background_remover']::text[] and id not like 'gpt-image-2.5%' and provider = 'fal' order by id`);
+    const { rows } = await pool.query(`select id, endpoint, features, ratios, durations_sec, max_images, image_prices, usd_per_second, enabled, sources from model_configs where kind = 'image' and cardinality(features) > 0 and not features && ARRAY['character_swap', 'model_swap', 'background_changer', 'reframe', 'image_upscale', 'face_swap', 'background_remover', 'multi_angle']::text[] and id not like 'gpt-image-2.5%' and provider = 'fal' order by id`);
     expect(rows.map((r) => [r.id, r.endpoint, r.features, r.image_prices])).toEqual([
       ['fashn-v1.6', 'fal-ai/fashn/tryon/v1.6', ['try_on'], { '1K': '0.075' }],
       ['gpt-image-2', 'openai/gpt-image-2/edit', ['image'], { '1K': '0.281', '2K': '0.301', '4K': '0.530' }],
@@ -1009,5 +1009,19 @@ describe('migration 0103 ratings', () => {
     await expect(rate('r4', 11, null)).rejects.toThrow(/ratings_score_check/);
     await expect(rate('r5', 5, 'x'.repeat(1001))).rejects.toThrow(/ratings_comment_check/);
     expect((await pool.query('select rating_snoozed_until from users where id = $1', [userId])).rows[0].rating_snoozed_until).toBeNull();
+  });
+});
+
+describe('migration 0105 multi-angle views', () => {
+  test('adds the enabled Qwen multiple-angles row for multi_angle at its one-megapixel price, its soft cap, and lets a job of the feature be stored', async () => {
+    const { rows } = await pool.query(`select id, provider, endpoint, kind, features, ratios, max_images, image_prices, enabled, sources from model_configs where 'multi_angle' = any(features)`);
+    expect(rows.map((r) => [r.id, r.provider, r.endpoint, r.kind, r.features, r.ratios, r.max_images, r.image_prices, r.enabled])).toEqual([
+      ['qwen-multiple-angles', 'fal', 'fal-ai/qwen-image-edit-2511-multiple-angles', 'image', ['multi_angle'], ['auto'], 1, { '1K': '0.035' }, true],
+    ]);
+    expect(rows[0].sources.ratios).toEqual({ url: 'https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=fal-ai/qwen-image-edit-2511-multiple-angles', readAt: '2026-11-18' });
+    expect(rows[0].sources.imagePrices.readAt).toBe('2026-11-18');
+    expect((await pool.query(`select monthly_usd::int as usd from feature_caps where feature = 'multi_angle'`)).rows[0].usd).toBe(10);
+    const id = await insertJob(userId);
+    await pool.query(`update jobs set feature = 'multi_angle', params = '{"resolution": "1K", "view": "back"}' where id = $1`, [id]);
   });
 });

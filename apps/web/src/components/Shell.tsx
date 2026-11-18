@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { type ComponentProps, createContext, type ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { api, errorText, type JobStatus, sendJson, thumbUrl, type TrayJob } from '@/lib/api';
-import { appBySlug } from '@/lib/apps';
+import { appBySlug, VIEW_LABELS } from '@/lib/apps';
 import type { ChangeEntry } from '@/lib/changelog';
 import { CHANGELOG_SEEN_EVENT, loadSeen, unseenEntries } from '@/lib/changelog-seen';
 import { downloadCompressed, downloadCompressedVideo } from '@/lib/compress-download';
@@ -141,8 +141,11 @@ const ratioBox =(ratio: string): string => {
   return m ? `${m[1]} / ${m[2]}` : '3 / 4';
 };
 
-/** The History card's title: the page's own name for what made it, as Fash titles its cards ("UGC Try On"). */
-const cardTitle = (job: TrayJob): string => (job.feature === 'marketing' ? cardTitleOfFormat(job.format) : featureLabel(job.feature));
+/** The History card's title: the page's own name for what made it, as Fash titles its cards ("UGC Try On"); a multi-angle card adds its view, as each view is its own job. */
+const cardTitle = (job: TrayJob): string => {
+  const view = job.view && VIEW_LABELS[job.view];
+  return job.feature === 'marketing' ? cardTitleOfFormat(job.format) : view ? `${featureLabel(job.feature)} · ${view}` : featureLabel(job.feature);
+};
 
 /**
  * One job in a page's History tab, laid out as Fash's History card: the result on the left; on the right the title, the member's own words,

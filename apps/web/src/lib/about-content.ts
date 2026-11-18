@@ -2294,6 +2294,48 @@ export const APP_ABOUT: Record<string, AboutPage> = {
       },
     ],
   },
+  'multi-angle': {
+    title: 'Ảnh nhiều góc từ một ảnh sản phẩm',
+    sections: [
+      {
+        title: 'Ảnh nhiều góc là gì?',
+        blocks: [
+          'Ảnh nhiều góc xoay sản phẩm trong một ảnh mặt trước sang các góc khác: mặt sau, bên trái, bên phải, góc 3/4 và nhìn từ trên. Mỗi góc là một ảnh riêng.',
+          `Dùng các ảnh này làm ảnh tham chiếu ở Tạo video hay Marketing Studio: mô hình video thấy sản phẩm từ nhiều phía nên giữ hình in quanh sản phẩm tốt hơn. ${APP_COST}`,
+        ],
+      },
+      {
+        title: 'Tạo ảnh nhiều góc trong 3 bước',
+        lead: 'Tải ảnh sản phẩm, chọn góc, rồi bấm Chạy.',
+        blocks: [
+          {
+            steps: [
+              { title: 'Tải ảnh sản phẩm', text: 'Thêm một ảnh mặt trước rõ nét của sản phẩm, tốt nhất trên nền trơn.' },
+              { title: 'Chọn góc', text: 'Mặc định là mặt sau và hai bên. Mỗi góc tạo một ảnh riêng và tính tiền riêng; tổng tiền hiện trước khi chạy.' },
+              { title: 'Chạy', text: 'Bấm Chạy. Mỗi góc là một lượt trong tab Lịch sử, dùng lại hay tải về như ảnh thường.' },
+            ],
+          },
+        ],
+      },
+      {
+        title: 'Giới hạn',
+        blocks: [
+          'AI chỉ thấy mặt trước, nên mặt sau và hai bên là phần nó đoán từ kiểu dáng sản phẩm. Hình in phủ toàn thân ở mặt sau không thể đoán đúng: nếu có ảnh thật hay mockup mặt sau, hãy dùng ảnh đó và chỉ tạo các góc còn lại.',
+        ],
+      },
+      {
+        title: 'Câu hỏi thường gặp',
+        blocks: [
+          {
+            faq: [
+              ['Mỗi góc tốn bao nhiêu?', `${APP_COST} Mỗi góc là một ảnh nên tổng tiền bằng giá một ảnh nhân số góc đã chọn.`],
+              ['Dùng ảnh nào để có kết quả tốt?', 'Một ảnh mặt trước rõ nét, thấy trọn sản phẩm, không bị tay hay đồ vật che.'],
+            ],
+          },
+        ],
+      },
+    ],
+  },
   'ai-fashion-model': {
     title: 'Tạo người mẫu AI từ vài lựa chọn',
     sections: [

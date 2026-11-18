@@ -1,17 +1,17 @@
-import { FEATURE_PROMPTS } from '@cvs/core/models';
+import { FEATURE_PROMPTS, PRODUCT_VIEWS } from '@cvs/core/models';
 import { FEATURES } from '@cvs/db';
 import { describe, expect, it } from 'vitest';
 import { APP_ABOUT } from './about-content';
-import { APPS, appBySlug, appInputs, appReason, type AppDraft, filterApps, motionReason, slotMax, splitImages, stockGroups, visibleApps } from './apps';
+import { APPS, appBySlug, appInputs, appReason, type AppDraft, DEFAULT_VIEWS, filterApps, motionReason, runTotal, slotMax, splitImages, stockGroups, VIEW_LABELS, visibleApps } from './apps';
 
 const img = (id: string) => ({ id });
 const draft = (images: string[][], prompt = '', maxImages = 2): AppDraft => ({ images: images.map((l) => l.map(img)), prompt, models: [{ maxImages }], failed: false });
 const reason = (slug: string, images: string[][], prompt?: string, maxImages?: number) => appReason(appBySlug(slug)!, draft(images, prompt, maxImages));
 
 describe('the app list', () => {
-  it('has thirteen apps with unique slugs, known features and (for the built image apps) a default prompt', () => {
-    expect(APPS).toHaveLength(13);
-    expect(new Set(APPS.map((a) => a.slug)).size).toBe(13);
+  it('has fourteen apps with unique slugs, known features and (for the built image apps) a default prompt', () => {
+    expect(APPS).toHaveLength(14);
+    expect(new Set(APPS.map((a) => a.slug)).size).toBe(14);
     for (const a of APPS) {
       expect(FEATURES as readonly string[]).toContain(a.feature);
       if (!a.soon && a.feature !== 'motion_control' && a.feature !== 'media_optimizer' && a.feature !== 'fashion_model' && a.slug !== 'smart-remake') expect(FEATURE_PROMPTS).toHaveProperty(a.feature);
@@ -22,13 +22,13 @@ describe('the app list', () => {
     expect(appBySlug('smart-remake')).toMatchObject({ slots: [], feature: 'video', category: 'video' });
   });
 
-  it('offers Smart Remake only when its flags are on: the first twelve apps keep their places and it comes last', () => {
-    expect(visibleApps(false)).toHaveLength(12);
+  it('offers Smart Remake only when its flags are on: the first thirteen apps keep their places and it comes last', () => {
+    expect(visibleApps(false)).toHaveLength(13);
     expect(visibleApps(false).map((a) => a.slug)).not.toContain('smart-remake');
     expect(visibleApps(true).at(-1)!.slug).toBe('smart-remake');
-    expect(filterApps('all', '')).toHaveLength(12); // off unless asked for
+    expect(filterApps('all', '')).toHaveLength(13); // off unless asked for
     expect(filterApps('video', '').map((a) => a.slug)).toEqual(['motion-control']);
-    expect(filterApps('all', '', true)).toHaveLength(13);
+    expect(filterApps('all', '', true)).toHaveLength(14);
     expect(filterApps('video', '', true).map((a) => a.slug)).toEqual(['motion-control', 'smart-remake']);
     expect(filterApps('all', 'remake', true).map((a) => a.slug)).toEqual(['smart-remake']);
     expect(filterApps('all', 'remake')).toEqual([]);
@@ -109,8 +109,8 @@ describe('the app About tabs', () => {
 
 describe('filterApps', () => {
   it('filters by category and by name or description, ignoring accents and case', () => {
-    expect(filterApps('all', '')).toHaveLength(12);
-    expect(filterApps('all', '').at(-1)!.slug).toBe('ai-fashion-model'); // ours comes after the live apps, which keep their order
+    expect(filterApps('all', '')).toHaveLength(13);
+    expect(filterApps('all', '').at(-1)!.slug).toBe('multi-angle'); // ours comes after the live apps, which keep their order
     expect(filterApps('fashion', '').map((a) => a.slug)).toEqual(['character-swap', 'model-swap', 'face-swap', 'jewelry-try-on', 'lingerie-try-on', 'ai-fashion-model']);
     expect(filterApps('video', '').map((a) => a.slug)).toEqual(['motion-control']);
     expect(filterApps('all', 'DOI NEN').map((a) => a.slug)).toEqual(['background-changer']);
@@ -147,6 +147,33 @@ describe('appReason', () => {
 
   it('refuses more images than the model takes', () => {
     expect(reason('character-swap', [['a'], ['b']], '', 1)).toBe('Mô hình này nhận tối đa 1 ảnh.');
+  });
+});
+
+describe('Ảnh nhiều góc', () => {
+  const app = appBySlug('multi-angle')!;
+  it('takes one product photo and shows the views, starting with the back and both sides', () => {
+    expect(app).toMatchObject({ feature: 'multi_angle', category: 'photo', views: true });
+    expect(app.slots.map((s) => [s.label, !!s.optional, !!s.many])).toEqual([['Sản phẩm', false, false]]);
+    expect(DEFAULT_VIEWS).toEqual(['back', 'left', 'right']);
+    expect(DEFAULT_VIEWS.every((v) => PRODUCT_VIEWS.some((p) => p.id === v))).toBe(true);
+    expect(Object.keys(VIEW_LABELS)).toEqual(PRODUCT_VIEWS.map((v) => v.id)); // a label for every view, in the same order
+    expect(filterApps('photo', '').map((a) => a.slug)).toContain('multi-angle');
+  });
+
+  it('asks for the photo, then for at least one view', () => {
+    const d = (images: string[], views: number): AppDraft => ({ images: [images.map(img)], prompt: '', models: [{ maxImages: 1 }], failed: false, views });
+    expect(appReason(app, d([], 3))).toBe('Tải lên ảnh: Sản phẩm.');
+    expect(appReason(app, d(['a'], 0))).toBe('Chọn ít nhất một góc.');
+    expect(appReason(app, d(['a'], 1))).toBeNull();
+    expect(appReason(appBySlug('reframe')!, draft([['a']]))).toBeNull(); // no other app asks for views
+  });
+
+  it('prices a Run as one job per view, with the 4 decimals of an estimate', () => {
+    expect(runTotal('0.035', 3)).toBe('0.1050');
+    expect(runTotal('0.0350', 6)).toBe('0.2100');
+    expect(runTotal('0.0000', 2)).toBe('0.0000');
+    expect(runTotal(undefined, 3)).toBeUndefined();
   });
 });
 

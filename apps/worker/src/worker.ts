@@ -256,7 +256,7 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
           // input's frame asks for that input's ratio.
           const kept = KEPT_INPUT[job.feature];
           const ratio = kept !== undefined && job.aspect === 'auto' ? await closestRatio(await readAsset(job.input_asset_ids.at(kept)), model.ratios) : job.aspect;
-          const request: ImageSubmitRequest = { model, prompt: job.prompt, imageUrls, ratio, resolution: job.params.resolution, quality: job.params.quality, thinking: job.params.thinking };
+          const request: ImageSubmitRequest = { model, prompt: job.prompt, imageUrls, ratio, resolution: job.params.resolution, quality: job.params.quality, thinking: job.params.thinking, view: job.params.view };
           return { send: () => provider.submit(request) };
         }
         const provider = providers[job.provider];

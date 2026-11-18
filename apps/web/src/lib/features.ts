@@ -9,6 +9,7 @@ export const FEATURE_LABELS: Record<string, string> = {
   jewelry_try_on: 'Thử trang sức',
   lingerie_try_on: 'Thử đồ lót',
   fashion_model: 'Tạo người mẫu AI',
+  multi_angle: 'Ảnh nhiều góc',
   background_changer: 'Đổi nền',
   reframe: 'Đổi khung hình',
   image_upscale: 'Tăng độ phân giải',
