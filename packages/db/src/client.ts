@@ -1,4 +1,6 @@
 // Connections shared by the web app and the worker.
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
 import pg from 'pg';
 import * as schema from './schema';
@@ -9,7 +11,8 @@ export type Db = NodePgDatabase<typeof schema>;
 export function databaseUrl(): string {
   if (!process.env.DATABASE_URL) {
     try {
-      process.loadEnvFile(new URL('../../../.env', import.meta.url));
+      // A path, not new URL('…/.env', import.meta.url): Turbopack copies a file named that way into the build, under the public .next/static/media.
+      process.loadEnvFile(join(dirname(fileURLToPath(import.meta.url)), '../../../.env'));
     } catch {
       // No .env file.
     }
