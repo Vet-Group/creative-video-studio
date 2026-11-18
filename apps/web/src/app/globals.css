@@ -469,6 +469,9 @@ dialog.modal.jobs-drawer[open] { animation: jobs-drawer-in .28s cubic-bezier(.2,
 .job-reuse { display: flex; align-items: center; justify-content: center; gap: 6px; height: 36px; border-radius: 8px; background: var(--fill); color: var(--ink-strong); font-size: 12px; font-weight: 500; text-decoration: none; }
 .job-reuse:hover { background: var(--fill-strong); }
 .job-main { display: grid; gap: 6px; margin-top: auto; }
+.job-unavailable { display: grid; gap: 4px; }
+.job-unavailable .help, .job-main .help { margin: 0; }
+.job-reuse:disabled:hover { background: var(--fill); }
 .job-reuse.job-primary { background: var(--ink); color: var(--on-ink); }
 .job-reuse.job-primary:hover { background: var(--ink-strong); }
 .job-card .job-actions { padding-top: 10px; }

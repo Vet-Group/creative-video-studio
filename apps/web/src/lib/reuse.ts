@@ -51,3 +51,36 @@ export function reuseHref(job: { id: string; feature: string }): string | null {
   const page = PAGES[job.feature];
   return page ? `${page}?reuse=${encodeURIComponent(job.id)}` : null;
 }
+
+/** What a refill could not bring back, each told to the member with its reason instead of dropped silently. */
+export interface Skipped {
+  /** The job's model is not offered here (switched off or hidden by an Admin, or not for this page); `instead` is the one the form chose. */
+  model?: { label: string | null; instead: string | null };
+  /** Input photos that no longer exist (deleted or purged). */
+  lost?: number;
+  /** Photos the form has no place for, left out. */
+  extra?: { count: number; max: number };
+  /** The job's store, hidden since. */
+  store?: boolean;
+}
+
+/** One line for a refill that left something out: what came back, then what did not and why; empty when nothing was skipped. `kept` is how many photos were put back. */
+export function skippedNote(kept: number, s: Skipped): string {
+  const list = [
+    ...(s.model ? [`mô hình ${s.model.label ?? 'đã dùng'} (đã tắt hoặc không còn dùng ở trang này${s.model.instead ? `, đã chọn ${s.model.instead}` : ''})`] : []),
+    ...(s.lost ? [`${s.lost} ảnh đầu vào (đã bị xoá)`] : []),
+    ...(s.extra ? [`${s.extra.count} ảnh thừa (chỗ này chỉ nhận ${s.extra.max} ảnh)`] : []),
+    ...(s.store ? ['cửa hàng (đã bị ẩn)'] : []),
+  ];
+  return list.length === 0 ? '' : `Đã điền lại ${kept > 0 ? `${kept} ảnh và ` : ''}phần còn lại. Không dùng lại được: ${list.join('; ')}.`;
+}
+
+/** Whether a job's refill has nothing to bring back: it had input photos, none exists any more, and it has no words to put in the form. */
+export const nothingRefilled = (j: { inputCount?: number; images: unknown[]; prompt?: string | null; brief?: string | null }): boolean =>
+  (j.inputCount ?? 0) > 0 && j.images.length === 0 && !(j.brief || j.prompt)?.trim();
+
+/** The line for a refill that changed nothing (see nothingRefilled). */
+export const nothingNote = (lost: number): string => `Không dùng lại được: ${lost} ảnh đầu vào đã bị xoá và lượt này không có mô tả. Biểu mẫu được giữ nguyên.`;
+
+/** How many of a job's input photos no longer exist (the jobs API tells how many it had); 0 for a sample or a template, which have no count. */
+export const lostInputs = (j: { inputCount?: number; images: unknown[] }): number => Math.max(0, (j.inputCount ?? 0) - j.images.length);

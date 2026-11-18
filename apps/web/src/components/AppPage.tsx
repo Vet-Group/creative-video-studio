@@ -7,6 +7,7 @@ import { type CSSProperties, type ReactNode, useEffect, useId, useRef, useState 
 import { api, errorText, sendJson } from '@/lib/api';
 import { type AppConfig, appInputs, appReason, type AppCategory, DEFAULT_VIEWS, motionReason, runTotal, slotMax, splitImages, stockGroups, VIEW_LABELS, visibleApps } from '@/lib/apps';
 import { basePrompt, promptTooLong } from '@/lib/prompt-limit';
+import { type Skipped, skippedNote } from '@/lib/reuse';
 import { confirmRun, sendRun } from '@/lib/run-guard';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { useRecall } from '@/lib/use-recall';
@@ -148,10 +149,13 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
     app.feature,
     (j) => {
       recall.touch();
-      if (j.images) setImages(splitImages(app, j.images));
+      // Photos beyond the app's slots have no place on the form.
+      const slots = j.images ? splitImages(app, j.images) : null;
+      if (slots) setImages(slots);
+      const extra = j.images && slots ? j.images.length - slots.flat().length : 0;
       setPrompt(j.brief ?? '');
       if (j.view) setViews([j.view]);
-      pick.refill(j);
+      pick.refill({ ...j, ...(extra > 0 && { extra: { count: extra, max: slots!.flat().length } }) });
     },
     (e) => setError(copyError(e, 'Không tìm thấy ảnh để dùng lại.')),
   );
@@ -410,6 +414,8 @@ function MotionForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
   const [notice, setNotice] = useState('');
   const [list, setList] = useState<{ models: MotionModel[]; best: string | null; failed: boolean } | null>(null);
   const [modelId, setModelId] = useState('');
+  /** What a refill left out (told under the form until the member picks a model): the lost photos, the extra ones and the job's model. */
+  const [left, setLeft] = useState<{ modelId: string | null; modelLabel: string | null; lost: number; extra?: Skipped['extra']; kept: number } | null>(null);
   const [orientation, setOrientation] = useState<'video' | 'image'>('video');
   const recall = useRecall(app.feature, (s) => setModelId(s.modelId), { skip: reuse !== undefined }); // the member's last model, unless a refill comes
   const promptId = useId();
@@ -432,8 +438,12 @@ function MotionForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
       if (j.images) {
         const inputs = j.images as (Img & { mime?: string; durationMs?: number | null })[];
         const ref = inputs.find((i) => i.mime?.startsWith('video/'));
-        setImage(inputs.filter((i) => i !== ref).slice(0, 1));
+        const pictures = inputs.filter((i) => i !== ref);
+        setImage(pictures.slice(0, 1));
         setVideo(ref ? { id: ref.id, filename: ref.filename, durationMs: ref.durationMs ?? 0 } : null);
+        // Pictures beyond the one character image have no place on the form.
+        const extra = Math.max(0, pictures.length - 1);
+        setLeft({ modelId: j.modelId, modelLabel: j.modelLabel ?? null, lost: j.lost ?? 0, extra: extra > 0 ? { count: extra, max: 1 } : undefined, kept: inputs.length - extra });
       }
       setPrompt(j.prompt ?? '');
       if (j.modelId) setModelId(j.modelId);
@@ -442,6 +452,7 @@ function MotionForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
     (e) => setError(copyError(e, 'Không tìm thấy video để dùng lại.')),
   );
   const chosen = list?.models.find((m) => m.id === modelId) ?? list?.models.find((m) => m.id === list.best) ?? list?.models[0];
+  const leftNote = left && list && chosen ? skippedNote(left.kept, { lost: left.lost, extra: left.extra, ...(left.modelId && !list.models.some((m) => m.id === left.modelId) && { model: { label: left.modelLabel, instead: chosen.label } }) }) : '';
   const reason = (recall.answered ? null : 'Đang tải cài đặt đã dùng...') ?? motionReason({ image: image.length > 0, videoMs: video?.durationMs ?? null, model: list === null ? null : chosen, failed: list?.failed ?? false, orientation }) ?? promptTooLong(chosen, prompt.trim().length);
   const canRun = reason === null && !busy;
 
@@ -545,7 +556,7 @@ function MotionForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
               {orientation === 'image' && <p className="help">Giữ hướng nhân vật như trong ảnh; chuyển động vẫn theo video.</p>}
             </div>
 
-            {list && list.models.length > 1 && <ModelPicker models={list.models} value={chosen?.id ?? ''} onChange={setModelId} />}
+            {list && list.models.length > 1 && <ModelPicker models={list.models} value={chosen?.id ?? ''} onChange={(id) => (setLeft(null), setModelId(id))} />}
 
             <PromptComposer
               id={promptId}
@@ -568,6 +579,7 @@ function MotionForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
                 {reason}
               </p>
             )}
+            {leftNote && <p className="help" role="status">{leftNote}</p>}
             {error && (
               <p className="error" role="alert">
                 {error}

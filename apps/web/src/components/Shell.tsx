@@ -3,7 +3,7 @@
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { type ComponentProps, createContext, type ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { type ComponentProps, createContext, type ReactNode, useCallback, useContext, useEffect, useId, useRef, useState } from 'react';
 import { api, errorText, type JobStatus, sendJson, thumbUrl, type TrayJob } from '@/lib/api';
 import { appBySlug, VIEW_LABELS } from '@/lib/apps';
 import type { ChangeEntry } from '@/lib/changelog';
@@ -176,6 +176,7 @@ function HistoryCard({ job, isAdmin, select }: { job: TrayJob; isAdmin: boolean;
   const form = useForm();
   const apply = form?.apply;
   const takes = (k: 'durationSec' | 'ratio' | 'resolution') => !!apply && (!form?.settings || form.settings.includes(k));
+  const inputsWhyId = useId();
   const { refresh, jobs } = useJobs();
   const typical = typicalLabel(job, jobs);
   const [problem, setProblem] = useState('');
@@ -332,6 +333,17 @@ function HistoryCard({ job, isAdmin, select }: { job: TrayJob; isAdmin: boolean;
         </p>
         {/* As on Fash, the words, each input and the result can go on the form beside the History. */}
         {job.text && <JobPrompt text={job.text} onUse={form?.prompt && (() => form.prompt!(job.text!))} />}
+        {/* A Motion Control job's inputs are a character image and a reference video: they go back together through Dùng lại, not one by one. */}
+        {job.inputAssetIds.length > 0 && job.feature === 'motion_control' && (
+          <div className="job-unavailable">
+            <button type="button" className="job-reuse" disabled aria-describedby={inputsWhyId}>
+              <Icon name="copy" /> Dùng ảnh đầu vào
+            </button>
+            <p id={inputsWhyId} className="help">
+              Ảnh nhân vật và video tham chiếu chỉ dùng lại cùng nhau: bấm Dùng lại.
+            </p>
+          </div>
+        )}
         {job.inputAssetIds.length > 0 && job.feature !== 'motion_control' && (
           <ul className="job-inputs" aria-label="Ảnh đầu vào">
             {job.inputAssetIds.map((id, n) => (

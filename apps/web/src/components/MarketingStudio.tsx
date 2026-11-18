@@ -20,7 +20,7 @@ import { useRecall } from '@/lib/use-recall';
 import { useDraftState } from '@/lib/use-draft';
 import { useSamples } from '@/lib/use-samples';
 import { cardSample } from '@/lib/examples';
-import { asExample, dropRefillQuery, queryOf } from '@/lib/reuse';
+import { asExample, dropRefillQuery, lostInputs, nothingNote, nothingRefilled, queryOf, skippedNote } from '@/lib/reuse';
 import { About } from './About';
 import { AudioSwitch } from './AudioSwitch';
 import { BrandPicker } from './BrandKit';
@@ -102,6 +102,12 @@ interface MarketingJob {
   feature: string;
   format: string | null;
   images: (Img | { sample: string })[];
+  /** How many input images the job had (not a sample's or a template's). */
+  inputCount?: number;
+  /** Whether the brand kit was added to the job, its store and whether that store is hidden since (a job's, not a template's or a sample's). */
+  brand?: boolean;
+  storeId?: string | null;
+  storeLost?: boolean;
   hook: string | null;
   /** The member's own hook and how a template's prompt was written; an older job has neither. */
   hookText?: string | null;
@@ -315,6 +321,10 @@ export function MarketingStudio({ format = 'ugc', reuse, recipe, wizardDefault =
         const j = await fillBlanks(reuse, loaded);
         if (stale) return; // superseded while the member filled the blanks
         if (!j) return dropRefillQuery(); // cancelled: the form stays as it is
+        if (nothingRefilled({ ...j, prompt: j.brief ?? j.hookText ?? j.ending ?? j.script })) {
+          notify(nothingNote(lostInputs(j))); // nothing to bring back: the form stays as it is
+          return dropRefillQuery();
+        }
         // A sample's photos become this member's inputs first, copied on the server.
         const samples = j.images.map((i) => ('sample' in i ? i.sample : null)).filter((s) => s !== null);
         const copied = samples.length > 0 ? await copySamples(samples) : (j.images as Img[]);
@@ -348,13 +358,20 @@ export function MarketingStudio({ format = 'ugc', reuse, recipe, wizardDefault =
         setEndText(j.endText ?? '');
         setEndTextPos((END_TEXT_POSITIONS as readonly string[]).includes(j.endTextPos ?? '') ? (j.endTextPos as EndTextPosition) : 'bottom');
         setAudio(j.audio !== 'off');
+        // The brand kit switch comes back with its store (a company example keeps the member's own, a template has no switch); a store hidden since leaves it off.
+        if (!source.recipe && j.brand !== undefined) {
+          const on = j.brand && !j.storeLost;
+          setUseBrand(on);
+          if (on) setStoreId(j.storeId ?? '');
+        }
         // A saved template may leave these out; the form's defaults stay.
         if (j.ratio) setRatio(j.ratio);
         if (j.durationSec) setDurationSec(j.durationSec);
         if (j.modelId) setModelId(j.modelId);
         if (source.recipe) notify(EXAMPLE_USED);
         else {
-          if (j.brief === null && advanced) setNotice('Clip này không có mô tả gốc: đã điền lại ảnh và cài đặt, hãy nhập lại mô tả.');
+          const said = [j.brief === null && advanced && 'Clip này không có mô tả gốc: đã điền lại ảnh và cài đặt, hãy nhập lại mô tả.', skippedNote(inputs.length, { lost: lostInputs(j), store: j.brand === true && j.storeLost === true })].filter(Boolean).join(' ');
+          if (said) setNotice(said);
           recreated(reuse);
         }
         dropRefillQuery();
