@@ -1,7 +1,7 @@
 'use client';
 // What the Try On and Image Generation pages share: the image-model picker data, the choice of model, ratio and resolution, the upload slot,
 // the tab strip and the gallery of the company's outputs.
-import { type CSSProperties, type DragEvent, type KeyboardEvent, type ReactNode, type Ref, useEffect, useId, useRef, useState } from 'react';
+import { type CSSProperties, type DragEvent, type ImgHTMLAttributes, type KeyboardEvent, type ReactNode, type Ref, useEffect, useId, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { api, ApiError, type Clip, sendJson, thumbUrl } from '@/lib/api';
@@ -863,6 +863,24 @@ export function ProductTypeFilter({ items, value, onChange }: { items: Clip[]; v
 /** The chosen type while some result still carries it, else '' (all), so a filter never empties the tab once its last such result is gone. */
 export const shownType = (items: Clip[], chosen: string): string => (items.some((c) => c.productType === chosen) ? chosen : '');
 
+/** The Examples grids' wait while their list is read: grey tiles, so nothing else (a stand-in picture) shows first. */
+export function TileSkeleton() {
+  return (
+    <div className="grid library-skeleton" style={{ '--card-min': '10rem' } as CSSProperties} role="status">
+      <span className="sr-only">Đang tải...</span>
+      {Array.from({ length: 6 }, (_, i) => (
+        <span key={i} className="skeleton" />
+      ))}
+    </div>
+  );
+}
+
+/** A tile's picture, which fades in over the tile's own fill once it has loaded (see `.tile-img`). */
+function TileImg(props: ImgHTMLAttributes<HTMLImageElement> & { alt: string }) {
+  const [loaded, setLoaded] = useState(false);
+  return <img {...props} className={loaded ? 'tile-img loaded' : 'tile-img'} onLoad={() => setLoaded(true)} onError={() => setLoaded(true)} />;
+}
+
 export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4], samples }: { kind: string; label: string; emptyText: string; video?: boolean; cols?: [number, number, number]; samples?: string }) {
   const have = useSamples();
   const sampleTiles = samples ? numberedSamples(have, samples, video ? 'mp4' : 'jpg') : [];
@@ -925,14 +943,7 @@ export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4
   // The fixed samples show at once; only the company's own outputs wait for the request.
   if (sampleTiles.length === 0) {
     if (state === 'loading')
-      return (
-        <div className="grid library-skeleton" style={{ '--card-min': '10rem' } as CSSProperties} role="status">
-          <span className="sr-only">Đang tải...</span>
-          {Array.from({ length: 6 }, (_, i) => (
-            <span key={i} className="skeleton" />
-          ))}
-        </div>
-      );
+      return <TileSkeleton />;
     if (state === 'error') return <LoadError text="Không tải được kết quả của công ty." onRetry={retry} />;
     // A sample list that failed is not an empty company: say so, with a retry (the list also retries by itself).
     if (items.length === 0 && samples && samplesFailed()) return <LoadError text="Không tải được ví dụ." onRetry={retry} />;
@@ -958,7 +969,7 @@ export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4
                   ) : (
                     // A picture opens in place as a clip does, with its details when it has a file.
                     <a href={`/api/samples/${it}`} aria-label={detailed.includes(it) ? 'Xem chi tiết ảnh mẫu' : 'Xem ảnh mẫu'} onClick={(e) => (e.preventDefault(), setOpen(sampleTiles.indexOf(it)))}>
-                      <img src={`/api/samples/${it}`} alt={`Ảnh mẫu ${sampleTiles.indexOf(it) + 1}`} loading="lazy" />
+                      <TileImg src={`/api/samples/${it}`} alt={`Ảnh mẫu ${sampleTiles.indexOf(it) + 1}`} loading="lazy" />
                     </a>
                   )}
                   {detailed.includes(it) && <SampleActions name={it} />}
@@ -967,11 +978,11 @@ export function Gallery({ kind, label, emptyText, video = false, cols = [2, 3, 4
               <li key={it.id} className="gallery-item" style={{ aspectRatio: aspectOf(it.ratio) }}>
                 {video ? (
                   <a href={`/api/assets/${it.videoAssetId}/content`} target="_blank" rel="noreferrer" aria-label={`Xem chi tiết video ${it.modelLabel}, ${it.ratio}`} onClick={(e) => (e.preventDefault(), setDetail(it.id))}>
-                    <Preview src={`/api/assets/${it.videoAssetId}/content`} poster={it.posterAssetId ? `/api/assets/${it.posterAssetId}/content` : ''} width={Number(it.ratio.split(':')[0]) || 9} height={Number(it.ratio.split(':')[1]) || 16} title={`${it.modelLabel}, ${it.ratio}`} onHover />
+                    <Preview src={`/api/assets/${it.videoAssetId}/content`} poster={it.posterAssetId ? thumbUrl(it.posterAssetId) : ''} width={Number(it.ratio.split(':')[0]) || 9} height={Number(it.ratio.split(':')[1]) || 16} title={`${it.modelLabel}, ${it.ratio}`} onHover />
                   </a>
                 ) : (
                   <a href={`/api/assets/${it.videoAssetId}/content`} target="_blank" rel="noreferrer" aria-label={`Xem chi tiết ảnh ${it.modelLabel}, ${it.ratio}`} onClick={(e) => (e.preventDefault(), setDetail(it.id))}>
-                    <img src={`/api/assets/${it.posterAssetId ?? it.videoAssetId}/content`} alt={`${it.modelLabel}, ${it.ratio}`} loading="lazy" />
+                    <TileImg src={thumbUrl(it.posterAssetId ?? it.videoAssetId)} alt={`${it.modelLabel}, ${it.ratio}`} loading="lazy" />
                   </a>
                 )}
                 {/* Fash's "Use this template": the page's form filled from this result's words and settings; its photos are another seller's, so the member's own stay. */}

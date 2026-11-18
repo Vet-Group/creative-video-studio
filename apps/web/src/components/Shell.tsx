@@ -23,6 +23,7 @@ import { CompareSlider } from './CompareSlider';
 import { ConfirmHost, confirmDialog } from './Confirm';
 import { FalLowNotice } from './FalLowNotice';
 import { ImpersonationBanner } from './ImpersonationBanner';
+import { EmptyArt } from './EmptyArt';
 import { Icon, type IconName } from './Icon';
 import { LarkLinkPrompt } from './LarkLinkPrompt';
 import { RatingPrompt } from './Rating';
@@ -409,8 +410,8 @@ function HistoryCard({ job, isAdmin, select }: { job: TrayJob; isAdmin: boolean;
 
 const AdminContext = createContext(false);
 
-/** The History of a page with no job yet, in the Library's empty style: one line and a way to the form. On a phone the form is its own tab, which this opens first. */
-function HistoryEmpty() {
+/** The History of a page with no job yet, in the Library's empty style: its picture, what will appear here and a way to the form. On a phone the form is its own tab, which this opens first. */
+function HistoryEmpty({ feature }: { feature: string }) {
   const toForm = () => {
     const form = document.querySelector<HTMLElement>('.form-card');
     if (!form) return;
@@ -420,7 +421,9 @@ function HistoryEmpty() {
   };
   return (
     <div className="library-empty">
-      <p className="muted">Chưa có lượt tạo nào.</p>
+      <EmptyArt />
+      <p className="library-empty-title">Chưa có lượt tạo nào.</p>
+      <p className="muted">Mỗi lần chạy {featureLabel(feature)}, kết quả sẽ hiện ở đây.</p>
       <p className="library-empty-actions">
         <button type="button" onClick={toForm}>
           Bắt đầu ngay
@@ -452,7 +455,7 @@ export function Tray({ feature }: { feature?: string }) {
       <CancelAllQueued jobs={all.jobs} refresh={refresh} />
       {workerOffline && <p className="warn">Máy xử lý đang tạm ngừng: chưa nhận được tín hiệu, lượt tạo sẽ chạy khi máy hoạt động lại.</p>}
       {failed && <LoadError text={!navigator.onLine ? 'Mất kết nối mạng. Sẽ cập nhật lại khi có mạng.' : loaded ? 'Không cập nhật được danh sách lượt tạo.' : 'Không tải được danh sách lượt tạo.'} onRetry={refresh} />}
-      {loaded && jobs.length === 0 && (feature ? <HistoryEmpty /> : <p className="muted">Chưa có lượt tạo nào.</p>)}
+      {loaded && jobs.length === 0 && (feature ? <HistoryEmpty feature={feature} /> : <p className="muted">Chưa có lượt tạo nào.</p>)}
       <ul>
         {jobs.map((j) => (feature ? <HistoryCard key={j.id} job={j} isAdmin={isAdmin} select={zip.check(j.id, `${cardTitle(j)} ${fmtTime(j.createdAt)}`)} /> : <TrayItem key={j.id} job={j} isAdmin={isAdmin} />))}
       </ul>

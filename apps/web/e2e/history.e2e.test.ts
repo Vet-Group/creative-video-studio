@@ -291,6 +291,9 @@ test('on a phone, Bắt đầu ngay in an empty History opens the form tab and p
   await page.getByRole('tab', { name: 'Lịch sử' }).click();
   const history = page.getByRole('complementary', { name: 'Lượt tạo của tôi' });
   await expect(history.getByText('Chưa có lượt tạo nào.')).toBeVisible();
+  // The Library's empty state: its picture, a hint for this page and the action.
+  await expect(history.locator('.library-art')).toBeVisible();
+  await expect(history.getByText('Mỗi lần chạy Tạo video, kết quả sẽ hiện ở đây.')).toBeVisible();
   await history.getByRole('button', { name: 'Bắt đầu ngay' }).click();
   await expect(page.getByRole('tab', { name: 'Tạo' })).toHaveAttribute('aria-selected', 'true');
   await expect(history).toBeHidden();

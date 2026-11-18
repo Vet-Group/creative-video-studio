@@ -41,3 +41,19 @@ test('the timer gives up after the last wait; the next page that needs the list 
   m.reloadSamples();
   expect(fetch).toHaveBeenCalledTimes(2 + m.RETRY_MS.length);
 });
+
+test('the list is pending until it has answered, whether it read or failed, so pages show a skeleton rather than the built-in test patterns', async () => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(ok([])).mockRejectedValue(new TypeError('network')));
+  const m = await import('./use-samples');
+  expect(m.samplesPending()).toBe(true);
+  m.reloadSamples();
+  await vi.waitFor(() => expect(m.samplesPending()).toBe(false)); // an empty list is an answer
+});
+
+test('a failed first read is not pending either', async () => {
+  vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('network')));
+  const m = await import('./use-samples');
+  m.reloadSamples();
+  await vi.waitFor(() => expect(m.samplesFailed()).toBe(true));
+  expect(m.samplesPending()).toBe(false);
+});

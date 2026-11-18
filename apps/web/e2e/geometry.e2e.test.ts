@@ -465,13 +465,14 @@ test.describe('1440x1000', () => {
     await expect(run).toContainText('$0.8000');
   });
 
-  test('history empty state: 14px rgb(102,102,102)', async ({ page }) => {
+  test('history empty state: a 16px title over a 14px rgb(102,102,102) hint like the Library', async ({ page }) => {
     await page.route(/\/api\/jobs\?mine/, (r) => r.fulfill({ json: { jobs: [], workerOffline: false } }));
     await page.reload();
     await page.getByRole('tab', { name: 'Lịch sử' }).click();
     const empty = page.getByText('Chưa có lượt tạo nào.');
     await expect(empty).toBeVisible();
-    expect(await css(empty, 'font-size', 'color')).toEqual(['14px', 'rgb(102, 102, 102)']);
+    expect(await css(empty, 'font-size', 'color')).toEqual(['16px', 'rgb(26, 26, 26)']);
+    expect(await css(page.getByText(/^Mỗi lần chạy /), 'font-size', 'color')).toEqual(['14px', 'rgb(102, 102, 102)']);
   });
 
   test('focus: the controls show a 2px outline when reached by keyboard', async ({ page }) => {
