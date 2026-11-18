@@ -208,7 +208,7 @@ export function useReuse(reuse: string | undefined, feature: string, fill: (j: O
         if (stale) return; // superseded while the member filled the blanks
         if (!j) return dropRefillQuery(); // cancelled: the form stays as it is
         if (nothingRefilled(j)) {
-          notify(nothingNote(lostInputs(j))); // nothing to bring back: the form stays as it is
+          notify(nothingNote(lostInputs(j), reuse)); // nothing to bring back: the form stays as it is
           return dropRefillQuery();
         }
         // A sample's photos become this member's inputs first, copied on the server.

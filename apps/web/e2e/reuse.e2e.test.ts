@@ -182,7 +182,7 @@ test('a saved template says what it could not bring back as a reuse does: a dele
   const bare = await save('image', { images: [a], ratio: '1:1' });
   await cut(bare, (j) => (j.images = []));
   await page.goto(`/image-generation?template=${bare}`);
-  await expect(page.getByRole('region', { name: 'Thông báo' }).getByText('Không dùng lại được: 1 ảnh đầu vào đã bị xoá và lượt này không có mô tả. Biểu mẫu được giữ nguyên.')).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Thông báo' }).getByText('Không dùng lại được: 1 ảnh đầu vào đã bị xoá và thiết lập này không có mô tả. Biểu mẫu được giữ nguyên.')).toBeVisible();
   await expect(page.getByRole('img', { name: 'first.png' })).toHaveCount(0);
 });
 

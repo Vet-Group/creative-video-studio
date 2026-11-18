@@ -79,8 +79,9 @@ export function skippedNote(kept: number, s: Skipped): string {
 export const nothingRefilled = (j: { inputCount?: number; images: unknown[]; prompt?: string | null; brief?: string | null }): boolean =>
   (j.inputCount ?? 0) > 0 && j.images.length === 0 && !(j.brief || j.prompt)?.trim();
 
-/** The line for a refill that changed nothing (see nothingRefilled). */
-export const nothingNote = (lost: number): string => `Không dùng lại được: ${lost} ảnh đầu vào đã bị xoá và lượt này không có mô tả. Biểu mẫu được giữ nguyên.`;
+/** The line for a refill that changed nothing (see nothingRefilled); `from` is the path it came from, a job's or a template's. */
+export const nothingNote = (lost: number, from: string): string =>
+  `Không dùng lại được: ${lost} ảnh đầu vào đã bị xoá và ${from.startsWith('/api/templates/') ? 'thiết lập' : 'lượt'} này không có mô tả. Biểu mẫu được giữ nguyên.`;
 
 /** How many of a job's or a template's input photos no longer exist (GET /api/jobs/:id and /api/templates/:id tell how many it had); 0 for a sample, which has no count. */
 export const lostInputs = (j: { inputCount?: number; images: unknown[] }): number => Math.max(0, (j.inputCount ?? 0) - j.images.length);

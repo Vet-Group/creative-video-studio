@@ -67,7 +67,8 @@ test('a refill has nothing to bring back only when every input photo is gone and
   expect(nothingRefilled({ inputCount: 2, images: [{}] })).toBe(false); // a photo still comes back
   expect(nothingRefilled({ inputCount: 0, images: [] })).toBe(false); // a job or a template without photos, or a sample (no count)
   expect(nothingRefilled({ images: [] })).toBe(false);
-  expect(nothingNote(2)).toBe('Không dùng lại được: 2 ảnh đầu vào đã bị xoá và lượt này không có mô tả. Biểu mẫu được giữ nguyên.');
+  expect(nothingNote(2, '/api/jobs/j1')).toBe('Không dùng lại được: 2 ảnh đầu vào đã bị xoá và lượt này không có mô tả. Biểu mẫu được giữ nguyên.');
+  expect(nothingNote(1, '/api/templates/t1')).toBe('Không dùng lại được: 1 ảnh đầu vào đã bị xoá và thiết lập này không có mô tả. Biểu mẫu được giữ nguyên.');
 });
 
 test("the photos lost are the job's or the template's count less those that still exist, and none for a sample", () => {
