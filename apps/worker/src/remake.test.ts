@@ -511,4 +511,26 @@ describe('settleFal: every outcome after fal took the request carries its cost',
     expect(await paidError(settleFal(statuses(won), 0.5, { ...fast, fetch: lost }))).toEqual(['could not download the fal output: HTTP 404', 0.108]);
     expect(await paidError(settleFal(statuses({ state: 'running' }), 0.5, { ...fast, deadlineMs: 0 }))).toEqual(['fal did not finish within 0 minutes', 0.5]); // booked at the estimate
   });
+
+  test('the output download is tried 3 times through a network blip or a 5xx, but not past a 4xx', async () => {
+    const answers = (...a: (Response | Error)[]) => {
+      const calls: number[] = [];
+      const fn = (async () => {
+        calls.push(1);
+        const v = a.shift() ?? new Response('gone', { status: 404 });
+        if (v instanceof Error) throw v;
+        return v;
+      }) as unknown as typeof fetch;
+      return { fn, calls };
+    };
+    const blip = answers(new TypeError('fetch failed'), new Response('busy', { status: 503 }), new Response(new Uint8Array([7])));
+    expect(await settleFal(statuses(won), 0.5, { ...fast, fetch: blip.fn })).toEqual({ bytes: new Uint8Array([7]), costUsd: 0.108 });
+    expect(blip.calls).toHaveLength(3);
+    const down = answers(new Response('', { status: 502 }), new Response('', { status: 502 }), new Response('', { status: 502 }), new Response(new Uint8Array([1])));
+    expect(await paidError(settleFal(statuses(won), 0.5, { ...fast, fetch: down.fn }))).toEqual(['could not download the fal output: HTTP 502', 0.108]);
+    expect(down.calls).toHaveLength(3);
+    const gone = answers(new Response('gone', { status: 404 }), new Response(new Uint8Array([1])));
+    expect(await paidError(settleFal(statuses(won), 0.5, { ...fast, fetch: gone.fn }))).toEqual(['could not download the fal output: HTTP 404', 0.108]);
+    expect(gone.calls).toHaveLength(1);
+  });
 });

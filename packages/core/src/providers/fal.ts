@@ -22,6 +22,33 @@ const LIFECYCLE = JSON.stringify({ expiration_duration_seconds: 3600 });
 /** The docs say status, result and cancel URLs use only owner and app ("fal-ai/kling-video"), not the full endpoint path (405 otherwise). */
 const appPath = (endpoint: string): string => endpoint.split('/').slice(0, 2).join('/');
 
+/**
+ * A submit fal turned away before taking it (429 rate limit, 503 no capacity) or one whose connection was never made took nothing, so it is sent
+ * again, up to SUBMIT_RETRIES more times, Retry-After honoured within 2 to 10 s. A 500, a 502, a 504 or a dropped connection may have reached fal
+ * and is not sent again: a second paid run would be worse than one failed run.
+ */
+const SUBMIT_RETRIES = 2;
+const NOT_CONNECTED = new Set(['ECONNREFUSED', 'ENOTFOUND', 'EAI_AGAIN', 'UND_ERR_CONNECT_TIMEOUT']);
+const unrefPause = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms).unref());
+export function retrySubmit(f: Fetch, pause: (ms: number) => Promise<void> = unrefPause): Fetch {
+  return async (url, init) => {
+    for (let n = 0; ; n++) {
+      let res: Response;
+      try {
+        res = await f(url, init);
+      } catch (e) {
+        const code = (e as { cause?: { code?: string } }).cause?.code;
+        if (n === SUBMIT_RETRIES || !code || !NOT_CONNECTED.has(code)) throw e;
+        await pause(2_000);
+        continue;
+      }
+      if (n === SUBMIT_RETRIES || (res.status !== 429 && res.status !== 503)) return res;
+      await res.body?.cancel();
+      await pause(Math.min(10_000, Math.max(2_000, Number(res.headers.get('retry-after')) * 1000 || 0)));
+    }
+  };
+}
+
 const falHeaders = (apiKey: string) => ({
   Authorization: `Key ${apiKey}`,
   'Content-Type': 'application/json',
@@ -287,7 +314,7 @@ async function uploadInputs(f: Fetch, apiKey: string, urls: string[], readImage?
 /** The worker shrinks each inlined input to 600 KB so that 4 fit the inline limit; more (up to 9 references) go through fal storage instead. */
 const MAX_INLINE_INPUTS = 4;
 
-export function createFalProvider(opts: { apiKey: string; fetch?: Fetch; readImage?: ReadImage; startTimeoutSec?: number }): VideoProvider {
+export function createFalProvider(opts: { apiKey: string; fetch?: Fetch; readImage?: ReadImage; startTimeoutSec?: number; pause?: (ms: number) => Promise<void> }): VideoProvider {
   const f = opts.fetch ?? fetch;
   const headers = falHeaders(opts.apiKey);
   // With `startTimeoutSec`, fal drops a request that has not started by then, so it is neither run nor billed after the caller gave up on it.
@@ -316,7 +343,7 @@ export function createFalProvider(opts: { apiKey: string; fetch?: Fetch; readIma
         body[spec.video!.field] = spec.video!.single ? url : [url];
         body.prompt = videoTokens(body.prompt as string, spec.video!.name);
       }
-      const res = (await sendJson(f, 'fal submit', `${QUEUE}/${endpoint}`, { method: 'POST', headers: submitHeaders, body: JSON.stringify(body) })) as { request_id?: string };
+      const res = (await sendJson(retrySubmit(f, opts.pause), 'fal submit', `${QUEUE}/${endpoint}`, { method: 'POST', headers: submitHeaders, body: JSON.stringify(body) })) as { request_id?: string };
       if (!res.request_id) throw new Error('fal submit: no request_id in the response');
       return { providerJobId: packJobId(req.durationSec, res.request_id) };
     },
@@ -437,7 +464,7 @@ const IMAGE_BODIES: Record<string, ImageBody> = {
   'fal-ai/bria/background/remove': (_req, [image_url]) => ({ image_url }),
 };
 
-export function createFalImageProvider(opts: { apiKey: string; fetch?: Fetch; readImage?: ReadImage }): ImageProvider {
+export function createFalImageProvider(opts: { apiKey: string; fetch?: Fetch; readImage?: ReadImage; pause?: (ms: number) => Promise<void> }): ImageProvider {
   const f = opts.fetch ?? fetch;
   const headers = falHeaders(opts.apiKey);
   return {
@@ -455,7 +482,7 @@ export function createFalImageProvider(opts: { apiKey: string; fetch?: Fetch; re
         // Nano Banana's text endpoint has no 'auto' ratio; without one each takes its own default.
         if (body.aspect_ratio === 'auto') delete body.aspect_ratio;
       }
-      const res = (await sendJson(f, 'fal submit', `${QUEUE}/${endpoint}`, { method: 'POST', headers, body: JSON.stringify(body) })) as { request_id?: string };
+      const res = (await sendJson(retrySubmit(f, opts.pause), 'fal submit', `${QUEUE}/${endpoint}`, { method: 'POST', headers, body: JSON.stringify(body) })) as { request_id?: string };
       if (!res.request_id) throw new Error('fal submit: no request_id in the response');
       return { providerJobId: res.request_id };
     },
