@@ -1,0 +1,3 @@
+import type { ChangeEntry } from '../changelog';
+
+export default { at: '2026-11-18T21:30:00+07:00', kind: 'fixed', title: 'Thiết lập đã lưu giữ đúng ô của từng ảnh', details: ['Khi mở một thiết lập đã lưu có ảnh đã bị xoá, các ảnh còn lại về đúng ô của mình, còn ô của ảnh đã xoá để trống để bạn thêm ảnh mới, như "Dùng lại" một lượt tạo đã làm. Trước đây ảnh phía sau bị dồn lên, như ảnh trang phục rơi vào ô người mẫu ở Thử đồ.', 'Áp dụng cho Thử đồ, các app nhiều ô ảnh và Marketing Studio, với thiết lập của bạn cũng như thiết lập chung của công ty hay cửa hàng.'], prs: [550], audience: 'all' } satisfies ChangeEntry;
