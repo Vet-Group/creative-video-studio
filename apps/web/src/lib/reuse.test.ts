@@ -27,6 +27,9 @@ test("Recreate on a sample reads that sample's details file, and nothing else", 
   expect(exampleFrom({ example: 'example-12' })).toBe('/api/samples/example-12.json'); // Create Videos' samples
   expect(exampleFrom({ example: 'try-on-example-4' })).toBe('/api/samples/try-on-example-4.json');
   expect(exampleFrom({ example: 'image-example-7' })).toBe('/api/samples/image-example-7.json'); // Image Generation's
+  expect(exampleFrom({ example: 'jewelry-try-on-example-10' })).toBe('/api/samples/jewelry-try-on-example-10.json'); // the two Try-On apps'
+  expect(exampleFrom({ example: 'lingerie-try-on-example-2' })).toBe('/api/samples/lingerie-try-on-example-2.json');
+  expect(['jewelry-try-on-example-0', 'lingerie-try-on-example-1-model', 'jewelry-example-1', 'lingerie-try-on-example-01'].map((example) => exampleFrom({ example }))).toEqual(Array(4).fill(undefined)); // a photo of a sample, or another app
   expect(exampleFrom({})).toBeUndefined();
 });
 

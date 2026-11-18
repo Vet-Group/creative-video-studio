@@ -3,6 +3,7 @@
 // settings, and the reuse link (Fash's Recreate). The details come from the sample's own file (`<sample>.json`, uploaded by an Admin beside it); nothing here runs a job.
 import { useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
+import { APPS } from '@/lib/apps';
 import { FORMAT_NAME, hrefOfFormat, isParamFormat } from '@/lib/marketing';
 import { exampleFrom } from '@/lib/reuse';
 import { BACKGROUNDS } from '@/lib/try-on-stock';
@@ -23,7 +24,8 @@ interface SampleDetails {
   /** Image Generation's words (its jobs keep the prompt itself). */
   prompt?: string | null;
   images: { sample: string }[];
-  ratio: string;
+  /** Left out where the app has no ratio field (Jewelry Try-On). */
+  ratio?: string;
   durationSec?: number;
   modelId?: string | null;
   resolution?: string | null;
@@ -71,9 +73,10 @@ export function SampleDetail({ names, index, onIndex, hasDetails = () => true }:
   }, [base, video, bare]);
   const picture = !video; // a Try On or an Image Generation sample: the photos before the words, resolution chips, Use Result
   const tryOn = base.startsWith('try-on-');
-  const feature = video ? 'marketing' : tryOn ? 'try_on' : 'image';
+  const app = APPS.find((a) => base.startsWith(`${a.slug}-example-`)); // Jewelry and Lingerie Try-On samples
+  const feature = video ? 'marketing' : tryOn ? 'try_on' : (app?.feature ?? 'image');
   const text = details?.brief ?? details?.prompt ?? null;
-  const title = bare ? (video ? 'Video mẫu' : 'Ảnh mẫu') : tryOn ? 'Thử đồ' : picture ? 'Tạo ảnh' : FORMAT_NAME[isParamFormat(details?.format) ? details.format : 'ugc'];
+  const title = bare ? (video ? 'Video mẫu' : 'Ảnh mẫu') : tryOn ? 'Thử đồ' : app ? app.name : picture ? 'Tạo ảnh' : FORMAT_NAME[isParamFormat(details?.format) ? details.format : 'ugc'];
   // As on Fash, each photo, the words, a chip and the result can go on the form beside the Examples.
   const inputs = details && details.images.length > 0 && (
     <ul className="job-inputs" aria-label="Ảnh đầu vào">
@@ -113,7 +116,7 @@ export function SampleDetail({ names, index, onIndex, hasDetails = () => true }:
         {details && (
           <p className="job-chips">
             {picture ? chip(details.resolution ?? '', apply && details.resolution ? () => apply({ resolution: details.resolution! }) : undefined, 'Dùng độ phân giải này') : chip(`${details.durationSec}s`, apply && details.durationSec ? () => apply({ durationSec: details.durationSec }) : undefined, 'Dùng thời lượng này')}
-            {chip(details.ratio, apply && (() => apply({ ratio: details.ratio })), 'Dùng tỉ lệ này')}
+            {details.ratio && chip(details.ratio, apply && (() => apply({ ratio: details.ratio })), 'Dùng tỉ lệ này')}
           </p>
         )}
         {details?.background && <p className="job-chips">{chip(backdropLabel!, form?.photo && backdrop && (() => form.photo!(backdrop, 'background')), 'Dùng bối cảnh này')}</p>}
@@ -154,7 +157,7 @@ export function SampleDetail({ names, index, onIndex, hasDetails = () => true }:
           </div>
         )}
         {details && (
-          <Recreate href={tryOn ? `/try-on?example=${base}` : picture ? `/image-generation?example=${base}` : `${hrefOfFormat(details.format)}?example=${base}`} from={exampleFrom({ example: base })!} className="lightbox-reuse" onDone={() => narrow && onIndex(null)}>
+          <Recreate href={tryOn ? `/try-on?example=${base}` : app ? `/apps/${app.slug}?example=${base}` : picture ? `/image-generation?example=${base}` : `${hrefOfFormat(details.format)}?example=${base}`} from={exampleFrom({ example: base })!} className="lightbox-reuse" onDone={() => narrow && onIndex(null)}>
             Dùng lại
           </Recreate>
         )}

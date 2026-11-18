@@ -11,12 +11,12 @@ import { confirmRun, sendRun } from '@/lib/run-guard';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { useRecall } from '@/lib/use-recall';
 import { useDraftState } from '@/lib/use-draft';
-import { cardSample } from '@/lib/examples';
+import { cardSample, GALLERY_SAMPLES } from '@/lib/examples';
 import { useSamples } from '@/lib/use-samples';
 import { About } from './About';
 import { CardMedia, LoopVideo } from './CardMedia';
 import { Icon, type IconName } from './Icon';
-import { copyError, copySamples, FormNotice, type Img, PhotoDialog, RATIO_LABEL, Slot, uploadError, uploadImages, UPLOAD_ERROR, type UploadKind, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
+import { copyError, copySamples, FormNotice, Gallery, type Img, PhotoDialog, RATIO_LABEL, Slot, uploadError, uploadImages, UPLOAD_ERROR, type UploadKind, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
 import { FormContext, useApplier, useJobs } from './jobs';
 import { type ModelOption, ModelPicker } from './ModelPicker';
 import { PromptComposer } from './PromptComposer';
@@ -27,8 +27,8 @@ import { Tray } from './Shell';
 import { useSmartRemakeEnabled } from './SmartRemakeGate';
 import { Templates } from './Templates';
 
-export type Tab = 'create' | 'history' | 'about';
-export const TAB_LABEL: Record<Tab, string> = { create: 'Tạo', history: 'Lịch sử', about: 'Giới thiệu' };
+export type Tab = 'create' | 'history' | 'examples' | 'about';
+export const TAB_LABEL: Record<Tab, string> = { create: 'Tạo', history: 'Lịch sử', examples: 'Ví dụ', about: 'Giới thiệu' };
 const CATEGORY_ICON: Record<AppCategory, IconName> = { fashion: 'tryon', photo: 'image', video: 'create', utility: 'library' };
 
 /** The picture of an app on a card and in the page header: its sample loop or still, else a tinted tile with the icon of its category. The loop plays under reduced motion too, as on the reference site's Apps pages. */
@@ -222,8 +222,9 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
     }
   }
 
-  const tabs: Tab[] = narrow ? ['create', 'history', 'about'] : ['history', 'about'];
-  const shown: Tab = narrow ? (tab ?? 'create') : tab === 'history' ? 'history' : 'about';
+  const samples = GALLERY_SAMPLES[app.feature]; // only the apps an Admin may put examples on have the Examples tab
+  const tabs: Tab[] = [...(narrow ? (['create'] as const) : []), 'history', ...(samples ? (['examples'] as const) : []), 'about'];
+  const shown: Tab = narrow ? (tab ?? 'create') : tab === 'history' || tab === 'examples' ? tab : 'about';
   const panel = shown === 'create' ? 'about' : shown;
   const two = app.slots.length === 2;
 
@@ -338,13 +339,19 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
         <div className="side" id={`app-panel-${panel}`} role="tabpanel" aria-labelledby={`app-tab-${panel}`} hidden={narrow && shown === 'create'}>
           <FormContext.Provider
             value={{
-              recreate: (from) => (recall.touch(), recreate(from), narrow && setTab('create')),
+              recreate: (from, recipe) => (recall.touch(), recreate(from, recipe), narrow && setTab('create')),
               // As on Try On, a card's chips and words go on the form; only the settings this app has.
               ...(settings.length > 0 && { apply, settings }),
               ...(app.prompt && { prompt: (text: string) => (setPrompt(text), notify('Đã chép mô tả')) }),
             }}
           >
-            {shown === 'history' ? <Tray feature={app.feature} /> : <AppAbout app={app} />}
+            {shown === 'history' ? (
+              <Tray feature={app.feature} />
+            ) : shown === 'examples' ? (
+              <Gallery kind={app.feature} samples={samples} cols={[2, 2, 3]} label={`Ảnh ${app.name.toLowerCase()} của công ty`} emptyText={`Chưa có ảnh ${app.name.toLowerCase()} nào trong công ty.`} />
+            ) : (
+              <AppAbout app={app} />
+            )}
           </FormContext.Provider>
         </div>
       </div>

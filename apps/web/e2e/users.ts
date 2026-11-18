@@ -55,6 +55,7 @@ export const USERS = {
   sizea: { email: 'sizea@e2e.test', name: 'E2E Gallery Size A', role: 'member' },
   tryexa: { email: 'tryexa@e2e.test', name: 'E2E Try On Examples A', role: 'member' },
   imgexa: { email: 'imgexa@e2e.test', name: 'E2E Image Examples A', role: 'member' },
+  appexa: { email: 'appexa@e2e.test', name: 'E2E App Examples A', role: 'member' }, // apps.e2e: the Examples tab of Jewelry Try-On
   chipa: { email: 'chipa@e2e.test', name: 'E2E Chips A', role: 'member' },
   vidfrom: { email: 'vidfrom@e2e.test', name: 'E2E Video From Image', role: 'member' },
   costa: { email: 'costa@e2e.test', name: 'E2E Costs A', role: 'member' },
