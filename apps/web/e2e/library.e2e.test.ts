@@ -103,7 +103,7 @@ test('Library views: grid or list remembered, a selection bar with the zip, sear
   await expect(item(first).locator('.lib-thumb').getByRole('button', { name: 'Xem chi tiết' })).toHaveCount(1);
   const thumb = (await item(first).locator('.lib-thumb').boundingBox())!;
   const corner = (await item(first).locator('.zip-check').boundingBox())!;
-  expect([corner.x - thumb.x, corner.y - thumb.y].every((d) => d >= 0 && d <= 4)).toBe(true);
+  expect({ x: Math.round(corner.x - thumb.x), y: Math.round(corner.y - thumb.y) }).toEqual({ x: 2, y: 2 });
   await expect(item(first).locator('.lib-thumb-len')).toHaveText(/^\d+s$/);
 
   // Marks work on a list row and in the detail view; Kết quả finds the unmarked items, and a fresh mark takes one out of that list.

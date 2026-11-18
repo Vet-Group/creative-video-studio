@@ -125,14 +125,15 @@ test('an image result opens full screen from the picture in History, and an imag
 
       await page.getByRole('tab', { name: 'Ví dụ' }).click();
       const gallery = page.getByRole('group', { name: 'Ảnh của công ty' });
-      // A sample without a details file opens its picture in a new tab.
+      // A sample without a details file opens in place too (owner, 2026-11-18): the picture and its file actions, no new tab.
       const sample = gallery.locator('.gallery-item:has(img[src="/api/samples/image-example-1.jpg"])');
       await expect(sample).toBeVisible();
-      const opened = page.context().waitForEvent('page', { timeout: 5_000 });
       await page.mouse.click(...(await at(sample, undefined, 12))); // near the top, clear of the Use this template pill
-      const tab = await opened;
-      await tab.waitForURL((u) => u.pathname === '/api/samples/image-example-1.jpg'); // a new tab reports an empty URL until its first navigation commits
-      await tab.close();
+      const plain = page.getByRole('dialog', { name: 'Chi tiết: Ảnh mẫu' });
+      await expect(plain.locator('.lightbox-media img')).toHaveAttribute('src', '/api/samples/image-example-1.jpg');
+      expect(page.context().pages()).toHaveLength(1);
+      await page.keyboard.press('Escape');
+      await expect(plain).toHaveCount(0);
       // A result's tile shows its preview and opens its details in place, as in the Library, with a 1600 px preview of the original.
       const result = gallery.locator(`.gallery-item:has(img[src="/api/assets/${preview}/content"])`);
       await page.mouse.click(...(await at(result, undefined, 12)));
