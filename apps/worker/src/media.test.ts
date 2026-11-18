@@ -82,6 +82,27 @@ describe('Smart Remake cuts and joins', () => {
     expect(meanDiff(inRed!, src)).toBeGreaterThan(10); // a remade span is the part, held over its whole second
     expect(meanDiff(inGreen!, src)).toBeGreaterThan(10);
   }, 30_000); // four ffmpeg runs and four frame reads
+
+  test('keeps every part on its own frames of the source, with no drift over many short spans', async () => {
+    // Many spans that do not fall on 24 fps frame lines: rounding each span on its own used to add up and slide the later parts off their sound.
+    const long = join(dir, 'long.mp4');
+    await run(requireFfmpeg(), ['-y', '-v', 'error', '-f', 'lavfi', '-i', 'color=c=0x4a7ab0:size=160x288:rate=24', '-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=44100', '-t', '8', '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-shortest', long]);
+    const red = join(dir, 'red-short.mp4');
+    await run(requireFfmpeg(), ['-y', '-v', 'error', '-f', 'lavfi', '-i', 'color=c=red:size=160x288:rate=30', '-t', '0.6', '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', red]);
+    const parts = Array.from({ length: 10 }, (_, i) => ({ start: 0.229 + i * 0.731, seconds: 0.271, clip: red }));
+    const full = join(dir, 'many.mp4');
+    await spliceClips(long, parts, full);
+    // Each output frame's mean V (red is high, the blue source is low), so the red runs show where each part landed.
+    const { stdout } = await run(ffprobe.path, ['-v', 'error', '-f', 'lavfi', '-i', `movie=${full.replaceAll('\\', '/').replace(':', '\\\\:')},signalstats`, '-show_entries', 'frame_tags=lavfi.signalstats.VAVG', '-of', 'csv=p=0'], { maxBuffer: 16 * 1024 * 1024 });
+    const isRed = stdout.trim().split(/\r?\n/).map((v) => Number(v) > 160);
+    expect(isRed.length).toBe(Math.round(8 * 24));
+    const runs: [number, number][] = [];
+    isRed.forEach((r, f) => {
+      if (r && !isRed[f - 1]) runs.push([f, f + 1]);
+      else if (r) runs.at(-1)![1] = f + 1;
+    });
+    expect(runs).toEqual(parts.map((p) => [Math.round(p.start * 24), Math.round((p.start + p.seconds) * 24)]));
+  }, 30_000);
 });
 
 describe('the end text', () => {
