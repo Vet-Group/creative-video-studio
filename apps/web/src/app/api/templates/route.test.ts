@@ -3,6 +3,7 @@ import { randomBytes } from 'node:crypto';
 import { DeleteBucketCommand, DeleteObjectsCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { createTestDatabase } from '@cvs/db/testing';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
+import { tryOnSlots } from '@/lib/reuse';
 
 const testDb = await createTestDatabase();
 process.env.DATABASE_URL = testDb.url;
@@ -205,6 +206,34 @@ describe('/api/templates', () => {
     expect(await apply(a, shared)).toMatchObject({ images: [{ id: a.asset }], clips: [{ id: clip }] });
     expect((await one(req(b, `/api/templates/${personal}`), ctx(personal))).status).toBe(404);
     expect((await pool.query('select count(*)::int as n from assets where owner_id = $1', [b.id])).rows[0].n).toBe(3);
+  });
+
+  test('names each saved photo in its place (inputIds), so the photos after a deleted one keep their slots, to the author and to a member applying copies', async () => {
+    const [a, b] = [await newUser(), await newUser()];
+    await pool.query(`insert into stores (id, name, code, hidden) values ('st-slots', 'Shop S', 'STS', false)`);
+    const [person, garment, backdrop] = [`${a.id}-person`, `${a.id}-garment`, `${a.id}-backdrop`];
+    for (const [id, name] of [[person, 'person.png'], [garment, 'garment.png'], [backdrop, 'backdrop.png']] as const) {
+      await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) values ($1, $2, 'input', $1, $3, 'image/png', 1)`, [id, a.id, name]);
+      await putObject(id, new Uint8Array([1]), 'image/png');
+    }
+    const res = await save(a, { feature: 'try_on', name: 'Slots', data: { images: [person, garment, backdrop], garments: 1 }, storeId: 'st-slots' });
+    const { id } = (await res.json()) as { id: string };
+    await pool.query('update assets set deleted_at = now() where id = $1', [person]);
+    type Got = { images: { id: string }[]; inputIds: string[]; garments: number };
+    const apply = async (u: User) => (await (await one(req(u, `/api/templates/${id}`), ctx(id))).json()) as Got;
+
+    // The author: their own ids in the order saved, the deleted person's too; the images only the live ones, as before.
+    const own = await apply(a);
+    expect(own.inputIds).toEqual([person, garment, backdrop]);
+    expect(own.images.map((i) => i.id)).toEqual([garment, backdrop]);
+    expect(tryOnSlots(own.inputIds, own.images, own.garments)).toEqual({ person: [], garments: [own.images[0]], background: [own.images[1]] });
+
+    // Another member: their copies' ids in the same places, and one that matches nothing for the deleted person.
+    const copy = await apply(b);
+    expect(copy.images).toMatchObject([{ filename: 'garment.png' }, { filename: 'backdrop.png' }]);
+    expect(copy.inputIds).toEqual(['', ...copy.images.map((i) => i.id)]);
+    expect(copy.inputIds).not.toContain(person);
+    expect(tryOnSlots(copy.inputIds, copy.images, copy.garments)).toEqual({ person: [], garments: [copy.images[0]], background: [copy.images[1]] });
   });
 
   test("takes own and company custom hooks and locations in data, refuses another member's private one, and keeps a company template to built-in or company ones", async () => {
