@@ -27,7 +27,7 @@ import { Icon, type IconName } from './Icon';
 import { LarkLinkPrompt } from './LarkLinkPrompt';
 import { RatingPrompt } from './Rating';
 import { JobFailureNote, canRetry, isCanceled, canRetryOnTwin, twinRetryText } from './JobFailure';
-import { CancelAllQueued, CancelButton, elapsedLabel, providerQueueLabel, JobPrompt, JobsProvider, Recreate, resultHref, roleOf, Tap, toggleFullscreen, useForm, useJobs } from './jobs';
+import { CancelAllQueued, CancelButton, elapsedLabel, providerQueueLabel, InputThumb, JobPrompt, JobsProvider, Recreate, resultHref, roleOf, toggleFullscreen, useForm, useJobs } from './jobs';
 import { LoadError } from './LoadError';
 import { Modal } from './Modal';
 import type { Account, Section } from './Settings';
@@ -302,11 +302,7 @@ function HistoryCard({ job, isAdmin, select }: { job: TrayJob; isAdmin: boolean;
         {job.inputAssetIds.length > 0 && job.feature !== 'motion_control' && (
           <ul className="job-inputs" aria-label="Ảnh đầu vào">
             {job.inputAssetIds.map((id, n) => (
-              <li key={id}>
-                <Tap on={form?.photo && (() => form.photo!({ asset: id }, roleOf(job.feature, n, { garments: job.garments, format: job.format, roles: job.roles })))} label={`Dùng ảnh đầu vào ${n + 1}`}>
-                  <img src={thumbUrl(id)} alt="" loading="lazy" />
-                </Tap>
-              </li>
+              <InputThumb key={id} photo={{ asset: id }} n={n} role={roleOf(job.feature, n, { garments: job.garments, format: job.format, roles: job.roles })} thumb={thumbUrl(id)} full={content(id)} />
             ))}
           </ul>
         )}
@@ -504,7 +500,10 @@ function Toasts() {
     <div ref={ref} popover="manual" className="toasts" role="region" aria-label="Thông báo" aria-live="polite">
       {toasts.map((t) => (
         <div key={t.id} className={t.ok ? 'toast' : 'toast toast-bad'}>
-          <span>{t.text}</span>
+          <span>
+            {t.text}
+            {t.count && t.count > 1 && <span className="toast-count"> ×{t.count}</span>}
+          </span>
           {t.href && !t.note && <Link href={t.href}>Xem</Link>}
           <button type="button" onClick={() => dismiss(t.id)} aria-label="Đóng thông báo">
             ×

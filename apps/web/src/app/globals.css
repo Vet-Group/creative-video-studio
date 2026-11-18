@@ -466,6 +466,23 @@ button.job-reuse, button.lightbox-reuse, button.gallery-use { width: 100%; borde
 .tap { display: block; padding: 0; border: 0; background: none; font: inherit; color: inherit; text-align: inherit; cursor: pointer; }
 .tap.job-text:hover { color: var(--ink); }
 .job-inputs .tap:hover img { outline: 2px solid var(--ink-strong); outline-offset: 1px; }
+/* A History card's or an Example's input photo: a click puts it on the form (a hover names its role), a tick marks one the form has, the corner button shows it large. */
+.input-thumb { position: relative; width: max-content; } /* the corner button sits on the photo, not at the end of a wide row */
+.input-thumb > .tap { position: relative; border-radius: 6px; }
+.input-thumb > .tap:not(:has(.input-use)) { cursor: zoom-in; } /* no form beside it: a click shows it large */
+.input-thumb:has(.input-used) img { outline: 2px solid var(--ink-strong); outline-offset: 1px; }
+.input-use { position: absolute; left: 50%; bottom: 4px; z-index: 2; padding: 2px 8px; border-radius: 999px; background: rgb(var(--shade) / .85); color: var(--on-dark); font-size: 12px; font-weight: 600; line-height: 16px; white-space: nowrap; transform: translateX(-50%); opacity: 0; transition: opacity .12s; pointer-events: none; }
+.input-thumb > .tap:is(:hover, :focus-visible) .input-use { opacity: 1; }
+.input-used { position: absolute; top: 3px; left: 3px; display: grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; background: var(--ink-strong); color: var(--on-ink); }
+.input-zoom { position: absolute; top: 0; right: 0; z-index: 1; display: none; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 0 6px 0 6px; background: rgb(var(--shade) / .7); color: var(--on-dark); cursor: zoom-in; opacity: 0; transition: opacity .12s; }
+@media (hover: hover) { .input-zoom { display: grid; } } /* a touch screen has no hover to find it; a tap there uses the photo, as before */
+.input-thumb:is(:hover, :focus-within) .input-zoom { opacity: 1; }
+.input-zoom:hover { background: rgb(var(--shade) / .9); }
+.input-zoom:focus-visible { outline-color: var(--ink-strong); outline-offset: 1px; }
+.toast-count { font-weight: 700; }
+/* A photo just put in a slot (from the History, an Example or an upload) rings once, so the eye finds where it went. */
+@keyframes slot-in { from { box-shadow: 0 0 0 3px var(--brand); } to { box-shadow: 0 0 0 3px transparent; } }
+@media (prefers-reduced-motion: no-preference) { .slot-thumbs li > :is(img, video) { animation: slot-in .9s ease-out; } }
 .lightbox-result { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; height: 40px; margin-top: 8px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface); color: var(--ink-strong); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
 @media (max-width: 640px) {
   .job-card { grid-template-columns: 1fr; min-height: 0; }
@@ -1172,7 +1189,8 @@ dialog.modal { position: fixed; width: min(45rem, calc(100vw - 2rem)); max-heigh
 .lightbox-back:hover { background: rgb(var(--shade) / .85); }
 @media (pointer: coarse) { .lightbox-back { height: 44px; } }
 .lightbox-back:focus-visible, .lightbox-step:focus-visible { outline-color: var(--on-dark); } /* the default dark ring vanishes on the dark picture (1.04:1 measured) */
-.job-inputs button.tap { border-radius: 6px; cursor: zoom-in; }
+.job-inputs button.tap { border-radius: 6px; }
+.job-inputs button.tap[aria-pressed] { cursor: zoom-in; } /* the Library detail's inputs show in place of the result */
 .job-inputs .tap[aria-pressed='true'] img { outline: 2px solid var(--ink-strong); outline-offset: 1px; }
 .lightbox-side { display: flex; flex-direction: column; gap: 12px; min-height: 0; padding: 16px; overflow-y: auto; background: var(--surface); }
 .lightbox-side h2 { margin: 6px 40px 0 0; color: var(--ink-strong); font-size: 14px; line-height: 21px; font-weight: 600; }
@@ -2757,9 +2775,13 @@ div.analysis-card { opacity: .85; }
 .compare-tag-after { right: 12px; }
 .compare input[type='range'] { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: ew-resize; }
 .compare:has(input:focus-visible) .compare-handle::after { outline: 2px solid var(--brand); outline-offset: 2px; }
-dialog.modal.compare-modal { width: min(760px, calc(100vw - 32px)); max-width: none; overflow: hidden; }
+dialog.modal.compare-modal, dialog.modal.input-viewer { width: min(760px, calc(100vw - 32px)); max-width: none; overflow: hidden; }
+/* A History input shown large (its corner button): the picture, and under it the button that puts it on the form. */
+.input-viewer .modal-body { display: grid; grid-template-rows: minmax(0, 1fr) auto; height: min(860px, calc(100dvh - 64px)); padding: 0; overflow: hidden; border-radius: 16px; background: var(--lightbox-bg); }
+.input-viewer .modal-body > img { width: 100%; height: 100%; min-height: 0; border-radius: 0; object-fit: contain; }
+.input-viewer .input-viewer-use { justify-self: center; gap: 6px; width: auto; margin: 12px; padding: 0 20px; }
 .compare-modal .modal-body { height: min(860px, calc(100dvh - 64px)); padding: 0; overflow: hidden; border-radius: 16px; background: var(--lightbox-bg); }
-.compare-modal .modal-close { z-index: 1; top: 16px; right: 16px; width: 32px; height: 32px; border-radius: 8px; background: rgb(var(--shade) / 50%); color: var(--on-dark); font-size: 20px; }
+.compare-modal .modal-close, .input-viewer .modal-close { z-index: 1; top: 16px; right: 16px; width: 32px; height: 32px; border-radius: 8px; background: rgb(var(--shade) / 50%); color: var(--on-dark); font-size: 20px; }
 /* The History-tab button after a sent job's status line on a phone: a link-like button in the line. */
 .notice-link { padding: 0; border: 0; background: none; color: var(--link); font: inherit; font-weight: 600; text-decoration: underline; cursor: pointer; }
 .analysis-en { margin: 6px 0; font-size: 13px; }

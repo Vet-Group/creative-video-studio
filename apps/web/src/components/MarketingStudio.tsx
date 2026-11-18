@@ -489,6 +489,7 @@ export function MarketingStudio({ format = 'ugc', reuse, recipe, wizardDefault =
     recreate: (from, recipe) => (recall.touch(), setSource({ from, recipe }), narrow && setTab('create')),
     apply,
     photo: (p, role) => void take(p, role),
+    has: (asset) => [...person, ...product, ...refs, ...packaging].some((i) => i.id === asset),
     prompt: (text) => ((sec ? setPrompt : setFreeText)(text), notify('Đã chép mô tả')),
     // An example's hook (the library one, else its own words) and its ending go in ① and ③, which only the sections have; the photos and the rest stay.
     hook: (h) => {

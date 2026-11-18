@@ -1044,7 +1044,7 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
           ) : shown === 'about' ? (
             <About page="create" models={models?.models} />
           ) : (
-            <FormContext.Provider value={{ recreate, apply, photo: (p) => void take(p), prompt: copyPrompt }}>
+            <FormContext.Provider value={{ recreate, apply, photo: (p) => void take(p), has: (asset) => images.some((i) => i.id === asset), prompt: copyPrompt }}>
               <Tray feature="video" />
             </FormContext.Provider>
           )}

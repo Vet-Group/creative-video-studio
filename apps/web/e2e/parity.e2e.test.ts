@@ -374,7 +374,7 @@ test('as on Fash, a sample with a details file shows its prompt, input photos, s
     await openTile(page, 'Tự viết mô tả');
     const detail = page.getByRole('dialog', { name: 'Chi tiết ví dụ' });
     await expect(detail.locator('.detail-prompt')).toHaveText(details.prompt);
-    await expect(detail.getByRole('list', { name: 'Ảnh đầu vào' }).getByRole('img')).toHaveCount(2);
+    await expect(detail.getByRole('list', { name: 'Ảnh đầu vào' }).getByRole('listitem')).toHaveCount(2);
     await expect(detail.getByRole('list', { name: 'Thông số' })).toHaveText('720p8s1:1');
     await expect(detail.locator('.detail-date')).toHaveText('18 thg 8, 2026');
     // As on Fash: the model above the prompt, no preset chip for a sample made from a prompt, and the title only for screen readers.

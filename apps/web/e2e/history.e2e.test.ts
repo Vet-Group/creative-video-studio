@@ -108,14 +108,33 @@ test("as on Fash, a History card's words, inputs and result go on the form besid
   await expect(card.getByText('Hoàn tất')).toBeVisible({ timeout: 60_000 });
   const note = (text: string) => page.getByRole('region', { name: 'Thông báo' }).getByText(text);
   const chosen = page.getByRole('list', { name: 'Ảnh tham chiếu: ảnh đã chọn' });
-  await card.getByRole('button', { name: 'Dùng ảnh đầu vào 2' }).click();
+  // A hover names where the photo goes; a click puts it there, and then it is ticked and not added twice.
+  const second = card.getByRole('button', { name: 'Ảnh đầu vào 2: dùng làm đầu vào', exact: true });
+  await second.hover();
+  await expect(second.locator('.input-use')).toHaveCSS('opacity', '1');
+  await expect(second.locator('.input-use')).toHaveText('+ Đầu vào');
+  await second.click();
   await expect(chosen.getByRole('img', { name: 'piece-2.png' })).toBeVisible();
   await expect(note('Đã thêm ảnh vào đầu vào')).toBeVisible();
+  await card.getByRole('button', { name: 'Ảnh đầu vào 2: dùng làm đầu vào, đã có trong biểu mẫu' }).click();
+  await expect(note('Ảnh này đã có trong biểu mẫu')).toBeVisible();
+  await expect(chosen.getByRole('img')).toHaveCount(1);
+  // The corner button shows the photo large, with the same use button.
+  await card.getByRole('button', { name: 'Ảnh đầu vào 1: dùng làm đầu vào', exact: true }).hover();
+  await card.getByRole('button', { name: 'Xem lớn ảnh 1' }).click();
+  const viewer = page.getByRole('dialog', { name: 'Ảnh đầu vào 1' });
+  await expect(viewer.getByRole('img', { name: 'Ảnh đầu vào 1' })).toHaveAttribute('src', /^\/api\/assets\/[^/]+\/content$/);
+  await expect.poll(() => viewer.getByRole('img').evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0);
+  await viewer.getByRole('button', { name: 'Dùng làm đầu vào' }).click();
+  await expect(viewer).toBeHidden();
+  await expect(chosen.getByRole('img', { name: 'piece-1.png' })).toBeVisible();
+  // The same note twice in a row is one toast that counts, not a stack.
+  await card.getByRole('button', { name: 'Chép vào ô mô tả' }).click();
   await card.getByRole('button', { name: 'Chép vào ô mô tả' }).click();
   await expect(page.getByRole('textbox', { name: 'Mô tả', exact: true })).toHaveValue('pieces shot');
-  await expect(note('Đã chép mô tả')).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Thông báo' }).locator('.toast', { hasText: 'Đã chép mô tả' })).toHaveText(['Đã chép mô tả ×2×']);
   await card.getByRole('button', { name: 'Dùng kết quả' }).click(); // Fash's Use Result: the result as one more input
-  await expect(chosen.getByRole('img')).toHaveCount(2);
+  await expect(chosen.getByRole('img')).toHaveCount(3);
   expect(await page.url()).toMatch(/\/image-generation$/);
 
   // Words that fit the four lines have no show more; the copy button puts them on the clipboard and says so.

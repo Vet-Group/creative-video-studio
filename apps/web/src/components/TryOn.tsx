@@ -281,6 +281,7 @@ export function TryOn({ reuse }: { reuse?: string }) {
               recreate: (from, recipe) => (recall.touch(), recreate(from, recipe), narrow && setTab('create')),
               apply,
               photo: (p, role) => void take(p, role),
+              has: (asset) => [...person, ...garments, ...background].some((i) => i.id === asset),
               prompt: (text) => (setPrompt(text), notify('Đã chép mô tả')),
               result: (p) => void take(p, 'model', 'Đã dùng kết quả làm ảnh người mẫu'),
             }}
