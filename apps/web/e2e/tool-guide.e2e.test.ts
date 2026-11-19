@@ -17,6 +17,8 @@ test('the sidebar tells what each creative tool is for, and "Chọn công cụ n
   await expect(hint).toBeHidden();
   // A keyboard user reads it too, and Esc puts it away.
   await nav.getByRole('link', { name: 'Thư viện', exact: true }).focus();
+  await page.keyboard.press('Shift+Tab'); // the Apps chevron sits between them
+  await expect(nav.getByRole('button', { name: 'Ứng dụng nhanh' })).toBeFocused();
   await page.keyboard.press('Shift+Tab');
   const video = page.locator('.nav-item').filter({ has: page.getByRole('link', { name: 'Ứng dụng', exact: true }) }).locator('.nav-hint');
   await expect(video).toBeVisible();
