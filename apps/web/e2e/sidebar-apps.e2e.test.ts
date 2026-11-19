@@ -10,7 +10,7 @@ test('the Apps row opens and closes a list of app shortcuts, remembers the choic
   await page.setViewportSize({ width: 1440, height: 1000 });
   await signIn(page, 'member1');
   await expect(toggle(page)).toHaveAttribute('aria-expanded', 'false');
-  await expect(toggle(page)).toHaveAttribute('aria-controls', await shortcuts(page).evaluate((ul) => ul.id)); // the button names the list it opens
+  await expect(toggle(page)).toHaveAttribute('aria-controls', await page.locator('ul.nav-sub').evaluate((ul) => ul.id)); // the button names the list it opens (hidden, so not found by role)
   await expect(shortcuts(page)).toBeHidden();
 
   await toggle(page).click();
