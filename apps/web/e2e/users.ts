@@ -182,6 +182,7 @@ export const USERS = {
   dragb: { email: 'dragb@e2e.test', name: 'E2E Drag B', role: 'member' },
   dragc: { email: 'dragc@e2e.test', name: 'E2E Drag C', role: 'member' },
   motion: { email: 'motion@e2e.test', name: 'E2E Motion', role: 'member' }, // motion.e2e: the dialog entrance, the Run button's grey and ready colours, the press scale
+  tutor: { email: 'tutor@e2e.test', name: 'E2E Tutor', role: 'member' }, // tutorials.e2e: the tutorial videos on the About tabs and the tutorials page
 } as const;
 
 export type UserKey = keyof typeof USERS;
