@@ -1,4 +1,4 @@
-// Migration 0107 (workspaces, phase 1) run by the migrator, as a deploy runs it, on a database that already holds rows from before it.
+// Migration 0106 (workspaces, phase 1) run by the migrator, as a deploy runs it, on a database that already holds rows from before it.
 import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -9,12 +9,12 @@ import { afterAll, beforeAll, expect, test } from 'vitest';
 import { createPool } from './client';
 import { createTestDatabase } from './testing';
 
-const TAG = '0107_workspaces';
+const TAG = '0106_workspaces';
 const TABLES = ['analyses', 'assets', 'cost_entries', 'fashion_models', 'feedback', 'jobs', 'preset_proposals', 'remakes', 'stores', 'suggestion_runs', 'user_choices', 'user_templates'];
 const migrationsFolder = fileURLToPath(new URL('../migrations', import.meta.url));
 
-// The migrations folder as it was before 0107.
-const before = mkdtempSync(join(tmpdir(), 'cvs-before-0107-'));
+// The migrations folder as it was before 0106.
+const before = mkdtempSync(join(tmpdir(), 'cvs-before-0106-'));
 cpSync(migrationsFolder, before, { recursive: true });
 const journalFile = join(before, 'meta', '_journal.json');
 const journal = JSON.parse(readFileSync(journalFile, 'utf8')) as { entries: { tag: string }[] };
@@ -59,7 +59,7 @@ beforeAll(async () => {
   await pool.query(`insert into preset_proposals (id, label, prompt, proposed_by) values ('w-proposal', 'L', 'p', 'w-member')`);
 });
 
-test('0107 waits at most its lock_timeout for a busy table, then rolls back whole', { timeout: 30_000 }, async () => {
+test('0106 waits at most its lock_timeout for a busy table, then rolls back whole', { timeout: 30_000 }, async () => {
   const count = await applied();
   const holder = await pool.connect();
   try {
@@ -79,7 +79,7 @@ test('0107 waits at most its lock_timeout for a busy table, then rolls back whol
   expect(await one(`select count(*)::int as n from information_schema.columns where column_name = 'workspace_id'`)).toEqual({ n: 0 });
 });
 
-test('0107 seeds ws_vet with every user (Admin as owner), files every existing row under it without a rewrite or a ledger update, and a rerun applies nothing', async () => {
+test('0106 seeds ws_vet with every user (Admin as owner), files every existing row under it without a rewrite or a ledger update, and a rerun applies nothing', async () => {
   const nodes = Object.fromEntries(await Promise.all(TABLES.map(async (t) => [t, await filenode(t)])));
   const count = await applied();
   await migrateAll();

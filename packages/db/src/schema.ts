@@ -47,7 +47,7 @@ export const VERDICTS = ['pass', 'fail'] as const;
 export const DEFAULT_TEAM_ID = 'team-unassigned';
 
 export const WORKSPACE_ROLES = ['owner', 'member'] as const;
-/** The company's workspace, which migration 0107 seeds and files every earlier row under (docs/WORKSPACES.md). */
+/** The company's workspace, which migration 0106 seeds and files every earlier row under (docs/WORKSPACES.md). */
 export const COMPANY_WORKSPACE_ID = 'ws_vet';
 
 const tstz = (name: string) => timestamp(name, { withTimezone: true });
