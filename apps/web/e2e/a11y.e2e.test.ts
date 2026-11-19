@@ -4,7 +4,7 @@ import { runViaApi, signIn } from './support.test';
 import { USERS } from './users';
 
 // The main pages, in both themes, carry no serious or critical axe violation (the 2026-11-04 accessibility pass).
-const MEMBER_PAGES = ['/explore', '/create', '/try-on', '/image-generation', '/marketing-studio', '/apps', '/apps/ai-fashion-model', '/apps/motion-control', '/apps/multi-angle', '/apps/breed-swap', '/library', '/account/sign-in-methods'];
+const MEMBER_PAGES = ['/explore', '/create', '/try-on', '/image-generation', '/marketing-studio', '/apps', '/apps/ai-fashion-model', '/apps/motion-control', '/apps/multi-angle', '/apps/breed-swap', '/apps/pet-portrait', '/apps/mockup-pack', '/apps/name-swap', '/library', '/account/sign-in-methods'];
 const ADMIN_PAGES = ['/admin', '/admin/users', '/admin/workspaces', '/admin/audit', '/admin/costs', '/admin/settings'];
 
 const blocking = async (page: import('@playwright/test').Page) =>

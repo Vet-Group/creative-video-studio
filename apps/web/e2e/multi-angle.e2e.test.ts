@@ -11,7 +11,7 @@ const pickModel = async (page: Page, name: RegExp) => {
 };
 
 // The multi-angle app: one product photo in, one job per view picked, each titled with its view in History.
-test('picks the views of a product photo, sees the price of one image per view, runs one job per view and reuses one of them', async ({ page }) => {
+test('picks the views of a product photo, sees the price of one image per view, runs one job per view and reuses the whole batch from one of them', async ({ page }) => {
   await signIn(page, 'viewsa');
   await page.goto('/apps');
   await page.getByRole('list', { name: 'Danh sách ứng dụng' }).getByRole('link').filter({ hasText: 'Ảnh nhiều góc' }).click();
@@ -47,10 +47,11 @@ test('picks the views of a product photo, sees the price of one image per view, 
   await expect(page.getByRole('heading', { name: 'Ảnh nhiều góc · Mặt sau', level: 3 })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Ảnh nhiều góc · Bên trái', level: 3 })).toBeVisible();
 
-  // Reuse one card: the photo back in its slot and only that card's view picked.
+  // Reuse one card: the photo back in its slot and every view of its Run picked again, so the member changes one and runs the batch again.
   const back = (await mine()).find((j) => j.view === 'back')!;
   await page.goto(`/apps/multi-angle?reuse=${back.id}`);
   await expect(page.getByRole('group', { name: 'Sản phẩm' }).getByRole('img', { name: 'hoodie.png' })).toBeVisible();
   await expect(views(page).getByRole('checkbox', { name: 'Mặt sau' })).toBeChecked();
-  for (const name of ['Bên trái', 'Bên phải']) await expect(views(page).getByRole('checkbox', { name })).not.toBeChecked();
+  await expect(views(page).getByRole('checkbox', { name: 'Bên trái' })).toBeChecked();
+  await expect(views(page).getByRole('checkbox', { name: 'Bên phải' })).not.toBeChecked();
 });
