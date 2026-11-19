@@ -388,6 +388,31 @@ const tryOn: AboutPage = {
   video: 'tutorial-try-on',
   sections: [
     {
+      kicker: 'So với công cụ chung',
+      title: 'Vì sao dùng Thử đồ thay vì ChatGPT, Gemini hay công cụ AI tạo ảnh chung?',
+      lead: 'Công cụ AI chung coi trang phục như một vật bất kỳ, nên logo dễ lệch, hoạ tiết dễ đổi và nếp vải dễ sai. Ở Thử đồ, ảnh trang phục bạn tải lên là đầu vào chính: AI mặc đúng món đó lên người mẫu thay vì tự vẽ một món na ná từ lời mô tả.',
+      blocks: [
+        {
+          cards: [
+            { title: 'Trang phục lấy từ ảnh của bạn', text: 'AI mặc chính món đồ trong ảnh lên người mẫu, giữ nguyên khuôn mặt, dáng và tư thế của người mẫu. Ảnh trang phục càng nét, sáng đều và thấy rõ logo, hoạ tiết thì kết quả càng sát; vẫn nên xem lại logo và chữ in trước khi đăng.' },
+            { title: 'Bắt đầu từ thứ đã có sẵn', text: 'Tab Ví dụ liệt kê các ảnh thử đồ công ty đã làm. Chọn một ví dụ, bấm Dùng ví dụ này để lấy lại mô tả và thông số của nó vào form, rồi thêm ảnh sản phẩm của bạn. Không phải viết mô tả từ đầu.' },
+            { title: 'Gương mặt riêng của thương hiệu', text: 'Tạo người mẫu AI của riêng bạn ngay trong bảng chọn người mẫu, hoặc ở ứng dụng Tạo người mẫu AI. Người mẫu lưu trong mục Người mẫu AI và dùng lại ở Thử đồ, Tạo ảnh và Tạo video, nên cả danh mục có cùng một gương mặt thay vì một người mới cho mỗi sản phẩm.' },
+            { title: 'Cả bộ trang phục trong một lần', text: 'Thêm nhiều món cùng lúc, như áo, quần, giày và phụ kiện, để phối trên một người mẫu. Số món và tổng số ảnh tối đa tuỳ mô hình bạn chọn.' },
+          ],
+        },
+        {
+          table: [
+            ['Bạn cần gì', 'Thử đồ', 'ChatGPT, Gemini hay công cụ AI tạo ảnh chung'],
+            ['Điểm bắt đầu', 'Ảnh trang phục và ảnh người mẫu, mô tả là tuỳ chọn', 'Một ô nhập trống và một đoạn mô tả bằng chữ'],
+            ['Ý tưởng', 'Ví dụ của công ty, dùng lại bằng Dùng ví dụ này rồi thay bằng sản phẩm của bạn', 'Bạn tự nghĩ ra mọi ý tưởng'],
+            ['Độ chính xác của sản phẩm', 'Trang phục lấy từ ảnh bạn tải lên, người mẫu giữ nguyên', 'Chi tiết thường lệch giữa các lần tạo'],
+            ['Cùng một người mẫu cho cả danh mục', 'Người mẫu AI đã lưu, dùng lại ở Thử đồ, Tạo ảnh và Tạo video', 'Mỗi lần tạo ra một gương mặt khác'],
+            ['Mô hình ảnh', 'FASHN v1.6, Nano Banana, Nano Banana 2.1 và Nano Banana Pro trong một tài khoản', 'Một mô hình duy nhất của chính công cụ đó'],
+          ],
+        },
+      ],
+    },
+    {
       kicker: 'Vì sao quan trọng',
       title: 'Vì sao nên dùng thử đồ AI cho ảnh sản phẩm?',
       lead: 'Tấm ảnh bạn chụp trên bàn sáng nay trở thành ảnh người mẫu, không cần thuê người mẫu, không cần thuê studio. Chi phí mỗi ảnh giảm đủ để bạn thôi phải dè sẻn, và thời gian giảm đủ để sản phẩm lên trang ngay trong tuần hàng về.',
@@ -2126,6 +2151,29 @@ export const APP_ABOUT: Record<string, AboutPage> = {
         ],
       },
       {
+        title: 'Vì sao dùng Thử trang sức thay vì ChatGPT, Gemini hay công cụ AI tạo ảnh chung?',
+        lead: 'Công cụ AI chung vẽ lại một chiếc nhẫn hay dây chuyền mỗi lần bạn yêu cầu, nên đá, ổ chấu và màu kim loại dễ lệch. Thử trang sức lấy món đồ từ chính ảnh sản phẩm của bạn rồi đặt nó lên người trong ảnh.',
+        blocks: [
+          {
+            cards: [
+              { title: 'Đúng món của bạn', text: 'Thiết kế, màu kim loại và đá lấy từ ảnh sản phẩm; phản chiếu và bóng đổ được khớp với ánh sáng của ảnh người đeo.' },
+              { title: 'Đặt đúng chỗ đeo', text: 'AI nhận ra hoa tai, dây chuyền, nhẫn, vòng tay, đồng hồ hay ghim cài áo và đặt mỗi loại vào đúng chỗ đeo.' },
+              { title: 'Nhiều món trong một lần', text: 'Thêm nhiều món trang sức vào ô Trang sức để đeo cùng lúc lên một người.' },
+              { title: 'Bắt đầu từ thứ đã có sẵn', text: 'Ở ô Người đeo, chọn một ảnh người đeo có sẵn nếu công ty đã đưa lên, hoặc mở tab Ví dụ và bấm Dùng ví dụ này. Không cần viết mô tả.' },
+            ],
+          },
+          {
+            table: [
+              ['Bạn cần gì', 'Thử trang sức', 'ChatGPT, Gemini hay công cụ AI tạo ảnh chung'],
+              ['Điểm bắt đầu', 'Ảnh món trang sức và ảnh người đeo, hoặc một mẫu có sẵn', 'Một đoạn mô tả món trang sức bằng chữ'],
+              ['Ý tưởng', 'Ví dụ của công ty, dùng lại bằng Dùng ví dụ này rồi thay bằng món của bạn', 'Bạn tự nghĩ ra mọi ý tưởng'],
+              ['Độ chính xác của sản phẩm', 'Giữ thiết kế, màu kim loại và đá từ ảnh sản phẩm', 'Đá và ổ chấu thường bị vẽ lại'],
+              ['Vị trí đeo', 'AI nhận loại trang sức và đặt đúng chỗ đeo', 'Phụ thuộc cách bạn viết mô tả'],
+            ],
+          },
+        ],
+      },
+      {
         title: 'Thử trang sức trong 3 bước',
         lead: 'Tải trang sức, chọn người đeo, rồi bấm Chạy.',
         blocks: [
@@ -2233,6 +2281,29 @@ export const APP_ABOUT: Record<string, AboutPage> = {
         blocks: [
           'Thử đồ lót là ứng dụng mặc đồ lót trong ảnh sản phẩm lên người mẫu trong một ảnh khác và trả về ảnh người mẫu đang mặc nó. Bạn tải ảnh đồ lót, chọn hoặc tải ảnh người mẫu rồi bấm Chạy. Khuôn mặt, dáng, màu da và bối cảnh giữ nguyên; chỉ bộ đồ lót được thay vào.',
           `Ứng dụng giúp đội bán hàng online có ảnh đồ lót trên người mẫu từ ảnh sản phẩm chụp một lần, không cần buổi chụp riêng. ${APP_COST}`,
+        ],
+      },
+      {
+        title: 'Vì sao dùng Thử đồ lót thay vì ChatGPT, Gemini hay công cụ AI tạo ảnh chung?',
+        lead: 'Đồ lót là nhóm khó nhất với công cụ AI chung: ren dễ thành hoạ tiết phẳng, dây và khoá dễ xê dịch. Thử đồ lót mặc chính bộ đồ trong ảnh sản phẩm của bạn lên người mẫu và giữ chất liệu, màu sắc và chi tiết của nó.',
+        blocks: [
+          {
+            cards: [
+              { title: 'Cấu tạo được giữ nguyên', text: 'Ren, lưới, satin, dây, đường may và màu sắc lấy theo ảnh sản phẩm.' },
+              { title: 'Cả bộ trong một ảnh', text: 'Thêm nhiều món của cùng một bộ, như áo ngực và quần, để người mẫu mặc cả bộ trong một lần chạy.' },
+              { title: 'Người mẫu có sẵn hoặc của bạn', text: 'Chọn một người mẫu có sẵn ở ô Người mẫu, hoặc tải ảnh người mẫu của bạn lên. Chạy cùng một bộ trên nhiều người mẫu để so sánh.' },
+              { title: 'Bắt đầu từ thứ đã có sẵn', text: 'Mở tab Ví dụ, bấm Dùng ví dụ này để lấy lại mô tả và thông số của ví dụ, rồi thêm đồ lót của bạn. Mô tả là tuỳ chọn.' },
+            ],
+          },
+          {
+            table: [
+              ['Bạn cần gì', 'Thử đồ lót', 'ChatGPT, Gemini hay công cụ AI tạo ảnh chung'],
+              ['Điểm bắt đầu', 'Ảnh đồ lót chụp trên nền trơn và một người mẫu', 'Một đoạn mô tả bằng chữ'],
+              ['Ý tưởng', 'Ví dụ của công ty, dùng lại bằng Dùng ví dụ này rồi thay bằng sản phẩm của bạn', 'Bạn tự nghĩ ra mọi ý tưởng'],
+              ['Ren, lưới và satin', 'Giữ như trong ảnh sản phẩm', 'Thường bị đơn giản hoá hoặc vẽ lại'],
+              ['Người mẫu', 'Người mẫu có sẵn hoặc ảnh người mẫu của bạn', 'Người nào mà lời mô tả tạo ra'],
+            ],
+          },
         ],
       },
       {
