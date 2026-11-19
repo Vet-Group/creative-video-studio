@@ -22,7 +22,7 @@ export function Tutorials() {
   return (
     <article className="about tutorials">
       <h1>Hướng dẫn</h1>
-      <p className="about-intro">Mỗi video dưới một phút, có giọng đọc và phụ đề: xem một lần là dùng được công cụ.</p>
+      <p className="about-intro">Một video tổng quan, rồi mỗi công cụ một video dưới một phút, đều có giọng đọc và phụ đề.</p>
       <Tutorial name={TOUR} title="Làm quen với CVS" />
       {content &&
         TOOLS.map(([key, href, name]) => {
