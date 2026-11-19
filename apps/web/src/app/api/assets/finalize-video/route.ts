@@ -33,12 +33,12 @@ export async function POST(request: Request) {
   const storeId = b?.storeId == null ? null : b.storeId;
   if (storeId !== null && (typeof storeId !== 'string' || (await pool.query('select 1 from stores where id = $1 and workspace_id = $2 and not hidden', [storeId, g.workspaceId])).rowCount === 0)) return bad('the store does not exist or is hidden');
 
-  // Idempotent: a repeated finalize of the same upload returns the row already made rather than conflicting on the primary key; one finalized in another
-  // workspace is not found here (and its object is left alone).
-  const existing = (await pool.query('select id, filename, duration_ms as "durationMs", bytes, workspace_id from assets where id = $1 and owner_id = $2', [assetId, userId])).rows[0];
+  // Idempotent: a repeated finalize of the same upload returns the row already made rather than conflicting on the primary key. Any row with this id ends
+  // the request before the object is touched: one of another user or workspace is not found here, and its object is never deleted below.
+  const existing = (await pool.query('select id, filename, duration_ms as "durationMs", bytes, owner_id, workspace_id from assets where id = $1', [assetId])).rows[0];
   if (existing) {
-    const { workspace_id: workspaceId, ...asset } = existing;
-    return workspaceId === g.workspaceId ? Response.json({ asset }) : bad('not found', 404);
+    const { owner_id: ownerId, workspace_id: workspaceId, ...asset } = existing;
+    return ownerId === userId && workspaceId === g.workspaceId ? Response.json({ asset }) : bad('not found', 404);
   }
 
   const key = r2Key(`assets/${assetId}`);
@@ -75,7 +75,9 @@ export async function POST(request: Request) {
   try {
     await insertAssets(db, [row]);
   } catch (e) {
-    await deleteObject(key); // no row points at it
+    // No row points at it, unless a concurrent finalize of the same id inserted first (23505): that row's object stays.
+    const err = e as { code?: string; cause?: { code?: string } }; // drizzle wraps the pg error in `cause`
+    if ((err.code ?? err.cause?.code) !== '23505') await deleteObject(key);
     throw e;
   }
   return Response.json({ asset: { id: assetId, filename: row.filename, durationMs, bytes: size } });

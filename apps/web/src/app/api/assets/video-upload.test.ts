@@ -121,6 +121,15 @@ test('finalize deletes the object and refuses a non-video, and 409s when it is m
   expect((await finalize({ assetId: randomUUID() })).status).toBe(409);
 });
 
+test('finalize of another user’s finalized id is not found and leaves their object alone', async () => {
+  const { user } = await auth.api.createUser({ body: { email: 'owner@example.test', name: 'O', password: PASSWORD, role: 'member' } });
+  const id = randomUUID();
+  await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) values ($1, $2, 'input', $3, 'theirs.mp4', 'video/mp4', 1000)`, [id, user.id, `r2:assets/${id}`]);
+  expect((await finalize({ assetId: id })).status).toBe(404);
+  expect(vi.mocked(storage.deleteObject)).not.toHaveBeenCalled();
+  expect((await pool.query('select owner_id from assets where id = $1', [id])).rows[0].owner_id).toBe(user.id);
+});
+
 test('finalize rejects a bad assetId and a hidden store', async () => {
   expect((await finalize({ assetId: 'not-a-uuid' })).status).toBe(400);
   expect((await finalize({ assetId: randomUUID(), storeId: 'store-hidden' })).status).toBe(400);
