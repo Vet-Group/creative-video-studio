@@ -54,10 +54,13 @@ export const reaAnalyzeEnabled = (env: NodeJS.ProcessEnv = process.env): boolean
 //   wall time to ~4.5 min while staying ~1.3 GB, under the worker's 2G MemoryMax (deploy/linux/cvs-worker.service).
 // --max-vlm-shots 40: bound the VLM spend and time on a pathologically long video (default 60); the busiest real
 //   clip measured was 27 shots, and rea-video spends the budget on the least-certain shots first.
+// --no-stems --no-speakers: ac47077 separates vocals/music and diarizes speakers by default, which nothing here reads; the
+//   stems pass alone was OOM-killed at 2G on prod (50s/720p clip, 2026-11-19). Without both: 898 MB peak / 4.5 min, survey on.
+//   The flags are unknown to earlier rea-video, so the host's install must be ac47077 or later.
 const realDecompose = async (video: string, outDir: string, env: Record<string, string>): Promise<void> => {
   await run(
     process.env.REA_VIDEO_BIN || 'rea-video',
-    ['decompose', video, '-o', outDir, '--vlm', '--lang', 'en', '--workers', '5', '--max-vlm-shots', '40'],
+    ['decompose', video, '-o', outDir, '--vlm', '--lang', 'en', '--workers', '5', '--max-vlm-shots', '40', '--no-stems', '--no-speakers'],
     { env: { ...process.env, ...env }, maxBuffer: 16 * 1024 * 1024 },
   );
 };
