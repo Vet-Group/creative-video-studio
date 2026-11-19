@@ -348,18 +348,18 @@ describe('bookInvoice', () => {
 describe('cancelQueued', () => {
   test('cancels the owner queued job: failed with the canceled marker, the estimate released to a final 0', async () => {
     const id = await reservedJob('1.5000');
-    expect(await cancelQueued(pool, id, 'u1')).toBe('canceled');
+    expect(await cancelQueued(pool, id, 'u1', 'ws_vet')).toBe('canceled');
     expect((await pool.query('select status, error, finished_at is not null as done from jobs where id = $1', [id])).rows[0]).toEqual({ status: 'failed', error: CANCELED_ERROR, done: true });
     expect((await rowsOf(id)).map((r) => [r.kind, r.usd, r.is_final])).toEqual([['estimate', '1.5000', false], ['release', '-1.5000', true]]);
     expect(await total(id)).toEqual({ usd: '0.0000', is_final: true });
-    expect(await cancelQueued(pool, id, 'u1')).toBe('started'); // no longer queued: a second cancel changes nothing
+    expect(await cancelQueued(pool, id, 'u1', 'ws_vet')).toBe('started'); // no longer queued: a second cancel changes nothing
     expect(await rowsOf(id)).toHaveLength(2);
   });
 
   test('refuses a job that is submitting, running or finished, and changes nothing', async () => {
     for (const status of ['submitting', 'running', 'succeeded', 'failed', 'timed_out']) {
       const id = await reservedJob('1.5000', { status });
-      expect(await cancelQueued(pool, id, 'u1')).toBe('started');
+      expect(await cancelQueued(pool, id, 'u1', 'ws_vet')).toBe('started');
       expect((await pool.query('select status, error from jobs where id = $1', [id])).rows[0]).toEqual({ status, error: null });
       expect(await rowsOf(id)).toHaveLength(1);
     }
@@ -367,14 +367,14 @@ describe('cancelQueued', () => {
 
   test('treats another member and an unknown id as not found', async () => {
     const id = await reservedJob('1.5000');
-    expect(await cancelQueued(pool, id, 'someone-else')).toBe('not_found');
-    expect(await cancelQueued(pool, 'no-such-job', 'u1')).toBe('not_found');
+    expect(await cancelQueued(pool, id, 'someone-else', 'ws_vet')).toBe('not_found');
+    expect(await cancelQueued(pool, 'no-such-job', 'u1', 'ws_vet')).toBe('not_found');
     expect((await pool.query('select status from jobs where id = $1', [id])).rows[0].status).toBe('queued');
   });
 
   test('cancels a queued job that has no ledger rows without booking any', async () => {
     const id = await newJob();
-    expect(await cancelQueued(pool, id, 'u1')).toBe('canceled');
+    expect(await cancelQueued(pool, id, 'u1', 'ws_vet')).toBe('canceled');
     expect(await rowsOf(id)).toEqual([]);
   });
 });

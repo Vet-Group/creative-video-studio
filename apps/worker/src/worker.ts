@@ -329,7 +329,7 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
    * and settles the job. A failure that may pass leaves the job running for the next pass.
    */
   async function deliver(
-    job: { id: string; user_id: string; provider: string; kind: string; output_resolution?: string | null; params?: Record<string, string>; feature?: string; duration_s?: number },
+    job: { id: string; user_id: string; workspace_id: string; provider: string; kind: string; output_resolution?: string | null; params?: Record<string, string>; feature?: string; duration_s?: number },
     outputUrl: string,
     costUsd: number,
     tokens?: number,
@@ -388,8 +388,8 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
       await putObject(keys[1]!, posterBytes, 'image/jpeg');
       const name = job.id.slice(0, 8);
       await insertAssets(db, [
-        { id: outputId, ownerId: job.user_id, kind: 'output', s3Key: keys[0]!, filename: `video-${name}.mp4`, mime: 'video/mp4', bytes: videoBytes.length, width, height, durationMs: seconds > 0 ? Math.round(seconds * 1000) : null },
-        { id: posterId, ownerId: job.user_id, kind: 'output', s3Key: keys[1]!, filename: `poster-${name}.jpg`, mime: 'image/jpeg', bytes: posterBytes.length },
+        { id: outputId, ownerId: job.user_id, workspaceId: job.workspace_id, kind: 'output', s3Key: keys[0]!, filename: `video-${name}.mp4`, mime: 'video/mp4', bytes: videoBytes.length, width, height, durationMs: seconds > 0 ? Math.round(seconds * 1000) : null },
+        { id: posterId, ownerId: job.user_id, workspaceId: job.workspace_id, kind: 'output', s3Key: keys[1]!, filename: `poster-${name}.jpg`, mime: 'image/jpeg', bytes: posterBytes.length },
       ]);
       // Before settle, so the warning is there the moment the job reads succeeded (settle leaves error alone).
       if (warnings.length) await pool.query(`update jobs set error = $2 where id = $1 and status = 'running'`, [job.id, warnings.join('; ').slice(0, 1000)]).catch((err) => log(`warning ${job.id}`, err));
@@ -405,7 +405,7 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
   }
 
   /** An image is stored as it came (its type read from its bytes); its poster is a small JPEG preview for tiles, and a failed preview only leaves it without one. */
-  async function deliverImage(job: { id: string; user_id: string; provider: string }, outputUrl: string, costUsd: number): Promise<void> {
+  async function deliverImage(job: { id: string; user_id: string; workspace_id: string; provider: string }, outputUrl: string, costUsd: number): Promise<void> {
     const dir = await mkdtemp(join(tmpdir(), 'cvs-deliver-'));
     const outputId = randomUUID();
     const key = `assets/${outputId}`;
@@ -421,8 +421,8 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
       }
       const { width, height } = await probeSize(file);
       await putObject(key, bytes, type.mime);
-      await insertAssets(db, [{ id: outputId, ownerId: job.user_id, kind: 'output', s3Key: key, filename: `image-${job.id.slice(0, 8)}.${type.ext}`, mime: type.mime, bytes: bytes.length, width, height }]);
-      previewId = await storePreview(db, job.user_id, job.id, bytes).catch((err) => (log(`preview ${job.id}`, err), null));
+      await insertAssets(db, [{ id: outputId, ownerId: job.user_id, workspaceId: job.workspace_id, kind: 'output', s3Key: key, filename: `image-${job.id.slice(0, 8)}.${type.ext}`, mime: type.mime, bytes: bytes.length, width, height }]);
+      previewId = await storePreview(db, job.user_id, job.workspace_id, job.id, bytes).catch((err) => (log(`preview ${job.id}`, err), null));
       if (await settle(pool, job.id, { status: 'succeeded', costUsd, outputAssetId: outputId, posterAssetId: previewId })) return;
       throw new Error('the job was settled by someone else');
     } catch (e) {
@@ -462,7 +462,7 @@ export async function startWorker(deps: WorkerDeps): Promise<RunningWorker> {
 
   async function pollRunning(): Promise<void> {
     const { rows } = await pool.query(
-      `select j.id, j.user_id, j.provider, j.provider_job_id, j.model, j.feature, j.params, j.duration_s, m.kind, m.output_resolution, (now() - j.started_at > ($1::float8 * interval '1 millisecond')) as expired
+      `select j.id, j.user_id, j.workspace_id, j.provider, j.provider_job_id, j.model, j.feature, j.params, j.duration_s, m.kind, m.output_resolution, (now() - j.started_at > ($1::float8 * interval '1 millisecond')) as expired
          from jobs j join model_configs m on m.id = j.model where j.status = 'running'`,
       [o.runTimeoutMs],
     );
