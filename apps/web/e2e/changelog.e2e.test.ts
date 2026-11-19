@@ -5,8 +5,8 @@ import { signIn } from './support.test';
 const SEEN = 'cvs.changelog.seen';
 const POPUP = 'cvs.changelog.popup';
 const longAgo = '2026-11-11T12:00:00+07:00'; // older than the newest three entries a member may read
-// The newest entry's Vietnam day, so a new entry on a later day does not break the spec.
-const NEWEST_DAY = CHANGELOG[0]!.at.slice(0, 10);
+// The Vietnam day of the newest entry a member reads, so a new entry on a later day (or a newer admin-only one) does not break the spec.
+const NEWEST_DAY = CHANGELOG.find((e) => e.audience === 'all')!.at.slice(0, 10);
 
 const dot = (page: Page) => page.locator('.sidebar nav a[href="/changelog"] .nav-dot');
 const popup = (page: Page) => page.getByRole('dialog', { name: 'Có gì mới' });
