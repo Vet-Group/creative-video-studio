@@ -12,5 +12,9 @@ export const smartRemakeAppEnabled = (): boolean => reaAnalyzeEnabled() && reaRe
 export const REMAKE_COLUMNS = `id, analysis_id as "analysisId", product_asset_id as "productAssetId", shots, status, (result - 'worker' - 'fal') as result, output_asset_id as "outputAssetId",
   cost_usd as "costUsd", error, created_at as "createdAt", finished_at as "finishedAt"`;
 
-/** A remake row as sent: what it cost is the company's figure, so another workspace gets null (docs/WORKSPACES.md §3). */
-export const spendOf = <T extends { costUsd: unknown }>(row: T, workspaceId: string): T => (workspaceId === COMPANY_WORKSPACE_ID ? row : { ...row, costUsd: null });
+/** A remake row as sent: what it and each of its shots cost are the company's figures, so another workspace gets a null cost and shots without one (docs/WORKSPACES.md §3). */
+export const spendOf = <T extends { costUsd: unknown; result?: unknown }>(row: T, workspaceId: string): T => {
+  if (workspaceId === COMPANY_WORKSPACE_ID) return row;
+  const result = row.result as { shots?: Record<string, unknown>[] } | null | undefined;
+  return { ...row, costUsd: null, ...(Array.isArray(result?.shots) && { result: { ...result, shots: result.shots.map(({ costUsd: _cost, ...shot }) => shot) } }) };
+};
