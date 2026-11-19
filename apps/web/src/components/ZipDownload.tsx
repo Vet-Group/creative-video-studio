@@ -1,7 +1,7 @@
 'use client';
 // Many results at once: the select toggle shows a checkbox per item with an output, and the bar downloads the picked ones as one .zip (POST for a signed link, then the link).
 // With `hover` (the Library) every item has its checkbox, shown on hover or focus by CSS; picking one starts the selection, and Esc or the clear button ends it.
-// `flip` picks or drops an item from elsewhere than its checkbox (the Library's picture, while a selection is on).
+// `flip` picks or drops an item from elsewhere than its checkbox (the Library's picture, while a selection is on); `pickMany` and `dropMany` take several (History's batch, a Library day).
 // `actions` adds the page's own controls for the picked ids to the bar (the Library's marks and store).
 import { type ReactNode, useEffect, useState } from 'react';
 import { api, ApiError, sendJson } from '@/lib/api';
@@ -11,11 +11,13 @@ const MAX = 50; // what /api/library/zip takes
 
 export function useZipDownload({ hover = false, actions }: { hover?: boolean; actions?: (ids: string[]) => ReactNode } = {}): {
   active: boolean;
+  ids: string[];
   toggle: ReactNode;
   bar: ReactNode;
   check: (id: string, label: string) => ReactNode;
   flip: (id: string) => void;
   pickMany: (many: string[]) => void;
+  dropMany: (many: string[]) => void;
 } {
   const [on, setOn] = useState(false);
   const [ids, setIds] = useState<string[]>([]);
@@ -59,6 +61,7 @@ export function useZipDownload({ hover = false, actions }: { hover?: boolean; ac
 
   return {
     active,
+    ids,
     toggle: (
       <button type="button" className="zip-toggle" aria-pressed={active} onClick={() => (active ? clear() : setOn(true))}>
         Chọn
@@ -91,7 +94,8 @@ export function useZipDownload({ hover = false, actions }: { hover?: boolean; ac
         </label>
       ),
     flip: (id) => pick(id, !ids.includes(id)),
-    // Several at once (History's "Chọn cả lô"): the checkboxes show, and the ones already picked stay.
-    pickMany: (many) => (setProblem(''), setOn(true), setIds((cur) => [...new Set([...cur, ...many])].slice(0, MAX))),
+    // Several at once (History's "Chọn cả lô", a Library day): the checkboxes show, and the ones already picked stay.
+    pickMany: (many) => (setProblem(new Set([...ids, ...many]).size > MAX ? `Tối đa ${MAX} mục mỗi lần tải.` : ''), setOn(true), setIds((cur) => [...new Set([...cur, ...many])].slice(0, MAX))),
+    dropMany: (many) => (setProblem(''), setIds((cur) => cur.filter((x) => !many.includes(x)))),
   };
 }
