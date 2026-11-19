@@ -1,0 +1,3 @@
+import type { ChangeEntry } from '../changelog';
+
+export default { at: '2026-11-19T09:30:00+07:00', kind: 'fixed', title: 'Thiết lập lưu từ biểu mẫu giữ đúng ô của từng ảnh', details: ['Khi bấm "Lưu thiết lập" trên biểu mẫu còn để trống một ô ảnh, như ở Thử đồ chưa có ảnh người mẫu, thiết lập đã lưu giờ giữ ô trống đó, nên khi áp dụng mỗi ảnh về đúng ô của mình. Trước đây ảnh phía sau bị dồn lên, như ảnh trang phục rơi vào ô người mẫu.', 'Áp dụng cho Thử đồ, Marketing Studio và các ứng dụng có nhiều ô ảnh, như Đổi nhân vật, Đổi nền hay Thử trang sức.'], prs: [553], audience: 'all' } satisfies ChangeEntry;

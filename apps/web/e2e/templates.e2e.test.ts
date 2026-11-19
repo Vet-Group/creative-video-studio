@@ -64,6 +64,24 @@ test('Try On: a saved template lists under Thiết lập đã lưu and refills t
   await expect(list).toContainText('Chưa có thiết lập nào.');
 });
 
+test('Try On: a template saved without a model photo puts the garment and the backdrop back in their own slots', async ({ page }) => {
+  await signIn(page, 'tplslots');
+  await page.goto('/try-on');
+  await page.getByLabel('Ảnh trang phục').setInputFiles(file('garment.png'));
+  await expect(page.getByRole('img', { name: 'garment.png' })).toBeVisible();
+  await page.getByLabel('Ảnh bối cảnh').setInputFiles(file('backdrop.png'));
+  await expect(page.getByRole('img', { name: 'backdrop.png' })).toBeVisible();
+  await saveAs(page, 'Không người mẫu');
+
+  await page.goto('/try-on');
+  await openTemplates(page);
+  await page.getByRole('dialog', { name: 'Thiết lập đã lưu' }).getByRole('link', { name: 'Không người mẫu' }).click();
+  await expect(page.getByLabel('Trang phục: ảnh đã chọn').getByRole('img')).toHaveAttribute('alt', 'garment.png');
+  await expect(page.getByLabel('Bối cảnh (tuỳ chọn): ảnh đã chọn').getByRole('img')).toHaveAttribute('alt', 'backdrop.png');
+  await expect(page.getByLabel('Người mẫu: ảnh đã chọn')).toHaveCount(0);
+  await expect(page.getByText('ảnh đầu vào (đã bị xoá)')).toHaveCount(0); // the empty model slot is no lost photo
+});
+
 test("Create: a template saved to the store chosen on the form is listed, tagged with the store, to another member who picks that store, and applies there with the author's photo, which that member's Run takes", async ({ page, browser }) => {
   await signIn(page, 'stpla');
   await page.goto('/create');

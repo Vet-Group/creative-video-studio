@@ -7,7 +7,7 @@ import { type CSSProperties, type ReactNode, useEffect, useId, useRef, useState 
 import { api, errorText, sendJson } from '@/lib/api';
 import { type AppConfig, appInputs, appReason, type AppCategory, DEFAULT_VIEWS, motionReason, runTotal, slotMax, splitImages, stockGroups, VIEW_LABELS, visibleApps } from '@/lib/apps';
 import { basePrompt, promptTooLong } from '@/lib/prompt-limit';
-import { alignInputs, type Skipped, skippedNote } from '@/lib/reuse';
+import { alignInputs, placesOf, type Skipped, skippedNote } from '@/lib/reuse';
 import { confirmRun, sendRun } from '@/lib/run-guard';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { useRecall } from '@/lib/use-recall';
@@ -322,8 +322,7 @@ function AppForm({ app, reuse }: { app: AppConfig; reuse?: string }) {
             {chosen && app.resolution && <Select label="Độ phân giải" icon="preset" heading="Chọn độ phân giải" value={pick.resolution} options={chosen.resolutions.map((r) => ({ value: r, label: r }))} onChange={pick.setResolution} />}
             <Templates
               feature={app.feature}
-              // shortcut: an empty slot shifts the later images up on refill, fine while every app's slots are all required
-              data={() => ({ images: images.flat().map((i) => i.id), brief: prompt.trim(), ratio: pick.ratio, resolution: pick.resolution, modelId: pick.modelId })}
+              data={() => ({ images: placesOf(images, app.slots), brief: prompt.trim(), ratio: pick.ratio, resolution: pick.resolution, modelId: pick.modelId })}
             />
           </div>
 

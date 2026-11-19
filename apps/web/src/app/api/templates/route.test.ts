@@ -3,7 +3,7 @@ import { randomBytes } from 'node:crypto';
 import { DeleteBucketCommand, DeleteObjectsCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { createTestDatabase } from '@cvs/db/testing';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
-import { lostInputs, tryOnSlots } from '@/lib/reuse';
+import { lostInputs, nothingRefilled, tryOnSlots } from '@/lib/reuse';
 
 const testDb = await createTestDatabase();
 process.env.DATABASE_URL = testDb.url;
@@ -236,7 +236,7 @@ describe('/api/templates', () => {
     expect(tryOnSlots(copy.inputIds, copy.images, copy.garments)).toEqual({ person: [], garments: [copy.images[0]], background: [copy.images[1]] });
   });
 
-  test('says how many photo places it saved (inputCount), so the form counts a photo deleted since as lost, to the author and to a member applying copies', async () => {
+  test('says how many photos it saved (inputCount), so the form counts a photo deleted since as lost, to the author and to a member applying copies', async () => {
     const [a, b] = [await newUser(), await newUser()];
     await pool.query(`insert into stores (id, name, code, hidden) values ('st-lost', 'Shop L', 'STL', false)`);
     const [first, second, third] = [`${a.id}-first`, `${a.id}-second`, `${a.id}-third`];
@@ -259,11 +259,18 @@ describe('/api/templates', () => {
       expect([got.inputCount, got.images.length, lostInputs(got)]).toEqual([3, 2, 1]);
     }
 
-    // Saved with an empty place for a photo deleted before the save (a template saved from a job): that place counts as lost too.
+    // An empty place ('': a slot left empty on the form, or a photo deleted before a save from History) holds no photo, so it is neither saved nor lost.
     await pool.query(`update user_templates set data = jsonb_set(data, '{images}', $2::jsonb) where id = $1`, [id, JSON.stringify(['', second, third])]);
     for (const u of [a, b]) {
       const got = await apply(u);
-      expect([got.inputCount, got.images.length, lostInputs(got)]).toEqual([3, 2, 1]);
+      expect([got.inputCount, got.images.length, lostInputs(got)]).toEqual([2, 2, 0]);
+    }
+
+    // Only empty places and no words: nothing comes back, and nothing was lost either, so the form says nothing of it.
+    const blank = ((await (await save(a, { feature: 'try_on', name: 'Blank', data: { images: ['', ''], garments: 1 }, storeId: 'st-lost' })).json()) as { id: string }).id;
+    for (const u of [a, b]) {
+      const got = (await (await one(req(u, `/api/templates/${blank}`), ctx(blank))).json()) as Got & { brief: string | null };
+      expect([got.inputCount, lostInputs(got), nothingRefilled(got)]).toEqual([0, 0, false]);
     }
   });
 

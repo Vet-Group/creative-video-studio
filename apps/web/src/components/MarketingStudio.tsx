@@ -20,7 +20,7 @@ import { useRecall } from '@/lib/use-recall';
 import { useDraftState } from '@/lib/use-draft';
 import { useSamples } from '@/lib/use-samples';
 import { cardSample } from '@/lib/examples';
-import { alignInputs, asExample, dropRefillQuery, lostInputs, nothingNote, nothingRefilled, queryOf, skippedNote } from '@/lib/reuse';
+import { alignInputs, asExample, dropRefillQuery, lostInputs, nothingNote, nothingRefilled, placesOf, queryOf, skippedNote } from '@/lib/reuse';
 import { About } from './About';
 import { AudioSwitch } from './AudioSwitch';
 import { BrandPicker } from './BrandKit';
@@ -778,7 +778,8 @@ export function MarketingStudio({ format = 'ugc', reuse, recipe, wizardDefault =
             <Templates
               feature="marketing"
               data={() => ({
-                images: images.map((i) => i.id),
+                // The model and the product go back by place, so an empty model keeps one; Unboxing's roles name its photos instead.
+                images: advanced || unboxing ? images.map((i) => i.id) : placesOf([person, product]),
                 ...(pf && { format: pf }),
                 ...((advanced || review) && { script: script.trim() }),
                 ...(advanced && video && { videoRef: video.id }),
