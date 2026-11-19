@@ -19,9 +19,9 @@ export async function GET(request: Request, { params }: RouteContext) {
  * owner grants only owner or member, never Admin or editor, and may not create an account on the company's email domains.
  */
 export async function POST(request: Request, { params }: RouteContext) {
-  if (!sameOrigin(request)) return bad('forbidden origin', 403);
   const g = await guard(request, 'member');
   if (g.error) return g.error;
+  if (!sameOrigin(request)) return bad('forbidden origin', 403);
   const { id } = await params;
   const as = await managerOf(g, id, true);
   if (as instanceof Response) return as;

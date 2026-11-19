@@ -6,9 +6,9 @@ import { guard, resolveWorkspace, sameOrigin, WORKSPACE_COOKIE } from '@/lib/ses
  * active member of (and, while an Admin is signed in as them, one both share); anything else answers 404. The page then reloads in that workspace.
  */
 export async function POST(request: Request) {
-  if (!sameOrigin(request)) return bad('forbidden origin', 403);
   const g = await guard(request, 'member');
   if (g.error) return g.error;
+  if (!sameOrigin(request)) return bad('forbidden origin', 403);
   const { workspaceId } = (await readBody(request)) ?? {};
   if (typeof workspaceId !== 'string') return bad('workspaceId is required');
   const found = await resolveWorkspace(g.session.user.id, workspaceId, g.session.session.impersonatedBy ?? null);

@@ -34,9 +34,9 @@ export async function GET(request: Request) {
  * whose temporary password the answer carries once. A name another workspace has (in any case) is refused, 409 name_taken.
  */
 export async function POST(request: Request) {
-  if (!sameOrigin(request)) return bad('forbidden origin', 403);
   const g = await guard(request, 'admin');
   if (g.error) return g.error;
+  if (!sameOrigin(request)) return bad('forbidden origin', 403);
   const body = (await readBody(request)) ?? {};
   const name = nameOf(body.name);
   const email = emailOf(body.ownerEmail);

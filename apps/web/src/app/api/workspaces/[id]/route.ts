@@ -13,9 +13,9 @@ import { managerOf, nameOf } from '@/lib/workspaces';
  * keeps its name and cannot be disabled. A name another workspace has, in any case, is refused (409 name_taken). Each change is audited.
  */
 export async function PATCH(request: Request, { params }: RouteContext) {
-  if (!sameOrigin(request)) return bad('forbidden origin', 403);
   const g = await guard(request, 'member');
   if (g.error) return g.error;
+  if (!sameOrigin(request)) return bad('forbidden origin', 403);
   const { id } = await params;
   const as = await managerOf(g, id, true);
   if (as instanceof Response) return as;
