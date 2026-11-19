@@ -22,6 +22,8 @@ test('creates a model inside the Try On model picker, fills the slot and lists i
   // A minor in the free text stops the run before it is sent, as on the app's page.
   const extra = form.getByLabel('Chi tiết thêm (tuỳ chọn)');
   const run = form.getByRole('button', { name: /^Tạo người mẫu/ });
+  // The free-text box takes the page's font, not the browser's monospace default.
+  expect(await extra.evaluate((e) => getComputedStyle(e).fontFamily)).toBe(await page.evaluate(() => getComputedStyle(document.body).fontFamily));
   await extra.fill('15 tuổi');
   await expect(run).toBeDisabled();
   await expect(form.getByText('Chi tiết thêm không được nhắc đến trẻ em')).toBeVisible();
