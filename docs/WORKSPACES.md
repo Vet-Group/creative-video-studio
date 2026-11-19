@@ -68,7 +68,7 @@ Root rows carry it; children are reached through their parent.
 ### 4. Accounts and sign-in
 
 - Lark sign-in is gated to the company's tenant. A user Lark creates joins `ws_vet`; the membership is added in the Lark provisioning path, not in a generic `user.create` hook (an Admin-created partner user passes through that hook too).
-- Email + password sign-up stays closed. A workspace owner adds an existing user by email, or creates an account with a temporary password (`mustChangePassword`) shown once to copy to the person; CVS sends no email. Owners may not create accounts for addresses on the company's email domains, and Lark never links a sign-in into an account an owner created, so a partner cannot pre-create a staff member's account.
+- Email + password sign-up stays closed. A workspace owner adds an existing user by email, or creates an account with a temporary password (`mustChangePassword`) shown once to copy to the person; CVS sends no email. Owners may not create accounts for addresses on the company's email domains (`CVS_COMPANY_EMAIL_DOMAINS`, `vetgroup.net` when unset; a member outside `ws_vet` cannot change their own email to one either), and Lark never links a sign-in into an account an owner created (it is created unverified, and its `workspace.account_create` audit row with `byOwner` makes the account hooks refuse a Lark link), so a partner cannot pre-create a staff member's account.
 - An Admin creates accounts in the workspace they pick (`ws_vet` by default). Google sign-in (sign-up closed) then works for the same address.
 
 ### 5. Phases
