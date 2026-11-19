@@ -1,13 +1,13 @@
 // Saved forms (user_templates): the inputs of one page in the shape the reuse link reads from a job, so a template refills a form the same way.
 import { PROMPT_CEILING } from '@cvs/core/models';
 import { END_TEXT_POSITIONS, isParamFormat, MAX_END_TEXT, MAX_ENDING, MAX_HIGHLIGHT, MAX_HIGHLIGHTS, MAX_HOOK, PARAM_FORMATS, UNBOXING_ROLES } from './marketing';
-import { poseOf } from './try-on-stock';
+import { MOST_GARMENTS, poseOf } from './try-on-stock';
 
 /** The most templates one member keeps. */
 export const MAX_TEMPLATES = 50;
 export const MAX_TEMPLATE_NAME = 60;
 const MAX_TEXT = PROMPT_CEILING; // the longest prompt any model takes
-const MAX_IMAGES = 7;
+const MAX_IMAGES = 15; // Try On's places: the person, up to MOST_GARMENTS garments and the background
 const MAX_CLIPS = 10; // the most reference audio clips a model takes (Seedance 2.5)
 
 /** A template's stored inputs: asset ids for the images, Create video's end frame and reference audio, and the fields of GET /api/jobs/:id the pages refill from. */
@@ -93,7 +93,7 @@ export function templateData(raw: unknown): TemplateData | string {
   if (d.audio !== undefined && d.audio !== 'on' && d.audio !== 'off') return 'data.audio must be on or off';
   if (d.orientation !== undefined && d.orientation !== 'video' && d.orientation !== 'image') return 'data.orientation must be video or image';
   if (d.enhance !== undefined && typeof d.enhance !== 'boolean') return 'data.enhance must be true or false';
-  if (d.garments !== undefined && !whole(d.garments, 1, 6)) return 'data.garments must be 1 to 6';
+  if (d.garments !== undefined && !whole(d.garments, 1, MOST_GARMENTS)) return `data.garments must be 1 to ${MOST_GARMENTS}`;
   if (d.pose !== undefined && !poseOf(d.pose as string)) return 'data.pose must be one of the Try On poses';
   if (d.durationSec !== undefined && !whole(d.durationSec, 1, 60)) return 'data.durationSec must be 1 to 60';
   return { ...(d as TemplateData), images: images as string[] };

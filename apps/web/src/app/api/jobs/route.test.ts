@@ -670,6 +670,28 @@ describe('POST /api/jobs for an image feature', () => {
     expect(await jobCount()).toBe(before);
   });
 
+  test("takes up to 13 garments (Nano Banana 2.1's cap), numbered past nine, while the model's own image limit still holds the run", async () => {
+    const m = await newMember();
+    const garments: string[] = [];
+    for (let i = 1; i <= 14; i++) await insertAsset(`${m.id}-many-${i}`, m.id).then(() => garments.push(`${m.id}-many-${i}`));
+    const tryOn = (n: number, count = String(n)) => ({ feature: 'try_on', prompt: undefined, assetIds: [m.asset, ...garments.slice(0, n)], params: { resolution: '1K', garments: count } });
+    await pool.query(`update model_configs set max_images = 16 where id = 'img-pro'`);
+    try {
+      const res = await runImage(m, tryOn(13));
+      expect(res.status, await res.clone().text()).toBe(201);
+      const { id } = (await res.json()) as { id: string };
+      expect((await pool.query('select params, cardinality(input_asset_ids) as n from jobs where id = $1', [id])).rows[0]).toMatchObject({ params: { garments: '13' }, n: 14 });
+      const before = await jobCount();
+      expect(await error(await runImage(m, tryOn(14)))).toMatch(/params.garments must count the garment images \(1 to 13\)/);
+      expect(await error(await runImage(m, tryOn(10, '010')))).toMatch(/params.garments must count the garment images \(1 to 10\)/);
+      expect(await error(await runImage(m, tryOn(10, '0')))).toMatch(/params.garments must count the garment images/);
+      expect(await jobCount()).toBe(before);
+    } finally {
+      await pool.query(`update model_configs set max_images = 2 where id = 'img-pro'`);
+    }
+    expect(await error(await runImage(m, tryOn(13)))).toMatch(/the model does not allow this ratio, resolution or number of images/); // 14 images on a model that takes 2
+  });
+
   describe('the image apps', () => {
     const appModels: [string, string, number, string][] = [
       ['app-char', 'character_swap', 2, 'auto'], ['app-model', 'model_swap', 2, 'auto'], ['app-bg', 'background_changer', 2, 'auto'], ['app-reframe', 'reframe', 1, '1:1,16:9'],

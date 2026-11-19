@@ -1,5 +1,5 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
-import { addExamples, gotoTryOn, jpg, modelButton, optionsOf, png, select, selectValue, settled, signIn } from './support.test';
+import { addExamples, gotoTryOn, jpg, modelButton, optionsOf, pickModel, png, select, selectValue, settled, signIn } from './support.test';
 
 const nav = (page: Page) => page.getByRole('navigation', { name: 'Điều hướng chính' });
 const file = (name: string) => ({ name, mimeType: 'image/png', buffer: png() });
@@ -33,6 +33,49 @@ test('Try On takes 5 garments, as Fash does with Nano Banana Pro, when the model
   await page.getByLabel('Ảnh bối cảnh').setInputFiles(file('scene.png'));
   await expect(page.getByRole('button', { name: /^Thử đồ/ })).toBeEnabled(); // 7 photos: under the model's 14
   await expect(page.locator('.form-message').getByRole('status')).toHaveCount(0);
+});
+
+test('Try On takes 13 garments on Nano Banana 2.1 and counts them on the slot; a model that takes 5 keeps all 13 and holds Run until 8 go', async ({ page }) => {
+  // The mock model is listed again under Nano Banana 2.1's id, which takes 13 garments (Fash's About page); both take 14 photos. Nothing is run.
+  await page.route(/\/api\/image-models\?/, async (r) => {
+    const res = await r.fetch();
+    const json = (await res.json()) as { models: { id: string; label: string; maxImages: number; recommended: boolean }[] };
+    const models = json.models.map((m) => ({ ...m, maxImages: 14, recommended: false }));
+    return r.fulfill({ json: { ...json, models: [...models, { ...models[0]!, id: 'nano-banana-2.1', label: 'Nano Banana 2.1' }] } });
+  });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await signIn(page, 'garmentcap');
+  await gotoTryOn(page);
+  const garments = page.getByRole('group', { name: 'Trang phục', exact: true });
+  const chosen = page.getByLabel('Trang phục: ảnh đã chọn').getByRole('img');
+  const run = page.getByRole('button', { name: /^Thử đồ/ });
+  const reason = page.locator('.form-message').getByRole('status');
+
+  await pickModel(page, /Nano Banana 2.1/);
+  await expect(modelButton(page)).toContainText('Nano Banana 2.1');
+  await expect(page.getByText('Thêm 1 đến 13 ảnh trang phục')).toBeVisible();
+  await page.getByLabel('Ảnh trang phục').setInputFiles(Array.from({ length: 14 }, (_, i) => file(`cap${i + 1}.png`)));
+  await expect(chosen).toHaveCount(13); // the fourteenth is left out
+  await expect(page.getByText('Chỉ lấy 13 ảnh đầu.')).toBeVisible();
+  await expect(garments).toHaveAccessibleDescription('13/13'); // the count beside the slot's name, read with the slot
+  await expect(page.getByRole('button', { name: 'Tải lên Trang phục' })).toHaveCount(0); // full: no add tile
+  await page.getByLabel('Ảnh người mẫu').setInputFiles(file('cap-person.png'));
+  await expect(run).toBeEnabled(); // 14 photos: the model's 14
+  await expect(reason).toHaveCount(0);
+
+  // A model that takes 5 drops none of the 13: the count reads over its cap and Run waits with the reason until 8 go.
+  await pickModel(page, /Mock image E2E/);
+  await expect(chosen).toHaveCount(13);
+  await expect(garments).toHaveAccessibleDescription('13/5');
+  await expect(reason).toHaveText('Mô hình này nhận tối đa 5 ảnh trang phục. Bỏ bớt 8 ảnh để chạy.');
+  await expect(run).toBeDisabled();
+  for (let n = 13; n > 5; n--) await page.getByRole('button', { name: `Bỏ ảnh cap${n}.png` }).click();
+  await expect(garments).toHaveAccessibleDescription('5/5');
+  await expect(reason).toHaveCount(0);
+  await expect(run).toBeEnabled();
+  await page.getByRole('button', { name: 'Bỏ ảnh cap5.png' }).click();
+  await expect(garments).toHaveAccessibleDescription('4/5');
+  await expect(page.getByRole('button', { name: 'Tải lên Trang phục' })).toBeVisible(); // room again: the add tile is back
 });
 
 test('Try On: a missing slot keeps Run disabled with a reason, a mock run reaches History and the Thử đồ chip, and the inputs go person, garment, background', async ({ page, browser }) => {
@@ -644,6 +687,10 @@ test("Try On, as Fash's pickers: a stock model then its pose, a garment category
     await models.getByRole('button', { name: 'Người mẫu có sẵn 1' }).click();
     const poses = page.getByRole('dialog', { name: 'Chọn tư thế' });
     await expect(poses.getByRole('button', { name: 'Tư thế 1' }).locator('img')).toHaveAttribute('src', '/api/samples/try-on-stock-model-10-pose-2.jpg?thumb=1');
+    // A pose step takes no upload of one's own: the chosen model heads it, and "Không chọn tư thế" (the photo as it is) comes first.
+    await expect(poses.getByText('Tải lên ảnh của bạn')).toHaveCount(0);
+    await expect(poses.locator('.pose-head img')).toHaveAttribute('src', '/api/samples/try-on-stock-model-10.jpg?thumb=1');
+    await expect(poses.locator('.model-grid > *').first()).toHaveAccessibleName('Không chọn tư thế');
     await poses.getByRole('button', { name: 'Quay lại' }).click(); // back to the models, as Fash's arrow
     await models.getByRole('button', { name: 'Người mẫu có sẵn 1' }).click();
     // The photo is copied on the server as the member's own input; a note says so until it is in, so a slow copy never looks like nothing happened.
@@ -661,6 +708,7 @@ test("Try On, as Fash's pickers: a stock model then its pose, a garment category
 
     await page.getByRole('button', { name: 'Tải lên Trang phục' }).click();
     await expect(page.getByRole('dialog', { name: 'Chọn trang phục' }).getByRole('button', { name: 'Áo' }).locator('img')).toHaveAttribute('src', '/api/samples/try-on-stock-top.jpg?thumb=1');
+    await expect(page.getByRole('dialog', { name: 'Chọn trang phục' }).getByRole('button', { name: 'Áo' }).locator('.photo-caption')).toHaveText('Áo'); // a category's name on its tile
     await page.getByRole('dialog', { name: 'Chọn trang phục' }).getByRole('button', { name: 'Áo' }).click();
     const garment = copied(['try-on-stock-top-1.jpg']);
     await page.getByRole('dialog', { name: 'Áo' }).getByRole('button', { name: 'Áo 1' }).click();
@@ -672,6 +720,7 @@ test("Try On, as Fash's pickers: a stock model then its pose, a garment category
 
     await page.getByRole('button', { name: 'Tải lên Bối cảnh (tuỳ chọn)' }).click();
     await expect(page.getByRole('dialog', { name: 'Chọn bối cảnh' }).getByRole('button', { name: 'New York Streets' }).locator('img')).toHaveAttribute('src', '/api/samples/try-on-bg-new-york.jpg?thumb=1');
+    await expect(page.getByRole('dialog', { name: 'Chọn bối cảnh' }).getByRole('button', { name: 'New York Streets' }).locator('.photo-caption')).toHaveText('New York Streets');
     const background = copied(['try-on-bg-new-york.jpg']);
     await page.getByRole('dialog', { name: 'Chọn bối cảnh' }).getByRole('button', { name: 'New York Streets' }).click();
     await background;
@@ -693,7 +742,7 @@ test("Try On, as Fash's pickers: a stock model then its pose, a garment category
   }
 });
 
-test("Try On, as Fash's model catalog: the filters narrow the portraits, a portrait goes on to the pose step, and the pose rides the run's prompt and params", async ({ page }) => {
+test("Try On, as Fash's model catalog: the filter chips narrow the named portraits, a portrait goes on to the pose step, the pose rides the run's prompt and params, and the pose chip opens the same pictures", async ({ page }) => {
   const names = ['try-on-portrait-woman-isla.jpg', 'try-on-portrait-man-kai.jpg', 'try-on-pose-woman-front.jpg', 'try-on-pose-woman-hand-on-hip.jpg'];
   const asAdmin = async (each: (name: string) => Promise<{ ok(): boolean }>) => {
     await page.context().clearCookies();
@@ -706,27 +755,41 @@ test("Try On, as Fash's model catalog: the filters narrow the portraits, a portr
     await page.setViewportSize({ width: 1440, height: 1000 });
     await signIn(page, 'tryposea');
     await gotoTryOn(page);
+    // The pose chip in the Model slot is a button that opens the pose step's pictures (named "Tư thế: <pose>").
+    const poseChip = page.getByRole('group', { name: 'Người mẫu', exact: true }).getByRole('button', { name: /^Tư thế: / });
     await expect(page.getByRole('button', { name: 'Tải lên Người mẫu' })).toHaveAttribute('aria-haspopup', 'dialog');
-    await expect(select(page, 'Tư thế')).toHaveCount(0); // no model photo yet
+    await expect(poseChip).toHaveCount(0); // no model photo yet
 
     await page.getByRole('button', { name: 'Tải lên Người mẫu' }).click();
     const models = page.getByRole('dialog', { name: 'Chọn người mẫu' });
     await expect(models.getByRole('button', { name: /^Người mẫu (Isla|Kai)$/ })).toHaveCount(2);
+    await expect(models.getByRole('button', { name: 'Người mẫu Isla' }).locator('.photo-caption')).toHaveText('Isla'); // the model's name on its card, as Fash's
+    // Fash's filters are compact chips that name the filter until a value is picked.
+    await expect(select(page, 'Giới tính')).toHaveText('Giới tính');
     await selectValue(page, 'Giới tính', 'man');
+    await expect(select(page, 'Giới tính')).toHaveText('Nam');
     await expect(models.getByRole('button', { name: 'Người mẫu Isla' })).toHaveCount(0);
     await expect(models.getByRole('button', { name: 'Người mẫu Kai' })).toHaveCount(1);
     await selectValue(page, 'Giới tính', '');
     await models.getByRole('button', { name: 'Người mẫu Isla' }).click();
 
-    // Fash's pose step: only the poses with a preview for her gender, and a way to skip.
+    // Fash's pose step: the chosen model beside the question, "Không chọn tư thế" first, then only the poses with a preview for her gender, each named.
     const poses = page.getByRole('dialog', { name: 'Chọn tư thế' });
+    await expect(poses.getByText('Người mẫu tạo dáng thế nào?')).toBeVisible();
+    await expect(poses.locator('.pose-head img')).toHaveAttribute('src', '/api/samples/try-on-portrait-woman-isla.jpg?thumb=1');
+    await expect(poses.getByText('Tải lên ảnh của bạn')).toHaveCount(0); // a pose is no photo of one's own
+    await expect(poses.locator('.model-grid > *').first()).toHaveAccessibleName('Không chọn tư thế');
+    await expect(poses.getByRole('button', { name: 'Không chọn tư thế' })).toHaveAccessibleDescription('Bạn có thể tả tư thế trong ô Mô tả. (Tuỳ chọn)');
+    await expect(poses.getByRole('button', { name: 'Không chọn tư thế' })).toHaveAttribute('aria-pressed', 'true'); // no pose yet
     await expect(poses.getByRole('button', { name: /^(Mặt trước|Tay chống hông)$/ })).toHaveCount(2);
+    await expect(poses.getByRole('button', { name: 'Tay chống hông' }).locator('.photo-caption')).toHaveText('Tay chống hông');
+    await expect(poses.getByRole('button', { name: 'Mặt trước' }).locator('img')).toHaveAttribute('src', '/api/samples/try-on-pose-woman-front.jpg?thumb=1');
     await poses.getByRole('button', { name: 'Tay chống hông' }).click();
     await expect(poses).toBeHidden();
     await expect(page.getByLabel('Người mẫu: ảnh đã chọn').getByRole('img', { name: 'try-on-portrait-woman-isla.jpg' })).toBeVisible();
-    await expect(select(page, 'Tư thế')).toHaveAttribute('data-value', 'hand-on-hip');
+    await expect(poseChip).toHaveAttribute('data-value', 'hand-on-hip');
     // The pose is a chip beside the photo in the Model slot, as Fash's "Hand on Hip x".
-    await expect(page.getByRole('group', { name: 'Người mẫu', exact: true }).getByRole('combobox', { name: 'Tư thế' })).toHaveText('Tay chống hông');
+    await expect(poseChip).toHaveAccessibleName('Tư thế: Tay chống hông');
 
     await page.getByLabel('Ảnh trang phục').setInputFiles({ name: 'pose-garment.png', mimeType: 'image/png', buffer: png() });
     await page.getByRole('button', { name: /^Thử đồ/ }).click();
@@ -736,13 +799,32 @@ test("Try On, as Fash's model catalog: the filters narrow the portraits, a portr
     expect(job.pose).toBe('hand-on-hip');
     expect(job.prompt).toContain('show them in this pose and framing: standing facing the camera with one hand on the hip');
 
-    // The chip's x drops the pose and the chip offers a pose again; picking one from it sets it back.
+    // The chip's x drops the pose and keeps the focus on the chip, which offers a pose again.
     await page.getByRole('button', { name: 'Bỏ tư thế' }).click();
-    await expect(select(page, 'Tư thế')).toHaveAttribute('data-value', '');
-    await expect(select(page, 'Tư thế')).toHaveText('Chọn tư thế');
-    await expect(select(page, 'Tư thế')).toBeFocused();
-    await selectValue(page, 'Tư thế', 'hand-on-hip');
-    await expect(select(page, 'Tư thế')).toHaveAttribute('data-value', 'hand-on-hip');
+    await expect(poseChip).toHaveAttribute('data-value', '');
+    await expect(poseChip).toHaveAccessibleName('Tư thế: Chọn tư thế');
+    await expect(poseChip).toBeFocused();
+    // From the keyboard, the chip opens the pose step's pictures for the photo already in the slot: a pick sets the pose and copies no photo again.
+    const copies: string[] = [];
+    page.on('request', (r) => void (r.method() === 'POST' && new URL(r.url()).pathname === '/api/assets/samples' && copies.push(r.url())));
+    await page.keyboard.press('Enter');
+    await expect(poses).toBeVisible();
+    await expect(poses.getByRole('button', { name: 'Quay lại' })).toHaveCount(0); // opened from the chip: nothing to go back to
+    await expect(poses.locator('.pose-head img')).toBeVisible(); // the slot's own photo
+    await expect(poses.getByRole('button', { name: 'Không chọn tư thế' })).toHaveAttribute('aria-pressed', 'true');
+    await poses.getByRole('button', { name: 'Tay chống hông' }).click();
+    await expect(poses).toBeHidden();
+    await expect(poseChip).toHaveAttribute('data-value', 'hand-on-hip');
+    await expect(poseChip).toBeFocused(); // the dialog hands the focus back to the chip
+    await expect(page.getByLabel('Người mẫu: ảnh đã chọn').getByRole('img', { name: 'try-on-portrait-woman-isla.jpg' })).toBeVisible();
+    expect(copies).toEqual([]);
+    // Opened again, the chosen pose is the marked one.
+    await poseChip.click();
+    await expect(poses.getByRole('button', { name: 'Tay chống hông' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(poses.getByRole('button', { name: 'Không chọn tư thế' })).toHaveAttribute('aria-pressed', 'false');
+    await page.keyboard.press('Escape');
+    await expect(poses).toBeHidden();
+    await expect(poseChip).toHaveAttribute('data-value', 'hand-on-hip');
 
     // Không chọn tư thế keeps the portrait and drops the pose; the full one-photo slot is emptied first, so it opens the picker again.
     await page.getByRole('button', { name: 'Bỏ ảnh try-on-portrait-woman-isla.jpg' }).click();
@@ -751,7 +833,7 @@ test("Try On, as Fash's model catalog: the filters narrow the portraits, a portr
     await poses.getByRole('button', { name: 'Không chọn tư thế' }).click();
     await expect(poses).toBeHidden();
     await expect(page.getByLabel('Người mẫu: ảnh đã chọn').getByRole('img', { name: 'try-on-portrait-woman-isla.jpg' })).toBeVisible();
-    await expect(select(page, 'Tư thế')).toHaveAttribute('data-value', '');
+    await expect(poseChip).toHaveAttribute('data-value', '');
   } finally {
     await asAdmin((name) => page.request.delete(`/api/admin/samples/${name}`));
   }

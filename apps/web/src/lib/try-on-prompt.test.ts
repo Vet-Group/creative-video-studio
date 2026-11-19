@@ -30,6 +30,11 @@ describe('tryOnPrompt', () => {
     expect(p.endsWith(' sunset')).toBe(true);
   });
 
+  it("numbers Nano Banana 2.1's 13 garments past nine, and the background after them", () => {
+    expect(tryOnPrompt(13, false, '')).toContain('Image 1 is the person. Images 2 to 14 are the garments. Dress the person in the garments.');
+    expect(tryOnPrompt(13, true, '')).toContain('Images 2 to 14 are the garments. Image 15 is the background scene.');
+  });
+
   it('gives a chosen pose its words in place of keeping the pose, even with one garment and no text, and ignores an unknown one', () => {
     const p = tryOnPrompt(1, false, '', 'hand-on-hip')!;
     expect(p).toContain("Keep the person's face and identity exactly unchanged, and show them in this pose and framing: standing facing the camera with one hand on the hip");

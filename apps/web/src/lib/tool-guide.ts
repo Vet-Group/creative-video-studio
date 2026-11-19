@@ -28,7 +28,7 @@ export const TOOL_GUIDE: ToolGuide[] = [
     icon: 'tryon',
     oneLine: 'Mặc quần áo của bạn lên người mẫu: ảnh trải phẳng hay ma-nơ-canh thành ảnh người mẫu mặc thật.',
     useIf: 'Bạn có ảnh quần áo chưa có người mặc và cần ảnh người mẫu mặc đúng món đó.',
-    have: '1–5 ảnh trang phục (trải phẳng, ma-nơ-canh hay người mặc) và 1 ảnh người mẫu hoặc người mẫu có sẵn; ảnh bối cảnh tuỳ chọn.',
+    have: '1–5 ảnh trang phục, đến 13 với Nano Banana 2.1 (trải phẳng, ma-nơ-canh hay người mặc) và 1 ảnh người mẫu hoặc người mẫu có sẵn; ảnh bối cảnh tuỳ chọn.',
     get: 'Ảnh người mẫu mặc đúng trang phục, giữ màu, hoạ tiết và chữ in.',
     useWhen: [
       'Hàng mới về chỉ có ảnh trải phẳng, cần ảnh người mẫu cho trang sản phẩm.',

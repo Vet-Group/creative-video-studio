@@ -2,6 +2,11 @@
 // the photos as samples: `try-on-stock-model-<n>.jpg` with its poses `try-on-stock-model-<n>-pose-<p>.jpg`, `try-on-stock-<category>.jpg` with its
 // garments `try-on-stock-<category>-<n>.jpg`, and `try-on-bg-<value>.jpg`. A picker shows only what was uploaded.
 
+/** The most garments a Try On run takes: Fash's About page reads "Up to 13 pieces on Nano Banana 2.1" (read 2026-11-19); the API checks this ceiling. */
+export const MOST_GARMENTS = 13;
+/** The garment cap of a model: 13 on Nano Banana 2.1 (its Vertex twin too), 5 on every other model (Fash's Nano Banana Pro MaxInputImageCount, read 2026-10-29). */
+export const garmentCap = (modelId: string | undefined): number => (/^nano-banana-2\.1(-vertex)?$/.test(modelId ?? '') ? MOST_GARMENTS : 5);
+
 /** Fash's garment categories, in its order. */
 export const GARMENT_CATEGORIES = [
   { id: 'accessories', label: 'Phụ kiện' },

@@ -460,7 +460,7 @@ const tryOn: AboutPage = {
         'Một lần chạy cần hai thứ: trang phục và người mặc. Mọi thứ khác trên form là tuỳ chọn.',
         {
           steps: [
-            { title: 'Tải ảnh trang phục', text: 'Thêm 1 đến 5 ảnh trang phục: ảnh trải phẳng, ảnh ma-nơ-canh ẩn hay ảnh người mặc đều được. Có thể chồng áo, quần và giày để phối cả bộ trong một lần. Tổng số ảnh của một lần chạy (người mẫu, trang phục và bối cảnh) không vượt giới hạn của mô hình: 14 với Nano Banana Pro, 2 và 2.1, 4 với Nano Banana, 2 với FASHN v1.6.', media: 'try-on-garment-1' },
+            { title: 'Tải ảnh trang phục', text: 'Thêm 1 đến 5 ảnh trang phục (đến 13 ảnh với Nano Banana 2.1): ảnh trải phẳng, ảnh ma-nơ-canh ẩn hay ảnh người mặc đều được. Có thể chồng áo, quần và giày để phối cả bộ trong một lần. Tổng số ảnh của một lần chạy (người mẫu, trang phục và bối cảnh) không vượt giới hạn của mô hình: 14 với Nano Banana Pro, 2 và 2.1, 4 với Nano Banana, 2 với FASHN v1.6.', media: 'try-on-garment-1' },
             { title: 'Chọn người mẫu', text: 'Tải ảnh một người, hoặc chọn một ảnh mẫu có sẵn nếu công ty đã đưa lên. Dùng ảnh toàn thân của một người nhìn thẳng vào máy; ảnh càng rõ, kết quả càng tốt.', media: 'try-on-model-1' },
             { title: 'Chọn thông số và chạy', text: 'Chọn mô hình, độ phân giải và tỉ lệ, thêm ảnh bối cảnh hoặc mô tả nếu muốn chỉ đạo cảnh, rồi bấm Thử đồ. Nút ghi chi phí ước tính bằng USD trước khi bạn bấm, và kết quả về tab Lịch sử.', media: 'try-on-example-1' },
           ],
@@ -485,7 +485,7 @@ const tryOn: AboutPage = {
     {
       kicker: 'Phạm vi',
       title: 'Thử được những gì?',
-      lead: 'Bạn có thể phối cả bộ trong một lần chạy: tối đa 5 ảnh trang phục, trong giới hạn ảnh của mô hình, và trộn các loại tuỳ ý.',
+      lead: 'Bạn có thể phối cả bộ trong một lần chạy: tối đa 5 ảnh trang phục (13 ảnh với Nano Banana 2.1), trong giới hạn ảnh của mô hình, và trộn các loại tuỳ ý.',
       blocks: [
         {
           cols: 3,
@@ -639,7 +639,7 @@ const tryOn: AboutPage = {
       kicker: 'Theo danh mục',
       title: 'Thử đồ có làm được cho nhiều sản phẩm cùng lúc không?',
       blocks: [
-        'Được, khi bạn hiểu một lần chạy được tính thế nào. Mỗi lần chạy cho một ảnh từ tối đa 5 ảnh trang phục, và AI phối chúng thành một bộ trên một người mẫu. Một lần chạy, một bộ đồ.',
+        'Được, khi bạn hiểu một lần chạy được tính thế nào. Mỗi lần chạy cho một ảnh từ tối đa 5 ảnh trang phục (13 ảnh với Nano Banana 2.1), và AI phối chúng thành một bộ trên một người mẫu. Một lần chạy, một bộ đồ.',
         'Vì vậy phủ một danh mục là chuyện xếp hàng. Không có nhập từ bảng tính, nhưng bạn có thể gửi lượt tạo tiếp theo trong lúc lượt trước đang chạy, và mỗi kết quả hiện trong tab Lịch sử ngay khi xong.',
       ],
     },
@@ -684,11 +684,11 @@ const tryOn: AboutPage = {
             ['Dùng ảnh người mẫu của mình được không?', 'Được. Tải ảnh toàn thân của một người nhìn thẳng vào máy, hoặc chọn một ảnh mẫu có sẵn. Ảnh rõ, sáng đều cho kết quả tốt nhất. Ảnh chân dung và ảnh nhóm cho kết quả kém, vì AI không thấy cả dáng người để ướm trang phục.'],
             ['Ảnh trang phục kiểu nào là tốt nhất?', 'Ảnh trải phẳng, ma-nơ-canh ẩn và ảnh người mặc đều được. Dùng ảnh nét trên nền trơn để AI đọc được chất vải, đường cắt và đường may. Trang phục gấp trên bàn che mất dáng, và đó là lý do phổ biến nhất khiến kết quả trông sai.'],
             ['Cần ảnh chuyên nghiệp hay điện thoại là đủ?', 'Điện thoại là đủ. Trải trang phục dưới ánh sáng đều trên nền trơn là AI có đủ thứ cần. Không cần máy ảnh, studio hay đèn. Điều quan trọng là độ nét và ánh sáng đều, vì bóng gắt trong ảnh sẽ bị hiểu là một phần của vải.'],
-            ['Thử nhiều món cùng lúc được không?', 'Được. Thêm tối đa 5 ảnh trang phục trong một lần chạy, trong giới hạn ảnh của mô hình (4 ảnh tổng cộng với Nano Banana, tính cả người mẫu và bối cảnh), và AI phối áo, quần, giày và phụ kiện thành một bộ trên một người mẫu. Tải mỗi món thành một ảnh riêng thay vì một ảnh ghép.'],
+            ['Thử nhiều món cùng lúc được không?', 'Được. Thêm tối đa 5 ảnh trang phục (13 ảnh với Nano Banana 2.1) trong một lần chạy, trong giới hạn ảnh của mô hình (4 ảnh tổng cộng với Nano Banana, tính cả người mẫu và bối cảnh), và AI phối áo, quần, giày và phụ kiện thành một bộ trên một người mẫu. Tải mỗi món thành một ảnh riêng thay vì một ảnh ghép.'],
             ['Tạo ảnh thử đồ không cần buổi chụp được không?', 'Được, đó chính là mục đích của trang này. Một ảnh trang phục có sẵn, kể cả chụp bằng điện thoại, cùng một ảnh người mẫu là đủ cho một lần chạy. Không đặt studio, không tuyển người mẫu, không chỉnh ảnh.'],
             ['Có phải cài ứng dụng không?', 'Không. Ứng dụng chạy trên trình duyệt, trên máy tính lẫn điện thoại, nên không có gì để tải về hay cài đặt. Mọi kết quả nằm trong Thư viện của công ty, xem được trên bất kỳ thiết bị nào bạn đăng nhập.'],
             ['Thử đồ có đổi khuôn mặt, tóc hay tư thế của người mẫu không?', 'Không. Chỉ quần áo thay đổi. Khuôn mặt, tóc, màu da, dáng người và tư thế giữ nguyên, và AI dựng lại chất vải, nếp nhăn và bóng đổ cho khớp với tư thế và ánh sáng sẵn có. Bối cảnh cũng giữ nguyên trừ khi bạn chủ động đổi bằng ảnh bối cảnh hoặc prompt. Muốn thay cả người, hãy dùng ứng dụng Đổi người mẫu.'],
-            ['Tạo ảnh cho nhiều sản phẩm cùng lúc được không?', 'Mỗi lần chạy cho một ảnh người mẫu từ tối đa 5 ảnh trang phục, được phối thành một bộ. Không có nhập từ bảng tính hay tải hàng loạt, nên phủ một danh mục là xếp hàng các lần chạy; kết quả hiện trong tab Lịch sử khi xong.'],
+            ['Tạo ảnh cho nhiều sản phẩm cùng lúc được không?', 'Mỗi lần chạy cho một ảnh người mẫu từ tối đa 5 ảnh trang phục (13 ảnh với Nano Banana 2.1), được phối thành một bộ. Không có nhập từ bảng tính hay tải hàng loạt, nên phủ một danh mục là xếp hàng các lần chạy; kết quả hiện trong tab Lịch sử khi xong.'],
             ['Thử đồ dùng những mô hình nào?', 'Danh mục có bốn mô hình: Nano Banana Pro (1K, 2K, 4K, chi tiết trang phục tốt nhất), Nano Banana 2.1 (1K, 2K), Nano Banana (rẻ và nhanh, một cỡ cố định) và FASHN v1.6 (một người mẫu và một trang phục). Bạn chọn trong menu Mô hình trước mỗi lần chạy, trong số mô hình Admin đã bật.'],
             ['Dùng ảnh thử đồ cho quảng cáo và trang sản phẩm được không?', `Được, ảnh là tài sản của công ty. ${RIGHTS} Nếu ảnh người mẫu là ảnh người thật, cần có sự đồng ý của người đó.`],
             ['Vì sao trang phục trong kết quả hơi khác ảnh gốc?', 'AI dựng lại cách vải rủ và nằm trên một cơ thể thật, nên món đồ có thể trông khác ảnh trải phẳng của nó. Ảnh trang phục nét hơn cho AI nhiều thông tin hơn. Nếu chi tiết vẫn mềm, chạy lại trên Nano Banana Pro ở 2K hoặc 4K.'],
