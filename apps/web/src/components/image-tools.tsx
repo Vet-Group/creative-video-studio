@@ -357,7 +357,7 @@ export function pastedImages(target: { closest?: (sel: string) => unknown } | nu
  * `slot` is the picker's first category, for a slot whose label names another page's category (Image Generation's reference photos); by default the label's.
  * `addRef` is the add button, for a page that moves focus to it.
  */
-export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRemove, samples = [], onSample, icon = 'image', onBrowse, onPick, storeId, optional, slot, addRef }: { label: string; empty: string; inputLabel: string; images: Img[]; max: number; busy: boolean; onAdd: (files: File[]) => void; onRemove: (id: string) => void; samples?: string[]; onSample?: (name: string) => void; icon?: IconName; onBrowse?: () => void; onPick?: (img: Img) => void; storeId?: string; optional?: boolean; slot?: UploadSlot; addRef?: Ref<HTMLButtonElement> }) {
+export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRemove, samples = [], onSample, icon = 'image', onBrowse, onPick, storeId, optional, slot, addRef, extra }: { label: string; empty: string; inputLabel: string; images: Img[]; max: number; busy: boolean; onAdd: (files: File[]) => void; onRemove: (id: string) => void; samples?: string[]; onSample?: (name: string) => void; icon?: IconName; onBrowse?: () => void; onPick?: (img: Img) => void; storeId?: string; optional?: boolean; slot?: UploadSlot; addRef?: Ref<HTMLButtonElement>; extra?: ReactNode }) {
   const hydrated = useHydrated();
   const input = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
@@ -457,6 +457,7 @@ export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRem
             ))}
           </ul>
         )}
+        {extra}
         {offer.length > 0 && (
           <ul className="slot-samples" aria-label={`${label}: ảnh mẫu`}>
             {offer.map((name, i) => (

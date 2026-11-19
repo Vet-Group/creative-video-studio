@@ -17,6 +17,7 @@ import { backgroundsIn, GARMENT_CATEGORIES, garmentsOf, PORTRAIT_FILTERS, portra
 import { About } from './About';
 import { copyError, copySamples, fashionTiles, FormNotice, Gallery, type Img, LockedFields, PhotoDialog, photoImg, RATIO_LABEL, Slot, THINKING_LABEL, uploadError, uploadImages, UPLOAD_ERROR, useImageChoice, useImageModels, useReuse, WorkTabs } from './image-tools';
 import type { UploadSlot } from '@/lib/upload-slots';
+import { Icon } from './Icon';
 import { FormContext, type Photo, type PhotoRole, useApplier, useJobs } from './jobs';
 import { ModelPicker } from './ModelPicker';
 import { OwnModel } from './OwnModel';
@@ -211,8 +212,27 @@ export function TryOn({ reuse }: { reuse?: string }) {
           <div className="form-scroll">
             <PageHint href="/try-on" />
             <Slot label="Trang phục" empty="Thêm 1 đến 5 ảnh trang phục" inputLabel="Ảnh trang phục" images={garments} max={MAX_GARMENTS} busy={busy} onAdd={add(setGarments, 'garment')} onRemove={(id) => setGarments((c) => c.filter((i) => i.id !== id))} samples={categories.length > 0 ? [] : samplesOf('garment')} onSample={addSample(setGarments, 'garment')} onBrowse={categories.length > 0 ? () => setPicker({ role: 'garment' }) : undefined} onPick={(a) => setGarments((c) => (c.length < MAX_GARMENTS ? [...c, a] : c))} />
-            <Slot label="Người mẫu" empty="Thêm 1 ảnh người mẫu" inputLabel="Ảnh người mẫu" images={person} max={1} busy={busy} onAdd={add(setPerson, 'model')} onRemove={(id) => setPerson((c) => c.filter((i) => i.id !== id))} samples={models0.length > 0 ? [] : samplesOf('model')} onSample={addSample(setPerson, 'model')} onBrowse={() => setPicker({ role: 'model' })} onPick={(a) => setPerson([a])} />
-            {(person.length > 0 || pose) && <Select label="Tư thế" icon="model" heading="Chọn tư thế" value={pose ?? ''} options={[{ value: '', label: 'Giữ tư thế trong ảnh' }, ...POSES.map((p) => ({ value: p.value, label: p.label }))]} onChange={(v) => setPose(v || null)} />}
+            <Slot label="Người mẫu" empty="Thêm 1 ảnh người mẫu" inputLabel="Ảnh người mẫu" images={person} max={1} busy={busy} onAdd={add(setPerson, 'model')} onRemove={(id) => setPerson((c) => c.filter((i) => i.id !== id))} samples={models0.length > 0 ? [] : samplesOf('model')} onSample={addSample(setPerson, 'model')} onBrowse={() => setPicker({ role: 'model' })} onPick={(a) => setPerson([a])} extra={(person.length > 0 || pose) && (
+              // The pose beside the model photo, as Fash's "Hand on Hip x" chip.
+              <span className="pose-chip">
+                <Select chip label="Tư thế" icon="model" heading="Chọn tư thế" value={pose ?? ''} options={[{ value: '', label: 'Giữ tư thế trong ảnh', short: 'Chọn tư thế' }, ...POSES.map((p) => ({ value: p.value, label: p.label }))]} onChange={(v) => setPose(v || null)} />
+                {pose && (
+                  <button
+                    type="button"
+                    className="pose-clear"
+                    aria-label="Bỏ tư thế"
+                    onClick={(e) => {
+                      const slot = e.currentTarget.closest('.slot');
+                      setPose(null);
+                      // This button goes: focus the chip, or the slot's upload button when the chip goes too (no photo).
+                      requestAnimationFrame(() => (slot?.querySelector<HTMLElement>('.select-trigger') ?? slot?.querySelector<HTMLElement>('.slot-add'))?.focus());
+                    }}
+                  >
+                    <Icon name="x" size={12} />
+                  </button>
+                )}
+              </span>
+            )} />
             <Slot label="Bối cảnh (tuỳ chọn)" empty="Thêm 1 ảnh bối cảnh nếu muốn" inputLabel="Ảnh bối cảnh" images={background} max={1} busy={busy} onAdd={add(setBackground, 'background')} onRemove={(id) => setBackground((c) => c.filter((i) => i.id !== id))} samples={backgrounds.length > 0 ? [] : samplesOf('background')} onSample={addSample(setBackground, 'background')} onBrowse={backgrounds.length > 0 ? () => setPicker({ role: 'background' }) : undefined} onPick={(a) => setBackground([a])} />
             {own ? (
               <PhotoDialog

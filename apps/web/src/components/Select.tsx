@@ -29,7 +29,7 @@ function ratioIcon(value: string): IconName {
   return w < h ? 'ratio-tall' : w === h ? 'ratio-square' : 'ratio';
 }
 
-export function Select({ label, icon, heading, value, options, onChange }: { label: string; icon: IconName; heading: string; value: string; options: SelectOption[]; onChange: (value: string) => void }) {
+export function Select({ label, icon, heading, value, options, onChange, chip = false }: { label: string; icon: IconName; heading: string; value: string; options: SelectOption[]; onChange: (value: string) => void; chip?: boolean }) {
   const uid = useId();
   const triggerId = `${uid}-trigger`;
   const listId = `${uid}-list`;
@@ -89,8 +89,8 @@ export function Select({ label, icon, heading, value, options, onChange }: { lab
   }
 
   return (
-    <div className="field">
-      <label htmlFor={triggerId} className="field-label">
+    <div className={chip ? 'field select-chip' : 'field'}>
+      <label htmlFor={triggerId} className={chip ? 'field-label sr-only' : 'field-label'}>
         {label}
       </label>
       <div className="select" data-open={open !== false} data-up={open === 'up' || undefined}>
