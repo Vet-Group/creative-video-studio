@@ -189,3 +189,27 @@ test('remakes another member’s analysis while an Admin shares it, with the cal
   const unshared = await post(shared);
   expect([unshared.status, await errorOf(unshared)]).toEqual([404, 'the analysis does not exist']);
 });
+
+test("outside the company workspace a remake carries no cost, neither its own nor any shot's", async () => {
+  await pool.query(`insert into workspaces (id, name) values ('ws_rm', 'Partner RM')`);
+  await pool.query(`insert into workspace_members (workspace_id, user_id, role) values ('ws_rm', $1, 'member')`, [userId]);
+  const shots = JSON.stringify({ shots: [{ index: 1, start: 0, end: 1, role: 'r', prompt: 'p' }] });
+  await pool.query(`insert into analyses (id, user_id, team_id, source_key, status, result, workspace_id) select 'an-rm', u.id, u.team_id, 's3/vid', 'succeeded', $2::jsonb, 'ws_rm' from users u where u.id = $1`, [userId, shots]);
+  const result = JSON.stringify({ shots: [{ index: 1, status: 'succeeded', costUsd: 0.2 }, { index: 2, status: 'failed', costUsd: 0.05 }] });
+  await pool.query(
+    `insert into remakes (id, user_id, team_id, analysis_id, shots, status, result, cost_usd, workspace_id)
+       select 'rm-partner', u.id, u.team_id, 'an-rm', '[1]'::jsonb, 'succeeded', $2::jsonb, 0.25, 'ws_rm' from users u where u.id = $1`,
+    [userId, result],
+  );
+  const asPartner = (path: string) => new Request(`http://localhost${path}`, { headers: { cookie: `${cookie}; cvs_ws=ws_rm` } });
+  const one = (await (await ONE(asPartner('/api/remakes/rm-partner'), { params: Promise.resolve({ id: 'rm-partner' }) })).json()) as { costUsd: unknown; result: { shots: object[] } };
+  const listed = ((await (await LIST(asPartner('/api/remakes'))).json()) as { remakes: { id: string }[] }).remakes.find((r) => r.id === 'rm-partner')!;
+  for (const r of [one, listed]) {
+    expect(r).toMatchObject({ costUsd: null, result: { shots: [{ index: 1, status: 'succeeded' }, { index: 2, status: 'failed' }] } });
+    expect(JSON.stringify(r)).not.toContain('costUsd":0');
+  }
+  // In the company workspace the same fields go out.
+  await pool.query(`update remakes set workspace_id = 'ws_vet' where id = 'rm-partner'`);
+  const company = (await (await ONE(call('/api/remakes/rm-partner'), { params: Promise.resolve({ id: 'rm-partner' }) })).json()) as { costUsd: string; result: { shots: { costUsd: number }[] } };
+  expect([company.costUsd, company.result.shots.map((s) => s.costUsd)]).toEqual(['0.250000', [0.2, 0.05]]);
+});

@@ -32,6 +32,8 @@ export interface Account {
   googleEnabled: boolean;
   larkEnabled: boolean;
   supportEmail: string | null;
+  /** Acting in the company's workspace: a partner's shows no team, the company's cost-centre label (docs/WORKSPACES.md phase 3). */
+  company: boolean;
 }
 
 /** A mail to the company's support address with the open page and the account filled in, so a report says where it happened. */
@@ -228,7 +230,13 @@ function ProfileCard({ name, color, email, isAdmin, onSaved }: { name: string; c
       onSaved({ name: saved.name, color: userAvatarColor(saved.name, saved.avatarColor), email: saved.email });
       stop();
     } catch (err) {
-      setError(err instanceof ApiError && err.status === 409 ? 'Email này đã có người khác dùng.' : 'Không lưu được hồ sơ. Hãy thử lại.');
+      setError(
+        err instanceof ApiError && err.status === 409
+          ? 'Email này đã có người khác dùng.'
+          : err instanceof ApiError && err.message === 'company_email'
+            ? 'Không dùng được email này cho tài khoản ở không gian làm việc này. Hãy dùng email khác.'
+            : 'Không lưu được hồ sơ. Hãy thử lại.',
+      );
     } finally {
       setBusy(false);
     }
@@ -495,16 +503,18 @@ export function Settings({ open, onClose, userName, account, start = 'profile' }
               <Protection account={account} twoFactor={twoFactor} onFix={(id, anchor) => go(id, 'jump', anchor)} />
               <Today usage={usage} onMore={() => go('limits', 'jump')} />
               <dl className="settings-fields settings-fields-pair">
-                <div>
-                  <dt>Nhóm</dt>
-                  <dd>{account.team ?? 'Chưa rõ'}</dd>
-                </div>
+                {account.company && (
+                  <div>
+                    <dt>Nhóm</dt>
+                    <dd>{account.team ?? 'Chưa rõ'}</dd>
+                  </div>
+                )}
                 <div>
                   <dt>Thành viên từ</dt>
                   <dd>{monthYear(account.memberSince)}</dd>
                 </div>
               </dl>
-              <p className="settings-note">Nhóm và quyền do Admin quản lý.</p>
+              {account.company && <p className="settings-note">Nhóm và quyền do Admin quản lý.</p>}
             </section>
           )}
           {section === 'limits' && (

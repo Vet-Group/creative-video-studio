@@ -1,5 +1,5 @@
 // Shared by the feedback board page, its detail page and the Admin triage controls: labels and the shapes the API returns. Client-safe (no pool).
-import type { FeedbackKind, FeedbackStatus } from '@cvs/db';
+import { COMPANY_WORKSPACE_ID, type FeedbackKind, type FeedbackStatus } from '@cvs/db';
 
 export const KIND_LABEL: Record<FeedbackKind, string> = { feedback: 'Góp ý', bug: 'Báo lỗi', feature: 'Yêu cầu tính năng' };
 export const STATUS_LABEL: Record<FeedbackStatus, string> = { new: 'Mới', reviewing: 'Đang xem', done: 'Đã xử lý', rejected: 'Từ chối' };
@@ -33,6 +33,8 @@ export interface ListedFeedback {
   unread: boolean;
   /** The name of the item's workspace when it is not the caller's active one: only an Admin's triage sees those (docs/WORKSPACES.md, the feedback exception). */
   workspaceName: string | null;
+  /** That workspace is the company's: shown with a fixed badge, so a partner's lookalike name cannot pass for it. */
+  workspaceCompany: boolean;
 }
 
 export interface FeedbackComment {
@@ -89,6 +91,7 @@ export const toListed = (r: Record<string, unknown>, workspaceId: string): Liste
   updatedAt: new Date(r.updated_at as string).toISOString(),
   unread: r.unread === true,
   workspaceName: r.workspace_id === workspaceId ? null : (r.workspace_name as string),
+  workspaceCompany: r.workspace_id === COMPANY_WORKSPACE_ID,
 });
 
 /** dd/mm/yyyy HH:mm in Vietnam time, how the board shows when something was posted. */

@@ -18,6 +18,7 @@ const item: ListedFeedback = {
   updatedAt: '2026-11-15T04:00:00.000Z',
   unread: false,
   workspaceName: null,
+  workspaceCompany: true,
 };
 const comments: FeedbackComment[] = [
   { id: 'c1', authorName: 'Trần B', authorAdmin: false, body: 'Mình cũng bị.\nTrên iPhone.', mine: false, createdAt: '2026-11-15T03:30:00.000Z' },

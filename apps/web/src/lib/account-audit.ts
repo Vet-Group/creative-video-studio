@@ -12,6 +12,16 @@ interface AccountRow {
   idToken?: string | null;
 }
 
+/** The audit action of an account created from a workspace's member list (lib/workspaces.ts); `byOwner` in its new value marks one a workspace owner made. */
+export const ACCOUNT_CREATED = 'workspace.account_create';
+
+/**
+ * Whether a workspace owner created this account. Lark never links into one, by a first sign-in or from the account page, so a partner cannot pre-create
+ * a staff member's account (docs/WORKSPACES.md §4). The marker is the account's creation audit row, which nothing updates.
+ */
+export const ownerMade = async (q: Queryable, userId: string): Promise<boolean> =>
+  Boolean((await q.query(`select 1 from audit_entries where action = $2 and target = 'user:' || $1 and (new_value->>'byOwner')::boolean`, [userId, ACCOUNT_CREATED])).rowCount);
+
 // Lark sends no id_token, so its getUserInfo leaves the email here, keyed by the Lark account id, for the account.link hook that follows.
 const larkEmails = new Map<string, string>();
 export function rememberLarkEmail(accountId: string, email: string): void {
@@ -40,6 +50,11 @@ export function accountAuditHooks(q: Queryable) {
       // Refuse before the row is written: the admin plugin's session hook also refuses a banned user, but only after this row and its audit row exist.
       async before(a: AccountRow) {
         if (a.providerId === 'credential') return; // an Admin may give a banned social-only user a password
+        // The backstop of the /link-social refusal in lib/auth.ts, and the only check on a first sign-in that would link by equal email.
+        if (a.providerId === 'lark' && (await ownerMade(q, a.userId))) {
+          larkEmails.delete(a.accountId);
+          throw APIError.from('FORBIDDEN', { message: 'Lark cannot be linked to an account a workspace owner created', code: 'unable_to_link_account' });
+        }
         const u = (await q.query('select banned, ban_expires from users where id = $1', [a.userId])).rows[0];
         if (!u?.banned || (u.ban_expires && new Date(u.ban_expires).getTime() < Date.now())) return; // an expired ban is lifted by that session hook
         larkEmails.delete(a.accountId);

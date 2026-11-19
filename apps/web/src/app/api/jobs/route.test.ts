@@ -509,9 +509,20 @@ describe('POST /api/jobs for an image feature', () => {
     expect((await pool.query('select preset_id, prompt, params, enhance from jobs where id = $1', [id])).rows).toEqual([
       { preset_id: 'style-street', prompt: `a bottle on marble${String.fromCharCode(10).repeat(2)}${style}`, params: { resolution: '2K', brief: 'a bottle on marble' }, enhance: true },
     ]);
-    // History shows the member's own words, not the style's prompt.
-    const listed = (await (await listJobs(new Request('http://localhost/api/jobs?mine', { headers: { cookie: m.cookie } }))).json()) as { jobs: { id: string; text: string }[] };
-    expect(listed.jobs.find((j) => j.id === id)?.text).toBe('a bottle on marble');
+    // History shows the member's own words, not the style's prompt, and what the job was booked at.
+    const listed = (await (await listJobs(new Request('http://localhost/api/jobs?mine', { headers: { cookie: m.cookie } }))).json()) as { jobs: { id: string; text: string; estimateUsd: string | null }[] };
+    expect(listed.jobs.find((j) => j.id === id)).toMatchObject({ text: 'a bottle on marble', estimateUsd: expect.stringMatching(/^\d+\.\d{4}$/) });
+    // Outside the company workspace that figure is not sent (docs/WORKSPACES.md §3): the same job, moved to a partner workspace the member is in.
+    await pool.query(`insert into workspaces (id, name) values ('ws_hist', 'Partner History') on conflict do nothing`);
+    await pool.query(`insert into workspace_members (workspace_id, user_id, role) values ('ws_hist', $1, 'member')`, [m.id]);
+    await pool.query(`update jobs set workspace_id = 'ws_hist' where id = $1`, [id]);
+    try {
+      const partner = (await (await listJobs(new Request('http://localhost/api/jobs?mine', { headers: { cookie: `${m.cookie}; cvs_ws=ws_hist` } }))).json()) as { jobs: { id: string; estimateUsd: string | null }[] };
+      expect(partner.jobs.find((j) => j.id === id)?.estimateUsd).toBeNull();
+    } finally {
+      await pool.query(`update jobs set workspace_id = 'ws_vet' where id = $1`, [id]);
+      await pool.query(`delete from workspace_members where workspace_id = 'ws_hist' and user_id = $1`, [m.id]);
+    }
 
     expect(await error(await runImage(m, { presetId: 'gentle-push-in' }))).toBe('the preset does not exist or is not enabled');
     expect(await error(await run(m.cookie, { ...base, assetIds: [m.asset], presetId: 'style-street' }))).toBe('the preset does not exist or is not enabled');

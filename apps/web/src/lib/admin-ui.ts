@@ -37,6 +37,8 @@ export const AUDIT_ACTIONS: Record<string, string> = {
   'user.ban': 'Khoá tài khoản', 'user.delete': 'Xoá tài khoản', 'user.password_change': 'Đổi mật khẩu', 'user.password_set': 'Đặt mật khẩu', 'user.profile_update': 'Sửa hồ sơ', 'user.role_change': 'Đổi vai trò',
   'user.sessions_revoke': 'Đăng xuất thiết bị khác', 'user.stores': 'Gán cửa hàng cho người dùng', 'user.team_change': 'Đổi nhóm', 'user.template_editor': 'Đổi quyền biên tập mẫu', 'user.system': 'Chuyển tài khoản vào hoặc ra khỏi nhóm hệ thống', 'user.outside_lark': 'Đánh dấu ngoài tổ chức Lark', 'user.developer': 'Đổi quyền nhà phát triển', 'user.impersonate_start': 'Bắt đầu đăng nhập thay người dùng', 'user.impersonate_stop': 'Thoát đăng nhập thay người dùng','user.two_factor_backup_codes': 'Tạo mã dự phòng 2 lớp', 'user.two_factor_disable': 'Tắt xác thực 2 lớp',
   'user.two_factor_enable': 'Bật xác thực 2 lớp', 'user.two_factor_failed': 'Nhập sai mã 2 lớp', 'user.unban': 'Mở khoá tài khoản', 'user.update': 'Sửa tài khoản', 'verdict.set': 'Chấm kết quả', 'vertex.switch_account': 'Chuyển tài khoản Vertex', 'vertex_account.update': 'Sửa tài khoản Vertex',
+  'workspace.create': 'Tạo không gian làm việc', 'workspace.rename': 'Đổi tên không gian làm việc', 'workspace.disable': 'Tắt không gian làm việc', 'workspace.enable': 'Bật lại không gian làm việc', 'workspace.member_add': 'Thêm thành viên vào không gian',
+  'workspace.member_remove': 'Xoá thành viên khỏi không gian', 'workspace.member_role': 'Đổi vai trò trong không gian', 'workspace.account_create': 'Tạo tài khoản cho không gian',
 };
 export const auditLabel = (action: string): string => AUDIT_ACTIONS[action] ?? action;
 
@@ -60,8 +62,19 @@ export function groupRecent<T extends { actorName: string; action: string; creat
   return out;
 }
 
+/** The workspace routes' refusals (lib/workspaces.ts), which a workspace owner reads too, in words. */
+const REASONS: Record<string, string> = {
+  no_user: 'Chưa có tài khoản nào với email này. Đánh dấu “Tạo tài khoản mới” để tạo.',
+  already_member: 'Người này đã là thành viên của không gian làm việc.',
+  email_taken: 'Email này đã có tài khoản. Bỏ dấu “Tạo tài khoản mới” để thêm người đó.',
+  company_email: 'Không dùng được email này trong không gian của bạn. Hãy dùng email khác, hoặc nhờ Admin.',
+  last_owner: 'Không gian làm việc cần ít nhất một chủ sở hữu.',
+  owner_made: 'Tài khoản này do chủ một không gian đối tác tạo, nên không thêm vào không gian công ty được.',
+  name_taken: 'Đã có không gian làm việc khác mang tên này.',
+};
+
 /** The Vietnamese text for a failed Admin call, followed by the server's reason, which Admins may read. */
-export const failText = (e: unknown, fallback: string): string => (e instanceof ApiError ? `${fallback} (${e.message})` : fallback);
+export const failText = (e: unknown, fallback: string): string => (e instanceof ApiError ? (REASONS[e.message] ?? `${fallback} (${e.message})`) : fallback);
 
 /**
  * Runs a change, reloads the page data after it and keeps the reason when it fails; `run` says whether it worked. One change at a time: `pending`

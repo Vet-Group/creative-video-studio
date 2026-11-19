@@ -67,13 +67,14 @@ export const personName = (name: string) => withoutRole(name).toLowerCase();
  * databaseHooks.user.create.before. A first Lark sign-in links by equal email, so a staff member whose CVS account has another address (a
  * Gmail one) would get a second, auto-provisioned account. When an existing user has the same name, the sign-in is refused instead with
  * lark_account_not_linked: the login page tells them to sign in the old way and link Lark under "Phương thức đăng nhập". Only an OAuth
- * callback creates users this way (Google has disableSignUp), so Admin-created users are never checked.
+ * callback creates users this way (Google has disableSignUp), so Admin-created users are never checked. Only company members count: a partner's
+ * owner naming an account like an incoming staff member must not block that person's first sign-in.
  */
 export function refuseLikelyDuplicate(q: Queryable) {
   return async (user: { name?: string | null }, ctx?: { path?: string } | null) => {
     const name = personName(user.name ?? '');
     if (!ctx?.path?.startsWith('/callback/') || !name) return;
-    const { rows } = await q.query('select name from users');
+    const { rows } = await q.query('select u.name from users u join workspace_members m on m.user_id = u.id where m.workspace_id = $1', [COMPANY_WORKSPACE_ID]);
     if ((rows as { name: string }[]).some((r) => personName(r.name) === name)) {
       throw new APIError('FORBIDDEN', { code: 'lark_account_not_linked', message: 'A user with this name already exists; link Lark from their account' });
     }

@@ -54,6 +54,8 @@ const bad = (error: string) => Response.json({ error }, { status: 400 });
  * `failureReason` is `real_person` or `sensitive_input` when the provider refused the job's input image, `output_audio` when it refused the sound it made, `upper_body_image`,
  * `upper_body_video` or `motion_short` when Motion Control could not read its inputs (read from `error`), else null. `unbilled` is true once the ledger closed the job at $0.
  * `twin` is `{ label, estimateUsd }` of the enabled twin model (migration 0075) a job refused for a real person or its sound can be retried on (POST `onTwin`), else null.
+ * `estimateUsd`, what the job was booked at, is a spend figure: null outside the company workspace (docs/WORKSPACES.md §3). The twin's price is a
+ * pre-run estimate, as on a Run button, and stays.
  */
 export async function GET(request: Request) {
   const g = await guard(request, 'member');
@@ -94,7 +96,7 @@ export async function GET(request: Request) {
       // For the History card: the member's own words (a free prompt on Create video and Image Generation; elsewhere the prompt is composed, so the kept brief),
       // the inputs, the format and the caller's favourite; `traits` is a Fashion Model Generator job's own traits (JSON), which its save dialog starts from.
       text: r.params.brief ?? ((r.feature === 'video' && !r.preset_id) || r.feature === 'image' ? r.prompt : null), inputAssetIds: r.input_asset_ids,
-      traits: r.feature === 'fashion_model' ? (r.params.traits ?? null) : null, garments: r.params.garments ? Number(r.params.garments) : null, format: r.params.format ?? null, roles: r.params.roles ?? null, view: r.params.view ?? null, breed: r.params.breed ?? null, favorite: r.favorite, estimateUsd: r.estimate_usd, unbilled: r.unbilled,
+      traits: r.feature === 'fashion_model' ? (r.params.traits ?? null) : null, garments: r.params.garments ? Number(r.params.garments) : null, format: r.params.format ?? null, roles: r.params.roles ?? null, view: r.params.view ?? null, breed: r.params.breed ?? null, favorite: r.favorite, estimateUsd: g.workspaceId === COMPANY_WORKSPACE_ID ? r.estimate_usd : null, unbilled: r.unbilled,
     })),
   });
 }

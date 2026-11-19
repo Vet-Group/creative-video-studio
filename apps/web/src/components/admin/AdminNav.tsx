@@ -8,6 +8,7 @@ import { Icon, type IconName } from '@/components/Icon';
 const PAGES: [string, ReactNode, IconName][] = [
   ['overview', 'Tổng quan', 'pulse'],
   ['users', 'Người dùng', 'users'],
+  ['workspaces', <>Không gian<span className="sr-only"> làm việc</span></>, 'apps'],
   ['teams', 'Nhóm', 'team'],
   ['stores', 'Cửa hàng', 'store'],
   ['settings', 'Cài đặt', 'gear'],
