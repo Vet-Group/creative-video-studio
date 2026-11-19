@@ -3,7 +3,8 @@ import { generateKeyPairSync } from 'node:crypto';
 import type { ModelConfig } from '../models';
 import type { SubmitRequest } from './types';
 import { ImageReadError, ProviderHttpError } from './http';
-import { createVertexOmniProvider, MAX_RESPONSE_BYTES, MAX_VIDEO_BYTES, SUBMIT_TIMEOUT_MS } from './vertex-omni';
+import { videoInputs } from './fal';
+import { createVertexOmniProvider, MAX_RESPONSE_BYTES, MAX_VIDEO_BYTES, SUBMIT_TIMEOUT_MS, VERTEX_OMNI_MODEL } from './vertex-omni';
 
 const model: ModelConfig = { id: 'omni', provider: 'vertex', endpoint: 'gemini-omni-1.2-flash', label: 'Omni', ratios: ['16:9', '9:16'], durationsSec: [3, 4, 5, 10, 15], maxImages: 9, outputResolution: '720p', usdPerSecond: 0.0695, billedAmountField: null, sources: {} };
 const request = (extra: Partial<SubmitRequest> = {}): SubmitRequest => ({ model, prompt: 'a cat', imageUrls: [], ratio: '9:16', durationSec: 5, ...extra });
@@ -63,6 +64,9 @@ describe('Vertex Omni', () => {
     ]);
     expect(body(calls).generation_config).toEqual({ video_config: { task: 'image_to_video' } });
     expect(body(calls).response_format[0].duration).toBe('10s');
+  });
+  test('the models list says an end frame goes with one image only, as submit refuses more, so the jobs API and the form stop it before the worker', () => {
+    expect(videoInputs(VERTEX_OMNI_MODEL)).toMatchObject({ endFrame: true, endMaxSec: 10, endMaxImages: 1 });
   });
   test('reference-to-video: several images, in order', async () => {
     const { provider, calls } = setup({ id: 'abc', status: 'in_progress' });

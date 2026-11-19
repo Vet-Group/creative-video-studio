@@ -183,6 +183,7 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
   const hydrated = useHydrated();
   const [images, setImages] = useState<Image[]>([]);
   const [endFrame, setEndFrame] = useState<Image | null>(null); // the image the clip ends on, as Fash's End frame; sent only on a model that takes one
+  const beforeLoop = useRef<Image | null>(null); // the end frame the loop shortcut replaced, given back when the loop is turned off
   const [presets, setPresets] = useState<PresetRow[] | null>(null); // the enabled presets, which a Run may use
   // A template editor's view of the picker: every preset, switched-off ones too, with what the edit form shows; null for a member.
   const [editable, setEditable] = useState<PresetRow[] | null>(null);
@@ -333,7 +334,7 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
     if (!image) return;
     let stale = false;
     photoImg({ asset: image })
-      .then((img) => !stale && setImages([img]))
+      .then((img) => !stale && (setImages([img]), setEndFrame(null))) // an end frame that was one of the images it replaces would be refused without them
       .catch(() => setError('Không tìm thấy ảnh để tạo video.'));
     return () => {
       stale = true;
@@ -363,6 +364,7 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
         setImages(source.recipe ? asExample(images) : images);
         // Sent only on a model that takes them, as when picked by hand.
         setEndFrame(j.endFrame ?? null);
+        beforeLoop.current = null;
         setClips(j.clips ?? []);
         setPresetId(preset ?? '');
         if (!preset) {
@@ -737,6 +739,12 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
   );
   const first = images[0];
   const loop = first !== undefined && endFrame?.id === first.id; // the clip ends on the picture it starts from
+  /** Takes an image off; an end frame that is that image goes with it, as a Run takes another member's photo (a company example's) as its end frame only beside it. */
+  function dropImage(id: string) {
+    setImages((cur) => cur.filter((x) => x.id !== id));
+    if (endFrame?.id === id) setEndFrame(null);
+    if (beforeLoop.current?.id === id) beforeLoop.current = null;
+  }
   /** The model picker, opened from the end frame's hint: the member picks, since another model has another price. */
   function openModels() {
     const trigger = document.getElementById(modelTrigger);
@@ -744,7 +752,7 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
     trigger?.click();
   }
   // In the sections, the end frame sits in ③ Ending beside the last shot; with free writing or a preset, under the photos.
-  // A model without one says so in its place while another model in the list takes one.
+  // A model without one says so in its place while another model in the list takes one with the ratio and duration chosen.
   const endSlot = chosen?.endFrame ? (
     <div className="end-frame">
       <Slot
@@ -768,7 +776,7 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
         storeId={storeId}
       />
       {first && (
-        <button type="button" className="end-loop" aria-pressed={loop} disabled={busy} onClick={() => setEndFrame(loop ? null : first)}>
+        <button type="button" className="end-loop" aria-pressed={loop} disabled={busy} onClick={() => (loop ? setEndFrame(beforeLoop.current) : ((beforeLoop.current = endFrame), setEndFrame(first)))}>
           {loop && <Icon name="check" size={12} />}
           Dùng ảnh đầu làm khung cuối (video lặp)
         </button>
@@ -776,16 +784,16 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
       {first && endFrame && (
         <figure className="end-path" aria-label="Đầu → Cuối">
           <span aria-hidden="true">Đầu</span>
-          <img src={thumbUrl(first.id)} alt="" />
+          <img src={thumbUrl(first.id)} alt="Ảnh đầu" />
           <Icon name="right" size={14} />
-          <img src={thumbUrl(endFrame.id)} alt="" />
+          <img src={thumbUrl(endFrame.id)} alt="Khung hình cuối" />
           <span aria-hidden="true">Cuối</span>
         </figure>
       )}
     </div>
   ) : (
     chosen &&
-    models?.models.some((m) => m.endFrame) && (
+    models?.models.some((m) => m.endFrame && m.supported) && (
       <p className="help end-off">
         Mô hình này không nhận khung hình cuối{endFrame ? ', ảnh khung cuối đã chọn sẽ không được gửi' : ''}.
         <button type="button" className="link-button" onClick={openModels}>
@@ -859,7 +867,7 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
                   {images.map((i) => (
                     <li key={i.id}>
                       <img src={thumbUrl(i.id)} alt={i.filename} />
-                      <button type="button" aria-label={`Bỏ ảnh ${i.filename}`} onClick={() => setImages((cur) => cur.filter((x) => x.id !== i.id))}>
+                      <button type="button" aria-label={`Bỏ ảnh ${i.filename}`} onClick={() => dropImage(i.id)}>
                         <Icon name="x" size={12} />
                       </button>
                     </li>

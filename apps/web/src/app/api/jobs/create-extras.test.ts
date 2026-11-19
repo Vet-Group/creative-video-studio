@@ -93,6 +93,13 @@ describe('the end frame', () => {
     expect(await errorOf(await run({ params: { endAssetId: 'theirs' } }))).toBe('params.endAssetId must be one of your own images');
   });
 
+  test('a loop on an image the Run may not use is refused as that image is: another member’s photo no job ran on, or the caller’s own from another workspace', async () => {
+    await pool.query(`insert into workspaces (id, name) values ('ws_end', 'Partner') on conflict do nothing`);
+    await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) select 'priv', owner_id, 'input', 'priv', 'p.png', 'image/png', 1 from assets where id = 'theirs'`);
+    await pool.query(`insert into assets (id, owner_id, workspace_id, kind, s3_key, filename, mime, bytes) select 'elsewhere', owner_id, 'ws_end', 'input', 'elsewhere', 'e.png', 'image/png', 1 from assets where id = 'img'`);
+    for (const id of ['priv', 'elsewhere']) expect(await errorOf(await run({ assetIds: [id], params: { endAssetId: id } })), id).toBe('one or more assets do not exist or cannot be used');
+  });
+
   test('Gemini Omni Flash takes an end frame on a clip of at most 10 s only (the picker says so), and a longer clip runs without one', async () => {
     await pool.query(`update model_configs set enabled = true where id = 'gemini-omni-flash'`);
     try {
