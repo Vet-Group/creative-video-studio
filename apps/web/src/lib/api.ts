@@ -38,10 +38,23 @@ export async function rotatingSession<T>(run: () => Promise<T>): Promise<T> {
   }
 }
 
+/**
+ * A write carries the workspace the page rendered with (the layout's `cvs-workspace` meta), so the server refuses it (409 workspace_changed) when this
+ * tab's workspace is no longer the browser's (docs/WORKSPACES.md §3). Pages outside the app layout have no meta and send none.
+ */
+export function withWorkspace(init?: RequestInit): RequestInit | undefined {
+  const method = (init?.method ?? 'GET').toUpperCase();
+  const workspace = typeof document === 'undefined' ? null : document.querySelector?.('meta[name="cvs-workspace"]')?.getAttribute('content');
+  if (!workspace || method === 'GET' || method === 'HEAD') return init;
+  const headers = new Headers(init?.headers);
+  headers.set('x-cvs-workspace', workspace);
+  return { ...init, headers };
+}
+
 /** Fetches a route and returns its JSON. A 401 outside the login page sends the user there, to come back to this page after the sign-in; any other failure throws an ApiError carrying the server's message. */
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const sentAt = rotations;
-  const res = await fetch(path, init);
+  const res = await fetch(path, withWorkspace(init));
   const body = (await res.json().catch(() => null)) as (T & { error?: string; code?: string; estimateUsd?: string }) | null;
   const stale = rotating > 0 || sentAt !== rotations;
   if (res.status === 401 && !signingOut && !stale && window.location.pathname !== '/login') window.location.assign(loginFor(window.location.pathname + window.location.search));
@@ -131,7 +144,8 @@ export interface Clip {
   storeId: string | null;
   /** The store's name when there is one the viewer may see. */
   storeName: string | null;
-  costUsd: string;
+  /** What the clip cost; null outside the company workspace, which alone sees spend. */
+  costUsd: string | null;
   costFinal: boolean;
   /** `featured`: a Pass shown first on Explore. */
   verdict: { verdict: 'pass' | 'fail'; fault: string | null; featured: boolean; markedBy: string } | null;

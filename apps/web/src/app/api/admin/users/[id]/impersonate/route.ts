@@ -3,12 +3,13 @@ import { withTransaction } from '@cvs/core/ledger';
 import { type RouteContext } from '@/lib/assets';
 import { auth, pool } from '@/lib/auth';
 import { authFailure, bad } from '@/lib/admin';
-import { guard, isImpersonated, sameOrigin } from '@/lib/session';
+import { guard, isImpersonated, resolveWorkspace, sameOrigin } from '@/lib/session';
 
 /**
  * Admin: sign in as another user (a member or an Admin) to see what they see; every action then counts for that user, runs included.
  * Only an Admin with the `can_impersonate` flag may (PATCH /api/admin/users/[id] sets it). Refused: yourself, a locked account, and
- * starting while already signed in as someone. better-auth keeps the Admin's own session in a signed cookie, and the session it opens for the
+ * starting while already signed in as someone, and a user who shares no active workspace with the Admin (lib/session.ts checks that again on every
+ * request of the session, docs/WORKSPACES.md §3). better-auth keeps the Admin's own session in a signed cookie, and the session it opens for the
  * user lasts one hour, which lib/session.ts enforces itself. The audit insert and the better-auth call run on different connections: the
  * call is made inside the audit transaction, so a failure rolls the audit row back, and the Set-Cookie headers are forwarded only after that
  * transaction has committed. POST /api/me/stop-impersonating ends it. Only this app's own origin may call it.
@@ -25,6 +26,7 @@ export async function POST(request: Request, { params }: RouteContext) {
   const user = (await pool.query('select name, banned from users where id = $1', [id])).rows[0];
   if (!user) return bad('not found', 404);
   if (user.banned) return bad('this account is locked', 409);
+  if (!(await resolveWorkspace(id, null, actorId))) return bad('you share no workspace with this user', 403);
   try {
     const { headers } = await withTransaction(pool, async (tx) => {
       await audit(tx, { actorId, action: 'user.impersonate_start', target: `user:${id}` });
