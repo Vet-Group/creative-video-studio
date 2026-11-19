@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { type CSSProperties, Fragment, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, useCallback, useEffect, useId, useRef, useState } from 'react';
+import { type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, useCallback, useEffect, useId, useRef, useState } from 'react';
 import { JOB_APPS } from '@/lib/apps';
 import { api, type Clip, errorText, sendJson, thumbUrl } from '@/lib/api';
 import { downloadCompressed, downloadCompressedVideo } from '@/lib/compress-download';
@@ -11,7 +11,7 @@ import { featureLabel } from '@/lib/features';
 import { GALLERY_SAMPLES, numberedSamples } from '@/lib/examples';
 import { cardTitleOfFormat, HOOKS, LOCATIONS } from '@/lib/marketing';
 import { PRODUCT_TYPES } from '@/lib/product-types';
-import { activeFilterChips, activeFilters, type ChipKey, dayHeadings, filtersFromParams, type LibraryFilters, type LibraryView, libraryQuery, matchesVerdict, mergeFresh, NO_FILTERS, NO_STORE, readView, saveView, type VerdictFilter } from '@/lib/library-view';
+import { activeFilterChips, activeFilters, type ChipKey, dayGroups, filtersFromParams, type LibraryFilters, type LibraryView, libraryQuery, matchesVerdict, mergeFresh, NO_FILTERS, NO_STORE, readView, saveView, type VerdictFilter } from '@/lib/library-view';
 import { alignInputs, reuseHref } from '@/lib/reuse';
 import { SWIPE_START_PX, swipeStep } from '@/lib/swipe';
 import { useSamples } from '@/lib/use-samples';
@@ -983,7 +983,8 @@ export function Library({ initialFilters = NO_FILTERS }: { initialFilters?: Libr
   const [view, setView] = useState<LibraryView>('grid');
   const [size, setSize] = useState(1);
   const [clips, setClips] = useState<Clip[]>([]);
-  const headings = dayHeadings(clips);
+  // The day groups of what is loaded; the Examples' own order (as GET /api/library sorts it) is not by date, so it stays one flat grid.
+  const groups = filters.examplesOnly && filters.sort === 'newest' && Object.hasOwn(GALLERY_SAMPLES, filters.kind) ? [{ day: '', label: '', start: 0, items: clips }] : dayGroups(clips);
   const [creators, setCreators] = useState<{ id: string; name: string }[]>([]);
   const [storeNames, setStoreNames] = useState<{ id: string; name: string }[]>([]); // the stores with a live item, for the store filter
   const [ratios, setRatios] = useState<string[]>([]);
@@ -1437,24 +1438,50 @@ export function Library({ initialFilters = NO_FILTERS }: { initialFilters?: Libr
           )}
         </div>
       )}
-      <div ref={grid} className={view === 'list' ? 'library-list' : 'grid'} style={{ '--card-min': SIZES[size] } as CSSProperties} aria-busy={state === 'loading'} hidden={clips.length === 0} onKeyDown={view === 'grid' ? gridKeys : undefined}>
-        {clips.map((c, i) => (
-          <Fragment key={c.id}>
-          {headings.has(i) && <h2 className="lib-day">{headings.get(i)}</h2>}
-          <ClipCard
-            clip={c}
-            view={view}
-            select={zip.check(c.id, c.downloadName)}
-            selecting={zip.active}
-            onChange={update}
-            onDeleted={(id) => {
-              uncount(clips.find((x) => x.id === id));
-              setClips((cur) => cur.filter((x) => x.id !== id));
-            }}
-            onOpen={zip.active ? () => zip.flip(c.id) : () => setDetail(i)}
-          />
-          </Fragment>
-        ))}
+      <div ref={grid} className="library-days" aria-busy={state === 'loading'} hidden={clips.length === 0} onKeyDown={view === 'grid' ? gridKeys : undefined}>
+        {groups.map((g) => {
+          const ids = g.items.map((c) => c.id);
+          const picked = ids.filter((id) => zip.ids.includes(id)).length;
+          return (
+            <section key={g.day} className="lib-day-group">
+              {g.label && (
+                <div className="lib-day">
+                  {/* Picks or drops every loaded item of the day through the same selection as Chọn, which it turns on. */}
+                  <label className="lib-day-check">
+                    <input
+                      type="checkbox"
+                      checked={picked === ids.length}
+                      ref={(box) => {
+                        if (box) box.indeterminate = picked > 0 && picked < ids.length;
+                      }}
+                      onChange={(e) => (e.target.checked ? zip.pickMany(ids) : zip.dropMany(ids))}
+                      aria-label={`Chọn tất cả ${ids.length} mục ngày ${g.label}`}
+                    />
+                  </label>
+                  <h2>{g.label}</h2>
+                  <span className="lib-day-count">{ids.length} mục</span>
+                </div>
+              )}
+              <div className={view === 'list' ? 'library-list' : 'grid'} style={{ '--card-min': SIZES[size] } as CSSProperties}>
+                {g.items.map((c, j) => (
+                  <ClipCard
+                    key={c.id}
+                    clip={c}
+                    view={view}
+                    select={zip.check(c.id, c.downloadName)}
+                    selecting={zip.active}
+                    onChange={update}
+                    onDeleted={(id) => {
+                      uncount(clips.find((x) => x.id === id));
+                      setClips((cur) => cur.filter((x) => x.id !== id));
+                    }}
+                    onOpen={zip.active ? () => zip.flip(c.id) : () => setDetail(g.start + j)}
+                  />
+                ))}
+              </div>
+            </section>
+          );
+        })}
       </div>
       {detail !== null && clips[detail] && <ClipDetail clips={clips} index={detail} stores={isAdmin ? stores : undefined} admin={isAdmin} onIndex={setDetail} onChange={update} />}
       {hasMore && (

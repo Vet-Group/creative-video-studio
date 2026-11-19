@@ -105,6 +105,7 @@ export const USERS = {
   explorenew: { email: 'explorenew@e2e.test', name: 'E2E Explore New', role: 'member' },
   explorestrip: { email: 'explorestrip@e2e.test', name: 'E2E Explore Strip', role: 'member' },
   libv: { email: 'libv@e2e.test', name: 'E2E Library View', role: 'member' }, // library.e2e: grid or list, the selection bar, search and the empty states
+  libd: { email: 'libd@e2e.test', name: 'E2E Library Days', role: 'member' }, // library.e2e: the day headings and their select-all checkbox
   // library.e2e: libra marks from the detail view and in bulk, librb owns the item libra may read but not mark.
   libra: { email: 'libra@e2e.test', name: 'E2E Library Recipe A', role: 'member' },
   librb: { email: 'librb@e2e.test', name: 'E2E Library Recipe B', role: 'member' },

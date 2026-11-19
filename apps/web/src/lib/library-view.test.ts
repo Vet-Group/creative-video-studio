@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { activeFilterChips, activeFilters, dayHeadings, filtersFromParams, libraryQuery, matchesVerdict, mergeFresh, NO_FILTERS, readView, saveView, VIEW_KEY } from './library-view';
+import { activeFilterChips, activeFilters, dayGroups, filtersFromParams, libraryQuery, matchesVerdict, mergeFresh, NO_FILTERS, readView, saveView, VIEW_KEY } from './library-view';
 
 describe('libraryQuery', () => {
   it('leaves the defaults out', () => {
@@ -142,24 +142,39 @@ describe('activeFilterChips', () => {
   });
 });
 
-describe('dayHeadings', () => {
+describe('dayGroups', () => {
   const now = new Date('2026-11-12T16:00:00+07:00');
+  const VN = 'Asia/Ho_Chi_Minh';
   const at = (iso: string) => ({ createdAt: iso });
-  it('puts a heading before the first item of each Vietnam day, newest first or oldest first', () => {
-    const items = [at('2026-11-12T09:00:00+07:00'), at('2026-11-12T00:30:00+07:00'), at('2026-11-11T23:59:00+07:00'), at('2026-11-09T10:00:00+07:00')];
-    expect([...dayHeadings(items, now)]).toEqual([
-      [0, 'Hôm nay'],
-      [2, 'Hôm qua'],
-      [3, new Intl.DateTimeFormat('vi-VN', { weekday: 'long', day: 'numeric', month: 'numeric', year: 'numeric', timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date('2026-11-09T10:00:00+07:00')).replace(/^./, (c) => c.toUpperCase())],
+  const view = (groups: ReturnType<typeof dayGroups>) => groups.map((g) => [g.label, g.start, g.items.length]);
+  it('labels today, yesterday, an earlier day this year with its weekday, and another year with the year', () => {
+    const items = [at('2026-11-12T09:00:00+07:00'), at('2026-11-12T00:30:00+07:00'), at('2026-11-11T23:59:00+07:00'), at('2026-11-09T10:00:00+07:00'), at('2025-12-31T10:00:00+07:00')];
+    expect(view(dayGroups(items, now, VN))).toEqual([
+      ['Hôm nay', 0, 2],
+      ['Hôm qua', 2, 1],
+      ['Thứ Hai, 09/11', 3, 1],
+      ['Thứ Tư, 31/12/2025', 4, 1],
     ]);
-    expect([...dayHeadings([...items].reverse(), now).keys()]).toEqual([0, 1, 2]);
   });
-  it('counts a UTC evening as the next Vietnam day', () => {
-    expect([...dayHeadings([at('2026-11-11T18:00:00Z'), at('2026-11-11T16:00:00Z')], now)]).toEqual([[0, 'Hôm nay'], [1, 'Hôm qua']]);
+  it('groups oldest first too, and keeps one heading for a list of one day', () => {
+    const items = [at('2026-11-11T08:00:00+07:00'), at('2026-11-12T08:00:00+07:00'), at('2026-11-12T09:00:00+07:00')];
+    expect(view(dayGroups(items, now, VN))).toEqual([['Hôm qua', 0, 1], ['Hôm nay', 1, 2]]);
+    expect(view(dayGroups(items.slice(1), now, VN))).toEqual([['Hôm nay', 0, 2]]);
+    expect(dayGroups([], now, VN)).toEqual([]);
   });
-  it('adds no heading when every item is from one day, or there is none', () => {
-    expect(dayHeadings([at('2026-11-12T09:00:00+07:00'), at('2026-11-12T08:00:00+07:00')], now).size).toBe(0);
-    expect(dayHeadings([], now).size).toBe(0);
+  it("splits days at the viewer's midnight, not UTC's", () => {
+    // 17:30 UTC on 11 November is past midnight in Vietnam (UTC+7) but still the morning of the 11th in Los Angeles.
+    const items = [at('2026-11-11T17:30:00Z'), at('2026-11-11T16:30:00Z')];
+    expect(view(dayGroups(items, now, VN))).toEqual([['Hôm nay', 0, 1], ['Hôm qua', 1, 1]]);
+    expect(view(dayGroups(items, now, 'America/Los_Angeles'))).toEqual([['Hôm qua', 0, 2]]);
+  });
+  it('counts yesterday by the calendar across a month and a year', () => {
+    expect(dayGroups([at('2025-12-31T12:00:00+07:00')], new Date('2026-01-01T08:00:00+07:00'), VN)[0]!.label).toBe('Hôm qua');
+  });
+  it('continues the last day when the next page starts on it', () => {
+    const page1 = [at('2026-11-12T09:00:00+07:00'), at('2026-11-11T09:00:00+07:00')];
+    const page2 = [at('2026-11-11T08:00:00+07:00'), at('2026-11-10T08:00:00+07:00')];
+    expect(view(dayGroups([...page1, ...page2], now, VN))).toEqual([['Hôm nay', 0, 1], ['Hôm qua', 1, 2], ['Thứ Ba, 10/11', 3, 1]]);
   });
 });
 

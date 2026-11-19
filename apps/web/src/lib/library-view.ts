@@ -1,5 +1,4 @@
-// The Library page's filters as the /api/library query, how many of them narrow the list, the day headings, and the grid or list view remembered per browser.
-import { vnDay } from './lark-prompt';
+// The Library page's filters as the /api/library query, how many of them narrow the list, the day groups, and the grid or list view remembered per browser.
 
 /** The verdict filter: every item (''), the unmarked ones, any Pass (a featured one too), only featured, or Fail. */
 export type VerdictFilter = '' | 'none' | 'pass' | 'featured' | 'fail';
@@ -133,21 +132,29 @@ export function saveView(view: LibraryView): void {
   } catch {} // blocked storage: the view lasts for this visit
 }
 
+const WEEKDAYS = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
+
 /**
- * The day heading before each item that starts a new Vietnam day, keyed by the item's index (today, yesterday, else the weekday and date), as ComfyUI's job list groups by day.
- * A list that is all one day gets none: a single heading would add nothing.
+ * The items as runs of one day in the viewer's time zone (or `timeZone`), each under its heading: Hôm nay, Hôm qua, else the weekday and day/month, with the year when it is not this one, as fash.studio's Library groups.
+ * One pass over the items as loaded, so a page that goes on with the last day adds to its run; `start` is the run's first index in `items`.
  */
-export function dayHeadings(items: { createdAt: string }[], now = new Date()): Map<number, string> {
-  const days = items.map((it) => vnDay(new Date(it.createdAt)));
-  const out = new Map<number, string>();
-  if (new Set(days).size < 2) return out;
-  const today = vnDay(now);
-  const yesterday = vnDay(new Date(now.getTime() - 86_400_000));
-  const long = new Intl.DateTimeFormat('vi-VN', { weekday: 'long', day: 'numeric', month: 'numeric', year: 'numeric', timeZone: 'Asia/Ho_Chi_Minh' });
-  days.forEach((d, i) => {
-    if (i > 0 && d === days[i - 1]) return;
-    const label = d === today ? 'Hôm nay' : d === yesterday ? 'Hôm qua' : long.format(new Date(items[i]!.createdAt));
-    out.set(i, label[0]!.toUpperCase() + label.slice(1));
+export function dayGroups<T extends { createdAt: string }>(items: T[], now = new Date(), timeZone?: string): { day: string; label: string; start: number; items: T[] }[] {
+  const dayOf = new Intl.DateTimeFormat('sv-SE', { timeZone }).format; // YYYY-MM-DD
+  const today = dayOf(now);
+  const [y, m, d] = today.split('-').map(Number);
+  const yesterday = new Date(Date.UTC(y!, m! - 1, d! - 1)).toISOString().slice(0, 10);
+  const label = (day: string) => {
+    if (day === today) return 'Hôm nay';
+    if (day === yesterday) return 'Hôm qua';
+    const [yyyy, mm, dd] = day.split('-');
+    return `${WEEKDAYS[new Date(`${day}T00:00:00Z`).getUTCDay()]}, ${dd}/${mm}${Number(yyyy) === y ? '' : `/${yyyy}`}`;
+  };
+  const groups: { day: string; label: string; start: number; items: T[] }[] = [];
+  items.forEach((it, i) => {
+    const day = dayOf(new Date(it.createdAt));
+    const last = groups.at(-1);
+    if (last?.day === day) last.items.push(it);
+    else groups.push({ day, label: label(day), start: i, items: [it] });
   });
-  return out;
+  return groups;
 }

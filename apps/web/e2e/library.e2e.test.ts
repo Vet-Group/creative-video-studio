@@ -208,6 +208,74 @@ test('Library views: grid or list remembered, a selection bar with the zip, sear
   await expect(page.locator('.library-empty').getByRole('link', { name: 'Tạo ảnh' })).toHaveAttribute('href', '/image-generation');
 });
 
+test('Library days: a heading per day whose checkbox picks every item of that day, in both orders and both views', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await signIn(page, 'libd');
+  const first = await runViaApi(page);
+  const second = await runViaApi(page);
+  await expect.poll(async () => ((await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { status: string }[] }).jobs.filter((j) => j.status === 'succeeded').length, { timeout: 60_000 }).toBe(2);
+  await page.goto('/library');
+  await page.getByLabel('Người tạo').selectOption({ label: 'E2E Library Days' });
+  await expect(page.getByRole('article')).toHaveCount(2);
+  const item = (id: string) => page.locator(`article[data-clip-id="${id}"]`);
+
+  // Today's two items sit under one "Hôm nay" heading with their count.
+  const heading = page.getByRole('heading', { level: 2, name: 'Hôm nay', exact: true });
+  await expect(heading).toHaveCount(1);
+  const today = page.locator('.lib-day-group').filter({ has: heading });
+  await expect(today.locator('.lib-day-count')).toHaveText('2 mục');
+  await expect(today.getByRole('article')).toHaveCount(2);
+
+  // The day's checkbox turns on the Chọn selection with both items, shows mixed once one is dropped, picks both again, and drops both.
+  const day = page.getByRole('checkbox', { name: 'Chọn tất cả 2 mục ngày Hôm nay', exact: true });
+  const bar = page.getByRole('group', { name: 'Tải nhiều mục' });
+  await day.check();
+  await expect(bar).toContainText('Đã chọn 2');
+  await expect(page.getByRole('button', { name: 'Chọn', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(item(first).getByRole('checkbox')).toBeChecked();
+  await expect(item(second).getByRole('checkbox')).toBeChecked();
+  await item(first).getByRole('checkbox').uncheck();
+  await expect(bar).toContainText('Đã chọn 1');
+  await expect(day).toBeChecked({ indeterminate: true });
+  await day.click();
+  await expect(bar).toContainText('Đã chọn 2');
+  await expect(day).toBeChecked();
+  await day.uncheck();
+  await expect(bar).toContainText('Đã chọn 0');
+  await expect(item(second).getByRole('checkbox')).not.toBeChecked();
+  await bar.getByRole('button', { name: 'Bỏ chọn' }).click();
+  await expect(bar).toHaveCount(0);
+
+  // Oldest first and the list view keep the heading over the same two items.
+  await page.getByLabel('Sắp xếp').selectOption('oldest');
+  await expect(page).toHaveURL(/sort=oldest/);
+  await expect(heading).toHaveCount(1);
+  await page.getByRole('button', { name: 'Danh sách', exact: true }).click();
+  await expect(today.locator('.lib-row')).toHaveCount(2);
+  await expect(day).toBeVisible();
+  await page.getByRole('button', { name: 'Lưới', exact: true }).click();
+});
+
+test.describe('touch phone', () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+
+  test("the Library day's checkbox takes a 44 px tap and starts the selection", async ({ page }) => {
+    await signIn(page, 'libd');
+    await runViaApi(page);
+    await expect.poll(async () => ((await (await page.request.get('/api/jobs?mine')).json()) as { jobs: { status: string }[] }).jobs.every((j) => j.status === 'succeeded'), { timeout: 60_000 }).toBe(true);
+    await page.goto('/library');
+    await page.getByLabel('Người tạo').selectOption({ label: 'E2E Library Days' });
+    const day = page.getByRole('checkbox', { name: /^Chọn tất cả \d+ mục ngày Hôm nay$/ });
+    const hit = (await page.locator('.lib-day-check').filter({ has: day }).boundingBox())!;
+    expect(Math.min(hit.width, hit.height)).toBeGreaterThanOrEqual(44);
+    expect(hit.x).toBeGreaterThanOrEqual(0);
+    await day.tap();
+    await expect(page.getByRole('group', { name: 'Tải nhiều mục' })).toContainText(/Đã chọn [1-9]/);
+    await expect(page.locator('.library')).toHaveAttribute('data-selecting', 'true');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  });
+});
+
 test('Library detail: how an item was made for anyone, marks by keyboard, ←/→ between items, bulk marks that skip the items of others, the unmarked count and no tray', async ({ page, browser }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   // Free-prompt clips on the mock video model, which the other Library specs already mark Pass: a mark stays after its job is deleted and moves the Recommended badge.
