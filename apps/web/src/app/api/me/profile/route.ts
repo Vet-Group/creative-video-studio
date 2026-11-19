@@ -3,9 +3,9 @@ import { withTransaction } from '@cvs/core/ledger';
 import { COMPANY_WORKSPACE_ID } from '@cvs/db';
 import { bad, readBody } from '@/lib/admin';
 import { pool } from '@/lib/auth';
-import { isAvatarColor, isEmail, nameProblem } from '@/lib/profile';
+import { isAvatarColor, nameProblem } from '@/lib/profile';
 import { guard, impersonationRefusal, isImpersonated } from '@/lib/session';
-import { onCompanyDomain } from '@/lib/workspaces';
+import { emailOf, onCompanyDomain } from '@/lib/workspaces';
 
 /**
  * The caller changes their own display name (1 to 60 characters after trimming, no control characters), avatar colour (one of the
@@ -25,8 +25,9 @@ export async function PATCH(request: Request) {
   if (name === undefined && avatarColor === undefined && email === undefined) return bad('give name, avatarColor or email');
   if (name !== undefined && (typeof name !== 'string' || nameProblem(name))) return bad('name must have 1 to 60 characters and no control characters');
   if (avatarColor !== undefined && avatarColor !== null && !isAvatarColor(avatarColor)) return bad('avatarColor must be null or a colour of the palette');
-  const newEmail = typeof email === 'string' ? email.trim().toLowerCase() : email;
-  if (newEmail !== undefined && !(typeof newEmail === 'string' && isEmail(newEmail))) return bad('email must be an email address');
+  // As an account is created with (lib/workspaces.ts emailOf): "boss@vetgroup.net." is no address, so it cannot slip past the domain rule below.
+  const newEmail = email === undefined ? undefined : emailOf(email);
+  if (newEmail === null) return bad('email must be an email address');
   const userId = g.session.user.id;
   if (typeof newEmail === 'string' && g.workspaceId !== COMPANY_WORKSPACE_ID && newEmail !== g.session.user.email.toLowerCase() && onCompanyDomain(newEmail)) return bad('company_email', 403);
   if (typeof newEmail === 'string' && (await pool.query('select 1 from users where lower(email) = $1 and id <> $2', [newEmail, userId])).rowCount) {

@@ -100,10 +100,13 @@ describe('PATCH /api/me/profile', () => {
     await pool.query(`insert into workspace_members (workspace_id, user_id, role) values ('ws_pp', $1, 'member') on conflict do nothing`, [id]);
     await auth.api.createUser({ body: { email: 'staff@vetgroup.net', name: 'Staff', password, role: 'member' } });
     const asPartner = `${cookie}; cvs_ws=ws_pp`;
-    for (const email of ['staff@vetgroup.net', 'Someone.New@VETGROUP.net', 'x@sales.vetgroup.net']) {
+    for (const email of ['staff@vetgroup.net', 'Someone.New@VETGROUP.net', 'x@sales.vetgroup.net', 'lead@vetglobalbrand.com']) {
       const res = await patch({ email }, asPartner);
       expect([res.status, ((await res.json()) as { error: string }).error], email).toEqual([403, 'company_email']);
     }
+    // A trailing dot is no address as an account is created with (zod's), so it cannot slip past the domain rule either.
+    const dotted = await patch({ email: 'boss@vetgroup.net.' }, asPartner);
+    expect([dotted.status, ((await dotted.json()) as { error: string }).error]).toEqual([400, 'email must be an email address']);
     expect((await pool.query('select email from users where id = $1', [id])).rows[0].email).toBe('me@example.test');
     // Another address still saves there, and in the company workspace a company address does too.
     expect((await patch({ email: 'me.partner@example.test' }, asPartner)).status).toBe(200);
