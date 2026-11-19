@@ -778,8 +778,9 @@ export function MarketingStudio({ format = 'ugc', reuse, recipe, wizardDefault =
             <Templates
               feature="marketing"
               data={() => ({
-                // The model and the product go back by place, so an empty model keeps one; Unboxing's roles name its photos instead.
-                images: advanced || unboxing ? images.map((i) => i.id) : placesOf([person, product]),
+                // The model and the product go back by place, so an empty model keeps one. Unboxing's roles name the model and the box only when
+                // they are there but always the product, so an empty product keeps its place ('') and the roles still match the photos.
+                images: advanced ? images.map((i) => i.id) : unboxing ? [...person.map((i) => i.id), product[0]?.id ?? '', ...packaging.map((i) => i.id)] : placesOf([person, product]),
                 ...(pf && { format: pf }),
                 ...((advanced || review) && { script: script.trim() }),
                 ...(advanced && video && { videoRef: video.id }),
