@@ -829,10 +829,10 @@ describe('GET /api/jobs/:id', () => {
     const res = await detail(bob.cookie, id);
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
-      id, userId: alice.id, status: 'succeeded', error: null, isMock: false, feature: 'video', resolution: null, presetId: 'gentle-push-in', prompt: 'a prompt', enhance: false, enhancedPrompt: null, audio: null, orientation: null, view: null, breed: null, ratio: '1:1', garments: null, pose: null, format: null, hook: null, location: null, brief: null, script: null, roles: null, highlights: null, brand: false, hookText: null, ending: null, endText: null, endTextPos: null, durationSec: 8, modelId: 'fal-test',
+      id, userId: alice.id, status: 'succeeded', error: null, isMock: false, feature: 'video', resolution: null, presetId: 'gentle-push-in', prompt: 'a prompt', enhance: false, enhancedPrompt: null, audio: null, orientation: null, view: null, breed: null, style: null, product: null, name: null, ratio: '1:1', garments: null, pose: null, format: null, hook: null, location: null, brief: null, script: null, roles: null, highlights: null, brand: false, hookText: null, ending: null, endText: null, endTextPos: null, durationSec: 8, modelId: 'fal-test',
       storeId: 'store-ok', storeLost: false, modelLabel: 'Fal test', inputCount: 3, inputIds: ['d-in-2', 'd-in-gone', 'd-in-1'], outputAssetId: `${id}-video`, posterAssetId: `${id}-poster`,
       images: [{ id: 'd-in-2', filename: 'in.png', width: null, height: null, mime: 'image/png', durationMs: null }, { id: 'd-in-1', filename: 'in.png', width: null, height: null, mime: 'image/png', durationMs: null }],
-      endFrame: null, videoRef: null, clips: [],
+      endFrame: null, videoRef: null, clips: [], batchItems: null,
     });
   });
 
@@ -852,6 +852,29 @@ describe('GET /api/jobs/:id', () => {
     for (const cookie of [bob.cookie, admin.cookie]) expect(await (await detail(cookie, id)).json()).toMatchObject({ endFrame: null, clips: [] });
     await pool.query(`update assets set deleted_at = now() where id = 'd-end'`);
     expect(await (await detail(alice.cookie, id)).json()).toMatchObject({ endFrame: null });
+  });
+
+  test('gives the creator the items of every job of a batch app Run, in the order sent, and anyone else only the job itself', async () => {
+    const batch = '0c8a7a0e-9d6e-4a54-8a39-6d1c4c7f2b10';
+    const item = async (params: Record<string, string>, at: string, o: { status?: string; deleted?: boolean; feature?: string; userId?: string } = {}) => {
+      const id = await clip(o.userId ?? alice.id, { status: o.status, createdAt: at });
+      await pool.query(`update jobs set feature = $2, params = $3, deleted_at = case when $4 then now() end where id = $1`, [id, o.feature ?? 'name_swap', { resolution: '1K', ...params }, o.deleted ?? false]);
+      return id;
+    };
+    const max = await item({ name: 'Max', breed: 'Pug', batch }, '2026-11-19T01:00:00Z');
+    await item({ name: 'Bella', breed: 'Pug', batch }, '2026-11-19T01:00:01Z', { status: 'failed' }); // a failed one is part of the Run
+    await item({ name: 'Luna', breed: 'Pug', batch }, '2026-11-19T01:00:02Z', { deleted: true }); // a deleted one is not
+    await item({ name: 'Coco', batch: '0c8a7a0e-9d6e-4a54-8a39-6d1c4c7f2b11' }, '2026-11-19T01:00:03Z'); // another Run
+    await item({ style: 'oil', batch }, '2026-11-19T01:00:04Z', { feature: 'pet_portrait' }); // another app
+    await item({ name: 'Rex', batch }, '2026-11-19T01:00:05Z', { userId: bob.id }); // someone else's job
+    const own = (await (await detail(alice.cookie, max)).json()) as { name: string; breed: string; batchItems: unknown };
+    expect([own.name, own.breed]).toEqual(['Max', 'Pug']);
+    expect(own.batchItems).toEqual([
+      { view: null, breed: 'Pug', style: null, product: null, name: 'Max' },
+      { view: null, breed: 'Pug', style: null, product: null, name: 'Bella' },
+    ]);
+    expect(await (await detail(bob.cookie, max)).json()).toMatchObject({ name: 'Max', breed: 'Pug', batchItems: null });
+    expect(await (await detail(admin.cookie, max)).json()).toMatchObject({ batchItems: null });
   });
 
   test('leaves out a store that is hidden now, hides a job that is not a clip from other Members but not from its owner or an Admin, and 404s a deleted one', async () => {

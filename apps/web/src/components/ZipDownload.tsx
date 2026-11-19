@@ -15,6 +15,7 @@ export function useZipDownload({ hover = false, actions }: { hover?: boolean; ac
   bar: ReactNode;
   check: (id: string, label: string) => ReactNode;
   flip: (id: string) => void;
+  pickMany: (many: string[]) => void;
 } {
   const [on, setOn] = useState(false);
   const [ids, setIds] = useState<string[]>([]);
@@ -90,5 +91,7 @@ export function useZipDownload({ hover = false, actions }: { hover?: boolean; ac
         </label>
       ),
     flip: (id) => pick(id, !ids.includes(id)),
+    // Several at once (History's "Chọn cả lô"): the checkboxes show, and the ones already picked stay.
+    pickMany: (many) => (setProblem(''), setOn(true), setIds((cur) => [...new Set([...cur, ...many])].slice(0, MAX))),
   };
 }

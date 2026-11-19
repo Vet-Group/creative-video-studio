@@ -8,6 +8,7 @@ import { api, ApiError, type Clip, sendJson, thumbUrl } from '@/lib/api';
 import { asExample, dropRefillQuery, exampleFrom, lostInputs, nothingNote, nothingRefilled, refillFrom, reuseHref, type Skipped, skippedNote } from '@/lib/reuse';
 import { NARROW, useMediaQuery, WIDE } from '@/lib/use-media-query';
 import { numberedSamples } from '@/lib/examples';
+import type { BatchItem } from '@/lib/apps';
 import { PRODUCT_TYPES } from '@/lib/product-types';
 import { decodeOptimizerImage, optimizeImage } from '@/lib/media-optimizer';
 import { useFashionModels } from '@/lib/use-fashion-models';
@@ -187,8 +188,14 @@ export interface ReuseJob {
   orientation?: string | null;
   /** The multi-angle app's view. */
   view?: string | null;
-  /** The breed swap app's breed. */
+  /** The breed swap app's breed (and the name swap app's). */
   breed?: string | null;
+  /** The pet portrait app's style, the mockup pack's product and the name swap app's name. */
+  style?: string | null;
+  product?: string | null;
+  name?: string | null;
+  /** The item of every job of the creator's batch Run (lib/apps.ts BATCH_FEATURES), which Reuse picks all again; null for any other job. */
+  batchItems?: BatchItem[] | null;
 }
 
 /** Refill (`reuse` is a job's or a saved template's API path, lib/reuse.ts): reads it and hands it to `fill` when it is of `feature`; `fail` otherwise. Everything stays editable.
