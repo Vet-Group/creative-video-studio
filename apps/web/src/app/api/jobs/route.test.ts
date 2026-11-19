@@ -729,7 +729,8 @@ describe('POST /api/jobs for an image feature', () => {
       expect([ok.status, ok.job]).toEqual([201, { feature: 'multi_angle', model: 'app-angles', prompt: FEATURE_PROMPTS.multi_angle, aspect: 'auto', params: { resolution: '1K', view: 'back' } }]);
     });
 
-    test('the breed swap app takes one picture and one known breed per job, with exactly the prompt that breed makes, kept with the job', async () => {
+    // Nine members, each created and signed in (two password hashes): near the 5 s default on a CI runner.
+    test('the breed swap app takes one picture and one known breed per job, with exactly the prompt that breed makes, kept with the job', { timeout: 30_000 }, async () => {
       const pug = { prompt: breedSwapPrompt('Pug'), params: { resolution: '1K', breed: 'Pug' } };
       expect((await app('breed_swap', 1, { prompt: breedSwapPrompt('Pug') })).error).toMatch(/^params.breed must be one of Golden Retriever, /);
       expect((await app('breed_swap', 1, { ...pug, params: { resolution: '1K', breed: 'Wolf' } })).error).toMatch(/^params.breed must be one of /);
