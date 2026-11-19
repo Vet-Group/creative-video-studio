@@ -82,6 +82,26 @@ test('Try On: a template saved without a model photo puts the garment and the ba
   await expect(page.getByText('ảnh đầu vào (đã bị xoá)')).toHaveCount(0); // the empty model slot is no lost photo
 });
 
+test('Unboxing: a template saved without a product photo is kept, and puts the model and the box back in their own slots', async ({ page }) => {
+  await signIn(page, 'tplunbox');
+  await page.goto('/marketing-studio/unboxing');
+  await page.getByLabel('Ảnh người mẫu').setInputFiles(file('model.png'));
+  await expect(page.getByRole('img', { name: 'model.png' })).toBeVisible();
+  await page.getByLabel('Ảnh bao bì').setInputFiles(file('box.png'));
+  await expect(page.getByRole('img', { name: 'box.png' })).toBeVisible();
+  await saveAs(page, 'Không sản phẩm');
+
+  await page.goto('/marketing-studio/unboxing');
+  await openTemplates(page);
+  await page.getByRole('dialog', { name: 'Thiết lập đã lưu' }).getByRole('link', { name: 'Không sản phẩm' }).click();
+  await expect(page.getByRole('img', { name: 'model.png' })).toBeVisible();
+  await expect(page.getByRole('img', { name: 'box.png' })).toBeVisible();
+  await expect(page.getByLabel(/^Người mẫu.*: ảnh đã chọn$/).getByRole('img')).toHaveAttribute('alt', 'model.png');
+  await expect(page.getByLabel(/^Bao bì.*: ảnh đã chọn$/).getByRole('img')).toHaveAttribute('alt', 'box.png');
+  await expect(page.getByLabel(/^Sản phẩm.*: ảnh đã chọn$/)).toHaveCount(0);
+  await expect(page.getByText('ảnh đầu vào (đã bị xoá)')).toHaveCount(0); // the empty product slot is no lost photo
+});
+
 test("Create: a template saved to the store chosen on the form is listed, tagged with the store, to another member who picks that store, and applies there with the author's photo, which that member's Run takes", async ({ page, browser }) => {
   await signIn(page, 'stpla');
   await page.goto('/create');
