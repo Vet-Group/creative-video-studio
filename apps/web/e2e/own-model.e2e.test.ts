@@ -49,4 +49,16 @@ test('creates a model inside the Try On model picker, fills the slot and lists i
   await page.getByRole('button', { name: 'Tải lên Người mẫu' }).click();
   await expect(picker.getByRole('heading', { name: 'Người mẫu AI' })).toBeVisible();
   await expect(picker.getByRole('button', { name: `Dùng người mẫu AI ${name}` })).toBeVisible();
+
+  // Closing the picker mid-run still saves the model, says so in a note, and leaves the slot empty.
+  await create.click();
+  await expect(run).toBeEnabled();
+  await run.click();
+  await page.keyboard.press('Escape');
+  await expect(form).toBeHidden();
+  const second = 'Nữ · 26-40 tuổi · Việt Nam / Đông Nam Á';
+  await expect(page.getByRole('region', { name: 'Thông báo' }).getByText(`Đã lưu người mẫu ${second} vào Người mẫu AI`)).toBeVisible({ timeout: 90_000 });
+  await expect(page.getByRole('list', { name: 'Người mẫu: ảnh đã chọn' })).toHaveCount(0);
+  const both = (await (await page.request.get('/api/fashion-models')).json()) as { models: { name: string }[] };
+  expect(both.models.map((m) => m.name).sort()).toEqual([name, second].sort());
 });

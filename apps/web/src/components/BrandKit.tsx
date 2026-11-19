@@ -44,7 +44,7 @@ export function BrandKitForm({ store, onClose, onSaved }: { store: BrandStore | 
   }
 
   return (
-    <Modal open={store !== null} onClose={onClose} label="Bộ nhận diện" className="choice-dialog">
+    <Modal open={store !== null} onClose={onClose} label="Bộ nhận diện" className="choice-dialog brand-kit">
       <h2>Bộ nhận diện{store && `: ${store.name}`}</h2>
       <p className="help">Khi bật &quot;Dùng bộ nhận diện&quot; ở Marketing Studio hoặc Tạo ảnh, phong cách và màu của cửa hàng được thêm vào prompt gửi đi. Khẩu hiệu chỉ dùng khi prompt yêu cầu chữ trên ảnh.</p>
       <label className="field-label" htmlFor={`${id}-voice`}>

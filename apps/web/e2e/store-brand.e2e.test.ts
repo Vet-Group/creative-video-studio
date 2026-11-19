@@ -14,6 +14,10 @@ test('an editor fills a store brand kit, and a member run with the switch on sto
   await expect(brand).toBeDisabled(); // no kit yet
   await page.getByRole('button', { name: 'Bộ nhận diện', exact: true }).click();
   const form = page.getByRole('dialog', { name: 'Bộ nhận diện' });
+  // The style box takes the page's font and the text inputs' width, not the browser's monospace default.
+  const style = form.getByLabel('Phong cách thương hiệu');
+  expect(await style.evaluate((e) => getComputedStyle(e).fontFamily)).toBe(await page.evaluate(() => getComputedStyle(document.body).fontFamily));
+  expect((await style.boundingBox())!.width).toBe((await form.getByLabel('Khẩu hiệu hoặc lời kêu gọi').boundingBox())!.width);
   await form.getByLabel('Phong cách thương hiệu').fill('Minimal, warm, natural light');
   await form.getByLabel('Màu thương hiệu (mã hex, cách nhau bằng dấu phẩy)').fill('#c8102e, #FFFFFF');
   await form.getByLabel('Khẩu hiệu hoặc lời kêu gọi').fill('Mặc là đẹp');
