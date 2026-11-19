@@ -362,6 +362,14 @@ main:focus { outline: none; } /* focus lands here from the skip link; it is not 
   .account-menu button { min-height: 44px; }
   .account-hint { display: none; } /* no keyboard to press it on */
 }
+/* The workspace switcher under the brand (Shell.tsx), for a user in two or more workspaces: the house select, a full touch target on a touch screen. */
+.ws-switch .field { margin: 0; padding: 0 4px; }
+.ws-switch .field-label { padding-left: 8px; color: var(--text-muted); font-size: 12px; line-height: 16px; }
+.ws-switch .select-trigger { background: var(--surface); border-color: var(--border); }
+@media (pointer: coarse), (max-width: 1023.98px) {
+  .ws-switch .select-trigger { height: 44px; }
+  .ws-switch .select-pop li { min-height: 44px; }
+}
 .menu-button { display: grid; place-items: center; flex: none; width: 44px; height: 44px; margin-right: -4px; padding: 0; border: 0; border-radius: 10px; background: transparent; color: var(--ink); } /* a full touch target; the margin keeps the title at x=52 */
 .menu-button:hover { background: var(--fill); }
 .content { min-width: 0; }
@@ -396,6 +404,7 @@ main:focus { outline: none; } /* focus lands here from the skip link; it is not 
   .app[data-collapsed='true'] .account-chip { justify-content: center; padding: 8px 0; }
   .app[data-collapsed='true'] :is(.account-who, .account-chevron) { display: none; }
   .app[data-collapsed='true'] .account-menu { right: auto; width: 240px; }
+  .app[data-collapsed='true'] .ws-switch { display: none; } /* the rail has no room for a name: expand it to switch */
 }
 @media (prefers-reduced-motion: reduce) {
   .sidebar, .scrim { transition: none; }
@@ -941,6 +950,13 @@ td code { white-space: pre-wrap; overflow-wrap: anywhere; }
 .admin .sign-ins li { padding: 0 8px; border-radius: 999px; background: var(--fill); color: var(--text-2); font-size: 12px; line-height: 22px; white-space: nowrap; }
 .admin .sign-ins .sign-in-2fa { background: var(--cat-utility-bg); color: var(--cat-utility-fg); font-weight: 600; }
 .admin td.row-end { width: 1%; text-align: right; }
+.admin .owners { margin: 0; padding: 0; list-style: none; }
+.admin td .tag { margin-left: 6px; }
+/* A new account's temporary password (WorkspaceMembers.tsx), shown once to copy. */
+.admin .temp-password { display: grid; gap: 8px; margin: 0 0 16px; padding: 12px 16px; }
+.admin .temp-password p { margin: 0; overflow-wrap: anywhere; }
+.admin .temp-password code { font-family: ui-monospace, Consolas, monospace; font-size: 15px; user-select: all; }
+.admin .temp-password .actions { margin: 0; }
 @media (max-width: 640px) {
   .admin .users.mobile-records tr { position: relative; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 12px; }
   .admin .users.mobile-records td { padding: 0; }

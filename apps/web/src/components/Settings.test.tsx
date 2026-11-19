@@ -18,6 +18,7 @@ const account: Account = {
   googleEnabled: false,
   larkEnabled: false,
   supportEmail: null,
+  company: true,
 };
 const render = (a: Partial<Account> = {}) => renderToStaticMarkup(<Settings open onClose={() => undefined} userName="Nguyễn Văn An" account={{ ...account, ...a }} />);
 
@@ -42,6 +43,13 @@ test('lists the sections in order with sign-out last, and the profile with team,
   expect(html).toContain('tháng 11/2026'); // 01:00 on 1 November in Vietnam
   expect(html).toContain('data-role="member">Thành viên</span>');
   expect(render({ isAdmin: true })).toContain('data-role="admin">Admin</span>');
+});
+
+test("a partner workspace's profile shows no team, which is the company's cost-centre label", () => {
+  const html = render({ company: false });
+  expect(html).not.toContain('Team Ảnh');
+  expect(html).not.toContain('<dt>Nhóm</dt>');
+  expect(html).toContain('tháng 11/2026');
 });
 
 test('the profile shows the picked avatar colour, the protection score and a way to each missing check', () => {

@@ -51,6 +51,9 @@ export function withWorkspace(init?: RequestInit): RequestInit | undefined {
   return { ...init, headers };
 }
 
+/** Dispatched on window when a write is refused because another tab switched the browser's workspace (409 workspace_changed); the shell offers a reload. */
+export const WORKSPACE_CHANGED_EVENT = 'cvs:workspace-changed';
+
 /** Fetches a route and returns its JSON. A 401 outside the login page sends the user there, to come back to this page after the sign-in; any other failure throws an ApiError carrying the server's message. */
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const sentAt = rotations;
@@ -58,6 +61,7 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const body = (await res.json().catch(() => null)) as (T & { error?: string; code?: string; estimateUsd?: string }) | null;
   const stale = rotating > 0 || sentAt !== rotations;
   if (res.status === 401 && !signingOut && !stale && window.location.pathname !== '/login') window.location.assign(loginFor(window.location.pathname + window.location.search));
+  if (res.status === 409 && body?.error === 'workspace_changed') window.dispatchEvent(new Event(WORKSPACE_CHANGED_EVENT));
   if (!res.ok) throw new ApiError(res.status, body?.error ?? `HTTP ${res.status}`, Number(res.headers.get('x-retry-after')) || null, body?.code ?? null, body?.estimateUsd ?? null);
   return body as T;
 }

@@ -22,6 +22,13 @@ test('the groups keep the order users know, and only an Admin gets the admin gro
   expect(navGroups(true).at(-1)!.label).toBe('Quản lý');
 });
 
+test("a partner workspace's owner gets the Members page in the management group, before an Admin's Quản trị", () => {
+  const manage = (admin: boolean, members: boolean) => navGroups(admin, 0, false, members).find((g) => g.label === 'Quản lý')?.items.map((i) => i.href);
+  expect(manage(false, false)).toBeUndefined();
+  expect(manage(false, true)).toEqual(['/members']);
+  expect(manage(true, true)).toEqual(['/members', '/admin/overview']);
+});
+
 test('the Phân tích item appears right after Tạo video only when the analysis feature is on', () => {
   const texts = (on: boolean) => navGroups(false, 0, on).flatMap((g) => g.items.map((i) => i.text));
   expect(texts(false)).not.toContain('Phân tích');

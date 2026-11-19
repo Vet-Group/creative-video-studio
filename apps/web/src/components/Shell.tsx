@@ -4,7 +4,7 @@ import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { type ComponentProps, createContext, type ReactNode, useCallback, useContext, useEffect, useId, useRef, useState } from 'react';
-import { api, errorText, type JobStatus, sendJson, thumbUrl, type TrayJob } from '@/lib/api';
+import { api, ApiError, errorText, type JobStatus, sendJson, thumbUrl, type TrayJob, WORKSPACE_CHANGED_EVENT } from '@/lib/api';
 import { appBySlug, VIEW_LABELS } from '@/lib/apps';
 import type { ChangeEntry } from '@/lib/changelog';
 import { CHANGELOG_SEEN_EVENT, loadSeen, unseenEntries } from '@/lib/changelog-seen';
@@ -27,6 +27,7 @@ import { EmptyArt } from './EmptyArt';
 import { Icon, type IconName } from './Icon';
 import { LarkLinkPrompt } from './LarkLinkPrompt';
 import { RatingPrompt } from './Rating';
+import { Select } from './Select';
 import { JobFailureNote, canRetry, isCanceled, canRetryOnTwin, twinRetryText } from './JobFailure';
 import { CancelAllQueued, CancelButton, elapsedLabel, providerQueueLabel, InputThumb, JobPrompt, JobsProvider, photoDrag, Recreate, resultHref, roleOf, toggleFullscreen, useForm, useJobs } from './jobs';
 import { LoadError } from './LoadError';
@@ -644,10 +645,58 @@ const PAGE_TITLES: [prefix: string, title: string][] = [
   ['/tutorials', 'Hướng dẫn'],
   ['/feedback', 'Góp ý'],
   ['/admin', 'Quản trị'],
+  ['/members', 'Thành viên'],
   ['/account', 'Phương thức đăng nhập'],
 ];
 
-export function Shell({ userId, userName, isAdmin, feedbackNew = 0, analyzeEnabled = false, account, larkPrompt = false, impersonating = false, changelog = [], initialCollapsed, children }: { userId: string; userName: string; isAdmin: boolean; feedbackNew?: number; analyzeEnabled?: boolean; account: Account; /** Show the once-a-day reminder to link Lark (lib/lark-prompt.ts). */ larkPrompt?: boolean; /** An Admin is signed in as this user (a session with impersonatedBy): shows the banner with the way out. */ impersonating?: boolean; /** The newest entries this user may read (lib/changelog-seen.ts), for the sidebar dot and the once-a-day popup. */ changelog?: ChangeEntry[]; initialCollapsed: boolean; children: ReactNode }) {
+/**
+ * The workspace switcher under the brand, for a user in two or more active workspaces (docs/WORKSPACES.md phase 3): marks the one this page acts in, and a
+ * pick sets the browser's workspace (POST /api/me/workspace, which checks the membership) and reloads the page in it.
+ */
+function WorkspaceSwitcher({ current, workspaces }: { current: string; workspaces: { id: string; name: string }[] }) {
+  const { notify } = useJobs();
+  async function pick(id: string) {
+    if (id === current) return;
+    try {
+      await api('/api/me/workspace', sendJson('POST', { workspaceId: id }));
+      window.location.reload();
+    } catch (e) {
+      // A tab another tab moved gets the reload dialog instead (WorkspaceChanged).
+      if (!(e instanceof ApiError && e.status === 409)) notify('Không chuyển được không gian làm việc. Hãy thử lại.');
+    }
+  }
+  return (
+    <div className="ws-switch">
+      <Select label="Không gian làm việc" icon="team" heading="Chuyển không gian làm việc" value={current} options={workspaces.map((w) => ({ value: w.id, label: w.name }))} onChange={(id) => void pick(id)} />
+    </div>
+  );
+}
+
+/** A write this tab sent was refused because another tab switched the browser to another workspace (409 workspace_changed): offers the reload. */
+function WorkspaceChanged() {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const show = () => setOpen(true);
+    window.addEventListener(WORKSPACE_CHANGED_EVENT, show);
+    return () => window.removeEventListener(WORKSPACE_CHANGED_EVENT, show);
+  }, []);
+  return (
+    <Modal open={open} onClose={() => setOpen(false)} label="Đã đổi không gian làm việc" className="confirm">
+      <h2>Đã đổi không gian làm việc</h2>
+      <p>Bạn vừa chuyển sang không gian làm việc khác ở một tab khác, nên thao tác vừa rồi ở tab này chưa được lưu. Tải lại trang để làm tiếp trong không gian đang chọn.</p>
+      <div className="actions">
+        <button type="button" onClick={() => setOpen(false)}>
+          Để sau
+        </button>
+        <button type="button" className="primary" onClick={() => window.location.reload()}>
+          Tải lại trang
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+export function Shell({ userId, userName, isAdmin, workspace, workspaces = [], feedbackNew = 0, analyzeEnabled = false, account, larkPrompt = false, impersonating = false, changelog = [], initialCollapsed, children }: { userId: string; userName: string; isAdmin: boolean; /** The workspace this page acts in: `owner` of it, `company` when it is the company's (a partner's hides company-only surfaces). */ workspace: { id: string; owner: boolean; company: boolean }; /** The user's active workspaces, for the switcher. */ workspaces?: { id: string; name: string }[]; feedbackNew?: number; analyzeEnabled?: boolean; account: Account; /** Show the once-a-day reminder to link Lark (lib/lark-prompt.ts). */ larkPrompt?: boolean; /** An Admin is signed in as this user (a session with impersonatedBy): shows the banner with the way out. */ impersonating?: boolean; /** The newest entries this user may read (lib/changelog-seen.ts), for the sidebar dot and the once-a-day popup. */ changelog?: ChangeEntry[]; initialCollapsed: boolean; children: ReactNode }) {
   const pathname = usePathname();
   const narrow = useMediaQuery(NARROW);
   const [open, setOpen] = useState(false); // the drawer, below 1024 px
@@ -764,8 +813,9 @@ export function Shell({ userId, userName, isAdmin, feedbackNew = 0, analyzeEnabl
                   <Icon name="x" size={16} />
                 </button>
               </div>
+              {workspaces.length > 1 && <WorkspaceSwitcher current={workspace.id} workspaces={workspaces} />}
               <nav aria-label="Điều hướng chính" data-hint-off={hintOff || undefined} onKeyDown={(e) => e.key === 'Escape' && setHintOff(true)} onFocus={(e) => (setHintOff(false), placeHint(e.target))} onPointerOver={(e) => (hintOff && setHintOff(false), placeHint(e.target))}>
-                {navGroups(isAdmin, feedbackNew, analyzeEnabled).map((g, i) => (
+                {navGroups(isAdmin, feedbackNew, analyzeEnabled, workspace.owner && !workspace.company).map((g, i) => (
                   <div key={g.label ?? 'home'} className="nav-group" role={g.label ? 'group' : undefined} aria-labelledby={g.label ? `nav-group-${i}` : undefined}>
                     {g.label && (
                       <div className="nav-group-head">
@@ -797,7 +847,7 @@ export function Shell({ userId, userName, isAdmin, feedbackNew = 0, analyzeEnabl
                 {trayPage && <JobsButton open={jobsOpen} onOpen={() => setJobsOpen(true)} />}
                 {accountMenu('avatar')}
               </header>
-              {isAdmin && <FalLowNotice />}
+              {isAdmin && workspace.company && <FalLowNotice />}
               <ChangelogPopup entries={changelog} larkPrompt={larkPrompt} />
               {larkPrompt && <LarkLinkPrompt />}
               {!impersonating && <RatingPrompt />}
@@ -811,6 +861,7 @@ export function Shell({ userId, userName, isAdmin, feedbackNew = 0, analyzeEnabl
           <ToolGuide open={guide} onClose={() => setGuide(false)} analyzeEnabled={analyzeEnabled} />
           <ConfirmHost />
           <TemplateBlanksHost />
+          <WorkspaceChanged />
         </OpenToolGuide>
       </AdminContext>
     </JobsProvider>

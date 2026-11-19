@@ -187,6 +187,7 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
   // A template editor's view of the picker: every preset, switched-off ones too, with what the edit form shows; null for a member.
   const [editable, setEditable] = useState<PresetRow[] | null>(null);
   const [canEdit, setCanEdit] = useState(false);
+  const [canPropose, setCanPropose] = useState(false); // proposals to the shared catalog are the company workspace's only
   const [draft, setDraft] = useState<PresetDraft | null>(null);
   const [pending, setPending] = useState<{ list: Proposal[]; count: number } | null>(null); // the proposals waiting for an editor
   const [reviewing, setReviewing] = useState(false);
@@ -276,11 +277,12 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
   }
 
   /** Takes a GET /api/presets answer: the enabled presets to pick from and, for a template editor, all of them. */
-  const takePresets = (r: { presets: PresetRow[]; canEdit: boolean }) => {
+  const takePresets = (r: { presets: PresetRow[]; canEdit: boolean; canPropose?: boolean }) => {
     const enabled = r.presets.filter((p) => p.enabled !== false);
     setPresets(enabled);
     setEditable(r.canEdit ? r.presets : null);
     setCanEdit(r.canEdit);
+    setCanPropose(r.canPropose === true);
     return enabled;
   };
   // The enabled presets the Admin set up; as on the live form, it starts on a free prompt unless Explore links to a preset.
@@ -1139,10 +1141,12 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
                     </button>
                   )}
                   {/* After the name, so the picker's buttons still read name first; it sits above the name's card-wide click area. */}
-                  <button type="button" className="preset-edit" aria-label={canEdit ? `Sửa mẫu ${p.label}` : `Đề xuất sửa mẫu ${p.label}`} onClick={() => setDraft({ preset: p, propose: !canEdit })}>
-                    <Icon name="edit" size={12} />
-                    <span>{canEdit ? 'Sửa' : 'Đề xuất sửa'}</span>
-                  </button>
+                  {(canEdit || canPropose) && (
+                    <button type="button" className="preset-edit" aria-label={canEdit ? `Sửa mẫu ${p.label}` : `Đề xuất sửa mẫu ${p.label}`} onClick={() => setDraft({ preset: p, propose: !canEdit })}>
+                      <Icon name="edit" size={12} />
+                      <span>{canEdit ? 'Sửa' : 'Đề xuất sửa'}</span>
+                    </button>
+                  )}
                 </li>
               );
             }}
@@ -1150,9 +1154,11 @@ export function CreateForm({ reuse, preset, model, image, seedPrompt }: { reuse?
         </ul>
         {/* Below the grid, so the first row keeps its place under the header. */}
         <div className="preset-actions">
-          <button type="button" className="link-button" onClick={() => setDraft({ preset: null, propose: !canEdit })}>
-            {canEdit ? 'Thêm mẫu' : 'Đề xuất mẫu mới'}
-          </button>
+          {(canEdit || canPropose) && (
+            <button type="button" className="link-button" onClick={() => setDraft({ preset: null, propose: !canEdit })}>
+              {canEdit ? 'Thêm mẫu' : 'Đề xuất mẫu mới'}
+            </button>
+          )}
           {canEdit && (
             <button type="button" className="link-button" onClick={() => setReviewing(true)}>
               Chờ duyệt ({pending?.count ?? 0})

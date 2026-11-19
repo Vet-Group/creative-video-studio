@@ -18,6 +18,7 @@ export function StylePicker({ value, onChange, onStyle }: { value: string; onCha
   const [styles, setStyles] = useState<PresetRow[] | null>(null); // the enabled styles, which a Run may use
   const [editable, setEditable] = useState<PresetRow[] | null>(null); // a template editor's view: switched-off styles too
   const [canEdit, setCanEdit] = useState(false);
+  const [canPropose, setCanPropose] = useState(false); // proposals to the shared catalog are the company workspace's only
   const [picking, setPicking] = useState(false);
   const [draft, setDraft] = useState<PresetDraft | null>(null);
   const [pending, setPending] = useState<{ list: Proposal[]; count: number } | null>(null);
@@ -25,11 +26,12 @@ export function StylePicker({ value, onChange, onStyle }: { value: string; onCha
   const have = useSamples();
 
   const load = () =>
-    api<{ presets: PresetRow[]; canEdit: boolean }>('/api/presets?feature=image').then(
+    api<{ presets: PresetRow[]; canEdit: boolean; canPropose: boolean }>('/api/presets?feature=image').then(
       (r) => {
         setStyles(r.presets.filter((p) => p.enabled !== false));
         setEditable(r.canEdit ? r.presets : null);
         setCanEdit(r.canEdit);
+        setCanPropose(r.canPropose === true);
       },
       () => setStyles([]),
     );
@@ -100,19 +102,23 @@ export function StylePicker({ value, onChange, onStyle }: { value: string; onCha
                       {p.label}
                     </button>
                   )}
-                  <button type="button" className="preset-edit" aria-label={canEdit ? `Sửa phong cách ${p.label}` : `Đề xuất sửa phong cách ${p.label}`} onClick={() => setDraft({ preset: p, propose: !canEdit })}>
-                    <Icon name="edit" size={12} />
-                    <span>{canEdit ? 'Sửa' : 'Đề xuất sửa'}</span>
-                  </button>
+                  {(canEdit || canPropose) && (
+                    <button type="button" className="preset-edit" aria-label={canEdit ? `Sửa phong cách ${p.label}` : `Đề xuất sửa phong cách ${p.label}`} onClick={() => setDraft({ preset: p, propose: !canEdit })}>
+                      <Icon name="edit" size={12} />
+                      <span>{canEdit ? 'Sửa' : 'Đề xuất sửa'}</span>
+                    </button>
+                  )}
                 </li>
               );
             }}
           />
         </ul>
         <div className="preset-actions">
-          <button type="button" className="link-button" onClick={() => setDraft({ preset: null, propose: !canEdit })}>
-            {canEdit ? 'Thêm phong cách' : 'Đề xuất phong cách mới'}
-          </button>
+          {(canEdit || canPropose) && (
+            <button type="button" className="link-button" onClick={() => setDraft({ preset: null, propose: !canEdit })}>
+              {canEdit ? 'Thêm phong cách' : 'Đề xuất phong cách mới'}
+            </button>
+          )}
           {canEdit && (
             <button type="button" className="link-button" onClick={() => setReviewing(true)}>
               Chờ duyệt ({pending?.count ?? 0})
