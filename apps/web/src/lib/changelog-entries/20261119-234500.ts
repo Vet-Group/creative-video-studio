@@ -1,0 +1,3 @@
+import type { ChangeEntry } from '../changelog';
+
+export default { at: '2026-11-19T23:45:00+07:00', kind: 'improved', title: 'Khung hình cuối ở Tạo video: một chạm làm video lặp, xem trước Đầu → Cuối', details: ['Nút "Dùng ảnh đầu làm khung cuối (video lặp)" lấy ngay ảnh sản phẩm đầu tiên làm khung hình cuối, để clip kết thúc đúng ở cảnh mở đầu và lặp liền mạch. Bấm lần nữa để bỏ.', 'Khi đã có khung hình cuối, một dải nhỏ "Đầu → Cuối" cho thấy clip đi từ ảnh đầu tới khung cuối, nên dễ hình dung chuyển cảnh trước khi tạo.', 'Mô hình không nhận khung hình cuối giờ ghi rõ điều đó ngay chỗ ô ảnh, kèm nút "Chọn mô hình khác". Mô hình không tự đổi, vì giá đổi theo mô hình.'], href: '/create', prs: [572], audience: 'all' } satisfies ChangeEntry;
