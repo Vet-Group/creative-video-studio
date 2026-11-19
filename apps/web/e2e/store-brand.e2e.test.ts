@@ -35,10 +35,14 @@ test('an editor fills a store brand kit, and a member run with the switch on sto
   await expect(page.getByRole('button', { name: 'Bộ nhận diện', exact: true })).toHaveCount(0); // only an editor or an Admin edits a kit
   await brand.click();
   await expect(brand).toHaveAttribute('aria-pressed', 'true');
-  const card = page.locator('.form-card');
+  const card = page.locator('.imagebar');
   await card.getByRole('textbox', { name: 'Mô tả', exact: true }).fill('a linen shirt on a chair');
   // the prompt preview shows the brand block the server adds, and that Enhance (on by default) rewrites it before the model gets it.
   const preview = card.locator('.prompt-preview');
+  // Folded in the prompt bar, so the bar does not grow with each word; a click opens it.
+  await expect(preview).not.toHaveAttribute('open');
+  await preview.locator('summary').click();
+  await expect(preview).toHaveAttribute('open');
   await expect(preview.locator('p')).toContainText('a linen shirt on a chair Brand style: Minimal, warm, natural light.');
   await expect(preview).toContainText('Cải thiện đang bật');
   const shown = await preview.locator('p').innerText();

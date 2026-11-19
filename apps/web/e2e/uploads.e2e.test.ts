@@ -74,7 +74,7 @@ test('an upload carries the store chosen on its page, and the picker opens on th
   await page.getByLabel('Ảnh sản phẩm').setInputFiles({ name: onA, mimeType: 'image/png', buffer: png() });
   await expect(page.getByLabel('Ảnh đã chọn').getByRole('img', { name: onA })).toBeVisible();
 
-  // Image Generation with store B, from the store picker above the tabs.
+  // Image Generation with store B, from the store picker in the prompt bar.
   await page.goto('/image-generation');
   await expect(page.getByLabel('Ảnh tham chiếu', { exact: true })).toBeEnabled();
   await selectText(page, store, 'E2E Brand Shop');

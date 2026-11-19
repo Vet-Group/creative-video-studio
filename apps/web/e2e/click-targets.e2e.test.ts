@@ -113,6 +113,7 @@ test('an image result opens full screen from the picture in History, and an imag
       const [out, preview] = [done.outputAssetId, done.posterAssetId];
       expect(preview).not.toBeNull();
       await addExamples(browser, [id]); // Examples lists a result only once an Admin put it there
+      await page.setViewportSize({ width: 1440, height: 1000 }); // tall enough that the picture's middle is above the prompt bar at the foot of the screen
       await page.goto('/image-generation');
       await openTab(page, 'Lịch sử');
       // The card shows the small preview; full screen shows the original.

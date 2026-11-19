@@ -67,6 +67,18 @@
 .compact { position: static; }
 /* There the list still floats over the bar at the foot of the page, scrolling inside a taller box. */
 .compact .popover { position: absolute; bottom: calc(100% + 6px); left: 0; right: 0; z-index: 40; max-height: min(480px, 60vh); overflow-y: auto; margin: 0; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); box-shadow: 0 12px 32px rgb(var(--shade) / .16); }
+/* Image Generation's prompt bar (globals.css .imagebar): the name is for screen readers, the box starts one line tall and grows with the words, and the meta row keeps its line,
+   so focusing the box does not lift the bar. Docked at the foot of a wide screen, the lists float above the box instead of growing the bar over the page. */
+:global(.imagebar) .head { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+:global(.imagebar) .input { min-height: 40px; max-height: 30vh; }
+:global(.imagebar) .composer:not(:focus-within) .meta:not(:has(.count)) { display: flex; }
+@media (pointer: coarse) {
+  :global(.imagebar) .tool, :global(.imagebar) .starter, :global(.imagebar) .toolbar > :global(.enhance) { height: 44px; }
+  :global(.imagebar) .iconTool { width: 44px; }
+}
+@media (min-width: 1024px) {
+  :global(.imagebar) .popover { position: absolute; bottom: calc(100% + 6px); left: 0; right: 0; z-index: 40; max-height: min(480px, 60vh); overflow-y: auto; margin: 0; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); box-shadow: 0 12px 32px rgb(var(--shade) / .16); }
+}
 /* Phones: the tools and the starter pills take a 44 px tap through an invisible ::after. The toolbar's padding and the strip's padding hold it,
    so it neither reaches another control (a wrapped toolbar row keeps 12 px apart) nor is clipped by the scrolling strip. */
 @media (max-width: 480px) {

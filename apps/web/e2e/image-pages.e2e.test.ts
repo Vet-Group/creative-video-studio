@@ -324,7 +324,7 @@ test('Image Generation: the form counts the prompt near the model limit, and a s
   await page.setViewportSize({ width: 1440, height: 1000 });
   await signIn(page, 'imgp');
   await page.goto('/image-generation');
-  const form = page.locator('.form-card');
+  const form = page.locator('.imagebar');
   const run = form.getByRole('button', { name: /^Tạo ảnh/ });
   const prompt = form.getByRole('textbox', { name: 'Mô tả', exact: true });
   const count = form.locator('.prompt-count'); // the prompt box's own count, as on Try On and Create video; nothing repeats it over Run
@@ -358,7 +358,7 @@ test('Image Generation: the form needs a prompt (and an image only on a model wi
   await expect(page).toHaveURL(/\/image-generation$/);
   await expect(page.getByRole('tab', { name: 'Ví dụ' })).toHaveAttribute('aria-selected', 'true');
 
-  const form = page.locator('.form-card');
+  const form = page.locator('.imagebar');
   const run = form.getByRole('button', { name: /^Tạo ảnh/ });
   const reason = form.locator('.form-message').getByRole('status');
   await expect(modelButton(page)).toContainText('Mock image E2E');
@@ -470,7 +470,7 @@ test('Image Generation, as Fash text-to-image: words alone make a picture on a m
   await page.setViewportSize({ width: 1440, height: 1000 });
   await signIn(page, 'member10');
   await page.goto('/image-generation');
-  const form = page.locator('.form-card');
+  const form = page.locator('.imagebar');
   await form.getByRole('textbox', { name: 'Mô tả', exact: true }).fill('a linen dress on a sunny balcony');
   await form.getByRole('button', { name: /^Tạo ảnh/ }).click();
   await page.getByRole('tab', { name: 'Lịch sử' }).click();
@@ -495,7 +495,7 @@ test('Image Generation: with words alone on a model that needs an image, one cli
   });
   await signIn(page, 'member10');
   await page.goto('/image-generation');
-  const form = page.locator('.form-card');
+  const form = page.locator('.imagebar');
   await expect(modelButton(page)).toContainText('Mock image E2E');
   await expect(form.locator('.form-message').getByRole('status')).toHaveText('Mô hình này cần ít nhất 1 ảnh tham chiếu.');
   await form.getByRole('button', { name: 'Dùng Mock image Solo' }).click(); // not switched silently: the member picks it
@@ -509,7 +509,7 @@ test('Image Generation: a cap refusal shows its message in Vietnamese', async ({
   await signIn(page, 'member10');
   await page.route(/\/api\/jobs$/, (r) => (r.request().method() === 'POST' ? r.fulfill({ status: 429, json: { error: 'Bạn đã dùng hết hạn mức chi phí hôm nay' } }) : r.fallback()));
   await page.goto('/image-generation');
-  const form = page.locator('.form-card');
+  const form = page.locator('.imagebar');
   await expect(form.getByLabel('Ảnh tham chiếu', { exact: true })).toBeEnabled(); // a fresh load: the input is disabled until hydration
   await form.getByLabel('Ảnh tham chiếu', { exact: true }).setInputFiles(file('reference.png'));
   await form.getByRole('textbox', { name: 'Mô tả', exact: true }).fill('a bottle');
@@ -517,7 +517,7 @@ test('Image Generation: a cap refusal shows its message in Vietnamese', async ({
   await expect(form.getByRole('alert')).toHaveText('Bạn đã dùng hết hạn mức chi phí hôm nay');
 });
 
-test('geometry at 1440: the Try On card is 360 wide at x=288, and Image Generation has the same card, pinned while its gallery scrolls beside it', async ({ page, browser }) => {
+test("geometry at 1440: the Try On card is 360 wide at x=288, and Image Generation's prompt bar floats 880 wide at the foot of the screen over its full-width gallery, whose last row ends above it", async ({ page, browser }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await signIn(page, 'member11');
   // Ten images from the mock model, put on Ví dụ below, so the gallery is taller than the screen. Two each from five members: the queue runs two
@@ -573,22 +573,26 @@ test('geometry at 1440: the Try On card is 360 wide at x=288, and Image Generati
   const gallery = page.getByRole('group', { name: 'Ảnh của công ty' });
   await expect(gallery.getByRole('img').first()).toBeVisible();
   await expect.poll(() => gallery.getByRole('img').first().evaluate((i: HTMLImageElement) => i.complete && i.naturalWidth > 0)).toBe(true); // decoded, not just in the DOM
-  // The left-column card of Try On, at the same place and size.
-  const form = page.locator('.form-card');
-  const f = await box(form);
-  near(f.x, c.x, 'image card x');
-  near(f.y, c.y, 'image card y');
-  near(f.width, c.width, 'image card width');
-  near(f.height, c.height, 'image card height');
-  expect(await form.evaluate((el) => getComputedStyle(el).borderTopLeftRadius)).toBe('24px');
-  near((await box(page.locator('.runbar'))).height, 73, 'image run wrapper height');
-  // The card is pinned while the gallery scrolls, and no tile ever sits under it; at the end of the page the last row is on screen.
+  // No left-column card: Fash's prompt bar, 880 wide and centred on the page's column (x 288 to 1392), 24 px off the foot of the screen, under tabs centred on the same column.
+  await expect(page.locator('.form-card')).toHaveCount(0);
+  const bar = page.locator('.imagebar');
+  const f = await box(bar);
+  near(f.width, 880, 'bar width');
+  near(f.x + f.width / 2, 288 + 1104 / 2, 'bar centre');
+  near(f.y + f.height, 1000 - 24, 'bar bottom');
+  expect(await bar.evaluate((el) => getComputedStyle(el).borderTopLeftRadius)).toBe('24px');
+  const imageTabs = await box(page.getByRole('tablist'));
+  near(imageTabs.x + imageTabs.width / 2, 288 + 1104 / 2, 'tabs centre');
+  // The bar is pinned while the gallery scrolls under it; at the end of the page the gallery spans the column and its last row is on screen above the bar.
   await page.evaluate(() => window.scrollTo(0, 400));
-  near((await box(form)).y, c.y, 'pinned card y');
+  near((await box(bar)).y, f.y, 'pinned bar y');
   await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
-  const tiles = await page.locator('.gallery-item').evaluateAll((els) => els.map((e) => e.getBoundingClientRect()).map((r) => ({ left: r.left, bottom: r.bottom })));
-  expect(Math.min(...tiles.map((t) => t.left))).toBeGreaterThanOrEqual(f.x + f.width);
-  expect(Math.max(...tiles.map((t) => t.bottom))).toBeLessThanOrEqual(1000);
+  const end = await box(bar);
+  near(end.y + end.height, 1000 - 24, 'bar bottom at the end');
+  const tiles = await page.locator('.gallery-item').evaluateAll((els) => els.map((e) => e.getBoundingClientRect()).map((r) => ({ left: r.left, right: r.right, bottom: r.bottom })));
+  near(Math.min(...tiles.map((t) => t.left)), 288, 'gallery left');
+  expect(Math.max(...tiles.map((t) => t.right))).toBeLessThanOrEqual(1392 + 1);
+  expect(Math.max(...tiles.map((t) => t.bottom))).toBeLessThanOrEqual(end.y);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
@@ -607,13 +611,14 @@ for (const [width, height] of [[390, 844], [1024, 768], [1440, 1000]] as const) 
     }
 
     if (width === 390) {
-      // Both pages stack into the Create-style tabs with their Run button inside the screen, across the card, which has 16 px gutters.
+      // Both pages stack into the Create-style tabs with their Run button inside the screen, across the card, which has 16 px gutters; Image
+      // Generation's card is its prompt bar, whose Run spans the bar inside its 16 px padding and 1 px border.
       for (const [path, name] of [['/try-on', /^Thử đồ/], ['/image-generation', /^Tạo ảnh/]] as const) {
         await page.goto(path);
         await expect(page.getByRole('tab')).toHaveText(['Tạo', 'Lịch sử', 'Ví dụ', 'Giới thiệu']);
         const run = await box(page.getByRole('button', { name }));
         expect(run.y + run.height, path).toBeLessThanOrEqual(height);
-        near(run.width, 358, `${path} run width`, 1);
+        near(run.width, path === '/try-on' ? 358 : 358 - 2 * 17, `${path} run width`, 1);
       }
       // The model panel opens inside the screen.
       await modelButton(page).click();
@@ -913,7 +918,7 @@ test('an upload says why it failed: a wrong format or a file over 10 MB before a
   const posts: string[] = [];
   page.on('request', (r) => void (r.method() === 'POST' && new URL(r.url()).pathname === '/api/assets' && posts.push(r.url())));
   await page.goto('/image-generation');
-  const form = page.locator('.form-card');
+  const form = page.locator('.imagebar');
   const input = form.getByLabel('Ảnh tham chiếu', { exact: true });
   await expect(modelButton(page)).toContainText('Mock image E2E');
   await input.setInputFiles({ name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('hello') });

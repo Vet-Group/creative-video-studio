@@ -1,7 +1,7 @@
 'use client';
-// Image Generation: a settings card (reference images, style, model, prompt, ratio, resolution, Enhance, the brand kit) beside the History, Examples and
-// About tabs, laid out like Try On and Create. Run posts an image job.
-import { useId, useState } from 'react';
+// Image Generation: the History, Examples and About tabs take the full width, and a prompt bar (reference images, prompt, style, model, ratio,
+// resolution, Enhance, the brand kit, Run) floats at the foot of the screen over them, as on Fash. Below 1024 px the bar is the Create tab. Run posts an image job.
+import { type FocusEvent, useId, useRef, useState } from 'react';
 import { errorText } from '@/lib/api';
 import { type BrandKit, withBrand } from '@/lib/brand';
 import { promptTooLong } from '@/lib/prompt-limit';
@@ -26,6 +26,7 @@ import { PageHint } from './ToolGuide';
 
 type Tab = 'create' | 'history' | 'examples' | 'about';
 const TAB_LABEL: Record<Tab, string> = { create: 'Tạo', history: 'Lịch sử', examples: 'Ví dụ', about: 'Giới thiệu' };
+const NO_PROMPT = 'Nhập mô tả cảnh bạn muốn tạo.';
 
 export function ImageGeneration({ reuse, model }: { reuse?: string; model?: string }) {
   const { refresh, notify, loading } = useJobs();
@@ -44,6 +45,16 @@ export function ImageGeneration({ reuse, model }: { reuse?: string; model?: stri
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const promptId = useId();
+  const bar = useRef<HTMLDivElement>(null);
+  /** On a wide screen the bar floats over the pane: a card or link the keyboard moves to under it scrolls up into sight (WCAG 2.4.11). Not a page
+   * scroll padding, which also scrolled the page each time a control of the bar itself took focus. */
+  function unhide(e: FocusEvent<HTMLElement>) {
+    const t = e.target;
+    const top = bar.current?.getBoundingClientRect().top;
+    if (narrow || top === undefined || !t.matches(':focus-visible') || t.closest('dialog')) return;
+    const over = t.getBoundingClientRect().bottom - top;
+    if (over > 0) window.scrollBy(0, over + 16);
+  }
   const { models, failed } = useImageModels('image');
   const pick = useImageChoice(models, Math.max(1, images.length), model); // Explore's model card picks the model
   // The member's last model and settings, unless a refill or Explore's model card opens the page.
@@ -126,8 +137,10 @@ ${style.prompt}` : prompt.trim();
               : images.length > chosen.maxImages
                 ? `Mô hình này nhận tối đa ${chosen.maxImages} ảnh.`
                 : prompt.trim() === ''
-                  ? 'Nhập mô tả cảnh bạn muốn tạo.'
+                  ? NO_PROMPT
                   : promptTooLong(chosen, sent.length);
+  // While the page loads, and before a prompt (the box's placeholder asks for it), the reason is for screen readers and Run's description only, so the bar keeps its height.
+  const quiet = !recall.answered || models === null || reason === NO_PROMPT;
   const canRun = reason === null && !busy;
   // With no image and a model that needs one, the best model that makes pictures from words is one click away (not switched to silently: its price differs).
   const wordsModel = chosen && images.length === 0 && !chosen.textToImage ? models?.filter((m) => m.textToImage).sort((a, b) => b.score - a.score)[0] : undefined;
@@ -173,80 +186,88 @@ ${style.prompt}` : prompt.trim();
   const panel = shown === 'create' ? 'history' : shown;
 
   return (
-    <section aria-labelledby="imagegen-title" className="create">
+    <section aria-labelledby="imagegen-title" className="create imagegen">
       <h1 id="imagegen-title" className="sr-only">
         Tạo ảnh
       </h1>
-      <div className="create-grid">
-        <WorkTabs prefix="imagegen" tabs={tabs} labels={TAB_LABEL} shown={shown} onSelect={setTab} />
+      <PageHint href="/image-generation" />
+      <WorkTabs prefix="imagegen" tabs={tabs} labels={TAB_LABEL} shown={shown} onSelect={setTab} />
 
-        <div className="card form-card" id="imagegen-panel-create" role={narrow ? 'tabpanel' : undefined} aria-labelledby={narrow ? 'imagegen-tab-create' : undefined} hidden={narrow && shown !== 'create'} onPointerDownCapture={recall.touch} onKeyDownCapture={recall.touch}>
-          <div className="form-scroll">
-            <PageHint href="/image-generation" />
-            <Slot label="Ảnh tham chiếu" optional empty={`Tối đa ${max} ảnh tham chiếu`} inputLabel="Ảnh tham chiếu" images={images} max={max} busy={busy} onAdd={(files) => void upload(files)} onRemove={(id) => setImages((cur) => cur.filter((x) => x.id !== id))} onPick={(img) => setImages((cur) => (cur.length < max ? [...cur, img] : cur))} storeId={storeId} slot="image" />
-            {/* In a field for the form's spacing; the chip names itself, so it has no label above it. */}
-            <div className="field">
-              <StylePicker value={styleId} onChange={setStyleId} onStyle={setStyle} />
-            </div>
-            {models && models.length > 0 && <ModelPicker models={pick.options} value={pick.modelId} onChange={pick.setModelId} />}
+      <div className="side" id={`imagegen-panel-${panel}`} role="tabpanel" aria-labelledby={`imagegen-tab-${panel}`} hidden={narrow && shown === 'create'} onFocus={unhide}>
+        <FormContext.Provider value={{ recreate: (from, recipe) => (recall.touch(), recreate(from, recipe), narrow && setTab('create')), apply, photo: (p) => void take(p), has: (asset) => images.some((i) => i.id === asset), prompt: (text) => (setPrompt(text), notify('Đã chép mô tả')), result: (p) => void take(p) }}>
+          {shown === 'examples' ? <Gallery kind="image" samples="image-example-" label="Ảnh của công ty" emptyText="Chưa có ảnh nào trong công ty. Hãy tạo ảnh đầu tiên." /> : shown === 'about' ? <About page="image" /> : <Tray feature="image" />}
+        </FormContext.Provider>
+      </div>
 
-            <PromptComposer
-              id={promptId}
-              label="Mô tả"
-              feature="image"
-              value={prompt}
-              onChange={setPrompt}
-              maxLength={chosen?.maxPromptChars}
-              onRun={() => canRun && void run()}
-              placeholder="Mô tả cảnh bạn muốn tạo…"
-              ask={chosen ? () => ({ field: 'prompt', feature: 'image', text: prompt, room: chosen.maxPromptChars, model: chosen.id }) : null}
-            />
-            {prompt.trim() && <PromptPreview feature="image" prompts={[sent]} limit={chosen?.maxPromptChars} note={previewNote || undefined} />}
-
-            {models !== null && !failed && !chosen && <LockedFields />}
-            {chosen && (
-              <>
-                <Select label="Tỉ lệ" icon="ratio" heading="Chọn tỉ lệ" value={pick.ratio} options={chosen.ratios.map((r) => ({ value: r, label: RATIO_LABEL[r] ?? r }))} onChange={pick.setRatio} />
-                <Select label="Độ phân giải" icon="preset" heading="Chọn độ phân giải" value={pick.resolution} options={chosen.resolutions.map((r) => ({ value: r, label: r }))} onChange={pick.setResolution} />
-                {pick.thinking && <Select label="Mức suy luận" icon="sliders" heading="Chọn mức suy luận" value={pick.thinking} options={chosen.thinking.map((t) => ({ value: t, label: THINKING_LABEL[t] ?? t }))} onChange={pick.setThinking} />}
-              </>
-            )}
-            <EnhanceToggle on={enhance} onChange={setEnhance} />
-            <BrandPicker storeId={storeId} onStore={(v) => (recall.touch(), setStoreId(v))} on={useBrand} onToggle={(v) => (recall.touch(), setUseBrand(v))} onKit={setKit} />
-            <Templates feature="image" data={() => ({ images: images.map((i) => i.id), prompt: prompt.trim(), presetId: styleId, enhance, ratio: pick.ratio, resolution: pick.resolution, modelId: pick.modelId })} />
-          </div>
-
-          <div className="form-message">
-            {reason && (
-              <p className="help" id="imagegen-reason" role="status">
-                {reason}
-              </p>
-            )}
-            {wordsModel && (
-              <button type="button" className="link-button" onClick={() => pick.setModelId(wordsModel.id)}>
-                Dùng {wordsModel.label}
-              </button>
-            )}
-            {error && (
-              <p className="error" role="alert">
-                {error}
-              </p>
-            )}
-            {pick.note && <p className="help" role="status">{pick.note}</p>}
-            <FormNotice text={notice} onHistory={narrow ? () => setTab('history') : undefined} />
-          </div>
-          <div className="runbar">
-            <button type="button" className="primary run" disabled={!canRun} aria-describedby={reason ? 'imagegen-reason' : undefined} onClick={() => void run()}>
-              Tạo ảnh
-              {busy ? <span className="run-cost">· Đang gửi…</span> : pick.estimate !== undefined && <span className="run-cost">· ${pick.estimate}</span>}
-            </button>
-          </div>
+      {/* The prompt bar: the reference strip and the prompt, the settings chips with Run, then the brand kit, the sent prompt and saved settings. Below 1024 px it is the Create tab's card. */}
+      <div
+        ref={bar}
+        className="imagebar"
+        id="imagegen-panel-create"
+        role={narrow ? 'tabpanel' : 'group'}
+        aria-label={narrow ? undefined : 'Thanh tạo ảnh'}
+        aria-labelledby={narrow ? 'imagegen-tab-create' : undefined}
+        hidden={narrow && shown !== 'create'}
+        onPointerDownCapture={recall.touch}
+        onKeyDownCapture={recall.touch}
+      >
+        <div className="imagebar-top">
+          <Slot label="Ảnh tham chiếu" optional icon="plus" empty={`Tối đa ${max} ảnh tham chiếu`} inputLabel="Ảnh tham chiếu" images={images} max={max} busy={busy} onAdd={(files) => void upload(files)} onRemove={(id) => setImages((cur) => cur.filter((x) => x.id !== id))} onPick={(img) => setImages((cur) => (cur.length < max ? [...cur, img] : cur))} storeId={storeId} slot="image" />
+          <PromptComposer
+            id={promptId}
+            label="Mô tả"
+            feature="image"
+            value={prompt}
+            onChange={setPrompt}
+            maxLength={chosen?.maxPromptChars}
+            onRun={() => canRun && void run()}
+            placeholder="Mô tả cảnh bạn muốn tạo…"
+            ask={chosen ? () => ({ field: 'prompt', feature: 'image', text: prompt, room: chosen.maxPromptChars, model: chosen.id }) : null}
+            enhance={<EnhanceToggle on={enhance} onChange={setEnhance} />}
+          />
         </div>
 
-        <div className="side" id={`imagegen-panel-${panel}`} role="tabpanel" aria-labelledby={`imagegen-tab-${panel}`} hidden={narrow && shown === 'create'}>
-          <FormContext.Provider value={{ recreate: (from, recipe) => (recall.touch(), recreate(from, recipe), narrow && setTab('create')), apply, photo: (p) => void take(p), has: (asset) => images.some((i) => i.id === asset), prompt: (text) => (setPrompt(text), notify('Đã chép mô tả')), result: (p) => void take(p) }}>
-            {shown === 'examples' ? <Gallery kind="image" samples="image-example-" label="Ảnh của công ty" emptyText="Chưa có ảnh nào trong công ty. Hãy tạo ảnh đầu tiên." /> : shown === 'about' ? <About page="image" /> : <Tray feature="image" />}
-          </FormContext.Provider>
+        <div className="form-message">
+          {reason && (
+            <p className="help" id="imagegen-reason" role="status" data-quiet={quiet || undefined}>
+              {reason}
+            </p>
+          )}
+          {wordsModel && (
+            <button type="button" className="link-button" onClick={() => pick.setModelId(wordsModel.id)}>
+              Dùng {wordsModel.label}
+            </button>
+          )}
+          {error && (
+            <p className="error" role="alert">
+              {error}
+            </p>
+          )}
+          {pick.note && <p className="help" role="status">{pick.note}</p>}
+          <FormNotice text={notice} onHistory={narrow ? () => setTab('history') : undefined} />
+        </div>
+
+        <div className="imagebar-chips">
+          <StylePicker value={styleId} onChange={setStyleId} onStyle={setStyle} />
+          {models && models.length > 0 && <ModelPicker models={pick.options} value={pick.modelId} onChange={pick.setModelId} />}
+          {models !== null && !failed && !chosen && <LockedFields />}
+          {chosen && (
+            <>
+              <Select chip label="Tỉ lệ" icon="ratio" heading="Chọn tỉ lệ" value={pick.ratio} options={chosen.ratios.map((r) => ({ value: r, label: RATIO_LABEL[r] ?? r }))} onChange={pick.setRatio} />
+              <Select chip label="Độ phân giải" icon="preset" heading="Chọn độ phân giải" value={pick.resolution} options={chosen.resolutions.map((r) => ({ value: r, label: r }))} onChange={pick.setResolution} />
+              {pick.thinking && <Select chip label="Mức suy luận" icon="sliders" heading="Chọn mức suy luận" value={pick.thinking} options={chosen.thinking.map((t) => ({ value: t, label: THINKING_LABEL[t] ?? t }))} onChange={pick.setThinking} />}
+            </>
+          )}
+          <button type="button" className="primary run" disabled={!canRun} aria-describedby={reason ? 'imagegen-reason' : undefined} onClick={() => void run()}>
+            Tạo ảnh
+            {busy ? <span className="run-cost">· Đang gửi…</span> : pick.estimate !== undefined && <span className="run-cost">· ${pick.estimate}</span>}
+          </button>
+        </div>
+
+        <div className="imagebar-foot">
+          <BrandPicker storeId={storeId} onStore={(v) => (recall.touch(), setStoreId(v))} on={useBrand} onToggle={(v) => (recall.touch(), setUseBrand(v))} onKit={setKit} />
+          {prompt.trim() && <PromptPreview feature="image" prompts={[sent]} limit={chosen?.maxPromptChars} note={previewNote || undefined} folded />}
+          <Templates feature="image" data={() => ({ images: images.map((i) => i.id), prompt: prompt.trim(), presetId: styleId, enhance, ratio: pick.ratio, resolution: pick.resolution, modelId: pick.modelId })} />
         </div>
       </div>
     </section>

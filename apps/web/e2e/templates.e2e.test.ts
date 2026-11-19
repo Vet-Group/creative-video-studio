@@ -12,15 +12,20 @@ async function saveAs(page: Page, name: string) {
   await expect(page.getByRole('status').filter({ hasText: 'Đã lưu thiết lập.' })).toBeVisible();
 }
 
-test('on every form the template links scroll with the fields, and the fixed bar below holds only Run, as on the live page', async ({ page }) => {
+test('on every form the template links scroll with the fields, and the fixed bar below holds only Run, as on the live page; Image Generation has them in its prompt bar', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await signIn(page, 'tplpos');
-  for (const path of ['/create', '/try-on', '/image-generation', '/marketing-studio', '/apps/character-swap']) {
+  for (const path of ['/create', '/try-on', '/marketing-studio', '/apps/character-swap']) {
     await page.goto(path);
     await expect(page.getByRole('button', { name: 'Lưu thiết lập', exact: true })).toBeVisible();
     await expect(page.locator('.form-scroll > .templates'), path).toHaveCount(1);
     await expect(page.locator('.runbar').getByRole('button'), path).toHaveCount(1);
   }
+  // Image Generation has no form column: the links sit in the foot of its prompt bar, which holds one Run.
+  await page.goto('/image-generation');
+  await expect(page.getByRole('button', { name: 'Lưu thiết lập', exact: true })).toBeVisible();
+  await expect(page.locator('.imagebar-foot > .templates')).toHaveCount(1);
+  await expect(page.locator('.imagebar').getByRole('button', { name: /^Tạo ảnh/ })).toHaveCount(1);
 });
 
 test('Try On: a saved template lists under Thiết lập đã lưu and refills the person, garment, text and resolution; another member does not see it; it can be deleted', async ({ page, browser }) => {

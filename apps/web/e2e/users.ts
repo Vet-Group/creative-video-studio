@@ -205,6 +205,10 @@ export const USERS = {
   // workspaces-manage.e2e: the Admin who creates a partner workspace and adds a company member to it, who then switches between the two.
   wsadm: { email: 'wsadm@e2e.test', name: 'E2E WS Admin', role: 'admin' },
   wsboth: { email: 'wsboth@e2e.test', name: 'E2E WS Both', role: 'member' },
+  // image-prompt-bar.e2e: the prompt bar at 1440, at 390, and its axe scans.
+  pbara: { email: 'pbara@e2e.test', name: 'E2E Prompt Bar A', role: 'member' },
+  pbarb: { email: 'pbarb@e2e.test', name: 'E2E Prompt Bar B', role: 'member' },
+  pbarc: { email: 'pbarc@e2e.test', name: 'E2E Prompt Bar C', role: 'member' },
 } as const;
 
 export type UserKey = keyof typeof USERS;

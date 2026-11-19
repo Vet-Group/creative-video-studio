@@ -492,7 +492,7 @@ export const HistoryArtContext = createContext<ReactNode>(null);
 function HistoryEmpty({ feature }: { feature: string }) {
   const art = useContext(HistoryArtContext);
   const toForm = () => {
-    const form = document.querySelector<HTMLElement>('.form-card');
+    const form = document.querySelector<HTMLElement>('.form-card, .imagebar'); // Image Generation's form is its prompt bar
     if (!form) return;
     if (form.hidden) document.getElementById(form.getAttribute('aria-labelledby') ?? '')?.click();
     // After the tab has rendered the form.
