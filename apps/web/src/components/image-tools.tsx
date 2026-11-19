@@ -160,7 +160,7 @@ export interface ReuseJob {
   feature: string;
   /** A sample's details file (`?example=`) names its photos as samples; a job or a template has uploaded images. */
   images: (Img | { sample: string })[];
-  /** How many input images the job had (GET /api/jobs/:id; not a sample's or a template's), so the form can say how many no longer exist. */
+  /** How many input images the job had or the template saved (GET /api/jobs/:id and /api/templates/:id; not a sample's), so the form can say how many no longer exist. */
   inputCount?: number;
   /** The job's input ids in the order sent, a deleted one's too, so each image goes back to its own slot (alignInputs). */
   inputIds?: string[];
@@ -208,7 +208,7 @@ export function useReuse(reuse: string | undefined, feature: string, fill: (j: O
         if (stale) return; // superseded while the member filled the blanks
         if (!j) return dropRefillQuery(); // cancelled: the form stays as it is
         if (nothingRefilled(j)) {
-          notify(nothingNote(lostInputs(j))); // nothing to bring back: the form stays as it is
+          notify(nothingNote(lostInputs(j), reuse)); // nothing to bring back: the form stays as it is
           return dropRefillQuery();
         }
         // A sample's photos become this member's inputs first, copied on the server.

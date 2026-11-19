@@ -102,7 +102,7 @@ interface MarketingJob {
   feature: string;
   format: string | null;
   images: (Img | { sample: string })[];
-  /** How many input images the job had (not a sample's or a template's). */
+  /** How many input images the job had or the template saved (not a sample's). */
   inputCount?: number;
   /** The job's input ids in the order sent, a deleted one's too (alignInputs). */
   inputIds?: string[];
@@ -324,7 +324,7 @@ export function MarketingStudio({ format = 'ugc', reuse, recipe, wizardDefault =
         if (stale) return; // superseded while the member filled the blanks
         if (!j) return dropRefillQuery(); // cancelled: the form stays as it is
         if (nothingRefilled({ ...j, prompt: j.brief ?? j.hookText ?? j.ending ?? j.script })) {
-          notify(nothingNote(lostInputs(j))); // nothing to bring back: the form stays as it is
+          notify(nothingNote(lostInputs(j), reuse)); // nothing to bring back: the form stays as it is
           return dropRefillQuery();
         }
         // A sample's photos become this member's inputs first, copied on the server.

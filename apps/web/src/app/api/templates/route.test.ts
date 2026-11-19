@@ -3,7 +3,7 @@ import { randomBytes } from 'node:crypto';
 import { DeleteBucketCommand, DeleteObjectsCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { createTestDatabase } from '@cvs/db/testing';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
-import { tryOnSlots } from '@/lib/reuse';
+import { lostInputs, tryOnSlots } from '@/lib/reuse';
 
 const testDb = await createTestDatabase();
 process.env.DATABASE_URL = testDb.url;
@@ -234,6 +234,37 @@ describe('/api/templates', () => {
     expect(copy.inputIds).toEqual(['', ...copy.images.map((i) => i.id)]);
     expect(copy.inputIds).not.toContain(person);
     expect(tryOnSlots(copy.inputIds, copy.images, copy.garments)).toEqual({ person: [], garments: [copy.images[0]], background: [copy.images[1]] });
+  });
+
+  test('says how many photo places it saved (inputCount), so the form counts a photo deleted since as lost, to the author and to a member applying copies', async () => {
+    const [a, b] = [await newUser(), await newUser()];
+    await pool.query(`insert into stores (id, name, code, hidden) values ('st-lost', 'Shop L', 'STL', false)`);
+    const [first, second, third] = [`${a.id}-first`, `${a.id}-second`, `${a.id}-third`];
+    for (const id of [first, second, third]) {
+      await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) values ($1, $2, 'input', $1, 'x.png', 'image/png', 1)`, [id, a.id]);
+      await putObject(id, new Uint8Array([1]), 'image/png');
+    }
+    const { id } = (await (await save(a, { feature: 'image', name: 'Lost', data: { images: [first, second, third], prompt: 'p' }, storeId: 'st-lost' })).json()) as { id: string };
+    type Got = { images: unknown[]; inputCount: number };
+    const apply = async (u: User) => (await (await one(req(u, `/api/templates/${id}`), ctx(id))).json()) as Got;
+
+    // Every photo still there: nothing lost.
+    expect(await apply(a)).toMatchObject({ inputCount: 3, images: [{}, {}, {}] });
+    expect(lostInputs(await apply(b))).toBe(0);
+
+    // The first photo deleted after the save: three places still, two photos back, one lost.
+    await pool.query('update assets set deleted_at = now() where id = $1', [first]);
+    for (const u of [a, b]) {
+      const got = await apply(u);
+      expect([got.inputCount, got.images.length, lostInputs(got)]).toEqual([3, 2, 1]);
+    }
+
+    // Saved with an empty place for a photo deleted before the save (a template saved from a job): that place counts as lost too.
+    await pool.query(`update user_templates set data = jsonb_set(data, '{images}', $2::jsonb) where id = $1`, [id, JSON.stringify(['', second, third])]);
+    for (const u of [a, b]) {
+      const got = await apply(u);
+      expect([got.inputCount, got.images.length, lostInputs(got)]).toEqual([3, 2, 1]);
+    }
   });
 
   test("takes own and company custom hooks and locations in data, refuses another member's private one, and keeps a company template to built-in or company ones", async () => {
