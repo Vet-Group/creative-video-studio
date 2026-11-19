@@ -2,19 +2,19 @@ import { FEATURE_PROMPTS, PRODUCT_VIEWS } from '@cvs/core/models';
 import { FEATURES } from '@cvs/db';
 import { describe, expect, it } from 'vitest';
 import { APP_ABOUT } from './about-content';
-import { APPS, appBySlug, appInputs, appReason, type AppDraft, breedSwapPrompt, DEFAULT_VIEWS, DOG_BREEDS, filterApps, motionReason, runTotal, slotMax, splitImages, stockGroups, VIEW_LABELS, visibleApps } from './apps';
+import { APPS, appBySlug, appInputs, appReason, type AppDraft, BATCH_FEATURES, breedSwapPrompt, cleanName, DEFAULT_VIEWS, DOG_BREEDS, filterApps, isBatchId, itemLabel, itemPrompt, MOCKUP_PRODUCTS, mockupPrompt, motionReason, nameOk, nameSwapPrompt, parseNames, PET_STYLES, petPortraitPrompt, runTotal, slotMax, splitImages, stockGroups, VIEW_LABELS, visibleApps } from './apps';
 
 const img = (id: string) => ({ id });
 const draft = (images: string[][], prompt = '', maxImages = 2): AppDraft => ({ images: images.map((l) => l.map(img)), prompt, models: [{ maxImages }], failed: false });
 const reason = (slug: string, images: string[][], prompt?: string, maxImages?: number) => appReason(appBySlug(slug)!, draft(images, prompt, maxImages));
 
 describe('the app list', () => {
-  it('has fifteen apps with unique slugs, known features and (for the built image apps) a default prompt', () => {
-    expect(APPS).toHaveLength(15);
-    expect(new Set(APPS.map((a) => a.slug)).size).toBe(15);
+  it('has eighteen apps with unique slugs, known features and (for the built image apps) a default prompt', () => {
+    expect(APPS).toHaveLength(18);
+    expect(new Set(APPS.map((a) => a.slug)).size).toBe(18);
     for (const a of APPS) {
       expect(FEATURES as readonly string[]).toContain(a.feature);
-      if (!a.soon && a.feature !== 'motion_control' && a.feature !== 'media_optimizer' && a.feature !== 'fashion_model' && a.feature !== 'breed_swap' && a.slug !== 'smart-remake') expect(FEATURE_PROMPTS).toHaveProperty(a.feature);
+      if (!a.soon && a.feature !== 'motion_control' && a.feature !== 'media_optimizer' && a.feature !== 'fashion_model' && !['breed_swap', 'pet_portrait', 'mockup_pack', 'name_swap'].includes(a.feature) && a.slug !== 'smart-remake') expect(FEATURE_PROMPTS).toHaveProperty(a.feature);
     }
   });
 
@@ -22,13 +22,13 @@ describe('the app list', () => {
     expect(appBySlug('smart-remake')).toMatchObject({ slots: [], feature: 'video', category: 'video' });
   });
 
-  it('offers Smart Remake only when its flags are on: the first fourteen apps keep their places and it comes last', () => {
-    expect(visibleApps(false)).toHaveLength(14);
+  it('offers Smart Remake only when its flags are on: the first seventeen apps keep their places and it comes last', () => {
+    expect(visibleApps(false)).toHaveLength(17);
     expect(visibleApps(false).map((a) => a.slug)).not.toContain('smart-remake');
     expect(visibleApps(true).at(-1)!.slug).toBe('smart-remake');
-    expect(filterApps('all', '')).toHaveLength(14); // off unless asked for
+    expect(filterApps('all', '')).toHaveLength(17); // off unless asked for
     expect(filterApps('video', '').map((a) => a.slug)).toEqual(['motion-control']);
-    expect(filterApps('all', '', true)).toHaveLength(15);
+    expect(filterApps('all', '', true)).toHaveLength(18);
     expect(filterApps('video', '', true).map((a) => a.slug)).toEqual(['motion-control', 'smart-remake']);
     expect(filterApps('all', 'remake', true).map((a) => a.slug)).toEqual(['smart-remake']);
     expect(filterApps('all', 'remake')).toEqual([]);
@@ -109,8 +109,8 @@ describe('the app About tabs', () => {
 
 describe('filterApps', () => {
   it('filters by category and by name or description, ignoring accents and case', () => {
-    expect(filterApps('all', '')).toHaveLength(14);
-    expect(filterApps('all', '').at(-1)!.slug).toBe('breed-swap'); // ours comes after the live apps, which keep their order
+    expect(filterApps('all', '')).toHaveLength(17);
+    expect(filterApps('all', '').at(-1)!.slug).toBe('name-swap'); // ours comes after the live apps, which keep their order
     expect(filterApps('fashion', '').map((a) => a.slug)).toEqual(['character-swap', 'model-swap', 'face-swap', 'jewelry-try-on', 'lingerie-try-on', 'ai-fashion-model']);
     expect(filterApps('video', '').map((a) => a.slug)).toEqual(['motion-control']);
     expect(filterApps('all', 'DOI NEN').map((a) => a.slug)).toEqual(['background-changer']);
@@ -187,7 +187,7 @@ describe('Đổi giống chó hàng loạt', () => {
     expect(new Set(DOG_BREEDS).size).toBe(DOG_BREEDS.length);
     expect(DOG_BREEDS.slice(0, 3)).toEqual(['Golden Retriever', 'Labrador Retriever', 'French Bulldog']);
     expect(filterApps('photo', '').map((a) => a.slug)).toContain('breed-swap');
-    expect(filterApps('all', 'giong cho').map((a) => a.slug)).toEqual(['breed-swap']);
+    expect(filterApps('all', 'giong cho').map((a) => a.slug)).toEqual(['breed-swap', 'name-swap']) // name swap can change the breed too;
   });
 
   it('asks for the picture, then for at least one breed', () => {
@@ -211,6 +211,149 @@ describe('Đổi giống chó hàng loạt', () => {
       expect(prompt).toMatch(/^[ -~]+$/); // English only, as the image models read best
       expect(prompt.replace(/ an? [^,]+, /, ' X, ')).toBe(pug.replace(/ an? [^,]+, /, ' X, ')); // only the breed differs
     }
+  });
+});
+
+describe('Chân dung thú cưng', () => {
+  const app = appBySlug('pet-portrait')!;
+  const d = (images: string[], styles: number): AppDraft => ({ images: [images.map(img)], prompt: '', models: [{ maxImages: 1 }], failed: false, styles });
+  it('takes one pet photo and shows eight print styles, each once', () => {
+    expect(app).toMatchObject({ feature: 'pet_portrait', category: 'photo', styles: true });
+    expect(app.slots.map((s) => [s.label, !!s.optional, !!s.many])).toEqual([['Thú cưng', false, false]]);
+    expect(PET_STYLES.map((s) => s.id)).toEqual(['watercolor', 'cartoon', 'line-art', 'royal', 'pop-art', 'flat-vector', 'pencil', 'oil']);
+    expect(new Set(PET_STYLES.map((s) => s.label)).size).toBe(8);
+    expect(filterApps('all', 'chan dung thu cung').map((a) => a.slug)).toEqual(['pet-portrait']);
+  });
+
+  it('asks for the photo, then for at least one style', () => {
+    expect(appReason(app, d([], 2))).toBe('Tải lên ảnh: Thú cưng.');
+    expect(appReason(app, d(['a'], 0))).toBe('Chọn ít nhất một phong cách.');
+    expect(appReason(app, d(['a'], 3))).toBeNull();
+  });
+
+  it('writes one English prompt per style that keeps the likeness, one centred pet on pure white, no text or frame', () => {
+    const water = petPortraitPrompt('watercolor');
+    expect(water).toMatch(/^Turn the pet in the photo into a print-ready design in this style: a soft watercolor painting/);
+    for (const kept of ['face, markings, coat colors and pattern, eye color and ear shape', 'this one pet only, centered', 'plain pure white background', 'No text', 'no frame', 'no watermark', 'ready to print']) {
+      expect(water).toContain(kept);
+    }
+    for (const s of PET_STYLES) {
+      const prompt = petPortraitPrompt(s.id);
+      expect(prompt).toContain(`style: ${s.look}. `);
+      expect(prompt).toMatch(/^[ -~]+$/); // English only, as the image models read best
+      expect(prompt.replace(s.look, 'X')).toBe(water.replace(PET_STYLES[0]!.look, 'X')); // only the style differs
+    }
+  });
+});
+
+describe('Mockup hàng loạt', () => {
+  const app = appBySlug('mockup-pack')!;
+  const d = (design: string[], blank: string[], products: number): AppDraft => ({ images: [design.map(img), blank.map(img)], prompt: '', models: [{ maxImages: 2 }], failed: false, products });
+  it('takes the design and an optional blank product photo, and shows six products', () => {
+    expect(app).toMatchObject({ feature: 'mockup_pack', category: 'photo', products: true });
+    expect(app.slots.map((s) => [s.label, !!s.optional, !!s.many])).toEqual([['Thiết kế', false, false], ['Sản phẩm trơn (tuỳ chọn)', true, false]]);
+    expect(MOCKUP_PRODUCTS.map((p) => p.id)).toEqual(['round-rug', 'ornament', 'tshirt', 'mug', 'blanket', 'canvas']);
+  });
+
+  it('asks for the design and a product, and takes only one product with a blank, the one the blank shows', () => {
+    expect(appReason(app, d([], [], 1))).toBe('Tải lên ảnh: Thiết kế.');
+    expect(appReason(app, d(['a'], [], 0))).toBe('Chọn ít nhất một sản phẩm.');
+    expect(appReason(app, d(['a'], [], 6))).toBeNull();
+    expect(appReason(app, d(['a'], ['b'], 2))).toBe('Có ảnh sản phẩm trơn thì chỉ chọn một sản phẩm: đúng loại trong ảnh đó.');
+    expect(appReason(app, d(['a'], ['b'], 1))).toBeNull();
+    expect(appReason(app, d(['a'], ['b'], 0))).toBe('Chọn ít nhất một sản phẩm.');
+  });
+
+  it('writes one English prompt per product that keeps the design exact, in its scene or on the blank as it is', () => {
+    const mug = mockupPrompt('mug', false);
+    expect(mug).toMatch(/^Make a realistic product photo of a white 11 oz ceramic mug standing on a wooden table/);
+    expect(mug).toContain('Use the design exactly as it is: the same colors, text and spelling, layout and proportions, not redrawn, cropped, mirrored or added to.');
+    expect(mug).toContain("Keep the product's real shape and proportions");
+    const onBlank = mockupPrompt('mug', true);
+    expect(onBlank).toMatch(/^Put the design from the first image on the white 11 oz ceramic mug in the second image\. Keep that product exactly as it is: its shape, size, color, material, angle, background and lighting\./);
+    expect(onBlank).toContain('not redrawn, cropped, mirrored or added to.');
+    for (const p of MOCKUP_PRODUCTS) for (const blank of [false, true]) expect(mockupPrompt(p.id, blank)).toMatch(/^[ -~]+$/);
+    expect(new Set(MOCKUP_PRODUCTS.map((p) => mockupPrompt(p.id, false))).size).toBe(6);
+  });
+});
+
+describe('Đổi tên hàng loạt', () => {
+  const app = appBySlug('name-swap')!;
+  const d = (names: string, breeds = 0): AppDraft => ({ images: [[img('a')]], prompt: '', models: [{ maxImages: 1 }], failed: false, names, breeds });
+  it('takes one design with a name and shows the names box and the breeds', () => {
+    expect(app).toMatchObject({ feature: 'name_swap', category: 'photo', names: true });
+    expect(app.breeds).toBeUndefined();
+    expect(app.slots.map((s) => [s.label, !!s.optional])).toEqual([['Thiết kế có tên', false]]);
+  });
+
+  it('cleans the names, one per line: trimmed, NFC, single spaces, blank lines and repeats dropped', () => {
+    expect(parseNames(' Max \n\n  Bella\r\nMax\nMary   Jane\n')).toEqual({ names: ['Max', 'Bella', 'Mary Jane'], problem: null });
+    const nfd = 'Nguyễn'; // Nguyễn typed with combining marks
+    expect(parseNames(nfd).names).toEqual(['Nguyễn']);
+    expect(cleanName(nfd)).toBe('Nguyễn');
+    expect(parseNames('')).toEqual({ names: [], problem: 'Nhập ít nhất một tên.' });
+    expect(parseNames(' \n \n').problem).toBe('Nhập ít nhất một tên.');
+  });
+
+  it('takes Vietnamese and Latin letters with their accents, digits, spaces, apostrophes and hyphens, up to 20 characters', () => {
+    for (const ok of ['Đức', 'Nguyễn Thị Ánh', 'Phở', 'José', 'Zoë', 'Søren', "O'Brien", 'D’Arcy', 'Mary-Jane', 'K9', 'Bé Na 2', 'x'.repeat(20), 'Ưng Hoàng Phúc']) {
+      expect([ok, nameOk(ok), parseNames(ok).problem]).toEqual([ok, true, null]);
+    }
+  });
+
+  it('refuses emoji, symbols, quotes, other scripts, punctuation alone and names over 20 characters', () => {
+    expect(parseNames('Max 🐶').problem).toBe('Tên "Max 🐶" chỉ được có chữ cái, chữ số, khoảng trắng, dấu nháy đơn và gạch nối.');
+    for (const bad of ['1️⃣', '❤', 'Max!', '"Max"', 'Max & Bella', 'a.b', '小明', 'Борис', '--', "'", 'Max\tBella​', '<b>']) expect([bad, nameOk(cleanName(bad))]).toEqual([bad, false]);
+    expect(parseNames('x'.repeat(21)).problem).toBe(`Tên "${'x'.repeat(21)}" dài quá 20 ký tự.`);
+    expect(parseNames('Bella\nMax 🐶\nLuna').problem).toMatch(/^Tên "Max 🐶"/); // the first wrong name is named
+  });
+
+  it('takes at most 25 names, and at most 25 pictures with the breeds', () => {
+    const many = (n: number) => Array.from({ length: n }, (_, i) => `Name ${i + 1}`).join('\n');
+    expect(parseNames(many(25)).problem).toBeNull();
+    expect(parseNames(many(26)).problem).toBe('Tối đa 25 tên mỗi lần chạy, đang có 26.');
+    expect(parseNames(`${many(25)}\nName 1`).problem).toBeNull(); // a repeat is not counted
+    expect(appReason(app, d(''))).toBe('Nhập ít nhất một tên.');
+    expect(appReason(app, d(many(25)))).toBeNull();
+    expect(appReason(app, d(many(5), 5))).toBeNull();
+    expect(appReason(app, d(many(5), 6))).toBe('Tối đa 25 ảnh mỗi lần chạy, đang là 30: bớt tên hoặc giống chó.');
+    expect(appReason(app, d('Max 🐶', 1))).toMatch(/^Tên "Max 🐶"/);
+  });
+
+  it('writes one English prompt per name that swaps only the name, and with a breed the dog too', () => {
+    const max = nameSwapPrompt('Max');
+    expect(max).toMatch(/^Replace only the personalized name in the image with the name "Max", spelled exactly like that, letter for letter, with every accent mark\. /);
+    for (const kept of ['same font, size, color, outline, curve and position', 'keep it centered on the same spot', 'the artwork, every other text and number, the layout', 'Do not add any other text, logos or watermarks.']) expect(max).toContain(kept);
+    expect(max).not.toContain('dog');
+    expect(max).toMatch(/^[ -~]+$/);
+    expect(nameSwapPrompt('Nguyễn Ánh')).toContain('with the name "Nguyễn Ánh", ');
+    const withBreed = nameSwapPrompt('Max', 'Australian Shepherd');
+    expect(withBreed).toContain('Also replace the dog with an Australian Shepherd, with the coat, colours and markings typical of the breed, in the same pose,');
+    expect(withBreed.replace(/Also replace the dog [^.]+\. /, '')).toBe(max);
+  });
+});
+
+describe('the batch apps', () => {
+  it('title each job with its item, and give each app that writes its own prompt the prompt of an item', () => {
+    expect(itemLabel({ view: 'back' })).toBe('Mặt sau');
+    expect(itemLabel({ breed: 'Pug' })).toBe('Pug');
+    expect(itemLabel({ style: 'royal' })).toBe('Chân dung hoàng gia');
+    expect(itemLabel({ product: 'mug' })).toBe('Cốc sứ 11 oz');
+    expect(itemLabel({ name: 'Max', breed: 'Pug' })).toBe('Max · Pug');
+    expect(itemLabel({ name: 'Max', breed: null })).toBe('Max');
+    expect(itemLabel({ view: null, breed: null, style: null, product: null, name: null })).toBeNull();
+    expect(itemPrompt('breed_swap', { breed: 'Pug' })).toBe(breedSwapPrompt('Pug'));
+    expect(itemPrompt('pet_portrait', { style: 'oil' })).toBe(petPortraitPrompt('oil'));
+    expect(itemPrompt('mockup_pack', { product: 'canvas' }, true)).toBe(mockupPrompt('canvas', true));
+    expect(itemPrompt('name_swap', { name: 'Max', breed: 'Pug' })).toBe(nameSwapPrompt('Max', 'Pug'));
+    expect(itemPrompt('multi_angle', { view: 'back' })).toBeUndefined();
+    expect(itemPrompt('reframe', {})).toBeUndefined();
+  });
+
+  it('are the apps that pick items, and their Run id is a UUID', () => {
+    expect(APPS.filter((a) => a.views || a.breeds || a.styles || a.products || a.names).map((a) => a.feature)).toEqual(BATCH_FEATURES);
+    expect(isBatchId('7d0e2f54-3c55-4a0e-9a59-2f3f0c8b1a11')).toBe(true);
+    for (const bad of ['', 'batch-1', '7D0E2F54-3C55-4A0E-9A59-2F3F0C8B1A11', '7d0e2f54-3c55-4a0e-9a59-2f3f0c8b1a11 ']) expect(isBatchId(bad)).toBe(false);
   });
 });
 

@@ -12,7 +12,7 @@ import { boss } from '@/lib/queue';
 import { findChoice } from '@/lib/choices';
 import { providerRefusal, TWIN_REASONS } from '@/lib/job-failure';
 import { jobNeed, offeredNow, retryTwin, servingRow, twinEstimate } from '@/lib/model-twins';
-import { breedSwapPrompt, DOG_BREEDS } from '@/lib/apps';
+import { BATCH_FEATURES, cleanName, DOG_BREEDS, isBatchId, itemPrompt, MAX_NAME, MOCKUP_PRODUCTS, nameOk, PET_STYLES } from '@/lib/apps';
 import { BRAND_FEATURES, withBrand } from '@/lib/brand';
 import { fashionModelPrompt, mentionsMinor, parseFashionTraits } from '@/lib/fashion-model';
 import { basePrompt } from '@/lib/prompt-limit';
@@ -46,6 +46,8 @@ type Spec = {
   /** Add the chosen store's brand kit to the prompt (Marketing Studio and Image Generation only, lib/brand.ts). */
   useBrand: boolean;
 };
+/** What the item of each app that writes its own prompt is called, in the refusal of another prompt. */
+const ITEM: Record<string, string> = { breed_swap: 'breed', pet_portrait: 'style', mockup_pack: 'product', name_swap: 'name' };
 const bad = (error: string) => Response.json({ error }, { status: 400 });
 
 /**
@@ -96,7 +98,7 @@ export async function GET(request: Request) {
       // For the History card: the member's own words (a free prompt on Create video and Image Generation; elsewhere the prompt is composed, so the kept brief),
       // the inputs, the format and the caller's favourite; `traits` is a Fashion Model Generator job's own traits (JSON), which its save dialog starts from.
       text: r.params.brief ?? ((r.feature === 'video' && !r.preset_id) || r.feature === 'image' ? r.prompt : null), inputAssetIds: r.input_asset_ids,
-      traits: r.feature === 'fashion_model' ? (r.params.traits ?? null) : null, garments: r.params.garments ? Number(r.params.garments) : null, format: r.params.format ?? null, roles: r.params.roles ?? null, view: r.params.view ?? null, breed: r.params.breed ?? null, favorite: r.favorite, estimateUsd: g.workspaceId === COMPANY_WORKSPACE_ID ? r.estimate_usd : null, unbilled: r.unbilled,
+      traits: r.feature === 'fashion_model' ? (r.params.traits ?? null) : null, garments: r.params.garments ? Number(r.params.garments) : null, format: r.params.format ?? null, roles: r.params.roles ?? null, view: r.params.view ?? null, breed: r.params.breed ?? null, style: r.params.style ?? null, product: r.params.product ?? null, name: r.params.name ?? null, batch: r.params.batch ?? null, favorite: r.favorite, estimateUsd: g.workspaceId === COMPANY_WORKSPACE_ID ? r.estimate_usd : null, unbilled: r.unbilled,
     })),
   });
 }
@@ -122,6 +124,9 @@ export async function GET(request: Request) {
  * `fashion_model` (the AI model generator) takes no input image, a text-to-image model that lists it, and `params.traits` (JSON, parseFashionTraits) with the prompt those traits make.
  * `multi_angle` (the multi-angle app) takes `params.view`, the id of one of PRODUCT_VIEWS: one job per view, the page sends one per view picked.
  * `breed_swap` (the breed swap app) takes `params.breed`, one of DOG_BREEDS, and exactly the prompt breedSwapPrompt makes of it: one job per breed, the page sends one per breed picked.
+ * `pet_portrait` takes `params.style` (an id of PET_STYLES), `mockup_pack` `params.product` (an id of MOCKUP_PRODUCTS) with the design and an optional blank product photo, and `name_swap`
+ * `params.name` (one name nameOk takes, already clean) and an optional `params.breed`; each takes exactly the prompt its item makes (itemPrompt), one job per item.
+ * The batch apps (BATCH_FEATURES) also take `params.batch`, a UUID the page gives every job of one Run, by which History finds the whole Run again.
  * Every other feature takes images only. `useBrand` (Marketing Studio and Image Generation) adds the chosen store's brand kit to the prompt (lib/brand.ts).
  * `retryOf` retries the caller's own failed job once: the inputs, model, preset, prompt, ratio, duration, team and store all come from the
  * original (the body may carry just `retryOf`), the estimate from the model's current price. `onTwin: true` with `retryOf` runs it on the original model's enabled twin instead (migration 0075),
@@ -173,14 +178,23 @@ export async function POST(request: Request) {
     // Images take resolution, quality and thinking, plus the member's own text (and Try On its garment count) kept for reuse; Marketing Studio takes format ('advanced', 'unboxing' or 'review'),
     // audio ('on' or 'off'), an end frame, the end text the worker burns in (endText, endTextPos) and the form's own inputs. The kept inputs are never read by the
     // worker. Create video takes audio, an end frame, reference audio and its prompt's sections (hookText, ending); the others none.
-    const keys = isImage ? ['resolution', 'quality', 'thinking', 'brief', ...(feature === 'try_on' ? ['garments', 'pose'] : feature === 'fashion_model' ? ['traits'] : feature === 'multi_angle' ? ['view'] : feature === 'breed_swap' ? ['breed'] : [])] : feature === 'marketing' ? ['format', 'audio', 'endAssetId', 'videoAssetId', 'hook', 'hookText', 'location', 'brief', 'script', 'ending', 'endText', 'endTextPos', 'roles', 'highlights'] : feature === 'video' ? ['audio', 'endAssetId', 'audioAssetIds', 'hookText', 'ending'] : motion ? ['orientation'] : [];
+    const keys = isImage ? ['resolution', 'quality', 'thinking', 'brief', ...(feature === 'try_on' ? ['garments', 'pose'] : feature === 'fashion_model' ? ['traits'] : feature === 'multi_angle' ? ['view'] : feature === 'breed_swap' ? ['breed'] : feature === 'pet_portrait' ? ['style'] : feature === 'mockup_pack' ? ['product'] : feature === 'name_swap' ? ['name', 'breed'] : []), ...(BATCH_FEATURES.includes(feature) ? ['batch'] : [])] : feature === 'marketing' ? ['format', 'audio', 'endAssetId', 'videoAssetId', 'hook', 'hookText', 'location', 'brief', 'script', 'ending', 'endText', 'endTextPos', 'roles', 'highlights'] : feature === 'video' ? ['audio', 'endAssetId', 'audioAssetIds', 'hookText', 'ending'] : motion ? ['orientation'] : [];
     if (!entries || entries.some(([k, v]) => !keys.includes(k) || typeof v !== 'string')) {
       return bad(keys.length > 0 ? `params may hold only ${keys.length > 1 ? `${keys.slice(0, -1).join(', ')} and ${keys.at(-1)}` : keys[0]}, as text` : 'params are for image features, Create video and Marketing Studio only');
     }
     if (isImage && given.resolution === undefined) return bad('params.resolution is required');
     if (feature === 'multi_angle' && !PRODUCT_VIEWS.some((v) => v.id === given.view)) return bad(`params.view must be one of ${PRODUCT_VIEWS.map((v) => v.id).join(', ')}`);
     if (feature === 'breed_swap' && !DOG_BREEDS.includes(given.breed ?? '')) return bad(`params.breed must be one of ${DOG_BREEDS.join(', ')}`);
-    if (feature === 'breed_swap' && (typeof freePrompt !== 'string' || freePrompt.trim() !== breedSwapPrompt(given.breed!))) return bad('the prompt must be the one the breed makes');
+    if (feature === 'pet_portrait' && !PET_STYLES.some((s) => s.id === given.style)) return bad(`params.style must be one of ${PET_STYLES.map((s) => s.id).join(', ')}`);
+    if (feature === 'mockup_pack' && !MOCKUP_PRODUCTS.some((p) => p.id === given.product)) return bad(`params.product must be one of ${MOCKUP_PRODUCTS.map((p) => p.id).join(', ')}`);
+    if (feature === 'mockup_pack' && assetIds.length > 2) return bad('the mockup pack takes the design and an optional blank product photo');
+    // A name goes into the prompt as it is, so it is held to the rule the page checks the box with.
+    if (feature === 'name_swap' && (given.name === undefined || given.name !== cleanName(given.name) || !nameOk(given.name))) return bad(`params.name must be one name of up to ${MAX_NAME} letters, digits, spaces, apostrophes or hyphens`);
+    if (feature === 'name_swap' && given.breed !== undefined && !DOG_BREEDS.includes(given.breed)) return bad(`params.breed must be one of ${DOG_BREEDS.join(', ')}`);
+    // The apps that write their own prompt per item take exactly that one (with the mockup pack's blank as the second image).
+    const own = itemPrompt(feature, given, assetIds.length > 1);
+    if (own !== undefined && (typeof freePrompt !== 'string' || freePrompt.trim() !== own)) return bad(`the prompt must be the one the ${ITEM[feature]} makes`);
+    if (given.batch !== undefined && !isBatchId(given.batch)) return bad('params.batch must be a UUID');
     // The Fashion Model Generator's prompt is built from its traits (lib/fashion-model.ts), which are kept as the canonical JSON; the page's prompt must be that one.
     if (feature === 'fashion_model') {
       let traits: ReturnType<typeof parseFashionTraits> = null;
