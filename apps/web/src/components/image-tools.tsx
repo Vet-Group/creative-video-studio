@@ -1,7 +1,7 @@
 'use client';
 // What the Try On and Image Generation pages share: the image-model picker data, the choice of model, ratio and resolution, the upload slot,
 // the tab strip and the gallery of the company's outputs.
-import { type CSSProperties, type DragEvent, type ImgHTMLAttributes, type KeyboardEvent, type ReactNode, type Ref, useEffect, useId, useRef, useState } from 'react';
+import { type CSSProperties, type ImgHTMLAttributes, type KeyboardEvent, type ReactNode, type Ref, type RefObject, useEffect, useId, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { api, ApiError, type Clip, sendJson, thumbUrl } from '@/lib/api';
@@ -359,6 +359,9 @@ export function pastedImages(target: { closest?: (sel: string) => unknown } | nu
   return images;
 }
 
+/** What a slot's drop reads, from React's drag event or the DOM's. */
+type Drag = { preventDefault(): void; dataTransfer: DataTransfer };
+
 /**
  * One labelled upload slot: its thumbnails with a remove button each, and a tile that opens the file picker until the slot is full.
  * `samples` (sample names, lib/samples.ts) show while the slot is empty, as on the live Try On; a click hands the name to `onSample`, which copies it on the server.
@@ -367,8 +370,9 @@ export function pastedImages(target: { closest?: (sel: string) => unknown } | nu
  * `slot` is the picker's first category, for a slot whose label names another page's category (Image Generation's reference photos); by default the label's.
  * `addRef` is the add button, for a page that moves focus to it.
  * `count` shows how many photos the slot holds of its `max` ("3/13") beside its name; more than `max` (a model with a lower cap chosen since) reads as an error.
+ * `zone` widens the drop target to a box around the slot (Image Generation's whole prompt bar), so a file dropped beside the small tile is not lost.
  */
-export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRemove, samples = [], onSample, icon = 'image', onBrowse, onPick, storeId, optional, slot, addRef, extra, count }: { label: string; empty: string; inputLabel: string; images: Img[]; max: number; busy: boolean; onAdd: (files: File[]) => void; onRemove: (id: string) => void; samples?: string[]; onSample?: (name: string) => void; icon?: IconName; onBrowse?: () => void; onPick?: (img: Img) => void; storeId?: string; optional?: boolean; slot?: UploadSlot; addRef?: Ref<HTMLButtonElement>; extra?: ReactNode; count?: boolean }) {
+export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRemove, samples = [], onSample, icon = 'image', onBrowse, onPick, storeId, optional, slot, addRef, extra, count, zone }: { label: string; empty: string; inputLabel: string; images: Img[]; max: number; busy: boolean; onAdd: (files: File[]) => void; onRemove: (id: string) => void; samples?: string[]; onSample?: (name: string) => void; icon?: IconName; onBrowse?: () => void; onPick?: (img: Img) => void; storeId?: string; optional?: boolean; slot?: UploadSlot; addRef?: Ref<HTMLButtonElement>; extra?: ReactNode; count?: boolean; zone?: RefObject<HTMLElement | null> }) {
   const hydrated = useHydrated();
   const input = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
@@ -399,17 +403,30 @@ export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRem
   }
   // A photo dragged from History or the Examples goes through the page's own put (a click's), in the role this slot gives; a full slot, or one the History's photos do not go to, is no target.
   const photoRole = room ? dropRole(slot ?? slotOfLabel(label)) : undefined;
-  function onDragOver(e: DragEvent) {
-    if (isPhotoDrag(e) && !photoRole) return;
+  // Only files and photos: words dragged into a prompt box inside the zone go there.
+  const carries = (e: Drag) => isPhotoDrag(e) || e.dataTransfer.types.includes('Files');
+  function onDragOver(e: Drag) {
+    if (!carries(e) || (isPhotoDrag(e) && !photoRole)) return;
     e.preventDefault();
     setOver(true);
   }
-  function onDrop(e: DragEvent) {
+  function onDrop(e: Drag) {
+    if (!carries(e)) return;
     e.preventDefault();
     setOver(false);
     if (isPhotoDrag(e)) return photoRole && dropPhoto(photoRole);
     if (hydrated && !full && !busy) add([...e.dataTransfer.files]);
   }
+  useEffect(() => {
+    const el = zone?.current;
+    if (!el) return;
+    const on = (f: (e: Drag) => void) => (e: globalThis.DragEvent) => void (e.dataTransfer && f(e as Drag));
+    const [over, leave, drop] = [on(onDragOver), () => setOver(false), on(onDrop)];
+    el.addEventListener('dragover', over);
+    el.addEventListener('dragleave', leave);
+    el.addEventListener('drop', drop);
+    return () => (el.removeEventListener('dragover', over), el.removeEventListener('dragleave', leave), el.removeEventListener('drop', drop));
+  });
   const labelText = (
     <span id={labelId} className="field-label">
       {label}
@@ -449,7 +466,7 @@ export function Slot({ label, empty, inputLabel, images, max, busy, onAdd, onRem
       ) : (
         name
       )}
-      <div ref={box} className="slot" role="group" aria-labelledby={labelId} aria-describedby={counter ? countId : undefined} data-room={room || undefined} data-over={over} data-one={(max === 1 && images.length === 1) || undefined} onDragOver={onDragOver} onDragLeave={() => setOver(false)} onDrop={onDrop}>
+      <div ref={box} className="slot" role="group" aria-labelledby={labelId} aria-describedby={counter ? countId : undefined} data-room={room || undefined} data-over={over} data-one={(max === 1 && images.length === 1) || undefined} {...(!zone && { onDragOver, onDragLeave: () => setOver(false), onDrop })}>
         <input
           ref={input}
           type="file"

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { optionsOf, select, selectText, signIn } from './support.test';
+import { openMore, optionsOf, select, selectText, signIn } from './support.test';
 
 // The store brand kit: a template editor fills a store's kit from the store picker on Image Generation, and a member who picks that store and turns on
 // the brand kit switch runs on the mock model; the server adds the kit to the stored prompt, and the page remembers the store and the switch.
@@ -10,6 +10,7 @@ test('an editor fills a store brand kit, and a member run with the switch on sto
   await page.goto('/image-generation');
   const store = 'Cửa hàng/Thương hiệu';
   const brand = page.getByRole('button', { name: 'Dùng bộ nhận diện', exact: true });
+  await openMore(page); // folded under the more-options pill on a wide screen
   await selectText(page, store, 'E2E Brand Shop');
   await expect(brand).toBeDisabled(); // no kit yet
   await page.getByRole('button', { name: 'Bộ nhận diện', exact: true }).click();
@@ -31,6 +32,7 @@ test('an editor fills a store brand kit, and a member run with the switch on sto
   await page.context().clearCookies(); // signed out, so /login shows its form
   await signIn(page, 'brandm');
   await page.goto('/image-generation');
+  await openMore(page);
   await selectText(page, store, 'E2E Brand Shop');
   await expect(page.getByRole('button', { name: 'Bộ nhận diện', exact: true })).toHaveCount(0); // only an editor or an Admin edits a kit
   await brand.click();
@@ -61,6 +63,7 @@ test('an editor fills a store brand kit, and a member run with the switch on sto
 
   // The page opens as the member last ran it: the store and the switch too.
   await page.reload();
+  await openMore(page);
   await expect(select(page, store)).toHaveText('E2E Brand Shop');
   await expect(brand).toHaveAttribute('aria-pressed', 'true');
 });

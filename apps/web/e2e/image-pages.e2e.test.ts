@@ -517,7 +517,7 @@ test('Image Generation: a cap refusal shows its message in Vietnamese', async ({
   await expect(form.getByRole('alert')).toHaveText('Bạn đã dùng hết hạn mức chi phí hôm nay');
 });
 
-test("geometry at 1440: the Try On card is 360 wide at x=288, and Image Generation's prompt bar floats 880 wide at the foot of the screen over its full-width gallery, whose last row ends above it", async ({ page, browser }) => {
+test("geometry at 1440: the Try On card is 360 wide at x=288, and Image Generation's prompt bar floats 920 wide at the foot of the screen over its full-width gallery, whose last row ends above it", async ({ page, browser }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await signIn(page, 'member11');
   // Ten images from the mock model, put on Ví dụ below, so the gallery is taller than the screen. Two each from five members: the queue runs two
@@ -573,11 +573,11 @@ test("geometry at 1440: the Try On card is 360 wide at x=288, and Image Generati
   const gallery = page.getByRole('group', { name: 'Ảnh của công ty' });
   await expect(gallery.getByRole('img').first()).toBeVisible();
   await expect.poll(() => gallery.getByRole('img').first().evaluate((i: HTMLImageElement) => i.complete && i.naturalWidth > 0)).toBe(true); // decoded, not just in the DOM
-  // No left-column card: Fash's prompt bar, 880 wide and centred on the page's column (x 288 to 1392), 24 px off the foot of the screen, under tabs centred on the same column.
+  // No left-column card: Fash's prompt bar, 920 wide and centred on the page's column (x 288 to 1392), 24 px off the foot of the screen, under tabs centred on the same column.
   await expect(page.locator('.form-card')).toHaveCount(0);
   const bar = page.locator('.imagebar');
   const f = await box(bar);
-  near(f.width, 880, 'bar width');
+  near(f.width, 920, 'bar width');
   near(f.x + f.width / 2, 288 + 1104 / 2, 'bar centre');
   near(f.y + f.height, 1000 - 24, 'bar bottom');
   expect(await bar.evaluate((el) => getComputedStyle(el).borderTopLeftRadius)).toBe('24px');

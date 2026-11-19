@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { modelButton, pickPreset, png, selectText, signIn } from './support.test';
+import { modelButton, openMore, pickPreset, png, selectText, signIn } from './support.test';
 
 test('a photo uploaded on Image Generation is offered by "Ảnh đã tải" on Create and Try On, and a pick fills the form as an upload would', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
@@ -77,6 +77,7 @@ test('an upload carries the store chosen on its page, and the picker opens on th
   // Image Generation with store B, from the store picker in the prompt bar.
   await page.goto('/image-generation');
   await expect(page.getByLabel('Ảnh tham chiếu', { exact: true })).toBeEnabled();
+  await openMore(page); // the store is under the more-options pill on a wide screen
   await selectText(page, store, 'E2E Brand Shop');
   await page.getByLabel('Ảnh tham chiếu', { exact: true }).setInputFiles({ name: onB, mimeType: 'image/png', buffer: png() });
   await expect(page.getByLabel('Ảnh tham chiếu: ảnh đã chọn').getByRole('img', { name: onB })).toBeVisible();
