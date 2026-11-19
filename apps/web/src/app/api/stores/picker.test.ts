@@ -37,8 +37,8 @@ let admin: User;
 beforeAll(async () => {
   [member, admin] = [await newUser(), await newUser('admin')];
   await pool.query(
-    `insert into stores (id, name, code, hidden) values
-       ('s-a', 'A Shop', 'A', false), ('s-b', 'B Shop', 'B', false), ('s-c', 'C Shop', 'C', false), ('s-d', 'D Shop', 'D', false), ('s-hid', 'Hidden', 'H', true)`,
+    `insert into stores (id, name, code, hidden, workspace_id) values
+       ('s-a', 'A Shop', 'A', false, 'ws_vet'), ('s-b', 'B Shop', 'B', false, 'ws_vet'), ('s-c', 'C Shop', 'C', false, 'ws_vet'), ('s-d', 'D Shop', 'D', false, 'ws_vet'), ('s-hid', 'Hidden', 'H', true, 'ws_vet')`,
   );
 });
 afterAll(async () => {

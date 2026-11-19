@@ -51,11 +51,10 @@ export const WORKSPACE_ROLES = ['owner', 'member'] as const;
 export const COMPANY_WORKSPACE_ID = 'ws_vet';
 
 const tstz = (name: string) => timestamp(name, { withTimezone: true });
-// The workspace a root row belongs to (docs/WORKSPACES.md §2). The default fills the rows from before workspaces; phase 2b drops it.
+// The workspace a root row belongs to (docs/WORKSPACES.md §2). No default (phase 2b): an insert that names none fails instead of filing the row under the company.
 const workspaceId = () =>
   text('workspace_id')
     .notNull()
-    .default(COMPANY_WORKSPACE_ID)
     .references((): AnyPgColumn => workspaces.id, { onDelete: 'restrict' });
 
 export const teams = pgTable(

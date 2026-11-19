@@ -35,7 +35,7 @@ const seams = (over: Partial<AnalyzeSeams> = {}): AnalyzeSeams => ({
 let seq = 0;
 async function queued(): Promise<string> {
   const id = `an-${++seq}`;
-  await pool.query(`insert into analyses (id, user_id, team_id, source_key, status) values ($1, 'u1', 'team-unassigned', $2, 'queued')`, [id, `sources/${id}.mp4`]);
+  await pool.query(`insert into analyses (id, user_id, team_id, source_key, status, workspace_id) values ($1, 'u1', 'team-unassigned', $2, 'queued', 'ws_vet')`, [id, `sources/${id}.mp4`]);
   return id;
 }
 const row = async (id: string) => (await pool.query('select status, result, raw_key, provider, model, cost_usd::text as cost_usd, error from analyses where id = $1', [id])).rows[0];
@@ -230,14 +230,14 @@ test('the backfill rewrites only the result of the old analyses from their store
     objects[`analyses/${id}/breakdown.json`] = new TextEncoder().encode(JSON.stringify(breakdown(point)));
     const result = { durationS: 11.4, shotCount: 1, format: 'product showcase', hook: 'h', summary: 's', shots: [{ index: 1, start: 0, end: 11.4, role: 'mood', prompt: point }], vi: { format: 'f', hook: 'h', summary: 's', shots: ['cũ'] } };
     await pool.query(
-      `insert into analyses (id, user_id, team_id, source_key, status, result, raw_key, provider, model, cost_usd, finished_at, shared_title, shared_at)
-       values ($1, 'u1', 'team-unassigned', $2, 'succeeded', $3, $4, 'byteplus', 'seed', 0.02, '2026-11-13T00:00:00Z', $5, $6)`,
+      `insert into analyses (id, user_id, team_id, source_key, status, result, raw_key, provider, model, cost_usd, finished_at, shared_title, shared_at, workspace_id)
+       values ($1, 'u1', 'team-unassigned', $2, 'succeeded', $3, $4, 'byteplus', 'seed', 0.02, '2026-11-13T00:00:00Z', $5, $6, 'ws_vet')`,
       [id, `sources/${id}.mp4`, JSON.stringify(result), `analyses/${id}/breakdown.json`, shared ? 'Áo thun' : null, shared ? '2026-11-14T00:00:00Z' : null],
     );
   };
   await old('bf-old', 'Model posing to showcase a plain white t-shirt.', true); // a shared reference video is backfilled too
   await old('bf-bad', 'A broken beat.');
-  await pool.query(`insert into analyses (id, user_id, team_id, source_key, status) values ('bf-queued', 'u1', 'team-unassigned', 'sources/q.mp4', 'queued')`);
+  await pool.query(`insert into analyses (id, user_id, team_id, source_key, status, workspace_id) values ('bf-queued', 'u1', 'team-unassigned', 'sources/q.mp4', 'queued', 'ws_vet')`);
 
   const asked: string[] = [];
   const chat = async (system: string, user: string) => {

@@ -215,7 +215,7 @@ describe('POST /api/assets', () => {
     const busy = await signIn('hourly@example.test');
     const add = (count: number, age: string) =>
       pool.query(
-        `insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, created_at) select 'up-' || g || '-' || replace($2, ' ', ''), $3::text, 'input', 'up/' || g || '-' || $2, 'x.jpg', 'image/jpeg', 1, now() - $2::interval from generate_series(1, $1) g`,
+        `insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, created_at, workspace_id) select 'up-' || g || '-' || replace($2, ' ', ''), $3::text, 'input', 'up/' || g || '-' || $2, 'x.jpg', 'image/jpeg', 1, now() - $2::interval, 'ws_vet' from generate_series(1, $1) g`,
         [count, age, busyId],
       );
     await add(UPLOAD_HOURLY_LIMIT, '2 hours'); // older than the hour: not counted
@@ -529,8 +529,8 @@ describe('GET /api/assets?recent=marketing-product', () => {
   async function job(userId: string, inputs: string[], minutesAgo: number, format?: string) {
     const id = `mkt-${randomBytes(4).toString('hex')}`;
     await pool.query(
-      `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, status, feature, params, created_at)
-       values ($1, $2, 'team-unassigned', 'fal-test', 'fal', 'p', '9:16', 5, $3, 'succeeded', 'marketing', $4, now() - make_interval(mins => $5))`,
+      `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, status, feature, params, created_at, workspace_id)
+       values ($1, $2, 'team-unassigned', 'fal-test', 'fal', 'p', '9:16', 5, $3, 'succeeded', 'marketing', $4, now() - make_interval(mins => $5), 'ws_vet')`,
       [id, userId, inputs, format ? { format } : {}, minutesAgo],
     );
   }
@@ -561,8 +561,8 @@ describe('GET /api/assets?recent=marketing-product', () => {
     const [m1, m2, garment] = [await up('model-1.png'), await up('model-2.png'), await up('garment.png')];
     for (const [inputs, ago] of [[[m1, garment], 20], [[m2, garment], 10]] as const) {
       await pool.query(
-        `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, status, feature, params, created_at)
-         values ($1, $2, 'team-unassigned', 'fal-test', 'fal', 'p', 'auto', 0, $3, 'succeeded', 'try_on', '{}', now() - make_interval(mins => $4))`,
+        `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, status, feature, params, created_at, workspace_id)
+         values ($1, $2, 'team-unassigned', 'fal-test', 'fal', 'p', 'auto', 0, $3, 'succeeded', 'try_on', '{}', now() - make_interval(mins => $4), 'ws_vet')`,
         [`tro-${randomBytes(4).toString('hex')}`, ownerId, inputs, ago],
       );
     }
@@ -594,8 +594,8 @@ describe('GET /api/assets?recent=uploads', () => {
   const age = (id: string, minutesAgo: number) => pool.query('update assets set created_at = now() - make_interval(mins => $2) where id = $1', [id, minutesAgo]);
   async function job(inputs: string[], { deleted = false, endAssetId }: { deleted?: boolean; endAssetId?: string } = {}) {
     await pool.query(
-      `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, status, feature, params, deleted_at)
-       values ($1, $2, 'team-unassigned', 'fal-test', 'fal', 'p', '9:16', 5, $3, 'succeeded', 'marketing', $4, $5)`,
+      `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, status, feature, params, deleted_at, workspace_id)
+       values ($1, $2, 'team-unassigned', 'fal-test', 'fal', 'p', '9:16', 5, $3, 'succeeded', 'marketing', $4, $5, 'ws_vet')`,
       [`upl-${randomBytes(4).toString('hex')}`, userId, inputs, endAssetId ? { endAssetId } : {}, deleted ? new Date() : null],
     );
   }
@@ -620,7 +620,7 @@ describe('GET /api/assets?recent=uploads', () => {
   });
 
   test("tags an upload with a visible store, refuses a hidden or unknown one, and filters by store among the caller's own photos only", async () => {
-    await pool.query(`insert into stores (id, name, code, hidden) values ('st-a', 'Shop A', 'STA', false), ('st-b', 'Shop B', 'STB', false), ('st-h', 'Shop H', 'STH', true)`);
+    await pool.query(`insert into stores (id, name, code, hidden, workspace_id) values ('st-a', 'Shop A', 'STA', false, 'ws_vet'), ('st-b', 'Shop B', 'STB', false, 'ws_vet'), ('st-h', 'Shop H', 'STH', true, 'ws_vet')`);
     const send = (who: string, name: string, storeId?: string) => upload(who, { name, bytes: png(64), storeId });
     const before = await assetCount();
     expect((await send(cookie, 'hidden.png', 'st-h')).status).toBe(400);
@@ -654,8 +654,8 @@ describe('GET /api/assets?recent=uploads', () => {
     expect((await send(ownerCookie, 'theirs.png'))[0]!.id).not.toBe(first!.id); // another member's copy is their own
 
     // An older copy (uploaded before hashing) shows once, as the newest; an unknown slot is ignored.
-    await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, sha256, slot, created_at)
-                      select 'old-copy', owner_id, 'input', 'assets/old-copy', 'old.png', mime, bytes, sha256, 'garment', now() - interval '1 day' from assets where id = $1`, [first!.id]);
+    await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, sha256, slot, created_at, workspace_id)
+                      select 'old-copy', owner_id, 'input', 'assets/old-copy', 'old.png', mime, bytes, sha256, 'garment', now() - interval '1 day', workspace_id from assets where id = $1`, [first!.id]);
     const ids = async (query: string) => (await uploads(cookie, query)).map((a) => a.id);
     expect((await ids('&slot=garment'))).toEqual([first!.id]);
     expect(await ids('&slot=model')).toEqual([]);
@@ -669,8 +669,8 @@ describe('GET /api/assets?recent=uploads', () => {
 
   test(`stops at ${UPLOADS_LIMIT}, the oldest left out, and asks for a session`, async () => {
     await pool.query(
-      `insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, created_at)
-       select 'bulk-' || n, $1, 'input', 'assets/bulk-' || n, 'bulk-' || n || '.png', 'image/png', 64, now() - make_interval(days => n) from generate_series(1, $2::int) n`,
+      `insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, created_at, workspace_id)
+       select 'bulk-' || n, $1, 'input', 'assets/bulk-' || n, 'bulk-' || n || '.png', 'image/png', 64, now() - make_interval(days => n), 'ws_vet' from generate_series(1, $2::int) n`,
       [userId, UPLOADS_LIMIT + 1],
     );
     const list = await uploads(cookie);

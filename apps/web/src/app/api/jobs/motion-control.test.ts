@@ -28,12 +28,12 @@ beforeAll(async () => {
   const res = await auth.api.signInEmail({ body: { email: 'member@example.test', password: PASSWORD }, asResponse: true });
   cookie = res.headers.getSetCookie().map((c) => c.split(';')[0]).join('; ');
   await pool.query(
-    `insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, duration_ms) values
-       ('img', $1, 'input', 'img', 'a.png', 'image/png', 1, null),
-       ('img2', $1, 'input', 'img2', 'b.png', 'image/png', 1, null),
-       ('vid', $1, 'input', 'vid', 'dance.mp4', 'video/mp4', 1, 5400),
-       ('mid', $1, 'input', 'mid', 'mid.mp4', 'video/mp4', 1, 12000),
-       ('long', $1, 'input', 'long', 'long.mp4', 'video/mp4', 1, 30500)`,
+    `insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, duration_ms, workspace_id) values
+       ('img', $1, 'input', 'img', 'a.png', 'image/png', 1, null, 'ws_vet'),
+       ('img2', $1, 'input', 'img2', 'b.png', 'image/png', 1, null, 'ws_vet'),
+       ('vid', $1, 'input', 'vid', 'dance.mp4', 'video/mp4', 1, 5400, 'ws_vet'),
+       ('mid', $1, 'input', 'mid', 'mid.mp4', 'video/mp4', 1, 12000, 'ws_vet'),
+       ('long', $1, 'input', 'long', 'long.mp4', 'video/mp4', 1, 30500, 'ws_vet')`,
     [user.id],
   );
   await pool.query(`update model_configs set enabled = true where id in ('kling-v3-motion-pro', 'kling-v3-motion-standard', 'kling-o3-pro')`);

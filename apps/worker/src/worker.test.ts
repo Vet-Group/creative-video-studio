@@ -89,7 +89,7 @@ async function waitFor<T>(what: string, fn: () => Promise<T | undefined | false>
 async function newJob(userId: string, o: { prompt?: string; estimate?: string; isMock?: boolean; provider?: string; model?: string } = {}): Promise<string> {
   const id = randomUUID();
   await pool.query(
-    `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, is_mock) values ($1, $2, 'team-unassigned', $6, $4, $3, '9:16', 5, '{}', $5)`,
+    `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, is_mock, workspace_id) values ($1, $2, 'team-unassigned', $6, $4, $3, '9:16', 5, '{}', $5, 'ws_vet')`,
     [id, userId, o.prompt ?? 'a product', o.provider ?? 'mock', o.isMock ?? false, o.model ?? 'mock-sample'],
   );
   await withTransaction(pool, (tx) => reserve(tx, id, o.estimate ?? '1.5000'));
@@ -479,7 +479,7 @@ async function storeClip(id: string, seconds: number, durationMs: number): Promi
   await mkdir(mockDir, { recursive: true });
   await run(requireFfmpeg(), ['-y', '-v', 'error', '-f', 'lavfi', '-i', 'testsrc2=size=320x240:rate=24', '-t', String(seconds), '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', file]);
   await putObject(`assets/${id}`, await readFile(file), 'video/mp4');
-  await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, duration_ms) values ($1, 'u1', 'input', $2, 'r.mp4', 'video/mp4', 1, $3)`, [id, `assets/${id}`, durationMs]);
+  await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, duration_ms, workspace_id) values ($1, 'u1', 'input', $2, 'r.mp4', 'video/mp4', 1, $3, 'ws_vet')`, [id, `assets/${id}`, durationMs]);
 }
 
 describe('Marketing Studio reference video', () => {
@@ -858,8 +858,8 @@ describe('image jobs', () => {
     const id = randomUUID();
     const resolution = o.resolution ?? '1K';
     await pool.query(
-      `insert into jobs (id, user_id, team_id, feature, model, provider, prompt, aspect, duration_s, params, input_asset_ids, is_mock)
-       values ($1, $2, 'team-unassigned', 'image', 'mock-image', 'mock', $3, $4, 0, $5, '{}', $6)`,
+      `insert into jobs (id, user_id, team_id, feature, model, provider, prompt, aspect, duration_s, params, input_asset_ids, is_mock, workspace_id)
+       values ($1, $2, 'team-unassigned', 'image', 'mock-image', 'mock', $3, $4, 0, $5, '{}', $6, 'ws_vet')`,
       [id, userId, o.prompt ?? 'a product', o.ratio ?? '3:4', JSON.stringify({ resolution, ...(o.quality && { quality: o.quality }), ...(o.thinking && { thinking: o.thinking }), ...(o.view && { view: o.view }) }), o.isMock ?? false],
     );
     await withTransaction(pool, (tx) => reserve(tx, id, resolution === '2K' ? '0.3000' : '0.1500'));
@@ -938,15 +938,15 @@ describe('image jobs', () => {
     const asset = async ([width, height]: readonly [number, number]) => {
       const id = randomUUID();
       await putObject(`assets/${id}`, await sharp({ create: { width, height, channels: 3, background: '#ccc' } }).png().toBuffer(), 'image/png');
-      await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) values ($1, 'u1', 'input', $2, 'p.png', 'image/png', 1)`, [id, `assets/${id}`]);
+      await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, workspace_id) values ($1, 'u1', 'input', $2, 'p.png', 'image/png', 1, 'ws_vet')`, [id, `assets/${id}`]);
       return id;
     };
     const inputs = [];
     for (const size of sizes) inputs.push(await asset(size));
     const id = randomUUID();
     await pool.query(
-      `insert into jobs (id, user_id, team_id, feature, model, provider, prompt, aspect, duration_s, params, input_asset_ids)
-       values ($1, 'u1', 'team-unassigned', $2, 'mock-image', 'mock', 'p', 'auto', 0, '{"resolution": "1K"}', $3)`,
+      `insert into jobs (id, user_id, team_id, feature, model, provider, prompt, aspect, duration_s, params, input_asset_ids, workspace_id)
+       values ($1, 'u1', 'team-unassigned', $2, 'mock-image', 'mock', 'p', 'auto', 0, '{"resolution": "1K"}', $3, 'ws_vet')`,
       [id, feature, inputs],
     );
     await withTransaction(pool, (tx) => reserve(tx, id, '0.1500'));
@@ -1118,8 +1118,8 @@ describe('Smart Remake', () => {
     // No remake is queued here, so a subscribed worker runs none; the key is dropped anyway so none could reach fal.
     delete process.env.FAL_KEY;
     delete process.env.FAL_KEY_NEXT;
-    await pool.query(`insert into analyses (id, user_id, team_id, source_key, status) values ('an-sweep', 'u1', 'team-unassigned', 's', 'succeeded')`);
-    await pool.query(`insert into remakes (id, user_id, team_id, analysis_id, shots, status, started_at) values ('rm-sweep', 'u1', 'team-unassigned', 'an-sweep', '[1]', 'running', now() - interval '1 day')`);
+    await pool.query(`insert into analyses (id, user_id, team_id, source_key, status, workspace_id) values ('an-sweep', 'u1', 'team-unassigned', 's', 'succeeded', 'ws_vet')`);
+    await pool.query(`insert into remakes (id, user_id, team_id, analysis_id, shots, status, started_at, workspace_id) values ('rm-sweep', 'u1', 'team-unassigned', 'an-sweep', '[1]', 'running', now() - interval '1 day', 'ws_vet')`);
     const remake = async () => (await pool.query(`select status from remakes where id = 'rm-sweep'`)).rows[0].status;
     await (await start(counting(300))).reconcile();
     expect(await remake()).toBe('running');
@@ -1139,15 +1139,15 @@ describe('the duration backfill', () => {
     await mkdir(mockDir, { recursive: true });
     await run(requireFfmpeg(), ['-y', '-v', 'error', '-f', 'lavfi', '-i', 'testsrc2=size=720x1280:rate=24', '-t', '3.7', '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', file]);
     await putObject('assets/bf-video', await readFile(file), 'video/mp4');
-    await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) values ('bf-video', 'u1', 'output', 'assets/bf-video', 'bf.mp4', 'video/mp4', 10)`);
+    await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, workspace_id) values ('bf-video', 'u1', 'output', 'assets/bf-video', 'bf.mp4', 'video/mp4', 10, 'ws_vet')`);
     await pool.query(
-      `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, feature, status, output_asset_id)
-       values ('bf-job', 'u1', 'team-unassigned', 'mock-sample', 'fal', 'p', '9:16', 6, '{}', 'motion_control', 'succeeded', 'bf-video')`,
+      `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, feature, status, output_asset_id, workspace_id)
+       values ('bf-job', 'u1', 'team-unassigned', 'mock-sample', 'fal', 'p', '9:16', 6, '{}', 'motion_control', 'succeeded', 'bf-video', 'ws_vet')`,
     );
     for (const [kind, usd, final] of [['estimate', '0.7560', false], ['actual_adjustment', '0.0000', true]] as const) {
       await pool.query(
-        `insert into cost_entries (kind, usd, month, day, user_id, team_id, job_id, is_final)
-         select $2, $3, to_char(created_at at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM'), (created_at at time zone 'Asia/Ho_Chi_Minh')::date, user_id, team_id, id, $4 from jobs where id = $1`,
+        `insert into cost_entries (kind, usd, month, day, user_id, team_id, job_id, is_final, workspace_id)
+         select $2, $3, to_char(created_at at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM'), (created_at at time zone 'Asia/Ho_Chi_Minh')::date, user_id, team_id, id, $4, workspace_id from jobs where id = $1`,
         ['bf-job', kind, usd, final],
       );
     }

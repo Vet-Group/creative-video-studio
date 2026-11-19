@@ -35,7 +35,7 @@ beforeAll(async () => {
     cookies[name] = res.headers.getSetCookie().map((c) => c.split(';')[0]).join('; ');
   }
   for (const [id, kind, mime, bytes] of [['clip', 'output', 'video/mp4', 1], ['clip2', 'output', 'video/mp4', 1], ['clip3', 'output', 'video/mp4', 1], ['pic', 'output', 'image/png', 1], ['upload', 'input', 'video/mp4', 1], ['huge', 'output', 'video/mp4', COMPRESS_MAX_BYTES + 1]]) {
-    await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) values ($1, $2, $3, concat('assets/', $1::text), $1, $4, $5)`, [id, ids.owner, kind, mime, bytes]);
+    await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, workspace_id) values ($1, $2, $3, concat('assets/', $1::text), $1, $4, $5, 'ws_vet')`, [id, ids.owner, kind, mime, bytes]);
   }
 });
 

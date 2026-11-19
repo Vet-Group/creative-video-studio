@@ -77,7 +77,7 @@ Root rows carry it; children are reached through their parent.
 |---|---|---|
 | 1. Expand + backfill | Migration only (plus `schema.ts` and its snapshot): the two tables; `ws_vet` "VET Group"; every user a member (Admin → owner, others → member); `workspace_id` on the tables of §2, filled by a constant default `ws_vet`; indexes for the list queries; `SET LOCAL lock_timeout`. | None |
 | 2. Code switch | The resolver in `guard()`/`currentUser()`; every path of the appendix scoped, own rows included; inserts write `workspace_id`; worker outputs and ledger rows inherit it; dedupe per workspace; the `x-cvs-workspace` check; impersonation and cost rules; memberships for users created after phase 1. An isolation e2e suite with a company user, a partner user and a user in both asserts nothing crosses in either direction. | None for company users |
-| 2b. Contract | Drop the `workspace_id` defaults (a deploy after phase 2). | None |
+| 2b. Contract | Drop the `workspace_id` defaults (a deploy after phase 2). Done in migration 0110; a schema test fails if any `workspace_id` regains a default. | None |
 | 3. Management | Admin: Workspaces page (create with an owner, disable, members, counts and monthly cost). Owner: Members page. A workspace switcher in the shell when a user has two or more. Company-only surfaces hidden in a partner workspace (Lark reminder, team, editor tools, costs). | New pages |
 
 Migrations are forward-only and drizzle skips a migration older than the last applied one, so a migration branch is regenerated on top of any migration merged before it. Before each deploy that migrates, take a backup (`scripts/run/vet.sh backup`); rollback is restoring it and deploying the previous commit.

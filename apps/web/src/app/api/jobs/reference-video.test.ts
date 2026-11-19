@@ -41,22 +41,22 @@ beforeAll(async () => {
   const res = await auth.api.signInEmail({ body: { email: 'member@example.test', password: PASSWORD }, asResponse: true });
   cookie = res.headers.getSetCookie().map((c) => c.split(';')[0]).join('; ');
   await pool.query(
-    `insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, duration_ms) values
-       ('img', $1, 'input', 'img', 'a.png', 'image/png', 1, null),
-       ('img2', $1, 'input', 'img2', 'b.png', 'image/png', 1, null),
-       ('img3', $1, 'input', 'img3', 'c.png', 'image/png', 1, null),
-       ('img4', $1, 'input', 'img4', 'd.png', 'image/png', 1, null),
-       ('img5', $1, 'input', 'img5', 'e.png', 'image/png', 1, null),
-       ('rv', $1, 'input', 'rv', 'ref.mp4', 'video/mp4', 1000, 4200),
-       ('rv-mov', $1, 'input', 'rv-mov', 'ref.mov', 'video/quicktime', 1000, 5000),
-       ('rv-short', $1, 'input', 'rv-short', 's.mp4', 'video/mp4', 1000, 2500),
-       ('rv-long', $1, 'input', 'rv-long', 'l.mp4', 'video/mp4', 1000, 20000),
-       ('rv-big', $1, 'input', 'rv-big', 'b.mp4', 'video/mp4', 60000000, 5000),
-       ('rv-theirs', $2, 'input', 'rv-theirs', 't.mp4', 'video/mp4', 1000, 5000),
-       ('rv-small', $1, 'input', 'rv-small', 'small.mp4', 'video/mp4', 1000, 5000),
-       ('rv-slow', $1, 'input', 'rv-slow', 'slow.mp4', 'video/mp4', 1000, 5000),
-       ('rv-720', $1, 'input', 'rv-720', 'ok.mp4', 'video/mp4', 1000, 5000),
-       ('aud', $1, 'input', 'aud', 'a.mp3', 'audio/mpeg', 1, 5000)`,
+    `insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, duration_ms, workspace_id) values
+       ('img', $1, 'input', 'img', 'a.png', 'image/png', 1, null, 'ws_vet'),
+       ('img2', $1, 'input', 'img2', 'b.png', 'image/png', 1, null, 'ws_vet'),
+       ('img3', $1, 'input', 'img3', 'c.png', 'image/png', 1, null, 'ws_vet'),
+       ('img4', $1, 'input', 'img4', 'd.png', 'image/png', 1, null, 'ws_vet'),
+       ('img5', $1, 'input', 'img5', 'e.png', 'image/png', 1, null, 'ws_vet'),
+       ('rv', $1, 'input', 'rv', 'ref.mp4', 'video/mp4', 1000, 4200, 'ws_vet'),
+       ('rv-mov', $1, 'input', 'rv-mov', 'ref.mov', 'video/quicktime', 1000, 5000, 'ws_vet'),
+       ('rv-short', $1, 'input', 'rv-short', 's.mp4', 'video/mp4', 1000, 2500, 'ws_vet'),
+       ('rv-long', $1, 'input', 'rv-long', 'l.mp4', 'video/mp4', 1000, 20000, 'ws_vet'),
+       ('rv-big', $1, 'input', 'rv-big', 'b.mp4', 'video/mp4', 60000000, 5000, 'ws_vet'),
+       ('rv-theirs', $2, 'input', 'rv-theirs', 't.mp4', 'video/mp4', 1000, 5000, 'ws_vet'),
+       ('rv-small', $1, 'input', 'rv-small', 'small.mp4', 'video/mp4', 1000, 5000, 'ws_vet'),
+       ('rv-slow', $1, 'input', 'rv-slow', 'slow.mp4', 'video/mp4', 1000, 5000, 'ws_vet'),
+       ('rv-720', $1, 'input', 'rv-720', 'ok.mp4', 'video/mp4', 1000, 5000, 'ws_vet'),
+       ('aud', $1, 'input', 'aud', 'a.mp3', 'audio/mpeg', 1, 5000, 'ws_vet')`,
     [user.id, other.user.id],
   );
   // Files whose headers give a picture size and a frame rate; the other clips have no object, so their headers cannot be read.
@@ -147,7 +147,7 @@ describe('a retry', () => {
   test('keeps the clip and is refused once it was deleted', async () => {
     const { id } = (await (await advanced()).json()) as { id: string };
     await pool.query(`update jobs set status = 'failed' where id = $1`, [id]);
-    await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, duration_ms) select 'rv-gone', owner_id, 'input', 'rv-gone', 'g.mp4', 'video/mp4', 1000, 5000 from assets where id = 'rv'`);
+    await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, duration_ms, workspace_id) select 'rv-gone', owner_id, 'input', 'rv-gone', 'g.mp4', 'video/mp4', 1000, 5000, workspace_id from assets where id = 'rv'`);
     const second = (await (await advanced({ params: { videoAssetId: 'rv-gone' } })).json()) as { id: string };
     await pool.query(`update jobs set status = 'failed' where id = $1`, [second.id]);
     await pool.query(`update assets set deleted_at = now() where id = 'rv-gone'`);

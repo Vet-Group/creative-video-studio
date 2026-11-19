@@ -96,8 +96,8 @@ describe('the BytePlus Seedance 2.0 resource pack in GET /api/admin/costs/balanc
     const id = `pack-job-${++n}`;
     await pool.query(`insert into users (id, email, name) values ('pack-u', 'pack-u@example.test', 'u') on conflict do nothing`);
     await pool.query(
-      `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, status, provider_tokens, finished_at)
-       values ($1, 'pack-u', 'team-unassigned', $2, 'byteplus', 'p', '9:16', 5, '{}', $3, $4, $5)`,
+      `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, status, provider_tokens, finished_at, workspace_id)
+       values ($1, 'pack-u', 'team-unassigned', $2, 'byteplus', 'p', '9:16', 5, '{}', $3, $4, $5, 'ws_vet')`,
       [id, model, status, tokens, finishedAt],
     );
   }

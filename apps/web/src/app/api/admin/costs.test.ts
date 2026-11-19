@@ -124,8 +124,8 @@ const sumVnd = (values: string[]) => String(values.reduce((t, v) => t + BigInt(v
 
 async function open(id: string, userId: string, teamId: string, storeId: string | null, provider: 'fal' | 'vertex', createdAt: string, estimate: string) {
   await pool.query(
-    `insert into jobs (id, user_id, team_id, store_id, model, provider, prompt, aspect, duration_s, input_asset_ids, created_at)
-     values ($1, $2, $3, $4, $5, $6, 'p', '9:16', 5, '{}', $7)`,
+    `insert into jobs (id, user_id, team_id, store_id, model, provider, prompt, aspect, duration_s, input_asset_ids, created_at, workspace_id)
+     values ($1, $2, $3, $4, $5, $6, 'p', '9:16', 5, '{}', $7, 'ws_vet')`,
     [id, userId, teamId, storeId, provider === 'fal' ? 'fal-test' : 'vtx-test', provider, createdAt],
   );
   await reserve(pool, id, estimate);
@@ -140,7 +140,7 @@ beforeAll(async () => {
   admin = await newUser('admin@example.test', 'admin');
   member = await newUser('member@example.test', 'member');
   await pool.query(`insert into teams (id, name, cost_centre_code) values ('t1', 'Alpha, Inc', 'CC-A'), ('t2', 'Beta', null), ('t3', 'Gamma', 'CC-G')`);
-  await pool.query(`insert into stores (id, name, code) values ('s1', 'Shop A', 'CODE-A'), ('s2', 'Shop B', 'CODE-B')`);
+  await pool.query(`insert into stores (id, name, code, workspace_id) values ('s1', 'Shop A', 'CODE-A', 'ws_vet'), ('s2', 'Shop B', 'CODE-B', 'ws_vet')`);
   await pool.query(
     `insert into users (id, email, name, team_id) values ('alice', 'alice@example.test', 'Alice', 't1'), ('bob', 'bob@example.test', 'Bob', 't2'), ('carol', 'carol@example.test', 'Carol', 't1')`,
   );
@@ -148,7 +148,7 @@ beforeAll(async () => {
     `insert into model_configs (id, provider, endpoint, label, ratios, durations_sec, max_images, output_resolution, usd_per_second, sources, enabled)
      values ('fal-test', 'fal', 'x', 'Fal test', '{9:16}', '{5}', 2, '720p', 0.2, '{}', true), ('vtx-test', 'vertex', 'x', 'Vertex test', '{9:16}', '{5}', 2, '720p', 0.4, '{}', true)`,
   );
-  await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) values ('out', 'alice', 'output', 'out.mp4', 'out.mp4', 'video/mp4', 1)`);
+  await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, workspace_id) values ('out', 'alice', 'output', 'out.mp4', 'out.mp4', 'video/mp4', 1, 'ws_vet')`);
 
   // j1: Alice in Alpha (t1), Shop A. Estimate 1.6, real cost 2.0 -> +0.4. Marked Pass.
   await open('j1', 'alice', 't1', 's1', 'fal', '2026-09-10 10:00:00+07', '1.6000');
@@ -601,7 +601,7 @@ describe("a Member's own month-to-date total", () => {
     expect(await ledgerSum()).toBe('2.0000');
 
     // A suggestion run has no job, and still counts.
-    await pool.query(`insert into suggestion_runs (id, user_id, input, status, cost_usd) values ('mtd-run', $1, '{}', 'succeeded', 0.0005)`, [member.id]);
+    await pool.query(`insert into suggestion_runs (id, user_id, input, status, cost_usd, workspace_id) values ('mtd-run', $1, '{}', 'succeeded', 0.0005, 'ws_vet')`, [member.id]);
     const { bookLlm } = await import('@cvs/core/ledger');
     await bookLlm(pool, { suggestion: 'mtd-run' }, { costUsd: 0.0005, provider: 'fal', model: 'google/gemini-2.5-flash' });
     expect(await toDate()).toEqual({ usd: '2.0005', provisional: false });
@@ -613,8 +613,8 @@ describe('the image and apps features on the Costs page', () => {
   const FM = '2031-08';
   async function featureJob(id: string, feature: string, estimate: string) {
     await pool.query(
-      `insert into jobs (id, user_id, team_id, store_id, model, provider, prompt, aspect, duration_s, input_asset_ids, created_at, feature)
-       values ($1, 'bob', 't2', null, 'fal-test', 'fal', 'p', '1:1', 5, '{}', '2031-08-10T03:00:00Z', $2)`,
+      `insert into jobs (id, user_id, team_id, store_id, model, provider, prompt, aspect, duration_s, input_asset_ids, created_at, feature, workspace_id)
+       values ($1, 'bob', 't2', null, 'fal-test', 'fal', 'p', '1:1', 5, '{}', '2031-08-10T03:00:00Z', $2, 'ws_vet')`,
       [id, feature],
     );
     await reserve(pool, id, estimate);
@@ -652,7 +652,7 @@ describe('LLM calls on the Costs page', () => {
     // Alice (Gamma, Shop A): a video job estimated 2.0 with its Enhance 0.0004. Bob (Beta): a suggestion run 0.0006 with no job.
     await open('lj1', 'alice', 't3', 's1', 'fal', '2031-09-10T03:00:00Z', '2.0000');
     expect(await bookLlm(pool, { enhance: 'lj1' }, { costUsd: 0.0004, provider: 'fal', model: 'google/gemini-2.5-flash' })).toBe(true);
-    await pool.query(`insert into suggestion_runs (id, user_id, input, status, cost_usd, created_at) values ('lr1', 'bob', '{}', 'succeeded', 0.0006, '2031-09-11T03:00:00Z')`);
+    await pool.query(`insert into suggestion_runs (id, user_id, input, status, cost_usd, created_at, workspace_id) values ('lr1', 'bob', '{}', 'succeeded', 0.0006, '2031-09-11T03:00:00Z', 'ws_vet')`);
     expect(await bookLlm(pool, { suggestion: 'lr1' }, { costUsd: 0.0006, provider: 'fal', model: 'google/gemini-2.5-flash' })).toBe(true);
 
     const p = (await page(LM)) as Page & { byFeature: { id: string; name: string; usd: string }[] };
@@ -689,8 +689,8 @@ describe('LLM calls on the Costs page', () => {
 
   test('a Smart Remake’s fal calls show on the LLM line but count in the video budget, as the caps count them', async () => {
     const { bookLlm } = await import('@cvs/core/ledger');
-    await pool.query(`insert into analyses (id, user_id, team_id, store_id, source_key, status, created_at) values ('ra1', 'alice', 't3', 's1', 's', 'succeeded', '2031-11-10T03:00:00Z')`);
-    await pool.query(`insert into remakes (id, user_id, team_id, store_id, analysis_id, shots, created_at) values ('rm1', 'alice', 't3', 's1', 'ra1', '[1]', '2031-11-10T03:00:00Z')`);
+    await pool.query(`insert into analyses (id, user_id, team_id, store_id, source_key, status, created_at, workspace_id) values ('ra1', 'alice', 't3', 's1', 's', 'succeeded', '2031-11-10T03:00:00Z', 'ws_vet')`);
+    await pool.query(`insert into remakes (id, user_id, team_id, store_id, analysis_id, shots, created_at, workspace_id) values ('rm1', 'alice', 't3', 's1', 'ra1', '[1]', '2031-11-10T03:00:00Z', 'ws_vet')`);
     expect(await bookLlm(pool, { remake: 'rm1', step: '1:edit' }, { costUsd: 0.0398, provider: 'fal', model: 'fal-ai/nano-banana/edit' })).toBe(true);
     expect(await bookLlm(pool, { remake: 'rm1', step: '1:video' }, { costUsd: 0.108, provider: 'fal', model: 'fal-ai/bytedance/seedance/v1/pro/fast/image-to-video' })).toBe(true);
     const p = (await page('2031-11')) as Page & { byFeature: { id: string; name: string; usd: string }[] };
@@ -720,12 +720,12 @@ describe('the analysis on the Costs page: cost per accepted clip, by model, by d
     await succeed('cj1', '2.0000');
     expect(await bookLlm(pool, { enhance: 'cj1' }, { costUsd: 0.001, provider: 'openai', model: 'gpt-6-luna' })).toBe(true);
     await pool.query(
-      `insert into jobs (id, user_id, team_id, store_id, model, provider, prompt, aspect, duration_s, input_asset_ids, created_at, feature)
-       values ('cj2', 'alice', 't3', null, 'fal-test', 'fal', 'p', '1:1', 5, '{}', '2032-02-05T03:00:00Z', 'try_on')`,
+      `insert into jobs (id, user_id, team_id, store_id, model, provider, prompt, aspect, duration_s, input_asset_ids, created_at, feature, workspace_id)
+       values ('cj2', 'alice', 't3', null, 'fal-test', 'fal', 'p', '1:1', 5, '{}', '2032-02-05T03:00:00Z', 'try_on', 'ws_vet')`,
     );
     await reserve(pool, 'cj2', '0.5000');
     await pool.query(`insert into verdicts (id, job_id, verdict, fault, marked_by) values ('cv1', 'cj1', 'pass', null, $1), ('cv2', 'cj2', 'pass', null, $1)`, [admin.id]);
-    await pool.query(`insert into suggestion_runs (id, user_id, input, status, cost_usd, created_at) values ('cr1', 'alice', '{}', 'succeeded', 0.0006, '2032-02-05T04:00:00Z')`);
+    await pool.query(`insert into suggestion_runs (id, user_id, input, status, cost_usd, created_at, workspace_id) values ('cr1', 'alice', '{}', 'succeeded', 0.0006, '2032-02-05T04:00:00Z', 'ws_vet')`);
     expect(await bookLlm(pool, { suggestion: 'cr1' }, { costUsd: 0.0006, provider: 'openai', model: 'gpt-6-luna' })).toBe(true);
     await bookShared(pool, { kind: 'bakeoff', usd: '1.0000', month: AM, provider: 'fal', ref: 'bakeoff-fal-2032-02' });
     await bookShared(pool, { kind: 'bakeoff', usd: '4.0000', month: '2032-01', provider: 'fal', ref: 'bakeoff-fal-2032-01' });

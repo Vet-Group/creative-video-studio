@@ -26,19 +26,19 @@ test('401 without a session; a member reads only their own usage beside the Admi
   for (const email of ['me@example.test', 'other@example.test']) await auth.api.createUser({ body: { email, name: email, password, role: 'member' } });
   const other = (await pool.query(`select id from users where email = 'other@example.test'`)).rows[0].id;
   await pool.query(
-    `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids) values ('job-other', $1, 'team-unassigned', 'kling-o3-pro', 'fal', 'p', '9:16', 5, '{}')`,
+    `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, workspace_id) values ('job-other', $1, 'team-unassigned', 'kling-o3-pro', 'fal', 'p', '9:16', 5, '{}', 'ws_vet')`,
     [other],
   );
   const me = (await pool.query(`select id from users where email = 'me@example.test'`)).rows[0].id;
   await pool.query(
-    `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids) values ('job-me', $1, 'team-unassigned', 'kling-o3-pro', 'fal', 'p', '9:16', 5, '{}')`,
+    `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, workspace_id) values ('job-me', $1, 'team-unassigned', 'kling-o3-pro', 'fal', 'p', '9:16', 5, '{}', 'ws_vet')`,
     [me],
   );
   // A closed cost on each clip: only the caller's reaches their month total.
   for (const [job, user, usd] of [['job-me', me, '2.5000'], ['job-other', other, '9.0000']])
     await pool.query(
-      `insert into cost_entries (kind, usd, month, day, user_id, team_id, job_id, provider, model, is_final, ref)
-       values ('estimate', $3, to_char(now() at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM'), (now() at time zone 'Asia/Ho_Chi_Minh')::date, $2, 'team-unassigned', $1, 'fal', 'kling-o3-pro', true, $1)`,
+      `insert into cost_entries (kind, usd, month, day, user_id, team_id, job_id, provider, model, is_final, ref, workspace_id)
+       values ('estimate', $3, to_char(now() at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM'), (now() at time zone 'Asia/Ho_Chi_Minh')::date, $2, 'team-unassigned', $1, 'fal', 'kling-o3-pro', true, $1, 'ws_vet')`,
       [job, user, usd],
     );
   await pool.query('update settings set member_daily_clip_cap = 7, member_daily_usd_cap = 12, member_monthly_usd_cap = 80 where id = 1');

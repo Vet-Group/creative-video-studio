@@ -35,7 +35,7 @@ beforeAll(async () => {
   admin = await newUser('admin@example.test', 'admin');
   member = await newUser('member@example.test', 'member');
   await pool.query(`update model_configs set enabled = false where id in ('veo-3.1', 'veo-3.1-vertex')`); // migration 0075 enables them; this file lists only its own models
-  await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) values ('in-1', $1, 'input', 'in-1', 'a.png', 'image/png', 1)`, [member.id]);
+  await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, workspace_id) values ('in-1', $1, 'input', 'in-1', 'a.png', 'image/png', 1, 'ws_vet')`, [member.id]);
 });
 
 afterAll(async () => {
@@ -70,10 +70,10 @@ describe('the model picker', () => {
   test('real jobs that fail lower the score, so the badge and the pre-selection move to the other model; mock jobs do not count', async () => {
     await pool.query(`update model_configs set enabled = true where id = 'seedance-2.5-byteplus'`);
     await pool.query(
-      `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, status, is_mock) values
-         ('fail-1', $1, 'team-unassigned', 'kling-o3-pro', 'fal', 'p', '9:16', 8, '{}', 'failed', false),
-         ('fail-2', $1, 'team-unassigned', 'kling-o3-pro', 'fal', 'p', '9:16', 8, '{}', 'timed_out', false),
-         ('fail-mock', $1, 'team-unassigned', 'kling-o3-pro', 'fal', 'p', '9:16', 8, '{}', 'failed', true)`,
+      `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, status, is_mock, workspace_id) values
+         ('fail-1', $1, 'team-unassigned', 'kling-o3-pro', 'fal', 'p', '9:16', 8, '{}', 'failed', false, 'ws_vet'),
+         ('fail-2', $1, 'team-unassigned', 'kling-o3-pro', 'fal', 'p', '9:16', 8, '{}', 'timed_out', false, 'ws_vet'),
+         ('fail-mock', $1, 'team-unassigned', 'kling-o3-pro', 'fal', 'p', '9:16', 8, '{}', 'failed', true, 'ws_vet')`,
       [member.id],
     );
     const after = await picker(member.cookie);
@@ -85,7 +85,7 @@ describe('the model picker', () => {
 
   test('adds the marked clips of a model to its seed: (seed passes + marked passes) / (seed n + marked n)', async () => {
     await pool.query(
-      `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids) values ('marked-1', $1, 'team-unassigned', 'kling-o3-pro', 'fal', 'p', '9:16', 8, '{}'), ('unmarked-1', $1, 'team-unassigned', 'kling-o3-pro', 'fal', 'p', '9:16', 8, '{}')`,
+      `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, workspace_id) values ('marked-1', $1, 'team-unassigned', 'kling-o3-pro', 'fal', 'p', '9:16', 8, '{}', 'ws_vet'), ('unmarked-1', $1, 'team-unassigned', 'kling-o3-pro', 'fal', 'p', '9:16', 8, '{}', 'ws_vet')`,
       [member.id],
     );
     await pool.query(`insert into verdicts (id, job_id, verdict, marked_by) values ('v-marked', 'marked-1', 'pass', $1)`, [member.id]);

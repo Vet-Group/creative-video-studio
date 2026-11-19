@@ -53,7 +53,7 @@ const seams = (over: Partial<RemakeSeams> = {}): RemakeSeams => ({
 let seq = 0;
 async function queued(shots: number[], product = 'prod'): Promise<string> {
   const id = `rm-${++seq}`;
-  await pool.query(`insert into remakes (id, user_id, team_id, store_id, analysis_id, product_asset_id, shots) values ($1, 'u1', 'team-unassigned', null, 'an1', $2, $3)`, [id, product, JSON.stringify(shots)]);
+  await pool.query(`insert into remakes (id, user_id, team_id, store_id, analysis_id, product_asset_id, shots, workspace_id) values ($1, 'u1', 'team-unassigned', null, 'an1', $2, $3, 'ws_vet')`, [id, product, JSON.stringify(shots)]);
   return id;
 }
 const row = async (id: string) => (await pool.query('select status, result, output_asset_id, cost_usd::text as cost_usd, error from remakes where id = $1', [id])).rows[0];
@@ -69,8 +69,8 @@ beforeAll(async () => {
   sourceVideo = await make(join(dir, 'source.mp4'), 2, 'blue');
   clipVideo = await make(join(dir, 'clip.mp4'), 2, 'green'); // what the edit answers for a 1 s shot sent as 2 s
   await pool.query(`insert into users (id, email, name) values ('u1', 'u1@example.test', 'u1')`);
-  await pool.query(`insert into analyses (id, user_id, team_id, source_key, status, result) values ('an1', 'u1', 'team-unassigned', 'sources/ref.mp4', 'succeeded', $1)`, [JSON.stringify(analysis)]);
-  await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) values ('prod', 'u1', 'input', 's3/prod', 'shirt.png', 'image/png', 4), ('gone', 'u1', 'input', 's3/gone', 'old.png', 'image/png', 4)`);
+  await pool.query(`insert into analyses (id, user_id, team_id, source_key, status, result, workspace_id) values ('an1', 'u1', 'team-unassigned', 'sources/ref.mp4', 'succeeded', $1, 'ws_vet')`, [JSON.stringify(analysis)]);
+  await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, workspace_id) values ('prod', 'u1', 'input', 's3/prod', 'shirt.png', 'image/png', 4, 'ws_vet'), ('gone', 'u1', 'input', 's3/gone', 'old.png', 'image/png', 4, 'ws_vet')`);
   await pool.query(`update assets set deleted_at = now() where id = 'gone'`);
 });
 afterAll(async () => {
@@ -171,10 +171,10 @@ test('a shot missing from the analysis fails alone; more shots than the cap fail
 
 test('a shot that starts a merged scene is remade over the whole scene, and its clip is cut back to the scene’s length', async () => {
   const s = (index: number, start: number, end: number, prompt: string) => ({ index, start, end, role: 'proof', prompt });
-  await pool.query(`insert into analyses (id, user_id, team_id, source_key, status, result) values ('an-merged', 'u1', 'team-unassigned', 'sources/ref.mp4', 'succeeded', $1)`, [
+  await pool.query(`insert into analyses (id, user_id, team_id, source_key, status, result, workspace_id) values ('an-merged', 'u1', 'team-unassigned', 'sources/ref.mp4', 'succeeded', $1, 'ws_vet')`, [
     JSON.stringify({ ...analysis, shots: [s(1, 0, 0.6, 'Pan.'), s(2, 0.6, 1.7, 'Pan.'), s(3, 1.7, 2, 'Spin.')] }),
   ]);
-  await pool.query(`insert into remakes (id, user_id, team_id, analysis_id, product_asset_id, shots) values ('rm-merged', 'u1', 'team-unassigned', 'an-merged', 'prod', '[1]')`);
+  await pool.query(`insert into remakes (id, user_id, team_id, analysis_id, product_asset_id, shots, workspace_id) values ('rm-merged', 'u1', 'team-unassigned', 'an-merged', 'prod', '[1]', 'ws_vet')`);
   calls = [];
   // The edit answers with the clip it was sent (2 s: the 1.7 s scene held on its last frame), so the stored clip shows what was cut.
   await runRemake(pool, 'rm-merged', seams({ edit: async (clip, _product, _prompt, seconds) => (calls.push(`edit ${seconds}s`), { video: clip, costUsd: 0.2 }) }));
@@ -186,10 +186,10 @@ test('a shot that starts a merged scene is remade over the whole scene, and its 
 });
 
 test('a shot past the end of the source fails before any paid call', async () => {
-  await pool.query(`insert into analyses (id, user_id, team_id, source_key, status, result) values ('an-late', 'u1', 'team-unassigned', 'sources/ref.mp4', 'succeeded', $1)`, [
+  await pool.query(`insert into analyses (id, user_id, team_id, source_key, status, result, workspace_id) values ('an-late', 'u1', 'team-unassigned', 'sources/ref.mp4', 'succeeded', $1, 'ws_vet')`, [
     JSON.stringify({ ...analysis, shots: [{ index: 1, start: 10, end: 11, role: 'hook', prompt: 'Late.' }] }),
   ]);
-  await pool.query(`insert into remakes (id, user_id, team_id, analysis_id, product_asset_id, shots) values ('rm-late', 'u1', 'team-unassigned', 'an-late', 'prod', '[1]')`);
+  await pool.query(`insert into remakes (id, user_id, team_id, analysis_id, product_asset_id, shots, workspace_id) values ('rm-late', 'u1', 'team-unassigned', 'an-late', 'prod', '[1]', 'ws_vet')`);
   calls = [];
   await runRemake(pool, 'rm-late', seams());
   expect(await row('rm-late')).toMatchObject({ status: 'failed', output_asset_id: null, error: 'shot 1 is not in the video', cost_usd: '0.000000' });

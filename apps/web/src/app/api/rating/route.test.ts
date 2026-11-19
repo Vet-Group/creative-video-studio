@@ -40,8 +40,8 @@ const due = async (cookie: string) => ((await (await get(cookie)).json()) as { d
 async function jobs(userId: string, n: number, set = '') {
   for (let i = 0; i < n; i++) {
     await pool.query(
-      `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, feature, status, is_mock)
-       values ($1, $2, 'team-unassigned', 'kling-o3-pro', 'fal', 'p', '9:16', 5, '{}', 'video', 'succeeded', false)`,
+      `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, feature, status, is_mock, workspace_id)
+       values ($1, $2, 'team-unassigned', 'kling-o3-pro', 'fal', 'p', '9:16', 5, '{}', 'video', 'succeeded', false, 'ws_vet')`,
       [randomUUID(), userId],
     );
   }

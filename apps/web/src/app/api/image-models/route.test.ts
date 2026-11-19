@@ -85,8 +85,8 @@ describe('GET /api/image-models', () => {
     await pool.query(`update model_configs set pass_seed_passes = 8, pass_seed_total = 10 where id = 't-both'`);
     const memberId = (await pool.query(`select id from users where email = 'member@example.test'`)).rows[0].id;
     await pool.query(
-      `insert into jobs (id, user_id, team_id, feature, model, provider, prompt, aspect, duration_s, input_asset_ids, status)
-       values ('img-1', $1, 'team-unassigned', 'image', 't-both', 'fal', 'p', 'auto', 0, '{}', 'succeeded')`,
+      `insert into jobs (id, user_id, team_id, feature, model, provider, prompt, aspect, duration_s, input_asset_ids, status, workspace_id)
+       values ('img-1', $1, 'team-unassigned', 'image', 't-both', 'fal', 'p', 'auto', 0, '{}', 'succeeded', 'ws_vet')`,
       [memberId],
     );
     await pool.query(`insert into verdicts (id, job_id, verdict, fault, marked_by) values ('v-img-1', 'img-1', 'fail', 'other', $1)`, [memberId]);

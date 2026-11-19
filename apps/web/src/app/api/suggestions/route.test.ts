@@ -80,8 +80,8 @@ describe('/api/suggestions', () => {
 
   test(`allows ${SUGGEST_DAILY_LIMIT} runs a day per member and refuses the next with 429`, async () => {
     const [u, other] = [await newUser(), await newUser()];
-    await pool.query(`insert into suggestion_runs (id, user_id, input) select 'seed-' || g, $1, '{}' from generate_series(1, $2) g`, [u.id, SUGGEST_DAILY_LIMIT - 1]);
-    await pool.query(`insert into suggestion_runs (id, user_id, input, created_at) values ('yesterday', $1, '{}', now() - interval '2 days')`, [u.id]); // not today
+    await pool.query(`insert into suggestion_runs (id, user_id, input, workspace_id) select 'seed-' || g, $1, '{}', 'ws_vet' from generate_series(1, $2) g`, [u.id, SUGGEST_DAILY_LIMIT - 1]);
+    await pool.query(`insert into suggestion_runs (id, user_id, input, created_at, workspace_id) values ('yesterday', $1, '{}', now() - interval '2 days', 'ws_vet')`, [u.id]); // not today
     expect((await ask(u, { field: 'brief' })).status).toBe(202);
     const res = await ask(u, { field: 'brief' });
     expect([res.status, await error(res)]).toEqual([429, `Bạn đã dùng hết ${SUGGEST_DAILY_LIMIT} lượt gợi ý hôm nay. Mai hãy thử lại.`]);
@@ -252,7 +252,7 @@ describe('/api/suggestions', () => {
 
   test("puts the member's own hook and location phrases in the context, and refuses another member's private one", async () => {
     const [u, other] = [await newUser(), await newUser()];
-    const choice = (id: string, userId: string, kind: string, phrase: string) => pool.query(`insert into user_choices (id, user_id, kind, name, phrase) values ($1, $2, $3, 'n', $4)`, [id, userId, kind, phrase]);
+    const choice = (id: string, userId: string, kind: string, phrase: string) => pool.query(`insert into user_choices (id, user_id, kind, name, phrase, workspace_id) values ($1, $2, $3, 'n', $4, 'ws_vet')`, [id, userId, kind, phrase]);
     await choice(`${u.id}-hook`, u.id, 'hook', 'The creator waves.');
     await choice(`${u.id}-spot`, u.id, 'location', 'a small cafe');
     await choice(`${other.id}-hook`, other.id, 'hook', 'Secret.');
@@ -283,7 +283,7 @@ describe('/api/suggestions for a preset prompt from its clip', () => {
     const { id } = (await res.json()) as { id: string };
     expect(sent.at(-1)).toEqual({ name: 'suggest', data: { runId: id } });
     expect((await pool.query('select input from suggestion_runs where id = $1', [id])).rows[0].input).toEqual({ field: 'video', text: '', context: '', max: 5000, clip: 'preset-walk-left.mp4' });
-    await pool.query(`insert into suggestion_runs (id, user_id, input) select 'v-seed-' || g, $1, '{}' from generate_series(1, $2) g`, [u.id, SUGGEST_DAILY_LIMIT - 1]);
+    await pool.query(`insert into suggestion_runs (id, user_id, input, workspace_id) select 'v-seed-' || g, $1, '{}', 'ws_vet' from generate_series(1, $2) g`, [u.id, SUGGEST_DAILY_LIMIT - 1]);
     expect((await ask(u, { field: 'video', preset: 'walk-left' })).status).toBe(429);
   });
 
@@ -305,12 +305,12 @@ describe('/api/suggestions scenes (Smart Remake)', () => {
     const [u, other] = [await newUser(), await newUser()];
     const team = (await pool.query('select team_id from users where id = $1', [u.id])).rows[0].team_id;
     await pool.query(
-      `insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) values
-         ($1, $3, 'input', 'k/' || $1 || '-product.png', 'p.png', 'image/png', 1), ($2, $3, 'input', 'k/' || $2 || '-clip.mp4', 'c.mp4', 'video/mp4', 1), ($4, $5, 'input', 'k/' || $4 || '-theirs.png', 't.png', 'image/png', 1)`,
+      `insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, workspace_id) values
+         ($1, $3, 'input', 'k/' || $1 || '-product.png', 'p.png', 'image/png', 1, 'ws_vet'), ($2, $3, 'input', 'k/' || $2 || '-clip.mp4', 'c.mp4', 'video/mp4', 1, 'ws_vet'), ($4, $5, 'input', 'k/' || $4 || '-theirs.png', 't.png', 'image/png', 1, 'ws_vet')`,
       [`${u.id}-img`, `${u.id}-vid`, u.id, `${other.id}-img`, other.id],
     );
     const add = (id: string, owner: string, status: string, result: string | null) =>
-      pool.query(`insert into analyses (id, user_id, team_id, source_key, status, result) values ($1, $2, $3, 'r2:analyses/clip.mp4', $4, $5::jsonb)`, [id, owner, team, status, result]);
+      pool.query(`insert into analyses (id, user_id, team_id, source_key, status, result, workspace_id) values ($1, $2, $3, 'r2:analyses/clip.mp4', $4, $5::jsonb, 'ws_vet')`, [id, owner, team, status, result]);
     await add(`${u.id}-ok`, u.id, 'succeeded', shots(3));
     await add(`${u.id}-running`, u.id, 'running', null);
     await add(`${u.id}-many`, u.id, 'succeeded', JSON.stringify({ shots: Array.from({ length: 31 }, (_, i) => ({ index: i + 1, start: i, end: i + 1, role: 'r', prompt: `p${i}` })) }));

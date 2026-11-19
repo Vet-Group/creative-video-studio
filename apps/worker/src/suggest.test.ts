@@ -15,7 +15,7 @@ let seq = 0;
 
 async function queued(ageSeconds = 0, i: object = input): Promise<string> {
   const id = `run-${++seq}`;
-  await pool.query(`insert into suggestion_runs (id, user_id, input, created_at) values ($1, 'u1', $2, now() - make_interval(secs => $3))`, [id, JSON.stringify(i), ageSeconds]);
+  await pool.query(`insert into suggestion_runs (id, user_id, input, created_at, workspace_id) values ($1, 'u1', $2, now() - make_interval(secs => $3), 'ws_vet')`, [id, JSON.stringify(i), ageSeconds]);
   return id;
 }
 const row = async (id: string) => (await pool.query('select status, output, cost_usd from suggestion_runs where id = $1', [id])).rows[0];

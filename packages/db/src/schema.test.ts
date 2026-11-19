@@ -32,8 +32,8 @@ async function insertUser(): Promise<string> {
 async function insertJob(userId: string): Promise<string> {
   const id = next();
   await pool.query(
-    `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids)
-     values ($1, $2, 'team-unassigned', 'kling-o3-pro', 'fal', 'p', '9:16', 5, '{}')`,
+    `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, workspace_id)
+     values ($1, $2, 'team-unassigned', 'kling-o3-pro', 'fal', 'p', '9:16', 5, '{}', 'ws_vet')`,
     [id, userId],
   );
   return id;
@@ -41,7 +41,7 @@ async function insertJob(userId: string): Promise<string> {
 
 const entry = (kind: string, jobId: string | null, usd: string, extra: Record<string, unknown> = {}) =>
   pool.query(
-    `insert into cost_entries (kind, usd, month, day, job_id, is_final, ref, note) values ($1, $2, '2026-10', $3, $4, $5, $6, $7)`,
+    `insert into cost_entries (kind, usd, month, day, job_id, is_final, ref, note, workspace_id) values ($1, $2, '2026-10', $3, $4, $5, $6, $7, 'ws_vet')`,
     [kind, usd, jobId ? '2026-10-23' : null, jobId, extra.isFinal ?? false, extra.ref ?? null, extra.note ?? null],
   );
 
@@ -318,21 +318,21 @@ describe('migration 0031 Vertex models', () => {
     await pool.query(`update model_configs set enabled = false where id = 'virtual-try-on-vertex'`);
     const user = await insertUser();
     await pool.query(
-      `insert into jobs (id, user_id, team_id, feature, model, provider, prompt, aspect, duration_s, params, input_asset_ids)
-       values ($1, $2, 'team-unassigned', 'try_on', 'virtual-try-on-vertex', 'vertex', '', 'auto', 0, '{"resolution": "1K"}', '{}')`,
+      `insert into jobs (id, user_id, team_id, feature, model, provider, prompt, aspect, duration_s, params, input_asset_ids, workspace_id)
+       values ($1, $2, 'team-unassigned', 'try_on', 'virtual-try-on-vertex', 'vertex', '', 'auto', 0, '{"resolution": "1K"}', '{}', 'ws_vet')`,
       [next(), user],
     );
     await expect(pool.query(`update model_configs set provider = 'openai' where id = 'virtual-try-on-vertex'`)).rejects.toThrow(/model_configs_provider_check/);
     await expect(
       pool.query(
-        `insert into jobs (id, user_id, team_id, feature, model, provider, prompt, aspect, duration_s, params, input_asset_ids)
-         values ($1, $2, 'team-unassigned', 'try_on', 'virtual-try-on-vertex', 'openai', '', 'auto', 0, '{"resolution": "1K"}', '{}')`,
+        `insert into jobs (id, user_id, team_id, feature, model, provider, prompt, aspect, duration_s, params, input_asset_ids, workspace_id)
+         values ($1, $2, 'team-unassigned', 'try_on', 'virtual-try-on-vertex', 'openai', '', 'auto', 0, '{"resolution": "1K"}', '{}', 'ws_vet')`,
         [next(), user],
       ),
     ).rejects.toThrow(/jobs_provider_check/);
     await pool.query(
-      `insert into jobs (id, user_id, team_id, feature, model, provider, prompt, aspect, duration_s, params, input_asset_ids)
-       values ($1, $2, 'team-unassigned', 'image', 'seedream-5-pro-byteplus', 'byteplus', '', '1:1', 0, '{"resolution": "1K"}', '{}')`,
+      `insert into jobs (id, user_id, team_id, feature, model, provider, prompt, aspect, duration_s, params, input_asset_ids, workspace_id)
+       values ($1, $2, 'team-unassigned', 'image', 'seedream-5-pro-byteplus', 'byteplus', '', '1:1', 0, '{"resolution": "1K"}', '{}', 'ws_vet')`,
       [next(), user],
     );
   });
@@ -342,7 +342,7 @@ describe('migration 0035 user choices', () => {
   test("keeps a member's hook or location with its limits, and drops it with the member", async () => {
     const user = await insertUser();
     const add = (kind: string, name: string, phrase: string, description: string | null = null) =>
-      pool.query(`insert into user_choices (id, user_id, kind, name, phrase, description) values ($1, $2, $3, $4, $5, $6)`, [next(), user, kind, name, phrase, description]);
+      pool.query(`insert into user_choices (id, user_id, kind, name, phrase, description, workspace_id) values ($1, $2, $3, $4, $5, $6, 'ws_vet')`, [next(), user, kind, name, phrase, description]);
     await add('hook', 'x'.repeat(40), 'y'.repeat(300), 'z'.repeat(100));
     await add('location', 'n', 'p');
     expect((await pool.query(`select kind, is_company, description from user_choices where user_id = $1 order by kind`, [user])).rows.map((r) => [r.kind, r.is_company, r.description?.length ?? null])).toEqual([['hook', false, 100], ['location', false, null]]);
@@ -396,8 +396,8 @@ describe('migration 0007 image models', () => {
     const user = await insertUser();
     const id = next();
     await pool.query(
-      `insert into jobs (id, user_id, team_id, feature, model, provider, prompt, aspect, duration_s, params, input_asset_ids)
-       values ($1, $2, 'team-unassigned', 'image', 'nano-banana-pro', 'fal', 'p', '21:9', 0, '{"resolution": "2K"}', '{}')`,
+      `insert into jobs (id, user_id, team_id, feature, model, provider, prompt, aspect, duration_s, params, input_asset_ids, workspace_id)
+       values ($1, $2, 'team-unassigned', 'image', 'nano-banana-pro', 'fal', 'p', '21:9', 0, '{"resolution": "2K"}', '{}', 'ws_vet')`,
       [id, user],
     );
     expect((await pool.query(`select params, duration_s from jobs where id = $1`, [id])).rows).toEqual([{ params: { resolution: '2K' }, duration_s: 0 }]);
@@ -731,14 +731,14 @@ describe('cost_entries', () => {
   });
 
   test('refuses a month that is not YYYY-MM and a shared row that names a user', async () => {
-    await expect(pool.query(`insert into cost_entries (kind, usd, month) values ('bakeoff', 1, '2026-13')`)).rejects.toThrow(/cost_entries_month_check/);
-    await expect(pool.query(`insert into cost_entries (kind, usd, month, user_id) values ('bakeoff', 1, '2026-10', $1)`, [userId])).rejects.toThrow(/cost_entries_shared_unattributed_check/);
+    await expect(pool.query(`insert into cost_entries (kind, usd, month, workspace_id) values ('bakeoff', 1, '2026-13', 'ws_vet')`)).rejects.toThrow(/cost_entries_month_check/);
+    await expect(pool.query(`insert into cost_entries (kind, usd, month, user_id, workspace_id) values ('bakeoff', 1, '2026-10', $1, 'ws_vet')`, [userId])).rejects.toThrow(/cost_entries_shared_unattributed_check/);
   });
 
   test('migration 0055: an llm row may go without a job but names its user, team, day and a unique ref; the other kinds keep their rules', async () => {
     const llm = (jobId: string | null, ref: string | null, o: { user?: string | null; team?: string | null; day?: string | null; isFinal?: boolean } = {}) =>
       pool.query(
-        `insert into cost_entries (kind, usd, month, day, user_id, team_id, job_id, provider, model, is_final, ref) values ('llm', 0.0004, '2026-11', $1, $2, $3, $4, 'fal', 'm', $5, $6)`,
+        `insert into cost_entries (kind, usd, month, day, user_id, team_id, job_id, provider, model, is_final, ref, workspace_id) values ('llm', 0.0004, '2026-11', $1, $2, $3, $4, 'fal', 'm', $5, $6, 'ws_vet')`,
         [o.day === undefined ? '2026-11-04' : o.day, o.user === undefined ? userId : o.user, o.team === undefined ? 'team-unassigned' : o.team, jobId, o.isFinal ?? jobId === null, ref],
       );
     const job = await insertJob(userId);
@@ -754,9 +754,9 @@ describe('cost_entries', () => {
     // The rules of the other kinds are unchanged.
     await expect(entry('store_reassign', null, '1')).rejects.toThrow(/cost_entries_job_shared_check/);
     await expect(entry('invoice_diff', job, '1')).rejects.toThrow(/cost_entries_job_shared_check/);
-    await expect(pool.query(`insert into cost_entries (kind, usd, month, team_id) values ('invoice_diff', 1, '2026-10', 'team-unassigned')`)).rejects.toThrow(/cost_entries_shared_unattributed_check/);
-    await expect(pool.query(`insert into cost_entries (kind, usd, month, day, job_id) values ('estimate', 1, '2026-10', null, $1)`, [job])).rejects.toThrow(/cost_entries_day_check/);
-    await expect(pool.query(`insert into cost_entries (kind, usd, month, day, job_id) values ('token', 1, '2026-10', '2026-10-01', $1)`, [job])).rejects.toThrow(/cost_entries_kind_check/);
+    await expect(pool.query(`insert into cost_entries (kind, usd, month, team_id, workspace_id) values ('invoice_diff', 1, '2026-10', 'team-unassigned', 'ws_vet')`)).rejects.toThrow(/cost_entries_shared_unattributed_check/);
+    await expect(pool.query(`insert into cost_entries (kind, usd, month, day, job_id, workspace_id) values ('estimate', 1, '2026-10', null, $1, 'ws_vet')`, [job])).rejects.toThrow(/cost_entries_day_check/);
+    await expect(pool.query(`insert into cost_entries (kind, usd, month, day, job_id, workspace_id) values ('token', 1, '2026-10', '2026-10-01', $1, 'ws_vet')`, [job])).rejects.toThrow(/cost_entries_kind_check/);
   });
 
   test('job_costs sums the rows of a job and is final once a row closes it', async () => {
@@ -897,7 +897,7 @@ describe('migration 0072 Replicate dropped', () => {
     ).rejects.toThrow(/model_configs_provider_check/);
     const user = await insertUser();
     await expect(
-      pool.query(`insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids) values ('rep-job', $1, 'team-unassigned', 'kling-o3-pro', 'replicate', 'p', '9:16', 5, '{}')`, [user]),
+      pool.query(`insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, workspace_id) values ('rep-job', $1, 'team-unassigned', 'kling-o3-pro', 'replicate', 'p', '9:16', 5, '{}', 'ws_vet')`, [user]),
     ).rejects.toThrow(/jobs_provider_check/);
   });
 
@@ -910,10 +910,10 @@ describe('migration 0072 Replicate dropped', () => {
 describe('migration 0071 choices by store', () => {
   test('lets a choice be an ending, carry a store (FK set null, store/kind index), a niche of 1 to 30 characters and a photo (FK set null), never store and company at once', async () => {
     const user = await insertUser();
-    await pool.query(`insert into stores (id, name, code) values ('cs1', 'Shop CS', 'CS1')`);
-    await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) values ('ca1', $1, 'input', 'ca1', 'f.jpg', 'image/jpeg', 1)`, [user]);
+    await pool.query(`insert into stores (id, name, code, workspace_id) values ('cs1', 'Shop CS', 'CS1', 'ws_vet')`);
+    await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, workspace_id) values ('ca1', $1, 'input', 'ca1', 'f.jpg', 'image/jpeg', 1, 'ws_vet')`, [user]);
     const choice = (id: string, extra: Record<string, unknown> = {}) => {
-      const row = { id, user_id: user, kind: 'ending', name: 'n', phrase: 'p', ...extra };
+      const row = { id, user_id: user, kind: 'ending', name: 'n', phrase: 'p', workspace_id: 'ws_vet', ...extra };
       const cols = Object.keys(row);
       return pool.query(`insert into user_choices (${cols.join(', ')}) values (${cols.map((_, i) => `$${i + 1}`).join(', ')})`, Object.values(row));
     };
@@ -989,7 +989,7 @@ describe('migration 0079 model name case', () => {
 describe('migration 0098 shared analyses', () => {
   test('sets a shared title and its time together or neither, with a partial index for the shared list', async () => {
     const analysis = (id: string, title: string | null, at: string | null) =>
-      pool.query(`insert into analyses (id, user_id, team_id, source_key, shared_title, shared_at) values ($1, $2, 'team-unassigned', $1, $3, $4)`, [id, userId, title, at]);
+      pool.query(`insert into analyses (id, user_id, team_id, source_key, shared_title, shared_at, workspace_id) values ($1, $2, 'team-unassigned', $1, $3, $4, 'ws_vet')`, [id, userId, title, at]);
     await analysis('sa1', null, null);
     await analysis('sa2', 'Áo thun', '2026-11-15T10:00:00Z');
     await expect(analysis('sa3', 'Áo thun', null)).rejects.toThrow(/analyses_shared_check/);
@@ -1048,5 +1048,14 @@ describe('migration 0109 pet apps', () => {
       const id = await insertJob(userId);
       await pool.query(`update jobs set feature = $2, params = '{"resolution": "1K", "batch": "7d0e2f54-3c55-4a0e-9a59-2f3f0c8b1a11"}' where id = $1`, [id, feature]);
     }
+  });
+});
+
+describe('migration 0110 workspace contract', () => {
+  test('leaves no workspace_id column with a default, so an insert that names no workspace fails instead of landing in the company workspace', async () => {
+    const { rows } = await pool.query(`select table_name, column_default from information_schema.columns where table_schema = 'public' and column_name = 'workspace_id' order by table_name`);
+    expect(rows.length).toBeGreaterThanOrEqual(13); // the 12 root tables and workspace_members
+    expect(rows.filter((r) => r.column_default !== null)).toEqual([]);
+    await expect(pool.query(`insert into stores (id, name, code) values ('no-ws', 'No workspace', 'NO-WS')`)).rejects.toThrow(/null value in column "workspace_id"/);
   });
 });

@@ -41,8 +41,8 @@ const report = async (query = '') => {
 /** A job of the user created at `createdAt` (+07), with a ledger estimate of `usd`, ended with `status` after `seconds`, and an optional verdict. */
 async function job(id: string, userId: string, createdAt: string, status: string, seconds: number, usd: string, verdict?: 'pass' | 'fail') {
   await pool.query(
-    `insert into jobs (id, user_id, team_id, store_id, model, provider, prompt, aspect, duration_s, input_asset_ids, created_at)
-     values ($1, $2, 'rt', 'rs', 'fal-test', 'fal', 'p', '9:16', 5, '{}', $3)`,
+    `insert into jobs (id, user_id, team_id, store_id, model, provider, prompt, aspect, duration_s, input_asset_ids, created_at, workspace_id)
+     values ($1, $2, 'rt', 'rs', 'fal-test', 'fal', 'p', '9:16', 5, '{}', $3, 'ws_vet')`,
     [id, userId, createdAt],
   );
   await reserve(pool, id, usd);
@@ -56,7 +56,7 @@ beforeAll(async () => {
   admin = await newUser('admin@example.test', 'admin');
   member = await newUser('member@example.test', 'member');
   await pool.query(`insert into teams (id, name) values ('rt', 'Report Team')`);
-  await pool.query(`insert into stores (id, name, code) values ('rs', 'Report Shop', 'RS')`);
+  await pool.query(`insert into stores (id, name, code, workspace_id) values ('rs', 'Report Shop', 'RS', 'ws_vet')`);
   await pool.query(`insert into users (id, email, name, team_id) values ('rep1', 'rep1@example.test', 'Rep One', 'rt'), ('rep2', 'rep2@example.test', 'Rep Two', 'rt')`);
   await pool.query(
     `insert into model_configs (id, provider, endpoint, label, ratios, durations_sec, max_images, output_resolution, usd_per_second, sources, enabled)
@@ -152,7 +152,7 @@ describe('GET /api/admin/report', () => {
     await job('r9', 'rep1', '2026-11-10 10:00:00+07', 'succeeded', 40, '2.0000', 'pass');
     const capBefore = (await report('?week=2026-11-12')).cap.usedUsd;
     await bookLlm(pool, { enhance: 'r9' }, { costUsd: 0.0004, provider: 'fal', model: 'google/gemini-2.5-flash' });
-    await pool.query(`insert into suggestion_runs (id, user_id, input, status, cost_usd, created_at) values ('rr1', 'rep2', '{}', 'succeeded', 0.0006, '2026-11-11 09:00:00+07')`);
+    await pool.query(`insert into suggestion_runs (id, user_id, input, status, cost_usd, created_at, workspace_id) values ('rr1', 'rep2', '{}', 'succeeded', 0.0006, '2026-11-11 09:00:00+07', 'ws_vet')`);
     await bookLlm(pool, { suggestion: 'rr1' }, { costUsd: 0.0006, provider: 'fal', model: 'google/gemini-2.5-flash' });
     const r = await report('?week=2026-11-12');
     expect(r.cap.usedUsd).toBe(capBefore); // LLM calls count toward no cap
@@ -175,8 +175,8 @@ describe('GET /api/admin/report', () => {
   });
 
   test("counts a Smart Remake's llm calls in the cap column and the month's usage like the cap does", async () => {
-    await pool.query(`insert into analyses (id, user_id, team_id, source_key, status) values ('rpt-an', 'rep2', 'rt', 's', 'succeeded')`);
-    await pool.query(`insert into remakes (id, user_id, team_id, analysis_id, shots, created_at) values ('rpt-rm', 'rep2', 'rt', 'rpt-an', '[1]', '2026-11-11 10:00:00+07')`);
+    await pool.query(`insert into analyses (id, user_id, team_id, source_key, status, workspace_id) values ('rpt-an', 'rep2', 'rt', 's', 'succeeded', 'ws_vet')`);
+    await pool.query(`insert into remakes (id, user_id, team_id, analysis_id, shots, created_at, workspace_id) values ('rpt-rm', 'rep2', 'rt', 'rpt-an', '[1]', '2026-11-11 10:00:00+07', 'ws_vet')`);
     const before = (await report('?week=2026-11-12')).cap.usedUsd;
     await bookLlm(pool, { remake: 'rpt-rm', step: '1:video' }, { costUsd: 0.25, provider: 'fal', model: 'm' });
     const { rows } = await pool.query(`select monthly_cap_usd::text as cap from settings where id = 1`);

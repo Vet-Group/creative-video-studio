@@ -35,7 +35,7 @@ function run(cookie: string | undefined, body: unknown) {
 }
 
 async function insertAsset(id: string, ownerId: string, extra = '') {
-  await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes${extra ? ', deleted_at' : ''}) values ($1, $2, 'input', $1, 'a.png', 'image/png', 1${extra ? ', now()' : ''})`, [id, ownerId]);
+  await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, workspace_id${extra ? ', deleted_at' : ''}) values ($1, $2, 'input', $1, 'a.png', 'image/png', 1, 'ws_vet'${extra ? ', now()' : ''})`, [id, ownerId]);
 }
 
 const jobCount = async () => (await pool.query('select count(*)::int as n from jobs')).rows[0].n as number;
@@ -46,7 +46,7 @@ let otherCookie = '';
 
 beforeAll(async () => {
   await pool.query(`insert into teams (id, name) values ('team-b', 'Team B')`);
-  await pool.query(`insert into stores (id, name, code, hidden) values ('store-ok', 'Store', 'S1', false), ('store-hidden', 'Hidden', 'S2', true)`);
+  await pool.query(`insert into stores (id, name, code, hidden, workspace_id) values ('store-ok', 'Store', 'S1', false, 'ws_vet'), ('store-hidden', 'Hidden', 'S2', true, 'ws_vet')`);
   await pool.query(
     `insert into model_configs (id, provider, endpoint, label, ratios, durations_sec, max_images, output_resolution, usd_per_second, sources, enabled) values
        ('fal-test', 'fal', 'x', 'Fal test', '{9:16,1:1}', '{5,10}', 2, '720p', 0.2, '{}', true),
@@ -63,7 +63,7 @@ beforeAll(async () => {
   await insertAsset('own-3', ownerId);
   await insertAsset('own-deleted', ownerId, 'deleted');
   await insertAsset('theirs-1', otherId);
-  await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) values ('own-output', $1, 'output', 'own-output', 'a.png', 'image/png', 1)`, [ownerId]);
+  await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, workspace_id) values ('own-output', $1, 'output', 'own-output', 'a.png', 'image/png', 1, 'ws_vet')`, [ownerId]);
 });
 
 afterAll(async () => {
@@ -123,7 +123,7 @@ describe('POST /api/jobs', () => {
   test("lets another Member reuse the inputs of a succeeded Library clip but not those of an unfinished job or an unused asset", async () => {
     const insertJob = (id: string, assets: string[], status: string) =>
       pool.query(
-        `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, status) values ($1, $2, 'team-b', 'fal-test', 'fal', 'p', '9:16', 5, $3, $4)`,
+        `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, status, workspace_id) values ($1, $2, 'team-b', 'fal-test', 'fal', 'p', '9:16', 5, $3, $4, 'ws_vet')`,
         [id, ownerId, assets, status],
       );
     await insertJob('queued-job', ['own-3'], 'queued');
@@ -257,7 +257,7 @@ async function seedJobs(userId: string, n: number, status = 'succeeded', extra: 
     const id = `seed-${userId}-${status}-${i}`;
     ids.push(id);
     await pool.query(
-      `insert into jobs (id, user_id, team_id, store_id, model, provider, prompt, aspect, duration_s, input_asset_ids, status) values ($1, $2, $3, $4, 'fal-test', 'fal', 'p', '9:16', 5, $6, $5)`,
+      `insert into jobs (id, user_id, team_id, store_id, model, provider, prompt, aspect, duration_s, input_asset_ids, status, workspace_id) values ($1, $2, $3, $4, 'fal-test', 'fal', 'p', '9:16', 5, $6, $5, 'ws_vet')`,
       [id, userId, extra.teamId ?? 'team-unassigned', extra.storeId ?? null, status, extra.assets ?? []],
     );
   }
@@ -421,7 +421,7 @@ describe('POST /api/jobs with retryOf', () => {
   test('keeps the free prompt of the original and its null preset', async () => {
     const m = await newMember();
     await pool.query(
-      `insert into jobs (id, user_id, team_id, model, provider, preset_id, prompt, aspect, duration_s, input_asset_ids, status) values ($1, $2, 'team-unassigned', 'fal-test', 'fal', null, 'My own prompt.', '9:16', 5, $3, 'failed')`,
+      `insert into jobs (id, user_id, team_id, model, provider, preset_id, prompt, aspect, duration_s, input_asset_ids, status, workspace_id) values ($1, $2, 'team-unassigned', 'fal-test', 'fal', null, 'My own prompt.', '9:16', 5, $3, 'failed', 'ws_vet')`,
       [`free-${m.id}`, m.id, [m.asset]],
     );
     const res = await runAs(m, { retryOf: `free-${m.id}` });
@@ -433,7 +433,7 @@ describe('POST /api/jobs with retryOf', () => {
   test('keeps Enhance and the brief the original already paid for, so the retry is not rewritten again', async () => {
     const m = await newMember();
     await pool.query(
-      `insert into jobs (id, user_id, team_id, model, provider, prompt, enhance, enhanced_prompt, aspect, duration_s, input_asset_ids, status) values ($1, $2, 'team-unassigned', 'fal-test', 'fal', 'turn', true, 'A slow turn brief.', '9:16', 5, $3, 'failed')`,
+      `insert into jobs (id, user_id, team_id, model, provider, prompt, enhance, enhanced_prompt, aspect, duration_s, input_asset_ids, status, workspace_id) values ($1, $2, 'team-unassigned', 'fal-test', 'fal', 'turn', true, 'A slow turn brief.', '9:16', 5, $3, 'failed', 'ws_vet')`,
       [`enh-${m.id}`, m.id, [m.asset]],
     );
     const { id } = (await (await runAs(m, { retryOf: `enh-${m.id}` })).json()) as { id: string };
@@ -944,7 +944,7 @@ describe('POST /api/jobs for an image feature', () => {
     const error = async (res: Response) => ((await res.json()) as { error: string }).error;
     const prompt = 'The person in [Image1] wears the product in [Image2].';
     async function marketing(m: Member, extra: Record<string, unknown> = {}) {
-      await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) values ($1, $2, 'input', $1, 'p.png', 'image/png', 1) on conflict (id) do nothing`, [`${m.id}-product`, m.id]);
+      await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, workspace_id) values ($1, $2, 'input', $1, 'p.png', 'image/png', 1, 'ws_vet') on conflict (id) do nothing`, [`${m.id}-product`, m.id]);
       return runAs(m, { feature: 'marketing', presetId: null, prompt, assetIds: [m.asset, `${m.id}-product`], ...extra });
     }
     const withMarketing = async (fn: () => Promise<void>) => {
@@ -1076,7 +1076,7 @@ describe('POST /api/jobs for an image feature', () => {
       test("takes the member's own and a company hook or location, and refuses another member's private one, an unknown id and a deleted one", async () => {
         const [m, other] = [await newMember(), await newMember()];
         const choice = (id: string, userId: string, kind: string, company = false) =>
-          pool.query(`insert into user_choices (id, user_id, kind, name, phrase, is_company) values ($1, $2, $3, 'n', 'p', $4)`, [id, userId, kind, company]);
+          pool.query(`insert into user_choices (id, user_id, kind, name, phrase, is_company, workspace_id) values ($1, $2, $3, 'n', 'p', $4, 'ws_vet')`, [id, userId, kind, company]);
         await choice(`${m.id}-hook`, m.id, 'hook');
         await choice(`${other.id}-spot`, other.id, 'location', true);
         await choice(`${other.id}-hook`, other.id, 'hook');

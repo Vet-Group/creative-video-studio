@@ -21,15 +21,15 @@ const next = (prefix: string) => `${prefix}${++seq}`;
 beforeAll(async () => {
   await pool.query(`insert into users (id, email, name) values ('u1', 'u1@example.test', 'u1')`);
   await pool.query(`insert into teams (id, name) values ('team-b', 'Team B')`);
-  await pool.query(`insert into stores (id, name, code) values ('store-a', 'Store A', 'A'), ('store-b', 'Store B', 'B')`);
+  await pool.query(`insert into stores (id, name, code, workspace_id) values ('store-a', 'Store A', 'A', 'ws_vet'), ('store-b', 'Store B', 'B', 'ws_vet')`);
 });
 
 type JobOpts = { status?: string; storeId?: string | null; isMock?: boolean; createdAt?: string; provider?: string; finishedAt?: string };
 async function newJob(o: JobOpts = {}): Promise<string> {
   const id = next('job');
   await pool.query(
-    `insert into jobs (id, user_id, team_id, store_id, model, provider, prompt, aspect, duration_s, input_asset_ids, status, is_mock, created_at, finished_at)
-     values ($1, 'u1', 'team-b', $2, 'kling-o3-pro', $3, 'p', '9:16', 5, '{}', $4, $5, coalesce($6::timestamptz, now()), $7)`,
+    `insert into jobs (id, user_id, team_id, store_id, model, provider, prompt, aspect, duration_s, input_asset_ids, status, is_mock, created_at, finished_at, workspace_id)
+     values ($1, 'u1', 'team-b', $2, 'kling-o3-pro', $3, 'p', '9:16', 5, '{}', $4, $5, coalesce($6::timestamptz, now()), $7, 'ws_vet')`,
     [id, o.storeId ?? null, o.provider ?? 'fal', o.status ?? 'queued', o.isMock ?? false, o.createdAt ?? null, o.finishedAt ?? null],
   );
   return id;
@@ -45,7 +45,7 @@ async function reservedJob(estimate: string, o: JobOpts = {}): Promise<string> {
 
 async function asset(): Promise<string> {
   const id = next('asset');
-  await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) values ($1, 'u1', 'output', $1, 'v.mp4', 'video/mp4', 1)`, [id]);
+  await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, workspace_id) values ($1, 'u1', 'output', $1, 'v.mp4', 'video/mp4', 1, 'ws_vet')`, [id]);
   return id;
 }
 
@@ -131,8 +131,8 @@ describe('settle', () => {
   test('refuses a running job whose ledger is already closed', async () => {
     const id = await reservedJob('1.0000', { status: 'running' });
     await pool.query(
-      `insert into cost_entries (kind, usd, month, day, user_id, team_id, job_id, provider, model, is_final)
-       select 'actual_adjustment', 0, month, day, user_id, team_id, job_id, provider, model, true from cost_entries where job_id = $1`,
+      `insert into cost_entries (kind, usd, month, day, user_id, team_id, job_id, provider, model, is_final, workspace_id)
+       select 'actual_adjustment', 0, month, day, user_id, team_id, job_id, provider, model, true, workspace_id from cost_entries where job_id = $1`,
       [id],
     );
     expect(await settle(pool, id, { status: 'succeeded', costUsd: 9, outputAssetId: await asset(), posterAssetId: null })).toBe(false);
@@ -298,7 +298,7 @@ describe('bookLlm', () => {
 
   test("books a suggestion or translation run without a job, on the member and the member's team, final", async () => {
     await pool.query(`insert into users (id, email, name, team_id) values ('u-llm', 'u-llm@example.test', 'u-llm', 'team-b')`);
-    await pool.query(`insert into suggestion_runs (id, user_id, input, created_at) values ('run-llm', 'u-llm', '{}', '2026-10-30T03:00:00Z')`);
+    await pool.query(`insert into suggestion_runs (id, user_id, input, created_at, workspace_id) values ('run-llm', 'u-llm', '{}', '2026-10-30T03:00:00Z', 'ws_vet')`);
     expect(await bookLlm(pool, { suggestion: 'run-llm' }, { costUsd: 0.00055, provider: 'openai', model: 'gpt-6-luna' })).toBe(true);
     expect(await bookLlm(pool, { suggestion: 'run-llm' }, { costUsd: 0.00055, provider: 'openai', model: 'gpt-6-luna' })).toBe(false);
     expect(await llmRows('llm:suggestion:run-llm')).toEqual([
@@ -307,7 +307,7 @@ describe('bookLlm', () => {
   });
 
   test("books a reference-video analysis without a job, on the member, team and store, final", async () => {
-    await pool.query(`insert into analyses (id, user_id, team_id, store_id, source_key, created_at) values ('an-1', 'u1', 'team-b', 'store-a', 'inputs/x.mp4', '2026-10-28T09:00:00Z')`);
+    await pool.query(`insert into analyses (id, user_id, team_id, store_id, source_key, created_at, workspace_id) values ('an-1', 'u1', 'team-b', 'store-a', 'inputs/x.mp4', '2026-10-28T09:00:00Z', 'ws_vet')`);
     expect(await bookLlm(pool, { analysis: 'an-1' }, { costUsd: 0.02, provider: 'byteplus', model: 'seed-2-0-lite-260428' })).toBe(true);
     expect(await bookLlm(pool, { analysis: 'an-1' }, { costUsd: 0.02, provider: 'byteplus', model: 'seed-2-0-lite-260428' })).toBe(false);
     expect(await llmRows('llm:analysis:an-1')).toEqual([

@@ -31,7 +31,7 @@ afterAll(async () => {
 /** An input asset `id` of `owner` holding `content`, made `minutes` ago. */
 async function input(id: string, content: string | null, minutes: number, owner = 'u1') {
   if (content !== null) files[`assets/${id}`] = content;
-  await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, created_at) values ($1, $2, 'input', $3, $1, 'image/png', 1, now() - make_interval(mins => $4))`, [id, owner, `assets/${id}`, minutes]);
+  await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, created_at, workspace_id) values ($1, $2, 'input', $3, $1, 'image/png', 1, now() - make_interval(mins => $4), 'ws_vet')`, [id, owner, `assets/${id}`, minutes]);
 }
 const live = async () => (await pool.query(`select id from assets where deleted_at is null order by id`)).rows.map((r: { id: string }) => r.id);
 
@@ -40,7 +40,7 @@ test('keeps the picture of a saved AI model, deleted or not, even when a newer c
   await input('m-live-newer', 'face', 1, 'u2'); // a later upload of the same file
   await input('m-gone', 'hat', 10, 'u2');
   await input('m-gone-newer', 'hat', 1, 'u2');
-  await pool.query(`insert into fashion_models (id, user_id, name, asset_id) values ('fm1', 'u2', 'Live', 'm-live'), ('fm2', 'u2', 'Gone', 'm-gone')`);
+  await pool.query(`insert into fashion_models (id, user_id, name, asset_id, workspace_id) values ('fm1', 'u2', 'Live', 'm-live', 'ws_vet'), ('fm2', 'u2', 'Gone', 'm-gone', 'ws_vet')`);
   await pool.query(`update fashion_models set deleted_at = now() where id = 'fm2'`);
   await dedupeTick(pool, read);
   expect(await live()).toEqual(expect.arrayContaining(['m-live', 'm-live-newer', 'm-gone', 'm-gone-newer']));
@@ -54,8 +54,8 @@ test("keeps an analysis' reference video and a remake's product image even when 
   await input('v-newer', 'clip', 1, 'u2');
   await input('p-used', 'top', 10, 'u2');
   await input('p-newer', 'top', 1, 'u2');
-  await pool.query(`insert into analyses (id, user_id, team_id, source_key, status) values ('an1', 'u2', 'team-unassigned', 'assets/v-used', 'succeeded')`);
-  await pool.query(`insert into remakes (id, user_id, team_id, analysis_id, product_asset_id, shots, status) values ('rm1', 'u2', 'team-unassigned', 'an1', 'p-used', '[0]', 'succeeded')`);
+  await pool.query(`insert into analyses (id, user_id, team_id, source_key, status, workspace_id) values ('an1', 'u2', 'team-unassigned', 'assets/v-used', 'succeeded', 'ws_vet')`);
+  await pool.query(`insert into remakes (id, user_id, team_id, analysis_id, product_asset_id, shots, status, workspace_id) values ('rm1', 'u2', 'team-unassigned', 'an1', 'p-used', '[0]', 'succeeded', 'ws_vet')`);
   await dedupeTick(pool, read);
   expect(await live()).toEqual(expect.arrayContaining(['v-used', 'v-newer', 'p-used', 'p-newer']));
   await pool.query(`delete from remakes`);
@@ -77,16 +77,16 @@ test('hashes old inputs, keeps the newest copy of a file the purge will not take
   await input('e-doomed', 'scarf', 1); // only a deleted job names it: the purge takes it with that job
   await input('e-old', 'scarf', 11); // so this older copy is the one kept
   await pool.query(
-    `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, status, params) values
-       ('j1', 'u1', 'team-unassigned', 'm', 'mock', 'p', '9:16', 5, '{a-job}', 'succeeded', '{}'),
-       ('j2', 'u1', 'team-unassigned', 'm', 'mock', 'p', '9:16', 5, '{b-only}', 'succeeded', '{"endAssetId": "a-end"}')`,
+    `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, status, params, workspace_id) values
+       ('j1', 'u1', 'team-unassigned', 'm', 'mock', 'p', '9:16', 5, '{a-job}', 'succeeded', '{}', 'ws_vet'),
+       ('j2', 'u1', 'team-unassigned', 'm', 'mock', 'p', '9:16', 5, '{b-only}', 'succeeded', '{"endAssetId": "a-end"}', 'ws_vet')`,
   );
   await pool.query(
-    `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, status, params, deleted_at)
-     values ('j3', 'u1', 'team-unassigned', 'm', 'mock', 'p', '9:16', 5, '{e-doomed}', 'succeeded', '{}', now())`,
+    `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, status, params, deleted_at, workspace_id)
+     values ('j3', 'u1', 'team-unassigned', 'm', 'mock', 'p', '9:16', 5, '{e-doomed}', 'succeeded', '{}', now(), 'ws_vet')`,
   );
-  await pool.query(`insert into user_templates (id, user_id, feature, name, data) values ('t1', 'u1', 'video', 'T', '{"images": ["a-tpl"]}')`);
-  await pool.query(`insert into user_choices (id, user_id, kind, name, phrase, image_asset_id) values ('c1', 'u1', 'hook', 'H', 'p', 'a-choice')`);
+  await pool.query(`insert into user_templates (id, user_id, feature, name, data, workspace_id) values ('t1', 'u1', 'video', 'T', '{"images": ["a-tpl"]}', 'ws_vet')`);
+  await pool.query(`insert into user_choices (id, user_id, kind, name, phrase, image_asset_id, workspace_id) values ('c1', 'u1', 'hook', 'H', 'p', 'a-choice', 'ws_vet')`);
 
   expect(await dedupeTick(pool, read)).toEqual({ hashed: 12, removed: 2 });
   expect(await live()).toEqual(['a-choice', 'a-end', 'a-job', 'a-new', 'a-tpl', 'b-only', 'c-other', 'd-gone', 'e-doomed', 'e-old']);

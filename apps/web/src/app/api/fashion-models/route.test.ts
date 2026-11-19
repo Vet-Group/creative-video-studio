@@ -42,10 +42,10 @@ const remove = (who: string, id: string) => DELETE(call(cookies[who], 'DELETE', 
 /** A finished generator result: an output asset (a PNG in the store unless `bytes` says otherwise) and the job that points at it. */
 async function result(id: string, owner: string, o: { feature?: string; bytes?: Uint8Array; status?: string } = {}): Promise<void> {
   await putObject(`assets/${id}`, o.bytes ?? PNG, 'image/png');
-  await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) values ($1, $2, 'output', $3, 'out.png', 'image/png', 12)`, [id, owner, `assets/${id}`]);
+  await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, workspace_id) values ($1, $2, 'output', $3, 'out.png', 'image/png', 12, 'ws_vet')`, [id, owner, `assets/${id}`]);
   await pool.query(
-    `insert into jobs (id, user_id, team_id, feature, model, provider, prompt, aspect, duration_s, params, input_asset_ids, status, output_asset_id)
-     values ($1, $2, 'team-unassigned', $3, 'mock-fashion', 'mock', 'p', '3:4', 0, $4::jsonb, '{}', $5, $6)`,
+    `insert into jobs (id, user_id, team_id, feature, model, provider, prompt, aspect, duration_s, params, input_asset_ids, status, output_asset_id, workspace_id)
+     values ($1, $2, 'team-unassigned', $3, 'mock-fashion', 'mock', 'p', '3:4', 0, $4::jsonb, '{}', $5, $6, 'ws_vet')`,
     [`job-${id}`, owner, o.feature ?? 'fashion_model', JSON.stringify({ resolution: '1K', traits: JSON.stringify({ ...DEFAULT_FASHION_TRAITS, gender: 'male' }) }), o.status ?? 'succeeded', id],
   );
 }

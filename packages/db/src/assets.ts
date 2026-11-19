@@ -6,8 +6,8 @@ import { assets } from './schema';
 export type Asset = typeof assets.$inferSelect;
 export type NewAsset = typeof assets.$inferInsert;
 
-/** Every row names its workspace (docs/WORKSPACES.md §3): the column's default is for the rows from before workspaces only. */
-export async function insertAssets(db: Db, rows: (NewAsset & { workspaceId: string })[]): Promise<void> {
+/** Every row names its workspace (docs/WORKSPACES.md §3): the column has no default. */
+export async function insertAssets(db: Db, rows: NewAsset[]): Promise<void> {
   if (rows.length > 0) await db.insert(assets).values(rows); // every file of an upload can be one the caller already has
 }
 

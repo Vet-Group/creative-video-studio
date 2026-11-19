@@ -27,8 +27,8 @@ let at = Date.parse('2026-10-01T00:00:00Z');
 async function job(u: User, j: { feature?: string; model?: string; aspect?: string; duration?: number; params?: Record<string, string>; preset?: string | null; enhance?: boolean; store?: string | null; deleted?: boolean }) {
   const id = `job-${++seq}`;
   await pool.query(
-    `insert into jobs (id, user_id, team_id, store_id, feature, model, provider, preset_id, prompt, aspect, duration_s, params, input_asset_ids, enhance, created_at, deleted_at)
-     select $1, $2, team_id, $3, $4, $5, 'mock', $6, 'p', $7, $8, $9::jsonb, '{}', $10, $11, case when $12 then now() end from users where id = $2`,
+    `insert into jobs (id, user_id, team_id, store_id, feature, model, provider, preset_id, prompt, aspect, duration_s, params, input_asset_ids, enhance, created_at, deleted_at, workspace_id)
+     select $1, $2, team_id, $3, $4, $5, 'mock', $6, 'p', $7, $8, $9::jsonb, '{}', $10, $11, case when $12 then now() end, 'ws_vet' from users where id = $2`,
     [id, u.id, j.store ?? null, j.feature ?? 'video', j.model ?? 'rv', j.preset ?? null, j.aspect ?? '9:16', j.duration ?? 5, JSON.stringify(j.params ?? {}), j.enhance ?? false, new Date((at += 1000)), j.deleted ?? false],
   );
   return id;
@@ -47,7 +47,7 @@ beforeAll(async () => {
        ('rv-off', 'mock', 'mock', 'Off', 'video', '{video}', '{9:16}', '{5}', 4, '{}', 0.1, '720p', '{}', false),
        ('ri', 'mock', 'mock', 'Image', 'image', '{image,try_on}', '{auto,3:4}', '{}', 4, '{"1K": "0.1", "2K": "0.2"}', 0, null, '{}', true)`,
   );
-  await pool.query(`insert into stores (id, name, code, hidden) values ('st', 'Shop', 'RS', false), ('st-hidden', 'Hidden', 'RH', true)`);
+  await pool.query(`insert into stores (id, name, code, hidden, workspace_id) values ('st', 'Shop', 'RS', false, 'ws_vet'), ('st-hidden', 'Hidden', 'RH', true, 'ws_vet')`);
 });
 
 afterAll(async () => {

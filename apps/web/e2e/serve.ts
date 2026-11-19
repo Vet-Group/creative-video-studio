@@ -77,9 +77,9 @@ await pool.query(
      ('mock-pets-priced', 'fal', 'fal-ai/e2e-pets-priced', 'Mock pets priced', 'image', '{pet_portrait,mockup_pack,name_swap}', '{auto}', '{}', 2, '{"1K": "0.15"}', '{}', true)`,
 );
 // A store the Create picker offers, for the specs that tag a clip with one.
-await pool.query(`insert into stores (id, name, code) values ('store-e2e', 'E2E Shop', 'E2E-SEED')`);
+await pool.query(`insert into stores (id, name, code, workspace_id) values ('store-e2e', 'E2E Shop', 'E2E-SEED', 'ws_vet')`);
 // A store whose brand kit store-brand.e2e fills, so no other spec's store gets one.
-await pool.query(`insert into stores (id, name, code) values ('store-brand', 'E2E Brand Shop', 'E2E-BRAND')`);
+await pool.query(`insert into stores (id, name, code, workspace_id) values ('store-brand', 'E2E Brand Shop', 'E2E-BRAND', 'ws_vet')`);
 // Every spec runs jobs; the daily clip cap is not what is under test here.
 await pool.query('update settings set member_daily_clip_cap = 1000 where id = 1');
 // Straight through better-auth, not POST /api/admin/users, so must_change_password stays false and the specs sign in to the app itself.
@@ -93,8 +93,8 @@ await pool.query('update users set can_impersonate = true where email = $1', [US
 // The satisfaction prompt asks after three succeeded real jobs (mock jobs never count and the specs run on the mock provider), so rating.e2e's members get them
 // seeded here, dated long ago so no page's "today" figure or weekly report moves.
 await pool.query(
-  `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, feature, status, created_at)
-   select 'rating-seed-' || u.id || '-' || n, u.id, u.team_id, 'mock-image-e2e', 'mock', 'seed', '1:1', 5, '{}', 'image', 'succeeded', '2026-01-02T00:00:00Z'
+  `insert into jobs (id, user_id, team_id, model, provider, prompt, aspect, duration_s, input_asset_ids, feature, status, created_at, workspace_id)
+   select 'rating-seed-' || u.id || '-' || n, u.id, u.team_id, 'mock-image-e2e', 'mock', 'seed', '1:1', 5, '{}', 'image', 'succeeded', '2026-01-02T00:00:00Z', 'ws_vet'
      from users u cross join generate_series(1, 3) n where u.email = any($1)`,
   [[USERS.ratea.email, USERS.rateb.email, USERS.ratec.email]],
 );

@@ -41,14 +41,14 @@ let admin: User;
 beforeAll(async () => {
   [member, editor, admin] = [await newUser(), await newUser(), await newUser('admin')];
   await pool.query('update users set can_edit_templates = true where id = $1', [editor.id]);
-  await pool.query(`insert into stores (id, name, code, hidden) values ('st-kit', 'Kit shop', 'KIT', false), ('st-plain', 'Plain shop', 'PLAIN', false), ('st-hidden', 'Hidden shop', 'HID', true)`);
+  await pool.query(`insert into stores (id, name, code, hidden, workspace_id) values ('st-kit', 'Kit shop', 'KIT', false, 'ws_vet'), ('st-plain', 'Plain shop', 'PLAIN', false, 'ws_vet'), ('st-hidden', 'Hidden shop', 'HID', true, 'ws_vet')`);
   await pool.query(`update stores set brand_voice = 'Bold', brand_colors = '{#000000}' where id = 'st-hidden'`);
   await pool.query(
     `insert into model_configs (id, provider, endpoint, label, kind, features, ratios, durations_sec, max_images, output_resolution, usd_per_second, image_prices, sources, enabled) values
        ('img-mock', 'mock', 'mock', 'Img mock', 'image', '{image,try_on}', '{1:1}', '{}', 2, null, null, '{"1K": "0.1"}', '{}', true),
        ('vid-mock', 'mock', 'mock', 'Vid mock', 'video', '{video,marketing}', '{9:16}', '{5}', 2, '720p', 0.1, null, '{}', true)`,
   );
-  for (const a of ['a1', 'a2']) await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) values ($1, $2, 'input', $1, 'a.png', 'image/png', 1)`, [a, member.id]);
+  for (const a of ['a1', 'a2']) await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, workspace_id) values ($1, $2, 'input', $1, 'a.png', 'image/png', 1, 'ws_vet')`, [a, member.id]);
 });
 
 afterAll(async () => {
