@@ -97,3 +97,14 @@ export function tryOnSlots<I extends { id: string }>(ids: string[] | undefined, 
   const slot = (from: number, to: number) => sent.slice(from, to).filter((i) => i !== null);
   return { person: slot(0, 1), garments: slot(1, 1 + n), background: slot(1 + n, 2 + n) };
 }
+
+/** A form's photos as a template saves them, slot by slot (what alignInputs reads back): '' for an empty slot of one photo, so the photos after it keep
+ * their slots; a slot of several (`many`, an app's pieces) has as many places as photos. */
+export const placesOf = (slots: { id: string }[][], kinds: { many?: boolean }[] = []): string[] =>
+  slots.flatMap((s, i) => (s.length === 0 && !kinds[i]?.many ? [''] : s.map((p) => p.id)));
+
+/** Try On's photos as a template saves them (what tryOnSlots reads back): no garment still holds one empty place, as an empty person does, so a backdrop stays the backdrop. */
+export const tryOnPlaces = (person: { id: string }[], garments: { id: string }[], background: { id: string }[]): { images: string[]; garments: number } => ({
+  images: placesOf([person, garments, background]),
+  garments: Math.max(1, garments.length),
+});

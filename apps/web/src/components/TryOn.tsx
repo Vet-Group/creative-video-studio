@@ -4,7 +4,7 @@
 import { useEffect, useId, useState } from 'react';
 import { api, errorText, thumbUrl } from '@/lib/api';
 import { basePrompt, promptTooLong } from '@/lib/prompt-limit';
-import { tryOnSlots } from '@/lib/reuse';
+import { tryOnPlaces, tryOnSlots } from '@/lib/reuse';
 import { confirmRun, sendRun } from '@/lib/run-guard';
 import { tryOnPrompt } from '@/lib/try-on-prompt';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
@@ -271,8 +271,7 @@ export function TryOn({ reuse }: { reuse?: string }) {
             <Templates
               feature="try_on"
               data={() => ({
-                images: [...person, ...garments, ...background].map((i) => i.id),
-                ...(garments.length > 0 && { garments: garments.length }),
+                ...tryOnPlaces(person, garments, background),
                 ...(pose && { pose }),
                 brief: prompt.trim(),
                 ratio: pick.ratio,

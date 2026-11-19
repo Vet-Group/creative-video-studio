@@ -39,7 +39,7 @@ async function copiesOf(ids: string[], authorId: string, viewerId: string): Prom
  * members). The images, end frame and audio clips are re-checked here: its owner gets their own live uploads back; anyone else gets their own copies of the
  * author's live uploads the template names (copiesOf), so a shared template hands out its photos and clips, and nothing else of the author's. `inputIds` lists
  * the template's photos in the order saved as the ids the caller gets (as the jobs route's), so each goes back to its own slot when one before it is gone, and
- * `inputCount` how many photo places it saved (as the jobs route's), so the form says how many no longer exist.
+ * `inputCount` how many photos it saved (as the jobs route's; an empty place '' holds none), so the form says how many no longer exist.
  */
 export async function GET(request: Request, { params }: RouteContext) {
   const g = await guard(request, 'member');
@@ -61,7 +61,7 @@ export async function GET(request: Request, { params }: RouteContext) {
   const [images, endFrame, videoRef, clips] = await Promise.all([own(data.images), own(data.endFrame ? [data.endFrame] : []), own(data.videoRef ? [data.videoRef] : [], true), own(data.clips ?? [])]);
   return Response.json({
     // A deleted upload has no copy: '' matches none of the images, so its slot stays empty without naming the author's id.
-    id: t.id, name: t.name, isCompany: t.is_company, feature: t.feature, images, inputCount: data.images.length, inputIds: copies ? data.images.map((i) => copies.get(i) ?? '') : data.images, endFrame: endFrame[0] ?? null, videoRef: videoRef[0] ?? null, clips,
+    id: t.id, name: t.name, isCompany: t.is_company, feature: t.feature, images, inputCount: data.images.filter((i) => i !== '').length, inputIds: copies ? data.images.map((i) => copies.get(i) ?? '') : data.images, endFrame: endFrame[0] ?? null, videoRef: videoRef[0] ?? null, clips,
     prompt: data.prompt ?? null, brief: data.brief ?? null, script: data.script ?? null, hookText: data.hookText ?? null, ending: data.ending ?? null, endText: data.endText ?? null, endTextPos: data.endTextPos ?? null,
     hook: data.hook ?? null, location: data.location ?? null,
     format: data.format ?? null, roles: data.roles ?? null, highlights: data.highlights ?? null, promptMode: data.promptMode ?? null, audio: data.audio ?? null, orientation: data.orientation ?? null, enhance: data.enhance ?? null, garments: data.garments ?? null, pose: data.pose ?? null, durationSec: data.durationSec ?? null,

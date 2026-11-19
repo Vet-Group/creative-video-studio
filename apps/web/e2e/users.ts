@@ -41,6 +41,7 @@ export const USERS = {
   reusea: { email: 'reusea@e2e.test', name: 'E2E Reuse A', role: 'member' },
   tpla: { email: 'tpla@e2e.test', name: 'E2E Templates A', role: 'member' },
   tplb: { email: 'tplb@e2e.test', name: 'E2E Templates B', role: 'member' },
+  tplslots: { email: 'tplslots@e2e.test', name: 'E2E Templates Slots', role: 'member' }, // templates.e2e: a Try On template saved without a model photo
   usea: { email: 'usea@e2e.test', name: 'E2E Use A', role: 'member' },
   useb: { email: 'useb@e2e.test', name: 'E2E Use B', role: 'member' },
   // templates.e2e: exmaker makes a company example on Create, exuse uses it and keeps their own photo and store.

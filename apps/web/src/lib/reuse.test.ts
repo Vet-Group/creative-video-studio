@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import { appBySlug, splitImages } from './apps';
-import { alignInputs, asExample, exampleFrom, lostInputs, nothingNote, nothingRefilled, queryOf, refillFrom, reuseHref, skippedNote, tryOnSlots } from './reuse';
+import { alignInputs, asExample, exampleFrom, lostInputs, nothingNote, nothingRefilled, placesOf, queryOf, refillFrom, reuseHref, skippedNote, tryOnPlaces, tryOnSlots } from './reuse';
 
 test('the reuse link opens the page that made the job, with the job to refill from; features without a refill yet get no link', () => {
   expect(reuseHref({ id: 'j1', feature: 'video' })).toBe('/create?reuse=j1');
@@ -92,4 +92,27 @@ test('Try On with the person deleted refills the garments as garments and the ba
   expect(tryOnSlots(['p', 'g1', 'g2', 'bg'], [{ id: 'p' }, g1, bg], 2)).toEqual({ person: [{ id: 'p' }], garments: [g1], background: [bg] }); // a deleted garment
   expect(tryOnSlots(['p', 'g1'], [g1], null)).toEqual({ person: [], garments: [g1], background: [] }); // no garment count: all but the person
   expect(tryOnSlots(undefined, [{ id: 'p' }, g1, g2], null)).toEqual({ person: [{ id: 'p' }], garments: [g1, g2], background: [] }); // a sample or a template
+});
+
+test('a form saved as a template keeps a place for each empty slot, so each photo goes back to its own slot when the template is applied', () => {
+  const [p, g1, g2, b] = [{ id: 'p' }, { id: 'g1' }, { id: 'g2' }, { id: 'b' }];
+  // Try On: no person, no garment and no backdrop, in every mix.
+  for (const person of [[], [p]]) {
+    for (const garments of [[], [g1], [g1, g2]]) {
+      for (const background of [[], [b]]) {
+        const saved = tryOnPlaces(person, garments, background);
+        expect(tryOnSlots(saved.images, [...person, ...garments, ...background], saved.garments), JSON.stringify(saved)).toEqual({ person, garments, background });
+      }
+    }
+  }
+  // An app: an empty slot of one image before or after the other, and Jewelry Try-On's pieces with no wearer, or a wearer with no pieces.
+  const applied = (slug: string, slots: { id: string }[][]) => {
+    const app = appBySlug(slug)!;
+    return splitImages(app, alignInputs(placesOf(slots, app.slots), slots.flat())).map((s) => s.filter((i) => i !== null));
+  };
+  for (const slots of [[[], [b]], [[p], []], [[p], [b]], [[], []]]) expect(applied('character-swap', slots)).toEqual(slots);
+  for (const slots of [[[], [b]], [[g1, g2], []], [[g1], []], [[g1, g2], [b]], [[], []]]) expect(applied('jewelry-try-on', slots)).toEqual(slots);
+  // Marketing Studio's model and product (Unboxing's roles name its photos instead): no model leaves the product the product.
+  const placed = alignInputs(placesOf([[], [g1]]), [g1]);
+  expect([placed.slice(0, 1), placed.slice(1, 2)]).toEqual([[null], [g1]]);
 });

@@ -1,3 +1,0 @@
-import type { ChangeEntry } from '../changelog';
-
-export default { at: '2026-11-18T22:30:00+07:00', kind: 'fixed', title: 'Lưu thiết lập từ Lịch sử giữ đúng ô của từng ảnh', details: ['Khi bấm "Lưu thiết lập" trên một thẻ ở Lịch sử cho lượt tạo có ảnh đầu vào đã bị xoá, thiết lập đã lưu giờ giữ ô trống cho ảnh đó, nên khi áp dụng các ảnh còn lại về đúng ô của mình. Trước đây ảnh phía sau bị dồn lên, như ảnh trang phục rơi vào ô người mẫu ở Thử đồ.', 'Áp dụng cho thiết lập của bạn cũng như thiết lập chia sẻ với công ty hay cửa hàng, và giữ cả vai trò của từng ảnh ở Mở hộp.'], prs: [551], audience: 'all' } satisfies ChangeEntry;
