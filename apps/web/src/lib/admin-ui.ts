@@ -39,8 +39,21 @@ export const AUDIT_ACTIONS: Record<string, string> = {
   'user.two_factor_enable': 'Bật xác thực 2 lớp', 'user.two_factor_failed': 'Nhập sai mã 2 lớp', 'user.unban': 'Mở khoá tài khoản', 'user.update': 'Sửa tài khoản', 'verdict.set': 'Chấm kết quả', 'vertex.switch_account': 'Chuyển tài khoản Vertex', 'vertex_account.update': 'Sửa tài khoản Vertex',
   'workspace.create': 'Tạo không gian làm việc', 'workspace.rename': 'Đổi tên không gian làm việc', 'workspace.disable': 'Tắt không gian làm việc', 'workspace.enable': 'Bật lại không gian làm việc', 'workspace.member_add': 'Thêm thành viên vào không gian',
   'workspace.member_remove': 'Xoá thành viên khỏi không gian', 'workspace.member_role': 'Đổi vai trò trong không gian', 'workspace.account_create': 'Tạo tài khoản cho không gian',
+  'workspace.member_refused': 'Bị từ chối thêm thành viên',
 };
 export const auditLabel = (action: string): string => AUDIT_ACTIONS[action] ?? action;
+
+/** Why an owner's add was refused (workspace.member_refused, lib/workspaces.ts addMember), as an Admin reads it; any other code shows as it is. */
+const REFUSALS: Record<string, string> = {
+  company_email: 'email thuộc tên miền công ty',
+  email_taken: 'email đã có tài khoản',
+  no_user: 'chưa có tài khoản hoặc là nhân viên',
+  already_member: 'đã là thành viên của không gian',
+};
+
+/** An entry's new value as the log lists it: a refused add's reason in words (the raw value under the details keeps the code). */
+export const auditNewValue = (action: string, v: unknown): unknown =>
+  action === 'workspace.member_refused' && v && typeof v === 'object' ? { ...v, reason: REFUSALS[(v as { reason: string }).reason] ?? (v as { reason: string }).reason } : v;
 
 /** An entry's target as an Admin reads it in the Overview: a sample's file name without the `sample:` prefix and the extension. */
 export const auditTarget = (target: string): string => (target.startsWith('sample:') ? target.slice('sample:'.length).replace(/\.[a-z0-9]+$/i, '') : target);

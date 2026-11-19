@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { auditChanges, auditLabel, auditTarget, groupRecent } from './admin-ui';
+import { auditChanges, auditLabel, auditNewValue, auditTarget, groupRecent } from './admin-ui';
 
 test('auditChanges shows a changed field as old → new and an unchanged or new field as its value', () => {
   expect(auditChanges({ enabled: false }, { enabled: true })).toEqual([{ key: 'enabled', text: 'false → true' }]);
@@ -32,4 +32,12 @@ test('auditTarget drops the sample prefix and the extension and leaves other tar
 test('auditLabel words the cap, Vertex and sample events and keeps the code of an unknown one', () => {
   expect(['feature_cap.update', 'vertex.switch_account', 'vertex_account.update', 'sample.put'].map(auditLabel)).toEqual(['Sửa hạn mức công cụ', 'Chuyển tài khoản Vertex', 'Sửa tài khoản Vertex', 'Tải ảnh mẫu']);
   expect(auditLabel('cost.release')).toBe('cost.release');
+});
+
+test("auditNewValue words a refused add's reason, keeps an unknown one and leaves other events alone", () => {
+  const v = { email: 'a@b.test', reason: 'no_user', mode: 'add' };
+  expect(auditNewValue('workspace.member_refused', v)).toEqual({ ...v, reason: 'chưa có tài khoản hoặc là nhân viên' });
+  expect(auditNewValue('workspace.member_refused', { ...v, reason: 'Some auth error' })).toEqual({ ...v, reason: 'Some auth error' });
+  expect(auditNewValue('workspace.member_add', v)).toBe(v);
+  expect(auditNewValue('workspace.member_refused', null)).toBeNull();
 });

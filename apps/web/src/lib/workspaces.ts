@@ -119,16 +119,28 @@ export async function join(tx: Queryable, actorId: string, workspaceId: string, 
  * POST a member: `{ email, role }` adds the existing user with that email; `{ email, name, role }` creates an account (createAccount). Answers 201 with the
  * user's id and, for a new account, the temporary password, shown once and never cached. An owner gets 403 company_email for the company's domains
  * before any lookup, and no_user for an Admin or a company member as for an unknown address: they can neither pull staff in nor learn who exists. An
- * account an owner created never joins the company workspace (409 owner_made).
+ * account an owner created never joins the company workspace (409 owner_made). Owners are not throttled: each refusal of a well-formed request from an
+ * owner is audited as workspace.member_refused (email, reason, mode) outside any transaction, so Admins can spot one probing which addresses have an
+ * account; the answer stays the same.
  */
 export async function addMember(request: Request, actorId: string, workspaceId: string, byOwner: boolean): Promise<Response> {
   const body = (await readBody(request)) ?? {};
   const email = emailOf(body.email);
   const role = body.role ?? 'member';
   if (!email || !isRole(role) || (body.name !== undefined && !nameOf(body.name))) return bad('email and role (owner|member) are required; name (1 to 100 characters) creates an account');
+  const name = body.name === undefined ? null : nameOf(body.name)!;
+  const res = await addValid(actorId, workspaceId, byOwner, email, role, name);
+  if (byOwner && !res.ok) {
+    const { error } = (await res.clone().json()) as { error: string };
+    await audit(pool, { actorId, action: 'workspace.member_refused', target: `workspace:${workspaceId}`, newValue: { email, reason: error, mode: name === null ? 'add' : 'create' } });
+  }
+  return res;
+}
+
+async function addValid(actorId: string, workspaceId: string, byOwner: boolean, email: string, role: WorkspaceRole, name: string | null): Promise<Response> {
   if (byOwner && onCompanyDomain(email)) return bad('company_email', 403);
-  if (body.name !== undefined) {
-    const made = await createAccount(actorId, { email, name: nameOf(body.name)!, byOwner, workspaceId }, (tx, userId) => join(tx, actorId, workspaceId, userId, role));
+  if (name !== null) {
+    const made = await createAccount(actorId, { email, name, byOwner, workspaceId }, (tx, userId) => join(tx, actorId, workspaceId, userId, role));
     return made instanceof Response ? made : Response.json({ id: made.userId, temporaryPassword: made.password }, { status: 201, headers: { 'cache-control': 'no-store' } });
   }
   const staff = `select 1 from workspace_members where workspace_id = $2 and user_id = users.id`;

@@ -187,6 +187,34 @@ describe('members', () => {
     }
   });
 
+  test("each refusal an owner gets is audited once, with the email, the reason and the mode, and answered as before; no success or Admin's refusal is", async () => {
+    const refused = async () => (await pool.query(`select actor_id, target, new_value from audit_entries where action = 'workspace.member_refused' order by id`)).rows;
+    const cases: [Record<string, unknown>, number, string, string, 'add' | 'create'][] = [
+      [{ email: ' Ghost@VETGROUP.net ' }, 403, 'company_email', 'ghost@vetgroup.net', 'add'],
+      [{ email: 'Boss@VetGlobalBrand.com', name: 'Boss' }, 403, 'company_email', 'boss@vetglobalbrand.com', 'create'],
+      [{ email: 'Plain@Example.test', name: 'Again' }, 409, 'email_taken', 'plain@example.test', 'create'],
+      [{ email: 'admin@example.test' }, 404, 'no_user', 'admin@example.test', 'add'],
+      [{ email: 'company@example.test' }, 404, 'no_user', 'company@example.test', 'add'],
+      [{ email: 'nobody@example.test', role: 'owner' }, 404, 'no_user', 'nobody@example.test', 'add'],
+      [{ email: 'plain@example.test' }, 409, 'already_member', 'plain@example.test', 'add'],
+    ];
+    for (const [body, status, error, email, mode] of cases) {
+      const before = (await refused()).length;
+      expect(await add(cookies.owner!, 'ws_p', body), error).toEqual({ status, body: { error } });
+      expect((await refused()).slice(before), error).toEqual([{ actor_id: owner, target: 'workspace:ws_p', new_value: { email, reason: error, mode } }]);
+    }
+
+    const before = (await refused()).length;
+    const loner = await user('loner@example.test');
+    expect(await add(cookies.owner!, 'ws_p', { email: 'loner@example.test' })).toEqual({ status: 201, body: { id: loner } });
+    const made = await add(cookies.owner!, 'ws_p', { email: 'fresh@example.test', name: 'Fresh' });
+    expect(made.status).toBe(201);
+    expect((await add(cookies.admin!, 'ws_p', { email: 'nobody@example.test' })).status).toBe(404);
+    expect((await add(cookies.owner!, 'ws_p', { email: 'not an email' })).status).toBe(400); // malformed: no lookup, so nothing to learn
+    expect(await refused()).toHaveLength(before);
+    for (const id of [loner, made.body.id as string]) await leave('ws_p', id); // the Admin Workspaces test counts ws_p's members
+  });
+
   test('the last owner can be neither demoted nor removed, by the owner or an Admin; with a second owner both work', async () => {
     expect(await setRole(cookies.owner!, 'ws_p', owner, 'member')).toEqual({ status: 409, body: { error: 'last_owner' } });
     expect(await remove(cookies.owner!, 'ws_p', owner)).toEqual({ status: 409, body: { error: 'last_owner' } });
@@ -202,7 +230,7 @@ describe('members', () => {
     expect((await remove(cookies.owner!, 'ws_p', staff)).status).toBe(200); // an owner removes a company member an Admin added
     expect(await roleIn('ws_p', staff)).toBeNull();
     expect((await remove(cookies.owner!, 'ws_p', staff)).status).toBe(404);
-    const actions = (await pool.query(`select action from audit_entries where target = 'workspace:ws_p' and action <> 'workspace.member_add' order by id`)).rows.map((r) => r.action);
+    const actions = (await pool.query(`select action from audit_entries where target = 'workspace:ws_p' and action not in ('workspace.member_add', 'workspace.member_refused') order by id`)).rows.map((r) => r.action);
     expect(actions).toEqual(['workspace.member_role', 'workspace.member_role', 'workspace.member_role', 'workspace.member_remove']);
   });
 });
