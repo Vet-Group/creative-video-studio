@@ -3,7 +3,7 @@
 import { randomBytes } from 'node:crypto';
 import { DeleteBucketCommand, DeleteObjectsCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { createTestDatabase } from '@cvs/db/testing';
-import { JOB_APPS } from '@/lib/apps';
+import { itemLabel, JOB_APPS } from '@/lib/apps';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
 const testDb = await createTestDatabase();
@@ -1000,6 +1000,18 @@ describe('download name', () => {
     expect(downloadName('20261023', '???', 'abcdef12-3456')).toBe('20261023-user-abcdef12.mp4');
   });
 
+  test("adds a batch job's item as its History card names it (itemLabel), folded to ASCII and capped", () => {
+    const name = (params: Record<string, string>) => downloadName('20261119', 'Mai', 'ab12cd34-5678', 'png', itemLabel(params));
+    expect(name({ breed: 'Golden Retriever', resolution: '1K' })).toBe('20261119-mai-golden-retriever-ab12cd34.png');
+    expect(name({ view: 'three-quarter-left' })).toBe('20261119-mai-goc-3-4-trai-ab12cd34.png');
+    expect(name({ style: 'watercolor' })).toBe('20261119-mai-mau-nuoc-ab12cd34.png');
+    expect(name({ product: 'mug' })).toBe('20261119-mai-coc-su-11-oz-ab12cd34.png');
+    expect(name({ name: 'Đậu Hũ', breed: 'Pug' })).toBe('20261119-mai-dau-hu-pug-ab12cd34.png'); // the name swap: the name, then its breed
+    // No item, an empty one, one with no letters or an id no app knows: the name stays as before.
+    for (const params of [{}, { resolution: '1K', brief: 'a dog' }, { breed: '' }, { name: '???' }, { view: 'under' }] as Record<string, string>[]) expect(name(params)).toBe('20261119-mai-ab12cd34.png');
+    expect(name({ name: `${'a'.repeat(59)} b` })).toBe(`20261119-mai-${'a'.repeat(59)}-ab12cd34.png`); // capped at 60, no dash left hanging
+  });
+
   test('names the downloaded video of a Library clip for another Member, and leaves other assets alone', async () => {
     const id = await clip(alice.id, { id: 'abcdef12-dl', createdAt: '2026-10-22T17:30:00Z' });
     await putObject(`assets/${id}-video`, new Uint8Array(10), 'video/mp4');
@@ -1014,6 +1026,11 @@ describe('download name', () => {
     };
     expect(await download(`${id}-video`)).toContain('attachment; filename="20261023-nguyen-van-dat-abcdef12.mp4"');
     expect(await download(`${id}-poster`)).toContain(`attachment; filename="${id}-poster"`);
+    // A batch job's item, as the Library and the zip name it.
+    const pug = await clip(alice.id, { id: 'ef56ab12-pug', createdAt: '2026-10-22T17:30:00Z' });
+    await pool.query(`update jobs set params = '{"breed": "Pug", "resolution": "1K"}' where id = $1`, [pug]);
+    await putObject(`assets/${pug}-video`, new Uint8Array(10), 'video/mp4');
+    expect(await download(`${pug}-video`)).toContain('attachment; filename="20261023-nguyen-van-dat-pug-ef56ab12.mp4"');
   });
 
   test('lets Members read the video, poster and inputs of a Library clip but not the input of an unfinished job', async () => {
