@@ -19,6 +19,7 @@ import { copyError, copySamples, fashionTiles, FormNotice, Gallery, type Img, Lo
 import type { UploadSlot } from '@/lib/upload-slots';
 import { FormContext, type Photo, type PhotoRole, useApplier, useJobs } from './jobs';
 import { ModelPicker } from './ModelPicker';
+import { OwnModel } from './OwnModel';
 import { PromptComposer } from './PromptComposer';
 import { PromptPreview } from './PromptSections';
 import { Select } from './Select';
@@ -60,7 +61,10 @@ export function TryOn({ reuse }: { reuse?: string }) {
       () => {},
     );
   }, []);
-  const aiModels = usable(useFashionModels().models ?? []);
+  /** Fash's "Create a model unique to your brand" in place of the model picker's photos; a save reads the AI models again. */
+  const [own, setOwn] = useState(false);
+  const [saved, setSaved] = useState(0);
+  const aiModels = usable(useFashionModels(true, saved).models ?? []);
   const [person, setPerson] = useState<Img[]>([]);
   const [background, setBackground] = useState<Img[]>([]);
   const [prompt, setPrompt, clearDraft] = useDraftState('try-on', reuse !== undefined);
@@ -207,9 +211,21 @@ export function TryOn({ reuse }: { reuse?: string }) {
           <div className="form-scroll">
             <PageHint href="/try-on" />
             <Slot label="Trang phục" empty="Thêm 1 đến 5 ảnh trang phục" inputLabel="Ảnh trang phục" images={garments} max={MAX_GARMENTS} busy={busy} onAdd={add(setGarments, 'garment')} onRemove={(id) => setGarments((c) => c.filter((i) => i.id !== id))} samples={categories.length > 0 ? [] : samplesOf('garment')} onSample={addSample(setGarments, 'garment')} onBrowse={categories.length > 0 ? () => setPicker({ role: 'garment' }) : undefined} onPick={(a) => setGarments((c) => (c.length < MAX_GARMENTS ? [...c, a] : c))} />
-            <Slot label="Người mẫu" empty="Thêm 1 ảnh người mẫu" inputLabel="Ảnh người mẫu" images={person} max={1} busy={busy} onAdd={add(setPerson, 'model')} onRemove={(id) => setPerson((c) => c.filter((i) => i.id !== id))} samples={models0.length > 0 ? [] : samplesOf('model')} onSample={addSample(setPerson, 'model')} onBrowse={catalog || models0.length + myModels.length + aiModels.length > 0 ? () => setPicker({ role: 'model' }) : undefined} onPick={(a) => setPerson([a])} />
+            <Slot label="Người mẫu" empty="Thêm 1 ảnh người mẫu" inputLabel="Ảnh người mẫu" images={person} max={1} busy={busy} onAdd={add(setPerson, 'model')} onRemove={(id) => setPerson((c) => c.filter((i) => i.id !== id))} samples={models0.length > 0 ? [] : samplesOf('model')} onSample={addSample(setPerson, 'model')} onBrowse={() => setPicker({ role: 'model' })} onPick={(a) => setPerson([a])} />
             {(person.length > 0 || pose) && <Select label="Tư thế" icon="model" heading="Chọn tư thế" value={pose ?? ''} options={[{ value: '', label: 'Giữ tư thế trong ảnh' }, ...POSES.map((p) => ({ value: p.value, label: p.label }))]} onChange={(v) => setPose(v || null)} />}
             <Slot label="Bối cảnh (tuỳ chọn)" empty="Thêm 1 ảnh bối cảnh nếu muốn" inputLabel="Ảnh bối cảnh" images={background} max={1} busy={busy} onAdd={add(setBackground, 'background')} onRemove={(id) => setBackground((c) => c.filter((i) => i.id !== id))} samples={backgrounds.length > 0 ? [] : samplesOf('background')} onSample={addSample(setBackground, 'background')} onBrowse={backgrounds.length > 0 ? () => setPicker({ role: 'background' }) : undefined} onPick={(a) => setBackground([a])} />
+            {own ? (
+              <PhotoDialog
+                open={picker !== null}
+                title="Tạo người mẫu riêng"
+                sub="Chọn đặc điểm, AI tạo một người mẫu toàn thân trên nền trắng và lưu vào mục Người mẫu AI để dùng lại."
+                tiles={[]}
+                busy={busy}
+                onClose={() => (setOwn(false), setPicker(null))}
+                onBack={() => setOwn(false)}
+                filter={<OwnModel onSaved={() => setSaved((n) => n + 1)} onPick={(img) => (setOwn(false), setPicker(null), setPerson([img]))} />}
+              />
+            ) : (
             <PhotoDialog
               open={picker !== null}
               title={picker?.of ? (picker.role === 'model' ? 'Chọn tư thế' : GARMENT_CATEGORIES.find((c) => c.id === picker.of)!.label) : picker?.role === 'model' ? 'Chọn người mẫu' : picker?.role === 'garment' ? 'Chọn trang phục' : 'Chọn bối cảnh'}
@@ -242,7 +258,9 @@ export function TryOn({ reuse }: { reuse?: string }) {
                 ) : undefined
               }
               mine={picker?.role === 'model' && !picker.of ? { title: 'Người mẫu của tôi', tiles: myModels.map((a) => ({ key: a.id, src: thumbUrl(a.id), label: `Dùng lại ${a.filename}`, pick: () => setPerson([a]) })) } : undefined}
+              create={picker?.role === 'model' && !picker.of ? { label: 'Tạo người mẫu riêng cho thương hiệu', onClick: () => setOwn(true) } : undefined}
             />
+            )}
 
             {models && models.length > 0 && <ModelPicker models={pick.options} value={pick.modelId} onChange={pick.setModelId} />}
 
