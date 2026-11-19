@@ -10,6 +10,7 @@ export const FEATURE_LABELS: Record<string, string> = {
   lingerie_try_on: 'Thử đồ lót',
   fashion_model: 'Tạo người mẫu AI',
   multi_angle: 'Ảnh nhiều góc',
+  breed_swap: 'Đổi giống chó',
   background_changer: 'Đổi nền',
   reframe: 'Đổi khung hình',
   image_upscale: 'Tăng độ phân giải',

@@ -157,6 +157,15 @@ export const PROMPT_TEMPLATES: Record<'video' | 'marketing' | 'advanced' | 'unbo
       body: 'Filmed like a real phone video at night outside a brightly lit stadium: the creator pulls the hood up, then zips the hoodie all the way up over the face so it becomes a full mask with only the eye opening left, the print on the hood lining up. A steady phone camera at eye level.',
       ending: 'The clip ends with the masked creator tilting their head at the camera, the whole front of the hoodie in view.',
     },
+    {
+      id: 'cun-nha-minh',
+      name: 'Cún nhà mình',
+      desc: 'Mặc áo in ảnh cún, rồi chú chó chạy tới bên cạnh',
+      needs: 'Cần ảnh áo in ảnh thú cưng',
+      hook: 'The clip opens with the creator wearing the custom pet shirt, pointing down at the printed dog photo and its name.',
+      body: 'Their dog, the same breed as the one on the print, trots into the frame and jumps up beside them, and the creator looks from the print to the dog and laughs. A bright, cosy living room, a handheld phone camera at chest height.',
+      ending: 'The clip ends with the creator kneeling to hug the dog, the front of the shirt and its print in full view.',
+    },
   ],
   advanced: [
     {
@@ -324,6 +333,11 @@ export const STARTERS: Record<string, Starter[]> = {
     { label: 'Sân vận động đêm', text: 'The garment on its own, shaped as if worn by an invisible body, standing on a football field at night under bright stadium floodlights, the crowd in the stands softly blurred behind, its colours and print exactly as in the photo.' },
     // A video model keeps an all-over print better when it has seen the garment from several sides: this sheet is one photo of all of them.
     { label: 'Ảnh nhiều góc', text: 'A product reference sheet on a plain light grey background: the same garment seen from the front, the back, the left side and the right side, plus a close-up of its main print, each view evenly lit and the same size, its colours and print exactly as in the photo.' },
+    // The pet pack (2026-11-19): personalised pet products, whose pet photo, name and text must stay exactly as designed.
+    { label: 'Thảm tròn Giáng sinh', text: 'The round rug from the photo lying flat on the wooden floor of a cosy living room decorated for Christmas, a lit tree, wrapped presents and a fireplace softly blurred behind, warm evening light, its printed design, the dog in it and any name exactly as in the photo.' },
+    { label: 'Ornament thú cưng', text: 'The glass ornament from the photo hanging from a branch of a decorated Christmas tree, warm fairy lights and baubles softly blurred behind, soft reflections on the glass, the pet photo and the name on it exactly as in the photo.' },
+    { label: 'Áo in ảnh thú cưng', text: 'A smiling person wearing the shirt from the photo sits on a sofa in a bright living room beside a dog of the breed printed on it, soft natural light, the printed pet photo, the name and any text exactly as in the photo.' },
+    { label: 'Tưởng nhớ thú cưng', text: 'The memorial ornament from the photo resting on a soft cream knit blanket beside a lit candle, a dog collar and a few dried flowers, warm gentle light and a calm mood, the pet photo, the name and any dates exactly as in the photo.' },
   ],
   try_on: [
     { label: 'Studio', text: "A clean studio backdrop with soft even light, the model's pose unchanged." },

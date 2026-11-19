@@ -23,6 +23,7 @@ const READERS: Record<string, string[]> = {
   audio: ['components/CreateForm.tsx', 'components/MarketingStudio.tsx'],
   orientation: ['components/AppPage.tsx'], // Motion Control
   view: ['components/AppPage.tsx'], // the multi-angle app
+  breed: ['components/AppPage.tsx'], // the breed swap app
   ratio: ['components/image-tools.tsx', 'components/CreateForm.tsx', 'components/MarketingStudio.tsx'],
   garments: ['components/TryOn.tsx'],
   pose: ['components/TryOn.tsx'],

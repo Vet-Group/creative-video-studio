@@ -102,6 +102,8 @@ export interface TrayJob {
   roles: string | null;
   /** A multi-angle job's view (an id of PRODUCT_VIEWS); null for any other job. */
   view: string | null;
+  /** A breed swap job's breed (one of DOG_BREEDS); null for any other job. */
+  breed: string | null;
   favorite: boolean;
   /** The job's estimate in USD (4 decimals), which a retry costs again; null for a job without one. */
   estimateUsd: string | null;

@@ -15,6 +15,7 @@ const { GET: listJobs, POST } = await import('./route');
 const { GET } = await import('../stores/route');
 const { settle } = await import('@cvs/core/ledger');
 const { FEATURE_PROMPTS } = await import('@cvs/core/models');
+const { breedSwapPrompt } = await import('@/lib/apps');
 const { forgetFalBalance } = await import('@/lib/provider-credit');
 
 const PASSWORD = 'correct-horse-battery';
@@ -659,7 +660,7 @@ describe('POST /api/jobs for an image feature', () => {
     const appModels: [string, string, number, string][] = [
       ['app-char', 'character_swap', 2, 'auto'], ['app-model', 'model_swap', 2, 'auto'], ['app-bg', 'background_changer', 2, 'auto'], ['app-reframe', 'reframe', 1, '1:1,16:9'],
       ['app-up', 'image_upscale', 1, 'auto'], ['app-face', 'face_swap', 2, 'auto'], ['app-rm', 'background_remover', 1, 'auto'], ['app-jewel', 'jewelry_try_on', 4, 'auto'], ['app-lingerie', 'lingerie_try_on', 4, 'auto'], ['app-fashion', 'fashion_model', 1, '3:4,auto'],
-      ['app-angles', 'multi_angle', 1, 'auto'],
+      ['app-angles', 'multi_angle', 1, 'auto'], ['app-breeds', 'breed_swap', 1, 'auto'],
     ];
     beforeAll(async () => {
       for (const [id, feature, max, ratios] of appModels) {
@@ -726,6 +727,19 @@ describe('POST /api/jobs for an image feature', () => {
       expect((await app('image_upscale', 1, { params: { resolution: '1K', view: 'back' } })).error).toMatch(/^params may hold only/); // no other app takes a view
       const ok = await app('multi_angle', 1, { params: { resolution: '1K', view: 'back' } });
       expect([ok.status, ok.job]).toEqual([201, { feature: 'multi_angle', model: 'app-angles', prompt: FEATURE_PROMPTS.multi_angle, aspect: 'auto', params: { resolution: '1K', view: 'back' } }]);
+    });
+
+    test('the breed swap app takes one picture and one known breed per job, with exactly the prompt that breed makes, kept with the job', async () => {
+      const pug = { prompt: breedSwapPrompt('Pug'), params: { resolution: '1K', breed: 'Pug' } };
+      expect((await app('breed_swap', 1, { prompt: breedSwapPrompt('Pug') })).error).toMatch(/^params.breed must be one of Golden Retriever, /);
+      expect((await app('breed_swap', 1, { ...pug, params: { resolution: '1K', breed: 'Wolf' } })).error).toMatch(/^params.breed must be one of /);
+      expect((await app('breed_swap', 1, { params: { resolution: '1K', breed: 'Pug' } })).error).toBe('the prompt must be the one the breed makes');
+      expect((await app('breed_swap', 1, { ...pug, prompt: breedSwapPrompt('Beagle') })).error).toBe('the prompt must be the one the breed makes');
+      expect((await app('breed_swap', 1, { ...pug, prompt: 'Replace the dog with a cat.' })).error).toBe('the prompt must be the one the breed makes');
+      expect((await app('breed_swap', 2, pug)).error).toMatch(/number of images/);
+      expect((await app('multi_angle', 1, { params: { resolution: '1K', view: 'back', breed: 'Pug' } })).error).toMatch(/^params may hold only/); // no other app takes a breed
+      const ok = await app('breed_swap', 1, pug);
+      expect([ok.status, ok.job]).toEqual([201, { feature: 'breed_swap', model: 'app-breeds', prompt: breedSwapPrompt('Pug'), aspect: 'auto', params: { resolution: '1K', breed: 'Pug' } }]);
     });
 
     test('the Fashion Model Generator takes no image, its traits as JSON and exactly the prompt they make, and keeps the traits as canonical JSON', async () => {

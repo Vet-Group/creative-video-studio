@@ -158,6 +158,8 @@ export const USERS = {
   fashiona: { email: 'fashiona@e2e.test', name: 'E2E Fashion A', role: 'member' },
   // multi-angle.e2e: the multi-angle app, one job per view.
   viewsa: { email: 'viewsa@e2e.test', name: 'E2E Views A', role: 'member' },
+  // breed-swap.e2e: the breed swap app, one job per breed.
+  breedsa: { email: 'breedsa@e2e.test', name: 'E2E Breeds A', role: 'member' },
   // changelog.e2e: the changelog page, the sidebar dot and the once-a-day popup, one member per test.
   chga: { email: 'chga@e2e.test', name: 'E2E Changelog A', role: 'member' },
   chgb: { email: 'chgb@e2e.test', name: 'E2E Changelog B', role: 'member' },

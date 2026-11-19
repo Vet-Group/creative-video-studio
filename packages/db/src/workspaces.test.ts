@@ -19,12 +19,17 @@ cpSync(migrationsFolder, before, { recursive: true });
 const journalFile = join(before, 'meta', '_journal.json');
 const journal = JSON.parse(readFileSync(journalFile, 'utf8')) as { entries: { tag: string }[] };
 const at = journal.entries.findIndex((e) => e.tag === TAG);
-journal.entries = journal.entries.slice(0, at);
+const entries = journal.entries;
+journal.entries = entries.slice(0, at);
 writeFileSync(journalFile, JSON.stringify(journal));
+// The migrations folder up to 0106, so a later migration is not counted or applied as part of this one.
+const through = mkdtempSync(join(tmpdir(), 'cvs-through-0106-'));
+cpSync(migrationsFolder, through, { recursive: true });
+writeFileSync(join(through, 'meta', '_journal.json'), JSON.stringify({ ...journal, entries: entries.slice(0, at + 1) }));
 
 const testDb = await createTestDatabase(undefined, before);
 const pool = createPool(testDb.url, 3);
-const migrateAll = () => migrate(drizzle(pool), { migrationsFolder });
+const migrateAll = () => migrate(drizzle(pool), { migrationsFolder: through });
 const one = async (q: string, params: unknown[] = []) => (await pool.query(q, params)).rows[0];
 const applied = async () => Number((await one('select count(*) from drizzle.__drizzle_migrations')).count);
 const filenode = async (table: string) => (await one('select pg_relation_filenode($1::regclass) as f', [table])).f as string;
@@ -34,6 +39,7 @@ afterAll(async () => {
     await pool.end();
   } finally {
     rmSync(before, { recursive: true, force: true });
+    rmSync(through, { recursive: true, force: true });
     await testDb.drop();
   }
 });

@@ -162,9 +162,9 @@ function WaitProgress({ job }: { job: TrayJob }) {
   );
 }
 
-/** The History card's title: the page's own name for what made it, as Fash titles its cards ("UGC Try On"); a multi-angle card adds its view, as each view is its own job. */
+/** The History card's title: the page's own name for what made it, as Fash titles its cards ("UGC Try On"); a multi-angle card adds its view and a breed swap card its breed, as each is its own job. */
 const cardTitle = (job: TrayJob): string => {
-  const view = job.view && VIEW_LABELS[job.view];
+  const view = (job.view && VIEW_LABELS[job.view]) || job.breed;
   return job.feature === 'marketing' ? cardTitleOfFormat(job.format) : view ? `${featureLabel(job.feature)} · ${view}` : featureLabel(job.feature);
 };
 

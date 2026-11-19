@@ -41,6 +41,8 @@ export interface AppConfig {
   resolution?: boolean;
   /** Shows the views (PRODUCT_VIEWS) to pick (the multi-angle app): Run sends one job per view picked, each with its `params.view`. */
   views?: boolean;
+  /** Shows the dog breeds (DOG_BREEDS) to pick (the breed swap app): Run sends one job per breed picked, each with its `params.breed` and the prompt breedSwapPrompt makes. */
+  breeds?: boolean;
   /** An app that is not built yet: its page says so, and why. */
   soon?: string;
 }
@@ -188,6 +190,16 @@ export const APPS: AppConfig[] = [
     views: true,
   },
   {
+    // Ours too (the pet pack, 2026-11-19): one design or photo with a dog, the same picture with another breed per job, so a seller lists one design for many breeds.
+    slug: 'breed-swap',
+    feature: 'breed_swap',
+    name: 'Đổi giống chó hàng loạt',
+    description: 'Từ một ảnh có chó (mockup, thiết kế hay ảnh chụp), tạo một ảnh cho mỗi giống chó đã chọn, giữ nguyên chữ và bố cục.',
+    category: 'photo',
+    slots: [{ label: 'Ảnh gốc', inputLabel: 'Ảnh gốc có chó', empty: 'Thêm 1 mockup, thiết kế hoặc ảnh chụp có một chú chó' }],
+    breeds: true,
+  },
+  {
     // Ours too, with its own page (components/SmartRemakeApp.tsx) and off unless both REA flags are on (visibleApps). It spends no job: a remake is video spend
     // of its own (api/remakes), so it borrows the `video` feature rather than add one whose per-feature cap would never apply.
     slug: 'smart-remake',
@@ -225,6 +237,8 @@ export interface AppDraft {
   failed: boolean;
   /** How many views are picked, on an app with `views`. */
   views?: number;
+  /** How many breeds are picked, on an app with `breeds`. */
+  breeds?: number;
 }
 
 /** The first thing that stops Run, in the order the form is filled; null when it can go. */
@@ -237,6 +251,7 @@ export function appReason(app: AppConfig, d: AppDraft): string | null {
     if (!slot.optional && d.images[i]!.length === 0) return `Tải lên ảnh: ${slot.label}.`;
   }
   if (app.views && !d.views) return 'Chọn ít nhất một góc.';
+  if (app.breeds && !d.breeds) return 'Chọn ít nhất một giống chó.';
   if (app.prompt === 'background') {
     const reference = d.images[1]!.length > 0;
     const written = d.prompt.trim() !== '';
@@ -314,3 +329,17 @@ export const DEFAULT_VIEWS = ['back', 'left', 'right'];
 
 /** What a Run of `runs` jobs at `unit` USD each costs, with the 4 decimals of a job's estimate; undefined while the price is unknown. */
 export const runTotal = (unit: string | undefined, runs: number): string | undefined => (unit === undefined ? undefined : (Number(unit) * runs).toFixed(4));
+
+/** The breeds the breed swap app offers, the most popular first. Sellers list them by these English names, so the page shows them as they are and a job keeps one as `params.breed`. */
+export const DOG_BREEDS = [
+  'Golden Retriever', 'Labrador Retriever', 'French Bulldog', 'German Shepherd', 'Poodle', 'Bulldog', 'Beagle', 'Rottweiler', 'Dachshund', 'Pembroke Welsh Corgi',
+  'Australian Shepherd', 'Yorkshire Terrier', 'Boxer', 'Siberian Husky', 'Cavalier King Charles Spaniel', 'Bernese Mountain Dog', 'Miniature Schnauzer', 'Shih Tzu',
+  'Pomeranian', 'Boston Terrier', 'Havanese', 'Shetland Sheepdog', 'Chihuahua', 'Pug', 'Border Collie',
+];
+
+/** The prompt of one breed swap job: only the dog changes, to `breed`, and the rest of the picture (a product mockup, a design or a photo) stays as it is. POST /api/jobs takes no other. */
+export const breedSwapPrompt = (breed: string): string =>
+  `Replace only the dog in the image with ${/^[AEIOU]/.test(breed) ? 'an' : 'a'} ${breed}, with the coat, colours and markings typical of the breed. ` +
+  'Keep the new dog in the same pose, at the same size and in the same position as the original dog, facing the same way. ' +
+  'Keep everything else exactly unchanged: every text, name and number, the layout, the background, the product and its shape, the lighting and the art style. ' +
+  'A photo stays a photo and an illustration stays an illustration in the same style. Do not add any text, logos or watermarks.';

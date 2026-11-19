@@ -1,0 +1,3 @@
+import type { ChangeEntry } from '../changelog';
+
+export default { at: '2026-11-19T18:30:00+07:00', kind: 'new', title: 'Gói thú cưng: ứng dụng Đổi giống chó hàng loạt, thảm tròn 3D và mẫu mô tả cho đồ thú cưng', details: ['Ứng dụng mới Đổi giống chó hàng loạt: tải một ảnh có chó (mockup, thiết kế hay ảnh chụp), chọn các giống cần tạo, mỗi giống ra một ảnh riêng, giữ nguyên chữ, tên và bố cục; tổng tiền hiện trước khi chạy.', 'Tab Ví dụ lọc được theo loại sản phẩm mới "Thảm, thảm tròn 3D".', 'Tạo ảnh có thêm gợi ý cho đồ thú cưng: thảm tròn Giáng sinh, ornament ảnh thú cưng, áo in ảnh thú cưng và ornament tưởng nhớ; Marketing Studio (UGC) có mẫu "Cún nhà mình".'], href: '/apps/breed-swap', prs: [560], audience: 'all' } satisfies ChangeEntry;
