@@ -4,11 +4,12 @@ import { FashionModelApp } from '@/components/FashionModelApp';
 import { MediaOptimizer } from '@/components/MediaOptimizer';
 import { SmartRemakeApp } from '@/components/SmartRemakeApp';
 import { appBySlug } from '@/lib/apps';
+import { pool } from '@/lib/auth';
 import { currentUser } from '@/lib/current-user';
 import { smartRemakeAppEnabled } from '@/lib/remake';
 import { exampleFrom, refillFrom } from '@/lib/reuse';
 
-export default async function AppRoute({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<{ reuse?: string; template?: string; example?: string; analysis?: string | string[]; product?: string | string[] }> }) {
+export default async function AppRoute({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<{ reuse?: string; template?: string; example?: string; analysis?: string | string[]; product?: string | string[]; image?: string | string[] }> }) {
   const app = appBySlug((await params).slug);
   if (!app) notFound();
   if (app.slug === 'smart-remake') {
@@ -24,5 +25,15 @@ export default async function AppRoute({ params, searchParams }: { params: Promi
   if (app.slug === 'ai-fashion-model') return <FashionModelApp app={app} isAdmin={(await currentUser())?.role === 'admin'} />;
   const q = await searchParams;
   const from = refillFrom(q) ?? exampleFrom(q);
-  return <AppPage key={`${app.slug}/${from ?? ''}`} app={app} reuse={from} />; // the key starts a fresh form when the app or the refill source changes
+  // A photo for the first slot (History's Background Remover and Image Upscale buttons copy a result into a new input first): only the member's own image input in the active workspace.
+  const user = typeof q.image === 'string' && !from ? await currentUser() : null;
+  const [image] = user?.workspaceId
+    ? (
+        await pool.query<{ id: string; filename: string }>(
+          `select id, filename from assets where id = $1 and owner_id = $2 and workspace_id = $3 and kind = 'input' and deleted_at is null and mime like 'image/%'`,
+          [q.image, user.id, user.workspaceId],
+        )
+      ).rows
+    : [];
+  return <AppPage key={`${app.slug}/${from ?? image?.id ?? ''}`} app={app} reuse={from} image={image} />; // the key starts a fresh form when the app or the refill source changes
 }

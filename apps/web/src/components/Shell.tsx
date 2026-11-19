@@ -2,7 +2,7 @@
 // The frame of every signed-in page: navigation, the "My jobs" tray and the toasts.
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { type ComponentProps, createContext, type ReactNode, useCallback, useContext, useEffect, useId, useRef, useState } from 'react';
 import { api, ApiError, errorText, type JobStatus, sendJson, thumbUrl, type TrayJob, WORKSPACE_CHANGED_EVENT } from '@/lib/api';
 import { appBySlug, itemLabel } from '@/lib/apps';
@@ -169,6 +169,12 @@ const cardTitle = (job: TrayJob): string => {
   return job.feature === 'marketing' ? cardTitleOfFormat(job.format) : view ? `${featureLabel(job.feature)} · ${view}` : featureLabel(job.feature);
 };
 
+/** The apps an image result opens in from its History card, as a new input in their first slot: those not marked as coming soon. */
+const IMAGE_TOOLS = ([['background-remover', 'wand'], ['image-upscale', 'expand']] as const).flatMap(([slug, icon]) => {
+  const app = appBySlug(slug);
+  return app && !app.soon ? [{ ...app, icon }] : [];
+});
+
 /**
  * One job in a page's History tab, laid out as Fash's History card: the result on the left; on the right the title, the member's own words,
  * the inputs, the ratio and length chips, the status and date, the icon actions and Dùng lại (Fash's Recreate, without the run).
@@ -241,7 +247,17 @@ function HistoryCard({ job, isAdmin, select, selectBatch }: { job: TrayJob; isAd
     setSaving(null);
     setSaved(true);
   }
-  // The server names the file as the Library does (YYYYMMDD-creator-id); the button waits for the link so a second click starts no second download.
+  // An image result in another app: copied into a new input of the member's (POST /api/assets/copy), which the app's page puts in its first slot.
+  const router = useRouter();
+  const openIn = async (slug: string) => {
+    setSending(true); // from the click on, so a double click copies once
+    await act(async () => {
+      const [copy] = (await api<{ assets: { id: string }[] }>('/api/assets/copy', sendJson('POST', { assetId: out }))).assets;
+      router.push(`/apps/${slug}?image=${copy!.id}`);
+    }, 'Không mở được ảnh này.');
+    setSending(false);
+  };
+  // The server names the file as the Library does (YYYYMMDD-creator[-item]-id); the button waits for the link so a second click starts no second download.
   const [downloading, setDownloading] = useState(false);
   const download = async () => {
     setDownloading(true);
@@ -433,6 +449,13 @@ function HistoryCard({ job, isAdmin, select, selectBatch }: { job: TrayJob; isAd
               <Icon name="film" /> Tạo video
             </Link>
           )}
+          {out &&
+            image &&
+            IMAGE_TOOLS.filter((a) => a.feature !== job.feature).map((a) => (
+              <button key={a.slug} type="button" className="job-reuse" disabled={sending} onClick={() => void openIn(a.slug)}>
+                <Icon name={a.icon} /> {a.name}
+              </button>
+            ))}
         </div>
         {(savable || out) && (
           <div className="job-actions" role="group" aria-label="Thao tác khác">
