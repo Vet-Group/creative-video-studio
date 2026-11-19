@@ -44,7 +44,9 @@ export interface AnalyzeSeams {
 /** The feature switch for this worker. Default OFF: the queue is not even subscribed when unset. */
 export const reaAnalyzeEnabled = (env: NodeJS.ProcessEnv = process.env): boolean => env.REA_ANALYZE_ENABLED === '1';
 
-// --vlm: per-shot VLM judgement (prompts the UI shows); --lang en: English report/summary/prompts (the UI
+// --vlm: per-shot VLM judgement (prompts the UI shows), and from rea-video ac47077 on also a survey of the cuts first: the VLM
+//   drops the detector's false cuts and merges dissolves into one change (--no-survey would skip it; a failed survey keeps the
+//   detector's cuts); --lang en: English report/summary/prompts (the UI
 // localizes only the format label, and the provider prompts must be English). Not relying on host rea-video
 // prefs keeps the invocation self-contained.
 // --workers 5: run the per-shot VLM calls 5 at a time (rea-video's default is 3). Measured on a 57s/720p clip:

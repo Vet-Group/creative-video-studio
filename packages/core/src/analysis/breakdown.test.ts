@@ -59,6 +59,28 @@ test('parses a real rea-video breakdown.json fixture into non-empty prompts (gua
   expect(a.shots.every((s) => s.prompt.length > 0)).toBe(true);
 });
 
+test('parses the breakdown of rea-video ac47077, whose --vlm run also surveys the cuts, and merges its shots into the beats it describes', () => {
+  // Trimmed from `rea-video decompose example-17.mp4 --vlm --lang en --workers 5 --max-vlm-shots 40` at ac47077 (2026-11-19).
+  const raw = JSON.parse(readFileSync(new URL('./__fixtures__/breakdown.survey.sample.json', import.meta.url), 'utf8'));
+  const a = parseBreakdown(raw);
+  expect(a.durationS).toBe(8.042);
+  expect(a.format).toBe('product showcase');
+  expect(a.shots.map((s) => [s.start, s.end, s.role])).toEqual([
+    [0, 1.167, 'hook'],
+    [1.167, 2.333, 'hook'],
+    [2.333, 4, 'proof'],
+    [4, 4.75, 'proof'],
+    [4.75, 6.417, 'proof'],
+    [6.417, 8.042, 'mood'],
+  ]);
+  expect(a.shots.every((s) => (s.point ?? '').length > 0)).toBe(true);
+  expect(mergeShots(a).shots.map((s) => [s.start, s.end, s.role])).toEqual([
+    [0, 2.333, 'hook'],
+    [2.333, 6.417, 'proof'],
+    [6.417, 8.042, 'mood'],
+  ]);
+});
+
 const scenes = (shots: Analysis['shots']) => mergeShots({ durationS: 0, shotCount: shots.length, format: '', hook: '', summary: '', shots });
 
 test('mergeShots joins adjacent shots on their role and point, so the distinct detailed prompts still merge', () => {
