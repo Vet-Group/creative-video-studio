@@ -22,9 +22,9 @@ test.afterAll(async () => {
   }
 });
 
-async function shot(page: Page, name: string): Promise<void> {
+async function shot(page: Page, name: string, fullPage = false): Promise<void> {
   const dir = process.env.CVS_E2E_SHOTS;
-  await page.screenshot({ path: dir ? `${dir}/${name}.png` : test.info().outputPath(`${name}.png`) });
+  await page.screenshot({ path: dir ? `${dir}/${name}.png` : test.info().outputPath(`${name}.png`), fullPage });
 }
 /** The same signed-in browser at a phone's width in dark mode, for the 390 px screenshots. */
 async function phone(browser: Browser, from: BrowserContext): Promise<Page> {
@@ -57,7 +57,7 @@ test('an Admin creates a partner workspace, its owner adds a member, who switche
   const adminPhone = await phone(browser, adminContext);
   await adminPhone.goto('/admin/workspaces');
   await expect(adminPhone.getByRole('row').filter({ hasText: WS_NAME })).toBeVisible();
-  await shot(adminPhone, 'admin-workspaces-390-dark');
+  await shot(adminPhone, 'admin-workspaces-390-dark', true);
   await adminPhone.context().close();
   const workspaceId = (await db.query('select id from workspaces where name = $1', [WS_NAME])).rows[0].id as string;
 
@@ -112,7 +112,7 @@ test('an Admin creates a partner workspace, its owner adds a member, who switche
   const ownerPhone = await phone(browser, ownerContext);
   await ownerPhone.goto('/members');
   await expect(ownerPhone.getByRole('table').getByRole('row').filter({ hasText: USERS.wsboth.email })).toBeVisible();
-  await shot(ownerPhone, 'members-390-dark');
+  await shot(ownerPhone, 'members-390-dark', true);
   await ownerPhone.context().close();
   await db.query(`insert into feedback (id, user_id, team_id, kind, title, body, image_asset_ids, workspace_id) select $1, id, team_id, 'feature', $2, 'b', '{}', $3 from users where email = $4`, [
     `wsm-${run}`,
