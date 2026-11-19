@@ -128,6 +128,17 @@ describe('Lark sign-in', () => {
     await auth.api.createUser({ body: { email: 'dung2@example.test', name: 'Võ Thị Dung', role: 'member', data: { emailVerified: true } } });
   });
 
+  test("a namesake outside the company workspace (a partner owner's account) does not block a staff member's first sign-in", async () => {
+    const partner = await user('lookalike@partner.test');
+    await pool.query(`update users set name = 'Trần Thị Mai' where id = $1`, [partner]);
+    await pool.query(`delete from workspace_members where user_id = $1 and workspace_id = 'ws_vet'`, [partner]);
+    const users = await count('users');
+    const flow = await oauth(route, { provider: 'lark', code: lark({ enterprise_email: 'mai@example.test', name: 'Trần Thị Mai - Seller' }) });
+    expect(flow.error).toBeNull();
+    expect(await count('users')).toBe(users + 1);
+    expect(await sessionUser(flow.cookie)).not.toBe(partner);
+  });
+
   test('refuses a banned user and starts no session', async () => {
     const id = await user('banned@example.test');
     await pool.query('update users set banned = true where id = $1', [id]);
