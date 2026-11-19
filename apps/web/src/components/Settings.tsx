@@ -230,7 +230,13 @@ function ProfileCard({ name, color, email, isAdmin, onSaved }: { name: string; c
       onSaved({ name: saved.name, color: userAvatarColor(saved.name, saved.avatarColor), email: saved.email });
       stop();
     } catch (err) {
-      setError(err instanceof ApiError && err.status === 409 ? 'Email này đã có người khác dùng.' : 'Không lưu được hồ sơ. Hãy thử lại.');
+      setError(
+        err instanceof ApiError && err.status === 409
+          ? 'Email này đã có người khác dùng.'
+          : err instanceof ApiError && err.message === 'company_email'
+            ? 'Không dùng được email này cho tài khoản ở không gian làm việc này. Hãy dùng email khác.'
+            : 'Không lưu được hồ sơ. Hãy thử lại.',
+      );
     } finally {
       setBusy(false);
     }

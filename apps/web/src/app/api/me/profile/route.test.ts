@@ -95,6 +95,22 @@ describe('PATCH /api/me/profile', () => {
     await pool.query("update users set email = 'me@example.test', email_verified = true where id = $1", [id]);
   });
 
+  test("outside the company workspace a company-domain address is refused before the uniqueness check, so it neither claims nor reveals a staff address", async () => {
+    await pool.query(`insert into workspaces (id, name) values ('ws_pp', 'Partner') on conflict do nothing`);
+    await pool.query(`insert into workspace_members (workspace_id, user_id, role) values ('ws_pp', $1, 'member') on conflict do nothing`, [id]);
+    await auth.api.createUser({ body: { email: 'staff@vetgroup.net', name: 'Staff', password, role: 'member' } });
+    const asPartner = `${cookie}; cvs_ws=ws_pp`;
+    for (const email of ['staff@vetgroup.net', 'Someone.New@VETGROUP.net', 'x@sales.vetgroup.net']) {
+      const res = await patch({ email }, asPartner);
+      expect([res.status, ((await res.json()) as { error: string }).error], email).toEqual([403, 'company_email']);
+    }
+    expect((await pool.query('select email from users where id = $1', [id])).rows[0].email).toBe('me@example.test');
+    // Another address still saves there, and in the company workspace a company address does too.
+    expect((await patch({ email: 'me.partner@example.test' }, asPartner)).status).toBe(200);
+    expect((await patch({ email: 'me@vetgroup.net' })).status).toBe(200);
+    await pool.query("update users set email = 'me@example.test', email_verified = true where id = $1", [id]);
+  });
+
   test('403 while the user must replace a temporary password', async () => {
     await pool.query('update users set must_change_password = true where id = $1', [id]);
     const before = await row();

@@ -1,9 +1,11 @@
 import { audit } from '@cvs/core/audit';
 import { withTransaction } from '@cvs/core/ledger';
+import { COMPANY_WORKSPACE_ID } from '@cvs/db';
 import { bad, readBody } from '@/lib/admin';
 import { pool } from '@/lib/auth';
 import { isAvatarColor, isEmail, nameProblem } from '@/lib/profile';
 import { guard, impersonationRefusal, isImpersonated } from '@/lib/session';
+import { onCompanyDomain } from '@/lib/workspaces';
 
 /**
  * The caller changes their own display name (1 to 60 characters after trimming, no control characters), avatar colour (one of the
@@ -12,6 +14,8 @@ import { guard, impersonationRefusal, isImpersonated } from '@/lib/session';
  * better-auth's /update-user is closed (api/auth/[...all]/route.ts), so this is the only way a user renames themselves.
  * A self-typed email is not verified: better-auth then never links a first Google sign-in to it by equal address, so typing someone
  * else's address does not hand them this account. Linked Lark and Google accounts and passkeys keep working; an Admin's change verifies it.
+ * Outside the company's workspace a new address on the company's email domains is refused (403 company_email), before the uniqueness check: a partner
+ * may neither pre-claim a staff member's address (and block their first Lark sign-in) nor learn which staff addresses exist (docs/WORKSPACES.md §4).
  */
 export async function PATCH(request: Request) {
   const g = await guard(request, 'member');
@@ -24,6 +28,7 @@ export async function PATCH(request: Request) {
   const newEmail = typeof email === 'string' ? email.trim().toLowerCase() : email;
   if (newEmail !== undefined && !(typeof newEmail === 'string' && isEmail(newEmail))) return bad('email must be an email address');
   const userId = g.session.user.id;
+  if (typeof newEmail === 'string' && g.workspaceId !== COMPANY_WORKSPACE_ID && newEmail !== g.session.user.email.toLowerCase() && onCompanyDomain(newEmail)) return bad('company_email', 403);
   if (typeof newEmail === 'string' && (await pool.query('select 1 from users where lower(email) = $1 and id <> $2', [newEmail, userId])).rowCount) {
     return bad('another user has this email', 409);
   }
