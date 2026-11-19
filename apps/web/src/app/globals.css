@@ -1085,6 +1085,11 @@ dialog.admin-modal { width: min(36rem, calc(100vw - 2rem)); }
 /* Try On's own-model form in the model picker (OwnModel.tsx): the free-text box as the choice form's, the price beside the button's words. */
 .own-model textarea { display: block; width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: inherit; font: inherit; font-size: 14px; line-height: 21px; resize: vertical; }
 .own-model > button.primary { display: inline-flex; align-items: center; gap: 6px; margin-top: 16px; }
+/* The model just made, with Fash's Use This Model and Create Another under it. */
+.own-model-made { display: grid; justify-items: center; gap: 12px; }
+.own-model-made img { display: block; width: 200px; max-width: 100%; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 12px; background: var(--fill); }
+.own-model-made .help { margin: 0; }
+.own-model-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
 .prompt-editor textarea { display: block; width: 100%; height: 60vh; padding: 8px; border: 1px solid var(--field-border); border-radius: 8px; background: var(--fill); color: inherit; font: inherit; font-size: 14px; line-height: 21px; resize: vertical; }
 /* Enhance: Fash's pill in the prompt box, filled when on, outlined when off. */
 .enhance { display: inline-flex; align-items: center; gap: 4px; height: 30px; padding: 0 10px; border: 1px solid var(--ink); border-radius: 999px; background: var(--ink); color: var(--on-ink); font: inherit; font-size: 12px; font-weight: 600; line-height: 18px; white-space: nowrap; cursor: pointer; }
@@ -1878,6 +1883,14 @@ dialog.modal.template-sheet { width: 100%; max-width: none; margin: auto 0 0; bo
 .clips li { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; overflow-wrap: anywhere; }
 .clips button { display: grid; flex: none; place-items: center; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%; background: var(--ink); color: var(--on-ink); }
 .slot-icon { display: grid; place-items: center; }
+/* Try On's pose beside the model photo (TryOn.tsx, Fash's "Hand on Hip x" chip): the pose select drawn as a pill over the slot's upload button, its clear button inside the pill. */
+.pose-chip { position: relative; z-index: 1; display: flex; align-items: center; }
+.select-chip { margin: 0; }
+.select-chip .select-trigger { width: auto; max-width: 220px; height: 32px; padding: 4px 10px; border-color: var(--border); border-radius: 999px; background: var(--surface); font-size: 13px; line-height: 18px; }
+.select-chip .select-pop { right: auto; min-width: 220px; }
+.pose-chip:has(.pose-clear) .select-trigger { padding-right: 34px; }
+.pose-clear { position: absolute; right: 6px; display: grid; place-items: center; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 50%; background: var(--fill); color: var(--ink); }
+@media (pointer: coarse) { .select-chip .select-trigger { height: 44px; } .pose-clear::after { content: ''; position: absolute; inset: -11px; } }
 .slot-name { display: none; color: var(--text-muted); font-size: 14px; line-height: 20px; }
 .app-slots[data-two='true'] .slot-add .slot-hint { display: none; } /* not the video slot's own line */
 .app-slots[data-two='true'] .slot-name { display: block; }

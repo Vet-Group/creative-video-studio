@@ -1,8 +1,9 @@
 'use client';
 // Try On's own-model creator (Fash's "Create a model unique to your brand", inside the model picker): Fash's five traits and an optional line make one
-// fashion_model job, run as the AI model app runs it; the result is saved as the member's private model and, while this form is still open, fills the Model slot (once it is closed, a note says so instead).
+// fashion_model job, run as the AI model app runs it; the result is saved as the member's private model and shown with Fash's "Use This Model" (fills the Model slot)
+// and "Create Another" (back to the same traits). Once this form is closed, a note says the model was saved instead.
 import { useEffect, useId, useRef, useState } from 'react';
-import { api, errorText, type JobStatus, sendJson } from '@/lib/api';
+import { api, errorText, type JobStatus, sendJson, thumbUrl } from '@/lib/api';
 import { DEFAULT_FASHION_TRAITS, FASHION_OPTIONS, fashionModelName, fashionModelPrompt, type FashionTraits, MAX_EXTRA, mentionsMinor, MINOR_REASON } from '@/lib/fashion-model';
 import type { FashionModelItem } from '@/lib/fashion-models';
 import { promptTooLong } from '@/lib/prompt-limit';
@@ -27,6 +28,9 @@ export function OwnModel({ onSaved, onPick }: { onSaved: () => void; onPick: (im
   const [traits, setTraits] = useState<FashionTraits>(START);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState('');
+  const [made, setMade] = useState<Img | null>(null); // the model just made, waiting for Use this model or Create another
+  const use = useRef<HTMLButtonElement>(null);
+  useEffect(() => void (made && use.current?.focus()), [made]);
   const ids = { extra: useId(), reason: useId() };
   const box = useRef<HTMLDivElement>(null);
   const shown = useRef(true); // false once the member goes back or closes the picker: the run still saves the model and says so in a note, filling nothing
@@ -60,7 +64,7 @@ export function OwnModel({ onSaved, onPick }: { onSaved: () => void; onPick: (im
         if (job.status !== 'succeeded' || !job.outputAssetId) continue;
         const saved = await api<FashionModelItem>('/api/fashion-models', sendJson('POST', { assetId: job.outputAssetId, name: fashionModelName(traits) }));
         onSaved();
-        if (shown.current) onPick({ id: saved.assetId, filename: saved.name });
+        if (shown.current) setMade({ id: saved.assetId, filename: saved.name });
         else notify(`Đã lưu người mẫu ${saved.name} vào Người mẫu AI`);
         return;
       }
@@ -72,6 +76,24 @@ export function OwnModel({ onSaved, onPick }: { onSaved: () => void; onPick: (im
       setRunning(false);
     }
   }
+
+  if (made)
+    return (
+      <div ref={box} className="own-model own-model-made">
+        <img src={thumbUrl(made.id)} alt={made.filename} />
+        <p className="help" role="status">
+          Đã lưu vào mục Người mẫu AI.
+        </p>
+        <div className="own-model-actions">
+          <button ref={use} type="button" className="primary" onClick={() => onPick(made)}>
+            Dùng người mẫu này
+          </button>
+          <button type="button" onClick={() => setMade(null)}>
+            Tạo người mẫu khác
+          </button>
+        </div>
+      </div>
+    );
 
   return (
     <div ref={box} className="own-model">

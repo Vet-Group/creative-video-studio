@@ -3,7 +3,8 @@ import { expect, test } from '@playwright/test';
 import { gotoTryOn, select, selectValue, signIn } from './support.test';
 
 // Try On's own-model creator (Fash's "Create a model unique to your brand"): the model picker's tile opens five traits in place of the photos and Back
-// returns; a run (the mock model) saves the member's private AI model, fills the Model slot with it, and the picker then lists it in its AI models group.
+// returns; a run (the mock model) saves the member's private AI model and shows it with Use this model, which fills the Model slot, and Create another,
+// which goes back to the same traits; the picker then lists it in its AI models group.
 test('creates a model inside the Try On model picker, fills the slot and lists it as an AI model', async ({ page }) => {
   await signIn(page, 'ownmodel');
   await gotoTryOn(page);
@@ -34,7 +35,12 @@ test('creates a model inside the Try On model picker, fills the slot and lists i
   await run.click();
 
   const name = 'Nam · 26-40 tuổi · Việt Nam / Đông Nam Á';
-  await expect(form).toBeHidden({ timeout: 90_000 });
+  // Fash's result step: the model just made, Use this model focused.
+  const use = form.getByRole('button', { name: 'Dùng người mẫu này' });
+  await expect(use).toBeFocused({ timeout: 90_000 });
+  await expect(form.getByRole('img', { name })).toBeVisible();
+  await use.click();
+  await expect(form).toBeHidden();
   await expect(page.getByRole('list', { name: 'Người mẫu: ảnh đã chọn' }).getByRole('img', { name })).toBeVisible();
 
   // One fashion_model job, full length on white, in a portrait ratio.
@@ -61,4 +67,15 @@ test('creates a model inside the Try On model picker, fills the slot and lists i
   await expect(page.getByRole('list', { name: 'Người mẫu: ảnh đã chọn' })).toHaveCount(0);
   const both = (await (await page.request.get('/api/fashion-models')).json()) as { models: { name: string }[] };
   expect(both.models.map((m) => m.name).sort()).toEqual([name, second].sort());
+
+  // Create another goes back to the traits just used, ready for one more run.
+  await page.getByRole('button', { name: 'Tải lên Người mẫu' }).click();
+  await create.click();
+  await selectValue(page, 'Tóc', 'short');
+  await run.click();
+  await form.getByRole('button', { name: 'Tạo người mẫu khác' }).click({ timeout: 90_000 });
+  await expect(select(page, 'Tóc')).toHaveAttribute('data-value', 'short');
+  await expect(run).toBeEnabled();
+  await page.keyboard.press('Escape');
+  await expect(form).toBeHidden();
 });

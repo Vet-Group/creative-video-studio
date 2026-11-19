@@ -725,6 +725,8 @@ test("Try On, as Fash's model catalog: the filters narrow the portraits, a portr
     await expect(poses).toBeHidden();
     await expect(page.getByLabel('Người mẫu: ảnh đã chọn').getByRole('img', { name: 'try-on-portrait-woman-isla.jpg' })).toBeVisible();
     await expect(select(page, 'Tư thế')).toHaveAttribute('data-value', 'hand-on-hip');
+    // The pose is a chip beside the photo in the Model slot, as Fash's "Hand on Hip x".
+    await expect(page.getByRole('group', { name: 'Người mẫu', exact: true }).getByRole('combobox', { name: 'Tư thế' })).toHaveText('Tay chống hông');
 
     await page.getByLabel('Ảnh trang phục').setInputFiles({ name: 'pose-garment.png', mimeType: 'image/png', buffer: png() });
     await page.getByRole('button', { name: /^Thử đồ/ }).click();
@@ -733,6 +735,13 @@ test("Try On, as Fash's model catalog: the filters narrow the portraits, a portr
     const job = (await (await page.request.get(`/api/jobs/${sent.id}`)).json()) as { prompt: string; pose: string };
     expect(job.pose).toBe('hand-on-hip');
     expect(job.prompt).toContain('show them in this pose and framing: standing facing the camera with one hand on the hip');
+
+    // The chip's x drops the pose and the chip offers a pose again; picking one from it sets it back.
+    await page.getByRole('button', { name: 'Bỏ tư thế' }).click();
+    await expect(select(page, 'Tư thế')).toHaveAttribute('data-value', '');
+    await expect(select(page, 'Tư thế')).toHaveText('Chọn tư thế');
+    await selectValue(page, 'Tư thế', 'hand-on-hip');
+    await expect(select(page, 'Tư thế')).toHaveAttribute('data-value', 'hand-on-hip');
 
     // Không chọn tư thế keeps the portrait and drops the pose; the full one-photo slot is emptied first, so it opens the picker again.
     await page.getByRole('button', { name: 'Bỏ ảnh try-on-portrait-woman-isla.jpg' }).click();
