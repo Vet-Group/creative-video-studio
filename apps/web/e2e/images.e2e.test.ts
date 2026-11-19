@@ -67,7 +67,7 @@ test('a mock image job made through the API is an image card under "Tất cả �
   const [download] = await Promise.all([page.waitForEvent('download'), card.getByRole('button', { name: 'Tải xuống' }).click()]);
   expect(download.suggestedFilename()).toMatch(new RegExp(`^${today()}-e2e-member-8-[0-9a-f]{8}\.png$`));
 
-  await card.getByRole('button', { name: 'Xoá' }).click();
+  await card.getByRole('button', { name: 'Xoá', exact: true }).click();
   await expect(page.getByRole('alertdialog', { name: 'Xác nhận xoá' })).toContainText('Xoá ảnh này?');
   await page.getByRole('button', { name: 'Xác nhận xoá' }).click();
   await expect(card).toHaveCount(0);
