@@ -390,10 +390,44 @@ describe('/api/templates', () => {
       await pool.query(`insert into stores (id, name, code, hidden) values ('tpl-ok', 'Ok', 'TPLOK', false), ('tpl-hidden', 'Hidden', 'TPLH', true)`);
       await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes, deleted_at) values ($1, $2, 'input', $1, 'x.png', 'image/png', 1, now())`, [`${u.id}-gone`, u.id]);
       const base = { feature: 'video', model: 'kling-o3-pro', prompt: 'p', duration: 5, inputs: [other.asset, `${u.id}-gone`, u.asset] };
-      expect((await saved(await fromJob(u, await job(u, { ...base, store: 'tpl-hidden' })))).data).toEqual({ images: [u.asset], prompt: 'p', enhance: false, ratio: '9:16', modelId: 'kling-o3-pro', durationSec: 5 });
-      expect((await saved(await fromJob(u, await job(u, { ...base, store: 'tpl-ok' })))).data).toMatchObject({ images: [u.asset], storeId: 'tpl-ok' });
+      // Each one left out keeps its place as an empty slot ('').
+      expect((await saved(await fromJob(u, await job(u, { ...base, store: 'tpl-hidden' })))).data).toEqual({ images: ['', '', u.asset], prompt: 'p', enhance: false, ratio: '9:16', modelId: 'kling-o3-pro', durationSec: 5 });
+      expect((await saved(await fromJob(u, await job(u, { ...base, store: 'tpl-ok' })))).data).toMatchObject({ images: ['', '', u.asset], storeId: 'tpl-ok' });
       const mkt = await job(u, { feature: 'marketing', model: 'kling-o3-pro', duration: 5, params: { hook: `${other.id}-private`, location: 'gym' }, inputs: [u.asset] });
       expect((await saved(await fromJob(u, mkt))).data).toEqual({ images: [u.asset], location: 'gym', ratio: '9:16', modelId: 'kling-o3-pro', durationSec: 5 });
+    });
+
+    test('keeps an empty slot for a photo deleted before the save, so the others keep their roles for the author and for a store member', async () => {
+      const [u, m] = [await newUser(), await newUser()];
+      await pool.query(`insert into stores (id, name, code, hidden) values ('tpl-gaps', 'Gaps', 'TPLGAP', false)`);
+      const names = ['person', 'garment', 'backdrop', 'product', 'box'];
+      const [person, garment, backdrop, product, box] = names.map((n) => `${u.id}-${n}`) as [string, string, string, string, string];
+      for (const n of names) {
+        await pool.query(`insert into assets (id, owner_id, kind, s3_key, filename, mime, bytes) values ($1, $2, 'input', $1, $3, 'image/png', 1)`, [`${u.id}-${n}`, u.id, `${n}.png`]);
+        await putObject(`${u.id}-${n}`, new Uint8Array([1]), 'image/png');
+      }
+      const tryOnJob = await job(u, { feature: 'try_on', model: 'nano-banana-pro', aspect: '3:4', params: { garments: '1' }, inputs: [person, garment, backdrop] });
+      const unboxing = await job(u, { feature: 'marketing', model: 'kling-o3-pro', duration: 5, params: { format: 'unboxing', audio: 'on', roles: 'model,product,packaging' }, inputs: [person, product, box] });
+      await pool.query('update assets set deleted_at = now() where id = $1', [person]);
+
+      const res = await fromJob(u, tryOnJob, { storeId: 'tpl-gaps' });
+      expect((await saved(res.clone())).data).toMatchObject({ images: ['', garment, backdrop], garments: 1 });
+      // The unboxing roles still name each place, the deleted model's too.
+      expect((await saved(await fromJob(u, unboxing))).data).toMatchObject({ images: ['', product, box], format: 'unboxing', roles: 'model,product,packaging' });
+
+      const { id } = (await res.json()) as { id: string };
+      type Got = { images: { id: string; filename: string }[]; inputIds: string[]; garments: number };
+      const apply = async (who: User) => (await (await one(req(who, `/api/templates/${id}`), ctx(id))).json()) as Got;
+      const slots = (g: Got) => Object.fromEntries(Object.entries(tryOnSlots(g.inputIds, g.images, g.garments)).map(([k, v]) => [k, v.map((i) => i.filename)]));
+      const own = await apply(u);
+      expect(own.inputIds).toEqual(['', garment, backdrop]);
+      expect(slots(own)).toEqual({ person: [], garments: ['garment.png'], background: ['backdrop.png'] });
+      // The store member gets copies in the same places, and the empty slot names nothing of the author's.
+      const copy = await apply(m);
+      expect(copy.inputIds).toEqual(['', ...copy.images.map((i) => i.id)]);
+      expect(slots(copy)).toEqual({ person: [], garments: ['garment.png'], background: ['backdrop.png'] });
+      // An empty slot skips the ownership check; another member's photo beside it is still refused.
+      expect(await error(await save(u, { feature: 'try_on', name: 'Gap', data: { images: ['', m.asset] } }))).toBe('data.images may hold only your own uploads');
     });
 
     test("refuses another member's or a deleted job, fromJob with data or feature, a page without templates, and sharing by a member; an Admin shares one", async () => {
