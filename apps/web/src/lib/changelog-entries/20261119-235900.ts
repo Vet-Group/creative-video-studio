@@ -1,0 +1,3 @@
+import type { ChangeEntry } from '../changelog';
+
+export default { at: '2026-11-19T23:59:00+07:00', kind: 'improved', title: 'Giới thiệu Thử đồ, Thử trang sức và Thử đồ lót giải thích vì sao nên dùng thay cho ChatGPT hay công cụ AI chung', details: ['Mở tab Giới thiệu của Thử đồ, Thử trang sức hoặc Thử đồ lót để xem mục mới: vì sao công cụ này giữ sản phẩm sát ảnh gốc hơn ChatGPT, Gemini hay công cụ AI tạo ảnh chung, kèm bảng so sánh.', 'Mục nhắc cách bắt đầu từ tab Ví dụ với nút Dùng ví dụ này, và với Thử đồ còn có người mẫu AI riêng của thương hiệu dùng lại cho cả danh mục.'], href: '/try-on', prs: [570], audience: 'all' } satisfies ChangeEntry;

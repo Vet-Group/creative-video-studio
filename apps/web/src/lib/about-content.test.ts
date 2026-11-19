@@ -65,6 +65,21 @@ describe('the About pages', () => {
     ]);
   });
 
+  it('answers "why not ChatGPT, Gemini or a general image tool" on Try On, Jewelry and Lingerie, after the opening, with a table as wide as its header and no garment count', () => {
+    const general = 'ChatGPT, Gemini hay công cụ AI tạo ảnh chung';
+    const why = (page: AboutPage) => page.sections.findIndex((s) => s.title.includes(general));
+    expect(why(ABOUT.tryOn)).toBe(0); // right after the page lead
+    expect(why(APP_ABOUT['jewelry-try-on']!)).toBe(1); // after "Thử trang sức bằng AI là gì?"
+    expect(why(APP_ABOUT['lingerie-try-on']!)).toBe(1);
+    for (const page of [ABOUT.tryOn, APP_ABOUT['jewelry-try-on']!, APP_ABOUT['lingerie-try-on']!]) {
+      const section = page.sections[why(page)]!;
+      const table = section.blocks!.flatMap((b) => (typeof b !== 'string' && 'table' in b ? [b.table] : []))[0]!;
+      expect(table[0]![2]).toBe(general);
+      expect(table.length).toBeGreaterThanOrEqual(5);
+      expect(section.blocks!.flatMap(text).join(' ')).not.toMatch(/\b\d+ (món|ảnh trang phục)|MCP/); // another change may raise the limit: say "nhiều món"
+    }
+  });
+
   it('describes every app that is open, and gives every one an About page', () => {
     for (const app of APPS.filter((a) => !a.soon)) {
       expect(app.description.trim().length, app.slug).toBeGreaterThan(20);
