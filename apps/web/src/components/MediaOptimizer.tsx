@@ -6,7 +6,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import type { AppConfig } from '@/lib/apps';
 import { NARROW, useMediaQuery } from '@/lib/use-media-query';
 import { addHistory } from '@/lib/optimizer-history';
-import { IMAGE_FORMATS, decodeOptimizerImage, imageFileReason, imageSizeReason, optimizeImage, outputSizeText, resizedDimensions, type ImageFormat } from '@/lib/media-optimizer';
+import { IMAGE_FORMATS, LISTING_SIDE, decodeOptimizerImage, imageFileReason, imageSizeReason, optimizeImage, outputSizeText, resizedDimensions, type ImageFormat } from '@/lib/media-optimizer';
 import { AppAbout, AppHeader, TAB_LABEL, type Tab } from './AppPage';
 import { FormNotice, Slot, WorkTabs } from './image-tools';
 import styles from './MediaOptimizer.module.css';
@@ -76,6 +76,7 @@ export function MediaOptimizer({ app }: { app: AppConfig }) {
   const [size, setSize] = useState({ width: 0, height: 0 });
   const [preserve, setPreserve] = useState(true);
   const [format, setFormat] = useState<ImageFormat>('image/webp');
+  const [listing, setListing] = useState(false); // the Etsy/Shopify preset: a square JPEG, the image fitted on white
   const [entries, setEntries] = useState<OptimizerEntry[]>([]);
   const [tab, setTab] = useState<Tab | null>(null); // null: the default for the width (the form below 1024 px, else About)
   const [busy, setBusy] = useState(false);
@@ -145,6 +146,9 @@ export function MediaOptimizer({ app }: { app: AppConfig }) {
     setSize(preserve && image.current ? resizedDimensions(image.current.width, image.current.height, side, value) : { ...size, [side]: value });
   }
 
+  // What a run makes: the preset's square JPEG, else the size and format picked.
+  const out = listing ? { width: LISTING_SIDE, height: LISTING_SIDE, format: 'image/jpeg' as const } : { ...size, format };
+
   async function run() {
     if (!image.current || !file) return;
     const current = generation.current;
@@ -152,10 +156,10 @@ export function MediaOptimizer({ app }: { app: AppConfig }) {
     setError('');
     setNotice('');
     try {
-      const blob = await optimizeImage(image.current, size.width, size.height, format);
+      const blob = await optimizeImage(image.current, out.width, out.height, out.format, listing ? image.current : undefined);
       if (current !== generation.current || !alive.current) return;
-      const name = `${file.name.replace(/\.[^.]+$/, '')}-optimized.${format === 'image/jpeg' ? 'jpg' : format.split('/')[1]}`;
-      const made = addHistory(kept.current, { id: nextId.current++, url: URL.createObjectURL(blob), name, before: file.size, after: blob.size, width: size.width, height: size.height, format });
+      const name = `${file.name.replace(/\.[^.]+$/, '')}-${listing ? 'listing' : 'optimized'}.${out.format === 'image/jpeg' ? 'jpg' : out.format.split('/')[1]}`;
+      const made = addHistory(kept.current, { id: nextId.current++, url: URL.createObjectURL(blob), name, before: file.size, after: blob.size, ...out });
       kept.current = made.list;
       setEntries(made.list);
       for (const dropped of made.dropped) URL.revokeObjectURL(dropped.url);
@@ -168,7 +172,7 @@ export function MediaOptimizer({ app }: { app: AppConfig }) {
     }
   }
 
-  const invalid = file ? imageSizeReason(size.width, size.height) : undefined;
+  const invalid = file ? imageSizeReason(out.width, out.height) : undefined;
   const reason = file ? invalid : 'Thêm một ảnh để bắt đầu.';
   const canRun = !!file && !busy && !invalid;
   const tabs: Tab[] = narrow ? ['create', 'history', 'about'] : ['history', 'about'];
@@ -207,20 +211,30 @@ export function MediaOptimizer({ app }: { app: AppConfig }) {
             )}
 
             <div className="field">
+              <span className="field-label">Mẫu có sẵn</span>
+              <div>
+                <button type="button" className="enhance" aria-pressed={listing} disabled={busy} onClick={() => (setListing(!listing), setNotice(''))}>
+                  Ảnh listing Etsy/Shopify
+                </button>
+              </div>
+              <span className="help">Ảnh vuông 2048 × 2048 px, JPG: giữ trọn ảnh, thêm nền trắng xung quanh và tô trắng vùng trong suốt (Etsy hiện ảnh PNG trong suốt trên nền đen).</span>
+            </div>
+
+            <div className="field">
               <span id={sizeId} className="field-label">
                 Kích thước
               </span>
               <div className={styles.size} role="group" aria-labelledby={sizeId}>
-                <input type="number" min="1" max="8000" inputMode="numeric" aria-label="Chiều rộng (px)" value={size.width || ''} disabled={!file || busy} onChange={(e) => dimension('width', Number(e.target.value))} />
+                <input type="number" min="1" max="8000" inputMode="numeric" aria-label="Chiều rộng (px)" value={out.width || ''} disabled={!file || busy || listing} onChange={(e) => dimension('width', Number(e.target.value))} />
                 <span aria-hidden="true">×</span>
-                <input type="number" min="1" max="8000" inputMode="numeric" aria-label="Chiều cao (px)" value={size.height || ''} disabled={!file || busy} onChange={(e) => dimension('height', Number(e.target.value))} />
+                <input type="number" min="1" max="8000" inputMode="numeric" aria-label="Chiều cao (px)" value={out.height || ''} disabled={!file || busy || listing} onChange={(e) => dimension('height', Number(e.target.value))} />
               </div>
               <div>
                 <button
                   type="button"
                   className="enhance"
                   aria-pressed={preserve}
-                  disabled={!file || busy}
+                  disabled={!file || busy || listing}
                   onClick={() => {
                     setPreserve(!preserve);
                     if (!preserve && image.current) setSize(resizedDimensions(image.current.width, image.current.height, 'width', size.width));
@@ -232,7 +246,7 @@ export function MediaOptimizer({ app }: { app: AppConfig }) {
               <span className="help">Đổi kích thước kết quả; kích thước gốc được điền sẵn.</span>
             </div>
 
-            <Select label="Định dạng (tuỳ chọn)" icon="preset" heading="Chọn định dạng" value={format} options={IMAGE_FORMATS.map((f) => ({ value: f, label: formatName(f) }))} onChange={(v) => { setFormat(v as ImageFormat); setNotice(''); }} />
+            {!listing && <Select label="Định dạng (tuỳ chọn)" icon="preset" heading="Chọn định dạng" value={format} options={IMAGE_FORMATS.map((f) => ({ value: f, label: formatName(f) }))} onChange={(v) => { setFormat(v as ImageFormat); setNotice(''); }} />}
             {file && <p className="help">JPG dùng nền trắng cho vùng trong suốt. JPG/WEBP dùng chất lượng 82%; dung lượng có thể lớn hơn bản gốc.</p>}
           </div>
 

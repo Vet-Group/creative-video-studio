@@ -43,7 +43,19 @@ export function outputSizeText(original: number, output: number): string {
   return output < original ? `Giảm ${percent}% dung lượng` : output > original ? `Lớn hơn bản gốc ${percent}%` : 'Dung lượng không đổi';
 }
 
-export async function optimizeImage(image: CanvasImageSource, width: number, height: number, format: ImageFormat): Promise<Blob> {
+/** The listing preset (Etsy, Shopify): a square JPEG of this side with the whole image on white. */
+export const LISTING_SIDE = 2048;
+
+/** Where an image of `width` × `height` lands when fitted whole and centred in a `boxWidth` × `boxHeight` box; the rest is padding. */
+export function fitRect(width: number, height: number, boxWidth: number, boxHeight: number) {
+  const scale = Math.min(boxWidth / width, boxHeight / height);
+  const w = Math.max(1, Math.round(width * scale));
+  const h = Math.max(1, Math.round(height * scale));
+  return { x: Math.round((boxWidth - w) / 2), y: Math.round((boxHeight - h) / 2), width: w, height: h };
+}
+
+/** Encodes `image` at `width` × `height`. With `fit`, the image's own size, it is drawn whole and centred on white instead of stretched (the listing preset). */
+export async function optimizeImage(image: CanvasImageSource, width: number, height: number, format: ImageFormat, fit?: { width: number; height: number }): Promise<Blob> {
   const reason = imageSizeReason(width, height);
   if (reason) throw new Error(reason);
   const canvas = document.createElement('canvas');
@@ -52,11 +64,13 @@ export async function optimizeImage(image: CanvasImageSource, width: number, hei
   try {
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('Trình duyệt không hỗ trợ xử lý ảnh.');
-    if (format === 'image/jpeg') {
+    // White under the image: JPEG has no transparency, and the listing padding is white.
+    if (format === 'image/jpeg' || fit) {
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, width, height);
     }
-    ctx.drawImage(image, 0, 0, width, height);
+    const r = fit ? fitRect(fit.width, fit.height, width, height) : { x: 0, y: 0, width, height };
+    ctx.drawImage(image, r.x, r.y, r.width, r.height);
     const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, format, 0.82));
     if (!blob || blob.type !== format) throw new Error('Trình duyệt không hỗ trợ định dạng đã chọn.');
     return blob;
